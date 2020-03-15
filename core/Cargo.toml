@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 herald = {path= "../../Rome"}
+slab_tree = "0.3"
+rxrust = {path="../../rx_rs"}
