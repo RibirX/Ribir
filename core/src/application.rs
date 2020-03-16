@@ -61,6 +61,9 @@ impl<'a> Application<'a> {
       match elem {
         StackElem::NodeID(id) => node_id = Some(id),
         StackElem::Widget(widget) => {
+          if let Some(id) = node_id {
+            stack.push(StackElem::NodeID(id));
+          }
           let widget_node = inflate_widget(widget, &mut stack);
           let new_id = self.add_widget(node_id, widget_node);
           stack.push(StackElem::NodeID(new_id))
@@ -193,12 +196,29 @@ mod test {
     app.inflate(post.into());
     let mut fmt_tree = String::new();
     let _r = app.widget_tree.unwrap().write_formatted(&mut fmt_tree);
-    panic!(fmt_tree);
     assert_eq!(
       fmt_tree,
       "combination
-        
-      "
+└── render
+    ├── render
+    ├── render
+    ├── render
+    └── combination
+        └── render
+            ├── render
+            ├── render
+            ├── render
+            └── combination
+                └── render
+                    ├── render
+                    ├── render
+                    ├── render
+                    └── combination
+                        └── render
+                            ├── render
+                            ├── render
+                            └── render
+"
     );
   }
 }

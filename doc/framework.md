@@ -57,3 +57,9 @@ if a render object is Expand Size, its children can't have Bound Size. In genera
 ## Children Relationship
 
 In `Lewis`, normal render object not hold the children, but we can use layout widget to build a parent & children relationship.
+
+## How to track same widget ?
+
+**Key**
+
+## avoid to rebuild widget ?
