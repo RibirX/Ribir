@@ -1,11 +1,28 @@
 use crate::widget::Widget;
 use ::herald::prelude::*;
 use slab_tree::*;
+use std::{collections::HashSet, ptr::NonNull};
+
+struct WidgetNode {
+  w: Widget,
+  subscription: Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
+}
+
+impl WidgetNode {
+  #[inline]
+  fn new(w: Widget) -> Self {
+    WidgetNode {
+      w,
+      subscription: None,
+    }
+  }
+}
 
 #[derive(Default)]
 pub struct Application<'a> {
   notifier: LocalSubject<'a, (), ()>,
-  widget_tree: Option<Tree<Widget>>,
+  widget_tree: Option<Tree<WidgetNode>>,
+  dirty_nodes: HashSet<NodeId>,
 }
 
 impl<'a> Application<'a> {
@@ -66,7 +83,7 @@ impl<'a> Application<'a> {
           }
           let widget_node = inflate_widget(widget, &mut stack);
           let new_id = self.add_widget(node_id, widget_node);
-          stack.push(StackElem::NodeID(new_id))
+          stack.push(StackElem::NodeID(new_id));
         }
       }
       if stack.is_empty() {
@@ -80,7 +97,7 @@ impl<'a> Application<'a> {
   /// Return new node's node_id.
   #[inline]
   fn add_widget(&mut self, id: Option<NodeId>, w: Widget) -> NodeId {
-    if let Some(id) = id {
+    let id = if let Some(id) = id {
       let mut node = self
         .widget_tree
         .as_mut()
@@ -88,12 +105,32 @@ impl<'a> Application<'a> {
         .get_mut(id)
         .expect("node have to exist in logic");
 
-      node.prepend(w).node_id()
+      node.prepend(WidgetNode::new(w)).node_id()
     } else {
-      let tree = TreeBuilder::new().with_root(w).build();
+      let tree = TreeBuilder::new().with_root(WidgetNode::new(w)).build();
       let root_id = tree.root_id().expect("assert root");
       self.widget_tree = Some(tree);
       root_id
+    };
+    self.track_widget_rebuild(id);
+    id
+  }
+
+  #[inline]
+  fn track_widget_rebuild(&mut self, id: NodeId) {
+    let w = self.widget_tree.as_mut().unwrap();
+    let mut w = w.get_mut(id).unwrap();
+    let node = w.data();
+    assert!(node.subscription.is_none());
+    let mut node_ptr: NonNull<_> = (&mut self.dirty_nodes).into();
+    if let Widget::Combination(ref mut w) = node.w {
+      node.subscription = w.emitter(self.notifier.clone()).map(|e| {
+        // framework logic promise the `node_ptr` always valid.
+        e.subscribe(move |_| unsafe {
+          node_ptr.as_mut().insert(id);
+        })
+        .unsubscribe_when_dropped()
+      });
     }
   }
 }
@@ -172,9 +209,9 @@ mod test {
   }
 
   use std::fmt::{Debug, Formatter, Result};
-  impl Debug for Widget {
+  impl Debug for WidgetNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-      match self {
+      match self.w {
         Widget::SingleChild(_) => f.write_str("single-child"),
         Widget::MultiChild(_) => f.write_str("multi-child"),
         Widget::Render(_) => f.write_str("render"),
