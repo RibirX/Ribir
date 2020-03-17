@@ -38,25 +38,40 @@ pub trait CombinationWidget<'a>: RebuildEmitter<'a> {
 }
 
 /// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget {
+pub trait RenderWidget<'a>: RebuildEmitter<'a> {
   fn create_render_object(&self) -> Box<dyn RenderObject>;
 }
 
 /// a widget has a child.
-pub trait SingleChildWidget {
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget>, Widget);
+pub trait SingleChildWidget<'a>: RebuildEmitter<'a> {
+  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget);
 }
 
 /// a widget has multi child
-pub trait MultiChildWidget {
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget>, Vec<Widget>);
+pub trait MultiChildWidget<'a>: RebuildEmitter<'a> {
+  fn split(self: Box<Self>)
+  -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>);
 }
 
 pub enum Widget {
   Combination(Box<dyn for<'a> CombinationWidget<'a>>),
-  Render(Box<dyn RenderWidget>),
-  SingleChild(Box<dyn SingleChildWidget>),
-  MultiChild(Box<dyn MultiChildWidget>),
+  Render(Box<dyn for<'a> RenderWidget<'a>>),
+  SingleChild(Box<dyn for<'a> SingleChildWidget<'a>>),
+  MultiChild(Box<dyn for<'a> MultiChildWidget<'a>>),
+}
+
+impl<'a> RebuildEmitter<'a> for Widget {
+  fn emitter(
+    &mut self,
+    notifier: LocalSubject<'a, (), ()>,
+  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
+    match self {
+      Widget::Combination(w) => w.emitter(notifier),
+      Widget::Render(w) => w.emitter(notifier),
+      Widget::SingleChild(w) => w.emitter(notifier),
+      Widget::MultiChild(w) => w.emitter(notifier),
+    }
+  }
 }
 
 impl<'a, T> RebuildEmitter<'a> for T {

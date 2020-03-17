@@ -1,4 +1,4 @@
-use crate::widget::Widget;
+use crate::widget::{RebuildEmitter, Widget};
 use ::herald::prelude::*;
 use slab_tree::*;
 use std::{collections::HashSet, ptr::NonNull};
@@ -123,15 +123,14 @@ impl<'a> Application<'a> {
     let node = w.data();
     assert!(node.subscription.is_none());
     let mut node_ptr: NonNull<_> = (&mut self.dirty_nodes).into();
-    if let Widget::Combination(ref mut w) = node.w {
-      node.subscription = w.emitter(self.notifier.clone()).map(|e| {
-        // framework logic promise the `node_ptr` always valid.
-        e.subscribe(move |_| unsafe {
-          node_ptr.as_mut().insert(id);
-        })
-        .unsubscribe_when_dropped()
-      });
-    }
+
+    node.subscription = node.w.emitter(self.notifier.clone()).map(|e| {
+      // framework logic promise the `node_ptr` always valid.
+      e.subscribe(move |_| unsafe {
+        node_ptr.as_mut().insert(id);
+      })
+      .unsubscribe_when_dropped()
+    });
   }
 }
 
@@ -158,7 +157,7 @@ mod test {
     fn from(t: Text) -> Self { Widget::Render(Box::new(t)) }
   }
 
-  impl RenderWidget for Text {
+  impl<'a> RenderWidget<'a> for Text {
     fn create_render_object(&self) -> Box<dyn RenderObject> {
       unimplemented!();
     }
@@ -166,7 +165,7 @@ mod test {
 
   struct RenderRow {}
 
-  impl RenderWidget for RenderRow {
+  impl<'a> RenderWidget<'a> for RenderRow {
     fn create_render_object(&self) -> Box<dyn RenderObject> {
       unimplemented!();
     }
@@ -184,8 +183,10 @@ mod test {
     fn from(r: Row) -> Self { Widget::MultiChild(Box::new(r)) }
   }
 
-  impl MultiChildWidget for Row {
-    fn split(self: Box<Self>) -> (Box<dyn RenderWidget>, Vec<Widget>) {
+  impl<'a> MultiChildWidget<'a> for Row {
+    fn split(
+      self: Box<Self>,
+    ) -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>) {
       (Box::new(RenderRow {}), self.children)
     }
   }
