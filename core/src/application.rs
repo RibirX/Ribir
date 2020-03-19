@@ -78,20 +78,22 @@ impl<'a> Application<'a> {
       }
     }
 
-    let mut stack = vec![StackElem::Widget(w)];
-    let mut node_id: Option<NodeId> = None;
+    let mut stack = vec![];
+    let widget_node = inflate_widget(w, &mut stack);
+    let mut node_id = self.build_widget_tree(widget_node);
 
     loop {
       let elem = stack.pop().unwrap();
       match elem {
-        StackElem::NodeID(id) => node_id = Some(id),
+        StackElem::NodeID(id) => node_id = id,
         StackElem::Widget(widget) => {
-          if let Some(id) = node_id {
-            stack.push(StackElem::NodeID(id));
-          }
+          stack.push(StackElem::NodeID(node_id));
+
           let widget_node = inflate_widget(widget, &mut stack);
-          let new_id = self.add_widget(node_id, widget_node);
+          let new_id = self.preend_widget_by_id(node_id, widget_node);
+
           stack.push(StackElem::NodeID(new_id));
+          self.track_widget_rebuild(new_id);
         }
       }
       if stack.is_empty() {
@@ -100,28 +102,21 @@ impl<'a> Application<'a> {
     }
   }
 
-  /// If `id` is `Some`-value add a widget into widget tree as a child of node
-  /// which node_id is `id`, if `id` is `None`-value, use `w` as root widget.
-  /// Return new node's node_id.
-  #[inline]
-  fn add_widget(&mut self, id: Option<NodeId>, w: WidgetInstance) -> NodeId {
-    let id = if let Some(id) = id {
-      let mut node = self
-        .widget_tree
-        .as_mut()
-        .expect("root have to exist in logic")
-        .get_mut(id)
-        .expect("node have to exist in logic");
+  fn preend_widget_by_id(&mut self, id: NodeId, w: WidgetInstance) -> NodeId {
+    let mut node = self
+      .widget_tree
+      .as_mut()
+      .expect("root have to exist in logic")
+      .get_mut(id)
+      .expect("node have to exist in logic");
 
-      node.prepend(WidgetNode::new(w)).node_id()
-    } else {
-      let tree = TreeBuilder::new().with_root(WidgetNode::new(w)).build();
-      let root_id = tree.root_id().expect("assert root");
-      self.widget_tree = Some(tree);
-      root_id
-    };
-    self.track_widget_rebuild(id);
-    id
+    node.prepend(WidgetNode::new(w)).node_id()
+  }
+
+  fn build_widget_tree(&mut self, w: WidgetInstance) -> NodeId {
+    self.widget_tree =
+      Some(TreeBuilder::new().with_root(WidgetNode::new(w)).build());
+    self.widget_tree.as_mut().unwrap().root_id().unwrap()
   }
 
   #[inline]
