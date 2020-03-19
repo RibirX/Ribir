@@ -1,16 +1,21 @@
-use crate::widget::{RebuildEmitter, Widget};
+use crate::widget::*;
 use ::herald::prelude::*;
 use slab_tree::*;
 use std::{collections::HashSet, ptr::NonNull};
 
+enum WidgetInstance {
+  Combination(Box<dyn for<'a> CombinationWidget<'a>>),
+  Render(Box<dyn for<'a> RenderWidget<'a>>),
+}
+
 struct WidgetNode {
-  w: Widget,
+  w: WidgetInstance,
   subscription: Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
 }
 
 impl WidgetNode {
   #[inline]
-  fn new(w: Widget) -> Self {
+  fn new(w: WidgetInstance) -> Self {
     WidgetNode {
       w,
       subscription: None,
@@ -47,25 +52,28 @@ impl<'a> Application<'a> {
     /// Return an widget after inflated, and store the sub widgets into the
     /// `stack`
     #[inline]
-    fn inflate_widget(widget: Widget, stack: &mut Vec<StackElem>) -> Widget {
+    fn inflate_widget(
+      widget: Widget,
+      stack: &mut Vec<StackElem>,
+    ) -> WidgetInstance {
       match widget {
         Widget::Combination(w) => {
           let c = w.build();
           stack.push(StackElem::Widget(c));
-          Widget::Combination(w)
+          WidgetInstance::Combination(w)
         }
-        w @ Widget::Render(_) => w,
+        Widget::Render(r) => WidgetInstance::Render(r),
         Widget::SingleChild(w) => {
           let (render, child) = w.split();
           stack.push(StackElem::Widget(child));
-          Widget::Render(render)
+          WidgetInstance::Render(render)
         }
         Widget::MultiChild(w) => {
           let (render, children) = w.split();
           children
             .into_iter()
             .for_each(|w| stack.push(StackElem::Widget(w)));
-          Widget::Render(render)
+          WidgetInstance::Render(render)
         }
       }
     }
@@ -96,7 +104,7 @@ impl<'a> Application<'a> {
   /// which node_id is `id`, if `id` is `None`-value, use `w` as root widget.
   /// Return new node's node_id.
   #[inline]
-  fn add_widget(&mut self, id: Option<NodeId>, w: Widget) -> NodeId {
+  fn add_widget(&mut self, id: Option<NodeId>, w: WidgetInstance) -> NodeId {
     let id = if let Some(id) = id {
       let mut node = self
         .widget_tree
@@ -121,7 +129,7 @@ impl<'a> Application<'a> {
     let w = self.widget_tree.as_mut().unwrap();
     let mut w = w.get_mut(id).unwrap();
     let node = w.data();
-    assert!(node.subscription.is_none());
+    debug_assert!(node.subscription.is_none());
     let mut node_ptr: NonNull<_> = (&mut self.dirty_nodes).into();
 
     node.subscription = node.w.emitter(self.notifier.clone()).map(|e| {
@@ -131,6 +139,16 @@ impl<'a> Application<'a> {
       })
       .unsubscribe_when_dropped()
     });
+  }
+}
+
+use std::fmt::{Debug, Formatter, Result};
+impl Debug for WidgetNode {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    match self.w {
+      WidgetInstance::Render(ref w) => f.write_str(&w.to_str()),
+      WidgetInstance::Combination(ref w) => f.write_str(&w.to_str()),
+    }
   }
 }
 
@@ -158,6 +176,8 @@ mod test {
   }
 
   impl<'a> RenderWidget<'a> for Text {
+    #[cfg(debug_assertions)]
+    fn to_str(&self) -> String { format!("text({})", self.0) }
     fn create_render_object(&self) -> Box<dyn RenderObject> {
       unimplemented!();
     }
@@ -166,6 +186,8 @@ mod test {
   struct RenderRow {}
 
   impl<'a> RenderWidget<'a> for RenderRow {
+    #[cfg(debug_assertions)]
+    fn to_str(&self) -> String { "Render Row".to_owned() }
     fn create_render_object(&self) -> Box<dyn RenderObject> {
       unimplemented!();
     }
@@ -192,6 +214,9 @@ mod test {
   }
 
   impl<'a> CombinationWidget<'a> for EmbedPost {
+    #[cfg(debug_assertions)]
+    fn to_str(&self) -> String { "Embed Post".to_owned() }
+
     fn build(&self) -> Widget {
       let mut row = Row {
         children: vec![
@@ -206,18 +231,6 @@ mod test {
         row.children.push(embed.into())
       }
       row.into()
-    }
-  }
-
-  use std::fmt::{Debug, Formatter, Result};
-  impl Debug for WidgetNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-      match self.w {
-        Widget::SingleChild(_) => f.write_str("single-child"),
-        Widget::MultiChild(_) => f.write_str("multi-child"),
-        Widget::Render(_) => f.write_str("render"),
-        Widget::Combination(_) => f.write_str("combination"),
-      }
     }
   }
 
@@ -236,26 +249,26 @@ mod test {
     let _r = app.widget_tree.unwrap().write_formatted(&mut fmt_tree);
     assert_eq!(
       fmt_tree,
-      "combination
-└── render
-    ├── render
-    ├── render
-    ├── render
-    └── combination
-        └── render
-            ├── render
-            ├── render
-            ├── render
-            └── combination
-                └── render
-                    ├── render
-                    ├── render
-                    ├── render
-                    └── combination
-                        └── render
-                            ├── render
-                            ├── render
-                            └── render
+      "Embed Post
+└── Render Row
+    ├── text(Simple demo)
+    ├── text(Adoo)
+    ├── text(Recursive 3 times)
+    └── Embed Post
+        └── Render Row
+            ├── text(Simple demo)
+            ├── text(Adoo)
+            ├── text(Recursive 3 times)
+            └── Embed Post
+                └── Render Row
+                    ├── text(Simple demo)
+                    ├── text(Adoo)
+                    ├── text(Recursive 3 times)
+                    └── Embed Post
+                        └── Render Row
+                            ├── text(Simple demo)
+                            ├── text(Adoo)
+                            └── text(Recursive 3 times)
 "
     );
   }

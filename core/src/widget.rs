@@ -33,12 +33,17 @@ pub trait RebuildEmitter<'a> {
 
 /// A widget represented by other widget compose.
 pub trait CombinationWidget<'a>: RebuildEmitter<'a> {
+  #[cfg(debug_assertions)]
+  fn to_str(&self) -> String;
   /// Describes the part of the user interface represented by this widget.
   fn build(&self) -> Widget;
 }
 
 /// RenderWidget is a widget has its render object to display self.
 pub trait RenderWidget<'a>: RebuildEmitter<'a> {
+  #[cfg(debug_assertions)]
+  fn to_str(&self) -> String;
+
   fn create_render_object(&self) -> Box<dyn RenderObject>;
 }
 
