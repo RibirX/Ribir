@@ -13,7 +13,10 @@ enum WidgetInstance {
 
 struct WidgetNode {
   widget: WidgetInstance,
-  subscription: Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
+  subscription_guards: (
+    Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
+    Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
+  ),
 }
 
 impl WidgetNode {
@@ -21,7 +24,7 @@ impl WidgetNode {
   fn new(w: WidgetInstance) -> Self {
     WidgetNode {
       widget: w,
-      subscription: None,
+      subscription_guards: (None, None),
     }
   }
 }
@@ -33,7 +36,8 @@ pub struct Application<'a> {
   render_tree: Tree<Box<dyn RenderObject>>,
   widget_to_render: HashMap<NodeId, NodeId>,
   render_to_widget: HashMap<NodeId, NodeId>,
-  dirty_nodes: HashSet<NodeId>,
+  dirty_widgets: HashSet<NodeId>,
+  wait_rebuilds: HashSet<NodeId>,
 }
 
 impl<'a> Application<'a> {
@@ -95,7 +99,7 @@ impl<'a> Application<'a> {
           let new_id = self.preend_widget_by_id(node_id, widget_node);
 
           stack.push(StackElem::NodeID(new_id));
-          self.track_widget_rebuild(new_id);
+          self.track_widget(new_id);
         }
       }
     }
@@ -110,19 +114,34 @@ impl<'a> Application<'a> {
     node.prepend(WidgetNode::new(w)).node_id()
   }
 
-  fn track_widget_rebuild(&mut self, id: NodeId) {
+  fn track_widget(&mut self, id: NodeId) {
     let mut w = self.widget_tree.get_mut(id).unwrap();
     let node = w.data();
-    debug_assert!(node.subscription.is_none());
-    let mut node_ptr: NonNull<_> = (&mut self.dirty_nodes).into();
+    debug_assert!(node.subscription_guards.0.is_none());
+    debug_assert!(node.subscription_guards.1.is_none());
 
-    node.subscription = node.widget.emitter(self.notifier.clone()).map(|e| {
-      // framework logic promise the `node_ptr` always valid.
-      e.subscribe(move |_| unsafe {
-        node_ptr.as_mut().insert(id);
-      })
-      .unsubscribe_when_dropped()
-    });
+    let mut node_ptr: NonNull<_> = (&mut self.dirty_widgets).into();
+    node.subscription_guards.0 =
+      node.widget.changed_emitter(self.notifier.clone()).map(|e| {
+        // Safety: framework logic promise the `node_ptr` always valid.
+        e.subscribe(move |_| unsafe {
+          node_ptr.as_mut().insert(id);
+        })
+        .unsubscribe_when_dropped()
+      });
+
+    if let WidgetInstance::Combination(c) = &mut node.widget {
+      let mut node_ptr: NonNull<_> = (&mut self.wait_rebuilds).into();
+      node.subscription_guards.1 = c
+        .rebuild_emitter(self.notifier.clone())
+        // Safety: framework logic promise the `node_ptr` always valid.
+        .map(|e| {
+          e.subscribe(move |_| unsafe {
+            node_ptr.as_mut().insert(id);
+          })
+          .unsubscribe_when_dropped()
+        });
+    }
   }
 
   fn construct_render_tree(&mut self) {
