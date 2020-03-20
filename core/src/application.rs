@@ -1,7 +1,10 @@
-use crate::widget::*;
+use crate::{render_object::*, widget::*};
 use ::herald::prelude::*;
 use slab_tree::*;
-use std::{collections::HashSet, ptr::NonNull};
+use std::{
+  collections::{HashMap, HashSet},
+  ptr::NonNull,
+};
 
 enum WidgetInstance {
   Combination(Box<dyn for<'a> CombinationWidget<'a>>),
@@ -9,7 +12,7 @@ enum WidgetInstance {
 }
 
 struct WidgetNode {
-  w: WidgetInstance,
+  widget: WidgetInstance,
   subscription: Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
 }
 
@@ -17,7 +20,7 @@ impl WidgetNode {
   #[inline]
   fn new(w: WidgetInstance) -> Self {
     WidgetNode {
-      w,
+      widget: w,
       subscription: None,
     }
   }
@@ -26,21 +29,21 @@ impl WidgetNode {
 #[derive(Default)]
 pub struct Application<'a> {
   notifier: LocalSubject<'a, (), ()>,
-  widget_tree: Option<Tree<WidgetNode>>,
+  widget_tree: Tree<WidgetNode>,
+  render_tree: Tree<Box<dyn RenderObject>>,
+  widget_to_render: HashMap<NodeId, NodeId>,
+  render_to_widget: HashMap<NodeId, NodeId>,
   dirty_nodes: HashSet<NodeId>,
 }
 
 impl<'a> Application<'a> {
-  pub fn new() -> Application<'a> {
-    Application {
-      widget_tree: None,
-      ..Default::default()
-    }
-  }
+  #[inline]
+  pub fn new() -> Application<'a> { Default::default() }
 
   pub fn run(mut self, w: Widget) {
     self.inflate(w);
-    todo!("implement render tree");
+    self.construct_render_tree();
+    todo!("not rebuild widget tree & render tree when change occurs");
   }
 
   fn inflate(&mut self, w: Widget) {
@@ -80,10 +83,9 @@ impl<'a> Application<'a> {
 
     let mut stack = vec![];
     let widget_node = inflate_widget(w, &mut stack);
-    let mut node_id = self.build_widget_tree(widget_node);
+    let mut node_id = self.widget_tree.set_root(WidgetNode::new(widget_node));
 
-    loop {
-      let elem = stack.pop().unwrap();
+    while let Some(elem) = stack.pop() {
       match elem {
         StackElem::NodeID(id) => node_id = id,
         StackElem::Widget(widget) => {
@@ -96,38 +98,25 @@ impl<'a> Application<'a> {
           self.track_widget_rebuild(new_id);
         }
       }
-      if stack.is_empty() {
-        break;
-      }
     }
   }
 
   fn preend_widget_by_id(&mut self, id: NodeId, w: WidgetInstance) -> NodeId {
     let mut node = self
       .widget_tree
-      .as_mut()
-      .expect("root have to exist in logic")
       .get_mut(id)
       .expect("node have to exist in logic");
 
     node.prepend(WidgetNode::new(w)).node_id()
   }
 
-  fn build_widget_tree(&mut self, w: WidgetInstance) -> NodeId {
-    self.widget_tree =
-      Some(TreeBuilder::new().with_root(WidgetNode::new(w)).build());
-    self.widget_tree.as_mut().unwrap().root_id().unwrap()
-  }
-
-  #[inline]
   fn track_widget_rebuild(&mut self, id: NodeId) {
-    let w = self.widget_tree.as_mut().unwrap();
-    let mut w = w.get_mut(id).unwrap();
+    let mut w = self.widget_tree.get_mut(id).unwrap();
     let node = w.data();
     debug_assert!(node.subscription.is_none());
     let mut node_ptr: NonNull<_> = (&mut self.dirty_nodes).into();
 
-    node.subscription = node.w.emitter(self.notifier.clone()).map(|e| {
+    node.subscription = node.widget.emitter(self.notifier.clone()).map(|e| {
       // framework logic promise the `node_ptr` always valid.
       e.subscribe(move |_| unsafe {
         node_ptr.as_mut().insert(id);
@@ -135,12 +124,89 @@ impl<'a> Application<'a> {
       .unsubscribe_when_dropped()
     });
   }
+
+  fn construct_render_tree(&mut self) {
+    fn skip_to_render_widget(
+      mut node: NodeRef<WidgetNode>,
+    ) -> (NodeId, Box<dyn RenderObject>) {
+      while let WidgetInstance::Combination(_) = &node.data().widget {
+        debug_assert!(node.first_child().unwrap().next_sibling().is_none());
+        let child = node
+          .first_child()
+          .expect("Combination node must be only one child");
+        // Safety: child's lifetime is bind to widget_tree not a NodeRef temp
+        // variable.
+        node = unsafe { std::mem::transmute(child) };
+      }
+      debug_assert!(matches!(&node.data().widget, WidgetInstance::Render(_)));
+
+      let render_object =
+        if let WidgetInstance::Render(ref r) = node.data().widget {
+          r.create_render_object()
+        } else {
+          unreachable!("only render widget can create render object!");
+        };
+      (node.node_id(), render_object)
+    }
+
+    let Self {
+      widget_to_render,
+      render_to_widget,
+      widget_tree,
+      render_tree,
+      ..
+    } = self;
+
+    let (w_id, render_obj) =
+      skip_to_render_widget(widget_tree.root().expect("root must exist!"));
+    let r_id = render_tree.set_root(render_obj);
+    Self::bind_widget_and_render(
+      widget_to_render,
+      render_to_widget,
+      w_id,
+      r_id,
+    );
+
+    let mut w_stack = vec![w_id];
+
+    while let Some(w_id) = w_stack.pop() {
+      widget_tree
+        .get(w_id)
+        .expect("must have")
+        .children()
+        .for_each(|w_child_node| {
+          let (w_child_id, r) = skip_to_render_widget(w_child_node);
+          w_stack.push(w_child_id);
+
+          let r_id = *widget_to_render.get(&w_id).unwrap();
+          let mut r_node = render_tree.get_mut(r_id).unwrap();
+          let r_child_id = r_node.append(r).node_id();
+          Self::bind_widget_and_render(
+            widget_to_render,
+            render_to_widget,
+            w_child_id,
+            r_child_id,
+          );
+        });
+    }
+  }
+
+  fn bind_widget_and_render(
+    w_2_r: &mut HashMap<NodeId, NodeId>,
+    r_2_w: &mut HashMap<NodeId, NodeId>,
+    w_id: NodeId,
+    r_id: NodeId,
+  ) {
+    w_2_r.insert(w_id, r_id);
+    r_2_w.insert(r_id, w_id);
+  }
 }
 
+#[cfg(debug_assertions)]
 use std::fmt::{Debug, Formatter, Result};
 impl Debug for WidgetNode {
   fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-    match self.w {
+    match self.widget {
       WidgetInstance::Render(ref w) => f.write_str(&w.to_str()),
       WidgetInstance::Combination(ref w) => f.write_str(&w.to_str()),
     }
@@ -150,7 +216,6 @@ impl Debug for WidgetNode {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::prelude::*;
 
   #[derive(Clone)]
   struct EmbedPost {
@@ -166,6 +231,13 @@ mod test {
 
   struct Text(&'static str);
 
+  impl RenderObject for Text {
+    #[cfg(debug_assertions)]
+    fn to_str(&self) -> String { format!("RO::Text({})", self.0) }
+    fn paint(&self) {}
+    fn perform_layout(&mut self, _ctx: RenderCtx) {}
+  }
+
   impl From<Text> for Widget {
     fn from(t: Text) -> Self { Widget::Render(Box::new(t)) }
   }
@@ -174,17 +246,25 @@ mod test {
     #[cfg(debug_assertions)]
     fn to_str(&self) -> String { format!("text({})", self.0) }
     fn create_render_object(&self) -> Box<dyn RenderObject> {
-      unimplemented!();
+      Box::new(Text(self.0))
     }
   }
 
+  struct RowRenderObject {}
+
+  impl RenderObject for RowRenderObject {
+    #[cfg(debug_assertions)]
+    fn to_str(&self) -> String { "RO::Row".to_owned() }
+    fn paint(&self) {}
+    fn perform_layout(&mut self, _ctx: RenderCtx) {}
+  }
   struct RenderRow {}
 
   impl<'a> RenderWidget<'a> for RenderRow {
     #[cfg(debug_assertions)]
     fn to_str(&self) -> String { "Render Row".to_owned() }
     fn create_render_object(&self) -> Box<dyn RenderObject> {
-      unimplemented!();
+      Box::new(RowRenderObject {})
     }
   }
 
@@ -240,10 +320,10 @@ mod test {
 
     let mut app = Application::new();
     app.inflate(post.into());
-    let mut fmt_tree = String::new();
-    let _r = app.widget_tree.unwrap().write_formatted(&mut fmt_tree);
+    let mut w_tree = String::new();
+    let _r = app.widget_tree.write_formatted(&mut w_tree);
     assert_eq!(
-      fmt_tree,
+      w_tree,
       "Embed Post
 └── Render Row
     ├── text(Simple demo)
@@ -264,6 +344,30 @@ mod test {
                             ├── text(Simple demo)
                             ├── text(Adoo)
                             └── text(Recursive 3 times)
+"
+    );
+
+    app.construct_render_tree();
+    let mut r_tree = String::new();
+    let _r = app.render_tree.write_formatted(&mut r_tree);
+    assert_eq!(
+      r_tree,
+      "RO::Row
+├── RO::Text(Simple demo)
+├── RO::Text(Adoo)
+├── RO::Text(Recursive 3 times)
+└── RO::Row
+    ├── RO::Text(Simple demo)
+    ├── RO::Text(Adoo)
+    ├── RO::Text(Recursive 3 times)
+    └── RO::Row
+        ├── RO::Text(Simple demo)
+        ├── RO::Text(Adoo)
+        ├── RO::Text(Recursive 3 times)
+        └── RO::Row
+            ├── RO::Text(Simple demo)
+            ├── RO::Text(Adoo)
+            └── RO::Text(Recursive 3 times)
 "
     );
   }
