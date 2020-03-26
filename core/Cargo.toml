@@ -7,11 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-herald = {path= "../../herald"}
+herald =  "0.1.0"
 slab_tree = "0.3"
-rxrust = {path="../../rx_rs"}
+rxrust = "0.8.3"
 
 
 [dependencies.blake3]
 version = "0.2.2"
 features = ["rayon"]
+
+[profile.bench]
+debug = true
