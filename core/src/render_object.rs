@@ -12,7 +12,12 @@ pub trait RenderObject {
 }
 
 #[cfg(debug_assertions)]
-use std::fmt::{Debug, Formatter, Result};
-impl Debug for Box<dyn RenderObject> {
-  fn fmt(&self, f: &mut Formatter<'_>) -> Result { f.write_str(&self.to_str()) }
+mod debug {
+  use super::*;
+  use std::fmt::{Debug, Formatter, Result};
+  impl Debug for Box<dyn RenderObject> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+      f.write_str(&self.to_str())
+    }
+  }
 }

@@ -222,12 +222,15 @@ impl<'a> Application<'a> {
 }
 
 #[cfg(debug_assertions)]
-use std::fmt::{Debug, Formatter, Result};
-impl Debug for WidgetNode {
-  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-    match self.widget {
-      WidgetInstance::Render(ref w) => f.write_str(&w.to_str()),
-      WidgetInstance::Combination(ref w) => f.write_str(&w.to_str()),
+mod debug {
+  use super::*;
+  use std::fmt::{Debug, Formatter, Result};
+  impl Debug for WidgetNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+      match self.widget {
+        WidgetInstance::Render(ref w) => f.write_str(&w.to_str()),
+        WidgetInstance::Combination(ref w) => f.write_str(&w.to_str()),
+      }
     }
   }
 }
@@ -329,6 +332,7 @@ mod test {
   }
 
   #[test]
+  #[cfg(debug_assertions)]
   fn widget_tree_inflate() {
     let post = EmbedPost {
       title: "Simple demo",
@@ -389,5 +393,37 @@ mod test {
             └── RO::Text(Recursive 3 times)
 "
     );
+  }
+
+  extern crate test;
+  use test::Bencher;
+
+  #[bench]
+  fn widget_tree_deep_1000(b: &mut Bencher) {
+    b.iter(|| {
+      let post = EmbedPost {
+        title: "Simple demo",
+        author: "Adoo",
+        content: "Recursive 1000 times",
+        level: 1000,
+      };
+      let mut app = Application::new();
+      app.inflate(post.into());
+    });
+  }
+
+  #[bench]
+  fn render_tree_deep_1000(b: &mut Bencher) {
+    b.iter(|| {
+      let post = EmbedPost {
+        title: "Simple demo",
+        author: "Adoo",
+        content: "Recursive 1000 times",
+        level: 1000,
+      };
+      let mut app = Application::new();
+      app.inflate(post.into());
+      app.construct_render_tree();
+    });
   }
 }

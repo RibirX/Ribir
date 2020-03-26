@@ -11,20 +11,20 @@ When a widget as a root to run in `Application`, `Holiday` inflate it to a widge
 
 Widget not update or rebuild subtree immediately when its rebuild emitter emitted. It's just mark this widget need rebuild and wait until the widget tree rebuild. 
 
-Widget tree do updating from top to bottom. If a bottom widget removed because its ancestor rebuild, its update or rebuild auto be canceled. Even if `CombinationWidget` require rebuild, that not mean `Holiday` will reconstruct the total subtree, the `KeyInfo` may help us to reduce many cost in some case.
+Widget tree do updating from top to bottom. If a bottom widget removed because its ancestor rebuild, its update or rebuild auto be canceled. Even if `CombinationWidget` require rebuild, that not mean `Holiday` will reconstruct the total subtree, the `Key` may help us to reduce many cost in some case.
 
-### KeyInfo
+### Key
 
-`KeyInfo` guarantee that if two same type widget has same `KeyInfo`, they have same behaviors and `Holiday` can treat them as same widget.
+`Key` guarantee that if two same type widget has same `Key`, they have same behaviors and `Holiday` can treat them as same widget.
 
-`KyeInfo` also be used in render object,and guarantee that if two same type render object has same `KeyInfo`, the always paint same thing and no matter what its father or children is.
+`Key` also be used in render object,and guarantee that if two same type render object has same `Key`, the always paint same thing and no matter what its father or children is.
 
 
 Widget tree do rebuilding base on widget diff. Work like below:
 
 1. if this widget is `CombinationWidget` and need to rebuild:
   a. build widget from `CombinationWidget`.
-  b. if new widget's type and `KeyInfo` is equal to the last time build widget in the widget tree ?
+  b. if new widget's type and `Key` is equal to the last time build widget in the widget tree ?
     * yes, that done, the subtree from this widget is rebuild finished.
   c. else, if the widget type is equal to the last time build in the widget tree ?
     * only use new widget instead of old widget in the widget tree, and not inflate.
@@ -67,8 +67,5 @@ if a render object is Expand Size, its children can't have Bound Size. In genera
 
 In `Holiday`, normal render object not hold the children, but we can use layout widget to build a parent & children relationship.
 
-## How to track same widget ?
-
-**Key**
 
 ## avoid to rebuild widget ?
