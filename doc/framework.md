@@ -15,25 +15,27 @@ Widget tree do updating from top to bottom. If a bottom widget removed because i
 
 ### Key
 
-`Key` guarantee that if two same type widget has same `Key`, they have same behaviors and `Holiday` can treat them as same widget.
-
-`Key` also be used in render object,and guarantee that if two same type render object has same `Key`, the always paint same thing and no matter what its father or children is.
-
+`Key` help `Holiday` to track which widgets add, remove and changed. So `Holiday` can modify widget tree and render tree minimal. A `Key` should unique for each widget under same father.
 
 Widget tree do rebuilding base on widget diff. Work like below:
 
-1. if this widget is `CombinationWidget` and need to rebuild:
+1. if this widget is `CombinationWidget`:
   a. build widget from `CombinationWidget`.
-  b. if new widget's type and `Key` is equal to the last time build widget in the widget tree ?
-    * yes, that done, the subtree from this widget is rebuild finished.
-  c. else, if the widget type is equal to the last time build in the widget tree ?
+  b. if new widget's `Key` is equal to the last time build widget in the widget tree ?
     * only use new widget instead of old widget in the widget tree, and not inflate.
-    * use new widget recursive to step 1.
-  d. else, inflate the new widget and use the new widget subtree instead of the old in widget tree.
-  e. done, the subtree from this widget is rebuild finished.
-2. else, if this widget has children and is need rebuild?
-  * use children recursive to step 1 one by one.
-3. else, done. 
+    * use new widget and recursive to step 1.
+  c. else, inflate the new widget and use the new widget subtree instead of the old in widget tree.
+  d. done, the subtree from this widget is rebuild finished.
+2. else, if this widget is render widget without children ?
+  a. if this widget has same `Key` as before ?
+   * Yes, we need do nothing any more.
+  b. else, use new widget replace before sub tree in widget.
+3. else, use children recursive to step 1 one by one.. 
+
+### Signature
+
+`Key` is used for widget, and `Signature` used for render object. Not like `Key` to identify if this widget is a same widget with before. `Signature` guarantee that if two same type render objects have same `Signature` that mean the have same content and will paint same thing. So `Holiday` can treat all render objects as one, if they have same type and same `Signature`.
+
 
 ## Compose prefer
 

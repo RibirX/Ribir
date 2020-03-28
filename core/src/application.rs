@@ -34,9 +34,16 @@ pub struct Application<'a> {
   notifier: LocalSubject<'a, (), ()>,
   widget_tree: Tree<WidgetNode>,
   render_tree: Tree<Box<dyn RenderObject>>,
+  /// A hash map to mapping a render widget in widget tree to its corresponds
+  /// render object in render tree.
   widget_to_render: HashMap<NodeId, NodeId>,
+  /// A hash map to mapping a render object in render tree to its corresponds
+  /// render widget in widget tree.
   render_to_widget: HashMap<NodeId, NodeId>,
+  /// Store widgets that modified and wait to update its corresponds render
+  /// objects in render tree.
   dirty_widgets: HashSet<NodeId>,
+  /// Store combination widgets that has require to rebuild its subtree.
   wait_rebuilds: HashSet<NodeId>,
 }
 
@@ -47,9 +54,12 @@ impl<'a> Application<'a> {
   pub fn run(mut self, w: Widget) {
     self.inflate(w);
     self.construct_render_tree();
+
     todo!("not rebuild widget tree & render tree when change occurs");
+    self.update_widget_tree();
   }
 
+  /// inflate widget tree, so every widget tree leaf should be a render object.
   fn inflate(&mut self, w: Widget) {
     enum StackElem {
       Widget(Widget),
@@ -79,6 +89,7 @@ impl<'a> Application<'a> {
           let (render, children) = w.split();
           children
             .into_iter()
+            .rev()
             .for_each(|w| stack.push(StackElem::Widget(w)));
           WidgetInstance::Render(render)
         }
@@ -88,6 +99,7 @@ impl<'a> Application<'a> {
     let mut stack = vec![];
     let widget_node = inflate_widget(w, &mut stack);
     let mut node_id = self.widget_tree.set_root(WidgetNode::new(widget_node));
+    self.track_widget(node_id);
 
     while let Some(elem) = stack.pop() {
       match elem {
@@ -96,7 +108,7 @@ impl<'a> Application<'a> {
           stack.push(StackElem::NodeID(node_id));
 
           let widget_node = inflate_widget(widget, &mut stack);
-          let new_id = self.preend_widget_by_id(node_id, widget_node);
+          let new_id = self.append_widget_by_id(node_id, widget_node);
 
           stack.push(StackElem::NodeID(new_id));
           self.track_widget(new_id);
@@ -105,45 +117,7 @@ impl<'a> Application<'a> {
     }
   }
 
-  fn preend_widget_by_id(&mut self, id: NodeId, w: WidgetInstance) -> NodeId {
-    let mut node = self
-      .widget_tree
-      .get_mut(id)
-      .expect("node have to exist in logic");
-
-    node.prepend(WidgetNode::new(w)).node_id()
-  }
-
-  fn track_widget(&mut self, id: NodeId) {
-    let mut w = self.widget_tree.get_mut(id).unwrap();
-    let node = w.data();
-    debug_assert!(node.subscription_guards.0.is_none());
-    debug_assert!(node.subscription_guards.1.is_none());
-
-    let mut node_ptr: NonNull<_> = (&mut self.dirty_widgets).into();
-    node.subscription_guards.0 =
-      node.widget.changed_emitter(self.notifier.clone()).map(|e| {
-        // Safety: framework logic promise the `node_ptr` always valid.
-        e.subscribe(move |_| unsafe {
-          node_ptr.as_mut().insert(id);
-        })
-        .unsubscribe_when_dropped()
-      });
-
-    if let WidgetInstance::Combination(c) = &mut node.widget {
-      let mut node_ptr: NonNull<_> = (&mut self.wait_rebuilds).into();
-      node.subscription_guards.1 = c
-        .rebuild_emitter(self.notifier.clone())
-        // Safety: framework logic promise the `node_ptr` always valid.
-        .map(|e| {
-          e.subscribe(move |_| unsafe {
-            node_ptr.as_mut().insert(id);
-          })
-          .unsubscribe_when_dropped()
-        });
-    }
-  }
-
+  /// construct a full render tree correspond to widget tree.
   fn construct_render_tree(&mut self) {
     fn skip_to_render_widget(
       mut node: NodeRef<WidgetNode>,
@@ -206,6 +180,75 @@ impl<'a> Application<'a> {
             w_child_id,
             r_child_id,
           );
+        });
+    }
+  }
+
+  fn update_widget_tree(&mut self) {
+    while let Some(first) = self.wait_rebuilds.iter().nth(0).map(|id| *id) {
+      // Always find the topmost rebuild widget to rebuild subtree.
+      if let Some(top) = self.get_rebuild_ancestors(first) {
+        self.rebuild_subtree(top);
+      } else {
+        self.wait_rebuilds.remove(&first);
+      }
+    }
+  }
+
+  fn rebuild_subtree(&mut self, id: NodeId) {
+    let mut sub_root = self.widget_tree.get_mut(id).unwrap();
+    if let WidgetInstance::Combination(ref c) = sub_root.data().widget {
+      todo!("rebuild subtree depends on widget key");
+    } else {
+      debug_assert!(false, "rebuild widget must be combination widget.");
+    }
+  }
+
+  fn get_rebuild_ancestors(&self, id: NodeId) -> Option<NodeId> {
+    let node = self.widget_tree.get(id);
+    node?
+      .ancestors()
+      .map(|node| node.node_id())
+      .filter(|id| self.wait_rebuilds.contains(id))
+      .last()
+      .or(Some(id))
+  }
+
+  fn append_widget_by_id(&mut self, id: NodeId, w: WidgetInstance) -> NodeId {
+    let mut node = self
+      .widget_tree
+      .get_mut(id)
+      .expect("node have to exist in logic");
+
+    node.append(WidgetNode::new(w)).node_id()
+  }
+
+  fn track_widget(&mut self, id: NodeId) {
+    let mut w = self.widget_tree.get_mut(id).unwrap();
+    let node = w.data();
+    debug_assert!(node.subscription_guards.0.is_none());
+    debug_assert!(node.subscription_guards.1.is_none());
+
+    let mut node_ptr: NonNull<_> = (&mut self.dirty_widgets).into();
+    node.subscription_guards.0 =
+      node.widget.changed_emitter(self.notifier.clone()).map(|e| {
+        // Safety: framework logic promise the `node_ptr` always valid.
+        e.subscribe(move |_| unsafe {
+          node_ptr.as_mut().insert(id);
+        })
+        .unsubscribe_when_dropped()
+      });
+
+    if let WidgetInstance::Combination(c) = &mut node.widget {
+      let mut node_ptr: NonNull<_> = (&mut self.wait_rebuilds).into();
+      node.subscription_guards.1 = c
+        .rebuild_emitter(self.notifier.clone())
+        // Safety: framework logic promise the `node_ptr` always valid.
+        .map(|e| {
+          e.subscribe(move |_| unsafe {
+            node_ptr.as_mut().insert(id);
+          })
+          .unsubscribe_when_dropped()
         });
     }
   }
