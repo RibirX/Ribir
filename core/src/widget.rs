@@ -3,6 +3,11 @@ use crate::render_object::RenderObject;
 use ::herald::prelude::*;
 use subject::LocalSubject;
 
+mod key;
+mod text;
+pub use key::KeyDetect;
+pub use text::Text;
+
 /// `WidgetStates` can return a subscribable stream which emit a `()` value,
 /// when widget state changed.
 pub trait WidgetStates<'a> {

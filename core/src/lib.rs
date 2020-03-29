@@ -1,4 +1,4 @@
-#![feature(raw, specialization)]
+#![feature(specialization, test, decl_macro)]
 
 mod application;
 mod render_object;
