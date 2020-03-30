@@ -1,44 +1,73 @@
+use crate::render_object::RenderCtx;
 use crate::widget::*;
 use blake3;
+use std::{any::Any, fmt::Debug};
 
-#[derive(Debug)]
-pub struct Key<T>(T);
-
-pub struct KeyDetect<T> {
-  key: Key<T>,
-  child: Widget,
+pub trait Key: Debug {
+  fn as_any(&self) -> &dyn Any;
+  fn eq(&self, other: &dyn Key) -> bool;
 }
 
-impl<T> KeyDetect<T> {
+impl PartialEq for Box<dyn Key> {
+  fn eq(&self, other: &Box<dyn Key>) -> bool { Key::eq(&**self, &**other) }
+}
+
+pub struct KeyDetect {
+  key: Box<dyn Key>,
+  child: Widget,
+}
+#[derive(Debug)]
+pub struct KeyRender;
+
+impl KeyDetect {
   pub fn new<K>(key: K, child: Widget) -> Self
   where
-    K: Into<Key<T>>,
+    K: Into<Box<dyn Key>>,
   {
     KeyDetect {
       key: key.into(),
       child,
     }
   }
+
+  #[inline(always)]
+  pub fn key(&self) -> &Box<dyn Key> { &self.key }
 }
 
-impl<T, Rhs> PartialEq<Key<Rhs>> for Key<T> {
-  #[inline(always)]
-  default fn eq(&self, _other: &Key<Rhs>) -> bool { false }
+impl<'a> SingleChildWidget<'a> for KeyDetect {
+  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget) {
+    (Box::new(self.key), self.child)
+  }
 }
 
-impl<T, Rhs> PartialEq<Key<Rhs>> for Key<T>
-where
-  T: PartialEq<Rhs>,
-{
-  #[inline(always)]
-  fn eq(&self, other: &Key<Rhs>) -> bool { self.0 == other.0 }
+impl<'a> RenderWidget<'a> for Box<dyn Key> {
+  fn create_render_object(&self) -> Box<dyn RenderObject> {
+    Box::new(KeyRender)
+  }
+}
+
+impl RenderObject for KeyRender {
+  fn paint(&self) {
+    unimplemented!();
+  }
+  fn perform_layout(&mut self, _ctx: RenderCtx) {
+    unimplemented!();
+  }
 }
 
 macro from_key_impl($($ty: ty)*) {
   $(
-    impl From<$ty> for Key<$ty> {
-      #[inline]
-      fn from(v: $ty) -> Self { Key(v) }
+    impl Key for $ty {
+      #[inline(always)]
+      fn as_any(&self) -> &dyn Any {
+        &*self
+      }
+      fn eq(&self, other: &dyn Key) -> bool{
+        other
+          .as_any()
+          .downcast_ref::<Self>()
+          .map_or(false, |other| other == self)
+      }
     }
   )*
 }
@@ -49,7 +78,14 @@ from_key_impl!(
   isize i8 i16 i32 i64 i128
   f32 f64
   bool char
+  StringKey
+  [u8;32]
 );
+
+impl<T: Key + 'static> From<T> for Box<dyn Key> {
+  #[inline(always)]
+  fn from(v: T) -> Self { Box::new(v) }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringKey {
@@ -59,25 +95,25 @@ pub enum StringKey {
 
 const MAX_KEY_STR: usize = 64;
 
-impl From<String> for Key<StringKey> {
+impl From<String> for Box<dyn Key> {
   fn from(s: String) -> Self {
-    let sk = if s.len() > MAX_KEY_STR {
+    let k = if s.len() > MAX_KEY_STR {
       StringKey::Str(s)
     } else {
       StringKey::HashStr(blake3::hash(s.as_bytes()).into())
     };
-    Key(sk)
+    Box::new(k)
   }
 }
 
-impl From<&str> for Key<StringKey> {
+impl From<&str> for Box<dyn Key> {
   fn from(s: &str) -> Self {
-    let sk = if s.len() > MAX_KEY_STR {
+    let k = if s.len() > MAX_KEY_STR {
       StringKey::Str(s.to_owned())
     } else {
       StringKey::HashStr(blake3::hash(s.as_bytes()).into())
     };
-    Key(sk)
+    Box::new(k)
   }
 }
 
@@ -88,7 +124,7 @@ pub macro complex_key($($k: expr),*) {
       $k.consume(&mut hasher);
     )*
     let bytes: [u8;32] = hasher.finalize().into();
-    Key(bytes)
+    bytes
   }
 }
 
@@ -146,8 +182,8 @@ fn key_detect() {
   let k3 = KeyDetect::new("", Text("").into());
   let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("").into());
   let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("").into());
-  assert_ne!(k1.key, k2.key);
-  assert_eq!(k2.key, k3.key);
-  assert_ne!(k3.key, k1.key);
-  assert_eq!(ck1.key, ck2.key);
+  assert!(&k1.key != &k2.key);
+  assert!(&k2.key == &k3.key);
+  assert!(&k3.key != &k1.key);
+  assert!(ck1.key == ck2.key);
 }
