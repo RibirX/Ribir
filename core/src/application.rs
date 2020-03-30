@@ -6,6 +6,7 @@ use std::{
   ptr::NonNull,
 };
 
+#[derive(Debug)]
 enum WidgetInstance {
   Combination(Box<dyn for<'a> CombinationWidget<'a>>),
   Render(Box<dyn for<'a> RenderWidget<'a>>),
@@ -264,25 +265,16 @@ impl<'a> Application<'a> {
   }
 }
 
-#[cfg(debug_assertions)]
-mod debug {
-  use super::*;
-  use std::fmt::{Debug, Formatter, Result};
-  impl Debug for WidgetNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-      match self.widget {
-        WidgetInstance::Render(ref w) => f.write_str(&w.to_str()),
-        WidgetInstance::Combination(ref w) => f.write_str(&w.to_str()),
-      }
-    }
-  }
+use std::fmt::{Debug, Formatter, Result};
+impl Debug for WidgetNode {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.widget.fmt(f) }
 }
 
 #[cfg(test)]
 mod test {
   use super::*;
 
-  #[derive(Clone)]
+  #[derive(Clone, Debug)]
   struct EmbedPost {
     title: &'static str,
     author: &'static str,
@@ -294,19 +286,18 @@ mod test {
     fn from(c: EmbedPost) -> Self { Widget::Combination(Box::new(c)) }
   }
 
-  struct RowRenderObject {}
+  #[derive(Debug)]
+  struct RowRenderObject ;
 
   impl RenderObject for RowRenderObject {
-    #[cfg(debug_assertions)]
-    fn to_str(&self) -> String { "RO::Row".to_owned() }
     fn paint(&self) {}
     fn perform_layout(&mut self, _ctx: RenderCtx) {}
   }
+
+  #[derive(Debug)]
   struct RenderRow {}
 
   impl<'a> RenderWidget<'a> for RenderRow {
-    #[cfg(debug_assertions)]
-    fn to_str(&self) -> String { "Render Row".to_owned() }
     fn create_render_object(&self) -> Box<dyn RenderObject> {
       Box::new(RowRenderObject {})
     }
@@ -333,9 +324,6 @@ mod test {
   }
 
   impl<'a> CombinationWidget<'a> for EmbedPost {
-    #[cfg(debug_assertions)]
-    fn to_str(&self) -> String { "Embed Post".to_owned() }
-
     fn build(&self) -> Widget {
       let mut row = Row {
         children: vec![
@@ -369,27 +357,27 @@ mod test {
     let _r = app.widget_tree.write_formatted(&mut w_tree);
     assert_eq!(
       w_tree,
-      "Embed Post
-└── Render Row
-    ├── text(Simple demo)
-    ├── text(Adoo)
-    ├── text(Recursive 3 times)
-    └── Embed Post
-        └── Render Row
-            ├── text(Simple demo)
-            ├── text(Adoo)
-            ├── text(Recursive 3 times)
-            └── Embed Post
-                └── Render Row
-                    ├── text(Simple demo)
-                    ├── text(Adoo)
-                    ├── text(Recursive 3 times)
-                    └── Embed Post
-                        └── Render Row
-                            ├── text(Simple demo)
-                            ├── text(Adoo)
-                            └── text(Recursive 3 times)
-"
+r#"Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive 3 times", level: 3 })
+└── Render(RenderRow)
+    ├── Render(Text("Simple demo"))
+    ├── Render(Text("Adoo"))
+    ├── Render(Text("Recursive 3 times"))
+    └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive 3 times", level: 2 })
+        └── Render(RenderRow)
+            ├── Render(Text("Simple demo"))
+            ├── Render(Text("Adoo"))
+            ├── Render(Text("Recursive 3 times"))
+            └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive 3 times", level: 1 })
+                └── Render(RenderRow)
+                    ├── Render(Text("Simple demo"))
+                    ├── Render(Text("Adoo"))
+                    ├── Render(Text("Recursive 3 times"))
+                    └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive 3 times", level: 0 })
+                        └── Render(RenderRow)
+                            ├── Render(Text("Simple demo"))
+                            ├── Render(Text("Adoo"))
+                            └── Render(Text("Recursive 3 times"))
+"#
     );
 
     app.construct_render_tree();
@@ -397,23 +385,23 @@ mod test {
     let _r = app.render_tree.write_formatted(&mut r_tree);
     assert_eq!(
       r_tree,
-      "RO::Row
-├── RO::Text(Simple demo)
-├── RO::Text(Adoo)
-├── RO::Text(Recursive 3 times)
-└── RO::Row
-    ├── RO::Text(Simple demo)
-    ├── RO::Text(Adoo)
-    ├── RO::Text(Recursive 3 times)
-    └── RO::Row
-        ├── RO::Text(Simple demo)
-        ├── RO::Text(Adoo)
-        ├── RO::Text(Recursive 3 times)
-        └── RO::Row
-            ├── RO::Text(Simple demo)
-            ├── RO::Text(Adoo)
-            └── RO::Text(Recursive 3 times)
-"
+r#"RowRenderObject
+├── Text("Simple demo")
+├── Text("Adoo")
+├── Text("Recursive 3 times")
+└── RowRenderObject
+    ├── Text("Simple demo")
+    ├── Text("Adoo")
+    ├── Text("Recursive 3 times")
+    └── RowRenderObject
+        ├── Text("Simple demo")
+        ├── Text("Adoo")
+        ├── Text("Recursive 3 times")
+        └── RowRenderObject
+            ├── Text("Simple demo")
+            ├── Text("Adoo")
+            └── Text("Recursive 3 times")
+"#
     );
   }
 

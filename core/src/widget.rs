@@ -1,6 +1,6 @@
-//! widget is a cheap config to detect how user interface should be display
 use crate::render_object::RenderObject;
 use ::herald::prelude::*;
+use std::fmt::Debug;
 use subject::LocalSubject;
 
 mod key;
@@ -18,9 +18,7 @@ pub trait WidgetStates<'a> {
 }
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget<'a>: WidgetStates<'a> {
-  #[cfg(debug_assertions)]
-  fn to_str(&self) -> String;
+pub trait CombinationWidget<'a>: WidgetStates<'a> + Debug {
   /// Describes the part of the user interface represented by this widget.
   fn build(&self) -> Widget;
 
@@ -38,10 +36,7 @@ pub trait CombinationWidget<'a>: WidgetStates<'a> {
 }
 
 /// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget<'a>: WidgetStates<'a> {
-  #[cfg(debug_assertions)]
-  fn to_str(&self) -> String;
-
+pub trait RenderWidget<'a>: WidgetStates<'a> + Debug {
   fn create_render_object(&self) -> Box<dyn RenderObject>;
 }
 
