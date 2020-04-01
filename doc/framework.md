@@ -19,18 +19,23 @@ Widget tree do updating from top to bottom. If a bottom widget removed because i
 
 Widget tree do rebuilding base on widget diff. Work like below:
 
-1. if this widget is `CombinationWidget`:
-  a. build widget from `CombinationWidget`.
-  b. if new widget's `Key` is equal to the last time build widget in the widget tree ?
-    * only use new widget instead of old widget in the widget tree, and not inflate.
-    * use new widget and recursive to step 1.
-  c. else, inflate the new widget and use the new widget subtree instead of the old in widget tree.
-  d. done, the subtree from this widget is rebuild finished.
-2. else, if this widget is render widget without children ?
-  a. if this widget has same `Key` as before ?
-   * Yes, we need do nothing any more.
-  b. else, use new widget replace before sub tree in widget.
-3. else, use children recursive to step 1 one by one.. 
+a. build widget from `CombinationWidget`.
+b. if new widget 's `Key` is equal to the last time build widget in the widget tree ?
+  1. use new widget replace before sub tree in widget and mark this widget dirty.
+  2. if this widget is `CombinationWidget`, use new widget recursive step a.
+  3. else, if this widget is render widget and has children.
+    * pluck all children from widget tree.
+    * process new children one by one
+      - if a old child can be found by new child's key in plucked children.
+        * insert old child back.
+        * recursive step 1.
+      - else add new widget in widget tree, and recursive step c.
+      - destroy the remaining plucked child and subtree, correspond render tree destroy too.
+  4. else done.
+c. else, inflate the new widget and use the new widget subtree instead of the old in widget tree, reconstruct render subtree correspond to this widget subtree.
+d. done, the subtree from this widget is rebuild finished.
+
+
 
 ### Signature
 

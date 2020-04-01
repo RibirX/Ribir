@@ -1,50 +1,83 @@
 use crate::render_ctx::RenderCtx;
 use crate::widget::*;
 use blake3;
-use slab_tree::*;
-use std::{any::Any, fmt::Debug};
+use std::{
+  any::Any,
+  cmp::{Eq, Ord, PartialOrd},
+  fmt::Debug,
+};
 
-pub trait Key: Debug {
-  fn as_any(&self) -> &dyn Any;
-  fn eq(&self, other: &dyn Key) -> bool;
-}
+/// Abstract all builtin provide key into a same type.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum Key {
+  KUsize(usize),
+  KU1(u8),
+  KU2(u16),
+  KU4(u32),
+  KU8(u64),
+  KU16(u128),
 
-impl PartialEq for Box<dyn Key> {
-  fn eq(&self, other: &Box<dyn Key>) -> bool { Key::eq(&**self, &**other) }
+  KIsize(isize),
+  KI1(i8),
+  KI2(i16),
+  KI4(i32),
+  KI8(i64),
+  KI16(i128),
+
+  KBool(bool),
+  KChar(char),
+
+  KString(String),
+  K32([u8; 32]),
 }
 
 pub struct KeyDetect {
-  key: Box<dyn Key>,
+  key: Key,
   child: Widget,
 }
 #[derive(Debug)]
 pub struct KeyRender;
 
 impl KeyDetect {
-  pub fn new<K>(key: K, child: Widget) -> Self
+  pub fn new<K, W>(key: K, child: W) -> Self
   where
-    K: Into<Box<dyn Key>>,
+    K: Into<Key>,
+    W: Into<Widget>,
   {
     KeyDetect {
       key: key.into(),
-      child,
+      child: child.into(),
     }
   }
 
-  #[inline(always)]
-  pub fn key(&self) -> &Box<dyn Key> { &self.key }
+  #[inline]
+  pub fn key(&self) -> &Key { &self.key }
+}
+
+impl<'a> WidgetStates<'a> for KeyDetect {
+  #[inline]
+  fn as_any(&self) -> Option<&dyn Any> { Some(&*self) }
 }
 
 impl<'a> SingleChildWidget<'a> for KeyDetect {
   fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget) {
-    (Box::new(self.key), self.child)
+    (Box::new(self.key), self.child.into())
   }
 }
 
-impl<'a> RenderWidget<'a> for Box<dyn Key> {
+impl From<KeyDetect> for Widget {
+  fn from(w: KeyDetect) -> Self { Widget::SingleChild(Box::new(w)) }
+}
+
+impl<'a> RenderWidget<'a> for Key {
   fn create_render_object(&self) -> Box<dyn RenderObject> {
     Box::new(KeyRender)
   }
+}
+
+impl<'a> WidgetStates<'a> for Key {
+  #[inline]
+  fn as_any(&self) -> Option<&dyn Any> { Some(&*self) }
 }
 
 impl RenderObject for KeyRender {
@@ -56,65 +89,42 @@ impl RenderObject for KeyRender {
   }
 }
 
-macro from_key_impl($($ty: ty)*) {
+macro from_key_impl($($ty: ty : $name: ident)*) {
   $(
-    impl Key for $ty {
-      #[inline(always)]
-      fn as_any(&self) -> &dyn Any {
-        &*self
-      }
-      fn eq(&self, other: &dyn Key) -> bool{
-        other
-          .as_any()
-          .downcast_ref::<Self>()
-          .map_or(false, |other| other == self)
+    impl From<$ty> for Key {
+      fn from(s: $ty) -> Self {
+        Key::$name(s)
       }
     }
   )*
 }
 
 from_key_impl!(
-  ()
-  usize u8 u16 u32 u64 u128
-  isize i8 i16 i32 i64 i128
-  f32 f64
-  bool char
-  StringKey
-  [u8;32]
+  usize:KUsize u8:KU1 u16:KU2 u32:KU4 u64:KU8 u128:KU16
+  isize:KIsize i8:KI1 i16:KI2 i32:KI4 i64:KI8 i128:KI16
+  bool:KBool char:KChar
+  [u8;32]:K32
 );
 
-impl<T: Key + 'static> From<T> for Box<dyn Key> {
-  #[inline(always)]
-  fn from(v: T) -> Self { Box::new(v) }
-}
+const MAX_KEY_STR: usize = 16;
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum StringKey {
-  Str(String),
-  HashStr([u8; blake3::OUT_LEN]),
-}
-
-const MAX_KEY_STR: usize = 64;
-
-impl From<String> for Box<dyn Key> {
+impl From<String> for Key {
   fn from(s: String) -> Self {
-    let k = if s.len() > MAX_KEY_STR {
-      StringKey::Str(s)
+    if s.len() < MAX_KEY_STR {
+      Key::KString(s)
     } else {
-      StringKey::HashStr(blake3::hash(s.as_bytes()).into())
-    };
-    Box::new(k)
+      Key::K32(blake3::hash(s.as_bytes()).into())
+    }
   }
 }
 
-impl From<&str> for Box<dyn Key> {
+impl From<&str> for Key {
   fn from(s: &str) -> Self {
-    let k = if s.len() > MAX_KEY_STR {
-      StringKey::Str(s.to_owned())
+    if s.len() < MAX_KEY_STR {
+      Key::KString(s.to_owned())
     } else {
-      StringKey::HashStr(blake3::hash(s.as_bytes()).into())
-    };
-    Box::new(k)
+      Key::K32(blake3::hash(s.as_bytes()).into())
+    }
   }
 }
 
@@ -178,11 +188,11 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
-  let k1 = KeyDetect::new(0, Text("").into());
-  let k2 = KeyDetect::new(String::new(), Text("").into());
-  let k3 = KeyDetect::new("", Text("").into());
-  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("").into());
-  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("").into());
+  let k1 = KeyDetect::new(0, Text(""));
+  let k2 = KeyDetect::new(String::new(), Text(""));
+  let k3 = KeyDetect::new("", Text(""));
+  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text(""));
+  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text(""));
   assert!(&k1.key != &k2.key);
   assert!(&k2.key == &k3.key);
   assert!(&k3.key != &k1.key);

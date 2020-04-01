@@ -8,13 +8,14 @@ edition = "2018"
 
 [dependencies]
 herald =  "0.1.0"
-slab_tree = "0.3"
+indextree= "4.0.0"
 rxrust = "0.8.3"
-
+smallvec= "1.2.0"
 
 [dependencies.blake3]
 version = "0.2.2"
 features = ["rayon"]
+
 
 [profile.bench]
 debug = true

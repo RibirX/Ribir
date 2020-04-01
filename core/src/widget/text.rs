@@ -16,6 +16,7 @@ impl From<Text> for Widget {
   fn from(t: Text) -> Self { Widget::Render(Box::new(t)) }
 }
 
+impl<'a> WidgetStates<'a> for Text {}
 impl<'a> RenderWidget<'a> for Text {
   fn create_render_object(&self) -> Box<dyn RenderObject> {
     Box::new(Text(self.0))
