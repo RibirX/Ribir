@@ -1,5 +1,5 @@
 use crate::{render_object::*, widget::*};
-use ::herald::prelude::*;
+use herald::prelude::*;
 use slab_tree::*;
 use std::{
   collections::{HashMap, HashSet},
@@ -198,7 +198,7 @@ impl<'a> Application<'a> {
 
   fn rebuild_subtree(&mut self, id: NodeId) {
     let mut sub_root = self.widget_tree.get_mut(id).unwrap();
-    if let WidgetInstance::Combination(ref c) = sub_root.data().widget {
+    if let WidgetInstance::Combination(ref _c) = sub_root.data().widget {
       todo!("rebuild subtree depends on widget key");
     } else {
       debug_assert!(false, "rebuild widget must be combination widget.");
@@ -273,6 +273,8 @@ impl Debug for WidgetNode {
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::widget::Row;
+  use crate::{render_object_box::*, render_ctx::*};
 
   #[derive(Clone, Debug)]
   struct EmbedPost {
@@ -285,44 +287,7 @@ mod test {
   impl From<EmbedPost> for Widget {
     fn from(c: EmbedPost) -> Self { Widget::Combination(Box::new(c)) }
   }
-
-  #[derive(Debug)]
-  struct RowRenderObject ;
-
-  impl RenderObject for RowRenderObject {
-    fn paint(&self) {}
-    fn perform_layout(&mut self, _ctx: RenderCtx) {}
-  }
-
-  #[derive(Debug)]
-  struct RenderRow {}
-
-  impl<'a> RenderWidget<'a> for RenderRow {
-    fn create_render_object(&self) -> Box<dyn RenderObject> {
-      Box::new(RowRenderObject {})
-    }
-  }
-
-  impl From<RenderRow> for Widget {
-    fn from(r: RenderRow) -> Self { Widget::Render(Box::new(r)) }
-  }
-
-  struct Row {
-    children: Vec<Widget>,
-  }
-
-  impl From<Row> for Widget {
-    fn from(r: Row) -> Self { Widget::MultiChild(Box::new(r)) }
-  }
-
-  impl<'a> MultiChildWidget<'a> for Row {
-    fn split(
-      self: Box<Self>,
-    ) -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>) {
-      (Box::new(RenderRow {}), self.children)
-    }
-  }
-
+  
   impl<'a> CombinationWidget<'a> for EmbedPost {
     fn build(&self) -> Widget {
       let mut row = Row {
@@ -385,19 +350,19 @@ r#"Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recur
     let _r = app.render_tree.write_formatted(&mut r_tree);
     assert_eq!(
       r_tree,
-r#"RowRenderObject
+r#"RowRenderObject { inner_layout: [], size: None }
 ├── Text("Simple demo")
 ├── Text("Adoo")
 ├── Text("Recursive 3 times")
-└── RowRenderObject
+└── RowRenderObject { inner_layout: [], size: None }
     ├── Text("Simple demo")
     ├── Text("Adoo")
     ├── Text("Recursive 3 times")
-    └── RowRenderObject
+    └── RowRenderObject { inner_layout: [], size: None }
         ├── Text("Simple demo")
         ├── Text("Adoo")
         ├── Text("Recursive 3 times")
-        └── RowRenderObject
+        └── RowRenderObject { inner_layout: [], size: None }
             ├── Text("Simple demo")
             ├── Text("Adoo")
             └── Text("Recursive 3 times")
@@ -407,6 +372,27 @@ r#"RowRenderObject
 
   extern crate test;
   use test::Bencher;
+
+  fn assert_root_bound(app:&mut Application, bound: Option<Size>) {
+    let mut mut_root = app.render_tree.root_mut().unwrap();
+    let render_box = mut_root.data().to_render_box().unwrap();
+    assert_eq!(render_box.bound(), bound);
+  }
+
+  fn layout_app(app:&mut Application) {
+    let mut_ptr = &mut app.render_tree as *mut Tree<Box<dyn RenderObject>>;
+    let root_id = app.render_tree.root().unwrap().node_id();
+    unsafe {
+        app.render_tree.root_mut().unwrap().data().layout(root_id, &mut RenderCtx::new(&mut *mut_ptr));
+    } 
+  }
+
+  fn mark_dirty(app: &mut Application, node_id: NodeId) {
+    let mut_ptr = &mut app.render_tree as *mut Tree<Box<dyn RenderObject>>;
+    unsafe {
+        app.render_tree.get_mut(node_id).unwrap().data().mark_dirty(node_id, &mut RenderCtx::new(&mut *mut_ptr));
+    } 
+  }
 
   #[bench]
   fn widget_tree_deep_1000(b: &mut Bencher) {
@@ -422,6 +408,29 @@ r#"RowRenderObject
     });
   }
 
+  #[test]
+  fn test_layout() {
+    let post = EmbedPost {
+      title: "Simple demo",
+      author: "Adoo",
+      content: "Recursive 5 times",
+      level: 5,
+    };
+    let mut app = Application::new();
+    app.inflate(post.into());
+    app.construct_render_tree();
+    
+    layout_app(&mut app);
+    assert_root_bound(&mut app, Some(Size{width: 192, height: 1}));
+
+    let last_child_id = app.render_tree.root().unwrap().last_child().unwrap().node_id();
+    mark_dirty(&mut app, last_child_id);
+    assert_root_bound(&mut app, None);
+    
+    layout_app(&mut app);
+    assert_root_bound(&mut app, Some(Size{width: 192, height: 1}));
+  }
+
   #[bench]
   fn render_tree_deep_1000(b: &mut Bencher) {
     b.iter(|| {
@@ -433,7 +442,6 @@ r#"RowRenderObject
       };
       let mut app = Application::new();
       app.inflate(post.into());
-      app.construct_render_tree();
     });
   }
 }

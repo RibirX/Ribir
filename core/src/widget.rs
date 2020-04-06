@@ -1,11 +1,14 @@
 use crate::render_object::RenderObject;
 use ::herald::prelude::*;
+
 use std::fmt::Debug;
 use subject::LocalSubject;
 
 mod key;
+mod row_layout;
 mod text;
 pub use key::KeyDetect;
+pub use row_layout::Row;
 pub use text::Text;
 
 /// `WidgetStates` can return a subscribable stream which emit a `()` value,
