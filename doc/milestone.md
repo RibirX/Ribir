@@ -1,13 +1,21 @@
 # Milestone
 
-## 0.1 core concept, tree framework 
+## 0.1 core concept, tree framework (5.1)
  
 - [x] widget tree
-  - [ ] a render widget to check widget framework ?
-  - [ ] a combination widget to check framework ?
+  - [ ] a render widget to test render tree?
+  - [ ] a combination widget to test widget tree?
 - [x] render tree
 - [ ] react widget change (1 week)
-- [ ] rebuild sub tree (1 week)
+- [x] rebuild sub tree (1 week)
+- [ ] ci & workflow
+  - [ ] mergifyio bot
+  - [ ] unit test 
+  - [ ] code cover
+  - [ ] benchmark compare
+  - [ ] merge framework branch to master.
+- [ ] elegant `herald` implementation.
+- [ ] we need readable & learnable documents.
 - [ ] perform layout on render tree (2 week)
   - [ ] layout flow
   - [ ] two layout widget
@@ -29,6 +37,16 @@
   - [ ] event loop
   - [ ] event framework.
     - [ ] point event ?
+    - [ ] keyboard event
+    - [ ] input widget.
+- [ ] platform support (need more people join us)
+  - [ ] osx
+  - [ ] linux
+  - [ ] windows
+  - [ ] android
+  - [ ] ios
+  - [ ] web / WebAssembly
+
 
 ## 0.3 base widgets and events to support.
 
