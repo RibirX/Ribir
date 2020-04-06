@@ -4,7 +4,7 @@ use ::herald::prelude::*;
 use std::{any::Any, fmt::Debug};
 use subject::LocalSubject;
 
-mod key;
+pub mod key;
 mod row_layout;
 pub mod text;
 

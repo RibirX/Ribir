@@ -1,5 +1,5 @@
 use crate::render_ctx::RenderCtx;
-use slab_tree::*;
+use indextree::*;
 
 #[derive(PartialEq)]
 pub enum LayoutConstraints {

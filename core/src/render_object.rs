@@ -1,6 +1,6 @@
 use crate::render_ctx::*;
 use crate::render_object_box::{LayoutConstraints, RenderObjectBox};
-use slab_tree::*;
+use indextree::*;
 use std::fmt::Debug;
 
 pub trait RenderObject: Debug {

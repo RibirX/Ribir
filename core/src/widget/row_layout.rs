@@ -3,7 +3,7 @@ use crate::render_ctx::RenderCtx;
 use crate::render_object_box::{
   LayoutConstraints, Position, RenderObjectBox, Size,
 };
-use slab_tree::*;
+use indextree::*;
 ///  a stupid implement for develope the framework.
 
 pub struct Row {
@@ -14,6 +14,7 @@ impl From<Row> for Widget {
   fn from(r: Row) -> Self { Widget::MultiChild(Box::new(r)) }
 }
 
+impl<'a> WidgetStates<'a> for Row {}
 impl<'a> MultiChildWidget<'a> for Row {
   fn split(
     self: Box<Self>,
@@ -76,6 +77,7 @@ impl From<RenderRow> for Widget {
   fn from(r: RenderRow) -> Self { Widget::Render(Box::new(r)) }
 }
 
+impl<'a> WidgetStates<'a> for RenderRow {}
 impl<'a> RenderWidget<'a> for RenderRow {
   fn create_render_object(&self) -> Box<dyn RenderObject> {
     Box::new(RowRenderObject {

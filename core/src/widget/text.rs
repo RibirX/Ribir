@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::render_ctx::RenderCtx;
 use crate::render_object_box::{LayoutConstraints, RenderObjectBox, Size};
-use slab_tree::*;
+use indextree::*;
 
 /// Just a stupid implement for develope the framework.
 #[derive(Debug)]

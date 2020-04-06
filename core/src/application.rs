@@ -527,7 +527,7 @@ impl Debug for WidgetNode {
 mod test {
   use super::*;
   use crate::widget::Row;
-  use crate::{render_object_box::*, render_ctx::*};
+  use crate::{render_ctx::*, render_object_box::*};
   extern crate test;
   use test::Bencher;
 
@@ -803,8 +803,9 @@ mod test {
 "#
     );
 
-    assert_eq!(app.render_symbol_tree(), 
-r#"KeyRender
+    assert_eq!(
+      app.render_symbol_tree(),
+      r#"KeyRender
 └── RowRenderObject
     ├── KeyRender
     │   └── Text("New title")
@@ -839,28 +840,39 @@ r#"KeyRender
                                         │   └── Text("")
                                         └── KeyRender
                                             └── Text("")
-"#);
+"#
+    );
   }
 
-  fn assert_root_bound(app:&mut Application, bound: Option<Size>) {
+  fn assert_root_bound(app: &mut Application, bound: Option<Size>) {
     let mut mut_root = app.render_tree.root_mut().unwrap();
     let render_box = mut_root.data().to_render_box().unwrap();
     assert_eq!(render_box.bound(), bound);
   }
 
-  fn layout_app(app:&mut Application) {
+  fn layout_app(app: &mut Application) {
     let mut_ptr = &mut app.render_tree as *mut Tree<Box<dyn RenderObject>>;
     let root_id = app.render_tree.root().unwrap().node_id();
     unsafe {
-        app.render_tree.root_mut().unwrap().data().layout(root_id, &mut RenderCtx::new(&mut *mut_ptr));
-    } 
+      app
+        .render_tree
+        .root_mut()
+        .unwrap()
+        .data()
+        .layout(root_id, &mut RenderCtx::new(&mut *mut_ptr));
+    }
   }
 
   fn mark_dirty(app: &mut Application, node_id: NodeId) {
     let mut_ptr = &mut app.render_tree as *mut Tree<Box<dyn RenderObject>>;
     unsafe {
-        app.render_tree.get_mut(node_id).unwrap().data().mark_dirty(node_id, &mut RenderCtx::new(&mut *mut_ptr));
-    } 
+      app
+        .render_tree
+        .get_mut(node_id)
+        .unwrap()
+        .data()
+        .mark_dirty(node_id, &mut RenderCtx::new(&mut *mut_ptr));
+    }
   }
 
   #[bench]
@@ -888,16 +900,34 @@ r#"KeyRender
     let mut app = Application::new();
     app.inflate(post.into());
     app.construct_render_tree();
-    
-    layout_app(&mut app);
-    assert_root_bound(&mut app, Some(Size{width: 192, height: 1}));
 
-    let last_child_id = app.render_tree.root().unwrap().last_child().unwrap().node_id();
+    layout_app(&mut app);
+    assert_root_bound(
+      &mut app,
+      Some(Size {
+        width: 192,
+        height: 1,
+      }),
+    );
+
+    let last_child_id = app
+      .render_tree
+      .root()
+      .unwrap()
+      .last_child()
+      .unwrap()
+      .node_id();
     mark_dirty(&mut app, last_child_id);
     assert_root_bound(&mut app, None);
-    
+
     layout_app(&mut app);
-    assert_root_bound(&mut app, Some(Size{width: 192, height: 1}));
+    assert_root_bound(
+      &mut app,
+      Some(Size {
+        width: 192,
+        height: 1,
+      }),
+    );
   }
 
   #[bench]
