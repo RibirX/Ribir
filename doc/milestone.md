@@ -6,8 +6,8 @@
   - [ ] a render widget to test render tree?
   - [ ] a combination widget to test widget tree?
 - [x] render tree
-- [ ] react widget change (1 week)
 - [x] rebuild sub tree (1 week)
+- [ ] react widget change (1 week)
 - [ ] ci & workflow
   - [ ] mergifyio bot
   - [ ] unit test 
@@ -29,7 +29,7 @@
         }
       ```
 
-## 0.2 paint & event, runnable
+## 0.2 paint & event, runnable (6.1)
 
 - [ ] which 2d graphic library to use?
 - [ ] paint flow.
