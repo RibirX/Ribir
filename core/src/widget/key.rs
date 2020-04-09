@@ -1,9 +1,7 @@
-use crate::render_ctx::RenderCtx;
 use crate::widget::*;
 use blake3;
-use indextree::*;
+
 use std::{
-  any::Any,
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
 };
@@ -32,61 +30,117 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-pub struct KeyDetect {
-  key: Key,
-  child: Widget,
-}
 #[derive(Debug)]
-pub struct KeyRender;
+pub struct KeyDetect<W> {
+  key: Key,
+  child: W,
+}
 
-impl KeyDetect {
-  pub fn new<K, W>(key: K, child: W) -> Self
+impl<W> KeyDetect<W> {
+  pub fn new<K>(key: K, child: W) -> Self
   where
     K: Into<Key>,
-    W: Into<Widget>,
   {
     KeyDetect {
       key: key.into(),
-      child: child.into(),
+      child,
     }
   }
-
-  #[inline]
-  pub fn key(&self) -> &Key { &self.key }
 }
 
-impl<'a> WidgetStates<'a> for KeyDetect {
+impl<'a, W> WidgetStates<'a> for KeyDetect<W>
+where
+  W: WidgetStates<'a>,
+{
   #[inline]
-  fn as_any(&self) -> Option<&dyn Any> { Some(&*self) }
+  fn changed_emitter(
+    &mut self,
+    notifier: LocalSubject<'a, (), ()>,
+  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
+    self.child.changed_emitter(notifier)
+  }
+
+  #[inline]
+  fn key(&self) -> Option<&Key> { Some(&self.key) }
 }
 
-impl<'a> SingleChildWidget<'a> for KeyDetect {
-  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget) {
-    (Box::new(self.key), self.child.into())
+impl<'a, W> CombinationWidget<'a> for KeyDetect<W>
+where
+  W: CombinationWidget<'a>,
+{
+  #[inline]
+  fn build(&self) -> Widget { self.child.build() }
+
+  #[inline]
+  fn rebuild_emitter(
+    &mut self,
+    notifier: LocalSubject<'a, (), ()>,
+  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
+    self.child.rebuild_emitter(notifier)
   }
 }
 
-impl From<KeyDetect> for Widget {
-  fn from(w: KeyDetect) -> Self { Widget::SingleChild(Box::new(w)) }
-}
-
-impl<'a> RenderWidget<'a> for Key {
+impl<'a, W> RenderWidget<'a> for KeyDetect<W>
+where
+  W: RenderWidget<'a>,
+{
   fn create_render_object(&self) -> Box<dyn RenderObject> {
-    Box::new(KeyRender)
+    self.child.create_render_object()
   }
 }
 
-impl<'a> WidgetStates<'a> for Key {
+#[derive(Debug)]
+pub struct KeyRender {
+  key: Key,
+  render: Box<dyn for<'r> RenderWidget<'r>>,
+}
+
+impl<'a> WidgetStates<'a> for KeyRender {
   #[inline]
-  fn as_any(&self) -> Option<&dyn Any> { Some(&*self) }
+  fn changed_emitter(
+    &mut self,
+    notifier: LocalSubject<'a, (), ()>,
+  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
+    self.render.changed_emitter(notifier)
+  }
+
+  #[inline]
+  fn key(&self) -> Option<&Key> { Some(&self.key) }
+}
+impl<'a> RenderWidget<'a> for KeyRender {
+  #[inline]
+  fn create_render_object(&self) -> Box<dyn RenderObject> {
+    self.render.create_render_object()
+  }
 }
 
-impl RenderObject for KeyRender {
-  fn paint(&self) {
-    unimplemented!();
+impl<'a, W> SingleChildWidget<'a> for KeyDetect<W>
+where
+  W: SingleChildWidget<'a>,
+{
+  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget) {
+    let (r, c) = Box::new(self.child).split();
+    let key_render = KeyRender {
+      key: self.key,
+      render: r,
+    };
+    (Box::new(key_render), c)
   }
-  fn perform_layout(&mut self, _node_id: NodeId, _ctx: &mut RenderCtx) {
-    unimplemented!();
+}
+
+impl<'a, W> MultiChildWidget<'a> for KeyDetect<W>
+where
+  W: MultiChildWidget<'a>,
+{
+  fn split(
+    self: Box<Self>,
+  ) -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>) {
+    let (r, c) = Box::new(self.child).split();
+    let key_render = KeyRender {
+      key: self.key,
+      render: r,
+    };
+    (Box::new(key_render), c)
   }
 }
 

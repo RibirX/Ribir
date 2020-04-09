@@ -1,7 +1,7 @@
 use crate::render_object::RenderObject;
 use ::herald::prelude::*;
 
-use std::{any::Any, fmt::Debug};
+use std::fmt::{Debug, Formatter, Result};
 use subject::LocalSubject;
 
 pub mod key;
@@ -23,8 +23,10 @@ pub trait WidgetStates<'a> {
     None
   }
 
-  #[inline]
-  fn as_any(&self) -> Option<&dyn Any> { None }
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
 }
 
 /// A widget represented by other widget compose.
@@ -46,7 +48,7 @@ pub trait CombinationWidget<'a>: WidgetStates<'a> + Debug {
 }
 
 /// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget<'a>: WidgetStates<'a> + Debug + Any {
+pub trait RenderWidget<'a>: WidgetStates<'a> + Debug {
   fn create_render_object(&self) -> Box<dyn RenderObject>;
 }
 
@@ -67,6 +69,16 @@ pub enum Widget {
   SingleChild(Box<dyn for<'a> SingleChildWidget<'a>>),
   MultiChild(Box<dyn for<'a> MultiChildWidget<'a>>),
 }
+impl Debug for Widget {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    match self {
+      Widget::Render(r) => r.fmt(f),
+      Widget::Combination(c) => c.fmt(f),
+      Widget::SingleChild(_) => f.write_str("SingleChild"),
+      Widget::MultiChild(_) => f.write_str("MultiChild"),
+    }
+  }
+}
 
 impl<'a> WidgetStates<'a> for Widget {
   fn changed_emitter(
@@ -80,27 +92,17 @@ impl<'a> WidgetStates<'a> for Widget {
       Widget::MultiChild(w) => w.changed_emitter(notifier),
     }
   }
-  fn as_any(&self) -> Option<&dyn Any> {
+
+  fn key(&self) -> Option<&Key> {
     match self {
-      Widget::Combination(w) => w.as_any(),
-      Widget::Render(w) => w.as_any(),
-      Widget::SingleChild(w) => w.as_any(),
-      Widget::MultiChild(w) => w.as_any(),
+      Widget::Combination(w) => w.key(),
+      Widget::Render(w) => w.key(),
+      Widget::SingleChild(w) => w.key(),
+      Widget::MultiChild(w) => w.key(),
     }
   }
 }
 
-impl Widget {
-  pub fn key(&self) -> Option<&Key> {
-    match self {
-      Widget::Render(w) => w.as_any()?.downcast_ref::<Key>(),
-      Widget::SingleChild(w) => {
-        w.as_any()?.downcast_ref::<KeyDetect>().map(|k| k.key())
-      }
-      _ => None,
-    }
-  }
-}
 impl<'a, T: Herald<'a> + 'a> WidgetStates<'a> for T {
   #[inline]
   default fn changed_emitter(
@@ -109,7 +111,36 @@ impl<'a, T: Herald<'a> + 'a> WidgetStates<'a> for T {
   ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
     Some(self.batched_change_stream(notifier).map(|_v| ()).box_it())
   }
+}
 
-  #[inline]
-  default fn as_any(&self) -> Option<&dyn Any> { None }
+pub trait CombinationWidgetInto {
+  fn to_widget(self) -> Widget;
+}
+
+impl<W: for<'r> CombinationWidget<'r> + 'static> CombinationWidgetInto for W {
+  fn to_widget(self) -> Widget { Widget::Combination(Box::new(self)) }
+}
+
+pub trait RenderWidgetInto {
+  fn to_widget(self) -> Widget;
+}
+
+impl<W: for<'r> RenderWidget<'r> + 'static> RenderWidgetInto for W {
+  fn to_widget(self) -> Widget { Widget::Render(Box::new(self)) }
+}
+
+pub trait SingleChildWidgetInto {
+  fn to_widget(self) -> Widget;
+}
+
+impl<W: for<'r> SingleChildWidget<'r> + 'static> SingleChildWidgetInto for W {
+  fn to_widget(self) -> Widget { Widget::SingleChild(Box::new(self)) }
+}
+
+pub trait MultiChildWidgetInto {
+  fn to_widget(self) -> Widget;
+}
+
+impl<W: for<'r> MultiChildWidget<'r> + 'static> MultiChildWidgetInto for W {
+  fn to_widget(self) -> Widget { Widget::MultiChild(Box::new(self)) }
 }
