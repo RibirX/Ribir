@@ -31,7 +31,7 @@ struct RowRenderObject {
 
 impl RenderObject for RowRenderObject {
   fn paint(&self) {}
-  // fn layout(&mut self, node_id: NodeId, _ctx: &mut RenderCtx);
+  // fn perform_layout(&mut self, node_id: NodeId, _ctx: &mut RenderCtx);
   fn to_render_box(&mut self) -> Option<&mut dyn RenderObjectBox> { Some(self) }
 }
 
@@ -47,11 +47,11 @@ impl RenderObjectBox for RowRenderObject {
     let y = 0;
 
     let mut ids = vec![];
-    ctx.step_into_child_box_reverse(self_id, &mut ids);
+    ctx.collect_children_box(self_id, &mut ids);
     ids.reverse();
     for id in ids {
-      let mut node = ctx.tree.get_mut(id).unwrap();
-      let render_box = node.data().to_render_box().unwrap();
+      let node = ctx.tree.get_mut(id).unwrap();
+      let render_box = node.get_mut().to_render_box().unwrap();
       let bound = render_box.bound().unwrap();
       self
         .inner_layout

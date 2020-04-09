@@ -85,7 +85,7 @@ impl RenderObject for KeyRender {
   fn paint(&self) {
     unimplemented!();
   }
-  fn layout(&mut self, _node_id: NodeId, _ctx: &mut RenderCtx) {
+  fn perform_layout(&mut self, _node_id: NodeId, _ctx: &mut RenderCtx) {
     unimplemented!();
   }
 }

@@ -832,36 +832,31 @@ mod test {
     );
   }
 
-  // fn assert_root_bound(app: &mut Application, bound: Option<Size>) {
-  //   let mut mut_root = app.render_tree.root_mut().unwrap();
-  //   let render_box = mut_root.data().to_render_box().unwrap();
-  //   assert_eq!(render_box.bound(), bound);
-  // }
+  fn assert_root_bound(app: &mut Application, bound: Option<Size>) {
+    let root = app.r_arena.get_mut(app.render_tree.unwrap()).unwrap();
+    let render_box = root.get_mut().to_render_box().unwrap();
+    assert_eq!(render_box.bound(), bound);
+  }
 
-  // fn layout_app(app: &mut Application) {
-  //   let mut_ptr = &mut app.render_tree as *mut Tree<Box<dyn RenderObject>>;
-  //   let root_id = app.render_tree.root().unwrap().node_id();
-  //   unsafe {
-  //     app
-  //       .render_tree
-  //       .root_mut()
-  //       .unwrap()
-  //       .data()
-  //       .layout(root_id, &mut RenderCtx::new(&mut *mut_ptr));
-  //   }
-  // }
+  fn layout_app(app: &mut Application) {
+    let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject>>;
+    let root = app.r_arena.get_mut(app.render_tree.unwrap()).unwrap();
+    unsafe {
+        root.get_mut().perform_layout(app.render_tree.unwrap(), &mut RenderCtx::new(&mut *mut_ptr));
+    }
+  }
 
-  // fn mark_dirty(app: &mut Application, node_id: NodeId) {
-  //   let mut_ptr = &mut app.render_tree as *mut Tree<Box<dyn RenderObject>>;
-  //   unsafe {
-  //     app
-  //       .render_tree
-  //       .get_mut(node_id)
-  //       .unwrap()
-  //       .data()
-  //       .mark_dirty(node_id, &mut RenderCtx::new(&mut *mut_ptr));
-  //   }
-  // }
+  fn mark_dirty(app: &mut Application, node_id: NodeId) {
+    let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject>>;
+    unsafe {
+      app
+        .r_arena
+        .get_mut(node_id)
+        .unwrap()
+        .get_mut()
+        .mark_dirty(node_id, &mut RenderCtx::new(&mut *mut_ptr));
+    }
+  }
 
   #[bench]
   fn widget_tree_deep_1000(b: &mut Bencher) {
@@ -877,47 +872,44 @@ mod test {
     });
   }
 
-  // #[test]
-  // fn test_layout() {
-  //   let post = EmbedPost {
-  //     title: "Simple demo",
-  //     author: "Adoo",
-  //     content: "Recursive 5 times",
-  //     level: 5,
-  //   };
-  //   let mut app = Application::new();
-  //   app.inflate(post.into());
-  //   app.construct_render_tree();
+  #[test]
+  fn test_layout() {
+    let post = EmbedPost {
+      title: "Simple demo",
+      author: "Adoo",
+      content: "Recursive 5 times",
+      level: 5,
+    };
+    let mut app = Application::new();
+    app.inflate(post.into());
+    app.construct_render_tree(app.widget_tree.unwrap());
 
-  //   layout_app(&mut app);
-  //   assert_root_bound(
-  //     &mut app,
-  //     Some(Size {
-  //       width: 192,
-  //       height: 1,
-  //     }),
-  //   );
+    layout_app(&mut app);
+    assert_root_bound(
+      &mut app,
+      Some(Size {
+        width: 192,
+        height: 1,
+      }),
+    );
 
-  //   let last_child_id = app
-  //     .render_tree
-  //     .root()
-  //     .unwrap()
-  //     .last_child()
-  //     .unwrap()
-  //     .node_id();
-  //   mark_dirty(&mut app, last_child_id);
-  //   assert_root_bound(&mut app, None);
+    let last_child_id = app
+      .r_arena.get(app.render_tree.unwrap())
+      .unwrap()
+      .last_child()
+      .unwrap();
+    mark_dirty(&mut app, last_child_id);
+    assert_root_bound(&mut app, None);
 
-  //   layout_app(&mut app);
-  //   assert_root_bound(
-  //     &mut app,
-  //     Some(Size {
-  //       width: 192,
-  //       height: 1,
-  //     }),
-  //   );
-  // }
-
+    layout_app(&mut app);
+    assert_root_bound(
+      &mut app,
+      Some(Size {
+        width: 192,
+        height: 1,
+      }),
+    );
+  }
 
   #[bench]
   fn widget_tree_deep_1000_with_key(b: &mut Bencher) {
