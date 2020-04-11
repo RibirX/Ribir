@@ -1,8 +1,6 @@
 use crate::render_object::RenderObject;
-use ::herald::prelude::*;
 
 use std::fmt::{Debug, Formatter, Result};
-use subject::LocalSubject;
 
 pub mod key;
 mod row_layout;
@@ -12,53 +10,44 @@ pub use key::{Key, KeyDetect};
 pub use row_layout::Row;
 pub use text::Text;
 
-/// `WidgetStates` can return a subscribable stream which emit a `()` value,
-/// when widget state changed.
-pub trait WidgetStates<'a> {
-  #[inline]
-  fn changed_emitter(
-    &mut self,
-    _notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    None
-  }
-
+/// A widget represented by other widget compose.
+pub trait CombinationWidget<'a>: Debug {
   /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
   /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
-}
 
-/// A widget represented by other widget compose.
-pub trait CombinationWidget<'a>: WidgetStates<'a> + Debug {
   /// Describes the part of the user interface represented by this widget.
   fn build(&self) -> Widget;
-
-  /// Return a Some-value which contain a subscribable stream to notify rebuild.
-  /// Return a None-value if this widget never occur rebuild.
-  /// By default, every widget state change will trigger rebuild, you can
-  /// override the default implement to decide which state change really need
-  /// rebuild, or just return `None` because your widget need rebuild never.
-  fn rebuild_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    self.changed_emitter(notifier)
-  }
 }
 
 /// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget<'a>: WidgetStates<'a> + Debug {
+pub trait RenderWidget<'a>: Debug {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
   fn create_render_object(&self) -> Box<dyn RenderObject>;
 }
 
 /// a widget has a child.
-pub trait SingleChildWidget<'a>: WidgetStates<'a> {
+pub trait SingleChildWidget<'a> {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
   fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget);
 }
 
 /// a widget has multi child
-pub trait MultiChildWidget<'a>: WidgetStates<'a> {
+pub trait MultiChildWidget<'a> {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
   fn split(self: Box<Self>)
   -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>);
 }
@@ -80,36 +69,14 @@ impl Debug for Widget {
   }
 }
 
-impl<'a> WidgetStates<'a> for Widget {
-  fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    match self {
-      Widget::Combination(w) => w.changed_emitter(notifier),
-      Widget::Render(w) => w.changed_emitter(notifier),
-      Widget::SingleChild(w) => w.changed_emitter(notifier),
-      Widget::MultiChild(w) => w.changed_emitter(notifier),
-    }
-  }
-
-  fn key(&self) -> Option<&Key> {
+impl Widget {
+  pub fn key(&self) -> Option<&Key> {
     match self {
       Widget::Combination(w) => w.key(),
       Widget::Render(w) => w.key(),
       Widget::SingleChild(w) => w.key(),
       Widget::MultiChild(w) => w.key(),
     }
-  }
-}
-
-impl<'a, T: Herald<'a> + 'a> WidgetStates<'a> for T {
-  #[inline]
-  default fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    Some(self.batched_change_stream(notifier).map(|_v| ()).box_it())
   }
 }
 

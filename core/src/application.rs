@@ -17,17 +17,7 @@ enum WidgetInstance {
   Render(Box<dyn for<'a> RenderWidget<'a>>),
 }
 
-impl<'a> WidgetStates<'a> for WidgetInstance {
-  fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    match self {
-      Self::Combination(c) => c.changed_emitter(notifier),
-      Self::Render(r) => r.changed_emitter(notifier),
-    }
-  }
-
+impl WidgetInstance {
   fn key(&self) -> Option<&Key> {
     match self {
       Self::Combination(c) => c.key(),
@@ -95,7 +85,6 @@ impl<'a> Application<'a> {
     let (widget_node, children) = Self::consume_widget_to_node(w);
     let root = self.w_arena.new_node(WidgetNode::new(widget_node));
     self.widget_tree = Some(root);
-    self.track_widget(root);
 
     if let Some(c) = children {
       self.inflate_widget_subtree(root, c);
@@ -138,7 +127,6 @@ impl<'a> Application<'a> {
       while let Some(child) = children.pop() {
         let (node, c_children) = Self::consume_widget_to_node(child);
         let new_id = self.preappend_widget(parent, node);
-        self.track_widget(new_id);
         if let Some(c_children) = c_children {
           stack.push((parent, children));
           stack.push((new_id, c_children));
@@ -447,37 +435,6 @@ impl<'a> Application<'a> {
     child
   }
 
-  fn track_widget(&mut self, wid: NodeId) {
-    let mut node = self.w_arena[wid].get_mut();
-
-    debug_assert!(node.subscription_guards.0.is_none());
-    debug_assert!(node.subscription_guards.1.is_none());
-
-    let mut node_ptr: NonNull<HashSet<NodeId>> =
-      (&mut self.dirty_widgets).into();
-    node.subscription_guards.0 =
-      node.widget.changed_emitter(self.notifier.clone()).map(|e| {
-        // Safety: framework logic promise the `node_ptr` always valid.
-        e.subscribe(move |_| unsafe {
-          node_ptr.as_mut().insert(wid);
-        })
-        .unsubscribe_when_dropped()
-      });
-
-    if let WidgetInstance::Combination(c) = &mut node.widget {
-      let mut node_ptr: NonNull<HashSet<NodeId>> =
-        (&mut self.wait_rebuilds).into();
-      node.subscription_guards.1 = c
-        .rebuild_emitter(self.notifier.clone())
-        // Safety: framework logic promise the `node_ptr` always valid.
-        .map(|e| {
-          e.subscribe(move |_| unsafe {
-            node_ptr.as_mut().insert(wid);
-          })
-          .unsubscribe_when_dropped()
-        });
-    }
-  }
 
   #[allow(dead_code)]
   pub(crate) fn widget_symbol_tree(&self) -> String {
@@ -519,7 +476,6 @@ mod test {
     level: usize,
   }
 
-  impl<'a> WidgetStates<'a> for EmbedPost {}
   impl<'a> CombinationWidget<'a> for EmbedPost {
     fn build(&self) -> Widget {
       let mut row = Row {
@@ -624,19 +580,6 @@ mod test {
     author: &'static str,
     content: &'static str,
     level: usize,
-    rebuild_emitter: LocalSubject<'static, (), ()>,
-  }
-
-  impl<'a> WidgetStates<'a> for EmbedKeyPost {
-    fn changed_emitter(
-      &mut self,
-      _notifier: LocalSubject<'a, (), ()>,
-    ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-      let res: LocalCloneBoxOp<'static, (), ()> =
-        self.rebuild_emitter.clone().box_it();
-      // not a good code below, just use for test.
-      unsafe { std::mem::transmute(res) }
-    }
   }
 
   impl Debug for EmbedKeyPost {
@@ -650,7 +593,6 @@ mod test {
     }
   }
 
-
   impl<'a> CombinationWidget<'a> for EmbedKeyPost {
     fn build(&self) -> Widget {
       let mut row = Row {
@@ -663,7 +605,9 @@ mod test {
       if self.level > 0 {
         let mut embed = self.clone();
         embed.level -= 1;
-        row.children.push(KeyDetect::new("embed", embed).to_widget())
+        row
+          .children
+          .push(KeyDetect::new("embed", embed).to_widget())
       }
       KeyDetect::new(0, row).to_widget()
     }
@@ -673,7 +617,6 @@ mod test {
   struct KeyDetectEnv<'a> {
     app: Application<'a>,
     title: Option<Rc<RefCell<&'static str>>>,
-    emitter: Option<LocalSubject<'static, (), ()>>,
   }
 
   impl<'a> KeyDetectEnv<'a> {
@@ -681,8 +624,6 @@ mod test {
       let mut post = EmbedKeyPost::default();
       post.level = level;
       let title = post.title.clone();
-      let emitter = post.rebuild_emitter.clone();
-      self.emitter = Some(emitter);
       self.title = Some(title);
 
       self.app.inflate(post.clone().to_widget());
@@ -695,7 +636,7 @@ mod test {
 
     fn emit_rebuild(&mut self) {
       *self.title.as_mut().unwrap().borrow_mut() = "New title";
-      self.emitter.as_mut().unwrap().next(());
+      self.app.wait_rebuilds.insert(self.app.widget_tree.unwrap());
     }
   }
 

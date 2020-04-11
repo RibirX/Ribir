@@ -10,7 +10,6 @@ pub struct Row {
   pub children: Vec<Widget>,
 }
 
-impl<'a> WidgetStates<'a> for Row {}
 impl<'a> MultiChildWidget<'a> for Row {
   fn split(
     self: Box<Self>,
@@ -69,7 +68,6 @@ impl RenderObjectBox for RowRenderObject {
 #[derive(Debug)]
 struct RenderRow {}
 
-impl<'a> WidgetStates<'a> for RenderRow {}
 impl<'a> RenderWidget<'a> for RenderRow {
   fn create_render_object(&self) -> Box<dyn RenderObject> {
     Box::new(RowRenderObject {

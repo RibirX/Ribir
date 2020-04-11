@@ -1,6 +1,5 @@
 use crate::widget::*;
 use blake3;
-
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -48,36 +47,15 @@ impl<W> KeyDetect<W> {
   }
 }
 
-impl<'a, W> WidgetStates<'a> for KeyDetect<W>
-where
-  W: WidgetStates<'a>,
-{
-  #[inline]
-  fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    self.child.changed_emitter(notifier)
-  }
-
-  #[inline]
-  fn key(&self) -> Option<&Key> { Some(&self.key) }
-}
-
 impl<'a, W> CombinationWidget<'a> for KeyDetect<W>
 where
   W: CombinationWidget<'a>,
 {
   #[inline]
-  fn build(&self) -> Widget { self.child.build() }
+  fn key(&self) -> Option<&Key> { Some(&self.key) }
 
   #[inline]
-  fn rebuild_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    self.child.rebuild_emitter(notifier)
-  }
+  fn build(&self) -> Widget { self.child.build() }
 }
 
 impl<'a, W> RenderWidget<'a> for KeyDetect<W>
@@ -95,18 +73,6 @@ pub struct KeyRender {
   render: Box<dyn for<'r> RenderWidget<'r>>,
 }
 
-impl<'a> WidgetStates<'a> for KeyRender {
-  #[inline]
-  fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    self.render.changed_emitter(notifier)
-  }
-
-  #[inline]
-  fn key(&self) -> Option<&Key> { Some(&self.key) }
-}
 impl<'a> RenderWidget<'a> for KeyRender {
   #[inline]
   fn create_render_object(&self) -> Box<dyn RenderObject> {
@@ -118,6 +84,9 @@ impl<'a, W> SingleChildWidget<'a> for KeyDetect<W>
 where
   W: SingleChildWidget<'a>,
 {
+  #[inline]
+  fn key(&self) -> Option<&Key> { Some(&self.key) }
+
   fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget) {
     let (r, c) = Box::new(self.child).split();
     let key_render = KeyRender {

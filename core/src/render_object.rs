@@ -1,5 +1,7 @@
-use crate::render_ctx::*;
-use crate::render_object_box::{LayoutConstraints, RenderObjectBox};
+use crate::{
+  render_ctx::*,
+  render_object_box::{LayoutConstraints, RenderObjectBox},
+};
 use indextree::*;
 use std::fmt::Debug;
 
