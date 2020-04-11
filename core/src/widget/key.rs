@@ -67,47 +67,29 @@ where
   }
 }
 
-#[derive(Debug)]
-pub struct KeyRender<'a> {
-  key: Key,
-  render: Box<dyn RenderWidget + 'a>,
-}
-
-impl<'a> RenderWidget for KeyRender<'a> {
+impl<W> SingleChildWidget for KeyDetect<W>
+where
+  W: SingleChildWidget,
+{
   #[inline]
-  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
-    self.render.create_render_object()
+  fn take_child<'a>(&mut self) -> Widget<'a>
+  where
+    Self: 'a,
+  {
+    self.child.take_child()
   }
 }
 
-impl<'a, W> SingleChildWidget<'a> for KeyDetect<W>
+impl<W> MultiChildWidget for KeyDetect<W>
 where
-  W: SingleChildWidget<'a>,
+  W: MultiChildWidget,
 {
   #[inline]
-  fn key(&self) -> Option<&Key> { Some(&self.key) }
-
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Widget<'a>) {
-    let (r, c) = Box::new(self.child).split();
-    let key_render = KeyRender {
-      key: self.key,
-      render: r,
-    };
-    (Box::new(key_render), c)
-  }
-}
-
-impl<'a, W> MultiChildWidget<'a> for KeyDetect<W>
-where
-  W: MultiChildWidget<'a>,
-{
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>) {
-    let (r, c) = Box::new(self.child).split();
-    let key_render = KeyRender {
-      key: self.key,
-      render: r,
-    };
-    (Box::new(key_render), c)
+  fn take_children<'a>(&mut self) -> Vec<Widget<'a>>
+  where
+    Self: 'a,
+  {
+    self.child.take_children()
   }
 }
 

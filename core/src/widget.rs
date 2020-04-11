@@ -1,6 +1,6 @@
 use crate::render_object::RenderObject;
 
-use std::fmt::{Debug, Formatter, Result};
+use std::fmt::Debug;
 
 pub mod key;
 mod row_layout;
@@ -19,6 +19,15 @@ pub trait CombinationWidget: Debug {
 
   /// Describes the part of the user interface represented by this widget.
   fn build<'a>(&self) -> Widget<'a>;
+
+  /// convert to [`Widget`](Widget), not override this method, will remove after
+  /// Rust generic specialization finished
+  fn to_widget<'a>(self) -> Widget<'a>
+  where
+    Self: Sized + 'a,
+  {
+    Widget::Combination(Box::new(self))
+  }
 }
 
 /// RenderWidget is a widget has its render object to display self.
@@ -32,40 +41,37 @@ pub trait RenderWidget: Debug {
 }
 
 /// a widget has a child.
-pub trait SingleChildWidget<'a> {
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
-  /// you want give a key to your widget.
-  fn key(&self) -> Option<&Key> { None }
+pub trait SingleChildWidget: RenderWidget {
+  /// called by framework to take child from this widget, and only called once.
+  fn take_child<'a>(&mut self) -> Widget<'a>
+  where
+    Self: 'a;
 
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Widget<'a>);
+  /// convert to [`Widget`](Widget), not override this method, will remove after
+  /// Rust generic specialization finished
+  fn to_widget<'a>(self) -> Widget<'a>
+  where
+    Self: Sized + 'a,
+  {
+    Widget::SingleChild(Box::new(self))
+  }
 }
 
 /// a widget has multi child
-pub trait MultiChildWidget<'a> {
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
-  /// you want give a key to your widget.
-  fn key(&self) -> Option<&Key> { None }
-
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>);
+pub trait MultiChildWidget: RenderWidget {
+  /// called by framework to take children from this widget, and only called
+  /// once.
+  fn take_children<'a>(&mut self) -> Vec<Widget<'a>>
+  where
+    Self: 'a;
 }
 
+#[derive(Debug)]
 pub enum Widget<'a> {
   Combination(Box<dyn CombinationWidget + 'a>),
   Render(Box<dyn RenderWidget + 'a>),
-  SingleChild(Box<dyn SingleChildWidget<'a> + 'a>),
-  MultiChild(Box<dyn MultiChildWidget<'a> + 'a>),
-}
-impl<'a> Debug for Widget<'a> {
-  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-    match self {
-      Widget::Render(r) => r.fmt(f),
-      Widget::Combination(c) => c.fmt(f),
-      Widget::SingleChild(_) => f.write_str("SingleChild"),
-      Widget::MultiChild(_) => f.write_str("MultiChild"),
-    }
-  }
+  SingleChild(Box<dyn SingleChildWidget + 'a>),
+  MultiChild(Box<dyn MultiChildWidget + 'a>),
 }
 
 impl<'a> Widget<'a> {
@@ -77,36 +83,37 @@ impl<'a> Widget<'a> {
       Widget::MultiChild(w) => w.key(),
     }
   }
+
+  pub fn same_type_widget(&self, other: &Widget) -> bool {
+    match self {
+      Widget::Combination(_) => matches!(other, Widget::Combination(_)),
+      Widget::Render(_) => matches!(other, Widget::Render(_)),
+      Widget::SingleChild(_) => matches!(other, Widget::SingleChild(_)),
+      Widget::MultiChild(_) => matches!(other, Widget::MultiChild(_)),
+    }
+  }
 }
 
-pub trait CombinationWidgetInto<'a> {
-  fn to_widget(self) -> Widget<'a>;
+pub trait IntoWidget {
+  fn to_widget<'a>(self) -> Widget<'a>
+  where
+    Self: 'a;
 }
 
-impl<'a, W: CombinationWidget + 'a> CombinationWidgetInto<'a> for W {
-  fn to_widget(self) -> Widget<'a> { Widget::Combination(Box::new(self)) }
+impl<W: RenderWidget> IntoWidget for W {
+  default fn to_widget<'a>(self) -> Widget<'a>
+  where
+    Self: 'a,
+  {
+    Widget::Render(Box::new(self))
+  }
 }
 
-pub trait RenderWidgetInto<'a> {
-  fn to_widget(self) -> Widget<'a>;
-}
-
-impl<'a, W: RenderWidget + 'a> RenderWidgetInto<'a> for W {
-  fn to_widget(self) -> Widget<'a> { Widget::Render(Box::new(self)) }
-}
-
-pub trait SingleChildWidgetInto<'a> {
-  fn to_widget(self) -> Widget<'a>;
-}
-
-impl<'a, W: SingleChildWidget<'a> + 'a> SingleChildWidgetInto<'a> for W {
-  fn to_widget(self) -> Widget<'a> { Widget::SingleChild(Box::new(self)) }
-}
-
-pub trait MultiChildWidgetInto<'a> {
-  fn to_widget(self) -> Widget<'a>;
-}
-
-impl<'a, W: MultiChildWidget<'a> + 'a> MultiChildWidgetInto<'a> for W {
-  fn to_widget(self) -> Widget<'a> { Widget::MultiChild(Box::new(self)) }
+impl<W: MultiChildWidget> IntoWidget for W {
+  fn to_widget<'a>(self) -> Widget<'a>
+  where
+    Self: 'a,
+  {
+    Widget::MultiChild(Box::new(self))
+  }
 }

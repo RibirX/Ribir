@@ -10,7 +10,6 @@ edition = "2018"
 herald =  "0.1.0"
 indextree= "4.0.0"
 rxrust = "0.8.3"
-smallvec= "1.2.0"
 bitflags = "1.2.1"
 
 [dependencies.blake3]

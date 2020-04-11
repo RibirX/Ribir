@@ -1,32 +1,12 @@
-use crate::{
-  render_object::*, util::TreeFormatter, widget::key::Key, widget::*,
-};
+use crate::{render_object::*, util::TreeFormatter, widget::*};
 use indextree::*;
-use smallvec::{smallvec, SmallVec};
-use std::{
-  collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 mod tree_relationship;
 use tree_relationship::Relationship;
 
-#[derive(Debug)]
-enum WidgetNode<'a> {
-  Combination(Box<dyn  CombinationWidget +'a>),
-  Render(Box<dyn  RenderWidget +'a>),
-}
-
-impl<'a> WidgetNode<'a> {
-  fn key(&self) -> Option<&Key> {
-    match self {
-      Self::Combination(c) => c.key(),
-      Self::Render(r) => r.key(),
-    }
-  }
-}
-
 #[derive(Default)]
 pub struct Application<'a> {
-  w_arena: Arena<WidgetNode<'a>>,
+  w_arena: Arena<Widget<'a>>,
   r_arena: Arena<Box<dyn RenderObject + Send + Sync>>,
   widget_tree: Option<NodeId>,
   render_tree: Option<NodeId>,
@@ -64,117 +44,71 @@ impl<'a> Application<'a> {
 
   /// inflate widget tree, so every widget tree leaf should be a render object.
   fn inflate(&mut self, w: Widget<'a>) {
-    let (widget_node, children) = Self::consume_widget_to_node(w);
-    let root = self.w_arena.new_node(widget_node);
+    let root = self.w_arena.new_node(w);
     self.widget_tree = Some(root);
 
-    if let Some(c) = children {
-      self.inflate_widget_subtree(root, c);
-    }
+    self.inflate_widget_subtree(root);
   }
 
   /// Return an widget after inflated, and its children
-  #[inline]
-  fn consume_widget_to_node(
-    widget: Widget,
-  ) -> (WidgetNode, Option<SmallVec<[Widget; 1]>>) {
-    match widget {
-      Widget::Combination(w) => {
-        let c = w.build();
-        (WidgetNode::Combination(w), Some(smallvec![c]))
-      }
-      Widget::Render(r) => (WidgetNode::Render(r), None),
-      Widget::SingleChild(w) => {
-        let (render, child) = w.split();
-        (WidgetNode::Render(render), Some(smallvec![child]))
-      }
-      Widget::MultiChild(w) => {
-        let (render, children) = w.split();
-        (
-          WidgetNode::Render(render),
-          Some(SmallVec::from(children)),
-        )
-      }
+
+  fn inflate_widget_subtree(&mut self, sub_tree: NodeId) {
+    let mut stack = vec![sub_tree];
+
+    fn append<'a>(
+      parent: NodeId,
+      widget: Widget<'a>,
+      stack: &mut Vec<NodeId>,
+      tree: &mut Application<'a>,
+    ) {
+      let node = tree.append_widget(parent, widget);
+      stack.push(node);
     }
-  }
 
-  fn inflate_widget_subtree(
-    &mut self,
-    sub_tree: NodeId,
-    children: SmallVec<[Widget<'a>; 1]>,
-  ) {
-    let mut stack = vec![(sub_tree, children)];
-
-    while let Some((parent, mut children)) = stack.pop() {
-      while let Some(child) = children.pop() {
-        let (node, c_children) = Self::consume_widget_to_node(child);
-        let new_id = self.preappend_widget(parent, node);
-        if let Some(c_children) = c_children {
-          stack.push((parent, children));
-          stack.push((new_id, c_children));
-          break;
+    while let Some(parent) = stack.pop() {
+      let p_widget = self.w_arena[parent].get_mut();
+      match p_widget {
+        Widget::Combination(ref c) => {
+          append(parent, c.build(), &mut stack, self);
+        }
+        Widget::SingleChild(single) => {
+          append(parent, single.take_child(), &mut stack, self);
+        }
+        Widget::MultiChild(multi) => {
+          multi.take_children().into_iter().for_each(|w| {
+            append(parent, w, &mut stack, self);
+          });
+        }
+        Widget::Render(_) => {
+          // Touch leaf, nothing to do.
         }
       }
     }
   }
 
   fn down_to_render_widget(&self, mut wid: NodeId) -> NodeId {
-    while let WidgetNode::Combination(_) = self.w_arena[wid].get() {
-      // combination widget always have single child.
-      debug_assert_eq!(wid.children(&self.w_arena).count(), 1);
-
-      wid = self.w_arena[wid]
-        .first_child()
-        .expect("Combination node must be only one child")
+    while let Widget::Combination(_) = self.w_arena[wid].get() {
+      wid = self.assert_widget_single_child(wid);
     }
-    debug_assert!(matches!(
-      &self.w_arena[wid].get(),
-      WidgetNode::Render(_)
-    ));
+    debug_assert!(!matches!(&self.w_arena[wid].get(), Widget::Combination(_)));
 
     wid
   }
 
   fn upper_to_render_widget(&self, mut wid: NodeId) -> NodeId {
-    while let WidgetNode::Combination(_) = self.w_arena[wid].get() {
+    while let Widget::Combination(_) = self.w_arena[wid].get() {
       wid = self.w_arena[wid].parent().expect(
         "should only call this method if `wid`  have render widget ancestor!",
       );
     }
-    debug_assert!(matches!(
-      &self.w_arena[wid].get(),
-      WidgetNode::Render(_)
-    ));
+    debug_assert!(matches!(&self.w_arena[wid].get(), Widget::Render(_)));
 
     wid
   }
 
   /// construct a render tree correspond to widget tree `wid`.
   fn construct_render_tree(&mut self, wid: NodeId) {
-    let mut r_wid = self.down_to_render_widget(wid);
-    let rid;
-    if self.render_tree.is_none() {
-      rid = self.r_arena.new_node(self.create_render_object(r_wid));
-      self.render_tree = Some(rid);
-      self.tree_relationship.bind(r_wid, rid);
-    } else if let Some(render_id) =
-      self.tree_relationship.widget_to_render(r_wid)
-    {
-      rid = *render_id;
-    } else {
-      let rw_parent = self.upper_to_render_widget(
-        self.w_arena[wid]
-          .parent()
-          .expect("should not be a root widget"),
-      );
-      let p_rid = *self.tree_relationship.widget_to_render(rw_parent).expect(
-        "parent render object node should construct before construct subtree",
-      );
-      let (render_widget, render_object) =
-        self.append_render_node(r_wid, p_rid);
-      r_wid = render_widget;
-      rid = render_object;
-    }
+    let (r_wid, rid) = self.widget_render_pair(wid);
 
     let mut stack = vec![];
     self.render_tree_depth_construct(r_wid, rid, &mut stack);
@@ -189,6 +123,34 @@ impl<'a> Application<'a> {
           &mut stack,
         );
       }
+    }
+  }
+
+  /// Return a pair of (render widget node id, render object node id) from the
+  /// widget node id `wid`, if a render object node exist, will create it.
+  fn widget_render_pair(&mut self, wid: NodeId) -> (NodeId, NodeId) {
+    let mut r_wid = self.down_to_render_widget(wid);
+    if self.render_tree.is_none() {
+      let rid = self.r_arena.new_node(self.create_render_object(r_wid));
+      self.render_tree = Some(rid);
+      self.tree_relationship.bind(r_wid, rid);
+    }
+
+    if let Some(render_id) = self.tree_relationship.widget_to_render(r_wid) {
+      (r_wid, *render_id)
+    } else {
+      let rw_parent = self.upper_to_render_widget(
+        self.w_arena[wid]
+          .parent()
+          .expect("should not be a root widget"),
+      );
+      let p_rid = *self.tree_relationship.widget_to_render(rw_parent).expect(
+        "parent render object node should construct before construct subtree",
+      );
+      let (render_widget, render_object) =
+        self.append_render_node(r_wid, p_rid);
+      r_wid = render_widget;
+      (r_wid, render_object)
     }
   }
 
@@ -224,82 +186,56 @@ impl<'a> Application<'a> {
     (wid, r_child)
   }
 
-  fn create_render_object(&self, render_wid: NodeId) -> Box<dyn RenderObject + Send + Sync> {
-    let render_object = if let WidgetNode::Render(ref r) =
-      self.w_arena[render_wid].get()
-    {
-      r.create_render_object()
-    } else {
-      unreachable!("only render widget can create render object!");
-    };
-    render_object
+  fn create_render_object(
+    &self,
+    render_wid: NodeId,
+  ) -> Box<dyn RenderObject + Send + Sync> {
+    match self.w_arena[render_wid].get() {
+      Widget::Combination(_) => {
+        unreachable!("only render widget can create render object!")
+      }
+      Widget::Render(r) => r.create_render_object(),
+      Widget::SingleChild(r) => r.create_render_object(),
+      Widget::MultiChild(r) => r.create_render_object(),
+    }
   }
 
   fn repair_tree(&mut self) {
-    let mut repair_stack = vec![];
     while let Some(first) = self.wait_rebuilds.iter().nth(0).map(|id| *id) {
       // Always find the topmost widget which need to rebuild to rebuild
       // subtree.
-      if let Some(top) = self.get_rebuild_ancestors(first) {
-        if let Some(sub_root)  = self.w_arena.get_mut(top) {
-          debug_assert!(
-            matches!(sub_root.get(), WidgetNode::Combination(_)),
-            "rebuild widget must be combination widget."
-          );
+      let top = self.get_rebuild_ancestors(first);
+      let widget = self.w_arena[top].get_mut();
 
-          // combination widget should have only one child."
-          debug_assert!(sub_root.first_child().is_some());
-          debug_assert_eq!(sub_root.first_child(), sub_root.last_child());
+      debug_assert!(
+        matches!(widget, Widget::Combination(_)),
+        "rebuild widget must be combination widget."
+      );
 
-          if let WidgetNode::Combination(ref c) = sub_root.get() {
-            let new_widget = c.build();
-            let old_node =
-              sub_root.first_child().expect("should have single child");
-
-            repair_stack.push((old_node, new_widget));
-            while let Some((node, widget)) = repair_stack.pop() {
-              self.repair_subtree(node, widget, &mut repair_stack);
-            }
-            self.wait_rebuilds.remove(&top);
-          }
-        }
-      } else {
-        self.wait_rebuilds.remove(&first);
+      if let Widget::Combination(ref c) = widget {
+        let new_widget = c.build();
+        let old_node = self.assert_widget_single_child(top);
+        self.repair_subtree(old_node, new_widget);
+        self.wait_rebuilds.remove(&top);
       }
     }
   }
 
-  /// Keep the `widget_subtree` to correct newest state, across minimal
-  /// reconstruct or replace node in the subtree.
-  fn repair_subtree(
-    &mut self,
-    old_node_id: NodeId,
-    new_widget: Widget<'a>,
-    stack: &mut Vec<(NodeId, Widget<'a>)>,
-  ) {
-    let old_key = self.w_arena[old_node_id].get().key();
-    if old_key.is_some() && old_key == new_widget.key() {
-      self.wait_rebuilds.remove(&old_node_id);
-      // keep node, but replace widget in node with new widget.
-      let (w, children) = Self::consume_widget_to_node(new_widget);
-      *self.w_arena[old_node_id].get_mut() = w;
-      self.dirty_widgets.insert(old_node_id);
+  fn repair_subtree(&mut self, old_node: NodeId, new_widget: Widget<'a>) {
+    let mut stack = vec![(old_node, new_widget)];
 
-      if let Some(widgets) = children {
-        self.repair_children_by_key(old_node_id, widgets, stack);
+    while let Some((old_node, new_widget)) = stack.pop() {
+      let old_key = self.w_arena[old_node].get().key();
+      if old_key.is_some() && old_key == new_widget.key() {
+        debug_assert!(
+          new_widget.same_type_widget(self.w_arena[old_node].get())
+        );
+        self.replace_widget(old_node, new_widget, &mut stack)
       } else {
-        // There is no children in new widget, drop all old children.
-        let mut child = self.w_arena[old_node_id].first_child();
-        while let Some(c) = child {
-          child = self.w_arena[c].next_sibling();
-          self.drop_subtree(c);
-        }
+        self.rebuild_subtree(old_node, new_widget);
       }
-    } else {
-      self.rebuild_subtree(old_node_id, new_widget);
+      self.wait_rebuilds.remove(&old_node);
     }
-
-    self.wait_rebuilds.remove(&old_node_id);
   }
 
   /// rebuild the subtree `wid` by the new children `new_children`, the same key
@@ -308,7 +244,7 @@ impl<'a> Application<'a> {
   fn repair_children_by_key(
     &mut self,
     wid: NodeId,
-    new_children: SmallVec<[Widget<'a>; 1]>,
+    new_children: Vec<Widget<'a>>,
     stack: &mut Vec<(NodeId, Widget<'a>)>,
   ) {
     let mut key_children = HashMap::new();
@@ -328,23 +264,49 @@ impl<'a> Application<'a> {
       if let Some(k) = w.key() {
         if let Some(id) = key_children.get(k).map(|id| *id) {
           key_children.remove(k);
-          wid.append(id, &mut self.w_arena);
-          stack.push((id, w));
+          self.replace_widget(id, w, stack);
           continue;
         }
       }
 
-      let (w, children) = Self::consume_widget_to_node(w);
       let child_id = self.append_widget(wid, w);
-      if let Some(children) = children {
-        self.inflate_widget_subtree(child_id, children);
-        self.construct_render_tree(child_id);
-      }
+
+      self.inflate_widget_subtree(child_id);
+      self.construct_render_tree(child_id);
     }
 
     key_children.into_iter().for_each(|(_, v)| {
       self.drop_subtree(v);
     });
+  }
+
+  fn replace_widget(
+    &mut self,
+    old_node: NodeId,
+    mut new_widget: Widget<'a>,
+    stack: &mut Vec<(NodeId, Widget<'a>)>,
+  ) {
+    match new_widget {
+      Widget::Combination(ref c) => {
+        let new_child = c.build();
+        let old_child_node = self.assert_widget_single_child(old_node);
+        stack.push((old_child_node, new_child));
+      }
+      Widget::SingleChild(ref mut r) => {
+        let new_child = r.take_child();
+        let old_child_node = self.assert_widget_single_child(old_node);
+        stack.push((old_child_node, new_child));
+      }
+      Widget::MultiChild(ref mut multi) => {
+        let children = multi.take_children();
+        self.repair_children_by_key(old_node, children, stack);
+      }
+      Widget::Render(_) => {
+        // down to leaf, nothing to do.
+      }
+    }
+    *self.w_arena[old_node].get_mut() = new_widget;
+    self.dirty_widgets.insert(old_node);
   }
 
   fn rebuild_subtree(&mut self, old_node: NodeId, new_widget: Widget<'a>) {
@@ -353,11 +315,10 @@ impl<'a> Application<'a> {
       .expect("parent should exists!");
     self.drop_subtree(old_node);
 
-    let (w, children) = Self::consume_widget_to_node(new_widget);
-    let new_child_id = self.append_widget(parent_id, w);
-    if let Some(children) = children {
-      self.inflate_widget_subtree(new_child_id, children);
-    }
+    let new_child_id = self.append_widget(parent_id, new_widget);
+
+    self.inflate_widget_subtree(new_child_id);
+
     self.construct_render_tree(new_child_id);
   }
 
@@ -377,7 +338,7 @@ impl<'a> Application<'a> {
 
     wid.descendants(w_arena).for_each(|id| {
       // clear relationship between render object and render widget.
-      if matches!(w_arena[id].get(), WidgetNode::Render(_)) {
+      if !matches!(w_arena[id].get(), Widget::Combination(_)) {
         tree_relationship.unbind(id)
       }
       dirty_widgets.remove(&id);
@@ -397,26 +358,30 @@ impl<'a> Application<'a> {
     }
   }
 
-  fn get_rebuild_ancestors(&self, wid: NodeId) -> Option<NodeId> {
+  fn get_rebuild_ancestors(&self, wid: NodeId) -> NodeId {
     wid
       .ancestors(&self.w_arena)
       .filter(|id| self.wait_rebuilds.contains(id))
       .last()
-      .or(Some(wid))
+      .unwrap_or(wid)
   }
 
-  fn append_widget(&mut self, wid: NodeId, w: WidgetNode<'a>) -> NodeId {
+  fn append_widget(&mut self, wid: NodeId, w: Widget<'a>) -> NodeId {
     let child = self.w_arena.new_node(w);
     wid.append(child, &mut self.w_arena);
     child
   }
 
-  fn preappend_widget(&mut self, wid: NodeId, w: WidgetNode<'a>) -> NodeId {
-    let child = self.w_arena.new_node(w);
-    wid.prepend(child, &mut self.w_arena);
-    child
+  fn assert_widget_single_child(&self, wid: NodeId) -> NodeId {
+    debug_assert!(self.w_arena[wid].first_child().is_some());
+    debug_assert_eq!(
+      self.w_arena[wid].first_child(),
+      self.w_arena[wid].last_child()
+    );
+    self.w_arena[wid]
+      .first_child()
+      .expect("Caller assert `wid` has single child")
   }
-
 
   #[allow(dead_code)]
   pub(crate) fn widget_symbol_tree(&self) -> String {
@@ -439,10 +404,10 @@ impl<'a> Application<'a> {
 
 #[cfg(test)]
 mod test {
-  use std::fmt::{Debug, Formatter, Result};
   use super::*;
   use crate::widget::Row;
   use crate::{render_ctx::*, render_object_box::*};
+  use std::fmt::{Debug, Formatter, Result};
   extern crate test;
   use test::Bencher;
 
@@ -456,19 +421,18 @@ mod test {
 
   impl CombinationWidget for EmbedPost {
     fn build<'a>(&self) -> Widget<'a> {
-      let mut row = Row {
-        children: vec![
-          Text(self.title).to_widget(),
-          Text(self.author).to_widget(),
-          Text(self.content).to_widget(),
-        ],
-      };
+      let mut children = vec![
+        Text(self.title).to_widget(),
+        Text(self.author).to_widget(),
+        Text(self.content).to_widget(),
+      ];
+
       if self.level > 0 {
         let mut embed = self.clone();
         embed.level -= 1;
-        row.children.push(embed.to_widget())
+        children.push(embed.to_widget())
       }
-      row.to_widget()
+      Row::new(children).to_widget()
     }
   }
 
@@ -493,22 +457,22 @@ mod test {
     assert_eq!(
       app.widget_symbol_tree(),
       r#"Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 })
-└── Render(RenderRow)
+└── MultiChild(Row { children: None })
     ├── Render(Text("Simple demo"))
     ├── Render(Text("Adoo"))
     ├── Render(Text("Recursive x times"))
     └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 2 })
-        └── Render(RenderRow)
+        └── MultiChild(Row { children: None })
             ├── Render(Text("Simple demo"))
             ├── Render(Text("Adoo"))
             ├── Render(Text("Recursive x times"))
             └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 1 })
-                └── Render(RenderRow)
+                └── MultiChild(Row { children: None })
                     ├── Render(Text("Simple demo"))
                     ├── Render(Text("Adoo"))
                     ├── Render(Text("Recursive x times"))
                     └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 0 })
-                        └── Render(RenderRow)
+                        └── MultiChild(Row { children: None })
                             ├── Render(Text("Simple demo"))
                             ├── Render(Text("Adoo"))
                             └── Render(Text("Recursive x times"))
@@ -573,21 +537,18 @@ mod test {
 
   impl CombinationWidget for EmbedKeyPost {
     fn build<'a>(&self) -> Widget<'a> {
-      let mut row = Row {
-        children: vec![
-          KeyDetect::new(0, Text(*self.title.borrow())).to_widget(),
-          KeyDetect::new(1, Text(self.author)).to_widget(),
-          KeyDetect::new(2, Text(self.content)).to_widget(),
-        ],
-      };
+      let mut children = vec![
+        KeyDetect::new(0, Text(*self.title.borrow())).to_widget(),
+        KeyDetect::new(1, Text(self.author)).to_widget(),
+        KeyDetect::new(2, Text(self.content)).to_widget(),
+      ];
+
       if self.level > 0 {
         let mut embed = self.clone();
         embed.level -= 1;
-        row
-          .children
-          .push(KeyDetect::new("embed", embed).to_widget())
+        children.push(KeyDetect::new("embed", embed).to_widget())
       }
-      KeyDetect::new(0, row).to_widget()
+      KeyDetect::new(0, Row::new(children)).to_widget()
     }
   }
 
@@ -626,23 +587,23 @@ mod test {
     // fixme: below assert should failed, after support update render tree data.
     assert_eq!(
       env.app.widget_symbol_tree(),
-      r#"Combination(EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 })
-└── Render(KeyRender { key: KI4(0), render: RenderRow })
+r#"Combination(EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 })
+└── MultiChild(KeyDetect { key: KI4(0), child: Row { children: None } })
     ├── Render(KeyDetect { key: KI4(0), child: Text("") })
     ├── Render(KeyDetect { key: KI4(1), child: Text("") })
     ├── Render(KeyDetect { key: KI4(2), child: Text("") })
     └── Combination(KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 } })
-        └── Render(KeyRender { key: KI4(0), render: RenderRow })
+        └── MultiChild(KeyDetect { key: KI4(0), child: Row { children: None } })
             ├── Render(KeyDetect { key: KI4(0), child: Text("") })
             ├── Render(KeyDetect { key: KI4(1), child: Text("") })
             ├── Render(KeyDetect { key: KI4(2), child: Text("") })
             └── Combination(KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 } })
-                └── Render(KeyRender { key: KI4(0), render: RenderRow })
+                └── MultiChild(KeyDetect { key: KI4(0), child: Row { children: None } })
                     ├── Render(KeyDetect { key: KI4(0), child: Text("") })
                     ├── Render(KeyDetect { key: KI4(1), child: Text("") })
                     ├── Render(KeyDetect { key: KI4(2), child: Text("") })
                     └── Combination(KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 } })
-                        └── Render(KeyRender { key: KI4(0), render: RenderRow })
+                        └── MultiChild(KeyDetect { key: KI4(0), child: Row { children: None } })
                             ├── Render(KeyDetect { key: KI4(0), child: Text("") })
                             ├── Render(KeyDetect { key: KI4(1), child: Text("") })
                             └── Render(KeyDetect { key: KI4(2), child: Text("") })

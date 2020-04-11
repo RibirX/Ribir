@@ -5,14 +5,38 @@ use crate::render_object_box::{
 };
 use indextree::*;
 ///  a stupid implement for develope the framework.
-
+#[derive(Debug)]
 pub struct Row<'a> {
-  pub children: Vec<Widget<'a>>,
+  children: Option<Vec<Widget<'a>>>,
 }
 
-impl<'a> MultiChildWidget<'a> for Row<'a> {
-  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>) {
-    (Box::new(RenderRow {}), self.children)
+impl<'a> Row<'a> {
+  #[inline]
+  pub fn new(children: Vec<Widget<'a>>) -> Self {
+    Row {
+      children: Some(children),
+    }
+  }
+}
+
+impl<'a> RenderWidget for Row<'a> {
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
+    Box::new(RowRenderObject {
+      inner_layout: vec![],
+      size: None,
+    })
+  }
+}
+
+impl<'a> MultiChildWidget for Row<'a> {
+  fn take_children<'b>(&mut self) -> Vec<Widget<'b>>
+  where
+    Self: 'b,
+  {
+    self
+      .children
+      .take()
+      .expect("children must init, and this should call once")
   }
 }
 
@@ -64,16 +88,4 @@ impl RenderObjectBox for RowRenderObject {
     self.inner_layout.clear();
   }
   fn is_dirty(&self) -> bool { return self.size.is_none(); }
-}
-
-#[derive(Debug)]
-struct RenderRow {}
-
-impl RenderWidget for RenderRow {
-  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
-    Box::new(RowRenderObject {
-      inner_layout: vec![],
-      size: None,
-    })
-  }
 }
