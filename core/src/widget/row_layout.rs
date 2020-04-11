@@ -32,17 +32,20 @@ struct RowRenderObject {
 impl RenderObject for RowRenderObject {
   fn paint(&self) {}
   // fn perform_layout(&mut self, node_id: NodeId, _ctx: &mut RenderCtx);
-  fn to_render_box(&mut self) -> Option<&mut dyn RenderObjectBox> { Some(self) }
+  fn to_render_box(&self) -> Option<&dyn RenderObjectBox> { Some(self) }
+  fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> {
+    Some(self)
+  }
 }
 
 impl RenderObjectBox for RowRenderObject {
   fn bound(&self) -> Option<Size> { return self.size.clone(); }
   fn get_constraints(&self) -> LayoutConstraints {
-    LayoutConstraints::EffectedByChildren
+    LayoutConstraints::EFFECTED_BY_CHILDREN
   }
 
-  fn layout_sink(&mut self, _ctx: &mut RenderCtx, _self_id: NodeId) {}
-  fn layout_bubble(&mut self, ctx: &mut RenderCtx, self_id: NodeId) {
+  fn layout_sink(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
+  fn layout_bubble(&mut self, self_id: NodeId, ctx: &mut RenderCtx) {
     let mut x = 0 as i32;
     let y = 0;
 

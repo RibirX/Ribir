@@ -20,7 +20,41 @@ pub trait RenderObject: Debug {
   /// bound otherwise should set in layout_bubble, when all the children's
   /// bound have been decided.
   fn perform_layout(&mut self, node_id: NodeId, ctx: &mut RenderCtx) {
-    layout_sub_tree(ctx, node_id);
+    let box_id = ctx
+      .get_render_box_id(node_id)
+      .expect("perform_layout must under layout_box node");
+
+    if !ctx.is_layout_dirty(&box_id) {
+      return;
+    }
+
+    let mut_ptr = ctx as *mut RenderCtx;
+    unsafe {
+      ctx
+        .tree
+        .get_mut(box_id)
+        .and_then(|node| node.get_mut().to_render_box_mut())
+        .map(|node| node.layout_sink(box_id, &mut *mut_ptr));
+    }
+
+    let mut ids = vec![];
+    ctx.collect_children_box(node_id, &mut ids);
+
+    for id in ids {
+      let node = ctx.tree.get_mut(id).unwrap();
+      unsafe {
+        node.get_mut().perform_layout(id, &mut *mut_ptr);
+      }
+    }
+
+    unsafe {
+      ctx
+        .tree
+        .get_mut(box_id)
+        .and_then(|node| node.get_mut().to_render_box_mut())
+        .map(|node| node.layout_bubble(box_id, &mut *mut_ptr));
+      ctx.clear_layout_dirty(&box_id);
+    }
   }
 
   fn mark_dirty(&self, node_id: NodeId, ctx: &mut RenderCtx) {
@@ -28,72 +62,53 @@ pub trait RenderObject: Debug {
     if id.is_none() {
       return;
     }
-    let mut constrants = mark_dirty_by_id(id.unwrap(), ctx);
-    while constrants == LayoutConstraints::EffectedByBoth
-      || constrants == LayoutConstraints::EffectedByChildren
-    {
+    loop {
+      mark_dirty_down(id.unwrap(), ctx);
       let parent_id = ctx.get_parent_box_id(id.unwrap());
       if parent_id.is_none() {
         break;
       }
+      let constraints = ctx.get_layout_constraints(parent_id.unwrap()).unwrap();
+      if !constraints.contains(LayoutConstraints::EFFECTED_BY_CHILDREN) {
+        break;
+      }
       id = parent_id;
-      constrants = mark_dirty_by_id(id.unwrap(), ctx);
     }
+    ctx.add_layout_sub_tree(id.unwrap());
+  }
+  fn to_render_box(&self) -> Option<&dyn RenderObjectBox> { None }
 
+  fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> { None }
+}
+
+fn mark_constraints_dirty(
+  id: NodeId,
+  ctx: &mut RenderCtx,
+  target: LayoutConstraints,
+) -> bool {
+  if let Some(constraints) = ctx.get_layout_constraints(id) {
+    if constraints.contains(target) {
+      ctx.mark_layout_dirty(id);
+      return true;
+    }
+  }
+  return false;
+}
+
+fn mark_dirty_down(mut id: NodeId, ctx: &mut RenderCtx) {
+  if let Some(box_id) = ctx.get_render_box_id(id) {
+    if ctx.is_layout_dirty(&box_id) {
+      return;
+    }
     let mut ids = vec![];
-    ctx.collect_children_box(id.unwrap(), &mut ids);
+    ctx.collect_children_box(id, &mut ids);
     while ids.len() > 0 {
-      let id = ids.pop().unwrap();
-      let node = ctx.tree.get_mut(id).unwrap();
-      let render_box = node.get_mut().to_render_box().unwrap();
-      constrants = render_box.get_constraints();
-      if constrants == LayoutConstraints::EffectedByBoth
-        || constrants == LayoutConstraints::EffectedByParent
+      id = ids.pop().unwrap();
+      if mark_constraints_dirty(id, ctx, LayoutConstraints::EFFECTED_BY_PARENT)
       {
-        render_box.mark_dirty();
         ctx.collect_children_box(id, &mut ids);
       }
     }
-  }
-  fn to_render_box(&mut self) -> Option<&mut dyn RenderObjectBox> { None }
-}
-
-fn mark_dirty_by_id(id: NodeId, ctx: &mut RenderCtx) -> LayoutConstraints {
-  let node = ctx.tree.get_mut(id).unwrap();
-  let render_box = node.get_mut().to_render_box().unwrap();
-  render_box.mark_dirty();
-  return render_box.get_constraints();
-}
-
-fn layout_sub_tree(ctx: &mut RenderCtx, node_id: NodeId) {
-  let mut ids = vec![node_id];
-  let mut down_ids = vec![];
-  let mut_ptr = ctx as *mut RenderCtx;
-  while ids.len() > 0 {
-    let mut id = ids.pop().unwrap();
-    id = ctx.get_render_box_id(id).unwrap();
-
-    let node = ctx.tree.get_mut(id).unwrap();
-    let render_box = node.get_mut().to_render_box().unwrap();
-    if !render_box.is_dirty() {
-      continue;
-    }
-
-    // the context deliver in layout need a more elegant way
-    unsafe {
-      render_box.layout_sink(&mut *mut_ptr, id);
-    }
-
-    ctx.collect_children_box(id, &mut ids);
-    down_ids.push(id);
-  }
-
-  while down_ids.len() > 0 {
-    let id = down_ids.pop().unwrap();
-    let node = ctx.tree.get_mut(id).unwrap();
-    let render_box = node.get_mut().to_render_box().unwrap();
-    unsafe {
-      render_box.layout_bubble(&mut *mut_ptr, id);
-    }
+    ctx.mark_layout_dirty(box_id);
   }
 }

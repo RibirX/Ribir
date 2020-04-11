@@ -70,6 +70,9 @@ pub struct Application<'a> {
   dirty_widgets: HashSet<NodeId>,
   /// Store combination widgets that has require to rebuild its subtree.
   wait_rebuilds: HashSet<NodeId>,
+
+  dirty_layouts: HashSet<NodeId>,
+  dirty_layout_roots: HashSet<NodeId>,
 }
 
 impl<'a> Application<'a> {
@@ -840,21 +843,25 @@ mod test {
 
   fn layout_app(app: &mut Application) {
     let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject>>;
-    let root = app.r_arena.get_mut(app.render_tree.unwrap()).unwrap();
+    let mut ctx = RenderCtx::new(&mut app.r_arena, &mut app.dirty_layouts, &mut app.dirty_layout_roots);
     unsafe {
-        root.get_mut().perform_layout(app.render_tree.unwrap(), &mut RenderCtx::new(&mut *mut_ptr));
+        let root = mut_ptr.as_mut().unwrap().get_mut(app.render_tree.unwrap()).unwrap();
+        root.get_mut().perform_layout(app.render_tree.unwrap(), &mut ctx);
     }
   }
 
   fn mark_dirty(app: &mut Application, node_id: NodeId) {
     let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject>>;
+    let mut ctx = RenderCtx::new(&mut app.r_arena, &mut app.dirty_layouts, &mut app.dirty_layout_roots);
+    
     unsafe {
-      app
-        .r_arena
+       mut_ptr
+        .as_mut()
+        .unwrap()
         .get_mut(node_id)
         .unwrap()
         .get_mut()
-        .mark_dirty(node_id, &mut RenderCtx::new(&mut *mut_ptr));
+        .mark_dirty(node_id, &mut ctx);
     }
   }
 
@@ -884,6 +891,8 @@ mod test {
     app.inflate(post.into());
     app.construct_render_tree(app.widget_tree.unwrap());
 
+    let root_id = app.render_tree.unwrap();
+    mark_dirty(&mut app, root_id);
     layout_app(&mut app);
     assert_root_bound(
       &mut app,
@@ -899,9 +908,10 @@ mod test {
       .last_child()
       .unwrap();
     mark_dirty(&mut app, last_child_id);
-    assert_root_bound(&mut app, None);
+    assert_eq!(app.dirty_layouts.contains(&root_id), true);
 
     layout_app(&mut app);
+    assert_eq!(app.dirty_layouts.contains(&root_id), false);
     assert_root_bound(
       &mut app,
       Some(Size {

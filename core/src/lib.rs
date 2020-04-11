@@ -1,5 +1,8 @@
 #![feature(specialization, test, decl_macro)]
 
+#[macro_use]
+extern crate bitflags;
+
 mod application;
 mod render_ctx;
 mod render_object;

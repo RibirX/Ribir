@@ -9,7 +9,10 @@ pub struct Text(pub &'static str);
 
 impl RenderObject for Text {
   fn paint(&self) {}
-  fn to_render_box(&mut self) -> Option<&mut dyn RenderObjectBox> { Some(self) }
+  fn to_render_box(&self) -> Option<&dyn RenderObjectBox> { Some(self) }
+  fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> {
+    Some(self)
+  }
 }
 
 impl From<Text> for Widget {
@@ -31,11 +34,11 @@ impl RenderObjectBox for Text {
     });
   }
   fn get_constraints(&self) -> LayoutConstraints {
-    LayoutConstraints::DecidedBySelf
+    LayoutConstraints::DECIDED_BY_SELF
   }
 
-  fn layout_sink(&mut self, _ctx: &mut RenderCtx, _self_id: NodeId) {}
-  fn layout_bubble(&mut self, _ctx: &mut RenderCtx, _self_id: NodeId) {}
+  fn layout_sink(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
+  fn layout_bubble(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
   fn mark_dirty(&mut self) {}
   fn is_dirty(&self) -> bool { return false; }
 }
