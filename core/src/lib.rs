@@ -1,4 +1,4 @@
-#![feature(specialization, test, decl_macro, raw)]
+#![feature(specialization, test, decl_macro, raw, generic_associated_types)]
 
 #[macro_use]
 extern crate bitflags;
@@ -12,6 +12,6 @@ mod util;
 mod widget;
 pub mod prelude {
   pub use crate::application::Application;
-  pub use crate::render_object::RenderObject;
+  pub use crate::render::*;
   pub use crate::widget::*;
 }

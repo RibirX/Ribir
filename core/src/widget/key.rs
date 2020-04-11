@@ -1,11 +1,12 @@
 use crate::widget::*;
+
 use blake3;
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
 };
 
-/// Abstract all builtin provide key into a same type.
+/// Abstract all builtin key into a same type.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Key {
   KUsize(usize),
@@ -35,6 +36,9 @@ pub struct KeyDetect<W> {
   child: W,
 }
 
+#[derive(Debug)]
+pub struct KeyRender<R>(R);
+
 impl<W> KeyDetect<W> {
   pub fn new<K>(key: K, child: W) -> Self
   where
@@ -62,14 +66,16 @@ impl<W> RenderWidget for KeyDetect<W>
 where
   W: RenderWidget,
 {
-  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
-    self.child.create_render_object()
+  type RO = KeyRender<W::RO>;
+  fn create_render_object(&self) -> Self::RO {
+    KeyRender(self.child.create_render_object())
   }
 }
 
 impl<W> SingleChildWidget for KeyDetect<W>
 where
-  W: SingleChildWidget,
+  W: SingleChildWidget + RenderWidget,
+  W::RO: Send + Sync + 'static,
 {
   #[inline]
   fn take_child<'a>(&mut self) -> Widget<'a>
@@ -82,7 +88,8 @@ where
 
 impl<W> MultiChildWidget for KeyDetect<W>
 where
-  W: MultiChildWidget,
+  W: MultiChildWidget + RenderWidget,
+  W::RO: Send + Sync + 'static,
 {
   #[inline]
   fn take_children<'a>(&mut self) -> Vec<Widget<'a>>
@@ -91,6 +98,13 @@ where
   {
     self.child.take_children()
   }
+}
+
+impl<W> RenderObject<KeyDetect<W>> for KeyRender<W::RO>
+where
+  W: RenderWidget,
+{
+  fn update(&mut self, owner_widget: &KeyDetect<W>) { unimplemented!() }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {

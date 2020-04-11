@@ -1,5 +1,4 @@
-use crate::render_object::RenderObject;
-
+use crate::render::*;
 use std::fmt::Debug;
 
 pub mod key;
@@ -30,35 +29,16 @@ pub trait CombinationWidget: Debug {
   }
 }
 
-/// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget: Debug {
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
-  /// you want give a key to your widget.
-  fn key(&self) -> Option<&Key> { None }
-
-  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync>;
-}
-
 /// a widget has a child.
-pub trait SingleChildWidget: RenderWidget {
+pub trait SingleChildWidget: RenderWidgetSafety {
   /// called by framework to take child from this widget, and only called once.
   fn take_child<'a>(&mut self) -> Widget<'a>
   where
     Self: 'a;
-
-  /// convert to [`Widget`](Widget), not override this method, will remove after
-  /// Rust generic specialization finished
-  fn to_widget<'a>(self) -> Widget<'a>
-  where
-    Self: Sized + 'a,
-  {
-    Widget::SingleChild(Box::new(self))
-  }
 }
 
 /// a widget has multi child
-pub trait MultiChildWidget: RenderWidget {
+pub trait MultiChildWidget: RenderWidgetSafety {
   /// called by framework to take children from this widget, and only called
   /// once.
   fn take_children<'a>(&mut self) -> Vec<Widget<'a>>
@@ -69,7 +49,7 @@ pub trait MultiChildWidget: RenderWidget {
 #[derive(Debug)]
 pub enum Widget<'a> {
   Combination(Box<dyn CombinationWidget + 'a>),
-  Render(Box<dyn RenderWidget + 'a>),
+  Render(Box<dyn RenderWidgetSafety + 'a>),
   SingleChild(Box<dyn SingleChildWidget + 'a>),
   MultiChild(Box<dyn MultiChildWidget + 'a>),
 }
@@ -100,7 +80,7 @@ pub trait IntoWidget {
     Self: 'a;
 }
 
-impl<W: RenderWidget> IntoWidget for W {
+impl<W: RenderWidgetSafety> IntoWidget for W {
   default fn to_widget<'a>(self) -> Widget<'a>
   where
     Self: 'a,
