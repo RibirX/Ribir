@@ -1,9 +1,10 @@
-#![feature(specialization, test, decl_macro)]
+#![feature(specialization, test, decl_macro, raw)]
 
 #[macro_use]
 extern crate bitflags;
 
 mod application;
+mod render;
 mod render_ctx;
 mod render_object;
 mod render_object_box;
