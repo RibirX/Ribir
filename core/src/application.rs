@@ -1,7 +1,6 @@
 use crate::{
   render_object::*, util::TreeFormatter, widget::key::Key, widget::*,
 };
-use ::herald::prelude::*;
 use indextree::*;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -11,12 +10,12 @@ mod tree_relationship;
 use tree_relationship::Relationship;
 
 #[derive(Debug)]
-enum WidgetNode {
-  Combination(Box<dyn for<'a> CombinationWidget<'a>>),
-  Render(Box<dyn for<'a> RenderWidget<'a>>),
+enum WidgetNode<'a> {
+  Combination(Box<dyn  CombinationWidget +'a>),
+  Render(Box<dyn  RenderWidget +'a>),
 }
 
-impl WidgetNode {
+impl<'a> WidgetNode<'a> {
   fn key(&self) -> Option<&Key> {
     match self {
       Self::Combination(c) => c.key(),
@@ -27,9 +26,8 @@ impl WidgetNode {
 
 #[derive(Default)]
 pub struct Application<'a> {
-  notifier: LocalSubject<'a, (), ()>,
-  w_arena: Arena<WidgetNode>,
-  r_arena: Arena<Box<dyn RenderObject>>,
+  w_arena: Arena<WidgetNode<'a>>,
+  r_arena: Arena<Box<dyn RenderObject + Send + Sync>>,
   widget_tree: Option<NodeId>,
   render_tree: Option<NodeId>,
   tree_relationship: Relationship,
@@ -44,7 +42,7 @@ impl<'a> Application<'a> {
   #[inline]
   pub fn new() -> Application<'a> { Default::default() }
 
-  pub fn run(mut self, w: Widget) {
+  pub fn run(mut self, w: Widget<'a>) {
     self.inflate(w);
     self.construct_render_tree(
       self.widget_tree.expect("widget root should exists"),
@@ -62,7 +60,7 @@ impl<'a> Application<'a> {
   }
 
   /// inflate widget tree, so every widget tree leaf should be a render object.
-  fn inflate(&mut self, w: Widget) {
+  fn inflate(&mut self, w: Widget<'a>) {
     let (widget_node, children) = Self::consume_widget_to_node(w);
     let root = self.w_arena.new_node(widget_node);
     self.widget_tree = Some(root);
@@ -100,7 +98,7 @@ impl<'a> Application<'a> {
   fn inflate_widget_subtree(
     &mut self,
     sub_tree: NodeId,
-    children: SmallVec<[Widget; 1]>,
+    children: SmallVec<[Widget<'a>; 1]>,
   ) {
     let mut stack = vec![(sub_tree, children)];
 
@@ -223,7 +221,7 @@ impl<'a> Application<'a> {
     (wid, r_child)
   }
 
-  fn create_render_object(&self, render_wid: NodeId) -> Box<dyn RenderObject> {
+  fn create_render_object(&self, render_wid: NodeId) -> Box<dyn RenderObject + Send + Sync> {
     let render_object = if let WidgetNode::Render(ref r) =
       self.w_arena[render_wid].get()
     {
@@ -240,7 +238,7 @@ impl<'a> Application<'a> {
       // Always find the topmost widget which need to rebuild to rebuild
       // subtree.
       if let Some(top) = self.get_rebuild_ancestors(first) {
-        if let Some(sub_root) = self.w_arena.get_mut(top) {
+        if let Some(sub_root)  = self.w_arena.get_mut(top) {
           debug_assert!(
             matches!(sub_root.get(), WidgetNode::Combination(_)),
             "rebuild widget must be combination widget."
@@ -273,8 +271,8 @@ impl<'a> Application<'a> {
   fn repair_subtree(
     &mut self,
     old_node_id: NodeId,
-    new_widget: Widget,
-    stack: &mut Vec<(NodeId, Widget)>,
+    new_widget: Widget<'a>,
+    stack: &mut Vec<(NodeId, Widget<'a>)>,
   ) {
     let old_key = self.w_arena[old_node_id].get().key();
     if old_key.is_some() && old_key == new_widget.key() {
@@ -307,8 +305,8 @@ impl<'a> Application<'a> {
   fn repair_children_by_key(
     &mut self,
     wid: NodeId,
-    new_children: SmallVec<[Widget; 1]>,
-    stack: &mut Vec<(NodeId, Widget)>,
+    new_children: SmallVec<[Widget<'a>; 1]>,
+    stack: &mut Vec<(NodeId, Widget<'a>)>,
   ) {
     let mut key_children = HashMap::new();
     let mut child = self.w_arena[wid].first_child();
@@ -346,7 +344,7 @@ impl<'a> Application<'a> {
     });
   }
 
-  fn rebuild_subtree(&mut self, old_node: NodeId, new_widget: Widget) {
+  fn rebuild_subtree(&mut self, old_node: NodeId, new_widget: Widget<'a>) {
     let parent_id = self.w_arena[old_node]
       .parent()
       .expect("parent should exists!");
@@ -404,13 +402,13 @@ impl<'a> Application<'a> {
       .or(Some(wid))
   }
 
-  fn append_widget(&mut self, wid: NodeId, w: WidgetNode) -> NodeId {
+  fn append_widget(&mut self, wid: NodeId, w: WidgetNode<'a>) -> NodeId {
     let child = self.w_arena.new_node(w);
     wid.append(child, &mut self.w_arena);
     child
   }
 
-  fn preappend_widget(&mut self, wid: NodeId, w: WidgetNode) -> NodeId {
+  fn preappend_widget(&mut self, wid: NodeId, w: WidgetNode<'a>) -> NodeId {
     let child = self.w_arena.new_node(w);
     wid.prepend(child, &mut self.w_arena);
     child
@@ -453,8 +451,8 @@ mod test {
     level: usize,
   }
 
-  impl<'a> CombinationWidget<'a> for EmbedPost {
-    fn build(&self) -> Widget {
+  impl CombinationWidget for EmbedPost {
+    fn build<'a>(&self) -> Widget<'a> {
       let mut row = Row {
         children: vec![
           Text(self.title).to_widget(),
@@ -570,8 +568,8 @@ mod test {
     }
   }
 
-  impl<'a> CombinationWidget<'a> for EmbedKeyPost {
-    fn build(&self) -> Widget {
+  impl CombinationWidget for EmbedKeyPost {
+    fn build<'a>(&self) -> Widget<'a> {
       let mut row = Row {
         children: vec![
           KeyDetect::new(0, Text(*self.title.borrow())).to_widget(),
@@ -678,7 +676,7 @@ mod test {
   }
 
   fn layout_app(app: &mut Application) {
-    let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject>>;
+    let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject + Send + Sync>>;
     let root = app.r_arena.get_mut(app.render_tree.unwrap()).unwrap();
     unsafe {
       root.get_mut().perform_layout(
@@ -689,7 +687,7 @@ mod test {
   }
 
   fn mark_dirty(app: &mut Application, node_id: NodeId) {
-    let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject>>;
+    let mut_ptr = &mut app.r_arena as *mut Arena<Box<dyn RenderObject + Send  +Sync>>;
     unsafe {
       app
         .r_arena

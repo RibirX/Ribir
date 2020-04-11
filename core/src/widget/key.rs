@@ -47,35 +47,35 @@ impl<W> KeyDetect<W> {
   }
 }
 
-impl<'a, W> CombinationWidget<'a> for KeyDetect<W>
+impl<W> CombinationWidget for KeyDetect<W>
 where
-  W: CombinationWidget<'a>,
+  W: CombinationWidget,
 {
   #[inline]
   fn key(&self) -> Option<&Key> { Some(&self.key) }
 
   #[inline]
-  fn build(&self) -> Widget { self.child.build() }
+  fn build<'a>(&self) -> Widget<'a> { self.child.build() }
 }
 
-impl<'a, W> RenderWidget<'a> for KeyDetect<W>
+impl<W> RenderWidget for KeyDetect<W>
 where
-  W: RenderWidget<'a>,
+  W: RenderWidget,
 {
-  fn create_render_object(&self) -> Box<dyn RenderObject> {
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
     self.child.create_render_object()
   }
 }
 
 #[derive(Debug)]
-pub struct KeyRender {
+pub struct KeyRender<'a> {
   key: Key,
-  render: Box<dyn for<'r> RenderWidget<'r>>,
+  render: Box<dyn RenderWidget + 'a>,
 }
 
-impl<'a> RenderWidget<'a> for KeyRender {
+impl<'a> RenderWidget for KeyRender<'a> {
   #[inline]
-  fn create_render_object(&self) -> Box<dyn RenderObject> {
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
     self.render.create_render_object()
   }
 }
@@ -87,7 +87,7 @@ where
   #[inline]
   fn key(&self) -> Option<&Key> { Some(&self.key) }
 
-  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget) {
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Widget<'a>) {
     let (r, c) = Box::new(self.child).split();
     let key_render = KeyRender {
       key: self.key,
@@ -101,9 +101,7 @@ impl<'a, W> MultiChildWidget<'a> for KeyDetect<W>
 where
   W: MultiChildWidget<'a>,
 {
-  fn split(
-    self: Box<Self>,
-  ) -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>) {
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>) {
     let (r, c) = Box::new(self.child).split();
     let key_render = KeyRender {
       key: self.key,

@@ -11,24 +11,24 @@ pub use row_layout::Row;
 pub use text::Text;
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget<'a>: Debug {
+pub trait CombinationWidget: Debug {
   /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
   /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
 
   /// Describes the part of the user interface represented by this widget.
-  fn build(&self) -> Widget;
+  fn build<'a>(&self) -> Widget<'a>;
 }
 
 /// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget<'a>: Debug {
+pub trait RenderWidget: Debug {
   /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
   /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
 
-  fn create_render_object(&self) -> Box<dyn RenderObject>;
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync>;
 }
 
 /// a widget has a child.
@@ -38,7 +38,7 @@ pub trait SingleChildWidget<'a> {
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
 
-  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget);
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Widget<'a>);
 }
 
 /// a widget has multi child
@@ -48,17 +48,16 @@ pub trait MultiChildWidget<'a> {
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
 
-  fn split(self: Box<Self>)
-  -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>);
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>);
 }
 
-pub enum Widget {
-  Combination(Box<dyn for<'a> CombinationWidget<'a>>),
-  Render(Box<dyn for<'a> RenderWidget<'a>>),
-  SingleChild(Box<dyn for<'a> SingleChildWidget<'a>>),
-  MultiChild(Box<dyn for<'a> MultiChildWidget<'a>>),
+pub enum Widget<'a> {
+  Combination(Box<dyn CombinationWidget + 'a>),
+  Render(Box<dyn RenderWidget + 'a>),
+  SingleChild(Box<dyn SingleChildWidget<'a> + 'a>),
+  MultiChild(Box<dyn MultiChildWidget<'a> + 'a>),
 }
-impl Debug for Widget {
+impl<'a> Debug for Widget<'a> {
   fn fmt(&self, f: &mut Formatter<'_>) -> Result {
     match self {
       Widget::Render(r) => r.fmt(f),
@@ -69,7 +68,7 @@ impl Debug for Widget {
   }
 }
 
-impl Widget {
+impl<'a> Widget<'a> {
   pub fn key(&self) -> Option<&Key> {
     match self {
       Widget::Combination(w) => w.key(),
@@ -80,34 +79,34 @@ impl Widget {
   }
 }
 
-pub trait CombinationWidgetInto {
-  fn to_widget(self) -> Widget;
+pub trait CombinationWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
 }
 
-impl<W: for<'r> CombinationWidget<'r> + 'static> CombinationWidgetInto for W {
-  fn to_widget(self) -> Widget { Widget::Combination(Box::new(self)) }
+impl<'a, W: CombinationWidget + 'a> CombinationWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::Combination(Box::new(self)) }
 }
 
-pub trait RenderWidgetInto {
-  fn to_widget(self) -> Widget;
+pub trait RenderWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
 }
 
-impl<W: for<'r> RenderWidget<'r> + 'static> RenderWidgetInto for W {
-  fn to_widget(self) -> Widget { Widget::Render(Box::new(self)) }
+impl<'a, W: RenderWidget + 'a> RenderWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::Render(Box::new(self)) }
 }
 
-pub trait SingleChildWidgetInto {
-  fn to_widget(self) -> Widget;
+pub trait SingleChildWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
 }
 
-impl<W: for<'r> SingleChildWidget<'r> + 'static> SingleChildWidgetInto for W {
-  fn to_widget(self) -> Widget { Widget::SingleChild(Box::new(self)) }
+impl<'a, W: SingleChildWidget<'a> + 'a> SingleChildWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::SingleChild(Box::new(self)) }
 }
 
-pub trait MultiChildWidgetInto {
-  fn to_widget(self) -> Widget;
+pub trait MultiChildWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
 }
 
-impl<W: for<'r> MultiChildWidget<'r> + 'static> MultiChildWidgetInto for W {
-  fn to_widget(self) -> Widget { Widget::MultiChild(Box::new(self)) }
+impl<'a, W: MultiChildWidget<'a> + 'a> MultiChildWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::MultiChild(Box::new(self)) }
 }

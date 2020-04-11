@@ -12,8 +12,8 @@ impl RenderObject for Text {
   fn to_render_box(&mut self) -> Option<&mut dyn RenderObjectBox> { Some(self) }
 }
 
-impl<'a> RenderWidget<'a> for Text {
-  fn create_render_object(&self) -> Box<dyn RenderObject> {
+impl RenderWidget for Text {
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
     Box::new(Text(self.0))
   }
 }

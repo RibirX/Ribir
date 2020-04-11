@@ -2,11 +2,13 @@ use crate::render_object::RenderObject;
 use crate::render_object_box::RenderObjectBox;
 use indextree::*;
 pub struct RenderCtx<'a> {
-  pub tree: &'a mut Arena<Box<dyn RenderObject>>,
+  pub tree: &'a mut Arena<Box<dyn RenderObject + Send + Sync>>,
 }
 
 impl<'a> RenderCtx<'a> {
-  pub fn new(tree: &'a mut Arena<Box<dyn RenderObject>>) -> RenderCtx<'a> {
+  pub fn new(
+    tree: &'a mut Arena<Box<dyn RenderObject + Send + Sync>>,
+  ) -> RenderCtx<'a> {
     return RenderCtx { tree: tree };
   }
 

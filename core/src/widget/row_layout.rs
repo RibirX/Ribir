@@ -6,14 +6,12 @@ use crate::render_object_box::{
 use indextree::*;
 ///  a stupid implement for develope the framework.
 
-pub struct Row {
-  pub children: Vec<Widget>,
+pub struct Row<'a> {
+  pub children: Vec<Widget<'a>>,
 }
 
-impl<'a> MultiChildWidget<'a> for Row {
-  fn split(
-    self: Box<Self>,
-  ) -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>) {
+impl<'a> MultiChildWidget<'a> for Row<'a> {
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>) {
     (Box::new(RenderRow {}), self.children)
   }
 }
@@ -68,8 +66,8 @@ impl RenderObjectBox for RowRenderObject {
 #[derive(Debug)]
 struct RenderRow {}
 
-impl<'a> RenderWidget<'a> for RenderRow {
-  fn create_render_object(&self) -> Box<dyn RenderObject> {
+impl RenderWidget for RenderRow {
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
     Box::new(RowRenderObject {
       inner_layout: vec![],
       size: None,
