@@ -1,8 +1,6 @@
 use crate::render_object::RenderObject;
-use ::herald::prelude::*;
 
-use std::{any::Any, fmt::Debug};
-use subject::LocalSubject;
+use std::fmt::{Debug, Formatter, Result};
 
 pub mod key;
 mod row_layout;
@@ -12,104 +10,103 @@ pub use key::{Key, KeyDetect};
 pub use row_layout::Row;
 pub use text::Text;
 
-/// `WidgetStates` can return a subscribable stream which emit a `()` value,
-/// when widget state changed.
-pub trait WidgetStates<'a> {
-  #[inline]
-  fn changed_emitter(
-    &mut self,
-    _notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    None
-  }
-
-  #[inline]
-  fn as_any(&self) -> Option<&dyn Any> { None }
-}
-
 /// A widget represented by other widget compose.
-pub trait CombinationWidget<'a>: WidgetStates<'a> + Debug {
-  /// Describes the part of the user interface represented by this widget.
-  fn build(&self) -> Widget;
+pub trait CombinationWidget: Debug {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
 
-  /// Return a Some-value which contain a subscribable stream to notify rebuild.
-  /// Return a None-value if this widget never occur rebuild.
-  /// By default, every widget state change will trigger rebuild, you can
-  /// override the default implement to decide which state change really need
-  /// rebuild, or just return `None` because your widget need rebuild never.
-  fn rebuild_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    self.changed_emitter(notifier)
-  }
+  /// Describes the part of the user interface represented by this widget.
+  fn build<'a>(&self) -> Widget<'a>;
 }
 
 /// RenderWidget is a widget has its render object to display self.
-pub trait RenderWidget<'a>: WidgetStates<'a> + Debug + Any {
-  fn create_render_object(&self) -> Box<dyn RenderObject>;
+pub trait RenderWidget: Debug {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync>;
 }
 
 /// a widget has a child.
-pub trait SingleChildWidget<'a>: WidgetStates<'a> {
-  fn split(self: Box<Self>) -> (Box<dyn for<'r> RenderWidget<'r>>, Widget);
+pub trait SingleChildWidget<'a> {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Widget<'a>);
 }
 
 /// a widget has multi child
-pub trait MultiChildWidget<'a>: WidgetStates<'a> {
-  fn split(self: Box<Self>)
-  -> (Box<dyn for<'r> RenderWidget<'r>>, Vec<Widget>);
+pub trait MultiChildWidget<'a> {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
+  fn split(self: Box<Self>) -> (Box<dyn RenderWidget + 'a>, Vec<Widget<'a>>);
 }
 
-pub enum Widget {
-  Combination(Box<dyn for<'a> CombinationWidget<'a>>),
-  Render(Box<dyn for<'a> RenderWidget<'a>>),
-  SingleChild(Box<dyn for<'a> SingleChildWidget<'a>>),
-  MultiChild(Box<dyn for<'a> MultiChildWidget<'a>>),
+pub enum Widget<'a> {
+  Combination(Box<dyn CombinationWidget + 'a>),
+  Render(Box<dyn RenderWidget + 'a>),
+  SingleChild(Box<dyn SingleChildWidget<'a> + 'a>),
+  MultiChild(Box<dyn MultiChildWidget<'a> + 'a>),
 }
-
-impl<'a> WidgetStates<'a> for Widget {
-  fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
+impl<'a> Debug for Widget<'a> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
     match self {
-      Widget::Combination(w) => w.changed_emitter(notifier),
-      Widget::Render(w) => w.changed_emitter(notifier),
-      Widget::SingleChild(w) => w.changed_emitter(notifier),
-      Widget::MultiChild(w) => w.changed_emitter(notifier),
-    }
-  }
-  fn as_any(&self) -> Option<&dyn Any> {
-    match self {
-      Widget::Combination(w) => w.as_any(),
-      Widget::Render(w) => w.as_any(),
-      Widget::SingleChild(w) => w.as_any(),
-      Widget::MultiChild(w) => w.as_any(),
+      Widget::Render(r) => r.fmt(f),
+      Widget::Combination(c) => c.fmt(f),
+      Widget::SingleChild(_) => f.write_str("SingleChild"),
+      Widget::MultiChild(_) => f.write_str("MultiChild"),
     }
   }
 }
 
-impl Widget {
+impl<'a> Widget<'a> {
   pub fn key(&self) -> Option<&Key> {
     match self {
-      Widget::Render(w) => w.as_any()?.downcast_ref::<Key>(),
-      Widget::SingleChild(w) => {
-        w.as_any()?.downcast_ref::<KeyDetect>().map(|k| k.key())
-      }
-      _ => None,
+      Widget::Combination(w) => w.key(),
+      Widget::Render(w) => w.key(),
+      Widget::SingleChild(w) => w.key(),
+      Widget::MultiChild(w) => w.key(),
     }
   }
 }
-impl<'a, T: Herald<'a> + 'a> WidgetStates<'a> for T {
-  #[inline]
-  default fn changed_emitter(
-    &mut self,
-    notifier: LocalSubject<'a, (), ()>,
-  ) -> Option<LocalCloneBoxOp<'a, (), ()>> {
-    Some(self.batched_change_stream(notifier).map(|_v| ()).box_it())
-  }
 
-  #[inline]
-  default fn as_any(&self) -> Option<&dyn Any> { None }
+pub trait CombinationWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
+}
+
+impl<'a, W: CombinationWidget + 'a> CombinationWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::Combination(Box::new(self)) }
+}
+
+pub trait RenderWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
+}
+
+impl<'a, W: RenderWidget + 'a> RenderWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::Render(Box::new(self)) }
+}
+
+pub trait SingleChildWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
+}
+
+impl<'a, W: SingleChildWidget<'a> + 'a> SingleChildWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::SingleChild(Box::new(self)) }
+}
+
+pub trait MultiChildWidgetInto<'a> {
+  fn to_widget(self) -> Widget<'a>;
+}
+
+impl<'a, W: MultiChildWidget<'a> + 'a> MultiChildWidgetInto<'a> for W {
+  fn to_widget(self) -> Widget<'a> { Widget::MultiChild(Box::new(self)) }
 }

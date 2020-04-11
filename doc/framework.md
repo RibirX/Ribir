@@ -55,7 +55,11 @@ Opacity! {
 
 ## RenderObject & RenderTree 
 
-Widget tree use states represents the user interface, and RenderTree is created by RenderWidget do the actually layout and paint. In this vision, widget is build cheap, and RenderObject is expensive.
+Widget tree use states represents the user interface, and RenderTree is created by RenderWidget do the actually layout and paint. In this vision, widget is build cheap, and RenderObject is more expensive than widget.
+
+## Update Data
+
+When we build a widget from CombinationWidget, framework provide a BuildContext param, and the NodeId of the widget build in the ctx, use the NodeId framework can provide State<Self> to change widget state when reactive user interactive. 
 
 ### Layout
 

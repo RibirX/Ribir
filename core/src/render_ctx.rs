@@ -6,14 +6,14 @@ use indextree::*;
 
 use std::collections::HashSet;
 pub struct RenderCtx<'a> {
-  pub tree: &'a mut Arena<Box<dyn RenderObject>>,
+  pub tree: &'a mut Arena<Box<dyn RenderObject + Send + Sync>>,
   dirty_layouts: &'a mut HashSet<NodeId>,
   dirty_layout_roots: &'a mut HashSet<NodeId>,
 }
 
 impl<'a> RenderCtx<'a> {
   pub fn new(
-    tree: &'a mut Arena<Box<dyn RenderObject>>,
+    tree: &'a mut Arena<Box<dyn RenderObject + Send + Sync>>,
     dirty_layouts: &'a mut HashSet<NodeId>,
     dirty_layout_roots: &'a mut HashSet<NodeId>,
   ) -> RenderCtx<'a> {
@@ -31,7 +31,10 @@ impl<'a> RenderCtx<'a> {
     }
   }
 
-  pub fn get_render_obj(&self, id: NodeId) -> Option<&dyn RenderObject> {
+  pub fn get_render_obj(
+    &self,
+    id: NodeId,
+  ) -> Option<&(dyn RenderObject + Send + Sync)> {
     self.tree.get(id).map(|node| node.get().as_ref())
   }
 
