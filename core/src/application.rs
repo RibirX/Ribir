@@ -6,40 +6,21 @@ use indextree::*;
 use smallvec::{smallvec, SmallVec};
 use std::{
   collections::{HashMap, HashSet},
-  ptr::NonNull,
 };
 mod tree_relationship;
 use tree_relationship::Relationship;
 
 #[derive(Debug)]
-enum WidgetInstance {
+enum WidgetNode {
   Combination(Box<dyn for<'a> CombinationWidget<'a>>),
   Render(Box<dyn for<'a> RenderWidget<'a>>),
 }
 
-impl WidgetInstance {
+impl WidgetNode {
   fn key(&self) -> Option<&Key> {
     match self {
       Self::Combination(c) => c.key(),
       Self::Render(r) => r.key(),
-    }
-  }
-}
-
-pub(crate) struct WidgetNode {
-  widget: WidgetInstance,
-  subscription_guards: (
-    Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
-    Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
-  ),
-}
-
-impl WidgetNode {
-  #[inline]
-  fn new(w: WidgetInstance) -> Self {
-    WidgetNode {
-      widget: w,
-      subscription_guards: (None, None),
     }
   }
 }
@@ -83,7 +64,7 @@ impl<'a> Application<'a> {
   /// inflate widget tree, so every widget tree leaf should be a render object.
   fn inflate(&mut self, w: Widget) {
     let (widget_node, children) = Self::consume_widget_to_node(w);
-    let root = self.w_arena.new_node(WidgetNode::new(widget_node));
+    let root = self.w_arena.new_node(widget_node);
     self.widget_tree = Some(root);
 
     if let Some(c) = children {
@@ -95,21 +76,21 @@ impl<'a> Application<'a> {
   #[inline]
   fn consume_widget_to_node(
     widget: Widget,
-  ) -> (WidgetInstance, Option<SmallVec<[Widget; 1]>>) {
+  ) -> (WidgetNode, Option<SmallVec<[Widget; 1]>>) {
     match widget {
       Widget::Combination(w) => {
         let c = w.build();
-        (WidgetInstance::Combination(w), Some(smallvec![c]))
+        (WidgetNode::Combination(w), Some(smallvec![c]))
       }
-      Widget::Render(r) => (WidgetInstance::Render(r), None),
+      Widget::Render(r) => (WidgetNode::Render(r), None),
       Widget::SingleChild(w) => {
         let (render, child) = w.split();
-        (WidgetInstance::Render(render), Some(smallvec![child]))
+        (WidgetNode::Render(render), Some(smallvec![child]))
       }
       Widget::MultiChild(w) => {
         let (render, children) = w.split();
         (
-          WidgetInstance::Render(render),
+          WidgetNode::Render(render),
           Some(SmallVec::from(children)),
         )
       }
@@ -137,7 +118,7 @@ impl<'a> Application<'a> {
   }
 
   fn down_to_render_widget(&self, mut wid: NodeId) -> NodeId {
-    while let WidgetInstance::Combination(_) = self.w_arena[wid].get().widget {
+    while let WidgetNode::Combination(_) = self.w_arena[wid].get() {
       // combination widget always have single child.
       debug_assert_eq!(wid.children(&self.w_arena).count(), 1);
 
@@ -146,22 +127,22 @@ impl<'a> Application<'a> {
         .expect("Combination node must be only one child")
     }
     debug_assert!(matches!(
-      &self.w_arena[wid].get().widget,
-      WidgetInstance::Render(_)
+      &self.w_arena[wid].get(),
+      WidgetNode::Render(_)
     ));
 
     wid
   }
 
   fn upper_to_render_widget(&self, mut wid: NodeId) -> NodeId {
-    while let WidgetInstance::Combination(_) = self.w_arena[wid].get().widget {
+    while let WidgetNode::Combination(_) = self.w_arena[wid].get() {
       wid = self.w_arena[wid].parent().expect(
         "should only call this method if `wid`  have render widget ancestor!",
       );
     }
     debug_assert!(matches!(
-      &self.w_arena[wid].get().widget,
-      WidgetInstance::Render(_)
+      &self.w_arena[wid].get(),
+      WidgetNode::Render(_)
     ));
 
     wid
@@ -243,8 +224,8 @@ impl<'a> Application<'a> {
   }
 
   fn create_render_object(&self, render_wid: NodeId) -> Box<dyn RenderObject> {
-    let render_object = if let WidgetInstance::Render(ref r) =
-      self.w_arena[render_wid].get().widget
+    let render_object = if let WidgetNode::Render(ref r) =
+      self.w_arena[render_wid].get()
     {
       r.create_render_object()
     } else {
@@ -261,7 +242,7 @@ impl<'a> Application<'a> {
       if let Some(top) = self.get_rebuild_ancestors(first) {
         if let Some(sub_root) = self.w_arena.get_mut(top) {
           debug_assert!(
-            matches!(sub_root.get().widget, WidgetInstance::Combination(_)),
+            matches!(sub_root.get(), WidgetNode::Combination(_)),
             "rebuild widget must be combination widget."
           );
 
@@ -269,7 +250,7 @@ impl<'a> Application<'a> {
           debug_assert!(sub_root.first_child().is_some());
           debug_assert_eq!(sub_root.first_child(), sub_root.last_child());
 
-          if let WidgetInstance::Combination(ref c) = sub_root.get().widget {
+          if let WidgetNode::Combination(ref c) = sub_root.get() {
             let new_widget = c.build();
             let old_node =
               sub_root.first_child().expect("should have single child");
@@ -295,12 +276,12 @@ impl<'a> Application<'a> {
     new_widget: Widget,
     stack: &mut Vec<(NodeId, Widget)>,
   ) {
-    let old_key = self.w_arena[old_node_id].get().widget.key();
+    let old_key = self.w_arena[old_node_id].get().key();
     if old_key.is_some() && old_key == new_widget.key() {
       self.wait_rebuilds.remove(&old_node_id);
       // keep node, but replace widget in node with new widget.
       let (w, children) = Self::consume_widget_to_node(new_widget);
-      self.w_arena[old_node_id].get_mut().widget = w;
+      *self.w_arena[old_node_id].get_mut() = w;
       self.dirty_widgets.insert(old_node_id);
 
       if let Some(widgets) = children {
@@ -333,7 +314,7 @@ impl<'a> Application<'a> {
     let mut child = self.w_arena[wid].first_child();
     while let Some(id) = child {
       child = self.w_arena[id].next_sibling();
-      let key = self.w_arena[id].get().widget.key().map(|k| k.clone());
+      let key = self.w_arena[id].get().key().map(|k| k.clone());
       if let Some(key) = key {
         id.detach(&mut self.w_arena);
         key_children.insert(key, id);
@@ -395,7 +376,7 @@ impl<'a> Application<'a> {
 
     wid.descendants(w_arena).for_each(|id| {
       // clear relationship between render object and render widget.
-      if matches!(w_arena[id].get().widget, WidgetInstance::Render(_)) {
+      if matches!(w_arena[id].get(), WidgetNode::Render(_)) {
         tree_relationship.unbind(id)
       }
       dirty_widgets.remove(&id);
@@ -423,14 +404,14 @@ impl<'a> Application<'a> {
       .or(Some(wid))
   }
 
-  fn append_widget(&mut self, wid: NodeId, w: WidgetInstance) -> NodeId {
-    let child = self.w_arena.new_node(WidgetNode::new(w));
+  fn append_widget(&mut self, wid: NodeId, w: WidgetNode) -> NodeId {
+    let child = self.w_arena.new_node(w);
     wid.append(child, &mut self.w_arena);
     child
   }
 
-  fn preappend_widget(&mut self, wid: NodeId, w: WidgetInstance) -> NodeId {
-    let child = self.w_arena.new_node(WidgetNode::new(w));
+  fn preappend_widget(&mut self, wid: NodeId, w: WidgetNode) -> NodeId {
+    let child = self.w_arena.new_node(w);
     wid.prepend(child, &mut self.w_arena);
     child
   }
@@ -455,13 +436,9 @@ impl<'a> Application<'a> {
   }
 }
 
-use std::fmt::{Debug, Formatter, Result};
-impl Debug for WidgetNode {
-  fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.widget.fmt(f) }
-}
-
 #[cfg(test)]
 mod test {
+  use std::fmt::{Debug, Formatter, Result};
   use super::*;
   use crate::widget::Row;
   use crate::{render_ctx::*, render_object_box::*};
