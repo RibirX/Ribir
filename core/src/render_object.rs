@@ -30,33 +30,17 @@ pub trait RenderObject: Debug {
       return;
     }
 
-    let mut_ptr = ctx as *mut RenderCtx;
-    unsafe {
-      ctx
-        .tree
-        .get_mut(box_id)
-        .and_then(|node| node.get_mut().to_render_box_mut())
-        .map(|node| node.layout_sink(box_id, &mut *mut_ptr));
-    }
+    ctx.perform_layout_sink(box_id);
 
     let mut ids = vec![];
     ctx.collect_children_box(node_id, &mut ids);
 
     for id in ids {
-      let node = ctx.tree.get_mut(id).unwrap();
-      unsafe {
-        node.get_mut().perform_layout(id, &mut *mut_ptr);
-      }
+      ctx.perform_layout(id);
     }
 
-    unsafe {
-      ctx
-        .tree
-        .get_mut(box_id)
-        .and_then(|node| node.get_mut().to_render_box_mut())
-        .map(|node| node.layout_bubble(box_id, &mut *mut_ptr));
-      ctx.clear_layout_dirty(&box_id);
-    }
+    ctx.perform_layout_bubble(box_id);
+    ctx.clear_layout_dirty(&box_id);
   }
 
   fn mark_dirty(&self, node_id: NodeId, ctx: &mut RenderCtx) {

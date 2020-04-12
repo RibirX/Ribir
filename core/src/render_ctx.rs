@@ -6,7 +6,7 @@ use indextree::*;
 
 use std::collections::HashSet;
 pub struct RenderCtx<'a> {
-  pub tree: &'a mut Arena<Box<dyn RenderObject + Send + Sync>>,
+  tree: &'a mut Arena<Box<dyn RenderObject + Send + Sync>>,
   dirty_layouts: &'a mut HashSet<NodeId>,
   dirty_layout_roots: &'a mut HashSet<NodeId>,
 }
@@ -29,6 +29,36 @@ impl<'a> RenderCtx<'a> {
     id: NodeId,
   ) -> &(dyn RenderObject + Send + Sync) {
     self.tree[id].get().as_ref()
+  }
+
+  pub fn perform_layout(&mut self, id: NodeId) {
+    let mut_ptr = self as *mut RenderCtx;
+    let node = &mut self.tree[id];
+    unsafe {
+      node.get_mut().perform_layout(id, &mut *mut_ptr);
+    }
+  }
+
+  pub fn perform_layout_sink(&mut self, box_id: NodeId) {
+    let mut_ptr = self as *mut RenderCtx;
+    unsafe {
+      self.tree[box_id]
+        .get_mut()
+        .to_render_box_mut()
+        .map(|node| node.layout_sink(box_id, &mut *mut_ptr))
+        .expect("must be RenderObject box");
+    }
+  }
+
+  pub fn perform_layout_bubble(&mut self, box_id: NodeId) {
+    let mut_ptr = self as *mut RenderCtx;
+    unsafe {
+      self.tree[box_id]
+        .get_mut()
+        .to_render_box_mut()
+        .map(|node| node.layout_bubble(box_id, &mut *mut_ptr))
+        .expect("must be RenderObject box");
+    }
   }
 
   pub fn collect_children_box(&mut self, id: NodeId, ids: &mut Vec<NodeId>) {
