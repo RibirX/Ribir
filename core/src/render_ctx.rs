@@ -24,18 +24,11 @@ impl<'a> RenderCtx<'a> {
     };
   }
 
-  pub fn collect_children(&mut self, id: NodeId, ids: &mut Vec<NodeId>) {
-    let children = id.reverse_children(self.tree);
-    for child in children {
-      ids.push(child);
-    }
-  }
-
   pub fn get_render_obj(
     &self,
     id: NodeId,
-  ) -> Option<&(dyn RenderObject + Send + Sync)> {
-    self.tree.get(id).map(|node| node.get().as_ref())
+  ) -> &(dyn RenderObject + Send + Sync) {
+    self.tree[id].get().as_ref()
   }
 
   pub fn collect_children_box(&mut self, id: NodeId, ids: &mut Vec<NodeId>) {
@@ -43,7 +36,7 @@ impl<'a> RenderCtx<'a> {
     self.collect_children(id, &mut children_ids);
     while children_ids.len() > 0 {
       let id = children_ids.pop().unwrap();
-      let render_box = self.get_render_obj(id).map(|node| node.to_render_box());
+      let render_box = self.get_render_obj(id).to_render_box();
       if render_box.is_none() {
         self.collect_children(id, &mut children_ids);
       } else {
@@ -55,7 +48,7 @@ impl<'a> RenderCtx<'a> {
   pub fn get_render_box_id(&self, node_id: NodeId) -> Option<NodeId> {
     let mut id = node_id;
     loop {
-      let current_node = self.tree.get(id).unwrap();
+      let current_node = &self.tree[id];
       let render_box = current_node.get().to_render_box();
       if render_box.is_some() {
         return Some(id);
@@ -72,17 +65,16 @@ impl<'a> RenderCtx<'a> {
     &self,
     node_id: NodeId,
   ) -> Option<LayoutConstraints> {
-    return self
-      .tree
-      .get(node_id)
-      .and_then(|node| node.get().to_render_box())
+    return self.tree[node_id]
+      .get()
+      .to_render_box()
       .map(|node| node.get_constraints());
   }
+
   pub fn get_parent_box_id(&mut self, node_id: NodeId) -> Option<NodeId> {
     return self
       .get_render_box_id(node_id)
-      .and_then(|box_id| self.tree.get(box_id))
-      .and_then(|node| node.parent())
+      .and_then(|box_id| self.tree[box_id].parent())
       .and_then(|id| self.get_render_box_id(id));
   }
 
@@ -105,5 +97,12 @@ impl<'a> RenderCtx<'a> {
   pub fn clear_all_dirty_layout(&mut self) {
     self.dirty_layout_roots.clear();
     self.dirty_layouts.clear();
+  }
+
+  fn collect_children(&mut self, id: NodeId, ids: &mut Vec<NodeId>) {
+    let children = id.reverse_children(self.tree);
+    for child in children {
+      ids.push(child);
+    }
   }
 }
