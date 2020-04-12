@@ -65,35 +65,51 @@ impl RenderId {
   pub fn remove(self, tree: &mut RenderTree) { self.0.remove(&mut tree.arena); }
 
   /// A delegate for [NodeId::parent](indextree::NodeId.parent)
-  pub fn parent(&self, tree: &RenderTree) -> Option<RenderId> {
+  pub fn parent(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_id_feature(tree, |node| node.parent())
   }
 
   /// A delegate for [NodeId::first_child](indextree::NodeId.first_child)
-  pub fn first_child(&self, tree: &RenderTree) -> Option<RenderId> {
+  pub fn first_child(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_id_feature(tree, |node| node.first_child())
   }
 
   /// A delegate for [NodeId::last_child](indextree::NodeId.last_child)
-  pub fn last_child(&self, tree: &RenderTree) -> Option<RenderId> {
+  pub fn last_child(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_id_feature(tree, |node| node.last_child())
   }
 
   /// A delegate for
   /// [NodeId::previous_sibling](indextree::NodeId.previous_sibling)
-  pub fn previous_sibling(&self, tree: &RenderTree) -> Option<RenderId> {
+  pub fn previous_sibling(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_id_feature(tree, |node| node.previous_sibling())
   }
 
   /// A delegate for [NodeId::next_sibling](indextree::NodeId.next_sibling)
-  pub fn next_sibling(&self, tree: &RenderTree) -> Option<RenderId> {
+  pub fn next_sibling(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_id_feature(tree, |node| node.next_sibling())
   }
 
+  /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
+  pub fn ancestors<'a>(
+    self,
+    tree: &'a RenderTree,
+  ) -> impl Iterator<Item = RenderId> + 'a {
+    self.0.ancestors(&tree.arena).map(|id| RenderId(id))
+  }
+
+  /// A delegate for [NodeId::descendants](indextree::NodeId.descendants)
+  pub fn descendants<'a>(
+    self,
+    tree: &'a RenderTree,
+  ) -> impl Iterator<Item = RenderId> + 'a {
+    self.0.descendants(&tree.arena).map(|id| RenderId(id))
+  }
+
   /// A delegate for [NodeId::detach](indextree::NodeId.detach)
-  pub fn detach(&self, tree: &mut RenderTree) {
+  pub fn detach(self, tree: &mut RenderTree) {
     self.0.detach(&mut tree.arena);
-    if tree.root == Some(*self) {
+    if tree.root == Some(self) {
       tree.root = None;
     }
   }

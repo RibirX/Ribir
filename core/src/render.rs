@@ -1,8 +1,7 @@
 use crate::widget::Key;
 use std::fmt::Debug;
 use std::raw::TraitObject;
-mod render_tree;
-pub use render_tree::*;
+pub mod render_tree;
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
