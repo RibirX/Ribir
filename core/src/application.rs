@@ -7,9 +7,8 @@ use tree_relationship::Relationship;
 #[derive(Default)]
 pub struct Application<'a> {
   w_arena: Arena<Widget<'a>>,
-  r_arena: Arena<Box<dyn RenderObjectSafety + Send + Sync>>,
+  render_tree: RenderTree,
   widget_tree: Option<NodeId>,
-  render_tree: Option<NodeId>,
   tree_relationship: Relationship,
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
@@ -128,11 +127,11 @@ impl<'a> Application<'a> {
 
   /// Return a pair of (render widget node id, render object node id) from the
   /// widget node id `wid`, if a render object node exist, will create it.
-  fn widget_render_pair(&mut self, wid: NodeId) -> (NodeId, NodeId) {
+  fn widget_render_pair(&mut self, wid: NodeId) -> (NodeId, RenderId) {
     let mut r_wid = self.down_to_render_widget(wid);
-    if self.render_tree.is_none() {
-      let rid = self.r_arena.new_node(self.create_render_object(r_wid));
-      self.render_tree = Some(rid);
+    if self.render_tree.root().is_none() {
+      let rid = self.render_tree.new_node(self.create_render_object(r_wid));
+      self.render_tree.set_root(rid);
       self.tree_relationship.bind(r_wid, rid);
     }
 
@@ -157,8 +156,8 @@ impl<'a> Application<'a> {
   fn render_tree_depth_construct(
     &mut self,
     mut wid: NodeId,
-    mut rid: NodeId,
-    stack: &mut Vec<(NodeId, NodeId)>,
+    mut rid: RenderId,
+    stack: &mut Vec<(NodeId, RenderId)>,
   ) {
     wid = self.down_to_render_widget(wid);
 
@@ -177,11 +176,11 @@ impl<'a> Application<'a> {
   fn append_render_node(
     &mut self,
     mut wid: NodeId,
-    rid: NodeId,
-  ) -> (NodeId, NodeId) {
+    rid: RenderId,
+  ) -> (NodeId, RenderId) {
     wid = self.down_to_render_widget(wid);
-    let r_child = self.r_arena.new_node(self.create_render_object(wid));
-    rid.append(r_child, &mut self.r_arena);
+    let r_child = self.render_tree.new_node(self.create_render_object(wid));
+    rid.append(r_child, &mut self.render_tree);
     self.tree_relationship.bind(wid, r_child);
     (wid, r_child)
   }
@@ -349,12 +348,9 @@ impl<'a> Application<'a> {
     // relationship
     // Fixme: memory leak here, node not remove.
     wid.detach(&mut self.w_arena);
-    rid.detach(&mut self.r_arena);
+    rid.detach(&mut self.render_tree);
     if self.widget_tree == Some(wid) {
       self.widget_tree = None;
-    }
-    if self.render_tree == Some(rid) {
-      self.render_tree = None;
     }
   }
 
@@ -387,15 +383,6 @@ impl<'a> Application<'a> {
   pub(crate) fn widget_symbol_tree(&self) -> String {
     if let Some(w_root) = self.widget_tree {
       format!("{:?}", TreeFormatter::new(&self.w_arena, w_root))
-    } else {
-      "".to_owned()
-    }
-  }
-
-  #[allow(dead_code)]
-  pub(crate) fn render_symbol_tree(&self) -> String {
-    if let Some(r_root) = self.render_tree {
-      format!("{:?}", TreeFormatter::new(&self.r_arena, r_root))
     } else {
       "".to_owned()
     }
@@ -480,23 +467,23 @@ mod test {
     );
 
     assert_eq!(
-      app.render_symbol_tree(),
-      r#"RowRenderObject { inner_layout: [], size: None }
-├── Text("Simple demo")
-├── Text("Adoo")
-├── Text("Recursive x times")
-└── RowRenderObject { inner_layout: [], size: None }
-    ├── Text("Simple demo")
-    ├── Text("Adoo")
-    ├── Text("Recursive x times")
-    └── RowRenderObject { inner_layout: [], size: None }
-        ├── Text("Simple demo")
-        ├── Text("Adoo")
-        ├── Text("Recursive x times")
-        └── RowRenderObject { inner_layout: [], size: None }
-            ├── Text("Simple demo")
-            ├── Text("Adoo")
-            └── Text("Recursive x times")
+      app.render_tree.symbol_shape(),
+      r#"RowRender { inner_layout: [], size: None }
+├── TextRender("Simple demo")
+├── TextRender("Adoo")
+├── TextRender("Recursive x times")
+└── RowRender { inner_layout: [], size: None }
+    ├── TextRender("Simple demo")
+    ├── TextRender("Adoo")
+    ├── TextRender("Recursive x times")
+    └── RowRender { inner_layout: [], size: None }
+        ├── TextRender("Simple demo")
+        ├── TextRender("Adoo")
+        ├── TextRender("Recursive x times")
+        └── RowRender { inner_layout: [], size: None }
+            ├── TextRender("Simple demo")
+            ├── TextRender("Adoo")
+            └── TextRender("Recursive x times")
 "#
     );
   }
@@ -512,7 +499,7 @@ mod test {
     assert!(app.wait_rebuilds.is_empty());
 
     assert!(app.widget_tree.is_none());
-    assert!(app.render_tree.is_none());
+    assert!(app.render_tree.root().is_none());
   }
 
   use std::{cell::RefCell, rc::Rc};
@@ -601,23 +588,23 @@ r#"Combination(EmbedKeyPost { title: RefCell { value: "New title" }, author: "",
 
     // fixme: below assert should failed, after support update render tree.
     assert_eq!(
-      env.app.render_symbol_tree(),
-      r#"RowRenderObject { inner_layout: [], size: None }
-├── Text("")
-├── Text("")
-├── Text("")
-└── RowRenderObject { inner_layout: [], size: None }
-    ├── Text("")
-    ├── Text("")
-    ├── Text("")
-    └── RowRenderObject { inner_layout: [], size: None }
-        ├── Text("")
-        ├── Text("")
-        ├── Text("")
-        └── RowRenderObject { inner_layout: [], size: None }
-            ├── Text("")
-            ├── Text("")
-            └── Text("")
+      env.app.render_tree.symbol_shape(),
+r#"KeyRender(RowRender { inner_layout: [], size: None })
+├── KeyRender(TextRender(""))
+├── KeyRender(TextRender(""))
+├── KeyRender(TextRender(""))
+└── KeyRender(RowRender { inner_layout: [], size: None })
+    ├── KeyRender(TextRender(""))
+    ├── KeyRender(TextRender(""))
+    ├── KeyRender(TextRender(""))
+    └── KeyRender(RowRender { inner_layout: [], size: None })
+        ├── KeyRender(TextRender(""))
+        ├── KeyRender(TextRender(""))
+        ├── KeyRender(TextRender(""))
+        └── KeyRender(RowRender { inner_layout: [], size: None })
+            ├── KeyRender(TextRender(""))
+            ├── KeyRender(TextRender(""))
+            └── KeyRender(TextRender(""))
 "#
     );
   }

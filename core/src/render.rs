@@ -1,6 +1,8 @@
 use crate::widget::Key;
 use std::fmt::Debug;
 use std::raw::TraitObject;
+mod render_tree;
+pub use render_tree::*;
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
@@ -9,8 +11,9 @@ pub trait RenderWidget: Debug + Sized {
   type RO: RenderObject<Self> + Send + Sync + 'static;
 
   /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
-  /// you want give a key to your widget.
+  /// You should not override this method, use
+  /// [`KeyDetect`](crate::widget::key::KeyDetect) if you want give a key to
+  /// your widget.
   fn key(&self) -> Option<&Key> { None }
 
   /// Creates an instance of the RenderObject that this RenderWidget
@@ -23,8 +26,8 @@ pub trait RenderWidget: Debug + Sized {
 pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   Debug + Sized + Send + Sync + 'static
 {
-  /// Call by framework when its owner render widget `owner_widget`
-  /// changed, should not call this method directly.
+  /// Call by framework when its owner `owner_widget` changed, should not call
+  /// this method directly.
   fn update(&mut self, owner_widget: &Owner);
 }
 
@@ -132,6 +135,7 @@ where
     let safety: Box<dyn RenderObjectSafety + Send + Sync> = Box::new(self);
     // unsafe introduce: `W` just use to constraint type, and never access it.
     // And `R` bounds with RenderObject should always `static` lifetime.
+    // This will be removed after rust GAT supported.
     unsafe { std::mem::transmute(safety) }
   }
 }

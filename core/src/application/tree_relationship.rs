@@ -1,3 +1,4 @@
+use crate::render::RenderId;
 use indextree::*;
 use std::collections::HashMap;
 
@@ -5,14 +6,14 @@ use std::collections::HashMap;
 pub struct Relationship {
   /// A hash map to mapping a render widget in widget tree to its corresponds
   /// render object in render tree.
-  widget_to_render: HashMap<NodeId, NodeId>,
+  widget_to_render: HashMap<NodeId, RenderId>,
   /// A hash map to mapping a render object in render tree to its corresponds
   /// render widget in widget tree.
-  render_to_widget: HashMap<NodeId, NodeId>,
+  render_to_widget: HashMap<RenderId, NodeId>,
 }
 
 impl Relationship {
-  pub fn bind(&mut self, wid: NodeId, rid: NodeId) {
+  pub fn bind(&mut self, wid: NodeId, rid: RenderId) {
     self.widget_to_render.insert(wid, rid);
     self.render_to_widget.insert(rid, wid);
   }
@@ -35,7 +36,7 @@ impl Relationship {
   }
 
   #[inline]
-  pub fn widget_to_render(&self, wid: NodeId) -> Option<&NodeId> {
+  pub fn widget_to_render(&self, wid: NodeId) -> Option<&RenderId> {
     self.widget_to_render.get(&wid)
   }
 }

@@ -11,7 +11,10 @@ pub struct Row<'a> {
 }
 
 #[derive(Debug, Default)]
-pub struct RowRender {}
+pub struct RowRender {
+  inner_layout: Vec<(Position, Size)>,
+  size: Option<Size>,
+}
 
 impl<'a> Row<'a> {
   #[inline]
