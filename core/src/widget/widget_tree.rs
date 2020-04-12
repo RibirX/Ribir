@@ -16,14 +16,51 @@ impl<'a> WidgetTree<'a> {
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
   #[inline]
-  pub fn set_root(&mut self, root: WidgetId) {
+  pub fn set_root(&mut self, data: Widget<'a>) -> WidgetId {
     debug_assert!(self.root.is_none());
+    let root = self.new_node(data);
     self.root = Some(root);
+    root
   }
 
   #[inline]
   pub fn new_node(&mut self, data: Widget<'a>) -> WidgetId {
     WidgetId(self.arena.new_node(data))
+  }
+
+  /// Inflate the subtree start from `wid`.
+  pub(crate) fn inflate(&mut self, wid: WidgetId) {
+    let mut stack = vec![wid];
+
+    fn append<'a>(
+      parent: WidgetId,
+      widget: Widget<'a>,
+      stack: &mut Vec<WidgetId>,
+      tree: &mut WidgetTree<'a>,
+    ) {
+      let node = parent.append_widget(widget, tree);
+      stack.push(node);
+    }
+
+    while let Some(parent) = stack.pop() {
+      let p_widget = parent.get_mut(self).expect("must exist!");
+      match p_widget {
+        Widget::Combination(ref c) => {
+          append(parent, c.build(), &mut stack, self);
+        }
+        Widget::SingleChild(single) => {
+          append(parent, single.take_child(), &mut stack, self);
+        }
+        Widget::MultiChild(multi) => {
+          multi.take_children().into_iter().for_each(|w| {
+            append(parent, w, &mut stack, self);
+          });
+        }
+        Widget::Render(_) => {
+          // Touch leaf, nothing to do.
+        }
+      }
+    }
   }
 
   #[allow(dead_code)]
@@ -48,6 +85,16 @@ impl WidgetId {
     tree: &'b mut WidgetTree<'a>,
   ) -> Option<&'b mut Widget<'a>> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
+  }
+
+  pub fn append_widget<'a>(
+    self,
+    data: Widget<'a>,
+    tree: &mut WidgetTree<'a>,
+  ) -> WidgetId {
+    let child = tree.new_node(data);
+    self.append(child, tree);
+    child
   }
 
   /// A delegate for [NodeId::append](indextree::NodeId.append)
@@ -158,5 +205,58 @@ impl WidgetId {
       .map(method)
       .flatten()
       .map(|id| WidgetId(id))
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::test::embed_post::EmbedPost;
+  extern crate test;
+  use test::Bencher;
+
+  fn create_env<'a>(level: usize) -> (WidgetTree<'a>, WidgetId) {
+    let mut tree = WidgetTree::default();
+    let root = tree.set_root(EmbedPost::new(level).to_widget());
+    (tree, root)
+  }
+
+  #[test]
+  fn infate_tree() {
+    let (mut tree, root) = create_env(3);
+    tree.inflate(root);
+    assert_eq!(
+      tree.symbol_shape(),
+      r#"Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 })
+└── MultiChild(Row { children: None })
+    ├── Render(Text("Simple demo"))
+    ├── Render(Text("Adoo"))
+    ├── Render(Text("Recursive x times"))
+    └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 2 })
+        └── MultiChild(Row { children: None })
+            ├── Render(Text("Simple demo"))
+            ├── Render(Text("Adoo"))
+            ├── Render(Text("Recursive x times"))
+            └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 1 })
+                └── MultiChild(Row { children: None })
+                    ├── Render(Text("Simple demo"))
+                    ├── Render(Text("Adoo"))
+                    ├── Render(Text("Recursive x times"))
+                    └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 0 })
+                        └── MultiChild(Row { children: None })
+                            ├── Render(Text("Simple demo"))
+                            ├── Render(Text("Adoo"))
+                            └── Render(Text("Recursive x times"))
+"#
+    );
+  }
+
+
+  #[bench]
+  fn inflate_5_x_1000(b: &mut Bencher) {
+    b.iter(|| {
+      let (mut tree, root) = create_env(1000);
+    tree.inflate(root);
+    });
   }
 }

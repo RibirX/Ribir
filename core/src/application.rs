@@ -1,4 +1,4 @@
-use crate::{prelude::*,  render::render_tree::*, widget::widget_tree::*};
+use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*};
 use indextree::*;
 use std::collections::{HashMap, HashSet};
 mod tree_relationship;
@@ -42,46 +42,8 @@ impl<'a> Application<'a> {
 
   /// inflate widget tree, so every widget tree leaf should be a render object.
   fn inflate(&mut self, w: Widget<'a>) {
-    let root = self.widget_tree.new_node(w);
-    self.widget_tree.set_root(root);
-
-    self.inflate_widget_subtree(root);
-  }
-
-  /// Return an widget after inflated, and its children
-
-  fn inflate_widget_subtree(&mut self, sub_tree: WidgetId) {
-    let mut stack = vec![sub_tree];
-
-    fn append<'a>(
-      parent: WidgetId,
-      widget: Widget<'a>,
-      stack: &mut Vec<WidgetId>,
-      tree: &mut Application<'a>,
-    ) {
-      let node = tree.append_widget(parent, widget);
-      stack.push(node);
-    }
-
-    while let Some(parent) = stack.pop() {
-      let p_widget = parent.get_mut(&mut self.widget_tree).expect("must exist!");
-      match p_widget {
-        Widget::Combination(ref c) => {
-          append(parent, c.build(), &mut stack, self);
-        }
-        Widget::SingleChild(single) => {
-          append(parent, single.take_child(), &mut stack, self);
-        }
-        Widget::MultiChild(multi) => {
-          multi.take_children().into_iter().for_each(|w| {
-            append(parent, w, &mut stack, self);
-          });
-        }
-        Widget::Render(_) => {
-          // Touch leaf, nothing to do.
-        }
-      }
-    }
+    let root = self.widget_tree.set_root(w);
+    self.widget_tree.inflate(root);
   }
 
   /// construct a render tree correspond to widget tree `wid`.
@@ -109,20 +71,18 @@ impl<'a> Application<'a> {
   fn widget_render_pair(&mut self, wid: WidgetId) -> (WidgetId, RenderId) {
     let mut r_wid = wid.down_nearest_render_widget(&self.widget_tree);
     if self.render_tree.root().is_none() {
-      let rid = self.render_tree.new_node(self.create_render_object(r_wid));
-      self.render_tree.set_root(rid);
+      let render_object = self.create_render_object(r_wid);
+      let rid = self.render_tree.set_root(render_object);
       self.tree_relationship.bind(r_wid, rid);
     }
 
     if let Some(render_id) = self.tree_relationship.widget_to_render(r_wid) {
       (r_wid, *render_id)
     } else {
-      let parent = wid.parent(&self.widget_tree)
-      .expect("should not be a root widget");
-      let rw_parent = parent.upper_nearest_render_widget(&self.widget_tree
-        
-        
-      );
+      let parent = wid
+        .parent(&self.widget_tree)
+        .expect("should not be a root widget");
+      let rw_parent = parent.upper_nearest_render_widget(&self.widget_tree);
       let p_rid = *self.tree_relationship.widget_to_render(rw_parent).expect(
         "parent render object node should construct before construct subtree",
       );
@@ -169,7 +129,7 @@ impl<'a> Application<'a> {
     &self,
     render_wid: WidgetId,
   ) -> Box<dyn RenderObjectSafety + Send + Sync> {
-    match render_wid.get(&self.widget_tree).expect("must exists!"){
+    match render_wid.get(&self.widget_tree).expect("must exists!") {
       Widget::Combination(_) => {
         unreachable!("only render widget can create render object!")
       }
@@ -206,9 +166,9 @@ impl<'a> Application<'a> {
     while let Some((old_node, new_widget)) = stack.pop() {
       let old_key = old_node.get(&self.widget_tree).map(|w| w.key()).flatten();
       if old_key.is_some() && old_key == new_widget.key() {
-        debug_assert!(
-          new_widget.same_type_widget(old_node.get(&self.widget_tree).expect("Must exist!"))
-        );
+        debug_assert!(new_widget.same_type_widget(
+          old_node.get(&self.widget_tree).expect("Must exist!")
+        ));
         self.replace_widget(old_node, new_widget, &mut stack)
       } else {
         self.rebuild_subtree(old_node, new_widget);
@@ -230,7 +190,10 @@ impl<'a> Application<'a> {
     let mut child = wid.first_child(&self.widget_tree);
     while let Some(id) = child {
       child = id.next_sibling(&self.widget_tree);
-      let key = id.get(&self.widget_tree).map(|w| w.key().map(|k|k.clone())).flatten();
+      let key = id
+        .get(&self.widget_tree)
+        .map(|w| w.key().map(|k| k.clone()))
+        .flatten();
       if let Some(key) = key {
         id.detach(&mut self.widget_tree);
         key_children.insert(key, id);
@@ -248,9 +211,9 @@ impl<'a> Application<'a> {
         }
       }
 
-      let child_id = self.append_widget(wid, w);
+      let child_id = wid.append_widget(w, &mut self.widget_tree);
 
-      self.inflate_widget_subtree(child_id);
+      self.widget_tree.inflate(child_id);
       self.construct_render_tree(child_id);
     }
 
@@ -285,7 +248,9 @@ impl<'a> Application<'a> {
       }
     }
 
-    *old_node.get_mut(&mut self.widget_tree).expect("Old node should exist!") = new_widget;
+    *old_node
+      .get_mut(&mut self.widget_tree)
+      .expect("Old node should exist!") = new_widget;
     self.dirty_widgets.insert(old_node);
   }
 
@@ -295,10 +260,10 @@ impl<'a> Application<'a> {
       .expect("parent should exists!");
     self.drop_subtree(old_node);
 
-    let new_child_id = self.append_widget(parent_id, new_widget);
+    let new_child_id =
+      parent_id.append_widget(new_widget, &mut self.widget_tree);
 
-    self.inflate_widget_subtree(new_child_id);
-
+    self.widget_tree.inflate(new_child_id);
     self.construct_render_tree(new_child_id);
   }
 
@@ -339,56 +304,17 @@ impl<'a> Application<'a> {
       .last()
       .unwrap_or(wid)
   }
-
-  fn append_widget(&mut self, wid: WidgetId, w: Widget<'a>) -> WidgetId {
-    let child = self.widget_tree.new_node(w);
-    wid.append(child, &mut self.widget_tree);
-    child
-  }
 }
 
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::widget::Row;
-  use crate::{render_ctx::*, render_object_box::*};
-  use std::fmt::{Debug, Formatter, Result};
+  use crate::test::embed_post::EmbedPost;
   extern crate test;
   use test::Bencher;
 
-  #[derive(Clone, Debug)]
-  struct EmbedPost {
-    title: &'static str,
-    author: &'static str,
-    content: &'static str,
-    level: usize,
-  }
-
-  impl CombinationWidget for EmbedPost {
-    fn build<'a>(&self) -> Widget<'a> {
-      let mut children = vec![
-        Text(self.title).to_widget(),
-        Text(self.author).to_widget(),
-        Text(self.content).to_widget(),
-      ];
-
-      if self.level > 0 {
-        let mut embed = self.clone();
-        embed.level -= 1;
-        children.push(embed.to_widget())
-      }
-      Row::new(children).to_widget()
-    }
-  }
-
   fn create_embed_app<'a>(level: usize) -> Application<'a> {
-    let post = EmbedPost {
-      title: "Simple demo",
-      author: "Adoo",
-      content: "Recursive x times",
-      level,
-    };
-
+    let post = EmbedPost::new(level);
     let mut app = Application::new();
     app.inflate(post.to_widget());
     app.construct_render_tree(app.widget_tree.root().expect("must exists"));
@@ -396,33 +322,8 @@ mod test {
   }
 
   #[test]
-  fn widget_tree_inflate() {
+  fn render_tree_construct() {
     let app = create_embed_app(3);
-
-    assert_eq!(
-      app.widget_tree.symbol_shape(),
-      r#"Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 })
-└── MultiChild(Row { children: None })
-    ├── Render(Text("Simple demo"))
-    ├── Render(Text("Adoo"))
-    ├── Render(Text("Recursive x times"))
-    └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 2 })
-        └── MultiChild(Row { children: None })
-            ├── Render(Text("Simple demo"))
-            ├── Render(Text("Adoo"))
-            ├── Render(Text("Recursive x times"))
-            └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 1 })
-                └── MultiChild(Row { children: None })
-                    ├── Render(Text("Simple demo"))
-                    ├── Render(Text("Adoo"))
-                    ├── Render(Text("Recursive x times"))
-                    └── Combination(EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 0 })
-                        └── MultiChild(Row { children: None })
-                            ├── Render(Text("Simple demo"))
-                            ├── Render(Text("Adoo"))
-                            └── Render(Text("Recursive x times"))
-"#
-    );
 
     assert_eq!(
       app.render_tree.symbol_shape(),
@@ -509,7 +410,10 @@ mod test {
 
     fn emit_rebuild(&mut self) {
       *self.title.as_mut().unwrap().borrow_mut() = "New title";
-      self.app.wait_rebuilds.insert(self.app.widget_tree.root().unwrap());
+      self
+        .app
+        .wait_rebuilds
+        .insert(self.app.widget_tree.root().unwrap());
     }
   }
 
@@ -521,7 +425,7 @@ mod test {
     // fixme: below assert should failed, after support update render tree data.
     assert_eq!(
       env.app.widget_tree.symbol_shape(),
-r#"Combination(EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 })
+      r#"Combination(EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 })
 └── MultiChild(KeyDetect { key: KI4(0), child: Row { children: None } })
     ├── Render(KeyDetect { key: KI4(0), child: Text("") })
     ├── Render(KeyDetect { key: KI4(1), child: Text("") })
@@ -547,7 +451,7 @@ r#"Combination(EmbedKeyPost { title: RefCell { value: "New title" }, author: "",
     // fixme: below assert should failed, after support update render tree.
     assert_eq!(
       env.app.render_tree.symbol_shape(),
-r#"KeyRender(RowRender { inner_layout: [], size: None })
+      r#"KeyRender(RowRender { inner_layout: [], size: None })
 ├── KeyRender(TextRender(""))
 ├── KeyRender(TextRender(""))
 ├── KeyRender(TextRender(""))
@@ -574,18 +478,20 @@ r#"KeyRender(RowRender { inner_layout: [], size: None })
   // }
 
   // fn layout_app(app: &mut Application) {
-  //   let mut_ptr = &mut app.r_arena as *mut Arena<Box<(dyn RenderObject + Send + Sync)>>;
-  //   let mut ctx = RenderCtx::new(&mut app.r_arena, &mut app.dirty_layouts, &mut app.dirty_layout_roots);
-  //   unsafe {
-  //       let root = mut_ptr.as_mut().unwrap().get_mut(app.render_tree.unwrap()).unwrap();
+  //   let mut_ptr = &mut app.r_arena as *mut Arena<Box<(dyn RenderObject + Send
+  // + Sync)>>;   let mut ctx = RenderCtx::new(&mut app.r_arena, &mut
+  // app.dirty_layouts, &mut app.dirty_layout_roots);   unsafe {
+  //       let root =
+  // mut_ptr.as_mut().unwrap().get_mut(app.render_tree.unwrap()).unwrap();
   //       root.get_mut().perform_layout(app.render_tree.unwrap(), &mut ctx);
   //   }
   // }
 
   // fn mark_dirty(app: &mut Application, node_id: NodeId) {
-  //   let mut_ptr = &mut app.r_arena as *mut Arena<Box<(dyn RenderObject + Send + Sync)>>;
-  //   let mut ctx = RenderCtx::new(&mut app.r_arena, &mut app.dirty_layouts, &mut app.dirty_layout_roots);
-    
+  //   let mut_ptr = &mut app.r_arena as *mut Arena<Box<(dyn RenderObject + Send
+  // + Sync)>>;   let mut ctx = RenderCtx::new(&mut app.r_arena, &mut
+  // app.dirty_layouts, &mut app.dirty_layout_roots);
+
   //   unsafe {
   //      mut_ptr
   //       .as_mut()
@@ -596,20 +502,6 @@ r#"KeyRender(RowRender { inner_layout: [], size: None })
   //       .mark_dirty(node_id, &mut ctx);
   //   }
   // }
-
-  #[bench]
-  fn widget_tree_deep_1000(b: &mut Bencher) {
-    b.iter(|| {
-      let post = EmbedPost {
-        title: "Simple demo",
-        author: "Adoo",
-        content: "Recursive 1000 times",
-        level: 1000,
-      };
-      let mut app = Application::new();
-      app.inflate(post.to_widget());
-    });
-  }
 
   // #[test]
   // fn test_layout() {
@@ -667,12 +559,7 @@ r#"KeyRender(RowRender { inner_layout: [], size: None })
   #[bench]
   fn render_tree_5_x_1000(b: &mut Bencher) {
     b.iter(|| {
-      let post = EmbedPost {
-        title: "Simple demo",
-        author: "Adoo",
-        content: "Recursive 1000 times",
-        level: 1000,
-      };
+      let post = EmbedPost::new(1000);
       let mut app = Application::new();
       app.inflate(post.to_widget());
       app.construct_render_tree(app.widget_tree.root().expect("must exists"));

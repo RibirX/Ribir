@@ -15,3 +15,6 @@ pub mod prelude {
   pub use crate::render::*;
   pub use crate::widget::*;
 }
+
+#[cfg(test)]
+pub mod test;

@@ -16,9 +16,14 @@ impl RenderTree {
   pub fn root(&self) -> Option<RenderId> { self.root }
 
   #[inline]
-  pub fn set_root(&mut self, root: RenderId) {
+  pub fn set_root(
+    &mut self,
+    data: Box<dyn RenderObjectSafety + Send + Sync>,
+  ) -> RenderId {
     debug_assert!(self.root.is_none());
+    let root = self.new_node(data);
     self.root = Some(root);
+    root
   }
 
   #[inline]
