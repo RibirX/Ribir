@@ -1,5 +1,5 @@
 error_on_line_overflow = true
-error_on_unformatted = true
+error_on_unformatted = false
 max_width = 80
 wrap_comments = true
 tab_spaces = 2

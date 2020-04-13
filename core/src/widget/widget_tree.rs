@@ -27,7 +27,7 @@ impl<'a> WidgetTree<'a> {
   pub fn new_node(&mut self, data: Widget<'a>) -> WidgetId {
     WidgetId(self.arena.new_node(data))
   }
-  
+
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.
   pub(crate) fn inflate(&mut self, wid: WidgetId) -> &mut Self {
     let mut stack = vec![wid];
@@ -156,14 +156,14 @@ impl WidgetId {
     }
   }
 
-  /// create a render object from this widget, return the created render object and 
-  /// the widget id which actually created the render object.
+  /// create a render object from this widget, return the created render object
+  /// and the widget id which actually created the render object.
   pub(crate) fn create_render_object(
     &self,
     tree: &WidgetTree,
-  ) -> ( Box<dyn RenderObjectSafety + Send + Sync>, WidgetId) {
+  ) -> (Box<dyn RenderObjectSafety + Send + Sync>, WidgetId) {
     let id = self.down_nearest_render_widget(tree);
-   let render_obj = match id.get(&tree).expect("must exists!") {
+    let render_obj = match id.get(&tree).expect("must exists!") {
       Widget::Combination(_) => {
         unreachable!("only render widget can create render object!")
       }
