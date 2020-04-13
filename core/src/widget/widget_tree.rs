@@ -29,7 +29,7 @@ impl<'a> WidgetTree<'a> {
   }
   
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.
-  pub(crate) fn inflate(&mut self, wid: WidgetId)-> &mut Self {
+  pub(crate) fn inflate(&mut self, wid: WidgetId) -> &mut Self {
     let mut stack = vec![wid];
 
     fn append<'a>(
@@ -154,6 +154,24 @@ impl WidgetId {
     if tree.root == Some(*self) {
       tree.root = None;
     }
+  }
+
+  /// create a render object from this widget, return the created render object and 
+  /// the widget id which actually created the render object.
+  pub(crate) fn create_render_object(
+    &self,
+    tree: &WidgetTree,
+  ) -> ( Box<dyn RenderObjectSafety + Send + Sync>, WidgetId) {
+    let id = self.down_nearest_render_widget(tree);
+   let render_obj = match id.get(&tree).expect("must exists!") {
+      Widget::Combination(_) => {
+        unreachable!("only render widget can create render object!")
+      }
+      Widget::Render(r) => r.create_render_object(),
+      Widget::SingleChild(r) => r.create_render_object(),
+      Widget::MultiChild(r) => r.create_render_object(),
+    };
+    (render_obj, id)
   }
 
   /// Caller assert this node only have one child, other panic!

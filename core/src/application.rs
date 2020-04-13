@@ -24,7 +24,7 @@ impl<'a> Application<'a> {
   pub fn new() -> Application<'a> { Default::default() }
 
   pub fn run(mut self, w: Widget<'a>) {
-  let root =  self.widget_tree.set_root(w);
+    let root = self.widget_tree.set_root(w);
     self.widget_tree.inflate(root);
     self.construct_render_tree(
       self.widget_tree.root().expect("widget root should exists"),
@@ -40,7 +40,6 @@ impl<'a> Application<'a> {
 
     self.repair_tree();
   }
-
 
   /// construct a render tree correspond to widget tree `wid`.
   pub(crate) fn construct_render_tree(&mut self, wid: WidgetId) {
@@ -65,13 +64,13 @@ impl<'a> Application<'a> {
   /// Return a pair of (render widget node id, render object node id) from the
   /// widget node id `wid`, if a render object node not exist, will create it.
   fn widget_render_pair(&mut self, wid: WidgetId) -> (WidgetId, RenderId) {
-    let mut r_wid = wid.down_nearest_render_widget(&self.widget_tree);
     if self.render_tree.root().is_none() {
-      let render_object = self.create_render_object(r_wid);
-      let rid = self.render_tree.set_root(render_object);
-      self.tree_relationship.bind(r_wid, rid);
+      let (render_obj, id) = wid.create_render_object(&self.widget_tree);
+      let rid = self.render_tree.set_root(render_obj);
+      self.tree_relationship.bind(id, rid);
     }
 
+    let mut r_wid = wid.down_nearest_render_widget(&self.widget_tree);
     if let Some(render_id) = self.tree_relationship.widget_to_render(r_wid) {
       (r_wid, *render_id)
     } else {
@@ -114,25 +113,11 @@ impl<'a> Application<'a> {
     mut wid: WidgetId,
     rid: RenderId,
   ) -> (WidgetId, RenderId) {
-    wid = wid.down_nearest_render_widget(&self.widget_tree);
-    let r_child = self.render_tree.new_node(self.create_render_object(wid));
+    let (render_obj, wid) = wid.create_render_object(&self.widget_tree);
+    let r_child = self.render_tree.new_node(render_obj);
     rid.append(r_child, &mut self.render_tree);
     self.tree_relationship.bind(wid, r_child);
     (wid, r_child)
-  }
-
-  fn create_render_object(
-    &self,
-    render_wid: WidgetId,
-  ) -> Box<dyn RenderObjectSafety + Send + Sync> {
-    match render_wid.get(&self.widget_tree).expect("must exists!") {
-      Widget::Combination(_) => {
-        unreachable!("only render widget can create render object!")
-      }
-      Widget::Render(r) => r.create_render_object(),
-      Widget::SingleChild(r) => r.create_render_object(),
-      Widget::MultiChild(r) => r.create_render_object(),
-    }
   }
 
   fn repair_tree(&mut self) {
@@ -303,8 +288,8 @@ impl<'a> Application<'a> {
 
 #[cfg(test)]
 mod test {
-  use super::*;
-  use crate::test::embed_post::{EmbedPost,create_embed_app};
+
+  use crate::test::embed_post::create_embed_app;
   extern crate test;
   use test::Bencher;
 
@@ -503,8 +488,6 @@ mod test {
 
   #[bench]
   fn render_tree_5_x_1000(b: &mut Bencher) {
-    b.iter(|| {
-       create_embed_app(1000)
-    });
+    b.iter(|| create_embed_app(1000));
   }
 }
