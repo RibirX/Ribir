@@ -27,9 +27,9 @@ impl<'a> WidgetTree<'a> {
   pub fn new_node(&mut self, data: Widget<'a>) -> WidgetId {
     WidgetId(self.arena.new_node(data))
   }
-
-  /// Inflate the subtree start from `wid`.
-  pub(crate) fn inflate(&mut self, wid: WidgetId) {
+  
+  /// inflate  subtree, so every subtree leaf should be a Widget::Render.
+  pub(crate) fn inflate(&mut self, wid: WidgetId)-> &mut Self {
     let mut stack = vec![wid];
 
     fn append<'a>(
@@ -61,6 +61,7 @@ impl<'a> WidgetTree<'a> {
         }
       }
     }
+    self
   }
 
   #[allow(dead_code)]
@@ -251,12 +252,11 @@ mod test {
     );
   }
 
-
   #[bench]
   fn inflate_5_x_1000(b: &mut Bencher) {
     b.iter(|| {
       let (mut tree, root) = create_env(1000);
-    tree.inflate(root);
+      tree.inflate(root);
     });
   }
 }

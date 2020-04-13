@@ -6,8 +6,8 @@ use tree_relationship::Relationship;
 
 #[derive(Default)]
 pub struct Application<'a> {
-  render_tree: RenderTree,
-  widget_tree: WidgetTree<'a>,
+  pub(crate) render_tree: RenderTree,
+  pub(crate) widget_tree: WidgetTree<'a>,
   tree_relationship: Relationship,
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
@@ -24,7 +24,8 @@ impl<'a> Application<'a> {
   pub fn new() -> Application<'a> { Default::default() }
 
   pub fn run(mut self, w: Widget<'a>) {
-    self.inflate(w);
+  let root =  self.widget_tree.set_root(w);
+    self.widget_tree.inflate(root);
     self.construct_render_tree(
       self.widget_tree.root().expect("widget root should exists"),
     );
@@ -40,14 +41,9 @@ impl<'a> Application<'a> {
     self.repair_tree();
   }
 
-  /// inflate widget tree, so every widget tree leaf should be a render object.
-  fn inflate(&mut self, w: Widget<'a>) {
-    let root = self.widget_tree.set_root(w);
-    self.widget_tree.inflate(root);
-  }
 
   /// construct a render tree correspond to widget tree `wid`.
-  fn construct_render_tree(&mut self, wid: WidgetId) {
+  pub(crate) fn construct_render_tree(&mut self, wid: WidgetId) {
     let (r_wid, rid) = self.widget_render_pair(wid);
 
     let mut stack = vec![];
@@ -300,8 +296,7 @@ impl<'a> Application<'a> {
   fn get_rebuild_ancestors(&self, wid: WidgetId) -> WidgetId {
     wid
       .ancestors(&self.widget_tree)
-      .filter(|id| self.wait_rebuilds.contains(id))
-      .last()
+      .find(|id| self.wait_rebuilds.contains(id))
       .unwrap_or(wid)
   }
 }
@@ -309,17 +304,9 @@ impl<'a> Application<'a> {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::test::embed_post::EmbedPost;
+  use crate::test::embed_post::{EmbedPost,create_embed_app};
   extern crate test;
   use test::Bencher;
-
-  fn create_embed_app<'a>(level: usize) -> Application<'a> {
-    let post = EmbedPost::new(level);
-    let mut app = Application::new();
-    app.inflate(post.to_widget());
-    app.construct_render_tree(app.widget_tree.root().expect("must exists"));
-    app
-  }
 
   #[test]
   fn render_tree_construct() {
@@ -361,66 +348,22 @@ mod test {
     assert!(app.render_tree.root().is_none());
   }
 
-  use std::{cell::RefCell, rc::Rc};
-  #[derive(Clone, Default, Debug)]
-  struct EmbedKeyPost {
-    title: Rc<RefCell<&'static str>>,
-    author: &'static str,
-    content: &'static str,
-    level: usize,
+  use crate::test::key_embed_post::KeyDetectEnv;
+
+  fn emit_rebuild(env: &mut KeyDetectEnv) {
+    *env.title.borrow_mut() = "New title";
+    env
+      .app
+      .wait_rebuilds
+      .insert(env.app.widget_tree.root().unwrap());
   }
-
-  impl CombinationWidget for EmbedKeyPost {
-    fn build<'a>(&self) -> Widget<'a> {
-      let mut children = vec![
-        KeyDetect::new(0, Text(*self.title.borrow())).to_widget(),
-        KeyDetect::new(1, Text(self.author)).to_widget(),
-        KeyDetect::new(2, Text(self.content)).to_widget(),
-      ];
-
-      if self.level > 0 {
-        let mut embed = self.clone();
-        embed.level -= 1;
-        children.push(KeyDetect::new("embed", embed).to_widget())
-      }
-      KeyDetect::new(0, Row::new(children)).to_widget()
-    }
-  }
-
-  #[derive(Default)]
-  struct KeyDetectEnv<'a> {
-    app: Application<'a>,
-    title: Option<Rc<RefCell<&'static str>>>,
-  }
-
-  impl<'a> KeyDetectEnv<'a> {
-    fn construct_tree(&mut self, level: usize) -> &mut Self {
-      let mut post = EmbedKeyPost::default();
-      post.level = level;
-      let title = post.title.clone();
-      self.title = Some(title);
-
-      self.app.inflate(post.clone().to_widget());
-      self
-        .app
-        .construct_render_tree(self.app.widget_tree.root().unwrap());
-
-      self
-    }
-
-    fn emit_rebuild(&mut self) {
-      *self.title.as_mut().unwrap().borrow_mut() = "New title";
-      self
-        .app
-        .wait_rebuilds
-        .insert(self.app.widget_tree.root().unwrap());
-    }
-  }
-
   #[test]
   fn repair_tree() {
-    let mut env = KeyDetectEnv::default();
-    env.construct_tree(3).emit_rebuild();
+    let mut env = KeyDetectEnv::new(3);
+    env
+      .app
+      .construct_render_tree(env.app.widget_tree.root().unwrap());
+    emit_rebuild(&mut env);
 
     // fixme: below assert should failed, after support update render tree data.
     assert_eq!(
@@ -548,10 +491,12 @@ mod test {
 
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
-    let mut env = KeyDetectEnv::default();
-    env.construct_tree(1000);
+    let mut env = KeyDetectEnv::new(1000);
+    env
+      .app
+      .construct_render_tree(env.app.widget_tree.root().unwrap());
     b.iter(|| {
-      env.emit_rebuild();
+      emit_rebuild(&mut env);
       env.app.repair_tree();
     });
   }
@@ -559,10 +504,7 @@ mod test {
   #[bench]
   fn render_tree_5_x_1000(b: &mut Bencher) {
     b.iter(|| {
-      let post = EmbedPost::new(1000);
-      let mut app = Application::new();
-      app.inflate(post.to_widget());
-      app.construct_render_tree(app.widget_tree.root().expect("must exists"));
+       create_embed_app(1000)
     });
   }
 }
