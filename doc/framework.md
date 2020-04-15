@@ -1,5 +1,15 @@
 # Core principles
 
+## Phase
+                    Main thread                       |             Parallelism   
+                        .                             |                   
+      Build Phase     --.-->  Render Ready Phase    --|-->    Layout    --|--> Paint
+                        .                             |                   |
+  inflate widget tree   .   construct render tree and |                   |
+  or rebuild subtree    . update render tree data from|                   |
+                        .         widget tree         |                   | 
+                    <---.---------------- May back build phase again <----|
+
 ## Declare & Reactive programming mode
 
 `Holiday` build a widget tree by your ui declare for data, and create a render object tree to layout and paint.
@@ -37,7 +47,7 @@ d. done, the subtree from this widget is rebuild finished.
 
 
 
-### Signature
+### Signature ?
 
 `Key` is used for widget, and `Signature` used for render object. Not like `Key` to identify if this widget is a same widget with before. `Signature` guarantee that if two same type render objects have same `Signature` that mean the have same content and will paint same thing. So `Holiday` can treat all render objects as one, if they have same type and same `Signature`.
 
@@ -47,7 +57,7 @@ d. done, the subtree from this widget is rebuild finished.
 Not like many classic GUI framework, `Holiday` not built on inherit mode. Because Rust not support inherit, `Holiday` built base on composition. For a example, If you want give a `Button` widget opacity, it's not have a field named `opacity` give you to set the opacity, you should use a `Opacity` widget to do it, like:
 
 ```rust
-Opacity! {
+Opacity {
   opacity: 0.5,
   Button! { text: "Click Me!"}
 }
@@ -55,7 +65,7 @@ Opacity! {
 
 ## RenderObject & RenderTree 
 
-Widget tree use states represents the user interface, and RenderTree is created by RenderWidget do the actually layout and paint. In this vision, widget is build cheap, and RenderObject is more expensive than widget.
+Widget tree use to represents the user interface, and RenderTree is created by RenderWidget do the actually layout and paint. In this vision, widget is build cheap, and RenderObject is more expensive than widget.
 
 ## Update Data
 

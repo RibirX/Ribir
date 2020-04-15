@@ -6,23 +6,12 @@ use crate::render_object_box::{
 use indextree::*;
 ///  a stupid implement for develope the framework.
 #[derive(Debug)]
-pub struct Row<'a> {
-  children: Option<Vec<Widget<'a>>>,
-}
+pub struct Row<'a>(pub Vec<Widget<'a>>);
 
 #[derive(Debug, Default)]
 pub struct RowRender {
   inner_layout: Vec<(Position, Size)>,
   size: Option<Size>,
-}
-
-impl<'a> Row<'a> {
-  #[inline]
-  pub fn new(children: Vec<Widget<'a>>) -> Self {
-    Row {
-      children: Some(children),
-    }
-  }
 }
 
 impl<'a> RenderWidget for Row<'a> {
@@ -35,10 +24,7 @@ impl<'a> MultiChildWidget for Row<'a> {
   where
     Self: 'b,
   {
-    self
-      .children
-      .take()
-      .expect("children must init, and this should call once")
+    std::mem::take(&mut self.0)
   }
 }
 

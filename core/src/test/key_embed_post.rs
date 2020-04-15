@@ -22,7 +22,7 @@ impl CombinationWidget for EmbedKeyPost {
       embed.level -= 1;
       children.push(KeyDetect::new("embed", embed).to_widget())
     }
-    KeyDetect::new(0, Row::new(children)).to_widget()
+    KeyDetect::new(0, Row(children)).to_widget()
   }
 }
 
@@ -42,9 +42,13 @@ impl<'a> KeyDetectEnv<'a> {
       app: Application::default(),
       title,
     };
-    let widget_tree = &mut env.app.widget_tree;
-    let root = widget_tree.set_root(post.to_widget());
-    widget_tree.inflate(root);
+    let Application {
+      widget_tree,
+      render_tree,
+      ..
+    } = &mut env.app;
+    widget_tree.set_root(post.to_widget(), render_tree);
+
     env
   }
 }
