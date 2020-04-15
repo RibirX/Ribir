@@ -86,28 +86,28 @@ impl RenderId {
 
   /// A delegate for [NodeId::parent](indextree::NodeId.parent)
   pub fn parent(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_id_feature(tree, |node| node.parent())
+    self.node_feature(tree, |node| node.parent())
   }
 
   /// A delegate for [NodeId::first_child](indextree::NodeId.first_child)
   pub fn first_child(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_id_feature(tree, |node| node.first_child())
+    self.node_feature(tree, |node| node.first_child())
   }
 
   /// A delegate for [NodeId::last_child](indextree::NodeId.last_child)
   pub fn last_child(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_id_feature(tree, |node| node.last_child())
+    self.node_feature(tree, |node| node.last_child())
   }
 
   /// A delegate for
   /// [NodeId::previous_sibling](indextree::NodeId.previous_sibling)
   pub fn previous_sibling(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_id_feature(tree, |node| node.previous_sibling())
+    self.node_feature(tree, |node| node.previous_sibling())
   }
 
   /// A delegate for [NodeId::next_sibling](indextree::NodeId.next_sibling)
   pub fn next_sibling(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_id_feature(tree, |node| node.next_sibling())
+    self.node_feature(tree, |node| node.next_sibling())
   }
 
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
@@ -174,7 +174,7 @@ impl RenderId {
     tree.render_to_widget.get(&self).map(|id| *id)
   }
 
-  fn node_id_feature<
+  fn node_feature<
     F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>,
   >(
     &self,
