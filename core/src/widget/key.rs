@@ -67,6 +67,7 @@ where
   W: RenderWidget,
 {
   type RO = KeyRender<W::RO>;
+  fn key(&self) -> Option<&Key> { Some(&self.key) }
   fn create_render_object(&self) -> Self::RO {
     KeyRender(self.child.create_render_object())
   }
@@ -104,7 +105,9 @@ impl<W> RenderObject<KeyDetect<W>> for KeyRender<W::RO>
 where
   W: RenderWidget,
 {
-  fn update(&mut self, owner_widget: &KeyDetect<W>) { unimplemented!() }
+  fn update(&mut self, owner_widget: &KeyDetect<W>) {
+    self.0.update(&owner_widget.child)
+  }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {

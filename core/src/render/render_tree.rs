@@ -1,6 +1,6 @@
-use crate::{prelude::*, util::TreeFormatter};
-
+use crate::{prelude::*, util::TreeFormatter, widget::widget_tree::*};
 use indextree::*;
+use std::collections::HashMap;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct RenderId(NodeId);
@@ -9,6 +9,9 @@ pub struct RenderId(NodeId);
 pub struct RenderTree {
   arena: Arena<Box<dyn RenderObjectSafety + Send + Sync>>,
   root: Option<RenderId>,
+  /// A hash map to mapping a render object in render tree to its corresponds
+  /// render widget in widget tree.
+  render_to_widget: HashMap<RenderId, WidgetId>,
 }
 
 impl RenderTree {
@@ -18,11 +21,13 @@ impl RenderTree {
   #[inline]
   pub fn set_root(
     &mut self,
+    owner: WidgetId,
     data: Box<dyn RenderObjectSafety + Send + Sync>,
   ) -> RenderId {
     debug_assert!(self.root.is_none());
     let root = self.new_node(data);
     self.root = Some(root);
+    self.render_to_widget.insert(root, owner);
     root
   }
 
@@ -41,6 +46,11 @@ impl RenderTree {
     } else {
       "".to_owned()
     }
+  }
+
+  #[cfg(test)]
+  pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> {
+    &self.render_to_widget
   }
 }
 
@@ -64,6 +74,11 @@ impl RenderId {
   /// A delegate for [NodeId::append](indextree::NodeId.append)
   pub fn append(self, new_child: RenderId, tree: &mut RenderTree) {
     self.0.append(new_child.0, &mut tree.arena);
+  }
+
+  /// A delegate for [NodeId::preend](indextree::NodeId.preend)
+  pub fn prepend(self, new_child: RenderId, tree: &mut RenderTree) {
+    self.0.prepend(new_child.0, &mut tree.arena);
   }
 
   /// A delegate for [NodeId::remove](indextree::NodeId.remove)
@@ -111,12 +126,52 @@ impl RenderId {
     self.0.descendants(&tree.arena).map(|id| RenderId(id))
   }
 
+  /// Preappend a RenderObject as child, and create this RenderObject's Widget
+  /// is `owner`
+  pub(crate) fn prepend_object(
+    self,
+    owner: WidgetId,
+    object: Box<dyn RenderObjectSafety + Send + Sync>,
+    tree: &mut RenderTree,
+  ) -> RenderId {
+    let child = tree.new_node(object);
+    self.prepend(child, tree);
+    tree.render_to_widget.insert(child, owner);
+    child
+  }
+
   /// A delegate for [NodeId::detach](indextree::NodeId.detach)
-  pub fn detach(self, tree: &mut RenderTree) {
+  pub(crate) fn detach(self, tree: &mut RenderTree) {
     self.0.detach(&mut tree.arena);
     if tree.root == Some(self) {
       tree.root = None;
     }
+  }
+
+  /// Drop the subtree
+  pub(crate) fn drop(self, tree: &mut RenderTree) {
+    let RenderTree {
+      render_to_widget,
+      arena,
+      ..
+    } = tree;
+    self.0.descendants(arena).for_each(|id| {
+      render_to_widget.remove(&RenderId(id));
+    });
+
+    // Todo: should remove in a more directly way and not care about
+    // relationship
+    // Fixme: memory leak here, node just detach and not remove. Wait a pr to
+    // provide a method to drop a subtree in indextree.
+    self.0.detach(&mut tree.arena);
+    if tree.root == Some(self) {
+      tree.root = None;
+    }
+  }
+
+  /// return the relative render widget.
+  pub fn relative_to_widget(self, tree: &mut RenderTree) -> Option<WidgetId> {
+    tree.render_to_widget.get(&self).map(|id| *id)
   }
 
   fn node_id_feature<
