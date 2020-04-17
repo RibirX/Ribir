@@ -22,27 +22,25 @@ impl EmbedPost {
 }
 
 impl CombinationWidget for EmbedPost {
-  fn build<'a>(&self) -> Widget<'a> {
+  fn build<'a>(&self) -> Box<dyn Widget + 'a> {
     let mut children = vec![
-      Text(self.title).to_widget(),
-      Text(self.author).to_widget(),
-      Text(self.content).to_widget(),
+      Text(self.title).into(),
+      Text(self.author).into(),
+      Text(self.content).into(),
     ];
 
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      children.push(embed.to_widget())
+      children.push(embed.into())
     }
-    Row(children).to_widget()
+    Row(children).into()
   }
 }
 
 pub fn create_embed_app<'a>(level: usize) -> Application<'a> {
   let post = EmbedPost::new(level);
   let mut app = Application::new();
-  app
-    .widget_tree
-    .set_root(post.to_widget(), &mut app.render_tree);
+  app.widget_tree.set_root(post.into(), &mut app.render_tree);
   app
 }

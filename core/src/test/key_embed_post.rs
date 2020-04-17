@@ -10,19 +10,19 @@ struct EmbedKeyPost {
 }
 
 impl CombinationWidget for EmbedKeyPost {
-  fn build<'a>(&self) -> Widget<'a> {
+  fn build<'a>(&self) -> Box<dyn Widget + 'a> {
     let mut children = vec![
-      KeyDetect::new(0, Text(*self.title.borrow())).to_widget(),
-      KeyDetect::new(1, Text(self.author)).to_widget(),
-      KeyDetect::new(2, Text(self.content)).to_widget(),
+      KeyDetect::new(0, Text(*self.title.borrow())).into(),
+      KeyDetect::new(1, Text(self.author)).into(),
+      KeyDetect::new(2, Text(self.content)).into(),
     ];
 
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      children.push(KeyDetect::new("embed", embed).to_widget())
+      children.push(KeyDetect::new("embed", embed).into())
     }
-    KeyDetect::new(0, Row(children)).to_widget()
+    KeyDetect::new(0, Row(children)).into()
   }
 }
 
@@ -47,7 +47,7 @@ impl<'a> KeyDetectEnv<'a> {
       render_tree,
       ..
     } = &mut env.app;
-    widget_tree.set_root(post.to_widget(), render_tree);
+    widget_tree.set_root(post.into(), render_tree);
 
     env
   }

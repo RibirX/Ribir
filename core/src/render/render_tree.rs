@@ -18,7 +18,6 @@ impl RenderTree {
   #[inline]
   pub fn root(&self) -> Option<RenderId> { self.root }
 
-  #[inline]
   pub fn set_root(
     &mut self,
     owner: WidgetId,

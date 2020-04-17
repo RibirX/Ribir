@@ -6,7 +6,11 @@ use crate::render_object_box::{
 use indextree::*;
 ///  a stupid implement for develope the framework.
 #[derive(Debug)]
-pub struct Row<'a>(pub Vec<Widget<'a>>);
+pub struct Row<'a>(pub Vec<Box<dyn Widget + 'a>>);
+
+impl<'a> Widget for Row<'a> {
+  multi_child_widget_base_impl!();
+}
 
 #[derive(Debug, Default)]
 pub struct RowRender {
@@ -20,7 +24,7 @@ impl<'a> RenderWidget for Row<'a> {
 }
 
 impl<'a> MultiChildWidget for Row<'a> {
-  fn take_children<'b>(&mut self) -> Vec<Widget<'b>>
+  fn take_children<'b>(&mut self) -> Vec<Box<dyn Widget + 'a>>
   where
     Self: 'b,
   {

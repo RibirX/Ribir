@@ -7,7 +7,7 @@
   - [ ] a combination widget to test widget tree?
 - [x] render tree
 - [x] rebuild sub tree (1 week)
-- [ ] react widget change (1 week)
+- [x] react widget change (1 week)
 - [ ] ci & workflow
   - [x] mergify bot
   - [x] unit test 

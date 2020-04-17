@@ -36,6 +36,15 @@ pub struct KeyDetect<W> {
   child: W,
 }
 
+impl<W: Widget> Widget for KeyDetect<W> {
+  #[inline]
+  fn key(&self) -> Option<&Key> { Some(&self.key) }
+  #[inline]
+  fn classify(&self) -> WidgetClassify { self.child.classify() }
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut { self.child.classify_mut() }
+}
+
 #[derive(Debug)]
 pub struct KeyRender<R>(R);
 
@@ -48,65 +57,6 @@ impl<W> KeyDetect<W> {
       key: key.into(),
       child,
     }
-  }
-}
-
-impl<W> CombinationWidget for KeyDetect<W>
-where
-  W: CombinationWidget,
-{
-  #[inline]
-  fn key(&self) -> Option<&Key> { Some(&self.key) }
-
-  #[inline]
-  fn build<'a>(&self) -> Widget<'a> { self.child.build() }
-}
-
-impl<W> RenderWidget for KeyDetect<W>
-where
-  W: RenderWidget,
-{
-  type RO = KeyRender<W::RO>;
-  fn key(&self) -> Option<&Key> { Some(&self.key) }
-  fn create_render_object(&self) -> Self::RO {
-    KeyRender(self.child.create_render_object())
-  }
-}
-
-impl<W> SingleChildWidget for KeyDetect<W>
-where
-  W: SingleChildWidget + RenderWidget,
-  W::RO: Send + Sync + 'static,
-{
-  #[inline]
-  fn take_child<'a>(&mut self) -> Widget<'a>
-  where
-    Self: 'a,
-  {
-    self.child.take_child()
-  }
-}
-
-impl<W> MultiChildWidget for KeyDetect<W>
-where
-  W: MultiChildWidget + RenderWidget,
-  W::RO: Send + Sync + 'static,
-{
-  #[inline]
-  fn take_children<'a>(&mut self) -> Vec<Widget<'a>>
-  where
-    Self: 'a,
-  {
-    self.child.take_children()
-  }
-}
-
-impl<W> RenderObject<KeyDetect<W>> for KeyRender<W::RO>
-where
-  W: RenderWidget,
-{
-  fn update(&mut self, owner_widget: &KeyDetect<W>) {
-    self.0.update(&owner_widget.child)
   }
 }
 

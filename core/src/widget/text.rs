@@ -5,6 +5,9 @@ use indextree::*;
 #[derive(Debug)]
 pub struct Text(pub &'static str);
 
+impl Widget for Text {
+  render_widget_base_impl!();
+}
 #[derive(Debug)]
 pub struct TextRender(&'static str);
 

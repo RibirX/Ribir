@@ -9,30 +9,35 @@ pub use key::{Key, KeyDetect};
 pub use row_layout::Row;
 pub use text::Text;
 
+/// The common behavior for widgets, also support to downcast to special widget.
+pub trait Widget: Debug {
+  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+  ///  You should not override this method, use [`KeyDetect`](key::KeyDetect) if
+  /// you want give a key to your widget.
+  fn key(&self) -> Option<&Key> { None }
+
+  /// classify this widget into one of four type widget, and return the
+  /// reference.
+  fn classify(&self) -> WidgetClassify;
+
+  /// classify this widget into one of four type widget as mutation reference.
+  fn classify_mut(&mut self) -> WidgetClassifyMut;
+}
+
 /// A widget represented by other widget compose.
 pub trait CombinationWidget: Debug {
   /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
   /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
-
   /// Describes the part of the user interface represented by this widget.
-  fn build<'a>(&self) -> Widget<'a>;
-
-  /// convert to [`Widget`](Widget), not override this method, will remove after
-  /// Rust generic specialization finished
-  fn to_widget<'a>(self) -> Widget<'a>
-  where
-    Self: Sized + 'a,
-  {
-    Widget::Combination(Box::new(self))
-  }
+  fn build<'a>(&self) -> Box<dyn Widget + 'a>;
 }
 
 /// a widget has a child.
 pub trait SingleChildWidget: RenderWidgetSafety {
   /// called by framework to take child from this widget, and only called once.
-  fn take_child<'a>(&mut self) -> Widget<'a>
+  fn take_child<'a>(&mut self) -> Box<dyn Widget + 'a>
   where
     Self: 'a;
 }
@@ -41,59 +46,100 @@ pub trait SingleChildWidget: RenderWidgetSafety {
 pub trait MultiChildWidget: RenderWidgetSafety {
   /// called by framework to take children from this widget, and only called
   /// once.
-  fn take_children<'a>(&mut self) -> Vec<Widget<'a>>
+  fn take_children<'a>(&mut self) -> Vec<Box<dyn Widget + 'a>>
   where
     Self: 'a;
 }
 
-#[derive(Debug)]
-pub enum Widget<'a> {
-  Combination(Box<dyn CombinationWidget + 'a>),
-  Render(Box<dyn RenderWidgetSafety + 'a>),
-  SingleChild(Box<dyn SingleChildWidget + 'a>),
-  MultiChild(Box<dyn MultiChildWidget + 'a>),
+pub enum WidgetClassify<'a> {
+  Combination(&'a dyn CombinationWidget),
+  Render(&'a dyn RenderWidgetSafety),
+  SingleChild(&'a dyn SingleChildWidget),
+  MultiChild(&'a dyn MultiChildWidget),
 }
 
-impl<'a> Widget<'a> {
-  pub fn key(&self) -> Option<&Key> {
+impl<'a> WidgetClassify<'a> {
+  /// Return a Some-Value if this is a render widget, remember single child
+  /// widget and multi child widget are render widget too. Otherwise return a
+  /// None-Value.
+  pub(crate) fn try_as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self {
-      Widget::Combination(w) => w.key(),
-      Widget::Render(w) => w.key(),
-      Widget::SingleChild(w) => w.key(),
-      Widget::MultiChild(w) => w.key(),
-    }
-  }
-
-  pub fn same_type_widget(&self, other: &Widget) -> bool {
-    match self {
-      Widget::Combination(_) => matches!(other, Widget::Combination(_)),
-      Widget::Render(_) => matches!(other, Widget::Render(_)),
-      Widget::SingleChild(_) => matches!(other, Widget::SingleChild(_)),
-      Widget::MultiChild(_) => matches!(other, Widget::MultiChild(_)),
+      WidgetClassify::Combination(w) => None,
+      WidgetClassify::Render(w) => Some(w.as_render()),
+      WidgetClassify::SingleChild(w) => Some(w.as_render()),
+      WidgetClassify::MultiChild(w) => Some(w.as_render()),
     }
   }
 }
 
-pub trait IntoWidget {
-  fn to_widget<'a>(self) -> Widget<'a>
-  where
-    Self: 'a;
+pub enum WidgetClassifyMut<'a> {
+  Combination(&'a mut dyn CombinationWidget),
+  Render(&'a mut dyn RenderWidgetSafety),
+  SingleChild(&'a mut dyn SingleChildWidget),
+  MultiChild(&'a mut dyn MultiChildWidget),
 }
 
-impl<W: RenderWidgetSafety> IntoWidget for W {
-  default fn to_widget<'a>(self) -> Widget<'a>
-  where
-    Self: 'a,
-  {
-    Widget::Render(Box::new(self))
+impl<'a> WidgetClassifyMut<'a> {
+  /// Return a Some-Value if this is a render widget, remember single child
+  /// widget and multi child widget are render widget too. Otherwise return a
+  /// None-Value.
+  pub(crate) fn try_as_render_mut(
+    &mut self,
+  ) -> Option<&mut dyn RenderWidgetSafety> {
+    match self {
+      WidgetClassifyMut::Combination(w) => None,
+      WidgetClassifyMut::Render(w) => Some(w.as_render_mut()),
+      WidgetClassifyMut::SingleChild(w) => Some(w.as_render_mut()),
+      WidgetClassifyMut::MultiChild(w) => Some(w.as_render_mut()),
+    }
   }
 }
 
-impl<W: MultiChildWidget> IntoWidget for W {
-  fn to_widget<'a>(self) -> Widget<'a>
-  where
-    Self: 'a,
-  {
-    Widget::MultiChild(Box::new(self))
+/// We should also implement Widget concrete methods for RenderWidgetSafety,
+/// SingleChildWidget and MultiChildWidget, but can not do it before rust
+/// specialization finished. So just CombinationWidget implemented it, this is
+/// user use most, and others provide a macro to do it.
+impl<'a, T: CombinationWidget + 'a> Widget for T {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
+
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut {
+    WidgetClassifyMut::Combination(self)
+  }
+}
+
+impl<'a, W: Widget + 'a> From<W> for Box<dyn Widget + 'a> {
+  #[inline]
+  fn from(w: W) -> Self { Box::new(w) }
+}
+
+pub macro render_widget_base_impl() {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
+
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut {
+    WidgetClassifyMut::Render(self)
+  }
+}
+
+pub macro single_child_widget_base_impl() {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { WidgetClassify::SingleChild(self) }
+
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut {
+    WidgetClassifyMut::SingleChild(self)
+  }
+}
+
+pub macro multi_child_widget_base_impl() {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { WidgetClassify::MultiChild(self) }
+
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut {
+    WidgetClassifyMut::MultiChild(self)
   }
 }
