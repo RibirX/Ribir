@@ -37,12 +37,3 @@ pull_request_rules:
     actions:
         comment:
           message: This pull request is now in conflicts. Could you fix it? 🙏
-      
-  - name: say hi on new contribution
-    conditions:
-      - author!=@M-Adoo
-    actions:
-        comment:
-          message: |
-              Welcome to Holiday!
-              We're delight to have you onboard <3
