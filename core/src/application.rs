@@ -15,8 +15,8 @@ impl<'a> Application<'a> {
   #[inline]
   pub fn new() -> Application<'a> { Default::default() }
 
-  pub fn run(mut self, w: Widget<'a>) {
-    self.widget_tree.set_root(w, &mut self.render_tree);
+  pub fn run<W: Into<Box<dyn Widget + 'a>>>(mut self, w: W) {
+    self.widget_tree.set_root(w.into(), &mut self.render_tree);
 
     todo!(
       "

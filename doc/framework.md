@@ -8,7 +8,7 @@
   inflate widget tree   .   construct render tree and |                   |
   or rebuild subtree    . update render tree data from|                   |
                         .         widget tree         |                   | 
-                    <---.---------------- May back build phase again <----|
+                      <------------------ May back build phase again <----|
 
 ## Declare & Reactive programming mode
 
@@ -62,6 +62,9 @@ Opacity {
   Button! { text: "Click Me!"}
 }
 ```
+
+### zero cost for compose ?
+
 
 ## RenderObject & RenderTree 
 

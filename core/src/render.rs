@@ -33,9 +33,13 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
 pub trait RenderWidgetSafety: Debug {
-  fn key(&self) -> Option<&Key> { None }
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
-  fn as_safety(&self) -> &dyn RenderWidgetSafety;
+  /// This method is provide to SubTrait upcast to a `RenderWidgetSafety`
+  /// reference.
+  fn as_render(&self) -> &dyn RenderWidgetSafety;
+  /// This method is provide to SubTrait upcast to a mutation
+  /// `RenderWidgetSafety` reference.
+  fn as_render_mut(&mut self) -> &mut dyn RenderWidgetSafety;
 }
 
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
@@ -66,8 +70,6 @@ impl<T> RenderWidgetSafety for T
 where
   T: RenderWidget,
 {
-  fn key(&self) -> Option<&Key> { RenderWidget::key(self) }
-
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync> {
     let r_box = RenderObjectBox {
       render: RenderWidget::create_render_object(self),
@@ -76,7 +78,11 @@ where
     r_box.to_safety()
   }
 
-  fn as_safety(&self) -> &dyn RenderWidgetSafety { self }
+  #[inline]
+  fn as_render(&self) -> &dyn RenderWidgetSafety { self }
+
+  #[inline]
+  fn as_render_mut(&mut self) -> &mut dyn RenderWidgetSafety { self }
 }
 
 use std::marker::PhantomData;
