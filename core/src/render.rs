@@ -1,6 +1,11 @@
+use crate::render::render_ctx::RenderCtx;
+use crate::render::render_layout::*;
+use crate::render::render_tree::RenderId;
 use crate::widget::Key;
 use std::fmt::Debug;
 use std::raw::TraitObject;
+pub mod render_ctx;
+pub mod render_layout;
 pub mod render_tree;
 
 /// RenderWidget provide configuration for render object which provide actual
@@ -28,6 +33,11 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   /// Call by framework when its owner `owner_widget` changed, should not call
   /// this method directly.
   fn update(&mut self, owner_widget: &Owner);
+
+  fn perform_layout(&self, id: RenderId, ctx: &mut RenderCtx);
+
+  fn bound(&self) -> Option<Size>;
+  fn get_constraints(&self) -> LayoutConstraints;
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
@@ -46,6 +56,9 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
+  fn perform_layout(&self, id: RenderId, ctx: &mut RenderCtx);
+  fn bound(&self) -> Option<Size>;
+  fn get_constraints(&self) -> LayoutConstraints;
 }
 
 pub(crate) fn downcast_widget<T: RenderWidget>(
@@ -133,6 +146,15 @@ where
 {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety) {
     RenderObject::update(&mut self.render, downcast_widget(owner_widget))
+  }
+
+  fn perform_layout(&self, id: RenderId, ctx: &mut RenderCtx) {
+    RenderObject::perform_layout(&self.render, id, ctx)
+  }
+
+  fn bound(&self) -> Option<Size> { RenderObject::bound(&self.render) }
+  fn get_constraints(&self) -> LayoutConstraints {
+    RenderObject::get_constraints(&self.render)
   }
 }
 

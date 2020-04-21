@@ -1,8 +1,7 @@
 use crate::prelude::*;
-use crate::render_ctx::RenderCtx;
-use crate::render_object_box::{
-  LayoutConstraints, Position, RenderObjectBox, Size,
-};
+use crate::render::render_ctx::RenderCtx;
+use crate::render::render_layout::{LayoutConstraints, Position, Size};
+use crate::render::render_tree::*;
 use indextree::*;
 ///  a stupid implement for develope the framework.
 #[derive(Debug)]
@@ -14,7 +13,7 @@ impl<'a> Widget for Row<'a> {
 
 #[derive(Debug, Default)]
 pub struct RowRender {
-  inner_layout: Vec<(Position, Size)>,
+  inner_layout: Vec<(Position)>,
   size: Option<Size>,
 }
 
@@ -34,6 +33,13 @@ impl<'a> MultiChildWidget for Row<'a> {
 
 impl<'a> RenderObject<Row<'a>> for RowRender {
   fn update(&mut self, _owner_widget: &Row<'a>) {}
+
+  fn perform_layout(&self, id: RenderId, ctx: &mut RenderCtx) {}
+
+  fn bound(&self) -> Option<Size> { None }
+  fn get_constraints(&self) -> LayoutConstraints {
+    LayoutConstraints::EFFECTED_BY_CHILDREN
+  }
 }
 
 // #[derive(Debug)]
@@ -79,9 +85,4 @@ impl<'a> RenderObject<Row<'a>> for RowRender {
 //       height: 1,
 //     });
 //   }
-//   fn mark_dirty(&mut self) {
-//     self.size = None;
-//     self.inner_layout.clear();
-//   }
-//   fn is_dirty(&self) -> bool { return self.size.is_none(); }
 // }
