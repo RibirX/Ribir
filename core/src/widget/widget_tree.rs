@@ -503,12 +503,8 @@ mod test {
 
   #[test]
   fn inflate_tree() {
-    let app = create_embed_app(3);
-    let Application {
-      widget_tree,
-      render_tree,
-      ..
-    } = app;
+    let (widget_tree, render_tree) = create_embed_app(3);
+
     assert_eq!(
       widget_tree.symbol_shape(),
       r#"EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 }
@@ -558,15 +554,12 @@ mod test {
 
   #[test]
   fn drop_all() {
-    let mut app = create_embed_app(3);
-    app.widget_tree.root().unwrap();
-    let Application {
-      widget_tree,
-      render_tree,
-      ..
-    } = &mut app;
+    let (mut widget_tree, mut render_tree) = create_embed_app(3);
 
-    widget_tree.root().unwrap().drop(widget_tree, render_tree);
+    widget_tree
+      .root()
+      .unwrap()
+      .drop(&mut widget_tree, &mut render_tree);
 
     assert!(widget_tree.widget_to_render.is_empty());
     assert!(render_tree.render_to_widget().is_empty());
@@ -581,25 +574,18 @@ mod test {
   fn emit_rebuild(env: &mut KeyDetectEnv) {
     *env.title.borrow_mut() = "New title";
     env
-      .app
       .widget_tree
       .need_builds
-      .insert(env.app.widget_tree.root().unwrap());
+      .insert(env.widget_tree.root().unwrap());
   }
   #[test]
   fn repair_tree() {
     let mut env = KeyDetectEnv::new(3);
     emit_rebuild(&mut env);
-    env.app.widget_tree.repair(&mut env.app.render_tree);
-
-    let Application {
-      widget_tree,
-      render_tree,
-      ..
-    } = env.app;
+    env.widget_tree.repair(&mut env.render_tree);
 
     assert_eq!(
-      widget_tree.symbol_shape(),
+      env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
 └── KeyDetect { key: KI4(0), child: Row([]) }
     ├── KeyDetect { key: KI4(0), child: Text("New title") }
@@ -624,7 +610,7 @@ mod test {
     );
 
     assert_eq!(
-      render_tree.symbol_shape(),
+      env.render_tree.symbol_shape(),
       r#"RowRender { inner_layout: [], size: None }
 ├── TextRender("New title")
 ├── TextRender("")
@@ -649,16 +635,13 @@ mod test {
     width: usize,
     depth: usize,
   ) -> (WidgetTree<'a>, RenderTree) {
-    let app = Application::default();
+    let mut widget_tree = WidgetTree::default();
+    let mut render_tree = RenderTree::default();
     let root = RecursiveRow { width, depth };
-    let Application {
-      mut widget_tree,
-      mut render_tree,
-      ..
-    } = app;
     widget_tree.set_root(root.into(), &mut render_tree);
     (widget_tree, render_tree)
   }
+
   #[bench]
   fn inflate_5_x_1000(b: &mut Bencher) { b.iter(|| create_env(1000)); }
 
@@ -681,7 +664,7 @@ mod test {
     let mut env = KeyDetectEnv::new(1000);
     b.iter(|| {
       emit_rebuild(&mut env);
-      env.app.widget_tree.repair(&mut env.app.render_tree);
+      env.widget_tree.repair(&mut env.render_tree);
     });
   }
 

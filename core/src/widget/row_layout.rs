@@ -34,6 +34,10 @@ impl<'a> MultiChildWidget for Row<'a> {
 
 impl<'a> RenderObject<Row<'a>> for RowRender {
   fn update(&mut self, _owner_widget: &Row<'a>) {}
+  fn paint(&self, mut ctx: PaintingContext) {
+    // todo should paint child in a correct position.
+    ctx.children().for_each(|id| ctx.paint_child(id));
+  }
 }
 
 // #[derive(Debug)]

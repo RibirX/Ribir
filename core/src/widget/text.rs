@@ -18,6 +18,9 @@ impl RenderWidget for Text {
 
 impl RenderObject<Text> for TextRender {
   fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0; }
+  fn paint(&self, mut ctx: PaintingContext) {
+    ctx.canvas().fill_text(self.0, Vector2F::new(10., 10.));
+  }
 }
 // impl RenderObject for Text {
 //   fn paint(&self) {}

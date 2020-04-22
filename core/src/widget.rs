@@ -5,6 +5,7 @@ pub mod key;
 mod row_layout;
 pub mod text;
 pub mod widget_tree;
+pub mod window;
 pub use key::{Key, KeyDetect};
 pub use row_layout::Row;
 pub use text::Text;
@@ -108,6 +109,11 @@ impl<'a, T: CombinationWidget + 'a> Widget for T {
     WidgetClassifyMut::Combination(self)
   }
 }
+
+impl<T: CombinationWidget> !RenderWidget for T {}
+impl<T: RenderWidget> !CombinationWidget for T {}
+impl<T: MultiChildWidget> !SingleChildWidget for T {}
+impl<T: SingleChildWidget> !MultiChildWidget for T {}
 
 impl<'a, W: Widget + 'a> From<W> for Box<dyn Widget + 'a> {
   #[inline]

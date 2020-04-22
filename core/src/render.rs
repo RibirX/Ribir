@@ -1,7 +1,12 @@
 use crate::widget::Key;
+pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
+pub mod canvas;
+pub(crate) mod device;
+pub mod painting_context;
 pub mod render_tree;
+pub use pathfinder_geometry::vector::Vector2F;
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
@@ -28,6 +33,9 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   /// Call by framework when its owner `owner_widget` changed, should not call
   /// this method directly.
   fn update(&mut self, owner_widget: &Owner);
+
+  /// Draw the render object into `PaintingContext`,
+  fn paint(&self, ctx: PaintingContext);
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
@@ -46,6 +54,7 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
+  fn paint(&self, ctx: PaintingContext);
 }
 
 pub(crate) fn downcast_widget<T: RenderWidget>(
@@ -134,6 +143,8 @@ where
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety) {
     RenderObject::update(&mut self.render, downcast_widget(owner_widget))
   }
+
+  fn paint(&self, ctx: PaintingContext) { self.render.paint(ctx); }
 }
 
 impl<W, R> RenderObjectBox<W, R>

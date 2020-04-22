@@ -1,6 +1,6 @@
 # Milestone
 
-## 0.0.1 core concept, tree framework (5.1)
+## core concept, tree framework (5.1)
  
 - [x] widget tree
   - [ ] a render widget to test render tree?
@@ -16,42 +16,58 @@
   - [x] merge framework branch to master.
 - [ ] perform layout on render tree (2 week)
   - [ ] layout flow
-  - [ ] two layout widget
+  - [ ] base layout widget
     - [ ] Row
     - [ ] Column
     - [ ] Center
 
-## 0.1 paint & event, runnable (6.1)
+## paint & event, runnable (6.1)
 
-- [ ] we need readable & learnable documents.
-  - [ ] readme
-  - [ ] contributing
-  - [ ] tutorial
-  - [ ] api docs cover
-  - [ ] inside framework
-- [ ] which 2d graphic library to use?
-- [ ] paint flow.
-- [ ] cross platform window
-  - [ ] event loop
-  - [ ] event framework.
-    - [ ] point event ?
-    - [ ] keyboard event
-    - [ ] input widget.
-- [ ] platform support (need more people join us)
-  - [ ] osx
-  - [ ] linux
-  - [ ] windows
-  - [ ] android
-  - [ ] ios
-  - [ ] web / WebAssembly
+- [ ] paint
+  - [ ] which 2d graphic library to use?
+  - [ ] paint flow.
+- [ ] event  
+  - [ ] support main window
+  - [ ] event 
+    - [ ] event loop
+    - [ ] bubbling framework
+    - [ ] event type
+      - [ ] point event ?
+      - [ ] window event ?
+      - [ ] keyboard event
+  - [ ] input widget.
+
+##  we need readable & learnable documents.
+
+- [ ] readme
+- [ ] contributing
+- [ ] tutorial
+- [ ] api docs cover
+- [ ] inside framework
+
+## cross platform
+
+- [ ] osx
+- [ ] linux
+- [ ] windows
+- [ ] android
+- [ ] ios
+- [ ] web / WebAssembly
 
 
-## 0.2 base widgets and animation support
-
-todo:
+## base widgets
 
 - [ ] widgets
-  - [ ] layout widget
 - [ ] events
 
-## 0.4 animation & tools
+## animation
+
+## parallelism layout 
+
+## multi main window
+
+## infinite / virtual scroll
+
+## debug, test and productive develop tools
+
+## runtime declare language to render ?
