@@ -1,4 +1,4 @@
-#![feature(specialization, test, decl_macro, raw)]
+#![feature(specialization, test, decl_macro, raw, negative_impls)]
 
 #[macro_use]
 extern crate bitflags;

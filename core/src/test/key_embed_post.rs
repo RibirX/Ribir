@@ -1,5 +1,5 @@
 #![cfg(test)]
-use crate::prelude::*;
+use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*};
 use std::{cell::RefCell, rc::Rc};
 #[derive(Clone, Default, Debug)]
 struct EmbedKeyPost {
@@ -27,7 +27,8 @@ impl CombinationWidget for EmbedKeyPost {
 }
 
 pub struct KeyDetectEnv<'a> {
-  pub app: Application<'a>,
+  pub widget_tree: WidgetTree<'a>,
+  pub render_tree: RenderTree,
   pub title: Rc<RefCell<&'static str>>,
 }
 
@@ -38,17 +39,13 @@ impl<'a> KeyDetectEnv<'a> {
     let title = post.title.clone();
     post.title = title.clone();
 
-    let mut env = KeyDetectEnv {
-      app: Application::default(),
-      title,
-    };
-    let Application {
+    let mut widget_tree = WidgetTree::default();
+    let mut render_tree = RenderTree::default();
+    widget_tree.set_root(post.into(), &mut render_tree);
+    KeyDetectEnv {
       widget_tree,
       render_tree,
-      ..
-    } = &mut env.app;
-    widget_tree.set_root(post.into(), render_tree);
-
-    env
+      title,
+    }
   }
 }
