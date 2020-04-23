@@ -65,7 +65,7 @@ impl<'a> WidgetClassify<'a> {
   /// None-Value.
   pub(crate) fn try_as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self {
-      WidgetClassify::Combination(w) => None,
+      WidgetClassify::Combination(_) => None,
       WidgetClassify::Render(w) => Some(w.as_render()),
       WidgetClassify::SingleChild(w) => Some(w.as_render()),
       WidgetClassify::MultiChild(w) => Some(w.as_render()),
@@ -88,7 +88,7 @@ impl<'a> WidgetClassifyMut<'a> {
     &mut self,
   ) -> Option<&mut dyn RenderWidgetSafety> {
     match self {
-      WidgetClassifyMut::Combination(w) => None,
+      WidgetClassifyMut::Combination(_) => None,
       WidgetClassifyMut::Render(w) => Some(w.as_render_mut()),
       WidgetClassifyMut::SingleChild(w) => Some(w.as_render_mut()),
       WidgetClassifyMut::MultiChild(w) => Some(w.as_render_mut()),

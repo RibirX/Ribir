@@ -3,9 +3,9 @@ use indextree::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use winit::{
-  event::{Event, WindowEvent},
+  event::Event,
   event_loop::{ControlFlow, EventLoop},
-  window::WindowBuilder,
+  platform::desktop::EventLoopExtDesktop,
 };
 
 pub struct Application<'a> {
@@ -30,12 +30,12 @@ impl<'a> Application<'a> {
     self.new_window(w);
 
     let Self {
-      event_loop,
+      mut event_loop,
       mut windows,
       ..
     } = self;
 
-    event_loop.run(move |event, _event_loop, control_flow| {
+    event_loop.run_return(move |event, _event_loop, control_flow| {
       *control_flow = ControlFlow::Wait;
 
       match event {

@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "holiday"
 version = "0.1.0"
 authors = ["adoo <Adoo@outlook.com>"]
 edition = "2018"
@@ -32,7 +32,3 @@ metal = "0.17.0"
 objc = "0.2.7"
 cocoa="0.20.0"
 pathfinder_metal= "0.5.1"
-
-
-[profile.bench]
-debug = true
