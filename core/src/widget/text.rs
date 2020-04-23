@@ -3,23 +3,25 @@ use indextree::*;
 
 /// Just a stupid implement for develope the framework.
 #[derive(Debug)]
-pub struct Text(pub &'static str);
+pub struct Text(pub String);
 
 impl Widget for Text {
   render_widget_base_impl!();
 }
 #[derive(Debug)]
-pub struct TextRender(&'static str);
+pub struct TextRender(String);
 
 impl RenderWidget for Text {
   type RO = TextRender;
-  fn create_render_object(&self) -> Self::RO { TextRender(self.0) }
+  fn create_render_object(&self) -> Self::RO { TextRender(self.0.clone()) }
 }
 
 impl RenderObject<Text> for TextRender {
-  fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0; }
+  fn update<'a>(&mut self, owner_widget: &Text) {
+    self.0 = owner_widget.0.clone();
+  }
   fn paint(&self, mut ctx: PaintingContext) {
-    ctx.canvas().fill_text(self.0, Vector2F::new(10., 10.));
+    ctx.canvas().fill_text(&self.0, Vector2F::new(10., 10.));
   }
 }
 // impl RenderObject for Text {

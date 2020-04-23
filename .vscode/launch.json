@@ -7,17 +7,54 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'core'",
+      "name": "Debug unit tests in library 'holiday'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
           "--lib",
-          "--package=core"
+          "--package=holiday"
         ],
         "filter": {
-          "name": "core",
+          "name": "holiday",
           "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'todos'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=todos",
+          "--package=todos"
+        ],
+        "filter": {
+          "name": "todos",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'todos'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=todos",
+          "--package=todos"
+        ],
+        "filter": {
+          "name": "todos",
+          "kind": "bin"
         }
       },
       "args": [],

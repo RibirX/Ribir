@@ -21,15 +21,19 @@ pull_request_rules:
     conditions:
       - status-failure=rust code format style check
     actions:
-        comment:
-          message: This pull request is now not keep same code style as this project. Could you fix it? 🙏 Just run `cargo fmt` to get more details.
+        comment: 
+          message: |- 
+            This pull request is now not keep same code style as this project. Could you fix it? 🙏 
+            Just run `cargo fmt` to get more details.
 
   - name: clippy check hint
     conditions:
       - status-failure=clippy_check
     actions:
         comment:
-          message: Clippy help us to improve our Rust code. Could you fix it? 🙏 Run `cargo clippy --all-targets --all-features -- -D warnings` to get more details.
+          message: |-
+            Clippy help us to improve our Rust code. Could you fix it? 🙏
+            Run `cargo clippy --all-targets --all-features -- -D warnings` to get more details.
 
   - name: ask to resolve conflict
     conditions:
