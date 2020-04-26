@@ -2,6 +2,7 @@
 
 members = [
     "core",
+    "canvas",
     "examples/*"
 ]
 
