@@ -12,9 +12,9 @@ struct EmbedKeyPost {
 impl CombinationWidget for EmbedKeyPost {
   fn build<'a>(&self) -> Box<dyn Widget + 'a> {
     let mut children = vec![
-      KeyDetect::new(0, Text(*self.title.borrow())).into(),
-      KeyDetect::new(1, Text(self.author)).into(),
-      KeyDetect::new(2, Text(self.content)).into(),
+      KeyDetect::new(0, Text(self.title.borrow().to_string())).into(),
+      KeyDetect::new(1, Text(self.author.to_string())).into(),
+      KeyDetect::new(2, Text(self.content.to_string())).into(),
     ];
 
     if self.level > 0 {

@@ -8,5 +8,5 @@ edition = "2018"
 
 [dependencies]
 wgpu = "0.5.0"
-lyon = "0.15.7"
+lyon =  { git = "https://github.com/nical/lyon", version="*"}
 palette = "0.5"

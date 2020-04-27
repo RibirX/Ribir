@@ -25,9 +25,9 @@ impl EmbedPost {
 impl CombinationWidget for EmbedPost {
   fn build<'a>(&self) -> Box<dyn Widget + 'a> {
     let mut children = vec![
-      Text(self.title).into(),
-      Text(self.author).into(),
-      Text(self.content).into(),
+      Text(self.title.to_string()).into(),
+      Text(self.author.to_string()).into(),
+      Text(self.content.to_string()).into(),
     ];
 
     if self.level > 0 {
