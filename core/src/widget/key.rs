@@ -159,11 +159,11 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
-  let k1 = KeyDetect::new(0, Text(""));
-  let k2 = KeyDetect::new(String::new(), Text(""));
-  let k3 = KeyDetect::new("", Text(""));
-  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text(""));
-  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text(""));
+  let k1 = KeyDetect::new(0, Text("".to_string()));
+  let k2 = KeyDetect::new(String::new(), Text("".to_string()));
+  let k3 = KeyDetect::new("".to_string(), Text("".to_string()));
+  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
+  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
   assert!(&k1.key != &k2.key);
   assert!(&k2.key == &k3.key);
   assert!(&k3.key != &k1.key);
