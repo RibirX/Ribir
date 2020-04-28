@@ -1,13 +1,13 @@
-use lyon::tessellation::*;
-use lyon::{
-  math::{Point, Transform},
-  path::Path,
+pub use lyon::{
+  math::{Point, Rect, Size, Transform},
+  path::{builder::PathBuilder, Path},
 };
-use palette::{named, Srgba};
-use std::ops::{Deref, DerefMut};
-
-#[derive(Copy, Clone, Debug)]
-struct Vertex([f32; 2]);
+use lyon::{path::Winding, tessellation::*};
+pub use palette::{named, Srgba};
+use std::{
+  cmp::PartialEq,
+  ops::{Deref, DerefMut},
+};
 
 const STROKE_STYLE: FillStyle = FillStyle::Color(Srgba {
   color: named::BLACK,
@@ -23,8 +23,8 @@ const INIT_TRANSFORM: Transform = Transform::row_major(1., 0., 0., 1., 0., 0.);
 
 const DEFAULT_STATE: State = State {
   transform: INIT_TRANSFORM,
-  stroke_style: STROKE_STYLE,
-  fill_style: FILL_STYLE,
+  stroke_pen: STROKE_STYLE,
+  fill_brush: FILL_STYLE,
 };
 
 pub struct Rendering2DLayer {
@@ -33,13 +33,15 @@ pub struct Rendering2DLayer {
 }
 
 impl Rendering2DLayer {
-  pub fn new() -> Self {
+  pub(crate) fn new() -> Self {
     Self {
       state_stack: vec![],
       commands: vec![],
     }
   }
 
+  /// Saves the entire state of the canvas by pushing the current drawing state
+  /// onto a stack.
   #[must_use]
   pub fn save(&mut self) -> LayerGuard {
     let new_state = if let Some(last) = self.state_stack.last() {
@@ -57,7 +59,7 @@ impl Rendering2DLayer {
     self
       .state_stack
       .last()
-      .map(|s| &s.stroke_style)
+      .map(|s| &s.stroke_pen)
       .unwrap_or(&STROKE_STYLE)
   }
   /// Returns the color, gradient, or pattern used for fill. Only `Color`
@@ -66,7 +68,7 @@ impl Rendering2DLayer {
     self
       .state_stack
       .last()
-      .map(|s| &s.fill_style)
+      .map(|s| &s.fill_brush)
       .unwrap_or(&FILL_STYLE)
   }
 
@@ -87,8 +89,8 @@ impl Rendering2DLayer {
       state.transform = transform;
     } else {
       self.state_stack.push(State {
-        stroke_style: STROKE_STYLE,
-        fill_style: FILL_STYLE,
+        stroke_pen: STROKE_STYLE,
+        fill_brush: FILL_STYLE,
         transform,
       });
     }
@@ -102,12 +104,15 @@ impl Rendering2DLayer {
     self.commands.push(self.ctor_stroke_command(path))
   }
 
-  /// Fills the interior of the `path`.
+  /// Use current brush fill the interior of the `path`.
   pub fn fill_path(&mut self, mut path: Path) {
     path = self.transform_path(path);
     self.commands.push(self.ctor_fill_command(path))
   }
 
+  /// All drawing of this layer has finished, and convert the layer to an
+  /// intermediate render buffer data that will provide to render process and
+  /// then commit to gpu.
   pub fn finish(self) -> LayerBuffer {
     let mut buffer = LayerBuffer {
       geometry: VertexBuffers::new(),
@@ -183,17 +188,65 @@ impl Rendering2DLayer {
   }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LayerBufferAttr {
   rg: std::ops::Range<usize>,
   style: FillStyle,
 }
 
+#[derive(Debug)]
 pub struct LayerBuffer {
   geometry: VertexBuffers<Point, u16>,
   attrs: Vec<LayerBufferAttr>,
 }
 
-#[derive(Clone)]
+impl LayerBuffer {
+  /// Return whether two buffer can be merged safely.
+  pub(crate) fn mergeable(&self, other: &LayerBuffer) -> bool {
+    self.geometry.vertices.len() + other.geometry.vertices.len()
+      <= u16::MAX as usize
+      && self.geometry.indices.len() + other.geometry.indices.len()
+        <= u16::MAX as usize
+  }
+
+  /// Merge an other buffer into self, caller should use `mergeable` to check if
+  /// safe to merge.
+  pub(crate) fn merge(&mut self, other: &LayerBuffer) {
+    fn append<T>(to: &mut Vec<T>, from: &Vec<T>) {
+      // Point, U16 and LayerBufferAttr are safe to memory copy.
+      unsafe {
+        let count = from.len();
+        to.reserve(count);
+        let len = to.len();
+        std::ptr::copy_nonoverlapping(
+          from.as_ptr() as *const T,
+          to.as_mut_ptr().add(len),
+          count,
+        );
+        to.set_len(len + count);
+      }
+    }
+
+    let offset_vertex = self.geometry.vertices.len();
+    let offset_index = self.geometry.indices.len();
+    let offset_attr = self.attrs.len();
+    append(&mut self.geometry.vertices, &other.geometry.vertices);
+    append(&mut self.geometry.indices, &other.geometry.indices);
+    append(&mut self.attrs, &other.attrs);
+    self
+      .geometry
+      .indices
+      .iter_mut()
+      .skip(offset_index)
+      .for_each(|index| *index += offset_vertex as u16);
+    self.attrs.iter_mut().skip(offset_attr).for_each(|attr| {
+      attr.rg.start += offset_index;
+      attr.rg.end += offset_index;
+    });
+  }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum FillStyle {
   Color(Srgba<u8>),
 }
@@ -201,8 +254,8 @@ pub enum FillStyle {
 #[derive(Clone)]
 struct State {
   transform: Transform,
-  stroke_style: FillStyle,
-  fill_style: FillStyle,
+  stroke_pen: FillStyle,
+  fill_brush: FillStyle,
 }
 
 impl State {}
@@ -242,21 +295,73 @@ impl<'a> DerefMut for LayerGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
-#[test]
-fn save_guard() {
-  let mut layer = Rendering2DLayer::new();
-  {
-    let mut paint = layer.save();
-    let t = Transform::row_major(1., 1., 1., 1., 1., 1.);
-    paint.set_transform(t.clone());
-    assert_eq!(&t, paint.get_transform());
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn save_guard() {
+    let mut layer = Rendering2DLayer::new();
     {
-      let mut p2 = paint.save();
-      let t2 = Transform::row_major(2., 2., 2., 2., 2., 2.);
-      p2.set_transform(t2);
-      assert_eq!(&t2, p2.get_transform());
+      let mut paint = layer.save();
+      let t = Transform::row_major(1., 1., 1., 1., 1., 1.);
+      paint.set_transform(t.clone());
+      assert_eq!(&t, paint.get_transform());
+      {
+        let mut p2 = paint.save();
+        let t2 = Transform::row_major(2., 2., 2., 2., 2., 2.);
+        p2.set_transform(t2);
+        assert_eq!(&t2, p2.get_transform());
+      }
+      assert_eq!(&t, paint.get_transform());
     }
-    assert_eq!(&t, paint.get_transform());
+    assert_eq!(&INIT_TRANSFORM, layer.get_transform());
   }
-  assert_eq!(&INIT_TRANSFORM, layer.get_transform());
+
+  #[test]
+  fn buffer() {
+    let mut layer = Rendering2DLayer::new();
+    let mut builder = Path::builder();
+    builder
+      .add_rectangle(&Rect::from_size((100., 100.).into()), Winding::Positive);
+    let path = builder.build();
+    layer.stroke_path(path.clone());
+    layer.fill_path(path);
+    let buffer = layer.finish();
+    assert_eq!(buffer.attrs.len(), 2);
+    assert!(!buffer.geometry.vertices.is_empty());
+  }
+
+  #[test]
+  fn merge_buffer() {
+    fn draw_point() -> LayerBuffer {
+      let mut layer = Rendering2DLayer::new();
+      let mut builder = Path::builder();
+      builder.begin((0., 0.).into());
+      builder.line_to((1., 0.).into());
+      builder.line_to((1., 1.).into());
+      builder.end(true);
+      let path = builder.build();
+      layer.fill_path(path);
+      layer.finish()
+    }
+    let mut buffer1 = draw_point();
+    let buffer2 = draw_point();
+    assert!(buffer1.mergeable(&buffer2));
+    buffer1.merge(&buffer2);
+    debug_assert_eq!(&buffer1.geometry.indices, &[1, 0, 2, 4, 3, 5]);
+    debug_assert_eq!(
+      &buffer1.attrs,
+      &[
+        LayerBufferAttr {
+          rg: 0..3,
+          style: FILL_STYLE,
+        },
+        LayerBufferAttr {
+          rg: 3..6,
+          style: FILL_STYLE,
+        }
+      ]
+    );
+  }
 }
