@@ -113,8 +113,8 @@ impl Rendering2DLayer {
   /// All drawing of this layer has finished, and convert the layer to an
   /// intermediate render buffer data that will provide to render process and
   /// then commit to gpu.
-  pub fn finish(self) -> LayerBuffer {
-    let mut buffer = LayerBuffer {
+  pub fn finish(self) -> LayerBuffer2D {
+    let mut buffer = LayerBuffer2D {
       geometry: VertexBuffers::new(),
       attrs: vec![],
     };
@@ -137,6 +137,7 @@ impl Rendering2DLayer {
         buffer.attrs.push(LayerBufferAttr {
           rg: start..buffer.geometry.indices.len(),
           style: path.style,
+          disjoint_attr: DisjointAttr::Fill {},
         })
       }
       RenderCommand::Stroke { path } => {
@@ -155,6 +156,7 @@ impl Rendering2DLayer {
         buffer.attrs.push(LayerBufferAttr {
           rg: start..buffer.geometry.indices.len(),
           style: path.style,
+          disjoint_attr: DisjointAttr::Stroke {},
         })
       }
     });
@@ -188,21 +190,29 @@ impl Rendering2DLayer {
   }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LayerBufferAttr {
   rg: std::ops::Range<usize>,
   style: FillStyle,
+  disjoint_attr: DisjointAttr,
 }
 
-#[derive(Debug)]
-pub struct LayerBuffer {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DisjointAttr {
+  Fill {},
+  Stroke {},
+}
+
+/// Layer buffer is the result of a layer drawing finished.
+#[derive(Debug, Clone)]
+pub struct LayerBuffer2D {
   geometry: VertexBuffers<Point, u16>,
   attrs: Vec<LayerBufferAttr>,
 }
 
-impl LayerBuffer {
+impl LayerBuffer2D {
   /// Return whether two buffer can be merged safely.
-  pub(crate) fn mergeable(&self, other: &LayerBuffer) -> bool {
+  pub(crate) fn mergeable(&self, other: &LayerBuffer2D) -> bool {
     self.geometry.vertices.len() + other.geometry.vertices.len()
       <= u16::MAX as usize
       && self.geometry.indices.len() + other.geometry.indices.len()
@@ -211,7 +221,7 @@ impl LayerBuffer {
 
   /// Merge an other buffer into self, caller should use `mergeable` to check if
   /// safe to merge.
-  pub(crate) fn merge(&mut self, other: &LayerBuffer) {
+  pub(crate) fn merge(&mut self, other: &LayerBuffer2D) {
     fn append<T>(to: &mut Vec<T>, from: &Vec<T>) {
       // Point, U16 and LayerBufferAttr are safe to memory copy.
       unsafe {
@@ -334,7 +344,7 @@ mod test {
 
   #[test]
   fn merge_buffer() {
-    fn draw_point() -> LayerBuffer {
+    fn draw_point() -> LayerBuffer2D {
       let mut layer = Rendering2DLayer::new();
       let mut builder = Path::builder();
       builder.begin((0., 0.).into());
@@ -356,10 +366,12 @@ mod test {
         LayerBufferAttr {
           rg: 0..3,
           style: FILL_STYLE,
+          disjoint_attr: DisjointAttr::Fill {}
         },
         LayerBufferAttr {
           rg: 3..6,
           style: FILL_STYLE,
+          disjoint_attr: DisjointAttr::Fill {}
         }
       ]
     );
