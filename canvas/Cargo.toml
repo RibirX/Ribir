@@ -10,3 +10,8 @@ edition = "2018"
 wgpu = "0.5.0"
 lyon =  { git = "https://github.com/nical/lyon", version="*"}
 palette = "0.5"
+raw-window-handle = "0.3.3"
+
+[dev-dependencies]
+winit="0.22.1"
+futures="0.3.4"
