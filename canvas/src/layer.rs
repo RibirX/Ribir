@@ -3,39 +3,31 @@ pub use lyon::{
   path::{builder::PathBuilder, Path},
 };
 use lyon::{path::Winding, tessellation::*};
-pub use palette::{named, Srgba};
 use std::{
   cmp::PartialEq,
-  ops::{Deref, DerefMut},
+  ops::{Deref, DerefMut, Range},
 };
 
-const STROKE_STYLE: FillStyle = FillStyle::Color(Srgba {
-  color: named::BLACK,
-  alpha: u8::MAX,
-});
-
-const FILL_STYLE: FillStyle = FillStyle::Color(Srgba {
-  color: named::WHITE,
-  alpha: u8::MAX,
-});
-
-const INIT_TRANSFORM: Transform = Transform::row_major(1., 0., 0., 1., 0., 0.);
-
 const DEFAULT_STATE: State = State {
-  transform: INIT_TRANSFORM,
-  stroke_pen: STROKE_STYLE,
-  fill_brush: FILL_STYLE,
+  transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
+  stroke_pen: StrokePen {
+    style: FillStyle::Color(wgpu::Color::BLACK),
+    line_width: 1.,
+  },
+  fill_brush: Brush {
+    style: FillStyle::Color(wgpu::Color::WHITE),
+  },
 };
 
 pub struct Rendering2DLayer {
   state_stack: Vec<State>,
-  commands: Vec<RenderCommand>,
+  commands: Vec<PathCommand>,
 }
 
 impl Rendering2DLayer {
   pub(crate) fn new() -> Self {
     Self {
-      state_stack: vec![],
+      state_stack: vec![DEFAULT_STATE],
       commands: vec![],
     }
   }
@@ -44,56 +36,34 @@ impl Rendering2DLayer {
   /// onto a stack.
   #[must_use]
   pub fn save(&mut self) -> LayerGuard {
-    let new_state = if let Some(last) = self.state_stack.last() {
-      last.clone()
-    } else {
-      DEFAULT_STATE.clone()
-    };
+    let new_state = self.current_state().clone();
     self.state_stack.push(new_state);
     LayerGuard(self)
   }
 
   /// Returns the color, gradient, or pattern used for strokes. Only `Color`
   /// support now.
-  pub fn get_stroke_style(&self) -> &FillStyle {
-    self
-      .state_stack
-      .last()
-      .map(|s| &s.stroke_pen)
-      .unwrap_or(&STROKE_STYLE)
+  #[inline]
+  pub fn get_stroke_pen_style(&self) -> &FillStyle {
+    &self.current_state().stroke_pen.style
   }
   /// Returns the color, gradient, or pattern used for fill. Only `Color`
   /// support now.
-  pub fn get_fill_style(&self) -> &FillStyle {
-    self
-      .state_stack
-      .last()
-      .map(|s| &s.fill_brush)
-      .unwrap_or(&FILL_STYLE)
+  #[inline]
+  pub fn get_brush_style(&self) -> &FillStyle {
+    &self.current_state().fill_brush.style
   }
 
   /// Return the current transformation matrix being applied to the layer.
-  pub fn get_transform(&self) -> &Transform {
-    self
-      .state_stack
-      .last()
-      .map(|s| &s.transform)
-      .unwrap_or(&INIT_TRANSFORM)
-  }
+  #[inline]
+  pub fn get_transform(&self) -> &Transform { &self.current_state().transform }
 
   /// Resets (overrides) the current transformation to the identity matrix, and
   /// then invokes a transformation described by the arguments of this method.
   /// This lets you scale, rotate, translate (move), and skew the context.
   pub fn set_transform(&mut self, transform: Transform) -> &mut Self {
-    if let Some(state) = self.state_stack.last_mut() {
-      state.transform = transform;
-    } else {
-      self.state_stack.push(State {
-        stroke_pen: STROKE_STYLE,
-        fill_brush: FILL_STYLE,
-        transform,
-      });
-    }
+    let mut state = self.state_stack.last_mut().expect("must have one level");
+    state.transform = transform;
 
     self
   }
@@ -121,64 +91,68 @@ impl Rendering2DLayer {
     let mut stroke_tess = StrokeTessellator::new();
     let mut fill_tess = FillTessellator::new();
 
-    self.commands.into_iter().for_each(|cmd| match cmd {
-      RenderCommand::Fill { path } => {
-        let start = buffer.geometry.indices.len();
-        fill_tess
-          .tessellate_path(
-            &path.path,
-            &FillOptions::default(),
-            &mut BuffersBuilder::new(
-              &mut buffer.geometry,
-              |pos: Point, _: FillAttributes| pos,
-            ),
-          )
-          .unwrap();
-        buffer.attrs.push(LayerBufferAttr {
-          rg: start..buffer.geometry.indices.len(),
-          style: path.style,
-          disjoint_attr: DisjointAttr::Fill {},
-        })
-      }
-      RenderCommand::Stroke { path } => {
-        let start = buffer.geometry.indices.len();
-        stroke_tess
-          .tessellate_path(
-            &path.path,
-            &StrokeOptions::default().dont_apply_line_width(),
-            &mut BuffersBuilder::new(
-              &mut buffer.geometry,
-              |pos: Point, _: StrokeAttributes| pos,
-            ),
-          )
-          .unwrap();
+    self.commands.into_iter().for_each(|cmd| {
+      let PathCommand {
+        transform,
+        path,
+        cmd_type,
+      } = cmd;
+      let start = buffer.geometry.indices.len();
+      let (style, line_width) = match cmd_type {
+        CommandType::Fill(brush) => {
+          fill_tess
+            .tessellate_path(
+              &path,
+              &FillOptions::default(),
+              &mut BuffersBuilder::new(
+                &mut buffer.geometry,
+                |pos: Point, _: FillAttributes| pos,
+              ),
+            )
+            .unwrap();
 
-        buffer.attrs.push(LayerBufferAttr {
-          rg: start..buffer.geometry.indices.len(),
-          style: path.style,
-          disjoint_attr: DisjointAttr::Stroke {},
-        })
-      }
+          (brush.style, 1.)
+        }
+        CommandType::Stroke(pen) => {
+          stroke_tess
+            .tessellate_path(
+              &path,
+              &StrokeOptions::default().dont_apply_line_width(),
+              &mut BuffersBuilder::new(
+                &mut buffer.geometry,
+                |pos: Point, _: StrokeAttributes| pos,
+              ),
+            )
+            .unwrap();
+          (pen.style, pen.line_width)
+        }
+      };
+      buffer.attrs.push(LayerBufferAttr {
+        rg: start..buffer.geometry.indices.len(),
+        transform,
+        style,
+        line_width,
+      });
     });
 
     buffer
   }
 
-  fn ctor_fill_command(&self, path: Path) -> RenderCommand {
-    RenderCommand::Fill {
-      path: PathCommand {
-        path,
-        style: self.get_fill_style().clone(),
-      },
+  fn ctor_fill_command(&self, path: Path) -> PathCommand {
+    let state = self.current_state();
+    PathCommand {
+      path,
+      transform: state.transform.clone(),
+      cmd_type: CommandType::Fill(state.fill_brush.clone()),
     }
   }
 
-  fn ctor_stroke_command(&self, path: Path) -> RenderCommand {
-    RenderCommand::Stroke {
-      path: PathCommand {
-        path,
-        style: self.get_stroke_style().clone(),
-      },
+  fn ctor_stroke_command(&self, path: Path) -> PathCommand {
+    let state = self.current_state();
+    PathCommand {
+      path,
+      transform: state.transform.clone(),
+      cmd_type: CommandType::Stroke(state.stroke_pen.clone()),
     }
   }
 
@@ -188,19 +162,21 @@ impl Rendering2DLayer {
     }
     path
   }
+
+  fn current_state(&self) -> &State {
+    self
+      .state_stack
+      .last()
+      .expect("Must have one state in stack!")
+  }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LayerBufferAttr {
-  rg: std::ops::Range<usize>,
+  rg: Range<usize>,
   style: FillStyle,
-  disjoint_attr: DisjointAttr,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum DisjointAttr {
-  Fill {},
-  Stroke {},
+  line_width: f32,
+  transform: Transform,
 }
 
 /// Layer buffer is the result of a layer drawing finished.
@@ -211,73 +187,73 @@ pub struct LayerBuffer2D {
 }
 
 impl LayerBuffer2D {
-  /// Return whether two buffer can be merged safely.
-  pub(crate) fn mergeable(&self, other: &LayerBuffer2D) -> bool {
-    self.geometry.vertices.len() + other.geometry.vertices.len()
-      <= u16::MAX as usize
-      && self.geometry.indices.len() + other.geometry.indices.len()
-        <= u16::MAX as usize
-  }
-
-  /// Merge an other buffer into self, caller should use `mergeable` to check if
-  /// safe to merge.
-  pub(crate) fn merge(&mut self, other: &LayerBuffer2D) {
-    fn append<T>(to: &mut Vec<T>, from: &Vec<T>) {
-      // Point, U16 and LayerBufferAttr are safe to memory copy.
-      unsafe {
-        let count = from.len();
-        to.reserve(count);
-        let len = to.len();
-        std::ptr::copy_nonoverlapping(
-          from.as_ptr() as *const T,
-          to.as_mut_ptr().add(len),
-          count,
-        );
-        to.set_len(len + count);
-      }
+  pub fn iter_same_style(&self) -> SameTypeIter {
+    SameTypeIter {
+      buffer: self,
+      idx: 0,
     }
+  }
+}
 
-    let offset_vertex = self.geometry.vertices.len();
-    let offset_index = self.geometry.indices.len();
-    let offset_attr = self.attrs.len();
-    append(&mut self.geometry.vertices, &other.geometry.vertices);
-    append(&mut self.geometry.indices, &other.geometry.indices);
-    append(&mut self.attrs, &other.attrs);
-    self
-      .geometry
-      .indices
-      .iter_mut()
-      .skip(offset_index)
-      .for_each(|index| *index += offset_vertex as u16);
-    self.attrs.iter_mut().skip(offset_attr).for_each(|attr| {
-      attr.rg.start += offset_index;
-      attr.rg.end += offset_index;
-    });
+/// The iterator for `LayerBuffer2D` that iter the same style attrs range.
+pub struct SameTypeIter<'a> {
+  buffer: &'a LayerBuffer2D,
+  idx: usize,
+}
+
+impl<'a> Iterator for SameTypeIter<'a> {
+  type Item = Range<usize>;
+  fn next(&mut self) -> Option<Self::Item> {
+    if let Some(attr) = self.buffer.attrs.get(self.idx) {
+      let pure_color = matches!(attr.style, FillStyle::Color(_));
+      let start = self.idx;
+      // Find the first different style attr.
+      let idx = self.buffer.attrs[start..]
+        .iter()
+        .position(|attr| {
+          matches!(attr.style, FillStyle::Color(_)) != pure_color
+        })
+        .map_or(self.buffer.attrs.len(), |offset| start + offset);
+      self.idx = idx;
+      Some(start..idx)
+    } else {
+      None
+    }
   }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FillStyle {
-  Color(Srgba<u8>),
+  Color(wgpu::Color),
+  Image,    // todo
+  Gradient, // todo,
 }
 
 #[derive(Clone)]
+struct StrokePen {
+  style: FillStyle,
+  line_width: f32,
+}
+
+#[derive(Clone)]
+struct Brush {
+  style: FillStyle,
+}
+#[derive(Clone)]
 struct State {
   transform: Transform,
-  stroke_pen: FillStyle,
-  fill_brush: FillStyle,
+  stroke_pen: StrokePen,
+  fill_brush: Brush,
 }
 
-impl State {}
-
-enum RenderCommand {
-  Fill { path: PathCommand },
-  Stroke { path: PathCommand },
+enum CommandType {
+  Fill(Brush),
+  Stroke(StrokePen),
 }
-
 struct PathCommand {
   path: Path,
-  style: FillStyle,
+  transform: Transform,
+  cmd_type: CommandType,
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -325,7 +301,10 @@ mod test {
       }
       assert_eq!(&t, paint.get_transform());
     }
-    assert_eq!(&INIT_TRANSFORM, layer.get_transform());
+    assert_eq!(
+      &Transform::row_major(1., 0., 0., 1., 0., 0.),
+      layer.get_transform()
+    );
   }
 
   #[test]
@@ -343,37 +322,31 @@ mod test {
   }
 
   #[test]
-  fn merge_buffer() {
-    fn draw_point() -> LayerBuffer2D {
-      let mut layer = Rendering2DLayer::new();
-      let mut builder = Path::builder();
-      builder.begin((0., 0.).into());
-      builder.line_to((1., 0.).into());
-      builder.line_to((1., 1.).into());
-      builder.end(true);
-      let path = builder.build();
-      layer.fill_path(path);
-      layer.finish()
+  fn buffer_iter() {
+    fn creat_attr(rg: Range<usize>, style: FillStyle) -> LayerBufferAttr {
+      LayerBufferAttr {
+        rg,
+        style,
+        line_width: 1.,
+        transform: Transform::row_major(0., 0., 0., 0., 0., 0.),
+      }
     }
-    let mut buffer1 = draw_point();
-    let buffer2 = draw_point();
-    assert!(buffer1.mergeable(&buffer2));
-    buffer1.merge(&buffer2);
-    debug_assert_eq!(&buffer1.geometry.indices, &[1, 0, 2, 4, 3, 5]);
-    debug_assert_eq!(
-      &buffer1.attrs,
-      &[
-        LayerBufferAttr {
-          rg: 0..3,
-          style: FILL_STYLE,
-          disjoint_attr: DisjointAttr::Fill {}
-        },
-        LayerBufferAttr {
-          rg: 3..6,
-          style: FILL_STYLE,
-          disjoint_attr: DisjointAttr::Fill {}
-        }
-      ]
-    );
+    let buffer = LayerBuffer2D {
+      geometry: VertexBuffers::new(),
+      //In real world, attrs should always match geometry.
+      attrs: vec![
+        creat_attr(0..10, FillStyle::Color(wgpu::Color::BLACK)),
+        creat_attr(10..20, FillStyle::Color(wgpu::Color::WHITE)),
+        creat_attr(20..30, FillStyle::Image),
+        creat_attr(30..40, FillStyle::Gradient),
+        creat_attr(40..50, FillStyle::Color(wgpu::Color::WHITE)),
+      ],
+    };
+
+    let mut iter = buffer.iter_same_style();
+    assert_eq!(iter.next(), Some(0..2));
+    assert_eq!(iter.next(), Some(2..4));
+    assert_eq!(iter.next(), Some(4..5));
+    assert_eq!(iter.next(), None);
   }
 }
