@@ -1,7 +1,31 @@
-use super::{LayerBuffer2D, Rendering2DLayer};
+use super::{LayerBuffer2D, Point, Rendering2DLayer, Transform};
+
+#[repr(C)]
+struct Vertex {
+  pos: Point,
+  prim_id: u32,
+}
+
+#[repr(C)]
+struct ColorPrimitive {
+  color: wgpu::Color,
+  line_width: f32,
+  transform: Transform,
+}
+
+enum RenderCommand {
+  Vertexes {
+    vertexes: Vec<Vertex>,
+    indexes: Vec<u16>,
+    primitives: Vec<ColorPrimitive>,
+  },
+  Texture {
+    // todo
+  },
+}
 
 pub struct Canvas {
-  buffers: Vec<LayerBuffer2D>,
+  buffers: Vec<RenderCommand>,
   device: wgpu::Device,
   queue: wgpu::Queue,
   swap_chain: wgpu::SwapChain,
@@ -72,14 +96,10 @@ impl Canvas {
   /// of a layer drawing finished.
   #[inline]
   pub fn compose_layer_buffer(&mut self, buffer: &LayerBuffer2D) -> &mut Self {
-    if let Some(last) = self.buffers.last_mut() {
-      if last.mergeable(buffer) {
-        last.merge(buffer);
-        return self;
-      }
+    if let Some(cmd) = self.buffers.last_mut() {
+    } else {
     }
 
-    self.buffers.push(buffer.clone());
     self
   }
 
@@ -108,8 +128,9 @@ impl Canvas {
           }],
           depth_stencil_attachment: None,
         });
+
       render_pass.set_pipeline(&mut self.render_pipeline);
-      render_pass.draw(0..3, 0..1);
+      render_pass.draw(0..6, 0..1);
     }
 
     self.queue.submit(&[encoder.finish()]);
