@@ -1,4 +1,8 @@
-use super::{LayerBuffer2D, Point, Rendering2DLayer, Transform};
+use super::{
+  Color, ColorBufferAttr, Point, RenderCommand, Rendering2DLayer,
+  TextureBufferAttr, Transform,
+};
+use lyon::tessellation::VertexBuffers;
 
 #[repr(C)]
 struct Vertex {
@@ -8,24 +12,19 @@ struct Vertex {
 
 #[repr(C)]
 struct ColorPrimitive {
-  color: wgpu::Color,
+  color: Color,
   line_width: f32,
   transform: Transform,
 }
 
-enum RenderCommand {
-  Vertexes {
-    vertexes: Vec<Vertex>,
-    indexes: Vec<u16>,
-    primitives: Vec<ColorPrimitive>,
-  },
-  Texture {
-    // todo
-  },
+struct PureColorCommand {
+  vertices: Vec<Vertex>,
+  indices: Vec<u16>,
+  primitives: Vec<ColorPrimitive>,
 }
 
 pub struct Canvas {
-  buffers: Vec<RenderCommand>,
+  buffer: Option<RenderCommand>,
   device: wgpu::Device,
   queue: wgpu::Queue,
   swap_chain: wgpu::SwapChain,
@@ -72,7 +71,7 @@ impl Canvas {
     Canvas {
       device,
       queue,
-      buffers: vec![],
+      buffer: None,
       swap_chain,
       render_pipeline,
     }
@@ -89,15 +88,34 @@ impl Canvas {
     &mut self,
     other_layer: Rendering2DLayer,
   ) -> &mut Self {
-    self.compose_layer_buffer(&other_layer.finish())
+    self.compose_2d_layer_buffer(&other_layer.finish())
   }
 
   /// Compose a layer buffer into current drawing. Layer buffer is the result
   /// of a layer drawing finished.
   #[inline]
-  pub fn compose_layer_buffer(&mut self, buffer: &LayerBuffer2D) -> &mut Self {
-    if let Some(cmd) = self.buffers.last_mut() {
-    } else {
+  pub fn compose_2d_layer_buffer(
+    &mut self,
+    commands: &Vec<RenderCommand>,
+  ) -> &mut Self {
+    // if the first render command is same type with last layer's last render
+    // command, will merge them into one to commit.
+    let mut merged = false;
+    if let Some(last) = &mut self.buffer {
+      if let Some(first) = commands.first() {
+        merged = last.merge(first);
+      }
+    }
+
+    // Skip the first command if it merged into buffer, and retain the last
+    // command as new buffer to merge new layer.
+    let rg = merged as usize..commands.len() - 1;
+    if rg.start < rg.end {
+      if let Some(cmd) = &self.buffer.take() {
+        self.commit_command(cmd);
+      }
+      commands[rg].iter().for_each(|cmd| self.commit_command(cmd));
+      self.buffer = commands.last().map(|cmd| cmd.clone());
     }
 
     self
@@ -182,10 +200,32 @@ impl Canvas {
     })
   }
 
-  fn flush_buffers(&mut self) {
-    self.buffers.iter().for_each(|buffer| {
-      // unimplemented
-    });
+  fn commit_command(&mut self, command: &RenderCommand) {
+    match command {
+      RenderCommand::PureColor { geometry, attrs } => {
+        self.commit_pure_color_command(geometry, attrs);
+      }
+      RenderCommand::Texture { geometry, attrs } => {
+        self.commit_texture_command(geometry, attrs)
+      }
+    }
+  }
+
+  fn commit_pure_color_command(
+    &mut self,
+    geometry: &VertexBuffers<Point, u16>,
+    attrs: &Vec<ColorBufferAttr>,
+  ) {
+    unimplemented!();
+  }
+
+  fn commit_texture_command(
+    &mut self,
+    geometry: &VertexBuffers<Point, u16>,
+    attrs: &Vec<TextureBufferAttr>,
+  ) {
+    self.buffer = None;
+    unimplemented!();
   }
 
   fn shaders(
