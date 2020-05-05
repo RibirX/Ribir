@@ -107,7 +107,7 @@ impl Canvas {
       }),
       rasterization_state: Some(wgpu::RasterizationStateDescriptor {
         front_face: wgpu::FrontFace::Ccw,
-        cull_mode: wgpu::CullMode::Back,
+        cull_mode: wgpu::CullMode::None,
         depth_bias: 0,
         depth_bias_slope_scale: 0.0,
         depth_bias_clamp: 0.0,
@@ -149,10 +149,11 @@ impl<'a> Drop for Frame<'a> {
     if let Some(cmd) = self.buffer.take() {
       self.commit_command(&cmd);
     }
-    self
-      .canvas
-      .queue
-      .submit(&[self.encoder.take().unwrap().finish()]);
+    self.canvas.queue.submit(&[self
+      .encoder
+      .take()
+      .expect("Encoder should always exist before drop!")
+      .finish()]);
   }
 }
 
@@ -255,29 +256,32 @@ impl<'a> Frame<'a> {
       wgpu::BufferUsage::INDEX,
     );
 
-    let mut render_pass = self
-      .encoder
-      .as_mut()
-      .expect("Encoder should always exist before drop!")
-      .begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-          attachment: &self.chain_output.view,
-          resolve_target: None,
-          load_op: wgpu::LoadOp::Clear,
-          store_op: wgpu::StoreOp::Store,
-          clear_color: wgpu::Color {
-            r: 0.1,
-            g: 0.2,
-            b: 0.3,
-            a: 1.0,
-          },
-        }],
-        depth_stencil_attachment: None,
-      });
-    render_pass.set_pipeline(&self.canvas.color_pipeline);
-    render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
-    render_pass.set_index_buffer(&indices_buffer, 0, 0);
-    render_pass.draw_indexed(0..geometry.indices.len() as u32, 0, 0..1);
+    {
+      let mut render_pass = self
+        .encoder
+        .as_mut()
+        .expect("Encoder should always exist before drop!")
+        .begin_render_pass(&wgpu::RenderPassDescriptor {
+          color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+            attachment: &self.chain_output.view,
+            resolve_target: None,
+            load_op: wgpu::LoadOp::Clear,
+            store_op: wgpu::StoreOp::Store,
+            clear_color: wgpu::Color {
+              r: 0.1,
+              g: 0.2,
+              b: 0.3,
+              a: 1.0,
+            },
+          }],
+          depth_stencil_attachment: None,
+        });
+
+      render_pass.set_pipeline(&self.canvas.color_pipeline);
+      render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
+      render_pass.set_index_buffer(&indices_buffer, 0, 0);
+      render_pass.draw_indexed(0..geometry.indices.len() as u32, 0, 0..1);
+    }
   }
 
   fn commit_texture_command(
@@ -290,7 +294,7 @@ impl<'a> Frame<'a> {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone, Debug)]
 struct Vertex {
   pos: Point,
   prim_id: u32,
@@ -319,9 +323,9 @@ impl Vertex {
           format: wgpu::VertexFormat::Float2,
         },
         wgpu::VertexAttributeDescriptor {
-          offset: mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+          offset: mem::size_of::<Point>() as wgpu::BufferAddress,
           shader_location: 1,
-          format: wgpu::VertexFormat::Float,
+          format: wgpu::VertexFormat::Uint,
         },
       ],
     }
