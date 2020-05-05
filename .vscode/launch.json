@@ -26,6 +26,62 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug unit tests in library 'canvas'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'canvas_hello'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=canvas_hello",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas_hello",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'canvas_hello'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=canvas_hello",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas_hello",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug executable 'todos'",
       "cargo": {
         "args": [
