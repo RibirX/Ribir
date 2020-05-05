@@ -9,6 +9,7 @@ use std::{
   ops::{Deref, DerefMut, Range},
 };
 
+const tolerance: f32 = 0.02;
 pub type Color = Srgba<u8>;
 const DEFAULT_STATE: State = State {
   transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
@@ -246,7 +247,7 @@ impl Rendering2DLayer {
         fill_tess
           .tessellate_path(
             &path,
-            &FillOptions::default(),
+            &FillOptions::tolerance(tolerance),
             &mut BuffersBuilder::new(
               &mut buffer,
               |pos: Point, _: FillAttributes| pos,
@@ -260,7 +261,7 @@ impl Rendering2DLayer {
         stroke_tess
           .tessellate_path(
             &path,
-            &StrokeOptions::default().dont_apply_line_width(),
+            &StrokeOptions::tolerance(tolerance).dont_apply_line_width(),
             &mut BuffersBuilder::new(
               &mut buffer,
               |pos: Point, _: StrokeAttributes| pos,
