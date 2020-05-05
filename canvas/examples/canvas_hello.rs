@@ -1,4 +1,4 @@
-use canvas::Canvas;
+use canvas::*;
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -32,8 +32,13 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let layer = canvas.new_2d_layer();
-      canvas.render();
+      let mut frame = canvas.new_frame();
+      let mut layer = frame.new_2d_layer();
+      let mut path = Path::builder();
+      path.add_circle(Point::new(0.1, 0.1), 0.3, Winding::Positive);
+      let path = path.build();
+      layer.fill_path(path);
+      frame.compose_2d_layer(layer);
     }
     Event::MainEventsCleared => {
       window.request_redraw();
