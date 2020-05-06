@@ -12,23 +12,9 @@ indextree= "4.0.0"
 rxrust = "0.8.3"
 bitflags = "1.2.1"
 winit = "0.22.1"
-pathfinder_renderer ="0.5.0"
-pathfinder_gpu= "0.5.0"
-pathfinder_content="0.5.0"
-pathfinder_geometry="0.5.1"
-pathfinder_color ="0.5.0"
-pathfinder_resources ="0.5.0"
-
-[dependencies.pathfinder_canvas]
-features = ["pf-text"]
-version = "0.5.0"
+canvas = {path= "../canvas", version="*"}
+futures="0.3.4"
 
 [dependencies.blake3]
 version = "0.3.2"
 features = ["rayon"]
-
-[target.'cfg(target_os = "macos")'.dependencies]
-metal = "0.17.0"
-objc = "0.2.7"
-cocoa="0.20.0"
-pathfinder_metal= "0.5.1"

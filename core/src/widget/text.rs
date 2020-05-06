@@ -21,7 +21,7 @@ impl RenderObject<Text> for TextRender {
     self.0 = owner_widget.0.clone();
   }
   fn paint(&self, mut ctx: PaintingContext) {
-    ctx.canvas().fill_text(&self.0, Vector2F::new(10., 10.));
+    // ctx.canvas().fill_text(&self.0, Vector2F::new(10., 10.));
   }
 }
 // impl RenderObject for Text {

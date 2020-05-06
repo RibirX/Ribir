@@ -1,28 +1,10 @@
-use super::{
-  canvas::CanvasRenderingContext2D,
-  device::{AbstractDevice, Device},
-  painting_context::PaintingContext,
-  render_tree::*,
-};
+use super::{painting_context::PaintingContext, render_tree::*};
 use crate::{prelude::*, widget::widget_tree::*};
-use pathfinder_canvas::CanvasFontContext;
-use pathfinder_color::ColorF;
-pub use pathfinder_geometry::vector::{Vector2F, Vector2I};
-use pathfinder_renderer::{
-  concurrent::rayon::RayonExecutor,
-  concurrent::scene_proxy::SceneProxy,
-  gpu::{
-    options::{DestFramebuffer, RendererOptions},
-    renderer::Renderer,
-  },
-  options::BuildOptions,
-};
-use pathfinder_resources::fs::FilesystemResourceLoader;
-
-pub use winit::window::WindowId;
+use canvas::Canvas;
 use winit::{
-  event::{Event, WindowEvent},
+  event::WindowEvent,
   event_loop::EventLoop,
+  window::WindowId,
   window::{Window as NativeWindow, WindowBuilder},
 };
 
@@ -31,9 +13,7 @@ pub struct Window<'a> {
   render_tree: RenderTree,
   widget_tree: WidgetTree<'a>,
   native_window: NativeWindow,
-  _device: Device,
-  renderer: Renderer<<Device as AbstractDevice>::D>,
-  font_ctx: CanvasFontContext,
+  canvas: Canvas,
 }
 
 impl<'a> Window<'a> {
@@ -45,27 +25,15 @@ impl<'a> Window<'a> {
     event_loop: &EventLoop<()>,
   ) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
-    let device = Device::new();
-    device.attach(&native_window);
     let size = native_window.inner_size();
-    let size = Vector2I::new(size.width as i32, size.height as i32);
-    // Create a Pathfinder renderer.
-    let renderer = Renderer::new(
-      device.native_device(),
-      &FilesystemResourceLoader::locate(),
-      DestFramebuffer::full_window(size),
-      RendererOptions {
-        background_color: Some(ColorF::white()),
-      },
-    );
+    let canvas = Canvas::new(&native_window, size.width, size.height);
 
+    let canvas = futures::executor::block_on(canvas);
     let mut wnd = Window {
       native_window,
       render_tree: Default::default(),
       widget_tree: Default::default(),
-      renderer,
-      _device: device,
-      font_ctx: CanvasFontContext::from_system_source(),
+      canvas,
     };
 
     wnd.widget_tree.set_root(root.into(), &mut wnd.render_tree);
@@ -96,24 +64,13 @@ impl<'a> Window<'a> {
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
     if let Some(root) = self.render_tree.root() {
-      let mut canvas = CanvasRenderingContext2D::new(
-        self.native_window.inner_size(),
-        self.font_ctx.clone(),
-      );
+      let mut frame = self.canvas.new_frame();
       let painting_context =
-        PaintingContext::new(&mut canvas, root, &self.render_tree);
+        PaintingContext::new(&mut frame, root, &self.render_tree);
       root
         .get(&self.render_tree)
         .expect("Root render object should exists when root id exists in tree.")
         .paint(painting_context);
-
-      // commit frame
-      let scene = SceneProxy::from_scene(
-        canvas.into_canvas().into_scene(),
-        RayonExecutor,
-      );
-      scene.build_and_render(&mut self.renderer, BuildOptions::default());
-      self.renderer.device.present_drawable();
     }
   }
 

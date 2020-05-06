@@ -579,8 +579,10 @@ mod test {
   fn buffer() {
     let mut layer = Rendering2DLayer::new();
     let mut builder = Path::builder();
-    builder
-      .add_rectangle(&Rect::from_size((100., 100.).into()), Winding::Positive);
+    builder.add_rectangle(
+      &euclid::Rect::from_size((100., 100.).into()),
+      Winding::Positive,
+    );
     let path = builder.build();
     layer.stroke_path(path.clone());
     layer.fill_path(path);
