@@ -2,11 +2,8 @@ use crate::widget::Key;
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
-pub mod canvas;
-pub(crate) mod device;
 pub mod painting_context;
 pub mod render_tree;
-pub use pathfinder_geometry::vector::Vector2F;
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.

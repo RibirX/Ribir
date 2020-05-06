@@ -2,6 +2,7 @@ use crate::{prelude::*, widget::window::*};
 use indextree::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
+pub use winit::window::WindowId;
 use winit::{
   event::Event,
   event_loop::{ControlFlow, EventLoop},
