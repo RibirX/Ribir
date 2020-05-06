@@ -12,6 +12,7 @@ lyon =  { git = "https://github.com/nical/lyon", version="*"}
 palette = "0.5"
 bytemuck = "1.2.0"
 raw-window-handle = "0.3.3"
+euclid = "0.20.11"
 
 [dev-dependencies]
 winit="0.22.1"
