@@ -35,7 +35,11 @@ fn main() {
       let mut frame = canvas.new_frame();
       let mut layer = frame.new_2d_layer();
       let mut path = Path::builder();
-      path.add_circle(Point::new(0.1, 0.1), 0.3, Winding::Positive);
+      path.add_circle(
+        euclid::Point2D::new(200., 200.),
+        100.,
+        Winding::Positive,
+      );
       let path = path.build();
       layer.fill_path(path);
       frame.compose_2d_layer(layer);

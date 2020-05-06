@@ -1,5 +1,5 @@
+use crate::{Point, Transform};
 pub use lyon::{
-  math::{Point, Rect, Size, Transform},
   path::{builder::PathBuilder, Path, Winding},
   tessellation::*,
 };
@@ -8,8 +8,7 @@ use std::{
   cmp::PartialEq,
   ops::{Deref, DerefMut, Range},
 };
-
-const tolerance: f32 = 0.02;
+const TOLERANCE: f32 = 0.5;
 pub type Color = Srgba<u8>;
 const DEFAULT_STATE: State = State {
   transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
@@ -28,6 +27,10 @@ const DEFAULT_STATE: State = State {
   },
 };
 
+/// The 2d layer is a two-dimensional grid. The coordinate (0, 0) is at the
+/// upper-left corner of the canvas. Along the X-axis, values increase towards
+/// the right edge of the canvas. Along the Y-axis, values increase towards the
+/// bottom edge of the canvas.
 pub struct Rendering2DLayer {
   state_stack: Vec<State>,
   commands: Vec<PathCommand>,
@@ -247,10 +250,12 @@ impl Rendering2DLayer {
         fill_tess
           .tessellate_path(
             &path,
-            &FillOptions::tolerance(tolerance),
+            &FillOptions::tolerance(TOLERANCE),
             &mut BuffersBuilder::new(
               &mut buffer,
-              |pos: Point, _: FillAttributes| pos,
+              |pos: lyon::math::Point, _: FillAttributes| {
+                Point::from_untyped(pos)
+              },
             ),
           )
           .unwrap();
@@ -261,10 +266,12 @@ impl Rendering2DLayer {
         stroke_tess
           .tessellate_path(
             &path,
-            &StrokeOptions::tolerance(tolerance).dont_apply_line_width(),
+            &StrokeOptions::tolerance(TOLERANCE).dont_apply_line_width(),
             &mut BuffersBuilder::new(
               &mut buffer,
-              |pos: Point, _: StrokeAttributes| pos,
+              |pos: lyon::math::Point, _: StrokeAttributes| {
+                Point::from_untyped(pos)
+              },
             ),
           )
           .unwrap();
@@ -427,7 +434,6 @@ impl RenderCommand {
           false
         }
       }
-      _ => false,
     }
   }
 
@@ -545,6 +551,7 @@ impl<'a> DerefMut for LayerGuard<'a> {
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::Rect;
 
   #[test]
   fn save_guard() {

@@ -1,14 +1,18 @@
 use super::{
-  Color, ColorBufferAttr, Point, RenderCommand, Rendering2DLayer,
-  TextureBufferAttr, Transform,
+  Color, ColorBufferAttr, DeviceUnit, LogicUnit, Point, RenderCommand,
+  Rendering2DLayer, TextureBufferAttr, Transform,
 };
+
 use lyon::tessellation::VertexBuffers;
 
 pub struct Canvas {
+  surface: wgpu::Surface,
   device: wgpu::Device,
   queue: wgpu::Queue,
   swap_chain: wgpu::SwapChain,
+  sc_desc: wgpu::SwapChainDescriptor,
   color_pipeline: wgpu::RenderPipeline,
+  canvas_2d_coordinate_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 pub struct Frame<'a> {
@@ -19,6 +23,8 @@ pub struct Frame<'a> {
 }
 
 impl Canvas {
+  const COORDINATE_2D_BINDING_INDEX: u32 = 0;
+
   /// Create a canvas by a native window.
   pub async fn new<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
@@ -53,16 +59,34 @@ impl Canvas {
       present_mode: wgpu::PresentMode::Fifo,
     };
     let swap_chain = device.create_swap_chain(&surface, &sc_desc);
-    let color_pipeline = Self::create_color_render_pipeline(&device, &sc_desc);
+    let canvas_2d_coordinate_bind_group_layout = device
+      .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        bindings: &[wgpu::BindGroupLayoutEntry {
+          binding: Self::COORDINATE_2D_BINDING_INDEX,
+          visibility: wgpu::ShaderStage::VERTEX,
+          ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+        }],
+        label: Some("canvas_2d_coordinate_bind_group_layout"),
+      });
+    let color_pipeline = Self::create_color_render_pipeline(
+      &device,
+      &sc_desc,
+      &[&canvas_2d_coordinate_bind_group_layout],
+    );
 
     Canvas {
       device,
+      surface,
       queue,
       swap_chain,
+      sc_desc,
       color_pipeline,
+      canvas_2d_coordinate_bind_group_layout,
     }
   }
 
+  /// Create a new frame texture to draw, and commit to device when the `Frame`
+  /// is dropped.
   pub fn new_frame(&mut self) -> Frame {
     let frame = self
       .swap_chain
@@ -84,13 +108,21 @@ impl Canvas {
     }
   }
 
+  pub fn resize(&mut self, width: u32, height: u32) {
+    self.sc_desc.width = width;
+    self.sc_desc.height = height;
+    self.swap_chain =
+      self.device.create_swap_chain(&self.surface, &self.sc_desc);
+  }
+
   fn create_color_render_pipeline(
     device: &wgpu::Device,
     sc_desc: &wgpu::SwapChainDescriptor,
+    bind_group_layouts: &[&wgpu::BindGroupLayout],
   ) -> wgpu::RenderPipeline {
     let render_pipeline_layout =
       device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        bind_group_layouts: &[],
+        bind_group_layouts,
       });
 
     let (vs_module, fs_module) = Self::color_shaders(device);
@@ -158,8 +190,8 @@ impl<'a> Drop for Frame<'a> {
 }
 
 impl<'a> Frame<'a> {
-  /// Create a new 2d layer to drawing, and not effect current canvas before
-  /// compose back to the canvas.
+  /// Create a 2d layer to drawing, and not effect current canvas before compose
+  /// back to the canvas.
   #[inline]
   pub fn new_2d_layer(&self) -> Rendering2DLayer { Rendering2DLayer::new() }
 
@@ -246,19 +278,44 @@ impl<'a> Frame<'a> {
       });
     });
 
-    let vertices_buffer = self.canvas.device.create_buffer_with_data(
+    let coordinate_map =
+      CoordinateMapMatrix(self.coordinate_map_matrix_from_2d());
+
+    let Self {
+      canvas, encoder, ..
+    } = self;
+
+    let vertices_buffer = canvas.device.create_buffer_with_data(
       bytemuck::cast_slice(vertices.as_slice()),
       wgpu::BufferUsage::VERTEX,
     );
 
-    let indices_buffer = self.canvas.device.create_buffer_with_data(
+    let indices_buffer = canvas.device.create_buffer_with_data(
       bytemuck::cast_slice(geometry.indices.as_slice()),
       wgpu::BufferUsage::INDEX,
     );
 
+    let uniform_buffer = canvas.device.create_buffer_with_data(
+      bytemuck::cast_slice(&[coordinate_map]),
+      wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+    );
+
+    let uniform_bind_group =
+      canvas.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &canvas.canvas_2d_coordinate_bind_group_layout,
+        bindings: &[wgpu::Binding {
+          binding: 0,
+          resource: wgpu::BindingResource::Buffer {
+            buffer: &uniform_buffer,
+            range: 0..std::mem::size_of_val(&coordinate_map)
+              as wgpu::BufferAddress,
+          },
+        }],
+        label: Some("uniform_bind_group"),
+      });
+
     {
-      let mut render_pass = self
-        .encoder
+      let mut render_pass = encoder
         .as_mut()
         .expect("Encoder should always exist before drop!")
         .begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -280,16 +337,40 @@ impl<'a> Frame<'a> {
       render_pass.set_pipeline(&self.canvas.color_pipeline);
       render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
       render_pass.set_index_buffer(&indices_buffer, 0, 0);
+      render_pass.set_bind_group(
+        Canvas::COORDINATE_2D_BINDING_INDEX,
+        &uniform_bind_group,
+        &[],
+      );
       render_pass.draw_indexed(0..geometry.indices.len() as u32, 0, 0..1);
     }
   }
 
   fn commit_texture_command(
     &mut self,
-    geometry: &VertexBuffers<Point, u16>,
-    attrs: &Vec<TextureBufferAttr>,
+    _geometry: &VertexBuffers<Point, u16>,
+    _attrs: &Vec<TextureBufferAttr>,
   ) {
     unimplemented!();
+  }
+
+  /// Convert coordinate system from canvas 2d into wgpu.
+  fn coordinate_map_matrix_from_2d(
+    &self,
+  ) -> euclid::Transform2D<f32, LogicUnit, DeviceUnit> {
+    euclid::Transform2D::row_major(
+      2. / self.canvas.sc_desc.width as f32,
+      0.,
+      0.,
+      -2. / self.canvas.sc_desc.height as f32,
+      -1.,
+      1.,
+    )
+    // .post_scale(
+    //   2. / self.canvas.sc_desc.width as f32,
+    //   -2. / self.canvas.sc_desc.height as f32,
+    // )
+    // .post_translate(euclid::Vector2D::new(-1., 1.))
   }
 }
 
@@ -331,3 +412,10 @@ impl Vertex {
     }
   }
 }
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+struct CoordinateMapMatrix(euclid::Transform2D<f32, LogicUnit, DeviceUnit>);
+
+unsafe impl bytemuck::Pod for CoordinateMapMatrix {}
+unsafe impl bytemuck::Zeroable for CoordinateMapMatrix {}
