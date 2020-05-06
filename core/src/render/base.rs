@@ -1,8 +1,4 @@
-use crate::render::render_ctx::*;
-use indextree::*;
 use std::fmt::Debug;
-
-use crate::render::render_ctx::RenderCtx;
 
 bitflags! {
     pub struct LayoutConstraints: u8 {
@@ -14,12 +10,12 @@ bitflags! {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Size {
-  pub width: i32,
-  pub height: i32,
+  pub width: f64,
+  pub height: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct Position {
-  pub x: i32,
-  pub y: i32,
+  pub x: f64,
+  pub y: f64,
 }

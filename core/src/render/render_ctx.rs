@@ -1,9 +1,5 @@
-use crate::application::Application;
-use crate::render::render_layout::LayoutConstraints;
 use crate::render::render_tree::*;
 use crate::render::*;
-
-use indextree::*;
 
 use std::collections::HashSet;
 pub struct RenderCtx<'a> {
@@ -24,6 +20,16 @@ impl<'a> RenderCtx<'a> {
       dirty_layout_roots: dirty_layout_roots,
     };
   }
+
+  pub fn render_object(
+    &self,
+    id: RenderId,
+  ) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
+    return id.get(self.tree);
+  }
+
+  /// return the render tree
+  pub fn render_tree(&self) -> &RenderTree { return &self.tree; }
 
   /// mark the render object dirty, will auto diffuse to all the node
   /// affected.
@@ -89,7 +95,7 @@ impl<'a> RenderCtx<'a> {
     self.dirty_layouts.remove(node_id);
   }
 
-  fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {
+  pub fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {
     let mut child = id.first_child(self.tree);
     while let Some(child_id) = child {
       ids.push(child_id);

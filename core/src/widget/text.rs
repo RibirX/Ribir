@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::render::render_ctx::*;
-use crate::render::render_layout::*;
 use crate::render::render_tree::*;
 use crate::render::*;
 use indextree::*;
@@ -22,11 +21,12 @@ impl RenderWidget for Text {
 
 impl RenderObject<Text> for TextRender {
   fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0; }
-  fn perform_layout(&self, id: RenderId, ctx: &mut RenderCtx) {}
-  fn bound(&self) -> Option<Size> { None }
+  fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
+  fn get_size(&self) -> Option<Size> { None }
   fn get_constraints(&self) -> LayoutConstraints {
     LayoutConstraints::DECIDED_BY_SELF
   }
+  fn set_box_bound(&mut self, _bound: Option<BoxBound>) {}
 }
 // impl RenderObject for Text {
 //   fn paint(&self) {}

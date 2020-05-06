@@ -2,11 +2,11 @@ use crate::render::*;
 use std::fmt::Debug;
 
 pub mod key;
-mod row_layout;
+pub mod layout;
 pub mod text;
 pub mod widget_tree;
 pub use key::{Key, KeyDetect};
-pub use row_layout::Row;
+pub use layout::row_layout::Row;
 pub use text::Text;
 
 /// The common behavior for widgets, also support to downcast to special widget.
