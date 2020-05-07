@@ -64,7 +64,7 @@ impl<'a> Window<'a> {
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
     if let Some(root) = self.render_tree.root() {
-      let mut frame = self.canvas.new_frame();
+      let mut frame = self.canvas.new_screen_frame();
       let painting_context =
         PaintingContext::new(&mut frame, root, &self.render_tree);
       root

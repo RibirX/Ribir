@@ -1,16 +1,16 @@
 use super::render_tree::*;
 use canvas::Frame;
 
-pub struct PaintingContext<'a, 'b> {
+pub struct PaintingContext<'a> {
   painting_node: RenderId,
   tree: &'a RenderTree,
-  frame: &'a mut Frame<'b>,
+  frame: &'a mut dyn Frame,
 }
 
-impl<'a, 'b> PaintingContext<'a, 'b> {
+impl<'a, 'b> PaintingContext<'a> {
   #[inline]
   pub(crate) fn new(
-    frame: &'a mut Frame<'b>,
+    frame: &'a mut dyn Frame,
     painting_node: RenderId,
     tree: &'a RenderTree,
   ) -> Self {
@@ -23,7 +23,7 @@ impl<'a, 'b> PaintingContext<'a, 'b> {
 
   pub fn paint_child(&mut self, child_id: RenderId) {
     let ctx = PaintingContext {
-      frame: &mut self.frame,
+      frame: self.frame,
       tree: self.tree,
       painting_node: child_id,
     };

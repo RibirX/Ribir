@@ -392,20 +392,6 @@ pub enum RenderCommand {
 }
 
 impl RenderCommand {
-  pub(crate) fn vertices(&self) -> &Vec<Point> {
-    match self {
-      RenderCommand::PureColor { geometry, .. } => &geometry.vertices,
-      RenderCommand::Texture { geometry, .. } => &geometry.vertices,
-    }
-  }
-
-  pub(crate) fn indices(&self) -> &Vec<u16> {
-    match self {
-      RenderCommand::PureColor { geometry, .. } => &geometry.indices,
-      RenderCommand::Texture { geometry, .. } => &geometry.indices,
-    }
-  }
-
   /// Merge an other render command, return true if merge successful other
   /// false.
   pub(crate) fn merge(&mut self, other: &Self) -> bool {
@@ -551,7 +537,22 @@ impl<'a> DerefMut for LayerGuard<'a> {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::Rect;
+
+  impl RenderCommand {
+    pub(crate) fn vertices(&self) -> &Vec<Point> {
+      match self {
+        RenderCommand::PureColor { geometry, .. } => &geometry.vertices,
+        RenderCommand::Texture { geometry, .. } => &geometry.vertices,
+      }
+    }
+
+    pub(crate) fn indices(&self) -> &Vec<u16> {
+      match self {
+        RenderCommand::PureColor { geometry, .. } => &geometry.indices,
+        RenderCommand::Texture { geometry, .. } => &geometry.indices,
+      }
+    }
+  }
 
   #[test]
   fn save_guard() {

@@ -32,7 +32,7 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let mut frame = canvas.new_frame();
+      let mut frame = canvas.new_screen_frame();
       let mut layer = frame.new_2d_layer();
       let mut path = Path::builder();
       path.add_circle(
