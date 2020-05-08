@@ -25,7 +25,7 @@ pub trait Frame {
   fn compose_2d_layer(&mut self, other_layer: Rendering2DLayer);
   /// Compose a layer buffer into current drawing. Layer buffer is the result
   /// of a layer drawing finished.
-  fn compose_2d_layer_buffer(&mut self, commands: &Vec<RenderCommand>);
+  fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]);
 }
 
 /// A frame for screen, anything drawing on the frame will commit to screen
@@ -93,8 +93,8 @@ impl<'a> TextureFrame<'a> {
         rows_per_image: 0,
       },
       wgpu::Extent3d {
-        width: width,
-        height: height,
+        width,
+        height,
         depth: 1,
       },
     );
@@ -351,7 +351,7 @@ macro frame_impl_proxy($ty: ident) {
     }
 
     #[inline]
-    fn compose_2d_layer_buffer(&mut self, commands: &Vec<RenderCommand>) {
+    fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]) {
       self.0.compose_2d_layer_buffer(commands);
     }
   }
@@ -402,7 +402,7 @@ impl<'a, T: FrameTextureView> Frame for FrameImpl<'a, T> {
   }
 
   #[inline]
-  fn compose_2d_layer_buffer(&mut self, commands: &Vec<RenderCommand>) {
+  fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]) {
     // if the first render command is same type with last layer's last render
     // command, will merge them into one to commit.
     let mut merged = false;
@@ -424,7 +424,7 @@ impl<'a, T: FrameTextureView> Frame for FrameImpl<'a, T> {
       }
 
       // Retain the last command as new buffer to merge new layer.
-      self.buffer = commands.last().map(|cmd| cmd.clone());
+      self.buffer = commands.last().cloned();
     }
   }
 }
@@ -444,12 +444,12 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
   fn commit_pure_color_command(
     &mut self,
     geometry: &VertexBuffers<Point, u16>,
-    attrs: &Vec<ColorBufferAttr>,
+    attrs: &[ColorBufferAttr],
   ) {
     let mut vertices = Vec::with_capacity(geometry.vertices.len());
     geometry.vertices.iter().for_each(|pos| {
       vertices.push(Vertex {
-        pos: pos.clone(),
+        pos: *pos,
         prim_id: 0,
       })
     });
@@ -461,7 +461,7 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
         vertices[*idx as usize].prim_id = primitives.len() as u32
       });
       primitives.push(ColorPrimitive {
-        color: attr.color.clone(),
+        color: attr.color,
         transform: attr.rg_attr.transform,
         line_width: attr.rg_attr.line_width,
       });
@@ -526,7 +526,7 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
   fn commit_texture_command(
     &mut self,
     _geometry: &VertexBuffers<Point, u16>,
-    _attrs: &Vec<TextureBufferAttr>,
+    _attrs: &[TextureBufferAttr],
   ) {
     unimplemented!();
   }

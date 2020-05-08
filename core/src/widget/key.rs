@@ -1,6 +1,5 @@
 use crate::widget::*;
 
-use blake3;
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,

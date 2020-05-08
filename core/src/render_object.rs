@@ -78,7 +78,7 @@ fn mark_constraints_dirty(
       return true;
     }
   }
-  return false;
+  false
 }
 
 fn mark_dirty_down(mut id: NodeId, ctx: &mut RenderCtx) {

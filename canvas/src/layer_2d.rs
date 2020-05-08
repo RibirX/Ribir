@@ -112,7 +112,7 @@ impl Rendering2DLayer {
     let state = self.current_state();
     let path = PathCommand {
       path,
-      transform: state.transform.clone(),
+      transform: state.transform,
       cmd_type: PathCommandType::Stroke(state.stroke_pen.clone()),
     };
     self.add_path(path);
@@ -123,7 +123,7 @@ impl Rendering2DLayer {
     let state = self.current_state();
     let path = PathCommand {
       path,
-      transform: state.transform.clone(),
+      transform: state.transform,
       cmd_type: PathCommandType::Fill(state.fill_brush.clone()),
     };
     self.add_path(path);
@@ -194,7 +194,7 @@ impl Rendering2DLayer {
 
       match cmd_type.style() {
         FillStyle::Color(c) => {
-          path_tess!(PureColor, ColorBufferAttr, c.clone());
+          path_tess!(PureColor, ColorBufferAttr, *c);
         }
         FillStyle::Image => {
           path_tess!(Texture, TextureBufferAttr, TextureStyle::Image);
@@ -302,7 +302,7 @@ impl Rendering2DLayer {
       if last.transform == path.transform {
         let (c1, lw1) = key_info(&last.cmd_type);
         let (c2, lw2) = key_info(&path.cmd_type);
-        if c1.is_some() && c1 == c2 && lw1 == lw2 {
+        if c1.is_some() && c1 == c2 && (lw1 - lw2).abs() < f32::EPSILON {
           let mut builder = Path::builder();
           builder.concatenate(&[last.path.as_slice(), path.path.as_slice()]);
           last.path = builder.build();
@@ -427,9 +427,9 @@ impl RenderCommand {
     geometry: &mut VertexBuffers<Point, u16>,
     attrs: &mut Vec<T>,
     other_geometry: &VertexBuffers<Point, u16>,
-    other_attrs: &Vec<T>,
+    other_attrs: &[T],
   ) {
-    fn append<T>(to: &mut Vec<T>, from: &Vec<T>) {
+    fn append<T>(to: &mut Vec<T>, from: &[T]) {
       // Point, U16 and LayerBufferAttr are safe to memory copy.
       unsafe {
         let count = from.len();
@@ -620,7 +620,7 @@ mod test {
     // Different type style can't be merged
     layer.set_brush_style(FillStyle::Image);
     layer.fill_path(sample_path.clone());
-    layer.stroke_path(sample_path.clone());
+    layer.stroke_path(sample_path);
     assert_eq!(layer.commands.len(), 5);
   }
 
