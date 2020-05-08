@@ -8,7 +8,7 @@ name: Code coverage with grcov
 
 jobs:
   grcov:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
 
