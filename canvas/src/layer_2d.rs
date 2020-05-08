@@ -251,12 +251,9 @@ impl Rendering2DLayer {
           .tessellate_path(
             &path,
             &FillOptions::tolerance(TOLERANCE),
-            &mut BuffersBuilder::new(
-              &mut buffer,
-              |pos: lyon::math::Point, _: FillAttributes| {
-                Point::from_untyped(pos)
-              },
-            ),
+            &mut BuffersBuilder::new(&mut buffer, |vertex: FillVertex| {
+              Point::from_untyped(vertex.position())
+            }),
           )
           .unwrap();
 
@@ -266,13 +263,10 @@ impl Rendering2DLayer {
         stroke_tess
           .tessellate_path(
             &path,
-            &StrokeOptions::tolerance(TOLERANCE).dont_apply_line_width(),
-            &mut BuffersBuilder::new(
-              &mut buffer,
-              |pos: lyon::math::Point, _: StrokeAttributes| {
-                Point::from_untyped(pos)
-              },
-            ),
+            &StrokeOptions::tolerance(TOLERANCE),
+            &mut BuffersBuilder::new(&mut buffer, |vertex: StrokeVertex| {
+              Point::from_untyped(vertex.position())
+            }),
           )
           .unwrap();
         pen.line_width
