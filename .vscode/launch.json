@@ -82,6 +82,25 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug integration test 'main_thread_tests'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=main_thread_tests",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "main_thread_tests",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug executable 'todos'",
       "cargo": {
         "args": [

@@ -15,6 +15,8 @@ pub struct Canvas {
   canvas_2d_coordinate_bind_group_layout: wgpu::BindGroupLayout,
 }
 
+/// Frame is created by Canvas, and provide a blank box to drawing. It's
+/// guarantee auto commit all data to texture when is drop.
 pub trait Frame {
   /// Create a 2d layer to drawing, and not effect current canvas before compose
   /// back to the canvas.
@@ -26,12 +28,38 @@ pub trait Frame {
   fn compose_2d_layer_buffer(&mut self, commands: &Vec<RenderCommand>);
 }
 
+/// A frame for screen, anything drawing on the frame will commit to screen
+/// display.
 pub struct ScreenFrame<'a>(FrameImpl<'a, wgpu::SwapChainOutput>);
 
+/// A texture frame, don't like [`ScreenFrame`](ScreenFrame), `TextureFrame` not
+/// directly present drawing on screen but on a texture.
+///
+/// # Example
+///
+/// This example draw a circle and write as a image.
+/// ```
+/// # use canvas::*;
+/// fn generate_png(mut canvas: Canvas, file_path: &str) {
+///   let mut frame = canvas.new_texture_frame();
+///   let mut layer = frame.new_2d_layer();
+///   let mut path = Path::builder();
+///   layer.set_brush_style(FillStyle::Color(const_color::BLACK.into()));
+///   path.add_circle(euclid::Point2D::new(200., 200.), 100., Winding::Positive);
+///   let path = path.build();
+///   layer.fill_path(path);
+///   frame.compose_2d_layer(layer);
+///   futures::executor::block_on(
+///     frame
+///     .png_encode(std::fs::File::create(file_path).unwrap()),
+///   ).unwrap();
+/// }
+/// ```
 pub struct TextureFrame<'a>(FrameImpl<'a, TextureTextureView>);
 
 impl<'a> TextureFrame<'a> {
-  pub async fn capture_screenshot_as_png<W: std::io::Write>(
+  /// PNG encoded the texture frame then write by `writer`.
+  pub async fn png_encode<W: std::io::Write>(
     mut self,
     writer: W,
   ) -> Result<(), &'static str> {
@@ -91,6 +119,11 @@ impl<'a> TextureFrame<'a> {
       .unwrap();
 
     Ok(())
+  }
+
+  /// Save the texture frame as a PNG image, store at the `path` location.
+  pub async fn save_as_png(self, path: &str) -> Result<(), &'static str> {
+    self.png_encode(std::fs::File::create(path).unwrap()).await
   }
 }
 
@@ -230,6 +263,22 @@ impl Canvas {
       self.device.create_swap_chain(&self.surface, &self.sc_desc);
   }
 
+  /// Convert coordinate system from canvas 2d into wgpu.
+  pub fn coordinate_2d_to_device_matrix(
+    &self,
+  ) -> euclid::Transform2D<f32, LogicUnit, DeviceUnit> {
+    euclid::Transform2D::row_major(
+      2. / self.sc_desc.width as f32,
+      0.,
+      0.,
+      -2. / self.sc_desc.height as f32,
+      -1.,
+      1.,
+    )
+  }
+}
+
+impl Canvas {
   fn create_color_render_pipeline(
     device: &wgpu::Device,
     sc_desc: &wgpu::SwapChainDescriptor,
@@ -419,7 +468,7 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
     });
 
     let coordinate_map =
-      CoordinateMapMatrix(self.coordinate_map_matrix_from_2d());
+      CoordinateMapMatrix(self.canvas.coordinate_2d_to_device_matrix());
 
     let device = &self.canvas.device;
 
@@ -480,20 +529,6 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
     _attrs: &Vec<TextureBufferAttr>,
   ) {
     unimplemented!();
-  }
-
-  /// Convert coordinate system from canvas 2d into wgpu.
-  fn coordinate_map_matrix_from_2d(
-    &self,
-  ) -> euclid::Transform2D<f32, LogicUnit, DeviceUnit> {
-    euclid::Transform2D::row_major(
-      2. / self.canvas.sc_desc.width as f32,
-      0.,
-      0.,
-      -2. / self.canvas.sc_desc.height as f32,
-      -1.,
-      1.,
-    )
   }
 
   fn commit_buffer(&mut self) {

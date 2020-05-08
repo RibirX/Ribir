@@ -18,8 +18,13 @@ png = "0.16.3"
 [dev-dependencies]
 winit="0.22.1"
 futures="0.3.4"
+colored = "1.9.3"
 
-# [[test]]
-# name = "wgpu_tests"
-# path = "wgpu_tests/canvas.rs"
-# harness = false
+[[test]]
+name = "canvas"
+path = "main_thread_tests/canvas.test.rs"
+harness = false
+required-features = ["main-thread-test"]
+
+[features]
+main-thread-test =[]

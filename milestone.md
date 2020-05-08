@@ -14,6 +14,7 @@
   - [x] code cover
   - [ ] benchmark comparison [#2](https://github.com/M-Adoo/Holiday/issues/2)
   - [x] merge framework branch to master.
+  - [ ] gpu environment support [Test](./doc/develope.md#Test)
 - [ ] perform layout on render tree (2 week)
   - [ ] layout flow
   - [ ] base layout widget
