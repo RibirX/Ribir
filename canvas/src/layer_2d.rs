@@ -174,18 +174,14 @@ impl Rendering2DLayer {
         if let Some(RenderCommand::$render_cmd_type { geometry, attrs }) =
           &mut last_cmd
         {
-          let (rg, line_width) = Self::tessellate_path(
+          let rg = Self::tessellate_path(
             geometry,
             path,
             &cmd_type,
             &mut fill_tess,
             &mut stroke_tess,
           );
-          let rg_attr = RangeAttr {
-            transform,
-            line_width,
-            rg,
-          };
+          let rg_attr = RangeAttr { transform, rg };
           attrs.push($attr_type::new(rg_attr, $attr_init));
         } else {
           unreachable!();
@@ -243,9 +239,9 @@ impl Rendering2DLayer {
     cmd_type: &PathCommandType,
     fill_tess: &mut FillTessellator,
     stroke_tess: &mut StrokeTessellator,
-  ) -> (Range<usize>, f32) {
+  ) -> Range<usize> {
     let start = buffer.indices.len();
-    let line_width = match cmd_type {
+    match cmd_type {
       PathCommandType::Fill(_) => {
         fill_tess
           .tessellate_path(
@@ -256,23 +252,21 @@ impl Rendering2DLayer {
             }),
           )
           .unwrap();
-
-        1.
       }
       PathCommandType::Stroke(pen) => {
         stroke_tess
           .tessellate_path(
             &path,
-            &StrokeOptions::tolerance(TOLERANCE),
+            &StrokeOptions::tolerance(TOLERANCE)
+              .with_line_width(pen.line_width),
             &mut BuffersBuilder::new(&mut buffer, |vertex: StrokeVertex| {
               Point::from_untyped(vertex.position())
             }),
           )
           .unwrap();
-        pen.line_width
       }
     };
-    (start..buffer.indices.len(), line_width)
+    start..buffer.indices.len()
   }
 
   fn add_path(&mut self, path: PathCommand) {
@@ -325,7 +319,6 @@ impl Rendering2DLayer {
 #[derive(Debug, Clone)]
 pub(crate) struct RangeAttr {
   pub(crate) rg: Range<usize>,
-  pub(crate) line_width: f32,
   pub(crate) transform: Transform,
 }
 

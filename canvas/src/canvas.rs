@@ -341,7 +341,7 @@ impl Canvas {
   }
 }
 
-macro frame_impl_proxy($ty: ident) {
+macro frame_impl_delegate($ty: ident) {
   impl<'a> Frame for $ty<'a> {
     #[inline]
     fn new_2d_layer(&self) -> Rendering2DLayer { self.0.new_2d_layer() }
@@ -358,8 +358,8 @@ macro frame_impl_proxy($ty: ident) {
   }
 }
 
-frame_impl_proxy!(ScreenFrame);
-frame_impl_proxy!(TextureFrame);
+frame_impl_delegate!(ScreenFrame);
+frame_impl_delegate!(TextureFrame);
 
 trait FrameTextureView {
   fn texture_view(&self) -> &wgpu::TextureView;
@@ -464,7 +464,6 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
       primitives.push(ColorPrimitive {
         color: attr.color,
         transform: attr.rg_attr.transform,
-        line_width: attr.rg_attr.line_width,
       });
     });
 
@@ -552,7 +551,6 @@ unsafe impl bytemuck::Zeroable for Vertex {}
 #[repr(C)]
 struct ColorPrimitive {
   color: Color,
-  line_width: f32,
   transform: Transform,
 }
 
