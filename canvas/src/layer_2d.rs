@@ -132,12 +132,12 @@ impl Rendering2DLayer {
   /// All drawing of this layer has finished, and convert the layer to an
   /// intermediate render buffer data that will provide to render process and
   /// then commit to gpu.
-  pub fn finish(self) -> Vec<RenderCommand> {
-    let mut buffer = vec![];
+  pub fn finish(self) -> RenderCommand {
     let mut stroke_tess = StrokeTessellator::new();
     let mut fill_tess = FillTessellator::new();
 
-    let mut last_cmd: Option<RenderCommand> = None;
+    let mut geometry = VertexBuffers::new();
+    let mut attrs = vec![];
 
     self.commands.into_iter().for_each(|cmd| {
       // If coming a different render command, crete a new render command.
@@ -146,95 +146,27 @@ impl Rendering2DLayer {
         path,
         cmd_type,
       } = cmd;
-      let color_cmd = matches!(cmd_type.style(), FillStyle::Color(_));
-      if matches!(last_cmd, Some(RenderCommand::PureColor { .. })) != color_cmd
-      {
-        Self::push_cmd(&mut buffer, last_cmd.take());
-      }
-      if last_cmd.is_none() {
-        let new_cmd = if color_cmd {
-          RenderCommand::PureColor {
-            geometry: VertexBuffers::new(),
-            attrs: vec![],
-          }
-        } else {
-          RenderCommand::Texture {
-            geometry: VertexBuffers::new(),
-            attrs: vec![],
-          }
-        };
-        last_cmd = Some(new_cmd);
-      }
 
-      macro path_tess(
-        $render_cmd_type: ident,
-        $attr_type: ident,
-        $attr_init: expr
-      ) {
-        if let Some(RenderCommand::$render_cmd_type { geometry, attrs }) =
-          &mut last_cmd
-        {
-          let rg = Self::tessellate_path(
-            geometry,
-            path,
-            &cmd_type,
-            &mut fill_tess,
-            &mut stroke_tess,
-          );
-          let rg_attr = RangeAttr { transform, rg };
-          attrs.push($attr_type::new(rg_attr, $attr_init));
-        } else {
-          unreachable!();
-        }
-      }
-
-      match cmd_type.style() {
-        FillStyle::Color(c) => {
-          path_tess!(PureColor, ColorBufferAttr, *c);
-        }
-        FillStyle::Image => {
-          path_tess!(Texture, TextureBufferAttr, TextureStyle::Image);
-        }
-        FillStyle::Gradient => {
-          path_tess!(Texture, TextureBufferAttr, TextureStyle::Gradient);
-        }
-      }
+      let rg = Self::tessellate_path(
+        &mut geometry,
+        path,
+        &cmd_type,
+        &mut fill_tess,
+        &mut stroke_tess,
+      );
+      let rg_attr = RangeAttr {
+        transform,
+        rg,
+        style: cmd_type.style().clone(),
+      };
+      attrs.push(rg_attr);
     });
 
-    Self::push_cmd(&mut buffer, last_cmd);
-    buffer
-  }
-
-  fn push_cmd(buffer: &mut Vec<RenderCommand>, cmd: Option<RenderCommand>) {
-    fn command_shrink<T>(
-      geometry: &mut VertexBuffers<Point, u16>,
-      attrs: &mut Vec<T>,
-    ) {
-      geometry.vertices.shrink_to_fit();
-      geometry.indices.shrink_to_fit();
-      attrs.shrink_to_fit()
-    }
-    if let Some(mut cmd) = cmd {
-      match &mut cmd {
-        RenderCommand::PureColor {
-          ref mut geometry,
-          ref mut attrs,
-        } => {
-          command_shrink(geometry, attrs);
-        }
-        RenderCommand::Texture {
-          ref mut geometry,
-          ref mut attrs,
-        } => {
-          command_shrink(geometry, attrs);
-        }
-      };
-      buffer.push(cmd);
-    }
+    RenderCommand { geometry, attrs }
   }
 
   fn tessellate_path(
-    mut buffer: &mut VertexBuffers<Point, u16>,
+    mut buffer: &mut VertexBuffers<Point, u32>,
     path: Path,
     cmd_type: &PathCommandType,
     fill_tess: &mut FillTessellator,
@@ -320,135 +252,13 @@ impl Rendering2DLayer {
 pub(crate) struct RangeAttr {
   pub(crate) rg: Range<usize>,
   pub(crate) transform: Transform,
+  pub(crate) style: FillStyle,
 }
 
 #[derive(Debug, Clone)]
-pub struct ColorBufferAttr {
-  pub(crate) rg_attr: RangeAttr,
-  pub(crate) color: Color,
-}
-
-impl ColorBufferAttr {
-  #[inline]
-  fn new(rg_attr: RangeAttr, color: Color) -> Self { Self { rg_attr, color } }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum TextureStyle {
-  Image,
-  Gradient,
-}
-
-#[derive(Debug, Clone)]
-pub struct TextureBufferAttr {
-  pub(crate) rg_attr: RangeAttr,
-  pub(crate) texture: TextureStyle,
-}
-
-impl TextureBufferAttr {
-  #[inline]
-  fn new(rg_attr: RangeAttr, texture: TextureStyle) -> Self {
-    Self { rg_attr, texture }
-  }
-}
-
-trait Attr {
-  fn range_attr(&mut self) -> &mut RangeAttr;
-}
-
-impl Attr for ColorBufferAttr {
-  #[inline]
-  fn range_attr(&mut self) -> &mut RangeAttr { &mut self.rg_attr }
-}
-
-impl Attr for TextureBufferAttr {
-  #[inline]
-  fn range_attr(&mut self) -> &mut RangeAttr { &mut self.rg_attr }
-}
-
-#[derive(Debug, Clone)]
-pub enum RenderCommand {
-  PureColor {
-    geometry: VertexBuffers<Point, u16>,
-    attrs: Vec<ColorBufferAttr>,
-  },
-  Texture {
-    geometry: VertexBuffers<Point, u16>,
-    attrs: Vec<TextureBufferAttr>,
-  },
-}
-
-impl RenderCommand {
-  /// Merge an other render command, return true if merge successful other
-  /// false.
-  pub(crate) fn merge(&mut self, other: &Self) -> bool {
-    match self {
-      RenderCommand::PureColor { geometry, attrs } => {
-        if let RenderCommand::PureColor {
-          geometry: other_geometry,
-          attrs: other_attrs,
-        } = other
-        {
-          Self::merge_data(geometry, attrs, other_geometry, other_attrs);
-          true
-        } else {
-          false
-        }
-      }
-      RenderCommand::Texture { geometry, attrs } => {
-        if let RenderCommand::Texture {
-          geometry: other_geometry,
-          attrs: other_attrs,
-        } = other
-        {
-          Self::merge_data(geometry, attrs, other_geometry, other_attrs);
-          true
-        } else {
-          false
-        }
-      }
-    }
-  }
-
-  fn merge_data<T: Attr>(
-    geometry: &mut VertexBuffers<Point, u16>,
-    attrs: &mut Vec<T>,
-    other_geometry: &VertexBuffers<Point, u16>,
-    other_attrs: &[T],
-  ) {
-    fn append<T>(to: &mut Vec<T>, from: &[T]) {
-      // Point, U16 and LayerBufferAttr are safe to memory copy.
-      unsafe {
-        let count = from.len();
-        to.reserve(count);
-        let len = to.len();
-        std::ptr::copy_nonoverlapping(
-          from.as_ptr() as *const T,
-          to.as_mut_ptr().add(len),
-          count,
-        );
-        to.set_len(len + count);
-      }
-    }
-
-    let vertex_offset = geometry.vertices.len();
-    let indices_offset = geometry.indices.len();
-    let offset_attr = attrs.len();
-    append(&mut geometry.vertices, &other_geometry.vertices);
-    append(&mut geometry.indices, &other_geometry.indices);
-    append(attrs, &other_attrs);
-
-    geometry
-      .indices
-      .iter_mut()
-      .skip(indices_offset)
-      .for_each(|index| *index += vertex_offset as u16);
-    attrs.iter_mut().skip(offset_attr).for_each(|attr| {
-      let rg_attr = attr.range_attr();
-      rg_attr.rg.start += indices_offset;
-      rg_attr.rg.end += indices_offset;
-    });
-  }
+pub struct RenderCommand {
+  pub(crate) geometry: VertexBuffers<Point, u32>,
+  pub(crate) attrs: Vec<RangeAttr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -525,22 +335,6 @@ impl<'a> DerefMut for LayerGuard<'a> {
 mod test {
   use super::*;
 
-  impl RenderCommand {
-    pub(crate) fn vertices(&self) -> &Vec<Point> {
-      match self {
-        RenderCommand::PureColor { geometry, .. } => &geometry.vertices,
-        RenderCommand::Texture { geometry, .. } => &geometry.vertices,
-      }
-    }
-
-    pub(crate) fn indices(&self) -> &Vec<u16> {
-      match self {
-        RenderCommand::PureColor { geometry, .. } => &geometry.indices,
-        RenderCommand::Texture { geometry, .. } => &geometry.indices,
-      }
-    }
-  }
-
   #[test]
   fn save_guard() {
     let mut layer = Rendering2DLayer::new();
@@ -575,13 +369,9 @@ mod test {
     layer.stroke_path(path.clone());
     layer.fill_path(path);
     let buffer = layer.finish();
-    assert_eq!(buffer.len(), 1);
-    assert!(!buffer[0].vertices().is_empty());
-    let attrs = match &buffer[0] {
-      RenderCommand::PureColor { attrs, .. } => attrs.len(),
-      RenderCommand::Texture { attrs, .. } => attrs.len(),
-    };
-    assert_eq!(attrs, 2);
+
+    assert!(!buffer.geometry.vertices.is_empty());
+    assert_eq!(buffer.attrs.len(), 2);
   }
 
   #[test]
@@ -609,33 +399,5 @@ mod test {
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
     assert_eq!(layer.commands.len(), 5);
-  }
-
-  #[test]
-  fn merge_buffer() {
-    fn draw() -> Vec<RenderCommand> {
-      let mut layer = Rendering2DLayer::new();
-      let mut builder = Path::builder();
-      builder.begin((0., 0.).into());
-      builder.line_to((1., 0.).into());
-      builder.line_to((1., 1.).into());
-      builder.end(true);
-      let path = builder.build();
-      layer.fill_path(path);
-      layer.finish()
-    }
-    let cmd1 = &mut draw()[0];
-    let cmd2 = &draw()[0];
-
-    assert!(cmd1.merge(&cmd2));
-    assert_eq!(cmd1.indices(), &[1, 0, 2, 4, 3, 5]);
-
-    if let RenderCommand::PureColor { attrs, .. } = cmd1 {
-      assert_eq!(attrs.len(), 2);
-      assert_eq!(attrs[0].rg_attr.rg, 0..3);
-      assert_eq!(attrs[1].rg_attr.rg, 3..6);
-    } else {
-      unreachable!();
-    }
   }
 }
