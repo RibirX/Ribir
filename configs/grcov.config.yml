@@ -6,5 +6,12 @@ output-file: ./lcov.info
 ignore:
   - "/*"
   - "../*"
-  - "**/main_thread_tests/**"
+  - "./canvas/main_thread_tests/**"
+  - "./core/src/test/**"
   - "**/examples/**"
+excl-line: "#\\[derive\\("
+excl-br-line: "#\\[derive\\("
+excl-start: "mod tests \\{"
+excl-br-start: "mod tests \\{"
+excl-start: "mod test \\{"
+excl-br-start: "mod test \\{"
