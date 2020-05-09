@@ -32,9 +32,9 @@ macro count {
     ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*))
 }
 
-/// A unit test help describe macro. This macro provide ability to pack many
-/// unit tests, and print the result like official. Should always use official
-/// test harness first, use it only when you execute test by self.
+/// A unit test help macro to describe the test flow. This macro provide ability
+/// to pack many unit tests, and print the result like official. Should always
+/// use official test harness first, use it only when you execute test by self.
 ///
 /// # Example
 /// fn test_first() {}

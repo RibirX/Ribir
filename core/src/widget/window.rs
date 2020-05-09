@@ -52,7 +52,7 @@ impl<'a> Window<'a> {
   /// construct.
   /// 2. every dirty widget has flush to render tree so render tree's data
   /// represent the latest application state.
-  /// 3. every render objet need layout has done, so very render object is in
+  /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub(crate) fn render_ready(&mut self) -> bool {
     self.tree_repair();

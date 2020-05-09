@@ -33,7 +33,8 @@ pub trait Frame {
 pub struct ScreenFrame<'a>(FrameImpl<'a, wgpu::SwapChainOutput>);
 
 /// A texture frame, don't like [`ScreenFrame`](ScreenFrame), `TextureFrame` not
-/// directly present drawing on screen but on a texture.
+/// directly present drawing on screen but drawing on a texture. Below example
+/// show how to store frame as a png image.
 ///
 /// # Example
 ///
