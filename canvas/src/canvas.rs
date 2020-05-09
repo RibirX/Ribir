@@ -1,9 +1,7 @@
 use super::{
-  Color, ColorBufferAttr, DeviceUnit, LogicUnit, Point, RenderCommand,
-  Rendering2DLayer, TextureBufferAttr, Transform,
+  Color, DeviceUnit, LogicUnit, Point, RenderCommand, Rendering2DLayer,
+  Transform,
 };
-
-use lyon::tessellation::VertexBuffers;
 
 pub struct Canvas {
   surface: wgpu::Surface,
@@ -23,9 +21,9 @@ pub trait Frame {
   fn new_2d_layer(&self) -> Rendering2DLayer;
   /// Compose a layer into the canvas.
   fn compose_2d_layer(&mut self, layer: Rendering2DLayer);
-  /// Compose a layer buffer into current drawing. Layer buffer is the result
+  /// Compose a RenderCommand into current drawing. RenderCommand is the result
   /// of a layer drawing finished.
-  fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]);
+  fn compose_2d_layer_buffer(&mut self, command: &RenderCommand);
 }
 
 /// A frame for screen, anything drawing on the frame will commit to screen
@@ -77,7 +75,7 @@ impl<'a> TextureFrame<'a> {
       label: None,
     });
 
-    self.0.commit_buffer();
+    self.0.commit();
 
     // Copy the data from the texture to the buffer
     encoder_mut!(self.0).copy_texture_to_buffer(
@@ -210,7 +208,9 @@ impl Canvas {
       texture: chain_output,
       canvas: self,
       encoder: Some(encoder),
-      buffer: None,
+      vertices: vec![],
+      indices: vec![],
+      texture_infos: vec![],
     })
   }
 
@@ -253,7 +253,9 @@ impl Canvas {
 
       canvas: self,
       encoder: Some(encoder),
-      buffer: None,
+      vertices: vec![],
+      indices: vec![],
+      texture_infos: vec![],
     })
   }
 
@@ -352,8 +354,8 @@ macro frame_impl_delegate($ty: ident) {
     }
 
     #[inline]
-    fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]) {
-      self.0.compose_2d_layer_buffer(commands);
+    fn compose_2d_layer_buffer(&mut self, command: &RenderCommand) {
+      self.0.compose_2d_layer_buffer(command);
     }
   }
 }
@@ -382,7 +384,9 @@ struct TextureTextureView {
 struct FrameImpl<'a, T: FrameTextureView> {
   texture: T,
   encoder: Option<wgpu::CommandEncoder>,
-  buffer: Option<RenderCommand>,
+  vertices: Vec<Vertex>,
+  indices: Vec<u32>,
+  texture_infos: Vec<TextureInfo>,
   canvas: &'a Canvas,
 }
 
@@ -402,83 +406,58 @@ impl<'a, T: FrameTextureView> Frame for FrameImpl<'a, T> {
     self.compose_2d_layer_buffer(&other_layer.finish())
   }
 
-  #[inline]
-  fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]) {
-    // if the first render command is same type with last layer's last render
-    // command, will merge them into one to commit.
-    let mut merged = false;
-    if let Some(last) = &mut self.buffer {
-      if let Some(first) = commands.first() {
-        merged = last.merge(first);
-      }
-    }
-
-    // Skip the first command if it merged into buffer
-    let start = merged as usize;
-    if commands.len() > start {
-      self.commit_buffer();
-      let end = commands.len() - 1;
-      if end > start {
-        commands[start..end]
-          .iter()
-          .for_each(|cmd| self.commit_command(cmd));
-      }
-
-      // Retain the last command as new buffer to merge new layer.
-      self.buffer = commands.last().cloned();
-    }
+  fn compose_2d_layer_buffer(&mut self, command: &RenderCommand) {
+    self.upload(command);
   }
 }
 
 impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
-  fn commit_command(&mut self, command: &RenderCommand) {
-    match command {
-      RenderCommand::PureColor { geometry, attrs } => {
-        self.commit_pure_color_command(geometry, attrs);
-      }
-      RenderCommand::Texture { geometry, attrs } => {
-        self.commit_texture_command(geometry, attrs)
-      }
-    }
+  fn upload(&mut self, command: &RenderCommand) {
+    let vertex_offset = self.vertices.len() as u32;
+    let indices_offset = self.indices.len() as u32;
+
+    let RenderCommand { geometry, attrs } = command;
+    let mapped_vertices = geometry.vertices.iter().map(|pos| Vertex {
+      pos: *pos,
+      tex_id: 0,
+    });
+    self.vertices.extend(mapped_vertices);
+
+    let mapped_indices =
+      geometry.indices.iter().map(|index| index + vertex_offset);
+    self.indices.extend(mapped_indices);
+
+    self.texture_infos.reserve(attrs.len());
+    attrs.iter().for_each(|attr| {
+      geometry.indices[attr.rg.clone()]
+        .iter()
+        // map index to new vertices container.
+        .map(|idx| idx + indices_offset)
+        .for_each(|idx| {
+          self.vertices[idx as usize].tex_id = self.texture_infos.len() as u32
+
+          // Todo: process texture info.
+          // self.texture_infos.push(TextureInfo {
+          //   color: attr.color,
+          //   transform: attr.rg_attr.transform,
+          // });
+        });
+    });
   }
 
-  fn commit_pure_color_command(
-    &mut self,
-    geometry: &VertexBuffers<Point, u16>,
-    attrs: &[ColorBufferAttr],
-  ) {
-    let mut vertices = Vec::with_capacity(geometry.vertices.len());
-    geometry.vertices.iter().for_each(|pos| {
-      vertices.push(Vertex {
-        pos: *pos,
-        prim_id: 0,
-      })
-    });
-
-    let mut primitives = Vec::with_capacity(attrs.len());
-    attrs.iter().for_each(|attr| {
-      let rg = &attr.rg_attr.rg;
-      geometry.indices[rg.start..rg.end].iter().for_each(|idx| {
-        vertices[*idx as usize].prim_id = primitives.len() as u32
-      });
-      primitives.push(ColorPrimitive {
-        color: attr.color,
-        transform: attr.rg_attr.transform,
-      });
-    });
-
+  fn commit(&mut self) {
     let coordinate_map =
       CoordinateMapMatrix(self.canvas.coordinate_2d_to_device_matrix());
 
     let device = &self.canvas.device;
 
     let vertices_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(vertices.as_slice()),
+      bytemuck::cast_slice(self.vertices.as_slice()),
       wgpu::BufferUsage::VERTEX,
     );
 
     let indices_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(geometry.indices.as_slice()),
+      bytemuck::cast_slice(self.indices.as_slice()),
       wgpu::BufferUsage::INDEX,
     );
 
@@ -520,36 +499,27 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
       &uniform_bind_group,
       &[],
     );
-    render_pass.draw_indexed(0..geometry.indices.len() as u32, 0, 0..1);
-  }
-
-  fn commit_texture_command(
-    &mut self,
-    _geometry: &VertexBuffers<Point, u16>,
-    _attrs: &[TextureBufferAttr],
-  ) {
-    unimplemented!();
-  }
-
-  fn commit_buffer(&mut self) {
-    if let Some(cmd) = self.buffer.take() {
-      self.commit_command(&cmd);
-    }
+    render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
   }
 }
 
+/// We use a texture atlas to shader vertices, even if a pure color path.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
   pos: Point,
-  prim_id: u32,
+  tex_id: u32,
 }
 
 unsafe impl bytemuck::Pod for Vertex {}
 unsafe impl bytemuck::Zeroable for Vertex {}
 
 #[repr(C)]
-struct ColorPrimitive {
+struct TextureInfo {
+  // // Texture offset in texture atlas.
+  // offset: euclid::Point2D<u32, DeviceUnit>,
+  // // Texture size.
+  // size: euclid::Size2D<u32, DeviceUnit>,
   color: Color,
   transform: Transform,
 }
@@ -584,7 +554,7 @@ unsafe impl bytemuck::Pod for CoordinateMapMatrix {}
 unsafe impl bytemuck::Zeroable for CoordinateMapMatrix {}
 
 fn finish_frame<T: FrameTextureView>(frame: &mut FrameImpl<'_, T>) {
-  frame.commit_buffer();
+  frame.commit();
 
   frame.canvas.queue.submit(&[frame
     .encoder
