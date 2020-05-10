@@ -2,6 +2,9 @@ use super::{
   Color, DeviceUnit, LogicUnit, Point, RenderCommand, Rendering2DLayer,
   Transform,
 };
+use zerocopy::AsBytes;
+
+use super::texture_atlas::TextureAtlas;
 
 pub struct Canvas {
   surface: wgpu::Surface,
@@ -9,8 +12,13 @@ pub struct Canvas {
   queue: wgpu::Queue,
   swap_chain: wgpu::SwapChain,
   sc_desc: wgpu::SwapChainDescriptor,
-  color_pipeline: wgpu::RenderPipeline,
-  canvas_2d_coordinate_bind_group_layout: wgpu::BindGroupLayout,
+  pipeline: wgpu::RenderPipeline,
+  uniform_layout: wgpu::BindGroupLayout,
+  uniforms: wgpu::BindGroup,
+
+  // texture atlas for pure color and image to draw.
+  tex_atlas: TextureAtlas,
+  tex_atlas_sampler: wgpu::Sampler,
 
   // Data wait to draw
   vertices: Vec<Vertex>,
@@ -34,10 +42,28 @@ pub trait Frame {
 
   /// Upload a RenderCommand into current frame. RenderCommand is the result
   /// of a layer drawing finished.
-  fn upload_render_command(&mut self, command: &RenderCommand);
+  fn upload_render_command(&mut self, command: &RenderCommand) {
+    self.canvas().upload(command);
+  }
 
-  /// Draw the frame.
+  /// Submits a series of finished command buffers for execution. You needn't
+  /// call this method manually, only if you want flush drawing things into gpu
+  /// immediately.
+  fn submit(&mut self) {
+    self.draw();
+
+    if let Some(encoder) = self.take_encoder() {
+      self.canvas().queue.submit(&[encoder.finish()]);
+    }
+  }
+
   fn draw(&mut self);
+
+  /// Return the command encoder.
+  fn take_encoder(&mut self) -> Option<wgpu::CommandEncoder>;
+
+  /// Return the host canvas.
+  fn canvas(&mut self) -> &mut Canvas;
 }
 
 /// A frame for screen, anything drawing on the frame will commit to screen
@@ -45,6 +71,7 @@ pub trait Frame {
 pub struct ScreenFrame<'a> {
   texture: wgpu::SwapChainOutput,
   canvas: &'a mut Canvas,
+  encoder: Option<wgpu::CommandEncoder>,
 }
 
 /// A texture frame, don't like [`ScreenFrame`](ScreenFrame), `TextureFrame` not
@@ -73,6 +100,7 @@ pub struct ScreenFrame<'a> {
 /// ```
 pub struct TextureFrame<'a> {
   texture: wgpu::Texture,
+  view: wgpu::TextureView,
   canvas: &'a mut Canvas,
   encoder: Option<wgpu::CommandEncoder>,
 }
@@ -97,7 +125,11 @@ impl<'a> TextureFrame<'a> {
     });
 
     // Copy the data from the texture to the buffer
-    let mut encoder = self.take_encoder();
+    if self.encoder.is_none() {
+      self.encoder = Some(self.canvas.new_encoder())
+    }
+    let encoder = self.encoder.as_mut().unwrap();
+    self.canvas.draw(&self.view, encoder);
     encoder.copy_texture_to_buffer(
       wgpu::TextureCopyView {
         texture: &self.texture,
@@ -118,8 +150,7 @@ impl<'a> TextureFrame<'a> {
       },
     );
 
-    self.encoder = Some(encoder);
-    self.draw();
+    self.submit();
 
     // Note that we're not calling `.await` here.
     let buffer_future = output_buffer.map_read(0, size);
@@ -144,15 +175,9 @@ impl<'a> TextureFrame<'a> {
   pub async fn save_as_png(self, path: &str) -> Result<(), &'static str> {
     self.png_encode(std::fs::File::create(path).unwrap()).await
   }
-
-  fn take_encoder(&mut self) -> wgpu::CommandEncoder {
-    self.encoder.take().unwrap_or(self.canvas.new_encoder())
-  }
 }
 
 impl Canvas {
-  const COORDINATE_2D_BINDING_INDEX: u32 = 0;
-
   /// Create a canvas by a native window.
   pub async fn new<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
@@ -186,30 +211,44 @@ impl Canvas {
       height,
       present_mode: wgpu::PresentMode::Fifo,
     };
+
     let swap_chain = device.create_swap_chain(&surface, &sc_desc);
-    let canvas_2d_coordinate_bind_group_layout = device
-      .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        bindings: &[wgpu::BindGroupLayoutEntry {
-          binding: Self::COORDINATE_2D_BINDING_INDEX,
-          visibility: wgpu::ShaderStage::VERTEX,
-          ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-        }],
-        label: Some("canvas_2d_coordinate_bind_group_layout"),
-      });
-    let color_pipeline = Self::create_color_render_pipeline(
+    let uniform_layout = create_uniform_layout(&device);
+    let pipeline =
+      create_render_pipeline(&device, &sc_desc, &[&uniform_layout]);
+
+    let tex_atlas = TextureAtlas::new(&device);
+    let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+      address_mode_u: wgpu::AddressMode::ClampToEdge,
+      address_mode_v: wgpu::AddressMode::ClampToEdge,
+      address_mode_w: wgpu::AddressMode::ClampToEdge,
+      mag_filter: wgpu::FilterMode::Linear,
+      min_filter: wgpu::FilterMode::Linear,
+      mipmap_filter: wgpu::FilterMode::Linear,
+      lod_min_clamp: 0.0,
+      lod_max_clamp: 0.0,
+      compare: wgpu::CompareFunction::Always,
+    });
+
+    let uniforms = create_uniforms(
       &device,
-      &sc_desc,
-      &[&canvas_2d_coordinate_bind_group_layout],
+      &uniform_layout,
+      &coordinate_2d_to_device_matrix(width, height),
+      &tex_atlas_sampler,
+      &tex_atlas.view,
     );
 
     Canvas {
+      tex_atlas,
+      tex_atlas_sampler,
       device,
       surface,
       queue,
       swap_chain,
       sc_desc,
-      color_pipeline,
-      canvas_2d_coordinate_bind_group_layout,
+      pipeline: pipeline,
+      uniform_layout,
+      uniforms,
       vertices: vec![],
       indices: vec![],
       texture_infos: vec![],
@@ -225,6 +264,7 @@ impl Canvas {
       .expect("Timeout getting texture");
 
     ScreenFrame {
+      encoder: None,
       texture: chain_output,
       canvas: self,
     }
@@ -255,6 +295,7 @@ impl Canvas {
     });
 
     TextureFrame {
+      view: texture.create_default_view(),
       texture,
       canvas: self,
       encoder: None,
@@ -267,65 +308,36 @@ impl Canvas {
     self.sc_desc.height = height;
     self.swap_chain =
       self.device.create_swap_chain(&self.surface, &self.sc_desc);
-  }
-
-  /// Convert coordinate system from canvas 2d into wgpu.
-  pub fn coordinate_2d_to_device_matrix(
-    &self,
-  ) -> euclid::Transform2D<f32, LogicUnit, DeviceUnit> {
-    euclid::Transform2D::row_major(
-      2. / self.sc_desc.width as f32,
-      0.,
-      0.,
-      -2. / self.sc_desc.height as f32,
-      -1.,
-      1.,
+    self.uniforms = create_uniforms(
+      &self.device,
+      &self.uniform_layout,
+      &coordinate_2d_to_device_matrix(width, height),
+      &self.tex_atlas_sampler,
+      &self.tex_atlas.view,
     )
   }
 }
 
 impl Canvas {
   #[inline]
-  fn cached_data_to_draw(&self) -> bool { !self.vertices.is_empty() }
+  fn has_cached_data_to_draw(&self) -> bool { !self.vertices.is_empty() }
 
   fn draw(
     &mut self,
     view: &wgpu::TextureView,
-    mut encoder: wgpu::CommandEncoder,
+    encoder: &mut wgpu::CommandEncoder,
   ) {
-    let coordinate_map =
-      CoordinateMapMatrix(self.coordinate_2d_to_device_matrix());
-
     let device = &self.device;
 
     let vertices_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(self.vertices.as_slice()),
+      self.vertices.as_bytes(),
       wgpu::BufferUsage::VERTEX,
     );
 
     let indices_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(self.indices.as_slice()),
+      self.indices.as_bytes(),
       wgpu::BufferUsage::INDEX,
     );
-
-    let uniform_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(&[coordinate_map]),
-      wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-    );
-
-    let uniform_bind_group =
-      device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &self.canvas_2d_coordinate_bind_group_layout,
-        bindings: &[wgpu::Binding {
-          binding: 0,
-          resource: wgpu::BindingResource::Buffer {
-            buffer: &uniform_buffer,
-            range: 0..std::mem::size_of_val(&coordinate_map)
-              as wgpu::BufferAddress,
-          },
-        }],
-        label: Some("uniform_bind_group"),
-      });
 
     {
       let mut render_pass =
@@ -339,18 +351,12 @@ impl Canvas {
           }],
           depth_stencil_attachment: None,
         });
-      render_pass.set_pipeline(&self.color_pipeline);
+      render_pass.set_pipeline(&self.pipeline);
       render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
       render_pass.set_index_buffer(&indices_buffer, 0, 0);
-      render_pass.set_bind_group(
-        Canvas::COORDINATE_2D_BINDING_INDEX,
-        &uniform_bind_group,
-        &[],
-      );
+      render_pass.set_bind_group(0, &self.uniforms, &[]);
       render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
     }
-
-    self.queue.submit(&[encoder.finish()]);
 
     self.reset_cache();
   }
@@ -369,73 +375,13 @@ impl Canvas {
     self.texture_infos.clear();
   }
 
-  fn create_color_render_pipeline(
-    device: &wgpu::Device,
-    sc_desc: &wgpu::SwapChainDescriptor,
-    bind_group_layouts: &[&wgpu::BindGroupLayout],
-  ) -> wgpu::RenderPipeline {
-    let render_pipeline_layout =
-      device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        bind_group_layouts,
-      });
-
-    let (vs_module, fs_module) = Self::color_shaders(device);
-
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-      layout: &render_pipeline_layout,
-      vertex_stage: wgpu::ProgrammableStageDescriptor {
-        module: &vs_module,
-        entry_point: "main",
-      },
-      fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-        module: &fs_module,
-        entry_point: "main",
-      }),
-      rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-        front_face: wgpu::FrontFace::Ccw,
-        cull_mode: wgpu::CullMode::None,
-        depth_bias: 0,
-        depth_bias_slope_scale: 0.0,
-        depth_bias_clamp: 0.0,
-      }),
-      color_states: &[wgpu::ColorStateDescriptor {
-        format: sc_desc.format,
-        color_blend: wgpu::BlendDescriptor::REPLACE,
-        alpha_blend: wgpu::BlendDescriptor::REPLACE,
-        write_mask: wgpu::ColorWrite::ALL,
-      }],
-      primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-      depth_stencil_state: None,
-      vertex_state: wgpu::VertexStateDescriptor {
-        index_format: wgpu::IndexFormat::Uint32,
-        vertex_buffers: &[Vertex::desc()],
-      },
-      sample_count: 1,
-      sample_mask: !0,
-      alpha_to_coverage_enabled: false,
-    })
-  }
-
-  fn color_shaders(
-    device: &wgpu::Device,
-  ) -> (wgpu::ShaderModule, wgpu::ShaderModule) {
-    let vs_bytes = include_bytes!("./shaders/geometry.vert.spv");
-    let fs_bytes = include_bytes!("./shaders/geometry.frag.spv");
-    let vs_spv = wgpu::read_spirv(std::io::Cursor::new(&vs_bytes[..])).unwrap();
-    let fs_spv = wgpu::read_spirv(std::io::Cursor::new(&fs_bytes[..])).unwrap();
-    let vs_module = device.create_shader_module(&vs_spv);
-    let fs_module = device.create_shader_module(&fs_spv);
-
-    (vs_module, fs_module)
-  }
-
   fn upload(&mut self, command: &RenderCommand) {
     let vertex_offset = self.vertices.len() as u32;
     let indices_offset = self.indices.len() as u32;
 
     let RenderCommand { geometry, attrs } = command;
     let mapped_vertices = geometry.vertices.iter().map(|pos| Vertex {
-      pos: *pos,
+      pos: [pos.x, pos.y],
       tex_id: 0,
     });
     self.vertices.extend(mapped_vertices);
@@ -451,7 +397,7 @@ impl Canvas {
         // map index to new vertices container.
         .map(|idx| idx + indices_offset)
         .for_each(|idx| {
-          self.vertices[idx as usize].tex_id = self.texture_infos.len() as u32
+          self.vertices[idx as usize].tex_id = self.texture_infos.len() as u32;
 
           // Todo: process texture info.
           // self.texture_infos.push(TextureInfo {
@@ -463,47 +409,181 @@ impl Canvas {
   }
 }
 
-impl<'a> Frame for ScreenFrame<'a> {
+fn create_render_pipeline(
+  device: &wgpu::Device,
+  sc_desc: &wgpu::SwapChainDescriptor,
+  bind_group_layouts: &[&wgpu::BindGroupLayout],
+) -> wgpu::RenderPipeline {
+  let render_pipeline_layout =
+    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      bind_group_layouts,
+    });
+
+  let (vs_module, fs_module) = create_shaders(device);
+
+  device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    layout: &render_pipeline_layout,
+    vertex_stage: wgpu::ProgrammableStageDescriptor {
+      module: &vs_module,
+      entry_point: "main",
+    },
+    fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+      module: &fs_module,
+      entry_point: "main",
+    }),
+    rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+      front_face: wgpu::FrontFace::Ccw,
+      cull_mode: wgpu::CullMode::None,
+      depth_bias: 0,
+      depth_bias_slope_scale: 0.0,
+      depth_bias_clamp: 0.0,
+    }),
+    color_states: &[wgpu::ColorStateDescriptor {
+      format: sc_desc.format,
+      color_blend: wgpu::BlendDescriptor::REPLACE,
+      alpha_blend: wgpu::BlendDescriptor::REPLACE,
+      write_mask: wgpu::ColorWrite::ALL,
+    }],
+    primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+    depth_stencil_state: None,
+    vertex_state: wgpu::VertexStateDescriptor {
+      index_format: wgpu::IndexFormat::Uint32,
+      vertex_buffers: &[Vertex::desc()],
+    },
+    sample_count: 1,
+    sample_mask: !0,
+    alpha_to_coverage_enabled: false,
+  })
+}
+
+fn create_shaders(
+  device: &wgpu::Device,
+) -> (wgpu::ShaderModule, wgpu::ShaderModule) {
+  let vs_bytes = include_bytes!("./shaders/geometry.vert.spv");
+  let fs_bytes = include_bytes!("./shaders/geometry.frag.spv");
+  let vs_spv = wgpu::read_spirv(std::io::Cursor::new(&vs_bytes[..])).unwrap();
+  let fs_spv = wgpu::read_spirv(std::io::Cursor::new(&fs_bytes[..])).unwrap();
+  let vs_module = device.create_shader_module(&vs_spv);
+  let fs_module = device.create_shader_module(&fs_spv);
+
+  (vs_module, fs_module)
+}
+
+fn create_uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+  device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    bindings: &[
+      wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStage::VERTEX,
+        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+      },
+      wgpu::BindGroupLayoutEntry {
+        binding: 1,
+        visibility: wgpu::ShaderStage::FRAGMENT,
+        ty: wgpu::BindingType::Sampler { comparison: false },
+      },
+      wgpu::BindGroupLayoutEntry {
+        binding: 2,
+        visibility: wgpu::ShaderStage::FRAGMENT,
+        ty: wgpu::BindingType::SampledTexture {
+          dimension: wgpu::TextureViewDimension::D2,
+          component_type: wgpu::TextureComponentType::Float,
+          multisampled: false,
+        },
+      },
+    ],
+    label: Some("canvas_2d_coordinate_bind_group_layout"),
+  })
+}
+
+/// Convert coordinate system from canvas 2d into wgpu.
+
+pub fn coordinate_2d_to_device_matrix(
+  width: u32,
+  height: u32,
+) -> euclid::Transform2D<f32, LogicUnit, DeviceUnit> {
+  euclid::Transform2D::row_major(
+    2. / width as f32,
+    0.,
+    0.,
+    -2. / height as f32,
+    -1.,
+    1.,
+  )
+}
+
+fn create_uniforms(
+  device: &wgpu::Device,
+  layout: &wgpu::BindGroupLayout,
+  canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, DeviceUnit>,
+  tex_atlas_sampler: &wgpu::Sampler,
+  tex_atlas: &wgpu::TextureView,
+) -> wgpu::BindGroup {
+  let uniform_buffer = device.create_buffer_with_data(
+    &canvas_2d_to_device_matrix.to_row_major_array().as_bytes(),
+    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+  );
+
+  device.create_bind_group(&wgpu::BindGroupDescriptor {
+    layout: layout,
+    bindings: &[
+      wgpu::Binding {
+        binding: 0,
+        resource: wgpu::BindingResource::Buffer {
+          buffer: &uniform_buffer,
+          range: 0..std::mem::size_of_val(&canvas_2d_to_device_matrix)
+            as wgpu::BufferAddress,
+        },
+      },
+      wgpu::Binding {
+        binding: 1,
+        resource: wgpu::BindingResource::Sampler(tex_atlas_sampler),
+      },
+      wgpu::Binding {
+        binding: 2,
+        resource: wgpu::BindingResource::TextureView(tex_atlas),
+      },
+    ],
+    label: Some("uniform_bind_group"),
+  })
+}
+
+macro frame_delegate_impl($($path: ident).*) {
   #[inline]
-  fn upload_render_command(&mut self, command: &RenderCommand) {
-    self.canvas.upload(command);
+  fn canvas(&mut self) -> &mut Canvas { &mut self.canvas }
+
+  #[inline]
+  fn take_encoder(&mut self) -> Option<wgpu::CommandEncoder> {
+    self.encoder.take()
   }
 
   fn draw(&mut self) {
-    if self.canvas.cached_data_to_draw() {
-      let Self { canvas, texture } = self;
-      let encoder = canvas.new_encoder();
-      canvas.draw(&texture.view, encoder);
+    if self.canvas.has_cached_data_to_draw() {
+      if self.encoder.is_none() {
+        self.encoder = Some(self.canvas().new_encoder())
+      }
+      self
+        .canvas
+        .draw(&self$(.$path)*, self.encoder.as_mut().unwrap());
     }
   }
 }
 
-impl<'a> Frame for TextureFrame<'a> {
-  #[inline]
-  fn upload_render_command(&mut self, command: &RenderCommand) {
-    self.canvas.upload(command);
-  }
+impl<'a> Frame for ScreenFrame<'a> {
+  frame_delegate_impl!(texture.view);
+}
 
-  fn draw(&mut self) {
-    if self.canvas.cached_data_to_draw() {
-      let encoder = self.take_encoder();
-      self
-        .canvas
-        .draw(&self.texture.create_default_view(), encoder);
-    }
-  }
+impl<'a> Frame for TextureFrame<'a> {
+  frame_delegate_impl!(view);
 }
 
 /// We use a texture atlas to shader vertices, even if a pure color path.
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, AsBytes)]
 struct Vertex {
-  pos: Point,
+  pos: [f32; 2],
   tex_id: u32,
 }
-
-unsafe impl bytemuck::Pod for Vertex {}
-unsafe impl bytemuck::Zeroable for Vertex {}
 
 #[repr(C)]
 struct TextureInfo {
@@ -537,19 +617,34 @@ impl Vertex {
   }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct CoordinateMapMatrix(euclid::Transform2D<f32, LogicUnit, DeviceUnit>);
-
-unsafe impl bytemuck::Pod for CoordinateMapMatrix {}
-unsafe impl bytemuck::Zeroable for CoordinateMapMatrix {}
-
 impl<'a> Drop for ScreenFrame<'a> {
   #[inline]
-  fn drop(&mut self) { self.draw(); }
+  fn drop(&mut self) { self.submit(); }
 }
 
 impl<'a> Drop for TextureFrame<'a> {
   #[inline]
-  fn drop(&mut self) { self.draw(); }
+  fn drop(&mut self) { self.submit(); }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn coordinate_2d_start() {
+    let matrix = coordinate_2d_to_device_matrix(400, 400);
+
+    let lt = matrix.transform_point(Point::new(0., 0.));
+    assert_eq!((lt.x, lt.y), (-1., 1.));
+
+    let rt = matrix.transform_point(Point::new(400., 0.));
+    assert_eq!((rt.x, rt.y), (1., 1.));
+
+    let lb = matrix.transform_point(Point::new(0., 400.));
+    assert_eq!((lb.x, lb.y), (-1., -1.));
+
+    let rb = matrix.transform_point(Point::new(400., 400.));
+    assert_eq!((rb.x, rb.y), (1., -1.0));
+  }
 }

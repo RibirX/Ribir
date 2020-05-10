@@ -82,16 +82,16 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug integration test 'main_thread_tests'",
+      "name": "Debug integration test canvas_gl",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--test=main_thread_tests",
+          "--test=canvas_gl",
           "--package=canvas"
         ],
         "filter": {
-          "name": "main_thread_tests",
+          "name": "canvas_gl",
           "kind": "test"
         }
       },
