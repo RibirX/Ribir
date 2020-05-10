@@ -11,6 +11,11 @@ pub struct Canvas {
   sc_desc: wgpu::SwapChainDescriptor,
   color_pipeline: wgpu::RenderPipeline,
   canvas_2d_coordinate_bind_group_layout: wgpu::BindGroupLayout,
+
+  // Data wait to draw
+  vertices: Vec<Vertex>,
+  indices: Vec<u32>,
+  texture_infos: Vec<TextureInfo>,
 }
 
 /// Frame is created by Canvas, and provide a blank box to drawing. It's
@@ -18,17 +23,29 @@ pub struct Canvas {
 pub trait Frame {
   /// Create a 2d layer to drawing, and not effect current canvas before compose
   /// back to the canvas.
-  fn new_2d_layer(&self) -> Rendering2DLayer;
+  #[inline]
+  fn new_2d_layer(&self) -> Rendering2DLayer { Rendering2DLayer::new() }
+
   /// Compose a layer into the canvas.
-  fn compose_2d_layer(&mut self, layer: Rendering2DLayer);
-  /// Compose a RenderCommand into current drawing. RenderCommand is the result
+  #[inline]
+  fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
+    self.upload_render_command(&layer.finish())
+  }
+
+  /// Upload a RenderCommand into current frame. RenderCommand is the result
   /// of a layer drawing finished.
-  fn compose_2d_layer_buffer(&mut self, command: &RenderCommand);
+  fn upload_render_command(&mut self, command: &RenderCommand);
+
+  /// Draw the frame.
+  fn draw(&mut self);
 }
 
 /// A frame for screen, anything drawing on the frame will commit to screen
 /// display.
-pub struct ScreenFrame<'a>(FrameImpl<'a, wgpu::SwapChainOutput>);
+pub struct ScreenFrame<'a> {
+  texture: wgpu::SwapChainOutput,
+  canvas: &'a mut Canvas,
+}
 
 /// A texture frame, don't like [`ScreenFrame`](ScreenFrame), `TextureFrame` not
 /// directly present drawing on screen but drawing on a texture. Below example
@@ -54,7 +71,11 @@ pub struct ScreenFrame<'a>(FrameImpl<'a, wgpu::SwapChainOutput>);
 ///   ).unwrap();
 /// }
 /// ```
-pub struct TextureFrame<'a>(FrameImpl<'a, TextureTextureView>);
+pub struct TextureFrame<'a> {
+  texture: wgpu::Texture,
+  canvas: &'a mut Canvas,
+  encoder: Option<wgpu::CommandEncoder>,
+}
 
 impl<'a> TextureFrame<'a> {
   /// PNG encoded the texture frame then write by `writer`.
@@ -62,8 +83,8 @@ impl<'a> TextureFrame<'a> {
     mut self,
     writer: W,
   ) -> Result<(), &'static str> {
-    let device = &self.0.canvas.device;
-    let sc_desc = &self.0.canvas.sc_desc;
+    let device = &self.canvas.device;
+    let sc_desc = &self.canvas.sc_desc;
     let width = sc_desc.width;
     let height = sc_desc.height;
     let size = width as u64 * height as u64 * std::mem::size_of::<u32>() as u64;
@@ -75,12 +96,11 @@ impl<'a> TextureFrame<'a> {
       label: None,
     });
 
-    self.0.commit();
-
     // Copy the data from the texture to the buffer
-    encoder_mut!(self.0).copy_texture_to_buffer(
+    let mut encoder = self.take_encoder();
+    encoder.copy_texture_to_buffer(
       wgpu::TextureCopyView {
-        texture: &self.0.texture.texture,
+        texture: &self.texture,
         mip_level: 0,
         array_layer: 0,
         origin: wgpu::Origin3d::ZERO,
@@ -98,14 +118,14 @@ impl<'a> TextureFrame<'a> {
       },
     );
 
-    // Drop this frame and commit render data to gpu before encode to png.
-    std::mem::drop(self);
+    self.encoder = Some(encoder);
+    self.draw();
 
     // Note that we're not calling `.await` here.
     let buffer_future = output_buffer.map_read(0, size);
 
     // Poll the device in a blocking manner so that our future resolves.
-    device.poll(wgpu::Maintain::Wait);
+    self.canvas.device.poll(wgpu::Maintain::Wait);
 
     let mapping = buffer_future.await.map_err(|_| "Async buffer error")?;
     let mut png_encoder = png::Encoder::new(writer, width, height);
@@ -123,6 +143,10 @@ impl<'a> TextureFrame<'a> {
   /// Save the texture frame as a PNG image, store at the `path` location.
   pub async fn save_as_png(self, path: &str) -> Result<(), &'static str> {
     self.png_encode(std::fs::File::create(path).unwrap()).await
+  }
+
+  fn take_encoder(&mut self) -> wgpu::CommandEncoder {
+    self.encoder.take().unwrap_or(self.canvas.new_encoder())
   }
 }
 
@@ -186,6 +210,9 @@ impl Canvas {
       sc_desc,
       color_pipeline,
       canvas_2d_coordinate_bind_group_layout,
+      vertices: vec![],
+      indices: vec![],
+      texture_infos: vec![],
     }
   }
 
@@ -197,21 +224,10 @@ impl Canvas {
       .get_next_texture()
       .expect("Timeout getting texture");
 
-    let encoder =
-      self
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-          label: Some("Render Encoder"),
-        });
-
-    ScreenFrame(FrameImpl {
+    ScreenFrame {
       texture: chain_output,
       canvas: self,
-      encoder: Some(encoder),
-      vertices: vec![],
-      indices: vec![],
-      texture_infos: vec![],
-    })
+    }
   }
 
   pub fn new_texture_frame(&mut self) -> TextureFrame {
@@ -238,27 +254,14 @@ impl Canvas {
       label: None,
     });
 
-    let encoder =
-      self
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-          label: Some("Render Encoder"),
-        });
-
-    TextureFrame(FrameImpl {
-      texture: TextureTextureView {
-        view: texture.create_default_view(),
-        texture,
-      },
-
+    TextureFrame {
+      texture,
       canvas: self,
-      encoder: Some(encoder),
-      vertices: vec![],
-      indices: vec![],
-      texture_infos: vec![],
-    })
+      encoder: None,
+    }
   }
 
+  /// Resize canvas
   pub fn resize(&mut self, width: u32, height: u32) {
     self.sc_desc.width = width;
     self.sc_desc.height = height;
@@ -282,6 +285,90 @@ impl Canvas {
 }
 
 impl Canvas {
+  #[inline]
+  fn cached_data_to_draw(&self) -> bool { !self.vertices.is_empty() }
+
+  fn draw(
+    &mut self,
+    view: &wgpu::TextureView,
+    mut encoder: wgpu::CommandEncoder,
+  ) {
+    let coordinate_map =
+      CoordinateMapMatrix(self.coordinate_2d_to_device_matrix());
+
+    let device = &self.device;
+
+    let vertices_buffer = device.create_buffer_with_data(
+      bytemuck::cast_slice(self.vertices.as_slice()),
+      wgpu::BufferUsage::VERTEX,
+    );
+
+    let indices_buffer = device.create_buffer_with_data(
+      bytemuck::cast_slice(self.indices.as_slice()),
+      wgpu::BufferUsage::INDEX,
+    );
+
+    let uniform_buffer = device.create_buffer_with_data(
+      bytemuck::cast_slice(&[coordinate_map]),
+      wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+    );
+
+    let uniform_bind_group =
+      device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &self.canvas_2d_coordinate_bind_group_layout,
+        bindings: &[wgpu::Binding {
+          binding: 0,
+          resource: wgpu::BindingResource::Buffer {
+            buffer: &uniform_buffer,
+            range: 0..std::mem::size_of_val(&coordinate_map)
+              as wgpu::BufferAddress,
+          },
+        }],
+        label: Some("uniform_bind_group"),
+      });
+
+    {
+      let mut render_pass =
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+          color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+            attachment: view,
+            resolve_target: None,
+            load_op: wgpu::LoadOp::Clear,
+            store_op: wgpu::StoreOp::Store,
+            clear_color: wgpu::Color::WHITE,
+          }],
+          depth_stencil_attachment: None,
+        });
+      render_pass.set_pipeline(&self.color_pipeline);
+      render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
+      render_pass.set_index_buffer(&indices_buffer, 0, 0);
+      render_pass.set_bind_group(
+        Canvas::COORDINATE_2D_BINDING_INDEX,
+        &uniform_bind_group,
+        &[],
+      );
+      render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+    }
+
+    self.queue.submit(&[encoder.finish()]);
+
+    self.reset_cache();
+  }
+
+  fn new_encoder(&mut self) -> wgpu::CommandEncoder {
+    self
+      .device
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Render Encoder"),
+      })
+  }
+
+  fn reset_cache(&mut self) {
+    self.vertices.clear();
+    self.indices.clear();
+    self.texture_infos.clear();
+  }
+
   fn create_color_render_pipeline(
     device: &wgpu::Device,
     sc_desc: &wgpu::SwapChainDescriptor,
@@ -320,7 +407,7 @@ impl Canvas {
       primitive_topology: wgpu::PrimitiveTopology::TriangleList,
       depth_stencil_state: None,
       vertex_state: wgpu::VertexStateDescriptor {
-        index_format: wgpu::IndexFormat::Uint16,
+        index_format: wgpu::IndexFormat::Uint32,
         vertex_buffers: &[Vertex::desc()],
       },
       sample_count: 1,
@@ -341,77 +428,7 @@ impl Canvas {
 
     (vs_module, fs_module)
   }
-}
 
-macro frame_impl_delegate($ty: ident) {
-  impl<'a> Frame for $ty<'a> {
-    #[inline]
-    fn new_2d_layer(&self) -> Rendering2DLayer { self.0.new_2d_layer() }
-
-    #[inline]
-    fn compose_2d_layer(&mut self, other_layer: Rendering2DLayer) {
-      self.0.compose_2d_layer(other_layer)
-    }
-
-    #[inline]
-    fn compose_2d_layer_buffer(&mut self, command: &RenderCommand) {
-      self.0.compose_2d_layer_buffer(command);
-    }
-  }
-}
-
-frame_impl_delegate!(ScreenFrame);
-frame_impl_delegate!(TextureFrame);
-
-trait FrameTextureView {
-  fn texture_view(&self) -> &wgpu::TextureView;
-}
-
-impl FrameTextureView for wgpu::SwapChainOutput {
-  #[inline]
-  fn texture_view(&self) -> &wgpu::TextureView { &self.view }
-}
-
-impl FrameTextureView for TextureTextureView {
-  #[inline]
-  fn texture_view(&self) -> &wgpu::TextureView { &self.view }
-}
-struct TextureTextureView {
-  texture: wgpu::Texture,
-  view: wgpu::TextureView,
-}
-
-struct FrameImpl<'a, T: FrameTextureView> {
-  texture: T,
-  encoder: Option<wgpu::CommandEncoder>,
-  vertices: Vec<Vertex>,
-  indices: Vec<u32>,
-  texture_infos: Vec<TextureInfo>,
-  canvas: &'a Canvas,
-}
-
-macro encoder_mut($frame: expr) {
-  $frame
-    .encoder
-    .as_mut()
-    .expect("Encoder should always exist before drop!")
-}
-
-impl<'a, T: FrameTextureView> Frame for FrameImpl<'a, T> {
-  #[inline]
-  fn new_2d_layer(&self) -> Rendering2DLayer { Rendering2DLayer::new() }
-
-  #[inline]
-  fn compose_2d_layer(&mut self, other_layer: Rendering2DLayer) {
-    self.compose_2d_layer_buffer(&other_layer.finish())
-  }
-
-  fn compose_2d_layer_buffer(&mut self, command: &RenderCommand) {
-    self.upload(command);
-  }
-}
-
-impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
   fn upload(&mut self, command: &RenderCommand) {
     let vertex_offset = self.vertices.len() as u32;
     let indices_offset = self.indices.len() as u32;
@@ -444,62 +461,36 @@ impl<'a, T: FrameTextureView> FrameImpl<'a, T> {
         });
     });
   }
+}
 
-  fn commit(&mut self) {
-    let coordinate_map =
-      CoordinateMapMatrix(self.canvas.coordinate_2d_to_device_matrix());
+impl<'a> Frame for ScreenFrame<'a> {
+  #[inline]
+  fn upload_render_command(&mut self, command: &RenderCommand) {
+    self.canvas.upload(command);
+  }
 
-    let device = &self.canvas.device;
+  fn draw(&mut self) {
+    if self.canvas.cached_data_to_draw() {
+      let Self { canvas, texture } = self;
+      let encoder = canvas.new_encoder();
+      canvas.draw(&texture.view, encoder);
+    }
+  }
+}
 
-    let vertices_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(self.vertices.as_slice()),
-      wgpu::BufferUsage::VERTEX,
-    );
+impl<'a> Frame for TextureFrame<'a> {
+  #[inline]
+  fn upload_render_command(&mut self, command: &RenderCommand) {
+    self.canvas.upload(command);
+  }
 
-    let indices_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(self.indices.as_slice()),
-      wgpu::BufferUsage::INDEX,
-    );
-
-    let uniform_buffer = device.create_buffer_with_data(
-      bytemuck::cast_slice(&[coordinate_map]),
-      wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-    );
-
-    let uniform_bind_group =
-      device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &self.canvas.canvas_2d_coordinate_bind_group_layout,
-        bindings: &[wgpu::Binding {
-          binding: 0,
-          resource: wgpu::BindingResource::Buffer {
-            buffer: &uniform_buffer,
-            range: 0..std::mem::size_of_val(&coordinate_map)
-              as wgpu::BufferAddress,
-          },
-        }],
-        label: Some("uniform_bind_group"),
-      });
-
-    let mut render_pass =
-      encoder_mut!(self).begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-          attachment: self.texture.texture_view(),
-          resolve_target: None,
-          load_op: wgpu::LoadOp::Clear,
-          store_op: wgpu::StoreOp::Store,
-          clear_color: wgpu::Color::WHITE,
-        }],
-        depth_stencil_attachment: None,
-      });
-    render_pass.set_pipeline(&self.canvas.color_pipeline);
-    render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
-    render_pass.set_index_buffer(&indices_buffer, 0, 0);
-    render_pass.set_bind_group(
-      Canvas::COORDINATE_2D_BINDING_INDEX,
-      &uniform_bind_group,
-      &[],
-    );
-    render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+  fn draw(&mut self) {
+    if self.canvas.cached_data_to_draw() {
+      let encoder = self.take_encoder();
+      self
+        .canvas
+        .draw(&self.texture.create_default_view(), encoder);
+    }
   }
 }
 
@@ -553,22 +544,12 @@ struct CoordinateMapMatrix(euclid::Transform2D<f32, LogicUnit, DeviceUnit>);
 unsafe impl bytemuck::Pod for CoordinateMapMatrix {}
 unsafe impl bytemuck::Zeroable for CoordinateMapMatrix {}
 
-fn finish_frame<T: FrameTextureView>(frame: &mut FrameImpl<'_, T>) {
-  frame.commit();
-
-  frame.canvas.queue.submit(&[frame
-    .encoder
-    .take()
-    .expect("Encoder should always exist before drop!")
-    .finish()]);
-}
-
 impl<'a> Drop for ScreenFrame<'a> {
   #[inline]
-  fn drop(&mut self) { finish_frame(&mut self.0); }
+  fn drop(&mut self) { self.draw(); }
 }
 
 impl<'a> Drop for TextureFrame<'a> {
   #[inline]
-  fn drop(&mut self) { finish_frame(&mut self.0); }
+  fn drop(&mut self) { self.draw(); }
 }
