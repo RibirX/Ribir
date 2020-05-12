@@ -6,7 +6,7 @@ pub use lyon::{
 pub use palette::{named as const_color, Srgba};
 use std::{
   cmp::PartialEq,
-  ops::{Deref, DerefMut, Range},
+  ops::{Deref, DerefMut},
 };
 const TOLERANCE: f32 = 0.5;
 pub type Color = Srgba<u8>;
@@ -141,23 +141,22 @@ impl Rendering2DLayer {
     let mut attrs = vec![];
 
     self.commands.into_iter().for_each(|cmd| {
-      // If coming a different render command, crete a new render command.
       let PathCommand {
         transform,
         path,
         cmd_type,
       } = cmd;
 
-      let rg = Self::tessellate_path(
+      let count = Self::tessellate_path(
         &mut geometry,
         path,
         &cmd_type,
         &mut fill_tess,
         &mut stroke_tess,
       );
-      let rg_attr = RangeAttr {
+      let rg_attr = RenderAttr {
         transform,
-        rg,
+        count,
         style: cmd_type.style().clone(),
       };
       attrs.push(rg_attr);
@@ -172,34 +171,27 @@ impl Rendering2DLayer {
     cmd_type: &PathCommandType,
     fill_tess: &mut FillTessellator,
     stroke_tess: &mut StrokeTessellator,
-  ) -> Range<usize> {
-    let start = buffer.indices.len();
+  ) -> Count {
     match cmd_type {
-      PathCommandType::Fill(_) => {
-        fill_tess
-          .tessellate_path(
-            &path,
-            &FillOptions::tolerance(TOLERANCE),
-            &mut BuffersBuilder::new(&mut buffer, |vertex: FillVertex| {
-              Point::from_untyped(vertex.position())
-            }),
-          )
-          .unwrap();
-      }
-      PathCommandType::Stroke(pen) => {
-        stroke_tess
-          .tessellate_path(
-            &path,
-            &StrokeOptions::tolerance(TOLERANCE)
-              .with_line_width(pen.line_width),
-            &mut BuffersBuilder::new(&mut buffer, |vertex: StrokeVertex| {
-              Point::from_untyped(vertex.position())
-            }),
-          )
-          .unwrap();
-      }
-    };
-    start..buffer.indices.len()
+      PathCommandType::Fill(_) => fill_tess
+        .tessellate_path(
+          &path,
+          &FillOptions::tolerance(TOLERANCE),
+          &mut BuffersBuilder::new(&mut buffer, |vertex: FillVertex| {
+            Point::from_untyped(vertex.position())
+          }),
+        )
+        .unwrap(),
+      PathCommandType::Stroke(pen) => stroke_tess
+        .tessellate_path(
+          &path,
+          &StrokeOptions::tolerance(TOLERANCE).with_line_width(pen.line_width),
+          &mut BuffersBuilder::new(&mut buffer, |vertex: StrokeVertex| {
+            Point::from_untyped(vertex.position())
+          }),
+        )
+        .unwrap(),
+    }
   }
 
   fn add_path(&mut self, path: PathCommand) {
@@ -250,8 +242,8 @@ impl Rendering2DLayer {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RangeAttr {
-  pub(crate) rg: Range<usize>,
+pub(crate) struct RenderAttr {
+  pub(crate) count: Count,
   pub(crate) transform: Transform,
   pub(crate) style: FillStyle,
 }
@@ -259,7 +251,7 @@ pub(crate) struct RangeAttr {
 #[derive(Debug, Clone)]
 pub struct RenderCommand {
   pub(crate) geometry: VertexBuffers<Point, u32>,
-  pub(crate) attrs: Vec<RangeAttr>,
+  pub(crate) attrs: Vec<RenderAttr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -5,7 +5,6 @@ use zerocopy::AsBytes;
 const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;
 
 pub(crate) struct ColorPalettes {
-  fulled_palettes: Vec<Allocation>,
   indexed_colors: std::collections::HashMap<u32, PhysicPoint>,
   current_palette: Palette,
   current_alloc: Allocation,
@@ -18,7 +17,6 @@ impl ColorPalettes {
     Self {
       indexed_colors: Default::default(),
       current_palette: Default::default(),
-      fulled_palettes: Default::default(),
       current_alloc: current_allocation,
     }
   }
@@ -35,14 +33,14 @@ impl ColorPalettes {
       return Some(*pos);
     }
     if !self.current_palette.is_fulled() {
-      return Some(self.add_color(color));
+      let pos = self.add_color(color);
+      self.indexed_colors.insert(color_hash(color), pos);
+      return Some(pos);
     }
 
     // We need create a new palette to store color
     self.save_current_palette_to_texture(texture, device, encoder);
-    let atlas_allocator = Self::allocate_palette(atlas_allocator)?;
-    let fulled = std::mem::replace(&mut self.current_alloc, atlas_allocator);
-    self.fulled_palettes.push(fulled);
+    self.current_alloc = Self::allocate_palette(atlas_allocator)?;
     self.current_palette = Default::default();
 
     Some(self.add_color(color))
@@ -69,7 +67,7 @@ impl ColorPalettes {
         rows_per_image: PALETTE_SIZE,
       },
       wgpu::TextureCopyView {
-        texture: texture,
+        texture,
         mip_level: 0,
         array_layer: 0,
         origin: wgpu::Origin3d {
@@ -118,7 +116,7 @@ struct Palette {
 type PaletteVector = euclid::Vector2D<i32, euclid::UnknownUnit>;
 impl Palette {
   #[inline]
-  fn is_fulled(&self) -> bool { self.size >= PALETTE_SIZE }
+  fn is_fulled(&self) -> bool { self.size >= PALETTE_SIZE ^ 2 }
 
   /// This function not check if the platte fulled, caller should check it
   /// before add.
