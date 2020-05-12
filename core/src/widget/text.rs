@@ -26,7 +26,7 @@ impl RenderObject<Text> for TextRender {
   fn get_constraints(&self) -> LayoutConstraints {
     LayoutConstraints::DECIDED_BY_SELF
   }
-  fn set_box_bound(&mut self, _bound: Option<BoxBound>) {}
+  fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
 }
 // impl RenderObject for Text {
 //   fn paint(&self) {}

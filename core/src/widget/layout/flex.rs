@@ -1,8 +1,7 @@
-// use super::box_constraint::*;
 use super::flex_item::*;
 use super::vec_layouts::*;
 use crate::prelude::*;
-// use crate::render::render_ctx::RenderCtx;
+
 use crate::render::render_tree::*;
 use crate::render::BoxLayout;
 use crate::render::RenderObjectSafety;
@@ -69,7 +68,7 @@ impl FlexContainer {
     let mut v = vec![];
     let mut autos = vec![];
 
-    let bound = self.bound.get_box_bound();
+    let bound = self.bound.get_box_limit();
     ctx.collect_children(id, &mut v);
 
     let mut total_flex = 0;
@@ -86,7 +85,6 @@ impl FlexContainer {
         }
       }
     }
-    // assert!(total_flex != 0 && (constraints & EFFECTED_BY_CHILDREN));
 
     let size = self.size.clone().unwrap();
     let space = size.width - allocated;
@@ -95,7 +93,11 @@ impl FlexContainer {
 
       for child_id in autos {
         let flex = ctx.render_object(child_id).unwrap().flex().unwrap();
-        // child.main_axis(flex * s);
+        ctx.set_box_limit(
+          child_id,
+          Some(self.set_main_to_bound(&bound, s * f64::from(flex))),
+        );
+
         if let (Some(main), Some(cross)) = self.child_layout(child_id, ctx) {
           allocated = allocated + main;
           cross_size = cross_size.max(cross);
@@ -118,7 +120,24 @@ impl FlexContainer {
     let mut v = vec![];
     ctx.collect_children(id, &mut v);
 
-    // todo fix child position
+    let mut x = 0.0;
+    let mut y = 0.0;
+    for idx in 0..v.len() {
+      self.layouts.update_size(
+        idx,
+        ctx
+          .render_object(v[idx])
+          .and_then(|obj| obj.get_size())
+          .unwrap(),
+      );
+      self.layouts.update_position(idx, Position { x: x, y: y });
+      if let (Some(main), Some(cross)) = self.child_axis_size(v[idx], ctx) {
+        match self.axis {
+          Axis::Horizontal => x = x + main,
+          Axis::Vertical => y = y + cross,
+        }
+      }
+    }
   }
 
   fn child_layout<'a>(
@@ -127,9 +146,32 @@ impl FlexContainer {
     ctx: &mut RenderCtx<'a>,
   ) -> (Option<f64>, Option<f64>) {
     ctx.perform_layout(id);
+    return self.child_axis_size(id, ctx);
+  }
+
+  fn child_axis_size<'a>(
+    &self,
+    id: RenderId,
+    ctx: &mut RenderCtx<'a>,
+  ) -> (Option<f64>, Option<f64>) {
     if let Some(child) = ctx.render_object(id) {
       return (self.main_size(child), self.cross_size(child));
     }
     return (None, None);
+  }
+
+  fn set_main_to_bound(&self, bound: &BoxLimit, main_size: f64) -> BoxLimit {
+    let mut res = bound.clone();
+    match self.axis {
+      Axis::Horizontal => {
+        res.min_width = 0.0;
+        res.max_width = main_size;
+      }
+      Axis::Vertical => {
+        res.min_height = 0.0;
+        res.max_height = main_size;
+      }
+    }
+    return res;
   }
 }

@@ -103,6 +103,10 @@ impl<'a> RenderCtx<'a> {
     }
   }
 
+  pub fn set_box_limit(&mut self, id: RenderId, bound: Option<BoxLimit>) {
+    id.clone().get_mut(self.tree).unwrap().set_box_limit(bound);
+  }
+
   fn mark_dirty_down(&mut self, mut id: RenderId) {
     if self.is_layout_dirty(&id) {
       return;

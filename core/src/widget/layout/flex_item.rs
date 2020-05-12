@@ -4,6 +4,8 @@ use crate::render::render_ctx::RenderCtx;
 use crate::render::render_tree::*;
 use crate::render::*;
 use crate::widget::Widget;
+
+// Expand box in the layout container will auto fill the area.
 #[derive(Debug)]
 struct ExpandBox {
   flex: i32,
@@ -11,7 +13,7 @@ struct ExpandBox {
   child: Box<dyn Widget>,
 }
 #[derive(Debug)]
-struct ExpendBoxRender {
+struct ExpandBoxRender {
   flex: i32,
   fit: FlexFit,
 
@@ -19,9 +21,9 @@ struct ExpendBoxRender {
 }
 
 impl RenderWidget for ExpandBox {
-  type RO = ExpendBoxRender;
+  type RO = ExpandBoxRender;
   fn create_render_object(&self) -> Self::RO {
-    ExpendBoxRender {
+    ExpandBoxRender {
       flex: self.flex,
       fit: self.fit,
       size: None,
@@ -44,7 +46,7 @@ impl FlexElem for ExpandBox {
   fn fit(&self) -> Option<FlexFit> { Some(self.fit) }
 }
 
-impl RenderObject<ExpandBox> for ExpendBoxRender {
+impl RenderObject<ExpandBox> for ExpandBoxRender {
   fn update(&mut self, owner: &ExpandBox) {
     self.fit = owner.fit;
     self.flex = owner.flex;
@@ -55,5 +57,5 @@ impl RenderObject<ExpandBox> for ExpendBoxRender {
   fn get_constraints(&self) -> LayoutConstraints {
     return LayoutConstraints::EFFECTED_BY_PARENT;
   }
-  fn set_box_bound(&mut self, _bound: Option<BoxBound>) {}
+  fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
 }

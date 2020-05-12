@@ -41,7 +41,7 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
 
   fn get_size(&self) -> Option<Size>;
   fn get_constraints(&self) -> LayoutConstraints;
-  fn set_box_bound(&mut self, bound: Option<BoxBound>);
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>);
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
@@ -63,7 +63,9 @@ pub trait RenderObjectSafety: Debug {
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
   fn get_size(&self) -> Option<Size>;
   fn get_constraints(&self) -> LayoutConstraints;
-  fn set_box_bound(&mut self, bound: Option<BoxBound>);
+  
+  /// set layout limitation to the render object.
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>);
 }
 
 pub(crate) fn downcast_widget<T: RenderWidget>(
@@ -161,8 +163,8 @@ where
   fn get_constraints(&self) -> LayoutConstraints {
     RenderObject::get_constraints(&self.render)
   }
-  fn set_box_bound(&mut self, bound: Option<BoxBound>) {
-    RenderObject::set_box_bound(&mut self.render, bound)
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>) {
+    RenderObject::set_box_limit(&mut self.render, bound)
   }
 }
 
