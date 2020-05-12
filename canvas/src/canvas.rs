@@ -1,10 +1,10 @@
 use super::{
-  Color, DeviceUnit, LogicUnit, Point, RenderCommand, Rendering2DLayer,
-  Transform,
+  FillStyle, LogicUnit, PhysicPoint, PhysicSize, PhysicUnit, Point, RangeAttr,
+  RenderCommand, Rendering2DLayer, Transform,
 };
 use zerocopy::AsBytes;
 
-use super::texture_atlas::TextureAtlas;
+use super::atlas::TextureAtlas;
 
 pub struct Canvas {
   surface: wgpu::Surface,
@@ -150,6 +150,7 @@ impl<'a> TextureFrame<'a> {
       },
     );
 
+    // Submit what are drawing before capture
     self.submit();
 
     // Note that we're not calling `.await` here.
@@ -308,13 +309,7 @@ impl Canvas {
     self.sc_desc.height = height;
     self.swap_chain =
       self.device.create_swap_chain(&self.surface, &self.sc_desc);
-    self.uniforms = create_uniforms(
-      &self.device,
-      &self.uniform_layout,
-      &coordinate_2d_to_device_matrix(width, height),
-      &self.tex_atlas_sampler,
-      &self.tex_atlas.view,
-    )
+    self.update_uniforms();
   }
 }
 
@@ -391,21 +386,72 @@ impl Canvas {
     self.indices.extend(mapped_indices);
 
     self.texture_infos.reserve(attrs.len());
-    attrs.iter().for_each(|attr| {
-      geometry.indices[attr.rg.clone()]
-        .iter()
-        // map index to new vertices container.
-        .map(|idx| idx + indices_offset)
-        .for_each(|idx| {
-          self.vertices[idx as usize].tex_id = self.texture_infos.len() as u32;
 
-          // Todo: process texture info.
-          // self.texture_infos.push(TextureInfo {
-          //   color: attr.color,
-          //   transform: attr.rg_attr.transform,
-          // });
-        });
-    });
+    // attrs.iter().for_each(
+    //   |RangeAttr {
+    //      transform,
+    //      rg,
+    //      style,
+    //    }| {
+    //     let tex_info = self.store_style_in_atlas(style, encoder);
+    //     if tex_info.is_none() {
+    //       self.draw(view, encoder);
+    //     }
+    //     if let Some((tex_offset, tex_size)) =
+    //       self.store_style_in_atlas(style, encoder)
+    //     {
+    //       self.texture_infos.push(TextureInfo {
+    //         tex_offset,
+    //         tex_size,
+    //         transform: *transform,
+    //       });
+    //     }
+
+    //     // update the tex_idx for new uploaded vertices.
+    //     geometry.indices[rg.clone()]
+    //       .iter()
+    //       // map index to new vertices container.
+    //       .map(|idx| idx + indices_offset)
+    //       .for_each(|idx| {
+    //         self.vertices[idx as usize].tex_id =
+    //           self.texture_infos.len() as u32;
+    //       });
+    //   },
+    // );
+  }
+
+  fn store_style_in_atlas(
+    &mut self,
+    style: &FillStyle,
+    encoder: &mut wgpu::CommandEncoder,
+  ) -> Option<(PhysicPoint, PhysicSize)> {
+    let (pos, size, grown) = match style {
+      FillStyle::Color(c) => {
+        let (pos, grown) =
+          self
+            .tex_atlas
+            .store_color_in_palette(*c, &self.device, encoder)?;
+
+        (pos, PhysicSize::new(1, 1), grown)
+      }
+      _ => todo!("not support in early develop"),
+    };
+
+    if grown {
+      self.update_uniforms();
+    }
+    Some((pos, size))
+  }
+
+  #[inline]
+  fn update_uniforms(&mut self) {
+    self.uniforms = create_uniforms(
+      &self.device,
+      &self.uniform_layout,
+      &coordinate_2d_to_device_matrix(self.sc_desc.width, self.sc_desc.height),
+      &self.tex_atlas_sampler,
+      &self.tex_atlas.view,
+    )
   }
 }
 
@@ -501,7 +547,7 @@ fn create_uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 pub fn coordinate_2d_to_device_matrix(
   width: u32,
   height: u32,
-) -> euclid::Transform2D<f32, LogicUnit, DeviceUnit> {
+) -> euclid::Transform2D<f32, LogicUnit, PhysicUnit> {
   euclid::Transform2D::row_major(
     2. / width as f32,
     0.,
@@ -515,7 +561,7 @@ pub fn coordinate_2d_to_device_matrix(
 fn create_uniforms(
   device: &wgpu::Device,
   layout: &wgpu::BindGroupLayout,
-  canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, DeviceUnit>,
+  canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
   tex_atlas_sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
@@ -587,11 +633,10 @@ struct Vertex {
 
 #[repr(C)]
 struct TextureInfo {
-  // // Texture offset in texture atlas.
-  // offset: euclid::Point2D<u32, DeviceUnit>,
-  // // Texture size.
-  // size: euclid::Size2D<u32, DeviceUnit>,
-  color: Color,
+  // Texture offset in texture atlas.
+  tex_offset: PhysicPoint,
+  // Texture size in texture atlas.
+  tex_size: PhysicSize,
   transform: Transform,
 }
 
