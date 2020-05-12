@@ -1,10 +1,10 @@
 use super::{
-  FillStyle, LogicUnit, PhysicPoint, PhysicSize, PhysicUnit, Point, RangeAttr,
+  FillStyle, LogicUnit, PhysicPoint, PhysicSize, PhysicUnit, Point, RenderAttr,
   RenderCommand, Rendering2DLayer, Transform,
 };
 use zerocopy::AsBytes;
 
-use super::atlas::TextureAtlas;
+use super::atlas::{AtlasStoreErr, TextureAtlas};
 
 pub struct Canvas {
   surface: wgpu::Surface,
@@ -20,10 +20,7 @@ pub struct Canvas {
   tex_atlas: TextureAtlas,
   tex_atlas_sampler: wgpu::Sampler,
 
-  // Data wait to draw
-  vertices: Vec<Vertex>,
-  indices: Vec<u32>,
-  texture_infos: Vec<TextureInfo>,
+  render_data: RenderData,
 }
 
 /// Frame is created by Canvas, and provide a blank box to drawing. It's
@@ -42,25 +39,16 @@ pub trait Frame {
 
   /// Upload a RenderCommand into current frame. RenderCommand is the result
   /// of a layer drawing finished.
-  fn upload_render_command(&mut self, command: &RenderCommand) {
-    self.canvas().upload(command);
-  }
+  fn upload_render_command(&mut self, command: &RenderCommand);
+
+  /// Commit all uploaded render command, but will not present in your texture
+  /// before [submit](Frame::submit) called.
+  fn draw(&mut self);
 
   /// Submits a series of finished command buffers for execution. You needn't
   /// call this method manually, only if you want flush drawing things into gpu
   /// immediately.
-  fn submit(&mut self) {
-    self.draw();
-
-    if let Some(encoder) = self.take_encoder() {
-      self.canvas().queue.submit(&[encoder.finish()]);
-    }
-  }
-
-  fn draw(&mut self);
-
-  /// Return the command encoder.
-  fn take_encoder(&mut self) -> Option<wgpu::CommandEncoder>;
+  fn submit(&mut self);
 
   /// Return the host canvas.
   fn canvas(&mut self) -> &mut Canvas;
@@ -250,9 +238,7 @@ impl Canvas {
       pipeline: pipeline,
       uniform_layout,
       uniforms,
-      vertices: vec![],
-      indices: vec![],
-      texture_infos: vec![],
+      render_data: RenderData::default(),
     }
   }
 
@@ -314,9 +300,6 @@ impl Canvas {
 }
 
 impl Canvas {
-  #[inline]
-  fn has_cached_data_to_draw(&self) -> bool { !self.vertices.is_empty() }
-
   fn draw(
     &mut self,
     view: &wgpu::TextureView,
@@ -324,13 +307,14 @@ impl Canvas {
   ) {
     let device = &self.device;
 
+    self.tex_atlas.flush(device, encoder);
     let vertices_buffer = device.create_buffer_with_data(
-      self.vertices.as_bytes(),
+      self.render_data.vertices.as_bytes(),
       wgpu::BufferUsage::VERTEX,
     );
 
     let indices_buffer = device.create_buffer_with_data(
-      self.indices.as_bytes(),
+      self.render_data.indices.as_bytes(),
       wgpu::BufferUsage::INDEX,
     );
 
@@ -350,13 +334,17 @@ impl Canvas {
       render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
       render_pass.set_index_buffer(&indices_buffer, 0, 0);
       render_pass.set_bind_group(0, &self.uniforms, &[]);
-      render_pass.draw_indexed(0..self.indices.len() as u32, 0, 0..1);
+      render_pass.draw_indexed(
+        0..self.render_data.indices.len() as u32,
+        0,
+        0..1,
+      );
     }
 
-    self.reset_cache();
+    self.render_data.clear();
   }
 
-  fn new_encoder(&mut self) -> wgpu::CommandEncoder {
+  pub(crate) fn new_encoder(&mut self) -> wgpu::CommandEncoder {
     self
       .device
       .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -364,67 +352,11 @@ impl Canvas {
       })
   }
 
-  fn reset_cache(&mut self) {
-    self.vertices.clear();
-    self.indices.clear();
-    self.texture_infos.clear();
-  }
-
-  fn upload(&mut self, command: &RenderCommand) {
-    let vertex_offset = self.vertices.len() as u32;
-    let indices_offset = self.indices.len() as u32;
-
-    let RenderCommand { geometry, attrs } = command;
-    let mapped_vertices = geometry.vertices.iter().map(|pos| Vertex {
-      pos: [pos.x, pos.y],
-      tex_id: 0,
-    });
-    self.vertices.extend(mapped_vertices);
-
-    let mapped_indices =
-      geometry.indices.iter().map(|index| index + vertex_offset);
-    self.indices.extend(mapped_indices);
-
-    self.texture_infos.reserve(attrs.len());
-
-    // attrs.iter().for_each(
-    //   |RangeAttr {
-    //      transform,
-    //      rg,
-    //      style,
-    //    }| {
-    //     let tex_info = self.store_style_in_atlas(style, encoder);
-    //     if tex_info.is_none() {
-    //       self.draw(view, encoder);
-    //     }
-    //     if let Some((tex_offset, tex_size)) =
-    //       self.store_style_in_atlas(style, encoder)
-    //     {
-    //       self.texture_infos.push(TextureInfo {
-    //         tex_offset,
-    //         tex_size,
-    //         transform: *transform,
-    //       });
-    //     }
-
-    //     // update the tex_idx for new uploaded vertices.
-    //     geometry.indices[rg.clone()]
-    //       .iter()
-    //       // map index to new vertices container.
-    //       .map(|idx| idx + indices_offset)
-    //       .for_each(|idx| {
-    //         self.vertices[idx as usize].tex_id =
-    //           self.texture_infos.len() as u32;
-    //       });
-    //   },
-    // );
-  }
-
   fn store_style_in_atlas(
     &mut self,
     style: &FillStyle,
     encoder: &mut wgpu::CommandEncoder,
-  ) -> Option<(PhysicPoint, PhysicSize)> {
+  ) -> Result<(PhysicPoint, PhysicSize), AtlasStoreErr> {
     let (pos, size, grown) = match style {
       FillStyle::Color(c) => {
         let (pos, grown) =
@@ -440,7 +372,7 @@ impl Canvas {
     if grown {
       self.update_uniforms();
     }
-    Some((pos, size))
+    Ok((pos, size))
   }
 
   #[inline]
@@ -543,7 +475,6 @@ fn create_uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 }
 
 /// Convert coordinate system from canvas 2d into wgpu.
-
 pub fn coordinate_2d_to_device_matrix(
   width: u32,
   height: u32,
@@ -594,24 +525,103 @@ fn create_uniforms(
   })
 }
 
+fn mut_encoder<'a>(
+  canvas: &mut Canvas,
+  encoder_store: &'a mut Option<wgpu::CommandEncoder>,
+) -> &'a mut wgpu::CommandEncoder {
+  if encoder_store.is_none() {
+    *encoder_store = Some(canvas.new_encoder())
+  }
+  encoder_store.as_mut().unwrap()
+}
+
+fn upload_render_command(
+  command: &RenderCommand,
+  canvas: &mut Canvas,
+  encoder: &mut wgpu::CommandEncoder,
+  view: &wgpu::TextureView,
+) {
+  let RenderCommand { attrs, geometry } = command;
+
+  let mut v_start = 0;
+  let mut i_start = 0;
+  attrs.iter().for_each(
+    |RenderAttr {
+       transform,
+       count,
+       style,
+     }| {
+      let res = canvas.store_style_in_atlas(style, encoder).or_else(|err| {
+        canvas.draw(view, encoder);
+
+        // Todo: we should not directly clear the texture atlas,
+        // but deallocate all not used texture.
+        canvas.tex_atlas.clear(&canvas.device, &canvas.queue);
+
+        match err {
+          AtlasStoreErr::SpaceNotEnough => {
+            let res = canvas.store_style_in_atlas(style, encoder);
+            debug_assert!(res.is_ok());
+            res
+          }
+          AtlasStoreErr::OverTheMaxLimit => {
+            unimplemented!("draw current attr individual");
+            Err(err)
+          }
+        }
+      });
+
+      let v_end = v_start + count.vertices as usize;
+      let i_end = i_start + count.indices as usize;
+
+      // Error already processed before, needn't care about it.
+      if let Ok((tex_offset, tex_size)) = res {
+        let tex_info = TextureInfo {
+          tex_offset,
+          tex_size,
+          transform: *transform,
+        };
+
+        canvas.render_data.append(
+          &geometry.vertices[v_start..v_end],
+          &geometry.indices[i_start..i_end],
+          tex_info,
+        )
+      }
+
+      v_start = v_end;
+      i_start = i_end;
+    },
+  );
+}
+
 macro frame_delegate_impl($($path: ident).*) {
   #[inline]
   fn canvas(&mut self) -> &mut Canvas { &mut self.canvas }
 
-  #[inline]
-  fn take_encoder(&mut self) -> Option<wgpu::CommandEncoder> {
-    self.encoder.take()
-  }
-
   fn draw(&mut self) {
-    if self.canvas.has_cached_data_to_draw() {
-      if self.encoder.is_none() {
-        self.encoder = Some(self.canvas().new_encoder())
-      }
+    if self.canvas.render_data.has_data() {
+      let encoder = mut_encoder(&mut self.canvas, &mut self.encoder);
+
       self
         .canvas
-        .draw(&self$(.$path)*, self.encoder.as_mut().unwrap());
+        .draw(&self$(.$path)*, encoder);
     }
+  }
+
+  fn submit(&mut self) {
+    self.draw();
+
+    if let Some(encoder) = self.encoder.take() {
+      self.canvas().queue.submit(&[encoder.finish()]);
+    }
+  }
+
+  fn upload_render_command(&mut self, command: &RenderCommand) {
+    let Self {canvas, encoder, ..} = self;
+    let encoder = mut_encoder(canvas, encoder);
+    let view = &self$(.$path)*;
+    upload_render_command(command, canvas, encoder, view);
   }
 }
 
@@ -621,6 +631,16 @@ impl<'a> Frame for ScreenFrame<'a> {
 
 impl<'a> Frame for TextureFrame<'a> {
   frame_delegate_impl!(view);
+}
+
+impl<'a> Drop for ScreenFrame<'a> {
+  #[inline]
+  fn drop(&mut self) { self.submit(); }
+}
+
+impl<'a> Drop for TextureFrame<'a> {
+  #[inline]
+  fn drop(&mut self) { self.submit(); }
 }
 
 /// We use a texture atlas to shader vertices, even if a pure color path.
@@ -662,14 +682,47 @@ impl Vertex {
   }
 }
 
-impl<'a> Drop for ScreenFrame<'a> {
-  #[inline]
-  fn drop(&mut self) { self.submit(); }
+#[derive(Default)]
+struct RenderData {
+  vertices: Vec<Vertex>,
+  indices: Vec<u32>,
+  texture_infos: Vec<TextureInfo>,
 }
 
-impl<'a> Drop for TextureFrame<'a> {
+impl RenderData {
   #[inline]
-  fn drop(&mut self) { self.submit(); }
+  fn has_data(&mut self) -> bool {
+    debug_assert_eq!(self.vertices.is_empty(), self.indices.is_empty());
+    debug_assert_eq!(self.vertices.is_empty(), self.texture_infos.is_empty());
+
+    !self.vertices.is_empty()
+  }
+
+  fn clear(&mut self) {
+    self.vertices.clear();
+    self.indices.clear();
+    self.texture_infos.clear();
+  }
+
+  fn append(
+    &mut self,
+    vertices: &[Point],
+    indices: &[u32],
+    tex_info: TextureInfo,
+  ) {
+    let tex_id = self.texture_infos.len() as u32;
+    self.texture_infos.push(tex_info);
+
+    let vertex_offset = self.vertices.len() as u32;
+    let mapped_indices = indices.iter().map(|index| index + vertex_offset);
+    self.indices.extend(mapped_indices);
+
+    let mapped_vertices = vertices.iter().map(|pos| Vertex {
+      pos: [pos.x, pos.y],
+      tex_id,
+    });
+    self.vertices.extend(mapped_vertices);
+  }
 }
 
 #[cfg(test)]
