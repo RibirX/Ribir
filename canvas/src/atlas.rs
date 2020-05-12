@@ -79,6 +79,9 @@ impl TextureAtlas {
       .ok_or_else(|| AtlasStoreErr::SpaceNotEnough)
   }
 
+  #[inline]
+  pub(crate) fn size(&self) -> PhysicSize { self.size }
+
   /// Flush all data to the texture and ready to commit to gpu.
   /// Call this function before commit drawing to gpu.
   pub(crate) fn flush(
