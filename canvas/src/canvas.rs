@@ -1,10 +1,17 @@
 use super::{
   FillStyle, LogicUnit, PhysicPoint, PhysicSize, PhysicUnit, Point, RenderAttr,
-  RenderCommand, Rendering2DLayer, Transform,
+  RenderCommand, Rendering2DLayer,
 };
 use zerocopy::AsBytes;
 
 use super::atlas::{AtlasStoreErr, TextureAtlas};
+
+enum CanvasBindings {
+  GlobalUniform = 0,
+  Primitives = 1,
+  TextureAtlas = 2,
+  TextureAtlasSampler = 3,
+}
 
 pub struct Canvas {
   surface: wgpu::Surface,
@@ -13,6 +20,7 @@ pub struct Canvas {
   swap_chain: wgpu::SwapChain,
   sc_desc: wgpu::SwapChainDescriptor,
   pipeline: wgpu::RenderPipeline,
+  tex_infos_layout: wgpu::BindGroupLayout,
   uniform_layout: wgpu::BindGroupLayout,
   uniforms: wgpu::BindGroup,
 
@@ -202,9 +210,12 @@ impl Canvas {
     };
 
     let swap_chain = device.create_swap_chain(&surface, &sc_desc);
-    let uniform_layout = create_uniform_layout(&device);
-    let pipeline =
-      create_render_pipeline(&device, &sc_desc, &[&uniform_layout]);
+    let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
+    let pipeline = create_render_pipeline(
+      &device,
+      &sc_desc,
+      &[&uniform_layout, &tex_infos_layout],
+    );
 
     let tex_atlas = TextureAtlas::new(&device);
     let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -222,6 +233,7 @@ impl Canvas {
     let uniforms = create_uniforms(
       &device,
       &uniform_layout,
+      tex_atlas.size(),
       &coordinate_2d_to_device_matrix(width, height),
       &tex_atlas_sampler,
       &tex_atlas.view,
@@ -237,6 +249,7 @@ impl Canvas {
       sc_desc,
       pipeline: pipeline,
       uniform_layout,
+      tex_infos_layout,
       uniforms,
       render_data: RenderData::default(),
     }
@@ -318,6 +331,7 @@ impl Canvas {
       wgpu::BufferUsage::INDEX,
     );
 
+    let tex_infos_bind_group = self.create_primitives_bind_group();
     {
       let mut render_pass =
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -334,6 +348,8 @@ impl Canvas {
       render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
       render_pass.set_index_buffer(&indices_buffer, 0, 0);
       render_pass.set_bind_group(0, &self.uniforms, &[]);
+      render_pass.set_bind_group(1, &tex_infos_bind_group, &[]);
+
       render_pass.draw_indexed(
         0..self.render_data.indices.len() as u32,
         0,
@@ -380,17 +396,38 @@ impl Canvas {
     self.uniforms = create_uniforms(
       &self.device,
       &self.uniform_layout,
+      self.tex_atlas.size(),
       &coordinate_2d_to_device_matrix(self.sc_desc.width, self.sc_desc.height),
       &self.tex_atlas_sampler,
       &self.tex_atlas.view,
     )
+  }
+
+  fn create_primitives_bind_group(&mut self) -> wgpu::BindGroup {
+    let primitives = &self.render_data.primitives;
+    let primitives_buffer = self.device.create_buffer_with_data(
+      primitives.as_bytes(),
+      wgpu::BufferUsage::STORAGE_READ,
+    );
+    let size = primitives.len() * std::mem::size_of::<Primitive>();
+    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+      layout: &self.tex_infos_layout,
+      bindings: &[wgpu::Binding {
+        binding: CanvasBindings::Primitives as u32,
+        resource: wgpu::BindingResource::Buffer {
+          buffer: &primitives_buffer,
+          range: 0..size as wgpu::BufferAddress,
+        },
+      }],
+      label: Some("texture infos bind group"),
+    })
   }
 }
 
 fn create_render_pipeline(
   device: &wgpu::Device,
   sc_desc: &wgpu::SwapChainDescriptor,
-  bind_group_layouts: &[&wgpu::BindGroupLayout],
+  bind_group_layouts: &[&wgpu::BindGroupLayout; 2],
 ) -> wgpu::RenderPipeline {
   let render_pipeline_layout =
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -447,31 +484,46 @@ fn create_shaders(
   (vs_module, fs_module)
 }
 
-fn create_uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-  device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    bindings: &[
-      wgpu::BindGroupLayoutEntry {
-        binding: 0,
-        visibility: wgpu::ShaderStage::VERTEX,
-        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-      },
-      wgpu::BindGroupLayoutEntry {
-        binding: 1,
-        visibility: wgpu::ShaderStage::FRAGMENT,
-        ty: wgpu::BindingType::Sampler { comparison: false },
-      },
-      wgpu::BindGroupLayoutEntry {
-        binding: 2,
-        visibility: wgpu::ShaderStage::FRAGMENT,
-        ty: wgpu::BindingType::SampledTexture {
-          dimension: wgpu::TextureViewDimension::D2,
-          component_type: wgpu::TextureComponentType::Float,
-          multisampled: false,
+fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
+  let stable =
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      bindings: &[
+        wgpu::BindGroupLayoutEntry {
+          binding: CanvasBindings::GlobalUniform as u32,
+          visibility: wgpu::ShaderStage::VERTEX,
+          ty: wgpu::BindingType::UniformBuffer { dynamic: false },
         },
-      },
-    ],
-    label: Some("canvas_2d_coordinate_bind_group_layout"),
-  })
+        wgpu::BindGroupLayoutEntry {
+          binding: CanvasBindings::TextureAtlas as u32,
+          visibility: wgpu::ShaderStage::FRAGMENT,
+          ty: wgpu::BindingType::SampledTexture {
+            dimension: wgpu::TextureViewDimension::D2,
+            component_type: wgpu::TextureComponentType::Float,
+            multisampled: false,
+          },
+        },
+        wgpu::BindGroupLayoutEntry {
+          binding: CanvasBindings::TextureAtlasSampler as u32,
+          visibility: wgpu::ShaderStage::FRAGMENT,
+          ty: wgpu::BindingType::Sampler { comparison: false },
+        },
+      ],
+      label: Some("uniforms stable layout"),
+    });
+
+  let dynamic =
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      bindings: &[wgpu::BindGroupLayoutEntry {
+        binding: CanvasBindings::Primitives as u32,
+        visibility: wgpu::ShaderStage::VERTEX,
+        ty: wgpu::BindingType::StorageBuffer {
+          dynamic: false,
+          readonly: true,
+        },
+      }],
+      label: Some("uniform layout for texture infos (changed every draw)"),
+    });
+  [stable, dynamic]
 }
 
 /// Convert coordinate system from canvas 2d into wgpu.
@@ -492,33 +544,36 @@ pub fn coordinate_2d_to_device_matrix(
 fn create_uniforms(
   device: &wgpu::Device,
   layout: &wgpu::BindGroupLayout,
+  atlas_size: PhysicSize,
   canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
   tex_atlas_sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
+  let uniform = GlobalUniform {
+    texture_atlas_size: [atlas_size.width, atlas_size.height],
+    canvas_coordinate_map: canvas_2d_to_device_matrix.to_row_major_array(),
+  };
   let uniform_buffer = device.create_buffer_with_data(
-    &canvas_2d_to_device_matrix.to_row_major_array().as_bytes(),
+    &uniform.as_bytes(),
     wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
   );
-
   device.create_bind_group(&wgpu::BindGroupDescriptor {
     layout: layout,
     bindings: &[
       wgpu::Binding {
-        binding: 0,
+        binding: CanvasBindings::GlobalUniform as u32,
         resource: wgpu::BindingResource::Buffer {
           buffer: &uniform_buffer,
-          range: 0..std::mem::size_of_val(&canvas_2d_to_device_matrix)
-            as wgpu::BufferAddress,
+          range: 0..std::mem::size_of::<GlobalUniform>() as wgpu::BufferAddress,
         },
       },
       wgpu::Binding {
-        binding: 1,
-        resource: wgpu::BindingResource::Sampler(tex_atlas_sampler),
+        binding: CanvasBindings::TextureAtlas as u32,
+        resource: wgpu::BindingResource::TextureView(tex_atlas),
       },
       wgpu::Binding {
-        binding: 2,
-        resource: wgpu::BindingResource::TextureView(tex_atlas),
+        binding: CanvasBindings::TextureAtlasSampler as u32,
+        resource: wgpu::BindingResource::Sampler(tex_atlas_sampler),
       },
     ],
     label: Some("uniform_bind_group"),
@@ -576,10 +631,10 @@ fn upload_render_command(
 
       // Error already processed before, needn't care about it.
       if let Ok((tex_offset, tex_size)) = res {
-        let tex_info = TextureInfo {
-          tex_offset,
-          tex_size,
-          transform: *transform,
+        let tex_info = Primitive {
+          tex_offset: [tex_offset.x, tex_offset.y],
+          tex_size: [tex_size.width, tex_size.height],
+          transform: transform.to_row_major_array(),
         };
 
         canvas.render_data.append(
@@ -652,12 +707,20 @@ struct Vertex {
 }
 
 #[repr(C)]
-struct TextureInfo {
+#[derive(AsBytes)]
+struct GlobalUniform {
+  canvas_coordinate_map: [f32; 6],
+  texture_atlas_size: [u32; 2],
+}
+
+#[repr(C)]
+#[derive(AsBytes)]
+struct Primitive {
   // Texture offset in texture atlas.
-  tex_offset: PhysicPoint,
+  tex_offset: [u32; 2],
   // Texture size in texture atlas.
-  tex_size: PhysicSize,
-  transform: Transform,
+  tex_size: [u32; 2],
+  transform: [f32; 6],
 }
 
 impl Vertex {
@@ -686,14 +749,14 @@ impl Vertex {
 struct RenderData {
   vertices: Vec<Vertex>,
   indices: Vec<u32>,
-  texture_infos: Vec<TextureInfo>,
+  primitives: Vec<Primitive>,
 }
 
 impl RenderData {
   #[inline]
   fn has_data(&mut self) -> bool {
     debug_assert_eq!(self.vertices.is_empty(), self.indices.is_empty());
-    debug_assert_eq!(self.vertices.is_empty(), self.texture_infos.is_empty());
+    debug_assert_eq!(self.vertices.is_empty(), self.primitives.is_empty());
 
     !self.vertices.is_empty()
   }
@@ -701,17 +764,17 @@ impl RenderData {
   fn clear(&mut self) {
     self.vertices.clear();
     self.indices.clear();
-    self.texture_infos.clear();
+    self.primitives.clear();
   }
 
   fn append(
     &mut self,
     vertices: &[Point],
     indices: &[u32],
-    tex_info: TextureInfo,
+    tex_info: Primitive,
   ) {
-    let tex_id = self.texture_infos.len() as u32;
-    self.texture_infos.push(tex_info);
+    let tex_id = self.primitives.len() as u32;
+    self.primitives.push(tex_info);
 
     let vertex_offset = self.vertices.len() as u32;
     let mapped_indices = indices.iter().map(|index| index + vertex_offset);
