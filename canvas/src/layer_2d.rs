@@ -10,6 +10,7 @@ use std::{
 };
 const TOLERANCE: f32 = 0.5;
 pub type Color = Srgba<u8>;
+
 const DEFAULT_STATE: State = State {
   transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
   stroke_pen: StrokePen {
