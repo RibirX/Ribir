@@ -88,6 +88,7 @@
           "test",
           "--no-run",
           "--test=canvas_gl",
+          "--all-features",
           "--package=canvas"
         ],
         "filter": {

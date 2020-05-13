@@ -1,6 +1,6 @@
-use crate::{Point, Transform};
+use crate::{Point, Rect, Size, Transform};
 pub use lyon::{
-  path::{builder::PathBuilder, Path, Winding},
+  path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
 };
 pub use palette::{named as const_color, Srgba};
@@ -32,6 +32,7 @@ const DEFAULT_STATE: State = State {
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
 /// bottom edge of the canvas.
+#[derive(Debug, Clone)]
 pub struct Rendering2DLayer {
   state_stack: Vec<State>,
   commands: Vec<PathCommand>,
@@ -116,7 +117,7 @@ impl Rendering2DLayer {
       transform: state.transform,
       cmd_type: PathCommandType::Stroke(state.stroke_pen.clone()),
     };
-    self.add_path(path);
+    self.add_cmd(path);
   }
 
   /// Use current brush fill the interior of the `path`.
@@ -127,7 +128,7 @@ impl Rendering2DLayer {
       transform: state.transform,
       cmd_type: PathCommandType::Fill(state.fill_brush.clone()),
     };
-    self.add_path(path);
+    self.add_cmd(path);
   }
 
   /// All drawing of this layer has finished, and convert the layer to an
@@ -138,9 +139,10 @@ impl Rendering2DLayer {
     let mut fill_tess = FillTessellator::new();
 
     let mut geometry = VertexBuffers::new();
-    let mut attrs = vec![];
+    let mut attrs: Vec<RenderAttr> = vec![];
 
     self.commands.into_iter().for_each(|cmd| {
+      let bounding_rect_for_style = cmd.bounding_rect();
       let PathCommand {
         transform,
         path,
@@ -154,12 +156,26 @@ impl Rendering2DLayer {
         &mut fill_tess,
         &mut stroke_tess,
       );
-      let rg_attr = RenderAttr {
+
+      let style = cmd_type.style();
+
+      if let Some(last) = attrs.last_mut() {
+        if last.bounding_rect_for_style == bounding_rect_for_style
+          && &last.style == style
+          && last.transform == transform
+        {
+          last.count.vertices += count.vertices;
+          last.count.indices += count.indices;
+          return;
+        }
+      }
+
+      attrs.push(RenderAttr {
         transform,
+        bounding_rect_for_style,
         count,
-        style: cmd_type.style().clone(),
-      };
-      attrs.push(rg_attr);
+        style: style.clone(),
+      });
     });
 
     RenderCommand { geometry, attrs }
@@ -194,37 +210,8 @@ impl Rendering2DLayer {
     }
   }
 
-  fn add_path(&mut self, path: PathCommand) {
-    // Try to merge path
-    if let Some(last) = self.commands.last_mut() {
-      fn style_color(style: &FillStyle) -> Option<&Color> {
-        if let FillStyle::Color(c) = style {
-          Some(c)
-        } else {
-          None
-        }
-      }
-      fn key_info(cmd_type: &PathCommandType) -> (Option<&Color>, f32) {
-        match cmd_type {
-          PathCommandType::Stroke(pen) => {
-            (style_color(&pen.style), pen.line_width)
-          }
-          PathCommandType::Fill(brush) => (style_color(&brush.style), 1.),
-        }
-      }
-      if last.transform == path.transform {
-        let (c1, lw1) = key_info(&last.cmd_type);
-        let (c2, lw2) = key_info(&path.cmd_type);
-        if c1.is_some() && c1 == c2 && (lw1 - lw2).abs() < f32::EPSILON {
-          let mut builder = Path::builder();
-          builder.concatenate(&[last.path.as_slice(), path.path.as_slice()]);
-          last.path = builder.build();
-          return;
-        }
-      }
-    }
-    self.commands.push(path)
-  }
+  #[inline]
+  fn add_cmd(&mut self, path: PathCommand) { self.commands.push(path) }
 
   fn current_state(&self) -> &State {
     self
@@ -246,6 +233,7 @@ pub(crate) struct RenderAttr {
   pub(crate) count: Count,
   pub(crate) transform: Transform,
   pub(crate) style: FillStyle,
+  pub(crate) bounding_rect_for_style: Rect,
 }
 
 #[derive(Debug, Clone)]
@@ -271,7 +259,7 @@ struct StrokePen {
 struct Brush {
   style: FillStyle,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct State {
   transform: Transform,
   stroke_pen: StrokePen,
@@ -293,10 +281,24 @@ impl PathCommandType {
   }
 }
 
+#[derive(Debug, Clone)]
 struct PathCommand {
   path: Path,
   transform: Transform,
   cmd_type: PathCommandType,
+}
+
+impl PathCommand {
+  fn bounding_rect(&self) -> Rect {
+    if let FillStyle::Color(_) = self.cmd_type.style() {
+      // Pure color's texture is a one pixel texture, and always use repeat
+      // pattern, so zero min is ok, no matter what really bounding min it is.
+      Rect::new(Point::new(0., 0.), Size::new(1., 1.))
+    } else {
+      let rect = lyon::algorithms::aabb::bounding_rect(self.path.iter());
+      Rect::from_untyped(&rect)
+    }
+  }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -375,22 +377,49 @@ mod test {
     // The stroke path both style and line width same should be merge.
     layer.stroke_path(sample_path.clone());
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.commands.len(), 1);
+    assert_eq!(layer.clone().finish().attrs.len(), 1);
 
-    // Different line width pen can't be merged.
+    // Different line width with same color pen can be merged.
     layer.set_line_width(2.);
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.commands.len(), 2);
+    assert_eq!(layer.clone().finish().attrs.len(), 1);
 
-    // Stroke and fill can't be merged.
+    // Different color can't be merged.
     layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
     layer.fill_path(sample_path.clone());
-    assert_eq!(layer.commands.len(), 3);
+    assert_eq!(layer.clone().finish().attrs.len(), 2);
 
     // Different type style can't be merged
     layer.set_brush_style(FillStyle::Image);
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
-    assert_eq!(layer.commands.len(), 5);
+    assert_eq!(layer.clone().finish().attrs.len(), 4);
+  }
+
+  #[test]
+  fn bounding_base() {
+    let layer = Rendering2DLayer::new();
+    let mut path = Path::builder();
+    path.add_rectangle(
+      &lyon::geom::rect(100., 100., 50., 50.),
+      Winding::Positive,
+    );
+    let path = path.build();
+
+    // color bounding min always zero.
+    let mut l1 = layer.clone();
+    l1.stroke_path(path.clone());
+    assert_eq!(
+      l1.finish().attrs[0].bounding_rect_for_style.min(),
+      Point::new(0., 0.)
+    );
+
+    let mut l2 = layer;
+    l2.set_stroke_pen_style(FillStyle::Image);
+    l2.stroke_path(path.clone());
+    assert_eq!(
+      l2.finish().attrs[0].bounding_rect_for_style.min(),
+      Point::new(100., 100.)
+    );
   }
 }
