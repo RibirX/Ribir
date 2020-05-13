@@ -1,6 +1,6 @@
 use super::{
-  FillStyle, LogicUnit, PhysicPoint, PhysicSize, PhysicUnit, Point, RenderAttr,
-  RenderCommand, Rendering2DLayer,
+  FillStyle, LogicUnit, PhysicPoint, PhysicRect, PhysicSize, PhysicUnit, Point,
+  RenderAttr, RenderCommand, Rendering2DLayer,
 };
 use zerocopy::AsBytes;
 
@@ -110,66 +110,22 @@ impl<'a> TextureFrame<'a> {
     &mut self,
     writer: W,
   ) -> Result<(), &'static str> {
-    let device = &self.canvas.device;
-    let sc_desc = &self.canvas.sc_desc;
-    let width = sc_desc.width;
-    let height = sc_desc.height;
-    let size = width as u64 * height as u64 * std::mem::size_of::<u32>() as u64;
-
-    // The output buffer lets us retrieve the data as an array
-    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-      size,
-      usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
-      label: None,
-    });
-
-    // Copy the data from the texture to the buffer
-    if self.encoder.is_none() {
-      self.encoder = Some(self.canvas.new_encoder())
-    }
-    let encoder = self.encoder.as_mut().unwrap();
-    self.canvas.draw(&self.view, encoder);
-
-    encoder.copy_texture_to_buffer(
-      wgpu::TextureCopyView {
-        texture: &self.texture,
-        mip_level: 0,
-        array_layer: 0,
-        origin: wgpu::Origin3d::ZERO,
-      },
-      wgpu::BufferCopyView {
-        buffer: &output_buffer,
-        offset: 0,
-        bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
-        rows_per_image: 0,
-      },
-      wgpu::Extent3d {
-        width,
-        height,
-        depth: 1,
-      },
-    );
-
-    // Submit what are drawing before capture
     self.submit();
 
-    // Note that we're not calling `.await` here.
-    let buffer_future = output_buffer.map_read(0, size);
-
-    // Poll the device in a blocking manner so that our future resolves.
-    self.canvas.device.poll(wgpu::Maintain::Wait);
-
-    let mapping = buffer_future.await.map_err(|_| "Async buffer error")?;
-    let mut png_encoder = png::Encoder::new(writer, width, height);
-    png_encoder.set_depth(png::BitDepth::Eight);
-    png_encoder.set_color(png::ColorType::RGBA);
-    png_encoder
-      .write_header()
-      .unwrap()
-      .write_image_data(mapping.as_slice())
-      .unwrap();
-
-    Ok(())
+    let Canvas {
+      device,
+      queue,
+      sc_desc,
+      ..
+    } = self.canvas;
+    texture_encode_png(
+      &self.texture,
+      device,
+      queue,
+      PhysicRect::from_size(PhysicSize::new(sc_desc.width, sc_desc.height)),
+      writer,
+    )
+    .await
   }
 
   /// Save the texture frame as a PNG image, store at the `path` location.
@@ -314,6 +270,96 @@ impl Canvas {
       self.device.create_swap_chain(&self.surface, &self.sc_desc);
     self.update_uniforms();
   }
+
+  #[cfg(debug_assertions)]
+  pub fn log_texture_atlas(&self) {
+    let Canvas {
+      device,
+      queue,
+      sc_desc,
+      tex_atlas,
+      ..
+    } = self;
+
+    let pkg_root = env!("CARGO_MANIFEST_DIR");
+    let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
+
+    let atlas = texture_encode_png(
+      &tex_atlas.texture,
+      device,
+      queue,
+      PhysicRect::from_size(PhysicSize::new(sc_desc.width, sc_desc.height)),
+      std::fs::File::create(atlas_capture).unwrap(),
+    );
+
+    let _r = futures::executor::block_on(atlas);
+  }
+}
+
+pub(crate) async fn texture_encode_png<W: std::io::Write>(
+  texture: &wgpu::Texture,
+  device: &wgpu::Device,
+  queue: &wgpu::Queue,
+  rect: PhysicRect,
+  writer: W,
+) -> Result<(), &'static str> {
+  let PhysicSize { width, height, .. } = rect.size;
+  let size = width as u64 * height as u64 * std::mem::size_of::<u32>() as u64;
+
+  // The output buffer lets us retrieve the data as an array
+  let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+    size,
+    usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
+    label: None,
+  });
+
+  let mut encoder =
+    device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("Encoder for encoding texture as png"),
+    });
+  encoder.copy_texture_to_buffer(
+    wgpu::TextureCopyView {
+      texture,
+      mip_level: 0,
+      array_layer: 0,
+      origin: wgpu::Origin3d {
+        x: rect.min_x(),
+        y: rect.min_y(),
+        z: 0,
+      },
+    },
+    wgpu::BufferCopyView {
+      buffer: &output_buffer,
+      offset: 0,
+      bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
+      rows_per_image: 0,
+    },
+    wgpu::Extent3d {
+      width: width,
+      height: height,
+      depth: 1,
+    },
+  );
+
+  queue.submit(&[encoder.finish()]);
+
+  // Note that we're not calling `.await` here.
+  let buffer_future = output_buffer.map_read(0, size);
+
+  // Poll the device in a blocking manner so that our future resolves.
+  device.poll(wgpu::Maintain::Wait);
+
+  let mapping = buffer_future.await.map_err(|_| "Async buffer error")?;
+  let mut png_encoder = png::Encoder::new(writer, width, height);
+  png_encoder.set_depth(png::BitDepth::Eight);
+  png_encoder.set_color(png::ColorType::RGBA);
+  png_encoder
+    .write_header()
+    .unwrap()
+    .write_image_data(mapping.as_slice())
+    .unwrap();
+
+  Ok(())
 }
 
 impl Canvas {

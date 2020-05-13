@@ -1,0 +1,1 @@
+Empty folder to store debug info, but ignored by git.
