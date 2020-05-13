@@ -6,11 +6,14 @@ use zerocopy::AsBytes;
 
 use super::atlas::{AtlasStoreErr, TextureAtlas};
 
-enum CanvasBindings {
+enum PrimaryBindings {
   GlobalUniform = 0,
-  Primitives = 1,
-  TextureAtlas = 2,
-  TextureAtlasSampler = 3,
+  TextureAtlas = 1,
+  TextureAtlasSampler = 2,
+}
+
+enum SecondBindings {
+  Primitive = 0,
 }
 
 pub struct Canvas {
@@ -20,7 +23,7 @@ pub struct Canvas {
   swap_chain: wgpu::SwapChain,
   sc_desc: wgpu::SwapChainDescriptor,
   pipeline: wgpu::RenderPipeline,
-  tex_infos_layout: wgpu::BindGroupLayout,
+  primitives_layout: wgpu::BindGroupLayout,
   uniform_layout: wgpu::BindGroupLayout,
   uniforms: wgpu::BindGroup,
 
@@ -104,7 +107,7 @@ pub struct TextureFrame<'a> {
 impl<'a> TextureFrame<'a> {
   /// PNG encoded the texture frame then write by `writer`.
   pub async fn png_encode<W: std::io::Write>(
-    mut self,
+    &mut self,
     writer: W,
   ) -> Result<(), &'static str> {
     let device = &self.canvas.device;
@@ -126,6 +129,7 @@ impl<'a> TextureFrame<'a> {
     }
     let encoder = self.encoder.as_mut().unwrap();
     self.canvas.draw(&self.view, encoder);
+
     encoder.copy_texture_to_buffer(
       wgpu::TextureCopyView {
         texture: &self.texture,
@@ -169,7 +173,7 @@ impl<'a> TextureFrame<'a> {
   }
 
   /// Save the texture frame as a PNG image, store at the `path` location.
-  pub async fn save_as_png(self, path: &str) -> Result<(), &'static str> {
+  pub async fn save_as_png(&mut self, path: &str) -> Result<(), &'static str> {
     self.png_encode(std::fs::File::create(path).unwrap()).await
   }
 }
@@ -249,7 +253,7 @@ impl Canvas {
       sc_desc,
       pipeline: pipeline,
       uniform_layout,
-      tex_infos_layout,
+      primitives_layout: tex_infos_layout,
       uniforms,
       render_data: RenderData::default(),
     }
@@ -411,9 +415,9 @@ impl Canvas {
     );
     let size = primitives.len() * std::mem::size_of::<Primitive>();
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-      layout: &self.tex_infos_layout,
+      layout: &self.primitives_layout,
       bindings: &[wgpu::Binding {
-        binding: CanvasBindings::Primitives as u32,
+        binding: SecondBindings::Primitive as u32,
         resource: wgpu::BindingResource::Buffer {
           buffer: &primitives_buffer,
           range: 0..size as wgpu::BufferAddress,
@@ -489,12 +493,12 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
       bindings: &[
         wgpu::BindGroupLayoutEntry {
-          binding: CanvasBindings::GlobalUniform as u32,
+          binding: PrimaryBindings::GlobalUniform as u32,
           visibility: wgpu::ShaderStage::VERTEX,
           ty: wgpu::BindingType::UniformBuffer { dynamic: false },
         },
         wgpu::BindGroupLayoutEntry {
-          binding: CanvasBindings::TextureAtlas as u32,
+          binding: PrimaryBindings::TextureAtlas as u32,
           visibility: wgpu::ShaderStage::FRAGMENT,
           ty: wgpu::BindingType::SampledTexture {
             dimension: wgpu::TextureViewDimension::D2,
@@ -503,7 +507,7 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
           },
         },
         wgpu::BindGroupLayoutEntry {
-          binding: CanvasBindings::TextureAtlasSampler as u32,
+          binding: PrimaryBindings::TextureAtlasSampler as u32,
           visibility: wgpu::ShaderStage::FRAGMENT,
           ty: wgpu::BindingType::Sampler { comparison: false },
         },
@@ -514,7 +518,7 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   let dynamic =
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
       bindings: &[wgpu::BindGroupLayoutEntry {
-        binding: CanvasBindings::Primitives as u32,
+        binding: SecondBindings::Primitive as u32,
         visibility: wgpu::ShaderStage::VERTEX,
         ty: wgpu::BindingType::StorageBuffer {
           dynamic: false,
@@ -551,7 +555,7 @@ fn create_uniforms(
 ) -> wgpu::BindGroup {
   let uniform = GlobalUniform {
     texture_atlas_size: [atlas_size.width, atlas_size.height],
-    canvas_coordinate_map: canvas_2d_to_device_matrix.to_row_major_array(),
+    canvas_coordinate_map: canvas_2d_to_device_matrix.to_row_arrays(),
   };
   let uniform_buffer = device.create_buffer_with_data(
     &uniform.as_bytes(),
@@ -561,18 +565,18 @@ fn create_uniforms(
     layout: layout,
     bindings: &[
       wgpu::Binding {
-        binding: CanvasBindings::GlobalUniform as u32,
+        binding: PrimaryBindings::GlobalUniform as u32,
         resource: wgpu::BindingResource::Buffer {
           buffer: &uniform_buffer,
           range: 0..std::mem::size_of::<GlobalUniform>() as wgpu::BufferAddress,
         },
       },
       wgpu::Binding {
-        binding: CanvasBindings::TextureAtlas as u32,
+        binding: PrimaryBindings::TextureAtlas as u32,
         resource: wgpu::BindingResource::TextureView(tex_atlas),
       },
       wgpu::Binding {
-        binding: CanvasBindings::TextureAtlasSampler as u32,
+        binding: PrimaryBindings::TextureAtlasSampler as u32,
         resource: wgpu::BindingResource::Sampler(tex_atlas_sampler),
       },
     ],
@@ -605,6 +609,7 @@ fn upload_render_command(
        transform,
        count,
        style,
+       bounding_rect_for_style,
      }| {
       let res = canvas.store_style_in_atlas(style, encoder).or_else(|err| {
         canvas.draw(view, encoder);
@@ -634,7 +639,9 @@ fn upload_render_command(
         let tex_info = Primitive {
           tex_offset: [tex_offset.x, tex_offset.y],
           tex_size: [tex_size.width, tex_size.height],
-          transform: transform.to_row_major_array(),
+          transform: transform.to_row_arrays(),
+          bound_min: bounding_rect_for_style.min().to_array(),
+          bounding_size: bounding_rect_for_style.size.to_array(),
         };
 
         canvas.render_data.append(
@@ -707,9 +714,9 @@ struct Vertex {
 }
 
 #[repr(C)]
-#[derive(AsBytes)]
+#[derive(Copy, Clone, AsBytes)]
 struct GlobalUniform {
-  canvas_coordinate_map: [f32; 6],
+  canvas_coordinate_map: [[f32; 2]; 3],
   texture_atlas_size: [u32; 2],
 }
 
@@ -720,7 +727,9 @@ struct Primitive {
   tex_offset: [u32; 2],
   // Texture size in texture atlas.
   tex_size: [u32; 2],
-  transform: [f32; 6],
+  bound_min: [f32; 2],
+  bounding_size: [f32; 2],
+  transform: [[f32; 2]; 3],
 }
 
 impl Vertex {
