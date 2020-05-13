@@ -16,6 +16,9 @@ png = "0.16.3"
 guillotiere ="0.5.1"
 zerocopy = "0.3"
 
+[target.'cfg(debug_assertions)'.dependencies]
+futures="0.3.5"
+
 [dev-dependencies]
 winit="0.22.1"
 futures="0.3.4"

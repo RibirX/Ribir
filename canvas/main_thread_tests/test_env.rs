@@ -16,9 +16,17 @@ pub fn new_canvas(width: u32, height: u32) -> (Canvas, Window, EventLoop<()>) {
   (canvas, window, event_loop)
 }
 
-/// check if the frame is equal to the image at `path`;
-pub fn assert_frame_eq(frame: TextureFrame, path: &str) {
-  let file_data = std::fs::read(path).unwrap();
+#[allow(dead_code)]
+pub fn write_frame_to(mut frame: TextureFrame, path: &str) {
+  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
+  let _ = block_on(frame.save_as_png(&abs_path));
+}
+
+/// check if the frame is equal to the image at `path`, the path relative the
+/// package root;
+pub fn assert_frame_eq(mut frame: TextureFrame, path: &str) {
+  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
+  let file_data = std::fs::read(abs_path).unwrap();
 
   let mut frame_data = vec![];
   let cursor = std::io::Cursor::new(&mut frame_data);
