@@ -98,7 +98,7 @@ pub struct ScreenFrame<'a> {
 ///   frame.compose_2d_layer(layer);
 ///   futures::executor::block_on(
 ///     frame
-///     .png_encode(std::fs::File::create(file_path).unwrap()),
+///     .to_png(std::fs::File::create(file_path).unwrap()),
 ///   ).unwrap();
 /// }
 /// ```
