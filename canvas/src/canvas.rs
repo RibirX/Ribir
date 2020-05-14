@@ -22,7 +22,7 @@ pub trait Frame {
   /// back to the canvas.
   fn new_2d_layer(&self) -> Rendering2DLayer;
   /// Compose a layer into the canvas.
-  fn compose_2d_layer(&mut self, other_layer: Rendering2DLayer);
+  fn compose_2d_layer(&mut self, layer: Rendering2DLayer);
   /// Compose a layer buffer into current drawing. Layer buffer is the result
   /// of a layer drawing finished.
   fn compose_2d_layer_buffer(&mut self, commands: &[RenderCommand]);
