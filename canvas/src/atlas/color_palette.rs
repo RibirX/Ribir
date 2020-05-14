@@ -101,9 +101,9 @@ fn color_hash(color: Color) -> u32 {
 }
 
 #[inline]
-fn color_as_brga(color: Color) -> u32 {
+fn color_as_bgra(color: Color) -> u32 {
   unsafe {
-    std::mem::transmute_copy(&[color.blue, color.red, color.green, color.alpha])
+    std::mem::transmute_copy(&[color.blue, color.green, color.red, color.alpha])
   }
 }
 
@@ -124,7 +124,7 @@ impl Palette {
     let index = self.size;
     let row = index / PALETTE_SIZE;
     let col = index % PALETTE_SIZE;
-    self.store[row as usize][col as usize] = color_as_brga(color);
+    self.store[row as usize][col as usize] = color_as_bgra(color);
     let pos = PaletteVector::new(col as i32, row as i32);
     self.size += index + 1;
 

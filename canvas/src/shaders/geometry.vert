@@ -33,21 +33,20 @@ buffer primitive_info {
 layout(location=0) out vec2 v_tex_coords;
 layout(location=1) out vec2 tex_size;
 layout(location=2) out vec2 tex_offset;
+layout(location=3) out vec2 v_atlas_size;
 
-vec2 map_2_device(vec2 pos, mat3x2 transform) {
-    vec2 cooridnate_mapped = mat3x2(r1, r2, r3) * vec3(pos, 1);
-    return transform * vec3(cooridnate_mapped, 1);
-}
 
 void main() {
     Primitive prim = primitives[prim_id];
     Transform2d t = prim.transform;
     mat3x2 transform = mat3x2(t.r1, t.r2, t.r3);
 
-    vec2 pos2d = map_2_device(pos, mat3x2(t.r1, t.r2, t.r3));
+    vec2 canvas_coord = mat3x2(t.r1, t.r2, t.r3) * vec3(pos, 1);
+    vec2 pos2d = mat3x2(r1, r2, r3) * vec3(canvas_coord, 1);
     gl_Position = vec4(pos2d, 0, 1.0);
 
     v_tex_coords = pos - prim.bounding_min + prim.tex_offset;
     tex_size = prim.tex_size;
     tex_offset = prim.tex_offset;
+    v_atlas_size = atlas_size;
 }

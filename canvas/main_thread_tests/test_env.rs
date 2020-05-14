@@ -24,15 +24,23 @@ pub fn write_frame_to(mut frame: TextureFrame, path: &str) {
 
 /// check if the frame is equal to the image at `path`, the path relative the
 /// package root;
-pub fn assert_frame_eq(mut frame: TextureFrame, path: &str) {
-  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
-  let file_data = std::fs::read(abs_path).unwrap();
+pub macro assert_frame_eq($frame: expr, $path: expr $(,)?) {
+  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
+  let file_data = std::fs::read(abs_path.clone()).unwrap();
 
   let mut frame_data = vec![];
   let cursor = std::io::Cursor::new(&mut frame_data);
-  block_on(frame.png_encode(cursor)).unwrap();
+  block_on($frame.to_png(cursor)).unwrap();
 
-  assert_eq!(file_data, frame_data);
+  if file_data != frame_data {
+    panic!(
+      "{}",
+      format!(
+        "Frame is not same with `{}`,\nMaybe you want use `write_frame_to` to save frame as png to compare.",
+        abs_path
+      )
+    );
+  }
 }
 
 macro count {

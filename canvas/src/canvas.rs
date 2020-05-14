@@ -6,6 +6,9 @@ use zerocopy::AsBytes;
 
 use super::atlas::{AtlasStoreErr, TextureAtlas};
 
+mod img_helper;
+use img_helper::{texture_to_png, RgbaConvert};
+
 enum PrimaryBindings {
   GlobalUniform = 0,
   TextureAtlas = 1,
@@ -32,6 +35,8 @@ pub struct Canvas {
   tex_atlas_sampler: wgpu::Sampler,
 
   render_data: RenderData,
+
+  rgba_converter: Option<RgbaConvert>,
 }
 
 /// Frame is created by Canvas, and provide a blank box to drawing. It's
@@ -106,23 +111,28 @@ pub struct TextureFrame<'a> {
 
 impl<'a> TextureFrame<'a> {
   /// PNG encoded the texture frame then write by `writer`.
-  pub async fn png_encode<W: std::io::Write>(
+  pub async fn to_png<W: std::io::Write>(
     &mut self,
     writer: W,
   ) -> Result<(), &'static str> {
     self.submit();
 
+    let wgpu::SwapChainDescriptor { width, height, .. } = self.canvas.sc_desc;
+    self.canvas.create_converter_if_none();
+    let rect = PhysicRect::from_size(PhysicSize::new(width, height));
+
     let Canvas {
       device,
       queue,
-      sc_desc,
+      rgba_converter,
       ..
     } = self.canvas;
-    texture_encode_png(
+    texture_to_png(
       &self.texture,
+      rect,
       device,
       queue,
-      PhysicRect::from_size(PhysicSize::new(sc_desc.width, sc_desc.height)),
+      rgba_converter.as_ref().unwrap(),
       writer,
     )
     .await
@@ -130,7 +140,7 @@ impl<'a> TextureFrame<'a> {
 
   /// Save the texture frame as a PNG image, store at the `path` location.
   pub async fn save_as_png(&mut self, path: &str) -> Result<(), &'static str> {
-    self.png_encode(std::fs::File::create(path).unwrap()).await
+    self.to_png(std::fs::File::create(path).unwrap()).await
   }
 }
 
@@ -212,6 +222,7 @@ impl Canvas {
       primitives_layout: tex_infos_layout,
       uniforms,
       render_data: RenderData::default(),
+      rgba_converter: None,
     }
   }
 
@@ -272,23 +283,27 @@ impl Canvas {
   }
 
   #[cfg(debug_assertions)]
-  pub fn log_texture_atlas(&self) {
+  pub fn log_texture_atlas(&mut self) {
+    self.create_converter_if_none();
+
     let Canvas {
-      device,
-      queue,
       sc_desc,
       tex_atlas,
+      device,
+      queue,
+      rgba_converter,
       ..
     } = self;
 
     let pkg_root = env!("CARGO_MANIFEST_DIR");
     let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
 
-    let atlas = texture_encode_png(
+    let atlas = texture_to_png(
       &tex_atlas.texture,
+      PhysicRect::from_size(PhysicSize::new(sc_desc.width, sc_desc.height)),
       device,
       queue,
-      PhysicRect::from_size(PhysicSize::new(sc_desc.width, sc_desc.height)),
+      rgba_converter.as_ref().unwrap(),
       std::fs::File::create(atlas_capture).unwrap(),
     );
 
@@ -296,73 +311,13 @@ impl Canvas {
   }
 }
 
-pub(crate) async fn texture_encode_png<W: std::io::Write>(
-  texture: &wgpu::Texture,
-  device: &wgpu::Device,
-  queue: &wgpu::Queue,
-  rect: PhysicRect,
-  writer: W,
-) -> Result<(), &'static str> {
-  let PhysicSize { width, height, .. } = rect.size;
-  let size = width as u64 * height as u64 * std::mem::size_of::<u32>() as u64;
-
-  // The output buffer lets us retrieve the data as an array
-  let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-    size,
-    usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
-    label: None,
-  });
-
-  let mut encoder =
-    device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("Encoder for encoding texture as png"),
-    });
-  encoder.copy_texture_to_buffer(
-    wgpu::TextureCopyView {
-      texture,
-      mip_level: 0,
-      array_layer: 0,
-      origin: wgpu::Origin3d {
-        x: rect.min_x(),
-        y: rect.min_y(),
-        z: 0,
-      },
-    },
-    wgpu::BufferCopyView {
-      buffer: &output_buffer,
-      offset: 0,
-      bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
-      rows_per_image: 0,
-    },
-    wgpu::Extent3d {
-      width: width,
-      height: height,
-      depth: 1,
-    },
-  );
-
-  queue.submit(&[encoder.finish()]);
-
-  // Note that we're not calling `.await` here.
-  let buffer_future = output_buffer.map_read(0, size);
-
-  // Poll the device in a blocking manner so that our future resolves.
-  device.poll(wgpu::Maintain::Wait);
-
-  let mapping = buffer_future.await.map_err(|_| "Async buffer error")?;
-  let mut png_encoder = png::Encoder::new(writer, width, height);
-  png_encoder.set_depth(png::BitDepth::Eight);
-  png_encoder.set_color(png::ColorType::RGBA);
-  png_encoder
-    .write_header()
-    .unwrap()
-    .write_image_data(mapping.as_slice())
-    .unwrap();
-
-  Ok(())
-}
-
 impl Canvas {
+  fn create_converter_if_none(&mut self) {
+    if self.rgba_converter.is_none() {
+      self.rgba_converter = Some(RgbaConvert::new(&self.device));
+    }
+  }
+
   fn draw(
     &mut self,
     view: &wgpu::TextureView,
@@ -472,6 +427,71 @@ impl Canvas {
       label: Some("texture infos bind group"),
     })
   }
+
+  fn upload_render_command(
+    &mut self,
+    command: &RenderCommand,
+    encoder: &mut wgpu::CommandEncoder,
+    view: &wgpu::TextureView,
+  ) {
+    let RenderCommand { attrs, geometry } = command;
+
+    let mut v_start: usize = 0;
+    let mut i_start: usize = 0;
+    let mut indices_offset = self.render_data.vertices.len() as i32;
+    attrs.iter().for_each(
+      |RenderAttr {
+         transform,
+         count,
+         style,
+         bounding_rect_for_style,
+       }| {
+        let res = self.store_style_in_atlas(style, encoder).or_else(|err| {
+          self.draw(view, encoder);
+
+          // Todo: we should not directly clear the texture atlas,
+          // but deallocate all not used texture.
+          self.tex_atlas.clear(&self.device, &self.queue);
+          indices_offset = -(v_start as i32);
+          match err {
+            AtlasStoreErr::SpaceNotEnough => {
+              let res = self.store_style_in_atlas(style, encoder);
+              debug_assert!(res.is_ok());
+              res
+            }
+            AtlasStoreErr::OverTheMaxLimit => {
+              unimplemented!("draw current attr individual");
+              Err(err)
+            }
+          }
+        });
+
+        let v_end = v_start + count.vertices as usize;
+        let i_end = i_start + count.indices as usize;
+
+        // Error already processed before, needn't care about it.
+        if let Ok((tex_offset, tex_size)) = res {
+          let tex_info = Primitive {
+            tex_offset: [tex_offset.x, tex_offset.y],
+            tex_size: [tex_size.width, tex_size.height],
+            transform: transform.to_row_arrays(),
+            bound_min: bounding_rect_for_style.min().to_array(),
+            bounding_size: bounding_rect_for_style.size.to_array(),
+          };
+
+          self.render_data.append(
+            indices_offset,
+            &geometry.vertices[v_start..v_end],
+            &geometry.indices[i_start..i_end],
+            tex_info,
+          )
+        }
+
+        v_start = v_end;
+        i_start = i_end;
+      },
+    );
+  }
 }
 
 fn create_render_pipeline(
@@ -484,7 +504,8 @@ fn create_render_pipeline(
       bind_group_layouts,
     });
 
-  let (vs_module, fs_module) = create_shaders(device);
+  let vs_module = spv_2_shader_module!(device, "./shaders/geometry.vert.spv");
+  let fs_module = spv_2_shader_module!(device, "./shaders/geometry.frag.spv");
 
   device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
     layout: &render_pipeline_layout,
@@ -521,18 +542,11 @@ fn create_render_pipeline(
   })
 }
 
-fn create_shaders(
-  device: &wgpu::Device,
-) -> (wgpu::ShaderModule, wgpu::ShaderModule) {
-  let vs_bytes = include_bytes!("./shaders/geometry.vert.spv");
-  let fs_bytes = include_bytes!("./shaders/geometry.frag.spv");
-  let vs_spv = wgpu::read_spirv(std::io::Cursor::new(&vs_bytes[..])).unwrap();
-  let fs_spv = wgpu::read_spirv(std::io::Cursor::new(&fs_bytes[..])).unwrap();
-  let vs_module = device.create_shader_module(&vs_spv);
-  let fs_module = device.create_shader_module(&fs_spv);
-
-  (vs_module, fs_module)
-}
+pub(crate) macro spv_2_shader_module($device: expr, $path: literal) {{
+  let bytes = include_bytes!($path);
+  let spv = wgpu::read_spirv(std::io::Cursor::new(&bytes[..])).unwrap();
+  $device.create_shader_module(&spv)
+}}
 
 fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   let stable =
@@ -640,69 +654,6 @@ fn mut_encoder<'a>(
   encoder_store.as_mut().unwrap()
 }
 
-fn upload_render_command(
-  command: &RenderCommand,
-  canvas: &mut Canvas,
-  encoder: &mut wgpu::CommandEncoder,
-  view: &wgpu::TextureView,
-) {
-  let RenderCommand { attrs, geometry } = command;
-
-  let mut v_start = 0;
-  let mut i_start = 0;
-  attrs.iter().for_each(
-    |RenderAttr {
-       transform,
-       count,
-       style,
-       bounding_rect_for_style,
-     }| {
-      let res = canvas.store_style_in_atlas(style, encoder).or_else(|err| {
-        canvas.draw(view, encoder);
-
-        // Todo: we should not directly clear the texture atlas,
-        // but deallocate all not used texture.
-        canvas.tex_atlas.clear(&canvas.device, &canvas.queue);
-
-        match err {
-          AtlasStoreErr::SpaceNotEnough => {
-            let res = canvas.store_style_in_atlas(style, encoder);
-            debug_assert!(res.is_ok());
-            res
-          }
-          AtlasStoreErr::OverTheMaxLimit => {
-            unimplemented!("draw current attr individual");
-            Err(err)
-          }
-        }
-      });
-
-      let v_end = v_start + count.vertices as usize;
-      let i_end = i_start + count.indices as usize;
-
-      // Error already processed before, needn't care about it.
-      if let Ok((tex_offset, tex_size)) = res {
-        let tex_info = Primitive {
-          tex_offset: [tex_offset.x, tex_offset.y],
-          tex_size: [tex_size.width, tex_size.height],
-          transform: transform.to_row_arrays(),
-          bound_min: bounding_rect_for_style.min().to_array(),
-          bounding_size: bounding_rect_for_style.size.to_array(),
-        };
-
-        canvas.render_data.append(
-          &geometry.vertices[v_start..v_end],
-          &geometry.indices[i_start..i_end],
-          tex_info,
-        )
-      }
-
-      v_start = v_end;
-      i_start = i_end;
-    },
-  );
-}
-
 macro frame_delegate_impl($($path: ident).*) {
   #[inline]
   fn canvas(&mut self) -> &mut Canvas { &mut self.canvas }
@@ -729,7 +680,7 @@ macro frame_delegate_impl($($path: ident).*) {
     let Self {canvas, encoder, ..} = self;
     let encoder = mut_encoder(canvas, encoder);
     let view = &self$(.$path)*;
-    upload_render_command(command, canvas, encoder, view);
+    canvas.upload_render_command(command, encoder, view);
   }
 }
 
@@ -824,6 +775,7 @@ impl RenderData {
 
   fn append(
     &mut self,
+    indices_offset: i32,
     vertices: &[Point],
     indices: &[u32],
     tex_info: Primitive,
@@ -831,8 +783,11 @@ impl RenderData {
     let tex_id = self.primitives.len() as u32;
     self.primitives.push(tex_info);
 
-    let vertex_offset = self.vertices.len() as u32;
-    let mapped_indices = indices.iter().map(|index| index + vertex_offset);
+    let mapped_indices = indices.iter().map(|index| {
+      let index = *index as i32 + indices_offset;
+      debug_assert!(index >= 0);
+      index as u32
+    });
     self.indices.extend(mapped_indices);
 
     let mapped_vertices = vertices.iter().map(|pos| Vertex {
