@@ -34,6 +34,7 @@ fn main() {
     Event::RedrawRequested(_) => {
       let mut frame = canvas.new_screen_frame();
       let mut layer = frame.new_2d_layer();
+      layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
       let mut path = Path::builder();
       path.add_circle(
         euclid::Point2D::new(200., 200.),

@@ -131,6 +131,20 @@ impl Rendering2DLayer {
     self.add_cmd(path);
   }
 
+  /// Adds a translation transformation to the current matrix by moving the
+  /// canvas and its origin x units horizontally and y units vertically on the
+  /// grid.
+  ///
+  /// * `x` - Distance to move in the horizontal direction. Positive values are
+  ///   to the right, and negative to the left.
+  /// * `y` - Distance to move in the vertical direction. Positive values are
+  ///   down, and negative are up.
+  pub fn translate(&mut self, x: f32, y: f32) -> &mut Self {
+    let t = &mut self.current_state_mut().transform;
+    *t = t.post_translate(euclid::Vector2D::new(x, y));
+    self
+  }
+
   /// All drawing of this layer has finished, and convert the layer to an
   /// intermediate render buffer data that will provide to render process and
   /// then commit to gpu.
