@@ -1,6 +1,6 @@
 use super::atlas::{AtlasStoreErr, TextureAtlas};
 use super::{
-  FillStyle, LogicUnit, PhysicPoint, PhysicRect, PhysicSize, PhysicUnit, Point,
+  DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit, Point,
   RenderAttr, RenderCommand, Rendering2DLayer,
 };
 use std::borrow::Borrow;
@@ -10,7 +10,7 @@ mod img_helper;
 use img_helper::{texture_to_png, RgbaConvert};
 pub mod surface;
 pub use surface::Surface;
-use surface::{FrameView, PhysicSurface, Texture};
+use surface::{FrameView, PhysicSurface, Texture, TextureSurface};
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -156,7 +156,7 @@ impl<'a, S: Surface> NewTextureFrame<'a, S> {
     self.submit();
 
     self.canvas.create_converter_if_none();
-    let rect = PhysicRect::from_size(self.canvas.surface.size());
+    let rect = DeviceRect::from_size(self.canvas.surface.size());
 
     let Canvas {
       device,
@@ -188,101 +188,56 @@ impl Canvas<PhysicSurface> {
   /// [`from_window`](Canvas::window).
   pub async fn from_window<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
-    width: u32,
-    height: u32,
+    size: DeviceSize,
   ) -> Self {
     let instance = wgpu::Instance::new();
 
     let w_surface = unsafe { instance.create_surface(window) };
-    let adapter = instance
-      .request_adapter(
-        &wgpu::RequestAdapterOptions {
-          power_preference: wgpu::PowerPreference::Default,
-          compatible_surface: Some(&w_surface),
-        },
-        wgpu::BackendBit::PRIMARY,
-      )
-      .await
-      .unwrap();
 
-    let (device, queue) = adapter
-      .request_device(
-        &wgpu::DeviceDescriptor {
-          extensions: wgpu::Extensions {
-            anisotropic_filtering: false,
-          },
-          limits: Default::default(),
-        },
-        None,
-      )
-      .await
-      .unwrap();
-
-    let surface = PhysicSurface::new(w_surface, &device, width, height);
-    let sc_desc = wgpu::SwapChainDescriptor {
-      usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-      format: wgpu::TextureFormat::Bgra8UnormSrgb,
-      width,
-      height,
-      present_mode: wgpu::PresentMode::Fifo,
-    };
-
-    let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
-    let pipeline = create_render_pipeline(
-      &device,
-      &sc_desc,
-      &[&uniform_layout, &tex_infos_layout],
+    let adapter = instance.request_adapter(
+      &wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::Default,
+        compatible_surface: Some(&w_surface),
+      },
+      wgpu::BackendBit::PRIMARY,
     );
 
-    let tex_atlas = TextureAtlas::new(&device);
-    let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-      address_mode_u: wgpu::AddressMode::ClampToEdge,
-      address_mode_v: wgpu::AddressMode::ClampToEdge,
-      address_mode_w: wgpu::AddressMode::ClampToEdge,
-      mag_filter: wgpu::FilterMode::Linear,
-      min_filter: wgpu::FilterMode::Linear,
-      mipmap_filter: wgpu::FilterMode::Linear,
-      lod_min_clamp: 0.0,
-      lod_max_clamp: 0.0,
-      compare: wgpu::CompareFunction::Always,
-      label: Some("Texture atlas sampler"),
-    });
+    Self::create_canvas(size, adapter, move |device| {
+      PhysicSurface::new(w_surface, &device, size)
+    })
+    .await
+  }
+}
 
-    let uniforms = create_uniforms(
-      &device,
-      &uniform_layout,
-      tex_atlas.size(),
-      &coordinate_2d_to_device_matrix(width, height),
-      &tex_atlas_sampler,
-      &tex_atlas.view,
+impl Canvas<TextureSurface> {
+  /// Create a canvas which its size is `width` and `size`, if you want to bind
+  /// to a window, use [`from_window`](Canvas::from_window).
+  pub async fn new(size: DeviceSize) -> Self {
+    let instance = wgpu::Instance::new();
+
+    let adapter = instance.request_adapter(
+      &wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::Default,
+        compatible_surface: None,
+      },
+      wgpu::BackendBit::PRIMARY,
     );
 
-    Canvas {
-      tex_atlas,
-      tex_atlas_sampler,
-      device,
-      surface,
-      queue,
-      pipeline: pipeline,
-      uniform_layout,
-      primitives_layout: tex_infos_layout,
-      uniforms,
-      render_data: RenderData::default(),
-      rgba_converter: None,
-    }
+    Canvas::create_canvas(size, adapter, |device| {
+      TextureSurface::new(
+        &device,
+        size,
+        wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+      )
+    })
+    .await
   }
 }
 
 impl<S: Surface> Canvas<S> {
-  /// Create a canvas which its size is `width` and `size`, if you want to bind
-  /// to a window, use [`from_window`](Canvas::from_window).
-  pub async fn new(width: u32, height: u32) -> Self {
-    unimplemented!();
-  }
-
   /// Create a new frame texture to draw, and commit to device when the `Frame`
   /// is dropped.
-  pub fn new_screen_frame(&mut self) -> CanvasFrame<S> {
+  pub fn next_frame(&mut self) -> CanvasFrame<S> {
     let chain_output = self.surface.get_next_view();
 
     CanvasFrame {
@@ -336,7 +291,7 @@ impl<S: Surface> Canvas<S> {
 
     let atlas = texture_to_png(
       &tex_atlas.texture.raw_texture,
-      PhysicRect::from_size(size),
+      DeviceRect::from_size(size),
       device,
       queue,
       rgba_converter.as_ref().unwrap(),
@@ -348,94 +303,84 @@ impl<S: Surface> Canvas<S> {
 }
 
 impl<S: Surface> Canvas<S> {
-  // async fn create<W: raw_window_handle::HasRawWindowHandle>(
-  //   window: Option<&W>,
-  //   width: u32,
-  //   height: u32,
-  // ) -> Self {
-  //   let instance = wgpu::Instance::new();
-  //   let compatible_surface = window
-  //     .map(|w| unsafe { instance.create_surface(w) })
-  //     .as_ref();
-  //   let adapter = instance
-  //     .request_adapter(
-  //       &wgpu::RequestAdapterOptions {
-  //         power_preference: wgpu::PowerPreference::Default,
-  //         compatible_surface,
-  //       },
-  //       wgpu::BackendBit::PRIMARY,
-  //     )
-  //     .await
-  //     .unwrap();
+  async fn create_canvas<C>(
+    size: DeviceSize,
+    adapter: impl std::future::Future<Output = Option<wgpu::Adapter>> + Send,
+    surface_ctor: C,
+  ) -> Canvas<S>
+  where
+    C: FnOnce(&wgpu::Device) -> S,
+  {
+    let (device, queue) = adapter
+      .await
+      .unwrap()
+      .request_device(
+        &wgpu::DeviceDescriptor {
+          extensions: wgpu::Extensions {
+            anisotropic_filtering: false,
+          },
+          limits: Default::default(),
+        },
+        None,
+      )
+      .await
+      .unwrap();
 
-  //   let (device, queue) = adapter
-  //     .request_device(
-  //       &wgpu::DeviceDescriptor {
-  //         extensions: wgpu::Extensions {
-  //           anisotropic_filtering: false,
-  //         },
-  //         limits: Default::default(),
-  //       },
-  //       None,
-  //     )
-  //     .await
-  //     .unwrap();
+    let surface = surface_ctor(&device);
 
-  //   let sc_desc = wgpu::SwapChainDescriptor {
-  //     usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-  //     format: wgpu::TextureFormat::Bgra8UnormSrgb,
-  //     width,
-  //     height,
-  //     present_mode: wgpu::PresentMode::Fifo,
-  //   };
+    let sc_desc = wgpu::SwapChainDescriptor {
+      usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+      format: wgpu::TextureFormat::Bgra8UnormSrgb,
+      width: size.width,
+      height: size.height,
+      present_mode: wgpu::PresentMode::Fifo,
+    };
 
-  //   let swap_chain = device.create_swap_chain(&surface, &sc_desc);
-  //   let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
-  //   let pipeline = create_render_pipeline(
-  //     &device,
-  //     &sc_desc,
-  //     &[&uniform_layout, &tex_infos_layout],
-  //   );
+    let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
+    let pipeline = create_render_pipeline(
+      &device,
+      &sc_desc,
+      &[&uniform_layout, &tex_infos_layout],
+    );
 
-  //   let tex_atlas = TextureAtlas::new(&device);
-  //   let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-  //     address_mode_u: wgpu::AddressMode::ClampToEdge,
-  //     address_mode_v: wgpu::AddressMode::ClampToEdge,
-  //     address_mode_w: wgpu::AddressMode::ClampToEdge,
-  //     mag_filter: wgpu::FilterMode::Linear,
-  //     min_filter: wgpu::FilterMode::Linear,
-  //     mipmap_filter: wgpu::FilterMode::Linear,
-  //     lod_min_clamp: 0.0,
-  //     lod_max_clamp: 0.0,
-  //     compare: wgpu::CompareFunction::Always,
-  //     label: Some("Texture atlas sampler"),
-  //   });
+    let tex_atlas = TextureAtlas::new(&device);
+    let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+      address_mode_u: wgpu::AddressMode::ClampToEdge,
+      address_mode_v: wgpu::AddressMode::ClampToEdge,
+      address_mode_w: wgpu::AddressMode::ClampToEdge,
+      mag_filter: wgpu::FilterMode::Linear,
+      min_filter: wgpu::FilterMode::Linear,
+      mipmap_filter: wgpu::FilterMode::Linear,
+      lod_min_clamp: 0.0,
+      lod_max_clamp: 0.0,
+      compare: wgpu::CompareFunction::Always,
+      label: Some("Texture atlas sampler"),
+    });
 
-  //   let uniforms = create_uniforms(
-  //     &device,
-  //     &uniform_layout,
-  //     tex_atlas.size(),
-  //     &coordinate_2d_to_device_matrix(width, height),
-  //     &tex_atlas_sampler,
-  //     &tex_atlas.view,
-  //   );
+    let uniforms = create_uniforms(
+      &device,
+      &uniform_layout,
+      tex_atlas.size(),
+      &coordinate_2d_to_device_matrix(size.width, size.height),
+      &tex_atlas_sampler,
+      &tex_atlas.view,
+    );
 
-  //   Canvas {
-  //     tex_atlas,
-  //     tex_atlas_sampler,
-  //     device,
-  //     surface,
-  //     queue,
-  //     swap_chain,
-  //     sc_desc,
-  //     pipeline: pipeline,
-  //     uniform_layout,
-  //     primitives_layout: tex_infos_layout,
-  //     uniforms,
-  //     render_data: RenderData::default(),
-  //     rgba_converter: None,
-  //   }
-  // }
+    Canvas {
+      tex_atlas,
+      tex_atlas_sampler,
+      device,
+      surface,
+      queue,
+      pipeline: pipeline,
+      uniform_layout,
+      primitives_layout: tex_infos_layout,
+      uniforms,
+      render_data: RenderData::default(),
+      rgba_converter: None,
+    }
+  }
+
   fn create_converter_if_none(&mut self) {
     if self.rgba_converter.is_none() {
       self.rgba_converter = Some(RgbaConvert::new(&self.device));
@@ -501,7 +446,7 @@ impl<S: Surface> Canvas<S> {
     &mut self,
     style: &FillStyle,
     encoder: &mut wgpu::CommandEncoder,
-  ) -> Result<(PhysicPoint, PhysicSize), AtlasStoreErr> {
+  ) -> Result<(DevicePoint, DeviceSize), AtlasStoreErr> {
     let (pos, size, grown) = match style {
       FillStyle::Color(c) => {
         let (pos, grown) = self.tex_atlas.store_color_in_palette(
@@ -511,7 +456,7 @@ impl<S: Surface> Canvas<S> {
           &self.queue,
         )?;
 
-        (pos, PhysicSize::new(1, 1), grown)
+        (pos, DeviceSize::new(1, 1), grown)
       }
       _ => todo!("not support in early develop"),
     };
@@ -731,7 +676,7 @@ pub fn coordinate_2d_to_device_matrix(
 fn create_uniforms(
   device: &wgpu::Device,
   layout: &wgpu::BindGroupLayout,
-  atlas_size: PhysicSize,
+  atlas_size: DeviceSize,
   canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
   tex_atlas_sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,
@@ -880,6 +825,8 @@ impl RenderData {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::*;
+  use futures::executor::block_on;
 
   #[test]
   fn coordinate_2d_start() {
@@ -896,5 +843,38 @@ mod tests {
 
     let rb = matrix.transform_point(Point::new(400., 400.));
     assert_eq!((rb.x, rb.y), (1., -1.0));
+  }
+
+  #[test]
+  fn render_command_upload_indices_check() {
+    use lyon::tessellation::VertexBuffers;
+
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(100, 100)));
+
+    let mut frame = canvas.next_frame();
+
+    let pt = Point::new(0., 0.);
+    let r_cmd = RenderCommand {
+      geometry: VertexBuffers {
+        vertices: vec![pt, pt, pt],
+        indices: vec![0, 1, 2],
+      },
+      attrs: vec![super::RenderAttr {
+        count: lyon::tessellation::Count {
+          indices: 3,
+          vertices: 3,
+        },
+        bounding_rect_for_style: Rect::default(),
+        style: FillStyle::Color(const_color::WHITE.into()),
+        transform: Transform::default(),
+      }],
+    };
+
+    frame.upload_render_command(&r_cmd);
+    frame.upload_render_command(&r_cmd);
+
+    let data = &frame.canvas.render_data;
+    debug_assert_eq!(data.vertices.len(), 6);
+    debug_assert_eq!(&data.indices, &[0, 1, 2, 3, 4, 5]);
   }
 }
