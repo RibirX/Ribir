@@ -1,11 +1,11 @@
-use super::{Color, PhysicPoint};
+use super::{Color, DevicePoint};
 use guillotiere::*;
 use zerocopy::AsBytes;
 
 const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;
 
 pub(crate) struct ColorPalettes {
-  indexed_colors: std::collections::HashMap<u32, PhysicPoint>,
+  indexed_colors: std::collections::HashMap<u32, DevicePoint>,
   current_palette: Palette,
   current_alloc: Allocation,
 }
@@ -28,7 +28,7 @@ impl ColorPalettes {
     atlas_allocator: &mut AtlasAllocator,
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
-  ) -> Option<PhysicPoint> {
+  ) -> Option<DevicePoint> {
     if let Some(pos) = self.indexed_colors.get(&color_hash(color)) {
       return Some(*pos);
     }
@@ -83,10 +83,10 @@ impl ColorPalettes {
     );
   }
 
-  fn add_color(&mut self, color: Color) -> PhysicPoint {
+  fn add_color(&mut self, color: Color) -> DevicePoint {
     let offset = self.current_palette.add_color(color);
-    let pos = (self.current_alloc.rectangle.min + offset).to_u32();
-    let pos = PhysicPoint::from_untyped(pos.to_u32());
+    let pos = self.current_alloc.rectangle.min + offset;
+    let pos = DevicePoint::new(pos.x as u32, pos.y as u32);
     self.indexed_colors.insert(color_hash(color), pos);
     pos
   }

@@ -12,7 +12,8 @@ pub fn new_canvas(width: u32, height: u32) -> (Canvas, Window, EventLoop<()>) {
   let event_loop = EventLoop::new();
   let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-  let canvas = block_on(Canvas::from_window(&window, width, height));
+  let canvas =
+    block_on(Canvas::from_window(&window, DeviceSize::new(width, height)));
   (canvas, window, event_loop)
 }
 

@@ -13,8 +13,10 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
-  let mut canvas =
-    block_on(Canvas::from_window(&window, size.width, size.height));
+  let mut canvas = block_on(Canvas::from_window(
+    &window,
+    DeviceSize::new(size.width, size.height),
+  ));
 
   event_loop.run(move |event, _, control_flow| match event {
     Event::WindowEvent {
@@ -33,7 +35,7 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let mut frame = canvas.new_screen_frame();
+      let mut frame = canvas.next_frame();
       let mut layer = frame.new_2d_layer();
       layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
       let mut path = Path::builder();

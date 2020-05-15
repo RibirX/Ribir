@@ -1,4 +1,4 @@
-use super::{spv_2_shader_module, PhysicRect, PhysicSize};
+use super::{spv_2_shader_module, DeviceRect, DeviceSize};
 pub(crate) struct RgbaConvert {
   group_layout: wgpu::BindGroupLayout,
   pipeline: wgpu::ComputePipeline,
@@ -48,7 +48,7 @@ impl RgbaConvert {
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
     bgra_buffer: &wgpu::Buffer,
-    size: PhysicSize,
+    size: DeviceSize,
   ) {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.group_layout,
@@ -70,13 +70,13 @@ impl RgbaConvert {
 
 pub(crate) async fn texture_to_png<W: std::io::Write>(
   texture: &wgpu::Texture,
-  rect: PhysicRect,
+  rect: DeviceRect,
   device: &wgpu::Device,
   queue: &wgpu::Queue,
   convert: &RgbaConvert,
   writer: W,
 ) -> Result<(), &'static str> {
-  let PhysicSize { width, height, .. } = rect.size;
+  let DeviceSize { width, height, .. } = rect.size;
   let size = width as u64 * height as u64 * std::mem::size_of::<u32>() as u64;
 
   // The output buffer lets us retrieve the data as an array

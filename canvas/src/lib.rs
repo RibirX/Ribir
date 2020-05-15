@@ -21,6 +21,6 @@ pub type Point = euclid::Point2D<f32, LogicUnit>;
 pub type Size = euclid::Size2D<f32, LogicUnit>;
 pub type Transform = euclid::Transform2D<f32, LogicUnit, LogicUnit>;
 
-pub type PhysicRect = euclid::Rect<u32, PhysicUnit>;
-pub type PhysicPoint = euclid::Point2D<u32, PhysicUnit>;
-pub type PhysicSize = euclid::Size2D<u32, PhysicUnit>;
+pub type DeviceRect = euclid::Rect<u32, PhysicUnit>;
+pub type DevicePoint = euclid::Point2D<u32, PhysicUnit>;
+pub type DeviceSize = euclid::Size2D<u32, PhysicUnit>;

@@ -1,4 +1,4 @@
-use super::PhysicSize;
+use super::DeviceSize;
 use std::borrow::Borrow;
 
 /// `Surface` is a thing presentable canvas visual display.
@@ -13,7 +13,7 @@ pub trait Surface {
     height: u32,
   );
 
-  fn size(&self) -> PhysicSize;
+  fn size(&self) -> DeviceSize;
 
   fn get_next_view(&mut self) -> Self::V;
 }
@@ -34,8 +34,8 @@ impl Surface for PhysicSurface {
   type V = FrameView<wgpu::SwapChainOutput>;
 
   #[inline]
-  fn size(&self) -> PhysicSize {
-    PhysicSize::new(self.sc_desc.width, self.sc_desc.height)
+  fn size(&self) -> DeviceSize {
+    DeviceSize::new(self.sc_desc.width, self.sc_desc.height)
   }
 
   fn resize(
@@ -64,7 +64,7 @@ impl Surface for TextureSurface {
   type V = FrameView<wgpu::TextureView>;
 
   #[inline]
-  fn size(&self) -> PhysicSize { self.size }
+  fn size(&self) -> DeviceSize { self.size }
 
   fn resize(
     &mut self,
@@ -73,7 +73,7 @@ impl Surface for TextureSurface {
     width: u32,
     height: u32,
   ) {
-    self.resize(device, queue, PhysicSize::new(width, height));
+    self.resize(device, queue, DeviceSize::new(width, height));
   }
 
   #[inline]
@@ -97,14 +97,13 @@ impl PhysicSurface {
   pub(crate) fn new(
     surface: wgpu::Surface,
     device: &wgpu::Device,
-    width: u32,
-    height: u32,
+    size: DeviceSize,
   ) -> Self {
     let sc_desc = wgpu::SwapChainDescriptor {
       usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
-      width,
-      height,
+      width: size.width,
+      height: size.height,
       present_mode: wgpu::PresentMode::Fifo,
     };
 
@@ -120,14 +119,14 @@ impl PhysicSurface {
 
 pub struct Texture {
   pub(crate) raw_texture: wgpu::Texture,
-  size: PhysicSize,
+  size: DeviceSize,
   usage: wgpu::TextureUsage,
 }
 
 impl Texture {
   pub(crate) fn new(
     device: &wgpu::Device,
-    size: PhysicSize,
+    size: DeviceSize,
     usage: wgpu::TextureUsage,
   ) -> Self {
     let raw_texture = Self::new_texture(device, size, usage);
@@ -139,13 +138,13 @@ impl Texture {
   }
 
   #[inline]
-  pub(crate) fn size(&self) -> PhysicSize { self.size }
+  pub(crate) fn size(&self) -> DeviceSize { self.size }
 
   pub(crate) fn resize(
     &mut self,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    size: PhysicSize,
+    size: DeviceSize,
   ) {
     let new_texture = Self::new_texture(device, size, self.usage);
 
@@ -182,7 +181,7 @@ impl Texture {
 
   fn new_texture(
     device: &wgpu::Device,
-    size: PhysicSize,
+    size: DeviceSize,
     usage: wgpu::TextureUsage,
   ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {

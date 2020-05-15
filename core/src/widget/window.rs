@@ -1,6 +1,6 @@
 use super::{painting_context::PaintingContext, render_tree::*};
 use crate::{prelude::*, widget::widget_tree::*};
-use canvas::Canvas;
+use canvas::{Canvas, DeviceSize};
 use winit::{
   event::WindowEvent,
   event_loop::EventLoop,
@@ -26,7 +26,10 @@ impl<'a> Window<'a> {
   ) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
-    let canvas = Canvas::from_window(&native_window, size.width, size.height);
+    let canvas = Canvas::from_window(
+      &native_window,
+      DeviceSize::new(size.width, size.height),
+    );
 
     let canvas = futures::executor::block_on(canvas);
     let mut wnd = Window {
@@ -64,7 +67,7 @@ impl<'a> Window<'a> {
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
     if let Some(root) = self.render_tree.root() {
-      let mut frame = self.canvas.new_screen_frame();
+      let mut frame = self.canvas.next_frame();
       let painting_context =
         PaintingContext::new(&mut frame, root, &self.render_tree);
       root

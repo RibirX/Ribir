@@ -1,4 +1,4 @@
-use super::{surface::Texture, Color, PhysicPoint, PhysicSize};
+use super::{surface::Texture, Color, DevicePoint, DeviceSize};
 use guillotiere::*;
 mod color_palette;
 use color_palette::ColorPalettes;
@@ -24,7 +24,7 @@ pub(crate) enum AtlasStoreErr {
 
 impl TextureAtlas {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
-    let size = PhysicSize::new(INIT_SIZE, INIT_SIZE);
+    let size = DeviceSize::new(INIT_SIZE, INIT_SIZE);
     let mut atlas_allocator = AtlasAllocator::new(size.cast_unit().to_i32());
     let texture = Texture::new(
       device,
@@ -50,7 +50,7 @@ impl TextureAtlas {
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
     queue: &wgpu::Queue,
-  ) -> Result<(PhysicPoint, bool), AtlasStoreErr> {
+  ) -> Result<(DevicePoint, bool), AtlasStoreErr> {
     macro store_color($grow: ident) {
       self
         .color_palettes
@@ -83,7 +83,7 @@ impl TextureAtlas {
   }
 
   #[inline]
-  pub(crate) fn size(&self) -> PhysicSize { self.texture.size() }
+  pub(crate) fn size(&self) -> DeviceSize { self.texture.size() }
 
   /// Flush all data to the texture and ready to commit to gpu.
   /// Call this function before commit drawing to gpu.
@@ -125,7 +125,7 @@ impl TextureAtlas {
 
   fn grow_texture(
     &mut self,
-    size: PhysicSize,
+    size: DeviceSize,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
   ) {
