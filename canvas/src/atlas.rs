@@ -117,7 +117,7 @@ impl TextureAtlas {
         depth_stencil_attachment: None,
       });
     }
-    queue.submit(&[encoder.finish()]);
+    queue.submit(Some(encoder.finish()));
   }
 
   fn grow_texture(
@@ -166,7 +166,6 @@ impl TextureAtlas {
         height,
         depth: 1,
       },
-      array_layer_count: 1,
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
       usage: wgpu::TextureUsage::COPY_DST

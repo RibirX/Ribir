@@ -50,16 +50,11 @@ impl RgbaConvert {
     bgra_buffer: &wgpu::Buffer,
     size: PhysicSize,
   ) {
-    let slice_size = size.area() as u64 * std::mem::size_of::<u32>() as u64;
-
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.group_layout,
       bindings: &[wgpu::Binding {
         binding: 0,
-        resource: wgpu::BindingResource::Buffer {
-          buffer: &bgra_buffer,
-          range: 0..slice_size,
-        },
+        resource: wgpu::BindingResource::Buffer(bgra_buffer.slice(..)),
       }],
       label: None,
     });
@@ -129,7 +124,7 @@ pub(crate) async fn texture_to_png<W: std::io::Write>(
     rect.size,
   );
 
-  queue.submit(&[encoder.finish()]);
+  queue.submit(Some(encoder.finish()));
 
   // Note that we're not calling `.await` here.
   let buffer_future = output_buffer.map_read(0, size);
