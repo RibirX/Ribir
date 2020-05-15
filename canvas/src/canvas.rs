@@ -8,6 +8,9 @@ use super::atlas::{AtlasStoreErr, TextureAtlas};
 
 mod img_helper;
 use img_helper::{texture_to_png, RgbaConvert};
+pub mod surface;
+pub use surface::Surface;
+use surface::{FrameView, PhysicSurface};
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -19,12 +22,10 @@ enum SecondBindings {
   Primitive = 0,
 }
 
-pub struct Canvas {
-  surface: wgpu::Surface,
+pub struct Canvas<S = PhysicSurface> {
   device: wgpu::Device,
   queue: wgpu::Queue,
-  swap_chain: wgpu::SwapChain,
-  sc_desc: wgpu::SwapChainDescriptor,
+  surface: S,
   pipeline: wgpu::RenderPipeline,
   primitives_layout: wgpu::BindGroupLayout,
   uniform_layout: wgpu::BindGroupLayout,
@@ -65,16 +66,13 @@ pub trait Frame {
   /// call this method manually, only if you want flush drawing things into gpu
   /// immediately.
   fn submit(&mut self);
-
-  /// Return the host canvas.
-  fn canvas(&mut self) -> &mut Canvas;
 }
 
 /// A frame for screen, anything drawing on the frame will commit to screen
 /// display.
-pub struct ScreenFrame<'a> {
-  texture: wgpu::SwapChainOutput,
-  canvas: &'a mut Canvas,
+pub struct ScreenFrame<'a, S: Surface> {
+  texture: S::V,
+  canvas: &'a mut Canvas<S>,
   encoder: Option<wgpu::CommandEncoder>,
 }
 
@@ -102,14 +100,23 @@ pub struct ScreenFrame<'a> {
 ///   ).unwrap();
 /// }
 /// ```
-pub struct TextureFrame<'a> {
-  texture: wgpu::Texture,
-  view: wgpu::TextureView,
-  canvas: &'a mut Canvas,
+pub struct TextureFrame<'a, S: Surface> {
+  texture: FrameTexture,
+  canvas: &'a mut Canvas<S>,
   encoder: Option<wgpu::CommandEncoder>,
 }
 
-impl<'a> TextureFrame<'a> {
+struct FrameTexture {
+  texture: wgpu::Texture,
+  view: wgpu::TextureView,
+}
+
+impl FrameTexture {
+  #[inline]
+  fn view(&self) -> &wgpu::TextureView { &self.view }
+}
+
+impl<'a, S: Surface> TextureFrame<'a, S> {
   /// PNG encoded the texture frame then write by `writer`.
   pub async fn to_png<W: std::io::Write>(
     &mut self,
@@ -117,9 +124,8 @@ impl<'a> TextureFrame<'a> {
   ) -> Result<(), &'static str> {
     self.submit();
 
-    let wgpu::SwapChainDescriptor { width, height, .. } = self.canvas.sc_desc;
     self.canvas.create_converter_if_none();
-    let rect = PhysicRect::from_size(PhysicSize::new(width, height));
+    let rect = PhysicRect::from_size(self.canvas.surface.size());
 
     let Canvas {
       device,
@@ -128,7 +134,7 @@ impl<'a> TextureFrame<'a> {
       ..
     } = self.canvas;
     texture_to_png(
-      &self.texture,
+      &self.texture.texture,
       rect,
       device,
       queue,
@@ -144,20 +150,23 @@ impl<'a> TextureFrame<'a> {
   }
 }
 
-impl Canvas {
-  /// Create a canvas by a native window.
-  pub async fn new<W: raw_window_handle::HasRawWindowHandle>(
+impl Canvas<PhysicSurface> {
+  /// Create a canvas and bind to a native window, its size is `width` and
+  /// `height`. If you want to create a headless window, use
+  /// [`from_window`](Canvas::window).
+  pub async fn from_window<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
     width: u32,
     height: u32,
   ) -> Self {
     let instance = wgpu::Instance::new();
-    let surface = unsafe { instance.create_surface(window) };
+
+    let w_surface = unsafe { instance.create_surface(window) };
     let adapter = instance
       .request_adapter(
         &wgpu::RequestAdapterOptions {
           power_preference: wgpu::PowerPreference::Default,
-          compatible_surface: Some(&surface),
+          compatible_surface: Some(&w_surface),
         },
         wgpu::BackendBit::PRIMARY,
       )
@@ -177,6 +186,7 @@ impl Canvas {
       .await
       .unwrap();
 
+    let surface = PhysicSurface::new(w_surface, &device, width, height);
     let sc_desc = wgpu::SwapChainDescriptor {
       usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
@@ -185,7 +195,6 @@ impl Canvas {
       present_mode: wgpu::PresentMode::Fifo,
     };
 
-    let swap_chain = device.create_swap_chain(&surface, &sc_desc);
     let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
     let pipeline = create_render_pipeline(
       &device,
@@ -222,8 +231,6 @@ impl Canvas {
       device,
       surface,
       queue,
-      swap_chain,
-      sc_desc,
       pipeline: pipeline,
       uniform_layout,
       primitives_layout: tex_infos_layout,
@@ -232,14 +239,19 @@ impl Canvas {
       rgba_converter: None,
     }
   }
+}
+
+impl<S: Surface> Canvas<S> {
+  /// Create a canvas which its size is `width` and `size`, if you want to bind
+  /// to a window, use [`from_window`](Canvas::from_window).
+  pub async fn new(width: u32, height: u32) -> Self {
+    unimplemented!();
+  }
 
   /// Create a new frame texture to draw, and commit to device when the `Frame`
   /// is dropped.
-  pub fn new_screen_frame(&mut self) -> ScreenFrame {
-    let chain_output = self
-      .swap_chain
-      .get_next_texture()
-      .expect("Timeout getting texture");
+  pub fn new_screen_frame(&mut self) -> ScreenFrame<S> {
+    let chain_output = self.surface.get_next_view();
 
     ScreenFrame {
       encoder: None,
@@ -248,13 +260,9 @@ impl Canvas {
     }
   }
 
-  pub fn new_texture_frame(&mut self) -> TextureFrame {
-    let wgpu::SwapChainDescriptor {
-      width,
-      height,
-      format,
-      ..
-    } = self.sc_desc;
+  pub fn new_texture_frame(&mut self) -> TextureFrame<S> {
+    let PhysicSize { width, height, .. } = self.surface.size();
+    let format = self.surface.format();
     // The render pipeline renders data into this texture
     let texture = self.device.create_texture(&wgpu::TextureDescriptor {
       size: wgpu::Extent3d {
@@ -272,8 +280,10 @@ impl Canvas {
     });
 
     TextureFrame {
-      view: texture.create_default_view(),
-      texture,
+      texture: FrameTexture {
+        view: texture.create_default_view(),
+        texture,
+      },
       canvas: self,
       encoder: None,
     }
@@ -281,10 +291,7 @@ impl Canvas {
 
   /// Resize canvas
   pub fn resize(&mut self, width: u32, height: u32) {
-    self.sc_desc.width = width;
-    self.sc_desc.height = height;
-    self.swap_chain =
-      self.device.create_swap_chain(&self.surface, &self.sc_desc);
+    self.surface.resize(&self.device, width, height);
     self.update_uniforms();
   }
 
@@ -292,8 +299,8 @@ impl Canvas {
   pub fn log_texture_atlas(&mut self) {
     self.create_converter_if_none();
 
+    let size = self.surface.size();
     let Canvas {
-      sc_desc,
       tex_atlas,
       device,
       queue,
@@ -306,7 +313,7 @@ impl Canvas {
 
     let atlas = texture_to_png(
       &tex_atlas.texture,
-      PhysicRect::from_size(PhysicSize::new(sc_desc.width, sc_desc.height)),
+      PhysicRect::from_size(size),
       device,
       queue,
       rgba_converter.as_ref().unwrap(),
@@ -317,7 +324,95 @@ impl Canvas {
   }
 }
 
-impl Canvas {
+impl<S: Surface> Canvas<S> {
+  // async fn create<W: raw_window_handle::HasRawWindowHandle>(
+  //   window: Option<&W>,
+  //   width: u32,
+  //   height: u32,
+  // ) -> Self {
+  //   let instance = wgpu::Instance::new();
+  //   let compatible_surface = window
+  //     .map(|w| unsafe { instance.create_surface(w) })
+  //     .as_ref();
+  //   let adapter = instance
+  //     .request_adapter(
+  //       &wgpu::RequestAdapterOptions {
+  //         power_preference: wgpu::PowerPreference::Default,
+  //         compatible_surface,
+  //       },
+  //       wgpu::BackendBit::PRIMARY,
+  //     )
+  //     .await
+  //     .unwrap();
+
+  //   let (device, queue) = adapter
+  //     .request_device(
+  //       &wgpu::DeviceDescriptor {
+  //         extensions: wgpu::Extensions {
+  //           anisotropic_filtering: false,
+  //         },
+  //         limits: Default::default(),
+  //       },
+  //       None,
+  //     )
+  //     .await
+  //     .unwrap();
+
+  //   let sc_desc = wgpu::SwapChainDescriptor {
+  //     usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+  //     format: wgpu::TextureFormat::Bgra8UnormSrgb,
+  //     width,
+  //     height,
+  //     present_mode: wgpu::PresentMode::Fifo,
+  //   };
+
+  //   let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+  //   let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
+  //   let pipeline = create_render_pipeline(
+  //     &device,
+  //     &sc_desc,
+  //     &[&uniform_layout, &tex_infos_layout],
+  //   );
+
+  //   let tex_atlas = TextureAtlas::new(&device);
+  //   let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+  //     address_mode_u: wgpu::AddressMode::ClampToEdge,
+  //     address_mode_v: wgpu::AddressMode::ClampToEdge,
+  //     address_mode_w: wgpu::AddressMode::ClampToEdge,
+  //     mag_filter: wgpu::FilterMode::Linear,
+  //     min_filter: wgpu::FilterMode::Linear,
+  //     mipmap_filter: wgpu::FilterMode::Linear,
+  //     lod_min_clamp: 0.0,
+  //     lod_max_clamp: 0.0,
+  //     compare: wgpu::CompareFunction::Always,
+  //     label: Some("Texture atlas sampler"),
+  //   });
+
+  //   let uniforms = create_uniforms(
+  //     &device,
+  //     &uniform_layout,
+  //     tex_atlas.size(),
+  //     &coordinate_2d_to_device_matrix(width, height),
+  //     &tex_atlas_sampler,
+  //     &tex_atlas.view,
+  //   );
+
+  //   Canvas {
+  //     tex_atlas,
+  //     tex_atlas_sampler,
+  //     device,
+  //     surface,
+  //     queue,
+  //     swap_chain,
+  //     sc_desc,
+  //     pipeline: pipeline,
+  //     uniform_layout,
+  //     primitives_layout: tex_infos_layout,
+  //     uniforms,
+  //     render_data: RenderData::default(),
+  //     rgba_converter: None,
+  //   }
+  // }
   fn create_converter_if_none(&mut self) {
     if self.rgba_converter.is_none() {
       self.rgba_converter = Some(RgbaConvert::new(&self.device));
@@ -404,11 +499,12 @@ impl Canvas {
 
   #[inline]
   fn update_uniforms(&mut self) {
+    let size = self.surface.size();
     self.uniforms = create_uniforms(
       &self.device,
       &self.uniform_layout,
       self.tex_atlas.size(),
-      &coordinate_2d_to_device_matrix(self.sc_desc.width, self.sc_desc.height),
+      &coordinate_2d_to_device_matrix(size.width, size.height),
       &self.tex_atlas_sampler,
       &self.tex_atlas.view,
     )
@@ -643,8 +739,8 @@ fn create_uniforms(
   })
 }
 
-fn mut_encoder<'a>(
-  canvas: &mut Canvas,
+fn mut_encoder<'a, S: Surface>(
+  canvas: &mut Canvas<S>,
   encoder_store: &'a mut Option<wgpu::CommandEncoder>,
 ) -> &'a mut wgpu::CommandEncoder {
   if encoder_store.is_none() {
@@ -653,17 +749,12 @@ fn mut_encoder<'a>(
   encoder_store.as_mut().unwrap()
 }
 
-macro frame_delegate_impl($($path: ident).*) {
-  #[inline]
-  fn canvas(&mut self) -> &mut Canvas { &mut self.canvas }
-
+macro frame_delegate_impl($($path: ident)?) {
   fn draw(&mut self) {
     if self.canvas.render_data.has_data() {
       let encoder = mut_encoder(&mut self.canvas, &mut self.encoder);
 
-      self
-        .canvas
-        .draw(&self$(.$path)*, encoder);
+      self.canvas.draw(&self.texture.view(), encoder);
     }
   }
 
@@ -671,32 +762,33 @@ macro frame_delegate_impl($($path: ident).*) {
     self.draw();
 
     if let Some(encoder) = self.encoder.take() {
-      self.canvas().queue.submit(Some(encoder.finish()));
+      self.canvas.queue.submit(Some(encoder.finish()));
     }
   }
 
   fn upload_render_command(&mut self, command: &RenderCommand) {
-    let Self {canvas, encoder, ..} = self;
+    let Self {
+      canvas, encoder, ..
+    } = self;
     let encoder = mut_encoder(canvas, encoder);
-    let view = &self$(.$path)*;
-    canvas.upload_render_command(command, encoder, view);
+    canvas.upload_render_command(command, encoder, self.texture.view());
   }
 }
 
-impl<'a> Frame for ScreenFrame<'a> {
-  frame_delegate_impl!(texture.view);
+impl<'a, S: Surface> Frame for ScreenFrame<'a, S> {
+  frame_delegate_impl!();
 }
 
-impl<'a> Frame for TextureFrame<'a> {
-  frame_delegate_impl!(view);
+impl<'a, S: Surface> Frame for TextureFrame<'a, S> {
+  frame_delegate_impl!();
 }
 
-impl<'a> Drop for ScreenFrame<'a> {
+impl<'a, S: Surface> Drop for ScreenFrame<'a, S> {
   #[inline]
   fn drop(&mut self) { self.submit(); }
 }
 
-impl<'a> Drop for TextureFrame<'a> {
+impl<'a, S: Surface> Drop for TextureFrame<'a, S> {
   #[inline]
   fn drop(&mut self) { self.submit(); }
 }
