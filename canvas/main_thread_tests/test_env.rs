@@ -17,7 +17,7 @@ pub fn new_canvas(width: u32, height: u32) -> (Canvas, Window, EventLoop<()>) {
 }
 
 #[allow(dead_code)]
-pub fn write_frame_to<S: Surface>(mut frame: TextureFrame<S>, path: &str) {
+pub fn write_frame_to<S: Surface>(mut frame: NewTextureFrame<S>, path: &str) {
   let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
   let _ = block_on(frame.save_as_png(&abs_path));
 }

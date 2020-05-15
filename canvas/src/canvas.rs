@@ -68,17 +68,47 @@ pub trait Frame {
   fn submit(&mut self);
 }
 
-/// A frame for screen, anything drawing on the frame will commit to screen
-/// display.
-pub struct ScreenFrame<'a, S: Surface> {
-  texture: S::V,
+pub struct FrameImpl<'a, S: Surface, T: FrameView> {
+  texture: T,
   canvas: &'a mut Canvas<S>,
   encoder: Option<wgpu::CommandEncoder>,
 }
 
-/// A texture frame, don't like [`ScreenFrame`](ScreenFrame), `TextureFrame` not
-/// directly present drawing on screen but drawing on a texture. Below example
-/// show how to store frame as a png image.
+impl<'a, S: Surface, T: FrameView> Frame for FrameImpl<'a, S, T> {
+  fn upload_render_command(&mut self, command: &RenderCommand) {
+    let Self {
+      canvas, encoder, ..
+    } = self;
+    let encoder = mut_encoder(canvas, encoder);
+    canvas.upload_render_command(command, encoder, self.texture.view());
+  }
+
+  fn draw(&mut self) {
+    if self.canvas.render_data.has_data() {
+      let encoder = mut_encoder(&mut self.canvas, &mut self.encoder);
+
+      self.canvas.draw(&self.texture.view(), encoder);
+    }
+  }
+
+  fn submit(&mut self) {
+    self.draw();
+
+    if let Some(encoder) = self.encoder.take() {
+      self.canvas.queue.submit(Some(encoder.finish()));
+    }
+  }
+}
+
+/// A frame for canvas, anything drawing on the frame will commit to canvas
+/// display.
+pub type CanvasFrame<'a, S> = FrameImpl<'a, S, <S as Surface>::V>;
+
+/// A frame will create new texture, don't like [`CanvasFrame`](CanvasFrame),
+/// `NewTextureFrame` not directly present drawing on canvas but drawing on self
+/// texture. What your draw on `NewTextureFrame` will not commit back to canvas.
+///
+/// Below example show how to store frame as a png image.
 ///
 /// # Example
 ///
@@ -100,23 +130,19 @@ pub struct ScreenFrame<'a, S: Surface> {
 ///   ).unwrap();
 /// }
 /// ```
-pub struct TextureFrame<'a, S: Surface> {
-  texture: FrameTexture,
-  canvas: &'a mut Canvas<S>,
-  encoder: Option<wgpu::CommandEncoder>,
-}
+pub type NewTextureFrame<'a, S> = FrameImpl<'a, S, FrameTexture>;
 
-struct FrameTexture {
+pub struct FrameTexture {
   texture: wgpu::Texture,
   view: wgpu::TextureView,
 }
 
-impl FrameTexture {
+impl FrameView for FrameTexture {
   #[inline]
   fn view(&self) -> &wgpu::TextureView { &self.view }
 }
 
-impl<'a, S: Surface> TextureFrame<'a, S> {
+impl<'a, S: Surface> NewTextureFrame<'a, S> {
   /// PNG encoded the texture frame then write by `writer`.
   pub async fn to_png<W: std::io::Write>(
     &mut self,
@@ -250,17 +276,17 @@ impl<S: Surface> Canvas<S> {
 
   /// Create a new frame texture to draw, and commit to device when the `Frame`
   /// is dropped.
-  pub fn new_screen_frame(&mut self) -> ScreenFrame<S> {
+  pub fn new_screen_frame(&mut self) -> CanvasFrame<S> {
     let chain_output = self.surface.get_next_view();
 
-    ScreenFrame {
+    CanvasFrame {
       encoder: None,
       texture: chain_output,
       canvas: self,
     }
   }
 
-  pub fn new_texture_frame(&mut self) -> TextureFrame<S> {
+  pub fn new_texture_frame(&mut self) -> NewTextureFrame<S> {
     let PhysicSize { width, height, .. } = self.surface.size();
     let format = self.surface.format();
     // The render pipeline renders data into this texture
@@ -279,7 +305,7 @@ impl<S: Surface> Canvas<S> {
       label: None,
     });
 
-    TextureFrame {
+    NewTextureFrame {
       texture: FrameTexture {
         view: texture.create_default_view(),
         texture,
@@ -749,46 +775,7 @@ fn mut_encoder<'a, S: Surface>(
   encoder_store.as_mut().unwrap()
 }
 
-macro frame_delegate_impl($($path: ident)?) {
-  fn draw(&mut self) {
-    if self.canvas.render_data.has_data() {
-      let encoder = mut_encoder(&mut self.canvas, &mut self.encoder);
-
-      self.canvas.draw(&self.texture.view(), encoder);
-    }
-  }
-
-  fn submit(&mut self) {
-    self.draw();
-
-    if let Some(encoder) = self.encoder.take() {
-      self.canvas.queue.submit(Some(encoder.finish()));
-    }
-  }
-
-  fn upload_render_command(&mut self, command: &RenderCommand) {
-    let Self {
-      canvas, encoder, ..
-    } = self;
-    let encoder = mut_encoder(canvas, encoder);
-    canvas.upload_render_command(command, encoder, self.texture.view());
-  }
-}
-
-impl<'a, S: Surface> Frame for ScreenFrame<'a, S> {
-  frame_delegate_impl!();
-}
-
-impl<'a, S: Surface> Frame for TextureFrame<'a, S> {
-  frame_delegate_impl!();
-}
-
-impl<'a, S: Surface> Drop for ScreenFrame<'a, S> {
-  #[inline]
-  fn drop(&mut self) { self.submit(); }
-}
-
-impl<'a, S: Surface> Drop for TextureFrame<'a, S> {
+impl<'a, S: Surface, T: FrameView> Drop for FrameImpl<'a, S, T> {
   #[inline]
   fn drop(&mut self) { self.submit(); }
 }
