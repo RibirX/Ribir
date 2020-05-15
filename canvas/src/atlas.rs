@@ -1,14 +1,13 @@
-use super::{Color, PhysicPoint, PhysicSize};
+use super::{surface::Texture, Color, PhysicPoint, PhysicSize};
 use guillotiere::*;
 mod color_palette;
 use color_palette::ColorPalettes;
 
 pub(crate) struct TextureAtlas {
-  pub(crate) texture: wgpu::Texture,
+  pub(crate) texture: Texture,
   pub(crate) view: wgpu::TextureView,
   atlas_allocator: AtlasAllocator,
   color_palettes: ColorPalettes,
-  size: PhysicSize,
 }
 
 const INIT_SIZE: u32 = 512;
@@ -25,16 +24,20 @@ pub(crate) enum AtlasStoreErr {
 
 impl TextureAtlas {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
-    let texture = Self::new_texture(device, INIT_SIZE, INIT_SIZE);
-
-    let mut atlas_allocator =
-      AtlasAllocator::new(size2(INIT_SIZE as i32, INIT_SIZE as i32));
+    let size = PhysicSize::new(INIT_SIZE, INIT_SIZE);
+    let mut atlas_allocator = AtlasAllocator::new(size.cast_unit().to_i32());
+    let texture = Texture::new(
+      device,
+      size,
+      wgpu::TextureUsage::COPY_DST
+        | wgpu::TextureUsage::SAMPLED
+        | wgpu::TextureUsage::COPY_SRC,
+    );
     TextureAtlas {
-      view: texture.create_default_view(),
+      view: texture.raw_texture.create_default_view(),
       texture,
       color_palettes: ColorPalettes::new(&mut atlas_allocator),
       atlas_allocator,
-      size: PhysicSize::new(INIT_SIZE, INIT_SIZE),
     }
   }
 
@@ -46,13 +49,14 @@ impl TextureAtlas {
     color: Color,
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
+    queue: &wgpu::Queue,
   ) -> Result<(PhysicPoint, bool), AtlasStoreErr> {
     macro store_color($grow: ident) {
       self
         .color_palettes
         .store_color_in_palette(
           color,
-          &self.texture,
+          &self.texture.raw_texture,
           &mut self.atlas_allocator,
           device,
           encoder,
@@ -62,15 +66,14 @@ impl TextureAtlas {
 
     store_color!(false)
       .or_else(|| {
-        if self.size.height * 2 <= MAX_SIZE {
-          let mut size = self.size;
+        let mut size = self.texture.size();
+        if size.height * 2 <= MAX_SIZE {
           size.height *= 2;
-          self.grow_texture(size, device, encoder);
+          self.grow_texture(size, device, queue);
           store_color!(true)
-        } else if self.size.width < MAX_SIZE {
-          let mut size = self.size;
+        } else if size.width < MAX_SIZE {
           size.width *= 2;
-          self.grow_texture(size, device, encoder);
+          self.grow_texture(size, device, queue);
           store_color!(true)
         } else {
           None
@@ -80,7 +83,7 @@ impl TextureAtlas {
   }
 
   #[inline]
-  pub(crate) fn size(&self) -> PhysicSize { self.size }
+  pub(crate) fn size(&self) -> PhysicSize { self.texture.size() }
 
   /// Flush all data to the texture and ready to commit to gpu.
   /// Call this function before commit drawing to gpu.
@@ -90,7 +93,7 @@ impl TextureAtlas {
     encoder: &mut wgpu::CommandEncoder,
   ) {
     self.color_palettes.save_current_palette_to_texture(
-      &self.texture,
+      &self.texture.raw_texture,
       device,
       encoder,
     );
@@ -124,55 +127,10 @@ impl TextureAtlas {
     &mut self,
     size: PhysicSize,
     device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
+    queue: &wgpu::Queue,
   ) {
     self.atlas_allocator.grow(size.to_i32().to_untyped());
-    let new_texture = Self::new_texture(device, size.width, size.height);
-
-    encoder.copy_texture_to_texture(
-      wgpu::TextureCopyView {
-        texture: &self.texture,
-        mip_level: 0,
-        array_layer: 0,
-        origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
-      },
-      wgpu::TextureCopyView {
-        texture: &new_texture,
-        mip_level: 0,
-        array_layer: 0,
-        origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
-      },
-      wgpu::Extent3d {
-        width: self.size.width,
-        height: self.size.height,
-        depth: 1,
-      },
-    );
-
-    self.size = size;
-    self.texture = new_texture;
-    self.view = self.texture.create_default_view();
-  }
-
-  fn new_texture(
-    device: &wgpu::Device,
-    width: u32,
-    height: u32,
-  ) -> wgpu::Texture {
-    device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("Canvas texture atlas"),
-      size: wgpu::Extent3d {
-        width,
-        height,
-        depth: 1,
-      },
-      dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Bgra8UnormSrgb,
-      usage: wgpu::TextureUsage::COPY_DST
-        | wgpu::TextureUsage::SAMPLED
-        | wgpu::TextureUsage::COPY_SRC,
-      mip_level_count: 1,
-      sample_count: 1,
-    })
+    self.texture.resize(device, queue, size);
+    self.view = self.texture.raw_texture.create_default_view();
   }
 }

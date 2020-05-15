@@ -1,16 +1,16 @@
+use super::atlas::{AtlasStoreErr, TextureAtlas};
 use super::{
   FillStyle, LogicUnit, PhysicPoint, PhysicRect, PhysicSize, PhysicUnit, Point,
   RenderAttr, RenderCommand, Rendering2DLayer,
 };
+use std::borrow::Borrow;
 use zerocopy::AsBytes;
-
-use super::atlas::{AtlasStoreErr, TextureAtlas};
 
 mod img_helper;
 use img_helper::{texture_to_png, RgbaConvert};
 pub mod surface;
 pub use surface::Surface;
-use surface::{FrameView, PhysicSurface};
+use surface::{FrameView, PhysicSurface, Texture};
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -68,26 +68,28 @@ pub trait Frame {
   fn submit(&mut self);
 }
 
-pub struct FrameImpl<'a, S: Surface, T: FrameView> {
-  texture: T,
+pub struct FrameImpl<'a, S: Surface, T: Borrow<wgpu::TextureView>> {
+  view: T,
   canvas: &'a mut Canvas<S>,
   encoder: Option<wgpu::CommandEncoder>,
 }
 
-impl<'a, S: Surface, T: FrameView> Frame for FrameImpl<'a, S, T> {
+impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Frame
+  for FrameImpl<'a, S, T>
+{
   fn upload_render_command(&mut self, command: &RenderCommand) {
     let Self {
       canvas, encoder, ..
     } = self;
     let encoder = mut_encoder(canvas, encoder);
-    canvas.upload_render_command(command, encoder, self.texture.view());
+    canvas.upload_render_command(command, encoder, self.view.borrow());
   }
 
   fn draw(&mut self) {
     if self.canvas.render_data.has_data() {
       let encoder = mut_encoder(&mut self.canvas, &mut self.encoder);
 
-      self.canvas.draw(&self.texture.view(), encoder);
+      self.canvas.draw(&self.view.borrow(), encoder);
     }
   }
 
@@ -130,16 +132,19 @@ pub type CanvasFrame<'a, S> = FrameImpl<'a, S, <S as Surface>::V>;
 ///   ).unwrap();
 /// }
 /// ```
-pub type NewTextureFrame<'a, S> = FrameImpl<'a, S, FrameTexture>;
-
-pub struct FrameTexture {
-  texture: wgpu::Texture,
-  view: wgpu::TextureView,
+pub struct NewTextureFrame<'a, S: Surface> {
+  frame: FrameImpl<'a, S, FrameView<wgpu::TextureView>>,
+  texture: Texture,
 }
 
-impl FrameView for FrameTexture {
+impl<'a, S: Surface> std::ops::Deref for NewTextureFrame<'a, S> {
+  type Target = FrameImpl<'a, S, FrameView<wgpu::TextureView>>;
   #[inline]
-  fn view(&self) -> &wgpu::TextureView { &self.view }
+  fn deref(&self) -> &Self::Target { &self.frame }
+}
+
+impl<'a, S: Surface> std::ops::DerefMut for NewTextureFrame<'a, S> {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.frame }
 }
 
 impl<'a, S: Surface> NewTextureFrame<'a, S> {
@@ -158,9 +163,10 @@ impl<'a, S: Surface> NewTextureFrame<'a, S> {
       queue,
       rgba_converter,
       ..
-    } = self.canvas;
+    } = self.frame.canvas;
+
     texture_to_png(
-      &self.texture.texture,
+      &self.texture.raw_texture,
       rect,
       device,
       queue,
@@ -281,43 +287,34 @@ impl<S: Surface> Canvas<S> {
 
     CanvasFrame {
       encoder: None,
-      texture: chain_output,
+      view: chain_output,
       canvas: self,
     }
   }
 
   pub fn new_texture_frame(&mut self) -> NewTextureFrame<S> {
-    let PhysicSize { width, height, .. } = self.surface.size();
-    let format = self.surface.format();
-    // The render pipeline renders data into this texture
-    let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-      size: wgpu::Extent3d {
-        width,
-        height,
-        depth: 1,
-      },
-      mip_level_count: 1,
-      sample_count: 1,
-      dimension: wgpu::TextureDimension::D2,
-      format,
-      usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
-        | wgpu::TextureUsage::COPY_SRC,
-      label: None,
-    });
+    let size = self.surface.size();
 
+    let mut texture = Texture::new(
+      &self.device,
+      size,
+      wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+    );
     NewTextureFrame {
-      texture: FrameTexture {
-        view: texture.create_default_view(),
-        texture,
+      frame: FrameImpl {
+        view: texture.get_next_view(),
+        canvas: self,
+        encoder: None,
       },
-      canvas: self,
-      encoder: None,
+      texture,
     }
   }
 
   /// Resize canvas
   pub fn resize(&mut self, width: u32, height: u32) {
-    self.surface.resize(&self.device, width, height);
+    self
+      .surface
+      .resize(&self.device, &self.queue, width, height);
     self.update_uniforms();
   }
 
@@ -338,7 +335,7 @@ impl<S: Surface> Canvas<S> {
     let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
 
     let atlas = texture_to_png(
-      &tex_atlas.texture,
+      &tex_atlas.texture.raw_texture,
       PhysicRect::from_size(size),
       device,
       queue,
@@ -507,10 +504,12 @@ impl<S: Surface> Canvas<S> {
   ) -> Result<(PhysicPoint, PhysicSize), AtlasStoreErr> {
     let (pos, size, grown) = match style {
       FillStyle::Color(c) => {
-        let (pos, grown) =
-          self
-            .tex_atlas
-            .store_color_in_palette(*c, &self.device, encoder)?;
+        let (pos, grown) = self.tex_atlas.store_color_in_palette(
+          *c,
+          &self.device,
+          encoder,
+          &self.queue,
+        )?;
 
         (pos, PhysicSize::new(1, 1), grown)
       }
@@ -775,7 +774,9 @@ fn mut_encoder<'a, S: Surface>(
   encoder_store.as_mut().unwrap()
 }
 
-impl<'a, S: Surface, T: FrameView> Drop for FrameImpl<'a, S, T> {
+impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Drop
+  for FrameImpl<'a, S, T>
+{
   #[inline]
   fn drop(&mut self) { self.submit(); }
 }

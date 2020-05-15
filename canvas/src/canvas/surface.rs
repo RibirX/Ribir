@@ -1,16 +1,21 @@
 use super::PhysicSize;
+use std::borrow::Borrow;
 
 /// `Surface` is a thing presentable canvas visual display.
 pub trait Surface {
-  type V: FrameView;
-  fn size(&self) -> PhysicSize;
-  fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32);
-  fn format(&self) -> wgpu::TextureFormat;
-  fn get_next_view(&mut self) -> Self::V;
-}
+  type V: Borrow<wgpu::TextureView>;
 
-pub trait FrameView {
-  fn view(&self) -> &wgpu::TextureView;
+  fn resize(
+    &mut self,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    width: u32,
+    height: u32,
+  );
+
+  fn size(&self) -> PhysicSize;
+
+  fn get_next_view(&mut self) -> Self::V;
 }
 
 /// A `Surface` represents a platform-specific surface (e.g. a window).
@@ -20,25 +25,33 @@ pub struct PhysicSurface {
   sc_desc: wgpu::SwapChainDescriptor,
 }
 
+/// A `Surface` present in a texture. Usually `PhysicSurface` display things to
+/// screen(window eg.), But `TextureSurface` is soft, may not display in any
+/// device, bug only in memory.
+pub type TextureSurface = Texture;
+
 impl Surface for PhysicSurface {
-  type V = TView<wgpu::SwapChainOutput>;
+  type V = FrameView<wgpu::SwapChainOutput>;
 
   #[inline]
   fn size(&self) -> PhysicSize {
     PhysicSize::new(self.sc_desc.width, self.sc_desc.height)
   }
 
-  fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+  fn resize(
+    &mut self,
+    device: &wgpu::Device,
+    _queue: &wgpu::Queue,
+    width: u32,
+    height: u32,
+  ) {
     self.sc_desc.width = width;
     self.sc_desc.height = height;
     self.swap_chain = device.create_swap_chain(&self.surface, &self.sc_desc);
   }
 
-  #[inline]
-  fn format(&self) -> wgpu::TextureFormat { self.sc_desc.format }
-
   fn get_next_view(&mut self) -> Self::V {
-    TView(
+    FrameView(
       self
         .swap_chain
         .get_next_texture()
@@ -47,11 +60,37 @@ impl Surface for PhysicSurface {
   }
 }
 
-pub struct TView<T>(T);
+impl Surface for TextureSurface {
+  type V = FrameView<wgpu::TextureView>;
 
-impl FrameView for TView<wgpu::SwapChainOutput> {
   #[inline]
-  fn view(&self) -> &wgpu::TextureView { &self.0.view }
+  fn size(&self) -> PhysicSize { self.size }
+
+  fn resize(
+    &mut self,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    width: u32,
+    height: u32,
+  ) {
+    self.resize(device, queue, PhysicSize::new(width, height));
+  }
+
+  #[inline]
+  fn get_next_view(&mut self) -> Self::V {
+    FrameView(self.raw_texture.create_default_view())
+  }
+}
+
+pub struct FrameView<T>(T);
+
+impl Borrow<wgpu::TextureView> for FrameView<wgpu::SwapChainOutput> {
+  fn borrow(&self) -> &wgpu::TextureView { &self.0.view }
+}
+
+impl Borrow<wgpu::TextureView> for FrameView<wgpu::TextureView> {
+  #[inline]
+  fn borrow(&self) -> &wgpu::TextureView { &self.0 }
 }
 
 impl PhysicSurface {
@@ -79,28 +118,85 @@ impl PhysicSurface {
   }
 }
 
-/// A surface use a texture to present
-pub(crate) struct SoftSurface {
+pub struct Texture {
+  pub(crate) raw_texture: wgpu::Texture,
   size: PhysicSize,
-  format: wgpu::TextureFormat,
-  texture: wgpu::Texture,
-  view: wgpu::TextureView,
+  usage: wgpu::TextureUsage,
 }
 
-// impl Surface for SoftSurface {
-//   type V = TView<wgpu::TextureView>;
+impl Texture {
+  pub(crate) fn new(
+    device: &wgpu::Device,
+    size: PhysicSize,
+    usage: wgpu::TextureUsage,
+  ) -> Self {
+    let raw_texture = Self::new_texture(device, size, usage);
+    Texture {
+      size,
+      raw_texture,
+      usage,
+    }
+  }
 
-//   #[inline(lint)]
-//   fn size(&self) -> PhysicSize { self.size }
+  #[inline]
+  pub(crate) fn size(&self) -> PhysicSize { self.size }
 
-//   #[inline]
-//   fn format(&self) -> wgpu::TextureFormat { self.format }
+  pub(crate) fn resize(
+    &mut self,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    size: PhysicSize,
+  ) {
+    let new_texture = Self::new_texture(device, size, self.usage);
 
-//   fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-//     unimplemented!();
-//   }
+    let size = size.min(self.size);
+    let mut encoder =
+      device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Render Encoder"),
+      });
+    encoder.copy_texture_to_texture(
+      wgpu::TextureCopyView {
+        texture: &self.raw_texture,
+        mip_level: 0,
+        array_layer: 0,
+        origin: wgpu::Origin3d::ZERO,
+      },
+      wgpu::TextureCopyView {
+        texture: &new_texture,
+        mip_level: 0,
+        array_layer: 0,
+        origin: wgpu::Origin3d::ZERO,
+      },
+      wgpu::Extent3d {
+        width: size.width,
+        height: size.height,
+        depth: 1,
+      },
+    );
 
-//   fn get_next_view(&mut self) -> Self::V {
-//     unimplemented!();
-//   }
-// }
+    queue.submit(Some(encoder.finish()));
+
+    self.size = size;
+    self.raw_texture = new_texture;
+  }
+
+  fn new_texture(
+    device: &wgpu::Device,
+    size: PhysicSize,
+    usage: wgpu::TextureUsage,
+  ) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+      label: Some("new texture"),
+      size: wgpu::Extent3d {
+        width: size.width,
+        height: size.height,
+        depth: 1,
+      },
+      dimension: wgpu::TextureDimension::D2,
+      format: wgpu::TextureFormat::Bgra8UnormSrgb,
+      usage,
+      mip_level_count: 1,
+      sample_count: 1,
+    })
+  }
+}
