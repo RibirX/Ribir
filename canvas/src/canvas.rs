@@ -151,25 +151,31 @@ impl Canvas {
     width: u32,
     height: u32,
   ) -> Self {
-    let surface = wgpu::Surface::create(window);
-    let adapter = wgpu::Adapter::request(
-      &wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::Default,
-        compatible_surface: Some(&surface),
-      },
-      wgpu::BackendBit::PRIMARY,
-    )
-    .await
-    .unwrap();
+    let instance = wgpu::Instance::new();
+    let surface = unsafe { instance.create_surface(window) };
+    let adapter = instance
+      .request_adapter(
+        &wgpu::RequestAdapterOptions {
+          power_preference: wgpu::PowerPreference::Default,
+          compatible_surface: Some(&surface),
+        },
+        wgpu::BackendBit::PRIMARY,
+      )
+      .await
+      .unwrap();
 
     let (device, queue) = adapter
-      .request_device(&wgpu::DeviceDescriptor {
-        extensions: wgpu::Extensions {
-          anisotropic_filtering: false,
+      .request_device(
+        &wgpu::DeviceDescriptor {
+          extensions: wgpu::Extensions {
+            anisotropic_filtering: false,
+          },
+          limits: Default::default(),
         },
-        limits: Default::default(),
-      })
-      .await;
+        None,
+      )
+      .await
+      .unwrap();
 
     let sc_desc = wgpu::SwapChainDescriptor {
       usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -198,6 +204,7 @@ impl Canvas {
       lod_min_clamp: 0.0,
       lod_max_clamp: 0.0,
       compare: wgpu::CompareFunction::Always,
+      label: Some("Texture atlas sampler"),
     });
 
     let uniforms = create_uniforms(
@@ -257,7 +264,6 @@ impl Canvas {
       },
       mip_level_count: 1,
       sample_count: 1,
-      array_layer_count: 1,
       dimension: wgpu::TextureDimension::D2,
       format,
       usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
@@ -350,8 +356,8 @@ impl Canvas {
           depth_stencil_attachment: None,
         });
       render_pass.set_pipeline(&self.pipeline);
-      render_pass.set_vertex_buffer(0, &vertices_buffer, 0, 0);
-      render_pass.set_index_buffer(&indices_buffer, 0, 0);
+      render_pass.set_vertex_buffer(0, vertices_buffer.slice(..));
+      render_pass.set_index_buffer(indices_buffer.slice(..));
       render_pass.set_bind_group(0, &self.uniforms, &[]);
       render_pass.set_bind_group(1, &tex_infos_bind_group, &[]);
 
@@ -412,17 +418,13 @@ impl Canvas {
     let primitives = &self.render_data.primitives;
     let primitives_buffer = self.device.create_buffer_with_data(
       primitives.as_bytes(),
-      wgpu::BufferUsage::STORAGE_READ,
+      wgpu::BufferUsage::STORAGE,
     );
-    let size = primitives.len() * std::mem::size_of::<Primitive>();
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.primitives_layout,
       bindings: &[wgpu::Binding {
         binding: SecondBindings::Primitive as u32,
-        resource: wgpu::BindingResource::Buffer {
-          buffer: &primitives_buffer,
-          range: 0..size as wgpu::BufferAddress,
-        },
+        resource: wgpu::BindingResource::Buffer(primitives_buffer.slice(..)),
       }],
       label: Some("texture infos bind group"),
     })
@@ -626,10 +628,7 @@ fn create_uniforms(
     bindings: &[
       wgpu::Binding {
         binding: PrimaryBindings::GlobalUniform as u32,
-        resource: wgpu::BindingResource::Buffer {
-          buffer: &uniform_buffer,
-          range: 0..std::mem::size_of::<GlobalUniform>() as wgpu::BufferAddress,
-        },
+        resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
       },
       wgpu::Binding {
         binding: PrimaryBindings::TextureAtlas as u32,
@@ -672,7 +671,7 @@ macro frame_delegate_impl($($path: ident).*) {
     self.draw();
 
     if let Some(encoder) = self.encoder.take() {
-      self.canvas().queue.submit(&[encoder.finish()]);
+      self.canvas().queue.submit(Some(encoder.finish()));
     }
   }
 
