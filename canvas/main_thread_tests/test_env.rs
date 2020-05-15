@@ -12,12 +12,12 @@ pub fn new_canvas(width: u32, height: u32) -> (Canvas, Window, EventLoop<()>) {
   let event_loop = EventLoop::new();
   let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-  let canvas = block_on(Canvas::new(&window, width, height));
+  let canvas = block_on(Canvas::from_window(&window, width, height));
   (canvas, window, event_loop)
 }
 
 #[allow(dead_code)]
-pub fn write_frame_to(mut frame: TextureFrame, path: &str) {
+pub fn write_frame_to<S: Surface>(mut frame: TextureFrame<S>, path: &str) {
   let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
   let _ = block_on(frame.save_as_png(&abs_path));
 }

@@ -13,7 +13,8 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
-  let mut canvas = block_on(Canvas::new(&window, size.width, size.height));
+  let mut canvas =
+    block_on(Canvas::from_window(&window, size.width, size.height));
 
   event_loop.run(move |event, _, control_flow| match event {
     Event::WindowEvent {

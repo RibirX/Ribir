@@ -26,7 +26,7 @@ impl<'a> Window<'a> {
   ) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
-    let canvas = Canvas::new(&native_window, size.width, size.height);
+    let canvas = Canvas::from_window(&native_window, size.width, size.height);
 
     let canvas = futures::executor::block_on(canvas);
     let mut wnd = Window {
