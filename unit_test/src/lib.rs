@@ -1,21 +1,11 @@
+#![feature(decl_macro)]
+
 use canvas::*;
+#[allow(unused_imports)]
 use colored::*;
 use futures::executor::block_on;
+#[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
-use winit::{
-  event_loop::EventLoop,
-  window::{Window, WindowBuilder},
-};
-
-/// create canvas env to test
-pub fn new_canvas(width: u32, height: u32) -> (Canvas, Window, EventLoop<()>) {
-  let event_loop = EventLoop::new();
-  let window = WindowBuilder::new().build(&event_loop).unwrap();
-
-  let canvas =
-    block_on(Canvas::from_window(&window, DeviceSize::new(width, height)));
-  (canvas, window, event_loop)
-}
 
 #[allow(dead_code)]
 pub fn write_frame_to<S: Surface>(mut frame: NewTextureFrame<S>, path: &str) {
@@ -44,14 +34,16 @@ pub macro assert_frame_eq($frame: expr, $path: expr $(,)?) {
   }
 }
 
+#[allow(unused_macros)]
 macro count {
-    () => (0usize),
-    ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*))
+  () => (0usize),
+  ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*))
 }
 
 /// A unit test help macro to describe the test flow. This macro provide ability
 /// to pack many unit tests, and print the result like official. Should always
-/// use official test harness first, use it only when you execute test by self.
+/// use official test harness first, use it only when you need execute test by
+/// self.
 ///
 /// # Example
 /// fn test_first() {}
@@ -118,3 +110,26 @@ pub macro unit_test_describe($(run_unit_test($name: ident);)* ) {{
   }
 
 }}
+
+#[cfg(test)]
+
+mod tests {
+  use super::*;
+
+  #[test]
+  #[should_panic = "test 2 panic!"]
+  fn smoke() {
+    fn test1() {
+      panic!("test 1 panic!");
+    }
+
+    fn test2() {
+      panic!("test 2 panic!");
+    }
+
+    unit_test_describe! {
+      run_unit_test(test1);
+      run_unit_test(test2);
+    }
+  }
+}

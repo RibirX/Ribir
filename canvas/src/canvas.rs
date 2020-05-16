@@ -232,6 +232,32 @@ impl Canvas<TextureSurface> {
     })
     .await
   }
+
+  /// PNG encoded the canvas then write by `writer`.
+  pub async fn to_png<W: std::io::Write>(
+    &mut self,
+    writer: W,
+  ) -> Result<(), &'static str> {
+    self.create_converter_if_none();
+    let rect = DeviceRect::from_size(self.surface.size());
+
+    let Self {
+      surface,
+      device,
+      queue,
+      rgba_converter,
+      ..
+    } = self;
+    texture_to_png(
+      &surface.raw_texture,
+      rect,
+      device,
+      queue,
+      rgba_converter.as_ref().unwrap(),
+      writer,
+    )
+    .await
+  }
 }
 
 impl<S: Surface> Canvas<S> {
@@ -828,6 +854,12 @@ mod tests {
   use crate::*;
   use futures::executor::block_on;
 
+  fn circle_50() -> Path {
+    let mut path = Path::builder();
+    path.add_circle(euclid::Point2D::new(0., 0.), 50., Winding::Positive);
+    path.build()
+  }
+
   #[test]
   fn coordinate_2d_start() {
     let matrix = coordinate_2d_to_device_matrix(400, 400);
@@ -846,6 +878,7 @@ mod tests {
   }
 
   #[test]
+  #[ignore = "gpu need"]
   fn render_command_upload_indices_check() {
     use lyon::tessellation::VertexBuffers;
 
@@ -876,5 +909,53 @@ mod tests {
     let data = &frame.canvas.render_data;
     debug_assert_eq!(data.vertices.len(), 6);
     debug_assert_eq!(&data.indices, &[0, 1, 2, 3, 4, 5]);
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn smoke_draw_circle() {
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let path = circle_50();
+
+    let mut frame = canvas.new_texture_frame();
+    let mut layer = frame.new_2d_layer();
+    layer.set_brush_style(FillStyle::Color(const_color::BLACK.into()));
+    layer.translate(50., 50.);
+    layer.fill_path(path);
+    frame.compose_2d_layer(layer);
+
+    unit_test::assert_frame_eq!(frame, "./test_imgs/smoke_draw_circle.png",);
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn color_palette_texture() {
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let path = circle_50();
+    {
+      let mut frame = canvas.new_texture_frame();
+      let mut layer = frame.new_2d_layer();
+
+      let mut fill_color_circle =
+        |color: Color, offset_x: f32, offset_y: f32| {
+          layer
+            .set_brush_style(FillStyle::Color(color))
+            .translate(offset_x, offset_y)
+            .fill_path(path.clone());
+        };
+
+      fill_color_circle(const_color::YELLOW.into(), 50., 50.);
+      fill_color_circle(const_color::RED.into(), 100., 0.);
+      fill_color_circle(const_color::PINK.into(), 100., 0.);
+      fill_color_circle(const_color::GREEN.into(), 100., 0.);
+      fill_color_circle(const_color::BLUE.into(), -0., 100.);
+
+      frame.compose_2d_layer(layer);
+
+      unit_test::assert_frame_eq!(
+        frame,
+        "./test_imgs/color_palette_texture.png",
+      );
+    }
   }
 }
