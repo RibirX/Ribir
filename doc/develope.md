@@ -3,48 +3,40 @@
 
 ## Test
 
-We mainly use the official test harness to test and bench our project. But some test case we need control in a custom way. Usually we don't use official way in two cases:
+We mainly use the official test harness to test and bench our project. But some test case we need control in a custom way. 
 
-1. Case must run in main thread, like need create a event loop etc.
-2. Case need gpu support, but generally not available in ci environment.
+### How to write your unit test ?
 
-So we split test cases into two parts by feature `main-thread-test`. 
+Usually just follow rust official test guide, except two  
 
-In develop environment, you should run all test:
+1. Your test case need gpu support, for example, need create a canvas. In generally these cases are not available in ci environment. So we need point out ignore it, otherwise ci may failure. So, just add a `ignore` attr for it, like below.
 
-```
-cargo test --all-features
-```
-
-In the ci environment we use two command to run different tests.
-
-First, and the major, test the tests by official harness and not require gpu support, neither need run in main thread:
-
-```
-cargo test
+```rust
+  #[test]
+  #[ignore = "gpu need"]
+  fn canvas_draw_circle() {
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    // ...
+  }
 ```
 
-Second, we run only the tests be limited in main thread and may access gpu ability. Also required the ci environment provide gpu support:
+`#[ignore = "gpu need"]`, that all.
 
-```
-cargo test --all-features main-thread-test 
-```
 
-### How to write test with `main-thread-test`
+2. Your test must run in main thread, for example it's depend on a event loop etc.
 
-First, disable official test harness in cargo.toml. And your test path like below, remember add `required-features = ["main-thread-test"]` so your test will run only with feature `main-thread-test`.
+To ensure test run in main thread, we need to disable official test harness in `cargo.toml`. And provide its own main function to handle running tests. 
 
 ```
 [[test]]
 name = "canvas"
 path = "main_thread_tests/canvas.test.rs"
 harness = false
-required-features = ["main-thread-test"]
 ```
 
 Now, the `main` function in `main_thread_tests/canvas.test.rs` can testable. But the output is not friendly, and whole file assume as one unit test.
 
-We provide an `unit_test_describe` to help to pack many tests, so you can write many tests in the file and output friendly, like this:
+We provide a crate `unit_test`  to help to pack many tests, so you can write many tests in the file and output friendly, like this:
 
 
 ```rust
@@ -65,4 +57,26 @@ fn main() {
   }
 }
 
+```
+
+## How to run tests ? 
+
+In develop environment, you should run all test:
+
+```
+cargo test --  --include-ignored -Z unstable-options
+```
+
+In the ci environment we use two command to run different tests.
+
+First, and the major, test the tests by official harness and not require gpu support:
+
+```
+cargo test
+```
+
+Second, we run only the tests be ignored that may access gpu ability. Also required the ci environment provide gpu support:
+
+```
+cargo test -- --ignored 
 ```

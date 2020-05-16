@@ -3,6 +3,7 @@
 members = [
     "core",
     "canvas",
+    "unit_test",
     "examples/*"
 ]
 

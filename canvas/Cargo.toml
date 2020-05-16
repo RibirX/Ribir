@@ -22,13 +22,4 @@ futures="0.3.5"
 [dev-dependencies]
 winit="0.22.1"
 futures="0.3.4"
-colored = "1.9.3"
-
-[[test]]
-name = "canvas_gl"
-path = "main_thread_tests/canvas.gl.test.rs"
-harness = false
-required-features = ["main-thread-test"]
-
-[features]
-main-thread-test =[]
+unit_test = {path ="../unit_test"}

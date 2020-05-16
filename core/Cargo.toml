@@ -18,6 +18,3 @@ futures="0.3.4"
 [dependencies.blake3]
 version = "0.3.2"
 features = ["rayon"]
-
-[profile.bench]	
-debug = true 
