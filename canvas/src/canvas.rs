@@ -1,13 +1,15 @@
-use super::atlas::{AtlasStoreErr, TextureAtlas};
 use super::{
+  atlas::{AtlasStoreErr, TextureAtlas},
+  text::TextBrush,
   DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit, Point,
   RenderAttr, RenderCommand, Rendering2DLayer,
 };
+
 use std::borrow::Borrow;
 use zerocopy::AsBytes;
 
 mod img_helper;
-use img_helper::{texture_to_png, RgbaConvert};
+pub(crate) use img_helper::{texture_to_png, RgbaConvert};
 pub mod surface;
 pub use surface::Surface;
 use surface::{FrameView, PhysicSurface, Texture, TextureSurface};
@@ -23,21 +25,22 @@ enum SecondBindings {
 }
 
 pub struct Canvas<S = PhysicSurface> {
-  device: wgpu::Device,
-  queue: wgpu::Queue,
-  surface: S,
-  pipeline: wgpu::RenderPipeline,
-  primitives_layout: wgpu::BindGroupLayout,
-  uniform_layout: wgpu::BindGroupLayout,
-  uniforms: wgpu::BindGroup,
+  pub(crate) device: wgpu::Device,
+  pub(crate) queue: wgpu::Queue,
+  pub(crate) surface: S,
+  pub(crate) pipeline: wgpu::RenderPipeline,
+  pub(crate) primitives_layout: wgpu::BindGroupLayout,
+  pub(crate) uniform_layout: wgpu::BindGroupLayout,
+  pub(crate) uniforms: wgpu::BindGroup,
 
   // texture atlas for pure color and image to draw.
-  tex_atlas: TextureAtlas,
-  tex_atlas_sampler: wgpu::Sampler,
+  pub(crate) tex_atlas: TextureAtlas,
+  pub(crate) tex_atlas_sampler: wgpu::Sampler,
 
+  pub(crate) text_brush: TextBrush,
+
+  pub(crate) rgba_converter: Option<RgbaConvert>,
   render_data: RenderData,
-
-  rgba_converter: Option<RgbaConvert>,
 }
 
 /// Frame is created by Canvas, and provide a blank box to drawing. It's
@@ -321,10 +324,12 @@ impl<S: Surface> Canvas<S> {
       device,
       queue,
       rgba_converter.as_ref().unwrap(),
-      std::fs::File::create(atlas_capture).unwrap(),
+      std::fs::File::create(&atlas_capture).unwrap(),
     );
 
     let _r = futures::executor::block_on(atlas);
+
+    log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
   }
 }
 
@@ -393,6 +398,7 @@ impl<S: Surface> Canvas<S> {
     );
 
     Canvas {
+      text_brush: TextBrush::new(&device),
       tex_atlas,
       tex_atlas_sampler,
       device,
@@ -407,7 +413,7 @@ impl<S: Surface> Canvas<S> {
     }
   }
 
-  fn create_converter_if_none(&mut self) {
+  pub(crate) fn create_converter_if_none(&mut self) {
     if self.rgba_converter.is_none() {
       self.rgba_converter = Some(RgbaConvert::new(&self.device));
     }

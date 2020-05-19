@@ -15,6 +15,9 @@ euclid = "0.20.11"
 png = "0.16.3"
 guillotiere ="0.5.1"
 zerocopy = "0.3"
+glyph_brush = {git="https://github.com/alexheretic/glyph-brush.git", path="glyph-brush", version="*"}
+log = "0.4.8"
+backtrace = "0.3"
 
 [target.'cfg(debug_assertions)'.dependencies]
 futures="0.3.5"
@@ -22,4 +25,5 @@ futures="0.3.5"
 [dev-dependencies]
 winit="0.22.1"
 futures="0.3.4"
+env_logger = "0.7.1"
 unit_test = {path ="../unit_test"}
