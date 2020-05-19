@@ -2,6 +2,7 @@
 mod atlas;
 mod canvas;
 mod layer_2d;
+mod text;
 
 pub use crate::canvas::*;
 pub use layer_2d::*;

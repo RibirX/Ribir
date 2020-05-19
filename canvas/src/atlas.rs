@@ -10,9 +10,6 @@ pub(crate) struct TextureAtlas {
   color_palettes: ColorPalettes,
 }
 
-const INIT_SIZE: u32 = 512;
-const MAX_SIZE: u32 = 4096;
-
 pub(crate) enum AtlasStoreErr {
   /// atlas is too full to store the texture, buf the texture is good for store
   /// in the atlas if it's not store too many others.
@@ -24,7 +21,8 @@ pub(crate) enum AtlasStoreErr {
 
 impl TextureAtlas {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
-    let size = DeviceSize::new(INIT_SIZE, INIT_SIZE);
+    const init: u32 = Texture::INIT_DIMENSION;
+    let size = DeviceSize::new(init, init);
     let mut atlas_allocator = AtlasAllocator::new(size.cast_unit().to_i32());
     let texture = Texture::new(
       device,
@@ -67,11 +65,11 @@ impl TextureAtlas {
     store_color!(false)
       .or_else(|| {
         let mut size = self.texture.size();
-        if size.height * 2 <= MAX_SIZE {
+        if size.height * 2 <= Texture::MAX_DIMENSION {
           size.height *= 2;
           self.grow_texture(size, device, queue);
           store_color!(true)
-        } else if size.width < MAX_SIZE {
+        } else if size.width < Texture::MAX_DIMENSION {
           size.width *= 2;
           self.grow_texture(size, device, queue);
           store_color!(true)
