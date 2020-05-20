@@ -1,4 +1,4 @@
-use super::{canvas, surface::Surface, Canvas, DeviceRect, DeviceSize, Rect};
+use super::{canvas, surface::Surface, Canvas, DeviceSize, Rect};
 use glyph_brush::{
   ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush,
   GlyphBrushBuilder,
@@ -6,7 +6,6 @@ use glyph_brush::{
 use log::{log_enabled, warn};
 
 pub(crate) type Section<'a> = glyph_brush::Section<'a, ()>;
-pub(crate) type Text<'a> = glyph_brush::Text<'a, ()>;
 
 const INIT_SIZE: DeviceSize = DeviceSize::new(512, 512);
 
@@ -19,6 +18,7 @@ pub(crate) struct QuadVertex {
 pub(crate) struct TextBrush {
   brush: GlyphBrush<QuadVertex, ()>,
   texture: wgpu::Texture,
+  view: wgpu::TextureView,
   quad_vertices_cache: Vec<QuadVertex>,
   available_fonts: std::collections::HashMap<String, FontId>,
 }
@@ -29,13 +29,18 @@ impl TextBrush {
       .initial_cache_size((INIT_SIZE.width, INIT_SIZE.height))
       .build();
 
+    let texture = Self::texture(device, INIT_SIZE);
     TextBrush {
       brush,
-      texture: Self::texture(device, INIT_SIZE),
+      view: texture.create_default_view(),
+      texture,
       quad_vertices_cache: vec![],
       available_fonts: Default::default(),
     }
   }
+
+  #[inline]
+  pub(crate) fn view(&self) -> &wgpu::TextureView { &self.view }
 
   #[inline]
   fn queue(&mut self, section: Section) { self.brush.queue(section); }
@@ -69,6 +74,7 @@ impl TextBrush {
         };
 
         self.texture = Self::texture(device, new_size.into());
+        self.view = self.texture.create_default_view();
         if log_enabled!(log::Level::Warn) {
           warn!(
             "Increasing glyph texture size {old:?} -> {new:?}. \
@@ -216,13 +222,13 @@ impl<S: Surface> Canvas<S> {
     name: &str,
     data: &'static [u8],
   ) -> Result<FontId, Box<dyn std::error::Error>> {
-    self.text_brush.add_font(name, data)
+    self.glyph_brush.add_font(name, data)
   }
 
   /// Get an using font id across its name
   #[inline]
   pub fn get_font_id_by_name(&mut self, name: &str) -> Option<FontId> {
-    self.text_brush.available_fonts.get(name).cloned()
+    self.glyph_brush.available_fonts.get(name).cloned()
   }
 
   pub(crate) fn process_text_sections<'a, Secs>(
@@ -234,7 +240,7 @@ impl<S: Surface> Canvas<S> {
   {
     sections
       .into_iter()
-      .for_each(|section| self.text_brush.queue(section));
+      .for_each(|section| self.glyph_brush.queue(section));
 
     loop {
       self.ensure_encoder_exist();
@@ -242,19 +248,19 @@ impl<S: Surface> Canvas<S> {
       let Self {
         device,
         encoder,
-        text_brush,
+        glyph_brush,
         ..
       } = self;
       let encoder = encoder.as_mut().unwrap();
 
-      let err = match text_brush.process_queued(device, encoder) {
+      let err = match glyph_brush.process_queued(device, encoder) {
         Ok(_) => break,
         Err(err) => err,
       };
-      self.text_brush.error_handle(err, device);
+      self.glyph_brush.error_handle(err, device);
     }
 
-    self.text_brush.quad_vertices_cache.as_slice()
+    self.glyph_brush.quad_vertices_cache.as_slice()
   }
 
   #[cfg(debug_assertions)]
@@ -267,7 +273,7 @@ impl<S: Surface> Canvas<S> {
     let atlas_capture =
       format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
 
-    let (width, height) = self.text_brush.brush.texture_dimensions();
+    let (width, height) = self.glyph_brush.brush.texture_dimensions();
 
     let size = width as u64 * height as u64 * std::mem::size_of::<u8>() as u64;
 
@@ -288,7 +294,7 @@ impl<S: Surface> Canvas<S> {
 
     encoder.copy_texture_to_buffer(
       wgpu::TextureCopyView {
-        texture: &self.text_brush.texture,
+        texture: &self.glyph_brush.texture,
         mip_level: 0,
         array_layer: 0,
         origin: wgpu::Origin3d::ZERO,
@@ -347,6 +353,7 @@ mod tests {
   use super::*;
   use crate::canvas::*;
   use futures::executor::block_on;
+  use glyph_brush::Text;
 
   fn uninited_brush() -> TextBrush {
     let v = std::mem::MaybeUninit::uninit();
@@ -362,8 +369,9 @@ mod tests {
   }
 
   fn free_uninit_brush(brush: TextBrush) {
-    let TextBrush { texture, .. } = brush;
+    let TextBrush { texture, view, .. } = brush;
     std::mem::forget(texture);
+    std::mem::forget(view);
   }
 
   fn add_default_fonts<S: Surface>(brush: &mut Canvas<S>) {

@@ -15,7 +15,7 @@ struct Primitive {
 
 
 layout(location=0) in vec2 pos;
-layout(location=1) in vec2 tex_pos;
+layout(location=1) in vec2 font_tex_pos;
 layout(location=2) in uint prim_id;
 
 layout(set=0, binding=0) 
@@ -31,10 +31,11 @@ buffer primitive_info {
     Primitive primitives[];
 };
 
-layout(location=0) out vec2 v_tex_coords;
-layout(location=1) out vec2 tex_size;
-layout(location=2) out vec2 tex_offset;
-layout(location=3) out vec2 v_atlas_size;
+layout(location=0) out vec2 atlas_tex_coords;
+layout(location=1) out vec2 atlas_sub_tex_size;
+layout(location=2) out vec2 atlas_sub_tex_offset;
+layout(location=3) out vec2 f_atlas_size;
+layout(location=4) out vec2 f_font_tex_pos;
 
 
 void main() {
@@ -46,8 +47,9 @@ void main() {
     vec2 pos2d = mat3x2(r1, r2, r3) * vec3(canvas_coord, 1);
     gl_Position = vec4(pos2d, 0, 1.0);
 
-    v_tex_coords = pos - prim.bounding_min + prim.tex_offset;
-    tex_size = prim.tex_size;
-    tex_offset = prim.tex_offset;
-    v_atlas_size = atlas_size;
+    atlas_tex_coords = pos - prim.bounding_min + prim.tex_offset;
+    atlas_sub_tex_size = prim.tex_size;
+    atlas_sub_tex_offset = prim.tex_offset;
+    f_atlas_size = atlas_size;
+    f_font_tex_pos = font_tex_pos;
 }

@@ -17,7 +17,8 @@ use surface::{PhysicSurface, Surface, TextureSurface};
 enum PrimaryBindings {
   GlobalUniform = 0,
   TextureAtlas = 1,
-  TextureAtlasSampler = 2,
+  GlyphTexture = 2,
+  Sampler = 3,
 }
 
 enum SecondBindings {
@@ -37,9 +38,8 @@ pub struct Canvas<S: Surface = PhysicSurface> {
 
   // texture atlas for pure color and image to draw.
   pub(crate) tex_atlas: TextureAtlas,
-  pub(crate) tex_atlas_sampler: wgpu::Sampler,
-
-  pub(crate) text_brush: TextBrush,
+  pub(crate) sampler: wgpu::Sampler,
+  pub(crate) glyph_brush: TextBrush,
 
   pub(crate) rgba_converter: Option<RgbaConvert>,
   render_data: RenderData,
@@ -197,46 +197,49 @@ impl<S: Surface> Canvas<S> {
       present_mode: wgpu::PresentMode::Fifo,
     };
 
-    let [uniform_layout, tex_infos_layout] = create_uniform_layout(&device);
+    let [uniform_layout, primitives_layout] = create_uniform_layout(&device);
     let pipeline = create_render_pipeline(
       &device,
       &sc_desc,
-      &[&uniform_layout, &tex_infos_layout],
+      &[&uniform_layout, &primitives_layout],
     );
 
     let tex_atlas = TextureAtlas::new(&device);
-    let tex_atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
       address_mode_v: wgpu::AddressMode::ClampToEdge,
       address_mode_w: wgpu::AddressMode::ClampToEdge,
-      mag_filter: wgpu::FilterMode::Linear,
-      min_filter: wgpu::FilterMode::Linear,
-      mipmap_filter: wgpu::FilterMode::Linear,
+      mag_filter: wgpu::FilterMode::Nearest,
+      min_filter: wgpu::FilterMode::Nearest,
+      mipmap_filter: wgpu::FilterMode::Nearest,
       lod_min_clamp: 0.0,
       lod_max_clamp: 0.0,
       compare: wgpu::CompareFunction::Always,
       label: Some("Texture atlas sampler"),
     });
 
+    let glyph_brush = TextBrush::new(&device);
+
     let uniforms = create_uniforms(
       &device,
       &uniform_layout,
       tex_atlas.size(),
       &coordinate_2d_to_device_matrix(size.width, size.height),
-      &tex_atlas_sampler,
+      &sampler,
       &tex_atlas.view,
+      glyph_brush.view(),
     );
 
     Canvas {
-      text_brush: TextBrush::new(&device),
+      glyph_brush,
       tex_atlas,
-      tex_atlas_sampler,
+      sampler,
       device,
       surface,
       queue,
-      pipeline: pipeline,
+      pipeline,
       uniform_layout,
-      primitives_layout: tex_infos_layout,
+      primitives_layout,
       uniforms,
       render_data: RenderData::default(),
       rgba_converter: None,
@@ -389,8 +392,9 @@ impl<S: Surface> Canvas<S> {
       &self.uniform_layout,
       self.tex_atlas.size(),
       &coordinate_2d_to_device_matrix(size.width, size.height),
-      &self.tex_atlas_sampler,
+      &self.sampler,
       &self.tex_atlas.view,
+      self.glyph_brush.view(),
     )
   }
 
@@ -505,8 +509,16 @@ fn create_render_pipeline(
     }),
     color_states: &[wgpu::ColorStateDescriptor {
       format: sc_desc.format,
-      color_blend: wgpu::BlendDescriptor::REPLACE,
-      alpha_blend: wgpu::BlendDescriptor::REPLACE,
+      color_blend: wgpu::BlendDescriptor {
+        src_factor: wgpu::BlendFactor::SrcAlpha,
+        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+      },
+      alpha_blend: wgpu::BlendDescriptor {
+        src_factor: wgpu::BlendFactor::One,
+        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+        operation: wgpu::BlendOperation::Add,
+      },
       write_mask: wgpu::ColorWrite::ALL,
     }],
     primitive_topology: wgpu::PrimitiveTopology::TriangleList,
@@ -546,9 +558,18 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
           },
         },
         wgpu::BindGroupLayoutEntry {
-          binding: PrimaryBindings::TextureAtlasSampler as u32,
+          binding: PrimaryBindings::Sampler as u32,
           visibility: wgpu::ShaderStage::FRAGMENT,
           ty: wgpu::BindingType::Sampler { comparison: false },
+        },
+        wgpu::BindGroupLayoutEntry {
+          binding: PrimaryBindings::GlyphTexture as u32,
+          visibility: wgpu::ShaderStage::FRAGMENT,
+          ty: wgpu::BindingType::SampledTexture {
+            dimension: wgpu::TextureViewDimension::D2,
+            component_type: wgpu::TextureComponentType::Float,
+            multisampled: false,
+          },
         },
       ],
       label: Some("uniforms stable layout"),
@@ -589,8 +610,9 @@ fn create_uniforms(
   layout: &wgpu::BindGroupLayout,
   atlas_size: DeviceSize,
   canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
-  tex_atlas_sampler: &wgpu::Sampler,
+  sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,
+  glyph_texture: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
   let uniform = GlobalUniform {
     texture_atlas_size: [atlas_size.width, atlas_size.height],
@@ -612,8 +634,12 @@ fn create_uniforms(
         resource: wgpu::BindingResource::TextureView(tex_atlas),
       },
       wgpu::Binding {
-        binding: PrimaryBindings::TextureAtlasSampler as u32,
-        resource: wgpu::BindingResource::Sampler(tex_atlas_sampler),
+        binding: PrimaryBindings::Sampler as u32,
+        resource: wgpu::BindingResource::Sampler(sampler),
+      },
+      wgpu::Binding {
+        binding: PrimaryBindings::GlyphTexture as u32,
+        resource: wgpu::BindingResource::TextureView(glyph_texture),
       },
     ],
     label: Some("uniform_bind_group"),
