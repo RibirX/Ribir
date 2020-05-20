@@ -21,8 +21,8 @@ pub(crate) enum AtlasStoreErr {
 
 impl TextureAtlas {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
-    const init: u32 = Texture::INIT_DIMENSION;
-    let size = DeviceSize::new(init, init);
+    const INIT: u32 = Texture::INIT_DIMENSION;
+    let size = DeviceSize::new(INIT, INIT);
     let mut atlas_allocator = AtlasAllocator::new(size.cast_unit().to_i32());
     let texture = Texture::new(
       device,

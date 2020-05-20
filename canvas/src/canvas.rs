@@ -1,7 +1,8 @@
 use super::{
   atlas::{AtlasStoreErr, TextureAtlas},
+  layer_2d,
   text::TextBrush,
-  DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit, Point,
+  DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit,
   RenderAttr, RenderCommand, Rendering2DLayer,
 };
 
@@ -11,8 +12,7 @@ use zerocopy::AsBytes;
 mod img_helper;
 pub(crate) use img_helper::{texture_to_png, RgbaConvert};
 pub mod surface;
-pub use surface::Surface;
-use surface::{FrameView, PhysicSurface, Texture, TextureSurface};
+use surface::{FrameView, PhysicSurface, Surface, Texture, TextureSurface};
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -49,13 +49,10 @@ pub trait Frame {
   /// Create a 2d layer to drawing, and not effect current canvas before compose
   /// back to the canvas.
   #[inline]
-  fn new_2d_layer(&self) -> Rendering2DLayer { Rendering2DLayer::new() }
+  fn new_2d_layer<'l>(&self) -> Rendering2DLayer<'l> { Rendering2DLayer::new() }
 
   /// Compose a layer into the canvas.
-  #[inline]
-  fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
-    self.upload_render_command(&layer.finish())
-  }
+  fn compose_2d_layer(&mut self, layer: Rendering2DLayer);
 
   /// Upload a RenderCommand into current frame. RenderCommand is the result
   /// of a layer drawing finished.
@@ -77,22 +74,56 @@ pub struct FrameImpl<'a, S: Surface, T: Borrow<wgpu::TextureView>> {
   encoder: Option<wgpu::CommandEncoder>,
 }
 
+impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> FrameImpl<'a, S, T> {
+  fn ensure_encoder_exist(&mut self) {
+    if self.encoder.is_none() {
+      self.encoder = Some(self.canvas.new_encoder())
+    }
+  }
+
+  /// return the mutable host canvas reference.
+  #[inline]
+  pub(crate) fn canvas_mut(&mut self) -> &mut Canvas<S> { self.canvas }
+
+  /// return the host canvas.
+  #[inline]
+  pub(crate) fn canvas(&self) -> &Canvas<S> { self.canvas }
+
+  /// return both `canvas` and `encoder`, it's useful to avoid lifetime problem
+  /// when need to use both canvas and encoder same time.
+  pub(crate) fn canvas_and_encoder(
+    &mut self,
+  ) -> (&mut Canvas<S>, &mut wgpu::CommandEncoder) {
+    self.ensure_encoder_exist();
+    (self.canvas, self.encoder.as_mut().unwrap())
+  }
+}
+
 impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Frame
   for FrameImpl<'a, S, T>
 {
+  #[inline]
+  fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
+    self.ensure_encoder_exist();
+    let render = layer.finish(self);
+    self.upload_render_command(&render)
+  }
+
   fn upload_render_command(&mut self, command: &RenderCommand) {
-    let Self {
-      canvas, encoder, ..
-    } = self;
-    let encoder = mut_encoder(canvas, encoder);
-    canvas.upload_render_command(command, encoder, self.view.borrow());
+    self.ensure_encoder_exist();
+    self.canvas.upload_render_command(
+      command,
+      self.encoder.as_mut().unwrap(),
+      self.view.borrow(),
+    );
   }
 
   fn draw(&mut self) {
     if self.canvas.render_data.has_data() {
-      let encoder = mut_encoder(&mut self.canvas, &mut self.encoder);
-
-      self.canvas.draw(&self.view.borrow(), encoder);
+      self.ensure_encoder_exist();
+      self
+        .canvas
+        .draw(&self.view.borrow(), self.encoder.as_mut().unwrap());
     }
   }
 
@@ -741,16 +772,6 @@ fn create_uniforms(
   })
 }
 
-fn mut_encoder<'a, S: Surface>(
-  canvas: &mut Canvas<S>,
-  encoder_store: &'a mut Option<wgpu::CommandEncoder>,
-) -> &'a mut wgpu::CommandEncoder {
-  if encoder_store.is_none() {
-    *encoder_store = Some(canvas.new_encoder())
-  }
-  encoder_store.as_mut().unwrap()
-}
-
 impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Drop
   for FrameImpl<'a, S, T>
 {
@@ -762,7 +783,8 @@ impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Drop
 #[repr(C)]
 #[derive(Copy, Clone, Debug, AsBytes)]
 struct Vertex {
-  pos: [f32; 2],
+  pixel_coords: [f32; 2],
+  texture_coors: [f32; 2],
   tex_id: u32,
 }
 
@@ -787,9 +809,9 @@ struct Primitive {
 
 impl Vertex {
   fn desc<'a>() -> wgpu::VertexBufferDescriptor<'a> {
-    use std::mem;
+    use std::mem::size_of;
     wgpu::VertexBufferDescriptor {
-      stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
+      stride: size_of::<Vertex>() as wgpu::BufferAddress,
       step_mode: wgpu::InputStepMode::Vertex,
       attributes: &[
         wgpu::VertexAttributeDescriptor {
@@ -798,8 +820,13 @@ impl Vertex {
           format: wgpu::VertexFormat::Float2,
         },
         wgpu::VertexAttributeDescriptor {
-          offset: mem::size_of::<Point>() as wgpu::BufferAddress,
+          offset: size_of::<[f32; 2]>() as wgpu::BufferAddress,
           shader_location: 1,
+          format: wgpu::VertexFormat::Float2,
+        },
+        wgpu::VertexAttributeDescriptor {
+          offset: (size_of::<[f32; 2]>() * 2) as wgpu::BufferAddress,
+          shader_location: 2,
           format: wgpu::VertexFormat::Uint,
         },
       ],
@@ -832,7 +859,7 @@ impl RenderData {
   fn append(
     &mut self,
     indices_offset: i32,
-    vertices: &[Point],
+    vertices: &[layer_2d::Vertex],
     indices: &[u32],
     tex_info: Primitive,
   ) {
@@ -846,8 +873,9 @@ impl RenderData {
     });
     self.indices.extend(mapped_indices);
 
-    let mapped_vertices = vertices.iter().map(|pos| Vertex {
-      pos: [pos.x, pos.y],
+    let mapped_vertices = vertices.iter().map(|v| Vertex {
+      pixel_coords: v.pixel_coords.to_array(),
+      texture_coors: v.texture_coords.to_array(),
       tex_id,
     });
     self.vertices.extend(mapped_vertices);
@@ -892,10 +920,13 @@ mod tests {
 
     let mut frame = canvas.next_frame();
 
-    let pt = Point::new(0., 0.);
+    let v = layer_2d::Vertex {
+      pixel_coords: Point::new(0., 0.),
+      texture_coords: Point::new(-1., -1.),
+    };
     let r_cmd = RenderCommand {
       geometry: VertexBuffers {
-        vertices: vec![pt, pt, pt],
+        vertices: vec![v.clone(), v.clone(), v],
         indices: vec![0, 1, 2],
       },
       attrs: vec![super::RenderAttr {

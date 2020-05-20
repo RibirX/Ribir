@@ -1,4 +1,7 @@
-use crate::{Point, Rect, Size, Transform};
+use crate::{
+  text::{Section, Text, TextBrush},
+  FrameImpl, Point, Rect, Size, Transform,
+};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
@@ -8,6 +11,7 @@ use std::{
   cmp::PartialEq,
   ops::{Deref, DerefMut},
 };
+
 const TOLERANCE: f32 = 0.5;
 pub type Color = Srgba<u8>;
 
@@ -33,12 +37,12 @@ const DEFAULT_STATE: State = State {
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
 /// bottom edge of the canvas.
 #[derive(Debug, Clone)]
-pub struct Rendering2DLayer {
+pub struct Rendering2DLayer<'a> {
   state_stack: Vec<State>,
-  commands: Vec<PathCommand>,
+  commands: Vec<Command<'a>>,
 }
 
-impl Rendering2DLayer {
+impl<'a> Rendering2DLayer<'a> {
   pub(crate) fn new() -> Self {
     Self {
       state_stack: vec![DEFAULT_STATE],
@@ -49,7 +53,7 @@ impl Rendering2DLayer {
   /// Saves the entire state of the canvas by pushing the current drawing state
   /// onto a stack.
   #[must_use]
-  pub fn save(&mut self) -> LayerGuard {
+  pub fn save<'l>(&'l mut self) -> LayerGuard<'l, 'a> {
     let new_state = self.current_state().clone();
     self.state_stack.push(new_state);
     LayerGuard(self)
@@ -112,23 +116,23 @@ impl Rendering2DLayer {
   /// Renders the specified path by using the current pen.
   pub fn stroke_path(&mut self, path: Path) {
     let state = self.current_state();
-    let path = PathCommand {
-      path,
+    let path = Command {
+      info: CommandInfo::Path(path),
       transform: state.transform,
-      cmd_type: PathCommandType::Stroke(state.stroke_pen.clone()),
+      cmd_type: CommandType::Stroke(state.stroke_pen.clone()),
     };
-    self.add_cmd(path);
+    self.commands.push(path);
   }
 
   /// Use current brush fill the interior of the `path`.
   pub fn fill_path(&mut self, path: Path) {
     let state = self.current_state();
-    let path = PathCommand {
-      path,
+    let path = Command {
+      info: CommandInfo::Path(path),
       transform: state.transform,
-      cmd_type: PathCommandType::Fill(state.fill_brush.clone()),
+      cmd_type: CommandType::Fill(state.fill_brush.clone()),
     };
-    self.add_cmd(path);
+    self.commands.push(path);
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -148,7 +152,11 @@ impl Rendering2DLayer {
   /// All drawing of this layer has finished, and convert the layer to an
   /// intermediate render buffer data that will provide to render process and
   /// then commit to gpu.
-  pub fn finish(self) -> RenderCommand {
+  pub fn finish<S, T>(self, frame: &mut FrameImpl<S, T>) -> RenderCommand
+  where
+    S: crate::canvas::surface::Surface,
+    T: std::borrow::Borrow<wgpu::TextureView>,
+  {
     let mut stroke_tess = StrokeTessellator::new();
     let mut fill_tess = FillTessellator::new();
 
@@ -156,20 +164,85 @@ impl Rendering2DLayer {
     let mut attrs: Vec<RenderAttr> = vec![];
 
     self.commands.into_iter().for_each(|cmd| {
-      let bounding_rect_for_style = cmd.bounding_rect();
-      let PathCommand {
+      let bounding_rect_for_style = cmd.bounding_rect_for_style();
+      let Command {
         transform,
-        path,
+        info,
         cmd_type,
       } = cmd;
 
-      let count = Self::tessellate_path(
-        &mut geometry,
-        path,
-        &cmd_type,
-        &mut fill_tess,
-        &mut stroke_tess,
-      );
+      let count = match info {
+        CommandInfo::Path(path) => Self::tessellate_path(
+          &mut geometry,
+          path,
+          &cmd_type,
+          &mut fill_tess,
+          &mut stroke_tess,
+        ),
+        CommandInfo::Text(sections) => {
+          sections.into_iter().for_each(|section| {
+            frame.canvas_mut().text_brush.queue(section);
+          });
+
+          let ptr = frame as *mut FrameImpl<S, T>;
+          let brush = &mut frame.canvas_mut().text_brush;
+          // Safe introduce:
+          // reference circle, but canvas will not modify brush.
+          let quad_vertices = unsafe { brush.process_queued(&mut *ptr) };
+          let count = Count {
+            vertices: quad_vertices.len() as u32 * 4,
+            indices: quad_vertices.len() as u32 * 6,
+          };
+          geometry.vertices.reserve(count.vertices as usize);
+          geometry.indices.reserve(count.indices as usize);
+
+          fn rect_corners(rect: &Rect) -> [Point; 4] {
+            [
+              rect.min(),
+              Point::new(rect.max_x(), rect.min_y()),
+              Point::new(rect.min_x(), rect.max_y()),
+              rect.max(),
+            ]
+          }
+          quad_vertices.iter().for_each(|v| {
+            let px_coords = rect_corners(&v.pixel_coords);
+            let tex_coords = rect_corners(&v.tex_coords);
+            geometry.vertices.push(Vertex {
+              pixel_coords: px_coords[0],
+              texture_coords: tex_coords[0],
+            });
+            geometry.vertices.push(Vertex {
+              pixel_coords: px_coords[1],
+              texture_coords: tex_coords[1],
+            });
+            geometry.vertices.push(Vertex {
+              pixel_coords: px_coords[2],
+              texture_coords: tex_coords[2],
+            });
+            geometry.vertices.push(Vertex {
+              pixel_coords: px_coords[3],
+              texture_coords: tex_coords[3],
+            });
+
+            let offset = geometry.indices.len();
+            let tl = 0;
+            let tr = 1 + offset as u32;
+            let bl = 2 + offset as u32;
+            let br = 3 + offset as u32;
+            geometry.indices.push(tl);
+            geometry.indices.push(tr);
+            geometry.indices.push(bl);
+            geometry.indices.push(bl);
+            geometry.indices.push(tr);
+            geometry.indices.push(br);
+          });
+
+          Count {
+            vertices: quad_vertices.len() as u32 * 4,
+            indices: quad_vertices.len() as u32 * 6,
+          }
+        }
+      };
 
       let style = cmd_type.style();
 
@@ -196,36 +269,29 @@ impl Rendering2DLayer {
   }
 
   fn tessellate_path(
-    mut buffer: &mut VertexBuffers<Point, u32>,
+    mut buffer: &mut VertexBuffers<Vertex, u32>,
     path: Path,
-    cmd_type: &PathCommandType,
+    cmd_type: &CommandType,
     fill_tess: &mut FillTessellator,
     stroke_tess: &mut StrokeTessellator,
   ) -> Count {
     match cmd_type {
-      PathCommandType::Fill(_) => fill_tess
+      CommandType::Fill(_) => fill_tess
         .tessellate_path(
           &path,
           &FillOptions::tolerance(TOLERANCE),
-          &mut BuffersBuilder::new(&mut buffer, |vertex: FillVertex| {
-            Point::from_untyped(vertex.position())
-          }),
+          &mut BuffersBuilder::new(&mut buffer, Vertex::from_fill_vertex),
         )
         .unwrap(),
-      PathCommandType::Stroke(pen) => stroke_tess
+      CommandType::Stroke(pen) => stroke_tess
         .tessellate_path(
           &path,
           &StrokeOptions::tolerance(TOLERANCE).with_line_width(pen.line_width),
-          &mut BuffersBuilder::new(&mut buffer, |vertex: StrokeVertex| {
-            Point::from_untyped(vertex.position())
-          }),
+          &mut BuffersBuilder::new(&mut buffer, Vertex::from_stroke_vertex),
         )
         .unwrap(),
     }
   }
-
-  #[inline]
-  fn add_cmd(&mut self, path: PathCommand) { self.commands.push(path) }
 
   fn current_state(&self) -> &State {
     self
@@ -251,8 +317,14 @@ pub(crate) struct RenderAttr {
 }
 
 #[derive(Debug, Clone)]
+pub struct Vertex {
+  pub(crate) pixel_coords: Point,
+  pub(crate) texture_coords: Point,
+}
+
+#[derive(Debug, Clone)]
 pub struct RenderCommand {
-  pub(crate) geometry: VertexBuffers<Point, u32>,
+  pub(crate) geometry: VertexBuffers<Vertex, u32>,
   pub(crate) attrs: Vec<RenderAttr>,
 }
 
@@ -281,36 +353,46 @@ struct State {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum PathCommandType {
+enum CommandType {
   Fill(Brush),
   Stroke(StrokePen),
 }
 
-impl PathCommandType {
+impl CommandType {
   fn style(&self) -> &FillStyle {
     match self {
-      PathCommandType::Stroke(pen) => &pen.style,
-      PathCommandType::Fill(brush) => &brush.style,
+      CommandType::Stroke(pen) => &pen.style,
+      CommandType::Fill(brush) => &brush.style,
     }
   }
 }
 
 #[derive(Debug, Clone)]
-struct PathCommand {
-  path: Path,
-  transform: Transform,
-  cmd_type: PathCommandType,
+enum CommandInfo<'a> {
+  Path(Path),
+  Text(Vec<Section<'a>>),
 }
 
-impl PathCommand {
-  fn bounding_rect(&self) -> Rect {
+#[derive(Debug, Clone)]
+struct Command<'a> {
+  info: CommandInfo<'a>,
+  transform: Transform,
+  cmd_type: CommandType,
+}
+
+impl<'a> Command<'a> {
+  fn bounding_rect_for_style(&self) -> Rect {
     if let FillStyle::Color(_) = self.cmd_type.style() {
-      // Pure color's texture is a one pixel texture, and always use repeat
-      // pattern, so zero min is ok, no matter what really bounding min it is.
+      // Pure color just one pixel in texture, and always use repeat pattern, so
+      // zero min is ok, no matter what really bounding it is.
       Rect::new(Point::new(0., 0.), Size::new(1., 1.))
     } else {
-      let rect = lyon::algorithms::aabb::bounding_rect(self.path.iter());
-      Rect::from_untyped(&rect)
+      if let CommandInfo::Path(ref path) = self.info {
+        let rect = lyon::algorithms::aabb::bounding_rect(path.iter());
+        Rect::from_untyped(&rect)
+      } else {
+        unimplemented!("text texture bounding not support now");
+      }
     }
   }
 }
@@ -319,9 +401,9 @@ impl PathCommand {
 /// structure is dropped (falls out of scope), changed state will auto restore.
 /// The data can be accessed through this guard via its Deref and DerefMut
 /// implementations.
-pub struct LayerGuard<'a>(&'a mut Rendering2DLayer);
+pub struct LayerGuard<'a, 'b>(&'a mut Rendering2DLayer<'b>);
 
-impl<'a> Drop for LayerGuard<'a> {
+impl<'a, 'b> Drop for LayerGuard<'a, 'b> {
   #[inline]
   fn drop(&mut self) {
     debug_assert!(!self.0.state_stack.is_empty());
@@ -329,20 +411,44 @@ impl<'a> Drop for LayerGuard<'a> {
   }
 }
 
-impl<'a> Deref for LayerGuard<'a> {
-  type Target = Rendering2DLayer;
+impl<'a, 'b> Deref for LayerGuard<'a, 'b> {
+  type Target = Rendering2DLayer<'b>;
   #[inline]
   fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-impl<'a> DerefMut for LayerGuard<'a> {
+impl<'a, 'b> DerefMut for LayerGuard<'a, 'b> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
+impl Vertex {
+  fn from_stroke_vertex(v: StrokeVertex) -> Self {
+    Self {
+      pixel_coords: Point::from_untyped(v.position()),
+      texture_coords: Point::new(-1., -1.),
+    }
+  }
+
+  fn from_fill_vertex(v: FillVertex) -> Self {
+    Self {
+      pixel_coords: Point::from_untyped(v.position()),
+      texture_coords: Point::new(-1., -1.),
+    }
+  }
 }
 
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::canvas::{surface::PhysicSurface, CanvasFrame};
+
+  fn uninit_frame<'a>() -> CanvasFrame<'a, PhysicSurface> {
+    unsafe {
+      let v = std::mem::MaybeUninit::uninit();
+      v.assume_init()
+    }
+  }
 
   #[test]
   fn save_guard() {
@@ -369,6 +475,7 @@ mod test {
   #[test]
   fn buffer() {
     let mut layer = Rendering2DLayer::new();
+    let mut frame = uninit_frame();
     let mut builder = Path::builder();
     builder.add_rectangle(
       &euclid::Rect::from_size((100., 100.).into()),
@@ -377,41 +484,49 @@ mod test {
     let path = builder.build();
     layer.stroke_path(path.clone());
     layer.fill_path(path);
-    let buffer = layer.finish();
+    let buffer = layer.finish(&mut frame);
 
     assert!(!buffer.geometry.vertices.is_empty());
     assert_eq!(buffer.attrs.len(), 2);
+
+    std::mem::forget(frame);
   }
 
   #[test]
   fn path_merge() {
     let mut layer = Rendering2DLayer::new();
 
+    let mut frame = uninit_frame();
+
     let sample_path = Path::builder().build();
     // The stroke path both style and line width same should be merge.
     layer.stroke_path(sample_path.clone());
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.clone().finish().attrs.len(), 1);
+    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 1);
 
     // Different line width with same color pen can be merged.
     layer.set_line_width(2.);
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.clone().finish().attrs.len(), 1);
+    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 1);
 
     // Different color can't be merged.
     layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
     layer.fill_path(sample_path.clone());
-    assert_eq!(layer.clone().finish().attrs.len(), 2);
+    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 2);
 
     // Different type style can't be merged
     layer.set_brush_style(FillStyle::Image);
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
-    assert_eq!(layer.clone().finish().attrs.len(), 4);
+    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 4);
+
+    std::mem::forget(frame);
   }
 
   #[test]
   fn bounding_base() {
+    let mut frame = uninit_frame();
+
     let layer = Rendering2DLayer::new();
     let mut path = Path::builder();
     path.add_rectangle(
@@ -424,7 +539,7 @@ mod test {
     let mut l1 = layer.clone();
     l1.stroke_path(path.clone());
     assert_eq!(
-      l1.finish().attrs[0].bounding_rect_for_style.min(),
+      l1.finish(&mut frame).attrs[0].bounding_rect_for_style.min(),
       Point::new(0., 0.)
     );
 
@@ -432,8 +547,10 @@ mod test {
     l2.set_stroke_pen_style(FillStyle::Image);
     l2.stroke_path(path.clone());
     assert_eq!(
-      l2.finish().attrs[0].bounding_rect_for_style.min(),
+      l2.finish(&mut frame).attrs[0].bounding_rect_for_style.min(),
       Point::new(100., 100.)
     );
+
+    std::mem::forget(frame);
   }
 }

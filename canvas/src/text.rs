@@ -1,9 +1,12 @@
-use super::{canvas, surface::Texture, Canvas, DeviceRect, DeviceSize, Rect};
+use super::{
+  canvas, surface::Surface, Canvas, DeviceRect, DeviceSize, Frame, FrameImpl,
+  Rect,
+};
 use glyph_brush::{
   ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush,
   GlyphBrushBuilder,
 };
-use log::{info, log_enabled, warn};
+use log::{log_enabled, warn};
 
 pub(crate) type Section<'a> = glyph_brush::Section<'a, ()>;
 pub(crate) type Text<'a> = glyph_brush::Text<'a, ()>;
@@ -11,9 +14,9 @@ pub(crate) type Text<'a> = glyph_brush::Text<'a, ()>;
 const INIT_SIZE: DeviceSize = DeviceSize::new(512, 512);
 
 #[derive(Debug, Clone)]
-struct QuadVertex {
-  pixel_coords: Rect,
-  tex_coords: Rect,
+pub(crate) struct QuadVertex {
+  pub(crate) pixel_coords: Rect,
+  pub(crate) tex_coords: Rect,
 }
 
 pub(crate) struct TextBrush {
@@ -41,16 +44,21 @@ impl TextBrush {
     self.brush.queue(section);
   }
 
-  pub(crate) fn process_queued(
+  pub(crate) fn process_queued<S, T>(
     &mut self,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-  ) {
-    let mut action;
+    frame: &mut FrameImpl<S, T>,
+  ) -> &[QuadVertex]
+  where
+    S: Surface,
+    T: std::borrow::Borrow<wgpu::TextureView>,
+  {
     loop {
       let Self { brush, texture, .. } = self;
-      action = brush.process_queued(
-        |rect, data| Self::update_texture(texture, device, encoder, rect, data),
+      let (canvas, encoder) = frame.canvas_and_encoder();
+      let action = brush.process_queued(
+        |rect, data| {
+          Self::update_texture(texture, &canvas.device, encoder, rect, data)
+        },
         Self::to_vertex,
       );
 
@@ -63,13 +71,15 @@ impl TextBrush {
           break;
         }
         Err(BrushError::TextureTooSmall { suggested }) => {
-          const MAX: u32 = Texture::MAX_DIMENSION;
+          const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
           let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
             (MAX, MAX)
           } else {
             suggested
           };
-          self.texture = Self::texture(device, new_size.into());
+          frame.submit();
+
+          self.texture = Self::texture(&frame.canvas().device, new_size.into());
           if log_enabled!(log::Level::Warn) {
             warn!(
               "Increasing glyph texture size {old:?} -> {new:?}. \
@@ -80,13 +90,15 @@ impl TextBrush {
               trace = backtrace::Backtrace::new()
             );
           }
+          self.brush.resize_texture(new_size.0, new_size.1)
         }
       }
     }
+    self.quad_vertices_cache.as_slice()
   }
 
   /// Add a font for brush, so brush can support this font.
-  pub(crate) fn add_font(
+  fn add_font(
     &mut self,
     name: &str,
     data: &'static [u8],
@@ -101,43 +113,6 @@ impl TextBrush {
     self.available_fonts.insert(name.to_string(), id);
 
     Ok(id)
-  }
-
-  /// Get an using font id across its name
-  #[inline]
-  pub(crate) fn get_font_id_by_name(&mut self, name: &str) -> Option<FontId> {
-    self.available_fonts.get(name).cloned()
-  }
-
-  #[cfg(debug_assertions)]
-  pub(crate) fn log_glyph_texture(&self, canvas: &mut Canvas) {
-    canvas.create_converter_if_none();
-
-    let Canvas {
-      tex_atlas,
-      device,
-      queue,
-      rgba_converter,
-      ..
-    } = canvas;
-
-    let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture =
-      format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
-
-    let size = self.brush.texture_dimensions();
-    let atlas = canvas::texture_to_png(
-      &tex_atlas.texture.raw_texture,
-      DeviceRect::from_size(size.into()),
-      device,
-      queue,
-      rgba_converter.as_ref().unwrap(),
-      std::fs::File::create(&atlas_capture).unwrap(),
-    );
-
-    let _r = futures::executor::block_on(atlas);
-
-    log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
   }
 
   fn update_texture(
@@ -245,6 +220,54 @@ impl TextBrush {
   }
 }
 
+impl<S: Surface> Canvas<S> {
+  #[inline]
+  pub fn add_font(
+    &mut self,
+    name: &str,
+    data: &'static [u8],
+  ) -> Result<FontId, Box<dyn std::error::Error>> {
+    self.text_brush.add_font(name, data)
+  }
+
+  /// Get an using font id across its name
+  #[inline]
+  pub fn get_font_id_by_name(&mut self, name: &str) -> Option<FontId> {
+    self.text_brush.available_fonts.get(name).cloned()
+  }
+
+  #[cfg(debug_assertions)]
+  pub(crate) fn log_glyph_texture(&mut self) {
+    self.create_converter_if_none();
+
+    let Canvas {
+      tex_atlas,
+      device,
+      queue,
+      rgba_converter,
+      ..
+    } = self;
+
+    let pkg_root = env!("CARGO_MANIFEST_DIR");
+    let atlas_capture =
+      format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
+
+    let size = self.text_brush.brush.texture_dimensions();
+    let atlas = canvas::texture_to_png(
+      &tex_atlas.texture.raw_texture,
+      DeviceRect::from_size(size.into()),
+      device,
+      queue,
+      rgba_converter.as_ref().unwrap(),
+      std::fs::File::create(&atlas_capture).unwrap(),
+    );
+
+    let _r = futures::executor::block_on(atlas);
+
+    log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
+  }
+}
+
 #[derive(Debug)]
 struct FontAlreadyAdded(String);
 impl std::fmt::Display for FontAlreadyAdded {
@@ -279,12 +302,16 @@ mod tests {
     std::mem::forget(texture);
   }
 
-  fn add_default_fonts(brush: &mut TextBrush) {
-    brush.add_font("DejaVu", include_bytes!("../fonts/DejaVuSans.ttf"));
-    brush.add_font(
-      "GaramondNo8",
-      include_bytes!("../fonts/GaramondNo8-Reg.ttf"),
-    );
+  fn add_default_fonts<S: Surface>(brush: &mut Canvas<S>) {
+    brush
+      .add_font("DejaVu", include_bytes!("../fonts/DejaVuSans.ttf"))
+      .unwrap();
+    brush
+      .add_font(
+        "GaramondNo8",
+        include_bytes!("../fonts/GaramondNo8-Reg.ttf"),
+      )
+      .unwrap();
   }
 
   #[test]
@@ -305,10 +332,10 @@ mod tests {
     let res = brush.add_font("DejaVu", deja);
     assert!(res.is_err());
 
-    assert_eq!(brush.get_font_id_by_name("DejaVu").unwrap(), deja_id);
+    assert_eq!(brush.available_fonts.get("DejaVu").unwrap(), &deja_id);
     assert_eq!(
-      brush.get_font_id_by_name("GaramondNo8").unwrap(),
-      graamond_id
+      brush.available_fonts.get("GaramondNo8").unwrap(),
+      &graamond_id
     );
 
     free_uninit_brush(brush);
@@ -318,18 +345,14 @@ mod tests {
   #[ignore = "gpu need"]
   fn glyph_cache_check() {
     let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    add_default_fonts(&mut canvas);
     let brush = &mut canvas.text_brush;
-    add_default_fonts(brush);
-    brush.queue(
-      Section::new().add_text(Text::default().with_text("Hello glyph!")),
-    );
+    let str = "Hello glyph!";
+    brush.queue(Section::new().add_text(Text::default().with_text(str)));
 
-    let encoder =
-      canvas
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-          label: Some("Render Encoder"),
-        });
+    let mut frame = canvas.next_frame();
+    let vertices = brush.process_queued(&mut frame);
+    assert_eq!(vertices.len(), str.chars().count());
 
     unimplemented!();
   }
