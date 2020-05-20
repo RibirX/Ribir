@@ -1,16 +1,16 @@
 #![feature(decl_macro)]
 
-use canvas::*;
 #[allow(unused_imports)]
 use colored::*;
+#[allow(unused_imports)]
 use futures::executor::block_on;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 
 #[allow(dead_code)]
-pub fn write_frame_to<S: Surface>(mut frame: NewTextureFrame<S>, path: &str) {
-  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
-  let _ = block_on(frame.save_as_png(&abs_path));
+pub macro write_frame_to($frame: expr, $path: expr) {
+  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
+  let _ = block_on($frame.save_as_png(&abs_path));
 }
 
 /// check if the frame is equal to the image at `path`, the path relative the

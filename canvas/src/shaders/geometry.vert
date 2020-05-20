@@ -15,7 +15,8 @@ struct Primitive {
 
 
 layout(location=0) in vec2 pos;
-layout(location=1) in uint prim_id;
+layout(location=1) in vec2 tex_pos;
+layout(location=2) in uint prim_id;
 
 layout(set=0, binding=0) 
 uniform global_uniform {
