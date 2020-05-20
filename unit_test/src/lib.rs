@@ -7,10 +7,10 @@ use futures::executor::block_on;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 
-pub macro write_canvas_to($frame: expr, $path: expr) {
+pub macro write_canvas_to($canvas: expr, $path: expr) {
   let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
   let writer = std::fs::File::create(&abs_path).unwrap();
-  let _ = block_on($frame.to_png(writer));
+  let _ = block_on($canvas.to_png(writer));
 }
 
 /// check if the frame is equal to the image at `path`, the path relative the
@@ -26,7 +26,7 @@ pub macro assert_canvas_eq($frame: expr, $path: expr $(,)?) {
     panic!(
       "{}",
       format!(
-        "Frame is not same with `{}`,\nMaybe you want use `write_canvas_to` to save frame as png to compare.",
+        "Canvas is not same with `{}`,\nMaybe you want use `write_canvas_to` to save Canvas as png to compare.",
         $path
       )
     );

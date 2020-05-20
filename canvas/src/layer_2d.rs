@@ -1,12 +1,11 @@
-use crate::{
-  text::{Section, Text, TextBrush},
-  Canvas, Point, Rect, Size, Transform,
-};
+use crate::{text::Section, Canvas, Point, Rect, Size, Transform};
+pub use glyph_brush::{FontId, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
 };
 pub use palette::{named as const_color, Srgba};
+
 use std::{
   cmp::PartialEq,
   ops::{Deref, DerefMut},
@@ -14,23 +13,6 @@ use std::{
 
 const TOLERANCE: f32 = 0.5;
 pub type Color = Srgba<u8>;
-
-const DEFAULT_STATE: State = State {
-  transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
-  stroke_pen: StrokePen {
-    style: FillStyle::Color(Color {
-      color: const_color::BLACK,
-      alpha: u8::MAX,
-    }),
-    line_width: 1.,
-  },
-  fill_brush: Brush {
-    style: FillStyle::Color(Color {
-      color: const_color::WHITE,
-      alpha: u8::MAX,
-    }),
-  },
-};
 
 /// The 2d layer is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -45,7 +27,7 @@ pub struct Rendering2DLayer<'a> {
 impl<'a> Rendering2DLayer<'a> {
   pub(crate) fn new() -> Self {
     Self {
-      state_stack: vec![DEFAULT_STATE],
+      state_stack: vec![State::new()],
       commands: vec![],
     }
   }
@@ -83,6 +65,15 @@ impl<'a> Rendering2DLayer<'a> {
   #[inline]
   pub fn set_line_width(&mut self, line_width: f32) -> &mut Self {
     self.current_state_mut().stroke_pen.line_width = line_width;
+    self
+  }
+
+  #[inline]
+  pub fn get_font(&self) -> FontId { self.current_state().font }
+
+  #[inline]
+  pub fn set_font(&mut self, font: FontId) -> &mut Self {
+    self.current_state_mut().font = font;
     self
   }
 
@@ -133,6 +124,41 @@ impl<'a> Rendering2DLayer<'a> {
       cmd_type: CommandType::Fill(state.fill_brush.clone()),
     };
     self.commands.push(path);
+  }
+
+  pub fn fill_text_with_desc(&mut self) {
+    unimplemented!();
+  }
+
+  /// Fill `text` from left to right, start at `left_top`.
+  /// Partially hitting the `max_width` will end the draw.
+  /// Use `font` and `font_size` to specify the font and font size.
+  /// Use [`fill_text_with_desc`](Rendering2DLayer::fill_text_with_desc) method
+  /// to fill complex text.
+  pub fn fill_text(
+    &mut self,
+    left_top: Point,
+    text: &'a str,
+    max_width: Option<f32>,
+  ) {
+    let state = self.current_state();
+    let mut sec = Section::new().with_screen_position(left_top).add_text(
+      glyph_brush::Text::default()
+        .with_text(text)
+        .with_font_id(state.font)
+        .with_scale(state.font_size),
+    );
+    if let Some(max_width) = max_width {
+      sec = sec.with_bounds((max_width, f32::MAX))
+    }
+    if let Some(cmd) = self.commands.last_mut() {
+      if let CommandInfo::Text(ref mut texts) = cmd.info {
+        texts.push(sec);
+        return;
+      }
+    }
+    let cmd = self.command_with_info(CommandInfo::Text(vec![sec]), false);
+    self.commands.push(cmd);
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -196,36 +222,37 @@ impl<'a> Rendering2DLayer<'a> {
             ]
           }
           quad_vertices.iter().for_each(|v| {
+            let VertexBuffers { vertices, indices } = &mut geometry;
+            let offset = vertices.len() as u32;
+            let tl = offset;
+            let tr = 1 + offset;
+            let bl = 2 + offset;
+            let br = 3 + offset;
+            indices.push(tl);
+            indices.push(tr);
+            indices.push(bl);
+            indices.push(bl);
+            indices.push(tr);
+            indices.push(br);
+
             let px_coords = rect_corners(&v.pixel_coords);
             let tex_coords = rect_corners(&v.tex_coords);
-            geometry.vertices.push(Vertex {
+            vertices.push(Vertex {
               pixel_coords: px_coords[0],
               texture_coords: tex_coords[0],
             });
-            geometry.vertices.push(Vertex {
+            vertices.push(Vertex {
               pixel_coords: px_coords[1],
               texture_coords: tex_coords[1],
             });
-            geometry.vertices.push(Vertex {
+            vertices.push(Vertex {
               pixel_coords: px_coords[2],
               texture_coords: tex_coords[2],
             });
-            geometry.vertices.push(Vertex {
+            vertices.push(Vertex {
               pixel_coords: px_coords[3],
               texture_coords: tex_coords[3],
             });
-
-            let offset = geometry.indices.len();
-            let tl = 0;
-            let tr = 1 + offset as u32;
-            let bl = 2 + offset as u32;
-            let br = 3 + offset as u32;
-            geometry.indices.push(tl);
-            geometry.indices.push(tr);
-            geometry.indices.push(bl);
-            geometry.indices.push(bl);
-            geometry.indices.push(tr);
-            geometry.indices.push(br);
           });
 
           Count {
@@ -258,45 +285,48 @@ impl<'a> Rendering2DLayer<'a> {
 
     RenderCommand { geometry, attrs }
   }
+}
 
-  fn tessellate_path(
-    mut buffer: &mut VertexBuffers<Vertex, u32>,
-    path: Path,
-    cmd_type: &CommandType,
-    fill_tess: &mut FillTessellator,
-    stroke_tess: &mut StrokeTessellator,
-  ) -> Count {
-    match cmd_type {
-      CommandType::Fill(_) => fill_tess
-        .tessellate_path(
-          &path,
-          &FillOptions::tolerance(TOLERANCE),
-          &mut BuffersBuilder::new(&mut buffer, Vertex::from_fill_vertex),
-        )
-        .unwrap(),
-      CommandType::Stroke(pen) => stroke_tess
-        .tessellate_path(
-          &path,
-          &StrokeOptions::tolerance(TOLERANCE).with_line_width(pen.line_width),
-          &mut BuffersBuilder::new(&mut buffer, Vertex::from_stroke_vertex),
-        )
-        .unwrap(),
-    }
-  }
+/// Describe render the text as single line or break as multiple lines.
+#[derive(Debug, Clone)]
+pub enum LineWrap {
+  /// Renders a single line from left-to-right according to the inner
+  /// alignment. Hard breaking will end the line, partially hitting the width
+  /// bound will end the line.
+  SingleLine,
+  /// Renders multiple lines from left-to-right according to the inner
+  /// alignment. Hard breaking characters will cause advancement to another
+  /// line. A characters hitting the width bound will also cause another line
+  /// to start.
+  Wrap,
+}
 
-  fn current_state(&self) -> &State {
-    self
-      .state_stack
-      .last()
-      .expect("Must have one state in stack!")
-  }
+#[derive(Debug, Clone)]
+pub struct TextLayout {
+  pub h_align: HorizontalAlign,
+  pub v_align: VerticalAlign,
+  pub wrap: LineWrap,
+}
 
-  fn current_state_mut(&mut self) -> &mut State {
-    self
-      .state_stack
-      .last_mut()
-      .expect("Must have one state in stack!")
-  }
+pub struct TextDesc<'a> {
+  /// Box bounds, in pixels from top-left. Defaults to unbounded.
+  pub bounds: Rect,
+  pub layout: TextLayout,
+  /// Text to render, rendered next to one another according the layout.
+  pub text: Vec<Text<'a>>,
+}
+
+pub struct Text<'a> {
+  /// Text to render
+  pub text: &'a str,
+  /// Text pixel size.
+  pub font_size: f32,
+  /// It must be a valid id of font, can query font id from
+  /// [`Canvas::get_font_id_by_name`](Canvas::get_font_id_by_name) or across
+  /// canvas to load custom font The default `FontId(0)` should always be
+  pub font_id: FontId,
+  /// Style to render text
+  pub style: FillStyle,
 }
 
 #[derive(Debug, Clone)]
@@ -336,11 +366,72 @@ struct StrokePen {
 struct Brush {
   style: FillStyle,
 }
+
+impl<'a> Rendering2DLayer<'a> {
+  fn tessellate_path(
+    mut buffer: &mut VertexBuffers<Vertex, u32>,
+    path: Path,
+    cmd_type: &CommandType,
+    fill_tess: &mut FillTessellator,
+    stroke_tess: &mut StrokeTessellator,
+  ) -> Count {
+    match cmd_type {
+      CommandType::Fill(_) => fill_tess
+        .tessellate_path(
+          &path,
+          &FillOptions::tolerance(TOLERANCE),
+          &mut BuffersBuilder::new(&mut buffer, Vertex::from_fill_vertex),
+        )
+        .unwrap(),
+      CommandType::Stroke(pen) => stroke_tess
+        .tessellate_path(
+          &path,
+          &StrokeOptions::tolerance(TOLERANCE).with_line_width(pen.line_width),
+          &mut BuffersBuilder::new(&mut buffer, Vertex::from_stroke_vertex),
+        )
+        .unwrap(),
+    }
+  }
+
+  fn current_state(&self) -> &State {
+    self
+      .state_stack
+      .last()
+      .expect("Must have one state in stack!")
+  }
+
+  fn current_state_mut(&mut self) -> &mut State {
+    self
+      .state_stack
+      .last_mut()
+      .expect("Must have one state in stack!")
+  }
+
+  fn command_with_info<'l>(
+    &self,
+    info: CommandInfo<'l>,
+    stroke_or_fill: bool,
+  ) -> Command<'l> {
+    let state = self.current_state();
+    let cmd_type = if stroke_or_fill {
+      CommandType::Stroke(state.stroke_pen.clone())
+    } else {
+      CommandType::Fill(state.fill_brush.clone())
+    };
+    Command {
+      info,
+      transform: state.transform,
+      cmd_type,
+    }
+  }
+}
 #[derive(Clone, Debug)]
 struct State {
   transform: Transform,
   stroke_pen: StrokePen,
   fill_brush: Brush,
+  font: FontId,
+  font_size: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -429,9 +520,55 @@ impl Vertex {
   }
 }
 
+impl Default for State {
+  #[inline]
+  fn default() -> Self { Self::new() }
+}
+
+impl State {
+  pub const fn new() -> Self {
+    Self {
+      transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
+      stroke_pen: StrokePen {
+        style: FillStyle::Color(Color {
+          color: const_color::BLACK,
+          alpha: u8::MAX,
+        }),
+        line_width: 1.,
+      },
+      fill_brush: Brush {
+        style: FillStyle::Color(Color {
+          color: const_color::BLACK,
+          alpha: u8::MAX,
+        }),
+      },
+      font: FontId(0),
+      font_size: 14.,
+    }
+  }
+}
+
+impl Default for TextLayout {
+  #[inline]
+  fn default() -> Self { Self::new() }
+}
+
+impl TextLayout {
+  const fn new() -> Self {
+    Self {
+      v_align: VerticalAlign::Center,
+      h_align: HorizontalAlign::Left,
+      wrap: LineWrap::SingleLine,
+    }
+  }
+}
+
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::*;
+
+  use futures::executor::block_on;
 
   fn uninit_frame<'a>() -> Canvas {
     unsafe {
@@ -477,7 +614,7 @@ mod test {
     let buffer = layer.finish(&mut frame);
 
     assert!(!buffer.geometry.vertices.is_empty());
-    assert_eq!(buffer.attrs.len(), 2);
+    assert_eq!(buffer.attrs.len(), 1);
 
     std::mem::forget(frame);
   }
@@ -542,5 +679,22 @@ mod test {
     );
 
     std::mem::forget(frame);
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn fill_text_hello() {
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let font = canvas
+      .add_font("DejaVuSans", include_bytes!("../fonts/DejaVuSans.ttf"))
+      .unwrap();
+
+    let mut layer = canvas.new_2d_layer();
+    layer.set_font(font);
+    layer.fill_text(Point::zero(), "Nice to meet you!", None);
+    canvas.compose_2d_layer(layer);
+    canvas.submit();
+
+    unit_test::assert_canvas_eq!(canvas, "./test_imgs/text_hello.png");
   }
 }
