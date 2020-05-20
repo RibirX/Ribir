@@ -7,17 +7,16 @@ use futures::executor::block_on;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 
-#[allow(dead_code)]
-pub macro write_frame_to($frame: expr, $path: expr) {
+pub macro write_canvas_to($frame: expr, $path: expr) {
   let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
-  let _ = block_on($frame.save_as_png(&abs_path));
+  let writer = std::fs::File::create(&abs_path).unwrap();
+  let _ = block_on($frame.to_png(writer));
 }
 
 /// check if the frame is equal to the image at `path`, the path relative the
 /// package root;
-pub macro assert_frame_eq($frame: expr, $path: expr $(,)?) {
-  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
-  let file_data = std::fs::read(abs_path.clone()).unwrap();
+pub macro assert_canvas_eq($frame: expr, $path: expr $(,)?) {
+  let file_data = file_bytes!($path);
 
   let mut frame_data = vec![];
   let cursor = std::io::Cursor::new(&mut frame_data);
@@ -27,12 +26,24 @@ pub macro assert_frame_eq($frame: expr, $path: expr $(,)?) {
     panic!(
       "{}",
       format!(
-        "Frame is not same with `{}`,\nMaybe you want use `write_frame_to` to save frame as png to compare.",
-        abs_path
+        "Frame is not same with `{}`,\nMaybe you want use `write_canvas_to` to save frame as png to compare.",
+        $path
       )
     );
   }
 }
+
+/// Check if two image has same data.
+pub macro assert_img_eq($img1: expr, $img2: expr) {
+  if file_bytes!($img1) != file_bytes!($img2) {
+    panic!("`{}` and `{}` is not same.", $img1, $img2);
+  }
+}
+
+pub macro file_bytes($path: expr) {{
+  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
+  std::fs::read(abs_path).expect(&format!("{}", $path))
+}}
 
 #[allow(unused_macros)]
 macro count {

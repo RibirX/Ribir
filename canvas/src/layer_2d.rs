@@ -1,6 +1,6 @@
 use crate::{
   text::{Section, Text, TextBrush},
-  FrameImpl, Point, Rect, Size, Transform,
+  Canvas, Point, Rect, Size, Transform,
 };
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
@@ -152,10 +152,9 @@ impl<'a> Rendering2DLayer<'a> {
   /// All drawing of this layer has finished, and convert the layer to an
   /// intermediate render buffer data that will provide to render process and
   /// then commit to gpu.
-  pub fn finish<S, T>(self, frame: &mut FrameImpl<S, T>) -> RenderCommand
+  pub fn finish<S>(self, canvas: &mut Canvas<S>) -> RenderCommand
   where
     S: crate::canvas::surface::Surface,
-    T: std::borrow::Borrow<wgpu::TextureView>,
   {
     let mut stroke_tess = StrokeTessellator::new();
     let mut fill_tess = FillTessellator::new();
@@ -180,15 +179,7 @@ impl<'a> Rendering2DLayer<'a> {
           &mut stroke_tess,
         ),
         CommandInfo::Text(sections) => {
-          sections.into_iter().for_each(|section| {
-            frame.canvas_mut().text_brush.queue(section);
-          });
-
-          let ptr = frame as *mut FrameImpl<S, T>;
-          let brush = &mut frame.canvas_mut().text_brush;
-          // Safe introduce:
-          // reference circle, but canvas will not modify brush.
-          let quad_vertices = unsafe { brush.process_queued(&mut *ptr) };
+          let quad_vertices = canvas.process_text_sections(sections);
           let count = Count {
             vertices: quad_vertices.len() as u32 * 4,
             indices: quad_vertices.len() as u32 * 6,
@@ -441,9 +432,8 @@ impl Vertex {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::canvas::{surface::PhysicSurface, CanvasFrame};
 
-  fn uninit_frame<'a>() -> CanvasFrame<'a, PhysicSurface> {
+  fn uninit_frame<'a>() -> Canvas {
     unsafe {
       let v = std::mem::MaybeUninit::uninit();
       v.assume_init()

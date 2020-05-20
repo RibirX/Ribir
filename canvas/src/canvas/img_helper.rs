@@ -1,4 +1,5 @@
 use super::{spv_2_shader_module, DeviceRect, DeviceSize};
+
 pub(crate) struct RgbaConvert {
   group_layout: wgpu::BindGroupLayout,
   pipeline: wgpu::ComputePipeline,
@@ -68,7 +69,7 @@ impl RgbaConvert {
   }
 }
 
-pub(crate) async fn texture_to_png<W: std::io::Write>(
+pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   texture: &wgpu::Texture,
   rect: DeviceRect,
   device: &wgpu::Device,

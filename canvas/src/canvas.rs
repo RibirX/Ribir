@@ -5,14 +5,14 @@ use super::{
   DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit,
   RenderAttr, RenderCommand, Rendering2DLayer,
 };
-
 use std::borrow::Borrow;
+
 use zerocopy::AsBytes;
 
 mod img_helper;
-pub(crate) use img_helper::{texture_to_png, RgbaConvert};
+pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
-use surface::{FrameView, PhysicSurface, Surface, Texture, TextureSurface};
+use surface::{PhysicSurface, Surface, TextureSurface};
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -24,7 +24,7 @@ enum SecondBindings {
   Primitive = 0,
 }
 
-pub struct Canvas<S = PhysicSurface> {
+pub struct Canvas<S: Surface = PhysicSurface> {
   pub(crate) device: wgpu::Device,
   pub(crate) queue: wgpu::Queue,
   pub(crate) surface: S,
@@ -32,6 +32,8 @@ pub struct Canvas<S = PhysicSurface> {
   pub(crate) primitives_layout: wgpu::BindGroupLayout,
   pub(crate) uniform_layout: wgpu::BindGroupLayout,
   pub(crate) uniforms: wgpu::BindGroup,
+  pub(crate) encoder: Option<wgpu::CommandEncoder>,
+  pub(crate) view: Option<S::V>,
 
   // texture atlas for pure color and image to draw.
   pub(crate) tex_atlas: TextureAtlas,
@@ -41,179 +43,6 @@ pub struct Canvas<S = PhysicSurface> {
 
   pub(crate) rgba_converter: Option<RgbaConvert>,
   render_data: RenderData,
-}
-
-/// Frame is created by Canvas, and provide a blank box to drawing. It's
-/// guarantee auto commit all data to texture when is drop.
-pub trait Frame {
-  /// Create a 2d layer to drawing, and not effect current canvas before compose
-  /// back to the canvas.
-  #[inline]
-  fn new_2d_layer<'l>(&self) -> Rendering2DLayer<'l> { Rendering2DLayer::new() }
-
-  /// Compose a layer into the canvas.
-  fn compose_2d_layer(&mut self, layer: Rendering2DLayer);
-
-  /// Upload a RenderCommand into current frame. RenderCommand is the result
-  /// of a layer drawing finished.
-  fn upload_render_command(&mut self, command: &RenderCommand);
-
-  /// Commit all uploaded render command, but will not present in your texture
-  /// before [submit](Frame::submit) called.
-  fn draw(&mut self);
-
-  /// Submits a series of finished command buffers for execution. You needn't
-  /// call this method manually, only if you want flush drawing things into gpu
-  /// immediately.
-  fn submit(&mut self);
-}
-
-pub struct FrameImpl<'a, S: Surface, T: Borrow<wgpu::TextureView>> {
-  view: T,
-  canvas: &'a mut Canvas<S>,
-  encoder: Option<wgpu::CommandEncoder>,
-}
-
-impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> FrameImpl<'a, S, T> {
-  fn ensure_encoder_exist(&mut self) {
-    if self.encoder.is_none() {
-      self.encoder = Some(self.canvas.new_encoder())
-    }
-  }
-
-  /// return the mutable host canvas reference.
-  #[inline]
-  pub(crate) fn canvas_mut(&mut self) -> &mut Canvas<S> { self.canvas }
-
-  /// return the host canvas.
-  #[inline]
-  pub(crate) fn canvas(&self) -> &Canvas<S> { self.canvas }
-
-  /// return both `canvas` and `encoder`, it's useful to avoid lifetime problem
-  /// when need to use both canvas and encoder same time.
-  pub(crate) fn canvas_and_encoder(
-    &mut self,
-  ) -> (&mut Canvas<S>, &mut wgpu::CommandEncoder) {
-    self.ensure_encoder_exist();
-    (self.canvas, self.encoder.as_mut().unwrap())
-  }
-}
-
-impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Frame
-  for FrameImpl<'a, S, T>
-{
-  #[inline]
-  fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
-    self.ensure_encoder_exist();
-    let render = layer.finish(self);
-    self.upload_render_command(&render)
-  }
-
-  fn upload_render_command(&mut self, command: &RenderCommand) {
-    self.ensure_encoder_exist();
-    self.canvas.upload_render_command(
-      command,
-      self.encoder.as_mut().unwrap(),
-      self.view.borrow(),
-    );
-  }
-
-  fn draw(&mut self) {
-    if self.canvas.render_data.has_data() {
-      self.ensure_encoder_exist();
-      self
-        .canvas
-        .draw(&self.view.borrow(), self.encoder.as_mut().unwrap());
-    }
-  }
-
-  fn submit(&mut self) {
-    self.draw();
-
-    if let Some(encoder) = self.encoder.take() {
-      self.canvas.queue.submit(Some(encoder.finish()));
-    }
-  }
-}
-
-/// A frame for canvas, anything drawing on the frame will commit to canvas
-/// display.
-pub type CanvasFrame<'a, S> = FrameImpl<'a, S, <S as Surface>::V>;
-
-/// A frame will create new texture, don't like [`CanvasFrame`](CanvasFrame),
-/// `NewTextureFrame` not directly present drawing on canvas but drawing on self
-/// texture. What your draw on `NewTextureFrame` will not commit back to canvas.
-///
-/// Below example show how to store frame as a png image.
-///
-/// # Example
-///
-/// This example draw a circle and write as a image.
-/// ```
-/// # use canvas::*;
-/// fn generate_png(mut canvas: Canvas, file_path: &str) {
-///   let mut frame = canvas.new_texture_frame();
-///   let mut layer = frame.new_2d_layer();
-///   let mut path = Path::builder();
-///   layer.set_brush_style(FillStyle::Color(const_color::BLACK.into()));
-///   path.add_circle(euclid::Point2D::new(200., 200.), 100., Winding::Positive);
-///   let path = path.build();
-///   layer.fill_path(path);
-///   frame.compose_2d_layer(layer);
-///   futures::executor::block_on(
-///     frame
-///     .to_png(std::fs::File::create(file_path).unwrap()),
-///   ).unwrap();
-/// }
-/// ```
-pub struct NewTextureFrame<'a, S: Surface> {
-  frame: FrameImpl<'a, S, FrameView<wgpu::TextureView>>,
-  texture: Texture,
-}
-
-impl<'a, S: Surface> std::ops::Deref for NewTextureFrame<'a, S> {
-  type Target = FrameImpl<'a, S, FrameView<wgpu::TextureView>>;
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.frame }
-}
-
-impl<'a, S: Surface> std::ops::DerefMut for NewTextureFrame<'a, S> {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.frame }
-}
-
-impl<'a, S: Surface> NewTextureFrame<'a, S> {
-  /// PNG encoded the texture frame then write by `writer`.
-  pub async fn to_png<W: std::io::Write>(
-    &mut self,
-    writer: W,
-  ) -> Result<(), &'static str> {
-    self.submit();
-
-    self.canvas.create_converter_if_none();
-    let rect = DeviceRect::from_size(self.canvas.surface.size());
-
-    let Canvas {
-      device,
-      queue,
-      rgba_converter,
-      ..
-    } = self.frame.canvas;
-
-    texture_to_png(
-      &self.texture.raw_texture,
-      rect,
-      device,
-      queue,
-      rgba_converter.as_ref().unwrap(),
-      writer,
-    )
-    .await
-  }
-
-  /// Save the texture frame as a PNG image, store at the `path` location.
-  pub async fn save_as_png(&mut self, path: &str) -> Result<(), &'static str> {
-    self.to_png(std::fs::File::create(path).unwrap()).await
-  }
 }
 
 impl Canvas<PhysicSurface> {
@@ -272,7 +101,7 @@ impl Canvas<TextureSurface> {
     &mut self,
     writer: W,
   ) -> Result<(), &'static str> {
-    self.create_converter_if_none();
+    self.ensure_rgba_converter();
     let rect = DeviceRect::from_size(self.surface.size());
 
     let Self {
@@ -282,7 +111,7 @@ impl Canvas<TextureSurface> {
       rgba_converter,
       ..
     } = self;
-    texture_to_png(
+    bgra_texture_to_png(
       &surface.raw_texture,
       rect,
       device,
@@ -295,36 +124,6 @@ impl Canvas<TextureSurface> {
 }
 
 impl<S: Surface> Canvas<S> {
-  /// Create a new frame texture to draw, and commit to device when the `Frame`
-  /// is dropped.
-  pub fn next_frame(&mut self) -> CanvasFrame<S> {
-    let chain_output = self.surface.get_next_view();
-
-    CanvasFrame {
-      encoder: None,
-      view: chain_output,
-      canvas: self,
-    }
-  }
-
-  pub fn new_texture_frame(&mut self) -> NewTextureFrame<S> {
-    let size = self.surface.size();
-
-    let mut texture = Texture::new(
-      &self.device,
-      size,
-      wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
-    );
-    NewTextureFrame {
-      frame: FrameImpl {
-        view: texture.get_next_view(),
-        canvas: self,
-        encoder: None,
-      },
-      texture,
-    }
-  }
-
   /// Resize canvas
   pub fn resize(&mut self, width: u32, height: u32) {
     self
@@ -335,7 +134,7 @@ impl<S: Surface> Canvas<S> {
 
   #[cfg(debug_assertions)]
   pub fn log_texture_atlas(&mut self) {
-    self.create_converter_if_none();
+    self.ensure_rgba_converter();
 
     let size = self.surface.size();
     let Canvas {
@@ -349,7 +148,7 @@ impl<S: Surface> Canvas<S> {
     let pkg_root = env!("CARGO_MANIFEST_DIR");
     let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
 
-    let atlas = texture_to_png(
+    let atlas = bgra_texture_to_png(
       &tex_atlas.texture.raw_texture,
       DeviceRect::from_size(size),
       device,
@@ -441,21 +240,76 @@ impl<S: Surface> Canvas<S> {
       uniforms,
       render_data: RenderData::default(),
       rgba_converter: None,
+      encoder: None,
+      view: None,
     }
   }
 
-  pub(crate) fn create_converter_if_none(&mut self) {
+  pub(crate) fn ensure_encoder_exist(&mut self) {
+    if self.encoder.is_none() {
+      self.encoder = Some(self.device.create_command_encoder(
+        &wgpu::CommandEncoderDescriptor {
+          label: Some("Render Encoder"),
+        },
+      ))
+    }
+  }
+
+  fn ensure_view_exist(&mut self) {
+    if self.view.is_none() {
+      self.view = Some(self.surface.get_next_view());
+    }
+  }
+
+  pub(crate) fn ensure_rgba_converter(&mut self) {
     if self.rgba_converter.is_none() {
       self.rgba_converter = Some(RgbaConvert::new(&self.device));
     }
   }
 
-  fn draw(
-    &mut self,
-    view: &wgpu::TextureView,
-    encoder: &mut wgpu::CommandEncoder,
-  ) {
-    let device = &self.device;
+  /// Create a 2d layer to drawing, and not effect current canvas before compose
+  /// back to the canvas.
+  #[inline]
+  pub fn new_2d_layer<'l>(&self) -> Rendering2DLayer<'l> {
+    Rendering2DLayer::new()
+  }
+
+  /// Compose a layer into the canvas.
+  pub fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
+    let cmd = layer.finish(self);
+    self.upload_render_command(&cmd);
+  }
+
+  /// Submits a series of finished command buffers for execution. You needn't
+  /// call this method manually, only if you want flush drawing things into gpu
+  /// immediately.
+  pub fn submit(&mut self) {
+    self.draw();
+
+    if let Some(encoder) = self.encoder.take() {
+      self.queue.submit(Some(encoder.finish()));
+    }
+    self.view.take();
+  }
+
+  pub fn draw(&mut self) {
+    if !self.render_data.has_data() {
+      return;
+    }
+
+    self.ensure_encoder_exist();
+    self.ensure_view_exist();
+
+    let tex_infos_bind_group = self.create_primitives_bind_group();
+
+    let Self {
+      device,
+      encoder,
+      view,
+      ..
+    } = self;
+    let encoder = encoder.as_mut().unwrap();
+    let view = view.as_ref().unwrap().borrow();
 
     self.tex_atlas.flush(device, encoder);
     let vertices_buffer = device.create_buffer_with_data(
@@ -468,7 +322,6 @@ impl<S: Surface> Canvas<S> {
       wgpu::BufferUsage::INDEX,
     );
 
-    let tex_infos_bind_group = self.create_primitives_bind_group();
     {
       let mut render_pass =
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -497,27 +350,25 @@ impl<S: Surface> Canvas<S> {
     self.render_data.clear();
   }
 
-  pub(crate) fn new_encoder(&mut self) -> wgpu::CommandEncoder {
-    self
-      .device
-      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Render Encoder"),
-      })
-  }
-
   fn store_style_in_atlas(
     &mut self,
     style: &FillStyle,
-    encoder: &mut wgpu::CommandEncoder,
   ) -> Result<(DevicePoint, DeviceSize), AtlasStoreErr> {
+    self.ensure_encoder_exist();
+
+    let Self {
+      encoder,
+      device,
+      queue,
+      tex_atlas,
+      ..
+    } = self;
+    let encoder = encoder.as_mut().unwrap();
+
     let (pos, size, grown) = match style {
       FillStyle::Color(c) => {
-        let (pos, grown) = self.tex_atlas.store_color_in_palette(
-          *c,
-          &self.device,
-          encoder,
-          &self.queue,
-        )?;
+        let (pos, grown) =
+          tex_atlas.store_color_in_palette(*c, device, encoder, queue)?;
 
         (pos, DeviceSize::new(1, 1), grown)
       }
@@ -559,12 +410,9 @@ impl<S: Surface> Canvas<S> {
     })
   }
 
-  fn upload_render_command(
-    &mut self,
-    command: &RenderCommand,
-    encoder: &mut wgpu::CommandEncoder,
-    view: &wgpu::TextureView,
-  ) {
+  /// Upload a RenderCommand into current frame. RenderCommand is the result
+  /// of a layer drawing finished.
+  pub fn upload_render_command(&mut self, command: &RenderCommand) {
     let RenderCommand { attrs, geometry } = command;
 
     let mut v_start: usize = 0;
@@ -577,8 +425,8 @@ impl<S: Surface> Canvas<S> {
          style,
          bounding_rect_for_style,
        }| {
-        let res = self.store_style_in_atlas(style, encoder).or_else(|err| {
-          self.draw(view, encoder);
+        let res = self.store_style_in_atlas(style).or_else(|err| {
+          self.draw();
 
           // Todo: we should not directly clear the texture atlas,
           // but deallocate all not used texture.
@@ -586,7 +434,7 @@ impl<S: Surface> Canvas<S> {
           indices_offset = -(v_start as i32);
           match err {
             AtlasStoreErr::SpaceNotEnough => {
-              let res = self.store_style_in_atlas(style, encoder);
+              let res = self.store_style_in_atlas(style);
               debug_assert!(res.is_ok());
               res
             }
@@ -772,13 +620,6 @@ fn create_uniforms(
   })
 }
 
-impl<'a, S: Surface, T: Borrow<wgpu::TextureView>> Drop
-  for FrameImpl<'a, S, T>
-{
-  #[inline]
-  fn drop(&mut self) { self.submit(); }
-}
-
 /// We use a texture atlas to shader vertices, even if a pure color path.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, AsBytes)]
@@ -843,7 +684,7 @@ struct RenderData {
 
 impl RenderData {
   #[inline]
-  fn has_data(&mut self) -> bool {
+  fn has_data(&self) -> bool {
     debug_assert_eq!(self.vertices.is_empty(), self.indices.is_empty());
     debug_assert_eq!(self.vertices.is_empty(), self.primitives.is_empty());
 
@@ -918,8 +759,6 @@ mod tests {
 
     let mut canvas = block_on(Canvas::new(DeviceSize::new(100, 100)));
 
-    let mut frame = canvas.next_frame();
-
     let v = layer_2d::Vertex {
       pixel_coords: Point::new(0., 0.),
       texture_coords: Point::new(-1., -1.),
@@ -940,10 +779,10 @@ mod tests {
       }],
     };
 
-    frame.upload_render_command(&r_cmd);
-    frame.upload_render_command(&r_cmd);
+    canvas.upload_render_command(&r_cmd);
+    canvas.upload_render_command(&r_cmd);
 
-    let data = &frame.canvas.render_data;
+    let data = &canvas.render_data;
     debug_assert_eq!(data.vertices.len(), 6);
     debug_assert_eq!(&data.indices, &[0, 1, 2, 3, 4, 5]);
   }
@@ -954,14 +793,14 @@ mod tests {
     let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
     let path = circle_50();
 
-    let mut frame = canvas.new_texture_frame();
-    let mut layer = frame.new_2d_layer();
+    let mut layer = canvas.new_2d_layer();
     layer.set_brush_style(FillStyle::Color(const_color::BLACK.into()));
     layer.translate(50., 50.);
     layer.fill_path(path);
-    frame.compose_2d_layer(layer);
+    canvas.compose_2d_layer(layer);
+    canvas.submit();
 
-    unit_test::assert_frame_eq!(frame, "./test_imgs/smoke_draw_circle.png",);
+    unit_test::assert_canvas_eq!(canvas, "./test_imgs/smoke_draw_circle.png");
   }
 
   #[test]
@@ -970,8 +809,7 @@ mod tests {
     let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
     let path = circle_50();
     {
-      let mut frame = canvas.new_texture_frame();
-      let mut layer = frame.new_2d_layer();
+      let mut layer = canvas.new_2d_layer();
 
       let mut fill_color_circle =
         |color: Color, offset_x: f32, offset_y: f32| {
@@ -987,10 +825,11 @@ mod tests {
       fill_color_circle(const_color::GREEN.into(), 100., 0.);
       fill_color_circle(const_color::BLUE.into(), -0., 100.);
 
-      frame.compose_2d_layer(layer);
+      canvas.compose_2d_layer(layer);
+      canvas.submit();
 
-      unit_test::assert_frame_eq!(
-        frame,
+      unit_test::assert_canvas_eq!(
+        canvas,
         "./test_imgs/color_palette_texture.png",
       );
     }

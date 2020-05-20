@@ -1,7 +1,4 @@
-use super::{
-  canvas, surface::Surface, Canvas, DeviceRect, DeviceSize, Frame, FrameImpl,
-  Rect,
-};
+use super::{canvas, surface::Surface, Canvas, DeviceRect, DeviceSize, Rect};
 use glyph_brush::{
   ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush,
   GlyphBrushBuilder,
@@ -40,61 +37,51 @@ impl TextBrush {
     }
   }
 
-  pub(crate) fn queue(&mut self, section: Section) {
-    self.brush.queue(section);
+  #[inline]
+  fn queue(&mut self, section: Section) { self.brush.queue(section); }
+
+  fn process_queued(
+    &mut self,
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+  ) -> Result<&[QuadVertex], BrushError> {
+    let Self { brush, texture, .. } = self;
+    let action = brush.process_queued(
+      |rect, data| Self::update_texture(texture, device, encoder, rect, data),
+      Self::to_vertex,
+    )?;
+    match action {
+      BrushAction::Draw(vertices) => self.quad_vertices_cache = vertices,
+      BrushAction::ReDraw => {}
+    }
+
+    Ok(self.quad_vertices_cache.as_slice())
   }
 
-  pub(crate) fn process_queued<S, T>(
-    &mut self,
-    frame: &mut FrameImpl<S, T>,
-  ) -> &[QuadVertex]
-  where
-    S: Surface,
-    T: std::borrow::Borrow<wgpu::TextureView>,
-  {
-    loop {
-      let Self { brush, texture, .. } = self;
-      let (canvas, encoder) = frame.canvas_and_encoder();
-      let action = brush.process_queued(
-        |rect, data| {
-          Self::update_texture(texture, &canvas.device, encoder, rect, data)
-        },
-        Self::to_vertex,
-      );
+  fn error_handle(&mut self, err: BrushError, device: &wgpu::Device) {
+    match err {
+      BrushError::TextureTooSmall { suggested } => {
+        const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
+        let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
+          (MAX, MAX)
+        } else {
+          suggested
+        };
 
-      match action {
-        Ok(res) => {
-          match res {
-            BrushAction::Draw(vertices) => self.quad_vertices_cache = vertices,
-            BrushAction::ReDraw => {}
-          }
-          break;
+        self.texture = Self::texture(device, new_size.into());
+        if log_enabled!(log::Level::Warn) {
+          warn!(
+            "Increasing glyph texture size {old:?} -> {new:?}. \
+             Consider building with `.initial_cache_size({new:?})` to avoid \
+             resizing. Called from:\n{trace:?}",
+            old = self.brush.texture_dimensions(),
+            new = new_size,
+            trace = backtrace::Backtrace::new()
+          );
         }
-        Err(BrushError::TextureTooSmall { suggested }) => {
-          const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
-          let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
-            (MAX, MAX)
-          } else {
-            suggested
-          };
-          frame.submit();
-
-          self.texture = Self::texture(&frame.canvas().device, new_size.into());
-          if log_enabled!(log::Level::Warn) {
-            warn!(
-              "Increasing glyph texture size {old:?} -> {new:?}. \
-               Consider building with `.initial_cache_size({new:?})` to avoid \
-               resizing. Called from:\n{trace:?}",
-              old = self.brush.texture_dimensions(),
-              new = new_size,
-              trace = backtrace::Backtrace::new()
-            );
-          }
-          self.brush.resize_texture(new_size.0, new_size.1)
-        }
+        self.brush.resize_texture(new_size.0, new_size.1)
       }
     }
-    self.quad_vertices_cache.as_slice()
   }
 
   /// Add a font for brush, so brush can support this font.
@@ -212,8 +199,10 @@ impl TextBrush {
         depth: 1,
       },
       dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Rg8Unorm,
-      usage: wgpu::TextureUsage::COPY_DST | wgpu::TextureUsage::SAMPLED,
+      format: wgpu::TextureFormat::R8Unorm,
+      usage: wgpu::TextureUsage::COPY_DST
+        | wgpu::TextureUsage::SAMPLED
+        | wgpu::TextureUsage::COPY_SRC,
       mip_level_count: 1,
       sample_count: 1,
     })
@@ -236,33 +225,108 @@ impl<S: Surface> Canvas<S> {
     self.text_brush.available_fonts.get(name).cloned()
   }
 
-  #[cfg(debug_assertions)]
-  pub(crate) fn log_glyph_texture(&mut self) {
-    self.create_converter_if_none();
+  pub(crate) fn process_text_sections<'a, Secs>(
+    &mut self,
+    sections: Secs,
+  ) -> &[QuadVertex]
+  where
+    Secs: IntoIterator<Item = Section<'a>>,
+  {
+    sections
+      .into_iter()
+      .for_each(|section| self.text_brush.queue(section));
 
-    let Canvas {
-      tex_atlas,
-      device,
-      queue,
-      rgba_converter,
-      ..
-    } = self;
+    loop {
+      self.ensure_encoder_exist();
+
+      let Self {
+        device,
+        encoder,
+        text_brush,
+        ..
+      } = self;
+      let encoder = encoder.as_mut().unwrap();
+
+      let err = match text_brush.process_queued(device, encoder) {
+        Ok(_) => break,
+        Err(err) => err,
+      };
+      self.text_brush.error_handle(err, device);
+    }
+
+    self.text_brush.quad_vertices_cache.as_slice()
+  }
+
+  #[cfg(debug_assertions)]
+  pub fn log_glyph_texture(&mut self) {
+    self.ensure_rgba_converter();
+
+    let Canvas { device, queue, .. } = self;
 
     let pkg_root = env!("CARGO_MANIFEST_DIR");
     let atlas_capture =
       format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
 
-    let size = self.text_brush.brush.texture_dimensions();
-    let atlas = canvas::texture_to_png(
-      &tex_atlas.texture.raw_texture,
-      DeviceRect::from_size(size.into()),
-      device,
-      queue,
-      rgba_converter.as_ref().unwrap(),
-      std::fs::File::create(&atlas_capture).unwrap(),
+    let (width, height) = self.text_brush.brush.texture_dimensions();
+
+    let size = width as u64 * height as u64 * std::mem::size_of::<u8>() as u64;
+
+    // The output buffer lets us retrieve the data as an array
+    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+      size,
+      usage: wgpu::BufferUsage::MAP_READ
+        | wgpu::BufferUsage::STORAGE
+        | wgpu::BufferUsage::COPY_DST,
+
+      label: None,
+    });
+
+    let mut encoder =
+      device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Encoder for encoding texture as png"),
+      });
+
+    encoder.copy_texture_to_buffer(
+      wgpu::TextureCopyView {
+        texture: &self.text_brush.texture,
+        mip_level: 0,
+        array_layer: 0,
+        origin: wgpu::Origin3d::ZERO,
+      },
+      wgpu::BufferCopyView {
+        buffer: &output_buffer,
+        offset: 0,
+        bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
+        rows_per_image: 0,
+      },
+      wgpu::Extent3d {
+        width: width,
+        height: height,
+        depth: 1,
+      },
     );
 
-    let _r = futures::executor::block_on(atlas);
+    queue.submit(Some(encoder.finish()));
+
+    // Note that we're not calling `.await` here.
+    let buffer_future = output_buffer.map_read(0, size);
+
+    // Poll the device in a blocking manner so that our future resolves.
+    device.poll(wgpu::Maintain::Wait);
+
+    let mapping = futures::executor::block_on(buffer_future).unwrap();
+    let mut png_encoder = png::Encoder::new(
+      std::fs::File::create(&atlas_capture).unwrap(),
+      width,
+      height,
+    );
+    png_encoder.set_depth(png::BitDepth::Eight);
+    png_encoder.set_color(png::ColorType::Grayscale);
+    png_encoder
+      .write_header()
+      .unwrap()
+      .write_image_data(mapping.as_slice())
+      .unwrap();
 
     log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
   }
@@ -346,14 +410,17 @@ mod tests {
   fn glyph_cache_check() {
     let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
     add_default_fonts(&mut canvas);
-    let brush = &mut canvas.text_brush;
-    let str = "Hello glyph!";
-    brush.queue(Section::new().add_text(Text::default().with_text(str)));
-
-    let mut frame = canvas.next_frame();
-    let vertices = brush.process_queued(&mut frame);
+    let str = "Hello_glyph!";
+    let section = Section::new().add_text(Text::default().with_text(str));
+    let vertices = canvas.process_text_sections(Some(section));
     assert_eq!(vertices.len(), str.chars().count());
+    canvas.submit();
 
-    unimplemented!();
+    canvas.log_glyph_texture();
+
+    unit_test::assert_img_eq!(
+      "./test_imgs/hello_glyph_cache.png",
+      "./.log/glyph_texture_cache.png"
+    );
   }
 }
