@@ -35,8 +35,7 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let mut frame = canvas.next_frame();
-      let mut layer = frame.new_2d_layer();
+      let mut layer = canvas.new_2d_layer();
       layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
       let mut path = Path::builder();
       path.add_circle(
@@ -46,7 +45,8 @@ fn main() {
       );
       let path = path.build();
       layer.fill_path(path);
-      frame.compose_2d_layer(layer);
+      canvas.compose_2d_layer(layer);
+      canvas.submit();
     }
     Event::MainEventsCleared => {
       window.request_redraw();

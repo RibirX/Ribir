@@ -67,9 +67,8 @@ impl<'a> Window<'a> {
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
     if let Some(root) = self.render_tree.root() {
-      let mut frame = self.canvas.next_frame();
       let painting_context =
-        PaintingContext::new(&mut frame, root, &self.render_tree);
+        PaintingContext::new(&mut self.canvas, root, &self.render_tree);
       root
         .get(&self.render_tree)
         .expect("Root render object should exists when root id exists in tree.")

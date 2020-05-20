@@ -1,4 +1,6 @@
-use super::{surface::Texture, Color, DevicePoint, DeviceSize};
+use super::{
+  surface::Texture, Canvas, Color, DevicePoint, DeviceSize, FillStyle,
+};
 use guillotiere::*;
 mod color_palette;
 use color_palette::ColorPalettes;
