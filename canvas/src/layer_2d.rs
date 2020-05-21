@@ -41,30 +41,26 @@ impl<'a> Rendering2DLayer<'a> {
     LayerGuard(self)
   }
 
-  /// Returns the color, gradient, or pattern used for strokes. Only `Color`
+  /// Returns the color, gradient, or pattern used for draw. Only `Color`
   /// support now.
   #[inline]
-  pub fn get_stroke_pen_style(&self) -> &FillStyle {
-    &self.current_state().stroke_pen.style
-  }
+  pub fn get_style(&self) -> &FillStyle { &self.current_state().style }
 
-  /// Change the style of pen that used to stroke path.
+  /// Change the style of pen that used to draw path.
   #[inline]
-  pub fn set_stroke_pen_style(&mut self, pen_style: FillStyle) -> &mut Self {
-    self.current_state_mut().stroke_pen.style = pen_style;
+  pub fn set_style(&mut self, pen_style: FillStyle) -> &mut Self {
+    self.current_state_mut().style = pen_style;
     self
   }
 
   /// Return the line width of the stroke pen.
   #[inline]
-  pub fn get_line_width(&self) -> f32 {
-    self.current_state().stroke_pen.line_width
-  }
+  pub fn get_line_width(&self) -> f32 { self.current_state().line_width }
 
   /// Set the line width of the stroke pen with `line_width`
   #[inline]
   pub fn set_line_width(&mut self, line_width: f32) -> &mut Self {
-    self.current_state_mut().stroke_pen.line_width = line_width;
+    self.current_state_mut().line_width = line_width;
     self
   }
 
@@ -74,20 +70,6 @@ impl<'a> Rendering2DLayer<'a> {
   #[inline]
   pub fn set_font(&mut self, font: FontId) -> &mut Self {
     self.current_state_mut().font = font;
-    self
-  }
-
-  /// Returns the color, gradient, or pattern used for fill. Only `Color`
-  /// support now.
-  #[inline]
-  pub fn get_brush_style(&self) -> &FillStyle {
-    &self.current_state().fill_brush.style
-  }
-
-  /// Change the style of brush that used to fill path.
-  #[inline]
-  pub fn set_brush_style(&mut self, pen_style: FillStyle) -> &mut Self {
-    self.current_state_mut().fill_brush.style = pen_style;
     self
   }
 
@@ -107,23 +89,15 @@ impl<'a> Rendering2DLayer<'a> {
   /// Renders the specified path by using the current pen.
   pub fn stroke_path(&mut self, path: Path) {
     let state = self.current_state();
-    let path = Command {
-      info: CommandInfo::Path(path),
-      transform: state.transform,
-      cmd_type: CommandType::Stroke(state.stroke_pen.clone()),
-    };
-    self.commands.push(path);
+    let cmd = self.command_from_path(path, true);
+    self.commands.push(cmd);
   }
 
   /// Use current brush fill the interior of the `path`.
   pub fn fill_path(&mut self, path: Path) {
     let state = self.current_state();
-    let path = Command {
-      info: CommandInfo::Path(path),
-      transform: state.transform,
-      cmd_type: CommandType::Fill(state.fill_brush.clone()),
-    };
-    self.commands.push(path);
+    let cmd = self.command_from_path(path, false);
+    self.commands.push(cmd);
   }
 
   pub fn fill_text_with_desc(&mut self) {
@@ -145,6 +119,8 @@ impl<'a> Rendering2DLayer<'a> {
     let mut sec = Section::new().with_screen_position(left_top).add_text(
       glyph_brush::Text::default()
         .with_text(text)
+        // fixme: text should have style
+        //.with_extra(state.style)
         .with_font_id(state.font)
         .with_scale(state.font_size),
     );
@@ -153,11 +129,17 @@ impl<'a> Rendering2DLayer<'a> {
     }
     if let Some(cmd) = self.commands.last_mut() {
       if let CommandInfo::Text(ref mut texts) = cmd.info {
-        texts.push(sec);
-        return;
+        if state.transform == cmd.transform {
+          texts.push(sec);
+          return;
+        }
       }
     }
-    let cmd = self.command_with_info(CommandInfo::Text(vec![sec]), false);
+
+    let cmd = Command {
+      info: CommandInfo::Text(vec![sec]),
+      transform: state.transform,
+    };
     self.commands.push(cmd);
   }
 
@@ -190,20 +172,39 @@ impl<'a> Rendering2DLayer<'a> {
 
     self.commands.into_iter().for_each(|cmd| {
       let bounding_rect_for_style = cmd.bounding_rect_for_style();
-      let Command {
-        transform,
-        info,
-        cmd_type,
-      } = cmd;
+      let Command { transform, info } = cmd;
 
       let count = match info {
-        CommandInfo::Path(path) => Self::tessellate_path(
-          &mut geometry,
+        CommandInfo::Path {
           path,
-          &cmd_type,
-          &mut fill_tess,
-          &mut stroke_tess,
-        ),
+          style,
+          stroke_line_width,
+        } => {
+          if let Some(line_width) = stroke_line_width {
+            stroke_tess
+              .tessellate_path(
+                &path,
+                &StrokeOptions::tolerance(TOLERANCE)
+                  .with_line_width(line_width),
+                &mut BuffersBuilder::new(
+                  &mut geometry,
+                  Vertex::from_stroke_vertex,
+                ),
+              )
+              .unwrap()
+          } else {
+            fill_tess
+              .tessellate_path(
+                &path,
+                &FillOptions::tolerance(TOLERANCE),
+                &mut BuffersBuilder::new(
+                  &mut geometry,
+                  Vertex::from_fill_vertex,
+                ),
+              )
+              .unwrap()
+          }
+        }
         CommandInfo::Text(sections) => {
           let quad_vertices = canvas.process_text_sections(sections);
           let count = Count {
@@ -261,8 +262,6 @@ impl<'a> Rendering2DLayer<'a> {
           }
         }
       };
-
-      let style = cmd_type.style();
 
       if let Some(last) = attrs.last_mut() {
         if last.bounding_rect_for_style == bounding_rect_for_style
@@ -368,31 +367,6 @@ struct Brush {
 }
 
 impl<'a> Rendering2DLayer<'a> {
-  fn tessellate_path(
-    mut buffer: &mut VertexBuffers<Vertex, u32>,
-    path: Path,
-    cmd_type: &CommandType,
-    fill_tess: &mut FillTessellator,
-    stroke_tess: &mut StrokeTessellator,
-  ) -> Count {
-    match cmd_type {
-      CommandType::Fill(_) => fill_tess
-        .tessellate_path(
-          &path,
-          &FillOptions::tolerance(TOLERANCE),
-          &mut BuffersBuilder::new(&mut buffer, Vertex::from_fill_vertex),
-        )
-        .unwrap(),
-      CommandType::Stroke(pen) => stroke_tess
-        .tessellate_path(
-          &path,
-          &StrokeOptions::tolerance(TOLERANCE).with_line_width(pen.line_width),
-          &mut BuffersBuilder::new(&mut buffer, Vertex::from_stroke_vertex),
-        )
-        .unwrap(),
-    }
-  }
-
   fn current_state(&self) -> &State {
     self
       .state_stack
@@ -407,51 +381,44 @@ impl<'a> Rendering2DLayer<'a> {
       .expect("Must have one state in stack!")
   }
 
-  fn command_with_info<'l>(
+  fn command_from_path<'l>(
     &self,
-    info: CommandInfo<'l>,
+    path: Path,
     stroke_or_fill: bool,
   ) -> Command<'l> {
     let state = self.current_state();
-    let cmd_type = if stroke_or_fill {
-      CommandType::Stroke(state.stroke_pen.clone())
+    let stroke_line_width = if stroke_or_fill {
+      Some(self.current_state().line_width)
     } else {
-      CommandType::Fill(state.fill_brush.clone())
+      None
     };
     Command {
-      info,
+      info: CommandInfo::Path {
+        path,
+        style: state.style,
+        stroke_line_width,
+      },
       transform: state.transform,
-      cmd_type,
     }
   }
 }
 #[derive(Clone, Debug)]
 struct State {
   transform: Transform,
-  stroke_pen: StrokePen,
-  fill_brush: Brush,
+  line_width: f32,
+  style: FillStyle,
   font: FontId,
   font_size: f32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum CommandType {
-  Fill(Brush),
-  Stroke(StrokePen),
-}
-
-impl CommandType {
-  fn style(&self) -> &FillStyle {
-    match self {
-      CommandType::Stroke(pen) => &pen.style,
-      CommandType::Fill(brush) => &brush.style,
-    }
-  }
-}
-
 #[derive(Debug, Clone)]
 enum CommandInfo<'a> {
-  Path(Path),
+  Path {
+    path: Path,
+    style: FillStyle,
+    // A some value means stroke with the line width in it, None means fill.
+    stroke_line_width: Option<f32>,
+  },
   Text(Vec<Section<'a>>),
 }
 
@@ -459,7 +426,6 @@ enum CommandInfo<'a> {
 struct Command<'a> {
   info: CommandInfo<'a>,
   transform: Transform,
-  cmd_type: CommandType,
 }
 
 impl<'a> Command<'a> {
@@ -529,19 +495,11 @@ impl State {
   pub const fn new() -> Self {
     Self {
       transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
-      stroke_pen: StrokePen {
-        style: FillStyle::Color(Color {
-          color: const_color::BLACK,
-          alpha: u8::MAX,
-        }),
-        line_width: 1.,
-      },
-      fill_brush: Brush {
-        style: FillStyle::Color(Color {
-          color: const_color::BLACK,
-          alpha: u8::MAX,
-        }),
-      },
+      style: FillStyle::Color(Color {
+        color: const_color::BLACK,
+        alpha: u8::MAX,
+      }),
+      line_width: 1.,
       font: FontId(0),
       font_size: 14.,
     }
