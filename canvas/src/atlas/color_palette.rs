@@ -34,7 +34,6 @@ impl ColorPalettes {
     }
     if !self.current_palette.is_fulled() {
       let pos = self.add_color(color);
-      self.indexed_colors.insert(color_hash(color), pos);
       return Some(pos);
     }
 
@@ -86,8 +85,10 @@ impl ColorPalettes {
 
   fn add_color(&mut self, color: Color) -> PhysicPoint {
     let offset = self.current_palette.add_color(color);
-    let pos = self.current_alloc.rectangle.min + offset;
-    PhysicPoint::new(pos.x as u32, pos.y as u32)
+    let pos = (self.current_alloc.rectangle.min + offset).to_u32();
+    let pos = PhysicPoint::from_untyped(pos.to_u32());
+    self.indexed_colors.insert(color_hash(color), pos);
+    pos
   }
 
   fn allocate_palette(atlas: &mut AtlasAllocator) -> Option<Allocation> {
