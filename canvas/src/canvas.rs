@@ -279,8 +279,7 @@ impl<S: Surface> Canvas<S> {
 
   /// Compose a layer into the canvas.
   pub fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
-    let cmd = layer.finish(self);
-    self.upload_render_command(&cmd);
+    layer.finish(self);
   }
 
   /// Submits a series of finished command buffers for execution. You needn't
@@ -820,7 +819,7 @@ mod tests {
     let path = circle_50();
 
     let mut layer = canvas.new_2d_layer();
-    layer.set_brush_style(FillStyle::Color(const_color::BLACK.into()));
+    layer.set_style(FillStyle::Color(const_color::BLACK.into()));
     layer.translate(50., 50.);
     layer.fill_path(path);
     canvas.compose_2d_layer(layer);
@@ -840,7 +839,7 @@ mod tests {
       let mut fill_color_circle =
         |color: Color, offset_x: f32, offset_y: f32| {
           layer
-            .set_brush_style(FillStyle::Color(color))
+            .set_style(FillStyle::Color(color))
             .translate(offset_x, offset_y)
             .fill_path(path.clone());
         };

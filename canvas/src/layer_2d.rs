@@ -1,5 +1,5 @@
-use crate::{text::Section, Canvas, Point, Rect, Size, Transform};
-pub use glyph_brush::{FontId, HorizontalAlign, Layout, VerticalAlign};
+use crate::{canvas::surface::Surface, text::Section, Canvas, Point, Rect, Size, Transform};
+pub use glyph_brush::{FontId, GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
@@ -88,20 +88,14 @@ impl<'a> Rendering2DLayer<'a> {
 
   /// Renders the specified path by using the current pen.
   pub fn stroke_path(&mut self, path: Path) {
-    let state = self.current_state();
     let cmd = self.command_from_path(path, true);
     self.commands.push(cmd);
   }
 
   /// Use current brush fill the interior of the `path`.
   pub fn fill_path(&mut self, path: Path) {
-    let state = self.current_state();
     let cmd = self.command_from_path(path, false);
     self.commands.push(cmd);
-  }
-
-  pub fn fill_text_with_desc(&mut self) {
-    unimplemented!();
   }
 
   /// Fill `text` from left to right, start at `left_top`.
@@ -109,38 +103,58 @@ impl<'a> Rendering2DLayer<'a> {
   /// Use `font` and `font_size` to specify the font and font size.
   /// Use [`fill_text_with_desc`](Rendering2DLayer::fill_text_with_desc) method
   /// to fill complex text.
-  pub fn fill_text(
-    &mut self,
-    left_top: Point,
-    text: &'a str,
-    max_width: Option<f32>,
-  ) {
-    let state = self.current_state();
-    let mut sec = Section::new().with_screen_position(left_top).add_text(
-      glyph_brush::Text::default()
-        .with_text(text)
-        // fixme: text should have style
-        //.with_extra(state.style)
-        .with_font_id(state.font)
-        .with_scale(state.font_size),
-    );
-    if let Some(max_width) = max_width {
-      sec = sec.with_bounds((max_width, f32::MAX))
-    }
-    if let Some(cmd) = self.commands.last_mut() {
-      if let CommandInfo::Text(ref mut texts) = cmd.info {
-        if state.transform == cmd.transform {
-          texts.push(sec);
-          return;
-        }
-      }
-    }
-
-    let cmd = Command {
-      info: CommandInfo::Text(vec![sec]),
-      transform: state.transform,
-    };
+  pub fn fill_text(&mut self, left_top: Point, text: &'a str, max_width: Option<f32>) {
+    let cmd = self.command_from_text(text, left_top, max_width);
     self.commands.push(cmd);
+  }
+
+  /// Draw multi texts with different font and color, and specify how to layout
+  /// it. Use [`fill_text`](Rendering2DLayer::fill_text) if just draw a single
+  /// line simple text.
+  ///
+  /// # Arguments.
+  ///
+  /// * `texts` -  Pairs of Text and its color to render, rendered next to one
+  ///   another.
+  /// * `bounds` - Box bounds, in pixels from top-left.
+  /// * `layout` - Layout info of the texts
+  pub fn fill_complex_texts(
+    &mut self,
+    texts: Vec<(Text<'a>, Color)>,
+    bounds: Option<Rect>,
+    layout: Option<TextLayout>,
+  ) {
+    let cmd = self.command_from(|_| CommandInfo::ComplexTexts {
+      texts,
+      bounds,
+      layout,
+    });
+    self.commands.push(cmd)
+  }
+
+  /// Draw multi texts with different font, and specify how to layout it. Its
+  /// behavior is similar with
+  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts), but use
+  /// current style to draw and texts can't specify color.
+  ///
+  /// # Arguments.
+  ///
+  /// * `texts` -  texts to render, rendered next to one another.
+  /// * `bounds` - Box bounds, in pixels from top-left.
+  /// * `layout` - Layout info of the texts
+  pub fn fill_complex_texts_by_style(
+    &mut self,
+    texts: Vec<Text<'a>>,
+    bounds: Option<Rect>,
+    layout: Option<TextLayout>,
+  ) {
+    let cmd = self.command_from(|state| CommandInfo::ComplexTextsByStyle {
+      texts,
+      bounds,
+      layout,
+      style: state.style.clone(),
+    });
+    self.commands.push(cmd)
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -157,137 +171,165 @@ impl<'a> Rendering2DLayer<'a> {
     self
   }
 
-  /// All drawing of this layer has finished, and convert the layer to an
-  /// intermediate render buffer data that will provide to render process and
-  /// then commit to gpu.
-  pub fn finish<S>(self, canvas: &mut Canvas<S>) -> RenderCommand
+  /// All drawing of this layer has finished, commit it to canvas and convert
+  /// the layer to an intermediate render buffer data that will provide to
+  /// render process and then commit to gpu.
+  ///
+  /// Return
+  /// If the canvas texture cache is update in the process, will return a
+  /// None-Value that means there is no buffer data can be cached.
+  pub fn finish<S>(self, canvas: &mut Canvas<S>) -> Option<RenderCommand>
   where
-    S: crate::canvas::surface::Surface,
+    S: Surface,
   {
     let mut stroke_tess = StrokeTessellator::new();
     let mut fill_tess = FillTessellator::new();
 
     let mut geometry = VertexBuffers::new();
     let mut attrs: Vec<RenderAttr> = vec![];
+    let mut unprocessed_attrs = vec![];
+    let mut texture_updated = false;
 
-    self.commands.into_iter().for_each(|cmd| {
-      let bounding_rect_for_style = cmd.bounding_rect_for_style();
-      let Command { transform, info } = cmd;
-
-      let count = match info {
-        CommandInfo::Path {
-          path,
-          style,
-          stroke_line_width,
-        } => {
-          if let Some(line_width) = stroke_line_width {
-            stroke_tess
-              .tessellate_path(
-                &path,
-                &StrokeOptions::tolerance(TOLERANCE)
-                  .with_line_width(line_width),
-                &mut BuffersBuilder::new(
-                  &mut geometry,
-                  Vertex::from_stroke_vertex,
-                ),
-              )
-              .unwrap()
-          } else {
-            fill_tess
-              .tessellate_path(
-                &path,
-                &FillOptions::tolerance(TOLERANCE),
-                &mut BuffersBuilder::new(
-                  &mut geometry,
-                  Vertex::from_fill_vertex,
-                ),
-              )
-              .unwrap()
+    let mut last_text = false;
+    self
+      .commands
+      .into_iter()
+      .for_each(|Command { transform, info }| {
+        match info {
+          CommandInfo::Path {
+            path,
+            style,
+            stroke_width,
+          } => {
+            if last_text {
+              texture_updated = canvas.process_queued_text(&mut geometry);
+              attrs.append(&mut unprocessed_attrs);
+              last_text = false;
+            }
+            let count = if let Some(line_width) = stroke_width {
+              stroke_tess
+                .tessellate_path(
+                  &path,
+                  &StrokeOptions::tolerance(TOLERANCE).with_line_width(line_width),
+                  &mut BuffersBuilder::new(&mut geometry, Vertex::from_stroke_vertex),
+                )
+                .unwrap()
+            } else {
+              fill_tess
+                .tessellate_path(
+                  &path,
+                  &FillOptions::tolerance(TOLERANCE),
+                  &mut BuffersBuilder::new(&mut geometry, Vertex::from_fill_vertex),
+                )
+                .unwrap()
+            };
+            let bounds = path_bounds_to_align_texture(&style, path);
+            add_attr_and_try_merge(&mut attrs, count, transform, style, bounds);
           }
-        }
-        CommandInfo::Text(sections) => {
-          let quad_vertices = canvas.process_text_sections(sections);
-          let count = Count {
-            vertices: quad_vertices.len() as u32 * 4,
-            indices: quad_vertices.len() as u32 * 6,
-          };
-          geometry.vertices.reserve(count.vertices as usize);
-          geometry.indices.reserve(count.indices as usize);
-
-          fn rect_corners(rect: &Rect) -> [Point; 4] {
-            [
-              rect.min(),
-              Point::new(rect.max_x(), rect.min_y()),
-              Point::new(rect.min_x(), rect.max_y()),
-              rect.max(),
-            ]
+          CommandInfo::SimpleText {
+            text,
+            style,
+            pos,
+            max_width,
+          } => {
+            let mut sec = Section::new().add_text(text).with_screen_position(pos);
+            if let Some(max_width) = max_width {
+              sec.bounds = (max_width, f32::INFINITY).into()
+            }
+            let bounds = section_bounds_to_align_texture(canvas, &style, &sec);
+            if !bounds.is_empty_or_negative() {
+              let glyph_count = canvas.glyph_brush.glyphs(&sec).count() as u32;
+              let count = glyphs_geometry_count(glyph_count);
+              add_attr_and_try_merge(&mut unprocessed_attrs, count, transform, style, bounds);
+            }
+            canvas.queue(sec);
+            last_text = true;
           }
-          quad_vertices.iter().for_each(|v| {
-            let VertexBuffers { vertices, indices } = &mut geometry;
-            let offset = vertices.len() as u32;
-            let tl = offset;
-            let tr = 1 + offset;
-            let bl = 2 + offset;
-            let br = 3 + offset;
-            indices.push(tl);
-            indices.push(tr);
-            indices.push(bl);
-            indices.push(bl);
-            indices.push(tr);
-            indices.push(br);
-
-            let px_coords = rect_corners(&v.pixel_coords);
-            let tex_coords = rect_corners(&v.tex_coords);
-            vertices.push(Vertex {
-              pixel_coords: px_coords[0],
-              texture_coords: tex_coords[0],
-            });
-            vertices.push(Vertex {
-              pixel_coords: px_coords[1],
-              texture_coords: tex_coords[1],
-            });
-            vertices.push(Vertex {
-              pixel_coords: px_coords[2],
-              texture_coords: tex_coords[2],
-            });
-            vertices.push(Vertex {
-              pixel_coords: px_coords[3],
-              texture_coords: tex_coords[3],
-            });
-          });
-
-          Count {
-            vertices: quad_vertices.len() as u32 * 4,
-            indices: quad_vertices.len() as u32 * 6,
+          CommandInfo::ComplexTexts {
+            texts,
+            bounds,
+            layout,
+          } => {
+            let texts = texts
+              .into_iter()
+              .map(|(t, color)| {
+                let glyph_count = canvas
+                  .glyph_brush
+                  .glyphs(&Section::new().add_text(t.clone()))
+                  .count() as u32;
+                add_attr_and_try_merge(
+                  &mut unprocessed_attrs,
+                  glyphs_geometry_count(glyph_count),
+                  transform,
+                  FillStyle::Color(color),
+                  COLOR_BOUNDS_TO_ALIGN_TEXTURE,
+                );
+                t.into()
+              })
+              .collect();
+            let mut sec = Section::new().with_text(texts);
+            if let Some(bounds) = bounds {
+              sec = sec
+                .with_screen_position(bounds.min())
+                .with_bounds(bounds.size);
+            }
+            if let Some(layout) = layout {
+              sec = sec.with_layout(layout);
+            }
+            canvas.queue(sec);
+            last_text = true;
           }
-        }
-      };
+          CommandInfo::ComplexTextsByStyle {
+            style,
+            texts,
+            bounds,
+            layout,
+          } => {
+            let texts = texts.into_iter().map(|t| t.into()).collect();
+            let mut sec = Section::new().with_text(texts);
+            let align_bounds = section_bounds_to_align_texture(canvas, &style, &sec);
+            if !align_bounds.is_empty_or_negative() {
+              if let Some(bounds) = bounds {
+                sec = sec
+                  .with_screen_position(bounds.min())
+                  .with_bounds(bounds.size);
+              }
+              if let Some(layout) = layout {
+                sec = sec.with_layout(layout);
+              }
 
-      if let Some(last) = attrs.last_mut() {
-        if last.bounding_rect_for_style == bounding_rect_for_style
-          && &last.style == style
-          && last.transform == transform
-        {
-          last.count.vertices += count.vertices;
-          last.count.indices += count.indices;
-          return;
-        }
-      }
-
-      attrs.push(RenderAttr {
-        transform,
-        bounding_rect_for_style,
-        count,
-        style: style.clone(),
+              let glyph_count = canvas.glyph_brush.glyphs(&sec).count() as u32;
+              let count = glyphs_geometry_count(glyph_count);
+              add_attr_and_try_merge(
+                &mut unprocessed_attrs,
+                count,
+                transform,
+                style,
+                align_bounds,
+              );
+              canvas.queue(sec);
+              last_text = true;
+            }
+          }
+        };
       });
-    });
 
-    RenderCommand { geometry, attrs }
+    if last_text {
+      canvas.process_queued_text(&mut geometry);
+      attrs.append(&mut unprocessed_attrs);
+    }
+    let cmd = RenderCommand { geometry, attrs };
+    if texture_updated {
+      canvas.upload_render_command(&cmd);
+      None
+    } else {
+      Some(cmd)
+    }
   }
 }
 
 /// Describe render the text as single line or break as multiple lines.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LineWrap {
   /// Renders a single line from left-to-right according to the inner
   /// alignment. Hard breaking will end the line, partially hitting the width
@@ -300,21 +342,18 @@ pub enum LineWrap {
   Wrap,
 }
 
+/// Describes how to layout the text.
 #[derive(Debug, Clone)]
 pub struct TextLayout {
+  /// horizontal alignment preference
   pub h_align: HorizontalAlign,
+  /// vertical alignment preference
   pub v_align: VerticalAlign,
+  /// text render in single line a multiple lins.
   pub wrap: LineWrap,
 }
 
-pub struct TextDesc<'a> {
-  /// Box bounds, in pixels from top-left. Defaults to unbounded.
-  pub bounds: Rect,
-  pub layout: TextLayout,
-  /// Text to render, rendered next to one another according the layout.
-  pub text: Vec<Text<'a>>,
-}
-
+#[derive(Debug, Clone)]
 pub struct Text<'a> {
   /// Text to render
   pub text: &'a str,
@@ -324,8 +363,6 @@ pub struct Text<'a> {
   /// [`Canvas::get_font_id_by_name`](Canvas::get_font_id_by_name) or across
   /// canvas to load custom font The default `FontId(0)` should always be
   pub font_id: FontId,
-  /// Style to render text
-  pub style: FillStyle,
 }
 
 #[derive(Debug, Clone)]
@@ -335,9 +372,15 @@ pub(crate) struct RenderAttr {
   pub(crate) style: FillStyle,
   pub(crate) bounding_rect_for_style: Rect,
 }
+#[derive(Debug, Clone, PartialEq)]
+pub enum FillStyle {
+  Color(Color),
+  Image,    // todo
+  Gradient, // todo,
+}
 
 #[derive(Debug, Clone)]
-pub struct Vertex {
+pub(crate) struct Vertex {
   pub(crate) pixel_coords: Point,
   pub(crate) texture_coords: Point,
 }
@@ -346,24 +389,6 @@ pub struct Vertex {
 pub struct RenderCommand {
   pub(crate) geometry: VertexBuffers<Vertex, u32>,
   pub(crate) attrs: Vec<RenderAttr>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum FillStyle {
-  Color(Color),
-  Image,    // todo
-  Gradient, // todo,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-struct StrokePen {
-  style: FillStyle,
-  line_width: f32,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct Brush {
-  style: FillStyle,
 }
 
 impl<'a> Rendering2DLayer<'a> {
@@ -381,25 +406,143 @@ impl<'a> Rendering2DLayer<'a> {
       .expect("Must have one state in stack!")
   }
 
-  fn command_from_path<'l>(
-    &self,
-    path: Path,
-    stroke_or_fill: bool,
-  ) -> Command<'l> {
-    let state = self.current_state();
-    let stroke_line_width = if stroke_or_fill {
-      Some(self.current_state().line_width)
-    } else {
-      None
-    };
-    Command {
-      info: CommandInfo::Path {
+  fn command_from_path<'l>(&self, path: Path, stroke_or_fill: bool) -> Command<'l> {
+    self.command_from(|state| {
+      let stroke_width = if stroke_or_fill {
+        Some(self.current_state().line_width)
+      } else {
+        None
+      };
+      CommandInfo::Path {
         path,
-        style: state.style,
-        stroke_line_width,
+        style: state.style.clone(),
+        stroke_width,
+      }
+    })
+  }
+
+  fn command_from_text<'l>(
+    &self,
+    text: &'l str,
+    pos: Point,
+    max_width: Option<f32>,
+  ) -> Command<'l> {
+    self.command_from(|state| CommandInfo::SimpleText {
+      text: Text {
+        text,
+        font_size: state.font_size,
+        font_id: state.font,
       },
+      style: state.style.clone(),
+      pos,
+      max_width,
+    })
+  }
+
+  #[inline]
+  fn command_from<'l, F: FnOnce(&State) -> CommandInfo<'l>>(&self, ctor_info: F) -> Command<'l> {
+    let state = self.current_state();
+    Command {
+      info: ctor_info(state),
       transform: state.transform,
     }
+  }
+}
+
+fn add_attr_and_try_merge(
+  attrs: &mut Vec<RenderAttr>,
+  count: Count,
+  transform: Transform,
+  style: FillStyle,
+  bounds: Rect,
+) {
+  if let Some(last) = attrs.last_mut() {
+    if last.bounding_rect_for_style == bounds && last.style == style && last.transform == transform
+    {
+      last.count.vertices += count.vertices;
+      last.count.indices += count.indices;
+      return;
+    }
+  }
+
+  attrs.push(RenderAttr {
+    transform,
+    bounding_rect_for_style: bounds,
+    count,
+    style: style.clone(),
+  });
+}
+
+#[inline]
+fn glyphs_geometry_count(glyph_count: u32) -> Count {
+  Count {
+    vertices: glyph_count * 4,
+    indices: glyph_count * 6,
+  }
+}
+impl<S: Surface> Canvas<S> {
+  fn process_queued_text(&mut self, geometry: &mut VertexBuffers<Vertex, u32>) -> bool {
+    let mut texture_updated = false;
+    let quad_vertices = loop {
+      match self.process_queued() {
+        Ok(quad_vertices) => break quad_vertices,
+        Err(glyph_brush::BrushError::TextureTooSmall { suggested }) => {
+          self.submit();
+          self.glyph_brush.resize_texture(&self.device, suggested);
+          texture_updated = true;
+        }
+      };
+    };
+
+    let count = Count {
+      vertices: quad_vertices.len() as u32 * 4,
+      indices: quad_vertices.len() as u32 * 6,
+    };
+    geometry.vertices.reserve(count.vertices as usize);
+    geometry.indices.reserve(count.indices as usize);
+
+    fn rect_corners(rect: &Rect) -> [Point; 4] {
+      [
+        rect.min(),
+        Point::new(rect.max_x(), rect.min_y()),
+        Point::new(rect.min_x(), rect.max_y()),
+        rect.max(),
+      ]
+    }
+    quad_vertices.iter().for_each(|v| {
+      let VertexBuffers { vertices, indices } = geometry;
+      let offset = vertices.len() as u32;
+      let tl = offset;
+      let tr = 1 + offset;
+      let bl = 2 + offset;
+      let br = 3 + offset;
+      indices.push(tl);
+      indices.push(tr);
+      indices.push(bl);
+      indices.push(bl);
+      indices.push(tr);
+      indices.push(br);
+
+      let px_coords = rect_corners(&v.pixel_coords);
+      let tex_coords = rect_corners(&v.tex_coords);
+      vertices.push(Vertex {
+        pixel_coords: px_coords[0],
+        texture_coords: tex_coords[0],
+      });
+      vertices.push(Vertex {
+        pixel_coords: px_coords[1],
+        texture_coords: tex_coords[1],
+      });
+      vertices.push(Vertex {
+        pixel_coords: px_coords[2],
+        texture_coords: tex_coords[2],
+      });
+      vertices.push(Vertex {
+        pixel_coords: px_coords[3],
+        texture_coords: tex_coords[3],
+      });
+    });
+    texture_updated
   }
 }
 #[derive(Clone, Debug)]
@@ -417,32 +560,31 @@ enum CommandInfo<'a> {
     path: Path,
     style: FillStyle,
     // A some value means stroke with the line width in it, None means fill.
-    stroke_line_width: Option<f32>,
+    stroke_width: Option<f32>,
   },
-  Text(Vec<Section<'a>>),
+  SimpleText {
+    text: Text<'a>,
+    style: FillStyle,
+    pos: Point,
+    max_width: Option<f32>,
+  },
+  ComplexTexts {
+    texts: Vec<(Text<'a>, Color)>,
+    bounds: Option<Rect>,
+    layout: Option<TextLayout>,
+  },
+  ComplexTextsByStyle {
+    texts: Vec<Text<'a>>,
+    bounds: Option<Rect>,
+    layout: Option<TextLayout>,
+    style: FillStyle,
+  },
 }
 
 #[derive(Debug, Clone)]
 struct Command<'a> {
   info: CommandInfo<'a>,
   transform: Transform,
-}
-
-impl<'a> Command<'a> {
-  fn bounding_rect_for_style(&self) -> Rect {
-    if let FillStyle::Color(_) = self.cmd_type.style() {
-      // Pure color just one pixel in texture, and always use repeat pattern, so
-      // zero min is ok, no matter what really bounding it is.
-      Rect::new(Point::new(0., 0.), Size::new(1., 1.))
-    } else {
-      if let CommandInfo::Path(ref path) = self.info {
-        let rect = lyon::algorithms::aabb::bounding_rect(path.iter());
-        Rect::from_untyped(&rect)
-      } else {
-        unimplemented!("text texture bounding not support now");
-      }
-    }
-  }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -486,6 +628,36 @@ impl Vertex {
   }
 }
 
+// Pure color just one pixel in texture, and always use repeat pattern, so
+// zero min is ok, no matter what really bounding it is.
+const COLOR_BOUNDS_TO_ALIGN_TEXTURE: Rect = Rect::new(Point::new(0., 0.), Size::new(1., 1.));
+
+fn path_bounds_to_align_texture(style: &FillStyle, path: Path) -> Rect {
+  if let FillStyle::Color(_) = style {
+    COLOR_BOUNDS_TO_ALIGN_TEXTURE
+  } else {
+    let rect = lyon::algorithms::aabb::bounding_rect(path.iter());
+    Rect::from_untyped(&rect)
+  }
+}
+
+fn section_bounds_to_align_texture<S: Surface>(
+  canvas: &mut Canvas<S>,
+  style: &FillStyle,
+  sec: &Section,
+) -> Rect {
+  if let FillStyle::Color(_) = style {
+    COLOR_BOUNDS_TO_ALIGN_TEXTURE
+  } else {
+    canvas.glyph_brush.glyph_bounds(sec).unwrap_or(Rect::zero())
+  }
+}
+
+impl Default for FillStyle {
+  #[inline]
+  fn default() -> Self { FillStyle::Color(const_color::WHITE.into()) }
+}
+
 impl Default for State {
   #[inline]
   fn default() -> Self { Self::new() }
@@ -517,6 +689,46 @@ impl TextLayout {
       v_align: VerticalAlign::Center,
       h_align: HorizontalAlign::Left,
       wrap: LineWrap::SingleLine,
+    }
+  }
+}
+
+impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
+  fn from(layout: TextLayout) -> Self {
+    let TextLayout {
+      h_align,
+      v_align,
+      wrap,
+    } = layout;
+    let line_breaker = glyph_brush::BuiltInLineBreaker::default();
+    if LineWrap::SingleLine == wrap {
+      glyph_brush::Layout::SingleLine {
+        h_align,
+        v_align,
+        line_breaker,
+      }
+    } else {
+      glyph_brush::Layout::Wrap {
+        h_align,
+        v_align,
+        line_breaker,
+      }
+    }
+  }
+}
+
+impl<'a> From<Text<'a>> for glyph_brush::Text<'a, ()> {
+  fn from(text: Text<'a>) -> Self {
+    let Text {
+      text,
+      font_id,
+      font_size,
+    } = text;
+    Self {
+      text,
+      font_id,
+      scale: font_size.into(),
+      extra: (),
     }
   }
 }
@@ -569,7 +781,7 @@ mod test {
     let path = builder.build();
     layer.stroke_path(path.clone());
     layer.fill_path(path);
-    let buffer = layer.finish(&mut frame);
+    let buffer = layer.finish(&mut frame).unwrap();
 
     assert!(!buffer.geometry.vertices.is_empty());
     assert_eq!(buffer.attrs.len(), 1);
@@ -587,23 +799,23 @@ mod test {
     // The stroke path both style and line width same should be merge.
     layer.stroke_path(sample_path.clone());
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 1);
+    assert_eq!(layer.clone().finish(&mut frame).unwrap().attrs.len(), 1);
 
     // Different line width with same color pen can be merged.
     layer.set_line_width(2.);
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 1);
+    assert_eq!(layer.clone().finish(&mut frame).unwrap().attrs.len(), 1);
 
     // Different color can't be merged.
-    layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
+    layer.set_style(FillStyle::Color(const_color::YELLOW.into()));
     layer.fill_path(sample_path.clone());
-    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 2);
+    assert_eq!(layer.clone().finish(&mut frame).unwrap().attrs.len(), 2);
 
     // Different type style can't be merged
-    layer.set_brush_style(FillStyle::Image);
+    layer.set_style(FillStyle::Image);
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
-    assert_eq!(layer.clone().finish(&mut frame).attrs.len(), 4);
+    assert_eq!(layer.clone().finish(&mut frame).unwrap().attrs.len(), 4);
 
     std::mem::forget(frame);
   }
@@ -614,25 +826,26 @@ mod test {
 
     let layer = Rendering2DLayer::new();
     let mut path = Path::builder();
-    path.add_rectangle(
-      &lyon::geom::rect(100., 100., 50., 50.),
-      Winding::Positive,
-    );
+    path.add_rectangle(&lyon::geom::rect(100., 100., 50., 50.), Winding::Positive);
     let path = path.build();
 
     // color bounding min always zero.
     let mut l1 = layer.clone();
     l1.stroke_path(path.clone());
     assert_eq!(
-      l1.finish(&mut frame).attrs[0].bounding_rect_for_style.min(),
+      l1.finish(&mut frame).unwrap().attrs[0]
+        .bounding_rect_for_style
+        .min(),
       Point::new(0., 0.)
     );
 
     let mut l2 = layer;
-    l2.set_stroke_pen_style(FillStyle::Image);
+    l2.set_style(FillStyle::Image);
     l2.stroke_path(path.clone());
     assert_eq!(
-      l2.finish(&mut frame).attrs[0].bounding_rect_for_style.min(),
+      l2.finish(&mut frame).unwrap().attrs[0]
+        .bounding_rect_for_style
+        .min(),
       Point::new(100., 100.)
     );
 
@@ -655,4 +868,22 @@ mod test {
 
     unit_test::assert_canvas_eq!(canvas, "./test_imgs/text_hello.png");
   }
+}
+
+#[test]
+#[ignore = "gpu need"]
+fn fill_text_complex() {
+  unimplemented!();
+}
+
+#[test]
+#[ignore = "gpu need"]
+fn fill_text_complex_single_style() {
+  unimplemented!();
+}
+
+#[test]
+#[ignore = "gpu need"]
+fn update_texture_on_processing() {
+  unimplemented!();
 }

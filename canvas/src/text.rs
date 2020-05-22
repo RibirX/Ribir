@@ -1,7 +1,6 @@
 use super::{canvas, surface::Surface, Canvas, DeviceSize, Rect};
 use glyph_brush::{
-  ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush,
-  GlyphBrushBuilder,
+  ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher,
 };
 use log::{log_enabled, warn};
 
@@ -43,6 +42,19 @@ impl TextBrush {
   pub(crate) fn view(&self) -> &wgpu::TextureView { &self.view }
 
   #[inline]
+  pub(crate) fn glyphs(&mut self, sec: &Section) -> glyph_brush::SectionGlyphIter {
+    self.brush.glyphs(sec)
+  }
+
+  #[inline]
+  pub(crate) fn glyph_bounds(&mut self, sec: &Section) -> Option<Rect> {
+    self
+      .brush
+      .glyph_bounds(sec)
+      .map(|rect| euclid::rect(rect.min.x, rect.min.y, rect.width(), rect.height()))
+  }
+
+  #[inline]
   fn queue(&mut self, section: Section) { self.brush.queue(section); }
 
   fn process_queued(
@@ -63,31 +75,27 @@ impl TextBrush {
     Ok(self.quad_vertices_cache.as_slice())
   }
 
-  fn error_handle(&mut self, err: BrushError, device: &wgpu::Device) {
-    match err {
-      BrushError::TextureTooSmall { suggested } => {
-        const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
-        let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
-          (MAX, MAX)
-        } else {
-          suggested
-        };
+  pub(crate) fn resize_texture(&mut self, device: &wgpu::Device, suggested: (u32, u32)) {
+    const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
+    let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
+      (MAX, MAX)
+    } else {
+      suggested
+    };
 
-        self.texture = Self::texture(device, new_size.into());
-        self.view = self.texture.create_default_view();
-        if log_enabled!(log::Level::Warn) {
-          warn!(
-            "Increasing glyph texture size {old:?} -> {new:?}. \
+    self.texture = Self::texture(device, new_size.into());
+    self.view = self.texture.create_default_view();
+    if log_enabled!(log::Level::Warn) {
+      warn!(
+        "Increasing glyph texture size {old:?} -> {new:?}. \
              Consider building with `.initial_cache_size({new:?})` to avoid \
              resizing. Called from:\n{trace:?}",
-            old = self.brush.texture_dimensions(),
-            new = new_size,
-            trace = backtrace::Backtrace::new()
-          );
-        }
-        self.brush.resize_texture(new_size.0, new_size.1)
-      }
+        old = self.brush.texture_dimensions(),
+        new = new_size,
+        trace = backtrace::Backtrace::new()
+      );
     }
+    self.brush.resize_texture(new_size.0, new_size.1)
   }
 
   /// Add a font for brush, so brush can support this font.
@@ -115,8 +123,7 @@ impl TextBrush {
     rect: glyph_brush::Rectangle<u32>,
     tex_data: &[u8],
   ) {
-    let buffer =
-      device.create_buffer_with_data(tex_data, wgpu::BufferUsage::COPY_SRC);
+    let buffer = device.create_buffer_with_data(tex_data, wgpu::BufferUsage::COPY_SRC);
 
     encoder.copy_buffer_to_texture(
       wgpu::BufferCopyView {
@@ -155,29 +162,27 @@ impl TextBrush {
     if pixel_coords.max.x > bounds.max.x {
       let old_width = pixel_coords.width();
       pixel_coords.max.x = bounds.max.x;
-      tex_coords.max.x = tex_coords.min.x
-        + tex_coords.width() * pixel_coords.width() / old_width;
+      tex_coords.max.x = tex_coords.min.x + tex_coords.width() * pixel_coords.width() / old_width;
     }
 
     if pixel_coords.min.x < bounds.min.x {
       let old_width = pixel_coords.width();
       pixel_coords.min.x = bounds.min.x;
-      tex_coords.min.x = tex_coords.max.x
-        - tex_coords.width() * pixel_coords.width() / old_width;
+      tex_coords.min.x = tex_coords.max.x - tex_coords.width() * pixel_coords.width() / old_width;
     }
 
     if pixel_coords.max.y > bounds.max.y {
       let old_height = pixel_coords.height();
       pixel_coords.max.y = bounds.max.y;
-      tex_coords.max.y = tex_coords.min.y
-        + tex_coords.height() * pixel_coords.height() / old_height;
+      tex_coords.max.y =
+        tex_coords.min.y + tex_coords.height() * pixel_coords.height() / old_height;
     }
 
     if pixel_coords.min.y < bounds.min.y {
       let old_height = pixel_coords.height();
       pixel_coords.min.y = bounds.min.y;
-      tex_coords.min.y = tex_coords.max.y
-        - tex_coords.height() * pixel_coords.height() / old_height;
+      tex_coords.min.y =
+        tex_coords.max.y - tex_coords.height() * pixel_coords.height() / old_height;
     }
 
     QuadVertex {
@@ -231,36 +236,21 @@ impl<S: Surface> Canvas<S> {
     self.glyph_brush.available_fonts.get(name).cloned()
   }
 
-  pub(crate) fn process_text_sections<'a, Secs>(
-    &mut self,
-    sections: Secs,
-  ) -> &[QuadVertex]
-  where
-    Secs: IntoIterator<Item = Section<'a>>,
-  {
-    sections
-      .into_iter()
-      .for_each(|section| self.glyph_brush.queue(section));
+  #[inline]
+  pub(crate) fn queue(&mut self, section: Section) { self.glyph_brush.queue(section); }
 
-    loop {
-      self.ensure_encoder_exist();
+  pub(crate) fn process_queued(&mut self) -> Result<&[QuadVertex], BrushError> {
+    self.ensure_encoder_exist();
 
-      let Self {
-        device,
-        encoder,
-        glyph_brush,
-        ..
-      } = self;
-      let encoder = encoder.as_mut().unwrap();
+    let Self {
+      device,
+      encoder,
+      glyph_brush,
+      ..
+    } = self;
+    let encoder = encoder.as_mut().unwrap();
 
-      let err = match glyph_brush.process_queued(device, encoder) {
-        Ok(_) => break,
-        Err(err) => err,
-      };
-      self.glyph_brush.error_handle(err, device);
-    }
-
-    self.glyph_brush.quad_vertices_cache.as_slice()
+    glyph_brush.process_queued(device, encoder)
   }
 
   #[cfg(debug_assertions)]
@@ -270,8 +260,7 @@ impl<S: Surface> Canvas<S> {
     let Canvas { device, queue, .. } = self;
 
     let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture =
-      format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
+    let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
 
     let (width, height) = self.glyph_brush.brush.texture_dimensions();
 
@@ -280,17 +269,14 @@ impl<S: Surface> Canvas<S> {
     // The output buffer lets us retrieve the data as an array
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
       size,
-      usage: wgpu::BufferUsage::MAP_READ
-        | wgpu::BufferUsage::STORAGE
-        | wgpu::BufferUsage::COPY_DST,
+      usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::STORAGE | wgpu::BufferUsage::COPY_DST,
 
       label: None,
     });
 
-    let mut encoder =
-      device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Encoder for encoding texture as png"),
-      });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("Encoder for encoding texture as png"),
+    });
 
     encoder.copy_texture_to_buffer(
       wgpu::TextureCopyView {
@@ -420,7 +406,8 @@ mod tests {
     add_default_fonts(&mut canvas);
     let str = "Hello_glyph!";
     let section = Section::new().add_text(Text::default().with_text(str));
-    let vertices = canvas.process_text_sections(Some(section));
+    canvas.queue(section);
+    let vertices = canvas.process_queued().unwrap();
     assert_eq!(vertices.len(), str.chars().count());
     canvas.submit();
 
