@@ -55,7 +55,15 @@ impl TextBrush {
   }
 
   #[inline]
-  fn queue(&mut self, section: Section) { self.brush.queue(section); }
+  pub(crate) fn draw_rect_for_cache(
+    &self,
+    glyph: &glyph_brush::SectionGlyph,
+  ) -> Option<(glyph_brush::ab_glyph::Rect, glyph_brush::ab_glyph::Rect)> {
+    self.brush.rect_for(glyph.font_id, &glyph.glyph)
+  }
+
+  #[inline]
+  fn queue(&mut self, section: &Section) { self.brush.queue(section); }
 
   fn process_queued(
     &mut self,
@@ -237,20 +245,28 @@ impl<S: Surface> Canvas<S> {
   }
 
   #[inline]
-  pub(crate) fn queue(&mut self, section: Section) { self.glyph_brush.queue(section); }
+  pub(crate) fn queue(&mut self, section: &Section) { self.glyph_brush.queue(&section); }
 
-  pub(crate) fn process_queued(&mut self) -> Result<&[QuadVertex], BrushError> {
-    self.ensure_encoder_exist();
+  pub(crate) fn process_queued(&mut self) -> (&[QuadVertex], bool) {
+    let mut texture_updated = false;
 
-    let Self {
-      device,
-      encoder,
-      glyph_brush,
-      ..
-    } = self;
-    let encoder = encoder.as_mut().unwrap();
+    loop {
+      self.ensure_encoder_exist();
 
-    glyph_brush.process_queued(device, encoder)
+      let encoder = self.encoder.as_mut().unwrap();
+
+      match self.glyph_brush.process_queued(&self.device, encoder) {
+        Ok(_) => break,
+        Err(glyph_brush::BrushError::TextureTooSmall { suggested }) => {
+          self.submit();
+          self.glyph_brush.resize_texture(&self.device, suggested);
+          texture_updated = true;
+        }
+      };
+    }
+
+    let quad_vertices = self.glyph_brush.quad_vertices_cache.as_slice();
+    (quad_vertices, texture_updated)
   }
 
   #[cfg(debug_assertions)]
@@ -406,10 +422,17 @@ mod tests {
     add_default_fonts(&mut canvas);
     let str = "Hello_glyph!";
     let section = Section::new().add_text(Text::default().with_text(str));
-    canvas.queue(section);
-    let vertices = canvas.process_queued().unwrap();
+    canvas.queue(&section);
+    let (vertices, update_texture) = canvas.process_queued();
+
     assert_eq!(vertices.len(), str.chars().count());
-    canvas.submit();
+    assert_eq!(update_texture, false);
+
+    // force submit data
+    if let Some(encoder) = canvas.encoder.take() {
+      canvas.queue.submit(Some(encoder.finish()));
+    }
+    canvas.view.take();
 
     canvas.log_glyph_texture();
 
