@@ -2,8 +2,8 @@ use super::{
   atlas::{AtlasStoreErr, TextureAtlas},
   layer_2d,
   text::TextBrush,
-  DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit,
-  RenderAttr, RenderCommand, Rendering2DLayer,
+  DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit, RenderAttr, RenderCommand,
+  Rendering2DLayer,
 };
 use std::borrow::Borrow;
 
@@ -97,10 +97,7 @@ impl Canvas<TextureSurface> {
   }
 
   /// PNG encoded the canvas then write by `writer`.
-  pub async fn to_png<W: std::io::Write>(
-    &mut self,
-    writer: W,
-  ) -> Result<(), &'static str> {
+  pub async fn to_png<W: std::io::Write>(&mut self, writer: W) -> Result<(), &'static str> {
     self.ensure_rgba_converter();
     let rect = DeviceRect::from_size(self.surface.size());
 
@@ -198,11 +195,8 @@ impl<S: Surface> Canvas<S> {
     };
 
     let [uniform_layout, primitives_layout] = create_uniform_layout(&device);
-    let pipeline = create_render_pipeline(
-      &device,
-      &sc_desc,
-      &[&uniform_layout, &primitives_layout],
-    );
+    let pipeline =
+      create_render_pipeline(&device, &sc_desc, &[&uniform_layout, &primitives_layout]);
 
     let tex_atlas = TextureAtlas::new(&device);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -250,11 +244,13 @@ impl<S: Surface> Canvas<S> {
 
   pub(crate) fn ensure_encoder_exist(&mut self) {
     if self.encoder.is_none() {
-      self.encoder = Some(self.device.create_command_encoder(
-        &wgpu::CommandEncoderDescriptor {
-          label: Some("Render Encoder"),
-        },
-      ))
+      self.encoder = Some(
+        self
+          .device
+          .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+          }),
+      )
     }
   }
 
@@ -273,28 +269,15 @@ impl<S: Surface> Canvas<S> {
   /// Create a 2d layer to drawing, and not effect current canvas before compose
   /// back to the canvas.
   #[inline]
-  pub fn new_2d_layer<'l>(&self) -> Rendering2DLayer<'l> {
-    Rendering2DLayer::new()
-  }
+  pub fn new_2d_layer<'l>(&self) -> Rendering2DLayer<'l> { Rendering2DLayer::new() }
 
   /// Compose a layer into the canvas.
-  pub fn compose_2d_layer(&mut self, layer: Rendering2DLayer) {
-    layer.finish(self);
-  }
+  pub fn compose_2d_layer(&mut self, layer: Rendering2DLayer) { layer.finish(self); }
 
   /// Submits a series of finished command buffers for execution. You needn't
   /// call this method manually, only if you want flush drawing things into gpu
   /// immediately.
   pub fn submit(&mut self) {
-    self.draw();
-
-    if let Some(encoder) = self.encoder.take() {
-      self.queue.submit(Some(encoder.finish()));
-    }
-    self.view.take();
-  }
-
-  pub fn draw(&mut self) {
     if !self.render_data.has_data() {
       return;
     }
@@ -325,31 +308,31 @@ impl<S: Surface> Canvas<S> {
     );
 
     {
-      let mut render_pass =
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-          color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-            attachment: view,
-            resolve_target: None,
-            load_op: wgpu::LoadOp::Clear,
-            store_op: wgpu::StoreOp::Store,
-            clear_color: wgpu::Color::WHITE,
-          }],
-          depth_stencil_attachment: None,
-        });
+      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+          attachment: view,
+          resolve_target: None,
+          load_op: wgpu::LoadOp::Clear,
+          store_op: wgpu::StoreOp::Store,
+          clear_color: wgpu::Color::WHITE,
+        }],
+        depth_stencil_attachment: None,
+      });
       render_pass.set_pipeline(&self.pipeline);
       render_pass.set_vertex_buffer(0, vertices_buffer.slice(..));
       render_pass.set_index_buffer(indices_buffer.slice(..));
       render_pass.set_bind_group(0, &self.uniforms, &[]);
       render_pass.set_bind_group(1, &tex_infos_bind_group, &[]);
 
-      render_pass.draw_indexed(
-        0..self.render_data.indices.len() as u32,
-        0,
-        0..1,
-      );
+      render_pass.draw_indexed(0..self.render_data.indices.len() as u32, 0, 0..1);
     }
 
     self.render_data.clear();
+
+    if let Some(encoder) = self.encoder.take() {
+      self.queue.submit(Some(encoder.finish()));
+    }
+    self.view.take();
   }
 
   fn store_style_in_atlas(
@@ -369,8 +352,7 @@ impl<S: Surface> Canvas<S> {
 
     let (pos, size, grown) = match style {
       FillStyle::Color(c) => {
-        let (pos, grown) =
-          tex_atlas.store_color_in_palette(*c, device, encoder, queue)?;
+        let (pos, grown) = tex_atlas.store_color_in_palette(*c, device, encoder, queue)?;
 
         (pos, DeviceSize::new(1, 1), grown)
       }
@@ -399,10 +381,9 @@ impl<S: Surface> Canvas<S> {
 
   fn create_primitives_bind_group(&mut self) -> wgpu::BindGroup {
     let primitives = &self.render_data.primitives;
-    let primitives_buffer = self.device.create_buffer_with_data(
-      primitives.as_bytes(),
-      wgpu::BufferUsage::STORAGE,
-    );
+    let primitives_buffer = self
+      .device
+      .create_buffer_with_data(primitives.as_bytes(), wgpu::BufferUsage::STORAGE);
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.primitives_layout,
       bindings: &[wgpu::Binding {
@@ -426,10 +407,10 @@ impl<S: Surface> Canvas<S> {
          transform,
          count,
          style,
-         bounding_rect_for_style,
+         bounding_to_align_texture,
        }| {
         let res = self.store_style_in_atlas(style).or_else(|err| {
-          self.draw();
+          self.submit();
 
           // Todo: we should not directly clear the texture atlas,
           // but deallocate all not used texture.
@@ -457,8 +438,8 @@ impl<S: Surface> Canvas<S> {
             tex_offset: [tex_offset.x, tex_offset.y],
             tex_size: [tex_size.width, tex_size.height],
             transform: transform.to_row_arrays(),
-            bound_min: bounding_rect_for_style.min().to_array(),
-            bounding_size: bounding_rect_for_style.size.to_array(),
+            bound_min: bounding_to_align_texture.min().to_array(),
+            bounding_size: bounding_to_align_texture.size.to_array(),
           };
 
           self.render_data.append(
@@ -482,9 +463,7 @@ fn create_render_pipeline(
   bind_group_layouts: &[&wgpu::BindGroupLayout; 2],
 ) -> wgpu::RenderPipeline {
   let render_pipeline_layout =
-    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-      bind_group_layouts,
-    });
+    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { bind_group_layouts });
 
   let vs_module = spv_2_shader_module!(device, "./shaders/geometry.vert.spv");
   let fs_module = spv_2_shader_module!(device, "./shaders/geometry.frag.spv");
@@ -539,53 +518,51 @@ pub(crate) macro spv_2_shader_module($device: expr, $path: literal) {{
 }}
 
 fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
-  let stable =
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      bindings: &[
-        wgpu::BindGroupLayoutEntry {
-          binding: PrimaryBindings::GlobalUniform as u32,
-          visibility: wgpu::ShaderStage::VERTEX,
-          ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-        },
-        wgpu::BindGroupLayoutEntry {
-          binding: PrimaryBindings::TextureAtlas as u32,
-          visibility: wgpu::ShaderStage::FRAGMENT,
-          ty: wgpu::BindingType::SampledTexture {
-            dimension: wgpu::TextureViewDimension::D2,
-            component_type: wgpu::TextureComponentType::Float,
-            multisampled: false,
-          },
-        },
-        wgpu::BindGroupLayoutEntry {
-          binding: PrimaryBindings::Sampler as u32,
-          visibility: wgpu::ShaderStage::FRAGMENT,
-          ty: wgpu::BindingType::Sampler { comparison: false },
-        },
-        wgpu::BindGroupLayoutEntry {
-          binding: PrimaryBindings::GlyphTexture as u32,
-          visibility: wgpu::ShaderStage::FRAGMENT,
-          ty: wgpu::BindingType::SampledTexture {
-            dimension: wgpu::TextureViewDimension::D2,
-            component_type: wgpu::TextureComponentType::Float,
-            multisampled: false,
-          },
-        },
-      ],
-      label: Some("uniforms stable layout"),
-    });
-
-  let dynamic =
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      bindings: &[wgpu::BindGroupLayoutEntry {
-        binding: SecondBindings::Primitive as u32,
+  let stable = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    bindings: &[
+      wgpu::BindGroupLayoutEntry {
+        binding: PrimaryBindings::GlobalUniform as u32,
         visibility: wgpu::ShaderStage::VERTEX,
-        ty: wgpu::BindingType::StorageBuffer {
-          dynamic: false,
-          readonly: true,
+        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+      },
+      wgpu::BindGroupLayoutEntry {
+        binding: PrimaryBindings::TextureAtlas as u32,
+        visibility: wgpu::ShaderStage::FRAGMENT,
+        ty: wgpu::BindingType::SampledTexture {
+          dimension: wgpu::TextureViewDimension::D2,
+          component_type: wgpu::TextureComponentType::Float,
+          multisampled: false,
         },
-      }],
-      label: Some("uniform layout for texture infos (changed every draw)"),
-    });
+      },
+      wgpu::BindGroupLayoutEntry {
+        binding: PrimaryBindings::Sampler as u32,
+        visibility: wgpu::ShaderStage::FRAGMENT,
+        ty: wgpu::BindingType::Sampler { comparison: false },
+      },
+      wgpu::BindGroupLayoutEntry {
+        binding: PrimaryBindings::GlyphTexture as u32,
+        visibility: wgpu::ShaderStage::FRAGMENT,
+        ty: wgpu::BindingType::SampledTexture {
+          dimension: wgpu::TextureViewDimension::D2,
+          component_type: wgpu::TextureComponentType::Float,
+          multisampled: false,
+        },
+      },
+    ],
+    label: Some("uniforms stable layout"),
+  });
+
+  let dynamic = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    bindings: &[wgpu::BindGroupLayoutEntry {
+      binding: SecondBindings::Primitive as u32,
+      visibility: wgpu::ShaderStage::VERTEX,
+      ty: wgpu::BindingType::StorageBuffer {
+        dynamic: false,
+        readonly: true,
+      },
+    }],
+    label: Some("uniform layout for texture infos (changed every draw)"),
+  });
   [stable, dynamic]
 }
 
@@ -594,14 +571,7 @@ pub fn coordinate_2d_to_device_matrix(
   width: u32,
   height: u32,
 ) -> euclid::Transform2D<f32, LogicUnit, PhysicUnit> {
-  euclid::Transform2D::row_major(
-    2. / width as f32,
-    0.,
-    0.,
-    -2. / height as f32,
-    -1.,
-    1.,
-  )
+  euclid::Transform2D::row_major(2. / width as f32, 0., 0., -2. / height as f32, -1., 1.)
 }
 
 fn create_uniforms(
@@ -798,7 +768,7 @@ mod tests {
           indices: 3,
           vertices: 3,
         },
-        bounding_rect_for_style: Rect::default(),
+        bounding_to_align_texture: Rect::default(),
         style: FillStyle::Color(const_color::WHITE.into()),
         transform: Transform::default(),
       }],
@@ -836,13 +806,12 @@ mod tests {
     {
       let mut layer = canvas.new_2d_layer();
 
-      let mut fill_color_circle =
-        |color: Color, offset_x: f32, offset_y: f32| {
-          layer
-            .set_style(FillStyle::Color(color))
-            .translate(offset_x, offset_y)
-            .fill_path(path.clone());
-        };
+      let mut fill_color_circle = |color: Color, offset_x: f32, offset_y: f32| {
+        layer
+          .set_style(FillStyle::Color(color))
+          .translate(offset_x, offset_y)
+          .fill_path(path.clone());
+      };
 
       fill_color_circle(const_color::YELLOW.into(), 50., 50.);
       fill_color_circle(const_color::RED.into(), 100., 0.);
@@ -853,10 +822,7 @@ mod tests {
       canvas.compose_2d_layer(layer);
       canvas.submit();
 
-      unit_test::assert_canvas_eq!(
-        canvas,
-        "./test_imgs/color_palette_texture.png",
-      );
+      unit_test::assert_canvas_eq!(canvas, "./test_imgs/color_palette_texture.png",);
     }
   }
 }
