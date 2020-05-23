@@ -366,7 +366,7 @@ impl<S: Surface> Canvas<S> {
   }
 
   #[inline]
-  fn update_uniforms(&mut self) {
+  pub(crate) fn update_uniforms(&mut self) {
     let size = self.surface.size();
     self.uniforms = create_uniforms(
       &self.device,
