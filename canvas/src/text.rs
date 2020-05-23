@@ -260,11 +260,15 @@ impl<S: Surface> Canvas<S> {
         Err(glyph_brush::BrushError::TextureTooSmall { suggested }) => {
           self.submit();
           self.glyph_brush.resize_texture(&self.device, suggested);
+
           texture_updated = true;
         }
       };
     }
 
+    if texture_updated {
+      self.update_uniforms();
+    }
     let quad_vertices = self.glyph_brush.quad_vertices_cache.as_slice();
     (quad_vertices, texture_updated)
   }
