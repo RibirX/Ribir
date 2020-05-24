@@ -298,7 +298,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
             // use unsafe to avoid create a vector to store glyphs.
             let draw_rect = unsafe { (&*ptr).draw_rect_for_cache(g) };
             draw_rect
-              .map(|(_, rect)| {
+              .map(|rect| {
                 sec_rect
                   .map(|sec_rect| {
                     let min = Point::new(rect.min.x, rect.min.y);
