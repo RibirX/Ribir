@@ -1,3 +1,4 @@
+mod fonts;
 use super::{canvas, surface::Surface, Canvas, DeviceSize, LogicUnit, Point, Rect};
 use glyph_brush::{
   ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher,
