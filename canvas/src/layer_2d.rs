@@ -690,7 +690,7 @@ And by opposing end them? To die: to sleep;\n",
   #[test]
   #[ignore = "gpu need"]
   fn update_texture_on_processing() {
-    let text = include_str!("../test_imgs/loads-of-unicode.txt");
+    let text = include_str!("../fonts/loads-of-unicode.txt");
     let (mut canvas, deja, _) = canvas_with_font();
     let mut layer = canvas.new_2d_layer();
     layer.fill_complex_texts_by_style(

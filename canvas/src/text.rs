@@ -1,4 +1,4 @@
-use super::{canvas, surface::Surface, Canvas, DeviceSize, Rect};
+use super::{canvas, surface::Surface, Canvas, DeviceSize, LogicUnit, Point, Rect};
 use glyph_brush::{
   ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher,
 };
@@ -58,8 +58,15 @@ impl TextBrush {
   pub(crate) fn draw_rect_for_cache(
     &self,
     glyph: &glyph_brush::SectionGlyph,
-  ) -> Option<(glyph_brush::ab_glyph::Rect, glyph_brush::ab_glyph::Rect)> {
-    self.brush.rect_for(glyph.font_id, &glyph.glyph)
+  ) -> Option<euclid::Box2D<f32, LogicUnit>> {
+    self
+      .brush
+      .drawn_rect_at(glyph.font_id, &glyph.glyph)
+      .map(|rect| {
+        let min = Point::new(rect.min.x, rect.min.y);
+        let max = Point::new(rect.max.x, rect.max.y);
+        euclid::Box2D::new(min, max)
+      })
   }
 
   #[inline]
