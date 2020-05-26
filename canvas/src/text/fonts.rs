@@ -1,16 +1,22 @@
+use super::{FontId, QuadVertex};
 pub use font_kit::properties::{
   Properties, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
 };
 use font_kit::{
-  error::FontLoadingError, family_name::FamilyName, font::Font, loader::Loader,
-  source::SystemSource,
+  family_name::FamilyName, font::Font as FK_Font, loader::Loader, source::SystemSource,
 };
+use glyph_brush::{ab_glyph::FontArc, GlyphBrush};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub struct Font {
+  pub font: FK_Font,
+  pub id: FontId,
+}
+
 /// Manage loaded font.
 pub(crate) struct Fonts {
-  load_fonts: HashMap<String, Vec<Font>>,
+  load_fonts: HashMap<FontKey, Font>,
   source: SystemSource,
 }
 
@@ -29,9 +35,10 @@ impl Fonts {
     &mut self,
     font_data: Arc<Vec<u8>>,
     font_index: u32,
-  ) -> Result<&Font, FontLoadingError> {
-    let font = Font::from_bytes(font_data, font_index)?;
-    Ok(self.insert_font(font))
+    brush: &mut GlyphBrush<QuadVertex, ()>,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    let font = FK_Font::from_bytes(font_data, font_index)?;
+    self.try_insert_font(font, brush)
   }
 
   /// Loads a font from the path to a `.ttf`/`.otf`/etc. file.
@@ -43,26 +50,30 @@ impl Fonts {
     &mut self,
     path: P,
     font_index: u32,
-  ) -> Result<&Font, FontLoadingError> {
-    let font = <Font as Loader>::from_path(path, font_index)?;
-    Ok(self.insert_font(font))
+    brush: &mut GlyphBrush<QuadVertex, ()>,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    let font = <FK_Font as Loader>::from_path(path, font_index)?;
+    self.try_insert_font(font, brush)
   }
 
   /// Performs font matching according to the CSS Fonts Level 3 specification
   /// and returns matched fonts.
-  pub fn select_best_match(&mut self, family_names: &str, props: &Properties) -> Option<&Font> {
+  pub fn select_best_match(
+    &mut self,
+    family_names: &str,
+    props: &Properties,
+    brush: &mut GlyphBrush<QuadVertex, ()>,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
     for family in family_names.split(',') {
       let family = family.replace('\'', "");
       let family = family.trim();
 
-      let idx = self
-        .load_fonts
-        .get(family)
-        .map(|families| families.iter().position(|f| &f.properties() == props))
-        .flatten();
-
-      if let Some(idx) = idx {
-        return self.load_fonts.get(family).map(|fonts| &fonts[idx]);
+      let key = FontKey {
+        family: family.to_string(),
+        props: *props,
+      };
+      if self.load_fonts.contains_key(&key) {
+        return self.load_fonts.get(&key).ok_or_else(|| unreachable!());
       } else {
         let font = self
           .source
@@ -71,28 +82,33 @@ impl Fonts {
           .map(|handle| handle.load().ok())
           .flatten();
         if let Some(font) = font {
-          return Some(self.insert_font(font));
+          return self.try_insert_font(font, brush);
         }
       }
     }
 
-    None
+    Err("No match font".into())
   }
 
-  fn insert_font(&mut self, font: Font) -> &Font {
-    let fonts = self
-      .load_fonts
-      .entry(font.family_name())
-      .or_insert_with(Vec::new);
-
-    if let Some(index) = fonts
-      .iter()
-      .position(|f| f.properties() == font.properties())
-    {
-      &fonts[index]
+  fn try_insert_font(
+    &mut self,
+    font: FK_Font,
+    brush: &mut GlyphBrush<QuadVertex, ()>,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    let key = FontKey::from_fk_font(&font);
+    if self.load_fonts.contains_key(&key) {
+      // todo: we should replace old font
+      self.load_fonts.get(&key).ok_or_else(|| unreachable!())
     } else {
-      fonts.push(font);
-      fonts.last().unwrap()
+      let data = font.copy_font_data().ok_or("font not available")?;
+      // unsafe introduce:
+      // Text brush logic keep font's data long live than brush.
+      let font_bytes: &'static [u8] = unsafe { std::mem::transmute(data.as_slice()) };
+      let brush_font = FontArc::try_from_slice(font_bytes)?;
+      let id = brush.add_font(brush_font);
+
+      let font = self.load_fonts.entry(key).or_insert(Font { font, id });
+      Ok(font)
     }
   }
 }
@@ -108,41 +124,76 @@ fn family_name(name: &str) -> FamilyName {
   }
 }
 
+#[derive(Debug, PartialEq)]
+struct FontKey {
+  family: String,
+  props: Properties,
+}
+
+impl std::hash::Hash for FontKey {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    state.write(self.family.as_bytes());
+    state.write_u8(self.props.style as u8);
+    state.write_u32(self.props.weight.0.to_bits());
+    state.write_u32(self.props.stretch.0.to_bits());
+  }
+}
+
+impl Eq for FontKey {}
+
+impl FontKey {
+  #[inline]
+  fn from_fk_font(font: &FK_Font) -> Self {
+    FontKey {
+      family: font.family_name(),
+      props: font.properties(),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
+  use glyph_brush::GlyphBrushBuilder;
 
   #[test]
   fn load_font_from_path() {
+    let mut brush = GlyphBrushBuilder::using_fonts(vec![]).build();
     let mut fonts = Fonts::new();
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/fonts/DejaVuSans.ttf";
-    let font = fonts.load_from_path(path, 0);
-    assert_eq!(font.unwrap().family_name(), "DejaVu Sans");
+    let font = fonts.load_from_path(path, 0, &mut brush);
+    assert_eq!(font.unwrap().font.family_name(), "DejaVu Sans");
   }
 
   #[test]
   fn load_font_from_bytes() {
+    let mut brush = GlyphBrushBuilder::using_fonts(vec![]).build();
     let mut fonts = Fonts::new();
     let bytes = include_bytes!("../../fonts/GaramondNo8-Reg.ttf");
-    let font = fonts.load_from_bytes(std::sync::Arc::new(bytes.to_vec()), 0);
-    assert_eq!(font.unwrap().family_name(), "GaramondNo8");
+    let font = fonts.load_from_bytes(std::sync::Arc::new(bytes.to_vec()), 0, &mut brush);
+    assert_eq!(font.unwrap().font.family_name(), "GaramondNo8");
   }
 
   #[test]
   fn match_font() {
+    let mut brush = GlyphBrushBuilder::using_fonts(vec![]).build();
     let mut fonts = Fonts::new();
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/fonts/DejaVuSans.ttf";
-    let _ = fonts.load_from_path(path, 0);
+    let _ = fonts.load_from_path(path, 0, &mut brush);
     let mut props = Properties::new();
 
-    let font = fonts.select_best_match("DejaVu Sans, Arial", &props);
-    // match custom load fonts.
-    assert_eq!(font.unwrap().family_name(), "DejaVu Sans");
+    {
+      let font = fonts.select_best_match("DejaVu Sans, Arial", &props, &mut brush);
+      // match custom load fonts.
+      assert_eq!(font.unwrap().font.family_name(), "DejaVu Sans");
+    }
 
     props.style = FontStyle::Italic;
-    let font = fonts.select_best_match("Arial, DejaVu Sans", &props);
+    let font = fonts
+      .select_best_match("Arial, DejaVu Sans", &props, &mut brush)
+      .unwrap();
     // match default fonts
-    assert_eq!(font.unwrap().family_name(), "Arial");
-    assert_eq!(font.unwrap().properties().style, FontStyle::Italic);
+    assert_eq!(font.font.family_name(), "Arial");
+    assert_eq!(font.font.properties().style, FontStyle::Italic);
   }
 }

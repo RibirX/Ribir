@@ -553,15 +553,15 @@ mod test {
     FontId,
   ) {
     let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
     let deja = canvas
-      .add_font("DejaVuSans", include_bytes!("../fonts/DejaVuSans.ttf"))
-      .unwrap();
+      .load_font_from_path(crate_root.clone() + "/fonts/DejaVuSans.ttf", 0)
+      .unwrap()
+      .id;
     let garamond = canvas
-      .add_font(
-        "GaramondNo8",
-        include_bytes!("../fonts/GaramondNo8-Reg.ttf"),
-      )
-      .unwrap();
+      .load_font_from_path(crate_root + "/fonts/GaramondNo8-Reg.ttf", 0)
+      .unwrap()
+      .id;
 
     (canvas, deja, garamond)
   }

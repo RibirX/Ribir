@@ -6,6 +6,7 @@ mod text;
 
 pub use crate::canvas::*;
 pub use layer_2d::*;
+pub use text::*;
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.
