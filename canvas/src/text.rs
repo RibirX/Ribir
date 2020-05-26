@@ -1,9 +1,9 @@
 mod fonts;
 use super::{canvas, surface::Surface, Canvas, DeviceSize, LogicUnit, Point, Rect};
-use glyph_brush::{
-  ab_glyph::FontArc, BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher,
-};
+pub use fonts::*;
+use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use log::{log_enabled, warn};
+use std::sync::Arc;
 
 pub(crate) type Section<'a> = glyph_brush::Section<'a, ()>;
 
@@ -16,11 +16,11 @@ pub(crate) struct QuadVertex {
 }
 
 pub(crate) struct TextBrush {
-  brush: GlyphBrush<QuadVertex, ()>,
   texture: wgpu::Texture,
   view: wgpu::TextureView,
   quad_vertices_cache: Vec<QuadVertex>,
-  available_fonts: std::collections::HashMap<String, FontId>,
+  fonts: Fonts,
+  brush: GlyphBrush<QuadVertex, ()>,
 }
 
 impl TextBrush {
@@ -35,7 +35,7 @@ impl TextBrush {
       view: texture.create_default_view(),
       texture,
       quad_vertices_cache: vec![],
-      available_fonts: Default::default(),
+      fonts: Fonts::new(),
     }
   }
 
@@ -114,22 +114,35 @@ impl TextBrush {
     self.brush.resize_texture(new_size.0, new_size.1)
   }
 
-  /// Add a font for brush, so brush can support this font.
-  fn add_font(
+  #[inline]
+  fn load_font_from_bytes(
     &mut self,
-    name: &str,
-    data: &'static [u8],
-  ) -> Result<FontId, Box<dyn std::error::Error>> {
-    if self.available_fonts.get(name).is_some() {
-      let msg = format!("Font {} has already added.", name);
-      return Err(FontAlreadyAdded(msg).into());
-    }
+    font_data: Vec<u8>,
+    font_index: u32,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self
+      .fonts
+      .load_from_bytes(Arc::new(font_data), font_index, &mut self.brush)
+  }
 
-    let font = FontArc::try_from_slice(data)?;
-    let id = self.brush.add_font(font.clone());
-    self.available_fonts.insert(name.to_string(), id);
+  #[inline]
+  fn load_font_from_path<P: AsRef<std::path::Path>>(
+    &mut self,
+    path: P,
+    font_index: u32,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self.fonts.load_from_path(path, font_index, &mut self.brush)
+  }
 
-    Ok(id)
+  #[inline]
+  fn select_best_match(
+    &mut self,
+    family_names: &str,
+    props: &Properties,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self
+      .fonts
+      .select_best_match(family_names, props, &mut self.brush)
   }
 
   fn update_texture(
@@ -237,19 +250,41 @@ impl TextBrush {
 }
 
 impl<S: Surface> Canvas<S> {
+  /// Add a custom font from bytes, so canvas support this font to draw text.
+  /// If the data represents a collection (`.ttc`/`.otc`/etc.), `font_index`
+  /// specifies the index of the font to load from it. If the data represents
+  /// a single font, pass 0 for `font_index`.
   #[inline]
-  pub fn add_font(
+  pub fn load_font_from_bytes(
     &mut self,
-    name: &str,
-    data: &'static [u8],
-  ) -> Result<FontId, Box<dyn std::error::Error>> {
-    self.glyph_brush.add_font(name, data)
+    font_data: Vec<u8>,
+    font_index: u32,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self.glyph_brush.load_font_from_bytes(font_data, font_index)
   }
 
-  /// Get an using font id across its name
+  /// Loads a font from the path to a `.ttf`/`.otf`/etc. file.
+  ///
+  /// If the file is a collection (`.ttc`/`.otc`/etc.), `font_index` specifies
+  /// the index of the font to load from it. If the file represents a single
+  /// font, pass 0 for `font_index`.
   #[inline]
-  pub fn get_font_id_by_name(&mut self, name: &str) -> Option<FontId> {
-    self.glyph_brush.available_fonts.get(name).cloned()
+  pub fn load_font_from_path<P: AsRef<std::path::Path>>(
+    &mut self,
+    path: P,
+    font_index: u32,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self.glyph_brush.load_font_from_path(path, font_index)
+  }
+
+  /// Performs font matching according to the CSS Fonts Level 3 specification
+  /// and returns matched fonts.
+  pub fn select_best_match(
+    &mut self,
+    family_names: &str,
+    props: &Properties,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self.glyph_brush.select_best_match(family_names, props)
   }
 
   #[inline]
@@ -352,16 +387,6 @@ impl<S: Surface> Canvas<S> {
   }
 }
 
-#[derive(Debug)]
-struct FontAlreadyAdded(String);
-impl std::fmt::Display for FontAlreadyAdded {
-  #[inline]
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str(self.0.as_str())
-  }
-}
-impl std::error::Error for FontAlreadyAdded {}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -369,62 +394,33 @@ mod tests {
   use futures::executor::block_on;
   use glyph_brush::Text;
 
-  fn uninited_brush() -> TextBrush {
-    let v = std::mem::MaybeUninit::uninit();
-    let mut t_brush: TextBrush = unsafe { v.assume_init() };
-    let brush = GlyphBrushBuilder::using_fonts(vec![])
-      .initial_cache_size((INIT_SIZE.width, INIT_SIZE.height))
-      .build();
-    t_brush.brush = brush;
-    t_brush.quad_vertices_cache = vec![];
-    t_brush.available_fonts = Default::default();
-
-    t_brush
-  }
-
-  fn free_uninit_brush(brush: TextBrush) {
-    let TextBrush { texture, view, .. } = brush;
-    std::mem::forget(texture);
-    std::mem::forget(view);
-  }
-
   fn add_default_fonts<S: Surface>(brush: &mut Canvas<S>) {
     brush
-      .add_font("DejaVu", include_bytes!("../fonts/DejaVuSans.ttf"))
+      .load_font_from_bytes(include_bytes!("../fonts/DejaVuSans.ttf").to_vec(), 0)
       .unwrap();
     brush
-      .add_font(
-        "GaramondNo8",
-        include_bytes!("../fonts/GaramondNo8-Reg.ttf"),
-      )
+      .load_font_from_bytes(include_bytes!("../fonts/GaramondNo8-Reg.ttf").to_vec(), 0)
       .unwrap();
   }
-
   #[test]
-  fn fonts_use() {
-    let mut brush = uninited_brush();
+  #[ignore = "gpu need"]
+  fn custom_fonts_use() {
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+
     let deja = include_bytes!("../fonts/DejaVuSans.ttf");
-    let graamond = include_bytes!("../fonts/GaramondNo8-Reg.ttf");
-    let deja_id = brush.add_font("DejaVu", deja).unwrap();
-    let graamond_id = brush.add_font("GaramondNo8", graamond).unwrap();
+    canvas.load_font_from_bytes(deja.to_vec(), 0).unwrap();
+    let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
+    canvas
+      .load_font_from_path(crate_root + "/fonts/GaramondNo8-Reg.ttf", 0)
+      .unwrap();
 
-    assert_eq!(brush.available_fonts.get("DejaVu").unwrap(), &deja_id);
-    assert_eq!(
-      brush.available_fonts.get("GaramondNo8").unwrap(),
-      &graamond_id
-    );
+    let brush = &mut canvas.glyph_brush;
 
-    // name should be unique
-    let res = brush.add_font("DejaVu", deja);
-    assert!(res.is_err());
+    let font = brush.select_best_match("DejaVu Sans", &Properties::default());
+    assert!(font.is_ok());
 
-    assert_eq!(brush.available_fonts.get("DejaVu").unwrap(), &deja_id);
-    assert_eq!(
-      brush.available_fonts.get("GaramondNo8").unwrap(),
-      &graamond_id
-    );
-
-    free_uninit_brush(brush);
+    let font = brush.select_best_match("GaramondNo8", &Properties::default());
+    assert!(font.is_ok());
   }
 
   #[test]
