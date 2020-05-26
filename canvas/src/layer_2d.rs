@@ -1,5 +1,8 @@
-use crate::{canvas::surface::Surface, Canvas, Point, Rect, Transform};
-pub use glyph_brush::{FontId, GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
+use crate::{
+  canvas::surface::Surface, Canvas, FontProperties, FontStretch, FontStyle, FontWeight, Point,
+  Rect, Transform, DEFAULT_FONT_FAMILY,
+};
+pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
@@ -64,10 +67,10 @@ impl<'a> Rendering2DLayer<'a> {
   }
 
   #[inline]
-  pub fn get_font(&self) -> FontId { self.current_state().font }
+  pub fn get_font(&self) -> &FontInfo { &self.current_state().font }
 
   #[inline]
-  pub fn set_font(&mut self, font: FontId) -> &mut Self {
+  pub fn set_font(&mut self, font: FontInfo) -> &mut Self {
     self.current_state_mut().font = font;
     self
   }
@@ -221,10 +224,8 @@ pub struct Text<'a> {
   pub text: &'a str,
   /// Text pixel size.
   pub font_size: f32,
-  /// It must be a valid id of font, can query font id from
-  /// [`Canvas::get_font_id_by_name`](Canvas::get_font_id_by_name) or across
-  /// canvas to load custom font The default `FontId(0)` should always be
-  pub font_id: FontId,
+  /// The font info
+  pub font: FontInfo,
 }
 
 #[derive(Debug, Clone)]
@@ -287,8 +288,8 @@ impl<'a> Rendering2DLayer<'a> {
     self.command_from(|state| CommandInfo::SimpleText {
       text: Text {
         text,
-        font_size: state.font_size,
-        font_id: state.font,
+        font_size: state.font.font_size,
+        font: state.font.clone(),
       },
       style: state.style.clone(),
       max_width,
@@ -305,13 +306,20 @@ impl<'a> Rendering2DLayer<'a> {
   }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct FontInfo {
+  /// CSS Fonts Level 3 specification of family.
+  family: String,
+  props: FontProperties,
+  font_size: f32,
+}
+
 #[derive(Clone, Debug)]
 struct State {
   transform: Transform,
   line_width: f32,
   style: FillStyle,
-  font: FontId,
-  font_size: f32,
+  font: FontInfo,
 }
 
 #[derive(Debug, Clone)]
@@ -398,7 +406,7 @@ impl Default for State {
 }
 
 impl State {
-  pub const fn new() -> Self {
+  pub fn new() -> Self {
     Self {
       transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
       style: FillStyle::Color(Color {
@@ -406,8 +414,7 @@ impl State {
         alpha: u8::MAX,
       }),
       line_width: 1.,
-      font: FontId(0),
-      font_size: 14.,
+      font: FontInfo::new(),
     }
   }
 }
@@ -451,19 +458,66 @@ impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
   }
 }
 
-impl<'a> From<Text<'a>> for glyph_brush::Text<'a, ()> {
-  fn from(text: Text<'a>) -> Self {
+impl<'a> Text<'a> {
+  fn to_glyph_text<S: Surface>(&self, canvas: &mut Canvas<S>) -> glyph_brush::Text<'a, ()> {
     let Text {
       text,
-      font_id,
+      font,
       font_size,
-    } = text;
-    Self {
+    } = self;
+    let font = canvas.select_best_match(font.family.as_str(), &font.props);
+    let font_id = if font.is_ok() {
+      font.unwrap().id
+    } else {
+      canvas.default_font().id
+    };
+
+    glyph_brush::Text {
       text,
       font_id,
-      scale: font_size.into(),
+      scale: (*font_size).into(),
       extra: (),
     }
+  }
+}
+
+impl FontInfo {
+  pub fn new() -> Self {
+    FontInfo {
+      family: DEFAULT_FONT_FAMILY.to_owned(),
+      props: <_>::default(),
+      font_size: 14.,
+    }
+  }
+
+  #[inline]
+  pub fn with_family(mut self, family: String) -> Self {
+    self.family = family;
+    self
+  }
+
+  #[inline]
+  pub fn with_weight(mut self, weight: FontWeight) -> Self {
+    self.props.weight(weight);
+    self
+  }
+
+  #[inline]
+  pub fn with_style(mut self, style: FontStyle) -> Self {
+    self.props.style(style);
+    self
+  }
+
+  #[inline]
+  pub fn with_stretch(mut self, stretch: FontStretch) -> Self {
+    self.props.stretch(stretch);
+    self
+  }
+
+  #[inline]
+  pub fn with_font_size(mut self, font_size: f32) -> Self {
+    self.font_size = font_size;
+    self
   }
 }
 
@@ -547,31 +601,17 @@ mod test {
     // assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 4);
   }
 
-  fn canvas_with_font() -> (
-    Canvas<crate::canvas::surface::TextureSurface>,
-    FontId,
-    FontId,
-  ) {
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
-    let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
-    let deja = canvas
-      .load_font_from_path(crate_root.clone() + "/fonts/DejaVuSans.ttf", 0)
-      .unwrap()
-      .id;
-    let garamond = canvas
-      .load_font_from_path(crate_root + "/fonts/GaramondNo8-Reg.ttf", 0)
-      .unwrap()
-      .id;
-
-    (canvas, deja, garamond)
+  fn canvas() -> Canvas<crate::canvas::surface::TextureSurface> {
+    block_on(Canvas::new(DeviceSize::new(400, 400)))
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn fill_text_hello() {
-    let (mut canvas, font, _) = canvas_with_font();
+    let mut canvas = canvas();
 
     let mut layer = canvas.new_2d_layer();
+    let font = FontInfo::new();
     layer.set_font(font);
     layer.fill_text("Nice to meet you!", None);
     canvas.compose_2d_layer(layer);
@@ -583,14 +623,15 @@ mod test {
   #[test]
   #[ignore = "gpu need"]
   fn fill_text_complex() {
-    let (mut canvas, deja, garamond) = canvas_with_font();
+    let mut canvas = canvas();
+    let serif = FontInfo::new();
 
     let mut layer = canvas.new_2d_layer();
     layer.fill_complex_texts(
       vec![(
         Text {
           text: "Hi, nice to meet you!",
-          font_id: deja,
+          font: serif.clone(),
           font_size: 36.,
         },
         const_color::BLACK.into(),
@@ -598,6 +639,8 @@ mod test {
       Some(Rect::from_size(Size::new(400., 400.))),
       None,
     );
+
+    let arial = FontInfo::new().with_family("Arial".to_owned());
 
     layer.fill_complex_texts(
       vec![(
@@ -608,7 +651,7 @@ The slings and arrows of outrageous fortune,
 Or to take arms against a sea of troubles,
 And by opposing end them? To die: to sleep;
 "#,
-          font_id: garamond,
+          font: arial,
           font_size: 24.,
         },
         const_color::GRAY.into(),
@@ -625,7 +668,7 @@ And by opposing end them? To die: to sleep;
       vec![(
         Text {
           text: "Bye!",
-          font_id: deja,
+          font: serif,
           font_size: 48.,
         },
         const_color::RED.into(),
@@ -647,7 +690,9 @@ And by opposing end them? To die: to sleep;
   #[test]
   #[ignore = "gpu need"]
   fn fill_text_complex_single_style() {
-    let (mut canvas, deja, garamond) = canvas_with_font();
+    let mut canvas = canvas();
+    let arial = FontInfo::new().with_family("Arial".to_owned());
+    let serif = FontInfo::new();
     let mut layer = canvas.new_2d_layer();
 
     layer.set_style(FillStyle::Color(const_color::GRAY.into()));
@@ -655,7 +700,7 @@ And by opposing end them? To die: to sleep;
       vec![
         Text {
           text: "Hi, nice to meet you!\n",
-          font_id: deja,
+          font: serif.clone(),
           font_size: 36.,
         },
         Text {
@@ -664,12 +709,12 @@ Whether it’s nobler in the mind to suffer
 The slings and arrows of outrageous fortune,
 Or to take arms against a sea of troubles,
 And by opposing end them? To die: to sleep;\n",
-          font_id: garamond,
+          font: arial,
           font_size: 24.,
         },
         Text {
           text: "Bye!",
-          font_id: deja,
+          font: serif,
           font_size: 48.,
         },
       ],
@@ -691,12 +736,17 @@ And by opposing end them? To die: to sleep;\n",
   #[ignore = "gpu need"]
   fn update_texture_on_processing() {
     let text = include_str!("../fonts/loads-of-unicode.txt");
-    let (mut canvas, deja, _) = canvas_with_font();
+    let mut canvas = canvas();
+    let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
+    canvas
+      .load_font_from_path(crate_root.clone() + "/fonts/DejaVuSans.ttf", 0)
+      .unwrap();
+    let deja = FontInfo::new().with_family("DejaVu Sans".to_owned());
     let mut layer = canvas.new_2d_layer();
     layer.fill_complex_texts_by_style(
       vec![Text {
         text,
-        font_id: deja,
+        font: deja,
         font_size: 36.,
       }],
       Some(Rect::from_size(Size::new(1600., 1600.))),

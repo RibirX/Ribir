@@ -6,6 +6,7 @@ use log::{log_enabled, warn};
 use std::sync::Arc;
 
 pub(crate) type Section<'a> = glyph_brush::Section<'a, ()>;
+pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 
 const INIT_SIZE: DeviceSize = DeviceSize::new(512, 512);
 
@@ -138,7 +139,7 @@ impl TextBrush {
   fn select_best_match(
     &mut self,
     family_names: &str,
-    props: &Properties,
+    props: &FontProperties,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     self
       .fonts
@@ -282,9 +283,16 @@ impl<S: Surface> Canvas<S> {
   pub fn select_best_match(
     &mut self,
     family_names: &str,
-    props: &Properties,
+    props: &FontProperties,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     self.glyph_brush.select_best_match(family_names, props)
+  }
+
+  pub(crate) fn default_font(&mut self) -> &Font {
+    self
+      .glyph_brush
+      .select_best_match(DEFAULT_FONT_FAMILY, &FontProperties::default())
+      .expect("Canvas default font not exist!")
   }
 
   #[inline]
@@ -416,10 +424,10 @@ mod tests {
 
     let brush = &mut canvas.glyph_brush;
 
-    let font = brush.select_best_match("DejaVu Sans", &Properties::default());
+    let font = brush.select_best_match("DejaVu Sans", &FontProperties::default());
     assert!(font.is_ok());
 
-    let font = brush.select_best_match("GaramondNo8", &Properties::default());
+    let font = brush.select_best_match("GaramondNo8", &FontProperties::default());
     assert!(font.is_ok());
   }
 
