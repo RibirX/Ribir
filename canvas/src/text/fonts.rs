@@ -1,6 +1,6 @@
 use super::{FontId, QuadVertex};
 pub use font_kit::properties::{
-  Properties, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
+  Properties as FontProperties, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
 };
 use font_kit::{
   family_name::FamilyName, font::Font as FK_Font, loader::Loader, source::SystemSource,
@@ -61,7 +61,7 @@ impl Fonts {
   pub fn select_best_match(
     &mut self,
     family_names: &str,
-    props: &Properties,
+    props: &FontProperties,
     brush: &mut GlyphBrush<QuadVertex, ()>,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     for family in family_names.split(',') {
@@ -127,7 +127,7 @@ fn family_name(name: &str) -> FamilyName {
 #[derive(Debug, PartialEq)]
 struct FontKey {
   family: String,
-  props: Properties,
+  props: FontProperties,
 }
 
 impl std::hash::Hash for FontKey {
@@ -180,7 +180,7 @@ mod tests {
     let mut fonts = Fonts::new();
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/fonts/DejaVuSans.ttf";
     let _ = fonts.load_from_path(path, 0, &mut brush);
-    let mut props = Properties::new();
+    let mut props = FontProperties::new();
 
     {
       let font = fonts.select_best_match("DejaVu Sans, Arial", &props, &mut brush);

@@ -201,7 +201,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     max_width: Option<f32>,
     transform: Transform,
   ) {
-    let mut sec = Section::new().add_text(text);
+    let mut sec = Section::new().add_text(text.to_glyph_text(self.canvas));
     if let Some(max_width) = max_width {
       sec.bounds = (max_width, f32::INFINITY).into()
     }
@@ -229,7 +229,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
       .into_iter()
       .map(|(t, color)| {
         attrs.push(FillStyle::Color(color));
-        t.into()
+        t.to_glyph_text(self.canvas)
       })
       .collect();
     let mut sec = Section::new().with_text(texts);
@@ -254,7 +254,10 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     bounds: Option<Rect>,
     layout: Option<TextLayout>,
   ) {
-    let texts = texts.into_iter().map(|t| t.into()).collect();
+    let texts = texts
+      .into_iter()
+      .map(|t| t.to_glyph_text(self.canvas))
+      .collect();
     let mut sec = Section::new().with_text(texts);
     let align_bounds = section_bounds_to_align_texture(self.canvas, &style, &sec);
     if !align_bounds.is_empty_or_negative() {
