@@ -9,6 +9,8 @@ use super::atlas::{AtlasStoreErr, TextureAtlas};
 mod img_helper;
 use img_helper::{texture_to_png, RgbaConvert};
 
+use super::ctx_2d::Ctx2D;
+
 enum PrimaryBindings {
   GlobalUniform = 0,
   TextureAtlas = 1,
@@ -222,8 +224,12 @@ impl Canvas {
       primitives_layout: tex_infos_layout,
       uniforms,
       render_data: RenderData::default(),
-      rgba_converter: None,
+      rgba_converter: None
     }
+  }
+
+  pub fn get_context_2d(&mut self) -> Ctx2D {
+    Ctx2D::new()
   }
 
   /// Create a new frame texture to draw, and commit to device when the `Frame`
@@ -461,6 +467,7 @@ impl Canvas {
             }
             AtlasStoreErr::OverTheMaxLimit => {
               unimplemented!("draw current attr individual");
+              #[allow(unreachable_code)]
               Err(err)
             }
           }

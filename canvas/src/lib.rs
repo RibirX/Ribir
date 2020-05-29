@@ -1,6 +1,7 @@
 #![feature(decl_macro)]
 mod atlas;
 mod canvas;
+mod ctx_2d;
 mod layer_2d;
 
 pub use crate::canvas::*;

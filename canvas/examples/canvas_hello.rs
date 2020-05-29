@@ -32,17 +32,25 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
+      let mut ctx = canvas.get_context_2d();
       let mut frame = canvas.new_screen_frame();
       let mut layer = frame.new_2d_layer();
       layer.set_brush_style(FillStyle::Color(const_color::YELLOW.into()));
-      let mut path = Path::builder();
-      path.add_circle(
-        euclid::Point2D::new(200., 200.),
-        100.,
-        Winding::Positive,
-      );
-      let path = path.build();
+
+      ctx.begin_path(0., 70.);
+      ctx.line_to(100.0, 70.0);
+      ctx.line_to(100.0, 0.0);
+      ctx.line_to(250.0, 100.0);
+      ctx.line_to(100.0, 200.0);
+      ctx.line_to(100.0, 130.0);
+      ctx.line_to(0.0, 130.0);
+      ctx.close_path();
+
+      ctx.rect(100.0, 100.0, 100.0, 100.0);
+
+      let path = ctx.get_path();
       layer.fill_path(path);
+
       frame.compose_2d_layer(layer);
     }
     Event::MainEventsCleared => {
