@@ -71,7 +71,6 @@ impl Ctx2D {
   }
 
   /// Adds a circular arc to the current path.
-  #[inline]
   pub fn arc(
     &mut self,
     x: f32,
@@ -86,7 +85,6 @@ impl Ctx2D {
 
   /// Adds an arc to the current path with the given control points and radius,
   /// connected to the previous point by a straight line.
-  #[inline]
   pub fn arc_to(
     &mut self,
     x1: f32,
@@ -99,7 +97,6 @@ impl Ctx2D {
   }
 
   /// Adds an elliptical arc to the current path.
-  #[inline]
   pub fn ellipse(
     &mut self,
     x: f32,
@@ -116,7 +113,6 @@ impl Ctx2D {
 
   /// Creates a path for a rectangle at position (x, y) with a size that is
   /// determined by width and height.
-  #[inline]
   pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> &mut Self {
     let tl_pt = point(x, y);
     let tr_pt = point(x + width, y);
