@@ -115,16 +115,12 @@ trait ConsumeByHasher {
 
 impl ConsumeByHasher for String {
   #[inline]
-  fn consume(self, hasher: &mut blake3::Hasher) {
-    hasher.update(self.as_bytes());
-  }
+  fn consume(self, hasher: &mut blake3::Hasher) { hasher.update(self.as_bytes()); }
 }
 
 impl<'a> ConsumeByHasher for &'a str {
   #[inline]
-  fn consume(self, hasher: &mut blake3::Hasher) {
-    hasher.update(self.as_bytes());
-  }
+  fn consume(self, hasher: &mut blake3::Hasher) { hasher.update(self.as_bytes()); }
 }
 
 macro impl_as_u8_consume_by_hasher($($t: ty)*) {

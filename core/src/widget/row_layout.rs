@@ -35,7 +35,7 @@ impl<'a> RenderObject<Row<'a>> for RowRender {
   #[inline]
   fn paint(&self, _ctx: &mut PaintingContext) {}
 
-  fn child_offset(&self, idx: usize) -> Option<Point> { None }
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
 
 // #[derive(Debug)]

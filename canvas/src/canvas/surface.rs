@@ -5,13 +5,7 @@ use std::borrow::Borrow;
 pub trait Surface {
   type V: Borrow<wgpu::TextureView>;
 
-  fn resize(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    width: u32,
-    height: u32,
-  );
+  fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, width: u32, height: u32);
 
   fn size(&self) -> DeviceSize;
 
@@ -34,17 +28,9 @@ impl Surface for PhysicSurface {
   type V = FrameView<wgpu::SwapChainOutput>;
 
   #[inline]
-  fn size(&self) -> DeviceSize {
-    DeviceSize::new(self.sc_desc.width, self.sc_desc.height)
-  }
+  fn size(&self) -> DeviceSize { DeviceSize::new(self.sc_desc.width, self.sc_desc.height) }
 
-  fn resize(
-    &mut self,
-    device: &wgpu::Device,
-    _queue: &wgpu::Queue,
-    width: u32,
-    height: u32,
-  ) {
+  fn resize(&mut self, device: &wgpu::Device, _queue: &wgpu::Queue, width: u32, height: u32) {
     self.sc_desc.width = width;
     self.sc_desc.height = height;
     self.swap_chain = device.create_swap_chain(&self.surface, &self.sc_desc);
@@ -66,20 +52,12 @@ impl Surface for TextureSurface {
   #[inline]
   fn size(&self) -> DeviceSize { self.size }
 
-  fn resize(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    width: u32,
-    height: u32,
-  ) {
+  fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, width: u32, height: u32) {
     self.resize(device, queue, DeviceSize::new(width, height));
   }
 
   #[inline]
-  fn get_next_view(&mut self) -> Self::V {
-    FrameView(self.raw_texture.create_default_view())
-  }
+  fn get_next_view(&mut self) -> Self::V { FrameView(self.raw_texture.create_default_view()) }
 }
 
 pub struct FrameView<T>(T);
@@ -94,11 +72,7 @@ impl Borrow<wgpu::TextureView> for FrameView<wgpu::TextureView> {
 }
 
 impl PhysicSurface {
-  pub(crate) fn new(
-    surface: wgpu::Surface,
-    device: &wgpu::Device,
-    size: DeviceSize,
-  ) -> Self {
+  pub(crate) fn new(surface: wgpu::Surface, device: &wgpu::Device, size: DeviceSize) -> Self {
     let sc_desc = wgpu::SwapChainDescriptor {
       usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
@@ -127,11 +101,7 @@ impl Texture {
   pub(crate) const INIT_DIMENSION: u32 = 512;
   pub(crate) const MAX_DIMENSION: u32 = 4096;
 
-  pub(crate) fn new(
-    device: &wgpu::Device,
-    size: DeviceSize,
-    usage: wgpu::TextureUsage,
-  ) -> Self {
+  pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsage) -> Self {
     let raw_texture = Self::new_texture(device, size, usage);
     Texture {
       size,
@@ -143,19 +113,13 @@ impl Texture {
   #[inline]
   pub(crate) fn size(&self) -> DeviceSize { self.size }
 
-  pub(crate) fn resize(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    size: DeviceSize,
-  ) {
+  pub(crate) fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: DeviceSize) {
     let new_texture = Self::new_texture(device, size, self.usage);
 
     let size = size.min(self.size);
-    let mut encoder =
-      device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Render Encoder"),
-      });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("Render Encoder"),
+    });
     encoder.copy_texture_to_texture(
       wgpu::TextureCopyView {
         texture: &self.raw_texture,

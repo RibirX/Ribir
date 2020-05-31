@@ -67,11 +67,7 @@ pub trait RenderObject: Debug {
   fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> { None }
 }
 
-fn mark_constraints_dirty(
-  id: NodeId,
-  ctx: &mut RenderCtx,
-  target: LayoutConstraints,
-) -> bool {
+fn mark_constraints_dirty(id: NodeId, ctx: &mut RenderCtx, target: LayoutConstraints) -> bool {
   if let Some(constraints) = ctx.get_layout_constraints(id) {
     if constraints.contains(target) {
       ctx.mark_layout_dirty(id);
@@ -90,8 +86,7 @@ fn mark_dirty_down(mut id: NodeId, ctx: &mut RenderCtx) {
     ctx.collect_children_box(id, &mut ids);
     while ids.len() > 0 {
       id = ids.pop().unwrap();
-      if mark_constraints_dirty(id, ctx, LayoutConstraints::EFFECTED_BY_PARENT)
-      {
+      if mark_constraints_dirty(id, ctx, LayoutConstraints::EFFECTED_BY_PARENT) {
         ctx.collect_children_box(id, &mut ids);
       }
     }

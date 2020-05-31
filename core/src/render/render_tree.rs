@@ -63,7 +63,7 @@ impl RenderId {
 
   /// Returns a mutable reference to the node data.
   pub(crate) fn get_mut<'a>(
-    mut self,
+    self,
     tree: &'a mut RenderTree,
   ) -> Option<&'a mut (dyn RenderObjectSafety + Send + Sync + 'static)> {
     tree.arena.get_mut(self.0).map(|node| &mut **node.get_mut())

@@ -27,9 +27,7 @@ impl TextureAtlas {
     let texture = Texture::new(
       device,
       size,
-      wgpu::TextureUsage::COPY_DST
-        | wgpu::TextureUsage::SAMPLED
-        | wgpu::TextureUsage::COPY_SRC,
+      wgpu::TextureUsage::COPY_DST | wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_SRC,
     );
     TextureAtlas {
       view: texture.raw_texture.create_default_view(),
@@ -85,16 +83,10 @@ impl TextureAtlas {
 
   /// Flush all data to the texture and ready to commit to gpu.
   /// Call this function before commit drawing to gpu.
-  pub(crate) fn flush(
-    &mut self,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-  ) {
-    self.color_palettes.save_current_palette_to_texture(
-      &self.texture.raw_texture,
-      device,
-      encoder,
-    );
+  pub(crate) fn flush(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder) {
+    self
+      .color_palettes
+      .save_current_palette_to_texture(&self.texture.raw_texture, device, encoder);
   }
 
   /// Clear the atlas.
@@ -102,10 +94,9 @@ impl TextureAtlas {
     self.atlas_allocator.clear();
     self.color_palettes = ColorPalettes::new(&mut self.atlas_allocator);
 
-    let mut encoder =
-      device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Render Encoder"),
-      });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("Render Encoder"),
+    });
     {
       encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -121,12 +112,7 @@ impl TextureAtlas {
     queue.submit(Some(encoder.finish()));
   }
 
-  fn grow_texture(
-    &mut self,
-    size: DeviceSize,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-  ) {
+  fn grow_texture(&mut self, size: DeviceSize, device: &wgpu::Device, queue: &wgpu::Queue) {
     self.atlas_allocator.grow(size.to_i32().to_untyped());
     self.texture.resize(device, queue, size);
     self.view = self.texture.raw_texture.create_default_view();
