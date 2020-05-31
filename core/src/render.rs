@@ -31,7 +31,10 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   /// this method directly.
   fn update(&mut self, owner_widget: &Owner);
 
-  /// Draw the render object into `PaintingContext`,
+  /// Paint the render object into `PaintingContext` by itself coordinate
+  /// system. Not care about children's paint in this method, framework will
+  /// call children's paint individual. And framework guarantee always paint
+  /// parent before children.
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 
   /// return the `idx`th child's offset relative to self.
