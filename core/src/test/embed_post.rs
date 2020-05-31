@@ -1,7 +1,5 @@
 #![cfg(test)]
-use crate::{
-  prelude::*, render::render_tree::*, widget::widget_tree::*, widget::Row,
-};
+use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*, widget::Row};
 
 #[derive(Clone, Debug)]
 pub struct EmbedPost {

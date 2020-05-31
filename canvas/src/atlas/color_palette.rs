@@ -12,8 +12,7 @@ pub(crate) struct ColorPalettes {
 
 impl ColorPalettes {
   pub(crate) fn new(atlas: &mut AtlasAllocator) -> Self {
-    let current_allocation =
-      Self::allocate_palette(atlas).expect("init palettes space must have.");
+    let current_allocation = Self::allocate_palette(atlas).expect("init palettes space must have.");
     Self {
       indexed_colors: Default::default(),
       current_palette: Default::default(),
@@ -97,15 +96,11 @@ impl ColorPalettes {
 }
 
 #[inline]
-fn color_hash(color: Color) -> u32 {
-  unsafe { std::mem::transmute_copy(&color) }
-}
+fn color_hash(color: Color) -> u32 { unsafe { std::mem::transmute_copy(&color) } }
 
 #[inline]
 fn color_as_bgra(color: Color) -> u32 {
-  unsafe {
-    std::mem::transmute_copy(&[color.blue, color.green, color.red, color.alpha])
-  }
+  unsafe { std::mem::transmute_copy(&[color.blue, color.green, color.red, color.alpha]) }
 }
 
 #[derive(Default)]

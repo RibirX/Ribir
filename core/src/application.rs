@@ -60,10 +60,7 @@ impl<'a> Application<'a> {
     });
   }
 
-  pub(crate) fn new_window<W: Into<Box<dyn Widget + 'a>>>(
-    &mut self,
-    w: W,
-  ) -> WindowId {
+  pub(crate) fn new_window<W: Into<Box<dyn Widget + 'a>>>(&mut self, w: W) -> WindowId {
     let window = Window::new(w, &self.event_loop);
     let id = window.id();
     self.windows.insert(window.id(), window);

@@ -363,8 +363,8 @@ impl<S: Surface> Canvas<S> {
         rows_per_image: 0,
       },
       wgpu::Extent3d {
-        width: width,
-        height: height,
+        width,
+        height,
         depth: 1,
       },
     );

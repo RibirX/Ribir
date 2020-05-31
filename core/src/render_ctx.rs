@@ -24,10 +24,7 @@ impl<'a> RenderCtx<'a> {
     };
   }
 
-  pub fn get_render_obj(
-    &self,
-    id: NodeId,
-  ) -> &(dyn RenderObject + Send + Sync) {
+  pub fn get_render_obj(&self, id: NodeId) -> &(dyn RenderObject + Send + Sync) {
     self.tree[id].get().as_ref()
   }
 
@@ -91,10 +88,7 @@ impl<'a> RenderCtx<'a> {
     }
     return None;
   }
-  pub fn get_layout_constraints(
-    &self,
-    node_id: NodeId,
-  ) -> Option<LayoutConstraints> {
+  pub fn get_layout_constraints(&self, node_id: NodeId) -> Option<LayoutConstraints> {
     return self.tree[node_id]
       .get()
       .to_render_box()
@@ -108,17 +102,13 @@ impl<'a> RenderCtx<'a> {
       .and_then(|id| self.get_render_box_id(id));
   }
 
-  pub fn mark_layout_dirty(&mut self, node_id: NodeId) {
-    self.dirty_layouts.insert(node_id);
-  }
+  pub fn mark_layout_dirty(&mut self, node_id: NodeId) { self.dirty_layouts.insert(node_id); }
 
   pub fn is_layout_dirty(&self, node_id: &NodeId) -> bool {
     return self.dirty_layouts.contains(node_id);
   }
 
-  pub fn clear_layout_dirty(&mut self, node_id: &NodeId) {
-    self.dirty_layouts.remove(node_id);
-  }
+  pub fn clear_layout_dirty(&mut self, node_id: &NodeId) { self.dirty_layouts.remove(node_id); }
 
   pub fn add_layout_sub_tree(&mut self, node_id: NodeId) {
     self.dirty_layout_roots.insert(node_id);

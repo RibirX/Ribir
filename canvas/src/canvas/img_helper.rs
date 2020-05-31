@@ -7,35 +7,31 @@ pub(crate) struct RgbaConvert {
 
 impl RgbaConvert {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
-    let group_layout =
-      device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        bindings: &[wgpu::BindGroupLayoutEntry {
-          binding: 0,
-          visibility: wgpu::ShaderStage::COMPUTE,
-          ty: wgpu::BindingType::StorageBuffer {
-            dynamic: false,
-            readonly: false,
-          },
-        }],
-        label: None,
-      });
-
-    let cs_module =
-      spv_2_shader_module!(device, "../shaders/bgra_2_rgba.comp.spv");
-
-    let pipeline_layout =
-      device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        bind_group_layouts: &[&group_layout],
-      });
-
-    let pipeline =
-      device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        layout: &pipeline_layout,
-        compute_stage: wgpu::ProgrammableStageDescriptor {
-          module: &cs_module,
-          entry_point: "main",
+    let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      bindings: &[wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStage::COMPUTE,
+        ty: wgpu::BindingType::StorageBuffer {
+          dynamic: false,
+          readonly: false,
         },
-      });
+      }],
+      label: None,
+    });
+
+    let cs_module = spv_2_shader_module!(device, "../shaders/bgra_2_rgba.comp.spv");
+
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      bind_group_layouts: &[&group_layout],
+    });
+
+    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+      layout: &pipeline_layout,
+      compute_stage: wgpu::ProgrammableStageDescriptor {
+        module: &cs_module,
+        entry_point: "main",
+      },
+    });
 
     Self {
       group_layout,
@@ -83,17 +79,14 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   // The output buffer lets us retrieve the data as an array
   let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
     size,
-    usage: wgpu::BufferUsage::MAP_READ
-      | wgpu::BufferUsage::STORAGE
-      | wgpu::BufferUsage::COPY_DST,
+    usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::STORAGE | wgpu::BufferUsage::COPY_DST,
 
     label: None,
   });
 
-  let mut encoder =
-    device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("Encoder for encoding texture as png"),
-    });
+  let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+    label: Some("Encoder for encoding texture as png"),
+  });
 
   encoder.copy_texture_to_buffer(
     wgpu::TextureCopyView {
@@ -118,12 +111,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
       depth: 1,
     },
   );
-  convert.compute_shader_convert(
-    device,
-    &mut encoder,
-    &output_buffer,
-    rect.size,
-  );
+  convert.compute_shader_convert(device, &mut encoder, &output_buffer, rect.size);
 
   queue.submit(Some(encoder.finish()));
 
