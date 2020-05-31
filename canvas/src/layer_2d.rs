@@ -465,12 +465,10 @@ impl<'a> Text<'a> {
       font,
       font_size,
     } = self;
-    let font = canvas.select_best_match(font.family.as_str(), &font.props);
-    let font_id = if font.is_ok() {
-      font.unwrap().id
-    } else {
-      canvas.default_font().id
-    };
+    let font_id = canvas
+      .select_best_match(font.family.as_str(), &font.props)
+      .map(|f| f.id)
+      .unwrap_or_else(|_| canvas.default_font().id);
 
     glyph_brush::Text {
       text,
