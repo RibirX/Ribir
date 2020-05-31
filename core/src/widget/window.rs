@@ -20,16 +20,10 @@ impl<'a> Window<'a> {
   #[inline]
   pub fn id(&self) -> WindowId { self.native_window.id() }
 
-  pub(crate) fn new<W: Into<Box<dyn Widget + 'a>>>(
-    root: W,
-    event_loop: &EventLoop<()>,
-  ) -> Self {
+  pub(crate) fn new<W: Into<Box<dyn Widget + 'a>>>(root: W, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
-    let canvas = Canvas::from_window(
-      &native_window,
-      DeviceSize::new(size.width, size.height),
-    );
+    let canvas = Canvas::from_window(&native_window, DeviceSize::new(size.width, size.height));
 
     let canvas = futures::executor::block_on(canvas);
     let mut wnd = Window {
@@ -66,13 +60,10 @@ impl<'a> Window<'a> {
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    if let Some(root) = self.render_tree.root() {
-      let painting_context =
-        PaintingContext::new(&mut self.canvas, root, &self.render_tree);
-      root
-        .get(&self.render_tree)
-        .expect("Root render object should exists when root id exists in tree.")
-        .paint(painting_context);
+    if let Some(ctx) = PaintingContext::new(&self.render_tree) {
+      let layer = ctx.draw();
+      self.canvas.compose_2d_layer(layer);
+      self.canvas.submit();
     }
   }
 

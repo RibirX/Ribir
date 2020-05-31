@@ -27,7 +27,7 @@ pub struct Rendering2DLayer<'a> {
 }
 
 impl<'a> Rendering2DLayer<'a> {
-  pub(crate) fn new() -> Self {
+  pub fn new() -> Self {
     Self {
       state_stack: vec![State::new()],
       commands: vec![],

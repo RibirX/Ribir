@@ -38,11 +38,7 @@ fn main() {
       let mut layer = canvas.new_2d_layer();
       layer.set_style(FillStyle::Color(const_color::YELLOW.into()));
       let mut path = Path::builder();
-      path.add_circle(
-        euclid::Point2D::new(200., 200.),
-        100.,
-        Winding::Positive,
-      );
+      path.add_circle(euclid::Point2D::new(200., 200.), 100., Winding::Positive);
       let path = path.build();
       layer.fill_path(path);
       canvas.compose_2d_layer(layer);
