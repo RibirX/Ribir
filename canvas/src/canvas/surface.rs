@@ -25,7 +25,7 @@ pub struct PhysicSurface {
 pub type TextureSurface = Texture;
 
 impl Surface for PhysicSurface {
-  type V = FrameView<wgpu::SwapChainOutput>;
+  type V = FrameView<wgpu::SwapChainFrame>;
 
   #[inline]
   fn size(&self) -> DeviceSize { DeviceSize::new(self.sc_desc.width, self.sc_desc.height) }
@@ -40,7 +40,7 @@ impl Surface for PhysicSurface {
     FrameView(
       self
         .swap_chain
-        .get_next_texture()
+        .get_next_frame()
         .expect("Timeout getting texture"),
     )
   }
@@ -62,8 +62,8 @@ impl Surface for TextureSurface {
 
 pub struct FrameView<T>(T);
 
-impl Borrow<wgpu::TextureView> for FrameView<wgpu::SwapChainOutput> {
-  fn borrow(&self) -> &wgpu::TextureView { &self.0.view }
+impl Borrow<wgpu::TextureView> for FrameView<wgpu::SwapChainFrame> {
+  fn borrow(&self) -> &wgpu::TextureView { &self.0.output.view }
 }
 
 impl Borrow<wgpu::TextureView> for FrameView<wgpu::TextureView> {
@@ -124,13 +124,11 @@ impl Texture {
       wgpu::TextureCopyView {
         texture: &self.raw_texture,
         mip_level: 0,
-        array_layer: 0,
         origin: wgpu::Origin3d::ZERO,
       },
       wgpu::TextureCopyView {
         texture: &new_texture,
         mip_level: 0,
-        array_layer: 0,
         origin: wgpu::Origin3d::ZERO,
       },
       wgpu::Extent3d {
