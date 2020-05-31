@@ -60,14 +60,15 @@ impl ColorPalettes {
     encoder.copy_buffer_to_texture(
       wgpu::BufferCopyView {
         buffer: &buffer,
-        offset: 0,
-        bytes_per_row: PALETTE_SIZE * std::mem::size_of::<u32>() as u32,
-        rows_per_image: PALETTE_SIZE,
+        layout: wgpu::TextureDataLayout {
+          offset: 0,
+          bytes_per_row: PALETTE_SIZE * std::mem::size_of::<u32>() as u32,
+          rows_per_image: PALETTE_SIZE,
+        },
       },
       wgpu::TextureCopyView {
         texture,
         mip_level: 0,
-        array_layer: 0,
         origin: wgpu::Origin3d {
           x: origin.x as u32,
           y: origin.y as u32,

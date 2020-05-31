@@ -11,7 +11,7 @@ wgpu = { git="https://github.com/gfx-rs/wgpu-rs.git", version ="*" }
 lyon =  { git = "https://github.com/nical/lyon", version="*"}
 palette = "0.5"
 raw-window-handle = "0.3.3"
-euclid = "0.20.11"
+euclid = "0.20.13"
 png = "0.16.3"
 guillotiere ="0.5.1"
 zerocopy = "0.3"
@@ -19,13 +19,13 @@ glyph_brush = {git="https://github.com/M-Adoo/glyph-brush.git", path="glyph-brus
 log = "0.4.8"
 backtrace = "0.3"
 smallvec = "1.4.0"
-font-kit= "0.7.0"
+font-kit= "0.7.1"
 
 [target.'cfg(debug_assertions)'.dependencies]
 futures="0.3.5"
 
 [dev-dependencies]
-winit="0.22.1"
-futures="0.3.4"
+winit="0.22.2"
+futures="0.3.5"
 env_logger = "0.7.1"
 unit_test = {path ="../unit_test"}

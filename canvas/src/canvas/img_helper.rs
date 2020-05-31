@@ -92,7 +92,6 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
     wgpu::TextureCopyView {
       texture,
       mip_level: 0,
-      array_layer: 0,
       origin: wgpu::Origin3d {
         x: rect.min_x(),
         y: rect.min_y(),
@@ -101,9 +100,11 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
     },
     wgpu::BufferCopyView {
       buffer: &output_buffer,
-      offset: 0,
-      bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
-      rows_per_image: 0,
+      layout: wgpu::TextureDataLayout {
+        offset: 0,
+        bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
+        rows_per_image: 0,
+      },
     },
     wgpu::Extent3d {
       width: width,
@@ -116,7 +117,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   queue.submit(Some(encoder.finish()));
 
   // Note that we're not calling `.await` here.
-  let buffer_future = output_buffer.map_read(0, size);
+  let buffer_future = output_buffer.map_read(0, wgpu::BufferSize(size));
 
   // Poll the device in a blocking manner so that our future resolves.
   device.poll(wgpu::Maintain::Wait);

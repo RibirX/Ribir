@@ -158,13 +158,14 @@ impl TextBrush {
     encoder.copy_buffer_to_texture(
       wgpu::BufferCopyView {
         buffer: &buffer,
-        offset: 0,
-        bytes_per_row: rect.width(),
-        rows_per_image: rect.height(),
+        layout: wgpu::TextureDataLayout {
+          offset: 0,
+          bytes_per_row: rect.width(),
+          rows_per_image: rect.height(),
+        },
       },
       wgpu::TextureCopyView {
         texture,
-        array_layer: 0,
         mip_level: 0,
         origin: wgpu::Origin3d {
           x: rect.min[0],
@@ -353,14 +354,15 @@ impl<S: Surface> Canvas<S> {
       wgpu::TextureCopyView {
         texture: &self.glyph_brush.texture,
         mip_level: 0,
-        array_layer: 0,
         origin: wgpu::Origin3d::ZERO,
       },
       wgpu::BufferCopyView {
         buffer: &output_buffer,
-        offset: 0,
-        bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
-        rows_per_image: 0,
+        layout: wgpu::TextureDataLayout {
+          offset: 0,
+          bytes_per_row: std::mem::size_of::<u32>() as u32 * width as u32,
+          rows_per_image: 0,
+        },
       },
       wgpu::Extent3d {
         width,
@@ -372,7 +374,7 @@ impl<S: Surface> Canvas<S> {
     queue.submit(Some(encoder.finish()));
 
     // Note that we're not calling `.await` here.
-    let buffer_future = output_buffer.map_read(0, size);
+    let buffer_future = output_buffer.map_read(0, wgpu::BufferSize(size));
 
     // Poll the device in a blocking manner so that our future resolves.
     device.poll(wgpu::Maintain::Wait);
