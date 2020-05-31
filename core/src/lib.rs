@@ -14,6 +14,7 @@ pub mod prelude {
   pub use crate::application::Application;
   pub use crate::render::*;
   pub use crate::widget::*;
+  pub use canvas::{Point, Rect, Size};
 }
 
 #[cfg(test)]

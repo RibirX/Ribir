@@ -1,4 +1,4 @@
-use crate::widget::Key;
+use crate::{prelude::Point, widget::Key};
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
@@ -32,7 +32,10 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   fn update(&mut self, owner_widget: &Owner);
 
   /// Draw the render object into `PaintingContext`,
-  fn paint(&self, ctx: PaintingContext);
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+
+  /// return the `idx`th child's offset relative to self.
+  fn child_offset(&self, idx: usize) -> Option<Point>;
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
@@ -51,21 +54,19 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
-  fn paint(&self, ctx: PaintingContext);
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+
+  fn child_offset(&self, idx: usize) -> Option<Point>;
 }
 
-pub(crate) fn downcast_widget<T: RenderWidget>(
-  obj: &dyn RenderWidgetSafety,
-) -> &T {
+pub(crate) fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
     &*(trait_obj.data as *const T)
   }
 }
 
-pub(crate) fn downcast_widget_mut<T: RenderWidget>(
-  obj: &mut dyn RenderWidgetSafety,
-) -> &mut T {
+pub(crate) fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
     &mut *(trait_obj.data as *mut T)
@@ -141,7 +142,13 @@ where
     RenderObject::update(&mut self.render, downcast_widget(owner_widget))
   }
 
-  fn paint(&self, ctx: PaintingContext) { self.render.paint(ctx); }
+  #[inline]
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.render.paint(ctx); }
+
+  #[inline]
+  fn child_offset(&self, idx: usize) -> Option<Point> {
+    RenderObject::child_offset(&self.render, idx)
+  }
 }
 
 impl<W, R> RenderObjectBox<W, R>

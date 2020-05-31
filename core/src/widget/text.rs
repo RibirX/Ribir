@@ -18,9 +18,12 @@ impl RenderWidget for Text {
 
 impl RenderObject<Text> for TextRender {
   fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0.clone(); }
-  fn paint(&self, mut ctx: PaintingContext) {
-    // ctx.canvas().fill_text(&self.0, Vector2F::new(10., 10.));
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
+    let painter = ctx.painter();
+    painter.fill_text(&self.0, None);
   }
+
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
 // impl RenderObject for Text {
 //   fn paint(&self) {}
