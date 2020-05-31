@@ -242,7 +242,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
       transform,
       sec_rect: bounds.map(|r| r.to_box2d()),
       align_bounds: COLOR_BOUNDS_TO_ALIGN_TEXTURE,
-      attrs: attrs,
+      attrs,
     })
   }
 

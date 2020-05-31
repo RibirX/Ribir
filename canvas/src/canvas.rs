@@ -424,7 +424,7 @@ impl<S: Surface> Canvas<S> {
             }
             AtlasStoreErr::OverTheMaxLimit => {
               unimplemented!("draw current attr individual");
-              Err(err)
+              // Err(err)
             }
           }
         });
@@ -592,7 +592,7 @@ fn create_uniforms(
     wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
   );
   device.create_bind_group(&wgpu::BindGroupDescriptor {
-    layout: layout,
+    layout,
     bindings: &[
       wgpu::Binding {
         binding: PrimaryBindings::GlobalUniform as u32,

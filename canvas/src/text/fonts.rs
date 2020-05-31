@@ -190,10 +190,10 @@ mod tests {
 
     props.style = FontStyle::Italic;
     let font = fonts
-      .select_best_match("Arial, DejaVu Sans", &props, &mut brush)
+      .select_best_match("serif, DejaVu Sans", &props, &mut brush)
       .unwrap();
     // match default fonts
-    assert_eq!(font.font.family_name(), "Arial");
+    assert_eq!(font.font.family_name(), "serif");
     assert_eq!(font.font.properties().style, FontStyle::Italic);
   }
 }

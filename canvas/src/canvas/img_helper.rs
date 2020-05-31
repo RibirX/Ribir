@@ -107,8 +107,8 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
       },
     },
     wgpu::Extent3d {
-      width: width,
-      height: height,
+      width,
+      height,
       depth: 1,
     },
   );
