@@ -3,7 +3,7 @@ use super::{canvas, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use log::{log_enabled, warn};
-use lyon::tessellation::{Count, VertexBuffers};
+use lyon::tessellation::VertexBuffers;
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
 #[derive(Debug, Default, Clone)]
@@ -14,18 +14,12 @@ pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 
 const INIT_SIZE: DeviceSize = DeviceSize::new(512, 512);
 
-#[derive(Debug, Clone)]
-pub(crate) struct QuadVertex {
-  pub(crate) pixel_coords: Rect,
-  pub(crate) tex_coords: Rect,
-}
-
 pub(crate) struct TextBrush {
   texture: wgpu::Texture,
   view: wgpu::TextureView,
-  quad_vertices_cache: Vec<QuadVertex>,
+  quad_vertices_cache: Vec<[Vertex; 4]>,
   fonts: Fonts,
-  brush: GlyphBrush<QuadVertex, GlyphStatistics>,
+  brush: GlyphBrush<[Vertex; 4], GlyphStatistics>,
 }
 
 impl TextBrush {
@@ -81,7 +75,7 @@ impl TextBrush {
     &mut self,
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
-  ) -> Result<&[QuadVertex], BrushError> {
+  ) -> Result<&[[Vertex; 4]], BrushError> {
     let Self { brush, texture, .. } = self;
     let action = brush.process_queued(
       |rect, data| Self::update_texture(texture, device, encoder, rect, data),
@@ -191,7 +185,7 @@ impl TextBrush {
       bounds,
       extra,
     }: glyph_brush::GlyphVertex<GlyphStatistics>,
-  ) -> QuadVertex {
+  ) -> [Vertex; 4] {
     // handle overlapping bounds, modify uv_rect to preserve texture aspect
     if pixel_coords.max.x > bounds.max.x {
       let old_width = pixel_coords.width();
@@ -220,20 +214,33 @@ impl TextBrush {
     }
     extra.0.set(extra.0.get() + 1);
 
-    QuadVertex {
-      pixel_coords: euclid::rect(
-        pixel_coords.min.x,
-        pixel_coords.min.y,
-        pixel_coords.width(),
-        pixel_coords.height(),
-      ),
-      tex_coords: euclid::rect(
-        tex_coords.min.x,
-        tex_coords.min.y,
-        tex_coords.width(),
-        tex_coords.height(),
-      ),
-    }
+    let glyph_brush::ab_glyph::Rect {
+      min: px_min,
+      max: px_max,
+    } = pixel_coords;
+    let glyph_brush::ab_glyph::Rect {
+      min: tx_min,
+      max: tx_max,
+    } = tex_coords;
+
+    [
+      Vertex {
+        pixel_coords: Point::new(px_min.x, px_min.y),
+        texture_coords: Point::new(tx_min.x, tx_min.y),
+      },
+      Vertex {
+        pixel_coords: Point::new(px_max.x, px_min.y),
+        texture_coords: Point::new(tx_max.x, tx_min.y),
+      },
+      Vertex {
+        pixel_coords: Point::new(px_min.x, px_max.y),
+        texture_coords: Point::new(tx_min.x, tx_max.y),
+      },
+      Vertex {
+        pixel_coords: Point::new(px_max.x, px_max.y),
+        texture_coords: Point::new(tx_max.x, tx_max.y),
+      },
+    ]
   }
 
   fn texture(device: &wgpu::Device, size: DeviceSize) -> wgpu::Texture {
@@ -327,8 +334,38 @@ impl<S: Surface> Canvas<S> {
     if texture_updated {
       self.update_uniforms();
     }
-    let quad_vertices = self.glyph_brush.quad_vertices_cache.as_slice();
-    append_quad_vertices(quad_vertices, buffer);
+
+    let quad_vertices = &self.glyph_brush.quad_vertices_cache;
+    let VertexBuffers { indices, vertices } = buffer;
+    vertices.reserve(quad_vertices.len() * 4);
+    indices.reserve(quad_vertices.len() * 6);
+
+    quad_vertices
+      .iter()
+      .fold(vertices.len() as u32, |state, _| {
+        let tl = state;
+        let tr = tl + 1;
+        let bl = tl + 2;
+        let br = tl + 3;
+        indices.push(tl);
+        indices.push(tr);
+        indices.push(bl);
+        indices.push(bl);
+        indices.push(tr);
+        indices.push(br);
+        state + 4
+      });
+
+    unsafe {
+      let count = quad_vertices.len() * 4;
+      let len = vertices.len();
+      std::ptr::copy_nonoverlapping(
+        quad_vertices.as_ptr() as *const Vertex,
+        vertices.as_mut_ptr().add(len),
+        count,
+      );
+      vertices.set_len(len + count);
+    }
 
     texture_updated
   }
@@ -405,26 +442,6 @@ impl<S: Surface> Canvas<S> {
   }
 }
 
-fn append_quad_vertices(quad_vertices: &[QuadVertex], geometry: &mut VertexBuffers<Vertex, u32>) {
-  let count = glyphs_geometry_count(quad_vertices.len());
-
-  geometry.vertices.reserve(count.vertices as usize);
-  geometry.indices.reserve(count.indices as usize);
-
-  quad_vertices
-    .iter()
-    .for_each(|v| v.push_to_vertex_buffer(geometry));
-}
-
-#[inline]
-fn glyphs_geometry_count(glyph_count: usize) -> Count {
-  let glyph_count = glyph_count as u32;
-  Count {
-    vertices: glyph_count * 4,
-    indices: glyph_count * 6,
-  }
-}
-
 impl From<GlyphStatistics> for lyon::tessellation::Count {
   fn from(g: GlyphStatistics) -> Self {
     let glyph_count = g.0.get();
@@ -447,57 +464,6 @@ mod no_effect {
   impl std::hash::Hash for GlyphStatistics {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
-  }
-}
-
-impl QuadVertex {
-  #[inline]
-  fn px_corners(&self) -> [Point; 4] { Self::rect_corners(&self.pixel_coords) }
-
-  #[inline]
-  fn tex_coords(&self) -> [Point; 4] { Self::rect_corners(&self.tex_coords) }
-
-  fn rect_corners(rect: &Rect) -> [Point; 4] {
-    [
-      rect.min(),
-      Point::new(rect.max_x(), rect.min_y()),
-      Point::new(rect.min_x(), rect.max_y()),
-      rect.max(),
-    ]
-  }
-
-  fn push_to_vertex_buffer(&self, geometry: &mut VertexBuffers<Vertex, u32>) {
-    let VertexBuffers { vertices, indices } = geometry;
-    let offset = vertices.len() as u32;
-    let tl = offset;
-    let tr = 1 + offset;
-    let bl = 2 + offset;
-    let br = 3 + offset;
-    indices.push(tl);
-    indices.push(tr);
-    indices.push(bl);
-    indices.push(bl);
-    indices.push(tr);
-    indices.push(br);
-
-    let px_coords = self.px_corners();
-    let tex_coords = self.tex_coords();
-    vertices.push(Vertex {
-      pixel_coords: px_coords[0],
-      texture_coords: tex_coords[0],
-    });
-    vertices.push(Vertex {
-      pixel_coords: px_coords[1],
-      texture_coords: tex_coords[1],
-    });
-    vertices.push(Vertex {
-      pixel_coords: px_coords[2],
-      texture_coords: tex_coords[2],
-    });
-    vertices.push(Vertex {
-      pixel_coords: px_coords[3],
-      texture_coords: tex_coords[3],
-    });
   }
 }
 
