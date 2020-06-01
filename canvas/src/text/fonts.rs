@@ -124,7 +124,7 @@ fn family_name(name: &str) -> FamilyName {
   }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 struct FontKey {
   family: String,
   props: FontProperties,
@@ -139,6 +139,10 @@ impl std::hash::Hash for FontKey {
   }
 }
 
+impl PartialEq for FontKey {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self.family == other.family && self.props == other.props }
+}
 impl Eq for FontKey {}
 
 impl FontKey {
@@ -190,10 +194,14 @@ mod tests {
 
     props.style = FontStyle::Italic;
     let font = fonts
-      .select_best_match("Times New Roman, DejaVu Sans", &props, &mut brush)
+      .select_best_match("monospace, DejaVu Sans", &props, &mut brush)
       .unwrap();
     // match default fonts
-    assert_eq!(font.font.family_name(), "Times New Roman");
+    #[cfg(target_os = "linux")]
+    assert_eq!(font.font.family_name(), "monospace");
+    #[cfg(target_os = "macos")]
+    assert_eq!(font.font.family_name(), "Courier New");
+
     assert_eq!(font.font.properties().style, FontStyle::Italic);
   }
 }
