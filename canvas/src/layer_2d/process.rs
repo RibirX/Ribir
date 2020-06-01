@@ -1,17 +1,16 @@
 use super::{
-  Color, Command, CommandInfo, FillStyle, HorizontalAlign, RenderAttr, RenderCommand,
-  Rendering2DLayer, Text, TextLayout, Transform, Vertex, VerticalAlign,
+  Color, Command, CommandInfo, FillStyle, GlyphStatistics, HorizontalAlign, RenderAttr,
+  RenderCommand, Rendering2DLayer, Text, TextLayout, Transform, Vertex, VerticalAlign,
 };
 use crate::{
   canvas::{surface::Surface, Canvas},
   text::Section,
-  LogicUnit, Point, Rect, Size,
+  Point, Rect, Size,
 };
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
 };
-use smallvec::{smallvec, SmallVec};
 
 const TOLERANCE: f32 = 0.5;
 
@@ -20,18 +19,17 @@ pub(crate) struct ProcessLayer2d<'a, S: Surface> {
   fill_tess: FillTessellator,
   geometry: VertexBuffers<Vertex, u32>,
   attrs: Vec<RenderAttr>,
-  unprocessed_text_attrs: Vec<UnprocessedTextAttr<'a>>,
+  unready_text_attrs: Vec<UnReadyTextAttr>,
   texture_updated: bool,
   queued_text: bool,
   canvas: &'a mut Canvas<S>,
 }
 
-struct UnprocessedTextAttr<'a> {
-  sec: Section<'a>,
-  sec_rect: Option<euclid::Box2D<f32, LogicUnit>>,
+struct UnReadyTextAttr {
+  count: GlyphStatistics,
   transform: Transform,
+  style: FillStyle,
   align_bounds: Rect,
-  attrs: SmallVec<[FillStyle; 1]>,
 }
 
 impl<'a, S: Surface> ProcessLayer2d<'a, S> {
@@ -41,7 +39,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
       fill_tess: FillTessellator::new(),
       geometry: VertexBuffers::new(),
       attrs: vec![],
-      unprocessed_text_attrs: vec![],
+      unready_text_attrs: vec![],
       texture_updated: false,
       queued_text: false,
       canvas,
@@ -201,20 +199,21 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     max_width: Option<f32>,
     transform: Transform,
   ) {
-    let mut sec = Section::new().add_text(text.to_glyph_text(self.canvas));
+    let text = text.to_glyph_text(self.canvas);
+    let count = text.extra.clone();
+    let mut sec = Section::new().add_text(text);
     if let Some(max_width) = max_width {
       sec.bounds = (max_width, f32::INFINITY).into()
     }
     let align_bounds = section_bounds_to_align_texture(self.canvas, &style, &sec);
     if !align_bounds.is_empty_or_negative() {
-      self.queue_section(&sec);
-      self.unprocessed_text_attrs.push(UnprocessedTextAttr {
-        sec,
+      self.unready_text_attrs.push(UnReadyTextAttr {
+        count,
         transform,
         align_bounds,
-        sec_rect: None,
-        attrs: smallvec![style],
+        style,
       });
+      self.queue_section(&sec);
     }
   }
   fn queue_complex_texts(
@@ -224,26 +223,24 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     bounds: Option<Rect>,
     layout: Option<TextLayout>,
   ) {
-    let mut attrs = SmallVec::with_capacity(texts.len());
-    let texts = texts
+    let (texts, mut attrs) = texts
       .into_iter()
       .map(|(t, color)| {
-        attrs.push(FillStyle::Color(color));
-        t.to_glyph_text(self.canvas)
+        let text = t.to_glyph_text(self.canvas);
+        let attr = UnReadyTextAttr {
+          count: text.extra.clone(),
+          transform,
+          align_bounds: COLOR_BOUNDS_TO_ALIGN_TEXTURE,
+          style: FillStyle::Color(color),
+        };
+        (text, attr)
       })
-      .collect();
+      .unzip();
+    self.unready_text_attrs.append(&mut attrs);
     let mut sec = Section::new().with_text(texts);
     sec = section_with_layout_bounds(sec, bounds, layout);
 
     self.queue_section(&sec);
-
-    self.unprocessed_text_attrs.push(UnprocessedTextAttr {
-      sec,
-      transform,
-      sec_rect: bounds.map(|r| r.to_box2d()),
-      align_bounds: COLOR_BOUNDS_TO_ALIGN_TEXTURE,
-      attrs,
-    })
   }
 
   fn queue_complex_texts_by_style(
@@ -262,78 +259,41 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     let align_bounds = section_bounds_to_align_texture(self.canvas, &style, &sec);
     if !align_bounds.is_empty_or_negative() {
       sec = section_with_layout_bounds(sec, bounds, layout);
-      self.queue_section(&sec);
-      self.unprocessed_text_attrs.push(UnprocessedTextAttr {
-        sec,
+
+      let attrs = sec.text.iter().map(|t| UnReadyTextAttr {
+        count: t.extra.clone(),
         transform,
-        sec_rect: bounds.map(|r| r.to_box2d()),
         align_bounds,
-        attrs: smallvec![style],
+        style: style.clone(),
       });
+      self.unready_text_attrs.extend(attrs);
+      self.queue_section(&sec);
     }
   }
 
   fn process_text_attrs(&mut self) {
     let Self {
-      canvas,
       attrs: render_attrs,
-      unprocessed_text_attrs,
+      unready_text_attrs,
       ..
     } = self;
-    let ptr = &canvas.glyph_brush as *const crate::text::TextBrush;
-    unprocessed_text_attrs.drain(..).for_each(
-      |UnprocessedTextAttr {
-         sec,
-         attrs,
-         align_bounds,
-         sec_rect,
+
+    let attrs = unready_text_attrs.drain(..).map(
+      |UnReadyTextAttr {
          transform,
+         style,
+         count,
+         align_bounds,
        }| {
-        let single_attr = attrs.len() == 1;
-        let mut glyph_counts = vec![0; attrs.len()];
-        canvas
-          .glyph_brush
-          .glyphs(&sec)
-          .filter(|g| {
-            // unsafe introduce:
-            // `glyph_brush.glyphs` need mut reference of glyph_brush, but its return
-            // iterator is not, so it's safe here to reference glyph_brush.
-            // use unsafe to avoid create a vector to store glyphs.
-            let draw_rect = unsafe { (&*ptr).draw_rect_for_cache(g) };
-            draw_rect
-              .map(|rect| {
-                sec_rect
-                  .map(|sec_rect| {
-                    let min = Point::new(rect.min.x, rect.min.y);
-                    let max = Point::new(rect.max.x, rect.max.y);
-                    let glyph_rect = euclid::Box2D::new(min, max);
-                    sec_rect.intersects(&glyph_rect)
-                  })
-                  .unwrap_or(true)
-              })
-              .unwrap_or(false)
-          })
-          .for_each(|g| {
-            let attr_idx = if single_attr { 0 } else { g.section_index };
-            glyph_counts[attr_idx] += 1;
-          });
-
-        let text_attrs =
-          attrs
-            .into_iter()
-            .zip(glyph_counts.into_iter())
-            .map(|(style, draw_count)| RenderAttr {
-              transform,
-              count: glyphs_geometry_count(draw_count),
-              style,
-              bounding_to_align_texture: align_bounds,
-            });
-
-        render_attrs.extend(text_attrs);
+        RenderAttr {
+          transform,
+          style,
+          align_bounds,
+          count: count.into(),
+        }
       },
     );
-
-    unprocessed_text_attrs.clear();
+    render_attrs.extend(attrs);
   }
 
   fn queue_section(&mut self, sec: &Section) {
@@ -349,10 +309,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     bounds: Rect,
   ) {
     if let Some(last) = self.attrs.last_mut() {
-      if last.bounding_to_align_texture == bounds
-        && last.style == style
-        && last.transform == transform
-      {
+      if last.align_bounds == bounds && last.style == style && last.transform == transform {
         last.count.vertices += count.vertices;
         last.count.indices += count.indices;
         return;
@@ -361,7 +318,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
 
     self.attrs.push(RenderAttr {
       transform,
-      bounding_to_align_texture: bounds,
+      align_bounds: bounds,
       count,
       style: style.clone(),
     });
@@ -438,7 +395,10 @@ fn section_bounds_to_align_texture<S: Surface>(
   if let FillStyle::Color(_) = style {
     COLOR_BOUNDS_TO_ALIGN_TEXTURE
   } else {
-    canvas.glyph_brush.glyph_bounds(sec).unwrap_or(Rect::zero())
+    canvas
+      .glyph_brush
+      .section_bounds(sec)
+      .unwrap_or(Rect::zero())
   }
 }
 

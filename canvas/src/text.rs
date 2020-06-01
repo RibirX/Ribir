@@ -1,11 +1,14 @@
 mod fonts;
-use super::{canvas, surface::Surface, Canvas, DeviceSize, LogicUnit, Point, Rect};
+use super::{canvas, surface::Surface, Canvas, DeviceSize, Rect};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use log::{log_enabled, warn};
-use std::sync::Arc;
+use std::{cell::Cell, rc::Rc, sync::Arc};
 
-pub(crate) type Section<'a> = glyph_brush::Section<'a, ()>;
+#[derive(Debug, Default, Clone)]
+pub(crate) struct GlyphStatistics(Rc<Cell<u32>>);
+
+pub(crate) type Section<'a> = glyph_brush::Section<'a, GlyphStatistics>;
 pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 
 const INIT_SIZE: DeviceSize = DeviceSize::new(512, 512);
@@ -21,7 +24,7 @@ pub(crate) struct TextBrush {
   view: wgpu::TextureView,
   quad_vertices_cache: Vec<QuadVertex>,
   fonts: Fonts,
-  brush: GlyphBrush<QuadVertex, ()>,
+  brush: GlyphBrush<QuadVertex, GlyphStatistics>,
 }
 
 impl TextBrush {
@@ -43,32 +46,31 @@ impl TextBrush {
   #[inline]
   pub(crate) fn view(&self) -> &wgpu::TextureView { &self.view }
 
-  #[inline]
-  pub(crate) fn glyphs(&mut self, sec: &Section) -> glyph_brush::SectionGlyphIter {
-    self.brush.glyphs(sec)
-  }
+  // #[inline]
+  // pub(crate) fn glyphs(&mut self, sec: &Section) ->
+  // glyph_brush::SectionGlyphIter {   self.brush.glyphs(sec)
+  // }
+
+  // pub(crate) fn glyph_bounds(
+  //   &self,
+  //   glyph: &glyph_brush::SectionGlyph,
+  // ) -> euclid::Box2D<f32, LogicUnit> {
+  //   use glyph_brush::ab_glyph::Font as BrushFont;
+  //   let font = &self.brush.fonts()[glyph.font_id];
+  //   let rect = font.glyph_bounds(&glyph.glyph);
+
+  //   euclid::Box2D::new(
+  //     Point::new(rect.min.x, rect.min.y),
+  //     Point::new(rect.max.x, rect.max.y),
+  //   )
+  // }
 
   #[inline]
-  pub(crate) fn glyph_bounds(&mut self, sec: &Section) -> Option<Rect> {
+  pub(crate) fn section_bounds(&mut self, sec: &Section) -> Option<Rect> {
     self
       .brush
       .glyph_bounds(sec)
       .map(|rect| euclid::rect(rect.min.x, rect.min.y, rect.width(), rect.height()))
-  }
-
-  #[inline]
-  pub(crate) fn draw_rect_for_cache(
-    &self,
-    glyph: &glyph_brush::SectionGlyph,
-  ) -> Option<euclid::Box2D<f32, LogicUnit>> {
-    self
-      .brush
-      .drawn_rect_at(glyph.font_id, &glyph.glyph)
-      .map(|rect| {
-        let min = Point::new(rect.min.x, rect.min.y);
-        let max = Point::new(rect.max.x, rect.max.y);
-        euclid::Box2D::new(min, max)
-      })
   }
 
   #[inline]
@@ -186,8 +188,8 @@ impl TextBrush {
       mut tex_coords,
       mut pixel_coords,
       bounds,
-      ..
-    }: glyph_brush::GlyphVertex<()>,
+      extra,
+    }: glyph_brush::GlyphVertex<GlyphStatistics>,
   ) -> QuadVertex {
     // handle overlapping bounds, modify uv_rect to preserve texture aspect
     if pixel_coords.max.x > bounds.max.x {
@@ -215,6 +217,7 @@ impl TextBrush {
       tex_coords.min.y =
         tex_coords.max.y - tex_coords.height() * pixel_coords.height() / old_height;
     }
+    extra.0.set(extra.0.get() + 1);
 
     QuadVertex {
       pixel_coords: euclid::rect(
@@ -394,6 +397,31 @@ impl<S: Surface> Canvas<S> {
       .unwrap();
 
     log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
+  }
+}
+
+impl From<GlyphStatistics> for lyon::tessellation::Count {
+  fn from(g: GlyphStatistics) -> Self {
+    let glyph_count = g.0.get();
+    Self {
+      vertices: glyph_count * 4,
+      indices: glyph_count * 6,
+    }
+  }
+}
+
+// GlyphStatistics as extra data for `Section` just use to count glyphs, not
+// effect on sections content.
+mod no_effect {
+  use super::*;
+  impl std::cmp::PartialEq for GlyphStatistics {
+    #[inline]
+    fn eq(&self, _: &Self) -> bool { true }
+  }
+
+  impl std::hash::Hash for GlyphStatistics {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
   }
 }
 
