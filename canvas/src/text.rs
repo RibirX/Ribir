@@ -1,8 +1,9 @@
 mod fonts;
-use super::{canvas, surface::Surface, Canvas, DeviceSize, Rect};
+use super::{canvas, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use log::{log_enabled, warn};
+use lyon::tessellation::{Count, VertexBuffers};
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
 #[derive(Debug, Default, Clone)]
@@ -302,7 +303,9 @@ impl<S: Surface> Canvas<S> {
   #[inline]
   pub(crate) fn queue(&mut self, section: &Section) { self.glyph_brush.queue(&section); }
 
-  pub(crate) fn process_queued(&mut self) -> (&[QuadVertex], bool) {
+  /// Processes all queued texts, and push the vertices and indices into the
+  /// buffer, return true if the texture has updated.
+  pub(crate) fn process_queued(&mut self, buffer: &mut VertexBuffers<Vertex, u32>) -> bool {
     let mut texture_updated = false;
 
     loop {
@@ -325,7 +328,9 @@ impl<S: Surface> Canvas<S> {
       self.update_uniforms();
     }
     let quad_vertices = self.glyph_brush.quad_vertices_cache.as_slice();
-    (quad_vertices, texture_updated)
+    append_quad_vertices(quad_vertices, buffer);
+
+    texture_updated
   }
 
   #[cfg(debug_assertions)]
@@ -400,6 +405,26 @@ impl<S: Surface> Canvas<S> {
   }
 }
 
+fn append_quad_vertices(quad_vertices: &[QuadVertex], geometry: &mut VertexBuffers<Vertex, u32>) {
+  let count = glyphs_geometry_count(quad_vertices.len());
+
+  geometry.vertices.reserve(count.vertices as usize);
+  geometry.indices.reserve(count.indices as usize);
+
+  quad_vertices
+    .iter()
+    .for_each(|v| v.push_to_vertex_buffer(geometry));
+}
+
+#[inline]
+fn glyphs_geometry_count(glyph_count: usize) -> Count {
+  let glyph_count = glyph_count as u32;
+  Count {
+    vertices: glyph_count * 4,
+    indices: glyph_count * 6,
+  }
+}
+
 impl From<GlyphStatistics> for lyon::tessellation::Count {
   fn from(g: GlyphStatistics) -> Self {
     let glyph_count = g.0.get();
@@ -422,6 +447,57 @@ mod no_effect {
   impl std::hash::Hash for GlyphStatistics {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
+  }
+}
+
+impl QuadVertex {
+  #[inline]
+  fn px_corners(&self) -> [Point; 4] { Self::rect_corners(&self.pixel_coords) }
+
+  #[inline]
+  fn tex_coords(&self) -> [Point; 4] { Self::rect_corners(&self.tex_coords) }
+
+  fn rect_corners(rect: &Rect) -> [Point; 4] {
+    [
+      rect.min(),
+      Point::new(rect.max_x(), rect.min_y()),
+      Point::new(rect.min_x(), rect.max_y()),
+      rect.max(),
+    ]
+  }
+
+  fn push_to_vertex_buffer(&self, geometry: &mut VertexBuffers<Vertex, u32>) {
+    let VertexBuffers { vertices, indices } = geometry;
+    let offset = vertices.len() as u32;
+    let tl = offset;
+    let tr = 1 + offset;
+    let bl = 2 + offset;
+    let br = 3 + offset;
+    indices.push(tl);
+    indices.push(tr);
+    indices.push(bl);
+    indices.push(bl);
+    indices.push(tr);
+    indices.push(br);
+
+    let px_coords = self.px_corners();
+    let tex_coords = self.tex_coords();
+    vertices.push(Vertex {
+      pixel_coords: px_coords[0],
+      texture_coords: tex_coords[0],
+    });
+    vertices.push(Vertex {
+      pixel_coords: px_coords[1],
+      texture_coords: tex_coords[1],
+    });
+    vertices.push(Vertex {
+      pixel_coords: px_coords[2],
+      texture_coords: tex_coords[2],
+    });
+    vertices.push(Vertex {
+      pixel_coords: px_coords[3],
+      texture_coords: tex_coords[3],
+    });
   }
 }
 
@@ -469,9 +545,11 @@ mod tests {
     let str = "Hello_glyph!";
     let section = Section::new().add_text(Text::default().with_text(str));
     canvas.queue(&section);
-    let (vertices, update_texture) = canvas.process_queued();
 
-    assert_eq!(vertices.len(), str.chars().count());
+    let mut buffer = VertexBuffers::new();
+    let update_texture = canvas.process_queued(&mut buffer);
+
+    assert_eq!(buffer.vertices.len(), str.chars().count() * 4);
     assert_eq!(update_texture, false);
 
     // force submit data
@@ -480,11 +558,29 @@ mod tests {
     }
     canvas.view.take();
 
+    #[cfg(debug_assertions)]
     canvas.log_glyph_texture();
 
     unit_test::assert_img_eq!(
       "./test_imgs/hello_glyph_cache.png",
       "./.log/glyph_texture_cache.png"
     );
+  }
+
+  extern crate test;
+  use test::Bencher;
+
+  #[bench]
+  #[ignore = "gpu need"]
+  fn generate_vertices(b: &mut Bencher) {
+    let mut canvas = block_on(Canvas::new(DeviceSize::new(800, 800)));
+    let _ = canvas.select_best_match("Times New Roman", &FontProperties::default());
+    let text = include_str!("../fonts/loads-of-unicode.txt");
+    let sec = Section::new().add_text(glyph_brush::Text::default().with_text(text));
+    b.iter(|| {
+      let mut buffer = VertexBuffers::new();
+      canvas.queue(&sec);
+      canvas.process_queued(&mut buffer);
+    })
   }
 }
