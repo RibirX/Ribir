@@ -1,6 +1,6 @@
 use crate::{
-  canvas::surface::Surface, Canvas, FontProperties, FontStretch, FontStyle, FontWeight, Point,
-  Rect, Transform, DEFAULT_FONT_FAMILY,
+  canvas::surface::Surface, text::GlyphStatistics, Canvas, FontProperties, FontStretch, FontStyle,
+  FontWeight, Point, Rect, Transform, DEFAULT_FONT_FAMILY,
 };
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
@@ -233,7 +233,7 @@ pub(crate) struct RenderAttr {
   pub(crate) count: Count,
   pub(crate) transform: Transform,
   pub(crate) style: FillStyle,
-  pub(crate) bounding_to_align_texture: Rect,
+  pub(crate) align_bounds: Rect,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum FillStyle {
@@ -459,7 +459,10 @@ impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
 }
 
 impl<'a> Text<'a> {
-  fn to_glyph_text<S: Surface>(&self, canvas: &mut Canvas<S>) -> glyph_brush::Text<'a, ()> {
+  fn to_glyph_text<S: Surface>(
+    &self,
+    canvas: &mut Canvas<S>,
+  ) -> glyph_brush::Text<'a, GlyphStatistics> {
     let Text {
       text,
       font,
@@ -474,7 +477,7 @@ impl<'a> Text<'a> {
       text,
       font_id,
       scale: (*font_size).into(),
-      extra: (),
+      extra: <_>::default(),
     }
   }
 }

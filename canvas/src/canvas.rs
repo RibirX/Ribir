@@ -407,7 +407,7 @@ impl<S: Surface> Canvas<S> {
          transform,
          count,
          style,
-         bounding_to_align_texture,
+         align_bounds,
        }| {
         let res = self.store_style_in_atlas(style).or_else(|err| {
           self.submit();
@@ -438,8 +438,8 @@ impl<S: Surface> Canvas<S> {
             tex_offset: [tex_offset.x, tex_offset.y],
             tex_size: [tex_size.width, tex_size.height],
             transform: transform.to_row_arrays(),
-            bound_min: bounding_to_align_texture.min().to_array(),
-            bounding_size: bounding_to_align_texture.size.to_array(),
+            bound_min: align_bounds.min().to_array(),
+            bounding_size: align_bounds.size.to_array(),
           };
 
           self.render_data.append(
@@ -768,7 +768,7 @@ mod tests {
           indices: 3,
           vertices: 3,
         },
-        bounding_to_align_texture: Rect::default(),
+        align_bounds: Rect::default(),
         style: FillStyle::Color(const_color::WHITE.into()),
         transform: Transform::default(),
       }],
