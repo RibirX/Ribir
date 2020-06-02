@@ -198,7 +198,7 @@ mod tests {
       .unwrap();
     // match default fonts
     #[cfg(target_os = "linux")]
-    assert_eq!(font.font.family_name(), "monospace");
+    assert_eq!(font.font.family_name(), "DejaVu Sans Mono");
     #[cfg(target_os = "macos")]
     assert_eq!(font.font.family_name(), "Courier New");
 
