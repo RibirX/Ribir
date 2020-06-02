@@ -20,7 +20,6 @@ impl RenderWidget for Text {
 }
 
 impl RenderObject<Text> for TextRender {
-  fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0; }
   fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
   fn get_size(&self) -> Option<Size> { None }
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }

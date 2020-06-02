@@ -6,7 +6,7 @@ pub use base::*;
 pub use box_constraint::*;
 pub use render_ctx::*;
 pub mod render_ctx;
-use crate::{prelude::Point, widget::Key};
+use crate::{prelude::Point, prelude::Size, widget::Key};
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
@@ -42,7 +42,7 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   // trig the process of layout
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
 
-  // return layout bound's size if has known 
+  // return layout bound's size if has known
   fn get_size(&self) -> Option<Size>;
   // get layout constraints type;
   fn get_constraints(&self) -> LayoutConstraints;
@@ -171,11 +171,10 @@ where
   }
 
   fn get_size(&self) -> Option<Size> { RenderObject::get_size(&self.render) }
-  fn get_constraints(&self) -> LayoutConstraints {
-    RenderObject::get_constraints(&self.render)
-  }
+  fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(&self.render) }
   fn set_box_bound(&mut self, bound: Option<BoxBound>) {
     RenderObject::set_box_bound(&mut self.render, bound)
+  }
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.render.paint(ctx); }
 

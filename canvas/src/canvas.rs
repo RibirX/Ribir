@@ -210,6 +210,7 @@ impl<S: Surface> Canvas<S> {
       lod_max_clamp: 0.0,
       compare: wgpu::CompareFunction::Always,
       label: Some("Texture atlas sampler"),
+      anisotropy_clamp: 0,
     });
 
     let glyph_brush = TextBrush::new(&device);

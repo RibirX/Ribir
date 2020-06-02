@@ -7,15 +7,3 @@ bitflags! {
         const EFFECTED_BY_CHILDREN = 2;
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Size {
-  pub width: f64,
-  pub height: f64,
-}
-
-#[derive(Debug, Clone)]
-pub struct Position {
-  pub x: f64,
-  pub y: f64,
-}

@@ -1,5 +1,6 @@
 // use super::box_constraint::BoxBound;
 use super::flex::FlexFit;
+use crate::prelude::{Point, Size};
 use crate::render::render_ctx::RenderCtx;
 use crate::render::render_tree::*;
 use crate::render::*;
@@ -52,8 +53,9 @@ impl RenderObject<ExpandBox> for ExpendBoxRender {
   }
   fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
   fn get_size(&self) -> Option<Size> { return self.size.clone(); }
-  fn get_constraints(&self) -> LayoutConstraints {
-    return LayoutConstraints::EFFECTED_BY_PARENT;
-  }
+  fn get_constraints(&self) -> LayoutConstraints { return LayoutConstraints::EFFECTED_BY_PARENT; }
   fn set_box_bound(&mut self, _bound: Option<BoxBound>) {}
+
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {}
+  fn child_offset(&self, idx: usize) -> Option<Point> { None }
 }

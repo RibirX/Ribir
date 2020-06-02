@@ -23,10 +23,7 @@ impl<'a> RenderWidget for Row<'a> {
   type RO = RowRender;
   fn create_render_object(&self) -> Self::RO {
     RowRender {
-      row: FlexContainer::new(
-        Axis::Horizontal,
-        LayoutConstraints::EFFECTED_BY_CHILDREN,
-      ),
+      row: FlexContainer::new(Axis::Horizontal, LayoutConstraints::EFFECTED_BY_CHILDREN),
     }
   }
 }
@@ -43,9 +40,8 @@ impl<'a> MultiChildWidget for Row<'a> {
 impl<'a> RenderObject<Row<'a>> for RowRender {
   fn update(&mut self, _owner_widget: &Row<'a>) {}
 
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) {
-    self.row.flex_layout(id, ctx);
-  }
-
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) { self.row.flex_layout(id, ctx); }
+  fn paint<'b>(&'b self, ctx: &mut PaintingContext<'b>) {}
+  fn child_offset(&self, idx: usize) -> Option<Point> { None }
   default_box_impl!({ row.bound });
 }
