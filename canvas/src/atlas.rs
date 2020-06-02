@@ -51,7 +51,7 @@ impl TextureAtlas {
       self
         .color_palettes
         .store_color_in_palette(
-          color,
+          color.clone(),
           &self.texture.raw_texture,
           &mut self.atlas_allocator,
           device,

@@ -355,7 +355,7 @@ impl<S: Surface> Canvas<S> {
 
     let (pos, size, grown) = match style {
       FillStyle::Color(c) => {
-        let (pos, grown) = tex_atlas.store_color_in_palette(*c, device, encoder, queue)?;
+        let (pos, grown) = tex_atlas.store_color_in_palette(c.clone(), device, encoder, queue)?;
 
         (pos, DeviceSize::new(1, 1), grown)
       }
@@ -796,7 +796,7 @@ mod tests {
           vertices: 3,
         },
         align_bounds: Rect::default(),
-        style: FillStyle::Color(const_color::WHITE.into()),
+        style: FillStyle::Color(Color::WHITE),
         transform: Transform::default(),
       }],
     };
@@ -816,7 +816,7 @@ mod tests {
     let path = circle_50();
 
     let mut layer = canvas.new_2d_layer();
-    layer.set_style(FillStyle::Color(const_color::BLACK.into()));
+    layer.set_style(FillStyle::Color(Color::BLACK));
     layer.translate(50., 50.);
     layer.fill_path(path);
     canvas.compose_2d_layer(layer);
@@ -840,11 +840,11 @@ mod tests {
           .fill_path(path.clone());
       };
 
-      fill_color_circle(const_color::YELLOW.into(), 50., 50.);
-      fill_color_circle(const_color::RED.into(), 100., 0.);
-      fill_color_circle(const_color::PINK.into(), 100., 0.);
-      fill_color_circle(const_color::GREEN.into(), 100., 0.);
-      fill_color_circle(const_color::BLUE.into(), -0., 100.);
+      fill_color_circle(Color::YELLOW, 50., 50.);
+      fill_color_circle(Color::RED, 100., 0.);
+      fill_color_circle(Color::PINK, 100., 0.);
+      fill_color_circle(Color::GREEN, 100., 0.);
+      fill_color_circle(Color::BLUE, -0., 100.);
 
       canvas.compose_2d_layer(layer);
       canvas.submit();
