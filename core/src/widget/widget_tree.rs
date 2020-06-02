@@ -42,16 +42,10 @@ impl<'a> WidgetTree<'a> {
   }
 
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.
-  pub(crate) fn inflate(
-    &mut self,
-    wid: WidgetId,
-    render_tree: &mut RenderTree,
-  ) -> &mut Self {
+  pub(crate) fn inflate(&mut self, wid: WidgetId, render_tree: &mut RenderTree) -> &mut Self {
     let parent_id = wid
       .ancestors(self)
-      .find(|id| {
-        !matches!(id.classify(self), Some(WidgetClassify::Combination(_)))
-      })
+      .find(|id| !matches!(id.classify(self), Some(WidgetClassify::Combination(_))))
       .map(|id| self.widget_to_render.get(&id))
       .flatten()
       .map(|id| *id);
@@ -117,31 +111,16 @@ impl<'a> WidgetTree<'a> {
           WidgetClassifyMut::Combination(c) => {
             let new_child = c.build();
             let old_child_node = need_build.single_child(&self);
-            self.try_replace_widget_or_rebuild(
-              old_child_node,
-              new_child,
-              &mut stack,
-              render_tree,
-            );
+            self.try_replace_widget_or_rebuild(old_child_node, new_child, &mut stack, render_tree);
           }
           WidgetClassifyMut::SingleChild(r) => {
             let new_child = r.take_child();
             let old_child_node = need_build.single_child(&self);
-            self.try_replace_widget_or_rebuild(
-              old_child_node,
-              new_child,
-              &mut stack,
-              render_tree,
-            );
+            self.try_replace_widget_or_rebuild(old_child_node, new_child, &mut stack, render_tree);
           }
           WidgetClassifyMut::MultiChild(multi) => {
             let new_children = multi.take_children();
-            self.repair_children_by_key(
-              need_build,
-              new_children,
-              &mut stack,
-              render_tree,
-            );
+            self.repair_children_by_key(need_build, new_children, &mut stack, render_tree);
           }
           WidgetClassifyMut::Render(_) => {
             // down to leaf, nothing to do.
@@ -157,7 +136,7 @@ impl<'a> WidgetTree<'a> {
   fn flush_to_render(&mut self, render_tree: &mut RenderTree) {
     self.changed_widgets.iter().for_each(|wid| {
       let widget = wid.classify(self).expect("Widget should exists!");
-      let mut render_id = *self
+      let render_id = *self
         .widget_to_render
         .get(wid)
         .expect("Changed widget should always render widget!");
@@ -284,10 +263,7 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub(crate) fn get<'a, 'b>(
-    self,
-    tree: &'a WidgetTree<'b>,
-  ) -> Option<&'a Box<dyn Widget + 'b>> {
+  pub(crate) fn get<'a, 'b>(self, tree: &'a WidgetTree<'b>) -> Option<&'a Box<dyn Widget + 'b>> {
     tree.arena.get(self.0).map(|node| node.get())
   }
 
@@ -300,10 +276,7 @@ impl WidgetId {
   }
 
   /// classify the widget back in this id, and return its reference
-  pub(crate) fn classify<'a, 'b>(
-    self,
-    tree: &'a WidgetTree<'b>,
-  ) -> Option<WidgetClassify<'b>> {
+  pub(crate) fn classify<'a, 'b>(self, tree: &'a WidgetTree<'b>) -> Option<WidgetClassify<'b>> {
     self.get(tree).map(|w| {
       // Safe: also the tree ref's lifetime is `'a`, but the boxed widget's
       // lifetime is `'b`, so we can do this lifetime convert;
@@ -320,8 +293,7 @@ impl WidgetId {
     self.get_mut(tree).map(|w| {
       // Safe: also the tree ref's lifetime is `'a`, but the boxed widget's
       // lifetime is `'b`, so we can do this lifetime convert;
-      let w: &'b mut dyn Widget =
-        unsafe { &mut *(&mut **w as *mut dyn Widget) };
+      let w: &'b mut dyn Widget = unsafe { &mut *(&mut **w as *mut dyn Widget) };
       w.classify_mut()
     })
   }
@@ -358,18 +330,12 @@ impl WidgetId {
   }
 
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
-  pub fn ancestors<'a>(
-    self,
-    tree: &'a WidgetTree,
-  ) -> impl Iterator<Item = WidgetId> + 'a {
+  pub fn ancestors<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item = WidgetId> + 'a {
     self.0.ancestors(&tree.arena).map(|id| WidgetId(id))
   }
 
   /// A delegate for [NodeId::descendants](indextree::NodeId.descendants)
-  pub fn descendants<'a>(
-    self,
-    tree: &'a WidgetTree,
-  ) -> impl Iterator<Item = WidgetId> + 'a {
+  pub fn descendants<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item = WidgetId> + 'a {
     self.0.descendants(&tree.arena).map(|id| WidgetId(id))
   }
 
@@ -403,16 +369,10 @@ impl WidgetId {
   }
 
   /// A delegate for [NodeId::remove](indextree::NodeId.remove)
-  pub(crate) fn remove(self, tree: &mut WidgetTree) {
-    self.0.remove(&mut tree.arena);
-  }
+  pub(crate) fn remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena); }
 
   /// Drop the subtree
-  pub(crate) fn drop(
-    self,
-    tree: &mut WidgetTree,
-    render_tree: &mut RenderTree,
-  ) {
+  pub(crate) fn drop(self, tree: &mut WidgetTree, render_tree: &mut RenderTree) {
     let rid = self.relative_to_render(tree).expect("must exists");
     let WidgetTree {
       widget_to_render,
@@ -454,10 +414,7 @@ impl WidgetId {
   }
 
   /// find the nearest render widget in subtree, include self.
-  pub(crate) fn down_nearest_render_widget(
-    self,
-    tree: &WidgetTree,
-  ) -> WidgetId {
+  pub(crate) fn down_nearest_render_widget(self, tree: &WidgetTree) -> WidgetId {
     let mut wid = self;
     while let Some(WidgetClassify::Combination(_)) = wid.classify(tree) {
       wid = wid.single_child(tree);
@@ -503,12 +460,8 @@ mod test {
 
   #[test]
   fn inflate_tree() {
-    let app = create_embed_app(3);
-    let Application {
-      widget_tree,
-      render_tree,
-      ..
-    } = app;
+    let (widget_tree, render_tree) = create_embed_app(3);
+
     assert_eq!(
       widget_tree.symbol_shape(),
       r#"EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 }
@@ -558,15 +511,12 @@ mod test {
 
   #[test]
   fn drop_all() {
-    let mut app = create_embed_app(3);
-    app.widget_tree.root().unwrap();
-    let Application {
-      widget_tree,
-      render_tree,
-      ..
-    } = &mut app;
+    let (mut widget_tree, mut render_tree) = create_embed_app(3);
 
-    widget_tree.root().unwrap().drop(widget_tree, render_tree);
+    widget_tree
+      .root()
+      .unwrap()
+      .drop(&mut widget_tree, &mut render_tree);
 
     assert!(widget_tree.widget_to_render.is_empty());
     assert!(render_tree.render_to_widget().is_empty());
@@ -581,25 +531,18 @@ mod test {
   fn emit_rebuild(env: &mut KeyDetectEnv) {
     *env.title.borrow_mut() = "New title";
     env
-      .app
       .widget_tree
       .need_builds
-      .insert(env.app.widget_tree.root().unwrap());
+      .insert(env.widget_tree.root().unwrap());
   }
   #[test]
   fn repair_tree() {
     let mut env = KeyDetectEnv::new(3);
     emit_rebuild(&mut env);
-    env.app.widget_tree.repair(&mut env.app.render_tree);
-
-    let Application {
-      widget_tree,
-      render_tree,
-      ..
-    } = env.app;
+    env.widget_tree.repair(&mut env.render_tree);
 
     assert_eq!(
-      widget_tree.symbol_shape(),
+      env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
 └── KeyDetect { key: KI4(0), child: Row([]) }
     ├── KeyDetect { key: KI4(0), child: Text("New title") }
@@ -624,7 +567,7 @@ mod test {
     );
 
     assert_eq!(
-      render_tree.symbol_shape(),
+      env.render_tree.symbol_shape(),
       r#"RowRender { inner_layout: [], size: None }
 ├── TextRender("New title")
 ├── TextRender("")
@@ -645,20 +588,14 @@ mod test {
     );
   }
 
-  fn test_sample_create<'a>(
-    width: usize,
-    depth: usize,
-  ) -> (WidgetTree<'a>, RenderTree) {
-    let app = Application::default();
+  fn test_sample_create<'a>(width: usize, depth: usize) -> (WidgetTree<'a>, RenderTree) {
+    let mut widget_tree = WidgetTree::default();
+    let mut render_tree = RenderTree::default();
     let root = RecursiveRow { width, depth };
-    let Application {
-      mut widget_tree,
-      mut render_tree,
-      ..
-    } = app;
     widget_tree.set_root(root.into(), &mut render_tree);
     (widget_tree, render_tree)
   }
+
   #[bench]
   fn inflate_5_x_1000(b: &mut Bencher) { b.iter(|| create_env(1000)); }
 
@@ -666,9 +603,7 @@ mod test {
   fn inflate_50_pow_2(b: &mut Bencher) { b.iter(|| test_sample_create(50, 2)) }
 
   #[bench]
-  fn inflate_100_pow_2(b: &mut Bencher) {
-    b.iter(|| test_sample_create(100, 2))
-  }
+  fn inflate_100_pow_2(b: &mut Bencher) { b.iter(|| test_sample_create(100, 2)) }
 
   #[bench]
   fn inflate_10_pow_4(b: &mut Bencher) { b.iter(|| test_sample_create(10, 4)) }
@@ -681,7 +616,7 @@ mod test {
     let mut env = KeyDetectEnv::new(1000);
     b.iter(|| {
       emit_rebuild(&mut env);
-      env.app.widget_tree.repair(&mut env.app.render_tree);
+      env.widget_tree.repair(&mut env.render_tree);
     });
   }
 

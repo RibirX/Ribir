@@ -1,37 +1,70 @@
-use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*};
+use crate::{prelude::*, widget::window::*};
 use indextree::*;
+use std::collections::HashMap;
 use std::collections::HashSet;
+pub use winit::window::WindowId;
+use winit::{
+  event::Event,
+  event_loop::{ControlFlow, EventLoop},
+  platform::desktop::EventLoopExtDesktop,
+};
 
-#[derive(Default)]
 pub struct Application<'a> {
-  pub(crate) render_tree: RenderTree,
-  pub(crate) widget_tree: WidgetTree<'a>,
-
+  windows: HashMap<WindowId, Window<'a>>,
+  event_loop: EventLoop<()>,
   dirty_layouts: HashSet<NodeId>,
   dirty_layout_roots: HashSet<NodeId>,
 }
 
 impl<'a> Application<'a> {
   #[inline]
-  pub fn new() -> Application<'a> { Default::default() }
+  pub fn new() -> Application<'a> {
+    Self {
+      windows: Default::default(),
+      event_loop: EventLoop::new(),
+      dirty_layouts: Default::default(),
+      dirty_layout_roots: Default::default(),
+    }
+  }
 
   pub fn run<W: Into<Box<dyn Widget + 'a>>>(mut self, w: W) {
-    self.widget_tree.set_root(w.into(), &mut self.render_tree);
-
-    todo!(
-      "
-      1. start a event loop to handle event.
-      2. run layout and paint for it.
-    "
-    );
+    self.new_window(w);
 
     let Self {
-      widget_tree,
-      render_tree,
+      mut event_loop,
+      mut windows,
       ..
     } = self;
 
-    widget_tree.repair(&mut render_tree);
+    event_loop.run_return(move |event, _event_loop, control_flow| {
+      *control_flow = ControlFlow::Wait;
+
+      match event {
+        Event::WindowEvent { event, window_id } => {
+          if let Some(wnd) = windows.get_mut(&window_id) {
+            wnd.processes_native_event(event);
+          }
+        }
+        Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
+          if wnd.render_ready() {
+            wnd.request_redraw();
+          }
+        }),
+        Event::RedrawRequested(id) => {
+          if let Some(wnd) = windows.get_mut(&id) {
+            wnd.draw_frame();
+          }
+        }
+        _ => (),
+      }
+    });
+  }
+
+  pub(crate) fn new_window<W: Into<Box<dyn Widget + 'a>>>(&mut self, w: W) -> WindowId {
+    let window = Window::new(w, &self.event_loop);
+    let id = window.id();
+    self.windows.insert(window.id(), window);
+    id
   }
 }
 

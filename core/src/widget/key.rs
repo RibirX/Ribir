@@ -1,6 +1,5 @@
 use crate::widget::*;
 
-use blake3;
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -116,16 +115,12 @@ trait ConsumeByHasher {
 
 impl ConsumeByHasher for String {
   #[inline]
-  fn consume(self, hasher: &mut blake3::Hasher) {
-    hasher.update(self.as_bytes());
-  }
+  fn consume(self, hasher: &mut blake3::Hasher) { hasher.update(self.as_bytes()); }
 }
 
 impl<'a> ConsumeByHasher for &'a str {
   #[inline]
-  fn consume(self, hasher: &mut blake3::Hasher) {
-    hasher.update(self.as_bytes());
-  }
+  fn consume(self, hasher: &mut blake3::Hasher) { hasher.update(self.as_bytes()); }
 }
 
 macro impl_as_u8_consume_by_hasher($($t: ty)*) {
@@ -159,11 +154,11 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
-  let k1 = KeyDetect::new(0, Text(""));
-  let k2 = KeyDetect::new(String::new(), Text(""));
-  let k3 = KeyDetect::new("", Text(""));
-  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text(""));
-  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text(""));
+  let k1 = KeyDetect::new(0, Text("".to_string()));
+  let k2 = KeyDetect::new(String::new(), Text("".to_string()));
+  let k3 = KeyDetect::new("".to_string(), Text("".to_string()));
+  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
+  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
   assert!(&k1.key != &k2.key);
   assert!(&k2.key == &k3.key);
   assert!(&k3.key != &k1.key);

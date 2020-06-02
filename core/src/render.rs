@@ -1,14 +1,16 @@
 use crate::render::render_tree::RenderId;
-use crate::widget::Key;
 
-use std::fmt::Debug;
-use std::raw::TraitObject;
 mod base;
 mod box_constraint;
 pub use base::*;
 pub use box_constraint::*;
 pub use render_ctx::*;
 pub mod render_ctx;
+use crate::{prelude::Point, widget::Key};
+pub use painting_context::PaintingContext;
+use std::fmt::Debug;
+use std::raw::TraitObject;
+pub mod painting_context;
 pub mod render_tree;
 
 /// RenderWidget provide configuration for render object which provide actual
@@ -37,11 +39,23 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   /// this method directly.
   fn update(&mut self, owner_widget: &Owner);
 
+  // trig the process of layout
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
 
+  // return layout bound's size if has known 
   fn get_size(&self) -> Option<Size>;
+  // get layout constraints type;
   fn get_constraints(&self) -> LayoutConstraints;
+  // set layout bound limit
   fn set_box_bound(&mut self, bound: Option<BoxBound>);
+  /// Paint the render object into `PaintingContext` by itself coordinate
+  /// system. Not care about children's paint in this method, framework will
+  /// call children's paint individual. And framework guarantee always paint
+  /// parent before children.
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+
+  /// return the `idx`th child's offset relative to self.
+  fn child_offset(&self, idx: usize) -> Option<Point>;
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
@@ -64,20 +78,19 @@ pub trait RenderObjectSafety: Debug {
   fn get_size(&self) -> Option<Size>;
   fn get_constraints(&self) -> LayoutConstraints;
   fn set_box_bound(&mut self, bound: Option<BoxBound>);
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+
+  fn child_offset(&self, idx: usize) -> Option<Point>;
 }
 
-pub(crate) fn downcast_widget<T: RenderWidget>(
-  obj: &dyn RenderWidgetSafety,
-) -> &T {
+pub(crate) fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
     &*(trait_obj.data as *const T)
   }
 }
 
-pub(crate) fn downcast_widget_mut<T: RenderWidget>(
-  obj: &mut dyn RenderWidgetSafety,
-) -> &mut T {
+pub(crate) fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
     &mut *(trait_obj.data as *mut T)
@@ -163,6 +176,12 @@ where
   }
   fn set_box_bound(&mut self, bound: Option<BoxBound>) {
     RenderObject::set_box_bound(&mut self.render, bound)
+  #[inline]
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.render.paint(ctx); }
+
+  #[inline]
+  fn child_offset(&self, idx: usize) -> Option<Point> {
+    RenderObject::child_offset(&self.render, idx)
   }
 }
 

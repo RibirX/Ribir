@@ -6,27 +6,32 @@ use indextree::*;
 
 /// Just a stupid implement for develope the framework.
 #[derive(Debug)]
-pub struct Text(pub &'static str);
+pub struct Text(pub String);
 
 impl Widget for Text {
   render_widget_base_impl!();
 }
 #[derive(Debug)]
-pub struct TextRender(&'static str);
+pub struct TextRender(String);
 
 impl RenderWidget for Text {
   type RO = TextRender;
-  fn create_render_object(&self) -> Self::RO { TextRender(self.0) }
+  fn create_render_object(&self) -> Self::RO { TextRender(self.0.clone()) }
 }
 
 impl RenderObject<Text> for TextRender {
   fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0; }
   fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
   fn get_size(&self) -> Option<Size> { None }
-  fn get_constraints(&self) -> LayoutConstraints {
-    LayoutConstraints::DECIDED_BY_SELF
-  }
+  fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }
   fn set_box_bound(&mut self, _bound: Option<BoxBound>) {}
+  fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0.clone(); }
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
+    let painter = ctx.painter();
+    painter.fill_text(&self.0, None);
+  }
+
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
 // impl RenderObject for Text {
 //   fn paint(&self) {}
