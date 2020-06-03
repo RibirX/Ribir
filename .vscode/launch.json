@@ -7,17 +7,130 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'core'",
+      "name": "Debug unit tests in library 'holiday'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
           "--lib",
-          "--package=core"
+          "--package=holiday"
         ],
         "filter": {
-          "name": "core",
+          "name": "holiday",
           "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'canvas'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'canvas_hello'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=canvas_hello",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas_hello",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'canvas_hello'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=canvas_hello",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas_hello",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test canvas_gl",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=canvas_gl",
+          "--all-features",
+          "--package=canvas"
+        ],
+        "filter": {
+          "name": "canvas_gl",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'todos'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=todos",
+          "--package=todos"
+        ],
+        "filter": {
+          "name": "todos",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'todos'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=todos",
+          "--package=todos"
+        ],
+        "filter": {
+          "name": "todos",
+          "kind": "bin"
         }
       },
       "args": [],

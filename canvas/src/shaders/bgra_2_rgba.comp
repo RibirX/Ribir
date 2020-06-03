@@ -1,0 +1,23 @@
+#version 450
+layout(local_size_x = 1) in;
+
+layout(set = 0, binding = 0) buffer PrimeIndices {
+    uint[] indices;
+};
+
+void main() {
+    
+    uint index = gl_GlobalInvocationID.x;
+    uint abgr = indices[index];
+    uint rgba =  
+      ((abgr << 16) & 0x00FF0000u) |
+      ((abgr >> 16) & 0x000000FFu) |
+      (abgr & 0xFF00FF00u);
+
+    // indices[index] = 0xFF000000;     // alpha
+    // indices[index] = 0xFFFF0000;     // blue
+    // indices[index] = 0xFF00FF00;     // green
+    // indices[index] = 0xFF0000FF;     // red
+
+     indices[index] = rgba;
+}

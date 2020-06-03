@@ -1,6 +1,5 @@
 #![cfg(test)]
-use crate::prelude::*;
-use crate::widget::Row;
+use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*, widget::Row};
 
 #[derive(Clone, Debug)]
 pub struct EmbedPost {
@@ -24,9 +23,9 @@ impl EmbedPost {
 impl CombinationWidget for EmbedPost {
   fn build<'a>(&self) -> Box<dyn Widget + 'a> {
     let mut children = vec![
-      Text(self.title).into(),
-      Text(self.author).into(),
-      Text(self.content).into(),
+      Text(self.title.to_string()).into(),
+      Text(self.author.to_string()).into(),
+      Text(self.content.to_string()).into(),
     ];
 
     if self.level > 0 {
@@ -38,9 +37,11 @@ impl CombinationWidget for EmbedPost {
   }
 }
 
-pub fn create_embed_app<'a>(level: usize) -> Application<'a> {
+pub fn create_embed_app<'a>(level: usize) -> (WidgetTree<'a>, RenderTree) {
   let post = EmbedPost::new(level);
-  let mut app = Application::new();
-  app.widget_tree.set_root(post.into(), &mut app.render_tree);
-  app
+  let mut widget_tree = WidgetTree::default();
+  let mut render_tree = RenderTree::default();
+
+  widget_tree.set_root(post.into(), &mut render_tree);
+  (widget_tree, render_tree)
 }

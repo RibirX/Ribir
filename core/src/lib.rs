@@ -1,4 +1,4 @@
-#![feature(specialization, test, decl_macro, raw)]
+#![feature(specialization, test, decl_macro, raw, negative_impls)]
 
 #[macro_use]
 extern crate bitflags;
@@ -6,11 +6,12 @@ extern crate bitflags;
 mod application;
 mod render;
 mod util;
-mod widget;
+pub mod widget;
 pub mod prelude {
   pub use crate::application::Application;
   pub use crate::render::*;
   pub use crate::widget::*;
+  pub use canvas::{Point, Rect, Size};
 }
 
 #[cfg(test)]

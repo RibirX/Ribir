@@ -5,6 +5,7 @@ pub mod key;
 pub mod layout;
 pub mod text;
 pub mod widget_tree;
+pub mod window;
 pub use key::{Key, KeyDetect};
 pub use layout::row_layout::Row;
 pub use text::Text;
@@ -64,7 +65,7 @@ impl<'a> WidgetClassify<'a> {
   /// None-Value.
   pub(crate) fn try_as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self {
-      WidgetClassify::Combination(w) => None,
+      WidgetClassify::Combination(_) => None,
       WidgetClassify::Render(w) => Some(w.as_render()),
       WidgetClassify::SingleChild(w) => Some(w.as_render()),
       WidgetClassify::MultiChild(w) => Some(w.as_render()),
@@ -83,11 +84,9 @@ impl<'a> WidgetClassifyMut<'a> {
   /// Return a Some-Value if this is a render widget, remember single child
   /// widget and multi child widget are render widget too. Otherwise return a
   /// None-Value.
-  pub(crate) fn try_as_render_mut(
-    &mut self,
-  ) -> Option<&mut dyn RenderWidgetSafety> {
+  pub(crate) fn try_as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
     match self {
-      WidgetClassifyMut::Combination(w) => None,
+      WidgetClassifyMut::Combination(_) => None,
       WidgetClassifyMut::Render(w) => Some(w.as_render_mut()),
       WidgetClassifyMut::SingleChild(w) => Some(w.as_render_mut()),
       WidgetClassifyMut::MultiChild(w) => Some(w.as_render_mut()),
@@ -104,10 +103,13 @@ impl<'a, T: CombinationWidget + 'a> Widget for T {
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut {
-    WidgetClassifyMut::Combination(self)
-  }
+  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
 }
+
+impl<T: CombinationWidget> !RenderWidget for T {}
+impl<T: RenderWidget> !CombinationWidget for T {}
+impl<T: MultiChildWidget> !SingleChildWidget for T {}
+impl<T: SingleChildWidget> !MultiChildWidget for T {}
 
 impl<'a, W: Widget + 'a> From<W> for Box<dyn Widget + 'a> {
   #[inline]
@@ -119,9 +121,7 @@ pub macro render_widget_base_impl() {
   fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut {
-    WidgetClassifyMut::Render(self)
-  }
+  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
 }
 
 pub macro single_child_widget_base_impl() {
@@ -129,9 +129,7 @@ pub macro single_child_widget_base_impl() {
   fn classify(&self) -> WidgetClassify { WidgetClassify::SingleChild(self) }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut {
-    WidgetClassifyMut::SingleChild(self)
-  }
+  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::SingleChild(self) }
 }
 
 pub macro multi_child_widget_base_impl() {
@@ -139,7 +137,5 @@ pub macro multi_child_widget_base_impl() {
   fn classify(&self) -> WidgetClassify { WidgetClassify::MultiChild(self) }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut {
-    WidgetClassifyMut::MultiChild(self)
-  }
+  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
 }

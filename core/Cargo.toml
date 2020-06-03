@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "holiday"
 version = "0.1.0"
 authors = ["adoo <Adoo@outlook.com>"]
 edition = "2018"
@@ -8,14 +8,13 @@ edition = "2018"
 
 [dependencies]
 herald =  "0.1.0"
-indextree= "4.0.0"
+indextree= "4.1.0"
 rxrust = "0.8.3"
 bitflags = "1.2.1"
+winit = "0.22.2"
+canvas = {path= "../canvas", version="*"}
+futures="0.3.5"
 
 [dependencies.blake3]
-version = "0.2.2"
+version = "0.3.4"
 features = ["rayon"]
-
-
-[profile.bench]
-debug = true

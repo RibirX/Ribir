@@ -1,11 +1,42 @@
-// use crate::prelude::*;
-// use crate::render::render_ctx::RenderCtx;
-// use crate::render::render_layout::{LayoutConstraints, Position, Size};
-// use crate::render::render_tree::*;
-// use indextree::*;
-// ///  a stupid implement for develope the framework.
-// #[derive(Debug)]
-// pub struct Row<'a>(pub Vec<Box<dyn Widget + 'a>>);
+use crate::prelude::*;
+use crate::render_ctx::RenderCtx;
+use crate::render_object_box::{LayoutConstraints, RenderObjectBox};
+use indextree::*;
+///  a stupid implement for develope the framework.
+#[derive(Debug)]
+pub struct Row<'a>(pub Vec<Box<dyn Widget + 'a>>);
+
+impl<'a> Widget for Row<'a> {
+  multi_child_widget_base_impl!();
+}
+
+#[derive(Debug, Default)]
+pub struct RowRender {
+  inner_layout: Vec<Point, Size>,
+  size: Option<Size>,
+}
+
+impl<'a> RenderWidget for Row<'a> {
+  type RO = RowRender;
+  fn create_render_object(&self) -> Self::RO { RowRender::default() }
+}
+
+impl<'a> MultiChildWidget for Row<'a> {
+  fn take_children<'b>(&mut self) -> Vec<Box<dyn Widget + 'a>>
+  where
+    Self: 'b,
+  {
+    std::mem::take(&mut self.0)
+  }
+}
+
+impl<'a> RenderObject<Row<'a>> for RowRender {
+  fn update(&mut self, _owner_widget: &Row<'a>) {}
+  #[inline]
+  fn paint(&self, _ctx: &mut PaintingContext) {}
+
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
+}
 
 // impl<'a> Widget for Row<'a> {
 //   multi_child_widget_base_impl!();

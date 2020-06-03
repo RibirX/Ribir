@@ -1,5 +1,11 @@
 [workspace]
 
 members = [
-    "core"
+    "core",
+    "canvas",
+    "unit_test",
+    "examples/*"
 ]
+
+[profile.bench]
+debug = true

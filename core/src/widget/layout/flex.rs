@@ -5,6 +5,8 @@ use crate::prelude::*;
 use crate::render::render_tree::*;
 use crate::render::BoxLayout;
 use crate::render::RenderObjectSafety;
+use canvas::LogicUnit;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FlexFit {
@@ -27,11 +29,11 @@ pub struct FlexContainer {
   pub bound: BoxLayout,
 }
 
-fn object_width(obj: &dyn RenderObjectSafety) -> Option<f64> {
+fn object_width(obj: &dyn RenderObjectSafety) -> Option<f32> {
   return obj.get_size().map(|size| size.width);
 }
 
-fn object_height(obj: &dyn RenderObjectSafety) -> Option<f64> {
+fn object_height(obj: &dyn RenderObjectSafety) -> Option<f32> {
   return obj.get_size().map(|size| size.height);
 }
 
@@ -45,14 +47,14 @@ impl FlexContainer {
     };
   }
 
-  pub fn main_size(&self, obj: &dyn RenderObjectSafety) -> Option<f64> {
+  pub fn main_size(&self, obj: &dyn RenderObjectSafety) -> Option<f32> {
     return match self.axis {
       Axis::Horizontal => object_width(obj),
       Axis::Vertical => object_height(obj),
     };
   }
 
-  pub fn cross_size(&self, obj: &dyn RenderObjectSafety) -> Option<f64> {
+  pub fn cross_size(&self, obj: &dyn RenderObjectSafety) -> Option<f32> {
     return match self.axis {
       Axis::Vertical => object_width(obj),
       Axis::Horizontal => object_height(obj),
@@ -72,8 +74,8 @@ impl FlexContainer {
     ctx.collect_children(id, &mut v);
 
     let mut total_flex = 0;
-    let mut allocated: f64 = 0.0;
-    let mut cross_size: f64 = 0.0;
+    let mut allocated: f32 = 0.0;
+    let mut cross_size: f32 = 0.0;
     for child_id in v {
       if let Some(flex) = ctx.render_object(child_id).and_then(|r| r.flex()) {
         total_flex = total_flex + flex;
@@ -89,7 +91,7 @@ impl FlexContainer {
     let size = self.size.clone().unwrap();
     let space = size.width - allocated;
     if total_flex > 0 {
-      let s = space / f64::from(total_flex);
+      let s = space / (total_flex as f32);
 
       for child_id in autos {
         let flex = ctx.render_object(child_id).unwrap().flex().unwrap();
@@ -108,15 +110,11 @@ impl FlexContainer {
     return Size {
       width: allocated,
       height: cross_size,
+      _unit: PhantomData::<LogicUnit>,
     };
   }
 
-  fn fix_child_position<'a>(
-    &mut self,
-    id: RenderId,
-    content: Size,
-    ctx: &mut RenderCtx<'a>,
-  ) {
+  fn fix_child_position<'a>(&mut self, id: RenderId, content: Size, ctx: &mut RenderCtx<'a>) {
     let mut v = vec![];
     ctx.collect_children(id, &mut v);
 
@@ -140,11 +138,7 @@ impl FlexContainer {
     }
   }
 
-  fn child_layout<'a>(
-    &self,
-    id: RenderId,
-    ctx: &mut RenderCtx<'a>,
-  ) -> (Option<f64>, Option<f64>) {
+  fn child_layout<'a>(&self, id: RenderId, ctx: &mut RenderCtx<'a>) -> (Option<f32>, Option<f32>) {
     ctx.perform_layout(id);
     return self.child_axis_size(id, ctx);
   }
