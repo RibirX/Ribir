@@ -21,10 +21,7 @@ impl<'a> RenderCtx<'a> {
     };
   }
 
-  pub fn render_object(
-    &self,
-    id: RenderId,
-  ) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
+  pub fn render_object(&self, id: RenderId) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
     return id.get(self.tree);
   }
 
@@ -91,9 +88,7 @@ impl<'a> RenderCtx<'a> {
   }
 
   /// remove the layout dirty flag.
-  pub fn remove_layout_dirty(&mut self, node_id: &RenderId) {
-    self.dirty_layouts.remove(node_id);
-  }
+  pub fn remove_layout_dirty(&mut self, node_id: &RenderId) { self.dirty_layouts.remove(node_id); }
 
   pub fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {
     let mut child = id.first_child(self.tree);
@@ -116,18 +111,13 @@ impl<'a> RenderCtx<'a> {
     self.collect_children(id, &mut ids);
     while ids.len() > 0 {
       id = ids.pop().unwrap();
-      if self.mark_constraints_dirty(id, LayoutConstraints::EFFECTED_BY_PARENT)
-      {
+      if self.mark_constraints_dirty(id, LayoutConstraints::EFFECTED_BY_PARENT) {
         self.collect_children(id, &mut ids);
       }
     }
   }
 
-  fn mark_constraints_dirty(
-    &mut self,
-    id: RenderId,
-    target: LayoutConstraints,
-  ) -> bool {
+  fn mark_constraints_dirty(&mut self, id: RenderId, target: LayoutConstraints) -> bool {
     let constraints = id
       .get(self.tree)
       .map(|node| node.get_constraints())
