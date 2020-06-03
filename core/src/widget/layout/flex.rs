@@ -97,7 +97,7 @@ impl FlexContainer {
         let flex = ctx.render_object(child_id).unwrap().flex().unwrap();
         ctx.set_box_limit(
           child_id,
-          Some(self.set_main_to_bound(&bound, s * f64::from(flex))),
+          Some(self.set_main_to_bound(&bound, s * (flex as f32))),
         );
 
         if let (Some(main), Some(cross)) = self.child_layout(child_id, ctx) {
@@ -128,7 +128,14 @@ impl FlexContainer {
           .and_then(|obj| obj.get_size())
           .unwrap(),
       );
-      self.layouts.update_position(idx, Position { x: x, y: y });
+      self.layouts.update_position(
+        idx,
+        Point {
+          x: x,
+          y: y,
+          _unit: PhantomData::<LogicUnit>,
+        },
+      );
       if let (Some(main), Some(cross)) = self.child_axis_size(v[idx], ctx) {
         match self.axis {
           Axis::Horizontal => x = x + main,
@@ -147,14 +154,14 @@ impl FlexContainer {
     &self,
     id: RenderId,
     ctx: &mut RenderCtx<'a>,
-  ) -> (Option<f64>, Option<f64>) {
+  ) -> (Option<f32>, Option<f32>) {
     if let Some(child) = ctx.render_object(id) {
       return (self.main_size(child), self.cross_size(child));
     }
     return (None, None);
   }
 
-  fn set_main_to_bound(&self, bound: &BoxLimit, main_size: f64) -> BoxLimit {
+  fn set_main_to_bound(&self, bound: &BoxLimit, main_size: f32) -> BoxLimit {
     let mut res = bound.clone();
     match self.axis {
       Axis::Horizontal => {
