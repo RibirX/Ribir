@@ -177,7 +177,7 @@ where
 
   fn get_size(&self) -> Option<Size> { RenderObject::get_size(&self.render) }
   fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(&self.render) }
-  fn set_box_limit(&mut self, bound: Option<BoxBound>) {
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>) {
     RenderObject::set_box_limit(&mut self.render, bound)
   }
   #[inline]

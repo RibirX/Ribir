@@ -174,9 +174,7 @@ impl<S: Surface> Canvas<S> {
       .unwrap()
       .request_device(
         &wgpu::DeviceDescriptor {
-          extensions: wgpu::Extensions {
-            anisotropic_filtering: false,
-          },
+          extensions: wgpu::Extensions::empty(),
           limits: Default::default(),
         },
         None,
@@ -208,9 +206,9 @@ impl<S: Surface> Canvas<S> {
       mipmap_filter: wgpu::FilterMode::Nearest,
       lod_min_clamp: 0.0,
       lod_max_clamp: 0.0,
-      compare: wgpu::CompareFunction::Always,
+      compare: Some(wgpu::CompareFunction::Always),
       label: Some("Texture atlas sampler"),
-      anisotropy_clamp: 0,
+      anisotropy_clamp: None,
     });
 
     let glyph_brush = TextBrush::new(&device);

@@ -80,7 +80,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
     size,
     usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::STORAGE | wgpu::BufferUsage::COPY_DST,
-
+    mapped_at_creation: false,
     label: None,
   });
 
@@ -117,20 +117,24 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   queue.submit(Some(encoder.finish()));
 
   // Note that we're not calling `.await` here.
-  let buffer_future = output_buffer.map_read(0, wgpu::BufferSize(size));
+  let buffer_future = output_buffer.map_async(wgpu::MapMode::Read, 0, wgpu::BufferSize(size));
 
   // Poll the device in a blocking manner so that our future resolves.
   device.poll(wgpu::Maintain::Wait);
 
-  let mapping = buffer_future.await.map_err(|_| "Async buffer error")?;
-  let mut png_encoder = png::Encoder::new(writer, width, height);
-  png_encoder.set_depth(png::BitDepth::Eight);
-  png_encoder.set_color(png::ColorType::RGBA);
-  png_encoder
-    .write_header()
-    .unwrap()
-    .write_image_data(mapping.as_slice())
-    .unwrap();
+  if let Ok(()) = buffer_future.await {
+    let data = output_buffer.get_mapped_range(0, wgpu::BufferSize::WHOLE);
+    let mut png_encoder = png::Encoder::new(writer, width, height);
+    png_encoder.set_depth(png::BitDepth::Eight);
+    png_encoder.set_color(png::ColorType::RGBA);
+    png_encoder
+      .write_header()
+      .unwrap()
+      .write_image_data(data)
+      .unwrap();
 
-  Ok(())
+    Ok(())
+  } else {
+    Err("Async buffer error")
+  }
 }

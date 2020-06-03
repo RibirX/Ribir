@@ -345,7 +345,7 @@ impl<S: Surface> Canvas<S> {
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
       size,
       usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::STORAGE | wgpu::BufferUsage::COPY_DST,
-
+      mapped_at_creation: false,
       label: None,
     });
 
@@ -377,12 +377,12 @@ impl<S: Surface> Canvas<S> {
     queue.submit(Some(encoder.finish()));
 
     // Note that we're not calling `.await` here.
-    let buffer_future = output_buffer.map_read(0, wgpu::BufferSize(size));
+    let buffer_future = output_buffer.map_async(wgpu::MapMode::Read, 0, wgpu::BufferSize(size));
 
     // Poll the device in a blocking manner so that our future resolves.
     device.poll(wgpu::Maintain::Wait);
 
-    let mapping = futures::executor::block_on(buffer_future).unwrap();
+    let data = output_buffer.get_mapped_range(0, wgpu::BufferSize::WHOLE);
     let mut png_encoder = png::Encoder::new(
       std::fs::File::create(&atlas_capture).unwrap(),
       width,
@@ -393,7 +393,7 @@ impl<S: Surface> Canvas<S> {
     png_encoder
       .write_header()
       .unwrap()
-      .write_image_data(mapping.as_slice())
+      .write_image_data(data)
       .unwrap();
 
     log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
