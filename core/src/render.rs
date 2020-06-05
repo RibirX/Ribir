@@ -1,8 +1,6 @@
 use crate::render::render_tree::RenderId;
 
-mod base;
 mod box_constraint;
-pub use base::*;
 pub use box_constraint::*;
 pub use render_ctx::*;
 pub mod render_ctx;
@@ -12,6 +10,14 @@ use std::fmt::Debug;
 use std::raw::TraitObject;
 pub mod painting_context;
 pub mod render_tree;
+
+bitflags! {
+    pub struct LayoutConstraints: u8 {
+        const DECIDED_BY_SELF = 0;
+        const EFFECTED_BY_PARENT = 1;
+        const EFFECTED_BY_CHILDREN = 2;
+    }
+}
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
@@ -167,16 +173,20 @@ where
   W: RenderWidget<RO = R>,
   R: RenderObject<W>,
 {
+  #[inline]
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety) {
     RenderObject::update(&mut self.render, downcast_widget(owner_widget))
   }
 
+  #[inline]
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) {
     RenderObject::perform_layout(&mut self.render, id, ctx)
   }
-
+  #[inline]
   fn get_size(&self) -> Option<Size> { RenderObject::get_size(&self.render) }
+  #[inline]
   fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(&self.render) }
+  #[inline]
   fn set_box_limit(&mut self, bound: Option<BoxLimit>) {
     RenderObject::set_box_limit(&mut self.render, bound)
   }

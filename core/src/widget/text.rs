@@ -20,16 +20,22 @@ impl RenderWidget for Text {
 }
 
 impl RenderObject<Text> for TextRender {
+  #[inline]
   fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
+  #[inline]
   fn get_size(&self) -> Option<Size> { None }
+  #[inline]
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }
+  #[inline]
   fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
+  #[inline]
   fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0.clone(); }
+  #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
     let painter = ctx.painter();
     painter.fill_text(&self.0, None);
   }
-
+  #[inline]
   fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
 // impl RenderObject for Text {
