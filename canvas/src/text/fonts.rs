@@ -192,16 +192,27 @@ mod tests {
       assert_eq!(font.unwrap().font.family_name(), "DejaVu Sans");
     }
 
-    props.style = FontStyle::Italic;
-    let font = fonts
-      .select_best_match("monospace, DejaVu Sans", &props, &mut brush)
-      .unwrap();
+    props.weight = FontWeight::BOLD;
+    let font;
     // match default fonts
     #[cfg(target_os = "linux")]
-    assert_eq!(font.font.family_name(), "DejaVu Sans Mono");
-    #[cfg(target_os = "macos")]
-    assert_eq!(font.font.family_name(), "Courier New");
+    {
+      font = fonts
+        .select_best_match("DejaVu Serif, DejaVu Sans", &props, &mut brush)
+        .unwrap();
 
-    assert_eq!(font.font.properties().style, FontStyle::Italic);
+      assert_eq!(font.font.family_name(), "DejaVu Serif");
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+      font = fonts
+        .select_best_match("Arial, DejaVu Sans", &props, &mut brush)
+        .unwrap();
+
+      assert_eq!(font.font.family_name(), "Arial");
+    }
+
+    assert_eq!(font.font.properties().weight, FontWeight::BOLD);
   }
 }
