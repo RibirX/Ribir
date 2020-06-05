@@ -37,11 +37,12 @@ pub struct Canvas<S: Surface = PhysicSurface> {
   pub(crate) view: Option<S::V>,
 
   // texture atlas for pure color and image to draw.
-  pub(crate) tex_atlas: TextureAtlas,
+  pub(crate) atlas: TextureAtlas,
   pub(crate) sampler: wgpu::Sampler,
   pub(crate) glyph_brush: TextBrush,
   pub(crate) rgba_converter: Option<RgbaConvert>,
   glyph_texture: wgpu::Texture,
+  texture_atlas: wgpu::Texture,
   render_data: RenderData,
 }
 
@@ -131,32 +132,33 @@ impl<S: Surface> Canvas<S> {
 
   #[cfg(debug_assertions)]
   pub fn log_texture_atlas(&mut self) {
-    self.ensure_rgba_converter();
+    unimplemented!();
+    // self.ensure_rgba_converter();
 
-    let size = self.surface.size();
-    let Canvas {
-      tex_atlas,
-      device,
-      queue,
-      rgba_converter,
-      ..
-    } = self;
+    // let size = self.surface.size();
+    // let Canvas {
+    //   tex_atlas,
+    //   device,
+    //   queue,
+    //   rgba_converter,
+    //   ..
+    // } = self;
 
-    let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
+    // let pkg_root = env!("CARGO_MANIFEST_DIR");
+    // let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
 
-    let atlas = bgra_texture_to_png(
-      &tex_atlas.texture.raw_texture,
-      DeviceRect::from_size(size),
-      device,
-      queue,
-      rgba_converter.as_ref().unwrap(),
-      std::fs::File::create(&atlas_capture).unwrap(),
-    );
+    // let atlas = bgra_texture_to_png(
+    //   &tex_atlas.texture.raw_texture,
+    //   DeviceRect::from_size(size),
+    //   device,
+    //   queue,
+    //   rgba_converter.as_ref().unwrap(),
+    //   std::fs::File::create(&atlas_capture).unwrap(),
+    // );
 
-    let _r = futures::executor::block_on(atlas);
+    // let _r = futures::executor::block_on(atlas);
 
-    log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
+    // log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
   }
 }
 
@@ -196,7 +198,7 @@ impl<S: Surface> Canvas<S> {
     let pipeline =
       create_render_pipeline(&device, &sc_desc, &[&uniform_layout, &primitives_layout]);
 
-    let tex_atlas = TextureAtlas::new(&device);
+    let tex_atlas = TextureAtlas::new();
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
       address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -213,19 +215,20 @@ impl<S: Surface> Canvas<S> {
 
     let glyph_brush = TextBrush::new();
     let glyph_texture = Self::glyph_texture(&device, &glyph_brush);
+    let texture_atlas = Self::atlas_texture(&device, &tex_atlas);
     let uniforms = create_uniforms(
       &device,
       &uniform_layout,
       tex_atlas.size(),
       &coordinate_2d_to_device_matrix(size.width, size.height),
       &sampler,
-      &tex_atlas.view,
+      &texture_atlas.create_default_view(),
       &glyph_texture.create_default_view(),
     );
 
     Canvas {
       glyph_brush,
-      tex_atlas,
+      atlas: tex_atlas,
       sampler,
       device,
       surface,
@@ -236,6 +239,7 @@ impl<S: Surface> Canvas<S> {
       uniforms,
       render_data: RenderData::default(),
       glyph_texture,
+      texture_atlas,
       rgba_converter: None,
       encoder: None,
       view: None,
@@ -285,6 +289,10 @@ impl<S: Surface> Canvas<S> {
     self.ensure_encoder_exist();
     self.ensure_view_exist();
 
+    if self.atlas.is_texture_resized() {
+      self.update_uniforms();
+    }
+
     let tex_infos_bind_group = self.create_primitives_bind_group();
 
     let Self {
@@ -292,12 +300,13 @@ impl<S: Surface> Canvas<S> {
       encoder,
       view,
       glyph_texture,
+      texture_atlas,
       ..
     } = self;
     let encoder = encoder.as_mut().unwrap();
     let view = view.as_ref().unwrap().borrow();
 
-    self.tex_atlas.flush(device, encoder);
+    self.atlas.flush_cache(device, encoder, texture_atlas);
     self.glyph_brush.flush_cache(device, encoder, glyph_texture);
 
     let vertices_buffer = device.create_buffer_with_data(
@@ -342,29 +351,15 @@ impl<S: Surface> Canvas<S> {
     &mut self,
     style: &FillStyle,
   ) -> Result<(DevicePoint, DeviceSize), AtlasStoreErr> {
-    self.ensure_encoder_exist();
-
-    let Self {
-      encoder,
-      device,
-      queue,
-      tex_atlas,
-      ..
-    } = self;
-    let encoder = encoder.as_mut().unwrap();
-
-    let (pos, size, grown) = match style {
+    let (pos, size) = match style {
       FillStyle::Color(c) => {
-        let (pos, grown) = tex_atlas.store_color_in_palette(c.clone(), device, encoder, queue)?;
+        let pos = self.atlas.store_color(c.clone())?;
 
-        (pos, DeviceSize::new(1, 1), grown)
+        (pos, DeviceSize::new(1, 1))
       }
       _ => todo!("not support in early develop"),
     };
 
-    if grown {
-      self.update_uniforms();
-    }
     Ok((pos, size))
   }
 
@@ -374,10 +369,10 @@ impl<S: Surface> Canvas<S> {
     self.uniforms = create_uniforms(
       &self.device,
       &self.uniform_layout,
-      self.tex_atlas.size(),
+      self.atlas.size(),
       &coordinate_2d_to_device_matrix(size.width, size.height),
       &self.sampler,
-      &self.tex_atlas.view,
+      &self.texture_atlas.create_default_view(),
       &self.glyph_texture.create_default_view(),
     )
   }
@@ -417,7 +412,7 @@ impl<S: Surface> Canvas<S> {
 
           // Todo: we should not directly clear the texture atlas,
           // but deallocate all not used texture.
-          self.tex_atlas.clear(&self.device, &self.queue);
+          self.atlas.clear();
           indices_offset = -(v_start as i32);
           match err {
             AtlasStoreErr::SpaceNotEnough => {
@@ -466,7 +461,7 @@ impl<S: Surface> Canvas<S> {
   fn glyph_texture(device: &wgpu::Device, brush: &TextBrush) -> wgpu::Texture {
     let size = brush.texture_size();
     device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("new texture"),
+      label: Some("new glyph texture"),
       size: wgpu::Extent3d {
         width: size.width,
         height: size.height,
@@ -474,6 +469,25 @@ impl<S: Surface> Canvas<S> {
       },
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::R8Unorm,
+      usage: wgpu::TextureUsage::COPY_DST
+        | wgpu::TextureUsage::SAMPLED
+        | wgpu::TextureUsage::COPY_SRC,
+      mip_level_count: 1,
+      sample_count: 1,
+    })
+  }
+
+  fn atlas_texture(device: &wgpu::Device, atlas: &TextureAtlas) -> wgpu::Texture {
+    let size = atlas.size();
+    device.create_texture(&wgpu::TextureDescriptor {
+      label: Some("new glyph texture"),
+      size: wgpu::Extent3d {
+        width: size.width,
+        height: size.height,
+        depth: 1,
+      },
+      dimension: wgpu::TextureDimension::D2,
+      format: wgpu::TextureFormat::Bgra8UnormSrgb,
       usage: wgpu::TextureUsage::COPY_DST
         | wgpu::TextureUsage::SAMPLED
         | wgpu::TextureUsage::COPY_SRC,

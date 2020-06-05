@@ -1,4 +1,5 @@
-#![feature(decl_macro, test, const_fn, clamp)]
+#![feature(decl_macro, test, const_fn, slice_fill)]
+mod array_2d;
 mod atlas;
 mod canvas;
 mod color;
