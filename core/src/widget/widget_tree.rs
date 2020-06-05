@@ -489,19 +489,19 @@ mod test {
 
     assert_eq!(
       render_tree.symbol_shape(),
-      r#"RowRender { inner_layout: [], size: None }
+      r#"RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
 ├── TextRender("Simple demo")
 ├── TextRender("Adoo")
 ├── TextRender("Recursive x times")
-└── RowRender { inner_layout: [], size: None }
+└── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
     ├── TextRender("Simple demo")
     ├── TextRender("Adoo")
     ├── TextRender("Recursive x times")
-    └── RowRender { inner_layout: [], size: None }
+    └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
         ├── TextRender("Simple demo")
         ├── TextRender("Adoo")
         ├── TextRender("Recursive x times")
-        └── RowRender { inner_layout: [], size: None }
+        └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
             ├── TextRender("Simple demo")
             ├── TextRender("Adoo")
             └── TextRender("Recursive x times")
@@ -568,19 +568,19 @@ mod test {
 
     assert_eq!(
       env.render_tree.symbol_shape(),
-      r#"RowRender { inner_layout: [], size: None }
+      r#"RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
 ├── TextRender("New title")
 ├── TextRender("")
 ├── TextRender("")
-└── RowRender { inner_layout: [], size: None }
+└── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
     ├── TextRender("New title")
     ├── TextRender("")
     ├── TextRender("")
-    └── RowRender { inner_layout: [], size: None }
+    └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
         ├── TextRender("New title")
         ├── TextRender("")
         ├── TextRender("")
-        └── RowRender { inner_layout: [], size: None }
+        └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
             ├── TextRender("New title")
             ├── TextRender("")
             └── TextRender("")

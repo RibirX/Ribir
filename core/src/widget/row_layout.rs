@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::render_ctx::RenderCtx;
-use crate::render_object_box::{LayoutConstraints, Position, RenderObjectBox, Size};
+use crate::render_object_box::{LayoutConstraints, RenderObjectBox};
 use indextree::*;
 ///  a stupid implement for develope the framework.
 #[derive(Debug)]
@@ -12,7 +12,7 @@ impl<'a> Widget for Row<'a> {
 
 #[derive(Debug, Default)]
 pub struct RowRender {
-  inner_layout: Vec<(Position, Size)>,
+  inner_layout: Vec<Point, Size>,
   size: Option<Size>,
 }
 
@@ -38,52 +38,110 @@ impl<'a> RenderObject<Row<'a>> for RowRender {
   fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
 
+// impl<'a> Widget for Row<'a> {
+//   multi_child_widget_base_impl!();
+// }
 // #[derive(Debug)]
-// struct RowRenderObject {
-//   inner_layout: Vec<(Position, Size)>,
-//   size: Option<Size>,
+// enum Horizontal {
+//   top,
+//   center,
+//   bottom,
+// }
+// impl Default for Horizontal {
+//   fn default() -> Self { Horizontal::center }
 // }
 
-// impl RenderObject for RowRenderObject {
-//   fn paint(&self) {}
-//   // fn perform_layout(&mut self, node_id: NodeId, _ctx: &mut RenderCtx);
-//   fn to_render_box(&self) -> Option<&dyn RenderObjectBox> { Some(self) }
-//   fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> {
-//     Some(self)
+// #[derive(Debug, Default)]
+// pub struct RowRender {
+//   child_x: Vec<i32>,
+//   size: Option<Size>,
+//   base_line: Horizontal,
+// }
+
+// impl<'a> RenderWidget for Row<'a> {
+//   type RO = RowRender;
+//   fn create_render_object(&self) -> Self::RO { RowRender::default() }
+// }
+
+// impl<'a> MultiChildWidget for Row<'a> {
+//   fn take_children<'b>(&mut self) -> Vec<Box<dyn Widget + 'a>>
+//   where
+//     Self: 'b,
+//   {
+//     std::mem::take(&mut self.0)
 //   }
 // }
 
-// impl RenderObjectBox for RowRenderObject {
-//   fn bound(&self) -> Option<Size> { return self.size.clone(); }
+// impl<'a> RenderObject<Row<'a>> for RowRender {
+//   fn update(&mut self, _owner_widget: &Row<'a>) {}
+
+//   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) {
+//     let mut accumulate = 0;
+//     let mut height = 0;
+//     let mut child = id.first_child(ctx.render_tree());
+//     while let Some(child_id) = child {
+//       child = child_id.next_sibling(ctx.render_tree());
+//       ctx.perform_layout(child_id);
+//       let bound = child_id.get(ctx.render_tree()).unwrap().bound().unwrap();
+//       self.child_x.push(accumulate);
+//       accumulate += bound.width;
+//       if (bound.height > height) {
+//         height = bound.height;
+//       }
+//     }
+//     self.size = Some(Size {
+//       width: accumulate,
+//       height: height,
+//     });
+//   }
+
+//   fn bound(&self) -> Option<Size> { self.size.clone() }
 //   fn get_constraints(&self) -> LayoutConstraints {
 //     LayoutConstraints::EFFECTED_BY_CHILDREN
 //   }
-
-//   fn layout_sink(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
-//   fn layout_bubble(&mut self, self_id: NodeId, ctx: &mut RenderCtx) {
-//     let mut x = 0 as i32;
-//     let y = 0;
-
-//     let mut ids = vec![];
-//     ctx.collect_children_box(self_id, &mut ids);
-//     ids.reverse();
-//     for id in ids {
-//       let node = ctx.tree.get_mut(id).unwrap();
-//       let render_box = node.get_mut().to_render_box().unwrap();
-//       let bound = render_box.bound().unwrap();
-//       self
-//         .inner_layout
-//         .push((Position { x: x, y: y }, bound.clone()));
-//       x += bound.width;
-//     }
-//     self.size = Some(Size {
-//       width: x,
-//       height: 1,
-//     });
-//   }
-//   fn mark_dirty(&mut self) {
-//     self.size = None;
-//     self.inner_layout.clear();
-//   }
-//   fn is_dirty(&self) -> bool { return self.size.is_none(); }
 // }
+
+// // #[derive(Debug)]
+// // struct RowRenderObject {
+// //   inner_layout: Vec<(Position, Size)>,
+// //   size: Option<Size>,
+// // }
+
+// // impl RenderObject for RowRenderObject {
+// //   fn paint(&self) {}
+// //   // fn perform_layout(&mut self, node_id: NodeId, _ctx: &mut RenderCtx);
+// //   fn to_render_box(&self) -> Option<&dyn RenderObjectBox> { Some(self) }
+// //   fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> {
+// //     Some(self)
+// //   }
+// // }
+
+// // impl RenderObjectBox for RowRenderObject {
+// //   fn bound(&self) -> Option<Size> { return self.size.clone(); }
+// //   fn get_constraints(&self) -> LayoutConstraints {
+// //     LayoutConstraints::EFFECTED_BY_CHILDREN
+// //   }
+
+// //   fn layout_sink(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
+// //   fn layout_bubble(&mut self, self_id: NodeId, ctx: &mut RenderCtx) {
+// //     let mut x = 0 as i32;
+// //     let y = 0;
+
+// //     let mut ids = vec![];
+// //     ctx.collect_children_box(self_id, &mut ids);
+// //     ids.reverse();
+// //     for id in ids {
+// //       let node = ctx.tree.get_mut(id).unwrap();
+// //       let render_box = node.get_mut().to_render_box().unwrap();
+// //       let bound = render_box.bound().unwrap();
+// //       self
+// //         .inner_layout
+// //         .push((Position { x: x, y: y }, bound.clone()));
+// //       x += bound.width;
+// //     }
+// //     self.size = Some(Size {
+// //       width: x,
+// //       height: 1,
+// //     });
+// //   }
+// // }

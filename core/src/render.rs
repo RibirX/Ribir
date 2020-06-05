@@ -1,9 +1,23 @@
-use crate::{prelude::Point, widget::Key};
+use crate::render::render_tree::RenderId;
+
+mod box_constraint;
+pub use box_constraint::*;
+pub use render_ctx::*;
+pub mod render_ctx;
+use crate::{prelude::Point, prelude::Size, widget::Key};
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
 pub mod painting_context;
 pub mod render_tree;
+
+bitflags! {
+    pub struct LayoutConstraints: u8 {
+        const DECIDED_BY_SELF = 0;
+        const EFFECTED_BY_PARENT = 1;
+        const EFFECTED_BY_CHILDREN = 2;
+    }
+}
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
@@ -31,6 +45,18 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   /// this method directly.
   fn update(&mut self, owner_widget: &Owner);
 
+  // trig the process of layout
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
+
+  // return layout bound's size if has known
+  fn get_size(&self) -> Option<Size>;
+
+  // get layout constraints type;
+  fn get_constraints(&self) -> LayoutConstraints;
+
+  // set layout bound limit
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>);
+
   /// Paint the render object into `PaintingContext` by itself coordinate
   /// system. Not care about children's paint in this method, framework will
   /// call children's paint individual. And framework guarantee always paint
@@ -57,6 +83,12 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
+  fn get_size(&self) -> Option<Size>;
+  fn get_constraints(&self) -> LayoutConstraints;
+  /// set layout limitation to the render object.
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>);
+
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 
   fn child_offset(&self, idx: usize) -> Option<Point>;
@@ -141,10 +173,23 @@ where
   W: RenderWidget<RO = R>,
   R: RenderObject<W>,
 {
+  #[inline]
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety) {
     RenderObject::update(&mut self.render, downcast_widget(owner_widget))
   }
 
+  #[inline]
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) {
+    RenderObject::perform_layout(&mut self.render, id, ctx)
+  }
+  #[inline]
+  fn get_size(&self) -> Option<Size> { RenderObject::get_size(&self.render) }
+  #[inline]
+  fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(&self.render) }
+  #[inline]
+  fn set_box_limit(&mut self, bound: Option<BoxLimit>) {
+    RenderObject::set_box_limit(&mut self.render, bound)
+  }
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.render.paint(ctx); }
 
