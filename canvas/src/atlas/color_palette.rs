@@ -2,7 +2,8 @@ use super::{Color, DevicePoint};
 use guillotiere::*;
 use zerocopy::AsBytes;
 
-const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;
+const PALETTE_WIDTH: u32 = 64;
+const PALETTE_HEIGHT: u32 = 8;
 
 pub(crate) struct ColorPalettes {
   indexed_colors: std::collections::HashMap<u32, DevicePoint>,
@@ -15,7 +16,7 @@ impl ColorPalettes {
     let current_allocation = Self::allocate_palette(atlas).expect("init palettes space must have.");
     Self {
       indexed_colors: Default::default(),
-      current_palette: Default::default(),
+      current_palette: Palette::new(),
       current_alloc: current_allocation,
     }
   }
@@ -39,7 +40,7 @@ impl ColorPalettes {
     // We need create a new palette to store color
     self.save_current_palette_to_texture(texture, device, encoder);
     self.current_alloc = Self::allocate_palette(atlas_allocator)?;
-    self.current_palette = Default::default();
+    self.current_palette = Palette::new();
 
     Some(self.add_color(color))
   }
@@ -62,8 +63,8 @@ impl ColorPalettes {
         buffer: &buffer,
         layout: wgpu::TextureDataLayout {
           offset: 0,
-          bytes_per_row: PALETTE_SIZE * std::mem::size_of::<u32>() as u32,
-          rows_per_image: PALETTE_SIZE,
+          bytes_per_row: PALETTE_WIDTH * std::mem::size_of::<u32>() as u32,
+          rows_per_image: PALETTE_HEIGHT,
         },
       },
       wgpu::TextureCopyView {
@@ -76,8 +77,8 @@ impl ColorPalettes {
         },
       },
       wgpu::Extent3d {
-        width: PALETTE_SIZE,
-        height: PALETTE_SIZE,
+        width: PALETTE_WIDTH,
+        height: PALETTE_HEIGHT,
         depth: 1,
       },
     );
@@ -92,7 +93,7 @@ impl ColorPalettes {
   }
 
   fn allocate_palette(atlas: &mut AtlasAllocator) -> Option<Allocation> {
-    atlas.allocate(Size::new(PALETTE_SIZE as i32, PALETTE_SIZE as i32))
+    atlas.allocate(Size::new(PALETTE_WIDTH as i32, PALETTE_HEIGHT as i32))
   }
 }
 
@@ -104,23 +105,29 @@ fn color_as_bgra(color: Color) -> u32 {
   unsafe { std::mem::transmute_copy(&[color.blue, color.green, color.red, color.alpha]) }
 }
 
-#[derive(Default)]
 struct Palette {
-  store: [[u32; PALETTE_SIZE as usize]; PALETTE_SIZE as usize],
+  store: [[u32; (PALETTE_WIDTH) as usize]; PALETTE_HEIGHT as usize],
   size: u32,
 }
 
 type PaletteVector = euclid::Vector2D<i32, euclid::UnknownUnit>;
 impl Palette {
+  fn new() -> Self {
+    Self {
+      store: [[0; PALETTE_WIDTH as usize]; PALETTE_HEIGHT as usize],
+      size: 0,
+    }
+  }
+
   #[inline]
-  fn is_fulled(&self) -> bool { self.size >= PALETTE_SIZE ^ 2 }
+  fn is_fulled(&self) -> bool { self.size >= PALETTE_WIDTH * PALETTE_HEIGHT }
 
   /// This function not check if the platte fulled, caller should check it
   /// before add.
   fn add_color(&mut self, color: Color) -> PaletteVector {
     let index = self.size;
-    let row = index / PALETTE_SIZE;
-    let col = index % PALETTE_SIZE;
+    let row = index / PALETTE_WIDTH;
+    let col = index % PALETTE_WIDTH;
     self.store[row as usize][col as usize] = color_as_bgra(color);
     let pos = PaletteVector::new(col as i32, row as i32);
     self.size += index + 1;

@@ -106,55 +106,9 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
     let Self {
       canvas, geometry, ..
     } = self;
-    let (quad_vertices, texture_updated) = canvas.process_queued();
-    self.texture_updated = texture_updated;
 
-    let count = glyphs_geometry_count(quad_vertices.len());
+    self.texture_updated = canvas.process_queued(geometry);
 
-    geometry.vertices.reserve(count.vertices as usize);
-    geometry.indices.reserve(count.indices as usize);
-
-    fn rect_corners(rect: &Rect) -> [Point; 4] {
-      [
-        rect.min(),
-        Point::new(rect.max_x(), rect.min_y()),
-        Point::new(rect.min_x(), rect.max_y()),
-        rect.max(),
-      ]
-    }
-    quad_vertices.iter().for_each(|v| {
-      let VertexBuffers { vertices, indices } = geometry;
-      let offset = vertices.len() as u32;
-      let tl = offset;
-      let tr = 1 + offset;
-      let bl = 2 + offset;
-      let br = 3 + offset;
-      indices.push(tl);
-      indices.push(tr);
-      indices.push(bl);
-      indices.push(bl);
-      indices.push(tr);
-      indices.push(br);
-
-      let px_coords = rect_corners(&v.pixel_coords);
-      let tex_coords = rect_corners(&v.tex_coords);
-      vertices.push(Vertex {
-        pixel_coords: px_coords[0],
-        texture_coords: tex_coords[0],
-      });
-      vertices.push(Vertex {
-        pixel_coords: px_coords[1],
-        texture_coords: tex_coords[1],
-      });
-      vertices.push(Vertex {
-        pixel_coords: px_coords[2],
-        texture_coords: tex_coords[2],
-      });
-      vertices.push(Vertex {
-        pixel_coords: px_coords[3],
-        texture_coords: tex_coords[3],
-      });
-    });
     self.queued_text = false;
     self.process_text_attrs();
   }
@@ -322,15 +276,6 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
       count,
       style: style.clone(),
     });
-  }
-}
-
-#[inline]
-fn glyphs_geometry_count(glyph_count: usize) -> Count {
-  let glyph_count = glyph_count as u32;
-  Count {
-    vertices: glyph_count * 4,
-    indices: glyph_count * 6,
   }
 }
 

@@ -1,4 +1,4 @@
-use super::{FontId, GlyphStatistics, QuadVertex};
+use super::{FontId, GlyphStatistics, Vertex};
 pub use font_kit::properties::{
   Properties as FontProperties, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
 };
@@ -35,7 +35,7 @@ impl Fonts {
     &mut self,
     font_data: Arc<Vec<u8>>,
     font_index: u32,
-    brush: &mut GlyphBrush<QuadVertex, GlyphStatistics>,
+    brush: &mut GlyphBrush<[Vertex; 4], GlyphStatistics>,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     let font = FK_Font::from_bytes(font_data, font_index)?;
     self.try_insert_font(font, brush)
@@ -50,7 +50,7 @@ impl Fonts {
     &mut self,
     path: P,
     font_index: u32,
-    brush: &mut GlyphBrush<QuadVertex, GlyphStatistics>,
+    brush: &mut GlyphBrush<[Vertex; 4], GlyphStatistics>,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     let font = <FK_Font as Loader>::from_path(path, font_index)?;
     self.try_insert_font(font, brush)
@@ -62,7 +62,7 @@ impl Fonts {
     &mut self,
     family_names: &str,
     props: &FontProperties,
-    brush: &mut GlyphBrush<QuadVertex, GlyphStatistics>,
+    brush: &mut GlyphBrush<[Vertex; 4], GlyphStatistics>,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     for family in family_names.split(',') {
       let family = family.replace('\'', "");
@@ -93,7 +93,7 @@ impl Fonts {
   fn try_insert_font(
     &mut self,
     font: FK_Font,
-    brush: &mut GlyphBrush<QuadVertex, GlyphStatistics>,
+    brush: &mut GlyphBrush<[Vertex; 4], GlyphStatistics>,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     let key = FontKey::from_fk_font(&font);
     if self.load_fonts.contains_key(&key) {
@@ -124,7 +124,7 @@ fn family_name(name: &str) -> FamilyName {
   }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 struct FontKey {
   family: String,
   props: FontProperties,
@@ -139,6 +139,10 @@ impl std::hash::Hash for FontKey {
   }
 }
 
+impl PartialEq for FontKey {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self.family == other.family && self.props == other.props }
+}
 impl Eq for FontKey {}
 
 impl FontKey {
@@ -188,12 +192,27 @@ mod tests {
       assert_eq!(font.unwrap().font.family_name(), "DejaVu Sans");
     }
 
-    props.style = FontStyle::Italic;
-    let font = fonts
-      .select_best_match("Times New Roman, DejaVu Sans", &props, &mut brush)
-      .unwrap();
+    props.weight = FontWeight::BOLD;
+    let font;
     // match default fonts
-    assert_eq!(font.font.family_name(), "Times New Roman");
-    assert_eq!(font.font.properties().style, FontStyle::Italic);
+    #[cfg(target_os = "linux")]
+    {
+      font = fonts
+        .select_best_match("DejaVu Serif, DejaVu Sans", &props, &mut brush)
+        .unwrap();
+
+      assert_eq!(font.font.family_name(), "DejaVu Serif");
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+      font = fonts
+        .select_best_match("Arial, DejaVu Sans", &props, &mut brush)
+        .unwrap();
+
+      assert_eq!(font.font.family_name(), "Arial");
+    }
+
+    assert_eq!(font.font.properties().weight, FontWeight::BOLD);
   }
 }

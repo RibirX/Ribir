@@ -762,7 +762,6 @@ And by opposing end them? To die: to sleep;\n",
     assert!(buffer.is_none());
 
     canvas.submit();
-    canvas.log_glyph_texture();
 
     unit_test::assert_canvas_eq!(canvas, "./test_imgs/texture_cache_update.png");
   }

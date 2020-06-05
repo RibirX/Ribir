@@ -12,7 +12,7 @@ lyon =  { git = "https://github.com/nical/lyon", version="*"}
 palette = "0.5"
 raw-window-handle = "0.3.3"
 euclid = "0.20.13"
-png = "0.16.3"
+png = "0.16.4"
 guillotiere ="0.5.1"
 zerocopy = "0.3"
 glyph_brush = { git="https://github.com/alexheretic/glyph-brush.git", path="glyph-brush",  version="*"}

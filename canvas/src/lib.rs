@@ -1,4 +1,4 @@
-#![feature(decl_macro)]
+#![feature(decl_macro, test)]
 mod atlas;
 mod canvas;
 mod layer_2d;
