@@ -1,6 +1,5 @@
-mod array_2d;
 mod fonts;
-use super::{canvas, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex};
+use super::{array_2d::Array2D, canvas, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use lyon::tessellation::VertexBuffers;
@@ -15,7 +14,7 @@ pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 const INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
 
 pub(crate) struct TextBrush {
-  texture: array_2d::Array2D<u8>,
+  texture: Array2D<u8>,
   texture_updated: bool,
   quad_vertices_cache: Vec<[Vertex; 4]>,
   fonts: Fonts,
@@ -33,7 +32,7 @@ impl TextBrush {
       brush,
       quad_vertices_cache: vec![],
       fonts: Fonts::new(),
-      texture: array_2d::Array2D::fill_from(INIT_SIZE.width as usize, INIT_SIZE.height as usize, 0),
+      texture: Array2D::fill_from(INIT_SIZE.width, INIT_SIZE.height, 0),
     }
   }
 
@@ -64,9 +63,7 @@ impl TextBrush {
   }
 
   #[inline]
-  pub fn texture_size(&self) -> DeviceSize {
-    DeviceSize::new(self.texture.columns() as u32, self.texture.rows() as u32)
-  }
+  pub fn texture_size(&self) -> DeviceSize { self.texture.size() }
 
   #[inline]
   fn queue(&mut self, section: &Section) { self.brush.queue(section); }
@@ -80,12 +77,7 @@ impl TextBrush {
     } = self;
     let action = brush.process_queued(
       |rect, data| {
-        texture.copy_from_slice(
-          rect.min[1] as usize,
-          rect.min[0] as usize,
-          rect.width() as usize,
-          data,
-        );
+        texture.copy_from_slice(rect.min[1], rect.min[0], rect.width(), data);
         *texture_updated = true;
       },
       Self::to_vertex,
@@ -105,7 +97,7 @@ impl TextBrush {
     } else {
       suggested
     };
-    self.texture = array_2d::Array2D::fill_from(new_size.1 as usize, new_size.0 as usize, 0);
+    self.texture = Array2D::fill_from(new_size.1, new_size.0, 0);
     self.brush.resize_texture(new_size.0, new_size.1)
   }
 
@@ -151,8 +143,7 @@ impl TextBrush {
 
       let buffer = device.create_buffer_with_data(self.texture.data(), wgpu::BufferUsage::COPY_SRC);
 
-      let height = self.texture.rows() as u32;
-      let width = self.texture.columns() as u32;
+      let DeviceSize { width, height, .. } = self.texture.size();
       encoder.copy_buffer_to_texture(
         wgpu::BufferCopyView {
           buffer: &buffer,
@@ -371,7 +362,10 @@ impl<S: Surface> Canvas<S> {
       .write_image_data(glyph_brush.texture.data())
       .unwrap();
 
-    log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
+    log::debug!(
+      "Write a image of canvas glyphs texture at: {}",
+      &atlas_capture
+    );
   }
 }
 
@@ -416,18 +410,15 @@ mod tests {
       .unwrap();
   }
   #[test]
-  #[ignore = "gpu need"]
   fn custom_fonts_use() {
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let mut brush = TextBrush::new();
 
     let deja = include_bytes!("../fonts/DejaVuSans.ttf");
-    canvas.load_font_from_bytes(deja.to_vec(), 0).unwrap();
+    brush.load_font_from_bytes(deja.to_vec(), 0).unwrap();
     let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
-    canvas
+    brush
       .load_font_from_path(crate_root + "/fonts/GaramondNo8-Reg.ttf", 0)
       .unwrap();
-
-    let brush = &mut canvas.glyph_brush;
 
     let font = brush.select_best_match("DejaVu Sans", &FontProperties::default());
     assert!(font.is_ok());
