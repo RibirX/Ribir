@@ -1,14 +1,13 @@
-use super::{array_2d::Array2D, surface::Texture, Color, DevicePoint, DeviceSize};
+use super::{mem_texture::MemTexture, surface::Texture, Color, DevicePoint, DeviceSize};
 use guillotiere::*;
-mod palette;
+
+const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;
 
 pub struct TextureAtlas {
-  texture_updated: bool,
-  texture_resized: bool,
-  texture: Array2D<u32>,
+  texture: MemTexture<u32>,
   atlas_allocator: AtlasAllocator,
   indexed_colors: std::collections::HashMap<u32, DevicePoint>,
-  current_palette: palette::Palette,
+  palette_stored: usize,
   palette_alloc: Allocation,
 }
 
@@ -29,18 +28,13 @@ impl TextureAtlas {
     let mut atlas_allocator = AtlasAllocator::new(size.cast_unit().to_i32());
 
     let palette_alloc = atlas_allocator
-      .allocate(Size::new(
-        palette::PALETTE_SIZE as i32,
-        palette::PALETTE_SIZE as i32,
-      ))
+      .allocate(Size::new(PALETTE_SIZE as i32, PALETTE_SIZE as i32))
       .unwrap();
 
     TextureAtlas {
-      texture: Array2D::fill_from(INIT, INIT, 0),
-      texture_resized: false,
-      texture_updated: false,
+      texture: MemTexture::new(DeviceSize::new(INIT, INIT)),
       indexed_colors: <_>::default(),
-      current_palette: <_>::default(),
+      palette_stored: 0,
       atlas_allocator,
       palette_alloc,
     }
@@ -51,25 +45,30 @@ impl TextureAtlas {
     if let Some(pos) = self.indexed_colors.get(&color.as_u32()) {
       return Ok(*pos);
     }
-    if !self.current_palette.is_fulled() {
+    if !self.is_palette_fulled() {
       let pos = self.add_color(color);
       return Ok(pos);
     }
 
     let allocated_new_palette = loop {
-      if !self.new_palette() {
-        let mut size = self.texture.size();
+      if let Some(alloc) = self
+        .atlas_allocator
+        .allocate(Size::new(PALETTE_SIZE as i32, PALETTE_SIZE as i32))
+      {
+        self.palette_alloc = alloc;
+        self.palette_stored = 0;
+        break true;
+      } else {
+        let mut size = *self.texture.size();
         if size.height * 2 <= Texture::MAX_DIMENSION {
           size.height *= 2;
-          self.grow_texture(size);
+          self.texture.grow_size(size, true);
         } else if size.width < Texture::MAX_DIMENSION {
           size.width *= 2;
-          self.grow_texture(size);
+          self.texture.grow_size(size, true);
         } else {
           break false;
         }
-      } else {
-        break true;
       }
     };
 
@@ -80,11 +79,10 @@ impl TextureAtlas {
     }
   }
 
+  /// Return the reference of the soft texture of the atlas, copy it to the
+  /// render engine texture to use it.
   #[inline]
-  pub fn is_texture_resized(&self) -> bool { self.texture_resized }
-
-  #[inline]
-  pub fn size(&self) -> DeviceSize { self.texture.size() }
+  pub fn texture(&self) -> &MemTexture<u32> { &self.texture }
 
   /// Flush all data to the texture and ready to commit to gpu.
   /// Call this function before commit drawing to gpu.
@@ -94,17 +92,10 @@ impl TextureAtlas {
     encoder: &mut wgpu::CommandEncoder,
     texture: &wgpu::Texture,
   ) {
-    if self.texture_updated {
-      self.texture_updated = false;
-      self.texture_resized = false;
-
-      if self.current_palette.stored_color_size() > 0 {
-        self.save_current_palette();
-      }
-
-      let DeviceSize { width, height, .. } = self.texture.size();
+    if self.texture.is_updated() {
+      let DeviceSize { width, height, .. } = *self.texture.size();
       let buffer =
-        device.create_buffer_with_data(self.texture.raw_data(), wgpu::BufferUsage::COPY_SRC);
+        device.create_buffer_with_data(self.texture.as_bytes(), wgpu::BufferUsage::COPY_SRC);
 
       encoder.copy_buffer_to_texture(
         wgpu::BufferCopyView {
@@ -132,54 +123,26 @@ impl TextureAtlas {
   /// Clear the atlas.
   pub fn clear(&mut self) {
     self.atlas_allocator.clear();
-    self.current_palette.clear();
     self.indexed_colors.clear();
-    self.texture.fill(0);
-  }
-
-  fn grow_texture(&mut self, size: DeviceSize) {
-    self.texture_resized = true;
-    self.texture_updated = true;
-    self.atlas_allocator.grow(size.to_i32().to_untyped());
-    let mut new_tex = Array2D::fill_from(size.height, size.width, 0);
-    new_tex.copy_from_slice(0, 0, self.texture.columns(), self.texture.data());
-    self.texture = new_tex;
+    self.texture.clear();
   }
 
   fn add_color(&mut self, color: Color) -> DevicePoint {
-    self.texture_updated = true;
-    let key = color.as_u32();
-    let offset = self.current_palette.add_color(color);
-    let pos = self.palette_alloc.rectangle.min + offset;
-    let pos = DevicePoint::new(pos.x as u32, pos.y as u32);
-    self.indexed_colors.insert(key, pos);
+    let index = self.palette_stored as u32;
+    let offset = euclid::Vector2D::new(index % PALETTE_SIZE, index / PALETTE_SIZE);
+    let pos = self.palette_alloc.rectangle.min.to_u32() + offset;
+    let pos = DevicePoint::from_untyped(pos);
+    let u_color = color.as_u32();
+    self.indexed_colors.insert(u_color, pos);
+    self.texture.set(&pos, u_color);
+    self.palette_stored += 1;
     pos
   }
 
-  fn new_palette(&mut self) -> bool {
-    self
-      .atlas_allocator
-      .allocate(Size::new(
-        palette::PALETTE_SIZE as i32,
-        palette::PALETTE_SIZE as i32,
-      ))
-      .and_then(|alloc| {
-        self.save_current_palette();
-        self.current_palette = palette::Palette::default();
-        self.palette_alloc = alloc;
-        Some(true)
-      })
-      .is_some()
-  }
-
-  fn save_current_palette(&mut self) {
-    let palette_pos = self.palette_alloc.rectangle.min.to_u32();
-    self.texture.copy_from_slice(
-      palette_pos.y,
-      palette_pos.x,
-      palette::PALETTE_SIZE,
-      self.current_palette.data(),
-    );
+  #[inline]
+  fn is_palette_fulled(&self) -> bool {
+    const PALETTE_SLOTS: usize = (PALETTE_SIZE * PALETTE_SIZE) as usize;
+    self.palette_stored < PALETTE_SLOTS
   }
 }
 

@@ -1,5 +1,7 @@
 mod fonts;
-use super::{array_2d::Array2D, canvas, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex};
+use super::{
+  canvas, mem_texture::MemTexture, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex,
+};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use lyon::tessellation::VertexBuffers;
@@ -14,9 +16,7 @@ pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 const INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
 
 pub(crate) struct TextBrush {
-  texture: Array2D<u8>,
-  texture_updated: bool,
-  texture_resized: bool,
+  texture: MemTexture<u8>,
   quad_vertices_cache: Vec<[Vertex; 4]>,
   fonts: Fonts,
   brush: GlyphBrush<[Vertex; 4], GlyphStatistics>,
@@ -29,12 +29,10 @@ impl TextBrush {
       .build();
 
     TextBrush {
-      texture_updated: false,
-      texture_resized: false,
       brush,
       quad_vertices_cache: vec![],
       fonts: Fonts::new(),
-      texture: Array2D::fill_from(INIT_SIZE.width, INIT_SIZE.height, 0),
+      texture: MemTexture::new(INIT_SIZE),
     }
   }
 
@@ -65,22 +63,17 @@ impl TextBrush {
   }
 
   #[inline]
-  pub fn texture_size(&self) -> DeviceSize { self.texture.size() }
+  pub fn texture(&self) -> &MemTexture<u8> { &self.texture }
 
   #[inline]
   fn queue(&mut self, section: &Section) { self.brush.queue(section); }
 
   fn process_queued(&mut self) -> Result<&[[Vertex; 4]], BrushError> {
-    let Self {
-      brush,
-      texture,
-      texture_updated,
-      ..
-    } = self;
+    let Self { brush, texture, .. } = self;
     let action = brush.process_queued(
       |rect, data| {
-        texture.copy_from_slice(rect.min[1], rect.min[0], rect.width(), data);
-        *texture_updated = true;
+        let rect = euclid::Box2D::new(rect.min.into(), rect.max.into()).to_rect();
+        texture.update_texture(&rect, data);
       },
       Self::to_vertex,
     )?;
@@ -93,14 +86,13 @@ impl TextBrush {
   }
 
   fn resize_texture(&mut self, suggested: (u32, u32)) {
-    self.texture_resized = true;
     const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
     let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
       (MAX, MAX)
     } else {
       suggested
     };
-    self.texture = Array2D::fill_from(new_size.1, new_size.0, 0);
+    self.texture.grow_size(new_size.into(), false);
     self.brush.resize_texture(new_size.0, new_size.1)
   }
 
@@ -141,12 +133,11 @@ impl TextBrush {
     encoder: &mut wgpu::CommandEncoder,
     texture: &wgpu::Texture,
   ) {
-    if self.texture_updated {
-      self.texture_updated = false;
+    if self.texture.is_updated() {
+      let buffer =
+        device.create_buffer_with_data(self.texture.as_bytes(), wgpu::BufferUsage::COPY_SRC);
 
-      let buffer = device.create_buffer_with_data(self.texture.data(), wgpu::BufferUsage::COPY_SRC);
-
-      let DeviceSize { width, height, .. } = self.texture.size();
+      let DeviceSize { width, height, .. } = *self.texture.size();
       encoder.copy_buffer_to_texture(
         wgpu::BufferCopyView {
           buffer: &buffer,
@@ -166,7 +157,8 @@ impl TextBrush {
           height,
           depth: 1,
         },
-      )
+      );
+      self.texture.data_synced();
     }
   }
 
@@ -299,8 +291,7 @@ impl<S: Surface> Canvas<S> {
       };
     }
 
-    if self.glyph_brush.texture_resized {
-      self.glyph_brush.texture_resized = false;
+    if self.glyph_brush.texture.is_resized() {
       self.resize_glyph_texture();
       self.update_uniforms();
     }
@@ -345,7 +336,7 @@ impl<S: Surface> Canvas<S> {
     let pkg_root = env!("CARGO_MANIFEST_DIR");
     let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
 
-    let DeviceSize { width, height, .. } = glyph_brush.texture_size();
+    let DeviceSize { width, height, .. } = *glyph_brush.texture().size();
 
     let mut png_encoder = png::Encoder::new(
       std::fs::File::create(&atlas_capture).unwrap(),
@@ -357,7 +348,7 @@ impl<S: Surface> Canvas<S> {
     png_encoder
       .write_header()
       .unwrap()
-      .write_image_data(glyph_brush.texture.data())
+      .write_image_data(glyph_brush.texture.as_bytes())
       .unwrap();
 
     log::debug!(
@@ -435,10 +426,11 @@ mod tests {
     canvas.queue(&section);
 
     let mut buffer = VertexBuffers::new();
-    let update_texture = canvas.process_queued(&mut buffer);
+    canvas.process_queued(&mut buffer);
 
     assert_eq!(buffer.vertices.len(), str.chars().count() * 4);
-    assert_eq!(update_texture, false);
+    assert_eq!(canvas.glyph_brush.texture_updated, true);
+    assert_eq!(canvas.glyph_brush.texture_resized, false);
 
     // force submit data
     if let Some(encoder) = canvas.encoder.take() {

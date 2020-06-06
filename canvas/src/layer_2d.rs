@@ -1,6 +1,6 @@
 use crate::{
-  canvas::surface::Surface, text::GlyphStatistics, Canvas, Color, FontProperties, FontStretch,
-  FontStyle, FontWeight, Point, Rect, Transform, DEFAULT_FONT_FAMILY,
+  canvas::surface::Surface, text_brush::GlyphStatistics, Canvas, Color, FontProperties,
+  FontStretch, FontStyle, FontWeight, Point, Rect, Transform, DEFAULT_FONT_FAMILY,
 };
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
