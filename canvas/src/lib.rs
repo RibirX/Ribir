@@ -1,15 +1,15 @@
 #![feature(decl_macro, test, const_fn, slice_fill)]
-mod array_2d;
 mod atlas;
 mod canvas;
 mod color;
 mod layer_2d;
-mod text;
+mod mem_texture;
+mod text_brush;
 
 pub use crate::canvas::*;
 pub use color::Color;
 pub use layer_2d::*;
-pub use text::*;
+pub use text_brush::*;
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.

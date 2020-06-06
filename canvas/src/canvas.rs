@@ -1,7 +1,7 @@
 use super::{
   atlas::{AtlasStoreErr, TextureAtlas},
   layer_2d,
-  text::TextBrush,
+  text_brush::TextBrush,
   DevicePoint, DeviceRect, DeviceSize, FillStyle, LogicUnit, PhysicUnit, RenderAttr, RenderCommand,
   Rendering2DLayer,
 };
@@ -219,7 +219,7 @@ impl<S: Surface> Canvas<S> {
     let uniforms = create_uniforms(
       &device,
       &uniform_layout,
-      tex_atlas.size(),
+      *tex_atlas.texture().size(),
       &coordinate_2d_to_device_matrix(size.width, size.height),
       &sampler,
       &texture_atlas.create_default_view(),
@@ -289,7 +289,7 @@ impl<S: Surface> Canvas<S> {
     self.ensure_encoder_exist();
     self.ensure_view_exist();
 
-    if self.atlas.is_texture_resized() {
+    if self.atlas.texture().is_updated() {
       self.update_uniforms();
     }
 
@@ -369,7 +369,7 @@ impl<S: Surface> Canvas<S> {
     self.uniforms = create_uniforms(
       &self.device,
       &self.uniform_layout,
-      self.atlas.size(),
+      *self.atlas.texture().size(),
       &coordinate_2d_to_device_matrix(size.width, size.height),
       &self.sampler,
       &self.texture_atlas.create_default_view(),
@@ -459,7 +459,7 @@ impl<S: Surface> Canvas<S> {
   }
 
   fn glyph_texture(device: &wgpu::Device, brush: &TextBrush) -> wgpu::Texture {
-    let size = brush.texture_size();
+    let size = brush.texture().size();
     device.create_texture(&wgpu::TextureDescriptor {
       label: Some("new glyph texture"),
       size: wgpu::Extent3d {
@@ -478,7 +478,7 @@ impl<S: Surface> Canvas<S> {
   }
 
   fn atlas_texture(device: &wgpu::Device, atlas: &TextureAtlas) -> wgpu::Texture {
-    let size = atlas.size();
+    let size = atlas.texture().size();
     device.create_texture(&wgpu::TextureDescriptor {
       label: Some("new glyph texture"),
       size: wgpu::Extent3d {

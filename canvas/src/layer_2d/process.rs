@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
   canvas::{surface::Surface, Canvas},
-  text::Section,
+  text_brush::Section,
   Point, Rect, Size,
 };
 pub use lyon::{
@@ -107,7 +107,7 @@ impl<'a, S: Surface> ProcessLayer2d<'a, S> {
       canvas, geometry, ..
     } = self;
 
-    self.texture_updated = canvas.process_queued(geometry);
+    canvas.process_queued(geometry);
 
     self.queued_text = false;
     self.process_text_attrs();

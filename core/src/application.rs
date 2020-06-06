@@ -1,7 +1,5 @@
 use crate::{prelude::*, widget::window::*};
-use indextree::*;
 use std::collections::HashMap;
-use std::collections::HashSet;
 pub use winit::window::WindowId;
 use winit::{
   event::Event,
@@ -12,8 +10,6 @@ use winit::{
 pub struct Application<'a> {
   windows: HashMap<WindowId, Window<'a>>,
   event_loop: EventLoop<()>,
-  dirty_layouts: HashSet<NodeId>,
-  dirty_layout_roots: HashSet<NodeId>,
 }
 
 impl<'a> Application<'a> {
@@ -22,8 +18,6 @@ impl<'a> Application<'a> {
     Self {
       windows: Default::default(),
       event_loop: EventLoop::new(),
-      dirty_layouts: Default::default(),
-      dirty_layout_roots: Default::default(),
     }
   }
 
