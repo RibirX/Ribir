@@ -98,9 +98,6 @@ pub struct Texture {
 }
 
 impl Texture {
-  pub(crate) const INIT_DIMENSION: u32 = 1024;
-  pub(crate) const MAX_DIMENSION: u32 = 4096;
-
   pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsage) -> Self {
     let raw_texture = Self::new_texture(device, size, usage);
     Texture {

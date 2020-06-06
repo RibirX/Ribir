@@ -2,11 +2,7 @@ use super::{
   Color, Command, CommandInfo, FillStyle, GlyphStatistics, HorizontalAlign, RenderAttr,
   RenderCommand, Rendering2DLayer, Text, TextLayout, Transform, Vertex, VerticalAlign,
 };
-use crate::{
-  canvas::{surface::Surface, Canvas},
-  text_brush::Section,
-  Point, Rect, Size,
-};
+use crate::{canvas::Canvas, text_brush::Section, Point, Rect, Size};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
@@ -14,7 +10,7 @@ pub use lyon::{
 
 const TOLERANCE: f32 = 0.5;
 
-pub(crate) struct ProcessLayer2d<'a, S: Surface> {
+pub(crate) struct ProcessLayer2d<'a> {
   stroke_tess: StrokeTessellator,
   fill_tess: FillTessellator,
   geometry: VertexBuffers<Vertex, u32>,
@@ -22,7 +18,7 @@ pub(crate) struct ProcessLayer2d<'a, S: Surface> {
   unready_text_attrs: Vec<UnReadyTextAttr>,
   texture_updated: bool,
   queued_text: bool,
-  canvas: &'a mut Canvas<S>,
+  canvas: &'a mut Canvas,
 }
 
 struct UnReadyTextAttr {
@@ -32,8 +28,8 @@ struct UnReadyTextAttr {
   align_bounds: Rect,
 }
 
-impl<'a, S: Surface> ProcessLayer2d<'a, S> {
-  pub(crate) fn new(canvas: &'a mut Canvas<S>) -> Self {
+impl<'a> ProcessLayer2d<'a> {
+  pub(crate) fn new(canvas: &'a mut Canvas) -> Self {
     Self {
       stroke_tess: <_>::default(),
       fill_tess: FillTessellator::new(),
@@ -332,11 +328,7 @@ fn path_bounds_to_align_texture(style: &FillStyle, path: &Path) -> Rect {
   }
 }
 
-fn section_bounds_to_align_texture<S: Surface>(
-  canvas: &mut Canvas<S>,
-  style: &FillStyle,
-  sec: &Section,
-) -> Rect {
+fn section_bounds_to_align_texture(canvas: &mut Canvas, style: &FillStyle, sec: &Section) -> Rect {
   if let FillStyle::Color(_) = style {
     COLOR_BOUNDS_TO_ALIGN_TEXTURE
   } else {

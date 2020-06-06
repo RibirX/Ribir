@@ -2,6 +2,7 @@
 mod atlas;
 mod canvas;
 mod color;
+pub mod error;
 mod layer_2d;
 mod mem_texture;
 mod text_brush;

@@ -1,6 +1,6 @@
 use crate::{
-  canvas::surface::Surface, text_brush::GlyphStatistics, Canvas, Color, FontProperties,
-  FontStretch, FontStyle, FontWeight, Point, Rect, Transform, DEFAULT_FONT_FAMILY,
+  text_brush::GlyphStatistics, Canvas, Color, FontProperties, FontStretch, FontStyle, FontWeight,
+  Point, Rect, Transform, DEFAULT_FONT_FAMILY,
 };
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
@@ -177,10 +177,7 @@ impl<'a> Rendering2DLayer<'a> {
   /// Return
   /// If the canvas texture cache is update in the process, will return a
   /// None-Value that means there is no buffer data can be cached.
-  pub fn finish<S>(self, canvas: &mut Canvas<S>) -> Option<RenderCommand>
-  where
-    S: Surface,
-  {
+  pub fn finish(self, canvas: &mut Canvas) -> Option<RenderCommand> {
     process::ProcessLayer2d::new(canvas)
       .process_layer(self)
       .and_then(|cmd| {
@@ -458,10 +455,7 @@ impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
 }
 
 impl<'a> Text<'a> {
-  fn to_glyph_text<S: Surface>(
-    &self,
-    canvas: &mut Canvas<S>,
-  ) -> glyph_brush::Text<'a, GlyphStatistics> {
+  fn to_glyph_text(&self, canvas: &mut Canvas) -> glyph_brush::Text<'a, GlyphStatistics> {
     let Text {
       text,
       font,

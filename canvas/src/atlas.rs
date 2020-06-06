@@ -1,4 +1,4 @@
-use super::{mem_texture::MemTexture, surface::Texture, Color, DevicePoint, DeviceSize};
+use super::{error::CanvasError, mem_texture::MemTexture, Color, DevicePoint, DeviceSize};
 use guillotiere::*;
 
 const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;
@@ -11,28 +11,16 @@ pub struct TextureAtlas {
   palette_alloc: Allocation,
 }
 
-#[derive(Debug)]
-pub enum AtlasStoreErr {
-  /// atlas is too full to store the texture, buf the texture is good for store
-  /// in the atlas if it's not store too many others.
-  SpaceNotEnough,
-  /// The texture you want to store in the atlas is too large, you should not
-  /// try to store it again.
-  OverTheMaxLimit,
-}
-
 impl TextureAtlas {
-  pub fn new() -> Self {
-    const INIT: u32 = Texture::INIT_DIMENSION;
-    let size = DeviceSize::new(INIT, INIT);
-    let mut atlas_allocator = AtlasAllocator::new(size.cast_unit().to_i32());
+  pub fn new(init_size: DeviceSize, max_size: DeviceSize) -> Self {
+    let mut atlas_allocator = AtlasAllocator::new(init_size.to_untyped().to_i32());
 
     let palette_alloc = atlas_allocator
       .allocate(Size::new(PALETTE_SIZE as i32, PALETTE_SIZE as i32))
       .unwrap();
 
     TextureAtlas {
-      texture: MemTexture::new(DeviceSize::new(INIT, INIT)),
+      texture: MemTexture::new(init_size, max_size),
       indexed_colors: <_>::default(),
       palette_stored: 0,
       atlas_allocator,
@@ -41,7 +29,7 @@ impl TextureAtlas {
   }
 
   /// Store the `color` in, return the position in the texture of the color was.
-  pub fn store_color(&mut self, color: Color) -> Result<DevicePoint, AtlasStoreErr> {
+  pub fn store_color(&mut self, color: Color) -> Result<DevicePoint, CanvasError> {
     if let Some(pos) = self.indexed_colors.get(&color.as_u32()) {
       return Ok(*pos);
     }
@@ -58,24 +46,15 @@ impl TextureAtlas {
         self.palette_alloc = alloc;
         self.palette_stored = 0;
         break true;
-      } else {
-        let mut size = *self.texture.size();
-        if size.height * 2 <= Texture::MAX_DIMENSION {
-          size.height *= 2;
-          self.texture.grow_size(size, true);
-        } else if size.width < Texture::MAX_DIMENSION {
-          size.width *= 2;
-          self.texture.grow_size(size, true);
-        } else {
-          break false;
-        }
+      } else if !self.texture.expand_size(true) {
+        break false;
       }
     };
 
     if allocated_new_palette {
       Ok(self.add_color(color))
     } else {
-      Err(AtlasStoreErr::SpaceNotEnough)
+      Err(CanvasError::TextureSpaceNotEnough)
     }
   }
 
@@ -83,42 +62,6 @@ impl TextureAtlas {
   /// render engine texture to use it.
   #[inline]
   pub fn texture(&self) -> &MemTexture<u32> { &self.texture }
-
-  /// Flush all data to the texture and ready to commit to gpu.
-  /// Call this function before commit drawing to gpu.
-  pub fn flush_cache(
-    &mut self,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-    texture: &wgpu::Texture,
-  ) {
-    if self.texture.is_updated() {
-      let DeviceSize { width, height, .. } = *self.texture.size();
-      let buffer =
-        device.create_buffer_with_data(self.texture.as_bytes(), wgpu::BufferUsage::COPY_SRC);
-
-      encoder.copy_buffer_to_texture(
-        wgpu::BufferCopyView {
-          buffer: &buffer,
-          layout: wgpu::TextureDataLayout {
-            offset: 0,
-            bytes_per_row: width * std::mem::size_of::<u32>() as u32,
-            rows_per_image: height,
-          },
-        },
-        wgpu::TextureCopyView {
-          texture,
-          mip_level: 0,
-          origin: wgpu::Origin3d::ZERO,
-        },
-        wgpu::Extent3d {
-          width,
-          height,
-          depth: 1,
-        },
-      )
-    }
-  }
 
   /// Clear the atlas.
   pub fn clear(&mut self) {

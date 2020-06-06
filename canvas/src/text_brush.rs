@@ -1,10 +1,8 @@
 mod fonts;
-use super::{
-  canvas, mem_texture::MemTexture, surface::Surface, Canvas, DeviceSize, Point, Rect, Vertex,
-};
+use super::{mem_texture::MemTexture, DeviceSize, Point, Rect, Vertex};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
-use lyon::tessellation::VertexBuffers;
+use lyon::tessellation::{Count, VertexBuffers};
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
 #[derive(Debug, Default, Clone)]
@@ -13,9 +11,7 @@ pub(crate) struct GlyphStatistics(Rc<Cell<u32>>);
 pub(crate) type Section<'a> = glyph_brush::Section<'a, GlyphStatistics>;
 pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 
-const INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
-
-pub(crate) struct TextBrush {
+pub struct TextBrush {
   texture: MemTexture<u8>,
   quad_vertices_cache: Vec<[Vertex; 4]>,
   fonts: Fonts,
@@ -23,39 +19,69 @@ pub(crate) struct TextBrush {
 }
 
 impl TextBrush {
-  pub fn new() -> Self {
+  pub(crate) fn new(init_size: DeviceSize, max_size: DeviceSize) -> Self {
     let brush = GlyphBrushBuilder::using_fonts(vec![])
-      .initial_cache_size((INIT_SIZE.width, INIT_SIZE.height))
+      .initial_cache_size((init_size.width, init_size.height))
       .build();
 
     TextBrush {
       brush,
       quad_vertices_cache: vec![],
       fonts: Fonts::new(),
-      texture: MemTexture::new(INIT_SIZE),
+      texture: MemTexture::new(init_size, max_size),
     }
   }
 
-  // #[inline]
-  // pub(crate) fn glyphs(&mut self, sec: &Section) ->
-  // glyph_brush::SectionGlyphIter {   self.brush.glyphs(sec)
-  // }
+  /// Add a custom font from bytes, so canvas support this font to draw text.
+  /// If the data represents a collection (`.ttc`/`.otc`/etc.), `font_index`
+  /// specifies the index of the font to load from it. If the data represents
+  /// a single font, pass 0 for `font_index`.
+  #[inline]
+  pub fn load_font_from_bytes(
+    &mut self,
+    font_data: Vec<u8>,
+    font_index: u32,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self
+      .fonts
+      .load_from_bytes(Arc::new(font_data), font_index, &mut self.brush)
+  }
 
-  // pub(crate) fn glyph_bounds(
-  //   &self,
-  //   glyph: &glyph_brush::SectionGlyph,
-  // ) -> euclid::Box2D<f32, LogicUnit> {
-  //   use glyph_brush::ab_glyph::Font as BrushFont;
-  //   let font = &self.brush.fonts()[glyph.font_id];
-  //   let rect = font.glyph_bounds(&glyph.glyph);
+  /// Loads a font from the path to a `.ttf`/`.otf`/etc. file.
+  ///
+  /// If the file is a collection (`.ttc`/`.otc`/etc.), `font_index` specifies
+  /// the index of the font to load from it. If the file represents a single
+  /// font, pass 0 for `font_index`.
+  #[inline]
+  pub fn load_font_from_path<P: AsRef<std::path::Path>>(
+    &mut self,
+    path: P,
+    font_index: u32,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self.fonts.load_from_path(path, font_index, &mut self.brush)
+  }
 
-  //   euclid::Box2D::new(
-  //     Point::new(rect.min.x, rect.min.y),
-  //     Point::new(rect.max.x, rect.max.y),
-  //   )
-  // }
+  /// Performs font matching according to the CSS Fonts Level 3 specification
+  /// and returns matched fonts.
+  #[inline]
+  pub fn select_best_match(
+    &mut self,
+    family_names: &str,
+    props: &FontProperties,
+  ) -> Result<&Font, Box<dyn std::error::Error>> {
+    self
+      .fonts
+      .select_best_match(family_names, props, &mut self.brush)
+  }
 
-  pub fn section_bounds(&mut self, sec: &Section) -> Option<Rect> {
+  #[inline]
+  pub fn default_font(&mut self) -> &Font {
+    self
+      .select_best_match(DEFAULT_FONT_FAMILY, &FontProperties::default())
+      .expect("Canvas default font not exist!")
+  }
+
+  pub(crate) fn section_bounds(&mut self, sec: &Section) -> Option<Rect> {
     self
       .brush
       .glyph_bounds(sec)
@@ -63,12 +89,99 @@ impl TextBrush {
   }
 
   #[inline]
-  pub fn texture(&self) -> &MemTexture<u8> { &self.texture }
+  pub(crate) fn texture(&self) -> &MemTexture<u8> { &self.texture }
 
   #[inline]
-  fn queue(&mut self, section: &Section) { self.brush.queue(section); }
+  pub(crate) fn queue(&mut self, section: &Section) { self.brush.queue(section); }
 
-  fn process_queued(&mut self) -> Result<&[[Vertex; 4]], BrushError> {
+  /// Processes all queued texts, and push the vertices and indices into the
+  /// buffer
+  pub(crate) fn process_queued(
+    &mut self,
+    buffer: &mut VertexBuffers<Vertex, u32>,
+  ) -> Result<lyon::tessellation::Count, Box<dyn std::error::Error>> {
+    loop {
+      match self.try_process_queued() {
+        Ok(_) => break,
+        Err(BrushError::TextureTooSmall { suggested }) => {
+          if self.texture.expand_size(false) {
+            let size = self.texture.size();
+            self.brush.resize_texture(size.width, size.height);
+          } else {
+            return Err(
+              "The text cache buffer is overflow, batch too much texts to draw at once.
+              Maybe you should not batch so many texts to draw or split your single big text draw as many pieces to draw"
+                .into(),
+            );
+          }
+        }
+      };
+    }
+
+    let quad_vertices = &self.quad_vertices_cache;
+    let VertexBuffers { indices, vertices } = buffer;
+
+    let count = glyph_vertices_count(quad_vertices.len() as u32);
+    vertices.reserve(count.vertices as usize);
+    indices.reserve(count.indices as usize);
+
+    quad_vertices
+      .iter()
+      .fold(vertices.len() as u32, |state, _| {
+        let tl = state;
+        let tr = tl + 1;
+        let bl = tl + 2;
+        let br = tl + 3;
+        indices.push(tl);
+        indices.push(tr);
+        indices.push(bl);
+        indices.push(bl);
+        indices.push(tr);
+        indices.push(br);
+        state + 4
+      });
+
+    unsafe {
+      let count = quad_vertices.len() * 4;
+      let len = vertices.len();
+      std::ptr::copy_nonoverlapping(
+        quad_vertices.as_ptr() as *const Vertex,
+        vertices.as_mut_ptr().add(len),
+        count,
+      );
+      vertices.set_len(len + count);
+    }
+
+    Ok(count)
+  }
+
+  #[cfg(debug_assertions)]
+  pub fn log_texture(&mut self) {
+    let pkg_root = env!("CARGO_MANIFEST_DIR");
+    let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
+
+    let DeviceSize { width, height, .. } = *self.texture().size();
+
+    let mut png_encoder = png::Encoder::new(
+      std::fs::File::create(&atlas_capture).unwrap(),
+      width,
+      height,
+    );
+    png_encoder.set_depth(png::BitDepth::Eight);
+    png_encoder.set_color(png::ColorType::Grayscale);
+    png_encoder
+      .write_header()
+      .unwrap()
+      .write_image_data(self.texture.as_bytes())
+      .unwrap();
+
+    log::debug!(
+      "Write a image of canvas glyphs texture at: {}",
+      &atlas_capture
+    );
+  }
+
+  fn try_process_queued(&mut self) -> Result<(), BrushError> {
     let Self { brush, texture, .. } = self;
     let action = brush.process_queued(
       |rect, data| {
@@ -82,84 +195,7 @@ impl TextBrush {
       BrushAction::ReDraw => {}
     }
 
-    Ok(self.quad_vertices_cache.as_slice())
-  }
-
-  fn resize_texture(&mut self, suggested: (u32, u32)) {
-    const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
-    let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
-      (MAX, MAX)
-    } else {
-      suggested
-    };
-    self.texture.grow_size(new_size.into(), false);
-    self.brush.resize_texture(new_size.0, new_size.1)
-  }
-
-  #[inline]
-  fn load_font_from_bytes(
-    &mut self,
-    font_data: Vec<u8>,
-    font_index: u32,
-  ) -> Result<&Font, Box<dyn std::error::Error>> {
-    self
-      .fonts
-      .load_from_bytes(Arc::new(font_data), font_index, &mut self.brush)
-  }
-
-  #[inline]
-  fn load_font_from_path<P: AsRef<std::path::Path>>(
-    &mut self,
-    path: P,
-    font_index: u32,
-  ) -> Result<&Font, Box<dyn std::error::Error>> {
-    self.fonts.load_from_path(path, font_index, &mut self.brush)
-  }
-
-  #[inline]
-  fn select_best_match(
-    &mut self,
-    family_names: &str,
-    props: &FontProperties,
-  ) -> Result<&Font, Box<dyn std::error::Error>> {
-    self
-      .fonts
-      .select_best_match(family_names, props, &mut self.brush)
-  }
-
-  pub fn flush_cache(
-    &mut self,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-    texture: &wgpu::Texture,
-  ) {
-    if self.texture.is_updated() {
-      let buffer =
-        device.create_buffer_with_data(self.texture.as_bytes(), wgpu::BufferUsage::COPY_SRC);
-
-      let DeviceSize { width, height, .. } = *self.texture.size();
-      encoder.copy_buffer_to_texture(
-        wgpu::BufferCopyView {
-          buffer: &buffer,
-          layout: wgpu::TextureDataLayout {
-            offset: 0,
-            bytes_per_row: width,
-            rows_per_image: height,
-          },
-        },
-        wgpu::TextureCopyView {
-          texture,
-          mip_level: 0,
-          origin: wgpu::Origin3d::ZERO,
-        },
-        wgpu::Extent3d {
-          width,
-          height,
-          depth: 1,
-        },
-      );
-      self.texture.data_synced();
-    }
+    Ok(())
   }
 
   fn to_vertex(
@@ -228,143 +264,16 @@ impl TextBrush {
   }
 }
 
-impl<S: Surface> Canvas<S> {
-  /// Add a custom font from bytes, so canvas support this font to draw text.
-  /// If the data represents a collection (`.ttc`/`.otc`/etc.), `font_index`
-  /// specifies the index of the font to load from it. If the data represents
-  /// a single font, pass 0 for `font_index`.
-  #[inline]
-  pub fn load_font_from_bytes(
-    &mut self,
-    font_data: Vec<u8>,
-    font_index: u32,
-  ) -> Result<&Font, Box<dyn std::error::Error>> {
-    self.glyph_brush.load_font_from_bytes(font_data, font_index)
-  }
-
-  /// Loads a font from the path to a `.ttf`/`.otf`/etc. file.
-  ///
-  /// If the file is a collection (`.ttc`/`.otc`/etc.), `font_index` specifies
-  /// the index of the font to load from it. If the file represents a single
-  /// font, pass 0 for `font_index`.
-  #[inline]
-  pub fn load_font_from_path<P: AsRef<std::path::Path>>(
-    &mut self,
-    path: P,
-    font_index: u32,
-  ) -> Result<&Font, Box<dyn std::error::Error>> {
-    self.glyph_brush.load_font_from_path(path, font_index)
-  }
-
-  /// Performs font matching according to the CSS Fonts Level 3 specification
-  /// and returns matched fonts.
-  pub fn select_best_match(
-    &mut self,
-    family_names: &str,
-    props: &FontProperties,
-  ) -> Result<&Font, Box<dyn std::error::Error>> {
-    self.glyph_brush.select_best_match(family_names, props)
-  }
-
-  pub(crate) fn default_font(&mut self) -> &Font {
-    self
-      .glyph_brush
-      .select_best_match(DEFAULT_FONT_FAMILY, &FontProperties::default())
-      .expect("Canvas default font not exist!")
-  }
-
-  #[inline]
-  pub(crate) fn queue(&mut self, section: &Section) { self.glyph_brush.queue(&section); }
-
-  /// Processes all queued texts, and push the vertices and indices into the
-  /// buffer, return true if the texture has updated.
-  pub(crate) fn process_queued(&mut self, buffer: &mut VertexBuffers<Vertex, u32>) {
-    loop {
-      self.ensure_encoder_exist();
-
-      match self.glyph_brush.process_queued() {
-        Ok(_) => break,
-        Err(glyph_brush::BrushError::TextureTooSmall { suggested }) => {
-          self.submit();
-          self.glyph_brush.resize_texture(suggested);
-        }
-      };
-    }
-
-    if self.glyph_brush.texture.is_resized() {
-      self.resize_glyph_texture();
-      self.update_uniforms();
-    }
-
-    let quad_vertices = &self.glyph_brush.quad_vertices_cache;
-    let VertexBuffers { indices, vertices } = buffer;
-    vertices.reserve(quad_vertices.len() * 4);
-    indices.reserve(quad_vertices.len() * 6);
-
-    quad_vertices
-      .iter()
-      .fold(vertices.len() as u32, |state, _| {
-        let tl = state;
-        let tr = tl + 1;
-        let bl = tl + 2;
-        let br = tl + 3;
-        indices.push(tl);
-        indices.push(tr);
-        indices.push(bl);
-        indices.push(bl);
-        indices.push(tr);
-        indices.push(br);
-        state + 4
-      });
-
-    unsafe {
-      let count = quad_vertices.len() * 4;
-      let len = vertices.len();
-      std::ptr::copy_nonoverlapping(
-        quad_vertices.as_ptr() as *const Vertex,
-        vertices.as_mut_ptr().add(len),
-        count,
-      );
-      vertices.set_len(len + count);
-    }
-  }
-
-  #[cfg(debug_assertions)]
-  pub fn log_glyph_texture(&mut self) {
-    let Canvas { glyph_brush, .. } = self;
-
-    let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
-
-    let DeviceSize { width, height, .. } = *glyph_brush.texture().size();
-
-    let mut png_encoder = png::Encoder::new(
-      std::fs::File::create(&atlas_capture).unwrap(),
-      width,
-      height,
-    );
-    png_encoder.set_depth(png::BitDepth::Eight);
-    png_encoder.set_color(png::ColorType::Grayscale);
-    png_encoder
-      .write_header()
-      .unwrap()
-      .write_image_data(glyph_brush.texture.as_bytes())
-      .unwrap();
-
-    log::debug!(
-      "Write a image of canvas glyphs texture at: {}",
-      &atlas_capture
-    );
+fn glyph_vertices_count(glyphs: u32) -> Count {
+  Count {
+    vertices: glyphs * 4,
+    indices: glyphs * 6,
   }
 }
-
 impl From<GlyphStatistics> for lyon::tessellation::Count {
   fn from(g: GlyphStatistics) -> Self {
     let glyph_count = g.0.get();
-    Self {
-      vertices: glyph_count * 4,
-      indices: glyph_count * 6,
-    }
+    glyph_vertices_count(glyph_count)
   }
 }
 

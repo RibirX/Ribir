@@ -1,6 +1,7 @@
 use super::{DevicePoint, DeviceRect, DeviceSize};
 
 pub struct MemTexture<T: Copy + Default> {
+  max_size: DeviceSize,
   array: Vec<T>,
   size: DeviceSize,
   updated: bool,
@@ -8,9 +9,10 @@ pub struct MemTexture<T: Copy + Default> {
 }
 
 impl<T: Copy + Default> MemTexture<T> {
-  pub fn new(size: DeviceSize) -> Self {
+  pub fn new(size: DeviceSize, max_size: DeviceSize) -> Self {
     Self {
       size,
+      max_size,
       array: vec![T::default(); size.area() as usize],
       updated: false,
       resized: false,
@@ -33,22 +35,32 @@ impl<T: Copy + Default> MemTexture<T> {
   #[inline]
   pub fn size(&self) -> &DeviceSize { &self.size }
 
-  /// Resize the texture
-  ///
-  /// This method is not allowed to shrink the width or height of the texture.
+  /// Expand the texture.
+  /// Return true if expand successful, false if this texture reach the limit.
   /// Use `keep_old_data` to detect if old data should keep or throw away.
-  pub fn grow_size(&mut self, size: DeviceSize, keep_old_data: bool) {
-    debug_assert!(size.greater_than(self.size).all());
+  pub fn expand_size(&mut self, keep_old_data: bool) -> bool {
+    let mut size = self.size;
+    if self.max_size.greater_than(size).any() {
+      if size.height < self.max_size.height {
+        size.height = (size.height * 2).min(self.max_size.height);
+      }
+      if size.width * 2 < self.max_size.width {
+        size.width = (size.width * 2).min(self.max_size.width);
+      }
 
-    self.resized = true;
-    self.updated = true;
-    let array = std::mem::replace(&mut self.array, vec![T::default(); size.area() as usize]);
-    if keep_old_data {
-      let old_size = self.size;
-      self.size = size;
-      self.update_texture(&DeviceRect::from(old_size), array.as_slice());
+      self.resized = true;
+      self.updated = true;
+      let array = std::mem::replace(&mut self.array, vec![T::default(); size.area() as usize]);
+      if keep_old_data {
+        let old_size = self.size;
+        self.size = size;
+        self.update_texture(&DeviceRect::from(old_size), array.as_slice());
+      } else {
+        self.size = size;
+      }
+      true
     } else {
-      self.size = size;
+      false
     }
   }
 
