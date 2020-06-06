@@ -16,6 +16,7 @@ const INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
 pub(crate) struct TextBrush {
   texture: Array2D<u8>,
   texture_updated: bool,
+  texture_resized: bool,
   quad_vertices_cache: Vec<[Vertex; 4]>,
   fonts: Fonts,
   brush: GlyphBrush<[Vertex; 4], GlyphStatistics>,
@@ -29,6 +30,7 @@ impl TextBrush {
 
     TextBrush {
       texture_updated: false,
+      texture_resized: false,
       brush,
       quad_vertices_cache: vec![],
       fonts: Fonts::new(),
@@ -91,6 +93,7 @@ impl TextBrush {
   }
 
   fn resize_texture(&mut self, suggested: (u32, u32)) {
+    self.texture_resized = true;
     const MAX: u32 = canvas::surface::Texture::MAX_DIMENSION;
     let new_size = if suggested.0 >= MAX || suggested.1 >= MAX {
       (MAX, MAX)
@@ -283,9 +286,7 @@ impl<S: Surface> Canvas<S> {
 
   /// Processes all queued texts, and push the vertices and indices into the
   /// buffer, return true if the texture has updated.
-  pub(crate) fn process_queued(&mut self, buffer: &mut VertexBuffers<Vertex, u32>) -> bool {
-    let mut texture_resized = false;
-
+  pub(crate) fn process_queued(&mut self, buffer: &mut VertexBuffers<Vertex, u32>) {
     loop {
       self.ensure_encoder_exist();
 
@@ -294,13 +295,12 @@ impl<S: Surface> Canvas<S> {
         Err(glyph_brush::BrushError::TextureTooSmall { suggested }) => {
           self.submit();
           self.glyph_brush.resize_texture(suggested);
-
-          texture_resized = true;
         }
       };
     }
 
-    if texture_resized {
+    if self.glyph_brush.texture_resized {
+      self.glyph_brush.texture_resized = false;
       self.resize_glyph_texture();
       self.update_uniforms();
     }
@@ -336,8 +336,6 @@ impl<S: Surface> Canvas<S> {
       );
       vertices.set_len(len + count);
     }
-
-    texture_resized
   }
 
   #[cfg(debug_assertions)]
