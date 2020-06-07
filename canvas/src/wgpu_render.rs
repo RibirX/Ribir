@@ -3,6 +3,17 @@ pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
 use surface::{PhysicSurface, Surface, TextureSurface};
 
+enum PrimaryBindings {
+  GlobalUniform = 0,
+  TextureAtlas = 1,
+  GlyphTexture = 2,
+  Sampler = 3,
+}
+
+enum SecondBindings {
+  Primitive = 0,
+}
+
 pub struct WgpuRender<S: Surface = PhysicSurface> {
   pub(crate) device: wgpu::Device,
   pub(crate) queue: wgpu::Queue,
@@ -309,7 +320,6 @@ impl<S: Surface> Canvas<S> {
       render_pass.draw_indexed(0..self.render_data.indices.len() as u32, 0, 0..1);
     }
 
-    self.render_data.clear();
 
     if let Some(encoder) = self.encoder.take() {
       self.queue.submit(Some(encoder.finish()));

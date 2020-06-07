@@ -1,21 +1,18 @@
 mod fonts;
-use super::{mem_texture::MemTexture, DeviceSize, Point, Rect, Vertex};
+use super::{canvas::Vertex, mem_texture::MemTexture, DeviceSize, Rect};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use lyon::tessellation::{Count, VertexBuffers};
-use std::{cell::Cell, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
-#[derive(Debug, Default, Clone)]
-pub(crate) struct GlyphStatistics(Rc<Cell<u32>>);
-
-pub(crate) type Section<'a> = glyph_brush::Section<'a, GlyphStatistics>;
+pub(crate) type Section<'a> = glyph_brush::Section<'a, u32>;
 pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
 
 pub struct TextBrush {
   texture: MemTexture<u8>,
   quad_vertices_cache: Vec<[Vertex; 4]>,
   fonts: Fonts,
-  brush: GlyphBrush<[Vertex; 4], GlyphStatistics>,
+  brush: GlyphBrush<[Vertex; 4], u32>,
 }
 
 impl TextBrush {
@@ -92,31 +89,15 @@ impl TextBrush {
   pub(crate) fn texture(&self) -> &MemTexture<u8> { &self.texture }
 
   #[inline]
-  pub(crate) fn queue(&mut self, section: &Section) { self.brush.queue(section); }
+  pub(crate) fn queue(&mut self, section: Section) { self.brush.queue(section); }
 
   /// Processes all queued texts, and push the vertices and indices into the
   /// buffer
   pub(crate) fn process_queued(
     &mut self,
     buffer: &mut VertexBuffers<Vertex, u32>,
-  ) -> Result<lyon::tessellation::Count, Box<dyn std::error::Error>> {
-    loop {
-      match self.try_process_queued() {
-        Ok(_) => break,
-        Err(BrushError::TextureTooSmall { suggested }) => {
-          if self.texture.expand_size(false) {
-            let size = self.texture.size();
-            self.brush.resize_texture(size.width, size.height);
-          } else {
-            return Err(
-              "The text cache buffer is overflow, batch too much texts to draw at once.
-              Maybe you should not batch so many texts to draw or split your single big text draw as many pieces to draw"
-                .into(),
-            );
-          }
-        }
-      };
-    }
+  ) -> Result<lyon::tessellation::Count, BrushError> {
+    self.try_process_queued()?;
 
     let quad_vertices = &self.quad_vertices_cache;
     let VertexBuffers { indices, vertices } = buffer;
@@ -153,6 +134,18 @@ impl TextBrush {
     }
 
     Ok(count)
+  }
+
+  pub(crate) fn grow_texture(&mut self) {
+    if self.texture.expand_size(false) {
+      let size = self.texture.size();
+      self.brush.resize_texture(size.width, size.height);
+    } else {
+      log::error!(
+        "The text cache buffer is overflow, too much texts to draw at once.
+      Maybe you should split your single big text draw as many pieces to draw"
+      );
+    }
   }
 
   #[cfg(debug_assertions)]
@@ -204,7 +197,7 @@ impl TextBrush {
       mut pixel_coords,
       bounds,
       extra,
-    }: glyph_brush::GlyphVertex<GlyphStatistics>,
+    }: glyph_brush::GlyphVertex<u32>,
   ) -> [Vertex; 4] {
     // handle overlapping bounds, modify uv_rect to preserve texture aspect
     if pixel_coords.max.x > bounds.max.x {
@@ -232,7 +225,6 @@ impl TextBrush {
       tex_coords.min.y =
         tex_coords.max.y - tex_coords.height() * pixel_coords.height() / old_height;
     }
-    extra.0.set(extra.0.get() + 1);
 
     let glyph_brush::ab_glyph::Rect {
       min: px_min,
@@ -245,20 +237,24 @@ impl TextBrush {
 
     [
       Vertex {
-        pixel_coords: Point::new(px_min.x, px_min.y),
-        texture_coords: Point::new(tx_min.x, tx_min.y),
+        pixel_coords: [px_min.x, px_min.y],
+        texture_coords: [tx_min.x, tx_min.y],
+        prim_id: *extra,
       },
       Vertex {
-        pixel_coords: Point::new(px_max.x, px_min.y),
-        texture_coords: Point::new(tx_max.x, tx_min.y),
+        pixel_coords: [px_max.x, px_min.y],
+        texture_coords: [tx_max.x, tx_min.y],
+        prim_id: *extra,
       },
       Vertex {
-        pixel_coords: Point::new(px_min.x, px_max.y),
-        texture_coords: Point::new(tx_min.x, tx_max.y),
+        pixel_coords: [px_min.x, px_max.y],
+        texture_coords: [tx_min.x, tx_max.y],
+        prim_id: *extra,
       },
       Vertex {
-        pixel_coords: Point::new(px_max.x, px_max.y),
-        texture_coords: Point::new(tx_max.x, tx_max.y),
+        pixel_coords: [px_max.x, px_max.y],
+        texture_coords: [tx_max.x, tx_max.y],
+        prim_id: *extra,
       },
     ]
   }
@@ -268,27 +264,6 @@ fn glyph_vertices_count(glyphs: u32) -> Count {
   Count {
     vertices: glyphs * 4,
     indices: glyphs * 6,
-  }
-}
-impl From<GlyphStatistics> for lyon::tessellation::Count {
-  fn from(g: GlyphStatistics) -> Self {
-    let glyph_count = g.0.get();
-    glyph_vertices_count(glyph_count)
-  }
-}
-
-// GlyphStatistics as extra data for `Section` just use to count glyphs, not
-// effect on sections content.
-mod no_effect {
-  use super::*;
-  impl std::cmp::PartialEq for GlyphStatistics {
-    #[inline]
-    fn eq(&self, _: &Self) -> bool { true }
-  }
-
-  impl std::hash::Hash for GlyphStatistics {
-    #[inline]
-    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
   }
 }
 
