@@ -61,7 +61,7 @@ impl TextureAtlas {
   /// Return the reference of the soft texture of the atlas, copy it to the
   /// render engine texture to use it.
   #[inline]
-  pub fn texture(&self) -> &MemTexture<u32> { &self.texture }
+  pub fn texture(&mut self) -> &mut MemTexture<u32> { &mut self.texture }
 
   /// Clear the atlas.
   pub fn clear(&mut self) {

@@ -15,7 +15,7 @@ impl<T: Copy + Default> MemTexture<T> {
       max_size,
       array: vec![T::default(); size.area() as usize],
       updated: false,
-      resized: false,
+      resized: true,
     }
   }
 
@@ -104,6 +104,28 @@ impl<T: Copy + Default> MemTexture<T> {
   pub fn data_synced(&mut self) {
     self.resized = false;
     self.updated = false;
+  }
+
+  pub fn log(&self) {
+    let pkg_root = env!("CARGO_MANIFEST_DIR");
+    let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
+
+    let DeviceSize { width, height, .. } = self.size;
+
+    let mut png_encoder = png::Encoder::new(
+      std::fs::File::create(&atlas_capture).unwrap(),
+      width,
+      height,
+    );
+    png_encoder.set_depth(png::BitDepth::Eight);
+    png_encoder.set_color(png::ColorType::Grayscale);
+    png_encoder
+      .write_header()
+      .unwrap()
+      .write_image_data(self.as_bytes())
+      .unwrap();
+
+    log::info!("Write a image of mem texture at: {}", &atlas_capture);
   }
 }
 

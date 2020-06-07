@@ -6,11 +6,13 @@ pub mod error;
 pub mod layer;
 mod mem_texture;
 mod text_brush;
+pub mod wgpu_render;
 
 pub use crate::canvas::*;
 pub use color::Color;
 pub use layer::*;
 pub use text_brush::*;
+pub use wgpu_render::*;
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.

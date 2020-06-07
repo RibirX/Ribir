@@ -1,7 +1,14 @@
+use crate::{
+  canvas::{CanvasRender, RenderData, Vertex},
+  mem_texture::MemTexture,
+  DeviceRect, DeviceSize, LogicUnit, PhysicUnit, Primitive,
+};
 mod img_helper;
 pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
+use std::borrow::Borrow;
 use surface::{PhysicSurface, Surface, TextureSurface};
+use zerocopy::AsBytes;
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -15,32 +22,28 @@ enum SecondBindings {
 }
 
 pub struct WgpuRender<S: Surface = PhysicSurface> {
-  pub(crate) device: wgpu::Device,
-  pub(crate) queue: wgpu::Queue,
-  pub(crate) surface: S,
-  pub(crate) pipeline: wgpu::RenderPipeline,
-  pub(crate) primitives_layout: wgpu::BindGroupLayout,
-  pub(crate) uniform_layout: wgpu::BindGroupLayout,
-  pub(crate) uniforms: wgpu::BindGroup,
-  pub(crate) encoder: Option<wgpu::CommandEncoder>,
-  pub(crate) view: Option<S::V>,
-  pub(crate) rgba_converter: Option<RgbaConvert>,
-  pub(crate) sampler: wgpu::Sampler,
-  glyph_texture: wgpu::Texture,
-  texture_atlas: wgpu::Texture,
+  device: wgpu::Device,
+  queue: wgpu::Queue,
+  surface: S,
+  pipeline: wgpu::RenderPipeline,
+  primitives_layout: wgpu::BindGroupLayout,
+  uniform_layout: wgpu::BindGroupLayout,
+  uniforms: wgpu::BindGroup,
+  rgba_converter: Option<RgbaConvert>,
+  sampler: wgpu::Sampler,
+  glyph: wgpu::Texture,
+  atlas: wgpu::Texture,
 }
 
-
-
-
-
-impl Canvas<PhysicSurface> {
+impl WgpuRender<PhysicSurface> {
   /// Create a canvas and bind to a native window, its size is `width` and
   /// `height`. If you want to create a headless window, use
   /// [`from_window`](Canvas::window).
-  pub async fn from_window<W: raw_window_handle::HasRawWindowHandle>(
+  pub async fn wnd_render<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
     size: DeviceSize,
+    glyph_texture_size: &DeviceSize,
+    atlas_texture_size: &DeviceSize,
   ) -> Self {
     let instance = wgpu::Instance::new();
 
@@ -54,17 +57,25 @@ impl Canvas<PhysicSurface> {
       wgpu::BackendBit::PRIMARY,
     );
 
-    Self::create_canvas(size, adapter, move |device| {
-      PhysicSurface::new(w_surface, &device, size)
-    })
+    Self::new(
+      size,
+      glyph_texture_size,
+      atlas_texture_size,
+      adapter,
+      move |device| PhysicSurface::new(w_surface, &device, size),
+    )
     .await
   }
 }
 
-impl Canvas<TextureSurface> {
-  /// Create a canvas which its size is `width` and `size`, if you want to bind
-  /// to a window, use [`from_window`](Canvas::from_window).
-  pub async fn new(size: DeviceSize) -> Self {
+impl WgpuRender<TextureSurface> {
+  /// Create a WgpuRender, if you want to bind to a window, use
+  /// [`wnd_render`](WgpuRender::wnd_render).
+  pub async fn headless_render(
+    size: DeviceSize,
+    glyph_texture_size: &DeviceSize,
+    atlas_texture_size: &DeviceSize,
+  ) -> Self {
     let instance = wgpu::Instance::new();
 
     let adapter = instance.request_adapter(
@@ -75,13 +86,19 @@ impl Canvas<TextureSurface> {
       wgpu::BackendBit::PRIMARY,
     );
 
-    Canvas::create_canvas(size, adapter, |device| {
-      TextureSurface::new(
-        &device,
-        size,
-        wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
-      )
-    })
+    WgpuRender::new(
+      size,
+      glyph_texture_size,
+      atlas_texture_size,
+      adapter,
+      |device| {
+        TextureSurface::new(
+          &device,
+          size,
+          wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+        )
+      },
+    )
     .await
   }
 
@@ -109,53 +126,87 @@ impl Canvas<TextureSurface> {
   }
 }
 
-impl<S: Surface> Canvas<S> {
-  /// Resize canvas
-  pub fn resize(&mut self, width: u32, height: u32) {
-    self
-      .surface
-      .resize(&self.device, &self.queue, width, height);
-    self.update_uniforms();
-  }
+impl<S: Surface> CanvasRender for WgpuRender<S> {
+  fn draw(
+    &mut self,
+    data: &RenderData,
+    mem_glyph: &mut MemTexture<u8>,
+    mem_atlas: &mut MemTexture<u32>,
+  ) {
+    let mut encoder = self
+      .device
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Render Encoder"),
+      });
 
-  #[cfg(debug_assertions)]
-  pub fn log_texture_atlas(&mut self) {
-    unimplemented!();
-    // self.ensure_rgba_converter();
+    let tex_infos_bind_group = self.create_primitives_bind_group(&data.primitives);
+    let Self {
+      device,
+      glyph,
+      atlas,
+      surface,
+      queue,
+      uniform_layout,
+      ..
+    } = self;
+    let texture_resized = mem_glyph.is_resized() || mem_atlas.is_resized();
+    type TF = wgpu::TextureFormat;
+    Self::sync_texture(device, glyph, mem_glyph, TF::R8Unorm, &mut encoder);
+    Self::sync_texture(device, atlas, mem_atlas, TF::Bgra8UnormSrgb, &mut encoder);
 
-    // let size = self.surface.size();
-    // let Canvas {
-    //   tex_atlas,
-    //   device,
-    //   queue,
-    //   rgba_converter,
-    //   ..
-    // } = self;
+    if texture_resized {
+      let size = surface.size();
+      self.uniforms = create_uniforms(
+        device,
+        uniform_layout,
+        mem_atlas.size(),
+        &coordinate_2d_to_device_matrix(size.width, size.height),
+        &self.sampler,
+        &atlas.create_default_view(),
+        &glyph.create_default_view(),
+      )
+    }
 
-    // let pkg_root = env!("CARGO_MANIFEST_DIR");
-    // let atlas_capture = format!("{}/.log/{}", pkg_root, "texture_atlas.png");
+    let view = surface.get_next_view();
 
-    // let atlas = bgra_texture_to_png(
-    //   &tex_atlas.texture.raw_texture,
-    //   DeviceRect::from_size(size),
-    //   device,
-    //   queue,
-    //   rgba_converter.as_ref().unwrap(),
-    //   std::fs::File::create(&atlas_capture).unwrap(),
-    // );
+    let vb = &data.vertices_buffer;
+    let vertices_buffer =
+      device.create_buffer_with_data(vb.vertices.as_bytes(), wgpu::BufferUsage::VERTEX);
+    let indices_buffer =
+      device.create_buffer_with_data(vb.indices.as_bytes(), wgpu::BufferUsage::INDEX);
 
-    // let _r = futures::executor::block_on(atlas);
+    {
+      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+          attachment: view.borrow(),
+          resolve_target: None,
+          load_op: wgpu::LoadOp::Clear,
+          store_op: wgpu::StoreOp::Store,
+          clear_color: wgpu::Color::WHITE,
+        }],
+        depth_stencil_attachment: None,
+      });
+      render_pass.set_pipeline(&self.pipeline);
+      render_pass.set_vertex_buffer(0, vertices_buffer.slice(..));
+      render_pass.set_index_buffer(indices_buffer.slice(..));
+      render_pass.set_bind_group(0, &self.uniforms, &[]);
+      render_pass.set_bind_group(1, &tex_infos_bind_group, &[]);
 
-    // log::debug!("Write a image of canvas atlas at: {}", &atlas_capture);
+      render_pass.draw_indexed(0..vb.indices.len() as u32, 0, 0..1);
+    }
+
+    queue.submit(Some(encoder.finish()));
   }
 }
 
-impl<S: Surface> Canvas<S> {
-  async fn create_canvas<C>(
+impl<S: Surface> WgpuRender<S> {
+  async fn new<C>(
     size: DeviceSize,
+    glyph_texture_size: &DeviceSize,
+    atlas_texture_size: &DeviceSize,
     adapter: impl std::future::Future<Output = Option<wgpu::Adapter>> + Send,
     surface_ctor: C,
-  ) -> Canvas<S>
+  ) -> WgpuRender<S>
   where
     C: FnOnce(&wgpu::Device) -> S,
   {
@@ -186,7 +237,6 @@ impl<S: Surface> Canvas<S> {
     let pipeline =
       create_render_pipeline(&device, &sc_desc, &[&uniform_layout, &primitives_layout]);
 
-    let tex_atlas = TextureAtlas::new();
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
       address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -201,22 +251,24 @@ impl<S: Surface> Canvas<S> {
       anisotropy_clamp: None,
     });
 
-    let glyph_brush = TextBrush::new();
-    let glyph_texture = Self::glyph_texture(&device, &glyph_brush);
-    let texture_atlas = Self::atlas_texture(&device, &tex_atlas);
+    let glyph_texture =
+      Self::create_wgpu_texture(&device, glyph_texture_size, wgpu::TextureFormat::R8Unorm);
+    let texture_atlas = Self::create_wgpu_texture(
+      &device,
+      atlas_texture_size,
+      wgpu::TextureFormat::Bgra8UnormSrgb,
+    );
     let uniforms = create_uniforms(
       &device,
       &uniform_layout,
-      *tex_atlas.texture().size(),
+      atlas_texture_size,
       &coordinate_2d_to_device_matrix(size.width, size.height),
       &sampler,
       &texture_atlas.create_default_view(),
       &glyph_texture.create_default_view(),
     );
 
-    Canvas {
-      glyph_brush,
-      atlas: tex_atlas,
+    WgpuRender {
       sampler,
       device,
       surface,
@@ -225,30 +277,9 @@ impl<S: Surface> Canvas<S> {
       uniform_layout,
       primitives_layout,
       uniforms,
-      render_data: RenderData::default(),
-      glyph_texture,
-      texture_atlas,
+      glyph: glyph_texture,
+      atlas: texture_atlas,
       rgba_converter: None,
-      encoder: None,
-      view: None,
-    }
-  }
-
-  pub(crate) fn ensure_encoder_exist(&mut self) {
-    if self.encoder.is_none() {
-      self.encoder = Some(
-        self
-          .device
-          .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-          }),
-      )
-    }
-  }
-
-  fn ensure_view_exist(&mut self) {
-    if self.view.is_none() {
-      self.view = Some(self.surface.get_next_view());
     }
   }
 
@@ -258,91 +289,7 @@ impl<S: Surface> Canvas<S> {
     }
   }
 
-
-  /// Submits a series of finished command buffers for execution. You needn't
-  /// call this method manually, only if you want flush drawing things into gpu
-  /// immediately.
-  pub fn submit(&mut self) {
-    if !self.render_data.has_data() {
-      return;
-    }
-
-    self.ensure_encoder_exist();
-    self.ensure_view_exist();
-
-    if self.atlas.texture().is_updated() {
-      self.update_uniforms();
-    }
-
-    let tex_infos_bind_group = self.create_primitives_bind_group();
-
-    let Self {
-      device,
-      encoder,
-      view,
-      glyph_texture,
-      texture_atlas,
-      ..
-    } = self;
-    let encoder = encoder.as_mut().unwrap();
-    let view = view.as_ref().unwrap().borrow();
-
-    self.atlas.flush_cache(device, encoder, texture_atlas);
-    self.glyph_brush.flush_cache(device, encoder, glyph_texture);
-
-    let vertices_buffer = device.create_buffer_with_data(
-      self.render_data.vertices.as_bytes(),
-      wgpu::BufferUsage::VERTEX,
-    );
-
-    let indices_buffer = device.create_buffer_with_data(
-      self.render_data.indices.as_bytes(),
-      wgpu::BufferUsage::INDEX,
-    );
-
-    {
-      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-          attachment: view,
-          resolve_target: None,
-          load_op: wgpu::LoadOp::Clear,
-          store_op: wgpu::StoreOp::Store,
-          clear_color: wgpu::Color::WHITE,
-        }],
-        depth_stencil_attachment: None,
-      });
-      render_pass.set_pipeline(&self.pipeline);
-      render_pass.set_vertex_buffer(0, vertices_buffer.slice(..));
-      render_pass.set_index_buffer(indices_buffer.slice(..));
-      render_pass.set_bind_group(0, &self.uniforms, &[]);
-      render_pass.set_bind_group(1, &tex_infos_bind_group, &[]);
-
-      render_pass.draw_indexed(0..self.render_data.indices.len() as u32, 0, 0..1);
-    }
-
-
-    if let Some(encoder) = self.encoder.take() {
-      self.queue.submit(Some(encoder.finish()));
-    }
-    self.view.take();
-  }
-
-  #[inline]
-  pub(crate) fn update_uniforms(&mut self) {
-    let size = self.surface.size();
-    self.uniforms = create_uniforms(
-      &self.device,
-      &self.uniform_layout,
-      *self.atlas.texture().size(),
-      &coordinate_2d_to_device_matrix(size.width, size.height),
-      &self.sampler,
-      &self.texture_atlas.create_default_view(),
-      &self.glyph_texture.create_default_view(),
-    )
-  }
-
-  fn create_primitives_bind_group(&mut self) -> wgpu::BindGroup {
-    let primitives = &self.render_data.primitives;
+  fn create_primitives_bind_group(&mut self, primitives: &[Primitive]) -> wgpu::BindGroup {
     let primitives_buffer = self
       .device
       .create_buffer_with_data(primitives.as_bytes(), wgpu::BufferUsage::STORAGE);
@@ -356,40 +303,57 @@ impl<S: Surface> Canvas<S> {
     })
   }
 
-  pub(crate) fn resize_glyph_texture(&mut self) {
-    self.glyph_texture = Self::glyph_texture(&self.device, &self.glyph_brush);
-  }
+  fn sync_texture<T: Copy + Default>(
+    device: &wgpu::Device,
+    wgpu_tex: &mut wgpu::Texture,
+    mem_tex: &mut MemTexture<T>,
+    format: wgpu::TextureFormat,
+    encoder: &mut wgpu::CommandEncoder,
+  ) {
+    if mem_tex.is_resized() {
+      *wgpu_tex = Self::create_wgpu_texture(device, mem_tex.size(), format);
+    }
+    if mem_tex.is_updated() {
+      let DeviceSize { width, height, .. } = *mem_tex.size();
+      let buffer = device.create_buffer_with_data(mem_tex.as_bytes(), wgpu::BufferUsage::COPY_SRC);
 
-  fn glyph_texture(device: &wgpu::Device, brush: &TextBrush) -> wgpu::Texture {
-    let size = brush.texture().size();
+      encoder.copy_buffer_to_texture(
+        wgpu::BufferCopyView {
+          buffer: &buffer,
+          layout: wgpu::TextureDataLayout {
+            offset: 0,
+            bytes_per_row: width * std::mem::size_of::<T>() as u32,
+            rows_per_image: height,
+          },
+        },
+        wgpu::TextureCopyView {
+          texture: wgpu_tex,
+          mip_level: 0,
+          origin: wgpu::Origin3d::ZERO,
+        },
+        wgpu::Extent3d {
+          width,
+          height,
+          depth: 1,
+        },
+      )
+    }
+    mem_tex.data_synced();
+  }
+  fn create_wgpu_texture(
+    device: &wgpu::Device,
+    size: &DeviceSize,
+    format: wgpu::TextureFormat,
+  ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("new glyph texture"),
+      label: Some("Create texture for memory texture"),
       size: wgpu::Extent3d {
         width: size.width,
         height: size.height,
         depth: 1,
       },
       dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::R8Unorm,
-      usage: wgpu::TextureUsage::COPY_DST
-        | wgpu::TextureUsage::SAMPLED
-        | wgpu::TextureUsage::COPY_SRC,
-      mip_level_count: 1,
-      sample_count: 1,
-    })
-  }
-
-  fn atlas_texture(device: &wgpu::Device, atlas: &TextureAtlas) -> wgpu::Texture {
-    let size = atlas.texture().size();
-    device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("new glyph texture"),
-      size: wgpu::Extent3d {
-        width: size.width,
-        height: size.height,
-        depth: 1,
-      },
-      dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Bgra8UnormSrgb,
+      format,
       usage: wgpu::TextureUsage::COPY_DST
         | wgpu::TextureUsage::SAMPLED
         | wgpu::TextureUsage::COPY_SRC,
@@ -519,14 +483,14 @@ pub fn coordinate_2d_to_device_matrix(
 fn create_uniforms(
   device: &wgpu::Device,
   layout: &wgpu::BindGroupLayout,
-  atlas_size: DeviceSize,
+  atlas_size: &DeviceSize,
   canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
   sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,
   glyph_texture: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
   let uniform = GlobalUniform {
-    texture_atlas_size: [atlas_size.width, atlas_size.height],
+    texture_atlas_size: atlas_size.to_array(),
     canvas_coordinate_map: canvas_2d_to_device_matrix.to_row_arrays(),
   };
   let uniform_buffer = device.create_buffer_with_data(
@@ -557,15 +521,12 @@ fn create_uniforms(
   })
 }
 
-
 #[repr(C)]
 #[derive(Copy, Clone, AsBytes)]
 struct GlobalUniform {
   canvas_coordinate_map: [[f32; 2]; 3],
   texture_atlas_size: [u32; 2],
 }
-
-
 
 impl Vertex {
   fn desc<'a>() -> wgpu::VertexBufferDescriptor<'a> {
@@ -591,77 +552,6 @@ impl Vertex {
         },
       ],
     }
-  }
-}
-
-/// Flush all data to the texture and ready to commit to gpu.
-  /// Call this function before commit drawing to gpu.
-  pub fn flush_atlas_cache(
-    &mut self,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-    texture: &wgpu::Texture,
-  ) {
-    if self.texture.is_updated() {
-      let DeviceSize { width, height, .. } = *self.texture.size();
-      let buffer =
-        device.create_buffer_with_data(self.texture.as_bytes(), wgpu::BufferUsage::COPY_SRC);
-
-      encoder.copy_buffer_to_texture(
-        wgpu::BufferCopyView {
-          buffer: &buffer,
-          layout: wgpu::TextureDataLayout {
-            offset: 0,
-            bytes_per_row: width * std::mem::size_of::<u32>() as u32,
-            rows_per_image: height,
-          },
-        },
-        wgpu::TextureCopyView {
-          texture,
-          mip_level: 0,
-          origin: wgpu::Origin3d::ZERO,
-        },
-        wgpu::Extent3d {
-          width,
-          height,
-          depth: 1,
-        },
-      )
-    }
-  }
-
-pub fn flush_glyph_cache(
-  &mut self,
-  device: &wgpu::Device,
-  encoder: &mut wgpu::CommandEncoder,
-  texture: &wgpu::Texture,
-) {
-  if self.texture.is_updated() {
-    let buffer =
-      device.create_buffer_with_data(self.texture.as_bytes(), wgpu::BufferUsage::COPY_SRC);
-
-    let DeviceSize { width, height, .. } = *self.texture.size();
-    encoder.copy_buffer_to_texture(
-      wgpu::BufferCopyView {
-        buffer: &buffer,
-        layout: wgpu::TextureDataLayout {
-          offset: 0,
-          bytes_per_row: width,
-          rows_per_image: height,
-        },
-      },
-      wgpu::TextureCopyView {
-        texture,
-        mip_level: 0,
-        origin: wgpu::Origin3d::ZERO,
-      },
-      wgpu::Extent3d {
-        width,
-        height,
-        depth: 1,
-      },
-    );
-    self.texture.data_synced();
   }
 }
 
