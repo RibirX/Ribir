@@ -13,7 +13,7 @@ pub struct Window<'a> {
   render_tree: RenderTree,
   widget_tree: WidgetTree<'a>,
   native_window: NativeWindow,
-  canvas: Canvas,
+  canvas: Canvas<'a>,
 }
 
 impl<'a> Window<'a> {

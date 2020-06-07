@@ -1,13 +1,11 @@
 use crate::{
-  text_brush::GlyphStatistics, Canvas, Color, FontProperties, FontStretch, FontStyle, FontWeight,
-  Point, Rect, Transform, DEFAULT_FONT_FAMILY,
+  Color, FontProperties, FontStretch, FontStyle, FontWeight, Rect, Transform, DEFAULT_FONT_FAMILY,
 };
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
 };
-mod process;
 use std::{
   cmp::PartialEq,
   ops::{Deref, DerefMut},
@@ -20,7 +18,7 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct Rendering2DLayer<'a> {
   state_stack: Vec<State>,
-  commands: Vec<Command<'a>>,
+  pub(crate) commands: Vec<Command<'a>>,
 }
 
 impl<'a> Rendering2DLayer<'a> {
@@ -169,22 +167,6 @@ impl<'a> Rendering2DLayer<'a> {
     *t = t.post_translate(euclid::Vector2D::new(x, y));
     self
   }
-
-  /// All drawing of this layer has finished, commit it to canvas and convert
-  /// the layer to an intermediate render buffer data that will provide to
-  /// render process and can directly commit to canvas.
-  ///
-  /// Return
-  /// If the canvas texture cache is update in the process, will return a
-  /// None-Value that means there is no buffer data can be cached.
-  pub fn finish(self, canvas: &mut Canvas) -> Option<RenderCommand> {
-    process::ProcessLayer2d::new(canvas)
-      .process_layer(self)
-      .and_then(|cmd| {
-        canvas.upload_render_command(&cmd);
-        Some(cmd)
-      })
-  }
 }
 
 /// Describe render the text as single line or break as multiple lines.
@@ -222,13 +204,6 @@ pub struct Text<'a> {
   pub font: FontInfo,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct RenderAttr {
-  pub(crate) count: Count,
-  pub(crate) transform: Transform,
-  pub(crate) style: FillStyle,
-  pub(crate) align_bounds: Rect,
-}
 #[derive(Debug, Clone, PartialEq)]
 pub enum FillStyle {
   Color(Color),
@@ -239,18 +214,6 @@ pub enum FillStyle {
 impl From<Color> for FillStyle {
   #[inline]
   fn from(c: Color) -> Self { FillStyle::Color(c) }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct Vertex {
-  pub(crate) pixel_coords: Point,
-  pub(crate) texture_coords: Point,
-}
-
-#[derive(Debug, Clone)]
-pub struct RenderCommand {
-  pub(crate) geometry: VertexBuffers<Vertex, u32>,
-  pub(crate) attrs: Vec<RenderAttr>,
 }
 
 impl<'a> Rendering2DLayer<'a> {
@@ -322,7 +285,7 @@ struct State {
 }
 
 #[derive(Debug, Clone)]
-enum CommandInfo<'a> {
+pub(crate) enum CommandInfo<'a> {
   Path {
     path: Path,
     style: FillStyle,
@@ -348,9 +311,9 @@ enum CommandInfo<'a> {
 }
 
 #[derive(Debug, Clone)]
-struct Command<'a> {
-  info: CommandInfo<'a>,
-  transform: Transform,
+pub(crate) struct Command<'a> {
+  pub(crate) info: CommandInfo<'a>,
+  pub(crate) transform: Transform,
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -376,22 +339,6 @@ impl<'a, 'b> Deref for LayerGuard<'a, 'b> {
 impl<'a, 'b> DerefMut for LayerGuard<'a, 'b> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-impl Vertex {
-  fn from_stroke_vertex(v: StrokeVertex) -> Self {
-    Self {
-      pixel_coords: Point::from_untyped(v.position()),
-      texture_coords: Point::new(-1., -1.),
-    }
-  }
-
-  fn from_fill_vertex(v: FillVertex) -> Self {
-    Self {
-      pixel_coords: Point::from_untyped(v.position()),
-      texture_coords: Point::new(-1., -1.),
-    }
-  }
 }
 
 impl Default for FillStyle {
@@ -454,27 +401,6 @@ impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
   }
 }
 
-impl<'a> Text<'a> {
-  fn to_glyph_text(&self, canvas: &mut Canvas) -> glyph_brush::Text<'a, GlyphStatistics> {
-    let Text {
-      text,
-      font,
-      font_size,
-    } = self;
-    let font_id = canvas
-      .select_best_match(font.family.as_str(), &font.props)
-      .map(|f| f.id)
-      .unwrap_or_else(|_| canvas.default_font().id);
-
-    glyph_brush::Text {
-      text,
-      font_id,
-      scale: (*font_size).into(),
-      extra: <_>::default(),
-    }
-  }
-}
-
 impl FontInfo {
   pub fn new() -> Self {
     FontInfo {
@@ -512,6 +438,31 @@ impl FontInfo {
   pub fn with_font_size(mut self, font_size: f32) -> Self {
     self.font_size = font_size;
     self
+  }
+}
+
+impl<'a> Text<'a> {
+  pub(crate) fn to_glyph_text(
+    &self,
+    text_brush: &mut crate::text_brush::TextBrush,
+    prim_id: usize,
+  ) -> glyph_brush::Text<'a, u32> {
+    let Text {
+      text,
+      font,
+      font_size,
+    } = self;
+    let font_id = text_brush
+      .select_best_match(font.family.as_str(), &font.props)
+      .map(|f| f.id)
+      .unwrap_or_else(|_| text_brush.default_font().id);
+
+    glyph_brush::Text {
+      text,
+      font_id,
+      scale: (*font_size).into(),
+      extra: prim_id as u32,
+    }
   }
 }
 
