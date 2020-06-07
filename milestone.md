@@ -24,11 +24,12 @@
 
 ## paint & event, runnable (6.1)
 
-- [ ] paint
-  - [ ] which 2d graphic library to use?
-  - [ ] paint flow.
+- [x] paint
+  - [x] which 2d graphic library to use?
+  - [x] paint flow.
+- [ ] Theme data.
 - [ ] event  
-  - [ ] support main window
+  - [ ] window event
   - [ ] event 
     - [ ] event loop
     - [ ] bubbling framework
@@ -36,7 +37,21 @@
       - [ ] point event ?
       - [ ] window event ?
       - [ ] keyboard event
+
+- widgets for todo demo
+- [ ] simple widget
+  - [ ] Button
+  - [ ] Text
+  - [ ] List
+  - [ ] Scroll
+  - [ ] Checkbox
+- [ ] layout widget
+  - [ ] Center
+  - [ ] Row
+- [ ] event widget
   - [ ] input widget.
+  - [ ] click widget
+
 
 ##  we need readable & learnable documents.
 

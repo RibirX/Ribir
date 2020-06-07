@@ -86,7 +86,7 @@ impl TextBrush {
   }
 
   #[inline]
-  pub(crate) fn texture(&self) -> &MemTexture<u8> { &self.texture }
+  pub(crate) fn texture(&mut self) -> &mut MemTexture<u8> { &mut self.texture }
 
   #[inline]
   pub(crate) fn queue(&mut self, section: Section) { self.brush.queue(section); }
@@ -146,32 +146,6 @@ impl TextBrush {
       Maybe you should split your single big text draw as many pieces to draw"
       );
     }
-  }
-
-  #[cfg(debug_assertions)]
-  pub fn log_texture(&mut self) {
-    let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
-
-    let DeviceSize { width, height, .. } = *self.texture().size();
-
-    let mut png_encoder = png::Encoder::new(
-      std::fs::File::create(&atlas_capture).unwrap(),
-      width,
-      height,
-    );
-    png_encoder.set_depth(png::BitDepth::Eight);
-    png_encoder.set_color(png::ColorType::Grayscale);
-    png_encoder
-      .write_header()
-      .unwrap()
-      .write_image_data(self.texture.as_bytes())
-      .unwrap();
-
-    log::debug!(
-      "Write a image of canvas glyphs texture at: {}",
-      &atlas_capture
-    );
   }
 
   fn try_process_queued(&mut self) -> Result<(), BrushError> {

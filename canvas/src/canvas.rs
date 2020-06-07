@@ -1,5 +1,6 @@
 use super::{
   atlas::TextureAtlas,
+  mem_texture::MemTexture,
   tessellator_2d::Tessellator,
   text_brush::{Section, TextBrush},
   Command, CommandInfo, DeviceRect, DeviceSize, FillStyle, HorizontalAlign, Point, Rect,
@@ -34,8 +35,12 @@ pub struct LayerID;
 
 /// The Render that support draw the canvas result render data.
 pub trait CanvasRender {
-  fn new() -> Self;
-  fn draw(&mut self);
+  fn draw(
+    &mut self,
+    data: &RenderData,
+    glyph_texture: &mut MemTexture<u8>,
+    atlas_texture: &mut MemTexture<u32>,
+  );
 }
 
 impl<'a> Canvas<'a> {
@@ -148,7 +153,11 @@ impl<'a> Canvas<'a> {
       .for_each(|layer| self.consume_2d_layer(layer, &mut tessellator, render));
 
     if self.render_data.has_data() {
-      // commit data to render
+      render.draw(
+        &self.render_data,
+        self.glyph_brush.texture(),
+        self.atlas.texture(),
+      )
     }
   }
 
