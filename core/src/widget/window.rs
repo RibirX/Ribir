@@ -1,6 +1,6 @@
 use super::{painting_context::PaintingContext, render_tree::*};
 use crate::{prelude::*, widget::widget_tree::*};
-use canvas::{Canvas, DeviceSize};
+use canvas::{Canvas, DeviceSize, WgpuRender};
 use winit::{
   event::WindowEvent,
   event_loop::EventLoop,
@@ -13,7 +13,8 @@ pub struct Window<'a> {
   render_tree: RenderTree,
   widget_tree: WidgetTree<'a>,
   native_window: NativeWindow,
-  canvas: Canvas<'a>,
+  canvas: Canvas,
+  render: WgpuRender,
 }
 
 impl<'a> Window<'a> {
@@ -23,14 +24,17 @@ impl<'a> Window<'a> {
   pub(crate) fn new<W: Into<Box<dyn Widget + 'a>>>(root: W, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
-    let canvas = Canvas::from_window(&native_window, DeviceSize::new(size.width, size.height));
+    let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
+      &native_window,
+      DeviceSize::new(size.width, size.height),
+    ));
 
-    let canvas = futures::executor::block_on(canvas);
     let mut wnd = Window {
       native_window,
       render_tree: Default::default(),
       widget_tree: Default::default(),
       canvas,
+      render,
     };
 
     wnd.widget_tree.set_root(root.into(), &mut wnd.render_tree);
@@ -39,7 +43,7 @@ impl<'a> Window<'a> {
   }
 
   /// processes native events from this native window
-  pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
+  pub(crate) fn processes_native_event(&mut self, _event: WindowEvent) {
     // todo: should process and dispatch event.
   }
 
@@ -62,8 +66,8 @@ impl<'a> Window<'a> {
   pub(crate) fn draw_frame(&mut self) {
     if let Some(ctx) = PaintingContext::new(&self.render_tree) {
       let layer = ctx.draw();
-      self.canvas.compose_2d_layer(layer);
-      self.canvas.submit();
+      let mut frame = self.canvas.next_frame(&mut self.render);
+      frame.compose_2d_layer(layer);
     }
   }
 

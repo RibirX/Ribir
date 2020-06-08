@@ -33,7 +33,7 @@ impl<T: Copy + Default> MemTexture<T> {
   pub fn is_resized(&self) -> bool { self.resized }
 
   #[inline]
-  pub fn size(&self) -> &DeviceSize { &self.size }
+  pub fn size(&self) -> DeviceSize { self.size }
 
   /// Expand the texture.
   /// Return true if expand successful, false if this texture reach the limit.
@@ -106,9 +106,9 @@ impl<T: Copy + Default> MemTexture<T> {
     self.updated = false;
   }
 
-  pub fn log(&self) {
+  pub fn log(&self, name: &str) {
     let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture = format!("{}/.log/{}", pkg_root, "glyph_texture_cache.png");
+    let atlas_capture = format!("{}/.log/{}", pkg_root, name);
 
     let DeviceSize { width, height, .. } = self.size;
 
@@ -151,7 +151,7 @@ mod tests {
   use super::*;
   #[test]
   fn update_texture() {
-    let mut tex = MemTexture::new(DeviceSize::new(8, 8));
+    let mut tex = MemTexture::new(DeviceSize::new(8, 8), DeviceSize::new(512, 512));
 
     tex.update_texture(&euclid::rect(0, 0, 2, 1), &[00, 01]);
     assert_eq!(&tex[0][0..4], &[00, 01, 0, 0]);
@@ -162,31 +162,31 @@ mod tests {
     tex.update_texture(&euclid::rect(4, 3, 2, 2), &[34, 35, 44, 45]);
     assert_eq!(&tex[3][4..], &[34, 35, 0, 0]);
     assert_eq!(&tex[4][4..], &[44, 45, 0, 0]);
-    debug_assert!(tex.is_updated(), true);
+    assert_eq!(tex.is_updated(), true);
 
     tex.data_synced();
-    debug_assert!(tex.is_updated(), false);
+    assert_eq!(tex.is_updated(), false);
   }
 
   #[test]
   fn grow() {
-    let tex = MemTexture::new(DeviceSize::new(2, 1));
-    tex.set(&DevicePoint::new(0, 1), 1u8);
-    tex.grow_size(DeviceSize::new(2, 2), true);
+    let mut tex = MemTexture::new(DeviceSize::new(2, 1), DeviceSize::new(512, 512));
+    tex.set(&DevicePoint::new(1, 0), 1u8);
+    tex.expand_size(true);
 
-    assert_eq!(tex.as_bytes().len(), 4);
-    assert_eq!(tex.size().to_array(), [2, 2]);
+    assert_eq!(tex.as_bytes().len(), 8);
+    assert_eq!(tex.size().to_array(), [4, 2]);
 
     // old data should keep in the same place.
-    assert_eq!(tex.as_bytes(), &[0, 1, 0, 0]);
-    debug_assert!(tex.is_updated(), true);
-    debug_assert!(tex.is_resized(), true);
+    assert_eq!(tex.as_bytes(), &[0, 1, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(tex.is_updated(), true);
+    assert_eq!(tex.is_resized(), true);
 
     // grow size and throw old data away.
-    tex.grow_size(DeviceSize::new(2, 3), false);
-    assert_eq!(tex.as_bytes(), &[0, 0, 0, 0, 0, 0]);
+    tex.expand_size(false);
+    assert_eq!(tex.as_bytes(), vec![0; 32].as_slice());
 
     tex.data_synced();
-    debug_assert!(tex.is_resized(), false);
+    assert_eq!(tex.is_resized(), false);
   }
 }

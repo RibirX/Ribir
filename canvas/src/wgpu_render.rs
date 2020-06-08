@@ -159,7 +159,7 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
       self.uniforms = create_uniforms(
         device,
         uniform_layout,
-        mem_atlas.size(),
+        &mem_atlas.size(),
         &coordinate_2d_to_device_matrix(size.width, size.height),
         &self.sampler,
         &atlas.create_default_view(),
@@ -311,10 +311,10 @@ impl<S: Surface> WgpuRender<S> {
     encoder: &mut wgpu::CommandEncoder,
   ) {
     if mem_tex.is_resized() {
-      *wgpu_tex = Self::create_wgpu_texture(device, mem_tex.size(), format);
+      *wgpu_tex = Self::create_wgpu_texture(device, &mem_tex.size(), format);
     }
     if mem_tex.is_updated() {
-      let DeviceSize { width, height, .. } = *mem_tex.size();
+      let DeviceSize { width, height, .. } = mem_tex.size();
       let buffer = device.create_buffer_with_data(mem_tex.as_bytes(), wgpu::BufferUsage::COPY_SRC);
 
       encoder.copy_buffer_to_texture(
@@ -371,8 +371,8 @@ fn create_render_pipeline(
   let render_pipeline_layout =
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { bind_group_layouts });
 
-  let vs_module = spv_2_shader_module!(device, "./shaders/geometry.vert.spv");
-  let fs_module = spv_2_shader_module!(device, "./shaders/geometry.frag.spv");
+  let vs_module = spv_2_shader_module!(device, "./wgpu_render/shaders/geometry.vert.spv");
+  let fs_module = spv_2_shader_module!(device, "./wgpu_render/shaders/geometry.frag.spv");
 
   device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
     layout: &render_pipeline_layout,
@@ -586,59 +586,29 @@ mod tests {
 
   #[test]
   #[ignore = "gpu need"]
-  fn render_command_upload_indices_check() {
-    use lyon::tessellation::VertexBuffers;
-
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(100, 100)));
-
-    let v = layer_2d::Vertex {
-      pixel_coords: Point::new(0., 0.),
-      texture_coords: Point::new(-1., -1.),
-    };
-    let r_cmd = RenderCommand {
-      geometry: VertexBuffers {
-        vertices: vec![v.clone(), v.clone(), v],
-        indices: vec![0, 1, 2],
-      },
-      attrs: vec![super::RenderAttr {
-        count: lyon::tessellation::Count {
-          indices: 3,
-          vertices: 3,
-        },
-        align_bounds: Rect::default(),
-        style: FillStyle::Color(Color::WHITE),
-        transform: Transform::default(),
-      }],
-    };
-
-    canvas.upload_render_command(&r_cmd);
-    canvas.upload_render_command(&r_cmd);
-
-    let data = &canvas.render_data;
-    debug_assert_eq!(data.vertices.len(), 6);
-    debug_assert_eq!(&data.indices, &[0, 1, 2, 3, 4, 5]);
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
   fn smoke_draw_circle() {
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let (mut canvas, mut render) = block_on(create_canvas_with_render_headless(DeviceSize::new(
+      400, 400,
+    )));
     let path = circle_50();
 
     let mut layer = canvas.new_2d_layer();
     layer.set_style(FillStyle::Color(Color::BLACK));
     layer.translate(50., 50.);
     layer.fill_path(path);
-    canvas.compose_2d_layer(layer);
-    canvas.submit();
-
-    unit_test::assert_canvas_eq!(canvas, "./test_imgs/smoke_draw_circle.png");
+    {
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
+    unit_test::assert_canvas_eq!(render, "./test_imgs/smoke_draw_circle.png");
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn color_palette_texture() {
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let (mut canvas, mut render) = block_on(create_canvas_with_render_headless(DeviceSize::new(
+      400, 400,
+    )));
     let path = circle_50();
     {
       let mut layer = canvas.new_2d_layer();
@@ -656,10 +626,12 @@ mod tests {
       fill_color_circle(Color::GREEN, 100., 0.);
       fill_color_circle(Color::BLUE, -0., 100.);
 
-      canvas.compose_2d_layer(layer);
-      canvas.submit();
+      {
+        let mut frame = canvas.next_frame(&mut render);
+        frame.compose_2d_layer(layer);
+      }
 
-      unit_test::assert_canvas_eq!(canvas, "./test_imgs/color_palette_texture.png");
+      unit_test::assert_canvas_eq!(render, "./test_imgs/color_palette_texture.png");
     }
   }
 }

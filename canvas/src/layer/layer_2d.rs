@@ -469,9 +469,14 @@ impl<'a> Text<'a> {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::{Size, *};
-
+  use crate::{mem_texture::MemTexture, Size, *};
   use futures::executor::block_on;
+
+  struct MockRender;
+
+  impl CanvasRender for MockRender {
+    fn draw(&mut self, _: &RenderData, _: &mut MemTexture<u8>, _: &mut MemTexture<u32>) {}
+  }
 
   #[test]
   fn save_guard() {
@@ -496,10 +501,9 @@ mod test {
   }
 
   #[test]
-  #[ignore = "gpu need"]
   fn buffer() {
     let mut layer = Rendering2DLayer::new();
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let mut canvas = Canvas::new(DeviceSize::new(400, 400));
     let mut builder = Path::builder();
     builder.add_rectangle(
       &euclid::Rect::from_size((100., 100.).into()),
@@ -508,67 +512,76 @@ mod test {
     let path = builder.build();
     layer.stroke_path(path.clone());
     layer.fill_path(path);
-    let buffer = layer.finish(&mut canvas).unwrap();
 
-    assert!(!buffer.geometry.vertices.is_empty());
-    assert_eq!(buffer.attrs.len(), 1);
+    canvas.consume_2d_layer(
+      layer,
+      &mut tessellator_2d::Tessellator::new(),
+      &mut MockRender {},
+    );
+
+    assert!(canvas.render_data().has_data());
   }
 
   #[test]
-  #[ignore = "gpu need"]
   fn path_merge() {
     let mut layer = Rendering2DLayer::new();
 
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
+    let mut canvas = Canvas::new(DeviceSize::new(400, 400));
+    let mut tessellator = tessellator_2d::Tessellator::new();
+    let mut mock_render = MockRender {};
 
     let sample_path = Path::builder().build();
     // The stroke path both style and line width same should be merge.
     layer.stroke_path(sample_path.clone());
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 1);
+    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    assert_eq!(canvas.render_data().primitives.len(), 1);
 
     // Different line width with same color pen can be merged.
     layer.set_line_width(2.);
     layer.stroke_path(sample_path.clone());
-    assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 1);
+    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    assert_eq!(canvas.render_data().primitives.len(), 1);
 
     // Different color can't be merged.
     layer.set_style(FillStyle::Color(Color::YELLOW));
     layer.fill_path(sample_path.clone());
-    assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 2);
+    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    assert_eq!(canvas.render_data().primitives.len(), 2);
 
     // Different type style can't be merged
     layer.set_style(FillStyle::Image);
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
-
-    // fixme: image not support now
-    // assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 4);
-  }
-
-  fn canvas() -> Canvas<crate::canvas::surface::TextureSurface> {
-    block_on(Canvas::new(DeviceSize::new(400, 400)))
+    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    assert_eq!(canvas.render_data().primitives.len(), 4);
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn fill_text_hello() {
-    let mut canvas = canvas();
+    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
+      DeviceSize::new(400, 400),
+    ));
 
     let mut layer = canvas.new_2d_layer();
     let font = FontInfo::new();
     layer.set_font(font);
     layer.fill_text("Nice to meet you!", None);
-    canvas.compose_2d_layer(layer);
-    canvas.submit();
+    {
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
 
-    unit_test::assert_canvas_eq!(canvas, "./test_imgs/text_hello.png");
+    unit_test::assert_canvas_eq!(render, "./test_imgs/text_hello.png");
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn fill_text_complex() {
-    let mut canvas = canvas();
+    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
+      DeviceSize::new(400, 400),
+    ));
     let serif = FontInfo::new();
 
     let mut layer = canvas.new_2d_layer();
@@ -626,16 +639,20 @@ And by opposing end them? To die: to sleep;
       }),
     );
 
-    canvas.compose_2d_layer(layer);
-    canvas.submit();
+    {
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
 
-    unit_test::assert_canvas_eq!(canvas, "./test_imgs/complex_text.png");
+    unit_test::assert_canvas_eq!(render, "./test_imgs/complex_text.png");
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn fill_text_complex_single_style() {
-    let mut canvas = canvas();
+    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
+      DeviceSize::new(400, 400),
+    ));
     let arial = FontInfo::new().with_family("Arial".to_owned());
     let serif = FontInfo::new();
     let mut layer = canvas.new_2d_layer();
@@ -671,19 +688,24 @@ And by opposing end them? To die: to sleep;\n",
       }),
     );
 
-    canvas.compose_2d_layer(layer);
-    canvas.submit();
+    {
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
 
-    unit_test::assert_canvas_eq!(canvas, "./test_imgs/complex_text_single_style.png");
+    unit_test::assert_canvas_eq!(render, "./test_imgs/complex_text_single_style.png");
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn update_texture_on_processing() {
-    let text = include_str!("../fonts/loads-of-unicode.txt");
-    let mut canvas = canvas();
+    let text = include_str!("../../fonts/loads-of-unicode.txt");
+    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
+      DeviceSize::new(400, 400),
+    ));
     let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
     canvas
+      .text_brush()
       .load_font_from_path(crate_root.clone() + "/fonts/DejaVuSans.ttf", 0)
       .unwrap();
     let deja = FontInfo::new().with_family("DejaVu Sans".to_owned());
@@ -702,11 +724,11 @@ And by opposing end them? To die: to sleep;\n",
       }),
     );
 
-    let buffer = layer.finish(&mut canvas);
-    assert!(buffer.is_none());
+    {
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
 
-    canvas.submit();
-
-    unit_test::assert_canvas_eq!(canvas, "./test_imgs/texture_cache_update.png");
+    unit_test::assert_canvas_eq!(render, "./test_imgs/texture_cache_update.png");
   }
 }

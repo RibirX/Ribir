@@ -32,3 +32,33 @@ pub type Transform = euclid::Transform2D<f32, LogicUnit, LogicUnit>;
 pub type DeviceRect = euclid::Rect<u32, PhysicUnit>;
 pub type DevicePoint = euclid::Point2D<u32, PhysicUnit>;
 pub type DeviceSize = euclid::Size2D<u32, PhysicUnit>;
+
+pub async fn create_canvas_with_render_from_wnd<W: raw_window_handle::HasRawWindowHandle>(
+  window: &W,
+  size: DeviceSize,
+) -> (Canvas, WgpuRender) {
+  let mut canvas = Canvas::new(size);
+  let render = WgpuRender::wnd_render(
+    window,
+    size,
+    &canvas.text_brush().texture().size(),
+    &canvas.atlas().texture().size(),
+  )
+  .await;
+
+  (canvas, render)
+}
+
+pub async fn create_canvas_with_render_headless(
+  size: DeviceSize,
+) -> (Canvas, WgpuRender<surface::TextureSurface>) {
+  let mut canvas = Canvas::new(size);
+  let render = WgpuRender::headless_render(
+    size,
+    &canvas.text_brush().texture().size(),
+    &canvas.atlas().texture().size(),
+  )
+  .await;
+
+  (canvas, render)
+}
