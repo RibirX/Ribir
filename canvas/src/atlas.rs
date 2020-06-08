@@ -78,6 +78,9 @@ impl TextureAtlas {
     self.texture.clear();
   }
 
+  #[inline]
+  pub fn log_png_to(&self, path: &str) { self.texture.log_png_to(path, png::ColorType::RGBA); }
+
   fn add_color(&mut self, color: u32) -> DevicePoint {
     let index = self.palette_stored as u32;
     let offset = euclid::Vector2D::new(index % PALETTE_SIZE, index / PALETTE_SIZE);
@@ -85,7 +88,7 @@ impl TextureAtlas {
     let pos = DevicePoint::from_untyped(pos);
 
     self.indexed_colors.insert(color, pos);
-    self.texture.set(&pos, color);
+    self.texture.set(&pos, color.to_be());
     self.palette_stored += 1;
     pos
   }
