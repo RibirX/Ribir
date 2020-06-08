@@ -30,5 +30,8 @@ void main() {
         discard;
     }
     f_color = texture(sampler2D(t_atals, s_sampler), tex_pos);
-    f_color = f_color * vec4(1.0, 1.0, 1.0, alpha);
+
+    // rbga fomat texture store in a Bgra8UnormSrgb texture.
+    // so f_color should be `b, g, r, a`, but Big-Endian byte order ?
+    f_color = vec4(f_color.a, f_color.r, f_color.g, f_color.b * alpha);
 }

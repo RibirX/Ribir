@@ -86,7 +86,10 @@ impl TextBrush {
   }
 
   #[inline]
-  pub(crate) fn texture(&mut self) -> &mut MemTexture<u8> { &mut self.texture }
+  pub(crate) fn texture(&self) -> &MemTexture<u8> { &self.texture }
+
+  #[inline]
+  pub(crate) fn texture_mut(&mut self) -> &mut MemTexture<u8> { &mut self.texture }
 
   #[inline]
   pub(crate) fn queue(&mut self, section: Section) { self.brush.queue(section); }
@@ -244,11 +247,12 @@ fn glyph_vertices_count(glyphs: u32) -> Count {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::canvas::*;
-  use futures::executor::block_on;
   use glyph_brush::Text;
 
-  fn add_default_fonts<S: Surface>(brush: &mut Canvas<S>) {
+  const INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
+  const MAX_SIZE: DeviceSize = DeviceSize::new(4096, 4096);
+
+  fn add_default_fonts(brush: &mut TextBrush) {
     brush
       .load_font_from_bytes(include_bytes!("../fonts/DejaVuSans.ttf").to_vec(), 0)
       .unwrap();
@@ -258,7 +262,7 @@ mod tests {
   }
   #[test]
   fn custom_fonts_use() {
-    let mut brush = TextBrush::new();
+    let mut brush = TextBrush::new(INIT_SIZE, MAX_SIZE);
 
     let deja = include_bytes!("../fonts/DejaVuSans.ttf");
     brush.load_font_from_bytes(deja.to_vec(), 0).unwrap();
@@ -275,29 +279,23 @@ mod tests {
   }
 
   #[test]
-  #[ignore = "gpu need"]
   fn glyph_cache_check() {
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(400, 400)));
-    add_default_fonts(&mut canvas);
+    let mut brush = TextBrush::new(INIT_SIZE, MAX_SIZE);
+    brush.texture_mut().data_synced();
+
+    add_default_fonts(&mut brush);
     let str = "Hello_glyph!";
     let section = Section::new().add_text(Text::default().with_text(str));
-    canvas.queue(&section);
+    brush.queue(section);
 
     let mut buffer = VertexBuffers::new();
-    canvas.process_queued(&mut buffer);
+    brush.process_queued(&mut buffer).unwrap();
 
     assert_eq!(buffer.vertices.len(), str.chars().count() * 4);
-    assert_eq!(canvas.glyph_brush.texture_updated, true);
-    assert_eq!(canvas.glyph_brush.texture_resized, false);
+    assert_eq!(brush.texture().is_updated(), true);
+    assert_eq!(brush.texture().is_resized(), false);
 
-    // force submit data
-    if let Some(encoder) = canvas.encoder.take() {
-      canvas.queue.submit(Some(encoder.finish()));
-    }
-    canvas.view.take();
-
-    #[cfg(debug_assertions)]
-    canvas.log_glyph_texture();
+    brush.texture().log("glyph_texture_cache.png");
 
     unit_test::assert_img_eq!(
       "./test_imgs/hello_glyph_cache.png",
@@ -309,16 +307,18 @@ mod tests {
   use test::Bencher;
 
   #[bench]
-  #[ignore = "gpu need"]
   fn generate_vertices(b: &mut Bencher) {
-    let mut canvas = block_on(Canvas::new(DeviceSize::new(800, 800)));
-    let _ = canvas.select_best_match("Times New Roman", &FontProperties::default());
+    let mut brush = TextBrush::new(INIT_SIZE, MAX_SIZE);
+
+    let _ = brush.select_best_match("Times New Roman", &FontProperties::default());
     let text = include_str!("../fonts/loads-of-unicode.txt");
     let sec = Section::new().add_text(glyph_brush::Text::default().with_text(text));
     b.iter(|| {
       let mut buffer = VertexBuffers::new();
-      canvas.queue(&sec);
-      canvas.process_queued(&mut buffer);
+      brush.queue(sec.clone());
+      while brush.process_queued(&mut buffer).is_err() {
+        brush.grow_texture();
+      }
     })
   }
 }

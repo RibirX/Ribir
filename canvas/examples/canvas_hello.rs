@@ -1,4 +1,4 @@
-use canvas::*;
+use canvas::{create_canvas_with_render_from_wnd, Color, DeviceSize, Path, PathBuilder, Winding};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -13,7 +13,7 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
-  let mut canvas = block_on(Canvas::from_window(
+  let (mut canvas, mut render) = block_on(create_canvas_with_render_from_wnd(
     &window,
     DeviceSize::new(size.width, size.height),
   ));
@@ -36,13 +36,12 @@ fn main() {
     },
     Event::RedrawRequested(_) => {
       let mut layer = canvas.new_2d_layer();
-      layer.set_style(FillStyle::Color(Color::YELLOW.into()));
+      layer.set_style(Color::YELLOW.into());
       let mut path = Path::builder();
       path.add_circle(euclid::Point2D::new(200., 200.), 100., Winding::Positive);
       let path = path.build();
       layer.fill_path(path);
-      canvas.compose_2d_layer(layer);
-      canvas.submit();
+      canvas.next_frame(&mut render).compose_2d_layer(layer);
     }
     Event::MainEventsCleared => {
       window.request_redraw();

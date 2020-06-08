@@ -14,6 +14,7 @@ void main() {
       ((abgr >> 16) & 0x000000FFu) |
       (abgr & 0xFF00FF00u);
 
+    // Big-Endian ?
     // indices[index] = 0xFF000000;     // alpha
     // indices[index] = 0xFFFF0000;     // blue
     // indices[index] = 0xFF00FF00;     // green

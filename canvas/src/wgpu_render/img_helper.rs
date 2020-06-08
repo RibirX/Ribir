@@ -19,7 +19,7 @@ impl RgbaConvert {
       label: None,
     });
 
-    let cs_module = spv_2_shader_module!(device, "../shaders/bgra_2_rgba.comp.spv");
+    let cs_module = spv_2_shader_module!(device, "./shaders/bgra_2_rgba.comp.spv");
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       bind_group_layouts: &[&group_layout],

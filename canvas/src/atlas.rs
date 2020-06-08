@@ -30,7 +30,8 @@ impl TextureAtlas {
 
   /// Store the `color` in, return the position in the texture of the color was.
   pub fn store_color(&mut self, color: Color) -> Result<DevicePoint, CanvasError> {
-    if let Some(pos) = self.indexed_colors.get(&color.as_u32()) {
+    let color = color.as_u32();
+    if let Some(pos) = self.indexed_colors.get(&color) {
       return Ok(*pos);
     }
     if !self.is_palette_fulled() {
@@ -46,7 +47,11 @@ impl TextureAtlas {
         self.palette_alloc = alloc;
         self.palette_stored = 0;
         break true;
-      } else if !self.texture.expand_size(true) {
+      } else if self.texture.expand_size(true) {
+        self
+          .atlas_allocator
+          .grow(self.texture().size().to_i32().to_untyped());
+      } else {
         break false;
       }
     };
@@ -61,7 +66,10 @@ impl TextureAtlas {
   /// Return the reference of the soft texture of the atlas, copy it to the
   /// render engine texture to use it.
   #[inline]
-  pub fn texture(&mut self) -> &mut MemTexture<u32> { &mut self.texture }
+  pub fn texture(&self) -> &MemTexture<u32> { &self.texture }
+
+  #[inline]
+  pub fn texture_mut(&mut self) -> &mut MemTexture<u32> { &mut self.texture }
 
   /// Clear the atlas.
   pub fn clear(&mut self) {
@@ -70,14 +78,14 @@ impl TextureAtlas {
     self.texture.clear();
   }
 
-  fn add_color(&mut self, color: Color) -> DevicePoint {
+  fn add_color(&mut self, color: u32) -> DevicePoint {
     let index = self.palette_stored as u32;
     let offset = euclid::Vector2D::new(index % PALETTE_SIZE, index / PALETTE_SIZE);
     let pos = self.palette_alloc.rectangle.min.to_u32() + offset;
     let pos = DevicePoint::from_untyped(pos);
-    let u_color = color.as_u32();
-    self.indexed_colors.insert(u_color, pos);
-    self.texture.set(&pos, u_color);
+
+    self.indexed_colors.insert(color, pos);
+    self.texture.set(&pos, color);
     self.palette_stored += 1;
     pos
   }
@@ -85,48 +93,29 @@ impl TextureAtlas {
   #[inline]
   fn is_palette_fulled(&self) -> bool {
     const PALETTE_SLOTS: usize = (PALETTE_SIZE * PALETTE_SIZE) as usize;
-    self.palette_stored < PALETTE_SLOTS
+    self.palette_stored >= PALETTE_SLOTS
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  const INIT_SIZE: DeviceSize = DeviceSize::new(32, 32);
+  const MAX_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
+
   #[test]
   fn store_color_smoke() {
-    let mut atlas = TextureAtlas::new();
-    atlas.store_color(Color::RED).unwrap();
-    atlas.store_color(Color::RED).unwrap();
+    let mut atlas = TextureAtlas::new(INIT_SIZE, MAX_SIZE);
+    let r1 = atlas.store_color(Color::RED).unwrap();
+    let r2 = atlas.store_color(Color::RED).unwrap();
+    assert_eq!(r1, r2);
+    assert!(atlas.texture().is_updated());
 
-    assert_eq!(
-      atlas.current_palette.data()[0],
-      palette::color_as_bgra(Color::RED)
-    );
-    assert_eq!(atlas.current_palette.data()[1], 0);
-    assert_eq!(atlas.current_palette.is_fulled(), false);
-    assert_eq!(atlas.texture[0][0], 0);
-
-    atlas.new_palette();
-    assert_eq!(atlas.current_palette.data()[0], 0);
-    assert_eq!(atlas.texture[0][0], palette::color_as_bgra(Color::RED));
-  }
-
-  #[test]
-  fn grow_texture() {
-    let mut atlas = TextureAtlas::new();
-    atlas.store_color(Color::RED).unwrap();
-
-    while atlas.new_palette() {}
-    let mut i = 0;
-    while !atlas.current_palette.is_fulled() {
-      i += 1;
+    (0..512).for_each(|i| {
       atlas.store_color(Color::from_u32(i)).unwrap();
-    }
-
-    atlas.store_color(Color::from_u32(0)).unwrap();
-
-    assert!(atlas.is_texture_resized());
-    // stored color should be kept after texture grow.
-    assert_eq!(atlas.texture[0][0], palette::color_as_bgra(Color::RED));
+    });
+    assert_eq!(atlas.texture()[0][0], Color::RED.as_u32());
+    assert!(atlas.texture().is_updated());
+    assert!(atlas.texture().is_resized());
   }
 }
