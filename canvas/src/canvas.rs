@@ -160,7 +160,7 @@ impl Canvas {
   }
 
   #[inline]
-  pub(crate) fn atlas(&self) -> &TextureAtlas { &self.atlas }
+  pub fn atlas(&self) -> &TextureAtlas { &self.atlas }
 
   pub fn consume_2d_layer<R: CanvasRender>(
     &mut self,

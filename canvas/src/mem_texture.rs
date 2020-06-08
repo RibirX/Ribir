@@ -106,7 +106,7 @@ impl<T: Copy + Default> MemTexture<T> {
     self.updated = false;
   }
 
-  pub fn log(&self, name: &str) {
+  pub fn log_png_to(&self, name: &str, color: png::ColorType) {
     let pkg_root = env!("CARGO_MANIFEST_DIR");
     let atlas_capture = format!("{}/.log/{}", pkg_root, name);
 
@@ -118,7 +118,7 @@ impl<T: Copy + Default> MemTexture<T> {
       height,
     );
     png_encoder.set_depth(png::BitDepth::Eight);
-    png_encoder.set_color(png::ColorType::Grayscale);
+    png_encoder.set_color(color);
     png_encoder
       .write_header()
       .unwrap()

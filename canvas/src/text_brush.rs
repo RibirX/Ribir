@@ -78,6 +78,11 @@ impl TextBrush {
       .expect("Canvas default font not exist!")
   }
 
+  #[inline]
+  pub fn log_glyph_cache_png_to(&self, path: &str) {
+    self.texture.log_png_to(path, png::ColorType::Grayscale);
+  }
+
   pub(crate) fn section_bounds(&mut self, sec: &Section) -> Option<Rect> {
     self
       .brush
@@ -295,7 +300,7 @@ mod tests {
     assert_eq!(brush.texture().is_updated(), true);
     assert_eq!(brush.texture().is_resized(), false);
 
-    brush.texture().log("glyph_texture_cache.png");
+    brush.log_glyph_cache_png_to("glyph_texture_cache.png");
 
     unit_test::assert_img_eq!(
       "./test_imgs/hello_glyph_cache.png",
