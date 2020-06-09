@@ -187,7 +187,7 @@ impl Canvas {
             let text = text.to_glyph_text(self.text_brush(), 0);
             let mut sec = Section::new().add_text(text);
             if let Some(max_width) = max_width {
-              sec.bounds = (max_width, f32::INFINITY).into()
+              sec.bounds = (max_width, f32::INFINITY)
             }
             let align_bounds = section_bounds_to_align_texture(self.text_brush(), &style, &sec);
             if !align_bounds.is_empty_or_negative() {
@@ -303,7 +303,6 @@ impl<'a, R: CanvasRender> Drop for Frame<'a, R> {
     let mut tessellator = crate::tessellator_2d::Tessellator::new();
     composed
       .drain(..)
-      .into_iter()
       .for_each(|layer| canvas.consume_2d_layer(layer, &mut tessellator, *render));
     self.canvas.submit(self.render);
   }
@@ -431,7 +430,7 @@ fn section_bounds_to_align_texture(
   if let FillStyle::Color(_) = style {
     COLOR_BOUNDS_TO_ALIGN_TEXTURE
   } else {
-    text_brush.section_bounds(sec).unwrap_or(Rect::zero())
+    text_brush.section_bounds(sec).unwrap_or_else(Rect::zero)
   }
 }
 

@@ -76,7 +76,7 @@ impl<T: Copy + Default> MemTexture<T> {
   }
 
   /// Set `v` to the pixel at `pos`.
-  pub fn set(&mut self, pos: &DevicePoint, v: T) {
+  pub fn set(&mut self, pos: DevicePoint, v: T) {
     self[pos.y][pos.x as usize] = v;
     self.updated = true;
   }
@@ -91,7 +91,7 @@ impl<T: Copy + Default> MemTexture<T> {
     debug_assert!(DeviceRect::from_size(self.size).contains_rect(&rect));
     let rect = rect.to_usize();
 
-    rect.y_range().into_iter().enumerate().for_each(|(idx, y)| {
+    rect.y_range().enumerate().for_each(|(idx, y)| {
       let offset = idx * rect.width();
       self[y as u32][rect.x_range()].copy_from_slice(&data[offset..offset + rect.width()]);
     });
@@ -153,8 +153,8 @@ mod tests {
   fn update_texture() {
     let mut tex = MemTexture::new(DeviceSize::new(8, 8), DeviceSize::new(512, 512));
 
-    tex.update_texture(&euclid::rect(0, 0, 2, 1), &[00, 01]);
-    assert_eq!(&tex[0][0..4], &[00, 01, 0, 0]);
+    tex.update_texture(&euclid::rect(0, 0, 2, 1), &[0, 1]);
+    assert_eq!(&tex[0][0..4], &[00, 1, 0, 0]);
 
     tex.update_texture(&euclid::rect(3, 7, 2, 1), &[73, 74]);
     assert_eq!(tex[7][3], 73);
@@ -171,7 +171,7 @@ mod tests {
   #[test]
   fn grow() {
     let mut tex = MemTexture::new(DeviceSize::new(2, 1), DeviceSize::new(512, 512));
-    tex.set(&DevicePoint::new(1, 0), 1u8);
+    tex.set(DevicePoint::new(1, 0), 1u8);
     tex.expand_size(true);
 
     assert_eq!(tex.as_bytes().len(), 8);

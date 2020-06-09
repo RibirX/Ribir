@@ -15,7 +15,7 @@ use std::{
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
 /// bottom edge of the canvas.
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Rendering2DLayer<'a> {
   state_stack: Vec<State>,
   pub(crate) commands: Vec<Command<'a>>,
@@ -276,6 +276,16 @@ pub struct FontInfo {
   font_size: f32,
 }
 
+impl Default for FontInfo {
+  fn default() -> Self {
+    FontInfo {
+      family: DEFAULT_FONT_FAMILY.to_owned(),
+      props: <_>::default(),
+      font_size: 14.,
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 struct State {
   transform: Transform,
@@ -402,13 +412,8 @@ impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
 }
 
 impl FontInfo {
-  pub fn new() -> Self {
-    FontInfo {
-      family: DEFAULT_FONT_FAMILY.to_owned(),
-      props: <_>::default(),
-      font_size: 14.,
-    }
-  }
+  #[inline]
+  pub fn new() -> Self { <_>::default() }
 
   #[inline]
   pub fn with_family(mut self, family: String) -> Self {

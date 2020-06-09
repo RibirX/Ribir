@@ -11,12 +11,8 @@ pub struct Tessellator {
 }
 
 impl Tessellator {
-  pub fn new() -> Self {
-    Self {
-      stroke_tess: <_>::default(),
-      fill_tess: FillTessellator::new(),
-    }
-  }
+  #[inline]
+  pub fn new() -> Self { <_>::default() }
 
   pub fn tessellate(
     &mut self,
@@ -54,5 +50,14 @@ impl Tessellator {
         )
         .unwrap()
     };
+  }
+}
+
+impl Default for Tessellator {
+  fn default() -> Self {
+    Self {
+      stroke_tess: <_>::default(),
+      fill_tess: FillTessellator::new(),
+    }
   }
 }
