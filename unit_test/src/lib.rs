@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 pub macro write_canvas_to($canvas: expr, $path: expr) {
   let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
   let writer = std::fs::File::create(&abs_path).unwrap();
-  let _ = block_on($canvas.to_png(writer));
+  let _ = block_on($canvas.write_png(writer));
 }
 
 /// check if the frame is equal to the image at `path`, the path relative the
@@ -20,7 +20,7 @@ pub macro assert_canvas_eq($frame: expr, $path: expr $(,)?) {
 
   let mut frame_data = vec![];
   let cursor = std::io::Cursor::new(&mut frame_data);
-  block_on($frame.to_png(cursor)).unwrap();
+  block_on($frame.write_png(cursor)).unwrap();
 
   if file_data != frame_data {
     panic!(

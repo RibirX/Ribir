@@ -313,17 +313,17 @@ mod tests {
 
   #[test]
   fn as_u32() {
-    assert_eq!(Color::BLACK.as_u32(), 0x000000FF);
-    assert_eq!(Color::RED.as_u32(), 0xFF0000FF);
+    assert_eq!(Color::BLACK.as_u32(), 0x0000_00FF);
+    assert_eq!(Color::RED.as_u32(), 0xFF00_00FF);
   }
 
   #[test]
   fn lighten() {
     let mut black = Color::BLACK;
-    assert_eq!(black.lighten(0.1).as_u32(), 0x1A1A1AFF);
-    assert_eq!(black.lighten(0.1).as_u32(), 0x333333FF);
-    assert_eq!(black.lighten(0.1).as_u32(), 0x4C4C4CFF);
-    assert_eq!(black.lighten(1.).as_u32(), 0xFFFFFFFF);
+    assert_eq!(black.lighten(0.1).as_u32(), 0x1A1A_1AFF);
+    assert_eq!(black.lighten(0.1).as_u32(), 0x3333_33FF);
+    assert_eq!(black.lighten(0.1).as_u32(), 0x4C4C_4CFF);
+    assert_eq!(black.lighten(1.).as_u32(), 0xFFFF_FFFF);
   }
 
   #[bench]
@@ -340,10 +340,7 @@ mod tests {
   #[bench]
   fn u8_to_f32(b: &mut Bencher) {
     b.iter(|| {
-      let sum: f32 = (0..100)
-        .into_iter()
-        .map(|i| Color::u8_to_f32(i as u8))
-        .sum();
+      let sum: f32 = (0..100).map(|i| Color::u8_to_f32(i as u8)).sum();
       sum
     })
   }

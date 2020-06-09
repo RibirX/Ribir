@@ -41,8 +41,8 @@ pub async fn create_canvas_with_render_from_wnd<W: raw_window_handle::HasRawWind
   let render = WgpuRender::wnd_render(
     window,
     size,
-    &canvas.text_brush().texture().size(),
-    &canvas.atlas().texture().size(),
+    canvas.text_brush().texture().size(),
+    canvas.atlas().texture().size(),
   )
   .await;
 
@@ -55,8 +55,8 @@ pub async fn create_canvas_with_render_headless(
   let mut canvas = Canvas::new(size);
   let render = WgpuRender::headless_render(
     size,
-    &canvas.text_brush().texture().size(),
-    &canvas.atlas().texture().size(),
+    canvas.text_brush().texture().size(),
+    canvas.atlas().texture().size(),
   )
   .await;
 

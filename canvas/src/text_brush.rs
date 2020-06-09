@@ -163,7 +163,7 @@ impl TextBrush {
         let rect = euclid::Box2D::new(rect.min.into(), rect.max.into()).to_rect();
         texture.update_texture(&rect, data);
       },
-      Self::to_vertex,
+      Self::convert_vertex,
     )?;
     match action {
       BrushAction::Draw(vertices) => self.quad_vertices_cache = vertices,
@@ -173,7 +173,7 @@ impl TextBrush {
     Ok(())
   }
 
-  fn to_vertex(
+  fn convert_vertex(
     glyph_brush::GlyphVertex {
       mut tex_coords,
       mut pixel_coords,
@@ -315,7 +315,7 @@ mod tests {
   fn generate_vertices(b: &mut Bencher) {
     let mut brush = TextBrush::new(INIT_SIZE, MAX_SIZE);
 
-    let _ = brush.select_best_match("Times New Roman", &FontProperties::default());
+    let _ = brush.select_best_match("DejaVu Serif, Arial", &FontProperties::default());
     let text = include_str!("../fonts/loads-of-unicode.txt");
     let sec = Section::new().add_text(glyph_brush::Text::default().with_text(text));
     b.iter(|| {

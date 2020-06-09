@@ -42,8 +42,8 @@ impl WgpuRender<PhysicSurface> {
   pub async fn wnd_render<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
     size: DeviceSize,
-    glyph_texture_size: &DeviceSize,
-    atlas_texture_size: &DeviceSize,
+    glyph_texture_size: DeviceSize,
+    atlas_texture_size: DeviceSize,
   ) -> Self {
     let instance = wgpu::Instance::new();
 
@@ -74,8 +74,8 @@ impl WgpuRender<TextureSurface> {
   /// [`wnd_render`](WgpuRender::wnd_render).
   pub async fn headless_render(
     size: DeviceSize,
-    glyph_texture_size: &DeviceSize,
-    atlas_texture_size: &DeviceSize,
+    glyph_texture_size: DeviceSize,
+    atlas_texture_size: DeviceSize,
   ) -> Self {
     let instance = wgpu::Instance::new();
 
@@ -105,7 +105,7 @@ impl WgpuRender<TextureSurface> {
   }
 
   /// PNG encoded the canvas then write by `writer`.
-  pub async fn to_png<W: std::io::Write>(&mut self, writer: W) -> Result<(), &'static str> {
+  pub async fn write_png<W: std::io::Write>(&mut self, writer: W) -> Result<(), &'static str> {
     self.ensure_rgba_converter();
     let rect = DeviceRect::from_size(self.surface.size());
 
@@ -161,7 +161,7 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
       self.uniforms = create_uniforms(
         device,
         uniform_layout,
-        &mem_atlas.size(),
+        mem_atlas.size(),
         &coordinate_2d_to_device_matrix(size.width, size.height),
         &self.sampler,
         &atlas.create_default_view(),
@@ -204,8 +204,8 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
 impl<S: Surface> WgpuRender<S> {
   async fn new<C>(
     size: DeviceSize,
-    glyph_texture_size: &DeviceSize,
-    atlas_texture_size: &DeviceSize,
+    glyph_texture_size: DeviceSize,
+    atlas_texture_size: DeviceSize,
     adapter: impl std::future::Future<Output = Option<wgpu::Adapter>> + Send,
     surface_ctor: C,
   ) -> WgpuRender<S>
@@ -313,7 +313,7 @@ impl<S: Surface> WgpuRender<S> {
     encoder: &mut wgpu::CommandEncoder,
   ) {
     if mem_tex.is_resized() {
-      *wgpu_tex = Self::create_wgpu_texture(device, &mem_tex.size(), format);
+      *wgpu_tex = Self::create_wgpu_texture(device, mem_tex.size(), format);
     }
     if mem_tex.is_updated() {
       let DeviceSize { width, height, .. } = mem_tex.size();
@@ -344,7 +344,7 @@ impl<S: Surface> WgpuRender<S> {
   }
   fn create_wgpu_texture(
     device: &wgpu::Device,
-    size: &DeviceSize,
+    size: DeviceSize,
     format: wgpu::TextureFormat,
   ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
@@ -485,7 +485,7 @@ pub fn coordinate_2d_to_device_matrix(
 fn create_uniforms(
   device: &wgpu::Device,
   layout: &wgpu::BindGroupLayout,
-  atlas_size: &DeviceSize,
+  atlas_size: DeviceSize,
   canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
   sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,

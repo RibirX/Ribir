@@ -88,7 +88,7 @@ impl TextureAtlas {
     let pos = DevicePoint::from_untyped(pos);
 
     self.indexed_colors.insert(color, pos);
-    self.texture.set(&pos, color.to_be());
+    self.texture.set(pos, color.to_be());
     self.palette_stored += 1;
     pos
   }

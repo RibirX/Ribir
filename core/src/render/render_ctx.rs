@@ -15,9 +15,9 @@ impl<'a> RenderCtx<'a> {
     dirty_layout_roots: &'a mut HashSet<RenderId>,
   ) -> RenderCtx<'a> {
     return RenderCtx {
-      tree: tree,
-      dirty_layouts: dirty_layouts,
-      dirty_layout_roots: dirty_layout_roots,
+      tree,
+      dirty_layouts,
+      dirty_layout_roots,
     };
   }
 
