@@ -485,7 +485,7 @@ mod tests {
     assert_eq!(s.screen_position, pos);
     assert_eq!(s.bounds, rect.size.into());
 
-    let mut l = layout.clone();
+    let mut l = layout;
     l.v_align = VerticalAlign::Bottom;
     let s = section_with_layout_bounds(section.clone(), Some(rect), Some(l));
     let pos = (rect.min().x, rect.max_y());
