@@ -580,7 +580,7 @@ mod test {
       frame.compose_2d_layer(layer);
     }
 
-    unit_test::assert_canvas_eq!(render, "./test_imgs/text_hello.png");
+    unit_test::assert_canvas_eq!(render, "../../test_imgs/text_hello.png");
   }
 
   #[test]
@@ -651,7 +651,7 @@ And by opposing end them? To die: to sleep;
       frame.compose_2d_layer(layer);
     }
 
-    unit_test::assert_canvas_eq!(render, "./test_imgs/complex_text.png");
+    unit_test::assert_canvas_eq!(render, "../../test_imgs/complex_text.png");
   }
 
   #[test]
@@ -700,7 +700,7 @@ And by opposing end them? To die: to sleep;\n",
       frame.compose_2d_layer(layer);
     }
 
-    unit_test::assert_canvas_eq!(render, "./test_imgs/complex_text_single_style.png");
+    unit_test::assert_canvas_eq!(render, "../../test_imgs/complex_text_single_style.png");
   }
 
   #[test]
@@ -736,6 +736,6 @@ And by opposing end them? To die: to sleep;\n",
       frame.compose_2d_layer(layer);
     }
 
-    unit_test::assert_canvas_eq!(render, "./test_imgs/texture_cache_update.png");
+    unit_test::assert_canvas_eq!(render, "../../test_imgs/texture_cache_update.png");
   }
 }

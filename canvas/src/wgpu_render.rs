@@ -602,7 +602,8 @@ mod tests {
       let mut frame = canvas.next_frame(&mut render);
       frame.compose_2d_layer(layer);
     }
-    unit_test::assert_canvas_eq!(render, "./test_imgs/smoke_draw_circle.png");
+
+    unit_test::assert_canvas_eq!(render, "../test_imgs/smoke_draw_circle.png");
   }
 
   #[test]
@@ -633,7 +634,7 @@ mod tests {
         frame.compose_2d_layer(layer);
       }
 
-      unit_test::assert_canvas_eq!(render, "./test_imgs/color_palette_texture.png");
+      unit_test::assert_canvas_eq!(render, "../test_imgs/color_palette_texture.png");
     }
   }
 }
