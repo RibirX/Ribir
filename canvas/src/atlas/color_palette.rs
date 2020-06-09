@@ -29,7 +29,7 @@ impl ColorPalettes {
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
   ) -> Option<DevicePoint> {
-    if let Some(pos) = self.indexed_colors.get(&color_hash(color)) {
+    if let Some(pos) = self.indexed_colors.get(&color.as_u32()) {
       return Some(*pos);
     }
     if !self.current_palette.is_fulled() {
@@ -85,10 +85,11 @@ impl ColorPalettes {
   }
 
   fn add_color(&mut self, color: Color) -> DevicePoint {
+    let key = color.as_u32();
     let offset = self.current_palette.add_color(color);
     let pos = self.current_alloc.rectangle.min + offset;
     let pos = DevicePoint::new(pos.x as u32, pos.y as u32);
-    self.indexed_colors.insert(color_hash(color), pos);
+    self.indexed_colors.insert(key, pos);
     pos
   }
 
@@ -97,12 +98,9 @@ impl ColorPalettes {
   }
 }
 
-#[inline]
-fn color_hash(color: Color) -> u32 { unsafe { std::mem::transmute_copy(&color) } }
-
-#[inline]
 fn color_as_bgra(color: Color) -> u32 {
-  unsafe { std::mem::transmute_copy(&[color.blue, color.green, color.red, color.alpha]) }
+  let [r, g, b, a] = color.into_raw();
+  unsafe { std::mem::transmute_copy(&[b, g, r, a]) }
 }
 
 struct Palette {

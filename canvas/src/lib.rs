@@ -1,10 +1,12 @@
-#![feature(decl_macro, test)]
+#![feature(decl_macro, test, const_fn, clamp)]
 mod atlas;
 mod canvas;
+mod color;
 mod layer_2d;
 mod text;
 
 pub use crate::canvas::*;
+pub use color::Color;
 pub use layer_2d::*;
 pub use text::*;
 

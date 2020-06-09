@@ -349,7 +349,6 @@ fn section_bounds_to_align_texture<S: Surface>(
 
 #[cfg(test)]
 mod tests {
-  use super::super::const_color;
   use super::*;
 
   #[test]
@@ -358,7 +357,7 @@ mod tests {
     path.add_rectangle(&lyon::geom::rect(100., 100., 50., 50.), Winding::Positive);
     let path = path.build();
 
-    let rect = path_bounds_to_align_texture(&FillStyle::Color(const_color::BLACK.into()), &path);
+    let rect = path_bounds_to_align_texture(&FillStyle::Color(Color::BLACK), &path);
     assert_eq!(rect, Rect::from_size(Size::new(1., 1.)));
 
     let rect = path_bounds_to_align_texture(&FillStyle::Image, &path);

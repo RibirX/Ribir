@@ -1,20 +1,17 @@
 use crate::{
-  canvas::surface::Surface, text::GlyphStatistics, Canvas, FontProperties, FontStretch, FontStyle,
-  FontWeight, Point, Rect, Transform, DEFAULT_FONT_FAMILY,
+  canvas::surface::Surface, text::GlyphStatistics, Canvas, Color, FontProperties, FontStretch,
+  FontStyle, FontWeight, Point, Rect, Transform, DEFAULT_FONT_FAMILY,
 };
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
   tessellation::*,
 };
-pub use palette::{named as const_color, Srgba};
 mod process;
 use std::{
   cmp::PartialEq,
   ops::{Deref, DerefMut},
 };
-
-pub type Color = Srgba<u8>;
 
 /// The 2d layer is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -242,6 +239,11 @@ pub enum FillStyle {
   Gradient, // todo,
 }
 
+impl From<Color> for FillStyle {
+  #[inline]
+  fn from(c: Color) -> Self { FillStyle::Color(c) }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Vertex {
   pub(crate) pixel_coords: Point,
@@ -397,7 +399,7 @@ impl Vertex {
 
 impl Default for FillStyle {
   #[inline]
-  fn default() -> Self { FillStyle::Color(const_color::WHITE.into()) }
+  fn default() -> Self { FillStyle::Color(Color::WHITE) }
 }
 
 impl Default for State {
@@ -409,10 +411,7 @@ impl State {
   pub fn new() -> Self {
     Self {
       transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
-      style: FillStyle::Color(Color {
-        color: const_color::BLACK,
-        alpha: u8::MAX,
-      }),
+      style: FillStyle::Color(Color::BLACK),
       line_width: 1.,
       font: FontInfo::new(),
     }
@@ -589,7 +588,7 @@ mod test {
     assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 1);
 
     // Different color can't be merged.
-    layer.set_style(FillStyle::Color(const_color::YELLOW.into()));
+    layer.set_style(FillStyle::Color(Color::YELLOW));
     layer.fill_path(sample_path.clone());
     assert_eq!(layer.clone().finish(&mut canvas).unwrap().attrs.len(), 2);
 
@@ -635,7 +634,7 @@ mod test {
           font: serif.clone(),
           font_size: 36.,
         },
-        const_color::BLACK.into(),
+        Color::BLACK,
       )],
       Some(Rect::from_size(Size::new(400., 400.))),
       None,
@@ -655,7 +654,7 @@ And by opposing end them? To die: to sleep;
           font: arial,
           font_size: 24.,
         },
-        const_color::GRAY.into(),
+        Color::GRAY,
       )],
       Some(Rect::from_size(Size::new(400., 400.))),
       Some(TextLayout {
@@ -672,7 +671,7 @@ And by opposing end them? To die: to sleep;
           font: serif,
           font_size: 48.,
         },
-        const_color::RED.into(),
+        Color::RED,
       )],
       Some(Rect::from_size(Size::new(400., 400.))),
       Some(TextLayout {
@@ -696,7 +695,7 @@ And by opposing end them? To die: to sleep;
     let serif = FontInfo::new();
     let mut layer = canvas.new_2d_layer();
 
-    layer.set_style(FillStyle::Color(const_color::GRAY.into()));
+    layer.set_style(FillStyle::Color(Color::GRAY));
     layer.fill_complex_texts_by_style(
       vec![
         Text {
