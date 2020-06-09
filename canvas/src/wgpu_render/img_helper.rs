@@ -76,7 +76,8 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   let DeviceSize { width, height, .. } = rect.size;
   const PX_BYTES: usize = std::mem::size_of::<u32>();
   // align to 256 bytes by WebGPU require.
-  const ALIGN_BYTES: u32 = (256 / PX_BYTES) as u32;
+  const WGPU_ALIGN: usize = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+  const ALIGN_BYTES: u32 = (WGPU_ALIGN / PX_BYTES) as u32;
   let align_width = {
     match width % ALIGN_BYTES {
       0 => width,
@@ -117,7 +118,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
       },
     },
     wgpu::Extent3d {
-      width: align_width,
+      width,
       height,
       depth: 1,
     },

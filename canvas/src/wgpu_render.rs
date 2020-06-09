@@ -54,6 +54,7 @@ impl WgpuRender<PhysicSurface> {
         power_preference: wgpu::PowerPreference::Default,
         compatible_surface: Some(&w_surface),
       },
+      wgpu::UnsafeExtensions::disallow(),
       wgpu::BackendBit::PRIMARY,
     );
 
@@ -83,6 +84,7 @@ impl WgpuRender<TextureSurface> {
         power_preference: wgpu::PowerPreference::Default,
         compatible_surface: None,
       },
+      wgpu::UnsafeExtensions::disallow(),
       wgpu::BackendBit::PRIMARY,
     );
 
@@ -217,6 +219,7 @@ impl<S: Surface> WgpuRender<S> {
         &wgpu::DeviceDescriptor {
           extensions: wgpu::Extensions::empty(),
           limits: Default::default(),
+          shader_validation: true,
         },
         None,
       )
@@ -246,9 +249,8 @@ impl<S: Surface> WgpuRender<S> {
       mipmap_filter: wgpu::FilterMode::Nearest,
       lod_min_clamp: 0.0,
       lod_max_clamp: 0.0,
-      compare: None,
       label: Some("Texture atlas sampler"),
-      anisotropy_clamp: None,
+      ..Default::default()
     });
 
     let glyph_texture =
