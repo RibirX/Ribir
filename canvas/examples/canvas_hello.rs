@@ -36,7 +36,7 @@ fn main() {
     },
     Event::RedrawRequested(_) => {
       let mut layer = canvas.new_2d_layer();
-      layer.set_style(Color::YELLOW.into());
+      layer.set_style(Color::YELLOW);
       let mut path = Path::builder();
       path.add_circle(euclid::Point2D::new(200., 200.), 100., Winding::Positive);
       let path = path.build();

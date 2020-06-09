@@ -98,13 +98,7 @@ impl Canvas {
   /// Consume all composed layer but not draw yet, then submit the output to
   /// render to draw.
   pub fn submit<R: CanvasRender>(&mut self, render: &mut R) {
-    if self.render_data().has_data() {
-      render.draw(
-        &self.render_data,
-        self.glyph_brush.texture_mut(),
-        self.atlas.texture_mut(),
-      )
-    }
+    self.submit_to_render(render);
     self.render_data.clear();
   }
 
@@ -146,7 +140,7 @@ impl Canvas {
         Err(glyph_brush::BrushError::TextureTooSmall { .. }) => {
           if !split_draw {
             split_draw = true;
-            self.submit(render);
+            self.submit_to_render(render);
             // only clear the vertices buffer, but leave primitives to keep the primitive id
             // already in queued text.
             self.render_data.vertices_buffer.vertices.clear();
@@ -179,28 +173,25 @@ impl Canvas {
             stroke_width,
           } => {
             let style_rect = self.store_style_in_atlas(&style, render);
-            let prim_id = self.render_data.primitives.len() as u32;
             let align_bounds = path_bounds_to_align_texture(&style, &path);
+            self.add_primitive(style_rect, align_bounds, transform);
+            let prim_id = self.render_data.primitives.len() as u32 - 1;
             let vertices_buffer = &mut self.render_data.vertices_buffer;
             tessellator.tessellate(vertices_buffer, path, stroke_width, &transform, prim_id);
-            self.add_primitive(style_rect, align_bounds, transform);
           }
           CommandInfo::SimpleText {
             text,
             style,
             max_width,
           } => {
-            let prim_id = self.render_data.primitives.len();
-            let text = text.to_glyph_text(self.text_brush(), prim_id);
+            let text = text.to_glyph_text(self.text_brush(), 0);
             let mut sec = Section::new().add_text(text);
             if let Some(max_width) = max_width {
               sec.bounds = (max_width, f32::INFINITY).into()
             }
             let align_bounds = section_bounds_to_align_texture(self.text_brush(), &style, &sec);
             if !align_bounds.is_empty_or_negative() {
-              let style_rect = self.store_style_in_atlas(&style, render);
-              self.add_primitive(style_rect, align_bounds, transform);
-              self.consume_section(render, sec);
+              self.single_style_section_consume(&style, render, align_bounds, transform, sec);
             }
           }
           CommandInfo::ComplexTexts {
@@ -211,11 +202,10 @@ impl Canvas {
             let texts = texts
               .into_iter()
               .map(|(t, color)| {
-                let prim_id = self.render_data.primitives.len();
-                let text = t.to_glyph_text(self.text_brush(), prim_id);
                 let style_rect = self.store_style_in_atlas(&color.into(), render);
                 self.add_primitive(style_rect, COLOR_BOUNDS_TO_ALIGN_TEXTURE, transform);
-                text
+                let prim_id = self.render_data.primitives.len() - 1;
+                t.to_glyph_text(self.text_brush(), prim_id)
               })
               .collect();
 
@@ -229,37 +219,62 @@ impl Canvas {
             bounds,
             layout,
           } => {
-            let prim_id = self.render_data.primitives.len();
             let texts = texts
               .into_iter()
-              .map(|t| t.to_glyph_text(self.text_brush(), prim_id))
+              .map(|t| t.to_glyph_text(self.text_brush(), 0))
               .collect();
             let mut sec = Section::new().with_text(texts);
             let align_bounds = section_bounds_to_align_texture(self.text_brush(), &style, &sec);
             if !align_bounds.is_empty_or_negative() {
               sec = section_with_layout_bounds(sec, bounds, layout);
-              let style_rect = self.store_style_in_atlas(&style, render);
-              self.add_primitive(style_rect, align_bounds, transform);
-              self.consume_section(render, sec);
+              self.single_style_section_consume(&style, render, align_bounds, transform, sec);
             }
           }
         };
       });
   }
 
+  fn single_style_section_consume<R: CanvasRender>(
+    &mut self,
+    style: &FillStyle,
+    render: &mut R,
+    align_bounds: Rect,
+    transform: Transform,
+    mut sec: Section,
+  ) {
+    let style_rect = self.store_style_in_atlas(&style, render);
+    self.add_primitive(style_rect, align_bounds, transform);
+    let prim_id = self.render_data.primitives.len() as u32 - 1;
+    sec.text.iter_mut().for_each(|t| t.extra = prim_id);
+    self.consume_section(render, sec);
+  }
+
   fn add_primitive(&mut self, style_rect: DeviceRect, align_bounds: Rect, transform: Transform) {
-    self.render_data.primitives.push(Primitive {
+    let primitive = Primitive {
       tex_offset: style_rect.min().to_array(),
       tex_size: style_rect.size.to_array(),
       transform: transform.to_row_arrays(),
       bound_min: align_bounds.min().to_array(),
       bounding_size: align_bounds.size.to_array(),
-    });
+    };
+    if self.render_data.primitives.last() != Some(&primitive) {
+      self.render_data.primitives.push(primitive);
+    }
   }
 
   fn consume_section<R: CanvasRender>(&mut self, render: &mut R, sec: Section) {
     self.text_brush().queue(sec);
     self.process_queued_with_render(render);
+  }
+
+  fn submit_to_render<R: CanvasRender>(&mut self, render: &mut R) {
+    if self.render_data().has_data() {
+      render.draw(
+        &self.render_data,
+        self.glyph_brush.texture_mut(),
+        self.atlas.texture_mut(),
+      )
+    }
   }
 }
 
@@ -300,7 +315,7 @@ pub struct RenderData {
 }
 
 #[repr(C)]
-#[derive(AsBytes)]
+#[derive(AsBytes, PartialEq)]
 pub struct Primitive {
   // Texture offset in texture atlas.
   pub(crate) tex_offset: [u32; 2],
