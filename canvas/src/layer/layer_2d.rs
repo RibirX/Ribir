@@ -45,8 +45,8 @@ impl<'a> Rendering2DLayer<'a> {
 
   /// Change the style of pen that used to draw path.
   #[inline]
-  pub fn set_style(&mut self, pen_style: FillStyle) -> &mut Self {
-    self.current_state_mut().style = pen_style;
+  pub fn set_style<S: Into<FillStyle>>(&mut self, pen_style: S) -> &mut Self {
+    self.current_state_mut().style = pen_style.into();
     self
   }
 
@@ -523,6 +523,7 @@ mod test {
   }
 
   #[test]
+  #[should_panic(expected = "not support in early develop")]
   fn path_merge() {
     let mut layer = Rendering2DLayer::new();
 
@@ -554,6 +555,7 @@ mod test {
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
     canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    // image not not support now, should panic.
     assert_eq!(canvas.render_data().primitives.len(), 4);
   }
 

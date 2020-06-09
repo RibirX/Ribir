@@ -8,16 +8,13 @@ layout(set = 0, binding = 0) buffer PrimeIndices {
 void main() {
     
     uint index = gl_GlobalInvocationID.x;
-    uint abgr = indices[index];
-    uint rgba =  
-      ((abgr << 16) & 0x00FF0000u) |
-      ((abgr >> 16) & 0x000000FFu) |
-      (abgr & 0xFF00FF00u);
+    uint bgra = indices[index];
 
-    // indices[index] = 0xFF000000;     // alpha
-    // indices[index] = 0xFFFF0000;     // blue
-    // indices[index] = 0xFF00FF00;     // green
-    // indices[index] = 0xFF0000FF;     // red
+    // bgra to rgba in little-endian.
+    uint rgba =  
+      ((bgra << 16) & 0x00FF0000u) |
+      ((bgra >> 16) & 0x000000FFu) |
+      (bgra & 0xFF00FF00u);
 
      indices[index] = rgba;
 }
