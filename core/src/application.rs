@@ -14,12 +14,7 @@ pub struct Application<'a> {
 
 impl<'a> Application<'a> {
   #[inline]
-  pub fn new() -> Application<'a> {
-    Self {
-      windows: Default::default(),
-      event_loop: EventLoop::new(),
-    }
-  }
+  pub fn new() -> Application<'a> { <_>::default() }
 
   pub fn run<W: Into<Box<dyn Widget + 'a>>>(mut self, w: W) {
     self.new_window(w);
@@ -59,6 +54,15 @@ impl<'a> Application<'a> {
     let id = window.id();
     self.windows.insert(window.id(), window);
     id
+  }
+}
+
+impl<'a> Default for Application<'a> {
+  fn default() -> Self {
+    Self {
+      windows: Default::default(),
+      event_loop: EventLoop::new(),
+    }
   }
 }
 

@@ -41,7 +41,9 @@ impl<'a> RenderObject<Row<'a>> for RowRender {
   fn update(&mut self, _owner_widget: &Row<'a>) {}
 
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) { self.row.flex_layout(id, ctx); }
-  fn paint<'b>(&'b self, ctx: &mut PaintingContext<'b>) {}
-  fn child_offset(&self, idx: usize) -> Option<Point> { None }
+  #[inline]
+  fn paint<'b>(&'b self, _ctx: &mut PaintingContext<'b>) {}
+  #[inline]
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
   default_box_impl!({ row.bound });
 }

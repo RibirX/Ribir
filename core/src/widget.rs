@@ -84,6 +84,7 @@ impl<'a> WidgetClassifyMut<'a> {
   /// Return a Some-Value if this is a render widget, remember single child
   /// widget and multi child widget are render widget too. Otherwise return a
   /// None-Value.
+  #[allow(dead_code)]
   pub(crate) fn try_as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
     match self {
       WidgetClassifyMut::Combination(_) => None,

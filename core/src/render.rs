@@ -101,6 +101,7 @@ pub(crate) fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> 
   }
 }
 
+#[allow(dead_code)]
 pub(crate) fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
@@ -117,7 +118,7 @@ where
       render: RenderWidget::create_render_object(self),
       _marker: PhantomData,
     };
-    r_box.to_safety()
+    r_box.into_safety()
   }
 
   #[inline]
@@ -204,7 +205,7 @@ where
   W: RenderWidget<RO = R>,
   R: RenderObject<W>,
 {
-  fn to_safety(self) -> Box<dyn RenderObjectSafety + Send + Sync + 'static> {
+  fn into_safety(self) -> Box<dyn RenderObjectSafety + Send + Sync + 'static> {
     let safety: Box<dyn RenderObjectSafety + Send + Sync> = Box::new(self);
     // unsafe introduce: `W` just use to constraint type, and never access it.
     // And `R` bounds with RenderObject should always `static` lifetime.
