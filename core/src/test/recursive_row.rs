@@ -7,7 +7,7 @@ pub struct RecursiveRow {
 }
 
 impl CombinationWidget for RecursiveRow {
-  fn build<'a>(&self) -> Box<dyn Widget + 'a> {
+  fn build(&self) -> Box<dyn Widget> {
     Row(
       (0..self.width)
         .map(|_| {

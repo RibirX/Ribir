@@ -21,7 +21,7 @@ impl EmbedPost {
 }
 
 impl CombinationWidget for EmbedPost {
-  fn build<'a>(&self) -> Box<dyn Widget + 'a> {
+  fn build(&self) -> Box<dyn Widget> {
     let mut children = vec![
       Text(self.title.to_string()).into(),
       Text(self.author.to_string()).into(),
@@ -37,7 +37,7 @@ impl CombinationWidget for EmbedPost {
   }
 }
 
-pub fn create_embed_app<'a>(level: usize) -> (WidgetTree<'a>, RenderTree) {
+pub fn create_embed_app(level: usize) -> (WidgetTree, RenderTree) {
   let post = EmbedPost::new(level);
   let mut widget_tree = WidgetTree::default();
   let mut render_tree = RenderTree::default();
