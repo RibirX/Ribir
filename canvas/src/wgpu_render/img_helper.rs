@@ -141,14 +141,16 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
 
   queue.submit(Some(encoder.finish()));
 
+  let buffer_slice = map_buffer.slice(..);
   // Note that we're not calling `.await` here.
-  let buffer_future = map_buffer.map_async(wgpu::MapMode::Read, 0, wgpu::BufferSize(size));
+
+  let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
 
   // Poll the device in a blocking manner so that our future resolves.
   device.poll(wgpu::Maintain::Wait);
   buffer_future.await.map_err(|_| "Async buffer error")?;
 
-  let data = map_buffer.get_mapped_range(0, wgpu::BufferSize(size));
+  let data = buffer_slice.get_mapped_range();
 
   let mut png_encoder = png::Encoder::new(writer, width, height);
   png_encoder.set_depth(png::BitDepth::Eight);

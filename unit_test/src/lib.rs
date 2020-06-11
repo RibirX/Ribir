@@ -8,7 +8,7 @@ use futures::executor::block_on;
 use std::sync::{Arc, Mutex};
 
 pub macro write_canvas_to($canvas: expr, $path: expr) {
-  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
+  let abs_path = abs_path!($path);
   let writer = std::fs::File::create(&abs_path).unwrap();
   let _ = block_on($canvas.write_png(writer));
 }
@@ -40,9 +40,19 @@ pub macro assert_img_eq($img1: expr, $img2: expr) {
   }
 }
 
-pub macro file_bytes($path: expr) {{
-  let abs_path = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path);
-  std::fs::read(abs_path).expect(&format!("{}", $path))
+#[allow(unused_macros)]
+macro file_bytes($path: expr) {{
+  let abs_path = abs_path!($path);
+  std::fs::read(abs_path).expect(&format!("{}", abs_path!($path).to_str().unwrap()))
+}}
+
+#[allow(unused_macros)]
+macro abs_path($path: expr) {{
+  std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    .with_file_name(file!())
+    .with_file_name($path)
+    .canonicalize()
+    .unwrap()
 }}
 
 #[allow(unused_macros)]

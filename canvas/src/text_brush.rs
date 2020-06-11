@@ -303,8 +303,8 @@ mod tests {
     brush.log_glyph_cache_png_to("glyph_texture_cache.png");
 
     unit_test::assert_img_eq!(
-      "./test_imgs/hello_glyph_cache.png",
-      "./.log/glyph_texture_cache.png"
+      "../test_imgs/hello_glyph_cache.png",
+      "../.log/glyph_texture_cache.png"
     );
   }
 
