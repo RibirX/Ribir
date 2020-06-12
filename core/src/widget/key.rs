@@ -159,8 +159,8 @@ fn key_detect() {
   let k3 = KeyDetect::new("".to_string(), Text("".to_string()));
   let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
   let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
-  assert!(&k1.key != &k2.key);
-  assert!(&k2.key == &k3.key);
-  assert!(&k3.key != &k1.key);
+  assert!(k1.key != k2.key);
+  assert!(k2.key == k3.key);
+  assert!(k3.key != k1.key);
   assert!(ck1.key == ck2.key);
 }

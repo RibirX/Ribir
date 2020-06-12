@@ -32,24 +32,20 @@ pub trait CombinationWidget: Debug {
   /// you want give a key to your widget.
   fn key(&self) -> Option<&Key> { None }
   /// Describes the part of the user interface represented by this widget.
-  fn build<'a>(&self) -> Box<dyn Widget + 'a>;
+  fn build(&self) -> Box<dyn Widget>;
 }
 
 /// a widget has a child.
 pub trait SingleChildWidget: RenderWidgetSafety {
   /// called by framework to take child from this widget, and only called once.
-  fn take_child<'a>(&mut self) -> Box<dyn Widget + 'a>
-  where
-    Self: 'a;
+  fn take_child(&mut self) -> Box<dyn Widget>;
 }
 
 /// a widget has multi child
 pub trait MultiChildWidget: RenderWidgetSafety {
   /// called by framework to take children from this widget, and only called
   /// once.
-  fn take_children<'a>(&mut self) -> Vec<Box<dyn Widget + 'a>>
-  where
-    Self: 'a;
+  fn take_children(&mut self) -> Vec<Box<dyn Widget>>;
 }
 
 pub enum WidgetClassify<'a> {
@@ -84,6 +80,7 @@ impl<'a> WidgetClassifyMut<'a> {
   /// Return a Some-Value if this is a render widget, remember single child
   /// widget and multi child widget are render widget too. Otherwise return a
   /// None-Value.
+  #[allow(dead_code)]
   pub(crate) fn try_as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
     match self {
       WidgetClassifyMut::Combination(_) => None,

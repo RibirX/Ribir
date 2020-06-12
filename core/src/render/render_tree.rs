@@ -54,10 +54,7 @@ impl RenderTree {
 
 impl RenderId {
   /// Returns a reference to the node data.
-  pub(crate) fn get<'a>(
-    self,
-    tree: &'a RenderTree,
-  ) -> Option<&'a (dyn RenderObjectSafety + Send + Sync)> {
+  pub(crate) fn get(self, tree: &RenderTree) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
     tree.arena.get(self.0).map(|node| &**node.get())
   }
 
@@ -70,6 +67,7 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::append](indextree::NodeId.append)
+  #[allow(dead_code)]
   #[inline]
   pub(crate) fn append(self, new_child: RenderId, tree: &mut RenderTree) {
     self.0.append(new_child.0, &mut tree.arena);
@@ -82,17 +80,19 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::remove](indextree::NodeId.remove)
+  #[allow(dead_code)]
   #[inline]
   pub(crate) fn remove(self, tree: &mut RenderTree) { self.0.remove(&mut tree.arena); }
 
   /// Returns an iterator of references to this node’s children.
+  #[allow(dead_code)]
   pub(crate) fn children<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
-    self.0.children(&tree.arena).map(|id| RenderId(id))
+    self.0.children(&tree.arena).map(RenderId)
   }
 
   /// Returns an iterator of references to this node and its descendants, in
   /// tree order.
-  pub(crate) fn traverse<'a>(&self, tree: &'a RenderTree) -> impl Iterator<Item = RenderEdge> + 'a {
+  pub(crate) fn traverse<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderEdge> + 'a {
     self.0.traverse(&tree.arena).map(|edge| match edge {
       NodeEdge::Start(id) => RenderEdge::Start(RenderId(id)),
       NodeEdge::End(id) => RenderEdge::End(RenderId(id)),
@@ -110,12 +110,14 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::last_child](indextree::NodeId.last_child)
+  #[allow(dead_code)]
   pub(crate) fn last_child(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_feature(tree, |node| node.last_child())
   }
 
   /// A delegate for
   /// [NodeId::previous_sibling](indextree::NodeId.previous_sibling)
+  #[allow(dead_code)]
   pub(crate) fn previous_sibling(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_feature(tree, |node| node.previous_sibling())
   }
@@ -126,13 +128,15 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
+  #[allow(dead_code)]
   pub(crate) fn ancestors<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
-    self.0.ancestors(&tree.arena).map(|id| RenderId(id))
+    self.0.ancestors(&tree.arena).map(RenderId)
   }
 
   /// A delegate for [NodeId::descendants](indextree::NodeId.descendants)
+  #[allow(dead_code)]
   pub(crate) fn descendants<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
-    self.0.descendants(&tree.arena).map(|id| RenderId(id))
+    self.0.descendants(&tree.arena).map(RenderId)
   }
 
   /// Preappend a RenderObject as child, and create this RenderObject's Widget
@@ -171,20 +175,16 @@ impl RenderId {
   }
 
   /// return the relative render widget.
+  #[allow(dead_code)]
   pub(crate) fn relative_to_widget(self, tree: &mut RenderTree) -> Option<WidgetId> {
-    tree.render_to_widget.get(&self).map(|id| *id)
+    tree.render_to_widget.get(&self).copied()
   }
 
   fn node_feature<F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>>(
-    &self,
+    self,
     tree: &RenderTree,
     method: F,
   ) -> Option<RenderId> {
-    tree
-      .arena
-      .get(self.0)
-      .map(method)
-      .flatten()
-      .map(|id| RenderId(id))
+    tree.arena.get(self.0).map(method).flatten().map(RenderId)
   }
 }

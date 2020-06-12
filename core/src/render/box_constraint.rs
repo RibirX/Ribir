@@ -25,25 +25,26 @@ pub struct BoxLayout {
 
 impl BoxLayout {
   pub fn new(lc: LayoutConstraints) -> BoxLayout {
-    return BoxLayout {
+    BoxLayout {
       constraints: lc,
       size: None,
       box_bound: None,
-    };
+    }
   }
-  pub fn get_size(&self) -> Option<Size> { self.size.clone() }
+  #[inline]
+  pub fn get_size(&self) -> Option<Size> { self.size }
   pub fn set_size(&mut self, size: Option<Size>) { self.size = size; }
 
   pub fn get_box_limit(&self) -> BoxLimit {
     if self.box_bound.is_some() {
-      return self.box_bound.unwrap().clone();
+      self.box_bound.unwrap()
     } else {
-      return BoxLimit {
+      BoxLimit {
         min_height: 0.0,
         max_height: f32::INFINITY,
         min_width: 0.0,
         max_width: f32::INFINITY,
-      };
+      }
     }
   }
 

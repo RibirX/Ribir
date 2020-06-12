@@ -54,10 +54,12 @@ impl RenderObject<ExpandBox> for ExpandBoxRender {
     self.size = None;
   }
   fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
-  fn get_size(&self) -> Option<Size> { return self.size.clone(); }
-  fn get_constraints(&self) -> LayoutConstraints { return LayoutConstraints::EFFECTED_BY_PARENT; }
+  #[inline]
+  fn get_size(&self) -> Option<Size> { self.size }
+  #[inline]
+  fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::EFFECTED_BY_PARENT }
   fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
 
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {}
-  fn child_offset(&self, idx: usize) -> Option<Point> { None }
+  fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {}
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }

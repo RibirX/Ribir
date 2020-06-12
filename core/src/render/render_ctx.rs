@@ -9,29 +9,32 @@ pub struct RenderCtx<'a> {
 }
 
 impl<'a> RenderCtx<'a> {
+  #[inline]
   pub fn new(
     tree: &'a mut RenderTree,
     dirty_layouts: &'a mut HashSet<RenderId>,
     dirty_layout_roots: &'a mut HashSet<RenderId>,
   ) -> RenderCtx<'a> {
-    return RenderCtx {
+    RenderCtx {
       tree,
       dirty_layouts,
       dirty_layout_roots,
-    };
+    }
   }
 
+  #[inline]
   pub fn render_object(&self, id: RenderId) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
-    return id.get(self.tree);
+    id.get(self.tree)
   }
 
   /// return the render tree
-  pub fn render_tree(&self) -> &RenderTree { return &self.tree; }
+  #[inline]
+  pub fn render_tree(&self) -> &RenderTree { &self.tree }
 
   /// mark the render object dirty, will auto diffuse to all the node
   /// affected.
   pub fn mark_layout_dirty(&mut self, mut node_id: RenderId) {
-    if self.is_layout_dirty(&node_id) {
+    if self.is_layout_dirty(node_id) {
       return;
     }
     self.dirty_layouts.insert(node_id);
@@ -70,7 +73,7 @@ impl<'a> RenderCtx<'a> {
 
   /// proxy call the renderObject's perform_layout if needed
   pub fn perform_layout(&mut self, id: RenderId) {
-    if !self.is_layout_dirty(&id) {
+    if !self.is_layout_dirty(id) {
       return;
     }
     let mut_ptr = self as *mut RenderCtx<'a>;
@@ -79,16 +82,15 @@ impl<'a> RenderCtx<'a> {
       node.perform_layout(id, &mut *mut_ptr);
     }
 
-    self.remove_layout_dirty(&id);
+    self.remove_layout_dirty(id);
   }
 
   /// get the layout dirty flag.
-  pub fn is_layout_dirty(&self, node_id: &RenderId) -> bool {
-    return self.dirty_layouts.contains(node_id);
-  }
+  #[inline]
+  pub fn is_layout_dirty(&self, node_id: RenderId) -> bool { self.dirty_layouts.contains(&node_id) }
 
   /// remove the layout dirty flag.
-  pub fn remove_layout_dirty(&mut self, node_id: &RenderId) { self.dirty_layouts.remove(node_id); }
+  pub fn remove_layout_dirty(&mut self, node_id: RenderId) { self.dirty_layouts.remove(&node_id); }
 
   pub fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {
     let mut child = id.first_child(self.tree);
@@ -103,14 +105,14 @@ impl<'a> RenderCtx<'a> {
   }
 
   fn mark_dirty_down(&mut self, mut id: RenderId) {
-    if self.is_layout_dirty(&id) {
+    if self.is_layout_dirty(id) {
       return;
     }
     self.dirty_layouts.insert(id);
     let mut ids = vec![];
     self.collect_children(id, &mut ids);
-    while ids.len() > 0 {
-      id = ids.pop().unwrap();
+    while let Some(i) = ids.pop() {
+      id = i;
       if self.mark_constraints_dirty(id, LayoutConstraints::EFFECTED_BY_PARENT) {
         self.collect_children(id, &mut ids);
       }
@@ -124,8 +126,9 @@ impl<'a> RenderCtx<'a> {
       .unwrap();
     if constraints.intersects(target) {
       self.dirty_layouts.insert(id);
-      return true;
+      true
+    } else {
+      false
     }
-    return false;
   }
 }

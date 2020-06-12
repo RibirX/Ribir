@@ -7,8 +7,8 @@ use indextree::*;
 pub struct WidgetId(NodeId);
 
 #[derive(Default)]
-pub struct WidgetTree<'a> {
-  arena: Arena<Box<dyn Widget + 'a>>,
+pub struct WidgetTree {
+  arena: Arena<Box<dyn Widget>>,
   root: Option<WidgetId>,
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
@@ -20,13 +20,13 @@ pub struct WidgetTree<'a> {
   widget_to_render: HashMap<WidgetId, RenderId>,
 }
 
-impl<'a> WidgetTree<'a> {
+impl WidgetTree {
   #[inline]
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
   pub(crate) fn set_root(
     &mut self,
-    data: Box<dyn Widget + 'a>,
+    data: Box<dyn Widget>,
     render_tree: &mut RenderTree,
   ) -> WidgetId {
     debug_assert!(self.root.is_none());
@@ -37,7 +37,7 @@ impl<'a> WidgetTree<'a> {
   }
 
   #[inline]
-  pub(crate) fn new_node(&mut self, data: Box<dyn Widget + 'a>) -> WidgetId {
+  pub(crate) fn new_node(&mut self, data: Box<dyn Widget>) -> WidgetId {
     WidgetId(self.arena.new_node(data))
   }
 
@@ -48,7 +48,7 @@ impl<'a> WidgetTree<'a> {
       .find(|id| !matches!(id.classify(self), Some(WidgetClassify::Combination(_))))
       .map(|id| self.widget_to_render.get(&id))
       .flatten()
-      .map(|id| *id);
+      .copied();
     let mut stack = vec![(wid, parent_id)];
 
     macro make_pair($widget: ident, $wid: ident, $parent_rid: ident) {{
@@ -156,14 +156,14 @@ impl<'a> WidgetTree<'a> {
   fn try_replace_widget_or_rebuild(
     &mut self,
     node: WidgetId,
-    widget: Box<dyn Widget + 'a>,
+    widget: Box<dyn Widget>,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
     let old_widget = node.get_mut(self).expect("Must exist!");
     let old_key = old_widget.key();
     if old_key.is_some() && old_key == widget.key() {
-      *old_widget = widget;
+      node.replace(self, widget);
       node.mark_changed(self);
       stack.push(node);
     } else {
@@ -181,7 +181,7 @@ impl<'a> WidgetTree<'a> {
   fn repair_children_by_key(
     &mut self,
     node: WidgetId,
-    new_children: Vec<Box<dyn Widget + 'a>>,
+    new_children: Vec<Box<dyn Widget>>,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
@@ -201,7 +201,7 @@ impl<'a> WidgetTree<'a> {
 
     for w in new_children.into_iter() {
       if let Some(k) = w.key() {
-        if let Some(id) = key_children.get(k).map(|id| *id) {
+        if let Some(id) = key_children.get(k).copied() {
           key_children.remove(k);
           node.append(id, self);
           self.try_replace_widget_or_rebuild(id, w, stack, render_tree);
@@ -223,7 +223,7 @@ impl<'a> WidgetTree<'a> {
     let topmost = self
       .need_builds
       .iter()
-      .nth(0)
+      .next()
       .map(|id| id.ancestors(self).find(|id| self.need_builds.contains(id)))
       .flatten();
     if let Some(topmost) = topmost.as_ref() {
@@ -245,7 +245,7 @@ impl<'a> WidgetTree<'a> {
 impl WidgetId {
   /// mark this id represented widget has changed, and need to update render
   /// tree in next frame.
-  pub fn mark_changed<'a>(self, tree: &'a mut WidgetTree) {
+  pub fn mark_changed(self, tree: &'_ mut WidgetTree) {
     if !matches!(self.classify(tree).unwrap(), WidgetClassify::Combination(_)) {
       tree.changed_widgets.insert(self);
     } else {
@@ -254,7 +254,7 @@ impl WidgetId {
   }
 
   /// mark this widget need to build in the next frame.
-  pub fn mark_needs_build<'a>(self, tree: &'a mut WidgetTree) {
+  pub fn mark_needs_build(self, tree: &mut WidgetTree) {
     debug_assert!(matches!(
       self.classify(tree).unwrap(),
       WidgetClassify::Combination(_)
@@ -263,39 +263,34 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub(crate) fn get<'a, 'b>(self, tree: &'a WidgetTree<'b>) -> Option<&'a Box<dyn Widget + 'b>> {
-    tree.arena.get(self.0).map(|node| node.get())
+  pub(crate) fn get<'a>(self, tree: &'a WidgetTree) -> Option<&'a dyn Widget> {
+    tree.arena.get(self.0).map(|node| &**node.get())
   }
 
   /// Returns a mutable reference to the node data.
-  pub(crate) fn get_mut<'a, 'b>(
-    self,
-    tree: &'b mut WidgetTree<'a>,
-  ) -> Option<&'b mut Box<dyn Widget + 'a>> {
-    tree.arena.get_mut(self.0).map(|node| node.get_mut())
+  pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut (dyn Widget + 'static)> {
+    tree.arena.get_mut(self.0).map(|node| &mut **node.get_mut())
+  }
+
+  /// Replace the widget back the widget id, return true if replace successful
+  /// and false if the widget id is not valid.
+  pub(crate) fn replace(self, tree: &mut WidgetTree, widget: Box<dyn Widget>) -> bool {
+    if let Some(node) = tree.arena.get_mut(self.0) {
+      *node.get_mut() = widget;
+      true
+    } else {
+      false
+    }
   }
 
   /// classify the widget back in this id, and return its reference
-  pub(crate) fn classify<'a, 'b>(self, tree: &'a WidgetTree<'b>) -> Option<WidgetClassify<'b>> {
-    self.get(tree).map(|w| {
-      // Safe: also the tree ref's lifetime is `'a`, but the boxed widget's
-      // lifetime is `'b`, so we can do this lifetime convert;
-      let w: &'b dyn Widget = unsafe { &*(&**w as *const dyn Widget) };
-      w.classify()
-    })
+  pub(crate) fn classify(self, tree: &WidgetTree) -> Option<WidgetClassify> {
+    self.get(tree).map(|w| w.classify())
   }
 
   /// classify the widget back in this id, and return its mutation reference.
-  pub(crate) fn classify_mut<'a, 'b>(
-    self,
-    tree: &'a mut WidgetTree<'b>,
-  ) -> Option<WidgetClassifyMut<'b>> {
-    self.get_mut(tree).map(|w| {
-      // Safe: also the tree ref's lifetime is `'a`, but the boxed widget's
-      // lifetime is `'b`, so we can do this lifetime convert;
-      let w: &'b mut dyn Widget = unsafe { &mut *(&mut **w as *mut dyn Widget) };
-      w.classify_mut()
-    })
+  pub(crate) fn classify_mut(self, tree: &mut WidgetTree) -> Option<WidgetClassifyMut> {
+    self.get_mut(tree).map(|w| w.classify_mut())
   }
 
   /// return the widget key of in this node.
@@ -331,12 +326,12 @@ impl WidgetId {
 
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
   pub fn ancestors<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item = WidgetId> + 'a {
-    self.0.ancestors(&tree.arena).map(|id| WidgetId(id))
+    self.0.ancestors(&tree.arena).map(WidgetId)
   }
 
   /// A delegate for [NodeId::descendants](indextree::NodeId.descendants)
   pub fn descendants<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item = WidgetId> + 'a {
-    self.0.descendants(&tree.arena).map(|id| WidgetId(id))
+    self.0.descendants(&tree.arena).map(WidgetId)
   }
 
   /// A delegate for [NodeId::detach](indextree::NodeId.detach)
@@ -350,14 +345,10 @@ impl WidgetId {
   /// return the relative render widget.
   pub fn relative_to_render(self, tree: &mut WidgetTree) -> Option<RenderId> {
     let wid = self.down_nearest_render_widget(tree);
-    tree.widget_to_render.get(&wid).map(|id| *id)
+    tree.widget_to_render.get(&wid).cloned()
   }
 
-  pub(crate) fn append_widget<'a>(
-    self,
-    data: Box<dyn Widget + 'a>,
-    tree: &mut WidgetTree<'a>,
-  ) -> WidgetId {
+  pub(crate) fn append_widget(self, data: Box<dyn Widget>, tree: &mut WidgetTree) -> WidgetId {
     let child = tree.new_node(data);
     self.append(child, tree);
     child
@@ -369,6 +360,7 @@ impl WidgetId {
   }
 
   /// A delegate for [NodeId::remove](indextree::NodeId.remove)
+  #[allow(dead_code)]
   pub(crate) fn remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena); }
 
   /// Drop the subtree
@@ -427,16 +419,11 @@ impl WidgetId {
   }
 
   fn node_feature<F: Fn(&Node<Box<dyn Widget + '_>>) -> Option<NodeId>>(
-    &self,
+    self,
     tree: &WidgetTree,
     method: F,
   ) -> Option<WidgetId> {
-    tree
-      .arena
-      .get(self.0)
-      .map(method)
-      .flatten()
-      .map(|id| WidgetId(id))
+    tree.arena.get(self.0).map(method).flatten().map(WidgetId)
   }
 }
 
@@ -451,7 +438,7 @@ mod test {
   extern crate test;
   use test::Bencher;
 
-  fn create_env<'a>(level: usize) -> WidgetTree<'a> {
+  fn create_env(level: usize) -> WidgetTree {
     let mut tree = WidgetTree::default();
     let mut render_tree = RenderTree::default();
     tree.set_root(EmbedPost::new(level).into(), &mut render_tree);
@@ -588,7 +575,7 @@ mod test {
     );
   }
 
-  fn test_sample_create<'a>(width: usize, depth: usize) -> (WidgetTree<'a>, RenderTree) {
+  fn test_sample_create<'a>(width: usize, depth: usize) -> (WidgetTree, RenderTree) {
     let mut widget_tree = WidgetTree::default();
     let mut render_tree = RenderTree::default();
     let root = RecursiveRow { width, depth };

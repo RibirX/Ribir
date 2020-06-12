@@ -10,7 +10,7 @@ struct EmbedKeyPost {
 }
 
 impl CombinationWidget for EmbedKeyPost {
-  fn build<'a>(&self) -> Box<dyn Widget + 'a> {
+  fn build(&self) -> Box<dyn Widget> {
     let mut children = vec![
       KeyDetect::new(0, Text(self.title.borrow().to_string())).into(),
       KeyDetect::new(1, Text(self.author.to_string())).into(),
@@ -26,13 +26,13 @@ impl CombinationWidget for EmbedKeyPost {
   }
 }
 
-pub struct KeyDetectEnv<'a> {
-  pub widget_tree: WidgetTree<'a>,
+pub struct KeyDetectEnv {
+  pub widget_tree: WidgetTree,
   pub render_tree: RenderTree,
   pub title: Rc<RefCell<&'static str>>,
 }
 
-impl<'a> KeyDetectEnv<'a> {
+impl KeyDetectEnv {
   pub fn new(level: usize) -> Self {
     let mut post = EmbedKeyPost::default();
     post.level = level;

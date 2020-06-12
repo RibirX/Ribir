@@ -8,9 +8,9 @@ use crate::render::LayoutConstraints;
 
 ///  a stupid implement for develope the framework.
 #[derive(Debug)]
-pub struct Row<'a>(pub Vec<Box<dyn Widget + 'a>>);
+pub struct Row(pub Vec<Box<dyn Widget>>);
 
-impl<'a> Widget for Row<'a> {
+impl Widget for Row {
   multi_child_widget_base_impl!();
 }
 
@@ -19,7 +19,7 @@ pub struct RowRender {
   pub row: FlexContainer,
 }
 
-impl<'a> RenderWidget for Row<'a> {
+impl RenderWidget for Row {
   type RO = RowRender;
   fn create_render_object(&self) -> Self::RO {
     RowRender {
@@ -28,20 +28,17 @@ impl<'a> RenderWidget for Row<'a> {
   }
 }
 
-impl<'a> MultiChildWidget for Row<'a> {
-  fn take_children<'b>(&mut self) -> Vec<Box<dyn Widget + 'a>>
-  where
-    Self: 'b,
-  {
-    std::mem::take(&mut self.0)
-  }
+impl MultiChildWidget for Row {
+  fn take_children(&mut self) -> Vec<Box<dyn Widget>> { std::mem::take(&mut self.0) }
 }
 
-impl<'a> RenderObject<Row<'a>> for RowRender {
-  fn update(&mut self, _owner_widget: &Row<'a>) {}
+impl RenderObject<Row> for RowRender {
+  fn update(&mut self, _owner_widget: &Row) {}
 
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) { self.row.flex_layout(id, ctx); }
-  fn paint<'b>(&'b self, ctx: &mut PaintingContext<'b>) {}
-  fn child_offset(&self, idx: usize) -> Option<Point> { None }
+  #[inline]
+  fn paint<'b>(&'b self, _ctx: &mut PaintingContext<'b>) {}
+  #[inline]
+  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
   default_box_impl!({ row.bound });
 }

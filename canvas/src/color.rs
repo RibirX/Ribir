@@ -305,10 +305,10 @@ mod tests {
   fn component_convert() {
     fn convert(c: f32) -> f32 { Color::u8_to_f32(Color::f32_to_u8(c)) }
 
-    assert_eq!(convert(0.), 0.);
-    assert_eq!(convert(1.0), 1.0);
-    assert_eq!(convert(-1.), 0.);
-    assert_eq!(convert(f32::NAN), 1.);
+    assert!(convert(0.).abs() <= f32::EPSILON);
+    assert!((convert(1.0) - 1.0).abs() <= f32::EPSILON);
+    assert!(convert(-1.).abs() <= f32::EPSILON);
+    assert!((convert(f32::NAN) - 1.) <= f32::EPSILON);
   }
 
   #[test]
@@ -329,10 +329,7 @@ mod tests {
   #[bench]
   fn f32_to_u8(b: &mut Bencher) {
     b.iter(|| {
-      let sum: u32 = (0..100)
-        .into_iter()
-        .map(|i| Color::f32_to_u8(i as f32) as u32)
-        .sum();
+      let sum: u32 = (0..100).map(|i| Color::f32_to_u8(i as f32) as u32).sum();
       sum
     })
   }

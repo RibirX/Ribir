@@ -1,16 +1,15 @@
 use crate::prelude::*;
-use crate::render::*;
 #[derive(Clone, Debug)]
 struct LayoutInfo {
   size: Option<Size>,
   pos: Option<Point>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VecLayouts(Vec<Option<LayoutInfo>>);
 
 impl VecLayouts {
-  pub fn new() -> VecLayouts { return VecLayouts(vec![]); }
+  pub fn new() -> VecLayouts { <_>::default() }
   pub fn reset(&mut self, cnt: usize) {
     self.0.clear();
     self.0.resize(cnt, None);
@@ -43,13 +42,13 @@ impl VecLayouts {
     if idx >= self.0.len() {
       return None;
     }
-    return self.0[idx].as_ref().and_then(|val| val.size.clone());
+    self.0[idx].as_ref().and_then(|val| val.size)
   }
 
   pub fn position(&self, idx: usize) -> Option<Point> {
     if idx >= self.0.len() {
       return None;
     }
-    return self.0[idx].as_ref().and_then(|val| val.pos.clone());
+    self.0[idx].as_ref().and_then(|val| val.pos)
   }
 }

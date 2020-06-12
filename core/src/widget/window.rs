@@ -9,19 +9,19 @@ use winit::{
 };
 
 /// Window is the root to represent.
-pub struct Window<'a> {
+pub struct Window {
   render_tree: RenderTree,
-  widget_tree: WidgetTree<'a>,
+  widget_tree: WidgetTree,
   native_window: NativeWindow,
   canvas: Canvas,
   render: WgpuRender,
 }
 
-impl<'a> Window<'a> {
+impl Window {
   #[inline]
   pub fn id(&self) -> WindowId { self.native_window.id() }
 
-  pub(crate) fn new<W: Into<Box<dyn Widget + 'a>>>(root: W, event_loop: &EventLoop<()>) -> Self {
+  pub(crate) fn new<W: Into<Box<dyn Widget>>>(root: W, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
     let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(

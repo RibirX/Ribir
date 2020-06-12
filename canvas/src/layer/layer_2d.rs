@@ -489,7 +489,7 @@ mod test {
     {
       let mut paint = layer.save();
       let t = Transform::row_major(1., 1., 1., 1., 1., 1.);
-      paint.set_transform(t.clone());
+      paint.set_transform(t);
       assert_eq!(&t, paint.get_transform());
       {
         let mut p2 = paint.save();
@@ -713,7 +713,7 @@ And by opposing end them? To die: to sleep;\n",
     let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
     canvas
       .text_brush()
-      .load_font_from_path(crate_root.clone() + "/fonts/DejaVuSans.ttf", 0)
+      .load_font_from_path(crate_root + "/fonts/DejaVuSans.ttf", 0)
       .unwrap();
     let deja = FontInfo::new().with_family("DejaVu Sans".to_owned());
     let mut layer = canvas.new_2d_layer();

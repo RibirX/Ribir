@@ -7,21 +7,16 @@ use winit::{
   platform::desktop::EventLoopExtDesktop,
 };
 
-pub struct Application<'a> {
-  windows: HashMap<WindowId, Window<'a>>,
+pub struct Application {
+  windows: HashMap<WindowId, Window>,
   event_loop: EventLoop<()>,
 }
 
-impl<'a> Application<'a> {
+impl Application {
   #[inline]
-  pub fn new() -> Application<'a> {
-    Self {
-      windows: Default::default(),
-      event_loop: EventLoop::new(),
-    }
-  }
+  pub fn new() -> Application { <_>::default() }
 
-  pub fn run<W: Into<Box<dyn Widget + 'a>>>(mut self, w: W) {
+  pub fn run<W: Into<Box<dyn Widget>>>(mut self, w: W) {
     self.new_window(w);
 
     let Self {
@@ -54,11 +49,20 @@ impl<'a> Application<'a> {
     });
   }
 
-  pub(crate) fn new_window<W: Into<Box<dyn Widget + 'a>>>(&mut self, w: W) -> WindowId {
+  pub(crate) fn new_window<W: Into<Box<dyn Widget>>>(&mut self, w: W) -> WindowId {
     let window = Window::new(w, &self.event_loop);
     let id = window.id();
     self.windows.insert(window.id(), window);
     id
+  }
+}
+
+impl<'a> Default for Application {
+  fn default() -> Self {
+    Self {
+      windows: Default::default(),
+      event_loop: EventLoop::new(),
+    }
   }
 }
 
