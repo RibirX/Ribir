@@ -432,6 +432,8 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
         binding: PrimaryBindings::GlobalUniform as u32,
         visibility: wgpu::ShaderStage::VERTEX,
         ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+        count: None,
+        ..<_>::default()
       },
       wgpu::BindGroupLayoutEntry {
         binding: PrimaryBindings::TextureAtlas as u32,
@@ -441,11 +443,15 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
           component_type: wgpu::TextureComponentType::Float,
           multisampled: false,
         },
+        count: None,
+        ..<_>::default()
       },
       wgpu::BindGroupLayoutEntry {
         binding: PrimaryBindings::Sampler as u32,
         visibility: wgpu::ShaderStage::FRAGMENT,
         ty: wgpu::BindingType::Sampler { comparison: false },
+        count: None,
+        ..<_>::default()
       },
       wgpu::BindGroupLayoutEntry {
         binding: PrimaryBindings::GlyphTexture as u32,
@@ -455,6 +461,8 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
           component_type: wgpu::TextureComponentType::Float,
           multisampled: false,
         },
+        count: None,
+        ..<_>::default()
       },
     ],
     label: Some("uniforms stable layout"),
@@ -468,6 +476,8 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
         dynamic: false,
         readonly: true,
       },
+      count: None,
+      ..<_>::default()
     }],
     label: Some("uniform layout for texture infos (changed every draw)"),
   });

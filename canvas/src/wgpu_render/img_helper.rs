@@ -15,6 +15,8 @@ impl RgbaConvert {
           dynamic: false,
           readonly: false,
         },
+        count: None,
+        ..<_>::default()
       }],
       label: None,
     });
