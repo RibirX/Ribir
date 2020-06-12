@@ -1,5 +1,5 @@
 use crate::render::*;
-use std::fmt::Debug;
+use std::{any::Any, fmt::Debug};
 
 pub mod key;
 pub mod layout;
@@ -11,18 +11,17 @@ pub use layout::row_layout::Row;
 pub use text::Text;
 
 /// The common behavior for widgets, also support to downcast to special widget.
-pub trait Widget: Debug {
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  ///  You should not override this method, use [`KeyDetect`](key::KeyDetect) if
-  /// you want give a key to your widget.
-  fn key(&self) -> Option<&Key> { None }
-
+pub trait Widget: Debug + Any {
   /// classify this widget into one of four type widget, and return the
   /// reference.
   fn classify(&self) -> WidgetClassify;
 
   /// classify this widget into one of four type widget as mutation reference.
   fn classify_mut(&mut self) -> WidgetClassifyMut;
+
+  fn as_any(&self) -> &dyn Any;
+
+  fn as_any_mut(&self) -> &dyn Any;
 }
 
 /// A widget represented by other widget compose.
@@ -95,12 +94,18 @@ impl<'a> WidgetClassifyMut<'a> {
 /// SingleChildWidget and MultiChildWidget, but can not do it before rust
 /// specialization finished. So just CombinationWidget implemented it, this is
 /// user use most, and others provide a macro to do it.
-impl<'a, T: CombinationWidget + 'a> Widget for T {
+impl<'a, T: CombinationWidget + Any + 'a> Widget for T {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 impl<T: CombinationWidget> !RenderWidget for T {}
@@ -119,6 +124,12 @@ pub macro render_widget_base_impl() {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 pub macro single_child_widget_base_impl() {
@@ -127,6 +138,12 @@ pub macro single_child_widget_base_impl() {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::SingleChild(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 pub macro multi_child_widget_base_impl() {
@@ -135,4 +152,10 @@ pub macro multi_child_widget_base_impl() {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&self) -> &dyn Any { self }
 }

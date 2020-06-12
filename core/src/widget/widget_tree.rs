@@ -160,9 +160,8 @@ impl WidgetTree {
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
-    let old_widget = node.get_mut(self).expect("Must exist!");
-    let old_key = old_widget.key();
-    if old_key.is_some() && old_key == widget.key() {
+    let key = widget.key();
+    if key.is_some() && key == node.key(self) {
       node.replace(self, widget);
       node.mark_changed(self);
       stack.push(node);
@@ -293,11 +292,6 @@ impl WidgetId {
     self.get_mut(tree).map(|w| w.classify_mut())
   }
 
-  /// return the widget key of in this node.
-  pub(crate) fn key<'a>(self, tree: &'a WidgetTree) -> Option<&'a Key> {
-    self.get(tree).map(|w| w.key()).flatten()
-  }
-
   /// A delegate for [NodeId::parent](indextree::NodeId.parent)
   pub fn parent(self, tree: &WidgetTree) -> Option<WidgetId> {
     self.node_feature(tree, |node| node.parent())
@@ -418,6 +412,15 @@ impl WidgetId {
     wid
   }
 
+  /// return the widget key of in this node.
+  fn key(self, tree: &WidgetTree) -> Option<&Key> {
+    self
+      .get(tree)
+      .map(|w| w.as_any().downcast_ref::<KeyDetect>())
+      .flatten()
+      .map(|k| k.key())
+  }
+
   fn node_feature<F: Fn(&Node<Box<dyn Widget + '_>>) -> Option<NodeId>>(
     self,
     tree: &WidgetTree,
@@ -425,6 +428,10 @@ impl WidgetId {
   ) -> Option<WidgetId> {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
   }
+}
+
+impl dyn Widget {
+  fn key(&self) -> Option<&Key> { self.as_any().downcast_ref::<KeyDetect>().map(|k| k.key()) }
 }
 
 #[cfg(test)]

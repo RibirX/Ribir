@@ -29,34 +29,42 @@ pub enum Key {
   K32([u8; 32]),
 }
 
+/// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+/// `KeyDetect` is a widget that only work for bind a key to a widget.
 #[derive(Debug)]
-pub struct KeyDetect<W> {
+pub struct KeyDetect {
   key: Key,
-  child: W,
+  child: Box<dyn Widget>,
 }
 
-impl<W: Widget> Widget for KeyDetect<W> {
-  #[inline]
-  fn key(&self) -> Option<&Key> { Some(&self.key) }
+impl Widget for KeyDetect {
   #[inline]
   fn classify(&self) -> WidgetClassify { self.child.classify() }
+
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { self.child.classify_mut() }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
-#[derive(Debug)]
-pub struct KeyRender<R>(R);
-
-impl<W> KeyDetect<W> {
-  pub fn new<K>(key: K, child: W) -> Self
+impl KeyDetect {
+  pub fn new<K, W>(key: K, child: W) -> Self
   where
     K: Into<Key>,
+    W: Into<Box<dyn Widget>>,
   {
     KeyDetect {
       key: key.into(),
-      child,
+      child: child.into(),
     }
   }
+
+  #[inline]
+  pub fn key(&self) -> &Key { &self.key }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {

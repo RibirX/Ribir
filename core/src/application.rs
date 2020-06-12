@@ -4,7 +4,6 @@ pub use winit::window::WindowId;
 use winit::{
   event::Event,
   event_loop::{ControlFlow, EventLoop},
-  platform::desktop::EventLoopExtDesktop,
 };
 
 pub struct Application {
@@ -20,12 +19,12 @@ impl Application {
     self.new_window(w);
 
     let Self {
-      mut event_loop,
+      event_loop,
       mut windows,
       ..
     } = self;
 
-    event_loop.run_return(move |event, _event_loop, control_flow| {
+    event_loop.run(move |event, _event_loop, control_flow| {
       *control_flow = ControlFlow::Wait;
 
       match event {
