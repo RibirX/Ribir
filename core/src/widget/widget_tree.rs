@@ -262,7 +262,7 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub(crate) fn get<'a>(self, tree: &'a WidgetTree) -> Option<&'a dyn Widget> {
+  pub(crate) fn get(self, tree: &WidgetTree) -> Option<&dyn Widget> {
     tree.arena.get(self.0).map(|node| &**node.get())
   }
 
@@ -582,7 +582,7 @@ mod test {
     );
   }
 
-  fn test_sample_create<'a>(width: usize, depth: usize) -> (WidgetTree, RenderTree) {
+  fn test_sample_create(width: usize, depth: usize) -> (WidgetTree, RenderTree) {
     let mut widget_tree = WidgetTree::default();
     let mut render_tree = RenderTree::default();
     let root = RecursiveRow { width, depth };
