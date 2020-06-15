@@ -1,6 +1,9 @@
 use super::{painting_context::PaintingContext, render_tree::*};
 use crate::{prelude::*, widget::widget_tree::*};
-use canvas::{Canvas, DeviceSize, WgpuRender};
+use canvas::{
+  surface::{PhysicSurface, Surface, TextureSurface},
+  Canvas, DeviceSize, WgpuRender,
+};
 use winit::{
   event::WindowEvent,
   event_loop::EventLoop,
@@ -9,39 +12,17 @@ use winit::{
 };
 
 /// Window is the root to represent.
-pub struct Window {
+pub struct Window<W = NativeWindow, S: Surface = PhysicSurface> {
   render_tree: RenderTree,
   widget_tree: WidgetTree,
-  native_window: NativeWindow,
+  native_window: W,
   canvas: Canvas,
-  render: WgpuRender,
+  render: WgpuRender<S>,
 }
 
-impl Window {
-  #[inline]
-  pub fn id(&self) -> WindowId { self.native_window.id() }
+pub type HeadlessWindow = Window<(), TextureSurface>;
 
-  pub(crate) fn new<W: Into<Box<dyn Widget>>>(root: W, event_loop: &EventLoop<()>) -> Self {
-    let native_window = WindowBuilder::new().build(event_loop).unwrap();
-    let size = native_window.inner_size();
-    let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
-      &native_window,
-      DeviceSize::new(size.width, size.height),
-    ));
-
-    let mut wnd = Window {
-      native_window,
-      render_tree: Default::default(),
-      widget_tree: Default::default(),
-      canvas,
-      render,
-    };
-
-    wnd.widget_tree.set_root(root.into(), &mut wnd.render_tree);
-
-    wnd
-  }
-
+impl<W, S: Surface> Window<W, S> {
   /// processes native events from this native window
   pub(crate) fn processes_native_event(&mut self, _event: WindowEvent) {
     // todo: should process and dispatch event.
@@ -72,11 +53,6 @@ impl Window {
     }
   }
 
-  /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
-  /// after all OS events have been processed by the event loop.
-  #[inline]
-  pub(crate) fn request_redraw(&self) { self.native_window.request_redraw(); }
-
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed. The render tree will also
   /// react widget tree's change.
@@ -99,5 +75,54 @@ impl Window {
     let root = self.render_tree.root().unwrap();
     let mut ctx = RenderCtx::new(&mut self.render_tree, &mut self.canvas);
     ctx.mark_layout_dirty(root);
+  }
+}
+
+impl Window {
+  #[inline]
+  pub fn id(&self) -> WindowId { self.native_window.id() }
+
+  pub(crate) fn new<W: Into<Box<dyn Widget>>>(root: W, event_loop: &EventLoop<()>) -> Self {
+    let native_window = WindowBuilder::new().build(event_loop).unwrap();
+    let size = native_window.inner_size();
+    let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
+      &native_window,
+      DeviceSize::new(size.width, size.height),
+    ));
+
+    let mut wnd = Window {
+      native_window,
+      render_tree: Default::default(),
+      widget_tree: Default::default(),
+      canvas,
+      render,
+    };
+
+    wnd.widget_tree.set_root(root.into(), &mut wnd.render_tree);
+
+    wnd
+  }
+
+  /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
+  /// after all OS events have been processed by the event loop.
+  #[inline]
+  pub(crate) fn request_redraw(&self) { self.native_window.request_redraw(); }
+}
+
+impl HeadlessWindow {
+  pub fn headless<W: Into<Box<dyn Widget>>>(root: W, size: DeviceSize) -> Self {
+    let (canvas, render) =
+      futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
+    let mut wnd = HeadlessWindow {
+      native_window: (),
+      render_tree: Default::default(),
+      widget_tree: Default::default(),
+      canvas,
+      render,
+    };
+
+    wnd.widget_tree.set_root(root.into(), &mut wnd.render_tree);
+
+    wnd
   }
 }
