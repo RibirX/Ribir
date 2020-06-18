@@ -428,57 +428,51 @@ pub(crate) macro spv_2_shader_module($device: expr, $path: literal) {{
 fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   let stable = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
     bindings: &[
-      wgpu::BindGroupLayoutEntry {
-        binding: PrimaryBindings::GlobalUniform as u32,
-        visibility: wgpu::ShaderStage::VERTEX,
-        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-        count: None,
-        ..<_>::default()
-      },
-      wgpu::BindGroupLayoutEntry {
-        binding: PrimaryBindings::TextureAtlas as u32,
-        visibility: wgpu::ShaderStage::FRAGMENT,
-        ty: wgpu::BindingType::SampledTexture {
+      wgpu::BindGroupLayoutEntry::new(
+        PrimaryBindings::GlobalUniform as u32,
+        wgpu::ShaderStage::VERTEX,
+        wgpu::BindingType::UniformBuffer {
+          dynamic: false,
+          min_binding_size: None,
+        },
+      ),
+      wgpu::BindGroupLayoutEntry::new(
+        PrimaryBindings::TextureAtlas as u32,
+        wgpu::ShaderStage::FRAGMENT,
+        wgpu::BindingType::SampledTexture {
           dimension: wgpu::TextureViewDimension::D2,
           component_type: wgpu::TextureComponentType::Float,
           multisampled: false,
         },
-        count: None,
-        ..<_>::default()
-      },
-      wgpu::BindGroupLayoutEntry {
-        binding: PrimaryBindings::Sampler as u32,
-        visibility: wgpu::ShaderStage::FRAGMENT,
-        ty: wgpu::BindingType::Sampler { comparison: false },
-        count: None,
-        ..<_>::default()
-      },
-      wgpu::BindGroupLayoutEntry {
-        binding: PrimaryBindings::GlyphTexture as u32,
-        visibility: wgpu::ShaderStage::FRAGMENT,
-        ty: wgpu::BindingType::SampledTexture {
+      ),
+      wgpu::BindGroupLayoutEntry::new(
+        PrimaryBindings::Sampler as u32,
+        wgpu::ShaderStage::FRAGMENT,
+        wgpu::BindingType::Sampler { comparison: false },
+      ),
+      wgpu::BindGroupLayoutEntry::new(
+        PrimaryBindings::GlyphTexture as u32,
+        wgpu::ShaderStage::FRAGMENT,
+        wgpu::BindingType::SampledTexture {
           dimension: wgpu::TextureViewDimension::D2,
           component_type: wgpu::TextureComponentType::Float,
           multisampled: false,
         },
-        count: None,
-        ..<_>::default()
-      },
+      ),
     ],
     label: Some("uniforms stable layout"),
   });
 
   let dynamic = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    bindings: &[wgpu::BindGroupLayoutEntry {
-      binding: SecondBindings::Primitive as u32,
-      visibility: wgpu::ShaderStage::VERTEX,
-      ty: wgpu::BindingType::StorageBuffer {
+    bindings: &[wgpu::BindGroupLayoutEntry::new(
+      SecondBindings::Primitive as u32,
+      wgpu::ShaderStage::VERTEX,
+      wgpu::BindingType::StorageBuffer {
         dynamic: false,
         readonly: true,
+        min_binding_size: None,
       },
-      count: None,
-      ..<_>::default()
-    }],
+    )],
     label: Some("uniform layout for texture infos (changed every draw)"),
   });
   [stable, dynamic]

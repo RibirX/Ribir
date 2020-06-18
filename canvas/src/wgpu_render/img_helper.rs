@@ -8,16 +8,15 @@ pub(crate) struct RgbaConvert {
 impl RgbaConvert {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
     let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      bindings: &[wgpu::BindGroupLayoutEntry {
-        binding: 0,
-        visibility: wgpu::ShaderStage::COMPUTE,
-        ty: wgpu::BindingType::StorageBuffer {
+      bindings: &[wgpu::BindGroupLayoutEntry::new(
+        0,
+        wgpu::ShaderStage::COMPUTE,
+        wgpu::BindingType::StorageBuffer {
           dynamic: false,
           readonly: false,
+          min_binding_size: None,
         },
-        count: None,
-        ..<_>::default()
-      }],
+      )],
       label: None,
     });
 
