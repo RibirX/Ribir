@@ -1,9 +1,10 @@
 use super::{
   atlas::TextureAtlas,
+  layer_2d::Text,
   mem_texture::MemTexture,
   tessellator_2d::Tessellator,
   text_brush::{Section, TextBrush},
-  Command, CommandInfo, DeviceRect, DeviceSize, FillStyle, HorizontalAlign, Point, Rect,
+  Color, Command, CommandInfo, DeviceRect, DeviceSize, FillStyle, HorizontalAlign, Point, Rect,
   Rendering2DLayer, Size, TextLayout, Transform, VerticalAlign,
 };
 
@@ -100,6 +101,16 @@ impl Canvas {
   pub fn submit<R: CanvasRender>(&mut self, render: &mut R) {
     self.submit_to_render(render);
     self.render_data.clear();
+  }
+
+  pub fn mesure_text<'a>(&mut self, src: &'a Text) -> Rect {
+    let text = src.to_glyph_text(&mut self.text_brush(), 0);
+    let mut sec = Section::new().add_text(text);
+    sec.bounds = (f32::INFINITY, f32::INFINITY);
+    return self
+      .text_brush()
+      .section_bounds(&sec)
+      .unwrap_or_else(Rect::zero);
   }
 
   #[inline]

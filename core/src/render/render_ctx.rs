@@ -1,24 +1,23 @@
 use crate::render::render_tree::*;
 use crate::render::*;
+use canvas::{Canvas, FontInfo, Rect, Text};
 
 use std::collections::HashSet;
 pub struct RenderCtx<'a> {
   tree: &'a mut RenderTree,
-  dirty_layouts: &'a mut HashSet<RenderId>,
-  dirty_layout_roots: &'a mut HashSet<RenderId>,
+  canvas: &'a mut Canvas,
+  ready_layouts: HashSet<RenderId>,
+  dirty_layout_roots: HashSet<RenderId>,
 }
 
 impl<'a> RenderCtx<'a> {
   #[inline]
-  pub fn new(
-    tree: &'a mut RenderTree,
-    dirty_layouts: &'a mut HashSet<RenderId>,
-    dirty_layout_roots: &'a mut HashSet<RenderId>,
-  ) -> RenderCtx<'a> {
+  pub fn new(tree: &'a mut RenderTree, canvas: &'a mut Canvas) -> RenderCtx<'a> {
     RenderCtx {
       tree,
-      dirty_layouts,
-      dirty_layout_roots,
+      canvas,
+      ready_layouts: HashSet::new(),
+      dirty_layout_roots: HashSet::new(),
     }
   }
 
@@ -37,7 +36,6 @@ impl<'a> RenderCtx<'a> {
     if self.is_layout_dirty(node_id) {
       return;
     }
-    self.dirty_layouts.insert(node_id);
     loop {
       self.mark_dirty_down(node_id);
       let parent_id = node_id.parent(self.tree);
@@ -60,13 +58,14 @@ impl<'a> RenderCtx<'a> {
   /// true, else perform layout just the dirty layout node
   pub fn layout_tree(&mut self, force: bool) {
     if force {
-      todo!("force all tree relayout");
-    } else {
-      let mut_ptr = self as *mut RenderCtx;
-      for root in self.dirty_layout_roots.drain() {
-        unsafe {
-          (*mut_ptr).perform_layout(root);
-        }
+      self.ready_layouts.clear();
+      self.dirty_layout_roots.clear();
+      self.dirty_layout_roots.insert(self.tree.root().unwrap());
+    }
+    let mut_ptr = self as *mut RenderCtx;
+    for root in self.dirty_layout_roots.drain() {
+      unsafe {
+        (*mut_ptr).perform_layout(root);
       }
     }
   }
@@ -85,18 +84,32 @@ impl<'a> RenderCtx<'a> {
     self.remove_layout_dirty(id);
   }
 
+  // mesure test bound
+  // todo support custom font
+  pub fn mesure_text(&mut self, text: &str) -> Rect {
+    let font = FontInfo::default();
+    return self.canvas.mesure_text(&Text {
+      text,
+      font_size: 14.0,
+      font: font,
+    });
+  }
+
   /// get the layout dirty flag.
   #[inline]
-  pub fn is_layout_dirty(&self, node_id: RenderId) -> bool { self.dirty_layouts.contains(&node_id) }
+  pub fn is_layout_dirty(&self, node_id: RenderId) -> bool {
+    !self.ready_layouts.contains(&node_id)
+  }
 
   /// remove the layout dirty flag.
-  pub fn remove_layout_dirty(&mut self, node_id: RenderId) { self.dirty_layouts.remove(&node_id); }
+  #[inline]
+  pub fn remove_layout_dirty(&mut self, node_id: RenderId) { self.ready_layouts.insert(node_id); }
 
   pub fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {
     let mut child = id.first_child(self.tree);
     while let Some(child_id) = child {
       ids.push(child_id);
-      child = id.next_sibling(self.tree);
+      child = child_id.next_sibling(self.tree);
     }
   }
 
@@ -108,7 +121,7 @@ impl<'a> RenderCtx<'a> {
     if self.is_layout_dirty(id) {
       return;
     }
-    self.dirty_layouts.insert(id);
+    self.ready_layouts.remove(&id);
     let mut ids = vec![];
     self.collect_children(id, &mut ids);
     while let Some(i) = ids.pop() {
@@ -125,7 +138,7 @@ impl<'a> RenderCtx<'a> {
       .map(|node| node.get_constraints())
       .unwrap();
     if constraints.intersects(target) {
-      self.dirty_layouts.insert(id);
+      self.ready_layouts.remove(&id);
       true
     } else {
       false

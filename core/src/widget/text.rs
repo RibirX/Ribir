@@ -11,28 +11,39 @@ impl Widget for Text {
   render_widget_base_impl!();
 }
 #[derive(Debug)]
-pub struct TextRender(String);
+pub struct TextRender {
+  text: String,
+  size: Option<Size>,
+}
 
 impl RenderWidget for Text {
   type RO = TextRender;
-  fn create_render_object(&self) -> Self::RO { TextRender(self.0.clone()) }
+  fn create_render_object(&self) -> Self::RO {
+    TextRender {
+      text: self.0.clone(),
+      size: None,
+    }
+  }
 }
 
 impl RenderObject<Text> for TextRender {
   #[inline]
-  fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
+  fn perform_layout(&mut self, _id: RenderId, ctx: &mut RenderCtx) {
+    let rc = ctx.mesure_text(&self.text);
+    self.size = Some(Size::new(rc.width(), rc.height()));
+  }
   #[inline]
-  fn get_size(&self) -> Option<Size> { None }
+  fn get_size(&self) -> Option<Size> { self.size }
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }
   #[inline]
   fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
   #[inline]
-  fn update<'a>(&mut self, owner_widget: &Text) { self.0 = owner_widget.0.clone(); }
+  fn update<'a>(&mut self, owner_widget: &Text) { self.text = owner_widget.0.clone(); }
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
     let painter = ctx.painter();
-    painter.fill_text(&self.0, None);
+    painter.fill_text(&self.text, None);
   }
   #[inline]
   fn child_offset(&self, _idx: usize) -> Option<Point> { None }

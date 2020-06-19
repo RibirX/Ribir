@@ -57,6 +57,7 @@ impl Window {
   /// the correct position.
   pub(crate) fn render_ready(&mut self) -> bool {
     self.tree_repair();
+    self.mark_dirty();
     self.layout();
     // Todo: "should return if need repaint."
     true
@@ -84,6 +85,19 @@ impl Window {
 
   /// Layout the render tree as needed
   fn layout(&mut self) {
-    // todo: layout the tree from window to leaf.
+    let mut_ptr = &mut self.render_tree as *mut RenderTree;
+    let root = self.render_tree.root().unwrap();
+    let mut ctx = RenderCtx::new(&mut self.render_tree, &mut self.canvas);
+    unsafe {
+      root
+        .get_mut(&mut *mut_ptr)
+        .map(|node| node.perform_layout(root, &mut ctx));
+    }
+  }
+
+  fn mark_dirty(&mut self) {
+    let root = self.render_tree.root().unwrap();
+    let mut ctx = RenderCtx::new(&mut self.render_tree, &mut self.canvas);
+    ctx.mark_layout_dirty(root);
   }
 }
