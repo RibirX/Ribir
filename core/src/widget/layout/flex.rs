@@ -13,7 +13,7 @@ pub enum FlexFit {
   Tight,
   Loose,
 }
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Axis {
   /// Left and right.
   Horizontal,
@@ -24,7 +24,6 @@ pub enum Axis {
 #[derive(Debug)]
 pub struct FlexContainer {
   axis: Axis,
-  size: Option<Size>,
   layouts: VecLayouts,
   pub bound: BoxLayout,
 }
@@ -41,12 +40,12 @@ impl FlexContainer {
   pub fn new(axis: Axis, layout_type: LayoutConstraints) -> FlexContainer {
     FlexContainer {
       axis,
-      size: None,
       layouts: VecLayouts::new(),
       bound: BoxLayout::new(layout_type),
     }
   }
 
+  pub fn child_offset(&self, idx: usize) -> Option<Point> { self.layouts.position(idx) }
   pub fn main_size(&self, obj: &dyn RenderObjectSafety) -> Option<f32> {
     match self.axis {
       Axis::Horizontal => object_width(obj),
@@ -63,7 +62,21 @@ impl FlexContainer {
 
   pub fn flex_layout<'a>(&mut self, id: RenderId, ctx: &mut RenderCtx<'a>) {
     let size = self.fix_child_size(id, ctx);
+
     self.fix_child_position(id, size, ctx);
+    self.update_self_size(size);
+  }
+
+  fn update_self_size(&mut self, size: Size) {
+    let real_size = match self.axis {
+      Axis::Horizontal => size,
+      Axis::Vertical => Size {
+        width: size.height,
+        height: size.width,
+        _unit: PhantomData::<LogicUnit>,
+      },
+    };
+    self.bound.set_size(Some(real_size));
   }
 
   fn fix_child_size<'a>(&self, id: RenderId, ctx: &mut RenderCtx<'a>) -> Size {
@@ -86,9 +99,12 @@ impl FlexContainer {
       }
     }
 
-    let size = self.size.clone().unwrap();
-    let space = size.width - allocated;
     if total_flex > 0 {
+      let size = match self.axis {
+        Axis::Horizontal => self.bound.get_box_limit().min_width,
+        Axis::Vertical => self.bound.get_box_limit().min_height,
+      };
+      let space = size - allocated;
       let s = space / (total_flex as f32);
 
       for child_id in autos {
@@ -105,17 +121,13 @@ impl FlexContainer {
       }
     }
 
-    Size {
-      width: allocated,
-      height: cross_size,
-      _unit: PhantomData::<LogicUnit>,
-    }
+    Size::new(allocated, cross_size)
   }
 
   fn fix_child_position<'a>(&mut self, id: RenderId, _content: Size, ctx: &mut RenderCtx<'a>) {
     let mut v = vec![];
     ctx.collect_children(id, &mut v);
-
+    self.layouts.reset(v.len());
     let mut x = 0.0;
     let mut y = 0.0;
     v.iter().enumerate().for_each(|(idx, value)| {
@@ -127,10 +139,10 @@ impl FlexContainer {
           .unwrap(),
       );
       self.layouts.update_position(idx, Point::new(x, y));
-      if let (Some(main), Some(cross)) = self.child_axis_size(*value, ctx) {
+      if let (Some(main), Some(_)) = self.child_axis_size(*value, ctx) {
         match self.axis {
           Axis::Horizontal => x += main,
-          Axis::Vertical => y += cross,
+          Axis::Vertical => y += main,
         }
       }
     })
