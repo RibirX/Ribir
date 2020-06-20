@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 holiday={path="../../core"}
+env_logger = "0.7.1"

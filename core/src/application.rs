@@ -49,7 +49,7 @@ impl Application {
   }
 
   pub(crate) fn new_window<W: Into<Box<dyn Widget>>>(&mut self, w: W) -> WindowId {
-    let window = Window::new(w, &self.event_loop);
+    let window = Window::from_event_loop(w, &self.event_loop);
     let id = window.id();
     self.windows.insert(window.id(), window);
     id
