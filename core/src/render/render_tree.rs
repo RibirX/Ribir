@@ -89,8 +89,17 @@ impl RenderId {
 
   /// Returns an iterator of references to this node’s children.
   #[allow(dead_code)]
+  #[inline]
   pub(crate) fn children<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
     self.0.children(&tree.arena).map(RenderId)
+  }
+
+  /// Returns an iterator of references to this node’s children.
+  pub(crate) fn reverse_children<'a>(
+    self,
+    tree: &'a RenderTree,
+  ) -> impl Iterator<Item = RenderId> + 'a {
+    self.0.reverse_children(&tree.arena).map(RenderId)
   }
 
   /// Returns an iterator of references to this node and its descendants, in
@@ -179,10 +188,12 @@ impl RenderId {
   }
 
   /// return the relative render widget.
-  #[allow(dead_code)]
-  pub(crate) fn relative_to_widget(self, tree: &mut RenderTree) -> Option<WidgetId> {
+  pub(crate) fn relative_to_widget(self, tree: &RenderTree) -> Option<WidgetId> {
     tree.render_to_widget.get(&self).copied()
   }
+
+  /// return the render object placed position relative to its parent.
+  pub(crate) fn box_place(&self, _tree: &RenderTree) -> Rect { unimplemented!() }
 
   fn node_feature<F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>>(
     self,

@@ -309,7 +309,7 @@ impl WidgetId {
   }
 
   /// return the relative render widget.
-  fn relative_to_render(self, tree: &mut WidgetTree) -> Option<RenderId> {
+  fn relative_to_render(self, tree: &WidgetTree) -> Option<RenderId> {
     let wid = self.down_nearest_render_widget(tree);
     tree.widget_to_render.get(&wid).cloned()
   }
