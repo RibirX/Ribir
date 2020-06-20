@@ -1,5 +1,9 @@
 #![cfg(test)]
-use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*};
+use crate::{
+  prelude::*,
+  render::render_tree::*,
+  widget::{widget_tree::*, RowColumn},
+};
 use std::{cell::RefCell, rc::Rc};
 #[derive(Clone, Default, Debug)]
 struct EmbedKeyPost {
@@ -22,7 +26,7 @@ impl CombinationWidget for EmbedKeyPost {
       embed.level -= 1;
       children.push(KeyDetect::new("embed", embed).into())
     }
-    KeyDetect::new(0, Row(children)).into()
+    KeyDetect::new(0, RowColumn::Row(children)).into()
   }
 }
 

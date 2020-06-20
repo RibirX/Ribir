@@ -45,7 +45,7 @@ impl WgpuRender<PhysicSurface> {
     glyph_texture_size: DeviceSize,
     atlas_texture_size: DeviceSize,
   ) -> Self {
-    let instance = wgpu::Instance::new();
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
     let w_surface = unsafe { instance.create_surface(window) };
 
@@ -55,7 +55,6 @@ impl WgpuRender<PhysicSurface> {
         compatible_surface: Some(&w_surface),
       },
       wgpu::UnsafeExtensions::disallow(),
-      wgpu::BackendBit::PRIMARY,
     );
 
     Self::new(
@@ -77,7 +76,7 @@ impl WgpuRender<TextureSurface> {
     glyph_texture_size: DeviceSize,
     atlas_texture_size: DeviceSize,
   ) -> Self {
-    let instance = wgpu::Instance::new();
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
     let adapter = instance.request_adapter(
       &wgpu::RequestAdapterOptions {
@@ -85,7 +84,6 @@ impl WgpuRender<TextureSurface> {
         compatible_surface: None,
       },
       wgpu::UnsafeExtensions::disallow(),
-      wgpu::BackendBit::PRIMARY,
     );
 
     WgpuRender::new(
@@ -373,8 +371,12 @@ fn create_render_pipeline(
   let render_pipeline_layout =
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { bind_group_layouts });
 
-  let vs_module = spv_2_shader_module!(device, "./wgpu_render/shaders/geometry.vert.spv");
-  let fs_module = spv_2_shader_module!(device, "./wgpu_render/shaders/geometry.frag.spv");
+  let vs_module = device.create_shader_module(wgpu::include_spirv!(
+    "./wgpu_render/shaders/geometry.vert.spv"
+  ));
+  let fs_module = device.create_shader_module(wgpu::include_spirv!(
+    "./wgpu_render/shaders/geometry.frag.spv"
+  ));
 
   device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
     layout: &render_pipeline_layout,
@@ -418,12 +420,6 @@ fn create_render_pipeline(
     alpha_to_coverage_enabled: false,
   })
 }
-
-pub(crate) macro spv_2_shader_module($device: expr, $path: literal) {{
-  let bytes = include_bytes!($path);
-  let spv = wgpu::read_spirv(std::io::Cursor::new(&bytes[..])).unwrap();
-  $device.create_shader_module(&spv)
-}}
 
 fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   let stable = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
