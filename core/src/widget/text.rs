@@ -13,7 +13,6 @@ impl Widget for Text {
 #[derive(Debug)]
 pub struct TextRender {
   text: String,
-  size: Option<Size>,
 }
 
 impl RenderWidget for Text {
@@ -21,19 +20,18 @@ impl RenderWidget for Text {
   fn create_render_object(&self) -> Self::RO {
     TextRender {
       text: self.0.clone(),
-      size: None,
     }
   }
 }
 
 impl RenderObject<Text> for TextRender {
   #[inline]
-  fn perform_layout(&mut self, _id: RenderId, ctx: &mut RenderCtx) {
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
     let rc = ctx.mesure_text(&self.text);
-    self.size = Some(Size::new(rc.width(), rc.height()));
+    ctx.update_size(id, rc.size);
+    rc.size
   }
-  #[inline]
-  fn get_size(&self) -> Option<Size> { self.size }
+
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }
   #[inline]
@@ -45,8 +43,6 @@ impl RenderObject<Text> for TextRender {
     let painter = ctx.painter();
     painter.fill_text(&self.text, None);
   }
-  #[inline]
-  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
 // impl RenderObject for Text {
 //   fn paint(&self) {}

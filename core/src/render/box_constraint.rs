@@ -15,7 +15,6 @@ pub struct BoxLimit {
 #[derive(Debug)]
 pub struct BoxLayout {
   constraints: LayoutConstraints,
-  size: Option<Size>,
 
   /// box bound is the bound of the layout can be place. it should be set before
   /// render object's process of layout. when the object it is in the layout
@@ -27,13 +26,10 @@ impl BoxLayout {
   pub fn new(lc: LayoutConstraints) -> BoxLayout {
     BoxLayout {
       constraints: lc,
-      size: None,
+
       box_bound: None,
     }
   }
-  #[inline]
-  pub fn get_size(&self) -> Option<Size> { self.size }
-  pub fn set_size(&mut self, size: Option<Size>) { self.size = size; }
 
   pub fn get_box_limit(&self) -> BoxLimit {
     if self.box_bound.is_some() {
@@ -54,9 +50,6 @@ impl BoxLayout {
 }
 
 pub macro default_box_impl( {$($path:ident).*}) {
-    #[inline]
-    proxy_immut_impl!{get_size,  {$($path).*},  Option<Size>, get_size, ()}
-
     #[inline]
     proxy_immut_impl!{get_constraints,  {$($path).* }, LayoutConstraints, get_constraints, ()}
 

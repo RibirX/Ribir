@@ -117,6 +117,17 @@ impl<'a> RenderCtx<'a> {
     id.clone().get_mut(self.tree).unwrap().set_box_limit(bound);
   }
 
+  #[inline]
+  pub fn update_child_pos(&mut self, child: RenderId, pos: Point) {
+    child.update_position(self.tree, pos);
+  }
+
+  #[inline]
+  pub fn update_size(&mut self, id: RenderId, size: Size) { id.update_size(self.tree, size); }
+
+  #[inline]
+  pub fn box_place(&self, id: RenderId) -> Option<&Rect> { id.box_place(self.tree) }
+
   fn mark_dirty_down(&mut self, mut id: RenderId) {
     if self.is_layout_dirty(id) {
       return;
