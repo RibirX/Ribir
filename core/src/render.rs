@@ -46,10 +46,7 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   fn update(&mut self, owner_widget: &Owner);
 
   // trig the process of layout
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
-
-  // return layout bound's size if has known
-  fn get_size(&self) -> Option<Size>;
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size;
 
   // get layout constraints type;
   fn get_constraints(&self) -> LayoutConstraints;
@@ -62,9 +59,6 @@ pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
   /// call children's paint individual. And framework guarantee always paint
   /// parent before children.
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
-
-  /// return the `idx`th child's offset relative to self.
-  fn child_offset(&self, idx: usize) -> Option<Point>;
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
@@ -83,15 +77,11 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx);
-  fn get_size(&self) -> Option<Size>;
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size;
   fn get_constraints(&self) -> LayoutConstraints;
   /// set layout limitation to the render object.
   fn set_box_limit(&mut self, bound: Option<BoxLimit>);
-
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
-
-  fn child_offset(&self, idx: usize) -> Option<Point>;
 }
 
 pub(crate) fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
@@ -180,11 +170,9 @@ where
   }
 
   #[inline]
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) {
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
     RenderObject::perform_layout(&mut self.render, id, ctx)
   }
-  #[inline]
-  fn get_size(&self) -> Option<Size> { RenderObject::get_size(&self.render) }
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(&self.render) }
   #[inline]
@@ -193,11 +181,6 @@ where
   }
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.render.paint(ctx); }
-
-  #[inline]
-  fn child_offset(&self, idx: usize) -> Option<Point> {
-    RenderObject::child_offset(&self.render, idx)
-  }
 }
 
 impl<W, R> RenderObjectBox<W, R>

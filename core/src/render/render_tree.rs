@@ -16,6 +16,9 @@ pub struct RenderTree {
   /// A hash map to mapping a render object in render tree to its corresponds
   /// render widget in widget tree.
   render_to_widget: HashMap<RenderId, WidgetId>,
+  /// Store the render object's place relative to parent coordinate after
+  /// layout.
+  box_place: HashMap<RenderId, Rect>,
 }
 
 impl RenderTree {
@@ -168,6 +171,7 @@ impl RenderId {
     // relationship
     // Fixme: memory leak here, node just detach and not remove. Wait a pr to
     // provide a method to drop a subtree in indextree.
+    tree.box_place.remove(&self);
     self.0.detach(&mut tree.arena);
     if tree.root == Some(self) {
       tree.root = None;
@@ -186,5 +190,18 @@ impl RenderId {
     method: F,
   ) -> Option<RenderId> {
     tree.arena.get(self.0).map(method).flatten().map(RenderId)
+  }
+
+  /// return the render object placed position relative to its parent, this
+  /// should only be called after layout, otherwise may return None or the place
+  /// of last layout.
+  pub(crate) fn box_place(self, tree: &RenderTree) -> Option<&Rect> { tree.box_place.get(&self) }
+
+  pub(crate) fn update_position(self, tree: &mut RenderTree, pos: Point) {
+    tree.box_place.entry(self).or_insert(Rect::zero()).origin = pos;
+  }
+
+  pub(crate) fn update_size(self, tree: &mut RenderTree, size: Size) {
+    tree.box_place.entry(self).or_insert(Rect::zero()).size = size;
   }
 }

@@ -1,6 +1,6 @@
 // use super::box_constraint::BoxBound;
 use super::flex::FlexFit;
-use crate::prelude::{Point, Size};
+use crate::prelude::Size;
 use crate::render::render_ctx::RenderCtx;
 use crate::render::render_tree::*;
 use crate::render::*;
@@ -17,8 +17,6 @@ struct ExpandBox {
 struct ExpandBoxRender {
   flex: i32,
   fit: FlexFit,
-
-  size: Option<Size>,
 }
 
 impl RenderWidget for ExpandBox {
@@ -27,7 +25,6 @@ impl RenderWidget for ExpandBox {
     ExpandBoxRender {
       flex: self.flex,
       fit: self.fit,
-      size: None,
     }
   }
 }
@@ -51,15 +48,14 @@ impl RenderObject<ExpandBox> for ExpandBoxRender {
   fn update(&mut self, owner: &ExpandBox) {
     self.fit = owner.fit;
     self.flex = owner.flex;
-    self.size = None;
   }
-  fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) {}
+
   #[inline]
-  fn get_size(&self) -> Option<Size> { self.size }
+  fn perform_layout(&mut self, _id: RenderId, _ctx: &mut RenderCtx) -> Size { Size::zero() }
+
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::EFFECTED_BY_PARENT }
   fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
 
   fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {}
-  fn child_offset(&self, _idx: usize) -> Option<Point> { None }
 }
