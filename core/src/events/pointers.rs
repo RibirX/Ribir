@@ -1,4 +1,4 @@
-use super::{common_event_method, Event};
+use super::{impl_common_event, EventCommon};
 use crate::{prelude::Point, widget::Widget};
 mod from_mouse;
 #[derive(Debug)]
@@ -50,7 +50,7 @@ pub struct PointerEvent {
   pub is_primary: bool,
   /// The buttons being depressed (if any) when the mouse event was fired.
   pub buttons: MouseButtons,
-  common: Event,
+  common: EventCommon,
 }
 
 bitflags! {
@@ -80,11 +80,12 @@ pub enum PointerType {
   Touch,
 }
 
+impl_common_event!(PointerEvent, common);
+
 impl PointerEvent {
   /// The button number that was pressed (if applicable) when the mouse event
   /// was fired.
   pub fn button_num(&self) -> usize { unimplemented!() }
-  common_event_method!(common);
 }
 
 /// A widget that calls callbacks in response to common pointer events.
