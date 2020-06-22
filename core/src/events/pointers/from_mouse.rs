@@ -1,6 +1,6 @@
 use super::{MouseButtons, PointerEvent, PointerId, PointerType};
 use crate::{
-  events::{Event, ModifiersState},
+  events::{EventCommon, ModifiersState},
   prelude::*,
   widget::widget_tree::WidgetId,
 };
@@ -14,7 +14,7 @@ impl PointerEvent {
     modifiers: ModifiersState,
     btn: winit::event::MouseButton,
   ) -> Self {
-    let event = Event {
+    let event = EventCommon {
       target,
       current_target: target,
       composed_path: vec![],

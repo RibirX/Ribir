@@ -67,9 +67,10 @@ impl<W, S: Surface> Window<W, S> {
 
   /// Layout the render tree as needed
   fn layout(&mut self) {
-    let mut_ptr = &mut self.render_tree as *mut RenderTree;
-    let root = self.render_tree.root().unwrap();
-    let mut ctx = RenderCtx::new(&mut self.render_tree, &mut self.canvas);
+    let mut tree = &mut self.render_tree.borrow_mut();
+    let mut_ptr = (&mut tree as &mut RenderTree) as *mut RenderTree;
+    let root = tree.root().unwrap();
+    let mut ctx = RenderCtx::new(&mut tree, &mut self.canvas);
     unsafe {
       root
         .get_mut(&mut *mut_ptr)
@@ -78,8 +79,9 @@ impl<W, S: Surface> Window<W, S> {
   }
 
   fn mark_dirty(&mut self) {
-    let root = self.render_tree.root().unwrap();
-    let mut ctx = RenderCtx::new(&mut self.render_tree, &mut self.canvas);
+    let mut tree = self.render_tree.borrow_mut();
+    let root = tree.root().unwrap();
+    let mut ctx = RenderCtx::new(&mut tree, &mut self.canvas);
     ctx.mark_layout_dirty(root);
   }
 
