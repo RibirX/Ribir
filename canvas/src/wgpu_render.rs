@@ -180,9 +180,10 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
           attachment: view.borrow(),
           resolve_target: None,
-          load_op: wgpu::LoadOp::Clear,
-          store_op: wgpu::StoreOp::Store,
-          clear_color: wgpu::Color::WHITE,
+          ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+            store: true,
+          },
         }],
         depth_stencil_attachment: None,
       });
