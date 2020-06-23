@@ -123,7 +123,7 @@ impl<T: RenderWidget> !CombinationWidget for T {}
 impl<T: MultiChildWidget> !SingleChildWidget for T {}
 impl<T: SingleChildWidget> !MultiChildWidget for T {}
 
-impl<'a, W: Widget + 'a> From<W> for Box<dyn Widget + 'a> {
+impl<W: Widget> From<W> for Box<dyn Widget> {
   #[inline]
   fn from(w: W) -> Self { Box::new(w) }
 }

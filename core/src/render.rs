@@ -1,5 +1,3 @@
-use crate::render::render_tree::RenderId;
-
 mod box_constraint;
 pub use box_constraint::*;
 pub use render_ctx::*;
@@ -9,6 +7,7 @@ pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 pub mod painting_context;
 pub mod render_tree;
+pub use render_tree::RenderId;
 
 bitflags! {
     pub struct LayoutConstraints: u8 {

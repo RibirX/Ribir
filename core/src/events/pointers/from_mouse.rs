@@ -9,7 +9,7 @@ use winit::event::MouseButton;
 impl PointerEvent {
   pub fn from_mouse(
     target: WidgetId,
-    pos: Point,
+    position: Point,
     global_pos: Point,
     modifiers: ModifiersState,
     btn: winit::event::MouseButton,
@@ -23,7 +23,7 @@ impl PointerEvent {
     };
 
     PointerEvent {
-      pos,
+      position,
       global_pos,
       // todo: how to generate pointer id ?
       id: PointerId(0),
