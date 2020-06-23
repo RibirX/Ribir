@@ -24,7 +24,7 @@ pub trait Event {
   fn modifiers(&self) -> ModifiersState;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct EventCommon {
   pub target: WidgetId,
   pub current_target: WidgetId,

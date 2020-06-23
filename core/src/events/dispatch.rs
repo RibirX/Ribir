@@ -35,16 +35,25 @@ impl Dispatcher {
       WindowEvent::ModifiersChanged(s) => self.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
-        self.bubble_pointer(|w, event| w.dispatch_pointer_move(event));
+        self.bubble_pointer(|w, event| {
+          log::info!("Pointer move {:?}", event);
+          w.dispatch_pointer_move(event)
+        });
       }
       WindowEvent::MouseInput { state, button, .. } => {
         self.button = button;
         match state {
           ElementState::Pressed => {
-            self.bubble_pointer(|w, event| w.dispatch_pointer_down(event));
+            self.bubble_pointer(|w, event| {
+              log::info!("Pointer down {:?}", event);
+              w.dispatch_pointer_down(event)
+            });
           }
           ElementState::Released => {
-            self.bubble_pointer(|w, event| w.dispatch_pointer_up(event));
+            self.bubble_pointer(|w, event| {
+              log::info!("Pointer up {:?}", event);
+              w.dispatch_pointer_up(event)
+            });
           }
         };
       }
@@ -63,7 +72,7 @@ impl Dispatcher {
         let event = pointer.get_or_insert_with(|| {
           PointerEvent::from_mouse(wid, pos, self.cursor_pos, self.modifiers, self.button)
         });
-        event.pos = pos;
+        event.position = pos;
         let common = event.as_mut();
         common.current_target = wid;
         common.composed_path.push(wid);
@@ -102,14 +111,14 @@ impl<'a> HitRenderIter<'a> {
   }
 
   fn try_down_coordinate(tree: &RenderTree, rid: RenderId, pos: &mut Point) -> bool {
-    let rect = rid.box_place(tree);
-    let offset: Size = rect.min().to_tuple().into();
-    if rect.contains(*pos) {
-      *pos -= offset;
-      true
-    } else {
-      false
-    }
+    rid
+      .box_place(tree)
+      .filter(|rect| rect.contains(*pos))
+      .map_or(false, |rect| {
+        let offset: Size = rect.min().to_tuple().into();
+        *pos -= offset;
+        true
+      })
   }
 }
 
@@ -127,5 +136,76 @@ impl<'a> Iterator for HitRenderIter<'a> {
     } else {
     }
     None
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::prelude::*;
+  use crate::widget::window::HeadlessWindow;
+  use std::{cell::RefCell, rc::Rc};
+
+  fn record_pointer<W: Into<Box<dyn Widget>>>(
+    event_stack: Rc<RefCell<Vec<PointerEvent>>>,
+    child: W,
+  ) -> PointerListener {
+    PointerListener::listen_on(child)
+      .on_pointer_down({
+        let stack = event_stack.clone();
+        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
+      })
+      .on_pointer_move({
+        let stack = event_stack.clone();
+        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
+      })
+      .on_pointer_up({
+        let stack = event_stack.clone();
+        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
+      })
+      .on_pointer_cancel({
+        let stack = event_stack.clone();
+        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
+      })
+  }
+
+  #[test]
+  fn pointer_from_mouse() {
+    let event_record = Rc::new(RefCell::new(vec![]));
+    let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
+    let root = record_pointer(event_record.clone(), record);
+    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    wnd.render_ready();
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+
+    {
+      let mut records = event_record.borrow_mut();
+      assert_eq!(records.len(), 4);
+      assert_eq!(records[0].composed_path().len(), 1);
+      assert_eq!(records[1].composed_path().len(), 2);
+      assert_eq!(records[0].button_num(), 0);
+      records.clear();
+    }
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    {
+      let mut records = event_record.borrow_mut();
+      assert_eq!(records[0].button_num(), 1);
+      assert_eq!(records[0].position, (1., 1.).into());
+      records.clear();
+    }
+
+    todo!("release button and then check, move events button");
   }
 }

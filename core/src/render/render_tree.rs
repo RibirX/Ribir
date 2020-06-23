@@ -192,9 +192,6 @@ impl RenderId {
     tree.render_to_widget.get(&self).copied()
   }
 
-  /// return the render object placed position relative to its parent.
-  pub(crate) fn box_place(&self, _tree: &RenderTree) -> Rect { unimplemented!() }
-
   fn node_feature<F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>>(
     self,
     tree: &RenderTree,
