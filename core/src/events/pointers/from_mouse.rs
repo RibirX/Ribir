@@ -12,14 +12,14 @@ impl PointerEvent {
     position: Point,
     global_pos: Point,
     modifiers: ModifiersState,
-    btn: winit::event::MouseButton,
+    btn: MouseButtons,
   ) -> Self {
     let event = EventCommon {
       target,
       current_target: target,
       composed_path: vec![],
       cancel_bubble: <_>::default(),
-      modifiers: modifiers,
+      modifiers,
     };
 
     PointerEvent {
@@ -51,7 +51,7 @@ impl From<MouseButton> for MouseButtons {
       MouseButton::Other(2) => MouseButtons::FIFTH,
       MouseButton::Other(v) => {
         log::warn!("Not support the mouse button {} now", v);
-        MouseButtons::NONE
+        MouseButtons::default()
       }
     }
   }
