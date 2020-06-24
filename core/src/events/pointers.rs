@@ -54,9 +54,8 @@ pub struct PointerEvent {
 }
 
 bitflags! {
+  #[derive(Default)]
   pub struct MouseButtons: u8 {
-    /// No button or un-initialized
-    const NONE = 0b0000_0000;
     /// Primary button (usually the left button)
     const PRIMARY = 0b0000_0001;
     /// Secondary button (usually the right button)
@@ -85,7 +84,7 @@ impl_common_event!(PointerEvent, common);
 impl PointerEvent {
   /// The button number that was pressed (if applicable) when the mouse event
   /// was fired.
-  pub fn button_num(&self) -> usize { unimplemented!() }
+  pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
 }
 
 /// A widget that calls callbacks in response to common pointer events.
@@ -200,6 +199,7 @@ impl RenderObject<PointerListener> for RenderPointer {
     let content = id
       .first_child(ctx.render_tree())
       .expect("Pointer must have only one child");
+    ctx.perform_layout(content);
     let size = ctx
       .box_place(content)
       .map_or(Size::zero(), |rect| rect.size);

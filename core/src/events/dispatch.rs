@@ -1,4 +1,4 @@
-use super::pointers::{PointerEvent, PointerListener};
+use super::pointers::{MouseButtons, PointerEvent, PointerListener};
 use crate::{
   prelude::{Point, Size},
   render::render_tree::{RenderId, RenderTree},
@@ -8,13 +8,13 @@ use std::{
   cell::{Ref, RefCell},
   rc::Rc,
 };
-use winit::event::{ElementState, ModifiersState, MouseButton, WindowEvent};
+use winit::event::{DeviceId, ElementState, ModifiersState, WindowEvent};
 
 pub(crate) struct Dispatcher {
   render_tree: Rc<RefCell<RenderTree>>,
   widget_tree: Rc<RefCell<WidgetTree>>,
   cursor_pos: Point,
-  button: MouseButton,
+  mouse_button: (Option<DeviceId>, MouseButtons),
   modifiers: ModifiersState,
 }
 
@@ -25,7 +25,7 @@ impl Dispatcher {
       widget_tree,
       cursor_pos: Point::zero(),
       modifiers: <_>::default(),
-      button: MouseButton::Other(0),
+      mouse_button: <_>::default(),
     }
   }
 
@@ -40,22 +40,38 @@ impl Dispatcher {
           w.dispatch_pointer_move(event)
         });
       }
-      WindowEvent::MouseInput { state, button, .. } => {
-        self.button = button;
-        match state {
-          ElementState::Pressed => {
-            self.bubble_pointer(|w, event| {
-              log::info!("Pointer down {:?}", event);
-              w.dispatch_pointer_down(event)
-            });
-          }
-          ElementState::Released => {
-            self.bubble_pointer(|w, event| {
-              log::info!("Pointer up {:?}", event);
-              w.dispatch_pointer_up(event)
-            });
-          }
-        };
+      WindowEvent::MouseInput {
+        state,
+        button,
+        device_id,
+        ..
+      } => {
+        // A mouse press/release emit during another mouse's press will ignored.
+        if self.mouse_button.0.get_or_insert(device_id) == &device_id {
+          match state {
+            ElementState::Pressed => {
+              self.mouse_button.1 |= button.into();
+              // only the first button press emit event.
+              if self.mouse_button.1 == button.into() {
+                self.bubble_pointer(|w, event| {
+                  log::info!("Pointer down {:?}", event);
+                  w.dispatch_pointer_down(event)
+                });
+              }
+            }
+            ElementState::Released => {
+              self.mouse_button.1.remove(button.into());
+              // only the last button release emit event.
+              if self.mouse_button.1.is_empty() {
+                self.mouse_button.0 = None;
+                self.bubble_pointer(|w, event| {
+                  log::info!("Pointer up {:?}", event);
+                  w.dispatch_pointer_up(event)
+                });
+              }
+            }
+          };
+        }
       }
       _ => log::info!("not processed event {:?}", event),
     }
@@ -70,7 +86,13 @@ impl Dispatcher {
         .and_then(|w| w.as_any().downcast_ref::<PointerListener>());
       if let Some(w) = w {
         let event = pointer.get_or_insert_with(|| {
-          PointerEvent::from_mouse(wid, pos, self.cursor_pos, self.modifiers, self.button)
+          PointerEvent::from_mouse(
+            wid,
+            pos,
+            self.cursor_pos,
+            self.modifiers,
+            self.mouse_button.1,
+          )
         });
         event.position = pos;
         let common = event.as_mut();
@@ -145,6 +167,7 @@ mod tests {
   use crate::prelude::*;
   use crate::widget::window::HeadlessWindow;
   use std::{cell::RefCell, rc::Rc};
+  use winit::event::MouseButton;
 
   fn record_pointer<W: Into<Box<dyn Widget>>>(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
@@ -170,7 +193,7 @@ mod tests {
   }
 
   #[test]
-  fn pointer_from_mouse() {
+  fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
     let root = record_pointer(event_record.clone(), record);
@@ -185,7 +208,7 @@ mod tests {
 
     {
       let mut records = event_record.borrow_mut();
-      assert_eq!(records.len(), 4);
+      assert_eq!(records.len(), 2);
       assert_eq!(records[0].composed_path().len(), 1);
       assert_eq!(records[1].composed_path().len(), 2);
       assert_eq!(records[0].button_num(), 0);
@@ -199,13 +222,98 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
-    {
-      let mut records = event_record.borrow_mut();
-      assert_eq!(records[0].button_num(), 1);
-      assert_eq!(records[0].position, (1., 1.).into());
-      records.clear();
-    }
+    let mut records = event_record.borrow_mut();
+    assert_eq!(records[0].button_num(), 1);
+    assert_eq!(records[0].position, (1., 1.).into());
+    records.clear();
+  }
 
-    todo!("release button and then check, move events button");
+  #[test]
+  fn mouse_buttons() {
+    let event_record = Rc::new(RefCell::new(vec![]));
+    let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
+    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    wnd.render_ready();
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Pressed,
+      button: MouseButton::Right,
+      modifiers: ModifiersState::default(),
+    });
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Released,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Released,
+      button: MouseButton::Right,
+      modifiers: ModifiersState::default(),
+    });
+
+    let records = event_record.borrow();
+    assert_eq!(records.len(), 3);
+
+    assert_eq!(records[0].buttons, MouseButtons::PRIMARY);
+    assert_eq!(
+      records[1].buttons,
+      MouseButtons::PRIMARY | MouseButtons::SECONDARY
+    );
+    assert_eq!(records[2].buttons, MouseButtons::default());
+  }
+
+  #[test]
+  fn different_mouse_() {
+    let event_record = Rc::new(RefCell::new(vec![]));
+    let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
+    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    wnd.render_ready();
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Pressed,
+      button: MouseButton::Right,
+      modifiers: ModifiersState::default(),
+    });
+
+    // second device press event skipped.
+    assert_eq!(event_record.borrow().len(), 1);
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+
+    // but cursor move processed.
+    assert_eq!(event_record.borrow().len(), 2);
+    // todo: A mouse press/release emit during another mouse's press will
+    // ignored. Use difference device id to simulate it.
+    // assert_eq!(event_record.borrow()[1].buttons, MouseButtons::PRIMARY);
   }
 }
