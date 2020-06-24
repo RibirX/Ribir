@@ -35,7 +35,7 @@ impl Dispatcher {
       WindowEvent::ModifiersChanged(s) => self.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
-        self.bubble_pointer(|w, event| {
+        self.bubble_mouse_pointer(|w, event| {
           log::info!("Pointer move {:?}", event);
           w.dispatch_pointer_move(event)
         });
@@ -53,7 +53,7 @@ impl Dispatcher {
               self.mouse_button.1 |= button.into();
               // only the first button press emit event.
               if self.mouse_button.1 == button.into() {
-                self.bubble_pointer(|w, event| {
+                self.bubble_mouse_pointer(|w, event| {
                   log::info!("Pointer down {:?}", event);
                   w.dispatch_pointer_down(event)
                 });
@@ -64,7 +64,7 @@ impl Dispatcher {
               // only the last button release emit event.
               if self.mouse_button.1.is_empty() {
                 self.mouse_button.0 = None;
-                self.bubble_pointer(|w, event| {
+                self.bubble_mouse_pointer(|w, event| {
                   log::info!("Pointer up {:?}", event);
                   w.dispatch_pointer_up(event)
                 });
@@ -77,30 +77,35 @@ impl Dispatcher {
     }
   }
 
-  fn bubble_pointer<D: Fn(&PointerListener, &PointerEvent)>(&mut self, dispatch: D) {
+  fn bubble_mouse_pointer<D: Fn(&PointerListener, &PointerEvent)>(&mut self, dispatch: D) {
     let mut pointer = None;
     let w_tree = self.widget_tree.borrow();
-    self.render_hit_iter().for_each(|(wid, pos)| {
-      let w = wid
+    self.render_hit_iter().all(|(wid, pos)| {
+      wid
         .get(&w_tree)
-        .and_then(|w| w.as_any().downcast_ref::<PointerListener>());
-      if let Some(w) = w {
-        let event = pointer.get_or_insert_with(|| {
-          PointerEvent::from_mouse(
-            wid,
-            pos,
-            self.cursor_pos,
-            self.modifiers,
-            self.mouse_button.1,
-          )
-        });
-        event.position = pos;
-        let common = event.as_mut();
-        common.current_target = wid;
-        common.composed_path.push(wid);
-        dispatch(w, &event);
-      }
-    })
+        .and_then(|w| w.as_any().downcast_ref::<PointerListener>())
+        .map_or(false, |w| {
+          let event = pointer.get_or_insert_with(|| {
+            PointerEvent::from_mouse(
+              wid,
+              pos,
+              self.cursor_pos,
+              self.modifiers,
+              self.mouse_button.1,
+            )
+          });
+          if event.as_mut().cancel_bubble.get() {
+            false
+          } else {
+            event.position = pos;
+            let common = event.as_mut();
+            common.current_target = wid;
+            common.composed_path.push(wid);
+            dispatch(w, &event);
+            true
+          }
+        })
+    });
   }
 
   fn render_hit_iter<'a>(&'a self) -> impl Iterator<Item = (WidgetId, Point)> + 'a {
@@ -315,5 +320,33 @@ mod tests {
     // todo: A mouse press/release emit during another mouse's press will
     // ignored. Use difference device id to simulate it.
     // assert_eq!(event_record.borrow()[1].buttons, MouseButtons::PRIMARY);
+  }
+
+  #[test]
+  fn cancel_bubble() {
+    let event_record = Rc::new(RefCell::new(vec![]));
+    let pointer = PointerListener::listen_on(Text("pointer event test".to_string()))
+      .on_pointer_move({
+        let stack = event_record.clone();
+        move |e: &PointerEvent| {
+          stack.borrow_mut().push(e.clone());
+          e.stop_bubbling();
+        }
+      });
+    let root = PointerListener::listen_on(pointer).on_pointer_down({
+      let stack = event_record.clone();
+      move |e| stack.borrow_mut().push(e.clone())
+    });
+    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    wnd.render_ready();
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    assert_eq!(event_record.borrow().len(), 1);
   }
 }
