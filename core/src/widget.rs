@@ -7,7 +7,8 @@ pub mod text;
 pub mod widget_tree;
 pub mod window;
 pub use key::{Key, KeyDetect};
-pub use layout::row_col_layout::RowColumn;
+pub use layout::row_col_layout::Column;
+pub use layout::row_col_layout::Row;
 pub use text::Text;
 
 /// The common behavior for widgets, also support to downcast to special widget.
