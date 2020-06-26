@@ -59,7 +59,7 @@ impl FlexContainer {
   fn self_size(&mut self, size: Size) -> Size {
     match self.axis {
       Axis::Horizontal => size,
-      Axis::Vertical => Size::new(size.width, size.height),
+      Axis::Vertical => Size::new(size.height, size.width),
     }
   }
 
