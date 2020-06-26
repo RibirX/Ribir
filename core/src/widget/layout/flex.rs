@@ -1,12 +1,8 @@
 use super::flex_item::*;
-use super::vec_layouts::*;
 use crate::prelude::*;
 
 use crate::render::render_tree::*;
 use crate::render::BoxLayout;
-use crate::render::RenderObjectSafety;
-use canvas::LogicUnit;
-use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FlexFit {
@@ -24,59 +20,47 @@ pub enum Axis {
 #[derive(Debug)]
 pub struct FlexContainer {
   axis: Axis,
-  layouts: VecLayouts,
   pub bound: BoxLayout,
-}
-
-fn object_width(obj: &dyn RenderObjectSafety) -> Option<f32> {
-  obj.get_size().map(|size| size.width)
-}
-
-fn object_height(obj: &dyn RenderObjectSafety) -> Option<f32> {
-  obj.get_size().map(|size| size.height)
 }
 
 impl FlexContainer {
   pub fn new(axis: Axis, layout_type: LayoutConstraints) -> FlexContainer {
     FlexContainer {
       axis,
-      layouts: VecLayouts::new(),
       bound: BoxLayout::new(layout_type),
     }
   }
 
-  pub fn child_offset(&self, idx: usize) -> Option<Point> { self.layouts.position(idx) }
-  pub fn main_size(&self, obj: &dyn RenderObjectSafety) -> Option<f32> {
+  pub fn main_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
+    let rect = ctx.box_place(id);
     match self.axis {
-      Axis::Horizontal => object_width(obj),
-      Axis::Vertical => object_height(obj),
+      Axis::Horizontal => rect.map(|r| r.width()),
+      Axis::Vertical => rect.map(|r| r.height()),
     }
   }
 
-  pub fn cross_size(&self, obj: &dyn RenderObjectSafety) -> Option<f32> {
+  pub fn cross_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
+    let rect = ctx.box_place(id);
     match self.axis {
-      Axis::Vertical => object_width(obj),
-      Axis::Horizontal => object_height(obj),
+      Axis::Vertical => rect.map(|r| r.width()),
+      Axis::Horizontal => rect.map(|r| r.height()),
     }
   }
 
-  pub fn flex_layout<'a>(&mut self, id: RenderId, ctx: &mut RenderCtx<'a>) {
+  pub fn flex_layout<'a>(&mut self, id: RenderId, ctx: &mut RenderCtx<'a>) -> Size {
     let size = self.fix_child_size(id, ctx);
 
     self.fix_child_position(id, size, ctx);
-    self.update_self_size(size);
+    let size = self.self_size(size);
+    ctx.update_size(id, size);
+    size
   }
 
-  fn update_self_size(&mut self, size: Size) {
-    let real_size = match self.axis {
+  fn self_size(&mut self, size: Size) -> Size {
+    match self.axis {
       Axis::Horizontal => size,
-      Axis::Vertical => Size {
-        width: size.height,
-        height: size.width,
-        _unit: PhantomData::<LogicUnit>,
-      },
-    };
-    self.bound.set_size(Some(real_size));
+      Axis::Vertical => Size::new(size.width, size.height),
+    }
   }
 
   fn fix_child_size<'a>(&self, id: RenderId, ctx: &mut RenderCtx<'a>) -> Size {
@@ -127,18 +111,11 @@ impl FlexContainer {
   fn fix_child_position<'a>(&mut self, id: RenderId, _content: Size, ctx: &mut RenderCtx<'a>) {
     let mut v = vec![];
     ctx.collect_children(id, &mut v);
-    self.layouts.reset(v.len());
     let mut x = 0.0;
     let mut y = 0.0;
-    v.iter().enumerate().for_each(|(idx, value)| {
-      self.layouts.update_size(
-        idx,
-        ctx
-          .render_object(*value)
-          .and_then(|obj| obj.get_size())
-          .unwrap(),
-      );
-      self.layouts.update_position(idx, Point::new(x, y));
+    v.iter().for_each(|value| {
+      ctx.update_size(*value, ctx.box_place(*value).unwrap().size);
+      ctx.update_child_pos(*value, Point::new(x, y));
       if let (Some(main), Some(_)) = self.child_axis_size(*value, ctx) {
         match self.axis {
           Axis::Horizontal => x += main,
@@ -158,10 +135,7 @@ impl FlexContainer {
     id: RenderId,
     ctx: &mut RenderCtx<'a>,
   ) -> (Option<f32>, Option<f32>) {
-    if let Some(child) = ctx.render_object(id) {
-      return (self.main_size(child), self.cross_size(child));
-    }
-    (None, None)
+    return (self.main_size(id, ctx), self.cross_size(id, ctx));
   }
 
   fn set_main_to_bound(&self, bound: &BoxLimit, main_size: f32) -> BoxLimit {

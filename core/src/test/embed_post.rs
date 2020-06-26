@@ -1,5 +1,8 @@
 #![cfg(test)]
-use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*, widget::Row};
+use crate::{
+  prelude::*, render::render_tree::*, widget::layout::row_col_layout::RowColumn,
+  widget::widget_tree::*,
+};
 
 #[derive(Clone, Debug)]
 pub struct EmbedPost {
@@ -33,7 +36,7 @@ impl CombinationWidget for EmbedPost {
       embed.level -= 1;
       children.push(embed.into())
     }
-    Row(children).into()
+    RowColumn::Row(children).into()
   }
 }
 

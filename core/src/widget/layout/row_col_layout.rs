@@ -52,12 +52,13 @@ impl MultiChildWidget for RowColumn {
 impl RenderObject<RowColumn> for RowColRender {
   fn update(&mut self, _owner_widget: &RowColumn) {}
 
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) {
-    self.flex.flex_layout(id, ctx);
+  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
+    let size = self.flex.flex_layout(id, ctx);
+    ctx.update_size(id, size);
+    size
   }
   #[inline]
   fn paint<'b>(&'b self, _ctx: &mut PaintingContext<'b>) {}
-  #[inline]
-  fn child_offset(&self, idx: usize) -> Option<Point> { self.flex.child_offset(idx) }
+
   default_box_impl!({ flex.bound });
 }
