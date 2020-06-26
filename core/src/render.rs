@@ -4,7 +4,7 @@ mod box_constraint;
 pub use box_constraint::*;
 pub use render_ctx::*;
 pub mod render_ctx;
-use crate::{prelude::Point, prelude::Size, widget::Key};
+use crate::{prelude::Point, prelude::Size};
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
@@ -24,12 +24,6 @@ bitflags! {
 pub trait RenderWidget: Debug + Sized {
   /// The render object type will created.
   type RO: RenderObject<Owner = Self> + Send + Sync + 'static;
-
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use
-  /// [`KeyDetect`](crate::widget::key::KeyDetect) if you want give a key to
-  /// your widget.
-  fn key(&self) -> Option<&Key> { None }
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
