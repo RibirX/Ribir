@@ -51,7 +51,8 @@ impl MultiChildWidget for RowColumn {
   fn take_children(&mut self) -> Vec<Box<dyn Widget>> { std::mem::take(&mut self.children) }
 }
 
-impl RenderObject<RowColumn> for RowColRender {
+impl RenderObject for RowColRender {
+  type Owner = RowColumn;
   fn update(&mut self, _owner_widget: &RowColumn) {}
 
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
