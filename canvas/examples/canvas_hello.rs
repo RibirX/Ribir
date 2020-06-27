@@ -1,9 +1,10 @@
-use canvas::{create_canvas_with_render_from_wnd, Color, DeviceSize, Path, PathBuilder, Winding};
+use canvas::{create_canvas_with_render_from_wnd, Color, DeviceSize, Winding};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
   window::WindowBuilder,
 };
+pub type Angle = euclid::Angle<f32>;
 
 fn main() {
   let event_loop = EventLoop::new();
@@ -40,9 +41,21 @@ fn main() {
     Event::RedrawRequested(_) => {
       let mut layer = canvas.new_2d_layer();
       layer.set_style(Color::YELLOW);
-      let mut path = Path::builder();
-      path.add_circle(euclid::Point2D::new(200., 200.), 100., Winding::Positive);
-      let path = path.build();
+      let mut ctx = layer.get_ctx_2d();
+
+      // ctx.begin_path(0., 70.);
+      // ctx.line_to(100.0, 70.0);
+      // ctx.line_to(100.0, 0.0);
+      // ctx.line_to(250.0, 100.0);
+      // ctx.line_to(100.0, 200.0);
+      // ctx.line_to(100.0, 130.0);
+      // ctx.line_to(0.0, 130.0);
+      // ctx.close_path();
+
+      // ctx.rect(100.0, 100.0, 100.0, 100.0);
+      // ctx.circle(200., 200., 100., Winding::Positive);
+      ctx.arc(100., 100., 50., Angle::zero(), Angle::pi());
+      let path = ctx.get_path();
       layer.fill_path(path);
       canvas.next_frame(&mut render).compose_2d_layer(layer);
     }
