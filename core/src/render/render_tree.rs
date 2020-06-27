@@ -9,6 +9,34 @@ pub enum RenderEdge {
   End(RenderId),
 }
 
+/// boundary limit of the render object's layout
+#[derive(Debug, Clone, Copy)]
+pub struct BoxLimit {
+  pub min_height: f32,
+  pub max_height: f32,
+  pub min_width: f32,
+  pub max_width: f32,
+}
+
+pub const BoxUnLimit: BoxLimit = BoxLimit {
+  min_height: 0.0,
+  max_height: f32::INFINITY,
+  min_width: 0.0,
+  max_width: f32::INFINITY,
+};
+
+/// render object's layout box, the information about layout,
+/// including box size, box position, and layout limit
+#[derive(Debug)]
+pub struct BoxLayout {
+  /// box bound is the bound of the layout can be place. it should be set before
+  /// render object's process of layout. when the object it is in the layout
+  /// such as row, flex ... it's size is decided by his parent.
+  pub limit: Option<BoxLimit>,
+
+  pub rect: Rect,
+}
+
 #[derive(Default)]
 pub struct RenderTree {
   arena: Arena<Box<dyn RenderObjectSafety + Send + Sync>>,
@@ -18,7 +46,7 @@ pub struct RenderTree {
   render_to_widget: HashMap<RenderId, WidgetId>,
   /// Store the render object's place relative to parent coordinate after
   /// layout.
-  box_place: HashMap<RenderId, Rect>,
+  box_place: HashMap<RenderId, BoxLayout>,
 }
 
 impl RenderTree {
@@ -195,13 +223,46 @@ impl RenderId {
   /// return the render object placed position relative to its parent, this
   /// should only be called after layout, otherwise may return None or the place
   /// of last layout.
-  pub(crate) fn box_place(self, tree: &RenderTree) -> Option<&Rect> { tree.box_place.get(&self) }
+  pub(crate) fn box_rect(self, tree: &RenderTree) -> Option<&Rect> {
+    tree.box_place.get(&self).map(|layout| &layout.rect)
+  }
 
   pub(crate) fn update_position(self, tree: &mut RenderTree, pos: Point) {
-    tree.box_place.entry(self).or_insert(Rect::zero()).origin = pos;
+    tree
+      .box_place
+      .entry(self)
+      .or_insert(BoxLayout {
+        limit: None,
+        rect: Rect::zero(),
+      })
+      .rect
+      .origin = pos;
   }
 
   pub(crate) fn update_size(self, tree: &mut RenderTree, size: Size) {
-    tree.box_place.entry(self).or_insert(Rect::zero()).size = size;
+    tree
+      .box_place
+      .entry(self)
+      .or_insert(BoxLayout {
+        limit: None,
+        rect: Rect::zero(),
+      })
+      .rect
+      .size = size;
+  }
+
+  pub(crate) fn set_box_limit(self, tree: &mut RenderTree, limit: Option<BoxLimit>) {
+    tree
+      .box_place
+      .entry(self)
+      .or_insert(BoxLayout {
+        limit: None,
+        rect: Rect::zero(),
+      })
+      .limit = limit;
+  }
+
+  pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<BoxLimit> {
+    tree.box_place.get(&self).and_then(|layout| layout.limit)
   }
 }

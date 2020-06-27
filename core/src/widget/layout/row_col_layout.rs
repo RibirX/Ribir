@@ -1,5 +1,4 @@
 use super::flex::{Axis, FlexContainer};
-use crate::render::default_box_impl;
 
 use crate::prelude::*;
 use crate::render::render_ctx::RenderCtx;
@@ -60,5 +59,5 @@ impl RenderObject<RowColumn> for RowColRender {
   #[inline]
   fn paint<'b>(&'b self, _ctx: &mut PaintingContext<'b>) {}
 
-  default_box_impl!({ flex.bound });
+  fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::EFFECTED_BY_CHILDREN }
 }

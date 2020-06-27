@@ -113,8 +113,10 @@ impl<'a> RenderCtx<'a> {
     }
   }
 
+  pub fn get_box_limit(&self, id: RenderId) -> Option<BoxLimit> { id.get_box_limit(&self.tree) }
+
   pub fn set_box_limit(&mut self, id: RenderId, bound: Option<BoxLimit>) {
-    id.clone().get_mut(self.tree).unwrap().set_box_limit(bound);
+    id.set_box_limit(&mut self.tree, bound);
   }
 
   #[inline]
@@ -126,7 +128,7 @@ impl<'a> RenderCtx<'a> {
   pub fn update_size(&mut self, id: RenderId, size: Size) { id.update_size(self.tree, size); }
 
   #[inline]
-  pub fn box_place(&self, id: RenderId) -> Option<&Rect> { id.box_place(self.tree) }
+  pub fn box_rect(&self, id: RenderId) -> Option<&Rect> { id.box_rect(self.tree) }
 
   fn mark_dirty_down(&mut self, mut id: RenderId) {
     if self.is_layout_dirty(id) {
