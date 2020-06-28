@@ -198,10 +198,10 @@ impl RenderId {
   pub(crate) fn box_place(self, tree: &RenderTree) -> Option<&Rect> { tree.box_place.get(&self) }
 
   pub(crate) fn update_position(self, tree: &mut RenderTree, pos: Point) {
-    tree.box_place.entry(self).or_insert(Rect::zero()).origin = pos;
+    tree.box_place.entry(self).or_insert_with(Rect::zero).origin = pos;
   }
 
   pub(crate) fn update_size(self, tree: &mut RenderTree, size: Size) {
-    tree.box_place.entry(self).or_insert(Rect::zero()).size = size;
+    tree.box_place.entry(self).or_insert_with(Rect::zero).size = size;
   }
 }

@@ -36,7 +36,7 @@ impl CombinationWidget for EmbedPost {
       embed.level -= 1;
       children.push(embed.into())
     }
-    RowColumn::Row(children).into()
+    RowColumn::row(children).into()
   }
 }
 

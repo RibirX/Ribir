@@ -24,7 +24,8 @@ impl RenderWidget for Text {
   }
 }
 
-impl RenderObject<Text> for TextRender {
+impl RenderObject for TextRender {
+  type Owner = Text;
   #[inline]
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
     let rc = ctx.mesure_text(&self.text);
