@@ -459,22 +459,22 @@ mod test {
     assert_eq!(
       widget_tree.symbol_shape(),
       r#"EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 }
-└── Row([])
+└── RowColumn { axis: Horizontal, children: [] }
     ├── Text("Simple demo")
     ├── Text("Adoo")
     ├── Text("Recursive x times")
     └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 2 }
-        └── Row([])
+        └── RowColumn { axis: Horizontal, children: [] }
             ├── Text("Simple demo")
             ├── Text("Adoo")
             ├── Text("Recursive x times")
             └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 1 }
-                └── Row([])
+                └── RowColumn { axis: Horizontal, children: [] }
                     ├── Text("Simple demo")
                     ├── Text("Adoo")
                     ├── Text("Recursive x times")
                     └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 0 }
-                        └── Row([])
+                        └── RowColumn { axis: Horizontal, children: [] }
                             ├── Text("Simple demo")
                             ├── Text("Adoo")
                             └── Text("Recursive x times")
@@ -483,22 +483,22 @@ mod test {
 
     assert_eq!(
       render_tree.symbol_shape(),
-      r#"RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-├── TextRender("Simple demo")
-├── TextRender("Adoo")
-├── TextRender("Recursive x times")
-└── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-    ├── TextRender("Simple demo")
-    ├── TextRender("Adoo")
-    ├── TextRender("Recursive x times")
-    └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-        ├── TextRender("Simple demo")
-        ├── TextRender("Adoo")
-        ├── TextRender("Recursive x times")
-        └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-            ├── TextRender("Simple demo")
-            ├── TextRender("Adoo")
-            └── TextRender("Recursive x times")
+      r#"RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+├── TextRender { text: "Simple demo" }
+├── TextRender { text: "Adoo" }
+├── TextRender { text: "Recursive x times" }
+└── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+    ├── TextRender { text: "Simple demo" }
+    ├── TextRender { text: "Adoo" }
+    ├── TextRender { text: "Recursive x times" }
+    └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+        ├── TextRender { text: "Simple demo" }
+        ├── TextRender { text: "Adoo" }
+        ├── TextRender { text: "Recursive x times" }
+        └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+            ├── TextRender { text: "Simple demo" }
+            ├── TextRender { text: "Adoo" }
+            └── TextRender { text: "Recursive x times" }
 "#
     );
   }
@@ -538,22 +538,22 @@ mod test {
     assert_eq!(
       env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
-└── KeyDetect { key: KI4(0), child: Row([]) }
+└── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
     ├── KeyDetect { key: KI4(0), child: Text("New title") }
     ├── KeyDetect { key: KI4(1), child: Text("") }
     ├── KeyDetect { key: KI4(2), child: Text("") }
     └── KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 } }
-        └── KeyDetect { key: KI4(0), child: Row([]) }
+        └── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
             ├── KeyDetect { key: KI4(0), child: Text("New title") }
             ├── KeyDetect { key: KI4(1), child: Text("") }
             ├── KeyDetect { key: KI4(2), child: Text("") }
             └── KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 } }
-                └── KeyDetect { key: KI4(0), child: Row([]) }
+                └── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
                     ├── KeyDetect { key: KI4(0), child: Text("New title") }
                     ├── KeyDetect { key: KI4(1), child: Text("") }
                     ├── KeyDetect { key: KI4(2), child: Text("") }
                     └── KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 } }
-                        └── KeyDetect { key: KI4(0), child: Row([]) }
+                        └── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
                             ├── KeyDetect { key: KI4(0), child: Text("New title") }
                             ├── KeyDetect { key: KI4(1), child: Text("") }
                             └── KeyDetect { key: KI4(2), child: Text("") }
@@ -562,22 +562,22 @@ mod test {
 
     assert_eq!(
       env.render_tree.symbol_shape(),
-      r#"RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-├── TextRender("New title")
-├── TextRender("")
-├── TextRender("")
-└── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-    ├── TextRender("New title")
-    ├── TextRender("")
-    ├── TextRender("")
-    └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-        ├── TextRender("New title")
-        ├── TextRender("")
-        ├── TextRender("")
-        └── RowRender { row: FlexContainer { axis: Horizontal, size: None, layouts: VecLayouts([]), bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, size: None, box_bound: None } } }
-            ├── TextRender("New title")
-            ├── TextRender("")
-            └── TextRender("")
+      r#"RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+├── TextRender { text: "New title" }
+├── TextRender { text: "" }
+├── TextRender { text: "" }
+└── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+    ├── TextRender { text: "New title" }
+    ├── TextRender { text: "" }
+    ├── TextRender { text: "" }
+    └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+        ├── TextRender { text: "New title" }
+        ├── TextRender { text: "" }
+        ├── TextRender { text: "" }
+        └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+            ├── TextRender { text: "New title" }
+            ├── TextRender { text: "" }
+            └── TextRender { text: "" }
 "#
     );
   }

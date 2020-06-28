@@ -26,7 +26,7 @@ impl CombinationWidget for EmbedKeyPost {
       embed.level -= 1;
       children.push(KeyDetect::new("embed", embed).into())
     }
-    KeyDetect::new(0, RowColumn::Row(children)).into()
+    KeyDetect::new(0, RowColumn::row(children)).into()
   }
 }
 
