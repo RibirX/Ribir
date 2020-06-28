@@ -48,7 +48,7 @@ impl Widget for KeyDetect {
   fn as_any(&self) -> &dyn Any { self }
 
   #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
 impl KeyDetect {

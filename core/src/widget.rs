@@ -1,8 +1,9 @@
 use crate::render::*;
 use std::{any::Any, fmt::Debug};
-
+pub mod build_ctx;
 pub mod key;
 pub mod layout;
+pub(crate) mod stateful;
 pub mod text;
 pub mod widget_tree;
 pub mod window;
@@ -21,7 +22,7 @@ pub trait Widget: Debug + Any {
 
   fn as_any(&self) -> &dyn Any;
 
-  fn as_any_mut(&self) -> &dyn Any;
+  fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 /// A widget represented by other widget compose.
@@ -101,7 +102,7 @@ impl<'a, T: CombinationWidget + Any + 'a> Widget for T {
   fn as_any(&self) -> &dyn Any { self }
 
   #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
 impl<T: CombinationWidget> !RenderWidget for T {}
@@ -125,7 +126,7 @@ pub macro render_widget_base_impl() {
   fn as_any(&self) -> &dyn Any { self }
 
   #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
 pub macro single_child_widget_base_impl() {
@@ -139,7 +140,7 @@ pub macro single_child_widget_base_impl() {
   fn as_any(&self) -> &dyn Any { self }
 
   #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
 pub macro multi_child_widget_base_impl() {
@@ -153,5 +154,5 @@ pub macro multi_child_widget_base_impl() {
   fn as_any(&self) -> &dyn Any { self }
 
   #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }

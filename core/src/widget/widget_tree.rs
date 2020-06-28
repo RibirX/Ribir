@@ -1,7 +1,10 @@
 use crate::{prelude::*, render::render_tree::*, util::TreeFormatter};
-use std::collections::{HashMap, HashSet};
-
 use indextree::*;
+use std::collections::{HashMap, HashSet};
+pub(crate) enum WidgetNode {
+  ID(WidgetId),
+  Widget(Box<dyn Widget>),
+}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
@@ -10,6 +13,7 @@ pub struct WidgetId(NodeId);
 pub struct WidgetTree {
   arena: Arena<Box<dyn Widget>>,
   root: Option<WidgetId>,
+  // todo: merge changed_widgets and need_builds
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
   changed_widgets: HashSet<WidgetId>,
