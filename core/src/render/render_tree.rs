@@ -11,19 +11,21 @@ pub enum RenderEdge {
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, Copy)]
-pub struct BoxLimit {
+pub struct LimitBox {
   pub min_height: f32,
   pub max_height: f32,
   pub min_width: f32,
   pub max_width: f32,
 }
 
-pub const BoxUnLimit: BoxLimit = BoxLimit {
+pub const UNLIMIT_BOX: LimitBox = LimitBox {
   min_height: 0.0,
   max_height: f32::INFINITY,
   min_width: 0.0,
   max_width: f32::INFINITY,
 };
+
+pub const UNVALID_SIZE: Size = Size::new(-1.0, -1.0);
 
 /// render object's layout box, the information about layout,
 /// including box size, box position, and layout limit
@@ -32,9 +34,18 @@ pub struct BoxLayout {
   /// box bound is the bound of the layout can be place. it should be set before
   /// render object's process of layout. when the object it is in the layout
   /// such as row, flex ... it's size is decided by his parent.
-  pub limit: Option<BoxLimit>,
+  pub limit: Option<LimitBox>,
 
   pub rect: Rect,
+}
+
+impl BoxLayout {
+  pub fn new() -> BoxLayout {
+    BoxLayout {
+      limit: None,
+      rect: Rect::new(Point::origin(), Size::new(-1.0, -1.0)),
+    }
+  }
 }
 
 #[derive(Default)]
@@ -243,26 +254,16 @@ impl RenderId {
     tree
       .box_place
       .entry(self)
-      .or_insert(BoxLayout {
-        limit: None,
-        rect: Rect::zero(),
-      })
+      .or_insert(BoxLayout::new())
       .rect
       .size = size;
   }
 
-  pub(crate) fn set_box_limit(self, tree: &mut RenderTree, limit: Option<BoxLimit>) {
-    tree
-      .box_place
-      .entry(self)
-      .or_insert(BoxLayout {
-        limit: None,
-        rect: Rect::zero(),
-      })
-      .limit = limit;
+  pub(crate) fn set_box_limit(self, tree: &mut RenderTree, limit: Option<LimitBox>) {
+    tree.box_place.entry(self).or_insert(BoxLayout::new()).limit = limit;
   }
 
-  pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<BoxLimit> {
+  pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<LimitBox> {
     tree.box_place.get(&self).and_then(|layout| layout.limit)
   }
 }

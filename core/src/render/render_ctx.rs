@@ -6,7 +6,6 @@ use std::collections::HashSet;
 pub struct RenderCtx<'a> {
   tree: &'a mut RenderTree,
   canvas: &'a mut Canvas,
-  ready_layouts: HashSet<RenderId>,
   dirty_layout_roots: HashSet<RenderId>,
 }
 
@@ -16,7 +15,6 @@ impl<'a> RenderCtx<'a> {
     RenderCtx {
       tree,
       canvas,
-      ready_layouts: HashSet::new(),
       dirty_layout_roots: HashSet::new(),
     }
   }
@@ -25,10 +23,6 @@ impl<'a> RenderCtx<'a> {
   pub fn render_object(&self, id: RenderId) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
     id.get(self.tree)
   }
-
-  /// return the render tree
-  #[inline]
-  pub fn render_tree(&self) -> &RenderTree { &self.tree }
 
   /// mark the render object dirty, will auto diffuse to all the node
   /// affected.
@@ -58,7 +52,6 @@ impl<'a> RenderCtx<'a> {
   /// true, else perform layout just the dirty layout node
   pub fn layout_tree(&mut self, force: bool) {
     if force {
-      self.ready_layouts.clear();
       self.dirty_layout_roots.clear();
       self.dirty_layout_roots.insert(self.tree.root().unwrap());
     }
@@ -71,17 +64,25 @@ impl<'a> RenderCtx<'a> {
   }
 
   /// proxy call the renderObject's perform_layout if needed
-  pub fn perform_layout(&mut self, id: RenderId) {
-    if !self.is_layout_dirty(id) {
-      return;
+  pub fn perform_layout(&mut self, id: RenderId) -> Size {
+    let size = self.get_layout_size(id);
+    if UNVALID_SIZE != size {
+      return size;
     }
     let mut_ptr = self as *mut RenderCtx<'a>;
     let node = id.clone().get_mut(self.tree).unwrap();
     unsafe {
-      node.perform_layout(id, &mut *mut_ptr);
+      return node.perform_layout(id, &mut *mut_ptr);
     }
+  }
 
-    self.remove_layout_dirty(id);
+  /// return the layout size. lazy perform layout, if the size has been decided.
+  pub fn query_layout_size(&mut self, id: RenderId) -> Size {
+    let mut size = self.get_layout_size(id);
+    if size == UNVALID_SIZE {
+      size = self.perform_layout(id);
+    }
+    return size;
   }
 
   // mesure test bound
@@ -95,16 +96,6 @@ impl<'a> RenderCtx<'a> {
     });
   }
 
-  /// get the layout dirty flag.
-  #[inline]
-  pub fn is_layout_dirty(&self, node_id: RenderId) -> bool {
-    !self.ready_layouts.contains(&node_id)
-  }
-
-  /// remove the layout dirty flag.
-  #[inline]
-  pub fn remove_layout_dirty(&mut self, node_id: RenderId) { self.ready_layouts.insert(node_id); }
-
   pub fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {
     let mut child = id.first_child(self.tree);
     while let Some(child_id) = child {
@@ -113,9 +104,9 @@ impl<'a> RenderCtx<'a> {
     }
   }
 
-  pub fn get_box_limit(&self, id: RenderId) -> Option<BoxLimit> { id.get_box_limit(&self.tree) }
+  pub fn get_box_limit(&self, id: RenderId) -> Option<LimitBox> { id.get_box_limit(&self.tree) }
 
-  pub fn set_box_limit(&mut self, id: RenderId, bound: Option<BoxLimit>) {
+  pub fn set_box_limit(&mut self, id: RenderId, bound: Option<LimitBox>) {
     id.set_box_limit(&mut self.tree, bound);
   }
 
@@ -130,11 +121,24 @@ impl<'a> RenderCtx<'a> {
   #[inline]
   pub fn box_rect(&self, id: RenderId) -> Option<&Rect> { id.box_rect(self.tree) }
 
+  pub(crate) fn get_layout_size(&self, node_id: RenderId) -> Size {
+    node_id
+      .box_rect(&self.tree)
+      .map(|rect| rect.size)
+      .unwrap_or(UNVALID_SIZE)
+  }
+
+  /// get the layout dirty flag.
+  #[inline]
+  pub(crate) fn is_layout_dirty(&self, node_id: RenderId) -> bool {
+    UNVALID_SIZE == self.get_layout_size(node_id)
+  }
+
   fn mark_dirty_down(&mut self, mut id: RenderId) {
     if self.is_layout_dirty(id) {
       return;
     }
-    self.ready_layouts.remove(&id);
+    id.update_size(self.tree, Size::new(-1.0, -1.0));
     let mut ids = vec![];
     self.collect_children(id, &mut ids);
     while let Some(i) = ids.pop() {
@@ -151,7 +155,7 @@ impl<'a> RenderCtx<'a> {
       .map(|node| node.get_constraints())
       .unwrap();
     if constraints.intersects(target) {
-      self.ready_layouts.remove(&id);
+      id.update_size(self.tree, Size::new(-1.0, -1.0));
       true
     } else {
       false
