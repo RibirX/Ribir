@@ -54,7 +54,7 @@ impl WgpuRender<PhysicSurface> {
         power_preference: wgpu::PowerPreference::Default,
         compatible_surface: Some(&w_surface),
       },
-      wgpu::UnsafeExtensions::disallow(),
+      wgpu::UnsafeFeatures::disallow(),
     );
 
     Self::new(
@@ -83,7 +83,7 @@ impl WgpuRender<TextureSurface> {
         power_preference: wgpu::PowerPreference::Default,
         compatible_surface: None,
       },
-      wgpu::UnsafeExtensions::disallow(),
+      wgpu::UnsafeFeatures::disallow(),
     );
 
     WgpuRender::new(
@@ -216,7 +216,7 @@ impl<S: Surface> WgpuRender<S> {
       .unwrap()
       .request_device(
         &wgpu::DeviceDescriptor {
-          extensions: wgpu::Extensions::empty(),
+          features: wgpu::Features::empty(),
           limits: Default::default(),
           shader_validation: true,
         },

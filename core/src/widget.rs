@@ -27,10 +27,6 @@ pub trait Widget: Debug + Any {
 
 /// A widget represented by other widget compose.
 pub trait CombinationWidget: Debug {
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use [`KeyDetect`](key::KeyDetect) if
-  /// you want give a key to your widget.
-  fn key(&self) -> Option<&Key> { None }
   /// Describes the part of the user interface represented by this widget.
   fn build(&self) -> Box<dyn Widget>;
 }

@@ -84,11 +84,11 @@ impl<'a> RenderCtx<'a> {
   // todo support custom font
   pub fn mesure_text(&mut self, text: &str) -> Rect {
     let font = FontInfo::default();
-    return self.canvas.mesure_text(&Text {
+    self.canvas.mesure_text(&Text {
       text,
       font_size: 14.0,
-      font: font,
-    });
+      font,
+    })
   }
 
   pub fn collect_children(&mut self, id: RenderId, ids: &mut Vec<RenderId>) {

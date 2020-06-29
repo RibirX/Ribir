@@ -4,7 +4,7 @@ use super::{
   mem_texture::MemTexture,
   tessellator_2d::Tessellator,
   text_brush::{Section, TextBrush},
-  Color, Command, CommandInfo, DeviceRect, DeviceSize, FillStyle, HorizontalAlign, Point, Rect,
+  Command, CommandInfo, DeviceRect, DeviceSize, FillStyle, HorizontalAlign, Point, Rect,
   Rendering2DLayer, Size, TextLayout, Transform, VerticalAlign,
 };
 
@@ -107,10 +107,10 @@ impl Canvas {
     let text = src.to_glyph_text(&mut self.text_brush(), 0);
     let mut sec = Section::new().add_text(text);
     sec.bounds = (f32::INFINITY, f32::INFINITY);
-    return self
+    self
       .text_brush()
       .section_bounds(&sec)
-      .unwrap_or_else(Rect::zero);
+      .unwrap_or_else(Rect::zero)
   }
 
   #[inline]

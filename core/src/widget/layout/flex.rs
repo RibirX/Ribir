@@ -127,7 +127,7 @@ impl FlexContainer {
     id: RenderId,
     ctx: &mut RenderCtx<'a>,
   ) -> (Option<f32>, Option<f32>) {
-    return (self.main_size(id, ctx), self.cross_size(id, ctx));
+    (self.main_size(id, ctx), self.cross_size(id, ctx))
   }
 
   fn set_main_to_bound(&self, bound: &LimitBox, main_size: f32) -> LimitBox {

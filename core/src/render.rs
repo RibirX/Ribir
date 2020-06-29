@@ -2,7 +2,7 @@ use crate::render::render_tree::RenderId;
 
 pub use render_ctx::*;
 pub mod render_ctx;
-use crate::{prelude::Point, prelude::Size, widget::Key};
+use crate::{prelude::Point, prelude::Size};
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 use std::raw::TraitObject;
@@ -21,27 +21,19 @@ bitflags! {
 /// rendering and paint for the application.
 pub trait RenderWidget: Debug + Sized {
   /// The render object type will created.
-  type RO: RenderObject<Self> + Send + Sync + 'static;
-
-  /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
-  /// You should not override this method, use
-  /// [`KeyDetect`](crate::widget::key::KeyDetect) if you want give a key to
-  /// your widget.
-  fn key(&self) -> Option<&Key> { None }
+  type RO: RenderObject<Owner = Self> + Send + Sync + 'static;
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
   fn create_render_object(&self) -> Self::RO;
 }
 
-/// The `Owner` is the render widget which created this object. And it's should
-/// be a associated type instead of generic type after rust support GAT.
-pub trait RenderObject<Owner: RenderWidget<RO = Self>>:
-  Debug + Sized + Send + Sync + 'static
-{
+/// The `Owner` is the render widget which created this object.
+pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
+  type Owner: RenderWidget<RO = Self>;
   /// Call by framework when its owner `owner_widget` changed, should not call
   /// this method directly.
-  fn update(&mut self, owner_widget: &Owner);
+  fn update(&mut self, owner_widget: &Self::Owner);
 
   // trig the process of layout
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size;
@@ -77,7 +69,7 @@ pub trait RenderObjectSafety: Debug {
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 }
 
-pub(crate) fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
+fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
     &*(trait_obj.data as *const T)
@@ -85,7 +77,7 @@ pub(crate) fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> 
 }
 
 #[allow(dead_code)]
-pub(crate) fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
+fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
   unsafe {
     let trait_obj: TraitObject = std::mem::transmute(obj);
     &mut *(trait_obj.data as *mut T)
@@ -97,11 +89,8 @@ where
   T: RenderWidget,
 {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync> {
-    let r_box = RenderObjectBox {
-      render: RenderWidget::create_render_object(self),
-      _marker: PhantomData,
-    };
-    r_box.into_safety()
+    let obj = RenderWidget::create_render_object(self);
+    Box::new(obj)
   }
 
   #[inline]
@@ -111,77 +100,22 @@ where
   fn as_render_mut(&mut self) -> &mut dyn RenderWidgetSafety { self }
 }
 
-use std::marker::PhantomData;
-/// Because `Owner` is a generic type of RenderObject trait, so we can't auto
-/// implement  RenderObjectSafety for type which implemented
-/// `RenderWidget<Owner>`, because unconstrained problem and associated item
-/// lifetime not support. So provide RenderObjectBox to implement
-/// RenderObjectSafety. It's not a elegant way and looks too tricky. After GAT
-/// is supported we let `Owner` as an associated item instead of generic type on
-/// `RenderObject`, and directly impl RenderObjectSafety like
-/// RenderWidgetSafety.
-pub struct RenderObjectBox<W, R>
+impl<T> RenderObjectSafety for T
 where
-  W: RenderWidget<RO = R>,
-  R: RenderObject<W>,
-{
-  render: R,
-  _marker: PhantomData<*const W>,
-}
-
-unsafe impl<W, R> Send for RenderObjectBox<W, R>
-where
-  W: RenderWidget<RO = R>,
-  R: RenderObject<W>,
-{
-}
-
-unsafe impl<W, R> Sync for RenderObjectBox<W, R>
-where
-  W: RenderWidget<RO = R>,
-  R: RenderObject<W>,
-{
-}
-
-use std::fmt::{Formatter, Result};
-impl<W, R> Debug for RenderObjectBox<W, R>
-where
-  W: RenderWidget<RO = R>,
-  R: RenderObject<W>,
-{
-  fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.render.fmt(f) }
-}
-
-impl<W, R> RenderObjectSafety for RenderObjectBox<W, R>
-where
-  W: RenderWidget<RO = R>,
-  R: RenderObject<W>,
+  T: RenderObject,
 {
   #[inline]
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety) {
-    RenderObject::update(&mut self.render, downcast_widget(owner_widget))
+    RenderObject::update(self, downcast_widget(owner_widget))
   }
 
   #[inline]
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
-    RenderObject::perform_layout(&mut self.render, id, ctx)
+    RenderObject::perform_layout(self, id, ctx)
   }
-  #[inline]
-  fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(&self.render) }
-  #[inline]
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.render.paint(ctx); }
-}
 
-impl<W, R> RenderObjectBox<W, R>
-where
-  W: RenderWidget<RO = R>,
-  R: RenderObject<W>,
-{
-  fn into_safety(self) -> Box<dyn RenderObjectSafety + Send + Sync + 'static> {
-    let safety: Box<dyn RenderObjectSafety + Send + Sync> = Box::new(self);
-    // unsafe introduce: `W` just use to constraint type, and never access it.
-    // And `R` bounds with RenderObject should always `static` lifetime.
-    // This will be removed after rust GAT supported.
-    unsafe { std::mem::transmute(safety) }
-  }
+  #[inline]
+  fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(self) }
+  #[inline]
+  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { RenderObject::paint(self, ctx); }
 }

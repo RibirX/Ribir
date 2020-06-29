@@ -44,7 +44,8 @@ impl FlexElem for ExpandBox {
   fn fit(&self) -> Option<FlexFit> { Some(self.fit) }
 }
 
-impl RenderObject<ExpandBox> for ExpandBoxRender {
+impl RenderObject for ExpandBoxRender {
+  type Owner = ExpandBox;
   fn update(&mut self, owner: &ExpandBox) {
     self.fit = owner.fit;
     self.flex = owner.flex;
