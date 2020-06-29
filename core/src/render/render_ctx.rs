@@ -6,17 +6,12 @@ use std::collections::HashSet;
 pub struct RenderCtx<'a> {
   tree: &'a mut RenderTree,
   canvas: &'a mut Canvas,
-  dirty_layout_roots: HashSet<RenderId>,
 }
 
 impl<'a> RenderCtx<'a> {
   #[inline]
   pub fn new(tree: &'a mut RenderTree, canvas: &'a mut Canvas) -> RenderCtx<'a> {
-    RenderCtx {
-      tree,
-      canvas,
-      dirty_layout_roots: HashSet::new(),
-    }
+    RenderCtx { tree, canvas }
   }
 
   #[inline]
@@ -45,18 +40,18 @@ impl<'a> RenderCtx<'a> {
       }
       node_id = parent_id.unwrap();
     }
-    self.dirty_layout_roots.insert(node_id);
+    node_id.as_dirty_root(self.tree);
   }
 
   /// perform layout of all node ignore the cache layout info when force is
   /// true, else perform layout just the dirty layout node
   pub fn layout_tree(&mut self, force: bool) {
     if force {
-      self.dirty_layout_roots.clear();
-      self.dirty_layout_roots.insert(self.tree.root().unwrap());
+      self.tree.clean_layout_info();
+      self.tree.root().map(|node| node.as_dirty_root(self.tree));
     }
     let mut_ptr = self as *mut RenderCtx;
-    for root in self.dirty_layout_roots.drain() {
+    for root in self.tree.drain_layout_roots() {
       unsafe {
         (*mut_ptr).perform_layout(root);
       }

@@ -1,6 +1,7 @@
 use crate::{prelude::*, util::TreeFormatter, widget::widget_tree::*};
 use indextree::*;
-use std::collections::HashMap;
+use std::collections::hash_set::Drain;
+use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct RenderId(NodeId);
@@ -58,6 +59,9 @@ pub struct RenderTree {
   /// Store the render object's place relative to parent coordinate after
   /// layout.
   box_place: HashMap<RenderId, BoxLayout>,
+
+  /// root of sub tree which needed to perform layout
+  dirty_layout_roots: HashSet<RenderId>,
 }
 
 impl RenderTree {
@@ -92,6 +96,15 @@ impl RenderTree {
 
   #[cfg(test)]
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
+
+  pub(crate) fn clean_layout_info(&mut self) {
+    self.box_place.clear();
+    self.dirty_layout_roots.clear();
+  }
+
+  pub(crate) fn drain_layout_roots(&mut self) -> Drain<'_, RenderId> {
+    self.dirty_layout_roots.drain()
+  }
 }
 
 impl RenderId {
@@ -266,4 +279,6 @@ impl RenderId {
   pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<LimitBox> {
     tree.box_place.get(&self).and_then(|layout| layout.limit)
   }
+
+  pub(crate) fn as_dirty_root(self, tree: &mut RenderTree) { tree.dirty_layout_roots.insert(self); }
 }
