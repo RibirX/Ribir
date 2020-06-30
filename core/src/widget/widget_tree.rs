@@ -1,10 +1,6 @@
 use crate::{prelude::*, render::render_tree::*, util::TreeFormatter};
 use indextree::*;
 use std::collections::{HashMap, HashSet};
-pub(crate) enum WidgetNode {
-  ID(WidgetId),
-  Widget(Box<dyn Widget>),
-}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
@@ -420,7 +416,7 @@ impl WidgetId {
   fn key(self, tree: &WidgetTree) -> Option<&Key> {
     self
       .get(tree)
-      .map(|w| w.as_any().downcast_ref::<KeyDetect>())
+      .map(|w| w.downcast_ref::<KeyDetect>())
       .flatten()
       .map(|k| k.key())
   }
@@ -435,7 +431,7 @@ impl WidgetId {
 }
 
 impl dyn Widget {
-  fn key(&self) -> Option<&Key> { self.as_any().downcast_ref::<KeyDetect>().map(|k| k.key()) }
+  fn key(&self) -> Option<&Key> { self.downcast_ref::<KeyDetect>().map(|k| k.key()) }
 }
 
 #[cfg(test)]
