@@ -141,7 +141,13 @@ impl WidgetTree {
         .get(wid)
         .expect("Changed widget should always render widget!");
 
-      let safety = widget.try_as_render().expect("Must be a render widget!");
+      let safety = match widget {
+        WidgetClassify::Combination(_) => unreachable!("Must be a render widget!"),
+        WidgetClassify::Render(w) => w.as_render(),
+        WidgetClassify::SingleChild(w) => w.as_render(),
+        WidgetClassify::MultiChild(w) => w.as_render(),
+      };
+
       render_id
         .get_mut(render_tree)
         .expect("render object must exists!")

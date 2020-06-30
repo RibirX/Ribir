@@ -50,20 +50,6 @@ pub enum WidgetClassify<'a> {
   MultiChild(&'a dyn MultiChildWidget),
 }
 
-impl<'a> WidgetClassify<'a> {
-  /// Return a Some-Value if this is a render widget, remember single child
-  /// widget and multi child widget are render widget too. Otherwise return a
-  /// None-Value.
-  pub(crate) fn try_as_render(&self) -> Option<&dyn RenderWidgetSafety> {
-    match self {
-      WidgetClassify::Combination(_) => None,
-      WidgetClassify::Render(w) => Some(w.as_render()),
-      WidgetClassify::SingleChild(w) => Some(w.as_render()),
-      WidgetClassify::MultiChild(w) => Some(w.as_render()),
-    }
-  }
-}
-
 pub enum WidgetClassifyMut<'a> {
   Combination(&'a mut dyn CombinationWidget),
   Render(&'a mut dyn RenderWidgetSafety),
@@ -71,25 +57,10 @@ pub enum WidgetClassifyMut<'a> {
   MultiChild(&'a mut dyn MultiChildWidget),
 }
 
-impl<'a> WidgetClassifyMut<'a> {
-  /// Return a Some-Value if this is a render widget, remember single child
-  /// widget and multi child widget are render widget too. Otherwise return a
-  /// None-Value.
-  #[allow(dead_code)]
-  pub(crate) fn try_as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
-    match self {
-      WidgetClassifyMut::Combination(_) => None,
-      WidgetClassifyMut::Render(w) => Some(w.as_render_mut()),
-      WidgetClassifyMut::SingleChild(w) => Some(w.as_render_mut()),
-      WidgetClassifyMut::MultiChild(w) => Some(w.as_render_mut()),
-    }
-  }
-}
-
-/// We should also implement Widget concrete methods for RenderWidgetSafety,
-/// SingleChildWidget and MultiChildWidget, but can not do it before rust
-/// specialization finished. So just CombinationWidget implemented it, this is
-/// user use most, and others provide a macro to do it.
+/// We should also implement Widget for RenderWidgetSafety, SingleChildWidget
+/// and MultiChildWidget, but can not do it before rust specialization finished.
+/// So just CombinationWidget implemented it, this is user use most, and others
+/// provide a macro to do it.
 impl<'a, T: CombinationWidget + Any + 'a> Widget for T {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
