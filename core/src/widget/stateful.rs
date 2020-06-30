@@ -26,7 +26,7 @@ impl<T: 'static> Stateful<T> {
       self
         .wid
         .get(tree)
-        .and_then(|w| w.as_any().downcast_ref::<T>())
+        .and_then(|w| w.downcast_ref::<T>())
         .unwrap_or_else(|| {
           unreachable!(
             "Something wrong, Maybe use a destroyed widget id and id assigned to another widget"
@@ -46,7 +46,7 @@ impl<T: 'static> Stateful<T> {
       self
         .wid
         .get_mut(tree)
-        .and_then(|w| w.as_any_mut().downcast_mut::<T>())
+        .and_then(|w| w.downcast_mut::<T>())
         .unwrap_or_else(|| {
           unreachable!(
             "Something wrong, Maybe use a destroyed widget id and id assigned to another widget"
@@ -54,8 +54,4 @@ impl<T: 'static> Stateful<T> {
         })
     })
   }
-}
-
-impl<T> From<Stateful<T>> for WidgetNode {
-  fn from(state: T) -> Self { widget_tree::WidgetNode::ID(state.wid) }
 }
