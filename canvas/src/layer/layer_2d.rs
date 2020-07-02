@@ -5,7 +5,7 @@ pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   geom::Arc,
   math::point,
-  path::{builder::PathBuilder, path::Builder, traits::PathIterator, Path, Winding},
+  path::{builder::PathBuilder, path::Builder, traits::PathIterator, EndpointId, Path, Winding},
   tessellation::*,
 };
 
@@ -21,10 +21,11 @@ pub type Angle = euclid::Angle<f32>;
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
 /// bottom edge of the canvas.
-#[derive(Default, Debug, Clone)]
+// #[derive(Default, Debug, Clone)]
 pub struct Rendering2DLayer<'a> {
   state_stack: Vec<State>,
   pub(crate) commands: Vec<Command<'a>>,
+  path: Option<Builder>,
 }
 
 impl<'a> Rendering2DLayer<'a> {
@@ -32,11 +33,130 @@ impl<'a> Rendering2DLayer<'a> {
     Self {
       state_stack: vec![State::new()],
       commands: vec![],
+      path: None,
     }
   }
 
   #[inline]
-  pub fn get_ctx_2d(&mut self) -> Ctx2D { Ctx2D::new() }
+  pub fn get_path(&mut self) -> Option<Path> { self.path.take().map(|b| b.build()) }
+
+  /// Starts a new path by emptying the list of sub-paths.
+  /// Call this method when you want to create a new path.
+  #[inline]
+  pub fn begin_path(&mut self, x: f32, y: f32) -> &mut Self {
+    self.path = Some(Builder::new());
+    self.path.as_mut().map(|b| b.begin(point(x, y)));
+    self
+  }
+
+  /// Causes the point of the pen to move back to the start of the current
+  /// sub-path. It tries to draw a straight line from the current point to the
+  /// start. If the shape has already been closed or has only one point, this
+  #[inline]
+  pub fn close_path(&mut self) -> &mut Self {
+    self.path.as_mut().map(|b| b.close());
+    self
+  }
+
+  /// Connects the last point in the current sub-path to the specified (x, y)
+  /// coordinates with a straight line.
+  #[inline]
+  pub fn line_to(&mut self, x: f32, y: f32) -> &mut Self {
+    self.path.as_mut().map(|b| b.line_to(point(x, y)));
+    self
+  }
+
+  /// Adds a cubic Bezier curve to the current path.
+  #[inline]
+  pub fn bezier_curve_to(
+    &mut self,
+    cp1x: f32,
+    cp1y: f32,
+    cp2x: f32,
+    cp2y: f32,
+    x: f32,
+    y: f32,
+  ) -> &mut Self {
+    self
+      .path
+      .as_mut()
+      .map(|b| b.cubic_bezier_to(point(cp1x, cp1y), point(cp2x, cp2y), point(x, y)));
+    self
+  }
+
+  /// Adds a quadratic Bézier curve to the current path.
+  #[inline]
+  pub fn quadratic_curve_to(&mut self, cpx: f32, cpy: f32, x: f32, y: f32) -> &mut Self {
+    self
+      .path
+      .as_mut()
+      .map(|b| b.quadratic_bezier_to(point(cpx, cpy), point(x, y)));
+    self
+  }
+
+  /// Adds a circular arc to the current path.
+  pub fn arc(
+    &mut self,
+    x: f32,
+    y: f32,
+    radius: f32,
+    start_angle: Angle,
+    end_angle: Angle,
+  ) -> &mut Self {
+    let sweep_angle = end_angle - start_angle;
+    let arc = Arc {
+      start_angle,
+      sweep_angle,
+      radii: Vector::new(radius, radius),
+      center: point(x, y),
+      x_rotation: Angle::zero(),
+    };
+    let arc_start = arc.from();
+    self.begin_path(arc_start.x, arc_start.y);
+    arc.for_each_quadratic_bezier(&mut |curve| {
+      self
+        .path
+        .as_mut()
+        .map(|b| b.quadratic_bezier_to(curve.ctrl, curve.to));
+    });
+    self.close_path();
+    self
+  }
+
+  /// Adds an arc to the current path with the given control points and radius,
+  /// connected to the previous point by a straight line.
+  pub fn arc_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, radius: f32) -> &mut Self {
+    unimplemented!();
+  }
+
+  /// Adds an elliptical arc to the current path.
+  pub fn ellipse(
+    &mut self,
+    x: f32,
+    y: f32,
+    radiusX: f32,
+    radiusY: f32,
+    rotation: f32,
+    start_angle: f32,
+    end_angle: f32,
+    winding: Winding,
+  ) -> &mut Self {
+    unimplemented!();
+  }
+
+  /// Creates a path for a rectangle at position (x, y) with a size that is
+  /// determined by width and height.
+  pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> &mut Self {
+    let tr_pt = point(x + width, y);
+    let bl_pt = point(x, y + height);
+    let br_pt = point(x + width, y + height);
+    self.begin_path(x, y);
+    self.path.as_mut().map(|b| b.line_to(tr_pt));
+    self.path.as_mut().map(|b| b.line_to(br_pt));
+    self.path.as_mut().map(|b| b.line_to(bl_pt));
+    self.close_path();
+    self
+  }
 
   /// Saves the entire state of the canvas by pushing the current drawing state
   /// onto a stack.
@@ -477,172 +597,6 @@ impl<'a> Text<'a> {
       scale: (*font_size).into(),
       extra: prim_id as u32,
     }
-  }
-}
-
-pub struct Ctx2D(Builder);
-
-impl Ctx2D {
-  pub fn new() -> Self {
-    let path = Path::builder();
-    Ctx2D(path)
-  }
-
-  #[inline]
-  pub fn get_path(self) -> Path { self.0.build() }
-
-  /// Starts a new path by emptying the list of sub-paths.
-  /// Call this method when you want to create a new path.
-  #[inline]
-  pub fn begin_path(&mut self, x: f32, y: f32) -> &mut Self {
-    self.0.begin(point(x, y));
-    self
-  }
-
-  /// Causes the point of the pen to move back to the start of the current
-  /// sub-path. It tries to draw a straight line from the current point to the
-  /// start. If the shape has already been closed or has only one point, this
-  #[inline]
-  pub fn close_path(&mut self) { self.0.close(); }
-
-  /// Connects the last point in the current sub-path to the specified (x, y)
-  /// coordinates with a straight line.
-  #[inline]
-  pub fn line_to(&mut self, x: f32, y: f32) -> &mut Self {
-    self.0.line_to(point(x, y));
-    self
-  }
-
-  /// Adds a cubic Bezier curve to the current path.
-  #[inline]
-  pub fn bezier_curve_to(
-    &mut self,
-    cp1x: f32,
-    cp1y: f32,
-    cp2x: f32,
-    cp2y: f32,
-    x: f32,
-    y: f32,
-  ) -> &mut Self {
-    self
-      .0
-      .cubic_bezier_to(point(cp1x, cp1y), point(cp2x, cp2y), point(x, y));
-    self
-  }
-
-  /// Adds a quadratic Bézier curve to the current path.
-  #[inline]
-  pub fn quadratic_curve_to(&mut self, cpx: f32, cpy: f32, x: f32, y: f32) -> &mut Self {
-    self.0.quadratic_bezier_to(point(cpx, cpy), point(x, y));
-    self
-  }
-
-  /// Adds a circular arc to the current path.
-  pub fn arc(
-    &mut self,
-    x: f32,
-    y: f32,
-    radius: f32,
-    start_angle: Angle,
-    end_angle: Angle,
-  ) -> &mut Self {
-    let sweep_angle = end_angle - start_angle;
-    let arc = Arc {
-      start_angle,
-      sweep_angle,
-      radii: Vector::new(radius, radius),
-      center: point(x, y),
-      x_rotation: Angle::zero(),
-    };
-    let arc_start = arc.from();
-    self.begin_path(arc_start.x, arc_start.y);
-    arc.for_each_quadratic_bezier(&mut |curve| {
-      self.0.quadratic_bezier_to(curve.ctrl, curve.to);
-    });
-    self.close_path();
-    self
-  }
-
-  pub fn circle(&mut self, x: f32, y: f32, radius: f32, winding: Winding) -> &mut Self {
-    let center = point(x, y);
-    let radius = radius.abs();
-    let dir = match winding {
-      Winding::Positive => 1.0,
-      Winding::Negative => -1.0,
-    };
-
-    let tan_pi_over_8 = 0.41421356237;
-    let cos_pi_over_4 = 0.70710678118;
-    let d = radius * tan_pi_over_8;
-
-    self.0.begin(center + Vector::new(-radius, 0.0));
-
-    let ctrl_0 = center + Vector::new(-radius, -d * dir);
-    let mid_0 = center + Vector::new(-1.0, -dir) * radius * cos_pi_over_4;
-    let ctrl_1 = center + Vector::new(-d, -radius * dir);
-    let mid_1 = center + Vector::new(0.0, -radius * dir);
-    self.0.quadratic_bezier_to(ctrl_0, mid_0);
-    self.0.quadratic_bezier_to(ctrl_1, mid_1);
-
-    let ctrl_0 = center + Vector::new(d, -radius * dir);
-    let mid_0 = center + Vector::new(1.0, -dir) * radius * cos_pi_over_4;
-    let ctrl_1 = center + Vector::new(radius, -d * dir);
-    let mid_1 = center + Vector::new(radius, 0.0);
-    self.0.quadratic_bezier_to(ctrl_0, mid_0);
-    self.0.quadratic_bezier_to(ctrl_1, mid_1);
-
-    let ctrl_0 = center + Vector::new(radius, d * dir);
-    let mid_0 = center + Vector::new(1.0, dir) * radius * cos_pi_over_4;
-    let ctrl_1 = center + Vector::new(d, radius * dir);
-    let mid_1 = center + Vector::new(0.0, radius * dir);
-    self.0.quadratic_bezier_to(ctrl_0, mid_0);
-    self.0.quadratic_bezier_to(ctrl_1, mid_1);
-
-    let ctrl_0 = center + Vector::new(-d, radius * dir);
-    let mid_0 = center + Vector::new(-1.0, dir) * radius * cos_pi_over_4;
-    let ctrl_1 = center + Vector::new(-radius, d * dir);
-    let mid_1 = center + Vector::new(-radius, 0.0);
-    self.0.quadratic_bezier_to(ctrl_0, mid_0);
-    self.0.quadratic_bezier_to(ctrl_1, mid_1);
-
-    self.0.close();
-    self
-  }
-
-  /// Adds an arc to the current path with the given control points and radius,
-  /// connected to the previous point by a straight line.
-  pub fn arc_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, radius: f32) -> &mut Self {
-    unimplemented!();
-  }
-
-  /// Adds an elliptical arc to the current path.
-  pub fn ellipse(
-    &mut self,
-    x: f32,
-    y: f32,
-    radiusX: f32,
-    radiusY: f32,
-    rotation: f32,
-    start_angle: f32,
-    end_angle: f32,
-    winding: Winding,
-  ) -> &mut Self {
-    unimplemented!();
-  }
-
-  /// Creates a path for a rectangle at position (x, y) with a size that is
-  /// determined by width and height.
-  pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> &mut Self {
-    let tl_pt = point(x, y);
-    let tr_pt = point(x + width, y);
-    let bl_pt = point(x, y + height);
-    let br_pt = point(x + width, y + height);
-    self.0.begin(tl_pt);
-    self.0.line_to(tr_pt);
-    self.0.line_to(br_pt);
-    self.0.line_to(bl_pt);
-    self.close_path();
-    self
   }
 }
 
