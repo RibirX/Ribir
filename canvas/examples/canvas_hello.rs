@@ -41,22 +41,23 @@ fn main() {
     Event::RedrawRequested(_) => {
       let mut layer = canvas.new_2d_layer();
       layer.set_style(Color::YELLOW);
-      let mut ctx = layer.get_ctx_2d();
 
-      // ctx.begin_path(0., 70.);
-      // ctx.line_to(100.0, 70.0);
-      // ctx.line_to(100.0, 0.0);
-      // ctx.line_to(250.0, 100.0);
-      // ctx.line_to(100.0, 200.0);
-      // ctx.line_to(100.0, 130.0);
-      // ctx.line_to(0.0, 130.0);
-      // ctx.close_path();
+      // layer.begin_path(0., 70.);
+      // layer.line_to(100.0, 70.0);
+      // layer.line_to(100.0, 0.0);
+      // layer.line_to(250.0, 100.0);
+      // layer.line_to(100.0, 200.0);
+      // layer.line_to(100.0, 130.0);
+      // layer.line_to(0.0, 130.0);
+      // layer.close_path();
 
-      // ctx.rect(100.0, 100.0, 100.0, 100.0);
-      // ctx.circle(200., 200., 100., Winding::Positive);
-      ctx.arc(100., 100., 50., Angle::zero(), Angle::pi());
-      let path = ctx.get_path();
-      layer.fill_path(path);
+      // layer.rect(100.0, 100.0, 100.0, 100.0);
+      layer.arc(100., 100., 50., Angle::zero(), Angle::pi());
+      let path = layer.get_path();
+      match path {
+        Some(p) => layer.fill_path(p),
+        None => panic!(),
+      }
       canvas.next_frame(&mut render).compose_2d_layer(layer);
     }
     Event::MainEventsCleared => {
