@@ -6,12 +6,14 @@ use std::{
 pub mod build_ctx;
 pub mod key;
 pub mod layout;
-pub(crate) mod stateful;
+mod stateful;
 pub mod text;
 pub mod widget_tree;
 pub mod window;
+pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
 pub use layout::row_col_layout::RowColumn;
+pub use stateful::{Stateful, StatefulRef};
 pub use text::Text;
 
 /// The common behavior for widgets, also support to downcast to special widget.
@@ -22,6 +24,15 @@ pub trait Widget: Debug + Any {
 
   /// classify this widget into one of four type widget as mutation reference.
   fn classify_mut(&mut self) -> WidgetClassifyMut;
+
+  /// Convert a stateless widget to stateful, use it get a cell ref to modify
+  /// the widget.
+  fn into_stateful(self, ctx: &BuildCtx) -> Stateful<Self>
+  where
+    Self: Sized,
+  {
+    Stateful::new(ctx.tree.clone(), self)
+  }
 }
 
 /// A widget represented by other widget compose.
