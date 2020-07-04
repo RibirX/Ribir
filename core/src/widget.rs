@@ -68,6 +68,34 @@ pub enum WidgetClassifyMut<'a> {
   MultiChild(&'a mut dyn MultiChildWidget),
 }
 
+impl<'a> WidgetClassify<'a> {
+  #[inline]
+  pub fn is_combination(&self) -> bool { matches!(self, WidgetClassify::Combination(_)) }
+
+  #[inline]
+  pub fn is_render(&self) -> bool { !matches!(self, WidgetClassify::Combination(_)) }
+
+  #[inline]
+  pub fn is_single_child(&self) -> bool { matches!(self, WidgetClassify::SingleChild(_)) }
+
+  #[inline]
+  pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassify::MultiChild(_)) }
+}
+
+impl<'a> WidgetClassifyMut<'a> {
+  #[inline]
+  pub fn is_combination(&self) -> bool { matches!(self, WidgetClassifyMut::Combination(_)) }
+
+  #[inline]
+  pub fn is_render(&self) -> bool { !matches!(self, WidgetClassifyMut::Combination(_)) }
+
+  #[inline]
+  pub fn is_single_child(&self) -> bool { matches!(self, WidgetClassifyMut::SingleChild(_)) }
+
+  #[inline]
+  pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassifyMut::MultiChild(_)) }
+}
+
 /// We should also implement Widget for RenderWidgetSafety, SingleChildWidget
 /// and MultiChildWidget, but can not do it before rust specialization finished.
 /// So just CombinationWidget implemented it, this is user use most, and others

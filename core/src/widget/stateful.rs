@@ -1,7 +1,8 @@
 use crate::prelude::*;
 use std::{
-  cell::{Ref, RefCell, RefMut},
+  cell::{Ref, RefCell},
   marker::PhantomData,
+  mem::ManuallyDrop,
   rc::Rc,
 };
 
@@ -20,7 +21,7 @@ pub struct StatefulRef<T>(Stateful<T>);
 /// `Stateful` erased widget type info and used only as common identify type for
 /// all stateful widget.
 #[derive(Debug)]
-struct StatefulWidget {
+pub(crate) struct StatefulWidget {
   wid: WidgetId,
   widget: Rc<RefCell<Box<dyn Widget>>>,
 }
@@ -40,6 +41,11 @@ impl Widget for StatefulWidget {
   }
 }
 
+impl StatefulWidget {
+  #[inline]
+  pub fn id(&self) -> WidgetId { self.wid }
+}
+
 impl<T> From<Stateful<T>> for Box<dyn Widget> {
   fn from(s: Stateful<T>) -> Self {
     Box::new(StatefulWidget {
@@ -54,24 +60,20 @@ impl<T: 'static> Clone for StatefulRef<T> {
   fn clone(&self) -> Self { Self::new(&self.0) }
 }
 
-impl<T> Drop for StatefulRef<T> {
-  fn drop(&mut self) {
-    let Stateful { tree, wid, .. } = &self.0;
-    let mut tree = tree.borrow_mut();
-    if let Some(WidgetClassify::Combination(_)) = wid.get(&tree).map(|w| w.classify()) {
-      wid.mark_needs_build(&mut tree);
-    } else {
-      wid.mark_changed(&mut tree);
-    }
-  }
-}
-impl<T: 'static> Stateful<T> {
+impl<T: Into<Box<dyn Widget>> + 'static> Stateful<T> {
   /// Return a mutable memory location with dynamically checked borrow rules of
   /// `T` widget.
   pub fn as_cell_ref(&self) -> StatefulRef<T> { StatefulRef::new(self) }
 
   pub(crate) fn new(tree: Rc<RefCell<widget_tree::WidgetTree>>, widget: T) -> Self {
-    unimplemented!();
+    let widget = Rc::new(RefCell::new(widget.into()));
+    let wid = tree.borrow_mut().new_node(widget.clone());
+    Self {
+      tree,
+      widget,
+      wid,
+      _type: PhantomData,
+    }
   }
 }
 
@@ -95,10 +97,15 @@ impl<T: 'static> StatefulRef<T> {
   /// Panics if the value is currently borrowed. For a non-panicking variant,
   /// use try_borrow_mut.
   pub fn borrow_mut(&self) -> RefMut<T> {
-    RefMut::map(self.0.widget.borrow_mut(), |w| {
+    let ref_mut = std::cell::RefMut::map(self.0.widget.borrow_mut(), |w| {
       w.downcast_mut::<T>()
         .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
-    })
+    });
+    RefMut {
+      ref_mut: ManuallyDrop::new(ref_mut),
+      tree: self.0.tree.clone(),
+      wid: self.0.wid,
+    }
   }
 
   fn new(stateful: &Stateful<T>) -> Self {
@@ -111,6 +118,41 @@ impl<T: 'static> StatefulRef<T> {
   }
 }
 
+pub struct RefMut<'a, T> {
+  ref_mut: ManuallyDrop<std::cell::RefMut<'a, T>>,
+  wid: WidgetId,
+  tree: Rc<RefCell<widget_tree::WidgetTree>>,
+}
+
+impl<'a, T> Drop for RefMut<'a, T> {
+  fn drop(&mut self) {
+    let Self { tree, wid, ref_mut } = self;
+
+    unsafe { ManuallyDrop::drop(ref_mut) };
+
+    let mut tree = tree.borrow_mut();
+    if wid
+      .get(&tree)
+      .map_or(false, |w| w.classify().is_combination())
+    {
+      wid.mark_needs_build(&mut tree);
+    } else {
+      wid.mark_changed(&mut tree);
+    }
+  }
+}
+
+impl<'a, T> std::ops::Deref for RefMut<'a, T> {
+  type Target = T;
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.ref_mut }
+}
+
+impl<'a, T> std::ops::DerefMut for RefMut<'a, T> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.ref_mut }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -119,15 +161,9 @@ mod tests {
   fn smoke() {
     let tree = widget_tree::WidgetTree::default();
     let tree = Rc::new(RefCell::new(tree));
-    let root = tree.borrow_mut().new_node(Text("root".to_string()).into());
-    let ctx = BuildCtx {
-      tree: tree.clone(),
-      current: root,
-    };
-
-    // Simulate text widget is used as other widget' s child, and want modify widget
-    // in other place. So return a cell ref of the `Text` but not own it. Can use
-    // the `cell_ref` in some closure.
+    let ctx = BuildCtx { tree: tree.clone() };
+    // Simulate `Text` widget need modify its text in event callback. So return a
+    // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
     let cell_ref = {
       let t = Text("Hello".to_string());
       let stateful = t.into_stateful(&ctx);
