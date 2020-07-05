@@ -12,7 +12,6 @@ pub struct WidgetId(NodeId);
 pub struct WidgetTree {
   arena: Arena<WidgetNode>,
   root: Option<WidgetId>,
-  // todo: merge changed_widgets and need_builds
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
   pub(crate) changed_widgets: HashSet<WidgetId>,
@@ -60,7 +59,7 @@ impl WidgetTree {
 
     while let Some((wid, parent_rid)) = stack.pop() {
       let (children, render) = {
-        let mut widget = wid.get_mut(self).expect("must exist!");
+        let mut widget = wid.assert_get_mut(self);
         (
           widget.take_children(),
           widget.as_render().map(|r| r.create_render_object()),
@@ -92,21 +91,14 @@ impl WidgetTree {
   pub fn repair(&mut self, render_tree: &mut RenderTree) {
     while let Some(need_build) = self.pop_need_build_widget() {
       debug_assert!(
-        need_build
-          .get(self)
-          .expect("Must exist!")
-          .classify()
-          .is_combination(),
+        need_build.assert_get(self).classify().is_combination(),
         "rebuild widget must be combination widget."
       );
 
       let mut stack = vec![need_build];
 
       while let Some(need_build) = stack.pop() {
-        let children = need_build
-          .get_mut(self)
-          .expect("Must exist!")
-          .take_children();
+        let children = need_build.assert_get_mut(self).take_children();
 
         if let Some(mut children) = children {
           if children.len() == 1 {
@@ -130,7 +122,7 @@ impl WidgetTree {
   /// Tell the render object its owner changed one by one.
   fn flush_to_render(&mut self, render_tree: &mut RenderTree) {
     self.changed_widgets.iter().for_each(|wid| {
-      let widget = wid.get(self).expect("Widget should exists!");
+      let widget = wid.assert_get(self);
 
       let render_id = *self
         .widget_to_render
@@ -162,8 +154,14 @@ impl WidgetTree {
       .and_then(|key| node.get(self).map(|w| Some(key) == w.key()))
       .unwrap_or(false);
     if same_key {
-      node.replace(self, widget.into());
-      node.mark_changed(self);
+      if widget.classify().is_render() {
+        self.changed_widgets.insert(node);
+      }
+      *self
+        .arena
+        .get_mut(node.0)
+        .expect("Widget not exist in the tree.")
+        .get_mut() = widget.into();
       stack.push(node);
     } else {
       let parent_id = node.parent(&self).expect("parent should exists!");
@@ -223,8 +221,8 @@ impl WidgetTree {
       .need_builds
       .iter()
       .next()
-      .map(|id| id.ancestors(self).find(|id| self.need_builds.contains(id)))
-      .flatten();
+      .and_then(|id| id.ancestors(self).find(|id| self.need_builds.contains(id)));
+
     if let Some(topmost) = topmost.as_ref() {
       self.need_builds.remove(topmost);
     }
@@ -245,17 +243,11 @@ impl WidgetId {
   /// mark this id represented widget has changed, and need to update render
   /// tree in next frame.
   pub fn mark_changed(self, tree: &'_ mut WidgetTree) {
-    if self.get(tree).unwrap().classify().is_render() {
+    if self.assert_get(tree).classify().is_render() {
       tree.changed_widgets.insert(self);
     } else {
-      // Combination widget has no render object to update!"
+      tree.need_builds.insert(self);
     }
-  }
-
-  /// mark this widget need to build in the next frame.
-  pub fn mark_needs_build(self, tree: &mut WidgetTree) {
-    debug_assert!(self.get(&tree).unwrap().classify().is_combination());
-    tree.need_builds.insert(self);
   }
 
   /// Returns a reference to the node data.
@@ -269,17 +261,6 @@ impl WidgetId {
       .arena
       .get_mut(self.0)
       .map(|node| node.get_mut().borrow_mut())
-  }
-
-  /// Replace the widget back the widget id, return true if replace successful
-  /// and false if the widget id is not valid.
-  fn replace(self, tree: &mut WidgetTree, widget: WidgetNode) -> bool {
-    if let Some(node) = tree.arena.get_mut(self.0) {
-      *node.get_mut() = widget;
-      true
-    } else {
-      false
-    }
   }
 
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)
@@ -403,6 +384,14 @@ impl WidgetId {
     method: F,
   ) -> Option<WidgetId> {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
+  }
+
+  fn assert_get(self, tree: &WidgetTree) -> WidgetRef {
+    self.get(tree).expect("Widget not exists in the `tree`")
+  }
+
+  fn assert_get_mut(self, tree: &mut WidgetTree) -> WidgetRefMut {
+    self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }
 

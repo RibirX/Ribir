@@ -127,18 +127,8 @@ pub struct RefMut<'a, T> {
 impl<'a, T> Drop for RefMut<'a, T> {
   fn drop(&mut self) {
     let Self { tree, wid, ref_mut } = self;
-
     unsafe { ManuallyDrop::drop(ref_mut) };
-
-    let mut tree = tree.borrow_mut();
-    if wid
-      .get(&tree)
-      .map_or(false, |w| w.classify().is_combination())
-    {
-      wid.mark_needs_build(&mut tree);
-    } else {
-      wid.mark_changed(&mut tree);
-    }
+    wid.mark_changed(&mut tree.borrow_mut());
   }
 }
 
