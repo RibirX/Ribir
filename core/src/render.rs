@@ -7,7 +7,6 @@ pub mod render_ctx;
 use crate::{prelude::Point, prelude::Size};
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
-use std::raw::TraitObject;
 pub mod painting_context;
 pub mod render_tree;
 
@@ -77,18 +76,16 @@ pub trait RenderObjectSafety: Debug {
 }
 
 fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
-  unsafe {
-    let trait_obj: TraitObject = std::mem::transmute(obj);
-    &*(trait_obj.data as *const T)
-  }
+  let ptr = obj as *const dyn RenderWidgetSafety as *const T;
+  // SAFETY: in this mod, we know obj must be type `T`.
+  unsafe { &*ptr }
 }
 
 #[allow(dead_code)]
 fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
-  unsafe {
-    let trait_obj: TraitObject = std::mem::transmute(obj);
-    &mut *(trait_obj.data as *mut T)
-  }
+  // SAFETY: in this mod, we know obj must be type `T`.
+  let ptr = obj as *mut dyn RenderWidgetSafety as *mut T;
+  unsafe { &mut *ptr }
 }
 
 impl<T> RenderWidgetSafety for T

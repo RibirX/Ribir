@@ -1,13 +1,19 @@
 use crate::render::*;
-use std::{any::Any, fmt::Debug};
-
+use std::{
+  any::{Any, TypeId},
+  fmt::Debug,
+};
+pub mod build_ctx;
 pub mod key;
 pub mod layout;
+mod stateful;
 pub mod text;
 pub mod widget_tree;
 pub mod window;
+pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
 pub use layout::row_col_layout::RowColumn;
+pub use stateful::{Stateful, StatefulRef};
 pub use text::Text;
 
 /// The common behavior for widgets, also support to downcast to special widget.
@@ -19,9 +25,14 @@ pub trait Widget: Debug + Any {
   /// classify this widget into one of four type widget as mutation reference.
   fn classify_mut(&mut self) -> WidgetClassifyMut;
 
-  fn as_any(&self) -> &dyn Any;
-
-  fn as_any_mut(&self) -> &dyn Any;
+  /// Convert a stateless widget to stateful, use it get a cell ref to modify
+  /// the widget.
+  fn into_stateful(self, ctx: &BuildCtx) -> Stateful<Self>
+  where
+    Self: Sized,
+  {
+    Stateful::new(ctx.tree.clone(), self)
+  }
 }
 
 /// A widget represented by other widget compose.
@@ -50,20 +61,6 @@ pub enum WidgetClassify<'a> {
   MultiChild(&'a dyn MultiChildWidget),
 }
 
-impl<'a> WidgetClassify<'a> {
-  /// Return a Some-Value if this is a render widget, remember single child
-  /// widget and multi child widget are render widget too. Otherwise return a
-  /// None-Value.
-  pub(crate) fn try_as_render(&self) -> Option<&dyn RenderWidgetSafety> {
-    match self {
-      WidgetClassify::Combination(_) => None,
-      WidgetClassify::Render(w) => Some(w.as_render()),
-      WidgetClassify::SingleChild(w) => Some(w.as_render()),
-      WidgetClassify::MultiChild(w) => Some(w.as_render()),
-    }
-  }
-}
-
 pub enum WidgetClassifyMut<'a> {
   Combination(&'a mut dyn CombinationWidget),
   Render(&'a mut dyn RenderWidgetSafety),
@@ -71,37 +68,44 @@ pub enum WidgetClassifyMut<'a> {
   MultiChild(&'a mut dyn MultiChildWidget),
 }
 
-impl<'a> WidgetClassifyMut<'a> {
-  /// Return a Some-Value if this is a render widget, remember single child
-  /// widget and multi child widget are render widget too. Otherwise return a
-  /// None-Value.
-  #[allow(dead_code)]
-  pub(crate) fn try_as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
-    match self {
-      WidgetClassifyMut::Combination(_) => None,
-      WidgetClassifyMut::Render(w) => Some(w.as_render_mut()),
-      WidgetClassifyMut::SingleChild(w) => Some(w.as_render_mut()),
-      WidgetClassifyMut::MultiChild(w) => Some(w.as_render_mut()),
-    }
-  }
+impl<'a> WidgetClassify<'a> {
+  #[inline]
+  pub fn is_combination(&self) -> bool { matches!(self, WidgetClassify::Combination(_)) }
+
+  #[inline]
+  pub fn is_render(&self) -> bool { !matches!(self, WidgetClassify::Combination(_)) }
+
+  #[inline]
+  pub fn is_single_child(&self) -> bool { matches!(self, WidgetClassify::SingleChild(_)) }
+
+  #[inline]
+  pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassify::MultiChild(_)) }
 }
 
-/// We should also implement Widget concrete methods for RenderWidgetSafety,
-/// SingleChildWidget and MultiChildWidget, but can not do it before rust
-/// specialization finished. So just CombinationWidget implemented it, this is
-/// user use most, and others provide a macro to do it.
+impl<'a> WidgetClassifyMut<'a> {
+  #[inline]
+  pub fn is_combination(&self) -> bool { matches!(self, WidgetClassifyMut::Combination(_)) }
+
+  #[inline]
+  pub fn is_render(&self) -> bool { !matches!(self, WidgetClassifyMut::Combination(_)) }
+
+  #[inline]
+  pub fn is_single_child(&self) -> bool { matches!(self, WidgetClassifyMut::SingleChild(_)) }
+
+  #[inline]
+  pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassifyMut::MultiChild(_)) }
+}
+
+/// We should also implement Widget for RenderWidgetSafety, SingleChildWidget
+/// and MultiChildWidget, but can not do it before rust specialization finished.
+/// So just CombinationWidget implemented it, this is user use most, and others
+/// provide a macro to do it.
 impl<'a, T: CombinationWidget + Any + 'a> Widget for T {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 impl<T: CombinationWidget> !RenderWidget for T {}
@@ -114,18 +118,38 @@ impl<'a, W: Widget + 'a> From<W> for Box<dyn Widget + 'a> {
   fn from(w: W) -> Self { Box::new(w) }
 }
 
+impl dyn Widget {
+  pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+    if (&*self).type_id() == TypeId::of::<T>() {
+      let ptr = self as *mut dyn Widget as *mut T;
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any for
+      // all types; no other impls can exist as they would conflict with our impl.
+      unsafe { Some(&mut *ptr) }
+    } else {
+      None
+    }
+  }
+
+  pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+    if self.type_id() == TypeId::of::<T>() {
+      let ptr = self as *const dyn Widget as *const T;
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any for
+      // all types; no other impls can exist as they would conflict with our impl.
+      unsafe { Some(&*ptr) }
+    } else {
+      None
+    }
+  }
+}
+
 pub macro render_widget_base_impl() {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 pub macro single_child_widget_base_impl() {
@@ -134,12 +158,6 @@ pub macro single_child_widget_base_impl() {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::SingleChild(self) }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 pub macro multi_child_widget_base_impl() {
@@ -148,10 +166,4 @@ pub macro multi_child_widget_base_impl() {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
 }

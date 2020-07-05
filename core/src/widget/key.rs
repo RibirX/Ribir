@@ -43,12 +43,6 @@ impl Widget for KeyDetect {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { self.child.classify_mut() }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
 }
 
 impl KeyDetect {
