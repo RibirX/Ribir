@@ -593,25 +593,25 @@ mod test {
     assert_eq!(
       env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
-└── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
-    ├── KeyDetect { key: KI4(0), child: Text("New title") }
-    ├── KeyDetect { key: KI4(1), child: Text("") }
-    ├── KeyDetect { key: KI4(2), child: Text("") }
-    └── KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 } }
-        └── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
-            ├── KeyDetect { key: KI4(0), child: Text("New title") }
-            ├── KeyDetect { key: KI4(1), child: Text("") }
-            ├── KeyDetect { key: KI4(2), child: Text("") }
-            └── KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 } }
-                └── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
-                    ├── KeyDetect { key: KI4(0), child: Text("New title") }
-                    ├── KeyDetect { key: KI4(1), child: Text("") }
-                    ├── KeyDetect { key: KI4(2), child: Text("") }
-                    └── KeyDetect { key: KString("embed"), child: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 } }
-                        └── KeyDetect { key: KI4(0), child: RowColumn { axis: Horizontal, children: [] } }
-                            ├── KeyDetect { key: KI4(0), child: Text("New title") }
-                            ├── KeyDetect { key: KI4(1), child: Text("") }
-                            └── KeyDetect { key: KI4(2), child: Text("") }
+└── KeyDetect { key: KI4(0), widget: RowColumn { axis: Horizontal, children: [] } }
+    ├── KeyDetect { key: KI4(0), widget: Text("New title") }
+    ├── KeyDetect { key: KI4(1), widget: Text("") }
+    ├── KeyDetect { key: KI4(2), widget: Text("") }
+    └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 } }
+        └── KeyDetect { key: KI4(0), widget: RowColumn { axis: Horizontal, children: [] } }
+            ├── KeyDetect { key: KI4(0), widget: Text("New title") }
+            ├── KeyDetect { key: KI4(1), widget: Text("") }
+            ├── KeyDetect { key: KI4(2), widget: Text("") }
+            └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 } }
+                └── KeyDetect { key: KI4(0), widget: RowColumn { axis: Horizontal, children: [] } }
+                    ├── KeyDetect { key: KI4(0), widget: Text("New title") }
+                    ├── KeyDetect { key: KI4(1), widget: Text("") }
+                    ├── KeyDetect { key: KI4(2), widget: Text("") }
+                    └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 } }
+                        └── KeyDetect { key: KI4(0), widget: RowColumn { axis: Horizontal, children: [] } }
+                            ├── KeyDetect { key: KI4(0), widget: Text("New title") }
+                            ├── KeyDetect { key: KI4(1), widget: Text("") }
+                            └── KeyDetect { key: KI4(2), widget: Text("") }
 "#
     );
 

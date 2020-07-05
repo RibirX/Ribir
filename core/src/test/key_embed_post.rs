@@ -16,17 +16,17 @@ struct EmbedKeyPost {
 impl CombinationWidget for EmbedKeyPost {
   fn build(&self) -> Box<dyn Widget> {
     let mut children = vec![
-      KeyDetect::new(0, Text(self.title.borrow().to_string())).into(),
-      KeyDetect::new(1, Text(self.author.to_string())).into(),
-      KeyDetect::new(2, Text(self.content.to_string())).into(),
+      Text(self.title.borrow().to_string()).with_key(0).into(),
+      Text(self.author.to_string()).with_key(1).into(),
+      Text(self.content.to_string()).with_key(2).into(),
     ];
 
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      children.push(KeyDetect::new("embed", embed).into())
+      children.push(embed.with_key("embed").into())
     }
-    KeyDetect::new(0, RowColumn::row(children)).into()
+    RowColumn::row(children).with_key(0).into()
   }
 }
 

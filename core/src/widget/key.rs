@@ -34,15 +34,15 @@ pub enum Key {
 #[derive(Debug)]
 pub struct KeyDetect {
   key: Key,
-  child: Box<dyn Widget>,
+  widget: Box<dyn Widget>,
 }
 
 impl Widget for KeyDetect {
   #[inline]
-  fn classify(&self) -> WidgetClassify { self.child.classify() }
+  fn classify(&self) -> WidgetClassify { self.widget.classify() }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.child.classify_mut() }
+  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
 }
 
 impl KeyDetect {
@@ -53,7 +53,7 @@ impl KeyDetect {
   {
     KeyDetect {
       key: key.into(),
-      child: child.into(),
+      widget: child.into(),
     }
   }
 
