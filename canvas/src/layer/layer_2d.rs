@@ -1,5 +1,6 @@
 use crate::{
-  Color, FontProperties, FontStretch, FontStyle, FontWeight, Rect, Transform, DEFAULT_FONT_FAMILY,
+  Angle, Color, FontProperties, FontStretch, FontStyle, FontWeight, Rect, Transform, Vector,
+  DEFAULT_FONT_FAMILY,
 };
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
@@ -14,9 +15,6 @@ use std::{
   ops::{Deref, DerefMut},
 };
 
-pub type Vector = euclid::default::Vector2D<f32>;
-pub type Angle = euclid::Angle<f32>;
-
 /// The 2d layer is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
@@ -28,6 +26,10 @@ pub struct Rendering2DLayer<'a> {
   path: Option<Builder>,
 }
 
+impl<'a> Default for Rendering2DLayer<'a> {
+  fn default() -> Self { Self::new() }
+}
+
 impl<'a> Rendering2DLayer<'a> {
   pub fn new() -> Self {
     Self {
@@ -37,14 +39,10 @@ impl<'a> Rendering2DLayer<'a> {
     }
   }
 
-  #[inline]
-  fn get_path(&mut self) -> Option<Path> { self.path.take().map(|b| b.build()) }
-
   /// Starts a new path by emptying the list of sub-paths.
   /// Call this method when you want to create a new path.
-  #[inline]
   pub fn begin_path(&mut self, x: f32, y: f32) -> &mut Self {
-    self.path.get_or_insert_with(|| Builder::new());
+    self.path.get_or_insert_with(Builder::new);
     self.path.as_mut().map(|b| b.begin(point(x, y)));
     self
   }
@@ -54,7 +52,9 @@ impl<'a> Rendering2DLayer<'a> {
   /// start. If the shape has already been closed or has only one point, this
   #[inline]
   pub fn close_path(&mut self) -> &mut Self {
-    self.path.as_mut().map(|b| b.close());
+    if let Some(b) = self.path.as_mut() {
+      b.close()
+    };
     self
   }
 
@@ -107,7 +107,7 @@ impl<'a> Rendering2DLayer<'a> {
     let arc = Arc {
       start_angle,
       sweep_angle,
-      radii: Vector::new(radius, radius),
+      radii: Vector::new(radius, radius).to_untyped(),
       center: point(x, y),
       x_rotation: Angle::zero(),
     };
@@ -133,30 +133,33 @@ impl<'a> Rendering2DLayer<'a> {
     rotation: f32,
     winding: Winding,
   ) -> &mut Self {
-    self.path.as_mut().map(|b| {
+    if let Some(b) = self.path.as_mut() {
       b.add_ellipse(
         point(x, y),
-        Vector::new(radius_x, radius_y),
+        Vector::new(radius_x, radius_y).to_untyped(),
         Angle::radians(rotation),
         winding,
       )
-    });
+    };
     self
   }
 
   /// Creates a path for a rectangle at position (x, y) with a size that is
   /// determined by width and height.
+  #[inline]
   pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> &mut Self {
-    self
-      .path
-      .as_mut()
-      .map(|b| b.add_rectangle(&rect(x, y, width, height), Winding::Positive));
+    if let Some(b) = self.path.as_mut() {
+      b.add_rectangle(&rect(x, y, width, height), Winding::Positive);
+    };
     self
   }
 
+  #[inline]
   pub fn fill(&mut self) {
     let cmd = self.get_path().map(|p| self.command_from_path(p, false));
-    cmd.map(|c| self.commands.push(c));
+    if let Some(c) = cmd {
+      self.commands.push(c)
+    };
   }
 
   /// Saves the entire state of the canvas by pushing the current drawing state
@@ -297,6 +300,9 @@ impl<'a> Rendering2DLayer<'a> {
     *t = t.post_translate(euclid::Vector2D::new(x, y));
     self
   }
+
+  #[inline]
+  fn get_path(&mut self) -> Option<Path> { self.path.take().map(|b| b.build()) }
 }
 
 /// Describe render the text as single line or break as multiple lines.
