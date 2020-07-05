@@ -80,11 +80,10 @@ impl Dispatcher {
   fn bubble_mouse_pointer<D: Fn(&PointerListener, &PointerEvent)>(&mut self, dispatch: D) {
     let mut pointer = None;
     let w_tree = self.widget_tree.borrow();
-    self.render_hit_iter().all(|(wid, pos)| {
-      wid
-        .get(&w_tree)
-        .and_then(|w| w.as_any().downcast_ref::<PointerListener>())
-        .map_or(false, |w| {
+
+    self.hit_widget_iter().all(|(wid, pos)| {
+      wid.get(&w_tree).map_or(false, |w| {
+        w.downcast_ref::<PointerListener>().map_or(false, |w| {
           let event = pointer.get_or_insert_with(|| {
             PointerEvent::from_mouse(
               wid,
@@ -94,7 +93,7 @@ impl Dispatcher {
               self.mouse_button.1,
             )
           });
-          if event.as_mut().cancel_bubble.get() {
+          if event.as_ref().cancel_bubble.get() {
             false
           } else {
             event.position = pos;
@@ -105,64 +104,88 @@ impl Dispatcher {
             true
           }
         })
+      })
     });
   }
 
-  fn render_hit_iter<'a>(&'a self) -> impl Iterator<Item = (WidgetId, Point)> + 'a {
-    let r_tree = self.render_tree.clone();
-    HitRenderIter::new(self.render_tree.borrow(), self.cursor_pos).filter_map(move |(rid, pos)| {
-      rid
-        .relative_to_widget(&r_tree.borrow())
-        .map(|wid| (wid, pos))
-    })
-  }
-}
-
-pub struct HitRenderIter<'a> {
-  r_tree: Ref<'a, RenderTree>,
-  current: Option<RenderId>,
-  pos: Point,
-}
-
-impl<'a> HitRenderIter<'a> {
-  fn new(r_tree: Ref<'a, RenderTree>, pos: Point) -> Self {
-    let mut iter = Self {
-      current: r_tree.root(),
-      r_tree,
-      pos,
-    };
-    iter.current = iter
-      .current
-      .filter(|rid| Self::try_down_coordinate(&iter.r_tree, *rid, &mut iter.pos));
-    iter
+  /// return a iterator of widgets war hit from leaf to root.
+  fn hit_widget_iter(&self) -> HitWidgetIter {
+    HitWidgetIter::new(self.widget_tree.borrow(), self.render_hit_path())
   }
 
-  fn try_down_coordinate(tree: &RenderTree, rid: RenderId, pos: &mut Point) -> bool {
-    rid
-      .box_place(tree)
-      .filter(|rect| rect.contains(*pos))
-      .map_or(false, |rect| {
-        let offset: Size = rect.min().to_tuple().into();
-        *pos -= offset;
-        true
-      })
-  }
-}
-
-impl<'a> Iterator for HitRenderIter<'a> {
-  type Item = (RenderId, Point);
-  fn next(&mut self) -> Option<Self::Item> {
-    if let Some(rid) = self.current {
-      let value = Some((rid, self.pos));
-      let Self { r_tree, pos, .. } = self;
-      self.current = rid
-        .reverse_children(r_tree)
-        .find(|rid| Self::try_down_coordinate(r_tree, *rid, pos));
-
-      return value;
-    } else {
+  /// collect the render widget hit path.
+  fn render_hit_path(&self) -> Vec<(WidgetId, Point)> {
+    fn down_coordinate_to(
+      id: RenderId,
+      pos: Point,
+      tree: &RenderTree,
+    ) -> Option<(RenderId, Point)> {
+      id.box_place(tree)
+        .filter(|rect| rect.contains(pos))
+        .map(|rect| {
+          let offset: Size = rect.min().to_tuple().into();
+          (id, pos - offset)
+        })
     }
-    None
+
+    let r_tree = self.render_tree.borrow();
+    let mut current = r_tree
+      .root()
+      .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree));
+
+    let mut path = vec![];
+    while let Some((rid, pos)) = current {
+      path.push((
+        rid
+          .relative_to_widget(&r_tree)
+          .expect("Render object 's owner widget is not exist."),
+        pos,
+      ));
+      current = rid
+        .reverse_children(&r_tree)
+        .find_map(|rid| down_coordinate_to(rid, pos, &r_tree));
+    }
+
+    path
+  }
+}
+
+struct HitWidgetIter<'a> {
+  w_tree: Ref<'a, WidgetTree>,
+  render_path: Vec<(WidgetId, Point)>,
+  switch: Option<(WidgetId, Point)>,
+  current: Option<(WidgetId, Point)>,
+}
+
+impl<'a> HitWidgetIter<'a> {
+  fn new(w_tree: Ref<'a, WidgetTree>, mut render_path: Vec<(WidgetId, Point)>) -> Self {
+    let current = render_path.pop();
+    let switch = render_path.pop();
+    Self {
+      w_tree,
+      render_path,
+      current,
+      switch,
+    }
+  }
+}
+
+impl<'a> Iterator for HitWidgetIter<'a> {
+  type Item = (WidgetId, Point);
+  fn next(&mut self) -> Option<Self::Item> {
+    let next = self.current.and_then(|(wid, pos)| {
+      wid.parent(&self.w_tree).map(|p| {
+        let pos = self
+          .switch
+          .filter(|(switch_wid, _)| *switch_wid == p)
+          .map_or(pos, |(_, switch_pos)| {
+            self.switch = self.render_path.pop();
+            switch_pos
+          });
+        (p, pos)
+      })
+    });
+    std::mem::replace(&mut self.current, next)
   }
 }
 

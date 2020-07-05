@@ -29,29 +29,48 @@ pub trait Event {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct EventCommon {
+pub struct EventCommon {
   pub target: WidgetId,
   pub current_target: WidgetId,
   pub composed_path: Vec<WidgetId>,
   pub modifiers: ModifiersState,
-  pub(crate) cancel_bubble: std::cell::Cell<bool>,
+  pub cancel_bubble: std::cell::Cell<bool>,
 }
 
-pub(crate) macro impl_common_event($ty:ty, $field: ident) {
-  impl Event for $ty {
-    #[inline]
-    fn target(&self) -> &WidgetId { &self.$field.target }
-    #[inline]
-    fn current_target(&self) -> &WidgetId { &self.$field.target }
-    #[inline]
-    fn composed_path(&self) -> &[WidgetId] { &self.$field.composed_path }
-    #[inline]
-    fn stop_bubbling(&self) { self.$field.cancel_bubble.set(false) }
-    #[inline]
-    fn modifiers(&self) -> ModifiersState { self.$field.modifiers }
-  }
+impl<T: std::convert::AsRef<EventCommon>> Event for T {
+  #[inline]
+  fn target(&self) -> &WidgetId { &self.as_ref().target }
+  #[inline]
+  fn current_target(&self) -> &WidgetId { &self.as_ref().target }
+  #[inline]
+  fn composed_path(&self) -> &[WidgetId] { &self.as_ref().composed_path }
+  #[inline]
+  fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(false) }
+  #[inline]
+  fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
+}
 
-  impl std::convert::AsMut<EventCommon> for $ty {
-    fn as_mut(&mut self) -> &mut EventCommon { &mut self.$field }
+pub(crate) fn add_listener<F: Fn(&E) + 'static, E: std::convert::AsRef<EventCommon> + 'static>(
+  holder: &mut Option<Box<dyn Fn(&E)>>,
+  handler: F,
+) {
+  *holder = if let Some(already) = holder.take() {
+    Some(Box::new(move |event| {
+      already(event);
+      if !event.as_ref().cancel_bubble.get() {
+        handler(event);
+      }
+    }))
+  } else {
+    Some(Box::new(handler))
+  };
+}
+
+pub(crate) fn dispatch_event<E: std::convert::AsRef<EventCommon> + 'static>(
+  holder: &Option<Box<dyn Fn(&E)>>,
+  event: &E,
+) {
+  if let Some(handler) = holder {
+    handler(event);
   }
 }
