@@ -33,6 +33,16 @@ pub trait Widget: Debug + Any {
   {
     Stateful::new(ctx.tree.clone(), self)
   }
+
+  /// Assign a key to the widget to help framework to track if two widget is a
+  /// same widget in two frame.
+  #[inline]
+  fn with_key<K: Into<Key>>(self, key: K) -> KeyDetect
+  where
+    Self: Sized,
+  {
+    KeyDetect::new(key, self)
+  }
 }
 
 /// A widget represented by other widget compose.
