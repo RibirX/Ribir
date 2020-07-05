@@ -1,8 +1,6 @@
 use crate::render::render_tree::*;
 use crate::render::*;
 use canvas::{Canvas, FontInfo, Rect, Text};
-
-use std::collections::HashSet;
 pub struct RenderCtx<'a> {
   tree: &'a mut RenderTree,
   canvas: &'a mut Canvas,
@@ -60,15 +58,13 @@ impl<'a> RenderCtx<'a> {
 
   /// proxy call the renderObject's perform_layout if needed
   pub fn perform_layout(&mut self, id: RenderId) -> Size {
-    let size = self.get_layout_size(id);
-    if UNVALID_SIZE != size {
-      return size;
+    let layout_size = self.get_layout_size(id);
+    if UNVALID_SIZE != layout_size {
+      return layout_size;
     }
     let mut_ptr = self as *mut RenderCtx<'a>;
     let node = id.clone().get_mut(self.tree).unwrap();
-    unsafe {
-      return node.perform_layout(id, &mut *mut_ptr);
-    }
+    unsafe { node.perform_layout(id, &mut *mut_ptr) }
   }
 
   /// return the layout size. lazy perform layout, if the size has been decided.
@@ -77,7 +73,7 @@ impl<'a> RenderCtx<'a> {
     if size == UNVALID_SIZE {
       size = self.perform_layout(id);
     }
-    return size;
+    size
   }
 
   // mesure test bound

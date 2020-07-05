@@ -22,7 +22,7 @@ pub struct FlexContainer {
 }
 
 impl FlexContainer {
-  pub fn new(axis: Axis, layout_type: LayoutConstraints) -> FlexContainer { FlexContainer { axis } }
+  pub fn new(axis: Axis) -> FlexContainer { FlexContainer { axis } }
 
   pub fn main_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
     let rect = ctx.box_rect(id);

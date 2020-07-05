@@ -39,7 +39,7 @@ impl RenderWidget for RowColumn {
   type RO = RowColRender;
   fn create_render_object(&self) -> Self::RO {
     RowColRender {
-      flex: FlexContainer::new(self.axis, LayoutConstraints::EFFECTED_BY_CHILDREN),
+      flex: FlexContainer::new(self.axis),
     }
   }
 }
