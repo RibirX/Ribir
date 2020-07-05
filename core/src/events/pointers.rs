@@ -1,4 +1,4 @@
-use super::{impl_common_event, EventCommon};
+use super::{add_listener, dispatch_event, EventCommon};
 use crate::prelude::*;
 mod from_mouse;
 #[derive(Debug, Clone)]
@@ -79,7 +79,15 @@ pub enum PointerType {
   Touch,
 }
 
-impl_common_event!(PointerEvent, common);
+impl std::convert::AsRef<EventCommon> for PointerEvent {
+  #[inline]
+  fn as_ref(&self) -> &EventCommon { &self.common }
+}
+
+impl std::convert::AsMut<EventCommon> for PointerEvent {
+  #[inline]
+  fn as_mut(&mut self) -> &mut EventCommon { &mut self.common }
+}
 
 impl PointerEvent {
   /// The button number that was pressed (if applicable) when the mouse event
@@ -89,7 +97,7 @@ impl PointerEvent {
 
 /// A widget that calls callbacks in response to common pointer events.
 pub struct PointerListener {
-  child: Option<Box<dyn Widget>>,
+  widget: Box<dyn Widget>,
   on_pointer_down: Option<Box<dyn Fn(&PointerEvent)>>,
   on_pointer_move: Option<Box<dyn Fn(&PointerEvent)>>,
   on_pointer_up: Option<Box<dyn Fn(&PointerEvent)>>,
@@ -105,7 +113,7 @@ pub struct PointerListener {
 impl PointerListener {
   pub fn listen_on<W: Into<Box<dyn Widget>>>(w: W) -> Self {
     Self {
-      child: Some(w.into()),
+      widget: w.into(),
       on_pointer_down: None,
       on_pointer_move: None,
       on_pointer_up: None,
@@ -115,54 +123,46 @@ impl PointerListener {
 
   #[inline]
   pub fn on_pointer_down<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    self.on_pointer_down = Some(Box::new(handler));
+    add_listener(&mut self.on_pointer_down, handler);
     self
   }
 
   #[inline]
   pub fn on_pointer_up<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    self.on_pointer_up = Some(Box::new(handler));
+    add_listener(&mut self.on_pointer_up, handler);
     self
   }
 
   #[inline]
   pub fn on_pointer_move<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    self.on_pointer_move = Some(Box::new(handler));
+    add_listener(&mut self.on_pointer_move, handler);
     self
   }
 
   #[inline]
   pub fn on_pointer_cancel<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    self.on_pointer_cancel = Some(Box::new(handler));
+    add_listener(&mut self.on_pointer_cancel, handler);
     self
   }
 
   pub(crate) fn dispatch_pointer_down(&self, event: &PointerEvent) {
     log::info!("dispatch pointer down: {:?}", event);
-    if let Some(ref cb) = self.on_pointer_down {
-      cb(event)
-    }
+    dispatch_event(&self.on_pointer_down, event)
   }
 
   pub(crate) fn dispatch_pointer_up(&self, event: &PointerEvent) {
     log::info!("dispatch pointer up: {:?}", event);
-    if let Some(ref cb) = self.on_pointer_up {
-      cb(event)
-    }
+    dispatch_event(&self.on_pointer_up, event)
   }
 
   pub(crate) fn dispatch_pointer_move(&self, event: &PointerEvent) {
     log::info!("dispatch pointer move: {:?}", event);
-    if let Some(ref cb) = self.on_pointer_move {
-      cb(event)
-    }
+    dispatch_event(&self.on_pointer_move, event)
   }
 
   pub(crate) fn dispatch_pointer_cancel(&self, event: &PointerEvent) {
     log::info!("dispatch pointer cancel: {:?}", event);
-    if let Some(ref cb) = self.on_pointer_cancel {
-      cb(event)
-    }
+    dispatch_event(&self.on_pointer_cancel, event)
   }
 }
 
@@ -174,48 +174,9 @@ impl std::fmt::Debug for PointerListener {
 }
 
 impl Widget for PointerListener {
-  single_child_widget_base_impl!();
-}
-
-impl RenderWidget for PointerListener {
-  type RO = RenderPointer;
-  fn create_render_object(&self) -> Self::RO { RenderPointer.into() }
-}
-
-impl SingleChildWidget for PointerListener {
-  fn take_child(&mut self) -> Box<dyn Widget> {
-    self
-      .child
-      .take()
-      .expect("Should have a child, take child only call once")
-  }
-}
-
-#[derive(Debug)]
-pub struct RenderPointer;
-
-impl RenderObject<PointerListener> for RenderPointer {
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
-    let content = id
-      .first_child(ctx.render_tree())
-      .expect("Pointer must have only one child");
-    ctx.perform_layout(content);
-    let size = ctx
-      .box_place(content)
-      .map_or(Size::zero(), |rect| rect.size);
-    ctx.update_size(id, size);
-    size
-  }
+  #[inline]
+  fn classify(&self) -> WidgetClassify { self.widget.classify() }
 
   #[inline]
-  fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::EFFECTED_BY_CHILDREN }
-
-  #[inline]
-  fn update(&mut self, _: &PointerListener) {}
-
-  #[inline]
-  fn set_box_limit(&mut self, _: Option<BoxLimit>) {}
-
-  #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
 }
