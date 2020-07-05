@@ -1,4 +1,4 @@
-use canvas::{create_canvas_with_render_from_wnd, Color, DeviceSize, Winding};
+use canvas::{create_canvas_with_render_from_wnd, Color, DeviceSize};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -42,22 +42,19 @@ fn main() {
       let mut layer = canvas.new_2d_layer();
       layer.set_style(Color::YELLOW);
 
-      // layer.begin_path(0., 70.);
-      // layer.line_to(100.0, 70.0);
-      // layer.line_to(100.0, 0.0);
-      // layer.line_to(250.0, 100.0);
-      // layer.line_to(100.0, 200.0);
-      // layer.line_to(100.0, 130.0);
-      // layer.line_to(0.0, 130.0);
-      // layer.close_path();
+      layer
+        .begin_path(0., 70.)
+        .line_to(100.0, 70.0)
+        .line_to(100.0, 0.0)
+        .line_to(250.0, 100.0)
+        .line_to(100.0, 200.0)
+        .line_to(100.0, 130.0)
+        .line_to(0.0, 130.0)
+        .close_path()
+        .fill();
 
-      // layer.rect(100.0, 100.0, 100.0, 100.0);
-      layer.arc(100., 100., 50., Angle::zero(), Angle::pi());
-      let path = layer.get_path();
-      match path {
-        Some(p) => layer.fill_path(p),
-        None => panic!(),
-      }
+      // layer.rect(100.0, 100.0, 100.0, 100.0).fill();
+      // layer.arc(100., 100., 50., Angle::zero(), Angle::pi()).fill();
       canvas.next_frame(&mut render).compose_2d_layer(layer);
     }
     Event::MainEventsCleared => {

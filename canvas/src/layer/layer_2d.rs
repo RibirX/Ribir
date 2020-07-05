@@ -4,7 +4,7 @@ use crate::{
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
 pub use lyon::{
   geom::Arc,
-  math::point,
+  math::{point, rect},
   path::{builder::PathBuilder, path::Builder, traits::PathIterator, EndpointId, Path, Winding},
   tessellation::*,
 };
@@ -38,13 +38,13 @@ impl<'a> Rendering2DLayer<'a> {
   }
 
   #[inline]
-  pub fn get_path(&mut self) -> Option<Path> { self.path.take().map(|b| b.build()) }
+  fn get_path(&mut self) -> Option<Path> { self.path.take().map(|b| b.build()) }
 
   /// Starts a new path by emptying the list of sub-paths.
   /// Call this method when you want to create a new path.
   #[inline]
   pub fn begin_path(&mut self, x: f32, y: f32) -> &mut Self {
-    self.path = Some(Builder::new());
+    self.path.get_or_insert_with(|| Builder::new());
     self.path.as_mut().map(|b| b.begin(point(x, y)));
     self
   }
@@ -123,39 +123,40 @@ impl<'a> Rendering2DLayer<'a> {
     self
   }
 
-  /// Adds an arc to the current path with the given control points and radius,
-  /// connected to the previous point by a straight line.
-  pub fn arc_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, radius: f32) -> &mut Self {
-    unimplemented!();
-  }
-
   /// Adds an elliptical arc to the current path.
   pub fn ellipse(
     &mut self,
     x: f32,
     y: f32,
-    radiusX: f32,
-    radiusY: f32,
+    radius_x: f32,
+    radius_y: f32,
     rotation: f32,
-    start_angle: f32,
-    end_angle: f32,
     winding: Winding,
   ) -> &mut Self {
-    unimplemented!();
+    self.path.as_mut().map(|b| {
+      b.add_ellipse(
+        point(x, y),
+        Vector::new(radius_x, radius_y),
+        Angle::radians(rotation),
+        winding,
+      )
+    });
+    self
   }
 
   /// Creates a path for a rectangle at position (x, y) with a size that is
   /// determined by width and height.
   pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> &mut Self {
-    let tr_pt = point(x + width, y);
-    let bl_pt = point(x, y + height);
-    let br_pt = point(x + width, y + height);
-    self.begin_path(x, y);
-    self.path.as_mut().map(|b| b.line_to(tr_pt));
-    self.path.as_mut().map(|b| b.line_to(br_pt));
-    self.path.as_mut().map(|b| b.line_to(bl_pt));
-    self.close_path();
     self
+      .path
+      .as_mut()
+      .map(|b| b.add_rectangle(&rect(x, y, width, height), Winding::Positive));
+    self
+  }
+
+  pub fn fill(&mut self) {
+    let cmd = self.get_path().map(|p| self.command_from_path(p, false));
+    cmd.map(|c| self.commands.push(c));
   }
 
   /// Saves the entire state of the canvas by pushing the current drawing state
@@ -669,26 +670,29 @@ mod test {
     // The stroke path both style and line width same should be merge.
     layer.stroke_path(sample_path.clone());
     layer.stroke_path(sample_path.clone());
-    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
     assert_eq!(canvas.render_data().primitives.len(), 1);
 
+    let mut layer = Rendering2DLayer::new();
     // Different line width with same color pen can be merged.
     layer.set_line_width(2.);
     layer.stroke_path(sample_path.clone());
-    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
     assert_eq!(canvas.render_data().primitives.len(), 1);
 
+    let mut layer = Rendering2DLayer::new();
     // Different color can't be merged.
     layer.set_style(FillStyle::Color(Color::YELLOW));
     layer.fill_path(sample_path.clone());
-    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
     assert_eq!(canvas.render_data().primitives.len(), 2);
 
+    let mut layer = Rendering2DLayer::new();
     // Different type style can't be merged
     layer.set_style(FillStyle::Image);
     layer.fill_path(sample_path.clone());
     layer.stroke_path(sample_path);
-    canvas.consume_2d_layer(layer.clone(), &mut tessellator, &mut mock_render);
+    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
     // image not not support now, should panic.
     assert_eq!(canvas.render_data().primitives.len(), 4);
   }
