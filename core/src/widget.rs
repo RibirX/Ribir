@@ -15,6 +15,7 @@ pub use key::{Key, KeyDetect};
 pub use layout::row_col_layout::RowColumn;
 pub use stateful::{Stateful, StatefulRef};
 pub use text::Text;
+pub mod events;
 
 /// The common behavior for widgets, also support to downcast to special widget.
 pub trait Widget: Debug + Any {
@@ -24,6 +25,15 @@ pub trait Widget: Debug + Any {
 
   /// classify this widget into one of four type widget as mutation reference.
   fn classify_mut(&mut self) -> WidgetClassifyMut;
+
+  /// return the some-value of `InheritWidget` reference if the widget is
+  /// inherit from another widget, otherwise None.
+  #[inline]
+  fn as_inherit(&self) -> Option<&dyn InheritWidget> { None }
+
+  /// like `as_inherit`, but return mutable reference.
+  #[inline]
+  fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { None }
 
   /// Convert a stateless widget to stateful, use it get a cell ref to modify
   /// the widget.
@@ -106,11 +116,42 @@ impl<'a> WidgetClassifyMut<'a> {
   pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassifyMut::MultiChild(_)) }
 }
 
+/// Use inherit method to implement a `Widget`, this is use to extend ability of
+/// a widget but not increase the widget number. Notice it's difference to class
+/// inherit, it's instance inherit.
+pub trait InheritWidget: Widget {
+  fn base_widget(&self) -> &dyn Widget;
+  fn base_widget_mut(&mut self) -> &mut dyn Widget;
+}
+
+pub macro inherit_widget($ty: ty, $base_widget: ident) {
+  impl InheritWidget for $ty {
+    #[inline]
+    fn base_widget(&self) -> &dyn Widget { &*self.$base_widget }
+    #[inline]
+    fn base_widget_mut(&mut self) -> &mut dyn Widget { &mut *self.$base_widget }
+  }
+
+  impl Widget for $ty {
+    #[inline]
+    fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
+
+    #[inline]
+    fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
+
+    #[inline]
+    fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
+
+    #[inline]
+    fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
+  }
+}
+
 /// We should also implement Widget for RenderWidgetSafety, SingleChildWidget
 /// and MultiChildWidget, but can not do it before rust specialization finished.
 /// So just CombinationWidget implemented it, this is user use most, and others
 /// provide a macro to do it.
-impl<'a, T: CombinationWidget + Any + 'a> Widget for T {
+impl<T: CombinationWidget + 'static> Widget for T {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
 
@@ -130,27 +171,44 @@ impl<W: Widget> From<W> for Box<dyn Widget> {
 
 impl dyn Widget {
   pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-    if (&*self).type_id() == TypeId::of::<T>() {
-      let ptr = self as *mut dyn Widget as *mut T;
-      // SAFETY: just checked whether we are pointing to the correct type, and we can
-      // rely on that check for memory safety because we have implemented Any for
-      // all types; no other impls can exist as they would conflict with our impl.
-      unsafe { Some(&mut *ptr) }
+    pub fn dynamic_cast<T: 'static>(widget: &mut dyn Widget) -> Option<&mut T> {
+      if (&*widget).type_id() == TypeId::of::<T>() {
+        let ptr = widget as *mut dyn Widget as *mut T;
+        // SAFETY: just checked whether we are pointing to the correct type, and we can
+        // rely on that check for memory safety because we have implemented Any for
+        // all types; no other impls can exist as they would conflict with our impl.
+        unsafe { Some(&mut *ptr) }
+      } else {
+        None
+      }
+    }
+    if dynamic_cast::<T>(self).is_some() {
+      dynamic_cast(self)
     } else {
-      None
+      self
+        .as_inherit_mut()
+        .and_then(|inherit| dynamic_cast(inherit.base_widget_mut()))
     }
   }
 
   pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-    if self.type_id() == TypeId::of::<T>() {
-      let ptr = self as *const dyn Widget as *const T;
-      // SAFETY: just checked whether we are pointing to the correct type, and we can
-      // rely on that check for memory safety because we have implemented Any for
-      // all types; no other impls can exist as they would conflict with our impl.
-      unsafe { Some(&*ptr) }
-    } else {
-      None
+    pub fn dynamic_cast<T: 'static>(widget: &dyn Widget) -> Option<&T> {
+      if widget.type_id() == TypeId::of::<T>() {
+        let ptr = widget as *const dyn Widget as *const T;
+        // SAFETY: just checked whether we are pointing to the correct type, and we can
+        // rely on that check for memory safety because we have implemented Any for
+        // all types; no other impls can exist as they would conflict with our impl.
+        unsafe { Some(&*ptr) }
+      } else {
+        None
+      }
     }
+
+    dynamic_cast(self).or_else(|| {
+      self
+        .as_inherit()
+        .and_then(|inherit| dynamic_cast(inherit.base_widget()))
+    })
   }
 }
 
@@ -176,4 +234,14 @@ pub macro multi_child_widget_base_impl() {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn dynamic_cast() {
+    unimplemented!();
+  }
 }

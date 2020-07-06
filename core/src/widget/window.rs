@@ -1,5 +1,8 @@
 use super::{painting_context::PaintingContext, render_tree::*};
-use crate::{events::dispatch::Dispatcher, prelude::*, widget::widget_tree::*};
+use crate::{
+  prelude::*,
+  widget::{events::dispatch::Dispatcher, widget_tree::*},
+};
 use canvas::{
   surface::{PhysicSurface, Surface, TextureSurface},
   Canvas, DeviceSize, WgpuRender,

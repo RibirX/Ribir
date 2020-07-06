@@ -1,9 +1,8 @@
-use super::{MouseButtons, PointerEvent, PointerId, PointerType};
-use crate::{
+use super::{
   events::{EventCommon, ModifiersState},
-  prelude::*,
-  widget::widget_tree::WidgetId,
+  MouseButtons, PointerEvent, PointerId, PointerType,
 };
+use crate::{prelude::*, widget::widget_tree::WidgetId};
 use winit::event::MouseButton;
 
 impl PointerEvent {

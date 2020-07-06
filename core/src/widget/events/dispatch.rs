@@ -1,6 +1,9 @@
-use super::pointers::{MouseButtons, PointerEvent, PointerListener};
+use super::{
+  pointers::{MouseButtons, PointerEvent, PointerListener},
+  EventCommon,
+};
 use crate::{
-  prelude::{Point, Size},
+  prelude::*,
   render::render_tree::{RenderId, RenderTree},
   widget::widget_tree::{WidgetId, WidgetTree},
 };
@@ -82,30 +85,43 @@ impl Dispatcher {
     let w_tree = self.widget_tree.borrow();
 
     self.hit_widget_iter().all(|(wid, pos)| {
-      wid.get(&w_tree).map_or(false, |w| {
-        w.downcast_ref::<PointerListener>().map_or(false, |w| {
-          let event = pointer.get_or_insert_with(|| {
-            PointerEvent::from_mouse(
-              wid,
-              pos,
-              self.cursor_pos,
-              self.modifiers,
-              self.mouse_button.1,
-            )
-          });
-          if event.as_ref().cancel_bubble.get() {
-            false
-          } else {
-            event.position = pos;
-            let common = event.as_mut();
-            common.current_target = wid;
-            common.composed_path.push(wid);
-            dispatch(w, &event);
-            true
-          }
-        })
-      })
+      let event = pointer.get_or_insert_with(|| {
+        PointerEvent::from_mouse(
+          wid,
+          pos,
+          self.cursor_pos,
+          self.modifiers,
+          self.mouse_button.1,
+        )
+      });
+      event.position = pos;
+      Self::try_inherit_dispatch(wid, &w_tree, &dispatch, event);
+      !event.as_mut().cancel_bubble.get()
     });
+  }
+
+  fn try_inherit_dispatch<T: Widget, E: std::convert::AsMut<EventCommon>, H: Fn(&T, &E)>(
+    wid: WidgetId,
+    tree: &WidgetTree,
+    handler: &H,
+    event: &mut E,
+  ) {
+    if let Some(w) = wid.get(tree) {
+      let mut event_widget = w.downcast_ref::<T>();
+      while let Some(w) = event_widget {
+        if event.as_mut().cancel_bubble.get() {
+          break;
+        }
+
+        let common = event.as_mut();
+        common.current_target = wid;
+        common.composed_path.push(wid);
+        handler(w, event);
+        event_widget = w
+          .as_inherit()
+          .and_then(|w| w.base_widget().downcast_ref::<T>());
+      }
+    }
   }
 
   /// return a iterator of widgets war hit from leaf to root.
@@ -192,7 +208,6 @@ impl<'a> Iterator for HitWidgetIter<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::*;
   use crate::widget::window::HeadlessWindow;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::MouseButton;
