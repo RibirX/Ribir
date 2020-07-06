@@ -10,18 +10,18 @@ use crate::render::LayoutConstraints;
 #[derive(Debug)]
 pub struct RowColumn {
   axis: Axis,
-  children: Vec<Box<dyn Widget>>,
+  children: Vec<BoxWidget>,
 }
 
 impl RowColumn {
-  pub fn column(children: Vec<Box<dyn Widget>>) -> RowColumn {
+  pub fn column(children: Vec<BoxWidget>) -> RowColumn {
     RowColumn {
       axis: Axis::Vertical,
       children,
     }
   }
 
-  pub fn row(children: Vec<Box<dyn Widget>>) -> RowColumn {
+  pub fn row(children: Vec<BoxWidget>) -> RowColumn {
     RowColumn {
       axis: Axis::Horizontal,
       children,
@@ -48,7 +48,7 @@ impl RenderWidget for RowColumn {
 }
 
 impl MultiChildWidget for RowColumn {
-  fn take_children(&mut self) -> Vec<Box<dyn Widget>> { std::mem::take(&mut self.children) }
+  fn take_children(&mut self) -> Vec<BoxWidget> { std::mem::take(&mut self.children) }
 }
 
 impl RenderObject for RowColRender {

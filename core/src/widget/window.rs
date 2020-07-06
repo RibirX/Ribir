@@ -88,7 +88,7 @@ impl<W, S: Surface> Window<W, S> {
     ctx.mark_layout_dirty(root);
   }
 
-  fn new<R: Into<Box<dyn Widget>>>(root: R, wnd: W, canvas: Canvas, render: WgpuRender<S>) -> Self {
+  fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: WgpuRender<S>) -> Self {
     let render_tree: Rc<RefCell<RenderTree>> = <_>::default();
     let widget_tree: Rc<RefCell<WidgetTree>> = <_>::default();
     let wnd = Self {
@@ -105,7 +105,7 @@ impl<W, S: Surface> Window<W, S> {
       wnd
         .widget_tree
         .borrow_mut()
-        .set_root(root.into(), &mut render_tree);
+        .set_root(root.box_it(), &mut render_tree);
     }
 
     wnd
@@ -136,10 +136,7 @@ impl Window {
     DevicePoint::new(pos.x as u32, pos.y as u32)
   }
 
-  pub(crate) fn from_event_loop<W: Into<Box<dyn Widget>>>(
-    root: W,
-    event_loop: &EventLoop<()>,
-  ) -> Self {
+  pub(crate) fn from_event_loop(root: BoxWidget, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
     let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
@@ -157,7 +154,7 @@ impl Window {
 }
 
 impl HeadlessWindow {
-  pub fn headless<W: Into<Box<dyn Widget>>>(root: W, size: DeviceSize) -> Self {
+  pub fn headless(root: BoxWidget, size: DeviceSize) -> Self {
     let (canvas, render) =
       futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
     Self::new(root, (), canvas, render)

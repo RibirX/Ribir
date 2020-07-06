@@ -97,11 +97,18 @@ impl PointerEvent {
 
 /// A widget that calls callbacks in response to common pointer events.
 pub struct PointerListener {
-  widget: Box<dyn Widget>,
+  widget: BoxWidget,
   on_pointer_down: Option<Box<dyn Fn(&PointerEvent)>>,
   on_pointer_move: Option<Box<dyn Fn(&PointerEvent)>>,
   on_pointer_up: Option<Box<dyn Fn(&PointerEvent)>>,
   on_pointer_cancel: Option<Box<dyn Fn(&PointerEvent)>>,
+}
+
+pub enum PointerEventType {
+  Down,
+  Move,
+  Up,
+  Cancel,
   /* onpointerover:
    * onpointerenter:
    * onpointerout:
@@ -111,9 +118,9 @@ pub struct PointerListener {
 }
 
 impl PointerListener {
-  pub fn listen_on<W: Into<Box<dyn Widget>>>(w: W) -> Self {
+  pub fn new(w: BoxWidget) -> Self {
     Self {
-      widget: w.into(),
+      widget: w.box_it(),
       on_pointer_down: None,
       on_pointer_move: None,
       on_pointer_up: None,
@@ -121,48 +128,28 @@ impl PointerListener {
     }
   }
 
-  #[inline]
-  pub fn on_pointer_down<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    add_listener(&mut self.on_pointer_down, handler);
-    self
+  pub fn listen_on<F: Fn(&PointerEvent) + 'static>(
+    &mut self,
+    event_type: PointerEventType,
+    handler: F,
+  ) {
+    let holder = match event_type {
+      PointerEventType::Down => &mut self.on_pointer_down,
+      PointerEventType::Move => &mut self.on_pointer_move,
+      PointerEventType::Up => &mut self.on_pointer_up,
+      PointerEventType::Cancel => &mut self.on_pointer_cancel,
+    };
+    add_listener(holder, handler);
   }
 
-  #[inline]
-  pub fn on_pointer_up<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    add_listener(&mut self.on_pointer_up, handler);
-    self
-  }
-
-  #[inline]
-  pub fn on_pointer_move<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    add_listener(&mut self.on_pointer_move, handler);
-    self
-  }
-
-  #[inline]
-  pub fn on_pointer_cancel<F: Fn(&PointerEvent) + 'static>(mut self, handler: F) -> Self {
-    add_listener(&mut self.on_pointer_cancel, handler);
-    self
-  }
-
-  pub(crate) fn dispatch_pointer_down(&self, event: &PointerEvent) {
-    log::info!("dispatch pointer down: {:?}", event);
-    dispatch_event(&self.on_pointer_down, event)
-  }
-
-  pub(crate) fn dispatch_pointer_up(&self, event: &PointerEvent) {
-    log::info!("dispatch pointer up: {:?}", event);
-    dispatch_event(&self.on_pointer_up, event)
-  }
-
-  pub(crate) fn dispatch_pointer_move(&self, event: &PointerEvent) {
-    log::info!("dispatch pointer move: {:?}", event);
-    dispatch_event(&self.on_pointer_move, event)
-  }
-
-  pub(crate) fn dispatch_pointer_cancel(&self, event: &PointerEvent) {
-    log::info!("dispatch pointer cancel: {:?}", event);
-    dispatch_event(&self.on_pointer_cancel, event)
+  pub(crate) fn dispatch(&self, event_type: PointerEventType, event: &PointerEvent) {
+    let holder = match event_type {
+      PointerEventType::Down => &self.on_pointer_down,
+      PointerEventType::Move => &self.on_pointer_move,
+      PointerEventType::Up => &self.on_pointer_up,
+      PointerEventType::Cancel => &self.on_pointer_cancel,
+    };
+    dispatch_event(holder, event)
   }
 }
 

@@ -11,7 +11,7 @@ pub struct Stateful<T> {
   tree: Rc<RefCell<widget_tree::WidgetTree>>,
   // `widget` field is necessary, when modify widget state, we can just borrow
   // from widget instead of the whole tree.
-  widget: Rc<RefCell<Box<dyn Widget>>>,
+  widget: Rc<RefCell<BoxWidget>>,
   _type: PhantomData<*const T>,
 }
 /// A mutable memory location with dynamically checked borrow rules of
@@ -23,20 +23,20 @@ pub struct StatefulRef<T>(Stateful<T>);
 #[derive(Debug)]
 pub(crate) struct StatefulWidget {
   wid: WidgetId,
-  widget: Rc<RefCell<Box<dyn Widget>>>,
+  widget: Rc<RefCell<BoxWidget>>,
 }
 
 impl Widget for StatefulWidget {
   fn classify(&self) -> WidgetClassify {
-    let ptr = &**self.widget.borrow() as *const dyn Widget;
-    // Safety: StatefulWidget is a inner widget and not support clone, it's only
-    // used when build widget tree.
+    let ptr = &*self.widget.borrow() as *const dyn Widget;
+    // Safety: StatefulWidget is a inner temporary widget and not support clone,
+    // it's only used when build widget tree.
     unsafe { (&*ptr).classify() }
   }
   fn classify_mut(&mut self) -> WidgetClassifyMut {
-    let ptr = &mut **self.widget.borrow_mut() as *mut dyn Widget;
-    // Safety: StatefulWidget is a inner widget and not support clone, it's only
-    // used when build widget tree.
+    let ptr = &mut *self.widget.borrow_mut() as *mut dyn Widget;
+    // Safety: StatefulWidget is a inner temporary widget and not support clone,
+    // it's only used when build widget tree.
     unsafe { (&mut *ptr).classify_mut() }
   }
 }
@@ -60,13 +60,13 @@ impl<T: 'static> Clone for StatefulRef<T> {
   fn clone(&self) -> Self { Self::new(&self.0) }
 }
 
-impl<T: Into<Box<dyn Widget>> + 'static> Stateful<T> {
+impl<T: Widget> Stateful<T> {
   /// Return a mutable memory location with dynamically checked borrow rules of
   /// `T` widget.
   pub fn as_cell_ref(&self) -> StatefulRef<T> { StatefulRef::new(self) }
 
   pub(crate) fn new(tree: Rc<RefCell<widget_tree::WidgetTree>>, widget: T) -> Self {
-    let widget = Rc::new(RefCell::new(widget.into()));
+    let widget = Rc::new(RefCell::new(widget.box_it()));
     let wid = tree.borrow_mut().new_node(widget.clone());
     Self {
       tree,
@@ -83,7 +83,7 @@ impl<T: 'static> StatefulRef<T> {
   /// time.
   pub fn borrow(&self) -> Ref<T> {
     Ref::map(self.0.widget.borrow(), |w| {
-      w.downcast_ref::<T>()
+      Widget::downcast_ref::<T>(w)
         .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
     })
   }
@@ -98,7 +98,7 @@ impl<T: 'static> StatefulRef<T> {
   /// use try_borrow_mut.
   pub fn borrow_mut(&self) -> RefMut<T> {
     let ref_mut = std::cell::RefMut::map(self.0.widget.borrow_mut(), |w| {
-      w.downcast_mut::<T>()
+      Widget::downcast_mut::<T>(w)
         .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
     });
     RefMut {

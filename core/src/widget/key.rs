@@ -34,26 +34,19 @@ pub enum Key {
 #[derive(Debug)]
 pub struct KeyDetect {
   key: Key,
-  widget: Box<dyn Widget>,
+  widget: BoxWidget,
 }
 
-impl Widget for KeyDetect {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { self.widget.classify() }
-
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
-}
+inherit_widget!(KeyDetect, widget);
 
 impl KeyDetect {
-  pub fn new<K, W>(key: K, child: W) -> Self
+  pub fn new<K>(key: K, widget: BoxWidget) -> Self
   where
     K: Into<Key>,
-    W: Into<Box<dyn Widget>>,
   {
     KeyDetect {
       key: key.into(),
-      widget: child.into(),
+      widget,
     }
   }
 
@@ -156,11 +149,11 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
-  let k1 = KeyDetect::new(0, Text("".to_string()));
-  let k2 = KeyDetect::new(String::new(), Text("".to_string()));
-  let k3 = KeyDetect::new("".to_string(), Text("".to_string()));
-  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
-  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
+  let k1 = KeyDetect::new(0, Text("".to_string()).box_it());
+  let k2 = KeyDetect::new(String::new(), Text("".to_string()).box_it());
+  let k3 = KeyDetect::new("".to_string(), Text("".to_string()).box_it());
+  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()).box_it());
+  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()).box_it());
   assert!(k1.key != k2.key);
   assert!(k2.key == k3.key);
   assert!(k3.key != k1.key);

@@ -4,7 +4,8 @@
 //! like web's bubble phase, always from the leaf to root.
 use crate::widget::widget_tree::WidgetId;
 pub(crate) mod dispatch;
-mod pointers;
+pub mod pointers;
+pub use pointers::{PointerEvent, PointerListener};
 pub use winit::event::ModifiersState;
 
 /// Event itself contains the properties and methods which are common to all
