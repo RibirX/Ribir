@@ -1,5 +1,5 @@
 use super::{add_listener, dispatch_event, EventCommon};
-use crate::prelude::*;
+use crate::{prelude::*, widget::inherit_widget};
 mod from_mouse;
 #[derive(Debug, Clone)]
 pub struct PointerId(usize);
@@ -173,10 +173,4 @@ impl std::fmt::Debug for PointerListener {
   }
 }
 
-impl Widget for PointerListener {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { self.widget.classify() }
-
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
-}
+inherit_widget!(PointerListener, widget);
