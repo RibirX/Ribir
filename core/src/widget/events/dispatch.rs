@@ -1,5 +1,5 @@
 use super::{
-  pointers::{MouseButtons, PointerEvent, PointerListener},
+  pointers::{MouseButtons, PointerEvent, PointerEventType, PointerListener},
   EventCommon,
 };
 use crate::{
@@ -40,7 +40,7 @@ impl Dispatcher {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
         self.bubble_mouse_pointer(|w, event| {
           log::info!("Pointer move {:?}", event);
-          w.dispatch_pointer_move(event)
+          w.dispatch(PointerEventType::Move, event)
         });
       }
       WindowEvent::MouseInput {
@@ -58,7 +58,7 @@ impl Dispatcher {
               if self.mouse_button.1 == button.into() {
                 self.bubble_mouse_pointer(|w, event| {
                   log::info!("Pointer down {:?}", event);
-                  w.dispatch_pointer_down(event)
+                  w.dispatch(PointerEventType::Down, event)
                 });
               }
             }
@@ -69,7 +69,7 @@ impl Dispatcher {
                 self.mouse_button.0 = None;
                 self.bubble_mouse_pointer(|w, event| {
                   log::info!("Pointer up {:?}", event);
-                  w.dispatch_pointer_up(event)
+                  w.dispatch(PointerEventType::Up, event)
                 });
               }
             }
@@ -212,34 +212,26 @@ mod tests {
   use std::{cell::RefCell, rc::Rc};
   use winit::event::MouseButton;
 
-  fn record_pointer<W: Into<Box<dyn Widget>>>(
+  fn record_pointer<W: Widget>(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
-    child: W,
-  ) -> PointerListener {
-    PointerListener::listen_on(child)
-      .on_pointer_down({
-        let stack = event_stack.clone();
-        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
-      })
-      .on_pointer_move({
-        let stack = event_stack.clone();
-        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
-      })
-      .on_pointer_up({
-        let stack = event_stack.clone();
-        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
-      })
-      .on_pointer_cancel({
-        let stack = event_stack.clone();
-        move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
-      })
+    widget: W,
+  ) -> BoxWidget {
+    let handler_ctor = || {
+      let stack = event_stack.clone();
+      move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
+    };
+    widget
+      .on_pointer_down(handler_ctor())
+      .on_pointer_move(handler_ctor())
+      .on_pointer_up(handler_ctor())
+      .on_pointer_cancel(handler_ctor())
   }
 
   #[test]
   fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let root = record_pointer(event_record.clone(), record);
+    let root = record_pointer(event_record.clone(), RowColumn::row(vec![record]));
     let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
@@ -324,7 +316,7 @@ mod tests {
   }
 
   #[test]
-  fn different_mouse_() {
+  fn different_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
     let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
@@ -363,19 +355,20 @@ mod tests {
   #[test]
   fn cancel_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let pointer = PointerListener::listen_on(Text("pointer event test".to_string()))
-      .on_pointer_move({
-        let stack = event_record.clone();
-        move |e: &PointerEvent| {
-          stack.borrow_mut().push(e.clone());
-          e.stop_bubbling();
-        }
-      });
-    let root = PointerListener::listen_on(pointer).on_pointer_down({
+    let mut pointer = PointerListener::new(Text("pointer event test".to_string()).box_it());
+    pointer.listen_on(PointerEventType::Move, {
+      let stack = event_record.clone();
+      move |e: &PointerEvent| {
+        stack.borrow_mut().push(e.clone());
+        e.stop_bubbling();
+      }
+    });
+    let mut root = PointerListener::new(pointer.box_it());
+    root.listen_on(PointerEventType::Down, {
       let stack = event_record.clone();
       move |e| stack.borrow_mut().push(e.clone())
     });
-    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    let mut wnd = HeadlessWindow::headless(root.box_it(), DeviceSize::new(100, 100));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {

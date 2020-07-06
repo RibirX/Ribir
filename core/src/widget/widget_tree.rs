@@ -26,7 +26,7 @@ impl WidgetTree {
   #[inline]
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
-  pub fn set_root(&mut self, data: Box<dyn Widget>, render_tree: &mut RenderTree) -> WidgetId {
+  pub fn set_root(&mut self, data: BoxWidget, render_tree: &mut RenderTree) -> WidgetId {
     debug_assert!(self.root.is_none());
     let root = self.new_node(data);
     self.root = Some(root);
@@ -145,12 +145,11 @@ impl WidgetTree {
   fn try_replace_widget_or_rebuild(
     &mut self,
     node: WidgetId,
-    widget: Box<dyn Widget>,
+    widget: BoxWidget,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
-    let same_key = widget
-      .key()
+    let same_key = Widget::key(&widget)
       .and_then(|key| node.get(self).map(|w| Some(key) == w.key()))
       .unwrap_or(false);
     if same_key {
@@ -178,7 +177,7 @@ impl WidgetTree {
   fn repair_children_by_key(
     &mut self,
     node: WidgetId,
-    new_children: Vec<Box<dyn Widget>>,
+    new_children: Vec<BoxWidget>,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
@@ -197,7 +196,7 @@ impl WidgetTree {
     }
 
     for w in new_children.into_iter() {
-      if let Some(k) = w.key() {
+      if let Some(k) = Widget::key(&w) {
         if let Some(id) = key_children.get(k).copied() {
           key_children.remove(k);
           node.0.append(id.0, &mut self.arena);
@@ -314,7 +313,7 @@ impl WidgetId {
     tree.widget_to_render.get(&wid).cloned()
   }
 
-  fn append_widget(self, data: Box<dyn Widget>, tree: &mut WidgetTree) -> WidgetId {
+  fn append_widget(self, data: BoxWidget, tree: &mut WidgetTree) -> WidgetId {
     let child = tree.new_node(data);
     self.0.append(child.0, &mut tree.arena);
     child
@@ -397,7 +396,7 @@ impl WidgetId {
 
 impl dyn Widget {
   fn key(&self) -> Option<&Key> { self.downcast_ref::<KeyDetect>().map(|k| k.key()) }
-  fn take_children(&mut self) -> Option<Vec<Box<dyn Widget>>> {
+  fn take_children(&mut self) -> Option<Vec<BoxWidget>> {
     match self.classify_mut() {
       WidgetClassifyMut::Combination(c) => Some(vec![c.build()]),
       WidgetClassifyMut::SingleChild(r) => Some(vec![r.take_child()]),
@@ -417,8 +416,8 @@ impl dyn Widget {
 }
 
 pub enum WidgetNode {
-  Rc(Rc<RefCell<Box<dyn Widget>>>),
-  Widget(Box<dyn Widget>),
+  Rc(Rc<RefCell<BoxWidget>>),
+  Widget(BoxWidget),
 }
 pub enum WidgetRef<'a> {
   BorrowRef(Ref<'a, dyn Widget>),
@@ -436,15 +435,15 @@ impl std::fmt::Debug for WidgetNode {
 impl WidgetNode {
   fn borrow_mut(&mut self) -> WidgetRefMut {
     match self {
-      WidgetNode::Rc(rc) => WidgetRefMut::BorrowRefMut(RefMut::map(rc.borrow_mut(), |w| &mut **w)),
-      WidgetNode::Widget(w) => WidgetRefMut::RefMut(&mut **w),
+      WidgetNode::Rc(rc) => WidgetRefMut::BorrowRefMut(rc.borrow_mut()),
+      WidgetNode::Widget(w) => WidgetRefMut::RefMut(w),
     }
   }
 
   fn borrow(&self) -> WidgetRef {
     match self {
-      WidgetNode::Rc(rc) => WidgetRef::BorrowRef(Ref::map(rc.borrow(), |w| &**w)),
-      WidgetNode::Widget(w) => WidgetRef::Ref(&**w),
+      WidgetNode::Rc(rc) => WidgetRef::BorrowRef(rc.borrow()),
+      WidgetNode::Widget(w) => WidgetRef::Ref(w),
     }
   }
 }
@@ -479,14 +478,14 @@ impl<'a> DerefMut for WidgetRefMut<'a> {
   }
 }
 
-impl From<Box<dyn Widget>> for WidgetNode {
+impl From<BoxWidget> for WidgetNode {
   #[inline]
-  fn from(w: Box<dyn Widget>) -> Self { WidgetNode::Widget(w) }
+  fn from(w: BoxWidget) -> Self { WidgetNode::Widget(w) }
 }
 
-impl From<Rc<RefCell<Box<dyn Widget>>>> for WidgetNode {
+impl From<Rc<RefCell<BoxWidget>>> for WidgetNode {
   #[inline]
-  fn from(w: Rc<RefCell<Box<dyn Widget>>>) -> Self { WidgetNode::Rc(w) }
+  fn from(w: Rc<RefCell<BoxWidget>>) -> Self { WidgetNode::Rc(w) }
 }
 
 #[cfg(test)]
@@ -503,7 +502,7 @@ mod test {
   fn create_env(level: usize) -> WidgetTree {
     let mut tree = WidgetTree::default();
     let mut render_tree = RenderTree::default();
-    tree.set_root(EmbedPost::new(level).into(), &mut render_tree);
+    tree.set_root(EmbedPost::new(level).box_it(), &mut render_tree);
     tree
   }
 
@@ -641,7 +640,7 @@ mod test {
     let mut widget_tree = WidgetTree::default();
     let mut render_tree = RenderTree::default();
     let root = RecursiveRow { width, depth };
-    widget_tree.set_root(root.into(), &mut render_tree);
+    widget_tree.set_root(root.box_it(), &mut render_tree);
     (widget_tree, render_tree)
   }
 
