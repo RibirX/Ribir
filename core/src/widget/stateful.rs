@@ -1,153 +1,96 @@
-use crate::prelude::*;
-use std::{
-  cell::{Ref, RefCell},
-  marker::PhantomData,
-  mem::ManuallyDrop,
-  rc::Rc,
-};
+use crate::{prelude::*, widget::inherit_widget};
+use std::{marker::PhantomData, ptr::NonNull};
 
-pub struct Stateful<T> {
+/// A pointer of stateful widget, can use it to directly access and modify
+/// stateful widget.
+///
+/// Remember it assume you changed the widget back this pointer if you mutably
+/// dereference this pointer. No matter if you really modify it.
+///
+/// ## Safety
+/// Because `StatefulPtr` can only be constructed in `Combination::build`
+/// method, the only way to live longer than `build` method scope it capture by
+/// some closure of widget that construct in the same scope, so the pointer will
+/// have same lifetime as the widget capture it. And framework guarantee the
+/// widgets constructed in the same `build` method  have same lifetime.
+///
+/// Maybe panic if widget impl the `Drop` trait, and call some closure in its
+/// `drop` method,  the captured `StatefulPtr` maybe is dangling.
+#[derive(Clone, Copy)]
+pub struct StatefulPtr<T> {
   wid: WidgetId,
-  tree: Rc<RefCell<widget_tree::WidgetTree>>,
-  // `widget` field is necessary, when modify widget state, we can just borrow
-  // from widget instead of the whole tree.
-  widget: Rc<RefCell<BoxWidget>>,
+  tree: NonNull<widget_tree::WidgetTree>,
+  widget: NonNull<BoxWidget>,
   _type: PhantomData<*const T>,
 }
-/// A mutable memory location with dynamically checked borrow rules of
-/// `T` widget. Usage like `std::cell:RefCell`.
-pub struct StatefulRef<T>(Stateful<T>);
 
 /// `Stateful` erased widget type info and used only as common identify type for
 /// all stateful widget.
+///
+/// ## Safety
+/// In safe code, `StatefulWidget` can only be constructed in
+/// `Combination::build` method. And it design as a temporary widget only to
+/// identify the preallocated real widget. It's only live during framework
+/// construct widget tree, and framework guarantee the real widget live longer
+/// than it.
 #[derive(Debug)]
 pub struct StatefulWidget {
   wid: WidgetId,
-  widget: Rc<RefCell<BoxWidget>>,
+  widget: NonNull<BoxWidget>,
 }
 
-impl Widget for StatefulWidget {
-  fn classify(&self) -> WidgetClassify {
-    let ptr = &*self.widget.borrow() as *const dyn Widget;
-    // Safety: StatefulWidget is a inner temporary widget and not support clone,
-    // it's only used when build widget tree.
-    unsafe { (&*ptr).classify() }
-  }
-  fn classify_mut(&mut self) -> WidgetClassifyMut {
-    let ptr = &mut *self.widget.borrow_mut() as *mut dyn Widget;
-    // Safety: StatefulWidget is a inner temporary widget and not support clone,
-    // it's only used when build widget tree.
-    unsafe { (&mut *ptr).classify_mut() }
-  }
+pub fn widget_into_stateful<W: Widget>(
+  widget: W,
+  ctx: &mut BuildCtx,
+) -> (StatefulWidget, StatefulPtr<W>) {
+  let box_widget = widget.box_it();
+  let widget = NonNull::from(&box_widget);
+  let wid = unsafe { ctx.tree.as_mut().new_node(box_widget) };
+  (
+    StatefulWidget { wid, widget },
+    StatefulPtr {
+      wid,
+      tree: ctx.tree,
+      widget,
+      _type: PhantomData,
+    },
+  )
 }
+
+inherit_widget!(StatefulWidget, widget);
 
 impl StatefulWidget {
   #[inline]
   pub fn id(&self) -> WidgetId { self.wid }
 }
 
-impl<T> From<Stateful<T>> for Box<dyn Widget> {
-  fn from(s: Stateful<T>) -> Self {
-    Box::new(StatefulWidget {
-      wid: s.wid,
-      widget: s.widget,
-    })
-  }
-}
-
-impl<T: 'static> Clone for StatefulRef<T> {
-  #[inline]
-  fn clone(&self) -> Self { Self::new(&self.0) }
-}
-
-impl<T: Widget> Stateful<T> {
-  /// Return a mutable memory location with dynamically checked borrow rules of
-  /// `T` widget.
-  pub fn as_cell_ref(&self) -> StatefulRef<T> { StatefulRef::new(self) }
-
-  pub(crate) fn new(tree: Rc<RefCell<widget_tree::WidgetTree>>, widget: T) -> Self {
-    let widget = Rc::new(RefCell::new(widget.box_it()));
-    let wid = tree.borrow_mut().new_node(widget.clone());
-    Self {
-      tree,
-      widget,
-      wid,
-      _type: PhantomData,
-    }
-  }
-
-  pub(crate) fn into_widget(self) -> StatefulWidget {
-    StatefulWidget {
-      wid: self.wid,
-      widget: self.widget,
-    }
-  }
-}
-
-impl<T: 'static> StatefulRef<T> {
-  /// Immutably borrows the wrapped value. The borrow lasts until the returned
-  /// Ref exits scope. Multiple immutable borrows can be taken out at the same
-  /// time.
-  pub fn borrow(&self) -> Ref<T> {
-    Ref::map(self.0.widget.borrow(), |w| {
-      Widget::downcast_ref::<T>(w)
-        .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
-    })
-  }
-
-  /// Mutably borrows the wrapped value and mark the widget as dirty.
-  /// The borrow lasts until the returned RefMut or all RefMuts derived from it
-  /// exit scope. The value cannot be borrowed while this borrow is active.
-
-  /// Remember framework assume you will change the wrapped widget 's state
-  /// after called `borrow_mut`.
-  /// Panics if the value is currently borrowed. For a non-panicking variant,
-  /// use try_borrow_mut.
-  pub fn borrow_mut(&self) -> RefMut<T> {
-    let ref_mut = std::cell::RefMut::map(self.0.widget.borrow_mut(), |w| {
-      Widget::downcast_mut::<T>(w)
-        .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
-    });
-    RefMut {
-      ref_mut: ManuallyDrop::new(ref_mut),
-      tree: self.0.tree.clone(),
-      wid: self.0.wid,
-    }
-  }
-
-  fn new(stateful: &Stateful<T>) -> Self {
-    StatefulRef(Stateful {
-      widget: stateful.widget.clone(),
-      tree: stateful.tree.clone(),
-      wid: stateful.wid,
-      _type: stateful._type,
-    })
-  }
-}
-
-pub struct RefMut<'a, T> {
-  ref_mut: ManuallyDrop<std::cell::RefMut<'a, T>>,
-  wid: WidgetId,
-  tree: Rc<RefCell<widget_tree::WidgetTree>>,
-}
-
-impl<'a, T> Drop for RefMut<'a, T> {
-  fn drop(&mut self) {
-    let Self { tree, wid, ref_mut } = self;
-    unsafe { ManuallyDrop::drop(ref_mut) };
-    wid.mark_changed(&mut tree.borrow_mut());
-  }
-}
-
-impl<'a, T> std::ops::Deref for RefMut<'a, T> {
+impl<T: 'static> std::ops::Deref for StatefulPtr<T> {
   type Target = T;
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.ref_mut }
+  fn deref(&self) -> &Self::Target {
+    unsafe { self.widget.as_ref() as &dyn Widget }
+      .downcast_ref::<T>()
+      .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
+  }
 }
 
-impl<'a, T> std::ops::DerefMut for RefMut<'a, T> {
+impl<T: 'static> std::ops::DerefMut for StatefulPtr<T> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    self.wid.mark_changed(unsafe { self.tree.as_mut() });
+    unsafe { self.widget.as_mut() as &mut dyn Widget }
+      .downcast_mut::<T>()
+      .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
+  }
+}
+
+impl std::borrow::Borrow<dyn Widget> for NonNull<BoxWidget> {
   #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.ref_mut }
+  fn borrow(&self) -> &dyn Widget { unsafe { self.as_ref() } }
+}
+
+impl std::borrow::BorrowMut<dyn Widget> for NonNull<BoxWidget> {
+  #[inline]
+  fn borrow_mut(&mut self) -> &mut dyn Widget { unsafe { self.as_mut() } }
 }
 
 #[cfg(test)]
@@ -157,18 +100,19 @@ mod tests {
   #[test]
   fn smoke() {
     let tree = widget_tree::WidgetTree::default();
-    let tree = Rc::new(RefCell::new(tree));
-    let ctx = BuildCtx { tree: tree.clone() };
+    let mut ctx = BuildCtx {
+      tree: NonNull::from(&tree),
+    };
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let cell_ref = {
+    let mut cell_ref = {
       let t = Text("Hello".to_string());
-      let (_, cell_ref) = t.into_stateful(&ctx);
+      let (_, cell_ref) = t.into_stateful(&mut ctx);
       cell_ref
     };
     {
-      cell_ref.borrow_mut().0 = "World!".to_string();
+      cell_ref.0 = "World!".to_string();
     }
-    assert!(tree.borrow().changed_widgets.get(&cell_ref.0.wid).is_some());
+    assert!(tree.changed_widgets.get(&cell_ref.wid).is_some());
   }
 }

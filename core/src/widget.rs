@@ -13,7 +13,7 @@ pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
 pub use layout::row_col_layout::RowColumn;
-pub use stateful::{Stateful, StatefulRef, StatefulWidget};
+pub use stateful::{StatefulPtr, StatefulWidget};
 pub use text::Text;
 pub mod events;
 use events::pointers::{PointerEvent, PointerEventType, PointerListener};
@@ -42,13 +42,12 @@ pub trait Widget: Debug + Any {
 
   /// Convert a stateless widget to stateful, use it get a cell ref to modify
   /// the widget.
-  fn into_stateful(self, ctx: &BuildCtx) -> (StatefulWidget, StatefulRef<Self>)
+  #[inline]
+  fn into_stateful(self, ctx: &mut BuildCtx) -> (StatefulWidget, StatefulPtr<Self>)
   where
     Self: Sized,
   {
-    let stateful = Stateful::new(ctx.tree.clone(), self);
-    let cell_ref = stateful.as_cell_ref();
-    (stateful.into_widget(), cell_ref)
+    stateful::widget_into_stateful(self, ctx)
   }
 
   /// Assign a key to the widget to help framework to track if two widget is a
@@ -107,19 +106,21 @@ pub trait Widget: Debug + Any {
 /// A widget represented by other widget compose.
 pub trait CombinationWidget: Debug {
   /// Describes the part of the user interface represented by this widget.
+  /// Called by framework, should never directly call it.
   fn build(&self) -> BoxWidget;
 }
 
 /// a widget has a child.
 pub trait SingleChildWidget: RenderWidgetSafety {
   /// called by framework to take child from this widget, and only called once.
+  /// Called by framework, should never directly call it.
   fn take_child(&mut self) -> BoxWidget;
 }
 
 /// a widget has multi child
 pub trait MultiChildWidget: RenderWidgetSafety {
   /// called by framework to take children from this widget, and only called
-  /// once.
+  /// once. Called by framework, should never directly call it.
   fn take_children(&mut self) -> Vec<BoxWidget>;
 }
 
