@@ -488,6 +488,8 @@ impl From<Rc<RefCell<BoxWidget>>> for WidgetNode {
   fn from(w: Rc<RefCell<BoxWidget>>) -> Self { WidgetNode::Rc(w) }
 }
 
+impl !Unpin for WidgetTree {}
+
 #[cfg(test)]
 mod test {
   use super::*;

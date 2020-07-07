@@ -7,22 +7,19 @@ use crate::{
   render::render_tree::{RenderId, RenderTree},
   widget::widget_tree::{WidgetId, WidgetTree},
 };
-use std::{
-  cell::{Ref, RefCell},
-  rc::Rc,
-};
+use std::ptr::NonNull;
 use winit::event::{DeviceId, ElementState, ModifiersState, WindowEvent};
 
 pub(crate) struct Dispatcher {
-  render_tree: Rc<RefCell<RenderTree>>,
-  widget_tree: Rc<RefCell<WidgetTree>>,
+  render_tree: NonNull<RenderTree>,
+  widget_tree: NonNull<WidgetTree>,
   cursor_pos: Point,
   mouse_button: (Option<DeviceId>, MouseButtons),
   modifiers: ModifiersState,
 }
 
 impl Dispatcher {
-  pub fn new(render_tree: Rc<RefCell<RenderTree>>, widget_tree: Rc<RefCell<WidgetTree>>) -> Self {
+  pub fn new(render_tree: NonNull<RenderTree>, widget_tree: NonNull<WidgetTree>) -> Self {
     Self {
       render_tree,
       widget_tree,
@@ -82,7 +79,6 @@ impl Dispatcher {
 
   fn bubble_mouse_pointer<D: Fn(&PointerListener, &PointerEvent)>(&mut self, dispatch: D) {
     let mut pointer = None;
-    let w_tree = self.widget_tree.borrow();
 
     self.hit_widget_iter().all(|(wid, pos)| {
       let event = pointer.get_or_insert_with(|| {
@@ -95,7 +91,7 @@ impl Dispatcher {
         )
       });
       event.position = pos;
-      Self::try_inherit_dispatch(wid, &w_tree, &dispatch, event);
+      Self::try_inherit_dispatch(wid, self.widget_tree_ref(), &dispatch, event);
       !event.as_mut().cancel_bubble.get()
     });
   }
@@ -126,7 +122,7 @@ impl Dispatcher {
 
   /// return a iterator of widgets war hit from leaf to root.
   fn hit_widget_iter(&self) -> HitWidgetIter {
-    HitWidgetIter::new(self.widget_tree.borrow(), self.render_hit_path())
+    HitWidgetIter::new(unsafe { self.widget_tree.as_ref() }, self.render_hit_path())
   }
 
   /// collect the render widget hit path.
@@ -144,7 +140,7 @@ impl Dispatcher {
         })
     }
 
-    let r_tree = self.render_tree.borrow();
+    let r_tree = self.render_tree_ref();
     let mut current = r_tree
       .root()
       .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree));
@@ -164,17 +160,23 @@ impl Dispatcher {
 
     path
   }
+
+  #[inline]
+  fn widget_tree_ref(&self) -> &WidgetTree { unsafe { self.widget_tree.as_ref() } }
+
+  #[inline]
+  fn render_tree_ref(&self) -> &RenderTree { unsafe { self.render_tree.as_ref() } }
 }
 
 struct HitWidgetIter<'a> {
-  w_tree: Ref<'a, WidgetTree>,
+  w_tree: &'a WidgetTree,
   render_path: Vec<(WidgetId, Point)>,
   switch: Option<(WidgetId, Point)>,
   current: Option<(WidgetId, Point)>,
 }
 
 impl<'a> HitWidgetIter<'a> {
-  fn new(w_tree: Ref<'a, WidgetTree>, mut render_path: Vec<(WidgetId, Point)>) -> Self {
+  fn new(w_tree: &'a WidgetTree, mut render_path: Vec<(WidgetId, Point)>) -> Self {
     let current = render_path.pop();
     let switch = render_path.pop();
     Self {
