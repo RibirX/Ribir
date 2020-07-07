@@ -21,7 +21,7 @@ pub struct StatefulRef<T>(Stateful<T>);
 /// `Stateful` erased widget type info and used only as common identify type for
 /// all stateful widget.
 #[derive(Debug)]
-pub(crate) struct StatefulWidget {
+pub struct StatefulWidget {
   wid: WidgetId,
   widget: Rc<RefCell<BoxWidget>>,
 }
@@ -73,6 +73,13 @@ impl<T: Widget> Stateful<T> {
       widget,
       wid,
       _type: PhantomData,
+    }
+  }
+
+  pub(crate) fn into_widget(self) -> StatefulWidget {
+    StatefulWidget {
+      wid: self.wid,
+      widget: self.widget,
     }
   }
 }
@@ -156,8 +163,8 @@ mod tests {
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
     let cell_ref = {
       let t = Text("Hello".to_string());
-      let stateful = t.into_stateful(&ctx);
-      stateful.as_cell_ref()
+      let (_, cell_ref) = t.into_stateful(&ctx);
+      cell_ref
     };
     {
       cell_ref.borrow_mut().0 = "World!".to_string();

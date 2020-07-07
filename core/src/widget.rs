@@ -13,13 +13,16 @@ pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
 pub use layout::row_col_layout::RowColumn;
-pub use stateful::{Stateful, StatefulRef};
+pub use stateful::{Stateful, StatefulRef, StatefulWidget};
 pub use text::Text;
 pub mod events;
 use events::pointers::{PointerEvent, PointerEventType, PointerListener};
 pub use events::Event;
 
-/// The common behavior for widgets, also support to downcast to special widget.
+/// The common behavior of widgets, also support to downcast to special widget.
+/// In most of cases  needn't  directly implement `Widget` trait directly,
+/// should implement `CombinationWidget`, `RenderWidget` `SingleChildWidget` or
+/// `MultiChildWidget`.
 pub trait Widget: Debug + Any {
   /// classify this widget into one of four type widget, and return the
   /// reference.
@@ -39,11 +42,13 @@ pub trait Widget: Debug + Any {
 
   /// Convert a stateless widget to stateful, use it get a cell ref to modify
   /// the widget.
-  fn into_stateful(self, ctx: &BuildCtx) -> Stateful<Self>
+  fn into_stateful(self, ctx: &BuildCtx) -> (StatefulWidget, StatefulRef<Self>)
   where
     Self: Sized,
   {
-    Stateful::new(ctx.tree.clone(), self)
+    let stateful = Stateful::new(ctx.tree.clone(), self);
+    let cell_ref = stateful.as_cell_ref();
+    (stateful.into_widget(), cell_ref)
   }
 
   /// Assign a key to the widget to help framework to track if two widget is a
@@ -56,16 +61,8 @@ pub trait Widget: Debug + Any {
     KeyDetect::new(key, self.box_it())
   }
 
-  #[inline]
-  fn box_it(self) -> BoxWidget
-  where
-    Self: Sized,
-  {
-    BoxWidget {
-      widget: Box::new(self),
-    }
-  }
-
+  /// Used to specify the event handler for the pointer down event, which is
+  /// fired when the pointing device is initially pressed.
   #[inline]
   fn on_pointer_down<F>(self, handler: F) -> BoxWidget
   where
@@ -75,6 +72,8 @@ pub trait Widget: Debug + Any {
     listen_pointer_event(self.box_it(), PointerEventType::Down, handler)
   }
 
+  /// Used to specify the event handler for the pointer up event, which is
+  /// fired when the initially pressed pointing device is released.
   #[inline]
   fn on_pointer_up<F>(self, handler: F) -> BoxWidget
   where
@@ -84,6 +83,7 @@ pub trait Widget: Debug + Any {
     listen_pointer_event(self.box_it(), PointerEventType::Up, handler)
   }
 
+  /// Specify the event handler to process pointer move event.
   #[inline]
   fn on_pointer_move<F>(self, handler: F) -> BoxWidget
   where
@@ -93,6 +93,7 @@ pub trait Widget: Debug + Any {
     listen_pointer_event(self.box_it(), PointerEventType::Move, handler)
   }
 
+  /// Specify the event handler to process pointer cancel event.
   #[inline]
   fn on_pointer_cancel<F>(self, handler: F) -> BoxWidget
   where
@@ -176,9 +177,26 @@ pub struct BoxWidget {
   widget: Box<dyn Widget>,
 }
 
+pub trait BoxIt {
+  fn box_it(self) -> BoxWidget;
+}
+
 impl std::fmt::Debug for BoxWidget {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.widget.fmt(f) }
+}
+
+impl<W: Widget> BoxIt for W {
+  default fn box_it(self) -> BoxWidget {
+    BoxWidget {
+      widget: Box::new(self),
+    }
+  }
+}
+
+impl BoxIt for BoxWidget {
+  #[inline]
+  fn box_it(self) -> BoxWidget { self }
 }
 
 inherit_widget!(BoxWidget, widget);

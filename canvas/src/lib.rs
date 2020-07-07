@@ -11,6 +11,7 @@ pub mod wgpu_render;
 pub use crate::canvas::*;
 pub use color::Color;
 pub use layer::*;
+pub use mem_texture::MemTexture;
 pub use text_brush::*;
 pub use wgpu_render::*;
 

@@ -3,10 +3,7 @@ use crate::{
   prelude::*,
   widget::{events::dispatch::Dispatcher, widget_tree::*},
 };
-use canvas::{
-  surface::{PhysicSurface, Surface, TextureSurface},
-  Canvas, DeviceSize, WgpuRender,
-};
+use canvas::{surface::TextureSurface, Canvas, CanvasRender, DeviceSize, WgpuRender};
 use std::{cell::RefCell, rc::Rc};
 use winit::{
   event::WindowEvent,
@@ -16,18 +13,30 @@ use winit::{
 };
 
 /// Window is the root to represent.
-pub struct Window<W = NativeWindow, S: Surface = PhysicSurface> {
+pub struct Window<W = NativeWindow, R: CanvasRender = WgpuRender> {
   render_tree: Rc<RefCell<RenderTree>>,
   widget_tree: Rc<RefCell<WidgetTree>>,
   native_window: W,
   canvas: Canvas,
-  render: WgpuRender<S>,
+  render: R,
   dispatcher: Dispatcher,
 }
 
-pub type HeadlessWindow = Window<(), TextureSurface>;
+pub type HeadlessWindow = Window<(), WgpuRender<TextureSurface>>;
+pub type NoRenderWindow = Window<(), MockRender>;
 
-impl<W, S: Surface> Window<W, S> {
+pub struct MockRender;
+impl CanvasRender for MockRender {
+  fn draw(
+    &mut self,
+    _: &canvas::RenderData,
+    _: &mut canvas::MemTexture<u8>,
+    _: &mut canvas::MemTexture<u32>,
+  ) {
+  }
+}
+
+impl<W, R: CanvasRender> Window<W, R> {
   /// processes native events from this native window
   #[inline]
   pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
@@ -88,7 +97,7 @@ impl<W, S: Surface> Window<W, S> {
     ctx.mark_layout_dirty(root);
   }
 
-  fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: WgpuRender<S>) -> Self {
+  fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
     let render_tree: Rc<RefCell<RenderTree>> = <_>::default();
     let widget_tree: Rc<RefCell<WidgetTree>> = <_>::default();
     let wnd = Self {
@@ -160,13 +169,23 @@ impl HeadlessWindow {
     Self::new(root, (), canvas, render)
   }
 
-  /// Returns the position of the top-left hand corner of the window's client
-  /// area relative to the top-left hand corner of the desktop.
   #[inline]
   pub fn inner_position(&self) -> DevicePoint { DevicePoint::new(20, 20) }
 
-  /// Returns the position of the top-left hand corner of the window relative to
-  /// the  top-left hand corner of the desktop.
+  #[inline]
+  pub fn outer_position(&self) -> DevicePoint { DevicePoint::new(0, 0) }
+}
+
+impl NoRenderWindow {
+  pub fn without_render(root: BoxWidget, size: DeviceSize) -> Self {
+    let canvas = Canvas::new(size);
+    let render = MockRender;
+    Self::new(root, (), canvas, render)
+  }
+
+  #[inline]
+  pub fn inner_position(&self) -> DevicePoint { DevicePoint::new(20, 20) }
+
   #[inline]
   pub fn outer_position(&self) -> DevicePoint { DevicePoint::new(0, 0) }
 }
