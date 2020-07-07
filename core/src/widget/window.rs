@@ -4,7 +4,7 @@ use crate::{
   widget::{events::dispatch::Dispatcher, widget_tree::*},
 };
 use canvas::{surface::TextureSurface, Canvas, CanvasRender, DeviceSize, WgpuRender};
-use std::{cell::RefCell, rc::Rc};
+use std::{pin::Pin, ptr::NonNull};
 use winit::{
   event::WindowEvent,
   event_loop::EventLoop,
@@ -14,8 +14,8 @@ use winit::{
 
 /// Window is the root to represent.
 pub struct Window<W = NativeWindow, R: CanvasRender = WgpuRender> {
-  render_tree: Rc<RefCell<RenderTree>>,
-  widget_tree: Rc<RefCell<WidgetTree>>,
+  render_tree: Pin<Box<RenderTree>>,
+  widget_tree: Pin<Box<WidgetTree>>,
   native_window: W,
   canvas: Canvas,
   render: R,
@@ -61,8 +61,7 @@ impl<W, R: CanvasRender> Window<W, R> {
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    let render_tree = self.render_tree.borrow();
-    if let Some(ctx) = PaintingContext::new(&render_tree) {
+    if let Some(ctx) = PaintingContext::new(&self.render_tree) {
       let layer = ctx.draw();
       let mut frame = self.canvas.next_frame(&mut self.render);
       frame.compose_2d_layer(layer);
@@ -72,17 +71,23 @@ impl<W, R: CanvasRender> Window<W, R> {
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed. The render tree will also
   /// react widget tree's change.
+  #[inline]
   fn tree_repair(&mut self) {
-    let mut render_tree = self.render_tree.borrow_mut();
-    self.widget_tree.borrow_mut().repair(&mut render_tree);
+    unsafe {
+      self
+        .widget_tree
+        .as_mut()
+        .get_unchecked_mut()
+        .repair(self.render_tree.as_mut().get_unchecked_mut());
+    }
   }
 
   /// Layout the render tree as needed
   fn layout(&mut self) {
-    let mut tree = &mut self.render_tree.borrow_mut();
-    let mut_ptr = (&mut tree as &mut RenderTree) as *mut RenderTree;
+    let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
+    let mut_ptr = tree as *mut RenderTree;
     let root = tree.root().unwrap();
-    let mut ctx = RenderCtx::new(&mut tree, &mut self.canvas);
+    let mut ctx = RenderCtx::new(tree, &mut self.canvas);
     unsafe {
       root
         .get_mut(&mut *mut_ptr)
@@ -91,30 +96,34 @@ impl<W, R: CanvasRender> Window<W, R> {
   }
 
   fn mark_dirty(&mut self) {
-    let mut tree = self.render_tree.borrow_mut();
+    let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
     let root = tree.root().unwrap();
-    let mut ctx = RenderCtx::new(&mut tree, &mut self.canvas);
+    let mut ctx = RenderCtx::new(tree, &mut self.canvas);
     ctx.mark_layout_dirty(root);
   }
 
   fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
-    let render_tree: Rc<RefCell<RenderTree>> = <_>::default();
-    let widget_tree: Rc<RefCell<WidgetTree>> = <_>::default();
-    let wnd = Self {
+    let render_tree = Box::pin(RenderTree::default());
+
+    let widget_tree = Box::pin(WidgetTree::default());
+    let mut wnd = Self {
       native_window: wnd,
-      dispatcher: Dispatcher::new(render_tree.clone(), widget_tree.clone()),
+      dispatcher: Dispatcher::new(
+        NonNull::from(render_tree.as_ref().get_ref()),
+        NonNull::from(widget_tree.as_ref().get_ref()),
+      ),
       render_tree,
       widget_tree,
       canvas,
       render,
     };
 
-    {
-      let mut render_tree = wnd.render_tree.borrow_mut();
+    unsafe {
       wnd
         .widget_tree
-        .borrow_mut()
-        .set_root(root.box_it(), &mut render_tree);
+        .as_mut()
+        .get_unchecked_mut()
+        .set_root(root.box_it(), wnd.render_tree.as_mut().get_unchecked_mut());
     }
 
     wnd

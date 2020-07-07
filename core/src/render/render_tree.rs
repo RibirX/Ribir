@@ -213,3 +213,5 @@ impl RenderId {
     tree.box_place.entry(self).or_insert_with(Rect::zero).size = size;
   }
 }
+
+impl !Unpin for RenderTree {}
