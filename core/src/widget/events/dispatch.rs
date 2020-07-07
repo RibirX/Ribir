@@ -208,7 +208,7 @@ impl<'a> Iterator for HitWidgetIter<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::window::HeadlessWindow;
+  use crate::widget::window::NoRenderWindow;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::MouseButton;
 
@@ -232,7 +232,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
     let root = record_pointer(event_record.clone(), RowColumn::row(vec![record]));
-    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -267,7 +267,7 @@ mod tests {
   fn mouse_buttons() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -319,7 +319,7 @@ mod tests {
   fn different_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let mut wnd = HeadlessWindow::headless(root, DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -368,7 +368,7 @@ mod tests {
       let stack = event_record.clone();
       move |e| stack.borrow_mut().push(e.clone())
     });
-    let mut wnd = HeadlessWindow::headless(root.box_it(), DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), DeviceSize::new(100, 100));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {

@@ -34,7 +34,7 @@ impl PointerEvent {
       twist: 0.,
       point_type: PointerType::Mouse,
       is_primary: true,
-      buttons: btn.into(),
+      buttons: btn,
       common: event,
     }
   }
