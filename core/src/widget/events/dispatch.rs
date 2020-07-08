@@ -77,9 +77,13 @@ impl Dispatcher {
     }
   }
 
-  fn bubble_mouse_pointer<D: Fn(&PointerListener, &PointerEvent)>(&mut self, dispatch: D) {
+  fn bubble_mouse_pointer<D: FnMut(&mut PointerListener, &PointerEvent)>(
+    &mut self,
+    mut dispatch: D,
+  ) {
     let mut pointer = None;
 
+    let mut w_tree = self.widget_tree;
     self.hit_widget_iter().all(|(wid, pos)| {
       let event = pointer.get_or_insert_with(|| {
         PointerEvent::from_mouse(
@@ -91,32 +95,30 @@ impl Dispatcher {
         )
       });
       event.position = pos;
-      Self::try_inherit_dispatch(wid, self.widget_tree_ref(), &dispatch, event);
+      Self::try_inherit_dispatch(wid, unsafe { w_tree.as_mut() }, &mut dispatch, event);
       !event.as_mut().cancel_bubble.get()
     });
   }
 
-  fn try_inherit_dispatch<T: Widget, E: std::convert::AsMut<EventCommon>, H: Fn(&T, &E)>(
+  fn try_inherit_dispatch<T: Widget, E: std::convert::AsMut<EventCommon>, H: FnMut(&mut T, &E)>(
     wid: WidgetId,
-    tree: &WidgetTree,
-    handler: &H,
+    tree: &mut WidgetTree,
+    handler: &mut H,
     event: &mut E,
   ) {
-    if let Some(w) = wid.get(tree) {
-      let mut event_widget = w.downcast_ref::<T>();
-      while let Some(w) = event_widget {
-        if event.as_mut().cancel_bubble.get() {
-          break;
-        }
-
-        let common = event.as_mut();
-        common.current_target = wid;
-        common.composed_path.push(wid);
-        handler(w, event);
-        event_widget = w
-          .as_inherit()
-          .and_then(|w| w.base_widget().downcast_ref::<T>());
+    let mut event_widget = wid.get_mut(tree).and_then(|w| w.downcast_mut::<T>());
+    while let Some(w) = event_widget {
+      if event.as_mut().cancel_bubble.get() {
+        break;
       }
+
+      let common = event.as_mut();
+      common.current_target = wid;
+      common.composed_path.push(wid);
+      handler(w, event);
+      event_widget = w
+        .as_inherit_mut()
+        .and_then(|w| w.base_widget_mut().downcast_mut::<T>());
     }
   }
 
@@ -160,9 +162,6 @@ impl Dispatcher {
 
     path
   }
-
-  #[inline]
-  fn widget_tree_ref(&self) -> &WidgetTree { unsafe { self.widget_tree.as_ref() } }
 
   #[inline]
   fn render_tree_ref(&self) -> &RenderTree { unsafe { self.render_tree.as_ref() } }

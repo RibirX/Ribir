@@ -7,7 +7,7 @@ pub struct RecursiveRow {
 }
 
 impl CombinationWidget for RecursiveRow {
-  fn build(&self) -> BoxWidget {
+  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     RowColumn::row(
       (0..self.width)
         .map(|_| {

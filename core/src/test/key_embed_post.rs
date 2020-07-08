@@ -14,7 +14,7 @@ struct EmbedKeyPost {
 }
 
 impl CombinationWidget for EmbedKeyPost {
-  fn build(&self) -> BoxWidget {
+  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     let mut children = vec![
       Text(self.title.borrow().to_string()).with_key(0).box_it(),
       Text(self.author.to_string()).with_key(1).box_it(),

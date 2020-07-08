@@ -51,11 +51,14 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
 }
 
-pub(crate) fn add_listener<F: Fn(&E) + 'static, E: std::convert::AsRef<EventCommon> + 'static>(
-  holder: &mut Option<Box<dyn Fn(&E)>>,
-  handler: F,
+pub(crate) fn add_listener<
+  F: FnMut(&E) + 'static,
+  E: std::convert::AsRef<EventCommon> + 'static,
+>(
+  holder: &mut Option<Box<dyn FnMut(&E)>>,
+  mut handler: F,
 ) {
-  *holder = if let Some(already) = holder.take() {
+  *holder = if let Some(mut already) = holder.take() {
     Some(Box::new(move |event| {
       already(event);
       if !event.as_ref().cancel_bubble.get() {
@@ -68,7 +71,7 @@ pub(crate) fn add_listener<F: Fn(&E) + 'static, E: std::convert::AsRef<EventComm
 }
 
 pub(crate) fn dispatch_event<E: std::convert::AsRef<EventCommon> + 'static>(
-  holder: &Option<Box<dyn Fn(&E)>>,
+  holder: &mut Option<Box<dyn FnMut(&E)>>,
   event: &E,
 ) {
   if let Some(handler) = holder {
