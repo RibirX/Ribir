@@ -108,10 +108,7 @@ impl<W, R: CanvasRender> Window<W, R> {
     let widget_tree = Box::pin(WidgetTree::default());
     let mut wnd = Self {
       native_window: wnd,
-      dispatcher: Dispatcher::new(
-        NonNull::from(render_tree.as_ref().get_ref()),
-        NonNull::from(widget_tree.as_ref().get_ref()),
-      ),
+      dispatcher: Dispatcher::new(NonNull::from(&*render_tree), NonNull::from(&*widget_tree)),
       render_tree,
       widget_tree,
       canvas,

@@ -1,16 +1,15 @@
 use crate::{prelude::*, render::render_tree::*, util::TreeFormatter};
 use indextree::*;
 use std::{
-  cell::{Ref, RefCell, RefMut},
   collections::{HashMap, HashSet},
-  rc::Rc,
+  pin::Pin,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 #[derive(Default)]
 pub struct WidgetTree {
-  arena: Arena<WidgetNode>,
+  arena: Arena<BoxWidget>,
   root: Option<WidgetId>,
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
@@ -35,17 +34,11 @@ impl WidgetTree {
   }
 
   #[inline]
-  pub fn new_node<N: Into<WidgetNode>>(&mut self, data: N) -> WidgetId {
-    let data = data.into();
-
+  pub fn new_node<W: Widget>(&mut self, widget: W) -> WidgetId {
     // stateful widget is a preallocate node, should not allocate again.
-    let id = {
-      let widget = data.borrow();
-      widget
-        .downcast_ref::<super::stateful::StatefulWidget>()
-        .map(|stateful| stateful.id())
-    };
-    id.unwrap_or_else(|| WidgetId(self.arena.new_node(data)))
+    Widget::downcast_ref::<super::stateful::StatefulWidget>(&widget)
+      .map(|stateful| stateful.id())
+      .unwrap_or_else(|| WidgetId(self.arena.new_node(widget.box_it())))
   }
 
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.
@@ -59,10 +52,12 @@ impl WidgetTree {
 
     while let Some((wid, parent_rid)) = stack.pop() {
       let (children, render) = {
-        let mut widget = wid.assert_get_mut(self);
         (
-          widget.take_children(),
-          widget.as_render().map(|r| r.create_render_object()),
+          wid.take_children(self),
+          wid
+            .get_mut(self)
+            .and_then(|w| w.as_render())
+            .map(|r| r.create_render_object()),
         )
       };
 
@@ -98,7 +93,7 @@ impl WidgetTree {
       let mut stack = vec![need_build];
 
       while let Some(need_build) = stack.pop() {
-        let children = need_build.assert_get_mut(self).take_children();
+        let children = need_build.take_children(self);
 
         if let Some(mut children) = children {
           if children.len() == 1 {
@@ -160,7 +155,7 @@ impl WidgetTree {
         .arena
         .get_mut(node.0)
         .expect("Widget not exist in the tree.")
-        .get_mut() = widget.into();
+        .get_mut() = widget;
       stack.push(node);
     } else {
       let parent_id = node.parent(&self).expect("parent should exists!");
@@ -250,16 +245,16 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub fn get(self, tree: &WidgetTree) -> Option<WidgetRef> {
-    tree.arena.get(self.0).map(|node| node.get().borrow())
+  pub fn get(self, tree: &WidgetTree) -> Option<&dyn Widget> {
+    tree.arena.get(self.0).map(|node| node.get() as &dyn Widget)
   }
 
   /// Returns a mutable reference to the node data.
-  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<WidgetRefMut> {
+  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut dyn Widget> {
     tree
       .arena
       .get_mut(self.0)
-      .map(|node| node.get_mut().borrow_mut())
+      .map(|node| node.get_mut() as &mut dyn Widget)
   }
 
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)
@@ -336,7 +331,7 @@ impl WidgetId {
     self.0.descendants(arena).map(WidgetId).for_each(|wid| {
       if arena
         .get(wid.0)
-        .map_or(false, |node| node.get().borrow().classify().is_render())
+        .map_or(false, |node| node.get().classify().is_render())
       {
         widget_to_render.remove(&wid);
       }
@@ -377,7 +372,23 @@ impl WidgetId {
     wid
   }
 
-  fn node_feature<F: Fn(&Node<WidgetNode>) -> Option<NodeId>>(
+  fn take_children(self, tree: &mut WidgetTree) -> Option<Vec<BoxWidget>> {
+    let (tree1, tree2) = unsafe {
+      let ptr = tree as *mut WidgetTree;
+      (&mut *ptr, &mut *ptr)
+    };
+    self.get_mut(tree1).and_then(|w| match w.classify_mut() {
+      WidgetClassifyMut::Combination(c) => {
+        let mut ctx = BuildCtx::new(unsafe { Pin::new_unchecked(tree2) }, self);
+        Some(vec![c.build(&mut ctx)])
+      }
+      WidgetClassifyMut::SingleChild(r) => Some(vec![r.take_child()]),
+      WidgetClassifyMut::MultiChild(multi) => Some(multi.take_children()),
+      WidgetClassifyMut::Render(_) => None,
+    })
+  }
+
+  fn node_feature<F: Fn(&Node<BoxWidget>) -> Option<NodeId>>(
     self,
     tree: &WidgetTree,
     method: F,
@@ -385,25 +396,13 @@ impl WidgetId {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
   }
 
-  fn assert_get(self, tree: &WidgetTree) -> WidgetRef {
+  fn assert_get(self, tree: &WidgetTree) -> &dyn Widget {
     self.get(tree).expect("Widget not exists in the `tree`")
-  }
-
-  fn assert_get_mut(self, tree: &mut WidgetTree) -> WidgetRefMut {
-    self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }
 
 impl dyn Widget {
   fn key(&self) -> Option<&Key> { self.downcast_ref::<KeyDetect>().map(|k| k.key()) }
-  fn take_children(&mut self) -> Option<Vec<BoxWidget>> {
-    match self.classify_mut() {
-      WidgetClassifyMut::Combination(c) => Some(vec![c.build()]),
-      WidgetClassifyMut::SingleChild(r) => Some(vec![r.take_child()]),
-      WidgetClassifyMut::MultiChild(multi) => Some(multi.take_children()),
-      WidgetClassifyMut::Render(_) => None,
-    }
-  }
 
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self.classify() {
@@ -413,79 +412,6 @@ impl dyn Widget {
       WidgetClassify::Render(r) => Some(r.as_render()),
     }
   }
-}
-
-pub enum WidgetNode {
-  Rc(Rc<RefCell<BoxWidget>>),
-  Widget(BoxWidget),
-}
-pub enum WidgetRef<'a> {
-  BorrowRef(Ref<'a, dyn Widget>),
-  Ref(&'a dyn Widget),
-}
-
-pub enum WidgetRefMut<'a> {
-  BorrowRefMut(RefMut<'a, dyn Widget>),
-  RefMut(&'a mut dyn Widget),
-}
-
-impl std::fmt::Debug for WidgetNode {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.borrow().fmt(f) }
-}
-impl WidgetNode {
-  fn borrow_mut(&mut self) -> WidgetRefMut {
-    match self {
-      WidgetNode::Rc(rc) => WidgetRefMut::BorrowRefMut(rc.borrow_mut()),
-      WidgetNode::Widget(w) => WidgetRefMut::RefMut(w),
-    }
-  }
-
-  fn borrow(&self) -> WidgetRef {
-    match self {
-      WidgetNode::Rc(rc) => WidgetRef::BorrowRef(rc.borrow()),
-      WidgetNode::Widget(w) => WidgetRef::Ref(w),
-    }
-  }
-}
-
-use std::ops::{Deref, DerefMut};
-impl<'a> Deref for WidgetRef<'a> {
-  type Target = dyn Widget;
-  fn deref(&self) -> &Self::Target {
-    match self {
-      WidgetRef::Ref(r) => *r,
-      WidgetRef::BorrowRef(r) => &**r,
-    }
-  }
-}
-
-impl<'a> Deref for WidgetRefMut<'a> {
-  type Target = dyn Widget;
-  fn deref(&self) -> &Self::Target {
-    match self {
-      WidgetRefMut::RefMut(r) => *r,
-      WidgetRefMut::BorrowRefMut(r) => &**r,
-    }
-  }
-}
-
-impl<'a> DerefMut for WidgetRefMut<'a> {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    match self {
-      WidgetRefMut::RefMut(r) => *r,
-      WidgetRefMut::BorrowRefMut(r) => &mut **r,
-    }
-  }
-}
-
-impl From<BoxWidget> for WidgetNode {
-  #[inline]
-  fn from(w: BoxWidget) -> Self { WidgetNode::Widget(w) }
-}
-
-impl From<Rc<RefCell<BoxWidget>>> for WidgetNode {
-  #[inline]
-  fn from(w: Rc<RefCell<BoxWidget>>) -> Self { WidgetNode::Rc(w) }
 }
 
 impl !Unpin for WidgetTree {}

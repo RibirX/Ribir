@@ -66,7 +66,7 @@ pub trait Widget: Debug + Any {
   fn on_pointer_down<F>(self, handler: F) -> BoxWidget
   where
     Self: Sized,
-    F: Fn(&PointerEvent) + 'static,
+    F: FnMut(&PointerEvent) + 'static,
   {
     listen_pointer_event(self.box_it(), PointerEventType::Down, handler)
   }
@@ -107,7 +107,7 @@ pub trait Widget: Debug + Any {
 pub trait CombinationWidget: Debug {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self) -> BoxWidget;
+  fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
 }
 
 /// a widget has a child.
@@ -175,7 +175,7 @@ pub trait InheritWidget: Widget {
 }
 
 pub struct BoxWidget {
-  widget: Box<dyn Widget>,
+  pub(crate) widget: Box<dyn Widget>,
 }
 
 pub trait BoxIt {
@@ -204,7 +204,7 @@ inherit_widget!(BoxWidget, widget);
 
 impl dyn Widget {
   pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-    if (&*self).type_id() == TypeId::of::<T>() {
+    if Any::type_id(self) == TypeId::of::<T>() {
       let ptr = self as *mut dyn Widget as *mut T;
       // SAFETY: just checked whether we are pointing to the correct type, and we can
       // rely on that check for memory safety because we have implemented Any for
@@ -298,7 +298,7 @@ pub macro multi_child_widget_base_impl() {
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
 }
 
-fn listen_pointer_event<H: Fn(&PointerEvent) + 'static>(
+fn listen_pointer_event<H: FnMut(&PointerEvent) + 'static>(
   mut w: BoxWidget,
   event_type: PointerEventType,
   handler: H,

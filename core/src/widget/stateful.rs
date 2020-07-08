@@ -20,7 +20,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 pub struct StatefulPtr<T> {
   wid: WidgetId,
   tree: NonNull<widget_tree::WidgetTree>,
-  widget: NonNull<BoxWidget>,
+  widget: NonNull<dyn Widget>,
   _type: PhantomData<*const T>,
 }
 
@@ -36,7 +36,7 @@ pub struct StatefulPtr<T> {
 #[derive(Debug)]
 pub struct StatefulWidget {
   wid: WidgetId,
-  widget: NonNull<BoxWidget>,
+  widget: NonNull<dyn Widget>,
 }
 
 pub fn widget_into_stateful<W: Widget>(
@@ -44,13 +44,13 @@ pub fn widget_into_stateful<W: Widget>(
   ctx: &mut BuildCtx,
 ) -> (StatefulWidget, StatefulPtr<W>) {
   let box_widget = widget.box_it();
-  let widget = NonNull::from(&box_widget);
-  let wid = unsafe { ctx.tree.as_mut().new_node(box_widget) };
+  let widget = NonNull::from(&*box_widget.widget);
+  let wid = unsafe { ctx.tree.as_mut().get_unchecked_mut() }.new_node(box_widget);
   (
     StatefulWidget { wid, widget },
     StatefulPtr {
       wid,
-      tree: ctx.tree,
+      tree: NonNull::from(&*ctx.tree),
       widget,
       _type: PhantomData,
     },
@@ -83,12 +83,12 @@ impl<T: 'static> std::ops::DerefMut for StatefulPtr<T> {
   }
 }
 
-impl std::borrow::Borrow<dyn Widget> for NonNull<BoxWidget> {
+impl std::borrow::Borrow<dyn Widget> for NonNull<dyn Widget> {
   #[inline]
   fn borrow(&self) -> &dyn Widget { unsafe { self.as_ref() } }
 }
 
-impl std::borrow::BorrowMut<dyn Widget> for NonNull<BoxWidget> {
+impl std::borrow::BorrowMut<dyn Widget> for NonNull<dyn Widget> {
   #[inline]
   fn borrow_mut(&mut self) -> &mut dyn Widget { unsafe { self.as_mut() } }
 }
@@ -99,10 +99,12 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let tree = widget_tree::WidgetTree::default();
-    let mut ctx = BuildCtx {
-      tree: NonNull::from(&tree),
-    };
+    let mut tree = Box::pin(widget_tree::WidgetTree::default());
+    #[warn(dead_code)]
+    let mut ctx = BuildCtx::new(tree.as_mut(), unsafe {
+      let id = std::mem::MaybeUninit::uninit();
+      id.assume_init()
+    });
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
     let mut cell_ref = {
