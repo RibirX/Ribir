@@ -106,7 +106,7 @@ impl Dispatcher {
     handler: &mut H,
     event: &mut E,
   ) {
-    let mut event_widget = wid.get_mut(tree).and_then(|w| w.downcast_mut::<T>());
+    let mut event_widget = wid.get_mut(tree).and_then(|w| w.dynamic_mut::<T>());
     while let Some(w) = event_widget {
       if event.as_mut().cancel_bubble.get() {
         break;
@@ -118,7 +118,7 @@ impl Dispatcher {
       handler(w, event);
       event_widget = w
         .as_inherit_mut()
-        .and_then(|w| w.base_widget_mut().downcast_mut::<T>());
+        .and_then(|w| w.base_widget_mut().dynamic_mut::<T>());
     }
   }
 

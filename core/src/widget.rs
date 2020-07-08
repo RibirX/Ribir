@@ -47,7 +47,7 @@ pub trait Widget: Debug + Any {
   where
     Self: Sized,
   {
-    stateful::widget_into_stateful(self, ctx)
+    stateful::widget_into_stateful(self, ctx.tree.as_mut())
   }
 
   /// Assign a key to the widget to help framework to track if two widget is a
@@ -203,20 +203,8 @@ impl BoxIt for BoxWidget {
 inherit_widget!(BoxWidget, widget);
 
 impl dyn Widget {
-  pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-    if Any::type_id(self) == TypeId::of::<T>() {
-      let ptr = self as *mut dyn Widget as *mut T;
-      // SAFETY: just checked whether we are pointing to the correct type, and we can
-      // rely on that check for memory safety because we have implemented Any for
-      // all types; no other impls can exist as they would conflict with our impl.
-      unsafe { Some(&mut *ptr) }
-    } else {
-      self
-        .as_inherit_mut()
-        .and_then(|inherit| Widget::downcast_mut(inherit.base_widget_mut()))
-    }
-  }
-
+  /// Returns some reference to the boxed value if it is of type T, or None if
+  /// it isn't.
   pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
     if self.type_id() == TypeId::of::<T>() {
       let ptr = self as *const dyn Widget as *const T;
@@ -225,10 +213,44 @@ impl dyn Widget {
       // all types; no other impls can exist as they would conflict with our impl.
       unsafe { Some(&*ptr) }
     } else {
+      None
+    }
+  }
+
+  /// Returns some mutable reference to the boxed value if it is of type T, or
+  /// None if it isn't.
+  pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+    if Any::type_id(self) == TypeId::of::<T>() {
+      let ptr = self as *mut dyn Widget as *mut T;
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any for
+      // all types; no other impls can exist as they would conflict with our impl.
+      unsafe { Some(&mut *ptr) }
+    } else {
+      None
+    }
+  }
+
+  /// Returns some mutable reference to the boxed value if it or its **base
+  /// type** is of type T, or None if it isn't.
+  pub fn dynamic_mut<T: 'static>(&mut self) -> Option<&mut T> {
+    if self.downcast_mut::<T>().is_some() {
+      self.downcast_mut()
+    } else {
+      self
+        .as_inherit_mut()
+        .and_then(|inherit| inherit.base_widget_mut().dynamic_mut())
+    }
+  }
+
+  /// Returns some reference to the boxed value if it or its **base type** is of
+  /// type T, or None if it isn't.
+  pub fn dynamic_ref<T: 'static>(&self) -> Option<&T> {
+    self.downcast_ref().or_else(|| {
       self
         .as_inherit()
-        .and_then(|inherit| inherit.base_widget().downcast_ref())
-    }
+        .and_then(|inherit| inherit.base_widget().dynamic_ref())
+    })
   }
 }
 
@@ -303,7 +325,7 @@ fn listen_pointer_event<H: FnMut(&PointerEvent) + 'static>(
   event_type: PointerEventType,
   handler: H,
 ) -> BoxWidget {
-  if let Some(listener) = Widget::downcast_mut::<PointerListener>(&mut w) {
+  if let Some(listener) = Widget::dynamic_mut::<PointerListener>(&mut w) {
     listener.listen_on(event_type, handler);
     w.box_it()
   } else {
@@ -323,11 +345,34 @@ mod tests {
       .with_key(0)
       .on_pointer_down(|_| {});
 
-    assert!(Widget::downcast_ref::<KeyDetect>(&widget).is_some());
-    assert!(Widget::downcast_mut::<KeyDetect>(&mut widget).is_some());
-    assert!(Widget::downcast_ref::<PointerListener>(&widget).is_some());
-    assert!(Widget::downcast_mut::<PointerListener>(&mut widget).is_some());
-    assert!(Widget::downcast_ref::<Text>(&widget).is_some());
-    assert!(Widget::downcast_mut::<Text>(&mut widget).is_some());
+    assert!(Widget::dynamic_ref::<KeyDetect>(&widget).is_some());
+    assert!(Widget::dynamic_mut::<KeyDetect>(&mut widget).is_some());
+    assert!(Widget::dynamic_ref::<PointerListener>(&widget).is_some());
+    assert!(Widget::dynamic_mut::<PointerListener>(&mut widget).is_some());
+    assert!(Widget::dynamic_ref::<Text>(&widget).is_some());
+    assert!(Widget::dynamic_mut::<Text>(&mut widget).is_some());
+  }
+
+  #[test]
+  fn downcast_cast() {
+    let mut widget: BoxWidget = Text("hello".to_string())
+      .with_key(0)
+      .on_pointer_down(|_| {});
+
+    assert!(Widget::downcast_ref::<PointerListener>(&widget).is_none());
+    assert!(Widget::downcast_mut::<PointerListener>(&mut widget).is_none());
+    assert!(Widget::downcast_ref::<KeyDetect>(&widget).is_none());
+    assert!(Widget::downcast_mut::<KeyDetect>(&mut widget).is_none());
+    assert!(Widget::downcast_ref::<Text>(&widget).is_none());
+    assert!(Widget::downcast_mut::<Text>(&mut widget).is_none());
+
+    let base = widget.base_widget();
+    assert!(base.downcast_ref::<PointerListener>().is_some());
+    assert!(base.downcast_ref::<KeyDetect>().is_none());
+    assert!(base.downcast_ref::<Text>().is_none());
+    let base_mut = widget.base_widget_mut();
+    assert!(base_mut.downcast_mut::<PointerListener>().is_some());
+    assert!(base_mut.downcast_mut::<KeyDetect>().is_none());
+    assert!(base_mut.downcast_mut::<Text>().is_none());
   }
 }

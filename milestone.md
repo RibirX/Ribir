@@ -31,8 +31,8 @@
 - [ ] event  
   - [ ] window event
   - [ ] event 
-    - [ ] event loop
-    - [ ] bubbling framework
+    - [x] event loop
+    - [x] bubbling framework
     - [ ] event type
       - [ ] point event ?
       - [ ] window event ?

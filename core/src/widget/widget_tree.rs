@@ -36,7 +36,7 @@ impl WidgetTree {
   #[inline]
   pub fn new_node<W: Widget>(&mut self, widget: W) -> WidgetId {
     // stateful widget is a preallocate node, should not allocate again.
-    Widget::downcast_ref::<super::stateful::StatefulWidget>(&widget)
+    Widget::dynamic_ref::<super::stateful::StatefulWidget>(&widget)
       .map(|stateful| stateful.id())
       .unwrap_or_else(|| WidgetId(self.arena.new_node(widget.box_it())))
   }
@@ -402,7 +402,7 @@ impl WidgetId {
 }
 
 impl dyn Widget {
-  fn key(&self) -> Option<&Key> { self.downcast_ref::<KeyDetect>().map(|k| k.key()) }
+  fn key(&self) -> Option<&Key> { self.dynamic_ref::<KeyDetect>().map(|k| k.key()) }
 
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self.classify() {
