@@ -1,5 +1,5 @@
 use crate::{prelude::*, widget::inherit_widget};
-use std::{marker::PhantomData, ptr::NonNull};
+use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
 
 /// A pointer of stateful widget, can use it to directly access and modify
 /// stateful widget.
@@ -41,16 +41,16 @@ pub struct StatefulWidget {
 
 pub fn widget_into_stateful<W: Widget>(
   widget: W,
-  ctx: &mut BuildCtx,
+  mut tree: Pin<&mut widget_tree::WidgetTree>,
 ) -> (StatefulWidget, StatefulPtr<W>) {
   let box_widget = widget.box_it();
   let widget = NonNull::from(&*box_widget.widget);
-  let wid = unsafe { ctx.tree.as_mut().get_unchecked_mut() }.new_node(box_widget);
+  let wid = unsafe { tree.as_mut().get_unchecked_mut() }.new_node(box_widget);
   (
     StatefulWidget { wid, widget },
     StatefulPtr {
       wid,
-      tree: NonNull::from(&*ctx.tree),
+      tree: NonNull::from(tree.into_ref().get_ref()),
       widget,
       _type: PhantomData,
     },
@@ -69,7 +69,7 @@ impl<T: 'static> std::ops::Deref for StatefulPtr<T> {
   #[inline]
   fn deref(&self) -> &Self::Target {
     unsafe { self.widget.as_ref() as &dyn Widget }
-      .downcast_ref::<T>()
+      .dynamic_ref::<T>()
       .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
   }
 }
@@ -78,7 +78,7 @@ impl<T: 'static> std::ops::DerefMut for StatefulPtr<T> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     self.wid.mark_changed(unsafe { self.tree.as_mut() });
     unsafe { self.widget.as_mut() as &mut dyn Widget }
-      .downcast_mut::<T>()
+      .dynamic_mut::<T>()
       .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
   }
 }
@@ -100,21 +100,27 @@ mod tests {
   #[test]
   fn smoke() {
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    #[warn(dead_code)]
-    let mut ctx = BuildCtx::new(tree.as_mut(), unsafe {
-      let id = std::mem::MaybeUninit::uninit();
-      id.assume_init()
-    });
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let mut cell_ref = {
-      let t = Text("Hello".to_string());
-      let (_, cell_ref) = t.into_stateful(&mut ctx);
-      cell_ref
-    };
+    let (_, mut cell_ref) = widget_into_stateful(Text("Hello".to_string()), tree.as_mut());
     {
       cell_ref.0 = "World!".to_string();
     }
     assert!(tree.changed_widgets.get(&cell_ref.wid).is_some());
+  }
+
+  #[test]
+  fn inherit_from_stateful() {
+    let mut render_tree = render_tree::RenderTree::default();
+    let mut tree = Box::pin(widget_tree::WidgetTree::default());
+
+    let (stateful, _) = widget_into_stateful(Text("Hello".to_string()), tree.as_mut());
+    // now key widget inherit from stateful widget.
+    let key = stateful.with_key(1);
+    let tree = unsafe { tree.as_mut().get_unchecked_mut() };
+    let id = tree.set_root(key.box_it(), &mut render_tree);
+
+    let key_back = id.get_mut(tree).and_then(|w| w.dynamic_ref::<KeyDetect>());
+    assert!(key_back.is_some());
   }
 }
