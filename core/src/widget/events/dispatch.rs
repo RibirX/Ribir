@@ -106,7 +106,9 @@ impl Dispatcher {
     handler: &mut H,
     event: &mut E,
   ) {
-    let mut event_widget = wid.get_mut(tree).and_then(|w| w.dynamic_mut::<T>());
+    let mut event_widget = wid
+      .get_mut(tree)
+      .and_then(|w| Widget::dynamic_cast_mut::<T>(w));
     while let Some(w) = event_widget {
       if event.as_mut().cancel_bubble.get() {
         break;
@@ -118,7 +120,7 @@ impl Dispatcher {
       handler(w, event);
       event_widget = w
         .as_inherit_mut()
-        .and_then(|w| w.base_widget_mut().dynamic_mut::<T>());
+        .and_then(|w| w.base_widget_mut().dynamic_cast_mut::<T>());
     }
   }
 
@@ -356,19 +358,19 @@ mod tests {
   #[test]
   fn cancel_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let mut pointer = PointerListener::new(Text("pointer event test".to_string()).box_it());
-    pointer.listen_on(PointerEventType::Move, {
-      let stack = event_record.clone();
-      move |e: &PointerEvent| {
-        stack.borrow_mut().push(e.clone());
-        e.stop_bubbling();
-      }
-    });
-    let mut root = PointerListener::new(pointer.box_it());
-    root.listen_on(PointerEventType::Down, {
-      let stack = event_record.clone();
-      move |e| stack.borrow_mut().push(e.clone())
-    });
+    let root = Text("pointer event test".to_string())
+      .on_pointer_move({
+        let stack = event_record.clone();
+        move |e: &PointerEvent| {
+          stack.borrow_mut().push(e.clone());
+          e.stop_bubbling();
+        }
+      })
+      .on_pointer_down({
+        let stack = event_record.clone();
+        move |e| stack.borrow_mut().push(e.clone())
+      });
+
     let mut wnd = NoRenderWindow::without_render(root.box_it(), DeviceSize::new(100, 100));
     wnd.render_ready();
 
