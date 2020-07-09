@@ -118,17 +118,29 @@ pub enum PointerEventType {
 }
 
 impl PointerListener {
-  pub fn new(w: BoxWidget) -> Self {
-    Self {
-      widget: w.box_it(),
-      on_pointer_down: None,
-      on_pointer_move: None,
-      on_pointer_up: None,
-      on_pointer_cancel: None,
-    }
+  pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
+    base: BoxWidget,
+    event_type: PointerEventType,
+    handler: H,
+  ) -> BoxWidget {
+    let mut pointer = inherit(
+      base,
+      |base| Self {
+        widget: base,
+        on_pointer_down: None,
+        on_pointer_move: None,
+        on_pointer_up: None,
+        on_pointer_cancel: None,
+      },
+      |_| {},
+    );
+    Widget::dynamic_cast_mut::<Self>(&mut pointer)
+      .unwrap()
+      .add_listener(event_type, handler);
+    pointer
   }
 
-  pub fn listen_on<F: FnMut(&PointerEvent) + 'static>(
+  fn add_listener<F: FnMut(&PointerEvent) + 'static>(
     &mut self,
     event_type: PointerEventType,
     handler: F,

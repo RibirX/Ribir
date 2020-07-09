@@ -13,7 +13,7 @@ pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
 pub use layout::row_col_layout::RowColumn;
-pub use stateful::{StatefulPtr, StatefulWidget};
+pub use stateful::{StateRef, StatefulWidget};
 pub use text::Text;
 pub mod events;
 use events::pointers::{PointerEvent, PointerEventType, PointerListener};
@@ -43,21 +43,21 @@ pub trait Widget: Debug + Any {
   /// Convert a stateless widget to stateful, use it get a cell ref to modify
   /// the widget.
   #[inline]
-  fn into_stateful(self, ctx: &mut BuildCtx) -> (StatefulWidget, StatefulPtr<Self>)
+  fn into_stateful(self, ctx: &mut BuildCtx) -> (BoxWidget, StateRef<Self>)
   where
     Self: Sized,
   {
-    stateful::widget_into_stateful(self, ctx.tree.as_mut())
+    StatefulWidget::stateful(self, ctx.tree.as_mut())
   }
 
   /// Assign a key to the widget to help framework to track if two widget is a
   /// same widget in two frame.
   #[inline]
-  fn with_key<K: Into<Key>>(self, key: K) -> KeyDetect
+  fn with_key<K: Into<Key>>(self, key: K) -> BoxWidget
   where
     Self: Sized,
   {
-    KeyDetect::new(key, self.box_it())
+    KeyDetect::with_key(key, self.box_it())
   }
 
   /// Used to specify the event handler for the pointer down event, which is
@@ -68,7 +68,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    listen_pointer_event(self.box_it(), PointerEventType::Down, handler)
+    PointerListener::listen_on(self.box_it(), PointerEventType::Down, handler)
   }
 
   /// Used to specify the event handler for the pointer up event, which is
@@ -79,7 +79,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: Fn(&PointerEvent) + 'static,
   {
-    listen_pointer_event(self.box_it(), PointerEventType::Up, handler)
+    PointerListener::listen_on(self.box_it(), PointerEventType::Up, handler)
   }
 
   /// Specify the event handler to process pointer move event.
@@ -89,7 +89,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: Fn(&PointerEvent) + 'static,
   {
-    listen_pointer_event(self.box_it(), PointerEventType::Move, handler)
+    PointerListener::listen_on(self.box_it(), PointerEventType::Move, handler)
   }
 
   /// Specify the event handler to process pointer cancel event.
@@ -99,7 +99,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: Fn(&PointerEvent) + 'static,
   {
-    listen_pointer_event(self.box_it(), PointerEventType::Cancel, handler)
+    PointerListener::listen_on(self.box_it(), PointerEventType::Cancel, handler)
   }
 }
 
@@ -168,7 +168,15 @@ impl<'a> WidgetClassifyMut<'a> {
 
 /// Use inherit method to implement a `Widget`, this is use to extend ability of
 /// a widget but not increase the widget number. Notice it's difference to class
-/// inherit, it's instance inherit.
+/// inherit, it's instance inherit. If the base widget already inherit a same
+/// type widget, the new widget not occur, should merge into the same type base
+/// widget. If the base widget is a `StatefulWidget`, the inherit should insert
+/// between `StatefulWidget` and its base widget, new widget inherit the base
+/// widget of `StatefulWidget` and `StatefulWidget` inherit the new widget.
+/// `StatefulWidget` is so special is because it's a preallocate widget in
+/// widget tree, so the widget inherit from it will be lost, so widget inherit
+/// it will be convert to be inherited by it. Base on the before two point, the
+/// inherit order are not guaranteed.
 pub trait InheritWidget: Widget {
   fn base_widget(&self) -> &dyn Widget;
   fn base_widget_mut(&mut self) -> &mut dyn Widget;
@@ -198,6 +206,32 @@ impl<W: Widget> BoxIt for W {
 impl BoxIt for BoxWidget {
   #[inline]
   fn box_it(self) -> BoxWidget { self }
+}
+
+/// A function help `InheritWidget` inherit `base` widget.
+///
+/// ## params
+/// *base*: the base widget want inherit from.
+/// *ctor_by_base*: construct widget with the base widget should really inherit
+/// from.
+pub fn inherit<T: InheritWidget, C, M>(
+  mut base: BoxWidget,
+  mut ctor_by_base: C,
+  mut merge: M,
+) -> BoxWidget
+where
+  M: FnMut(&mut T),
+  C: FnMut(BoxWidget) -> T,
+{
+  if let Some(already) = Widget::dynamic_cast_mut::<T>(&mut base) {
+    merge(already);
+    base
+  } else if let Some(stateful) = Widget::dynamic_cast_mut::<StatefulWidget>(&mut base) {
+    stateful.replace_base_with(|base| ctor_by_base(base).box_it());
+    base
+  } else {
+    ctor_by_base(base).box_it()
+  }
 }
 
 inherit_widget!(BoxWidget, widget);
@@ -233,23 +267,23 @@ impl dyn Widget {
 
   /// Returns some mutable reference to the boxed value if it or its **base
   /// type** is of type T, or None if it isn't.
-  pub fn dynamic_mut<T: 'static>(&mut self) -> Option<&mut T> {
+  pub fn dynamic_cast_mut<T: 'static>(&mut self) -> Option<&mut T> {
     if self.downcast_mut::<T>().is_some() {
       self.downcast_mut()
     } else {
       self
         .as_inherit_mut()
-        .and_then(|inherit| inherit.base_widget_mut().dynamic_mut())
+        .and_then(|inherit| inherit.base_widget_mut().dynamic_cast_mut())
     }
   }
 
   /// Returns some reference to the boxed value if it or its **base type** is of
   /// type T, or None if it isn't.
-  pub fn dynamic_ref<T: 'static>(&self) -> Option<&T> {
+  pub fn dynamic_cast_ref<T: 'static>(&self) -> Option<&T> {
     self.downcast_ref().or_else(|| {
       self
         .as_inherit()
-        .and_then(|inherit| inherit.base_widget().dynamic_ref())
+        .and_then(|inherit| inherit.base_widget().dynamic_cast_ref())
     })
   }
 }
@@ -264,19 +298,7 @@ pub macro inherit_widget($ty: ty, $base_widget: ident) {
     fn base_widget_mut(&mut self) -> &mut dyn Widget { self.$base_widget.borrow_mut() }
   }
 
-  impl Widget for $ty {
-    #[inline]
-    fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
-
-    #[inline]
-    fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
-
-    #[inline]
-    fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
-
-    #[inline]
-    fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
-  }
+  impl_widget_for_inherit_widget!($ty);
 }
 
 /// We should also implement Widget for RenderWidgetSafety, SingleChildWidget
@@ -320,21 +342,21 @@ pub macro multi_child_widget_base_impl() {
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
 }
 
-fn listen_pointer_event<H: FnMut(&PointerEvent) + 'static>(
-  mut w: BoxWidget,
-  event_type: PointerEventType,
-  handler: H,
-) -> BoxWidget {
-  if let Some(listener) = Widget::dynamic_mut::<PointerListener>(&mut w) {
-    listener.listen_on(event_type, handler);
-    w.box_it()
-  } else {
-    let mut pointer = PointerListener::new(w);
-    pointer.listen_on(event_type, handler);
-    pointer.box_it()
+pub macro impl_widget_for_inherit_widget($ty: ty) {
+  impl Widget for $ty {
+    #[inline]
+    fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
+
+    #[inline]
+    fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
+
+    #[inline]
+    fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
+
+    #[inline]
+    fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
   }
 }
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -345,12 +367,12 @@ mod tests {
       .with_key(0)
       .on_pointer_down(|_| {});
 
-    assert!(Widget::dynamic_ref::<KeyDetect>(&widget).is_some());
-    assert!(Widget::dynamic_mut::<KeyDetect>(&mut widget).is_some());
-    assert!(Widget::dynamic_ref::<PointerListener>(&widget).is_some());
-    assert!(Widget::dynamic_mut::<PointerListener>(&mut widget).is_some());
-    assert!(Widget::dynamic_ref::<Text>(&widget).is_some());
-    assert!(Widget::dynamic_mut::<Text>(&mut widget).is_some());
+    assert!(Widget::dynamic_cast_ref::<KeyDetect>(&widget).is_some());
+    assert!(Widget::dynamic_cast_mut::<KeyDetect>(&mut widget).is_some());
+    assert!(Widget::dynamic_cast_ref::<PointerListener>(&widget).is_some());
+    assert!(Widget::dynamic_cast_mut::<PointerListener>(&mut widget).is_some());
+    assert!(Widget::dynamic_cast_ref::<Text>(&widget).is_some());
+    assert!(Widget::dynamic_cast_mut::<Text>(&mut widget).is_some());
   }
 
   #[test]

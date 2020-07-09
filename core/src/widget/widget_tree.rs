@@ -34,11 +34,11 @@ impl WidgetTree {
   }
 
   #[inline]
-  pub fn new_node<W: Widget>(&mut self, widget: W) -> WidgetId {
+  pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
     // stateful widget is a preallocate node, should not allocate again.
-    Widget::dynamic_ref::<super::stateful::StatefulWidget>(&widget)
+    Widget::dynamic_cast_ref::<super::stateful::StatefulWidget>(&widget)
       .map(|stateful| stateful.id())
-      .unwrap_or_else(|| WidgetId(self.arena.new_node(widget.box_it())))
+      .unwrap_or_else(|| WidgetId(self.arena.new_node(widget)))
   }
 
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.
@@ -56,7 +56,7 @@ impl WidgetTree {
           wid.take_children(self),
           wid
             .get_mut(self)
-            .and_then(|w| w.as_render())
+            .and_then(|w| Widget::as_render(w))
             .map(|r| r.create_render_object()),
         )
       };
@@ -124,7 +124,7 @@ impl WidgetTree {
         .get(wid)
         .expect("Changed widget should always render widget!");
 
-      let safety = widget.as_render().expect("Must be a render widget!");
+      let safety = Widget::as_render(widget).expect("Must be a render widget!");
 
       render_id
         .get_mut(render_tree)
@@ -145,7 +145,7 @@ impl WidgetTree {
     render_tree: &mut RenderTree,
   ) {
     let same_key = Widget::key(&widget)
-      .and_then(|key| node.get(self).map(|w| Some(key) == w.key()))
+      .and_then(|key| node.get(self).map(|w| Some(key) == Widget::key(w)))
       .unwrap_or(false);
     if same_key {
       if widget.classify().is_render() {
@@ -181,7 +181,7 @@ impl WidgetTree {
     while let Some(id) = child {
       child = id.next_sibling(self);
 
-      let key = id.get(self).and_then(|w| w.key().cloned());
+      let key = id.get(self).and_then(|w| Widget::key(w).cloned());
       if let Some(key) = key {
         id.detach(self);
         key_children.insert(key, id);
@@ -245,16 +245,13 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub fn get(self, tree: &WidgetTree) -> Option<&dyn Widget> {
-    tree.arena.get(self.0).map(|node| node.get() as &dyn Widget)
+  pub fn get(self, tree: &WidgetTree) -> Option<&BoxWidget> {
+    tree.arena.get(self.0).map(|node| node.get())
   }
 
   /// Returns a mutable reference to the node data.
-  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut dyn Widget> {
-    tree
-      .arena
-      .get_mut(self.0)
-      .map(|node| node.get_mut() as &mut dyn Widget)
+  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut BoxWidget> {
+    tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)
@@ -396,13 +393,17 @@ impl WidgetId {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
   }
 
-  fn assert_get(self, tree: &WidgetTree) -> &dyn Widget {
+  pub fn assert_get(self, tree: &WidgetTree) -> &BoxWidget {
     self.get(tree).expect("Widget not exists in the `tree`")
+  }
+
+  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut BoxWidget {
+    self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }
 
 impl dyn Widget {
-  fn key(&self) -> Option<&Key> { self.dynamic_ref::<KeyDetect>().map(|k| k.key()) }
+  fn key(&self) -> Option<&Key> { self.dynamic_cast_ref::<KeyDetect>().map(|k| k.key()) }
 
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self.classify() {
