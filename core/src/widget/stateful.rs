@@ -1,21 +1,21 @@
 use crate::prelude::*;
 use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
 
-/// A pointer of stateful widget, can use it to directly access and modify
+/// A reference of stateful widget, can use it to directly access and modify
 /// stateful widget.
 ///
-/// Remember it assume you changed the widget back this pointer if you mutably
-/// dereference this pointer. No matter if you really modify it.
+/// Remember it assume you changed the widget back of this reference if you
+/// mutably dereference this pointer. No matter if you really modify it.
 ///
 /// ## Safety
-/// Because `StatefulPtr` can only be constructed in `Combination::build`
-/// method, the only way to live longer than `build` method scope it capture by
-/// some closure of widget that construct in the same scope. And framework
-/// guarantee the widgets constructed in the same `build` method  have same
-/// lifetime. so the wid is always valid in its lifetime.
+/// Because `StateRef` can only be constructed in `Combination::build` method,
+/// the only way to live longer than `build` method scope it capture by some
+/// widget that construct in the same scope. And framework guarantee the widgets
+/// constructed in the same `build` method  have same lifetime. so the wid is
+/// always valid in its lifetime.
 ///
-/// Maybe panic if widget impl the `Drop` trait, and call some closure in its
-/// `drop` method,  the captured `StatefulPtr` maybe is dangling.
+/// Maybe panic if widget impl the `Drop` trait, and access `StateRef` in its
+/// `drop` method,  the captured `StateRef` maybe is dangling.
 #[derive(Clone, Copy)]
 pub struct StateRef<T> {
   wid: WidgetId,
@@ -23,8 +23,7 @@ pub struct StateRef<T> {
   _type: PhantomData<*const T>,
 }
 
-/// `Stateful` erased widget type info and used only as common identify type for
-/// all stateful widget.
+/// Hold the preallocated widget.
 ///
 /// ## Safety
 /// In safe code, `StatefulWidget` can only be constructed in
@@ -110,6 +109,16 @@ impl<T: 'static> std::ops::DerefMut for StateRef<T> {
 
     Widget::dynamic_cast_mut::<T>(w)
       .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
+  }
+}
+
+impl Drop for StatefulWidget {
+  fn drop(&mut self) {
+    let tree = unsafe { self.tree.as_mut() };
+    if Some(self.wid) != tree.root() && self.wid.parent(tree).is_none() {
+      log::warn!("The stateful widget not add into widget tree.");
+      self.wid.remove(tree);
+    }
   }
 }
 

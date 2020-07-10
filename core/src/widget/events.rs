@@ -1,4 +1,4 @@
-//! Holiday use special widgets to listens to corresponding events, Three are
+//! Framework use special widgets to listens to corresponding events, Three are
 //! two raw listeners [`PointerListener`](pointers::PointerListener),
 //! [`KeyboardListener`](keyboard::KeyboardListener). `Holiday` dispatch event
 //! like web's bubble phase, always from the leaf to root.
@@ -13,8 +13,8 @@ pub use winit::event::ModifiersState;
 pub trait Event {
   /// The target property of the Event interface is a reference to the object
   /// onto which the event was dispatched. It is different from
-  /// Event.currentTarget when the event handler is called during the bubbling
-  /// or capturing phase of the event.
+  /// Event::current_target when the event handler is called during the bubbling
+  /// phase of the event.
   fn target(&self) -> &WidgetId;
   /// A reference to the currently registered target for the event. This is the
   /// object to which the event is currently slated to be sent. It's possible

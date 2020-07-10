@@ -95,32 +95,25 @@ impl Dispatcher {
         )
       });
       event.position = pos;
-      Self::try_inherit_dispatch(wid, unsafe { w_tree.as_mut() }, &mut dispatch, event);
+      Self::dispatch_to_widget(wid, unsafe { w_tree.as_mut() }, &mut dispatch, event);
       !event.as_mut().cancel_bubble.get()
     });
   }
 
-  fn try_inherit_dispatch<T: Widget, E: std::convert::AsMut<EventCommon>, H: FnMut(&mut T, &E)>(
+  fn dispatch_to_widget<T: Widget, E: std::convert::AsMut<EventCommon>, H: FnMut(&mut T, &E)>(
     wid: WidgetId,
     tree: &mut WidgetTree,
     handler: &mut H,
     event: &mut E,
   ) {
-    let mut event_widget = wid
+    let event_widget = wid
       .get_mut(tree)
       .and_then(|w| Widget::dynamic_cast_mut::<T>(w));
-    while let Some(w) = event_widget {
-      if event.as_mut().cancel_bubble.get() {
-        break;
-      }
-
+    if let Some(w) = event_widget {
       let common = event.as_mut();
       common.current_target = wid;
       common.composed_path.push(wid);
       handler(w, event);
-      event_widget = w
-        .as_inherit_mut()
-        .and_then(|w| w.base_widget_mut().dynamic_cast_mut::<T>());
     }
   }
 
