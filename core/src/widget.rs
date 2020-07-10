@@ -19,10 +19,10 @@ pub mod events;
 use events::pointers::{PointerEvent, PointerEventType, PointerListener};
 pub use events::Event;
 
-/// The common behavior of widgets, also support to downcast to special widget.
-/// In most of cases  needn't  directly implement `Widget` trait directly,
-/// should implement `CombinationWidget`, `RenderWidget` `SingleChildWidget` or
-/// `MultiChildWidget`.
+/// The common behavior of widgets, also support to dynamic cast to special
+/// widget. In most of cases, user needn't implement `Widget` trait directly,
+/// and implement `CombinationWidget`, `RenderWidget` `SingleChildWidget` or
+/// `MultiChildWidget` is the right way.
 pub trait Widget: Debug + Any {
   /// classify this widget into one of four type widget, and return the
   /// reference.
@@ -40,8 +40,9 @@ pub trait Widget: Debug + Any {
   #[inline]
   fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { None }
 
-  /// Convert a stateless widget to stateful, use it get a cell ref to modify
-  /// the widget.
+  /// Convert a stateless widget to stateful, and will split to a stateful
+  /// widget, and a `StateRef` which can be use to modify the states of the
+  /// widget.
   #[inline]
   fn into_stateful(self, ctx: &mut BuildCtx) -> (BoxWidget, StateRef<Self>)
   where
@@ -72,7 +73,7 @@ pub trait Widget: Debug + Any {
   }
 
   /// Used to specify the event handler for the pointer up event, which is
-  /// fired when the initially pressed pointing device is released.
+  /// fired when the all pressed pointing device is released.
   #[inline]
   fn on_pointer_up<F>(self, handler: F) -> BoxWidget
   where
@@ -112,14 +113,13 @@ pub trait CombinationWidget: Debug {
 
 /// a widget has a child.
 pub trait SingleChildWidget: RenderWidgetSafety {
-  /// called by framework to take child from this widget, and only called once.
-  /// Called by framework, should never directly call it.
+  /// Called by framework to take child from this widget, and only called once.
   fn take_child(&mut self) -> BoxWidget;
 }
 
 /// a widget has multi child
 pub trait MultiChildWidget: RenderWidgetSafety {
-  /// called by framework to take children from this widget, and only called
+  /// Called by framework to take children from this widget, and only called
   /// once. Called by framework, should never directly call it.
   fn take_children(&mut self) -> Vec<BoxWidget>;
 }
@@ -169,14 +169,15 @@ impl<'a> WidgetClassifyMut<'a> {
 /// Use inherit method to implement a `Widget`, this is use to extend ability of
 /// a widget but not increase the widget number. Notice it's difference to class
 /// inherit, it's instance inherit. If the base widget already inherit a same
-/// type widget, the new widget not occur, should merge into the same type base
-/// widget. If the base widget is a `StatefulWidget`, the inherit should insert
+/// type widget, the new widget should merge into the same type base widget. If
+/// the base widget is a `StatefulWidget`, the new widget should inherit
 /// between `StatefulWidget` and its base widget, new widget inherit the base
 /// widget of `StatefulWidget` and `StatefulWidget` inherit the new widget.
 /// `StatefulWidget` is so special is because it's a preallocate widget in
-/// widget tree, so the widget inherit from it will be lost, so widget inherit
-/// it will be convert to be inherited by it. Base on the before two point, the
-/// inherit order are not guaranteed.
+/// widget tree, so if we not do this, the widget inherit from `StatefulWidget`
+/// will be lost, so widget inherit `StatefulWidget` will be convert to be
+/// inherited by it. Base on the before two point, the inherit order are not
+/// guaranteed.
 pub trait InheritWidget: Widget {
   fn base_widget(&self) -> &dyn Widget;
   fn base_widget_mut(&mut self) -> &mut dyn Widget;
@@ -208,12 +209,15 @@ impl BoxIt for BoxWidget {
   fn box_it(self) -> BoxWidget { self }
 }
 
+inherit_widget!(BoxWidget, widget);
+
 /// A function help `InheritWidget` inherit `base` widget.
 ///
 /// ## params
 /// *base*: the base widget want inherit from.
 /// *ctor_by_base*: construct widget with the base widget should really inherit
-/// from.
+/// *merge*: use to merge the widget into the base widget `T`, if the type `T`
+/// is already be inherited in the  base widgets, from.
 pub fn inherit<T: InheritWidget, C, M>(
   mut base: BoxWidget,
   mut ctor_by_base: C,
@@ -234,26 +238,10 @@ where
   }
 }
 
-inherit_widget!(BoxWidget, widget);
-
 impl dyn Widget {
-  /// Returns some reference to the boxed value if it is of type T, or None if
-  /// it isn't.
-  pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-    if self.type_id() == TypeId::of::<T>() {
-      let ptr = self as *const dyn Widget as *const T;
-      // SAFETY: just checked whether we are pointing to the correct type, and we can
-      // rely on that check for memory safety because we have implemented Any for
-      // all types; no other impls can exist as they would conflict with our impl.
-      unsafe { Some(&*ptr) }
-    } else {
-      None
-    }
-  }
-
-  /// Returns some mutable reference to the boxed value if it is of type T, or
-  /// None if it isn't.
-  pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+  /// Returns some mutable reference to the boxed value if it or its **base
+  /// widget** is of type T, or None if it isn't.
+  pub fn dynamic_cast_mut<T: 'static>(&mut self) -> Option<&mut T> {
     if Any::type_id(self) == TypeId::of::<T>() {
       let ptr = self as *mut dyn Widget as *mut T;
       // SAFETY: just checked whether we are pointing to the correct type, and we can
@@ -261,30 +249,26 @@ impl dyn Widget {
       // all types; no other impls can exist as they would conflict with our impl.
       unsafe { Some(&mut *ptr) }
     } else {
-      None
-    }
-  }
-
-  /// Returns some mutable reference to the boxed value if it or its **base
-  /// type** is of type T, or None if it isn't.
-  pub fn dynamic_cast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-    if self.downcast_mut::<T>().is_some() {
-      self.downcast_mut()
-    } else {
       self
         .as_inherit_mut()
         .and_then(|inherit| inherit.base_widget_mut().dynamic_cast_mut())
     }
   }
 
-  /// Returns some reference to the boxed value if it or its **base type** is of
-  /// type T, or None if it isn't.
+  /// Returns some reference to the boxed value if it or its **base widget** is
+  /// of type T, or None if it isn't.
   pub fn dynamic_cast_ref<T: 'static>(&self) -> Option<&T> {
-    self.downcast_ref().or_else(|| {
+    if self.type_id() == TypeId::of::<T>() {
+      let ptr = self as *const dyn Widget as *const T;
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any for
+      // all types; no other impls can exist as they would conflict with our impl.
+      unsafe { Some(&*ptr) }
+    } else {
       self
         .as_inherit()
         .and_then(|inherit| inherit.base_widget().dynamic_cast_ref())
-    })
+    }
   }
 }
 
@@ -301,10 +285,10 @@ pub macro inherit_widget($ty: ty, $base_widget: ident) {
   impl_widget_for_inherit_widget!($ty);
 }
 
-/// We should also implement Widget for RenderWidgetSafety, SingleChildWidget
-/// and MultiChildWidget, but can not do it before rust specialization finished.
-/// So just CombinationWidget implemented it, this is user use most, and others
-/// provide a macro to do it.
+/// Auto implement `Widget` for `CombinationWidget`,  We should also implement
+/// `Widget` for RenderWidgetSafety, SingleChildWidget and MultiChildWidget, but
+/// can not do it before rust specialization finished. So just CombinationWidget
+/// implemented it, this is user use most, and others provide a macro to do it.
 impl<T: CombinationWidget + 'static> Widget for T {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
@@ -373,28 +357,5 @@ mod tests {
     assert!(Widget::dynamic_cast_mut::<PointerListener>(&mut widget).is_some());
     assert!(Widget::dynamic_cast_ref::<Text>(&widget).is_some());
     assert!(Widget::dynamic_cast_mut::<Text>(&mut widget).is_some());
-  }
-
-  #[test]
-  fn downcast_cast() {
-    let mut widget: BoxWidget = Text("hello".to_string())
-      .with_key(0)
-      .on_pointer_down(|_| {});
-
-    assert!(Widget::downcast_ref::<PointerListener>(&widget).is_none());
-    assert!(Widget::downcast_mut::<PointerListener>(&mut widget).is_none());
-    assert!(Widget::downcast_ref::<KeyDetect>(&widget).is_none());
-    assert!(Widget::downcast_mut::<KeyDetect>(&mut widget).is_none());
-    assert!(Widget::downcast_ref::<Text>(&widget).is_none());
-    assert!(Widget::downcast_mut::<Text>(&mut widget).is_none());
-
-    let base = widget.base_widget();
-    assert!(base.downcast_ref::<PointerListener>().is_some());
-    assert!(base.downcast_ref::<KeyDetect>().is_none());
-    assert!(base.downcast_ref::<Text>().is_none());
-    let base_mut = widget.base_widget_mut();
-    assert!(base_mut.downcast_mut::<PointerListener>().is_some());
-    assert!(base_mut.downcast_mut::<KeyDetect>().is_none());
-    assert!(base_mut.downcast_mut::<Text>().is_none());
   }
 }

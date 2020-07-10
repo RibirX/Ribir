@@ -313,7 +313,7 @@ impl WidgetId {
 
   /// A proxy for [NodeId::remove](indextree::NodeId.remove)
   #[allow(dead_code)]
-  fn remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena); }
+  pub(crate) fn remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena); }
 
   /// Drop the subtree
   fn drop(self, tree: &mut WidgetTree, render_tree: &mut RenderTree) {

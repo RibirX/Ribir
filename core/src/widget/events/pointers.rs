@@ -19,11 +19,11 @@ pub struct PointerEvent {
   pub global_pos: Point,
   /// A unique identifier for the pointer causing the event.
   pub id: PointerId,
-  /// The width (magnitude on the X axis), in CSS pixels, of the contact
-  /// geometry of the pointer.
+  /// The width (magnitude on the X axis), in pixels, of the contact geometry of
+  /// the pointer.
   pub width: f32,
-  /// the height (magnitude on the Y axis), in CSS pixels, of the contact
-  /// geometry of the pointer.
+  /// the height (magnitude on the Y axis), in pixels, of the contact geometry
+  /// of the pointer.
   pub height: f32,
   /// the normalized pressure of the pointer input in the range of 0 to 1, where
   /// 0 and 1 represent the minimum and maximum pressure the hardware is capable
