@@ -66,6 +66,7 @@ impl Dispatcher {
                 self.mouse_button.0 = None;
                 self.bubble_mouse_pointer(|w, event| {
                   log::info!("Pointer up {:?}", event);
+                  event.pressure = 0.;
                   w.dispatch(PointerEventType::Up, event)
                 });
               }
@@ -77,7 +78,7 @@ impl Dispatcher {
     }
   }
 
-  fn bubble_mouse_pointer<D: FnMut(&mut PointerListener, &PointerEvent)>(
+  fn bubble_mouse_pointer<D: FnMut(&mut PointerListener, &mut PointerEvent)>(
     &mut self,
     mut dispatch: D,
   ) {
@@ -100,7 +101,11 @@ impl Dispatcher {
     });
   }
 
-  fn dispatch_to_widget<T: Widget, E: std::convert::AsMut<EventCommon>, H: FnMut(&mut T, &E)>(
+  fn dispatch_to_widget<
+    T: Widget,
+    E: std::convert::AsMut<EventCommon>,
+    H: FnMut(&mut T, &mut E),
+  >(
     wid: WidgetId,
     tree: &mut WidgetTree,
     handler: &mut H,
@@ -266,35 +271,36 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
+    let device_id = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       state: ElementState::Pressed,
       button: MouseButton::Right,
       modifiers: ModifiersState::default(),
     });
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       state: ElementState::Released,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       state: ElementState::Released,
       button: MouseButton::Right,
       modifiers: ModifiersState::default(),
