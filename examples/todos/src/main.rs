@@ -1,26 +1,26 @@
-use holiday::{prelude::*, widget::Column, widget::Row};
+use holiday::{prelude::*, widget::column, widget::row};
 
 fn main() {
-  let todo = Column(vec![
-    Box::new(Row(vec![
-      Box::new(Row(vec![Text("FirstRow".to_string()).into()])),
-      Box::new(Column(
+  let todo = column(vec![
+    Box::new(row(vec![
+      Box::new(row(vec![Text("FirstRow".to_string()).into()])),
+      Box::new(column(
         (0..3)
           .map(|i| Text(format!("SecondColumn {}", i)).into())
           .collect(),
       )),
-      Box::new(Column(
+      Box::new(column(
         (0..10)
           .map(|i| Text(format!("ThirdColumn {}", i)).into())
           .collect(),
       )),
     ])),
-    Box::new(Row(
+    Box::new(row(
       (0..1)
         .map(|i| Text(format!("SecondRow {}", i)).into())
         .collect(),
     )),
-    Box::new(Row(
+    Box::new(row(
       (0..3)
         .map(|i| Text(format!("ThirdRow {}", i)).into())
         .collect(),

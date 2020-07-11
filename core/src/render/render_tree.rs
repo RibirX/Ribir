@@ -40,8 +40,8 @@ pub struct BoxLayout {
   pub rect: Rect,
 }
 
-impl BoxLayout {
-  pub fn new() -> BoxLayout {
+impl Default for BoxLayout {
+  fn default() -> Self {
     BoxLayout {
       limit: None,
       rect: Rect::new(Point::origin(), Size::new(-1.0, -1.0)),
@@ -267,13 +267,17 @@ impl RenderId {
     tree
       .box_place
       .entry(self)
-      .or_insert(BoxLayout::new())
+      .or_insert_with(BoxLayout::default)
       .rect
       .size = size;
   }
 
   pub(crate) fn set_box_limit(self, tree: &mut RenderTree, limit: Option<LimitBox>) {
-    tree.box_place.entry(self).or_insert(BoxLayout::new()).limit = limit;
+    tree
+      .box_place
+      .entry(self)
+      .or_insert_with(BoxLayout::default)
+      .limit = limit;
   }
 
   pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<LimitBox> {

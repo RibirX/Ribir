@@ -1,5 +1,5 @@
 #![cfg(test)]
-use crate::{prelude::*, widget::Row};
+use crate::{prelude::*, widget::row};
 #[derive(Debug)]
 pub struct RecursiveRow {
   pub width: usize,
@@ -8,7 +8,7 @@ pub struct RecursiveRow {
 
 impl CombinationWidget for RecursiveRow {
   fn build(&self) -> Box<dyn Widget> {
-    Row(
+    row(
       (0..self.width)
         .map(|_| {
           if self.depth > 1 {

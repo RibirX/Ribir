@@ -33,7 +33,7 @@ impl CombinationWidget for EmbedPost {
       embed.level -= 1;
       children.push(embed.into())
     }
-    Row(children).into()
+    row(children).into()
   }
 }
 

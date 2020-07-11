@@ -12,14 +12,14 @@ pub struct RowColumn {
   children: Vec<Box<dyn Widget>>,
 }
 
-pub fn Row(children: Vec<Box<dyn Widget>>) -> RowColumn {
+pub fn row(children: Vec<Box<dyn Widget>>) -> RowColumn {
   RowColumn {
     axis: Axis::Horizontal,
     children,
   }
 }
 
-pub fn Column(children: Vec<Box<dyn Widget>>) -> RowColumn {
+pub fn column(children: Vec<Box<dyn Widget>>) -> RowColumn {
   RowColumn {
     axis: Axis::Vertical,
     children,

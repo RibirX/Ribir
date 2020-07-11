@@ -46,7 +46,9 @@ impl<'a> RenderCtx<'a> {
   pub fn layout_tree(&mut self, force: bool) {
     if force {
       self.tree.clean_layout_info();
-      self.tree.root().map(|node| node.as_dirty_root(self.tree));
+      if let Some(node) = self.tree.root() {
+        node.as_dirty_root(self.tree);
+      }
     }
     let mut_ptr = self as *mut RenderCtx;
     for root in self.tree.drain_layout_roots() {
