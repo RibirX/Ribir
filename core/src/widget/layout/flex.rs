@@ -2,7 +2,6 @@ use super::flex_item::*;
 use crate::prelude::*;
 
 use crate::render::render_tree::*;
-use crate::render::BoxLayout;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FlexFit {
@@ -20,19 +19,13 @@ pub enum Axis {
 #[derive(Debug)]
 pub struct FlexContainer {
   axis: Axis,
-  pub bound: BoxLayout,
 }
 
 impl FlexContainer {
-  pub fn new(axis: Axis, layout_type: LayoutConstraints) -> FlexContainer {
-    FlexContainer {
-      axis,
-      bound: BoxLayout::new(layout_type),
-    }
-  }
+  pub fn new(axis: Axis) -> FlexContainer { FlexContainer { axis } }
 
   pub fn main_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
-    let rect = ctx.box_place(id);
+    let rect = ctx.box_rect(id);
     match self.axis {
       Axis::Horizontal => rect.map(|r| r.width()),
       Axis::Vertical => rect.map(|r| r.height()),
@@ -40,7 +33,7 @@ impl FlexContainer {
   }
 
   pub fn cross_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
-    let rect = ctx.box_place(id);
+    let rect = ctx.box_rect(id);
     match self.axis {
       Axis::Vertical => rect.map(|r| r.width()),
       Axis::Horizontal => rect.map(|r| r.height()),
@@ -59,7 +52,7 @@ impl FlexContainer {
   fn self_size(&mut self, size: Size) -> Size {
     match self.axis {
       Axis::Horizontal => size,
-      Axis::Vertical => Size::new(size.width, size.height),
+      Axis::Vertical => Size::new(size.height, size.width),
     }
   }
 
@@ -67,7 +60,7 @@ impl FlexContainer {
     let mut v = vec![];
     let mut autos = vec![];
 
-    let bound = self.bound.get_box_limit();
+    let bound = ctx.get_box_limit(id).unwrap_or(UNLIMIT_BOX);
     ctx.collect_children(id, &mut v);
 
     let mut total_flex = 0;
@@ -85,8 +78,8 @@ impl FlexContainer {
 
     if total_flex > 0 {
       let size = match self.axis {
-        Axis::Horizontal => self.bound.get_box_limit().min_width,
-        Axis::Vertical => self.bound.get_box_limit().min_height,
+        Axis::Horizontal => ctx.get_box_limit(id).unwrap_or(UNLIMIT_BOX).min_width,
+        Axis::Vertical => ctx.get_box_limit(id).unwrap_or(UNLIMIT_BOX).min_height,
       };
       let space = size - allocated;
       let s = space / (total_flex as f32);
@@ -114,7 +107,6 @@ impl FlexContainer {
     let mut x = 0.0;
     let mut y = 0.0;
     v.iter().for_each(|value| {
-      ctx.update_size(*value, ctx.box_place(*value).unwrap().size);
       ctx.update_child_pos(*value, Point::new(x, y));
       if let (Some(main), Some(_)) = self.child_axis_size(*value, ctx) {
         match self.axis {
@@ -138,7 +130,7 @@ impl FlexContainer {
     (self.main_size(id, ctx), self.cross_size(id, ctx))
   }
 
-  fn set_main_to_bound(&self, bound: &BoxLimit, main_size: f32) -> BoxLimit {
+  fn set_main_to_bound(&self, bound: &LimitBox, main_size: f32) -> LimitBox {
     let mut res = *bound;
     match self.axis {
       Axis::Horizontal => {

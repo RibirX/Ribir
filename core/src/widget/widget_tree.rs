@@ -466,19 +466,19 @@ mod test {
 
     assert_eq!(
       render_tree.symbol_shape(),
-      r#"RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+      r#"RowColRender { flex: FlexContainer { axis: Horizontal } }
 ├── TextRender { text: "Simple demo" }
 ├── TextRender { text: "Adoo" }
 ├── TextRender { text: "Recursive x times" }
-└── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+└── RowColRender { flex: FlexContainer { axis: Horizontal } }
     ├── TextRender { text: "Simple demo" }
     ├── TextRender { text: "Adoo" }
     ├── TextRender { text: "Recursive x times" }
-    └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+    └── RowColRender { flex: FlexContainer { axis: Horizontal } }
         ├── TextRender { text: "Simple demo" }
         ├── TextRender { text: "Adoo" }
         ├── TextRender { text: "Recursive x times" }
-        └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+        └── RowColRender { flex: FlexContainer { axis: Horizontal } }
             ├── TextRender { text: "Simple demo" }
             ├── TextRender { text: "Adoo" }
             └── TextRender { text: "Recursive x times" }
@@ -545,19 +545,19 @@ mod test {
 
     assert_eq!(
       env.render_tree.symbol_shape(),
-      r#"RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+      r#"RowColRender { flex: FlexContainer { axis: Horizontal } }
 ├── TextRender { text: "New title" }
 ├── TextRender { text: "" }
 ├── TextRender { text: "" }
-└── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+└── RowColRender { flex: FlexContainer { axis: Horizontal } }
     ├── TextRender { text: "New title" }
     ├── TextRender { text: "" }
     ├── TextRender { text: "" }
-    └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+    └── RowColRender { flex: FlexContainer { axis: Horizontal } }
         ├── TextRender { text: "New title" }
         ├── TextRender { text: "" }
         ├── TextRender { text: "" }
-        └── RowColRender { flex: FlexContainer { axis: Horizontal, bound: BoxLayout { constraints: EFFECTED_BY_CHILDREN, box_bound: None } } }
+        └── RowColRender { flex: FlexContainer { axis: Horizontal } }
             ├── TextRender { text: "New title" }
             ├── TextRender { text: "" }
             └── TextRender { text: "" }

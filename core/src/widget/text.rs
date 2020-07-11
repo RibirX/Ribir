@@ -36,8 +36,6 @@ impl RenderObject for TextRender {
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }
   #[inline]
-  fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
-  #[inline]
   fn update<'a>(&mut self, owner_widget: &Text) { self.text = owner_widget.0.clone(); }
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {

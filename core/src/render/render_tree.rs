@@ -1,12 +1,52 @@
 use crate::{prelude::*, util::TreeFormatter, widget::widget_tree::*};
 use indextree::*;
-use std::collections::HashMap;
+use std::collections::hash_set::Drain;
+use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct RenderId(NodeId);
 pub enum RenderEdge {
   Start(RenderId),
   End(RenderId),
+}
+
+/// boundary limit of the render object's layout
+#[derive(Debug, Clone, Copy)]
+pub struct LimitBox {
+  pub min_height: f32,
+  pub max_height: f32,
+  pub min_width: f32,
+  pub max_width: f32,
+}
+
+pub const UNLIMIT_BOX: LimitBox = LimitBox {
+  min_height: 0.0,
+  max_height: f32::INFINITY,
+  min_width: 0.0,
+  max_width: f32::INFINITY,
+};
+
+pub const UNVALID_SIZE: Size = Size::new(-1.0, -1.0);
+
+/// render object's layout box, the information about layout,
+/// including box size, box position, and layout limit
+#[derive(Debug)]
+pub struct BoxLayout {
+  /// box bound is the bound of the layout can be place. it should be set before
+  /// render object's process of layout. when the object it is in the layout
+  /// such as row, flex ... it's size is decided by his parent.
+  pub limit: Option<LimitBox>,
+
+  pub rect: Rect,
+}
+
+impl Default for BoxLayout {
+  fn default() -> Self {
+    BoxLayout {
+      limit: None,
+      rect: Rect::new(Point::origin(), Size::new(-1.0, -1.0)),
+    }
+  }
 }
 
 #[derive(Default)]
@@ -18,7 +58,10 @@ pub struct RenderTree {
   render_to_widget: HashMap<RenderId, WidgetId>,
   /// Store the render object's place relative to parent coordinate after
   /// layout.
-  box_place: HashMap<RenderId, Rect>,
+  box_place: HashMap<RenderId, BoxLayout>,
+
+  /// root of sub tree which needed to perform layout
+  dirty_layout_roots: HashSet<RenderId>,
 }
 
 impl RenderTree {
@@ -53,6 +96,15 @@ impl RenderTree {
 
   #[cfg(test)]
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
+
+  pub(crate) fn clean_layout_info(&mut self) {
+    self.box_place.clear();
+    self.dirty_layout_roots.clear();
+  }
+
+  pub(crate) fn drain_layout_roots(&mut self) -> Drain<'_, RenderId> {
+    self.dirty_layout_roots.drain()
+  }
 }
 
 impl RenderId {
@@ -203,15 +255,44 @@ impl RenderId {
   /// return the render object placed position relative to its parent, this
   /// should only be called after layout, otherwise may return None or the place
   /// of last layout.
-  pub(crate) fn box_place(self, tree: &RenderTree) -> Option<&Rect> { tree.box_place.get(&self) }
+  pub(crate) fn box_rect(self, tree: &RenderTree) -> Option<&Rect> {
+    tree.box_place.get(&self).map(|layout| &layout.rect)
+  }
 
   pub(crate) fn update_position(self, tree: &mut RenderTree, pos: Point) {
-    tree.box_place.entry(self).or_insert_with(Rect::zero).origin = pos;
+    tree
+      .box_place
+      .entry(self)
+      .or_insert(BoxLayout {
+        limit: None,
+        rect: Rect::zero(),
+      })
+      .rect
+      .origin = pos;
   }
 
   pub(crate) fn update_size(self, tree: &mut RenderTree, size: Size) {
-    tree.box_place.entry(self).or_insert_with(Rect::zero).size = size;
+    tree
+      .box_place
+      .entry(self)
+      .or_insert_with(BoxLayout::default)
+      .rect
+      .size = size;
   }
+
+  pub(crate) fn set_box_limit(self, tree: &mut RenderTree, limit: Option<LimitBox>) {
+    tree
+      .box_place
+      .entry(self)
+      .or_insert_with(BoxLayout::default)
+      .limit = limit;
+  }
+
+  pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<LimitBox> {
+    tree.box_place.get(&self).and_then(|layout| layout.limit)
+  }
+
+  pub(crate) fn as_dirty_root(self, tree: &mut RenderTree) { tree.dirty_layout_roots.insert(self); }
 }
 
 impl !Unpin for RenderTree {}

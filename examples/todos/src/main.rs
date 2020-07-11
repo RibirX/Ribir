@@ -1,12 +1,12 @@
-use holiday::{prelude::*, widget::RowColumn};
+use holiday::{prelude::*, widget::column, widget::row};
 
 #[derive(Debug)]
 struct Todos {}
 
 impl CombinationWidget for Todos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
-    RowColumn::column(vec![
-      RowColumn::row(
+    column(vec![
+      row(
         (0..15)
           .map(|i| {
             let (stateful, mut state_modify) = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
@@ -15,13 +15,13 @@ impl CombinationWidget for Todos {
           .collect(),
       )
       .box_it(),
-      RowColumn::row(
+      row(
         (0..1)
           .map(|i| Text(format!("SecondRow {} ", i)).box_it())
           .collect(),
       )
       .box_it(),
-      RowColumn::row(
+      row(
         (0..3)
           .map(|i| Text(format!("ThirdRow {} ", i)).box_it())
           .collect(),

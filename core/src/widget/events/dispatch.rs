@@ -134,7 +134,7 @@ impl Dispatcher {
       pos: Point,
       tree: &RenderTree,
     ) -> Option<(RenderId, Point)> {
-      id.box_place(tree)
+      id.box_rect(tree)
         .filter(|rect| rect.contains(pos))
         .map(|rect| {
           let offset: Size = rect.min().to_tuple().into();
@@ -232,7 +232,7 @@ mod tests {
   fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let root = record_pointer(event_record.clone(), RowColumn::row(vec![record]));
+    let root = record_pointer(event_record.clone(), row(vec![record]));
     let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 

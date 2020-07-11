@@ -1,5 +1,4 @@
 use super::flex::{Axis, FlexContainer};
-use crate::render::default_box_impl;
 
 use crate::prelude::*;
 use crate::render::render_ctx::RenderCtx;
@@ -13,19 +12,17 @@ pub struct RowColumn {
   children: Vec<BoxWidget>,
 }
 
-impl RowColumn {
-  pub fn column(children: Vec<BoxWidget>) -> RowColumn {
-    RowColumn {
-      axis: Axis::Vertical,
-      children,
-    }
+pub fn row(children: Vec<BoxWidget>) -> RowColumn {
+  RowColumn {
+    axis: Axis::Horizontal,
+    children,
   }
+}
 
-  pub fn row(children: Vec<BoxWidget>) -> RowColumn {
-    RowColumn {
-      axis: Axis::Horizontal,
-      children,
-    }
+pub fn column(children: Vec<BoxWidget>) -> RowColumn {
+  RowColumn {
+    axis: Axis::Vertical,
+    children,
   }
 }
 
@@ -42,7 +39,7 @@ impl RenderWidget for RowColumn {
   type RO = RowColRender;
   fn create_render_object(&self) -> Self::RO {
     RowColRender {
-      flex: FlexContainer::new(self.axis, LayoutConstraints::EFFECTED_BY_CHILDREN),
+      flex: FlexContainer::new(self.axis),
     }
   }
 }
@@ -63,5 +60,5 @@ impl RenderObject for RowColRender {
   #[inline]
   fn paint<'b>(&'b self, _ctx: &mut PaintingContext<'b>) {}
 
-  default_box_impl!({ flex.bound });
+  fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::EFFECTED_BY_CHILDREN }
 }

@@ -2,7 +2,7 @@
 use crate::{
   prelude::*,
   render::render_tree::*,
-  widget::{widget_tree::*, RowColumn},
+  widget::{row, widget_tree::*},
 };
 use std::{cell::RefCell, rc::Rc};
 #[derive(Clone, Default, Debug)]
@@ -26,7 +26,7 @@ impl CombinationWidget for EmbedKeyPost {
       embed.level -= 1;
       children.push(embed.with_key("embed").box_it())
     }
-    RowColumn::row(children).with_key(0).box_it()
+    row(children).with_key(0).box_it()
   }
 }
 

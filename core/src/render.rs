@@ -1,5 +1,3 @@
-mod box_constraint;
-pub use box_constraint::*;
 pub use render_ctx::*;
 pub mod render_ctx;
 use crate::{prelude::Point, prelude::Size};
@@ -41,9 +39,6 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   // get layout constraints type;
   fn get_constraints(&self) -> LayoutConstraints;
 
-  // set layout bound limit
-  fn set_box_limit(&mut self, bound: Option<BoxLimit>);
-
   /// Paint the render object into `PaintingContext` by itself coordinate
   /// system. Not care about children's paint in this method, framework will
   /// call children's paint individual. And framework guarantee always paint
@@ -69,8 +64,6 @@ pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
   fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size;
   fn get_constraints(&self) -> LayoutConstraints;
-  /// set layout limitation to the render object.
-  fn set_box_limit(&mut self, bound: Option<BoxLimit>);
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 }
 
@@ -119,8 +112,6 @@ where
 
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(self) }
-  #[inline]
-  fn set_box_limit(&mut self, bound: Option<BoxLimit>) { RenderObject::set_box_limit(self, bound) }
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { RenderObject::paint(self, ctx); }
 }

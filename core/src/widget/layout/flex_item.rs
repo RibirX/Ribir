@@ -56,7 +56,6 @@ impl RenderObject for ExpandBoxRender {
 
   #[inline]
   fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::EFFECTED_BY_PARENT }
-  fn set_box_limit(&mut self, _bound: Option<BoxLimit>) {}
 
   fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {}
 }
