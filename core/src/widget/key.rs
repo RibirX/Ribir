@@ -34,33 +34,25 @@ pub enum Key {
 #[derive(Debug)]
 pub struct KeyDetect {
   key: Key,
-  child: Box<dyn Widget>,
+  widget: BoxWidget,
 }
 
-impl Widget for KeyDetect {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { self.child.classify() }
-
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.child.classify_mut() }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&self) -> &dyn Any { self }
-}
+inherit_widget!(KeyDetect, widget);
 
 impl KeyDetect {
-  pub fn new<K, W>(key: K, child: W) -> Self
+  pub fn with_key<K>(key: K, widget: BoxWidget) -> BoxWidget
   where
     K: Into<Key>,
-    W: Into<Box<dyn Widget>>,
   {
-    KeyDetect {
-      key: key.into(),
-      child: child.into(),
-    }
+    let key = key.into();
+    inherit(
+      widget,
+      |base| KeyDetect {
+        key: key.clone(),
+        widget: base,
+      },
+      |k| k.key = key.clone(),
+    )
   }
 
   #[inline]
@@ -162,13 +154,17 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
-  let k1 = KeyDetect::new(0, Text("".to_string()));
-  let k2 = KeyDetect::new(String::new(), Text("".to_string()));
-  let k3 = KeyDetect::new("".to_string(), Text("".to_string()));
-  let ck1 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
-  let ck2 = KeyDetect::new(complex_key!("asd", true, 1), Text("".to_string()));
-  assert!(k1.key != k2.key);
-  assert!(k2.key == k3.key);
-  assert!(k3.key != k1.key);
-  assert!(ck1.key == ck2.key);
+  impl BoxWidget {
+    fn as_key(&self) -> &Key { &Widget::dynamic_cast_ref::<KeyDetect>(self).unwrap().key }
+  }
+
+  let k1 = Text("".to_string()).with_key(0);
+  let k2 = Text("".to_string()).with_key(String::new());
+  let k3 = Text("".to_string()).with_key("");
+  let ck1 = Text("".to_string()).with_key(complex_key!("asd", true, 1));
+  let ck2 = Text("".to_string()).with_key(complex_key!("asd", true, 1));
+  assert!(k1.as_key() != k2.as_key());
+  assert!(k2.as_key() == k3.as_key());
+  assert!(k3.as_key() != k1.as_key());
+  assert!(ck1.as_key() == ck2.as_key());
 }

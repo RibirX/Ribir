@@ -49,13 +49,10 @@ impl WgpuRender<PhysicSurface> {
 
     let w_surface = unsafe { instance.create_surface(window) };
 
-    let adapter = instance.request_adapter(
-      &wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::Default,
-        compatible_surface: Some(&w_surface),
-      },
-      wgpu::UnsafeFeatures::disallow(),
-    );
+    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
+      power_preference: wgpu::PowerPreference::Default,
+      compatible_surface: Some(&w_surface),
+    });
 
     Self::new(
       size,
@@ -78,13 +75,10 @@ impl WgpuRender<TextureSurface> {
   ) -> Self {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
-    let adapter = instance.request_adapter(
-      &wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::Default,
-        compatible_surface: None,
-      },
-      wgpu::UnsafeFeatures::disallow(),
-    );
+    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
+      power_preference: wgpu::PowerPreference::Default,
+      compatible_surface: None,
+    });
 
     WgpuRender::new(
       size,

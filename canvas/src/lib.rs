@@ -11,6 +11,7 @@ pub mod wgpu_render;
 pub use crate::canvas::*;
 pub use color::Color;
 pub use layer::*;
+pub use mem_texture::MemTexture;
 pub use text_brush::*;
 pub use wgpu_render::*;
 
@@ -28,6 +29,8 @@ pub type Rect = euclid::Rect<f32, LogicUnit>;
 pub type Point = euclid::Point2D<f32, LogicUnit>;
 pub type Size = euclid::Size2D<f32, LogicUnit>;
 pub type Transform = euclid::Transform2D<f32, LogicUnit, LogicUnit>;
+pub type Vector = euclid::Vector2D<f32, LogicUnit>;
+pub type Angle = euclid::Angle<f32>;
 
 pub type DeviceRect = euclid::Rect<u32, PhysicUnit>;
 pub type DevicePoint = euclid::Point2D<u32, PhysicUnit>;

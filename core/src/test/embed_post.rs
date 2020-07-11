@@ -21,19 +21,19 @@ impl EmbedPost {
 }
 
 impl CombinationWidget for EmbedPost {
-  fn build(&self) -> Box<dyn Widget> {
+  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     let mut children = vec![
-      Text(self.title.to_string()).into(),
-      Text(self.author.to_string()).into(),
-      Text(self.content.to_string()).into(),
+      Text(self.title.to_string()).box_it(),
+      Text(self.author.to_string()).box_it(),
+      Text(self.content.to_string()).box_it(),
     ];
 
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      children.push(embed.into())
+      children.push(embed.box_it())
     }
-    row(children).into()
+    row(children).box_it()
   }
 }
 
@@ -42,6 +42,6 @@ pub fn create_embed_app(level: usize) -> (WidgetTree, RenderTree) {
   let mut widget_tree = WidgetTree::default();
   let mut render_tree = RenderTree::default();
 
-  widget_tree.set_root(post.into(), &mut render_tree);
+  widget_tree.set_root(post.box_it(), &mut render_tree);
   (widget_tree, render_tree)
 }

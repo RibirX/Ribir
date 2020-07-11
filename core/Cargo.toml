@@ -14,6 +14,7 @@ bitflags = "1.2.1"
 winit = "0.22.2"
 canvas = {path= "../canvas", version="*"}
 futures="0.3.5"
+log = "0.4.8"
 
 [dependencies.blake3]
 version = "0.3.4"

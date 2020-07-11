@@ -15,7 +15,7 @@ impl Application {
   #[inline]
   pub fn new() -> Application { <_>::default() }
 
-  pub fn run<W: Into<Box<dyn Widget>>>(mut self, w: W) {
+  pub fn run(mut self, w: BoxWidget) {
     self.new_window(w);
 
     let Self {
@@ -48,8 +48,8 @@ impl Application {
     });
   }
 
-  pub(crate) fn new_window<W: Into<Box<dyn Widget>>>(&mut self, w: W) -> WindowId {
-    let window = Window::new(w, &self.event_loop);
+  pub(crate) fn new_window(&mut self, w: BoxWidget) -> WindowId {
+    let window = Window::from_event_loop(w, &self.event_loop);
     let id = window.id();
     self.windows.insert(window.id(), window);
     id
