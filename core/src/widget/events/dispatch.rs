@@ -236,8 +236,9 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
+    let device_id = mock_device_id(0);
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
     });
@@ -252,7 +253,7 @@ mod tests {
     }
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
@@ -271,7 +272,7 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
-    let device_id = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    let device_id = mock_device_id(0);
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -318,40 +319,58 @@ mod tests {
   }
 
   #[test]
-  fn different_mouse() {
+  fn different_device_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
     let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 
+    let device_id = mock_device_id(0);
+    let device_id_2 = mock_device_id(1);
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    assert_eq!(event_record.borrow().len(), 1);
+
+    // A mouse press/release emit during another mouse's press will be ignored.
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: device_id_2,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
-      state: ElementState::Pressed,
-      button: MouseButton::Right,
+      device_id: device_id_2,
+      state: ElementState::Released,
+      button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
-
-    // second device press event skipped.
     assert_eq!(event_record.borrow().len(), 1);
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id: device_id_2,
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
     });
 
     // but cursor move processed.
     assert_eq!(event_record.borrow().len(), 2);
-    // todo: A mouse press/release emit during another mouse's press will
-    // ignored. Use difference device id to simulate it.
-    // assert_eq!(event_record.borrow()[1].buttons, MouseButtons::PRIMARY);
+    assert_eq!(event_record.borrow().len(), 2);
+    assert_eq!(event_record.borrow()[1].buttons, MouseButtons::PRIMARY);
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Released,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    assert_eq!(event_record.borrow().len(), 3);
   }
 
   #[test]
@@ -374,12 +393,21 @@ mod tests {
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+      device_id: mock_device_id(0),
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
 
     assert_eq!(event_record.borrow().len(), 1);
+  }
+
+  fn mock_device_id(value: u8) -> DeviceId {
+    unsafe {
+      let mut id = std::mem::MaybeUninit::<DeviceId>::uninit();
+      id.as_mut_ptr()
+        .write_bytes(value, std::mem::size_of::<DeviceId>());
+      id.assume_init()
+    }
   }
 }
