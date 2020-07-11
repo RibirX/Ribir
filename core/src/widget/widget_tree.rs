@@ -27,7 +27,11 @@ impl WidgetTree {
 
   pub fn set_root(&mut self, data: BoxWidget, render_tree: &mut RenderTree) -> WidgetId {
     debug_assert!(self.root.is_none());
-    let root = self.new_node(data);
+    let root = if let Some(w) = Widget::dynamic_cast_ref::<StatefulWidget>(&data) {
+      w.id()
+    } else {
+      self.new_node(data)
+    };
     self.root = Some(root);
     self.inflate(root, render_tree);
     root
@@ -35,10 +39,7 @@ impl WidgetTree {
 
   #[inline]
   pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
-    // stateful widget is a preallocate node, should not allocate again.
-    Widget::dynamic_cast_ref::<super::stateful::StatefulWidget>(&widget)
-      .map(|stateful| stateful.id())
-      .unwrap_or_else(|| WidgetId(self.arena.new_node(widget)))
+    WidgetId(self.arena.new_node(widget))
   }
 
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.
@@ -306,9 +307,13 @@ impl WidgetId {
   }
 
   fn append_widget(self, data: BoxWidget, tree: &mut WidgetTree) -> WidgetId {
-    let child = tree.new_node(data);
-    self.0.append(child.0, &mut tree.arena);
-    child
+    let id = if let Some(w) = Widget::dynamic_cast_ref::<StatefulWidget>(&data) {
+      w.id()
+    } else {
+      tree.new_node(data)
+    };
+    self.0.append(id.0, &mut tree.arena);
+    id
   }
 
   /// A proxy for [NodeId::remove](indextree::NodeId.remove)
