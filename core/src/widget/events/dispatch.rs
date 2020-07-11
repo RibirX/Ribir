@@ -318,6 +318,8 @@ mod tests {
     assert_eq!(records[2].buttons, MouseButtons::default());
   }
 
+  // Can not mock two different device id for macos.
+  #[cfg(not(target_os = "macos"))]
   #[test]
   fn different_device_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
@@ -326,7 +328,6 @@ mod tests {
     wnd.render_ready();
 
     let device_id = mock_device_id(0);
-    let device_id_2 = mock_device_id(1);
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -337,6 +338,7 @@ mod tests {
     assert_eq!(event_record.borrow().len(), 1);
 
     // A mouse press/release emit during another mouse's press will be ignored.
+    let device_id_2 = mock_device_id(1);
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: device_id_2,
       state: ElementState::Pressed,
