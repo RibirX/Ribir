@@ -1,11 +1,11 @@
 pub use render_ctx::*;
 pub mod render_ctx;
-use crate::{prelude::Point, prelude::Size};
+use crate::prelude::*;
 pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 pub mod painting_context;
 pub mod render_tree;
-pub use render_tree::RenderId;
+pub use render_tree::{LimitBox, RenderId};
 
 bitflags! {
     pub struct LayoutConstraints: u8 {
@@ -33,8 +33,12 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   /// this method directly.
   fn update(&mut self, owner_widget: &Self::Owner);
 
-  // trig the process of layout
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size;
+  /// Do the work of computing the layout for this render object, and return the
+  /// render object size after layout.
+  ///
+  /// In implementing this function, you must call layout on each of your
+  /// children
+  fn perform_layout(&mut self, limit: &LimitBox, ctx: &mut RenderCtx) -> Size;
 
   // get layout constraints type;
   fn get_constraints(&self) -> LayoutConstraints;
@@ -62,7 +66,7 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size;
+  fn perform_layout(&mut self, limit: &LimitBox, ctx: &mut RenderCtx) -> Size;
   fn get_constraints(&self) -> LayoutConstraints;
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 }
@@ -106,8 +110,8 @@ where
   }
 
   #[inline]
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
-    RenderObject::perform_layout(self, id, ctx)
+  fn perform_layout(&mut self, limit: &LimitBox, ctx: &mut RenderCtx) -> Size {
+    RenderObject::perform_layout(self, limit, ctx)
   }
 
   #[inline]

@@ -13,17 +13,13 @@ pub enum RenderEdge {
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, Copy)]
 pub struct LimitBox {
-  pub min_height: f32,
-  pub max_height: f32,
-  pub min_width: f32,
-  pub max_width: f32,
+  min: Size,
+  max: Size,
 }
 
 pub const UNLIMIT_BOX: LimitBox = LimitBox {
-  min_height: 0.0,
-  max_height: f32::INFINITY,
-  min_width: 0.0,
-  max_width: f32::INFINITY,
+  min: Size::zero(),
+  max: Size::new(f32::INFINITY, f32::INFINITY),
 };
 
 pub const UNVALID_SIZE: Size = Size::new(-1.0, -1.0);
