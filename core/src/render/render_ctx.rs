@@ -1,15 +1,27 @@
 use crate::render::render_tree::*;
 use crate::render::*;
 use canvas::{Canvas, FontInfo, Rect, Text};
+
 pub struct RenderCtx<'a> {
   tree: &'a mut RenderTree,
   canvas: &'a mut Canvas,
+  /// the render id of current render object.
+  current: RenderId,
 }
 
 impl<'a> RenderCtx<'a> {
   #[inline]
-  pub fn new(tree: &'a mut RenderTree, canvas: &'a mut Canvas) -> RenderCtx<'a> {
-    RenderCtx { tree, canvas }
+  pub fn new(tree: &'a mut RenderTree, canvas: &'a mut Canvas, current: RenderId) -> RenderCtx<'a> {
+    RenderCtx {
+      tree,
+      canvas,
+      current,
+    }
+  }
+
+  /// Set the child position, the coordinate is relative to self.
+  pub fn set_child_position(&mut self, child: RenderId, rect: Rect) {
+    unimplemented!();
   }
 
   #[inline]

@@ -83,7 +83,7 @@ When we build a widget from `CombinationWidget`, framework provide a `BuildConte
 
 2. all the render object is independent, all owned by render tree. in the processing of performing layout, it can only accept immutable reference of render object  of it's parent or it's children through RenderId of itself and render ctx.
 
-3. when mark_need_dirty of a render object, it will start from the current Node, climbing up until it's parent's constraint has no flag of EFFECTED_BY_CHILDREN, the  ancestor in the path will be mark dirty and diffuse dirty flag down to children who has constraint flag of EFFECTED_BY_PARENT recursive.
+3. when call need_layout of a render object, it will start from the current Node, climbing up until it's parent's constraint has no flag of EFFECTED_BY_CHILDREN, the  ancestor in the path will be mark dirty and diffuse dirty flag down to children who has constraint flag of EFFECTED_BY_PARENT recursive.
 
 if a render object is Expand Size, its children can't have Bound Size. In general, when perform a layout, fixed size children should be first perform, then expand size and bound size last.
 
