@@ -30,7 +30,7 @@ The widget tree update from top to bottom. If a bottom widget removed because it
 The widget tree rebuilds base on widget diff. Work like below:
 
 a. build widget from `CombinationWidget`.
-b. if new widget's `Key` is equal to the last time build widget in the widget tree ?
+b. if new the  `key` of widget is equal to the last time build widget in the widget tree ?
   1. use new widget replace before sub tree in widget and mark this widget dirty.
   2. if this widget is `CombinationWidget`, use new widget recursive step a.
   3. else, if this widget is render widget and has children.

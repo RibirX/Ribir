@@ -134,7 +134,7 @@ impl Dispatcher {
       pos: Point,
       tree: &RenderTree,
     ) -> Option<(RenderId, Point)> {
-      id.box_rect(tree)
+      id.layout_box_rect(tree)
         .filter(|rect| rect.contains(pos))
         .map(|rect| {
           let offset: Size = rect.min().to_tuple().into();

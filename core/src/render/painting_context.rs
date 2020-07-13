@@ -25,7 +25,7 @@ impl<'a> PaintingContext<'a> {
 
   pub(crate) fn draw(mut self) -> Rendering2DLayer<'a> {
     fn assert_place(id: RenderId, tree: &RenderTree) -> Point {
-      id.box_rect(tree)
+      id.layout_box_rect(tree)
         .expect("Every widget should at its place before draw.")
         .min()
     }

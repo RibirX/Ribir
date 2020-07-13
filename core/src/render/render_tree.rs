@@ -11,38 +11,23 @@ pub enum RenderEdge {
 }
 
 /// boundary limit of the render object's layout
-#[derive(Debug, Clone, Copy)]
-pub struct LimitBox {
-  min: Size,
-  max: Size,
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct BoxClamp {
+  pub min: Size,
+  pub max: Size,
 }
 
-pub const UNLIMIT_BOX: LimitBox = LimitBox {
-  min: Size::zero(),
-  max: Size::new(f32::INFINITY, f32::INFINITY),
-};
-
-pub const UNVALID_SIZE: Size = Size::new(-1.0, -1.0);
-
-/// render object's layout box, the information about layout,
-/// including box size, box position, and layout limit
-#[derive(Debug)]
+/// render object's layout box, the information about layout, including box
+/// size, box position, and the clamp of render object layout.
+#[derive(Debug, Default)]
 pub struct BoxLayout {
-  /// box bound is the bound of the layout can be place. it should be set before
-  /// render object's process of layout. when the object it is in the layout
-  /// such as row, flex ... it's size is decided by his parent.
-  pub limit: Option<LimitBox>,
-
-  pub rect: Rect,
-}
-
-impl Default for BoxLayout {
-  fn default() -> Self {
-    BoxLayout {
-      limit: None,
-      rect: Rect::new(Point::origin(), Size::new(-1.0, -1.0)),
-    }
-  }
+  /// Box bound is the bound of the layout can be place. it will be set after
+  /// render object computing its layout. It's passed by render object's parent.
+  pub clamp: BoxClamp,
+  /// The position and size render object to place, relative to its parent
+  /// coordinate. Some value after the relative render object has been layout,
+  /// otherwise is none value.
+  pub rect: Option<Rect>,
 }
 
 #[derive(Default)]
@@ -52,12 +37,25 @@ pub struct RenderTree {
   /// A hash map to mapping a render object in render tree to its corresponds
   /// render widget in widget tree.
   render_to_widget: HashMap<RenderId, WidgetId>,
-  /// Store the render object's place relative to parent coordinate after
-  /// layout.
-  box_place: HashMap<RenderId, BoxLayout>,
-
+  /// Store the render object's place relative to parent coordinate and the
+  /// clamp passed from parent.
+  layout_info: HashMap<RenderId, BoxLayout>,
   /// root of sub tree which needed to perform layout
   dirty_layout_roots: HashSet<RenderId>,
+}
+
+impl BoxClamp {
+  #[inline]
+  pub fn clamp(self, size: Size) -> Size { size.clamp(self.min, self.max) }
+}
+
+impl Default for BoxClamp {
+  fn default() -> Self {
+    Self {
+      min: Size::new(0., 0.),
+      max: Size::new(f32::INFINITY, f32::INFINITY),
+    }
+  }
 }
 
 impl RenderTree {
@@ -94,7 +92,7 @@ impl RenderTree {
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
 
   pub(crate) fn clean_layout_info(&mut self) {
-    self.box_place.clear();
+    self.layout_info.clear();
     self.dirty_layout_roots.clear();
   }
 
@@ -136,7 +134,6 @@ impl RenderId {
   pub(crate) fn remove(self, tree: &mut RenderTree) { self.0.remove(&mut tree.arena); }
 
   /// Returns an iterator of references to this node’s children.
-  #[allow(dead_code)]
   #[inline]
   pub(crate) fn children<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
     self.0.children(&tree.arena).map(RenderId)
@@ -228,17 +225,43 @@ impl RenderId {
     // relationship
     // Fixme: memory leak here, node just detach and not remove. Wait a pr to
     // provide a method to drop a subtree in indextree.
-    tree.box_place.remove(&self);
+    tree.layout_info.remove(&self);
     self.0.detach(&mut tree.arena);
     if tree.root == Some(self) {
       tree.root = None;
     }
   }
 
-  /// return the relative render widget.
   pub(crate) fn relative_to_widget(self, tree: &RenderTree) -> Option<WidgetId> {
     tree.render_to_widget.get(&self).copied()
   }
+
+  pub(crate) fn layout_clamp(self, tree: &RenderTree) -> Option<BoxClamp> {
+    tree.layout_info.get(&self).map(|info| info.clamp)
+  }
+
+  pub(crate) fn layout_box_rect(self, tree: &RenderTree) -> Option<Rect> {
+    tree.layout_info.get(&self).and_then(|info| info.rect)
+  }
+
+  pub(crate) fn layout_clamp_mut(self, tree: &mut RenderTree) -> &mut BoxClamp {
+    &mut self.layout_info_mut(tree).clamp
+  }
+
+  pub(crate) fn layout_box_rect_mut(self, tree: &mut RenderTree) -> &mut Rect {
+    self
+      .layout_info_mut(tree)
+      .rect
+      .get_or_insert_with(Rect::zero)
+  }
+
+  fn layout_info_mut(self, tree: &mut RenderTree) -> &mut BoxLayout {
+    tree
+      .layout_info
+      .entry(self)
+      .or_insert_with(BoxLayout::default)
+  }
+  pub(crate) fn as_dirty_root(self, tree: &mut RenderTree) { tree.dirty_layout_roots.insert(self); }
 
   fn node_feature<F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>>(
     self,
@@ -247,48 +270,6 @@ impl RenderId {
   ) -> Option<RenderId> {
     tree.arena.get(self.0).map(method).flatten().map(RenderId)
   }
-
-  /// return the render object placed position relative to its parent, this
-  /// should only be called after layout, otherwise may return None or the place
-  /// of last layout.
-  pub(crate) fn box_rect(self, tree: &RenderTree) -> Option<&Rect> {
-    tree.box_place.get(&self).map(|layout| &layout.rect)
-  }
-
-  pub(crate) fn update_position(self, tree: &mut RenderTree, pos: Point) {
-    tree
-      .box_place
-      .entry(self)
-      .or_insert(BoxLayout {
-        limit: None,
-        rect: Rect::zero(),
-      })
-      .rect
-      .origin = pos;
-  }
-
-  pub(crate) fn update_size(self, tree: &mut RenderTree, size: Size) {
-    tree
-      .box_place
-      .entry(self)
-      .or_insert_with(BoxLayout::default)
-      .rect
-      .size = size;
-  }
-
-  pub(crate) fn set_box_limit(self, tree: &mut RenderTree, limit: Option<LimitBox>) {
-    tree
-      .box_place
-      .entry(self)
-      .or_insert_with(BoxLayout::default)
-      .limit = limit;
-  }
-
-  pub(crate) fn get_box_limit(self, tree: &RenderTree) -> Option<LimitBox> {
-    tree.box_place.get(&self).and_then(|layout| layout.limit)
-  }
-
-  pub(crate) fn as_dirty_root(self, tree: &mut RenderTree) { tree.dirty_layout_roots.insert(self); }
 }
 
 impl !Unpin for RenderTree {}

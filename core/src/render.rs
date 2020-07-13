@@ -5,15 +5,7 @@ pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 pub mod painting_context;
 pub mod render_tree;
-pub use render_tree::{LimitBox, RenderId};
-
-bitflags! {
-    pub struct LayoutConstraints: u8 {
-        const DECIDED_BY_SELF = 0;
-        const EFFECTED_BY_PARENT = 1;
-        const EFFECTED_BY_CHILDREN = 2;
-    }
-}
+pub use render_tree::{BoxClamp, RenderId};
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
@@ -38,10 +30,11 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   ///
   /// In implementing this function, you must call layout on each of your
   /// children
-  fn perform_layout(&mut self, limit: &LimitBox, ctx: &mut RenderCtx) -> Size;
+  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size;
 
-  // get layout constraints type;
-  fn get_constraints(&self) -> LayoutConstraints;
+  /// Whether the constraints from parent are the only input to detect the
+  /// widget size, and child nodes' size have no effect it.
+  fn only_sized_by_parent(&self) -> bool;
 
   /// Paint the render object into `PaintingContext` by itself coordinate
   /// system. Not care about children's paint in this method, framework will
@@ -66,8 +59,8 @@ pub trait RenderWidgetSafety: Debug {
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
-  fn perform_layout(&mut self, limit: &LimitBox, ctx: &mut RenderCtx) -> Size;
-  fn get_constraints(&self) -> LayoutConstraints;
+  fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size;
+  fn only_sized_by_parent(&self) -> bool;
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 }
 
@@ -75,13 +68,6 @@ fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
   let ptr = obj as *const dyn RenderWidgetSafety as *const T;
   // SAFETY: in this mod, we know obj must be type `T`.
   unsafe { &*ptr }
-}
-
-#[allow(dead_code)]
-fn downcast_widget_mut<T: RenderWidget>(obj: &mut dyn RenderWidgetSafety) -> &mut T {
-  // SAFETY: in this mod, we know obj must be type `T`.
-  let ptr = obj as *mut dyn RenderWidgetSafety as *mut T;
-  unsafe { &mut *ptr }
 }
 
 impl<T> RenderWidgetSafety for T
@@ -110,12 +96,13 @@ where
   }
 
   #[inline]
-  fn perform_layout(&mut self, limit: &LimitBox, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size {
     RenderObject::perform_layout(self, limit, ctx)
   }
 
   #[inline]
-  fn get_constraints(&self) -> LayoutConstraints { RenderObject::get_constraints(self) }
+  fn only_sized_by_parent(&self) -> bool { RenderObject::only_sized_by_parent(self) }
+
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { RenderObject::paint(self, ctx); }
 }
