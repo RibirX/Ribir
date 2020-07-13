@@ -5,7 +5,9 @@ pub use painting_context::PaintingContext;
 use std::fmt::Debug;
 pub mod painting_context;
 pub mod render_tree;
+pub mod update_ctx;
 pub use render_tree::{BoxClamp, RenderId};
+pub use update_ctx::UpdateCtx;
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering and paint for the application.
@@ -23,7 +25,7 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   type Owner: RenderWidget<RO = Self>;
   /// Call by framework when its owner `owner_widget` changed, should not call
   /// this method directly.
-  fn update(&mut self, owner_widget: &Self::Owner);
+  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx);
 
   /// Do the work of computing the layout for this render object, and return the
   /// render object size after layout.
@@ -58,7 +60,7 @@ pub trait RenderWidgetSafety: Debug {
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Debug {
-  fn update(&mut self, owner_widget: &dyn RenderWidgetSafety);
+  fn update(&mut self, owner_widget: &dyn RenderWidgetSafety, ctx: &mut UpdateCtx);
   fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size;
   fn only_sized_by_parent(&self) -> bool;
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
@@ -91,8 +93,8 @@ where
   T: RenderObject,
 {
   #[inline]
-  fn update(&mut self, owner_widget: &dyn RenderWidgetSafety) {
-    RenderObject::update(self, downcast_widget(owner_widget))
+  fn update(&mut self, owner_widget: &dyn RenderWidgetSafety, ctx: &mut UpdateCtx) {
+    RenderObject::update(self, downcast_widget(owner_widget), ctx)
   }
 
   #[inline]

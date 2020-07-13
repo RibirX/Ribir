@@ -13,9 +13,9 @@ pub struct WidgetTree {
   root: Option<WidgetId>,
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
-  pub(crate) changed_widgets: HashSet<WidgetId>,
+  changed_widgets: HashSet<WidgetId>,
   /// Store combination widgets that needs build subtree.
-  pub(crate) need_builds: HashSet<WidgetId>,
+  need_builds: HashSet<WidgetId>,
   /// A hash map to mapping a render widget in widget tree to its corresponds
   /// render object in render tree.
   widget_to_render: HashMap<WidgetId, RenderId>,
@@ -117,20 +117,25 @@ impl WidgetTree {
 
   /// Tell the render object its owner changed one by one.
   fn flush_to_render(&mut self, render_tree: &mut RenderTree) {
+    // Safety: just split render_tree as two to update render object, never modify
+    // the render tree's struct.
+    let (r_tree1, r_tree2) = unsafe {
+      let ptr = render_tree as *mut RenderTree;
+      (&mut *ptr, &mut *ptr)
+    };
     self.changed_widgets.iter().for_each(|wid| {
       let widget = wid.assert_get(self);
 
-      let render_id = *self
+      let rid = *self
         .widget_to_render
         .get(wid)
         .expect("Changed widget should always render widget!");
 
       let safety = Widget::as_render(widget).expect("Must be a render widget!");
 
-      render_id
-        .get_mut(render_tree)
-        .expect("render object must exists!")
-        .update(safety);
+      rid
+        .get_mut(r_tree1)
+        .update(safety, &mut UpdateCtx::new(rid, r_tree2));
     });
 
     self.changed_widgets.clear();

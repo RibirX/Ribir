@@ -1,7 +1,9 @@
 use crate::{prelude::*, util::TreeFormatter, widget::widget_tree::*};
 use indextree::*;
-use std::collections::hash_set::Drain;
-use std::collections::{HashMap, HashSet};
+use std::{
+  cmp::Reverse,
+  collections::{BinaryHeap, HashMap},
+};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct RenderId(NodeId);
@@ -40,8 +42,9 @@ pub struct RenderTree {
   /// Store the render object's place relative to parent coordinate and the
   /// clamp passed from parent.
   layout_info: HashMap<RenderId, BoxLayout>,
-  /// root of sub tree which needed to perform layout
-  dirty_layout_roots: HashSet<RenderId>,
+  /// root of sub tree which needed to perform layout, store as min-head by the
+  /// node's depth.
+  needs_layout: BinaryHeap<Reverse<(usize, RenderId)>>,
 }
 
 impl BoxClamp {
@@ -90,15 +93,6 @@ impl RenderTree {
 
   #[cfg(test)]
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
-
-  pub(crate) fn clean_layout_info(&mut self) {
-    self.layout_info.clear();
-    self.dirty_layout_roots.clear();
-  }
-
-  pub(crate) fn drain_layout_roots(&mut self) -> Drain<'_, RenderId> {
-    self.dirty_layout_roots.drain()
-  }
 }
 
 impl RenderId {
@@ -108,11 +102,15 @@ impl RenderId {
   }
 
   /// Returns a mutable reference to the node data.
-  pub(crate) fn get_mut<'a>(
+  pub(crate) fn get_mut(
     self,
-    tree: &'a mut RenderTree,
-  ) -> Option<&'a mut (dyn RenderObjectSafety + Send + Sync + 'static)> {
-    tree.arena.get_mut(self.0).map(|node| &mut **node.get_mut())
+    tree: &mut RenderTree,
+  ) -> &mut (dyn RenderObjectSafety + Send + Sync + 'static) {
+    &mut **tree
+      .arena
+      .get_mut(self.0)
+      .expect("Access a removed render object")
+      .get_mut()
   }
 
   /// A delegate for [NodeId::append](indextree::NodeId.append)
@@ -167,14 +165,12 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::last_child](indextree::NodeId.last_child)
-  #[allow(dead_code)]
   pub(crate) fn last_child(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_feature(tree, |node| node.last_child())
   }
 
   /// A delegate for
   /// [NodeId::previous_sibling](indextree::NodeId.previous_sibling)
-  #[allow(dead_code)]
   pub(crate) fn previous_sibling(self, tree: &RenderTree) -> Option<RenderId> {
     self.node_feature(tree, |node| node.previous_sibling())
   }
@@ -185,13 +181,11 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
-  #[allow(dead_code)]
   pub(crate) fn ancestors<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
     self.0.ancestors(&tree.arena).map(RenderId)
   }
 
   /// A delegate for [NodeId::descendants](indextree::NodeId.descendants)
-  #[allow(dead_code)]
   pub(crate) fn descendants<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
     self.0.descendants(&tree.arena).map(RenderId)
   }
@@ -245,23 +239,44 @@ impl RenderId {
   }
 
   pub(crate) fn layout_clamp_mut(self, tree: &mut RenderTree) -> &mut BoxClamp {
-    &mut self.layout_info_mut(tree).clamp
+    &mut self.layout_info_mut(&mut tree.layout_info).clamp
   }
 
   pub(crate) fn layout_box_rect_mut(self, tree: &mut RenderTree) -> &mut Rect {
     self
-      .layout_info_mut(tree)
+      .layout_info_mut(&mut tree.layout_info)
       .rect
       .get_or_insert_with(Rect::zero)
   }
 
-  fn layout_info_mut(self, tree: &mut RenderTree) -> &mut BoxLayout {
-    tree
-      .layout_info
-      .entry(self)
-      .or_insert_with(BoxLayout::default)
+  pub(crate) fn mark_needs_layout(self, tree: &mut RenderTree) {
+    let mut relayout_root = self;
+    let RenderTree {
+      arena, layout_info, ..
+    } = tree;
+    // All ancestors of this render object should relayout until the one which only
+    // sized by parent.
+    self.0.ancestors(arena).all(|id| {
+      let sized_by_parent = arena
+        .get(id)
+        .map_or(false, |node| node.get().only_sized_by_parent());
+      if !sized_by_parent {
+        let rid = RenderId(id);
+        self.layout_info_mut(layout_info).rect = None;
+        relayout_root = rid;
+      }
+
+      !sized_by_parent
+    });
+    tree.needs_layout.push(std::cmp::Reverse((
+      relayout_root.ancestors(tree).count(),
+      relayout_root,
+    )));
   }
-  pub(crate) fn as_dirty_root(self, tree: &mut RenderTree) { tree.dirty_layout_roots.insert(self); }
+
+  fn layout_info_mut(self, layout_info: &mut HashMap<RenderId, BoxLayout>) -> &mut BoxLayout {
+    layout_info.entry(self).or_insert_with(BoxLayout::default)
+  }
 
   fn node_feature<F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>>(
     self,
