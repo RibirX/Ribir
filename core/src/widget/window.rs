@@ -203,4 +203,14 @@ impl NoRenderWindow {
 
   #[cfg(test)]
   pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
+
+  #[cfg(test)]
+  pub fn new_build_ctx(&mut self, wid: WidgetId) -> BuildCtx {
+    BuildCtx::new(self.widget_tree(), wid)
+  }
+
+  #[cfg(test)]
+  pub fn new_render_ctx(&mut self, rid: RenderId) -> RenderCtx {
+    RenderCtx::new(self.render_tree.as_mut(), self.canvas.as_mut(), rid)
+  }
 }

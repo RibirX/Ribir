@@ -6,19 +6,20 @@ use std::{
 pub mod build_ctx;
 pub mod key;
 pub mod layout;
-mod stateful;
+pub use layout::*;
+pub mod stateful;
 pub mod text;
 pub mod widget_tree;
 pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
-// pub use layout::row_col_layout::column;
-// pub use layout::row_col_layout::row;
 pub use stateful::{StateRef, StatefulWidget};
 pub use text::Text;
 pub mod events;
-use events::pointers::{PointerEvent, PointerEventType, PointerListener};
-pub use events::Event;
+pub use events::{
+  pointers::{PointerEvent, PointerEventType, PointerListener},
+  Event,
+};
 mod phantom;
 pub use phantom::PhantomWidget;
 

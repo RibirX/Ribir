@@ -1,15 +1,9 @@
-use super::flex_item::*;
 use crate::prelude::*;
 
 use crate::render::render_tree::*;
 
-#[derive(Debug, Clone, Copy)]
-pub enum FlexFit {
-  Tight,
-  Loose,
-}
-#[derive(Debug, Copy, Clone)]
-pub enum Axis {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Direction {
   /// Left and right.
   Horizontal,
   /// Up and down.
@@ -17,131 +11,219 @@ pub enum Axis {
 }
 
 #[derive(Debug)]
-pub struct FlexContainer {
-  axis: Axis,
+pub struct Flex {
+  pub reverse: bool,
+  pub wrap: bool,
+  pub direction: Direction,
+  pub children: Vec<BoxWidget>,
 }
 
-impl FlexContainer {
-  pub fn new(axis: Axis) -> FlexContainer { FlexContainer { axis } }
+#[derive(Debug)]
+pub struct FlexRender {
+  pub reverse: bool,
+  pub direction: Direction,
+  pub wrap: bool,
+}
 
-  pub fn main_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
-    let rect = ctx.box_rect(id);
-    match self.axis {
-      Axis::Horizontal => rect.map(|r| r.width()),
-      Axis::Vertical => rect.map(|r| r.height()),
+impl Flex {
+  pub fn from_iter(children: impl Iterator<Item = BoxWidget>) -> Self {
+    Self {
+      reverse: false,
+      wrap: false,
+      direction: Direction::Horizontal,
+      children: children.collect(),
     }
   }
 
-  pub fn cross_size(&self, id: RenderId, ctx: &RenderCtx) -> Option<f32> {
-    let rect = ctx.box_rect(id);
-    match self.axis {
-      Axis::Vertical => rect.map(|r| r.width()),
-      Axis::Horizontal => rect.map(|r| r.height()),
+  #[inline]
+  pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
+    self.children.push(child.box_it());
+    self
+  }
+
+  #[inline]
+  pub fn with_reverse(mut self, reverse: bool) -> Self {
+    self.reverse = reverse;
+    self
+  }
+
+  #[inline]
+  pub fn with_direction(mut self, direction: Direction) -> Self {
+    self.direction = direction;
+    self
+  }
+
+  #[inline]
+  pub fn with_wrap(mut self, wrap: bool) -> Self {
+    self.wrap = wrap;
+    self
+  }
+}
+
+impl Default for Flex {
+  fn default() -> Self {
+    Self {
+      reverse: false,
+      wrap: false,
+      direction: Direction::Horizontal,
+      children: vec![],
+    }
+  }
+}
+
+impl_widget_for_multi_child_widget!(Flex);
+
+impl RenderWidget for Flex {
+  type RO = FlexRender;
+  fn create_render_object(&self) -> Self::RO {
+    FlexRender {
+      reverse: self.reverse,
+      direction: self.direction,
+      wrap: self.wrap,
+    }
+  }
+}
+
+impl MultiChildWidget for Flex {
+  #[inline]
+  fn take_children(&mut self) -> Vec<BoxWidget> { std::mem::replace(&mut self.children, vec![]) }
+}
+
+impl RenderObject for FlexRender {
+  type Owner = Flex;
+  fn update(&mut self, owner: &Self::Owner, ctx: &mut UpdateCtx) {
+    if self.wrap != owner.wrap {
+      self.wrap = owner.wrap;
+      ctx.mark_needs_layout();
+    }
+    if self.reverse != owner.reverse {
+      self.reverse = owner.reverse;
+      ctx.mark_needs_layout();
+    }
+    if self.direction != owner.direction {
+      self.direction = owner.direction;
+      ctx.mark_needs_layout();
     }
   }
 
-  pub fn flex_layout<'a>(&mut self, id: RenderId, ctx: &mut RenderCtx<'a>) -> Size {
-    let size = self.fix_child_size(id, ctx);
+  fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size {
+    let boundary = FlexSize::from_size(limit.max, self.direction);
+    // Store all place position of all children
+    let mut geometry_pos = vec![];
+    // Store the (index, flex) of all expanded child.
+    let mut expended = vec![];
+    // Flex sum.
+    let mut flex = 0.0;
+    // the max of child touch in main axis
+    let mut main_max = 0.0f32;
+    let mut allocated_pos = FlexSize {
+      main: 0.,
+      cross: 0.,
+    };
+    // current line's cross height.
+    let mut cross_line_height = 0.;
 
-    self.fix_child_position(id, size, ctx);
-    let size = self.self_size(size);
-    ctx.update_size(id, size);
-    size
-  }
+    ctx.children().enumerate().for_each(|(idx, mut child_ctx)| {
+      // expand item
+      if false {
+        expended.push(idx);
+      } else {
+        let size = child_ctx.perform_layout(BoxClamp {
+          max: (boundary - allocated_pos).to_size(self.direction),
+          min: Size::zero(),
+        });
 
-  fn self_size(&mut self, size: Size) -> Size {
-    match self.axis {
-      Axis::Horizontal => size,
-      Axis::Vertical => Size::new(size.height, size.width),
-    }
-  }
-
-  fn fix_child_size<'a>(&self, id: RenderId, ctx: &mut RenderCtx<'a>) -> Size {
-    let mut v = vec![];
-    let mut autos = vec![];
-
-    let bound = ctx.get_box_limit(id).unwrap_or(UNLIMIT_BOX);
-    ctx.collect_children(id, &mut v);
-
-    let mut total_flex = 0;
-    let mut allocated: f32 = 0.0;
-    let mut cross_size: f32 = 0.0;
-    for child_id in v {
-      if let Some(flex) = ctx.render_object(child_id).and_then(|r| r.flex()) {
-        total_flex += flex;
-        autos.push(child_id);
-      } else if let (Some(main), Some(cross)) = self.child_layout(child_id, ctx) {
-        allocated += main;
-        cross_size = cross_size.max(cross);
-      }
-    }
-
-    if total_flex > 0 {
-      let size = match self.axis {
-        Axis::Horizontal => ctx.get_box_limit(id).unwrap_or(UNLIMIT_BOX).min_width,
-        Axis::Vertical => ctx.get_box_limit(id).unwrap_or(UNLIMIT_BOX).min_height,
-      };
-      let space = size - allocated;
-      let s = space / (total_flex as f32);
-
-      for child_id in autos {
-        let flex = ctx.render_object(child_id).unwrap().flex().unwrap();
-        ctx.set_box_limit(
-          child_id,
-          Some(self.set_main_to_bound(&bound, s * (flex as f32))),
-        );
-
-        if let (Some(main), Some(cross)) = self.child_layout(child_id, ctx) {
-          allocated += main;
-          cross_size = cross_size.max(cross);
+        let flex_size = FlexSize::from_size(size, self.direction);
+        if self.wrap && allocated_pos.main + flex_size.main > boundary.main {
+          main_max = main_max.max(allocated_pos.main);
+          // wrap to a new line to place child.
+          allocated_pos.main = 0.;
+          allocated_pos.cross += cross_line_height;
+          cross_line_height = flex_size.cross;
+        } else {
+          cross_line_height = cross_line_height.max(flex_size.cross);
+          allocated_pos.main += flex_size.main;
         }
       }
+      geometry_pos.push(allocated_pos);
+    });
+    main_max = main_max.max(allocated_pos.main);
+
+    // todo: lay out expanded children
+    // todo: support align children
+
+    ctx
+      .children()
+      .zip(geometry_pos.iter())
+      .for_each(|(mut ctx, size)| ctx.update_position(size.to_point(self.direction)));
+
+    allocated_pos.main = allocated_pos.main.max(main_max);
+    allocated_pos.cross += cross_line_height;
+    allocated_pos.to_size(self.direction)
+  }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { false }
+
+  #[inline]
+  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+}
+
+impl FlexRender {
+  pub fn new(dir: Direction) -> Flex {
+    Flex {
+      direction: dir,
+      children: vec![],
+      reverse: false,
+      wrap: false,
     }
-
-    Size::new(allocated, cross_size)
   }
+}
 
-  fn fix_child_position<'a>(&mut self, id: RenderId, _content: Size, ctx: &mut RenderCtx<'a>) {
-    let mut v = vec![];
-    ctx.collect_children(id, &mut v);
-    let mut x = 0.0;
-    let mut y = 0.0;
-    v.iter().for_each(|value| {
-      ctx.update_child_pos(*value, Point::new(x, y));
-      if let (Some(main), Some(_)) = self.child_axis_size(*value, ctx) {
-        match self.axis {
-          Axis::Horizontal => x += main,
-          Axis::Vertical => y += main,
-        }
-      }
-    })
-  }
+#[derive(Debug, Clone, Copy)]
+struct FlexSize {
+  main: f32,
+  cross: f32,
+}
 
-  fn child_layout<'a>(&self, id: RenderId, ctx: &mut RenderCtx<'a>) -> (Option<f32>, Option<f32>) {
-    ctx.perform_layout(id);
-    self.child_axis_size(id, ctx)
-  }
-
-  fn child_axis_size<'a>(
-    &self,
-    id: RenderId,
-    ctx: &mut RenderCtx<'a>,
-  ) -> (Option<f32>, Option<f32>) {
-    (self.main_size(id, ctx), self.cross_size(id, ctx))
-  }
-
-  fn set_main_to_bound(&self, bound: &LimitBox, main_size: f32) -> LimitBox {
-    let mut res = *bound;
-    match self.axis {
-      Axis::Horizontal => {
-        res.min_width = 0.0;
-        res.max_width = main_size;
-      }
-      Axis::Vertical => {
-        res.min_height = 0.0;
-        res.max_height = main_size;
-      }
+impl FlexSize {
+  #[inline]
+  fn to_size(&self, dir: Direction) -> Size {
+    match dir {
+      Direction::Horizontal => Size::new(self.main, self.cross),
+      Direction::Vertical => Size::new(self.cross, self.main),
     }
-    res
   }
+
+  #[inline]
+  fn to_point(&self, dir: Direction) -> Point { self.to_size(dir).to_vector().to_point() }
+
+  #[inline]
+  fn from_size(size: Size, dir: Direction) -> Self {
+    match dir {
+      Direction::Horizontal => Self {
+        main: size.width,
+        cross: size.height,
+      },
+      Direction::Vertical => Self {
+        cross: size.width,
+        main: size.height,
+      },
+    }
+  }
+}
+
+impl std::ops::Sub for FlexSize {
+  type Output = Self;
+  fn sub(self, rhs: Self) -> Self::Output {
+    FlexSize {
+      main: self.main - rhs.main,
+      cross: self.cross - rhs.cross,
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
 }

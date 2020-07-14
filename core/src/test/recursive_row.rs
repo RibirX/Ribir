@@ -1,5 +1,5 @@
 #![cfg(test)]
-use crate::{prelude::*, widget::row};
+use crate::{prelude::*, widget::Row};
 #[derive(Debug)]
 pub struct RecursiveRow {
   pub width: usize,
@@ -8,21 +8,17 @@ pub struct RecursiveRow {
 
 impl CombinationWidget for RecursiveRow {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
-    row(
-      (0..self.width)
-        .map(|_| {
-          if self.depth > 1 {
-            RecursiveRow {
-              width: self.width,
-              depth: self.depth - 1,
-            }
-            .box_it()
-          } else {
-            Text("leaf".to_string()).box_it()
-          }
-        })
-        .collect(),
-    )
+    Row::from_iter((0..self.width).map(|_| {
+      if self.depth > 1 {
+        RecursiveRow {
+          width: self.width,
+          depth: self.depth - 1,
+        }
+        .box_it()
+      } else {
+        Text("leaf".to_string()).box_it()
+      }
+    }))
     .box_it()
   }
 }
