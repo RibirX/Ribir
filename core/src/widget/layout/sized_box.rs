@@ -95,7 +95,7 @@ mod tests {
 
   fn check(sized_box: SizedBox, check_size: Size) {
     let mut window =
-      window::NoRenderWindow::without_render(sized_box.box_it(), DeviceSize::new(500, 400));
+      window::NoRenderWindow::without_render(sized_box.box_it(), Size::new(500., 400.));
     window.render_ready();
 
     let r_tree = window.render_tree();
@@ -114,7 +114,7 @@ mod tests {
     check(sized_box, size);
 
     let expand_box = SizedBox::expanded(Text("".to_string()));
-    check(expand_box, Size::new(500., 500.));
+    check(expand_box, Size::new(500., 400.));
 
     let shrink = SizedBox::shrink(Text("".to_string()));
     check(shrink, Size::zero());

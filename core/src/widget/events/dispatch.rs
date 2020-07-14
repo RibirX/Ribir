@@ -237,7 +237,7 @@ mod tests {
       row.push(record);
       row
     });
-    let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = mock_device_id(0);
@@ -273,7 +273,7 @@ mod tests {
   fn mouse_buttons() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = mock_device_id(0);
@@ -395,7 +395,7 @@ mod tests {
         move |e| stack.borrow_mut().push(e.clone())
       });
 
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), DeviceSize::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {

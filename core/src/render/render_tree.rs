@@ -1,8 +1,10 @@
 use crate::{prelude::*, util::TreeFormatter, widget::widget_tree::*};
+use canvas::Canvas;
 use indextree::*;
 use std::{
   cmp::Reverse,
   collections::{BinaryHeap, HashMap},
+  pin::Pin,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -81,6 +83,22 @@ impl RenderTree {
   #[inline]
   pub fn new_node(&mut self, data: Box<dyn RenderObjectSafety + Send + Sync>) -> RenderId {
     RenderId(self.arena.new_node(data))
+  }
+
+  /// Do the work of computing the layout for all node which need, always layout
+  /// from the root to leaf. Return if any node has really computing the layout.
+  pub fn layout(&mut self, win_size: Size, mut canvas: Pin<&mut Canvas>) -> bool {
+    let needs_layout = self.needs_layout.clone();
+    needs_layout.iter().for_each(|Reverse((_depth, rid))| {
+      let clamp = rid.layout_clamp(self).unwrap_or_else(|| BoxClamp {
+        min: Size::zero(),
+        max: win_size,
+      });
+      rid.perform_layout(clamp, canvas.as_mut(), unsafe { Pin::new_unchecked(self) });
+    });
+
+    self.needs_layout.clear();
+    !needs_layout.is_empty()
   }
 
   #[allow(dead_code)]
@@ -164,40 +182,9 @@ impl RenderId {
     })
   }
 
-  /// A delegate for [NodeId::parent](indextree::NodeId.parent)
-  pub(crate) fn parent(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_feature(tree, |node| node.parent())
-  }
-
-  /// A delegate for [NodeId::first_child](indextree::NodeId.first_child)
-  pub(crate) fn first_child(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_feature(tree, |node| node.first_child())
-  }
-
-  /// A delegate for [NodeId::last_child](indextree::NodeId.last_child)
-  pub(crate) fn last_child(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_feature(tree, |node| node.last_child())
-  }
-
-  /// A delegate for
-  /// [NodeId::previous_sibling](indextree::NodeId.previous_sibling)
-  pub(crate) fn previous_sibling(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_feature(tree, |node| node.previous_sibling())
-  }
-
-  /// A delegate for [NodeId::next_sibling](indextree::NodeId.next_sibling)
-  pub(crate) fn next_sibling(self, tree: &RenderTree) -> Option<RenderId> {
-    self.node_feature(tree, |node| node.next_sibling())
-  }
-
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
   pub(crate) fn ancestors<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
     self.0.ancestors(&tree.arena).map(RenderId)
-  }
-
-  /// A delegate for [NodeId::descendants](indextree::NodeId.descendants)
-  pub(crate) fn descendants<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
-    self.0.descendants(&tree.arena).map(RenderId)
   }
 
   /// Preappend a RenderObject as child, and create this RenderObject's Widget
@@ -283,17 +270,84 @@ impl RenderId {
     }
   }
 
-  fn layout_info_mut(self, layout_info: &mut HashMap<RenderId, BoxLayout>) -> &mut BoxLayout {
-    layout_info.entry(self).or_insert_with(BoxLayout::default)
+  pub(crate) fn perform_layout(
+    self,
+    clamp: BoxClamp,
+    canvas: Pin<&mut Canvas>,
+    mut tree: Pin<&mut RenderTree>,
+  ) -> Size {
+    let lay_outed = self.layout_box_rect(&*tree);
+    if lay_outed.is_some() && self.layout_clamp(&*tree) == Some(clamp) {
+      lay_outed.unwrap().size
+    } else {
+      // Safety: only split tree from ctx to access the render object instance.
+      let tree_mut = unsafe {
+        let ptr = tree.as_mut().get_unchecked_mut() as *mut RenderTree;
+        &mut *ptr
+      };
+      let size = self
+        .get_mut(tree_mut)
+        .perform_layout(clamp, &mut RenderCtx::new(tree, canvas, self));
+      *self.layout_clamp_mut(tree_mut) = clamp;
+      self.layout_box_rect_mut(tree_mut).size = size;
+      size
+    }
   }
 
-  fn node_feature<F: Fn(&Node<Box<dyn RenderObjectSafety + Send + Sync>>) -> Option<NodeId>>(
-    self,
-    tree: &RenderTree,
-    method: F,
-  ) -> Option<RenderId> {
-    tree.arena.get(self.0).map(method).flatten().map(RenderId)
+  fn layout_info_mut(self, layout_info: &mut HashMap<RenderId, BoxLayout>) -> &mut BoxLayout {
+    layout_info.entry(self).or_insert_with(BoxLayout::default)
   }
 }
 
 impl !Unpin for RenderTree {}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::sync::{Arc, Mutex};
+
+  #[derive(Debug, Clone)]
+  struct MockRenderObj {
+    records: Arc<Mutex<Vec<RenderId>>>,
+  }
+
+  impl RenderObjectSafety for MockRenderObj {
+    fn update(&mut self, _: &dyn RenderWidgetSafety, _: &mut UpdateCtx) {}
+    fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+      self.records.lock().unwrap().push(ctx.render_id());
+      ctx.children().for_each(|mut child| {
+        child.perform_layout(clamp);
+      });
+      Size::zero()
+    }
+    fn only_sized_by_parent(&self) -> bool { false }
+    fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+  }
+
+  fn mock_widget_id(i: usize) -> WidgetId { unsafe { std::mem::transmute(i) } }
+
+  #[test]
+  fn relayout_always_from_top_to_down() {
+    let records = Arc::new(Mutex::new(vec![]));
+    let mut tree = RenderTree::default();
+    let obj = Box::new(MockRenderObj {
+      records: records.clone(),
+    });
+    let grand_parent = tree.set_root(mock_widget_id(0), obj.clone());
+
+    let parent = tree.new_node(obj.clone());
+    grand_parent.append(parent, &mut tree);
+
+    let son = tree.new_node(obj.clone());
+    parent.append(son, &mut tree);
+
+    parent.mark_needs_layout(&mut tree);
+    grand_parent.mark_needs_layout(&mut tree);
+    son.mark_needs_layout(&mut tree);
+    let mut canvas = Box::pin(Canvas::new(DeviceSize::new(0, 0)));
+    tree.layout(Size::zero(), canvas.as_mut());
+
+    assert_eq!(&*records.lock().unwrap(), &[grand_parent, parent, son]);
+    assert!(tree.needs_layout.is_empty());
+  }
+}

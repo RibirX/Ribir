@@ -83,8 +83,9 @@ impl WidgetTree {
   }
 
   /// Check all the need build widgets and update the widget tree to what need
-  /// build widgets want it to be.
-  pub fn repair(&mut self, render_tree: &mut RenderTree) {
+  /// build widgets want it to be. Return if any node really rebuild or updated.
+  pub fn repair(&mut self, render_tree: &mut RenderTree) -> bool {
+    let repaired = !self.need_builds.is_empty() || !self.changed_widgets.is_empty();
     while let Some(need_build) = self.pop_need_build_widget() {
       debug_assert!(
         need_build.assert_get(self).classify().is_combination(),
@@ -113,6 +114,7 @@ impl WidgetTree {
     }
 
     self.flush_to_render(render_tree);
+    repaired
   }
 
   #[cfg(test)]

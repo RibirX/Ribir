@@ -66,20 +66,9 @@ impl<'a> RenderCtx<'a> {
   /// Do the work of computing the layout for this render object, and return the
   /// render object box size. Should called from parent.
   pub fn perform_layout(&mut self, clamp: BoxClamp) -> Size {
-    let lay_outed = self.render_obj.layout_box_rect(&*self.tree);
-    if lay_outed.is_some() && self.render_obj.layout_clamp(&*self.tree) == Some(clamp) {
-      lay_outed.unwrap().size
-    } else {
-      // Safety: only split tree from ctx to access the render object instance.
-      let tree = unsafe {
-        let ptr = self.tree.as_mut().get_unchecked_mut() as *mut RenderTree;
-        &mut *ptr
-      };
-      let size = self.render_obj.get_mut(tree).perform_layout(clamp, self);
-      *self.render_obj.layout_clamp_mut(tree) = clamp;
-      self.render_obj.layout_box_rect_mut(tree).size = size;
-      size
-    }
+    self
+      .render_obj
+      .perform_layout(clamp, self.canvas.as_mut(), self.tree.as_mut())
   }
 
   // mesure test bound

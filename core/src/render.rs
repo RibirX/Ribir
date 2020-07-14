@@ -30,8 +30,8 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   /// Do the work of computing the layout for this render object, and return the
   /// render object size after layout.
   ///
-  /// In implementing this function, you must call layout on each of your
-  /// children
+  /// In implementing this function, You are responsible for calling every
+  /// children's perform_layout across the `RenderCtx`
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size;
 
   /// Whether the constraints from parent are the only input to detect the
