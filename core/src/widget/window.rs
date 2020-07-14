@@ -12,31 +12,34 @@ use winit::{
   window::{Window as NativeWindow, WindowBuilder},
 };
 
+pub trait RawWindow {
+  fn inner_size(&self) -> Size;
+  fn outer_size(&self) -> Size;
+}
+
+impl RawWindow for NativeWindow {
+  fn inner_size(&self) -> Size {
+    let size = self.inner_size().to_logical(self.scale_factor());
+    Size::new(size.width, size.height)
+  }
+
+  fn outer_size(&self) -> Size {
+    let size = self.outer_size().to_logical(self.scale_factor());
+    Size::new(size.width, size.height)
+  }
+}
+
 /// Window is the root to represent.
-pub struct Window<W = NativeWindow, R: CanvasRender = WgpuRender> {
+pub struct Window<W: RawWindow = NativeWindow, R: CanvasRender = WgpuRender> {
   render_tree: Pin<Box<RenderTree>>,
   widget_tree: Pin<Box<WidgetTree>>,
-  native_window: W,
+  raw_window: W,
   canvas: Pin<Box<Canvas>>,
   render: R,
   dispatcher: Dispatcher,
 }
 
-pub type HeadlessWindow = Window<(), WgpuRender<TextureSurface>>;
-pub type NoRenderWindow = Window<(), MockRender>;
-
-pub struct MockRender;
-impl CanvasRender for MockRender {
-  fn draw(
-    &mut self,
-    _: &canvas::RenderData,
-    _: &mut canvas::MemTexture<u8>,
-    _: &mut canvas::MemTexture<u32>,
-  ) {
-  }
-}
-
-impl<W, R: CanvasRender> Window<W, R> {
+impl<W: RawWindow, R: CanvasRender> Window<W, R> {
   /// processes native events from this native window
   #[inline]
   pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
@@ -52,11 +55,9 @@ impl<W, R: CanvasRender> Window<W, R> {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub(crate) fn render_ready(&mut self) -> bool {
-    self.tree_repair();
-    self.mark_dirty();
+    let changed = self.tree_repair();
     self.layout();
-    // Todo: "should return if need repaint."
-    true
+    changed
   }
 
   /// Draw an image what current render tree represent.
@@ -71,35 +72,25 @@ impl<W, R: CanvasRender> Window<W, R> {
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed. The render tree will also
   /// react widget tree's change.
-  #[inline]
-  fn tree_repair(&mut self) {
+  fn tree_repair(&mut self) -> bool {
     unsafe {
       self
         .widget_tree
         .as_mut()
         .get_unchecked_mut()
-        .repair(self.render_tree.as_mut().get_unchecked_mut());
+        .repair(self.render_tree.as_mut().get_unchecked_mut())
     }
   }
 
   /// Layout the render tree as needed
   fn layout(&mut self) {
-    // let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
-    // let mut_ptr = tree as *mut RenderTree;
-    // let root = tree.root().unwrap();
-    // let mut ctx = RenderCtx::new(tree, &mut self.canvas);
-    // unsafe {
-    //   root
-    //     .get_mut(&mut *mut_ptr)
-    //     .map(|node| node.perform_layout(root, &mut ctx));
-    // }
-  }
-
-  fn mark_dirty(&mut self) {
-    // let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
-    // let root = tree.root().unwrap();
-    // let mut ctx = RenderCtx::new(tree, &mut self.canvas);
-    // ctx.mark_layout_dirty(root);
+    unsafe {
+      self
+        .render_tree
+        .as_mut()
+        .get_unchecked_mut()
+        .layout(self.raw_window.inner_size(), self.canvas.as_mut())
+    };
   }
 
   fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
@@ -107,7 +98,7 @@ impl<W, R: CanvasRender> Window<W, R> {
 
     let widget_tree = Box::pin(WidgetTree::default());
     let mut wnd = Self {
-      native_window: wnd,
+      raw_window: wnd,
       dispatcher: Dispatcher::new(NonNull::from(&*render_tree), NonNull::from(&*widget_tree)),
       render_tree,
       widget_tree,
@@ -125,17 +116,36 @@ impl<W, R: CanvasRender> Window<W, R> {
 
     wnd
   }
+
+  #[cfg(test)]
+  pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
+
+  #[cfg(test)]
+  pub fn widget_tree(&mut self) -> Pin<&mut WidgetTree> { self.widget_tree.as_mut() }
+
+  #[cfg(test)]
+  pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
+
+  #[cfg(test)]
+  pub fn new_build_ctx(&mut self, wid: WidgetId) -> BuildCtx {
+    BuildCtx::new(self.widget_tree(), wid)
+  }
+
+  #[cfg(test)]
+  pub fn new_render_ctx(&mut self, rid: RenderId) -> RenderCtx {
+    RenderCtx::new(self.render_tree.as_mut(), self.canvas.as_mut(), rid)
+  }
 }
 
 impl Window {
   #[inline]
-  pub fn id(&self) -> WindowId { self.native_window.id() }
+  pub fn id(&self) -> WindowId { self.raw_window.id() }
 
   /// Returns the position of the top-left hand corner of the window's client
   /// area relative to the top-left hand corner of the desktop.
   pub fn inner_position(&self) -> DevicePoint {
     let pos = self
-      .native_window
+      .raw_window
       .inner_position()
       .expect(" Can only be called on the main thread");
     DevicePoint::new(pos.x as u32, pos.y as u32)
@@ -145,7 +155,7 @@ impl Window {
   /// the  top-left hand corner of the desktop.
   pub fn outer_position(&self) -> DevicePoint {
     let pos = self
-      .native_window
+      .raw_window
       .outer_position()
       .expect(" Can only be called on the main thread");
     DevicePoint::new(pos.x as u32, pos.y as u32)
@@ -165,52 +175,53 @@ impl Window {
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
   /// after all OS events have been processed by the event loop.
   #[inline]
-  pub(crate) fn request_redraw(&self) { self.native_window.request_redraw(); }
+  pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
+}
+
+pub type HeadlessWindow = Window<MockRawWindow, WgpuRender<TextureSurface>>;
+pub type NoRenderWindow = Window<MockRawWindow, MockRender>;
+
+pub struct MockRender;
+
+pub struct MockRawWindow {
+  size: Size,
+}
+
+impl CanvasRender for MockRender {
+  fn draw(
+    &mut self,
+    _: &canvas::RenderData,
+    _: &mut canvas::MemTexture<u8>,
+    _: &mut canvas::MemTexture<u32>,
+  ) {
+  }
+}
+
+impl RawWindow for MockRawWindow {
+  fn inner_size(&self) -> Size { self.size }
+  fn outer_size(&self) -> Size { self.size }
 }
 
 impl HeadlessWindow {
   pub fn headless(root: BoxWidget, size: DeviceSize) -> Self {
     let (canvas, render) =
       futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
-    Self::new(root, (), canvas, render)
+    Self::new(
+      root,
+      MockRawWindow {
+        size: Size::new(800., 600.),
+      },
+      canvas,
+      render,
+    )
   }
-
-  #[inline]
-  pub fn inner_position(&self) -> DevicePoint { DevicePoint::new(20, 20) }
-
-  #[inline]
-  pub fn outer_position(&self) -> DevicePoint { DevicePoint::new(0, 0) }
 }
 
 impl NoRenderWindow {
-  pub fn without_render(root: BoxWidget, size: DeviceSize) -> Self {
-    let canvas = Canvas::new(size);
+  pub fn without_render(root: BoxWidget, size: Size) -> Self {
+    // todo: should set the global transform of canvas by window's scale factor.
+    let canvas = Canvas::new(DeviceSize::new(size.width as u32, size.height as u32));
     let render = MockRender;
-    Self::new(root, (), canvas, render)
-  }
-
-  #[inline]
-  pub fn inner_position(&self) -> DevicePoint { DevicePoint::new(20, 20) }
-
-  #[inline]
-  pub fn outer_position(&self) -> DevicePoint { DevicePoint::new(0, 0) }
-
-  #[cfg(test)]
-  pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
-
-  #[cfg(test)]
-  pub fn widget_tree(&mut self) -> Pin<&mut WidgetTree> { self.widget_tree.as_mut() }
-
-  #[cfg(test)]
-  pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
-
-  #[cfg(test)]
-  pub fn new_build_ctx(&mut self, wid: WidgetId) -> BuildCtx {
-    BuildCtx::new(self.widget_tree(), wid)
-  }
-
-  #[cfg(test)]
-  pub fn new_render_ctx(&mut self, rid: RenderId) -> RenderCtx {
-    RenderCtx::new(self.render_tree.as_mut(), self.canvas.as_mut(), rid)
+    Self::new(root, MockRawWindow { size }, canvas, render)
   }
 }

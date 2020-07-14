@@ -127,6 +127,7 @@ impl RenderObject for FlexRender {
       // expand item
       if false {
         expended.push(idx);
+        geometry_pos.push(allocated_pos);
       } else {
         let size = child_ctx.perform_layout(BoxClamp {
           max: (boundary - allocated_pos).to_size(self.direction),
@@ -137,15 +138,18 @@ impl RenderObject for FlexRender {
         if self.wrap && allocated_pos.main + flex_size.main > boundary.main {
           main_max = main_max.max(allocated_pos.main);
           // wrap to a new line to place child.
-          allocated_pos.main = 0.;
           allocated_pos.cross += cross_line_height;
+          allocated_pos.main = flex_size.main;
           cross_line_height = flex_size.cross;
         } else {
           cross_line_height = cross_line_height.max(flex_size.cross);
           allocated_pos.main += flex_size.main;
         }
+        geometry_pos.push(FlexSize {
+          main: allocated_pos.main - flex_size.main,
+          cross: allocated_pos.cross,
+        });
       }
-      geometry_pos.push(allocated_pos);
     });
     main_max = main_max.max(allocated_pos.main);
 
