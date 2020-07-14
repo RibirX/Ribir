@@ -94,13 +94,14 @@ mod tests {
   use super::*;
 
   fn check(sized_box: SizedBox, check_size: Size) {
-    let window =
+    let mut window =
       window::NoRenderWindow::without_render(sized_box.box_it(), DeviceSize::new(500, 400));
     window.render_ready();
 
-    let info = window.render_tree().layout_info();
+    let r_tree = window.render_tree();
+    let info = r_tree.layout_info();
     assert_eq!(info.len(), 2);
-    let iter = info.values();
+    let mut iter = info.values();
     assert_eq!(iter.next().unwrap().rect.unwrap().size, check_size);
     assert_eq!(iter.next().unwrap().rect.unwrap().size, check_size);
   }
@@ -108,14 +109,14 @@ mod tests {
   #[test]
   fn smoke() {
     let size = Size::new(100., 100.);
-    let child = Text("".to_string());
-    let sized_box = SizedBox::from_size(size, child);
+
+    let sized_box = SizedBox::from_size(size, Text("".to_string()));
     check(sized_box, size);
 
-    let expand_box = SizedBox::expanded(child);
-    check(sized_box, Size::new(500., 500.));
+    let expand_box = SizedBox::expanded(Text("".to_string()));
+    check(expand_box, Size::new(500., 500.));
 
-    let shrink = SizedBox::shrink(child);
-    check(sized_box, Size::zero());
+    let shrink = SizedBox::shrink(Text("".to_string()));
+    check(shrink, Size::zero());
   }
 }

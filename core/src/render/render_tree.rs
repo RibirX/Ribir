@@ -74,6 +74,7 @@ impl RenderTree {
     let root = self.new_node(data);
     self.root = Some(root);
     self.render_to_widget.insert(root, owner);
+    self.push_relayout_sub_root(root);
     root
   }
 
@@ -93,6 +94,15 @@ impl RenderTree {
 
   #[cfg(test)]
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
+
+  #[cfg(test)]
+  pub fn layout_info(&self) -> &HashMap<RenderId, BoxLayout> { &self.layout_info }
+
+  fn push_relayout_sub_root(&mut self, rid: RenderId) {
+    self
+      .needs_layout
+      .push(std::cmp::Reverse((rid.ancestors(self).count(), rid)));
+  }
 }
 
 impl RenderId {
@@ -250,28 +260,27 @@ impl RenderId {
   }
 
   pub(crate) fn mark_needs_layout(self, tree: &mut RenderTree) {
-    let mut relayout_root = self;
-    let RenderTree {
-      arena, layout_info, ..
-    } = tree;
-    // All ancestors of this render object should relayout until the one which only
-    // sized by parent.
-    self.0.ancestors(arena).all(|id| {
-      let sized_by_parent = arena
-        .get(id)
-        .map_or(false, |node| node.get().only_sized_by_parent());
-      if !sized_by_parent {
-        let rid = RenderId(id);
-        self.layout_info_mut(layout_info).rect = None;
-        relayout_root = rid;
-      }
+    if self.layout_box_rect(tree).is_none() {
+      let mut relayout_root = self;
+      let RenderTree {
+        arena, layout_info, ..
+      } = tree;
+      // All ancestors of this render object should relayout until the one which only
+      // sized by parent.
+      self.0.ancestors(arena).all(|id| {
+        let sized_by_parent = arena
+          .get(id)
+          .map_or(false, |node| node.get().only_sized_by_parent());
+        if !sized_by_parent {
+          let rid = RenderId(id);
+          self.layout_info_mut(layout_info).rect = None;
+          relayout_root = rid;
+        }
 
-      !sized_by_parent
-    });
-    tree.needs_layout.push(std::cmp::Reverse((
-      relayout_root.ancestors(tree).count(),
-      relayout_root,
-    )));
+        !sized_by_parent
+      });
+      tree.push_relayout_sub_root(relayout_root);
+    }
   }
 
   fn layout_info_mut(self, layout_info: &mut HashMap<RenderId, BoxLayout>) -> &mut BoxLayout {

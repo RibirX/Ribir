@@ -1,5 +1,9 @@
 #![cfg(test)]
-use crate::{prelude::*, render::render_tree::*, widget::widget_tree::*};
+use crate::{
+  prelude::*,
+  render::render_tree::*,
+  widget::{layout::Row, widget_tree::*},
+};
 
 #[derive(Clone, Debug)]
 pub struct EmbedPost {
@@ -22,18 +26,18 @@ impl EmbedPost {
 
 impl CombinationWidget for EmbedPost {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
-    let mut children = vec![
-      Text(self.title.to_string()).box_it(),
-      Text(self.author.to_string()).box_it(),
-      Text(self.content.to_string()).box_it(),
-    ];
+    let mut row = Row::default();
+    row
+      .push(Text(self.title.to_string()))
+      .push(Text(self.author.to_string()))
+      .push(Text(self.content.to_string()));
 
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      children.push(embed.box_it())
+      row.push(embed.box_it());
     }
-    row(children).box_it()
+    row.box_it()
   }
 }
 

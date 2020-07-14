@@ -209,7 +209,7 @@ impl<'a> Iterator for HitWidgetIter<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::window::NoRenderWindow;
+  use crate::widget::{layout::Row, window::NoRenderWindow};
   use std::{cell::RefCell, rc::Rc};
   use winit::event::MouseButton;
 
@@ -232,7 +232,11 @@ mod tests {
   fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let root = record_pointer(event_record.clone(), row(vec![record]));
+    let root = record_pointer(event_record.clone(), {
+      let mut row = Row::default();
+      row.push(record);
+      row
+    });
     let mut wnd = NoRenderWindow::without_render(root, DeviceSize::new(100, 100));
     wnd.render_ready();
 

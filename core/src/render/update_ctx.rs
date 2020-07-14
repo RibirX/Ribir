@@ -11,13 +11,6 @@ impl<'a> UpdateCtx<'a> {
   }
   /// Mark this render object needs relayout, and spread up to an ancestor which
   /// its size only effected by parent.
-  pub fn mark_needs_layout(&mut self) {
-    self.rid.mark_needs_layout(self.render_tree);
-    self.mark_needs_repaint()
-  }
-
-  /// Mark this render object need repaint. No need call this if you already
-  /// called `mark_needs_layout`.
   #[inline]
-  pub fn mark_needs_repaint(&mut self) { unimplemented!() }
+  pub fn mark_needs_layout(&mut self) { self.rid.mark_needs_layout(self.render_tree); }
 }

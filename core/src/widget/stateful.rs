@@ -145,7 +145,7 @@ mod tests {
     {
       cell_ref.0 = "World!".to_string();
     }
-    assert!(tree.changed_widgets.get(&cell_ref.wid).is_some());
+    assert!(tree.changed_widgets().get(&cell_ref.wid).is_some());
   }
 
   #[test]
