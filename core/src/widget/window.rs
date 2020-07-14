@@ -17,7 +17,7 @@ pub struct Window<W = NativeWindow, R: CanvasRender = WgpuRender> {
   render_tree: Pin<Box<RenderTree>>,
   widget_tree: Pin<Box<WidgetTree>>,
   native_window: W,
-  canvas: Canvas,
+  canvas: Pin<Box<Canvas>>,
   render: R,
   dispatcher: Dispatcher,
 }
@@ -84,22 +84,22 @@ impl<W, R: CanvasRender> Window<W, R> {
 
   /// Layout the render tree as needed
   fn layout(&mut self) {
-    let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
-    let mut_ptr = tree as *mut RenderTree;
-    let root = tree.root().unwrap();
-    let mut ctx = RenderCtx::new(tree, &mut self.canvas);
-    unsafe {
-      root
-        .get_mut(&mut *mut_ptr)
-        .map(|node| node.perform_layout(root, &mut ctx));
-    }
+    // let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
+    // let mut_ptr = tree as *mut RenderTree;
+    // let root = tree.root().unwrap();
+    // let mut ctx = RenderCtx::new(tree, &mut self.canvas);
+    // unsafe {
+    //   root
+    //     .get_mut(&mut *mut_ptr)
+    //     .map(|node| node.perform_layout(root, &mut ctx));
+    // }
   }
 
   fn mark_dirty(&mut self) {
-    let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
-    let root = tree.root().unwrap();
-    let mut ctx = RenderCtx::new(tree, &mut self.canvas);
-    ctx.mark_layout_dirty(root);
+    // let tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
+    // let root = tree.root().unwrap();
+    // let mut ctx = RenderCtx::new(tree, &mut self.canvas);
+    // ctx.mark_layout_dirty(root);
   }
 
   fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
@@ -111,7 +111,7 @@ impl<W, R: CanvasRender> Window<W, R> {
       dispatcher: Dispatcher::new(NonNull::from(&*render_tree), NonNull::from(&*widget_tree)),
       render_tree,
       widget_tree,
-      canvas,
+      canvas: Box::pin(canvas),
       render,
     };
 
@@ -194,4 +194,13 @@ impl NoRenderWindow {
 
   #[inline]
   pub fn outer_position(&self) -> DevicePoint { DevicePoint::new(0, 0) }
+
+  #[cfg(test)]
+  pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
+
+  #[cfg(test)]
+  pub fn widget_tree(&mut self) -> Pin<&mut WidgetTree> { self.widget_tree.as_mut() }
+
+  #[cfg(test)]
+  pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
 }

@@ -7,9 +7,8 @@ use crate::render::*;
 #[derive(Debug)]
 pub struct Text(pub String);
 
-impl Widget for Text {
-  render_widget_base_impl!();
-}
+render_widget_base_impl!(Text);
+
 #[derive(Debug)]
 pub struct TextRender {
   text: String,
@@ -27,49 +26,24 @@ impl RenderWidget for Text {
 impl RenderObject for TextRender {
   type Owner = Text;
   #[inline]
-  fn perform_layout(&mut self, id: RenderId, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let rc = ctx.mesure_text(&self.text);
-    ctx.update_size(id, rc.size);
-    rc.size
+    clamp.clamp(rc.size)
   }
 
   #[inline]
-  fn get_constraints(&self) -> LayoutConstraints { LayoutConstraints::DECIDED_BY_SELF }
-  #[inline]
-  fn update<'a>(&mut self, owner_widget: &Text) { self.text = owner_widget.0.clone(); }
+  fn only_sized_by_parent(&self) -> bool { false }
+
+  fn update<'a>(&mut self, owner_widget: &Text, ctx: &mut UpdateCtx) {
+    if self.text != owner_widget.0 {
+      self.text = owner_widget.0.clone();
+      ctx.mark_needs_layout();
+    }
+  }
+
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
     let painter = ctx.painter();
     painter.fill_text(&self.text, None);
   }
 }
-// impl RenderObject for Text {
-//   fn paint(&self) {}
-//   fn to_render_box(&self) -> Option<&dyn RenderObjectBox> { Some(self) }
-//   fn to_render_box_mut(&mut self) -> Option<&mut dyn RenderObjectBox> {
-//     Some(self)
-//   }
-// }
-
-// impl RenderWidget for Text {
-//   fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
-//     Box::new(Text(self.0))
-//   }
-// }
-
-// impl RenderObjectBox for Text {
-//   fn bound(&self) -> Option<Size> {
-//     return Some(Size {
-//       width: self.0.len() as i32,
-//       height: 1,
-//     });
-//   }
-//   fn get_constraints(&self) -> LayoutConstraints {
-//     LayoutConstraints::DECIDED_BY_SELF
-//   }
-
-//   fn layout_sink(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
-//   fn layout_bubble(&mut self, _self_id: NodeId, _ctx: &mut RenderCtx) {}
-//   fn mark_dirty(&mut self) {}
-//   fn is_dirty(&self) -> bool { return false; }
-// }

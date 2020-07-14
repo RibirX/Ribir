@@ -84,12 +84,12 @@ impl<'a> RenderCtx<'a> {
 
   // mesure test bound
   // todo support custom font
-  // pub fn mesure_text(&mut self, text: &str) -> Rect {
-  //   let font = FontInfo::default();
-  //   self.canvas.mesure_text(&Text {
-  //     text,
-  //     font_size: 14.0,
-  //     font,
-  //   })
-  // }
+  pub fn mesure_text(&mut self, text: &str) -> Rect {
+    let font = FontInfo::default();
+    self.canvas.mesure_text(&Text {
+      text,
+      font_size: 14.0,
+      font,
+    })
+  }
 }
