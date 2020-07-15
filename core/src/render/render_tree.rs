@@ -270,20 +270,21 @@ impl RenderId {
     mut tree: Pin<&mut RenderTree>,
   ) -> Size {
     let lay_outed = self.layout_box_rect(&*tree);
-    if lay_outed.is_some() && self.layout_clamp(&*tree) == Some(clamp) {
-      lay_outed.unwrap().size
-    } else {
-      // Safety: only split tree from ctx to access the render object instance.
-      let tree_mut = unsafe {
-        let ptr = tree.as_mut().get_unchecked_mut() as *mut RenderTree;
-        &mut *ptr
-      };
-      let size = self
-        .get_mut(tree_mut)
-        .perform_layout(clamp, &mut RenderCtx::new(tree, canvas, self));
-      *self.layout_clamp_mut(tree_mut) = clamp;
-      self.layout_box_rect_mut(tree_mut).size = size;
-      size
+    match lay_outed {
+      Some(rect) if self.layout_clamp(&*tree) == Some(clamp) => rect.size,
+      _ => {
+        // Safety: only split tree from ctx to access the render object instance.
+        let tree_mut = unsafe {
+          let ptr = tree.as_mut().get_unchecked_mut() as *mut RenderTree;
+          &mut *ptr
+        };
+        let size = self
+          .get_mut(tree_mut)
+          .perform_layout(clamp, &mut RenderCtx::new(tree, canvas, self));
+        *self.layout_clamp_mut(tree_mut) = clamp;
+        self.layout_box_rect_mut(tree_mut).size = size;
+        size
+      }
     }
   }
 
@@ -331,7 +332,7 @@ mod tests {
     let parent = tree.new_node(obj.clone());
     grand_parent.prepend(parent, &mut tree);
 
-    let son = tree.new_node(obj.clone());
+    let son = tree.new_node(obj);
     parent.prepend(son, &mut tree);
 
     parent.mark_needs_layout(&mut tree);

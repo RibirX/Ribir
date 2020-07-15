@@ -5,10 +5,6 @@ use crate::prelude::*;
 pub struct Column(Flex);
 
 impl Column {
-  pub fn from_iter(children: impl Iterator<Item = BoxWidget>) -> Self {
-    Self(Flex::from_iter(children).with_direction(Direction::Vertical))
-  }
-
   #[inline]
   pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
     self.0.push(child);
@@ -24,6 +20,12 @@ impl Column {
 
 impl Default for Column {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Vertical)) }
+}
+
+impl std::iter::FromIterator<BoxWidget> for Column {
+  fn from_iter<T: IntoIterator<Item = BoxWidget>>(iter: T) -> Self {
+    Self(Flex::from_iter(iter).with_direction(Direction::Vertical))
+  }
 }
 
 impl Widget for Column {
