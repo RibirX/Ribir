@@ -1,6 +1,6 @@
 use crate::prelude::*;
-
 use crate::render::render_tree::*;
+use smallvec::{smallvec, SmallVec};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Direction {
@@ -15,7 +15,7 @@ pub struct Flex {
   pub reverse: bool,
   pub wrap: bool,
   pub direction: Direction,
-  pub children: Vec<BoxWidget>,
+  pub children: SmallVec<[BoxWidget; 1]>,
 }
 
 #[derive(Debug)]
@@ -66,12 +66,12 @@ impl Default for Flex {
       reverse: false,
       wrap: false,
       direction: Direction::Horizontal,
-      children: vec![],
+      children: smallvec![],
     }
   }
 }
 
-impl_widget_for_multi_child_widget!(Flex);
+render_widget_base_impl!(Flex);
 
 impl RenderWidget for Flex {
   type RO = FlexRender;
@@ -82,11 +82,11 @@ impl RenderWidget for Flex {
       wrap: self.wrap,
     }
   }
-}
 
-impl MultiChildWidget for Flex {
   #[inline]
-  fn take_children(&mut self) -> Vec<BoxWidget> { std::mem::replace(&mut self.children, vec![]) }
+  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+    Some(std::mem::replace(&mut self.children, smallvec![]))
+  }
 }
 
 impl RenderObject for FlexRender {
@@ -177,7 +177,7 @@ impl FlexRender {
   pub fn new(dir: Direction) -> Flex {
     Flex {
       direction: dir,
-      children: vec![],
+      children: smallvec![],
       reverse: false,
       wrap: false,
     }

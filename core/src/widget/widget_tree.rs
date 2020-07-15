@@ -46,7 +46,7 @@ impl WidgetTree {
   pub fn inflate(&mut self, wid: WidgetId, render_tree: &mut RenderTree) -> &mut Self {
     let parent_id = wid
       .ancestors(self)
-      .find(|id| id.get(self).map_or(false, |w| w.classify().is_render()))
+      .find(|id| id.get(self).map_or(false, |w| w.is_render()))
       .and_then(|id| self.widget_to_render.get(&id))
       .copied();
     let mut stack = vec![(wid, parent_id)];
@@ -88,7 +88,7 @@ impl WidgetTree {
     let repaired = !self.need_builds.is_empty() || !self.changed_widgets.is_empty();
     while let Some(need_build) = self.pop_need_build_widget() {
       debug_assert!(
-        need_build.assert_get(self).classify().is_combination(),
+        need_build.assert_get(self).is_combination(),
         "rebuild widget must be combination widget."
       );
 
@@ -159,7 +159,7 @@ impl WidgetTree {
       .and_then(|key| node.get(self).map(|w| Some(key) == Widget::key(w)))
       .unwrap_or(false);
     if same_key {
-      if widget.classify().is_render() {
+      if widget.is_render() {
         self.changed_widgets.insert(node);
       }
       *self
@@ -183,7 +183,7 @@ impl WidgetTree {
   fn repair_children_by_key(
     &mut self,
     node: WidgetId,
-    new_children: Vec<BoxWidget>,
+    new_children: SmallVec<[BoxWidget; 1]>,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
@@ -248,7 +248,7 @@ impl WidgetId {
   /// mark this id represented widget has changed, and need to update render
   /// tree in next frame.
   pub fn mark_changed(self, tree: &'_ mut WidgetTree) {
-    if self.assert_get(tree).classify().is_render() {
+    if self.assert_get(tree).is_render() {
       tree.changed_widgets.insert(self);
     } else {
       tree.need_builds.insert(self);
@@ -343,7 +343,7 @@ impl WidgetId {
     self.0.descendants(arena).map(WidgetId).for_each(|wid| {
       if arena
         .get(wid.0)
-        .map_or(false, |node| node.get().classify().is_render())
+        .map_or(false, |node| node.get().is_render())
       {
         widget_to_render.remove(&wid);
       }
@@ -374,17 +374,14 @@ impl WidgetId {
   /// find the nearest render widget in subtree, include self.
   fn down_nearest_render_widget(self, tree: &WidgetTree) -> WidgetId {
     let mut wid = self;
-    while wid
-      .get(tree)
-      .map_or(false, |w| w.classify().is_combination())
-    {
+    while wid.get(tree).map_or(false, |w| w.is_combination()) {
       wid = wid.single_child(tree);
     }
-    debug_assert!(wid.get(tree).map_or(false, |w| w.classify().is_render()));
+    debug_assert!(wid.get(tree).map_or(false, |w| w.is_render()));
     wid
   }
 
-  fn take_children(self, tree: &mut WidgetTree) -> Option<Vec<BoxWidget>> {
+  fn take_children(self, tree: &mut WidgetTree) -> Option<SmallVec<[BoxWidget; 1]>> {
     let (tree1, tree2) = unsafe {
       let ptr = tree as *mut WidgetTree;
       (&mut *ptr, &mut *ptr)
@@ -392,11 +389,9 @@ impl WidgetId {
     self.get_mut(tree1).and_then(|w| match w.classify_mut() {
       WidgetClassifyMut::Combination(c) => {
         let mut ctx = BuildCtx::new(unsafe { Pin::new_unchecked(tree2) }, self);
-        Some(vec![c.build(&mut ctx)])
+        Some(smallvec![c.build(&mut ctx)])
       }
-      WidgetClassifyMut::SingleChild(r) => Some(vec![r.take_child()]),
-      WidgetClassifyMut::MultiChild(multi) => Some(multi.take_children()),
-      WidgetClassifyMut::Render(_) => None,
+      WidgetClassifyMut::Render(r) => r.take_children(),
     })
   }
 
@@ -423,9 +418,7 @@ impl dyn Widget {
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self.classify() {
       WidgetClassify::Combination(_) => None,
-      WidgetClassify::SingleChild(s) => Some(s.as_render()),
-      WidgetClassify::MultiChild(m) => Some(m.as_render()),
-      WidgetClassify::Render(r) => Some(r.as_render()),
+      WidgetClassify::Render(r) => Some(r),
     }
   }
 }

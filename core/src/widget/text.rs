@@ -21,6 +21,9 @@ impl RenderWidget for Text {
       text: self.0.clone(),
     }
   }
+
+  #[inline]
+  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> { None }
 }
 
 impl RenderObject for TextRender {

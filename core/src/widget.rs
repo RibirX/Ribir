@@ -22,11 +22,11 @@ pub use events::{
 };
 mod phantom;
 pub use phantom::PhantomWidget;
+pub use smallvec::{smallvec, SmallVec};
 
 /// The common behavior of widgets, also support to dynamic cast to special
-/// widget. In most of cases, user needn't implement `Widget` trait directly,
-/// and implement `CombinationWidget`, `RenderWidget` `SingleChildWidget` or
-/// `MultiChildWidget` is the right way.
+/// widget. In most of cases, needn't implement `Widget` trait directly, and
+/// implement `CombinationWidget`, `RenderWidget` instead of
 pub trait Widget: Debug + Any {
   /// classify this widget into one of four type widget, and return the
   /// reference.
@@ -34,6 +34,12 @@ pub trait Widget: Debug + Any {
 
   /// classify this widget into one of four type widget as mutation reference.
   fn classify_mut(&mut self) -> WidgetClassifyMut;
+
+  #[inline]
+  fn is_combination(&self) -> bool { matches!(self.classify(), WidgetClassify::Combination(_)) }
+
+  #[inline]
+  fn is_render(&self) -> bool { !matches!(self.classify(), WidgetClassify::Combination(_)) }
 
   /// return the some-value of `InheritWidget` reference if the widget is
   /// inherit from another widget, otherwise None.
@@ -115,59 +121,37 @@ pub trait CombinationWidget: Debug {
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
 }
 
-/// a widget has a child.
-pub trait SingleChildWidget: RenderWidgetSafety {
-  /// Called by framework to take child from this widget, and only called once.
-  fn take_child(&mut self) -> BoxWidget;
+/// RenderWidget provide configuration for render object which provide actual
+/// rendering or computing layout for the application.
+pub trait RenderWidget: Debug + Sized {
+  /// The render object type will created.
+  type RO: RenderObject<Owner = Self> + Send + Sync + 'static;
+
+  /// Creates an instance of the RenderObject that this RenderWidget
+  /// represents, using the configuration described by this RenderWidget
+  fn create_render_object(&self) -> Self::RO;
+
+  /// Called by framework to take children from this widget, return some-value
+  /// to if it has child, else return None. This method will only be called
+  /// once. Should never directly call it.
+  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>>;
 }
 
-/// a widget has multi child
-pub trait MultiChildWidget: RenderWidgetSafety {
-  /// Called by framework to take children from this widget, and only called
-  /// once. Called by framework, should never directly call it.
-  fn take_children(&mut self) -> Vec<BoxWidget>;
+/// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
+/// implement this trait, just implement [`RenderWidget`](RenderWidget).
+pub trait RenderWidgetSafety: Debug {
+  fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
+  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>>;
 }
 
 pub enum WidgetClassify<'a> {
   Combination(&'a dyn CombinationWidget),
   Render(&'a dyn RenderWidgetSafety),
-  SingleChild(&'a dyn SingleChildWidget),
-  MultiChild(&'a dyn MultiChildWidget),
 }
 
 pub enum WidgetClassifyMut<'a> {
   Combination(&'a mut dyn CombinationWidget),
   Render(&'a mut dyn RenderWidgetSafety),
-  SingleChild(&'a mut dyn SingleChildWidget),
-  MultiChild(&'a mut dyn MultiChildWidget),
-}
-
-impl<'a> WidgetClassify<'a> {
-  #[inline]
-  pub fn is_combination(&self) -> bool { matches!(self, WidgetClassify::Combination(_)) }
-
-  #[inline]
-  pub fn is_render(&self) -> bool { !matches!(self, WidgetClassify::Combination(_)) }
-
-  #[inline]
-  pub fn is_single_child(&self) -> bool { matches!(self, WidgetClassify::SingleChild(_)) }
-
-  #[inline]
-  pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassify::MultiChild(_)) }
-}
-
-impl<'a> WidgetClassifyMut<'a> {
-  #[inline]
-  pub fn is_combination(&self) -> bool { matches!(self, WidgetClassifyMut::Combination(_)) }
-
-  #[inline]
-  pub fn is_render(&self) -> bool { !matches!(self, WidgetClassifyMut::Combination(_)) }
-
-  #[inline]
-  pub fn is_single_child(&self) -> bool { matches!(self, WidgetClassifyMut::SingleChild(_)) }
-
-  #[inline]
-  pub fn is_multi_child(&self) -> bool { matches!(self, WidgetClassifyMut::MultiChild(_)) }
 }
 
 /// Use inherit method to implement a `Widget`, this is use to extend ability of
@@ -290,9 +274,9 @@ pub macro inherit_widget($ty: ty, $base_widget: ident) {
 }
 
 /// Auto implement `Widget` for `CombinationWidget`,  We should also implement
-/// `Widget` for RenderWidgetSafety, SingleChildWidget and MultiChildWidget, but
-/// can not do it before rust specialization finished. So just CombinationWidget
-/// implemented it, this is user use most, and others provide a macro to do it.
+/// `Widget` for `RenderWidget`, but can not do it before rust specialization
+/// finished. So just CombinationWidget implemented it, this is user use most,
+/// and others provide a macro to do it.
 impl<T: CombinationWidget + 'static> Widget for T {
   #[inline]
   fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
@@ -303,8 +287,6 @@ impl<T: CombinationWidget + 'static> Widget for T {
 
 impl<T: CombinationWidget> !RenderWidget for T {}
 impl<T: RenderWidget> !CombinationWidget for T {}
-impl<T: MultiChildWidget> !SingleChildWidget for T {}
-impl<T: SingleChildWidget> !MultiChildWidget for T {}
 
 pub macro render_widget_base_impl($ty: ty) {
   impl Widget for $ty {
@@ -313,26 +295,6 @@ pub macro render_widget_base_impl($ty: ty) {
 
     #[inline]
     fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
-  }
-}
-
-pub macro single_child_widget_base_impl($ty: ty) {
-  impl Widget for $ty {
-    #[inline]
-    fn classify(&self) -> WidgetClassify { WidgetClassify::SingleChild(self) }
-
-    #[inline]
-    fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::SingleChild(self) }
-  }
-}
-
-pub macro impl_widget_for_multi_child_widget($ty: ty) {
-  impl Widget for $ty {
-    #[inline]
-    fn classify(&self) -> WidgetClassify { WidgetClassify::MultiChild(self) }
-
-    #[inline]
-    fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::MultiChild(self) }
   }
 }
 

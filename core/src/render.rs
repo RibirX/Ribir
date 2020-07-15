@@ -9,17 +9,6 @@ pub mod update_ctx;
 pub use render_tree::{BoxClamp, RenderId};
 pub use update_ctx::UpdateCtx;
 
-/// RenderWidget provide configuration for render object which provide actual
-/// rendering and paint for the application.
-pub trait RenderWidget: Debug + Sized {
-  /// The render object type will created.
-  type RO: RenderObject<Owner = Self> + Send + Sync + 'static;
-
-  /// Creates an instance of the RenderObject that this RenderWidget
-  /// represents, using the configuration described by this RenderWidget
-  fn create_render_object(&self) -> Self::RO;
-}
-
 /// The `Owner` is the render widget which created this object.
 pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   type Owner: RenderWidget<RO = Self>;
@@ -28,7 +17,7 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx);
 
   /// Do the work of computing the layout for this render object, and return the
-  /// render object size after layout.
+  /// size it need.
   ///
   /// In implementing this function, You are responsible for calling every
   /// children's perform_layout across the `RenderCtx`
@@ -43,18 +32,6 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   /// call children's paint individual. And framework guarantee always paint
   /// parent before children.
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
-}
-
-/// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
-/// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety: Debug {
-  fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
-  /// This method is provide to SubTrait upcast to a `RenderWidgetSafety`
-  /// reference.
-  fn as_render(&self) -> &dyn RenderWidgetSafety;
-  /// This method is provide to SubTrait upcast to a mutation
-  /// `RenderWidgetSafety` reference.
-  fn as_render_mut(&mut self) -> &mut dyn RenderWidgetSafety;
 }
 
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
@@ -82,10 +59,9 @@ where
   }
 
   #[inline]
-  fn as_render(&self) -> &dyn RenderWidgetSafety { self }
-
-  #[inline]
-  fn as_render_mut(&mut self) -> &mut dyn RenderWidgetSafety { self }
+  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+    RenderWidget::take_children(self)
+  }
 }
 
 impl<T> RenderObjectSafety for T
