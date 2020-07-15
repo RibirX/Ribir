@@ -1,4 +1,5 @@
 use crate::prelude::*;
+pub use smallvec::{smallvec, SmallVec};
 
 /// A box with a specified size.
 ///
@@ -7,7 +8,7 @@ use crate::prelude::*;
 #[derive(Debug)]
 pub struct SizedBox {
   pub size: Size,
-  pub child: BoxWidget,
+  pub child: Option<BoxWidget>,
 }
 
 #[derive(Debug)]
@@ -17,26 +18,26 @@ pub struct SizedBoxRender {
 
 impl SizedBox {
   /// Creates a box with the specified size.
-  pub fn from_size<W: Widget>(size: Size, child: W) -> Self {
+  pub fn from_size<W: Widget>(size: Size, child: Option<W>) -> Self {
     Self {
       size,
-      child: child.box_it(),
+      child: child.map(|w| w.box_it()),
     }
   }
 
   /// Creates a box that will become as large as its parent allows.
-  pub fn expanded<W: Widget>(child: W) -> Self {
+  pub fn expanded<W: Widget>(child: Option<W>) -> Self {
     Self {
       size: Size::new(f32::INFINITY, f32::INFINITY),
-      child: child.box_it(),
+      child: child.map(|w| w.box_it()),
     }
   }
 
   /// Creates a box that will become as small as its parent allows.
-  pub fn shrink<W: Widget>(child: W) -> Self {
+  pub fn shrink<W: Widget>(child: Option<W>) -> Self {
     Self {
       size: Size::zero(),
-      child: child.box_it(),
+      child: child.map(|w| w.box_it()),
     }
   }
 }
@@ -45,16 +46,13 @@ impl RenderWidget for SizedBox {
   type RO = SizedBoxRender;
   #[inline]
   fn create_render_object(&self) -> Self::RO { SizedBoxRender { size: self.size } }
-}
 
-single_child_widget_base_impl!(SizedBox);
-
-impl SingleChildWidget for SizedBox {
-  fn take_child(&mut self) -> BoxWidget {
-    let hold = PhantomWidget.box_it();
-    std::mem::replace(&mut self.child, hold)
+  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+    self.child.take().map(|w| smallvec![w])
   }
 }
+
+render_widget_base_impl!(SizedBox);
 
 impl RenderObject for SizedBoxRender {
   type Owner = SizedBox;
@@ -69,17 +67,16 @@ impl RenderObject for SizedBoxRender {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let size = clamp.clamp(self.size);
     let mut child_iter = ctx.children();
-    let mut child = child_iter
-      .next()
-      .expect("SizedBox must have a single child.");
+    let child = child_iter.next();
     debug_assert!(child_iter.next().is_none());
-    child.perform_layout(BoxClamp {
-      min: size,
-      max: size,
-    });
+    if let Some(mut child_ctx) = child {
+      child_ctx.perform_layout(BoxClamp {
+        min: size,
+        max: size,
+      });
+    }
     size
   }
-
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 
@@ -110,13 +107,13 @@ mod tests {
   fn smoke() {
     let size = Size::new(100., 100.);
 
-    let sized_box = SizedBox::from_size(size, Text("".to_string()));
+    let sized_box = SizedBox::from_size(size, Some(Text("".to_string())));
     check(sized_box, size);
 
-    let expand_box = SizedBox::expanded(Text("".to_string()));
+    let expand_box = SizedBox::expanded(Some(Text("".to_string())));
     check(expand_box, Size::new(500., 400.));
 
-    let shrink = SizedBox::shrink(Text("".to_string()));
+    let shrink = SizedBox::shrink(Some(Text("".to_string())));
     check(shrink, Size::zero());
   }
 }
