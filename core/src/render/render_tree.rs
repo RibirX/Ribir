@@ -141,13 +141,6 @@ impl RenderId {
       .get_mut()
   }
 
-  /// A delegate for [NodeId::append](indextree::NodeId.append)
-  #[allow(dead_code)]
-  #[inline]
-  pub(crate) fn append(self, new_child: RenderId, tree: &mut RenderTree) {
-    self.0.append(new_child.0, &mut tree.arena);
-  }
-
   /// A delegate for [NodeId::preend](indextree::NodeId.preend)
   #[inline]
   pub(crate) fn prepend(self, new_child: RenderId, tree: &mut RenderTree) {
@@ -336,10 +329,10 @@ mod tests {
     let grand_parent = tree.set_root(mock_widget_id(0), obj.clone());
 
     let parent = tree.new_node(obj.clone());
-    grand_parent.append(parent, &mut tree);
+    grand_parent.prepend(parent, &mut tree);
 
     let son = tree.new_node(obj.clone());
-    parent.append(son, &mut tree);
+    parent.prepend(son, &mut tree);
 
     parent.mark_needs_layout(&mut tree);
     grand_parent.mark_needs_layout(&mut tree);

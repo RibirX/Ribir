@@ -18,28 +18,31 @@ pub struct SizedBoxRender {
 
 impl SizedBox {
   /// Creates a box with the specified size.
-  pub fn from_size<W: Widget>(size: Size, child: Option<W>) -> Self {
+  pub fn from_size<W: Widget>(size: Size, child: W) -> Self {
     Self {
       size,
-      child: child.map(|w| w.box_it()),
+      child: Some(child.box_it()),
     }
   }
 
   /// Creates a box that will become as large as its parent allows.
-  pub fn expanded<W: Widget>(child: Option<W>) -> Self {
+  pub fn expanded<W: Widget>(child: W) -> Self {
     Self {
       size: Size::new(f32::INFINITY, f32::INFINITY),
-      child: child.map(|w| w.box_it()),
+      child: Some(child.box_it()),
     }
   }
 
   /// Creates a box that will become as small as its parent allows.
-  pub fn shrink<W: Widget>(child: Option<W>) -> Self {
+  pub fn shrink<W: Widget>(child: W) -> Self {
     Self {
       size: Size::zero(),
-      child: child.map(|w| w.box_it()),
+      child: Some(child.box_it()),
     }
   }
+
+  /// Creates a box with specified size without child.
+  pub fn empty_box(size: Size) -> Self { Self { size, child: None } }
 }
 
 impl RenderWidget for SizedBox {
@@ -89,31 +92,42 @@ impl RenderObject for SizedBoxRender {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::widget_and_its_children_box_rect;
 
-  fn check(sized_box: SizedBox, check_size: Size) {
-    let mut window =
-      window::NoRenderWindow::without_render(sized_box.box_it(), Size::new(500., 400.));
-    window.render_ready();
-
-    let r_tree = window.render_tree();
-    let info = r_tree.layout_info();
-    assert_eq!(info.len(), 2);
-    let mut iter = info.values();
-    assert_eq!(iter.next().unwrap().rect.unwrap().size, check_size);
-    assert_eq!(iter.next().unwrap().rect.unwrap().size, check_size);
+  #[test]
+  fn fix_size() {
+    let size = Size::new(100., 100.);
+    let sized_box = SizedBox::from_size(size, Text("".to_string()));
+    let (rect, child) = widget_and_its_children_box_rect(sized_box);
+    assert_eq!(rect.size, size);
+    assert_eq!(child, vec![Rect::from_size(size)]);
   }
 
   #[test]
-  fn smoke() {
-    let size = Size::new(100., 100.);
+  fn shrink_size() {
+    let shrink = SizedBox::shrink(Text("".to_string()));
+    let (rect, child) = widget_and_its_children_box_rect(shrink);
 
-    let sized_box = SizedBox::from_size(size, Some(Text("".to_string())));
-    check(sized_box, size);
+    assert_eq!(rect.size, Size::zero());
+    assert_eq!(child, vec![Rect::zero()]);
+  }
 
-    let expand_box = SizedBox::expanded(Some(Text("".to_string())));
-    check(expand_box, Size::new(500., 400.));
+  #[test]
+  fn expanded_size() {
+    let wnd_size = Size::new(500., 500.);
+    let expand_box = SizedBox::expanded(Text("".to_string()));
+    let (rect, child) = widget_and_its_children_box_rect(expand_box);
 
-    let shrink = SizedBox::shrink(Some(Text("".to_string())));
-    check(shrink, Size::zero());
+    assert_eq!(rect.size, wnd_size);
+    assert_eq!(child, vec![Rect::from_size(wnd_size)]);
+  }
+
+  #[test]
+  fn empty_box() {
+    let size = Size::new(10., 10.);
+    let empty_box = SizedBox::empty_box(size);
+    let (rect, child) = widget_and_its_children_box_rect(empty_box);
+    assert_eq!(rect.size, size);
+    assert_eq!(child, vec![]);
   }
 }

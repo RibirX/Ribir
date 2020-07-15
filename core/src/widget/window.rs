@@ -218,10 +218,10 @@ impl HeadlessWindow {
 }
 
 impl NoRenderWindow {
-  pub fn without_render(root: BoxWidget, size: Size) -> Self {
+  pub fn without_render<W: Widget>(root: W, size: Size) -> Self {
     // todo: should set the global transform of canvas by window's scale factor.
     let canvas = Canvas::new(DeviceSize::new(size.width as u32, size.height as u32));
     let render = MockRender;
-    Self::new(root, MockRawWindow { size }, canvas, render)
+    Self::new(root.box_it(), MockRawWindow { size }, canvas, render)
   }
 }

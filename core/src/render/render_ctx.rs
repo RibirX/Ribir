@@ -47,6 +47,24 @@ impl<'a> RenderCtx<'a> {
       })
   }
 
+  pub fn reverse_children<'l>(&'l mut self) -> impl Iterator<Item = RenderCtx<'l>> + 'l {
+    // Safety: only split the lifetime for children one by one.
+    let (tree_ptr, canvas_ptr) = unsafe {
+      let tree_ptr = self.tree.as_mut().get_unchecked_mut() as *mut _;
+      let canvas_ptr = self.canvas.as_mut().get_unchecked_mut() as *mut _;
+      (tree_ptr, canvas_ptr)
+    };
+
+    self
+      .render_obj
+      .reverse_children(&*self.tree)
+      .map(move |rid| RenderCtx {
+        render_obj: rid,
+        tree: unsafe { Pin::new_unchecked(&mut *tree_ptr) },
+        canvas: unsafe { Pin::new_unchecked(&mut *canvas_ptr) },
+      })
+  }
+
   /// Update the position of the render object should place. Relative to parent.
   pub fn update_position(&mut self, pos: Point) {
     self

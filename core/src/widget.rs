@@ -20,8 +20,6 @@ pub use events::{
   pointers::{PointerEvent, PointerEventType, PointerListener},
   Event,
 };
-mod phantom;
-pub use phantom::PhantomWidget;
 pub use smallvec::{smallvec, SmallVec};
 
 /// The common behavior of widgets, also support to dynamic cast to special
