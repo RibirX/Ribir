@@ -5,10 +5,6 @@ use crate::prelude::*;
 pub struct Row(Flex);
 
 impl Row {
-  pub fn from_iter(children: impl Iterator<Item = BoxWidget>) -> Self {
-    Self(Flex::from_iter(children).with_direction(Direction::Horizontal))
-  }
-
   #[inline]
   pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
     self.0.push(child);
@@ -20,6 +16,12 @@ impl Row {
 
   #[inline]
   pub fn with_wrap(self, wrap: bool) -> Self { Self(self.0.with_wrap(wrap)) }
+}
+
+impl std::iter::FromIterator<BoxWidget> for Row {
+  fn from_iter<T: IntoIterator<Item = BoxWidget>>(iter: T) -> Self {
+    Self(Flex::from_iter(iter).with_direction(Direction::Horizontal))
+  }
 }
 
 impl Default for Row {

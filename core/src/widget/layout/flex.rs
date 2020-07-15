@@ -26,15 +26,6 @@ pub struct FlexRender {
 }
 
 impl Flex {
-  pub fn from_iter(children: impl Iterator<Item = BoxWidget>) -> Self {
-    Self {
-      reverse: false,
-      wrap: false,
-      direction: Direction::Horizontal,
-      children: children.collect(),
-    }
-  }
-
   #[inline]
   pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
     self.children.push(child.box_it());
@@ -57,6 +48,17 @@ impl Flex {
   pub fn with_wrap(mut self, wrap: bool) -> Self {
     self.wrap = wrap;
     self
+  }
+}
+
+impl std::iter::FromIterator<BoxWidget> for Flex {
+  fn from_iter<T: IntoIterator<Item = BoxWidget>>(iter: T) -> Self {
+    Self {
+      reverse: false,
+      wrap: false,
+      direction: Direction::Horizontal,
+      children: iter.into_iter().collect(),
+    }
   }
 }
 
@@ -129,17 +131,6 @@ impl RenderObject for FlexRender {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
 }
 
-impl FlexRender {
-  pub fn new(dir: Direction) -> Flex {
-    Flex {
-      direction: dir,
-      children: smallvec![],
-      reverse: false,
-      wrap: false,
-    }
-  }
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 struct FlexSize {
   main: f32,
@@ -148,7 +139,7 @@ struct FlexSize {
 
 impl FlexSize {
   #[inline]
-  fn to_size(&self, dir: Direction) -> Size {
+  fn to_size(self, dir: Direction) -> Size {
     match dir {
       Direction::Horizontal => Size::new(self.main, self.cross),
       Direction::Vertical => Size::new(self.cross, self.main),
@@ -156,7 +147,7 @@ impl FlexSize {
   }
 
   #[inline]
-  fn to_point(&self, dir: Direction) -> Point { self.to_size(dir).to_vector().to_point() }
+  fn to_point(self, dir: Direction) -> Point { self.to_size(dir).to_vector().to_point() }
 
   #[inline]
   fn from_size(size: Size, dir: Direction) -> Self {
@@ -268,14 +259,18 @@ mod tests {
 
   #[test]
   fn horizontal_line() {
-    let row = Flex::from_iter((0..10).map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it()));
+    let row = (0..10)
+      .map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it())
+      .collect::<Flex>();
     let (rect, _) = widget_and_its_children_box_rect(row);
     assert_eq!(rect.size, Size::new(100., 20.));
   }
 
   #[test]
   fn vertical_line() {
-    let col = Flex::from_iter((0..10).map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it()))
+    let col = (0..10)
+      .map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it())
+      .collect::<Flex>()
       .with_direction(Direction::Vertical);
     let (rect, _) = widget_and_its_children_box_rect(col);
     assert_eq!(rect.size, Size::new(10., 200.));
@@ -284,7 +279,10 @@ mod tests {
   #[test]
   fn row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex::from_iter((0..3).map(|_| SizedBox::empty_box(size).box_it())).with_wrap(true);
+    let row = (0..3)
+      .map(|_| SizedBox::empty_box(size).box_it())
+      .collect::<Flex>()
+      .with_wrap(true);
     let (rect, children) = widget_and_its_children_box_rect(row);
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -306,7 +304,9 @@ mod tests {
   #[test]
   fn reverse_row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex::from_iter((0..3).map(|_| SizedBox::empty_box(size).box_it()))
+    let row = (0..3)
+      .map(|_| SizedBox::empty_box(size).box_it())
+      .collect::<Flex>()
       .with_wrap(true)
       .with_reverse(true);
     let (rect, children) = widget_and_its_children_box_rect(row);
