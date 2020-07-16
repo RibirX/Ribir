@@ -1,3 +1,4 @@
+use super::expanded::ExpandedRender;
 use crate::prelude::*;
 use crate::render::render_tree::*;
 use smallvec::{smallvec, SmallVec};
@@ -113,15 +114,14 @@ impl RenderObject for FlexRender {
   }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let mut layouter = FlexLayouter::new(clamp.max, self.direction, self.wrap);
+    let mut layouter = FlexLayouter::new(clamp, self.direction, self.wrap);
     if self.reverse {
-      layouter.perform_children(ctx.reverse_children());
-      layouter.update_position(ctx.reverse_children());
+      layouter.children_perform(ctx.reverse_children());
+      layouter.expanded_widget_flex(ctx.reverse_children())
     } else {
-      layouter.perform_children(ctx.children());
-      layouter.update_position(ctx.children());
+      layouter.children_perform(ctx.children());
+      layouter.expanded_widget_flex(ctx.children())
     }
-    clamp.clamp(layouter.best_size())
   }
 
   #[inline]
@@ -138,7 +138,6 @@ struct FlexSize {
 }
 
 impl FlexSize {
-  #[inline]
   fn to_size(self, dir: Direction) -> Size {
     match dir {
       Direction::Horizontal => Size::new(self.main, self.cross),
@@ -146,10 +145,6 @@ impl FlexSize {
     }
   }
 
-  #[inline]
-  fn to_point(self, dir: Direction) -> Point { self.to_size(dir).to_vector().to_point() }
-
-  #[inline]
   fn from_size(size: Size, dir: Direction) -> Self {
     match dir {
       Direction::Horizontal => Self {
@@ -161,6 +156,12 @@ impl FlexSize {
         main: size.height,
       },
     }
+  }
+
+  fn to_point(self, dir: Direction) -> Point { self.to_size(dir).to_vector().to_point() }
+
+  fn from_point(pos: Point, dir: Direction) -> Self {
+    FlexSize::from_size(Size::new(pos.x, pos.y), dir)
   }
 }
 
@@ -176,80 +177,178 @@ impl std::ops::Sub for FlexSize {
 
 #[derive(Default)]
 struct FlexLayouter {
-  boundary: Size,
+  clamp: BoxClamp,
   direction: Direction,
-  /// Store all place position of all children
-  geometry_pos: Vec<FlexSize>,
-  /// Store the (index, flex) of all expanded child.
-  expended: Vec<(usize, f32)>,
-  /// Flex sum.
-  flex_sum: f32,
   /// the max of child touch in main axis
   main_max: f32,
-  /// the position next child to place.
-  allocated_start: FlexSize,
-  /// current line's cross height.
-  cross_line_height: f32,
   wrap: bool,
+  current_line: MainLineInfo,
+  lines_info: Vec<MainLineInfo>,
 }
 
 impl FlexLayouter {
-  fn new(boundary: Size, direction: Direction, wrap: bool) -> Self {
+  fn new(clamp: BoxClamp, direction: Direction, wrap: bool) -> Self {
     Self {
-      boundary,
+      clamp,
       direction,
       wrap,
       ..Default::default()
     }
   }
 
-  fn perform_children<'a>(&mut self, children: impl Iterator<Item = RenderCtx<'a>>) {
-    let boundary = FlexSize::from_size(self.boundary, self.direction);
+  fn children_perform<'a>(&mut self, children: impl Iterator<Item = RenderCtx<'a>>) {
+    let max = self.clamp.max;
+    let boundary = FlexSize::from_size(max, self.direction);
     let clamp = BoxClamp {
-      max: self.boundary,
+      max,
       min: Size::zero(),
     };
 
-    children.enumerate().for_each(|(idx, mut child_ctx)| {
-      // expand item
-      if false {
-        self.expended.push((idx, 1.));
-        self.geometry_pos.push(self.allocated_start);
-      } else {
-        let size = child_ctx.perform_layout(clamp);
-        let flex_size = FlexSize::from_size(size, self.direction);
-        if self.wrap && self.allocated_start.main + flex_size.main > boundary.main {
-          self.main_max = self.main_max.max(self.allocated_start.main);
-          // wrap to a new line to place child.
-          self.allocated_start.cross += self.cross_line_height;
-          self.allocated_start.main = flex_size.main;
-          self.cross_line_height = flex_size.cross;
-        } else {
-          self.cross_line_height = self.cross_line_height.max(flex_size.cross);
-          self.allocated_start.main += flex_size.main;
+    children.for_each(|mut child_ctx| {
+      let size = child_ctx.perform_layout(clamp);
+      let flex_size = FlexSize::from_size(size, self.direction);
+      if self.wrap
+        && !self.current_line.is_empty()
+        && self.current_line.main_width + flex_size.main > boundary.main
+      {
+        self.place_line();
+      }
+      child_ctx.update_position(
+        FlexSize {
+          main: self.current_line.main_width,
+          cross: self.current_line.cross_pos,
         }
-        self.geometry_pos.push(FlexSize {
-          main: self.allocated_start.main - flex_size.main,
-          cross: self.allocated_start.cross,
-        });
+        .to_point(self.direction),
+      );
+      self.place_widget(flex_size, &child_ctx);
+    });
+    self.place_line();
+  }
+
+  fn expanded_widget_flex<'a>(
+    &mut self,
+    mut children: impl Iterator<Item = RenderCtx<'a>>,
+  ) -> Size {
+    let size = FlexSize::from_size(self.clamp.max, self.direction);
+
+    let Self {
+      lines_info,
+      main_max,
+      direction,
+      ..
+    } = self;
+    let dir = *direction;
+    lines_info.iter_mut().for_each(|line| {
+      // resize the expanded widget.
+      let mut flex_sum = line.flex_sum;
+      if flex_sum > 0. {
+        let mut offset_main = 0.;
+        let mut remain_space = size.main - line.main_width + line.flex_main_width;
+        (0..line.child_count)
+          .map(|_| children.next().unwrap())
+          .for_each(|mut ctx| {
+            let prefer_rect = ctx
+              .box_rect()
+              .expect("relayout a expanded widget which not prepare layout");
+
+            if offset_main > 0. {
+              let mut flex_pos = FlexSize::from_point(prefer_rect.origin, dir);
+              flex_pos.main += offset_main;
+              ctx.update_position(flex_pos.to_point(dir));
+            }
+
+            if let Some(flex) = Self::child_flex(&ctx) {
+              let expand_main = remain_space * (flex / flex_sum);
+              let prefer_size = FlexSize::from_size(ctx.box_rect().unwrap().size, dir);
+              // relayout the expand widget with new clamp.
+              if expand_main > prefer_size.main {
+                let clamp = BoxClamp {
+                  max: FlexSize {
+                    main: expand_main,
+                    cross: line.cross_line_height,
+                  }
+                  .to_size(dir),
+                  min: FlexSize {
+                    main: expand_main,
+                    cross: 0.,
+                  }
+                  .to_size(dir),
+                };
+                let real_size = FlexSize::from_size(ctx.perform_layout(clamp), dir);
+                offset_main += real_size.main - prefer_size.main;
+                remain_space -= real_size.main;
+              } else {
+                remain_space -= prefer_size.main;
+              }
+              flex_sum -= flex;
+            }
+          });
+        line.main_width += offset_main;
+        *main_max = main_max.max(line.main_width);
       }
     });
-    self.main_max = self.main_max.max(self.allocated_start.main);
+    self.box_size()
   }
 
-  fn update_position<'a>(&mut self, children: impl Iterator<Item = RenderCtx<'a>>) {
-    children
-      .zip(self.geometry_pos.iter())
-      .for_each(|(mut ctx, size)| ctx.update_position(size.to_point(self.direction)));
-  }
-
-  fn best_size(&self) -> Size {
-    FlexSize {
-      main: self.main_max,
-      cross: self.allocated_start.cross + self.cross_line_height,
+  fn place_widget(&mut self, size: FlexSize, child_ctx: &RenderCtx) {
+    let mut line = &mut self.current_line;
+    line.main_width += size.main;
+    line.cross_line_height = line.cross_line_height.max(size.cross);
+    line.child_count += 1;
+    if let Some(flex) = Self::child_flex(child_ctx) {
+      line.flex_sum += flex;
+      line.flex_main_width += size.main;
     }
-    .to_size(self.direction)
   }
+
+  fn place_line(&mut self) {
+    if !self.current_line.is_empty() {
+      self.main_max = self.main_max.max(self.current_line.main_width);
+      let mut new_line = MainLineInfo::default();
+      new_line.cross_pos = self.current_line.cross_bottom();
+      self
+        .lines_info
+        .push(std::mem::replace(&mut self.current_line, new_line));
+    }
+  }
+
+  fn box_size(&self) -> Size {
+    let cross = self
+      .lines_info
+      .last()
+      .map(|line| line.cross_bottom())
+      .unwrap_or(0.);
+    self.clamp.clamp(
+      FlexSize {
+        cross,
+        main: self.main_max,
+      }
+      .to_size(self.direction),
+    )
+  }
+
+  fn child_flex(ctx: &RenderCtx) -> Option<f32> {
+    ctx
+      .render_obj()
+      .downcast_ref::<ExpandedRender>()
+      .map(|expanded| expanded.flex)
+  }
+}
+
+#[derive(Default)]
+struct MainLineInfo {
+  child_count: usize,
+  cross_pos: f32,
+  main_width: f32,
+  flex_sum: f32,
+  flex_main_width: f32,
+  cross_line_height: f32,
+}
+
+impl MainLineInfo {
+  fn is_empty(&self) -> bool { self.child_count == 0 || self.main_width == 0. }
+
+  fn cross_bottom(&self) -> f32 { self.cross_pos + self.cross_line_height }
 }
 
 #[cfg(test)]
@@ -262,7 +361,7 @@ mod tests {
     let row = (0..10)
       .map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it())
       .collect::<Flex>();
-    let (rect, _) = widget_and_its_children_box_rect(row);
+    let (rect, _) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 20.));
   }
 
@@ -272,7 +371,7 @@ mod tests {
       .map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it())
       .collect::<Flex>()
       .with_direction(Direction::Vertical);
-    let (rect, _) = widget_and_its_children_box_rect(col);
+    let (rect, _) = widget_and_its_children_box_rect(col, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
 
@@ -283,7 +382,7 @@ mod tests {
       .map(|_| SizedBox::empty_box(size).box_it())
       .collect::<Flex>()
       .with_wrap(true);
-    let (rect, children) = widget_and_its_children_box_rect(row);
+    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
       children,
@@ -309,7 +408,7 @@ mod tests {
       .collect::<Flex>()
       .with_wrap(true)
       .with_reverse(true);
-    let (rect, children) = widget_and_its_children_box_rect(row);
+    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
       children,

@@ -28,10 +28,4 @@ impl std::iter::FromIterator<BoxWidget> for Column {
   }
 }
 
-impl Widget for Column {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { self.0.classify() }
-
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.0.classify_mut() }
-}
+inherit_widget!(Column, 0);

@@ -125,7 +125,10 @@ impl RenderTree {
 
 impl RenderId {
   /// Returns a reference to the node data.
-  pub(crate) fn get(self, tree: &RenderTree) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
+  pub(crate) fn get(
+    self,
+    tree: &RenderTree,
+  ) -> Option<&(dyn RenderObjectSafety + Send + Sync + 'static)> {
     tree.arena.get(self.0).map(|node| &**node.get())
   }
 
