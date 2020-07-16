@@ -20,6 +20,8 @@ pub use events::{
   pointers::{PointerEvent, PointerEventType, PointerListener},
   Event,
 };
+mod phantom;
+pub use phantom::PhantomWidget;
 pub use smallvec::{smallvec, SmallVec};
 
 /// The common behavior of widgets, also support to dynamic cast to special
@@ -260,7 +262,7 @@ impl dyn Widget {
 
 use std::borrow::{Borrow, BorrowMut};
 
-pub macro inherit_widget($ty: ty, $base_widget: ident) {
+pub macro inherit_widget($ty: ty, $base_widget: tt) {
   impl InheritWidget for $ty {
     #[inline]
     fn base_widget(&self) -> &dyn Widget { self.$base_widget.borrow() }

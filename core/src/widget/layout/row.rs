@@ -28,10 +28,4 @@ impl Default for Row {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
 }
 
-impl Widget for Row {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { self.0.classify() }
-
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.0.classify_mut() }
-}
+inherit_widget!(Row, 0);

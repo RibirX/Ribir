@@ -2,7 +2,10 @@ pub use render_ctx::*;
 pub mod render_ctx;
 use crate::prelude::*;
 pub use painting_context::PaintingContext;
-use std::fmt::Debug;
+use std::{
+  any::{Any, TypeId},
+  fmt::Debug,
+};
 pub mod painting_context;
 pub mod render_tree;
 pub mod update_ctx;
@@ -36,7 +39,7 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
 
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
 /// implement this trait, just implement [`RenderObject`](RenderObject).
-pub trait RenderObjectSafety: Debug {
+pub trait RenderObjectSafety: Debug + Any {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety, ctx: &mut UpdateCtx);
   fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size;
   fn only_sized_by_parent(&self) -> bool;
@@ -83,4 +86,20 @@ where
 
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { RenderObject::paint(self, ctx); }
+}
+
+impl dyn RenderObjectSafety {
+  /// Returns some reference to the boxed value if it or its **base widget** is
+  /// of type T, or None if it isn't.
+  pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+    if self.type_id() == TypeId::of::<T>() {
+      let ptr = self as *const dyn RenderObjectSafety as *const T;
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any for
+      // all types; no other impls can exist as they would conflict with our impl.
+      unsafe { Some(&*ptr) }
+    } else {
+      None
+    }
+  }
 }
