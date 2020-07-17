@@ -290,7 +290,7 @@ impl<S: Surface> WgpuRender<S> {
       .create_buffer_with_data(primitives.as_bytes(), wgpu::BufferUsage::STORAGE);
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.primitives_layout,
-      bindings: &[wgpu::Binding {
+      entries: &[wgpu::BindGroupEntry {
         binding: SecondBindings::Primitive as u32,
         resource: wgpu::BindingResource::Buffer(primitives_buffer.slice(..)),
       }],
@@ -363,8 +363,10 @@ fn create_render_pipeline(
   sc_desc: &wgpu::SwapChainDescriptor,
   bind_group_layouts: &[&wgpu::BindGroupLayout; 2],
 ) -> wgpu::RenderPipeline {
-  let render_pipeline_layout =
-    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { bind_group_layouts });
+  let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+    bind_group_layouts,
+    push_constant_ranges: &[],
+  });
 
   let vs_module = device.create_shader_module(wgpu::include_spirv!(
     "./wgpu_render/shaders/geometry.vert.spv"
@@ -418,7 +420,7 @@ fn create_render_pipeline(
 
 fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   let stable = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    bindings: &[
+    entries: &[
       wgpu::BindGroupLayoutEntry::new(
         PrimaryBindings::GlobalUniform as u32,
         wgpu::ShaderStage::VERTEX,
@@ -455,7 +457,7 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   });
 
   let dynamic = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    bindings: &[wgpu::BindGroupLayoutEntry::new(
+    entries: &[wgpu::BindGroupLayoutEntry::new(
       SecondBindings::Primitive as u32,
       wgpu::ShaderStage::VERTEX,
       wgpu::BindingType::StorageBuffer {
@@ -496,20 +498,20 @@ fn create_uniforms(
   );
   device.create_bind_group(&wgpu::BindGroupDescriptor {
     layout,
-    bindings: &[
-      wgpu::Binding {
+    entries: &[
+      wgpu::BindGroupEntry {
         binding: PrimaryBindings::GlobalUniform as u32,
         resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
       },
-      wgpu::Binding {
+      wgpu::BindGroupEntry {
         binding: PrimaryBindings::TextureAtlas as u32,
         resource: wgpu::BindingResource::TextureView(tex_atlas),
       },
-      wgpu::Binding {
+      wgpu::BindGroupEntry {
         binding: PrimaryBindings::Sampler as u32,
         resource: wgpu::BindingResource::Sampler(sampler),
       },
-      wgpu::Binding {
+      wgpu::BindGroupEntry {
         binding: PrimaryBindings::GlyphTexture as u32,
         resource: wgpu::BindingResource::TextureView(glyph_texture),
       },

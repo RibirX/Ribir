@@ -8,7 +8,7 @@ pub(crate) struct RgbaConvert {
 impl RgbaConvert {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
     let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      bindings: &[wgpu::BindGroupLayoutEntry::new(
+      entries: &[wgpu::BindGroupLayoutEntry::new(
         0,
         wgpu::ShaderStage::COMPUTE,
         wgpu::BindingType::StorageBuffer {
@@ -25,6 +25,7 @@ impl RgbaConvert {
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       bind_group_layouts: &[&group_layout],
+      push_constant_ranges: &[],
     });
 
     let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -51,7 +52,7 @@ impl RgbaConvert {
   ) {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.group_layout,
-      bindings: &[wgpu::Binding {
+      entries: &[wgpu::BindGroupEntry {
         binding: 0,
         resource: wgpu::BindingResource::Buffer(bgra_buffer.slice(..)),
       }],
