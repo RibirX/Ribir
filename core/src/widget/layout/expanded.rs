@@ -41,7 +41,7 @@ impl RenderObject for ExpandedRender {
   type Owner = Expanded;
 
   fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if owner_widget.flex != self.flex {
+    if (owner_widget.flex - self.flex).abs() > f32::EPSILON {
       ctx.mark_needs_layout();
     }
   }

@@ -125,10 +125,7 @@ impl RenderTree {
 
 impl RenderId {
   /// Returns a reference to the node data.
-  pub(crate) fn get(
-    self,
-    tree: &RenderTree,
-  ) -> Option<&(dyn RenderObjectSafety + Send + Sync + 'static)> {
+  pub(crate) fn get(self, tree: &RenderTree) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
     tree.arena.get(self.0).map(|node| &**node.get())
   }
 
@@ -136,7 +133,7 @@ impl RenderId {
   pub(crate) fn get_mut(
     self,
     tree: &mut RenderTree,
-  ) -> &mut (dyn RenderObjectSafety + Send + Sync + 'static) {
+  ) -> &mut (dyn RenderObjectSafety + Send + Sync) {
     &mut **tree
       .arena
       .get_mut(self.0)
