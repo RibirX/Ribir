@@ -328,7 +328,7 @@ mod tests {
   fn different_device_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let mut wnd = NoRenderWindow::without_render(root, Size::new(100, 100));
+    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = mock_device_id(0);
