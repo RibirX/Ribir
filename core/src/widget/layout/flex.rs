@@ -451,15 +451,16 @@ impl FlexLayouter {
       clamp_min.cross = line.cross_line_height;
     }
 
-    let mut real_size = pre_size;
-    // Relayout only if the child object size may change.
-    if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
+    let real_size = if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
+      // Relayout only if the child object size may change.
       let new_size = child_ctx.perform_layout(BoxClamp {
         max: clamp_max.to_size(dir),
         min: clamp_min.to_size(dir),
       });
-      real_size = FlexSize::from_size(new_size, dir);
-    }
+      FlexSize::from_size(new_size, dir)
+    } else {
+      pre_size
+    };
 
     let main_diff = real_size.main - pre_size.main;
     line.main_width += main_diff;
