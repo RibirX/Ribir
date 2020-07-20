@@ -450,22 +450,22 @@ mod test {
     assert_eq!(
       widget_tree.symbol_shape(),
       r#"EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 }
-└── Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] })
+└── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
     ├── Text("Simple demo")
     ├── Text("Adoo")
     ├── Text("Recursive x times")
     └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 2 }
-        └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] })
+        └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
             ├── Text("Simple demo")
             ├── Text("Adoo")
             ├── Text("Recursive x times")
             └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 1 }
-                └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] })
+                └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
                     ├── Text("Simple demo")
                     ├── Text("Adoo")
                     ├── Text("Recursive x times")
                     └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 0 }
-                        └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] })
+                        └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
                             ├── Text("Simple demo")
                             ├── Text("Adoo")
                             └── Text("Recursive x times")
@@ -474,19 +474,19 @@ mod test {
 
     assert_eq!(
       render_tree.symbol_shape(),
-      r#"FlexRender { reverse: false, direction: Horizontal, wrap: false }
+      r#"FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
 ├── TextRender { text: "Simple demo" }
 ├── TextRender { text: "Adoo" }
 ├── TextRender { text: "Recursive x times" }
-└── FlexRender { reverse: false, direction: Horizontal, wrap: false }
+└── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
     ├── TextRender { text: "Simple demo" }
     ├── TextRender { text: "Adoo" }
     ├── TextRender { text: "Recursive x times" }
-    └── FlexRender { reverse: false, direction: Horizontal, wrap: false }
+    └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
         ├── TextRender { text: "Simple demo" }
         ├── TextRender { text: "Adoo" }
         ├── TextRender { text: "Recursive x times" }
-        └── FlexRender { reverse: false, direction: Horizontal, wrap: false }
+        └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
             ├── TextRender { text: "Simple demo" }
             ├── TextRender { text: "Adoo" }
             └── TextRender { text: "Recursive x times" }
@@ -529,22 +529,22 @@ mod test {
     assert_eq!(
       env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
-└── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] }) }
+└── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
     ├── KeyDetect { key: KI4(0), widget: Text("New title") }
     ├── KeyDetect { key: KI4(1), widget: Text("") }
     ├── KeyDetect { key: KI4(2), widget: Text("") }
     └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 } }
-        └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] }) }
+        └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
             ├── KeyDetect { key: KI4(0), widget: Text("New title") }
             ├── KeyDetect { key: KI4(1), widget: Text("") }
             ├── KeyDetect { key: KI4(2), widget: Text("") }
             └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 } }
-                └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] }) }
+                └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
                     ├── KeyDetect { key: KI4(0), widget: Text("New title") }
                     ├── KeyDetect { key: KI4(1), widget: Text("") }
                     ├── KeyDetect { key: KI4(2), widget: Text("") }
                     └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 } }
-                        └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, children: [] }) }
+                        └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
                             ├── KeyDetect { key: KI4(0), widget: Text("New title") }
                             ├── KeyDetect { key: KI4(1), widget: Text("") }
                             └── KeyDetect { key: KI4(2), widget: Text("") }
@@ -553,19 +553,19 @@ mod test {
 
     assert_eq!(
       env.render_tree.symbol_shape(),
-      r#"FlexRender { reverse: false, direction: Horizontal, wrap: false }
+      r#"FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
 ├── TextRender { text: "New title" }
 ├── TextRender { text: "" }
 ├── TextRender { text: "" }
-└── FlexRender { reverse: false, direction: Horizontal, wrap: false }
+└── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
     ├── TextRender { text: "New title" }
     ├── TextRender { text: "" }
     ├── TextRender { text: "" }
-    └── FlexRender { reverse: false, direction: Horizontal, wrap: false }
+    └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
         ├── TextRender { text: "New title" }
         ├── TextRender { text: "" }
         ├── TextRender { text: "" }
-        └── FlexRender { reverse: false, direction: Horizontal, wrap: false }
+        └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
             ├── TextRender { text: "New title" }
             ├── TextRender { text: "" }
             └── TextRender { text: "" }

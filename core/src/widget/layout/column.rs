@@ -16,6 +16,11 @@ impl Column {
 
   #[inline]
   pub fn with_wrap(self, wrap: bool) -> Self { Self(self.0.with_wrap(wrap)) }
+
+  #[inline]
+  pub fn with_cross_align(self, align: CrossAxisAlign) -> Self {
+    Self(self.0.with_cross_align(align))
+  }
 }
 
 impl Default for Column {

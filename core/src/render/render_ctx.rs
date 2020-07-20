@@ -73,7 +73,12 @@ impl<'a> RenderCtx<'a> {
       .origin = pos;
   }
 
-  pub fn box_rect(&self) -> Option<Rect> { self.render_obj.layout_box_rect(&*self.tree) }
+  pub fn box_rect(&self) -> Rect {
+    self
+      .render_obj
+      .layout_box_rect(&*self.tree)
+      .expect("relayout a expanded widget which not prepare layout")
+  }
 
   /// Return render object of this context.
   pub fn render_obj(&self) -> &(dyn RenderObjectSafety + 'static) {
