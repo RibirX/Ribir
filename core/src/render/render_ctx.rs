@@ -3,6 +3,10 @@ use crate::render::*;
 use canvas::{Canvas, FontInfo, Rect, Text};
 use std::pin::Pin;
 
+/// A place to compute the render object's layout. Rather than holding children
+/// directly, `RenderObject` perform layout across `RenderCtx`. `RenderCtx`
+/// provide method to perform layout and also provides methods to access the
+/// `RenderCtx` of the children.
 pub struct RenderCtx<'a> {
   tree: Pin<&'a mut RenderTree>,
   canvas: Pin<&'a mut Canvas>,
@@ -24,7 +28,7 @@ impl<'a> RenderCtx<'a> {
     }
   }
 
-  /// Return the render id of the render object this context provide for.
+  /// Return the render id of the render object this context standard for.
   #[inline]
   pub fn render_id(&self) -> RenderId { self.render_obj }
 
@@ -47,6 +51,8 @@ impl<'a> RenderCtx<'a> {
       })
   }
 
+  /// Returns an iterator of RenderId of this RenderObject’s children, in
+  /// reverse order.
   pub fn reverse_children<'l>(&'l mut self) -> impl Iterator<Item = RenderCtx<'l>> + 'l {
     // Safety: only split the lifetime for children one by one.
     let (tree_ptr, canvas_ptr) = unsafe {
@@ -73,12 +79,8 @@ impl<'a> RenderCtx<'a> {
       .origin = pos;
   }
 
-  pub fn box_rect(&self) -> Rect {
-    self
-      .render_obj
-      .layout_box_rect(&*self.tree)
-      .expect("relayout a expanded widget which not prepare layout")
-  }
+  /// Return the boxed rect of the RenderObject already placed.
+  pub fn box_rect(&self) -> Option<Rect> { self.render_obj.layout_box_rect(&*self.tree) }
 
   /// Return render object of this context.
   pub fn render_obj(&self) -> &(dyn RenderObjectSafety + 'static) {

@@ -27,7 +27,7 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size;
 
   /// Whether the constraints from parent are the only input to detect the
-  /// widget size, and child nodes' size have no effect it.
+  /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool;
 
   /// Paint the render object into `PaintingContext` by itself coordinate

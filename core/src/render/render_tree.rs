@@ -7,6 +7,7 @@ use std::{
   pin::Pin,
 };
 
+/// The id of the render object. Should not hold it.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct RenderId(NodeId);
 pub enum RenderEdge {
@@ -158,7 +159,8 @@ impl RenderId {
     self.0.children(&tree.arena).map(RenderId)
   }
 
-  /// Returns an iterator of references to this node’s children.
+  /// Returns an iterator of RenderId of this RenderObject’s children, in
+  /// reverse order.
   pub(crate) fn reverse_children<'a>(
     self,
     tree: &'a RenderTree,

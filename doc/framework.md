@@ -15,13 +15,13 @@ inflate the widget tree     .   construct render tree and  |                   |
 `Holiday` builds widget tree with your ui by declare data, meanwhile it creates render object tree to layout and paint.
 When the data that the widget depends on changes, widget tree will make a update, and render objects correspond updated widgets to update also.
 
-Wnen a widget as root node run in `Application`, it will be inflated into widget tree by `Holiday`. Every leaf in the widget tree is a rendered widget. Sometimes, only tree has updated is not enough, it's possible that `CombinationWidget` builds a complete differently `Widget` at last. In these scenes, corresponded subtree need to rebuild. Because every widget must explicit provide a rebuild emitter or not by `RebuildEmitter` trait, so the widget tree know how to efficient rebuild a subtree across the widget diff algorithm. `Holiday` will implement a `RebuildEmitter` for every widget, so it's not a burden to implement a widget. Widgets also have a chance to implement it by itself, because a widget know which time need to rebuild really, and how to have the best performance. 
+When a widget as root node run in `Application`, it will be inflated into widget tree by framework. Every leaf in the widget tree is a rendered widget. Sometimes, only has tree updated is not enough, it's possible that `CombinationWidget` builds a complete full differently `Widget`.  So if a `CombinationWidget` is changed, it need rebuild and maybe reconstruct full subtree. Framework try to rebuild the widget tree and the render tree as mini as possible.
 
 ## Rebuild Widget Subtree Diff Algorithm
 
-Widget doesn't update or rebuild subtree immediately when its rebuild emitter emitted. It's just mark this widget need to rebuild and wait until the widget tree rebuild. 
+Widget doesn't update or rebuild subtree immediately when its state changed. It's just mark this widget need to rebuild and wait until the widget tree rebuild. 
 
-The widget tree update from top to bottom. If a bottom widget removed because its ancestor rebuild, its update or rebuild auto be canceled. Even if `CombinationWidget` require rebuild, that not mean `Holiday` will reconstruct the total subtree, the `Key` may help us to reduce many cost in some case.
+The widget tree update from top to bottom. If a bottom widget removed because its ancestor rebuild, its update or rebuild auto be canceled. Even if `CombinationWidget` require rebuild, itself must be rebuild, but that not mean `Holiday` will reconstruct the total subtree, the `Key`may help us to reduce many cost in some case.
 
 ### Key
 
@@ -30,7 +30,7 @@ The widget tree update from top to bottom. If a bottom widget removed because it
 The widget tree rebuilds base on widget diff. Work like below:
 
 a. build widget from `CombinationWidget`.
-b. if new the  `key` of widget is equal to the last time build widget in the widget tree ?
+b. if the `key` of widget is equal to the last time build widget in the widget tree ?
   1. use new widget replace before sub tree in widget and mark this widget dirty.
   2. if this widget is `CombinationWidget`, use new widget recursive step a.
   3. else, if this widget is render widget and has children.
@@ -47,11 +47,6 @@ d. done, the subtree from this widget is rebuild finished.
 
 
 
-### Signature ?
-
-`Key` is used for widget, and `Signature` used for the render object. Unlike `Key` to identify if this widget is a same widget with before. `Signature` guarantee that if two same type render objects have same `Signature` that mean the have same content and will paint same thing. So `Holiday` can treat all render objects as one, if they have same type and same `Signature`.
-
-
 ## Compose prefer
 
 Unlike many classic GUI framework, `Holiday` doesn't build on inherit mode. Because Rust not support inherit, `Holiday` built base on composition. For example, If you want give a `Button` widget opacity, it doesn't have a field named `opacity` give you to set the opacity, you should use a `Opacity` widget to do it, like:
@@ -63,29 +58,29 @@ Opacity {
 }
 ```
 
-### zero cost for compose ?
+### Inherit Widget
 
 
 ## RenderObject & RenderTree 
 
-The widget tree corresponds to the user interface, and `RenderTree` is created by RenderWidget do the actually layout and paint. In this vision, widget is build cheap, and RenderObject is more expensive than widget.
+The widget tree corresponds to the user interface, and `RenderTree` is created by RenderWidget, it do the actually layout and paint. In this vision, widget is build cheap, and RenderObject is more expensive than widget.
 
-## Update Data
+## Stateless and Stateful
 
-When we build a widget from `CombinationWidget`, framework provide a `BuildContext` param, and the `RenderId` of the widget build in the ctx, use the `RenderId` framework can provide State<Self> to change widget state when reactive user interactive. 
+As default, every widget is stateless, just present like what you declare and no interactive. But in real world we often need change widget to another state to respond to user actions, IO request and so on. A way to support it is rebuild the whole widget tree and do a tree diff to update the minimal render tree. But we provide another way to do it, every widget can across `into_stateful` convert to a stateful widget, a `StateRef` will also return at the same time, which can be used to modify the states of the widget.
 
 ### Layout
 
-`Holiday` performs a layout per frame, it's a recursive layout from parent down to children. There is some point to help write a layout:
-    1. DECIDED_BY_SELF which mean it's size layout can just deceded by self, it's conflict to the other constraint.
-    2. EFFECTED_BY_PARENT which mean it's size layout will be affected by it's parent, so when parent need reperform layout it should be relayout too.
-    3. EFFECTED_BY_CHILDREN which mean it's size layout will be affected by it's children, so when it's children need reperform layout it should be relayout too.
+`Holiday` performs a layout per frame, and the layout algorithm works in a single pass. It's a recursive layout from parent down to children. 
 
-2. all the render object is independent, all owned by render tree. in the processing of performing layout, it can only accept immutable reference of render object  of it's parent or it's children through RenderId of itself and render ctx.
+There is some important point to help understand how to write a layout:
 
-3. when call need_layout of a render object, it will start from the current Node, climbing up until it's parent's constraint has no flag of EFFECTED_BY_CHILDREN, the  ancestor in the path will be mark dirty and diffuse dirty flag down to children who has constraint flag of EFFECTED_BY_PARENT recursive.
+1. RenderObject not directly hold its children, and have no way to directly access them.
+2. `RenderTree` store the `RenderObject`'s layout result, so `RenderObject` only need to provide its layout algorithm in `perform_layout` method.  The `perform_layout` have two input, a `BoxClamp` that limit the min and max size it can, a `RenderCtx` provide the ability to call the `perform_layout` of its children, and it a way to know the size the child need.
+3. `RenderObject::perform_layout` responsible for calling every children's perform_layout across the `RenderCtx`。
+4. The `BoxClamp` it always gave by parent.
 
-if a render object is Expand Size, its children can't have Bound Size. In general, when perform a layout, fixed size children should be first perform, then expand size and bound size last.
+`only_sized_by_parent` method can help framework know if the `RenderObject` is the only input to detect the size, and children size not affect its size.
 
 ## Children Relationship
 
