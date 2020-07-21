@@ -2,7 +2,10 @@
 use crate::{
   prelude::*,
   render::render_tree::*,
-  widget::{layout::Row, widget_tree::*},
+  widget::{
+    layout::{flex::CrossAxisAlign, Row},
+    widget_tree::*,
+  },
 };
 
 #[derive(Clone, Debug)]
@@ -26,7 +29,7 @@ impl EmbedPost {
 
 impl CombinationWidget for EmbedPost {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
-    let mut row = Row::default();
+    let mut row = Row::default().with_cross_align(CrossAxisAlign::Start);
     row
       .push(Text(self.title.to_string()))
       .push(Text(self.author.to_string()))

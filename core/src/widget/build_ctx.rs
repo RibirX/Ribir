@@ -9,10 +9,7 @@ pub struct BuildCtx<'a> {
 
 impl<'a> BuildCtx<'a> {
   #[inline]
-  pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, current: WidgetId) -> Self {
-    Self {
-      tree,
-      widget: current,
-    }
+  pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, widget: WidgetId) -> Self {
+    Self { tree, widget }
   }
 }

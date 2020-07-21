@@ -14,9 +14,16 @@ pub enum Direction {
 /// How the children should be placed along the cross axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum CrossAxisAlign {
+  /// Place the children with their start edge aligned with the start side of
+  /// the cross axis.
   Start,
+  /// Place the children so that their centers align with the middle of the
+  /// cross axis.This is the default cross-axis alignment.
   Center,
+  /// Place the children as close to the end of the cross axis as possible.
   End,
+  /// Require the children to fill the cross axis. This causes the constraints
+  /// passed to the children to be tight in the cross axis.
   Stretch,
 }
 
@@ -46,12 +53,19 @@ pub enum MainAxisAlignment {
   SpaceEvenly,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Flex {
+  /// Reverse the main axis.
   pub reverse: bool,
+  /// Whether flex items are forced onto one line or can wrap onto multiple
+  /// lines
   pub wrap: bool,
+  /// Sets how flex items are placed in the flex container defining the main
+  /// axis and the direction
   pub direction: Direction,
+  /// How the children should be placed along the cross axis in a flex layout.
   pub cross_align: CrossAxisAlign,
+  /// How the children should be placed along the main axis in a flex layout.
   pub main_align: MainAxisAlignment,
   pub children: SmallVec<[BoxWidget; 1]>,
 }
@@ -66,36 +80,42 @@ pub struct FlexRender {
 }
 
 impl Flex {
+  /// Add a children into the flex container.
   #[inline]
   pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
     self.children.push(child.box_it());
     self
   }
 
+  /// Create a new Flex like `self`, but with the give `reverse`.
   #[inline]
   pub fn with_reverse(mut self, reverse: bool) -> Self {
     self.reverse = reverse;
     self
   }
 
+  /// Create a new Flex like `self`, but with the give `direction`.
   #[inline]
   pub fn with_direction(mut self, direction: Direction) -> Self {
     self.direction = direction;
     self
   }
 
+  /// Create a new Flex like `self`, but with the give `cross_align`.
   #[inline]
   pub fn with_cross_align(mut self, cross_align: CrossAxisAlign) -> Self {
     self.cross_align = cross_align;
     self
   }
 
+  /// Create a new Flex like `self`, but with the give `main_align`.
   #[inline]
   pub fn with_main_align(mut self, main_align: MainAxisAlignment) -> Self {
     self.main_align = main_align;
     self
   }
 
+  /// Create a new Flex like `self`, but with the give `wrap`.
   #[inline]
   pub fn with_wrap(mut self, wrap: bool) -> Self {
     self.wrap = wrap;
@@ -106,31 +126,25 @@ impl Flex {
 impl std::iter::FromIterator<BoxWidget> for Flex {
   fn from_iter<T: IntoIterator<Item = BoxWidget>>(iter: T) -> Self {
     Self {
-      reverse: false,
-      wrap: false,
-      direction: Direction::Horizontal,
-      cross_align: CrossAxisAlign::Start,
-      main_align: MainAxisAlignment::Start,
       children: iter.into_iter().collect(),
+      ..Default::default()
     }
   }
 }
 
-impl Default for Flex {
-  fn default() -> Self {
-    Self {
-      reverse: false,
-      wrap: false,
-      direction: Direction::Horizontal,
-      cross_align: CrossAxisAlign::Start,
-      main_align: MainAxisAlignment::Start,
-      children: smallvec![],
-    }
-  }
-}
 impl Default for Direction {
   #[inline]
   fn default() -> Self { Direction::Horizontal }
+}
+
+impl Default for CrossAxisAlign {
+  #[inline]
+  fn default() -> Self { CrossAxisAlign::Center }
+}
+
+impl Default for MainAxisAlignment {
+  #[inline]
+  fn default() -> Self { MainAxisAlignment::Start }
 }
 
 render_widget_base_impl!(Flex);
@@ -378,7 +392,9 @@ impl FlexLayouter {
       (0..line.child_count)
         .map(|_| children.next().unwrap())
         .fold(offset, |main_offset: f32, mut child_ctx| {
-          let rect = child_ctx.box_rect();
+          let rect = child_ctx
+            .box_rect()
+            .expect("relayout a expanded widget which not prepare layout");
           let mut origin = FlexSize::from_point(rect.origin, *direction);
           let child_size = FlexSize::from_size(rect.size, *direction);
 
@@ -427,7 +443,9 @@ impl FlexLayouter {
     cross_align: CrossAxisAlign,
     max_size: FlexSize,
   ) -> f32 {
-    let pre_layout_rect = child_ctx.box_rect();
+    let pre_layout_rect = child_ctx
+      .box_rect()
+      .expect("relayout a expanded widget which not prepare layout");
 
     let pre_size = FlexSize::from_size(pre_layout_rect.size, dir);
     let mut prefer_main = pre_size.main;
@@ -653,7 +671,9 @@ mod tests {
   fn main_align() {
     fn main_align_check(align: MainAxisAlignment, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
-      let mut row = Row::default().with_main_align(align);
+      let mut row = Row::default()
+        .with_main_align(align)
+        .with_cross_align(CrossAxisAlign::Start);
       row
         .push(SizedBox::empty_box(item_size))
         .push(SizedBox::empty_box(item_size))
