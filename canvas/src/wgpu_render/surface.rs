@@ -40,7 +40,7 @@ impl Surface for PhysicSurface {
     FrameView(
       self
         .swap_chain
-        .get_next_frame()
+        .get_current_frame()
         .expect("Timeout getting texture"),
     )
   }
