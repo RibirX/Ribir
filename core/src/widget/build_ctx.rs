@@ -12,4 +12,9 @@ impl<'a> BuildCtx<'a> {
   pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, widget: WidgetId) -> Self {
     Self { tree, widget }
   }
+
+  /// The data from the closest Theme instance that encloses this context.
+  pub fn theme(&self) -> ThemeData {
+    unimplemented!();
+  }
 }

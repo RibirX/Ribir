@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Color {
   /// The amount of red light, where 0.0 is no red light and 1.0f
   /// is the highest displayable amount.
@@ -55,6 +55,11 @@ impl Color {
     self.red += amount;
     self.green += amount;
     self.blue += amount;
+    self
+  }
+
+  pub fn with_alpha(mut self, alpha: f32) -> Self {
+    self.alpha = alpha;
     self
   }
 
@@ -264,6 +269,12 @@ impl Color {
 
   pub const YELLOW: Color = Self::const_rgb_from(255, 255, 0);
   pub const YELLOWGREEN: Color = Self::const_rgb_from(154, 205, 50);
+  pub const TRANSPARENT: Color = Self {
+    alpha: 0.,
+    red: 0.,
+    green: 0.,
+    blue: 0.,
+  };
 
   // Algorithm from https://github.com/Ogeon/palette/pull/184/files.
   fn u8_to_f32(v: u8) -> f32 {
