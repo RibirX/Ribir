@@ -9,6 +9,8 @@ pub mod layout;
 pub use layout::*;
 pub mod stateful;
 pub mod text;
+mod theme;
+pub use theme::*;
 pub mod widget_tree;
 pub mod window;
 pub use build_ctx::BuildCtx;
