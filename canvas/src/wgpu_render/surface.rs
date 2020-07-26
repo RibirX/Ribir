@@ -1,5 +1,6 @@
 use super::DeviceSize;
 use std::borrow::Borrow;
+use std::borrow::Cow;
 
 /// `Surface` is a thing presentable canvas visual display.
 pub trait Surface {
@@ -115,7 +116,7 @@ impl Texture {
 
     let size = size.min(self.size);
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("Render Encoder"),
+      label: Some(Cow::Borrowed("Render Encoder")),
     });
     encoder.copy_texture_to_texture(
       wgpu::TextureCopyView {
@@ -147,7 +148,7 @@ impl Texture {
     usage: wgpu::TextureUsage,
   ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("new texture"),
+      label: Some(Cow::Borrowed("new texture")),
       size: wgpu::Extent3d {
         width: size.width,
         height: size.height,

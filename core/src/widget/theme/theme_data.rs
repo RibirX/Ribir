@@ -174,7 +174,7 @@ impl TypographyTheme {
         font_size: 14.0,
         weight: FontWeight::MEDIUM,
         letter_space: 0.1,
-        family: titles_family.clone(),
+        family: titles_family,
         foreground: body_style.clone(),
         decoration,
         decoration_color: decoration_color.clone(),
@@ -227,7 +227,7 @@ impl TypographyTheme {
         family: body_family,
         foreground: body_style,
         decoration,
-        decoration_color: decoration_color.clone(),
+        decoration_color,
         ..Default::default()
       },
     }
