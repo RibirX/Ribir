@@ -6,7 +6,7 @@ use crate::{
 mod img_helper;
 pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use surface::{PhysicSurface, Surface, TextureSurface};
 use zerocopy::AsBytes;
 
@@ -130,7 +130,7 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     let mut encoder = self
       .device
       .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Render Encoder"),
+        label: Some(Cow::Borrowed("Render Encoder")),
       });
 
     let tex_infos_bind_group = self.create_primitives_bind_group(&data.primitives);
@@ -171,14 +171,14 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
 
     {
       let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+        color_attachments: Cow::Borrowed(&[wgpu::RenderPassColorAttachmentDescriptor {
           attachment: view.borrow(),
           resolve_target: None,
           ops: wgpu::Operations {
             load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
             store: true,
           },
-        }],
+        }]),
         depth_stencil_attachment: None,
       });
       render_pass.set_pipeline(&self.pipeline);
@@ -242,7 +242,7 @@ impl<S: Surface> WgpuRender<S> {
       mipmap_filter: wgpu::FilterMode::Nearest,
       lod_min_clamp: 0.0,
       lod_max_clamp: 0.0,
-      label: Some("Texture atlas sampler"),
+      label: Some(Cow::Borrowed("Texture atlas sampler")),
       ..Default::default()
     });
 
@@ -290,11 +290,11 @@ impl<S: Surface> WgpuRender<S> {
       .create_buffer_with_data(primitives.as_bytes(), wgpu::BufferUsage::STORAGE);
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.primitives_layout,
-      entries: &[wgpu::BindGroupEntry {
+      entries: Cow::Borrowed(&[wgpu::BindGroupEntry {
         binding: SecondBindings::Primitive as u32,
         resource: wgpu::BindingResource::Buffer(primitives_buffer.slice(..)),
-      }],
-      label: Some("texture infos bind group"),
+      }]),
+      label: Some(Cow::Borrowed("texture infos bind group")),
     })
   }
 
@@ -341,7 +341,7 @@ impl<S: Surface> WgpuRender<S> {
     format: wgpu::TextureFormat,
   ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("Create texture for memory texture"),
+      label: Some(Cow::Borrowed("Create texture for memory texture")),
       size: wgpu::Extent3d {
         width: size.width,
         height: size.height,
@@ -364,8 +364,8 @@ fn create_render_pipeline(
   bind_group_layouts: &[&wgpu::BindGroupLayout; 2],
 ) -> wgpu::RenderPipeline {
   let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-    bind_group_layouts,
-    push_constant_ranges: &[],
+    bind_group_layouts: Cow::Borrowed(bind_group_layouts),
+    push_constant_ranges: Cow::Borrowed(&[]),
   });
 
   let vs_module = device.create_shader_module(wgpu::include_spirv!(
@@ -379,11 +379,11 @@ fn create_render_pipeline(
     layout: &render_pipeline_layout,
     vertex_stage: wgpu::ProgrammableStageDescriptor {
       module: &vs_module,
-      entry_point: "main",
+      entry_point: Cow::Borrowed("main"),
     },
     fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
       module: &fs_module,
-      entry_point: "main",
+      entry_point: Cow::Borrowed("main"),
     }),
     rasterization_state: Some(wgpu::RasterizationStateDescriptor {
       front_face: wgpu::FrontFace::Ccw,
@@ -391,8 +391,9 @@ fn create_render_pipeline(
       depth_bias: 0,
       depth_bias_slope_scale: 0.0,
       depth_bias_clamp: 0.0,
+      clamp_depth: false,
     }),
-    color_states: &[wgpu::ColorStateDescriptor {
+    color_states: Cow::Borrowed(&[wgpu::ColorStateDescriptor {
       format: sc_desc.format,
       color_blend: wgpu::BlendDescriptor {
         src_factor: wgpu::BlendFactor::SrcAlpha,
@@ -405,12 +406,12 @@ fn create_render_pipeline(
         operation: wgpu::BlendOperation::Add,
       },
       write_mask: wgpu::ColorWrite::ALL,
-    }],
+    }]),
     primitive_topology: wgpu::PrimitiveTopology::TriangleList,
     depth_stencil_state: None,
     vertex_state: wgpu::VertexStateDescriptor {
       index_format: wgpu::IndexFormat::Uint32,
-      vertex_buffers: &[Vertex::desc()],
+      vertex_buffers: Cow::Borrowed(&[Vertex::desc()]),
     },
     sample_count: 1,
     sample_mask: !0,
@@ -420,7 +421,7 @@ fn create_render_pipeline(
 
 fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
   let stable = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    entries: &[
+    entries: Cow::Borrowed(&[
       wgpu::BindGroupLayoutEntry::new(
         PrimaryBindings::GlobalUniform as u32,
         wgpu::ShaderStage::VERTEX,
@@ -452,12 +453,12 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
           multisampled: false,
         },
       ),
-    ],
-    label: Some("uniforms stable layout"),
+    ]),
+    label: Some(Cow::Borrowed("uniforms stable layout")),
   });
 
   let dynamic = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    entries: &[wgpu::BindGroupLayoutEntry::new(
+    entries: Cow::Borrowed(&[wgpu::BindGroupLayoutEntry::new(
       SecondBindings::Primitive as u32,
       wgpu::ShaderStage::VERTEX,
       wgpu::BindingType::StorageBuffer {
@@ -465,8 +466,10 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
         readonly: true,
         min_binding_size: None,
       },
-    )],
-    label: Some("uniform layout for texture infos (changed every draw)"),
+    )]),
+    label: Some(Cow::Borrowed(
+      "uniform layout for texture infos (changed every draw)",
+    )),
   });
   [stable, dynamic]
 }
@@ -498,7 +501,7 @@ fn create_uniforms(
   );
   device.create_bind_group(&wgpu::BindGroupDescriptor {
     layout,
-    entries: &[
+    entries: Cow::Borrowed(&[
       wgpu::BindGroupEntry {
         binding: PrimaryBindings::GlobalUniform as u32,
         resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
@@ -515,8 +518,8 @@ fn create_uniforms(
         binding: PrimaryBindings::GlyphTexture as u32,
         resource: wgpu::BindingResource::TextureView(glyph_texture),
       },
-    ],
-    label: Some("uniform_bind_group"),
+    ]),
+    label: Some(Cow::Borrowed("uniform_bind_group")),
   })
 }
 
@@ -533,7 +536,7 @@ impl Vertex {
     wgpu::VertexBufferDescriptor {
       stride: size_of::<Vertex>() as wgpu::BufferAddress,
       step_mode: wgpu::InputStepMode::Vertex,
-      attributes: &[
+      attributes: Cow::Borrowed(&[
         wgpu::VertexAttributeDescriptor {
           offset: 0,
           shader_location: 0,
@@ -549,7 +552,7 @@ impl Vertex {
           shader_location: 2,
           format: wgpu::VertexFormat::Uint,
         },
-      ],
+      ]),
     }
   }
 }

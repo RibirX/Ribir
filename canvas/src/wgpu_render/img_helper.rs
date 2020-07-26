@@ -1,4 +1,5 @@
 use super::{DeviceRect, DeviceSize};
+use std::borrow::Cow;
 
 pub(crate) struct RgbaConvert {
   group_layout: wgpu::BindGroupLayout,
@@ -8,7 +9,7 @@ pub(crate) struct RgbaConvert {
 impl RgbaConvert {
   pub(crate) fn new(device: &wgpu::Device) -> Self {
     let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      entries: &[wgpu::BindGroupLayoutEntry::new(
+      entries: Cow::Borrowed(&[wgpu::BindGroupLayoutEntry::new(
         0,
         wgpu::ShaderStage::COMPUTE,
         wgpu::BindingType::StorageBuffer {
@@ -16,7 +17,7 @@ impl RgbaConvert {
           readonly: false,
           min_binding_size: None,
         },
-      )],
+      )]),
       label: None,
     });
 
@@ -24,15 +25,15 @@ impl RgbaConvert {
       device.create_shader_module(wgpu::include_spirv!("./shaders/bgra_2_rgba.comp.spv"));
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-      bind_group_layouts: &[&group_layout],
-      push_constant_ranges: &[],
+      bind_group_layouts: Cow::Borrowed(&[&group_layout]),
+      push_constant_ranges: Cow::Borrowed(&[]),
     });
 
     let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
       layout: &pipeline_layout,
       compute_stage: wgpu::ProgrammableStageDescriptor {
         module: &cs_module,
-        entry_point: "main",
+        entry_point: Cow::Borrowed("main"),
       },
     });
 
@@ -52,10 +53,10 @@ impl RgbaConvert {
   ) {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.group_layout,
-      entries: &[wgpu::BindGroupEntry {
+      entries: Cow::Borrowed(&[wgpu::BindGroupEntry {
         binding: 0,
         resource: wgpu::BindingResource::Buffer(bgra_buffer.slice(..)),
-      }],
+      }]),
       label: None,
     });
 
@@ -91,7 +92,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   let size = align_width as u64 * height as u64 * PX_BYTES as u64;
 
   let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-    label: Some("Encoder for encoding texture as png"),
+    label: Some(Cow::Borrowed("Encoder for encoding texture as png")),
   });
 
   // The output buffer lets us retrieve the data as an array

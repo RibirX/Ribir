@@ -86,7 +86,7 @@ mod tests {
       themes: track_themes.clone(),
     };
     let dark_theme = Theme {
-      data: light.clone(),
+      data: light,
       widget: SizedBox::expanded(Theme {
         data: dark.clone(),
         widget: SizedBox::shrink(theme).box_it(),
