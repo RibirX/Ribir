@@ -93,7 +93,14 @@ impl<W: RawWindow, R: CanvasRender> Window<W, R> {
     };
   }
 
-  fn new(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
+  fn new(mut root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
+    if Widget::dynamic_cast_ref::<Theme>(&root).is_none() {
+      root = Theme {
+        data: material::light("Roboto".to_string()),
+        widget: root,
+      }
+      .box_it();
+    }
     let render_tree = Box::pin(RenderTree::default());
 
     let widget_tree = Box::pin(WidgetTree::default());

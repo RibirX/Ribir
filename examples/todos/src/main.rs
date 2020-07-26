@@ -25,7 +25,7 @@ impl CombinationWidget for Todos {
       )
       .push(
         (0..3)
-          .map(|i| Text(format!("ThirdRow {} ", i)).box_it())
+          .map(|i| Text(format!("ThirdRow{} ", i)).box_it())
           .collect::<Row>(),
       );
 
