@@ -1,6 +1,6 @@
 pub use canvas::{Color, FillStyle, FontStyle, FontWeight};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
   Dark,
   Light,
@@ -20,7 +20,7 @@ bitflags! {
   }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct TextStyle {
   /// The style drawn as a foreground for the text.
   pub foreground: FillStyle,
@@ -43,7 +43,7 @@ pub struct TextStyle {
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
 /// spec](https://material.io/design/typography/the-type-system.html#applying-the-type-scale)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TypographyTheme {
   pub headline1: TextStyle,
   pub headline2: TextStyle,
@@ -61,7 +61,7 @@ pub struct TypographyTheme {
 }
 
 /// Properties from [Material Theme](https://material.io/design/material-theming/implementing-your-theme.html)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ThemeData {
   // Dark or light theme.
   pub brightness: Brightness,
