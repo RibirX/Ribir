@@ -114,6 +114,24 @@ pub trait Widget: Debug + Any {
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Cancel, handler)
   }
+
+  #[inline]
+  fn on_pointer_enter<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self.box_it(), PointerEventType::Enter, handler)
+  }
+
+  #[inline]
+  fn on_pointer_leave<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self.box_it(), PointerEventType::Leave, handler)
+  }
 }
 
 /// A widget represented by other widget compose.

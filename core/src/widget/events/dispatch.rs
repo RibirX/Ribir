@@ -44,6 +44,11 @@ impl Dispatcher {
           w.dispatch(PointerEventType::Move, event)
         });
       }
+      WindowEvent::CursorLeft { .. } => {
+        self.cursor_pos = Point::new(-1., -1.);
+        let pointer = self.mouse_pointer_without_target();
+        self.pointer_enter_leave_dispatch(pointer);
+      }
       WindowEvent::MouseInput {
         state,
         button,
@@ -124,9 +129,9 @@ impl Dispatcher {
     };
     let mut new_path = self.render_hit_path();
     // Remove the common ancestors of `old_path` and `new_path`
-    while old_path.last() == new_path.last().map(|(wid, _)| wid) {
+    while !old_path.is_empty() && old_path.last() == new_path.first().map(|(wid, _)| wid) {
       old_path.pop();
-      new_path.pop();
+      new_path.remove(0);
     }
 
     old_path.iter().for_each(|wid| {
@@ -139,7 +144,7 @@ impl Dispatcher {
         &mut event,
       );
     });
-    new_path.iter().rev().for_each(|(wid, pos)| {
+    new_path.iter().for_each(|(wid, pos)| {
       event.position = *pos;
       log::info!("Pointer enter {:?}", event);
       Self::dispatch_to_widget(
@@ -149,7 +154,7 @@ impl Dispatcher {
         &mut event,
       );
     });
-    self.last_pointer_widget = new_path.first().map(|(wid, _)| *wid);
+    self.last_pointer_widget = new_path.last().map(|(wid, _)| *wid);
   }
 
   /// return a iterator of widgets war from leaf to root.
@@ -458,6 +463,53 @@ mod tests {
     });
 
     assert_eq!(event_record.borrow().len(), 1);
+  }
+
+  #[test]
+  fn enter_leave() {
+    let enter_event = Rc::new(RefCell::new(vec![]));
+    let leave_event = Rc::new(RefCell::new(vec![]));
+
+    let c_enter_event = enter_event.clone();
+    let c_leave_event = leave_event.clone();
+    let child = SizedBox::empty_box(Size::new(f32::INFINITY, f32::INFINITY))
+      .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(1))
+      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(1));
+    let c_enter_event = enter_event.clone();
+    let c_leave_event = leave_event.clone();
+    let parent = SizedBox::expanded(child)
+      .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(2))
+      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(2));
+
+    let mut wnd = NoRenderWindow::without_render(parent, Size::new(100., 100.));
+    wnd.render_ready();
+
+    let device_id = mock_device_id(0);
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+    assert_eq!(&*enter_event.borrow(), &[2, 1]);
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (1000, 1000).into(),
+      modifiers: ModifiersState::default(),
+    });
+
+    assert_eq!(&*leave_event.borrow(), &[1, 2]);
+
+    // leave event trigger by window left.
+    leave_event.borrow_mut().clear();
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+    wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
+    assert_eq!(&*leave_event.borrow(), &[1, 2]);
   }
 
   fn mock_device_id(value: u8) -> DeviceId {
