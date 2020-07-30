@@ -4,42 +4,99 @@ use crate::{
   widget::{events::dispatch::Dispatcher, widget_tree::*},
 };
 use canvas::{surface::TextureSurface, Canvas, CanvasRender, DeviceSize, WgpuRender};
-use std::{pin::Pin, ptr::NonNull};
-use winit::{
-  event::WindowEvent,
-  event_loop::EventLoop,
-  window::WindowId,
-  window::{Window as NativeWindow, WindowBuilder},
-};
+use std::{cell::RefCell, pin::Pin, ptr::NonNull, rc::Rc};
+pub use winit::window::CursorIcon;
+use winit::{event::WindowEvent, event_loop::EventLoop, window::WindowBuilder, window::WindowId};
 
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
+  fn inner_position(&self) -> Point;
+  fn outer_position(&self) -> Point;
+  fn id(&self) -> WindowId;
+  /// Modifies the cursor icon of the window. Not effective immediately.
+  fn set_cursor(&mut self, cursor: CursorIcon);
+  /// The cursor set to the window, but not submit to native window yet.
+  fn updated_cursor(&self) -> Option<CursorIcon>;
+  fn request_redraw(&self);
+  /// Modify the native window if cursor modified.
+  fn submit_cursor(&mut self);
+}
+
+pub struct NativeWindow {
+  native: winit::window::Window,
+  cursor: Option<CursorIcon>,
 }
 
 impl RawWindow for NativeWindow {
   fn inner_size(&self) -> Size {
-    let size = self.inner_size().to_logical(self.scale_factor());
+    let wnd = &self.native;
+    let size = wnd.inner_size().to_logical(wnd.scale_factor());
     Size::new(size.width, size.height)
   }
 
   fn outer_size(&self) -> Size {
-    let size = self.outer_size().to_logical(self.scale_factor());
+    let wnd = &self.native;
+    let size = wnd.outer_size().to_logical(wnd.scale_factor());
     Size::new(size.width, size.height)
+  }
+
+  fn inner_position(&self) -> Point {
+    let wnd = &self.native;
+    let pos = wnd
+      .inner_position()
+      .expect(" Can only be called on the main thread")
+      .to_logical(wnd.scale_factor());
+
+    Point::new(pos.x, pos.y)
+  }
+  #[inline]
+  fn id(&self) -> WindowId { self.native.id() }
+
+  fn outer_position(&self) -> Point {
+    let wnd = &self.native;
+    let pos = wnd
+      .outer_position()
+      .expect(" Can only be called on the main thread")
+      .to_logical(wnd.scale_factor());
+    Point::new(pos.x, pos.y)
+  }
+
+  #[inline]
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor) }
+
+  #[inline]
+  fn updated_cursor(&self) -> Option<CursorIcon> { self.cursor }
+
+  #[inline]
+  fn request_redraw(&self) { self.native.request_redraw() }
+
+  fn submit_cursor(&mut self) {
+    if let Some(cursor) = self.cursor.take() {
+      self.native.set_cursor_icon(cursor)
+    }
   }
 }
 
 /// Window is the root to represent.
-pub struct Window<W: RawWindow = NativeWindow, R: CanvasRender = WgpuRender> {
+pub struct Window<R: CanvasRender = WgpuRender> {
   render_tree: Pin<Box<RenderTree>>,
   widget_tree: Pin<Box<WidgetTree>>,
-  raw_window: W,
+  raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
   canvas: Pin<Box<Canvas>>,
   render: R,
   dispatcher: Dispatcher,
 }
 
-impl<W: RawWindow, R: CanvasRender> Window<W, R> {
+impl<R: CanvasRender> Window<R> {
+  #[inline]
+  pub fn raw_window(&self) -> std::cell::Ref<Box<dyn RawWindow>> { self.raw_window.borrow() }
+
+  #[inline]
+  pub fn raw_window_mut(&mut self) -> std::cell::RefMut<Box<dyn RawWindow>> {
+    self.raw_window.borrow_mut()
+  }
+
   /// processes native events from this native window
   #[inline]
   pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
@@ -89,11 +146,11 @@ impl<W: RawWindow, R: CanvasRender> Window<W, R> {
         .render_tree
         .as_mut()
         .get_unchecked_mut()
-        .layout(self.raw_window.inner_size(), self.canvas.as_mut())
+        .layout(self.raw_window.borrow().inner_size(), self.canvas.as_mut())
     };
   }
 
-  fn new(mut root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
+  fn new<W: RawWindow + 'static>(mut root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
     if Widget::dynamic_cast_ref::<Theme>(&root).is_none() {
       root = Theme {
         data: material::light("Roboto".to_string()),
@@ -102,11 +159,15 @@ impl<W: RawWindow, R: CanvasRender> Window<W, R> {
       .box_it();
     }
     let render_tree = Box::pin(RenderTree::default());
-
     let widget_tree = Box::pin(WidgetTree::default());
+    let raw_window: Rc<RefCell<Box<dyn RawWindow>>> = Rc::new(RefCell::new(Box::new(wnd)));
     let mut wnd = Self {
-      raw_window: wnd,
-      dispatcher: Dispatcher::new(NonNull::from(&*render_tree), NonNull::from(&*widget_tree)),
+      dispatcher: Dispatcher::new(
+        NonNull::from(&*render_tree),
+        NonNull::from(&*widget_tree),
+        raw_window.clone(),
+      ),
+      raw_window,
       render_tree,
       widget_tree,
       canvas: Box::pin(canvas),
@@ -145,29 +206,6 @@ impl<W: RawWindow, R: CanvasRender> Window<W, R> {
 }
 
 impl Window {
-  #[inline]
-  pub fn id(&self) -> WindowId { self.raw_window.id() }
-
-  /// Returns the position of the top-left hand corner of the window's client
-  /// area relative to the top-left hand corner of the desktop.
-  pub fn inner_position(&self) -> DevicePoint {
-    let pos = self
-      .raw_window
-      .inner_position()
-      .expect(" Can only be called on the main thread");
-    DevicePoint::new(pos.x as u32, pos.y as u32)
-  }
-
-  /// Returns the position of the top-left hand corner of the window relative to
-  /// the  top-left hand corner of the desktop.
-  pub fn outer_position(&self) -> DevicePoint {
-    let pos = self
-      .raw_window
-      .outer_position()
-      .expect(" Can only be called on the main thread");
-    DevicePoint::new(pos.x as u32, pos.y as u32)
-  }
-
   pub(crate) fn from_event_loop(root: BoxWidget, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
@@ -176,22 +214,32 @@ impl Window {
       DeviceSize::new(size.width, size.height),
     ));
 
-    Self::new(root, native_window, canvas, render)
+    Self::new(
+      root,
+      NativeWindow {
+        native: native_window,
+        cursor: None,
+      },
+      canvas,
+      render,
+    )
   }
 
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
   /// after all OS events have been processed by the event loop.
   #[inline]
-  pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
+  pub(crate) fn request_redraw(&self) { self.raw_window.borrow().request_redraw(); }
 }
 
-pub type HeadlessWindow = Window<MockRawWindow, WgpuRender<TextureSurface>>;
-pub type NoRenderWindow = Window<MockRawWindow, MockRender>;
+pub type HeadlessWindow = Window<WgpuRender<TextureSurface>>;
+pub type NoRenderWindow = Window<MockRender>;
 
 pub struct MockRender;
 
+#[derive(Default)]
 pub struct MockRawWindow {
-  size: Size,
+  pub size: Size,
+  pub cursor: Option<CursorIcon>,
 }
 
 impl CanvasRender for MockRender {
@@ -207,6 +255,13 @@ impl CanvasRender for MockRender {
 impl RawWindow for MockRawWindow {
   fn inner_size(&self) -> Size { self.size }
   fn outer_size(&self) -> Size { self.size }
+  fn inner_position(&self) -> Point { Point::zero() }
+  fn outer_position(&self) -> Point { Point::zero() }
+  fn id(&self) -> WindowId { unsafe { WindowId::dummy() } }
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
+  fn request_redraw(&self) {}
+  fn updated_cursor(&self) -> Option<CursorIcon> { self.cursor }
+  fn submit_cursor(&mut self) { self.cursor.take(); }
 }
 
 impl HeadlessWindow {
@@ -217,6 +272,7 @@ impl HeadlessWindow {
       root,
       MockRawWindow {
         size: Size::new(800., 600.),
+        ..Default::default()
       },
       canvas,
       render,
@@ -229,6 +285,14 @@ impl NoRenderWindow {
     // todo: should set the global transform of canvas by window's scale factor.
     let canvas = Canvas::new(DeviceSize::new(size.width as u32, size.height as u32));
     let render = MockRender;
-    Self::new(root.box_it(), MockRawWindow { size }, canvas, render)
+    Self::new(
+      root.box_it(),
+      MockRawWindow {
+        size,
+        ..Default::default()
+      },
+      canvas,
+      render,
+    )
   }
 }

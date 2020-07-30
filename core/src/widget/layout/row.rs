@@ -23,7 +23,7 @@ impl Row {
   }
 
   #[inline]
-  pub fn with_main_align(self, align: MainAxisAlignment) -> Self {
+  pub fn with_main_align(self, align: MainAxisAlign) -> Self {
     Self(self.0.with_main_align(align))
   }
 
