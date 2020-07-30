@@ -14,6 +14,7 @@ pub(crate) struct Dispatcher {
   render_tree: NonNull<RenderTree>,
   widget_tree: NonNull<WidgetTree>,
   cursor_pos: Point,
+  last_pointer_widget: Option<WidgetId>,
   mouse_button: (Option<DeviceId>, MouseButtons),
   modifiers: ModifiersState,
 }
@@ -23,6 +24,7 @@ impl Dispatcher {
     Self {
       render_tree,
       widget_tree,
+      last_pointer_widget: None,
       cursor_pos: Point::zero(),
       modifiers: <_>::default(),
       mouse_button: <_>::default(),
@@ -35,10 +37,17 @@ impl Dispatcher {
       WindowEvent::ModifiersChanged(s) => self.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
+        let pointer = self.mouse_pointer_without_target();
+        self.pointer_enter_leave_dispatch(pointer);
         self.bubble_mouse_pointer(|w, event| {
           log::info!("Pointer move {:?}", event);
           w.dispatch(PointerEventType::Move, event)
         });
+      }
+      WindowEvent::CursorLeft { .. } => {
+        self.cursor_pos = Point::new(-1., -1.);
+        let pointer = self.mouse_pointer_without_target();
+        self.pointer_enter_leave_dispatch(pointer);
       }
       WindowEvent::MouseInput {
         state,
@@ -82,21 +91,11 @@ impl Dispatcher {
     &mut self,
     mut dispatch: D,
   ) {
-    let mut pointer = None;
-
+    let mut event = self.mouse_pointer_without_target();
     let mut w_tree = self.widget_tree;
     self.hit_widget_iter().all(|(wid, pos)| {
-      let event = pointer.get_or_insert_with(|| {
-        PointerEvent::from_mouse(
-          wid,
-          pos,
-          self.cursor_pos,
-          self.modifiers,
-          self.mouse_button.1,
-        )
-      });
       event.position = pos;
-      Self::dispatch_to_widget(wid, unsafe { w_tree.as_mut() }, &mut dispatch, event);
+      Self::dispatch_to_widget(wid, unsafe { w_tree.as_mut() }, &mut dispatch, &mut event);
       !event.as_mut().cancel_bubble.get()
     });
   }
@@ -122,9 +121,45 @@ impl Dispatcher {
     }
   }
 
-  /// return a iterator of widgets war hit from leaf to root.
+  fn pointer_enter_leave_dispatch(&mut self, mut event: PointerEvent) {
+    let mut old_path = if let Some(last) = self.last_pointer_widget {
+      last.ancestors(self.widget_tree_ref()).collect::<Vec<_>>()
+    } else {
+      vec![]
+    };
+    let mut new_path = self.render_hit_path();
+    // Remove the common ancestors of `old_path` and `new_path`
+    while !old_path.is_empty() && old_path.last() == new_path.first().map(|(wid, _)| wid) {
+      old_path.pop();
+      new_path.remove(0);
+    }
+
+    old_path.iter().for_each(|wid| {
+      event.position = self.widget_relative_point(*wid);
+      log::info!("Pointer leave {:?}", event);
+      Self::dispatch_to_widget(
+        *wid,
+        unsafe { self.widget_tree.as_mut() },
+        &mut |widget: &mut PointerListener, e| widget.dispatch(PointerEventType::Leave, e),
+        &mut event,
+      );
+    });
+    new_path.iter().for_each(|(wid, pos)| {
+      event.position = *pos;
+      log::info!("Pointer enter {:?}", event);
+      Self::dispatch_to_widget(
+        *wid,
+        unsafe { self.widget_tree.as_mut() },
+        &mut |widget: &mut PointerListener, e| widget.dispatch(PointerEventType::Enter, e),
+        &mut event,
+      );
+    });
+    self.last_pointer_widget = new_path.last().map(|(wid, _)| *wid);
+  }
+
+  /// return a iterator of widgets war from leaf to root.
   fn hit_widget_iter(&self) -> HitWidgetIter {
-    HitWidgetIter::new(unsafe { self.widget_tree.as_ref() }, self.render_hit_path())
+    HitWidgetIter::new(self.widget_tree_ref(), self.render_hit_path())
   }
 
   /// collect the render widget hit path.
@@ -165,6 +200,28 @@ impl Dispatcher {
 
   #[inline]
   fn render_tree_ref(&self) -> &RenderTree { unsafe { self.render_tree.as_ref() } }
+
+  #[inline]
+  fn widget_tree_ref(&self) -> &WidgetTree { unsafe { self.widget_tree.as_ref() } }
+
+  fn widget_relative_point(&self, wid: WidgetId) -> Point {
+    let r_tree = self.render_tree_ref();
+    if let Some(rid) = wid.relative_to_render(self.widget_tree_ref()) {
+      rid
+        .ancestors(r_tree)
+        .map(|r| {
+          r.layout_box_rect(r_tree)
+            .map_or_else(Point::zero, |rect| rect.origin)
+        })
+        .fold(Point::zero(), |sum, pos| sum + pos.to_vector())
+    } else {
+      unreachable!("");
+    }
+  }
+
+  fn mouse_pointer_without_target(&self) -> PointerEvent {
+    PointerEvent::from_mouse_without_target(self.cursor_pos, self.modifiers, self.mouse_button.1)
+  }
 }
 
 struct HitWidgetIter<'a> {
@@ -406,6 +463,53 @@ mod tests {
     });
 
     assert_eq!(event_record.borrow().len(), 1);
+  }
+
+  #[test]
+  fn enter_leave() {
+    let enter_event = Rc::new(RefCell::new(vec![]));
+    let leave_event = Rc::new(RefCell::new(vec![]));
+
+    let c_enter_event = enter_event.clone();
+    let c_leave_event = leave_event.clone();
+    let child = SizedBox::empty_box(Size::new(f32::INFINITY, f32::INFINITY))
+      .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(1))
+      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(1));
+    let c_enter_event = enter_event.clone();
+    let c_leave_event = leave_event.clone();
+    let parent = SizedBox::expanded(child)
+      .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(2))
+      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(2));
+
+    let mut wnd = NoRenderWindow::without_render(parent, Size::new(100., 100.));
+    wnd.render_ready();
+
+    let device_id = mock_device_id(0);
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+    assert_eq!(&*enter_event.borrow(), &[2, 1]);
+
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (1000, 1000).into(),
+      modifiers: ModifiersState::default(),
+    });
+
+    assert_eq!(&*leave_event.borrow(), &[1, 2]);
+
+    // leave event trigger by window left.
+    leave_event.borrow_mut().clear();
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+    wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
+    assert_eq!(&*leave_event.borrow(), &[1, 2]);
   }
 
   fn mock_device_id(value: u8) -> DeviceId {

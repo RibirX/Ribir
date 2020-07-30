@@ -102,17 +102,20 @@ pub struct PointerListener {
   on_pointer_move: Option<Box<dyn FnMut(&PointerEvent)>>,
   on_pointer_up: Option<Box<dyn FnMut(&PointerEvent)>>,
   on_pointer_cancel: Option<Box<dyn FnMut(&PointerEvent)>>,
+  on_pointer_enter: Option<Box<dyn FnMut(&PointerEvent)>>,
+  on_pointer_leave: Option<Box<dyn FnMut(&PointerEvent)>>,
 }
 
+/// Enter/Leave do not bubble.
 pub enum PointerEventType {
   Down,
   Move,
   Up,
   Cancel,
+  Enter,
+  Leave,
   /* onpointerover:
-   * onpointerenter:
    * onpointerout:
-   * onpointerleave:
    * gotpointercapture:
    * lostpointercapture: */
 }
@@ -131,6 +134,8 @@ impl PointerListener {
         on_pointer_move: None,
         on_pointer_up: None,
         on_pointer_cancel: None,
+        on_pointer_enter: None,
+        on_pointer_leave: None,
       },
       |_| {},
     );
@@ -145,23 +150,27 @@ impl PointerListener {
     event_type: PointerEventType,
     handler: F,
   ) {
-    let holder = match event_type {
-      PointerEventType::Down => &mut self.on_pointer_down,
-      PointerEventType::Move => &mut self.on_pointer_move,
-      PointerEventType::Up => &mut self.on_pointer_up,
-      PointerEventType::Cancel => &mut self.on_pointer_cancel,
-    };
+    let holder = self.pointer_handler(event_type);
     add_listener(holder, handler);
   }
 
   pub(crate) fn dispatch(&mut self, event_type: PointerEventType, event: &PointerEvent) {
-    let holder = match event_type {
+    let handler = self.pointer_handler(event_type);
+    dispatch_event(handler, event)
+  }
+
+  fn pointer_handler(
+    &mut self,
+    event_type: PointerEventType,
+  ) -> &mut Option<Box<dyn FnMut(&PointerEvent)>> {
+    match event_type {
       PointerEventType::Down => &mut self.on_pointer_down,
       PointerEventType::Move => &mut self.on_pointer_move,
       PointerEventType::Up => &mut self.on_pointer_up,
       PointerEventType::Cancel => &mut self.on_pointer_cancel,
-    };
-    dispatch_event(holder, event)
+      PointerEventType::Enter => &mut self.on_pointer_enter,
+      PointerEventType::Leave => &mut self.on_pointer_leave,
+    }
   }
 }
 

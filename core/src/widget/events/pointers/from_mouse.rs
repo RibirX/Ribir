@@ -6,13 +6,12 @@ use crate::{prelude::*, widget::widget_tree::WidgetId};
 use winit::event::MouseButton;
 
 impl PointerEvent {
-  pub fn from_mouse(
-    target: WidgetId,
-    position: Point,
+  pub(crate) fn from_mouse_without_target(
     global_pos: Point,
     modifiers: ModifiersState,
     btn: MouseButtons,
   ) -> Self {
+    let target = uninit_target();
     let event = EventCommon {
       target,
       current_target: target,
@@ -22,7 +21,7 @@ impl PointerEvent {
     };
 
     PointerEvent {
-      position,
+      position: global_pos,
       global_pos,
       // todo: how to generate pointer id ?
       id: PointerId(0),
@@ -38,6 +37,10 @@ impl PointerEvent {
       common: event,
     }
   }
+}
+fn uninit_target() -> WidgetId {
+  let id = std::num::NonZeroUsize::new(0);
+  unsafe { std::mem::transmute(id) }
 }
 
 impl From<MouseButton> for MouseButtons {
