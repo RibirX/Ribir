@@ -23,9 +23,7 @@ impl Row {
   }
 
   #[inline]
-  pub fn with_main_align(self, align: MainAxisAlign) -> Self {
-    Self(self.0.with_main_align(align))
-  }
+  pub fn with_main_align(self, align: MainAxisAlign) -> Self { Self(self.0.with_main_align(align)) }
 
   #[inline]
   pub fn get_cross_align(&self) -> CrossAxisAlign { self.0.cross_align }
