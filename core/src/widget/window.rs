@@ -101,6 +101,7 @@ impl<R: CanvasRender> Window<R> {
   #[inline]
   pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
     self.dispatcher.dispatch(event);
+    self.raw_window.borrow_mut().submit_cursor();
   }
 
   /// This method ensure render tree is ready to paint, three things it's have
