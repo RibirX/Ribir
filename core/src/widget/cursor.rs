@@ -35,7 +35,8 @@ mod tests {
   use winit::event::{DeviceId, WindowEvent};
 
   fn submit_cursor(wnd: &mut NoRenderWindow) -> CursorIcon {
-    let ptr = (&mut **wnd.raw_window_mut()) as *mut dyn RawWindow;
+    let ptr = (&mut **wnd.raw_window.borrow_mut()) as *mut dyn RawWindow;
+    #[allow(clippy::cast_ptr_alignment)]
     let mock_window = unsafe { &mut *(ptr as *mut MockRawWindow) };
     let cursor = mock_window.cursor.unwrap();
     mock_window.submit_cursor();
@@ -66,7 +67,7 @@ mod tests {
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.processes_native_event(WindowEvent::CursorMoved {
+    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
       device_id,
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
@@ -74,7 +75,7 @@ mod tests {
     assert_eq!(submit_cursor(&mut wnd), CursorIcon::Help);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.processes_native_event(WindowEvent::CursorMoved {
+    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
       device_id,
       position: (101, 1).into(),
       modifiers: ModifiersState::default(),
@@ -82,7 +83,7 @@ mod tests {
     assert_eq!(submit_cursor(&mut wnd), CursorIcon::Hand);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.processes_native_event(WindowEvent::CursorMoved {
+    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
       device_id,
       position: (201, 1).into(),
       modifiers: ModifiersState::default(),
@@ -90,7 +91,7 @@ mod tests {
     assert_eq!(submit_cursor(&mut wnd), CursorIcon::AllScroll);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.processes_native_event(WindowEvent::CursorMoved {
+    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
       device_id,
       position: (101, 1).into(),
       modifiers: ModifiersState::default(),
@@ -98,7 +99,7 @@ mod tests {
     assert_eq!(submit_cursor(&mut wnd), CursorIcon::Hand);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.processes_native_event(WindowEvent::CursorMoved {
+    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
       device_id,
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),

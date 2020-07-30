@@ -82,21 +82,13 @@ impl RawWindow for NativeWindow {
 pub struct Window<R: CanvasRender = WgpuRender> {
   render_tree: Pin<Box<RenderTree>>,
   widget_tree: Pin<Box<WidgetTree>>,
-  raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
+  pub(crate) raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
   canvas: Pin<Box<Canvas>>,
   render: R,
-  dispatcher: Dispatcher,
+  pub(crate) dispatcher: Dispatcher,
 }
 
 impl<R: CanvasRender> Window<R> {
-  #[inline]
-  pub fn raw_window(&self) -> std::cell::Ref<Box<dyn RawWindow>> { self.raw_window.borrow() }
-
-  #[inline]
-  pub fn raw_window_mut(&mut self) -> std::cell::RefMut<Box<dyn RawWindow>> {
-    self.raw_window.borrow_mut()
-  }
-
   /// processes native events from this native window
   #[inline]
   pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {

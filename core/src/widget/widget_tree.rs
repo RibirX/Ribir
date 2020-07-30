@@ -427,6 +427,9 @@ impl !Unpin for WidgetTree {}
 
 impl WidgetId {
   /// Return a dummy `WidgetId` use for unit test.
+  /// # Safety
+  /// Just use it for unit test or ensure you will reassign a valid WidgetId
+  /// from `WidgetTree`
   pub unsafe fn dummy() -> Self {
     let id = std::num::NonZeroUsize::new(0);
     std::mem::transmute(id)

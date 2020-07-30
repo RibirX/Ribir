@@ -50,7 +50,7 @@ impl Application {
 
   pub(crate) fn new_window(&mut self, w: BoxWidget) -> WindowId {
     let window = Window::from_event_loop(w, &self.event_loop);
-    let id = window.raw_window().id();
+    let id = window.raw_window.borrow().id();
     self.windows.insert(id, window);
     id
   }

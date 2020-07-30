@@ -8,6 +8,7 @@ pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
 use std::borrow::{Borrow, Cow};
 use surface::{PhysicSurface, Surface, TextureSurface};
+use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
 enum PrimaryBindings {
@@ -164,10 +165,16 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     let view = surface.get_next_view();
 
     let vb = &data.vertices_buffer;
-    let vertices_buffer =
-      device.create_buffer_with_data(vb.vertices.as_bytes(), wgpu::BufferUsage::VERTEX);
-    let indices_buffer =
-      device.create_buffer_with_data(vb.indices.as_bytes(), wgpu::BufferUsage::INDEX);
+    let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+      label: Some("Vertices buffer"),
+      contents: vb.vertices.as_bytes(),
+      usage: wgpu::BufferUsage::VERTEX,
+    });
+    let indices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+      contents: vb.indices.as_bytes(),
+      usage: wgpu::BufferUsage::INDEX,
+      label: Some("Indices buffer"),
+    });
 
     {
       let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -287,7 +294,11 @@ impl<S: Surface> WgpuRender<S> {
   fn create_primitives_bind_group(&mut self, primitives: &[Primitive]) -> wgpu::BindGroup {
     let primitives_buffer = self
       .device
-      .create_buffer_with_data(primitives.as_bytes(), wgpu::BufferUsage::STORAGE);
+      .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Primitive Buffer"),
+        contents: primitives.as_bytes(),
+        usage: wgpu::BufferUsage::STORAGE,
+      });
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.primitives_layout,
       entries: Cow::Borrowed(&[wgpu::BindGroupEntry {
@@ -310,7 +321,11 @@ impl<S: Surface> WgpuRender<S> {
     }
     if mem_tex.is_updated() {
       let DeviceSize { width, height, .. } = mem_tex.size();
-      let buffer = device.create_buffer_with_data(mem_tex.as_bytes(), wgpu::BufferUsage::COPY_SRC);
+      let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Memory texture submit to wgpu render."),
+        contents: mem_tex.as_bytes(),
+        usage: wgpu::BufferUsage::COPY_SRC,
+      });
 
       encoder.copy_buffer_to_texture(
         wgpu::BufferCopyView {
@@ -495,10 +510,11 @@ fn create_uniforms(
     texture_atlas_size: atlas_size.to_array(),
     canvas_coordinate_map: canvas_2d_to_device_matrix.to_row_arrays(),
   };
-  let uniform_buffer = device.create_buffer_with_data(
-    &uniform.as_bytes(),
-    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-  );
+  let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    contents: &uniform.as_bytes(),
+    usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+    label: Some("uniform buffer"),
+  });
   device.create_bind_group(&wgpu::BindGroupDescriptor {
     layout,
     entries: Cow::Borrowed(&[
