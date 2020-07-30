@@ -8,6 +8,8 @@ use crate::{
   widget::widget_tree::{WidgetId, WidgetTree},
 };
 use std::ptr::NonNull;
+use std::{cell::RefCell, rc::Rc};
+pub use window::RawWindow;
 use winit::event::{DeviceId, ElementState, ModifiersState, WindowEvent};
 
 pub(crate) struct Dispatcher {
@@ -17,10 +19,15 @@ pub(crate) struct Dispatcher {
   last_pointer_widget: Option<WidgetId>,
   mouse_button: (Option<DeviceId>, MouseButtons),
   modifiers: ModifiersState,
+  window: Rc<RefCell<Box<dyn RawWindow>>>,
 }
 
 impl Dispatcher {
-  pub fn new(render_tree: NonNull<RenderTree>, widget_tree: NonNull<WidgetTree>) -> Self {
+  pub fn new(
+    render_tree: NonNull<RenderTree>,
+    widget_tree: NonNull<WidgetTree>,
+    window: Rc<RefCell<Box<dyn RawWindow>>>,
+  ) -> Self {
     Self {
       render_tree,
       widget_tree,
@@ -28,6 +35,7 @@ impl Dispatcher {
       cursor_pos: Point::zero(),
       modifiers: <_>::default(),
       mouse_button: <_>::default(),
+      window,
     }
   }
 
@@ -37,8 +45,7 @@ impl Dispatcher {
       WindowEvent::ModifiersChanged(s) => self.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
-        let pointer = self.mouse_pointer_without_target();
-        self.pointer_enter_leave_dispatch(pointer);
+        self.pointer_enter_leave_dispatch();
         self.bubble_mouse_pointer(|w, event| {
           log::info!("Pointer move {:?}", event);
           w.dispatch(PointerEventType::Move, event)
@@ -46,8 +53,7 @@ impl Dispatcher {
       }
       WindowEvent::CursorLeft { .. } => {
         self.cursor_pos = Point::new(-1., -1.);
-        let pointer = self.mouse_pointer_without_target();
-        self.pointer_enter_leave_dispatch(pointer);
+        self.pointer_enter_leave_dispatch();
       }
       WindowEvent::MouseInput {
         state,
@@ -90,7 +96,7 @@ impl Dispatcher {
   fn bubble_mouse_pointer<D: FnMut(&mut PointerListener, &mut PointerEvent)>(
     &mut self,
     mut dispatch: D,
-  ) {
+  ) -> PointerEvent {
     let mut event = self.mouse_pointer_without_target();
     let mut w_tree = self.widget_tree;
     self.hit_widget_iter().all(|(wid, pos)| {
@@ -98,6 +104,7 @@ impl Dispatcher {
       Self::dispatch_to_widget(wid, unsafe { w_tree.as_mut() }, &mut dispatch, &mut event);
       !event.as_mut().cancel_bubble.get()
     });
+    event
   }
 
   fn dispatch_to_widget<
@@ -121,7 +128,8 @@ impl Dispatcher {
     }
   }
 
-  fn pointer_enter_leave_dispatch(&mut self, mut event: PointerEvent) {
+  fn pointer_enter_leave_dispatch(&mut self) {
+    let mut event = self.mouse_pointer_without_target();
     let mut old_path = if let Some(last) = self.last_pointer_widget {
       last.ancestors(self.widget_tree_ref()).collect::<Vec<_>>()
     } else {
@@ -220,7 +228,14 @@ impl Dispatcher {
   }
 
   fn mouse_pointer_without_target(&self) -> PointerEvent {
-    PointerEvent::from_mouse_without_target(self.cursor_pos, self.modifiers, self.mouse_button.1)
+    unsafe {
+      PointerEvent::from_mouse_with_dummy_target(
+        self.cursor_pos,
+        self.modifiers,
+        self.mouse_button.1,
+        self.window.clone(),
+      )
+    }
   }
 }
 
@@ -297,7 +312,7 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
-    let device_id = mock_device_id(0);
+    let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (1, 1).into(),
@@ -333,7 +348,7 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
-    let device_id = mock_device_id(0);
+    let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -456,7 +471,7 @@ mod tests {
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: mock_device_id(0),
+      device_id: unsafe { DeviceId::dummy() },
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
@@ -484,7 +499,7 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(parent, Size::new(100., 100.));
     wnd.render_ready();
 
-    let device_id = mock_device_id(0);
+    let device_id = unsafe { DeviceId::dummy() };
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
@@ -510,14 +525,5 @@ mod tests {
     });
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
-  }
-
-  fn mock_device_id(value: u8) -> DeviceId {
-    unsafe {
-      let mut id = std::mem::MaybeUninit::<DeviceId>::uninit();
-      id.as_mut_ptr()
-        .write_bytes(value, std::mem::size_of::<DeviceId>());
-      id.assume_init()
-    }
   }
 }

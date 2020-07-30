@@ -3,9 +3,12 @@
 //! [`KeyboardListener`](keyboard::KeyboardListener). `Holiday` dispatch event
 //! like web's bubble phase, always from the leaf to root.
 use crate::widget::widget_tree::WidgetId;
+use std::cell::Cell;
 pub(crate) mod dispatch;
 pub mod pointers;
-pub use pointers::{PointerEvent, PointerListener};
+use crate::widget::window::RawWindow;
+pub use pointers::*;
+use std::{cell::RefCell, rc::Rc};
 pub use winit::event::ModifiersState;
 
 /// Event itself contains the properties and methods which are common to all
@@ -29,13 +32,14 @@ pub trait Event {
   fn modifiers(&self) -> ModifiersState;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EventCommon {
   pub target: WidgetId,
   pub current_target: WidgetId,
   pub composed_path: Vec<WidgetId>,
   pub modifiers: ModifiersState,
-  pub cancel_bubble: std::cell::Cell<bool>,
+  pub cancel_bubble: Cell<bool>,
+  pub window: Rc<RefCell<Box<dyn RawWindow>>>,
 }
 
 impl<T: std::convert::AsRef<EventCommon>> Event for T {
@@ -76,5 +80,17 @@ pub(crate) fn dispatch_event<E: std::convert::AsRef<EventCommon> + 'static>(
 ) {
   if let Some(handler) = holder {
     handler(event);
+  }
+}
+
+impl std::fmt::Debug for EventCommon {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("CommonEvent")
+      .field("target", &self.target)
+      .field("current_target", &self.current_target)
+      .field("composed_path", &self.composed_path)
+      .field("modifiers", &self.modifiers)
+      .field("cancel_bubble", &self.cancel_bubble)
+      .finish()
   }
 }

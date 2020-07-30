@@ -18,13 +18,13 @@ pub use key::{Key, KeyDetect};
 pub use stateful::{StateRef, StatefulWidget};
 pub use text::Text;
 pub mod events;
-pub use events::{
-  pointers::{PointerEvent, PointerEventType, PointerListener},
-  Event,
-};
+pub use events::*;
 mod phantom;
 pub use phantom::PhantomWidget;
 pub use smallvec::{smallvec, SmallVec};
+mod cursor;
+pub use cursor::Cursor;
+pub use winit::window::CursorIcon;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -115,6 +115,7 @@ pub trait Widget: Debug + Any {
     PointerListener::listen_on(self.box_it(), PointerEventType::Cancel, handler)
   }
 
+  /// specify the event handler when pointer enter this widget.
   #[inline]
   fn on_pointer_enter<F>(self, handler: F) -> BoxWidget
   where
@@ -124,6 +125,7 @@ pub trait Widget: Debug + Any {
     PointerListener::listen_on(self.box_it(), PointerEventType::Enter, handler)
   }
 
+  /// Specify the event handler when pointer leave this widget.
   #[inline]
   fn on_pointer_leave<F>(self, handler: F) -> BoxWidget
   where
@@ -131,6 +133,16 @@ pub trait Widget: Debug + Any {
     F: FnMut(&PointerEvent) + 'static,
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Leave, handler)
+  }
+
+  /// Assign the type of mouse cursor, show when the mouse pointer is over this
+  /// widget.
+  #[inline]
+  fn with_cursor(self, cursor: CursorIcon) -> Cursor
+  where
+    Self: Sized,
+  {
+    Cursor::new(cursor, self)
   }
 }
 
@@ -282,15 +294,23 @@ impl dyn Widget {
 
 use std::borrow::{Borrow, BorrowMut};
 
-pub macro inherit_widget($ty: ty, $base_widget: tt) {
-  impl InheritWidget for $ty {
+pub macro inherit_widget(
+  $ty: ty,
+  $base_widget: tt
+  $(, <$($generics: tt),*>)?
+  $(, where $($wty:ty : $bound: tt),*)?
+) {
+  impl<$($($generics ,)*)?> InheritWidget for $ty
+  where
+    $($($wty: $bound), *)?
+  {
     #[inline]
     fn base_widget(&self) -> &dyn Widget { self.$base_widget.borrow() }
     #[inline]
     fn base_widget_mut(&mut self) -> &mut dyn Widget { self.$base_widget.borrow_mut() }
   }
 
-  impl_widget_for_inherit_widget!($ty);
+  impl_widget_for_inherit_widget!($ty $(, <$($generics),*>)? $(, where $($wty : $bound),*)?);
 }
 
 /// Auto implement `Widget` for `CombinationWidget`,  We should also implement
@@ -318,8 +338,15 @@ pub macro render_widget_base_impl($ty: ty) {
   }
 }
 
-pub macro impl_widget_for_inherit_widget($ty: ty) {
-  impl Widget for $ty {
+pub macro impl_widget_for_inherit_widget(
+  $ty: ty
+  $(, <$($generics: tt),*>)?
+  $(, where $($wty:ty : $bound: tt),*)?
+) {
+  impl<$($($generics ,)*)?> Widget for $ty
+  where
+    $($($wty: $bound), *)?
+  {
     #[inline]
     fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
 

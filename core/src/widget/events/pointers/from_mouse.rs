@@ -2,22 +2,26 @@ use super::{
   events::{EventCommon, ModifiersState},
   MouseButtons, PointerEvent, PointerId, PointerType,
 };
-use crate::{prelude::*, widget::widget_tree::WidgetId};
+use crate::prelude::*;
+use std::{cell::RefCell, rc::Rc};
+use window::RawWindow;
 use winit::event::MouseButton;
 
 impl PointerEvent {
-  pub(crate) fn from_mouse_without_target(
+  pub(crate) unsafe fn from_mouse_with_dummy_target(
     global_pos: Point,
     modifiers: ModifiersState,
     btn: MouseButtons,
+    window: Rc<RefCell<Box<dyn RawWindow>>>,
   ) -> Self {
-    let target = uninit_target();
+    let target = WidgetId::dummy();
     let event = EventCommon {
+      modifiers,
       target,
       current_target: target,
-      composed_path: vec![],
+      composed_path: <_>::default(),
       cancel_bubble: <_>::default(),
-      modifiers,
+      window,
     };
 
     PointerEvent {
@@ -37,10 +41,6 @@ impl PointerEvent {
       common: event,
     }
   }
-}
-fn uninit_target() -> WidgetId {
-  let id = std::num::NonZeroUsize::new(0);
-  unsafe { std::mem::transmute(id) }
 }
 
 impl From<MouseButton> for MouseButtons {

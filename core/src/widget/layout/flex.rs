@@ -29,7 +29,7 @@ pub enum CrossAxisAlign {
 
 /// How the children should be placed along the main axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum MainAxisAlignment {
+pub enum MainAxisAlign {
   /// Place the children as close to the start of the main axis as possible.
   Start,
   ///Place the children as close to the middle of the main axis as possible.
@@ -66,7 +66,7 @@ pub struct Flex {
   /// How the children should be placed along the cross axis in a flex layout.
   pub cross_align: CrossAxisAlign,
   /// How the children should be placed along the main axis in a flex layout.
-  pub main_align: MainAxisAlignment,
+  pub main_align: MainAxisAlign,
   pub children: SmallVec<[BoxWidget; 1]>,
 }
 
@@ -75,7 +75,7 @@ pub struct FlexRender {
   pub reverse: bool,
   pub direction: Direction,
   cross_align: CrossAxisAlign,
-  main_align: MainAxisAlignment,
+  main_align: MainAxisAlign,
   pub wrap: bool,
 }
 
@@ -110,7 +110,7 @@ impl Flex {
 
   /// Create a new Flex like `self`, but with the give `main_align`.
   #[inline]
-  pub fn with_main_align(mut self, main_align: MainAxisAlignment) -> Self {
+  pub fn with_main_align(mut self, main_align: MainAxisAlign) -> Self {
     self.main_align = main_align;
     self
   }
@@ -142,9 +142,9 @@ impl Default for CrossAxisAlign {
   fn default() -> Self { CrossAxisAlign::Center }
 }
 
-impl Default for MainAxisAlignment {
+impl Default for MainAxisAlign {
   #[inline]
-  fn default() -> Self { MainAxisAlignment::Start }
+  fn default() -> Self { MainAxisAlign::Start }
 }
 
 render_widget_base_impl!(Flex);
@@ -279,7 +279,7 @@ struct FlexLayouter {
   current_line: MainLineInfo,
   lines_info: Vec<MainLineInfo>,
   cross_align: CrossAxisAlign,
-  main_align: MainAxisAlignment,
+  main_align: MainAxisAlign,
 }
 
 impl FlexLayouter {
@@ -372,18 +372,18 @@ impl FlexLayouter {
     };
     lines_info.iter_mut().for_each(|line| {
       let (offset, step) = match main_align {
-        MainAxisAlignment::Start => (0., 0.),
-        MainAxisAlignment::Center => ((size.main - line.main_width) / 2., 0.),
-        MainAxisAlignment::End => (size.main - line.main_width, 0.),
-        MainAxisAlignment::SpaceAround => {
+        MainAxisAlign::Start => (0., 0.),
+        MainAxisAlign::Center => ((size.main - line.main_width) / 2., 0.),
+        MainAxisAlign::End => (size.main - line.main_width, 0.),
+        MainAxisAlign::SpaceAround => {
           let step = (size.main - line.main_width) / line.child_count as f32;
           (step / 2., step)
         }
-        MainAxisAlignment::SpaceBetween => {
+        MainAxisAlign::SpaceBetween => {
           let step = (size.main - line.main_width) / (line.child_count - 1) as f32;
           (0., step)
         }
-        MainAxisAlignment::SpaceEvenly => {
+        MainAxisAlign::SpaceEvenly => {
           let step = (size.main - line.main_width) / (line.child_count + 1) as f32;
           (step, step)
         }
@@ -669,7 +669,7 @@ mod tests {
 
   #[test]
   fn main_align() {
-    fn main_align_check(align: MainAxisAlignment, pos: [(f32, f32); 3]) {
+    fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
       let mut row = Row::default()
         .with_main_align(align)
@@ -715,19 +715,16 @@ mod tests {
       );
     }
 
-    main_align_check(MainAxisAlignment::Start, [(0., 0.), (100., 0.), (200., 0.)]);
+    main_align_check(MainAxisAlign::Start, [(0., 0.), (100., 0.), (200., 0.)]);
+    main_align_check(MainAxisAlign::Center, [(100., 0.), (200., 0.), (300., 0.)]);
+    main_align_check(MainAxisAlign::End, [(200., 0.), (300., 0.), (400., 0.)]);
     main_align_check(
-      MainAxisAlignment::Center,
-      [(100., 0.), (200., 0.), (300., 0.)],
-    );
-    main_align_check(MainAxisAlignment::End, [(200., 0.), (300., 0.), (400., 0.)]);
-    main_align_check(
-      MainAxisAlignment::SpaceBetween,
+      MainAxisAlign::SpaceBetween,
       [(0., 0.), (200., 0.), (400., 0.)],
     );
     let space = 200.0 / 3.0;
     main_align_check(
-      MainAxisAlignment::SpaceAround,
+      MainAxisAlign::SpaceAround,
       [
         (0.5 * space, 0.),
         (100. + space * 1.5, 0.),
@@ -735,7 +732,7 @@ mod tests {
       ],
     );
     main_align_check(
-      MainAxisAlignment::SpaceEvenly,
+      MainAxisAlign::SpaceEvenly,
       [(50., 0.), (200., 0.), (350., 0.)],
     );
   }

@@ -425,6 +425,14 @@ impl dyn Widget {
 
 impl !Unpin for WidgetTree {}
 
+impl WidgetId {
+  /// Return a dummy `WidgetId` use for unit test.
+  pub unsafe fn dummy() -> Self {
+    let id = std::num::NonZeroUsize::new(0);
+    std::mem::transmute(id)
+  }
+}
+
 #[cfg(test)]
 mod test {
   use super::*;
