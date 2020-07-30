@@ -403,7 +403,7 @@ mod tests {
     let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
-    let device_id = mock_device_id(0);
+    let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -414,7 +414,7 @@ mod tests {
     assert_eq!(event_record.borrow().len(), 1);
 
     // A mouse press/release emit during another mouse's press will be ignored.
-    let device_id_2 = mock_device_id(1);
+    let device_id_2 = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: device_id_2,
       state: ElementState::Pressed,
