@@ -494,7 +494,7 @@ pub fn coordinate_2d_to_device_matrix(
   width: u32,
   height: u32,
 ) -> euclid::Transform2D<f32, LogicUnit, PhysicUnit> {
-  euclid::Transform2D::row_major(2. / width as f32, 0., 0., -2. / height as f32, -1., 1.)
+  euclid::Transform2D::new(2. / width as f32, 0., 0., -2. / height as f32, -1., 1.)
 }
 
 fn create_uniforms(
@@ -508,7 +508,7 @@ fn create_uniforms(
 ) -> wgpu::BindGroup {
   let uniform = GlobalUniform {
     texture_atlas_size: atlas_size.to_array(),
-    canvas_coordinate_map: canvas_2d_to_device_matrix.to_row_arrays(),
+    canvas_coordinate_map: canvas_2d_to_device_matrix.to_arrays(),
   };
   let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
     contents: &uniform.as_bytes(),

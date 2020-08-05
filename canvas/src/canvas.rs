@@ -201,7 +201,7 @@ impl Canvas {
               sec.bounds = (max_width, f32::INFINITY)
             }
             let align_bounds = section_bounds_to_align_texture(self.text_brush(), &style, &sec);
-            if !align_bounds.is_empty_or_negative() {
+            if !align_bounds.is_empty() {
               self.single_style_section_consume(&style, render, align_bounds, transform, sec);
             }
           }
@@ -236,7 +236,7 @@ impl Canvas {
               .collect();
             let mut sec = Section::new().with_text(texts);
             let align_bounds = section_bounds_to_align_texture(self.text_brush(), &style, &sec);
-            if !align_bounds.is_empty_or_negative() {
+            if !align_bounds.is_empty() {
               sec = section_with_layout_bounds(sec, bounds, layout);
               self.single_style_section_consume(&style, render, align_bounds, transform, sec);
             }
@@ -264,7 +264,7 @@ impl Canvas {
     let primitive = Primitive {
       tex_offset: style_rect.min().to_array(),
       tex_size: style_rect.size.to_array(),
-      transform: transform.to_row_arrays(),
+      transform: transform.to_arrays(),
       bound_min: align_bounds.min().to_array(),
       bounding_size: align_bounds.size.to_array(),
     };
