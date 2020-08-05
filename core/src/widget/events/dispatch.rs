@@ -414,7 +414,11 @@ mod tests {
     assert_eq!(event_record.borrow().len(), 1);
 
     // A mouse press/release emit during another mouse's press will be ignored.
-    let device_id_2 = unsafe { DeviceId::dummy() };
+    let device_id_2 = unsafe {
+      let mut id = DeviceId::dummy();
+      (&mut id as *mut DeviceId).write_bytes(1, std::mem::size_of::<DeviceId>());
+      id
+    };
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: device_id_2,
       state: ElementState::Pressed,
