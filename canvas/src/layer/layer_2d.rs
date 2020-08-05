@@ -297,7 +297,7 @@ impl<'a> Rendering2DLayer<'a> {
   ///   down, and negative are up.
   pub fn translate(&mut self, x: f32, y: f32) -> &mut Self {
     let t = &mut self.current_state_mut().transform;
-    *t = t.post_translate(euclid::Vector2D::new(x, y));
+    *t = t.then_translate(euclid::Vector2D::new(x, y));
     self
   }
 
@@ -500,7 +500,7 @@ impl Default for State {
 impl State {
   pub fn new() -> Self {
     Self {
-      transform: Transform::row_major(1., 0., 0., 1., 0., 0.),
+      transform: Transform::new(1., 0., 0., 1., 0., 0.),
       style: FillStyle::Color(Color::BLACK),
       line_width: 1.,
       font: FontInfo::new(),
@@ -624,19 +624,19 @@ mod test {
     let mut layer = Rendering2DLayer::new();
     {
       let mut paint = layer.save();
-      let t = Transform::row_major(1., 1., 1., 1., 1., 1.);
+      let t = Transform::new(1., 1., 1., 1., 1., 1.);
       paint.set_transform(t);
       assert_eq!(&t, paint.get_transform());
       {
         let mut p2 = paint.save();
-        let t2 = Transform::row_major(2., 2., 2., 2., 2., 2.);
+        let t2 = Transform::new(2., 2., 2., 2., 2., 2.);
         p2.set_transform(t2);
         assert_eq!(&t2, p2.get_transform());
       }
       assert_eq!(&t, paint.get_transform());
     }
     assert_eq!(
-      &Transform::row_major(1., 0., 0., 1., 0., 0.),
+      &Transform::new(1., 0., 0., 1., 0., 0.),
       layer.get_transform()
     );
   }
