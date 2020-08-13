@@ -1,5 +1,8 @@
-use super::{add_listener, dispatch_event, EventCommon};
+use super::EventCommon;
 use crate::{prelude::*, widget::inherit_widget};
+use rxrust::prelude::*;
+use std::rc::Rc;
+
 mod from_mouse;
 #[derive(Debug, Clone)]
 pub struct PointerId(usize);
@@ -98,15 +101,11 @@ impl PointerEvent {
 /// A widget that calls callbacks in response to common pointer events.
 pub struct PointerListener {
   widget: BoxWidget,
-  on_pointer_down: Option<Box<dyn FnMut(&PointerEvent)>>,
-  on_pointer_move: Option<Box<dyn FnMut(&PointerEvent)>>,
-  on_pointer_up: Option<Box<dyn FnMut(&PointerEvent)>>,
-  on_pointer_cancel: Option<Box<dyn FnMut(&PointerEvent)>>,
-  on_pointer_enter: Option<Box<dyn FnMut(&PointerEvent)>>,
-  on_pointer_leave: Option<Box<dyn FnMut(&PointerEvent)>>,
+  subject: LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>,
 }
 
 /// Enter/Leave do not bubble.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
   Down,
   Move,
@@ -121,6 +120,14 @@ pub enum PointerEventType {
 }
 
 impl PointerListener {
+  /// Return a `Observable` of the pointer events.
+  #[inline]
+  pub fn pointer_observable(
+    &self,
+  ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
+    self.subject.clone()
+  }
+
   pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
     base: BoxWidget,
     event_type: PointerEventType,
@@ -130,12 +137,7 @@ impl PointerListener {
       base,
       |base| Self {
         widget: base,
-        on_pointer_down: None,
-        on_pointer_move: None,
-        on_pointer_up: None,
-        on_pointer_cancel: None,
-        on_pointer_enter: None,
-        on_pointer_leave: None,
+        subject: Subject::new(),
       },
       |_| {},
     );
@@ -148,29 +150,17 @@ impl PointerListener {
   fn add_listener<F: FnMut(&PointerEvent) + 'static>(
     &mut self,
     event_type: PointerEventType,
-    handler: F,
+    mut handler: F,
   ) {
-    let holder = self.pointer_handler(event_type);
-    add_listener(holder, handler);
+    self
+      .subject
+      .clone()
+      .filter(move |(t, _)| *t == event_type)
+      .subscribe(move |(_, event)| handler(&*event));
   }
 
-  pub(crate) fn dispatch(&mut self, event_type: PointerEventType, event: &PointerEvent) {
-    let handler = self.pointer_handler(event_type);
-    dispatch_event(handler, event)
-  }
-
-  fn pointer_handler(
-    &mut self,
-    event_type: PointerEventType,
-  ) -> &mut Option<Box<dyn FnMut(&PointerEvent)>> {
-    match event_type {
-      PointerEventType::Down => &mut self.on_pointer_down,
-      PointerEventType::Move => &mut self.on_pointer_move,
-      PointerEventType::Up => &mut self.on_pointer_up,
-      PointerEventType::Cancel => &mut self.on_pointer_cancel,
-      PointerEventType::Enter => &mut self.on_pointer_enter,
-      PointerEventType::Leave => &mut self.on_pointer_leave,
-    }
+  pub(crate) fn dispatch(&mut self, event_type: PointerEventType, event: Rc<PointerEvent>) {
+    self.subject.next((event_type, event));
   }
 }
 

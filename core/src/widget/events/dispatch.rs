@@ -46,10 +46,13 @@ impl Dispatcher {
       WindowEvent::CursorMoved { position, .. } => {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
         self.pointer_enter_leave_dispatch();
-        self.bubble_mouse_pointer(|w, event| {
-          log::info!("Pointer move {:?}", event);
-          w.dispatch(PointerEventType::Move, event)
-        });
+        self.bubble_mouse_pointer(
+          |w, event| {
+            log::info!("Pointer move {:?}", event);
+            w.dispatch(PointerEventType::Move, event)
+          },
+          self.mouse_pointer_without_target(),
+        );
       }
       WindowEvent::CursorLeft { .. } => {
         self.cursor_pos = Point::new(-1., -1.);
@@ -68,10 +71,13 @@ impl Dispatcher {
               self.mouse_button.1 |= button.into();
               // only the first button press emit event.
               if self.mouse_button.1 == button.into() {
-                self.bubble_mouse_pointer(|w, event| {
-                  log::info!("Pointer down {:?}", event);
-                  w.dispatch(PointerEventType::Down, event)
-                });
+                self.bubble_mouse_pointer(
+                  |w, event| {
+                    log::info!("Pointer down {:?}", event);
+                    w.dispatch(PointerEventType::Down, event)
+                  },
+                  self.mouse_pointer_without_target(),
+                );
               }
             }
             ElementState::Released => {
@@ -79,11 +85,15 @@ impl Dispatcher {
               // only the last button release emit event.
               if self.mouse_button.1.is_empty() {
                 self.mouse_button.0 = None;
-                self.bubble_mouse_pointer(|w, event| {
-                  log::info!("Pointer up {:?}", event);
-                  event.pressure = 0.;
-                  w.dispatch(PointerEventType::Up, event)
-                });
+                let mut event = self.mouse_pointer_without_target();
+                event.pressure = 0.;
+                self.bubble_mouse_pointer(
+                  |w, event| {
+                    log::info!("Pointer up {:?}", event);
+                    w.dispatch(PointerEventType::Up, event)
+                  },
+                  event,
+                );
               }
             }
           };
@@ -93,15 +103,22 @@ impl Dispatcher {
     }
   }
 
-  fn bubble_mouse_pointer<D: FnMut(&mut PointerListener, &mut PointerEvent)>(
+  fn bubble_mouse_pointer<D: FnMut(&mut PointerListener, Rc<PointerEvent>)>(
     &mut self,
     mut dispatch: D,
+    mut event: PointerEvent,
   ) -> PointerEvent {
-    let mut event = self.mouse_pointer_without_target();
     let mut w_tree = self.widget_tree;
     self.hit_widget_iter().all(|(wid, pos)| {
       event.position = pos;
-      Self::dispatch_to_widget(wid, unsafe { w_tree.as_mut() }, &mut dispatch, &mut event);
+
+      event = Self::dispatch_to_widget(
+        wid,
+        unsafe { w_tree.as_mut() },
+        &mut dispatch,
+        event.clone(),
+      );
+
       !event.as_mut().cancel_bubble.get()
     });
     event
@@ -109,14 +126,14 @@ impl Dispatcher {
 
   fn dispatch_to_widget<
     T: Widget,
-    E: std::convert::AsMut<EventCommon>,
-    H: FnMut(&mut T, &mut E),
+    E: std::convert::AsMut<EventCommon> + std::fmt::Debug,
+    H: FnMut(&mut T, Rc<E>),
   >(
     wid: WidgetId,
     tree: &mut WidgetTree,
     handler: &mut H,
-    event: &mut E,
-  ) {
+    mut event: E,
+  ) -> E {
     let event_widget = wid
       .get_mut(tree)
       .and_then(|w| Widget::dynamic_cast_mut::<T>(w));
@@ -124,8 +141,12 @@ impl Dispatcher {
       let common = event.as_mut();
       common.current_target = wid;
       common.composed_path.push(wid);
-      handler(w, event);
+
+      let rc_event = Rc::new(event);
+      handler(w, rc_event.clone());
+      event = Rc::try_unwrap(rc_event).expect("Keep the event is dangerous and not allowed");
     }
+    event
   }
 
   fn pointer_enter_leave_dispatch(&mut self) {
@@ -145,21 +166,21 @@ impl Dispatcher {
     old_path.iter().for_each(|wid| {
       event.position = self.widget_relative_point(*wid);
       log::info!("Pointer leave {:?}", event);
-      Self::dispatch_to_widget(
+      event = Self::dispatch_to_widget(
         *wid,
         unsafe { self.widget_tree.as_mut() },
         &mut |widget: &mut PointerListener, e| widget.dispatch(PointerEventType::Leave, e),
-        &mut event,
+        event.clone(),
       );
     });
     new_path.iter().for_each(|(wid, pos)| {
       event.position = *pos;
       log::info!("Pointer enter {:?}", event);
-      Self::dispatch_to_widget(
+      event = Self::dispatch_to_widget(
         *wid,
         unsafe { self.widget_tree.as_mut() },
         &mut |widget: &mut PointerListener, e| widget.dispatch(PointerEventType::Enter, e),
-        &mut event,
+        event.clone(),
       );
     });
     self.last_pointer_widget = new_path.last().map(|(wid, _)| *wid);

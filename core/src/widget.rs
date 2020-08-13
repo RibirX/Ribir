@@ -90,7 +90,7 @@ pub trait Widget: Debug + Any {
   fn on_pointer_up<F>(self, handler: F) -> BoxWidget
   where
     Self: Sized,
-    F: Fn(&PointerEvent) + 'static,
+    F: FnMut(&PointerEvent) + 'static,
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Up, handler)
   }
@@ -100,7 +100,7 @@ pub trait Widget: Debug + Any {
   fn on_pointer_move<F>(self, handler: F) -> BoxWidget
   where
     Self: Sized,
-    F: Fn(&PointerEvent) + 'static,
+    F: FnMut(&PointerEvent) + 'static,
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Move, handler)
   }
@@ -110,7 +110,7 @@ pub trait Widget: Debug + Any {
   fn on_pointer_cancel<F>(self, handler: F) -> BoxWidget
   where
     Self: Sized,
-    F: Fn(&PointerEvent) + 'static,
+    F: FnMut(&PointerEvent) + 'static,
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Cancel, handler)
   }
