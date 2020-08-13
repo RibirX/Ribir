@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 herald =  "0.1.0"
 indextree= "4.1.0"
-rxrust = "0.8.3"
+rxrust = {git="https://github.com/rxRust/rxRust.git"}
 bitflags = "1.2.1"
 winit = "0.22.2"
 canvas = {path= "../canvas", version="*"}
