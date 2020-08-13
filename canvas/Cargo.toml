@@ -11,8 +11,8 @@ wgpu = { git="https://github.com/gfx-rs/wgpu-rs.git", version ="*" }
 lyon =  { git = "https://github.com/nical/lyon", version="*"}
 raw-window-handle = "0.3.3"
 euclid = "0.22.0"
-png = "0.16.4"
-guillotiere = {git="https://github.com/M-Adoo/guillotiere.git", version="*"}
+png = "0.16.7"
+guillotiere = "0.6.0"
 zerocopy = "0.3"
 glyph_brush = { git="https://github.com/alexheretic/glyph-brush.git", path="glyph-brush",  version="*"}
 log = "0.4.8"

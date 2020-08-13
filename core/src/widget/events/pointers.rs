@@ -153,8 +153,7 @@ impl PointerListener {
     mut handler: F,
   ) {
     self
-      .subject
-      .clone()
+      .pointer_observable()
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event));
   }
