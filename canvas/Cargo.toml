@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wgpu = { git="https://github.com/gfx-rs/wgpu-rs.git", version ="*" }
+wgpu = "0.6.0"
 lyon =  { git = "https://github.com/nical/lyon", version="*"}
 raw-window-handle = "0.3.3"
 euclid = "0.22.0"
