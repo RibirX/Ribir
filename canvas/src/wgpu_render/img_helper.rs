@@ -31,6 +31,7 @@ impl RgbaConvert {
     });
 
     let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+      label: Some("image convert pipeline"),
       layout: Some(&pipeline_layout),
       compute_stage: wgpu::ProgrammableStageDescriptor {
         module: &cs_module,
