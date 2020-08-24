@@ -105,6 +105,16 @@ pub trait Widget: Debug + Any {
     PointerListener::listen_on(self.box_it(), PointerEventType::Move, handler)
   }
 
+  /// Specify the event handler to process pointer tap event.
+  #[inline]
+  fn on_pointer_tap<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self.box_it(), PointerEventType::Tap, handler)
+  }
+
   /// Specify the event handler to process pointer cancel event.
   #[inline]
   fn on_pointer_cancel<F>(self, handler: F) -> BoxWidget

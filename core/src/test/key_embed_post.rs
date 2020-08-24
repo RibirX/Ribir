@@ -15,8 +15,8 @@ struct EmbedKeyPost {
 
 impl CombinationWidget for EmbedKeyPost {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
-    let mut row = Row::default().with_cross_align(CrossAxisAlign::Start);
-    row
+    let mut row = Row::default()
+      .with_cross_align(CrossAxisAlign::Start)
       .push(Text(self.title.borrow().to_string()).with_key(0))
       .push(Text(self.author.to_string()).with_key(1))
       .push(Text(self.content.to_string()).with_key(2));
@@ -24,7 +24,7 @@ impl CombinationWidget for EmbedKeyPost {
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      row.push(embed.with_key("embed"));
+      row = row.push(embed.with_key("embed"));
     }
 
     row.with_key(0).box_it()

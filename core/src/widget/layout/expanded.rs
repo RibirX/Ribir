@@ -76,8 +76,7 @@ mod tests {
   #[test]
   fn one_line_expanded() {
     let size = Size::new(100., 50.);
-    let mut row = Row::default();
-    row
+    let row = Row::default()
       .push(Expanded::new(1., SizedBox::empty_box(size)))
       .push(SizedBox::empty_box(size))
       .push(SizedBox::empty_box(size))
@@ -100,8 +99,8 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let mut row = Row::default().with_wrap(true);
-    row
+    let row = Row::default()
+      .with_wrap(true)
       .push(Expanded::new(1., SizedBox::empty_box(size)))
       .push(SizedBox::empty_box(size))
       .push(SizedBox::empty_box(size))

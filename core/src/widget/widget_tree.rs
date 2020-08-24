@@ -265,6 +265,24 @@ impl WidgetId {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
+  /// detect if the widget of this id point to is dropped.
+  pub fn is_drooped(self) -> bool {
+    // todo:
+    false
+  }
+
+  pub fn common_ancestor_of(self, other: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
+    if self.is_drooped() || other.is_drooped() {
+      return None;
+    }
+    self.ancestors(tree).find(|id| {
+      other
+        .ancestors(tree)
+        .find(|other_p| other_p == id)
+        .is_some()
+    })
+  }
+
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)
   pub fn parent(self, tree: &WidgetTree) -> Option<WidgetId> {
     self.node_feature(tree, |node| node.parent())

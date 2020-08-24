@@ -8,15 +8,14 @@ struct Todos {}
 
 impl CombinationWidget for Todos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
-    let mut column = Column::default();
-    column
+    Column::default()
       .push(
         (0..15)
           .map(|i| {
             let (stateful, mut state_modify) = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
             stateful
               .with_cursor(CursorIcon::Grab)
-              .on_pointer_down(move |_| state_modify.0 = state_modify.0.clone() + "1")
+              .on_pointer_tap(move |_| state_modify.0 = state_modify.0.clone() + "1")
           })
           .collect::<Row>(),
       )
@@ -37,9 +36,8 @@ impl CombinationWidget for Todos {
               .box_it()
           })
           .collect::<Row>(),
-      );
-
-    column.box_it()
+      )
+      .box_it()
   }
 }
 fn main() {
