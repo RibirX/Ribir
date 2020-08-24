@@ -6,10 +6,7 @@ pub struct Column(Flex);
 
 impl Column {
   #[inline]
-  pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
-    self.0.push(child);
-    self
-  }
+  pub fn push<W: Widget>(self, child: W) -> Self { Column(self.0.push(child)) }
 
   #[inline]
   pub fn with_reverse(self, reverse: bool) -> Self { Self(self.0.with_reverse(reverse)) }

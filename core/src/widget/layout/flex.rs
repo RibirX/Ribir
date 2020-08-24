@@ -82,7 +82,7 @@ pub struct FlexRender {
 impl Flex {
   /// Add a children into the flex container.
   #[inline]
-  pub fn push<W: Widget>(&mut self, child: W) -> &mut Self {
+  pub fn push<W: Widget>(mut self, child: W) -> Self {
     self.children.push(child.box_it());
     self
   }
@@ -610,8 +610,8 @@ mod tests {
   #[test]
   fn cross_align() {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
-      let mut row = Row::default().with_cross_align(align);
-      row
+      let row = Row::default()
+        .with_cross_align(align)
         .push(SizedBox::empty_box(Size::new(100., 20.)))
         .push(SizedBox::empty_box(Size::new(100., 30.)))
         .push(SizedBox::empty_box(Size::new(100., 40.)));
@@ -640,8 +640,8 @@ mod tests {
     cross_align_check(CrossAxisAlign::Center, [10., 5., 0.]);
     cross_align_check(CrossAxisAlign::End, [20., 10., 0.]);
 
-    let mut row = Row::default().with_cross_align(CrossAxisAlign::Stretch);
-    row
+    let row = Row::default()
+      .with_cross_align(CrossAxisAlign::Stretch)
       .push(SizedBox::empty_box(Size::new(100., 20.)))
       .push(SizedBox::empty_box(Size::new(100., 30.)))
       .push(SizedBox::empty_box(Size::new(100., 40.)));
@@ -671,10 +671,9 @@ mod tests {
   fn main_align() {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
-      let mut row = Row::default()
+      let row = Row::default()
         .with_main_align(align)
-        .with_cross_align(CrossAxisAlign::Start);
-      row
+        .with_cross_align(CrossAxisAlign::Start)
         .push(SizedBox::empty_box(item_size))
         .push(SizedBox::empty_box(item_size))
         .push(SizedBox::empty_box(item_size));

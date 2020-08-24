@@ -46,19 +46,18 @@ mod tests {
   #[test]
   fn tree_down_up() {
     let widget_tree = SizedBox::expanded({
-      let mut hand = Row::default()
+      let hand = Row::default()
         .with_cross_align(CrossAxisAlign::Start)
-        .with_main_align(MainAxisAlign::Start);
-      hand.push(
-        SizedBox::from_size(Size::new(200., 200.), {
-          let mut help = Row::default()
-            .with_cross_align(CrossAxisAlign::Start)
-            .with_main_align(MainAxisAlign::Start);
-          help.push(SizedBox::empty_box(Size::new(100., 100.)).with_cursor(CursorIcon::Help));
-          help
-        })
-        .with_cursor(CursorIcon::Hand),
-      );
+        .with_main_align(MainAxisAlign::Start)
+        .push(
+          SizedBox::from_size(Size::new(200., 200.), {
+            Row::default()
+              .with_cross_align(CrossAxisAlign::Start)
+              .with_main_align(MainAxisAlign::Start)
+              .push(SizedBox::empty_box(Size::new(100., 100.)).with_cursor(CursorIcon::Help))
+          })
+          .with_cursor(CursorIcon::Hand),
+        );
       hand
     })
     .with_cursor(CursorIcon::AllScroll);

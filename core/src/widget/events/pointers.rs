@@ -110,6 +110,7 @@ pub enum PointerEventType {
   Down,
   Move,
   Up,
+  Tap,
   Cancel,
   Enter,
   Leave,

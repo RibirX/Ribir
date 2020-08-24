@@ -29,8 +29,8 @@ impl EmbedPost {
 
 impl CombinationWidget for EmbedPost {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
-    let mut row = Row::default().with_cross_align(CrossAxisAlign::Start);
-    row
+    let mut row = Row::default()
+      .with_cross_align(CrossAxisAlign::Start)
       .push(Text(self.title.to_string()))
       .push(Text(self.author.to_string()))
       .push(Text(self.content.to_string()));
@@ -38,7 +38,7 @@ impl CombinationWidget for EmbedPost {
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      row.push(embed.box_it());
+      row = row.push(embed.box_it());
     }
     row.box_it()
   }
