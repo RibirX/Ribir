@@ -544,7 +544,7 @@ mod tests {
   fn click() {
     let click_path = Rc::new(RefCell::new((vec![], 0)));
     let c_click_path = click_path.clone();
-    let child = SizedBox::empty_box(Size::new(100., 100.)).on_pointer_tap(move |e| {
+    let child = SizedBox::empty_box(Size::new(100., 100.)).on_tap(move |e| {
       let mut res = c_click_path.borrow_mut();
       res.0 = e.composed_path().to_vec();
       res.1 += 1;
@@ -556,7 +556,7 @@ mod tests {
       .push(child)
       // Stretch row
       .push(SizedBox::empty_box(Size::new(100., 400.)))
-      .on_pointer_tap(move |e| {
+      .on_tap(move |e| {
         let mut res = c_click_path.borrow_mut();
         res.0 = e.composed_path().to_vec();
         res.1 += 1;

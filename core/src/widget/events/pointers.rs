@@ -1,7 +1,10 @@
 use super::EventCommon;
 use crate::{prelude::*, widget::inherit_widget};
 use rxrust::prelude::*;
-use std::rc::Rc;
+use std::{
+  rc::Rc,
+  time::{Duration, Instant},
+};
 
 mod from_mouse;
 #[derive(Debug, Clone)]
@@ -121,12 +124,16 @@ pub enum PointerEventType {
 }
 
 impl PointerListener {
-  /// Return a `Observable` of the pointer events.
-  #[inline]
-  pub fn pointer_observable(
-    &self,
-  ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
-    self.subject.clone()
+  /// Ensure the `widget` is a `PointerListener` widget.
+  pub fn from_widget<W: Widget>(widget: W) -> BoxWidget {
+    inherit(
+      widget.box_it(),
+      |base| Self {
+        widget: base,
+        subject: Subject::new(),
+      },
+      |_| {},
+    )
   }
 
   pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
@@ -134,18 +141,64 @@ impl PointerListener {
     event_type: PointerEventType,
     handler: H,
   ) -> BoxWidget {
-    let mut pointer = inherit(
-      base,
-      |base| Self {
-        widget: base,
-        subject: Subject::new(),
-      },
-      |_| {},
-    );
+    let mut pointer = Self::from_widget(base);
     Widget::dynamic_cast_mut::<Self>(&mut pointer)
       .unwrap()
       .add_listener(event_type, handler);
     pointer
+  }
+
+  pub fn tap_times_observable(
+    &mut self,
+    times: u8,
+  ) -> impl LocalObservable<'static, Item = Rc<PointerEvent>, Err = ()> {
+    const DUR: Duration = Duration::from_millis(250);
+    #[derive(Clone)]
+    struct TapInfo {
+      first_tap_stamp: Instant,
+      tap_times: u8,
+      pointer_type: PointerType,
+      mouse_btns: MouseButtons,
+    }
+    self
+      .pointer_observable()
+      .filter(|(t, _)| t == &PointerEventType::Tap)
+      .scan_initial(None, move |mut first_tap: Option<(TapInfo, _)>, (_, e)| {
+        if let Some((info, _)) = &mut first_tap {
+          if info.pointer_type == e.point_type
+            && info.mouse_btns == e.buttons
+            && info.tap_times < times
+            && info.first_tap_stamp.elapsed() < DUR
+          {
+            info.tap_times += 1;
+            return first_tap;
+          }
+        }
+
+        Some((
+          TapInfo {
+            first_tap_stamp: Instant::now(),
+            tap_times: 1,
+            pointer_type: e.point_type.clone(),
+            mouse_btns: e.buttons,
+          },
+          e,
+        ))
+      })
+      .filter_map(
+        move |info: Option<(TapInfo, Rc<PointerEvent>)>| match info {
+          Some((info, e)) if info.tap_times == times => Some(e),
+          _ => None,
+        },
+      )
+  }
+
+  /// Return a `Observable` of the pointer events.
+  #[inline]
+  pub fn pointer_observable(
+    &self,
+  ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
+    self.subject.clone()
   }
 
   fn add_listener<F: FnMut(&PointerEvent) + 'static>(
