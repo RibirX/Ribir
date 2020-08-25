@@ -15,7 +15,7 @@ impl CombinationWidget for Todos {
             let (stateful, mut state_modify) = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
             stateful
               .with_cursor(CursorIcon::Grab)
-              .on_pointer_tap(move |_| state_modify.0 = state_modify.0.clone() + "1")
+              .on_tap(move |_| state_modify.0 = state_modify.0.clone() + "1")
           })
           .collect::<Row>(),
       )

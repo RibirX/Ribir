@@ -275,12 +275,9 @@ impl WidgetId {
     if self.is_drooped() || other.is_drooped() {
       return None;
     }
-    self.ancestors(tree).find(|id| {
-      other
-        .ancestors(tree)
-        .find(|other_p| other_p == id)
-        .is_some()
-    })
+    self
+      .ancestors(tree)
+      .find(|id| other.ancestors(tree).any(|other_p| other_p == *id))
   }
 
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)

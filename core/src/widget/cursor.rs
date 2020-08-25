@@ -46,7 +46,7 @@ mod tests {
   #[test]
   fn tree_down_up() {
     let widget_tree = SizedBox::expanded({
-      let hand = Row::default()
+      Row::default()
         .with_cross_align(CrossAxisAlign::Start)
         .with_main_align(MainAxisAlign::Start)
         .push(
@@ -57,8 +57,7 @@ mod tests {
               .push(SizedBox::empty_box(Size::new(100., 100.)).with_cursor(CursorIcon::Help))
           })
           .with_cursor(CursorIcon::Hand),
-        );
-      hand
+        )
     })
     .with_cursor(CursorIcon::AllScroll);
     let mut wnd = NoRenderWindow::without_render(widget_tree, Size::new(400., 400.));

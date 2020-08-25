@@ -24,6 +24,7 @@ pub use phantom::PhantomWidget;
 pub use smallvec::{smallvec, SmallVec};
 mod cursor;
 pub use cursor::Cursor;
+use rxrust::prelude::*;
 pub use winit::window::CursorIcon;
 
 /// The common behavior of widgets, also support to dynamic cast to special
@@ -107,12 +108,26 @@ pub trait Widget: Debug + Any {
 
   /// Specify the event handler to process pointer tap event.
   #[inline]
-  fn on_pointer_tap<F>(self, handler: F) -> BoxWidget
+  fn on_tap<F>(self, handler: F) -> BoxWidget
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Tap, handler)
+  }
+
+  /// Specify the event handler to process pointer tap event.
+  fn on_tap_times<F>(self, times: u8, mut handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    let mut pointer = PointerListener::from_widget(self);
+    Widget::dynamic_cast_mut::<PointerListener>(&mut pointer)
+      .unwrap()
+      .tap_times_observable(times)
+      .subscribe(move |e| handler(&*e));
+    pointer
   }
 
   /// Specify the event handler to process pointer cancel event.
@@ -247,7 +262,7 @@ inherit_widget!(BoxWidget, widget);
 /// *base*: the base widget want inherit from.
 /// *ctor_by_base*: construct widget with the base widget should really inherit
 /// *merge*: use to merge the widget into the base widget `T`, if the type `T`
-/// is already be inherited in the  base widgets, from.
+/// is already be inherited in the  base widgets.
 pub fn inherit<T: InheritWidget, C, M>(
   mut base: BoxWidget,
   mut ctor_by_base: C,
