@@ -164,13 +164,14 @@ impl PointerListener {
       .pointer_observable()
       .filter(|(t, _)| t == &PointerEventType::Tap)
       .scan_initial(None, move |mut first_tap: Option<(TapInfo, _)>, (_, e)| {
-        if let Some((info, _)) = &mut first_tap {
+        if let Some((info, event)) = &mut first_tap {
           if info.pointer_type == e.point_type
             && info.mouse_btns == e.buttons
             && info.tap_times < times
             && info.first_tap_stamp.elapsed() < DUR
           {
             info.tap_times += 1;
+            *event = Rc::downgrade(&e);
             return first_tap;
           }
         }
@@ -182,12 +183,12 @@ impl PointerListener {
             pointer_type: e.point_type.clone(),
             mouse_btns: e.buttons,
           },
-          e,
+          Rc::downgrade(&e),
         ))
       })
       .filter_map(
-        move |info: Option<(TapInfo, Rc<PointerEvent>)>| match info {
-          Some((info, e)) if info.tap_times == times => Some(e),
+        move |info: Option<(TapInfo, std::rc::Weak<PointerEvent>)>| match info {
+          Some((info, e)) if info.tap_times == times => e.upgrade(),
           _ => None,
         },
       )
@@ -225,3 +226,95 @@ impl std::fmt::Debug for PointerListener {
 }
 
 inherit_widget!(PointerListener, widget);
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::widget::window::NoRenderWindow;
+  use futures::executor::LocalPool;
+  use std::{cell::RefCell, rc::Rc};
+  use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
+
+  fn env(times: u8) -> (window::Window<window::MockRender>, Rc<RefCell<usize>>) {
+    let size = Size::new(400., 400.);
+    let count = Rc::new(RefCell::new(0));
+    let c_count = count.clone();
+    let sized_box =
+      SizedBox::empty_box(size).on_tap_times(times, move |_| *c_count.borrow_mut() += 1);
+    let mut wnd = NoRenderWindow::without_render(sized_box, size);
+    wnd.render_ready();
+
+    (wnd, count)
+  }
+
+  #[test]
+  fn double_tap() {
+    let (mut wnd, count) = env(2);
+
+    let mut local_pool = LocalPool::new();
+    let device_id = unsafe { DeviceId::dummy() };
+    observable::interval(Duration::from_millis(50), local_pool.spawner())
+      .take(8)
+      .subscribe(move |i| {
+        wnd.processes_native_event(WindowEvent::MouseInput {
+          device_id,
+          state: if i % 2 == 0 {
+            ElementState::Pressed
+          } else {
+            ElementState::Released
+          },
+          button: MouseButton::Left,
+          modifiers: ModifiersState::default(),
+        });
+      });
+
+    local_pool.run();
+
+    assert_eq!(*count.borrow(), 2);
+
+    let (mut wnd, count) = env(2);
+    observable::interval(Duration::from_millis(251), local_pool.spawner())
+      .take(8)
+      .subscribe(move |i| {
+        wnd.processes_native_event(WindowEvent::MouseInput {
+          device_id,
+          state: if i % 2 == 0 {
+            ElementState::Pressed
+          } else {
+            ElementState::Released
+          },
+          button: MouseButton::Left,
+          modifiers: ModifiersState::default(),
+        });
+      });
+
+    local_pool.run();
+    assert_eq!(*count.borrow(), 0);
+  }
+
+  #[test]
+  fn tripe_tap() {
+    let (mut wnd, count) = env(3);
+
+    let mut local_pool = LocalPool::new();
+    let device_id = unsafe { DeviceId::dummy() };
+    observable::interval(Duration::from_millis(20), local_pool.spawner())
+      .take(12)
+      .subscribe(move |i| {
+        wnd.processes_native_event(WindowEvent::MouseInput {
+          device_id,
+          state: if i % 2 == 0 {
+            ElementState::Pressed
+          } else {
+            ElementState::Released
+          },
+          button: MouseButton::Left,
+          modifiers: ModifiersState::default(),
+        });
+      });
+
+    local_pool.run();
+
+    assert_eq!(*count.borrow(), 2);
+  }
+}
