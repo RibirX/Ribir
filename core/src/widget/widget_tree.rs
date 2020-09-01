@@ -266,13 +266,13 @@ impl WidgetId {
   }
 
   /// detect if the widget of this id point to is dropped.
-  pub fn is_drooped(self) -> bool {
+  pub fn is_dropped(self) -> bool {
     // todo:
     false
   }
 
   pub fn common_ancestor_of(self, other: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
-    if self.is_drooped() || other.is_drooped() {
+    if self.is_dropped() || other.is_dropped() {
       return None;
     }
     self
