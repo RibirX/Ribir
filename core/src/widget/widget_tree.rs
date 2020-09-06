@@ -367,10 +367,7 @@ impl WidgetId {
     });
 
     rid.drop(render_tree);
-    // Todo: should remove in a more directly way and not care about
-    // relationship
-    // Fixme: memory leak here, node just detach and not remove. Wait a pr to
-    // provide a method to drop a subtree in indextree.
+    self.0.remove_subtree(&mut tree.arena);
     self.0.detach(&mut tree.arena);
     if tree.root == Some(self) {
       tree.root = None;
@@ -446,8 +443,8 @@ impl WidgetId {
   /// Just use it for unit test or ensure you will reassign a valid WidgetId
   /// from `WidgetTree`
   pub unsafe fn dummy() -> Self {
-    let id = std::num::NonZeroUsize::new(0);
-    std::mem::transmute(id)
+    let index = std::num::NonZeroUsize::new(0);
+    std::mem::transmute((index, 0))
   }
 }
 
