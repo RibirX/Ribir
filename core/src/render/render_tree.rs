@@ -207,12 +207,8 @@ impl RenderId {
       render_to_widget.remove(&RenderId(id));
     });
 
-    // Todo: should remove in a more directly way and not care about
-    // relationship
-    // Fixme: memory leak here, node just detach and not remove. Wait a pr to
-    // provide a method to drop a subtree in indextree.
     tree.layout_info.remove(&self);
-    self.0.detach(&mut tree.arena);
+    self.0.remove_subtree(&mut tree.arena);
     if tree.root == Some(self) {
       tree.root = None;
     }
@@ -320,7 +316,7 @@ mod tests {
     fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
   }
 
-  fn mock_widget_id(i: usize) -> WidgetId { unsafe { std::mem::transmute(i) } }
+  fn mock_widget_id(i: usize) -> WidgetId { unsafe { std::mem::transmute((i, 0)) } }
 
   #[test]
   fn relayout_always_from_top_to_down() {

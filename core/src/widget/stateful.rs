@@ -141,7 +141,7 @@ mod tests {
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let (_, mut cell_ref) = StatefulWidget::stateful(Text("Hello".to_string()), tree.as_mut());
+    let (_s, mut cell_ref) = StatefulWidget::stateful(Text("Hello".to_string()), tree.as_mut());
     {
       cell_ref.0 = "World!".to_string();
     }
@@ -168,7 +168,7 @@ mod tests {
   #[test]
   fn fix_pin_widget_node() {
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let (_, ptr_ref_) = StatefulWidget::stateful(Text("hello".to_string()), tree.as_mut());
+    let (_s, ptr_ref_) = StatefulWidget::stateful(Text("hello".to_string()), tree.as_mut());
     (0..128).for_each(|_| unsafe {
       tree
         .as_mut()
