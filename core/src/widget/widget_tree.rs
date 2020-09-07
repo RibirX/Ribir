@@ -266,13 +266,10 @@ impl WidgetId {
   }
 
   /// detect if the widget of this id point to is dropped.
-  pub fn is_dropped(self) -> bool {
-    // todo:
-    false
-  }
+  pub fn is_dropped(self, tree: &WidgetTree) -> bool { self.0.is_removed(&tree.arena) }
 
   pub fn common_ancestor_of(self, other: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
-    if self.is_dropped() || other.is_dropped() {
+    if self.is_dropped(tree) || other.is_dropped(tree) {
       return None;
     }
     self
