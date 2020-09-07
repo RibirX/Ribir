@@ -74,6 +74,36 @@ pub trait Widget: Debug + Any {
     KeyDetect::with_key(key, self.box_it())
   }
 
+  /// Assign the type of mouse cursor, show when the mouse pointer is over this
+  /// widget.
+  #[inline]
+  fn with_cursor(self, cursor: CursorIcon) -> Cursor
+  where
+    Self: Sized,
+  {
+    Cursor::new(cursor, self)
+  }
+
+  /// Assign whether the `widget` should automatically get focus when the window
+  /// loads. Indicates the `widget` can be focused.
+  #[inline]
+  fn with_auto_focus(self, auto_focus: bool) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    Focus::from_widget(self.box_it(), Some(auto_focus), None)
+  }
+
+  /// Assign where the widget participates in sequential keyboard navigation.
+  /// Indicates the `widget` can be focused and
+  #[inline]
+  fn with_tab_index(self, tab_index: i16) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    Focus::from_widget(self.box_it(), None, Some(tab_index))
+  }
+
   /// Used to specify the event handler for the pointer down event, which is
   /// fired when the pointing device is initially pressed.
   #[inline]
@@ -158,16 +188,6 @@ pub trait Widget: Debug + Any {
     F: FnMut(&PointerEvent) + 'static,
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Leave, handler)
-  }
-
-  /// Assign the type of mouse cursor, show when the mouse pointer is over this
-  /// widget.
-  #[inline]
-  fn with_cursor(self, cursor: CursorIcon) -> Cursor
-  where
-    Self: Sized,
-  {
-    Cursor::new(cursor, self)
   }
 }
 

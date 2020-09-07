@@ -10,7 +10,8 @@ use crate::widget::window::RawWindow;
 pub use pointers::*;
 use std::{cell::RefCell, rc::Rc};
 pub use winit::event::ModifiersState;
-mod focus;
+pub mod focus;
+pub use focus::Focus;
 
 /// Event itself contains the properties and methods which are common to all
 /// events
