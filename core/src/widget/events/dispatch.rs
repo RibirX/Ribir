@@ -157,7 +157,21 @@ impl Dispatcher {
     event
   }
 
-  fn dispatch_to_widget<
+  fn dispatch_pointer(
+    &mut self,
+    wid: WidgetId,
+    pointer_type: PointerEventType,
+    event: PointerEvent,
+  ) -> PointerEvent {
+    Self::dispatch_to_widget(
+      wid,
+      unsafe { self.widget_tree.as_mut() },
+      &mut |widget: &mut PointerListener, e| widget.dispatch(pointer_type, e),
+      event,
+    )
+  }
+
+  pub(crate) fn dispatch_to_widget<
     T: Widget,
     E: std::convert::AsMut<EventCommon> + std::fmt::Debug,
     H: FnMut(&mut T, Rc<E>),
@@ -196,25 +210,16 @@ impl Dispatcher {
       new_path.remove(0);
     }
 
-    old_path.iter().for_each(|wid| {
+    event = old_path.iter().fold(event, |mut event, wid| {
       event.position = self.widget_relative_point(*wid);
       log::info!("Pointer leave {:?}", event);
-      event = Self::dispatch_to_widget(
-        *wid,
-        unsafe { self.widget_tree.as_mut() },
-        &mut |widget: &mut PointerListener, e| widget.dispatch(PointerEventType::Leave, e),
-        event.clone(),
-      );
+      self.dispatch_pointer(*wid, PointerEventType::Leave, event)
     });
-    new_path.iter().for_each(|(wid, pos)| {
+
+    new_path.iter().fold(event, |mut event, (wid, pos)| {
       event.position = *pos;
       log::info!("Pointer enter {:?}", event);
-      event = Self::dispatch_to_widget(
-        *wid,
-        unsafe { self.widget_tree.as_mut() },
-        &mut |widget: &mut PointerListener, e| widget.dispatch(PointerEventType::Enter, e),
-        event.clone(),
-      );
+      self.dispatch_pointer(*wid, PointerEventType::Enter, event)
     });
     self.last_pointer_widget = new_path.last().map(|(wid, _)| *wid);
   }
