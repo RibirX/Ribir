@@ -107,7 +107,6 @@ pub struct PointerListener {
   subject: LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>,
 }
 
-/// Enter/Leave do not bubble.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
   Down,

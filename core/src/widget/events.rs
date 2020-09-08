@@ -68,3 +68,13 @@ impl std::fmt::Debug for EventCommon {
       .finish()
   }
 }
+
+impl std::convert::AsMut<EventCommon> for EventCommon {
+  #[inline]
+  fn as_mut(&mut self) -> &mut EventCommon { self }
+}
+
+impl std::convert::AsRef<EventCommon> for EventCommon {
+  #[inline]
+  fn as_ref(&self) -> &EventCommon { self }
+}
