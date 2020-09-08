@@ -310,7 +310,7 @@ impl FocusManager {
         log::info!("{:?} {:?}", event_type, event);
         focus.subject.next((event_type, event));
       },
-      event.clone(),
+      event,
     )
   }
 
@@ -430,7 +430,7 @@ mod tests {
     // drain filter
     id0.remove(&mut tree);
     mgr.drain_tab_index(0, &mut tree, <_>::default(), wnd.clone());
-    assert_eq!(mgr.auto_focus(&mut tree), None);
+    assert_eq!(mgr.auto_focus(&tree), None);
     assert_eq!(mgr.focus_order.get(&0), None);
     assert_eq!(
       mgr.prev_focus_widget(&mut tree, <_>::default(), wnd),
