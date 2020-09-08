@@ -48,13 +48,7 @@ impl Dispatcher {
       WindowEvent::CursorMoved { position, .. } => {
         self.cursor_pos = Point::new(position.x as f32, position.y as f32);
         self.pointer_enter_leave_dispatch();
-        self.bubble_pointer(
-          |w, event| {
-            log::info!("Pointer move {:?}", event);
-            w.dispatch(PointerEventType::Move, event)
-          },
-          self.mouse_pointer_without_target(),
-        );
+        self.bubble_pointer(PointerEventType::Move);
       }
       WindowEvent::CursorLeft { .. } => {
         self.cursor_pos = Point::new(-1., -1.);
@@ -75,14 +69,7 @@ impl Dispatcher {
               self.pointer_down_uid = path.last().map(|(id, _)| *id);
               // only the first button press emit event.
               if self.mouse_button.1 == button.into() {
-                self.bubble_pointer_by_path(
-                  |w, event| {
-                    log::info!("Pointer down {:?}", event);
-                    w.dispatch(PointerEventType::Down, event)
-                  },
-                  self.mouse_pointer_without_target(),
-                  path.iter().rev(),
-                );
+                self.bubble_pointer(PointerEventType::Down);
               }
             }
             ElementState::Released => {
@@ -90,16 +77,7 @@ impl Dispatcher {
               // only the last button release emit event.
               if self.mouse_button.1.is_empty() {
                 self.mouse_button.0 = None;
-                let mut event = self.mouse_pointer_without_target();
-                event.pressure = 0.;
-                self.bubble_pointer_by_path(
-                  |w, event| {
-                    log::info!("Pointer up {:?}", event);
-                    w.dispatch(PointerEventType::Up, event)
-                  },
-                  event,
-                  path.iter().rev(),
-                );
+                self.bubble_pointer(PointerEventType::Up);
 
                 let release_on = path.last().map(|(id, _)| *id);
                 let common_ancestor = self.pointer_down_uid.take().and_then(|down| {
@@ -108,16 +86,7 @@ impl Dispatcher {
                 });
                 if let Some(from) = common_ancestor {
                   let iter = path.iter().rev().skip_while(|w| w.0 != from);
-                  let mut event = self.mouse_pointer_without_target();
-                  event.pressure = 0.;
-                  self.bubble_pointer_by_path(
-                    |w, event| {
-                      log::info!("click {:?}", event);
-                      w.dispatch(PointerEventType::Tap, event)
-                    },
-                    event,
-                    iter,
-                  );
+                  self.bubble_pointer_by_path(PointerEventType::Tap, iter);
                 }
               }
             }
@@ -128,33 +97,34 @@ impl Dispatcher {
     }
   }
 
-  fn bubble_pointer<D: FnMut(&mut PointerListener, Rc<PointerEvent>)>(
-    &mut self,
-    dispatch: D,
-    event: PointerEvent,
-  ) -> PointerEvent {
-    self.bubble_pointer_by_path(dispatch, event, self.widget_hit_path().iter().rev())
+  fn bubble_pointer(&mut self, event_type: PointerEventType) -> PointerEvent {
+    self.bubble_pointer_by_path(event_type, self.widget_hit_path().iter().rev())
   }
 
-  fn bubble_pointer_by_path<'r, D: FnMut(&mut PointerListener, Rc<PointerEvent>)>(
+  fn bubble_pointer_by_path<'r>(
     &mut self,
-    mut dispatch: D,
-    mut event: PointerEvent,
-    mut leaf_to_root: impl Iterator<Item = &'r (WidgetId, Point)>,
+    event_type: PointerEventType,
+    mut path: impl Iterator<Item = &'r (WidgetId, Point)>,
   ) -> PointerEvent {
-    let mut w_tree = self.widget_tree;
-    leaf_to_root.all(|(wid, pos)| {
+    let event = self.mouse_pointer_without_target();
+    let mut init_target = false;
+    let res = path.try_fold(event, |mut event, (wid, pos)| {
+      if !init_target {
+        event.as_mut().target = *wid;
+        init_target = true;
+      }
       event.position = *pos;
-      event = Self::dispatch_to_widget(
-        *wid,
-        unsafe { w_tree.as_mut() },
-        &mut dispatch,
-        event.clone(),
-      );
-
-      !event.as_mut().cancel_bubble.get()
+      event = self.dispatch_pointer(*wid, event_type, event);
+      if event.as_mut().cancel_bubble.get() {
+        Err(event)
+      } else {
+        Ok(event)
+      }
     });
-    event
+    match res {
+      Ok(event) => event,
+      Err(event) => event,
+    }
   }
 
   fn dispatch_pointer(
@@ -163,6 +133,7 @@ impl Dispatcher {
     pointer_type: PointerEventType,
     event: PointerEvent,
   ) -> PointerEvent {
+    log::info!("{:?} {:?}", pointer_type, event);
     Self::dispatch_to_widget(
       wid,
       unsafe { self.widget_tree.as_mut() },

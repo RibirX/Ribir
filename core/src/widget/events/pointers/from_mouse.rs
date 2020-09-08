@@ -31,7 +31,7 @@ impl PointerEvent {
       id: PointerId(0),
       width: 1.0,
       height: 1.0,
-      pressure: 0.5,
+      pressure: if btn.is_empty() { 0. } else { 0.5 },
       tilt_x: 90.,
       tilt_y: 90.,
       twist: 0.,
