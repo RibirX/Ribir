@@ -11,7 +11,7 @@ pub use pointers::*;
 use std::{cell::RefCell, rc::Rc};
 pub use winit::event::ModifiersState;
 pub mod focus;
-pub use focus::Focus;
+pub use focus::{Focus, FocusEvent, FocusEventType};
 
 /// Event itself contains the properties and methods which are common to all
 /// events

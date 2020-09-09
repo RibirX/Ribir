@@ -189,6 +189,50 @@ pub trait Widget: Debug + Any {
   {
     PointerListener::listen_on(self.box_it(), PointerEventType::Leave, handler)
   }
+
+  /// Specify the event handler to process focus event. The focus event is
+  /// raised when when the user sets focus on an element.
+  #[inline]
+  fn on_focus<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    Focus::listen_on(self.box_it(), FocusEventType::Focus, handler)
+  }
+
+  /// Specify the event handler to process blur event. The blur event is raised
+  /// when an widget loses focus.
+  #[inline]
+  fn on_blur<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    Focus::listen_on(self.box_it(), FocusEventType::Blur, handler)
+  }
+
+  /// Specify the event handler to process focusin event.  The main difference
+  /// between this event and blur is that focusin bubbles while blur does not.
+  #[inline]
+  fn on_focus_in<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    Focus::listen_on(self.box_it(), FocusEventType::FocusIn, handler)
+  }
+
+  /// Specify the event handler to process focusout event. The main difference
+  /// between this event and blur is that focusout bubbles while blur does not.
+  #[inline]
+  fn on_focus_out<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    Focus::listen_on(self.box_it(), FocusEventType::FocusOut, handler)
+  }
 }
 
 /// A widget represented by other widget compose.
