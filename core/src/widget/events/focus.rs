@@ -37,7 +37,7 @@ pub enum FocusEventType {
 /// Focus widget
 #[derive(Debug)]
 pub struct Focus {
-  widget: BoxWidget,
+  pub widget: BoxWidget,
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
   ///
@@ -56,14 +56,14 @@ pub struct Focus {
   ///   tab_index value, their order relative to each other follows their
   ///   position in the document source. The maximum value for tab_index is
   ///   32767. If not specified, it takes the default value 0.
-  tab_index: i16,
+  pub tab_index: i16,
   /// Indicates whether the `widget` should automatically get focus when the
   /// window loads.
   ///
   /// Only one widget should have this attribute specified.  If there are
   /// several, the first widget with the attribute set inserted, get the initial
   /// focus.
-  auto_focus: bool,
+  pub auto_focus: bool,
   subject: LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()>,
 }
 
@@ -205,6 +205,9 @@ impl FocusManager {
       .map(|wid| wid.wid)
   }
 
+  /// return the focusing widget.
+  pub fn focusing(&self) -> Option<WidgetId> { self.focusing.map(|node| node.wid) }
+
   pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
     while let Some(node) = self.auto_focus.front() {
       if node.wid.is_dropped(tree) {
@@ -259,23 +262,21 @@ impl FocusManager {
     self.focusing = node;
 
     if let Some(ref blur) = old {
-      let mut event = Self::focus_event(blur.wid, modifiers, window.clone());
-
       // dispatch blur event
-      event = Self::dispatch_event(blur.wid, tree, FocusEventType::Blur, event);
-      event.cancel_bubble.set(false);
+      let event = Self::focus_event(blur.wid, modifiers, window.clone());
+      Self::dispatch_event(blur.wid, tree, FocusEventType::Blur, event);
 
       // bubble focus out
+      let event = Self::focus_event(blur.wid, modifiers, window.clone());
       Self::bubble_dispatch(blur.wid, FocusEventType::FocusOut, tree, event);
     }
 
     if let Some(focus) = self.focusing {
-      let mut event = Self::focus_event(focus.wid, modifiers, window);
-      // dispatch blur event
-      event = Self::dispatch_event(focus.wid, tree, FocusEventType::Focus, event);
-      event.cancel_bubble.set(false);
+      let event = Self::focus_event(focus.wid, modifiers, window.clone());
+      Self::dispatch_event(focus.wid, tree, FocusEventType::Focus, event);
 
       // bubble focus out
+      let event = Self::focus_event(focus.wid, modifiers, window);
       Self::bubble_dispatch(focus.wid, FocusEventType::FocusIn, tree, event);
     }
 
@@ -362,6 +363,27 @@ impl Focus {
       },
     )
   }
+
+  #[inline]
+  pub fn focus_event_observable(
+    &self,
+  ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
+    self.subject.clone()
+  }
+
+  pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
+    base: BoxWidget,
+    event_type: FocusEventType,
+    mut handler: H,
+  ) -> BoxWidget {
+    let mut pointer = Self::from_widget(base, None, None);
+    Widget::dynamic_cast_mut::<Self>(&mut pointer)
+      .unwrap()
+      .focus_event_observable()
+      .filter(move |(t, _)| *t == event_type)
+      .subscribe(move |(_, event)| handler(&*event));
+    pointer
+  }
 }
 
 impl FocusNode {
@@ -372,6 +394,7 @@ impl FocusNode {
 mod tests {
   use super::*;
   use crate::widget::SizedBox;
+  use widget::BoxWidget;
 
   fn empty_box() -> SizedBox { SizedBox::empty_box(Size::zero()) }
   fn unwrap_focus(id: WidgetId, tree: &WidgetTree) -> &Focus {
@@ -436,5 +459,80 @@ mod tests {
       mgr.prev_focus_widget(&mut tree, <_>::default(), wnd),
       Some(id1)
     );
+  }
+
+  #[test]
+  fn focus_event() {
+    #[derive(Debug, Default)]
+    struct EmbedFocus {
+      log: Rc<RefCell<Vec<String>>>,
+    }
+
+    impl CombinationWidget for EmbedFocus {
+      fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+        let child = log_focus_event("child", empty_box(), self.log.clone());
+        let parent = log_focus_event("parent", SizedBox::expanded(child), self.log.clone());
+        parent
+      }
+    }
+
+    fn log_focus_event(
+      name: &'static str,
+      widget: impl Widget,
+      log: Rc<RefCell<Vec<String>>>,
+    ) -> BoxWidget {
+      let log2 = log.clone();
+      let log3 = log.clone();
+      let log4 = log.clone();
+      widget
+        .on_focus(move |_| {
+          log.borrow_mut().push(format!("focus {}", name));
+        })
+        .on_blur(move |_| {
+          log2.borrow_mut().push(format!("blur {}", name));
+        })
+        .on_focus_in(move |_| {
+          log3.borrow_mut().push(format!("focusin {}", name));
+        })
+        .on_focus_out(move |_| {
+          log4.borrow_mut().push(format!("focusout {}", name));
+        })
+    }
+
+    let wnd: Rc<RefCell<Box<dyn RawWindow>>> =
+      Rc::new(RefCell::new(Box::new(window::MockRawWindow::default())));
+    let mut tree = WidgetTree::default();
+    let mut r_tree = render_tree::RenderTree::default();
+    let mut mgr = FocusManager::default();
+
+    let widget = EmbedFocus::default();
+    let log = widget.log.clone();
+    let root = tree.set_root(widget.box_it(), &mut r_tree);
+    let parent = root.first_child(&tree).unwrap();
+    let child = parent.first_child(&tree).unwrap();
+    mgr.add_new_focus_widget(parent, unwrap_focus(parent, &tree));
+    mgr.add_new_focus_widget(child, unwrap_focus(child, &tree));
+    mgr.focus(child, 0, ModifiersState::default(), wnd.clone(), &mut tree);
+    assert_eq!(
+      &*log.borrow(),
+      &["focus child", "focusin child", "focusin parent"]
+    );
+    log.borrow_mut().clear();
+
+    mgr.focus(parent, 0, ModifiersState::default(), wnd.clone(), &mut tree);
+    assert_eq!(
+      &*log.borrow(),
+      &[
+        "blur child",
+        "focusout child",
+        "focusout parent",
+        "focus parent",
+        "focusin parent"
+      ]
+    );
+    log.borrow_mut().clear();
+
+    mgr.blur(ModifiersState::default(), wnd, &mut tree);
+    assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
 }

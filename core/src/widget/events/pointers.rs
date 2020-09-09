@@ -138,12 +138,14 @@ impl PointerListener {
   pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
     base: BoxWidget,
     event_type: PointerEventType,
-    handler: H,
+    mut handler: H,
   ) -> BoxWidget {
     let mut pointer = Self::from_widget(base);
     Widget::dynamic_cast_mut::<Self>(&mut pointer)
       .unwrap()
-      .add_listener(event_type, handler);
+      .pointer_observable()
+      .filter(move |(t, _)| *t == event_type)
+      .subscribe(move |(_, event)| handler(&*event));
     pointer
   }
 
@@ -199,17 +201,6 @@ impl PointerListener {
     &self,
   ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
     self.subject.clone()
-  }
-
-  fn add_listener<F: FnMut(&PointerEvent) + 'static>(
-    &mut self,
-    event_type: PointerEventType,
-    mut handler: F,
-  ) {
-    self
-      .pointer_observable()
-      .filter(move |(t, _)| *t == event_type)
-      .subscribe(move |(_, event)| handler(&*event));
   }
 
   pub(crate) fn dispatch(&mut self, event_type: PointerEventType, event: Rc<PointerEvent>) {

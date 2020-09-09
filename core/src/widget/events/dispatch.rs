@@ -5,6 +5,7 @@ use super::{
 use crate::{
   prelude::*,
   render::render_tree::{RenderId, RenderTree},
+  widget::events::focus::FocusManager,
   widget::widget_tree::{WidgetId, WidgetTree},
 };
 use std::ptr::NonNull;
@@ -15,6 +16,7 @@ use winit::event::{DeviceId, ElementState, ModifiersState, WindowEvent};
 pub(crate) struct Dispatcher {
   render_tree: NonNull<RenderTree>,
   widget_tree: NonNull<WidgetTree>,
+  focus_mgr: FocusManager,
   cursor_pos: Point,
   last_pointer_widget: Option<WidgetId>,
   mouse_button: (Option<DeviceId>, MouseButtons),
@@ -32,6 +34,7 @@ impl Dispatcher {
     Self {
       render_tree,
       widget_tree,
+      focus_mgr: FocusManager::default(),
       last_pointer_widget: None,
       cursor_pos: Point::zero(),
       modifiers: <_>::default(),
@@ -66,9 +69,9 @@ impl Dispatcher {
           match state {
             ElementState::Pressed => {
               self.mouse_button.1 |= button.into();
-              self.pointer_down_uid = path.last().map(|(id, _)| *id);
               // only the first button press emit event.
               if self.mouse_button.1 == button.into() {
+                self.pointer_down_uid = path.last().map(|(id, _)| *id);
                 self.bubble_pointer(PointerEventType::Down);
               }
             }
@@ -98,6 +101,31 @@ impl Dispatcher {
   }
 
   fn bubble_pointer(&mut self, event_type: PointerEventType) -> PointerEvent {
+    // change the focus widget.
+    if event_type == PointerEventType::Down {
+      let nearest_focus = self.pointer_down_uid.and_then(|wid| {
+        wid.ancestors(self.widget_tree_ref()).find_map(|id| {
+          id.get(self.widget_tree_ref())
+            .and_then(|widget| Widget::dynamic_cast_ref::<Focus>(widget))
+            .map(|focus| (id, focus.tab_index))
+        })
+      });
+      if let Some((focus_id, tab_index)) = nearest_focus {
+        self.focus_mgr.focus(
+          focus_id,
+          tab_index,
+          self.modifiers,
+          self.window.clone(),
+          unsafe { self.widget_tree.as_mut() },
+        );
+      } else {
+        self
+          .focus_mgr
+          .blur(self.modifiers, self.window.clone(), unsafe {
+            self.widget_tree.as_mut()
+          });
+      }
+    }
     self.bubble_pointer_by_path(event_type, self.widget_hit_path().iter().rev())
   }
 
@@ -599,5 +627,51 @@ mod tests {
       assert_eq!(&clicked.0, &[parent_id]);
       assert_eq!(clicked.1, 1);
     }
+  }
+
+  #[test]
+  fn focus_change_by_event() {
+    let root = Row::default()
+      .push(SizedBox::empty_box(Size::new(50., 50.)).with_tab_index(0))
+      .push(SizedBox::empty_box(Size::new(50., 50.)));
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    wnd.render_ready();
+
+    let device_id = unsafe { DeviceId::dummy() };
+    let modifiers = ModifiersState::default();
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (45, 45).into(),
+      modifiers,
+    });
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers,
+    });
+
+    // point down on a focus widget
+    assert!(wnd.dispatcher.focus_mgr.focusing().is_some());
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Released,
+      button: MouseButton::Left,
+      modifiers,
+    });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (80, 80).into(),
+      modifiers,
+    });
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers,
+    });
+
+    assert!(wnd.dispatcher.focus_mgr.focusing().is_none());
   }
 }
