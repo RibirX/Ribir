@@ -107,6 +107,12 @@ impl<R: CanvasRender> Window<R> {
   pub(crate) fn render_ready(&mut self) -> bool {
     let changed = self.tree_repair();
     self.layout();
+    self.dispatcher.focus_mgr.update(
+      unsafe { self.widget_tree.as_mut().get_unchecked_mut() },
+      self.dispatcher.modifiers,
+      self.raw_window.clone(),
+    );
+
     changed
   }
 
@@ -173,6 +179,15 @@ impl<R: CanvasRender> Window<R> {
         .as_mut()
         .get_unchecked_mut()
         .set_root(root.box_it(), wnd.render_tree.as_mut().get_unchecked_mut());
+    }
+    let focus_mgr = &mut wnd.dispatcher.focus_mgr;
+    if let Some(auto_focusing) = focus_mgr.auto_focus(&wnd.widget_tree) {
+      focus_mgr.focus(
+        auto_focusing,
+        wnd.dispatcher.modifiers,
+        wnd.raw_window.clone(),
+        unsafe { wnd.widget_tree.as_mut().get_unchecked_mut() },
+      )
     }
 
     wnd
