@@ -16,11 +16,11 @@ use winit::event::{DeviceId, ElementState, ModifiersState, WindowEvent};
 pub(crate) struct Dispatcher {
   render_tree: NonNull<RenderTree>,
   widget_tree: NonNull<WidgetTree>,
-  focus_mgr: FocusManager,
+  pub(crate) focus_mgr: FocusManager,
   cursor_pos: Point,
   last_pointer_widget: Option<WidgetId>,
   mouse_button: (Option<DeviceId>, MouseButtons),
-  modifiers: ModifiersState,
+  pub(crate) modifiers: ModifiersState,
   window: Rc<RefCell<Box<dyn RawWindow>>>,
   pointer_down_uid: Option<WidgetId>,
 }
@@ -104,20 +104,18 @@ impl Dispatcher {
     // change the focus widget.
     if event_type == PointerEventType::Down {
       let nearest_focus = self.pointer_down_uid.and_then(|wid| {
-        wid.ancestors(self.widget_tree_ref()).find_map(|id| {
+        wid.ancestors(self.widget_tree_ref()).find(|id| {
           id.get(self.widget_tree_ref())
             .and_then(|widget| Widget::dynamic_cast_ref::<Focus>(widget))
-            .map(|focus| (id, focus.tab_index))
+            .is_some()
         })
       });
-      if let Some((focus_id, tab_index)) = nearest_focus {
-        self.focus_mgr.focus(
-          focus_id,
-          tab_index,
-          self.modifiers,
-          self.window.clone(),
-          unsafe { self.widget_tree.as_mut() },
-        );
+      if let Some(focus_id) = nearest_focus {
+        self
+          .focus_mgr
+          .focus(focus_id, self.modifiers, self.window.clone(), unsafe {
+            self.widget_tree.as_mut()
+          });
       } else {
         self
           .focus_mgr

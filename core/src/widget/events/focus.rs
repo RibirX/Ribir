@@ -3,13 +3,13 @@ use crate::{
   widget::{dispatch::Dispatcher, widget_tree::WidgetTree, window::RawWindow},
 };
 use rxrust::prelude::*;
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Default)]
 pub struct FocusManager {
-  focus_order: BTreeMap<i16, Vec<WidgetId>>,
-  focusing: Option<FocusNode>,
-  auto_focus: std::collections::VecDeque<FocusNode>,
+  /// store current focusing node, and its position in tab_orders.
+  focusing: Option<(FocusNode, usize)>,
+  tab_orders: Vec<FocusNode>,
 }
 
 pub type FocusEvent = EventCommon;
@@ -48,20 +48,20 @@ pub struct Focus {
   ///   visually by clicking with the mouse.
   /// - Zero means that the element should be focusable in sequential keyboard
   ///   navigation, after any positive tab_index values and its order is defined
-  ///   by the document's source order.
+  ///   by the tree's source order.
   /// - A positive value means the element should be focusable in sequential
   ///   keyboard navigation, with its order defined by the value of the number.
   ///   That is, tab_index=4 is focused before tab_index=5 and tab_index=0, but
   ///   after tab_index=3. If multiple elements share the same positive
   ///   tab_index value, their order relative to each other follows their
-  ///   position in the document source. The maximum value for tab_index is
-  ///   32767. If not specified, it takes the default value 0.
+  ///   position in the tree source. The maximum value for tab_index is 32767.
+  ///   If not specified, it takes the default value 0.
   pub tab_index: i16,
   /// Indicates whether the `widget` should automatically get focus when the
   /// window loads.
   ///
   /// Only one widget should have this attribute specified.  If there are
-  /// several, the first widget with the attribute set inserted, get the initial
+  /// several, the widget nearest the root, get the initial
   /// focus.
   pub auto_focus: bool,
   subject: LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()>,
@@ -74,44 +74,6 @@ struct FocusNode {
 }
 
 impl FocusManager {
-  pub fn add_new_focus_widget(&mut self, wid: WidgetId, widget: &Focus) {
-    if widget.auto_focus {
-      self.auto_focus.push_back(FocusNode {
-        tab_index: widget.tab_index,
-        wid,
-      });
-    }
-    self
-      .focus_order
-      .entry(widget.tab_index)
-      .or_insert_with(Vec::new)
-      .push(wid);
-  }
-
-  /// Remove the destroyed widget which tab index is `tab_index`. Should not
-  /// directly remove a focus widget, but use the tab index to batch remove.
-  pub fn drain_tab_index(
-    &mut self,
-    tab_index: i16,
-    tree: &mut WidgetTree,
-    modifiers: ModifiersState,
-    window: Rc<RefCell<Box<dyn RawWindow>>>,
-  ) {
-    if let Some(current) = self.focusing {
-      if current.wid.is_dropped(tree) {
-        self.next_focus_widget(tree, modifiers, window);
-      }
-    }
-
-    let vec = self.focus_order.get_mut(&tab_index);
-    if let Some(vec) = vec {
-      vec.drain_filter(|w| w.is_dropped(tree));
-      if vec.is_empty() {
-        self.focus_order.remove(&tab_index);
-      }
-    }
-  }
-
   /// Switch to the next focus widget and return it.
   pub fn next_focus_widget(
     &mut self,
@@ -119,28 +81,17 @@ impl FocusManager {
     modifiers: ModifiersState,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
   ) -> Option<WidgetId> {
-    let next = if let Some(FocusNode { wid, tab_index }) = self.focusing {
-      // find the same tab_index widget next to current focusing.
-      self
-        .focus_order
-        .get(&tab_index)
-        .and_then(|vec| {
-          vec
-            .iter()
-            .skip_while(|id| **id != wid)
-            .skip(1)
-            .find(|id| !id.is_dropped(tree))
-            .map(|wid| FocusNode::new(tab_index, *wid))
-        })
-        // or get the nearest focus widget which `tab_index` less than current.
-        .or_else(|| self.next_focus_in_range(0..tab_index, tree))
-        // or enter the next cycle, get the largest `tab_index` focus widget.
-        .or_else(|| self.next_focus_in_range(tab_index.., tree))
-    } else {
-      self.next_focus_in_range(0.., tree)
-    };
+    let next = self
+      .focusing
+      .filter(|(_, index0)| *index0 < usize::MAX)
+      .and_then(|(_, index0)| {
+        let next = index0 + 1;
+        self.tab_orders.get(next).map(|node| (*node, next))
+      })
+      .or_else(|| self.tab_orders.first().map(|node| (*node, 0)));
+
     self.change_focusing_to(next, modifiers, window, tree);
-    self.focusing.map(|node| node.wid)
+    self.focusing.map(|(node, _)| node.wid)
   }
 
   /// Switch to previous focus widget and return it.
@@ -150,47 +101,41 @@ impl FocusManager {
     modifiers: ModifiersState,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
   ) -> Option<WidgetId> {
-    let prev = if let Some(FocusNode { wid, tab_index }) = self.focusing {
-      // find the same tab_index widget next to current focusing.
-      self
-        .focus_order
-        .get(&tab_index)
-        .and_then(|vec| {
-          vec
-            .iter()
-            .rev()
-            .skip_while(|id| **id != wid)
-            .skip(1)
-            .find(|id| !id.is_dropped(tree))
-            .map(|wid| FocusNode::new(tab_index, *wid))
-        })
-        // or get the nearest focus widget which `tab_index` greater than current.
-        .or_else(|| self.prev_focus_in_range(tab_index + 1.., tree))
-        // or enter the next cycle, get the least `tab_index` focus widget.
-        .or_else(|| self.prev_focus_in_range(0..=tab_index, tree))
-    } else {
-      self.prev_focus_in_range(0.., tree)
-    };
+    let prev = self
+      .focusing
+      .filter(|(_, index0)| *index0 > 0)
+      .and_then(|(_, index0)| {
+        let prev = index0 - 1;
+        self.tab_orders.get(prev).map(|node| (*node, prev))
+      })
+      .or_else(|| {
+        self
+          .tab_orders
+          .last()
+          .map(|node| (*node, self.tab_orders.len() - 1))
+      });
+
     self.change_focusing_to(prev, modifiers, window, tree);
-    self.focusing.map(|node| node.wid)
+    self.focusing.map(|(node, _)| node.wid)
   }
 
   /// This method sets focus on the specified widget across its id `wid`.
   pub fn focus(
     &mut self,
     wid: WidgetId,
-    tab_index: i16,
     modifiers: ModifiersState,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
     tree: &mut WidgetTree,
   ) {
-    debug_assert!(
-      self
-        .focus_order
-        .get(&tab_index)
-        .map_or(false, |vec| vec.contains(&wid))
-    );
-    self.change_focusing_to(Some(FocusNode { tab_index, wid }), modifiers, window, tree);
+    let node = self
+      .tab_orders
+      .iter()
+      .enumerate()
+      .find(|(_, node)| node.wid == wid)
+      .map(|(idx, node)| (*node, idx));
+
+    assert!(node.is_some());
+    self.change_focusing_to(node, modifiers, window, tree);
   }
 
   /// Removes keyboard focus from the current focusing widget and return its id.
@@ -202,66 +147,79 @@ impl FocusManager {
   ) -> Option<WidgetId> {
     self
       .change_focusing_to(None, modifiers, window, tree)
-      .map(|wid| wid.wid)
+      .map(|(node, _)| node.wid)
   }
 
   /// return the focusing widget.
-  pub fn focusing(&self) -> Option<WidgetId> { self.focusing.map(|node| node.wid) }
+  pub fn focusing(&self) -> Option<WidgetId> { self.focusing.map(|(node, _)| node.wid) }
 
+  /// return the auto focus widget of the tree.
   pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
-    while let Some(node) = self.auto_focus.front() {
-      if node.wid.is_dropped(tree) {
-        self.auto_focus.pop_front();
-      } else {
-        break;
-      }
+    tree.root().and_then(|root| {
+      root.descendants(tree).find(|id| {
+        id.get(tree)
+          .and_then(|w| Widget::dynamic_cast_ref::<Focus>(w))
+          .map_or(false, |focus| focus.auto_focus)
+      })
+    })
+  }
+
+  pub fn update(
+    &mut self,
+    tree: &mut WidgetTree,
+    modifiers: ModifiersState,
+    window: Rc<RefCell<Box<dyn RawWindow>>>,
+  ) {
+    self.tab_orders.clear();
+    if let Some(root) = tree.root() {
+      let mut zeros = vec![];
+      root
+        .descendants(tree)
+        .filter_map(|id| {
+          id.get(tree)
+            .and_then(|w| Widget::dynamic_cast_ref::<Focus>(w))
+            .map(|focus| FocusNode {
+              tab_index: focus.tab_index,
+              wid: id,
+            })
+        })
+        .for_each(|node| match node.tab_index {
+          0 => zeros.push(node),
+          i if i > 0 => {
+            self.tab_orders.push(node);
+            self.tab_orders.sort_by_key(|node| node.tab_index);
+          }
+          _ => {}
+        });
+      self.tab_orders.append(&mut zeros);
     }
 
-    self.auto_focus.front().map(|node| node.wid)
-  }
-
-  fn next_focus_in_range<R: std::ops::RangeBounds<i16>>(
-    &self,
-    rg: R,
-    tree: &WidgetTree,
-  ) -> Option<FocusNode> {
-    self
-      .focus_order
-      .range(rg)
-      .rev()
-      .find_map(|(tab_index, vec)| {
-        vec
+    // if current focusing widget is dropped, find the next focus replace it.
+    if let Some((focusing, _)) = self.focusing {
+      if focusing.wid.is_dropped(tree) {
+        let node = self
+          .tab_orders
           .iter()
-          .find(|wid| !wid.is_dropped(tree))
-          .map(|wid| FocusNode::new(*tab_index, *wid))
-      })
-  }
-
-  fn prev_focus_in_range<R: std::ops::RangeBounds<i16>>(
-    &self,
-    rg: R,
-    tree: &WidgetTree,
-  ) -> Option<FocusNode> {
-    self.focus_order.range(rg).find_map(|(tab_index, vec)| {
-      vec
-        .iter()
-        .rev()
-        .find(|wid| !wid.is_dropped(tree))
-        .map(|wid| FocusNode::new(*tab_index, *wid))
-    })
+          .enumerate()
+          .find(|(_, node)| node.tab_index >= focusing.tab_index)
+          .or_else(|| self.tab_orders.iter().enumerate().next())
+          .map(|(idx, node)| (*node, idx));
+        self.change_focusing_to(node, modifiers, window, tree);
+      }
+    }
   }
 
   fn change_focusing_to(
     &mut self,
-    node: Option<FocusNode>,
+    node: Option<(FocusNode, usize)>,
     modifiers: ModifiersState,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
     tree: &mut WidgetTree,
-  ) -> Option<FocusNode> {
+  ) -> Option<(FocusNode, usize)> {
     let old = std::mem::replace(&mut self.focusing, node);
     self.focusing = node;
 
-    if let Some(ref blur) = old {
+    if let Some((ref blur, _)) = old {
       // dispatch blur event
       let event = Self::focus_event(blur.wid, modifiers, window.clone());
       Self::dispatch_event(blur.wid, tree, FocusEventType::Blur, event);
@@ -271,7 +229,7 @@ impl FocusManager {
       Self::bubble_dispatch(blur.wid, FocusEventType::FocusOut, tree, event);
     }
 
-    if let Some(focus) = self.focusing {
+    if let Some((focus, _)) = self.focusing {
       let event = Self::focus_event(focus.wid, modifiers, window.clone());
       Self::dispatch_event(focus.wid, tree, FocusEventType::Focus, event);
 
@@ -386,79 +344,85 @@ impl Focus {
   }
 }
 
-impl FocusNode {
-  fn new(tab_index: i16, wid: WidgetId) -> Self { FocusNode { tab_index, wid } }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::SizedBox;
+  use crate::{render::render_tree::RenderTree, widget::SizedBox};
   use widget::BoxWidget;
 
   fn empty_box() -> SizedBox { SizedBox::empty_box(Size::zero()) }
-  fn unwrap_focus(id: WidgetId, tree: &WidgetTree) -> &Focus {
-    Widget::dynamic_cast_ref::<Focus>(id.get(tree).unwrap()).unwrap()
+
+  fn mock_wnd() -> Rc<RefCell<Box<dyn RawWindow>>> {
+    Rc::new(RefCell::new(Box::new(window::MockRawWindow::default())))
+  }
+
+  fn env<W: Widget>(widget: W) -> (WidgetTree, FocusManager) {
+    let mut tree = WidgetTree::default();
+    let mut r_tree = RenderTree::default();
+    let mut mgr = FocusManager::default();
+    tree.set_root(widget.box_it(), &mut r_tree);
+    mgr.update(&mut tree, ModifiersState::default(), mock_wnd());
+    (tree, mgr)
   }
 
   #[test]
   fn auto_focus() {
-    let mut tree = WidgetTree::default();
-    let mut mgr = FocusManager::default();
+    // two auto focus widget
+    let widget = Row::default()
+      .push(empty_box().with_auto_focus(true))
+      .push(empty_box().with_auto_focus(true));
+    let (tree, mut mgr) = env(widget);
+    let id = tree.root().and_then(|root| root.first_child(&tree));
+    assert!(id.is_some());
+    assert_eq!(mgr.auto_focus(&tree), id);
 
-    let id0 = tree.new_node(empty_box().with_auto_focus(true));
-    let id1 = tree.new_node(empty_box().with_auto_focus(true));
-    mgr.add_new_focus_widget(id0, unwrap_focus(id0, &tree));
-    mgr.add_new_focus_widget(id1, unwrap_focus(id1, &tree));
-
-    assert_eq!(mgr.auto_focus(&tree), Some(id0));
-    id0.remove(&mut tree);
-    assert_eq!(mgr.auto_focus(&tree), Some(id1));
+    // one auto focus widget
+    let widget = Row::default()
+      .push(empty_box())
+      .push(empty_box().with_auto_focus(true));
+    let (tree, mut mgr) = env(widget);
+    let id = tree
+      .root()
+      .and_then(|root| root.first_child(&tree))
+      .and_then(|p| p.next_sibling(&tree));
+    assert!(id.is_some());
+    assert_eq!(mgr.auto_focus(&tree), id);
   }
 
   #[test]
   fn tab_index() {
-    let wnd: Rc<RefCell<Box<dyn RawWindow>>> =
-      Rc::new(RefCell::new(Box::new(window::MockRawWindow::default())));
-    let mut tree = WidgetTree::default();
-    let mut mgr = FocusManager::default();
+    let widget = Row::default()
+      .push(empty_box().with_tab_index(-1))
+      .push(empty_box().with_tab_index(0).with_auto_focus(true))
+      .push(empty_box().with_tab_index(1))
+      .push(empty_box().with_tab_index(2))
+      .push(empty_box().with_tab_index(3));
 
-    let negative = tree.new_node(empty_box().with_tab_index(-1));
-    let id0 = tree.new_node(empty_box().with_tab_index(0).with_auto_focus(true));
-    let id1 = tree.new_node(empty_box().with_tab_index(1));
-    let id2 = tree.new_node(empty_box().with_tab_index(2));
-    let id22 = tree.new_node(empty_box().with_tab_index(2));
-    mgr.add_new_focus_widget(negative, unwrap_focus(negative, &tree));
-    mgr.add_new_focus_widget(id0, unwrap_focus(id0, &tree));
-    mgr.add_new_focus_widget(id1, unwrap_focus(id1, &tree));
-    mgr.add_new_focus_widget(id2, unwrap_focus(id2, &tree));
-    mgr.add_new_focus_widget(id22, unwrap_focus(id22, &tree));
+    let wnd = mock_wnd();
+    let (mut tree, mut mgr) = env(widget);
+
+    let negative = tree.root().unwrap().first_child(&tree).unwrap();
+    let id0 = negative.next_sibling(&tree).unwrap();
+    let id1 = id0.next_sibling(&tree).unwrap();
+    let id2 = id1.next_sibling(&tree).unwrap();
+    let id22 = id2.next_sibling(&tree).unwrap();
 
     {
       let mut next_focus = || mgr.next_focus_widget(&mut tree, <_>::default(), wnd.clone());
       // next focus sequential
+      assert_eq!(next_focus(), Some(id1));
       assert_eq!(next_focus(), Some(id2));
       assert_eq!(next_focus(), Some(id22));
-      assert_eq!(next_focus(), Some(id1));
       assert_eq!(next_focus(), Some(id0));
-      assert_eq!(next_focus(), Some(id2));
+      assert_eq!(next_focus(), Some(id1));
 
       // previous focus sequential
       let mut prev_focus = || mgr.prev_focus_widget(&mut tree, <_>::default(), wnd.clone());
       assert_eq!(prev_focus(), Some(id0));
-      assert_eq!(prev_focus(), Some(id1));
       assert_eq!(prev_focus(), Some(id22));
       assert_eq!(prev_focus(), Some(id2));
+      assert_eq!(prev_focus(), Some(id1));
     }
-    // drain filter
-    id0.remove(&mut tree);
-    mgr.drain_tab_index(0, &mut tree, <_>::default(), wnd.clone());
-    assert_eq!(mgr.auto_focus(&tree), None);
-    assert_eq!(mgr.focus_order.get(&0), None);
-    assert_eq!(
-      mgr.prev_focus_widget(&mut tree, <_>::default(), wnd),
-      Some(id1)
-    );
   }
 
   #[test]
@@ -471,8 +435,7 @@ mod tests {
     impl CombinationWidget for EmbedFocus {
       fn build(&self, _: &mut BuildCtx) -> BoxWidget {
         let child = log_focus_event("child", empty_box(), self.log.clone());
-        let parent = log_focus_event("parent", SizedBox::expanded(child), self.log.clone());
-        parent
+        log_focus_event("parent", SizedBox::expanded(child), self.log.clone())
       }
     }
 
@@ -501,25 +464,21 @@ mod tests {
 
     let wnd: Rc<RefCell<Box<dyn RawWindow>>> =
       Rc::new(RefCell::new(Box::new(window::MockRawWindow::default())));
-    let mut tree = WidgetTree::default();
-    let mut r_tree = render_tree::RenderTree::default();
-    let mut mgr = FocusManager::default();
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let root = tree.set_root(widget.box_it(), &mut r_tree);
-    let parent = root.first_child(&tree).unwrap();
+    let (mut tree, mut mgr) = env(widget);
+    let parent = tree.root().unwrap().first_child(&tree).unwrap();
     let child = parent.first_child(&tree).unwrap();
-    mgr.add_new_focus_widget(parent, unwrap_focus(parent, &tree));
-    mgr.add_new_focus_widget(child, unwrap_focus(child, &tree));
-    mgr.focus(child, 0, ModifiersState::default(), wnd.clone(), &mut tree);
+
+    mgr.focus(child, ModifiersState::default(), wnd.clone(), &mut tree);
     assert_eq!(
       &*log.borrow(),
       &["focus child", "focusin child", "focusin parent"]
     );
     log.borrow_mut().clear();
 
-    mgr.focus(parent, 0, ModifiersState::default(), wnd.clone(), &mut tree);
+    mgr.focus(parent, ModifiersState::default(), wnd.clone(), &mut tree);
     assert_eq!(
       &*log.borrow(),
       &[
