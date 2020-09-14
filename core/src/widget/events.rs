@@ -4,14 +4,14 @@
 //! like web's bubble phase, always from the leaf to root.
 use crate::widget::widget_tree::WidgetId;
 use std::cell::Cell;
-pub(crate) mod dispatch;
+pub(crate) mod dispatcher;
 pub mod pointers;
 use crate::widget::window::RawWindow;
 pub use pointers::*;
 use std::{cell::RefCell, rc::Rc};
-pub use winit::event::ModifiersState;
+pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 pub mod focus;
-pub use focus::{Focus, FocusEvent, FocusEventType};
+pub use focus::*;
 
 /// Event itself contains the properties and methods which are common to all
 /// events
@@ -52,7 +52,7 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   #[inline]
   fn composed_path(&self) -> &[WidgetId] { &self.as_ref().composed_path }
   #[inline]
-  fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(false) }
+  fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(true) }
   #[inline]
   fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
 }

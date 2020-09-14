@@ -1,7 +1,7 @@
 use super::{painting_context::PaintingContext, render_tree::*};
 use crate::{
   prelude::*,
-  widget::{events::dispatch::Dispatcher, widget_tree::*},
+  widget::{events::dispatcher::Dispatcher, widget_tree::*},
 };
 use canvas::{surface::TextureSurface, Canvas, CanvasRender, DeviceSize, WgpuRender};
 use std::{cell::RefCell, pin::Pin, ptr::NonNull, rc::Rc};
@@ -107,11 +107,7 @@ impl<R: CanvasRender> Window<R> {
   pub(crate) fn render_ready(&mut self) -> bool {
     let changed = self.tree_repair();
     self.layout();
-    self.dispatcher.focus_mgr.update(
-      unsafe { self.widget_tree.as_mut().get_unchecked_mut() },
-      self.dispatcher.modifiers,
-      self.raw_window.clone(),
-    );
+    self.dispatcher.focus_mgr.update(&self.dispatcher.common);
 
     changed
   }
@@ -181,13 +177,9 @@ impl<R: CanvasRender> Window<R> {
         .set_root(root.box_it(), wnd.render_tree.as_mut().get_unchecked_mut());
     }
     let focus_mgr = &mut wnd.dispatcher.focus_mgr;
+    focus_mgr.update(&wnd.dispatcher.common);
     if let Some(auto_focusing) = focus_mgr.auto_focus(&wnd.widget_tree) {
-      focus_mgr.focus(
-        auto_focusing,
-        wnd.dispatcher.modifiers,
-        wnd.raw_window.clone(),
-        unsafe { wnd.widget_tree.as_mut().get_unchecked_mut() },
-      )
+      focus_mgr.focus(auto_focusing, &wnd.dispatcher.common)
     }
 
     wnd

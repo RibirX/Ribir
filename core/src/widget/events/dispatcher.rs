@@ -1,28 +1,18 @@
-use super::{
-  pointers::{MouseButtons, PointerEvent, PointerEventType, PointerListener},
-  EventCommon,
-};
-use crate::{
-  prelude::*,
-  render::render_tree::{RenderId, RenderTree},
-  widget::events::focus::FocusManager,
-  widget::widget_tree::{WidgetId, WidgetTree},
-};
-use std::ptr::NonNull;
-use std::{cell::RefCell, rc::Rc};
+use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
+mod focus_mgr;
+pub(crate) use focus_mgr::FocusManager;
+mod pointer;
+pub(crate) use pointer::PointerDispatcher;
+mod common;
+pub(crate) use common::CommonDispatcher;
+use std::{cell::RefCell, ptr::NonNull, rc::Rc};
 pub use window::RawWindow;
-use winit::event::{DeviceId, ElementState, ModifiersState, WindowEvent};
+use winit::event::WindowEvent;
 
 pub(crate) struct Dispatcher {
-  render_tree: NonNull<RenderTree>,
-  widget_tree: NonNull<WidgetTree>,
+  pub(crate) common: CommonDispatcher,
+  pub(crate) pointer: PointerDispatcher,
   pub(crate) focus_mgr: FocusManager,
-  cursor_pos: Point,
-  last_pointer_widget: Option<WidgetId>,
-  mouse_button: (Option<DeviceId>, MouseButtons),
-  pub(crate) modifiers: ModifiersState,
-  window: Rc<RefCell<Box<dyn RawWindow>>>,
-  pointer_down_uid: Option<WidgetId>,
 }
 
 impl Dispatcher {
@@ -32,260 +22,34 @@ impl Dispatcher {
     window: Rc<RefCell<Box<dyn RawWindow>>>,
   ) -> Self {
     Self {
-      render_tree,
-      widget_tree,
+      common: CommonDispatcher::new(render_tree, widget_tree, window),
+      pointer: PointerDispatcher::default(),
       focus_mgr: FocusManager::default(),
-      last_pointer_widget: None,
-      cursor_pos: Point::zero(),
-      modifiers: <_>::default(),
-      mouse_button: <_>::default(),
-      window,
-      pointer_down_uid: None,
     }
   }
 
   pub fn dispatch(&mut self, event: WindowEvent) {
     log::info!("Dispatch winit event {:?}", event);
     match event {
-      WindowEvent::ModifiersChanged(s) => self.modifiers = s,
-      WindowEvent::CursorMoved { position, .. } => {
-        self.cursor_pos = Point::new(position.x as f32, position.y as f32);
-        self.pointer_enter_leave_dispatch();
-        self.bubble_pointer(PointerEventType::Move);
-      }
-      WindowEvent::CursorLeft { .. } => {
-        self.cursor_pos = Point::new(-1., -1.);
-        self.pointer_enter_leave_dispatch();
-      }
+      WindowEvent::ModifiersChanged(s) => self.common.modifiers_change(s),
+      WindowEvent::CursorMoved { position, .. } => self.pointer.cursor_move_to(
+        Point::new(position.x as f32, position.y as f32),
+        &self.common,
+      ),
+      WindowEvent::CursorLeft { .. } => self.pointer.on_cursor_left(&self.common),
       WindowEvent::MouseInput {
         state,
         button,
         device_id,
         ..
-      } => {
-        // A mouse press/release emit during another mouse's press will ignored.
-        if self.mouse_button.0.get_or_insert(device_id) == &device_id {
-          let path = self.widget_hit_path();
-          match state {
-            ElementState::Pressed => {
-              self.mouse_button.1 |= button.into();
-              // only the first button press emit event.
-              if self.mouse_button.1 == button.into() {
-                self.pointer_down_uid = path.last().map(|(id, _)| *id);
-                self.bubble_pointer(PointerEventType::Down);
-              }
-            }
-            ElementState::Released => {
-              self.mouse_button.1.remove(button.into());
-              // only the last button release emit event.
-              if self.mouse_button.1.is_empty() {
-                self.mouse_button.0 = None;
-                self.bubble_pointer(PointerEventType::Up);
-
-                let release_on = path.last().map(|(id, _)| *id);
-                let common_ancestor = self.pointer_down_uid.take().and_then(|down| {
-                  release_on
-                    .and_then(|release| down.common_ancestor_of(release, self.widget_tree_ref()))
-                });
-                if let Some(from) = common_ancestor {
-                  let iter = path.iter().rev().skip_while(|w| w.0 != from);
-                  self.bubble_pointer_by_path(PointerEventType::Tap, iter);
-                }
-              }
-            }
-          };
-        }
-      }
+      } => self.pointer.dispatch_mouse_input(
+        device_id,
+        state,
+        button,
+        &self.common,
+        &mut self.focus_mgr,
+      ),
       _ => log::info!("not processed event {:?}", event),
-    }
-  }
-
-  fn bubble_pointer(&mut self, event_type: PointerEventType) -> PointerEvent {
-    // change the focus widget.
-    if event_type == PointerEventType::Down {
-      let nearest_focus = self.pointer_down_uid.and_then(|wid| {
-        wid.ancestors(self.widget_tree_ref()).find(|id| {
-          id.get(self.widget_tree_ref())
-            .and_then(|widget| Widget::dynamic_cast_ref::<Focus>(widget))
-            .is_some()
-        })
-      });
-      if let Some(focus_id) = nearest_focus {
-        self
-          .focus_mgr
-          .focus(focus_id, self.modifiers, self.window.clone(), unsafe {
-            self.widget_tree.as_mut()
-          });
-      } else {
-        self
-          .focus_mgr
-          .blur(self.modifiers, self.window.clone(), unsafe {
-            self.widget_tree.as_mut()
-          });
-      }
-    }
-    self.bubble_pointer_by_path(event_type, self.widget_hit_path().iter().rev())
-  }
-
-  fn bubble_pointer_by_path<'r>(
-    &mut self,
-    event_type: PointerEventType,
-    mut path: impl Iterator<Item = &'r (WidgetId, Point)>,
-  ) -> PointerEvent {
-    let event = self.mouse_pointer_without_target();
-    let mut init_target = false;
-    let res = path.try_fold(event, |mut event, (wid, pos)| {
-      if !init_target {
-        event.as_mut().target = *wid;
-        init_target = true;
-      }
-      event.position = *pos;
-      event = self.dispatch_pointer(*wid, event_type, event);
-      if event.as_mut().cancel_bubble.get() {
-        Err(event)
-      } else {
-        Ok(event)
-      }
-    });
-    match res {
-      Ok(event) => event,
-      Err(event) => event,
-    }
-  }
-
-  fn dispatch_pointer(
-    &mut self,
-    wid: WidgetId,
-    pointer_type: PointerEventType,
-    event: PointerEvent,
-  ) -> PointerEvent {
-    log::info!("{:?} {:?}", pointer_type, event);
-    Self::dispatch_to_widget(
-      wid,
-      unsafe { self.widget_tree.as_mut() },
-      &mut |widget: &mut PointerListener, e| widget.dispatch(pointer_type, e),
-      event,
-    )
-  }
-
-  pub(crate) fn dispatch_to_widget<
-    T: Widget,
-    E: std::convert::AsMut<EventCommon> + std::fmt::Debug,
-    H: FnMut(&mut T, Rc<E>),
-  >(
-    wid: WidgetId,
-    tree: &mut WidgetTree,
-    handler: &mut H,
-    mut event: E,
-  ) -> E {
-    let event_widget = wid
-      .get_mut(tree)
-      .and_then(|w| Widget::dynamic_cast_mut::<T>(w));
-    if let Some(w) = event_widget {
-      let common = event.as_mut();
-      common.current_target = wid;
-      common.composed_path.push(wid);
-
-      let rc_event = Rc::new(event);
-      handler(w, rc_event.clone());
-      event = Rc::try_unwrap(rc_event).expect("Keep the event is dangerous and not allowed");
-    }
-    event
-  }
-
-  fn pointer_enter_leave_dispatch(&mut self) {
-    let mut event = self.mouse_pointer_without_target();
-    let mut old_path = if let Some(last) = self.last_pointer_widget {
-      last.ancestors(self.widget_tree_ref()).collect::<Vec<_>>()
-    } else {
-      vec![]
-    };
-    let mut new_path = self.widget_hit_path();
-    // Remove the common ancestors of `old_path` and `new_path`
-    while !old_path.is_empty() && old_path.last() == new_path.first().map(|(wid, _)| wid) {
-      old_path.pop();
-      new_path.remove(0);
-    }
-
-    event = old_path.iter().fold(event, |mut event, wid| {
-      event.position = self.widget_relative_point(*wid);
-      log::info!("Pointer leave {:?}", event);
-      self.dispatch_pointer(*wid, PointerEventType::Leave, event)
-    });
-
-    new_path.iter().fold(event, |mut event, (wid, pos)| {
-      event.position = *pos;
-      log::info!("Pointer enter {:?}", event);
-      self.dispatch_pointer(*wid, PointerEventType::Enter, event)
-    });
-    self.last_pointer_widget = new_path.last().map(|(wid, _)| *wid);
-  }
-
-  /// collect the render widget hit path.
-  fn widget_hit_path(&self) -> Vec<(WidgetId, Point)> {
-    fn down_coordinate_to(
-      id: RenderId,
-      pos: Point,
-      tree: &RenderTree,
-    ) -> Option<(RenderId, Point)> {
-      id.layout_box_rect(tree)
-        .filter(|rect| rect.contains(pos))
-        .map(|rect| {
-          let offset: Size = rect.min().to_tuple().into();
-          (id, pos - offset)
-        })
-    }
-
-    let r_tree = self.render_tree_ref();
-    let mut current = r_tree
-      .root()
-      .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree));
-
-    let mut path = vec![];
-    while let Some((rid, pos)) = current {
-      path.push((
-        rid
-          .relative_to_widget(&r_tree)
-          .expect("Render object 's owner widget is not exist."),
-        pos,
-      ));
-      current = rid
-        .reverse_children(&r_tree)
-        .find_map(|rid| down_coordinate_to(rid, pos, &r_tree));
-    }
-
-    path
-  }
-
-  #[inline]
-  fn render_tree_ref(&self) -> &RenderTree { unsafe { self.render_tree.as_ref() } }
-
-  #[inline]
-  fn widget_tree_ref(&self) -> &WidgetTree { unsafe { self.widget_tree.as_ref() } }
-
-  fn widget_relative_point(&self, wid: WidgetId) -> Point {
-    let r_tree = self.render_tree_ref();
-    if let Some(rid) = wid.relative_to_render(self.widget_tree_ref()) {
-      rid
-        .ancestors(r_tree)
-        .map(|r| {
-          r.layout_box_rect(r_tree)
-            .map_or_else(Point::zero, |rect| rect.origin)
-        })
-        .fold(Point::zero(), |sum, pos| sum + pos.to_vector())
-    } else {
-      unreachable!("");
-    }
-  }
-
-  fn mouse_pointer_without_target(&self) -> PointerEvent {
-    unsafe {
-      PointerEvent::from_mouse_with_dummy_target(
-        self.cursor_pos,
-        self.modifiers,
-        self.mouse_button.1,
-        self.window.clone(),
-      )
     }
   }
 }
@@ -298,7 +62,7 @@ mod tests {
     window::NoRenderWindow,
   };
   use std::{cell::RefCell, rc::Rc};
-  use winit::event::MouseButton;
+  use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
   fn record_pointer<W: Widget>(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
@@ -469,18 +233,17 @@ mod tests {
   #[test]
   fn cancel_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = Text("pointer event test".to_string())
-      .on_pointer_move({
-        let stack = event_record.clone();
-        move |e: &PointerEvent| {
-          stack.borrow_mut().push(e.clone());
-          e.stop_bubbling();
-        }
-      })
-      .on_pointer_down({
-        let stack = event_record.clone();
-        move |e| stack.borrow_mut().push(e.clone())
-      });
+    let root = SizedBox::expanded(Text("pointer event test".to_string()).on_pointer_down({
+      let stack = event_record.clone();
+      move |e| {
+        stack.borrow_mut().push(e.clone());
+        e.stop_bubbling();
+      }
+    }))
+    .on_pointer_down({
+      let stack = event_record.clone();
+      move |e| stack.borrow_mut().push(e.clone())
+    });
 
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
