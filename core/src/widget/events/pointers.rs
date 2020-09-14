@@ -56,7 +56,7 @@ pub struct PointerEvent {
   pub is_primary: bool,
   /// The buttons being depressed (if any) when the mouse event was fired.
   pub buttons: MouseButtons,
-  common: EventCommon,
+  pub common: EventCommon,
 }
 
 bitflags! {
@@ -140,8 +140,8 @@ impl PointerListener {
     event_type: PointerEventType,
     mut handler: H,
   ) -> BoxWidget {
-    let mut pointer = Self::from_widget(base);
-    Widget::dynamic_cast_mut::<Self>(&mut pointer)
+    let pointer = Self::from_widget(base);
+    Widget::dynamic_cast_ref::<Self>(&pointer)
       .unwrap()
       .pointer_observable()
       .filter(move |(t, _)| *t == event_type)
@@ -150,7 +150,7 @@ impl PointerListener {
   }
 
   pub fn tap_times_observable(
-    &mut self,
+    &self,
     times: u8,
   ) -> impl LocalObservable<'static, Item = Rc<PointerEvent>, Err = ()> {
     const DUR: Duration = Duration::from_millis(250);
@@ -201,10 +201,6 @@ impl PointerListener {
     &self,
   ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
     self.subject.clone()
-  }
-
-  pub(crate) fn dispatch(&mut self, event_type: PointerEventType, event: Rc<PointerEvent>) {
-    self.subject.next((event_type, event));
   }
 }
 
