@@ -125,6 +125,68 @@ impl RenderTree {
 }
 
 impl RenderId {
+  /// Translates the global window coordinate pos to widget coordinates.
+  pub fn map_to_global(self, pos: Point, tree: &RenderTree) -> Point {
+    self
+      .ancestors(&tree)
+      .fold(pos, |pos, id| id.map_to_parent(pos, &tree))
+  }
+
+  /// Translates the global screen coordinate pos to widget coordinates.
+  pub fn map_from_global(self, pos: Point, tree: &RenderTree) -> Point {
+    self
+      .ancestors(tree)
+      .fold(pos, |pos, id| id.map_from_parent(pos, &tree))
+  }
+
+  /// Translates the render object coordinate pos to the coordinate system of
+  /// `parent`.
+  pub fn map_to_parent(self, mut pos: Point, tree: &RenderTree) -> Point {
+    let obj = self.get(tree).expect("Access a invalid render object");
+
+    if let Some(t) = obj.transform() {
+      pos = t.transform_point(pos);
+    }
+
+    self
+      .layout_box_rect(tree)
+      .map_or(pos, |rect| pos + rect.min().to_vector())
+  }
+
+  /// Translates the render object coordinate pos from the coordinate system of
+  /// parent to this render object coordinate system.
+  pub fn map_from_parent(self, pos: Point, tree: &RenderTree) -> Point {
+    let pos = self
+      .layout_box_rect(tree)
+      .map_or(pos, |rect| pos - rect.min().to_vector());
+
+    let obj = self.get(tree).expect("Access a invalid render object");
+    obj
+      .transform()
+      .and_then(|t| t.inverse())
+      .map_or(pos, |t| t.transform_point(pos))
+  }
+
+  /// Translates the render object coordinate pos to the coordinate system of
+  /// `ancestor`. The `ancestor` must be a ancestor of the calling render
+  /// object.
+  pub fn map_to(self, pos: Point, ancestor: RenderId, tree: &RenderTree) -> Point {
+    self
+      .ancestors(&tree)
+      .take_while(|id| *id == ancestor)
+      .fold(pos, |pos, id| id.map_to_parent(pos, &tree))
+  }
+
+  /// Translates the render object coordinate pos from the coordinate system of
+  /// ancestor to this render object coordinate system. The parent must be a
+  /// parent of the calling render object.
+  pub fn map_from(self, pos: Point, ancestor: RenderId, tree: &RenderTree) -> Point {
+    self
+      .ancestors(&tree)
+      .take_while(|id| *id == ancestor)
+      .fold(pos, |pos, id| id.map_from_parent(pos, &tree))
+  }
+
   /// Returns a reference to the node data.
   pub(crate) fn get(self, tree: &RenderTree) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
     tree.arena.get(self.0).map(|node| &**node.get())
@@ -214,7 +276,7 @@ impl RenderId {
     }
   }
 
-  pub(crate) fn relative_to_widget(self, tree: &RenderTree) -> Option<WidgetId> {
+  pub(crate) fn relative_to_widget(&self, tree: &RenderTree) -> Option<WidgetId> {
     tree.render_to_widget.get(&self).copied()
   }
 
@@ -314,6 +376,7 @@ mod tests {
     }
     fn only_sized_by_parent(&self) -> bool { false }
     fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+    fn transform(&self) -> Option<Transform> { None }
   }
 
   fn mock_widget_id(i: usize) -> WidgetId { unsafe { std::mem::transmute((i, 0)) } }

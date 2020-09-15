@@ -265,6 +265,22 @@ impl WidgetId {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
+  // Dynamic cast the widget that the id stand for to a reference of the type `W`
+  // , if the widget is or its **base widget** is type `W`.
+  pub fn dynamic_cast_ref<W: Widget>(self, tree: &WidgetTree) -> Option<&W> {
+    self
+      .get(tree)
+      .and_then(|w| Widget::dynamic_cast_ref::<W>(w))
+  }
+
+  // Dynamic cast the widget that the id stand for to a mutable reference of the
+  // type `W` , if the widget is or its **base widget** is type `W`.
+  pub fn dynamic_cast_mut<W: Widget>(self, tree: &mut WidgetTree) -> Option<&mut W> {
+    self
+      .get_mut(tree)
+      .and_then(|w| Widget::dynamic_cast_mut::<W>(w))
+  }
+
   /// detect if the widget of this id point to is dropped.
   pub fn is_dropped(self, tree: &WidgetTree) -> bool { self.0.is_removed(&tree.arena) }
 
@@ -272,9 +288,20 @@ impl WidgetId {
     if self.is_dropped(tree) || other.is_dropped(tree) {
       return None;
     }
-    self
-      .ancestors(tree)
-      .find(|id| other.ancestors(tree).any(|other_p| other_p == *id))
+
+    let other_path = other.ancestors(tree).collect::<Vec<_>>();
+    let self_path = self.ancestors(tree).collect::<Vec<_>>();
+
+    let min_len = other_path.len().min(self_path.len());
+    (1..=min_len)
+      .find(|idx| other_path[other_path.len() - idx] != self_path[self_path.len() - idx])
+      // if one widget is the ancestor of the other, the reverse index `min_len` store the common
+      // ancestor.
+      .or(Some(min_len + 1))
+      .and_then(|r_idx| {
+        let idx = self_path.len() + 1 - r_idx;
+        self_path.get(idx).cloned()
+      })
   }
 
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)

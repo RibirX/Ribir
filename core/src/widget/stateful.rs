@@ -159,9 +159,7 @@ mod tests {
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
     let id = tree.set_root(key.box_it(), &mut render_tree);
 
-    let key_back = id
-      .get_mut(tree)
-      .and_then(|w| Widget::dynamic_cast_ref::<KeyDetect>(w));
+    let key_back = id.dynamic_cast_ref::<KeyDetect>(tree);
     assert!(key_back.is_some());
   }
 

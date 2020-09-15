@@ -35,6 +35,11 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
   /// call children's paint individual. And framework guarantee always paint
   /// parent before children.
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+
+  /// Returns a matrix that maps the local logic coordinate system to the local
+  /// paint box coordinate system. None-Value means there is not transform
+  /// between the coordinate system.
+  fn transform(&self) -> Option<Transform> { None }
 }
 
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
@@ -44,6 +49,7 @@ pub trait RenderObjectSafety: Debug + Any {
   fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size;
   fn only_sized_by_parent(&self) -> bool;
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+  fn transform(&self) -> Option<Transform>;
 }
 
 fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
@@ -86,6 +92,9 @@ where
 
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { RenderObject::paint(self, ctx); }
+
+  #[inline]
+  fn transform(&self) -> Option<Transform> { RenderObject::transform(self) }
 }
 
 impl dyn RenderObjectSafety {

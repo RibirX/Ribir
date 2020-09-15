@@ -25,9 +25,6 @@ pub trait Event {
   /// object to which the event is currently slated to be sent. It's possible
   /// this has been changed along the way through retargeting.
   fn current_target(&self) -> &WidgetId;
-  /// The composed_path of the Event interface returns the event’s path which is
-  /// an array of the objects on which listeners will be invoked
-  fn composed_path(&self) -> &[WidgetId];
   /// Prevent event bubbling to parent.
   fn stop_bubbling(&self);
   /// Represents the current state of the keyboard modifiers
@@ -38,7 +35,6 @@ pub trait Event {
 pub struct EventCommon {
   pub target: WidgetId,
   pub current_target: WidgetId,
-  pub composed_path: Vec<WidgetId>,
   pub modifiers: ModifiersState,
   pub cancel_bubble: Cell<bool>,
   pub window: Rc<RefCell<Box<dyn RawWindow>>>,
@@ -50,8 +46,6 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   #[inline]
   fn current_target(&self) -> &WidgetId { &self.as_ref().target }
   #[inline]
-  fn composed_path(&self) -> &[WidgetId] { &self.as_ref().composed_path }
-  #[inline]
   fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(true) }
   #[inline]
   fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
@@ -62,7 +56,6 @@ impl std::fmt::Debug for EventCommon {
     f.debug_struct("CommonEvent")
       .field("target", &self.target)
       .field("current_target", &self.current_target)
-      .field("composed_path", &self.composed_path)
       .field("modifiers", &self.modifiers)
       .field("cancel_bubble", &self.cancel_bubble)
       .finish()

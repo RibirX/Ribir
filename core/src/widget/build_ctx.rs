@@ -19,10 +19,7 @@ impl<'a> BuildCtx<'a> {
     let theme = self
       .widget
       .ancestors(tree)
-      .find_map(|id| {
-        id.get(tree)
-          .and_then(|w| Widget::dynamic_cast_ref::<Theme>(w))
-      })
+      .find_map(|id| id.dynamic_cast_ref::<Theme>(tree))
       .expect("At least， root theme should be found.");
     &theme.data
   }
@@ -42,8 +39,7 @@ mod tests {
     let tree = wnd.widget_tree();
     let theme = tree
       .root()
-      .and_then(|root| root.get(&*tree))
-      .and_then(|root| Widget::dynamic_cast_ref::<Theme>(root));
+      .and_then(|root| root.dynamic_cast_ref::<Theme>(&*tree));
 
     assert!(theme.is_some());
   }

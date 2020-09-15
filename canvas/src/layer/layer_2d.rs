@@ -162,14 +162,26 @@ impl<'a> Rendering2DLayer<'a> {
     };
   }
 
-  /// Saves the entire state of the canvas by pushing the current drawing state
-  /// onto a stack.
+  /// Saves the entire state and return a guard to auto restore the state when
+  /// if drop.
   #[must_use]
-  pub fn save<'l>(&'l mut self) -> LayerGuard<'l, 'a> {
-    let new_state = self.current_state().clone();
-    self.state_stack.push(new_state);
+  pub fn save_guard<'l>(&'l mut self) -> LayerGuard<'l, 'a> {
+    self.save();
     LayerGuard(self)
   }
+
+  /// Saves the entire state of the canvas by pushing the current drawing state
+  /// onto a stack.
+  pub fn save(&mut self) {
+    let new_state = self.current_state().clone();
+    self.state_stack.push(new_state);
+  }
+
+  /// Restores the most recently saved canvas state by popping the top entry in
+  /// the drawing state stack. If there is no saved state, this method does
+  /// nothing.
+  #[inline]
+  pub fn restore(&mut self) { self.state_stack.pop(); }
 
   /// Returns the color, gradient, or pattern used for draw. Only `Color`
   /// support now.
@@ -472,7 +484,7 @@ impl<'a, 'b> Drop for LayerGuard<'a, 'b> {
   #[inline]
   fn drop(&mut self) {
     debug_assert!(!self.0.state_stack.is_empty());
-    self.0.state_stack.pop();
+    self.0.restore();
   }
 }
 
@@ -623,12 +635,12 @@ mod test {
   fn save_guard() {
     let mut layer = Rendering2DLayer::new();
     {
-      let mut paint = layer.save();
+      let mut paint = layer.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
       paint.set_transform(t);
       assert_eq!(&t, paint.get_transform());
       {
-        let mut p2 = paint.save();
+        let mut p2 = paint.save_guard();
         let t2 = Transform::new(2., 2., 2., 2., 2., 2.);
         p2.set_transform(t2);
         assert_eq!(&t2, p2.get_transform());

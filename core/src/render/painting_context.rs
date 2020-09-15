@@ -1,5 +1,4 @@
-use super::render_tree::*;
-use crate::prelude::Point;
+use super::{render_tree::*, RenderObjectSafety};
 use canvas::Rendering2DLayer;
 
 pub type Painter2D<'a> = Rendering2DLayer<'a>;
@@ -24,11 +23,6 @@ impl<'a> PaintingContext<'a> {
   pub fn painter(&mut self) -> &mut Painter2D<'a> { &mut self.layer_2d }
 
   pub(crate) fn draw(mut self) -> Rendering2DLayer<'a> {
-    fn assert_place(id: RenderId, tree: &RenderTree) -> Point {
-      id.layout_box_rect(tree)
-        .expect("Every widget should at its place before draw.")
-        .min()
-    }
     self
       .current_node
       .traverse(&self.tree)
@@ -40,14 +34,26 @@ impl<'a> PaintingContext<'a> {
             .get(&self.tree)
             .expect("Render object should exists when traverse the tree.");
 
-          let offset = assert_place(id, &self.tree);
-          self.layer_2d.translate(offset.x, offset.y);
+          self.layer_2d.save();
+          let offset = id
+            .layout_box_rect(&self.tree)
+            .expect("Every widget should at its place before draw.")
+            .min();
+
+          let mut matrix = self
+            .layer_2d
+            .get_transform()
+            .then_translate(offset.to_vector());
+
+          if let Some(t) = id.get(&self.tree).and_then(RenderObjectSafety::transform) {
+            matrix = matrix.then(&t);
+          }
+          self.layer_2d.set_transform(matrix);
 
           r_obj.paint(&mut self);
         }
-        RenderEdge::End(id) => {
-          let offset = assert_place(id, &self.tree);
-          self.layer_2d.translate(-offset.x, -offset.y);
+        RenderEdge::End(_) => {
+          self.layer_2d.restore();
         }
       });
 

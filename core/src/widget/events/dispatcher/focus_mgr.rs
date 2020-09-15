@@ -78,8 +78,7 @@ impl FocusManager {
   pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
-        id.get(tree)
-          .and_then(|w| Widget::dynamic_cast_ref::<Focus>(w))
+        id.dynamic_cast_ref::<Focus>(tree)
           .map_or(false, |focus| focus.auto_focus)
       })
     })
@@ -93,12 +92,10 @@ impl FocusManager {
       root
         .descendants(tree)
         .filter_map(|id| {
-          id.get(tree)
-            .and_then(|w| Widget::dynamic_cast_ref::<Focus>(w))
-            .map(|focus| FocusNode {
-              tab_index: focus.tab_index,
-              wid: id,
-            })
+          id.dynamic_cast_ref::<Focus>(tree).map(|focus| FocusNode {
+            tab_index: focus.tab_index,
+            wid: id,
+          })
         })
         .for_each(|node| match node.tab_index {
           0 => zeros.push(node),
@@ -149,6 +146,7 @@ impl FocusManager {
         blur.wid,
         Self::create_emitter(FocusEventType::FocusOut),
         event,
+        |_| {},
       );
     }
 
@@ -166,6 +164,7 @@ impl FocusManager {
         focus.wid,
         Self::create_emitter(FocusEventType::FocusIn),
         event,
+        |_| {},
       );
     }
 
@@ -176,7 +175,6 @@ impl FocusManager {
     FocusEvent {
       target: wid,
       current_target: wid,
-      composed_path: vec![],
       modifiers: dispatcher.modifiers,
       cancel_bubble: <_>::default(),
       window: dispatcher.window.clone(),
