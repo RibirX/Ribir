@@ -8,24 +8,24 @@ use window::RawWindow;
 use winit::event::MouseButton;
 
 impl PointerEvent {
-  pub(crate) unsafe fn from_mouse_with_dummy_target(
+  pub(crate) fn from_mouse(
+    target: WidgetId,
+    position: Point,
     global_pos: Point,
     modifiers: ModifiersState,
     btn: MouseButtons,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
   ) -> Self {
-    let target = WidgetId::dummy();
     let event = EventCommon {
       modifiers,
       target,
       current_target: target,
-      composed_path: <_>::default(),
       cancel_bubble: <_>::default(),
       window,
     };
 
     PointerEvent {
-      position: global_pos,
+      position,
       global_pos,
       // todo: how to generate pointer id ?
       id: PointerId(0),

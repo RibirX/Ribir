@@ -12,7 +12,7 @@ pub mod prelude {
   pub use crate::render::*;
   pub use crate::widget;
   pub use crate::widget::{build_ctx::BuildCtx, widget_tree::WidgetId, *};
-  pub use canvas::{DevicePoint, DeviceRect, DeviceSize, Point, Rect, Size};
+  pub use canvas::{DevicePoint, DeviceRect, DeviceSize, Point, Rect, Size, Transform};
 }
 
 #[cfg(test)]
