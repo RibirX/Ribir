@@ -292,7 +292,7 @@ impl WidgetId {
 
     let other_path = other.ancestors(tree).collect::<Vec<_>>();
     let self_path = self.ancestors(tree).collect::<Vec<_>>();
-    
+
     let min_len = other_path.len().min(self_path.len());
     (1..=min_len)
       .find(|idx| other_path[other_path.len() - idx] != self_path[self_path.len() - idx])

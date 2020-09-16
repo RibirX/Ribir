@@ -239,7 +239,7 @@ mod tests {
 
     let mut local_pool = LocalPool::new();
     let device_id = unsafe { DeviceId::dummy() };
-    observable::interval(Duration::from_millis(50), local_pool.spawner())
+    observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(8)
       .subscribe(move |i| {
         wnd.processes_native_event(WindowEvent::MouseInput {
@@ -284,7 +284,7 @@ mod tests {
 
     let mut local_pool = LocalPool::new();
     let device_id = unsafe { DeviceId::dummy() };
-    observable::interval(Duration::from_millis(20), local_pool.spawner())
+    observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(12)
       .subscribe(move |i| {
         wnd.processes_native_event(WindowEvent::MouseInput {
