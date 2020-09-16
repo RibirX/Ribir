@@ -47,8 +47,8 @@ impl KeyboardListener {
     event_type: KeyboardEventType,
     mut handler: H,
   ) -> BoxWidget {
-    let mut keyboard = Self::from_widget(base);
-    Widget::dynamic_cast_ref::<Self>(&mut keyboard)
+    let keyboard = Self::from_widget(base);
+    Widget::dynamic_cast_ref::<Self>(&keyboard)
       .unwrap()
       .event_observable()
       .filter(move |(t, _)| *t == event_type)
