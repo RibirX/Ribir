@@ -172,13 +172,7 @@ impl FocusManager {
   }
 
   fn focus_event(wid: WidgetId, dispatcher: &CommonDispatcher) -> FocusEvent {
-    FocusEvent {
-      target: wid,
-      current_target: wid,
-      modifiers: dispatcher.modifiers,
-      cancel_bubble: <_>::default(),
-      window: dispatcher.window.clone(),
-    }
+    FocusEvent::new(dispatcher.modifiers, wid, dispatcher.window.clone())
   }
 
   fn create_emitter(event_type: FocusEventType) -> impl FnMut(&Focus, Rc<EventCommon>) {

@@ -16,13 +16,7 @@ impl PointerEvent {
     btn: MouseButtons,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
   ) -> Self {
-    let event = EventCommon {
-      modifiers,
-      target,
-      current_target: target,
-      cancel_bubble: <_>::default(),
-      window,
-    };
+    let event = EventCommon::new(modifiers, target, window);
 
     PointerEvent {
       position,

@@ -67,9 +67,9 @@ impl CommonDispatcher {
     event: Event,
     // Calling before dispatch event to the target widget, give an chance to update event data.
     mut update_event: EventDataUpdate,
-  ) {
+  ) -> Event {
     let tree = self.widget_tree_ref();
-    let _ = wid
+    let res = wid
       .ancestors(tree)
       .filter_map(|wid| wid.dynamic_cast_ref(tree).map(|widget| (wid, widget)))
       .try_fold(event, |mut event, (wid, widget)| {
@@ -78,6 +78,11 @@ impl CommonDispatcher {
         event = Self::rc_dispatch(widget, event, &mut handler);
         Self::ok_bubble(event)
       });
+
+    match res {
+      Ok(event) => event,
+      Err(event) => event,
+    }
   }
 
   pub fn ok_bubble<Event: AsRef<EventCommon>>(e: Event) -> Result<Event, Event> {

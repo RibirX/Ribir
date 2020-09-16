@@ -12,6 +12,8 @@ use std::{cell::RefCell, rc::Rc};
 pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 pub mod focus;
 pub use focus::*;
+pub mod keyboard;
+pub use keyboard::*;
 
 /// Event itself contains the properties and methods which are common to all
 /// events
@@ -27,6 +29,9 @@ pub trait Event {
   fn current_target(&self) -> &WidgetId;
   /// Prevent event bubbling to parent.
   fn stop_bubbling(&self);
+  /// Tells the user agent that if the event does not get explicitly handled,
+  /// its default action should not be taken as it normally would be.
+  fn prevent_default(&self);
   /// Represents the current state of the keyboard modifiers
   fn modifiers(&self) -> ModifiersState;
 }
@@ -37,6 +42,7 @@ pub struct EventCommon {
   pub current_target: WidgetId,
   pub modifiers: ModifiersState,
   pub cancel_bubble: Cell<bool>,
+  pub prevent_default: Cell<bool>,
   pub window: Rc<RefCell<Box<dyn RawWindow>>>,
 }
 
@@ -47,6 +53,8 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   fn current_target(&self) -> &WidgetId { &self.as_ref().target }
   #[inline]
   fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(true) }
+  #[inline]
+  fn prevent_default(&self) { self.as_ref().prevent_default.set(true) }
   #[inline]
   fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
 }
@@ -70,4 +78,21 @@ impl std::convert::AsMut<EventCommon> for EventCommon {
 impl std::convert::AsRef<EventCommon> for EventCommon {
   #[inline]
   fn as_ref(&self) -> &EventCommon { self }
+}
+
+impl EventCommon {
+  pub fn new(
+    modifiers: ModifiersState,
+    target: WidgetId,
+    window: Rc<RefCell<Box<dyn RawWindow>>>,
+  ) -> Self {
+    Self {
+      modifiers,
+      target,
+      current_target: target,
+      cancel_bubble: <_>::default(),
+      prevent_default: <_>::default(),
+      window,
+    }
+  }
 }

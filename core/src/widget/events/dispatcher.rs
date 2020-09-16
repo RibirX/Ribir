@@ -5,9 +5,10 @@ mod pointer;
 pub(crate) use pointer::PointerDispatcher;
 mod common;
 pub(crate) use common::CommonDispatcher;
+use rxrust::prelude::*;
 use std::{cell::RefCell, ptr::NonNull, rc::Rc};
 pub use window::RawWindow;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, WindowEvent};
 
 pub(crate) struct Dispatcher {
   pub(crate) common: CommonDispatcher,
@@ -51,7 +52,51 @@ impl Dispatcher {
           &mut self.focus_mgr,
         );
       }
+      WindowEvent::KeyboardInput { input, .. } => {
+        self.dispatch_keyboard_input(input);
+      }
       _ => log::info!("not processed event {:?}", event),
+    }
+  }
+
+  pub fn dispatch_keyboard_input(&mut self, input: winit::event::KeyboardInput) {
+    if let Some(key) = input.virtual_keycode {
+      let prevented = if let Some(focus) = self.focus_mgr.focusing() {
+        let event = KeyboardEvent {
+          key,
+          scan_code: input.scancode,
+          common: EventCommon::new(self.common.modifiers, focus, self.common.window.clone()),
+        };
+        let event_type = match input.state {
+          ElementState::Pressed => KeyboardEventType::KeyDown,
+          ElementState::Released => KeyboardEventType::KeyUp,
+        };
+        let event = self.common.bubble_dispatch(
+          focus,
+          |keyboard: &KeyboardListener, event| {
+            log::info!("{:?}: {:?}", event_type, event);
+            keyboard.event_observable().next((event_type, event))
+          },
+          event,
+          |_| {},
+        );
+        event.common.prevent_default.get()
+      } else {
+        false
+      };
+      if !prevented {
+        self.shortcut_process(key);
+      }
+    }
+  }
+
+  pub fn shortcut_process(&mut self, key: VirtualKeyCode) {
+    if key == VirtualKeyCode::Tab {
+      if self.common.modifiers.contains(ModifiersState::SHIFT) {
+        self.focus_mgr.prev_focus_widget(&self.common);
+      } else {
+        self.focus_mgr.next_focus_widget(&self.common);
+      }
     }
   }
 }
