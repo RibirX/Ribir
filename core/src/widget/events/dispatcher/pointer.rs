@@ -104,7 +104,7 @@ impl PointerDispatcher {
       Self::event_emitter(event_type),
       event,
       Self::event_position_updater(wid, common),
-    )
+    );
   }
 
   fn pointer_enter_leave_dispatch(&mut self, common: &CommonDispatcher) {

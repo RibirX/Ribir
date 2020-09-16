@@ -233,6 +233,26 @@ pub trait Widget: Debug + Any {
   {
     Focus::listen_on(self.box_it(), FocusEventType::FocusOut, handler)
   }
+
+  /// Specify the event handler when keyboard press down.
+  #[inline]
+  fn on_key_down<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&KeyboardEvent) + 'static,
+  {
+    KeyboardListener::listen_on(self.box_it(), KeyboardEventType::KeyDown, handler)
+  }
+
+  /// Specify the event handler when a key is released.
+  #[inline]
+  fn on_key_up<F>(self, handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&KeyboardEvent) + 'static,
+  {
+    KeyboardListener::listen_on(self.box_it(), KeyboardEventType::KeyUp, handler)
+  }
 }
 
 /// A widget represented by other widget compose.
