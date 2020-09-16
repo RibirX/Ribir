@@ -284,6 +284,7 @@ impl WidgetId {
   /// detect if the widget of this id point to is dropped.
   pub fn is_dropped(self, tree: &WidgetTree) -> bool { self.0.is_removed(&tree.arena) }
 
+  #[allow(clippy::needless_collect)]
   pub fn common_ancestor_of(self, other: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
     if self.is_dropped(tree) || other.is_dropped(tree) {
       return None;
@@ -291,7 +292,7 @@ impl WidgetId {
 
     let other_path = other.ancestors(tree).collect::<Vec<_>>();
     let self_path = self.ancestors(tree).collect::<Vec<_>>();
-
+    
     let min_len = other_path.len().min(self_path.len());
     (1..=min_len)
       .find(|idx| other_path[other_path.len() - idx] != self_path[self_path.len() - idx])
