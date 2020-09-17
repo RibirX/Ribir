@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 /// Focus widget
 #[derive(Debug)]
-pub struct Focus {
+pub struct FocusListener {
   pub widget: BoxWidget,
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -57,9 +57,9 @@ pub enum FocusEventType {
   FocusOut,
 }
 
-inherit_widget!(Focus, widget);
+inherit_widget!(FocusListener, widget);
 
-impl Focus {
+impl FocusListener {
   pub fn from_widget(
     widget: BoxWidget,
     auto_focus: Option<bool>,

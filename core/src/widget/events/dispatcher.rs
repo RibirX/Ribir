@@ -55,6 +55,9 @@ impl Dispatcher {
       WindowEvent::KeyboardInput { input, .. } => {
         self.dispatch_keyboard_input(input);
       }
+      WindowEvent::ReceivedCharacter(c) => {
+        self.dispatch_received_char(c);
+      }
       _ => log::info!("not processed event {:?}", event),
     }
   }
@@ -87,6 +90,24 @@ impl Dispatcher {
       if !prevented {
         self.shortcut_process(key);
       }
+    }
+  }
+
+  pub fn dispatch_received_char(&mut self, c: char) {
+    if let Some(focus) = self.focus_mgr.focusing() {
+      let event = CharEvent {
+        char: c,
+        common: EventCommon::new(self.common.modifiers, focus, self.common.window.clone()),
+      };
+      self.common.bubble_dispatch(
+        focus,
+        |listener: &CharListener, event| {
+          log::info!("char event: {:?}", event);
+          listener.event_observable().next(event);
+        },
+        event,
+        |_| {},
+      );
     }
   }
 

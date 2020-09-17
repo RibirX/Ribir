@@ -91,7 +91,7 @@ pub trait Widget: Debug + Any {
   where
     Self: Sized,
   {
-    Focus::from_widget(self.box_it(), Some(auto_focus), None)
+    FocusListener::from_widget(self.box_it(), Some(auto_focus), None)
   }
 
   /// Assign where the widget participates in sequential keyboard navigation.
@@ -101,7 +101,7 @@ pub trait Widget: Debug + Any {
   where
     Self: Sized,
   {
-    Focus::from_widget(self.box_it(), None, Some(tab_index))
+    FocusListener::from_widget(self.box_it(), None, Some(tab_index))
   }
 
   /// Used to specify the event handler for the pointer down event, which is
@@ -198,7 +198,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    Focus::listen_on(self.box_it(), FocusEventType::Focus, handler)
+    FocusListener::listen_on(self.box_it(), FocusEventType::Focus, handler)
   }
 
   /// Specify the event handler to process blur event. The blur event is raised
@@ -209,7 +209,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    Focus::listen_on(self.box_it(), FocusEventType::Blur, handler)
+    FocusListener::listen_on(self.box_it(), FocusEventType::Blur, handler)
   }
 
   /// Specify the event handler to process focusin event.  The main difference
@@ -220,7 +220,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    Focus::listen_on(self.box_it(), FocusEventType::FocusIn, handler)
+    FocusListener::listen_on(self.box_it(), FocusEventType::FocusIn, handler)
   }
 
   /// Specify the event handler to process focusout event. The main difference
@@ -231,7 +231,7 @@ pub trait Widget: Debug + Any {
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    Focus::listen_on(self.box_it(), FocusEventType::FocusOut, handler)
+    FocusListener::listen_on(self.box_it(), FocusEventType::FocusOut, handler)
   }
 
   /// Specify the event handler when keyboard press down.
@@ -252,6 +252,21 @@ pub trait Widget: Debug + Any {
     F: FnMut(&KeyboardEvent) + 'static,
   {
     KeyboardListener::listen_on(self.box_it(), KeyboardEventType::KeyUp, handler)
+  }
+
+  /// Specify the event handler when received a unicode character.
+  #[inline]
+  fn on_char<F>(self, mut handler: F) -> BoxWidget
+  where
+    Self: Sized,
+    F: FnMut(&CharEvent) + 'static,
+  {
+    let widget = CharListener::from_widget(self.box_it());
+    Widget::dynamic_cast_ref::<CharListener>(&widget)
+      .unwrap()
+      .event_observable()
+      .subscribe(move |char_event| handler(&*char_event));
+    widget
   }
 }
 
