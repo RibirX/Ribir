@@ -1,4 +1,4 @@
-use super::{focus::Focus, CommonDispatcher, FocusManager};
+use super::{CommonDispatcher, FocusListener, FocusManager};
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use winit::event::{DeviceId, ElementState, MouseButton};
@@ -79,7 +79,7 @@ impl PointerDispatcher {
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid
         .ancestors(tree)
-        .find(|id| id.dynamic_cast_ref::<Focus>(tree).is_some())
+        .find(|id| id.dynamic_cast_ref::<FocusListener>(tree).is_some())
     });
     if let Some(focus_id) = nearest_focus {
       focus_mgr.focus(focus_id, common);

@@ -78,7 +78,7 @@ impl FocusManager {
   pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
-        id.dynamic_cast_ref::<Focus>(tree)
+        id.dynamic_cast_ref::<FocusListener>(tree)
           .map_or(false, |focus| focus.auto_focus)
       })
     })
@@ -92,7 +92,7 @@ impl FocusManager {
       root
         .descendants(tree)
         .filter_map(|id| {
-          id.dynamic_cast_ref::<Focus>(tree).map(|focus| FocusNode {
+          id.dynamic_cast_ref::<FocusListener>(tree).map(|focus| FocusNode {
             tab_index: focus.tab_index,
             wid: id,
           })
@@ -175,8 +175,8 @@ impl FocusManager {
     FocusEvent::new(dispatcher.modifiers, wid, dispatcher.window.clone())
   }
 
-  fn create_emitter(event_type: FocusEventType) -> impl FnMut(&Focus, Rc<EventCommon>) {
-    move |focus: &Focus, event: Rc<FocusEvent>| {
+  fn create_emitter(event_type: FocusEventType) -> impl FnMut(&FocusListener, Rc<EventCommon>) {
+    move |focus: &FocusListener, event: Rc<FocusEvent>| {
       log::info!("{:?} {:?}", event_type, event);
       focus.focus_event_observable().next((event_type, event));
     }

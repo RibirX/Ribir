@@ -5,15 +5,17 @@
 use crate::widget::widget_tree::WidgetId;
 use std::cell::Cell;
 pub(crate) mod dispatcher;
-pub mod pointers;
+mod pointers;
 use crate::widget::window::RawWindow;
 pub use pointers::*;
 use std::{cell::RefCell, rc::Rc};
 pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
-pub mod focus;
+mod focus;
 pub use focus::*;
-pub mod keyboard;
+mod keyboard;
 pub use keyboard::*;
+mod character;
+pub use character::*;
 
 /// Event itself contains the properties and methods which are common to all
 /// events
