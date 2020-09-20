@@ -92,10 +92,11 @@ impl FocusManager {
       root
         .descendants(tree)
         .filter_map(|id| {
-          id.dynamic_cast_ref::<FocusListener>(tree).map(|focus| FocusNode {
-            tab_index: focus.tab_index,
-            wid: id,
-          })
+          id.dynamic_cast_ref::<FocusListener>(tree)
+            .map(|focus| FocusNode {
+              tab_index: focus.tab_index,
+              wid: id,
+            })
         })
         .for_each(|node| match node.tab_index {
           0 => zeros.push(node),

@@ -26,6 +26,10 @@ mod cursor;
 pub use cursor::Cursor;
 use rxrust::prelude::*;
 pub use winit::window::CursorIcon;
+mod margin;
+pub use margin::*;
+mod padding;
+pub use padding::*;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -102,6 +106,30 @@ pub trait Widget: Debug + Any {
     Self: Sized,
   {
     FocusListener::from_widget(self.box_it(), None, Some(tab_index))
+  }
+
+  /// Insets the child of a widget by the given padding.
+  #[inline]
+  fn padding(self, edges: EdgeInsets) -> Padding
+  where
+    Self: Sized,
+  {
+    Padding {
+      padding: edges,
+      child: self.box_it(),
+    }
+  }
+
+  // Create space around the widget
+  #[inline]
+  fn margin(self, edges: EdgeInsets) -> Margin
+  where
+    Self: Sized,
+  {
+    Margin {
+      margin: edges,
+      child: self.box_it(),
+    }
   }
 
   /// Used to specify the event handler for the pointer down event, which is
