@@ -79,6 +79,17 @@ impl<'a> RenderCtx<'a> {
       .origin = pos;
   }
 
+  /// Update the size of the render object should place. Use this method to
+  /// directly change the size of a render object, in most cast you needn't call
+  /// this method, use  clamp to limit the child size is enough. Use this method
+  /// only it you know what you are doing.
+  pub fn update_size(&mut self, size: Size) {
+    self
+      .render_obj
+      .layout_box_rect_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
+      .size = size;
+  }
+
   /// Return the boxed rect of the RenderObject already placed.
   pub fn box_rect(&self) -> Option<Rect> { self.render_obj.layout_box_rect(&*self.tree) }
 
