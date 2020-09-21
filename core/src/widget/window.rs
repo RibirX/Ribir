@@ -92,7 +92,16 @@ impl<R: CanvasRender> Window<R> {
   /// processes native events from this native window
   #[inline]
   pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
-    self.dispatcher.dispatch(event);
+    match event {
+      WindowEvent::Resized(size) => {
+        self.resize(DeviceSize::new(size.width, size.height));
+      }
+      WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+        self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
+        todo!("support sync dpi change to canvas")
+      }
+      event => self.dispatcher.dispatch(event),
+    };
     self.raw_window.borrow_mut().submit_cursor();
   }
 
@@ -185,6 +194,15 @@ impl<R: CanvasRender> Window<R> {
     wnd
   }
 
+  fn resize(&mut self, size: DeviceSize) {
+    let r_tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
+    if let Some(root) = r_tree.root() {
+      root.mark_needs_layout(r_tree);
+    }
+    self.render.resize(size);
+    self.raw_window.borrow().request_redraw();
+  }
+
   #[cfg(test)]
   pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
 
@@ -250,6 +268,8 @@ impl CanvasRender for MockRender {
     _: &mut canvas::MemTexture<u32>,
   ) {
   }
+
+  fn resize(&mut self, _: DeviceSize) {}
 }
 
 impl RawWindow for MockRawWindow {
@@ -283,7 +303,7 @@ impl HeadlessWindow {
 impl NoRenderWindow {
   pub fn without_render<W: Widget>(root: W, size: Size) -> Self {
     // todo: should set the global transform of canvas by window's scale factor.
-    let canvas = Canvas::new(DeviceSize::new(size.width as u32, size.height as u32));
+    let canvas = Canvas::new(None);
     let render = MockRender;
     Self::new(
       root.box_it(),
