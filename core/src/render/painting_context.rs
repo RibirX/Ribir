@@ -1,4 +1,5 @@
 use super::{render_tree::*, RenderObjectSafety};
+use crate::prelude::*;
 use canvas::Rendering2DLayer;
 
 pub type Painter2D<'a> = Rendering2DLayer<'a>;
@@ -11,11 +12,15 @@ pub struct PaintingContext<'a> {
 
 impl<'a> PaintingContext<'a> {
   #[inline]
-  pub(crate) fn new(tree: &'a RenderTree) -> Option<Self> {
-    tree.root().map(|root| Self {
-      layer_2d: Rendering2DLayer::new(),
-      current_node: root,
-      tree,
+  pub(crate) fn new(tree: &'a RenderTree, transform: Transform) -> Option<Self> {
+    tree.root().map(|root| {
+      let mut layer_2d = Rendering2DLayer::new();
+      layer_2d.set_transform(transform);
+      Self {
+        layer_2d,
+        current_node: root,
+        tree,
+      }
     })
   }
 
@@ -43,7 +48,7 @@ impl<'a> PaintingContext<'a> {
           let mut matrix = self
             .layer_2d
             .get_transform()
-            .then_translate(offset.to_vector());
+            .pre_translate(offset.to_vector());
 
           if let Some(t) = id.get(&self.tree).and_then(RenderObjectSafety::transform) {
             matrix = matrix.then(&t);
