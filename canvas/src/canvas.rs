@@ -25,7 +25,7 @@ pub struct Frame<'a, R: CanvasRender> {
 }
 
 pub struct CanvasOptions {
-  pub size: DeviceSize,
+  // pub size: DeviceSize,
   pub texture_max_size: DeviceSize,
   pub texture_init_size: DeviceSize,
 }
@@ -49,11 +49,13 @@ pub trait CanvasRender {
     glyph_texture: &mut MemTexture<u8>,
     atlas_texture: &mut MemTexture<u32>,
   );
+
+  fn resize(&mut self, size: DeviceSize);
 }
 
 impl Canvas {
-  pub fn new(size: DeviceSize) -> Self {
-    let options = CanvasOptions::new(size);
+  pub fn new(options: Option<CanvasOptions>) -> Self {
+    let options = options.unwrap_or_else(Default::default);
     let CanvasOptions {
       texture_init_size: init_size,
       texture_max_size: max_size,
@@ -370,16 +372,15 @@ impl RenderData {
   }
 }
 
-impl CanvasOptions {
-  #[inline]
-  fn new(size: DeviceSize) -> Self {
+impl Default for CanvasOptions {
+  fn default() -> Self {
     Self {
-      size,
       texture_init_size: DeviceSize::new(1024, 1024),
       texture_max_size: DeviceSize::new(4096, 4096),
     }
   }
 }
+
 fn section_with_layout_bounds(
   mut sec: Section,
   bounds: Option<Rect>,

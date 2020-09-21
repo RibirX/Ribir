@@ -34,6 +34,7 @@ pub struct WgpuRender<S: Surface = PhysicSurface> {
   sampler: wgpu::Sampler,
   glyph: wgpu::Texture,
   atlas: wgpu::Texture,
+  resized: bool,
 }
 
 impl WgpuRender<PhysicSurface> {
@@ -149,7 +150,8 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     Self::sync_texture(device, glyph, mem_glyph, TF::R8Unorm, &mut encoder);
     Self::sync_texture(device, atlas, mem_atlas, TF::Bgra8UnormSrgb, &mut encoder);
 
-    if texture_resized {
+    if self.resized || texture_resized {
+      self.resized = false;
       let size = surface.size();
       self.uniforms = create_uniforms(
         device,
@@ -198,6 +200,14 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     }
 
     queue.submit(Some(encoder.finish()));
+  }
+
+  #[inline]
+  fn resize(&mut self, size: DeviceSize) {
+    self
+      .surface
+      .resize(&self.device, &self.queue, size.width, size.height);
+    self.resized = true;
   }
 }
 
@@ -282,6 +292,7 @@ impl<S: Surface> WgpuRender<S> {
       glyph: glyph_texture,
       atlas: texture_atlas,
       rgba_converter: None,
+      resized: false,
     }
   }
 

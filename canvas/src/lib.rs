@@ -40,7 +40,7 @@ pub async fn create_canvas_with_render_from_wnd<W: raw_window_handle::HasRawWind
   window: &W,
   size: DeviceSize,
 ) -> (Canvas, WgpuRender) {
-  let mut canvas = Canvas::new(size);
+  let mut canvas = Canvas::new(None);
   let render = WgpuRender::wnd_render(
     window,
     size,
@@ -55,7 +55,7 @@ pub async fn create_canvas_with_render_from_wnd<W: raw_window_handle::HasRawWind
 pub async fn create_canvas_with_render_headless(
   size: DeviceSize,
 ) -> (Canvas, WgpuRender<surface::TextureSurface>) {
-  let mut canvas = Canvas::new(size);
+  let mut canvas = Canvas::new(None);
   let render = WgpuRender::headless_render(
     size,
     canvas.text_brush().texture().size(),

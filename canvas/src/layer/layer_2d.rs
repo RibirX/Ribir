@@ -629,6 +629,7 @@ mod test {
 
   impl CanvasRender for MockRender {
     fn draw(&mut self, _: &RenderData, _: &mut MemTexture<u8>, _: &mut MemTexture<u32>) {}
+    fn resize(&mut self, _: DeviceSize) {}
   }
 
   #[test]
@@ -656,7 +657,7 @@ mod test {
   #[test]
   fn buffer() {
     let mut layer = Rendering2DLayer::new();
-    let mut canvas = Canvas::new(DeviceSize::new(400, 400));
+    let mut canvas = Canvas::new(None);
     let mut builder = Path::builder();
     builder.add_rectangle(
       &euclid::Rect::from_size((100., 100.).into()),
@@ -680,7 +681,7 @@ mod test {
   fn path_merge() {
     let mut layer = Rendering2DLayer::new();
 
-    let mut canvas = Canvas::new(DeviceSize::new(400, 400));
+    let mut canvas = Canvas::new(None);
     let mut tessellator = tessellator_2d::Tessellator::new();
     let mut mock_render = MockRender {};
 

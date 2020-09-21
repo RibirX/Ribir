@@ -399,7 +399,7 @@ mod tests {
     parent.mark_needs_layout(&mut tree);
     grand_parent.mark_needs_layout(&mut tree);
     son.mark_needs_layout(&mut tree);
-    let mut canvas = Box::pin(Canvas::new(DeviceSize::new(0, 0)));
+    let mut canvas = Box::pin(Canvas::new(None));
     tree.layout(Size::zero(), canvas.as_mut());
 
     assert_eq!(&*records.lock().unwrap(), &[grand_parent, parent, son]);
