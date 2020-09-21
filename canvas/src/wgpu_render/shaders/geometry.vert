@@ -43,7 +43,7 @@ void main() {
     Transform2d t = prim.transform;
     mat3x2 transform = mat3x2(t.r1, t.r2, t.r3);
 
-    vec2 canvas_coord = mat3x2(t.r1, t.r2, t.r3) * vec3(pos, 1);
+    vec2 canvas_coord = transform * vec3(pos, 1);
     vec2 pos2d = mat3x2(r1, r2, r3) * vec3(canvas_coord, 1);
     gl_Position = vec4(pos2d, 0, 1.0);
 

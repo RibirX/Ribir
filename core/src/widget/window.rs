@@ -96,8 +96,15 @@ impl<R: CanvasRender> Window<R> {
       WindowEvent::Resized(size) => {
         self.resize(DeviceSize::new(size.width, size.height));
       }
-      WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+      WindowEvent::ScaleFactorChanged {
+        new_inner_size,
+        scale_factor,
+      } => {
         self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
+        let factor = scale_factor as f32;
+        self
+          .canvas
+          .set_default_transform(Transform::new(factor, 0., 0., factor, 0., 0.));
         todo!("support sync dpi change to canvas")
       }
       event => self.dispatcher.dispatch(event),
@@ -123,8 +130,9 @@ impl<R: CanvasRender> Window<R> {
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    if let Some(ctx) = PaintingContext::new(&self.render_tree) {
-      let layer = ctx.draw();
+    if let Some(layer) =
+      PaintingContext::new(&self.render_tree, self.canvas.default_transform()).map(|ctx| ctx.draw())
+    {
       let mut frame = self.canvas.next_frame(&mut self.render);
       frame.compose_2d_layer(layer);
     }
@@ -227,10 +235,13 @@ impl Window {
   pub(crate) fn from_event_loop(root: BoxWidget, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
-    let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
-      &native_window,
-      DeviceSize::new(size.width, size.height),
-    ));
+    let (mut canvas, render) =
+      futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
+        &native_window,
+        DeviceSize::new(size.width, size.height),
+      ));
+    let factor = native_window.scale_factor() as f32;
+    canvas.set_default_transform(Transform::new(factor, 0., 0., factor, 0., 0.));
 
     Self::new(
       root,
