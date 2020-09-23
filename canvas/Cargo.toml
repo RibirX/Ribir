@@ -14,10 +14,10 @@ euclid = "0.22.0"
 png = "0.16.7"
 guillotiere = "0.6.0"
 zerocopy = "0.3"
-glyph_brush = { git="https://github.com/alexheretic/glyph-brush.git", path="glyph-brush",  version="*"}
+glyph_brush = "0.7.0"
 log = "0.4.8"
 backtrace = "0.3"
-font-kit= "0.7.1"
+font-kit= "0.10.0"
 
 [target.'cfg(debug_assertions)'.dependencies]
 futures="0.3.5"

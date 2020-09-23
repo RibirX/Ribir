@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 herald =  "0.1.0"
-indextree= {git = "https://github.com/M-Adoo/indextree.git"}
+indextree= "4.3.1"
 rxrust = "0.9.1"
 bitflags = "1.2.1"
 winit = "0.22.2"

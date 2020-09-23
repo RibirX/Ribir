@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
@@ -32,7 +32,7 @@ jobs:
         os: [macos-latest, ubuntu-latest]
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
@@ -70,7 +70,7 @@ jobs:
   clippy_check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: nightly
@@ -80,3 +80,33 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-targets --all-features -- -D warnings 
+  codecov:
+      name: code coverage analysis
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v2
+
+        - name: Install nightly toolchain
+          uses: actions-rs/toolchain@v1
+          with:
+            toolchain: nightly
+            override: true
+
+        - name: Run cargo-tarpaulin
+          uses: actions-rs/tarpaulin@v0.1
+          with:
+            version: '0.9.0'
+            args: '-- --test-threads 1'
+
+        - name: Upload to codecov.io
+          uses: codecov/codecov-action@v1.0.2
+          with:
+            token: ${{secrets.CODECOV_TOKEN}}
+            fail_ci_if_error: true
+
+        - name: Archive code coverage results
+          uses: actions/upload-artifact@v1
+          with:
+            name: code-coverage-report
+            path: cobertura.xml
