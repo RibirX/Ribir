@@ -1,4 +1,4 @@
-use super::{painting_context::PaintingContext, render_tree::*};
+use super::{render_tree::*, PaintingContext};
 use crate::{
   prelude::*,
   widget::{events::dispatcher::Dispatcher, widget_tree::*},
@@ -221,6 +221,9 @@ impl<R: CanvasRender> Window<R> {
   pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
 
   #[cfg(test)]
+  pub fn render(&mut self) -> &mut R { &mut self.render }
+
+  #[cfg(test)]
   pub fn new_build_ctx(&mut self, wid: WidgetId) -> BuildCtx {
     BuildCtx::new(self.widget_tree(), wid)
   }
@@ -302,7 +305,7 @@ impl HeadlessWindow {
     Self::new(
       root,
       MockRawWindow {
-        size: Size::new(800., 600.),
+        size: Size::from_untyped(size.to_f32().to_untyped()),
         ..Default::default()
       },
       canvas,

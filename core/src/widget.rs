@@ -1,4 +1,4 @@
-use crate::render::*;
+use crate::{prelude::*, render::*};
 use std::{
   any::{Any, TypeId},
   fmt::Debug,
@@ -30,6 +30,8 @@ mod margin;
 pub use margin::*;
 mod padding;
 pub use padding::*;
+mod box_decoration;
+pub use box_decoration::*;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -110,7 +112,7 @@ pub trait Widget: Debug + Any {
 
   /// Insets the child of a widget by the given padding.
   #[inline]
-  fn padding(self, edges: EdgeInsets) -> Padding
+  fn with_padding(self, edges: EdgeInsets) -> Padding
   where
     Self: Sized,
   {
@@ -120,15 +122,60 @@ pub trait Widget: Debug + Any {
     }
   }
 
-  // Create space around the widget
+  /// Create space around the widget
   #[inline]
-  fn margin(self, edges: EdgeInsets) -> Margin
+  fn with_margin(self, edges: EdgeInsets) -> Margin
   where
     Self: Sized,
   {
     Margin {
       margin: edges,
       child: self.box_it(),
+    }
+  }
+
+  /// Sets the background of the widget.
+  fn with_background(mut self, background: FillStyle) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    if let Some(box_decoration) = Widget::dynamic_cast_mut::<BoxDecoration>(&mut self) {
+      box_decoration.background = Some(background);
+      self.box_it()
+    } else {
+      BoxDecoration::new(self.box_it())
+        .with_background(background)
+        .box_it()
+    }
+  }
+
+  /// Set the border of the widget
+  fn with_border(mut self, border: Border) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    if let Some(box_decoration) = Widget::dynamic_cast_mut::<BoxDecoration>(&mut self) {
+      box_decoration.border = Some(border);
+      self.box_it()
+    } else {
+      BoxDecoration::new(self.box_it())
+        .width_border(border)
+        .box_it()
+    }
+  }
+
+  /// Set the radius of the widget.
+  fn with_border_radius(mut self, radius: BorderRadius) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    if let Some(box_decoration) = Widget::dynamic_cast_mut::<BoxDecoration>(&mut self) {
+      box_decoration.radius = Some(radius);
+      self.box_it()
+    } else {
+      BoxDecoration::new(self.box_it())
+        .with_border_radius(radius)
+        .box_it()
     }
   }
 

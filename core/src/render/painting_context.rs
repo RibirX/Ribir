@@ -27,6 +27,23 @@ impl<'a> PaintingContext<'a> {
   /// Return the 2d painter to draw 2d things.
   pub fn painter(&mut self) -> &mut Painter2D<'a> { &mut self.layer_2d }
 
+  /// Return the size of the render object occupied after perform layout.
+  pub fn self_size(&self) -> Option<Size> {
+    self
+      .current_node
+      .layout_box_rect(self.tree)
+      .map(|rect| rect.size)
+  }
+
+  /// Return an iterator of children's box rect relative to this widget.
+  pub fn children_rect<'l>(&'l self) -> impl Iterator<Item = Rect> + 'l {
+    self.current_node.children(self.tree).map(move |rid| {
+      rid
+        .layout_box_rect(self.tree)
+        .expect("children must already layout when paint.")
+    })
+  }
+
   pub(crate) fn draw(mut self) -> Rendering2DLayer<'a> {
     self
       .current_node
