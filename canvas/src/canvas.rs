@@ -1,18 +1,14 @@
 use super::{
   atlas::TextureAtlas,
-  layer_2d::Text,
   mem_texture::MemTexture,
   tessellator_2d::Tessellator,
   text_brush::{Section, TextBrush},
   Command, CommandInfo, DeviceRect, DeviceSize, FillStyle, HorizontalAlign, Point, Rect,
-  Rendering2DLayer, Size, TextLayout, Transform, VerticalAlign,
+  Rendering2DLayer, Size, Text, TextLayout, Transform, VerticalAlign,
 };
 
+use lyon::path::Path;
 use lyon::tessellation::VertexBuffers;
-pub use lyon::{
-  path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
-  tessellation::*,
-};
 
 use zerocopy::AsBytes;
 
@@ -199,11 +195,11 @@ impl Canvas {
             stroke_width,
           } => {
             let style_rect = self.store_style_in_atlas(&style, render);
-            let align_bounds = path_bounds_to_align_texture(&style, &path);
+            let align_bounds = path_bounds_to_align_texture(&style, &path.0);
             self.add_primitive(style_rect, align_bounds, transform);
             let prim_id = self.render_data.primitives.len() as u32 - 1;
             let vertices_buffer = &mut self.render_data.vertices_buffer;
-            tessellator.tessellate(vertices_buffer, path, stroke_width, &transform, prim_id);
+            tessellator.tessellate(vertices_buffer, path.0, stroke_width, &transform, prim_id);
           }
           CommandInfo::SimpleText {
             text,
@@ -463,18 +459,18 @@ fn section_bounds_to_align_texture(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::Color;
+  use crate::*;
 
   #[test]
   fn bounding_align() {
-    let mut path = Path::builder();
-    path.add_rectangle(&lyon::geom::rect(100., 100., 50., 50.), Winding::Positive);
+    let mut path = PathBuilder::new();
+    path.rect(&Rect::new(Point::new(100., 100.), Size::new(50., 50.)));
     let path = path.build();
 
-    let rect = path_bounds_to_align_texture(&Color::BLACK.into(), &path);
+    let rect = path_bounds_to_align_texture(&Color::BLACK.into(), &path.0);
     assert_eq!(rect, Rect::from_size(Size::new(1., 1.)));
 
-    let rect = path_bounds_to_align_texture(&FillStyle::Image, &path);
+    let rect = path_bounds_to_align_texture(&FillStyle::Image, &path.0);
     assert_eq!(rect.min(), Point::new(100., 100.));
     assert_eq!(rect.size, Size::new(50., 50.));
   }

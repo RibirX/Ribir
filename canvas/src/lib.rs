@@ -1,6 +1,12 @@
-#![feature(decl_macro, test, const_fn, slice_fill)]
+#![feature(
+  decl_macro,
+  test,
+  const_fn,
+  slice_fill,
+  const_fn_floating_point_arithmetic
+)]
 mod atlas;
-pub mod canvas;
+mod canvas;
 pub mod color;
 pub mod error;
 pub mod layer;

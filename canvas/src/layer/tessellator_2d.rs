@@ -1,8 +1,5 @@
 use crate::{canvas::Vertex, Transform};
-pub use lyon::{
-  path::{builder::PathBuilder, traits::PathIterator, Path, Winding},
-  tessellation::*,
-};
+use lyon::{path::Path, tessellation::*};
 
 const TOLERANCE: f32 = 0.5;
 pub struct Tessellator {

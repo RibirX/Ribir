@@ -1,14 +1,6 @@
-use crate::{
-  Angle, Color, FontProperties, FontStretch, FontStyle, FontWeight, Rect, Transform, Vector,
-  DEFAULT_FONT_FAMILY,
-};
+use crate::layer::PathBuilder;
+use crate::*;
 pub use glyph_brush::{GlyphCruncher, HorizontalAlign, Layout, VerticalAlign};
-pub use lyon::{
-  geom::Arc,
-  math::{point, rect},
-  path::{builder::PathBuilder, path::Builder, traits::PathIterator, EndpointId, Path, Winding},
-  tessellation::*,
-};
 
 use std::{
   cmp::PartialEq,
@@ -23,7 +15,7 @@ use std::{
 pub struct Rendering2DLayer<'a> {
   state_stack: Vec<State>,
   pub(crate) commands: Vec<Command<'a>>,
-  path: Option<Builder>,
+  path: Option<PathBuilder>,
 }
 
 impl<'a> Default for Rendering2DLayer<'a> {
@@ -41,124 +33,100 @@ impl<'a> Rendering2DLayer<'a> {
 
   /// Starts a new path by emptying the list of sub-paths.
   /// Call this method when you want to create a new path.
-  pub fn begin_path(&mut self, x: f32, y: f32) -> &mut Self {
-    self.path.get_or_insert_with(Builder::new);
-    self.path.as_mut().map(|b| b.begin(point(x, y)));
+  pub fn begin_path(&mut self, at: Point) -> &mut Self {
+    self.path_builder().begin_path(at);
     self
   }
 
   /// Causes the point of the pen to move back to the start of the current
   /// sub-path. It tries to draw a straight line from the current point to the
   /// start. If the shape has already been closed or has only one point, this
-  #[inline]
   pub fn close_path(&mut self) -> &mut Self {
-    if let Some(b) = self.path.as_mut() {
-      b.close()
+    if let Some(ref mut b) = self.path {
+      b.close_path()
     };
     self
   }
 
   /// Connects the last point in the current sub-path to the specified (x, y)
   /// coordinates with a straight line.
-  #[inline]
-  pub fn line_to(&mut self, x: f32, y: f32) -> &mut Self {
-    self.path.as_mut().map(|b| b.line_to(point(x, y)));
+  pub fn line_to(&mut self, to: Point) -> &mut Self {
+    self.path_builder().line_to(to);
     self
   }
 
   /// Adds a cubic Bezier curve to the current path.
-  #[inline]
-  pub fn bezier_curve_to(
-    &mut self,
-    cp1x: f32,
-    cp1y: f32,
-    cp2x: f32,
-    cp2y: f32,
-    x: f32,
-    y: f32,
-  ) -> &mut Self {
-    self
-      .path
-      .as_mut()
-      .map(|b| b.cubic_bezier_to(point(cp1x, cp1y), point(cp2x, cp2y), point(x, y)));
+  pub fn bezier_curve_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) -> &mut Self {
+    self.path_builder().bezier_curve_to(ctrl1, ctrl2, to);
+
     self
   }
 
   /// Adds a quadratic Bézier curve to the current path.
-  #[inline]
-  pub fn quadratic_curve_to(&mut self, cpx: f32, cpy: f32, x: f32, y: f32) -> &mut Self {
-    self
-      .path
-      .as_mut()
-      .map(|b| b.quadratic_bezier_to(point(cpx, cpy), point(x, y)));
+  pub fn quadratic_curve_to(&mut self, ctrl: Point, to: Point) -> &mut Self {
+    self.path_builder().quadratic_curve_to(ctrl, to);
     self
   }
 
-  /// Adds a circular arc to the current path.
-  pub fn arc(
+  /// adds a circular arc to the current sub-path, using the given control
+  /// points and radius. The arc is automatically connected to the path's latest
+  /// point with a straight line, if necessary for the specified
+  pub fn arc_to(
     &mut self,
-    x: f32,
-    y: f32,
+    center: Point,
     radius: f32,
     start_angle: Angle,
     end_angle: Angle,
   ) -> &mut Self {
-    let sweep_angle = end_angle - start_angle;
-    let arc = Arc {
-      start_angle,
-      sweep_angle,
-      radii: Vector::new(radius, radius).to_untyped(),
-      center: point(x, y),
-      x_rotation: Angle::zero(),
-    };
-    let arc_start = arc.from();
-    self.begin_path(arc_start.x, arc_start.y);
-    arc.for_each_quadratic_bezier(&mut |curve| {
-      self
-        .path
-        .as_mut()
-        .map(|b| b.quadratic_bezier_to(curve.ctrl, curve.to));
-    });
-    self.close_path();
     self
+      .path_builder()
+      .arc_to(center, radius, start_angle, end_angle);
+    self
+  }
+
+  /// The ellipse_to() method creates an elliptical arc centered at `center`
+  /// with the `radius`. The path starts at startAngle and ends at endAngle, and
+  /// travels in the direction given by anticlockwise (defaulting to
+  /// clockwise).
+  pub fn ellipse_to(
+    &mut self,
+    center: Point,
+    radius: Vector,
+    start_angle: Angle,
+    end_angle: Angle,
+  ) {
+    self
+      .path_builder()
+      .ellipse_to(center, radius, start_angle, end_angle);
   }
 
   /// Adds an elliptical arc to the current path.
-  pub fn ellipse(
-    &mut self,
-    x: f32,
-    y: f32,
-    radius_x: f32,
-    radius_y: f32,
-    rotation: f32,
-    winding: Winding,
-  ) -> &mut Self {
-    if let Some(b) = self.path.as_mut() {
-      b.add_ellipse(
-        point(x, y),
-        Vector::new(radius_x, radius_y).to_untyped(),
-        Angle::radians(rotation),
-        winding,
-      )
-    };
+  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32) -> &mut Self {
+    self.path_builder().ellipse(center, radius, rotation);
     self
   }
 
-  /// Creates a path for a rectangle at position (x, y) with a size that is
-  /// determined by width and height.
-  #[inline]
-  pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> &mut Self {
-    if let Some(b) = self.path.as_mut() {
-      b.add_rectangle(&rect(x, y, width, height), Winding::Positive);
-    };
+  /// Creates a path for a rectangle by `rect`
+  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
+    self.path_builder().rect(rect);
     self
   }
 
-  #[inline]
+  /// Creates a path for a rectangle by `rect` with `radius`.
+  pub fn rect_round(&mut self, rect: &Rect, radius: &BorderRadius) -> &mut Self {
+    self.path_builder().rect_round(rect, radius);
+    self
+  }
+
   pub fn fill(&mut self) {
-    let cmd = self.get_path().map(|p| self.command_from_path(p, false));
-    if let Some(c) = cmd {
-      self.commands.push(c)
+    if let Some(builder) = self.path.take() {
+      self.fill_path(builder.build())
+    };
+  }
+
+  pub fn stroke(&mut self) {
+    if let Some(builder) = self.path.take() {
+      self.stroke_path(builder.build())
     };
   }
 
@@ -314,7 +282,7 @@ impl<'a> Rendering2DLayer<'a> {
   }
 
   #[inline]
-  fn get_path(&mut self) -> Option<Path> { self.path.take().map(|b| b.build()) }
+  fn path_builder(&mut self) -> &mut PathBuilder { self.path.get_or_insert_with(PathBuilder::new) }
 }
 
 /// Describe render the text as single line or break as multiple lines.
@@ -622,7 +590,7 @@ impl<'a> Text<'a> {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::{mem_texture::MemTexture, Size, *};
+  use crate::{mem_texture::MemTexture, Size};
   use futures::executor::block_on;
 
   struct MockRender;
@@ -658,11 +626,8 @@ mod test {
   fn buffer() {
     let mut layer = Rendering2DLayer::new();
     let mut canvas = Canvas::new(None);
-    let mut builder = Path::builder();
-    builder.add_rectangle(
-      &euclid::Rect::from_size((100., 100.).into()),
-      Winding::Positive,
-    );
+    let mut builder = PathBuilder::new();
+    builder.rect(&euclid::Rect::from_size((100., 100.).into()));
     let path = builder.build();
     layer.stroke_path(path.clone());
     layer.fill_path(path);
@@ -685,7 +650,7 @@ mod test {
     let mut tessellator = tessellator_2d::Tessellator::new();
     let mut mock_render = MockRender {};
 
-    let sample_path = Path::builder().build();
+    let sample_path = PathBuilder::new().build();
     // The stroke path both style and line width same should be merge.
     layer.stroke_path(sample_path.clone());
     layer.stroke_path(sample_path.clone());
@@ -889,5 +854,61 @@ And by opposing end them? To die: to sleep;\n",
     }
 
     unit_test::assert_canvas_eq!(render, "../../test_imgs/texture_cache_update.png");
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn round_rect() {
+    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
+      DeviceSize::new(800, 200),
+    ));
+
+    let mut layer = canvas.new_2d_layer();
+    layer.set_style(Color::RED);
+    let rect = Rect::from_size(Size::new(80., 40.));
+
+    let radius = Vector::new(20., 10.);
+    [
+      BorderRadius::only(Vector::zero()),
+      BorderRadius::only(Vector::new(10., 10.)),
+      BorderRadius {
+        top_left: radius,
+        ..Default::default()
+      },
+      BorderRadius {
+        top_right: radius,
+        ..Default::default()
+      },
+      BorderRadius {
+        bottom_right: radius,
+        ..Default::default()
+      },
+      BorderRadius {
+        bottom_left: radius,
+        ..Default::default()
+      },
+      BorderRadius {
+        top_left: Vector::new(50., 50.),
+        bottom_right: Vector::new(50., 50.),
+        ..Default::default()
+      },
+    ]
+    .iter()
+    .for_each(|radius| {
+      layer.save_guard().rect_round(&rect, &radius).stroke();
+      layer
+        .translate(0., rect.height() + 5.)
+        .rect_round(&rect, &radius)
+        .fill();
+
+      layer.translate(rect.width() + 5., -(rect.height() + 5.));
+    });
+
+    {
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
+
+    unit_test::write_canvas_to!(render, "../../test_imgs/rect_round.png");
   }
 }
