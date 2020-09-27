@@ -909,6 +909,6 @@ And by opposing end them? To die: to sleep;\n",
       frame.compose_2d_layer(layer);
     }
 
-    unit_test::write_canvas_to!(render, "../../test_imgs/rect_round.png");
+    unit_test::assert_canvas_eq!(render, "../../test_imgs/rect_round.png");
   }
 }

@@ -218,9 +218,6 @@ impl PathBuilder {
   pub fn build(self) -> Path { Path(self.0.build()) }
 }
 
-#[inline]
-fn circle_radius(radius: &Vector) -> bool { (radius.x - radius.y).abs() < f32::EPSILON }
-
 impl BorderRadius {
   pub fn only(radius: Vector) -> Self {
     Self {

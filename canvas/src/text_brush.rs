@@ -3,7 +3,6 @@ use super::{canvas::Vertex, mem_texture::MemTexture, DeviceSize, Rect};
 pub use fonts::*;
 use glyph_brush::{BrushAction, BrushError, FontId, GlyphBrush, GlyphBrushBuilder, GlyphCruncher};
 use lyon::tessellation::{Count, VertexBuffers};
-use std::sync::Arc;
 
 pub(crate) type Section<'a> = glyph_brush::Section<'a, u32>;
 pub(crate) const DEFAULT_FONT_FAMILY: &str = "serif";
@@ -41,7 +40,7 @@ impl TextBrush {
   ) -> Result<&Font, Box<dyn std::error::Error>> {
     self
       .fonts
-      .load_from_bytes(Arc::new(font_data), font_index, &mut self.brush)
+      .load_from_bytes(font_data, font_index, &mut self.brush)
   }
 
   /// Loads a font from the path to a `.ttf`/`.otf`/etc. file.
