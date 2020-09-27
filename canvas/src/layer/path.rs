@@ -219,7 +219,7 @@ impl PathBuilder {
 }
 
 impl BorderRadius {
-  pub fn only(radius: Vector) -> Self {
+  pub fn all(radius: Vector) -> Self {
     Self {
       top_left: radius,
       top_right: radius,

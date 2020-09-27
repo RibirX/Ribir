@@ -869,8 +869,8 @@ And by opposing end them? To die: to sleep;\n",
 
     let radius = Vector::new(20., 10.);
     [
-      BorderRadius::only(Vector::zero()),
-      BorderRadius::only(Vector::new(10., 10.)),
+      BorderRadius::all(Vector::zero()),
+      BorderRadius::all(Vector::new(10., 10.)),
       BorderRadius {
         top_left: radius,
         ..Default::default()

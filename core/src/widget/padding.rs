@@ -77,7 +77,7 @@ mod tests {
   fn smoke() {
     let widget = Row::default()
       .push(SizedBox::empty_box(Size::new(100., 100.)))
-      .padding(EdgeInsets::only_left(1.));
+      .with_padding(EdgeInsets::only_left(1.));
     let mut wnd = window::Window::without_render(widget.box_it(), Size::new(200., 200.));
     wnd.render_ready();
     let r_tree = wnd.render_tree();

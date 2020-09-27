@@ -1,12 +1,12 @@
 pub use render_ctx::*;
 pub mod render_ctx;
 use crate::prelude::*;
-pub use painting_context::PaintingContext;
+pub use painting_context::*;
 use std::{
   any::{Any, TypeId},
   fmt::Debug,
 };
-pub mod painting_context;
+mod painting_context;
 pub mod render_tree;
 pub mod update_ctx;
 pub use render_tree::{BoxClamp, RenderId};
