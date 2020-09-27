@@ -33,11 +33,11 @@ impl Fonts {
   /// a single font, pass 0 for `font_index`.
   pub fn load_from_bytes(
     &mut self,
-    font_data: Arc<Vec<u8>>,
+    font_data: Vec<u8>,
     font_index: u32,
     brush: &mut GlyphBrush<[Vertex; 4], u32>,
   ) -> Result<&Font, Box<dyn std::error::Error>> {
-    let font = FK_Font::from_bytes(font_data, font_index)?;
+    let font = FK_Font::from_bytes(Arc::new(font_data), font_index)?;
     self.try_insert_font(font, brush)
   }
 
@@ -174,7 +174,7 @@ mod tests {
     let mut brush = GlyphBrushBuilder::using_fonts(vec![]).build();
     let mut fonts = Fonts::new();
     let bytes = include_bytes!("../../fonts/GaramondNo8-Reg.ttf");
-    let font = fonts.load_from_bytes(std::sync::Arc::new(bytes.to_vec()), 0, &mut brush);
+    let font = fonts.load_from_bytes(bytes.to_vec(), 0, &mut brush);
     assert_eq!(font.unwrap().font.family_name(), "GaramondNo8");
   }
 
