@@ -8,7 +8,9 @@ use futures::executor::block_on;
 use std::sync::{Arc, Mutex};
 
 pub macro write_canvas_to($canvas: expr, $path: expr) {
-  let abs_path = abs_path!($path);
+  let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    .with_file_name(file!())
+    .with_file_name($path);
   let writer = std::fs::File::create(&abs_path).unwrap();
   let _ = block_on($canvas.write_png(writer));
 }

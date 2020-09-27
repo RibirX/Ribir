@@ -596,8 +596,8 @@ mod tests {
   use futures::executor::block_on;
 
   fn circle_50() -> Path {
-    let mut path = Path::builder();
-    path.add_circle(euclid::Point2D::new(0., 0.), 50., Winding::Positive);
+    let mut path = PathBuilder::new();
+    path.circle(euclid::Point2D::new(0., 0.), 50.);
     path.build()
   }
 

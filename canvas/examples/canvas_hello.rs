@@ -43,13 +43,13 @@ fn main() {
       layer.set_style(Color::YELLOW);
 
       layer
-        .begin_path(0., 70.)
-        .line_to(100.0, 70.0)
-        .line_to(100.0, 0.0)
-        .line_to(250.0, 100.0)
-        .line_to(100.0, 200.0)
-        .line_to(100.0, 130.0)
-        .line_to(0.0, 130.0)
+        .begin_path((0., 70.).into())
+        .line_to((100.0, 70.0).into())
+        .line_to((100.0, 0.0).into())
+        .line_to((250.0, 100.0).into())
+        .line_to((100.0, 200.0).into())
+        .line_to((100.0, 130.0).into())
+        .line_to((0.0, 130.0).into())
         .close_path()
         .fill();
 
