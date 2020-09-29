@@ -22,6 +22,15 @@ enum SecondBindings {
   Primitive = 0,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum AntiAliasing {
+  None = 1,
+  MSAA2X = 2,
+  MSAA4X = 4,
+  MSAA8X = 8,
+  MSAA16X = 16,
+}
+
 pub struct WgpuRender<S: Surface = PhysicSurface> {
   device: wgpu::Device,
   queue: wgpu::Queue,
@@ -35,6 +44,9 @@ pub struct WgpuRender<S: Surface = PhysicSurface> {
   glyph: wgpu::Texture,
   atlas: wgpu::Texture,
   resized: bool,
+  anti_aliasing: AntiAliasing,
+  multisampled_framebuffer: wgpu::TextureView,
+  sc_desc: wgpu::SwapChainDescriptor,
 }
 
 impl WgpuRender<PhysicSurface> {
@@ -46,6 +58,7 @@ impl WgpuRender<PhysicSurface> {
     size: DeviceSize,
     glyph_texture_size: DeviceSize,
     atlas_texture_size: DeviceSize,
+    anti_aliasing: AntiAliasing,
   ) -> Self {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
@@ -62,6 +75,7 @@ impl WgpuRender<PhysicSurface> {
       atlas_texture_size,
       adapter,
       move |device| PhysicSurface::new(w_surface, &device, size),
+      anti_aliasing,
     )
     .await
   }
@@ -94,6 +108,7 @@ impl WgpuRender<TextureSurface> {
           wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
         )
       },
+      AntiAliasing::None,
     )
     .await
   }
@@ -179,15 +194,28 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     });
 
     {
-      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+      let rpass_color_attachment = if self.anti_aliasing == AntiAliasing::None {
+        wgpu::RenderPassColorAttachmentDescriptor {
           attachment: view.borrow(),
           resolve_target: None,
           ops: wgpu::Operations {
             load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
             store: true,
           },
-        }],
+        }
+      } else {
+        wgpu::RenderPassColorAttachmentDescriptor {
+          attachment: &self.multisampled_framebuffer,
+          resolve_target: Some(view.borrow()),
+          ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+            store: true,
+          },
+        }
+      };
+
+      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        color_attachments: &[rpass_color_attachment],
         depth_stencil_attachment: None,
       });
       render_pass.set_pipeline(&self.pipeline);
@@ -218,6 +246,7 @@ impl<S: Surface> WgpuRender<S> {
     atlas_texture_size: DeviceSize,
     adapter: impl std::future::Future<Output = Option<wgpu::Adapter>> + Send,
     surface_ctor: C,
+    anti_aliasing: AntiAliasing,
   ) -> WgpuRender<S>
   where
     C: FnOnce(&wgpu::Device) -> S,
@@ -247,8 +276,12 @@ impl<S: Surface> WgpuRender<S> {
     };
 
     let [uniform_layout, primitives_layout] = create_uniform_layout(&device);
-    let pipeline =
-      create_render_pipeline(&device, &sc_desc, &[&uniform_layout, &primitives_layout]);
+    let pipeline = create_render_pipeline(
+      &device,
+      &sc_desc,
+      &[&uniform_layout, &primitives_layout],
+      anti_aliasing as u32,
+    );
 
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -280,6 +313,9 @@ impl<S: Surface> WgpuRender<S> {
       &glyph_texture.create_view(&wgpu::TextureViewDescriptor::default()),
     );
 
+    let multisampled_framebuffer =
+      Self::create_multisampled_framebuffer(&device, &sc_desc, anti_aliasing as u32);
+
     WgpuRender {
       sampler,
       device,
@@ -293,7 +329,24 @@ impl<S: Surface> WgpuRender<S> {
       atlas: texture_atlas,
       rgba_converter: None,
       resized: false,
+      anti_aliasing,
+      multisampled_framebuffer,
+      sc_desc,
     }
+  }
+
+  pub fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
+    self.anti_aliasing = anti_aliasing;
+
+    self.multisampled_framebuffer =
+      Self::create_multisampled_framebuffer(&self.device, &self.sc_desc, anti_aliasing as u32);
+    let [uniform_layout, primitives_layout] = create_uniform_layout(&self.device);
+    self.pipeline = create_render_pipeline(
+      &self.device,
+      &self.sc_desc,
+      &[&uniform_layout, &primitives_layout],
+      anti_aliasing as u32,
+    );
   }
 
   pub(crate) fn ensure_rgba_converter(&mut self) {
@@ -361,6 +414,7 @@ impl<S: Surface> WgpuRender<S> {
     }
     mem_tex.data_synced();
   }
+
   fn create_wgpu_texture(
     device: &wgpu::Device,
     size: DeviceSize,
@@ -382,12 +436,38 @@ impl<S: Surface> WgpuRender<S> {
       sample_count: 1,
     })
   }
+
+  fn create_multisampled_framebuffer(
+    device: &wgpu::Device,
+    sc_desc: &wgpu::SwapChainDescriptor,
+    sample_count: u32,
+  ) -> wgpu::TextureView {
+    let multisampled_texture_extent = wgpu::Extent3d {
+      width: sc_desc.width,
+      height: sc_desc.height,
+      depth: 1,
+    };
+    let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+      size: multisampled_texture_extent,
+      mip_level_count: 1,
+      sample_count: sample_count,
+      dimension: wgpu::TextureDimension::D2,
+      format: sc_desc.format,
+      usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+      label: None,
+    };
+
+    device
+      .create_texture(multisampled_frame_descriptor)
+      .create_view(&wgpu::TextureViewDescriptor::default())
+  }
 }
 
 fn create_render_pipeline(
   device: &wgpu::Device,
   sc_desc: &wgpu::SwapChainDescriptor,
   bind_group_layouts: &[&wgpu::BindGroupLayout; 2],
+  sample_count: u32,
 ) -> wgpu::RenderPipeline {
   let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
     label: Some("render pipeline"),
@@ -441,7 +521,7 @@ fn create_render_pipeline(
       index_format: wgpu::IndexFormat::Uint32,
       vertex_buffers: &[Vertex::desc()],
     },
-    sample_count: 1,
+    sample_count,
     sample_mask: !0,
     alpha_to_coverage_enabled: false,
   })
@@ -624,17 +704,30 @@ mod tests {
     let (mut canvas, mut render) = block_on(create_canvas_with_render_headless(DeviceSize::new(
       400, 400,
     )));
-    let path = circle_50();
 
-    let mut layer = canvas.new_2d_layer();
-    layer.set_style(FillStyle::Color(Color::BLACK));
-    layer.translate(50., 50.);
-    layer.fill_path(path);
+    fn circle_layer<'a>(canvas: &mut Canvas) -> Rendering2DLayer<'a> {
+      let path = circle_50();
+      let mut layer = canvas.new_2d_layer();
+      layer.set_style(FillStyle::Color(Color::BLACK));
+      layer.translate(50., 50.);
+      layer.fill_path(path);
+      layer
+    }
+
     {
+      let layer = circle_layer(&mut canvas);
       let mut frame = canvas.next_frame(&mut render);
       frame.compose_2d_layer(layer);
     }
+    unit_test::assert_canvas_eq!(render, "../test_imgs/smoke_draw_circle.png");
 
+    // Enable anti aliasing
+    {
+      render.set_anti_aliasing(AntiAliasing::MSAA4X);
+      let layer = circle_layer(&mut canvas);
+      let mut frame = canvas.next_frame(&mut render);
+      frame.compose_2d_layer(layer);
+    }
     unit_test::assert_canvas_eq!(render, "../test_imgs/smoke_draw_circle.png");
   }
 

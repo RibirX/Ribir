@@ -52,6 +52,7 @@ pub async fn create_canvas_with_render_from_wnd<W: raw_window_handle::HasRawWind
     size,
     canvas.text_brush().texture().size(),
     canvas.atlas().texture().size(),
+    AntiAliasing::MSAA4X,
   )
   .await;
 
