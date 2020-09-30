@@ -450,7 +450,7 @@ impl<S: Surface> WgpuRender<S> {
     let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
       size: multisampled_texture_extent,
       mip_level_count: 1,
-      sample_count: sample_count,
+      sample_count,
       dimension: wgpu::TextureDimension::D2,
       format: sc_desc.format,
       usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
