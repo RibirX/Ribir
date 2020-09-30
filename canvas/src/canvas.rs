@@ -184,6 +184,15 @@ impl Canvas {
     tessellator: &mut Tessellator,
     render: &mut R,
   ) {
+    fn font_device_scale(mut transform: Transform) -> (f32, Transform) {
+      let scale = transform.m11.max(transform.m22);
+      if scale > f32::EPSILON {
+        let s = 1. / scale;
+        transform = transform.pre_scale(s, s);
+      }
+      (scale, transform)
+    }
+
     layer
       .commands
       .into_iter()
@@ -206,7 +215,10 @@ impl Canvas {
             style,
             max_width,
           } => {
-            let text = text.to_glyph_text(self.text_brush(), 0);
+            let (scale, transform) = font_device_scale(transform);
+            let text = text
+              .to_glyph_text(self.text_brush(), 0)
+              .with_scale(text.font_size * scale);
             let mut sec = Section::new().add_text(text);
             if let Some(max_width) = max_width {
               sec.bounds = (max_width, f32::INFINITY)
@@ -221,6 +233,7 @@ impl Canvas {
             bounds,
             layout,
           } => {
+            let (scale, transform) = font_device_scale(transform);
             let texts = texts
               .into_iter()
               .map(|(t, color)| {
@@ -228,6 +241,7 @@ impl Canvas {
                 self.add_primitive(style_rect, COLOR_BOUNDS_TO_ALIGN_TEXTURE, transform);
                 let prim_id = self.render_data.primitives.len() - 1;
                 t.to_glyph_text(self.text_brush(), prim_id)
+                  .with_scale(t.font_size * scale)
               })
               .collect();
 
@@ -241,9 +255,13 @@ impl Canvas {
             bounds,
             layout,
           } => {
+            let (scale, transform) = font_device_scale(transform);
             let texts = texts
               .into_iter()
-              .map(|t| t.to_glyph_text(self.text_brush(), 0))
+              .map(|t| {
+                t.to_glyph_text(self.text_brush(), 0)
+                  .with_scale(t.font_size * scale)
+              })
               .collect();
             let mut sec = Section::new().with_text(texts);
             let align_bounds = section_bounds_to_align_texture(self.text_brush(), &style, &sec);
