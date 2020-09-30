@@ -357,7 +357,7 @@ impl Border {
       left: side.clone(),
       right: side.clone(),
       top: side.clone(),
-      bottom: side.clone(),
+      bottom: side,
     }
   }
 }
@@ -432,7 +432,7 @@ mod tests {
           .with_border_radius(radius)
           .with_border(Border::all(BorderSide {
             width: 5.,
-            color: Color::BLACK.into(),
+            color: Color::BLACK,
           }))
           .with_margin(EdgeInsets::all(2.))
           .box_it()
