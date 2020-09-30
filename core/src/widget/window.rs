@@ -105,7 +105,6 @@ impl<R: CanvasRender> Window<R> {
         self
           .canvas
           .set_default_transform(Transform::new(factor, 0., 0., factor, 0., 0.));
-        todo!("support sync dpi change to canvas")
       }
       event => self.dispatcher.dispatch(event),
     };
@@ -121,8 +120,8 @@ impl<R: CanvasRender> Window<R> {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub(crate) fn render_ready(&mut self) -> bool {
-    let changed = self.tree_repair();
-    self.layout();
+    let mut changed = self.tree_repair();
+    changed = self.layout() || changed;
     self.dispatcher.focus_mgr.update(&self.dispatcher.common);
 
     changed
@@ -152,14 +151,14 @@ impl<R: CanvasRender> Window<R> {
   }
 
   /// Layout the render tree as needed
-  fn layout(&mut self) {
+  fn layout(&mut self) -> bool {
     unsafe {
       self
         .render_tree
         .as_mut()
         .get_unchecked_mut()
         .layout(self.raw_window.borrow().inner_size(), self.canvas.as_mut())
-    };
+    }
   }
 
   fn new<W: RawWindow + 'static>(mut root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
