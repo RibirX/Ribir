@@ -16,8 +16,11 @@ impl Application {
   pub fn new() -> Application { <_>::default() }
 
   pub fn run(mut self, w: BoxWidget) {
-    self.new_window(w);
-
+    let wnd_id = self.new_window(w);
+    if let Some(wnd) = self.windows.get_mut(&wnd_id) {
+      wnd.render_ready();
+      wnd.draw_frame();
+    }
     let Self {
       event_loop,
       mut windows,

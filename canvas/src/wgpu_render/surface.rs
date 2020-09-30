@@ -5,9 +5,12 @@ use std::borrow::Borrow;
 pub trait Surface {
   type V: Borrow<wgpu::TextureView>;
 
-  fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, width: u32, height: u32);
-
-  fn size(&self) -> DeviceSize;
+  fn update(
+    &mut self,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    sc_desc: &wgpu::SwapChainDescriptor,
+  );
 
   fn get_next_view(&mut self) -> Self::V;
 }
@@ -16,7 +19,6 @@ pub trait Surface {
 pub struct PhysicSurface {
   swap_chain: wgpu::SwapChain,
   surface: wgpu::Surface,
-  sc_desc: wgpu::SwapChainDescriptor,
 }
 
 /// A `Surface` present in a texture. Usually `PhysicSurface` display things to
@@ -27,13 +29,13 @@ pub type TextureSurface = Texture;
 impl Surface for PhysicSurface {
   type V = FrameView<wgpu::SwapChainFrame>;
 
-  #[inline]
-  fn size(&self) -> DeviceSize { DeviceSize::new(self.sc_desc.width, self.sc_desc.height) }
-
-  fn resize(&mut self, device: &wgpu::Device, _queue: &wgpu::Queue, width: u32, height: u32) {
-    self.sc_desc.width = width;
-    self.sc_desc.height = height;
-    self.swap_chain = device.create_swap_chain(&self.surface, &self.sc_desc);
+  fn update(
+    &mut self,
+    device: &wgpu::Device,
+    _queue: &wgpu::Queue,
+    sc_desc: &wgpu::SwapChainDescriptor,
+  ) {
+    self.swap_chain = device.create_swap_chain(&self.surface, &sc_desc);
   }
 
   fn get_next_view(&mut self) -> Self::V {
@@ -49,11 +51,17 @@ impl Surface for PhysicSurface {
 impl Surface for TextureSurface {
   type V = FrameView<wgpu::TextureView>;
 
-  #[inline]
-  fn size(&self) -> DeviceSize { self.size }
-
-  fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, width: u32, height: u32) {
-    self.resize(device, queue, DeviceSize::new(width, height));
+  fn update(
+    &mut self,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    sc_desc: &wgpu::SwapChainDescriptor,
+  ) {
+    self.resize(
+      device,
+      queue,
+      DeviceSize::new(sc_desc.width, sc_desc.height),
+    );
   }
 
   #[inline]
@@ -91,7 +99,6 @@ impl PhysicSurface {
 
     Self {
       swap_chain,
-      sc_desc,
       surface,
     }
   }

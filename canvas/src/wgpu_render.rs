@@ -43,7 +43,7 @@ pub struct WgpuRender<S: Surface = PhysicSurface> {
   sampler: wgpu::Sampler,
   glyph: wgpu::Texture,
   atlas: wgpu::Texture,
-  resized: bool,
+  rebuild_pipeline: bool,
   anti_aliasing: AntiAliasing,
   multisampled_framebuffer: wgpu::TextureView,
   sc_desc: wgpu::SwapChainDescriptor,
@@ -158,6 +158,7 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
       surface,
       queue,
       uniform_layout,
+      sc_desc,
       ..
     } = self;
     let texture_resized = mem_glyph.is_resized() || mem_atlas.is_resized();
@@ -165,18 +166,29 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     Self::sync_texture(device, glyph, mem_glyph, TF::R8Unorm, &mut encoder);
     Self::sync_texture(device, atlas, mem_atlas, TF::Bgra8UnormSrgb, &mut encoder);
 
-    if self.resized || texture_resized {
-      self.resized = false;
-      let size = surface.size();
+    if self.rebuild_pipeline || texture_resized {
       self.uniforms = create_uniforms(
         device,
         uniform_layout,
         mem_atlas.size(),
-        &coordinate_2d_to_device_matrix(size.width, size.height),
+        &coordinate_2d_to_device_matrix(sc_desc.width, sc_desc.height),
         &self.sampler,
         &atlas.create_view(&wgpu::TextureViewDescriptor::default()),
         &glyph.create_view(&wgpu::TextureViewDescriptor::default()),
       )
+    }
+    if self.rebuild_pipeline {
+      let sample_count = self.anti_aliasing as u32;
+      self.multisampled_framebuffer =
+        Self::create_multisampled_framebuffer(device, sc_desc, sample_count);
+      let [uniform_layout, primitives_layout] = create_uniform_layout(device);
+      self.pipeline = create_render_pipeline(
+        device,
+        sc_desc,
+        &[&uniform_layout, &primitives_layout],
+        sample_count,
+      );
+      self.rebuild_pipeline = false;
     }
 
     let view = surface.get_next_view();
@@ -232,10 +244,12 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
 
   #[inline]
   fn resize(&mut self, size: DeviceSize) {
+    self.sc_desc.width = size.width;
+    self.sc_desc.height = size.height;
     self
       .surface
-      .resize(&self.device, &self.queue, size.width, size.height);
-    self.resized = true;
+      .update(&self.device, &self.queue, &self.sc_desc);
+    self.rebuild_pipeline = true;
   }
 }
 
@@ -328,7 +342,7 @@ impl<S: Surface> WgpuRender<S> {
       glyph: glyph_texture,
       atlas: texture_atlas,
       rgba_converter: None,
-      resized: false,
+      rebuild_pipeline: false,
       anti_aliasing,
       multisampled_framebuffer,
       sc_desc,
@@ -337,16 +351,7 @@ impl<S: Surface> WgpuRender<S> {
 
   pub fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
     self.anti_aliasing = anti_aliasing;
-
-    self.multisampled_framebuffer =
-      Self::create_multisampled_framebuffer(&self.device, &self.sc_desc, anti_aliasing as u32);
-    let [uniform_layout, primitives_layout] = create_uniform_layout(&self.device);
-    self.pipeline = create_render_pipeline(
-      &self.device,
-      &self.sc_desc,
-      &[&uniform_layout, &primitives_layout],
-      anti_aliasing as u32,
-    );
+    self.rebuild_pipeline = true;
   }
 
   pub(crate) fn ensure_rgba_converter(&mut self) {
