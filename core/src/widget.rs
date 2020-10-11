@@ -23,6 +23,7 @@ mod phantom;
 pub use phantom::PhantomWidget;
 pub use smallvec::{smallvec, SmallVec};
 mod cursor;
+pub use crate::render::font::FontStyle;
 pub use cursor::Cursor;
 use rxrust::prelude::*;
 pub use winit::window::CursorIcon;

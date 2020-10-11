@@ -419,9 +419,9 @@ impl<'a> Rendering2DLayer<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FontInfo {
   /// CSS Fonts Level 3 specification of family.
-  family: String,
-  props: FontProperties,
-  font_size: f32,
+  pub family: String,
+  pub props: FontProperties,
+  pub font_size: f32,
 }
 
 impl Default for FontInfo {

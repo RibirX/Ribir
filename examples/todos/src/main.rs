@@ -1,42 +1,39 @@
-use holiday::{
-  prelude::*,
-  widget::{Column, Row},
-};
+use canvas::Color;
+use holiday::{prelude::*, widget::FontStyle};
 
 #[derive(Debug)]
 struct Todos {}
 
 impl CombinationWidget for Todos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
-    Column::default()
-      .push(
-        (0..15)
-          .map(|i| {
-            let (stateful, mut state_modify) = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
-            stateful
-              .with_cursor(CursorIcon::Text)
-              .on_char(move |e| state_modify.0.push(e.char))
-          })
-          .collect::<Row>(),
-      )
-      .push(
-        (0..10)
-          .map(|i| {
-            Text(format!("SecondRow {} ", i))
-              .with_cursor(CursorIcon::Hand)
-              .box_it()
-          })
-          .collect::<Row>(),
-      )
-      .push(
-        (0..3)
-          .map(|i| {
-            Text(format!("ThirdRow{} ", i))
-              .with_cursor(CursorIcon::Progress)
-              .box_it()
-          })
-          .collect::<Row>(),
-      )
+    (0..2)
+      .map(|i| {
+        let (stateful, mut state_modify) = Text {
+          text: Some(format!("Row {} ", i)),
+          children: Some(
+            (0..1)
+              .map(|i| {
+                Text {
+                  text: Some(format!("SecondElem {} ", i)),
+                  children: None,
+                  style: Some(FontStyle::default().with_size(48.).with_color(Color::BLUE)),
+                }
+                .box_it()
+              })
+              .collect(),
+          ),
+          style: Some(
+            FontStyle::default()
+              .with_size(164.)
+              .with_color(Color::YELLOW),
+          ),
+        }
+        .into_stateful(ctx);
+        stateful.with_cursor(CursorIcon::Text).on_char(move |e| {
+          state_modify.text.as_mut().map(|text| text.push(e.char));
+        })
+      })
+      .collect::<Column>()
       .box_it()
   }
 }

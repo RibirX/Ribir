@@ -1,3 +1,4 @@
+pub mod font;
 pub use render_ctx::*;
 pub mod render_ctx;
 use crate::prelude::*;
@@ -107,6 +108,17 @@ impl dyn RenderObjectSafety {
       // rely on that check for memory safety because we have implemented Any for
       // all types; no other impls can exist as they would conflict with our impl.
       unsafe { Some(&*ptr) }
+    } else {
+      None
+    }
+  }
+
+  pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+    if TypeId::of::<T>() == (*self).type_id() {
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any for
+      // all types; no other impls can exist as they would conflict with our impl.
+      unsafe { Some(&mut *(self as *mut dyn RenderObjectSafety as *mut T)) }
     } else {
       None
     }

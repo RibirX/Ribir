@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 holiday={path="../../core"}
+canvas={path="../../canvas"}
 env_logger = "0.7.1"

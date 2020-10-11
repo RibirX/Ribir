@@ -1,6 +1,9 @@
+use crate::render::font::*;
 use crate::render::render_tree::*;
 use crate::render::*;
-use canvas::{Canvas, FontInfo, Rect, Text};
+use canvas::{Canvas, Rect, Text};
+use std::sync::Arc;
+
 use std::pin::Pin;
 
 /// A place to compute the render object's layout. Rather than holding children
@@ -101,6 +104,13 @@ impl<'a> RenderCtx<'a> {
       .expect("The render object of this context is not exist.")
   }
 
+  /// Return render object of this context.
+  pub fn render_obj_mut(&mut self) -> &mut (dyn RenderObjectSafety + 'static) {
+    self
+      .render_obj
+      .get_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
+  }
+
   /// Do the work of computing the layout for this render object, and return the
   /// render object box size. Should called from parent.
   pub fn perform_layout(&mut self, clamp: BoxClamp) -> Size {
@@ -111,12 +121,14 @@ impl<'a> RenderCtx<'a> {
 
   // mesure test bound
   // todo support custom font
-  pub fn mesure_text(&mut self, text: &str) -> Rect {
-    let font = FontInfo::default();
+  pub fn mesure_text(&mut self, text: &str, text_style: &Option<Arc<FontStyle>>) -> Rect {
+    let font = to_font(text_style);
     self.canvas.mesure_text(&Text {
       text,
-      font_size: 14.0,
+      font_size: font.font_size,
       font,
     })
   }
 }
+
+// should move to theme
