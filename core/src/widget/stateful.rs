@@ -1,5 +1,10 @@
 use crate::prelude::*;
-use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
+use std::{
+  marker::PhantomData,
+  ops::{Deref, DerefMut},
+  pin::Pin,
+  ptr::NonNull,
+};
 
 /// A reference of stateful widget, can use it to directly access and modify
 /// stateful widget.
@@ -16,11 +21,8 @@ use std::{marker::PhantomData, pin::Pin, ptr::NonNull};
 ///
 /// Maybe panic if widget impl the `Drop` trait, and access `StateRef` in its
 /// `drop` method,  the captured `StateRef` maybe is dangling.
-#[derive(Clone, Copy)]
-pub struct StateRef<T> {
-  wid: WidgetId,
-  tree: NonNull<widget_tree::WidgetTree>,
-  _type: PhantomData<*const T>,
+pub struct StateRef<T: Widget> {
+  inner: InnerStateful<T>,
 }
 
 /// Hold the preallocated widget.
@@ -32,78 +34,115 @@ pub struct StateRef<T> {
 /// construct widget tree, and framework guarantee the real widget live longer
 /// than it.
 #[derive(Debug)]
-pub struct StatefulWidget {
-  wid: WidgetId,
-  tree: NonNull<widget_tree::WidgetTree>,
+pub struct Stateful<T: Widget> {
+  inner: InnerStateful<T>,
 }
 
-impl InheritWidget for StatefulWidget {
+#[derive(Debug)]
+struct InnerStateful<T: Widget> {
+  wid: WidgetId,
+  tree_ptr: NonNull<widget_tree::WidgetTree>,
+  marker: PhantomData<*const T>,
+}
+
+impl<T: Widget> InheritWidget for Stateful<T> {
   #[inline]
-  fn base_widget(&self) -> &dyn Widget { self.wid.assert_get(unsafe { self.tree.as_ref() }) }
+  fn base_widget(&self) -> &dyn Widget {
+    let inner = &self.inner;
+    inner.wid.assert_get(unsafe { inner.tree_ptr.as_ref() })
+  }
 
   #[inline]
   fn base_widget_mut(&mut self) -> &mut dyn Widget {
-    self.wid.assert_get_mut(unsafe { self.tree.as_mut() })
+    let inner = &mut self.inner;
+    inner.wid.assert_get_mut(unsafe { inner.tree_ptr.as_mut() })
   }
 }
 
-impl_widget_for_inherit_widget!(StatefulWidget);
+impl<T: Widget> Widget for Stateful<T> {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
 
-impl StatefulWidget {
-  pub fn stateful<W: Widget>(
-    widget: W,
-    mut tree: Pin<&mut widget_tree::WidgetTree>,
-  ) -> (BoxWidget, StateRef<W>) {
-    let tree_ptr = NonNull::from(&*tree);
-    let widget = inherit(
-      widget.box_it(),
-      |widget| {
-        let wid = unsafe { tree.as_mut().get_unchecked_mut() }.new_node(widget);
-        StatefulWidget {
-          wid,
-          tree: tree_ptr,
-        }
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
+
+  #[inline]
+  fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
+
+  #[inline]
+  fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
+
+  #[inline]
+  fn box_it(self) -> BoxWidget {
+    let inner = self.inner.clone();
+    let widget: Stateful<BoxWidget> = Stateful {
+      inner: InnerStateful {
+        wid: inner.wid,
+        tree_ptr: inner.tree_ptr,
+        marker: PhantomData,
       },
-      |_| {},
-    );
-
-    let stateful = Widget::dynamic_cast_ref::<StatefulWidget>(&widget).unwrap();
-    let ptr = StateRef {
-      wid: stateful.wid,
-      tree: tree_ptr,
-      _type: PhantomData,
     };
-    (widget, ptr)
+    // widget replaced self to live.
+    std::mem::forget(self);
+
+    BoxWidget {
+      widget: Box::new(widget),
+    }
+  }
+}
+
+impl<W: Widget> Stateful<W> {
+  pub fn stateful(widget: W, mut tree: Pin<&mut widget_tree::WidgetTree>) -> Self {
+    let tree_ptr = NonNull::from(&*tree);
+    let wid = unsafe { tree.as_mut().get_unchecked_mut() }.new_node(widget.box_it());
+
+    Stateful {
+      inner: InnerStateful {
+        wid,
+        tree_ptr,
+        marker: PhantomData,
+      },
+    }
   }
 
   #[inline]
-  pub fn id(&self) -> WidgetId { self.wid }
+  pub fn id(&self) -> WidgetId { self.inner.wid }
 
   pub(crate) fn replace_base_with<C: FnOnce(BoxWidget) -> BoxWidget>(&mut self, ctor: C) {
     let temp = std::mem::MaybeUninit::uninit();
     let mut temp = unsafe { temp.assume_init() };
-    let base = self.wid.assert_get_mut(unsafe { self.tree.as_mut() });
+    let base = self
+      .inner
+      .wid
+      .assert_get_mut(unsafe { self.inner.tree_ptr.as_mut() });
     std::mem::swap(&mut temp, base);
     let mut temp = ctor(temp);
     std::mem::swap(&mut temp, base);
     std::mem::forget(temp);
   }
+
+  #[inline]
+  pub fn get_state_ref(&self) -> StateRef<W> {
+    StateRef {
+      inner: self.inner.clone(),
+    }
+  }
 }
 
-impl<T: 'static> std::ops::Deref for StateRef<T> {
+impl<T: Widget> Deref for InnerStateful<T> {
   type Target = T;
   #[inline]
   fn deref(&self) -> &Self::Target {
-    let w = self.wid.assert_get(unsafe { self.tree.as_ref() });
+    let w = self.wid.assert_get(unsafe { self.tree_ptr.as_ref() });
 
     Widget::dynamic_cast_ref::<T>(w)
       .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
   }
 }
 
-impl<T: 'static> std::ops::DerefMut for StateRef<T> {
+impl<T: Widget> DerefMut for InnerStateful<T> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    let tree = unsafe { self.tree.as_mut() };
+    let tree = unsafe { self.tree_ptr.as_mut() };
     self.wid.mark_changed(tree);
     let w = self.wid.assert_get_mut(tree);
 
@@ -112,24 +151,55 @@ impl<T: 'static> std::ops::DerefMut for StateRef<T> {
   }
 }
 
-impl Drop for StatefulWidget {
-  fn drop(&mut self) {
-    let tree = unsafe { self.tree.as_mut() };
-    if Some(self.wid) != tree.root() && self.wid.parent(tree).is_none() {
-      log::warn!("The stateful widget not add into widget tree.");
-      self.wid.remove(tree);
+impl<T: Widget> Deref for Stateful<T> {
+  type Target = T;
+  #[inline]
+  fn deref(&self) -> &Self::Target { self.inner.deref() }
+}
+
+impl<T: Widget> DerefMut for Stateful<T> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { self.inner.deref_mut() }
+}
+
+impl<T: Widget> Deref for StateRef<T> {
+  type Target = T;
+  #[inline]
+  fn deref(&self) -> &Self::Target { self.inner.deref() }
+}
+
+impl<T: Widget> DerefMut for StateRef<T> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { self.inner.deref_mut() }
+}
+
+impl<T: Widget> Clone for InnerStateful<T> {
+  fn clone(&self) -> Self {
+    Self {
+      wid: self.wid,
+      tree_ptr: self.tree_ptr,
+      marker: PhantomData,
     }
   }
 }
 
-impl std::borrow::Borrow<dyn Widget> for NonNull<BoxWidget> {
-  #[inline]
-  fn borrow(&self) -> &dyn Widget { unsafe { self.as_ref() } }
+impl<T: Widget> Clone for StateRef<T> {
+  fn clone(&self) -> Self {
+    Self {
+      inner: self.inner.clone(),
+    }
+  }
 }
 
-impl std::borrow::BorrowMut<dyn Widget> for NonNull<BoxWidget> {
-  #[inline]
-  fn borrow_mut(&mut self) -> &mut dyn Widget { unsafe { self.as_mut() } }
+impl<T: Widget> Drop for Stateful<T> {
+  fn drop(&mut self) {
+    let tree = unsafe { self.inner.tree_ptr.as_mut() };
+    let wid = self.inner.wid;
+    if Some(wid) != tree.root() && wid.parent(tree).is_none() {
+      log::warn!("The stateful widget not add into widget tree.");
+      wid.remove(tree);
+    }
+  }
 }
 
 #[cfg(test)]
@@ -141,11 +211,16 @@ mod tests {
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let (_s, mut cell_ref) = StatefulWidget::stateful(Text("Hello".to_string()), tree.as_mut());
+    let stateful = Stateful::stateful(Text("Hello".to_string()), tree.as_mut());
     {
-      cell_ref.0 = "World!".to_string();
+      stateful.get_state_ref().0 = "World!".to_string();
     }
-    assert!(tree.changed_widgets().get(&cell_ref.wid).is_some());
+    assert!(
+      tree
+        .changed_widgets()
+        .get(&stateful.get_state_ref().inner.wid)
+        .is_some()
+    );
   }
 
   #[test]
@@ -153,7 +228,7 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let (stateful, _) = StatefulWidget::stateful(Text("Hello".to_string()), tree.as_mut());
+    let stateful = Stateful::stateful(Text("Hello".to_string()), tree.as_mut());
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
@@ -166,7 +241,7 @@ mod tests {
   #[test]
   fn fix_pin_widget_node() {
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let (_s, ptr_ref_) = StatefulWidget::stateful(Text("hello".to_string()), tree.as_mut());
+    let stateful = Stateful::stateful(Text("hello".to_string()), tree.as_mut());
     (0..128).for_each(|_| unsafe {
       tree
         .as_mut()
@@ -174,6 +249,6 @@ mod tests {
         .new_node(Text("".to_string()).box_it());
     });
 
-    assert_eq!(ptr_ref_.0, "hello")
+    assert_eq!(stateful.0, "hello")
   }
 }

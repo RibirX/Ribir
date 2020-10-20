@@ -12,10 +12,11 @@ impl CombinationWidget for Todos {
       .push(
         (0..15)
           .map(|i| {
-            let (stateful, mut state_modify) = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
+            let stateful = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
+            let mut state_ref = stateful.get_state_ref();
             stateful
               .with_cursor(CursorIcon::Text)
-              .on_char(move |e| state_modify.0.push(e.char))
+              .on_char(move |e| state_ref.0.push(e.char))
           })
           .collect::<Row>(),
       )
