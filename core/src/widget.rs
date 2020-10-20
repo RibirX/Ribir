@@ -15,7 +15,7 @@ pub mod widget_tree;
 pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
-pub use stateful::{StateRef, StatefulWidget};
+pub use stateful::{StateRef, Stateful};
 pub use text::Text;
 pub mod events;
 pub use events::*;
@@ -59,15 +59,24 @@ pub trait Widget: Debug + Any {
   #[inline]
   fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { None }
 
+  fn box_it(self) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    BoxWidget {
+      widget: Box::new(self),
+    }
+  }
+
   /// Convert a stateless widget to stateful, and will split to a stateful
   /// widget, and a `StateRef` which can be use to modify the states of the
   /// widget.
   #[inline]
-  fn into_stateful(self, ctx: &mut BuildCtx) -> (BoxWidget, StateRef<Self>)
+  fn into_stateful(self, ctx: &mut BuildCtx) -> Stateful<Self>
   where
     Self: Sized,
   {
-    StatefulWidget::stateful(self, ctx.tree.as_mut())
+    Stateful::stateful(self, ctx.tree.as_mut())
   }
 
   /// Assign a key to the widget to help framework to track if two widget is a
@@ -406,29 +415,38 @@ pub struct BoxWidget {
   pub(crate) widget: Box<dyn Widget>,
 }
 
-pub trait BoxIt {
-  fn box_it(self) -> BoxWidget;
-}
-
 impl std::fmt::Debug for BoxWidget {
   #[inline]
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.widget.fmt(f) }
 }
 
-impl<W: Widget> BoxIt for W {
-  default fn box_it(self) -> BoxWidget {
-    BoxWidget {
-      widget: Box::new(self),
-    }
+impl InheritWidget for BoxWidget {
+  #[inline]
+  fn base_widget(&self) -> &dyn Widget { self.widget.borrow() }
+  #[inline]
+  fn base_widget_mut(&mut self) -> &mut dyn Widget { self.widget.borrow_mut() }
+}
+
+impl Widget for BoxWidget {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
+
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
+
+  #[inline]
+  fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
+
+  #[inline]
+  fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
+
+  fn box_it(self) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    self
   }
 }
-
-impl BoxIt for BoxWidget {
-  #[inline]
-  fn box_it(self) -> BoxWidget { self }
-}
-
-inherit_widget!(BoxWidget, widget);
 
 /// A function help `InheritWidget` inherit `base` widget.
 ///
@@ -449,7 +467,7 @@ where
   if let Some(already) = Widget::dynamic_cast_mut::<T>(&mut base) {
     merge(already);
     base
-  } else if let Some(stateful) = Widget::dynamic_cast_mut::<StatefulWidget>(&mut base) {
+  } else if let Some(stateful) = Widget::dynamic_cast_mut::<Stateful<BoxWidget>>(&mut base) {
     stateful.replace_base_with(|base| ctor_by_base(base).box_it());
     base
   } else {
