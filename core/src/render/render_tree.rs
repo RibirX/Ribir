@@ -77,7 +77,7 @@ impl RenderTree {
     let root = self.new_node(data);
     self.root = Some(root);
     self.render_to_widget.insert(root, owner);
-    self.push_relayout_sub_root(root);
+
     root
   }
 
@@ -263,10 +263,13 @@ impl RenderId {
     let RenderTree {
       render_to_widget,
       arena,
+      layout_info,
       ..
     } = tree;
     self.0.descendants(arena).for_each(|id| {
-      render_to_widget.remove(&RenderId(id));
+      let rid = RenderId(id);
+      render_to_widget.remove(&rid);
+      layout_info.remove(&rid);
     });
 
     tree.layout_info.remove(&self);
@@ -300,7 +303,7 @@ impl RenderId {
   }
 
   pub(crate) fn mark_needs_layout(self, tree: &mut RenderTree) {
-    if self.layout_box_rect(tree).is_none() {
+    if self.layout_box_rect(tree).is_some() {
       let mut relayout_root = self;
       let RenderTree {
         arena, layout_info, ..
@@ -308,18 +311,19 @@ impl RenderId {
       // All ancestors of this render object should relayout until the one which only
       // sized by parent.
       self.0.ancestors(arena).all(|id| {
+        let rid = RenderId(id);
+        layout_info.remove(&rid);
+        relayout_root = rid;
+
         let sized_by_parent = arena
           .get(id)
           .map_or(false, |node| node.get().only_sized_by_parent());
-        if !sized_by_parent {
-          let rid = RenderId(id);
-          self.layout_info_mut(layout_info).rect = None;
-          relayout_root = rid;
-        }
 
         !sized_by_parent
       });
       tree.push_relayout_sub_root(relayout_root);
+    } else {
+      tree.push_relayout_sub_root(self);
     }
   }
 
@@ -404,5 +408,60 @@ mod tests {
 
     assert_eq!(&*records.lock().unwrap(), &[grand_parent, parent, son]);
     assert!(tree.needs_layout.is_empty());
+  }
+
+  #[test]
+  fn fix_ensure_relayout() {
+    #[derive(Debug)]
+    struct DoubleSize;
+
+    impl CombinationWidget for DoubleSize {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+        let stateful = SizedBox::empty_box(Size::new(100., 100.)).into_stateful(ctx);
+        let mut pointer = stateful.get_state_ref();
+        stateful
+          .on_pointer_move(move |_| {
+            let mut sized_box = pointer.borrow_mut();
+            sized_box.size = sized_box.size * 2.;
+          })
+          .box_it()
+      }
+    }
+
+    impl_widget_for_combination_widget!(DoubleSize);
+
+    let mut wnd = window::Window::without_render(DoubleSize.box_it(), Size::new(500., 500.));
+    wnd.render_ready();
+
+    {
+      let r_tree = wnd.render_tree();
+      let r_root = r_tree.root().unwrap();
+
+      assert_eq!(
+        r_root
+          .layout_box_rect(unsafe { r_tree.get_unchecked_mut() })
+          .unwrap()
+          .size,
+        Size::new(100., 100.)
+      );
+    }
+
+    wnd.processes_native_event(winit::event::WindowEvent::CursorMoved {
+      device_id: unsafe { winit::event::DeviceId::dummy() },
+      position: (1, 1).into(),
+      modifiers: ModifiersState::default(),
+    });
+
+    wnd.render_ready();
+
+    let r_tree = wnd.render_tree();
+    let r_root = r_tree.root().unwrap();
+    assert_eq!(
+      r_root
+        .layout_box_rect(unsafe { r_tree.get_unchecked_mut() })
+        .unwrap()
+        .size,
+      Size::new(200., 200.)
+    );
   }
 }

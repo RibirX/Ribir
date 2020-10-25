@@ -33,8 +33,18 @@ impl WidgetTree {
     root
   }
 
-  #[inline]
   pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
+    if let Some(stateful) = widget.downcast_attr_widget::<stateful::StatefulAttr>() {
+      let id = stateful.id();
+      *id.get_mut(self).unwrap() = widget;
+      id
+    } else {
+      self.alloc_node(widget)
+    }
+  }
+
+  #[inline]
+  pub fn alloc_node(&mut self, widget: BoxWidget) -> WidgetId {
     WidgetId(self.arena.new_node(widget))
   }
 
@@ -75,6 +85,11 @@ impl WidgetTree {
         });
       }
     }
+
+    if let Some(rid) = wid.relative_to_render(self) {
+      rid.mark_needs_layout(render_tree);
+    }
+
     self
   }
 
@@ -115,6 +130,9 @@ impl WidgetTree {
 
   #[cfg(test)]
   pub fn changed_widgets(&self) -> &HashSet<WidgetId> { &self.changed_widgets }
+
+  #[cfg(test)]
+  pub fn count(&self) -> usize { self.arena.count() }
 
   /// Tell the render object its owner changed one by one.
   fn flush_to_render(&mut self, render_tree: &mut RenderTree) {

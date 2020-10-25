@@ -30,6 +30,8 @@ mod box_decoration;
 pub use box_decoration::*;
 mod attr;
 pub use attr::*;
+mod checkbox;
+pub use checkbox::*;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -121,6 +123,13 @@ pub trait CombinationWidget: Widget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
+
+  fn self_state_ref(&self, ctx: &mut BuildCtx) -> StateRef<Self>
+  where
+    Self: Sized,
+  {
+    unsafe { StateRef::new(ctx.state_attr()) }
+  }
 }
 
 /// RenderWidget provide configuration for render object which provide actual

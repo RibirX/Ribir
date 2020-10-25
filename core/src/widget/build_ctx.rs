@@ -3,7 +3,6 @@ use std::pin::Pin;
 
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
-  #[allow(dead_code)]
   widget: WidgetId,
 }
 
@@ -22,6 +21,11 @@ impl<'a> BuildCtx<'a> {
       .find_map(|id| id.get(tree).and_then(|w| w.downcast_attr_widget()))
       .expect("At least， root theme should be found.");
     theme.data()
+  }
+
+  #[inline]
+  pub fn state_attr(&mut self) -> widget::stateful::StatefulAttr {
+    widget::stateful::StatefulAttr::from_id(self.widget, self.tree.as_mut())
   }
 }
 
@@ -73,7 +77,10 @@ mod tests {
     let mut wnd = window::Window::without_render(dark_light_theme, Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
-    assert_eq!(track_themes.borrow()[0], light);
+    assert_eq!(
+      track_themes.borrow()[0].brightness,
+      theme_data::Brightness::Light
+    );
 
     let theme = ThemeTrack {
       themes: track_themes.clone(),
@@ -84,6 +91,9 @@ mod tests {
     let mut wnd = window::Window::without_render(light_dark_theme, Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 2);
-    assert_eq!(track_themes.borrow()[1], dark);
+    assert_eq!(
+      track_themes.borrow()[1].brightness,
+      theme_data::Brightness::Dark
+    );
   }
 }

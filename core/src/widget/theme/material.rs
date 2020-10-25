@@ -11,6 +11,7 @@ pub fn light(family: String) -> ThemeData {
     TextDecoration::NONE,
     Color::TRANSPARENT,
   );
+  let unselected_widget_color = Color::BLACK.with_alpha(0.7);
   ThemeData {
     brightness: Brightness::Light,
     primary: Color::from_u32(0x6200_EEFF),
@@ -27,11 +28,17 @@ pub fn light(family: String) -> ThemeData {
     on_error: Color::from_u32(0xFFFF_FFFF),
     typography_theme: dark_text,
     default_font_family: family,
+    check_box: CheckboxTheme {
+      border_color: unselected_widget_color.clone().with_alpha(0.65),
+      ..Default::default()
+    },
+    unselected_widget_color,
   }
 }
 
 /// A default dark theme with a teal accent color. Colors from https://material.io/design/color/dark-theme.html#ui-application
 pub fn dark(family: String) -> ThemeData {
+  let unselected_widget_color = Color::WHITE.with_alpha(0.7);
   let light_text = TypographyTheme::new(
     family.clone(),
     family.clone(),
@@ -41,7 +48,7 @@ pub fn dark(family: String) -> ThemeData {
     Color::TRANSPARENT,
   );
   ThemeData {
-    brightness: Brightness::Light,
+    brightness: Brightness::Dark,
     primary: Color::from_u32(0xBB86_FCFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary: Color::from_u32(0x03DA_C6FF),
@@ -56,5 +63,10 @@ pub fn dark(family: String) -> ThemeData {
     on_error: Color::from_u32(0),
     typography_theme: light_text,
     default_font_family: family,
+    check_box: CheckboxTheme {
+      border_color: unselected_widget_color.clone().with_alpha(0.65),
+      ..Default::default()
+    },
+    unselected_widget_color,
   }
 }

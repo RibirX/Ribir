@@ -310,7 +310,6 @@ impl HeadlessWindow {
 
 impl NoRenderWindow {
   pub fn without_render<W: Widget>(root: W, size: Size) -> Self {
-    // todo: should set the global transform of canvas by window's scale factor.
     let canvas = Canvas::new(None);
     let render = MockRender;
     Self::new(

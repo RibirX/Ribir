@@ -9,12 +9,12 @@ struct Todos {}
 impl_widget_for_combination_widget!(Todos);
 
 impl CombinationWidget for Todos {
-  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
     Column::default()
       .push(
         (0..15)
           .map(|i| {
-            let stateful = Text(format!("FirstRow {} ", i)).into_stateful();
+            let stateful = Text(format!("FirstRow {} ", i)).into_stateful(ctx);
             let mut state_ref = stateful.get_state_ref();
             stateful
               .with_cursor(CursorIcon::Text)
