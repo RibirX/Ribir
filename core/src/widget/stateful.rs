@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use std::{
+  any::Any,
   marker::PhantomData,
   ops::{Deref, DerefMut},
   pin::Pin,
@@ -71,6 +72,12 @@ impl<T: Widget> Widget for Stateful<T> {
 
   #[inline]
   fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 
   #[inline]
   fn box_it(self) -> BoxWidget {

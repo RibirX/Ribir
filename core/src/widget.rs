@@ -32,6 +32,8 @@ mod padding;
 pub use padding::*;
 mod box_decoration;
 pub use box_decoration::*;
+mod attr;
+pub use attr::*;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -43,6 +45,9 @@ pub trait Widget: Debug + Any {
 
   /// classify this widget into one of four type widget as mutation reference.
   fn classify_mut(&mut self) -> WidgetClassifyMut;
+
+  fn as_any(&self) -> &dyn Any;
+  fn as_any_mut(&mut self) -> &mut dyn Any;
 
   #[inline]
   fn is_combination(&self) -> bool { matches!(self.classify(), WidgetClassify::Combination(_)) }
@@ -58,6 +63,25 @@ pub trait Widget: Debug + Any {
   /// like `as_inherit`, but return mutable reference.
   #[inline]
   fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { None }
+
+  /// return the some-value of `WidgetAttr` reference if the widget attached
+  /// attr.
+  #[inline]
+  fn as_attr(&self) -> Option<&dyn Attribute>
+  where
+    Self: Sized,
+  {
+    None
+  }
+
+  /// like `as_attr`, but return mutable reference.
+  #[inline]
+  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>
+  where
+    Self: Sized,
+  {
+    None
+  }
 
   fn box_it(self) -> BoxWidget
   where
@@ -440,6 +464,12 @@ impl Widget for BoxWidget {
   #[inline]
   fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
 
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
@@ -540,6 +570,12 @@ impl<T: CombinationWidget + 'static> Widget for T {
 
   #[inline]
   fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
 impl<T: CombinationWidget> !RenderWidget for T {}
@@ -552,6 +588,12 @@ pub macro render_widget_base_impl($ty: ty) {
 
     #[inline]
     fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
+
+    #[inline]
+    fn as_any(&self) -> &dyn Any { self }
+
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any { self }
   }
 }
 
@@ -575,6 +617,12 @@ pub macro impl_widget_for_inherit_widget(
 
     #[inline]
     fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
+
+    #[inline]
+    fn as_any(&self) -> &dyn Any { self }
+
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any { self }
   }
 }
 #[cfg(test)]
