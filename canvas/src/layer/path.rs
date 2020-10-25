@@ -24,18 +24,27 @@ impl PathBuilder {
   /// Starts a new path by emptying the list of sub-paths.
   /// Call this method when you want to create a new path.
   #[inline]
-  pub fn begin_path(&mut self, at: Point) { self.0.begin(at.to_untyped()); }
+  pub fn begin_path(&mut self, at: Point) -> &mut Self {
+    self.0.begin(at.to_untyped());
+    self
+  }
 
   /// Causes the point of the pen to move back to the start of the current
   /// sub-path. It tries to draw a straight line from the current point to the
   /// start. If the shape has already been closed or has only one point, this
   #[inline]
-  pub fn close_path(&mut self) { self.0.close(); }
+  pub fn close_path(&mut self) -> &mut Self {
+    self.0.close();
+    self
+  }
 
   /// Connects the last point in the current sub-path to the specified (x, y)
   /// coordinates with a straight line.
   #[inline]
-  pub fn line_to(&mut self, to: Point) { self.0.line_to(to.to_untyped()); }
+  pub fn line_to(&mut self, to: Point) -> &mut Self {
+    self.0.line_to(to.to_untyped());
+    self
+  }
 
   /// Adds a cubic Bezier curve to the current path.
   #[inline]

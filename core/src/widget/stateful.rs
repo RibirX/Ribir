@@ -2,6 +2,8 @@ use crate::prelude::*;
 use std::{
   cell::{Ref, RefCell, RefMut},
   marker::PhantomData,
+  pin::Pin,
+  ptr::NonNull,
   rc::Rc,
 };
 
@@ -18,7 +20,7 @@ use std::{
 /// parent live longer than parent. So not pass a `StateRef` to its ancestors,
 /// that maybe panic.
 pub struct StateRef<T: Widget> {
-  pointer: StatefulPointer,
+  attr: StatefulAttr,
   type_info: PhantomData<*const T>,
 }
 
@@ -26,41 +28,96 @@ pub struct StateRef<T: Widget> {
 pub type Stateful<T> = WidgetAttr<T, StatefulAttr>;
 
 #[derive(Debug)]
-pub struct StatefulAttr(StatefulPointer);
-
-type StatefulPointer = Rc<RefCell<(*const dyn Widget, *mut dyn Widget)>>;
+pub struct StatefulAttr {
+  tree: NonNull<widget_tree::WidgetTree>,
+  pointer: Rc<RefCell<(*const dyn Widget, *mut dyn Widget)>>,
+  id: WidgetId,
+}
 
 impl<W: Widget> Stateful<W> {
   #[inline]
   pub fn get_state_ref(&self) -> StateRef<W> {
     StateRef {
-      pointer: self.attr.0.clone(),
+      attr: StatefulAttr {
+        tree: self.attr.tree,
+        pointer: self.attr.pointer.clone(),
+        id: self.attr.id,
+      },
       type_info: PhantomData,
     }
   }
+
+  #[inline]
+  pub fn id(&self) -> WidgetId { self.attr.id }
 }
 
 impl<W: Widget> StateRef<W> {
+  /// ## Safety
+  /// Should ensure the pointer in attr has the same type with `W`, otherwise
+  /// panic occur.
+  pub unsafe fn new(attr: StatefulAttr) -> Self {
+    StateRef {
+      attr: StatefulAttr {
+        tree: attr.tree,
+        pointer: attr.pointer.clone(),
+        id: attr.id,
+      },
+      type_info: std::marker::PhantomData,
+    }
+  }
+
   pub fn borrow(&self) -> Ref<W> {
-    Ref::map(self.pointer.borrow(), |(p, _)| unsafe {
+    Ref::map(self.attr.pointer.borrow(), |(p, _)| unsafe {
       &*(*p as *const W)
     })
   }
 
   pub fn borrow_mut(&mut self) -> RefMut<W> {
-    RefMut::map(self.pointer.borrow_mut(), |(_, p)| unsafe {
+    self
+      .attr
+      .id
+      .mark_changed(unsafe { self.attr.tree.as_mut() });
+    RefMut::map(self.attr.pointer.borrow_mut(), |(_, p)| unsafe {
       &mut *(*p as *mut W)
     })
   }
 }
 
+impl<W: Widget> Stateful<W> {
+  pub fn stateful<A: AttributeAttach<HostWidget = W>>(
+    widget: A,
+    mut tree: Pin<&mut widget_tree::WidgetTree>,
+  ) -> Self {
+    widget.unwrap_attr_or_else_with(|mut widget| {
+      let id =
+        unsafe { tree.as_mut().get_unchecked_mut() }.alloc_node(widget::PhantomWidget.box_it());
+      let pointer = StatefulAttr::rc_pointer(&mut widget);
+      let attr = StatefulAttr {
+        id,
+        pointer,
+        tree: NonNull::from(&*tree),
+      };
+      (widget, attr)
+    })
+  }
+}
+
 impl StatefulAttr {
-  pub fn new(widget: &mut BoxWidget) -> Self {
-    let pointer = Rc::new(RefCell::new((
+  pub(crate) fn from_id(id: WidgetId, mut tree: Pin<&mut widget_tree::WidgetTree>) -> Self {
+    let widget = id.assert_get_mut(unsafe { tree.as_mut().get_unchecked_mut() });
+    let pointer = Self::rc_pointer(widget);
+    Self {
+      pointer,
+      id,
+      tree: NonNull::from(&*tree),
+    }
+  }
+
+  fn rc_pointer(widget: &mut BoxWidget) -> Rc<RefCell<(*const dyn Widget, *mut dyn Widget)>> {
+    Rc::new(RefCell::new((
       &*widget.widget as *const _,
       &mut *widget.widget as *mut _,
-    )));
-    Self(pointer)
+    )))
   }
 }
 
@@ -70,9 +127,10 @@ mod tests {
 
   #[test]
   fn smoke() {
+    let mut tree = Box::pin(widget_tree::WidgetTree::default());
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let stateful = Text("Hello".to_string()).into_stateful();
+    let stateful = Stateful::stateful(Text("Hello".to_string()), tree.as_mut());
     {
       stateful.get_state_ref().borrow_mut().0 = "World!".to_string();
     }
@@ -84,7 +142,7 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let stateful = Text("Hello".to_string()).into_stateful();
+    let stateful = Stateful::stateful(Text("Hello".to_string()), tree.as_mut());
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
@@ -98,9 +156,23 @@ mod tests {
   }
 
   #[test]
-  fn access_state() {
-    let stateful = Text("hello".to_string()).into_stateful();
+  fn fix_pin_widget_node() {
+    #[derive(Debug)]
+    struct TestWidget;
 
-    assert_eq!(stateful.0, "hello")
+    impl CombinationWidget for TestWidget {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+        SizedBox::empty_box(Size::new(100., 100.))
+          .into_stateful(ctx)
+          .box_it()
+      }
+    }
+
+    impl_widget_for_combination_widget!(TestWidget);
+
+    let mut wnd = window::Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
+    wnd.render_ready();
+    let tree = wnd.widget_tree();
+    assert_eq!(tree.count(), 2);
   }
 }

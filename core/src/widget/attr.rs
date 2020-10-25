@@ -80,14 +80,11 @@ pub trait AttributeAttach: Widget {
   /// widget, and a `StateRef` which can be use to modify the states of the
   /// widget.
   #[inline]
-  fn into_stateful(self) -> Stateful<Self::HostWidget>
+  fn into_stateful(self, ctx: &mut BuildCtx) -> Stateful<Self::HostWidget>
   where
     Self: Sized,
   {
-    self.unwrap_attr_or_else_with(|mut widget| {
-      let attr = widget::stateful::StatefulAttr::new(&mut widget);
-      (widget, attr)
-    })
+    Stateful::stateful(self, ctx.tree.as_mut())
   }
 
   #[inline]

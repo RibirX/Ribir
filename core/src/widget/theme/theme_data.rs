@@ -1,4 +1,4 @@
-pub use canvas::{Color, FillStyle, FontStyle, FontWeight};
+pub use canvas::{Color, FillStyle, FontStyle, FontWeight, Path, PathBuilder, Point};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -61,7 +61,7 @@ pub struct TypographyTheme {
 }
 
 /// Properties from [Material Theme](https://material.io/design/material-theming/implementing-your-theme.html)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ThemeData {
   // Dark or light theme.
   pub brightness: Brightness,
@@ -78,8 +78,11 @@ pub struct ThemeData {
   pub on_surface: Color,
   pub on_error: Color,
   pub typography_theme: TypographyTheme,
-  // Default text font family
+  /// The color used for widgets in their inactive (but enabled) state.
+  pub unselected_widget_color: Color,
+  /// Default text font family
   pub default_font_family: String,
+  pub check_box: CheckboxTheme,
 }
 
 impl TypographyTheme {
@@ -230,6 +233,35 @@ impl TypographyTheme {
         decoration_color,
         ..Default::default()
       },
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct CheckboxTheme {
+  pub size: f32,
+  pub border_width: f32,
+  pub check_mark_width: f32,
+  pub border_radius: f32,
+  pub border_color: Color,
+  pub checked_path: Path,
+}
+
+impl Default for CheckboxTheme {
+  fn default() -> Self {
+    let mut builder = PathBuilder::new();
+    builder
+      .begin_path(Point::new(4.1, 12.7))
+      .line_to(Point::new(9., 17.6))
+      .line_to(Point::new(20.3, 6.3))
+      .close_path();
+    Self {
+      size: 16.,
+      border_width: 2.,
+      check_mark_width: 2.1333333333,
+      border_radius: 2.,
+      border_color: Color::BLACK,
+      checked_path: builder.build(),
     }
   }
 }

@@ -43,7 +43,7 @@ impl<'a> Rendering2DLayer<'a> {
   /// start. If the shape has already been closed or has only one point, this
   pub fn close_path(&mut self) -> &mut Self {
     if let Some(ref mut b) = self.path {
-      b.close_path()
+      b.close_path();
     };
     self
   }
