@@ -24,16 +24,78 @@ pub struct WidgetAttr<W: Widget, AttrData> {
 pub trait Attribute: Widget {
   fn widget(&self) -> &BoxWidget;
   fn widget_mut(&mut self) -> &mut BoxWidget;
-
-  #[inline]
-  fn reattach(&mut self, widget: BoxWidget) -> BoxWidget {
-    std::mem::replace(self.widget_mut(), widget)
-  }
 }
 
-pub trait HarvestAttr {
-  type W: Widget;
-  fn attach_attr<AttrData: Default + 'static>(self) -> WidgetAttr<Self::W, AttrData>;
+pub enum AttrOrWidget<W: Widget, A> {
+  Attr(WidgetAttr<W, A>),
+  Widget(BoxWidget),
+}
+// Todo, the attribute implementation should also implement itself attach method
+// , Like `with_key` for `KeyDetect`.
+pub trait AttributeAttach: Widget {
+  type HostWidget: Widget;
+
+  /// Assign a key to the widget to help framework to track if two widget is a
+  /// same widget in two frame.
+  #[inline]
+  fn with_key<K: Into<Key> + 'static>(self, key: K) -> KeyDetect<Self::HostWidget>
+  where
+    Self: Sized,
+  {
+    let key = key.into();
+    match self.pop_attr() {
+      AttrOrWidget::Attr(mut attr) => {
+        attr.attr = key;
+        attr
+      }
+      AttrOrWidget::Widget(widget) => KeyDetect {
+        widget,
+        attr: key,
+        marker: PhantomData,
+      },
+    }
+  }
+
+  /// If this widget is has the `AttrData` attribute, this method pop the
+  /// `AttrData` to the most outside, and return it, otherwise return a
+  /// `BoxWidget`
+  fn pop_attr<AttrData: 'static>(self) -> AttrOrWidget<Self::HostWidget, AttrData>
+  where
+    Self: Sized,
+  {
+    let mut boxed = self.box_it();
+    if let Some((widget, attr)) = copy_split_attr(&mut boxed) {
+      std::mem::forget(boxed);
+      AttrOrWidget::Attr(WidgetAttr {
+        attr,
+        widget,
+        marker: PhantomData,
+      })
+    } else {
+      let mut target = boxed.as_attr_mut();
+      let mut attr = None;
+      while let Some(attr_widget) = target.take() {
+        if let Some((widget, a)) = copy_split_attr(attr_widget.widget_mut()) {
+          let detached = std::mem::replace(attr_widget.widget_mut(), widget);
+          std::mem::forget(detached);
+          attr = Some(a);
+          break;
+        } else {
+          target = attr_widget.widget_mut().as_attr_mut();
+        }
+      }
+
+      if let Some(attr) = attr {
+        AttrOrWidget::Attr(WidgetAttr {
+          attr,
+          widget: boxed,
+          marker: PhantomData,
+        })
+      } else {
+        AttrOrWidget::Widget(boxed)
+      }
+    }
+  }
 }
 
 impl<W: Widget, AttrData: Any + Debug> Attribute for WidgetAttr<W, AttrData> {
@@ -81,7 +143,8 @@ impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
       attr: self.attr,
       marker: PhantomData,
     };
-    erase_type.box_it()
+    let widget: Box<dyn Widget> = Box::new(erase_type);
+    widget.into()
   }
 }
 
@@ -105,41 +168,10 @@ fn copy_split_attr<AttrData: 'static>(widget: &mut BoxWidget) -> Option<(BoxWidg
   }
 }
 
-impl<W: Widget> HarvestAttr for W {
-  default type W = BoxWidget;
-  default fn attach_attr<AttrData: Default + 'static>(self) -> WidgetAttr<Self::W, AttrData> {
-    let mut boxed = self.box_it();
-    if let Some((widget, attr)) = copy_split_attr(&mut boxed) {
-      std::mem::forget(boxed);
-      WidgetAttr {
-        attr,
-        widget,
-        marker: PhantomData,
-      }
-    } else {
-      let mut target = boxed.as_attr_mut();
-      let mut attr = None;
-      while let Some(attr_widget) = target.take() {
-        if let Some((widget, a)) = copy_split_attr(attr_widget.widget_mut()) {
-          let detached = attr_widget.reattach(widget);
-          std::mem::forget(detached);
-          attr = Some(a);
-          break;
-        } else {
-          target = attr_widget.widget_mut().as_attr_mut();
-        }
-      }
-
-      let attr = attr.unwrap_or_else(|| unimplemented!());
-      WidgetAttr {
-        attr,
-        widget: boxed,
-        marker: PhantomData,
-      }
-    }
-  }
+impl<W: Widget> AttributeAttach for W {
+  default type HostWidget = Self;
 }
 
-impl<W: Widget, Data: Debug + 'static> HarvestAttr for WidgetAttr<W, Data> {
-  type W = W;
+impl<W: Widget, Data: Debug + 'static> AttributeAttach for WidgetAttr<W, Data> {
+  type HostWidget = W;
 }

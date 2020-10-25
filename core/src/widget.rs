@@ -83,6 +83,23 @@ pub trait Widget: Debug + Any {
     None
   }
 
+  fn downcast_attr_widget<Attr: Attribute>(&self) -> Option<&Attr>
+  where
+    Self: Sized,
+  {
+    let mut attr = self.as_attr();
+
+    while let Some(a) = attr {
+      let target_attr = a.as_any().downcast_ref::<Attr>();
+      if target_attr.is_some() {
+        return target_attr;
+      } else {
+        attr = a.widget().as_attr();
+      }
+    }
+    None
+  }
+
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
@@ -101,16 +118,6 @@ pub trait Widget: Debug + Any {
     Self: Sized,
   {
     Stateful::stateful(self, ctx.tree.as_mut())
-  }
-
-  /// Assign a key to the widget to help framework to track if two widget is a
-  /// same widget in two frame.
-  #[inline]
-  fn with_key<K: Into<Key>>(self, key: K) -> BoxWidget
-  where
-    Self: Sized,
-  {
-    KeyDetect::with_key(key, self.box_it())
   }
 
   /// Assign the type of mouse cursor, show when the mouse pointer is over this
@@ -478,6 +485,11 @@ impl Widget for BoxWidget {
   }
 }
 
+impl From<Box<dyn Widget>> for BoxWidget {
+  #[inline]
+  fn from(widget: Box<dyn Widget>) -> Self { Self { widget } }
+}
+
 /// A function help `InheritWidget` inherit `base` widget.
 ///
 /// ## params
@@ -635,8 +647,6 @@ mod tests {
       .with_key(0)
       .on_pointer_down(|_| {});
 
-    assert!(Widget::dynamic_cast_ref::<KeyDetect>(&widget).is_some());
-    assert!(Widget::dynamic_cast_mut::<KeyDetect>(&mut widget).is_some());
     assert!(Widget::dynamic_cast_ref::<PointerListener>(&widget).is_some());
     assert!(Widget::dynamic_cast_mut::<PointerListener>(&mut widget).is_some());
     assert!(Widget::dynamic_cast_ref::<Text>(&widget).is_some());

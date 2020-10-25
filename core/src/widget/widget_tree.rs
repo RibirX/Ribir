@@ -57,7 +57,7 @@ impl WidgetTree {
           wid.take_children(self),
           wid
             .get_mut(self)
-            .and_then(|w| Widget::as_render(w))
+            .and_then(|w| w.as_render())
             .map(|r| r.create_render_object()),
         )
       };
@@ -136,7 +136,7 @@ impl WidgetTree {
         .get(wid)
         .expect("Changed widget should always render widget!");
 
-      let safety = Widget::as_render(widget).expect("Must be a render widget!");
+      let safety = widget.as_render().expect("Must be a render widget!");
 
       rid
         .get_mut(r_tree1)
@@ -155,8 +155,9 @@ impl WidgetTree {
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
-    let same_key = Widget::key(&widget)
-      .and_then(|key| node.get(self).map(|w| Some(key) == Widget::key(w)))
+    let same_key = widget
+      .key()
+      .and_then(|key| node.get(self).map(|w| Some(key) == w.key()))
       .unwrap_or(false);
     if same_key {
       if widget.is_render() {
@@ -192,7 +193,7 @@ impl WidgetTree {
     while let Some(id) = child {
       child = id.next_sibling(self);
 
-      let key = id.get(self).and_then(|w| Widget::key(w).cloned());
+      let key = id.get(self).and_then(|w| w.key().cloned());
       if let Some(key) = key {
         id.detach(self);
         key_children.insert(key, id);
@@ -202,7 +203,7 @@ impl WidgetTree {
     }
 
     for w in new_children.into_iter() {
-      if let Some(k) = Widget::key(&w) {
+      if let Some(k) = w.key() {
         if let Some(id) = key_children.get(k).copied() {
           key_children.remove(k);
           node.0.append(id.0, &mut self.arena);
@@ -449,8 +450,12 @@ impl WidgetId {
   }
 }
 
-impl dyn Widget {
-  fn key(&self) -> Option<&Key> { self.dynamic_cast_ref::<KeyDetect>().map(|k| k.key()) }
+impl BoxWidget {
+  fn key(&self) -> Option<&Key> {
+    self
+      .downcast_attr_widget::<KeyDetect<BoxWidget>>()
+      .map(|k| k.key())
+  }
 
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self.classify() {

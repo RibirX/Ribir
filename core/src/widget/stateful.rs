@@ -241,7 +241,10 @@ mod tests {
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
     let id = tree.set_root(key.box_it(), &mut render_tree);
 
-    let key_back = id.dynamic_cast_ref::<KeyDetect>(tree);
+    let key_back = id
+      .get(tree)
+      .and_then(|w| w.downcast_attr_widget::<KeyDetect<BoxWidget>>())
+      .map(|k| k.key());
     assert!(key_back.is_some());
   }
 
