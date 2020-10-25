@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::any::Any;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[derive(Debug)]
@@ -43,24 +44,49 @@ impl BoxDecoration {
       radius: None,
     }
   }
+}
 
-  pub fn with_background(mut self, background: FillStyle) -> Self {
+impl Widget for BoxDecoration {
+  #[inline]
+  fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
+
+  #[inline]
+  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
+
+  #[inline]
+  fn as_any(&self) -> &dyn Any { self }
+
+  #[inline]
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
+  #[inline]
+  fn as_attr(&self) -> Option<&dyn Attribute> { None }
+
+  #[inline]
+  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
+
+  #[inline]
+  fn with_background(mut self, background: FillStyle) -> Self {
     self.background = Some(background);
     self
   }
 
-  pub fn width_border(mut self, border: Border) -> Self {
+  #[inline]
+  fn with_border(mut self, border: Border) -> Self {
     self.border = Some(border);
     self
   }
 
-  pub fn with_border_radius(mut self, radius: BorderRadius) -> Self {
+  #[inline]
+  fn with_border_radius(mut self, radius: BorderRadius) -> Self {
     self.radius = Some(radius);
     self
   }
 }
 
-render_widget_base_impl!(BoxDecoration);
+impl AttributeAttach for BoxDecoration {
+  type HostWidget = Self;
+}
 
 impl RenderWidget for BoxDecoration {
   type RO = BoxDecorationRender;

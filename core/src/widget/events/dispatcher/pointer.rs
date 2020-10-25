@@ -1,4 +1,4 @@
-use super::{CommonDispatcher, FocusListener, FocusManager};
+use super::{CommonDispatcher, FocusManager};
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use winit::event::{DeviceId, ElementState, MouseButton};
@@ -79,7 +79,7 @@ impl PointerDispatcher {
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid
         .ancestors(tree)
-        .find(|id| id.dynamic_cast_ref::<FocusListener>(tree).is_some())
+        .find(|id| id.get(tree).map_or(false, |w| w.has_attr::<FocusAttr>()))
     });
     if let Some(focus_id) = nearest_focus {
       focus_mgr.focus(focus_id, common);
@@ -228,8 +228,8 @@ impl PointerDispatcher {
   }
   fn event_emitter(
     event_type: PointerEventType,
-  ) -> impl FnMut(&PointerListener, std::rc::Rc<PointerEvent>) {
-    move |listener: &PointerListener, event: std::rc::Rc<PointerEvent>| {
+  ) -> impl FnMut(&PointerListener<BoxWidget>, std::rc::Rc<PointerEvent>) {
+    move |listener: &PointerListener<BoxWidget>, event: std::rc::Rc<PointerEvent>| {
       log::info!("{:?} {:?}", event_type, event);
       listener.pointer_observable().next((event_type, event));
     }
@@ -274,10 +274,10 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer<W: Widget>(
+  fn record_pointer<W: AttributeAttach>(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
     widget: W,
-  ) -> BoxWidget {
+  ) -> PointerListener<W::HostWidget> {
     let handler_ctor = || {
       let stack = event_stack.clone();
       move |e: &PointerEvent| stack.borrow_mut().push(e.clone())

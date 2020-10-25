@@ -27,11 +27,7 @@ impl WidgetTree {
 
   pub fn set_root(&mut self, data: BoxWidget, render_tree: &mut RenderTree) -> WidgetId {
     debug_assert!(self.root.is_none());
-    let root = if let Some(w) = Widget::dynamic_cast_ref::<Stateful<BoxWidget>>(&data) {
-      w.id()
-    } else {
-      self.new_node(data)
-    };
+    let root = self.new_node(data);
     self.root = Some(root);
     self.inflate(root, render_tree);
     root
@@ -57,7 +53,7 @@ impl WidgetTree {
           wid.take_children(self),
           wid
             .get_mut(self)
-            .and_then(|w| Widget::as_render(w))
+            .and_then(|w| w.as_render())
             .map(|r| r.create_render_object()),
         )
       };
@@ -136,7 +132,7 @@ impl WidgetTree {
         .get(wid)
         .expect("Changed widget should always render widget!");
 
-      let safety = Widget::as_render(widget).expect("Must be a render widget!");
+      let safety = widget.as_render().expect("Must be a render widget!");
 
       rid
         .get_mut(r_tree1)
@@ -155,8 +151,9 @@ impl WidgetTree {
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
-    let same_key = Widget::key(&widget)
-      .and_then(|key| node.get(self).map(|w| Some(key) == Widget::key(w)))
+    let same_key = widget
+      .key()
+      .and_then(|key| node.get(self).map(|w| Some(key) == w.key()))
       .unwrap_or(false);
     if same_key {
       if widget.is_render() {
@@ -192,7 +189,7 @@ impl WidgetTree {
     while let Some(id) = child {
       child = id.next_sibling(self);
 
-      let key = id.get(self).and_then(|w| Widget::key(w).cloned());
+      let key = id.get(self).and_then(|w| w.key().cloned());
       if let Some(key) = key {
         id.detach(self);
         key_children.insert(key, id);
@@ -202,7 +199,7 @@ impl WidgetTree {
     }
 
     for w in new_children.into_iter() {
-      if let Some(k) = Widget::key(&w) {
+      if let Some(k) = w.key() {
         if let Some(id) = key_children.get(k).copied() {
           key_children.remove(k);
           node.0.append(id.0, &mut self.arena);
@@ -263,22 +260,6 @@ impl WidgetId {
   /// Returns a mutable reference to the node data.
   pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut BoxWidget> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
-  }
-
-  // Dynamic cast the widget that the id stand for to a reference of the type `W`
-  // , if the widget is or its **base widget** is type `W`.
-  pub fn dynamic_cast_ref<W: Widget>(self, tree: &WidgetTree) -> Option<&W> {
-    self
-      .get(tree)
-      .and_then(|w| Widget::dynamic_cast_ref::<W>(w))
-  }
-
-  // Dynamic cast the widget that the id stand for to a mutable reference of the
-  // type `W` , if the widget is or its **base widget** is type `W`.
-  pub fn dynamic_cast_mut<W: Widget>(self, tree: &mut WidgetTree) -> Option<&mut W> {
-    self
-      .get_mut(tree)
-      .and_then(|w| Widget::dynamic_cast_mut::<W>(w))
   }
 
   /// detect if the widget of this id point to is dropped.
@@ -357,11 +338,7 @@ impl WidgetId {
   }
 
   fn append_widget(self, data: BoxWidget, tree: &mut WidgetTree) -> WidgetId {
-    let id = if let Some(w) = Widget::dynamic_cast_ref::<Stateful<BoxWidget>>(&data) {
-      w.id()
-    } else {
-      tree.new_node(data)
-    };
+    let id = tree.new_node(data);
     self.0.append(id.0, &mut tree.arena);
     id
   }
@@ -449,8 +426,8 @@ impl WidgetId {
   }
 }
 
-impl dyn Widget {
-  fn key(&self) -> Option<&Key> { self.dynamic_cast_ref::<KeyDetect>().map(|k| k.key()) }
+impl BoxWidget {
+  fn key(&self) -> Option<&Key> { self.downcast_attr_widget::<Key>().map(|k| k.key()) }
 
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
     match self.classify() {
@@ -577,25 +554,25 @@ mod test {
     assert_eq!(
       env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
-└── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
-    ├── KeyDetect { key: KI4(0), widget: Text("New title") }
-    ├── KeyDetect { key: KI4(1), widget: Text("") }
-    ├── KeyDetect { key: KI4(2), widget: Text("") }
-    └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 } }
-        └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
-            ├── KeyDetect { key: KI4(0), widget: Text("New title") }
-            ├── KeyDetect { key: KI4(1), widget: Text("") }
-            ├── KeyDetect { key: KI4(2), widget: Text("") }
-            └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 } }
-                └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
-                    ├── KeyDetect { key: KI4(0), widget: Text("New title") }
-                    ├── KeyDetect { key: KI4(1), widget: Text("") }
-                    ├── KeyDetect { key: KI4(2), widget: Text("") }
-                    └── KeyDetect { key: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 } }
-                        └── KeyDetect { key: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }) }
-                            ├── KeyDetect { key: KI4(0), widget: Text("New title") }
-                            ├── KeyDetect { key: KI4(1), widget: Text("") }
-                            └── KeyDetect { key: KI4(2), widget: Text("") }
+└── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+    ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
+    ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
+    ├── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
+    └── WidgetAttr { attr: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 }, type_info: PhantomData }
+        └── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+            ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
+            ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
+            ├── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
+            └── WidgetAttr { attr: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 }, type_info: PhantomData }
+                └── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+                    ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
+                    ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
+                    ├── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
+                    └── WidgetAttr { attr: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 }, type_info: PhantomData }
+                        └── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+                            ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
+                            ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
+                            └── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
 "#
     );
 

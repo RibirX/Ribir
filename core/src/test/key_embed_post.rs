@@ -13,6 +13,7 @@ struct EmbedKeyPost {
   level: usize,
 }
 
+impl_widget_for_combination_widget!(EmbedKeyPost);
 impl CombinationWidget for EmbedKeyPost {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     let mut row = Row::default()

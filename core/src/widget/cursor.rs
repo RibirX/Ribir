@@ -2,31 +2,32 @@ use crate::prelude::*;
 use std::{cell::Cell, rc::Rc};
 use winit::window::CursorIcon;
 
+#[derive(Debug)]
+pub struct CursorAttr(Rc<Cell<CursorIcon>>);
+
 /// `Cursor` is a widget inherit from another widget and assign an `cursor` to
 /// it.
-#[derive(Debug)]
-pub struct Cursor {
-  pub cursor: Rc<Cell<CursorIcon>>,
-  pub widget: BoxWidget,
-}
+pub type Cursor<W> = WidgetAttr<W, CursorAttr>;
 
-impl Cursor {
-  pub fn new<W: Widget>(cursor: CursorIcon, widget: W) -> Self {
-    let cursor = Rc::new(Cell::new(cursor));
-    let c_cursor = cursor.clone();
-    let w = widget.on_pointer_move(move |e| {
-      if e.point_type == PointerType::Mouse
-        && e.buttons == MouseButtons::empty()
-        && e.as_ref().window.borrow().updated_cursor().is_none()
-      {
-        e.as_ref().window.borrow_mut().set_cursor(c_cursor.get())
-      }
+impl<W: Widget> Cursor<W> {
+  pub fn new<A: AttributeAttach<HostWidget = W>>(cursor: CursorIcon, widget: A) -> Self {
+    let c = widget.unwrap_attr_or_else_with(|widget| {
+      let cursor = Rc::new(Cell::new(cursor));
+      let c_cursor = cursor.clone();
+      let w = widget.on_pointer_move(move |e| {
+        if e.point_type == PointerType::Mouse
+          && e.buttons == MouseButtons::empty()
+          && e.as_ref().window.borrow().updated_cursor().is_none()
+        {
+          e.as_ref().window.borrow_mut().set_cursor(c_cursor.get())
+        }
+      });
+      (w.box_it(), CursorAttr(cursor))
     });
-    Self { cursor, widget: w }
+    c.attr.0.set(cursor);
+    c
   }
 }
-
-inherit_widget!(Cursor, widget);
 
 #[cfg(test)]
 mod tests {
