@@ -7,10 +7,9 @@ pub mod theme_data;
 use crate::prelude::*;
 pub use theme_data::ThemeData;
 
-#[derive(Debug)]
-pub struct Theme {
-  pub data: ThemeData,
-  pub widget: BoxWidget,
-}
+pub type Theme<W> = WidgetAttr<W, ThemeData>;
 
-inherit_widget!(Theme, widget);
+impl<W: Widget> Theme<W> {
+  #[inline]
+  pub fn data(&self) -> &ThemeData { &self.attr }
+}

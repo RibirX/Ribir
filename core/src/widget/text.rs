@@ -7,7 +7,7 @@ use crate::render::*;
 #[derive(Debug)]
 pub struct Text(pub String);
 
-render_widget_base_impl!(Text);
+impl_widget_for_render_widget!(Text);
 
 #[derive(Debug)]
 pub struct TextRender {

@@ -31,32 +31,11 @@ pub enum Key {
 
 /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
 /// `KeyDetect` is a widget that only work for bind a key to a widget.
-#[derive(Debug)]
-pub struct KeyDetect {
-  key: Key,
-  widget: BoxWidget,
-}
+pub type KeyDetect<W> = WidgetAttr<W, Key>;
 
-inherit_widget!(KeyDetect, widget);
-
-impl KeyDetect {
-  pub fn with_key<K>(key: K, widget: BoxWidget) -> BoxWidget
-  where
-    K: Into<Key>,
-  {
-    let key = key.into();
-    inherit(
-      widget,
-      |base| KeyDetect {
-        key: key.clone(),
-        widget: base,
-      },
-      |k| k.key = key.clone(),
-    )
-  }
-
+impl<W: Widget> KeyDetect<W> {
   #[inline]
-  pub fn key(&self) -> &Key { &self.key }
+  pub fn key(&self) -> &Key { &self.attr }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {
@@ -154,17 +133,13 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
-  impl BoxWidget {
-    fn as_key(&self) -> &Key { &Widget::dynamic_cast_ref::<KeyDetect>(self).unwrap().key }
-  }
-
   let k1 = Text("".to_string()).with_key(0);
   let k2 = Text("".to_string()).with_key(String::new());
   let k3 = Text("".to_string()).with_key("");
   let ck1 = Text("".to_string()).with_key(complex_key!("asd", true, 1));
   let ck2 = Text("".to_string()).with_key(complex_key!("asd", true, 1));
-  assert!(k1.as_key() != k2.as_key());
-  assert!(k2.as_key() == k3.as_key());
-  assert!(k3.as_key() != k1.as_key());
-  assert!(ck1.as_key() == ck2.as_key());
+  assert!(k1.key() != k2.key());
+  assert!(k2.key() == k3.key());
+  assert!(k3.key() != k1.key());
+  assert!(ck1.key() == ck2.key());
 }

@@ -10,7 +10,7 @@ pub struct Padding {
 #[derive(Debug)]
 pub struct PaddingRender(EdgeInsets);
 
-render_widget_base_impl!(Padding);
+impl_widget_for_render_widget!(Padding);
 
 impl RenderWidget for Padding {
   type RO = PaddingRender;

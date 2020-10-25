@@ -30,4 +30,4 @@ impl std::iter::FromIterator<BoxWidget> for Column {
   }
 }
 
-inherit_widget!(Column, 0);
+impl_proxy_widget!(Column, 0);

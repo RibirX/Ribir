@@ -1,9 +1,8 @@
 use crate::prelude::*;
 use std::{
+  cell::{Ref, RefCell, RefMut},
   marker::PhantomData,
-  ops::{Deref, DerefMut},
-  pin::Pin,
-  ptr::NonNull,
+  rc::Rc,
 };
 
 /// A reference of stateful widget, can use it to directly access and modify
@@ -12,193 +11,56 @@ use std::{
 /// Remember it assume you changed the widget back of this reference if you
 /// mutably dereference this pointer. No matter if you really modify it.
 ///
-/// ## Safety
-/// Because `StateRef` can only be constructed in `Combination::build` method,
-/// the only way to live longer than `build` method scope it capture by some
-/// widget that construct in the same scope. And framework guarantee the widgets
-/// constructed in the same `build` method  have same lifetime. so the wid is
-/// always valid in its lifetime.
+/// ## Panics
 ///
-/// Maybe panic if widget impl the `Drop` trait, and access `StateRef` in its
-/// `drop` method,  the captured `StateRef` maybe is dangling.
+/// `StateRef` should not live longer than its widget. Framework guarantee the
+/// widgets constructed in the same `build` method  have same lifetime,  and
+/// parent live longer than parent. So not pass a `StateRef` to its ancestors,
+/// that maybe panic.
 pub struct StateRef<T: Widget> {
-  inner: InnerStateful<T>,
+  pointer: StatefulPointer,
+  type_info: PhantomData<*const T>,
 }
 
-/// Hold the preallocated widget.
-///
-/// ## Safety
-/// In safe code, `StatefulWidget` can only be constructed in
-/// `Combination::build` method. And it design as a temporary widget only to
-/// identify the preallocated real widget. It's only live during framework
-/// construct widget tree, and framework guarantee the real widget live longer
-/// than it.
-#[derive(Debug)]
-pub struct Stateful<T: Widget> {
-  inner: InnerStateful<T>,
-}
+/// This widget convert a stateless widget to stateful.
+pub type Stateful<T> = WidgetAttr<T, StatefulAttr>;
 
 #[derive(Debug)]
-struct InnerStateful<T: Widget> {
-  wid: WidgetId,
-  tree_ptr: NonNull<widget_tree::WidgetTree>,
-  marker: PhantomData<*const T>,
-}
+pub struct StatefulAttr(StatefulPointer);
 
-impl<T: Widget> InheritWidget for Stateful<T> {
-  #[inline]
-  fn base_widget(&self) -> &dyn Widget {
-    let inner = &self.inner;
-    inner.wid.assert_get(unsafe { inner.tree_ptr.as_ref() })
-  }
-
-  #[inline]
-  fn base_widget_mut(&mut self) -> &mut dyn Widget {
-    let inner = &mut self.inner;
-    inner.wid.assert_get_mut(unsafe { inner.tree_ptr.as_mut() })
-  }
-}
-
-impl<T: Widget> Widget for Stateful<T> {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
-
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
-
-  #[inline]
-  fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
-
-  #[inline]
-  fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
-
-  #[inline]
-  fn box_it(self) -> BoxWidget {
-    let inner = self.inner.clone();
-    let widget: Stateful<BoxWidget> = Stateful {
-      inner: InnerStateful {
-        wid: inner.wid,
-        tree_ptr: inner.tree_ptr,
-        marker: PhantomData,
-      },
-    };
-    // widget replaced self to live.
-    std::mem::forget(self);
-
-    BoxWidget {
-      widget: Box::new(widget),
-    }
-  }
-}
+type StatefulPointer = Rc<RefCell<(*const dyn Widget, *mut dyn Widget)>>;
 
 impl<W: Widget> Stateful<W> {
-  pub fn stateful(widget: W, mut tree: Pin<&mut widget_tree::WidgetTree>) -> Self {
-    let tree_ptr = NonNull::from(&*tree);
-    let wid = unsafe { tree.as_mut().get_unchecked_mut() }.new_node(widget.box_it());
-
-    Stateful {
-      inner: InnerStateful {
-        wid,
-        tree_ptr,
-        marker: PhantomData,
-      },
-    }
-  }
-
-  #[inline]
-  pub fn id(&self) -> WidgetId { self.inner.wid }
-
-  pub(crate) fn replace_base_with<C: FnOnce(BoxWidget) -> BoxWidget>(&mut self, ctor: C) {
-    let temp = std::mem::MaybeUninit::uninit();
-    let mut temp = unsafe { temp.assume_init() };
-    let base = self
-      .inner
-      .wid
-      .assert_get_mut(unsafe { self.inner.tree_ptr.as_mut() });
-    std::mem::swap(&mut temp, base);
-    let mut temp = ctor(temp);
-    std::mem::swap(&mut temp, base);
-    std::mem::forget(temp);
-  }
-
   #[inline]
   pub fn get_state_ref(&self) -> StateRef<W> {
     StateRef {
-      inner: self.inner.clone(),
+      pointer: self.attr.0.clone(),
+      type_info: PhantomData,
     }
   }
 }
 
-impl<T: Widget> Deref for InnerStateful<T> {
-  type Target = T;
-  #[inline]
-  fn deref(&self) -> &Self::Target {
-    let w = self.wid.assert_get(unsafe { self.tree_ptr.as_ref() });
+impl<W: Widget> StateRef<W> {
+  pub fn borrow(&self) -> Ref<W> {
+    Ref::map(self.pointer.borrow(), |(p, _)| unsafe {
+      &*(*p as *const W)
+    })
+  }
 
-    Widget::dynamic_cast_ref::<T>(w)
-      .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
+  pub fn borrow_mut(&mut self) -> RefMut<W> {
+    RefMut::map(self.pointer.borrow_mut(), |(_, p)| unsafe {
+      &mut *(*p as *mut W)
+    })
   }
 }
 
-impl<T: Widget> DerefMut for InnerStateful<T> {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    let tree = unsafe { self.tree_ptr.as_mut() };
-    self.wid.mark_changed(tree);
-    let w = self.wid.assert_get_mut(tree);
-
-    Widget::dynamic_cast_mut::<T>(w)
-      .unwrap_or_else(|| unreachable!("Ref type error. should never happen!"))
-  }
-}
-
-impl<T: Widget> Deref for Stateful<T> {
-  type Target = T;
-  #[inline]
-  fn deref(&self) -> &Self::Target { self.inner.deref() }
-}
-
-impl<T: Widget> DerefMut for Stateful<T> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { self.inner.deref_mut() }
-}
-
-impl<T: Widget> Deref for StateRef<T> {
-  type Target = T;
-  #[inline]
-  fn deref(&self) -> &Self::Target { self.inner.deref() }
-}
-
-impl<T: Widget> DerefMut for StateRef<T> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { self.inner.deref_mut() }
-}
-
-impl<T: Widget> Clone for InnerStateful<T> {
-  fn clone(&self) -> Self {
-    Self {
-      wid: self.wid,
-      tree_ptr: self.tree_ptr,
-      marker: PhantomData,
-    }
-  }
-}
-
-impl<T: Widget> Clone for StateRef<T> {
-  fn clone(&self) -> Self {
-    Self {
-      inner: self.inner.clone(),
-    }
-  }
-}
-
-impl<T: Widget> Drop for Stateful<T> {
-  fn drop(&mut self) {
-    let tree = unsafe { self.inner.tree_ptr.as_mut() };
-    let wid = self.inner.wid;
-    if Some(wid) != tree.root() && wid.parent(tree).is_none() {
-      log::warn!("The stateful widget not add into widget tree.");
-      wid.remove(tree);
-    }
+impl StatefulAttr {
+  pub fn new(widget: &mut BoxWidget) -> Self {
+    let pointer = Rc::new(RefCell::new((
+      &*widget.widget as *const _,
+      &mut *widget.widget as *mut _,
+    )));
+    Self(pointer)
   }
 }
 
@@ -208,19 +70,13 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let mut tree = Box::pin(widget_tree::WidgetTree::default());
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let stateful = Stateful::stateful(Text("Hello".to_string()), tree.as_mut());
+    let stateful = Text("Hello".to_string()).into_stateful();
     {
-      stateful.get_state_ref().0 = "World!".to_string();
+      stateful.get_state_ref().borrow_mut().0 = "World!".to_string();
     }
-    assert!(
-      tree
-        .changed_widgets()
-        .get(&stateful.get_state_ref().inner.wid)
-        .is_some()
-    );
+    assert_eq!(&stateful.0, "World!");
   }
 
   #[test]
@@ -228,26 +84,22 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let stateful = Stateful::stateful(Text("Hello".to_string()), tree.as_mut());
+    let stateful = Text("Hello".to_string()).into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
     let id = tree.set_root(key.box_it(), &mut render_tree);
 
-    let key_back = id.dynamic_cast_ref::<KeyDetect>(tree);
+    let key_back = id
+      .get(tree)
+      .and_then(|w| w.downcast_attr_widget::<Key>())
+      .map(|k| k.key());
     assert!(key_back.is_some());
   }
 
   #[test]
-  fn fix_pin_widget_node() {
-    let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let stateful = Stateful::stateful(Text("hello".to_string()), tree.as_mut());
-    (0..128).for_each(|_| unsafe {
-      tree
-        .as_mut()
-        .get_unchecked_mut()
-        .new_node(Text("".to_string()).box_it());
-    });
+  fn access_state() {
+    let stateful = Text("hello".to_string()).into_stateful();
 
     assert_eq!(stateful.0, "hello")
   }

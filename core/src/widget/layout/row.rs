@@ -36,4 +36,4 @@ impl Default for Row {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
 }
 
-inherit_widget!(Row, 0);
+impl_proxy_widget!(Row, 0);
