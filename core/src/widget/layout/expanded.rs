@@ -66,7 +66,7 @@ impl RenderObject for ExpandedRender {
   }
 }
 
-render_widget_base_impl!(Expanded);
+impl_widget_for_render_widget!(Expanded);
 
 #[cfg(test)]
 mod tests {

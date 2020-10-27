@@ -16,9 +16,9 @@ use std::{any::Any, fmt::Debug, marker::PhantomData};
 /// should merge them.
 #[derive(Debug)]
 pub struct WidgetAttr<W: Widget, AttrData> {
-  pub widget: BoxWidget,
   pub attr: AttrData,
-  pub marker: PhantomData<*const W>,
+  widget: BoxWidget,
+  type_info: PhantomData<*const W>,
 }
 
 pub trait Attribute: Widget {
@@ -30,8 +30,7 @@ pub enum AttrOrWidget<W: Widget, A> {
   Attr(WidgetAttr<W, A>),
   Widget(BoxWidget),
 }
-// Todo, the attribute implementation should also implement itself attach method
-// , Like `with_key` for `KeyDetect`.
+
 pub trait AttributeAttach: Widget {
   type HostWidget: Widget;
 
@@ -51,8 +50,30 @@ pub trait AttributeAttach: Widget {
       AttrOrWidget::Widget(widget) => KeyDetect {
         widget,
         attr: key,
-        marker: PhantomData,
+        type_info: PhantomData,
       },
+    }
+  }
+
+  /// Convert a stateless widget to stateful, and will split to a stateful
+  /// widget, and a `StateRef` which can be use to modify the states of the
+  /// widget.
+  #[inline]
+  fn into_stateful(self) -> Stateful<Self::HostWidget>
+  where
+    Self: Sized,
+  {
+    match self.pop_attr() {
+      AttrOrWidget::Attr(attr) => attr,
+      AttrOrWidget::Widget(mut widget) => {
+        let attr = widget::stateful::StatefulAttr::new(&mut widget);
+
+        Stateful {
+          widget,
+          attr,
+          type_info: PhantomData,
+        }
+      }
     }
   }
 
@@ -64,18 +85,20 @@ pub trait AttributeAttach: Widget {
     Self: Sized,
   {
     let mut boxed = self.box_it();
-    if let Some((widget, attr)) = copy_split_attr(&mut boxed) {
+    // Safety: if we success copy the attribute, we will forget the origin object.
+    if let Some((widget, attr)) = unsafe { copy_attr(&mut boxed) } {
       std::mem::forget(boxed);
       AttrOrWidget::Attr(WidgetAttr {
         attr,
         widget,
-        marker: PhantomData,
+        type_info: PhantomData,
       })
     } else {
       let mut target = boxed.as_attr_mut();
       let mut attr = None;
       while let Some(attr_widget) = target.take() {
-        if let Some((widget, a)) = copy_split_attr(attr_widget.widget_mut()) {
+        // Safety: if we success copy the attribute, we will forget the origin object.
+        if let Some((widget, a)) = unsafe { copy_attr(attr_widget.widget_mut()) } {
           let detached = std::mem::replace(attr_widget.widget_mut(), widget);
           std::mem::forget(detached);
           attr = Some(a);
@@ -89,7 +112,7 @@ pub trait AttributeAttach: Widget {
         AttrOrWidget::Attr(WidgetAttr {
           attr,
           widget: boxed,
-          marker: PhantomData,
+          type_info: PhantomData,
         })
       } else {
         AttrOrWidget::Widget(boxed)
@@ -141,37 +164,69 @@ impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
     let erase_type: WidgetAttr<BoxWidget, Data> = WidgetAttr {
       widget: self.widget,
       attr: self.attr,
-      marker: PhantomData,
+      type_info: PhantomData,
     };
     let widget: Box<dyn Widget> = Box::new(erase_type);
     widget.into()
   }
 }
 
-fn copy_split_attr<AttrData: 'static>(widget: &mut BoxWidget) -> Option<(BoxWidget, AttrData)> {
+unsafe fn copy_attr<AttrData: 'static>(widget: &mut BoxWidget) -> Option<(BoxWidget, AttrData)> {
   if let Some(attr) = widget
     .as_any_mut()
     .downcast_mut::<WidgetAttr<BoxWidget, AttrData>>()
   {
     let mut tmp = std::mem::MaybeUninit::uninit();
     let ptr: *mut WidgetAttr<BoxWidget, AttrData> = tmp.as_mut_ptr();
-    let tmp = unsafe {
-      ptr.copy_from(
-        attr as *const WidgetAttr<BoxWidget, AttrData>,
-        std::mem::size_of::<WidgetAttr<BoxWidget, AttrData>>(),
-      );
-      tmp.assume_init()
-    };
+    ptr.copy_from(
+      attr as *const WidgetAttr<BoxWidget, AttrData>,
+      std::mem::size_of::<WidgetAttr<BoxWidget, AttrData>>(),
+    );
+    let tmp = tmp.assume_init();
     Some((tmp.widget, tmp.attr))
   } else {
     None
   }
 }
 
-impl<W: Widget> AttributeAttach for W {
-  default type HostWidget = Self;
-}
-
 impl<W: Widget, Data: Debug + 'static> AttributeAttach for WidgetAttr<W, Data> {
   type HostWidget = W;
+}
+
+impl<W: Widget, Attr: Any + Debug> std::ops::Deref for WidgetAttr<W, Attr> {
+  type Target = W;
+  fn deref(&self) -> &Self::Target {
+    let mut widget: &dyn Widget = self;
+    while let Some(attr) = widget.as_attr() {
+      widget = attr.widget();
+    }
+    debug_assert_eq!(
+      widget.as_any().type_id(),
+      std::any::TypeId::of::<Self::Target>()
+    );
+    let ptr = widget as *const dyn Widget as *const Self::Target;
+
+    // Safety: the type info always hold the origin widget type.
+    unsafe { &*ptr }
+  }
+}
+
+impl<W: Widget, Attr: Any + Debug> std::ops::DerefMut for WidgetAttr<W, Attr> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    let mut widget = self as *mut dyn Widget;
+    // Safety: the type info always hold the origin widget type.
+    unsafe {
+      while let Some(attr) = (&mut *widget).as_attr_mut() {
+        widget = attr.widget_mut() as *mut dyn Widget;
+      }
+
+      debug_assert_eq!(
+        (*widget).as_any().type_id(),
+        std::any::TypeId::of::<Self::Target>()
+      );
+
+      let ptr = widget as *mut Self::Target;
+      &mut *ptr
+    }
+  }
 }

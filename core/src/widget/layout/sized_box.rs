@@ -55,7 +55,7 @@ impl RenderWidget for SizedBox {
   }
 }
 
-render_widget_base_impl!(SizedBox);
+impl_widget_for_render_widget!(SizedBox);
 
 impl RenderObject for SizedBoxRender {
   type Owner = SizedBox;

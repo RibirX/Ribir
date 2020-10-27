@@ -60,7 +60,7 @@ impl BoxDecoration {
   }
 }
 
-render_widget_base_impl!(BoxDecoration);
+impl_widget_for_render_widget!(BoxDecoration);
 
 impl RenderWidget for BoxDecoration {
   type RO = BoxDecorationRender;

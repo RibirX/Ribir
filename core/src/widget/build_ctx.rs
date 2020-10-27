@@ -49,6 +49,7 @@ mod tests {
     themes: Rc<RefCell<Vec<ThemeData>>>,
   }
 
+  impl_widget_for_combination_widget!(ThemeTrack);
   impl CombinationWidget for ThemeTrack {
     fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
       self.themes.borrow_mut().push(ctx.theme().clone());

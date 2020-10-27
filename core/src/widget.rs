@@ -66,22 +66,10 @@ pub trait Widget: Debug + Any {
 
   /// return the some-value of `WidgetAttr` reference if the widget attached
   /// attr.
-  #[inline]
-  fn as_attr(&self) -> Option<&dyn Attribute>
-  where
-    Self: Sized,
-  {
-    None
-  }
+  fn as_attr(&self) -> Option<&dyn Attribute>;
 
   /// like `as_attr`, but return mutable reference.
-  #[inline]
-  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>
-  where
-    Self: Sized,
-  {
-    None
-  }
+  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>;
 
   fn downcast_attr_widget<Attr: Attribute>(&self) -> Option<&Attr>
   where
@@ -107,17 +95,6 @@ pub trait Widget: Debug + Any {
     BoxWidget {
       widget: Box::new(self),
     }
-  }
-
-  /// Convert a stateless widget to stateful, and will split to a stateful
-  /// widget, and a `StateRef` which can be use to modify the states of the
-  /// widget.
-  #[inline]
-  fn into_stateful(self, ctx: &mut BuildCtx) -> Stateful<Self>
-  where
-    Self: Sized,
-  {
-    Stateful::stateful(self, ctx.tree.as_mut())
   }
 
   /// Assign the type of mouse cursor, show when the mouse pointer is over this
@@ -386,7 +363,7 @@ pub trait Widget: Debug + Any {
 }
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Debug {
+pub trait CombinationWidget: Widget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
@@ -394,7 +371,7 @@ pub trait CombinationWidget: Debug {
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: Debug + Sized {
+pub trait RenderWidget: Widget + Sized {
   /// The render object type will created.
   type RO: RenderObject<Owner = Self> + Send + Sync + 'static;
 
@@ -451,31 +428,24 @@ impl std::fmt::Debug for BoxWidget {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.widget.fmt(f) }
 }
 
-impl InheritWidget for BoxWidget {
-  #[inline]
-  fn base_widget(&self) -> &dyn Widget { self.widget.borrow() }
-  #[inline]
-  fn base_widget_mut(&mut self) -> &mut dyn Widget { self.widget.borrow_mut() }
-}
-
 impl Widget for BoxWidget {
   #[inline]
-  fn classify(&self) -> WidgetClassify { self.base_widget().classify() }
+  fn classify(&self) -> WidgetClassify { self.widget.classify() }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.base_widget_mut().classify_mut() }
+  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
 
   #[inline]
-  fn as_inherit(&self) -> Option<&dyn InheritWidget> { Some(self) }
+  fn as_any(&self) -> &dyn Any { self.widget.as_any() }
 
   #[inline]
-  fn as_inherit_mut(&mut self) -> Option<&mut dyn InheritWidget> { Some(self) }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self.widget.as_any_mut() }
 
   #[inline]
-  fn as_any(&self) -> &dyn Any { self }
+  fn as_attr(&self) -> Option<&dyn Attribute> { self.widget.as_attr() }
 
   #[inline]
-  fn as_any_mut(&mut self) -> &mut dyn Any { self }
+  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.widget.as_attr_mut() }
 
   fn box_it(self) -> BoxWidget
   where
@@ -510,8 +480,7 @@ where
     merge(already);
     base
   } else if let Some(stateful) = Widget::dynamic_cast_mut::<Stateful<BoxWidget>>(&mut base) {
-    stateful.replace_base_with(|base| ctor_by_base(base).box_it());
-    base
+    unimplemented!()
   } else {
     ctor_by_base(base).box_it()
   }
@@ -572,29 +541,53 @@ pub macro inherit_widget(
   impl_widget_for_inherit_widget!($ty $(, <$($generics),*>)? $(, where $($wty : $bound),*)?);
 }
 
-/// Auto implement `Widget` for `CombinationWidget`,  We should also implement
-/// `Widget` for `RenderWidget`, but can not do it before rust specialization
-/// finished. So just CombinationWidget implemented it, this is user use most,
-/// and others provide a macro to do it.
-impl<T: CombinationWidget + 'static> Widget for T {
-  #[inline]
-  fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
+/// Todo: We should auto implement Widget for CombinationWidget and
+/// RenderWidget after rust specialization finished.
+pub macro impl_widget_for_combination_widget(
+  $ty: ty
+  $(, <$($generics: tt),*>)?
+  $(, where $($wty:ty : $bound: tt),*)?
+) {
+  impl<$($($generics ,)*)?> Widget for $ty
+  where
+    $($($wty: $bound), *)?
+  {
+    #[inline]
+    fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
 
-  #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
+    #[inline]
+    fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
 
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
+    #[inline]
+    fn as_any(&self) -> &dyn Any { self }
 
-  #[inline]
-  fn as_any_mut(&mut self) -> &mut dyn Any { self }
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
+    #[inline]
+    fn as_attr(&self) -> Option<&dyn Attribute> { None }
+
+    #[inline]
+    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
+  }
+
+  impl<$($($generics ,)*)?> AttributeAttach for $ty
+  where
+    $($($wty: $bound), *)?
+  {
+    type HostWidget = $ty;
+  }
 }
 
-impl<T: CombinationWidget> !RenderWidget for T {}
-impl<T: RenderWidget> !CombinationWidget for T {}
-
-pub macro render_widget_base_impl($ty: ty) {
-  impl Widget for $ty {
+pub macro impl_widget_for_render_widget(
+  $ty: ty
+  $(, <$($generics: tt),*>)?
+  $(, where $($wty:ty : $bound: tt),*)?
+) {
+  impl<$($($generics ,)*)?> Widget for $ty
+  where
+    $($($wty: $bound), *)?
+  {
     #[inline]
     fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
 
@@ -606,6 +599,56 @@ pub macro render_widget_base_impl($ty: ty) {
 
     #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
+    #[inline]
+    fn as_attr(&self) -> Option<&dyn Attribute> { None }
+
+    #[inline]
+    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
+  }
+
+  impl<$($($generics ,)*)?> AttributeAttach for $ty
+  where
+    $($($wty: $bound), *)?
+  {
+    type HostWidget = $ty;
+  }
+}
+
+pub macro impl_proxy_widget(
+  $ty: ty,
+  $base_widget: tt
+  $(, <$($generics: tt),*>)?
+  $(, where $($wty:ty : $bound: tt),*)?
+) {
+  impl<$($($generics ,)*)?> Widget for $ty
+  where
+    $($($wty: $bound), *)?
+  {
+    #[inline]
+    fn classify(&self) -> WidgetClassify { self.$base_widget.classify() }
+
+    #[inline]
+    fn classify_mut(&mut self) -> WidgetClassifyMut { self.$base_widget.classify_mut() }
+
+    #[inline]
+    fn as_any(&self) -> &dyn Any { self }
+
+    #[inline]
+    fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
+    #[inline]
+    fn as_attr(&self) -> Option<&dyn Attribute> { self.$base_widget.as_attr() }
+
+    #[inline]
+    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$base_widget.as_attr_mut() }
+  }
+
+  impl<$($($generics ,)*)?> AttributeAttach for $ty
+  where
+    $($($wty: $bound), *)?
+  {
+    type HostWidget = $ty;
   }
 }
 
@@ -635,6 +678,12 @@ pub macro impl_widget_for_inherit_widget(
 
     #[inline]
     fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
+    #[inline]
+    fn as_attr(&self) -> Option<&dyn Attribute> { None }
+
+    #[inline]
+    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
   }
 }
 #[cfg(test)]

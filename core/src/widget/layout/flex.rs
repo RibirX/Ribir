@@ -147,7 +147,7 @@ impl Default for MainAxisAlign {
   fn default() -> Self { MainAxisAlign::Start }
 }
 
-render_widget_base_impl!(Flex);
+impl_widget_for_render_widget!(Flex);
 
 impl RenderWidget for Flex {
   type RO = FlexRender;

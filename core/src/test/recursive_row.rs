@@ -6,6 +6,7 @@ pub struct RecursiveRow {
   pub depth: usize,
 }
 
+impl_widget_for_combination_widget!(RecursiveRow);
 impl CombinationWidget for RecursiveRow {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     (0..self.width)

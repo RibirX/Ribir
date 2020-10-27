@@ -27,11 +27,7 @@ impl WidgetTree {
 
   pub fn set_root(&mut self, data: BoxWidget, render_tree: &mut RenderTree) -> WidgetId {
     debug_assert!(self.root.is_none());
-    let root = if let Some(w) = Widget::dynamic_cast_ref::<Stateful<BoxWidget>>(&data) {
-      w.id()
-    } else {
-      self.new_node(data)
-    };
+    let root = self.new_node(data);
     self.root = Some(root);
     self.inflate(root, render_tree);
     root
@@ -358,11 +354,7 @@ impl WidgetId {
   }
 
   fn append_widget(self, data: BoxWidget, tree: &mut WidgetTree) -> WidgetId {
-    let id = if let Some(w) = Widget::dynamic_cast_ref::<Stateful<BoxWidget>>(&data) {
-      w.id()
-    } else {
-      tree.new_node(data)
-    };
+    let id = tree.new_node(data);
     self.0.append(id.0, &mut tree.arena);
     id
   }
