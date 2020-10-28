@@ -490,10 +490,10 @@ impl<W: Widget, Attr: Any + Debug> std::ops::Deref for WidgetAttr<W, Attr> {
       widget.as_any().type_id(),
       std::any::TypeId::of::<Self::Target>()
     );
-    let ptr = widget as *const dyn Widget as *const Self::Target;
-
-    // Safety: the type info always hold the origin widget type.
-    unsafe { &*ptr }
+    widget
+      .as_any()
+      .downcast_ref::<Self::Target>()
+      .expect("The type of widget should be equal to the `type_info`")
   }
 }
 
@@ -511,8 +511,10 @@ impl<W: Widget, Attr: Any + Debug> std::ops::DerefMut for WidgetAttr<W, Attr> {
         std::any::TypeId::of::<Self::Target>()
       );
 
-      let ptr = widget as *mut Self::Target;
-      &mut *ptr
+      (*widget)
+        .as_any_mut()
+        .downcast_mut::<Self::Target>()
+        .expect("The type of widget should be equal to the `type_info`")
     }
   }
 }
