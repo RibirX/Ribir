@@ -19,6 +19,7 @@ impl CombinationWidget for Todos {
             stateful
               .with_cursor(CursorIcon::Text)
               .on_char(move |e| state_ref.borrow_mut().0.push(e.char))
+              .box_it()
           })
           .collect::<Row>(),
       )

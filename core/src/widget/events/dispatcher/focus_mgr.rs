@@ -78,8 +78,9 @@ impl FocusManager {
   pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
-        id.dynamic_cast_ref::<FocusListener>(tree)
-          .map_or(false, |focus| focus.auto_focus)
+        id.get(tree)
+          .and_then(|w| w.downcast_attr_widget::<FocusAttr>())
+          .map_or(false, |focus| focus.is_auto_focus())
       })
     })
   }
@@ -92,9 +93,10 @@ impl FocusManager {
       root
         .descendants(tree)
         .filter_map(|id| {
-          id.dynamic_cast_ref::<FocusListener>(tree)
+          id.get(tree)
+            .and_then(|w| w.downcast_attr_widget::<FocusAttr>())
             .map(|focus| FocusNode {
-              tab_index: focus.tab_index,
+              tab_index: focus.tab_index(),
               wid: id,
             })
         })
@@ -176,8 +178,10 @@ impl FocusManager {
     FocusEvent::new(dispatcher.modifiers, wid, dispatcher.window.clone())
   }
 
-  fn create_emitter(event_type: FocusEventType) -> impl FnMut(&FocusListener, Rc<EventCommon>) {
-    move |focus: &FocusListener, event: Rc<FocusEvent>| {
+  fn create_emitter(
+    event_type: FocusEventType,
+  ) -> impl FnMut(&FocusListener<BoxWidget>, Rc<EventCommon>) {
+    move |focus: &FocusListener<BoxWidget>, event: Rc<FocusEvent>| {
       log::info!("{:?} {:?}", event_type, event);
       focus.focus_event_observable().next((event_type, event));
     }
@@ -274,15 +278,15 @@ mod tests {
     impl CombinationWidget for EmbedFocus {
       fn build(&self, _: &mut BuildCtx) -> BoxWidget {
         let child = log_focus_event("child", empty_box(), self.log.clone());
-        log_focus_event("parent", SizedBox::expanded(child), self.log.clone())
+        log_focus_event("parent", SizedBox::expanded(child), self.log.clone()).box_it()
       }
     }
 
-    fn log_focus_event(
+    fn log_focus_event<A: AttributeAttach>(
       name: &'static str,
-      widget: impl Widget,
+      widget: A,
       log: Rc<RefCell<Vec<String>>>,
-    ) -> BoxWidget {
+    ) -> FocusListener<A::HostWidget> {
       let log2 = log.clone();
       let log3 = log.clone();
       let log4 = log.clone();

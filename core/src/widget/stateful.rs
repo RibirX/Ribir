@@ -92,21 +92,14 @@ mod tests {
 
     let key_back = id
       .get(tree)
-      .and_then(|w| w.downcast_attr_widget::<KeyDetect<BoxWidget>>())
+      .and_then(|w| w.downcast_attr_widget::<Key>())
       .map(|k| k.key());
     assert!(key_back.is_some());
   }
 
   #[test]
-  fn fix_pin_widget_node() {
-    let mut tree = Box::pin(widget_tree::WidgetTree::default());
+  fn access_state() {
     let stateful = Text("hello".to_string()).into_stateful();
-    (0..128).for_each(|_| unsafe {
-      tree
-        .as_mut()
-        .get_unchecked_mut()
-        .new_node(Text("".to_string()).box_it());
-    });
 
     assert_eq!(stateful.0, "hello")
   }

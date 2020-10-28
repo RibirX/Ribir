@@ -3,9 +3,10 @@ use rxrust::prelude::*;
 use std::rc::Rc;
 
 /// Focus widget
+pub type FocusListener<W> = WidgetAttr<W, FocusAttr>;
+
 #[derive(Debug)]
-pub struct FocusListener {
-  pub widget: BoxWidget,
+pub struct FocusAttr {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
   ///
@@ -57,51 +58,42 @@ pub enum FocusEventType {
   FocusOut,
 }
 
-inherit_widget!(FocusListener, widget);
-
-impl FocusListener {
-  pub fn from_widget(
-    widget: BoxWidget,
+impl<W: Widget> FocusListener<W> {
+  pub fn from_widget<A: AttributeAttach<HostWidget = W>>(
+    widget: A,
     auto_focus: Option<bool>,
     tab_index: Option<i16>,
-  ) -> BoxWidget {
-    inherit(
-      widget.box_it(),
-      |base| Self {
-        widget: base,
-        tab_index: tab_index.unwrap_or(0),
-        auto_focus: auto_focus.unwrap_or(false),
-        subject: <_>::default(),
-      },
-      move |base| {
-        if let Some(tab_index) = tab_index {
-          base.tab_index = tab_index;
-        }
-        if let Some(auto_focus) = auto_focus {
-          base.auto_focus = auto_focus;
-        }
-      },
-    )
+  ) -> Self {
+    widget.unwrap_attr_or_else(|| FocusAttr {
+      tab_index: tab_index.unwrap_or(0),
+      auto_focus: auto_focus.unwrap_or(false),
+      subject: <_>::default(),
+    })
   }
 
   #[inline]
   pub fn focus_event_observable(
     &self,
   ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.subject.clone()
+    self.attr.subject.clone()
   }
 
-  pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
-    base: BoxWidget,
+  pub fn listen_on<A: AttributeAttach<HostWidget = W>, H: FnMut(&FocusEvent) + 'static>(
+    base: A,
     event_type: FocusEventType,
     mut handler: H,
-  ) -> BoxWidget {
+  ) -> Self {
     let pointer = Self::from_widget(base, None, None);
-    Widget::dynamic_cast_ref::<Self>(&pointer)
-      .unwrap()
+    pointer
       .focus_event_observable()
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event));
     pointer
   }
+
+  #[inline]
+  pub fn is_auto_focus(&self) -> bool { self.attr.auto_focus }
+
+  #[inline]
+  pub fn tab_index(&self) -> i16 { self.attr.tab_index }
 }

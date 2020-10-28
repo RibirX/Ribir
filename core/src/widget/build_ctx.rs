@@ -19,9 +19,9 @@ impl<'a> BuildCtx<'a> {
     let theme = self
       .widget
       .ancestors(tree)
-      .find_map(|id| id.dynamic_cast_ref::<Theme>(tree))
+      .find_map(|id| id.get(tree).and_then(|w| w.downcast_attr_widget()))
       .expect("At least， root theme should be found.");
-    &theme.data
+    theme.data()
   }
 }
 
@@ -37,11 +37,11 @@ mod tests {
     let mut wnd = window::Window::without_render(sized, win_size);
     wnd.render_ready();
     let tree = wnd.widget_tree();
-    let theme = tree
+    let has_them = tree
       .root()
-      .and_then(|root| root.dynamic_cast_ref::<Theme>(&*tree));
-
-    assert!(theme.is_some());
+      .and_then(|root| root.get(&*tree))
+      .map_or(false, |w| w.has_attr::<ThemeData>());
+    assert!(has_them);
   }
 
   #[derive(Debug)]
@@ -63,18 +63,14 @@ mod tests {
     let dark = material::dark("dark".to_string());
     let light = material::light("light".to_string());
 
-    let theme = ThemeTrack {
+    let theme_track = ThemeTrack {
       themes: track_themes.clone(),
     };
-    let light_theme = Theme {
-      data: dark.clone(),
-      widget: SizedBox::expanded(Theme {
-        data: light.clone(),
-        widget: SizedBox::shrink(theme).box_it(),
-      })
-      .box_it(),
-    };
-    let mut wnd = window::Window::without_render(light_theme, Size::zero());
+
+    let light_theme = SizedBox::shrink(theme_track).with_theme(light.clone());
+    let dark_light_theme = SizedBox::expanded(light_theme).with_theme(dark.clone());
+
+    let mut wnd = window::Window::without_render(dark_light_theme, Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(track_themes.borrow()[0], light);
@@ -82,15 +78,10 @@ mod tests {
     let theme = ThemeTrack {
       themes: track_themes.clone(),
     };
-    let dark_theme = Theme {
-      data: light,
-      widget: SizedBox::expanded(Theme {
-        data: dark.clone(),
-        widget: SizedBox::shrink(theme).box_it(),
-      })
-      .box_it(),
-    };
-    let mut wnd = window::Window::without_render(dark_theme, Size::zero());
+    let dark_theme = SizedBox::shrink(theme).with_theme(dark.clone());
+    let light_dark_theme = SizedBox::expanded(dark_theme).with_theme(light.clone());
+
+    let mut wnd = window::Window::without_render(light_dark_theme, Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 2);
     assert_eq!(track_themes.borrow()[1], dark);

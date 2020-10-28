@@ -4,11 +4,10 @@ use std::rc::Rc;
 
 /// A widget that sends a single Unicode codepoint. The character can be pushed
 /// to the end of a string.
+pub type CharListener<W> = WidgetAttr<W, CharAttr>;
+
 #[derive(Debug)]
-pub struct CharListener {
-  widget: BoxWidget,
-  subject: LocalSubject<'static, Rc<CharEvent>, ()>,
-}
+pub struct CharAttr(LocalSubject<'static, Rc<CharEvent>, ()>);
 
 #[derive(Debug)]
 pub struct CharEvent {
@@ -16,24 +15,16 @@ pub struct CharEvent {
   pub common: EventCommon,
 }
 
-widget::inherit_widget!(CharListener, widget);
-
-impl CharListener {
-  pub fn from_widget(widget: BoxWidget) -> BoxWidget {
-    widget::inherit(
-      FocusListener::from_widget(widget.box_it(), None, None),
-      |base| Self {
-        widget: base,
-        subject: <_>::default(),
-      },
-      |_| {},
-    )
+impl<W: Widget> CharListener<W> {
+  pub fn from_widget<A: AttributeAttach<HostWidget = W>>(widget: A) -> Self {
+    widget.unwrap_attr_or_else_with(|widget| {
+      let focus = FocusListener::from_widget(widget, None, None);
+      (focus.box_it(), CharAttr(<_>::default()))
+    })
   }
 
   #[inline]
-  pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> {
-    self.subject.clone()
-  }
+  pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> { self.attr.0.clone() }
 }
 
 impl std::convert::AsRef<EventCommon> for CharEvent {

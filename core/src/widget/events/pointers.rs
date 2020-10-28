@@ -1,5 +1,5 @@
 use super::EventCommon;
-use crate::{prelude::*, widget::inherit_widget};
+use crate::prelude::*;
 use rxrust::prelude::*;
 use std::{
   rc::Rc,
@@ -101,11 +101,10 @@ impl PointerEvent {
   pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
 }
 
+pub struct PointerAttr(LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>);
+
 /// A widget that calls callbacks in response to common pointer events.
-pub struct PointerListener {
-  widget: BoxWidget,
-  subject: LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>,
-}
+pub type PointerListener<W> = WidgetAttr<W, PointerAttr>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
@@ -122,27 +121,18 @@ pub enum PointerEventType {
    * lostpointercapture: */
 }
 
-impl PointerListener {
-  /// Ensure the `widget` is a `PointerListener` widget.
-  pub fn from_widget<W: Widget>(widget: W) -> BoxWidget {
-    inherit(
-      widget.box_it(),
-      |base| Self {
-        widget: base,
-        subject: Subject::new(),
-      },
-      |_| {},
-    )
+impl<W: Widget> PointerListener<W> {
+  pub fn from_widget<A: AttributeAttach<HostWidget = W>>(widget: A) -> Self {
+    widget.unwrap_attr_or_else(|| PointerAttr(Subject::new()))
   }
 
-  pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
-    base: BoxWidget,
+  pub fn listen_on<A: AttributeAttach<HostWidget = W>, H: FnMut(&PointerEvent) + 'static>(
+    base: A,
     event_type: PointerEventType,
     mut handler: H,
-  ) -> BoxWidget {
+  ) -> Self {
     let pointer = Self::from_widget(base);
-    Widget::dynamic_cast_ref::<Self>(&pointer)
-      .unwrap()
+    pointer
       .pointer_observable()
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event));
@@ -200,18 +190,16 @@ impl PointerListener {
   pub fn pointer_observable(
     &self,
   ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
-    self.subject.clone()
+    self.attr.0.clone()
   }
 }
 
-impl std::fmt::Debug for PointerListener {
+impl std::fmt::Debug for PointerAttr {
   fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     // Todo: we should remove the `Debug` bound for widget.
     Ok(())
   }
 }
-
-inherit_widget!(PointerListener, widget);
 
 #[cfg(test)]
 mod tests {

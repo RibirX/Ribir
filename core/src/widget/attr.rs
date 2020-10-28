@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use rxrust::prelude::*;
 use std::{any::Any, fmt::Debug, marker::PhantomData};
 
 /// WidgetAttr is use to extend ability of a widget but not increase the widget
@@ -42,17 +43,37 @@ pub trait AttributeAttach: Widget {
     Self: Sized,
   {
     let key = key.into();
-    match self.pop_attr() {
-      AttrOrWidget::Attr(mut attr) => {
-        attr.attr = key;
-        attr
-      }
-      AttrOrWidget::Widget(widget) => KeyDetect {
-        widget,
-        attr: key,
-        type_info: PhantomData,
-      },
-    }
+    self.attach_attr(key)
+  }
+
+  /// Assign the type of mouse cursor, show when the mouse pointer is over this
+  /// widget.
+  #[inline]
+  fn with_cursor(self, cursor: CursorIcon) -> Cursor<Self::HostWidget>
+  where
+    Self: Sized,
+  {
+    Cursor::new(cursor, self)
+  }
+
+  /// Assign whether the `widget` should automatically get focus when the window
+  /// loads. Indicates the `widget` can be focused.
+  #[inline]
+  fn with_auto_focus(self, auto_focus: bool) -> FocusListener<Self::HostWidget>
+  where
+    Self: Sized,
+  {
+    FocusListener::from_widget(self, Some(auto_focus), None)
+  }
+
+  /// Assign where the widget participates in sequential keyboard navigation.
+  /// Indicates the `widget` can be focused and
+  #[inline]
+  fn with_tab_index(self, tab_index: i16) -> FocusListener<Self::HostWidget>
+  where
+    Self: Sized,
+  {
+    FocusListener::from_widget(self, None, Some(tab_index))
   }
 
   /// Convert a stateless widget to stateful, and will split to a stateful
@@ -63,12 +84,236 @@ pub trait AttributeAttach: Widget {
   where
     Self: Sized,
   {
-    match self.pop_attr() {
-      AttrOrWidget::Attr(attr) => attr,
-      AttrOrWidget::Widget(mut widget) => {
-        let attr = widget::stateful::StatefulAttr::new(&mut widget);
+    self.unwrap_attr_or_else_with(|mut widget| {
+      let attr = widget::stateful::StatefulAttr::new(&mut widget);
+      (widget, attr)
+    })
+  }
 
-        Stateful {
+  #[inline]
+  fn with_theme(self, data: ThemeData) -> Theme<Self::HostWidget>
+  where
+    Self: Sized,
+  {
+    self.attach_attr(data)
+  }
+
+  /// Used to specify the event handler for the pointer down event, which is
+  /// fired when the pointing device is initially pressed.
+  #[inline]
+  fn on_pointer_down<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Down, handler)
+  }
+
+  /// Used to specify the event handler for the pointer up event, which is
+  /// fired when the all pressed pointing device is released.
+  #[inline]
+  fn on_pointer_up<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Up, handler)
+  }
+
+  /// Specify the event handler to process pointer move event.
+  #[inline]
+  fn on_pointer_move<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Move, handler)
+  }
+
+  /// Specify the event handler to process pointer tap event.
+  #[inline]
+  fn on_tap<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Tap, handler)
+  }
+
+  /// Specify the event handler to process pointer tap event.
+  fn on_tap_times<F>(self, times: u8, mut handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    let pointer = PointerListener::from_widget(self);
+    pointer
+      .tap_times_observable(times)
+      .subscribe(move |e| handler(&*e));
+    pointer
+  }
+
+  /// Specify the event handler to process pointer cancel event.
+  #[inline]
+  fn on_pointer_cancel<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Cancel, handler)
+  }
+
+  /// specify the event handler when pointer enter this widget.
+  #[inline]
+  fn on_pointer_enter<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Enter, handler)
+  }
+
+  /// Specify the event handler when pointer leave this widget.
+  #[inline]
+  fn on_pointer_leave<F>(self, handler: F) -> PointerListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&PointerEvent) + 'static,
+  {
+    PointerListener::listen_on(self, PointerEventType::Leave, handler)
+  }
+
+  /// Specify the event handler to process focus event. The focus event is
+  /// raised when when the user sets focus on an element.
+  #[inline]
+  fn on_focus<F>(self, handler: F) -> FocusListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    FocusListener::listen_on(self, FocusEventType::Focus, handler)
+  }
+
+  /// Specify the event handler to process blur event. The blur event is raised
+  /// when an widget loses focus.
+  #[inline]
+  fn on_blur<F>(self, handler: F) -> FocusListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    FocusListener::listen_on(self, FocusEventType::Blur, handler)
+  }
+
+  /// Specify the event handler to process focusin event.  The main difference
+  /// between this event and blur is that focusin bubbles while blur does not.
+  #[inline]
+  fn on_focus_in<F>(self, handler: F) -> FocusListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    FocusListener::listen_on(self, FocusEventType::FocusIn, handler)
+  }
+
+  /// Specify the event handler to process focusout event. The main difference
+  /// between this event and blur is that focusout bubbles while blur does not.
+  #[inline]
+  fn on_focus_out<F>(self, handler: F) -> FocusListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&FocusEvent) + 'static,
+  {
+    FocusListener::listen_on(self, FocusEventType::FocusOut, handler)
+  }
+
+  /// Specify the event handler when keyboard press down.
+  #[inline]
+  fn on_key_down<F>(self, handler: F) -> KeyboardListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&KeyboardEvent) + 'static,
+  {
+    KeyboardListener::listen_on(self, KeyboardEventType::KeyDown, handler)
+  }
+
+  /// Specify the event handler when a key is released.
+  #[inline]
+  fn on_key_up<F>(self, handler: F) -> KeyboardListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&KeyboardEvent) + 'static,
+  {
+    KeyboardListener::listen_on(self, KeyboardEventType::KeyUp, handler)
+  }
+
+  /// Specify the event handler when received a unicode character.
+  #[inline]
+  fn on_char<F>(self, mut handler: F) -> CharListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&CharEvent) + 'static,
+  {
+    let widget = CharListener::from_widget(self);
+    widget
+      .event_observable()
+      .subscribe(move |char_event| handler(&*char_event));
+    widget
+  }
+
+  /// If this widget attached an `AttrData`, unwrap it, otherwise attach
+  /// an attribute data computes from a closure..
+  fn unwrap_attr_or_else<AttrData: 'static, F: FnOnce() -> AttrData>(
+    self,
+    f: F,
+  ) -> WidgetAttr<Self::HostWidget, AttrData>
+  where
+    Self: Sized,
+  {
+    match pop_attr(self) {
+      AttrOrWidget::Attr(attr) => attr,
+      AttrOrWidget::Widget(widget) => WidgetAttr {
+        widget,
+        attr: f(),
+        type_info: PhantomData,
+      },
+    }
+  }
+
+  /// If this widget attached an `AttrData`, unwrap it, otherwise attach
+  /// `attr_data` on it.
+  fn unwrap_attr_or<AttrData: 'static>(
+    self,
+    attr_data: AttrData,
+  ) -> WidgetAttr<Self::HostWidget, AttrData>
+  where
+    Self: Sized,
+  {
+    match pop_attr(self) {
+      AttrOrWidget::Attr(attr) => attr,
+      AttrOrWidget::Widget(widget) => WidgetAttr {
+        widget,
+        attr: attr_data,
+        type_info: PhantomData,
+      },
+    }
+  }
+
+  /// If this widget attached an `AttrData`, unwrap it, otherwise attach
+  /// an attribute data to a new widget, both the widget and attribute data
+  /// computes from a closure.
+  fn unwrap_attr_or_else_with<AttrData: 'static, F: FnOnce(BoxWidget) -> (BoxWidget, AttrData)>(
+    self,
+    f: F,
+  ) -> WidgetAttr<Self::HostWidget, AttrData>
+  where
+    Self: Sized,
+  {
+    match pop_attr(self) {
+      AttrOrWidget::Attr(attr) => attr,
+      AttrOrWidget::Widget(widget) => {
+        let (widget, attr) = f(widget);
+        WidgetAttr {
           widget,
           attr,
           type_info: PhantomData,
@@ -77,46 +322,89 @@ pub trait AttributeAttach: Widget {
     }
   }
 
-  /// If this widget is has the `AttrData` attribute, this method pop the
-  /// `AttrData` to the most outside, and return it, otherwise return a
-  /// `BoxWidget`
-  fn pop_attr<AttrData: 'static>(self) -> AttrOrWidget<Self::HostWidget, AttrData>
+  /// Attach `attr_data` to this widget, If it's attached a same type attribute
+  /// data, overwrite it.
+  fn attach_attr<AttrData: 'static>(
+    self,
+    attr_data: AttrData,
+  ) -> WidgetAttr<Self::HostWidget, AttrData>
   where
     Self: Sized,
   {
-    let mut boxed = self.box_it();
-    // Safety: if we success copy the attribute, we will forget the origin object.
-    if let Some((widget, attr)) = unsafe { copy_attr(&mut boxed) } {
-      std::mem::forget(boxed);
+    match pop_attr(self) {
+      AttrOrWidget::Attr(mut attr) => {
+        attr.attr = attr_data;
+        attr
+      }
+      AttrOrWidget::Widget(widget) => WidgetAttr {
+        widget,
+        attr: attr_data,
+        type_info: PhantomData,
+      },
+    }
+  }
+
+  fn has_attr<AttrData: 'static>(&self) -> bool
+  where
+    Self: Sized,
+  {
+    let mut attr = self.as_attr();
+    let mut first = true;
+    while let Some(a) = attr {
+      if first && a.as_any().is::<WidgetAttr<Self::HostWidget, AttrData>>() {
+        return true;
+      } else if a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>() {
+        return true;
+      } else {
+        first = false;
+        attr = a.widget().as_attr();
+      }
+    }
+    false
+  }
+}
+
+/// If this widget is has the `AttrData` attribute, this method pop the
+/// `AttrData` to the most outside, and return it, otherwise return a
+/// `BoxWidget`
+fn pop_attr<A: AttributeAttach, AttrData: 'static>(
+  widget: A,
+) -> AttrOrWidget<A::HostWidget, AttrData>
+where
+  A: Sized,
+{
+  let mut boxed = widget.box_it();
+  // Safety: if we success copy the attribute, we will forget the origin object.
+  if let Some((widget, attr)) = unsafe { copy_attr(&mut boxed) } {
+    std::mem::forget(boxed);
+    AttrOrWidget::Attr(WidgetAttr {
+      attr,
+      widget,
+      type_info: PhantomData,
+    })
+  } else {
+    let mut target = boxed.as_attr_mut();
+    let mut attr = None;
+    while let Some(attr_widget) = target.take() {
+      // Safety: if we success copy the attribute, we will forget the origin object.
+      if let Some((widget, a)) = unsafe { copy_attr(attr_widget.widget_mut()) } {
+        let detached = std::mem::replace(attr_widget.widget_mut(), widget);
+        std::mem::forget(detached);
+        attr = Some(a);
+        break;
+      } else {
+        target = attr_widget.widget_mut().as_attr_mut();
+      }
+    }
+
+    if let Some(attr) = attr {
       AttrOrWidget::Attr(WidgetAttr {
         attr,
-        widget,
+        widget: boxed,
         type_info: PhantomData,
       })
     } else {
-      let mut target = boxed.as_attr_mut();
-      let mut attr = None;
-      while let Some(attr_widget) = target.take() {
-        // Safety: if we success copy the attribute, we will forget the origin object.
-        if let Some((widget, a)) = unsafe { copy_attr(attr_widget.widget_mut()) } {
-          let detached = std::mem::replace(attr_widget.widget_mut(), widget);
-          std::mem::forget(detached);
-          attr = Some(a);
-          break;
-        } else {
-          target = attr_widget.widget_mut().as_attr_mut();
-        }
-      }
-
-      if let Some(attr) = attr {
-        AttrOrWidget::Attr(WidgetAttr {
-          attr,
-          widget: boxed,
-          type_info: PhantomData,
-        })
-      } else {
-        AttrOrWidget::Widget(boxed)
-      }
+      AttrOrWidget::Widget(boxed)
     }
   }
 }
@@ -176,13 +464,11 @@ unsafe fn copy_attr<AttrData: 'static>(widget: &mut BoxWidget) -> Option<(BoxWid
     .as_any_mut()
     .downcast_mut::<WidgetAttr<BoxWidget, AttrData>>()
   {
-    let mut tmp = std::mem::MaybeUninit::uninit();
-    let ptr: *mut WidgetAttr<BoxWidget, AttrData> = tmp.as_mut_ptr();
-    ptr.copy_from(
-      attr as *const WidgetAttr<BoxWidget, AttrData>,
-      std::mem::size_of::<WidgetAttr<BoxWidget, AttrData>>(),
-    );
-    let tmp = tmp.assume_init();
+    #[allow(invalid_value)]
+    let mut tmp: WidgetAttr<BoxWidget, AttrData> = std::mem::MaybeUninit::uninit().assume_init();
+    let to: *mut WidgetAttr<BoxWidget, AttrData> = &mut tmp;
+    to.copy_from(attr, 1);
+
     Some((tmp.widget, tmp.attr))
   } else {
     None

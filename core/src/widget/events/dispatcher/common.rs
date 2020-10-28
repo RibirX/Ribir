@@ -38,16 +38,18 @@ impl CommonDispatcher {
   pub fn widget_tree_ref(&self) -> &WidgetTree { unsafe { self.widget_tree.as_ref() } }
 
   pub fn dispatch_to<
-    W: Widget,
     Event: std::convert::AsMut<EventCommon> + std::fmt::Debug,
-    Handler: FnMut(&W, Rc<Event>),
+    Handler: FnMut(&WidgetAttr<BoxWidget, AttrData>, Rc<Event>),
+    AttrData: std::fmt::Debug + 'static,
   >(
     &self,
     wid: WidgetId,
     handler: &mut Handler,
     event: Event,
   ) -> Event {
-    let event_widget = wid.dynamic_cast_ref(self.widget_tree_ref());
+    let event_widget = wid
+      .get(self.widget_tree_ref())
+      .and_then(|w| w.downcast_attr_widget());
     if let Some(w) = event_widget {
       Self::rc_dispatch(w, event, handler)
     } else {
@@ -56,10 +58,10 @@ impl CommonDispatcher {
   }
 
   pub fn bubble_dispatch<
-    W: Widget,
     Event: AsMut<EventCommon> + AsRef<EventCommon> + std::fmt::Debug,
-    Handler: FnMut(&W, Rc<Event>),
+    Handler: FnMut(&WidgetAttr<BoxWidget, AttrData>, Rc<Event>),
     EventDataUpdate: FnMut(&mut Event),
+    AttrData: std::fmt::Debug + 'static,
   >(
     &self,
     wid: WidgetId,
@@ -71,7 +73,12 @@ impl CommonDispatcher {
     let tree = self.widget_tree_ref();
     let res = wid
       .ancestors(tree)
-      .filter_map(|wid| wid.dynamic_cast_ref(tree).map(|widget| (wid, widget)))
+      .filter_map(|wid| {
+        wid
+          .get(tree)
+          .and_then(|w| w.downcast_attr_widget())
+          .map(|widget| (wid, widget))
+      })
       .try_fold(event, |mut event, (wid, widget)| {
         event.as_mut().current_target = wid;
         update_event(&mut event);

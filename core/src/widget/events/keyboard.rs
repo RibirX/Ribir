@@ -14,42 +14,31 @@ pub struct KeyboardEvent {
   pub common: EventCommon,
 }
 
-/// A widget that fire event whenever press or release a key.
 #[derive(Debug)]
-pub struct KeyboardListener {
-  widget: BoxWidget,
-  subject: LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>,
-}
+pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>);
 
-widget::inherit_widget!(KeyboardListener, widget);
+/// A widget that fire event whenever press or release a key.
+pub type KeyboardListener<W> = WidgetAttr<W, KeyboardAttr>;
 
-impl KeyboardListener {
-  pub fn from_widget(widget: BoxWidget) -> BoxWidget {
-    widget::inherit(
-      widget.box_it(),
-      |base| Self {
-        widget: base,
-        subject: <_>::default(),
-      },
-      |_| {},
-    )
+impl<W: Widget> KeyboardListener<W> {
+  pub fn from_widget<A: AttributeAttach<HostWidget = W>>(widget: A) -> Self {
+    widget.unwrap_attr_or_else(|| KeyboardAttr(<_>::default()))
   }
 
   #[inline]
   pub fn event_observable(
     &self,
   ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
-    self.subject.clone()
+    self.attr.0.clone()
   }
 
-  pub fn listen_on<H: FnMut(&KeyboardEvent) + 'static>(
-    base: BoxWidget,
+  pub fn listen_on<A: AttributeAttach<HostWidget = W>, H: FnMut(&KeyboardEvent) + 'static>(
+    base: A,
     event_type: KeyboardEventType,
     mut handler: H,
-  ) -> BoxWidget {
+  ) -> Self {
     let keyboard = Self::from_widget(base);
-    Widget::dynamic_cast_ref::<Self>(&keyboard)
-      .unwrap()
+    keyboard
       .event_observable()
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event));

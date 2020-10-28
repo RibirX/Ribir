@@ -161,14 +161,9 @@ impl<R: CanvasRender> Window<R> {
     }
   }
 
-  fn new<W: RawWindow + 'static>(mut root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
-    if Widget::dynamic_cast_ref::<Theme>(&root).is_none() {
-      root = Theme {
-        data: material::light("Roboto".to_string()),
-        widget: root,
-      }
-      .box_it();
-    }
+  fn new<W: RawWindow + 'static>(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
+    let root = root.unwrap_attr_or_else(|| material::light("Roboto".to_string()));
+
     let render_tree = Box::pin(RenderTree::default());
     let widget_tree = Box::pin(WidgetTree::default());
     let raw_window: Rc<RefCell<Box<dyn RawWindow>>> = Rc::new(RefCell::new(Box::new(wnd)));

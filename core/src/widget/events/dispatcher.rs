@@ -76,7 +76,7 @@ impl Dispatcher {
         };
         let event = self.common.bubble_dispatch(
           focus,
-          |keyboard: &KeyboardListener, event| {
+          |keyboard: &KeyboardListener<BoxWidget>, event| {
             log::info!("{:?}: {:?}", event_type, event);
             keyboard.event_observable().next((event_type, event))
           },
@@ -101,7 +101,7 @@ impl Dispatcher {
       };
       self.common.bubble_dispatch(
         focus,
-        |listener: &CharListener, event| {
+        |listener: &CharListener<BoxWidget>, event| {
           log::info!("char event: {:?}", event);
           listener.event_observable().next(event);
         },
