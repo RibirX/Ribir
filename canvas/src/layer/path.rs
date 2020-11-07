@@ -1,6 +1,6 @@
 use crate::*;
 use lyon::{
-  geom::Arc,
+  geom::{Arc, LineSegment},
   path::{builder::PathBuilder as LyonBuilder, Winding},
 };
 
@@ -101,6 +101,15 @@ impl PathBuilder {
     arc.for_each_quadratic_bezier(&mut |curve| {
       self.0.quadratic_bezier_to(curve.ctrl, curve.to);
     });
+  }
+
+  #[inline]
+  pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
+    self.0.add_line_segment(&LineSegment {
+      from: from.to_untyped(),
+      to: to.to_untyped(),
+    });
+    self
   }
 
   /// Adds a sub-path containing an ellipse.
