@@ -85,8 +85,8 @@ mod tests {
     let theme = ThemeTrack {
       themes: track_themes.clone(),
     };
-    let dark_theme = SizedBox::shrink(theme).with_theme(dark.clone());
-    let light_dark_theme = SizedBox::expanded(dark_theme).with_theme(light.clone());
+    let dark_theme = SizedBox::shrink(theme).with_theme(dark);
+    let light_dark_theme = SizedBox::expanded(dark_theme).with_theme(light);
 
     let mut wnd = window::Window::without_render(light_dark_theme, Size::zero());
     wnd.render_ready();

@@ -422,7 +422,7 @@ mod tests {
         stateful
           .on_pointer_move(move |_| {
             let mut sized_box = pointer.borrow_mut();
-            sized_box.size = sized_box.size * 2.;
+            sized_box.size *= 2.;
           })
           .box_it()
       }

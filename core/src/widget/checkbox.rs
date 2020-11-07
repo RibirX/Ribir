@@ -11,13 +11,19 @@ pub struct Checkbox {
 }
 
 impl Checkbox {
-  pub fn from_theme(theme: ThemeData) -> Self {
+  pub fn from_theme(theme: &ThemeData) -> Self {
     Self {
-      color: theme.primary,
-      theme: theme.check_box,
-      marker_color: theme.secondary,
+      color: theme.secondary.clone(),
+      theme: theme.check_box.clone(),
+      marker_color: theme.secondary.clone(),
       ..Default::default()
     }
+  }
+
+  #[inline]
+  pub fn with_checked(mut self, checked: bool) -> Self {
+    self.checked = checked;
+    self
   }
 
   fn switch_check(&mut self) {
@@ -51,6 +57,7 @@ impl CombinationWidget for Checkbox {
       } else {
         (checked_path, check_mark_width)
       };
+      let size = size + border_width * 2.;
       CheckboxMarker {
         size,
         check_mark_width,
@@ -101,7 +108,7 @@ impl RenderObject for CheckboxMarker {
   type Owner = CheckboxMarker;
 
   fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if owner_widget.size != self.size {
+    if (owner_widget.size - self.size).abs() < f32::EPSILON {
       ctx.mark_needs_layout();
     }
     *self = owner_widget.clone();

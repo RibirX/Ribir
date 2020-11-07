@@ -250,15 +250,15 @@ pub struct CheckboxTheme {
 impl Default for CheckboxTheme {
   fn default() -> Self {
     let mut builder = PathBuilder::new();
-    builder
-      .begin_path(Point::new(4.1, 12.7))
-      .line_to(Point::new(9., 17.6))
-      .line_to(Point::new(20.3, 6.3))
-      .close_path();
+    let start = Point::new(4.1, 12.7);
+    let mid = Point::new(9., 17.6);
+    let end = Point::new(20.3, 6.3);
+    builder.segment(start, mid).segment(mid, end);
+
     Self {
-      size: 16.,
+      size: 12.,
       border_width: 2.,
-      check_mark_width: 2.1333333333,
+      check_mark_width: 2.133_333_4,
       border_radius: 2.,
       border_color: Color::BLACK,
       checked_path: builder.build(),

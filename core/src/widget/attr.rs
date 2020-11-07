@@ -348,9 +348,9 @@ pub trait AttributeAttach: Widget {
     let mut attr = self.as_attr();
     let mut first = true;
     while let Some(a) = attr {
-      if first && a.as_any().is::<WidgetAttr<Self::HostWidget, AttrData>>() {
-        return true;
-      } else if a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>() {
+      if (first && a.as_any().is::<WidgetAttr<Self::HostWidget, AttrData>>())
+        || a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>()
+      {
         return true;
       } else {
         first = false;
