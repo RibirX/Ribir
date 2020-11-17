@@ -4,7 +4,6 @@ use crate::widget::theme_data::CheckboxTheme;
 #[derive(Debug, Default)]
 pub struct Checkbox {
   pub color: Color,
-  pub marker_color: Color,
   pub checked: bool,
   pub indeterminate: bool,
   pub theme: CheckboxTheme,
@@ -15,7 +14,7 @@ impl Checkbox {
     Self {
       color: theme.secondary.clone(),
       theme: theme.check_box.clone(),
-      marker_color: theme.secondary.clone(),
+
       ..Default::default()
     }
   }
@@ -45,6 +44,7 @@ impl CombinationWidget for Checkbox {
       border_radius,
       border_color,
       checked_path,
+      marker_color,
     } = self.theme.clone();
     let marker = if self.indeterminate || self.checked {
       let (path, check_mark_width) = if self.indeterminate {
@@ -61,7 +61,7 @@ impl CombinationWidget for Checkbox {
       CheckboxMarker {
         size,
         check_mark_width,
-        color: self.marker_color.clone(),
+        color: marker_color,
         path,
       }
       .with_background(self.color.clone().into())
@@ -78,6 +78,7 @@ impl CombinationWidget for Checkbox {
     marker
       .on_tap(move |_| state.borrow_mut().switch_check())
       .on_key_up(|_| unimplemented!())
+      .with_cursor(CursorIcon::Hand)
       .box_it()
   }
 }

@@ -52,8 +52,8 @@ impl WidgetTree {
   pub fn inflate(&mut self, wid: WidgetId, render_tree: &mut RenderTree) -> &mut Self {
     let parent_id = wid
       .ancestors(self)
-      .find(|id| id.get(self).map_or(false, |w| w.is_render()))
-      .and_then(|id| self.widget_to_render.get(&id))
+      .filter(|id| id.get(self).map_or(false, |w| w.is_render()))
+      .find_map(|id| self.widget_to_render.get(&id))
       .copied();
     let mut stack = vec![(wid, parent_id)];
 

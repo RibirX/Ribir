@@ -11,6 +11,7 @@ pub fn light(family: String) -> ThemeData {
     TextDecoration::NONE,
     Color::TRANSPARENT,
   );
+  let background = Color::from_u32(0xFFFF_FFFF);
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
   ThemeData {
     brightness: Brightness::Light,
@@ -18,7 +19,7 @@ pub fn light(family: String) -> ThemeData {
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary: Color::from_u32(0x03DA_C6FF),
     secondary_variant: Color::from_u32(0x0187_86FF),
-    background: Color::from_u32(0xFFFF_FFFF),
+    background: background.clone(),
     surface: Color::from_u32(0xFFFF_FFFF),
     error: Color::from_u32(0xB000_20FF),
     on_primary: Color::from_u32(0xFFFF_FFFF),
@@ -30,6 +31,7 @@ pub fn light(family: String) -> ThemeData {
     default_font_family: family,
     check_box: CheckboxTheme {
       border_color: unselected_widget_color.clone().with_alpha(0.65),
+      marker_color: background,
       ..Default::default()
     },
     unselected_widget_color,
@@ -39,6 +41,7 @@ pub fn light(family: String) -> ThemeData {
 /// A default dark theme with a teal accent color. Colors from https://material.io/design/color/dark-theme.html#ui-application
 pub fn dark(family: String) -> ThemeData {
   let unselected_widget_color = Color::WHITE.with_alpha(0.7);
+  let background = Color::from_u32(0x1212_12FF);
   let light_text = TypographyTheme::new(
     family.clone(),
     family.clone(),
@@ -53,7 +56,7 @@ pub fn dark(family: String) -> ThemeData {
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary: Color::from_u32(0x03DA_C6FF),
     secondary_variant: Color::from_u32(0x1212_12FF),
-    background: Color::from_u32(0x1212_12FF),
+    background: background.clone(),
     surface: Color::from_u32(0x1212_12FF),
     error: Color::from_u32(0xCF66_79FF),
     on_primary: Color::from_u32(0),
@@ -65,6 +68,7 @@ pub fn dark(family: String) -> ThemeData {
     default_font_family: family,
     check_box: CheckboxTheme {
       border_color: unselected_widget_color.clone().with_alpha(0.65),
+      marker_color: background,
       ..Default::default()
     },
     unselected_widget_color,
