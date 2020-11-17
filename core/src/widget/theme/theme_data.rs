@@ -244,21 +244,23 @@ pub struct CheckboxTheme {
   pub check_mark_width: f32,
   pub border_radius: f32,
   pub border_color: Color,
+  pub marker_color: Color,
   pub checked_path: Path,
 }
 
 impl Default for CheckboxTheme {
   fn default() -> Self {
     let mut builder = PathBuilder::new();
-    let start = Point::new(4.1, 12.7);
-    let mid = Point::new(9., 17.6);
-    let end = Point::new(20.3, 6.3);
+    let start = Point::new(2.733_333_3, 8.466_666_7);
+    let mid = Point::new(6., 11.733_333_3);
+    let end = Point::new(13.533_333_3, 4.2);
     builder.segment(start, mid).segment(mid, end);
 
     Self {
       size: 12.,
       border_width: 2.,
-      check_mark_width: 2.133_333_4,
+      check_mark_width: 1.422_222_2,
+      marker_color: Color::WHITE,
       border_radius: 2.,
       border_color: Color::BLACK,
       checked_path: builder.build(),

@@ -24,11 +24,11 @@ pub trait Event {
   /// onto which the event was dispatched. It is different from
   /// Event::current_target when the event handler is called during the bubbling
   /// phase of the event.
-  fn target(&self) -> &WidgetId;
+  fn target(&self) -> WidgetId;
   /// A reference to the currently registered target for the event. This is the
   /// object to which the event is currently slated to be sent. It's possible
   /// this has been changed along the way through retargeting.
-  fn current_target(&self) -> &WidgetId;
+  fn current_target(&self) -> WidgetId;
   /// Prevent event bubbling to parent.
   fn stop_bubbling(&self);
   /// Tells the user agent that if the event does not get explicitly handled,
@@ -50,9 +50,9 @@ pub struct EventCommon {
 
 impl<T: std::convert::AsRef<EventCommon>> Event for T {
   #[inline]
-  fn target(&self) -> &WidgetId { &self.as_ref().target }
+  fn target(&self) -> WidgetId { self.as_ref().target }
   #[inline]
-  fn current_target(&self) -> &WidgetId { &self.as_ref().target }
+  fn current_target(&self) -> WidgetId { self.as_ref().current_target }
   #[inline]
   fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(true) }
   #[inline]

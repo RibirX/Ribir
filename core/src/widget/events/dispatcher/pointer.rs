@@ -6,7 +6,7 @@ use winit::event::{DeviceId, ElementState, MouseButton};
 #[derive(Default)]
 pub(crate) struct PointerDispatcher {
   cursor_pos: Point,
-  last_pointer_widget: Option<WidgetId>,
+  entered_widgets: Vec<WidgetId>,
   mouse_button: (Option<DeviceId>, MouseButtons),
   pointer_down_uid: Option<WidgetId>,
 }
@@ -110,60 +110,50 @@ impl PointerDispatcher {
   fn pointer_enter_leave_dispatch(&mut self, common: &CommonDispatcher) {
     let tree = common.widget_tree_ref();
     let new_hit = self.hit_widget(common);
-    let mut old_path = self
-      .last_pointer_widget
-      .map(|wid| wid.ancestors(tree).collect::<Vec<_>>());
-    let mut new_path = new_hit.map(|(wid, _)| wid.ancestors(tree).collect::<Vec<_>>());
 
-    // remove the common ancestor
-    if let Some(ref mut old_path) = old_path {
-      if let Some(ref mut new_path) = new_path {
-        while !old_path.is_empty() && old_path.last() == new_path.last() {
-          old_path.pop();
-          new_path.pop();
+    let mut already_entered = vec![];
+
+    let mut leave_emitter = Self::event_emitter(PointerEventType::Leave);
+    self.entered_widgets.iter().for_each(|w| {
+      // if the widget is not the ancestor of the hit widget
+      if !w.is_dropped(tree) {
+        if new_hit.is_none()
+          || !w
+            .ancestors(tree)
+            .any(|w| Some(w) == new_hit.as_ref().map(|h| h.0))
+        {
+          let old_pos = w.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
+          let event = self.mouse_pointer(*w, old_pos, common);
+          common.dispatch_to(*w, &mut leave_emitter, event);
+        } else {
+          already_entered.push(*w)
         }
       }
-    }
+    });
+    self.entered_widgets.clear();
 
-    if let Some(old_path) = old_path {
-      if let Some(old_on) = old_path.first() {
-        let old_pos = old_on.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
-        let event = self.mouse_pointer(*old_on, old_pos, common);
-        let mut pos_update = Self::event_position_updater(*old_on, common);
-        let _ = old_path.iter().try_fold(event, |mut event, wid| {
-          event.as_mut().current_target = *wid;
-          pos_update(&mut event);
-          event = common.dispatch_to(
-            *wid,
-            &mut Self::event_emitter(PointerEventType::Leave),
-            event,
-          );
-          CommonDispatcher::ok_bubble(event)
+    if let Some((hit_widget, _)) = new_hit {
+      let mut enter_emitter = Self::event_emitter(PointerEventType::Enter);
+      hit_widget
+        .ancestors(tree)
+        .filter(|w| {
+          w.get(tree)
+            .and_then(|w| w.downcast_attr_widget::<PointerAttr>())
+            .is_some()
+        })
+        .for_each(|w| self.entered_widgets.push(w));
+
+      self
+        .entered_widgets
+        .iter()
+        .rev()
+        .filter(|w| !already_entered.iter().any(|e| e != *w))
+        .for_each(|w| {
+          let old_pos = w.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
+          let event = self.mouse_pointer(*w, old_pos, common);
+          common.dispatch_to(*w, &mut enter_emitter, event);
         });
-      }
     }
-
-    if let Some(new_path) = new_path {
-      if let Some(enter_from) = new_path.last() {
-        let pos = enter_from.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
-        let event = self.mouse_pointer(*enter_from, pos, common);
-        let mut last_enter = *enter_from;
-        let _ = new_path.iter().rev().try_fold(event, |mut event, wid| {
-          event.as_mut().current_target = *wid;
-          event.position = wid.map_from(pos, last_enter, tree, common.render_tree_ref());
-          last_enter = *event.target();
-
-          event = common.dispatch_to(
-            *wid,
-            &mut Self::event_emitter(PointerEventType::Enter),
-            event,
-          );
-          CommonDispatcher::ok_bubble(event)
-        });
-      }
-    }
-
-    self.last_pointer_widget = new_hit.map(|(wid, _)| wid);
   }
 
   fn mouse_pointer(&self, target: WidgetId, pos: Point, common: &CommonDispatcher) -> PointerEvent {
@@ -219,7 +209,7 @@ impl PointerDispatcher {
     move |e: &mut PointerEvent| {
       e.position = last_bubble_from.map_to(
         e.position,
-        *e.target(),
+        e.target(),
         common.widget_tree_ref(),
         common.render_tree_ref(),
       );
@@ -242,19 +232,6 @@ impl WidgetId {
     let map_to = ancestor.relative_to_render(tree).expect("must have");
 
     rid.map_to(pos, map_to, r_tree)
-  }
-
-  fn map_from(
-    self,
-    pos: Point,
-    ancestor: WidgetId,
-    tree: &WidgetTree,
-    r_tree: &RenderTree,
-  ) -> Point {
-    let rid = self.relative_to_render(tree).expect("must have");
-    let map_from = ancestor.relative_to_render(tree).expect("must have");
-
-    rid.map_from(pos, map_from, r_tree)
   }
 
   fn map_from_global(self, pos: Point, tree: &WidgetTree, r_tree: &RenderTree) -> Point {
