@@ -17,7 +17,7 @@ pub struct CharEvent {
 
 impl<W: Widget> CharListener<W> {
   pub fn from_widget<A: AttributeAttach<HostWidget = W>>(widget: A) -> Self {
-    widget.unwrap_attr_or_else_with(|widget| {
+    FocusListener::from_widget(widget, None, None).unwrap_attr_or_else_with(|widget| {
       let focus = FocusListener::from_widget(widget, None, None);
       (focus.box_it(), CharAttr(<_>::default()))
     })

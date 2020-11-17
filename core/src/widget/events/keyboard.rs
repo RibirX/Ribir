@@ -22,7 +22,8 @@ pub type KeyboardListener<W> = WidgetAttr<W, KeyboardAttr>;
 
 impl<W: Widget> KeyboardListener<W> {
   pub fn from_widget<A: AttributeAttach<HostWidget = W>>(widget: A) -> Self {
-    widget.unwrap_attr_or_else(|| KeyboardAttr(<_>::default()))
+    FocusListener::from_widget(widget, None, None)
+      .unwrap_attr_or_else(|| KeyboardAttr(<_>::default()))
   }
 
   #[inline]
