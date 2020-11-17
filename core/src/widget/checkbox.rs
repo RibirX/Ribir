@@ -75,9 +75,14 @@ impl CombinationWidget for Checkbox {
     .with_margin(EdgeInsets::all(4.));
 
     let mut state = self.self_state_ref(ctx);
+    let mut state2 = self.self_state_ref(ctx);
     marker
       .on_tap(move |_| state.borrow_mut().switch_check())
-      .on_key_up(|_| unimplemented!())
+      .on_key_up(move |ke| {
+        if ke.key == VirtualKeyCode::Space {
+          state2.borrow_mut().switch_check()
+        }
+      })
       .with_cursor(CursorIcon::Hand)
       .box_it()
   }
