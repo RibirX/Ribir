@@ -86,7 +86,7 @@ impl WidgetTree {
       }
     }
 
-    if let Some(rid) = parent_id.or(render_tree.root()) {
+    if let Some(rid) = parent_id.or_else(|| render_tree.root()) {
       rid.mark_needs_layout(render_tree);
     }
 

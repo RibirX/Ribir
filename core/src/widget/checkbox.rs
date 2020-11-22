@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use crate::widget::theme_data::CheckboxTheme;
 
+/// Represents a control that a user can select and clear.
 #[derive(Debug, Default)]
 pub struct Checkbox {
-  pub color: Color,
   pub checked: bool,
   pub indeterminate: bool,
   pub theme: CheckboxTheme,
@@ -12,7 +12,6 @@ pub struct Checkbox {
 impl Checkbox {
   pub fn from_theme(theme: &ThemeData) -> Self {
     Self {
-      color: theme.secondary.clone(),
       theme: theme.check_box.clone(),
 
       ..Default::default()
@@ -22,6 +21,12 @@ impl Checkbox {
   #[inline]
   pub fn with_checked(mut self, checked: bool) -> Self {
     self.checked = checked;
+    self
+  }
+
+  #[inline]
+  pub fn with_indeterminate(mut self, b: bool) -> Self {
+    self.indeterminate = b;
     self
   }
 
@@ -45,26 +50,28 @@ impl CombinationWidget for Checkbox {
       border_color,
       checked_path,
       marker_color,
+      color,
     } = self.theme.clone();
     let marker = if self.indeterminate || self.checked {
+      let size = size + border_width * 2.;
       let (path, check_mark_width) = if self.indeterminate {
         let center_y = size / 2.;
         let mut builder = PathBuilder::new();
         builder
           .begin_path(Point::new(3., center_y))
-          .line_to(Point::new(size - 6., center_y));
+          .line_to(Point::new(size - 3., center_y))
+          .close_path();
         (builder.build(), 2.)
       } else {
         (checked_path, check_mark_width)
       };
-      let size = size + border_width * 2.;
       CheckboxMarker {
         size,
         check_mark_width,
         color: marker_color,
         path,
       }
-      .with_background(self.color.clone().into())
+      .with_background(color.into())
     } else {
       SizedBox::empty_box(Size::new(size, size)).with_border(Border::all(BorderSide {
         color: border_color,
@@ -133,5 +140,70 @@ impl RenderObject for CheckboxMarker {
       .set_style(self.color.clone())
       .set_line_width(self.check_mark_width)
       .stroke_path(self.path.clone());
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test::widget_and_its_children_box_rect;
+  use widget::theme::material;
+
+  fn checkbox() -> Checkbox { Checkbox::from_theme(&material::light("".to_string())) }
+  #[test]
+  fn layout() {
+    let w = checkbox();
+    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(200., 200.));
+    debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
+
+    debug_assert_eq!(
+      child,
+      vec![Rect::new(Point::new(4., 4.), Size::new(16., 16.))]
+    );
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn checked_paint() {
+    let c = checkbox().with_checked(true);
+    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
+    window.render_ready();
+    window.draw_frame();
+
+    unit_test::assert_canvas_eq!(window.render(), "../test/test_imgs/checkbox_checked.png");
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn unchecked_paint() {
+    let mut window = window::Window::headless(checkbox().box_it(), DeviceSize::new(100, 100));
+    window.render_ready();
+    window.draw_frame();
+
+    unit_test::assert_canvas_eq!(window.render(), "../test/test_imgs/checkbox_uncheck.png");
+  }
+
+  #[test]
+  #[ignore = "gpu need"]
+  fn indeterminate_paint() {
+    let c = checkbox().with_checked(true).with_indeterminate(true);
+    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
+    window.render_ready();
+    window.draw_frame();
+
+    unit_test::assert_canvas_eq!(
+      window.render(),
+      "../test/test_imgs/checkbox_indeterminate.png"
+    );
+
+    let c = checkbox().with_checked(false).with_indeterminate(true);
+    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
+    window.render_ready();
+    window.draw_frame();
+
+    unit_test::assert_canvas_eq!(
+      window.render(),
+      "../test/test_imgs/checkbox_indeterminate.png"
+    );
   }
 }

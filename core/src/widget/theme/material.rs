@@ -12,14 +12,21 @@ pub fn light(family: String) -> ThemeData {
     Color::TRANSPARENT,
   );
   let background = Color::from_u32(0xFFFF_FFFF);
+  let secondary = Color::from_u32(0x03DA_C6FF);
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
   ThemeData {
     brightness: Brightness::Light,
+    check_box: CheckboxTheme {
+      color: secondary.clone(),
+      border_color: unselected_widget_color.clone().with_alpha(0.65),
+      marker_color: background.clone(),
+      ..Default::default()
+    },
     primary: Color::from_u32(0x6200_EEFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
-    secondary: Color::from_u32(0x03DA_C6FF),
+    secondary,
     secondary_variant: Color::from_u32(0x0187_86FF),
-    background: background.clone(),
+    background,
     surface: Color::from_u32(0xFFFF_FFFF),
     error: Color::from_u32(0xB000_20FF),
     on_primary: Color::from_u32(0xFFFF_FFFF),
@@ -29,11 +36,6 @@ pub fn light(family: String) -> ThemeData {
     on_error: Color::from_u32(0xFFFF_FFFF),
     typography_theme: dark_text,
     default_font_family: family,
-    check_box: CheckboxTheme {
-      border_color: unselected_widget_color.clone().with_alpha(0.65),
-      marker_color: background,
-      ..Default::default()
-    },
     unselected_widget_color,
   }
 }
@@ -42,6 +44,7 @@ pub fn light(family: String) -> ThemeData {
 pub fn dark(family: String) -> ThemeData {
   let unselected_widget_color = Color::WHITE.with_alpha(0.7);
   let background = Color::from_u32(0x1212_12FF);
+  let secondary = Color::from_u32(0x03DA_C6FF);
   let light_text = TypographyTheme::new(
     family.clone(),
     family.clone(),
@@ -52,11 +55,17 @@ pub fn dark(family: String) -> ThemeData {
   );
   ThemeData {
     brightness: Brightness::Dark,
+    check_box: CheckboxTheme {
+      border_color: unselected_widget_color.clone().with_alpha(0.65),
+      marker_color: background.clone(),
+      color: secondary.clone(),
+      ..Default::default()
+    },
     primary: Color::from_u32(0xBB86_FCFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
-    secondary: Color::from_u32(0x03DA_C6FF),
+    secondary,
     secondary_variant: Color::from_u32(0x1212_12FF),
-    background: background.clone(),
+    background,
     surface: Color::from_u32(0x1212_12FF),
     error: Color::from_u32(0xCF66_79FF),
     on_primary: Color::from_u32(0),
@@ -66,11 +75,6 @@ pub fn dark(family: String) -> ThemeData {
     on_error: Color::from_u32(0),
     typography_theme: light_text,
     default_font_family: family,
-    check_box: CheckboxTheme {
-      border_color: unselected_widget_color.clone().with_alpha(0.65),
-      marker_color: background,
-      ..Default::default()
-    },
     unselected_widget_color,
   }
 }
