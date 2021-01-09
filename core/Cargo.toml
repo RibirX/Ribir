@@ -1,25 +1,25 @@
 [package]
-name = "holiday"
-version = "0.1.0"
 authors = ["adoo <Adoo@outlook.com>"]
 edition = "2018"
+name = "holiday"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-herald =  "0.1.0"
-indextree= "4.3.1"
-rxrust = "0.9.1"
 bitflags = "1.2.1"
-winit = "0.22.2"
-canvas = {path= "../canvas", version="*"}
-futures="0.3.5"
+canvas = {path = "../canvas", version = "*"}
+futures = "0.3.5"
+herald = "0.1.0"
+indextree = "4.3.1"
 log = "0.4.8"
-smallvec = "1.4.1"
+rxrust = "0.10.0"
+smallvec = "1.5.1"
+winit = "0.24.0"
 
 [dependencies.blake3]
-version = "0.3.4"
 features = ["rayon"]
+version = "0.3.4"
 
 [dev-dependencies]
-unit_test = {path ="../unit_test"}
+unit_test = {path = "../unit_test"}

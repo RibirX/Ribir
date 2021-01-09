@@ -415,6 +415,7 @@ impl<W: Widget, AttrData: Any + Debug> Attribute for WidgetAttr<W, AttrData> {
 }
 
 impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
+  #[inline]
   fn classify(&self) -> WidgetClassify { self.widget.classify() }
 
   #[inline]

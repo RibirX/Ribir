@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::widget::theme_data::CheckboxTheme;
+use rxrust::prelude::*;
 
 /// Represents a control that a user can select and clear.
 #[derive(Debug, Default)]
@@ -37,6 +38,13 @@ impl Checkbox {
     } else {
       self.checked = !self.checked;
     }
+  }
+}
+
+impl Stateful<Checkbox> {
+  /// A change stream of the checked state.
+  pub fn checked_state(&mut self) -> impl Observable<Item = StateChange<bool>, Err = ()> {
+    self.pick_state(|w| w.checked)
   }
 }
 
@@ -81,8 +89,8 @@ impl CombinationWidget for Checkbox {
     .with_border_radius(BorderRadius::all(Vector::new(border_radius, border_radius)))
     .with_margin(EdgeInsets::all(4.));
 
-    let mut state = self.self_state_ref(ctx);
-    let mut state2 = self.self_state_ref(ctx);
+    let mut state = self.self_state_ref_cell(ctx);
+    let mut state2 = state.clone();
     marker
       .on_tap(move |_| state.borrow_mut().switch_check())
       .on_key_up(move |ke| {
