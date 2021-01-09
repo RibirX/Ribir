@@ -12,7 +12,7 @@ pub mod widget_tree;
 pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
-pub use stateful::{StateRef, Stateful};
+pub use stateful::{StateChange, StateRefCell, Stateful};
 pub use text::Text;
 pub mod events;
 pub use events::*;
@@ -124,11 +124,12 @@ pub trait CombinationWidget: Widget {
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
 
-  fn self_state_ref(&self, ctx: &mut BuildCtx) -> StateRef<Self>
+  fn self_state_ref_cell(&self, ctx: &mut BuildCtx) -> StateRefCell<Self>
   where
     Self: Sized,
   {
-    unsafe { StateRef::new(ctx.state_attr()) }
+    // Safety: We know the host type of `StateAttr` from `BuildCtx` is `Self`.
+    unsafe { ctx.state_attr().ref_cell() }
   }
 }
 

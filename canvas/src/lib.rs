@@ -2,7 +2,6 @@
   decl_macro,
   test,
   const_fn,
-  slice_fill,
   const_fn_floating_point_arithmetic
 )]
 mod atlas;
