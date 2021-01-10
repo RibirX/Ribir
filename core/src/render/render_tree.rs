@@ -217,22 +217,19 @@ impl RenderId {
 
   /// Returns an iterator of references to this node’s children.
   #[inline]
-  pub(crate) fn children<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
+  pub(crate) fn children(self, tree: &RenderTree) -> impl Iterator<Item = RenderId> + '_ {
     self.0.children(&tree.arena).map(RenderId)
   }
 
   /// Returns an iterator of RenderId of this RenderObject’s children, in
   /// reverse order.
-  pub(crate) fn reverse_children<'a>(
-    self,
-    tree: &'a RenderTree,
-  ) -> impl Iterator<Item = RenderId> + 'a {
+  pub(crate) fn reverse_children(self, tree: &RenderTree) -> impl Iterator<Item = RenderId> + '_ {
     self.0.reverse_children(&tree.arena).map(RenderId)
   }
 
   /// Returns an iterator of references to this node and its descendants, in
   /// tree order.
-  pub(crate) fn traverse<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderEdge> + 'a {
+  pub(crate) fn traverse(self, tree: &RenderTree) -> impl Iterator<Item = RenderEdge> + '_ {
     self.0.traverse(&tree.arena).map(|edge| match edge {
       NodeEdge::Start(id) => RenderEdge::Start(RenderId(id)),
       NodeEdge::End(id) => RenderEdge::End(RenderId(id)),
@@ -240,7 +237,7 @@ impl RenderId {
   }
 
   /// A delegate for [NodeId::ancestors](indextree::NodeId.ancestors)
-  pub(crate) fn ancestors<'a>(self, tree: &'a RenderTree) -> impl Iterator<Item = RenderId> + 'a {
+  pub(crate) fn ancestors(self, tree: &RenderTree) -> impl Iterator<Item = RenderId> + '_ {
     self.0.ancestors(&tree.arena).map(RenderId)
   }
 

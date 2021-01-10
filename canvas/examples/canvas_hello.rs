@@ -25,16 +25,15 @@ fn main() {
       window_id,
     } if window_id == window.id() => match event {
       WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-      WindowEvent::KeyboardInput { input, .. } => {
-        if let KeyboardInput {
-          state: ElementState::Pressed,
-          virtual_keycode: Some(VirtualKeyCode::Escape),
-          ..
-        } = input
-        {
-          *control_flow = ControlFlow::Exit
-        }
-      }
+      WindowEvent::KeyboardInput {
+        input:
+          KeyboardInput {
+            state: ElementState::Pressed,
+            virtual_keycode: Some(VirtualKeyCode::Escape),
+            ..
+          },
+        ..
+      } => *control_flow = ControlFlow::Exit,
 
       _ => {}
     },

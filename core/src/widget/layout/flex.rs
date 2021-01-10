@@ -425,8 +425,10 @@ impl FlexLayouter {
   fn place_line(&mut self) {
     if !self.current_line.is_empty() {
       self.main_max = self.main_max.max(self.current_line.main_width);
-      let mut new_line = MainLineInfo::default();
-      new_line.cross_pos = self.current_line.cross_bottom();
+      let new_line = MainLineInfo {
+        cross_pos: self.current_line.cross_bottom(),
+        ..Default::default()
+      };
       self
         .lines_info
         .push(std::mem::replace(&mut self.current_line, new_line));
