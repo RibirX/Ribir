@@ -105,7 +105,7 @@ impl<W: Widget> Clone for StateRefCell<W> {
   fn clone(&self) -> Self {
     Self {
       attr: self.attr.clone(),
-      type_info: self.type_info.clone(),
+      type_info: self.type_info,
     }
   }
 }
@@ -264,11 +264,9 @@ mod tests {
 
     let changed_size = Rc::new(RefCell::new(Size::zero()));
     let c_changed_size = changed_size.clone();
-    sized_box
-      .pick_state(|w| w.size.clone())
-      .subscribe(move |size| {
-        *c_changed_size.borrow_mut() = size.after.clone();
-      });
+    sized_box.pick_state(|w| w.size).subscribe(move |size| {
+      *c_changed_size.borrow_mut() = size.after;
+    });
 
     let mut state = sized_box.ref_cell();
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };

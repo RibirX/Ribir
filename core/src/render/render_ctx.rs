@@ -33,7 +33,7 @@ impl<'a> RenderCtx<'a> {
   pub fn render_id(&self) -> RenderId { self.render_obj }
 
   /// Return an iterator of children's `RenderCtx`
-  pub fn children<'l>(&'l mut self) -> impl Iterator<Item = RenderCtx<'l>> + 'l {
+  pub fn children(&mut self) -> impl Iterator<Item = RenderCtx> + '_ {
     // Safety: only split the lifetime for children one by one.
     let (tree_ptr, canvas_ptr) = unsafe {
       let tree_ptr = self.tree.as_mut().get_unchecked_mut() as *mut _;
@@ -53,7 +53,7 @@ impl<'a> RenderCtx<'a> {
 
   /// Returns an iterator of RenderId of this RenderObject’s children, in
   /// reverse order.
-  pub fn reverse_children<'l>(&'l mut self) -> impl Iterator<Item = RenderCtx<'l>> + 'l {
+  pub fn reverse_children(&mut self) -> impl Iterator<Item = RenderCtx> + '_ {
     // Safety: only split the lifetime for children one by one.
     let (tree_ptr, canvas_ptr) = unsafe {
       let tree_ptr = self.tree.as_mut().get_unchecked_mut() as *mut _;

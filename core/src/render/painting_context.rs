@@ -36,7 +36,7 @@ impl<'a> PaintingContext<'a> {
   }
 
   /// Return an iterator of children's box rect relative to this widget.
-  pub fn children_rect<'l>(&'l self) -> impl Iterator<Item = Rect> + 'l {
+  pub fn children_rect(&self) -> impl Iterator<Item = Rect> + '_ {
     self.current_node.children(self.tree).map(move |rid| {
       rid
         .layout_box_rect(self.tree)

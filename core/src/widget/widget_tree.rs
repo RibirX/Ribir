@@ -331,13 +331,13 @@ impl WidgetId {
   }
 
   /// A proxy for [NodeId::ancestors](indextree::NodeId.ancestors)
-  pub fn ancestors<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item = WidgetId> + 'a {
+  pub fn ancestors(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(&tree.arena).map(WidgetId)
   }
 
   /// A proxy for [NodeId::descendants](indextree::NodeId.descendants)
 
-  pub fn descendants<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item = WidgetId> + 'a {
+  pub fn descendants(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.descendants(&tree.arena).map(WidgetId)
   }
 

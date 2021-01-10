@@ -40,7 +40,10 @@ pub struct KeyDetectEnv {
 
 impl KeyDetectEnv {
   pub fn new(level: usize) -> Self {
-    let mut post = EmbedKeyPost::default();
+    let mut post = EmbedKeyPost {
+      level,
+      ..Default::default()
+    };
     post.level = level;
     let title = post.title.clone();
     post.title = title.clone();

@@ -201,10 +201,10 @@ impl PointerDispatcher {
     })
   }
 
-  fn event_position_updater<'r>(
+  fn event_position_updater(
     init_from: WidgetId,
-    common: &'r CommonDispatcher,
-  ) -> impl FnMut(&mut PointerEvent) + 'r {
+    common: &CommonDispatcher,
+  ) -> impl FnMut(&mut PointerEvent) + '_ {
     let mut last_bubble_from = init_from;
     move |e: &mut PointerEvent| {
       e.position = last_bubble_from.map_to(
@@ -376,7 +376,7 @@ mod tests {
     // A mouse press/release emit during another mouse's press will be ignored.
     let device_id_2 = unsafe {
       let mut id = DeviceId::dummy();
-      (&mut id as *mut DeviceId).write_bytes(1, std::mem::size_of::<DeviceId>());
+      (&mut id as *mut DeviceId).write_bytes(1, 1);
       id
     };
     wnd.processes_native_event(WindowEvent::MouseInput {
