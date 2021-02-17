@@ -8,6 +8,7 @@ use std::{
   ptr::NonNull,
   rc::Rc,
 };
+use widget_tree::WidgetTree;
 
 /// This widget convert a stateless widget to stateful.
 pub type Stateful<W> = WidgetAttr<W, StatefulAttr>;
@@ -30,22 +31,20 @@ pub struct StateRefCell<W: Widget> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StatefulAttr {
-  tree: NonNull<widget_tree::WidgetTree>,
-  state: InnerState,
-  id: WidgetId,
-}
+pub struct StatefulAttr(Rc<RefCell<InnerState>>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct InnerState {
-  change_emitter: Option<LocalSubject<'static, (), ()>>,
-  widget_ptr: Rc<RefCell<(*const dyn Widget, *mut dyn Widget)>>,
+  tree: NonNull<widget_tree::WidgetTree>,
+  id: WidgetId,
+  host_widget_ptr: *mut dyn Widget,
+  subject: Option<LocalSubject<'static, (), ()>>,
 }
 
 #[derive(Clone)]
 pub struct StateChange<T: Clone> {
-  before: T,
-  after: T,
+  pub before: T,
+  pub after: T,
 }
 
 impl<W: Widget> Stateful<W> {
@@ -53,22 +52,18 @@ impl<W: Widget> Stateful<W> {
   pub fn ref_cell(&self) -> StateRefCell<W> { unsafe { self.attr.ref_cell() } }
 
   #[inline]
-  pub fn id(&self) -> WidgetId { self.attr.id }
+  pub fn id(&self) -> WidgetId { self.attr.0.borrow().id }
 
   /// Event emitted when this widget modified.
   pub fn change_stream(
     &mut self,
   ) -> impl LocalObservable<'static, Item = StateRefCell<W>, Err = ()> {
     let ref_cell = self.ref_cell();
-    self
-      .attr
-      .state
-      .change_emitter()
-      .map(move |_| ref_cell.clone())
+    self.attr.state_subject().map(move |_| ref_cell.clone())
   }
 
   /// Pick a field change stream from the host widget.
-  pub fn pick_state<T: Clone + 'static>(
+  pub fn state_change<T: Clone + 'static>(
     &mut self,
     pick: impl Fn(&W) -> T + 'static,
   ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()> {
@@ -88,14 +83,18 @@ impl<W: Widget> Stateful<W> {
 }
 
 impl<W: Widget> StateRefCell<W> {
-  #[inline]
-  pub fn borrow(&self) -> Ref<W> { unsafe { self.attr.state.borrow() } }
+  pub fn borrow(&self) -> Ref<W> {
+    Ref::map(self.attr.0.borrow(), |state| unsafe {
+      &*(state.host_widget_ptr as *const W)
+    })
+  }
 
-  #[inline]
   pub fn borrow_mut(&mut self) -> StateRefMut<W> {
     StateRefMut {
       attr: self.attr.clone(),
-      ref_mut: ManuallyDrop::new(unsafe { self.attr.state.borrow_mut() }),
+      ref_mut: ManuallyDrop::new(RefMut::map(self.attr.0.borrow_mut(), |state| unsafe {
+        &mut *(state.host_widget_ptr as *mut W)
+      })),
     }
   }
 }
@@ -117,20 +116,15 @@ pub struct StateRefMut<'a, W: Widget> {
 
 impl<'a, W: Widget> Drop for StateRefMut<'a, W> {
   fn drop(&mut self) {
-    let StatefulAttr {
-      id, state, tree, ..
-    } = &mut self.attr;
-
     // Safety drop the RefMut first , will never borrow it.
     unsafe { ManuallyDrop::drop(&mut self.ref_mut) };
-    if let Some(subject) = &mut state.change_emitter {
-      subject.next(());
+
+    if self.attr.0.borrow().subject.is_some() {
+      self.attr.state_subject().next(())
     }
 
-    unsafe {
-      let tree = tree.as_mut();
-      id.mark_changed(tree);
-    }
+    let mut borrowed = self.attr.0.borrow_mut();
+    borrowed.id.mark_changed(unsafe { borrowed.tree.as_mut() });
   }
 }
 
@@ -151,65 +145,58 @@ impl<W: Widget> Stateful<W> {
     widget.unwrap_attr_or_else_with(|mut widget| {
       let id =
         unsafe { tree.as_mut().get_unchecked_mut() }.alloc_node(widget::PhantomWidget.box_it());
-      let pointer = InnerState::new(&mut widget);
-      let attr = StatefulAttr {
-        id,
-        state: pointer,
-        tree: NonNull::from(&*tree),
-      };
+
+      let attr = StatefulAttr::new(id, unsafe { tree.get_unchecked_mut().into() }, &mut widget);
+
       (widget, attr)
     })
   }
 }
 
 impl StatefulAttr {
-  pub(crate) fn from_id(id: WidgetId, mut tree: Pin<&mut widget_tree::WidgetTree>) -> Self {
-    let widget = id.assert_get_mut(unsafe { tree.as_mut().get_unchecked_mut() });
-    let pointer = InnerState::new(widget);
-    Self {
-      state: pointer,
-      id,
-      tree: NonNull::from(&*tree),
-    }
+  pub(crate) fn from_id(id: WidgetId, mut tree: Pin<&mut WidgetTree>) -> Self {
+    let tree_ptr = unsafe { tree.as_mut().get_unchecked_mut() }.into();
+    let tree_mut = unsafe { tree.get_unchecked_mut() };
+    let widget = id.assert_get_mut(tree_mut);
+    Self::new(id, tree_ptr, widget)
   }
-}
 
-impl StatefulAttr {
   /// ## Safety
   /// Should ensure the pointer in attr has the same type with `W`, otherwise
   /// panic occur.
-  pub unsafe fn ref_cell<W: Widget>(&self) -> StateRefCell<W> {
+  pub(crate) unsafe fn ref_cell<W: Widget>(&self) -> StateRefCell<W> {
     StateRefCell {
       attr: self.clone(),
       type_info: PhantomData,
     }
   }
-}
 
-impl InnerState {
-  fn new(widget: &mut BoxWidget) -> Self {
-    Self {
-      widget_ptr: Rc::new(RefCell::new((
-        &*widget.widget as *const _,
-        &mut *widget.widget as *mut _,
-      ))),
-      change_emitter: None,
-    }
-  }
-
-  fn change_emitter(&mut self) -> LocalSubject<'static, (), ()> {
+  fn state_subject(&mut self) -> LocalSubject<'static, (), ()> {
     self
-      .change_emitter
-      .get_or_insert_with(Subject::default)
+      .0
+      .borrow_mut()
+      .subject
+      .get_or_insert_with(<_>::default)
       .clone()
   }
 
-  unsafe fn borrow<W>(&self) -> Ref<W> {
-    Ref::map(self.widget_ptr.borrow(), |(p, _)| &*(*p as *const W))
+  pub(crate) fn new(id: WidgetId, tree: NonNull<WidgetTree>, widget: &mut BoxWidget) -> Self {
+    Self(Rc::new(RefCell::new(InnerState {
+      id,
+      host_widget_ptr: &mut *widget.widget as *mut _,
+      tree,
+      subject: None,
+    })))
   }
+}
 
-  unsafe fn borrow_mut<W>(&mut self) -> RefMut<W> {
-    RefMut::map(self.widget_ptr.borrow_mut(), |(_, p)| &mut *(*p as *mut W))
+impl Drop for InnerState {
+  fn drop(&mut self) {
+    let tree = unsafe { self.tree.as_mut() };
+    if Some(self.id) != tree.root() && self.id.parent(tree).is_none() {
+      log::warn!("The stateful widget not add into widget tree.");
+      self.id.remove(tree);
+    }
   }
 }
 
@@ -264,7 +251,7 @@ mod tests {
 
     let changed_size = Rc::new(RefCell::new(Size::zero()));
     let c_changed_size = changed_size.clone();
-    sized_box.pick_state(|w| w.size).subscribe(move |size| {
+    sized_box.state_change(|w| w.size).subscribe(move |size| {
       *c_changed_size.borrow_mut() = size.after;
     });
 

@@ -22,4 +22,5 @@ features = ["rayon"]
 version = "0.3.4"
 
 [dev-dependencies]
+env_logger = "0.7.1"
 unit_test = {path = "../unit_test"}
