@@ -26,6 +26,43 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug example 'todo'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=todo",
+          "--package=holiday"
+        ],
+        "filter": {
+          "name": "todo",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'todo'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=todo",
+          "--package=holiday"
+        ],
+        "filter": {
+          "name": "todo",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug unit tests in library 'canvas'",
       "cargo": {
         "args": [
@@ -82,18 +119,17 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug integration test canvas_gl",
+      "name": "Debug unit tests in library 'unit_test'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--test=canvas_gl",
-          "--all-features",
-          "--package=canvas"
+          "--lib",
+          "--package=unit_test"
         ],
         "filter": {
-          "name": "canvas_gl",
-          "kind": "test"
+          "name": "unit_test",
+          "kind": "lib"
         }
       },
       "args": [],
@@ -101,40 +137,9 @@
     },
     {
       "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'todos'",
-      "cargo": {
-        "args": [
-          "build",
-          "--bin=todos",
-          "--package=todos"
-        ],
-        "filter": {
-          "name": "todos",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'todos'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=todos",
-          "--package=todos"
-        ],
-        "filter": {
-          "name": "todos",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
+      "request": "attach",
+      "name": "Attach example 'todo' to debug",
+      "pid": "${command:pickMyProcess}"
     }
   ]
 }

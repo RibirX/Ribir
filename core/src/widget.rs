@@ -32,6 +32,7 @@ mod attr;
 pub use attr::*;
 mod checkbox;
 pub use checkbox::*;
+use widget::stateful::StatefulAttr;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -128,8 +129,20 @@ pub trait CombinationWidget: Widget {
   where
     Self: Sized,
   {
-    // Safety: We know the host type of `StateAttr` from `BuildCtx` is `Self`.
-    unsafe { ctx.state_attr().ref_cell() }
+    if let Some(stateful) = ctx.widget().downcast_attr_widget::<StatefulAttr>() {
+      return unsafe { stateful.attr.ref_cell() };
+    } else {
+      let attr = ctx.state_attr();
+      let ref_cell = unsafe { attr.ref_cell() };
+
+      let mut temp = PhantomWidget.box_it();
+      let widget = ctx.widget_mut();
+      std::mem::swap(widget, &mut temp);
+
+      temp = temp.attach_attr(attr).box_it();
+      std::mem::swap(widget, &mut temp);
+      ref_cell
+    }
   }
 }
 
@@ -176,20 +189,36 @@ impl std::fmt::Debug for BoxWidget {
 }
 
 impl BoxWidget {
-  fn downcast_attr_widget<AttrData: 'static>(&self) -> Option<&WidgetAttr<BoxWidget, AttrData>>
+  pub fn downcast_attr_widget<AttrData: 'static>(&self) -> Option<&WidgetAttr<BoxWidget, AttrData>>
   where
     Self: Sized,
   {
     let mut attr = self.as_attr();
-    while let Some(a) = attr {
-      let target_attr = a.as_any().downcast_ref::<WidgetAttr<BoxWidget, AttrData>>();
-      if target_attr.is_some() {
-        return target_attr;
-      } else {
-        attr = a.widget().as_attr();
-      }
+
+    while attr.as_ref().map_or(false, |a| {
+      !a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>()
+    }) {
+      attr = attr.and_then(|a| a.widget().as_attr());
     }
-    None
+
+    attr.and_then(|a| a.as_any().downcast_ref())
+  }
+
+  pub fn downcast_attr_widget_mut<AttrData: 'static>(
+    &mut self,
+  ) -> Option<&mut WidgetAttr<BoxWidget, AttrData>>
+  where
+    Self: Sized,
+  {
+    let mut attr = self.as_attr_mut();
+
+    while attr.as_ref().map_or(false, |a| {
+      !a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>()
+    }) {
+      attr = attr.and_then(|a| a.widget_mut().as_attr_mut());
+    }
+
+    attr.and_then(|a| a.as_any_mut().downcast_mut())
   }
 }
 

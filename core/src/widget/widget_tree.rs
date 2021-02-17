@@ -1,5 +1,6 @@
 use crate::{prelude::*, render::render_tree::*, util::TreeFormatter};
 use indextree::*;
+use stateful::StatefulAttr;
 use std::{
   collections::{HashMap, HashSet},
   pin::Pin,
@@ -34,7 +35,7 @@ impl WidgetTree {
   }
 
   pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
-    if let Some(stateful) = widget.downcast_attr_widget::<stateful::StatefulAttr>() {
+    if let Some(stateful) = widget.downcast_attr_widget::<StatefulAttr>() {
       let id = stateful.id();
       *id.get_mut(self).unwrap() = widget;
       id
@@ -185,7 +186,7 @@ impl WidgetTree {
       stack.push(node);
     } else {
       let parent_id = node.parent(&self).expect("parent should exists!");
-      node.drop(self, render_tree);
+      node.drop_subtree(self, render_tree);
 
       let new_child_id = parent_id.append_widget(widget, self);
       self.inflate(new_child_id, render_tree);
@@ -212,7 +213,7 @@ impl WidgetTree {
         id.detach(self);
         key_children.insert(key, id);
       } else {
-        id.drop(self, render_tree);
+        id.drop_subtree(self, render_tree);
       }
     }
 
@@ -232,7 +233,7 @@ impl WidgetTree {
 
     key_children
       .into_iter()
-      .for_each(|(_, v)| v.drop(self, render_tree));
+      .for_each(|(_, v)| v.drop_subtree(self, render_tree));
   }
 
   /// Return the topmost need rebuild
@@ -341,6 +342,20 @@ impl WidgetId {
     self.0.descendants(&tree.arena).map(WidgetId)
   }
 
+  /// return the relative render widget.
+  pub(crate) fn relative_to_render(self, tree: &WidgetTree) -> Option<RenderId> {
+    let wid = self.down_nearest_render_widget(tree);
+    tree.widget_to_render.get(&wid).cloned()
+  }
+
+  /// A proxy for [NodeId::remove](indextree::NodeId.remove)
+  #[allow(dead_code)]
+  pub(crate) fn remove(self, tree: &mut WidgetTree) {
+    self.clear_info(tree);
+
+    self.0.remove(&mut tree.arena);
+  }
+
   /// A proxy for [NodeId::detach](indextree::NodeId.detach)
   fn detach(self, tree: &mut WidgetTree) {
     self.0.detach(&mut tree.arena);
@@ -349,41 +364,22 @@ impl WidgetId {
     }
   }
 
-  /// return the relative render widget.
-  pub(crate) fn relative_to_render(self, tree: &WidgetTree) -> Option<RenderId> {
-    let wid = self.down_nearest_render_widget(tree);
-    tree.widget_to_render.get(&wid).cloned()
-  }
-
   fn append_widget(self, data: BoxWidget, tree: &mut WidgetTree) -> WidgetId {
     let id = tree.new_node(data);
     self.0.append(id.0, &mut tree.arena);
     id
   }
 
-  /// A proxy for [NodeId::remove](indextree::NodeId.remove)
-  #[allow(dead_code)]
-  pub(crate) fn remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena); }
-
   /// Drop the subtree
-  fn drop(self, tree: &mut WidgetTree, render_tree: &mut RenderTree) {
+  fn drop_subtree(self, tree: &mut WidgetTree, render_tree: &mut RenderTree) {
     let rid = self.relative_to_render(tree).expect("must exists");
-    let WidgetTree {
-      widget_to_render,
-      arena,
-      changed_widgets,
-      need_builds,
-      ..
-    } = tree;
-    self.0.descendants(arena).map(WidgetId).for_each(|wid| {
-      if arena
-        .get(wid.0)
-        .map_or(false, |node| node.get().is_render())
-      {
-        widget_to_render.remove(&wid);
-      }
-      changed_widgets.remove(&wid);
-      need_builds.remove(&wid);
+    // split tree
+    let (tree1, tree2) = unsafe {
+      let ptr = tree as *mut WidgetTree;
+      (&mut *ptr, &mut *ptr)
+    };
+    self.descendants(tree1).for_each(|wid| {
+      wid.clear_info(tree2);
     });
 
     rid.drop(render_tree);
@@ -433,6 +429,25 @@ impl WidgetId {
     method: F,
   ) -> Option<WidgetId> {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
+  }
+
+  fn clear_info(self, tree: &mut WidgetTree) {
+    let WidgetTree {
+      widget_to_render,
+      arena,
+      changed_widgets,
+      need_builds,
+      ..
+    } = tree;
+
+    if arena
+      .get(self.0)
+      .map_or(false, |node| node.get().is_render())
+    {
+      widget_to_render.remove(&self);
+    }
+    changed_widgets.remove(&self);
+    need_builds.remove(&self);
   }
 
   pub fn assert_get(self, tree: &WidgetTree) -> &BoxWidget {
@@ -544,7 +559,7 @@ mod test {
     widget_tree
       .root()
       .unwrap()
-      .drop(&mut widget_tree, &mut render_tree);
+      .drop_subtree(&mut widget_tree, &mut render_tree);
 
     assert!(widget_tree.widget_to_render.is_empty());
     assert!(render_tree.render_to_widget().is_empty());

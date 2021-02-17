@@ -43,8 +43,10 @@ impl Checkbox {
 
 impl Stateful<Checkbox> {
   /// A change stream of the checked state.
-  pub fn checked_state(&mut self) -> impl Observable<Item = StateChange<bool>, Err = ()> {
-    self.pick_state(|w| w.checked)
+  pub fn checked_state(
+    &mut self,
+  ) -> impl LocalObservable<'static, Item = StateChange<bool>, Err = ()> {
+    self.state_change(|w| w.checked)
   }
 }
 
@@ -93,8 +95,8 @@ impl CombinationWidget for Checkbox {
     let mut state2 = state.clone();
     marker
       .on_tap(move |_| state.borrow_mut().switch_check())
-      .on_key_up(move |ke| {
-        if ke.key == VirtualKeyCode::Space {
+      .on_key_up(move |k| {
+        if k.key == VirtualKeyCode::Space {
           state2.borrow_mut().switch_check()
         }
       })

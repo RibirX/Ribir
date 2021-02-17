@@ -1,10 +1,9 @@
 [workspace]
 
 members = [
-    "core",
-    "canvas",
-    "unit_test",
-    "examples/*"
+  "core",
+  "canvas",
+  "unit_test",
 ]
 
 [profile.bench]

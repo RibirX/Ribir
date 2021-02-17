@@ -1,22 +1,18 @@
 use crate::prelude::*;
+use stateful::StatefulAttr;
 use std::pin::Pin;
 
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
-  widget: WidgetId,
+  wid: WidgetId,
 }
 
 impl<'a> BuildCtx<'a> {
-  #[inline]
-  pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, widget: WidgetId) -> Self {
-    Self { tree, widget }
-  }
-
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&self) -> &ThemeData {
     let tree = &*self.tree;
     let theme = self
-      .widget
+      .wid
       .ancestors(tree)
       .find_map(|id| id.get(tree).and_then(|w| w.downcast_attr_widget()))
       .expect("At least， root theme should be found.");
@@ -24,8 +20,23 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub fn state_attr(&mut self) -> widget::stateful::StatefulAttr {
-    widget::stateful::StatefulAttr::from_id(self.widget, self.tree.as_mut())
+  pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, widget: WidgetId) -> Self {
+    Self { tree, wid: widget }
+  }
+
+  #[inline]
+  pub(crate) fn widget(&self) -> &BoxWidget { self.wid.assert_get(&*self.tree) }
+
+  #[inline]
+  pub(crate) fn widget_mut(&mut self) -> &mut BoxWidget {
+    self
+      .wid
+      .assert_get_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
+  }
+
+  #[inline]
+  pub(crate) fn state_attr(&mut self) -> StatefulAttr {
+    StatefulAttr::from_id(self.wid, self.tree.as_mut())
   }
 }
 
