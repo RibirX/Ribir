@@ -125,22 +125,19 @@ pub trait CombinationWidget: Widget {
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
 
-  fn self_state_ref_cell(&self, ctx: &mut BuildCtx) -> StateRefCell<Self>
+  fn state_ref_cell(&self, ctx: &mut BuildCtx) -> StateRefCell<Self>
   where
     Self: Sized,
   {
     if let Some(stateful) = ctx.widget().downcast_attr_widget::<StatefulAttr>() {
-      return unsafe { stateful.attr.ref_cell() };
+      unsafe { stateful.attr.ref_cell() }
     } else {
       let attr = ctx.state_attr();
       let ref_cell = unsafe { attr.ref_cell() };
 
-      let mut temp = PhantomWidget.box_it();
-      let widget = ctx.widget_mut();
-      std::mem::swap(widget, &mut temp);
-
-      temp = temp.attach_attr(attr).box_it();
-      std::mem::swap(widget, &mut temp);
+      let widget = std::mem::replace(ctx.widget_mut(), PhantomWidget.box_it());
+      let stateful = widget.attach_attr(attr).box_it();
+      let _ = std::mem::replace(ctx.widget_mut(), stateful);
       ref_cell
     }
   }
