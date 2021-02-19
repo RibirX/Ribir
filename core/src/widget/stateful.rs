@@ -140,13 +140,12 @@ impl<'a, W: Widget> std::ops::DerefMut for StateRefMut<'a, W> {
 impl<W: Widget> Stateful<W> {
   pub fn stateful<A: AttributeAttach<HostWidget = W>>(
     widget: A,
-    mut tree: Pin<&mut widget_tree::WidgetTree>,
+    tree: Pin<&mut WidgetTree>,
   ) -> Self {
     widget.unwrap_attr_or_else_with(|mut widget| {
-      let id =
-        unsafe { tree.as_mut().get_unchecked_mut() }.alloc_node(widget::PhantomWidget.box_it());
-
-      let attr = StatefulAttr::new(id, unsafe { tree.get_unchecked_mut().into() }, &mut widget);
+      let tree = unsafe { tree.get_unchecked_mut() };
+      let id = tree.alloc_node(widget::PhantomWidget.box_it());
+      let attr = StatefulAttr::new(id, tree.into(), &mut widget);
 
       (widget, attr)
     })
@@ -158,6 +157,12 @@ impl StatefulAttr {
     let tree_ptr = unsafe { tree.as_mut().get_unchecked_mut() }.into();
     let tree_mut = unsafe { tree.get_unchecked_mut() };
     let widget = id.assert_get_mut(tree_mut);
+
+    let widget = if let Some(attr) = widget.as_attr_mut() {
+      attr.widget_mut()
+    } else {
+      widget
+    };
     Self::new(id, tree_ptr, widget)
   }
 
@@ -217,7 +222,7 @@ mod tests {
   }
 
   #[test]
-  fn inherit_from_stateful() {
+  fn downcast() {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 

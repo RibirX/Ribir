@@ -91,7 +91,7 @@ impl CombinationWidget for Checkbox {
     .with_border_radius(BorderRadius::all(Vector::new(border_radius, border_radius)))
     .with_margin(EdgeInsets::all(4.));
 
-    let mut state = self.self_state_ref_cell(ctx);
+    let mut state = self.state_ref_cell(ctx);
     let mut state2 = state.clone();
     marker
       .on_tap(move |_| state.borrow_mut().switch_check())
