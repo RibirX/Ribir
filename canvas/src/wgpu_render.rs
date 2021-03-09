@@ -25,10 +25,10 @@ enum SecondBindings {
 #[derive(Clone, Copy, PartialEq)]
 pub enum AntiAliasing {
   None = 1,
-  MSAA2X = 2,
-  MSAA4X = 4,
-  MSAA8X = 8,
-  MSAA16X = 16,
+  Msaa2X = 2,
+  Msaa4X = 4,
+  Msaa8X = 8,
+  Msaa16X = 16,
 }
 
 pub struct WgpuRender<S: Surface = PhysicSurface> {
@@ -162,9 +162,9 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
       ..
     } = self;
     let texture_resized = mem_glyph.is_resized() || mem_atlas.is_resized();
-    type TF = wgpu::TextureFormat;
-    Self::sync_texture(device, glyph, mem_glyph, TF::R8Unorm, &mut encoder);
-    Self::sync_texture(device, atlas, mem_atlas, TF::Bgra8UnormSrgb, &mut encoder);
+    type Tf = wgpu::TextureFormat;
+    Self::sync_texture(device, glyph, mem_glyph, Tf::R8Unorm, &mut encoder);
+    Self::sync_texture(device, atlas, mem_atlas, Tf::Bgra8UnormSrgb, &mut encoder);
 
     if self.rebuild_pipeline || texture_resized {
       self.uniforms = create_uniforms(
@@ -728,7 +728,7 @@ mod tests {
 
     // Enable anti aliasing
     {
-      render.set_anti_aliasing(AntiAliasing::MSAA4X);
+      render.set_anti_aliasing(AntiAliasing::Msaa4X);
       let layer = circle_layer(&mut canvas);
       let mut frame = canvas.next_frame(&mut render);
       frame.compose_2d_layer(layer);

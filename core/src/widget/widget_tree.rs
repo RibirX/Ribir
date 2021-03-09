@@ -587,25 +587,25 @@ mod test {
     assert_eq!(
       env.widget_tree.symbol_shape(),
       r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
-└── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-    ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
-    ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
-    ├── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
-    └── WidgetAttr { attr: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 }, type_info: PhantomData }
-        └── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-            ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
-            ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
-            ├── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
-            └── WidgetAttr { attr: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 }, type_info: PhantomData }
-                └── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-                    ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
-                    ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
-                    ├── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
-                    └── WidgetAttr { attr: KString("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 }, type_info: PhantomData }
-                        └── WidgetAttr { attr: KI4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-                            ├── WidgetAttr { attr: KI4(0), widget: Text("New title"), type_info: PhantomData }
-                            ├── WidgetAttr { attr: KI4(1), widget: Text(""), type_info: PhantomData }
-                            └── WidgetAttr { attr: KI4(2), widget: Text(""), type_info: PhantomData }
+└── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+    ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
+    ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
+    ├── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
+    └── WidgetAttr { attr: Kstring("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 }, type_info: PhantomData }
+        └── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+            ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
+            ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
+            ├── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
+            └── WidgetAttr { attr: Kstring("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 }, type_info: PhantomData }
+                └── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+                    ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
+                    ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
+                    ├── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
+                    └── WidgetAttr { attr: Kstring("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 }, type_info: PhantomData }
+                        └── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
+                            ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
+                            ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
+                            └── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
 "#
     );
 
