@@ -4,5 +4,5 @@ pub enum CanvasError {
   /// in the atlas if it's not store too many others.
   TextureSpaceNotEnough,
   /// The layer id is invalid, maybe its cache be cleaned.
-  InValidLayerID,
+  InValidLayerId,
 }
