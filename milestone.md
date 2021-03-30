@@ -3,8 +3,8 @@
 ## core concept, tree framework (5.1)
  
 - [x] widget tree
-  - [ ] a render widget to test render tree?
-  - [ ] a combination widget to test widget tree?
+  - [x] a render widget to test render tree?
+  - [x] a combination widget to test widget tree?
 - [x] render tree
 - [x] rebuild sub tree (1 week)
 - [x] react widget change (1 week)
@@ -16,42 +16,46 @@
   - [x] merge framework branch to master.
   - [ ] gpu environment support [Test](./doc/develope.md#Test)
 - [ ] perform layout on render tree (2 week)
-  - [ ] layout flow
-  - [ ] base layout widget
-    - [ ] Row
-    - [ ] Column
+  - [x] layout flow
+  - [x] base layout widget
+    - [x] Row
+    - [x] Column
     - [ ] Center
 
 ## paint & event, runnable (6.1)
 
+- [ ] Widget Derive
 - [x] paint
   - [x] which 2d graphic library to use?
   - [x] paint flow.
-- [ ] Theme data.
+- [x] Theme data.
 - [ ] event  
   - [ ] window event
   - [ ] event 
     - [x] event loop
     - [x] bubbling framework
     - [ ] event type
-      - [ ] point event ?
+      - [x] point event ?
       - [ ] window event ?
-      - [ ] keyboard event
+      - [x] keyboard event
+        [x] wheel event
 
 - widgets for todo demo
 - [ ] simple widget
   - [ ] Button
   - [ ] Text
   - [ ] List
-  - [ ] Scroll
-  - [ ] Checkbox
+  - [x] Scrollable
+  - [ ] Table scroll
+  - [x] Checkbox
 - [ ] layout widget
   - [ ] Center
-  - [ ] Row
+  - [x] Row
 - [ ] event widget
-  - [ ] input widget.
-  - [ ] click widget
+  - [x] input widget.
+  - [x] click widget
 
+- [ ] A derive macro for state impl
 
 ##  we need readable & learnable documents.
 
@@ -63,18 +67,13 @@
 
 ## cross platform
 
-- [ ] osx
-- [ ] linux
+- [x] osx
+- [x] linux, already add a test in ci.
 - [ ] windows
 - [ ] android
 - [ ] ios
 - [ ] web / WebAssembly
 
-
-## base widgets
-
-- [ ] widgets
-- [ ] events
 
 ## animation
 

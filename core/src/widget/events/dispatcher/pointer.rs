@@ -86,7 +86,13 @@ impl PointerDispatcher {
       let event = WheelEvent {
         delta_x,
         delta_y,
-        common: EventCommon::new(common.modifiers, wid, common.window.clone()),
+        common: EventCommon::new(
+          common.modifiers,
+          wid,
+          common.window.clone(),
+          common.widget_tree,
+          common.render_tree,
+        ),
       };
       common.bubble_dispatch(
         wid,
@@ -185,14 +191,7 @@ impl PointerDispatcher {
   }
 
   fn mouse_pointer(&self, target: WidgetId, pos: Point, common: &CommonDispatcher) -> PointerEvent {
-    PointerEvent::from_mouse(
-      target,
-      pos,
-      self.cursor_pos,
-      common.modifiers,
-      self.mouse_button.1,
-      common.window.clone(),
-    )
+    PointerEvent::from_mouse(target, pos, self.cursor_pos, self.mouse_button.1, common)
   }
 
   fn hit_widget(&self, common: &CommonDispatcher) -> Option<(WidgetId, Point)> {

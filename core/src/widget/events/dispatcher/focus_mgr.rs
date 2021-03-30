@@ -175,7 +175,13 @@ impl FocusManager {
   }
 
   fn focus_event(wid: WidgetId, dispatcher: &CommonDispatcher) -> FocusEvent {
-    FocusEvent::new(dispatcher.modifiers, wid, dispatcher.window.clone())
+    FocusEvent::new(
+      dispatcher.modifiers,
+      wid,
+      dispatcher.window.clone(),
+      dispatcher.widget_tree,
+      dispatcher.render_tree,
+    )
   }
 
   fn create_emitter(

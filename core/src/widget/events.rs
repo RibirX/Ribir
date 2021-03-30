@@ -2,8 +2,12 @@
 //! two raw listeners [`PointerListener`](pointers::PointerListener),
 //! [`KeyboardListener`](keyboard::KeyboardListener). `Holiday` dispatch event
 //! like web's bubble phase, always from the leaf to root.
-use crate::widget::widget_tree::WidgetId;
-use std::cell::Cell;
+use crate::{
+  render::render_tree::RenderTree,
+  widget::widget_tree::{WidgetId, WidgetTree},
+};
+use std::{cell::Cell, ptr::NonNull};
+
 pub(crate) mod dispatcher;
 mod pointers;
 use crate::widget::window::RawWindow;
@@ -38,6 +42,10 @@ pub trait Event {
   fn prevent_default(&self);
   /// Represents the current state of the keyboard modifiers
   fn modifiers(&self) -> ModifiersState;
+
+  fn widget_tree(&self) -> &WidgetTree;
+
+  fn render_tree(&self) -> &RenderTree;
 }
 
 #[derive(Clone)]
@@ -48,6 +56,8 @@ pub struct EventCommon {
   pub cancel_bubble: Cell<bool>,
   pub prevent_default: Cell<bool>,
   pub window: Rc<RefCell<Box<dyn RawWindow>>>,
+  widget_tree: NonNull<WidgetTree>,
+  render_tree: NonNull<RenderTree>,
 }
 
 impl<T: std::convert::AsRef<EventCommon>> Event for T {
@@ -61,6 +71,10 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   fn prevent_default(&self) { self.as_ref().prevent_default.set(true) }
   #[inline]
   fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
+  #[inline]
+  fn widget_tree(&self) -> &WidgetTree { unsafe { &*self.as_ref().widget_tree.as_ref() } }
+  #[inline]
+  fn render_tree(&self) -> &RenderTree { unsafe { &*self.as_ref().render_tree.as_ref() } }
 }
 
 impl std::fmt::Debug for EventCommon {
@@ -89,6 +103,8 @@ impl EventCommon {
     modifiers: ModifiersState,
     target: WidgetId,
     window: Rc<RefCell<Box<dyn RawWindow>>>,
+    widget_tree: NonNull<WidgetTree>,
+    render_tree: NonNull<RenderTree>,
   ) -> Self {
     Self {
       modifiers,
@@ -97,6 +113,8 @@ impl EventCommon {
       cancel_bubble: <_>::default(),
       prevent_default: <_>::default(),
       window,
+      render_tree,
+      widget_tree,
     }
   }
 }

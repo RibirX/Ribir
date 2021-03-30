@@ -34,7 +34,8 @@ impl<'a> RenderCtx<'a> {
 
   /// Return an iterator of children's `RenderCtx`
   pub fn children(&mut self) -> impl Iterator<Item = RenderCtx> + '_ {
-    // Safety: only split the lifetime for children one by one.
+    // Safety: only split the lifetime for children one by one, and `RenderCtx` will
+    // not provide method to change the render tree.
     let (tree_ptr, canvas_ptr) = unsafe {
       let tree_ptr = self.tree.as_mut().get_unchecked_mut() as *mut _;
       let canvas_ptr = self.canvas.as_mut().get_unchecked_mut() as *mut _;

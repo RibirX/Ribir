@@ -33,6 +33,8 @@ pub use attr::*;
 mod checkbox;
 pub use checkbox::*;
 use widget::stateful::StatefulAttr;
+mod scrollable;
+pub use scrollable::*;
 
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
@@ -116,6 +118,33 @@ pub trait Widget: Debug + Any {
     Self: Sized,
   {
     BoxDecoration::new(self.box_it()).with_border_radius(radius)
+  }
+
+  /// Let this widget horizontal scrollable and the scroll view is as large as
+  /// its parent allow.
+  fn x_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<ScrollableX>
+  where
+    Self: Sized,
+  {
+    ScrollableX::new(self.box_it(), 0., ctx)
+  }
+
+  /// Let this widget vertical scrollable and the scroll view is as large as
+  /// its parent allow.
+  fn y_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<ScrollableY>
+  where
+    Self: Sized,
+  {
+    ScrollableY::new(self.box_it(), 0., ctx)
+  }
+
+  /// Let this widget both scrollable in horizontal and vertical, and the scroll
+  /// view is as large as its parent allow.
+  fn both_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<ScrollableBoth>
+  where
+    Self: Sized,
+  {
+    ScrollableBoth::new(self.box_it(), Point::zero(), ctx)
   }
 }
 
