@@ -69,7 +69,13 @@ impl Dispatcher {
         let event = KeyboardEvent {
           key,
           scan_code: input.scancode,
-          common: EventCommon::new(self.common.modifiers, focus, self.common.window.clone()),
+          common: EventCommon::new(
+            self.common.modifiers,
+            focus,
+            self.common.window.clone(),
+            self.common.widget_tree,
+            self.common.render_tree,
+          ),
         };
         let event_type = match input.state {
           ElementState::Pressed => KeyboardEventType::KeyDown,
@@ -98,7 +104,13 @@ impl Dispatcher {
     if let Some(focus) = self.focus_mgr.focusing() {
       let event = CharEvent {
         char: c,
-        common: EventCommon::new(self.common.modifiers, focus, self.common.window.clone()),
+        common: EventCommon::new(
+          self.common.modifiers,
+          focus,
+          self.common.window.clone(),
+          self.common.widget_tree,
+          self.common.render_tree,
+        ),
       };
       self.common.bubble_dispatch(
         focus,

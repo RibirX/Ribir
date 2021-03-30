@@ -8,8 +8,8 @@ use crate::{
 };
 use std::{cell::RefCell, ptr::NonNull, rc::Rc};
 pub(crate) struct CommonDispatcher {
-  render_tree: NonNull<RenderTree>,
-  widget_tree: NonNull<WidgetTree>,
+  pub(crate) render_tree: NonNull<RenderTree>,
+  pub(crate) widget_tree: NonNull<WidgetTree>,
   pub(crate) modifiers: ModifiersState,
   pub(crate) window: Rc<RefCell<Box<dyn RawWindow>>>,
 }

@@ -1,10 +1,10 @@
-use super::{
-  events::{EventCommon, ModifiersState},
-  MouseButtons, PointerEvent, PointerId, PointerType,
+use super::PointerId;
+use crate::{
+  prelude::*,
+  widget::{
+    dispatcher::CommonDispatcher, events::EventCommon, MouseButtons, PointerEvent, PointerType,
+  },
 };
-use crate::prelude::*;
-use std::{cell::RefCell, rc::Rc};
-use window::RawWindow;
 use winit::event::MouseButton;
 
 impl PointerEvent {
@@ -12,11 +12,16 @@ impl PointerEvent {
     target: WidgetId,
     position: Point,
     global_pos: Point,
-    modifiers: ModifiersState,
     btn: MouseButtons,
-    window: Rc<RefCell<Box<dyn RawWindow>>>,
+    common: &CommonDispatcher,
   ) -> Self {
-    let event = EventCommon::new(modifiers, target, window);
+    let event = EventCommon::new(
+      common.modifiers,
+      target,
+      common.window.clone(),
+      common.widget_tree,
+      common.render_tree,
+    );
 
     PointerEvent {
       position,

@@ -8,3 +8,5 @@ pub use row::Row;
 pub use sized_box::SizedBox;
 pub mod expanded;
 pub use expanded::Expanded;
+mod direction;
+pub use direction::*;

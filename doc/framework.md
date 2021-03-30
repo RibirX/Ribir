@@ -58,7 +58,7 @@ Opacity {
 }
 ```
 
-### Inherit Widget
+### Widget Attribute
 
 
 ## RenderObject & RenderTree 

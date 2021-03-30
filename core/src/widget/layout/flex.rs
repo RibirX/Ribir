@@ -3,14 +3,6 @@ use crate::prelude::*;
 use crate::render::render_tree::*;
 use smallvec::{smallvec, SmallVec};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Direction {
-  /// Left and right.
-  Horizontal,
-  /// Up and down.
-  Vertical,
-}
-
 /// How the children should be placed along the cross axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum CrossAxisAlign {
@@ -130,11 +122,6 @@ impl std::iter::FromIterator<BoxWidget> for Flex {
       ..Default::default()
     }
   }
-}
-
-impl Default for Direction {
-  #[inline]
-  fn default() -> Self { Direction::Horizontal }
 }
 
 impl Default for CrossAxisAlign {
