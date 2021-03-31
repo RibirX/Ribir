@@ -21,6 +21,7 @@ pub trait RawWindow {
   fn request_redraw(&self);
   /// Modify the native window if cursor modified.
   fn submit_cursor(&mut self);
+  fn scale_factor(&self) -> f64;
 }
 
 pub struct NativeWindow {
@@ -76,6 +77,9 @@ impl RawWindow for NativeWindow {
       self.native.set_cursor_icon(cursor)
     }
   }
+
+  #[inline]
+  fn scale_factor(&self) -> f64 { self.native.scale_factor() }
 }
 
 /// Window is the root to represent.
@@ -290,6 +294,7 @@ impl RawWindow for MockRawWindow {
   fn request_redraw(&self) {}
   fn updated_cursor(&self) -> Option<CursorIcon> { self.cursor }
   fn submit_cursor(&mut self) { self.cursor.take(); }
+  fn scale_factor(&self) -> f64 { 1. }
 }
 
 impl HeadlessWindow {

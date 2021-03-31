@@ -23,7 +23,7 @@ font-kit= "0.10.0"
 futures="0.3.5"
 
 [dev-dependencies]
-winit="0.22.2"
+winit="0.24.0"
 futures="0.3.5"
 env_logger = "0.7.1"
 unit_test = {path ="../unit_test"}

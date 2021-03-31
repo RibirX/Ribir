@@ -58,6 +58,7 @@ impl Dispatcher {
       WindowEvent::ReceivedCharacter(c) => {
         self.dispatch_received_char(c);
       }
+      WindowEvent::MouseWheel { delta, .. } => self.pointer.dispatch_wheel(delta, &self.common),
       _ => log::info!("not processed event {:?}", event),
     }
   }

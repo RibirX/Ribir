@@ -21,7 +21,7 @@
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
     },
     {
       "type": "lldb",
@@ -39,7 +39,7 @@
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
@@ -134,12 +134,6 @@
       },
       "args": [],
       "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "attach",
-      "name": "Attach example 'todo' to debug",
-      "pid": "${command:pickMyProcess}"
     }
   ]
 }
