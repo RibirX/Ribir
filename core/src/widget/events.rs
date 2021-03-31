@@ -16,6 +16,8 @@ mod keyboard;
 pub use keyboard::*;
 mod character;
 pub use character::*;
+mod wheel;
+pub use wheel::*;
 
 /// Event itself contains the properties and methods which are common to all
 /// events

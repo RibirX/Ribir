@@ -114,8 +114,8 @@ impl Texture {
   pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsage) -> Self {
     let raw_texture = Self::new_texture(device, size, usage);
     Texture {
-      size,
       raw_texture,
+      size,
       usage,
     }
   }

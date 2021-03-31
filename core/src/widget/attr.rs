@@ -258,6 +258,20 @@ pub trait AttributeAttach: Widget {
     widget
   }
 
+  /// Specify the event handler when user moving a mouse wheel or similar input
+  /// device.
+  fn on_wheel<F>(self, mut handler: F) -> WheelListener<Self::HostWidget>
+  where
+    Self: Sized,
+    F: FnMut(&WheelEvent) + 'static,
+  {
+    let widget = WheelListener::from_widget(self);
+    widget
+      .event_observable()
+      .subscribe(move |wheel_event| handler(&*wheel_event));
+    widget
+  }
+
   /// If this widget attached an `AttrData`, unwrap it, otherwise attach
   /// an attribute data computes from a closure..
   fn unwrap_attr_or_else<AttrData: 'static, F: FnOnce() -> AttrData>(

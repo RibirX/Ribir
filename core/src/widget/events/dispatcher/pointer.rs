@@ -1,7 +1,7 @@
 use super::{CommonDispatcher, FocusManager};
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
-use winit::event::{DeviceId, ElementState, MouseButton};
+use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta};
 
 #[derive(Default)]
 pub(crate) struct PointerDispatcher {
@@ -70,6 +70,34 @@ impl PointerDispatcher {
       };
     }
     Some(())
+  }
+
+  pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, common: &CommonDispatcher) {
+    if let Some((wid, _)) = self.hit_widget(common) {
+      let (delta_x, delta_y) = match delta {
+        MouseScrollDelta::LineDelta(x, y) => (x, y),
+        MouseScrollDelta::PixelDelta(delta) => {
+          let winit::dpi::LogicalPosition { x, y } =
+            delta.to_logical(common.window.borrow().scale_factor());
+          (x, y)
+        }
+      };
+
+      let event = WheelEvent {
+        delta_x,
+        delta_y,
+        common: EventCommon::new(common.modifiers, wid, common.window.clone()),
+      };
+      common.bubble_dispatch(
+        wid,
+        |listener: &WheelListener<BoxWidget>, event| {
+          log::info!("char event: {:?}", event);
+          listener.event_observable().next(event);
+        },
+        event,
+        |_| {},
+      );
+    }
   }
 
   fn bubble_mouse_down(&mut self, common: &CommonDispatcher, focus_mgr: &mut FocusManager) {

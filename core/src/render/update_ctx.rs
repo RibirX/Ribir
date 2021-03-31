@@ -7,7 +7,7 @@ pub struct UpdateCtx<'a> {
 
 impl<'a> UpdateCtx<'a> {
   pub(crate) fn new(rid: RenderId, render_tree: &'a mut render_tree::RenderTree) -> Self {
-    Self { rid, render_tree }
+    Self { render_tree, rid }
   }
   /// Mark this render object needs relayout, and spread up to an ancestor which
   /// its size only effected by parent.
