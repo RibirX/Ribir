@@ -48,10 +48,16 @@ impl BoxDecoration {
 
 impl Widget for BoxDecoration {
   #[inline]
-  fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
+  fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
+  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
+
+  #[inline]
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
+
+  #[inline]
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
 
   #[inline]
   fn as_any(&self) -> &dyn Any { self }
