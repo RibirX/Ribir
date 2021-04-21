@@ -445,6 +445,21 @@ impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
   #[inline]
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { self.widget.as_render_mut() }
 
+  fn box_it(self) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    let erase_type: WidgetAttr<BoxWidget, Data> = WidgetAttr {
+      widget: self.widget,
+      attr: self.attr,
+      type_info: PhantomData,
+    };
+    let widget: Box<dyn Widget> = Box::new(erase_type);
+    widget.into()
+  }
+}
+
+impl<W: Widget, Data: Any + Debug> AsAttr for WidgetAttr<W, Data> {
   #[inline]
   fn as_attr(&self) -> Option<&dyn Attribute>
   where
@@ -459,19 +474,6 @@ impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
     Self: Sized,
   {
     Some(self)
-  }
-
-  fn box_it(self) -> BoxWidget
-  where
-    Self: Sized,
-  {
-    let erase_type: WidgetAttr<BoxWidget, Data> = WidgetAttr {
-      widget: self.widget,
-      attr: self.attr,
-      type_info: PhantomData,
-    };
-    let widget: Box<dyn Widget> = Box::new(erase_type);
-    widget.into()
   }
 }
 
