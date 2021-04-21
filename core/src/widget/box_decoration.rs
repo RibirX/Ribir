@@ -47,18 +47,6 @@ impl BoxDecoration {
 
 impl Widget for BoxDecoration {
   #[inline]
-  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
-
-  #[inline]
-  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
-
-  #[inline]
-  fn as_attr(&self) -> Option<&dyn Attribute> { None }
-
-  #[inline]
-  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
-
-  #[inline]
   fn with_background(mut self, background: FillStyle) -> Self {
     self.background = Some(background);
     self

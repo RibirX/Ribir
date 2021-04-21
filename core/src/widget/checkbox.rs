@@ -113,8 +113,6 @@ pub struct CheckboxMarker {
   size: f32,
 }
 
-impl_widget_for_render_widget!(CheckboxMarker);
-
 impl RenderWidget for CheckboxMarker {
   type RO = CheckboxMarker;
 

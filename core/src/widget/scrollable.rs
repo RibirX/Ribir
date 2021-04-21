@@ -96,10 +96,6 @@ pub struct BothRender {
   pos: Point,
 }
 
-impl_widget_for_render_widget!(ScrollableX);
-impl_widget_for_render_widget!(ScrollableY);
-impl_widget_for_render_widget!(ScrollableBoth);
-
 impl RenderWidget for ScrollableX {
   type RO = XRender;
 
