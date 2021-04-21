@@ -444,12 +444,6 @@ impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { self.widget.as_render_mut() }
 
   #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&mut self) -> &mut dyn Any { self }
-
-  #[inline]
   fn as_attr(&self) -> Option<&dyn Attribute>
   where
     Self: Sized,

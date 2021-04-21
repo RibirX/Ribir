@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use std::any::Any;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[derive(Debug)]
@@ -58,12 +57,6 @@ impl Widget for BoxDecoration {
 
   #[inline]
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 
   #[inline]
   fn as_attr(&self) -> Option<&dyn Attribute> { None }
