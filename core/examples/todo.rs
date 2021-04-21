@@ -8,7 +8,7 @@ struct Task {
   finished: bool,
   label: String,
 }
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 struct Todos {
   tasks: Vec<Task>,
 }

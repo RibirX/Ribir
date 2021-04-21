@@ -4,6 +4,7 @@ members = [
   "core",
   "canvas",
   "unit_test",
+  "widget_derive",
 ]
 
 [profile.bench]

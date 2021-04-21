@@ -4,7 +4,7 @@ use crate::render::render_tree::*;
 use crate::render::*;
 
 /// Just a stupid implement for develope the framework.
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct Text(pub String);
 
 #[derive(Debug)]

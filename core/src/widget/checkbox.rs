@@ -3,7 +3,7 @@ use crate::widget::theme_data::CheckboxTheme;
 use rxrust::prelude::*;
 
 /// Represents a control that a user can select and clear.
-#[derive(Debug, Default)]
+#[derive(Debug, Widget, Default)]
 pub struct Checkbox {
   pub checked: bool,
   pub indeterminate: bool,
@@ -105,7 +105,7 @@ impl CombinationWidget for Checkbox {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Widget, Clone)]
 pub struct CheckboxMarker {
   check_mark_width: f32,
   path: Path,

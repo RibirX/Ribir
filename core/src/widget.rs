@@ -335,8 +335,14 @@ pub macro impl_proxy_widget(
     $($($wty: $bound), *)?
   {
     $($override)?
-
   }
+
+  impl<$($($generics ,)*)?> AttributeAttach for $ty
+  where
+    $($($wty: $bound), *)?
+    {
+      type HostWidget = Self;
+    }
 
   impl<$($($generics ,)*)?> AsCombination for $ty
   where

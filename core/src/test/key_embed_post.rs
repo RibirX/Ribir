@@ -5,7 +5,7 @@ use crate::{
   widget::{layout::flex::CrossAxisAlign, widget_tree::*, Row},
 };
 use std::{cell::RefCell, rc::Rc};
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Widget)]
 struct EmbedKeyPost {
   title: Rc<RefCell<&'static str>>,
   author: &'static str,

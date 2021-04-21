@@ -1,18 +1,18 @@
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct ScrollableX {
   child: Option<BoxWidget>,
   pos: f32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct ScrollableY {
   child: Option<BoxWidget>,
   pos: f32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct ScrollableBoth {
   child: Option<BoxWidget>,
   pos: Point,
@@ -285,7 +285,7 @@ mod tests {
 
   #[test]
   fn x_scroll() {
-    #[derive(Debug)]
+    #[derive(Debug, Widget)]
     struct X;
 
     impl CombinationWidget for X {
@@ -303,7 +303,7 @@ mod tests {
 
   #[test]
   fn y_scroll() {
-    #[derive(Debug)]
+    #[derive(Debug, Widget)]
     struct Y;
 
     impl CombinationWidget for Y {
@@ -321,7 +321,7 @@ mod tests {
 
   #[test]
   fn both_scroll() {
-    #[derive(Debug)]
+    #[derive(Debug, Widget)]
     struct Both;
 
     impl CombinationWidget for Both {

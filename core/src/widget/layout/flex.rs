@@ -45,7 +45,7 @@ pub enum MainAxisAlign {
   SpaceEvenly,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Widget, Default)]
 pub struct Flex {
   /// Reverse the main axis.
   pub reverse: bool,

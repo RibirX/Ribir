@@ -276,7 +276,7 @@ mod tests {
 
   #[test]
   fn fix_pin_widget_node() {
-    #[derive(Debug)]
+    #[derive(Debug, Widget)]
     struct TestWidget;
 
     impl CombinationWidget for TestWidget {
