@@ -39,7 +39,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsAny + AsCombination + Debug + 'static {
+pub trait Widget: AsCombination + AsAny + AsAttr + Debug + 'static {
   /// return some-value of `RenderWidgetSafety` reference if this widget
   /// is a render widget.
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety>;
@@ -47,13 +47,6 @@ pub trait Widget: AsAny + AsCombination + Debug + 'static {
   /// return some-value of `RenderWidgetSafety` mutable reference if this widget
   /// is a render widget.
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
-
-  /// return the some-value of `WidgetAttr` reference if the widget attached
-  /// attr.
-  fn as_attr(&self) -> Option<&dyn Attribute>;
-
-  /// like `as_attr`, but return mutable reference.
-  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>;
 
   fn box_it(self) -> BoxWidget
   where
@@ -203,6 +196,15 @@ pub trait AsCombination {
   fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget>;
 }
 
+pub trait AsAttr {
+  /// return the some-value of `WidgetAttr` reference if the widget attached
+  /// attr.
+  fn as_attr(&self) -> Option<&dyn Attribute>;
+
+  /// like `as_attr`, but return mutable reference.
+  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>;
+}
+
 impl<T: Widget> AsCombination for T {
   #[inline]
   default fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
@@ -227,13 +229,6 @@ impl<T: CombinationWidget> Widget for T {
   /// return some-value of `RenderWidgetSafety` mutable reference if this widget
   /// is a render widget.
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
-
-  /// return the some-value of `WidgetAttr` reference if the widget attached
-  /// attr.
-  fn as_attr(&self) -> Option<&dyn Attribute> { None }
-
-  /// like `as_attr`, but return mutable reference.
-  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
 }
 
 impl<T: Widget + Any> AsAny for T {
@@ -242,6 +237,12 @@ impl<T: Widget + Any> AsAny for T {
 
   #[inline]
   default fn as_any_mut(&mut self) -> &mut dyn Any { self }
+}
+
+impl<T: Widget> AsAttr for T {
+  default fn as_attr(&self) -> Option<&dyn Attribute> { None }
+
+  default fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
 }
 
 // Todo: Remove BoxWidget after support specialization Box<dyn Widget>
@@ -324,19 +325,11 @@ pub macro impl_widget_for_render_widget(
     $($($wty: $bound), *)?
   {
 
-
-
     #[inline]
     fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
 
     #[inline]
     fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
-
-    #[inline]
-    fn as_attr(&self) -> Option<&dyn Attribute> { None }
-
-    #[inline]
-    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
   }
 }
 
@@ -361,12 +354,6 @@ pub macro impl_proxy_widget(
       self.$base_widget.as_render_mut()
     }
 
-    #[inline]
-    fn as_attr(&self) -> Option<&dyn Attribute> { self.$base_widget.as_attr() }
-
-    #[inline]
-    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$base_widget.as_attr_mut() }
-
     $($override)?
 
   }
@@ -375,14 +362,25 @@ pub macro impl_proxy_widget(
   where
     $($($wty: $bound), *)?
     {
-    #[inline]
-    fn as_combination(&self) -> Option<&dyn CombinationWidget> {
-      self.$base_widget.as_combination()
+      #[inline]
+      fn as_combination(&self) -> Option<&dyn CombinationWidget> {
+        self.$base_widget.as_combination()
+      }
+
+      #[inline]
+      fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
+        self.$base_widget.as_combination_mut()
+      }
     }
 
-    #[inline]
-    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
-      self.$base_widget.as_combination_mut()
-    }
+  impl<$($($generics ,)*)?> AsAttr for $ty
+  where
+    $($($wty: $bound), *)?
+    {
+      #[inline]
+      fn as_attr(&self) -> Option<&dyn Attribute> { self.$base_widget.as_attr() }
+
+      #[inline]
+      fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$base_widget.as_attr_mut() }
     }
 }
