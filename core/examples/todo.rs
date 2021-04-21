@@ -13,8 +13,6 @@ struct Todos {
   tasks: Vec<Task>,
 }
 
-impl_widget_for_combination_widget!(Todos);
-
 impl CombinationWidget for Todos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
     self

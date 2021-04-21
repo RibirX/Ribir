@@ -287,8 +287,6 @@ mod tests {
       }
     }
 
-    impl_widget_for_combination_widget!(TestWidget);
-
     let mut wnd = window::Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
     wnd.render_ready();
     let tree = wnd.widget_tree();

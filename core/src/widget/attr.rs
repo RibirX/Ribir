@@ -428,7 +428,7 @@ impl<W: Widget, AttrData: Any + Debug> Attribute for WidgetAttr<W, AttrData> {
   fn widget_mut(&mut self) -> &mut BoxWidget { &mut self.widget }
 }
 
-impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
+impl<W: Widget, Data: Any + Debug> AsCombination for WidgetAttr<W, Data> {
   #[inline]
   fn as_combination(&self) -> Option<&dyn CombinationWidget> { self.widget.as_combination() }
 
@@ -436,7 +436,9 @@ impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
   fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
     self.widget.as_combination_mut()
   }
+}
 
+impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
   #[inline]
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.widget.as_render() }
 

@@ -280,7 +280,6 @@ mod tests {
       log: Rc<RefCell<Vec<String>>>,
     }
 
-    impl_widget_for_combination_widget!(EmbedFocus);
     impl CombinationWidget for EmbedFocus {
       fn build(&self, _: &mut BuildCtx) -> BoxWidget {
         let child = log_focus_event("child", empty_box(), self.log.clone());

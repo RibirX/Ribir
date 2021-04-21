@@ -27,7 +27,6 @@ impl EmbedPost {
   }
 }
 
-impl_widget_for_combination_widget!(EmbedPost);
 impl CombinationWidget for EmbedPost {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     let mut row = Row::default()

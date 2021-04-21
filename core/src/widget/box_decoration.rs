@@ -47,12 +47,6 @@ impl BoxDecoration {
 
 impl Widget for BoxDecoration {
   #[inline]
-  fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
-
-  #[inline]
-  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
-
-  #[inline]
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
 
   #[inline]
@@ -81,10 +75,6 @@ impl Widget for BoxDecoration {
     self.radius = Some(radius);
     self
   }
-}
-
-impl AttributeAttach for BoxDecoration {
-  type HostWidget = Self;
 }
 
 impl RenderWidget for BoxDecoration {
