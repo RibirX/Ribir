@@ -40,21 +40,25 @@ pub use scrollable::*;
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
 pub trait Widget: Debug + Any {
-  /// classify this widget into one of four type widget, and return the
-  /// reference.
-  fn classify(&self) -> WidgetClassify;
+  /// return some-value  of `CombinationWidget` reference if this widget is a
+  /// combination widget.
+  fn as_combination(&self) -> Option<&dyn CombinationWidget>;
 
-  /// classify this widget into one of four type widget as mutation reference.
-  fn classify_mut(&mut self) -> WidgetClassifyMut;
+  /// return some-value of `CombinationWidget` mutable reference if this widget
+  /// is a combination widget.
+  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget>;
+
+  /// return some-value of `RenderWidgetSafety` reference if this widget
+  /// is a render widget.
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety>;
+
+  /// return some-value of `RenderWidgetSafety` mutable reference if this widget
+  /// is a render widget.
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
 
   fn as_any(&self) -> &dyn Any;
+
   fn as_any_mut(&mut self) -> &mut dyn Any;
-
-  #[inline]
-  fn is_combination(&self) -> bool { matches!(self.classify(), WidgetClassify::Combination(_)) }
-
-  #[inline]
-  fn is_render(&self) -> bool { !matches!(self.classify(), WidgetClassify::Combination(_)) }
 
   /// return the some-value of `WidgetAttr` reference if the widget attached
   /// attr.
@@ -195,16 +199,6 @@ pub trait RenderWidgetSafety: Debug {
   fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>>;
 }
 
-pub enum WidgetClassify<'a> {
-  Combination(&'a dyn CombinationWidget),
-  Render(&'a dyn RenderWidgetSafety),
-}
-
-pub enum WidgetClassifyMut<'a> {
-  Combination(&'a mut dyn CombinationWidget),
-  Render(&'a mut dyn RenderWidgetSafety),
-}
-
 pub struct BoxWidget {
   pub(crate) widget: Box<dyn Widget>,
 }
@@ -215,6 +209,8 @@ impl std::fmt::Debug for BoxWidget {
 }
 
 impl BoxWidget {
+  pub fn key(&self) -> Option<&Key> { self.downcast_attr_widget::<Key>().map(|k| k.key()) }
+
   pub fn downcast_attr_widget<AttrData: 'static>(&self) -> Option<&WidgetAttr<BoxWidget, AttrData>>
   where
     Self: Sized,
@@ -250,10 +246,18 @@ impl BoxWidget {
 
 impl Widget for BoxWidget {
   #[inline]
-  fn classify(&self) -> WidgetClassify { self.widget.classify() }
+  fn as_combination(&self) -> Option<&dyn CombinationWidget> { self.widget.as_combination() }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
+  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
+    self.widget.as_combination_mut()
+  }
+
+  #[inline]
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.widget.as_render() }
+
+  #[inline]
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { self.widget.as_render_mut() }
 
   #[inline]
   fn as_any(&self) -> &dyn Any { self.widget.as_any() }
@@ -296,10 +300,16 @@ pub macro impl_widget_for_combination_widget(
     $($($wty: $bound), *)?
   {
     #[inline]
-    fn classify(&self) -> WidgetClassify { WidgetClassify::Combination(self) }
+    fn as_combination(&self) -> Option<&dyn CombinationWidget> { Some(self) }
 
     #[inline]
-    fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Combination(self) }
+    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { Some(self) }
+
+    #[inline]
+    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { None }
+
+    #[inline]
+    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
 
     #[inline]
     fn as_any(&self) -> &dyn Any { self }
@@ -331,11 +341,18 @@ pub macro impl_widget_for_render_widget(
   where
     $($($wty: $bound), *)?
   {
-    #[inline]
-    fn classify(&self) -> WidgetClassify { WidgetClassify::Render(self) }
 
     #[inline]
-    fn classify_mut(&mut self) -> WidgetClassifyMut { WidgetClassifyMut::Render(self) }
+    fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
+
+    #[inline]
+    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
+
+    #[inline]
+    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
+
+    #[inline]
+    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
 
     #[inline]
     fn as_any(&self) -> &dyn Any { self }
@@ -363,16 +380,33 @@ pub macro impl_proxy_widget(
   $base_widget: tt
   $(, <$($generics: tt),*>)?
   $(, where $($wty:ty : $bound: tt),*)?
+  $(, $override: tt)?
 ) {
   impl<$($($generics ,)*)?> Widget for $ty
   where
     $($($wty: $bound), *)?
   {
-    #[inline]
-    fn classify(&self) -> WidgetClassify { self.$base_widget.classify() }
 
     #[inline]
-    fn classify_mut(&mut self) -> WidgetClassifyMut { self.$base_widget.classify_mut() }
+    fn as_combination(&self) -> Option<&dyn CombinationWidget> {
+      self.$base_widget.as_combination()
+    }
+
+    #[inline]
+    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
+      self.$base_widget.as_combination_mut()
+    }
+
+
+    #[inline]
+    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
+      self.$base_widget.as_render()
+    }
+
+    #[inline]
+    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
+      self.$base_widget.as_render_mut()
+    }
 
     #[inline]
     fn as_any(&self) -> &dyn Any { self }

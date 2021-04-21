@@ -430,10 +430,18 @@ impl<W: Widget, AttrData: Any + Debug> Attribute for WidgetAttr<W, AttrData> {
 
 impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
   #[inline]
-  fn classify(&self) -> WidgetClassify { self.widget.classify() }
+  fn as_combination(&self) -> Option<&dyn CombinationWidget> { self.widget.as_combination() }
 
   #[inline]
-  fn classify_mut(&mut self) -> WidgetClassifyMut { self.widget.classify_mut() }
+  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
+    self.widget.as_combination_mut()
+  }
+
+  #[inline]
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.widget.as_render() }
+
+  #[inline]
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { self.widget.as_render_mut() }
 
   #[inline]
   fn as_any(&self) -> &dyn Any { self }
