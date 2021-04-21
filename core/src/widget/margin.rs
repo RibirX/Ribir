@@ -18,8 +18,6 @@ pub struct Margin {
 #[derive(Debug)]
 pub struct MarginRender(EdgeInsets);
 
-impl_widget_for_render_widget!(Margin);
-
 impl RenderWidget for Margin {
   type RO = MarginRender;
   #[inline]

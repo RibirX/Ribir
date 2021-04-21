@@ -39,15 +39,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsCombination + AsAny + AsAttr + Debug + 'static {
-  /// return some-value of `RenderWidgetSafety` reference if this widget
-  /// is a render widget.
-  fn as_render(&self) -> Option<&dyn RenderWidgetSafety>;
-
-  /// return some-value of `RenderWidgetSafety` mutable reference if this widget
-  /// is a render widget.
-  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
-
+pub trait Widget: AsCombination + AsRender + AsAny + AsAttr + Debug + 'static {
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
@@ -196,6 +188,16 @@ pub trait AsCombination {
   fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget>;
 }
 
+pub trait AsRender {
+  /// return some-value of `RenderWidgetSafety` reference if this widget
+  /// is a render widget.
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety>;
+
+  /// return some-value of `RenderWidgetSafety` mutable reference if this widget
+  /// is a render widget.
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
+}
+
 pub trait AsAttr {
   /// return the some-value of `WidgetAttr` reference if the widget attached
   /// attr.
@@ -213,7 +215,7 @@ impl<T: Widget> AsCombination for T {
   default fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
 }
 
-impl<T: Widget + CombinationWidget> AsCombination for T {
+impl<T: CombinationWidget> AsCombination for T {
   #[inline]
   fn as_combination(&self) -> Option<&dyn CombinationWidget> { Some(self) }
 
@@ -221,14 +223,20 @@ impl<T: Widget + CombinationWidget> AsCombination for T {
   fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { Some(self) }
 }
 
-impl<T: CombinationWidget> Widget for T {
-  /// return some-value of `RenderWidgetSafety` reference if this widget
-  /// is a render widget.
-  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { None }
+impl<T: Widget> AsRender for T {
+  #[inline]
+  default fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { None }
 
-  /// return some-value of `RenderWidgetSafety` mutable reference if this widget
-  /// is a render widget.
-  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
+  #[inline]
+  default fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
+}
+
+impl<T: RenderWidget> AsRender for T {
+  #[inline]
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
+
+  #[inline]
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
 }
 
 impl<T: Widget + Any> AsAny for T {
@@ -315,24 +323,6 @@ impl From<Box<dyn Widget>> for BoxWidget {
   fn from(widget: Box<dyn Widget>) -> Self { Self { widget } }
 }
 
-pub macro impl_widget_for_render_widget(
-  $ty: ty
-  $(, <$($generics: tt),*>)?
-  $(, where $($wty:ty : $bound: tt),*)?
-) {
-  impl<$($($generics ,)*)?> Widget for $ty
-  where
-    $($($wty: $bound), *)?
-  {
-
-    #[inline]
-    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
-
-    #[inline]
-    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
-  }
-}
-
 pub macro impl_proxy_widget(
   $ty: ty,
   $base_widget: tt
@@ -344,16 +334,6 @@ pub macro impl_proxy_widget(
   where
     $($($wty: $bound), *)?
   {
-    #[inline]
-    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
-      self.$base_widget.as_render()
-    }
-
-    #[inline]
-    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
-      self.$base_widget.as_render_mut()
-    }
-
     $($override)?
 
   }
@@ -382,5 +362,20 @@ pub macro impl_proxy_widget(
 
       #[inline]
       fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$base_widget.as_attr_mut() }
+    }
+
+    impl<$($($generics ,)*)?> AsRender for $ty
+    where
+      $($($wty: $bound), *)?
+    {
+      #[inline]
+      fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
+        self.$base_widget.as_render()
+      }
+
+      #[inline]
+      fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
+        self.$base_widget.as_render_mut()
+      }
     }
 }

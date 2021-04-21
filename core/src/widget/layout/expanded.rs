@@ -66,8 +66,6 @@ impl RenderObject for ExpandedRender {
   }
 }
 
-impl_widget_for_render_widget!(Expanded);
-
 #[cfg(test)]
 mod tests {
   use super::*;

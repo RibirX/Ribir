@@ -438,13 +438,15 @@ impl<W: Widget, Data: Any + Debug> AsCombination for WidgetAttr<W, Data> {
   }
 }
 
-impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
+impl<W: Widget, Data: Any + Debug> AsRender for WidgetAttr<W, Data> {
   #[inline]
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.widget.as_render() }
 
   #[inline]
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { self.widget.as_render_mut() }
+}
 
+impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
