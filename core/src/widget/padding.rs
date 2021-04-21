@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct Padding {
   pub padding: EdgeInsets,
   pub child: BoxWidget,

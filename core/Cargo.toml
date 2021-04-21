@@ -14,6 +14,7 @@ indextree = "4.3.1"
 log = "0.4.8"
 rxrust = "0.11.0"
 smallvec = "1.5.1"
+widget_derive = {path = "../widget_derive"}
 winit = "0.24.0"
 
 [dependencies.blake3]
