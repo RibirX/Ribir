@@ -105,8 +105,6 @@ impl CombinationWidget for Checkbox {
   }
 }
 
-impl_widget_for_combination_widget!(Checkbox);
-
 #[derive(Debug, Clone)]
 pub struct CheckboxMarker {
   check_mark_width: f32,

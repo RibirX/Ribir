@@ -292,7 +292,6 @@ mod tests {
     #[derive(Debug)]
     struct X;
 
-    impl_widget_for_combination_widget!(X);
     impl CombinationWidget for X {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(1000., 1000.))
@@ -311,7 +310,6 @@ mod tests {
     #[derive(Debug)]
     struct Y;
 
-    impl_widget_for_combination_widget!(Y);
     impl CombinationWidget for Y {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(1000., 1000.))
@@ -330,7 +328,6 @@ mod tests {
     #[derive(Debug)]
     struct Both;
 
-    impl_widget_for_combination_widget!(Both);
     impl CombinationWidget for Both {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(1000., 1000.))

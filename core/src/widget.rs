@@ -39,15 +39,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: Debug + AsAny + 'static {
-  /// return some-value  of `CombinationWidget` reference if this widget is a
-  /// combination widget.
-  fn as_combination(&self) -> Option<&dyn CombinationWidget>;
-
-  /// return some-value of `CombinationWidget` mutable reference if this widget
-  /// is a combination widget.
-  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget>;
-
+pub trait Widget: AsAny + AsCombination + Debug + 'static {
   /// return some-value of `RenderWidgetSafety` reference if this widget
   /// is a render widget.
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety>;
@@ -201,6 +193,49 @@ pub trait AsAny {
   fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
+pub trait AsCombination {
+  /// return some-value  of `CombinationWidget` reference if this widget is a
+  /// combination widget.`
+  fn as_combination(&self) -> Option<&dyn CombinationWidget>;
+
+  /// return some-value of `CombinationWidget` mutable reference if this widget
+  /// is a combination widget.
+  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget>;
+}
+
+impl<T: Widget> AsCombination for T {
+  #[inline]
+  default fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
+
+  #[inline]
+  default fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
+}
+
+impl<T: Widget + CombinationWidget> AsCombination for T {
+  #[inline]
+  fn as_combination(&self) -> Option<&dyn CombinationWidget> { Some(self) }
+
+  #[inline]
+  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { Some(self) }
+}
+
+impl<T: CombinationWidget> Widget for T {
+  /// return some-value of `RenderWidgetSafety` reference if this widget
+  /// is a render widget.
+  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { None }
+
+  /// return some-value of `RenderWidgetSafety` mutable reference if this widget
+  /// is a render widget.
+  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
+
+  /// return the some-value of `WidgetAttr` reference if the widget attached
+  /// attr.
+  fn as_attr(&self) -> Option<&dyn Attribute> { None }
+
+  /// like `as_attr`, but return mutable reference.
+  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
+}
+
 impl<T: Widget + Any> AsAny for T {
   #[inline]
   default fn as_any(&self) -> &dyn Any { self }
@@ -209,6 +244,7 @@ impl<T: Widget + Any> AsAny for T {
   default fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
+// Todo: Remove BoxWidget after support specialization Box<dyn Widget>
 pub struct BoxWidget {
   pub(crate) widget: Box<dyn Widget>,
 }
@@ -278,44 +314,6 @@ impl From<Box<dyn Widget>> for BoxWidget {
   fn from(widget: Box<dyn Widget>) -> Self { Self { widget } }
 }
 
-/// Todo: We should auto implement Widget for CombinationWidget and
-/// RenderWidget after rust specialization finished.
-pub macro impl_widget_for_combination_widget(
-  $ty: ty
-  $(, <$($generics: tt),*>)?
-  $(, where $($wty:ty : $bound: tt),*)?
-) {
-  impl<$($($generics ,)*)?> Widget for $ty
-  where
-    $($($wty: $bound), *)?
-  {
-    #[inline]
-    fn as_combination(&self) -> Option<&dyn CombinationWidget> { Some(self) }
-
-    #[inline]
-    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { Some(self) }
-
-    #[inline]
-    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { None }
-
-    #[inline]
-    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
-
-    #[inline]
-    fn as_attr(&self) -> Option<&dyn Attribute> { None }
-
-    #[inline]
-    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
-  }
-
-  impl<$($($generics ,)*)?> AttributeAttach for $ty
-  where
-    $($($wty: $bound), *)?
-  {
-    type HostWidget = $ty;
-  }
-}
-
 pub macro impl_widget_for_render_widget(
   $ty: ty
   $(, <$($generics: tt),*>)?
@@ -326,11 +324,7 @@ pub macro impl_widget_for_render_widget(
     $($($wty: $bound), *)?
   {
 
-    #[inline]
-    fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
 
-    #[inline]
-    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
 
     #[inline]
     fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
@@ -343,13 +337,6 @@ pub macro impl_widget_for_render_widget(
 
     #[inline]
     fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
-  }
-
-  impl<$($($generics ,)*)?> AttributeAttach for $ty
-  where
-    $($($wty: $bound), *)?
-  {
-    type HostWidget = $ty;
   }
 }
 
@@ -364,18 +351,6 @@ pub macro impl_proxy_widget(
   where
     $($($wty: $bound), *)?
   {
-
-    #[inline]
-    fn as_combination(&self) -> Option<&dyn CombinationWidget> {
-      self.$base_widget.as_combination()
-    }
-
-    #[inline]
-    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
-      self.$base_widget.as_combination_mut()
-    }
-
-
     #[inline]
     fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
       self.$base_widget.as_render()
@@ -396,10 +371,18 @@ pub macro impl_proxy_widget(
 
   }
 
-  impl<$($($generics ,)*)?> AttributeAttach for $ty
+  impl<$($($generics ,)*)?> AsCombination for $ty
   where
     $($($wty: $bound), *)?
-  {
-    type HostWidget = $ty;
-  }
+    {
+    #[inline]
+    fn as_combination(&self) -> Option<&dyn CombinationWidget> {
+      self.$base_widget.as_combination()
+    }
+
+    #[inline]
+    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
+      self.$base_widget.as_combination_mut()
+    }
+    }
 }

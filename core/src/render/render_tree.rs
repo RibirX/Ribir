@@ -425,8 +425,6 @@ mod tests {
       }
     }
 
-    impl_widget_for_combination_widget!(DoubleSize);
-
     let mut wnd = window::Window::without_render(DoubleSize.box_it(), Size::new(500., 500.));
     wnd.render_ready();
 
