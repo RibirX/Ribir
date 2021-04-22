@@ -307,81 +307,59 @@ impl BoxWidget {
   }
 }
 
-impl_proxy_widget!(
-  BoxWidget,
-  widget,
+impl Widget for BoxWidget {
+  #[inline]
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
   {
     self
   }
-);
+}
+
+impl AttributeAttach for BoxWidget {
+  type HostWidget = Self;
+}
+
+proxy_impl_as_trait!(BoxWidget, widget);
 
 impl From<Box<dyn Widget>> for BoxWidget {
   #[inline]
   fn from(widget: Box<dyn Widget>) -> Self { Self { widget } }
 }
 
-pub macro impl_proxy_widget(
-  $ty: ty,
-  $base_widget: tt
-  $(, <$($generics: tt),*>)?
-  $(, where $($wty:ty : $bound: tt),*)?
-  $(, $override: item)?
-) {
-  impl<$($($generics ,)*)?> Widget for $ty
-  where
-    $($($wty: $bound), *)?
-  {
-    $($override)?
+pub(crate) macro proxy_impl_as_trait(
+  $name: ty,
+  $proxy_member: tt) {
+  impl AsCombination for $name {
+    #[inline]
+    fn as_combination(&self) -> Option<&dyn CombinationWidget> {
+      self.$proxy_member.as_combination()
+    }
+
+    #[inline]
+    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
+      self.$proxy_member.as_combination_mut()
+    }
   }
 
-  impl<$($($generics ,)*)?> AttributeAttach for $ty
-  where
-    $($($wty: $bound), *)?
-    {
-      type HostWidget = Self;
+  impl AsAttr for $name {
+    #[inline]
+    fn as_attr(&self) -> Option<&dyn Attribute> { self.$proxy_member.as_attr() }
+
+    #[inline]
+    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$proxy_member.as_attr_mut() }
+  }
+
+  impl AsRender for $name {
+    #[inline]
+    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.$proxy_member.as_render() }
+
+    #[inline]
+    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
+      self.$proxy_member.as_render_mut()
     }
+  }
 
-  impl<$($($generics ,)*)?> AsCombination for $ty
-  where
-    $($($wty: $bound), *)?
-    {
-      #[inline]
-      fn as_combination(&self) -> Option<&dyn CombinationWidget> {
-        self.$base_widget.as_combination()
-      }
-
-      #[inline]
-      fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
-        self.$base_widget.as_combination_mut()
-      }
-    }
-
-  impl<$($($generics ,)*)?> AsAttr for $ty
-  where
-    $($($wty: $bound), *)?
-    {
-      #[inline]
-      fn as_attr(&self) -> Option<&dyn Attribute> { self.$base_widget.as_attr() }
-
-      #[inline]
-      fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$base_widget.as_attr_mut() }
-    }
-
-    impl<$($($generics ,)*)?> AsRender for $ty
-    where
-      $($($wty: $bound), *)?
-    {
-      #[inline]
-      fn as_render(&self) -> Option<&dyn RenderWidgetSafety> {
-        self.$base_widget.as_render()
-      }
-
-      #[inline]
-      fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
-        self.$base_widget.as_render_mut()
-      }
-    }
+  // AsAny should not be proxy.
 }
