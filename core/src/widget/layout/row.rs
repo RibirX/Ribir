@@ -1,7 +1,7 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct Row(Flex);
 
 impl Row {
@@ -36,4 +36,4 @@ impl Default for Row {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
 }
 
-impl_proxy_widget!(Row, 0);
+proxy_impl_as_trait!(Row, 0);

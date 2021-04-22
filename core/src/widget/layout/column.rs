@@ -1,7 +1,7 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, Widget)]
 pub struct Column(Flex);
 
 impl Column {
@@ -30,4 +30,4 @@ impl std::iter::FromIterator<BoxWidget> for Column {
   }
 }
 
-impl_proxy_widget!(Column, 0);
+proxy_impl_as_trait!(Column, 0);
