@@ -1,3 +1,5 @@
+use std::usize;
+
 use proc_macro2::Span;
 use syn::{
   punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
@@ -11,32 +13,37 @@ fn prefix_ident(prefix: &str, ident: &Ident) -> Ident {
 /// Pick fields from struct by specify inner attr.
 pub struct AttrFields<'a> {
   attr_name: &'static str,
-generics: &'a Generics,
-  state_fields: Vec<Field>,
+  generics: &'a Generics,
+  state_fields: Vec<(Field, usize)>,
   is_tuple: bool,
 }
 
 impl<'a> AttrFields<'a> {
   pub fn new(from: &'a DataStruct, generics: &'a Generics, attr_name: &'static str) -> Self {
     Self {
-      state_fields: Self::pick_state_fields(from, attr_name),
+      state_fields: Self::pick_attr_fields(from, attr_name),
       generics,
       is_tuple: matches!(from.fields, Fields::Unnamed(_)),
       attr_name,
     }
   }
 
-  fn pick_state_fields(stt: &DataStruct, attr_name: &'static str) -> Vec<Field> {
-    let pick_state_fields = |fds: &Punctuated<Field, Comma>| -> Vec<Field> {
+  fn pick_attr_fields(stt: &DataStruct, attr_name: &'static str) -> Vec<(Field, usize)> {
+    let pick_state_fields = |fds: &Punctuated<Field, Comma>| -> Vec<(Field, usize)> {
       fds
         .iter()
-        .cloned()
-        .filter_map(|mut f| {
+        .enumerate()
+        .filter_map(|(idx, f)| {
+          let mut f = f.clone();
           let len = f.attrs.len();
           f.attrs.retain(|attr| {
             attr.path.segments.len() == 1 && attr.path.segments[0].ident != attr_name
           });
-          if f.attrs.len() != len { Some(f) } else { None }
+          if f.attrs.len() != len {
+            Some((f, idx))
+          } else {
+            None
+          }
         })
         .collect()
     };
@@ -48,7 +55,7 @@ impl<'a> AttrFields<'a> {
     }
   }
 
-  pub fn state_generics(&self) -> Generics {
+  pub fn attr_fields_generics(&self) -> Generics {
     let Generics {
       gt_token,
       mut params,
@@ -79,7 +86,7 @@ impl<'a> AttrFields<'a> {
     }
   }
 
-  pub fn attr_fields(&self) -> &[Field] { &self.state_fields }
+  pub fn attr_fields(&self) -> &[(Field, usize)] { &self.state_fields }
 
   pub fn is_attr_generic(&self, param: &GenericParam) -> bool {
     let ident = match param {
@@ -87,15 +94,21 @@ impl<'a> AttrFields<'a> {
       GenericParam::Lifetime(l) => &l.lifetime.ident,
       GenericParam::Const(c) => &c.ident,
     };
-    self.state_fields.iter().any(|f| type_contain(&f.ty, ident))
+    self
+      .state_fields
+      .iter()
+      .any(|(f, _)| type_contain(&f.ty, ident))
   }
 
   fn is_attr_clause(&self, where_predicate: &WherePredicate) -> bool {
-    self.state_fields.iter().any(|f| match where_predicate {
-      WherePredicate::Lifetime(lf) => type_contain(&f.ty, &lf.lifetime.ident),
-      WherePredicate::Type(ty) => f.ty == ty.bounded_ty,
-      WherePredicate::Eq(eq) => f.ty == eq.lhs_ty,
-    })
+    self
+      .state_fields
+      .iter()
+      .any(|(f, _)| match where_predicate {
+        WherePredicate::Lifetime(lf) => type_contain(&f.ty, &lf.lifetime.ident),
+        WherePredicate::Type(ty) => f.ty == ty.bounded_ty,
+        WherePredicate::Eq(eq) => f.ty == eq.lhs_ty,
+      })
   }
 }
 

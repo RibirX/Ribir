@@ -7,7 +7,7 @@ pub const PROXY_PATH: &'static str = "proxy";
 
 pub fn proxy_derive(
   input: &syn::DeriveInput,
-  mut derive_impl: impl FnMut(&Generics, &AttrFields, &Ident) -> TokenStream,
+  mut derive_impl: impl FnMut(&Generics, &AttrFields, &Ident, TokenStream) -> TokenStream,
 ) -> TokenStream {
   let DeriveInput {
     ident,
@@ -25,9 +25,19 @@ pub fn proxy_derive(
             ident.span() => compile_error!("Must specify a `#[proxy] attr to one field.");
           }
         }
-        1 => derive_impl(generics, &attr_fields, ident),
+        1 => {
+          let (f, idx) = &attr_fields.attr_fields()[0];
+          let path = f.ident.as_ref().map_or_else(
+            || {
+              let index = syn::Index::from(*idx);
+              quote! {#index}
+            },
+            |f| quote! {#f},
+          );
+          derive_impl(generics, &attr_fields, ident, path)
+        }
         _ => {
-          let too_many = fields.iter().map(|f| {
+          let too_many = fields.iter().map(|(f, _)| {
             quote_spanned! {
               f.attrs.iter().find(|attr| {
                 attr.path.segments.len() == 1 && attr.path.segments[0].ident != PROXY_PATH
@@ -54,15 +64,13 @@ pub fn proxy_derive(
 pub fn combination_derive(input: &syn::DeriveInput) -> TokenStream {
   proxy_derive(
     input,
-    |generics: &Generics, attr_fields: &AttrFields, ident: &Ident| {
+    |generics: &Generics, attr_fields: &AttrFields, ident: &Ident, path| {
       let generics =
         add_trait_bounds_if(generics.clone(), parse_quote!(CombinationWidget), |param| {
           attr_fields.is_attr_generic(param)
         });
       let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-      let path = &attr_fields.attr_fields()[0].ident;
 
-      // todo!("support tuple, should hold index in state fields");
       quote! {
         impl #impl_generics CombinationWidget for #ident #ty_generics #where_clause {
           #[inline]
