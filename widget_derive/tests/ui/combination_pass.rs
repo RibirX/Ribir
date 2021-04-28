@@ -15,6 +15,9 @@ struct B<W: std::fmt::Debug + 'static> {
   a: W,
 }
 
+#[derive(Debug, Widget, CombinationWidget)]
+struct TupleB<W: std::fmt::Debug + 'static>(#[proxy] W);
+
 fn main() {
   let b = B { a: A };
   let _: Box<dyn CombinationWidget> = Box::new(b);
