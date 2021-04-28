@@ -1,11 +1,15 @@
 extern crate proc_macro;
+extern crate proc_macro2;
+
+mod attr_fields;
+mod combination;
 
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(Widget)]
-pub fn hello_macro_derive(input: TokenStream) -> TokenStream {
+pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let name = input.ident;
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -29,4 +33,11 @@ pub fn hello_macro_derive(input: TokenStream) -> TokenStream {
   };
 
   expanded.into()
+}
+
+#[proc_macro_derive(CombinationWidget, attributes(proxy))]
+pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+
+  combination::combination_derive(&input).into()
 }
