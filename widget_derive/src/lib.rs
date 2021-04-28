@@ -2,7 +2,8 @@ extern crate proc_macro;
 extern crate proc_macro2;
 
 mod attr_fields;
-mod combination;
+mod combination_derive;
+mod render_derive;
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -39,5 +40,14 @@ pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
 pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
 
-  combination::combination_derive(&input).into()
+  combination_derive::combination_derive(&input).into()
+}
+
+#[proc_macro_derive(RenderWidget, attributes(proxy))]
+pub fn render_macro_derive(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+
+  let expand = render_derive::render_derive(&input);
+  println!("{}", expand);
+  expand.into()
 }

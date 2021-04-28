@@ -11,7 +11,7 @@ fn prefix_ident(prefix: &str, ident: &Ident) -> Ident {
 /// Pick fields from struct by specify inner attr.
 pub struct AttrFields<'a> {
   attr_name: &'static str,
-  generics: &'a Generics,
+generics: &'a Generics,
   state_fields: Vec<Field>,
   is_tuple: bool,
 }
