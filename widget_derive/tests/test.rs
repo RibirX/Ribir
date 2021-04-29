@@ -1,11 +1,14 @@
 use holiday::prelude::*;
 
-#[derive(Widget, Debug)]
-struct A;
+#[derive(Widget)]
+struct Test {
+  #[state]
+  field: f32,
+}
 
 #[test]
 fn derive_widget() {
-  let a = A;
+  let a = Test { field: 1. };
   a.with_key("a").box_it();
 }
 

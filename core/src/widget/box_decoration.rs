@@ -46,6 +46,9 @@ impl BoxDecoration {
 
 impl Widget for BoxDecoration {
   #[inline]
+  fn attrs(&self) -> Option<&Attrs> { None }
+
+  #[inline]
   fn with_background(mut self, background: FillStyle) -> Self {
     self.background = Some(background);
     self

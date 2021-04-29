@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use rxrust::prelude::*;
-use std::{any::Any, fmt::Debug, marker::PhantomData};
+use std::{any::Any, marker::PhantomData};
 
 /// WidgetAttr is use to extend ability of a widget but not increase the widget
 /// number. If a widget is not a combination widget and will not do layout or
@@ -21,11 +21,6 @@ pub struct WidgetAttr<W: Widget, AttrData> {
   type_info: PhantomData<*const W>,
 }
 
-pub trait Attribute: Widget {
-  fn widget(&self) -> &BoxWidget;
-  fn widget_mut(&mut self) -> &mut BoxWidget;
-}
-
 pub enum AttrOrWidget<W: Widget, A> {
   Attr(WidgetAttr<W, A>),
   Widget(BoxWidget),
@@ -33,17 +28,6 @@ pub enum AttrOrWidget<W: Widget, A> {
 
 pub trait AttributeAttach: Widget {
   type HostWidget: Widget;
-
-  /// Assign a key to the widget to help framework to track if two widget is a
-  /// same widget in two frame.
-  #[inline]
-  fn with_key<K: Into<Key> + 'static>(self, key: K) -> KeyDetect<Self::HostWidget>
-  where
-    Self: Sized,
-  {
-    let key = key.into();
-    self.attach_attr(key)
-  }
 
   /// Assign the type of mouse cursor, show when the mouse pointer is over this
   /// widget.
@@ -419,14 +403,6 @@ where
   }
 }
 
-impl<W: Widget, AttrData: Any> Attribute for WidgetAttr<W, AttrData> {
-  #[inline]
-  fn widget(&self) -> &BoxWidget { &self.widget }
-
-  #[inline]
-  fn widget_mut(&mut self) -> &mut BoxWidget { &mut self.widget }
-}
-
 impl<W: Widget, Data: Any> AsCombination for WidgetAttr<W, Data> {
   #[inline]
   fn as_combination(&self) -> Option<&dyn CombinationWidget> { self.widget.as_combination() }
@@ -446,6 +422,7 @@ impl<W: Widget, Data: Any> AsRender for WidgetAttr<W, Data> {
 }
 
 impl<W: Widget, Data: Any> Widget for WidgetAttr<W, Data> {
+  fn attrs(&self) -> Option<&Attrs> { unimplemented!() }
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
@@ -457,24 +434,6 @@ impl<W: Widget, Data: Any> Widget for WidgetAttr<W, Data> {
     };
     let widget: Box<dyn Widget> = Box::new(erase_type);
     widget.into()
-  }
-}
-
-impl<W: Widget, Data: Any + Debug> AsAttr for WidgetAttr<W, Data> {
-  #[inline]
-  fn as_attr(&self) -> Option<&dyn Attribute>
-  where
-    Self: Sized,
-  {
-    Some(self)
-  }
-
-  #[inline]
-  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>
-  where
-    Self: Sized,
-  {
-    Some(self)
   }
 }
 
@@ -494,11 +453,11 @@ unsafe fn copy_attr<AttrData: 'static>(widget: &mut BoxWidget) -> Option<(BoxWid
   }
 }
 
-impl<W: Widget, Data: Debug + 'static> AttributeAttach for WidgetAttr<W, Data> {
+impl<W: Widget, Data: 'static> AttributeAttach for WidgetAttr<W, Data> {
   type HostWidget = W;
 }
 
-impl<W: Widget, Attr: Any + Debug> std::ops::Deref for WidgetAttr<W, Attr> {
+impl<W: Widget, Attr: 'static> std::ops::Deref for WidgetAttr<W, Attr> {
   type Target = W;
   fn deref(&self) -> &Self::Target {
     let mut widget: &dyn Widget = self;
@@ -516,7 +475,7 @@ impl<W: Widget, Attr: Any + Debug> std::ops::Deref for WidgetAttr<W, Attr> {
   }
 }
 
-impl<W: Widget, Attr: Any + Debug> std::ops::DerefMut for WidgetAttr<W, Attr> {
+impl<W: Widget, Attr: 'static> std::ops::DerefMut for WidgetAttr<W, Attr> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     let mut widget = self as *mut dyn Widget;
     // Safety: the type info always hold the origin widget type.
@@ -536,4 +495,102 @@ impl<W: Widget, Attr: Any + Debug> std::ops::DerefMut for WidgetAttr<W, Attr> {
         .expect("The type of widget should be equal to the `type_info`")
     }
   }
+}
+
+use std::collections::LinkedList;
+
+pub trait AttachAttr: Widget {
+  /// The widget the attribute attached to.
+  type W: Widget;
+
+  fn split_attrs(self) -> (Self::W, Option<Attrs>);
+
+  /// Assign a key to the widget to help framework to track if two widget is a
+  /// same widget in two frame.
+  #[inline]
+  fn with_key<K: Into<Key> + 'static>(self, key: K) -> KeyDetect<Self::W>
+  where
+    Self: Sized,
+  {
+    let w_attrs = self.into_attr_widget();
+    KeyDetect::new(key.into(), w_attrs)
+  }
+
+  /// This method split attr from widget.
+  fn into_attr_widget<A: Any>(self) -> AttrWidget<Self::W, A>
+  where
+    Self: Sized,
+  {
+    let (widget, mut other_attrs) = self.split_attrs();
+    let major_attr = other_attrs
+      .as_mut()
+      .and_then(|attrs| attrs.remove_attr::<A>());
+    AttrWidget {
+      widget,
+      major_attr,
+      other_attrs,
+    }
+  }
+}
+
+/// This struct store a widget and its attributes, It is created by
+/// [`AttachAttr::into_attr_widget()`]
+pub struct AttrWidget<W: Widget, A: Any> {
+  pub widget: W,
+  pub major_attr: Option<A>,
+  pub other_attrs: Option<Attrs>,
+}
+
+#[derive(Default)]
+pub struct Attrs(LinkedList<Box<dyn Any>>);
+
+pub struct AttrsRef<'a> {
+  major: &'a dyn Any,
+  other_atts: Option<&'a LinkedList<Box<dyn Any>>>,
+}
+
+pub struct AttrsMut<'a> {
+  major: &'a mut dyn Any,
+  other_atts: Option<&'a mut LinkedList<Box<dyn Any>>>,
+}
+
+impl<'a> AttrsRef<'a> {
+  pub fn find_attr<A: 'static>(&self) -> Option<&A> {
+    self.major.downcast_ref::<A>().or(
+      self
+        .other_atts
+        .and_then(|attts| attts.iter().find_map(|attr| attr.downcast_ref::<A>())),
+    )
+  }
+}
+
+impl<'a> AttrsMut<'a> {
+  pub fn find_attr_mut<A: 'static>(&self) -> Option<&mut A> {
+    self.major.downcast_mut::<A>().or(
+      self
+        .other_atts
+        .and_then(|attts| attts.iter_mut().find_map(|attr| attr.downcast_mut::<A>())),
+    )
+  }
+}
+
+impl Attrs {
+  /// Remove the type `A` attribute out of the attributes.
+  pub fn remove_attr<A: Any>(&mut self) -> Option<A> {
+    let mut cursor = self.0.cursor_front_mut();
+
+    while cursor.current().map(|any| any.is::<A>()).unwrap_or(false) {}
+
+    cursor.remove_current().map(|mut any| {
+      let attr = any.downcast_mut::<A>().unwrap();
+      let tmp = unsafe { std::mem::transmute_copy(attr) };
+      std::mem::forget(any);
+      tmp
+    })
+  }
+
+  /// Detect if the type `A` attribute in the attributes.
+  pub fn has_attr<A: Any>(&self) -> bool { self.0.iter().any(|attr| attr.is::<A>()) }
+
+  pub fn front_push_attr<A: Any>(&mut self, attr: A) { self.0.push_front(Box::new(attr)); }
 }

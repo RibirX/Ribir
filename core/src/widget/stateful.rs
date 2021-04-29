@@ -30,7 +30,7 @@ pub struct StateRefCell<W: Widget> {
   type_info: PhantomData<*const W>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StatefulAttr(Rc<RefCell<InnerState>>);
 
 #[derive(Debug)]

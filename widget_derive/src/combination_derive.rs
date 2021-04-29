@@ -51,7 +51,7 @@ pub fn proxy_derive(
       }
     }
     Data::Enum(_) => {
-      unimplemented!("Unimplemented know");
+      unimplemented!("Unimplemented now");
     }
     _ => {
       quote_spanned! {

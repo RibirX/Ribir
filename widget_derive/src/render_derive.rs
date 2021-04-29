@@ -24,9 +24,9 @@ pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
         |param| attr_fields.is_attr_generic(param),
       );
       let (proxy_impl_generics, _, proxy_where_clause) = proxy_generics.split_for_impl();
-
+      let vis = &input.vis;
       quote! {
-        struct #render_name #proxy_impl_generics(
+        #vis struct #render_name #proxy_impl_generics(
           <#proxy_ty as RenderWidget>::RO
         ) #proxy_where_clause;
 
