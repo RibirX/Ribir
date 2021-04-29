@@ -39,7 +39,14 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsCombination + AsRender + AsAny + AsAttr + 'static {
+pub trait Widget: AsCombination + AsRender + AsAny + 'static {
+  /// Return the reference to the attrs that attached to the this widget.
+  fn attrs_ref(&self) -> Option<&AttrsRef>;
+
+  /// Return the mutable reference to the attrs that attached to the this
+  /// widget.
+  fn attrs_mut(&self) -> Option<&AttrsMut>;
+
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
@@ -198,15 +205,6 @@ pub trait AsRender {
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
 }
 
-pub trait AsAttr {
-  /// return the some-value of `WidgetAttr` reference if the widget attached
-  /// attr.
-  fn as_attr(&self) -> Option<&dyn Attribute>;
-
-  /// like `as_attr`, but return mutable reference.
-  fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute>;
-}
-
 impl<T: Widget> AsCombination for T {
   #[inline]
   default fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
@@ -247,12 +245,6 @@ impl<T: Widget + Any> AsAny for T {
   default fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
-impl<T: Widget> AsAttr for T {
-  default fn as_attr(&self) -> Option<&dyn Attribute> { None }
-
-  default fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { None }
-}
-
 // Todo: Remove BoxWidget after support specialization Box<dyn Widget>
 pub struct BoxWidget {
   pub(crate) widget: Box<dyn Widget>,
@@ -266,43 +258,25 @@ impl AsAny for BoxWidget {
   fn as_any_mut(&mut self) -> &mut dyn Any { self.widget.as_any_mut() }
 }
 
-impl BoxWidget {
-  pub fn key(&self) -> Option<&Key> { self.downcast_attr_widget::<Key>().map(|k| k.key()) }
+impl<'a> dyn Widget + 'a {
+  pub fn key(&self) -> Option<&Key> { self.attrs_ref().and_then(|attrs| attrs.find_attr()) }
 
-  pub fn downcast_attr_widget<AttrData: 'static>(&self) -> Option<&WidgetAttr<BoxWidget, AttrData>>
-  where
-    Self: Sized,
-  {
-    let mut attr = self.as_attr();
-
-    while attr.as_ref().map_or(false, |a| {
-      !a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>()
-    }) {
-      attr = attr.and_then(|a| a.widget().as_attr());
-    }
-
-    attr.and_then(|a| a.as_any().downcast_ref())
+  pub fn find_attr<A: 'static>(&self) -> Option<&A> {
+    self.attrs_ref().and_then(|attrs| attrs.find_attr())
   }
 
-  pub fn downcast_attr_widget_mut<AttrData: 'static>(
-    &mut self,
-  ) -> Option<&mut WidgetAttr<BoxWidget, AttrData>>
-  where
-    Self: Sized,
-  {
-    let mut attr = self.as_attr_mut();
-
-    while attr.as_ref().map_or(false, |a| {
-      !a.as_any().is::<WidgetAttr<BoxWidget, AttrData>>()
-    }) {
-      attr = attr.and_then(|a| a.widget_mut().as_attr_mut());
-    }
-
-    attr.and_then(|a| a.as_any_mut().downcast_mut())
+  pub fn find_attr_mut<A: 'static>(&self) -> Option<&mut A> {
+    self.attrs_mut().and_then(|attrs| attrs.find_attr_mut())
   }
 }
 
 impl Widget for BoxWidget {
+  #[inline]
+  fn attrs_ref(&self) -> Option<&AttrsRef> { self.widget.attrs_ref() }
+
+  #[inline]
+  fn attrs_mut(&self) -> Option<&AttrsMut> { self.widget.attrs_mut() }
+
   #[inline]
   fn box_it(self) -> BoxWidget
   where
@@ -336,14 +310,6 @@ pub(crate) macro proxy_impl_as_trait(
     fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
       self.$proxy_member.as_combination_mut()
     }
-  }
-
-  impl AsAttr for $name {
-    #[inline]
-    fn as_attr(&self) -> Option<&dyn Attribute> { self.$proxy_member.as_attr() }
-
-    #[inline]
-    fn as_attr_mut(&mut self) -> Option<&mut dyn Attribute> { self.$proxy_member.as_attr_mut() }
   }
 
   impl AsRender for $name {

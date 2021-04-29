@@ -8,7 +8,6 @@ pub struct WheelEvent {
   pub common: EventCommon,
 }
 
-#[derive(Debug)]
 pub struct WheelAttr(LocalSubject<'static, Rc<WheelEvent>, ()>);
 
 /// Firing the wheel event when the user rotates a wheel button on a pointing

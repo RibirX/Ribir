@@ -61,7 +61,7 @@ impl CommonDispatcher {
     Event: AsMut<EventCommon> + AsRef<EventCommon> + std::fmt::Debug,
     Handler: FnMut(&WidgetAttr<BoxWidget, AttrData>, Rc<Event>),
     EventDataUpdate: FnMut(&mut Event),
-    AttrData: std::fmt::Debug + 'static,
+    AttrData: 'static,
   >(
     &self,
     wid: WidgetId,

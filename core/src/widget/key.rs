@@ -31,11 +31,41 @@ pub enum Key {
 
 /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
 /// `KeyDetect` is a widget that only work for bind a key to a widget.
-pub type KeyDetect<W> = WidgetAttr<W, Key>;
+#[derive(Widget, CombinationWidget, RenderWidget)]
+pub struct KeyDetect<W: Widget> {
+  #[proxy]
+  widget: W,
+  key: Key,
+  other_attrs: Option<Attrs>,
+}
 
 impl<W: Widget> KeyDetect<W> {
   #[inline]
-  pub fn key(&self) -> &Key { &self.attr }
+  pub fn key(&self) -> &Key { &self.key }
+
+  pub fn new(key: Key, attr: AttrWidget<W, Key>) -> Self {
+    let AttrWidget {
+      widget,
+      major_attr,
+      other_attrs,
+    } = attr;
+    let key = major_attr.unwrap_or(key);
+    KeyDetect {
+      widget,
+      key,
+      other_attrs,
+    }
+  }
+}
+
+impl<W: Widget> AttachAttr for KeyDetect<W> {
+  type W = W;
+
+  fn split_attrs(self) -> (Self::W, Option<Attrs>) {
+    let mut attrs = self.other_attrs.unwrap_or(<_>::default());
+    attrs.front_push_attr(self.key);
+    (self.widget, Some(attrs))
+  }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {
