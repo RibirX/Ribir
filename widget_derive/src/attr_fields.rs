@@ -12,7 +12,6 @@ fn prefix_ident(prefix: &str, ident: &Ident) -> Ident {
 
 /// Pick fields from struct by specify inner attr.
 pub struct AttrFields<'a> {
-  attr_name: &'static str,
   generics: &'a Generics,
   state_fields: Vec<(Field, usize)>,
   is_tuple: bool,
@@ -24,7 +23,6 @@ impl<'a> AttrFields<'a> {
       state_fields: Self::pick_attr_fields(from, attr_name),
       generics,
       is_tuple: matches!(from.fields, Fields::Unnamed(_)),
-      attr_name,
     }
   }
 
@@ -64,24 +62,24 @@ impl<'a> AttrFields<'a> {
     } = self.generics.clone();
     params = params
       .iter()
-      .map(|p| p.clone())
+      .cloned()
       .filter(|p| self.is_attr_generic(p))
       .collect::<Punctuated<_, syn::token::Comma>>();
 
-    where_clause = where_clause.and_then(|mut clause| {
+    where_clause = where_clause.map(|mut clause| {
       clause.predicates = clause
         .predicates
         .iter()
         .filter(|p| self.is_attr_clause(p))
         .cloned()
         .collect::<Punctuated<_, syn::token::Comma>>();
-      Some(clause)
+      clause
     });
 
     Generics {
+      lt_token,
       params,
       gt_token,
-      lt_token,
       where_clause,
     }
   }

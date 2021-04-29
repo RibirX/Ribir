@@ -1,18 +1,18 @@
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 
-#[derive(Debug, Widget)]
+#[derive(Widget)]
 pub struct ScrollableX {
   child: Option<BoxWidget>,
   pos: f32,
 }
 
-#[derive(Debug, Widget)]
+#[derive(Widget)]
 pub struct ScrollableY {
   child: Option<BoxWidget>,
   pos: f32,
 }
 
-#[derive(Debug, Widget)]
+#[derive(Widget)]
 pub struct ScrollableBoth {
   child: Option<BoxWidget>,
   pos: Point,

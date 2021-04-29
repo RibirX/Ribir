@@ -26,7 +26,6 @@ pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
       let (proxy_impl_generics, _, proxy_where_clause) = proxy_generics.split_for_impl();
 
       quote! {
-        #[derive(Debug)]
         struct #render_name #proxy_impl_generics(
           <#proxy_ty as RenderWidget>::RO
         ) #proxy_where_clause;

@@ -3,7 +3,7 @@ use crate::prelude::*;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(Debug, Widget)]
+#[derive(Widget)]
 pub struct Expanded {
   pub flex: f32,
   pub child: BoxWidget,

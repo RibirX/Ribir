@@ -1,5 +1,5 @@
 use crate::{prelude::*, render::*};
-use std::{any::Any, fmt::Debug};
+use std::any::Any;
 pub mod build_ctx;
 pub mod key;
 pub mod layout;
@@ -39,7 +39,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsCombination + AsRender + AsAny + AsAttr + Debug + 'static {
+pub trait Widget: AsCombination + AsRender + AsAny + AsAttr + 'static {
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
@@ -167,7 +167,7 @@ pub trait RenderWidget: Widget + Sized {
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety: Debug {
+pub trait RenderWidgetSafety {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
   fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>>;
 }
@@ -256,11 +256,6 @@ impl<T: Widget> AsAttr for T {
 // Todo: Remove BoxWidget after support specialization Box<dyn Widget>
 pub struct BoxWidget {
   pub(crate) widget: Box<dyn Widget>,
-}
-
-impl std::fmt::Debug for BoxWidget {
-  #[inline]
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.widget.fmt(f) }
 }
 
 impl AsAny for BoxWidget {

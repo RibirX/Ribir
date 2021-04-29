@@ -2,10 +2,7 @@ pub use render_ctx::*;
 pub mod render_ctx;
 use crate::prelude::*;
 pub use painting_context::*;
-use std::{
-  any::{Any, TypeId},
-  fmt::Debug,
-};
+use std::any::{Any, TypeId};
 mod painting_context;
 pub mod render_tree;
 pub mod update_ctx;
@@ -13,7 +10,7 @@ pub use render_tree::{BoxClamp, RenderId};
 pub use update_ctx::UpdateCtx;
 
 /// The `Owner` is the render widget which created this object.
-pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
+pub trait RenderObject: Sized + Send + Sync + 'static {
   type Owner: RenderWidget<RO = Self>;
   /// Call by framework when its owner `owner_widget` changed, should not call
   /// this method directly.
@@ -44,7 +41,7 @@ pub trait RenderObject: Debug + Sized + Send + Sync + 'static {
 
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
 /// implement this trait, just implement [`RenderObject`](RenderObject).
-pub trait RenderObjectSafety: Debug + Any {
+pub trait RenderObjectSafety: Any {
   fn update(&mut self, owner_widget: &dyn RenderWidgetSafety, ctx: &mut UpdateCtx);
   fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size;
   fn only_sized_by_parent(&self) -> bool;

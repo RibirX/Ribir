@@ -296,8 +296,8 @@ mod tests {
     brush.process_queued(&mut buffer).unwrap();
 
     assert_eq!(buffer.vertices.len(), str.chars().count() * 4);
-    assert_eq!(brush.texture().is_updated(), true);
-    assert_eq!(brush.texture().is_resized(), false);
+    assert!(brush.texture().is_updated());
+    assert!(!brush.texture().is_resized());
 
     brush.log_glyph_cache_png_to("glyph_texture_cache.png");
 

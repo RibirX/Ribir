@@ -179,8 +179,8 @@ mod tests {
 
     // old data should keep in the same place.
     assert_eq!(tex.as_bytes(), &[0, 1, 0, 0, 0, 0, 0, 0]);
-    assert_eq!(tex.is_updated(), true);
-    assert_eq!(tex.is_resized(), true);
+    assert!(tex.is_updated());
+    assert!(tex.is_resized());
 
     // grow size and throw old data away.
     tex.expand_size(false);
