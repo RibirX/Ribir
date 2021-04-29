@@ -1,7 +1,7 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(Debug, Widget)]
+#[derive(Widget)]
 pub struct Column(Flex);
 
 impl Column {

@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Generics, Ident};
 
-pub const PROXY_PATH: &'static str = "proxy";
+pub const PROXY_PATH: &str = "proxy";
 
 pub fn proxy_derive(
   input: &syn::DeriveInput,

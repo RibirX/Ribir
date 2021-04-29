@@ -15,7 +15,6 @@ use std::{any::Any, fmt::Debug, marker::PhantomData};
 /// When you implement a new `WidgetAttr`, you should remember a widget can only
 /// attach one attr of same `WidgetAttr` type. If user attach it many times, you
 /// should merge them.
-#[derive(Debug)]
 pub struct WidgetAttr<W: Widget, AttrData> {
   pub attr: AttrData,
   widget: BoxWidget,
@@ -420,7 +419,7 @@ where
   }
 }
 
-impl<W: Widget, AttrData: Any + Debug> Attribute for WidgetAttr<W, AttrData> {
+impl<W: Widget, AttrData: Any> Attribute for WidgetAttr<W, AttrData> {
   #[inline]
   fn widget(&self) -> &BoxWidget { &self.widget }
 
@@ -428,7 +427,7 @@ impl<W: Widget, AttrData: Any + Debug> Attribute for WidgetAttr<W, AttrData> {
   fn widget_mut(&mut self) -> &mut BoxWidget { &mut self.widget }
 }
 
-impl<W: Widget, Data: Any + Debug> AsCombination for WidgetAttr<W, Data> {
+impl<W: Widget, Data: Any> AsCombination for WidgetAttr<W, Data> {
   #[inline]
   fn as_combination(&self) -> Option<&dyn CombinationWidget> { self.widget.as_combination() }
 
@@ -438,7 +437,7 @@ impl<W: Widget, Data: Any + Debug> AsCombination for WidgetAttr<W, Data> {
   }
 }
 
-impl<W: Widget, Data: Any + Debug> AsRender for WidgetAttr<W, Data> {
+impl<W: Widget, Data: Any> AsRender for WidgetAttr<W, Data> {
   #[inline]
   fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.widget.as_render() }
 
@@ -446,7 +445,7 @@ impl<W: Widget, Data: Any + Debug> AsRender for WidgetAttr<W, Data> {
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { self.widget.as_render_mut() }
 }
 
-impl<W: Widget, Data: Any + Debug> Widget for WidgetAttr<W, Data> {
+impl<W: Widget, Data: Any> Widget for WidgetAttr<W, Data> {
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,

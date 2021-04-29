@@ -47,7 +47,5 @@ pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
 pub fn render_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
 
-  let expand = render_derive::render_derive(&input);
-  println!("{}", expand);
-  expand.into()
+  render_derive::render_derive(&input).into()
 }

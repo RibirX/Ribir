@@ -1,4 +1,4 @@
-use crate::{prelude::*, util::TreeFormatter, widget::widget_tree::*};
+use crate::{prelude::*, widget::widget_tree::*};
 use canvas::Canvas;
 use indextree::*;
 use std::{
@@ -100,15 +100,6 @@ impl RenderTree {
 
     self.needs_layout.clear();
     !needs_layout.is_empty()
-  }
-
-  #[allow(dead_code)]
-  pub(crate) fn symbol_shape(&self) -> String {
-    if let Some(root) = self.root {
-      format!("{:?}", TreeFormatter::new(&self.arena, root.0))
-    } else {
-      "".to_owned()
-    }
   }
 
   #[cfg(test)]

@@ -9,7 +9,7 @@ pub struct EdgeInsets {
 }
 
 /// A widget that crate space around its child.
-#[derive(Debug, Widget)]
+#[derive(Widget)]
 pub struct Margin {
   pub margin: EdgeInsets,
   pub child: BoxWidget,

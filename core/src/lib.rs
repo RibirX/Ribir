@@ -7,7 +7,6 @@ extern crate widget_derive;
 
 mod application;
 mod render;
-mod util;
 pub mod widget;
 pub mod prelude {
   pub use crate::application::Application;

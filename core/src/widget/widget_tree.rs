@@ -1,4 +1,4 @@
-use crate::{prelude::*, render::render_tree::*, util::TreeFormatter};
+use crate::{prelude::*, render::render_tree::*};
 use indextree::*;
 use stateful::StatefulAttr;
 use std::{
@@ -249,15 +249,6 @@ impl WidgetTree {
     }
     topmost
   }
-
-  #[allow(dead_code)]
-  pub(crate) fn symbol_shape(&self) -> String {
-    if let Some(root) = self.root {
-      format!("{:?}", TreeFormatter::new(&self.arena, root.0))
-    } else {
-      "".to_owned()
-    }
-  }
 }
 
 impl WidgetId {
@@ -498,57 +489,6 @@ mod test {
   }
 
   #[test]
-  fn inflate_tree() {
-    let (widget_tree, render_tree) = create_embed_app(3);
-
-    assert_eq!(
-      widget_tree.symbol_shape(),
-      r#"EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 3 }
-└── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
-    ├── Text("Simple demo")
-    ├── Text("Adoo")
-    ├── Text("Recursive x times")
-    └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 2 }
-        └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
-            ├── Text("Simple demo")
-            ├── Text("Adoo")
-            ├── Text("Recursive x times")
-            └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 1 }
-                └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
-                    ├── Text("Simple demo")
-                    ├── Text("Adoo")
-                    ├── Text("Recursive x times")
-                    └── EmbedPost { title: "Simple demo", author: "Adoo", content: "Recursive x times", level: 0 }
-                        └── Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] })
-                            ├── Text("Simple demo")
-                            ├── Text("Adoo")
-                            └── Text("Recursive x times")
-"#
-    );
-
-    assert_eq!(
-      render_tree.symbol_shape(),
-      r#"FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-├── TextRender { text: "Simple demo" }
-├── TextRender { text: "Adoo" }
-├── TextRender { text: "Recursive x times" }
-└── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-    ├── TextRender { text: "Simple demo" }
-    ├── TextRender { text: "Adoo" }
-    ├── TextRender { text: "Recursive x times" }
-    └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-        ├── TextRender { text: "Simple demo" }
-        ├── TextRender { text: "Adoo" }
-        ├── TextRender { text: "Recursive x times" }
-        └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-            ├── TextRender { text: "Simple demo" }
-            ├── TextRender { text: "Adoo" }
-            └── TextRender { text: "Recursive x times" }
-"#
-    );
-  }
-
-  #[test]
   fn drop_all() {
     let (mut widget_tree, mut render_tree) = create_embed_app(3);
 
@@ -573,58 +513,6 @@ mod test {
       .widget_tree
       .need_builds
       .insert(env.widget_tree.root().unwrap());
-  }
-  #[test]
-  fn repair_tree() {
-    let mut env = KeyDetectEnv::new(3);
-    emit_rebuild(&mut env);
-    env.widget_tree.repair(&mut env.render_tree);
-
-    assert_eq!(
-      env.widget_tree.symbol_shape(),
-      r#"EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 3 }
-└── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-    ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
-    ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
-    ├── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
-    └── WidgetAttr { attr: Kstring("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 2 }, type_info: PhantomData }
-        └── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-            ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
-            ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
-            ├── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
-            └── WidgetAttr { attr: Kstring("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 1 }, type_info: PhantomData }
-                └── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-                    ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
-                    ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
-                    ├── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
-                    └── WidgetAttr { attr: Kstring("embed"), widget: EmbedKeyPost { title: RefCell { value: "New title" }, author: "", content: "", level: 0 }, type_info: PhantomData }
-                        └── WidgetAttr { attr: Ki4(0), widget: Row(Flex { reverse: false, wrap: false, direction: Horizontal, cross_align: Start, main_align: Start, children: [] }), type_info: PhantomData }
-                            ├── WidgetAttr { attr: Ki4(0), widget: Text("New title"), type_info: PhantomData }
-                            ├── WidgetAttr { attr: Ki4(1), widget: Text(""), type_info: PhantomData }
-                            └── WidgetAttr { attr: Ki4(2), widget: Text(""), type_info: PhantomData }
-"#
-    );
-
-    assert_eq!(
-      env.render_tree.symbol_shape(),
-      r#"FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-├── TextRender { text: "New title" }
-├── TextRender { text: "" }
-├── TextRender { text: "" }
-└── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-    ├── TextRender { text: "New title" }
-    ├── TextRender { text: "" }
-    ├── TextRender { text: "" }
-    └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-        ├── TextRender { text: "New title" }
-        ├── TextRender { text: "" }
-        ├── TextRender { text: "" }
-        └── FlexRender { reverse: false, direction: Horizontal, cross_align: Start, main_align: Start, wrap: false }
-            ├── TextRender { text: "New title" }
-            ├── TextRender { text: "" }
-            └── TextRender { text: "" }
-"#
-    );
   }
 
   fn test_sample_create(width: usize, depth: usize) -> (WidgetTree, RenderTree) {

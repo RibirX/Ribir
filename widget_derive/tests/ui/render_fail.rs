@@ -1,9 +1,9 @@
 use holiday::prelude::*;
 
-#[derive(Widget, RenderWidget, Debug)]
+#[derive(Widget, RenderWidget)]
 struct A;
 
-#[derive(Debug, Widget, RenderWidget)]
+#[derive(Widget, RenderWidget)]
 struct B {
   #[proxy]
   a: Flex,
