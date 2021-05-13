@@ -1,9 +1,10 @@
-use crate::{prelude::*, render::render_tree::*};
+use crate::{prelude::*, render::render_tree::*, widget::stateful::TreeInfo};
 use indextree::*;
 use stateful::StatefulAttr;
 use std::{
   collections::{HashMap, HashSet},
   pin::Pin,
+  ptr::NonNull,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -35,18 +36,17 @@ impl WidgetTree {
   }
 
   pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
-    if let Some(stateful) = widget.downcast_attr_widget::<StatefulAttr>() {
-      let id = stateful.id();
-      *id.get_mut(self).unwrap() = widget;
-      id
-    } else {
-      self.alloc_node(widget)
+    let state = widget.widget.find_attr::<StatefulAttr>().cloned();
+    let id = WidgetId(self.arena.new_node(widget));
+    if let Some(state) = state {
+      debug_assert!(state.0.borrow().tree_info.is_none());
+      state.0.borrow_mut().tree_info = Some(TreeInfo {
+        id,
+        tree: { NonNull::from(self) },
+      });
     }
-  }
 
-  #[inline]
-  pub fn alloc_node(&mut self, widget: BoxWidget) -> WidgetId {
-    WidgetId(self.arena.new_node(widget))
+    id
   }
 
   /// inflate  subtree, so every subtree leaf should be a Widget::Render.

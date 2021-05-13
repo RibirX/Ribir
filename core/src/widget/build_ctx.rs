@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use stateful::StatefulAttr;
-use std::pin::Pin;
+use std::{pin::Pin, ptr::NonNull};
 
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
@@ -11,12 +11,14 @@ impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&self) -> &ThemeData {
     let tree = &*self.tree;
-    let theme = self
+    self
       .wid
       .ancestors(tree)
-      .find_map(|id| id.get(tree).and_then(|w| w.downcast_attr_widget()))
-      .expect("At least， root theme should be found.");
-    theme.data()
+      .find_map(|id| {
+        id.get(tree)
+          .and_then(|w| w.attrs_ref().and_then(|a| a.find_attr::<ThemeData>()))
+      })
+      .expect("At least， root theme should be found.")
   }
 
   #[inline]
@@ -36,7 +38,7 @@ impl<'a> BuildCtx<'a> {
 
   #[inline]
   pub(crate) fn state_attr(&mut self) -> StatefulAttr {
-    StatefulAttr::from_id(self.wid, self.tree.as_mut())
+    StatefulAttr::new(self.wid, NonNull::from(&*self.tree))
   }
 }
 
@@ -55,7 +57,7 @@ mod tests {
     let has_them = tree
       .root()
       .and_then(|root| root.get(&*tree))
-      .map_or(false, |w| w.has_attr::<ThemeData>());
+      .map_or(false, |w| w.widget.find_attr::<ThemeData>().is_some());
     assert!(has_them);
   }
 

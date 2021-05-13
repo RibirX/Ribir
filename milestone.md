@@ -56,6 +56,9 @@
   - [x] click widget
 
 - [ ] A derive macro for state impl
+- [ ] refactor stateful
+  - [ ] stateful should be a widget not a attr.
+  - [ ] into_sateful should not depend on `BuildCtx`
 
 ##  we need readable & learnable documents.
 

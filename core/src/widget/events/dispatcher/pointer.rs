@@ -111,9 +111,13 @@ impl PointerDispatcher {
     let hit = self.hit_widget(common);
     self.pointer_down_uid = hit.map(|(wid, _)| wid);
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
-      wid
-        .ancestors(tree)
-        .find(|id| id.get(tree).map_or(false, |w| w.has_attr::<FocusAttr>()))
+      wid.ancestors(tree).find(|id| {
+        id.get(tree).map_or(false, |w| {
+          w.attrs_ref()
+            .and_then(|attrs| attrs.find_attr::<FocusAttr>())
+            .is_some()
+        })
+      })
     });
     if let Some(focus_id) = nearest_focus {
       focus_mgr.focus(focus_id, common);
@@ -172,7 +176,8 @@ impl PointerDispatcher {
         .ancestors(tree)
         .filter(|w| {
           w.get(tree)
-            .and_then(|w| w.downcast_attr_widget::<PointerAttr>())
+            .and_then(|w| w.attrs_ref())
+            .and_then(|attrs| attrs.find_attr::<PointerAttr>())
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -248,7 +253,10 @@ impl PointerDispatcher {
   ) -> impl FnMut(&PointerListener<BoxWidget>, std::rc::Rc<PointerEvent>) {
     move |listener: &PointerListener<BoxWidget>, event: std::rc::Rc<PointerEvent>| {
       log::info!("{:?} {:?}", event_type, event);
-      listener.pointer_observable().next((event_type, event));
+      listener
+        .pointer
+        .pointer_observable()
+        .next((event_type, event));
     }
   }
 }
@@ -278,10 +286,10 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer<W: AttributeAttach>(
+  fn record_pointer<W: AttachAttr>(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
     widget: W,
-  ) -> PointerListener<W::HostWidget> {
+  ) -> PointerListener<W::W> {
     let handler_ctor = || {
       let stack = event_stack.clone();
       move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
@@ -457,7 +465,7 @@ mod tests {
       move |e| stack.borrow_mut().push(e.clone())
     });
 
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -600,7 +608,7 @@ mod tests {
     let root = Row::default()
       .push(SizedBox::empty_box(Size::new(50., 50.)).with_tab_index(0))
       .push(SizedBox::empty_box(Size::new(50., 50.)));
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };

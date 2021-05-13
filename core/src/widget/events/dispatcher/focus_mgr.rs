@@ -79,8 +79,8 @@ impl FocusManager {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
         id.get(tree)
-          .and_then(|w| w.downcast_attr_widget::<FocusAttr>())
-          .map_or(false, |focus| focus.is_auto_focus())
+          .and_then(|w| w.widget.find_attr::<FocusAttr>())
+          .map_or(false, |focus| focus.auto_focus)
       })
     })
   }
@@ -94,9 +94,9 @@ impl FocusManager {
         .descendants(tree)
         .filter_map(|id| {
           id.get(tree)
-            .and_then(|w| w.downcast_attr_widget::<FocusAttr>())
+            .and_then(|w| w.widget.find_attr::<FocusAttr>())
             .map(|focus| FocusNode {
-              tab_index: focus.tab_index(),
+              tab_index: focus.tab_index,
               wid: id,
             })
         })
@@ -203,7 +203,7 @@ mod tests {
 
   fn empty_box() -> SizedBox { SizedBox::empty_box(Size::zero()) }
 
-  fn env<W: Widget>(widget: W) -> (window::Window<window::MockRender>, FocusManager) {
+  fn env<W: AttachAttr>(widget: W) -> (window::Window<window::MockRender>, FocusManager) {
     let wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
     // use a aloneside FocusManager for test easy.
     let mut mgr = FocusManager::default();
@@ -287,11 +287,11 @@ mod tests {
       }
     }
 
-    fn log_focus_event<A: AttributeAttach>(
+    fn log_focus_event<A: AttachAttr>(
       name: &'static str,
       widget: A,
       log: Rc<RefCell<Vec<String>>>,
-    ) -> FocusListener<A::HostWidget> {
+    ) -> FocusListener<A::W> {
       let log2 = log.clone();
       let log3 = log.clone();
       let log4 = log.clone();

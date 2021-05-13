@@ -13,14 +13,14 @@ fn prefix_ident(prefix: &str, ident: &Ident) -> Ident {
 /// Pick fields from struct by specify inner attr.
 pub struct AttrFields<'a> {
   generics: &'a Generics,
-  state_fields: Vec<(Field, usize)>,
+  attr_fields: Vec<(Field, usize)>,
   is_tuple: bool,
 }
 
 impl<'a> AttrFields<'a> {
   pub fn new(from: &'a DataStruct, generics: &'a Generics, attr_name: &'static str) -> Self {
     Self {
-      state_fields: Self::pick_attr_fields(from, attr_name),
+      attr_fields: Self::pick_attr_fields(from, attr_name),
       generics,
       is_tuple: matches!(from.fields, Fields::Unnamed(_)),
     }
@@ -60,6 +60,7 @@ impl<'a> AttrFields<'a> {
       lt_token,
       mut where_clause,
     } = self.generics.clone();
+
     params = params
       .iter()
       .cloned()
@@ -84,7 +85,7 @@ impl<'a> AttrFields<'a> {
     }
   }
 
-  pub fn attr_fields(&self) -> &[(Field, usize)] { &self.state_fields }
+  pub fn attr_fields(&self) -> &[(Field, usize)] { &self.attr_fields }
 
   pub fn is_attr_generic(&self, param: &GenericParam) -> bool {
     let ident = match param {
@@ -93,20 +94,17 @@ impl<'a> AttrFields<'a> {
       GenericParam::Const(c) => &c.ident,
     };
     self
-      .state_fields
+      .attr_fields
       .iter()
       .any(|(f, _)| type_contain(&f.ty, ident))
   }
 
   fn is_attr_clause(&self, where_predicate: &WherePredicate) -> bool {
-    self
-      .state_fields
-      .iter()
-      .any(|(f, _)| match where_predicate {
-        WherePredicate::Lifetime(lf) => type_contain(&f.ty, &lf.lifetime.ident),
-        WherePredicate::Type(ty) => f.ty == ty.bounded_ty,
-        WherePredicate::Eq(eq) => f.ty == eq.lhs_ty,
-      })
+    self.attr_fields.iter().any(|(f, _)| match where_predicate {
+      WherePredicate::Lifetime(lf) => type_contain(&f.ty, &lf.lifetime.ident),
+      WherePredicate::Type(ty) => f.ty == ty.bounded_ty,
+      WherePredicate::Eq(eq) => f.ty == eq.lhs_ty,
+    })
   }
 }
 

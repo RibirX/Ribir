@@ -2,10 +2,10 @@ use crate::prelude::*;
 use rxrust::prelude::*;
 use std::rc::Rc;
 
-/// Focus widget
-pub type FocusListener<W> = WidgetAttr<W, FocusAttr>;
+/// Focus attr attach to widget to support get ability to focus in.
+pub type FocusListener<W: Widget> = AttrWidget<W, FocusAttr>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FocusAttr {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -59,41 +59,39 @@ pub enum FocusEventType {
 }
 
 impl<W: Widget> FocusListener<W> {
-  pub fn from_widget<A: AttributeAttach<HostWidget = W>>(
+  pub fn from_widget<A: AttachAttr<W = W>>(
     widget: A,
     auto_focus: Option<bool>,
     tab_index: Option<i16>,
   ) -> Self {
-    widget.unwrap_attr_or_else(|| FocusAttr {
-      tab_index: tab_index.unwrap_or(0),
-      auto_focus: auto_focus.unwrap_or(false),
-      subject: <_>::default(),
-    })
+    let (major, others, widget) = widget.take_attr();
+    let mut major = major.unwrap_or_default();
+    major.tab_index = tab_index.unwrap_or(0);
+    major.auto_focus = auto_focus.unwrap_or(false);
+    FocusListener { major, widget, others }
   }
 
   #[inline]
   pub fn focus_event_observable(
     &self,
   ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.attr.subject.clone()
+    self.focus.subject.clone()
   }
 
-  pub fn listen_on<A: AttributeAttach<HostWidget = W>, H: FnMut(&FocusEvent) + 'static>(
-    base: A,
+  pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
+    &self,
     event_type: FocusEventType,
     mut handler: H,
-  ) -> Self {
-    let pointer = Self::from_widget(base, None, None);
-    pointer
+  ) -> SubscriptionWrapper<LocalSubscription> {
+    self
       .focus_event_observable()
       .filter(move |(t, _)| *t == event_type)
-      .subscribe(move |(_, event)| handler(&*event));
-    pointer
+      .subscribe(move |(_, event)| handler(&*event))
   }
 
   #[inline]
-  pub fn is_auto_focus(&self) -> bool { self.attr.auto_focus }
+  pub fn is_auto_focus(&self) -> bool { self.focus.auto_focus }
 
   #[inline]
-  pub fn tab_index(&self) -> i16 { self.attr.tab_index }
+  pub fn tab_index(&self) -> i16 { self.focus.tab_index }
 }
