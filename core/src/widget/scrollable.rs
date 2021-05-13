@@ -20,12 +20,8 @@ pub struct ScrollableBoth {
 
 impl ScrollableX {
   #[inline]
-  pub fn new(child: BoxWidget, pos: f32, ctx: &mut BuildCtx) -> WheelListener<Self> {
-    let scroll = ScrollableX {
-      child: Some(child),
-      pos,
-    }
-    .into_stateful(ctx);
+  pub fn new(child: BoxWidget, pos: f32, ctx: &mut BuildCtx) -> WheelListener<RcWidget<Self>> {
+    let scroll = ScrollableX { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
@@ -40,12 +36,8 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn new(child: BoxWidget, pos: f32, ctx: &mut BuildCtx) -> WheelListener<Self> {
-    let scroll = ScrollableY {
-      child: Some(child),
-      pos,
-    }
-    .into_stateful(ctx);
+  pub fn new(child: BoxWidget, pos: f32, ctx: &mut BuildCtx) -> WheelListener<RcWidget<Self>> {
+    let scroll = ScrollableY { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
@@ -60,12 +52,8 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn new(child: BoxWidget, pos: Point, ctx: &mut BuildCtx) -> WheelListener<Self> {
-    let scroll = ScrollableBoth {
-      child: Some(child),
-      pos,
-    }
-    .into_stateful(ctx);
+  pub fn new(child: BoxWidget, pos: Point, ctx: &mut BuildCtx) -> WheelListener<RcWidget<Self>> {
+    let scroll = ScrollableBoth { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
@@ -265,7 +253,7 @@ mod tests {
   use crate::test::root_and_children_rect;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  fn test_assert<W: Widget>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
+  fn test_assert<W: AttachAttr>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
     let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();

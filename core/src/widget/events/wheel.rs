@@ -8,23 +8,32 @@ pub struct WheelEvent {
   pub common: EventCommon,
 }
 
+#[derive(Default)]
 pub struct WheelAttr(LocalSubject<'static, Rc<WheelEvent>, ()>);
 
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
-pub type WheelListener<W> = WidgetAttr<W, WheelAttr>;
+pub type WheelListener<W: Widget> = AttrWidget<W, WheelAttr>;
 
 impl<W: Widget> WheelListener<W> {
-  pub fn from_widget<A: AttributeAttach<HostWidget = W>>(widget: A) -> Self {
-    FocusListener::from_widget(widget, None, None).unwrap_attr_or_else_with(|widget| {
-      let focus = FocusListener::from_widget(widget, None, None);
-      (focus.box_it(), WheelAttr(<_>::default()))
-    })
+  pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
+    let (major, mut others, widget) = widget.take_attr();
+
+    let major = major.unwrap_or_else(|| {
+      let other_attrs = others.get_or_insert_with(<_>::default);
+      if other_attrs.find_attr::<FocusAttr>().is_none() {
+        other_attrs.front_push_attr(FocusAttr::default());
+      }
+
+      WheelAttr::default()
+    });
+
+    WheelListener { major, others, widget }
   }
 
   #[inline]
   pub fn event_observable(&self) -> LocalSubject<'static, Rc<WheelEvent>, ()> {
-    self.attr.0.clone()
+    self.wheel_attr.0.clone()
   }
 }
 

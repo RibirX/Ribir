@@ -7,9 +7,15 @@ pub mod theme_data;
 use crate::prelude::*;
 pub use theme_data::ThemeData;
 
-pub type Theme<W> = WidgetAttr<W, ThemeData>;
+pub type Theme<W: Widget> = AttrWidget<W, ThemeData>;
 
 impl<W: Widget> Theme<W> {
   #[inline]
-  pub fn data(&self) -> &ThemeData { &self.attr }
+  pub fn new<A: AttachAttr<W = W>>(widget: A, theme_data: ThemeData) -> Self {
+    let (_, widget, others) = widget.into_attr_widget::<A>();
+    Theme { widget, major: theme_data, others }
+  }
+
+  #[inline]
+  pub fn data(&self) -> &ThemeData { &self.theme_data }
 }

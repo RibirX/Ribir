@@ -31,40 +31,15 @@ pub enum Key {
 
 /// `Key` help `Holiday` to track if two widget is a same widget in two frame.
 /// `KeyDetect` is a widget that only work for bind a key to a widget.
-#[derive(Widget, CombinationWidget, RenderWidget)]
-pub struct KeyDetect<W: Widget> {
-  #[proxy]
-  widget: W,
-  key: Key,
-  other_attrs: Option<Attrs>,
-}
+pub type KeyDetect<W: Widget> = AttrWidget<W, Key>;
 
 impl<W: Widget> KeyDetect<W> {
   #[inline]
   pub fn key(&self) -> &Key { &self.key }
 
-  pub fn new(key: Key, attr: AttrWidget<W, Key>) -> Self {
-    let AttrWidget {
-      widget,
-      major_attr,
-      other_attrs,
-    } = attr;
-    let key = major_attr.unwrap_or(key);
-    KeyDetect {
-      widget,
-      key,
-      other_attrs,
-    }
-  }
-}
-
-impl<W: Widget> AttachAttr for KeyDetect<W> {
-  type W = W;
-
-  fn split_attrs(self) -> (Self::W, Option<Attrs>) {
-    let mut attrs = self.other_attrs.unwrap_or(<_>::default());
-    attrs.front_push_attr(self.key);
-    (self.widget, Some(attrs))
+  pub fn new<A: AttachAttr<W = W>, K: Into<Key>>(w: A, key: K) -> Self {
+    let (_, others, widget) = w.take_attr();
+    KeyDetect { widget: w, major: key.into(), others }
   }
 }
 

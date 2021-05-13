@@ -15,7 +15,7 @@ impl Application {
   #[inline]
   pub fn new() -> Application { <_>::default() }
 
-  pub fn run(mut self, w: BoxWidget) {
+  pub fn run<W: AttachAttr>(mut self, w: W) {
     let wnd_id = self.new_window(w);
     if let Some(wnd) = self.windows.get_mut(&wnd_id) {
       wnd.render_ready();
@@ -51,7 +51,7 @@ impl Application {
     });
   }
 
-  pub(crate) fn new_window(&mut self, w: BoxWidget) -> WindowId {
+  pub(crate) fn new_window<W: AttachAttr>(&mut self, w: W) -> WindowId {
     let window = Window::from_event_loop(w, &self.event_loop);
     let id = window.raw_window.borrow().id();
     self.windows.insert(id, window);

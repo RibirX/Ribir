@@ -46,7 +46,10 @@ impl BoxDecoration {
 
 impl Widget for BoxDecoration {
   #[inline]
-  fn attrs(&self) -> Option<&Attrs> { None }
+  fn find_attr<A: Any>(&self) -> Option<&A> { None }
+
+  #[inline]
+  fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> { None }
 
   #[inline]
   fn with_background(mut self, background: FillStyle) -> Self {
@@ -65,6 +68,13 @@ impl Widget for BoxDecoration {
     self.radius = Some(radius);
     self
   }
+}
+
+impl AttachAttr for BoxDecoration {
+  type W = Self;
+
+  #[inline]
+  fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) { (None, None, self) }
 }
 
 impl RenderWidget for BoxDecoration {
@@ -375,22 +385,10 @@ mod tests {
   fn layout() {
     let size = Size::new(100., 100.);
     let sized_box = SizedBox::empty_box(size).with_border(Border {
-      left: BorderSide {
-        width: 1.,
-        color: Color::BLACK,
-      },
-      right: BorderSide {
-        width: 2.,
-        color: Color::BLACK,
-      },
-      top: BorderSide {
-        width: 3.,
-        color: Color::BLACK,
-      },
-      bottom: BorderSide {
-        width: 4.,
-        color: Color::BLACK,
-      },
+      left: BorderSide { width: 1., color: Color::BLACK },
+      right: BorderSide { width: 2., color: Color::BLACK },
+      top: BorderSide { width: 3., color: Color::BLACK },
+      bottom: BorderSide { width: 4., color: Color::BLACK },
     });
     let (rect, child) = widget_and_its_children_box_rect(sized_box, Size::new(500., 500.));
     assert_eq!(rect, Rect::from_size(Size::new(103., 107.)));
@@ -435,10 +433,7 @@ mod tests {
         SizedBox::empty_box(Size::new(60., 40.))
           .with_background(Color::RED.into())
           .with_border_radius(radius)
-          .with_border(Border::all(BorderSide {
-            width: 5.,
-            color: Color::BLACK,
-          }))
+          .with_border(Border::all(BorderSide { width: 5., color: Color::BLACK }))
           .with_margin(EdgeInsets::all(2.))
           .box_it()
       })
@@ -447,29 +442,17 @@ mod tests {
         SizedBox::empty_box(Size::new(60., 40.))
           .with_background(Color::PINK.into())
           .with_border(Border {
-            left: BorderSide {
-              width: 1.,
-              color: Color::BLACK,
-            },
-            right: BorderSide {
-              width: 2.,
-              color: Color::RED,
-            },
-            top: BorderSide {
-              width: 3.,
-              color: Color::GREEN,
-            },
-            bottom: BorderSide {
-              width: 4.,
-              color: Color::YELLOW,
-            },
+            left: BorderSide { width: 1., color: Color::BLACK },
+            right: BorderSide { width: 2., color: Color::RED },
+            top: BorderSide { width: 3., color: Color::GREEN },
+            bottom: BorderSide { width: 4., color: Color::YELLOW },
           })
           .with_margin(EdgeInsets::all(2.))
           .box_it(),
       )
       .with_wrap(true);
 
-    let mut window = window::Window::headless(row.box_it(), DeviceSize::new(400, 600));
+    let mut window = window::Window::headless(row, DeviceSize::new(400, 600));
     window.render_ready();
     window.draw_frame();
 

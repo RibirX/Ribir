@@ -10,13 +10,13 @@ impl CombinationWidget for A {
 }
 
 #[derive(Debug, Widget, CombinationWidget)]
-struct B<W: std::fmt::Debug + 'static> {
+struct B<W: 'static> {
   #[proxy]
   a: W,
 }
 
 #[derive(Debug, Widget, CombinationWidget)]
-struct TupleB<W: std::fmt::Debug + 'static>(#[proxy] W);
+struct TupleB<W: 'static>(#[proxy] W);
 
 fn main() {
   let b = B { a: A };

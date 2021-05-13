@@ -4,3 +4,4 @@ wrap_comments = true
 tab_spaces = 2
 fn_single_line = true
 version = "Two"
+struct_lit_width= 36

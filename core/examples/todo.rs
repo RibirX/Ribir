@@ -66,5 +66,5 @@ fn main() {
     ],
   };
 
-  Application::new().run(todo.box_it());
+  Application::new().run(todo);
 }

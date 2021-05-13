@@ -1,5 +1,5 @@
 use crate::{prelude::*, render::*};
-use std::any::Any;
+pub use std::any::Any;
 pub mod build_ctx;
 pub mod key;
 pub mod layout;
@@ -12,7 +12,7 @@ pub mod widget_tree;
 pub mod window;
 pub use build_ctx::BuildCtx;
 pub use key::{Key, KeyDetect};
-pub use stateful::{StateChange, StateRefCell, Stateful};
+pub use stateful::*;
 pub use text::Text;
 pub mod events;
 pub use events::*;
@@ -32,7 +32,6 @@ mod attr;
 pub use attr::*;
 mod checkbox;
 pub use checkbox::*;
-use widget::stateful::StatefulAttr;
 mod scrollable;
 pub use scrollable::*;
 
@@ -40,20 +39,19 @@ pub use scrollable::*;
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
 pub trait Widget: AsCombination + AsRender + AsAny + 'static {
-  /// Return the reference to the attrs that attached to the this widget.
-  fn attrs_ref(&self) -> Option<&AttrsRef>;
+  /// Find an attr of this widget. If it have the `A` type attr, return the
+  /// reference.
+  fn find_attr<A: Any>(&self) -> Option<&A>;
 
-  /// Return the mutable reference to the attrs that attached to the this
-  /// widget.
-  fn attrs_mut(&self) -> Option<&AttrsMut>;
+  /// Find an attr of this widget. If it have the `A` type attr, return the
+  /// mutable reference.
+  fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A>;
 
   fn box_it(self) -> BoxWidget
   where
     Self: Sized,
   {
-    BoxWidget {
-      widget: Box::new(self),
-    }
+    BoxWidget { widget: Box::new(self) }
   }
 
   /// Insets the child of a widget by the given padding.
@@ -62,10 +60,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + 'static {
   where
     Self: Sized,
   {
-    Padding {
-      padding: edges,
-      child: self.box_it(),
-    }
+    Padding { padding: edges, child: self.box_it() }
   }
 
   /// Create space around the widget
@@ -74,10 +69,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + 'static {
   where
     Self: Sized,
   {
-    Margin {
-      margin: edges,
-      child: self.box_it(),
-    }
+    Margin { margin: edges, child: self.box_it() }
   }
 
   /// Sets the background of the widget.
@@ -106,7 +98,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + 'static {
 
   /// Let this widget horizontal scrollable and the scroll view is as large as
   /// its parent allow.
-  fn x_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<ScrollableX>
+  fn x_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<RcWidget<ScrollableX>>
   where
     Self: Sized,
   {
@@ -115,7 +107,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + 'static {
 
   /// Let this widget vertical scrollable and the scroll view is as large as
   /// its parent allow.
-  fn y_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<ScrollableY>
+  fn y_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<RcWidget<ScrollableY>>
   where
     Self: Sized,
   {
@@ -124,7 +116,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + 'static {
 
   /// Let this widget both scrollable in horizontal and vertical, and the scroll
   /// view is as large as its parent allow.
-  fn both_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<ScrollableBoth>
+  fn both_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<RcWidget<ScrollableBoth>>
   where
     Self: Sized,
   {
@@ -142,17 +134,21 @@ pub trait CombinationWidget: Widget {
   where
     Self: Sized,
   {
-    if let Some(stateful) = ctx.widget().downcast_attr_widget::<StatefulAttr>() {
-      unsafe { stateful.attr.ref_cell() }
-    } else {
-      let attr = ctx.state_attr();
-      let ref_cell = unsafe { attr.ref_cell() };
+    unimplemented!();
+    // if let Some(stateful) = ctx.widget().widget.find_attr::<StatefulAttr>() {
+    //   let widget =
+    // ctx.widget().as_any().downcast_ref::<RcWidget<Self>>().expect("stateful
+    // attr not hold a");   unsafe { stateful.attr.ref_cell() }
+    // } else {
+    //   let attr = ctx.state_attr();
 
-      let widget = std::mem::replace(ctx.widget_mut(), PhantomWidget.box_it());
-      let stateful = widget.attach_attr(attr).box_it();
-      let _ = std::mem::replace(ctx.widget_mut(), stateful);
-      ref_cell
-    }
+    //   let widget = std::mem::replace(ctx.widget_mut(),
+    // PhantomWidget.box_it());
+
+    //   let stateful = widget.attach_attr(attr).box_it();
+    //   let _ = std::mem::replace(ctx.widget_mut(), stateful);
+    //   ref_cell
+    // }
   }
 }
 
@@ -259,23 +255,15 @@ impl AsAny for BoxWidget {
 }
 
 impl<'a> dyn Widget + 'a {
-  pub fn key(&self) -> Option<&Key> { self.attrs_ref().and_then(|attrs| attrs.find_attr()) }
-
-  pub fn find_attr<A: 'static>(&self) -> Option<&A> {
-    self.attrs_ref().and_then(|attrs| attrs.find_attr())
-  }
-
-  pub fn find_attr_mut<A: 'static>(&self) -> Option<&mut A> {
-    self.attrs_mut().and_then(|attrs| attrs.find_attr_mut())
-  }
+  pub fn key(&self) -> Option<&Key> { self.find_attr() }
 }
 
 impl Widget for BoxWidget {
   #[inline]
-  fn attrs_ref(&self) -> Option<&AttrsRef> { self.widget.attrs_ref() }
+  fn find_attr<A: Any>(&self) -> Option<&A> { self.widget.find_attr() }
 
   #[inline]
-  fn attrs_mut(&self) -> Option<&AttrsMut> { self.widget.attrs_mut() }
+  fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> { self.widget.find_attr_mut() }
 
   #[inline]
   fn box_it(self) -> BoxWidget
@@ -286,8 +274,9 @@ impl Widget for BoxWidget {
   }
 }
 
-impl AttributeAttach for BoxWidget {
-  type HostWidget = Self;
+impl BoxWidget {
+  #[inline]
+  pub fn key(&self) -> Option<&Key> { self.widget.key() }
 }
 
 proxy_impl_as_trait!(BoxWidget, widget);

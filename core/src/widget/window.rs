@@ -165,8 +165,23 @@ impl<R: CanvasRender> Window<R> {
     }
   }
 
-  fn new<W: RawWindow + 'static>(root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
-    let root = root.unwrap_attr_or_else(|| material::light("Roboto".to_string()));
+  fn new<W: RawWindow + 'static, A: AttachAttr>(
+    root: A,
+    wnd: W,
+    canvas: Canvas,
+    render: R,
+  ) -> Self {
+    let root = if root
+      .attrs_ref()
+      .and_then(|attrs| attrs.find_attr::<ThemeData>())
+      .is_some()
+    {
+      root.box_it()
+    } else {
+      root
+        .with_theme(material::light("Roboto".to_string()))
+        .box_it()
+    };
 
     let render_tree = Box::pin(RenderTree::default());
     let widget_tree = Box::pin(WidgetTree::default());
@@ -233,7 +248,7 @@ impl<R: CanvasRender> Window<R> {
 }
 
 impl Window {
-  pub(crate) fn from_event_loop(root: BoxWidget, event_loop: &EventLoop<()>) -> Self {
+  pub(crate) fn from_event_loop<W: AttachAttr>(root: W, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
     let (mut canvas, render) =
@@ -298,7 +313,7 @@ impl RawWindow for MockRawWindow {
 }
 
 impl HeadlessWindow {
-  pub fn headless(root: BoxWidget, size: DeviceSize) -> Self {
+  pub fn headless<W: AttachAttr>(root: W, size: DeviceSize) -> Self {
     let (canvas, render) =
       futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
     Self::new(
@@ -314,11 +329,11 @@ impl HeadlessWindow {
 }
 
 impl NoRenderWindow {
-  pub fn without_render<W: Widget>(root: W, size: Size) -> Self {
+  pub fn without_render<W: AttachAttr>(root: W, size: Size) -> Self {
     let canvas = Canvas::new(None);
     let render = MockRender;
     Self::new(
-      root.box_it(),
+      root,
       MockRawWindow {
         size,
         ..Default::default()
