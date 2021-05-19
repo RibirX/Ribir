@@ -16,7 +16,7 @@ struct B<W: 'static> {
 }
 
 #[derive(Debug, Widget, CombinationWidget)]
-struct TupleB<W: 'static>(#[proxy] W);
+struct TupleB<W>(#[proxy] W);
 
 fn main() {
   let b = B { a: A };

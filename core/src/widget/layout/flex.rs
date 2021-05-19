@@ -218,14 +218,8 @@ impl FlexSize {
 
   fn from_size(size: Size, dir: Direction) -> Self {
     match dir {
-      Direction::Horizontal => Self {
-        main: size.width,
-        cross: size.height,
-      },
-      Direction::Vertical => Self {
-        cross: size.width,
-        main: size.height,
-      },
+      Direction::Horizontal => Self { main: size.width, cross: size.height },
+      Direction::Vertical => Self { cross: size.width, main: size.height },
     }
   }
 
@@ -448,10 +442,7 @@ impl FlexLayouter {
       main: prefer_main,
       cross: line.cross_line_height,
     };
-    let mut clamp_min = FlexSize {
-      main: prefer_main,
-      cross: 0.,
-    };
+    let mut clamp_min = FlexSize { main: prefer_main, cross: 0. };
     if CrossAxisAlign::Stretch == cross_align {
       clamp_min.cross = line.cross_line_height;
     }
@@ -487,10 +478,7 @@ impl FlexLayouter {
       .last()
       .map(|line| line.cross_bottom())
       .unwrap_or(0.);
-    FlexSize {
-      cross,
-      main: self.main_max,
-    }
+    FlexSize { cross, main: self.main_max }
   }
 
   fn box_size(&self) -> FlexSize { self.best_size().clamp(self.min_size, self.max_size) }
@@ -556,14 +544,8 @@ mod tests {
       children,
       vec![
         Rect::from_size(size),
-        Rect {
-          origin: Point::new(200., 0.),
-          size
-        },
-        Rect {
-          origin: Point::new(0., 20.),
-          size
-        },
+        Rect { origin: Point::new(200., 0.), size },
+        Rect { origin: Point::new(0., 20.), size },
       ]
     );
   }
@@ -581,14 +563,8 @@ mod tests {
     assert_eq!(
       children,
       vec![
-        Rect {
-          origin: Point::new(0., 20.),
-          size
-        },
-        Rect {
-          origin: Point::new(200., 0.),
-          size
-        },
+        Rect { origin: Point::new(0., 20.), size },
+        Rect { origin: Point::new(200., 0.), size },
         Rect::from_size(size),
       ]
     );

@@ -1,8 +1,8 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(Widget)]
-pub struct Column(Flex);
+#[derive(Widget, RenderWidget)]
+pub struct Column(#[proxy] Flex);
 
 impl Column {
   #[inline]
@@ -29,5 +29,3 @@ impl std::iter::FromIterator<BoxWidget> for Column {
     Self(Flex::from_iter(iter).with_direction(Direction::Vertical))
   }
 }
-
-proxy_impl_as_trait!(Column, 0);

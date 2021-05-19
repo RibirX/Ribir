@@ -1,16 +1,24 @@
-use crate::attr_fields::{add_trait_bounds_if, AttrFields};
-use crate::combination_derive::proxy_derive;
+use crate::attr_fields::add_trait_bounds_if;
+use crate::widget_derive::ProxyDeriveInfo;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_quote, Generics, Ident};
+use syn::{parse_quote, Ident};
 
 pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
-  proxy_derive(
-    input,
-    |generics: &Generics, attr_fields: &AttrFields, ident: &Ident, path| {
-      let generics = add_trait_bounds_if(generics.clone(), parse_quote!(RenderWidget), |param| {
-        attr_fields.is_attr_generic(param)
-      });
+  let info = ProxyDeriveInfo::new(input, "RenderWidget")
+    .and_then(|stt| stt.none_proxy_specified_error())
+    .and_then(|stt| stt.too_many_proxy_specified_error());
+
+  match info {
+    Ok(info) => {
+      let path = info.proxy_path();
+      let ident = info.ident;
+      let attr_fields = info.attr_fields;
+
+      let generics =
+        add_trait_bounds_if(info.generics.clone(), parse_quote!(RenderWidget), |param| {
+          attr_fields.is_attr_generic(param)
+        });
       let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
       let (field, _) = &attr_fields.attr_fields()[0];
@@ -69,6 +77,7 @@ pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
           fn transform(&self) -> Option<Transform> { RenderObject:: transform(&self.0) }
         }
       }
-    },
-  )
+    }
+    Err(err) => err,
+  }
 }

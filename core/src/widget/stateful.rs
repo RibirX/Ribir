@@ -50,14 +50,14 @@ pub struct StateRefCell<W: 'static> {
 }
 
 #[derive(Widget, RenderWidget, CombinationWidget)]
-pub struct StatefulImpl<W: 'static> {
+pub struct StatefulImpl<W> {
   #[proxy]
   widget: RcWidget<W>,
   info: StateInfo,
 }
 
 #[derive(Widget)]
-pub struct RcWidget<W: 'static>(Rc<RefCell<W>>);
+pub struct RcWidget<W>(Rc<RefCell<W>>);
 
 #[derive(Clone, Default)]
 pub struct StateInfo(Rc<RefCell<InnerInfo>>);
@@ -70,6 +70,12 @@ pub struct StateChange<T: Clone> {
 pub(crate) struct TreeInfo {
   pub tree: NonNull<widget_tree::WidgetTree>,
   pub id: WidgetId,
+}
+
+impl<W: 'static> Widget for StatefulImpl<W> {
+  default fn attrs_ref(&self) -> Option<AttrsRef> { None }
+
+  default fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
 }
 
 impl<W> Stateful for StatefulImpl<W>
@@ -100,7 +106,7 @@ struct InnerInfo {
   subject: Option<LocalSubject<'static, (), ()>>,
 }
 
-impl<W: 'static> Clone for RcWidget<W> {
+impl<W> Clone for RcWidget<W> {
   #[inline]
   fn clone(&self) -> Self { Self(self.0.clone()) }
 }

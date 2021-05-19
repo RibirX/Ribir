@@ -266,7 +266,7 @@ pub trait AttachAttr {
 
 // todo: should derive RenderWidget too.
 #[derive(CombinationWidget)]
-pub struct AttrWidget<W: Widget, A: Any> {
+pub struct AttrWidget<W, A: Any> {
   #[proxy]
   pub widget: W,
   pub major: A,
@@ -373,13 +373,13 @@ impl<W: Stateful, A: Any> Stateful for AttrWidget<W, A> {
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.widget.ref_cell() }
 }
 
-impl<W: Widget, A: Any> std::ops::Deref for AttrWidget<W, A> {
+impl<W, A: Any> std::ops::Deref for AttrWidget<W, A> {
   type Target = W;
   #[inline]
   fn deref(&self) -> &Self::Target { &self.widget }
 }
 
-impl<W: Widget, A: Any> std::ops::DerefMut for AttrWidget<W, A> {
+impl<W, A: Any> std::ops::DerefMut for AttrWidget<W, A> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.widget }
 }
