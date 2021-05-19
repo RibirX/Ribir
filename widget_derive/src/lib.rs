@@ -49,7 +49,7 @@ mod state;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_derive(Widget, attributes(state))]
+#[proc_macro_derive(Widget, attributes(proxy))]
 pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
 
