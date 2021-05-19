@@ -3,7 +3,7 @@ use rxrust::prelude::*;
 use std::rc::Rc;
 
 /// Focus attr attach to widget to support get ability to focus in.
-pub type FocusListener<W: Widget> = AttrWidget<W, FocusAttr>;
+pub type FocusListener<W> = AttrWidget<W, FocusAttr>;
 
 #[derive(Debug, Default)]
 pub struct FocusAttr {
@@ -65,7 +65,7 @@ impl<W: Widget> FocusListener<W> {
     tab_index: Option<i16>,
   ) -> Self {
     let (major, others, widget) = widget.take_attr();
-    let mut major = major.unwrap_or_default();
+    let mut major: FocusAttr = major.unwrap_or_default();
     major.tab_index = tab_index.unwrap_or(0);
     major.auto_focus = auto_focus.unwrap_or(false);
     FocusListener { major, widget, others }
@@ -75,7 +75,7 @@ impl<W: Widget> FocusListener<W> {
   pub fn focus_event_observable(
     &self,
   ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.focus.subject.clone()
+    self.major.subject.clone()
   }
 
   pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
@@ -90,8 +90,8 @@ impl<W: Widget> FocusListener<W> {
   }
 
   #[inline]
-  pub fn is_auto_focus(&self) -> bool { self.focus.auto_focus }
+  pub fn is_auto_focus(&self) -> bool { self.major.auto_focus }
 
   #[inline]
-  pub fn tab_index(&self) -> i16 { self.focus.tab_index }
+  pub fn tab_index(&self) -> i16 { self.major.tab_index }
 }

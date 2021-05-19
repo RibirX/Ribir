@@ -46,10 +46,10 @@ impl BoxDecoration {
 
 impl Widget for BoxDecoration {
   #[inline]
-  fn find_attr<A: Any>(&self) -> Option<&A> { None }
+  fn attrs_ref(&self) -> Option<AttrsRef> { None }
 
   #[inline]
-  fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> { None }
+  fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
 
   #[inline]
   fn with_background(mut self, background: FillStyle) -> Self {

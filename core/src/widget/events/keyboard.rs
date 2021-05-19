@@ -18,7 +18,7 @@ pub struct KeyboardEvent {
 pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>);
 
 /// A widget that fire event whenever press or release a key.
-pub type KeyboardListener<W: Widget> = AttrWidget<W, KeyboardAttr>;
+pub type KeyboardListener<W> = AttrWidget<W, KeyboardAttr>;
 
 impl<W: Widget> KeyboardListener<W> {
   pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
@@ -40,7 +40,7 @@ impl<W: Widget> KeyboardListener<W> {
   pub fn event_observable(
     &self,
   ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
-    self.keyboard.0.clone()
+    self.major.0.clone()
   }
 
   pub fn listen_on<H: FnMut(&KeyboardEvent) + 'static>(

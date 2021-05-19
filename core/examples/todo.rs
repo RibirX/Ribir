@@ -21,9 +21,7 @@ impl CombinationWidget for Todos {
       .enumerate()
       .map(|(idx, task)| {
         let mut todos = self.state_ref_cell(ctx);
-        let mut checkbox = Checkbox::from_theme(ctx.theme())
-          .with_checked(task.finished)
-          .into_stateful(ctx);
+        let mut checkbox = Checkbox::from_theme(ctx.theme()).with_checked(task.finished);
         checkbox.checked_state().subscribe(move |v| {
           todos.borrow_mut().tasks[idx].finished = v.after;
         });
@@ -66,5 +64,5 @@ fn main() {
     ],
   };
 
-  Application::new().run(todo);
+  Application::new().run(todo.box_it());
 }

@@ -1,10 +1,12 @@
 use crate::prelude::*;
 use crate::widget::theme_data::CheckboxTheme;
-use rxrust::prelude::*;
 
 /// Represents a control that a user can select and clear.
-#[derive(Debug, Widget, Default)]
-pub struct Checkbox {
+#[derive(Widget)]
+pub struct Checkbox(StatefulImpl<CheckboxInner>);
+
+#[derive(Default)]
+pub struct CheckboxInner {
   pub checked: bool,
   pub indeterminate: bool,
   pub theme: CheckboxTheme,
@@ -12,25 +14,29 @@ pub struct Checkbox {
 
 impl Checkbox {
   pub fn from_theme(theme: &ThemeData) -> Self {
-    Self {
+    Checkbox(StatefulImpl::new(CheckboxInner {
       theme: theme.check_box.clone(),
 
       ..Default::default()
-    }
+    }))
   }
 
   #[inline]
   pub fn with_checked(mut self, checked: bool) -> Self {
-    self.checked = checked;
+    self.0.as_mut().checked = checked;
     self
   }
 
   #[inline]
   pub fn with_indeterminate(mut self, b: bool) -> Self {
-    self.indeterminate = b;
+    self.0.as_mut().indeterminate = b;
     self
   }
 
+  pub fn switch_check(&mut self) { self.0.as_mut().switch_check() }
+}
+
+impl CheckboxInner {
   fn switch_check(&mut self) {
     if self.indeterminate {
       self.indeterminate = false;
@@ -41,17 +47,14 @@ impl Checkbox {
   }
 }
 
-impl Stateful<Checkbox> {
-  /// A change stream of the checked state.
-  pub fn checked_state(
-    &mut self,
-  ) -> impl LocalObservable<'static, Item = StateChange<bool>, Err = ()> {
-    self.state_change(|w| w.checked)
-  }
+impl Stateful for Checkbox {
+  type RawWidget = CheckboxInner;
+  #[inline]
+  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.0.ref_cell() }
 }
 
 impl CombinationWidget for Checkbox {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     let CheckboxTheme {
       size,
       border_width,
@@ -61,10 +64,11 @@ impl CombinationWidget for Checkbox {
       checked_path,
       marker_color,
       color,
-    } = self.theme.clone();
-    let marker = if self.indeterminate || self.checked {
+    } = self.0.as_ref().theme.clone();
+    let check_state = self.0.as_ref();
+    let marker = if check_state.indeterminate || check_state.checked {
       let size = size + border_width * 2.;
-      let (path, check_mark_width) = if self.indeterminate {
+      let (path, check_mark_width) = if check_state.indeterminate {
         let center_y = size / 2.;
         let mut builder = PathBuilder::new();
         builder
@@ -91,7 +95,7 @@ impl CombinationWidget for Checkbox {
     .with_border_radius(BorderRadius::all(Vector::new(border_radius, border_radius)))
     .with_margin(EdgeInsets::all(4.));
 
-    let mut state = self.state_ref_cell(ctx);
+    let mut state = self.ref_cell();
     let mut state2 = state.clone();
     marker
       .on_tap(move |_| state.borrow_mut().switch_check())
@@ -182,7 +186,7 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn unchecked_paint() {
-    let mut window = window::Window::headless(checkbox(), DeviceSize::new(100, 100));
+    let mut window = window::Window::headless(checkbox().box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 

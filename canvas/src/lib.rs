@@ -1,4 +1,4 @@
-#![feature(decl_macro, test, const_fn, const_fn_floating_point_arithmetic)]
+#![feature(decl_macro, test, const_fn_floating_point_arithmetic)]
 mod atlas;
 mod canvas;
 pub mod color;

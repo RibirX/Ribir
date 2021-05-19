@@ -18,9 +18,27 @@ pub struct ScrollableBoth {
   pos: Point,
 }
 
+impl IntoStateful for ScrollableX {
+  type S = StatefulImpl<ScrollableX>;
+  #[inline]
+  fn into_stateful(self) -> Self::S { StatefulImpl::new(self) }
+}
+
+impl IntoStateful for ScrollableY {
+  type S = StatefulImpl<ScrollableY>;
+  #[inline]
+  fn into_stateful(self) -> Self::S { StatefulImpl::new(self) }
+}
+
+impl IntoStateful for ScrollableBoth {
+  type S = StatefulImpl<ScrollableBoth>;
+  #[inline]
+  fn into_stateful(self) -> Self::S { StatefulImpl::new(self) }
+}
+
 impl ScrollableX {
   #[inline]
-  pub fn new(child: BoxWidget, pos: f32, ctx: &mut BuildCtx) -> WheelListener<RcWidget<Self>> {
+  pub fn new(child: BoxWidget, pos: f32) -> WheelListener<StatefulImpl<Self>> {
     let scroll = ScrollableX { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -36,7 +54,7 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn new(child: BoxWidget, pos: f32, ctx: &mut BuildCtx) -> WheelListener<RcWidget<Self>> {
+  pub fn new(child: BoxWidget, pos: f32) -> WheelListener<StatefulImpl<Self>> {
     let scroll = ScrollableY { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -52,7 +70,7 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn new(child: BoxWidget, pos: Point, ctx: &mut BuildCtx) -> WheelListener<RcWidget<Self>> {
+  pub fn new(child: BoxWidget, pos: Point) -> WheelListener<StatefulImpl<Self>> {
     let scroll = ScrollableBoth { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -253,8 +271,8 @@ mod tests {
   use crate::test::root_and_children_rect;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  fn test_assert<W: AttachAttr>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
+  fn test_assert<W: Widget>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
+    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
 
     wnd.render_ready();
 
@@ -279,7 +297,7 @@ mod tests {
     impl CombinationWidget for X {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(1000., 1000.))
-          .x_scrollable(ctx)
+          .x_scrollable()
           .box_it()
       }
     }
@@ -297,7 +315,7 @@ mod tests {
     impl CombinationWidget for Y {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(1000., 1000.))
-          .y_scrollable(ctx)
+          .y_scrollable()
           .box_it()
       }
     }
@@ -315,7 +333,7 @@ mod tests {
     impl CombinationWidget for Both {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(1000., 1000.))
-          .both_scrollable(ctx)
+          .both_scrollable()
           .box_it()
       }
     }

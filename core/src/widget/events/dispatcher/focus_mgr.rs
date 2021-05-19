@@ -95,10 +95,7 @@ impl FocusManager {
         .filter_map(|id| {
           id.get(tree)
             .and_then(|w| w.widget.find_attr::<FocusAttr>())
-            .map(|focus| FocusNode {
-              tab_index: focus.tab_index,
-              wid: id,
-            })
+            .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
         })
         .for_each(|node| match node.tab_index {
           0 => zeros.push(node),
@@ -203,7 +200,7 @@ mod tests {
 
   fn empty_box() -> SizedBox { SizedBox::empty_box(Size::zero()) }
 
-  fn env<W: AttachAttr>(widget: W) -> (window::Window<window::MockRender>, FocusManager) {
+  fn env<W: Widget>(widget: W) -> (window::Window<window::MockRender>, FocusManager) {
     let wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
     // use a aloneside FocusManager for test easy.
     let mut mgr = FocusManager::default();
