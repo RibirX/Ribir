@@ -1,8 +1,8 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(Widget)]
-pub struct Row(Flex);
+#[derive(Widget, RenderWidget)]
+pub struct Row(#[proxy] Flex);
 
 impl Row {
   #[inline]
@@ -35,5 +35,3 @@ impl std::iter::FromIterator<BoxWidget> for Row {
 impl Default for Row {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
 }
-
-proxy_impl_as_trait!(Row, 0);

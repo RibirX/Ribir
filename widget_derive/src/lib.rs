@@ -43,42 +43,17 @@ extern crate proc_macro2;
 mod attr_fields;
 mod combination_derive;
 mod render_derive;
+mod widget_derive;
 
 mod state;
 use proc_macro::TokenStream;
-use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(Widget, attributes(state))]
 pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
 
-  let name = input.ident;
-  let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
-  // Todo: use #[proxy] to implement `find_attr`
-  let expanded = quote! {
-      // The generated `Widget` impl.
-      impl #impl_generics Widget for #name #ty_generics #where_clause {
-        #[inline]
-        fn attrs_ref(&self) -> Option<AttrsRef> { None }
-
-        #[inline]
-        fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
-      }
-
-      impl #impl_generics AttachAttr for #name #ty_generics #where_clause {
-        type W = Self;
-
-        fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) {
-          (None, None, self)
-        }
-      }
-
-
-  };
-
-  expanded.into()
+  widget_derive::widget_derive(&input).into()
 }
 
 #[proc_macro_derive(CombinationWidget, attributes(proxy))]
