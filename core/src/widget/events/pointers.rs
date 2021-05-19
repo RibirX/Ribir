@@ -105,7 +105,7 @@ impl PointerEvent {
 pub struct PointerAttr(LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>);
 
 /// A widget that calls callbacks in response to common pointer events.
-pub type PointerListener<W: Widget> = AttrWidget<W, PointerAttr>;
+pub type PointerListener<W> = AttrWidget<W, PointerAttr>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
@@ -133,9 +133,9 @@ impl<W: Widget> PointerListener<W> {
   pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
     &mut self,
     event_type: PointerEventType,
-    mut handler: H,
+    handler: H,
   ) -> SubscriptionWrapper<LocalSubscription> {
-    self.pointer.listen_on(event_type, handler)
+    self.major.listen_on(event_type, handler)
   }
 
   pub fn tap_times_observable(
@@ -151,7 +151,7 @@ impl<W: Widget> PointerListener<W> {
       mouse_btns: MouseButtons,
     }
     self
-      .pointer
+      .major
       .pointer_observable()
       .filter(|(t, _)| t == &PointerEventType::Tap)
       .scan_initial(None, move |mut first_tap: Option<(TapInfo, _)>, (_, e)| {

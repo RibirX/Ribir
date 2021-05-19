@@ -1,10 +1,8 @@
-use crate::{prelude::*, render::render_tree::*, widget::stateful::TreeInfo};
+use crate::{prelude::*, render::render_tree::*};
 use indextree::*;
-use stateful::StatefulAttr;
 use std::{
   collections::{HashMap, HashSet},
   pin::Pin,
-  ptr::NonNull,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -36,14 +34,10 @@ impl WidgetTree {
   }
 
   pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
-    let state = widget.widget.find_attr::<StatefulAttr>().cloned();
+    let state_info = widget.state_info();
     let id = WidgetId(self.arena.new_node(widget));
-    if let Some(state) = state {
-      debug_assert!(state.0.borrow().tree_info.is_none());
-      state.0.borrow_mut().tree_info = Some(TreeInfo {
-        id,
-        tree: { NonNull::from(self) },
-      });
+    if let Some(state_info) = state_info {
+      state_info.assign_id(id, std::ptr::NonNull::from(self))
     }
 
     id

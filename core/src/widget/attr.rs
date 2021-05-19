@@ -274,18 +274,33 @@ pub struct AttrWidget<W: Widget, A: Any> {
 }
 
 impl<W: Widget, A: Any> Widget for AttrWidget<W, A> {
-  fn find_attr(&self) -> Option<&A> {
-    self
-      .major
-      .downcast_ref::<A>()
-      .or_else(|| self.other_attrs.and_then(|attrs| attrs.find_attr()))
+  #[inline]
+  fn attrs_ref(&self) -> Option<AttrsRef> {
+    Some(AttrsRef {
+      major: &self.major,
+      other_attrs: self.others.as_ref().map(|a| &a.0),
+    })
   }
 
-  fn find_attr_mut(&mut self) -> Option<&mut A> {
-    let Self { major, other_attrs, .. } = self;
-    major
-      .downcast_mut::<A>()
-      .or_else(move || other_attrs.and_then(|attrs| attrs.find_attr_mut()))
+  #[inline]
+  fn attrs_mut(&mut self) -> Option<AttrsMut> {
+    Some(AttrsMut {
+      major: &mut self.major,
+      other_attrs: self.others.as_mut().map(|a| &mut a.0),
+    })
+  }
+
+  fn box_it(self) -> BoxWidget
+  where
+    Self: Sized,
+  {
+    let Self { widget, major, others } = self;
+    let w = AttrWidget {
+      widget: widget.box_it(),
+      major,
+      others,
+    };
+    BoxWidget { widget: Box::new(w) }
   }
 }
 
@@ -293,12 +308,18 @@ impl<W: Widget, A: Any> AttachAttr for AttrWidget<W, A> {
   type W = W;
 
   fn take_attr<M: Any>(self) -> (Option<M>, Option<Attrs>, Self::W) {
-    let Self { widget, major, mut others } = self;
-    let new_major = if major.is::<M>() {
-      Some(unsafe { std::mem::transmute(major) })
+    let Self { widget, mut major, mut others } = self;
+    let new_major = if let Some(m) = (&mut major as &mut dyn Any).downcast_mut::<M>() {
+      let mut tmp = std::mem::MaybeUninit::<M>::uninit();
+      unsafe {
+        tmp.as_mut_ptr().copy_from(m as *const M, 1);
+      }
+      Some(unsafe { tmp.assume_init() })
     } else {
-      let new_major = others.and_then(|others| others.remove_attr::<M>());
-      others.get_or_insert_default().front_push_attr(major);
+      let new_major = others.as_mut().and_then(|others| others.remove_attr::<M>());
+      others
+        .get_or_insert_with(Attrs::default)
+        .front_push_attr(major);
       new_major
     };
 
@@ -306,15 +327,50 @@ impl<W: Widget, A: Any> AttachAttr for AttrWidget<W, A> {
   }
 }
 
-impl<W: IntoStateful, A: Any> IntoStateful for AttrWidget<W, A> {
+pub struct AttrsRef<'a> {
+  major: &'a dyn Any,
+  other_attrs: Option<&'a LinkedList<Box<dyn Any>>>,
+}
+
+pub struct AttrsMut<'a> {
+  major: &'a mut dyn Any,
+  other_attrs: Option<&'a mut LinkedList<Box<dyn Any>>>,
+}
+
+impl<'a> AttrsRef<'a> {
+  pub fn find_attr<A: 'static>(self) -> Option<&'a A> {
+    self.major.downcast_ref::<A>().or(
+      self
+        .other_attrs
+        .and_then(|attrs| attrs.iter().find_map(|attr| attr.downcast_ref::<A>())),
+    )
+  }
+}
+
+impl<'a> AttrsMut<'a> {
+  pub fn find_attr_mut<A: 'static>(self) -> Option<&'a mut A> {
+    let Self { major, other_attrs } = self;
+    major.downcast_mut::<A>().or_else(move || {
+      other_attrs.and_then(|attrs| attrs.iter_mut().find_map(|attr| attr.downcast_mut::<A>()))
+    })
+  }
+}
+
+impl<W: IntoStateful + Widget, A: Any> IntoStateful for AttrWidget<W, A> {
   type S = AttrWidget<W::S, A>;
 
   fn into_stateful(self) -> Self::S {
-    let AttrWidget { widget, major, others } = self;
+    let Self { widget, major, others } = self;
 
     let widget = widget.into_stateful();
-    Self { widget, major, others }
+    AttrWidget { widget, major, others }
   }
+}
+
+impl<W: Stateful, A: Any> Stateful for AttrWidget<W, A> {
+  type RawWidget = W::RawWidget;
+  #[inline]
+  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.widget.ref_cell() }
 }
 
 impl<W: Widget, A: Any> std::ops::Deref for AttrWidget<W, A> {

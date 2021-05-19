@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use stateful::StatefulAttr;
-use std::{pin::Pin, ptr::NonNull};
+use std::pin::Pin;
 
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
@@ -14,10 +13,7 @@ impl<'a> BuildCtx<'a> {
     self
       .wid
       .ancestors(tree)
-      .find_map(|id| {
-        id.get(tree)
-          .and_then(|w| w.attrs_ref().and_then(|a| a.find_attr::<ThemeData>()))
-      })
+      .find_map(|id| id.get(tree).and_then(|w| w.widget.find_attr::<ThemeData>()))
       .expect("At least， root theme should be found.")
   }
 
@@ -34,11 +30,6 @@ impl<'a> BuildCtx<'a> {
     self
       .wid
       .assert_get_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
-  }
-
-  #[inline]
-  pub(crate) fn state_attr(&mut self) -> StatefulAttr {
-    StatefulAttr::new(self.wid, NonNull::from(&*self.tree))
   }
 }
 
@@ -79,9 +70,7 @@ mod tests {
     let dark = material::dark("dark".to_string());
     let light = material::light("light".to_string());
 
-    let theme_track = ThemeTrack {
-      themes: track_themes.clone(),
-    };
+    let theme_track = ThemeTrack { themes: track_themes.clone() };
 
     let light_theme = SizedBox::shrink(theme_track).with_theme(light.clone());
     let dark_light_theme = SizedBox::expanded(light_theme).with_theme(dark.clone());
@@ -94,9 +83,7 @@ mod tests {
       theme_data::Brightness::Light
     );
 
-    let theme = ThemeTrack {
-      themes: track_themes.clone(),
-    };
+    let theme = ThemeTrack { themes: track_themes.clone() };
     let dark_theme = SizedBox::shrink(theme).with_theme(dark);
     let light_dark_theme = SizedBox::expanded(dark_theme).with_theme(light);
 

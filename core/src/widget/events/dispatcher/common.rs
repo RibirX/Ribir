@@ -49,8 +49,7 @@ impl CommonDispatcher {
   ) -> Event {
     let attr = wid
       .get(self.widget_tree_ref())
-      .and_then(|w| w.attrs_ref())
-      .and_then(|a| a.find_attr::<AttrData>());
+      .and_then(|w| w.widget.find_attr::<AttrData>());
     if let Some(attr) = attr {
       Self::rc_dispatch(attr, event, handler)
     } else {

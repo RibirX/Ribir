@@ -38,14 +38,13 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsCombination + AsRender + AsAny + 'static {
-  /// Find an attr of this widget. If it have the `A` type attr, return the
-  /// reference.
-  fn find_attr<A: Any>(&self) -> Option<&A>;
+pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
+  /// Return the reference to the attrs that attached to the this widget.
+  fn attrs_ref(&self) -> Option<AttrsRef>;
 
-  /// Find an attr of this widget. If it have the `A` type attr, return the
-  /// mutable reference.
-  fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A>;
+  /// Return the mutable reference to the attrs that attached to the this
+  /// widget.
+  fn attrs_mut(&mut self) -> Option<AttrsMut>;
 
   fn box_it(self) -> BoxWidget
   where
@@ -98,29 +97,29 @@ pub trait Widget: AsCombination + AsRender + AsAny + 'static {
 
   /// Let this widget horizontal scrollable and the scroll view is as large as
   /// its parent allow.
-  fn x_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<RcWidget<ScrollableX>>
+  fn x_scrollable(self) -> WheelListener<StatefulImpl<ScrollableX>>
   where
     Self: Sized,
   {
-    ScrollableX::new(self.box_it(), 0., ctx)
+    ScrollableX::new(self.box_it(), 0.)
   }
 
   /// Let this widget vertical scrollable and the scroll view is as large as
   /// its parent allow.
-  fn y_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<RcWidget<ScrollableY>>
+  fn y_scrollable(self) -> WheelListener<StatefulImpl<ScrollableY>>
   where
     Self: Sized,
   {
-    ScrollableY::new(self.box_it(), 0., ctx)
+    ScrollableY::new(self.box_it(), 0.)
   }
 
   /// Let this widget both scrollable in horizontal and vertical, and the scroll
   /// view is as large as its parent allow.
-  fn both_scrollable(self, ctx: &mut BuildCtx) -> WheelListener<RcWidget<ScrollableBoth>>
+  fn both_scrollable(self) -> WheelListener<StatefulImpl<ScrollableBoth>>
   where
     Self: Sized,
   {
-    ScrollableBoth::new(self.box_it(), Point::zero(), ctx)
+    ScrollableBoth::new(self.box_it(), Point::zero())
   }
 }
 
@@ -129,27 +128,6 @@ pub trait CombinationWidget: Widget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
-
-  fn state_ref_cell(&self, ctx: &mut BuildCtx) -> StateRefCell<Self>
-  where
-    Self: Sized,
-  {
-    unimplemented!();
-    // if let Some(stateful) = ctx.widget().widget.find_attr::<StatefulAttr>() {
-    //   let widget =
-    // ctx.widget().as_any().downcast_ref::<RcWidget<Self>>().expect("stateful
-    // attr not hold a");   unsafe { stateful.attr.ref_cell() }
-    // } else {
-    //   let attr = ctx.state_attr();
-
-    //   let widget = std::mem::replace(ctx.widget_mut(),
-    // PhantomWidget.box_it());
-
-    //   let stateful = widget.attach_attr(attr).box_it();
-    //   let _ = std::mem::replace(ctx.widget_mut(), stateful);
-    //   ref_cell
-    // }
-  }
 }
 
 /// RenderWidget provide configuration for render object which provide actual
@@ -254,16 +232,33 @@ impl AsAny for BoxWidget {
   fn as_any_mut(&mut self) -> &mut dyn Any { self.widget.as_any_mut() }
 }
 
+impl AttachAttr for BoxWidget {
+  type W = BoxWidget;
+  fn take_attr<A: Any>(mut self) -> (Option<A>, Option<Attrs>, Self::W) {
+    // todo: should remove.
+    if let Some(_) = self
+      .widget
+      .as_any_mut()
+      .downcast_mut::<AttrWidget<BoxWidget, A>>()
+    {
+      unimplemented!()
+      // w.take_attr()
+    } else {
+      (None, None, self)
+    }
+  }
+}
+
 impl<'a> dyn Widget + 'a {
   pub fn key(&self) -> Option<&Key> { self.find_attr() }
 }
 
 impl Widget for BoxWidget {
   #[inline]
-  fn find_attr<A: Any>(&self) -> Option<&A> { self.widget.find_attr() }
+  fn attrs_ref(&self) -> Option<AttrsRef> { self.widget.attrs_ref() }
 
   #[inline]
-  fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> { self.widget.find_attr_mut() }
+  fn attrs_mut(&mut self) -> Option<AttrsMut> { self.widget.attrs_mut() }
 
   #[inline]
   fn box_it(self) -> BoxWidget
@@ -284,6 +279,20 @@ proxy_impl_as_trait!(BoxWidget, widget);
 impl From<Box<dyn Widget>> for BoxWidget {
   #[inline]
   fn from(widget: Box<dyn Widget>) -> Self { Self { widget } }
+}
+
+impl<'a> dyn Widget + 'a {
+  /// Find an attr of this widget. If it have the `A` type attr, return the
+  /// reference.
+  pub fn find_attr<A: Any>(&self) -> Option<&A> {
+    self.attrs_ref().and_then(|attrs| attrs.find_attr())
+  }
+
+  /// Find an attr of this widget. If it have the `A` type attr, return the
+  /// mutable reference.
+  pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> {
+    self.attrs_mut().and_then(|attrs| attrs.find_attr_mut())
+  }
 }
 
 pub(crate) macro proxy_impl_as_trait(

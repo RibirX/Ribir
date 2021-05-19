@@ -2,7 +2,6 @@ use holiday::prelude::*;
 
 #[derive(Widget)]
 struct Test {
-  #[state]
   field: f32,
 }
 

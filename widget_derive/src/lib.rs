@@ -13,6 +13,8 @@
 //！
 //! Derive from field b, like a checkbox. Because `Checkbox` is a
 //! render widget, also derive the `RenderWidget`
+//!
+//! ```
 //！#[derive(Widget, RenderWidget)]
 //! struct W {
 //!  #[proxy]
@@ -50,16 +52,16 @@ use syn::{parse_macro_input, DeriveInput};
 #[proc_macro_derive(Widget, attributes(state))]
 pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
-  let state_impl = state::state_gen(&input);
 
   let name = input.ident;
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
+  // Todo: use #[proxy] to implement `find_attr`
   let expanded = quote! {
       // The generated `Widget` impl.
       impl #impl_generics Widget for #name #ty_generics #where_clause {
         #[inline]
-        fn attrs_ref(&self) -> Option<AttrsRef>{ None }
+        fn attrs_ref(&self) -> Option<AttrsRef> { None }
 
         #[inline]
         fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
@@ -68,13 +70,12 @@ pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
       impl #impl_generics AttachAttr for #name #ty_generics #where_clause {
         type W = Self;
 
-        #[inline]
-        fn split_attrs(self) -> (Self::W, Option<Attrs>) {
-          (self, None)
+        fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) {
+          (None, None, self)
         }
       }
 
-      #state_impl
+
   };
 
   expanded.into()
@@ -93,3 +94,6 @@ pub fn render_macro_derive(input: TokenStream) -> TokenStream {
 
   render_derive::render_derive(&input).into()
 }
+
+#[proc_macro_derive(Stateful, attributes(state))]
+pub fn stateful_derive(input: TokenStream) -> TokenStream { unimplemented!() }

@@ -13,7 +13,7 @@ pub struct WheelAttr(LocalSubject<'static, Rc<WheelEvent>, ()>);
 
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
-pub type WheelListener<W: Widget> = AttrWidget<W, WheelAttr>;
+pub type WheelListener<W> = AttrWidget<W, WheelAttr>;
 
 impl<W: Widget> WheelListener<W> {
   pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
@@ -33,7 +33,7 @@ impl<W: Widget> WheelListener<W> {
 
   #[inline]
   pub fn event_observable(&self) -> LocalSubject<'static, Rc<WheelEvent>, ()> {
-    self.wheel_attr.0.clone()
+    self.major.0.clone()
   }
 }
 
@@ -63,7 +63,7 @@ mod tests {
       .on_wheel(move |wheel| {
         *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y);
       });
-    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
+    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
 
     wnd.render_ready();
     let device_id = unsafe { DeviceId::dummy() };

@@ -112,11 +112,8 @@ impl PointerDispatcher {
     self.pointer_down_uid = hit.map(|(wid, _)| wid);
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
-        id.get(tree).map_or(false, |w| {
-          w.attrs_ref()
-            .and_then(|attrs| attrs.find_attr::<FocusAttr>())
-            .is_some()
-        })
+        id.get(tree)
+          .map_or(false, |w| w.widget.find_attr::<FocusAttr>().is_some())
       })
     });
     if let Some(focus_id) = nearest_focus {
@@ -176,8 +173,7 @@ impl PointerDispatcher {
         .ancestors(tree)
         .filter(|w| {
           w.get(tree)
-            .and_then(|w| w.attrs_ref())
-            .and_then(|attrs| attrs.find_attr::<PointerAttr>())
+            .and_then(|w| w.widget.find_attr::<PointerAttr>())
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -254,7 +250,7 @@ impl PointerDispatcher {
     move |listener: &PointerListener<BoxWidget>, event: std::rc::Rc<PointerEvent>| {
       log::info!("{:?} {:?}", event_type, event);
       listener
-        .pointer
+        .major
         .pointer_observable()
         .next((event_type, event));
     }

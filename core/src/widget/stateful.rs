@@ -1,30 +1,42 @@
-use crate::{prelude::*, widget::attr};
+use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{
   any::Any,
   cell::{Ref, RefCell, RefMut},
-  mem::ManuallyDrop,
   ptr::NonNull,
   rc::Rc,
 };
 
-use super::widget_tree::WidgetTree;
-
-/// This widget convert a stateless widget to stateful.
-#[derive(RenderWidget, CombinationWidget)]
-pub struct Stateful<W: Widget> {
-  #[proxy]
-  widget: RcWidget<W>,
-  stateful: StatefulAttr,
-  others: Option<Attrs>,
+/// Widget witch can be referenced and modified across `StateRefCell`
+///
+/// # Notice
+///
+/// `Stateful` trait can only implement for raw widget which not attach any
+/// attributes on.
+pub trait Stateful: Widget {
+  type RawWidget;
+  fn ref_cell(&self) -> StateRefCell<Self::RawWidget>;
 }
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
-/// which can be use to modify the states of the widget.
+/// to use to modify the states of the widget.
 pub trait IntoStateful {
-  type W: Widget;
+  type S: Stateful;
+  fn into_stateful(self) -> Self::S;
+}
 
-  fn into_stateful(self, ctx: &mut BuildCtx) -> Stateful<Self::W>;
+/// Detect if a widget is stateful. If a widget is stateful return the state
+/// info else return none-value.
+pub trait StateDetect {
+  fn state_info(&self) -> Option<StateInfo>;
+}
+
+impl<W: Widget> StateDetect for W {
+  default fn state_info(&self) -> Option<StateInfo> { None }
+}
+
+impl<W: Stateful> StateDetect for W {
+  fn state_info(&self) -> Option<StateInfo> { Some(self.ref_cell().info.clone()) }
 }
 
 /// A reference of stateful widget, can use it to directly access and modify
@@ -32,23 +44,23 @@ pub trait IntoStateful {
 ///
 /// Remember it assume you changed the widget back of this reference if you
 /// mutably borrow this pointer. No matter if you really modify it.
-///
-/// ## Panics
-///
-/// `StateRefCell` should not live longer than its widget. Framework guarantee
-/// the widgets constructed in the same `build` method  have same lifetime,  and
-/// parent live longer than parent. So not pass a `StateRefCell` to its
-/// ancestors, that maybe panic.
-pub struct StateRefCell<W: Widget> {
-  attr: StatefulAttr,
+pub struct StateRefCell<W: 'static> {
+  info: StateInfo,
   inner_widget: RcWidget<W>,
+}
+
+#[derive(Widget, RenderWidget, CombinationWidget)]
+pub struct StatefulImpl<W: 'static> {
+  #[proxy]
+  widget: RcWidget<W>,
+  info: StateInfo,
 }
 
 #[derive(Widget)]
 pub struct RcWidget<W: 'static>(Rc<RefCell<W>>);
 
 #[derive(Clone, Default)]
-pub struct StatefulAttr(pub(crate) Rc<RefCell<InnerAttr>>);
+pub struct StateInfo(Rc<RefCell<InnerInfo>>);
 
 #[derive(Clone)]
 pub struct StateChange<T: Clone> {
@@ -60,100 +72,90 @@ pub(crate) struct TreeInfo {
   pub id: WidgetId,
 }
 
+impl<W> Stateful for StatefulImpl<W>
+where
+  Self: Widget,
+{
+  type RawWidget = W;
+  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> {
+    StateRefCell {
+      info: self.info.clone(),
+      inner_widget: self.widget.clone(),
+    }
+  }
+}
+
+impl<W> IntoStateful for StatefulImpl<W>
+where
+  Self: Widget,
+{
+  type S = Self;
+  #[inline]
+  fn into_stateful(self) -> Self::S { self }
+}
+
 #[derive(Default)]
-pub(crate) struct InnerAttr {
+struct InnerInfo {
   pub(crate) tree_info: Option<TreeInfo>,
   subject: Option<LocalSubject<'static, (), ()>>,
 }
 
-impl<W: Widget> Clone for RcWidget<W> {
+impl<W: 'static> Clone for RcWidget<W> {
   #[inline]
   fn clone(&self) -> Self { Self(self.0.clone()) }
 }
 
-impl<W: Widget> Clone for StateRefCell<W> {
+impl<W: 'static> Clone for StateRefCell<W> {
   fn clone(&self) -> Self {
     Self {
-      attr: self.attr.clone(),
+      info: self.info.clone(),
       inner_widget: self.inner_widget.clone(),
     }
   }
 }
 
-impl<W: Widget> Widget for Stateful<W> {
-  fn attrs_ref(&self) -> Option<AttrsRef> {
-    Some(AttrsRef::new(&self.stateful, self.others.as_ref()))
+impl<W> StatefulImpl<W> {
+  pub fn new(w: W) -> Self {
+    Self {
+      info: <_>::default(),
+      widget: RcWidget(Rc::new(RefCell::new(w))),
+    }
   }
-
-  fn attrs_mut(&mut self) -> Option<AttrsMut> {
-    Some(AttrsMut::new(&mut self.stateful, self.others.as_mut()))
-  }
-}
-
-impl<W: Widget> AttachAttr for Stateful<W> {
-  type W = RcWidget<W>;
-
-  fn split_attrs(self) -> (Self::W, Option<Attrs>) {
-    let mut attrs = self.others.unwrap_or(<_>::default());
-    attrs.front_push_attr(self.stateful);
-    (self.widget, Some(attrs))
-  }
-}
-
-impl<W: Widget> Stateful<W> {
-  // pub fn stateful<A: AttachAttr>(widget: A) -> Self {
-  //   let AttrWidget {
-  //     widget,
-  //     major,
-  //     others,
-  //   } = widget.into_attr_widget::<StatefulAttr>();
-
-  //   if let Some(major) = major {
-  //     if let Some(w) = Any::downcast_ref::<RcWidget<W>>(&widget) {
-  //       let rcw = std::mem::MaybeUninit::uninit();
-  //       let ptr: *mut RcWidget<W> = rcw.as_mut_ptr();
-  //       unsafe { ptr.copy_from(w as *const RcWidget<W>, 1) }
-  //       std::mem::forget(widget);
-  //       let widget = unsafe { rcw.assume_init() };
-  //       Stateful {
-  //         widget,
-  //         stateful: major,
-  //         others,
-  //       }
-  //     } else {
-  //       unimplemented!()
-  //     }
-  //   } else {
-  //     unimplemented!()
-  //   }
-  // }
 
   #[inline]
-  pub fn ref_cell(&self) -> StateRefCell<W> {
-    StateRefCell {
-      attr: self.stateful.clone(),
-      inner_widget: self.widget.clone(),
+  pub fn as_ref(&self) -> Ref<W> { self.widget.0.borrow() }
+
+  #[inline]
+  pub fn as_mut(&mut self) -> RefMut<W> { self.widget.0.borrow_mut() }
+}
+
+impl<W: 'static> StateRefCell<W> {
+  pub(crate) fn new(attr: StateInfo, widget: RcWidget<W>) -> Self {
+    Self { info: attr, inner_widget: widget }
+  }
+
+  pub fn borrow(&self) -> Ref<W> { self.inner_widget.0.borrow() }
+
+  pub fn borrow_mut(&mut self) -> StateRefMut<W> {
+    StateRefMut {
+      attr: self.info.clone(),
+      ref_mut: self.inner_widget.0.borrow_mut(),
     }
   }
 
   /// Event emitted when this widget modified.
-  pub fn change_stream(
-    &mut self,
-  ) -> impl LocalObservable<'static, Item = StateRefCell<W>, Err = ()> {
-    let ref_cell = self.ref_cell();
-    self.stateful.state_subject().map(move |_| ref_cell.clone())
+  fn change_stream(&mut self) -> impl LocalObservable<'static, Item = StateRefCell<W>, Err = ()> {
+    let ref_cell = self.clone();
+    self.info.state_subject().map(move |_| ref_cell.clone())
   }
 
   /// Pick a field change stream from the host widget.
-  pub fn state_change<T: Clone + 'static>(
+  fn state_change<T: Clone + 'static>(
     &mut self,
     pick: impl Fn(&W) -> T + 'static,
   ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()> {
-    let v = pick(&*self.widget.0.borrow());
-    let init = StateChange {
-      before: v.clone(),
-      after: v,
-    };
+    let v = pick(&*self.inner_widget.0.borrow());
+    let init = StateChange { before: v.clone(), after: v };
     self
       .change_stream()
       .scan_initial(init, move |mut init, value| {
@@ -164,62 +166,44 @@ impl<W: Widget> Stateful<W> {
   }
 }
 
-impl<W: Widget> StateRefCell<W> {
-  pub(crate) fn new(attr: StatefulAttr, widget: RcWidget<W>) -> Self {
-    Self {
-      attr,
-      inner_widget: widget,
-    }
-  }
-
-  pub fn borrow(&self) -> Ref<W> { self.inner_widget.0.borrow() }
-
-  pub fn borrow_mut(&mut self) -> StateRefMut<W> {
-    StateRefMut {
-      attr: self.attr.clone(),
-      ref_mut: ManuallyDrop::new(self.inner_widget.0.borrow_mut()),
-    }
-  }
+pub struct StateRefMut<'a, W: 'static> {
+  ref_mut: RefMut<'a, W>,
+  attr: StateInfo,
 }
 
-pub struct StateRefMut<'a, W: Widget> {
-  ref_mut: ManuallyDrop<RefMut<'a, W>>,
-  attr: StatefulAttr,
-}
-
-impl<'a, W: Widget> Drop for StateRefMut<'a, W> {
+impl<'a, W> Drop for StateRefMut<'a, W> {
   fn drop(&mut self) {
+    let Self { ref_mut, attr } = self;
     // Safety drop the RefMut first , will never borrow it.
-    unsafe { ManuallyDrop::drop(&mut self.ref_mut) };
+    std::mem::drop(ref_mut);
 
-    if self.attr.0.borrow().subject.is_some() {
-      self.attr.state_subject().next(())
+    if attr.0.borrow().subject.is_some() {
+      attr.state_subject().next(())
     }
 
-    let mut borrowed = self.attr.0.borrow_mut();
+    let borrowed = attr.0.borrow_mut();
     if let Some(TreeInfo { mut tree, id }) = borrowed.tree_info {
       id.mark_changed(unsafe { tree.as_mut() });
     }
   }
 }
 
-impl<'a, W: Widget> std::ops::Deref for StateRefMut<'a, W> {
+impl<'a, W> std::ops::Deref for StateRefMut<'a, W> {
   type Target = RefMut<'a, W>;
   fn deref(&self) -> &Self::Target { &self.ref_mut }
 }
 
-impl<'a, W: Widget> std::ops::DerefMut for StateRefMut<'a, W> {
+impl<'a, W> std::ops::DerefMut for StateRefMut<'a, W> {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.ref_mut }
 }
 
-impl StatefulAttr {
+impl StateInfo {
   pub fn id(&self) -> Option<WidgetId> { self.0.borrow().tree_info.as_ref().map(|info| info.id) }
 
-  pub(crate) fn new(id: WidgetId, tree: NonNull<WidgetTree>) -> Self {
-    Self(Rc::new(RefCell::new(InnerAttr {
-      tree_info: Some(TreeInfo { id, tree }),
-      subject: None,
-    })))
+  pub(crate) fn assign_id(&self, id: WidgetId, tree: NonNull<WidgetTree>) {
+    let mut info = self.0.borrow_mut();
+    debug_assert!(info.tree_info.is_none());
+    info.tree_info = Some(TreeInfo { id, tree })
   }
 
   fn state_subject(&mut self) -> LocalSubject<'static, (), ()> {
@@ -272,36 +256,6 @@ impl<R: RenderObject> RenderObject for StateInnerRender<R> {
 
   #[inline]
   fn transform(&self) -> Option<Transform> { self.0.transform() }
-}
-
-impl<W: AttachAttr> IntoStateful for W {
-  type W = W::W;
-  fn into_stateful(self, ctx: &mut BuildCtx) -> Stateful<Self::W> {
-    let AttrWidget {
-      widget,
-      major,
-      others,
-    } = self.into_attr_widget::<StatefulAttr>();
-
-    let widget = major
-      .and_then(|_| Any::downcast_ref::<RcWidget<Self::W>>(&widget))
-      .map(|w| {
-        let rcw = std::mem::MaybeUninit::uninit();
-        let ptr: *mut RcWidget<Self::W> = rcw.as_mut_ptr();
-        unsafe { ptr.copy_from(w as *const RcWidget<Self::W>, 1) }
-        std::mem::forget(widget);
-        unsafe { rcw.assume_init() }
-      })
-      .unwrap_or_else(|| RcWidget(Rc::new(RefCell::new(widget))));
-
-    let stateful = major.unwrap_or_default();
-
-    Stateful {
-      widget,
-      stateful,
-      others,
-    }
-  }
 }
 
 #[cfg(test)]

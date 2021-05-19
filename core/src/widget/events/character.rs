@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 /// A widget that sends a single Unicode codepoint. The character can be pushed
 /// to the end of a string.
-pub type CharListener<W: Widget> = AttrWidget<W, CharAttr>;
+pub type CharListener<W> = AttrWidget<W, CharAttr>;
 
 #[derive(Debug, Default)]
 pub struct CharAttr(LocalSubject<'static, Rc<CharEvent>, ()>);
@@ -17,9 +17,9 @@ pub struct CharEvent {
 
 impl<W: Widget> CharListener<W> {
   pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
-    let (major, mut others, widget) = widget.into_attr_widget::<CharAttr>();
+    let (major, mut others, widget) = widget.take_attr::<CharAttr>();
 
-    let char_attr = major.unwrap_or_else(|| {
+    let major = major.unwrap_or_else(|| {
       let attrs = others.get_or_insert_with(|| <_>::default());
       if attrs.find_attr::<FocusAttr>().is_none() {
         attrs.front_push_attr(FocusAttr::default());
@@ -33,7 +33,7 @@ impl<W: Widget> CharListener<W> {
 
   #[inline]
   pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> {
-    self.char_attr.0.clone()
+    self.major.0.clone()
   }
 }
 

@@ -100,10 +100,7 @@ impl<R: CanvasRender> Window<R> {
       WindowEvent::Resized(size) => {
         self.resize(DeviceSize::new(size.width, size.height));
       }
-      WindowEvent::ScaleFactorChanged {
-        new_inner_size,
-        scale_factor,
-      } => {
+      WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
         self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
         let factor = scale_factor as f32;
         self
@@ -165,20 +162,9 @@ impl<R: CanvasRender> Window<R> {
     }
   }
 
-  fn new<W: RawWindow + 'static, A: AttachAttr>(
-    root: A,
-    wnd: W,
-    canvas: Canvas,
-    render: R,
-  ) -> Self {
-    let root = if root
-      .attrs_ref()
-      .and_then(|attrs| attrs.find_attr::<ThemeData>())
-      .is_some()
-    {
-      root.box_it()
-    } else {
-      root
+  fn new<W: RawWindow + 'static>(mut root: BoxWidget, wnd: W, canvas: Canvas, render: R) -> Self {
+    if root.widget.find_attr::<ThemeData>().is_none() {
+      root = root
         .with_theme(material::light("Roboto".to_string()))
         .box_it()
     };
@@ -248,7 +234,7 @@ impl<R: CanvasRender> Window<R> {
 }
 
 impl Window {
-  pub(crate) fn from_event_loop<W: AttachAttr>(root: W, event_loop: &EventLoop<()>) -> Self {
+  pub(crate) fn from_event_loop(root: BoxWidget, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
     let (mut canvas, render) =
@@ -261,10 +247,7 @@ impl Window {
 
     Self::new(
       root,
-      NativeWindow {
-        native: native_window,
-        cursor: None,
-      },
+      NativeWindow { native: native_window, cursor: None },
       canvas,
       render,
     )
@@ -313,11 +296,11 @@ impl RawWindow for MockRawWindow {
 }
 
 impl HeadlessWindow {
-  pub fn headless<W: AttachAttr>(root: W, size: DeviceSize) -> Self {
+  pub fn headless<W: Widget>(root: W, size: DeviceSize) -> Self {
     let (canvas, render) =
       futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
     Self::new(
-      root,
+      root.box_it(),
       MockRawWindow {
         size: Size::from_untyped(size.to_f32().to_untyped()),
         ..Default::default()
@@ -329,15 +312,12 @@ impl HeadlessWindow {
 }
 
 impl NoRenderWindow {
-  pub fn without_render<W: AttachAttr>(root: W, size: Size) -> Self {
+  pub fn without_render<W: Widget>(root: W, size: Size) -> Self {
     let canvas = Canvas::new(None);
     let render = MockRender;
     Self::new(
-      root,
-      MockRawWindow {
-        size,
-        ..Default::default()
-      },
+      root.box_it(),
+      MockRawWindow { size, ..Default::default() },
       canvas,
       render,
     )
