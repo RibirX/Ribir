@@ -21,16 +21,6 @@ impl<'a> BuildCtx<'a> {
   pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, widget: WidgetId) -> Self {
     Self { tree, wid: widget }
   }
-
-  #[inline]
-  pub(crate) fn widget(&self) -> &BoxWidget { self.wid.assert_get(&*self.tree) }
-
-  #[inline]
-  pub(crate) fn widget_mut(&mut self) -> &mut BoxWidget {
-    self
-      .wid
-      .assert_get_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
-  }
 }
 
 #[cfg(test)]

@@ -4,8 +4,8 @@ use crate::render::render_tree::*;
 use crate::render::*;
 
 /// Just a stupid implement for develope the framework.
-#[derive(Debug, Widget)]
-pub struct Text(pub String);
+#[derive(Debug, Widget, Stateful)]
+pub struct Text(#[state] pub String);
 
 #[derive(Debug)]
 pub struct TextRender {
@@ -14,11 +14,7 @@ pub struct TextRender {
 
 impl RenderWidget for Text {
   type RO = TextRender;
-  fn create_render_object(&self) -> Self::RO {
-    TextRender {
-      text: self.0.clone(),
-    }
-  }
+  fn create_render_object(&self) -> Self::RO { TextRender { text: self.0.clone() } }
 
   #[inline]
   fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> { None }

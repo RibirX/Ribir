@@ -45,7 +45,7 @@ mod combination_derive;
 mod render_derive;
 mod widget_derive;
 
-mod state;
+mod state_derive;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -71,4 +71,8 @@ pub fn render_macro_derive(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(Stateful, attributes(state))]
-pub fn stateful_derive(input: TokenStream) -> TokenStream { unimplemented!() }
+pub fn stateful_macro_derive(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+
+  state_derive::stateful_derive(&input).into()
+}

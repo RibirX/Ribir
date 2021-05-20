@@ -9,25 +9,34 @@ pub struct ProxyDeriveInfo<'a> {
   pub attr_fields: AttrFields<'a>,
   pub ident: &'a Ident,
   pub generics: &'a Generics,
+  pub attr_name: &'static str,
 }
 
 impl<'a> ProxyDeriveInfo<'a> {
-  pub fn new(input: &'a syn::DeriveInput, derive_trait: &'static str) -> Result<Self, TokenStream> {
+  pub fn new(
+    input: &'a syn::DeriveInput,
+    derive_trait: &'static str,
+    attr_name: &'static str,
+  ) -> Result<Self, TokenStream> {
     let DeriveInput { ident, data, generics, .. } = input;
 
     match data {
       Data::Struct(stt) => {
-        let attr_fields = AttrFields::new(&stt, generics, PROXY_PATH);
+        let attr_fields = AttrFields::new(&stt, generics, attr_name);
         Ok(Self {
           derive_trait,
           attr_fields,
           ident,
           generics,
+          attr_name,
         })
       }
-      _ => Err(quote_spanned! {
-        ident.span() => compile_error!("`{}` can not derived by this type.", derive_trait);
-      }),
+      _ => {
+        let err_str = format!("`{}` can not derived by this type.", derive_trait);
+        Err(quote_spanned! {
+          ident.span() => compile_error!(#err_str);
+        })
+      }
     }
   }
 
@@ -45,8 +54,12 @@ impl<'a> ProxyDeriveInfo<'a> {
 
   pub fn too_many_proxy_specified_error(self) -> Result<Self, TokenStream> {
     if self.attr_fields.attr_fields().len() > 1 {
+      let err_str = format!(
+        "Too many `#[{}]` attr specified, need only one",
+        self.attr_name,
+      );
       Err(quote_spanned! {
-       self.ident.span() => compile_error!("`{}` can not derived by this type.", self.derive_trait);
+       self.ident.span() => compile_error!(#err_str);
       })
     } else {
       Ok(self)
@@ -54,9 +67,13 @@ impl<'a> ProxyDeriveInfo<'a> {
   }
 
   pub fn none_proxy_specified_error(self) -> Result<Self, TokenStream> {
-    if self.attr_fields.attr_fields().len() == 0 {
+    if self.attr_fields.attr_fields().is_empty() {
+      let err_str = format!(
+        "There is not `#[{}]` attr specified, required by {}",
+        self.attr_name, self.derive_trait
+      );
       Err(quote_spanned! {
-       self. ident.span() => compile_error!("Must specify a `#[proxy] attr to one field.");
+       self. ident.span() => compile_error!(#err_str);
       })
     } else {
       Ok(self)
@@ -65,8 +82,8 @@ impl<'a> ProxyDeriveInfo<'a> {
 }
 
 pub fn widget_derive(input: &syn::DeriveInput) -> TokenStream {
-  let info =
-    ProxyDeriveInfo::new(input, "Widget").and_then(|stt| stt.too_many_proxy_specified_error());
+  let info = ProxyDeriveInfo::new(input, "Widget", PROXY_PATH)
+    .and_then(|stt| stt.too_many_proxy_specified_error());
 
   match info {
     Ok(info) => {

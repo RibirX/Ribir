@@ -3,26 +3,30 @@ use holiday::{
   widget::{Column, Row},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct Task {
   finished: bool,
   label: String,
 }
-#[derive(Debug, Widget)]
+#[derive(Debug, Widget, Stateful)]
 struct Todos {
+  #[state]
   tasks: Vec<Task>,
 }
 
-impl CombinationWidget for Todos {
+impl CombinationWidget for StatefulTodos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
     self
+      .as_ref()
       .tasks
       .iter()
       .enumerate()
       .map(|(idx, task)| {
-        let mut todos = self.state_ref_cell(ctx);
-        let mut checkbox = Checkbox::from_theme(ctx.theme()).with_checked(task.finished);
-        checkbox.checked_state().subscribe(move |v| {
+        let mut todos = self.ref_cell();
+        let mut checkbox = Checkbox::from_theme(ctx.theme())
+          .with_checked(task.finished)
+          .into_stateful();
+        checkbox.state_checked().subscribe(move |v| {
           todos.borrow_mut().tasks[idx].finished = v.after;
         });
         Row::default()
@@ -62,7 +66,8 @@ fn main() {
         label: "Support data bind".to_string(),
       },
     ],
-  };
+  }
+  .into_stateful();
 
   Application::new().run(todo.box_it());
 }

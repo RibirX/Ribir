@@ -91,10 +91,9 @@ impl RenderTree {
   pub fn layout(&mut self, win_size: Size, mut canvas: Pin<&mut Canvas>) -> bool {
     let needs_layout = self.needs_layout.clone();
     needs_layout.iter().for_each(|Reverse((_depth, rid))| {
-      let clamp = rid.layout_clamp(self).unwrap_or_else(|| BoxClamp {
-        min: Size::zero(),
-        max: win_size,
-      });
+      let clamp = rid
+        .layout_clamp(self)
+        .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
       rid.perform_layout(clamp, canvas.as_mut(), unsafe { Pin::new_unchecked(self) });
     });
 
@@ -249,10 +248,7 @@ impl RenderId {
   /// Drop the subtree
   pub(crate) fn drop(self, tree: &mut RenderTree) {
     let RenderTree {
-      render_to_widget,
-      arena,
-      layout_info,
-      ..
+      render_to_widget, arena, layout_info, ..
     } = tree;
     self.0.descendants(arena).for_each(|id| {
       let rid = RenderId(id);
@@ -293,9 +289,7 @@ impl RenderId {
   pub(crate) fn mark_needs_layout(self, tree: &mut RenderTree) {
     if self.layout_box_rect(tree).is_some() {
       let mut relayout_root = self;
-      let RenderTree {
-        arena, layout_info, ..
-      } = tree;
+      let RenderTree { arena, layout_info, .. } = tree;
       // All ancestors of this render object should relayout until the one which only
       // sized by parent.
       self.0.ancestors(arena).all(|id| {
@@ -377,9 +371,7 @@ mod tests {
   fn relayout_always_from_top_to_down() {
     let records = Arc::new(Mutex::new(vec![]));
     let mut tree = RenderTree::default();
-    let obj = Box::new(MockRenderObj {
-      records: records.clone(),
-    });
+    let obj = Box::new(MockRenderObj { records: records.clone() });
     let grand_parent = tree.set_root(mock_widget_id(0), obj.clone());
 
     let parent = tree.new_node(obj.clone());
@@ -405,7 +397,7 @@ mod tests {
 
     impl CombinationWidget for DoubleSize {
       fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
-        let stateful = SizedBox::empty_box(Size::new(100., 100.)).into_stateful(ctx);
+        let stateful = SizedBox::empty_box(Size::new(100., 100.)).into_stateful();
         let mut state = stateful.ref_cell();
         stateful
           .on_pointer_move(move |_| {

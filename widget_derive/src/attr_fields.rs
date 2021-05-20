@@ -1,20 +1,15 @@
 use std::usize;
 
-use proc_macro2::Span;
 use syn::{
   punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
   Type, TypeParamBound, WherePredicate,
 };
 
-fn prefix_ident(prefix: &str, ident: &Ident) -> Ident {
-  Ident::new(&format!("{}{}", prefix, ident), Span::call_site())
-}
-
 /// Pick fields from struct by specify inner attr.
 pub struct AttrFields<'a> {
   generics: &'a Generics,
   attr_fields: Vec<(Field, usize)>,
-  is_tuple: bool,
+  pub is_tuple: bool,
 }
 
 impl<'a> AttrFields<'a> {

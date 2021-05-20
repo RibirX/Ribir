@@ -2,41 +2,36 @@ use crate::prelude::*;
 use crate::widget::theme_data::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
-#[derive(Widget)]
-pub struct Checkbox(StatefulImpl<CheckboxInner>);
-
-#[derive(Default)]
-pub struct CheckboxInner {
+#[derive(Default, Widget, Stateful)]
+pub struct Checkbox {
+  #[state]
   pub checked: bool,
+  #[state]
   pub indeterminate: bool,
   pub theme: CheckboxTheme,
 }
 
 impl Checkbox {
   pub fn from_theme(theme: &ThemeData) -> Self {
-    Checkbox(StatefulImpl::new(CheckboxInner {
+    Checkbox {
       theme: theme.check_box.clone(),
 
       ..Default::default()
-    }))
+    }
   }
 
   #[inline]
   pub fn with_checked(mut self, checked: bool) -> Self {
-    self.0.as_mut().checked = checked;
+    self.checked = checked;
     self
   }
 
   #[inline]
   pub fn with_indeterminate(mut self, b: bool) -> Self {
-    self.0.as_mut().indeterminate = b;
+    self.indeterminate = b;
     self
   }
 
-  pub fn switch_check(&mut self) { self.0.as_mut().switch_check() }
-}
-
-impl CheckboxInner {
   fn switch_check(&mut self) {
     if self.indeterminate {
       self.indeterminate = false;
@@ -47,13 +42,7 @@ impl CheckboxInner {
   }
 }
 
-impl Stateful for Checkbox {
-  type RawWidget = CheckboxInner;
-  #[inline]
-  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.0.ref_cell() }
-}
-
-impl CombinationWidget for Checkbox {
+impl CombinationWidget for StatefulCheckbox {
   fn build(&self, _: &mut BuildCtx) -> BoxWidget {
     let CheckboxTheme {
       size,
