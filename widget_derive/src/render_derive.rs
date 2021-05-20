@@ -1,11 +1,11 @@
-use crate::attr_fields::add_trait_bounds_if;
 use crate::widget_derive::ProxyDeriveInfo;
+use crate::{attr_fields::add_trait_bounds_if, widget_derive::PROXY_PATH};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{parse_quote, Ident};
 
 pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
-  let info = ProxyDeriveInfo::new(input, "RenderWidget")
+  let info = ProxyDeriveInfo::new(input, "RenderWidget", PROXY_PATH)
     .and_then(|stt| stt.none_proxy_specified_error())
     .and_then(|stt| stt.too_many_proxy_specified_error());
 

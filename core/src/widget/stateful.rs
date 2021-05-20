@@ -44,7 +44,7 @@ impl<W: Stateful> StateDetect for W {
 ///
 /// Remember it assume you changed the widget back of this reference if you
 /// mutably borrow this pointer. No matter if you really modify it.
-pub struct StateRefCell<W: 'static> {
+pub struct StateRefCell<W> {
   info: StateInfo,
   inner_widget: RcWidget<W>,
 }
@@ -120,7 +120,7 @@ impl<W: 'static> Clone for StateRefCell<W> {
   }
 }
 
-impl<W> StatefulImpl<W> {
+impl<W: 'static> StatefulImpl<W> {
   pub fn new(w: W) -> Self {
     Self {
       info: <_>::default(),
@@ -133,34 +133,21 @@ impl<W> StatefulImpl<W> {
 
   #[inline]
   pub fn as_mut(&mut self) -> RefMut<W> { self.widget.0.borrow_mut() }
-}
-
-impl<W: 'static> StateRefCell<W> {
-  pub(crate) fn new(attr: StateInfo, widget: RcWidget<W>) -> Self {
-    Self { info: attr, inner_widget: widget }
-  }
-
-  pub fn borrow(&self) -> Ref<W> { self.inner_widget.0.borrow() }
-
-  pub fn borrow_mut(&mut self) -> StateRefMut<W> {
-    StateRefMut {
-      attr: self.info.clone(),
-      ref_mut: self.inner_widget.0.borrow_mut(),
-    }
-  }
 
   /// Event emitted when this widget modified.
-  fn change_stream(&mut self) -> impl LocalObservable<'static, Item = StateRefCell<W>, Err = ()> {
-    let ref_cell = self.clone();
+  pub fn change_stream(
+    &mut self,
+  ) -> impl LocalObservable<'static, Item = StateRefCell<W>, Err = ()> {
+    let ref_cell = self.ref_cell();
     self.info.state_subject().map(move |_| ref_cell.clone())
   }
 
   /// Pick a field change stream from the host widget.
-  fn state_change<T: Clone + 'static>(
+  pub fn state_change<T: Clone + 'static>(
     &mut self,
     pick: impl Fn(&W) -> T + 'static,
   ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()> {
-    let v = pick(&*self.inner_widget.0.borrow());
+    let v = pick(&*self.widget.0.borrow());
     let init = StateChange { before: v.clone(), after: v };
     self
       .change_stream()
@@ -169,6 +156,17 @@ impl<W: 'static> StateRefCell<W> {
         init.after = pick(&*value.borrow());
         init
       })
+  }
+}
+
+impl<W: 'static> StateRefCell<W> {
+  pub fn borrow(&self) -> Ref<W> { self.inner_widget.0.borrow() }
+
+  pub fn borrow_mut(&mut self) -> StateRefMut<W> {
+    StateRefMut {
+      attr: self.info.clone(),
+      ref_mut: self.inner_widget.0.borrow_mut(),
+    }
   }
 }
 
@@ -270,14 +268,13 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let mut tree = Box::pin(widget_tree::WidgetTree::default());
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let stateful = Stateful::stateful(Text("Hello".to_string()).into_attr_widget());
+    let stateful = Text("Hello".to_string()).into_stateful();
     {
       stateful.ref_cell().borrow_mut().0 = "World!".to_string();
     }
-    assert_eq!(&stateful.0, "World!");
+    assert_eq!(stateful.as_ref().0, "World!");
   }
 
   #[test]
@@ -285,16 +282,13 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let stateful = Stateful::stateful(Text("Hello".to_string()).into_attr_widget());
+    let stateful = Text("Hello".to_string()).into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
     let id = tree.set_root(key.box_it(), &mut render_tree);
 
-    let key_back = id
-      .get(tree)
-      .and_then(|w| w.find_attr::<Key>())
-      .map(|k| k.key());
+    let key_back = id.get(tree).and_then(|w| w.widget.find_attr::<Key>());
     assert!(key_back.is_some());
   }
 
@@ -306,9 +300,7 @@ mod tests {
 
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let mut sized_box =
-      Stateful::stateful(SizedBox::empty_box(Size::new(100., 100.)).into_attr_widget());
-
+    let mut sized_box = SizedBox::empty_box(Size::new(100., 100.)).into_stateful();
     sized_box
       .change_stream()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -339,9 +331,9 @@ mod tests {
     struct TestWidget;
 
     impl CombinationWidget for TestWidget {
-      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> BoxWidget {
         SizedBox::empty_box(Size::new(100., 100.))
-          .into_stateful(ctx)
+          .into_stateful()
           .box_it()
       }
     }

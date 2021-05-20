@@ -5,8 +5,9 @@ pub use smallvec::{smallvec, SmallVec};
 ///
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct SizedBox {
+  #[state]
   pub size: Size,
   pub child: Option<BoxWidget>,
 }
@@ -19,10 +20,7 @@ pub struct SizedBoxRender {
 impl SizedBox {
   /// Creates a box with the specified size.
   pub fn from_size<W: Widget>(size: Size, child: W) -> Self {
-    Self {
-      size,
-      child: Some(child.box_it()),
-    }
+    Self { size, child: Some(child.box_it()) }
   }
 
   /// Creates a box that will become as large as its parent allows.
@@ -71,10 +69,7 @@ impl RenderObject for SizedBoxRender {
     let child = child_iter.next();
     debug_assert!(child_iter.next().is_none());
     if let Some(mut child_ctx) = child {
-      child_ctx.perform_layout(BoxClamp {
-        min: size,
-        max: size,
-      });
+      child_ctx.perform_layout(BoxClamp { min: size, max: size });
     }
     size
   }
