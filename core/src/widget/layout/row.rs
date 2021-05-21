@@ -26,8 +26,8 @@ impl Row {
   pub fn get_cross_align(&self) -> CrossAxisAlign { self.0.cross_align }
 }
 
-impl std::iter::FromIterator<BoxWidget> for Row {
-  fn from_iter<T: IntoIterator<Item = BoxWidget>>(iter: T) -> Self {
+impl std::iter::FromIterator<Box<dyn Widget>> for Row {
+  fn from_iter<T: IntoIterator<Item = Box<dyn Widget>>>(iter: T) -> Self {
     Self(Flex::from_iter(iter).with_direction(Direction::Horizontal))
   }
 }

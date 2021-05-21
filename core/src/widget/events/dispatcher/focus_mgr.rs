@@ -79,7 +79,7 @@ impl FocusManager {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
         id.get(tree)
-          .and_then(|w| w.widget.find_attr::<FocusAttr>())
+          .and_then(|w| w.find_attr::<FocusAttr>())
           .map_or(false, |focus| focus.auto_focus)
       })
     })
@@ -94,7 +94,7 @@ impl FocusManager {
         .descendants(tree)
         .filter_map(|id| {
           id.get(tree)
-            .and_then(|w| w.widget.find_attr::<FocusAttr>())
+            .and_then(|w| w.find_attr::<FocusAttr>())
             .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
         })
         .for_each(|node| match node.tab_index {
@@ -181,10 +181,8 @@ impl FocusManager {
     )
   }
 
-  fn create_emitter(
-    event_type: FocusEventType,
-  ) -> impl FnMut(&FocusListener<BoxWidget>, Rc<EventCommon>) {
-    move |focus: &FocusListener<BoxWidget>, event: Rc<FocusEvent>| {
+  fn create_emitter(event_type: FocusEventType) -> impl FnMut(&FocusAttr, Rc<EventCommon>) {
+    move |focus: &FocusAttr, event: Rc<FocusEvent>| {
       log::info!("{:?} {:?}", event_type, event);
       focus.focus_event_observable().next((event_type, event));
     }
@@ -196,11 +194,10 @@ mod tests {
   use super::*;
   use crate::widget::SizedBox;
   use std::cell::RefCell;
-  use widget::BoxWidget;
 
   fn empty_box() -> SizedBox { SizedBox::empty_box(Size::zero()) }
 
-  fn env<W: Widget>(widget: W) -> (window::Window<window::MockRender>, FocusManager) {
+  fn env<W: Widget + AttachAttr>(widget: W) -> (window::Window<window::MockRender>, FocusManager) {
     let wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
     // use a aloneside FocusManager for test easy.
     let mut mgr = FocusManager::default();
@@ -278,7 +275,7 @@ mod tests {
     }
 
     impl CombinationWidget for EmbedFocus {
-      fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
         let child = log_focus_event("child", empty_box(), self.log.clone());
         log_focus_event("parent", SizedBox::expanded(child), self.log.clone()).box_it()
       }

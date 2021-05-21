@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::widget::theme_data::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
-#[derive(Default, Widget, Stateful)]
+#[derive(Default, Stateful)]
 pub struct Checkbox {
   #[state]
   pub checked: bool,
@@ -43,7 +43,7 @@ impl Checkbox {
 }
 
 impl CombinationWidget for StatefulCheckbox {
-  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+  fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
     let CheckboxTheme {
       size,
       border_width,
@@ -113,7 +113,7 @@ impl RenderWidget for CheckboxMarker {
   fn create_render_object(&self) -> Self::RO { self.clone() }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> { None }
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> { None }
 }
 
 impl RenderObject for CheckboxMarker {
@@ -151,7 +151,7 @@ mod tests {
   fn checkbox() -> Checkbox { Checkbox::from_theme(&material::light("".to_string())) }
   #[test]
   fn layout() {
-    let w = checkbox();
+    let w = checkbox().into_stateful();
     let (rect, child) = widget_and_its_children_box_rect(w, Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
 
@@ -164,7 +164,7 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn checked_paint() {
-    let c = checkbox().with_checked(true);
+    let c = checkbox().with_checked(true).into_stateful();
     let mut window = window::Window::headless(c, DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
@@ -175,7 +175,8 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn unchecked_paint() {
-    let mut window = window::Window::headless(checkbox().box_it(), DeviceSize::new(100, 100));
+    let mut window =
+      window::Window::headless(checkbox().into_stateful(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -185,7 +186,10 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn indeterminate_paint() {
-    let c = checkbox().with_checked(true).with_indeterminate(true);
+    let c = checkbox()
+      .with_checked(true)
+      .with_indeterminate(true)
+      .into_stateful();
     let mut window = window::Window::headless(c, DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
@@ -195,7 +199,10 @@ mod tests {
       "../test/test_imgs/checkbox_indeterminate.png"
     );
 
-    let c = checkbox().with_checked(false).with_indeterminate(true);
+    let c = checkbox()
+      .with_checked(false)
+      .with_indeterminate(true)
+      .into_stateful();
     let mut window = window::Window::headless(c, DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();

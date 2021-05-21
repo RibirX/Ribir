@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 pub struct BoxDecoration {
-  pub child: BoxWidget,
+  pub child: Box<dyn Widget>,
   /// The background of the box.
   pub background: Option<FillStyle>,
   /// A border to draw above the background
@@ -34,7 +34,7 @@ pub struct BoxDecorationRender {
 }
 
 impl BoxDecoration {
-  pub fn new(child: BoxWidget) -> Self {
+  pub fn new(child: Box<dyn Widget>) -> Self {
     Self {
       child,
       border: None,
@@ -86,7 +86,7 @@ impl RenderWidget for BoxDecoration {
       background: self.background.clone(),
     }
   }
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
       &mut self.child,
       PhantomWidget.box_it()
@@ -447,8 +447,7 @@ mod tests {
             top: BorderSide { width: 3., color: Color::GREEN },
             bottom: BorderSide { width: 4., color: Color::YELLOW },
           })
-          .with_margin(EdgeInsets::all(2.))
-          .box_it(),
+          .with_margin(EdgeInsets::all(2.)),
       )
       .with_wrap(true);
 

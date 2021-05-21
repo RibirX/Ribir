@@ -396,7 +396,7 @@ mod tests {
     struct DoubleSize;
 
     impl CombinationWidget for DoubleSize {
-      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
         let stateful = SizedBox::empty_box(Size::new(100., 100.)).into_stateful();
         let mut state = stateful.ref_cell();
         stateful
@@ -408,7 +408,7 @@ mod tests {
       }
     }
 
-    let mut wnd = window::Window::without_render(DoubleSize.box_it(), Size::new(500., 500.));
+    let mut wnd = window::Window::without_render(DoubleSize, Size::new(500., 500.));
     wnd.render_ready();
 
     {

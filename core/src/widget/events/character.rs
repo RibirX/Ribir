@@ -15,7 +15,7 @@ pub struct CharEvent {
   pub common: EventCommon,
 }
 
-impl<W: Widget> CharListener<W> {
+impl<W> CharListener<W> {
   pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
     let (major, mut others, widget) = widget.take_attr::<CharAttr>();
 

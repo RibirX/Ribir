@@ -9,7 +9,7 @@ use std::{
 pub struct WidgetId(NodeId);
 #[derive(Default)]
 pub struct WidgetTree {
-  arena: Arena<BoxWidget>,
+  arena: Arena<Box<dyn Widget>>,
   root: Option<WidgetId>,
   /// Store widgets that modified and wait to update its corresponds render
   /// object in render tree.
@@ -25,7 +25,7 @@ impl WidgetTree {
   #[inline]
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
-  pub fn set_root(&mut self, data: BoxWidget, render_tree: &mut RenderTree) -> WidgetId {
+  pub fn set_root(&mut self, data: Box<dyn Widget>, render_tree: &mut RenderTree) -> WidgetId {
     debug_assert!(self.root.is_none());
     let root = self.new_node(data);
     self.root = Some(root);
@@ -33,7 +33,7 @@ impl WidgetTree {
     root
   }
 
-  pub fn new_node(&mut self, widget: BoxWidget) -> WidgetId {
+  pub fn new_node(&mut self, widget: Box<dyn Widget>) -> WidgetId {
     let state_info = widget.state_info();
     let id = WidgetId(self.arena.new_node(widget));
     if let Some(state_info) = state_info {
@@ -160,7 +160,7 @@ impl WidgetTree {
   fn try_replace_widget_or_rebuild(
     &mut self,
     node: WidgetId,
-    widget: BoxWidget,
+    widget: Box<dyn Widget>,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
@@ -193,7 +193,7 @@ impl WidgetTree {
   fn repair_children_by_key(
     &mut self,
     node: WidgetId,
-    new_children: SmallVec<[BoxWidget; 1]>,
+    new_children: SmallVec<[Box<dyn Widget>; 1]>,
     stack: &mut Vec<WidgetId>,
     render_tree: &mut RenderTree,
   ) {
@@ -257,12 +257,12 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub fn get(self, tree: &WidgetTree) -> Option<&BoxWidget> {
+  pub fn get(self, tree: &WidgetTree) -> Option<&Box<dyn Widget>> {
     tree.arena.get(self.0).map(|node| node.get())
   }
 
   /// Returns a mutable reference to the node data.
-  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut BoxWidget> {
+  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn Widget>> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
@@ -349,7 +349,7 @@ impl WidgetId {
     }
   }
 
-  fn append_widget(self, data: BoxWidget, tree: &mut WidgetTree) -> WidgetId {
+  fn append_widget(self, data: Box<dyn Widget>, tree: &mut WidgetTree) -> WidgetId {
     let id = tree.new_node(data);
     self.0.append(id.0, &mut tree.arena);
     id
@@ -397,7 +397,7 @@ impl WidgetId {
     wid
   }
 
-  fn take_children(self, tree: &mut WidgetTree) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(self, tree: &mut WidgetTree) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     let (tree1, tree2) = unsafe {
       let ptr = tree as *mut WidgetTree;
       (&mut *ptr, &mut *ptr)
@@ -414,7 +414,7 @@ impl WidgetId {
     })
   }
 
-  fn node_feature<F: Fn(&Node<BoxWidget>) -> Option<NodeId>>(
+  fn node_feature<F: Fn(&Node<Box<dyn Widget>>) -> Option<NodeId>>(
     self,
     tree: &WidgetTree,
     method: F,
@@ -442,11 +442,11 @@ impl WidgetId {
     need_builds.remove(&self);
   }
 
-  pub fn assert_get(self, tree: &WidgetTree) -> &BoxWidget {
+  pub fn assert_get(self, tree: &WidgetTree) -> &Box<dyn Widget> {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut BoxWidget {
+  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Widget> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }

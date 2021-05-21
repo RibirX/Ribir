@@ -38,12 +38,7 @@ impl Dispatcher {
         &self.common,
       ),
       WindowEvent::CursorLeft { .. } => self.pointer.on_cursor_left(&self.common),
-      WindowEvent::MouseInput {
-        state,
-        button,
-        device_id,
-        ..
-      } => {
+      WindowEvent::MouseInput { state, button, device_id, .. } => {
         self.pointer.dispatch_mouse_input(
           device_id,
           state,
@@ -83,7 +78,7 @@ impl Dispatcher {
         };
         let event = self.common.bubble_dispatch(
           focus,
-          |keyboard: &KeyboardListener<BoxWidget>, event| {
+          |keyboard: &KeyboardAttr, event| {
             log::info!("{:?}: {:?}", event_type, event);
             keyboard.event_observable().next((event_type, event))
           },
@@ -114,7 +109,7 @@ impl Dispatcher {
       };
       self.common.bubble_dispatch(
         focus,
-        |listener: &CharListener<BoxWidget>, event| {
+        |listener: &CharListener<Box<dyn Widget>>, event| {
           log::info!("char event: {:?}", event);
           listener.event_observable().next(event);
         },

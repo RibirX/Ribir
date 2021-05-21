@@ -122,6 +122,8 @@ pub fn widget_derive(input: &syn::DeriveInput) -> TokenStream {
             fn attrs_mut(&mut self) -> Option<AttrsMut> { #attrs_mut_impl }
           }
 
+
+          // Should give a default implement in attr mod.  Depends on https://github.com/rust-lang/rust/pull/85499 fixed.
           impl #impl_generics AttachAttr for #name #ty_generics #where_clause {
             type W = Self;
 

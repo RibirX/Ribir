@@ -14,7 +14,7 @@ struct EmbedKeyPost {
 }
 
 impl CombinationWidget for EmbedKeyPost {
-  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+  fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
     let mut row = Row::default()
       .with_cross_align(CrossAxisAlign::Start)
       .push(Text(self.title.borrow().to_string()).with_key(0))
@@ -39,10 +39,7 @@ pub struct KeyDetectEnv {
 
 impl KeyDetectEnv {
   pub fn new(level: usize) -> Self {
-    let mut post = EmbedKeyPost {
-      level,
-      ..Default::default()
-    };
+    let mut post = EmbedKeyPost { level, ..Default::default() };
     post.level = level;
     let title = post.title.clone();
     post.title = title.clone();
@@ -50,10 +47,6 @@ impl KeyDetectEnv {
     let mut widget_tree = WidgetTree::default();
     let mut render_tree = RenderTree::default();
     widget_tree.set_root(post.box_it(), &mut render_tree);
-    KeyDetectEnv {
-      widget_tree,
-      render_tree,
-      title,
-    }
+    KeyDetectEnv { widget_tree, render_tree, title }
   }
 }

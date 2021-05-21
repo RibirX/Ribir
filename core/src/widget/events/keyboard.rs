@@ -40,7 +40,7 @@ impl<W: Widget> KeyboardListener<W> {
   pub fn event_observable(
     &self,
   ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
-    self.major.0.clone()
+    self.major.event_observable()
   }
 
   pub fn listen_on<H: FnMut(&KeyboardEvent) + 'static>(
@@ -52,6 +52,15 @@ impl<W: Widget> KeyboardListener<W> {
       .event_observable()
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event))
+  }
+}
+
+impl KeyboardAttr {
+  #[inline]
+  pub fn event_observable(
+    &self,
+  ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
+    self.0.clone()
   }
 }
 

@@ -222,7 +222,7 @@ impl StateInfo {
 
 impl<W: CombinationWidget> CombinationWidget for RcWidget<W> {
   #[inline]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxWidget { self.0.borrow().build(ctx) }
+  fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> { self.0.borrow().build(ctx) }
 }
 pub struct StateInnerRender<R>(R);
 
@@ -235,7 +235,7 @@ impl<W: RenderWidget> RenderWidget for RcWidget<W> {
   }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     (self.0.borrow_mut()).take_children()
   }
 }
@@ -288,7 +288,7 @@ mod tests {
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
     let id = tree.set_root(key.box_it(), &mut render_tree);
 
-    let key_back = id.get(tree).and_then(|w| w.widget.find_attr::<Key>());
+    let key_back = id.get(tree).and_then(|w| w.find_attr::<Key>());
     assert!(key_back.is_some());
   }
 
@@ -331,7 +331,7 @@ mod tests {
     struct TestWidget;
 
     impl CombinationWidget for TestWidget {
-      fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
         SizedBox::empty_box(Size::new(100., 100.))
           .into_stateful()
           .box_it()

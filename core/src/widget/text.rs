@@ -17,7 +17,7 @@ impl RenderWidget for Text {
   fn create_render_object(&self) -> Self::RO { TextRender { text: self.0.clone() } }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> { None }
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> { None }
 }
 
 impl RenderObject for TextRender {

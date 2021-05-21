@@ -4,7 +4,7 @@ use crate::prelude::*;
 #[derive(Widget)]
 pub struct Padding {
   pub padding: EdgeInsets,
-  pub child: BoxWidget,
+  pub child: Box<dyn Widget>,
 }
 
 #[derive(Debug)]
@@ -13,10 +13,10 @@ pub struct PaddingRender(EdgeInsets);
 impl RenderWidget for Padding {
   type RO = PaddingRender;
 
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
       &mut self.child,
-      PhantomWidget.box_it()
+      Box::new(PhantomWidget)
     )])
   }
 
@@ -75,8 +75,7 @@ mod tests {
   fn smoke() {
     let widget = Row::default()
       .push(SizedBox::empty_box(Size::new(100., 100.)))
-      .with_padding(EdgeInsets::only_left(1.))
-      .box_it();
+      .with_padding(EdgeInsets::only_left(1.));
     let mut wnd = window::Window::without_render(widget, Size::new(200., 200.));
     wnd.render_ready();
     let r_tree = wnd.render_tree();

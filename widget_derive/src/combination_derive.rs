@@ -23,7 +23,7 @@ pub fn combination_derive(input: &syn::DeriveInput) -> TokenStream {
       quote! {
         impl #impl_generics CombinationWidget for #ident #ty_generics #where_clause {
           #[inline]
-          fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+          fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
             self.#path.build(ctx)
           }
         }

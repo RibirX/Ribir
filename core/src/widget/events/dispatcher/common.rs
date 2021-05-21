@@ -49,7 +49,7 @@ impl CommonDispatcher {
   ) -> Event {
     let attr = wid
       .get(self.widget_tree_ref())
-      .and_then(|w| w.widget.find_attr::<AttrData>());
+      .and_then(|w| w.find_attr::<AttrData>());
     if let Some(attr) = attr {
       Self::rc_dispatch(attr, event, handler)
     } else {
@@ -76,7 +76,7 @@ impl CommonDispatcher {
       .filter_map(|wid| {
         wid
           .get(tree)
-          .and_then(|w| w.widget.find_attr::<Attr>())
+          .and_then(|w| w.find_attr::<Attr>())
           .map(|widget| (wid, widget))
       })
       .try_fold(event, |mut event, (wid, attr)| {

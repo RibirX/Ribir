@@ -264,8 +264,7 @@ pub trait AttachAttr {
   fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W);
 }
 
-// todo: should derive RenderWidget too.
-#[derive(CombinationWidget)]
+#[derive(CombinationWidget, RenderWidget)]
 pub struct AttrWidget<W, A: Any> {
   #[proxy]
   pub widget: W,
@@ -288,19 +287,6 @@ impl<W: Widget, A: Any> Widget for AttrWidget<W, A> {
       major: &mut self.major,
       other_attrs: self.others.as_mut().map(|a| &mut a.0),
     })
-  }
-
-  fn box_it(self) -> BoxWidget
-  where
-    Self: Sized,
-  {
-    let Self { widget, major, others } = self;
-    let w = AttrWidget {
-      widget: widget.box_it(),
-      major,
-      others,
-    };
-    BoxWidget { widget: Box::new(w) }
   }
 }
 
@@ -393,9 +379,11 @@ impl Attrs {
   pub fn remove_attr<A: Any>(&mut self) -> Option<A> {
     let mut cursor = self.0.cursor_front_mut();
 
-    while cursor.current().map(|any| any.is::<A>()).unwrap_or(false) {}
+    while !cursor.current()?.is::<A>() {
+      cursor.move_next();
+    }
 
-    cursor.remove_current().map(|mut any| {
+    cursor.remove_current().and_then(|mut any| {
       let attr = any.downcast_mut::<A>().unwrap();
       let tmp = unsafe { std::mem::transmute_copy(attr) };
       std::mem::forget(any);

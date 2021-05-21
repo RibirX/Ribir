@@ -6,16 +6,11 @@ use crate::prelude::*;
 #[derive(Widget)]
 pub struct Expanded {
   pub flex: f32,
-  pub child: BoxWidget,
+  pub child: Box<dyn Widget>,
 }
 
 impl Expanded {
-  pub fn new<W: Widget>(flex: f32, child: W) -> Self {
-    Self {
-      flex,
-      child: child.box_it(),
-    }
-  }
+  pub fn new<W: Widget>(flex: f32, child: W) -> Self { Self { flex, child: child.box_it() } }
 }
 
 impl RenderWidget for Expanded {
@@ -24,7 +19,7 @@ impl RenderWidget for Expanded {
   fn create_render_object(&self) -> Self::RO { ExpandedRender { flex: self.flex } }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
       &mut self.child,
       PhantomWidget.box_it()

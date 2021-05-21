@@ -2,19 +2,19 @@ use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::Wi
 
 #[derive(Widget)]
 pub struct ScrollableX {
-  child: Option<BoxWidget>,
+  child: Option<Box<dyn Widget>>,
   pos: f32,
 }
 
 #[derive(Widget)]
 pub struct ScrollableY {
-  child: Option<BoxWidget>,
+  child: Option<Box<dyn Widget>>,
   pos: f32,
 }
 
 #[derive(Widget)]
 pub struct ScrollableBoth {
-  child: Option<BoxWidget>,
+  child: Option<Box<dyn Widget>>,
   pos: Point,
 }
 
@@ -38,7 +38,7 @@ impl IntoStateful for ScrollableBoth {
 
 impl ScrollableX {
   #[inline]
-  pub fn new(child: BoxWidget, pos: f32) -> WheelListener<StatefulImpl<Self>> {
+  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulImpl<Self>> {
     let scroll = ScrollableX { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -54,7 +54,7 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn new(child: BoxWidget, pos: f32) -> WheelListener<StatefulImpl<Self>> {
+  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulImpl<Self>> {
     let scroll = ScrollableY { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -70,7 +70,7 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn new(child: BoxWidget, pos: Point) -> WheelListener<StatefulImpl<Self>> {
+  pub fn new(child: Box<dyn Widget>, pos: Point) -> WheelListener<StatefulImpl<Self>> {
     let scroll = ScrollableBoth { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -108,7 +108,7 @@ impl RenderWidget for ScrollableX {
   #[inline]
   fn create_render_object(&self) -> Self::RO { XRender { pos: self.pos } }
 
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     self.child.take().map(|w| smallvec![w])
   }
 }
@@ -119,7 +119,7 @@ impl RenderWidget for ScrollableY {
   #[inline]
   fn create_render_object(&self) -> Self::RO { YRender { pos: self.pos } }
 
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     self.child.take().map(|w| smallvec![w])
   }
 }
@@ -130,7 +130,7 @@ impl RenderWidget for ScrollableBoth {
   #[inline]
   fn create_render_object(&self) -> Self::RO { BothRender { pos: self.pos } }
 
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     self.child.take().map(|w| smallvec![w])
   }
 }
@@ -271,8 +271,8 @@ mod tests {
   use crate::test::root_and_children_rect;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  fn test_assert<W: Widget>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
+  fn test_assert<W: Widget + AttachAttr>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
+    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();
 
@@ -295,7 +295,7 @@ mod tests {
     struct X;
 
     impl CombinationWidget for X {
-      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
         SizedBox::empty_box(Size::new(1000., 1000.))
           .x_scrollable()
           .box_it()
@@ -313,7 +313,7 @@ mod tests {
     struct Y;
 
     impl CombinationWidget for Y {
-      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
         SizedBox::empty_box(Size::new(1000., 1000.))
           .y_scrollable()
           .box_it()
@@ -331,7 +331,7 @@ mod tests {
     struct Both;
 
     impl CombinationWidget for Both {
-      fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
         SizedBox::empty_box(Size::new(1000., 1000.))
           .both_scrollable()
           .box_it()

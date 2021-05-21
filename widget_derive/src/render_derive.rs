@@ -31,7 +31,8 @@ pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
         parse_quote!(RenderWidget),
         |param| attr_fields.is_attr_generic(param),
       );
-      let (proxy_impl_generics, _, proxy_where_clause) = proxy_generics.split_for_impl();
+      let (proxy_impl_generics, proxy_type_generics, proxy_where_clause) =
+        proxy_generics.split_for_impl();
       let vis = &input.vis;
       quote! {
         #vis struct #render_name #proxy_impl_generics(
@@ -39,7 +40,7 @@ pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
         ) #proxy_where_clause;
 
         impl #impl_generics RenderWidget for #ident #ty_generics #where_clause {
-          type RO = #render_name #ty_generics;
+          type RO = #render_name #proxy_type_generics;
 
           #[inline]
           fn create_render_object(&self) -> Self::RO {
@@ -47,12 +48,12 @@ pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
           }
 
           #[inline]
-          fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+          fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
             RenderWidget::take_children(&mut self.#path)
           }
         }
 
-        impl #impl_generics RenderObject for #render_name #ty_generics #where_clause{
+        impl #proxy_impl_generics RenderObject for #render_name #proxy_type_generics #where_clause{
           type Owner = #ident #ty_generics;
 
           #[inline]

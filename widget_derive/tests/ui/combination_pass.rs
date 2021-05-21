@@ -4,7 +4,7 @@ use holiday::prelude::*;
 struct A;
 
 impl CombinationWidget for A {
-  fn build(&self, _: &mut BuildCtx) -> BoxWidget {
+  fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
     unimplemented!();
   }
 }
