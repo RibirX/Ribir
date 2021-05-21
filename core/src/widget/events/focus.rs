@@ -70,12 +70,11 @@ impl<W: Widget> FocusListener<W> {
     major.auto_focus = auto_focus.unwrap_or(false);
     FocusListener { major, widget, others }
   }
-
   #[inline]
   pub fn focus_event_observable(
     &self,
   ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.major.subject.clone()
+    self.major.focus_event_observable()
   }
 
   pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
@@ -94,4 +93,13 @@ impl<W: Widget> FocusListener<W> {
 
   #[inline]
   pub fn tab_index(&self) -> i16 { self.major.tab_index }
+}
+
+impl FocusAttr {
+  #[inline]
+  pub fn focus_event_observable(
+    &self,
+  ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
+    self.subject.clone()
+  }
 }

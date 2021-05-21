@@ -96,7 +96,7 @@ impl PointerDispatcher {
       };
       common.bubble_dispatch(
         wid,
-        |listener: &WheelListener<BoxWidget>, event| {
+        |listener: &WheelAttr, event| {
           log::info!("char event: {:?}", event);
           listener.event_observable().next(event);
         },
@@ -113,7 +113,7 @@ impl PointerDispatcher {
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
         id.get(tree)
-          .map_or(false, |w| w.widget.find_attr::<FocusAttr>().is_some())
+          .map_or(false, |w| w.find_attr::<FocusAttr>().is_some())
       })
     });
     if let Some(focus_id) = nearest_focus {
@@ -173,7 +173,7 @@ impl PointerDispatcher {
         .ancestors(tree)
         .filter(|w| {
           w.get(tree)
-            .and_then(|w| w.widget.find_attr::<PointerAttr>())
+            .and_then(|w| w.find_attr::<PointerAttr>())
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -246,8 +246,8 @@ impl PointerDispatcher {
   }
   fn event_emitter(
     event_type: PointerEventType,
-  ) -> impl FnMut(&PointerListener<BoxWidget>, std::rc::Rc<PointerEvent>) {
-    move |listener: &PointerListener<BoxWidget>, event: std::rc::Rc<PointerEvent>| {
+  ) -> impl FnMut(&PointerListener<Box<dyn Widget>>, std::rc::Rc<PointerEvent>) {
+    move |listener: &PointerListener<Box<dyn Widget>>, event: std::rc::Rc<PointerEvent>| {
       log::info!("{:?} {:?}", event_type, event);
       listener
         .major

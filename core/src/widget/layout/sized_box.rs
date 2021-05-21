@@ -9,7 +9,7 @@ pub use smallvec::{smallvec, SmallVec};
 pub struct SizedBox {
   #[state]
   pub size: Size,
-  pub child: Option<BoxWidget>,
+  pub child: Option<Box<dyn Widget>>,
 }
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ impl RenderWidget for SizedBox {
   #[inline]
   fn create_render_object(&self) -> Self::RO { SizedBoxRender { size: self.size } }
 
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     self.child.take().map(|w| smallvec![w])
   }
 }

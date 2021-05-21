@@ -65,7 +65,7 @@ where
   }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     RenderWidget::take_children(self)
   }
 }

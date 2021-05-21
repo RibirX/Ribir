@@ -33,7 +33,7 @@ impl<W: Widget> WheelListener<W> {
 
   #[inline]
   pub fn event_observable(&self) -> LocalSubject<'static, Rc<WheelEvent>, ()> {
-    self.major.0.clone()
+    self.major.event_observable()
   }
 }
 
@@ -45,6 +45,11 @@ impl std::convert::AsRef<EventCommon> for WheelEvent {
 impl std::convert::AsMut<EventCommon> for WheelEvent {
   #[inline]
   fn as_mut(&mut self) -> &mut EventCommon { self.common.as_mut() }
+}
+
+impl WheelAttr {
+  #[inline]
+  pub fn event_observable(&self) -> LocalSubject<'static, Rc<WheelEvent>, ()> { self.0.clone() }
 }
 
 #[cfg(test)]
@@ -63,7 +68,7 @@ mod tests {
       .on_wheel(move |wheel| {
         *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y);
       });
-    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
+    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();
     let device_id = unsafe { DeviceId::dummy() };

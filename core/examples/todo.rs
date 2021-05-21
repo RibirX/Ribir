@@ -15,7 +15,7 @@ struct Todos {
 }
 
 impl CombinationWidget for StatefulTodos {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+  fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
     self
       .as_ref()
       .tasks
@@ -33,10 +33,9 @@ impl CombinationWidget for StatefulTodos {
           .push(
             checkbox
               .with_margin(EdgeInsets::horizontal(4.))
-              .with_key(idx)
-              .box_it(),
+              .with_key(idx),
           )
-          .push(Text(task.label.clone()).box_it())
+          .push(Text(task.label.clone()))
           .with_margin(EdgeInsets::vertical(4.))
           .box_it()
       })
@@ -69,5 +68,5 @@ fn main() {
   }
   .into_stateful();
 
-  Application::new().run(todo.box_it());
+  Application::new().run(todo);
 }

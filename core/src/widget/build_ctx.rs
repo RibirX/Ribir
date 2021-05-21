@@ -13,7 +13,7 @@ impl<'a> BuildCtx<'a> {
     self
       .wid
       .ancestors(tree)
-      .find_map(|id| id.get(tree).and_then(|w| w.widget.find_attr::<ThemeData>()))
+      .find_map(|id| id.get(tree).and_then(|w| w.find_attr::<ThemeData>()))
       .expect("At least， root theme should be found.")
   }
 
@@ -38,7 +38,7 @@ mod tests {
     let has_them = tree
       .root()
       .and_then(|root| root.get(&*tree))
-      .map_or(false, |w| w.widget.find_attr::<ThemeData>().is_some());
+      .map_or(false, |w| w.find_attr::<ThemeData>().is_some());
     assert!(has_them);
   }
 
@@ -48,7 +48,7 @@ mod tests {
   }
 
   impl CombinationWidget for ThemeTrack {
-    fn build(&self, ctx: &mut BuildCtx) -> BoxWidget {
+    fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
       self.themes.borrow_mut().push(ctx.theme().clone());
       SizedBox::empty_box(Size::zero()).box_it()
     }

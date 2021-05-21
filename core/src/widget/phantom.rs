@@ -4,5 +4,5 @@ use crate::prelude::*;
 pub struct PhantomWidget;
 
 impl CombinationWidget for PhantomWidget {
-  fn build(&self, _: &mut BuildCtx) -> BoxWidget { unreachable!() }
+  fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> { unreachable!() }
 }

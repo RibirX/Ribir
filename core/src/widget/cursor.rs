@@ -72,8 +72,7 @@ mod tests {
           .with_cursor(CursorIcon::Hand),
         )
     })
-    .with_cursor(CursorIcon::AllScroll)
-    .box_it();
+    .with_cursor(CursorIcon::AllScroll);
     let mut wnd = NoRenderWindow::without_render(widget_tree, Size::new(400., 400.));
 
     wnd.render_ready();

@@ -12,7 +12,7 @@ pub struct EdgeInsets {
 #[derive(Widget)]
 pub struct Margin {
   pub margin: EdgeInsets,
-  pub child: BoxWidget,
+  pub child: Box<dyn Widget>,
 }
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ impl RenderWidget for Margin {
   #[inline]
   fn create_render_object(&self) -> Self::RO { MarginRender(self.margin.clone()) }
 
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
       &mut self.child,
       PhantomWidget.box_it()
@@ -73,35 +73,15 @@ impl EdgeInsets {
   }
 
   #[inline]
-  pub fn only_left(left: f32) -> Self {
-    Self {
-      left,
-      ..Default::default()
-    }
-  }
+  pub fn only_left(left: f32) -> Self { Self { left, ..Default::default() } }
 
   #[inline]
-  pub fn only_right(right: f32) -> Self {
-    Self {
-      right,
-      ..Default::default()
-    }
-  }
+  pub fn only_right(right: f32) -> Self { Self { right, ..Default::default() } }
   #[inline]
-  pub fn only_bottom(bottom: f32) -> Self {
-    Self {
-      bottom,
-      ..Default::default()
-    }
-  }
+  pub fn only_bottom(bottom: f32) -> Self { Self { bottom, ..Default::default() } }
 
   #[inline]
-  pub fn only_top(top: f32) -> Self {
-    Self {
-      top,
-      ..Default::default()
-    }
-  }
+  pub fn only_top(top: f32) -> Self { Self { top, ..Default::default() } }
 
   #[inline]
   pub fn symmetrical(vertical: f32, horizontal: f32) -> Self {

@@ -46,11 +46,12 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
   /// widget.
   fn attrs_mut(&mut self) -> Option<AttrsMut>;
 
-  fn box_it(self) -> BoxWidget
+  #[inline]
+  fn box_it(self) -> Box<dyn Widget>
   where
     Self: Sized,
   {
-    BoxWidget { widget: Box::new(self) }
+    Box::new(self)
   }
 
   /// Insets the child of a widget by the given padding.
@@ -127,7 +128,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
 pub trait CombinationWidget: Widget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self, ctx: &mut BuildCtx) -> BoxWidget;
+  fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget>;
 }
 
 /// RenderWidget provide configuration for render object which provide actual
@@ -143,14 +144,14 @@ pub trait RenderWidget: Widget + Sized {
   /// Called by framework to take children from this widget, return some-value
   /// to if it has child, else return None. This method will only be called
   /// once. Should never directly call it.
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>>;
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>>;
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
 pub trait RenderWidgetSafety {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>>;
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>>;
 }
 
 pub trait AsAny {
@@ -219,66 +220,8 @@ impl<T: Widget + Any> AsAny for T {
   default fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
-// Todo: Remove BoxWidget after support specialization Box<dyn Widget>
-pub struct BoxWidget {
-  pub(crate) widget: Box<dyn Widget>,
-}
-
-impl AsAny for BoxWidget {
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self.widget.as_any() }
-
-#[inline]
-  fn as_any_mut(&mut self) -> &mut dyn Any { self.widget.as_any_mut() }
-}
-
-impl AttachAttr for BoxWidget {
-  type W = BoxWidget;
-  fn take_attr<A: Any>(mut self) -> (Option<A>, Option<Attrs>, Self::W) {
-    // todo: should remove.
-    if let Some(_) = self
-      .widget
-      .as_any_mut()
-      .downcast_mut::<AttrWidget<BoxWidget, A>>()
-    {
-      unimplemented!()
-      // w.take_attr()
-    } else {
-      (None, None, self)
-    }
-  }
-}
-
 impl<'a> dyn Widget + 'a {
   pub fn key(&self) -> Option<&Key> { self.find_attr() }
-}
-
-impl Widget for BoxWidget {
-  #[inline]
-  fn attrs_ref(&self) -> Option<AttrsRef> { self.widget.attrs_ref() }
-
-  #[inline]
-  fn attrs_mut(&mut self) -> Option<AttrsMut> { self.widget.attrs_mut() }
-
-  #[inline]
-  fn box_it(self) -> BoxWidget
-  where
-    Self: Sized,
-  {
-    self
-  }
-}
-
-impl BoxWidget {
-  #[inline]
-  pub fn key(&self) -> Option<&Key> { self.widget.key() }
-}
-
-proxy_impl_as_trait!(BoxWidget, widget);
-
-impl From<Box<dyn Widget>> for BoxWidget {
-  #[inline]
-  fn from(widget: Box<dyn Widget>) -> Self { Self { widget } }
 }
 
 impl<'a> dyn Widget + 'a {
@@ -293,32 +236,4 @@ impl<'a> dyn Widget + 'a {
   pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> {
     self.attrs_mut().and_then(|attrs| attrs.find_attr_mut())
   }
-}
-
-pub(crate) macro proxy_impl_as_trait(
-  $name: ty,
-  $proxy_member: tt) {
-  impl AsCombination for $name {
-    #[inline]
-    fn as_combination(&self) -> Option<&dyn CombinationWidget> {
-      self.$proxy_member.as_combination()
-    }
-
-    #[inline]
-    fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> {
-      self.$proxy_member.as_combination_mut()
-    }
-  }
-
-  impl AsRender for $name {
-    #[inline]
-    fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { self.$proxy_member.as_render() }
-
-    #[inline]
-    fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> {
-      self.$proxy_member.as_render_mut()
-    }
-  }
-
-  // AsAny should not be proxy.
 }

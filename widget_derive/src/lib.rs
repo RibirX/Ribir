@@ -66,8 +66,11 @@ pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(RenderWidget, attributes(proxy))]
 pub fn render_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
-
-  render_derive::render_derive(&input).into()
+  let tokens = render_derive::render_derive(&input).into();
+  if input.ident == "AttrWidget" {
+    println!("{}", tokens);
+  }
+  tokens
 }
 
 #[proc_macro_derive(Stateful, attributes(state))]

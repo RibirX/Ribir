@@ -59,7 +59,7 @@ pub struct Flex {
   pub cross_align: CrossAxisAlign,
   /// How the children should be placed along the main axis in a flex layout.
   pub main_align: MainAxisAlign,
-  pub children: SmallVec<[BoxWidget; 1]>,
+  pub children: SmallVec<[Box<dyn Widget>; 1]>,
 }
 
 #[derive(Debug)]
@@ -115,8 +115,8 @@ impl Flex {
   }
 }
 
-impl std::iter::FromIterator<BoxWidget> for Flex {
-  fn from_iter<T: IntoIterator<Item = BoxWidget>>(iter: T) -> Self {
+impl std::iter::FromIterator<Box<dyn Widget>> for Flex {
+  fn from_iter<T: IntoIterator<Item = Box<dyn Widget>>>(iter: T) -> Self {
     Self {
       children: iter.into_iter().collect(),
       ..Default::default()
@@ -147,7 +147,7 @@ impl RenderWidget for Flex {
   }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[BoxWidget; 1]>> {
+  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(std::mem::replace(&mut self.children, smallvec![]))
   }
 }
