@@ -3,8 +3,9 @@ use crate::prelude::*;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct Expanded {
+  #[state]
   pub flex: f32,
   pub child: Box<dyn Widget>,
 }
@@ -33,13 +34,10 @@ pub struct ExpandedRender {
 }
 
 impl RenderObject for ExpandedRender {
-  type Owner = Expanded;
+  type States = ExpandedState;
 
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if (owner_widget.flex - self.flex).abs() > f32::EPSILON {
-      ctx.mark_needs_layout();
-    }
-  }
+  #[inline]
+  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.flex = states.flex; }
 
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {

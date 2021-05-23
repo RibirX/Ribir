@@ -147,9 +147,10 @@ impl WidgetTree {
 
       let safety = widget.as_render().expect("Must be a render widget!");
 
-      rid
-        .get_mut(r_tree1)
-        .update(safety, &mut UpdateCtx::new(rid, r_tree2));
+      rid.get_mut(r_tree1).update(
+        safety.clone_boxed_states(),
+        &mut UpdateCtx::new(rid, r_tree2),
+      );
     });
 
     self.changed_widgets.clear();

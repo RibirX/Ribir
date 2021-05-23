@@ -14,8 +14,21 @@ use std::{
 /// `Stateful` trait can only implement for raw widget which not attach any
 /// attributes on.
 pub trait Stateful: Widget {
-  type RawWidget;
+  type RawWidget: CloneStates;
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget>;
+}
+
+/// Trait for state change detect, this is different than equality comparisons.
+/// And no strictly rules to follow, just need to make sure it's implementation
+/// is cheap, some complexity struct can always return 'false'.
+pub trait StatePartialEq<Rhs: ?Sized = Self> {
+  fn eq(&self, other: &Rhs) -> bool;
+}
+
+/// Clone the states from the widget.
+pub trait CloneStates {
+  type States: StatePartialEq;
+  fn clone_states(&self) -> Self::States;
 }
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
@@ -78,7 +91,7 @@ impl<W: 'static> Widget for StatefulImpl<W> {
   default fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
 }
 
-impl<W> Stateful for StatefulImpl<W>
+impl<W: CloneStates> Stateful for StatefulImpl<W>
 where
   Self: Widget,
 {
@@ -91,7 +104,7 @@ where
   }
 }
 
-impl<W> IntoStateful for StatefulImpl<W>
+impl<W: CloneStates> IntoStateful for StatefulImpl<W>
 where
   Self: Widget,
 {
@@ -120,7 +133,7 @@ impl<W: 'static> Clone for StateRefCell<W> {
   }
 }
 
-impl<W: 'static> StatefulImpl<W> {
+impl<W: CloneStates + 'static> StatefulImpl<W> {
   pub fn new(w: W) -> Self {
     Self {
       info: <_>::default(),
@@ -224,15 +237,17 @@ impl<W: CombinationWidget> CombinationWidget for RcWidget<W> {
   #[inline]
   fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> { self.0.borrow().build(ctx) }
 }
-pub struct StateInnerRender<R>(R);
+
+impl<W: CloneStates> CloneStates for RcWidget<W> {
+  type States = W::States;
+  fn clone_states(&self) -> Self::States { self.0.borrow().clone_states() }
+}
 
 impl<W: RenderWidget> RenderWidget for RcWidget<W> {
-  type RO = StateInnerRender<W::RO>;
+  type RO = W::RO;
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO {
-    StateInnerRender(self.0.borrow().create_render_object())
-  }
+  fn create_render_object(&self) -> Self::RO { self.0.borrow().create_render_object() }
 
   #[inline]
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
@@ -240,26 +255,29 @@ impl<W: RenderWidget> RenderWidget for RcWidget<W> {
   }
 }
 
-impl<R: RenderObject> RenderObject for StateInnerRender<R> {
-  type Owner = RcWidget<R::Owner>;
+macro state_partial_impl($($ty: ty)*) {
+  $(impl StatePartialEq for $ty {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool { self == other }
+  })*
+}
 
-  #[inline]
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    self.0.update(&*owner_widget.0.borrow(), ctx)
+state_partial_impl! {
+  () usize u8 u16 u32 u64 u128
+  isize i8 i16 i32 i64 i128
+  f32 f64 String bool
+}
+
+impl<T: StatePartialEq> StatePartialEq<Self> for Option<T> {
+  fn eq(&self, other: &Self) -> bool {
+    match self {
+      Some(lhs) => match other {
+        Some(rhs) => lhs.eq(rhs),
+        None => false,
+      },
+      None => other.is_none(),
+    }
   }
-  #[inline]
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    self.0.perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.0.only_sized_by_parent() }
-
-  #[inline]
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) { self.0.paint(ctx) }
-
-  #[inline]
-  fn transform(&self) -> Option<Transform> { self.0.transform() }
 }
 
 #[cfg(test)]

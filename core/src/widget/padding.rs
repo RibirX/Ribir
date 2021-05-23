@@ -1,8 +1,9 @@
 use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct Padding {
+  #[state]
   pub padding: EdgeInsets,
   pub child: Box<dyn Widget>,
 }
@@ -25,12 +26,9 @@ impl RenderWidget for Padding {
 }
 
 impl RenderObject for PaddingRender {
-  type Owner = Padding;
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if self.0 != owner_widget.padding {
-      ctx.mark_needs_layout()
-    }
-  }
+  type States = PaddingState;
+  #[inline]
+  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.0 = states.padding; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     debug_assert_eq!(ctx.children().count(), 1);

@@ -43,6 +43,7 @@ extern crate proc_macro2;
 mod attr_fields;
 mod combination_derive;
 mod render_derive;
+mod state_partial_eq_derive;
 mod widget_derive;
 
 mod state_derive;
@@ -78,4 +79,22 @@ pub fn stateful_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
 
   state_derive::stateful_derive(&input).into()
+}
+
+#[proc_macro_derive(StatePartialEq)]
+pub fn state_partial_eq_macro_derive(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  // if input.ident == "Direction" {
+  //   let quote =
+  // state_partial_eq_derive::derive_state_partial_eq(&input).into();
+  //   println!(
+  //     "-------------------------------TextState----------------------------------
+  //   {}",
+  //     quote
+  //   );
+  //   quote
+  // } else {
+  //   (quote::quote! {}).into()
+  // }
+  state_partial_eq_derive::derive_state_partial_eq(&input).into()
 }

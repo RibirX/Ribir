@@ -98,7 +98,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
 
   /// Let this widget horizontal scrollable and the scroll view is as large as
   /// its parent allow.
-  fn x_scrollable(self) -> WheelListener<StatefulImpl<ScrollableX>>
+  fn x_scrollable(self) -> WheelListener<StatefulScrollableX>
   where
     Self: Sized,
   {
@@ -107,7 +107,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
 
   /// Let this widget vertical scrollable and the scroll view is as large as
   /// its parent allow.
-  fn y_scrollable(self) -> WheelListener<StatefulImpl<ScrollableY>>
+  fn y_scrollable(self) -> WheelListener<StatefulScrollableY>
   where
     Self: Sized,
   {
@@ -116,7 +116,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
 
   /// Let this widget both scrollable in horizontal and vertical, and the scroll
   /// view is as large as its parent allow.
-  fn both_scrollable(self) -> WheelListener<StatefulImpl<ScrollableBoth>>
+  fn both_scrollable(self) -> WheelListener<StatefulScrollableBoth>
   where
     Self: Sized,
   {
@@ -133,9 +133,9 @@ pub trait CombinationWidget: Widget {
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: Widget + Sized {
+pub trait RenderWidget: Widget + CloneStates + Sized {
   /// The render object type will created.
-  type RO: RenderObject<Owner = Self> + Send + Sync + 'static;
+  type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
@@ -152,6 +152,7 @@ pub trait RenderWidget: Widget + Sized {
 pub trait RenderWidgetSafety {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>>;
+  fn clone_boxed_states(&self) -> Box<dyn Any>;
 }
 
 pub trait AsAny {

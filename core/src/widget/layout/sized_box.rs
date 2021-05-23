@@ -54,14 +54,10 @@ impl RenderWidget for SizedBox {
 }
 
 impl RenderObject for SizedBoxRender {
-  type Owner = SizedBox;
+  type States = SizedBoxState;
 
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if self.size != owner_widget.size {
-      self.size = owner_widget.size;
-      ctx.mark_needs_layout();
-    }
-  }
+  #[inline]
+  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.size = states.size; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let size = clamp.clamp(self.size);
@@ -80,6 +76,11 @@ impl RenderObject for SizedBoxRender {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
     // nothing to paint, just a layout widget.
   }
+}
+
+impl StatePartialEq<Self> for Size {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self == other }
 }
 
 #[cfg(test)]

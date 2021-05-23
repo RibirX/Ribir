@@ -98,36 +98,38 @@ impl CombinationWidget for StatefulCheckbox {
   }
 }
 
-#[derive(Debug, Widget, Clone)]
+#[derive(Debug, Widget, Clone, Stateful)]
 pub struct CheckboxMarker {
+  #[state]
   check_mark_width: f32,
+  #[state]
   path: Path,
+  #[state]
   color: Color,
+  #[state]
   size: f32,
 }
 
+pub struct CheckboxMarkerRender(CheckboxMarkerState);
+
 impl RenderWidget for CheckboxMarker {
-  type RO = CheckboxMarker;
+  type RO = CheckboxMarkerRender;
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
+  fn create_render_object(&self) -> Self::RO { CheckboxMarkerRender(self.clone_states()) }
 
   #[inline]
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> { None }
 }
 
-impl RenderObject for CheckboxMarker {
-  type Owner = CheckboxMarker;
+impl RenderObject for CheckboxMarkerRender {
+  type States = CheckboxMarkerState;
 
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if (owner_widget.size - self.size).abs() < f32::EPSILON {
-      ctx.mark_needs_layout();
-    }
-    *self = owner_widget.clone();
-  }
+  #[inline]
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.0 = states; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, _: &mut RenderCtx) -> Size {
-    Size::new(self.size, self.size).clamp(clamp.min, clamp.max)
+    Size::new(self.0.size, self.0.size).clamp(clamp.min, clamp.max)
   }
 
   #[inline]
@@ -136,10 +138,15 @@ impl RenderObject for CheckboxMarker {
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
     ctx
       .painter()
-      .set_style(self.color.clone())
-      .set_line_width(self.check_mark_width)
-      .stroke_path(self.path.clone());
+      .set_style(self.0.color.clone())
+      .set_line_width(self.0.check_mark_width)
+      .stroke_path(self.0.path.clone());
   }
+}
+
+impl StatePartialEq<Self> for Path {
+  #[inline]
+  fn eq(&self, _: &Self) -> bool { false }
 }
 
 #[cfg(test)]

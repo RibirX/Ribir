@@ -9,7 +9,7 @@ pub struct PathBuilder(lyon::path::path::Builder);
 #[derive(Debug, Clone)]
 pub struct Path(pub(crate) lyon::path::Path);
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct BorderRadius {
   pub top_left: Vector,
   pub top_right: Vector,
