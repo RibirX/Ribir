@@ -42,19 +42,20 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
 
       let state_def = if info.attr_fields.is_tuple {
         quote! {
-          #[derive(PartialEq)]
+          #[derive(StatePartialEq)]
           #vis struct #state_name #ty_generics #where_clause (
             #(#state_fields ,)*
           );
         }
       } else {
         quote! {
-          #[derive(Clone, PartialEq)]
+          #[derive(StatePartialEq)]
           #vis struct #state_name #ty_generics #where_clause {
             #(#state_fields, )*
           }
         }
       };
+
       quote! {
         // Define custom state.
         #state_def
@@ -80,15 +81,11 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
           }
         }
 
-        impl #w_impl_generics std::ops::Deref for #stateful_name #w_ty_generics #w_where_clause {
-          type Target = StatefulImpl<#name #w_ty_generics>;
-          #[inline]
-          fn deref(&self) -> &Self::Target { &self.0}
-        }
-
-        impl #w_impl_generics std::ops::DerefMut for #stateful_name #w_ty_generics #w_where_clause {
-          #[inline]
-          fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+        impl #w_impl_generics CloneStates for #name #w_ty_generics #w_where_clause {
+          type States =  #state_name #ty_generics;
+          fn clone_states(&self) -> Self::States {
+            unimplemented!()
+          }
         }
 
         impl #w_impl_generics IntoStateful for #name #w_ty_generics #w_where_clause {
@@ -98,6 +95,17 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
           fn into_stateful(self) -> Self::S {
             #stateful_name(StatefulImpl::new(self))
           }
+        }
+
+        impl #w_impl_generics std::ops::Deref for #stateful_name #w_ty_generics #w_where_clause {
+          type Target = StatefulImpl<#name #w_ty_generics>;
+          #[inline]
+          fn deref(&self) -> &Self::Target { &self.0}
+        }
+
+        impl #w_impl_generics std::ops::DerefMut for #stateful_name #w_ty_generics #w_where_clause {
+          #[inline]
+          fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
         }
       }
     }

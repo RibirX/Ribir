@@ -67,7 +67,7 @@ The widget tree corresponds to the user interface, and `RenderTree` is created b
 
 ## Stateless and Stateful
 
-As default, every widget is stateless, just present like what you declare and no interactive. But in real world we often need change widget to another state to respond to user actions, IO request and so on. A way to support it is rebuild the whole widget tree and do a tree diff to update the minimal render tree. But we provide another way to do it, every widget can across `into_stateful` convert to a stateful widget, a `StateRef` will also return at the same time, which can be used to modify the states of the widget.
+As default, every widget is stateless, just present like what you declare and no interactive. But in real world we often need change widget to another state to respond to user actions, IO request and so on. A way to support it is rebuild the whole widget tree and do a tree diff to update the minimal render tree. But we provide another way to do it, widget can across `into_stateful` convert to a stateful widget, which can be used to reference the widget and modify the states of the widget.
 
 ### Layout
 

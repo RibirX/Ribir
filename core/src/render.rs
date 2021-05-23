@@ -11,10 +11,10 @@ pub use update_ctx::UpdateCtx;
 
 /// The `Owner` is the render widget which created this object.
 pub trait RenderObject: Sized + Send + Sync + 'static {
-  type Owner: RenderWidget<RO = Self>;
-  /// Call by framework when its owner `owner_widget` changed, should not call
-  /// this method directly.
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx);
+  type States;
+  /// Call by framework when the state of its render widget changed, should not
+  /// call this method directly.
+  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx);
 
   /// Do the work of computing the layout for this render object, and return the
   /// size it need.
@@ -42,17 +42,11 @@ pub trait RenderObject: Sized + Send + Sync + 'static {
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
 /// implement this trait, just implement [`RenderObject`](RenderObject).
 pub trait RenderObjectSafety: Any {
-  fn update(&mut self, owner_widget: &dyn RenderWidgetSafety, ctx: &mut UpdateCtx);
+  fn update(&mut self, states: Box<dyn Any>, ctx: &mut UpdateCtx);
   fn perform_layout(&mut self, limit: BoxClamp, ctx: &mut RenderCtx) -> Size;
   fn only_sized_by_parent(&self) -> bool;
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
   fn transform(&self) -> Option<Transform>;
-}
-
-fn downcast_widget<T: RenderWidget>(obj: &dyn RenderWidgetSafety) -> &T {
-  let ptr = obj as *const dyn RenderWidgetSafety as *const T;
-  // SAFETY: in this mod, we know obj must be type `T`.
-  unsafe { &*ptr }
 }
 
 impl<T> RenderWidgetSafety for T
@@ -68,6 +62,9 @@ where
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     RenderWidget::take_children(self)
   }
+
+  #[inline]
+  fn clone_boxed_states(&self) -> Box<dyn Any> { Box::new(self.clone_states()) }
 }
 
 impl<T> RenderObjectSafety for T
@@ -75,8 +72,17 @@ where
   T: RenderObject,
 {
   #[inline]
-  fn update(&mut self, owner_widget: &dyn RenderWidgetSafety, ctx: &mut UpdateCtx) {
-    RenderObject::update(self, downcast_widget(owner_widget), ctx)
+  fn update(&mut self, states: Box<dyn Any>, ctx: &mut UpdateCtx) {
+    let raw_states = states.downcast_ref::<T::States>().unwrap();
+    let mut copy = std::mem::MaybeUninit::<T::States>::uninit();
+    let copy = unsafe {
+      copy
+        .as_mut_ptr()
+        .copy_from(raw_states as *const T::States, 1);
+      copy.assume_init()
+    };
+    RenderObject::update(self, copy, ctx);
+    std::mem::forget(states)
   }
 
   #[inline]

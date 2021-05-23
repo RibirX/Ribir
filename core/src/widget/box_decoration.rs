@@ -1,18 +1,22 @@
 use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
+#[derive(Stateful)]
 pub struct BoxDecoration {
   pub child: Box<dyn Widget>,
   /// The background of the box.
+  #[state]
   pub background: Option<FillStyle>,
   /// A border to draw above the background
+  #[state]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
+  #[state]
   pub radius: Option<BorderRadius>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, StatePartialEq)]
 pub struct Border {
   pub left: BorderSide,
   pub right: BorderSide,
@@ -20,18 +24,27 @@ pub struct Border {
   pub bottom: BorderSide,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, StatePartialEq)]
 pub struct BorderSide {
   pub color: Color,
   pub width: f32,
 }
 
-#[derive(Debug)]
-pub struct BoxDecorationRender {
-  pub background: Option<FillStyle>,
-  pub border: Option<Border>,
-  pub radius: Option<BorderRadius>,
+impl StatePartialEq<Self> for Color {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self == other }
 }
+
+impl StatePartialEq<Self> for FillStyle {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self == other }
+}
+
+impl StatePartialEq<Self> for BorderRadius {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self == other }
+}
+pub struct BoxDecorationRender(BoxDecorationState);
 
 impl BoxDecoration {
   pub fn new(child: Box<dyn Widget>) -> Self {
@@ -79,13 +92,8 @@ impl AttachAttr for BoxDecoration {
 
 impl RenderWidget for BoxDecoration {
   type RO = BoxDecorationRender;
-  fn create_render_object(&self) -> Self::RO {
-    BoxDecorationRender {
-      border: self.border.clone(),
-      radius: self.radius.clone(),
-      background: self.background.clone(),
-    }
-  }
+  #[inline]
+  fn create_render_object(&self) -> Self::RO { BoxDecorationRender(self.clone_states()) }
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
       &mut self.child,
@@ -95,10 +103,10 @@ impl RenderWidget for BoxDecoration {
 }
 
 impl RenderObject for BoxDecorationRender {
-  type Owner = BoxDecoration;
+  type States = BoxDecorationState;
 
   #[inline]
-  fn update(&mut self, _: &Self::Owner, _: &mut UpdateCtx) {}
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.0 = states }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
@@ -110,7 +118,7 @@ impl RenderObject for BoxDecorationRender {
       .next()
       .expect("BoxDecoration must have one child.");
     let mut size = child.perform_layout(clamp);
-    if let Some(ref border) = self.border {
+    if let Some(ref border) = self.0.border {
       size.width += border.left.width + border.right.width;
       size.height += border.top.width + border.bottom.width;
       child.update_position(Point::new(border.left.width, border.top.width));
@@ -127,9 +135,9 @@ impl RenderObject for BoxDecorationRender {
       .expect("BoxDecoration must have one child.");
 
     let painter = ctx.painter();
-    if let Some(ref background) = self.background {
+    if let Some(ref background) = self.0.background {
       painter.set_style(background.clone());
-      if let Some(radius) = &self.radius {
+      if let Some(radius) = &self.0.radius {
         painter.rect_round(&content_rect, radius);
       } else {
         painter.rect(&content_rect);
@@ -153,7 +161,7 @@ impl BoxDecorationRender {
     if path_to_paint.is_empty() {
       return;
     }
-    let border = self.border.as_ref().unwrap();
+    let border = self.0.border.as_ref().unwrap();
     // A continue rect round border.
     if path_to_paint.len() == 1 && path_to_paint[0].len() == 4 {
       let border_width = border.left.width;
@@ -163,7 +171,7 @@ impl BoxDecorationRender {
 
       let half_boder = border_width / 2.;
       let rect = rect.inflate(half_boder, half_boder);
-      if let Some(ref radius) = self.radius {
+      if let Some(ref radius) = self.0.radius {
         painter.rect_round(&rect, radius);
       } else {
         painter.rect(&rect);
@@ -185,7 +193,7 @@ impl BoxDecorationRender {
         top_right,
         bottom_left,
         bottom_right,
-      }) = self.radius
+      }) = self.0.radius
       {
         tl_x = top_left.x.abs().min(w);
         tl_y = top_left.y.abs().min(h);
@@ -320,7 +328,7 @@ impl BoxDecorationRender {
 
   fn continues_border(&self) -> Vec<Vec<BorderPosition>> {
     let mut path_to_paint = vec![];
-    if let Some(border) = &self.border {
+    if let Some(border) = &self.0.border {
       let mut continues_border = vec![];
 
       if border.top.is_visible() {

@@ -4,7 +4,7 @@ use crate::render::render_tree::*;
 use smallvec::{smallvec, SmallVec};
 
 /// How the children should be placed along the cross axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, StatePartialEq)]
 pub enum CrossAxisAlign {
   /// Place the children with their start edge aligned with the start side of
   /// the cross axis.
@@ -20,7 +20,7 @@ pub enum CrossAxisAlign {
 }
 
 /// How the children should be placed along the main axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, StatePartialEq)]
 pub enum MainAxisAlign {
   /// Place the children as close to the start of the main axis as possible.
   Start,
@@ -45,31 +45,29 @@ pub enum MainAxisAlign {
   SpaceEvenly,
 }
 
-#[derive(Widget, Default)]
+#[derive(Widget, Default, Stateful)]
 pub struct Flex {
   /// Reverse the main axis.
+  #[state]
   pub reverse: bool,
   /// Whether flex items are forced onto one line or can wrap onto multiple
   /// lines
+  #[state]
   pub wrap: bool,
   /// Sets how flex items are placed in the flex container defining the main
   /// axis and the direction
+  #[state]
   pub direction: Direction,
   /// How the children should be placed along the cross axis in a flex layout.
+  #[state]
   pub cross_align: CrossAxisAlign,
   /// How the children should be placed along the main axis in a flex layout.
+  #[state]
   pub main_align: MainAxisAlign,
   pub children: SmallVec<[Box<dyn Widget>; 1]>,
 }
 
-#[derive(Debug)]
-pub struct FlexRender {
-  pub reverse: bool,
-  pub direction: Direction,
-  cross_align: CrossAxisAlign,
-  main_align: MainAxisAlign,
-  pub wrap: bool,
-}
+pub struct FlexRender(FlexState);
 
 impl Flex {
   /// Add a children into the flex container.
@@ -136,15 +134,8 @@ impl Default for MainAxisAlign {
 
 impl RenderWidget for Flex {
   type RO = FlexRender;
-  fn create_render_object(&self) -> Self::RO {
-    FlexRender {
-      reverse: self.reverse,
-      direction: self.direction,
-      wrap: self.wrap,
-      cross_align: self.cross_align,
-      main_align: self.main_align,
-    }
-  }
+  #[inline]
+  fn create_render_object(&self) -> Self::RO { FlexRender(self.clone_states()) }
 
   #[inline]
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
@@ -153,44 +144,23 @@ impl RenderWidget for Flex {
 }
 
 impl RenderObject for FlexRender {
-  type Owner = Flex;
-  fn update(&mut self, owner: &Self::Owner, ctx: &mut UpdateCtx) {
-    if self.wrap != owner.wrap {
-      self.wrap = owner.wrap;
-      ctx.mark_needs_layout();
-    }
-    if self.reverse != owner.reverse {
-      self.reverse = owner.reverse;
-      ctx.mark_needs_layout();
-    }
-    if self.direction != owner.direction {
-      self.direction = owner.direction;
-      ctx.mark_needs_layout();
-    }
-    if self.cross_align != owner.cross_align {
-      self.cross_align = owner.cross_align;
-      ctx.mark_needs_layout();
-    }
-
-    if self.main_align != owner.main_align {
-      self.main_align = owner.main_align;
-      ctx.mark_needs_layout();
-    }
-  }
+  type States = FlexState;
+  #[inline]
+  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.0 = states; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let direction = self.direction;
+    let direction = self.0.direction;
     let mut layouter = FlexLayouter {
       max_size: FlexSize::from_size(clamp.max, direction),
       min_size: FlexSize::from_size(clamp.min, direction),
       direction,
-      reverse: self.reverse,
-      wrap: self.wrap,
+      reverse: self.0.reverse,
+      wrap: self.0.wrap,
       main_max: 0.,
       current_line: <_>::default(),
       lines_info: vec![],
-      cross_align: self.cross_align,
-      main_align: self.main_align,
+      cross_align: self.0.cross_align,
+      main_align: self.0.main_align,
     };
     layouter.layout(ctx)
   }

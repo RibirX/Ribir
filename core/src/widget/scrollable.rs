@@ -1,44 +1,29 @@
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct ScrollableX {
   child: Option<Box<dyn Widget>>,
+  #[state]
   pos: f32,
 }
 
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct ScrollableY {
   child: Option<Box<dyn Widget>>,
+  #[state]
   pos: f32,
 }
 
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct ScrollableBoth {
   child: Option<Box<dyn Widget>>,
+  #[state]
   pos: Point,
-}
-
-impl IntoStateful for ScrollableX {
-  type S = StatefulImpl<ScrollableX>;
-  #[inline]
-  fn into_stateful(self) -> Self::S { StatefulImpl::new(self) }
-}
-
-impl IntoStateful for ScrollableY {
-  type S = StatefulImpl<ScrollableY>;
-  #[inline]
-  fn into_stateful(self) -> Self::S { StatefulImpl::new(self) }
-}
-
-impl IntoStateful for ScrollableBoth {
-  type S = StatefulImpl<ScrollableBoth>;
-  #[inline]
-  fn into_stateful(self) -> Self::S { StatefulImpl::new(self) }
 }
 
 impl ScrollableX {
   #[inline]
-  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulImpl<Self>> {
+  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableX> {
     let scroll = ScrollableX { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -54,7 +39,7 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulImpl<Self>> {
+  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableY> {
     let scroll = ScrollableY { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -70,7 +55,7 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn new(child: Box<dyn Widget>, pos: Point) -> WheelListener<StatefulImpl<Self>> {
+  pub fn new(child: Box<dyn Widget>, pos: Point) -> WheelListener<StatefulScrollableBoth> {
     let scroll = ScrollableBoth { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -87,84 +72,48 @@ impl ScrollableBoth {
   }
 }
 
-#[derive(Debug)]
-pub struct XRender {
-  pos: f32,
-}
+macro scroll_render_widget_impl($widget: ty, $state: ty) {
+  impl RenderWidget for $widget {
+    type RO = ScrollRender<$state>;
 
-#[derive(Debug)]
-pub struct YRender {
-  pos: f32,
-}
+    #[inline]
+    fn create_render_object(&self) -> Self::RO { ScrollRender { states: self.clone_states() } }
 
-#[derive(Debug)]
-pub struct BothRender {
-  pos: Point,
-}
-
-impl RenderWidget for ScrollableX {
-  type RO = XRender;
-
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { XRender { pos: self.pos } }
-
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    self.child.take().map(|w| smallvec![w])
+    fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
+      self.child.take().map(|w| smallvec![w])
+    }
   }
 }
 
-impl RenderWidget for ScrollableY {
-  type RO = YRender;
-
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { YRender { pos: self.pos } }
-
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    self.child.take().map(|w| smallvec![w])
-  }
-}
-
-impl RenderWidget for ScrollableBoth {
-  type RO = BothRender;
-
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { BothRender { pos: self.pos } }
-
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    self.child.take().map(|w| smallvec![w])
-  }
-}
+scroll_render_widget_impl!(ScrollableX, ScrollableXState);
+scroll_render_widget_impl!(ScrollableY, ScrollableYState);
+scroll_render_widget_impl!(ScrollableBoth, ScrollableBothState);
 
 #[inline]
 fn validate_pos(view: f32, content: f32, pos: f32) -> f32 { pos.min(0.).max(view - content) }
 
 pub trait ScrollWorker {
-  type Owner;
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp;
 
   fn content_pos(&self, content: Size, view: &Size) -> Point;
-
-  fn update_state(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx);
 }
 
-impl<T, O> RenderObject for T
-where
-  T: ScrollWorker<Owner = O> + Send + Sync + std::fmt::Debug + 'static,
-  O: RenderWidget<RO = T>,
-{
-  type Owner = O;
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    self.update_state(owner_widget, ctx);
-  }
+pub struct ScrollRender<States> {
+  states: States,
+}
+
+impl<S: ScrollWorker + Sync + Send + 'static> RenderObject for ScrollRender<S> {
+  type States = S;
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.states = states; }
 
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     debug_assert_eq!(ctx.children().count(), 1);
     let size = clamp.max;
     if let Some(mut child) = ctx.children().next() {
-      let content_clamp = self.content_clamp(clamp);
+      let content_clamp = self.states.content_clamp(clamp);
       let content = child.perform_layout(content_clamp);
-      let pos = self.content_pos(content, &size);
+      let pos = self.states.content_pos(content, &size);
       child.update_position(pos);
     }
 
@@ -178,9 +127,7 @@ where
   }
 }
 
-impl ScrollWorker for XRender {
-  type Owner = ScrollableX;
-
+impl ScrollWorker for ScrollableXState {
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp {
     let min = Size::zero();
     let mut max = clamp.max;
@@ -192,18 +139,9 @@ impl ScrollWorker for XRender {
   fn content_pos(&self, content: Size, view: &Size) -> Point {
     Point::new(validate_pos(view.width, content.width, self.pos), 0.)
   }
-
-  fn update_state(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if (self.pos - owner_widget.pos).abs() > f32::EPSILON {
-      self.pos = owner_widget.pos;
-      ctx.mark_needs_layout()
-    }
-  }
 }
 
-impl ScrollWorker for YRender {
-  type Owner = ScrollableY;
-
+impl ScrollWorker for ScrollableYState {
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp {
     let min = Size::zero();
     let mut max = clamp.max;
@@ -215,18 +153,9 @@ impl ScrollWorker for YRender {
   fn content_pos(&self, content: Size, view: &Size) -> Point {
     Point::new(0., validate_pos(view.height, content.height, self.pos))
   }
-
-  fn update_state(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if (self.pos - owner_widget.pos).abs() > f32::EPSILON {
-      self.pos = owner_widget.pos;
-      ctx.mark_needs_layout()
-    }
-  }
 }
 
-impl ScrollWorker for BothRender {
-  type Owner = ScrollableBoth;
-
+impl ScrollWorker for ScrollableBothState {
   fn content_clamp(&self, _: BoxClamp) -> BoxClamp {
     BoxClamp {
       min: Size::zero(),
@@ -239,13 +168,6 @@ impl ScrollWorker for BothRender {
       validate_pos(view.width, content.width, self.pos.x),
       validate_pos(view.height, content.height, self.pos.y),
     )
-  }
-
-  fn update_state(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if self.pos != owner_widget.pos {
-      self.pos = owner_widget.pos;
-      ctx.mark_needs_layout()
-    }
   }
 }
 
@@ -263,6 +185,11 @@ fn view_content(event: &WheelEvent) -> (Rect, Rect) {
   let view = widget_rect(target, w_tree, r_tree);
   let content = widget_rect(target.first_child(w_tree).unwrap(), w_tree, r_tree);
   (view, content)
+}
+
+impl StatePartialEq for Point {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self == other }
 }
 
 #[cfg(test)]

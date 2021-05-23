@@ -264,7 +264,8 @@ pub trait AttachAttr {
   fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W);
 }
 
-#[derive(CombinationWidget, RenderWidget)]
+// todo should derive render widget.
+#[derive(CombinationWidget)]
 pub struct AttrWidget<W, A: Any> {
   #[proxy]
   pub widget: W,

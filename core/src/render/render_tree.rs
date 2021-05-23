@@ -68,7 +68,7 @@ impl RenderTree {
   #[inline]
   pub fn root(&self) -> Option<RenderId> { self.root }
 
-  pub fn set_root(
+  pub(crate) fn set_root(
     &mut self,
     owner: WidgetId,
     data: Box<dyn RenderObjectSafety + Send + Sync>,
@@ -82,7 +82,7 @@ impl RenderTree {
   }
 
   #[inline]
-  pub fn new_node(&mut self, data: Box<dyn RenderObjectSafety + Send + Sync>) -> RenderId {
+  pub(crate) fn new_node(&mut self, data: Box<dyn RenderObjectSafety + Send + Sync>) -> RenderId {
     RenderId(self.arena.new_node(data))
   }
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, StatePartialEq)]
 pub struct EdgeInsets {
   pub left: f32,
   pub right: f32,
@@ -9,8 +9,9 @@ pub struct EdgeInsets {
 }
 
 /// A widget that crate space around its child.
-#[derive(Widget)]
+#[derive(Widget, Stateful)]
 pub struct Margin {
+  #[state]
   pub margin: EdgeInsets,
   pub child: Box<dyn Widget>,
 }
@@ -32,12 +33,9 @@ impl RenderWidget for Margin {
 }
 
 impl RenderObject for MarginRender {
-  type Owner = Margin;
-  fn update(&mut self, owner_widget: &Self::Owner, ctx: &mut UpdateCtx) {
-    if owner_widget.margin != self.0 {
-      ctx.mark_needs_layout();
-    }
-  }
+  type States = MarginState;
+  #[inline]
+  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.0 = states.margin; }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }

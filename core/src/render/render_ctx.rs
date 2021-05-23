@@ -21,11 +21,7 @@ impl<'a> RenderCtx<'a> {
     canvas: Pin<&'a mut Canvas>,
     current: RenderId,
   ) -> RenderCtx<'a> {
-    RenderCtx {
-      tree,
-      canvas,
-      render_obj: current,
-    }
+    RenderCtx { tree, canvas, render_obj: current }
   }
 
   /// Return the render id of the render object this context standard for.
@@ -95,7 +91,7 @@ impl<'a> RenderCtx<'a> {
   pub fn box_rect(&self) -> Option<Rect> { self.render_obj.layout_box_rect(&*self.tree) }
 
   /// Return render object of this context.
-  pub fn render_obj(&self) -> &(dyn RenderObjectSafety + 'static) {
+  pub(crate) fn render_obj(&self) -> &(dyn RenderObjectSafety + 'static) {
     self
       .render_obj
       .get(&*self.tree)
@@ -114,10 +110,8 @@ impl<'a> RenderCtx<'a> {
   // todo support custom font
   pub fn mesure_text(&mut self, text: &str) -> Rect {
     let font = FontInfo::default();
-    self.canvas.mesure_text(&Text {
-      text,
-      font_size: 14.0,
-      font,
-    })
+    self
+      .canvas
+      .mesure_text(&Text { text, font_size: 14.0, font })
   }
 }

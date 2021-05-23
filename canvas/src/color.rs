@@ -17,12 +17,7 @@ pub struct Color {
 impl Color {
   #[inline]
   pub const fn new(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
-    Color {
-      red,
-      green,
-      blue,
-      alpha,
-    }
+    Color { red, green, blue, alpha }
   }
 
   pub fn into_raw(self) -> [u8; 4] {
