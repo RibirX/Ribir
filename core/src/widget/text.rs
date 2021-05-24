@@ -4,7 +4,8 @@ use crate::render::render_tree::*;
 use crate::render::*;
 
 /// Just a stupid implement for develope the framework.
-#[derive(Debug, Widget, Stateful)]
+#[stateful]
+#[derive(Debug, Widget)]
 pub struct Text(#[state] pub String);
 
 impl RenderWidget for Text {

@@ -8,7 +8,8 @@ struct Task {
   finished: bool,
   label: String,
 }
-#[derive(Debug, Widget, Stateful)]
+#[stateful]
+#[derive(Debug, Widget)]
 struct Todos {
   #[state]
   tasks: Vec<Task>,

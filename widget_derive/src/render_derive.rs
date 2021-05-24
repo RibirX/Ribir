@@ -4,14 +4,14 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse_quote;
 
-pub fn render_derive(input: &syn::DeriveInput) -> TokenStream {
+pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
   let info = ProxyDeriveInfo::new(input, "RenderWidget", PROXY_PATH)
-    .and_then(|stt| stt.none_proxy_specified_error())
-    .and_then(|stt| stt.too_many_proxy_specified_error());
+    .and_then(|stt| stt.none_attr_specified_error())
+    .and_then(|stt| stt.too_many_attr_specified_error());
 
   match info {
     Ok(info) => {
-      let path = info.proxy_path();
+      let path = info.attr_path();
       let ident = info.ident;
       let attr_fields = info.attr_fields;
 
