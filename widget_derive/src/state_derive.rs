@@ -5,23 +5,26 @@ use syn::{
   Ident, Index,
 };
 
-use crate::widget_derive::ProxyDeriveInfo;
+use crate::{ widget_derive::{ProxyDeriveInfo}};
 
 const STATE_ATTR_NAME: &'static str = "state";
 
-pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
-  let info = ProxyDeriveInfo::new(input, "Stateful", STATE_ATTR_NAME)
-    .and_then(|stt| stt.none_proxy_specified_error());
+pub(crate) fn stateful_derive(input: &mut syn::DeriveInput) -> TokenStream2 {
+  let name = input.ident.clone();
+  let vis = input.vis.clone();
 
-  match info {
+  let info = ProxyDeriveInfo::new(input, "stateful", STATE_ATTR_NAME)
+    .and_then(|stt| stt.none_attr_specified_error());
+
+ let expanded = match info {
     Ok(info) => {
-      let name = &input.ident;
-      let state_name: Ident = syn::parse_str(&format!("{}State", input.ident)).unwrap();
+  
+      let state_name: Ident = syn::parse_str(&format!("{}State", name)).unwrap();
 
       let state_generis = info.attr_fields.attr_fields_generics();
       let (_, ty_generics, where_clause) = state_generis.split_for_impl();
-      let (w_impl_generics, w_ty_generics, w_where_clause) = input.generics.split_for_impl();
-      let vis = input.vis.clone();
+      let (w_impl_generics, w_ty_generics, w_where_clause) = info.generics.split_for_impl();
+
 
       let state_fields = info.attr_fields.attr_fields().into_iter().map(|(f, _)| f);
       let state_field_names = state_fields.clone().enumerate().map(|(idx, f)| {
@@ -124,6 +127,12 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
       }
     }
     Err(err) => err,
+  };
+
+  quote! {
+    #input
+
+    #expanded
   }
 }
 

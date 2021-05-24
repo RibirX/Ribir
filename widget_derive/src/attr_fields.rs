@@ -1,8 +1,8 @@
 use std::usize;
 
 use syn::{
-  punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
-  Type, TypeParamBound, WherePredicate,
+  punctuated::Punctuated, token::Comma, Attribute, DataStruct, Field, Fields, GenericParam,
+  Generics, Ident, Type, TypeParamBound, WherePredicate,
 };
 
 /// Pick fields from struct by specify inner attr.
@@ -13,7 +13,7 @@ pub struct AttrFields<'a> {
 }
 
 impl<'a> AttrFields<'a> {
-  pub fn new(from: &'a DataStruct, generics: &'a Generics, attr_name: &'static str) -> Self {
+  pub fn new(from: &'a mut DataStruct, generics: &'a Generics, attr_name: &'static str) -> Self {
     Self {
       attr_fields: Self::pick_attr_fields(from, attr_name),
       generics,
@@ -21,19 +21,16 @@ impl<'a> AttrFields<'a> {
     }
   }
 
-  fn pick_attr_fields(stt: &DataStruct, attr_name: &'static str) -> Vec<(Field, usize)> {
-    let pick_state_fields = |fds: &Punctuated<Field, Comma>| -> Vec<(Field, usize)> {
+  fn pick_attr_fields(stt: &mut DataStruct, attr_name: &'static str) -> Vec<(Field, usize)> {
+    let pick_state_fields = |fds: &mut Punctuated<Field, Comma>| -> Vec<(Field, usize)> {
       fds
-        .iter()
+        .iter_mut()
         .enumerate()
         .filter_map(|(idx, f)| {
-          let mut f = f.clone();
           let len = f.attrs.len();
-          f.attrs.retain(|attr| {
-            attr.path.segments.len() == 1 && attr.path.segments[0].ident != attr_name
-          });
+          f.attrs.retain(|attr| pure_attr(attr, attr_name));
           if f.attrs.len() != len {
-            Some((f, idx))
+            Some((f.clone(), idx))
           } else {
             None
           }
@@ -41,10 +38,10 @@ impl<'a> AttrFields<'a> {
         .collect()
     };
 
-    match stt.fields {
+    match &mut stt.fields {
       Fields::Unit => vec![],
-      Fields::Unnamed(ref fds) => pick_state_fields(&fds.unnamed),
-      Fields::Named(ref fds) => pick_state_fields(&fds.named),
+      Fields::Unnamed(fds) => pick_state_fields(&mut fds.unnamed),
+      Fields::Named(fds) => pick_state_fields(&mut fds.named),
     }
   }
 
@@ -184,4 +181,8 @@ pub fn add_trait_bounds_if(
     }
   }
   generics
+}
+
+pub fn pure_attr(attr: &Attribute, attr_name: &'static str) -> bool {
+  attr.path.segments.len() == 1 && attr.path.segments[0].ident != attr_name
 }

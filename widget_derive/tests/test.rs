@@ -3,7 +3,8 @@ use holiday::prelude::*;
 #[derive(Widget)]
 struct Test {}
 
-#[derive(Widget, Stateful)]
+#[stateful]
+#[derive(Widget)]
 struct TestState {
   #[state]
   a: f32,
@@ -27,7 +28,8 @@ fn derive_stateful() {
 
 #[test]
 fn state_derive_tuple_support() {
-  #[derive(Widget, Stateful)]
+  #[stateful]
+  #[derive(Widget)]
   struct StateTupleSupport(#[state] i32);
 }
 
@@ -44,4 +46,11 @@ fn ui() {
   let t = trybuild::TestCases::new();
   t.compile_fail("tests/ui/*fail.rs");
   t.pass("tests/ui/*pass.rs");
+}
+
+#[test]
+fn stateful_as_render_check() {
+  let w = SizedBox::empty_box(Size::zero()).into_stateful();
+
+  assert!(w.as_render().is_some());
 }

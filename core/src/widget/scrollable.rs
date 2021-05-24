@@ -1,20 +1,23 @@
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 
-#[derive(Widget, Stateful)]
+#[stateful]
+#[derive(Widget)]
 pub struct ScrollableX {
   child: Option<Box<dyn Widget>>,
   #[state]
   pos: f32,
 }
 
-#[derive(Widget, Stateful)]
+#[stateful]
+#[derive(Widget)]
 pub struct ScrollableY {
   child: Option<Box<dyn Widget>>,
   #[state]
   pos: f32,
 }
 
-#[derive(Widget, Stateful)]
+#[stateful]
+#[derive(Widget)]
 pub struct ScrollableBoth {
   child: Option<Box<dyn Widget>>,
   #[state]

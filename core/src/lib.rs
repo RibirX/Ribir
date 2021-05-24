@@ -15,7 +15,7 @@ pub mod prelude {
   pub use crate::widget::{build_ctx::BuildCtx, widget_tree::WidgetId, *};
   pub use canvas::*;
   pub use rxrust::prelude::*;
-  pub use widget_derive::{CombinationWidget, RenderWidget, StatePartialEq, Stateful, Widget};
+  pub use widget_derive::{stateful, CombinationWidget, RenderWidget, StatePartialEq, Widget};
 }
 
 #[cfg(test)]

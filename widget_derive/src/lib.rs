@@ -52,34 +52,30 @@ use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(Widget, attributes(proxy))]
 pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-
-  widget_derive::widget_derive(&input).into()
+  let mut input = parse_macro_input!(input as DeriveInput);
+  widget_derive::widget_derive(&mut input).into()
 }
 
 #[proc_macro_derive(CombinationWidget, attributes(proxy))]
 pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-
-  combination_derive::combination_derive(&input).into()
+  let mut input = parse_macro_input!(input as DeriveInput);
+  combination_derive::combination_derive(&mut input).into()
 }
 
 #[proc_macro_derive(RenderWidget, attributes(proxy))]
 pub fn render_macro_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  render_derive::render_derive(&input).into()
-}
-
-#[proc_macro_derive(Stateful, attributes(state))]
-pub fn stateful_macro_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-
-  state_derive::stateful_derive(&input).into()
+  let mut input = parse_macro_input!(input as DeriveInput);
+  render_derive::render_derive(&mut input).into()
 }
 
 #[proc_macro_derive(StatePartialEq)]
 pub fn state_partial_eq_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
-
   state_partial_eq_derive::derive_state_partial_eq(&input).into()
+}
+
+#[proc_macro_attribute]
+pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
+  let mut input = parse_macro_input!(input as DeriveInput);
+  state_derive::stateful_derive(&mut input).into()
 }
