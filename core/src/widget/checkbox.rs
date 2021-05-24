@@ -142,6 +142,9 @@ impl RenderObject for CheckboxMarkerRender {
       .set_line_width(self.0.check_mark_width)
       .stroke_path(self.0.path.clone());
   }
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { &self.0 }
 }
 
 impl StatePartialEq<Self> for Path {

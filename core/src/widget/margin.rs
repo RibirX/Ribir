@@ -16,13 +16,10 @@ pub struct Margin {
   pub child: Box<dyn Widget>,
 }
 
-#[derive(Debug)]
-pub struct MarginRender(EdgeInsets);
-
 impl RenderWidget for Margin {
-  type RO = MarginRender;
+  type RO = MarginState;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { MarginRender(self.margin.clone()) }
+  fn create_render_object(&self) -> Self::RO { self.clone_states() }
 
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
@@ -32,16 +29,16 @@ impl RenderWidget for Margin {
   }
 }
 
-impl RenderObject for MarginRender {
-  type States = MarginState;
+impl RenderObject for MarginState {
+  type States = Self;
   #[inline]
-  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.0 = states.margin; }
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { *self = states; }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let thickness = self.0.thickness();
+    let thickness = self.margin.thickness();
     let zero = Size::zero();
     let min = (clamp.min - thickness).max(zero);
     let max = (clamp.max - thickness).max(zero);
@@ -50,13 +47,16 @@ impl RenderObject for MarginRender {
     debug_assert_eq!(ctx.children().count(), 1);
     let mut child = ctx.children().next().expect("Margin must have one child");
     let size = child.perform_layout(child_clamp);
-    child.update_position(Point::new(self.0.left, self.0.top));
+    child.update_position(Point::new(self.margin.left, self.margin.top));
 
     clamp.clamp(size + thickness)
   }
 
   #[inline]
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { self }
 }
 
 impl EdgeInsets {

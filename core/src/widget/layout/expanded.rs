@@ -15,9 +15,9 @@ impl Expanded {
 }
 
 impl RenderWidget for Expanded {
-  type RO = ExpandedRender;
+  type RO = ExpandedState;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { ExpandedRender { flex: self.flex } }
+  fn create_render_object(&self) -> Self::RO { ExpandedState { flex: self.flex } }
 
   #[inline]
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
@@ -28,16 +28,11 @@ impl RenderWidget for Expanded {
   }
 }
 
-#[derive(Debug)]
-pub struct ExpandedRender {
-  pub flex: f32,
-}
-
-impl RenderObject for ExpandedRender {
+impl RenderObject for ExpandedState {
   type States = ExpandedState;
 
   #[inline]
-  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.flex = states.flex; }
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.flex = states.flex; }
 
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
@@ -57,6 +52,9 @@ impl RenderObject for ExpandedRender {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
     // nothing to draw.
   }
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { self }
 }
 
 #[cfg(test)]

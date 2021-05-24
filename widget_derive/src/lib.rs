@@ -1,4 +1,4 @@
-//! A custom derive implemention for `Widget` and `CombinationWidget`
+//! A custom derive implementation for `Widget` and `CombinationWidget`
 //! `RenderWidget`. Can use `proxy` attr to specify where to derive form.
 //!
 //! ## `proxy` attr.
@@ -67,11 +67,7 @@ pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(RenderWidget, attributes(proxy))]
 pub fn render_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
-  let tokens = render_derive::render_derive(&input).into();
-  if input.ident == "AttrWidget" {
-    println!("{}", tokens);
-  }
-  tokens
+  render_derive::render_derive(&input).into()
 }
 
 #[proc_macro_derive(Stateful, attributes(state))]
@@ -84,17 +80,6 @@ pub fn stateful_macro_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(StatePartialEq)]
 pub fn state_partial_eq_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
-  // if input.ident == "Direction" {
-  //   let quote =
-  // state_partial_eq_derive::derive_state_partial_eq(&input).into();
-  //   println!(
-  //     "-------------------------------TextState----------------------------------
-  //   {}",
-  //     quote
-  //   );
-  //   quote
-  // } else {
-  //   (quote::quote! {}).into()
-  // }
+
   state_partial_eq_derive::derive_state_partial_eq(&input).into()
 }
