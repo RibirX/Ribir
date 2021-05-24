@@ -11,7 +11,7 @@ pub use update_ctx::UpdateCtx;
 
 /// The `Owner` is the render widget which created this object.
 pub trait RenderObject: Sized + Send + Sync + 'static {
-  type States;
+  type States: StatePartialEq;
   /// Call by framework when the state of its render widget changed, should not
   /// call this method directly.
   fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx);
@@ -33,10 +33,13 @@ pub trait RenderObject: Sized + Send + Sync + 'static {
   /// parent before children.
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
 
-  /// Returns a matrix that maps the local logic coordinate system to the local
+  /// Return a matrix that maps the local logic coordinate system to the local
   /// paint box coordinate system. None-Value means there is not transform
   /// between the coordinate system.
   fn transform(&self) -> Option<Transform> { None }
+
+  /// Return the states hold in the object.
+  fn get_states(&self) -> &Self::States;
 }
 
 /// RenderObjectSafety is a object safety trait of RenderObject, never directly
@@ -74,15 +77,17 @@ where
   #[inline]
   fn update(&mut self, states: Box<dyn Any>, ctx: &mut UpdateCtx) {
     let raw_states = states.downcast_ref::<T::States>().unwrap();
-    let mut copy = std::mem::MaybeUninit::<T::States>::uninit();
-    let copy = unsafe {
-      copy
-        .as_mut_ptr()
-        .copy_from(raw_states as *const T::States, 1);
-      copy.assume_init()
-    };
-    RenderObject::update(self, copy, ctx);
-    std::mem::forget(states)
+    if !raw_states.eq(self.get_states()) {
+      let mut copy = std::mem::MaybeUninit::<T::States>::uninit();
+      let copy = unsafe {
+        copy
+          .as_mut_ptr()
+          .copy_from(raw_states as *const T::States, 1);
+        copy.assume_init()
+      };
+      RenderObject::update(self, copy, ctx);
+      std::mem::forget(states)
+    }
   }
 
   #[inline]

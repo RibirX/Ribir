@@ -264,8 +264,7 @@ pub trait AttachAttr {
   fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W);
 }
 
-// todo should derive render widget.
-#[derive(CombinationWidget)]
+#[derive(CombinationWidget, RenderWidget)]
 pub struct AttrWidget<W, A: Any> {
   #[proxy]
   pub widget: W,
@@ -372,7 +371,6 @@ impl<W, A: Any> std::ops::DerefMut for AttrWidget<W, A> {
 }
 
 #[derive(Default)]
-// Todo: use a `Attribute` trait to replace Any.
 pub struct Attrs(LinkedList<Box<dyn Any>>);
 
 impl Attrs {

@@ -12,11 +12,6 @@ pub struct SizedBox {
   pub child: Option<Box<dyn Widget>>,
 }
 
-#[derive(Debug)]
-pub struct SizedBoxRender {
-  size: Size,
-}
-
 impl SizedBox {
   /// Creates a box with the specified size.
   pub fn from_size<W: Widget>(size: Size, child: W) -> Self {
@@ -44,20 +39,20 @@ impl SizedBox {
 }
 
 impl RenderWidget for SizedBox {
-  type RO = SizedBoxRender;
+  type RO = SizedBoxState;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { SizedBoxRender { size: self.size } }
+  fn create_render_object(&self) -> Self::RO { SizedBoxState { size: self.size } }
 
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     self.child.take().map(|w| smallvec![w])
   }
 }
 
-impl RenderObject for SizedBoxRender {
+impl RenderObject for SizedBoxState {
   type States = SizedBoxState;
 
   #[inline]
-  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.size = states.size; }
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.size = states.size; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let size = clamp.clamp(self.size);
@@ -76,6 +71,9 @@ impl RenderObject for SizedBoxRender {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
     // nothing to paint, just a layout widget.
   }
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { self }
 }
 
 impl StatePartialEq<Self> for Size {

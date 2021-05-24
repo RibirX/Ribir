@@ -102,7 +102,7 @@ pub struct ScrollRender<States> {
   states: States,
 }
 
-impl<S: ScrollWorker + Sync + Send + 'static> RenderObject for ScrollRender<S> {
+impl<S: ScrollWorker + StatePartialEq + Sync + Send + 'static> RenderObject for ScrollRender<S> {
   type States = S;
   fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.states = states; }
 
@@ -125,6 +125,9 @@ impl<S: ScrollWorker + Sync + Send + 'static> RenderObject for ScrollRender<S> {
   fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {
     // nothing to paint, just a layout widget.
   }
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { &self.states }
 }
 
 impl ScrollWorker for ScrollableXState {

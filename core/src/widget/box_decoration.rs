@@ -146,6 +146,9 @@ impl RenderObject for BoxDecorationRender {
     }
     self.paint_border(painter, &content_rect);
   }
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { &self.0 }
 }
 
 #[derive(Clone)]

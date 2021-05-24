@@ -8,11 +8,8 @@ pub struct Padding {
   pub child: Box<dyn Widget>,
 }
 
-#[derive(Debug)]
-pub struct PaddingRender(EdgeInsets);
-
 impl RenderWidget for Padding {
-  type RO = PaddingRender;
+  type RO = PaddingState;
 
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
     Some(smallvec![std::mem::replace(
@@ -22,18 +19,18 @@ impl RenderWidget for Padding {
   }
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO { PaddingRender(self.padding.clone()) }
+  fn create_render_object(&self) -> Self::RO { self.clone_states() }
 }
 
-impl RenderObject for PaddingRender {
+impl RenderObject for PaddingState {
   type States = PaddingState;
   #[inline]
-  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.0 = states.padding; }
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { *self = states; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     debug_assert_eq!(ctx.children().count(), 1);
 
-    let thickness = self.0.thickness();
+    let thickness = self.padding.thickness();
     let zero = Size::zero();
     let min = (clamp.min - thickness).max(zero);
     let max = (clamp.max - thickness).max(zero);
@@ -53,7 +50,7 @@ impl RenderObject for PaddingRender {
         .box_rect()
         .expect("The grandson must performed layout")
         .origin;
-      c.update_position(pos + Vector::new(self.0.left, self.0.top));
+      c.update_position(pos + Vector::new(self.padding.left, self.padding.top));
     });
     size
   }
@@ -63,6 +60,9 @@ impl RenderObject for PaddingRender {
 
   #[inline]
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { self }
 }
 
 #[cfg(test)]

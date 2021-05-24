@@ -18,9 +18,10 @@ pub trait Stateful: Widget {
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget>;
 }
 
-/// Trait for state change detect, this is different than equality comparisons.
-/// And no strictly rules to follow, just need to make sure it's implementation
-/// is cheap, some complexity struct can always return 'false'.
+/// Trait for state change quick detect to reduce update render object, this is
+/// different than equality comparisons. And no strictly rules to follow, just
+/// need to make sure it's implementation is cheap, some complexity struct can
+/// always return 'false'.
 pub trait StatePartialEq<Rhs: ?Sized = Self> {
   fn eq(&self, other: &Rhs) -> bool;
 }
@@ -262,11 +263,23 @@ macro state_partial_impl($($ty: ty)*) {
   })*
 }
 
+macro state_partial_for_collection($($ty:ident <$($g:ident),*>),*) {
+  $(impl<$($g),*> StatePartialEq for $ty<$($g),*> {
+    #[inline]
+    fn eq(&self, _: &Self) -> bool { false }
+  })*
+}
+
 state_partial_impl! {
   () usize u8 u16 u32 u64 u128
   isize i8 i16 i32 i64 i128
   f32 f64 String bool
 }
+
+use std::collections::{
+  btree_map::BTreeMap, btree_set::BTreeSet, hash_map::HashMap, linked_list::LinkedList,
+};
+state_partial_for_collection!(Vec<T>, LinkedList<T>, HashMap<K, V>, BTreeMap<K, V>, BTreeSet<K>);
 
 impl<T: StatePartialEq> StatePartialEq<Self> for Option<T> {
   fn eq(&self, other: &Self) -> bool {

@@ -1,4 +1,4 @@
-use super::expanded::ExpandedRender;
+use super::expanded::ExpandedState;
 use crate::prelude::*;
 use crate::render::render_tree::*;
 use smallvec::{smallvec, SmallVec};
@@ -67,8 +67,6 @@ pub struct Flex {
   pub children: SmallVec<[Box<dyn Widget>; 1]>,
 }
 
-pub struct FlexRender(FlexState);
-
 impl Flex {
   /// Add a children into the flex container.
   #[inline]
@@ -133,9 +131,9 @@ impl Default for MainAxisAlign {
 }
 
 impl RenderWidget for Flex {
-  type RO = FlexRender;
+  type RO = FlexState;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { FlexRender(self.clone_states()) }
+  fn create_render_object(&self) -> Self::RO { self.clone_states() }
 
   #[inline]
   fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
@@ -143,24 +141,24 @@ impl RenderWidget for Flex {
   }
 }
 
-impl RenderObject for FlexRender {
+impl RenderObject for FlexState {
   type States = FlexState;
   #[inline]
-  fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx) { self.0 = states; }
+  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { *self = states; }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let direction = self.0.direction;
+    let direction = self.direction;
     let mut layouter = FlexLayouter {
       max_size: FlexSize::from_size(clamp.max, direction),
       min_size: FlexSize::from_size(clamp.min, direction),
       direction,
-      reverse: self.0.reverse,
-      wrap: self.0.wrap,
+      reverse: self.reverse,
+      wrap: self.wrap,
       main_max: 0.,
       current_line: <_>::default(),
       lines_info: vec![],
-      cross_align: self.0.cross_align,
-      main_align: self.0.main_align,
+      cross_align: self.cross_align,
+      main_align: self.main_align,
     };
     layouter.layout(ctx)
   }
@@ -169,7 +167,12 @@ impl RenderObject for FlexRender {
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
+    // Nothing to draw.
+  }
+
+  #[inline]
+  fn get_states(&self) -> &Self::States { self }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -456,7 +459,7 @@ impl FlexLayouter {
   fn child_flex(ctx: &RenderCtx) -> Option<f32> {
     ctx
       .render_obj()
-      .downcast_ref::<ExpandedRender>()
+      .downcast_ref::<ExpandedState>()
       .map(|expanded| expanded.flex)
   }
 }

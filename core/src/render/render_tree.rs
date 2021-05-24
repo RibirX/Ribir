@@ -352,7 +352,7 @@ mod tests {
   }
 
   impl RenderObjectSafety for MockRenderObj {
-    fn update(&mut self, _: &dyn RenderWidgetSafety, _: &mut UpdateCtx) {}
+    fn update(&mut self, _: Box<dyn Any>, _: &mut UpdateCtx) {}
     fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
       self.records.lock().unwrap().push(ctx.render_id());
       ctx.children().for_each(|mut child| {

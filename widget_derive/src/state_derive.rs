@@ -1,6 +1,9 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{Ident, Index};
+use syn::{
+  token::{Brace, Paren},
+  Ident, Index,
+};
 
 use crate::widget_derive::ProxyDeriveInfo;
 
@@ -18,18 +21,17 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
       let state_generis = info.attr_fields.attr_fields_generics();
       let (_, ty_generics, where_clause) = state_generis.split_for_impl();
       let (w_impl_generics, w_ty_generics, w_where_clause) = input.generics.split_for_impl();
-      let state_fields = info.attr_fields.attr_fields().into_iter().map(|(f, _)| f);
-
       let vis = input.vis.clone();
 
+      let state_fields = info.attr_fields.attr_fields().into_iter().map(|(f, _)| f);
       let state_field_names = state_fields.clone().enumerate().map(|(idx, f)| {
-         f
-          .ident
-          .as_ref()
-          .map_or_else(||{
+        f.ident.as_ref().map_or_else(
+          || {
             let index = Index::from(idx);
-            quote!{#index}
-          }, |ident|quote!{#ident})
+            quote! {#index}
+          },
+          |ident| quote! {#ident},
+        )
       });
 
       let state_fn_names = state_field_names
@@ -38,23 +40,35 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
 
       let state_ty = state_fields.clone().map(|f| &f.ty);
 
-      let stateful_name = prefix_ident("Stateful", &quote!{#name} );
+      let stateful_name = prefix_ident("Stateful", &quote! {#name});
 
-      let state_def = if info.attr_fields.is_tuple {
-        quote! {
-          #[derive(StatePartialEq)]
-          #vis struct #state_name #ty_generics #where_clause (
-            #(#state_fields ,)*
-          );
-        }
-      } else {
-        quote! {
-          #[derive(StatePartialEq)]
-          #vis struct #state_name #ty_generics #where_clause {
-            #(#state_fields, )*
-          }
-        }
+      // State define
+      let mut state_def = quote! {
+        #[derive(StatePartialEq)]
+        #vis struct #state_name #ty_generics #where_clause
       };
+      let to_surround = |tokens: &mut TokenStream2| {
+        *tokens = quote! { #(#state_fields ,)* };
+      };
+      if info.attr_fields.is_tuple {
+        Paren::default().surround(&mut state_def, to_surround);
+        state_def = quote! {#state_def;};
+      } else {
+        Brace::default().surround(&mut state_def, to_surround)
+      }
+
+      // impl clone_states;
+      let mut impl_clone_state = quote! { #state_name };
+      let recurse_names = state_field_names.clone();
+      if info.attr_fields.is_tuple {
+        Paren::default().surround(&mut impl_clone_state, |tokens| {
+          *tokens = quote! { #(self.#recurse_names.clone()) ,*};
+        });
+      } else {
+        Brace::default().surround(&mut impl_clone_state, |tokens| {
+          *tokens = quote! { #(#recurse_names: self.#recurse_names.clone()) ,*};
+        });
+      }
 
       quote! {
         // Define custom state.
@@ -64,7 +78,7 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
         #[derive(Widget)]
         #vis struct #stateful_name #w_ty_generics(StatefulImpl<#name #w_ty_generics>) #w_where_clause;
 
-        // Every state have a state observable. 
+        // Every state have a state observable.
         impl #w_impl_generics #stateful_name #w_ty_generics #w_where_clause {
           #(
             pub fn #state_fn_names(&mut self)
@@ -84,7 +98,7 @@ pub(crate) fn stateful_derive(input: &syn::DeriveInput) -> TokenStream2 {
         impl #w_impl_generics CloneStates for #name #w_ty_generics #w_where_clause {
           type States =  #state_name #ty_generics;
           fn clone_states(&self) -> Self::States {
-            unimplemented!()
+            #impl_clone_state
           }
         }
 

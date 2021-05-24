@@ -215,10 +215,10 @@ impl<T: RenderWidget> AsRender for T {
 
 impl<T: Widget + Any> AsAny for T {
   #[inline]
-  default fn as_any(&self) -> &dyn Any { self }
+  fn as_any(&self) -> &dyn Any { self }
 
   #[inline]
-  default fn as_any_mut(&mut self) -> &mut dyn Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 }
 
 impl<'a> dyn Widget + 'a {
