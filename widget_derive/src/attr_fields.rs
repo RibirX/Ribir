@@ -1,8 +1,6 @@
-use std::usize;
-
 use syn::{
-  punctuated::Punctuated, token::Comma, Attribute, DataStruct, Field, Fields, GenericParam,
-  Generics, Ident, Type, TypeParamBound, WherePredicate,
+  punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
+  Path, Type, TypeParamBound, WherePredicate,
 };
 
 /// Pick fields from struct by specify inner attr.
@@ -28,7 +26,7 @@ impl<'a> AttrFields<'a> {
         .enumerate()
         .filter_map(|(idx, f)| {
           let len = f.attrs.len();
-          f.attrs.retain(|attr| pure_attr(attr, attr_name));
+          f.attrs.retain(|attr| !pure_ident(&attr.path, attr_name));
           if f.attrs.len() != len {
             Some((f.clone(), idx))
           } else {
@@ -183,6 +181,6 @@ pub fn add_trait_bounds_if(
   generics
 }
 
-pub fn pure_attr(attr: &Attribute, attr_name: &'static str) -> bool {
-  attr.path.segments.len() == 1 && attr.path.segments[0].ident != attr_name
+pub fn pure_ident(path: &Path, attr_name: &'static str) -> bool {
+  path.segments.len() == 1 && path.segments[0].ident == attr_name
 }

@@ -43,10 +43,10 @@ extern crate proc_macro2;
 mod attr_fields;
 mod combination_derive;
 mod render_derive;
+mod state_derive;
 mod state_partial_eq_derive;
 mod widget_derive;
 
-mod state_derive;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -76,6 +76,9 @@ pub fn state_partial_eq_macro_derive(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
+  let attrs = parse_macro_input!(attrs as syn::AttributeArgs);
   let mut input = parse_macro_input!(input as DeriveInput);
-  state_derive::stateful_derive(&mut input).into()
+  state_derive::stateful_derive(&mut input, attrs)
+    .unwrap_or_else(|e| e)
+    .into()
 }
