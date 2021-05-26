@@ -1,5 +1,12 @@
 #![allow(incomplete_features)]
-#![feature(specialization, test, decl_macro, negative_impls, linked_list_cursors)]
+#![feature(
+  specialization,
+  test,
+  decl_macro,
+  negative_impls,
+  linked_list_cursors,
+  trivial_bounds
+)]
 #[macro_use]
 extern crate bitflags;
 

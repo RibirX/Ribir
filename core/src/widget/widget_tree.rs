@@ -258,13 +258,13 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub fn get(self, tree: &WidgetTree) -> Option<&Box<dyn Widget>> {
-    tree.arena.get(self.0).map(|node| node.get())
+  pub fn get(self, tree: &WidgetTree) -> Option<&dyn Widget> {
+    tree.arena.get(self.0).map(|node| &**node.get())
   }
 
   /// Returns a mutable reference to the node data.
-  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn Widget>> {
-    tree.arena.get_mut(self.0).map(|node| node.get_mut())
+  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut dyn Widget> {
+    tree.arena.get_mut(self.0).map(|node| &mut **node.get_mut())
   }
 
   /// detect if the widget of this id point to is dropped.
@@ -443,11 +443,11 @@ impl WidgetId {
     need_builds.remove(&self);
   }
 
-  pub fn assert_get(self, tree: &WidgetTree) -> &Box<dyn Widget> {
+  pub fn assert_get(self, tree: &WidgetTree) -> &dyn Widget {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Widget> {
+  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut dyn Widget {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }

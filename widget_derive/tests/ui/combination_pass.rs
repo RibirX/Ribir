@@ -10,7 +10,7 @@ impl CombinationWidget for A {
 }
 
 #[derive(Debug, Widget, CombinationWidget)]
-struct B<W: 'static> {
+struct B<W> {
   #[proxy]
   a: W,
 }

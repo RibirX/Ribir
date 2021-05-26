@@ -20,7 +20,7 @@ impl<W> CharListener<W> {
     let (major, mut others, widget) = widget.take_attr::<CharAttr>();
 
     let major = major.unwrap_or_else(|| {
-      let attrs = others.get_or_insert_with(|| <_>::default());
+      let attrs = others.get_or_insert_with(<_>::default);
       if attrs.find_attr::<FocusAttr>().is_none() {
         attrs.front_push_attr(FocusAttr::default());
       }
@@ -33,7 +33,7 @@ impl<W> CharListener<W> {
 
   #[inline]
   pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> {
-    self.major.0.clone()
+    self.major.event_observable()
   }
 }
 
@@ -45,6 +45,11 @@ impl std::convert::AsRef<EventCommon> for CharEvent {
 impl std::convert::AsMut<EventCommon> for CharEvent {
   #[inline]
   fn as_mut(&mut self) -> &mut EventCommon { &mut self.common }
+}
+
+impl CharAttr {
+  #[inline]
+  pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> { self.0.clone() }
 }
 
 #[cfg(test)]

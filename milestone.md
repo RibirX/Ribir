@@ -52,13 +52,14 @@
   - [ ] Center
   - [x] Row
 - [ ] event widget
-  - [x] input widget.
+  - [ ] input widget.
   - [x] click widget
 
-- [ ] A derive macro for state impl
-- [ ] refactor stateful
-  - [ ] stateful should be a widget not a attr.
-  - [ ] into_sateful should not depend on `BuildCtx`
+- [x] A derive macro for state impl
+- [x] refactor stateful
+  - [x] stateful should be a widget not a attr.
+  - [x] into_sateful should not depend on `BuildCtx`
+- [ ] auto implement declare macro to build widget.
 
 ##  we need readable & learnable documents.
 

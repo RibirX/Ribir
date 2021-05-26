@@ -1,3 +1,5 @@
+#![feature(trivial_bounds)]
+
 use holiday::prelude::*;
 
 #[derive(Widget)]

@@ -109,9 +109,9 @@ impl Dispatcher {
       };
       self.common.bubble_dispatch(
         focus,
-        |listener: &CharListener<Box<dyn Widget>>, event| {
+        |attr: &CharAttr, event| {
           log::info!("char event: {:?}", event);
-          listener.event_observable().next(event);
+          attr.event_observable().next(event);
         },
         event,
         |_| {},

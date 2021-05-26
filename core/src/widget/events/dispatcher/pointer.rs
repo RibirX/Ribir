@@ -134,11 +134,20 @@ impl PointerDispatcher {
   ) {
     let (wid, pos) = from;
     let event = self.mouse_pointer(wid, pos, common);
+    let mut last_bubble_from = wid;
     common.bubble_dispatch(
       wid,
-      Self::event_emitter(event_type),
+      Self::pointer_event_emitter(event_type),
       event,
-      Self::event_position_updater(wid, common),
+      move |e: &mut PointerEvent| {
+        e.position = last_bubble_from.map_to(
+          e.position,
+          e.target(),
+          common.widget_tree_ref(),
+          common.render_tree_ref(),
+        );
+        last_bubble_from = wid;
+      },
     );
   }
 
@@ -148,7 +157,7 @@ impl PointerDispatcher {
 
     let mut already_entered = vec![];
 
-    let mut leave_emitter = Self::event_emitter(PointerEventType::Leave);
+    let mut leave_emitter = Self::pointer_event_emitter(PointerEventType::Leave);
     self.entered_widgets.iter().for_each(|w| {
       // if the widget is not the ancestor of the hit widget
       if !w.is_dropped(tree) {
@@ -168,7 +177,7 @@ impl PointerDispatcher {
     self.entered_widgets.clear();
 
     if let Some((hit_widget, _)) = new_hit {
-      let mut enter_emitter = Self::event_emitter(PointerEventType::Enter);
+      let mut enter_emitter = Self::pointer_event_emitter(PointerEventType::Enter);
       hit_widget
         .ancestors(tree)
         .filter(|w| {
@@ -229,30 +238,12 @@ impl PointerDispatcher {
     })
   }
 
-  fn event_position_updater(
-    init_from: WidgetId,
-    common: &CommonDispatcher,
-  ) -> impl FnMut(&mut PointerEvent) + '_ {
-    let mut last_bubble_from = init_from;
-    move |e: &mut PointerEvent| {
-      e.position = last_bubble_from.map_to(
-        e.position,
-        e.target(),
-        common.widget_tree_ref(),
-        common.render_tree_ref(),
-      );
-      last_bubble_from = init_from;
-    }
-  }
-  fn event_emitter(
+  fn pointer_event_emitter(
     event_type: PointerEventType,
-  ) -> impl FnMut(&PointerListener<Box<dyn Widget>>, std::rc::Rc<PointerEvent>) {
-    move |listener: &PointerListener<Box<dyn Widget>>, event: std::rc::Rc<PointerEvent>| {
+  ) -> impl FnMut(&PointerAttr, std::rc::Rc<PointerEvent>) {
+    move |attr, event: std::rc::Rc<PointerEvent>| {
       log::info!("{:?} {:?}", event_type, event);
-      listener
-        .major
-        .pointer_observable()
-        .next((event_type, event));
+      attr.pointer_observable().next((event_type, event));
     }
   }
 }

@@ -52,7 +52,7 @@ pub struct WgpuRender<S: Surface = PhysicSurface> {
 impl WgpuRender<PhysicSurface> {
   /// Create a canvas and bind to a native window, its size is `width` and
   /// `height`. If you want to create a headless window, use
-  /// [`from_window`](Canvas::window).
+  /// [`headless_render`](WgpuRender::headless_render).
   pub async fn wnd_render<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
     size: DeviceSize,
@@ -146,9 +146,7 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
   ) {
     let mut encoder = self
       .device
-      .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Render Encoder"),
-      });
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") });
 
     let tex_infos_bind_group = self.create_primitives_bind_group(&data.primitives);
     let Self {
@@ -410,11 +408,7 @@ impl<S: Surface> WgpuRender<S> {
           mip_level: 0,
           origin: wgpu::Origin3d::ZERO,
         },
-        wgpu::Extent3d {
-          width,
-          height,
-          depth: 1,
-        },
+        wgpu::Extent3d { width, height, depth: 1 },
       )
     }
     mem_tex.data_synced();

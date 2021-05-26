@@ -16,7 +16,7 @@ pub struct PointerId(usize);
 /// regardless of the user's hardware. However, for scenarios when
 /// device-specific handling is desired, pointer events defines a pointerType
 /// property to inspect the device type which produced the event.
-/// Reference: https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event
+/// Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
 #[derive(Debug, Clone)]
 pub struct PointerEvent {
   /// The X, Y coordinate of the pointer in current target widget.

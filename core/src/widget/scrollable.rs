@@ -26,7 +26,7 @@ pub struct ScrollableBoth {
 
 impl ScrollableX {
   #[inline]
-  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableX> {
+  pub fn x_scroll(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableX> {
     let scroll = ScrollableX { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -42,7 +42,7 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn new(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableY> {
+  pub fn y_scroll(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableY> {
     let scroll = ScrollableY { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
@@ -58,7 +58,7 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn new(child: Box<dyn Widget>, pos: Point) -> WheelListener<StatefulScrollableBoth> {
+  pub fn both_scroll(child: Box<dyn Widget>, pos: Point) -> WheelListener<StatefulScrollableBoth> {
     let scroll = ScrollableBoth { child: Some(child), pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
