@@ -8,7 +8,7 @@ struct Task {
   finished: bool,
   label: String,
 }
-#[stateful]
+#[stateful(custom)]
 #[derive(Debug, Widget)]
 struct Todos {
   #[state]

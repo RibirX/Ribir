@@ -1,42 +1,38 @@
-//! A custom derive implementation for `Widget` and `CombinationWidget`
+//! A custom derive implementation for `Widget`, `CombinationWidget` and
 //! `RenderWidget`. Can use `proxy` attr to specify where to derive form.
 //!
-//! ## `proxy` attr.
-//! To derive `CombinationWidget` or `RenderWidget` must specify one and only
-//! `proxy` attr, `Widget` can emit the it to give a default implementation.
-//！
+//! # Example
 //! A default widget implementation for W.
-//！```
-//！#[derive(Widget)]
+
+//! ```
+//! use holiday::prelude::*;
+//！##[derive(Widget)]
 //! struct W;
 //! ```
-//！
-//! Derive from field b, like a checkbox. Because `Checkbox` is a
-//! render widget, also derive the `RenderWidget`
+//! ## proxy attr.
+//!
+//! `#[proxy]` attr tell the widget trait where to derive from. `Widget` can
+//! emit it to give a default implementation, but `CombinationWidget` or
+//! `RenderWidget` must specify one and only one `proxy` attr.
+
+//! Derive from field `b` which is a `Text`. Because `Text` is a render widget,
 //!
 //! ```
-//！#[derive(Widget, RenderWidget)]
+//! use holiday::prelude::*;
+//! ##[derive(Widget, RenderWidget)]
 //! struct W {
-//!  #[proxy]
-//!  b: Checkbox
+//!  ##[proxy]
+//!  b: widget::Text
 //! }
 //! ```
 //！
 //! Derive from a generic type, and derive `RenderWidget` if it's a render
-//! widget, derive `CombinationWidget`.
-//！```
-//! #[derive(Widget, RenderWidget, CombinationWidget)]
+//! widget, derive `CombinationWidget` if it's a combination widget.
+//! ```
+//! use holiday::prelude::*;
+//! ##[derive(Widget, RenderWidget, CombinationWidget)]
 //! struct ProxyWidget<W>(#[proxy] W);
-//!
-//! Use meta `ref` and `ref_mut` to give a method name to specify how to borrow
-//! the reference from the field.
-//!
-//! #[derive(Widget, RenderWidget)]
-//! struct W {
-//!  #[proxy(ref=borrow, ref_mut=borrow_mut)]
-//!  b: Checkbox
-//! }
-
+//! ```
 extern crate proc_macro;
 extern crate proc_macro2;
 

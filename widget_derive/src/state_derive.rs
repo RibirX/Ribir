@@ -8,9 +8,9 @@ use syn::{
 
 use crate::{attr_fields::pure_ident, widget_derive::ProxyDeriveInfo};
 
-const STATEFUL_ATTR: &'static str = "stateful";
-const STATE_ATTR_NAME: &'static str = "state";
-const CUSTOM_IMPL: &'static str = "custom";
+const STATEFUL_ATTR: &str = "stateful";
+const STATE_ATTR_NAME: &str = "state";
+const CUSTOM_IMPL: &str = "custom";
 
 pub(crate) fn stateful_derive(
   input: &mut syn::DeriveInput,
@@ -28,7 +28,7 @@ pub(crate) fn stateful_derive(
   let (_, ty_generics, where_clause) = state_generis.split_for_impl();
   let (w_impl_generics, w_ty_generics, w_where_clause) = info.generics.split_for_impl();
 
-  let state_fields = info.attr_fields.attr_fields().into_iter().map(|(f, _)| f);
+  let state_fields = info.attr_fields.attr_fields().iter().map(|(f, _)| f);
   let state_field_names = state_fields.clone().enumerate().map(|(idx, f)| {
     f.ident.as_ref().map_or_else(
       || {
@@ -151,12 +151,11 @@ fn prefix_ident(prefix: &str, ident: &TokenStream2) -> Ident {
 
 fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<bool, TokenStream2> {
   let (custom_impl, errors): (Vec<_>, Vec<_>) = attrs.into_iter().partition(|attr| {
-    if let NestedMeta::Meta(ref meta) = attr {
-      if let syn::Meta::Path(path) = meta {
-        return pure_ident(path, CUSTOM_IMPL);
-      }
+    if let NestedMeta::Meta(syn::Meta::Path(path)) = attr {
+      pure_ident(path, CUSTOM_IMPL)
+    } else {
+      false
     }
-    false
   });
   if !errors.is_empty() {
     let error_recursive = errors.into_iter().map(|attr| {

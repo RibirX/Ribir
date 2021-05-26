@@ -211,8 +211,9 @@ impl<'a> Rendering2DLayer<'a> {
   /// Fill `text` from left to right, start at let top position, use translate
   /// move to the position what you want. Partially hitting the `max_width`
   /// will end the draw. Use `font` and `font_size` to specify the font and
-  /// font size. Use [`fill_text_with_desc`](Rendering2DLayer::
-  /// fill_text_with_desc) method to fill complex text.
+  /// font size. Use
+  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
+  /// fill complex text.
   pub fn fill_text(&mut self, text: &'a str, max_width: Option<f32>) {
     let cmd = self.command_from_text(text, max_width);
     self.commands.push(cmd);
@@ -234,11 +235,7 @@ impl<'a> Rendering2DLayer<'a> {
     bounds: Option<Rect>,
     layout: Option<TextLayout>,
   ) {
-    let cmd = self.command_from(|_| CommandInfo::ComplexTexts {
-      texts,
-      bounds,
-      layout,
-    });
+    let cmd = self.command_from(|_| CommandInfo::ComplexTexts { texts, bounds, layout });
     self.commands.push(cmd)
   }
 
@@ -505,24 +502,12 @@ impl TextLayout {
 
 impl From<TextLayout> for glyph_brush::Layout<glyph_brush::BuiltInLineBreaker> {
   fn from(layout: TextLayout) -> Self {
-    let TextLayout {
-      h_align,
-      v_align,
-      wrap,
-    } = layout;
+    let TextLayout { h_align, v_align, wrap } = layout;
     let line_breaker = glyph_brush::BuiltInLineBreaker::default();
     if LineWrap::SingleLine == wrap {
-      glyph_brush::Layout::SingleLine {
-        h_align,
-        v_align,
-        line_breaker,
-      }
+      glyph_brush::Layout::SingleLine { h_align, v_align, line_breaker }
     } else {
-      glyph_brush::Layout::Wrap {
-        h_align,
-        v_align,
-        line_breaker,
-      }
+      glyph_brush::Layout::Wrap { h_align, v_align, line_breaker }
     }
   }
 }
@@ -568,11 +553,7 @@ impl<'a> Text<'a> {
     text_brush: &mut crate::text_brush::TextBrush,
     prim_id: usize,
   ) -> glyph_brush::Text<'a, u32> {
-    let Text {
-      text,
-      font,
-      font_size,
-    } = self;
+    let Text { text, font, font_size } = self;
     let font_id = text_brush
       .select_best_match(font.family.as_str(), &font.props)
       .map(|f| f.id)
@@ -835,11 +816,7 @@ And by opposing end them? To die: to sleep;\n",
     let deja = FontInfo::new().with_family("DejaVu Sans".to_owned());
     let mut layer = canvas.new_2d_layer();
     layer.fill_complex_texts_by_style(
-      vec![Text {
-        text,
-        font: deja,
-        font_size: 36.,
-      }],
+      vec![Text { text, font: deja, font_size: 36. }],
       Some(Rect::from_size(Size::new(1600., 1600.))),
       Some(TextLayout {
         h_align: HorizontalAlign::Right,

@@ -300,6 +300,7 @@ impl<W: Widget, A: Any> AttachAttr for AttrWidget<W, A> {
       unsafe {
         tmp.as_mut_ptr().copy_from(m as *const M, 1);
       }
+      std::mem::forget(major);
       Some(unsafe { tmp.assume_init() })
     } else {
       let new_major = others.as_mut().and_then(|others| others.remove_attr::<M>());
@@ -325,11 +326,11 @@ pub struct AttrsMut<'a> {
 
 impl<'a> AttrsRef<'a> {
   pub fn find_attr<A: 'static>(self) -> Option<&'a A> {
-    self.major.downcast_ref::<A>().or(
+    self.major.downcast_ref::<A>().or_else(|| {
       self
         .other_attrs
-        .and_then(|attrs| attrs.iter().find_map(|attr| attr.downcast_ref::<A>())),
-    )
+        .and_then(|attrs| attrs.iter().find_map(|attr| attr.downcast_ref::<A>()))
+    })
   }
 }
 

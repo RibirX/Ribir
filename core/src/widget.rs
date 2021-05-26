@@ -102,7 +102,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
   where
     Self: Sized,
   {
-    ScrollableX::new(self.box_it(), 0.)
+    ScrollableX::x_scroll(self.box_it(), 0.)
   }
 
   /// Let this widget vertical scrollable and the scroll view is as large as
@@ -111,7 +111,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
   where
     Self: Sized,
   {
-    ScrollableY::new(self.box_it(), 0.)
+    ScrollableY::y_scroll(self.box_it(), 0.)
   }
 
   /// Let this widget both scrollable in horizontal and vertical, and the scroll
@@ -120,7 +120,7 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
   where
     Self: Sized,
   {
-    ScrollableBoth::new(self.box_it(), Point::zero())
+    ScrollableBoth::both_scroll(self.box_it(), Point::zero())
   }
 }
 

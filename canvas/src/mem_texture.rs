@@ -162,10 +162,10 @@ mod tests {
     tex.update_texture(&euclid::rect(4, 3, 2, 2), &[34, 35, 44, 45]);
     assert_eq!(&tex[3][4..], &[34, 35, 0, 0]);
     assert_eq!(&tex[4][4..], &[44, 45, 0, 0]);
-    assert_eq!(tex.is_updated(), true);
+    assert!(tex.is_updated());
 
     tex.data_synced();
-    assert_eq!(tex.is_updated(), false);
+    assert!(!tex.is_updated());
   }
 
   #[test]
@@ -187,6 +187,6 @@ mod tests {
     assert_eq!(tex.as_bytes(), vec![0; 32].as_slice());
 
     tex.data_synced();
-    assert_eq!(tex.is_resized(), false);
+    assert!(!tex.is_resized());
   }
 }

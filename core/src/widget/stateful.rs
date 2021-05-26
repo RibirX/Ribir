@@ -3,6 +3,7 @@ use rxrust::prelude::*;
 use std::{
   any::Any,
   cell::{Ref, RefCell, RefMut},
+  mem::ManuallyDrop,
   ptr::NonNull,
   rc::Rc,
 };
@@ -50,7 +51,7 @@ impl<W: Widget> StateDetect for W {
 }
 
 impl<W: Stateful> StateDetect for W {
-  fn state_info(&self) -> Option<StateInfo> { Some(self.ref_cell().info.clone()) }
+  fn state_info(&self) -> Option<StateInfo> { Some(self.ref_cell().info) }
 }
 
 /// A reference of stateful widget, can use it to directly access and modify
@@ -178,28 +179,28 @@ impl<W: 'static> StateRefCell<W> {
 
   pub fn borrow_mut(&mut self) -> StateRefMut<W> {
     StateRefMut {
-      attr: self.info.clone(),
-      ref_mut: self.inner_widget.0.borrow_mut(),
+      info: self.info.clone(),
+      ref_mut: ManuallyDrop::new(self.inner_widget.0.borrow_mut()),
     }
   }
 }
 
 pub struct StateRefMut<'a, W: 'static> {
-  ref_mut: RefMut<'a, W>,
-  attr: StateInfo,
+  ref_mut: ManuallyDrop<RefMut<'a, W>>,
+  info: StateInfo,
 }
 
 impl<'a, W> Drop for StateRefMut<'a, W> {
   fn drop(&mut self) {
-    let Self { ref_mut, attr } = self;
+    let Self { ref_mut, info } = self;
     // Safety drop the RefMut first , will never borrow it.
-    std::mem::drop(ref_mut);
+    unsafe { ManuallyDrop::drop(ref_mut) };
 
-    if attr.0.borrow().subject.is_some() {
-      attr.state_subject().next(())
+    if info.0.borrow().subject.is_some() {
+      info.state_subject().next(())
     }
 
-    let borrowed = attr.0.borrow_mut();
+    let borrowed = info.0.borrow_mut();
     if let Some(TreeInfo { mut tree, id }) = borrowed.tree_info {
       id.mark_changed(unsafe { tree.as_mut() });
     }

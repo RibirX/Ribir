@@ -86,7 +86,8 @@ where
         copy.assume_init()
       };
       RenderObject::update(self, copy, ctx);
-      std::mem::forget(states)
+      std::mem::forget(states);
+      ctx.mark_needs_layout();
     }
   }
 

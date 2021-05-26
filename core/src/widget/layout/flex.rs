@@ -237,18 +237,19 @@ struct FlexLayouter {
 
 impl FlexLayouter {
   fn layout(&mut self, ctx: &mut RenderCtx) -> Size {
+    macro_rules! inner_layout {
+      ($method: ident) => {{
+        self.children_perform(ctx.$method());
+        self.relayout_if_need(ctx.$method());
+        let size = self.box_size();
+        self.line_inner_align(ctx.$method(), size);
+        size.to_size(self.direction)
+      }};
+    }
     if self.reverse {
-      self.children_perform(ctx.reverse_children());
-      self.relayout_if_need(ctx.reverse_children());
-      let size = self.box_size();
-      self.line_inner_align(ctx.reverse_children(), size);
-      size.to_size(self.direction)
+      inner_layout!(reverse_children)
     } else {
-      self.children_perform(ctx.children());
-      self.relayout_if_need(ctx.children());
-      let size = self.box_size();
-      self.line_inner_align(ctx.children(), size);
-      size.to_size(self.direction)
+      inner_layout!(children)
     }
   }
 

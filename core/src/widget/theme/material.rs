@@ -1,7 +1,7 @@
 pub use super::theme_data::*;
 pub use canvas::{Color, FillStyle, FontStyle, FontWeight};
 
-/// A default light blue theme. Colors from https://material.io/design/color/dark-theme.html#ui-application
+/// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
 pub fn light(family: String) -> ThemeData {
   let dark_text = TypographyTheme::new(
     family.clone(),
@@ -40,7 +40,7 @@ pub fn light(family: String) -> ThemeData {
   }
 }
 
-/// A default dark theme with a teal accent color. Colors from https://material.io/design/color/dark-theme.html#ui-application
+/// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
 pub fn dark(family: String) -> ThemeData {
   let unselected_widget_color = Color::WHITE.with_alpha(0.7);
   let background = Color::from_u32(0x1212_12FF);
