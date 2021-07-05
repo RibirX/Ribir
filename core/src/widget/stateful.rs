@@ -1,3 +1,96 @@
+//! ## Stateless and Stateful
+//! As default, In Ribir, every widget is stateless, just present like what you
+//! declare and no interactive. That mean when you change the data of this
+//! widget, the presentation of this widget will not change.
+
+//! But Ribir provide a common method to convert a widget from sateless to
+//! stateful if a widget need repaint or relayout to respond to some widget
+//! change. This depends on [`Stateful`][Stateful] and
+//! [`IntoStateful`][IntoStateful]
+//! Use the `#[stateful]` attr  to the widget and mark what fields is state
+//! field by `#[state]`. Those will provide a stateful version widget named
+//! `StatefulXXX` which just a tuple struct wrap the
+//! [`StatefulImpl`][StatefulImpl] with the stateless version and implement
+//! [`IntoStateful`][IntoStateful]  for the stateless version widget. We
+//! needn't write some logic code to support stateful, and shouldn't.
+
+//! # Example
+//! This example implement a rectangle widget which support change its size and
+//! fill color.
+//! ```
+//! # #![feature(trivial_bounds)]
+//! # use holiday::prelude::*;
+//!
+//! #[stateful]
+//! #[derive(Widget)]
+//! struct Rectangle {
+//!   #[state]
+//!   size: Size,
+//!   #[state]
+//!   color: Color,
+//! }
+//!
+//! impl CombinationWidget for Rectangle {
+//!   fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
+//!     SizedBox::empty_box(self.size)
+//!       .with_background(self.color.clone().into())
+//!      .box_it()
+//!   }
+//! }
+//!
+//! let rect = Rectangle {
+//!   size: Size::new(100., 100.),
+//!   color: Color::RED,
+//! }
+//! // Rectangle support convert to stateful now.
+//! .into_stateful();
+//!
+//! let mut state_ref = rect.ref_cell();
+//! rect.on_tap(move |_| {
+//!   state_ref.borrow_mut().color = Color::BLACK;
+//! });
+//! ```
+//! In the above example, we implement a widget `Rectangle`, and use it to
+//! change its color when user tapped. How to do if we want this behavior  as a
+//! part of the rectangle itself. In other word, a stateless `Rectangle` is
+//! useless, we only need a stateful `Rectangle`. To implement it, we can
+//! specify `custom` meta to `#[stateful(custom)]` attr. This tell Ribir, "I
+//! want to implement the stateful widget by myself instead of direct derive
+//! from the stateless version."
+
+//! ```
+//! # #![feature(trivial_bounds)]
+//! # use holiday::prelude::*;
+//!
+//! #[stateful(custom)]
+//! struct Rectangle {
+//!   #[state]
+//!   size: Size,
+//!   #[state]
+//!   color: Color,
+//! }
+//!
+//! impl CombinationWidget for StatefulRectangle {
+//!   fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
+//!     let rect = self.as_ref();
+//!     let mut state_ref = self.ref_cell();
+//!     SizedBox::empty_box(rect.size)
+//!       .with_background(rect.color.clone().into())
+//!       .on_tap(move |_| {
+//!         state_ref.borrow_mut().color = Color::BLACK;
+//!       })
+//!      .box_it()
+//!   }
+//! }
+//!
+//! // Remember call the 'into_stateful', the `Rectangle` is not a widget but
+//! // `StatefulRectangle` is.
+//! let rect = Rectangle {
+//!   size: Size::new(100., 100.),
+//!   color: Color::RED,
+//! }.into_stateful();
+//! ```
+
 use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{

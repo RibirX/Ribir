@@ -16,11 +16,7 @@ impl<'a> PaintingContext<'a> {
     tree.root().map(|root| {
       let mut layer_2d = Rendering2DLayer::new();
       layer_2d.set_transform(transform);
-      Self {
-        layer_2d,
-        current_node: root,
-        tree,
-      }
+      Self { layer_2d, current_node: root, tree }
     })
   }
 

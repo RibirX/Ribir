@@ -1,9 +1,9 @@
 use holiday::prelude::*;
 
-#[derive(Widget, CombinationWidget, Debug)]
+#[derive(Widget, CombinationWidget)]
 struct A;
 
-#[derive(Debug, Widget, CombinationWidget)]
+#[derive(Widget, CombinationWidget)]
 struct B {
   #[proxy]
   a: Checkbox,

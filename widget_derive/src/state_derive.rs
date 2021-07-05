@@ -76,14 +76,16 @@ pub(crate) fn stateful_derive(
 
   let stateful_def = if custom_impl_attr(attrs)? {
     quote! {
-        #[derive(Widget)]
-        #vis struct #stateful_name #w_ty_generics(StatefulImpl<#name
-    #w_ty_generics>) #w_where_clause;   }
+      #[derive(Widget)]
+      #vis struct #stateful_name #w_ty_generics(
+        StatefulImpl<#name #w_ty_generics>) #w_where_clause;
+    }
   } else {
     quote! {
-        #[derive(Widget, RenderWidget, CombinationWidget)]
-        #vis struct #stateful_name #w_ty_generics(#[proxy] StatefulImpl<#name
-    #w_ty_generics>) #w_where_clause;   }
+      #[derive(Widget, RenderWidget, CombinationWidget)]
+      #vis struct #stateful_name #w_ty_generics(
+        #[proxy] StatefulImpl<#name #w_ty_generics>) #w_where_clause;
+    }
   };
 
   let expanded = quote! {

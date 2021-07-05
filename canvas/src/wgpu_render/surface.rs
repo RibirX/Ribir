@@ -97,10 +97,7 @@ impl PhysicSurface {
 
     let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-    Self {
-      swap_chain,
-      surface,
-    }
+    Self { swap_chain, surface }
   }
 }
 
@@ -113,11 +110,7 @@ pub struct Texture {
 impl Texture {
   pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsage) -> Self {
     let raw_texture = Self::new_texture(device, size, usage);
-    Texture {
-      raw_texture,
-      size,
-      usage,
-    }
+    Texture { raw_texture, size, usage }
   }
 
   #[inline]
@@ -127,9 +120,8 @@ impl Texture {
     let new_texture = Self::new_texture(device, size, self.usage);
 
     let size = size.min(self.size);
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("Render Encoder"),
-    });
+    let mut encoder = device
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") });
     encoder.copy_texture_to_texture(
       wgpu::TextureCopyView {
         texture: &self.raw_texture,

@@ -39,10 +39,7 @@ impl RgbaConvert {
       },
     });
 
-    Self {
-      group_layout,
-      pipeline,
-    }
+    Self { group_layout, pipeline }
   }
 
   /// Use compute shader to convert a image from bgra to rgba.
@@ -123,11 +120,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
         rows_per_image: 0,
       },
     },
-    wgpu::Extent3d {
-      width,
-      height,
-      depth: 1,
-    },
+    wgpu::Extent3d { width, height, depth: 1 },
   );
   convert.compute_shader_convert(
     device,
