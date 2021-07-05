@@ -9,25 +9,3 @@ error: Too many `#[proxy]` attr specified, need only one
   |
 7 | struct B {
   |        ^
-
-error[E0277]: `holiday::widget::Checkbox` doesn't implement `Debug`
- --> $DIR/combination_fail.rs:9:3
-  |
-9 |   a: Checkbox,
-  |   ^^^^^^^^^^^ `holiday::widget::Checkbox` cannot be formatted using `{:?}` because it doesn't implement `Debug`
-  |
-  = help: the trait `Debug` is not implemented for `holiday::widget::Checkbox`
-  = note: required because of the requirements on the impl of `Debug` for `&holiday::widget::Checkbox`
-  = note: required for the cast to the object type `dyn Debug`
-  = note: this error originates in the derive macro `Debug` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0277]: `holiday::widget::Checkbox` doesn't implement `Debug`
-  --> $DIR/combination_fail.rs:11:3
-   |
-11 |   b: Checkbox,
-   |   ^^^^^^^^^^^ `holiday::widget::Checkbox` cannot be formatted using `{:?}` because it doesn't implement `Debug`
-   |
-   = help: the trait `Debug` is not implemented for `holiday::widget::Checkbox`
-   = note: required because of the requirements on the impl of `Debug` for `&holiday::widget::Checkbox`
-   = note: required for the cast to the object type `dyn Debug`
-   = note: this error originates in the derive macro `Debug` (in Nightly builds, run with -Z macro-backtrace for more info)

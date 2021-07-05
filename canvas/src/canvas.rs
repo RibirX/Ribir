@@ -198,11 +198,7 @@ impl Canvas {
       .into_iter()
       .for_each(|Command { transform, info }| {
         match info {
-          CommandInfo::Path {
-            path,
-            style,
-            stroke_width,
-          } => {
+          CommandInfo::Path { path, style, stroke_width } => {
             let style_rect = self.store_style_in_atlas(&style, render);
             let align_bounds = path_bounds_to_align_texture(&style, &path.0);
             self.add_primitive(style_rect, align_bounds, transform);
@@ -210,11 +206,7 @@ impl Canvas {
             let vertices_buffer = &mut self.render_data.vertices_buffer;
             tessellator.tessellate(vertices_buffer, path.0, stroke_width, &transform, prim_id);
           }
-          CommandInfo::SimpleText {
-            text,
-            style,
-            max_width,
-          } => {
+          CommandInfo::SimpleText { text, style, max_width } => {
             let (scale, transform) = font_device_scale(transform);
             let text = text
               .to_glyph_text(self.text_brush(), 0)
@@ -228,11 +220,7 @@ impl Canvas {
               self.single_style_section_consume(&style, render, align_bounds, transform, sec);
             }
           }
-          CommandInfo::ComplexTexts {
-            texts,
-            bounds,
-            layout,
-          } => {
+          CommandInfo::ComplexTexts { texts, bounds, layout } => {
             let (scale, transform) = font_device_scale(transform);
             let texts = texts
               .into_iter()
@@ -249,12 +237,7 @@ impl Canvas {
             sec = section_with_layout_bounds(sec, bounds, layout);
             self.consume_section(render, sec);
           }
-          CommandInfo::ComplexTextsByStyle {
-            style,
-            texts,
-            bounds,
-            layout,
-          } => {
+          CommandInfo::ComplexTextsByStyle { style, texts, bounds, layout } => {
             let (scale, transform) = font_device_scale(transform);
             let texts = texts
               .into_iter()
@@ -335,11 +318,7 @@ impl<'a, R: CanvasRender> Frame<'a, R> {
 
 impl<'a, R: CanvasRender> Drop for Frame<'a, R> {
   fn drop(&mut self) {
-    let Self {
-      canvas,
-      composed,
-      render,
-    } = self;
+    let Self { canvas, composed, render } = self;
     let mut tessellator = crate::tessellator_2d::Tessellator::new();
     composed
       .drain(..)
@@ -427,12 +406,8 @@ fn section_with_bounds(mut sec: Section, bounds: Rect) -> Section {
   sec = sec.with_bounds(bounds.size);
 
   let (h_align, v_align) = match &sec.layout {
-    glyph_brush::Layout::SingleLine {
-      h_align, v_align, ..
-    } => (h_align, v_align),
-    glyph_brush::Layout::Wrap {
-      h_align, v_align, ..
-    } => (h_align, v_align),
+    glyph_brush::Layout::SingleLine { h_align, v_align, .. } => (h_align, v_align),
+    glyph_brush::Layout::Wrap { h_align, v_align, .. } => (h_align, v_align),
   };
 
   let mut pos = bounds.min();

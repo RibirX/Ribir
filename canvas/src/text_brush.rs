@@ -207,14 +207,8 @@ impl TextBrush {
         tex_coords.max.y - tex_coords.height() * pixel_coords.height() / old_height;
     }
 
-    let glyph_brush::ab_glyph::Rect {
-      min: px_min,
-      max: px_max,
-    } = pixel_coords;
-    let glyph_brush::ab_glyph::Rect {
-      min: tx_min,
-      max: tx_max,
-    } = tex_coords;
+    let glyph_brush::ab_glyph::Rect { min: px_min, max: px_max } = pixel_coords;
+    let glyph_brush::ab_glyph::Rect { min: tx_min, max: tx_max } = tex_coords;
 
     [
       Vertex {

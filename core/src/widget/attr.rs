@@ -1,21 +1,82 @@
+//! Attributes is use to extend ability of a widget. Across attach attribute,
+//! widget can be expanded much ability from the attributes. The attach means
+//! the widget number will not increase after attributes attached and the origin
+//! widget behavior will be kept.
+
+//! Note that widget use the attribute ability across [`find_attr`][find],
+//! widget can't hold two same type attribute, so if you implement a custom
+//! attribute, you should merge or replace the same type attr if user try to
+//! attach.
+//!
+//! Ribir provide many builtin attributes, and provide method to easy attach.
+//! For example, we implement a custom widget and the builtin attributes can be
+//! attached to it.
+
+//! ```
+//! # use holiday::prelude::*;
+//! // implement a custom widget.
+//! ##[derive(Widget)]
+//! pub struct MyCheckbox;
+//!
+//! impl CombinationWidget for MyCheckbox {
+//!   fn build(&self, ctx: &mut  BuildCtx) -> Box<dyn Widget>{
+//!     Checkbox::from_theme(ctx.theme()).box_it()
+//!   }
+//! }
+//!
+//! let checkbox = MyCheckbox
+//!  // can use key attribute
+//!  .with_key(1)
+//!  // can use pointer listener attribute feedback pointer event input.
+//!  .on_pointer_move(|_| {})
+//!  // char listener attribute too
+//!  .on_char(|_| {});
+//!  // and more ....
+//! ```
+//! # Custom implement attribute.
+//!
+//! To implement custom attribute, use [`AttrWidget`][AttrWidget] is the easiest
+//! way. For example
+
+//! ```
+//! # use holiday::{prelude::*, widget::AttrWidget};
+
+//! #[derive(Widget, RenderWidget, CombinationWidget)]
+//! pub struct Hello<W: Widget>(#[proxy] AttrWidget<W, HelloAttr>);
+//!
+//! pub struct HelloAttr;
+//!
+//! impl HelloAttr {
+//!   pub fn hello(&self) {
+//!     println!("Hello!");
+//!   }
+//! }
+//!
+//! impl<W: Widget> Hello<W> {
+//!   pub fn new<A: AttachAttr<W = W>>(w: A) -> Self {
+//!     // Take attr from a widget if it's have. We not use the old 'HelloAttr'
+//!     // here.
+//!     let (_, others, widget) = w.take_attr::<HelloAttr>();
+//!     Hello (AttrWidget { widget, major: HelloAttr, others })
+//!   }
+//! }
+//! let widget: Box<dyn Widget> = Hello::new(Text("".to_string())).box_it();
+//! widget.find_attr::<HelloAttr>().unwrap().hello()
+//! ```
+//! [find]: crate::Widget::find_attr
+//! [attr_impl] crate::widget::attr::WidgetAttr
+
 use crate::prelude::*;
 use rxrust::prelude::*;
 use std::any::Any;
 
 use std::collections::LinkedList;
 
-/// Attributes is use to extend ability of a widget but not increase the
-/// widget number. If a widget is not a combination widget and will not do
-/// layout or paint, it should be consider use attribute to exptend it. Like the
-/// event listeners, `KeyDetect` and so on.
+/// `AttachAttr` provide the ability to attach the builtin attrs implemented by
+/// Ribir. See the [module-level documentation][mod] for more details. When
+/// derive `#[derive(Widget)]` `AttachAttr` will be also implemented.
 ///
-/// `AttachAttr` attach ability to a widget. Attributes attach to a widget store
-/// like a like list. The same type attributes should be merge into one.
-///
-/// ## Notice
-/// When you implement `AttachAttr`  for a widget, you should remember a widget
-/// can only attach one attr of each type. If user attach many same type attr,
-/// you should merge them.
+/// [mod]: crate::widget::attr
 pub trait AttachAttr {
   /// The widget the attribute attached to.
   type W: Widget;
@@ -261,6 +322,8 @@ pub trait AttachAttr {
     widget
   }
 
+  /// Detach attributes from the widget, and return the specified attr `A` if
+  /// have, other attributes and the origin widget attributes attached to.
   fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W);
 }
 

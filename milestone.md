@@ -24,7 +24,7 @@
 
 ## paint & event, runnable (6.1)
 
-- [ ] Widget Derive
+- [x] Widget Derive
 - [x] paint
   - [x] which 2d graphic library to use?
   - [x] paint flow.
