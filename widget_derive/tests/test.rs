@@ -1,6 +1,6 @@
 #![feature(trivial_bounds)]
 
-use holiday::prelude::*;
+use ribir::prelude::*;
 
 #[derive(Widget)]
 struct Test {}

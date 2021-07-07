@@ -1,4 +1,4 @@
-use holiday::prelude::*;
+use ribir::prelude::*;
 
 #[derive(Debug, Widget)]
 struct A;

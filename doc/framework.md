@@ -12,7 +12,7 @@ inflate the widget tree     .   construct render tree and  |                   |
 
 ## Declare & Reactive programming mode
 
-`Holiday` builds widget tree with your ui by declare data, meanwhile it creates render object tree to layout and paint.
+`Ribir` builds widget tree with your ui by declare data, meanwhile it creates render object tree to layout and paint.
 When the data that the widget depends on changes, widget tree will make a update, and render objects correspond updated widgets to update also.
 
 When a widget as root node run in `Application`, it will be inflated into widget tree by framework. Every leaf in the widget tree is a rendered widget. Sometimes, only has tree updated is not enough, it's possible that `CombinationWidget` builds a complete full differently `Widget`.  So if a `CombinationWidget` is changed, it need rebuild and maybe reconstruct full subtree. Framework try to rebuild the widget tree and the render tree as mini as possible.
@@ -21,11 +21,11 @@ When a widget as root node run in `Application`, it will be inflated into widget
 
 Widget doesn't update or rebuild subtree immediately when its state changed. It's just mark this widget need to rebuild and wait until the widget tree rebuild. 
 
-The widget tree update from top to bottom. If a bottom widget removed because its ancestor rebuild, its update or rebuild auto be canceled. Even if `CombinationWidget` require rebuild, itself must be rebuild, but that not mean `Holiday` will reconstruct the total subtree, the `Key`may help us to reduce many cost in some case.
+The widget tree update from top to bottom. If a bottom widget removed because its ancestor rebuild, its update or rebuild auto be canceled. Even if `CombinationWidget` require rebuild, itself must be rebuild, but that not mean `Ribir` will reconstruct the total subtree, the `Key`may help us to reduce many cost in some case.
 
 ### Key
 
-`Key` helps `Holiday` to track what widgets add, remove and changed. So `Holiday` can modify the widget tree and the render tree minimally. A `Key` should unique for each widget under the same father.
+`Key` helps `Ribir` to track what widgets add, remove and changed. So `Ribir` can modify the widget tree and the render tree minimally. A `Key` should unique for each widget under the same father.
 
 The widget tree rebuilds base on widget diff. Work like below:
 
@@ -49,7 +49,7 @@ d. done, the subtree from this widget is rebuild finished.
 
 ## Compose prefer
 
-Unlike many classic GUI framework, `Holiday` doesn't build on inherit mode. Because Rust not support inherit, `Holiday` built base on composition. For example, If you want give a `Button` widget opacity, it doesn't have a field named `opacity` give you to set the opacity, you should use a `Opacity` widget to do it, like:
+Unlike many classic GUI framework, `Ribir` doesn't build on inherit mode. Because Rust not support inherit, `Ribir` built base on composition. For example, If you want give a `Button` widget opacity, it doesn't have a field named `opacity` give you to set the opacity, you should use a `Opacity` widget to do it, like:
 
 ```rust
 Opacity {
@@ -71,7 +71,7 @@ As default, every widget is stateless, just present like what you declare and no
 
 ### Layout
 
-`Holiday` performs a layout per frame, and the layout algorithm works in a single pass. It's a recursive layout from parent down to children. 
+`Ribir` performs a layout per frame, and the layout algorithm works in a single pass. It's a recursive layout from parent down to children. 
 
 There is some important point to help understand how to write a layout:
 
@@ -84,7 +84,7 @@ There is some important point to help understand how to write a layout:
 
 ## Children Relationship
 
-In `Holiday`, normal render object not hold the children, but we can use layout widget to build a parent & children relationship.
+In `Ribir`, normal render object not hold the children, but we can use layout widget to build a parent & children relationship.
 
 
 ## avoid to rebuild widget ?

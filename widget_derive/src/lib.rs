@@ -5,7 +5,7 @@
 //! A default widget implementation for W.
 
 //! ```
-//! use holiday::prelude::*;
+//! use ribir::prelude::*;
 //！##[derive(Widget)]
 //! struct W;
 //! ```
@@ -18,7 +18,7 @@
 //! Derive from field `b` which is a `Text`. Because `Text` is a render widget,
 //!
 //! ```
-//! use holiday::prelude::*;
+//! use ribir::prelude::*;
 //! ##[derive(Widget, RenderWidget)]
 //! struct W {
 //!  ##[proxy]
@@ -29,7 +29,7 @@
 //! Derive from a generic type, and derive `RenderWidget` if it's a render
 //! widget, derive `CombinationWidget` if it's a combination widget.
 //! ```
-//! use holiday::prelude::*;
+//! use ribir::prelude::*;
 //! ##[derive(Widget, RenderWidget, CombinationWidget)]
 //! struct ProxyWidget<W>(#[proxy] W);
 //! ```

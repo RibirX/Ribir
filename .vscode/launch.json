@@ -7,16 +7,16 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'holiday'",
+      "name": "Debug unit tests in library 'ribir'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
           "--lib",
-          "--package=holiday"
+          "--package=ribir"
         ],
         "filter": {
-          "name": "holiday",
+          "name": "ribir",
           "kind": "lib"
         }
       },
@@ -31,7 +31,7 @@
         "args": [
           "build",
           "--example=todo",
-          "--package=holiday"
+          "--package=ribir"
         ],
         "filter": {
           "name": "todo",
@@ -50,7 +50,7 @@
           "test",
           "--no-run",
           "--example=todo",
-          "--package=holiday"
+          "--package=ribir"
         ],
         "filter": {
           "name": "todo",

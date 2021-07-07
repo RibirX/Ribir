@@ -1,4 +1,4 @@
-use holiday::prelude::*;
+use ribir::prelude::*;
 
 #[derive(Widget, CombinationWidget)]
 struct A;
