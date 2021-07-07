@@ -11,5 +11,5 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         # issue-message: |-
         pr-message: |-
-          # Welcome to Holiday!
+          # Welcome to Ribir!
           We're delight to have you onboard <3

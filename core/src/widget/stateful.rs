@@ -19,7 +19,7 @@
 //! fill color.
 //! ```
 //! # #![feature(trivial_bounds)]
-//! # use holiday::prelude::*;
+//! # use ribir::prelude::*;
 //!
 //! #[stateful]
 //! #[derive(Widget)]
@@ -60,7 +60,7 @@
 
 //! ```
 //! # #![feature(trivial_bounds)]
-//! # use holiday::prelude::*;
+//! # use ribir::prelude::*;
 //!
 //! #[stateful(custom)]
 //! struct Rectangle {

@@ -1,6 +1,6 @@
 # Canvas
 
-`Canvas` is a vector font and 2d/3d graphic library, the main goal is as a fast render for `Holiday`.
+`Canvas` is a vector font and 2d/3d graphic library, the main goal is as a fast render for `Ribir`.
 
 
 ## Design

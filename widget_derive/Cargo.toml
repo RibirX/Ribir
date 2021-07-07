@@ -15,5 +15,5 @@ quote = "1.0.9"
 syn = "1.0.69"
 
 [dev-dependencies]
-holiday = {path = "../core"}
+ribir = {path = "../core"}
 trybuild = "1.0"

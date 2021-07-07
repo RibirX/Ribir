@@ -29,7 +29,7 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-/// `Key` help `Holiday` to track if two widget is a same widget in two frame.
+/// `Key` help `Ribir` to track if two widget is a same widget in two frame.
 /// `KeyDetect` is a widget that only work for bind a key to a widget.
 pub type KeyDetect<W> = AttrWidget<W, Key>;
 

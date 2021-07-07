@@ -1,6 +1,6 @@
 //! Framework use special widgets to listens to corresponding events, Three are
 //! two raw listeners [`PointerListener`](pointers::PointerListener),
-//! [`KeyboardListener`](keyboard::KeyboardListener). `Holiday` dispatch event
+//! [`KeyboardListener`](keyboard::KeyboardListener). `Ribir` dispatch event
 //! like web's bubble phase, always from the leaf to root.
 use crate::{
   render::render_tree::RenderTree,

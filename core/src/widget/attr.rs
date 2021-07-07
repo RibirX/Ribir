@@ -13,7 +13,7 @@
 //! attached to it.
 
 //! ```
-//! # use holiday::prelude::*;
+//! # use ribir::prelude::*;
 //! // implement a custom widget.
 //! ##[derive(Widget)]
 //! pub struct MyCheckbox;
@@ -39,7 +39,7 @@
 //! way. For example
 
 //! ```
-//! # use holiday::{prelude::*, widget::AttrWidget};
+//! # use ribir::{prelude::*, widget::AttrWidget};
 
 //! #[derive(Widget, RenderWidget, CombinationWidget)]
 //! pub struct Hello<W: Widget>(#[proxy] AttrWidget<W, HelloAttr>);

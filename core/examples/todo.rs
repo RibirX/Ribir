@@ -1,4 +1,4 @@
-use holiday::{
+use ribir::{
   prelude::*,
   widget::{Column, Row},
 };
