@@ -1,7 +1,6 @@
 use super::expanded::ExpandedState;
 use crate::prelude::*;
 use crate::render::render_tree::*;
-use smallvec::{smallvec, SmallVec};
 
 /// How the children should be placed along the cross axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq, StatePartialEq)]
@@ -65,17 +64,9 @@ pub struct Flex {
   /// How the children should be placed along the main axis in a flex layout.
   #[state]
   pub main_align: MainAxisAlign,
-  pub children: SmallVec<[Box<dyn Widget>; 1]>,
 }
 
 impl Flex {
-  /// Add a children into the flex container.
-  #[inline]
-  pub fn push<W: Widget>(mut self, child: W) -> Self {
-    self.children.push(child.box_it());
-    self
-  }
-
   /// Create a new Flex like `self`, but with the give `reverse`.
   #[inline]
   pub fn with_reverse(mut self, reverse: bool) -> Self {
@@ -112,15 +103,6 @@ impl Flex {
   }
 }
 
-impl std::iter::FromIterator<Box<dyn Widget>> for Flex {
-  fn from_iter<T: IntoIterator<Item = Box<dyn Widget>>>(iter: T) -> Self {
-    Self {
-      children: iter.into_iter().collect(),
-      ..Default::default()
-    }
-  }
-}
-
 impl Default for CrossAxisAlign {
   #[inline]
   fn default() -> Self { CrossAxisAlign::Center }
@@ -135,11 +117,6 @@ impl RenderWidget for Flex {
   type RO = FlexState;
   #[inline]
   fn create_render_object(&self) -> Self::RO { self.clone_states() }
-
-  #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    Some(std::mem::replace(&mut self.children, smallvec![]))
-  }
 }
 
 impl RenderObject for FlexState {

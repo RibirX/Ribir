@@ -2,8 +2,8 @@ use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[stateful]
+#[derive(Widget, SingleChildWidget, Default)]
 pub struct BoxDecoration {
-  pub child: Box<dyn Widget>,
   /// The background of the box.
   #[state]
   pub background: Option<FillStyle>,
@@ -46,60 +46,10 @@ impl StatePartialEq<Self> for BorderRadius {
 }
 pub struct BoxDecorationRender(BoxDecorationState);
 
-impl BoxDecoration {
-  pub fn new(child: Box<dyn Widget>) -> Self {
-    Self {
-      child,
-      border: None,
-      background: None,
-      radius: None,
-    }
-  }
-}
-
-impl Widget for BoxDecoration {
-  #[inline]
-  fn attrs_ref(&self) -> Option<AttrsRef> { None }
-
-  #[inline]
-  fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
-
-  #[inline]
-  fn with_background(mut self, background: FillStyle) -> Self {
-    self.background = Some(background);
-    self
-  }
-
-  #[inline]
-  fn with_border(mut self, border: Border) -> Self {
-    self.border = Some(border);
-    self
-  }
-
-  #[inline]
-  fn with_border_radius(mut self, radius: BorderRadius) -> Self {
-    self.radius = Some(radius);
-    self
-  }
-}
-
-impl AttachAttr for BoxDecoration {
-  type W = Self;
-
-  #[inline]
-  fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) { (None, None, self) }
-}
-
 impl RenderWidget for BoxDecoration {
   type RO = BoxDecorationRender;
   #[inline]
   fn create_render_object(&self) -> Self::RO { BoxDecorationRender(self.clone_states()) }
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    Some(smallvec![std::mem::replace(
-      &mut self.child,
-      PhantomWidget.box_it()
-    )])
-  }
 }
 
 impl RenderObject for BoxDecorationRender {

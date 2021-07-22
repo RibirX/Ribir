@@ -6,47 +6,33 @@ pub use smallvec::{smallvec, SmallVec};
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
 #[stateful]
-#[derive(Widget)]
+#[derive(Widget, SingleChildWidget)]
 pub struct SizedBox {
   #[state]
   pub size: Size,
-  pub child: Option<Box<dyn Widget>>,
 }
 
 impl SizedBox {
   /// Creates a box with the specified size.
-  pub fn from_size<W: Widget>(size: Size, child: W) -> Self {
-    Self { size, child: Some(child.box_it()) }
-  }
+  #[inline]
+  pub fn from_size(size: Size) -> SizedBox { Self { size } }
 
   /// Creates a box that will become as large as its parent allows.
-  pub fn expanded<W: Widget>(child: W) -> Self {
-    Self {
-      size: Size::new(f32::INFINITY, f32::INFINITY),
-      child: Some(child.box_it()),
-    }
+  #[inline]
+  pub fn expanded() -> SizedBox {
+    const infinity: f32 = f32::INFINITY;
+    Self { size: Size::new(infinity, infinity) }
   }
 
   /// Creates a box that will become as small as its parent allows.
-  pub fn shrink<W: Widget>(child: W) -> Self {
-    Self {
-      size: Size::zero(),
-      child: Some(child.box_it()),
-    }
-  }
-
-  /// Creates a box with specified size without child.
-  pub fn empty_box(size: Size) -> Self { Self { size, child: None } }
+  #[inline]
+  pub fn shrink<W: Widget>(child: W) -> Self { Self { size: Size::zero() } }
 }
 
 impl RenderWidget for SizedBox {
   type RO = SizedBoxState;
   #[inline]
   fn create_render_object(&self) -> Self::RO { SizedBoxState { size: self.size } }
-
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    self.child.take().map(|w| smallvec![w])
-  }
 }
 
 impl RenderObject for SizedBoxState {

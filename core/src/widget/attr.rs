@@ -377,6 +377,9 @@ impl<W: Widget, A: Any> AttachAttr for AttrWidget<W, A> {
   }
 }
 
+impl<W: SingleChildWidget, A: Any> SingleChildWidget for AttrWidget<W, A> {}
+impl<W: MultiChildWidget, A: Any> MultiChildWidget for AttrWidget<W, A> {}
+
 pub struct AttrsRef<'a> {
   major: &'a dyn Any,
   other_attrs: Option<&'a LinkedList<Box<dyn Any>>>,

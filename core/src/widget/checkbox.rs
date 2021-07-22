@@ -77,7 +77,7 @@ impl CombinationWidget for StatefulCheckbox {
       }
       .with_background(color.into())
     } else {
-      SizedBox::empty_box(Size::new(size, size)).with_border(Border::all(BorderSide {
+      SizedBox::from_size(Size::new(size, size)).with_border(Border::all(BorderSide {
         color: border_color,
         width: border_width,
       }))
@@ -119,9 +119,6 @@ impl RenderWidget for CheckboxMarker {
 
   #[inline]
   fn create_render_object(&self) -> Self::RO { CheckboxMarkerRender(self.clone_states()) }
-
-  #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> { None }
 }
 
 impl RenderObject for CheckboxMarkerRender {

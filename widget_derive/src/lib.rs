@@ -44,6 +44,7 @@ mod state_partial_eq_derive;
 mod widget_derive;
 
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(Widget, attributes(proxy))]
@@ -62,6 +63,28 @@ pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
 pub fn render_macro_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
   render_derive::render_derive(&mut input).into()
+}
+
+#[proc_macro_derive(SingleChildWidget)]
+pub fn single_marco_derive(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
+  let name = input.ident;
+  let token_stream = quote! {
+    impl #g_impl SingleChildWidget  for #name #g_ty  #g_where {}
+  };
+  token_stream.into()
+}
+
+#[proc_macro_derive(MultiChildWidget)]
+pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
+  let input = parse_macro_input!(input as DeriveInput);
+  let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
+  let name = input.ident;
+  let token_stream = quote! {
+    impl #g_impl MultiChildWidget  for #name #g_ty  #g_where {}
+  };
+  token_stream.into()
 }
 
 #[proc_macro_derive(StatePartialEq)]

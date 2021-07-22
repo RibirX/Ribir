@@ -45,11 +45,6 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
           fn create_render_object(&self) -> Self::RO {
             RenderWidget::create_render_object(&self.#path)
           }
-
-          #[inline]
-          fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-            RenderWidget::take_children(&mut self.#path)
-           }
         }
       }
     }

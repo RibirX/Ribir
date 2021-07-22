@@ -343,11 +343,6 @@ impl<W: RenderWidget> RenderWidget for RcWidget<W> {
 
   #[inline]
   fn create_render_object(&self) -> Self::RO { self.0.borrow().create_render_object() }
-
-  #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    (self.0.borrow_mut()).take_children()
-  }
 }
 
 macro state_partial_impl($($ty: ty)*) {

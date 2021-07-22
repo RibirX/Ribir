@@ -10,24 +10,16 @@ pub struct EdgeInsets {
 
 /// A widget that crate space around its child.
 #[stateful]
-#[derive(Widget)]
+#[derive(Widget, SingleChildWidget)]
 pub struct Margin {
   #[state]
   pub margin: EdgeInsets,
-  pub child: Box<dyn Widget>,
 }
 
 impl RenderWidget for Margin {
   type RO = MarginState;
   #[inline]
   fn create_render_object(&self) -> Self::RO { self.clone_states() }
-
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    Some(smallvec![std::mem::replace(
-      &mut self.child,
-      PhantomWidget.box_it()
-    )])
-  }
 }
 
 impl RenderObject for MarginState {

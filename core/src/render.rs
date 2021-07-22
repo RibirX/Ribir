@@ -62,11 +62,6 @@ where
   }
 
   #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    RenderWidget::take_children(self)
-  }
-
-  #[inline]
   fn clone_boxed_states(&self) -> Box<dyn Any> { Box::new(self.clone_states()) }
 }
 

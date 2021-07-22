@@ -1,33 +1,30 @@
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 
 #[stateful]
-#[derive(Widget)]
+#[derive(Widget, SingleChildWidget)]
 pub struct ScrollableX {
-  child: Option<Box<dyn Widget>>,
   #[state]
   pos: f32,
 }
 
 #[stateful]
-#[derive(Widget)]
+#[derive(Widget, SingleChildWidget)]
 pub struct ScrollableY {
-  child: Option<Box<dyn Widget>>,
   #[state]
   pos: f32,
 }
 
 #[stateful]
-#[derive(Widget)]
+#[derive(Widget, SingleChildWidget)]
 pub struct ScrollableBoth {
-  child: Option<Box<dyn Widget>>,
   #[state]
   pos: Point,
 }
 
 impl ScrollableX {
   #[inline]
-  pub fn x_scroll(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableX> {
-    let scroll = ScrollableX { child: Some(child), pos }.into_stateful();
+  pub fn x_scroll(pos: f32) -> WheelListener<StatefulScrollableX> {
+    let scroll = ScrollableX { pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
@@ -42,8 +39,8 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn y_scroll(child: Box<dyn Widget>, pos: f32) -> WheelListener<StatefulScrollableY> {
-    let scroll = ScrollableY { child: Some(child), pos }.into_stateful();
+  pub fn y_scroll(pos: f32) -> WheelListener<StatefulScrollableY> {
+    let scroll = ScrollableY { pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
@@ -58,8 +55,8 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn both_scroll(child: Box<dyn Widget>, pos: Point) -> WheelListener<StatefulScrollableBoth> {
-    let scroll = ScrollableBoth { child: Some(child), pos }.into_stateful();
+  pub fn both_scroll(pos: Point) -> WheelListener<StatefulScrollableBoth> {
+    let scroll = ScrollableBoth { pos }.into_stateful();
     let mut scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
@@ -81,10 +78,6 @@ macro scroll_render_widget_impl($widget: ty, $state: ty) {
 
     #[inline]
     fn create_render_object(&self) -> Self::RO { ScrollRender { states: self.clone_states() } }
-
-    fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-      self.child.take().map(|w| smallvec![w])
-    }
   }
 }
 
