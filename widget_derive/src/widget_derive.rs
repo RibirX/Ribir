@@ -98,53 +98,99 @@ pub fn widget_derive(input: &mut syn::DeriveInput) -> TokenStream {
     .and_then(|stt| stt.too_many_attr_specified_error());
 
   match info {
-    Ok(info) => {
-      let name = info.ident;
-      let attr_fields = &info.attr_fields;
-
-      let mut generics = info.generics.clone();
-
-      let (attrs_ref_impl, attrs_mut_impl) = if attr_fields.attr_fields().len() == 1 {
-        generics = add_trait_bounds_if(generics, parse_quote!(Widget), |param| {
-          attr_fields.is_attr_generic(param)
-        });
-        let path = info.attr_path();
-        (
-          quote! { self.#path.attrs_ref() },
-          quote! {self.#path.attrs_mut()},
-        )
-      } else {
-        if let Some(ref mut w) = generics.where_clause {
-          w.predicates.push(parse_quote!(Self:'static));
-        } else {
-          generics.where_clause = parse_quote!(where Self: 'static)
-        }
-
-        (quote! {None}, quote! {None})
-      };
-
-      let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-      quote! {
-          impl #impl_generics Widget for #name #ty_generics #where_clause {
-            #[inline]
-            fn attrs_ref(&self) -> Option<AttrsRef> { #attrs_ref_impl }
-
-            #[inline]
-            fn attrs_mut(&mut self) -> Option<AttrsMut> { #attrs_mut_impl }
-          }
-
-
-          // Should give a default implement in attr mod.  Depends on https://github.com/rust-lang/rust/pull/85499 fixed.
-          impl #impl_generics AttachAttr for #name #ty_generics #where_clause {
-            type W = Self;
-
-            fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) {
-              (None, None, self)
-            }
-          }
-      }
-    }
+    Ok(info) => derive_widget_impl(&info),
     Err(err) => err,
   }
+}
+
+fn derive_widget_impl(info: &ProxyDeriveInfo) -> TokenStream {
+  let name = info.ident;
+  let attr_fields = &info.attr_fields;
+  let mut generics = info.generics.clone();
+
+  let (attrs_ref_impl, attrs_mut_impl) = if attr_fields.attr_fields().len() == 1 {
+    generics = add_trait_bounds_if(generics, parse_quote!(Widget), |param| {
+      attr_fields.is_attr_generic(param)
+    });
+    let path = info.attr_path();
+    (
+      quote! { self.#path.attrs_ref() },
+      quote! {self.#path.attrs_mut()},
+    )
+  } else {
+    if let Some(ref mut w) = generics.where_clause {
+      w.predicates.push(parse_quote!(Self:'static));
+    } else {
+      generics.where_clause = parse_quote!(where Self: 'static)
+    }
+
+    (quote! {None}, quote! {None})
+  };
+
+  let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+  let single_child = single_child_impl(info);
+  let multi_child = multi_child_impl(info);
+  quote! {
+      impl #impl_generics Widget for #name #ty_generics #where_clause {
+        #[inline]
+        fn attrs_ref(&self) -> Option<AttrsRef> { #attrs_ref_impl }
+
+        #[inline]
+        fn attrs_mut(&mut self) -> Option<AttrsMut> { #attrs_mut_impl }
+      }
+
+      #single_child
+
+      #multi_child
+
+      // Should give a default implement in attr mod.  Depends on https://github.com/rust-lang/rust/pull/85499 fixed.
+      impl #impl_generics AttachAttr for #name #ty_generics #where_clause {
+        type W = Self;
+
+        fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) {
+          (None, None, self)
+        }
+      }
+  }
+}
+
+fn single_child_impl(info: &ProxyDeriveInfo) -> Option<TokenStream> {
+  let attr_fields = &info.attr_fields;
+  if attr_fields.attr_fields().is_empty() {
+    return None;
+  }
+  assert_eq!(attr_fields.attr_fields().len(), 1);
+
+  let generics = add_trait_bounds_if(
+    info.generics.clone(),
+    parse_quote!(SingleChildWidget),
+    |param| info.attr_fields.is_attr_generic(param),
+  );
+
+  let name = info.ident;
+  let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+  Some(quote! {
+      impl #impl_generics SingleChildWidget for #name #ty_generics #where_clause {}
+  })
+}
+
+fn multi_child_impl(info: &ProxyDeriveInfo) -> Option<TokenStream> {
+  let attr_fields = &info.attr_fields;
+  if attr_fields.attr_fields().is_empty() {
+    return None;
+  }
+  assert_eq!(attr_fields.attr_fields().len(), 1);
+
+  let generics = add_trait_bounds_if(
+    info.generics.clone(),
+    parse_quote!(MultiChildWidget),
+    |param| info.attr_fields.is_attr_generic(param),
+  );
+
+  let name = info.ident;
+  let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+  Some(quote! {
+      impl #impl_generics MultiChildWidget for #name #ty_generics #where_clause {}
+  })
 }

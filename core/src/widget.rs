@@ -46,81 +46,82 @@ pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
   /// widget.
   fn attrs_mut(&mut self) -> Option<AttrsMut>;
 
-  #[inline]
-  fn box_it(self) -> Box<dyn Widget>
-  where
-    Self: Sized,
-  {
-    Box::new(self)
-  }
-
   /// Insets the child of a widget by the given padding.
   #[inline]
-  fn with_padding(self, edges: EdgeInsets) -> Padding
+  fn with_padding(self, edges: EdgeInsets) -> SingleChild<Padding>
   where
     Self: Sized,
   {
-    Padding { padding: edges, child: self.box_it() }
+    Padding { padding: edges }.with_child(self.box_it())
   }
 
   /// Create space around the widget
   #[inline]
-  fn with_margin(self, edges: EdgeInsets) -> Margin
+  fn with_margin(self, edges: EdgeInsets) -> SingleChild<Margin>
   where
     Self: Sized,
   {
-    Margin { margin: edges, child: self.box_it() }
+    Margin { margin: edges }.with_child(self.box_it())
   }
 
   /// Sets the background of the widget.
-  fn with_background(self, background: FillStyle) -> BoxDecoration
+  fn with_background(self, background: FillStyle) -> SingleChild<BoxDecoration>
   where
     Self: Sized,
   {
-    BoxDecoration::new(self.box_it()).with_background(background)
+    // todo: should detect if this widget is a BoxDecoration?
+    BoxDecoration::default()
+      .with_child(self.box_it())
+      .with_background(background)
   }
 
   /// Set the border of the widget
-  fn with_border(self, border: Border) -> BoxDecoration
+  fn with_border(self, border: Border) -> SingleChild<BoxDecoration>
   where
     Self: Sized,
   {
-    BoxDecoration::new(self.box_it()).with_border(border)
+    // todo: should detect if this widget is a BoxDecoration?
+    BoxDecoration::default()
+      .with_child(self.box_it())
+      .with_border(border)
   }
 
   /// Set the radius of the widget.
-  fn with_border_radius(self, radius: BorderRadius) -> BoxDecoration
+  fn with_border_radius(self, radius: BorderRadius) -> SingleChild<BoxDecoration>
   where
     Self: Sized,
   {
-    BoxDecoration::new(self.box_it()).with_border_radius(radius)
+    // todo: should detect if this widget is a BoxDecoration?
+    BoxDecoration::default()
+      .with_child(self.box_it())
+      .with_border_radius(radius)
   }
 
   /// Let this widget horizontal scrollable and the scroll view is as large as
   /// its parent allow.
-  fn x_scrollable(self) -> WheelListener<StatefulScrollableX>
+  fn x_scrollable(self) -> SingleChild<WheelListener<StatefulScrollableX>>
   where
     Self: Sized,
   {
-    ScrollableX::x_scroll(self.box_it(), 0.)
+    ScrollableX::x_scroll(0.).with_child(self.box_it())
   }
 
   /// Let this widget vertical scrollable and the scroll view is as large as
   /// its parent allow.
-  fn y_scrollable(self) -> WheelListener<StatefulScrollableY>
+  fn y_scrollable(self) -> SingleChild<WheelListener<StatefulScrollableY>>
   where
     Self: Sized,
   {
-    ScrollableY::y_scroll(self.box_it(), 0.)
+    ScrollableY::y_scroll(0.).with_child(self.box_it())
   }
 
   /// Let this widget both scrollable in horizontal and vertical, and the scroll
   /// view is as large as its parent allow.
-  fn both_scrollable(self) -> WheelListener<StatefulScrollableBoth>
+  fn both_scrollable(self) -> SingleChild<WheelListener<StatefulScrollableBoth>>
   where
     Self: Sized,
   {
-    ScrollableBoth::both_scroll(self.box_it(), Point::zero())
+    ScrollableBoth::both_scroll(Point::zero()).with_child(self.box_it())
   }
 }
 
@@ -140,18 +141,12 @@ pub trait RenderWidget: Widget + CloneStates + Sized {
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
   fn create_render_object(&self) -> Self::RO;
-
-  /// Called by framework to take children from this widget, return some-value
-  /// to if it has child, else return None. This method will only be called
-  /// once. Should never directly call it.
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>>;
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
 pub trait RenderWidgetSafety {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>>;
   fn clone_boxed_states(&self) -> Box<dyn Any>;
 }
 
@@ -179,6 +174,10 @@ pub trait AsRender {
   /// return some-value of `RenderWidgetSafety` mutable reference if this widget
   /// is a render widget.
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
+}
+
+pub trait BoxWidget {
+  fn box_it(self) -> Box<dyn Widget>;
 }
 
 impl<T: Widget> AsCombination for T {
@@ -219,6 +218,11 @@ impl<T: Widget + Any> AsAny for T {
 
   #[inline]
   fn as_any_mut(&mut self) -> &mut dyn Any { self }
+}
+
+impl<W: Widget> BoxWidget for W {
+  #[inline]
+  default fn box_it(self) -> Box<dyn Widget> { Box::new(self) }
 }
 
 impl<'a> dyn Widget + 'a {

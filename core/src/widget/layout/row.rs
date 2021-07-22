@@ -6,9 +6,6 @@ pub struct Row(#[proxy] Flex);
 
 impl Row {
   #[inline]
-  pub fn push<W: Widget>(self, child: W) -> Self { Row(self.0.push(child)) }
-
-  #[inline]
   pub fn with_reverse(self, reverse: bool) -> Self { Self(self.0.with_reverse(reverse)) }
 
   #[inline]
@@ -24,12 +21,6 @@ impl Row {
 
   #[inline]
   pub fn get_cross_align(&self) -> CrossAxisAlign { self.0.cross_align }
-}
-
-impl std::iter::FromIterator<Box<dyn Widget>> for Row {
-  fn from_iter<T: IntoIterator<Item = Box<dyn Widget>>>(iter: T) -> Self {
-    Self(Flex::from_iter(iter).with_direction(Direction::Horizontal))
-  }
 }
 
 impl Default for Row {

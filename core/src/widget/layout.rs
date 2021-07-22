@@ -10,3 +10,5 @@ pub mod expanded;
 pub use expanded::Expanded;
 mod direction;
 pub use direction::*;
+mod widget_children;
+pub use widget_children::{MultiChildWidget, MultiChild, SingleChildWidget, SingleChild};

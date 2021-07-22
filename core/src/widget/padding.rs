@@ -2,22 +2,14 @@ use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
 #[stateful]
-#[derive(Widget)]
+#[derive(Widget, SingleChildWidget)]
 pub struct Padding {
   #[state]
   pub padding: EdgeInsets,
-  pub child: Box<dyn Widget>,
 }
 
 impl RenderWidget for Padding {
   type RO = PaddingState;
-
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    Some(smallvec![std::mem::replace(
-      &mut self.child,
-      Box::new(PhantomWidget)
-    )])
-  }
 
   #[inline]
   fn create_render_object(&self) -> Self::RO { self.clone_states() }

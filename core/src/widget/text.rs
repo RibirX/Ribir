@@ -12,9 +12,6 @@ impl RenderWidget for Text {
   type RO = TextState;
   #[inline]
   fn create_render_object(&self) -> Self::RO { self.clone_states() }
-
-  #[inline]
-  fn take_children(&mut self) -> Option<SmallVec<[Box<dyn Widget>; 1]>> { None }
 }
 
 impl RenderObject for TextState {
