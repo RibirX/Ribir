@@ -68,22 +68,34 @@ impl RenderTree {
   #[inline]
   pub fn root(&self) -> Option<RenderId> { self.root }
 
-  pub(crate) fn set_root(
+  pub(crate) fn set_root(&mut self, root: RenderId) {
+    debug_assert!(self.root.is_none());
+    self.root = Some(root);
+  }
+
+  #[inline]
+  pub(crate) fn prepend_obj(
+    &mut self,
+    owner: WidgetId,
+    parent: Option<RenderId>,
+    obj: Box<dyn RenderObjectSafety + Send + Sync>,
+  ) -> RenderId {
+    let rid = self.new_node(owner, obj);
+    if let Some(p) = parent {
+      p.prepend(rid, self)
+    }
+    rid
+  }
+
+  #[inline]
+  pub(crate) fn new_node(
     &mut self,
     owner: WidgetId,
     data: Box<dyn RenderObjectSafety + Send + Sync>,
   ) -> RenderId {
-    debug_assert!(self.root.is_none());
-    let root = self.new_node(data);
-    self.root = Some(root);
-    self.render_to_widget.insert(root, owner);
-
-    root
-  }
-
-  #[inline]
-  pub(crate) fn new_node(&mut self, data: Box<dyn RenderObjectSafety + Send + Sync>) -> RenderId {
-    RenderId(self.arena.new_node(data))
+    let rid = RenderId(self.arena.new_node(data));
+    self.render_to_widget.insert(rid, owner);
+    rid
   }
 
   /// Do the work of computing the layout for all node which need, always layout
@@ -239,9 +251,8 @@ impl RenderId {
     object: Box<dyn RenderObjectSafety + Send + Sync>,
     tree: &mut RenderTree,
   ) -> RenderId {
-    let child = tree.new_node(object);
+    let child = tree.new_node(owner, object);
     self.prepend(child, tree);
-    tree.render_to_widget.insert(child, owner);
     child
   }
 

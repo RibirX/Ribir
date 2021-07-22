@@ -44,7 +44,7 @@ impl Checkbox {
 }
 
 impl CombinationWidget for StatefulCheckbox {
-  fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
+  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
     let CheckboxTheme {
       size,
       border_width,
@@ -56,7 +56,16 @@ impl CombinationWidget for StatefulCheckbox {
       color,
     } = self.0.as_ref().theme.clone();
     let check_state = self.0.as_ref();
-    let marker = if check_state.indeterminate || check_state.checked {
+
+    let mut state = self.ref_cell();
+    let mut state2 = state.clone();
+
+    let mut marker = BoxDecoration {
+      radius: Some(BorderRadius::all(Vector::new(border_radius, border_radius))),
+      ..<_>::default()
+    };
+
+    let checkbox = if check_state.indeterminate || check_state.checked {
       let size = size + border_width * 2.;
       let (path, check_mark_width) = if check_state.indeterminate {
         let center_y = size / 2.;
@@ -69,25 +78,25 @@ impl CombinationWidget for StatefulCheckbox {
       } else {
         (checked_path, check_mark_width)
       };
-      CheckboxMarker {
-        size,
-        check_mark_width,
-        color: marker_color,
-        path,
-      }
-      .with_background(color.into())
+      marker.background = Some(color.into());
+      marker.with_child(
+        CheckboxMarker {
+          size,
+          check_mark_width,
+          color: marker_color,
+          path,
+        }
+        .box_it(),
+      )
     } else {
-      SizedBox::from_size(Size::new(size, size)).with_border(Border::all(BorderSide {
+      marker.border = Some(Border::all(BorderSide {
         color: border_color,
         width: border_width,
-      }))
-    }
-    .with_border_radius(BorderRadius::all(Vector::new(border_radius, border_radius)))
-    .with_margin(EdgeInsets::all(4.));
+      }));
+      marker.with_child(SizedBox::from_size(Size::new(size, size)).box_it())
+    };
 
-    let mut state = self.ref_cell();
-    let mut state2 = state.clone();
-    marker
+    Margin::new(EdgeInsets::all(4.))
       .on_tap(move |_| state.borrow_mut().switch_check())
       .on_key_up(move |k| {
         if k.key == VirtualKeyCode::Space {
@@ -95,6 +104,7 @@ impl CombinationWidget for StatefulCheckbox {
         }
       })
       .with_cursor(CursorIcon::Hand)
+      .with_child(checkbox.box_it())
       .box_it()
   }
 }

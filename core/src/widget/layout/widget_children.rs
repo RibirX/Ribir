@@ -3,7 +3,7 @@ pub use crate::prelude::*;
 /// A marker trait to tell Ribir a widget can have one child.
 pub trait SingleChildWidget: RenderWidget {
   // todo: a better name
-  fn with_child(self, child: Box<dyn Widget>) -> SingleChild<Self>
+  fn with_child(self, child: BoxedWidget) -> SingleChild<Self>
   where
     Self: Sized,
   {
@@ -11,46 +11,46 @@ pub trait SingleChildWidget: RenderWidget {
   }
 }
 
-#[derive(Widget)]
 pub struct SingleChild<S> {
   widget: S,
-  child: Box<dyn Widget>,
+  child: BoxedWidget,
 }
 
-pub type BoxedSingleChild = SingleChild<Box<dyn RenderWidgetSafety>>;
+pub type BoxedSingleChild = Box<SingleChild<Box<dyn RenderWidgetSafety>>>;
 
 impl<S> SingleChild<S> {
   #[inline]
-  pub fn unzip(self) -> (S, Box<dyn Widget>) { (self.widget, self.child) }
+  pub fn unzip(self) -> (S, BoxedWidget) { (self.widget, self.child) }
 }
 
-impl<S: SingleChildWidget> BoxWidget for SingleChild<S> {
-  fn box_it(self) -> Box<dyn Widget> {
+impl<S: SingleChildWidget> SingleChild<S> {
+  pub fn box_it(self) -> BoxedWidget {
     let widget: Box<dyn RenderWidgetSafety> = Box::new(self.widget);
-    SingleChild { widget, child: self.child }.box_it()
+    let boxed = Box::new(SingleChild { widget, child: self.child });
+    BoxedWidget::SingleChild(boxed)
   }
 }
 
-impl<S: SingleChildWidget> std::ops::Deref for SingleChild<S> {
+impl<S> std::ops::Deref for SingleChild<S> {
   type Target = S;
   #[inline]
   fn deref(&self) -> &S { &self.widget }
 }
 
-impl<R: SingleChildWidget> std::ops::DerefMut for SingleChild<R> {
+impl<R> std::ops::DerefMut for SingleChild<R> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.widget }
 }
 
 /// A marker trait to tell Ribir a widget can have multi child.
-pub trait MultiChildWidget: RenderWidget {
+pub trait MultiChildWidget: RenderWidget + Sized {
   // todo: a better name
-  fn with_children(self, children: Vec<Box<dyn Widget>>) -> MultiChild<Self> {
+  fn with_children(self, children: Vec<BoxedWidget>) -> MultiChild<Self> {
     MultiChild { widget: self, children }
   }
 
   // todo: a better name
-  fn from_iter<T: IntoIterator<Item = Box<dyn Widget>>>(self, iter: T) -> MultiChild<Self> {
+  fn from_iter<T: IntoIterator<Item = BoxedWidget>>(self, iter: T) -> MultiChild<Self> {
     MultiChild {
       widget: self,
       children: iter.into_iter().collect(),
@@ -58,41 +58,38 @@ pub trait MultiChildWidget: RenderWidget {
   }
 }
 
-#[derive(Widget)]
 pub struct MultiChild<M> {
   widget: M,
-  children: Vec<Box<dyn Widget>>,
+  children: Vec<BoxedWidget>,
 }
 
 pub type BoxedMultiChild = MultiChild<Box<dyn RenderWidgetSafety>>;
 
 impl<M> MultiChild<M> {
   #[inline]
-  pub fn unzip(self) -> (M, Vec<Box<dyn Widget>>) { (self.widget, self.children) }
+  pub fn unzip(self) -> (M, Vec<BoxedWidget>) { (self.widget, self.children) }
 }
 
-impl<M: MultiChildWidget> BoxWidget for MultiChild<M> {
-  fn box_it(self) -> Box<dyn Widget> {
+impl<M: MultiChildWidget> MultiChild<M> {
+  pub fn box_it(self) -> BoxedWidget {
     let widget: Box<dyn RenderWidgetSafety> = Box::new(self.widget);
-    MultiChild { widget, children: self.children }.box_it()
+    BoxedWidget::MultiChild(MultiChild { widget, children: self.children })
+  }
+
+  #[inline]
+  pub fn push(mut self, child: BoxedWidget) -> Self {
+    self.children.push(child);
+    self
   }
 }
 
-impl<R: RenderWidget> std::ops::Deref for MultiChild<R> {
+impl<R> std::ops::Deref for MultiChild<R> {
   type Target = R;
   #[inline]
   fn deref(&self) -> &R { &self.widget }
 }
 
-impl<R: RenderWidget> std::ops::DerefMut for MultiChild<R> {
+impl<R> std::ops::DerefMut for MultiChild<R> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.widget }
-}
-
-impl<R: RenderWidget> MultiChild<R> {
-  #[inline]
-  pub fn push(mut self, child: Box<dyn Widget>) -> Self {
-    self.children.push(child);
-    self
-  }
 }

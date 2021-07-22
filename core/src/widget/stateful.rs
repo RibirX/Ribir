@@ -330,7 +330,7 @@ impl StateInfo {
 
 impl<W: CombinationWidget> CombinationWidget for RcWidget<W> {
   #[inline]
-  fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> { self.0.borrow().build(ctx) }
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.borrow().build(ctx) }
 }
 
 impl<W: CloneStates> CloneStates for RcWidget<W> {

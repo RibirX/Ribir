@@ -1,4 +1,4 @@
-use crate::{prelude::*, render::*};
+use crate::render::*;
 pub use std::any::Any;
 pub mod build_ctx;
 pub mod key;
@@ -18,7 +18,6 @@ pub mod events;
 pub use events::*;
 mod phantom;
 pub use phantom::PhantomWidget;
-pub use smallvec::{smallvec, SmallVec};
 mod cursor;
 pub use cursor::Cursor;
 pub use winit::window::CursorIcon;
@@ -38,122 +37,54 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsCombination + AsRender + AsAny + StateDetect + 'static {
+pub trait Widget: AsCombination + AsRender + Any + StateDetect + 'static {
   /// Return the reference to the attrs that attached to the this widget.
-  fn attrs_ref(&self) -> Option<AttrsRef>;
+  #[inline]
+  fn attrs_ref(&self) -> Option<AttrsRef> { None }
 
   /// Return the mutable reference to the attrs that attached to the this
   /// widget.
-  fn attrs_mut(&mut self) -> Option<AttrsMut>;
-
-  /// Insets the child of a widget by the given padding.
   #[inline]
-  fn with_padding(self, edges: EdgeInsets) -> SingleChild<Padding>
-  where
-    Self: Sized,
-  {
-    Padding { padding: edges }.with_child(self.box_it())
-  }
-
-  /// Create space around the widget
-  #[inline]
-  fn with_margin(self, edges: EdgeInsets) -> SingleChild<Margin>
-  where
-    Self: Sized,
-  {
-    Margin { margin: edges }.with_child(self.box_it())
-  }
-
-  /// Sets the background of the widget.
-  fn with_background(self, background: FillStyle) -> SingleChild<BoxDecoration>
-  where
-    Self: Sized,
-  {
-    // todo: should detect if this widget is a BoxDecoration?
-    BoxDecoration::default()
-      .with_child(self.box_it())
-      .with_background(background)
-  }
-
-  /// Set the border of the widget
-  fn with_border(self, border: Border) -> SingleChild<BoxDecoration>
-  where
-    Self: Sized,
-  {
-    // todo: should detect if this widget is a BoxDecoration?
-    BoxDecoration::default()
-      .with_child(self.box_it())
-      .with_border(border)
-  }
-
-  /// Set the radius of the widget.
-  fn with_border_radius(self, radius: BorderRadius) -> SingleChild<BoxDecoration>
-  where
-    Self: Sized,
-  {
-    // todo: should detect if this widget is a BoxDecoration?
-    BoxDecoration::default()
-      .with_child(self.box_it())
-      .with_border_radius(radius)
-  }
-
-  /// Let this widget horizontal scrollable and the scroll view is as large as
-  /// its parent allow.
-  fn x_scrollable(self) -> SingleChild<WheelListener<StatefulScrollableX>>
-  where
-    Self: Sized,
-  {
-    ScrollableX::x_scroll(0.).with_child(self.box_it())
-  }
-
-  /// Let this widget vertical scrollable and the scroll view is as large as
-  /// its parent allow.
-  fn y_scrollable(self) -> SingleChild<WheelListener<StatefulScrollableY>>
-  where
-    Self: Sized,
-  {
-    ScrollableY::y_scroll(0.).with_child(self.box_it())
-  }
-
-  /// Let this widget both scrollable in horizontal and vertical, and the scroll
-  /// view is as large as its parent allow.
-  fn both_scrollable(self) -> SingleChild<WheelListener<StatefulScrollableBoth>>
-  where
-    Self: Sized,
-  {
-    ScrollableBoth::both_scroll(Point::zero()).with_child(self.box_it())
-  }
+  fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
 }
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Widget {
+pub trait CombinationWidget: Widget + IntoWidget + AsWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget>;
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
+
+  fn box_it(self) -> BoxedWidget
+  where
+    Self: Sized,
+  {
+    BoxedWidget::Combination(Box::new(self))
+  }
 }
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: Widget + CloneStates + Sized {
+pub trait RenderWidget: Widget + CloneStates {
   /// The render object type will created.
   type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
   fn create_render_object(&self) -> Self::RO;
+
+  fn box_it(self) -> BoxedWidget
+  where
+    Self: Sized,
+  {
+    BoxedWidget::Render(Box::new(self))
+  }
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety {
+pub trait RenderWidgetSafety: Widget + IntoWidget + AsWidget {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
   fn clone_boxed_states(&self) -> Box<dyn Any>;
-}
-
-pub trait AsAny {
-  fn as_any(&self) -> &dyn Any;
-
-  fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 pub trait AsCombination {
@@ -176,8 +107,20 @@ pub trait AsRender {
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
 }
 
-pub trait BoxWidget {
-  fn box_it(self) -> Box<dyn Widget>;
+pub enum BoxedWidget {
+  Combination(Box<dyn CombinationWidget>),
+  Render(Box<dyn RenderWidgetSafety>),
+  SingleChild(BoxedSingleChild),
+  MultiChild(BoxedMultiChild),
+}
+
+pub trait IntoWidget {
+  fn into_widget(self: Box<Self>) -> Box<dyn Widget>;
+}
+
+impl<W: Widget> IntoWidget for W {
+  #[inline]
+  fn into_widget(self: Box<Self>) -> Box<dyn Widget> { self }
 }
 
 impl<T: Widget> AsCombination for T {
@@ -212,24 +155,10 @@ impl<T: RenderWidget> AsRender for T {
   fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
 }
 
-impl<T: Widget + Any> AsAny for T {
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
-
-  #[inline]
-  fn as_any_mut(&mut self) -> &mut dyn Any { self }
-}
-
-impl<W: Widget> BoxWidget for W {
-  #[inline]
-  default fn box_it(self) -> Box<dyn Widget> { Box::new(self) }
-}
-
 impl<'a> dyn Widget + 'a {
+  /// Return the `Key` attribute of the widget.
   pub fn key(&self) -> Option<&Key> { self.find_attr() }
-}
 
-impl<'a> dyn Widget + 'a {
   /// Find an attr of this widget. If it have the `A` type attr, return the
   /// reference.
   pub fn find_attr<A: Any>(&self) -> Option<&A> {
@@ -240,5 +169,26 @@ impl<'a> dyn Widget + 'a {
   /// mutable reference.
   pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> {
     self.attrs_mut().and_then(|attrs| attrs.find_attr_mut())
+  }
+}
+
+pub trait AsWidget {
+  fn as_widget(&self) -> &dyn Widget;
+}
+
+impl<W: Widget> AsWidget for W {
+  #[inline]
+  fn as_widget(&self) -> &dyn Widget { self }
+}
+
+impl BoxedWidget {
+  pub fn key(&self) -> Option<&Key> {
+    let w = match self {
+      BoxedWidget::Combination(c) => c.as_widget(),
+      BoxedWidget::Render(r) => r.as_widget(),
+      BoxedWidget::SingleChild(s) => s.as_widget(),
+      BoxedWidget::MultiChild(m) => m.as_widget(),
+    };
+    w.key()
   }
 }

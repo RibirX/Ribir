@@ -33,7 +33,7 @@ pub fn combination_derive(input: &mut syn::DeriveInput) -> TokenStream {
       quote! {
         impl #impl_generics CombinationWidget for #ident #ty_generics #where_clause {
           #[inline]
-          fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
+          fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
             self.#path.build(ctx)
           }
         }

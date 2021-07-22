@@ -1,4 +1,5 @@
 use crate::{prelude::*, render::render_tree::*};
+
 use indextree::*;
 use std::{
   collections::{HashMap, HashSet},
@@ -25,11 +26,16 @@ impl WidgetTree {
   #[inline]
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
-  pub fn set_root(&mut self, data: Box<dyn Widget>, render_tree: &mut RenderTree) -> WidgetId {
+  pub fn set_root(&mut self, root: BoxedWidget, r_tree: &mut RenderTree) -> WidgetId {
     debug_assert!(self.root.is_none());
-    let root = self.new_node(data);
+    let root = self.inflate(root, None, r_tree);
     self.root = Some(root);
-    self.inflate(root, render_tree);
+    let r_root = root
+      .down_nearest_render_widget(self)
+      .relative_to_render(self)
+      .unwrap();
+    r_tree.set_root(r_root);
+    r_root.mark_needs_layout(r_tree);
     root
   }
 
@@ -43,83 +49,91 @@ impl WidgetTree {
     id
   }
 
-  /// inflate  subtree, so every subtree leaf should be a Widget::Render.
-  pub fn inflate(&mut self, wid: WidgetId, render_tree: &mut RenderTree) -> &mut Self {
-    let parent_id = wid
-      .ancestors(self)
-      .filter(|id| id.get(self).and_then(|w| w.as_render()).is_some())
-      .find_map(|id| self.widget_to_render.get(&id))
+  fn append_widget(&mut self, w: Box<dyn Widget>, p: Option<WidgetId>) -> WidgetId {
+    let wid = self.new_node(w);
+    if let Some(p) = p {
+      p.append(wid, self);
+    }
+    wid
+  }
+
+  fn add_render_widget(
+    &mut self,
+    render_widget: Box<dyn RenderWidgetSafety>,
+    p_wid: Option<WidgetId>,
+    p_rid: Option<RenderId>,
+    r_tree: &mut RenderTree,
+  ) -> (WidgetId, RenderId) {
+    let ro = render_widget.create_render_object();
+    let wid = self.append_widget(render_widget.into_widget(), p_wid);
+    let rid = r_tree.prepend_obj(wid, p_rid, ro);
+
+    self.widget_to_render.insert(wid, rid);
+    (wid, rid)
+  }
+
+  /// inflate subtree, so every leaf should be a Widget::Render.
+  pub fn inflate(
+    &mut self,
+    widget: BoxedWidget,
+    p_wid: Option<WidgetId>,
+    r_tree: &mut RenderTree,
+  ) -> WidgetId {
+    let mut p_rid = p_wid
+      .and_then(|wid| wid.up_nearest_render_widget(self))
+      .and_then(|wid| self.widget_to_render.get(&wid))
       .copied();
-    let mut stack = vec![(wid, parent_id)];
 
-    while let Some((wid, parent_rid)) = stack.pop() {
-      let (children, render) = {
-        (
-          wid.take_children(self),
-          wid
-            .get_mut(self)
-            .and_then(|w| w.as_render())
-            .map(|r| r.create_render_object()),
-        )
-      };
+    let mut stack = vec![];
 
-      let rid = render.map_or(parent_rid, |render_obj| {
-        let rid = if let Some(id) = parent_rid {
-          id.prepend_object(wid, render_obj, render_tree)
-        } else {
-          render_tree.set_root(wid, render_obj)
-        };
-        self.widget_to_render.insert(wid, rid);
-        Some(rid)
-      });
-
-      if let Some(children) = children {
-        children.into_iter().for_each(|w| {
-          let id = wid.append_widget(w, self);
-          stack.push((id, rid));
-        });
+    let inflate_widget = |widget: BoxedWidget| match widget {
+      BoxedWidget::Combination(c) => {
+        let c_ptr = &*c as *const dyn CombinationWidget;
+        let wid = self.append_widget(c.into_widget(), p_wid);
+        let child = c.build_child(wid, self);
+        stack.push((child, Some(wid), p_rid));
+        wid
       }
+      BoxedWidget::Render(rw) => {
+        let (wid, rid) = self.add_render_widget(rw, p_wid, p_rid, r_tree);
+        wid
+      }
+      BoxedWidget::SingleChild(s) => {
+        let (rw, child) = s.unzip();
+        let (wid, rid) = self.add_render_widget(rw, p_wid, p_rid, r_tree);
+        stack.push((child, Some(wid), Some(rid)));
+        wid
+      }
+      BoxedWidget::MultiChild(m) => {
+        let (rw, children) = m.unzip();
+        let (wid, rid) = self.add_render_widget(rw, p_wid, p_rid, r_tree);
+        children.into_iter().for_each(|w| {
+          stack.push((w, Some(wid), Some(rid)));
+        });
+        wid
+      }
+    };
+
+    let w_subtree_root = inflate_widget(widget);
+
+    while let Some((widget, wid, rid)) = stack.pop() {
+      p_wid = wid;
+      p_rid = rid;
+      inflate_widget(widget);
     }
 
-    if let Some(rid) = parent_id.or_else(|| render_tree.root()) {
-      rid.mark_needs_layout(render_tree);
-    }
-
-    self
+    w_subtree_root
   }
 
   /// Check all the need build widgets and update the widget tree to what need
   /// build widgets want it to be. Return if any node really rebuild or updated.
-  pub fn repair(&mut self, render_tree: &mut RenderTree) -> bool {
+  pub fn repair(&mut self, r_tree: &mut RenderTree) -> bool {
     let repaired = !self.need_builds.is_empty() || !self.changed_widgets.is_empty();
     while let Some(need_build) = self.pop_need_build_widget() {
-      debug_assert!(
-        need_build.assert_get(self).as_combination().is_some(),
-        "rebuild widget must be combination widget."
-      );
-
-      let mut stack = vec![need_build];
-
-      while let Some(need_build) = stack.pop() {
-        let children = need_build.take_children(self);
-
-        if let Some(mut children) = children {
-          if children.len() == 1 {
-            let old_child_node = need_build.single_child(self);
-            self.try_replace_widget_or_rebuild(
-              old_child_node,
-              children.pop().unwrap(),
-              &mut stack,
-              render_tree,
-            );
-          } else {
-            self.repair_children_by_key(need_build, children, &mut stack, render_tree);
-          }
-        }
-      }
+      self.repair_subtree(need_build, r_tree)
     }
 
-    self.flush_to_render(render_tree);
+    self.flush_to_render(r_tree);
     repaired
   }
 
@@ -156,50 +170,122 @@ impl WidgetTree {
     self.changed_widgets.clear();
   }
 
-  /// Try to use `new_widget` to replace widget in old_node and push the
-  /// `old_node` into stack, if they have same key. Other, drop the subtree.
-  fn try_replace_widget_or_rebuild(
-    &mut self,
-    node: WidgetId,
-    widget: Box<dyn Widget>,
-    stack: &mut Vec<WidgetId>,
-    render_tree: &mut RenderTree,
-  ) {
-    let same_key = widget
-      .key()
-      .and_then(|key| node.get(self).map(|w| Some(key) == w.key()))
-      .unwrap_or(false);
-    if same_key {
-      if widget.as_render().is_some() {
-        self.changed_widgets.insert(node);
-      }
-      *self
-        .arena
-        .get_mut(node.0)
-        .expect("Widget not exist in the tree.")
-        .get_mut() = widget;
-      stack.push(node);
-    } else {
-      let parent_id = node.parent(&self).expect("parent should exists!");
-      node.drop_subtree(self, render_tree);
+  fn repair_subtree(&mut self, sub_tree: WidgetId, r_tree: &mut RenderTree) {
+    let c = sub_tree
+      .assert_get(self)
+      .as_combination()
+      .expect("rebuild widget must be combination widget.");
 
-      let new_child_id = parent_id.append_widget(widget, self);
-      self.inflate(new_child_id, render_tree);
+    let child = c.build_child(sub_tree, self);
+    let child_id = sub_tree.single_child(self);
+
+    let stack = vec![(child, child_id)];
+    while let Some((w, wid)) = stack.pop() {
+      match child {
+        BoxedWidget::Combination(c) => {
+          let (new_id, child) = self.update_combination_widget_by_diff(c, wid, r_tree);
+          self.need_builds.remove(&wid);
+          if new_id == wid {
+            stack.push((child, wid.single_child(self)));
+          } else {
+            self.inflate(child, Some(new_id), r_tree);
+          }
+        }
+        BoxedWidget::Render(r) => {
+          self.update_render_widget_by_diff(r, wid, r_tree);
+        }
+        BoxedWidget::SingleChild(s) => {
+          let (r, child) = s.unzip();
+          let new_id = self.update_render_widget_by_diff(r, wid, r_tree);
+          if new_id == wid {
+            stack.push((child, wid.single_child(self)));
+          } else {
+            self.inflate(child, Some(new_id), r_tree);
+          }
+        }
+        BoxedWidget::MultiChild(m) => {
+          let (r, children) = m.unzip();
+          let new_id = self.update_render_widget_by_diff(r, wid, r_tree);
+          if new_id == wid {
+            let key_children = self.collect_key_children(wid, r_tree);
+            children.into_iter().for_each(|c| {
+              let k_widget = w.key().and_then(|k| key_children.remove(k));
+              if let Some(id) = k_widget {
+                new_id.0.append(id.0, &mut self.arena);
+                stack.push((c, id));
+              } else {
+                self.inflate(c, Some(new_id), r_tree);
+              }
+            });
+            key_children
+              .into_iter()
+              .for_each(|(_, v)| v.drop_subtree(self, r_tree));
+          } else {
+            children.into_iter().for_each(|c| {
+              self.inflate(child, Some(new_id), r_tree);
+            })
+          }
+        }
+      }
     }
   }
 
-  /// rebuild the subtree `wid` by the new children `new_children`, the same key
-  /// children as before will keep the old subtree and will add into the `stack`
-  /// to recursive repair, else will construct a new subtree.
-  fn repair_children_by_key(
+  fn update_combination_widget_by_diff(
     &mut self,
-    node: WidgetId,
-    new_children: SmallVec<[Box<dyn Widget>; 1]>,
-    stack: &mut Vec<WidgetId>,
-    render_tree: &mut RenderTree,
-  ) {
+    c: Box<dyn CombinationWidget>,
+    id: WidgetId,
+    r_tree: &mut RenderTree,
+  ) -> (WidgetId, BoxedWidget) {
+    let old = id.assert_get_mut(self);
+    let c_ptr = &*c as *const dyn CombinationWidget;
+    let new_id = self.update_widget_by_diff(c.into_widget(), id, r_tree);
+
+    let child = unsafe { &*c }.build_child(id, self);
+
+    (new_id, child)
+  }
+
+  fn update_render_widget_by_diff(
+    &mut self,
+    r: Box<dyn RenderWidgetSafety>,
+    id: WidgetId,
+    r_tree: &mut RenderTree,
+  ) -> WidgetId {
+    let old = id.assert_get_mut(self);
+    let new_id = self.update_widget_by_diff(r.into_widget(), id, r_tree);
+    if id != new_id {
+      self.changed_widgets.insert(id);
+    }
+    new_id
+  }
+
+  // update widget by key diff, return the new id of the widget.
+  fn update_widget_by_diff(
+    &mut self,
+    w: Box<dyn Widget>,
+    id: WidgetId,
+    r_tree: &mut RenderTree,
+  ) -> WidgetId {
+    let old = id.assert_get_mut(self);
+    let o_key = old.key();
+    if o_key.is_some() && o_key != w.key() {
+      *old = w;
+      id
+    } else {
+      let parent = id.parent(&self).expect("parent should exists!");
+      id.drop_subtree(self, r_tree);
+      parent.append_widget(w, self)
+    }
+  }
+
+  // Collect and detach the child has key, and drop the others.
+  fn collect_key_children(
+    &mut self,
+    wid: WidgetId,
+    r_tree: &mut RenderTree,
+  ) -> HashMap<Key, WidgetId> {
     let mut key_children = HashMap::new();
-    let mut child = node.first_child(self);
+    let mut child = wid.first_child(self);
     while let Some(id) = child {
       child = id.next_sibling(self);
 
@@ -208,27 +294,10 @@ impl WidgetTree {
         id.detach(self);
         key_children.insert(key, id);
       } else {
-        id.drop_subtree(self, render_tree);
+        id.drop_subtree(self, r_tree);
       }
     }
-
-    for w in new_children.into_iter() {
-      if let Some(k) = w.key() {
-        if let Some(id) = key_children.get(k).copied() {
-          key_children.remove(k);
-          node.0.append(id.0, &mut self.arena);
-          self.try_replace_widget_or_rebuild(id, w, stack, render_tree);
-          continue;
-        }
-      }
-
-      let child_id = node.append_widget(w, self);
-      self.inflate(child_id, render_tree);
-    }
-
     key_children
-      .into_iter()
-      .for_each(|(_, v)| v.drop_subtree(self, render_tree));
   }
 
   /// Return the topmost need rebuild
@@ -263,8 +332,8 @@ impl WidgetId {
   }
 
   /// Returns a mutable reference to the node data.
-  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut dyn Widget> {
-    tree.arena.get_mut(self.0).map(|node| &mut **node.get_mut())
+  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn Widget>> {
+    tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
   /// detect if the widget of this id point to is dropped.
@@ -350,6 +419,10 @@ impl WidgetId {
     }
   }
 
+  fn append(self, child: WidgetId, tree: &mut WidgetTree) {
+    self.0.append(child.0, &mut tree.arena)
+  }
+
   fn append_widget(self, data: Box<dyn Widget>, tree: &mut WidgetTree) -> WidgetId {
     let id = tree.new_node(data);
     self.0.append(id.0, &mut tree.arena);
@@ -385,6 +458,14 @@ impl WidgetId {
       .expect("Caller assert `wid` has single child")
   }
 
+  /// find the nearest render widget of its ancestors.
+  fn up_nearest_render_widget(self, tree: &WidgetTree) -> Option<WidgetId> {
+    self
+      .ancestors(tree)
+      .filter(|id| id.get(tree).and_then(|w| w.as_render()).is_some())
+      .next()
+  }
+
   /// find the nearest render widget in subtree, include self.
   fn down_nearest_render_widget(self, tree: &WidgetTree) -> WidgetId {
     let mut wid = self;
@@ -396,23 +477,6 @@ impl WidgetId {
     }
     debug_assert!(wid.get(tree).and_then(|w| w.as_render()).is_some());
     wid
-  }
-
-  fn take_children(self, tree: &mut WidgetTree) -> Option<SmallVec<[Box<dyn Widget>; 1]>> {
-    let (tree1, tree2) = unsafe {
-      let ptr = tree as *mut WidgetTree;
-      (&mut *ptr, &mut *ptr)
-    };
-    self.get_mut(tree1).and_then(|w| {
-      if let Some(c) = w.as_combination_mut() {
-        let mut ctx = BuildCtx::new(unsafe { Pin::new_unchecked(tree2) }, self);
-        Some(smallvec![c.build(&mut ctx)])
-      } else if let Some(r) = w.as_render_mut() {
-        r.take_children()
-      } else {
-        unreachable!("Widget either combination or render");
-      }
-    })
   }
 
   fn node_feature<F: Fn(&Node<Box<dyn Widget>>) -> Option<NodeId>>(
@@ -447,7 +511,7 @@ impl WidgetId {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut dyn Widget {
+  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Widget> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }
@@ -462,6 +526,14 @@ impl WidgetId {
   pub unsafe fn dummy() -> Self {
     let index = std::num::NonZeroUsize::new(0);
     std::mem::transmute((index, 0))
+  }
+}
+
+impl dyn CombinationWidget {
+  fn build_child(&self, wid: WidgetId, tree: &mut WidgetTree) -> BoxedWidget {
+    let c_ptr = self as *const dyn CombinationWidget;
+    let mut ctx = BuildCtx::new(unsafe { Pin::new_unchecked(tree) }, wid);
+    unsafe { &*c_ptr }.build(&mut ctx)
   }
 }
 
