@@ -2,6 +2,7 @@
 #![feature(
   specialization,
   test,
+  box_into_inner,
   decl_macro,
   negative_impls,
   linked_list_cursors,

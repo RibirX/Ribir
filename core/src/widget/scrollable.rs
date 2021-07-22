@@ -1,5 +1,7 @@
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 
+/// A widget let its child horizontal scrollable and the scroll view is as large
+/// as its parent allow.
 #[stateful]
 #[derive(Widget, SingleChildWidget)]
 pub struct ScrollableX {
@@ -7,6 +9,8 @@ pub struct ScrollableX {
   pos: f32,
 }
 
+/// A widget let its child vertical scrollable and the scroll view is as large
+/// as its parent allow.
 #[stateful]
 #[derive(Widget, SingleChildWidget)]
 pub struct ScrollableY {
@@ -14,6 +18,8 @@ pub struct ScrollableY {
   pos: f32,
 }
 
+/// A widget let its child both scrollable in horizontal and vertical, and the
+/// scroll view is as large as its parent allow.
 #[stateful]
 #[derive(Widget, SingleChildWidget)]
 pub struct ScrollableBoth {

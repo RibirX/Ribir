@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use std::pin::Pin;
 
+static DEFAULT_THEME: ThemeData = material::light("Roboto".to_string());
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
   wid: WidgetId,
@@ -14,7 +15,7 @@ impl<'a> BuildCtx<'a> {
       .wid
       .ancestors(tree)
       .find_map(|id| id.get(tree).and_then(|w| w.find_attr::<ThemeData>()))
-      .expect("At least， root theme should be found.")
+      .unwrap_or(&DEFAULT_THEME)
   }
 
   #[inline]

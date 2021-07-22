@@ -52,6 +52,11 @@ impl RenderObject for MarginState {
   fn get_states(&self) -> &Self::States { self }
 }
 
+impl Margin {
+  #[inline]
+  pub fn new(margin: EdgeInsets) -> Self { Self { margin } }
+}
+
 impl EdgeInsets {
   #[inline]
   pub fn all(value: f32) -> Self {

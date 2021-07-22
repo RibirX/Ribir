@@ -58,6 +58,11 @@ impl RenderObject for PaddingState {
   fn get_states(&self) -> &Self::States { self }
 }
 
+impl Padding {
+  #[inline]
+  pub fn new(padding: EdgeInsets) -> Self { Self { padding } }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
