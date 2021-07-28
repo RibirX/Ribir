@@ -37,7 +37,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: AsCombination + AsRender + Any + StateDetect + 'static {
+pub trait Widget: Any + StateDetect + 'static {
   /// Return the reference to the attrs that attached to the this widget.
   #[inline]
   fn attrs_ref(&self) -> Option<AttrsRef> { None }
@@ -87,26 +87,6 @@ pub trait RenderWidgetSafety: Widget + AsWidget {
   fn clone_boxed_states(&self) -> Box<dyn Any>;
 }
 
-pub trait AsCombination {
-  /// return some-value  of `CombinationWidget` reference if this widget is a
-  /// combination widget.`
-  fn as_combination(&self) -> Option<&dyn CombinationWidget>;
-
-  /// return some-value of `CombinationWidget` mutable reference if this widget
-  /// is a combination widget.
-  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget>;
-}
-
-pub trait AsRender {
-  /// return some-value of `RenderWidgetSafety` reference if this widget
-  /// is a render widget.
-  fn as_render(&self) -> Option<&dyn RenderWidgetSafety>;
-
-  /// return some-value of `RenderWidgetSafety` mutable reference if this widget
-  /// is a render widget.
-  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety>;
-}
-
 pub enum BoxedWidget {
   Combination(Box<dyn CombinationWidget>),
   Render(Box<dyn RenderWidgetSafety>),
@@ -114,38 +94,7 @@ pub enum BoxedWidget {
   MultiChild(BoxedMultiChild),
 }
 
-impl<T: Widget> AsCombination for T {
-  #[inline]
-  default fn as_combination(&self) -> Option<&dyn CombinationWidget> { None }
-
-  #[inline]
-  default fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { None }
-}
-
-impl<T: CombinationWidget> AsCombination for T {
-  #[inline]
-  fn as_combination(&self) -> Option<&dyn CombinationWidget> { Some(self) }
-
-  #[inline]
-  fn as_combination_mut(&mut self) -> Option<&mut dyn CombinationWidget> { Some(self) }
-}
-
-impl<T: Widget> AsRender for T {
-  #[inline]
-  default fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { None }
-
-  #[inline]
-  default fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { None }
-}
-
-impl<T: RenderWidget> AsRender for T {
-  #[inline]
-  fn as_render(&self) -> Option<&dyn RenderWidgetSafety> { Some(self) }
-
-  #[inline]
-  fn as_render_mut(&mut self) -> Option<&mut dyn RenderWidgetSafety> { Some(self) }
-}
-
+// todo: remove it.
 impl<'a> dyn Widget + 'a {
   /// Return the `Key` attribute of the widget.
   pub fn key(&self) -> Option<&Key> { self.find_attr() }
@@ -163,6 +112,7 @@ impl<'a> dyn Widget + 'a {
   }
 }
 
+// todo: remove it
 pub trait AsWidget {
   fn as_widget(&self) -> &dyn Widget;
 }
@@ -170,16 +120,4 @@ pub trait AsWidget {
 impl<W: Widget> AsWidget for W {
   #[inline]
   fn as_widget(&self) -> &dyn Widget { self }
-}
-
-impl BoxedWidget {
-  pub fn key(&self) -> Option<&Key> {
-    let w = match self {
-      BoxedWidget::Combination(c) => c.as_widget(),
-      BoxedWidget::Render(r) => r.as_widget(),
-      BoxedWidget::SingleChild(s) => s.as_widget(),
-      BoxedWidget::MultiChild(m) => m.as_widget(),
-    };
-    w.key()
-  }
 }
