@@ -553,6 +553,18 @@ impl WidgetNode {
   pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> { unimplemented!() }
 }
 
+impl BoxedWidget {
+  fn key(&self) -> Option<&Key> {
+    let w = match self {
+      BoxedWidget::Combination(c) => c.as_widget(),
+      BoxedWidget::Render(r) => r.as_widget(),
+      BoxedWidget::SingleChild(s) => s.as_widget(),
+      BoxedWidget::MultiChild(m) => m.as_widget(),
+    };
+    w.key()
+  }
+}
+
 #[cfg(test)]
 mod test {
   use super::*;

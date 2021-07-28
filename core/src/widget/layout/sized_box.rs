@@ -26,7 +26,7 @@ impl SizedBox {
 
   /// Creates a box that will become as small as its parent allows.
   #[inline]
-  pub fn shrink<W: Widget>(child: W) -> Self { Self { size: Size::zero() } }
+  pub fn shrink() -> Self { Self { size: Size::zero() } }
 }
 
 impl RenderWidget for SizedBox {
