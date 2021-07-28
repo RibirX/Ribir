@@ -10,7 +10,7 @@
 )]
 #[macro_use]
 extern crate bitflags;
-
+extern crate lazy_static;
 extern crate widget_derive;
 
 mod application;
