@@ -16,6 +16,7 @@ rxrust = "0.13.0"
 smallvec = "1.5.1"
 widget_derive = {path = "../widget_derive"}
 winit = "0.24.0"
+lazy_static ="1.4.0"
 
 [dependencies.blake3]
 features = ["rayon"]

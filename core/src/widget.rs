@@ -49,7 +49,7 @@ pub trait Widget: AsCombination + AsRender + Any + StateDetect + 'static {
 }
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Widget + IntoWidget + AsWidget {
+pub trait CombinationWidget: Widget + AsWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
@@ -82,7 +82,7 @@ pub trait RenderWidget: Widget + CloneStates {
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety: Widget + IntoWidget + AsWidget {
+pub trait RenderWidgetSafety: Widget + AsWidget {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
   fn clone_boxed_states(&self) -> Box<dyn Any>;
 }
@@ -112,15 +112,6 @@ pub enum BoxedWidget {
   Render(Box<dyn RenderWidgetSafety>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
-}
-
-pub trait IntoWidget {
-  fn into_widget(self: Box<Self>) -> Box<dyn Widget>;
-}
-
-impl<W: Widget> IntoWidget for W {
-  #[inline]
-  fn into_widget(self: Box<Self>) -> Box<dyn Widget> { self }
 }
 
 impl<T: Widget> AsCombination for T {

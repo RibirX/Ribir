@@ -1,7 +1,10 @@
 use crate::prelude::*;
 use std::pin::Pin;
 
-static DEFAULT_THEME: ThemeData = material::light("Roboto".to_string());
+lazy_static::lazy_static! {
+  static ref DEFAULT_THEME: ThemeData =  widget::material::light("Roboto".to_string());
+}
+
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
   wid: WidgetId,
