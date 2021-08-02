@@ -37,7 +37,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: Any + StateDetect + 'static {
+pub trait Widget: Any + 'static {
   /// Return the reference to the attrs that attached to the this widget.
   #[inline]
   fn attrs_ref(&self) -> Option<AttrsRef> { None }
@@ -49,7 +49,7 @@ pub trait Widget: Any + StateDetect + 'static {
 }
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Widget + AsWidget {
+pub trait CombinationWidget: Widget + StateDetect + AsWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
@@ -64,7 +64,7 @@ pub trait CombinationWidget: Widget + AsWidget {
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: Widget + CloneStates {
+pub trait RenderWidget: Widget + StateDetect + CloneStates {
   /// The render object type will created.
   type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
 
