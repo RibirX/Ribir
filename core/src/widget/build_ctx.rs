@@ -6,7 +6,7 @@ lazy_static::lazy_static! {
 }
 
 pub struct BuildCtx<'a> {
-  pub(crate) tree: Pin<&'a mut widget_tree::WidgetTree>,
+  pub(crate) tree: Pin<&'a widget_tree::WidgetTree>,
   wid: WidgetId,
 }
 
@@ -22,7 +22,7 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(tree: Pin<&'a mut widget_tree::WidgetTree>, widget: WidgetId) -> Self {
+  pub(crate) fn new(tree: Pin<&'a widget_tree::WidgetTree>, widget: WidgetId) -> Self {
     Self { tree, wid: widget }
   }
 }
@@ -35,8 +35,8 @@ mod tests {
   #[test]
   fn default_theme() {
     let win_size = Size::zero();
-    let sized = widget::SizedBox::empty_box(win_size);
-    let mut wnd = window::Window::without_render(sized, win_size);
+    let sized = widget::SizedBox::from_size(win_size);
+    let mut wnd = window::Window::without_render(sized.box_it(), win_size);
     wnd.render_ready();
     let tree = wnd.widget_tree();
     let has_them = tree
@@ -52,9 +52,9 @@ mod tests {
   }
 
   impl CombinationWidget for ThemeTrack {
-    fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       self.themes.borrow_mut().push(ctx.theme().clone());
-      SizedBox::empty_box(Size::zero()).box_it()
+      SizedBox::from_size(Size::zero()).box_it()
     }
   }
 
@@ -66,10 +66,14 @@ mod tests {
 
     let theme_track = ThemeTrack { themes: track_themes.clone() };
 
-    let light_theme = SizedBox::shrink(theme_track).with_theme(light.clone());
-    let dark_light_theme = SizedBox::expanded(light_theme).with_theme(dark.clone());
+    let light_theme = SizedBox::shrink()
+      .with_theme(light.clone())
+      .with_child(theme_track.box_it());
+    let dark_light_theme = SizedBox::expanded()
+      .with_theme(dark.clone())
+      .with_child(light_theme.box_it());
 
-    let mut wnd = window::Window::without_render(dark_light_theme, Size::zero());
+    let mut wnd = window::Window::without_render(dark_light_theme.box_it(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
@@ -78,10 +82,14 @@ mod tests {
     );
 
     let theme = ThemeTrack { themes: track_themes.clone() };
-    let dark_theme = SizedBox::shrink(theme).with_theme(dark);
-    let light_dark_theme = SizedBox::expanded(dark_theme).with_theme(light);
+    let dark_theme = SizedBox::shrink()
+      .with_theme(dark)
+      .with_child(theme.box_it());
+    let light_dark_theme = SizedBox::expanded()
+      .with_theme(light)
+      .with_child(dark_theme.box_it());
 
-    let mut wnd = window::Window::without_render(light_dark_theme, Size::zero());
+    let mut wnd = window::Window::without_render(light_dark_theme.box_it(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 2);
     assert_eq!(

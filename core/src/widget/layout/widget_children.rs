@@ -56,6 +56,11 @@ pub trait MultiChildWidget: RenderWidget + Sized {
       children: iter.into_iter().collect(),
     }
   }
+
+  #[inline]
+  fn push(self, child: BoxedWidget) -> MultiChild<Self> {
+    MultiChild { widget: self, children: vec![child] }
+  }
 }
 
 pub struct MultiChild<M> {

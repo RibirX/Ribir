@@ -292,8 +292,8 @@ mod tests {
   fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let root = record_pointer(event_record.clone(), Row::default().push(record));
-    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
+    let root = record_pointer(event_record.clone(), Row::default()).push(record.box_it());
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -327,7 +327,7 @@ mod tests {
   fn mouse_buttons() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -382,7 +382,7 @@ mod tests {
   fn different_device_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -440,19 +440,24 @@ mod tests {
   #[test]
   fn cancel_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = SizedBox::expanded(Text("pointer event test".to_string()).on_pointer_down({
-      let stack = event_record.clone();
-      move |e| {
-        stack.borrow_mut().push(e.clone());
-        e.stop_bubbling();
-      }
-    }))
-    .on_pointer_down({
-      let stack = event_record.clone();
-      move |e| stack.borrow_mut().push(e.clone())
-    });
+    let root = SizedBox::expanded()
+      .on_pointer_down({
+        let stack = event_record.clone();
+        move |e| stack.borrow_mut().push(e.clone())
+      })
+      .with_child(
+        Text("pointer event test".to_string())
+          .on_pointer_down({
+            let stack = event_record.clone();
+            move |e| {
+              stack.borrow_mut().push(e.clone());
+              e.stop_bubbling();
+            }
+          })
+          .box_it(),
+      );
 
-    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -472,16 +477,17 @@ mod tests {
 
     let c_enter_event = enter_event.clone();
     let c_leave_event = leave_event.clone();
-    let child = SizedBox::empty_box(Size::new(f32::INFINITY, f32::INFINITY))
+    let child = SizedBox::from_size(Size::new(f32::INFINITY, f32::INFINITY))
       .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(1))
       .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(1));
     let c_enter_event = enter_event.clone();
     let c_leave_event = leave_event.clone();
-    let parent = SizedBox::expanded(child)
+    let parent = SizedBox::expanded()
       .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(2))
-      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(2));
+      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(2))
+      .with_child(child.box_it());
 
-    let mut wnd = NoRenderWindow::without_render(parent, Size::new(100., 100.));
+    let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -516,7 +522,7 @@ mod tests {
   fn click() {
     let click_path = Rc::new(RefCell::new(0));
     let c_click_path = click_path.clone();
-    let child = SizedBox::empty_box(Size::new(100., 100.)).on_tap(move |_| {
+    let child = SizedBox::from_size(Size::new(100., 100.)).on_tap(move |_| {
       let mut res = c_click_path.borrow_mut();
       *res += 1;
     });
@@ -524,14 +530,14 @@ mod tests {
     let c_click_path = click_path.clone();
     let parent = Row::default()
       .with_cross_align(CrossAxisAlign::Start)
-      .push(child)
-      // Stretch row
-      .push(SizedBox::empty_box(Size::new(100., 400.)))
       .on_tap(move |_| {
         let mut res = c_click_path.borrow_mut();
         *res += 1;
-      });
-    let mut wnd = NoRenderWindow::without_render(parent, Size::new(400., 400.));
+      })
+      .push(child.box_it())
+      // Stretch row
+      .push(SizedBox::from_size(Size::new(100., 400.)).box_it());
+    let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(400., 400.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -593,9 +599,13 @@ mod tests {
   #[test]
   fn focus_change_by_event() {
     let root = Row::default()
-      .push(SizedBox::empty_box(Size::new(50., 50.)).with_tab_index(0))
-      .push(SizedBox::empty_box(Size::new(50., 50.)));
-    let mut wnd = NoRenderWindow::without_render(root, Size::new(100., 100.));
+      .push(
+        SizedBox::from_size(Size::new(50., 50.))
+          .with_tab_index(0)
+          .box_it(),
+      )
+      .push(SizedBox::from_size(Size::new(50., 50.)).box_it());
+    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };

@@ -45,7 +45,7 @@ pub enum MainAxisAlign {
 }
 
 #[stateful]
-#[derive(Widget, Default)]
+#[derive(Widget, Default, MultiChildWidget)]
 pub struct Flex {
   /// Reverse the main axis.
   #[state]
@@ -466,31 +466,28 @@ mod tests {
 
   #[test]
   fn horizontal_line() {
-    let row = (0..10)
-      .map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it())
-      .collect::<Flex>();
-    let (rect, _) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
+    let row =
+      Flex::default().from_iter((0..10).map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it()));
+    let (rect, _) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 20.));
   }
 
   #[test]
   fn vertical_line() {
-    let col = (0..10)
-      .map(|_| SizedBox::empty_box(Size::new(10., 20.)).box_it())
-      .collect::<Flex>()
-      .with_direction(Direction::Vertical);
-    let (rect, _) = widget_and_its_children_box_rect(col, Size::new(500., 500.));
+    let col = Flex::default()
+      .with_direction(Direction::Vertical)
+      .from_iter((0..10).map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it()));
+    let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
 
   #[test]
   fn row_wrap() {
     let size = Size::new(200., 20.);
-    let row = (0..3)
-      .map(|_| SizedBox::empty_box(size).box_it())
-      .collect::<Flex>()
-      .with_wrap(true);
-    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
+    let row = Flex::default()
+      .with_wrap(true)
+      .from_iter((0..3).map(|_| SizedBox::from_size(size).box_it()));
+    let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
       children,
@@ -505,12 +502,11 @@ mod tests {
   #[test]
   fn reverse_row_wrap() {
     let size = Size::new(200., 20.);
-    let row = (0..3)
-      .map(|_| SizedBox::empty_box(size).box_it())
-      .collect::<Flex>()
+    let row = Flex::default()
       .with_wrap(true)
-      .with_reverse(true);
-    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
+      .with_reverse(true)
+      .from_iter((0..3).map(|_| SizedBox::from_size(size).box_it()));
+    let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
       children,
@@ -527,9 +523,10 @@ mod tests {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
       let row = Row::default()
         .with_cross_align(align)
-        .push(SizedBox::empty_box(Size::new(100., 20.)))
-        .push(SizedBox::empty_box(Size::new(100., 30.)))
-        .push(SizedBox::empty_box(Size::new(100., 40.)));
+        .push(SizedBox::from_size(Size::new(100., 20.)).box_it())
+        .push(SizedBox::from_size(Size::new(100., 30.)).box_it())
+        .push(SizedBox::from_size(Size::new(100., 40.)).box_it())
+        .box_it();
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
       assert_eq!(rect.size, Size::new(300., 40.));
@@ -557,9 +554,10 @@ mod tests {
 
     let row = Row::default()
       .with_cross_align(CrossAxisAlign::Stretch)
-      .push(SizedBox::empty_box(Size::new(100., 20.)))
-      .push(SizedBox::empty_box(Size::new(100., 30.)))
-      .push(SizedBox::empty_box(Size::new(100., 40.)));
+      .push(SizedBox::from_size(Size::new(100., 20.)).box_it())
+      .push(SizedBox::from_size(Size::new(100., 30.)).box_it())
+      .push(SizedBox::from_size(Size::new(100., 40.)).box_it())
+      .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(300., 40.));
@@ -589,11 +587,15 @@ mod tests {
       let row = Row::default()
         .with_main_align(align)
         .with_cross_align(CrossAxisAlign::Start)
-        .push(SizedBox::empty_box(item_size))
-        .push(SizedBox::empty_box(item_size))
-        .push(SizedBox::empty_box(item_size));
+        .push(SizedBox::from_size(item_size).box_it())
+        .push(SizedBox::from_size(item_size).box_it())
+        .push(SizedBox::from_size(item_size).box_it())
+        .box_it();
 
-      let mut wnd = window::Window::without_render(SizedBox::expanded(row), Size::new(500., 500.));
+      let mut wnd = window::Window::without_render(
+        SizedBox::expanded().with_child(row).box_it(),
+        Size::new(500., 500.),
+      );
       wnd.render_ready();
       let r_tree = wnd.render_tree();
       let row_obj = r_tree

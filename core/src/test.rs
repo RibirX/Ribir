@@ -7,10 +7,7 @@ use widget::window::MockRender;
 use crate::prelude::*;
 
 // return the flex box rect, and rect of its children.
-pub fn widget_and_its_children_box_rect<W: Widget + AttachAttr>(
-  root: W,
-  window_size: Size,
-) -> (Rect, Vec<Rect>) {
+pub fn widget_and_its_children_box_rect(root: BoxedWidget, window_size: Size) -> (Rect, Vec<Rect>) {
   let mut wnd = window::Window::without_render(root, window_size);
   wnd.render_ready();
 

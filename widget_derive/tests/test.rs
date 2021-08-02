@@ -36,14 +36,6 @@ fn state_derive_tuple_support() {
 }
 
 #[test]
-fn derive_widget() {
-  let a = Test {}.with_key("a");
-
-  debug_assert!(a.as_render().is_none());
-  debug_assert!(a.as_combination().is_none());
-}
-
-#[test]
 fn ui() {
   let t = trybuild::TestCases::new();
   t.compile_fail("tests/ui/*fail.rs");
@@ -52,7 +44,6 @@ fn ui() {
 
 #[test]
 fn stateful_as_render_check() {
-  let w = SizedBox::empty_box(Size::zero()).into_stateful();
-
-  assert!(w.as_render().is_some());
+  let w = SizedBox::from_size(Size::zero()).into_stateful().box_it();
+  assert!(matches!(w, BoxedWidget::Render(_)));
 }

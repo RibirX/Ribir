@@ -63,12 +63,12 @@ mod tests {
     let receive = Rc::new(RefCell::new((0., 0.)));
     let c_receive = receive.clone();
 
-    let widget = SizedBox::empty_box(Size::new(100., 100.))
+    let widget = SizedBox::from_size(Size::new(100., 100.))
       .with_auto_focus(true)
       .on_wheel(move |wheel| {
         *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y);
       });
-    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
+    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
 
     wnd.render_ready();
     let device_id = unsafe { DeviceId::dummy() };

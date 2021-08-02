@@ -37,7 +37,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: Any + 'static {
+pub trait Widget: 'static {
   /// Return the reference to the attrs that attached to the this widget.
   #[inline]
   fn attrs_ref(&self) -> Option<AttrsRef> { None }
