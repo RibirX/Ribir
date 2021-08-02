@@ -11,7 +11,7 @@ pub struct Expanded {
 }
 
 impl Expanded {
-  pub fn new<W: Widget>(flex: f32, child: W) -> Self { Self { flex } }
+  pub fn new(flex: f32) -> Self { Self { flex } }
 }
 
 impl RenderWidget for Expanded {
@@ -58,10 +58,19 @@ mod tests {
   fn one_line_expanded() {
     let size = Size::new(100., 50.);
     let row = Row::default()
-      .push(Expanded::new(1., SizedBox::empty_box(size)))
-      .push(SizedBox::empty_box(size))
-      .push(SizedBox::empty_box(size))
-      .push(Expanded::new(2., SizedBox::empty_box(size)));
+      .push(
+        Expanded::new(1.)
+          .with_child(SizedBox::from_size(size).box_it())
+          .box_it(),
+      )
+      .push(SizedBox::from_size(size).box_it())
+      .push(SizedBox::from_size(size).box_it())
+      .push(
+        Expanded::new(2.)
+          .with_child(SizedBox::from_size(size).box_it())
+          .box_it(),
+      )
+      .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
 
@@ -82,12 +91,20 @@ mod tests {
     let size = Size::new(100., 50.);
     let row = Row::default()
       .with_wrap(true)
-      .push(Expanded::new(1., SizedBox::empty_box(size)))
-      .push(SizedBox::empty_box(size))
-      .push(SizedBox::empty_box(size))
-      .push(Expanded::new(2., SizedBox::empty_box(size)));
+      .push(
+        Expanded::new(1.)
+          .with_child(SizedBox::from_size(size).box_it())
+          .box_it(),
+      )
+      .push(SizedBox::from_size(size).box_it())
+      .push(SizedBox::from_size(size).box_it())
+      .push(
+        Expanded::new(2.)
+          .with_child(SizedBox::from_size(size).box_it())
+          .box_it(),
+      );
 
-    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(350., 500.));
+    let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(350., 500.));
 
     assert_eq!(rect, Rect::from_size(Size::new(350., 100.)));
     assert_eq!(

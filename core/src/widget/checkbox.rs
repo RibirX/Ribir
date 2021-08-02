@@ -171,7 +171,7 @@ mod tests {
   #[test]
   fn layout() {
     let w = checkbox().into_stateful();
-    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(200., 200.));
+    let (rect, child) = widget_and_its_children_box_rect(w.box_it(), Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
 
     debug_assert_eq!(
@@ -184,7 +184,7 @@ mod tests {
   #[ignore = "gpu need"]
   fn checked_paint() {
     let c = checkbox().with_checked(true).into_stateful();
-    let mut window = window::Window::headless(c, DeviceSize::new(100, 100));
+    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -194,8 +194,10 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn unchecked_paint() {
-    let mut window =
-      window::Window::headless(checkbox().into_stateful(), DeviceSize::new(100, 100));
+    let mut window = window::Window::headless(
+      checkbox().into_stateful().box_it(),
+      DeviceSize::new(100, 100),
+    );
     window.render_ready();
     window.draw_frame();
 
@@ -209,7 +211,7 @@ mod tests {
       .with_checked(true)
       .with_indeterminate(true)
       .into_stateful();
-    let mut window = window::Window::headless(c, DeviceSize::new(100, 100));
+    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -222,7 +224,7 @@ mod tests {
       .with_checked(false)
       .with_indeterminate(true)
       .into_stateful();
-    let mut window = window::Window::headless(c, DeviceSize::new(100, 100));
+    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 

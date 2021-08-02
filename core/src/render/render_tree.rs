@@ -74,20 +74,6 @@ impl RenderTree {
   }
 
   #[inline]
-  pub(crate) fn prepend_obj(
-    &mut self,
-    owner: WidgetId,
-    parent: Option<RenderId>,
-    obj: Box<dyn RenderObjectSafety + Send + Sync>,
-  ) -> RenderId {
-    let rid = self.new_node(owner, obj);
-    if let Some(p) = parent {
-      p.prepend(rid, self)
-    }
-    rid
-  }
-
-  #[inline]
   pub(crate) fn new_node(
     &mut self,
     owner: WidgetId,
@@ -243,19 +229,6 @@ impl RenderId {
     self.0.ancestors(&tree.arena).map(RenderId)
   }
 
-  /// Preappend a RenderObject as child, and create this RenderObject's Widget
-  /// is `owner`
-  pub(crate) fn prepend_object(
-    self,
-    owner: WidgetId,
-    object: Box<dyn RenderObjectSafety + Send + Sync>,
-    tree: &mut RenderTree,
-  ) -> RenderId {
-    let child = tree.new_node(owner, object);
-    self.prepend(child, tree);
-    child
-  }
-
   /// Drop the subtree
   pub(crate) fn drop(self, tree: &mut RenderTree) {
     let RenderTree {
@@ -376,19 +349,18 @@ mod tests {
     fn transform(&self) -> Option<Transform> { None }
   }
 
-  fn mock_widget_id(i: usize) -> WidgetId { unsafe { std::mem::transmute((i, 0)) } }
-
   #[test]
   fn relayout_always_from_top_to_down() {
     let records = Arc::new(Mutex::new(vec![]));
     let mut tree = RenderTree::default();
     let obj = Box::new(MockRenderObj { records: records.clone() });
-    let grand_parent = tree.set_root(mock_widget_id(0), obj.clone());
+    let grand_parent = tree.new_node(unsafe { WidgetId::dummy() }, obj.clone());
+    tree.set_root(grand_parent);
 
-    let parent = tree.new_node(obj.clone());
+    let parent = tree.new_node(unsafe { WidgetId::dummy() }, obj.clone());
     grand_parent.prepend(parent, &mut tree);
 
-    let son = tree.new_node(obj);
+    let son = tree.new_node(unsafe { WidgetId::dummy() }, obj.clone());
     parent.prepend(son, &mut tree);
 
     parent.mark_needs_layout(&mut tree);
@@ -407,8 +379,8 @@ mod tests {
     struct DoubleSize;
 
     impl CombinationWidget for DoubleSize {
-      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
-        let stateful = SizedBox::empty_box(Size::new(100., 100.)).into_stateful();
+      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+        let stateful = SizedBox::from_size(Size::new(100., 100.)).into_stateful();
         let mut state = stateful.ref_cell();
         stateful
           .on_pointer_move(move |_| {
@@ -419,7 +391,7 @@ mod tests {
       }
     }
 
-    let mut wnd = window::Window::without_render(DoubleSize, Size::new(500., 500.));
+    let mut wnd = window::Window::without_render(DoubleSize.box_it(), Size::new(500., 500.));
     wnd.render_ready();
 
     {

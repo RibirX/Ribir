@@ -1,7 +1,7 @@
 use crate::attr_fields::{add_trait_bounds_if, AttrFields};
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
-use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Generics, Ident};
+use syn::{parse_quote, spanned::Spanned, token::Where, Data, DeriveInput, Generics, Ident};
 pub const PROXY_PATH: &str = "proxy";
 
 pub struct ProxyDeriveInfo<'a> {
@@ -131,6 +131,7 @@ fn derive_widget_impl(info: &ProxyDeriveInfo) -> TokenStream {
 
   let single_child = single_child_impl(info);
   let multi_child = multi_child_impl(info);
+
   quote! {
       impl #impl_generics Widget for #name #ty_generics #where_clause {
         #[inline]
@@ -162,11 +163,17 @@ fn single_child_impl(info: &ProxyDeriveInfo) -> Option<TokenStream> {
   }
   assert_eq!(attr_fields.attr_fields().len(), 1);
 
-  let generics = add_trait_bounds_if(
-    info.generics.clone(),
-    parse_quote!(SingleChildWidget),
-    |param| info.attr_fields.is_attr_generic(param),
-  );
+  let (field, _) = &attr_fields.attr_fields()[0];
+  let proxy_ty = &field.ty;
+  let mut generics = info.generics.clone();
+  generics
+    .where_clause
+    .get_or_insert_with(|| syn::WhereClause {
+      where_token: Where(Span::call_site()),
+      predicates: <_>::default(),
+    })
+    .predicates
+    .push(parse_quote! {#proxy_ty: SingleChildWidget});
 
   let name = info.ident;
   let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -182,11 +189,17 @@ fn multi_child_impl(info: &ProxyDeriveInfo) -> Option<TokenStream> {
   }
   assert_eq!(attr_fields.attr_fields().len(), 1);
 
-  let generics = add_trait_bounds_if(
-    info.generics.clone(),
-    parse_quote!(MultiChildWidget),
-    |param| info.attr_fields.is_attr_generic(param),
-  );
+  let (field, _) = &attr_fields.attr_fields()[0];
+  let proxy_ty = &field.ty;
+  let mut generics = info.generics.clone();
+  generics
+    .where_clause
+    .get_or_insert_with(|| syn::WhereClause {
+      where_token: Where(Span::call_site()),
+      predicates: <_>::default(),
+    })
+    .predicates
+    .push(parse_quote! {#proxy_ty: MultiChildWidget});
 
   let name = info.ident;
   let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();

@@ -3,7 +3,7 @@ use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::Wi
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(Widget, SingleChildWidget)]
+#[derive(Widget, SingleChildWidget, Default)]
 pub struct ScrollableX {
   #[state]
   pos: f32,
@@ -12,7 +12,7 @@ pub struct ScrollableX {
 /// A widget let its child vertical scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(Widget, SingleChildWidget)]
+#[derive(Widget, SingleChildWidget, Default)]
 pub struct ScrollableY {
   #[state]
   pos: f32,
@@ -21,7 +21,7 @@ pub struct ScrollableY {
 /// A widget let its child both scrollable in horizontal and vertical, and the
 /// scroll view is as large as its parent allow.
 #[stateful]
-#[derive(Widget, SingleChildWidget)]
+#[derive(Widget, SingleChildWidget, Default)]
 pub struct ScrollableBoth {
   #[state]
   pos: Point,
@@ -203,7 +203,7 @@ mod tests {
   use crate::test::root_and_children_rect;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  fn test_assert<W: Widget + AttachAttr>(widget: W, delta_x: f32, delta_y: f32, child_pos: Point) {
+  fn test_assert(widget: BoxedWidget, delta_x: f32, delta_y: f32, child_pos: Point) {
     let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();
@@ -227,16 +227,16 @@ mod tests {
     struct X;
 
     impl CombinationWidget for X {
-      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
-        SizedBox::empty_box(Size::new(1000., 1000.))
-          .x_scrollable()
+      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+        ScrollableX::default()
+          .with_child(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
           .box_it()
       }
     }
 
-    test_assert(X, 10., 10., Point::new(-10., 0.));
-    test_assert(X, 10000., 10., Point::new(-900., 0.));
-    test_assert(X, -100., 10., Point::new(0., 0.));
+    test_assert(X.box_it(), 10., 10., Point::new(-10., 0.));
+    test_assert(X.box_it(), 10000., 10., Point::new(-900., 0.));
+    test_assert(X.box_it(), -100., 10., Point::new(0., 0.));
   }
 
   #[test]
@@ -245,16 +245,16 @@ mod tests {
     struct Y;
 
     impl CombinationWidget for Y {
-      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
-        SizedBox::empty_box(Size::new(1000., 1000.))
-          .y_scrollable()
+      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+        ScrollableY::default()
+          .with_child(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
           .box_it()
       }
     }
 
-    test_assert(Y, 10., 10., Point::new(0., -10.));
-    test_assert(Y, 10., 10000., Point::new(0., -900.));
-    test_assert(Y, -10., -100., Point::new(0., 0.));
+    test_assert(Y.box_it(), 10., 10., Point::new(0., -10.));
+    test_assert(Y.box_it(), 10., 10000., Point::new(0., -900.));
+    test_assert(Y.box_it(), -10., -100., Point::new(0., 0.));
   }
 
   #[test]
@@ -263,15 +263,15 @@ mod tests {
     struct Both;
 
     impl CombinationWidget for Both {
-      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
-        SizedBox::empty_box(Size::new(1000., 1000.))
-          .both_scrollable()
+      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+        ScrollableBoth::default()
+          .with_child(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
           .box_it()
       }
     }
 
-    test_assert(Both, 10., 10., Point::new(-10., -10.));
-    test_assert(Both, 10000., 10000., Point::new(-900., -900.));
-    test_assert(Both, -100., -100., Point::new(0., 0.));
+    test_assert(Both.box_it(), 10., 10., Point::new(-10., -10.));
+    test_assert(Both.box_it(), 10000., 10000., Point::new(-900., -900.));
+    test_assert(Both.box_it(), -100., -100., Point::new(0., 0.));
   }
 }

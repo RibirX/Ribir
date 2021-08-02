@@ -139,7 +139,7 @@ pub trait StateDetect {
   fn state_info(&self) -> Option<StateInfo>;
 }
 
-impl<W: Widget> StateDetect for W {
+impl<W> StateDetect for W {
   default fn state_info(&self) -> Option<StateInfo> { None }
 }
 
@@ -420,7 +420,7 @@ mod tests {
 
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let mut sized_box = SizedBox::empty_box(Size::new(100., 100.)).into_stateful();
+    let mut sized_box = SizedBox::from_size(Size::new(100., 100.)).into_stateful();
     sized_box
       .change_stream()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -451,14 +451,14 @@ mod tests {
     struct TestWidget;
 
     impl CombinationWidget for TestWidget {
-      fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
-        SizedBox::empty_box(Size::new(100., 100.))
+      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+        SizedBox::from_size(Size::new(100., 100.))
           .into_stateful()
           .box_it()
       }
     }
 
-    let mut wnd = window::Window::without_render(TestWidget, Size::new(500., 500.));
+    let mut wnd = window::Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
     wnd.render_ready();
     let tree = wnd.widget_tree();
     assert_eq!(tree.count(), 2);

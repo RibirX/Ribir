@@ -58,22 +58,36 @@ mod tests {
 
   #[test]
   fn tree_down_up() {
-    let widget_tree = SizedBox::expanded({
-      Row::default()
-        .with_cross_align(CrossAxisAlign::Start)
-        .with_main_align(MainAxisAlign::Start)
-        .push(
-          SizedBox::from_size(Size::new(200., 200.), {
-            Row::default()
-              .with_cross_align(CrossAxisAlign::Start)
-              .with_main_align(MainAxisAlign::Start)
-              .push(SizedBox::empty_box(Size::new(100., 100.)).with_cursor(CursorIcon::Help))
-          })
-          .with_cursor(CursorIcon::Hand),
-        )
-    })
-    .with_cursor(CursorIcon::AllScroll);
-    let mut wnd = NoRenderWindow::without_render(widget_tree, Size::new(400., 400.));
+    let row_tree = SizedBox::expanded()
+      .with_cursor(CursorIcon::AllScroll)
+      .with_child(
+        {
+          Row::default()
+            .with_cross_align(CrossAxisAlign::Start)
+            .with_main_align(MainAxisAlign::Start)
+            .with_cursor(CursorIcon::Hand)
+            .push(
+              SizedBox::from_size(Size::new(200., 200.))
+                .with_child(
+                  {
+                    Row::default()
+                      .with_cross_align(CrossAxisAlign::Start)
+                      .with_main_align(MainAxisAlign::Start)
+                      .push(
+                        SizedBox::from_size(Size::new(100., 100.))
+                          .with_cursor(CursorIcon::Help)
+                          .box_it(),
+                      )
+                  }
+                  .box_it(),
+                )
+                .box_it(),
+            )
+        }
+        .box_it(),
+      )
+      .box_it();
+    let mut wnd = NoRenderWindow::without_render(row_tree, Size::new(400., 400.));
 
     wnd.render_ready();
 

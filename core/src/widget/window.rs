@@ -215,16 +215,6 @@ impl<R: CanvasRender> Window<R> {
 
   #[cfg(test)]
   pub fn render(&mut self) -> &mut R { &mut self.render }
-
-  #[cfg(test)]
-  pub fn new_build_ctx(&mut self, wid: WidgetId) -> BuildCtx {
-    BuildCtx::new(self.widget_tree(), wid)
-  }
-
-  #[cfg(test)]
-  pub fn new_render_ctx(&mut self, rid: RenderId) -> RenderCtx {
-    RenderCtx::new(self.render_tree.as_mut(), self.canvas.as_mut(), rid)
-  }
 }
 
 impl Window {
@@ -290,7 +280,7 @@ impl RawWindow for MockRawWindow {
 }
 
 impl HeadlessWindow {
-  pub fn headless<W>(root: BoxedWidget, size: DeviceSize) -> Self {
+  pub fn headless(root: BoxedWidget, size: DeviceSize) -> Self {
     let (canvas, render) =
       futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
     Self::new(

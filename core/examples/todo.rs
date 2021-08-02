@@ -16,13 +16,10 @@ struct Todos {
 }
 
 impl CombinationWidget for StatefulTodos {
-  fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
-    self
-      .as_ref()
-      .tasks
-      .iter()
-      .enumerate()
-      .map(|(idx, task)| {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    Column::default()
+      .with_cross_align(CrossAxisAlign::Start)
+      .from_iter(self.as_ref().tasks.iter().enumerate().map(|(idx, task)| {
         let mut todos = self.ref_cell();
         let mut checkbox = Checkbox::from_theme(ctx.theme())
           .with_checked(task.finished)
@@ -30,18 +27,19 @@ impl CombinationWidget for StatefulTodos {
         checkbox.state_checked().subscribe(move |v| {
           todos.borrow_mut().tasks[idx].finished = v.after;
         });
-        Row::default()
-          .push(
-            checkbox
-              .with_margin(EdgeInsets::horizontal(4.))
-              .with_key(idx),
+        Margin { margin: EdgeInsets::vertical(4.) }
+          .with_child(
+            Row::default()
+              .push(
+                Margin { margin: EdgeInsets::horizontal(4.) }
+                  .with_key(idx)
+                  .box_it(),
+              )
+              .push(Text(task.label.clone()).box_it())
+              .box_it(),
           )
-          .push(Text(task.label.clone()))
-          .with_margin(EdgeInsets::vertical(4.))
           .box_it()
-      })
-      .collect::<Column>()
-      .with_cross_align(CrossAxisAlign::Start)
+      }))
       .box_it()
   }
 }
@@ -69,5 +67,5 @@ fn main() {
   }
   .into_stateful();
 
-  Application::new().run(todo);
+  Application::new().run(todo.box_it());
 }

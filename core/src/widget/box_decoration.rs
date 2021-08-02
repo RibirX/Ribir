@@ -345,12 +345,18 @@ mod tests {
   #[test]
   fn layout() {
     let size = Size::new(100., 100.);
-    let sized_box = SizedBox::empty_box(size).with_border(Border {
-      left: BorderSide { width: 1., color: Color::BLACK },
-      right: BorderSide { width: 2., color: Color::BLACK },
-      top: BorderSide { width: 3., color: Color::BLACK },
-      bottom: BorderSide { width: 4., color: Color::BLACK },
-    });
+    let sized_box = BoxDecoration {
+      border: Some(Border {
+        left: BorderSide { width: 1., color: Color::BLACK },
+        right: BorderSide { width: 2., color: Color::BLACK },
+        top: BorderSide { width: 3., color: Color::BLACK },
+        bottom: BorderSide { width: 4., color: Color::BLACK },
+      }),
+      ..Default::default()
+    }
+    .with_child(SizedBox::from_size(size).box_it())
+    .box_it();
+
     let (rect, child) = widget_and_its_children_box_rect(sized_box, Size::new(500., 500.));
     assert_eq!(rect, Rect::from_size(Size::new(103., 107.)));
     assert_eq!(
@@ -388,31 +394,40 @@ mod tests {
         ..Default::default()
       },
     ];
-    let row = radius_cases
-      .into_iter()
-      .map(|radius| {
-        SizedBox::empty_box(Size::new(60., 40.))
-          .with_background(Color::RED.into())
-          .with_border_radius(radius)
-          .with_border(Border::all(BorderSide { width: 5., color: Color::BLACK }))
-          .with_margin(EdgeInsets::all(2.))
+    let row = Row::default()
+      .with_wrap(true)
+      .from_iter(radius_cases.into_iter().map(|radius| {
+        Margin { margin: EdgeInsets::all(2.) }
+          .with_child(
+            BoxDecoration {
+              background: Some(Color::RED.into()),
+              radius: Some(radius),
+              border: Some(Border::all(BorderSide { width: 5., color: Color::BLACK })),
+            }
+            .with_child(SizedBox::from_size(Size::new(60., 40.)).box_it())
+            .box_it(),
+          )
           .box_it()
-      })
-      .collect::<Row>()
+      }))
       .push(
-        SizedBox::empty_box(Size::new(60., 40.))
-          .with_background(Color::PINK.into())
-          .with_border(Border {
-            left: BorderSide { width: 1., color: Color::BLACK },
-            right: BorderSide { width: 2., color: Color::RED },
-            top: BorderSide { width: 3., color: Color::GREEN },
-            bottom: BorderSide { width: 4., color: Color::YELLOW },
-          })
-          .with_margin(EdgeInsets::all(2.)),
-      )
-      .with_wrap(true);
+        Margin { margin: EdgeInsets::all(2.) }
+          .with_child(
+            BoxDecoration {
+              background: Some(Color::PINK.into()),
+              border: Some(Border {
+                left: BorderSide { width: 1., color: Color::BLACK },
+                right: BorderSide { width: 2., color: Color::RED },
+                top: BorderSide { width: 3., color: Color::GREEN },
+                bottom: BorderSide { width: 4., color: Color::YELLOW },
+              }),
+              ..Default::default()
+            }
+            .box_it(),
+          )
+          .box_it(),
+      );
 
-    let mut window = window::Window::headless(row, DeviceSize::new(400, 600));
+    let mut window = window::Window::headless(row.box_it(), DeviceSize::new(400, 600));
     window.render_ready();
     window.draw_frame();
 
