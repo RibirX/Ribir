@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::widget::theme_data::CheckboxTheme;
+use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
 #[stateful(custom)]
@@ -13,7 +13,7 @@ pub struct Checkbox {
 }
 
 impl Checkbox {
-  pub fn from_theme(theme: &ThemeData) -> Self {
+  pub fn from_theme(theme: &Theme) -> Self {
     Checkbox {
       theme: theme.check_box.clone(),
 

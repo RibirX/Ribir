@@ -101,11 +101,9 @@ impl PointerEvent {
   pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
 }
 
+/// An attribute that calls callbacks in response to common pointer events.
 #[derive(Default)]
 pub struct PointerAttr(LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>);
-
-/// A widget that calls callbacks in response to common pointer events.
-pub type PointerListener<W> = AttrWidget<W, PointerAttr>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
@@ -122,20 +120,37 @@ pub enum PointerEventType {
    * lostpointercapture: */
 }
 
-impl<W: Widget> PointerListener<W> {
-  pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
-    let (major, others, widget) = widget.take_attr();
-    let major = major.unwrap_or_default();
-    PointerListener { widget, major, others }
+pub fn pointer_listen_on<W: AttachAttr, H: FnMut(&PointerEvent) + 'static>(
+  widget: W,
+  event_type: PointerEventType,
+  mut handler: H,
+) -> AttrWidget<W::W> {
+  let w = widget.into_attr_widget();
+  w.attrs
+    .entry::<PointerAttr>()
+    .or_default()
+    .listen_on(event_type, handler);
+  w
+}
+
+impl PointerAttr {
+  /// Return a `Observable` of the pointer events.
+  #[inline]
+  pub fn pointer_observable(
+    &self,
+  ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
+    self.0.clone()
   }
 
-  #[inline]
   pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
     &mut self,
     event_type: PointerEventType,
-    handler: H,
+    mut handler: H,
   ) -> SubscriptionWrapper<LocalSubscription> {
-    self.major.listen_on(event_type, handler)
+    self
+      .pointer_observable()
+      .filter(move |(t, _)| *t == event_type)
+      .subscribe(move |(_, event)| handler(&*event))
   }
 
   pub fn tap_times_observable(
@@ -151,7 +166,6 @@ impl<W: Widget> PointerListener<W> {
       mouse_btns: MouseButtons,
     }
     self
-      .major
       .pointer_observable()
       .filter(|(t, _)| t == &PointerEventType::Tap)
       .scan_initial(None, move |mut first_tap: Option<(TapInfo, _)>, (_, e)| {
@@ -183,27 +197,6 @@ impl<W: Widget> PointerListener<W> {
           _ => None,
         },
       )
-  }
-}
-
-impl PointerAttr {
-  /// Return a `Observable` of the pointer events.
-  #[inline]
-  pub fn pointer_observable(
-    &self,
-  ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
-    self.0.clone()
-  }
-
-  pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
-    &mut self,
-    event_type: PointerEventType,
-    mut handler: H,
-  ) -> SubscriptionWrapper<LocalSubscription> {
-    self
-      .pointer_observable()
-      .filter(move |(t, _)| *t == event_type)
-      .subscribe(move |(_, event)| handler(&*event))
   }
 }
 

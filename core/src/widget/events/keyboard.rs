@@ -14,33 +14,35 @@ pub struct KeyboardEvent {
   pub common: EventCommon,
 }
 
+/// An attributes that fire event whenever press or release a key.
 #[derive(Debug, Default)]
 pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>);
 
-/// A widget that fire event whenever press or release a key.
-pub type KeyboardListener<W> = AttrWidget<W, KeyboardAttr>;
+pub fn keyboard_listen_on<W: AttachAttr, H: FnMut(&KeyboardEvent) + 'static>(
+  widget: W,
+  event_type: KeyboardEventType,
+  mut handler: H,
+) -> AttrWidget<W::W> {
+  let w = widget.into_attr_widget();
+  // ensure focus attr attached, because a widget can accept keyboard event base
+  // on it can be focused.
+  w.attrs
+    .entry::<FocusAttr>()
+    .or_insert_with(FocusAttr::default);
 
-impl<W: Widget> KeyboardListener<W> {
-  pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
-    let (major, mut others, widget) = widget.take_attr();
+  w.attrs
+    .entry::<KeyboardAttr>()
+    .or_default()
+    .listen_on(event_type, handler);
+  w
+}
 
-    let major = major.unwrap_or_else(|| {
-      let other_attrs = others.get_or_insert_with(<_>::default);
-      if other_attrs.find_attr::<FocusAttr>().is_none() {
-        other_attrs.front_push_attr(FocusAttr::default());
-      }
-
-      KeyboardAttr::default()
-    });
-
-    KeyboardListener { major, others, widget }
-  }
-
+impl KeyboardAttr {
   #[inline]
   pub fn event_observable(
     &self,
   ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
-    self.major.event_observable()
+    self.0.clone()
   }
 
   pub fn listen_on<H: FnMut(&KeyboardEvent) + 'static>(
@@ -52,15 +54,6 @@ impl<W: Widget> KeyboardListener<W> {
       .event_observable()
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event))
-  }
-}
-
-impl KeyboardAttr {
-  #[inline]
-  pub fn event_observable(
-    &self,
-  ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
-    self.0.clone()
   }
 }
 

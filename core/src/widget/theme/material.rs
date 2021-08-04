@@ -1,8 +1,8 @@
-pub use super::theme_data::*;
+pub use super::*;
 pub use canvas::{Color, FillStyle, FontStyle, FontWeight};
 
 /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-pub fn light(family: String) -> ThemeData {
+pub fn light(family: String) -> Theme {
   let dark_text = TypographyTheme::new(
     family.clone(),
     family.clone(),
@@ -14,7 +14,7 @@ pub fn light(family: String) -> ThemeData {
   let background = Color::from_u32(0xFFFF_FFFF);
   let secondary = Color::from_u32(0x03DA_C6FF);
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
-  ThemeData {
+  Theme {
     brightness: Brightness::Light,
     check_box: CheckboxTheme {
       color: secondary.clone(),
@@ -41,7 +41,7 @@ pub fn light(family: String) -> ThemeData {
 }
 
 /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-pub fn dark(family: String) -> ThemeData {
+pub fn dark(family: String) -> Theme {
   let unselected_widget_color = Color::WHITE.with_alpha(0.7);
   let background = Color::from_u32(0x1212_12FF);
   let secondary = Color::from_u32(0x03DA_C6FF);
@@ -53,7 +53,7 @@ pub fn dark(family: String) -> ThemeData {
     TextDecoration::NONE,
     Color::TRANSPARENT,
   );
-  ThemeData {
+  Theme {
     brightness: Brightness::Dark,
     check_box: CheckboxTheme {
       border_color: unselected_widget_color.clone().with_alpha(0.65),

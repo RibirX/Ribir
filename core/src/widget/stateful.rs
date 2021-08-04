@@ -94,7 +94,6 @@
 use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{
-  any::Any,
   cell::{Ref, RefCell, RefMut},
   mem::ManuallyDrop,
   ptr::NonNull,
@@ -180,11 +179,7 @@ pub(crate) struct TreeInfo {
   pub id: WidgetId,
 }
 
-impl<W: 'static> Widget for StatefulImpl<W> {
-  default fn attrs_ref(&self) -> Option<AttrsRef> { None }
-
-  default fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
-}
+impl<W: 'static> Widget for StatefulImpl<W> {}
 
 impl<W: CloneStates> Stateful for StatefulImpl<W>
 where

@@ -2,7 +2,7 @@ use crate::prelude::*;
 use std::pin::Pin;
 
 lazy_static::lazy_static! {
-  static ref DEFAULT_THEME: ThemeData =  widget::material::light("Roboto".to_string());
+  static ref DEFAULT_THEME: Theme =  widget::material::light("Roboto".to_string());
 }
 
 pub struct BuildCtx<'a> {
@@ -12,12 +12,12 @@ pub struct BuildCtx<'a> {
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
-  pub fn theme(&self) -> &ThemeData {
+  pub fn theme(&self) -> &Theme {
     let tree = &*self.tree;
     self
       .wid
       .ancestors(tree)
-      .find_map(|id| id.get(tree).and_then(|w| w.find_attr::<ThemeData>()))
+      .find_map(|id| id.get(tree).and_then(|w| w.find_attr::<Theme>()))
       .unwrap_or(&DEFAULT_THEME)
   }
 
@@ -42,13 +42,13 @@ mod tests {
     let has_them = tree
       .root()
       .and_then(|root| root.get(&*tree))
-      .map_or(false, |w| w.find_attr::<ThemeData>().is_some());
+      .map_or(false, |w| w.find_attr::<Theme>().is_some());
     assert!(has_them);
   }
 
   #[derive(Debug, Widget)]
   struct ThemeTrack {
-    themes: Rc<RefCell<Vec<ThemeData>>>,
+    themes: Rc<RefCell<Vec<Theme>>>,
   }
 
   impl CombinationWidget for ThemeTrack {
@@ -60,7 +60,7 @@ mod tests {
 
   #[test]
   fn nearest_theme() {
-    let track_themes: Rc<RefCell<Vec<ThemeData>>> = <_>::default();
+    let track_themes: Rc<RefCell<Vec<Theme>>> = <_>::default();
     let dark = material::dark("dark".to_string());
     let light = material::light("light".to_string());
 
