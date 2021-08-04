@@ -78,7 +78,7 @@ mod tests {
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
       track_themes.borrow()[0].brightness,
-      theme_data::Brightness::Light
+      widget::theme::Brightness::Light
     );
 
     let theme = ThemeTrack { themes: track_themes.clone() };
@@ -94,7 +94,7 @@ mod tests {
     assert_eq!(track_themes.borrow().len(), 2);
     assert_eq!(
       track_themes.borrow()[1].brightness,
-      theme_data::Brightness::Dark
+      widget::theme::Brightness::Dark
     );
   }
 }

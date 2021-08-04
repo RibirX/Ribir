@@ -1,5 +1,3 @@
-use crate::widget::*;
-
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -125,6 +123,10 @@ impl_bytes_consume_by_hasher!(
 
 #[test]
 fn key_detect() {
+  use crate::widget::*;
+  impl<W> AttrWidget<W> {
+    fn key(&self) -> Option<&Key> { self.attrs.get() }
+  }
   let k1 = Text("".to_string()).with_key(0);
   let k2 = Text("".to_string()).with_key(String::new());
   let k3 = Text("".to_string()).with_key("");

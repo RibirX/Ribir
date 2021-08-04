@@ -530,30 +530,38 @@ pub enum WidgetNode {
 }
 
 impl StateDetect for WidgetNode {
-  fn state_info(&self) -> Option<StateInfo> { unimplemented!() }
+  fn state_info(&self) -> Option<StateInfo> {
+    match self {
+      WidgetNode::Combination(c) => c.state_info(),
+      WidgetNode::Render(r) => r.state_info(),
+    }
+  }
 }
 
 impl WidgetNode {
-  pub fn key(&self) -> Option<&Key> { unimplemented!() }
+  pub fn key(&self) -> Option<&Key> { self.find_attr() }
 
   /// Find an attr of this widget. If it have the `A` type attr, return the
   /// reference.
-  pub fn find_attr<A: Any>(&self) -> Option<&A> { unimplemented!() }
+  pub fn find_attr<A: Any>(&self) -> Option<&A> { self.get_attr().and_then(|attr| attr.get()) }
 
-  /// Find an attr of this widget. If it have the `A` type attr, return the
-  /// mutable reference.
-  pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> { unimplemented!() }
+  fn get_attr(&self) -> Option<&Attributes> {
+    match self {
+      WidgetNode::Combination(c) => c.get_attrs(),
+      WidgetNode::Render(r) => r.get_attrs(),
+    }
+  }
 }
 
 impl BoxedWidget {
   fn key(&self) -> Option<&Key> {
-    let w = match self {
-      BoxedWidget::Combination(c) => c.as_widget(),
-      BoxedWidget::Render(r) => r.as_widget(),
-      BoxedWidget::SingleChild(s) => s.as_widget(),
-      BoxedWidget::MultiChild(m) => m.as_widget(),
+    let attrs = match self {
+      BoxedWidget::Combination(c) => c.get_attrs(),
+      BoxedWidget::Render(r) => r.get_attrs(),
+      BoxedWidget::SingleChild(s) => s.get_attrs(),
+      BoxedWidget::MultiChild(m) => m.get_attrs(),
     };
-    w.key()
+    attrs.and_then(|attrs| attrs.get())
   }
 }
 

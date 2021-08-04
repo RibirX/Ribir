@@ -21,9 +21,9 @@ pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEve
 pub fn keyboard_listen_on<W: AttachAttr, H: FnMut(&KeyboardEvent) + 'static>(
   widget: W,
   event_type: KeyboardEventType,
-  mut handler: H,
+  handler: H,
 ) -> AttrWidget<W::W> {
-  let w = widget.into_attr_widget();
+  let mut w = widget.into_attr_widget();
   // ensure focus attr attached, because a widget can accept keyboard event base
   // on it can be focused.
   w.attrs

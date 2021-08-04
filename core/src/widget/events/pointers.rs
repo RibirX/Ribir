@@ -123,9 +123,9 @@ pub enum PointerEventType {
 pub fn pointer_listen_on<W: AttachAttr, H: FnMut(&PointerEvent) + 'static>(
   widget: W,
   event_type: PointerEventType,
-  mut handler: H,
+  handler: H,
 ) -> AttrWidget<W::W> {
-  let w = widget.into_attr_widget();
+  let mut w = widget.into_attr_widget();
   w.attrs
     .entry::<PointerAttr>()
     .or_default()

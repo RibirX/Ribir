@@ -79,9 +79,9 @@ impl FocusAttr {
 pub fn focus_listen_on<W: AttachAttr, H: FnMut(&FocusEvent) + 'static>(
   widget: W,
   event_type: FocusEventType,
-  mut handler: H,
+  handler: H,
 ) -> AttrWidget<W::W> {
-  let w = widget.into_attr_widget();
+  let mut w = widget.into_attr_widget();
   w.attrs
     .entry::<FocusAttr>()
     .or_default()

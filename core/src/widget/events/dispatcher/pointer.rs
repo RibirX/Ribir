@@ -276,7 +276,7 @@ mod tests {
   fn record_pointer<W: AttachAttr>(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
     widget: W,
-  ) -> PointerListener<W::W> {
+  ) -> AttrWidget<W::W> {
     let handler_ctor = || {
       let stack = event_stack.clone();
       move |e: &PointerEvent| stack.borrow_mut().push(e.clone())

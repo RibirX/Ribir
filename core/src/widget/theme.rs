@@ -3,7 +3,6 @@
 //! theme data from `BuildCtx`. Use `Theme` widgets to specify part of
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
-use crate::prelude::*;
 pub mod material;
 
 pub use canvas::{Color, FillStyle, FontStyle, FontWeight, Path, PathBuilder, Point};
