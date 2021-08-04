@@ -287,7 +287,7 @@ mod tests {
       name: &'static str,
       widget: A,
       log: Rc<RefCell<Vec<String>>>,
-    ) -> FocusListener<A::W> {
+    ) -> AttrWidget<A::W> {
       let log2 = log.clone();
       let log3 = log.clone();
       let log4 = log.clone();

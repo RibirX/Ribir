@@ -43,7 +43,7 @@ pub use scrollable::*;
 pub trait Widget: 'static {}
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Widget + StateDetect + AsWidget {
+pub trait CombinationWidget: Widget + StateDetect {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
@@ -82,8 +82,9 @@ pub trait RenderWidget: Widget + StateDetect + CloneStates {
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety: Widget + AsWidget {
+pub trait RenderWidgetSafety: Widget {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
+  fn get_attrs(&self) -> Option<&Attributes>;
   fn clone_boxed_states(&self) -> Box<dyn Any>;
 }
 
@@ -92,32 +93,4 @@ pub enum BoxedWidget {
   Render(Box<dyn RenderWidgetSafety>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
-}
-
-// todo: remove it.
-impl<'a> dyn Widget + 'a {
-  /// Return the `Key` attribute of the widget.
-  pub fn key(&self) -> Option<&Key> { self.find_attr() }
-
-  /// Find an attr of this widget. If it have the `A` type attr, return the
-  /// reference.
-  pub fn find_attr<A: Any>(&self) -> Option<&A> {
-    self.attrs_ref().and_then(|attrs| attrs.find_attr())
-  }
-
-  /// Find an attr of this widget. If it have the `A` type attr, return the
-  /// mutable reference.
-  pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> {
-    self.attrs_mut().and_then(|attrs| attrs.find_attr_mut())
-  }
-}
-
-// todo: remove it
-pub trait AsWidget {
-  fn as_widget(&self) -> &dyn Widget;
-}
-
-impl<W: Widget> AsWidget for W {
-  #[inline]
-  fn as_widget(&self) -> &dyn Widget { self }
 }

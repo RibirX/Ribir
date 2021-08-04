@@ -158,7 +158,7 @@ pub trait AttachAttr {
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let w = self.into_attr_widget();
+    let mut w = self.into_attr_widget();
     w.attrs
       .entry::<PointerAttr>()
       .or_default()
@@ -204,7 +204,7 @@ pub trait AttachAttr {
   where
     Self: Sized,
   {
-    let w = self.into_attr_widget();
+    let mut w = self.into_attr_widget();
     w.attrs.entry::<FocusAttr>().or_default().auto_focus = auto_focus;
     w
   }
@@ -216,7 +216,7 @@ pub trait AttachAttr {
   where
     Self: Sized,
   {
-    let w = self.into_attr_widget();
+    let mut w = self.into_attr_widget();
     w.attrs.entry::<FocusAttr>().or_default().tab_index = tab_index;
     w
   }
@@ -291,7 +291,7 @@ pub trait AttachAttr {
     Self: Sized,
     F: FnMut(&CharEvent) + 'static,
   {
-    let w = self.into_attr_widget();
+    let mut w = self.into_attr_widget();
 
     // ensure focus attr attached, because a widget can accept char event base
     // on it can be focused.
@@ -312,7 +312,7 @@ pub trait AttachAttr {
     Self: Sized,
     F: FnMut(&WheelEvent) + 'static,
   {
-    let w = self.into_attr_widget();
+    let mut w = self.into_attr_widget();
 
     w.attrs
       .entry::<WheelAttr>()
@@ -329,7 +329,7 @@ pub trait AttachAttr {
   where
     Self: Sized,
   {
-    let w = self.into_attr_widget();
+    let mut w = self.into_attr_widget();
     w.attrs.insert(attr);
     w
   }
@@ -412,6 +412,13 @@ impl Attributes {
       .0
       .insert(TypeId::of::<A>(), Box::new(attr))
       .map(|a| a.downcast().unwrap())
+  }
+
+  pub fn get<A: Any>(&self) -> Option<&A> {
+    self
+      .0
+      .get(&TypeId::of::<A>())
+      .map(|attr| attr.downcast_ref().unwrap())
   }
 
   pub fn get_mut<A: Any>(&mut self) -> Option<&mut A> {

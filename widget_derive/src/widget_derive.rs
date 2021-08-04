@@ -108,23 +108,16 @@ fn derive_widget_impl(info: &ProxyDeriveInfo) -> TokenStream {
   let attr_fields = &info.attr_fields;
   let mut generics = info.generics.clone();
 
-  let (attrs_ref_impl, attrs_mut_impl) = if attr_fields.attr_fields().len() == 1 {
+  if attr_fields.attr_fields().len() == 1 {
     generics = add_trait_bounds_if(generics, parse_quote!(Widget), |param| {
       attr_fields.is_attr_generic(param)
     });
-    let path = info.attr_path();
-    (
-      quote! { self.#path.attrs_ref() },
-      quote! {self.#path.attrs_mut()},
-    )
   } else {
     if let Some(ref mut w) = generics.where_clause {
       w.predicates.push(parse_quote!(Self:'static));
     } else {
       generics.where_clause = parse_quote!(where Self: 'static)
     }
-
-    (quote! {None}, quote! {None})
   };
 
   let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();

@@ -7,7 +7,7 @@ use winit::window::CursorIcon;
 pub struct Cursor(Rc<Cell<CursorIcon>>);
 
 pub fn cursor_attach<A: AttachAttr>(cursor: CursorIcon, widget: A) -> AttrWidget<A::W> {
-  let w = widget.into_attr_widget();
+  let mut w = widget.into_attr_widget();
 
   if let Some(c) = w.attrs.get_mut::<Cursor>() {
     c.0.set(cursor);
@@ -15,7 +15,7 @@ pub fn cursor_attach<A: AttachAttr>(cursor: CursorIcon, widget: A) -> AttrWidget
   } else {
     let cursor = Rc::new(Cell::new(cursor));
     let c_cursor = cursor.clone();
-    let w = w.on_pointer_move(move |e| {
+    let mut w = w.on_pointer_move(move |e| {
       if e.point_type == PointerType::Mouse
         && e.buttons == MouseButtons::empty()
         && e.as_ref().window.borrow().updated_cursor().is_none()
