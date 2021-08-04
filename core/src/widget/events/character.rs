@@ -2,10 +2,8 @@ use crate::prelude::*;
 use rxrust::prelude::*;
 use std::rc::Rc;
 
-/// A widget that sends a single Unicode codepoint. The character can be pushed
-/// to the end of a string.
-pub type CharListener<W> = AttrWidget<W, CharAttr>;
-
+/// An attribute that sends a single Unicode codepoint. The character can be
+/// pushed to the end of a string.
 #[derive(Debug, Default)]
 pub struct CharAttr(LocalSubject<'static, Rc<CharEvent>, ()>);
 
@@ -13,28 +11,6 @@ pub struct CharAttr(LocalSubject<'static, Rc<CharEvent>, ()>);
 pub struct CharEvent {
   pub char: char,
   pub common: EventCommon,
-}
-
-impl<W> CharListener<W> {
-  pub fn from_widget<A: AttachAttr<W = W>>(widget: A) -> Self {
-    let (major, mut others, widget) = widget.take_attr::<CharAttr>();
-
-    let major = major.unwrap_or_else(|| {
-      let attrs = others.get_or_insert_with(<_>::default);
-      if attrs.find_attr::<FocusAttr>().is_none() {
-        attrs.front_push_attr(FocusAttr::default());
-      }
-
-      CharAttr::default()
-    });
-
-    CharListener { major, others, widget }
-  }
-
-  #[inline]
-  pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> {
-    self.major.event_observable()
-  }
 }
 
 impl std::convert::AsRef<EventCommon> for CharEvent {

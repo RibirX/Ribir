@@ -5,6 +5,7 @@ use std::{
   fmt::Debug,
 };
 
+/// `Key` help `Ribir` to track if two widget is a same widget in two frame.
 /// Abstract all builtin key into a same type.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Key {
@@ -27,20 +28,6 @@ pub enum Key {
 
   Kstring(String),
   K32([u8; 32]),
-}
-
-/// `Key` help `Ribir` to track if two widget is a same widget in two frame.
-/// `KeyDetect` is a widget that only work for bind a key to a widget.
-pub type KeyDetect<W> = AttrWidget<W, Key>;
-
-impl<W: Widget> KeyDetect<W> {
-  #[inline]
-  pub fn key(&self) -> &Key { &self.major }
-
-  pub fn new<A: AttachAttr<W = W>, K: Into<Key>>(w: A, key: K) -> Self {
-    let (_, others, widget) = w.take_attr::<Key>();
-    KeyDetect { widget, major: key.into(), others }
-  }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {

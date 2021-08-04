@@ -68,9 +68,10 @@
 
 use crate::prelude::*;
 use rxrust::prelude::*;
-use std::any::Any;
-
-use std::collections::LinkedList;
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use widget::{focus_listen_on, keyboard_listen_on, pointer_listen_on};
 
 /// `AttachAttr` provide the ability to attach the builtin attrs implemented by
 /// Ribir. See the [module-level documentation][mod] for more details. When
@@ -84,384 +85,368 @@ pub trait AttachAttr {
   /// Assign a key to the widget to help framework to track if two widget is a
   /// same widget in two frame.
   #[inline]
-  fn with_key<K: Into<Key> + 'static>(self, key: K) -> KeyDetect<Self::W>
+  fn with_key<K: Into<Key> + 'static>(self, key: K) -> AttrWidget<Self::W>
   where
     Self: Sized,
   {
-    KeyDetect::new(self, key)
+    self.attach(key)
   }
 
   /// Assign the type of mouse cursor, show when the mouse pointer is over this
   /// widget.
   #[inline]
-  fn with_cursor(self, cursor: CursorIcon) -> Cursor<Self::W>
+  fn with_cursor(self, cursor: CursorIcon) -> AttrWidget<Self::W>
   where
     Self: Sized,
   {
-    Cursor::new(cursor, self)
+    widget::cursor::cursor_attach(cursor, self)
   }
 
   #[inline]
-  fn with_theme(self, data: ThemeData) -> Theme<Self::W>
+  fn with_theme(self, data: Theme) -> AttrWidget<Self::W>
   where
     Self: Sized,
   {
-    Theme::new(self, data)
+    self.attach(data)
   }
 
   /// Used to specify the event handler for the pointer down event, which is
   /// fired when the pointing device is initially pressed.
-  fn on_pointer_down<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_pointer_down<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Down, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Down, handler)
   }
 
   /// Used to specify the event handler for the pointer up event, which is
   /// fired when the all pressed pointing device is released.
-  fn on_pointer_up<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_pointer_up<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Up, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Up, handler)
   }
 
   /// Specify the event handler to process pointer move event.
-  fn on_pointer_move<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_pointer_move<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Move, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Move, handler)
   }
 
   /// Specify the event handler to process pointer tap event.
-  fn on_tap<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_tap<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Tap, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Tap, handler)
   }
 
   /// Specify the event handler to process pointer tap event.
-  fn on_tap_times<F>(self, times: u8, mut handler: F) -> PointerListener<Self::W>
+  fn on_tap_times<F>(self, times: u8, mut handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let pointer = PointerListener::from_widget(self);
-    pointer
+    let w = self.into_attr_widget();
+    w.attrs
+      .entry::<PointerAttr>()
+      .or_default()
       .tap_times_observable(times)
       .subscribe(move |e| handler(&*e));
-    pointer
+    w
   }
 
   /// Specify the event handler to process pointer cancel event.
-  fn on_pointer_cancel<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_pointer_cancel<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Cancel, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Cancel, handler)
   }
 
   /// specify the event handler when pointer enter this widget.
-  fn on_pointer_enter<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_pointer_enter<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Enter, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Enter, handler)
   }
 
   /// Specify the event handler when pointer leave this widget.
-  fn on_pointer_leave<F>(self, handler: F) -> PointerListener<Self::W>
+  #[inline]
+  fn on_pointer_leave<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&PointerEvent) + 'static,
   {
-    let mut listener = PointerListener::from_widget(self);
-    listener.listen_on(PointerEventType::Leave, handler);
-    listener
+    pointer_listen_on(self, PointerEventType::Leave, handler)
   }
 
   /// Assign whether the `widget` should automatically get focus when the window
   /// loads. Indicates the `widget` can be focused.
   #[inline]
-  fn with_auto_focus(self, auto_focus: bool) -> FocusListener<Self::W>
+  fn with_auto_focus(self, auto_focus: bool) -> AttrWidget<Self::W>
   where
     Self: Sized,
   {
-    FocusListener::from_widget(self, Some(auto_focus), None)
+    let w = self.into_attr_widget();
+    w.attrs.entry::<FocusAttr>().or_default().auto_focus = auto_focus;
+    w
   }
 
   /// Assign where the widget participates in sequential keyboard navigation.
   /// Indicates the `widget` can be focused and
   #[inline]
-  fn with_tab_index(self, tab_index: i16) -> FocusListener<Self::W>
+  fn with_tab_index(self, tab_index: i16) -> AttrWidget<Self::W>
   where
     Self: Sized,
   {
-    FocusListener::from_widget(self, None, Some(tab_index))
+    let w = self.into_attr_widget();
+    w.attrs.entry::<FocusAttr>().or_default().tab_index = tab_index;
+    w
   }
 
   /// Specify the event handler to process focus event. The focus event is
   /// raised when when the user sets focus on an element.
-  fn on_focus<F>(self, handler: F) -> FocusListener<Self::W>
+  #[inline]
+  fn on_focus<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    let focus = FocusListener::from_widget(self, None, None);
-    focus.listen_on(FocusEventType::Focus, handler);
-    focus
+    focus_listen_on(self, FocusEventType::Focus, handler)
   }
 
   /// Specify the event handler to process blur event. The blur event is raised
   /// when an widget loses focus.
-  fn on_blur<F>(self, handler: F) -> FocusListener<Self::W>
+  #[inline]
+  fn on_blur<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    let focus = FocusListener::from_widget(self, None, None);
-    focus.listen_on(FocusEventType::Blur, handler);
-    focus
+    focus_listen_on(self, FocusEventType::Blur, handler)
   }
 
   /// Specify the event handler to process focusin event.  The main difference
   /// between this event and blur is that focusin bubbles while blur does not.
   #[inline]
-  fn on_focus_in<F>(self, handler: F) -> FocusListener<Self::W>
+  fn on_focus_in<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    let focus = FocusListener::from_widget(self, None, None);
-    focus.listen_on(FocusEventType::FocusIn, handler);
-    focus
+    focus_listen_on(self, FocusEventType::FocusIn, handler)
   }
 
   /// Specify the event handler to process focusout event. The main difference
   /// between this event and blur is that focusout bubbles while blur does not.
   #[inline]
-  fn on_focus_out<F>(self, handler: F) -> FocusListener<Self::W>
+  fn on_focus_out<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&FocusEvent) + 'static,
   {
-    let focus = FocusListener::from_widget(self, None, None);
-    focus.listen_on(FocusEventType::FocusOut, handler);
-    focus
+    focus_listen_on(self, FocusEventType::FocusOut, handler)
   }
 
   /// Specify the event handler when keyboard press down.
   #[inline]
-  fn on_key_down<F>(self, handler: F) -> KeyboardListener<Self::W>
+  fn on_key_down<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&KeyboardEvent) + 'static,
   {
-    let keyboard = KeyboardListener::from_widget(self);
-    keyboard.listen_on(KeyboardEventType::KeyDown, handler);
-    keyboard
+    keyboard_listen_on(self, KeyboardEventType::KeyDown, handler)
   }
 
   /// Specify the event handler when a key is released.
   #[inline]
-  fn on_key_up<F>(self, handler: F) -> KeyboardListener<Self::W>
+  fn on_key_up<F>(self, handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&KeyboardEvent) + 'static,
   {
-    let keyboard = KeyboardListener::from_widget(self);
-    keyboard.listen_on(KeyboardEventType::KeyUp, handler);
-    keyboard
+    keyboard_listen_on(self, KeyboardEventType::KeyUp, handler)
   }
 
   /// Specify the event handler when received a unicode character.
-  fn on_char<F>(self, mut handler: F) -> CharListener<Self::W>
+  fn on_char<F>(self, mut handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&CharEvent) + 'static,
   {
-    let widget = CharListener::from_widget(self);
-    widget
+    let w = self.into_attr_widget();
+
+    // ensure focus attr attached, because a widget can accept char event base
+    // on it can be focused.
+    w.attrs.entry::<FocusAttr>().or_default();
+
+    w.attrs
+      .entry::<CharAttr>()
+      .or_default()
       .event_observable()
       .subscribe(move |char_event| handler(&*char_event));
-    widget
+    w
   }
 
   /// Specify the event handler when user moving a mouse wheel or similar input
   /// device.
-  fn on_wheel<F>(self, mut handler: F) -> WheelListener<Self::W>
+  fn on_wheel<F>(self, mut handler: F) -> AttrWidget<Self::W>
   where
     Self: Sized,
     F: FnMut(&WheelEvent) + 'static,
   {
-    let widget = WheelListener::from_widget(self);
-    widget
+    let w = self.into_attr_widget();
+
+    w.attrs
+      .entry::<WheelAttr>()
+      .or_default()
       .event_observable()
       .subscribe(move |wheel_event| handler(&*wheel_event));
-    widget
+    w
   }
 
-  /// Detach attributes from the widget, and return the specified attr `A` if
-  /// have, other attributes and the origin widget attributes attached to.
-  fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W);
+  /// Attach the attr to the widget, if it's already attached an `A` type attr
+  /// replace it.
+  #[inline]
+  fn attach<A: Any>(self, attr: A) -> AttrWidget<Self::W>
+  where
+    Self: Sized,
+  {
+    let w = self.into_attr_widget();
+    w.attrs.insert(attr);
+    w
+  }
+
+  /// convert widget to `AttrWidget` which support to attach attributes in it.
+  fn into_attr_widget(self) -> AttrWidget<Self::W>;
 }
 
-#[derive(CombinationWidget, RenderWidget)]
-pub struct AttrWidget<W, A: Any> {
-  #[proxy]
+pub struct AttrWidget<W> {
   pub widget: W,
-  pub major: A,
-  pub others: Option<Attrs>,
+  pub attrs: Attributes,
 }
 
-impl<W: Widget, A: Any> Widget for AttrWidget<W, A> {
+impl<W: Widget> Widget for AttrWidget<W> {}
+
+impl<W: CombinationWidget> CombinationWidget for AttrWidget<W> {
   #[inline]
-  fn attrs_ref(&self) -> Option<AttrsRef> {
-    Some(AttrsRef {
-      major: &self.major,
-      other_attrs: self.others.as_ref().map(|a| &a.0),
-    })
-  }
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.build(ctx) }
 
   #[inline]
-  fn attrs_mut(&mut self) -> Option<AttrsMut> {
-    Some(AttrsMut {
-      major: &mut self.major,
-      other_attrs: self.others.as_mut().map(|a| &mut a.0),
-    })
-  }
+  fn get_attrs(&self) -> Option<&Attributes> { Some(&self.attrs) }
 }
 
-impl<W: Widget, A: Any> AttachAttr for AttrWidget<W, A> {
+impl<W: CloneStates> CloneStates for AttrWidget<W> {
+  type States = W::States;
+  #[inline]
+  fn clone_states(&self) -> Self::States { self.widget.clone_states() }
+}
+
+impl<W: RenderWidget> RenderWidget for AttrWidget<W> {
+  type RO = W::RO;
+  #[inline]
+  fn create_render_object(&self) -> Self::RO { self.widget.create_render_object() }
+}
+
+impl<W: Widget> AttachAttr for AttrWidget<W> {
   type W = W;
 
-  fn take_attr<M: Any>(self) -> (Option<M>, Option<Attrs>, Self::W) {
-    let Self { widget, mut major, mut others } = self;
-    let new_major = if let Some(m) = (&mut major as &mut dyn Any).downcast_mut::<M>() {
-      let mut tmp = std::mem::MaybeUninit::<M>::uninit();
-      unsafe {
-        tmp.as_mut_ptr().copy_from(m as *const M, 1);
-      }
-      std::mem::forget(major);
-      Some(unsafe { tmp.assume_init() })
-    } else {
-      let new_major = others.as_mut().and_then(|others| others.remove_attr::<M>());
-      others
-        .get_or_insert_with(Attrs::default)
-        .front_push_attr(major);
-      new_major
-    };
-
-    (new_major, others, widget)
-  }
+  #[inline]
+  fn into_attr_widget(self) -> AttrWidget<Self::W> { self }
 }
 
-impl<W: SingleChildWidget, A: Any> SingleChildWidget for AttrWidget<W, A> {}
-impl<W: MultiChildWidget, A: Any> MultiChildWidget for AttrWidget<W, A> {}
+impl<W: SingleChildWidget> SingleChildWidget for AttrWidget<W> {}
+impl<W: MultiChildWidget> MultiChildWidget for AttrWidget<W> {}
 
-pub struct AttrsRef<'a> {
-  major: &'a dyn Any,
-  other_attrs: Option<&'a LinkedList<Box<dyn Any>>>,
-}
-
-pub struct AttrsMut<'a> {
-  major: &'a mut dyn Any,
-  other_attrs: Option<&'a mut LinkedList<Box<dyn Any>>>,
-}
-
-impl<'a> AttrsRef<'a> {
-  pub fn find_attr<A: 'static>(self) -> Option<&'a A> {
-    self.major.downcast_ref::<A>().or_else(|| {
-      self
-        .other_attrs
-        .and_then(|attrs| attrs.iter().find_map(|attr| attr.downcast_ref::<A>()))
-    })
-  }
-}
-
-impl<'a> AttrsMut<'a> {
-  pub fn find_attr_mut<A: 'static>(self) -> Option<&'a mut A> {
-    let Self { major, other_attrs } = self;
-    major.downcast_mut::<A>().or_else(move || {
-      other_attrs.and_then(|attrs| attrs.iter_mut().find_map(|attr| attr.downcast_mut::<A>()))
-    })
-  }
-}
-
-impl<W: IntoStateful + Widget, A: Any> IntoStateful for AttrWidget<W, A> {
-  type S = AttrWidget<W::S, A>;
+impl<W: IntoStateful + Widget> IntoStateful for AttrWidget<W> {
+  type S = AttrWidget<W::S>;
 
   fn into_stateful(self) -> Self::S {
-    let Self { widget, major, others } = self;
+    let Self { widget, attrs } = self;
 
     let widget = widget.into_stateful();
-    AttrWidget { widget, major, others }
+    AttrWidget { widget, attrs }
   }
 }
 
-impl<W: Stateful, A: Any> Stateful for AttrWidget<W, A> {
+impl<W: Stateful> Stateful for AttrWidget<W> {
   type RawWidget = W::RawWidget;
   #[inline]
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.widget.ref_cell() }
 }
 
-impl<W, A: Any> std::ops::Deref for AttrWidget<W, A> {
+impl<W> std::ops::Deref for AttrWidget<W> {
   type Target = W;
   #[inline]
   fn deref(&self) -> &Self::Target { &self.widget }
 }
 
-impl<W, A: Any> std::ops::DerefMut for AttrWidget<W, A> {
+impl<W> std::ops::DerefMut for AttrWidget<W> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.widget }
 }
 
 #[derive(Default)]
-pub struct Attrs(LinkedList<Box<dyn Any>>);
+pub struct Attributes(HashMap<TypeId, Box<dyn Any>>);
 
-impl Attrs {
-  /// Remove the type `A` attribute out of the attributes.
-  pub fn remove_attr<A: Any>(&mut self) -> Option<A> {
-    let mut cursor = self.0.cursor_front_mut();
-
-    while !cursor.current()?.is::<A>() {
-      cursor.move_next();
-    }
-
-    cursor.remove_current().and_then(|mut any| {
-      let attr = any.downcast_mut::<A>().unwrap();
-      let tmp = unsafe { std::mem::transmute_copy(attr) };
-      std::mem::forget(any);
-      tmp
-    })
+impl Attributes {
+  pub fn insert<A: Any>(&mut self, attr: A) -> Option<Box<A>> {
+    self
+      .0
+      .insert(TypeId::of::<A>(), Box::new(attr))
+      .map(|a| a.downcast().unwrap())
   }
 
-  pub fn front_push_attr<A: Any>(&mut self, attr: A) { self.0.push_front(Box::new(attr)); }
+  pub fn get_mut<A: Any>(&mut self) -> Option<&mut A> {
+    self.0.get_mut(&TypeId::of::<A>()).map(attr_downcast_mut)
+  }
 
-  pub fn find_attr<A: Any>(&self) -> Option<&A> { self.0.iter().find_map(|a| a.downcast_ref()) }
-
-  pub fn find_attr_mut<A: Any>(&mut self) -> Option<&mut A> {
-    self.0.iter_mut().find_map(|a| a.downcast_mut())
+  #[inline]
+  pub fn entry<A: Any>(&mut self) -> Entry<A> {
+    Entry {
+      entry: self.0.entry(TypeId::of::<A>()),
+      type_mark: PhantomData,
+    }
   }
 }
+
+pub struct Entry<'a, A: Any> {
+  entry: std::collections::hash_map::Entry<'a, TypeId, Box<dyn Any>>,
+  type_mark: PhantomData<*const A>,
+}
+
+impl<'a, A: Any> Entry<'a, A> {
+  #[inline]
+  pub fn or_default(self) -> &'a mut A
+  where
+    A: Default,
+  {
+    self.or_insert_with(A::default)
+  }
+
+  pub fn or_insert_with<F: FnOnce() -> A>(self, default: F) -> &'a mut A {
+    attr_downcast_mut(self.entry.or_insert_with(|| Box::new(default())))
+  }
+}
+
+///  Safety: a utility function to downcast attribute, use it only if you know
+/// the type backed in the `Box<dyn Any>`
+#[inline]
+fn attr_downcast_mut<A: Any>(attr: &mut Box<dyn Any>) -> &mut A { attr.downcast_mut().unwrap() }

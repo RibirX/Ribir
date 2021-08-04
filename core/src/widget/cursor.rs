@@ -2,42 +2,29 @@ use crate::prelude::*;
 use std::{cell::Cell, rc::Rc};
 use winit::window::CursorIcon;
 
+/// `Cursor` is an attribute to assign an `cursor` to a widget.
 #[derive(Debug)]
-pub struct CursorAttr(Rc<Cell<CursorIcon>>);
+pub struct Cursor(Rc<Cell<CursorIcon>>);
 
-/// `Cursor` is a widget inherit from another widget and assign an `cursor` to
-/// it.
-pub type Cursor<W> = AttrWidget<W, CursorAttr>;
+pub fn cursor_attach<A: AttachAttr>(cursor: CursorIcon, widget: A) -> AttrWidget<A::W> {
+  let w = widget.into_attr_widget();
 
-impl<W: Widget> Cursor<W> {
-  pub fn new<A: AttachAttr<W = W>>(cursor: CursorIcon, widget: A) -> Self {
-    let (major, mut others, widget) = widget.take_attr();
-
-    let major = major.map_or_else(
-      || {
-        let cursor = Rc::new(Cell::new(cursor));
-        let c_cursor = cursor.clone();
-        let other_attrs = others.get_or_insert_with(<_>::default);
-        let mut attr: PointerAttr = other_attrs.remove_attr().unwrap_or_default();
-        attr.listen_on(PointerEventType::Move, move |e| {
-          if e.point_type == PointerType::Mouse
-            && e.buttons == MouseButtons::empty()
-            && e.as_ref().window.borrow().updated_cursor().is_none()
-          {
-            e.as_ref().window.borrow_mut().set_cursor(c_cursor.get())
-          }
-        });
-        other_attrs.front_push_attr(attr);
-
-        CursorAttr(cursor)
-      },
-      |c: CursorAttr| {
-        c.0.set(cursor);
-        c
-      },
-    );
-
-    Cursor { major, widget, others }
+  if let Some(c) = w.attrs.get_mut::<Cursor>() {
+    c.0.set(cursor);
+    w
+  } else {
+    let cursor = Rc::new(Cell::new(cursor));
+    let c_cursor = cursor.clone();
+    let w = w.on_pointer_move(move |e| {
+      if e.point_type == PointerType::Mouse
+        && e.buttons == MouseButtons::empty()
+        && e.as_ref().window.borrow().updated_cursor().is_none()
+      {
+        e.as_ref().window.borrow_mut().set_cursor(c_cursor.get())
+      }
+    });
+    w.attrs.insert(cursor);
+    w
   }
 }
 

@@ -1,5 +1,8 @@
 use crate::render::*;
-pub use std::any::Any;
+pub use std::{
+  any::{Any, TypeId},
+  collections::HashMap,
+};
 pub mod build_ctx;
 pub mod key;
 pub mod layout;
@@ -11,7 +14,7 @@ pub use theme::*;
 pub mod widget_tree;
 pub mod window;
 pub use build_ctx::BuildCtx;
-pub use key::{Key, KeyDetect};
+pub use key::Key;
 pub use stateful::*;
 pub use text::Text;
 pub mod events;
@@ -37,16 +40,7 @@ pub use scrollable::*;
 /// The common behavior of widgets, also support to dynamic cast to special
 /// widget. In most of cases, needn't implement `Widget` trait directly, and
 /// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: 'static {
-  /// Return the reference to the attrs that attached to the this widget.
-  #[inline]
-  fn attrs_ref(&self) -> Option<AttrsRef> { None }
-
-  /// Return the mutable reference to the attrs that attached to the this
-  /// widget.
-  #[inline]
-  fn attrs_mut(&mut self) -> Option<AttrsMut> { None }
-}
+pub trait Widget: 'static {}
 
 /// A widget represented by other widget compose.
 pub trait CombinationWidget: Widget + StateDetect + AsWidget {
@@ -60,6 +54,9 @@ pub trait CombinationWidget: Widget + StateDetect + AsWidget {
   {
     BoxedWidget::Combination(Box::new(self))
   }
+
+  /// Return the reference to the attrs that attached to the this widget.
+  fn get_attrs(&self) -> Option<&Attributes> { None }
 }
 
 /// RenderWidget provide configuration for render object which provide actual
@@ -78,6 +75,9 @@ pub trait RenderWidget: Widget + StateDetect + CloneStates {
   {
     BoxedWidget::Render(Box::new(self))
   }
+
+  /// Return the reference to the attrs that attached to the this widget.
+  fn get_attrs(&self) -> Option<&Attributes> { None }
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly

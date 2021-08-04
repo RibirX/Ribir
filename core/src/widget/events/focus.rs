@@ -3,8 +3,6 @@ use rxrust::prelude::*;
 use std::rc::Rc;
 
 /// Focus attr attach to widget to support get ability to focus in.
-pub type FocusListener<W> = AttrWidget<W, FocusAttr>;
-
 #[derive(Debug, Default)]
 pub struct FocusAttr {
   /// Indicates that `widget` can be focused, and where it participates in
@@ -58,23 +56,12 @@ pub enum FocusEventType {
   FocusOut,
 }
 
-impl<W: Widget> FocusListener<W> {
-  pub fn from_widget<A: AttachAttr<W = W>>(
-    widget: A,
-    auto_focus: Option<bool>,
-    tab_index: Option<i16>,
-  ) -> Self {
-    let (major, others, widget) = widget.take_attr();
-    let mut major: FocusAttr = major.unwrap_or_default();
-    major.tab_index = tab_index.unwrap_or(0);
-    major.auto_focus = auto_focus.unwrap_or(false);
-    FocusListener { major, widget, others }
-  }
+impl FocusAttr {
   #[inline]
   pub fn focus_event_observable(
     &self,
   ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.major.focus_event_observable()
+    self.subject.clone()
   }
 
   pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
@@ -87,19 +74,17 @@ impl<W: Widget> FocusListener<W> {
       .filter(move |(t, _)| *t == event_type)
       .subscribe(move |(_, event)| handler(&*event))
   }
-
-  #[inline]
-  pub fn is_auto_focus(&self) -> bool { self.major.auto_focus }
-
-  #[inline]
-  pub fn tab_index(&self) -> i16 { self.major.tab_index }
 }
 
-impl FocusAttr {
-  #[inline]
-  pub fn focus_event_observable(
-    &self,
-  ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.subject.clone()
-  }
+pub fn focus_listen_on<W: AttachAttr, H: FnMut(&FocusEvent) + 'static>(
+  widget: W,
+  event_type: FocusEventType,
+  mut handler: H,
+) -> AttrWidget<W::W> {
+  let w = widget.into_attr_widget();
+  w.attrs
+    .entry::<FocusAttr>()
+    .or_default()
+    .listen_on(event_type, handler);
+  w
 }

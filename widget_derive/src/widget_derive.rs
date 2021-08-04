@@ -134,11 +134,6 @@ fn derive_widget_impl(info: &ProxyDeriveInfo) -> TokenStream {
 
   quote! {
       impl #impl_generics Widget for #name #ty_generics #where_clause {
-        #[inline]
-        fn attrs_ref(&self) -> Option<AttrsRef> { #attrs_ref_impl }
-
-        #[inline]
-        fn attrs_mut(&mut self) -> Option<AttrsMut> { #attrs_mut_impl }
       }
 
       #single_child
@@ -149,8 +144,8 @@ fn derive_widget_impl(info: &ProxyDeriveInfo) -> TokenStream {
       impl #impl_generics AttachAttr for #name #ty_generics #where_clause {
         type W = Self;
 
-        fn take_attr<A: Any>(self) -> (Option<A>, Option<Attrs>, Self::W) {
-          (None, None, self)
+        fn into_attr_widget(self) -> AttrWidget<Self::W> {
+          AttrWidget {widget: self, attrs: Default::default()}
         }
       }
   }
