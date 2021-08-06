@@ -43,7 +43,7 @@ pub use scrollable::*;
 pub trait Widget: 'static {}
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Widget + StateDetect {
+pub trait CombinationWidget: Widget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
@@ -61,7 +61,7 @@ pub trait CombinationWidget: Widget + StateDetect {
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: Widget + StateDetect + CloneStates {
+pub trait RenderWidget: Widget + CloneStates {
   /// The render object type will created.
   type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
 

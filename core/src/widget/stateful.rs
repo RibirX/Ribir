@@ -12,7 +12,7 @@
 //! `StatefulXXX` which just a tuple struct wrap the
 //! [`StatefulImpl`][StatefulImpl] with the stateless version and implement
 //! [`IntoStateful`][IntoStateful]  for the stateless version widget. We
-//! needn't write some logic code to support stateful, and shouldn't.
+//! needn't write any logic code to support stateful, and shouldn't.
 
 //! # Example
 //! This example implement a rectangle widget which support change its size and
@@ -132,42 +132,23 @@ pub trait IntoStateful {
   fn into_stateful(self) -> Self::S;
 }
 
-/// Detect if a widget is stateful. If a widget is stateful return the state
-/// info else return none-value.
-pub trait StateDetect {
-  fn state_info(&self) -> Option<StateInfo>;
-}
-
-impl<W> StateDetect for W {
-  default fn state_info(&self) -> Option<StateInfo> { None }
-}
-
-impl<W: Stateful> StateDetect for W {
-  fn state_info(&self) -> Option<StateInfo> { Some(self.ref_cell().info) }
-}
-
 /// A reference of stateful widget, can use it to directly access and modify
 /// stateful widget.
 ///
 /// Remember it assume you changed the widget back of this reference if you
 /// mutably borrow this pointer. No matter if you really modify it.
 pub struct StateRefCell<W> {
-  info: StateInfo,
+  info: StateAttr,
   inner_widget: RcWidget<W>,
 }
 
-#[derive(Widget, RenderWidget, CombinationWidget)]
-pub struct StatefulImpl<W> {
-  #[proxy]
-  widget: RcWidget<W>,
-  info: StateInfo,
-}
+pub type StatefulImpl<W> = AttrWidget<RcWidget<W>>;
 
 #[derive(Widget)]
 pub struct RcWidget<W>(Rc<RefCell<W>>);
 
 #[derive(Clone, Default)]
-pub struct StateInfo(Rc<RefCell<InnerInfo>>);
+pub struct StateAttr(Rc<RefCell<InnerInfo>>);
 
 #[derive(Clone)]
 pub struct StateChange<T: Clone> {
@@ -188,19 +169,10 @@ where
   type RawWidget = W;
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget> {
     StateRefCell {
-      info: self.info.clone(),
+      info: self.attrs.get::<StateAttr>().unwrap().clone(),
       inner_widget: self.widget.clone(),
     }
   }
-}
-
-impl<W: CloneStates> IntoStateful for StatefulImpl<W>
-where
-  Self: Widget,
-{
-  type S = Self;
-  #[inline]
-  fn into_stateful(self) -> Self::S { self }
 }
 
 #[derive(Default)]
@@ -224,9 +196,16 @@ impl<W: 'static> Clone for StateRefCell<W> {
 }
 
 impl<W: CloneStates + 'static> StatefulImpl<W> {
-  pub fn new(w: W) -> Self {
+  // Convert a widget to a stateful widget, only called by framework. Maybe you
+  // want [`into_stateful`](IntoStateful::into_stateful)
+  pub fn new(w: W) -> Self
+  where
+    W: AttachAttr,
+  {
+    let mut attrs: Attributes = <_>::default();
+    attrs.insert(StateAttr::default());
     Self {
-      info: <_>::default(),
+      attrs,
       widget: RcWidget(Rc::new(RefCell::new(w))),
     }
   }
@@ -242,7 +221,12 @@ impl<W: CloneStates + 'static> StatefulImpl<W> {
     &mut self,
   ) -> impl LocalObservable<'static, Item = StateRefCell<W>, Err = ()> {
     let ref_cell = self.ref_cell();
-    self.info.state_subject().map(move |_| ref_cell.clone())
+    self
+      .attrs
+      .get_mut::<StateAttr>()
+      .unwrap()
+      .state_subject()
+      .map(move |_| ref_cell.clone())
   }
 
   /// Pick a field change stream from the host widget.
@@ -275,7 +259,7 @@ impl<W: 'static> StateRefCell<W> {
 
 pub struct StateRefMut<'a, W: 'static> {
   ref_mut: ManuallyDrop<RefMut<'a, W>>,
-  info: StateInfo,
+  info: StateAttr,
 }
 
 impl<'a, W> Drop for StateRefMut<'a, W> {
@@ -304,7 +288,7 @@ impl<'a, W> std::ops::DerefMut for StateRefMut<'a, W> {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.ref_mut }
 }
 
-impl StateInfo {
+impl StateAttr {
   pub fn id(&self) -> Option<WidgetId> { self.0.borrow().tree_info.as_ref().map(|info| info.id) }
 
   pub(crate) fn assign_id(&self, id: WidgetId, tree: NonNull<WidgetTree>) {
