@@ -2,11 +2,11 @@
 
 use ribir::prelude::*;
 
-#[derive(Widget)]
+#[derive(AttachAttr)]
 struct Test {}
 
 #[stateful]
-#[derive(Widget)]
+#[derive(AttachAttr)]
 struct TestState {
   #[state]
   a: f32,
@@ -31,7 +31,7 @@ fn derive_stateful() {
 #[test]
 fn state_derive_tuple_support() {
   #[stateful]
-  #[derive(Widget)]
+  #[derive(AttachAttr)]
   struct StateTupleSupport(#[state] i32);
 }
 

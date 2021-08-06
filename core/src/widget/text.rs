@@ -5,7 +5,7 @@ use crate::render::*;
 
 /// Just a stupid implement for develope the framework.
 #[stateful]
-#[derive(Debug, Widget)]
+#[derive(Debug, AttachAttr)]
 pub struct Text(#[state] pub String);
 
 impl RenderWidget for Text {

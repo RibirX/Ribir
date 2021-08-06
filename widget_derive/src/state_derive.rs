@@ -6,7 +6,7 @@ use syn::{
   Ident, Index, NestedMeta,
 };
 
-use crate::{attr_fields::pure_ident, widget_derive::ProxyDeriveInfo};
+use crate::{attr_fields::pure_ident, proxy_derive::ProxyDeriveInfo};
 
 const STATEFUL_ATTR: &str = "stateful";
 const STATE_ATTR_NAME: &str = "state";
@@ -76,13 +76,12 @@ pub(crate) fn stateful_derive(
 
   let stateful_def = if custom_impl_attr(attrs)? {
     quote! {
-      #[derive(Widget)]
       #vis struct #stateful_name #w_ty_generics(
         StatefulImpl<#name #w_ty_generics>) #w_where_clause;
     }
   } else {
     quote! {
-      #[derive(Widget, RenderWidget, CombinationWidget)]
+      #[derive(RenderWidget, CombinationWidget, SingleChildWidget, MultiChildWidget)]
       #vis struct #stateful_name #w_ty_generics(
         #[proxy] StatefulImpl<#name #w_ty_generics>) #w_where_clause;
     }
@@ -126,6 +125,13 @@ pub(crate) fn stateful_derive(
       fn into_stateful(self) -> Self::S {
         #stateful_name(StatefulImpl::new(self))
       }
+    }
+
+    impl #w_impl_generics AttachAttr for #stateful_name #w_ty_generics #w_where_clause {
+      type W = RcWidget<#name #w_ty_generics>;
+
+      #[inline]
+      fn into_attr_widget(self) -> AttrWidget<Self::W> { self.0 }
     }
 
     impl #w_impl_generics std::ops::Deref for #stateful_name #w_ty_generics #w_where_clause {

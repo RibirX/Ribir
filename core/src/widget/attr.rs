@@ -80,7 +80,7 @@ use widget::{focus_listen_on, keyboard_listen_on, pointer_listen_on};
 /// [mod]: crate::widget::attr
 pub trait AttachAttr {
   /// The widget the attribute attached to.
-  type W: Widget;
+  type W;
 
   /// Assign a key to the widget to help framework to track if two widget is a
   /// same widget in two frame.
@@ -343,8 +343,6 @@ pub struct AttrWidget<W> {
   pub attrs: Attributes,
 }
 
-impl<W: Widget> Widget for AttrWidget<W> {}
-
 impl<W: CombinationWidget> CombinationWidget for AttrWidget<W> {
   #[inline]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.build(ctx) }
@@ -365,7 +363,7 @@ impl<W: RenderWidget> RenderWidget for AttrWidget<W> {
   fn create_render_object(&self) -> Self::RO { self.widget.create_render_object() }
 }
 
-impl<W: Widget> AttachAttr for AttrWidget<W> {
+impl<W> AttachAttr for AttrWidget<W> {
   type W = W;
 
   #[inline]
@@ -375,7 +373,7 @@ impl<W: Widget> AttachAttr for AttrWidget<W> {
 impl<W: SingleChildWidget> SingleChildWidget for AttrWidget<W> {}
 impl<W: MultiChildWidget> MultiChildWidget for AttrWidget<W> {}
 
-impl<W: IntoStateful + Widget> IntoStateful for AttrWidget<W> {
+impl<W: IntoStateful> IntoStateful for AttrWidget<W> {
   type S = AttrWidget<W::S>;
 
   fn into_stateful(self) -> Self::S {

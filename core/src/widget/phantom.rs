@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-#[derive(Debug, Widget)]
 pub struct PhantomWidget;
 
 impl CombinationWidget for PhantomWidget {

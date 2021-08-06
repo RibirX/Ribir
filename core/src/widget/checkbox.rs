@@ -3,7 +3,7 @@ use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
 #[stateful(custom)]
-#[derive(Default, Widget)]
+#[derive(Default, AttachAttr)]
 pub struct Checkbox {
   #[state]
   pub checked: bool,
@@ -110,7 +110,7 @@ impl CombinationWidget for StatefulCheckbox {
 }
 
 #[stateful]
-#[derive(Debug, Widget, Clone)]
+#[derive(Debug, Clone, AttachAttr)]
 pub struct CheckboxMarker {
   #[state]
   check_mark_width: f32,

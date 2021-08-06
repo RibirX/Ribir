@@ -4,7 +4,7 @@ use crate::prelude::*;
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
 #[stateful]
-#[derive(Widget, SingleChildWidget)]
+#[derive(SingleChildWidget, AttachAttr)]
 pub struct Expanded {
   #[state]
   pub flex: f32,

@@ -45,7 +45,7 @@ pub enum MainAxisAlign {
 }
 
 #[stateful]
-#[derive(Widget, Default, MultiChildWidget)]
+#[derive(Default, MultiChildWidget, AttachAttr)]
 pub struct Flex {
   /// Reverse the main axis.
   #[state]

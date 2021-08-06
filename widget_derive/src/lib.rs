@@ -36,22 +36,18 @@
 extern crate proc_macro;
 extern crate proc_macro2;
 
+mod attach_attr_derive;
 mod attr_fields;
 mod combination_derive;
+mod multi_derive;
 mod render_derive;
+mod single_derive;
 mod state_derive;
 mod state_partial_eq_derive;
-mod widget_derive;
+mod proxy_derive;
 
 use proc_macro::TokenStream;
-use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-
-#[proc_macro_derive(Widget, attributes(proxy))]
-pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  widget_derive::widget_derive(&mut input).into()
-}
 
 #[proc_macro_derive(CombinationWidget, attributes(proxy))]
 pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
@@ -65,26 +61,23 @@ pub fn render_macro_derive(input: TokenStream) -> TokenStream {
   render_derive::render_derive(&mut input).into()
 }
 
-#[proc_macro_derive(SingleChildWidget)]
+#[proc_macro_derive(SingleChildWidget, attributes(proxy))]
 pub fn single_marco_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
-  let name = input.ident;
-  let token_stream = quote! {
-    impl #g_impl SingleChildWidget  for #name #g_ty  #g_where {}
-  };
-  token_stream.into()
+  let mut input = parse_macro_input!(input as DeriveInput);
+  single_derive::single_derive(&mut input).into()
 }
 
-#[proc_macro_derive(MultiChildWidget)]
+#[proc_macro_derive(MultiChildWidget, attributes(proxy))]
 pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
+  let mut input = parse_macro_input!(input as DeriveInput);
+  multi_derive::multi_derive(&mut input).into()
+}
+
+// Todo Should give a default implement in attr mod.  Depends on https://github.com/rust-lang/rust/pull/85499 fixed.
+#[proc_macro_derive(AttachAttr)]
+pub fn attach_attr_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
-  let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
-  let name = input.ident;
-  let token_stream = quote! {
-    impl #g_impl MultiChildWidget  for #name #g_ty  #g_where {}
-  };
-  token_stream.into()
+  attach_attr_derive::attach_attr_derive(&input).into()
 }
 
 #[proc_macro_derive(StatePartialEq)]

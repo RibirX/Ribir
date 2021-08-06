@@ -37,13 +37,8 @@ pub use checkbox::*;
 mod scrollable;
 pub use scrollable::*;
 
-/// The common behavior of widgets, also support to dynamic cast to special
-/// widget. In most of cases, needn't implement `Widget` trait directly, and
-/// implement `CombinationWidget`, `RenderWidget` instead of
-pub trait Widget: 'static {}
-
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: Widget {
+pub trait CombinationWidget: 'static {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
@@ -61,7 +56,7 @@ pub trait CombinationWidget: Widget {
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: Widget + CloneStates {
+pub trait RenderWidget: CloneStates + 'static {
   /// The render object type will created.
   type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
 
@@ -82,7 +77,7 @@ pub trait RenderWidget: Widget + CloneStates {
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety: Widget {
+pub trait RenderWidgetSafety {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
   fn get_attrs(&self) -> Option<&Attributes>;
   fn clone_boxed_states(&self) -> Box<dyn Any>;

@@ -46,7 +46,7 @@ mod tests {
     assert!(has_them);
   }
 
-  #[derive(Debug, Widget)]
+  #[derive(Debug, AttachAttr)]
   struct ThemeTrack {
     themes: Rc<RefCell<Vec<Theme>>>,
   }

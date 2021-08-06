@@ -269,7 +269,7 @@ mod tests {
 
   #[test]
   fn focus_event() {
-    #[derive(Debug, Default, Widget)]
+    #[derive(Debug, Default, AttachAttr)]
     struct EmbedFocus {
       log: Rc<RefCell<Vec<String>>>,
     }

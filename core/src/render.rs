@@ -11,7 +11,7 @@ pub use update_ctx::UpdateCtx;
 
 /// The `Owner` is the render widget which created this object.
 pub trait RenderObject: Sized + Send + Sync + 'static {
-  type States: StatePartialEq;
+  type States: StatePartialEq + 'static;
   /// Call by framework when the state of its render widget changed, should not
   /// call this method directly.
   fn update(&mut self, states: Self::States, ctx: &mut UpdateCtx);

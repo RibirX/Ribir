@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[stateful]
-#[derive(Widget, SingleChildWidget, Default)]
+#[derive(SingleChildWidget, Default, AttachAttr)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[state]
