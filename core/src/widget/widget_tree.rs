@@ -46,7 +46,10 @@ impl WidgetTree {
   }
 
   pub fn new_node(&mut self, widget: WidgetNode) -> WidgetId {
-    let state_info = widget.state_info();
+    let state_info = widget
+      .get_attr()
+      .and_then(|attrs| attrs.get::<StateAttr>())
+      .cloned();
     let id = WidgetId(self.arena.new_node(widget));
     if let Some(state_info) = state_info {
       state_info.assign_id(id, std::ptr::NonNull::from(self))
@@ -140,8 +143,8 @@ impl WidgetTree {
     let ro = widget.create_render_object();
     let wid = p_wid.append_widget(WidgetNode::Render(widget), self);
     let rid = r_tree.new_node(wid, ro);
-    if let Some(rid) = p_rid {
-      rid.prepend(rid, r_tree);
+    if let Some(p) = p_rid {
+      p.prepend(rid, r_tree);
     }
     self.widget_to_render.insert(wid, rid);
     (wid, rid)
@@ -527,15 +530,6 @@ impl dyn CombinationWidget {
 pub enum WidgetNode {
   Combination(Box<dyn CombinationWidget>),
   Render(Box<dyn RenderWidgetSafety>),
-}
-
-impl StateDetect for WidgetNode {
-  fn state_info(&self) -> Option<StateInfo> {
-    match self {
-      WidgetNode::Combination(c) => c.state_info(),
-      WidgetNode::Render(r) => r.state_info(),
-    }
-  }
 }
 
 impl WidgetNode {
