@@ -27,7 +27,6 @@ impl WidgetTree {
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
   pub fn set_root(&mut self, root: BoxedWidget, r_tree: &mut RenderTree) -> WidgetId {
-    #[derive(Widget)]
     struct Temp;
     impl CombinationWidget for Temp {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {

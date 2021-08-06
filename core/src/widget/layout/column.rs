@@ -1,7 +1,7 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(Widget, RenderWidget)]
+#[derive(RenderWidget, MultiChildWidget)]
 pub struct Column(#[proxy] Flex);
 
 impl Column {

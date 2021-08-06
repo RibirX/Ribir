@@ -375,7 +375,7 @@ mod tests {
 
   #[test]
   fn fix_ensure_relayout() {
-    #[derive(Debug, Widget)]
+    #[derive(Debug, AttachAttr)]
     struct DoubleSize;
 
     impl CombinationWidget for DoubleSize {

@@ -1,9 +1,7 @@
-use crate::widget_derive::ProxyDeriveInfo;
-use crate::widget_derive::PROXY_PATH;
-use proc_macro2::{Span, TokenStream};
+use crate::proxy_derive::ProxyDeriveInfo;
+use crate::proxy_derive::PROXY_PATH;
+use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse_quote;
-use syn::token::Where;
 
 pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
   let info = ProxyDeriveInfo::new(input, "RenderWidget", PROXY_PATH)
@@ -13,20 +11,11 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
   match info {
     Ok(info) => {
       let path = info.attr_path();
+      let generics = info.attr_fields.proxy_bounds_generic(quote! {RenderWidget});
       let ident = info.ident;
       let attr_fields = info.attr_fields;
-
       let (field, _) = &attr_fields.attr_fields()[0];
       let proxy_ty = &field.ty;
-      let mut generics = info.generics.clone();
-      generics
-        .where_clause
-        .get_or_insert_with(|| syn::WhereClause {
-          where_token: Where(Span::call_site()),
-          predicates: <_>::default(),
-        })
-        .predicates
-        .push(parse_quote! {#proxy_ty: RenderWidget});
 
       let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 

@@ -25,8 +25,8 @@ pub mod prelude {
   pub use rxrust::prelude::*;
   pub use widget::layout::{MultiChild, SingleChild};
   pub use widget_derive::{
-    stateful, CombinationWidget, MultiChildWidget, RenderWidget, SingleChildWidget, StatePartialEq,
-    Widget,
+    stateful, AttachAttr, CombinationWidget, MultiChildWidget, RenderWidget, SingleChildWidget,
+    StatePartialEq,
   };
 }
 

@@ -9,7 +9,7 @@ struct Task {
   label: String,
 }
 #[stateful(custom)]
-#[derive(Debug, Widget)]
+#[derive(Debug, AttachAttr)]
 struct Todos {
   #[state]
   tasks: Vec<Task>,

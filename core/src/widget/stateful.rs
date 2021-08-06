@@ -106,7 +106,7 @@ use std::{
 ///
 /// `Stateful` trait can only implement for raw widget which not attach any
 /// attributes on.
-pub trait Stateful: Widget {
+pub trait Stateful {
   type RawWidget: CloneStates;
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget>;
 }
@@ -144,7 +144,6 @@ pub struct StateRefCell<W> {
 
 pub type StatefulImpl<W> = AttrWidget<RcWidget<W>>;
 
-#[derive(Widget)]
 pub struct RcWidget<W>(Rc<RefCell<W>>);
 
 #[derive(Clone, Default)]
@@ -160,12 +159,7 @@ pub(crate) struct TreeInfo {
   pub id: WidgetId,
 }
 
-impl<W: 'static> Widget for StatefulImpl<W> {}
-
-impl<W: CloneStates> Stateful for StatefulImpl<W>
-where
-  Self: Widget,
-{
+impl<W: CloneStates> Stateful for StatefulImpl<W> {
   type RawWidget = W;
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget> {
     StateRefCell {
@@ -426,7 +420,7 @@ mod tests {
 
   #[test]
   fn fix_pin_widget_node() {
-    #[derive(Debug, Widget)]
+    #[derive(Debug, AttachAttr)]
     struct TestWidget;
 
     impl CombinationWidget for TestWidget {

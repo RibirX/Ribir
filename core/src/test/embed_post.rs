@@ -8,7 +8,7 @@ use crate::{
   },
 };
 
-#[derive(Clone, Debug, Widget)]
+#[derive(Clone, Debug)]
 pub struct EmbedPost {
   title: &'static str,
   author: &'static str,

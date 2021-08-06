@@ -1,3 +1,6 @@
+use proc_macro2::{Span, TokenStream};
+use syn::parse_quote;
+use syn::token::Where;
 use syn::{
   punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
   Path, Type, TypeParamBound, WherePredicate,
@@ -41,6 +44,26 @@ impl<'a> AttrFields<'a> {
       Fields::Unnamed(fds) => pick_state_fields(&mut fds.unnamed),
       Fields::Named(fds) => pick_state_fields(&mut fds.named),
     }
+  }
+
+  pub fn proxy_bounds_generic(&self, trait_token: TokenStream) -> Generics {
+    let mut generics = self.generics.clone();
+
+    if !self.attr_fields.is_empty() {
+      let (field, _) = &self.attr_fields[0];
+      let proxy_ty = &field.ty;
+
+      generics
+        .where_clause
+        .get_or_insert_with(|| syn::WhereClause {
+          where_token: Where(Span::call_site()),
+          predicates: <_>::default(),
+        })
+        .predicates
+        .push(parse_quote! {#proxy_ty: #trait_token});
+    }
+
+    generics
   }
 
   pub fn attr_fields_generics(&self) -> Generics {

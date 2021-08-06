@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::{prelude::*, widget::Row};
-#[derive(Debug, Widget)]
+#[derive(Debug, AttachAttr)]
 pub struct RecursiveRow {
   pub width: usize,
   pub depth: usize,

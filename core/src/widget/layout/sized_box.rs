@@ -6,7 +6,7 @@ pub use smallvec::{smallvec, SmallVec};
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
 #[stateful]
-#[derive(Widget, SingleChildWidget)]
+#[derive(SingleChildWidget, AttachAttr)]
 pub struct SizedBox {
   #[state]
   pub size: Size,
