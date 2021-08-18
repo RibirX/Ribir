@@ -76,7 +76,7 @@ mod tests {
   #[test]
   fn fix_size() {
     let size = Size::new(100., 100.);
-    let sized_box = SizedBox::from_size(size).with_child(Text("".to_string()).box_it());
+    let sized_box = SizedBox::from_size(size).have(Text("".to_string()).box_it());
     let (rect, child) = widget_and_its_children_box_rect(sized_box.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, size);
     assert_eq!(child, vec![Rect::from_size(size)]);
@@ -84,7 +84,7 @@ mod tests {
 
   #[test]
   fn shrink_size() {
-    let shrink = SizedBox::shrink().with_child(Text("".to_string()).box_it());
+    let shrink = SizedBox::shrink().have(Text("".to_string()).box_it());
     let (rect, child) = widget_and_its_children_box_rect(shrink.box_it(), Size::new(500., 500.));
 
     assert_eq!(rect.size, Size::zero());
@@ -95,7 +95,7 @@ mod tests {
   fn expanded_size() {
     let wnd_size = Size::new(500., 500.);
     let expand_box = SizedBox::expanded()
-      .with_child(Text("".to_string()).box_it())
+      .have(Text("".to_string()).box_it())
       .box_it();
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));
 

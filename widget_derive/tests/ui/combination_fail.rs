@@ -1,9 +1,9 @@
 use ribir::prelude::*;
 
-#[derive(Widget, CombinationWidget)]
+#[derive(CombinationWidget)]
 struct A;
 
-#[derive(Widget, CombinationWidget)]
+#[derive(CombinationWidget)]
 struct B {
   #[proxy]
   a: Checkbox,

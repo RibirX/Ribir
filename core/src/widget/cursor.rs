@@ -47,15 +47,15 @@ mod tests {
   fn tree_down_up() {
     let row_tree = SizedBox::expanded()
       .with_cursor(CursorIcon::AllScroll)
-      .with_child(
+      .have(
         {
           Row::default()
             .with_cross_align(CrossAxisAlign::Start)
             .with_main_align(MainAxisAlign::Start)
-            .with_cursor(CursorIcon::Hand)
             .push(
               SizedBox::from_size(Size::new(200., 200.))
-                .with_child(
+                .with_cursor(CursorIcon::Hand)
+                .have(
                   {
                     Row::default()
                       .with_cross_align(CrossAxisAlign::Start)

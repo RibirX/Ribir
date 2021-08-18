@@ -1,9 +1,9 @@
 use ribir::prelude::*;
 
-#[derive(Widget, RenderWidget)]
+#[derive(RenderWidget)]
 struct A;
 
-#[derive(Widget, RenderWidget)]
+#[derive(RenderWidget)]
 struct B {
   #[proxy]
   a: Flex,

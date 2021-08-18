@@ -60,14 +60,14 @@ mod tests {
     let row = Row::default()
       .push(
         Expanded::new(1.)
-          .with_child(SizedBox::from_size(size).box_it())
+          .have(SizedBox::from_size(size).box_it())
           .box_it(),
       )
       .push(SizedBox::from_size(size).box_it())
       .push(SizedBox::from_size(size).box_it())
       .push(
         Expanded::new(2.)
-          .with_child(SizedBox::from_size(size).box_it())
+          .have(SizedBox::from_size(size).box_it())
           .box_it(),
       )
       .box_it();
@@ -93,14 +93,14 @@ mod tests {
       .with_wrap(true)
       .push(
         Expanded::new(1.)
-          .with_child(SizedBox::from_size(size).box_it())
+          .have(SizedBox::from_size(size).box_it())
           .box_it(),
       )
       .push(SizedBox::from_size(size).box_it())
       .push(SizedBox::from_size(size).box_it())
       .push(
         Expanded::new(2.)
-          .with_child(SizedBox::from_size(size).box_it())
+          .have(SizedBox::from_size(size).box_it())
           .box_it(),
       );
 

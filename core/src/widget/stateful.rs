@@ -22,7 +22,7 @@
 //! # use ribir::prelude::*;
 //!
 //! #[stateful]
-//! #[derive(Widget)]
+//! #[derive(AttachAttr)]
 //! struct Rectangle {
 //!   #[state]
 //!   size: Size,
@@ -31,10 +31,15 @@
 //! }
 //!
 //! impl CombinationWidget for Rectangle {
-//!   fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
-//!     SizedBox::empty_box(self.size)
-//!       .with_background(self.color.clone().into())
-//!      .box_it()
+//!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+//!     BoxDecoration {
+//!       background: Some(self.color.clone().into()),
+//!       ..Default::default()
+//!     }
+//!     .have(
+//!       SizedBox::from_size(self.size).box_it()
+//!     )
+//!     .box_it()
 //!   }
 //! }
 //!
@@ -63,6 +68,7 @@
 //! # use ribir::prelude::*;
 //!
 //! #[stateful(custom)]
+//! #[derive(AttachAttr)]
 //! struct Rectangle {
 //!   #[state]
 //!   size: Size,
@@ -71,15 +77,21 @@
 //! }
 //!
 //! impl CombinationWidget for StatefulRectangle {
-//!   fn build(&self, ctx: &mut BuildCtx) -> Box<dyn Widget> {
+//!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     let rect = self.as_ref();
 //!     let mut state_ref = self.ref_cell();
-//!     SizedBox::empty_box(rect.size)
-//!       .with_background(rect.color.clone().into())
-//!       .on_tap(move |_| {
-//!         state_ref.borrow_mut().color = Color::BLACK;
-//!       })
-//!      .box_it()
+//!     BoxDecoration {
+//!       background: Some(rect.color.clone().into()),
+//!       ..Default::default()
+//!     }
+//!     .have(
+//!       SizedBox::from_size(rect.size)
+//!         .on_tap(move |_| {
+//!           state_ref.borrow_mut().color = Color::BLACK;
+//!         })
+//!        .box_it()
+//!    )
+//!     .box_it()
 //!   }
 //! }
 //!
@@ -179,6 +191,10 @@ impl<W> Clone for RcWidget<W> {
   #[inline]
   fn clone(&self) -> Self { Self(self.0.clone()) }
 }
+
+impl<W: SingleChildWidget> SingleChildWidget for RcWidget<W> {}
+
+impl<W: MultiChildWidget> MultiChildWidget for RcWidget<W> {}
 
 impl<W: 'static> Clone for StateRefCell<W> {
   fn clone(&self) -> Self {
@@ -288,7 +304,7 @@ impl StateAttr {
   pub(crate) fn assign_id(&self, id: WidgetId, tree: NonNull<WidgetTree>) {
     let mut info = self.0.borrow_mut();
     debug_assert!(info.tree_info.is_none());
-    info.tree_info = Some(TreeInfo { id, tree })
+    info.tree_info = Some(TreeInfo { tree, id })
   }
 
   fn state_subject(&mut self) -> LocalSubject<'static, (), ()> {
@@ -434,6 +450,6 @@ mod tests {
     let mut wnd = window::Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
     wnd.render_ready();
     let tree = wnd.widget_tree();
-    assert_eq!(tree.count(), 2);
+    assert_eq!(tree.root().unwrap().descendants(&*tree).count(), 2);
   }
 }

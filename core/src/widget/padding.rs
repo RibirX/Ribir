@@ -70,7 +70,7 @@ mod tests {
   #[test]
   fn smoke() {
     let widget = Padding { padding: EdgeInsets::only_left(1.) }
-      .with_child(
+      .have(
         Row::default()
           .push(SizedBox::from_size(Size::new(100., 100.)).box_it())
           .box_it(),

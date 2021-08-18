@@ -1,21 +1,21 @@
 use ribir::prelude::*;
 
-#[derive(Debug, Widget)]
+#[derive(Debug)]
 struct A;
 
 impl CombinationWidget for A {
-  fn build(&self, _: &mut BuildCtx) -> Box<dyn Widget> {
-    unimplemented!();
+  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+    unreachable!();
   }
 }
 
-#[derive(Debug, Widget, CombinationWidget)]
+#[derive(Debug, CombinationWidget)]
 struct B<W> {
   #[proxy]
   a: W,
 }
 
-#[derive(Debug, Widget, CombinationWidget)]
+#[derive(Debug, CombinationWidget)]
 struct TupleB<W>(#[proxy] W);
 
 fn main() {

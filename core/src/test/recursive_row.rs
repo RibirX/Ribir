@@ -9,17 +9,21 @@ pub struct RecursiveRow {
 impl CombinationWidget for RecursiveRow {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
     Row::default()
-      .from_iter((0..self.width).map(|_| {
-        if self.depth > 1 {
-          RecursiveRow {
-            width: self.width,
-            depth: self.depth - 1,
-          }
-          .box_it()
-        } else {
-          Text("leaf".to_string()).box_it()
-        }
-      }))
+      .have(
+        (0..self.width)
+          .map(|_| {
+            if self.depth > 1 {
+              RecursiveRow {
+                width: self.width,
+                depth: self.depth - 1,
+              }
+              .box_it()
+            } else {
+              Text("leaf".to_string()).box_it()
+            }
+          })
+          .collect(),
+      )
       .box_it()
   }
 }

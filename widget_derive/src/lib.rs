@@ -1,14 +1,6 @@
-//! A custom derive implementation for `Widget`, `CombinationWidget` and
-//! `RenderWidget`. Can use `proxy` attr to specify where to derive form.
+//! A derive implementation for `CombinationWidget` and `RenderWidget`. Can use
+//! `proxy` attr to specify where to derive form.
 //!
-//! # Example
-//! A default widget implementation for W.
-
-//! ```
-//! use ribir::prelude::*;
-//！##[derive(Widget)]
-//! struct W;
-//! ```
 //! ## proxy attr.
 //!
 //! `#[proxy]` attr tell the widget trait where to derive from. `Widget` can
@@ -19,7 +11,7 @@
 //!
 //! ```
 //! use ribir::prelude::*;
-//! ##[derive(Widget, RenderWidget)]
+//! ##[derive(RenderWidget)]
 //! struct W {
 //!  ##[proxy]
 //!  b: widget::Text
@@ -30,7 +22,7 @@
 //! widget, derive `CombinationWidget` if it's a combination widget.
 //! ```
 //! use ribir::prelude::*;
-//! ##[derive(Widget, RenderWidget, CombinationWidget)]
+//! ##[derive(RenderWidget, CombinationWidget)]
 //! struct ProxyWidget<W>(#[proxy] W);
 //! ```
 extern crate proc_macro;
@@ -40,11 +32,11 @@ mod attach_attr_derive;
 mod attr_fields;
 mod combination_derive;
 mod multi_derive;
+mod proxy_derive;
 mod render_derive;
 mod single_derive;
 mod state_derive;
 mod state_partial_eq_derive;
-mod proxy_derive;
 
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};

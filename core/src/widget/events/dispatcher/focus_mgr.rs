@@ -247,21 +247,21 @@ mod tests {
     let id0 = negative.next_sibling(&tree).unwrap();
     let id1 = id0.next_sibling(&tree).unwrap();
     let id2 = id1.next_sibling(&tree).unwrap();
-    let id22 = id2.next_sibling(&tree).unwrap();
+    let id3 = id2.next_sibling(&tree).unwrap();
 
     {
       let mut next_focus = || mgr.next_focus_widget(&wnd.dispatcher.common);
       // next focus sequential
       assert_eq!(next_focus(), Some(id1));
       assert_eq!(next_focus(), Some(id2));
-      assert_eq!(next_focus(), Some(id22));
+      assert_eq!(next_focus(), Some(id3));
       assert_eq!(next_focus(), Some(id0));
       assert_eq!(next_focus(), Some(id1));
 
       // previous focus sequential
       let mut prev_focus = || mgr.prev_focus_widget(&wnd.dispatcher.common);
       assert_eq!(prev_focus(), Some(id0));
-      assert_eq!(prev_focus(), Some(id22));
+      assert_eq!(prev_focus(), Some(id3));
       assert_eq!(prev_focus(), Some(id2));
       assert_eq!(prev_focus(), Some(id1));
     }
@@ -278,7 +278,7 @@ mod tests {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         let child = log_focus_event("child", empty_box(), self.log.clone());
         log_focus_event("parent", SizedBox::expanded(), self.log.clone())
-          .with_child(child.box_it())
+          .have(child.box_it())
           .box_it()
       }
     }

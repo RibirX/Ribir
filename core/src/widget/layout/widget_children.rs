@@ -2,8 +2,7 @@ pub use crate::prelude::*;
 
 /// A marker trait to tell Ribir a widget can have one child.
 pub trait SingleChildWidget: RenderWidget {
-  // todo: a better name
-  fn with_child(self, child: BoxedWidget) -> SingleChild<Self>
+  fn have(self, child: BoxedWidget) -> SingleChild<Self>
   where
     Self: Sized,
   {
@@ -44,17 +43,8 @@ impl<R> std::ops::DerefMut for SingleChild<R> {
 
 /// A marker trait to tell Ribir a widget can have multi child.
 pub trait MultiChildWidget: RenderWidget + Sized {
-  // todo: a better name
-  fn with_children(self, children: Vec<BoxedWidget>) -> MultiChild<Self> {
+  fn have(self, children: Vec<BoxedWidget>) -> MultiChild<Self> {
     MultiChild { widget: self, children }
-  }
-
-  // todo: a better name
-  fn from_iter<T: IntoIterator<Item = BoxedWidget>>(self, iter: T) -> MultiChild<Self> {
-    MultiChild {
-      widget: self,
-      children: iter.into_iter().collect(),
-    }
   }
 
   #[inline]

@@ -34,7 +34,14 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
           fn create_render_object(&self) -> Self::RO {
             RenderWidget::create_render_object(&self.#path)
           }
+
+          #[inline]
+          fn get_attrs(&self) -> Option<&Attributes> {
+            RenderWidget::get_attrs(&self.#path)
+           }
         }
+
+        //Todo: should derive AttachAttr ?
       }
     }
     Err(err) => err,

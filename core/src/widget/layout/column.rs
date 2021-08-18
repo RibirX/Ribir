@@ -1,7 +1,7 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(RenderWidget, MultiChildWidget)]
+#[derive(RenderWidget, MultiChildWidget, AttachAttr)]
 pub struct Column(#[proxy] Flex);
 
 impl Column {
@@ -19,4 +19,9 @@ impl Column {
 
 impl Default for Column {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Vertical)) }
+}
+
+impl IntoStateful for Column {
+  type S = StatefulFlex;
+  fn into_stateful(self) -> Self::S { self.0.into_stateful() }
 }

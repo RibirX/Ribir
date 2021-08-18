@@ -79,7 +79,7 @@ impl CombinationWidget for StatefulCheckbox {
         (checked_path, check_mark_width)
       };
       marker.background = Some(color.into());
-      marker.with_child(
+      marker.have(
         CheckboxMarker {
           size,
           check_mark_width,
@@ -93,7 +93,7 @@ impl CombinationWidget for StatefulCheckbox {
         color: border_color,
         width: border_width,
       }));
-      marker.with_child(SizedBox::from_size(Size::new(size, size)).box_it())
+      marker.have(SizedBox::from_size(Size::new(size, size)).box_it())
     };
 
     Margin::new(EdgeInsets::all(4.))
@@ -104,7 +104,7 @@ impl CombinationWidget for StatefulCheckbox {
         }
       })
       .with_cursor(CursorIcon::Hand)
-      .with_child(checkbox.box_it())
+      .have(checkbox.box_it())
       .box_it()
   }
 }
