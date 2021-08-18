@@ -89,3 +89,22 @@ pub enum BoxedWidget {
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
 }
+
+impl BoxedWidget {
+  pub fn find_attr<A: Any>(&self) -> Option<&A> {
+    match self {
+      BoxedWidget::Combination(c) => c.find_attr(),
+      BoxedWidget::Render(r) => r.find_attr(),
+      BoxedWidget::SingleChild(s) => s.find_attr(),
+      BoxedWidget::MultiChild(m) => m.find_attr(),
+    }
+  }
+}
+
+impl dyn CombinationWidget {
+  pub fn find_attr<A: Any>(&self) -> Option<&A> { self.get_attrs().and_then(|attrs| attrs.get()) }
+}
+
+impl dyn RenderWidgetSafety {
+  pub fn find_attr<A: Any>(&self) -> Option<&A> { self.get_attrs().and_then(|attrs| attrs.get()) }
+}

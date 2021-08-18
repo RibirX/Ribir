@@ -3,5 +3,9 @@
     "/rustc/ff2c947c00f867b9f012e28ba88cecfbe556f904/": "/home/adoo/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/"
   },
   "lldb.displayFormat": "auto",
-  "lldb.dereferencePointers": true
+  "lldb.dereferencePointers": true,
+  "todo-tree.tree.showBadges": true,
+  "todo-tree.filtering.excludeGlobs": [
+    "**/todo.rs"
+  ]
 }

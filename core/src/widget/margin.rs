@@ -124,7 +124,7 @@ mod tests {
     let widget = Margin {
       margin: EdgeInsets::symmetrical(1., 1.),
     }
-    .with_child(SizedBox::from_size(Size::new(100., 100.)).box_it());
+    .have(SizedBox::from_size(Size::new(100., 100.)).box_it());
 
     let (rect, children) = widget_and_its_children_box_rect(widget.box_it(), Size::new(200., 200.));
 

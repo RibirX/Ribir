@@ -15,12 +15,12 @@
 //! ```
 //! # use ribir::prelude::*;
 //! // implement a custom widget.
-//! ##[derive(Widget)]
+//! #[derive(AttachAttr)]
 //! pub struct MyCheckbox;
 //!
 //! impl CombinationWidget for MyCheckbox {
-//!   fn build(&self, ctx: &mut  BuildCtx) -> Box<dyn Widget>{
-//!     Checkbox::from_theme(ctx.theme()).box_it()
+//!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
+//!     Checkbox::from_theme(ctx.theme()).into_stateful().box_it()
 //!   }
 //! }
 //!
@@ -41,9 +41,6 @@
 //! ```
 //! # use ribir::{prelude::*, widget::AttrWidget};
 
-//! #[derive(Widget, RenderWidget, CombinationWidget)]
-//! pub struct Hello<W: Widget>(#[proxy] AttrWidget<W, HelloAttr>);
-//!
 //! pub struct HelloAttr;
 //!
 //! impl HelloAttr {
@@ -52,15 +49,10 @@
 //!   }
 //! }
 //!
-//! impl<W: Widget> Hello<W> {
-//!   pub fn new<A: AttachAttr<W = W>>(w: A) -> Self {
-//!     // Take attr from a widget if it's have. We not use the old 'HelloAttr'
-//!     // here.
-//!     let (_, others, widget) = w.take_attr::<HelloAttr>();
-//!     Hello (AttrWidget { widget, major: HelloAttr, others })
-//!   }
-//! }
-//! let widget: Box<dyn Widget> = Hello::new(Text("".to_string())).box_it();
+//! let widget: BoxedWidget = Text("".to_string())
+//!                             .into_attr_widget()
+//!                             .attach(HelloAttr)
+//!                             .box_it();
 //! widget.find_attr::<HelloAttr>().unwrap().hello()
 //! ```
 //! [find]: crate::Widget::find_attr
@@ -74,8 +66,7 @@ use std::marker::PhantomData;
 use widget::{focus_listen_on, keyboard_listen_on, pointer_listen_on};
 
 /// `AttachAttr` provide the ability to attach the builtin attrs implemented by
-/// Ribir. See the [module-level documentation][mod] for more details. When
-/// derive `#[derive(Widget)]` `AttachAttr` will be also implemented.
+/// Ribir. See the [module-level documentation][mod] for more details.
 ///
 /// [mod]: crate::widget::attr
 pub trait AttachAttr {
@@ -89,6 +80,7 @@ pub trait AttachAttr {
   where
     Self: Sized,
   {
+    let key: Key = key.into();
     self.attach(key)
   }
 
@@ -361,6 +353,9 @@ impl<W: RenderWidget> RenderWidget for AttrWidget<W> {
   type RO = W::RO;
   #[inline]
   fn create_render_object(&self) -> Self::RO { self.widget.create_render_object() }
+
+  #[inline]
+  fn get_attrs(&self) -> Option<&Attributes> { Some(&self.attrs) }
 }
 
 impl<W> AttachAttr for AttrWidget<W> {

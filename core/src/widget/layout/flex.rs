@@ -466,17 +466,22 @@ mod tests {
 
   #[test]
   fn horizontal_line() {
-    let row =
-      Flex::default().from_iter((0..10).map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it()));
+    let row = Flex::default().have(
+      (0..10)
+        .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
+        .collect(),
+    );
     let (rect, _) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 20.));
   }
 
   #[test]
   fn vertical_line() {
-    let col = Flex::default()
-      .with_direction(Direction::Vertical)
-      .from_iter((0..10).map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it()));
+    let col = Flex::default().with_direction(Direction::Vertical).have(
+      (0..10)
+        .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
+        .collect(),
+    );
     let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
@@ -486,7 +491,7 @@ mod tests {
     let size = Size::new(200., 20.);
     let row = Flex::default()
       .with_wrap(true)
-      .from_iter((0..3).map(|_| SizedBox::from_size(size).box_it()));
+      .have((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -505,7 +510,7 @@ mod tests {
     let row = Flex::default()
       .with_wrap(true)
       .with_reverse(true)
-      .from_iter((0..3).map(|_| SizedBox::from_size(size).box_it()));
+      .have((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -593,7 +598,7 @@ mod tests {
         .box_it();
 
       let mut wnd = window::Window::without_render(
-        SizedBox::expanded().with_child(row).box_it(),
+        SizedBox::expanded().have(row).box_it(),
         Size::new(500., 500.),
       );
       wnd.render_ready();

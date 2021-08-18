@@ -354,7 +354,7 @@ mod tests {
       }),
       ..Default::default()
     }
-    .with_child(SizedBox::from_size(size).box_it())
+    .have(SizedBox::from_size(size).box_it())
     .box_it();
 
     let (rect, child) = widget_and_its_children_box_rect(sized_box, Size::new(500., 500.));
@@ -396,22 +396,27 @@ mod tests {
     ];
     let row = Row::default()
       .with_wrap(true)
-      .from_iter(radius_cases.into_iter().map(|radius| {
-        Margin { margin: EdgeInsets::all(2.) }
-          .with_child(
-            BoxDecoration {
-              background: Some(Color::RED.into()),
-              radius: Some(radius),
-              border: Some(Border::all(BorderSide { width: 5., color: Color::BLACK })),
-            }
-            .with_child(SizedBox::from_size(Size::new(60., 40.)).box_it())
-            .box_it(),
-          )
-          .box_it()
-      }))
+      .have(
+        radius_cases
+          .into_iter()
+          .map(|radius| {
+            Margin { margin: EdgeInsets::all(2.) }
+              .have(
+                BoxDecoration {
+                  background: Some(Color::RED.into()),
+                  radius: Some(radius),
+                  border: Some(Border::all(BorderSide { width: 5., color: Color::BLACK })),
+                }
+                .have(SizedBox::from_size(Size::new(60., 40.)).box_it())
+                .box_it(),
+              )
+              .box_it()
+          })
+          .collect(),
+      )
       .push(
         Margin { margin: EdgeInsets::all(2.) }
-          .with_child(
+          .have(
             BoxDecoration {
               background: Some(Color::PINK.into()),
               border: Some(Border {

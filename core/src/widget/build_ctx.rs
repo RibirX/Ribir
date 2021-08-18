@@ -39,11 +39,9 @@ mod tests {
     let mut wnd = window::Window::without_render(sized.box_it(), win_size);
     wnd.render_ready();
     let tree = wnd.widget_tree();
-    let has_them = tree
-      .root()
-      .and_then(|root| root.get(&*tree))
-      .map_or(false, |w| w.find_attr::<Theme>().is_some());
-    assert!(has_them);
+
+    let ctx = BuildCtx::new(tree.as_ref(), tree.root().unwrap());
+    ctx.theme();
   }
 
   #[derive(Debug, AttachAttr)]
@@ -68,10 +66,10 @@ mod tests {
 
     let light_theme = SizedBox::shrink()
       .with_theme(light.clone())
-      .with_child(theme_track.box_it());
+      .have(theme_track.box_it());
     let dark_light_theme = SizedBox::expanded()
       .with_theme(dark.clone())
-      .with_child(light_theme.box_it());
+      .have(light_theme.box_it());
 
     let mut wnd = window::Window::without_render(dark_light_theme.box_it(), Size::zero());
     wnd.render_ready();
@@ -84,10 +82,10 @@ mod tests {
     let theme = ThemeTrack { themes: track_themes.clone() };
     let dark_theme = SizedBox::shrink()
       .with_theme(dark)
-      .with_child(theme.box_it());
+      .have(theme.box_it());
     let light_dark_theme = SizedBox::expanded()
       .with_theme(light)
-      .with_child(dark_theme.box_it());
+      .have(dark_theme.box_it());
 
     let mut wnd = window::Window::without_render(light_dark_theme.box_it(), Size::zero());
     wnd.render_ready();

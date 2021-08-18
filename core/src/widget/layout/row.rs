@@ -26,3 +26,8 @@ impl Row {
 impl Default for Row {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
 }
+
+impl IntoStateful for Row {
+  type S = StatefulFlex;
+  fn into_stateful(self) -> Self::S { self.0.into_stateful() }
+}

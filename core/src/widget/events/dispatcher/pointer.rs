@@ -445,7 +445,7 @@ mod tests {
         let stack = event_record.clone();
         move |e| stack.borrow_mut().push(e.clone())
       })
-      .with_child(
+      .have(
         Text("pointer event test".to_string())
           .on_pointer_down({
             let stack = event_record.clone();
@@ -485,7 +485,7 @@ mod tests {
     let parent = SizedBox::expanded()
       .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(2))
       .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(2))
-      .with_child(child.box_it());
+      .have(child.box_it());
 
     let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(100., 100.));
     wnd.render_ready();

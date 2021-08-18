@@ -3,7 +3,7 @@ use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::Wi
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, Default, AttachAttr)]
+#[derive(SingleChildWidget, AttachAttr)]
 pub struct ScrollableX {
   #[state]
   pos: f32,
@@ -28,6 +28,8 @@ pub struct ScrollableBoth {
 }
 
 impl ScrollableX {
+  // Todo: scrollable should directly as a full widget, not depend on the
+  // `x_scroll` method.
   #[inline]
   pub fn x_scroll(pos: f32) -> AttrWidget<RcWidget<ScrollableX>> {
     let scroll = ScrollableX { pos }.into_stateful();
@@ -228,8 +230,8 @@ mod tests {
 
     impl CombinationWidget for X {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        ScrollableX::default()
-          .with_child(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
+        ScrollableX::x_scroll(0.)
+          .have(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
           .box_it()
       }
     }
@@ -246,8 +248,8 @@ mod tests {
 
     impl CombinationWidget for Y {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        ScrollableY::default()
-          .with_child(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
+        ScrollableY::y_scroll(0.)
+          .have(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
           .box_it()
       }
     }
@@ -264,8 +266,8 @@ mod tests {
 
     impl CombinationWidget for Both {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        ScrollableBoth::default()
-          .with_child(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
+        ScrollableBoth::both_scroll(Point::default())
+          .have(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
           .box_it()
       }
     }

@@ -24,7 +24,14 @@ pub fn combination_derive(input: &mut syn::DeriveInput) -> TokenStream {
           fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
             self.#path.build(ctx)
           }
+
+          #[inline]
+          fn get_attrs(&self) -> Option<&Attributes> {
+            CombinationWidget::get_attrs(&self.#path)
+           }
         }
+
+        //todo should derive AttachAttr ?
       }
     }
     Err(err) => err,
