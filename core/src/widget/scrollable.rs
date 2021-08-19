@@ -28,8 +28,6 @@ pub struct ScrollableBoth {
 }
 
 impl ScrollableX {
-  // Todo: scrollable should directly as a full widget, not depend on the
-  // `x_scroll` method.
   #[inline]
   pub fn x_scroll(pos: f32) -> AttrWidget<RcWidget<ScrollableX>> {
     let scroll = ScrollableX { pos }.into_stateful();

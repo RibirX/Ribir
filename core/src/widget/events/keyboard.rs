@@ -26,9 +26,7 @@ pub fn keyboard_listen_on<W: AttachAttr, H: FnMut(&KeyboardEvent) + 'static>(
   let mut w = widget.into_attr_widget();
   // ensure focus attr attached, because a widget can accept keyboard event base
   // on it can be focused.
-  w.attrs
-    .entry::<FocusAttr>()
-    .or_insert_with(FocusAttr::default);
+  w.attrs.entry::<FocusAttr>().or_default();
 
   w.attrs
     .entry::<KeyboardAttr>()

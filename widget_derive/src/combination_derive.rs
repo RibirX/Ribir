@@ -30,8 +30,6 @@ pub fn combination_derive(input: &mut syn::DeriveInput) -> TokenStream {
             CombinationWidget::get_attrs(&self.#path)
            }
         }
-
-        //todo should derive AttachAttr ?
       }
     }
     Err(err) => err,

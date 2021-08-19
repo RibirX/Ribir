@@ -59,9 +59,12 @@
 //! change its color when user tapped. How to do if we want this behavior  as a
 //! part of the rectangle itself. In other word, a stateless `Rectangle` is
 //! useless, we only need a stateful `Rectangle`. To implement it, we can
-//! specify `custom` meta to `#[stateful(custom)]` attr. This tell Ribir, "I
-//! want to implement the stateful widget by myself instead of direct derive
-//! from the stateless version."
+//! specify `custom` meta to `#[stateful(custom=XXXName)]` attr. This tell
+//! Ribir, "I want to implement RenderWidget/CombinationWidget for the stateful
+//! widget by myself instead of direct derive from the stateless version, and
+//! specify name by myself. This is useful when you implement a widget and the
+//! stateless version is useless and the widget self has behavior to change its
+//! state. For example the [`Checkbox`](crate::prelude::Checkbox) widget."
 
 //! ```
 //! # #![feature(trivial_bounds)]
