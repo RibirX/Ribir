@@ -44,7 +44,7 @@ pub(crate) fn stateful_derive(
     .map(|name| prefix_ident("state_", &name));
 
   let state_ty = state_fields.clone().map(|f| &f.ty);
-  let stateful_name = prefix_ident("Stateful", &quote! {#name});
+  let mut stateful_name = prefix_ident("Stateful", &quote! {#name});
 
   // State define
   let mut state_def = quote! {
@@ -74,7 +74,11 @@ pub(crate) fn stateful_derive(
     });
   }
 
-  let stateful_def = if custom_impl_attr(attrs)? {
+  let (custom_impl, custom_name) = custom_impl_attr(attrs)?;
+  if let Some(custom_name) = custom_name {
+    stateful_name = custom_name;
+  }
+  let stateful_def = if custom_impl {
     quote! {
       #vis struct #stateful_name #w_ty_generics(
         StatefulImpl<#name #w_ty_generics>) #w_where_clause;
@@ -157,16 +161,20 @@ fn prefix_ident(prefix: &str, ident: &TokenStream2) -> Ident {
   syn::parse_str::<Ident>(&format!("{}{}", prefix, ident)).unwrap()
 }
 
-fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<bool, TokenStream2> {
-  let (custom_impl, errors): (Vec<_>, Vec<_>) = attrs.into_iter().partition(|attr| {
-    if let NestedMeta::Meta(syn::Meta::Path(path)) = attr {
-      pure_ident(path, CUSTOM_IMPL)
+fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<(bool, Option<Ident>), TokenStream2> {
+  let (custom_impl, not_supports): (Vec<_>, Vec<_>) = attrs.into_iter().partition(|attr| {
+    if let NestedMeta::Meta(meta) = attr {
+      match meta {
+        syn::Meta::Path(path) => pure_ident(path, CUSTOM_IMPL),
+        syn::Meta::NameValue(meta) => pure_ident(&meta.path, CUSTOM_IMPL),
+        _ => false,
+      }
     } else {
       false
     }
   });
-  if !errors.is_empty() {
-    let error_recursive = errors.into_iter().map(|attr| {
+  if !not_supports.is_empty() {
+    let error_recursive = not_supports.into_iter().map(|attr| {
       let err_str = format!("#[{}] not support this argument", STATEFUL_ATTR);
       quote_spanned! {  attr.span() => compile_error!(#err_str); }
     });
@@ -185,7 +193,25 @@ fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<bool, TokenStream2> {
       quote_spanned! { attr.span() => compile_error!(#err_str); }
     });
     Err(quote! { #(#error_recursive)* })
+  } else if let Some(attr) = custom_impl.get(0) {
+    match attr {
+      NestedMeta::Meta(syn::Meta::Path(_)) => Ok((true, None)),
+      NestedMeta::Meta(syn::Meta::NameValue(named)) => match named.lit {
+        syn::Lit::Str(ref name) => match name.parse::<Ident>() {
+          Ok(name) => Ok((true, Some(name))),
+          Err(_) => {
+            let err_str = format!("{} is not a valid name for widget.", name.value());
+            Err(quote_spanned! {  named.lit.span() => compile_error!(#err_str); })
+          }
+        },
+        _ => {
+          let err_str = "Only a valid string can be used as widget name.";
+          Err(quote_spanned! {  named.lit.span() => compile_error!(#err_str); })
+        }
+      },
+      _ => unreachable!(),
+    }
   } else {
-    Ok(custom_impl.len() == 1)
+    Ok((false, None))
   }
 }

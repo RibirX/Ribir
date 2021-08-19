@@ -13,7 +13,6 @@ futures = "0.3.5"
 indextree = "4.3.1"
 log = "0.4.8"
 rxrust = "0.13.0"
-smallvec = "1.5.1"
 widget_derive = {path = "../widget_derive"}
 winit = "0.24.0"
 lazy_static ="1.4.0"

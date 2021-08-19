@@ -20,7 +20,7 @@
 //!
 //! impl CombinationWidget for MyCheckbox {
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
-//!     Checkbox::from_theme(ctx.theme()).into_stateful().box_it()
+//!     Checkbox::from_theme(ctx.theme()).box_it()
 //!   }
 //! }
 //!

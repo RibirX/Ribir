@@ -27,9 +27,7 @@ impl CombinationWidget for StatefulTodos {
           .enumerate()
           .map(|(idx, task)| {
             let mut todos = self.ref_cell();
-            let mut checkbox = Checkbox::from_theme(ctx.theme())
-              .with_checked(task.finished)
-              .into_stateful();
+            let mut checkbox = Checkbox::from_theme(ctx.theme()).with_checked(task.finished);
             checkbox.state_checked().subscribe(move |v| {
               todos.borrow_mut().tasks[idx].finished = v.after;
             });

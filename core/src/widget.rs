@@ -19,8 +19,6 @@ pub use stateful::*;
 pub use text::Text;
 pub mod events;
 pub use events::*;
-mod phantom;
-pub use phantom::PhantomWidget;
 mod cursor;
 pub use cursor::Cursor;
 pub use winit::window::CursorIcon;

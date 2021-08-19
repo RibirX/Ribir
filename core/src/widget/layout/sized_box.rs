@@ -1,5 +1,4 @@
 use crate::prelude::*;
-pub use smallvec::{smallvec, SmallVec};
 
 /// A box with a specified size.
 ///

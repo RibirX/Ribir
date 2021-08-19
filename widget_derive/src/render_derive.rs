@@ -40,8 +40,6 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
             RenderWidget::get_attrs(&self.#path)
            }
         }
-
-        //Todo: should derive AttachAttr ?
       }
     }
     Err(err) => err,

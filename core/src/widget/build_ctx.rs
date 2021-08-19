@@ -80,9 +80,7 @@ mod tests {
     );
 
     let theme = ThemeTrack { themes: track_themes.clone() };
-    let dark_theme = SizedBox::shrink()
-      .with_theme(dark)
-      .have(theme.box_it());
+    let dark_theme = SizedBox::shrink().with_theme(dark).have(theme.box_it());
     let light_dark_theme = SizedBox::expanded()
       .with_theme(light)
       .have(dark_theme.box_it());
