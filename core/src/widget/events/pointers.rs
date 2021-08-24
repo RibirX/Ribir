@@ -124,12 +124,13 @@ pub fn pointer_listen_on<W: AttachAttr, H: FnMut(&PointerEvent) + 'static>(
   widget: W,
   event_type: PointerEventType,
   handler: H,
-) -> AttrWidget<W::W> {
+) -> W::W {
   let mut w = widget.into_attr_widget();
-  w.attrs
+  w.attrs_mut()
     .entry::<PointerAttr>()
     .or_default()
     .listen_on(event_type, handler);
+
   w
 }
 
@@ -146,7 +147,7 @@ impl PointerAttr {
     &mut self,
     event_type: PointerEventType,
     mut handler: H,
-  ) -> SubscriptionWrapper<LocalSubscription> {
+  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
     self
       .pointer_observable()
       .filter(move |(t, _)| *t == event_type)

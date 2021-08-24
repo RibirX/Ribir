@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[stateful]
-#[derive(SingleChildWidget, Default, AttachAttr)]
+#[derive(SingleChildWidget, Default)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[state]
@@ -396,7 +396,7 @@ mod tests {
     ];
     let row = Row::default()
       .with_wrap(true)
-      .have(
+      .have_multi(
         radius_cases
           .into_iter()
           .map(|radius| {
@@ -414,7 +414,7 @@ mod tests {
           })
           .collect(),
       )
-      .push(
+      .have(
         Margin { margin: EdgeInsets::all(2.) }
           .have(
             BoxDecoration {

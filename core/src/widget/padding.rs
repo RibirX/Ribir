@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
 #[stateful]
-#[derive(SingleChildWidget, AttachAttr)]
+#[derive(SingleChildWidget)]
 pub struct Padding {
   #[state]
   pub padding: EdgeInsets,
@@ -72,7 +72,7 @@ mod tests {
     let widget = Padding { padding: EdgeInsets::only_left(1.) }
       .have(
         Row::default()
-          .push(SizedBox::from_size(Size::new(100., 100.)).box_it())
+          .have(SizedBox::from_size(Size::new(100., 100.)).box_it())
           .box_it(),
       )
       .box_it();

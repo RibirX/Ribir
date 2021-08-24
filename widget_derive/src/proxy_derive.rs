@@ -1,7 +1,7 @@
-use crate::attr_fields::AttrFields;
+use crate::{attr_fields::AttrFields, util::struct_unwrap};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{spanned::Spanned, Data, DeriveInput, Generics, Ident};
+use syn::{DeriveInput, Generics, Ident};
 pub const PROXY_PATH: &str = "proxy";
 
 pub struct ProxyDeriveInfo<'a> {
@@ -10,27 +10,6 @@ pub struct ProxyDeriveInfo<'a> {
   pub ident: &'a Ident,
   pub generics: &'a Generics,
   pub attr_name: &'static str,
-}
-
-pub fn struct_unwrap<'a>(
-  data: &'a mut syn::Data,
-  derive_trait: &'static str,
-) -> Result<&'a mut syn::DataStruct, TokenStream> {
-  match data {
-    Data::Struct(stt) => Ok(stt),
-    Data::Enum(e) => {
-      let err_str = format!("`{}` not support for Enum", derive_trait);
-      Err(quote_spanned! {
-        e.enum_token.span() => compile_error!(#err_str);
-      })
-    }
-    Data::Union(u) => {
-      let err_str = format!("`{}` not support for Union", derive_trait);
-      Err(quote_spanned! {
-        u.union_token.span() => compile_error!(#err_str);
-      })
-    }
-  }
 }
 
 impl<'a> ProxyDeriveInfo<'a> {

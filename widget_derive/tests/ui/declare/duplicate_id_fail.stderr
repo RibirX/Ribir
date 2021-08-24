@@ -1,0 +1,8 @@
+error: Same id(`same_id`) assign to multiple widgets, id must be unique.
+  --> $DIR/duplicate_id_fail.rs:6:11
+   |
+6  |       id: same_id,
+   |           ^^^^^^^
+...
+10 |         id: same_id,
+   |             ^^^^^^^

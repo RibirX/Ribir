@@ -1,0 +1,5 @@
+error: Field should alwyas declare before children.
+ --> $DIR/widget_before_field_fail.rs:8:7
+  |
+8 |       size
+  |       ^^^^

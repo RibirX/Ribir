@@ -3,7 +3,7 @@ use rxrust::prelude::*;
 use std::rc::Rc;
 
 /// Focus attr attach to widget to support get ability to focus in.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct FocusAttr {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -68,7 +68,7 @@ impl FocusAttr {
     &self,
     event_type: FocusEventType,
     mut handler: H,
-  ) -> SubscriptionWrapper<LocalSubscription> {
+  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
     self
       .focus_event_observable()
       .filter(move |(t, _)| *t == event_type)
@@ -80,9 +80,9 @@ pub fn focus_listen_on<W: AttachAttr, H: FnMut(&FocusEvent) + 'static>(
   widget: W,
   event_type: FocusEventType,
   handler: H,
-) -> AttrWidget<W::W> {
+) -> W::W {
   let mut w = widget.into_attr_widget();
-  w.attrs
+  w.attrs_mut()
     .entry::<FocusAttr>()
     .or_default()
     .listen_on(event_type, handler);

@@ -1,5 +1,6 @@
 use crate::proxy_derive::ProxyDeriveInfo;
 use crate::proxy_derive::PROXY_PATH;
+use crate::util::add_where_bounds;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -11,7 +12,8 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
   match info {
     Ok(info) => {
       let path = info.attr_path();
-      let generics = info.attr_fields.proxy_bounds_generic(quote! {RenderWidget});
+      let mut generics = info.attr_fields.proxy_bounds_generic(quote! {RenderWidget});
+      add_where_bounds(&mut generics, quote! { Self: AttrsAccess});
       let ident = info.ident;
       let attr_fields = info.attr_fields;
       let (field, _) = &attr_fields.attr_fields()[0];
@@ -34,11 +36,6 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
           fn create_render_object(&self) -> Self::RO {
             RenderWidget::create_render_object(&self.#path)
           }
-
-          #[inline]
-          fn get_attrs(&self) -> Option<&Attributes> {
-            RenderWidget::get_attrs(&self.#path)
-           }
         }
       }
     }

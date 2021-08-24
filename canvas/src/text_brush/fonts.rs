@@ -198,10 +198,10 @@ mod tests {
     #[cfg(target_os = "linux")]
     {
       font = fonts
-        .select_best_match("DejaVu Serif, DejaVu Sans", &props, &mut brush)
+        .select_best_match("DejaVu Serif, Noto Serif, DejaVu Sans", &props, &mut brush)
         .unwrap();
 
-      assert_eq!(font.font.family_name(), "DejaVu Serif");
+      assert!(font.font.family_name().contains("Serif"));
     }
 
     #[cfg(target_os = "macos")]

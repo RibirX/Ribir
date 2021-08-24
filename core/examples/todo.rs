@@ -1,3 +1,4 @@
+#![feature(negative_impls)]
 use ribir::{
   prelude::*,
   widget::{Column, Row},
@@ -9,7 +10,7 @@ struct Task {
   label: String,
 }
 #[stateful(custom)]
-#[derive(Debug, AttachAttr)]
+#[derive(Debug)]
 struct Todos {
   #[state]
   tasks: Vec<Task>,
@@ -19,27 +20,27 @@ impl CombinationWidget for StatefulTodos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     Column::default()
       .with_cross_align(CrossAxisAlign::Start)
-      .have(
+      .have_multi(
         self
-          .as_ref()
+          .borrow()
           .tasks
           .iter()
           .enumerate()
           .map(|(idx, task)| {
-            let mut todos = self.ref_cell();
-            let mut checkbox = Checkbox::from_theme(ctx.theme()).with_checked(task.finished);
+            let todos = self.ref_cell();
+            let mut checkbox = Checkbox::from_theme(&*ctx.theme()).with_checked(task.finished);
             checkbox.state_checked().subscribe(move |v| {
               todos.borrow_mut().tasks[idx].finished = v.after;
             });
             Margin { margin: EdgeInsets::vertical(4.) }
               .have(
                 Row::default()
-                  .push(
+                  .have(
                     Margin { margin: EdgeInsets::horizontal(4.) }
                       .with_key(idx)
                       .box_it(),
                   )
-                  .push(Text(task.label.clone()).box_it())
+                  .have(Text(task.label.clone()).box_it())
                   .box_it(),
               )
               .box_it()

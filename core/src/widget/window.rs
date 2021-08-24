@@ -84,9 +84,9 @@ impl RawWindow for NativeWindow {
 
 /// Window is the root to represent.
 pub struct Window<R: CanvasRender = WgpuRender> {
+  pub raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
   render_tree: Pin<Box<RenderTree>>,
   widget_tree: Pin<Box<WidgetTree>>,
-  pub(crate) raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
   canvas: Pin<Box<Canvas>>,
   render: R,
   pub(crate) dispatcher: Dispatcher,
@@ -95,7 +95,7 @@ pub struct Window<R: CanvasRender = WgpuRender> {
 impl<R: CanvasRender> Window<R> {
   /// processes native events from this native window
   #[inline]
-  pub(crate) fn processes_native_event(&mut self, event: WindowEvent) {
+  pub fn processes_native_event(&mut self, event: WindowEvent) {
     match event {
       WindowEvent::Resized(size) => {
         self.resize(DeviceSize::new(size.width, size.height));
@@ -120,10 +120,13 @@ impl<R: CanvasRender> Window<R> {
   /// represent the latest application state.
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
-  pub(crate) fn render_ready(&mut self) -> bool {
+  pub fn render_ready(&mut self) -> bool {
+    unsafe { self.widget_tree.as_mut().get_unchecked_mut() }.all_state_change_notify();
     let mut changed = self.tree_repair();
     changed = self.layout() || changed;
-    self.dispatcher.focus_mgr.update(&self.dispatcher.common);
+    if changed {
+      self.dispatcher.focus_mgr.update(&self.dispatcher.common);
+    }
 
     changed
   }
@@ -204,10 +207,8 @@ impl<R: CanvasRender> Window<R> {
     self.raw_window.borrow().request_redraw();
   }
 
-  #[cfg(test)]
   pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
 
-  #[cfg(test)]
   pub fn widget_tree(&mut self) -> Pin<&mut WidgetTree> { self.widget_tree.as_mut() }
 
   #[cfg(test)]

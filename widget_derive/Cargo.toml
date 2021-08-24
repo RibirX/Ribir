@@ -1,6 +1,6 @@
 [package]
 authors = ["Adoo <Adoo@outlook.com>"]
-edition = "2018"
+edition = "2021"
 name = "widget_derive"
 version = "0.1.0"
 
@@ -10,10 +10,15 @@ version = "0.1.0"
 proc-macro = true
 
 [dependencies]
+lazy_static = "1.4.0"
 proc-macro2 = "1.0.26"
 quote = "1.0.9"
-syn = "1.0.69"
 
 [dev-dependencies]
 ribir = {path = "../core"}
-trybuild = "1.0"
+trybuild = "1.0.53"
+winit = "0.24.0"
+
+[dependencies.syn]
+features = ["visit-mut","full","extra-traits"]
+version = "1.0.82"

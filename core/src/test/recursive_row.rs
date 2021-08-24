@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::{prelude::*, widget::Row};
-#[derive(Debug, AttachAttr)]
+#[derive(Debug)]
 pub struct RecursiveRow {
   pub width: usize,
   pub depth: usize,
@@ -9,7 +9,7 @@ pub struct RecursiveRow {
 impl CombinationWidget for RecursiveRow {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
     Row::default()
-      .have(
+      .have_multi(
         (0..self.width)
           .map(|_| {
             if self.depth > 1 {

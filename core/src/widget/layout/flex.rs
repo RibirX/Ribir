@@ -45,7 +45,7 @@ pub enum MainAxisAlign {
 }
 
 #[stateful]
-#[derive(Default, MultiChildWidget, AttachAttr)]
+#[derive(Default, MultiChildWidget, Declare)]
 pub struct Flex {
   /// Reverse the main axis.
   #[state]
@@ -466,7 +466,7 @@ mod tests {
 
   #[test]
   fn horizontal_line() {
-    let row = Flex::default().have(
+    let row = Flex::default().have_multi(
       (0..10)
         .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
         .collect(),
@@ -477,11 +477,13 @@ mod tests {
 
   #[test]
   fn vertical_line() {
-    let col = Flex::default().with_direction(Direction::Vertical).have(
-      (0..10)
-        .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
-        .collect(),
-    );
+    let col = Flex::default()
+      .with_direction(Direction::Vertical)
+      .have_multi(
+        (0..10)
+          .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
+          .collect(),
+      );
     let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
@@ -491,7 +493,7 @@ mod tests {
     let size = Size::new(200., 20.);
     let row = Flex::default()
       .with_wrap(true)
-      .have((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
+      .have_multi((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -510,7 +512,7 @@ mod tests {
     let row = Flex::default()
       .with_wrap(true)
       .with_reverse(true)
-      .have((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
+      .have_multi((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -528,9 +530,9 @@ mod tests {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
       let row = Row::default()
         .with_cross_align(align)
-        .push(SizedBox::from_size(Size::new(100., 20.)).box_it())
-        .push(SizedBox::from_size(Size::new(100., 30.)).box_it())
-        .push(SizedBox::from_size(Size::new(100., 40.)).box_it())
+        .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
+        .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
+        .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
         .box_it();
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
@@ -559,9 +561,9 @@ mod tests {
 
     let row = Row::default()
       .with_cross_align(CrossAxisAlign::Stretch)
-      .push(SizedBox::from_size(Size::new(100., 20.)).box_it())
-      .push(SizedBox::from_size(Size::new(100., 30.)).box_it())
-      .push(SizedBox::from_size(Size::new(100., 40.)).box_it())
+      .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
+      .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
+      .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
       .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
@@ -592,9 +594,9 @@ mod tests {
       let row = Row::default()
         .with_main_align(align)
         .with_cross_align(CrossAxisAlign::Start)
-        .push(SizedBox::from_size(item_size).box_it())
-        .push(SizedBox::from_size(item_size).box_it())
-        .push(SizedBox::from_size(item_size).box_it())
+        .have(SizedBox::from_size(item_size).box_it())
+        .have(SizedBox::from_size(item_size).box_it())
+        .have(SizedBox::from_size(item_size).box_it())
         .box_it();
 
       let mut wnd = window::Window::without_render(

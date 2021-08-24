@@ -375,13 +375,13 @@ mod tests {
 
   #[test]
   fn fix_ensure_relayout() {
-    #[derive(Debug, AttachAttr)]
+    #[derive(Debug)]
     struct DoubleSize;
 
     impl CombinationWidget for DoubleSize {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         let stateful = SizedBox::from_size(Size::new(100., 100.)).into_stateful();
-        let mut state = stateful.ref_cell();
+        let state = stateful.ref_cell();
         stateful
           .on_pointer_move(move |_| {
             let mut sized_box = state.borrow_mut();

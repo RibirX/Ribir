@@ -8,9 +8,9 @@ pub struct EdgeInsets {
   pub top: f32,
 }
 
-/// A widget that crate space around its child.
+/// A widget that create space around its child.
 #[stateful]
-#[derive(SingleChildWidget, AttachAttr)]
+#[derive(SingleChildWidget)]
 pub struct Margin {
   #[state]
   pub margin: EdgeInsets,
@@ -112,6 +112,25 @@ impl EdgeInsets {
   /// Convert to an array by the top, right, bottom, left order.
   #[inline]
   pub fn to_array(&self) -> [f32; 4] { [self.top, self.right, self.bottom, self.left] }
+}
+
+impl std::ops::Add for EdgeInsets {
+  type Output = Self;
+
+  #[inline]
+  fn add(mut self, rhs: Self) -> Self::Output {
+    self += rhs;
+    self
+  }
+}
+
+impl std::ops::AddAssign for EdgeInsets {
+  fn add_assign(&mut self, rhs: Self) {
+    self.left += rhs.left;
+    self.right += rhs.right;
+    self.bottom += rhs.bottom;
+    self.top += rhs.top;
+  }
 }
 
 #[cfg(test)]

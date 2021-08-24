@@ -125,7 +125,7 @@ impl_bytes_consume_by_hasher!(
 fn key_detect() {
   use crate::widget::*;
   impl<W> AttrWidget<W> {
-    fn key(&self) -> Option<&Key> { self.attrs.get() }
+    fn key(&self) -> Option<&Key> { self.attrs.find() }
   }
   let k1 = Text("".to_string()).with_key(0);
   let k2 = Text("".to_string()).with_key(String::new());

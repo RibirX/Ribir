@@ -1,7 +1,7 @@
 error_on_line_overflow = true
 error_on_unformatted = false
-wrap_comments = true
-tab_spaces = 2
 fn_single_line = true
+struct_lit_width = 36
+tab_spaces = 2
 version = "Two"
-struct_lit_width= 36
+wrap_comments = true

@@ -31,14 +31,13 @@
 - [x] Theme data.
 - [ ] event  
   - [ ] window event
-  - [ ] event 
-    - [x] event loop
-    - [x] bubbling framework
-    - [ ] event type
-      - [x] point event ?
-      - [ ] window event ?
-      - [x] keyboard event
-        [x] wheel event
+  - [x] event loop
+  - [x] bubbling framework
+  - [ ] event type
+    - [x] point event ?
+    - [ ] window event ?
+    - [x] keyboard event
+      [x] wheel event
 
 - widgets for todo demo
 - [ ] simple widget
@@ -53,13 +52,13 @@
   - [x] Row
 - [ ] event widget
   - [ ] input widget.
-  - [x] click widget
+  - [x] click event listener
 
 - [x] A derive macro for state impl
 - [x] refactor stateful
   - [x] stateful should be a widget not a attr.
   - [x] into_sateful should not depend on `BuildCtx`
-- [ ] auto implement declare macro to build widget.
+- [x] auto implement declare macro to build widget.
 
 ##  we need readable & learnable documents.
 
@@ -89,4 +88,7 @@
 
 ## debug, test and productive develop tools
 
-## runtime declare language to render ?
+## declare language to describe ui.
+
+provide `declare!` macro.
+

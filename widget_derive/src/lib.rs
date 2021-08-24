@@ -1,3 +1,4 @@
+#![feature(proc_macro_diagnostic)]
 //! A derive implementation for `CombinationWidget` and `RenderWidget`. Can use
 //! `proxy` attr to specify where to derive form.
 //!
@@ -28,16 +29,18 @@
 extern crate proc_macro;
 extern crate proc_macro2;
 
-mod attach_attr_derive;
 mod attr_fields;
 mod combination_derive;
+mod declare_derive;
+mod declare_func_derive;
+mod error;
 mod multi_derive;
 mod proxy_derive;
 mod render_derive;
 mod single_derive;
 mod state_derive;
 mod state_partial_eq_derive;
-
+mod util;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -65,13 +68,6 @@ pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
   multi_derive::multi_derive(&mut input).into()
 }
 
-// Todo Should give a default implement in attr mod.  Depends on https://github.com/rust-lang/rust/pull/85499 fixed.
-#[proc_macro_derive(AttachAttr)]
-pub fn attach_attr_macro_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  attach_attr_derive::attach_attr_derive(&input).into()
-}
-
 #[proc_macro_derive(StatePartialEq)]
 pub fn state_partial_eq_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
@@ -85,4 +81,17 @@ pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
   state_derive::stateful_derive(&mut input, attrs)
     .unwrap_or_else(|e| e)
     .into()
+}
+
+#[proc_macro_derive(Declare, attributes(rename))]
+pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
+  let mut input = parse_macro_input!(input as DeriveInput);
+  declare_derive::declare_derive(&mut input)
+    .unwrap_or_else(|e| e)
+    .into()
+}
+
+#[proc_macro]
+pub fn declare(input: TokenStream) -> TokenStream {
+  declare_func_derive::declare_func_macro(input).into()
 }

@@ -1,6 +1,5 @@
-use proc_macro2::{Span, TokenStream};
-use syn::parse_quote;
-use syn::token::Where;
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{
   punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
   Path, Type, TypeParamBound, WherePredicate,
@@ -52,15 +51,7 @@ impl<'a> AttrFields<'a> {
     if !self.attr_fields.is_empty() {
       let (field, _) = &self.attr_fields[0];
       let proxy_ty = &field.ty;
-
-      generics
-        .where_clause
-        .get_or_insert_with(|| syn::WhereClause {
-          where_token: Where(Span::call_site()),
-          predicates: <_>::default(),
-        })
-        .predicates
-        .push(parse_quote! {#proxy_ty: #trait_token});
+      crate::util::add_where_bounds(&mut generics, quote! {#proxy_ty: #trait_token});
     }
 
     generics
@@ -169,19 +160,19 @@ fn type_contain(ty: &Type, generic_ident: &Ident) -> bool {
     }),
     Type::ImplTrait(_) => false,
     Type::TraitObject(_trait_obj) => {
-      unimplemented!("TraitObject type cannot derive as state yet")
+      panic!("TraitObject type cannot derive as state yet")
     }
     Type::Paren(_paren) => {
-      unimplemented!("Paren  type cannot derive as state yet")
+      panic!("Paren  type cannot derive as state yet")
     }
     Type::Group(_group) => {
-      unimplemented!("Group type cannot derive as state yet")
+      panic!("Group type cannot derive as state yet")
     }
     Type::Macro(_macro) => {
-      unimplemented!("Macro type cannot derive as state yet")
+      panic!("Macro type cannot derive as state yet")
     }
     Type::Verbatim(_verbatim) => {
-      unimplemented!("Verbatim type cannot derive as state yet")
+      panic!("Verbatim type cannot derive as state yet")
     }
     Type::Infer(_) => unreachable!(),
     Type::__TestExhaustive(_) => unreachable!(),

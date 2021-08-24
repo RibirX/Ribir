@@ -1,0 +1,17 @@
+error: Test for declare syntax warning.
+ --> $DIR/unused_warning_fail.rs:4:3
+  |
+4 |   compile_error!("Test for declare syntax warning.");
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `test_id` does not be used
+  --> $DIR/unused_warning_fail.rs:10:11
+   |
+10 |       id: test_id,
+   |           ^^^^^^^
+   |
+help: Remove this line.
+  --> $DIR/unused_warning_fail.rs:10:11
+   |
+10 |       id: test_id,
+   |           ^^^^^^^

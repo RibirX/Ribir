@@ -39,19 +39,21 @@ impl CommonDispatcher {
 
   pub fn dispatch_to<
     Event: std::convert::AsMut<EventCommon> + std::fmt::Debug,
-    Handler: FnMut(&AttrData, Rc<Event>),
-    AttrData: Any,
+    O: Observer<Item = Rc<Event>, Err = ()>,
+    F: Fn(&Attr) -> O,
+    Attr: Any,
   >(
     &self,
     wid: WidgetId,
-    handler: &mut Handler,
+    f: F,
     event: Event,
   ) -> Event {
-    let attr = wid
+    let observer = wid
       .get(self.widget_tree_ref())
-      .and_then(|w| w.find_attr::<AttrData>());
-    if let Some(attr) = attr {
-      Self::rc_dispatch(attr, event, handler)
+      .and_then(|w| (w as &dyn AttrsAccess).find_attr::<Attr>())
+      .map(|a| f(&*a));
+    if let Some(o) = observer {
+      Self::rc_dispatch(event, o)
     } else {
       event
     }
@@ -59,13 +61,14 @@ impl CommonDispatcher {
 
   pub fn bubble_dispatch<
     Event: AsMut<EventCommon> + AsRef<EventCommon> + std::fmt::Debug,
-    Handler: FnMut(&Attr, Rc<Event>),
+    O: Observer<Item = Rc<Event>, Err = ()>,
+    F: Fn(&Attr) -> O,
     EventDataUpdate: FnMut(&mut Event),
     Attr: Any,
   >(
     &self,
     wid: WidgetId,
-    mut handler: Handler,
+    map_to_observer: F,
     event: Event,
     // Calling before dispatch event to the target widget, give an chance to update event data.
     mut update_event: EventDataUpdate,
@@ -76,13 +79,13 @@ impl CommonDispatcher {
       .filter_map(|wid| {
         wid
           .get(tree)
-          .and_then(|w| w.find_attr::<Attr>())
-          .map(|widget| (wid, widget))
+          .and_then(|w| (w as &dyn AttrsAccess).find_attr::<Attr>())
+          .map(|attr| (wid, map_to_observer(&*attr)))
       })
-      .try_fold(event, |mut event, (wid, attr)| {
+      .try_fold(event, |mut event, (wid, observer)| {
         event.as_mut().current_target = wid;
         update_event(&mut event);
-        event = Self::rc_dispatch(attr, event, &mut handler);
+        event = Self::rc_dispatch(event, observer);
         Self::ok_bubble(event)
       });
 
@@ -100,14 +103,13 @@ impl CommonDispatcher {
     }
   }
 
-  fn rc_dispatch<Attr, Event, Handler>(widget: &Attr, event: Event, handler: &mut Handler) -> Event
+  fn rc_dispatch<Event, O>(event: Event, mut observer: O) -> Event
   where
-    Attr: Any,
     Event: std::fmt::Debug,
-    Handler: FnMut(&Attr, Rc<Event>),
+    O: Observer<Item = Rc<Event>, Err = ()>,
   {
     let rc_event = Rc::new(event);
-    handler(widget, rc_event.clone());
+    observer.next(rc_event.clone());
     Rc::try_unwrap(rc_event).expect("Keep the event is dangerous and not allowed")
   }
 }
