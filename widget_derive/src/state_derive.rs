@@ -1,3 +1,4 @@
+use crate::util::prefix_ident;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
 use syn::{
@@ -11,6 +12,7 @@ use crate::{attr_fields::pure_ident, proxy_derive::ProxyDeriveInfo};
 const STATEFUL_ATTR: &str = "stateful";
 const STATE_ATTR_NAME: &str = "state";
 const CUSTOM_IMPL: &str = "custom";
+pub const STATE_PREFIX: &str = "state_";
 
 pub(crate) fn stateful_derive(
   input: &mut syn::DeriveInput,
@@ -41,7 +43,7 @@ pub(crate) fn stateful_derive(
 
   let state_fn_names = state_field_names
     .clone()
-    .map(|name| prefix_ident("state_", &name));
+    .map(|name| prefix_ident(STATE_PREFIX, &name));
 
   let state_ty = state_fields.clone().map(|f| &f.ty);
   let mut stateful_name = prefix_ident("Stateful", &quote! {#name});
@@ -87,7 +89,8 @@ pub(crate) fn stateful_derive(
     quote! {
       #[derive(RenderWidget, CombinationWidget, SingleChildWidget, MultiChildWidget)]
       #vis struct #stateful_name #w_ty_generics(
-        #[proxy] StatefulImpl<#name #w_ty_generics>) #w_where_clause;
+        #[proxy] StatefulImpl<#name #w_ty_generics>
+      ) #w_where_clause;
     }
   };
 
@@ -131,11 +134,28 @@ pub(crate) fn stateful_derive(
       }
     }
 
+    impl #w_impl_generics !NoAttrs for #stateful_name #w_ty_generics #w_where_clause {}
+
     impl #w_impl_generics AttachAttr for #stateful_name #w_ty_generics #w_where_clause {
-      type W = RcWidget<#name #w_ty_generics>;
+      type W = Self;
+      #[inline]
+      fn into_attr_widget(self) -> Self::W { self }
+    }
+
+    impl #w_impl_generics AttrsAccess for #stateful_name #w_ty_generics #w_where_clause {
+      #[inline]
+      fn get_attrs(&self) -> Option<AttrRef<Attributes>> { self.0.get_attrs() }
 
       #[inline]
-      fn into_attr_widget(self) -> AttrWidget<Self::W> { self.0 }
+      fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> { self.0.get_attrs_mut() }
+    }
+
+    impl #w_impl_generics Attrs for #stateful_name #w_ty_generics #w_where_clause {
+      #[inline]
+      fn attrs(&self) -> AttrRef<Attributes> { self.0.attrs() }
+
+      #[inline]
+      fn attrs_mut(&mut self) -> AttrRefMut<Attributes> { self.0.attrs_mut() }
     }
 
     impl #w_impl_generics std::ops::Deref for #stateful_name #w_ty_generics #w_where_clause {
@@ -155,10 +175,6 @@ pub(crate) fn stateful_derive(
 
     #expanded
   })
-}
-
-fn prefix_ident(prefix: &str, ident: &TokenStream2) -> Ident {
-  syn::parse_str::<Ident>(&format!("{}{}", prefix, ident)).unwrap()
 }
 
 fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<(bool, Option<Ident>), TokenStream2> {

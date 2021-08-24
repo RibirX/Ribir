@@ -28,7 +28,8 @@ pub macro assert_canvas_eq($frame: expr, $path: expr $(,)?) {
     panic!(
       "{}",
       format!(
-        "Canvas is not same with `{}`,\nMaybe you want use `write_canvas_to` to save Canvas as png to compare.",
+        "Canvas is not same with `{}`.\n
+You can use `write_canvas_to` to save Canvas as png to compare.",
         $path
       )
     );

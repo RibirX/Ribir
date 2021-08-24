@@ -21,7 +21,7 @@
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}",
+      "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
@@ -130,6 +130,44 @@
         "filter": {
           "name": "unit_test",
           "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=test",
+          "--package=widget_derive"
+        ],
+        "filter": {
+          "name": "test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'declare_test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=declare_test",
+          "--package=widget_derive"
+        ],
+        "filter": {
+          "name": "declare_test",
+          "kind": "test"
         }
       },
       "args": [],

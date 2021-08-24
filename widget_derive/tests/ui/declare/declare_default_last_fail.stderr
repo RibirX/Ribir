@@ -1,0 +1,5 @@
+error: The base struct must always be the last field.
+ --> $DIR/declare_default_last_fail.rs:6:7
+  |
+6 |       ..<_>::default(),
+  |       ^^^^^^^^^^^^^^^^

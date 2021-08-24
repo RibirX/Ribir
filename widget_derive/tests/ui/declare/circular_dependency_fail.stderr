@@ -1,0 +1,68 @@
+error: Can't init widget because circle follow: id1.size -> id2 , id2.size -> id3 , id3.size -> id1
+  --> tests/ui/declare/circular_dependency_fail.rs:8:13
+   |
+8  |         id: id1,
+   |             ^^^
+9  |         size: id2.size,
+   |         ^^^^  ^^^
+...
+12 |         id: id2,
+   |             ^^^
+13 |         size: id3.size,
+   |         ^^^^  ^^^
+...
+16 |         id: id3,
+   |             ^^^
+17 |         size: id1.size,
+   |         ^^^^  ^^^
+   |
+note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
+  --> tests/ui/declare/circular_dependency_fail.rs:9:9
+   |
+9  |         size: id2.size,
+   |         ^^^^
+...
+13 |         size: id3.size,
+   |         ^^^^
+...
+17 |         size: id1.size,
+   |         ^^^^
+
+error: Can't init widget because circle follow: child.margin -> parent , parent.margin -> child
+  --> tests/ui/declare/circular_dependency_fail.rs:26:11
+   |
+26 |       id: parent,
+   |           ^^^^^^
+27 |       size: Size::zero(),
+28 |       margin: child.margin.clone(),
+   |       ^^^^^^  ^^^^^^^^^^^^
+29 |       SizedBox{
+30 |         id: child,
+   |             ^^^^^
+31 |         size: Size::zero(),
+32 |         margin: parent.margin.clone(),
+   |         ^^^^^^  ^^^^^^^^^^^^^
+   |
+note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
+  --> tests/ui/declare/circular_dependency_fail.rs:28:7
+   |
+28 |       margin: child.margin.clone(),
+   |       ^^^^^^
+...
+32 |         margin: parent.margin.clone(),
+   |         ^^^^^^
+
+error: Circle follow will cause infinite state change trigger: a -> a
+  --> tests/ui/declare/circular_dependency_fail.rs:41:11
+   |
+41 |       id: a,
+   |           ^
+...
+44 |     data_flow! { a.size ~> a.size }
+   |                  ^         ^
+   |
+note: If the circular is your want, use `#[skip_nc]` attribute before field or data_flow to skip the no change trigger of the field modify to ignore infinite state change trigger.
+  --> tests/ui/declare/circular_dependency_fail.rs:44:18
+   |
+44 |     data_flow! { a.size ~> a.size }
+   |                  ^^^^^^^^^^^

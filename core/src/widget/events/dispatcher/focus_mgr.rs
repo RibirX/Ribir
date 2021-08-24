@@ -79,7 +79,7 @@ impl FocusManager {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
         id.get(tree)
-          .and_then(|w| w.find_attr::<FocusAttr>())
+          .and_then(|w| (w as &dyn AttrsAccess).find_attr::<FocusAttr>())
           .map_or(false, |focus| focus.auto_focus)
       })
     })
@@ -94,7 +94,7 @@ impl FocusManager {
         .descendants(tree)
         .filter_map(|id| {
           id.get(tree)
-            .and_then(|w| w.find_attr::<FocusAttr>())
+            .and_then(|w| (w as &dyn AttrsAccess).find_attr::<FocusAttr>())
             .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
         })
         .for_each(|node| match node.tab_index {
@@ -136,7 +136,7 @@ impl FocusManager {
       let event = Self::focus_event(blur.wid, dispatcher);
       dispatcher.dispatch_to(
         blur.wid,
-        &mut Self::create_emitter(FocusEventType::Blur),
+        |f| FocusObserver::new(f, FocusEventType::Blur),
         event,
       );
 
@@ -144,7 +144,7 @@ impl FocusManager {
       let event = Self::focus_event(blur.wid, dispatcher);
       dispatcher.bubble_dispatch(
         blur.wid,
-        Self::create_emitter(FocusEventType::FocusOut),
+        |f| FocusObserver::new(f, FocusEventType::FocusOut),
         event,
         |_| {},
       );
@@ -154,7 +154,7 @@ impl FocusManager {
       let event = Self::focus_event(focus.wid, dispatcher);
       dispatcher.dispatch_to(
         focus.wid,
-        &mut Self::create_emitter(FocusEventType::Focus),
+        |f| FocusObserver::new(f, FocusEventType::Focus),
         event,
       );
 
@@ -162,7 +162,7 @@ impl FocusManager {
       let event = Self::focus_event(focus.wid, dispatcher);
       dispatcher.bubble_dispatch(
         focus.wid,
-        Self::create_emitter(FocusEventType::FocusIn),
+        |f| FocusObserver::new(f, FocusEventType::FocusIn),
         event,
         |_| {},
       );
@@ -180,13 +180,31 @@ impl FocusManager {
       dispatcher.render_tree,
     )
   }
+}
 
-  fn create_emitter(event_type: FocusEventType) -> impl FnMut(&FocusAttr, Rc<EventCommon>) {
-    move |focus: &FocusAttr, event: Rc<FocusEvent>| {
-      log::info!("{:?} {:?}", event_type, event);
-      focus.focus_event_observable().next((event_type, event));
+struct FocusObserver {
+  event_type: FocusEventType,
+  subject: LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()>,
+}
+
+impl FocusObserver {
+  fn new(attr: &FocusAttr, event_type: FocusEventType) -> Self {
+    Self {
+      event_type,
+      subject: attr.focus_event_observable(),
     }
   }
+}
+
+impl Observer for FocusObserver {
+  type Item = Rc<FocusEvent>;
+  type Err = ();
+
+  fn next(&mut self, value: Self::Item) { self.subject.next((self.event_type, value)) }
+
+  fn error(&mut self, err: Self::Err) { self.subject.error(err); }
+
+  fn complete(&mut self) { self.subject.complete() }
 }
 
 #[cfg(test)]
@@ -209,8 +227,8 @@ mod tests {
   fn auto_focus() {
     // two auto focus widget
     let widget = Row::default()
-      .push(empty_box().with_auto_focus(true).box_it())
-      .push(empty_box().with_auto_focus(true).box_it());
+      .have(empty_box().with_auto_focus(true).box_it())
+      .have(empty_box().with_auto_focus(true).box_it());
     let (wnd, mut mgr) = env(widget.box_it());
     let tree = wnd.dispatcher.common.widget_tree_ref();
     let id = tree.root().and_then(|root| root.first_child(&tree));
@@ -219,8 +237,8 @@ mod tests {
 
     // one auto focus widget
     let widget = Row::default()
-      .push(empty_box().box_it())
-      .push(empty_box().with_auto_focus(true).box_it());
+      .have(empty_box().box_it())
+      .have(empty_box().with_auto_focus(true).box_it());
     let (wnd, mut mgr) = env(widget.box_it());
     let tree = wnd.dispatcher.common.widget_tree_ref();
     let id = tree
@@ -234,11 +252,11 @@ mod tests {
   #[test]
   fn tab_index() {
     let widget = Row::default()
-      .push(empty_box().with_tab_index(-1).box_it())
-      .push(empty_box().with_tab_index(0).with_auto_focus(true).box_it())
-      .push(empty_box().with_tab_index(1).box_it())
-      .push(empty_box().with_tab_index(2).box_it())
-      .push(empty_box().with_tab_index(3).box_it());
+      .have(empty_box().with_tab_index(-1).box_it())
+      .have(empty_box().with_tab_index(0).with_auto_focus(true).box_it())
+      .have(empty_box().with_tab_index(1).box_it())
+      .have(empty_box().with_tab_index(2).box_it())
+      .have(empty_box().with_tab_index(3).box_it());
 
     let (wnd, mut mgr) = env(widget.box_it());
     let tree = wnd.dispatcher.common.widget_tree_ref();
@@ -269,7 +287,7 @@ mod tests {
 
   #[test]
   fn focus_event() {
-    #[derive(Debug, Default, AttachAttr)]
+    #[derive(Debug, Default)]
     struct EmbedFocus {
       log: Rc<RefCell<Vec<String>>>,
     }
@@ -287,7 +305,10 @@ mod tests {
       name: &'static str,
       widget: A,
       log: Rc<RefCell<Vec<String>>>,
-    ) -> AttrWidget<A::W> {
+    ) -> A::W
+    where
+      A::W: AttachAttr<W = A::W>,
+    {
       let log2 = log.clone();
       let log3 = log.clone();
       let log4 = log.clone();

@@ -3,7 +3,7 @@ use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
 #[stateful(custom = "Checkbox")]
-#[derive(Default, AttachAttr)]
+#[derive(Default)]
 pub struct CheckboxInner {
   #[state]
   pub checked: bool,
@@ -23,14 +23,14 @@ impl Checkbox {
   }
 
   #[inline]
-  pub fn with_checked(mut self, checked: bool) -> Self {
-    self.as_mut().checked = checked;
+  pub fn with_checked(self, checked: bool) -> Self {
+    self.borrow_mut().checked = checked;
     self
   }
 
   #[inline]
-  pub fn with_indeterminate(mut self, b: bool) -> Self {
-    self.as_mut().indeterminate = b;
+  pub fn with_indeterminate(self, b: bool) -> Self {
+    self.borrow_mut().indeterminate = b;
     self
   }
 }
@@ -57,11 +57,11 @@ impl CombinationWidget for Checkbox {
       checked_path,
       marker_color,
       color,
-    } = self.0.as_ref().theme.clone();
-    let check_state = self.0.as_ref();
+    } = self.0.borrow().theme.clone();
+    let check_state = self.0.borrow();
 
-    let mut state = self.ref_cell();
-    let mut state2 = state.clone();
+    let state = self.ref_cell();
+    let state2 = state.clone();
 
     let mut marker = BoxDecoration {
       radius: Some(BorderRadius::all(Vector::new(border_radius, border_radius))),
@@ -113,7 +113,7 @@ impl CombinationWidget for Checkbox {
 }
 
 #[stateful]
-#[derive(Debug, Clone, AttachAttr)]
+#[derive(Debug, Clone)]
 pub struct CheckboxMarker {
   #[state]
   check_mark_width: f32,

@@ -1,4 +1,3 @@
-use crate::render::*;
 pub use std::{
   any::{Any, TypeId},
   collections::HashMap,
@@ -36,51 +35,32 @@ mod scrollable;
 pub use scrollable::*;
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: 'static {
+pub trait CombinationWidget: AttrsAccess + 'static {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
-
-  fn box_it(self) -> BoxedWidget
-  where
-    Self: Sized,
-  {
-    BoxedWidget::Combination(Box::new(self))
-  }
-
-  /// Return the reference to the attrs that attached to the this widget.
-  fn get_attrs(&self) -> Option<&Attributes> { None }
 }
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: CloneStates + 'static {
+pub trait RenderWidget: AttrsAccess + CloneStates + 'static {
   /// The render object type will created.
   type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
   fn create_render_object(&self) -> Self::RO;
-
-  fn box_it(self) -> BoxedWidget
-  where
-    Self: Sized,
-  {
-    BoxedWidget::Render(Box::new(self))
-  }
-
-  /// Return the reference to the attrs that attached to the this widget.
-  fn get_attrs(&self) -> Option<&Attributes> { None }
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety {
+pub trait RenderWidgetSafety: AttrsAccess {
   fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
-  fn get_attrs(&self) -> Option<&Attributes>;
   fn clone_boxed_states(&self) -> Box<dyn Any>;
 }
 
+pub type BoxedSingleChild = Box<SingleChild<Box<dyn RenderWidgetSafety>>>;
+pub type BoxedMultiChild = MultiChild<Box<dyn RenderWidgetSafety>>;
 pub enum BoxedWidget {
   Combination(Box<dyn CombinationWidget>),
   Render(Box<dyn RenderWidgetSafety>),
@@ -88,21 +68,63 @@ pub enum BoxedWidget {
   MultiChild(BoxedMultiChild),
 }
 
-impl BoxedWidget {
-  pub fn find_attr<A: Any>(&self) -> Option<&A> {
+impl AttrsAccess for BoxedWidget {
+  fn get_attrs(&self) -> Option<AttrRef<Attributes>> {
     match self {
-      BoxedWidget::Combination(c) => c.find_attr(),
-      BoxedWidget::Render(r) => r.find_attr(),
-      BoxedWidget::SingleChild(s) => s.find_attr(),
-      BoxedWidget::MultiChild(m) => m.find_attr(),
+      BoxedWidget::Combination(c) => c.get_attrs(),
+      BoxedWidget::Render(r) => r.get_attrs(),
+      BoxedWidget::SingleChild(s) => s.get_attrs(),
+      BoxedWidget::MultiChild(m) => m.get_attrs(),
+    }
+  }
+
+  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> {
+    match self {
+      BoxedWidget::Combination(c) => c.get_attrs_mut(),
+      BoxedWidget::Render(r) => r.get_attrs_mut(),
+      BoxedWidget::SingleChild(s) => s.get_attrs_mut(),
+      BoxedWidget::MultiChild(m) => m.get_attrs_mut(),
     }
   }
 }
 
-impl dyn CombinationWidget {
-  pub fn find_attr<A: Any>(&self) -> Option<&A> { self.get_attrs().and_then(|attrs| attrs.get()) }
+// Widget & BoxWidget default implementation
+
+pub struct CombinationMarker;
+pub struct RenderMarker;
+pub trait BoxWidget<Marker> {
+  fn box_it(self) -> BoxedWidget;
 }
 
-impl dyn RenderWidgetSafety {
-  pub fn find_attr<A: Any>(&self) -> Option<&A> { self.get_attrs().and_then(|attrs| attrs.get()) }
+impl<T: CombinationWidget> BoxWidget<()> for T {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { BoxedWidget::Combination(Box::new(self)) }
+}
+
+impl<T: RenderWidget> BoxWidget<RenderMarker> for T {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { BoxedWidget::Render(Box::new(self)) }
+}
+
+impl<S> BoxWidget<()> for SingleChild<S>
+where
+  S: RenderWidget,
+{
+  fn box_it(self) -> BoxedWidget {
+    let widget: Box<dyn RenderWidgetSafety> = Box::new(self.widget);
+    let boxed = Box::new(SingleChild { widget, child: self.child });
+    BoxedWidget::SingleChild(boxed)
+  }
+}
+
+impl<M: MultiChildWidget> BoxWidget<()> for MultiChild<M> {
+  fn box_it(self) -> BoxedWidget {
+    let widget: Box<dyn RenderWidgetSafety> = Box::new(self.widget);
+    BoxedWidget::MultiChild(MultiChild { widget, children: self.children })
+  }
+}
+
+impl BoxWidget<()> for BoxedWidget {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { self }
 }

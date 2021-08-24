@@ -15,23 +15,23 @@ pub struct KeyboardEvent {
 }
 
 /// An attributes that fire event whenever press or release a key.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>);
 
 pub fn keyboard_listen_on<W: AttachAttr, H: FnMut(&KeyboardEvent) + 'static>(
   widget: W,
   event_type: KeyboardEventType,
   handler: H,
-) -> AttrWidget<W::W> {
+) -> W::W {
   let mut w = widget.into_attr_widget();
   // ensure focus attr attached, because a widget can accept keyboard event base
   // on it can be focused.
-  w.attrs.entry::<FocusAttr>().or_default();
-
-  w.attrs
+  w.attrs_mut().entry::<FocusAttr>().or_default();
+  w.attrs_mut()
     .entry::<KeyboardAttr>()
     .or_default()
     .listen_on(event_type, handler);
+
   w
 }
 
@@ -47,7 +47,7 @@ impl KeyboardAttr {
     &self,
     event_type: KeyboardEventType,
     mut handler: H,
-  ) -> SubscriptionWrapper<LocalSubscription> {
+  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
     self
       .event_observable()
       .filter(move |(t, _)| *t == event_type)

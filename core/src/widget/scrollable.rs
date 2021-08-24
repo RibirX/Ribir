@@ -3,7 +3,7 @@ use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::Wi
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, AttachAttr)]
+#[derive(SingleChildWidget, Default)]
 pub struct ScrollableX {
   #[state]
   pos: f32,
@@ -12,7 +12,7 @@ pub struct ScrollableX {
 /// A widget let its child vertical scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, Default, AttachAttr)]
+#[derive(SingleChildWidget, Default)]
 pub struct ScrollableY {
   #[state]
   pos: f32,
@@ -21,7 +21,7 @@ pub struct ScrollableY {
 /// A widget let its child both scrollable in horizontal and vertical, and the
 /// scroll view is as large as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, Default, AttachAttr)]
+#[derive(SingleChildWidget, Default)]
 pub struct ScrollableBoth {
   #[state]
   pos: Point,
@@ -29,9 +29,9 @@ pub struct ScrollableBoth {
 
 impl ScrollableX {
   #[inline]
-  pub fn x_scroll(pos: f32) -> AttrWidget<RcWidget<ScrollableX>> {
+  pub fn x_scroll(pos: f32) -> StatefulScrollableX {
     let scroll = ScrollableX { pos }.into_stateful();
-    let mut scroll_ref = scroll.ref_cell();
+    let scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.borrow().pos;
@@ -45,9 +45,9 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn y_scroll(pos: f32) -> AttrWidget<RcWidget<ScrollableY>> {
+  pub fn y_scroll(pos: f32) -> StatefulScrollableY {
     let scroll = ScrollableY { pos }.into_stateful();
-    let mut scroll_ref = scroll.ref_cell();
+    let scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.borrow().pos;
@@ -61,9 +61,9 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn both_scroll(pos: Point) -> AttrWidget<RcWidget<ScrollableBoth>> {
+  pub fn both_scroll(pos: Point) -> StatefulScrollableBoth {
     let scroll = ScrollableBoth { pos }.into_stateful();
-    let mut scroll_ref = scroll.ref_cell();
+    let scroll_ref = scroll.ref_cell();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.borrow().pos;
@@ -241,7 +241,7 @@ mod tests {
 
   #[test]
   fn y_scroll() {
-    #[derive(Debug, AttachAttr)]
+    #[derive(Debug)]
     struct Y;
 
     impl CombinationWidget for Y {
@@ -259,7 +259,7 @@ mod tests {
 
   #[test]
   fn both_scroll() {
-    #[derive(Debug, AttachAttr)]
+    #[derive(Debug)]
     struct Both;
 
     impl CombinationWidget for Both {

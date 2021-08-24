@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::{CommonDispatcher, FocusManager};
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
@@ -96,10 +98,7 @@ impl PointerDispatcher {
       };
       common.bubble_dispatch(
         wid,
-        |listener: &WheelAttr, event| {
-          log::info!("char event: {:?}", event);
-          listener.event_observable().next(event);
-        },
+        |wheel_attr: &WheelAttr| wheel_attr.event_observable(),
         event,
         |_| {},
       );
@@ -112,8 +111,9 @@ impl PointerDispatcher {
     self.pointer_down_uid = hit.map(|(wid, _)| wid);
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
-        id.get(tree)
-          .map_or(false, |w| w.find_attr::<FocusAttr>().is_some())
+        id.get(tree).map_or(false, |w| {
+          (w as &dyn AttrsAccess).find_attr::<FocusAttr>().is_some()
+        })
       })
     });
     if let Some(focus_id) = nearest_focus {
@@ -137,7 +137,7 @@ impl PointerDispatcher {
     let mut last_bubble_from = wid;
     common.bubble_dispatch(
       wid,
-      Self::pointer_event_emitter(event_type),
+      |p_attr| PointerObserver::new(p_attr, event_type),
       event,
       move |e: &mut PointerEvent| {
         e.position = last_bubble_from.map_to(
@@ -157,7 +157,6 @@ impl PointerDispatcher {
 
     let mut already_entered = vec![];
 
-    let mut leave_emitter = Self::pointer_event_emitter(PointerEventType::Leave);
     self.entered_widgets.iter().for_each(|w| {
       // if the widget is not the ancestor of the hit widget
       if !w.is_dropped(tree) {
@@ -168,7 +167,11 @@ impl PointerDispatcher {
         {
           let old_pos = w.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
           let event = self.mouse_pointer(*w, old_pos, common);
-          common.dispatch_to(*w, &mut leave_emitter, event);
+          common.dispatch_to(
+            *w,
+            |p_attr| PointerObserver::new(p_attr, PointerEventType::Leave),
+            event,
+          );
         } else {
           already_entered.push(*w)
         }
@@ -177,12 +180,11 @@ impl PointerDispatcher {
     self.entered_widgets.clear();
 
     if let Some((hit_widget, _)) = new_hit {
-      let mut enter_emitter = Self::pointer_event_emitter(PointerEventType::Enter);
       hit_widget
         .ancestors(tree)
         .filter(|w| {
           w.get(tree)
-            .and_then(|w| w.find_attr::<PointerAttr>())
+            .and_then(|w| (w as &dyn AttrsAccess).find_attr::<PointerAttr>())
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -195,7 +197,11 @@ impl PointerDispatcher {
         .for_each(|w| {
           let old_pos = w.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
           let event = self.mouse_pointer(*w, old_pos, common);
-          common.dispatch_to(*w, &mut enter_emitter, event);
+          common.dispatch_to(
+            *w,
+            |p| PointerObserver::new(p, PointerEventType::Enter),
+            event,
+          );
         });
     }
   }
@@ -237,15 +243,6 @@ impl PointerDispatcher {
         .map(|wid| (wid, pos))
     })
   }
-
-  fn pointer_event_emitter(
-    event_type: PointerEventType,
-  ) -> impl FnMut(&PointerAttr, std::rc::Rc<PointerEvent>) {
-    move |attr, event: std::rc::Rc<PointerEvent>| {
-      log::info!("{:?} {:?}", event_type, event);
-      attr.pointer_observable().next((event_type, event));
-    }
-  }
 }
 
 impl WidgetId {
@@ -262,6 +259,31 @@ impl WidgetId {
   }
 }
 
+struct PointerObserver {
+  event_type: PointerEventType,
+  subject: LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>,
+}
+
+impl PointerObserver {
+  fn new(attr: &PointerAttr, event_type: PointerEventType) -> Self {
+    Self {
+      event_type,
+      subject: attr.pointer_observable(),
+    }
+  }
+}
+
+impl Observer for PointerObserver {
+  type Item = Rc<PointerEvent>;
+  type Err = ();
+
+  fn next(&mut self, value: Self::Item) { self.subject.next((self.event_type, value)) }
+
+  fn error(&mut self, err: Self::Err) { self.subject.error(err); }
+
+  fn complete(&mut self) { self.subject.complete() }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -273,10 +295,10 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer<W: AttachAttr>(
-    event_stack: Rc<RefCell<Vec<PointerEvent>>>,
-    widget: W,
-  ) -> AttrWidget<W::W> {
+  fn record_pointer<W: AttachAttr>(event_stack: Rc<RefCell<Vec<PointerEvent>>>, widget: W) -> W::W
+  where
+    W::W: AttachAttr<W = W::W>,
+  {
     let handler_ctor = || {
       let stack = event_stack.clone();
       move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
@@ -292,7 +314,7 @@ mod tests {
   fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
-    let root = record_pointer(event_record.clone(), Row::default()).push(record.box_it());
+    let root = record_pointer(event_record.clone(), Row::default()).have(record.box_it());
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
@@ -534,9 +556,9 @@ mod tests {
         let mut res = c_click_path.borrow_mut();
         *res += 1;
       })
-      .push(child.box_it())
+      .have(child.box_it())
       // Stretch row
-      .push(SizedBox::from_size(Size::new(100., 400.)).box_it());
+      .have(SizedBox::from_size(Size::new(100., 400.)).box_it());
     let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(400., 400.));
     wnd.render_ready();
 
@@ -599,12 +621,12 @@ mod tests {
   #[test]
   fn focus_change_by_event() {
     let root = Row::default()
-      .push(
+      .have(
         SizedBox::from_size(Size::new(50., 50.))
           .with_tab_index(0)
           .box_it(),
       )
-      .push(SizedBox::from_size(Size::new(50., 50.)).box_it());
+      .have(SizedBox::from_size(Size::new(50., 50.)).box_it());
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 

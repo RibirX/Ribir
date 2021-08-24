@@ -308,7 +308,10 @@ mod tests {
   fn generate_vertices(b: &mut Bencher) {
     let mut brush = TextBrush::new(INIT_SIZE, MAX_SIZE);
 
-    let _ = brush.select_best_match("DejaVu Serif, Arial", &FontProperties::default());
+    let _ = brush.select_best_match(
+      "DejaVu Serif, Noto Serif, Arial",
+      &FontProperties::default(),
+    );
     let text = include_str!("../fonts/loads-of-unicode.txt");
     let sec = Section::new().add_text(glyph_brush::Text::default().with_text(text));
     b.iter(|| {

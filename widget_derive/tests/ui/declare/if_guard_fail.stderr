@@ -1,0 +1,16 @@
+error: if guard is not supported in `id`
+  --> $DIR/if_guard_fail.rs:23:10
+   |
+23 |       id if true => : test,
+   |          ^^^^^^^
+
+error: Depends on a field which behind `if guard`, its existence depends on the `if guard` result in runtime.
+   |
+help: field define here.
+  --> $DIR/if_guard_fail.rs:34:11
+   |
+34 |         id: a,
+   |  ___________^
+35 | |       size: Size::zero(),
+36 | |       margin if true =>:  EdgeInsets::all(0.),
+   | |____________^ ^^^^^^^

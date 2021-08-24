@@ -63,9 +63,6 @@ where
 
   #[inline]
   fn clone_boxed_states(&self) -> Box<dyn Any> { Box::new(self.clone_states()) }
-
-  #[inline]
-  fn get_attrs(&self) -> Option<&Attributes> { RenderWidget::get_attrs(self) }
 }
 
 impl<T> RenderObjectSafety for T

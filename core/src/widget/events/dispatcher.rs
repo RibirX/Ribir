@@ -78,10 +78,7 @@ impl Dispatcher {
         };
         let event = self.common.bubble_dispatch(
           focus,
-          |keyboard: &KeyboardAttr, event| {
-            log::info!("{:?}: {:?}", event_type, event);
-            keyboard.event_observable().next((event_type, event))
-          },
+          |keyboard: &KeyboardAttr| KeyBoardObserver::new(keyboard, event_type),
           event,
           |_| {},
         );
@@ -109,10 +106,7 @@ impl Dispatcher {
       };
       self.common.bubble_dispatch(
         focus,
-        |attr: &CharAttr, event| {
-          log::info!("char event: {:?}", event);
-          attr.event_observable().next(event);
-        },
+        |attr: &CharAttr| attr.event_observable(),
         event,
         |_| {},
       );
@@ -128,4 +122,29 @@ impl Dispatcher {
       }
     }
   }
+}
+
+struct KeyBoardObserver {
+  event_type: KeyboardEventType,
+  subject: LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>,
+}
+
+impl KeyBoardObserver {
+  fn new(attr: &KeyboardAttr, event_type: KeyboardEventType) -> Self {
+    Self {
+      event_type,
+      subject: attr.event_observable(),
+    }
+  }
+}
+
+impl Observer for KeyBoardObserver {
+  type Item = Rc<KeyboardEvent>;
+  type Err = ();
+
+  fn next(&mut self, value: Self::Item) { self.subject.next((self.event_type, value)) }
+
+  fn error(&mut self, err: Self::Err) { self.subject.error(err); }
+
+  fn complete(&mut self) { self.subject.complete() }
 }

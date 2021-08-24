@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct CharAttr(LocalSubject<'static, Rc<CharEvent>, ()>);
 
 #[derive(Debug)]

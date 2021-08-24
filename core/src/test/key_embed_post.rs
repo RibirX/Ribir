@@ -5,7 +5,7 @@ use crate::{
   widget::{layout::flex::CrossAxisAlign, widget_tree::*, Row},
 };
 use std::{cell::RefCell, rc::Rc};
-#[derive(Clone, Default, Debug, AttachAttr)]
+#[derive(Clone, Default, Debug)]
 struct EmbedKeyPost {
   title: Rc<RefCell<&'static str>>,
   author: &'static str,
@@ -18,14 +18,14 @@ impl CombinationWidget for EmbedKeyPost {
     let mut row = Row::default()
       .with_cross_align(CrossAxisAlign::Start)
       .with_key(0)
-      .push(Text(self.title.borrow().to_string()).with_key(0).box_it())
-      .push(Text(self.author.to_string()).with_key(1).box_it())
-      .push(Text(self.content.to_string()).with_key(2).box_it());
+      .have(Text(self.title.borrow().to_string()).with_key(0).box_it())
+      .have(Text(self.author.to_string()).with_key(1).box_it())
+      .have(Text(self.content.to_string()).with_key(2).box_it());
 
     if self.level > 0 {
       let mut embed = self.clone();
       embed.level -= 1;
-      row = row.push(embed.with_key("embed").box_it());
+      row = row.have(embed.with_key("embed").box_it());
     }
 
     row.box_it()

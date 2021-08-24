@@ -12,13 +12,16 @@ pub struct BuildCtx<'a> {
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
-  pub fn theme(&self) -> &Theme {
+  pub fn theme(&self) -> AttrRef<Theme> {
     let tree = &*self.tree;
     self
       .wid
       .ancestors(tree)
-      .find_map(|id| id.get(tree).and_then(|w| w.find_attr::<Theme>()))
-      .unwrap_or(&DEFAULT_THEME)
+      .find_map(|id| {
+        id.get(tree)
+          .and_then(|w| (w as &dyn AttrsAccess).find_attr::<Theme>())
+      })
+      .unwrap_or(AttrRef::Ref(&DEFAULT_THEME))
   }
 
   #[inline]
@@ -44,7 +47,7 @@ mod tests {
     ctx.theme();
   }
 
-  #[derive(Debug, AttachAttr)]
+  #[derive(Debug)]
   struct ThemeTrack {
     themes: Rc<RefCell<Vec<Theme>>>,
   }

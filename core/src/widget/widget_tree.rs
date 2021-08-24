@@ -20,6 +20,16 @@ pub struct WidgetTree {
   /// A hash map to mapping a render widget in widget tree to its corresponds
   /// render object in render tree.
   widget_to_render: HashMap<WidgetId, RenderId>,
+  /// A buffer to store all stateful widget which state changed but not trigger
+  /// notify.
+  state_changed: std::collections::VecDeque<Box<dyn StateTrigger>>,
+}
+
+struct TempHold;
+impl CombinationWidget for TempHold {
+  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+    unreachable!();
+  }
 }
 
 impl WidgetTree {
@@ -27,30 +37,40 @@ impl WidgetTree {
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
   pub fn set_root(&mut self, root: BoxedWidget, r_tree: &mut RenderTree) -> WidgetId {
-    struct Temp;
-    impl CombinationWidget for Temp {
-      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        unreachable!();
-      }
-    }
-
     debug_assert!(self.root.is_none());
 
-    let temp = self.new_node(WidgetNode::Combination(Box::new(Temp)));
+    let temp = self.new_node(WidgetNode::Combination(Box::new(TempHold)));
     let root = self.inflate(root, temp, r_tree);
     temp.0.remove(&mut self.arena);
     root.detach(self);
     self.root = Some(root);
+    self.ensure_render_tree_root(r_tree);
+
+    self.all_state_change_notify();
+
     root
   }
 
   pub fn new_node(&mut self, widget: WidgetNode) -> WidgetId {
-    let state_info = widget.find_attr::<StateAttr>().cloned();
+    let tree2 = unsafe {
+      let ptr = self as *mut WidgetTree;
+      &mut *ptr
+    };
     let id = WidgetId(self.arena.new_node(widget));
-    if let Some(state_info) = state_info {
-      state_info.assign_id(id, std::ptr::NonNull::from(self))
+    let state_info = (id.get_mut(self).unwrap() as &mut dyn AttrsAccess)
+      .find_attr_mut::<StateAttr>()
+      .map(|attr| attr);
+
+    if let Some(mut info) = state_info {
+      info.assign_id(id, std::ptr::NonNull::from(tree2));
     }
     id
+  }
+
+  pub fn all_state_change_notify(&mut self) {
+    while let Some(id) = self.state_changed.pop_front() {
+      id.trigger_change();
+    }
   }
 
   /// inflate subtree, so every leaf should be a render widget.
@@ -102,9 +122,6 @@ impl WidgetTree {
       .down_nearest_render_widget(self)
       .relative_to_render(self)
       .unwrap();
-    if r_parent.is_none() {
-      r_tree.set_root(r_root);
-    }
 
     r_root.mark_needs_layout(r_tree);
 
@@ -119,8 +136,15 @@ impl WidgetTree {
       self.repair_subtree(need_build, r_tree)
     }
 
+    self.ensure_render_tree_root(r_tree);
     self.flush_to_render(r_tree);
     repaired
+  }
+
+  /// add a state trigger into the trigger queue
+  #[inline]
+  pub(crate) fn add_state_trigger(&mut self, trigger: Box<dyn StateTrigger>) {
+    self.state_changed.push_back(trigger);
   }
 
   #[cfg(test)]
@@ -128,6 +152,19 @@ impl WidgetTree {
 
   #[cfg(test)]
   pub fn count(&self) -> usize { self.arena.count() }
+
+  fn ensure_render_tree_root(&self, r_tree: &mut RenderTree) {
+    if r_tree.root().is_none() {
+      let r_root = self
+        .root()
+        .unwrap()
+        .down_nearest_render_widget(self)
+        .relative_to_render(self)
+        .unwrap();
+      r_tree.set_root(r_root);
+      r_root.mark_needs_layout(r_tree);
+    }
+  }
 
   fn append_render_widget(
     &mut self,
@@ -231,7 +268,7 @@ impl WidgetTree {
           } else {
             let mut key_children = self.collect_key_children(wid, r_tree);
             children.into_iter().for_each(|c| {
-              let k_widget = c.key().and_then(|k| key_children.remove(k));
+              let k_widget = c.get_key().and_then(|k| key_children.remove(&*k));
               if let Some(id) = k_widget {
                 wid.0.append(id.0, &mut self.arena);
               }
@@ -256,8 +293,12 @@ impl WidgetTree {
   ) -> Option<WidgetId> {
     self.need_builds.remove(&id);
     let old = id.assert_get_mut(self);
-    let o_key = old.key();
-    if o_key.is_some() && o_key != w.key() {
+
+    if old
+      .get_key()
+      .zip(w.get_key())
+      .map_or(false, |(a, b)| a == b)
+    {
       *old = w;
       None
     } else {
@@ -289,7 +330,7 @@ impl WidgetTree {
     while let Some(id) = child {
       child = id.next_sibling(self);
 
-      let key = id.get(self).and_then(|w| w.key().cloned());
+      let key = id.get(self).and_then(|w| w.get_key().map(|k| k.clone()));
       if let Some(key) = key {
         id.detach(self);
         key_children.insert(key, id);
@@ -316,7 +357,7 @@ impl WidgetTree {
 }
 
 impl WidgetId {
-  /// mark this id represented widget has changed, and need to update render
+  /// mark this id combination widget has changed, and need to update render
   /// tree in next frame.
   pub fn mark_changed(self, tree: &'_ mut WidgetTree) {
     if matches!(self.assert_get(tree), WidgetNode::Render(_)) {
@@ -345,19 +386,15 @@ impl WidgetId {
       return None;
     }
 
-    let other_path = other.ancestors(tree).collect::<Vec<_>>();
-    let self_path = self.ancestors(tree).collect::<Vec<_>>();
+    let p0 = other.ancestors(tree).collect::<Vec<_>>();
+    let p1 = self.ancestors(tree).collect::<Vec<_>>();
 
-    let min_len = other_path.len().min(self_path.len());
-    (1..=min_len)
-      .find(|idx| other_path[other_path.len() - idx] != self_path[self_path.len() - idx])
-      // if one widget is the ancestor of the other, the reverse index `min_len` store the common
-      // ancestor.
-      .or(Some(min_len + 1))
-      .and_then(|r_idx| {
-        let idx = self_path.len() + 1 - r_idx;
-        self_path.get(idx).cloned()
-      })
+    p0.iter()
+      .rev()
+      .zip(p1.iter().rev())
+      .filter(|(a, b)| a == b)
+      .last()
+      .map(|(p, _)| p.clone())
   }
 
   /// A proxy for [NodeId::parent](indextree::NodeId.parent)
@@ -526,22 +563,20 @@ pub enum WidgetNode {
   Render(Box<dyn RenderWidgetSafety>),
 }
 
-impl WidgetNode {
-  pub fn key(&self) -> Option<&Key> { self.find_attr() }
-
-  /// Find an attr of this widget. If it have the `A` type attr, return the
-  /// reference.
-  pub fn find_attr<A: Any>(&self) -> Option<&A> {
+impl AttrsAccess for WidgetNode {
+  fn get_attrs(&self) -> Option<AttrRef<Attributes>> {
     match self {
-      WidgetNode::Combination(c) => c.find_attr(),
-      WidgetNode::Render(r) => r.find_attr(),
+      WidgetNode::Combination(c) => c.get_attrs(),
+      WidgetNode::Render(r) => r.get_attrs(),
     }
   }
-}
 
-impl BoxedWidget {
-  #[inline]
-  fn key(&self) -> Option<&Key> { self.find_attr() }
+  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> {
+    match self {
+      WidgetNode::Combination(c) => c.get_attrs_mut(),
+      WidgetNode::Render(r) => r.get_attrs_mut(),
+    }
+  }
 }
 
 #[cfg(test)]

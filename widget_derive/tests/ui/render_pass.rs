@@ -1,7 +1,7 @@
 use ribir::prelude::*;
 
 #[derive(RenderWidget)]
-struct B<W> {
+struct B<W: RenderWidget + NoAttrs> {
   #[proxy]
   a: W,
 }

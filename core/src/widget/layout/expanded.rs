@@ -4,7 +4,7 @@ use crate::prelude::*;
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
 #[stateful]
-#[derive(SingleChildWidget, AttachAttr)]
+#[derive(SingleChildWidget)]
 pub struct Expanded {
   #[state]
   pub flex: f32,
@@ -58,7 +58,7 @@ mod tests {
   fn one_line_expanded() {
     let size = Size::new(100., 50.);
     let row = Row::default()
-      .have(vec![
+      .have_multi(vec![
         Expanded::new(1.)
           .have(SizedBox::from_size(size).box_it())
           .box_it(),
@@ -87,7 +87,7 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let row = Row::default().with_wrap(true).have(vec![
+    let row = Row::default().with_wrap(true).have_multi(vec![
       Expanded::new(1.)
         .have(SizedBox::from_size(size).box_it())
         .box_it(),

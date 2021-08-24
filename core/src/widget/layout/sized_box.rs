@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
 #[stateful]
-#[derive(SingleChildWidget, AttachAttr)]
+#[derive(SingleChildWidget, Declare)]
 pub struct SizedBox {
   #[state]
   pub size: Size,
@@ -51,7 +51,7 @@ impl RenderObject for SizedBoxState {
     size
   }
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
