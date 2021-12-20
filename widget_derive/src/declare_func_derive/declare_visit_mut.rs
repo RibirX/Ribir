@@ -227,7 +227,8 @@ impl VisitMut for DeclareCtx {
       .analyze_stack
       .last_mut()
       .expect(&format!(
-        "Stack should not be empty, at {}:{}:{}",
+        "Crash when visit `{}`, stack should not be empty, at {}:{}:{}",
+        quote! { #i },
         file!(),
         line!(),
         column!()
@@ -353,6 +354,7 @@ impl DeclareCtx {
       super::Child::Declare(d) => visit_self_only(d, self),
       super::Child::Expr(expr) => {
         let old_follows = std::mem::take(&mut self.current_follows);
+        self.stack_push();
         self.save_follow_scope(false);
         self.visit_expr_mut(expr);
         if let Some(follows) = self.take_current_follows() {
@@ -364,6 +366,7 @@ impl DeclareCtx {
         }
         self.current_follows = old_follows;
         self.pop_follow_scope();
+        self.stack_pop(); 
       }
     })
   }

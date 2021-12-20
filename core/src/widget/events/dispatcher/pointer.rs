@@ -313,7 +313,12 @@ mod tests {
   #[test]
   fn mouse_pointer_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let record = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
+    let record = record_pointer(
+      event_record.clone(),
+      Text {
+        text: "pointer event test".to_string(),
+      },
+    );
     let root = record_pointer(event_record.clone(), Row::default()).have(record.box_it());
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -348,7 +353,12 @@ mod tests {
   #[test]
   fn mouse_buttons() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
+    let root = record_pointer(
+      event_record.clone(),
+      Text {
+        text: "pointer event test".to_string(),
+      },
+    );
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
@@ -403,7 +413,12 @@ mod tests {
   #[test]
   fn different_device_mouse() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = record_pointer(event_record.clone(), Text("pointer event test".to_string()));
+    let root = record_pointer(
+      event_record.clone(),
+      Text {
+        text: "pointer event test".to_string(),
+      },
+    );
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
@@ -468,15 +483,17 @@ mod tests {
         move |e| stack.borrow_mut().push(e.clone())
       })
       .have(
-        Text("pointer event test".to_string())
-          .on_pointer_down({
-            let stack = event_record.clone();
-            move |e| {
-              stack.borrow_mut().push(e.clone());
-              e.stop_bubbling();
-            }
-          })
-          .box_it(),
+        Text {
+          text: "pointer event test".to_string(),
+        }
+        .on_pointer_down({
+          let stack = event_record.clone();
+          move |e| {
+            stack.borrow_mut().push(e.clone());
+            e.stop_bubbling();
+          }
+        })
+        .box_it(),
       );
 
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
@@ -543,22 +560,34 @@ mod tests {
   #[test]
   fn click() {
     let click_path = Rc::new(RefCell::new(0));
-    let c_click_path = click_path.clone();
-    let child = SizedBox::from_size(Size::new(100., 100.)).on_tap(move |_| {
-      let mut res = c_click_path.borrow_mut();
-      *res += 1;
-    });
 
-    let c_click_path = click_path.clone();
-    let parent = Row::default()
-      .with_cross_align(CrossAxisAlign::Start)
-      .on_tap(move |_| {
-        let mut res = c_click_path.borrow_mut();
-        *res += 1;
-      })
-      .have(child.box_it())
-      // Stretch row
-      .have(SizedBox::from_size(Size::new(100., 400.)).box_it());
+    let parent = declare! {
+      Row {
+        cross_align: CrossAxisAlign::Start,
+        on_tap: {
+          let click_path = click_path.clone();
+          move |_| {
+          let mut res = click_path.borrow_mut();
+          *res += 1;
+        }},
+        ..<_>::default(),
+        SizedBox {
+          size: Size::new(100., 100.),
+          on_tap: {
+            let click_path = click_path.clone();
+            move |_| {
+            let mut res = click_path.borrow_mut();
+            *res += 1;
+            }
+          }
+        }
+        SizedBox {
+          size: Size::new(100., 400.)
+        }
+      }
+    };
+
+    // Stretch row
     let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(400., 400.));
     wnd.render_ready();
 

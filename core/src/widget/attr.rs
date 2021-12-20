@@ -22,7 +22,12 @@
 //!
 //! impl CombinationWidget for MyCheckbox {
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
-//!     Checkbox::from_theme(&*ctx.theme()).box_it()
+//!     Checkbox {
+//!       style: ctx.theme().check_box.clone(),
+//!       ..<_>::default()
+//!     }
+//!     .build()
+//!     .box_it()
 //!   }
 //! }
 //!

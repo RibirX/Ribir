@@ -1,5 +1,5 @@
 pub trait Declare {
-  type Builder: DeclareBuilder<Target = Self>;
+  type Builder: DeclareBuilder;
 }
 
 pub trait DeclareBuilder {

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   parse_macro_input,
   punctuated::Punctuated,
@@ -441,7 +441,8 @@ impl DeclareField {
     ctx: &DeclareCtx,
   ) -> Option<Ident> {
     let Self { if_guard, member, expr, .. } = self;
-    let expr = converter.map_or_else(|| quote! {#expr}, |f| f(expr));
+    let expr_tokens = converter.map_or_else(|| quote! {#expr}, |f| f(expr));
+    let expr_tokens = quote_spanned! { expr.span() =>  #expr_tokens };
     // we need to calculate field value before define widget to avoid twice
     // calculate it, only if filed  have `if guard`
     if let Some(if_guard) = if_guard {
@@ -449,7 +450,7 @@ impl DeclareField {
 
       value_before.extend(quote! {
           let (#member, #follow) = #if_guard {
-            (#expr.into(), true)
+            (#expr_tokens, true)
           } else {
             (<_>::default(), false)
           };
@@ -468,7 +469,7 @@ impl DeclareField {
       Some(follow)
     } else {
       let colon = self.colon_token.unwrap_or_default();
-      widget_def.extend(quote! {#member #colon #expr.into()});
+      widget_def.extend(quote! {#member #colon #expr_tokens});
       if let Some(follow) = self.follow_tokens(ref_name, def_name, ctx) {
         follow_after.extend(follow);
       }

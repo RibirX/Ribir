@@ -89,7 +89,7 @@ pub struct Theme {
   pub unselected_widget_color: Color,
   /// Default text font family
   pub default_font_family: String,
-  pub check_box: CheckboxTheme,
+  pub checkbox: CheckboxTheme,
 }
 
 impl TypographyTheme {
@@ -244,6 +244,7 @@ impl TypographyTheme {
   }
 }
 
+// todo: more general
 #[derive(Debug, Clone)]
 pub struct CheckboxTheme {
   pub size: f32,
@@ -254,25 +255,42 @@ pub struct CheckboxTheme {
   pub border_color: Color,
   pub marker_color: Color,
   pub checked_path: Path,
+  pub indeterminate_path: Path,
 }
 
 impl Default for CheckboxTheme {
   fn default() -> Self {
-    let mut builder = PathBuilder::new();
-    let start = Point::new(2.733_333_3, 8.466_667);
-    let mid = Point::new(6., 11.733_333);
-    let end = Point::new(13.533_333, 4.2);
-    builder.segment(start, mid).segment(mid, end);
+    let size: f32 = 12.;
+    let border_width = 2.;
+    let checked_path = {
+      let mut builder = PathBuilder::new();
+      let start = Point::new(2.733_333_3, 8.466_667);
+      let mid = Point::new(6., 11.733_333);
+      let end = Point::new(13.533_333, 4.2);
+      builder.segment(start, mid).segment(mid, end);
+      builder.build()
+    };
+
+    let center_y = size / 2. + border_width;
+    let indeterminate_path = {
+      let mut builder = PathBuilder::new();
+      builder
+        .begin_path(Point::new(3., center_y))
+        .line_to(Point::new(size + border_width * 2. - 3., center_y))
+        .close_path();
+      builder.build()
+    };
 
     Self {
-      size: 12.,
-      border_width: 2.,
+      size,
+      border_width,
       check_mark_width: 1.422_222,
       marker_color: Color::WHITE,
-      color: Color::default(),
+      color: Color::BLACK,
       border_radius: 2.,
       border_color: Color::BLACK,
-      checked_path: builder.build(),
+      checked_path,
+      indeterminate_path,
     }
   }
 }

@@ -66,3 +66,21 @@ pub async fn create_canvas_with_render_headless(
 
   (canvas, render)
 }
+
+pub mod prelude {
+  pub use super::LogicUnit;
+  pub use super::PhysicUnit;
+
+  pub use super::Angle;
+  pub use super::Point;
+  pub use super::Rect;
+  pub use super::Size;
+  pub use super::Transform;
+  pub use super::Vector;
+
+  pub use super::DevicePoint;
+  pub use super::DeviceRect;
+  pub use super::DeviceSize;
+
+  pub use super::BorderRadius;
+}

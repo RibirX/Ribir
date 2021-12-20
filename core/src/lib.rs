@@ -23,7 +23,7 @@ pub mod prelude {
   pub use crate::render::*;
   pub use crate::widget;
   pub use crate::widget::{build_ctx::BuildCtx, widget_tree::WidgetId, *};
-  pub use canvas::*;
+  pub use canvas::prelude::*;
   pub use rxrust::prelude::*;
   pub use widget::layout::{MultiChild, SingleChild};
   pub use widget_derive::{

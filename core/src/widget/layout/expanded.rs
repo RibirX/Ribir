@@ -52,7 +52,7 @@ impl RenderObject for ExpandedState {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::{prelude::layout::row::RowBuilder, test::*};
 
   #[test]
   fn one_line_expanded() {
@@ -87,16 +87,18 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let row = Row::default().with_wrap(true).have_multi(vec![
-      Expanded::new(1.)
-        .have(SizedBox::from_size(size).box_it())
-        .box_it(),
-      SizedBox::from_size(size).box_it(),
-      SizedBox::from_size(size).box_it(),
-      Expanded::new(2.)
-        .have(SizedBox::from_size(size).box_it())
-        .box_it(),
-    ]);
+    let row = RowBuilder { wrap: true, ..<_>::default() }
+      .build()
+      .have_multi(vec![
+        Expanded::new(1.)
+          .have(SizedBox::from_size(size).box_it())
+          .box_it(),
+        SizedBox::from_size(size).box_it(),
+        SizedBox::from_size(size).box_it(),
+        Expanded::new(2.)
+          .have(SizedBox::from_size(size).box_it())
+          .box_it(),
+      ]);
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(350., 500.));
 

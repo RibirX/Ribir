@@ -16,7 +16,7 @@ pub fn light(family: String) -> Theme {
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
   Theme {
     brightness: Brightness::Light,
-    check_box: CheckboxTheme {
+    checkbox: CheckboxTheme {
       color: secondary.clone(),
       border_color: unselected_widget_color.clone().with_alpha(0.65),
       marker_color: background.clone(),
@@ -55,7 +55,7 @@ pub fn dark(family: String) -> Theme {
   );
   Theme {
     brightness: Brightness::Dark,
-    check_box: CheckboxTheme {
+    checkbox: CheckboxTheme {
       border_color: unselected_widget_color.clone().with_alpha(0.65),
       marker_color: background.clone(),
       color: secondary.clone(),

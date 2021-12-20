@@ -10,7 +10,7 @@ pub struct EdgeInsets {
 
 /// A widget that create space around its child.
 #[stateful]
-#[derive(SingleChildWidget)]
+#[derive(SingleChildWidget, Default)]
 pub struct Margin {
   #[state]
   pub margin: EdgeInsets,

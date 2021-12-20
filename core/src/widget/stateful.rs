@@ -152,6 +152,7 @@ pub trait IntoStateful {
 /// widget. No matter if you really modify it.
 pub struct StateRefCell<W>(StatefulImpl<W>);
 
+// todo: maybe should use pointer directly.
 pub struct StatefulImpl<W>(Rc<RefCell<AttrWidget<W>>>);
 
 pub(crate) trait StateTrigger {
@@ -442,11 +443,11 @@ mod tests {
   fn smoke() {
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let stateful = Text("Hello".to_string()).into_stateful();
+    let stateful = Text { text: "Hello".to_string() }.into_stateful();
     {
-      stateful.ref_cell().borrow_mut().0 = "World!".to_string();
+      stateful.ref_cell().borrow_mut().text = "World!".to_string();
     }
-    assert_eq!(stateful.borrow().0, "World!");
+    assert_eq!(stateful.borrow().text, "World!");
   }
 
   #[test]
@@ -454,7 +455,7 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let stateful = Text("Hello".to_string()).into_stateful();
+    let stateful = Text { text: "Hello".to_string() }.into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };

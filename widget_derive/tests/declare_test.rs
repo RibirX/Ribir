@@ -292,6 +292,7 @@ fn with_attr_ref() {
 
   assert_eq!(root_cursor(&mut wnd), Some(CursorIcon::Hand));
   tap_at(&mut wnd, (1, 1));
+  wnd.render_ready();
   assert_eq!(root_cursor(&mut wnd), Some(CursorIcon::AllScroll));
 }
 
@@ -314,9 +315,9 @@ fn attr_bind_to_self() {
   let mut wnd = NoRenderWindow::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
   tap_at(&mut wnd, (1, 1));
+  wnd.render_ready();
   let w_tree = wnd.widget_tree();
   let w = w_tree.root().and_then(|r| r.get(&*w_tree)).unwrap();
-
   assert_eq!(w.get_cursor(), Some(CursorIcon::Help));
 }
 

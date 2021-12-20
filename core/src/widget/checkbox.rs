@@ -2,40 +2,17 @@ use crate::prelude::*;
 use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
-#[stateful(custom = "Checkbox")]
-#[derive(Default)]
-pub struct CheckboxInner {
+#[stateful(custom)]
+#[derive(Default, Clone)]
+pub struct Checkbox {
   #[state]
   pub checked: bool,
   #[state]
   pub indeterminate: bool,
-  pub theme: CheckboxTheme,
+  pub style: CheckboxTheme,
 }
 
 impl Checkbox {
-  pub fn from_theme(theme: &Theme) -> Self {
-    CheckboxInner {
-      theme: theme.check_box.clone(),
-
-      ..Default::default()
-    }
-    .into_stateful()
-  }
-
-  #[inline]
-  pub fn with_checked(self, checked: bool) -> Self {
-    self.borrow_mut().checked = checked;
-    self
-  }
-
-  #[inline]
-  pub fn with_indeterminate(self, b: bool) -> Self {
-    self.borrow_mut().indeterminate = b;
-    self
-  }
-}
-
-impl CheckboxInner {
   fn switch_check(&mut self) {
     if self.indeterminate {
       self.indeterminate = false;
@@ -57,66 +34,93 @@ impl CombinationWidget for Checkbox {
       checked_path,
       marker_color,
       color,
-    } = self.0.borrow().theme.clone();
-    let check_state = self.0.borrow();
+      indeterminate_path,
+    } = self.style.clone();
 
-    let state = self.ref_cell();
-    let state2 = state.clone();
+    let has_check = self.indeterminate || self.checked;
+    let radius = BorderRadius::all(Vector::new(border_radius, border_radius));
+    let margin = EdgeInsets::all(4.);
 
-    let mut marker = BoxDecoration {
-      radius: Some(BorderRadius::all(Vector::new(border_radius, border_radius))),
-      ..<_>::default()
-    };
-
-    let checkbox = if check_state.indeterminate || check_state.checked {
-      let size = size + border_width * 2.;
-      let (path, check_mark_width) = if check_state.indeterminate {
-        let center_y = size / 2.;
-        let mut builder = PathBuilder::new();
-        builder
-          .begin_path(Point::new(3., center_y))
-          .line_to(Point::new(size - 3., center_y))
-          .close_path();
-        (builder.build(), 2.)
-      } else {
-        (checked_path, check_mark_width)
-      };
-      marker.background = Some(color.into());
-      marker.have(
+    if has_check {
+      declare! {
         CheckboxMarker {
-          size,
-          check_mark_width,
+          size: size + border_width * 2.,
           color: marker_color,
-          path,
+          path_width: if self.indeterminate {
+            border_width
+          } else {
+            check_mark_width
+          },
+          path: if self.indeterminate {
+            indeterminate_path
+          } else {
+            checked_path
+          },
+          margin,
+          radius,
+          background: color,
         }
-        .box_it(),
-      )
+      }
     } else {
-      marker.border = Some(Border::all(BorderSide {
-        color: border_color,
-        width: border_width,
-      }));
-      marker.have(SizedBox::from_size(Size::new(size, size)).box_it())
-    };
+      declare! {
+        SizedBox {
+          size: Size::new(size, size),
+          margin,
+          radius,
+          border if !has_check =>: Border::all(BorderSide {
+            color: border_color,
+            width: border_width,
+          }),
+        }
+      }
+    }
+  }
+}
 
-    Margin::new(EdgeInsets::all(4.))
-      .on_tap(move |_| state.borrow_mut().switch_check())
-      .on_key_up(move |k| {
-        if k.key == VirtualKeyCode::Space {
-          state2.borrow_mut().switch_check()
+impl CombinationWidget for StatefulCheckbox {
+  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+    let w = self.0.borrow().clone();
+    w.with_cursor(CursorIcon::Hand.into())
+      .on_tap({
+        let state = self.ref_cell();
+        move |_| state.borrow_mut().switch_check()
+      })
+      .on_key_up({
+        let state = self.ref_cell();
+        move |k| {
+          if k.key == VirtualKeyCode::Space {
+            state.borrow_mut().switch_check()
+          }
         }
       })
-      .with_cursor(CursorIcon::Hand)
-      .have(checkbox.box_it())
       .box_it()
   }
 }
 
+impl IntoStateful for StatefulCheckbox {
+  type S = Self;
+
+  #[inline]
+  fn into_stateful(self) -> Self::S { self }
+}
+
+/// Build checkbox as stateful default to support user interactive.
+impl Declare for Checkbox {
+  type Builder = Checkbox;
+}
+
+impl DeclareBuilder for Checkbox {
+  type Target = StatefulCheckbox;
+
+  #[inline]
+  fn build(self) -> Self::Target { self.into_stateful() }
+}
+// todo: use a common path widget to replace this.
 #[stateful]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Declare)]
 pub struct CheckboxMarker {
   #[state]
-  check_mark_width: f32,
+  path_width: f32,
   #[state]
   path: Path,
   #[state]
@@ -151,7 +155,7 @@ impl RenderObject for CheckboxMarkerRender {
     ctx
       .painter()
       .set_style(self.0.color.clone())
-      .set_line_width(self.0.check_mark_width)
+      .set_line_width(self.0.path_width)
       .stroke_path(self.0.path.clone());
   }
 
@@ -168,12 +172,10 @@ impl StatePartialEq<Self> for Path {
 mod tests {
   use super::*;
   use crate::test::widget_and_its_children_box_rect;
-  use widget::theme::material;
 
-  fn checkbox() -> Checkbox { Checkbox::from_theme(&material::light("".to_string())) }
   #[test]
   fn layout() {
-    let w = checkbox();
+    let w = Checkbox::default().build();
     let (rect, child) = widget_and_its_children_box_rect(w.box_it(), Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
 
@@ -186,7 +188,7 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn checked_paint() {
-    let c = checkbox().with_checked(true);
+    let c = Checkbox { checked: true, ..<_>::default() };
     let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
@@ -197,7 +199,8 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn unchecked_paint() {
-    let mut window = window::Window::headless(checkbox().box_it(), DeviceSize::new(100, 100));
+    let mut window =
+      window::Window::headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -207,7 +210,12 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn indeterminate_paint() {
-    let c = checkbox().with_checked(true).with_indeterminate(true);
+    let c = Checkbox {
+      checked: true,
+      indeterminate: true,
+      ..<_>::default()
+    }
+    .build();
     let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
@@ -217,7 +225,11 @@ mod tests {
       "../test/test_imgs/checkbox_indeterminate.png"
     );
 
-    let c = checkbox().with_checked(false).with_indeterminate(true);
+    let c = Checkbox {
+      checked: false,
+      indeterminate: true,
+      ..<_>::default()
+    };
     let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
