@@ -29,18 +29,20 @@ impl EmbedPost {
 
 impl CombinationWidget for EmbedPost {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-    let mut row = Row::default()
-      .with_cross_align(CrossAxisAlign::Start)
-      .have(Text(self.title.to_string()).box_it())
-      .have(Text(self.author.to_string()).box_it())
-      .have(Text(self.content.to_string()).box_it());
-
-    if self.level > 0 {
-      let mut embed = self.clone();
-      embed.level -= 1;
-      row = row.have(embed.box_it());
+    declare! {
+      Row {
+        cross_align: CrossAxisAlign::Start,
+        ..<_>::default(),
+        Text { text: self.title.to_string() },
+        Text { text: self.author.to_string() },
+        Text { text: self.content.to_string() },
+        (self.level >0).then(||{
+          let mut embed = self.clone();
+          embed.level -= 1;
+          embed
+        })
+      }
     }
-    row.box_it()
   }
 }
 

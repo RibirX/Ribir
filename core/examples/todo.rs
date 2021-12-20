@@ -1,8 +1,5 @@
 #![feature(negative_impls)]
-use ribir::{
-  prelude::*,
-  widget::{Column, Row},
-};
+use ribir::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {
@@ -18,36 +15,35 @@ struct Todos {
 
 impl CombinationWidget for StatefulTodos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    Column::default()
-      .with_cross_align(CrossAxisAlign::Start)
-      .have_multi(
-        self
-          .borrow()
-          .tasks
-          .iter()
-          .enumerate()
-          .map(|(idx, task)| {
-            let todos = self.ref_cell();
-            let mut checkbox = Checkbox::from_theme(&*ctx.theme()).with_checked(task.finished);
-            checkbox.state_checked().subscribe(move |v| {
-              todos.borrow_mut().tasks[idx].finished = v.after;
-            });
-            Margin { margin: EdgeInsets::vertical(4.) }
-              .have(
-                Row::default()
-                  .have(
-                    Margin { margin: EdgeInsets::horizontal(4.) }
-                      .with_key(idx)
-                      .box_it(),
-                  )
-                  .have(Text(task.label.clone()).box_it())
-                  .box_it(),
-              )
-              .box_it()
-          })
-          .collect(),
-      )
-      .box_it()
+    let state = self.ref_cell();
+    let tasks = &self.borrow().tasks;
+    let tasks_iter = tasks.iter().enumerate();
+    declare! {
+      Column {
+        cross_align: CrossAxisAlign::Start,
+        ..<_>::default(),
+        tasks_iter.map(|(idx, task)|{
+          let state = state.clone();
+          declare!{
+            Row {
+              margin: EdgeInsets::vertical(4.),
+              ..<_>::default(),
+              Checkbox{
+                id: checkbox,
+                checked: task.finished,
+                style: ctx.theme().checkbox.clone(),
+                ..<_>::default(),
+              }
+              Text{
+                text:task.label.clone(),
+                margin: EdgeInsets::vertical(4.),
+              }
+            }
+            data_flow!{ checkbox.checked ~> state.silent_mut().tasks[idx].finished }
+          }
+        })
+      }
+    }
   }
 }
 fn main() {
@@ -59,7 +55,7 @@ fn main() {
         label: "Implement Checkbox".to_string(),
       },
       Task {
-        finished: false,
+        finished: true,
         label: "Support Scroll".to_string(),
       },
       Task {

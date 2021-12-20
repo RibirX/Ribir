@@ -63,35 +63,30 @@ mod tests {
 
   #[test]
   fn tree_down_up() {
-    let row_tree = SizedBox::expanded()
-      .with_cursor(CursorIcon::AllScroll)
-      .have(
-        {
-          Row::default()
-            .with_cross_align(CrossAxisAlign::Start)
-            .with_main_align(MainAxisAlign::Start)
-            .have(
-              SizedBox::from_size(Size::new(200., 200.))
-                .with_cursor(CursorIcon::Hand)
-                .have(
-                  {
-                    Row::default()
-                      .with_cross_align(CrossAxisAlign::Start)
-                      .with_main_align(MainAxisAlign::Start)
-                      .have(
-                        SizedBox::from_size(Size::new(100., 100.))
-                          .with_cursor(CursorIcon::Help)
-                          .box_it(),
-                      )
-                  }
-                  .box_it(),
-                )
-                .box_it(),
-            )
+    let row_tree = declare! {
+      SizedBox{
+        size: Size::new(f32::INFINITY, f32::INFINITY),
+        cursor: CursorIcon::AllScroll,
+        Row{
+          cross_align: CrossAxisAlign::Start,
+          main_align: MainAxisAlign::Start,
+          ..<_>::default(),
+          SizedBox {
+            size: Size::new(200., 200.),
+            cursor: CursorIcon::Hand,
+            Row {
+              cross_align: CrossAxisAlign::Start,
+              main_align: MainAxisAlign::Start,
+              ..<_>::default(),
+              SizedBox {
+                size:  Size::new(100., 100.),
+                cursor: CursorIcon::Help,
+              }
+            }
+          }
         }
-        .box_it(),
-      )
-      .box_it();
+      }
+    };
     let mut wnd = NoRenderWindow::without_render(row_tree, Size::new(400., 400.));
 
     wnd.render_ready();

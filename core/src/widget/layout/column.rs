@@ -4,24 +4,48 @@ use crate::prelude::*;
 #[derive(RenderWidget, MultiChildWidget)]
 pub struct Column(#[proxy] Flex);
 
-impl Column {
-  #[inline]
-  pub fn with_reverse(self, reverse: bool) -> Self { Self(self.0.with_reverse(reverse)) }
-
-  #[inline]
-  pub fn with_wrap(self, wrap: bool) -> Self { Self(self.0.with_wrap(wrap)) }
-
-  #[inline]
-  pub fn with_cross_align(self, align: CrossAxisAlign) -> Self {
-    Self(self.0.with_cross_align(align))
-  }
-}
-
 impl Default for Column {
-  fn default() -> Self { Self(Flex::default().with_direction(Direction::Vertical)) }
+  fn default() -> Self { ColumnBuilder::default().build() }
 }
 
 impl IntoStateful for Column {
   type S = StatefulFlex;
   fn into_stateful(self) -> Self::S { self.0.into_stateful() }
+}
+
+// declare macro  support.
+#[derive(Default)]
+pub struct ColumnBuilder {
+  pub reverse: bool,
+  pub wrap: bool,
+  pub cross_align: CrossAxisAlign,
+  pub main_align: MainAxisAlign,
+}
+
+impl Declare for Column {
+  type Builder = ColumnBuilder;
+}
+
+impl DeclareBuilder for ColumnBuilder {
+  type Target = Column;
+
+  #[inline]
+  fn build(self) -> Self::Target {
+    let Self {
+      reverse,
+      wrap,
+      cross_align,
+      main_align,
+    } = self;
+    Column(
+      FlexBuilder {
+        reverse,
+        wrap,
+        direction: Direction::Vertical,
+        cross_align,
+        main_align,
+      }
+      .build(),
+    )
+  }
 }

@@ -23,7 +23,7 @@
 //!   | ( DataFlowExprs )
 //!   | { DataFlowExprs }
 //!
-//! DataFlowExprs: DataFlowExpr (; DataFlowExpr)* ;？
+//! DataFlowExprs: DataFlowExpr (; DataFlowExpr)* ;?
 //!
 //! DataFlowExpr: Expr ～> Expr  | Expr < Expr
 //! ```
@@ -188,15 +188,9 @@ impl Parse for DataFlow {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     Ok(Self {
       skip_nc: try_parse_skip_nc(input)?,
-      from: DataFlowExpr {
-        expr: input.parse()?,
-        follows: None,
-      },
+      from: DataFlowExpr { expr: input.parse()?, follows: None },
       _arrow_token: input.parse()?,
-      to: DataFlowExpr {
-        expr: input.parse()?,
-        follows: None,
-      },
+      to: DataFlowExpr { expr: input.parse()?, follows: None },
     })
   }
 }

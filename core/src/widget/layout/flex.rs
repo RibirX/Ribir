@@ -462,7 +462,7 @@ impl MainLineInfo {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::widget_and_its_children_box_rect;
+  use crate::{prelude::layout::row::RowBuilder, test::widget_and_its_children_box_rect};
 
   #[test]
   fn horizontal_line() {
@@ -528,8 +528,8 @@ mod tests {
   #[test]
   fn cross_align() {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
-      let row = Row::default()
-        .with_cross_align(align)
+      let row = RowBuilder { cross_align: align, ..<_>::default() }
+        .build()
         .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
         .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
         .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
@@ -559,12 +559,15 @@ mod tests {
     cross_align_check(CrossAxisAlign::Center, [10., 5., 0.]);
     cross_align_check(CrossAxisAlign::End, [20., 10., 0.]);
 
-    let row = Row::default()
-      .with_cross_align(CrossAxisAlign::Stretch)
-      .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
-      .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
-      .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
-      .box_it();
+    let row = RowBuilder {
+      cross_align: CrossAxisAlign::Stretch,
+      ..<_>::default()
+    }
+    .build()
+    .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
+    .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
+    .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
+    .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(300., 40.));
@@ -591,13 +594,16 @@ mod tests {
   fn main_align() {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
-      let row = Row::default()
-        .with_main_align(align)
-        .with_cross_align(CrossAxisAlign::Start)
-        .have(SizedBox::from_size(item_size).box_it())
-        .have(SizedBox::from_size(item_size).box_it())
-        .have(SizedBox::from_size(item_size).box_it())
-        .box_it();
+      let row = RowBuilder {
+        main_align: align,
+        cross_align: CrossAxisAlign::Start,
+        ..<_>::default()
+      }
+      .build()
+      .have(SizedBox::from_size(item_size).box_it())
+      .have(SizedBox::from_size(item_size).box_it())
+      .have(SizedBox::from_size(item_size).box_it())
+      .box_it();
 
       let mut wnd = window::Window::without_render(
         SizedBox::expanded().have(row).box_it(),

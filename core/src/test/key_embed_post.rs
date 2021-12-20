@@ -15,20 +15,21 @@ struct EmbedKeyPost {
 
 impl CombinationWidget for EmbedKeyPost {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-    let mut row = Row::default()
-      .with_cross_align(CrossAxisAlign::Start)
-      .with_key(0)
-      .have(Text(self.title.borrow().to_string()).with_key(0).box_it())
-      .have(Text(self.author.to_string()).with_key(1).box_it())
-      .have(Text(self.content.to_string()).with_key(2).box_it());
-
-    if self.level > 0 {
-      let mut embed = self.clone();
-      embed.level -= 1;
-      row = row.have(embed.with_key("embed").box_it());
+    declare! {
+      Row{
+        key: 0,
+        cross_align: CrossAxisAlign::Start,
+        ..<_>::default(),
+        Text { text: self.title.borrow().to_string(), key: 1},
+        Text { text: self.author.to_string(), key: 2},
+        Text { text: self.content.to_string(), key: 3},
+        (self.level > 0).then(||{
+          let mut embed = self.clone();
+          embed.level -= 1;
+          embed.with_key("embed")
+        })
+      }
     }
-
-    row.box_it()
   }
 }
 

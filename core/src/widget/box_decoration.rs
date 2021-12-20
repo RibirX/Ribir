@@ -394,44 +394,34 @@ mod tests {
         ..Default::default()
       },
     ];
-    let row = Row::default()
-      .with_wrap(true)
-      .have_multi(
-        radius_cases
-          .into_iter()
-          .map(|radius| {
-            Margin { margin: EdgeInsets::all(2.) }
-              .have(
-                BoxDecoration {
-                  background: Some(Color::RED.into()),
-                  radius: Some(radius),
-                  border: Some(Border::all(BorderSide { width: 5., color: Color::BLACK })),
-                }
-                .have(SizedBox::from_size(Size::new(60., 40.)).box_it())
-                .box_it(),
-              )
-              .box_it()
-          })
-          .collect(),
-      )
-      .have(
-        Margin { margin: EdgeInsets::all(2.) }
-          .have(
-            BoxDecoration {
-              background: Some(Color::PINK.into()),
-              border: Some(Border {
-                left: BorderSide { width: 1., color: Color::BLACK },
-                right: BorderSide { width: 2., color: Color::RED },
-                top: BorderSide { width: 3., color: Color::GREEN },
-                bottom: BorderSide { width: 4., color: Color::YELLOW },
-              }),
-              ..Default::default()
-            }
-            .box_it(),
-          )
-          .box_it(),
-      );
 
+    let row = declare! {
+      Row {
+        wrap: true,
+        margin: EdgeInsets::all(2.),
+        background: Color::PINK,
+        border: Border {
+          left: BorderSide { width: 1., color: Color::BLACK },
+          right: BorderSide { width: 2., color: Color::RED },
+          top: BorderSide { width: 3., color: Color::GREEN },
+          bottom: BorderSide { width: 4., color: Color::YELLOW },
+        },
+        ..<_>::default(),
+        radius_cases
+        .into_iter()
+        .map(|radius| {
+          declare!{
+            SizedBox {
+              size: Size::new(60., 40.),
+              background: Color::RED,
+              radius: radius,
+              border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
+              margin: EdgeInsets::all(2.)
+            }
+          }
+        }),
+      }
+    };
     let mut window = window::Window::headless(row.box_it(), DeviceSize::new(400, 600));
     window.render_ready();
     window.draw_frame();

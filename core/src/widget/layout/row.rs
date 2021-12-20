@@ -4,25 +4,6 @@ use crate::prelude::*;
 #[derive(RenderWidget, MultiChildWidget)]
 pub struct Row(#[proxy] Flex);
 
-impl Row {
-  #[inline]
-  pub fn with_reverse(self, reverse: bool) -> Self { Self(self.0.with_reverse(reverse)) }
-
-  #[inline]
-  pub fn with_wrap(self, wrap: bool) -> Self { Self(self.0.with_wrap(wrap)) }
-
-  #[inline]
-  pub fn with_cross_align(self, align: CrossAxisAlign) -> Self {
-    Self(self.0.with_cross_align(align))
-  }
-
-  #[inline]
-  pub fn with_main_align(self, align: MainAxisAlign) -> Self { Self(self.0.with_main_align(align)) }
-
-  #[inline]
-  pub fn get_cross_align(&self) -> CrossAxisAlign { self.0.cross_align }
-}
-
 impl Default for Row {
   fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
 }
@@ -30,4 +11,41 @@ impl Default for Row {
 impl IntoStateful for Row {
   type S = StatefulFlex;
   fn into_stateful(self) -> Self::S { self.0.into_stateful() }
+}
+
+// declare macro  support.
+#[derive(Default)]
+pub struct RowBuilder {
+  pub reverse: bool,
+  pub wrap: bool,
+  pub cross_align: CrossAxisAlign,
+  pub main_align: MainAxisAlign,
+}
+
+impl Declare for Row {
+  type Builder = RowBuilder;
+}
+
+impl DeclareBuilder for RowBuilder {
+  type Target = Row;
+
+  #[inline]
+  fn build(self) -> Self::Target {
+    let Self {
+      reverse,
+      wrap,
+      cross_align,
+      main_align,
+    } = self;
+    Row(
+      FlexBuilder {
+        reverse,
+        wrap,
+        direction: Direction::Horizontal,
+        cross_align,
+        main_align,
+      }
+      .build(),
+    )
+  }
 }
