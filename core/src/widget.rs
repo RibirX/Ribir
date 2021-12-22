@@ -1,3 +1,4 @@
+#[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   collections::HashMap,

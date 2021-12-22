@@ -13,8 +13,5 @@
     "paren",
     "segs",
     "subpat"
-  ],
-  "files.exclude": {
-    "**/target": true
-  }
+  ]
 }
