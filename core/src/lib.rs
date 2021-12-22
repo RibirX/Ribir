@@ -38,7 +38,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use widget_derive::{
     declare, stateful, CombinationWidget, Declare, MultiChildWidget, RenderWidget,
-    SingleChildWidget, StatePartialEq,
+    SingleChildWidget,
   };
 }
 

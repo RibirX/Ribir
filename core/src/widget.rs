@@ -44,20 +44,25 @@ pub trait CombinationWidget: AttrsAccess + 'static {
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: AttrsAccess + CloneStates + 'static {
+pub trait RenderWidget: AttrsAccess + 'static {
   /// The render object type will created.
-  type RO: RenderObject<States = Self::States> + Send + Sync + 'static;
+  type RO: RenderObject + Send + Sync + 'static;
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
   fn create_render_object(&self) -> Self::RO;
+
+  /// update the render object when the render widget is changed, and if the
+  /// change effect to the layout remember to call `ctx.mark_needs_layout()`
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx);
 }
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
 pub trait RenderWidgetSafety: AttrsAccess {
-  fn create_render_object(&self) -> Box<dyn RenderObjectSafety + Send + Sync>;
-  fn clone_boxed_states(&self) -> Box<dyn Any>;
+  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync>;
+
+  fn update_render_object(&self, object: &mut dyn RenderObject, ctx: &mut UpdateCtx);
 }
 
 pub type BoxedSingleChild = Box<SingleChild<Box<dyn RenderWidgetSafety>>>;

@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::render::render_tree::*;
 
 /// How the children should be placed along the cross axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq, StatePartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum CrossAxisAlign {
   /// Place the children with their start edge aligned with the start side of
   /// the cross axis.
@@ -19,7 +19,7 @@ pub enum CrossAxisAlign {
 }
 
 /// How the children should be placed along the main axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq, StatePartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MainAxisAlign {
   /// Place the children as close to the start of the main axis as possible.
   Start,
@@ -45,7 +45,7 @@ pub enum MainAxisAlign {
 }
 
 #[stateful]
-#[derive(Default, MultiChildWidget, Declare)]
+#[derive(Default, MultiChildWidget, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
   #[state]
@@ -114,16 +114,19 @@ impl Default for MainAxisAlign {
 }
 
 impl RenderWidget for Flex {
-  type RO = FlexState;
+  type RO = Self;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone_states() }
+  fn create_render_object(&self) -> Self::RO { self.clone() }
+
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    if self != object {
+      *object = self.clone();
+      ctx.mark_needs_layout();
+    }
+  }
 }
 
-impl RenderObject for FlexState {
-  type States = FlexState;
-  #[inline]
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { *self = states; }
-
+impl RenderObject for Flex {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let direction = self.direction;
     let mut layouter = FlexLayouter {
@@ -148,9 +151,6 @@ impl RenderObject for FlexState {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
     // Nothing to draw.
   }
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { self }
 }
 
 #[derive(Debug, Clone, Copy, Default)]

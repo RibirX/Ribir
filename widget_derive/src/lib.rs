@@ -39,7 +39,6 @@ mod proxy_derive;
 mod render_derive;
 mod single_derive;
 mod state_derive;
-mod state_partial_eq_derive;
 mod util;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
@@ -66,12 +65,6 @@ pub fn single_marco_derive(input: TokenStream) -> TokenStream {
 pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
   multi_derive::multi_derive(&mut input).into()
-}
-
-#[proc_macro_derive(StatePartialEq)]
-pub fn state_partial_eq_macro_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  state_partial_eq_derive::derive_state_partial_eq(&input).into()
 }
 
 #[proc_macro_attribute]

@@ -37,7 +37,7 @@ pub struct BoxLayout {
 
 #[derive(Default)]
 pub struct RenderTree {
-  arena: Arena<Box<dyn RenderObjectSafety + Send + Sync>>,
+  arena: Arena<Box<dyn RenderObject>>,
   root: Option<RenderId>,
   /// A hash map to mapping a render object in render tree to its corresponds
   /// render widget in widget tree.
@@ -74,11 +74,7 @@ impl RenderTree {
   }
 
   #[inline]
-  pub(crate) fn new_node(
-    &mut self,
-    owner: WidgetId,
-    data: Box<dyn RenderObjectSafety + Send + Sync>,
-  ) -> RenderId {
+  pub(crate) fn new_node(&mut self, owner: WidgetId, data: Box<dyn RenderObject>) -> RenderId {
     let rid = RenderId(self.arena.new_node(data));
     self.render_to_widget.insert(rid, owner);
     rid
@@ -176,15 +172,12 @@ impl RenderId {
   }
 
   /// Returns a reference to the node data.
-  pub(crate) fn get(self, tree: &RenderTree) -> Option<&(dyn RenderObjectSafety + Send + Sync)> {
+  pub(crate) fn get(self, tree: &RenderTree) -> Option<&dyn RenderObject> {
     tree.arena.get(self.0).map(|node| &**node.get())
   }
 
   /// Returns a mutable reference to the node data.
-  pub(crate) fn get_mut(
-    self,
-    tree: &mut RenderTree,
-  ) -> &mut (dyn RenderObjectSafety + Send + Sync) {
+  pub(crate) fn get_mut(self, tree: &mut RenderTree) -> &mut dyn RenderObject {
     &mut **tree
       .arena
       .get_mut(self.0)
@@ -335,8 +328,7 @@ mod tests {
     records: Arc<Mutex<Vec<RenderId>>>,
   }
 
-  impl RenderObjectSafety for MockRenderObj {
-    fn update(&mut self, _: Box<dyn Any>, _: &mut UpdateCtx) {}
+  impl RenderObject for MockRenderObj {
     fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
       self.records.lock().unwrap().push(ctx.render_id());
       ctx.children().for_each(|mut child| {

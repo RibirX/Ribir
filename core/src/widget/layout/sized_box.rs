@@ -32,14 +32,16 @@ impl RenderWidget for SizedBox {
   type RO = SizedBoxState;
   #[inline]
   fn create_render_object(&self) -> Self::RO { SizedBoxState { size: self.size } }
+
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    if self.size != object.size {
+      object.size = self.size;
+      ctx.mark_needs_layout();
+    }
+  }
 }
 
 impl RenderObject for SizedBoxState {
-  type States = SizedBoxState;
-
-  #[inline]
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.size = states.size; }
-
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let size = clamp.clamp(self.size);
     let mut child_iter = ctx.children();
@@ -57,14 +59,6 @@ impl RenderObject for SizedBoxState {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
     // nothing to paint, just a layout widget.
   }
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { self }
-}
-
-impl StatePartialEq<Self> for Size {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { self == other }
 }
 
 #[cfg(test)]
@@ -94,7 +88,7 @@ mod tests {
   fn expanded_size() {
     let wnd_size = Size::new(500., 500.);
     let expand_box = SizedBox::expanded()
-      .have(Text{ text: "".to_string()}.box_it())
+      .have(Text { text: "".to_string() }.box_it())
       .box_it();
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));
 

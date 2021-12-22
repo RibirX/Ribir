@@ -91,7 +91,7 @@ impl<'a> RenderCtx<'a> {
   pub fn box_rect(&self) -> Option<Rect> { self.render_obj.layout_box_rect(&*self.tree) }
 
   /// Return render object of this context.
-  pub(crate) fn render_obj(&self) -> &(dyn RenderObjectSafety + 'static) {
+  pub(crate) fn render_obj(&self) -> &dyn RenderObject {
     self
       .render_obj
       .get(&*self.tree)

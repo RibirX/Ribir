@@ -204,10 +204,7 @@ impl WidgetTree {
         WidgetNode::Render(r) => r,
       };
 
-      rid.get_mut(r_tree1).update(
-        safety.clone_boxed_states(),
-        &mut UpdateCtx::new(rid, r_tree2),
-      );
+      safety.update_render_object(rid.get_mut(r_tree1), &mut UpdateCtx::new(rid, r_tree2));
     });
 
     self.changed_widgets.clear();

@@ -22,15 +22,13 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
       let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
       quote! {
-        impl #impl_generics CloneStates for #ident #ty_generics #where_clause {
-          type States = <#proxy_ty as CloneStates>::States;
-
-          #[inline]
-          fn clone_states(&self) -> Self::States { self.#path.clone_states() }
-        }
-
         impl #impl_generics RenderWidget for #ident #ty_generics #where_clause {
           type RO = <#proxy_ty as RenderWidget>::RO;
+
+          #[inline]
+          fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+            RenderWidget::update_render_object(&self.#path, object, ctx)
+          }
 
           #[inline]
           fn create_render_object(&self) -> Self::RO {

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Debug, Clone, Default, PartialEq, StatePartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct EdgeInsets {
   pub left: f32,
   pub right: f32,
@@ -10,23 +10,26 @@ pub struct EdgeInsets {
 
 /// A widget that create space around its child.
 #[stateful]
-#[derive(SingleChildWidget, Default)]
+#[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct Margin {
   #[state]
   pub margin: EdgeInsets,
 }
 
 impl RenderWidget for Margin {
-  type RO = MarginState;
+  type RO = Self;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone_states() }
+  fn create_render_object(&self) -> Self::RO { self.clone() }
+
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    if self != object {
+      *object = self.clone();
+      ctx.mark_needs_layout();
+    }
+  }
 }
 
-impl RenderObject for MarginState {
-  type States = Self;
-  #[inline]
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { *self = states; }
-
+impl RenderObject for Margin {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
@@ -47,9 +50,6 @@ impl RenderObject for MarginState {
 
   #[inline]
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { self }
 }
 
 impl Margin {
