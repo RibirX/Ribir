@@ -2,24 +2,28 @@ use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
 #[stateful]
-#[derive(SingleChildWidget)]
+#[derive(SingleChildWidget, Clone)]
 pub struct Padding {
   #[state]
   pub padding: EdgeInsets,
 }
 
 impl RenderWidget for Padding {
-  type RO = PaddingState;
+  type RO = Self;
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone_states() }
+  fn create_render_object(&self) -> Self::RO { self.clone() }
+
+  #[inline]
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    if self.padding != object.padding {
+      ctx.mark_needs_layout();
+      object.padding = self.padding.clone();
+    }
+  }
 }
 
-impl RenderObject for PaddingState {
-  type States = PaddingState;
-  #[inline]
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { *self = states; }
-
+impl RenderObject for Padding {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     debug_assert_eq!(ctx.children().count(), 1);
 
@@ -53,9 +57,6 @@ impl RenderObject for PaddingState {
 
   #[inline]
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { self }
 }
 
 impl Padding {

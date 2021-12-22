@@ -3,7 +3,7 @@ use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::Wi
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, Default)]
+#[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableX {
   #[state]
   pos: f32,
@@ -12,7 +12,7 @@ pub struct ScrollableX {
 /// A widget let its child vertical scrollable and the scroll view is as large
 /// as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, Default)]
+#[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableY {
   #[state]
   pos: f32,
@@ -21,7 +21,7 @@ pub struct ScrollableY {
 /// A widget let its child both scrollable in horizontal and vertical, and the
 /// scroll view is as large as its parent allow.
 #[stateful]
-#[derive(SingleChildWidget, Default)]
+#[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableBoth {
   #[state]
   pos: Point,
@@ -80,10 +80,40 @@ impl ScrollableBoth {
 
 macro scroll_render_widget_impl($widget: ty, $state: ty) {
   impl RenderWidget for $widget {
-    type RO = ScrollRender<$state>;
+    type RO = Self;
 
     #[inline]
-    fn create_render_object(&self) -> Self::RO { ScrollRender { states: self.clone_states() } }
+    fn create_render_object(&self) -> Self::RO { self.clone() }
+
+    #[inline]
+    fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+      if self != object {
+        *object = self.clone();
+        ctx.mark_needs_layout();
+      }
+    }
+  }
+
+  impl RenderObject for $widget {
+    #[inline]
+    fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+      debug_assert_eq!(ctx.children().count(), 1);
+      let size = clamp.max;
+      if let Some(mut child) = ctx.children().next() {
+        let content_clamp = self.content_clamp(clamp);
+        let content = child.perform_layout(content_clamp);
+        let pos = self.content_pos(content, &size);
+        child.update_position(pos);
+      }
+
+      size
+    }
+
+    fn only_sized_by_parent(&self) -> bool { true }
+
+    fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {
+      // nothing to paint, just a layout widget.
+    }
   }
 }
 
@@ -104,35 +134,7 @@ pub struct ScrollRender<States> {
   states: States,
 }
 
-impl<S: ScrollWorker + StatePartialEq + Sync + Send + 'static> RenderObject for ScrollRender<S> {
-  type States = S;
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.states = states; }
-
-  #[inline]
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    debug_assert_eq!(ctx.children().count(), 1);
-    let size = clamp.max;
-    if let Some(mut child) = ctx.children().next() {
-      let content_clamp = self.states.content_clamp(clamp);
-      let content = child.perform_layout(content_clamp);
-      let pos = self.states.content_pos(content, &size);
-      child.update_position(pos);
-    }
-
-    size
-  }
-
-  fn only_sized_by_parent(&self) -> bool { true }
-
-  fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {
-    // nothing to paint, just a layout widget.
-  }
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { &self.states }
-}
-
-impl ScrollWorker for ScrollableXState {
+impl ScrollWorker for ScrollableX {
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp {
     let min = Size::zero();
     let mut max = clamp.max;
@@ -146,7 +148,7 @@ impl ScrollWorker for ScrollableXState {
   }
 }
 
-impl ScrollWorker for ScrollableYState {
+impl ScrollWorker for ScrollableY {
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp {
     let min = Size::zero();
     let mut max = clamp.max;
@@ -160,7 +162,7 @@ impl ScrollWorker for ScrollableYState {
   }
 }
 
-impl ScrollWorker for ScrollableBothState {
+impl ScrollWorker for ScrollableBoth {
   fn content_clamp(&self, _: BoxClamp) -> BoxClamp {
     BoxClamp {
       min: Size::zero(),
@@ -190,11 +192,6 @@ fn view_content(event: &WheelEvent) -> (Rect, Rect) {
   let view = widget_rect(target, w_tree, r_tree);
   let content = widget_rect(target.first_child(w_tree).unwrap(), w_tree, r_tree);
   (view, content)
-}
-
-impl StatePartialEq for Point {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { self == other }
 }
 
 #[cfg(test)]

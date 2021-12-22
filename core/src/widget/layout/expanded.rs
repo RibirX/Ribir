@@ -18,14 +18,16 @@ impl RenderWidget for Expanded {
   type RO = ExpandedState;
   #[inline]
   fn create_render_object(&self) -> Self::RO { ExpandedState { flex: self.flex } }
+
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    if self.flex != object.flex {
+      object.flex = self.flex;
+      ctx.mark_needs_layout();
+    }
+  }
 }
 
 impl RenderObject for ExpandedState {
-  type States = ExpandedState;
-
-  #[inline]
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.flex = states.flex; }
-
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     debug_assert_eq!(ctx.children().count(), 1);
@@ -44,9 +46,6 @@ impl RenderObject for ExpandedState {
   fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
     // nothing to draw.
   }
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { self }
 }
 
 #[cfg(test)]

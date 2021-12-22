@@ -1,7 +1,6 @@
 // todo: support the direction in horizontal and vertical
-use crate::prelude::StatePartialEq;
 
-#[derive(Debug, Copy, Clone, PartialEq, StatePartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Direction {
   /// Left and right.
   Horizontal,

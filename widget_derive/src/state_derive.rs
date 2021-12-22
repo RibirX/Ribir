@@ -50,7 +50,6 @@ pub(crate) fn stateful_derive(
 
   // State define
   let mut state_def = quote! {
-    #[derive(StatePartialEq)]
     #vis struct #state_name #ty_generics #where_clause
   };
   let to_surround = |tokens: &mut TokenStream2| {
@@ -62,20 +61,6 @@ pub(crate) fn stateful_derive(
   } else {
     Brace::default().surround(&mut state_def, to_surround)
   }
-
-  // impl clone_states;
-  let mut impl_clone_state = quote! { #state_name };
-  let recurse_names = state_field_names.clone();
-  if info.attr_fields.is_tuple {
-    Paren::default().surround(&mut impl_clone_state, |tokens| {
-      *tokens = quote! { #(self.#recurse_names.clone()) ,*};
-    });
-  } else {
-    Brace::default().surround(&mut impl_clone_state, |tokens| {
-      *tokens = quote! { #(#recurse_names: self.#recurse_names.clone()) ,*};
-    });
-  }
-
   let (custom_impl, custom_name) = custom_impl_attr(attrs)?;
   if let Some(custom_name) = custom_name {
     stateful_name = custom_name;
@@ -115,13 +100,6 @@ pub(crate) fn stateful_derive(
       type RawWidget = #name #w_ty_generics;
       fn ref_cell(&self) -> StateRefCell<Self::RawWidget> {
         self.0.ref_cell()
-      }
-    }
-
-    impl #w_impl_generics CloneStates for #name #w_ty_generics #w_where_clause {
-      type States =  #state_name #ty_generics;
-      fn clone_states(&self) -> Self::States {
-        #impl_clone_state
       }
     }
 

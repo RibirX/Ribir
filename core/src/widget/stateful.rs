@@ -119,22 +119,8 @@ use std::{
 /// `Stateful` trait can only implement for raw widget which not attach any
 /// attributes on.
 pub trait Stateful {
-  type RawWidget: CloneStates;
+  type RawWidget;
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget>;
-}
-
-/// Trait for state change quick detect to reduce update render object, this is
-/// different than equality comparisons. And no strictly rules to follow, just
-/// need to make sure it's implementation is cheap, some complexity struct can
-/// always return 'false'.
-pub trait StatePartialEq<Rhs: ?Sized = Self> {
-  fn eq(&self, other: &Rhs) -> bool;
-}
-
-/// Clone the states from the widget.
-pub trait CloneStates {
-  type States: StatePartialEq;
-  fn clone_states(&self) -> Self::States;
 }
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
@@ -170,7 +156,7 @@ pub(crate) struct TreeInfo {
   pub id: WidgetId,
 }
 
-impl<W: CloneStates> Stateful for StatefulImpl<W> {
+impl<W> Stateful for StatefulImpl<W> {
   type RawWidget = W;
   fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { StateRefCell(StatefulImpl(self.0.clone())) }
 }
@@ -181,7 +167,7 @@ pub struct StateAttr {
   subject: Option<LocalSubject<'static, (), ()>>,
 }
 
-impl<W: CloneStates> Clone for StateRefCell<W> {
+impl<W> Clone for StateRefCell<W> {
   fn clone(&self) -> Self { self.0.ref_cell() }
 }
 
@@ -213,7 +199,7 @@ impl<W> AttachAttr for StatefulImpl<W> {
   fn into_attr_widget(self) -> Self::W { self }
 }
 
-impl<W: CloneStates + 'static> StatefulImpl<W> {
+impl<W: 'static> StatefulImpl<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
   // want [`into_stateful`](IntoStateful::into_stateful)
   pub fn new(w: W) -> Self {
@@ -240,27 +226,23 @@ impl<W: CloneStates + 'static> StatefulImpl<W> {
       .state_subject()
   }
 
-  /// Pick a field change stream from the widget, only if this state is really
-  /// changed, and it detected by [`StatePartialEq`](StatePartialEq).
-  pub fn state_change<T: Clone + StatePartialEq + 'static>(
+  /// Pick field change stream from the widget change
+  pub fn state_change<T: Clone + 'static>(
     &self,
     pick: impl Fn(&W) -> T + 'static,
   ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()> {
     let state_ref = self.ref_cell();
     let v = pick(&self.0.borrow().widget);
     let init = StateChange { before: v.clone(), after: v };
-    self
-      .change_stream()
-      .scan_initial(init, move |mut init, _| {
-        init.before = init.after;
-        init.after = pick(&*state_ref.borrow());
-        init
-      })
-      .filter(|change| !change.before.eq(&change.after))
+    self.change_stream().scan_initial(init, move |mut init, _| {
+      init.before = init.after;
+      init.after = pick(&*state_ref.borrow());
+      init
+    })
   }
 }
 
-impl<W: CloneStates> StateRefCell<W> {
+impl<W> StateRefCell<W> {
   pub fn borrow(&self) -> Ref<AttrWidget<W>> { self.0.0.borrow() }
 
   /// Mutably borrows the stateful widget behind the state ref.
@@ -372,50 +354,13 @@ impl<W: RenderWidget> RenderWidget for StatefulImpl<W> {
   type RO = W::RO;
 
   #[inline]
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    RenderWidget::update_render_object(&*self.0.borrow(), object, ctx)
+  }
+
+  #[inline]
   fn create_render_object(&self) -> Self::RO {
     RenderWidget::create_render_object(&*self.0.borrow())
-  }
-}
-
-impl<W: CloneStates> CloneStates for StatefulImpl<W> {
-  type States = W::States;
-  fn clone_states(&self) -> Self::States { self.0.borrow().clone_states() }
-}
-
-macro state_partial_impl($($ty: ty)*) {
-  $(impl StatePartialEq for $ty {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool { self == other }
-  })*
-}
-
-macro state_partial_for_collection($($ty:ident <$($g:ident),*>),*) {
-  $(impl<$($g),*> StatePartialEq for $ty<$($g),*> {
-    #[inline]
-    fn eq(&self, _: &Self) -> bool { false }
-  })*
-}
-
-state_partial_impl! {
-  () usize u8 u16 u32 u64 u128
-  isize i8 i16 i32 i64 i128
-  f32 f64 String bool
-}
-
-use std::collections::{
-  btree_map::BTreeMap, btree_set::BTreeSet, hash_map::HashMap, linked_list::LinkedList,
-};
-state_partial_for_collection!(Vec<T>, LinkedList<T>, HashMap<K, V>, BTreeMap<K, V>, BTreeSet<K>);
-
-impl<T: StatePartialEq> StatePartialEq<Self> for Option<T> {
-  fn eq(&self, other: &Self) -> bool {
-    match self {
-      Some(lhs) => match other {
-        Some(rhs) => lhs.eq(rhs),
-        None => false,
-      },
-      None => other.is_none(),
-    }
   }
 }
 

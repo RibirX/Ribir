@@ -129,23 +129,23 @@ pub struct CheckboxMarker {
   size: f32,
 }
 
-pub struct CheckboxMarkerRender(CheckboxMarkerState);
-
 impl RenderWidget for CheckboxMarker {
-  type RO = CheckboxMarkerRender;
+  type RO = Self;
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO { CheckboxMarkerRender(self.clone_states()) }
+  fn create_render_object(&self) -> Self::RO { self.clone() }
+
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    if self.size != object.size {
+      ctx.mark_needs_layout();
+    }
+    object.size = self.size;
+  }
 }
 
-impl RenderObject for CheckboxMarkerRender {
-  type States = CheckboxMarkerState;
-
-  #[inline]
-  fn update(&mut self, states: Self::States, _: &mut UpdateCtx) { self.0 = states; }
-
+impl RenderObject for CheckboxMarker {
   fn perform_layout(&mut self, clamp: BoxClamp, _: &mut RenderCtx) -> Size {
-    Size::new(self.0.size, self.0.size).clamp(clamp.min, clamp.max)
+    Size::new(self.size, self.size).clamp(clamp.min, clamp.max)
   }
 
   #[inline]
@@ -154,18 +154,10 @@ impl RenderObject for CheckboxMarkerRender {
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
     ctx
       .painter()
-      .set_style(self.0.color.clone())
-      .set_line_width(self.0.path_width)
-      .stroke_path(self.0.path.clone());
+      .set_style(self.color.clone())
+      .set_line_width(self.path_width)
+      .stroke_path(self.path.clone());
   }
-
-  #[inline]
-  fn get_states(&self) -> &Self::States { &self.0 }
-}
-
-impl StatePartialEq<Self> for Path {
-  #[inline]
-  fn eq(&self, _: &Self) -> bool { false }
 }
 
 #[cfg(test)]

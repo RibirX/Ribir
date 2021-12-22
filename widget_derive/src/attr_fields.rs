@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
   punctuated::Punctuated, token::Comma, DataStruct, Field, Fields, GenericParam, Generics, Ident,
-  Path, Type, TypeParamBound, WherePredicate,
+  Path, Type, WherePredicate,
 };
 
 /// Pick fields from struct by specify inner attr.
@@ -178,21 +178,6 @@ fn type_contain(ty: &Type, generic_ident: &Ident) -> bool {
     Type::__TestExhaustive(_) => unreachable!(),
   };
   res
-}
-
-pub fn add_trait_bounds_if(
-  mut generics: Generics,
-  bound: TypeParamBound,
-  func: impl Fn(&GenericParam) -> bool,
-) -> Generics {
-  for param in &mut generics.params {
-    if func(param) {
-      if let GenericParam::Type(ref mut type_param) = *param {
-        type_param.bounds.push(bound.clone());
-      }
-    }
-  }
-  generics
 }
 
 pub fn pure_ident(path: &Path, attr_name: &'static str) -> bool {

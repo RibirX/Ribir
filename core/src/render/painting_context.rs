@@ -1,4 +1,4 @@
-use super::{render_tree::*, RenderObjectSafety};
+use super::render_tree::*;
 use crate::prelude::*;
 use canvas::Rendering2DLayer;
 
@@ -63,7 +63,7 @@ impl<'a> PaintingContext<'a> {
             .get_transform()
             .pre_translate(offset.to_vector());
 
-          if let Some(t) = id.get(&self.tree).and_then(RenderObjectSafety::transform) {
+          if let Some(t) = id.get(&self.tree).and_then(RenderObject::transform) {
             matrix = matrix.then(&t);
           }
           self.layer_2d.set_transform(matrix);
