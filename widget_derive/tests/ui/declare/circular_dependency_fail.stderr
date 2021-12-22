@@ -1,4 +1,4 @@
-error: Can't init widget because circle follow: id1.size -> id2 , id2.size -> id3 , id3.size -> id1
+error: Can't init widget because circle follow: id1.size ～> id2 , id2.size ～> id3 , id3.size ～> id1
   --> tests/ui/declare/circular_dependency_fail.rs:8:13
    |
 8  |         id: id1,
@@ -28,7 +28,7 @@ note: If the circular is your want and will finally not infinite change,you shou
 17 |         size: id1.size,
    |         ^^^^
 
-error: Can't init widget because circle follow: child.margin -> parent , parent.margin -> child
+error: Can't init widget because circle follow: child.margin ～> parent , parent.margin ～> child
   --> tests/ui/declare/circular_dependency_fail.rs:26:11
    |
 26 |       id: parent,
@@ -52,7 +52,7 @@ note: If the circular is your want and will finally not infinite change,you shou
 32 |         margin: parent.margin.clone(),
    |         ^^^^^^
 
-error: Circle follow will cause infinite state change trigger: a -> a
+error: Circle follow will cause infinite state change trigger: a ～> a
   --> tests/ui/declare/circular_dependency_fail.rs:41:11
    |
 41 |       id: a,

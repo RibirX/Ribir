@@ -91,6 +91,7 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
+#[doc = include_str!("../../docs/declare_macro.md")]
 #[proc_macro]
 pub fn declare(input: TokenStream) -> TokenStream {
   declare_func_derive::declare_func_macro(input).into()

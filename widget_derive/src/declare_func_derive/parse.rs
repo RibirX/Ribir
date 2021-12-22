@@ -1,5 +1,5 @@
 //! # Declare Macro tokens Syntax
-//! ```ignore
+//! ```ascii
 //! 
 //! DeclareMacroTokens: DeclareWidget DataFlow?
 //!

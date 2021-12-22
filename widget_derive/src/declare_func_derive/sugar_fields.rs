@@ -196,6 +196,7 @@ pub mod kw {
   syn::custom_keyword!(skip_nc);
 }
 
+// todo: auto generate the sugar fields list document by the below code.
 fields_sugar_def! {
   #[derive(Default)]
   pub struct SugarFields {
@@ -247,11 +248,11 @@ fields_sugar_def! {
     #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
     on_wheel: Option<DeclareField>,
 
+    #[widget_wrap]
     // padding should always before margin, it widget have margin & padding both
     // margin should wrap padding.
     #[doc="set the padding area on all four sides of the widget."]
     padding: Option<DeclareField>,
-    #[widget_wrap]
     #[doc="expand space around widget wrapped."]
     margin: Option<DeclareField>,
     #[doc="specify the background of the widget box."]
@@ -470,7 +471,8 @@ fn common_def_tokens(
   let wrap_name = ctx.no_conflict_name_with_suffix(def_name, &member);
   let wrap_ref = ctx.no_conflict_name_with_suffix(ref_name, &member);
   let stateful = is_stateful(&wrap_ref, f, ctx).then(|| quote! { .into_stateful() });
-  let field_follow = f.follow_tokens(&wrap_ref, &wrap_name, ctx);
+
+  let field_follow = f.follow_tokens(&wrap_ref, &wrap_name, None, ctx);
   let widget_tokens = quote! {
     let #wrap_name = #widget_lit #stateful;
     #field_follow

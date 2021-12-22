@@ -136,9 +136,9 @@ fn path_info(
     .map(|(widget, member, on)| {
       let on_widget = ctx.widget_name_to_id(&on.widget);
       if let Some(m) = member {
-        format!("{}.{} -> {} ", widget, m, on_widget)
+        format!("{}.{} ～> {} ", widget, m, on_widget)
       } else {
-        format!("{} -> {} ", widget, on_widget)
+        format!("{} ～> {} ", widget, on_widget)
       }
     })
     .collect::<Vec<_>>()

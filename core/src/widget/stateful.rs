@@ -152,7 +152,7 @@ pub trait IntoStateful {
 /// widget. No matter if you really modify it.
 pub struct StateRefCell<W>(StatefulImpl<W>);
 
-// todo: maybe should use pointer directly.
+// todo: remove refCell and use Rc::get_mut
 pub struct StatefulImpl<W>(Rc<RefCell<AttrWidget<W>>>);
 
 pub(crate) trait StateTrigger {

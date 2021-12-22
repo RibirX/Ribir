@@ -23,7 +23,7 @@
 //! impl CombinationWidget for MyCheckbox {
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
 //!     Checkbox {
-//!       style: ctx.theme().check_box.clone(),
+//!       style: ctx.theme().checkbox.clone(),
 //!       ..<_>::default()
 //!     }
 //!     .build()
@@ -56,13 +56,13 @@
 //!   }
 //! }
 //!
-//! let mut text = Text("".to_string()).into_attr_widget();
+//! let mut text = Text{ text: "".to_string()}.into_attr_widget();
 //! text.attrs_mut().insert(HelloAttr);
 //! let w: BoxedWidget = text.box_it();
 //! (&w as &dyn AttrsAccess).find_attr::<HelloAttr>().unwrap().hello();
 //! ```
-//! [find]: crate::Widget::find_attr
-//! [attr_impl] crate::widget::attr::WidgetAttr
+//! [find]: crate::prelude::(dyn AttrsAccess)::find_attr
+//! [attr_impl]: crate::widget::attr::WidgetAttr
 
 use crate::prelude::*;
 use std::{

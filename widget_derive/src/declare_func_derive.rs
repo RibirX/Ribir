@@ -458,7 +458,7 @@ impl DeclareField {
 
       member.to_tokens(widget_def);
 
-      if let Some(field_follow) = self.follow_tokens(ref_name, def_name, ctx) {
+      if let Some(field_follow) = self.follow_tokens(ref_name, def_name, converter, ctx) {
         follow_after.extend(quote! {
           if #follow {
             #field_follow
@@ -470,7 +470,7 @@ impl DeclareField {
     } else {
       let colon = self.colon_token.unwrap_or_default();
       widget_def.extend(quote! {#member #colon #expr_tokens});
-      if let Some(follow) = self.follow_tokens(ref_name, def_name, ctx) {
+      if let Some(follow) = self.follow_tokens(ref_name, def_name, converter, ctx) {
         follow_after.extend(follow);
       }
       None
@@ -481,17 +481,26 @@ impl DeclareField {
     &self,
     ref_name: &Ident,
     def_name: &Ident,
+    converter: Option<fn(&Expr) -> TokenStream2>,
     ctx: &DeclareCtx,
   ) -> Option<TokenStream2> {
     let Self {
       member,
-      expr,
       follows: depends_on,
       skip_nc,
+      expr,
       ..
     } = self;
+    let expr_tokens = converter.map_or_else(|| quote! {#expr}, |f| f(expr));
+    let expr_tokens = quote_spanned! { expr.span() =>  #expr_tokens };
+
     depends_on.as_ref().map(|follows| {
-      let assign = skip_nc_assign(skip_nc.is_some(), &quote! { #ref_name.#member}, expr, ctx);
+      let assign = skip_nc_assign(
+        skip_nc.is_some(),
+        &quote! { #ref_name.#member},
+        &expr_tokens,
+        ctx,
+      );
       let upstream = upstream_observable(&follows);
       let ref_cells = state_ref_tokens(follows.names());
       let self_ref_tokens =
