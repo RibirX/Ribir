@@ -5,17 +5,16 @@ use crate::render::*;
 
 /// Just a stupid implement for develope the framework.
 #[stateful]
-#[derive(Debug, Declare)]
+#[derive(Debug, Declare, Clone)]
 pub struct Text {
-  #[state]
   pub text: String,
 }
 
 impl RenderWidget for Text {
-  type RO = TextState;
+  type RO = Self;
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO { TextState { text: self.text.clone() } }
+  fn create_render_object(&self) -> Self::RO { self.clone() }
 
   #[inline]
   fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
@@ -26,7 +25,7 @@ impl RenderWidget for Text {
   }
 }
 
-impl RenderObject for TextState {
+impl RenderObject for Text {
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let rc = ctx.mesure_text(&self.text);

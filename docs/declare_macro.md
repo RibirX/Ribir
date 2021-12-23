@@ -253,6 +253,8 @@ In some specific scenarios，we know some data follow need't effect the widget r
 There is a simple todo example, to show how it use.
 
 ```rust
+#![feature(trivial_bounds)]
+
 use ribir::prelude::*;
 
 #[stateful]

@@ -5,7 +5,6 @@ use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::Wi
 #[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableX {
-  #[state]
   pos: f32,
 }
 
@@ -14,7 +13,6 @@ pub struct ScrollableX {
 #[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableY {
-  #[state]
   pos: f32,
 }
 
@@ -23,7 +21,6 @@ pub struct ScrollableY {
 #[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableBoth {
-  #[state]
   pos: Point,
 }
 
@@ -128,10 +125,6 @@ pub trait ScrollWorker {
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp;
 
   fn content_pos(&self, content: Size, view: &Size) -> Point;
-}
-
-pub struct ScrollRender<States> {
-  states: States,
 }
 
 impl ScrollWorker for ScrollableX {

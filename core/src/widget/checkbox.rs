@@ -5,9 +5,7 @@ use crate::widget::theme::CheckboxTheme;
 #[stateful(custom)]
 #[derive(Default, Clone)]
 pub struct Checkbox {
-  #[state]
   pub checked: bool,
-  #[state]
   pub indeterminate: bool,
   pub style: CheckboxTheme,
 }
@@ -119,13 +117,9 @@ impl DeclareBuilder for Checkbox {
 #[stateful]
 #[derive(Debug, Clone, Declare)]
 pub struct CheckboxMarker {
-  #[state]
   path_width: f32,
-  #[state]
   path: Path,
-  #[state]
   color: Color,
-  #[state]
   size: f32,
 }
 

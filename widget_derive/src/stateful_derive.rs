@@ -1,70 +1,24 @@
 use crate::util::prefix_ident;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
-use syn::{
-  spanned::Spanned,
-  token::{Brace, Paren},
-  Ident, Index, NestedMeta,
-};
+use syn::{spanned::Spanned, DeriveInput, NestedMeta};
 
-use crate::{attr_fields::pure_ident, proxy_derive::ProxyDeriveInfo};
+use crate::attr_fields::pure_ident;
 
 const STATEFUL_ATTR: &str = "stateful";
-const STATE_ATTR_NAME: &str = "state";
 const CUSTOM_IMPL: &str = "custom";
-pub const STATE_PREFIX: &str = "state_";
 
 pub(crate) fn stateful_derive(
   input: &mut syn::DeriveInput,
   attrs: Vec<NestedMeta>,
 ) -> Result<TokenStream2, TokenStream2> {
-  let name = input.ident.clone();
-  let vis = input.vis.clone();
+  let DeriveInput { ident: name, generics, vis, .. } = input;
 
-  let info =
-    ProxyDeriveInfo::new(input, STATEFUL_ATTR, STATE_ATTR_NAME)?.none_attr_specified_error()?;
+  let (w_impl_generics, w_ty_generics, w_where_clause) = generics.split_for_impl();
+  let stateful_name = prefix_ident("Stateful", &quote! {#name});
 
-  let state_name: Ident = syn::parse_str(&format!("{}State", name)).unwrap();
+  let custom_impl = custom_impl_attr(attrs)?;
 
-  let state_generis = info.attr_fields.attr_fields_generics();
-  let (_, ty_generics, where_clause) = state_generis.split_for_impl();
-  let (w_impl_generics, w_ty_generics, w_where_clause) = info.generics.split_for_impl();
-
-  let state_fields = info.attr_fields.attr_fields().iter().map(|(f, _)| f);
-  let state_field_names = state_fields.clone().enumerate().map(|(idx, f)| {
-    f.ident.as_ref().map_or_else(
-      || {
-        let index = Index::from(idx);
-        quote! {#index}
-      },
-      |ident| quote! {#ident},
-    )
-  });
-
-  let state_fn_names = state_field_names
-    .clone()
-    .map(|name| prefix_ident(STATE_PREFIX, &name));
-
-  let state_ty = state_fields.clone().map(|f| &f.ty);
-  let mut stateful_name = prefix_ident("Stateful", &quote! {#name});
-
-  // State define
-  let mut state_def = quote! {
-    #vis struct #state_name #ty_generics #where_clause
-  };
-  let to_surround = |tokens: &mut TokenStream2| {
-    *tokens = quote! { #(#state_fields ,)* };
-  };
-  if info.attr_fields.is_tuple {
-    Paren::default().surround(&mut state_def, to_surround);
-    state_def = quote! {#state_def;};
-  } else {
-    Brace::default().surround(&mut state_def, to_surround)
-  }
-  let (custom_impl, custom_name) = custom_impl_attr(attrs)?;
-  if let Some(custom_name) = custom_name {
-    stateful_name = custom_name;
-  }
   let stateful_def = if custom_impl {
     quote! {
       #vis struct #stateful_name #w_ty_generics(
@@ -80,21 +34,9 @@ pub(crate) fn stateful_derive(
   };
 
   let expanded = quote! {
-    // Define custom state.
-    #state_def
-
     // A stateful version widget
     #stateful_def
 
-    // Every state have a state observable.
-    impl #w_impl_generics #stateful_name #w_ty_generics #w_where_clause {
-      #(
-        pub fn #state_fn_names(&mut self)
-          -> impl LocalObservable<'static, Item = StateChange<#state_ty>, Err = ()> {
-          self.0.state_change(|w| w.#state_field_names.clone())
-        }
-      )*
-    }
 
     impl #w_impl_generics Stateful for #stateful_name #w_ty_generics #w_where_clause {
       type RawWidget = #name #w_ty_generics;
@@ -155,7 +97,7 @@ pub(crate) fn stateful_derive(
   })
 }
 
-fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<(bool, Option<Ident>), TokenStream2> {
+fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<bool, TokenStream2> {
   let (custom_impl, not_supports): (Vec<_>, Vec<_>) = attrs.into_iter().partition(|attr| {
     if let NestedMeta::Meta(meta) = attr {
       match meta {
@@ -187,25 +129,7 @@ fn custom_impl_attr(attrs: Vec<NestedMeta>) -> Result<(bool, Option<Ident>), Tok
       quote_spanned! { attr.span() => compile_error!(#err_str); }
     });
     Err(quote! { #(#error_recursive)* })
-  } else if let Some(attr) = custom_impl.get(0) {
-    match attr {
-      NestedMeta::Meta(syn::Meta::Path(_)) => Ok((true, None)),
-      NestedMeta::Meta(syn::Meta::NameValue(named)) => match named.lit {
-        syn::Lit::Str(ref name) => match name.parse::<Ident>() {
-          Ok(name) => Ok((true, Some(name))),
-          Err(_) => {
-            let err_str = format!("{} is not a valid name for widget.", name.value());
-            Err(quote_spanned! {  named.lit.span() => compile_error!(#err_str); })
-          }
-        },
-        _ => {
-          let err_str = "Only a valid string can be used as widget name.";
-          Err(quote_spanned! {  named.lit.span() => compile_error!(#err_str); })
-        }
-      },
-      _ => unreachable!(),
-    }
   } else {
-    Ok((false, None))
+    Ok(custom_impl.len() == 1)
   }
 }

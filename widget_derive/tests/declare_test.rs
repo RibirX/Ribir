@@ -131,7 +131,7 @@ fn widget_wrap_bind_work() {
 #[test]
 fn expression_for_children() {
   #[stateful]
-  struct EmbedExpr(#[state] Size);
+  struct EmbedExpr(Size);
 
   impl CombinationWidget for EmbedExpr {
     fn build(&self, _: &mut BuildCtx) -> BoxedWidget {

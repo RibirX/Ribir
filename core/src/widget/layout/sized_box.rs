@@ -5,9 +5,8 @@ use crate::prelude::*;
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
 #[stateful]
-#[derive(SingleChildWidget, Declare)]
+#[derive(SingleChildWidget, Declare, Clone)]
 pub struct SizedBox {
-  #[state]
   pub size: Size,
 }
 
@@ -29,9 +28,9 @@ impl SizedBox {
 }
 
 impl RenderWidget for SizedBox {
-  type RO = SizedBoxState;
+  type RO = Self;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { SizedBoxState { size: self.size } }
+  fn create_render_object(&self) -> Self::RO { self.clone() }
 
   fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
     if self.size != object.size {
@@ -41,7 +40,7 @@ impl RenderWidget for SizedBox {
   }
 }
 
-impl RenderObject for SizedBoxState {
+impl RenderObject for SizedBox {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let size = clamp.clamp(self.size);
     let mut child_iter = ctx.children();

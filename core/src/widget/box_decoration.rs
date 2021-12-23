@@ -5,14 +5,11 @@ use crate::prelude::*;
 #[derive(SingleChildWidget, Default, Clone)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[state]
   pub background: Option<FillStyle>,
   /// A border to draw above the background
-  #[state]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[state]
   pub radius: Option<BorderRadius>,
 }
 
@@ -29,8 +26,6 @@ pub struct BorderSide {
   pub color: Color,
   pub width: f32,
 }
-
-pub struct BoxDecorationRender(BoxDecorationState);
 
 impl RenderWidget for BoxDecoration {
   type RO = Self;

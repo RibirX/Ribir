@@ -23,9 +23,7 @@
 //!
 //! #[stateful]
 //! struct Rectangle {
-//!   #[state]
 //!   size: Size,
-//!   #[state]
 //!   color: Color,
 //! }
 //!
@@ -71,9 +69,7 @@
 //!
 //! #[stateful(custom)]
 //! struct Rectangle {
-//!   #[state]
 //!   size: Size,
-//!   #[state]
 //!   color: Color,
 //! }
 //!
@@ -111,6 +107,9 @@ use std::{
   ptr::NonNull,
   rc::Rc,
 };
+
+// todo: update stateful document,
+// todo: #[stateful] should derive as trait not attr macro.
 
 /// Widget witch can be referenced and modified across `StateRefCell`
 ///

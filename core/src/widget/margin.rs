@@ -12,7 +12,6 @@ pub struct EdgeInsets {
 #[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct Margin {
-  #[state]
   pub margin: EdgeInsets,
 }
 
