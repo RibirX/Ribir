@@ -424,10 +424,13 @@ impl<'a> dyn AttrsAccess + 'a {
   }
 }
 
+// todo duplicated
 pub enum AttrRef<'a, T> {
   Ref(&'a T),
   CellRef(Ref<'a, T>),
 }
+
+// todo: duplicated
 pub enum AttrRefMut<'a, T> {
   Ref(&'a mut T),
   CellRef(RefMut<'a, T>),
@@ -498,7 +501,7 @@ impl<W: IntoStateful> IntoStateful for AttrWidget<W> {
 impl<W: Stateful> Stateful for AttrWidget<W> {
   type RawWidget = W::RawWidget;
   #[inline]
-  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.widget.ref_cell() }
+  fn state_ref(&self) -> StateRef<Self::RawWidget> { self.widget.state_ref() }
 }
 
 impl<W> std::ops::Deref for AttrWidget<W> {

@@ -5,7 +5,8 @@
   cell_filter_map,
   linked_list_cursors,
   trivial_bounds,
-  auto_traits
+  auto_traits,
+  get_mut_unchecked
 )]
 
 #[macro_use]

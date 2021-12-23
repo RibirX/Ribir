@@ -130,9 +130,9 @@ impl Parse for DeclareWidget {
 
     loop {
       // Expr child should not a `Type` or `Path`, if it's a `Ident`（`Path`), it's
-      // ambiguous  with `DeclareChild`, and perfer as `DeclareField`.
+      // ambiguous  with `DeclareChild`, and prefer as `DeclareField`.
       match content.fork().parse() {
-        Err(_) => break,
+        Err(_) if !(content.peek(Ident) && content.peek2(Brace)) => break,
         Ok(Child::Expr(Expr::Path(_))) => break,
         Ok(Child::Expr(Expr::Type(_))) => break,
         _ => {}
@@ -150,7 +150,7 @@ impl Parse for DeclareWidget {
         if !widget.children.is_empty() {
           return Err(syn::Error::new(
             f.span(),
-            "Field should alwyas declare before children.",
+            "Field should always declare before children.",
           ));
         }
         if let Some(RestExpr(dot, expr)) = widget.rest {

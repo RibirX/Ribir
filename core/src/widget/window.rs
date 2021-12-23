@@ -121,7 +121,7 @@ impl<R: CanvasRender> Window<R> {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
-    unsafe { self.widget_tree.as_mut().get_unchecked_mut() }.all_state_change_notify();
+    unsafe { self.widget_tree.as_mut().get_unchecked_mut() }.notify_state_change_until_empty();
     let mut changed = self.tree_repair();
     changed = self.layout() || changed;
     if changed {

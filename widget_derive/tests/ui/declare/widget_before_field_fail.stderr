@@ -1,5 +1,5 @@
-error: Field should alwyas declare before children.
- --> $DIR/widget_before_field_fail.rs:8:7
+error: Field should always declare before children.
+ --> tests/ui/declare/widget_before_field_fail.rs:8:7
   |
 8 |       size
   |       ^^^^

@@ -152,8 +152,8 @@ fn expression_for_children() {
   }
 
   let w = EmbedExpr(Size::new(1., 1.)).into_stateful();
-  let state_ref = w.ref_cell();
-  let w = w.on_tap(move |_| state_ref.borrow_mut().0 = Size::new(5., 5.));
+  let mut state_ref = w.state_ref();
+  let w = w.on_tap(move |_| state_ref.0 = Size::new(5., 5.));
 
   let mut wnd = NoRenderWindow::without_render(w.box_it(), Size::new(2000., 2000.));
   wnd.render_ready();

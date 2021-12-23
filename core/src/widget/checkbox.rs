@@ -77,17 +77,19 @@ impl CombinationWidget for Checkbox {
 
 impl CombinationWidget for StatefulCheckbox {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-    let w = self.0.borrow().clone();
-    w.with_cursor(CursorIcon::Hand.into())
+    self
+      .0
+      .clone()
+      .with_cursor(CursorIcon::Hand.into())
       .on_tap({
-        let state = self.ref_cell();
-        move |_| state.borrow_mut().switch_check()
+        let mut state = self.state_ref();
+        move |_| state.switch_check()
       })
       .on_key_up({
-        let state = self.ref_cell();
+        let mut state = self.state_ref();
         move |k| {
           if k.key == VirtualKeyCode::Space {
-            state.borrow_mut().switch_check()
+            state.switch_check()
           }
         }
       })

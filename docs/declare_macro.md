@@ -69,6 +69,8 @@ let _ = declare!{
 At before we use struct literal to declare children, we also have an another option, pass any rust expression as children.
 
 ```rust
+use ribir::prelude::*;
+
 const ribir_steps: [&'static str; 5] = [
   "declare UI", "compile to international api", "layout and paint", 
   "generate triangles", "submit to gpu"
@@ -77,7 +79,7 @@ const ribir_steps: [&'static str; 5] = [
 let _ = declare!{
   Row {
     ..<_>::default(),
-    ribir_steps.iter().map(|text|  { Text { text } })
+    ribir_steps.iter().map(|text|  { Text { text: text.to_string() } })
   }
 };
 ```
@@ -103,10 +105,11 @@ let _ = declare!{
     Checkbox {
       id: checkbox,
       checked: false,
+      ..<_>::default(),
     }
     Text {
-      text: "Change text background by checked state."
-      background: if checkbox.checked { Color::Blue } else { Color:: Red }
+      text: "Change text background by checked state.".to_string(),
+      background: if checkbox.checked { Color::BLUE } else { Color:: RED }
     }
   }
 };
@@ -218,7 +221,7 @@ let _ = declare!{
       text: a.text.clone()
     }
   }
-  data_flow! { #[skip_nc] b.text ~> a.text }
+  data_flow! { #[skip_nc] b.text.clone() ~> a.text }
 };
 ```
 
@@ -241,7 +244,7 @@ let _ = declare!{
       text: a.text.clone()
     }
   }
-  data_flow! { b.text ~> a.text }
+  data_flow! { b.text.clone() ~> a.text }
 };
 ```
 ### Silent follow to avoid widget rebuild or layout.
@@ -253,28 +256,30 @@ In some specific scenarios，we know some data follow need't effect the widget r
 There is a simple todo example, to show how it use.
 
 ```rust
-#![feature(trivial_bounds)]
+#![feature(trivial_bounds, negative_impls)]
 
 use ribir::prelude::*;
 
-#[stateful]
+
 struct Todo  {
   finished: bool,
-  title: String,
+  label: String,
 }
+
+#[stateful(custom)]
 struct Todos {
   tasks: Vec<Todo>
 };
 
 impl CombinationWidget for StatefulTodos {
    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    let self_ref = self.stateful_ref();
+    let self_ref = self.state_ref();
     declare! {
       Column {
         cross_align: CrossAxisAlign::Start,
         ..<_>::default(),
-        self.tasks.iter().map(|(idx, task)|{
-          let state = state.clone();
+        self.tasks.iter().enumerate().map(|(idx, task)|{
+          let self_ref = self_ref.clone();
           declare!{
             Row {
               margin: EdgeInsets::vertical(4.),

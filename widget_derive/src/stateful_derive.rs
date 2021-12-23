@@ -40,8 +40,8 @@ pub(crate) fn stateful_derive(
 
     impl #w_impl_generics Stateful for #stateful_name #w_ty_generics #w_where_clause {
       type RawWidget = #name #w_ty_generics;
-      fn ref_cell(&self) -> StateRefCell<Self::RawWidget> {
-        self.0.ref_cell()
+      fn state_ref(&self) -> StateRef<Self::RawWidget> {
+        self.0.state_ref()
       }
     }
 

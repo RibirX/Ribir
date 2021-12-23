@@ -14,14 +14,12 @@ struct Todos {
 
 impl CombinationWidget for StatefulTodos {
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    let state = self.ref_cell();
-    let tasks = &self.borrow().tasks;
-    let tasks_iter = tasks.iter().enumerate();
+    let state = self.state_ref();
     declare! {
       Column {
         cross_align: CrossAxisAlign::Start,
         ..<_>::default(),
-        tasks_iter.map(|(idx, task)|{
+        self.tasks.iter().enumerate().map(|(idx, task)|{
           let state = state.clone();
           declare!{
             Row {
@@ -38,7 +36,7 @@ impl CombinationWidget for StatefulTodos {
                 margin: EdgeInsets::vertical(4.),
               }
             }
-            data_flow!{ checkbox.checked ~> state.silent_mut().tasks[idx].finished }
+            data_flow!{ checkbox.checked ~> state.silent().tasks[idx].finished }
           }
         })
       }

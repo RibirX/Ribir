@@ -389,7 +389,7 @@ impl SugarFields {
       let mut gen_decoration_field_tokens = |f: &DeclareField| -> Option<Ident> {
         if ctx.be_followed(ref_name) {
           let bg_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
-          follow_after.extend(quote! { let #bg_ref = #wrap_def_name.ref_cell();});
+          follow_after.extend(quote! { let #bg_ref = #wrap_def_name.state_ref();});
         }
         let cond = f.gen_tokens(
           &wrap_def_name,
@@ -486,7 +486,7 @@ fn common_def_tokens(
     // widget have `if guard` syntax, can not be depended.
 
     if ctx.be_followed(&wrap_ref) {
-      def_and_ref_tokens.extend(quote! { let #wrap_ref =  #wrap_name.ref_cell(); });
+      def_and_ref_tokens.extend(quote! { let #wrap_ref =  #wrap_name.state_ref(); });
     }
   }
 
