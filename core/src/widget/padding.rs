@@ -4,7 +4,6 @@ use crate::prelude::*;
 #[stateful]
 #[derive(SingleChildWidget, Clone)]
 pub struct Padding {
-  #[state]
   pub padding: EdgeInsets,
 }
 

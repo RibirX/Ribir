@@ -1,4 +1,3 @@
-use super::expanded::ExpandedState;
 use crate::prelude::*;
 use crate::render::render_tree::*;
 
@@ -48,21 +47,16 @@ pub enum MainAxisAlign {
 #[derive(Default, MultiChildWidget, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
-  #[state]
   pub reverse: bool,
   /// Whether flex items are forced onto one line or can wrap onto multiple
   /// lines
-  #[state]
   pub wrap: bool,
   /// Sets how flex items are placed in the flex container defining the main
   /// axis and the direction
-  #[state]
   pub direction: Direction,
   /// How the children should be placed along the cross axis in a flex layout.
-  #[state]
   pub cross_align: CrossAxisAlign,
   /// How the children should be placed along the main axis in a flex layout.
-  #[state]
   pub main_align: MainAxisAlign,
 }
 
@@ -438,7 +432,7 @@ impl FlexLayouter {
   fn child_flex(ctx: &RenderCtx) -> Option<f32> {
     ctx
       .render_obj()
-      .downcast_ref::<ExpandedState>()
+      .downcast_ref::<<Expanded as RenderWidget>::RO>()
       .map(|expanded| expanded.flex)
   }
 }

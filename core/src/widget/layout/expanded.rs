@@ -4,9 +4,8 @@ use crate::prelude::*;
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
 #[stateful]
-#[derive(SingleChildWidget)]
+#[derive(SingleChildWidget, Clone, PartialEq)]
 pub struct Expanded {
-  #[state]
   pub flex: f32,
 }
 
@@ -15,19 +14,20 @@ impl Expanded {
 }
 
 impl RenderWidget for Expanded {
-  type RO = ExpandedState;
+  type RO = Self;
   #[inline]
-  fn create_render_object(&self) -> Self::RO { ExpandedState { flex: self.flex } }
+
+  fn create_render_object(&self) -> Self::RO { self.clone() }
 
   fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self.flex != object.flex {
-      object.flex = self.flex;
+    if self != object {
+      *object = self.clone();
       ctx.mark_needs_layout();
     }
   }
 }
 
-impl RenderObject for ExpandedState {
+impl RenderObject for Expanded {
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     debug_assert_eq!(ctx.children().count(), 1);

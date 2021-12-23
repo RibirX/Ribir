@@ -38,7 +38,7 @@ mod multi_derive;
 mod proxy_derive;
 mod render_derive;
 mod single_derive;
-mod state_derive;
+mod stateful_derive;
 mod util;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
@@ -71,7 +71,7 @@ pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
 pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
   let attrs = parse_macro_input!(attrs as syn::AttributeArgs);
   let mut input = parse_macro_input!(input as DeriveInput);
-  state_derive::stateful_derive(&mut input, attrs)
+  stateful_derive::stateful_derive(&mut input, attrs)
     .unwrap_or_else(|e| e)
     .into()
 }

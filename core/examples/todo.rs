@@ -9,7 +9,6 @@ struct Task {
 #[stateful(custom)]
 #[derive(Debug)]
 struct Todos {
-  #[state]
   tasks: Vec<Task>,
 }
 

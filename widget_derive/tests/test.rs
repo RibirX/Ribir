@@ -8,9 +8,7 @@ use ribir::prelude::*;
 
 #[stateful]
 struct TestState {
-  #[state]
   a: f32,
-  #[state]
   b: f32,
 }
 
@@ -20,9 +18,9 @@ impl CombinationWidget for TestState {
 
 #[test]
 fn derive_stateful() {
-  let mut state = TestState { a: 1., b: 2. }.into_stateful();
+  let state = TestState { a: 1., b: 2. }.into_stateful();
   let s_ref = state.ref_cell();
-  state.state_a().subscribe(move |t| {
+  state.state_change(|s| s.a).subscribe(move |t| {
     s_ref.borrow_mut().b = t.after;
   });
   {
@@ -35,7 +33,7 @@ fn derive_stateful() {
 #[test]
 fn state_derive_tuple_support() {
   #[stateful]
-  struct StateTupleSupport(#[state] i32);
+  struct StateTupleSupport(i32);
 
   impl CombinationWidget for StateTupleSupport {
     fn build(&self, _: &mut BuildCtx) -> BoxedWidget { unreachable!() }
