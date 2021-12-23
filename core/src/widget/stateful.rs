@@ -175,17 +175,17 @@ impl<W: SingleChildWidget> SingleChildWidget for StatefulImpl<W> {}
 impl<W: MultiChildWidget> MultiChildWidget for StatefulImpl<W> {}
 
 impl<W> AttrsAccess for StatefulImpl<W> {
-  fn get_attrs(&self) -> Option<AttrRef<Attributes>> { Some(self.attrs()) }
+  fn get_attrs(&self) -> Option<&Attributes> { Some(self.attrs()) }
 
-  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> { Some(self.attrs_mut()) }
+  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> { Some(self.attrs_mut()) }
 }
 
 impl<W> Attrs for StatefulImpl<W> {
   #[inline]
-  fn attrs(&self) -> AttrRef<Attributes> { AttrRef::Ref(&self.attrs) }
+  fn attrs(&self) -> &Attributes { &self.attrs }
 
   #[inline]
-  fn attrs_mut(&mut self) -> AttrRefMut<Attributes> { AttrRefMut::Ref(&mut self.attrs) }
+  fn attrs_mut(&mut self) -> &mut Attributes { &mut self.attrs }
 }
 
 impl<W> AttachAttr for StatefulImpl<W> {

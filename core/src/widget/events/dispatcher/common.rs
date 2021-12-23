@@ -50,7 +50,8 @@ impl CommonDispatcher {
   ) -> Event {
     let observer = wid
       .get(self.widget_tree_ref())
-      .and_then(|w| (w as &dyn AttrsAccess).find_attr::<Attr>())
+      .and_then(|w| w.get_attrs())
+      .and_then(Attributes::find)
       .map(|a| f(&*a));
     if let Some(o) = observer {
       Self::rc_dispatch(event, o)
@@ -79,7 +80,8 @@ impl CommonDispatcher {
       .filter_map(|wid| {
         wid
           .get(tree)
-          .and_then(|w| (w as &dyn AttrsAccess).find_attr::<Attr>())
+          .and_then(|w| w.get_attrs())
+          .and_then(Attributes::find)
           .map(|attr| (wid, map_to_observer(&*attr)))
       })
       .try_fold(event, |mut event, (wid, observer)| {

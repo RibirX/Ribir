@@ -3,13 +3,13 @@
 //! the widget number will not increase after attributes attached and the origin
 //! widget behavior will be kept.
 
-//! Note that widget use the attribute ability across [`find_attr`][find],
+//! Note that widget use the attribute ability across [`AttrsAccess`]!,
 //! widget can't hold two same type attribute, so if you implement a custom
 //! attribute, you should merge or replace the same type attr if user try to
 //! attach more than once.
 //!
 //! Ribir provide many builtin attributes, and provide method to easy attach,
-//! See [`AttachAttr`](AttachAttr).
+//! See [`AttachAttr`]!.
 //!
 //! We can implement a custom widget and the builtin attributes can be directly
 //! attached to it.
@@ -22,12 +22,12 @@
 //!
 //! impl CombinationWidget for MyCheckbox {
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
-//!     Checkbox {
-//!       style: ctx.theme().checkbox.clone(),
-//!       ..<_>::default()
+//!     declare!{
+//!       Checkbox {
+//!         style: ctx.theme().checkbox.clone(),
+//!         ..<_>::default()
+//!       }
 //!     }
-//!     .build()
-//!     .box_it()
 //!   }
 //! }
 //!
@@ -59,15 +59,14 @@
 //! let mut text = Text{ text: "".to_string()}.into_attr_widget();
 //! text.attrs_mut().insert(HelloAttr);
 //! let w: BoxedWidget = text.box_it();
-//! (&w as &dyn AttrsAccess).find_attr::<HelloAttr>().unwrap().hello();
+//! w.get_attrs().and_then(Attributes::find::<HelloAttr>).unwrap().hello();
 //! ```
-//! [find]: crate::prelude::(dyn AttrsAccess)::find_attr
+
 //! [attr_impl]: crate::widget::attr::WidgetAttr
 
 use crate::prelude::*;
 use std::{
   any::{Any, TypeId},
-  cell::{Ref, RefMut},
   collections::HashMap,
   marker::PhantomData,
 };
@@ -329,29 +328,23 @@ pub trait AttachAttr {
 }
 
 macro get_attr($name: ident) {
-  $name
-    .get_attrs()
-    .and_then(|attrs| AttrRef::filter_map(attrs, Attributes::find))
+  $name.get_attrs().and_then(Attributes::find)
 }
 
 pub trait AttrsAccess {
   /// return reference of the cursor specified to this widget if have.
-  fn get_key(&self) -> Option<AttrRef<Key>> { get_attr!(self) }
+  #[inline]
+  fn get_key(&self) -> Option<&Key> { get_attr!(self) }
 
   /// return reference of the cursor specified to this widget if have.
-  fn get_cursor(&self) -> Option<CursorIcon> {
-    self
-      .get_attrs()
-      .and_then(|attrs| AttrRef::filter_map(attrs, Attributes::find))
-      .map(|c: AttrRef<Cursor>| c.icon())
-  }
+  fn get_cursor(&self) -> Option<CursorIcon> { get_attr!(self).map(Cursor::icon) }
 
   /// Try to set cursor icon of a widget, return false if success which the
   /// widget is not implement `Attrs` . Otherwise return true.
   fn try_set_cursor(&mut self, icon: CursorIcon) -> bool {
     self
       .get_attrs_mut()
-      .map(|mut attrs| {
+      .map(|attrs| {
         if let Some(cursor) = attrs.find_mut::<Cursor>() {
           cursor.set_icon(icon);
         } else {
@@ -365,81 +358,52 @@ pub trait AttrsAccess {
   /// not find theme in ancestors, if you want to find the theme effect this
   /// widget, usually you should use the
   /// [`BuildCtx::theme`](crate::widget::BuildCtx).
-  fn get_theme(&self) -> Option<AttrRef<Theme>> { get_attr!(self) }
+  #[inline]
+  fn get_theme(&self) -> Option<&Theme> { get_attr!(self) }
 
   /// Try to set theme to the subtree of the widget, return false if success
   /// which the widget is not implement `Attrs`. Otherwise return true.
   fn try_set_theme(&mut self, theme: Theme) -> bool {
     self
       .get_attrs_mut()
-      .map(|mut attrs| attrs.insert(theme))
+      .map(|attrs| attrs.insert(theme))
       .is_some()
   }
 
   /// Return the sequential keyboard navigation of widget if it is a focusable
   /// widget.
-  fn get_tab_index(&self) -> Option<i16> {
-    get_attr!(self).map(|f: AttrRef<FocusAttr>| f.tab_index)
-  }
+  fn get_tab_index(&self) -> Option<i16> { get_attr!(self).map(|f: &FocusAttr| f.tab_index) }
 
   /// Try to set the sequential keyboard navigation of widget, return false if
   /// the widget is implement `Attrs`. Otherwise return true.
   fn try_set_tab_index(&mut self, tab_index: i16) -> bool {
     self
       .get_attrs_mut()
-      .map(|mut attrs| attrs.entry::<FocusAttr>().or_default().tab_index = tab_index)
+      .map(|attrs| attrs.entry::<FocusAttr>().or_default().tab_index = tab_index)
       .is_some()
   }
 
   /// Return if the widget is auto focused if it is a focusable widget.
-  fn get_auto_focus(&self) -> Option<bool> {
-    get_attr!(self).map(|f: AttrRef<FocusAttr>| f.auto_focus)
-  }
+  fn get_auto_focus(&self) -> Option<bool> { get_attr!(self).map(|f: &FocusAttr| f.auto_focus) }
 
   /// Try to set auto focus of widget, return false if success which the widget
   /// is implement `Attrs`. Otherwise return true.
   fn try_set_auto_focus(&mut self, auto_focus: bool) -> bool {
     self
       .get_attrs_mut()
-      .map(|mut attrs| attrs.entry::<FocusAttr>().or_default().auto_focus = auto_focus)
+      .map(|attrs| attrs.entry::<FocusAttr>().or_default().auto_focus = auto_focus)
       .is_some()
   }
 
-  fn get_attrs(&self) -> Option<AttrRef<Attributes>>;
+  fn get_attrs(&self) -> Option<&Attributes>;
 
-  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>>;
-}
-
-impl<'a> dyn AttrsAccess + 'a {
-  pub fn find_attr<A: Any>(&self) -> Option<AttrRef<A>> {
-    self
-      .get_attrs()
-      .and_then(|attrs| AttrRef::filter_map(attrs, Attributes::find))
-  }
-
-  pub fn find_attr_mut<A: Any>(&mut self) -> Option<AttrRefMut<A>> {
-    self
-      .get_attrs_mut()
-      .and_then(|attrs| AttrRefMut::filter_map(attrs, Attributes::find_mut))
-  }
-}
-
-// todo duplicated
-pub enum AttrRef<'a, T> {
-  Ref(&'a T),
-  CellRef(Ref<'a, T>),
-}
-
-// todo: duplicated
-pub enum AttrRefMut<'a, T> {
-  Ref(&'a mut T),
-  CellRef(RefMut<'a, T>),
+  fn get_attrs_mut(&mut self) -> Option<&mut Attributes>;
 }
 
 pub trait Attrs: AttachAttr {
-  fn attrs(&self) -> AttrRef<Attributes>;
+  fn attrs(&self) -> &Attributes;
 
-  fn attrs_mut(&mut self) -> AttrRefMut<Attributes>;
+  fn attrs_mut(&mut self) -> &mut Attributes;
 }
 
 pub auto trait NoAttrs {}
@@ -459,24 +423,26 @@ impl<W> AttachAttr for AttrWidget<W> {
 
 impl<W: NoAttrs> AttrsAccess for W {
   #[inline]
-  fn get_attrs(&self) -> Option<AttrRef<Attributes>> { None }
+  fn get_attrs(&self) -> Option<&Attributes> { None }
 
   #[inline]
-  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> { None }
+  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> { None }
 }
 
 impl<W> AttrsAccess for AttrWidget<W> {
   #[inline]
-  fn get_attrs(&self) -> Option<AttrRef<Attributes>> { Some(self.attrs()) }
+  fn get_attrs(&self) -> Option<&Attributes> { Some(self.attrs()) }
 
   #[inline]
-  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> { Some(self.attrs_mut()) }
+  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> { Some(self.attrs_mut()) }
 }
 
 impl<W> Attrs for AttrWidget<W> {
-  fn attrs(&self) -> AttrRef<Attributes> { AttrRef::Ref(&self.attrs) }
+  #[inline]
+  fn attrs(&self) -> &Attributes { &self.attrs }
 
-  fn attrs_mut(&mut self) -> AttrRefMut<Attributes> { AttrRefMut::Ref(&mut self.attrs) }
+  #[inline]
+  fn attrs_mut(&mut self) -> &mut Attributes { &mut self.attrs }
 }
 
 #[derive(CombinationWidget, RenderWidget, SingleChildWidget, MultiChildWidget)]
@@ -513,68 +479,6 @@ impl<W> std::ops::Deref for AttrWidget<W> {
 impl<W> std::ops::DerefMut for AttrWidget<W> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.widget }
-}
-
-impl<'a, T> std::ops::Deref for AttrRef<'a, T> {
-  type Target = T;
-
-  fn deref(&self) -> &Self::Target {
-    match self {
-      AttrRef::Ref(r) => r,
-      AttrRef::CellRef(r) => &*r,
-    }
-  }
-}
-
-impl<'a, T> std::ops::Deref for AttrRefMut<'a, T> {
-  type Target = T;
-
-  fn deref(&self) -> &Self::Target {
-    match self {
-      AttrRefMut::Ref(r) => r,
-      AttrRefMut::CellRef(r) => &*r,
-    }
-  }
-}
-
-impl<'a, T> std::ops::DerefMut for AttrRefMut<'a, T> {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    match self {
-      AttrRefMut::Ref(r) => r,
-      AttrRefMut::CellRef(r) => &mut *r,
-    }
-  }
-}
-
-impl<'a, T> AttrRef<'a, T> {
-  pub fn filter_map<U, F: FnOnce(&T) -> Option<&U>>(ori: Self, f: F) -> Option<AttrRef<'a, U>> {
-    match ori {
-      AttrRef::Ref(r) => f(r).map(AttrRef::Ref),
-      AttrRef::CellRef(r) => Ref::filter_map(r, f).ok().map(AttrRef::CellRef),
-    }
-  }
-}
-
-impl<'a, T> AttrRefMut<'a, T> {
-  pub fn filter_map<U, F: FnOnce(&mut T) -> Option<&mut U>>(
-    ori: Self,
-    f: F,
-  ) -> Option<AttrRefMut<'a, U>> {
-    match ori {
-      AttrRefMut::Ref(r) => f(r).map(AttrRefMut::Ref),
-      AttrRefMut::CellRef(r) => RefMut::filter_map(r, f).ok().map(AttrRefMut::CellRef),
-    }
-  }
-}
-
-impl<'a, T: PartialEq> PartialEq for AttrRef<'a, T> {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { (&**self).eq(other) }
-}
-
-impl<'a, T: PartialEq> PartialEq for AttrRefMut<'a, T> {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { (&**self).eq(other) }
 }
 
 #[derive(Default)]

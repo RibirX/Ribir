@@ -75,7 +75,7 @@ pub enum BoxedWidget {
 }
 
 impl AttrsAccess for BoxedWidget {
-  fn get_attrs(&self) -> Option<AttrRef<Attributes>> {
+  fn get_attrs(&self) -> Option<&Attributes> {
     match self {
       BoxedWidget::Combination(c) => c.get_attrs(),
       BoxedWidget::Render(r) => r.get_attrs(),
@@ -84,7 +84,7 @@ impl AttrsAccess for BoxedWidget {
     }
   }
 
-  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> {
+  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> {
     match self {
       BoxedWidget::Combination(c) => c.get_attrs_mut(),
       BoxedWidget::Render(r) => r.get_attrs_mut(),
