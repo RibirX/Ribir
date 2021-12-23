@@ -79,7 +79,8 @@ impl FocusManager {
     tree.root().and_then(|root| {
       root.descendants(tree).find(|id| {
         id.get(tree)
-          .and_then(|w| (w as &dyn AttrsAccess).find_attr::<FocusAttr>())
+          .and_then(|w| w.get_attrs())
+          .and_then(Attributes::find::<FocusAttr>)
           .map_or(false, |focus| focus.auto_focus)
       })
     })
@@ -94,7 +95,8 @@ impl FocusManager {
         .descendants(tree)
         .filter_map(|id| {
           id.get(tree)
-            .and_then(|w| (w as &dyn AttrsAccess).find_attr::<FocusAttr>())
+            .and_then(|w| w.get_attrs())
+            .and_then(Attributes::find::<FocusAttr>)
             .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
         })
         .for_each(|node| match node.tab_index {

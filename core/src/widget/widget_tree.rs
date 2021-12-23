@@ -58,11 +58,14 @@ impl WidgetTree {
       &mut *ptr
     };
     let id = WidgetId(self.arena.new_node(widget));
-    let state_info = (id.get_mut(self).unwrap() as &mut dyn AttrsAccess)
-      .find_attr_mut::<StateAttr>()
+    let state_info = id
+      .get_mut(self)
+      .unwrap()
+      .get_attrs_mut()
+      .and_then(Attributes::find_mut::<StateAttr>)
       .map(|attr| attr);
 
-    if let Some(mut info) = state_info {
+    if let Some(info) = state_info {
       info.assign_id(id, std::ptr::NonNull::from(tree2));
     }
     id
@@ -583,14 +586,14 @@ pub enum WidgetNode {
 }
 
 impl AttrsAccess for WidgetNode {
-  fn get_attrs(&self) -> Option<AttrRef<Attributes>> {
+  fn get_attrs(&self) -> Option<&Attributes> {
     match self {
       WidgetNode::Combination(c) => c.get_attrs(),
       WidgetNode::Render(r) => r.get_attrs(),
     }
   }
 
-  fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> {
+  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> {
     match self {
       WidgetNode::Combination(c) => c.get_attrs_mut(),
       WidgetNode::Render(r) => r.get_attrs_mut(),

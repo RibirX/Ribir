@@ -64,18 +64,18 @@ pub(crate) fn stateful_derive(
 
     impl #w_impl_generics AttrsAccess for #stateful_name #w_ty_generics #w_where_clause {
       #[inline]
-      fn get_attrs(&self) -> Option<AttrRef<Attributes>> { self.0.get_attrs() }
+      fn get_attrs(&self) -> Option<&Attributes> { self.0.get_attrs() }
 
       #[inline]
-      fn get_attrs_mut(&mut self) -> Option<AttrRefMut<Attributes>> { self.0.get_attrs_mut() }
+      fn get_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.get_attrs_mut() }
     }
 
     impl #w_impl_generics Attrs for #stateful_name #w_ty_generics #w_where_clause {
       #[inline]
-      fn attrs(&self) -> AttrRef<Attributes> { self.0.attrs() }
+      fn attrs(&self) -> &Attributes { self.0.attrs() }
 
       #[inline]
-      fn attrs_mut(&mut self) -> AttrRefMut<Attributes> { self.0.attrs_mut() }
+      fn attrs_mut(&mut self) -> &mut Attributes { self.0.attrs_mut() }
     }
 
     impl #w_impl_generics std::ops::Deref for #stateful_name #w_ty_generics #w_where_clause {

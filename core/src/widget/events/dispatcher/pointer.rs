@@ -112,7 +112,9 @@ impl PointerDispatcher {
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
         id.get(tree).map_or(false, |w| {
-          (w as &dyn AttrsAccess).find_attr::<FocusAttr>().is_some()
+          w.get_attrs()
+            .and_then(Attributes::find::<FocusAttr>)
+            .is_some()
         })
       })
     });
@@ -184,7 +186,8 @@ impl PointerDispatcher {
         .ancestors(tree)
         .filter(|w| {
           w.get(tree)
-            .and_then(|w| (w as &dyn AttrsAccess).find_attr::<PointerAttr>())
+            .and_then(|w| w.get_attrs())
+            .and_then(Attributes::find::<PointerAttr>)
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
