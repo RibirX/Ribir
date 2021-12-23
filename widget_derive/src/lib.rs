@@ -67,6 +67,20 @@ pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
   multi_derive::multi_derive(&mut input).into()
 }
 
+/// `#[stateful]` macro attr to auto implement a stateful widget named
+/// `StatefulXXX` to `XXX` stateless widget. It's a tuple struct wrap of
+/// [`StatefulImpl`][stateful_impl], and
+/// implement [`IntoStateful`][into_stateful] and
+/// [`Stateful`][stateful]. The stateful widget will as a proxy widget of the
+/// stateless widget.
+///
+/// If you want have a custom widget implementation for the
+/// stateful widget, just provide a `custom` meta, use like
+/// `#[stateful(custom)]`.
+///
+/// [stateful_impl]: ../ribir/widget/stateful/struct.StatefulImpl.html
+/// [stateful]: ../ribir/widget/stateful/trait.Stateful.html
+/// [into_stateful]: ../ribir/widget/stateful/trait.IntoStateful.html
 #[proc_macro_attribute]
 pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
   let attrs = parse_macro_input!(attrs as syn::AttributeArgs);

@@ -28,13 +28,13 @@ impl ScrollableX {
   #[inline]
   pub fn x_scroll(pos: f32) -> StatefulScrollableX {
     let scroll = ScrollableX { pos }.into_stateful();
-    let scroll_ref = scroll.ref_cell();
+    let mut scroll_ref = scroll.state_ref();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
-      let old = scroll_ref.borrow().pos;
+      let old = scroll_ref.pos;
       let new = validate_pos(view.width(), content.width(), old - event.delta_x);
       if (new - old).abs() > f32::EPSILON {
-        scroll_ref.borrow_mut().pos = new;
+        scroll_ref.pos = new;
       }
     })
   }
@@ -44,13 +44,13 @@ impl ScrollableY {
   #[inline]
   pub fn y_scroll(pos: f32) -> StatefulScrollableY {
     let scroll = ScrollableY { pos }.into_stateful();
-    let scroll_ref = scroll.ref_cell();
+    let mut scroll_ref = scroll.state_ref();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
-      let old = scroll_ref.borrow().pos;
+      let old = scroll_ref.pos;
       let new = validate_pos(view.height(), content.height(), old - event.delta_y);
       if (new - old).abs() > f32::EPSILON {
-        scroll_ref.borrow_mut().pos = new;
+        scroll_ref.pos = new;
       }
     })
   }
@@ -60,16 +60,16 @@ impl ScrollableBoth {
   #[inline]
   pub fn both_scroll(pos: Point) -> StatefulScrollableBoth {
     let scroll = ScrollableBoth { pos }.into_stateful();
-    let scroll_ref = scroll.ref_cell();
+    let mut scroll_ref = scroll.state_ref();
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
-      let old = scroll_ref.borrow().pos;
+      let old = scroll_ref.pos;
       let new = Point::new(
         validate_pos(view.width(), content.width(), old.x - event.delta_x),
         validate_pos(view.height(), content.height(), old.y - event.delta_y),
       );
       if new != old {
-        scroll_ref.borrow_mut().pos = new;
+        scroll_ref.pos = new;
       }
     })
   }

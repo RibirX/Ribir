@@ -4,6 +4,7 @@ use indextree::*;
 use std::{
   collections::{HashMap, HashSet},
   pin::Pin,
+  ptr::NonNull,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -22,7 +23,7 @@ pub struct WidgetTree {
   widget_to_render: HashMap<WidgetId, RenderId>,
   /// A buffer to store all stateful widget which state changed but not trigger
   /// notify.
-  state_changed: std::collections::VecDeque<Box<dyn StateTrigger>>,
+  state_changed: std::collections::VecDeque<NonNull<StateAttr>>,
 }
 
 struct TempHold;
@@ -46,7 +47,7 @@ impl WidgetTree {
     self.root = Some(root);
     self.ensure_render_tree_root(r_tree);
 
-    self.all_state_change_notify();
+    self.notify_state_change_until_empty();
 
     root
   }
@@ -67,9 +68,27 @@ impl WidgetTree {
     id
   }
 
-  pub fn all_state_change_notify(&mut self) {
-    while let Some(id) = self.state_changed.pop_front() {
-      id.trigger_change();
+  pub fn notify_state_change_until_empty(&mut self) {
+    while !self.state_changed.is_empty() {
+      self.state_change_notify_a_round();
+    }
+  }
+
+  fn state_change_notify_a_round(&mut self) {
+    let mut count = self.state_changed.len();
+    let mut sets = HashSet::new();
+    loop {
+      if let Some(mut s) = self.state_changed.pop_front() {
+        if !sets.contains(&s) {
+          sets.insert(s);
+          s.trigger_change();
+        }
+        count -= 1;
+      }
+
+      if count == 0 {
+        break;
+      }
     }
   }
 
@@ -143,8 +162,11 @@ impl WidgetTree {
 
   /// add a state trigger into the trigger queue
   #[inline]
-  pub(crate) fn add_state_trigger(&mut self, trigger: Box<dyn StateTrigger>) {
-    self.state_changed.push_back(trigger);
+  pub(crate) fn add_state_trigger(&mut self, trigger: NonNull<StateAttr>) {
+    // Do a quick filter for the same state trigger.
+    if Some(&trigger) != self.state_changed.iter().rev().next() {
+      self.state_changed.push_back(trigger);
+    }
   }
 
   #[cfg(test)]

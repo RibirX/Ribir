@@ -373,11 +373,10 @@ mod tests {
     impl CombinationWidget for DoubleSize {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         let stateful = SizedBox::from_size(Size::new(100., 100.)).into_stateful();
-        let state = stateful.ref_cell();
+        let mut state = stateful.state_ref();
         stateful
           .on_pointer_move(move |_| {
-            let mut sized_box = state.borrow_mut();
-            sized_box.size *= 2.;
+            state.size *= 2.;
           })
           .box_it()
       }

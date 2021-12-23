@@ -75,13 +75,13 @@ impl<R> std::ops::DerefMut for MultiChild<R> {
 impl<S: Stateful> Stateful for SingleChild<S> {
   type RawWidget = S::RawWidget;
   #[inline]
-  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.widget.ref_cell() }
+  fn state_ref(&self) -> StateRef<Self::RawWidget> { self.widget.state_ref() }
 }
 
 impl<M: Stateful> Stateful for MultiChild<M> {
   type RawWidget = M::RawWidget;
   #[inline]
-  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { self.widget.ref_cell() }
+  fn state_ref(&self) -> StateRef<Self::RawWidget> { self.widget.state_ref() }
 }
 
 impl<S: IntoStateful> IntoStateful for SingleChild<S> {

@@ -100,18 +100,13 @@ impl DataFlow {
       .chain(to.follows.iter().flat_map(|f| f.names()))
       .collect::<HashSet<_>>();
 
-    let ref_cells = state_ref_tokens(names.clone());
-    let ref_mut = state_mut_ref(names, ctx);
+    let state_refs = state_ref_tokens(names.clone());
     let assign = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr, ctx);
     tokens.extend(quote! {
       #upstream.subscribe({
-        {
-          #ref_mut
-          #assign
-        }
-        #ref_cells
+        #state_refs
+        #assign
         move |_| {
-          #ref_mut
           #assign
         }
       });
@@ -468,8 +463,12 @@ impl DeclareField {
 
       Some(follow)
     } else {
-      let colon = self.colon_token.unwrap_or_default();
-      widget_def.extend(quote! {#member #colon #expr_tokens});
+      if self.colon_token.is_none() && converter.is_none() {
+        member.to_tokens(widget_def);
+      } else {
+        let colon = self.colon_token.unwrap_or_default();
+        widget_def.extend(quote! {#member #colon #expr_tokens});
+      }
       if let Some(follow) = self.follow_tokens(ref_name, def_name, converter, ctx) {
         follow_after.extend(follow);
       }
@@ -502,18 +501,14 @@ impl DeclareField {
         ctx,
       );
       let upstream = upstream_observable(&follows);
-      let ref_cells = state_ref_tokens(follows.names());
+      let state_refs = state_ref_tokens(follows.names());
       let self_ref_tokens =
-        (!follows.contain(&ref_name)).then(|| quote! {let #ref_name = #def_name.ref_cell();});
+        (!follows.contain(&ref_name)).then(|| quote! {let mut #ref_name = #def_name.state_ref();});
       quote! {
           #upstream.subscribe({
-            #ref_cells
+            #state_refs
             #self_ref_tokens
-            move |_|{
-               // field expr already extend depends mut references.
-               let mut #ref_name = #ref_name.borrow_mut();
-               #assign
-            }
+            move |_|{ #assign }
           });
       }
     })
@@ -552,16 +547,19 @@ impl DeclareWidget {
     });
     def_tokens.extend(quote! {.build()#stateful});
 
-    let ref_cell = ctx.be_followed(&ref_name).then(|| {
-      let ref_name = self.widget_ref_name(ctx);
-      quote! { let #ref_name = #def_name.ref_cell(); }
-    });
+    let state_ref = if ctx.be_followed(&ref_name) {
+      Some(quote! { let #ref_name = #def_name.state_ref(); })
+    } else if ctx.be_reference(&ref_name) {
+      Some(quote! { let #ref_name = &mut #def_name; })
+    } else {
+      None
+    };
 
     let mut tokens = quote! {
       #value_before
       let mut #def_name = { #def_tokens };
       #follow_after
-      #ref_cell
+      #state_ref
     };
 
     self.normal_attrs_tokens(ctx, &mut tokens);
@@ -714,15 +712,15 @@ impl DeclareWidget {
           }
 
           let def_name = self.widget_def_name(ctx);
-          let self_ref_tokens =
-            (!follows.contain(&self_ref)).then(|| quote! {let #self_ref = #def_name.ref_cell();});
+          let self_ref_tokens = (!follows.contain(&self_ref))
+            .then(|| quote! {let mut #self_ref = #def_name.state_ref();});
           quote! {
             #upstream.subscribe({
               #refs
               #self_ref_tokens
               move |_| {
                 let #value = #expr;
-                let mut #self_ref = #self_ref.silent_mut();
+                let mut #self_ref = #self_ref.silent_ref();
                 #assign_value
               }
             });

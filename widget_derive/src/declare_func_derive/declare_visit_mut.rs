@@ -8,28 +8,34 @@ use proc_macro::{Diagnostic, Level, TokenStream};
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, quote_spanned};
 use std::collections::{HashMap, HashSet};
-use syn::{
-  parse_quote, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, ExprClosure, Ident,
-};
+use syn::{parse_quote, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident};
 
 const DECLARE_MACRO_NAME: &'static str = "declare";
 
 #[derive(Default)]
 pub struct DeclareCtx {
-  // Key is the name of widget which has been depended by other, and value is a bool represent if
-  // it's depended directly or just be depended by its wrap widget, if guard or child gen
-  // expression.
-  pub be_followed: HashMap<Ident, bool>,
   // the key is the widget name which depends to the value
   pub named_widgets: HashSet<Ident>,
   pub current_follows: HashMap<Ident, Vec<Span>>,
-  pub contain_capture_closure: bool,
+  // Key is the name of widget which has been depended by other, and value is a bool represent if
+  // it's depended directly or just be depended by its wrap widget, if guard or child gen
+  // expression.
+  be_followed: HashMap<Ident, ReferenceInfo>,
   analyze_stack: Vec<Vec<LocalVariable>>,
   forbid_warnings: bool,
   widget_name_to_id: HashMap<Ident, Ident>,
   follow_scopes: Vec<bool>,
 }
 
+#[derive(PartialEq, Clone, Copy)]
+enum ReferenceInfo {
+  // reference by other expression, but not follow its change.
+  Reference,
+  //  Followed by others, and need follow its change.
+  BeFollowed,
+  // not be referenced or followed, but its wrap widget maybe.
+  WrapWidgetRef,
+}
 #[derive(Debug)]
 struct LocalVariable {
   name: Ident,
@@ -37,44 +43,37 @@ struct LocalVariable {
 }
 
 pub fn state_ref_tokens<'a, I: IntoIterator<Item = &'a Ident>>(follows: I) -> TokenStream2 {
-  let ref_cells = follows.into_iter().map(|follow_w| {
-    quote_spanned! { follow_w.span() => let #follow_w = #follow_w.ref_cell(); }
-  });
-
-  quote! { #(#ref_cells)*}
-}
-
-pub fn state_mut_ref<'a, I: IntoIterator<Item = &'a Ident>>(
-  follows: I,
-  ctx: &DeclareCtx,
-) -> TokenStream2 {
-  let ref_cells = follows.into_iter().map(|ref_name| {
-    // named widget can use and must use StateRefCell to access, because is may
-    // captured in closure.
-    if ctx.be_followed(ref_name) {
-      quote_spanned! { ref_name.span() =>
-        #[allow(unused_mut)]
-        let mut #ref_name = #ref_name.borrow_mut();
-      }
-    } else {
-      let def_name = ctx.no_conflict_widget_def_name(&ref_name);
-
-      // We should not allow modify the widget in the declare macro except is across
-      // StateRefCell.
-      quote_spanned! { ref_name.span() =>
-        let #ref_name = &#def_name;
-      }
+  let state_refs = follows.into_iter().map(|follow_w| {
+    quote_spanned! { follow_w.span() =>
+      #[allow(unused_mut)]
+      let mut #follow_w = #follow_w.clone();
     }
   });
 
-  quote! { #(#ref_cells)*}
+  quote! { #(#state_refs)*}
 }
 
 impl VisitMut for DeclareCtx {
   fn visit_expr_mut(&mut self, expr: &mut Expr) {
     match expr {
       Expr::Closure(c) if c.capture.is_some() => {
-        self.visit_capture_mut_and_expand(c);
+        let mut old_follows = std::mem::take(&mut self.current_follows);
+        visit_mut::visit_expr_closure_mut(self, c);
+        let closure_follows = std::mem::take(&mut self.current_follows);
+
+        if !closure_follows.is_empty() {
+          let state_refs = state_ref_tokens(closure_follows.keys());
+          let closure = quote_spanned! { c.span() => {
+            #state_refs
+            #c
+          }};
+
+          *expr = parse_quote! { #closure };
+
+          old_follows.extend(closure_follows);
+        }
+
+        self.current_follows = old_follows;
       }
       Expr::Macro(m) if m.mac.path.is_ident(DECLARE_MACRO_NAME) => {
         let tokens = std::mem::replace(&mut m.mac.tokens, quote! {});
@@ -111,10 +110,10 @@ impl VisitMut for DeclareCtx {
         self
           .widget_name_to_id
           .insert(wrap_name.clone(), name.clone());
-        self.add_depend(wrap_name);
-        self.add_be_depended(name, false);
+        self.add_follow(wrap_name);
+        self.add_reference(name, ReferenceInfo::WrapWidgetRef);
       } else {
-        self.add_depend(name);
+        self.add_follow(name);
       }
     }
   }
@@ -203,7 +202,7 @@ impl VisitMut for DeclareCtx {
   fn visit_expr_method_call_mut(&mut self, i: &mut syn::ExprMethodCall) {
     visit_mut::visit_expr_method_call_mut(self, i);
     if let Some(name) = self.expr_find_name_widget(&i.receiver).cloned() {
-      self.add_depend(name);
+      self.add_follow(name);
     }
   }
 
@@ -261,28 +260,6 @@ impl DeclareCtx {
 
     parse_quote!(#tokens)
   }
-
-  fn visit_capture_mut_and_expand(&mut self, c: &mut ExprClosure) {
-    let mut old_follows = std::mem::take(&mut self.current_follows);
-    visit_mut::visit_expr_closure_mut(self, c);
-
-    let closure_follows = std::mem::take(&mut self.current_follows);
-    if !closure_follows.is_empty() {
-      let mut_refs = state_mut_ref(closure_follows.keys(), self);
-      let mut_refs = quote_spanned! { c.body.span() => #mut_refs };
-
-      let body = &mut c.body;
-      let body_tokens = quote_spanned! { body.span() => {
-        #mut_refs
-        #body
-      }};
-      *body = Box::new(parse_quote! { #body_tokens });
-      self.contain_capture_closure = true;
-      old_follows.extend(closure_follows);
-    }
-
-    self.current_follows = old_follows;
-  }
 }
 
 impl DeclareCtx {
@@ -310,20 +287,6 @@ impl DeclareCtx {
     self.visit_expr_mut(&mut f.expr);
 
     f.follows = self.take_current_follows();
-    if let Some(follows) = f.follows.as_ref() {
-      let refs = if self.contain_capture_closure {
-        state_ref_tokens(follows.names())
-      } else {
-        state_mut_ref(follows.names(), self)
-      };
-      let expr = &mut f.expr;
-      let expr_tokens = quote_spanned! { expr.span() => {
-        #refs
-        #expr
-      }};
-      *expr = parse_quote! { #expr_tokens };
-    }
-    self.contain_capture_closure = false;
   }
 
   pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
@@ -343,7 +306,7 @@ impl DeclareCtx {
           .chain(w.sugar_fields.listeners_iter())
           .any(|f| f.follows.is_some());
         if followed_by_attr {
-          ctx.add_depend(name.clone());
+          ctx.add_follow(name.clone());
         }
       }
 
@@ -353,20 +316,11 @@ impl DeclareCtx {
     w.children.iter_mut().for_each(|c| match c {
       super::Child::Declare(d) => visit_self_only(d, self),
       super::Child::Expr(expr) => {
-        let old_follows = std::mem::take(&mut self.current_follows);
         self.stack_push();
         self.save_follow_scope(false);
         self.visit_expr_mut(expr);
-        if let Some(follows) = self.take_current_follows() {
-          let mut_refs = state_mut_ref(follows.names(), self);
-          *expr = parse_quote! {{
-            #mut_refs
-            #expr
-          }};
-        }
-        self.current_follows = old_follows;
         self.pop_follow_scope();
-        self.stack_pop(); 
+        self.stack_pop();
       }
     })
   }
@@ -391,7 +345,19 @@ impl DeclareCtx {
   }
 
   pub fn be_followed(&self, name: &Ident) -> bool {
-    self.be_followed.get(name).cloned().unwrap_or(false)
+    self
+      .be_followed
+      .get(name)
+      .map(|r| r == &ReferenceInfo::BeFollowed)
+      .unwrap_or(false)
+  }
+
+  pub fn be_reference(&self, name: &Ident) -> bool {
+    self
+      .be_followed
+      .get(name)
+      .map(|r| r == &ReferenceInfo::Reference)
+      .unwrap_or(false)
   }
 
   pub fn widget_name_to_id<'a>(&'a self, name: &'a Ident) -> &'a Ident {
@@ -486,7 +452,7 @@ impl DeclareCtx {
     }
   }
 
-  fn add_depend(&mut self, name: Ident) {
+  fn add_follow(&mut self, name: Ident) {
     self
       .current_follows
       .entry(name.clone())
@@ -494,11 +460,28 @@ impl DeclareCtx {
       .push(name.span());
 
     let in_follow_scope = self.follow_scopes.last().cloned().unwrap_or(true);
-    self.add_be_depended(name, true && in_follow_scope);
+    self.add_reference(
+      name,
+      if in_follow_scope {
+        ReferenceInfo::BeFollowed
+      } else {
+        ReferenceInfo::Reference
+      },
+    );
   }
 
-  fn add_be_depended(&mut self, name: Ident, directly: bool) {
-    let v = self.be_followed.entry(name).or_default();
-    *v = *v || directly;
+  fn add_reference(&mut self, name: Ident, ref_info: ReferenceInfo) {
+    let v = self
+      .be_followed
+      .entry(name)
+      .or_insert(ReferenceInfo::Reference);
+    match (*v, ref_info) {
+      (ReferenceInfo::Reference, ReferenceInfo::Reference) => *v = ref_info,
+      (ReferenceInfo::Reference, ReferenceInfo::BeFollowed) => *v = ref_info,
+      (ReferenceInfo::Reference, ReferenceInfo::WrapWidgetRef) => *v = ref_info,
+      (ReferenceInfo::WrapWidgetRef, ReferenceInfo::Reference) => *v = ref_info,
+      (ReferenceInfo::WrapWidgetRef, ReferenceInfo::BeFollowed) => *v = ref_info,
+      _ => {}
+    }
   }
 }

@@ -18,16 +18,15 @@ impl CombinationWidget for TestState {
 
 #[test]
 fn derive_stateful() {
-  let state = TestState { a: 1., b: 2. }.into_stateful();
-  let s_ref = state.ref_cell();
+  let mut state = TestState { a: 1., b: 2. }.into_stateful();
+  let mut s_ref = state.state_ref();
   state.state_change(|s| s.a).subscribe(move |t| {
-    s_ref.borrow_mut().b = t.after;
+    s_ref.b = t.after;
   });
   {
-    state.borrow_mut().a = 2.;
+    state.a = 2.;
   }
-  let state_ref = state.borrow();
-  assert_eq!(state_ref.b, 2.)
+  assert_eq!(state.b, 2.)
 }
 
 #[test]

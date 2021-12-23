@@ -1,18 +1,17 @@
 //! ## Stateless and Stateful
 //! As default, In Ribir, every widget is stateless, just present like what you
-//! declare and no interactive. That mean when you change the data of this
-//! widget, the presentation of this widget will not change.
+//! declare and no interactive. That mean you change modify the data of this
+//! widget, the presentation of this widget is static.
 
 //! But Ribir provide a common method to convert a widget from sateless to
 //! stateful if a widget need repaint or relayout to respond to some widget
 //! change. This depends on [`Stateful`][Stateful] and
 //! [`IntoStateful`][IntoStateful]
-//! Use the `#[stateful]` attr  to the widget and mark what fields is state
-//! field by `#[state]`. Those will provide a stateful version widget named
+//! Use the `#[stateful]` attr  to provide a stateful version widget named
 //! `StatefulXXX` which just a tuple struct wrap the
 //! [`StatefulImpl`][StatefulImpl] with the stateless version and implement
 //! [`IntoStateful`][IntoStateful]  for the stateless version widget. We
-//! needn't write any logic code to support stateful, and shouldn't.
+//! needn't write any logic code to support stateful.
 
 //! # Example
 //! This example implement a rectangle widget which support change its size and
@@ -29,14 +28,12 @@
 //!
 //! impl CombinationWidget for Rectangle {
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     BoxDecoration {
-//!       background: Some(self.color.clone().into()),
-//!       ..Default::default()
+//!     declare!{
+//!       SizedBox {
+//!         size: self.size,
+//!         background: self.color.clone()
+//!       }
 //!     }
-//!     .have(
-//!       SizedBox::from_size(self.size).box_it()
-//!     )
-//!     .box_it()
 //!   }
 //! }
 //!
@@ -47,22 +44,20 @@
 //! // Rectangle support convert to stateful now.
 //! .into_stateful();
 //!
-//! let mut state_ref = rect.ref_cell();
+//! let mut state_ref = rect.state_ref();
 //! rect.on_tap(move |_| {
-//!   state_ref.borrow_mut().color = Color::BLACK;
+//!   state_ref.color = Color::BLACK;
 //! });
 //! ```
 //! In the above example, we implement a widget `Rectangle`, and use it to
-//! change its color when user tapped. How to do if we want this behavior  as a
-//! part of the rectangle itself. In other word, a stateless `Rectangle` is
-//! useless, we only need a stateful `Rectangle`. To implement it, we can
-//! specify `custom` meta to `#[stateful(custom=XXXName)]` attr. This tell
-//! Ribir, "I want to implement RenderWidget/CombinationWidget for the stateful
-//! widget by myself instead of direct derive from the stateless version, and
-//! specify name by myself. This is useful when you implement a widget and the
-//! stateless version is useless and the widget self has behavior to change its
-//! state. For example the [`Checkbox`](crate::prelude::Checkbox) widget."
-
+//! change its color when user tapped.
+//!
+//! How to do if we want this behavior as a part of the rectangle itself. In
+//! other word, a stateless `Rectangle` is useless, we only need a stateful
+//! `Rectangle`. To implement it, we can specify `custom` meta to
+//! `#[stateful(custom)]` attr. This tell Ribir, "I want to implement
+//! RenderWidget/CombinationWidget for the stateful widget by myself instead of
+//! direct derive from the stateless version.
 //! ```
 //! # #![feature(trivial_bounds, negative_impls)]
 //! # use ribir::prelude::*;
@@ -75,20 +70,14 @@
 //!
 //! impl CombinationWidget for StatefulRectangle {
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     let rect = self.borrow();
-//!     let mut state_ref = self.ref_cell();
-//!     BoxDecoration {
-//!       background: Some(rect.color.clone().into()),
-//!       ..Default::default()
+//!     let mut state_ref = self.state_ref();
+//!     declare!{
+//!       SizedBox {
+//!         size: self.size,
+//!         background: self.color.clone(),
+//!         on_tap: move |_| state_ref.color = Color::BLACK
+//!       }
 //!     }
-//!     .have(
-//!       SizedBox::from_size(rect.size)
-//!         .on_tap(move |_| {
-//!           state_ref.borrow_mut().color = Color::BLACK;
-//!         })
-//!        .box_it()
-//!    )
-//!     .box_it()
 //!   }
 //! }
 //!
@@ -99,17 +88,14 @@
 //!   color: Color::RED,
 //! }.into_stateful();
 //! ```
+//! You can implement [`Declare`](crate::prelude::Declare) trait to always build
+//! a stateful version `Rectangle` as default.`
 
 use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
-use std::{
-  cell::{Ref, RefCell, RefMut},
-  ptr::NonNull,
-  rc::Rc,
-};
+use std::{ptr::NonNull, rc::Rc};
 
 // todo: update stateful document,
-// todo: #[stateful] should derive as trait not attr macro.
 
 /// Widget witch can be referenced and modified across `StateRefCell`
 ///
@@ -119,7 +105,7 @@ use std::{
 /// attributes on.
 pub trait Stateful {
   type RawWidget;
-  fn ref_cell(&self) -> StateRefCell<Self::RawWidget>;
+  fn state_ref(&self) -> StateRef<Self::RawWidget>;
 }
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
@@ -130,18 +116,26 @@ pub trait IntoStateful {
 }
 
 /// A reference of stateful widget, can use it to directly access and modify
-/// stateful widget.
-///
-/// Remember it assume you changed the widget back of this reference if you
-/// mutably borrow this ref and try to use a mutable reference of the stateful
-/// widget. No matter if you really modify it.
-pub struct StateRefCell<W>(StatefulImpl<W>);
+/// stateful widget. Tracked the state change across if user mutable reference
+/// the `StateRef` and trigger state change notify and require `ribir` to
+/// rebuild or relayout inner widget.
+pub struct StateRef<W>(StatefulImpl<W>);
 
-// todo: remove refCell and use Rc::get_mut
-pub struct StatefulImpl<W>(Rc<RefCell<AttrWidget<W>>>);
+/// A reference of stateful widget, tracked the state change across if user
+/// mutable reference the `SilentRef`. If mutable reference occur, state change
+/// notify will trigger, but not effect the inner widget relayout or rebuild.
+///
+/// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
+pub struct SilentRef<W>(StatefulImpl<W>);
+
+/// The stateful widget generic implementation.
+pub struct StatefulImpl<W> {
+  widget: Rc<AttrWidget<W>>,
+  state_attr: NonNull<StateAttr>,
+}
 
 pub(crate) trait StateTrigger {
-  fn trigger_change(&self);
+  fn trigger_change(&mut self);
 }
 
 #[derive(Clone)]
@@ -157,17 +151,23 @@ pub(crate) struct TreeInfo {
 
 impl<W> Stateful for StatefulImpl<W> {
   type RawWidget = W;
-  fn ref_cell(&self) -> StateRefCell<Self::RawWidget> { StateRefCell(StatefulImpl(self.0.clone())) }
+  #[inline]
+  fn state_ref(&self) -> StateRef<Self::RawWidget> {
+    StateRef(StatefulImpl {
+      widget: self.widget.clone(),
+      state_attr: self.state_attr,
+    })
+  }
 }
 
 #[derive(Default)]
-pub struct StateAttr {
+pub(crate) struct StateAttr {
   pub(crate) tree_info: Option<TreeInfo>,
   subject: Option<LocalSubject<'static, (), ()>>,
 }
 
-impl<W> Clone for StateRefCell<W> {
-  fn clone(&self) -> Self { self.0.ref_cell() }
+impl<W> Clone for StateRef<W> {
+  fn clone(&self) -> Self { self.0.state_ref() }
 }
 
 impl<W: SingleChildWidget> SingleChildWidget for StatefulImpl<W> {}
@@ -181,15 +181,11 @@ impl<W> AttrsAccess for StatefulImpl<W> {
 }
 
 impl<W> Attrs for StatefulImpl<W> {
-  fn attrs(&self) -> AttrRef<Attributes> {
-    let attrs = Ref::map(self.0.borrow(), |w| &w.attrs);
-    AttrRef::CellRef(attrs)
-  }
+  #[inline]
+  fn attrs(&self) -> AttrRef<Attributes> { AttrRef::Ref(&self.attrs) }
 
-  fn attrs_mut(&mut self) -> AttrRefMut<Attributes> {
-    let attrs = RefMut::map(self.0.borrow_mut(), |w| &mut w.attrs);
-    AttrRefMut::CellRef(attrs)
-  }
+  #[inline]
+  fn attrs_mut(&mut self) -> AttrRefMut<Attributes> { AttrRefMut::Ref(&mut self.attrs) }
 }
 
 impl<W> AttachAttr for StatefulImpl<W> {
@@ -204,21 +200,23 @@ impl<W: 'static> StatefulImpl<W> {
   pub fn new(w: W) -> Self {
     let mut attrs: Attributes = <_>::default();
     attrs.insert(StateAttr::default());
-    StatefulImpl(Rc::new(RefCell::new(AttrWidget { widget: w, attrs })))
+    StatefulImpl {
+      state_attr: NonNull::new(attrs.find_mut::<StateAttr>().unwrap() as *mut _).unwrap(),
+      widget: Rc::new(AttrWidget { widget: w, attrs }),
+    }
+  }
+  /// Return a `SilentRef` of the stateful widget.
+  pub fn silent_ref(&self) -> SilentRef<W> {
+    SilentRef(StatefulImpl {
+      widget: self.widget.clone(),
+      state_attr: self.state_attr,
+    })
   }
 
-  #[inline]
-  pub fn borrow(&self) -> Ref<AttrWidget<W>> { self.0.borrow() }
-
-  #[inline]
-  pub fn borrow_mut(&self) -> RefMut<AttrWidget<W>> { self.0.borrow_mut() }
-
   /// Event emitted when this widget modified. No mather if the widget really
-
   pub fn change_stream(&self) -> LocalSubject<'static, (), ()> {
     self
-      .0
-      .borrow_mut()
+      .silent_ref()
       .attrs
       .find_mut::<StateAttr>()
       .unwrap()
@@ -230,110 +228,93 @@ impl<W: 'static> StatefulImpl<W> {
     &self,
     pick: impl Fn(&W) -> T + 'static,
   ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()> {
-    let state_ref = self.ref_cell();
-    let v = pick(&self.0.borrow().widget);
+    let state_ref = self.state_ref();
+    let v = pick(&self.widget);
     let init = StateChange { before: v.clone(), after: v };
     self.change_stream().scan_initial(init, move |mut init, _| {
       init.before = init.after;
-      init.after = pick(&*state_ref.borrow());
+      init.after = pick(&state_ref);
       init
     })
   }
 }
 
-impl<W> StateRefCell<W> {
-  pub fn borrow(&self) -> Ref<AttrWidget<W>> { self.0.0.borrow() }
-
-  /// Mutably borrows the stateful widget behind the state ref.
-  ///
-  /// The borrow lasts until the returned `RefMut` or all `RefMut`s derived
-  /// from it exit scope. The stateful widget cannot be borrowed while this
-  /// borrow is active.
-  ///
-  /// If the returned mutable reference is really mutable access, state change
-  /// will be trigger and the stateful widget also mark as changed at the end of
-  /// this borrow exit.
-  pub fn borrow_mut(&self) -> StateRefMut<W> {
-    StateRefMut {
-      ref_mut: self.0.0.borrow_mut(),
-      deref_mut_occur: false,
-      silent: false,
-      host: self.0.0.clone(),
-    }
-  }
-
-  /// Mutably borrows the stateful widget behind the state ref.
-  ///
-  /// The borrow lasts until the returned `RefMut` or all `RefMut`s derived
-  /// from it exit scope. The stateful widget cannot be borrowed while this
-  /// borrow is active.
-  ///
-  /// If the returned mutable reference is really mutable access, state change
-  /// will be trigger at the end of this borrow exit. The only difference from
-  /// `borrow_mut` is the `silent_mut` will not effect the widget.
-  pub fn silent_mut(&self) -> StateRefMut<W> {
-    let mut ref_mut = self.borrow_mut();
-    ref_mut.silent = true;
-    ref_mut
-  }
-
-  pub fn ref_cell(&self) -> Self { self.clone() }
-
-  pub fn change_stream(&self) -> LocalSubject<'static, (), ()>
-  where
-    W: 'static,
-  {
-    self.0.change_stream()
+impl<W> StateRef<W> {
+  // convert a `StateRef` to `SilentRef`
+  pub fn silent(&self) -> SilentRef<W> {
+    SilentRef(StatefulImpl {
+      widget: self.widget.clone(),
+      state_attr: self.state_attr,
+    })
   }
 }
 
-pub struct StateRefMut<'a, W: 'static> {
-  ref_mut: RefMut<'a, AttrWidget<W>>,
-  deref_mut_occur: bool,
-  silent: bool,
-  host: Rc<RefCell<AttrWidget<W>>>,
+impl<W> std::ops::Deref for StatefulImpl<W> {
+  type Target = AttrWidget<W>;
+
+  fn deref(&self) -> &Self::Target { self.widget.as_ref() }
 }
 
-impl<'a, W> StateRefMut<'a, W> {
-  pub fn silent(&mut self) -> &mut Self {
-    self.silent = true;
-    self
+impl<W> std::ops::DerefMut for StatefulImpl<W> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    // Safety
+    // - StatefulImpl is not support clone, so as a widget it's unique and safe to
+    //   get inner mutable reference。
+    // - StateRef may hold a refcount of this, in the `declare!` macro, ribir
+    //   guarantee the generate code have not data race.
+    // - User directly use the internal api should be careful not hold the inner
+    //   mutable reference.
+    unsafe { Rc::get_mut_unchecked(&mut self.widget) }
   }
 }
 
-impl<'a, W: 'static> Drop for StateRefMut<'a, W> {
-  fn drop(&mut self) {
-    if !self.deref_mut_occur {
-      return;
+impl<W> std::ops::Deref for SilentRef<W> {
+  type Target = StatefulImpl<W>;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl<W> std::ops::DerefMut for SilentRef<W> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    // Safety: the back data of `state_attr` pointer have the same lifetime with
+    // this pointer. And the pointer is use only in deref_mut in StateRef or
+    // SilentRef
+    let state_attr = unsafe { self.0.state_attr.as_mut() };
+    if let Some(TreeInfo { mut tree, .. }) = state_attr.tree_info {
+      let tree = unsafe { tree.as_mut() };
+      tree.add_state_trigger(self.state_attr);
     }
 
-    let mut attrs = self.ref_mut.attrs_mut();
-    let state_attr = attrs.find_mut::<StateAttr>().unwrap();
+    &mut self.0
+  }
+}
+
+impl<W> std::ops::Deref for StateRef<W> {
+  type Target = StatefulImpl<W>;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl<W> std::ops::DerefMut for StateRef<W> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    // Safety: the back data of `state_attr` pointer have the same lifetime with
+    // this pointer. And the pointer is use only in deref_mut in StateRef or
+    // SilentRef
+    let state_attr = unsafe { self.0.state_attr.as_mut() };
     if let Some(TreeInfo { mut tree, id }) = state_attr.tree_info {
       let tree = unsafe { tree.as_mut() };
-      tree.add_state_trigger(Box::new(self.host.clone()));
-      if !self.silent {
-        id.mark_changed(tree);
-      }
+      tree.add_state_trigger(self.state_attr);
+      id.mark_changed(tree);
     }
-  }
-}
 
-impl<'a, W> std::ops::Deref for StateRefMut<'a, W> {
-  type Target = RefMut<'a, AttrWidget<W>>;
-  fn deref(&self) -> &Self::Target { &self.ref_mut }
-}
-
-impl<'a, W> std::ops::DerefMut for StateRefMut<'a, W> {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    self.deref_mut_occur = true;
-    &mut self.ref_mut
+    &mut self.0
   }
 }
 
 impl StateAttr {
-  pub fn id(&self) -> Option<WidgetId> { self.tree_info.as_ref().map(|info| info.id) }
-
   pub(crate) fn assign_id(&mut self, id: WidgetId, tree: NonNull<WidgetTree>) {
     debug_assert!(self.tree_info.is_none());
     self.tree_info = Some(TreeInfo { tree, id })
@@ -346,7 +327,7 @@ impl StateAttr {
 
 impl<W: CombinationWidget> CombinationWidget for StatefulImpl<W> {
   #[inline]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.borrow().build(ctx) }
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.build(ctx) }
 }
 
 impl<W: RenderWidget> RenderWidget for StatefulImpl<W> {
@@ -354,27 +335,20 @@ impl<W: RenderWidget> RenderWidget for StatefulImpl<W> {
 
   #[inline]
   fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    RenderWidget::update_render_object(&*self.0.borrow(), object, ctx)
+    RenderWidget::update_render_object(&*self.widget, object, ctx)
   }
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO {
-    RenderWidget::create_render_object(&*self.0.borrow())
-  }
+  fn create_render_object(&self) -> Self::RO { RenderWidget::create_render_object(&*self.widget) }
 }
 
-impl<W> StateTrigger for Rc<RefCell<AttrWidget<W>>> {
-  fn trigger_change(&self) {
-    // safety: borrow the inner trigger to notify state change and never modify the
-    // StatefulImpl
-    let attr: Option<&mut StateAttr> = self
-      .borrow_mut()
-      .attrs_mut()
-      .find_mut::<StateAttr>()
-      .map(|attr| unsafe { std::mem::transmute(attr) });
-
-    if let Some(StateAttr { subject: Some(sbj), .. }) = attr {
-      sbj.next(())
+impl StateTrigger for NonNull<StateAttr> {
+  fn trigger_change(&mut self) {
+    // Safety:  `StateAttr` is  not a public type, and this method only trigger by
+    // framework. Safe guarantee by caller.
+    let state_attr = unsafe { self.as_mut() };
+    if let Some(subject) = &mut state_attr.subject {
+      subject.next(())
     }
   }
 }
@@ -389,9 +363,9 @@ mod tests {
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
     let stateful = Text { text: "Hello".to_string() }.into_stateful();
     {
-      stateful.ref_cell().borrow_mut().text = "World!".to_string();
+      stateful.state_ref().text = "World!".to_string();
     }
-    assert_eq!(stateful.borrow().text, "World!");
+    assert_eq!(stateful.text, "World!");
   }
 
   #[test]
@@ -428,21 +402,17 @@ mod tests {
       *c_changed_size.borrow_mut() = size.after;
     });
 
-    let state = sized_box.ref_cell();
+    let mut state = sized_box.state_ref();
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
     tree.set_root(sized_box.box_it(), &mut render_tree);
 
-    // Borrow mut but not use it
-    {
-      let _ = state.borrow_mut().size;
-    }
     assert_eq!(*notified_count.borrow(), 0);
     assert_eq!(tree.changed_widgets().len(), 0);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
     {
-      state.borrow_mut().size = Size::new(1., 1.);
+      state.size = Size::new(1., 1.);
     }
-    tree.all_state_change_notify();
+    tree.notify_state_change_until_empty();
     assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(tree.changed_widgets().len(), 1);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
