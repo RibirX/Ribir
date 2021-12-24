@@ -452,22 +452,20 @@ pub struct AttrWidget<W> {
   pub attrs: Attributes,
 }
 
-impl<W: IntoStateful> IntoStateful for AttrWidget<W> {
-  type S = AttrWidget<W::S>;
+impl<W: IntoStateful> IntoStateful for AttrWidget<W>
+where
+  W::S: Attrs,
+{
+  type S = W::S;
 
   fn into_stateful(self) -> Self::S {
     let Self { widget, attrs } = self;
 
-    let widget = widget.into_stateful();
-    // fixme: should merge attrs into stateful widget.
-    AttrWidget { widget, attrs }
-  }
-}
+    let mut stateful = widget.into_stateful();
+    stateful.attrs_mut().0.extend(attrs.0);
 
-impl<W: Stateful> Stateful for AttrWidget<W> {
-  type RawWidget = W::RawWidget;
-  #[inline]
-  fn state_ref(&self) -> StateRef<Self::RawWidget> { self.widget.state_ref() }
+    stateful
+  }
 }
 
 impl<W> std::ops::Deref for AttrWidget<W> {
@@ -535,3 +533,14 @@ impl<'a, A: Any> Entry<'a, A> {
 /// the type backed in the `Box<dyn Any>`
 #[inline]
 fn attr_downcast_mut<A: Any>(attr: &mut Box<dyn Any>) -> &mut A { attr.downcast_mut().unwrap() }
+
+#[test]
+fn fix_into_stateful_keep_attrs() {
+  let s = SizedBox { size: Size::zero() }.with_key(1).into_stateful();
+  assert_eq!(get_attr!(s), Some(&Key::Ki4(1)));
+  assert!(
+    s.get_attrs()
+      .and_then(Attributes::find::<StateAttr>)
+      .is_some()
+  );
+}

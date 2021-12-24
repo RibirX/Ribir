@@ -95,8 +95,6 @@ use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{ptr::NonNull, rc::Rc};
 
-// todo: update stateful document,
-
 /// Widget witch can be referenced and modified across `StateRefCell`
 ///
 /// # Notice
