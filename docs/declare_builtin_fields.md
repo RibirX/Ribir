@@ -1,0 +1,54 @@
+# Full builtin fields list 
+
+- key : [`Key`](../ribir/widget/key/enum.Key.html) 
+ 	 - assign a key to the widget use for track it when tree rebuild.
+- cursor : [`CursorIcon`](../ribir/widget/enum.CursorIcon.html) 
+ 	 - assign cursor to the widget.
+- theme : [`Theme`](../ribir/widget/struct.Theme.html) 
+ 	 - assign theme to the widget.
+- auto_focus : bool 
+ 	 - Indicates whether the widget should automatically get focus when the window loads.
+- tab_index : i16 
+ 	 - indicates that widget can be focused, and where it participates in sequential keyboard navigation (usually with the Tab key, hence the name.
+- on_pointer_down : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler for the pointer down event.
+- on_pointer_up : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler for the pointer up event.
+- on_pointer_move : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler for the pointer move event.
+- on_tap : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler for the pointer tap event.
+- on_tap_times : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler for processing the specified times tap.
+- on_pointer_cancel : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler to process pointer cancel event.
+- on_pointer_enter : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler when pointer enter this widget.
+- on_pointer_leave : FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html)) 
+ 	 - specify the event handler when pointer leave this widget.
+- on_focus : FnMut(&[`FocusEvent`](../ribir/widget/events/type.FocusEvent.html)) 
+ 	 - specify the event handler to process focus event.
+- on_blur : FnMut(&[`FocusEvent`](../ribir/widget/events/type.FocusEvent.html)) 
+ 	 - specify the event handler to process blur event.
+- on_focus_in : FnMut(&[`FocusEvent`](../ribir/widget/events/type.FocusEvent.html)) 
+ 	 - specify the event handler to process focusin event.
+- on_focus_out : FnMut(&[`FocusEvent`](../ribir/widget/events/type.FocusEvent.html)) 
+ 	 - specify the event handler to process focusout event.
+- on_key_down : FnMut(&[`KeyboardEvent`](../ribir/widget/events/struct.KeyboardEvent.html)) 
+ 	 - specify the event handler when keyboard press down.
+- on_key_up : FnMut(&[`KeyboardEvent`](../ribir/widget/events/struct.KeyboardEvent.html)) 
+ 	 - specify the event handler when a key is released.
+- on_char : FnMut(&[`CharEvent`](../ribir/widget/events/struct.CharEvent.html)) 
+ 	 - specify the event handler when received a unicode character.
+- on_wheel : FnMut(&[`WheelEvent`](../ribir/widget/events/struct.WheelEvent.html)) 
+ 	 - specify the event handler when user moving a mouse wheel or similar input device.
+- padding : [`EdgeInsets`](../ribir/widget/struct.EdgeInsets.html) 
+ 	 - set the padding area on all four sides of the widget.
+- margin : [`EdgeInsets`](../ribir/widget/struct.EdgeInsets.html) 
+ 	 - expand space around widget wrapped.
+- background : type which implement Into<[`FillStyle`](../ribir/widget/enum.FillStyle.html)> 
+ 	 - specify the background of the widget box.
+- border : [`Border`](ribir/widget/struct.Border.html) 
+ 	 - specify the border of the widget which draw above the background
+- radius : [`BorderRadius`](../doc/canvas/layer/struct.BorderRadius.html) 
+ 	 - specify how rounded the corners have of the widget.

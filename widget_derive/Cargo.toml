@@ -19,6 +19,10 @@ ribir = {path = "../core"}
 trybuild = "1.0.53"
 winit = "0.24.0"
 
+[build-dependencies]
+proc-macro2 = "1.0.26"
+syn = "1.0.83"
+
 [dependencies.syn]
-features = ["visit-mut","full","extra-traits"]
-version = "1.0.82"
+features = ["visit-mut", "full", "extra-traits"]
+version = "1.0.83"
