@@ -156,11 +156,10 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   png_encoder.set_color(png::ColorType::RGBA);
 
   let data: Vec<_> = (0..height)
-    .map(|i| {
+    .flat_map(|i| {
       let start = (i * align_width) as usize * PX_BYTES;
       data[start..(start + width as usize * PX_BYTES)].iter()
     })
-    .flatten()
     .cloned()
     .collect();
 

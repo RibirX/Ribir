@@ -398,8 +398,8 @@ fn common_def_tokens(
     f.follows.is_some() || ctx.be_followed(name)
   }
 
-  let wrap_name = ctx.no_conflict_name_with_suffix(def_name, &member);
-  let wrap_ref = ctx.no_conflict_name_with_suffix(ref_name, &member);
+  let wrap_name = ctx.no_conflict_name_with_suffix(def_name, member);
+  let wrap_ref = ctx.no_conflict_name_with_suffix(ref_name, member);
   let stateful = is_stateful(&wrap_ref, f, ctx).then(|| quote! { .into_stateful() });
 
   let field_follow = f.follow_tokens(&wrap_ref, &wrap_name, None, ctx);

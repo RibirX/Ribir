@@ -37,7 +37,7 @@ impl Color {
   }
 
   pub fn from_u32(word: u32) -> Self {
-    let [r, g, b, a]: [u8; 4] = unsafe { std::mem::transmute(word.to_be()) };
+    let [r, g, b, a]: [u8; 4] = word.to_be().to_ne_bytes();
     Self {
       red: Color::u8_to_f32(r),
       green: Color::u8_to_f32(g),

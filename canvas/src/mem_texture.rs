@@ -88,7 +88,7 @@ impl<T: Copy + Default> MemTexture<T> {
     T: Copy,
   {
     debug_assert_eq!(rect.area() as usize, data.len());
-    debug_assert!(DeviceRect::from_size(self.size).contains_rect(&rect));
+    debug_assert!(DeviceRect::from_size(self.size).contains_rect(rect));
     let rect = rect.to_usize();
 
     rect.y_range().enumerate().for_each(|(idx, y)| {

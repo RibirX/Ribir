@@ -456,12 +456,12 @@ impl<'a, 'b> Drop for LayerGuard<'a, 'b> {
 impl<'a, 'b> Deref for LayerGuard<'a, 'b> {
   type Target = Rendering2DLayer<'b>;
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.0 }
+  fn deref(&self) -> &Self::Target { self.0 }
 }
 
 impl<'a, 'b> DerefMut for LayerGuard<'a, 'b> {
   #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+  fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }
 
 impl Default for FillStyle {
@@ -872,10 +872,10 @@ And by opposing end them? To die: to sleep;\n",
     ]
     .iter()
     .for_each(|radius| {
-      layer.save_guard().rect_round(&rect, &radius).stroke();
+      layer.save_guard().rect_round(&rect, radius).stroke();
       layer
         .translate(0., rect.height() + 5.)
-        .rect_round(&rect, &radius)
+        .rect_round(&rect, radius)
         .fill();
 
       layer.translate(rect.width() + 5., -(rect.height() + 5.));

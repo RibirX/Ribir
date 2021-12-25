@@ -4,9 +4,9 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Fields, Meta};
 
-pub const DECLARE: &'static str = "Declare";
-pub const BUILDER: &'static str = "Builder";
-pub const RENAME: &'static str = "rename";
+pub const DECLARE: &str = "Declare";
+pub const BUILDER: &str = "Builder";
+pub const RENAME: &str = "rename";
 
 pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> Result<TokenStream, TokenStream> {
   let vis = &input.vis;

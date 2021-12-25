@@ -41,7 +41,7 @@ use syn::{
 impl Parse for DeclareMacro {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     fn parse_data_flows_tokens(input: ParseStream) -> syn::Result<Punctuated<DataFlow, Token![;]>> {
-      Ok(Punctuated::parse_terminated(input)?)
+      Punctuated::parse_terminated(input)
     }
     fn parse_data_flows(input: ParseStream) -> syn::Result<Punctuated<DataFlow, Token![;]>> {
       if input.is_empty() {
@@ -80,7 +80,7 @@ impl Parse for DeclareWidget {
 
     fn parse_fields(input: ParseStream) -> syn::Result<Punctuated<DeclareField, Token!(,)>> {
       let mut punctuated = Punctuated::new();
-      while is_field(&input) {
+      while is_field(input) {
         punctuated.push(input.parse()?);
         if input.is_empty() {
           break;
@@ -133,8 +133,7 @@ impl Parse for DeclareWidget {
       // ambiguous  with `DeclareChild`, and prefer as `DeclareField`.
       match content.fork().parse() {
         Err(_) if !(content.peek(Ident) && content.peek2(Brace)) => break,
-        Ok(Child::Expr(Expr::Path(_))) => break,
-        Ok(Child::Expr(Expr::Type(_))) => break,
+        Ok(Child::Expr(c)) if matches!(*c, Expr::Path(_)) || matches!(*c, Expr::Type(_)) => break,
         _ => {}
       }
 
@@ -175,10 +174,12 @@ impl Parse for DeclareWidget {
 
 impl Parse for SkipNcAttr {
   fn parse(input: ParseStream) -> syn::Result<Self> {
+    let pound_token = input.parse()?;
     let content;
+    let bracket_token = bracketed!(content in input);
     Ok(Self {
-      pound_token: input.parse()?,
-      bracket_token: bracketed!(content in input),
+      pound_token,
+      bracket_token,
       skip_nc_meta: content.parse()?,
     })
   }

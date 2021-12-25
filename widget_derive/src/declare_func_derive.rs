@@ -20,8 +20,8 @@ mod parse;
 pub use follow_on::*;
 
 enum Child {
-  Declare(DeclareWidget),
-  Expr(syn::Expr),
+  Declare(Box<DeclareWidget>),
+  Expr(Box<syn::Expr>),
 }
 
 pub struct DeclareMacro {
@@ -91,9 +91,9 @@ impl DataFlow {
     let follows_on = from
       .follows
       .as_ref()
-      .ok_or(DeclareError::DataFlowNoDepends(from.expr.span()))?;
+      .ok_or_else(|| DeclareError::DataFlowNoDepends(from.expr.span()))?;
 
-    let upstream = upstream_observable(&follows_on);
+    let upstream = upstream_observable(follows_on);
 
     let names = follows_on
       .names()
@@ -124,7 +124,7 @@ struct CircleCheckStack<'a> {
 
 impl DeclareMacro {
   fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream2> {
-    fn circle_stack_to_path(stack: &Vec<CircleCheckStack>) -> Box<[FollowInfo]> {
+    fn circle_stack_to_path(stack: &[CircleCheckStack]) -> Box<[FollowInfo]> {
       stack
         .iter()
         .map(|o| FollowInfo {
@@ -188,7 +188,7 @@ impl DeclareMacro {
     self
       .data_flows
       .iter_mut()
-      .try_for_each(|df| df.gen_tokens(&mut tokens, &ctx))?;
+      .try_for_each(|df| df.gen_tokens(&mut tokens, ctx))?;
 
     let def_name = self.widget.widget_def_name(ctx);
     Ok(quote! {{ #tokens #def_name.box_it() }})
@@ -223,7 +223,7 @@ impl DeclareMacro {
                 .filter_map(|mut f_follows| {
                   let follows = &mut f_follows.follows;
                   *follows = follows
-                    .into_iter()
+                    .iter()
                     .filter(|f| f.widget != ref_name)
                     .cloned()
                     .collect();
@@ -330,7 +330,7 @@ impl DeclareMacro {
           };
           Ok(())
         }
-        Some(CheckState::Checking) => err_detect(&stack),
+        Some(CheckState::Checking) => err_detect(stack),
         Some(CheckState::Checked) => Ok(()),
       }
     }
@@ -500,10 +500,10 @@ impl DeclareField {
         &expr_tokens,
         ctx,
       );
-      let upstream = upstream_observable(&follows);
+      let upstream = upstream_observable(follows);
       let state_refs = state_ref_tokens(follows.names());
       let self_ref_tokens =
-        (!follows.contain(&ref_name)).then(|| quote! {let mut #ref_name = #def_name.state_ref();});
+        (!follows.contain(ref_name)).then(|| quote! {let mut #ref_name = #def_name.state_ref();});
       quote! {
           #upstream.subscribe({
             #state_refs
@@ -600,7 +600,7 @@ impl DeclareWidget {
         Child::Declare(d) => {
           let child_widget_name = d.widget_def_name(ctx);
           let c_name = if d.named.is_some() {
-            child_widget_name.clone()
+            child_widget_name
           } else {
             let c_name = ctx.no_conflict_child_name(idx);
             let mut child_tokens = quote! {};
@@ -668,7 +668,7 @@ impl DeclareWidget {
   }
 }
 
-pub fn upstream_observable<'a>(depends_on: &FollowOnVec) -> TokenStream2 {
+pub fn upstream_observable(depends_on: &FollowOnVec) -> TokenStream2 {
   let upstream = depends_on
     .names()
     .map(|depend_w| quote! { #depend_w.change_stream() });
@@ -695,7 +695,7 @@ impl DeclareWidget {
        }| {
         let method = Ident::new(&format!("with_{}", quote! {#member}), member.span());
         let depends_tokens = follows.as_ref().map(|follows| {
-          let upstream = upstream_observable(&follows);
+          let upstream = upstream_observable(follows);
           let refs = state_ref_tokens(follows.names());
           let set_attr = Ident::new(&format!("try_set_{}", quote! {#member}), member.span());
           let get_attr = Ident::new(&format!("get_{}", quote! {#member}), member.span());
@@ -798,7 +798,7 @@ impl DeclareWidget {
     self
       .sugar_fields
       .widget_wrap_field_iter()
-      .try_for_each(|f| unnecessary_skip_nc(f))
+      .try_for_each(unnecessary_skip_nc)
   }
 
   fn wrap_widget_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {

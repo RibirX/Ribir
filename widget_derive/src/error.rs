@@ -31,8 +31,8 @@ pub enum DeclareError {
 pub type Result<T> = std::result::Result<T, DeclareError>;
 
 impl DeclareError {
-  pub fn into_compile_error(&self, ctx: &DeclareCtx, declare: &DeclareMacro) -> TokenStream {
-    self.error_emit(&ctx, declare);
+  pub fn into_compile_error(self, ctx: &DeclareCtx, declare: &DeclareMacro) -> TokenStream {
+    self.error_emit(ctx, declare);
     // A Valid widget return to avoid compile noise when error occur.
     quote! {{
       struct __Tmp;
@@ -92,7 +92,7 @@ impl DeclareError {
       }
       DeclareError::KeyDependsOnOther { key, depends_on } => {
         let mut spans = vec![key.unwrap()];
-        spans.extend(depends_on.into_iter().map(|s| s.unwrap()));
+        spans.extend(depends_on.iter().map(|s| s.unwrap()));
         diagnostic.set_spans(spans);
         diagnostic.set_message("The key attribute is not allowed to depend on others.");
       }
@@ -103,10 +103,9 @@ impl DeclareError {
           .filter_map(|f| {
             f.follows
               .as_ref()
-              .and_then(|follows| follows.into_iter().find(|f| &f.widget == wrap_name))
+              .and_then(|follows| follows.iter().find(|f| &f.widget == wrap_name))
           })
-          .map(|f| f.spans.into_iter().map(|s| s.unwrap()))
-          .flatten()
+          .flat_map(|f| f.spans.iter().map(|s| s.unwrap()))
           .collect::<Vec<_>>();
         diagnostic.set_spans(error_spans);
         diagnostic.set_message( "Depends on a field which behind `if guard`, its existence depends on the `if guard` result in runtime.");
@@ -124,7 +123,7 @@ impl DeclareError {
 // return a tuple compose by the string display of path, the path follow spans
 // and the spans of will `#[skip_nc]` can add.
 fn path_info(
-  path: &Box<[FollowInfo]>,
+  path: &[FollowInfo],
   ctx: &DeclareCtx,
 ) -> (String, Vec<proc_macro::Span>, Vec<proc_macro::Span>) {
   let path = path.iter().map(|FollowInfo { widget, member, on }| {
@@ -168,7 +167,7 @@ fn path_info(
         m.span().unwrap()
       } else {
         on.spans
-          .into_iter()
+          .iter()
           .fold(widget.span(), |s1, s2| s2.join(s1).unwrap())
           .unwrap()
       }

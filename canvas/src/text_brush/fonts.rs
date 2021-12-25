@@ -79,8 +79,7 @@ impl Fonts {
           .source
           .select_best_match(&[family_name(family)], props)
           .ok()
-          .map(|handle| handle.load().ok())
-          .flatten();
+          .and_then(|handle| handle.load().ok());
         if let Some(font) = font {
           return self.try_insert_font(font, brush);
         }

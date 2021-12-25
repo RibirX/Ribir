@@ -10,7 +10,7 @@ use quote::{quote, quote_spanned};
 use std::collections::{HashMap, HashSet};
 use syn::{parse_quote, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident};
 
-const DECLARE_MACRO_NAME: &'static str = "declare";
+const DECLARE_MACRO_NAME: &str = "declare";
 
 #[derive(Default)]
 pub struct DeclareCtx {
@@ -131,11 +131,10 @@ impl VisitMut for DeclareCtx {
         .analyze_stack
         .iter_mut()
         .rev()
-        .map(|locals| locals.iter_mut().rev())
-        .flatten()
+        .flat_map(|locals| locals.iter_mut().rev())
         .find(|v| v.name == local);
       if let Some(local_var) = local_var {
-        local_var.alias_of_name = Some(named.clone());
+        local_var.alias_of_name = Some(named);
       }
     }
   }
@@ -225,13 +224,15 @@ impl VisitMut for DeclareCtx {
     self
       .analyze_stack
       .last_mut()
-      .expect(&format!(
-        "Crash when visit `{}`, stack should not be empty, at {}:{}:{}",
-        quote! { #i },
-        file!(),
-        line!(),
-        column!()
-      ))
+      .unwrap_or_else(|| {
+        panic!(
+          "Crash when visit `{}`, stack should not be empty, at {}:{}:{}",
+          quote! { #i },
+          file!(),
+          line!(),
+          column!()
+        )
+      })
       .push(LocalVariable {
         name: i.ident.clone(),
         alias_of_name: None,
@@ -375,7 +376,7 @@ impl DeclareCtx {
     self
       .named_widgets
       .iter()
-      .filter(|k| !self.be_followed.contains_key(k) && !k.to_string().starts_with("_"))
+      .filter(|k| !self.be_followed.contains_key(k) && !k.to_string().starts_with('_'))
       .for_each(|id| {
         Diagnostic::spanned(
           vec![id.span().unwrap()],
@@ -435,8 +436,7 @@ impl DeclareCtx {
       .analyze_stack
       .iter()
       .rev()
-      .map(|local| local.iter().rev())
-      .flatten()
+      .flat_map(|local| local.iter().rev())
       .find(|v| &v.name == ident)
       .and_then(|v| v.alias_of_name.as_ref())
       .or_else(|| self.named_widgets.contains(ident).then(|| ident))

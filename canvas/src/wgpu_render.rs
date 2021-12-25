@@ -74,7 +74,7 @@ impl WgpuRender<PhysicSurface> {
       glyph_texture_size,
       atlas_texture_size,
       adapter,
-      move |device| PhysicSurface::new(w_surface, &device, size),
+      move |device| PhysicSurface::new(w_surface, device, size),
       anti_aliasing,
     )
     .await
@@ -103,7 +103,7 @@ impl WgpuRender<TextureSurface> {
       adapter,
       |device| {
         TextureSurface::new(
-          &device,
+          device,
           size,
           wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
         )
@@ -606,7 +606,7 @@ fn create_uniforms(
     canvas_coordinate_map: canvas_2d_to_device_matrix.to_arrays(),
   };
   let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-    contents: &uniform.as_bytes(),
+    contents: uniform.as_bytes(),
     usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
     label: Some("uniform buffer"),
   });

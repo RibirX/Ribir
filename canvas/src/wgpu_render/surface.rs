@@ -35,7 +35,7 @@ impl Surface for PhysicSurface {
     _queue: &wgpu::Queue,
     sc_desc: &wgpu::SwapChainDescriptor,
   ) {
-    self.swap_chain = device.create_swap_chain(&self.surface, &sc_desc);
+    self.swap_chain = device.create_swap_chain(&self.surface, sc_desc);
   }
 
   fn get_next_view(&mut self) -> Self::V {

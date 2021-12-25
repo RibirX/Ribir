@@ -52,7 +52,7 @@ pub trait CanvasRender {
 
 impl Canvas {
   pub fn new(options: Option<CanvasOptions>) -> Self {
-    let options = options.unwrap_or_else(Default::default);
+    let options = options.unwrap_or_default();
     let CanvasOptions {
       texture_init_size: init_size,
       texture_max_size: max_size,
@@ -107,7 +107,7 @@ impl Canvas {
   }
 
   pub fn mesure_text<'a>(&mut self, src: &'a Text) -> Rect {
-    let text = src.to_glyph_text(&mut self.text_brush(), 0);
+    let text = src.to_glyph_text(self.text_brush(), 0);
     let mut sec = Section::new().add_text(text);
     sec.bounds = (f32::INFINITY, f32::INFINITY);
     self
@@ -265,7 +265,7 @@ impl Canvas {
     transform: Transform,
     mut sec: Section,
   ) {
-    let style_rect = self.store_style_in_atlas(&style, render);
+    let style_rect = self.store_style_in_atlas(style, render);
     self.add_primitive(style_rect, align_bounds, transform);
     let prim_id = self.render_data.primitives.len() as u32 - 1;
     sec.text.iter_mut().for_each(|t| t.extra = prim_id);
