@@ -312,7 +312,7 @@ Every widget can be supported to use in `declare!` macro if it implemented [`Dec
 
 The easiest way it to derive the `Declare` trait. See more detail in the [`mod level document`][mod].
 
-[builtin]: todo
+[builtin]: #full-builtin-fields-list
 [mod]: ../ribir/declare/index.html
 [declare]: ../ribir/declare/trait.Declare.html
 [declare_builder]: ../ribir/declare/trait.DeclareBuilder.html

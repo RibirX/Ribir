@@ -28,7 +28,7 @@ mod padding;
 pub use padding::*;
 mod box_decoration;
 pub use box_decoration::*;
-mod attr;
+pub mod attr;
 pub use attr::*;
 mod checkbox;
 pub use checkbox::*;

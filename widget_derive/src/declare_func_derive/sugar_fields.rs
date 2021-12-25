@@ -78,34 +78,30 @@ impl Id {
 
 macro_rules! fields_sugar_def {
   (
-    $(#[$m:meta])*
-    $v: vis struct $name:ident {
-      #[attributes]
+    #attributes
+    $(
+      #[doc=$attr_doc: literal]
+      $attrs:ident: $a_ty: literal,
+    )*
 
-      $(
-        #[doc=$attr_doc: literal]
-        $attrs:ident : $a_ty:ty,
-      )*
+    #listeners
 
-      #[listeners]
+    $(
+      #[doc=$listener_doc: literal]
+      $listeners:ident: $l_ty: literal,
+    )*
 
-      $(
-        #[doc=$listener_doc: literal]
-        $listeners:ident : $l_ty:ty,
-      )*
-
-      #[widget_wrap]
-      $(
-        #[doc=$w_wrap_doc: literal]
-        $w_wrap:ident : $w_ty:ty
-      ),*
-    }
+    #widget_wrap
+    $(
+      #[doc=$w_wrap_doc: literal]
+      $w_wrap:ident : $w_ty: literal
+    ),*
   ) => {
-    $(#[$m])*
-    $v struct $name {
-      $($attrs : $a_ty,)*
-      $($listeners: $l_ty,)*
-      $($w_wrap: $w_ty),*
+    #[derive(Default)]
+    pub struct SugarFields {
+      $($attrs : Option<DeclareField>,)*
+      $($listeners: Option<DeclareField>,)*
+      $($w_wrap: Option<DeclareField>),*
     }
 
 
@@ -119,7 +115,7 @@ macro_rules! fields_sugar_def {
       ]);
     }
 
-    impl $name {
+    impl SugarFields {
 
       pub fn assign_field(&mut self, f: DeclareField) -> Result<Option<DeclareField>> {
         $(
@@ -196,73 +192,7 @@ pub mod kw {
   syn::custom_keyword!(skip_nc);
 }
 
-// todo: auto generate the sugar fields list document by the below code.
-fields_sugar_def! {
-  #[derive(Default)]
-  pub struct SugarFields {
-    #[attributes]
-    #[doc="assign a key to the widget use for track it when tree rebuild."]
-    key: Option<DeclareField>,
-    #[doc="assign cursor to the widget."]
-    cursor: Option<DeclareField>,
-    #[doc="assign theme to the widget."]
-    theme: Option<DeclareField>,
-    #[doc="Indicates whether the widget should automatically get focus when the window loads."]
-    auto_focus: Option<DeclareField>,
-    #[doc="indicates that `widget` can be focused, and where it participates in \
-          sequential keyboard navigation (usually with the Tab key, hence the name."]
-    tab_index: Option<DeclareField>,
-
-    #[listeners]
-
-    #[doc="specify the event handler for the pointer down event."]
-    on_pointer_down: Option<DeclareField>,
-    #[doc="specify the event handler for the pointer up event."]
-    on_pointer_up: Option<DeclareField>,
-    #[doc="specify the event handler for the pointer move event."]
-    on_pointer_move: Option<DeclareField>,
-    #[doc="specify the event handler for the pointer tap event."]
-    on_tap: Option<DeclareField>,
-    #[doc="specify the event handler for processing the specified times tap."]
-    on_tap_times: Option<DeclareField>,
-    #[doc="specify the event handler to process pointer cancel event."]
-    on_pointer_cancel: Option<DeclareField>,
-    #[doc="specify the event handler when pointer enter this widget."]
-    on_pointer_enter: Option<DeclareField>,
-    #[doc="specify the event handler when pointer leave this widget."]
-    on_pointer_leave: Option<DeclareField>,
-    #[doc="specify the event handler to process focus event."]
-    on_focus: Option<DeclareField>,
-    #[doc="specify the event handler to process blur event."]
-    on_blur: Option<DeclareField>,
-    #[doc="specify the event handler to process focusin event."]
-    on_focus_in: Option<DeclareField>,
-    #[doc="specify the event handler to process focusout event."]
-    on_focus_out: Option<DeclareField>,
-    #[doc="specify the event handler when keyboard press down."]
-    on_key_down: Option<DeclareField>,
-    #[doc="specify the event handler when a key is released."]
-    on_key_up: Option<DeclareField>,
-    #[doc="specify the event handler when received a unicode character."]
-    on_char: Option<DeclareField>,
-    #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
-    on_wheel: Option<DeclareField>,
-
-    #[widget_wrap]
-    // padding should always before margin, it widget have margin & padding both
-    // margin should wrap padding.
-    #[doc="set the padding area on all four sides of the widget."]
-    padding: Option<DeclareField>,
-    #[doc="expand space around widget wrapped."]
-    margin: Option<DeclareField>,
-    #[doc="specify the background of the widget box."]
-    background: Option<DeclareField>,
-    #[doc="specify the border of the widget which draw above the background"]
-    border: Option<DeclareField>,
-    #[doc= "specify how rounded the corners have of the widget."]
-    radius: Option<DeclareField>
-  }
-}
+include!("./sugar_fields_struct.rs");
 
 const DECORATION: &str = "decoration";
 
