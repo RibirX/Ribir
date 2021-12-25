@@ -9,6 +9,7 @@ module.exports = {
     "refactor",
     "style",
     "ci",
+    "release",
     "perf"
   ],
   "maxMessageLength": 64,
