@@ -103,8 +103,8 @@ impl BoxDecoration {
         .set_line_width(border_width)
         .set_style(FillStyle::Color(border.left.color.clone()));
 
-      let half_boder = border_width / 2.;
-      let rect = rect.inflate(half_boder, half_boder);
+      let half_border = border_width / 2.;
+      let rect = rect.inflate(half_border, half_border);
       if let Some(ref radius) = self.radius {
         painter.rect_round(&rect, radius);
       } else {
