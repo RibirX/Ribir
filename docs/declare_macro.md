@@ -306,13 +306,12 @@ impl CombinationWidget for StatefulTodos {
 
 See the `data_follow`, `self_ref` with a `silent` method call, this means when `checkbox` change, modify back  to `self_ref.silent().tasks[idx].finished`, but this modify not effect the `StatefulTodos` widget to rebuild.
 
-## How to support custom widget work in `declare!` syntax
+## How to support widget work in `declare!` syntax ?
 
-Every widget can be supported to use in `declare!` macro if it implemented [`Declare`][declare] and [`DeclareBuilder`][declare_builder].
+Every widget can be supported to use in `declare!` macro if it implemented the [`Declare`](declare). 
 
 The easiest way it to derive the `Declare` trait. See more detail in the [`mod level document`][mod].
 
+[declare]: ../ribir/declare/trait.Declare.html
 [builtin]: #full-builtin-fields-list
 [mod]: ../ribir/declare/index.html
-[declare]: ../ribir/declare/trait.Declare.html
-[declare_builder]: ../ribir/declare/trait.DeclareBuilder.html

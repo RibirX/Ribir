@@ -3,7 +3,7 @@ use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
 #[stateful(custom)]
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Declare)]
 pub struct Checkbox {
   pub checked: bool,
   pub indeterminate: bool,
@@ -97,26 +97,7 @@ impl CombinationWidget for StatefulCheckbox {
   }
 }
 
-impl IntoStateful for StatefulCheckbox {
-  type S = Self;
-
-  #[inline]
-  fn into_stateful(self) -> Self::S { self }
-}
-
-/// Build checkbox as stateful default to support user interactive.
-impl Declare for Checkbox {
-  type Builder = Checkbox;
-}
-
-impl DeclareBuilder for Checkbox {
-  type Target = StatefulCheckbox;
-
-  #[inline]
-  fn build(self) -> Self::Target { self.into_stateful() }
-}
 // todo: use a common path widget to replace this.
-#[stateful]
 #[derive(Debug, Clone, Declare)]
 pub struct CheckboxMarker {
   path_width: f32,
@@ -163,7 +144,7 @@ mod tests {
 
   #[test]
   fn layout() {
-    let w = Checkbox::default().build();
+    let w = CheckboxBuilder::default().build();
     let (rect, child) = widget_and_its_children_box_rect(w.box_it(), Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
 
@@ -198,7 +179,7 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn indeterminate_paint() {
-    let c = Checkbox {
+    let c = CheckboxBuilder {
       checked: true,
       indeterminate: true,
       ..<_>::default()

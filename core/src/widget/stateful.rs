@@ -88,8 +88,6 @@
 //!   color: Color::RED,
 //! }.into_stateful();
 //! ```
-//! You can implement [`Declare`](crate::prelude::Declare) trait to always build
-//! a stateful version `Rectangle` as default.`
 
 use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;

@@ -1,11 +1,10 @@
 error: the identify `margin` is reserved to expand space around widget wrapped.
- --> $DIR/declare_builder_fail.rs:7:3
+ --> tests/ui/declare_builder_fail.rs:7:3
   |
 7 |   margin: i32,
   |   ^^^^^^
   |
-  = help: rename it in builder to ignore the conflict
-          ```
-          #[rename = "xxx"]
+  = help: use `rename` meta to avoid the name conflict in `declare!` macro.
+
+          #[declare(rename = "xxx")]
           margin : i32
-          ```

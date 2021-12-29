@@ -1,6 +1,6 @@
 use crate::{attr_fields::AttrFields, util::struct_unwrap};
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::quote;
 use syn::{DeriveInput, Generics, Ident};
 pub const PROXY_PATH: &str = "proxy";
 
@@ -17,7 +17,7 @@ impl<'a> ProxyDeriveInfo<'a> {
     input: &'a mut syn::DeriveInput,
     derive_trait: &'static str,
     attr_name: &'static str,
-  ) -> Result<Self, TokenStream> {
+  ) -> syn::Result<Self> {
     let DeriveInput { ident, data, generics, .. } = input;
 
     let stt = struct_unwrap(data, derive_trait)?;
@@ -43,29 +43,25 @@ impl<'a> ProxyDeriveInfo<'a> {
     path
   }
 
-  pub fn too_many_attr_specified_error(self) -> Result<Self, TokenStream> {
+  pub fn too_many_attr_specified_error(self) -> syn::Result<Self> {
     if self.attr_fields.attr_fields().len() > 1 {
       let err_str = format!(
         "Too many `#[{}]` attr specified, need only one",
         self.attr_name,
       );
-      Err(quote_spanned! {
-       self.ident.span() => compile_error!(#err_str);
-      })
+      Err(syn::Error::new(self.ident.span(), err_str))
     } else {
       Ok(self)
     }
   }
 
-  pub fn none_attr_specified_error(self) -> Result<Self, TokenStream> {
+  pub fn none_attr_specified_error(self) -> syn::Result<Self> {
     if self.attr_fields.attr_fields().is_empty() {
       let err_str = format!(
         "There is not `#[{}]` attr specified, required by {}",
         self.attr_name, self.derive_trait
       );
-      Err(quote_spanned! {
-       self. ident.span() => compile_error!(#err_str);
-      })
+      Err(syn::Error::new(self.ident.span(), err_str))
     } else {
       Ok(self)
     }

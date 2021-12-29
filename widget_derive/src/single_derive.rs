@@ -19,6 +19,6 @@ pub fn single_derive(input: &mut syn::DeriveInput) -> TokenStream {
           impl #impl_generics SingleChildWidget for #name #ty_generics #where_clause {}
       }
     }
-    Err(err) => err,
+    Err(err) => err.into_compile_error(),
   }
 }

@@ -90,11 +90,26 @@ pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[proc_macro_derive(Declare, attributes(rename))]
+/// Macro to implement the `Declare` trait. To know how to use it see the
+/// [`declare` mod document](declare)
+///
+/// This macro implement a `XXXBuilder` struct with same field type for `XXX`
+/// widget, then
+///
+/// - implement `Declare` for `XXX`  mark `XXXBuilder` as its builder type.
+/// - implement `DeclareBuilder` for `XXXBuilder` which build `XXX` and used by
+///   `declare！` to build the `XXX` widget.
+/// - for every field of `XXXBuilder` implement an associate method `into_xxx`
+///   use to convert a value to the `xxx` field type, which effect by the
+///   `convert` meta. `declare!` will use it to convert the field value
+///   expression.
+///
+///  [declare]: ../ribir/declare/index.html
+#[proc_macro_derive(Declare, attributes(declare))]
 pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
   declare_derive::declare_derive(&mut input)
-    .unwrap_or_else(|e| e)
+    .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }
 

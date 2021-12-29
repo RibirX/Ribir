@@ -17,6 +17,7 @@ mod declare_visit_mut;
 pub use declare_visit_mut::*;
 mod follow_on;
 mod parse;
+use crate::declare_derive::field_convert_method;
 pub use follow_on::*;
 
 enum Child {
@@ -432,19 +433,17 @@ impl DeclareField {
     value_before: &mut TokenStream2,
     widget_def: &mut TokenStream2,
     follow_after: &mut TokenStream2,
-    converter: Option<fn(&Expr) -> TokenStream2>,
     ctx: &DeclareCtx,
   ) -> Option<Ident> {
-    let Self { if_guard, member, expr, .. } = self;
-    let expr_tokens = converter.map_or_else(|| quote! {#expr}, |f| f(expr));
-    let expr_tokens = quote_spanned! { expr.span() =>  #expr_tokens };
+    let Self { if_guard, member, .. } = self;
+    let expr_tokens = self.field_value_tokens(ctx);
     // we need to calculate field value before define widget to avoid twice
     // calculate it, only if filed  have `if guard`
     if let Some(if_guard) = if_guard {
-      let follow = Ident::new(&format!("{}_follow", member), Span::call_site());
+      let follow_cond = Ident::new(&format!("{}_follow", member), Span::call_site());
 
       value_before.extend(quote! {
-          let (#member, #follow) = #if_guard {
+          let (#member, #follow_cond) = #if_guard {
             (#expr_tokens, true)
           } else {
             (<_>::default(), false)
@@ -453,23 +452,21 @@ impl DeclareField {
 
       member.to_tokens(widget_def);
 
-      if let Some(field_follow) = self.follow_tokens(ref_name, def_name, converter, ctx) {
+      if let Some(field_follow) = self.follow_tokens(ref_name, def_name, ctx) {
         follow_after.extend(quote! {
-          if #follow {
+          if #follow_cond {
             #field_follow
           }
         });
       }
 
-      Some(follow)
+      Some(follow_cond)
     } else {
-      if self.colon_token.is_none() && converter.is_none() {
-        member.to_tokens(widget_def);
-      } else {
-        let colon = self.colon_token.unwrap_or_default();
-        widget_def.extend(quote! {#member #colon #expr_tokens});
-      }
-      if let Some(follow) = self.follow_tokens(ref_name, def_name, converter, ctx) {
+      member.to_tokens(widget_def);
+      let colon = self.colon_token.unwrap_or_default();
+      colon.to_tokens(widget_def);
+      expr_tokens.to_tokens(widget_def);
+      if let Some(follow) = self.follow_tokens(ref_name, def_name, ctx) {
         follow_after.extend(follow);
       }
       None
@@ -480,18 +477,13 @@ impl DeclareField {
     &self,
     ref_name: &Ident,
     def_name: &Ident,
-    converter: Option<fn(&Expr) -> TokenStream2>,
     ctx: &DeclareCtx,
   ) -> Option<TokenStream2> {
     let Self {
-      member,
-      follows: depends_on,
-      skip_nc,
-      expr,
-      ..
+      member, follows: depends_on, skip_nc, ..
     } = self;
-    let expr_tokens = converter.map_or_else(|| quote! {#expr}, |f| f(expr));
-    let expr_tokens = quote_spanned! { expr.span() =>  #expr_tokens };
+
+    let expr_tokens = self.field_value_tokens(ctx);
 
     depends_on.as_ref().map(|follows| {
       let assign = skip_nc_assign(
@@ -513,6 +505,13 @@ impl DeclareField {
       }
     })
   }
+
+  fn field_value_tokens(&self, ctx: &DeclareCtx) -> TokenStream2 {
+    let Self { member, expr, .. } = self;
+    let builder_ty = ctx.no_config_builder_type_name();
+    let field_converter = field_convert_method(member);
+    quote_spanned! { expr.span() => #builder_ty::#field_converter(#expr) }
+  }
 }
 
 impl DeclareWidget {
@@ -525,11 +524,11 @@ impl DeclareWidget {
     let ref_name = self.widget_ref_name(ctx);
 
     let mut value_before = quote! {};
-    let mut def_tokens = quote! { type #builder_ty = <#path as Declare>::Builder;  };
+    let mut build_widget = quote! {};
     let mut follow_after = quote! {};
 
-    builder_ty.to_tokens(&mut def_tokens);
-    brace_token.surround(&mut def_tokens, |content| {
+    builder_ty.to_tokens(&mut build_widget);
+    brace_token.surround(&mut build_widget, |content| {
       fields.pairs().for_each(|pair| {
         let (f, comma) = pair.into_tuple();
         f.gen_tokens(
@@ -538,14 +537,13 @@ impl DeclareWidget {
           &mut value_before,
           content,
           &mut follow_after,
-          None,
           ctx,
         );
         comma.to_tokens(content);
       });
       rest.to_tokens(content)
     });
-    def_tokens.extend(quote! {.build()#stateful});
+    build_widget.extend(quote! {.build()#stateful});
 
     let state_ref = if ctx.be_followed(&ref_name) {
       Some(quote! { let #ref_name = #def_name.state_ref(); })
@@ -555,12 +553,25 @@ impl DeclareWidget {
       None
     };
 
-    let mut tokens = quote! {
-      #value_before
-      let mut #def_name = { #def_tokens };
-      #follow_after
-      #state_ref
-    };
+    let mut tokens = quote! { let mut #def_name = };
+    brace_token.surround(&mut tokens, |tokens| {
+      tokens.extend(quote! {
+        type #builder_ty = <#path as Declare>::Builder;
+        #value_before
+      });
+      if follow_after.is_empty() {
+        build_widget.to_tokens(tokens);
+      } else {
+        tokens.extend(quote! {
+          let #def_name = #build_widget;
+          #follow_after
+          #def_name
+        })
+      }
+    });
+    syn::token::Semi::default().to_tokens(&mut tokens);
+
+    state_ref.to_tokens(&mut tokens);
 
     self.normal_attrs_tokens(ctx, &mut tokens);
     self.listeners_tokens(ctx, &mut tokens);

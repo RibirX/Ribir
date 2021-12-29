@@ -1,51 +1,48 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(RenderWidget, MultiChildWidget)]
-pub struct Row(#[proxy] Flex);
-
-impl Default for Row {
-  fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
-}
-
-impl IntoStateful for Row {
-  type S = StatefulFlex;
-  fn into_stateful(self) -> Self::S { self.0.into_stateful() }
-}
-
-// declare macro  support.
-#[derive(Default)]
-pub struct RowBuilder {
+#[stateful]
+#[derive(Default, MultiChildWidget, Declare)]
+pub struct Row {
   pub reverse: bool,
   pub wrap: bool,
   pub cross_align: CrossAxisAlign,
   pub main_align: MainAxisAlign,
 }
 
-impl Declare for Row {
-  type Builder = RowBuilder;
-}
+impl RenderWidget for Row {
+  type RO = Flex;
 
-impl DeclareBuilder for RowBuilder {
-  type Target = Row;
+  fn create_render_object(&self) -> Self::RO {
+    Flex {
+      reverse: self.reverse,
+      wrap: self.wrap,
+      direction: Direction::Horizontal,
+      cross_align: self.cross_align,
+      main_align: self.main_align,
+    }
+  }
 
-  #[inline]
-  fn build(self) -> Self::Target {
-    let Self {
-      reverse,
-      wrap,
-      cross_align,
-      main_align,
-    } = self;
-    Row(
-      FlexBuilder {
-        reverse,
-        wrap,
-        direction: Direction::Horizontal,
-        cross_align,
-        main_align,
-      }
-      .build(),
-    )
+  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
+    let mut need_layout = false;
+    if self.reverse != object.reverse {
+      object.reverse = self.reverse;
+      need_layout = true;
+    }
+    if self.wrap != object.wrap {
+      object.wrap = self.wrap;
+      need_layout = true;
+    }
+    if self.cross_align != object.cross_align {
+      object.cross_align = self.cross_align;
+      need_layout = true;
+    }
+    if self.main_align != object.main_align {
+      object.main_align = self.main_align;
+      need_layout = true;
+    }
+    if need_layout {
+      ctx.mark_needs_layout()
+    }
   }
 }

@@ -9,7 +9,7 @@ pub fn combination_derive(input: &mut syn::DeriveInput) -> TokenStream {
     .and_then(|stt| stt.none_attr_specified_error())
     .and_then(|stt| stt.too_many_attr_specified_error())
     .map_or_else(
-      |err| err,
+      |err| err.into_compile_error(),
       |info| {
         let mut generics = info
           .attr_fields

@@ -37,6 +37,6 @@ pub fn render_derive(input: &mut syn::DeriveInput) -> TokenStream {
         }
       }
     }
-    Err(err) => err,
+    Err(err) => err.into_compile_error(),
   }
 }

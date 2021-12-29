@@ -9,8 +9,14 @@ struct ReservedNames {
 
 #[derive(Declare)]
 struct RenameReservedNames {
-  #[rename = "margin_data"]
+  #[declare(rename = "margin_data")]
   margin: i32,
+}
+
+#[derive(Declare)]
+struct Converter {
+  #[declare(convert(into, some))]
+  x: Option<i32>,
 }
 
 fn main() {}

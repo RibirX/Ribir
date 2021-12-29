@@ -2,14 +2,17 @@ use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[stateful]
-#[derive(SingleChildWidget, Default, Clone)]
+#[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
+  #[declare(builtin, convert(some, into))]
   pub background: Option<FillStyle>,
   /// A border to draw above the background
+  #[declare(builtin, convert(some))]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
+  #[declare(builtin, convert(some, into))]
   pub radius: Option<BorderRadius>,
 }
 

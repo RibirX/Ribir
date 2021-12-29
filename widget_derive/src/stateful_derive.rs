@@ -1,7 +1,6 @@
-use crate::util::prefix_ident;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
-use syn::{spanned::Spanned, DeriveInput, NestedMeta};
+use syn::{spanned::Spanned, DeriveInput, Ident, NestedMeta};
 
 use crate::attr_fields::pure_ident;
 
@@ -15,7 +14,7 @@ pub(crate) fn stateful_derive(
   let DeriveInput { ident: name, generics, vis, .. } = input;
 
   let (w_impl_generics, w_ty_generics, w_where_clause) = generics.split_for_impl();
-  let stateful_name = prefix_ident("Stateful", &quote! {#name});
+  let stateful_name = Ident::new(&format!("Stateful{}", name), name.span());
 
   let custom_impl = custom_impl_attr(attrs)?;
 
