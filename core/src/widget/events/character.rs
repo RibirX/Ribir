@@ -39,11 +39,14 @@ mod tests {
     let receive = Rc::new(RefCell::new("".to_string()));
     let c_receive = receive.clone();
 
-    let widget = SizedBox::from_size(Size::zero())
-      .with_auto_focus(true)
-      .on_char(move |key| {
-        c_receive.borrow_mut().push(key.char);
-      });
+    let widget = declare! {
+      SizedBox {
+        size: SizedBox::shrink_size(),
+        auto_focus: true,
+        on_char: move |key| c_receive.borrow_mut().push(key.char)
+      }
+    };
+
     let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
 
     let test_text_case = "Hello 世界！";

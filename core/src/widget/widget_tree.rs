@@ -62,8 +62,7 @@ impl WidgetTree {
       .get_mut(self)
       .unwrap()
       .get_attrs_mut()
-      .and_then(Attributes::find_mut::<StateAttr>)
-      .map(|attr| attr);
+      .and_then(Attributes::find_mut::<StateAttr>);
 
     if let Some(info) = state_info {
       info.assign_id(id, std::ptr::NonNull::from(tree2));

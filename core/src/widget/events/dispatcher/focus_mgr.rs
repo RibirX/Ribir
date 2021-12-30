@@ -215,7 +215,7 @@ mod tests {
   use crate::widget::SizedBox;
   use std::cell::RefCell;
 
-  fn empty_box() -> SizedBox { SizedBox::from_size(Size::zero()) }
+  fn empty_box() -> SizedBox { SizedBox { size: Size::zero() } }
 
   fn env(widget: BoxedWidget) -> (window::Window<window::MockRender>, FocusManager) {
     let wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
@@ -297,9 +297,13 @@ mod tests {
     impl CombinationWidget for EmbedFocus {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         let child = log_focus_event("child", empty_box(), self.log.clone());
-        log_focus_event("parent", SizedBox::expanded(), self.log.clone())
-          .have(child.box_it())
-          .box_it()
+        log_focus_event(
+          "parent",
+          SizedBox { size: SizedBox::expanded_size() },
+          self.log.clone(),
+        )
+        .have(child.box_it())
+        .box_it()
       }
     }
 

@@ -357,11 +357,11 @@ mod tests {
   fn smoke() {
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let stateful = Text { text: "Hello".to_string() }.into_stateful();
+    let stateful = Text { text: "Hello".into() }.into_stateful();
     {
-      stateful.state_ref().text = "World!".to_string();
+      stateful.state_ref().text = "World!".into();
     }
-    assert_eq!(stateful.text, "World!");
+    assert_eq!(&*stateful.text, "World!");
   }
 
   #[test]
@@ -369,7 +369,7 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let stateful = Text { text: "Hello".to_string() }.into_stateful();
+    let stateful = Text { text: "Hello".into() }.into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };
@@ -387,7 +387,7 @@ mod tests {
 
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let sized_box = SizedBox::from_size(Size::new(100., 100.)).into_stateful();
+    let sized_box = SizedBox { size: Size::new(100., 100.) }.into_stateful();
     sized_box
       .change_stream()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -421,7 +421,7 @@ mod tests {
 
     impl CombinationWidget for TestWidget {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        SizedBox::from_size(Size::new(100., 100.))
+        SizedBox { size: Size::new(100., 100.) }
           .into_stateful()
           .box_it()
       }

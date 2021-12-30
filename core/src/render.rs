@@ -10,7 +10,7 @@ pub use render_tree::{BoxClamp, RenderId};
 pub use update_ctx::UpdateCtx;
 
 /// The `Owner` is the render widget which created this object.
-pub trait RenderObject: Send + Sync + Any {
+pub trait RenderObject: Any {
   /// Do the work of computing the layout for this render object, and return the
   /// size it need.
   ///
@@ -38,7 +38,7 @@ impl<T> RenderWidgetSafety for T
 where
   T: RenderWidget,
 {
-  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync> {
+  fn create_render_object(&self) -> Box<dyn RenderObject> {
     let obj = RenderWidget::create_render_object(self);
     Box::new(obj)
   }

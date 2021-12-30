@@ -127,11 +127,11 @@ fn key_detect() {
   impl<W> AttrWidget<W> {
     fn key(&self) -> Option<&Key> { self.attrs.find() }
   }
-  let k1 = Text { text: "".to_string() }.with_key(0);
-  let k2 = Text { text: "".to_string() }.with_key(String::new());
-  let k3 = Text { text: "".to_string() }.with_key("");
-  let ck1 = Text { text: "".to_string() }.with_key(complex_key!("asd", true, 1));
-  let ck2 = Text { text: "".to_string() }.with_key(complex_key!("asd", true, 1));
+  let k1 = Text { text: "".into() }.with_key(0);
+  let k2 = Text { text: "".into() }.with_key(String::new());
+  let k3 = Text { text: "".into() }.with_key("");
+  let ck1 = Text { text: "".into() }.with_key(complex_key!("asd", true, 1));
+  let ck2 = Text { text: "".into() }.with_key(complex_key!("asd", true, 1));
   assert!(k1.key() != k2.key());
   assert!(k2.key() == k3.key());
   assert!(k3.key() != k1.key());

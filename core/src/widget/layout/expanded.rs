@@ -4,7 +4,7 @@ use crate::prelude::*;
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
 #[stateful]
-#[derive(SingleChildWidget, Clone, PartialEq)]
+#[derive(SingleChildWidget, Clone, PartialEq, Declare)]
 pub struct Expanded {
   pub flex: f32,
 }
@@ -51,23 +51,26 @@ impl RenderObject for Expanded {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::layout::row::RowBuilder, test::*};
+  use crate::test::*;
 
   #[test]
   fn one_line_expanded() {
     let size = Size::new(100., 50.);
-    let row = Row::default()
-      .have_multi(vec![
-        Expanded::new(1.)
-          .have(SizedBox::from_size(size).box_it())
-          .box_it(),
-        SizedBox::from_size(size).box_it(),
-        SizedBox::from_size(size).box_it(),
-        Expanded::new(2.)
-          .have(SizedBox::from_size(size).box_it())
-          .box_it(),
-      ])
-      .box_it();
+    let row = declare! {
+      Row {
+        ..<_>::default(),
+        Expanded {
+          flex: 1.,
+          SizedBox { size }
+        }
+        SizedBox { size }
+        SizedBox { size }
+        Expanded {
+          flex: 2.,
+          SizedBox { size }
+        }
+      }
+    };
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
 
@@ -86,18 +89,21 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let row = RowBuilder { wrap: true, ..<_>::default() }
-      .build()
-      .have_multi(vec![
-        Expanded::new(1.)
-          .have(SizedBox::from_size(size).box_it())
-          .box_it(),
-        SizedBox::from_size(size).box_it(),
-        SizedBox::from_size(size).box_it(),
-        Expanded::new(2.)
-          .have(SizedBox::from_size(size).box_it())
-          .box_it(),
-      ]);
+    let row = declare! {
+      Row {
+        wrap: true, ..<_>::default(),
+        Expanded {
+          flex: 1.,
+          SizedBox { size }
+        }
+        SizedBox { size }
+        SizedBox { size }
+        Expanded {
+          flex: 2.,
+          SizedBox { size }
+        }
+      }
+    };
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(350., 500.));
 

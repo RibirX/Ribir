@@ -30,6 +30,11 @@ pub struct BorderSide {
   pub width: f32,
 }
 
+impl BorderSide {
+  #[inline]
+  pub fn new(width: f32, color: Color) -> Self { Self { width, color } }
+}
+
 impl RenderWidget for BoxDecoration {
   type RO = Self;
   #[inline]
@@ -329,17 +334,17 @@ mod tests {
   #[test]
   fn layout() {
     let size = Size::new(100., 100.);
-    let sized_box = BoxDecoration {
-      border: Some(Border {
-        left: BorderSide { width: 1., color: Color::BLACK },
-        right: BorderSide { width: 2., color: Color::BLACK },
-        top: BorderSide { width: 3., color: Color::BLACK },
-        bottom: BorderSide { width: 4., color: Color::BLACK },
-      }),
-      ..Default::default()
-    }
-    .have(SizedBox::from_size(size).box_it())
-    .box_it();
+    let sized_box = declare! {
+      SizedBox {
+        size,
+        border: Border {
+          left: BorderSide::new(1., Color::BLACK),
+          right: BorderSide::new(2., Color::BLACK),
+          top: BorderSide::new(3., Color::BLACK),
+          bottom: BorderSide::new(4., Color::BLACK),
+        },
+      }
+    };
 
     let (rect, child) = widget_and_its_children_box_rect(sized_box, Size::new(500., 500.));
     assert_eq!(rect, Rect::from_size(Size::new(103., 107.)));

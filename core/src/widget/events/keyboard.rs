@@ -90,14 +90,19 @@ mod tests {
     let keys = Rc::new(RefCell::new(vec![]));
     let down_keys = keys.clone();
     let up_keys = keys.clone();
-    let widget = SizedBox::from_size(Size::zero())
-      .with_auto_focus(true)
-      .on_key_down(move |key| {
-        down_keys
-          .borrow_mut()
-          .push(format!("key down {:?}", key.key))
-      })
-      .on_key_up(move |key| up_keys.borrow_mut().push(format!("key up {:?}", key.key)));
+    let widget = declare! {
+      SizedBox {
+        size: Size::zero(),
+        auto_focus: true,
+        on_key_down: move |key| {
+          down_keys
+            .borrow_mut()
+            .push(format!("key down {:?}", key.key))
+        },
+        on_key_up: move |key| up_keys.borrow_mut().push(format!("key up {:?}", key.key))
+      }
+    };
+
     let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 

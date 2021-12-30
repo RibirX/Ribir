@@ -39,7 +39,7 @@ mod tests {
   #[test]
   fn default_theme() {
     let win_size = Size::zero();
-    let sized = widget::SizedBox::from_size(win_size);
+    let sized = widget::SizedBox { size: win_size };
     let mut wnd = window::Window::without_render(sized.box_it(), win_size);
     wnd.render_ready();
     let tree = wnd.widget_tree();
@@ -48,7 +48,7 @@ mod tests {
     ctx.theme();
   }
 
-  #[derive(Debug)]
+  #[derive(Debug, Declare)]
   struct ThemeTrack {
     themes: Rc<RefCell<Vec<Theme>>>,
   }
@@ -56,7 +56,7 @@ mod tests {
   impl CombinationWidget for ThemeTrack {
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       self.themes.borrow_mut().push(ctx.theme().clone());
-      SizedBox::from_size(Size::zero()).box_it()
+      SizedBox { size: Size::zero() }.box_it()
     }
   }
 
@@ -66,14 +66,17 @@ mod tests {
     let dark = material::dark("dark".to_string());
     let light = material::light("light".to_string());
 
-    let theme_track = ThemeTrack { themes: track_themes.clone() };
-
-    let light_theme = SizedBox::shrink()
-      .with_theme(light.clone())
-      .have(theme_track.box_it());
-    let dark_light_theme = SizedBox::expanded()
-      .with_theme(dark.clone())
-      .have(light_theme.box_it());
+    let dark_light_theme = declare! {
+      SizedBox {
+        size: SizedBox::expanded_size(),
+        theme: dark.clone(),
+        SizedBox {
+          size: SizedBox::shrink_size(),
+          theme: light.clone(),
+          ThemeTrack { themes: track_themes.clone() }
+        }
+      }
+    };
 
     let mut wnd = window::Window::without_render(dark_light_theme.box_it(), Size::zero());
     wnd.render_ready();
@@ -83,11 +86,17 @@ mod tests {
       widget::theme::Brightness::Light
     );
 
-    let theme = ThemeTrack { themes: track_themes.clone() };
-    let dark_theme = SizedBox::shrink().with_theme(dark).have(theme.box_it());
-    let light_dark_theme = SizedBox::expanded()
-      .with_theme(light)
-      .have(dark_theme.box_it());
+    let light_dark_theme = declare! {
+      SizedBox {
+        size: SizedBox::expanded_size(),
+        theme: light,
+        SizedBox {
+          size: SizedBox::shrink_size(),
+          theme: dark,
+          ThemeTrack { themes: track_themes.clone() }
+        }
+      }
+    };
 
     let mut wnd = window::Window::without_render(light_dark_theme.box_it(), Size::zero());
     wnd.render_ready();

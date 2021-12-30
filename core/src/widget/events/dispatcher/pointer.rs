@@ -316,9 +316,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      Text {
-        text: "pointer event test".to_string(),
-      },
+      Text { text: "pointer event test".into() },
     );
     let root = record_pointer(event_record.clone(), Row::default()).have(record.box_it());
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
@@ -356,9 +354,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      Text {
-        text: "pointer event test".to_string(),
-      },
+      Text { text: "pointer event test".into() },
     );
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -416,9 +412,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      Text {
-        text: "pointer event test".to_string(),
-      },
+      Text { text: "pointer event test".into() },
     );
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -478,24 +472,25 @@ mod tests {
   #[test]
   fn cancel_bubble() {
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = SizedBox::expanded()
-      .on_pointer_down({
-        let stack = event_record.clone();
-        move |e| stack.borrow_mut().push(e.clone())
-      })
-      .have(
-        Text {
-          text: "pointer event test".to_string(),
-        }
-        .on_pointer_down({
+    let root = declare! {
+      SizedBox {
+        size: SizedBox::expanded_size(),
+        on_pointer_down: {
           let stack = event_record.clone();
-          move |e| {
-            stack.borrow_mut().push(e.clone());
-            e.stop_bubbling();
+          move |e| stack.borrow_mut().push(e.clone())
+        },
+        Text {
+          text: "pointer event test",
+          on_pointer_down: {
+            let stack = event_record.clone();
+            move |e| {
+              stack.borrow_mut().push(e.clone());
+              e.stop_bubbling();
+            }
           }
-        })
-        .box_it(),
-      );
+        }
+      }
+    };
 
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -517,15 +512,22 @@ mod tests {
 
     let c_enter_event = enter_event.clone();
     let c_leave_event = leave_event.clone();
-    let child = SizedBox::from_size(Size::new(f32::INFINITY, f32::INFINITY))
-      .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(1))
-      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(1));
+
     let c_enter_event = enter_event.clone();
     let c_leave_event = leave_event.clone();
-    let parent = SizedBox::expanded()
-      .on_pointer_enter(move |_| c_enter_event.borrow_mut().push(2))
-      .on_pointer_leave(move |_| c_leave_event.borrow_mut().push(2))
-      .have(child.box_it());
+
+    let parent = declare! {
+      SizedBox {
+        size: SizedBox::expanded_size(),
+        on_pointer_enter: move |_| c_enter_event.borrow_mut().push(2),
+        on_pointer_leave: move |_| c_leave_event.borrow_mut().push(2),
+        SizedBox {
+          size: SizedBox::expanded_size(),
+          on_pointer_enter: move |_| c_enter_event.borrow_mut().push(1),
+          on_pointer_leave: move |_| c_leave_event.borrow_mut().push(1)
+        }
+      }
+    };
 
     let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -650,13 +652,19 @@ mod tests {
 
   #[test]
   fn focus_change_by_event() {
-    let root = Row::default()
-      .have(
-        SizedBox::from_size(Size::new(50., 50.))
-          .with_tab_index(0)
-          .box_it(),
-      )
-      .have(SizedBox::from_size(Size::new(50., 50.)).box_it());
+    let root = declare! {
+      Row {
+        ..<_>::default(),
+        SizedBox {
+          size: Size::new(50., 50.),
+          tab_index: 0
+        }
+        SizedBox {
+          size: Size::new(50., 50.)
+        }
+      }
+    };
+
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 

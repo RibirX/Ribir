@@ -372,7 +372,7 @@ mod tests {
 
     impl CombinationWidget for DoubleSize {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        let stateful = SizedBox::from_size(Size::new(100., 100.)).into_stateful();
+        let stateful = SizedBox { size: Size::new(100., 100.) }.into_stateful();
         let mut state = stateful.state_ref();
         stateful
           .on_pointer_move(move |_| {

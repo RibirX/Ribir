@@ -11,20 +11,16 @@ pub struct SizedBox {
 }
 
 impl SizedBox {
-  /// Creates a box with the specified size.
-  #[inline]
-  pub fn from_size(size: Size) -> SizedBox { Self { size } }
-
   /// Creates a box that will become as large as its parent allows.
   #[inline]
-  pub fn expanded() -> SizedBox {
+  pub fn expanded_size() -> Size {
     const INFINITY: f32 = f32::INFINITY;
-    Self { size: Size::new(INFINITY, INFINITY) }
+    Size::new(INFINITY, INFINITY)
   }
 
   /// Creates a box that will become as small as its parent allows.
   #[inline]
-  pub fn shrink() -> Self { Self { size: Size::zero() } }
+  pub fn shrink_size() -> Size { Size::zero() }
 }
 
 impl RenderWidget for SizedBox {
@@ -68,7 +64,13 @@ mod tests {
   #[test]
   fn fix_size() {
     let size = Size::new(100., 100.);
-    let sized_box = SizedBox::from_size(size).have(Text { text: "".to_string() }.box_it());
+    let sized_box = declare! {
+      SizedBox {
+        size,
+        Text { text: "" }
+      }
+    };
+
     let (rect, child) = widget_and_its_children_box_rect(sized_box.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, size);
     assert_eq!(child, vec![Rect::from_size(size)]);
@@ -76,7 +78,12 @@ mod tests {
 
   #[test]
   fn shrink_size() {
-    let shrink = SizedBox::shrink().have(Text { text: "".to_string() }.box_it());
+    let shrink = declare! {
+      SizedBox {
+        size: SizedBox::shrink_size(),
+        Text { text: ""}
+      }
+    };
     let (rect, child) = widget_and_its_children_box_rect(shrink.box_it(), Size::new(500., 500.));
 
     assert_eq!(rect.size, Size::zero());
@@ -86,9 +93,12 @@ mod tests {
   #[test]
   fn expanded_size() {
     let wnd_size = Size::new(500., 500.);
-    let expand_box = SizedBox::expanded()
-      .have(Text { text: "".to_string() }.box_it())
-      .box_it();
+    let expand_box = declare! {
+      SizedBox {
+        size: SizedBox::expanded_size(),
+        Text { text:"" }
+      }
+    };
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));
 
     assert_eq!(rect.size, wnd_size);
@@ -98,7 +108,7 @@ mod tests {
   #[test]
   fn empty_box() {
     let size = Size::new(10., 10.);
-    let empty_box = SizedBox::from_size(size);
+    let empty_box = SizedBox { size };
     let (rect, child) = widget_and_its_children_box_rect(empty_box.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, size);
     assert_eq!(child, vec![]);

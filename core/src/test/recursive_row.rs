@@ -19,7 +19,7 @@ impl CombinationWidget for RecursiveRow {
               }
               .box_it()
             } else {
-              Text { text: "leaf".to_string() }.box_it()
+              Text { text: "leaf".into() }.box_it()
             }
           })
           .collect(),

@@ -3,11 +3,11 @@ use crate::render::render_ctx::*;
 use crate::render::render_tree::*;
 use crate::render::*;
 
-/// Just a stupid implement for develope the framework.
 #[stateful]
-#[derive(Debug, Declare, Clone)]
+#[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
-  pub text: String,
+  #[declare(convert(into))]
+  pub text: CowRc<str>,
 }
 
 impl RenderWidget for Text {
@@ -18,8 +18,8 @@ impl RenderWidget for Text {
 
   #[inline]
   fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self.text != object.text {
-      object.text = self.text.clone();
+    if self != object {
+      *object = self.clone();
       ctx.mark_needs_layout();
     }
   }

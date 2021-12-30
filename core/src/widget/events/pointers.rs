@@ -213,8 +213,7 @@ mod tests {
     let size = Size::new(400., 400.);
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
-    let sized_box =
-      SizedBox::from_size(size).on_tap_times(times, move |_| *c_count.borrow_mut() += 1);
+    let sized_box = SizedBox { size }.on_tap_times(times, move |_| *c_count.borrow_mut() += 1);
     let mut wnd = NoRenderWindow::without_render(sized_box.box_it(), size);
     wnd.render_ready();
 

@@ -47,7 +47,7 @@ pub trait CombinationWidget: AttrsAccess + 'static {
 /// rendering or computing layout for the application.
 pub trait RenderWidget: AttrsAccess + 'static {
   /// The render object type will created.
-  type RO: RenderObject + Send + Sync + 'static;
+  type RO: RenderObject;
 
   /// Creates an instance of the RenderObject that this RenderWidget
   /// represents, using the configuration described by this RenderWidget
@@ -61,7 +61,7 @@ pub trait RenderWidget: AttrsAccess + 'static {
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
 pub trait RenderWidgetSafety: AttrsAccess {
-  fn create_render_object(&self) -> Box<dyn RenderObject + Send + Sync>;
+  fn create_render_object(&self) -> Box<dyn RenderObject>;
 
   fn update_render_object(&self, object: &mut dyn RenderObject, ctx: &mut UpdateCtx);
 }

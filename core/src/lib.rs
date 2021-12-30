@@ -15,6 +15,7 @@ extern crate lazy_static;
 extern crate widget_derive;
 
 mod application;
+mod cow_rc;
 pub mod declare;
 mod render;
 pub mod widget;
@@ -22,6 +23,7 @@ pub mod widget;
 pub mod prelude {
   #[doc(no_inline)]
   pub use crate::application::Application;
+  pub use crate::cow_rc::CowRc;
   #[doc(no_inline)]
   pub use crate::declare::{Declare, DeclareBuilder};
   #[doc(no_inline)]

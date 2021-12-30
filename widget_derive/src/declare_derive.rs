@@ -114,7 +114,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
 
           builder_fields.push(((*pair.value()).clone(), builder_attr));
           if let Some(c) = pair.punct() {
-            builder_fields.push_punct((*c).clone());
+            builder_fields.push_punct(**c);
           }
 
           Ok(())
@@ -302,12 +302,12 @@ fn extract_type_from_option(ty: &syn::Type) -> Option<&syn::Type> {
       });
     vec!["Option|", "std|option|Option|", "core|option|Option|"]
       .into_iter()
-      .find(|s| &idents_of_path == *s)
+      .find(|s| idents_of_path == *s)
       .and_then(|_| path.segments.last())
   }
 
   extract_type_path(ty)
-    .and_then(|path| extract_option_segment(path))
+    .and_then(extract_option_segment)
     .and_then(|path_seg| {
       let type_params = &path_seg.arguments;
       // It should have only on angle-bracketed param ("<String>"):

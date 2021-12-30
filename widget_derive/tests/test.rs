@@ -48,6 +48,6 @@ fn ui() {
 
 #[test]
 fn stateful_as_render_check() {
-  let w = SizedBox::from_size(Size::zero()).into_stateful().box_it();
+  let w = SizedBox { size: Size::zero() }.into_stateful().box_it();
   assert!(matches!(w, BoxedWidget::Render(_)));
 }
