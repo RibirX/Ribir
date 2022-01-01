@@ -33,9 +33,9 @@ impl CombinationWidget for EmbedPost {
       Row {
         cross_align: CrossAxisAlign::Start,
         ..<_>::default(),
-        Text { text: self.title },
-        Text { text: self.author },
-        Text { text: self.content },
+        Text { text: self.title, style: <_>::default() },
+        Text { text: self.author, style: <_>::default() },
+        Text { text: self.content, style: <_>::default() },
         (self.level >0).then(||{
           let mut embed = self.clone();
           embed.level -= 1;

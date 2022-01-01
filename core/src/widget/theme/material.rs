@@ -2,14 +2,14 @@ pub use super::*;
 pub use canvas::{Color, FillStyle, FontStyle, FontWeight};
 
 /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-pub fn light(family: String) -> Theme {
+pub fn light(family: Box<[FontFamily]>) -> Theme {
   let dark_text = TypographyTheme::new(
     family.clone(),
     family.clone(),
     Color::BLACK.with_alpha(0.54).into(),
     Color::BLACK.with_alpha(0.87).into(),
     TextDecoration::NONE,
-    Color::TRANSPARENT,
+    Color::TRANSPARENT.into(),
   );
   let background = Color::from_u32(0xFFFF_FFFF);
   let secondary = Color::from_u32(0x03DA_C6FF);
@@ -41,7 +41,7 @@ pub fn light(family: String) -> Theme {
 }
 
 /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-pub fn dark(family: String) -> Theme {
+pub fn dark(family: Box<[FontFamily]>) -> Theme {
   let unselected_widget_color = Color::WHITE.with_alpha(0.7);
   let background = Color::from_u32(0x1212_12FF);
   let secondary = Color::from_u32(0x03DA_C6FF);
@@ -51,7 +51,7 @@ pub fn dark(family: String) -> Theme {
     Color::WHITE.with_alpha(0.70).into(),
     Color::WHITE.into(),
     TextDecoration::NONE,
-    Color::TRANSPARENT,
+    Color::TRANSPARENT.into(),
   );
   Theme {
     brightness: Brightness::Dark,

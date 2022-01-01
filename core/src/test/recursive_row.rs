@@ -8,8 +8,9 @@ pub struct RecursiveRow {
 
 impl CombinationWidget for RecursiveRow {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-    Row::default()
-      .have_multi(
+    declare! {
+      Row{
+        ..<_>::default(),
         (0..self.width)
           .map(|_| {
             if self.depth > 1 {
@@ -19,11 +20,10 @@ impl CombinationWidget for RecursiveRow {
               }
               .box_it()
             } else {
-              Text { text: "leaf".into() }.box_it()
+              Text { text: "leaf".into(), style: <_>::default() }.box_it()
             }
           })
-          .collect(),
-      )
-      .box_it()
+      }
+    }
   }
 }

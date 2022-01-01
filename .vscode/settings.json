@@ -9,9 +9,13 @@
     "**/todo.rs"
   ],
   "cSpell.words": [
+    "bitflags",
     "cond",
+    "fontdb",
+    "Monospace",
     "paren",
     "segs",
-    "subpat"
+    "subpat",
+    "THROUGHLINE"
   ]
 }

@@ -20,9 +20,9 @@ impl CombinationWidget for EmbedKeyPost {
         key: 0,
         cross_align: CrossAxisAlign::Start,
         ..<_>::default(),
-        Text { text: self.title.borrow().to_string(), key: 1},
-        Text { text: self.author, key: 2},
-        Text { text: self.content, key: 3},
+        Text { text: self.title.borrow().to_string(), style: <_>::default(), key: 1},
+        Text { text: self.author, style: <_>::default(), key: 2},
+        Text { text: self.content, style: <_>::default(), key: 3},
         (self.level > 0).then(||{
           let mut embed = self.clone();
           embed.level -= 1;

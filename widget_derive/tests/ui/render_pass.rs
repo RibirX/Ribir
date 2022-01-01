@@ -11,9 +11,9 @@ struct B<W: RenderWidget + NoAttrs> {
 struct C(#[proxy] SizedBox);
 
 fn main() {
-  let b = B { a: SizedBox::from_size(Size::zero()) };
+  let b = B { a: SizedBox { size: Size::zero() } };
   let _: Box<dyn RenderWidgetSafety> = Box::new(b);
 
-  let c = C(SizedBox::from_size(Size::zero()));
+  let c = C(SizedBox { size: Size::zero() });
   let _: Box<dyn RenderWidgetSafety> = Box::new(c);
 }

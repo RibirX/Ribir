@@ -10,6 +10,8 @@ version = "0.1.0"
 bitflags = "1.2.1"
 canvas = {path = "../canvas", version = "*"}
 futures = "0.3.5"
+glyph_brush = "0.7.3"
+fontdb="0.7.0"
 indextree = "4.3.1"
 lazy_static = "1.4.0"
 log = "0.4.8"

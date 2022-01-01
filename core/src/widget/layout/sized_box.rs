@@ -67,7 +67,7 @@ mod tests {
     let sized_box = declare! {
       SizedBox {
         size,
-        Text { text: "" }
+        Text { text: "", style: <_>::default() }
       }
     };
 
@@ -81,7 +81,7 @@ mod tests {
     let shrink = declare! {
       SizedBox {
         size: SizedBox::shrink_size(),
-        Text { text: ""}
+        Text { text: "", style: <_>::default()}
       }
     };
     let (rect, child) = widget_and_its_children_box_rect(shrink.box_it(), Size::new(500., 500.));
@@ -96,7 +96,7 @@ mod tests {
     let expand_box = declare! {
       SizedBox {
         size: SizedBox::expanded_size(),
-        Text { text:"" }
+        Text { text:"" , style: <_>::default(),}
       }
     };
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));

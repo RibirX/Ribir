@@ -1,13 +1,16 @@
+use crate::mark_layout_assign;
 use crate::prelude::*;
 use crate::render::render_ctx::*;
 use crate::render::render_tree::*;
 use crate::render::*;
 
+/// The text widget display text with a single style.
 #[stateful]
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
   #[declare(convert(into))]
   pub text: CowRc<str>,
+  pub style: TextStyle,
 }
 
 impl RenderWidget for Text {
@@ -18,17 +21,19 @@ impl RenderWidget for Text {
 
   #[inline]
   fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
+    let obj_style = &mut object.style;
+    let style = &self.style;
+    mark_layout_assign!(obj_style.font_size, style.font_size, ctx);
+    mark_layout_assign!(obj_style.font_face, style.font_face, ctx);
+    mark_layout_assign!(obj_style.letter_space, style.letter_space, ctx);
+    obj_style.foreground = style.foreground.clone();
   }
 }
 
 impl RenderObject for Text {
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let rc = ctx.mesure_text(&self.text);
+    let rc = ctx.measure_text(&self.text);
     clamp.clamp(rc.size)
   }
 

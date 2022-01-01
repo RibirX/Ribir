@@ -15,10 +15,12 @@ let _ = declare!{
     Row {
       ..<_>::default(),
       Text {
-        text: "hello ".to_owned(),
+        text: "hello ",
+        style: <_>::default()
       }
       Text {
-        text: "world".to_owned(),
+        text: "world",
+        style: <_>::default()
       }
     }
   }
@@ -79,7 +81,9 @@ const ribir_steps: [&'static str; 5] = [
 let _ = declare!{
   Row {
     ..<_>::default(),
-    ribir_steps.iter().map(|text|  { Text { text: text.to_string() } })
+    ribir_steps.iter().map(|text|  { 
+      Text { text: (*text).into(), style: <_>::default() } 
+    })
   }
 };
 ```
@@ -109,6 +113,7 @@ let _ = declare!{
     }
     Text {
       text: "Change text background by checked state.".to_string(),
+      style: <_>::default(),
       background: if checkbox.checked { Color::BLUE } else { Color:: RED }
     }
   }
@@ -131,11 +136,13 @@ let _ = declare!{
     ..<_>::default(),
     Text {
       id: a,
-      text: b.text.clone()
+      text: b.text.clone(),
+      style: <_>::default()
     }
     Text {
       id: b,
-      text: a.text.clone()
+      text: a.text.clone(),
+      style: <_>::default()
     }
   }
 };
@@ -178,19 +185,19 @@ let _ = declare! {
     Row {
       ..<_>::default(),
       Checkbox { id: task , ..<_>::default() }
-      Text { text: "Task".to_owned() }
+      Text { text: "Task", style: <_>::default() }
     }
     Row {
       margin: EdgeInsets::only_left(16.),
       ..<_>::default(),
       Checkbox { id: sub_task1 , ..<_>::default() }
-      Text { text: "SubTask 1".to_owned() }
+      Text { text: "SubTask 1", style: <_>::default() }
     }
     Row {
       margin: EdgeInsets::only_left(16.),
       ..<_>::default(),
       Checkbox { id: sub_task2 , ..<_>::default() }
-      Text { text: "SubTask 2".to_owned() }
+      Text { text: "SubTask 2", style: <_>::default() }
     }
   }
   data_flow!{
@@ -214,11 +221,13 @@ let _ = declare!{
     ..<_>::default(),
     Text {
       id: a,
-      text: "Hi".to_owned()
+      text: "Hi",
+      style: <_>::default()
     }
     Text {
       id: b,
-      text: a.text.clone()
+      text: a.text.clone(),
+      style: <_>::default()
     }
   }
   data_flow! { #[skip_nc] b.text.clone() ~> a.text }
@@ -236,12 +245,14 @@ let _ = declare!{
     ..<_>::default(),
     Text {
       id: a,
-      text: "Hi".to_owned(),
+      text: "Hi",
+      style: <_>::default()
     }
     Text {
       id: b,
       #[skip_nc]
-      text: a.text.clone()
+      text: a.text.clone(),
+      style: <_>::default()
     }
   }
   data_flow! { b.text.clone() ~> a.text }
@@ -292,6 +303,7 @@ impl CombinationWidget for StatefulTodos {
               }
               Text{
                 text:task.label.clone(),
+                style: <_>::default(),
                 margin: EdgeInsets::vertical(4.),
               }
             }

@@ -357,7 +357,11 @@ mod tests {
   fn smoke() {
     // Simulate `Text` widget need modify its text in event callback. So return a
     // cell ref of the `Text` but not own it. Can use the `cell_ref` in closure.
-    let stateful = Text { text: "Hello".into() }.into_stateful();
+    let stateful = Text {
+      text: "Hello".into(),
+      style: TextStyle::default(),
+    }
+    .into_stateful();
     {
       stateful.state_ref().text = "World!".into();
     }
@@ -369,7 +373,11 @@ mod tests {
     let mut render_tree = render_tree::RenderTree::default();
     let mut tree = Box::pin(widget_tree::WidgetTree::default());
 
-    let stateful = Text { text: "Hello".into() }.into_stateful();
+    let stateful = Text {
+      text: "Hello".into(),
+      style: TextStyle::default(),
+    }
+    .into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
     let tree = unsafe { tree.as_mut().get_unchecked_mut() };

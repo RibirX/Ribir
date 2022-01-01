@@ -24,7 +24,7 @@ where
   }
 }
 
-impl<T: ToOwned + ?Sized> Clone for CowRc<T> {
+impl<T: ToOwned + ?Sized + 'static> Clone for CowRc<T> {
   #[inline]
   fn clone(&self) -> Self {
     match self {
@@ -53,6 +53,15 @@ impl<T: ToOwned + ?Sized> CowRc<T> {
 
   #[inline]
   pub fn owned(v: T::Owned) -> Self { CowRc::Owned(Arc::new(v)) }
+
+  /// Return if two `CowRc` pointer to same allocation.
+  pub fn ptr_eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (CowRc::Borrowed(a), CowRc::Borrowed(b)) => std::ptr::eq(a, b),
+      (CowRc::Owned(a), CowRc::Owned(b)) => Arc::ptr_eq(a, b),
+      _ => false,
+    }
+  }
 
   /// Return true if the data is borrowed
   #[inline]
@@ -90,6 +99,11 @@ impl<T: ToOwned + ?Sized> From<&'static T> for CowRc<T> {
 
 impl<T: ToOwned<Owned = T>> From<T> for CowRc<T> {
   fn from(owned: T) -> Self { CowRc::owned(owned) }
+}
+
+impl From<String> for CowRc<str> {
+  #[inline]
+  fn from(str: String) -> Self { CowRc::owned(str) }
 }
 
 #[test]

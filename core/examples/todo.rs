@@ -33,6 +33,7 @@ impl CombinationWidget for StatefulTodos {
               }
               Text{
                 text:task.label.clone(),
+                style: ctx.theme().typography_theme.body1.text.clone() ,
                 margin: EdgeInsets::vertical(4.),
               }
             }

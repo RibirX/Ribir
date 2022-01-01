@@ -56,8 +56,8 @@
 //!   }
 //! }
 //!
-//! let mut text = Text{ text: "".to_string()}.into_attr_widget();
-//! text.attrs_mut().insert(HelloAttr);
+//! let mut text = Text{ text: "".into(), style:
+//! <_>::default()}.into_attr_widget(); text.attrs_mut().insert(HelloAttr);
 //! let w: BoxedWidget = text.box_it();
 //! w.get_attrs().and_then(Attributes::find::<HelloAttr>).unwrap().hello();
 //! ```

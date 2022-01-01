@@ -2,7 +2,7 @@ use crate::prelude::*;
 use std::pin::Pin;
 
 lazy_static::lazy_static! {
-  static ref DEFAULT_THEME: Theme =  widget::material::light("Roboto".to_string());
+  static ref DEFAULT_THEME: Theme =  widget::material::light(Box::new([FontFamily::Name(CowRc::borrowed( "Roboto"))]));
 }
 
 pub struct BuildCtx<'a> {
@@ -63,8 +63,9 @@ mod tests {
   #[test]
   fn nearest_theme() {
     let track_themes: Rc<RefCell<Vec<Theme>>> = <_>::default();
-    let dark = material::dark("dark".to_string());
-    let light = material::light("light".to_string());
+    let family = Box::new([FontFamily::Name(CowRc::borrowed("serif"))]);
+    let dark = material::dark(family.clone());
+    let light = material::light(family);
 
     let dark_light_theme = declare! {
       SizedBox {

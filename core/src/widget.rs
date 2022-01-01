@@ -66,6 +66,16 @@ pub trait RenderWidgetSafety: AttrsAccess {
   fn update_render_object(&self, object: &mut dyn RenderObject, ctx: &mut UpdateCtx);
 }
 
+#[macro_export]
+macro_rules! mark_layout_assign {
+  ($left: expr, $right: expr, $ctx: ident) => {
+    if &$left != &$right {
+      $left = $right.clone();
+      $ctx.mark_needs_layout();
+    }
+  };
+}
+
 pub type BoxedSingleChild = Box<SingleChild<Box<dyn RenderWidgetSafety>>>;
 pub type BoxedMultiChild = MultiChild<Box<dyn RenderWidgetSafety>>;
 pub enum BoxedWidget {

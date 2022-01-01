@@ -5,7 +5,10 @@
 //! windows.
 pub mod material;
 
-pub use canvas::{Color, FillStyle, FontStyle, FontWeight, Path, PathBuilder, Point};
+pub use canvas::{Color, FillStyle, Path, PathBuilder, Point};
+pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+
+use super::CowRc;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -27,44 +30,102 @@ bitflags! {
   }
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
+// Enum value descriptions are from the CSS spec.
+/// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum FontFamily {
+  /// The name of a font family of choice.
+  Name(CowRc<str>),
+
+  /// Serif fonts represent the formal text style for a script.
+  Serif,
+
+  /// Glyphs in sans-serif fonts, as the term is used in CSS, are generally low
+  /// contrast and have stroke endings that are plain — without any flaring,
+  /// cross stroke, or other ornamentation.
+  SansSerif,
+
+  /// Glyphs in cursive fonts generally use a more informal script style,
+  /// and the result looks more like handwritten pen or brush writing than
+  /// printed letterwork.
+  Cursive,
+
+  /// Fantasy fonts are primarily decorative or expressive fonts that
+  /// contain decorative or expressive representations of characters.
+  Fantasy,
+
+  /// The sole criterion of a monospace font is that all glyphs have the same
+  /// fixed width.
+  Monospace,
+}
+
+/// Encapsulates the font properties of font face.
+#[derive(Clone, Debug, PartialEq, Hash)]
+pub struct FontFace {
+  /// A prioritized list of font family names or generic family names.
+  ///
+  /// [font-family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family) in CSS.
+  pub family: Box<[FontFamily]>,
+  /// Selects a normal, condensed, or expanded face from a font family.
+  ///
+  /// [font-stretch](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-stretch-prop) in CSS.
+  pub stretch: FontStretch,
+  /// Allows italic or oblique faces to be selected.
+  ///
+  /// [font-style](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-style-prop) in CSS.
+  pub style: FontStyle,
+  /// Specifies the weight of glyphs in the font, their degree of blackness or
+  /// stroke thickness.
+  ///
+  /// [font-weight](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-weight-prop) in CSS.
+  pub weight: FontWeight,
+}
+
+/// Encapsulates the text style for painting.
+#[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
-  /// The style drawn as a foreground for the text.
-  pub foreground: FillStyle,
-  /// The name of the font to use when painting the text (e.g., Roboto).
-  pub family: String,
   /// The size of glyphs (in logical pixels) to use when painting the text.
   pub font_size: f32,
-  /// The typeface variant to use when drawing the letters (e.g., italics).
-  pub style: FontStyle,
-  /// The typeface thickness to use when painting the text (e.g., bold).
-  pub weight: FontWeight,
+  /// The style drawn as a foreground for the text.
+  pub foreground: FillStyle,
+  /// The font face to use when painting the text.
+  pub font_face: CowRc<FontFace>,
   // Not support now.
   pub letter_space: f32,
+}
+
+/// Encapsulates the text decoration style for painting.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextDecorationStyle {
   /// The decorations to paint near the text
   pub decoration: TextDecoration,
   /// The color in which to paint the text decorations.
-  pub decoration_color: Color,
+  pub decoration_color: FillStyle,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextTheme {
+  pub text: TextStyle,
+  pub decoration: TextDecorationStyle,
+}
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
 /// spec](https://material.io/design/typography/the-type-system.html#applying-the-type-scale)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypographyTheme {
-  pub headline1: TextStyle,
-  pub headline2: TextStyle,
-  pub headline3: TextStyle,
-  pub headline4: TextStyle,
-  pub headline5: TextStyle,
-  pub headline6: TextStyle,
-  pub subtitle1: TextStyle,
-  pub subtitle2: TextStyle,
-  pub body1: TextStyle,
-  pub body2: TextStyle,
-  pub button: TextStyle,
-  pub caption: TextStyle,
-  pub overline: TextStyle,
+  pub headline1: TextTheme,
+  pub headline2: TextTheme,
+  pub headline3: TextTheme,
+  pub headline4: TextTheme,
+  pub headline5: TextTheme,
+  pub headline6: TextTheme,
+  pub subtitle1: TextTheme,
+  pub subtitle2: TextTheme,
+  pub body1: TextTheme,
+  pub body2: TextTheme,
+  pub button: TextTheme,
+  pub caption: TextTheme,
+  pub overline: TextTheme,
 }
 
 /// Properties from [Material Theme](https://material.io/design/material-theming/implementing-your-theme.html)
@@ -88,7 +149,7 @@ pub struct Theme {
   /// The color used for widgets in their inactive (but enabled) state.
   pub unselected_widget_color: Color,
   /// Default text font family
-  pub default_font_family: String,
+  pub default_font_family: Box<[FontFamily]>,
   pub checkbox: CheckboxTheme,
 }
 
@@ -101,144 +162,155 @@ impl TypographyTheme {
   /// headline4, headline3, headline2, headline1, and caption. The
   /// `body_style` is applied to the remaining text styles.
   pub fn new(
-    titles_family: String,
-    body_family: String,
+    titles_family: Box<[FontFamily]>,
+    body_family: Box<[FontFamily]>,
     display_style: FillStyle,
     body_style: FillStyle,
     decoration: TextDecoration,
-    decoration_color: Color,
+    decoration_color: FillStyle,
   ) -> Self {
+    let decoration = TextDecorationStyle { decoration, decoration_color };
+    let light_title_face: CowRc<FontFace> = CowRc::owned(FontFace {
+      family: titles_family,
+      weight: FontWeight::LIGHT,
+      ..<_>::default()
+    });
+
+    let mut normal_title_face = light_title_face.clone();
+    normal_title_face.to_mut().weight = FontWeight::NORMAL;
+
+    let mut medium_title_face = light_title_face.clone();
+    medium_title_face.to_mut().weight = FontWeight::MEDIUM;
+
+    let body_face: CowRc<FontFace> = CowRc::owned(FontFace {
+      family: body_family,
+      ..<_>::default()
+    });
+
     Self {
-      headline1: TextStyle {
-        font_size: 96.0,
-        weight: FontWeight::LIGHT,
-        letter_space: -1.5,
-        family: titles_family.clone(),
-        foreground: display_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      headline1: TextTheme {
+        text: TextStyle {
+          font_size: 96.0,
+          letter_space: -1.5,
+          foreground: display_style.clone(),
+          font_face: light_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      headline2: TextStyle {
-        font_size: 60.0,
-        weight: FontWeight::LIGHT,
-        letter_space: -0.5,
-        family: titles_family.clone(),
-        foreground: display_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      headline2: TextTheme {
+        text: TextStyle {
+          font_size: 60.0,
+          letter_space: -0.5,
+          foreground: display_style.clone(),
+          font_face: light_title_face,
+        },
+        decoration: decoration.clone(),
       },
-      headline3: TextStyle {
-        font_size: 48.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.0,
-        family: titles_family.clone(),
-        foreground: display_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
-      },
-      headline4: TextStyle {
-        font_size: 34.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.25,
-        family: titles_family.clone(),
-        foreground: display_style,
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      headline3: TextTheme {
+        text: TextStyle {
+          font_size: 48.0,
+          foreground: display_style.clone(),
+          letter_space: 0.0,
+          font_face: normal_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
 
-      headline5: TextStyle {
-        font_size: 24.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.0,
-        family: titles_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      headline4: TextTheme {
+        text: TextStyle {
+          font_size: 34.0,
+          foreground: display_style.clone(),
+          letter_space: 0.25,
+          font_face: normal_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      headline6: TextStyle {
-        font_size: 20.0,
-        weight: FontWeight::MEDIUM,
-        letter_space: 0.15,
-        family: titles_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      headline5: TextTheme {
+        text: TextStyle {
+          font_size: 24.0,
+          letter_space: 0.0,
+          foreground: body_style.clone(),
+          font_face: normal_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      subtitle1: TextStyle {
-        font_size: 16.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.15,
-        family: titles_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      headline6: TextTheme {
+        text: TextStyle {
+          font_size: 20.0,
+          letter_space: 0.15,
+          foreground: body_style.clone(),
+          font_face: medium_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      subtitle2: TextStyle {
-        font_size: 14.0,
-        weight: FontWeight::MEDIUM,
-        letter_space: 0.1,
-        family: titles_family,
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+
+      subtitle1: TextTheme {
+        text: TextStyle {
+          font_size: 16.0,
+          letter_space: 0.15,
+          foreground: body_style.clone(),
+          font_face: normal_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      body1: TextStyle {
-        font_size: 16.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.5,
-        family: body_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      subtitle2: TextTheme {
+        text: TextStyle {
+          font_size: 14.0,
+          letter_space: 0.1,
+          foreground: body_style.clone(),
+          font_face: medium_title_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      body2: TextStyle {
-        font_size: 14.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.25,
-        family: body_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      body1: TextTheme {
+        text: TextStyle {
+          font_size: 16.0,
+          letter_space: 0.5,
+          foreground: body_style.clone(),
+          font_face: body_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      button: TextStyle {
-        font_size: 14.0,
-        weight: FontWeight::MEDIUM,
-        letter_space: 1.25,
-        family: body_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+
+      body2: TextTheme {
+        text: TextStyle {
+          font_size: 14.0,
+          letter_space: 0.25,
+          foreground: body_style.clone(),
+          font_face: body_face.clone(),
+        },
+        decoration: decoration.clone(),
       },
-      caption: TextStyle {
-        font_size: 12.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 0.4,
-        family: body_family.clone(),
-        foreground: body_style.clone(),
-        decoration,
-        decoration_color: decoration_color.clone(),
-        ..Default::default()
+      button: TextTheme {
+        text: TextStyle {
+          font_size: 14.0,
+          letter_space: 1.25,
+          foreground: body_style.clone(),
+          font_face: {
+            let mut face = body_face.clone();
+            face.to_mut().weight = FontWeight::MEDIUM;
+            face
+          },
+        },
+        decoration: decoration.clone(),
       },
-      overline: TextStyle {
-        font_size: 10.0,
-        weight: FontWeight::NORMAL,
-        letter_space: 1.5,
-        family: body_family,
-        foreground: body_style,
+      caption: TextTheme {
+        text: TextStyle {
+          font_size: 12.0,
+          letter_space: 0.4,
+          foreground: body_style.clone(),
+          font_face: body_face.clone(),
+        },
+        decoration: decoration.clone(),
+      },
+      overline: TextTheme {
+        text: TextStyle {
+          font_size: 10.0,
+          letter_space: 1.5,
+          foreground: body_style,
+          font_face: body_face,
+        },
         decoration,
-        decoration_color,
-        ..Default::default()
       },
     }
   }
@@ -291,6 +363,28 @@ impl Default for CheckboxTheme {
       border_color: Color::BLACK,
       checked_path,
       indeterminate_path,
+    }
+  }
+}
+
+impl Default for FontFace {
+  fn default() -> Self {
+    Self {
+      family: Box::new([FontFamily::Serif]),
+      stretch: Default::default(),
+      style: Default::default(),
+      weight: Default::default(),
+    }
+  }
+}
+
+impl Default for TextStyle {
+  fn default() -> Self {
+    Self {
+      font_size: 14.,
+      foreground: Color::BLACK.into(),
+      font_face: CowRc::owned(Default::default()),
+      letter_space: 0.,
     }
   }
 }

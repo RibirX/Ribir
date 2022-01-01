@@ -316,7 +316,10 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      Text { text: "pointer event test".into() },
+      Text {
+        text: "pointer event test".into(),
+        style: TextStyle::default(),
+      },
     );
     let root = record_pointer(event_record.clone(), Row::default()).have(record.box_it());
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
@@ -354,7 +357,10 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      Text { text: "pointer event test".into() },
+      Text {
+        text: "pointer event test".into(),
+        style: TextStyle::default(),
+      },
     );
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -412,7 +418,10 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      Text { text: "pointer event test".into() },
+      Text {
+        text: "pointer event test".into(),
+        style: TextStyle::default(),
+      },
     );
     let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -481,6 +490,7 @@ mod tests {
         },
         Text {
           text: "pointer event test",
+          style: TextStyle::default(),
           on_pointer_down: {
             let stack = event_record.clone();
             move |e| {
@@ -510,21 +520,27 @@ mod tests {
     let enter_event = Rc::new(RefCell::new(vec![]));
     let leave_event = Rc::new(RefCell::new(vec![]));
 
-    let c_enter_event = enter_event.clone();
-    let c_leave_event = leave_event.clone();
-
-    let c_enter_event = enter_event.clone();
-    let c_leave_event = leave_event.clone();
-
     let parent = declare! {
       SizedBox {
         size: SizedBox::expanded_size(),
-        on_pointer_enter: move |_| c_enter_event.borrow_mut().push(2),
-        on_pointer_leave: move |_| c_leave_event.borrow_mut().push(2),
+        on_pointer_enter: {
+          let enter_event = enter_event.clone();
+          move |_| enter_event.borrow_mut().push(2)
+        },
+        on_pointer_leave: {
+          let leave_event = leave_event.clone();
+          move |_| leave_event.borrow_mut().push(2)
+        },
         SizedBox {
           size: SizedBox::expanded_size(),
-          on_pointer_enter: move |_| c_enter_event.borrow_mut().push(1),
-          on_pointer_leave: move |_| c_leave_event.borrow_mut().push(1)
+          on_pointer_enter: {
+            let enter_event = enter_event.clone();
+            move |_| enter_event.borrow_mut().push(1)
+          },
+          on_pointer_leave: {
+            let leave_event = leave_event.clone();
+            move |_| leave_event.borrow_mut().push(1)
+          }
         }
       }
     };

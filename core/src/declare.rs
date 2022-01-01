@@ -24,12 +24,22 @@
 //!
 //! impl CombinationWidget for PeopleCard {
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget{
+//!     let text_style = ctx.theme().typography_theme.body1.text.clone();
 //!     declare! {
 //!       Column {
 //!          ..<_>::default(),
-//!          Text { text: self.name.clone() }
-//!          self.email.clone().map(|email| Text { text: email })
-//!          self.tel.clone().map(|tel| Text { text: tel })
+//!          Text {
+//!            text: self.name.clone(),
+//!            style: text_style.clone()
+//!          }
+//!          self.email.clone().map(|email| Text {
+//!            text: email.into(),
+//!            style: text_style.clone()
+//!          })
+//!          self.tel.clone().map(|tel| Text {
+//!             text: tel.into(),
+//!             style: text_style.clone()
+//!          })
 //!       }
 //!     }
 //!   }
