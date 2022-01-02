@@ -1,27 +1,32 @@
-use super::render_tree::*;
+use super::{
+  painter::{PaintCommand, Painter},
+  render_tree::*,
+};
 use crate::prelude::*;
-use canvas::Rendering2DLayer;
-
-pub type Painter2D<'a> = Rendering2DLayer<'a>;
 
 pub struct PaintingContext<'a> {
-  layer_2d: Rendering2DLayer<'a>,
+  painter: Painter,
   current_node: RenderId,
   tree: &'a RenderTree,
 }
 
 impl<'a> PaintingContext<'a> {
   #[inline]
-  pub(crate) fn new(tree: &'a RenderTree, transform: Transform) -> Option<Self> {
-    tree.root().map(|root| {
-      let mut layer_2d = Rendering2DLayer::new();
-      layer_2d.set_transform(transform);
-      Self { layer_2d, current_node: root, tree }
-    })
+  pub(crate) fn new(tree: &'a RenderTree, transform: Transform) -> Self {
+    let mut layer_2d = Painter::new();
+    layer_2d.set_transform(transform);
+
+    Self {
+      painter: layer_2d,
+      current_node: tree
+        .root()
+        .expect("Try to paint a uninit render tree, which root is none"),
+      tree,
+    }
   }
 
   /// Return the 2d painter to draw 2d things.
-  pub fn painter(&mut self) -> &mut Painter2D<'a> { &mut self.layer_2d }
+  pub fn painter(&mut self) -> &mut Painter { &mut self.painter }
 
   /// Return the size of the render object occupied after perform layout.
   pub fn self_size(&self) -> Option<Size> {
@@ -40,7 +45,7 @@ impl<'a> PaintingContext<'a> {
     })
   }
 
-  pub(crate) fn draw(mut self) -> Rendering2DLayer<'a> {
+  pub(crate) fn draw(mut self) -> Vec<PaintCommand> {
     self
       .current_node
       .traverse(&self.tree)
@@ -52,29 +57,29 @@ impl<'a> PaintingContext<'a> {
             .get(&self.tree)
             .expect("Render object should exists when traverse the tree.");
 
-          self.layer_2d.save();
+          self.painter.save();
           let offset = id
             .layout_box_rect(&self.tree)
             .expect("Every widget should at its place before draw.")
             .min();
 
           let mut matrix = self
-            .layer_2d
+            .painter
             .get_transform()
             .pre_translate(offset.to_vector());
 
           if let Some(t) = id.get(&self.tree).and_then(RenderObject::transform) {
             matrix = matrix.then(&t);
           }
-          self.layer_2d.set_transform(matrix);
+          self.painter.set_transform(matrix);
 
           r_obj.paint(&mut self);
         }
         RenderEdge::End(_) => {
-          self.layer_2d.restore();
+          self.painter.restore();
         }
       });
 
-    self.layer_2d
+    self.painter.commands
   }
 }

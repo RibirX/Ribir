@@ -43,6 +43,6 @@ impl RenderObject for Text {
   #[inline]
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
     let painter = ctx.painter();
-    painter.fill_text(&self.text, None);
+    painter.fill_text(self.text.clone());
   }
 }

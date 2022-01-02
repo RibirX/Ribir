@@ -8,12 +8,11 @@ version = "0.1.0"
 
 [dependencies]
 backtrace = "0.3"
-euclid = "0.22.6"
-font-kit = "0.10.0"
-glyph_brush = "0.7.0"
 guillotiere = "0.6.0"
 log = "0.4.8"
-lyon = "0.17.10"
+lyon_algorithms = "0.17.7"
+lyon_tessellation = "0.17.10"
+painter = {path = "../painter"}
 png = "0.16.7"
 raw-window-handle = "0.3.3"
 wgpu = "0.6.0"

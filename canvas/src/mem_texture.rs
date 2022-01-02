@@ -1,4 +1,4 @@
-use super::{DevicePoint, DeviceRect, DeviceSize};
+use painter::{DevicePoint, DeviceRect, DeviceSize};
 
 pub struct MemTexture<T: Copy + Default> {
   max_size: DeviceSize,

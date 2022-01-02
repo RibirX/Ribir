@@ -1,10 +1,10 @@
-use canvas::{create_canvas_with_render_from_wnd, Color, DeviceSize};
+use canvas::create_canvas_with_render_from_wnd;
+use painter::{Color, DeviceSize, Transform};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
   window::WindowBuilder,
 };
-pub type Angle = euclid::Angle<f32>;
 
 fn main() {
   let event_loop = EventLoop::new();
@@ -14,9 +14,11 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
-  let (mut canvas, mut render) = block_on(create_canvas_with_render_from_wnd(
+  let (mut tessellator, mut render) = block_on(create_canvas_with_render_from_wnd(
     &window,
     DeviceSize::new(size.width, size.height),
+    None,
+    None,
   ));
 
   event_loop.run(move |event, _, control_flow| match event {
@@ -35,10 +37,10 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let mut layer = canvas.new_2d_layer();
-      layer.set_style(Color::YELLOW);
+      let mut painter = painter::Painter::new(Transform::new(1., 0., 0., 1., 0., 0.));
+      painter.set_brush(Color::YELLOW);
 
-      layer
+      painter
         .begin_path((0., 70.).into())
         .line_to((100.0, 70.0).into())
         .line_to((100.0, 0.0).into())
@@ -46,12 +48,11 @@ fn main() {
         .line_to((100.0, 200.0).into())
         .line_to((100.0, 130.0).into())
         .line_to((0.0, 130.0).into())
-        .close_path()
-        .fill();
+        .close_path();
+      painter.fill();
 
-      // layer.rect(100.0, 100.0, 100.0, 100.0).fill();
-      // layer.arc(100., 100., 50., Angle::zero(), Angle::pi()).fill();
-      canvas.next_frame(&mut render).compose_2d_layer(layer);
+      let commands = painter.finish();
+      tessellator.tessellate(commands, &mut render);
     }
     Event::MainEventsCleared => {
       window.request_redraw();

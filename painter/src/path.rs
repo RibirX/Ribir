@@ -1,26 +1,55 @@
-use crate::*;
-use lyon::{
+use lyon_path::{
+  builder::BorderRadii,
   geom::{Arc, LineSegment},
-  path::{builder::PathBuilder as LyonBuilder, Winding},
+  traits::PathBuilder,
+  Winding,
 };
 
-pub struct PathBuilder(lyon::path::path::Builder);
+use crate::{Angle, Color, Point, Rect, Vector};
 
-#[derive(Debug, Clone)]
-pub struct Path(pub(crate) lyon::path::Path);
-
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct BorderRadius {
-  pub top_left: Vector,
-  pub top_right: Vector,
-  pub bottom_left: Vector,
-  pub bottom_right: Vector,
+#[derive(Debug, Clone, PartialEq)]
+pub enum Brush {
+  Color(Color),
+  Image,    // todo
+  Gradient, // todo,
 }
 
-impl PathBuilder {
-  #[inline]
-  pub fn new() -> Self { Default::default() }
+/// The style to paint path, maybe fill or stroke.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum PathStyle {
+  /// Fill the path.
+  Fill,
+  /// Stroke path with line width.
+  Stroke(f32),
+}
 
+/// Path widget describe a shape, build the shape from [`Builder`]!
+#[derive(Clone, Debug)]
+pub struct Path {
+  pub path: lyon_path::path::Path,
+  pub brush: Brush,
+  pub path_style: PathStyle,
+}
+
+/// The radius of each corner of a rounded rectangle.
+#[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Default)]
+pub struct Radius(BorderRadii);
+
+/// The builder for path
+#[derive(Default)]
+pub struct Builder(lyon_path::path::Builder);
+
+impl Path {
+  #[inline]
+  pub fn builder() -> Builder { Builder::default() }
+
+  #[inline]
+  pub fn box_rect(&self) -> Rect {
+    lyon_algorithms::aabb::bounding_rect(self.path.iter()).cast_unit()
+  }
+}
+
+impl Builder {
   /// Starts a new path by emptying the list of sub-paths.
   /// Call this method when you want to create a new path.
   #[inline]
@@ -33,10 +62,7 @@ impl PathBuilder {
   /// sub-path. It tries to draw a straight line from the current point to the
   /// start. If the shape has already been closed or has only one point, this
   #[inline]
-  pub fn close_path(&mut self) -> &mut Self {
-    self.0.close();
-    self
-  }
+  pub fn close_path(&mut self) { self.0.close(); }
 
   /// Connects the last point in the current sub-path to the specified (x, y)
   /// coordinates with a straight line.
@@ -147,106 +173,93 @@ impl PathBuilder {
   }
 
   /// Creates a path for a rectangle by `rect` with `radius`.
-  pub fn rect_round(&mut self, rect: &Rect, radius: &BorderRadius) {
-    let BorderRadius {
+  /// #[inline]
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) {
+    // Safety, just a unit type convert, it's same type.
+    let rect = unsafe { std::mem::transmute(rect) };
+    self
+      .0
+      .add_rounded_rectangle(rect, &*radius, Winding::Positive)
+  }
+
+  /// Build a stroke path with `width` size, and `style`.
+  #[inline]
+  pub fn stroke(self, line_width: f32, style: Brush) -> Path {
+    Path {
+      path: self.0.build(),
+      brush: style,
+      path_style: PathStyle::Stroke(line_width),
+    }
+  }
+
+  /// Build a fill path, witch should fill with `style`
+  #[inline]
+  pub fn fill(self, style: Brush) -> Path {
+    Path {
+      path: self.0.build(),
+      brush: style,
+      path_style: PathStyle::Fill,
+    }
+  }
+}
+
+impl std::ops::Deref for Radius {
+  type Target = BorderRadii;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl std::ops::DerefMut for Radius {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
+impl Radius {
+  #[inline]
+  pub fn new(top_left: f32, top_right: f32, bottom_left: f32, bottom_right: f32) -> Radius {
+    BorderRadii {
       top_left,
       top_right,
       bottom_left,
       bottom_right,
-    } = radius;
-
-    let w = rect.width();
-    let h = rect.height();
-    let mut tl_x = top_left.x.abs().min(w);
-    let mut tl_y = top_left.y.abs().min(h);
-    let mut tr_x = top_right.x.abs().min(w);
-    let mut tr_y = top_right.y.abs().min(h);
-    let mut bl_x = bottom_left.x.abs().min(w);
-    let mut bl_y = bottom_left.y.abs().min(h);
-    let mut br_x = bottom_right.x.abs().min(w);
-    let mut br_y = bottom_right.y.abs().min(h);
-    if tl_x + tr_x > w {
-      let shrink = (tl_x + tr_x - w) / 2.;
-      tl_x -= shrink;
-      tr_x -= shrink;
     }
-    if bl_x + br_x > w {
-      let shrink = (bl_x + br_x - w) / 2.;
-      bl_x -= shrink;
-      br_x -= shrink;
-    }
-    if tl_y + bl_y > h {
-      let shrink = (tl_y + bl_y - h) / 2.;
-      tl_y -= shrink;
-      bl_y -= shrink;
-    }
-    if tr_y + br_y > h {
-      let shrink = (tr_y + br_y - h) / 2.;
-      tr_y -= shrink;
-      br_y -= shrink;
-    }
-
-    let max = rect.max();
-    if tl_x > 0. && tl_y > 0. {
-      self.begin_path(Point::new(rect.min_x(), rect.min_y() + tl_y));
-      let radius = Vector::new(tl_x, tl_y);
-      self.ellipse_to(
-        rect.min() + radius,
-        radius,
-        Angle::degrees(180.),
-        Angle::degrees(270.),
-      );
-    } else {
-      self.begin_path(rect.min());
-    }
-    if tr_x > 0. && tr_y > 0. {
-      let radius = Vector::new(tr_x, tr_y);
-      let center = Point::new(max.x - tr_x, rect.min_y() + tr_y);
-      self.line_to(Point::new(max.x - tr_x, rect.min_y()));
-      self.ellipse_to(center, radius, Angle::degrees(270.), Angle::degrees(360.));
-    } else {
-      self.line_to(Point::new(max.x, rect.min_y()));
-    }
-    if br_x > 0. && br_y > 0. {
-      let radius = Vector::new(br_x, br_y);
-      let center = max - radius;
-      self.line_to(Point::new(max.x, max.y - br_y));
-      self.ellipse_to(center, radius, Angle::degrees(0.), Angle::degrees(90.));
-    } else {
-      self.line_to(max);
-    }
-
-    if bl_x > 0. && bl_y > 0. {
-      let radius = Vector::new(bl_x, bl_y);
-      self.line_to(Point::new(rect.min_x() + bl_x, max.y));
-      self.ellipse_to(
-        Point::new(rect.min_x() + bl_x, max.y - bl_y),
-        radius,
-        Angle::degrees(90.),
-        Angle::degrees(180.),
-      );
-    } else {
-      self.line_to(Point::new(rect.min_x(), max.y));
-    }
-
-    self.close_path();
+    .into()
   }
+
+  /// Creates a radius where all radii are radius.
+  #[inline]
+  pub fn all(radius: f32) -> Radius { Self::new(radius, radius, radius, radius) }
 
   #[inline]
-  pub fn build(self) -> Path { Path(self.0.build()) }
+  pub fn left(left: f32) -> Radius { Self::new(left, 0., left, 0.) }
+
+  #[inline]
+  pub fn right(right: f32) -> Radius { Self::new(0., right, 0., right) }
+
+  #[inline]
+  pub fn top(top: f32) -> Radius { Self::new(top, top, 0., 0.) }
+
+  #[inline]
+  pub fn bottom(bottom: f32) -> Radius { Self::new(0., 0., bottom, bottom) }
+
+  /// Creates a horizontally symmetrical radius where the left and right sides
+  /// of the rectangle have the same radii.
+  #[inline]
+  pub fn horizontal(left: f32, right: f32) -> Radius { Self::new(left, right, left, right) }
+
+  ///Creates a vertically symmetric radius where the top and bottom sides of
+  /// the rectangle have the same radii.
+  #[inline]
+  pub fn vertical(top: f32, bottom: f32) -> Radius { Self::new(top, top, bottom, bottom) }
 }
 
-impl BorderRadius {
-  pub fn all(radius: Vector) -> Self {
-    Self {
-      top_left: radius,
-      top_right: radius,
-      bottom_left: radius,
-      bottom_right: radius,
-    }
-  }
+impl From<Radius> for BorderRadii {
+  #[inline]
+  fn from(radius: Radius) -> Self { radius.0 }
 }
 
-impl Default for PathBuilder {
-  fn default() -> Self { Self(lyon::path::path::Builder::new()) }
+impl From<BorderRadii> for Radius {
+  #[inline]
+  fn from(radii: BorderRadii) -> Self { Self(radii) }
 }

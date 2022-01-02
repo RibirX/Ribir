@@ -133,11 +133,9 @@ impl<R: CanvasRender> Window<R> {
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    if let Some(layer) =
-      PaintingContext::new(&self.render_tree, self.canvas.default_transform()).map(|ctx| ctx.draw())
-    {
-      let mut frame = self.canvas.next_frame(&mut self.render);
-      frame.compose_2d_layer(layer);
+    let commands = PaintingContext::new(&self.render_tree, self.canvas.default_transform()).draw();
+    if !commands.is_empty() {
+      todo!()
     }
   }
 

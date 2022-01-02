@@ -1,11 +1,11 @@
 # Canvas
 
-`Canvas` is a vector font and 2d/3d graphic library, the main goal is as a fast render for `Ribir`.
+`Canvas` is a vector font and 2d graphic library, the main goal is as a fast render for `Ribir`.
 
 
 ## Design
 
-`Canvas`'s work split as two phase, the cpu phase and gpu phase.
+`Canvas` accept the `PaintCommand` as input, and its work split as two phase, the cpu phase and gpu phase.
 
 **In the cpu phase**, everything painted will be generate to render data in memory. Render data has two part, the triangles and texture. Geometry and texts will convert to triangles, the color and image will store in an atlas texture, and text glyphs store in glyphs texture. These output is easy to use for rendering engine. And can be cached in your application.
 

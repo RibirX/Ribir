@@ -1,8 +1,5 @@
-use crate::{
-  canvas::{CanvasRender, RenderData, Vertex},
-  mem_texture::MemTexture,
-  DeviceRect, DeviceSize, LogicUnit, PhysicUnit, Primitive,
-};
+use crate::{mem_texture::MemTexture, CanvasRender, Primitive, RenderData, Vertex};
+use painter::{DeviceRect, DeviceSize, LogicUnit, PhysicUnit};
 mod img_helper;
 pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
@@ -11,10 +8,11 @@ use surface::{PhysicSurface, Surface, TextureSurface};
 use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
+type Transform2D = painter::Transform2D<f32, LogicUnit, PhysicUnit>;
+
 enum PrimaryBindings {
   GlobalUniform = 0,
   TextureAtlas = 1,
-  GlyphTexture = 2,
   Sampler = 3,
 }
 
@@ -41,7 +39,6 @@ pub struct WgpuRender<S: Surface = PhysicSurface> {
   uniforms: wgpu::BindGroup,
   rgba_converter: Option<RgbaConvert>,
   sampler: wgpu::Sampler,
-  glyph: wgpu::Texture,
   atlas: wgpu::Texture,
   rebuild_pipeline: bool,
   anti_aliasing: AntiAliasing,
@@ -56,7 +53,6 @@ impl WgpuRender<PhysicSurface> {
   pub async fn wnd_render<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
     size: DeviceSize,
-    glyph_texture_size: DeviceSize,
     atlas_texture_size: DeviceSize,
     anti_aliasing: AntiAliasing,
   ) -> Self {
@@ -71,7 +67,6 @@ impl WgpuRender<PhysicSurface> {
 
     Self::new(
       size,
-      glyph_texture_size,
       atlas_texture_size,
       adapter,
       move |device| PhysicSurface::new(w_surface, device, size),
@@ -84,11 +79,7 @@ impl WgpuRender<PhysicSurface> {
 impl WgpuRender<TextureSurface> {
   /// Create a WgpuRender, if you want to bind to a window, use
   /// [`wnd_render`](WgpuRender::wnd_render).
-  pub async fn headless_render(
-    size: DeviceSize,
-    glyph_texture_size: DeviceSize,
-    atlas_texture_size: DeviceSize,
-  ) -> Self {
+  pub async fn headless_render(size: DeviceSize, atlas_texture_size: DeviceSize) -> Self {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
     let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -98,7 +89,6 @@ impl WgpuRender<TextureSurface> {
 
     WgpuRender::new(
       size,
-      glyph_texture_size,
       atlas_texture_size,
       adapter,
       |device| {
@@ -138,12 +128,7 @@ impl WgpuRender<TextureSurface> {
 }
 
 impl<S: Surface> CanvasRender for WgpuRender<S> {
-  fn draw(
-    &mut self,
-    data: &RenderData,
-    mem_glyph: &mut MemTexture<u8>,
-    mem_atlas: &mut MemTexture<u32>,
-  ) {
+  fn draw(&mut self, data: &RenderData, mem_atlas: &mut MemTexture<u32>) {
     let mut encoder = self
       .device
       .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") });
@@ -151,7 +136,6 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
     let tex_infos_bind_group = self.create_primitives_bind_group(&data.primitives);
     let Self {
       device,
-      glyph,
       atlas,
       surface,
       queue,
@@ -159,12 +143,11 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
       sc_desc,
       ..
     } = self;
-    let texture_resized = mem_glyph.is_resized() || mem_atlas.is_resized();
+
     type Tf = wgpu::TextureFormat;
-    Self::sync_texture(device, glyph, mem_glyph, Tf::R8Unorm, &mut encoder);
     Self::sync_texture(device, atlas, mem_atlas, Tf::Bgra8UnormSrgb, &mut encoder);
 
-    if self.rebuild_pipeline || texture_resized {
+    if self.rebuild_pipeline || mem_atlas.is_resized() {
       self.uniforms = create_uniforms(
         device,
         uniform_layout,
@@ -172,7 +155,6 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
         &coordinate_2d_to_device_matrix(sc_desc.width, sc_desc.height),
         &self.sampler,
         &atlas.create_view(&wgpu::TextureViewDescriptor::default()),
-        &glyph.create_view(&wgpu::TextureViewDescriptor::default()),
       )
     }
     if self.rebuild_pipeline {
@@ -254,7 +236,6 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
 impl<S: Surface> WgpuRender<S> {
   async fn new<C>(
     size: DeviceSize,
-    glyph_texture_size: DeviceSize,
     atlas_texture_size: DeviceSize,
     adapter: impl std::future::Future<Output = Option<wgpu::Adapter>> + Send,
     surface_ctor: C,
@@ -308,8 +289,6 @@ impl<S: Surface> WgpuRender<S> {
       ..Default::default()
     });
 
-    let glyph_texture =
-      Self::create_wgpu_texture(&device, glyph_texture_size, wgpu::TextureFormat::R8Unorm);
     let texture_atlas = Self::create_wgpu_texture(
       &device,
       atlas_texture_size,
@@ -322,7 +301,6 @@ impl<S: Surface> WgpuRender<S> {
       &coordinate_2d_to_device_matrix(size.width, size.height),
       &sampler,
       &texture_atlas.create_view(&wgpu::TextureViewDescriptor::default()),
-      &glyph_texture.create_view(&wgpu::TextureViewDescriptor::default()),
     );
 
     let multisampled_framebuffer =
@@ -337,7 +315,6 @@ impl<S: Surface> WgpuRender<S> {
       uniform_layout,
       primitives_layout,
       uniforms,
-      glyph: glyph_texture,
       atlas: texture_atlas,
       rgba_converter: None,
       rebuild_pipeline: false,
@@ -554,16 +531,6 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
         ty: wgpu::BindingType::Sampler { comparison: false },
         count: None,
       },
-      wgpu::BindGroupLayoutEntry {
-        binding: PrimaryBindings::GlyphTexture as u32,
-        visibility: wgpu::ShaderStage::FRAGMENT,
-        ty: wgpu::BindingType::SampledTexture {
-          dimension: wgpu::TextureViewDimension::D2,
-          component_type: wgpu::TextureComponentType::Float,
-          multisampled: false,
-        },
-        count: None,
-      },
     ],
     label: Some("uniforms stable layout"),
   });
@@ -585,23 +552,20 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
 }
 
 /// Convert coordinate system from canvas 2d into wgpu.
-pub fn coordinate_2d_to_device_matrix(
-  width: u32,
-  height: u32,
-) -> euclid::Transform2D<f32, LogicUnit, PhysicUnit> {
-  euclid::Transform2D::new(2. / width as f32, 0., 0., -2. / height as f32, -1., 1.)
+pub fn coordinate_2d_to_device_matrix(width: u32, height: u32) -> Transform2D {
+  Transform2D::new(2. / width as f32, 0., 0., -2. / height as f32, -1., 1.)
 }
 
 fn create_uniforms(
   device: &wgpu::Device,
   layout: &wgpu::BindGroupLayout,
   atlas_size: DeviceSize,
-  canvas_2d_to_device_matrix: &euclid::Transform2D<f32, LogicUnit, PhysicUnit>,
+  canvas_2d_to_device_matrix: &Transform2D,
   sampler: &wgpu::Sampler,
   tex_atlas: &wgpu::TextureView,
-  glyph_texture: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
   let uniform = GlobalUniform {
+    // todo: seems not have same layout in shader?
     texture_atlas_size: atlas_size.to_array(),
     canvas_coordinate_map: canvas_2d_to_device_matrix.to_arrays(),
   };
@@ -624,10 +588,6 @@ fn create_uniforms(
       wgpu::BindGroupEntry {
         binding: PrimaryBindings::Sampler as u32,
         resource: wgpu::BindingResource::Sampler(sampler),
-      },
-      wgpu::BindGroupEntry {
-        binding: PrimaryBindings::GlyphTexture as u32,
-        resource: wgpu::BindingResource::TextureView(glyph_texture),
       },
     ],
     label: Some("uniform_bind_group"),
@@ -673,6 +633,7 @@ mod tests {
   use super::*;
   use crate::*;
   use futures::executor::block_on;
+  use painter::Color;
 
   fn circle_50() -> Path {
     let mut path = PathBuilder::new();

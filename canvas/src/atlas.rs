@@ -1,4 +1,6 @@
-use super::{error::CanvasError, mem_texture::MemTexture, Color, DevicePoint, DeviceSize};
+use super::{error::CanvasError, mem_texture::MemTexture};
+use painter::{Color, DevicePoint, DeviceSize};
+
 use guillotiere::*;
 
 const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;

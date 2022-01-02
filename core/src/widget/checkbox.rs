@@ -24,52 +24,38 @@ impl Checkbox {
 impl CombinationWidget for Checkbox {
   fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
     let CheckboxTheme {
-      size,
+      mut size,
       border_width,
-      check_mark_width,
-      border_radius,
+      radius,
       border_color,
       checked_path,
-      marker_color,
-      color,
+      check_background: color,
       indeterminate_path,
     } = self.style.clone();
 
-    let has_check = self.indeterminate || self.checked;
-    let radius = BorderRadius::all(Vector::new(border_radius, border_radius));
-    let margin = EdgeInsets::all(4.);
+    let has_checked = self.indeterminate || self.checked;
+    // border draw out of the box
+    if !has_checked {
+      size += border_width * 2.;
+    }
 
-    if has_check {
-      declare! {
-        CheckboxMarker {
-          size: size + border_width * 2.,
-          color: marker_color,
-          path_width: if self.indeterminate {
-            border_width
-          } else {
-            check_mark_width
-          },
-          path: if self.indeterminate {
+    declare! {
+      SizedBox {
+        size: Size::new(size, size),
+        margin: EdgeInsets::all(4.),
+        radius: Radius::all(radius),
+        border if !has_checked =>: Border::all(BorderSide {
+          color: border_color,
+          width: border_width,
+        }),
+        background if has_checked => : color,
+        has_checked.then(||{
+          if self.indeterminate {
             indeterminate_path
           } else {
             checked_path
-          },
-          margin,
-          radius,
-          background: color,
-        }
-      }
-    } else {
-      declare! {
-        SizedBox {
-          size: Size::new(size, size),
-          margin,
-          radius,
-          border if !has_check =>: Border::all(BorderSide {
-            color: border_color,
-            width: border_width,
-          }),
-        }
+          }
+        })
       }
     }
   }
@@ -94,46 +80,6 @@ impl CombinationWidget for StatefulCheckbox {
         }
       })
       .box_it()
-  }
-}
-
-// todo: use a common path widget to replace this.
-#[derive(Debug, Clone, Declare)]
-pub struct CheckboxMarker {
-  path_width: f32,
-  path: Path,
-  color: Color,
-  size: f32,
-}
-
-impl RenderWidget for CheckboxMarker {
-  type RO = Self;
-
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self.size != object.size {
-      ctx.mark_needs_layout();
-    }
-    object.size = self.size;
-  }
-}
-
-impl RenderObject for CheckboxMarker {
-  fn perform_layout(&mut self, clamp: BoxClamp, _: &mut RenderCtx) -> Size {
-    Size::new(self.size, self.size).clamp(clamp.min, clamp.max)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
-
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
-    ctx
-      .painter()
-      .set_style(self.color.clone())
-      .set_line_width(self.path_width)
-      .stroke_path(self.path.clone());
   }
 }
 

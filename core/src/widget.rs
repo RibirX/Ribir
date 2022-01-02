@@ -34,7 +34,8 @@ mod checkbox;
 pub use checkbox::*;
 mod scrollable;
 pub use scrollable::*;
-pub mod path;
+mod path;
+pub use path::*;
 
 /// A widget represented by other widget compose.
 pub trait CombinationWidget: AttrsAccess + 'static {

@@ -1,19 +1,21 @@
 use crate::prelude::*;
 
+use super::painter::Painter;
+
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[stateful]
 #[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[declare(builtin, convert(some, into))]
-  pub background: Option<FillStyle>,
+  pub background: Option<Brush>,
   /// A border to draw above the background
   #[declare(builtin, convert(some))]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
   #[declare(builtin, convert(some, into))]
-  pub radius: Option<BorderRadius>,
+  pub radius: Option<Radius>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -78,7 +80,7 @@ impl RenderObject for BoxDecoration {
 
     let painter = ctx.painter();
     if let Some(ref background) = self.background {
-      painter.set_style(background.clone());
+      painter.set_brush(background.clone());
       if let Some(radius) = &self.radius {
         painter.rect_round(&content_rect, radius);
       } else {
@@ -98,7 +100,7 @@ enum BorderPosition {
   Right,
 }
 impl BoxDecoration {
-  fn paint_border(&self, painter: &mut Painter2D, rect: &Rect) {
+  fn paint_border(&self, painter: &mut Painter, rect: &Rect) {
     let path_to_paint = self.continues_border();
     if path_to_paint.is_empty() {
       return;
@@ -109,7 +111,7 @@ impl BoxDecoration {
       let border_width = border.left.width;
       painter
         .set_line_width(border_width)
-        .set_style(FillStyle::Color(border.left.color.clone()));
+        .set_brush(Brush::Color(border.left.color.clone()));
 
       let half_border = border_width / 2.;
       let rect = rect.inflate(half_border, half_border);
@@ -122,48 +124,35 @@ impl BoxDecoration {
     } else {
       let w = rect.width();
       let h = rect.height();
-      let mut tl_x = 0.;
-      let mut tl_y = 0.;
-      let mut tr_x = 0.;
-      let mut tr_y = 0.;
-      let mut bl_x = 0.;
-      let mut bl_y = 0.;
-      let mut br_x = 0.;
-      let mut br_y = 0.;
-      if let Some(BorderRadius {
-        top_left,
-        top_right,
-        bottom_left,
-        bottom_right,
-      }) = self.radius
-      {
-        tl_x = top_left.x.abs().min(w);
-        tl_y = top_left.y.abs().min(h);
-        tr_x = top_right.x.abs().min(w);
-        tr_y = top_right.y.abs().min(h);
-        bl_x = bottom_left.x.abs().min(w);
-        bl_y = bottom_left.y.abs().min(h);
-        br_x = bottom_right.x.abs().min(w);
-        br_y = bottom_right.y.abs().min(h);
-        if tl_x + tr_x > w {
-          let shrink = (tl_x + tr_x - w) / 2.;
-          tl_x -= shrink;
-          tr_x -= shrink;
+      let mut tl = 0.;
+      let mut tr = 0.;
+      let mut bl = 0.;
+      let mut br = 0.;
+      if let Some(radius) = self.radius {
+        tl = radius.top_left.abs().min(w).min(h);
+        tr = radius.top_right.abs().min(w).min(h);
+        bl = radius.bottom_left.abs().min(w).min(h);
+        br = radius.bottom_right.abs().min(w).min(h);
+
+        if tl + tr > w {
+          let shrink = (tl + tr - w) / 2.;
+          tl -= shrink;
+          tr -= shrink;
         }
-        if bl_x + br_x > w {
-          let shrink = (bl_x + br_x - w) / 2.;
-          bl_x -= shrink;
-          br_x -= shrink;
+        if bl + br > w {
+          let shrink = (bl + br - w) / 2.;
+          bl -= shrink;
+          br -= shrink;
         }
-        if tl_y + bl_y > h {
-          let shrink = (tl_y + bl_y - h) / 2.;
-          tl_y -= shrink;
-          bl_y -= shrink;
+        if tl + bl > h {
+          let shrink = (tl + bl - h) / 2.;
+          tl -= shrink;
+          bl -= shrink;
         }
-        if tr_y + br_y > h {
-          let shrink = (tr_y + br_y - h) / 2.;
-          tr_y -= shrink;
-          br_y -= shrink;
+        if tr + br > h {
+          let shrink = (tr + br - h) / 2.;
+          tr -= shrink;
+          br -= shrink;
         }
       }
       let max = rect.max();
@@ -180,15 +169,15 @@ impl BoxDecoration {
               let y = rect.min_y() - half_top;
               if start {
                 painter
-                  .begin_path(Point::new(rect.min_x() - border.left.width, y))
                   .set_line_width(border.top.width)
-                  .set_style(border.top.color.clone());
+                  .set_brush(border.top.color.clone())
+                  .begin_path(Point::new(rect.min_x() - border.left.width, y));
               }
-              if !end && tr_x > 0. && tr_y > 0. {
-                let center = Point::new(max.x - tr_x, rect.min_y() + tr_y);
-                painter.line_to(Point::new(max.x - tr_x, y)).ellipse_to(
+              if !end && tr > 0. && tr > 0. {
+                let center = Point::new(max.x - tr, rect.min_y() + tr);
+                painter.line_to(Point::new(max.x - tr, y)).ellipse_to(
                   center,
-                  Vector::new(tr_x + half_right, tr_y + half_top),
+                  Vector::new(tr + half_right, tr + half_top),
                   Angle::degrees(270.),
                   Angle::degrees(360.),
                 );
@@ -200,14 +189,14 @@ impl BoxDecoration {
               let x = max.x + half_right;
               if start {
                 painter
-                  .begin_path(Point::new(x, rect.min_y() - border.top.width))
                   .set_line_width(border.right.width)
-                  .set_style(border.right.color.clone());
+                  .set_brush(border.right.color.clone())
+                  .begin_path(Point::new(x, rect.min_y() - border.top.width));
               }
-              if !end && br_x > 0. && br_y > 0. {
-                let radius = Vector::new(br_x, br_y);
+              if !end && br > 0. && br > 0. {
+                let radius = Vector::new(br, br);
                 let center = max - radius;
-                painter.line_to(Point::new(x, max.y - br_y)).ellipse_to(
+                painter.line_to(Point::new(x, max.y - br)).ellipse_to(
                   center,
                   radius + Vector::new(half_right, half_bottom),
                   Angle::degrees(0.),
@@ -221,16 +210,16 @@ impl BoxDecoration {
               let y = max.y + half_bottom;
               if start {
                 painter
-                  .begin_path(Point::new(max.x + border.right.width, y))
                   .set_line_width(border.bottom.width)
-                  .set_style(border.bottom.color.clone());
+                  .set_brush(border.bottom.color.clone())
+                  .begin_path(Point::new(max.x + border.right.width, y));
               }
-              if !end && bl_x > 0. && bl_y > 0. {
+              if !end && bl > 0. && bl > 0. {
                 painter
-                  .line_to(Point::new(rect.min_x() + bl_x, y))
+                  .line_to(Point::new(rect.min_x() + bl, y))
                   .ellipse_to(
-                    Point::new(rect.min_x() + bl_x, max.y - bl_y),
-                    Vector::new(bl_x + half_left, bl_y + half_bottom),
+                    Point::new(rect.min_x() + bl, max.y - bl),
+                    Vector::new(bl + half_left, bl + half_bottom),
                     Angle::degrees(90.),
                     Angle::degrees(180.),
                   );
@@ -242,15 +231,15 @@ impl BoxDecoration {
               let x = rect.min_x() - half_left;
               if start {
                 painter
-                  .begin_path(Point::new(x, max.y + border.bottom.width))
                   .set_line_width(border.left.width)
-                  .set_style(border.left.color.clone());
+                  .set_brush(border.left.color.clone())
+                  .begin_path(Point::new(x, max.y + border.bottom.width));
               }
 
-              if !end && tl_x > 0. && tl_y > 0. {
-                let radius = Vector::new(tl_x, tl_y);
+              if !end && tl > 0. && tl > 0. {
+                let radius = Vector::new(tl, tl);
                 painter
-                  .line_to(Point::new(x, rect.min_y() + tl_y))
+                  .line_to(Point::new(x, rect.min_y() + tl))
                   .ellipse_to(
                     rect.min() + radius,
                     radius + Vector::new(half_left, half_top),
@@ -263,7 +252,8 @@ impl BoxDecoration {
             }
           }
         });
-        painter.close_path().stroke();
+        painter.close_path();
+        painter.stroke();
       })
     }
   }

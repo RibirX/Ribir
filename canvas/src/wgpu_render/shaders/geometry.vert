@@ -35,7 +35,6 @@ layout(location=0) out vec2 atlas_tex_coords;
 layout(location=1) out vec2 atlas_sub_tex_size;
 layout(location=2) out vec2 atlas_sub_tex_offset;
 layout(location=3) out vec2 f_atlas_size;
-layout(location=4) out vec2 f_font_tex_pos;
 
 
 void main() {
@@ -51,5 +50,4 @@ void main() {
     atlas_sub_tex_size = prim.tex_size;
     atlas_sub_tex_offset = prim.tex_offset;
     f_atlas_size = atlas_size;
-    f_font_tex_pos = font_tex_pos;
 }

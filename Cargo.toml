@@ -2,8 +2,10 @@
 members = [
   "core",
   "canvas",
+  "painter",
   "unit_test",
   "widget_derive",
+  "algo",
 ]
 
 [profile.bench]

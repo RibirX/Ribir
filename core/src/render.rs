@@ -3,6 +3,7 @@ pub mod render_ctx;
 use crate::prelude::*;
 pub use painting_context::*;
 use std::any::{Any, TypeId};
+pub mod painter;
 mod painting_context;
 pub mod render_tree;
 pub mod update_ctx;
