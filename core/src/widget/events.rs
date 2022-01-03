@@ -1,5 +1,5 @@
 use crate::{
-  render::render_tree::RenderTree,
+  render::{layout_store::LayoutStore, render_tree::RenderTree},
   widget::widget_tree::{WidgetId, WidgetTree},
 };
 use std::{cell::Cell, ptr::NonNull};
@@ -113,4 +113,6 @@ impl EventCommon {
       widget_tree,
     }
   }
+
+  pub fn layout_store(&self) -> &LayoutStore { todo!() }
 }

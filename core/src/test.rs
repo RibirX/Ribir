@@ -14,12 +14,13 @@ pub fn widget_and_its_children_box_rect(root: BoxedWidget, window_size: Size) ->
 }
 
 pub fn root_and_children_rect(wnd: &mut window::Window<MockRender>) -> (Rect, Vec<Rect>) {
-  let r_tree = wnd.render_tree();
+  let r_tree = &*wnd.render_tree;
+  let layout = &mut wnd.layout_store;
   let root = r_tree.root().unwrap();
-  let rect = root.layout_box_rect(&*r_tree).unwrap();
+  let rect = layout.layout_box_rect(root).unwrap();
   let children_box_rect = root
     .children(&*r_tree)
-    .map(|rid| rid.layout_box_rect(&*r_tree).unwrap())
+    .map(|rid| layout.layout_box_rect(rid).unwrap())
     .collect();
 
   (rect, children_box_rect)

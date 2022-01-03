@@ -30,13 +30,10 @@ impl RenderWidget for Expanded {
 impl RenderObject for Expanded {
   #[inline]
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    debug_assert_eq!(ctx.children().count(), 1);
-
-    ctx
-      .children()
-      .next()
-      .expect("Expanded render should always have a single child")
-      .perform_layout(clamp)
+    let child = ctx
+      .single_child()
+      .expect("Expanded render should always have a single child");
+    ctx.perform_child_layout(child, clamp)
   }
 
   #[inline]

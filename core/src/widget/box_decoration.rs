@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-use super::painter::Painter;
-
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[stateful]
 #[derive(SingleChildWidget, Default, Clone, Declare)]
@@ -56,20 +54,17 @@ impl RenderObject for BoxDecoration {
   fn only_sized_by_parent(&self) -> bool { false }
 
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    debug_assert_eq!(ctx.children().count(), 1);
-    let mut child = ctx
-      .children()
-      .next()
+    let child = ctx
+      .single_child()
       .expect("BoxDecoration must have one child.");
-    let mut size = child.perform_layout(clamp);
+
+    let mut size = ctx.perform_child_layout(child, clamp);
     if let Some(ref border) = self.border {
       size.width += border.left.width + border.right.width;
       size.height += border.top.width + border.bottom.width;
-      child.update_position(Point::new(border.left.width, border.top.width));
-      size
-    } else {
-      size
+      ctx.update_child_position(child, Point::new(border.left.width, border.top.width));
     }
+    size
   }
 
   fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {

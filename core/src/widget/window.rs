@@ -3,7 +3,7 @@ use crate::{
   prelude::*,
   widget::{events::dispatcher::Dispatcher, widget_tree::*},
 };
-use canvas::{surface::TextureSurface, Canvas, CanvasRender, DeviceSize, WgpuRender};
+use canvas::{surface::TextureSurface, CanvasRender, MemTexture, RenderData, WgpuRender};
 use std::{cell::RefCell, pin::Pin, ptr::NonNull, rc::Rc};
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, event_loop::EventLoop, window::WindowBuilder, window::WindowId};
@@ -85,9 +85,10 @@ impl RawWindow for NativeWindow {
 /// Window is the root to represent.
 pub struct Window<R: CanvasRender = WgpuRender> {
   pub raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
-  render_tree: Pin<Box<RenderTree>>,
-  widget_tree: Pin<Box<WidgetTree>>,
-  canvas: Pin<Box<Canvas>>,
+  pub(crate) render_tree: Pin<Box<RenderTree>>,
+  pub(crate) layout_store: layout_store::LayoutStore,
+  pub(crate) widget_tree: Pin<Box<WidgetTree>>,
+  painter: Painter,
   render: R,
   pub(crate) dispatcher: Dispatcher,
 }
@@ -104,8 +105,8 @@ impl<R: CanvasRender> Window<R> {
         self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
         let factor = scale_factor as f32;
         self
-          .canvas
-          .set_default_transform(Transform::new(factor, 0., 0., factor, 0., 0.));
+          .painter
+          .reset(Some(Transform::new(factor, 0., 0., factor, 0., 0.)));
       }
       event => self.dispatcher.dispatch(event),
     };
@@ -133,7 +134,8 @@ impl<R: CanvasRender> Window<R> {
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    let commands = PaintingContext::new(&self.render_tree, self.canvas.default_transform()).draw();
+    let commands =
+      PaintingContext::new(&self.render_tree, &mut self.painter, &self.layout_store).draw();
     if !commands.is_empty() {
       todo!()
     }
@@ -144,29 +146,28 @@ impl<R: CanvasRender> Window<R> {
   /// react widget tree's change.
   fn tree_repair(&mut self) -> bool {
     unsafe {
-      self
-        .widget_tree
-        .as_mut()
-        .get_unchecked_mut()
-        .repair(self.render_tree.as_mut().get_unchecked_mut())
+      self.widget_tree.as_mut().get_unchecked_mut().repair(
+        self.render_tree.as_mut().get_unchecked_mut(),
+        &mut self.layout_store,
+      )
     }
   }
 
   /// Layout the render tree as needed
   fn layout(&mut self) -> bool {
-    unsafe {
-      self
-        .render_tree
-        .as_mut()
-        .get_unchecked_mut()
-        .layout(self.raw_window.borrow().inner_size(), self.canvas.as_mut())
-    }
+    self
+      .layout_store
+      .layout(self.raw_window.borrow().inner_size(), unsafe {
+        self.render_tree.as_mut().get_unchecked_mut()
+      })
   }
 
-  fn new<W: RawWindow + 'static>(root: BoxedWidget, wnd: W, canvas: Canvas, render: R) -> Self {
+  fn new<W: RawWindow + 'static>(root: BoxedWidget, wnd: W, render: R) -> Self {
     let render_tree = Box::pin(RenderTree::default());
     let widget_tree = Box::pin(WidgetTree::default());
+    let factor = wnd.scale_factor() as f32;
     let raw_window: Rc<RefCell<Box<dyn RawWindow>>> = Rc::new(RefCell::new(Box::new(wnd)));
+    let painter = Painter::new(Transform::new(factor, 0., 0., factor, 0., 0.));
     let mut wnd = Self {
       dispatcher: Dispatcher::new(
         NonNull::from(&*render_tree),
@@ -176,16 +177,17 @@ impl<R: CanvasRender> Window<R> {
       raw_window,
       render_tree,
       widget_tree,
-      canvas: Box::pin(canvas),
+      layout_store: <_>::default(),
+      painter,
       render,
     };
 
     unsafe {
-      wnd
-        .widget_tree
-        .as_mut()
-        .get_unchecked_mut()
-        .set_root(root, wnd.render_tree.as_mut().get_unchecked_mut());
+      wnd.widget_tree.as_mut().get_unchecked_mut().set_root(
+        root,
+        wnd.render_tree.as_mut().get_unchecked_mut(),
+        &mut wnd.layout_store,
+      );
     }
     let focus_mgr = &mut wnd.dispatcher.focus_mgr;
     focus_mgr.update(&wnd.dispatcher.common);
@@ -199,7 +201,9 @@ impl<R: CanvasRender> Window<R> {
   fn resize(&mut self, size: DeviceSize) {
     let r_tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
     if let Some(root) = r_tree.root() {
-      root.mark_needs_layout(r_tree);
+      self
+        .layout_store
+        .mark_needs_layout(root, &*self.render_tree);
     }
     self.render.resize(size);
     self.raw_window.borrow().request_redraw();
@@ -208,6 +212,8 @@ impl<R: CanvasRender> Window<R> {
   pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
 
   pub fn widget_tree(&mut self) -> Pin<&mut WidgetTree> { self.widget_tree.as_mut() }
+
+  pub fn layout_store(&self) -> &layout_store::LayoutStore { &self.layout_store }
 
   #[cfg(test)]
   pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
@@ -220,18 +226,16 @@ impl Window {
   pub(crate) fn from_event_loop(root: BoxedWidget, event_loop: &EventLoop<()>) -> Self {
     let native_window = WindowBuilder::new().build(event_loop).unwrap();
     let size = native_window.inner_size();
-    let (mut canvas, render) =
-      futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
-        &native_window,
-        DeviceSize::new(size.width, size.height),
-      ));
-    let factor = native_window.scale_factor() as f32;
-    canvas.set_default_transform(Transform::new(factor, 0., 0., factor, 0., 0.));
+    let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
+      &native_window,
+      DeviceSize::new(size.width, size.height),
+      None,
+      None,
+    ));
 
     Self::new(
       root,
       NativeWindow { native: native_window, cursor: None },
-      canvas,
       render,
     )
   }
@@ -254,13 +258,7 @@ pub struct MockRawWindow {
 }
 
 impl CanvasRender for MockRender {
-  fn draw(
-    &mut self,
-    _: &canvas::RenderData,
-    _: &mut canvas::MemTexture<u8>,
-    _: &mut canvas::MemTexture<u32>,
-  ) {
-  }
+  fn draw(&mut self, data: &RenderData, atlas_texture: &mut MemTexture<u32>) {}
 
   fn resize(&mut self, _: DeviceSize) {}
 }
@@ -280,15 +278,14 @@ impl RawWindow for MockRawWindow {
 
 impl HeadlessWindow {
   pub fn headless(root: BoxedWidget, size: DeviceSize) -> Self {
-    let (canvas, render) =
-      futures::executor::block_on(canvas::create_canvas_with_render_headless(size));
+    let (tessellator, render) =
+      futures::executor::block_on(canvas::create_canvas_with_render_headless(size, None, None));
     Self::new(
       root,
       MockRawWindow {
         size: Size::from_untyped(size.to_f32().to_untyped()),
         ..Default::default()
       },
-      canvas,
       render,
     )
   }
@@ -296,13 +293,7 @@ impl HeadlessWindow {
 
 impl NoRenderWindow {
   pub fn without_render(root: BoxedWidget, size: Size) -> Self {
-    let canvas = Canvas::new(None);
     let render = MockRender;
-    Self::new(
-      root,
-      MockRawWindow { size, ..Default::default() },
-      canvas,
-      render,
-    )
+    Self::new(root, MockRawWindow { size, ..Default::default() }, render)
   }
 }

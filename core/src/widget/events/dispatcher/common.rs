@@ -37,6 +37,8 @@ impl CommonDispatcher {
   #[inline]
   pub fn widget_tree_ref(&self) -> &WidgetTree { unsafe { self.widget_tree.as_ref() } }
 
+  pub fn layout_store(&self) -> &layout_store::LayoutStore { todo!() }
+
   pub fn dispatch_to<
     Event: std::convert::AsMut<EventCommon> + std::fmt::Debug,
     O: Observer<Item = Rc<Event>, Err = ()>,

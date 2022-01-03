@@ -1,23 +1,23 @@
-use super::{
-  painter::{PaintCommand, Painter},
-  render_tree::*,
-};
+use super::{layout_store::LayoutStore, render_tree::*};
 use crate::prelude::*;
 
 pub struct PaintingContext<'a> {
-  painter: Painter,
+  painter: &'a mut Painter,
   current_node: RenderId,
+  layout_store: &'a LayoutStore,
   tree: &'a RenderTree,
 }
 
 impl<'a> PaintingContext<'a> {
   #[inline]
-  pub(crate) fn new(tree: &'a RenderTree, transform: Transform) -> Self {
-    let mut layer_2d = Painter::new();
-    layer_2d.set_transform(transform);
-
+  pub(crate) fn new(
+    tree: &'a RenderTree,
+    painter: &'a mut Painter,
+    layout_store: &'a LayoutStore,
+  ) -> Self {
     Self {
-      painter: layer_2d,
+      painter,
+      layout_store,
       current_node: tree
         .root()
         .expect("Try to paint a uninit render tree, which root is none"),
@@ -31,16 +31,17 @@ impl<'a> PaintingContext<'a> {
   /// Return the size of the render object occupied after perform layout.
   pub fn self_size(&self) -> Option<Size> {
     self
-      .current_node
-      .layout_box_rect(self.tree)
+      .layout_store
+      .layout_box_rect(self.current_node)
       .map(|rect| rect.size)
   }
 
   /// Return an iterator of children's box rect relative to this widget.
   pub fn children_rect(&self) -> impl Iterator<Item = Rect> + '_ {
     self.current_node.children(self.tree).map(move |rid| {
-      rid
-        .layout_box_rect(self.tree)
+      self
+        .layout_store
+        .layout_box_rect(rid)
         .expect("children must already layout when paint.")
     })
   }
@@ -58,8 +59,9 @@ impl<'a> PaintingContext<'a> {
             .expect("Render object should exists when traverse the tree.");
 
           self.painter.save();
-          let offset = id
-            .layout_box_rect(&self.tree)
+          let offset = self
+            .layout_store
+            .layout_box_rect(id)
             .expect("Every widget should at its place before draw.")
             .min();
 
@@ -80,6 +82,6 @@ impl<'a> PaintingContext<'a> {
         }
       });
 
-    self.painter.commands
+    self.painter.finish()
   }
 }

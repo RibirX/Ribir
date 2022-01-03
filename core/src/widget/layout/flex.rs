@@ -210,28 +210,35 @@ impl FlexLayouter {
   fn layout(&mut self, ctx: &mut RenderCtx) -> Size {
     macro_rules! inner_layout {
       ($method: ident) => {{
-        self.children_perform(ctx.$method());
-        self.relayout_if_need(ctx.$method());
+        let (ctx, iter) = ctx.$method();
+        self.children_perform(ctx, iter);
+        let (ctx, iter) = ctx.$method();
+        self.relayout_if_need(ctx, iter);
         let size = self.box_size();
-        self.line_inner_align(ctx.$method(), size);
+        let (ctx, iter) = ctx.$method();
+        self.line_inner_align(ctx, iter, size);
         size.to_size(self.direction)
       }};
     }
     if self.reverse {
-      inner_layout!(reverse_children)
+      inner_layout!(split_rev_children_iter)
     } else {
-      inner_layout!(children)
+      inner_layout!(split_children_iter)
     }
   }
 
-  fn children_perform<'a>(&mut self, children: impl Iterator<Item = RenderCtx<'a>>) {
+  fn children_perform<'a>(
+    &mut self,
+    ctx: &mut RenderCtx,
+    children: impl Iterator<Item = RenderId>,
+  ) {
     let clamp = BoxClamp {
       max: self.max_size.to_size(self.direction),
       min: Size::zero(),
     };
 
-    children.for_each(|mut child_ctx| {
-      let size = child_ctx.perform_layout(clamp);
+    children.for_each(|child| {
+      let size = ctx.perform_child_layout(child, clamp);
       let flex_size = FlexSize::from_size(size, self.direction);
       if self.wrap
         && !self.current_line.is_empty()
@@ -239,19 +246,24 @@ impl FlexLayouter {
       {
         self.place_line();
       }
-      child_ctx.update_position(
+      ctx.update_child_position(
+        child,
         FlexSize {
           main: self.current_line.main_width,
           cross: self.current_line.cross_pos,
         }
         .to_point(self.direction),
       );
-      self.place_widget(flex_size, &child_ctx);
+      self.place_widget(flex_size, child, ctx);
     });
     self.place_line();
   }
 
-  fn relayout_if_need<'a>(&mut self, mut children: impl Iterator<Item = RenderCtx<'a>>) {
+  fn relayout_if_need<'a>(
+    &mut self,
+    ctx: &mut RenderCtx,
+    mut children: impl Iterator<Item = RenderId>,
+  ) {
     let Self {
       lines_info,
       direction,
@@ -263,9 +275,10 @@ impl FlexLayouter {
     lines_info.iter_mut().for_each(|line| {
       (0..line.child_count)
         .map(|_| children.next().unwrap())
-        .fold(0.0f32, |main_offset, mut child_ctx| {
+        .fold(0.0f32, |main_offset, child| {
           Self::obj_real_rect_with_main_start(
-            &mut child_ctx,
+            ctx,
+            child,
             line,
             main_offset,
             *direction,
@@ -279,7 +292,8 @@ impl FlexLayouter {
 
   fn line_inner_align<'a>(
     &mut self,
-    mut children: impl Iterator<Item = RenderCtx<'a>>,
+    ctx: &mut RenderCtx,
+    mut children: impl Iterator<Item = RenderId>,
     size: FlexSize,
   ) {
     let real_size = self.best_size();
@@ -316,9 +330,9 @@ impl FlexLayouter {
 
       (0..line.child_count)
         .map(|_| children.next().unwrap())
-        .fold(offset, |main_offset: f32, mut child_ctx| {
-          let rect = child_ctx
-            .box_rect()
+        .fold(offset, |main_offset: f32, child| {
+          let rect = ctx
+            .child_box_rect(child)
             .expect("relayout a expanded widget which not prepare layout");
           let mut origin = FlexSize::from_point(rect.origin, *direction);
           let child_size = FlexSize::from_size(rect.size, *direction);
@@ -330,18 +344,18 @@ impl FlexLayouter {
           };
           origin.main += main_offset;
           origin.cross += container_cross_offset + line_cross_offset;
-          child_ctx.update_position(origin.to_point(*direction));
+          ctx.update_child_position(child, origin.to_point(*direction));
           main_offset + step
         });
     });
   }
 
-  fn place_widget(&mut self, size: FlexSize, child_ctx: &RenderCtx) {
+  fn place_widget(&mut self, size: FlexSize, child: RenderId, ctx: &mut RenderCtx) {
     let mut line = &mut self.current_line;
     line.main_width += size.main;
     line.cross_line_height = line.cross_line_height.max(size.cross);
     line.child_count += 1;
-    if let Some(flex) = Self::child_flex(child_ctx) {
+    if let Some(flex) = Self::child_flex(ctx, child) {
       line.flex_sum += flex;
       line.flex_main_width += size.main;
     }
@@ -363,20 +377,21 @@ impl FlexLayouter {
   // relayout child to get the real size, and return the new offset in main axis
   // for next siblings.
   fn obj_real_rect_with_main_start(
-    child_ctx: &mut RenderCtx,
+    ctx: &mut RenderCtx,
+    child: RenderId,
     line: &mut MainLineInfo,
     main_offset: f32,
     dir: Direction,
     cross_align: CrossAxisAlign,
     max_size: FlexSize,
   ) -> f32 {
-    let pre_layout_rect = child_ctx
-      .box_rect()
+    let pre_layout_rect = ctx
+      .child_box_rect(child)
       .expect("relayout a expanded widget which not prepare layout");
 
     let pre_size = FlexSize::from_size(pre_layout_rect.size, dir);
     let mut prefer_main = pre_size.main;
-    if let Some(flex) = Self::child_flex(child_ctx) {
+    if let Some(flex) = Self::child_flex(ctx, child) {
       let remain_space = max_size.main - line.main_width + line.flex_main_width;
       prefer_main = remain_space * (flex / line.flex_sum);
       line.flex_sum -= flex;
@@ -395,10 +410,13 @@ impl FlexLayouter {
 
     let real_size = if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
       // Relayout only if the child object size may change.
-      let new_size = child_ctx.perform_layout(BoxClamp {
-        max: clamp_max.to_size(dir),
-        min: clamp_min.to_size(dir),
-      });
+      let new_size = ctx.perform_child_layout(
+        child,
+        BoxClamp {
+          max: clamp_max.to_size(dir),
+          min: clamp_min.to_size(dir),
+        },
+      );
       FlexSize::from_size(new_size, dir)
     } else {
       pre_size
@@ -412,7 +430,7 @@ impl FlexLayouter {
     let new_pos = new_pos.to_point(dir);
 
     if pre_layout_rect.origin != new_pos {
-      child_ctx.update_position(new_pos);
+      ctx.update_child_position(child, new_pos);
     }
 
     main_offset + main_diff
@@ -429,8 +447,9 @@ impl FlexLayouter {
 
   fn box_size(&self) -> FlexSize { self.best_size().clamp(self.min_size, self.max_size) }
 
-  fn child_flex(ctx: &RenderCtx) -> Option<f32> {
+  fn child_flex(ctx: &mut RenderCtx, child: RenderId) -> Option<f32> {
     ctx
+      .new_ctx(child)
       .render_obj()
       .downcast_ref::<<Expanded as RenderWidget>::RO>()
       .map(|expanded| expanded.flex)

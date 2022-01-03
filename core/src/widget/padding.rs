@@ -25,30 +25,31 @@ impl RenderWidget for Padding {
 
 impl RenderObject for Padding {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    debug_assert_eq!(ctx.children().count(), 1);
-
     let thickness = self.padding.thickness();
     let zero = Size::zero();
     let min = (clamp.min - thickness).max(zero);
     let max = (clamp.max - thickness).max(zero);
     // Shrink the clamp of child.
     let child_clamp = BoxClamp { min, max };
-    let mut child = ctx.children().next().expect("Margin must have one child");
-    let size = child.perform_layout(child_clamp);
+    let child = ctx.single_child().expect("Margin must have one child");
+    let size = ctx.perform_child_layout(child, child_clamp);
 
     // Expand the size, so the child have padding.
     let size = clamp.clamp(size + thickness);
-    child.update_size(size);
+    ctx.update_child_size(child, size);
 
     // Update child's children position, let the have a correct position after
     // expanded with padding. padding.
-    child.children().for_each(|mut c| {
-      let pos = c
+    let mut child_ctx = ctx.new_ctx(child);
+    let (child_ctx, grandson_iter) = child_ctx.split_children_iter();
+    grandson_iter.for_each(|c| {
+      let pos = child_ctx
         .box_rect()
         .expect("The grandson must performed layout")
         .origin;
-      c.update_position(pos + Vector::new(self.padding.left, self.padding.top));
+      child_ctx.update_child_position(c, pos);
     });
+
     size
   }
 

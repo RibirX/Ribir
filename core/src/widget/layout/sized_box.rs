@@ -39,11 +39,8 @@ impl RenderWidget for SizedBox {
 impl RenderObject for SizedBox {
   fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let size = clamp.clamp(self.size);
-    let mut child_iter = ctx.children();
-    let child = child_iter.next();
-    debug_assert!(child_iter.next().is_none());
-    if let Some(mut child_ctx) = child {
-      child_ctx.perform_layout(BoxClamp { min: size, max: size });
+    if let Some(child) = ctx.single_child() {
+      ctx.perform_child_layout(child, BoxClamp { min: size, max: size });
     }
     size
   }

@@ -1,4 +1,4 @@
-pub use painter::Path;
+use crate::prelude::*;
 
 impl RenderWidget for Path {
   type RO = Self;

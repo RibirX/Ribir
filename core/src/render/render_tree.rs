@@ -1,11 +1,8 @@
 use crate::{prelude::*, widget::widget_tree::*};
-use canvas::Canvas;
 use indextree::*;
-use std::{
-  cmp::Reverse,
-  collections::{BinaryHeap, HashMap},
-  pin::Pin,
-};
+use std::collections::HashMap;
+
+use super::layout_store::LayoutStore;
 
 /// The id of the render object. Should not hold it.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -22,19 +19,6 @@ pub struct BoxClamp {
   pub max: Size,
 }
 
-/// render object's layout box, the information about layout, including box
-/// size, box position, and the clamp of render object layout.
-#[derive(Debug, Default)]
-pub struct BoxLayout {
-  /// Box bound is the bound of the layout can be place. it will be set after
-  /// render object computing its layout. It's passed by render object's parent.
-  pub clamp: BoxClamp,
-  /// The position and size render object to place, relative to its parent
-  /// coordinate. Some value after the relative render object has been layout,
-  /// otherwise is none value.
-  pub rect: Option<Rect>,
-}
-
 #[derive(Default)]
 pub struct RenderTree {
   arena: Arena<Box<dyn RenderObject>>,
@@ -42,12 +26,6 @@ pub struct RenderTree {
   /// A hash map to mapping a render object in render tree to its corresponds
   /// render widget in widget tree.
   render_to_widget: HashMap<RenderId, WidgetId>,
-  /// Store the render object's place relative to parent coordinate and the
-  /// clamp passed from parent.
-  layout_info: HashMap<RenderId, BoxLayout>,
-  /// root of sub tree which needed to perform layout, store as min-head by the
-  /// node's depth.
-  needs_layout: BinaryHeap<Reverse<(usize, RenderId)>>,
 }
 
 impl BoxClamp {
@@ -80,68 +58,52 @@ impl RenderTree {
     rid
   }
 
-  /// Do the work of computing the layout for all node which need, always layout
-  /// from the root to leaf. Return if any node has really computing the layout.
-  pub fn layout(&mut self, win_size: Size, mut canvas: Pin<&mut Canvas>) -> bool {
-    let needs_layout = self.needs_layout.clone();
-    needs_layout.iter().for_each(|Reverse((_depth, rid))| {
-      let clamp = rid
-        .layout_clamp(self)
-        .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
-      rid.perform_layout(clamp, canvas.as_mut(), unsafe { Pin::new_unchecked(self) });
-    });
-
-    self.needs_layout.clear();
-    !needs_layout.is_empty()
-  }
-
   #[cfg(test)]
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
 
   #[cfg(test)]
   pub fn layout_info(&self) -> &HashMap<RenderId, BoxLayout> { &self.layout_info }
-
-  fn push_relayout_sub_root(&mut self, rid: RenderId) {
-    self
-      .needs_layout
-      .push(std::cmp::Reverse((rid.ancestors(self).count(), rid)));
-  }
 }
 
 impl RenderId {
   /// Translates the global window coordinate pos to widget coordinates.
-  pub fn map_to_global(self, pos: Point, tree: &RenderTree) -> Point {
+  pub fn map_to_global(self, pos: Point, tree: &RenderTree, layout_infos: &LayoutStore) -> Point {
     self
       .ancestors(&tree)
-      .fold(pos, |pos, id| id.map_to_parent(pos, &tree))
+      .fold(pos, |pos, id| id.map_to_parent(pos, &tree, layout_infos))
   }
 
   /// Translates the global screen coordinate pos to widget coordinates.
-  pub fn map_from_global(self, pos: Point, tree: &RenderTree) -> Point {
+  pub fn map_from_global(self, pos: Point, tree: &RenderTree, layout_infos: &LayoutStore) -> Point {
     self
       .ancestors(tree)
-      .fold(pos, |pos, id| id.map_from_parent(pos, &tree))
+      .fold(pos, |pos, id| id.map_from_parent(pos, &tree, layout_infos))
   }
 
   /// Translates the render object coordinate pos to the coordinate system of
   /// `parent`.
-  pub fn map_to_parent(self, mut pos: Point, tree: &RenderTree) -> Point {
+  pub fn map_to_parent(
+    self,
+    mut pos: Point,
+    tree: &RenderTree,
+    layout_infos: &LayoutStore,
+  ) -> Point {
     let obj = self.get(tree).expect("Access a invalid render object");
 
     if let Some(t) = obj.transform() {
       pos = t.transform_point(pos);
     }
 
-    self
-      .layout_box_rect(tree)
+    layout_infos
+      .layout_box_rect(self)
       .map_or(pos, |rect| pos + rect.min().to_vector())
   }
 
   /// Translates the render object coordinate pos from the coordinate system of
   /// parent to this render object coordinate system.
-  pub fn map_from_parent(self, pos: Point, tree: &RenderTree) -> Point {
-    let pos = self
-      .layout_box_rect(tree)
+  pub fn map_from_parent(self, pos: Point, tree: &RenderTree, layout_infos: &LayoutStore) -> Point {
+    let pos = layout_infos
+      .layout_box_rect(self)
       .map_or(pos, |rect| pos - rect.min().to_vector());
 
     let obj = self.get(tree).expect("Access a invalid render object");
@@ -154,21 +116,33 @@ impl RenderId {
   /// Translates the render object coordinate pos to the coordinate system of
   /// `ancestor`. The `ancestor` must be a ancestor of the calling render
   /// object.
-  pub fn map_to(self, pos: Point, ancestor: RenderId, tree: &RenderTree) -> Point {
+  pub fn map_to(
+    self,
+    pos: Point,
+    ancestor: RenderId,
+    tree: &RenderTree,
+    layout_infos: &LayoutStore,
+  ) -> Point {
     self
       .ancestors(&tree)
       .take_while(|id| *id == ancestor)
-      .fold(pos, |pos, id| id.map_to_parent(pos, &tree))
+      .fold(pos, |pos, id| id.map_to_parent(pos, &tree, layout_infos))
   }
 
   /// Translates the render object coordinate pos from the coordinate system of
   /// ancestor to this render object coordinate system. The parent must be a
   /// parent of the calling render object.
-  pub fn map_from(self, pos: Point, ancestor: RenderId, tree: &RenderTree) -> Point {
+  pub fn map_from(
+    self,
+    pos: Point,
+    ancestor: RenderId,
+    tree: &RenderTree,
+    layout_infos: &LayoutStore,
+  ) -> Point {
     self
       .ancestors(&tree)
       .take_while(|id| *id == ancestor)
-      .fold(pos, |pos, id| id.map_from_parent(pos, &tree))
+      .fold(pos, |pos, id| id.map_from_parent(pos, &tree, layout_infos))
   }
 
   /// Returns a reference to the node data.
@@ -223,17 +197,15 @@ impl RenderId {
   }
 
   /// Drop the subtree
-  pub(crate) fn drop(self, tree: &mut RenderTree) {
-    let RenderTree {
-      render_to_widget, arena, layout_info, ..
-    } = tree;
+  pub(crate) fn drop(self, tree: &mut RenderTree, layout_info: &mut layout_store::LayoutStore) {
+    let RenderTree { render_to_widget, arena, .. } = tree;
     self.0.descendants(arena).for_each(|id| {
       let rid = RenderId(id);
       render_to_widget.remove(&rid);
-      layout_info.remove(&rid);
+      layout_info.remove(rid);
     });
 
-    tree.layout_info.remove(&self);
+    layout_info.remove(self);
     self.0.remove_subtree(&mut tree.arena);
     if tree.root == Some(self) {
       tree.root = None;
@@ -242,77 +214,6 @@ impl RenderId {
 
   pub(crate) fn relative_to_widget(&self, tree: &RenderTree) -> Option<WidgetId> {
     tree.render_to_widget.get(&self).copied()
-  }
-
-  pub(crate) fn layout_clamp(self, tree: &RenderTree) -> Option<BoxClamp> {
-    tree.layout_info.get(&self).map(|info| info.clamp)
-  }
-
-  pub(crate) fn layout_box_rect(self, tree: &RenderTree) -> Option<Rect> {
-    tree.layout_info.get(&self).and_then(|info| info.rect)
-  }
-
-  pub(crate) fn layout_clamp_mut(self, tree: &mut RenderTree) -> &mut BoxClamp {
-    &mut self.layout_info_mut(&mut tree.layout_info).clamp
-  }
-
-  pub(crate) fn layout_box_rect_mut(self, tree: &mut RenderTree) -> &mut Rect {
-    self
-      .layout_info_mut(&mut tree.layout_info)
-      .rect
-      .get_or_insert_with(Rect::zero)
-  }
-
-  pub(crate) fn mark_needs_layout(self, tree: &mut RenderTree) {
-    if self.layout_box_rect(tree).is_some() {
-      let mut relayout_root = self;
-      let RenderTree { arena, layout_info, .. } = tree;
-      // All ancestors of this render object should relayout until the one which only
-      // sized by parent.
-      self.0.ancestors(arena).all(|id| {
-        let rid = RenderId(id);
-        layout_info.remove(&rid);
-        relayout_root = rid;
-
-        let sized_by_parent = arena
-          .get(id)
-          .map_or(false, |node| node.get().only_sized_by_parent());
-
-        !sized_by_parent
-      });
-      tree.push_relayout_sub_root(relayout_root);
-    } else {
-      tree.push_relayout_sub_root(self);
-    }
-  }
-
-  pub(crate) fn perform_layout(
-    self,
-    clamp: BoxClamp,
-    canvas: Pin<&mut Canvas>,
-    mut tree: Pin<&mut RenderTree>,
-  ) -> Size {
-    let lay_outed = self.layout_box_rect(&*tree);
-    match lay_outed {
-      Some(rect) if self.layout_clamp(&*tree) == Some(clamp) => rect.size,
-      _ => {
-        // Safety: only split tree from ctx to access the render object instance.
-        let tree_mut = unsafe {
-          let ptr = tree.as_mut().get_unchecked_mut() as *mut RenderTree;
-          &mut *ptr
-        };
-        let size = self
-          .get_mut(tree_mut)
-          .perform_layout(clamp, &mut RenderCtx::new(tree, canvas, self));
-        *self.layout_clamp_mut(tree_mut) = clamp;
-        self.layout_box_rect_mut(tree_mut).size = size;
-        size
-      }
-    }
-  }
-
-  fn layout_info_mut(self, layout_info: &mut HashMap<RenderId, BoxLayout>) -> &mut BoxLayout {
-    layout_info.entry(self).or_insert_with(BoxLayout::default)
   }
 }
 

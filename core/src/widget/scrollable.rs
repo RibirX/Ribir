@@ -1,4 +1,8 @@
-use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
+use crate::{
+  prelude::{layout_store::LayoutStore, *},
+  render::render_tree::RenderTree,
+  widget::widget_tree::WidgetTree,
+};
 
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
@@ -94,13 +98,12 @@ macro scroll_render_widget_impl($widget: ty, $state: ty) {
   impl RenderObject for $widget {
     #[inline]
     fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-      debug_assert_eq!(ctx.children().count(), 1);
       let size = clamp.max;
-      if let Some(mut child) = ctx.children().next() {
+      if let Some(child) = ctx.single_child() {
         let content_clamp = self.content_clamp(clamp);
-        let content = child.perform_layout(content_clamp);
+        let content = ctx.perform_child_layout(child, content_clamp);
         let pos = self.content_pos(content, &size);
-        child.update_position(pos);
+        ctx.update_child_position(child, pos);
       }
 
       size
@@ -172,18 +175,29 @@ impl ScrollWorker for ScrollableBoth {
 }
 
 fn view_content(event: &WheelEvent) -> (Rect, Rect) {
-  fn widget_rect(wid: WidgetId, tree: &WidgetTree, r_tree: &RenderTree) -> Rect {
+  fn widget_rect(
+    wid: WidgetId,
+    tree: &WidgetTree,
+    r_tree: &RenderTree,
+    layout_store: &LayoutStore,
+  ) -> Rect {
     wid
       .relative_to_render(tree)
-      .and_then(|rid| rid.layout_box_rect(r_tree))
+      .and_then(|rid| layout_store.layout_box_rect(rid))
       .unwrap_or_else(Rect::zero)
   }
 
   let w_tree = event.widget_tree();
   let r_tree = event.render_tree();
   let target = event.current_target();
-  let view = widget_rect(target, w_tree, r_tree);
-  let content = widget_rect(target.first_child(w_tree).unwrap(), w_tree, r_tree);
+  let layout_store = event.common.layout_store();
+  let view = widget_rect(target, w_tree, r_tree, layout_store);
+  let content = widget_rect(
+    target.first_child(w_tree).unwrap(),
+    w_tree,
+    r_tree,
+    layout_store,
+  );
   (view, content)
 }
 

@@ -4,9 +4,8 @@
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
 pub mod material;
-pub use super::path::{Builder, Path};
-pub use canvas::{Color, Point};
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+pub use painter::*;
 
 use super::CowRc;
 

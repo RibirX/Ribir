@@ -32,10 +32,7 @@ impl RenderWidget for Text {
 
 impl RenderObject for Text {
   #[inline]
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let rc = ctx.measure_text(&self.text);
-    clamp.clamp(rc.size)
-  }
+  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size { unimplemented!() }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }

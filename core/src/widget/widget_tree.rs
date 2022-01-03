@@ -7,6 +7,8 @@ use std::{
   ptr::NonNull,
 };
 
+use super::layout_store::LayoutStore;
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 #[derive(Default)]
@@ -37,15 +39,20 @@ impl WidgetTree {
   #[inline]
   pub fn root(&self) -> Option<WidgetId> { self.root }
 
-  pub fn set_root(&mut self, root: BoxedWidget, r_tree: &mut RenderTree) -> WidgetId {
+  pub fn set_root(
+    &mut self,
+    root: BoxedWidget,
+    r_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
+  ) -> WidgetId {
     debug_assert!(self.root.is_none());
 
     let temp = self.new_node(WidgetNode::Combination(Box::new(TempHold)));
-    let root = self.inflate(root, temp, r_tree);
+    let root = self.inflate(root, temp, r_tree, layout_store);
     temp.0.remove(&mut self.arena);
     root.detach(self);
     self.root = Some(root);
-    self.ensure_render_tree_root(r_tree);
+    self.ensure_render_tree_root(r_tree, layout_store);
 
     self.notify_state_change_until_empty();
 
@@ -100,6 +107,7 @@ impl WidgetTree {
     widget: BoxedWidget,
     parent: WidgetId,
     r_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
   ) -> WidgetId {
     let r_parent = parent
       .up_nearest_render_widget(self)
@@ -144,21 +152,21 @@ impl WidgetTree {
       .relative_to_render(self)
       .unwrap();
 
-    r_root.mark_needs_layout(r_tree);
+    layout_store.mark_needs_layout(r_root, &r_tree);
 
     w_root
   }
 
   /// Check all the need build widgets and update the widget tree to what need
   /// build widgets want it to be. Return if any node really rebuild or updated.
-  pub fn repair(&mut self, r_tree: &mut RenderTree) -> bool {
+  pub fn repair(&mut self, r_tree: &mut RenderTree, layout_store: &mut LayoutStore) -> bool {
     let repaired = !self.need_builds.is_empty() || !self.changed_widgets.is_empty();
     while let Some(need_build) = self.pop_need_build_widget() {
-      self.repair_subtree(need_build, r_tree)
+      self.repair_subtree(need_build, r_tree, layout_store)
     }
 
-    self.ensure_render_tree_root(r_tree);
-    self.flush_to_render(r_tree);
+    self.ensure_render_tree_root(r_tree, layout_store);
+    self.flush_to_render(r_tree, layout_store);
     repaired
   }
 
@@ -177,7 +185,7 @@ impl WidgetTree {
   #[cfg(test)]
   pub fn count(&self) -> usize { self.arena.count() }
 
-  fn ensure_render_tree_root(&self, r_tree: &mut RenderTree) {
+  fn ensure_render_tree_root(&self, r_tree: &mut RenderTree, layout_store: &mut LayoutStore) {
     if r_tree.root().is_none() {
       let r_root = self
         .root()
@@ -186,7 +194,7 @@ impl WidgetTree {
         .relative_to_render(self)
         .unwrap();
       r_tree.set_root(r_root);
-      r_root.mark_needs_layout(r_tree);
+      layout_store.mark_needs_layout(r_root, r_tree);
     }
   }
 
@@ -208,7 +216,7 @@ impl WidgetTree {
   }
 
   /// Tell the render object its owner changed one by one.
-  fn flush_to_render(&mut self, render_tree: &mut RenderTree) {
+  fn flush_to_render(&mut self, render_tree: &mut RenderTree, layout_store: &mut LayoutStore) {
     // Safety: just split render_tree as two to update render object, never modify
     // the render tree's struct.
     let (r_tree1, r_tree2) = unsafe {
@@ -228,7 +236,10 @@ impl WidgetTree {
         WidgetNode::Render(r) => r,
       };
 
-      safety.update_render_object(rid.get_mut(r_tree1), &mut UpdateCtx::new(rid, r_tree2));
+      safety.update_render_object(
+        rid.get_mut(r_tree1),
+        &mut UpdateCtx::new(rid, r_tree2, layout_store),
+      );
     });
 
     self.changed_widgets.clear();
@@ -243,16 +254,22 @@ impl WidgetTree {
     child: BoxedWidget,
     child_stack: &mut Vec<(BoxedWidget, WidgetId)>,
     r_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
   ) -> bool {
     if let Some(new_id) = new_wid {
-      self.inflate(child, new_id, r_tree);
+      self.inflate(child, new_id, r_tree, layout_store);
     } else {
       child_stack.push((child, old.single_child(self)));
     }
     new_wid.is_some()
   }
 
-  fn repair_subtree(&mut self, sub_tree: WidgetId, r_tree: &mut RenderTree) {
+  fn repair_subtree(
+    &mut self,
+    sub_tree: WidgetId,
+    r_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
+  ) {
     let c = match sub_tree.assert_get(self) {
       WidgetNode::Combination(c) => c,
       WidgetNode::Render(_) => unreachable!("rebuild widget must be combination widget."),
@@ -266,38 +283,38 @@ impl WidgetTree {
       match w {
         BoxedWidget::Combination(c) => {
           let c_ptr = &*c as *const dyn CombinationWidget;
-          let new_wid = self.update_widget(WidgetNode::Combination(c), wid, r_tree);
+          let new_wid = self.update_widget(WidgetNode::Combination(c), wid, r_tree, layout_store);
           let child = unsafe { &*c_ptr }.build_child(wid, self);
 
-          self.try_inflate_child_or_push(wid, new_wid, child, &mut stack, r_tree);
+          self.try_inflate_child_or_push(wid, new_wid, child, &mut stack, r_tree, layout_store);
         }
         BoxedWidget::Render(r) => {
-          self.update_widget(WidgetNode::Render(r), wid, r_tree);
+          self.update_widget(WidgetNode::Render(r), wid, r_tree, layout_store);
         }
         BoxedWidget::SingleChild(s) => {
           let (r, child) = s.unzip();
-          let new_wid = self.update_widget(WidgetNode::Render(r), wid, r_tree);
-          self.try_inflate_child_or_push(wid, new_wid, child, &mut stack, r_tree);
+          let new_wid = self.update_widget(WidgetNode::Render(r), wid, r_tree, layout_store);
+          self.try_inflate_child_or_push(wid, new_wid, child, &mut stack, r_tree, layout_store);
         }
         BoxedWidget::MultiChild(m) => {
           let (r, children) = m.unzip();
-          let new_id = self.update_widget(WidgetNode::Render(r), wid, r_tree);
+          let new_id = self.update_widget(WidgetNode::Render(r), wid, r_tree, layout_store);
           if let Some(new_id) = new_id {
             children.into_iter().for_each(|c| {
-              self.inflate(c, new_id, r_tree);
+              self.inflate(c, new_id, r_tree, layout_store);
             })
           } else {
-            let mut key_children = self.collect_key_children(wid, r_tree);
+            let mut key_children = self.collect_key_children(wid, r_tree, layout_store);
             children.into_iter().for_each(|c| {
               let k_widget = c.get_key().and_then(|k| key_children.remove(&*k));
               if let Some(id) = k_widget {
                 wid.0.append(id.0, &mut self.arena);
               }
-              self.try_inflate_child_or_push(wid, k_widget, c, &mut stack, r_tree);
+              self.try_inflate_child_or_push(wid, k_widget, c, &mut stack, r_tree, layout_store);
             });
             key_children
               .into_iter()
-              .for_each(|(_, v)| v.drop_subtree(self, r_tree));
+              .for_each(|(_, v)| v.drop_subtree(self, r_tree, layout_store));
           }
         }
       }
@@ -311,6 +328,7 @@ impl WidgetTree {
     w: WidgetNode,
     id: WidgetId,
     r_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
   ) -> Option<WidgetId> {
     self.need_builds.remove(&id);
     let old = id.assert_get_mut(self);
@@ -324,7 +342,7 @@ impl WidgetTree {
       None
     } else {
       let parent = id.parent(&self).expect("parent should exists!");
-      id.drop_subtree(self, r_tree);
+      id.drop_subtree(self, r_tree, layout_store);
       let wid = match w {
         WidgetNode::Combination(_) => parent.append_widget(w, self),
         WidgetNode::Render(r) => {
@@ -345,6 +363,7 @@ impl WidgetTree {
     &mut self,
     wid: WidgetId,
     r_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
   ) -> HashMap<Key, WidgetId> {
     let mut key_children = HashMap::new();
     let mut child = wid.first_child(self);
@@ -356,7 +375,7 @@ impl WidgetTree {
         id.detach(self);
         key_children.insert(key, id);
       } else {
-        id.drop_subtree(self, r_tree);
+        id.drop_subtree(self, r_tree, layout_store);
       }
     }
     key_children
@@ -484,7 +503,12 @@ impl WidgetId {
   }
 
   /// Drop the subtree
-  fn drop_subtree(self, tree: &mut WidgetTree, render_tree: &mut RenderTree) {
+  fn drop_subtree(
+    self,
+    tree: &mut WidgetTree,
+    render_tree: &mut RenderTree,
+    layout_store: &mut LayoutStore,
+  ) {
     let rid = self
       .down_nearest_render_widget(tree)
       .relative_to_render(tree)
@@ -498,7 +522,7 @@ impl WidgetId {
       wid.clear_info(tree2);
     });
 
-    rid.drop(render_tree);
+    rid.drop(render_tree, layout_store);
     self.0.remove_subtree(&mut tree.arena);
     self.0.detach(&mut tree.arena);
     if tree.root == Some(self) {

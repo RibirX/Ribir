@@ -7,6 +7,7 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+algo = {path = "../algo"}
 bitflags = "1.2.1"
 canvas = {path = "../canvas", version = "*"}
 fontdb = "0.7.0"

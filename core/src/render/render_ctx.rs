@@ -1,117 +1,142 @@
+use super::layout_store::{BoxLayout, LayoutStore};
 use crate::render::render_tree::*;
 use crate::render::*;
-use canvas::{Canvas, FontInfo, Rect, Text};
-use std::pin::Pin;
 
 /// A place to compute the render object's layout. Rather than holding children
 /// directly, `RenderObject` perform layout across `RenderCtx`. `RenderCtx`
 /// provide method to perform layout and also provides methods to access the
 /// `RenderCtx` of the children.
 pub struct RenderCtx<'a> {
-  tree: Pin<&'a mut RenderTree>,
-  canvas: Pin<&'a mut Canvas>,
-  /// the render id of current render object.
-  render_obj: RenderId,
+  r_tree: &'a mut RenderTree,
+  /// current render object id.
+  rid: RenderId,
+  layout_store: &'a mut LayoutStore,
 }
 
 impl<'a> RenderCtx<'a> {
   #[inline]
   pub(crate) fn new(
-    tree: Pin<&'a mut RenderTree>,
-    canvas: Pin<&'a mut Canvas>,
-    current: RenderId,
+    rid: RenderId,
+    tree: &'a mut RenderTree,
+    layout_store: &'a mut LayoutStore,
   ) -> RenderCtx<'a> {
-    RenderCtx { tree, canvas, render_obj: current }
+    RenderCtx { r_tree: tree, rid, layout_store }
+  }
+
+  /// Return the boxed rect of the RenderObject already placed.
+  #[inline]
+  pub fn box_rect(&self) -> Option<Rect> { self.layout_store.layout_box_rect(self.rid) }
+
+  /// Update the position of the child render object should place. Relative to
+  /// parent.
+  #[inline]
+  pub fn update_child_position(&mut self, child: RenderId, pos: Point) {
+    debug_assert!(self.is_child(child));
+    self.layout_store.layout_box_rect_mut(child).origin = pos;
+  }
+
+  /// Update the size of the child render object should place. Use this method
+  /// to directly change the size of a render object, in most cast you needn't
+  /// call this method, use  clamp to limit the child size is enough. Use this
+  /// method only it you know what you are doing.
+
+  #[inline]
+  pub fn update_child_size(&mut self, child: RenderId, size: Size) {
+    debug_assert!(self.is_child(child));
+    self.layout_store.layout_box_rect_mut(child).size = size;
+  }
+
+  /// Return the boxed rect of the child render object already placed.
+  #[inline]
+  pub fn child_box_rect(&self, child: RenderId) -> Option<Rect> {
+    debug_assert!(self.is_child(child));
+    self.layout_store.layout_box_rect(child)
+  }
+
+  /// Do the work of computing the layout for child object, and return the
+  /// render object box size. Should called from parent.
+  pub fn perform_child_layout(&mut self, child: RenderId, clamp: BoxClamp) -> Size {
+    debug_assert!(self.is_child(child));
+    let rid = self.rid;
+    self.rid = child;
+    let size = self.perform_layout(clamp);
+    self.rid = rid;
+    size
+  }
+
+  /// Return the single child, panic if have more than once child.
+  pub fn single_child(&mut self) -> Option<RenderId> {
+    let mut iter = self.rid.children(self.r_tree);
+    let child = iter.next();
+    assert!(iter.next().is_none(), "Not only once child.");
+    child
+  }
+
+  #[cfg(debug_assertions)]
+  fn is_child(&self, child: RenderId) -> bool {
+    child.ancestors(self.r_tree).find(|r| r == &child).is_some()
   }
 
   /// Return the render id of the render object this context standard for.
   #[inline]
-  pub fn render_id(&self) -> RenderId { self.render_obj }
+  pub fn render_id(&self) -> RenderId { self.rid }
 
-  /// Return an iterator of children's `RenderCtx`
-  pub fn children(&mut self) -> impl Iterator<Item = RenderCtx> + '_ {
-    // Safety: only split the lifetime for children one by one, and `RenderCtx` will
-    // not provide method to change the render tree.
-    let (tree_ptr, canvas_ptr) = unsafe {
-      let tree_ptr = self.tree.as_mut().get_unchecked_mut() as *mut _;
-      let canvas_ptr = self.canvas.as_mut().get_unchecked_mut() as *mut _;
-      (tree_ptr, canvas_ptr)
-    };
+  #[inline]
+  pub fn render_tree(&self) -> &RenderTree { &self.r_tree }
 
-    self
-      .render_obj
-      .children(&*self.tree)
-      .map(move |rid| RenderCtx {
-        render_obj: rid,
-        tree: unsafe { Pin::new_unchecked(&mut *tree_ptr) },
-        canvas: unsafe { Pin::new_unchecked(&mut *canvas_ptr) },
-      })
+  /// Return a tuple of [`RenderCtx`]! and  an iterator of children, so you can
+  /// avoid the lifetime problem when precess on child.
+  pub fn split_children_iter(&mut self) -> (&mut Self, impl Iterator<Item = RenderId> + '_) {
+    let rid = self.rid;
+    let (ctx, tree) = self.split_r_tree();
+    (ctx, rid.children(tree))
   }
 
-  /// Returns an iterator of RenderId of this RenderObject’s children, in
-  /// reverse order.
-  pub fn reverse_children(&mut self) -> impl Iterator<Item = RenderCtx> + '_ {
-    // Safety: only split the lifetime for children one by one.
-    let (tree_ptr, canvas_ptr) = unsafe {
-      let tree_ptr = self.tree.as_mut().get_unchecked_mut() as *mut _;
-      let canvas_ptr = self.canvas.as_mut().get_unchecked_mut() as *mut _;
-      (tree_ptr, canvas_ptr)
-    };
-
-    self
-      .render_obj
-      .reverse_children(&*self.tree)
-      .map(move |rid| RenderCtx {
-        render_obj: rid,
-        tree: unsafe { Pin::new_unchecked(&mut *tree_ptr) },
-        canvas: unsafe { Pin::new_unchecked(&mut *canvas_ptr) },
-      })
+  /// Return a tuple of [`RenderCtx`]! and  an reverse iterator of children, so
+  /// you can avoid the lifetime problem when precess on child.
+  pub fn split_rev_children_iter(&mut self) -> (&mut Self, impl Iterator<Item = RenderId> + '_) {
+    let rid = self.rid;
+    let (ctx, tree) = self.split_r_tree();
+    (ctx, rid.reverse_children(tree))
   }
 
-  /// Update the position of the render object should place. Relative to parent.
-  pub fn update_position(&mut self, pos: Point) {
-    self
-      .render_obj
-      .layout_box_rect_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
-      .origin = pos;
+  pub fn new_ctx(&mut self, other: RenderId) -> RenderCtx {
+    RenderCtx {
+      r_tree: &mut self.r_tree,
+      rid: other,
+      layout_store: &mut self.layout_store,
+    }
   }
-
-  /// Update the size of the render object should place. Use this method to
-  /// directly change the size of a render object, in most cast you needn't call
-  /// this method, use  clamp to limit the child size is enough. Use this method
-  /// only it you know what you are doing.
-  pub fn update_size(&mut self, size: Size) {
-    self
-      .render_obj
-      .layout_box_rect_mut(unsafe { self.tree.as_mut().get_unchecked_mut() })
-      .size = size;
-  }
-
-  /// Return the boxed rect of the RenderObject already placed.
-  pub fn box_rect(&self) -> Option<Rect> { self.render_obj.layout_box_rect(&*self.tree) }
 
   /// Return render object of this context.
   pub(crate) fn render_obj(&self) -> &dyn RenderObject {
     self
-      .render_obj
-      .get(&*self.tree)
+      .rid
+      .get(&*self.r_tree)
       .expect("The render object of this context is not exist.")
   }
 
-  /// Do the work of computing the layout for this render object, and return the
-  /// render object box size. Should called from parent.
-  pub fn perform_layout(&mut self, clamp: BoxClamp) -> Size {
-    self
-      .render_obj
-      .perform_layout(clamp, self.canvas.as_mut(), self.tree.as_mut())
+  /// Perform layout if need, not a public api
+  pub(crate) fn perform_layout(&mut self, out_clamp: BoxClamp) -> Size {
+    match self.layout_store.layout_info(self.rid) {
+      Some(BoxLayout { clamp, rect: Some(rect) }) if &out_clamp == clamp => rect.size,
+      _ => {
+        let (ctx, r_tree) = self.split_r_tree();
+        let size = ctx.rid.get_mut(r_tree).perform_layout(out_clamp, ctx);
+
+        let info = self.layout_store.layout_info_or_default(self.rid);
+        info.clamp = out_clamp;
+        info.rect.get_or_insert_with(Rect::zero).size = size;
+        size
+      }
+    }
   }
 
-  // mesure test bound
-  // todo support custom font
-  pub fn measure_text(&mut self, text: &str) -> Rect {
-    let font = FontInfo::default();
-    self
-      .canvas
-      .mesure_text(&Text { text, font_size: 14.0, font })
+  fn split_r_tree(&mut self) -> (&mut Self, &mut RenderTree) {
+    // Safety: split `RenderTree` as two mutable reference is safety, because it's a
+    // private inner mutable and promise export only use to access inner object and
+    // never modify the tree struct by this reference.
+    let r_tree = unsafe { &mut *(self.r_tree as *mut RenderTree) };
+    (self, r_tree)
   }
 }

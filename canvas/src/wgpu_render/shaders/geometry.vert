@@ -15,7 +15,6 @@ struct Primitive {
 
 
 layout(location=0) in vec2 pos;
-layout(location=1) in vec2 font_tex_pos;
 layout(location=2) in uint prim_id;
 
 layout(set=0, binding=0) 

@@ -3,12 +3,12 @@ pub mod render_ctx;
 use crate::prelude::*;
 pub use painting_context::*;
 use std::any::{Any, TypeId};
-pub mod painter;
 mod painting_context;
 pub mod render_tree;
 pub mod update_ctx;
 pub use render_tree::{BoxClamp, RenderId};
 pub use update_ctx::UpdateCtx;
+pub(crate) mod layout_store;
 
 /// The `Owner` is the render widget which created this object.
 pub trait RenderObject: Any {

@@ -24,5 +24,5 @@ void main() {
     f_color = texture(sampler2D(t_atals, s_sampler), tex_pos);
 
     // rbga fomat texture store in a Bgra8UnormSrgb texture.
-    f_color = vec4(f_color.b, f_color.g, f_color.r, f_color.a);
+    f_color = vec4(f_color.b, f_color.g, f_color.r, 1);
 }

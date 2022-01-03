@@ -15,7 +15,7 @@ extern crate lazy_static;
 extern crate widget_derive;
 
 mod application;
-mod cow_rc;
+
 pub mod declare;
 mod render;
 pub mod widget;
@@ -23,7 +23,6 @@ pub mod widget;
 pub mod prelude {
   #[doc(no_inline)]
   pub use crate::application::Application;
-  pub use crate::cow_rc::CowRc;
   #[doc(no_inline)]
   pub use crate::declare::{Declare, DeclareBuilder};
   #[doc(no_inline)]
@@ -33,7 +32,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget::{build_ctx::BuildCtx, widget_tree::WidgetId, *};
   #[doc(no_inline)]
-  pub use canvas::prelude::*;
+  pub use algo::CowRc;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   #[doc(no_inline)]
@@ -43,6 +42,8 @@ pub mod prelude {
     declare, stateful, CombinationWidget, Declare, MultiChildWidget, RenderWidget,
     SingleChildWidget,
   };
+  #[doc(no_inline)]
+  pub use ::painter::*;
 }
 
 pub mod test;

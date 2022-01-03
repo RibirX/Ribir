@@ -47,7 +47,6 @@ pub struct Primitive {
 #[derive(Copy, Clone, Debug, AsBytes)]
 pub struct Vertex {
   pub pixel_coords: [f32; 2],
-  pub texture_coords: [f32; 2],
   pub prim_id: u32,
 }
 

@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use super::{CommonDispatcher, FocusManager};
+use crate::render::layout_store::LayoutStore;
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta};
@@ -64,6 +65,7 @@ impl PointerDispatcher {
               tap_on,
               common.widget_tree_ref(),
               common.render_tree_ref(),
+              common.layout_store(),
             );
 
             self.bubble_pointer_from(PointerEventType::Tap, common, (tap_on, tap_pos));
@@ -147,6 +149,7 @@ impl PointerDispatcher {
           e.target(),
           common.widget_tree_ref(),
           common.render_tree_ref(),
+          common.layout_store(),
         );
         last_bubble_from = wid;
       },
@@ -167,7 +170,12 @@ impl PointerDispatcher {
             .ancestors(tree)
             .any(|w| Some(w) == new_hit.as_ref().map(|h| h.0))
         {
-          let old_pos = w.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
+          let old_pos = w.map_from_global(
+            self.cursor_pos,
+            tree,
+            common.render_tree_ref(),
+            common.layout_store(),
+          );
           let event = self.mouse_pointer(*w, old_pos, common);
           common.dispatch_to(
             *w,
@@ -198,7 +206,12 @@ impl PointerDispatcher {
         .rev()
         .filter(|w| !already_entered.iter().any(|e| e != *w))
         .for_each(|w| {
-          let old_pos = w.map_from_global(self.cursor_pos, tree, common.render_tree_ref());
+          let old_pos = w.map_from_global(
+            self.cursor_pos,
+            tree,
+            common.render_tree_ref(),
+            common.layout_store(),
+          );
           let event = self.mouse_pointer(*w, old_pos, common);
           common.dispatch_to(
             *w,
@@ -218,24 +231,27 @@ impl PointerDispatcher {
       id: RenderId,
       pos: Point,
       tree: &RenderTree,
+      layout_store: &LayoutStore,
     ) -> Option<(RenderId, Point)> {
-      id.layout_box_rect(tree)
+      layout_store
+        .layout_box_rect(id)
         // check if contain the position
         .filter(|rect| rect.contains(pos))
-        .map(|_| (id, id.map_from_parent(pos, tree)))
+        .map(|_| (id, id.map_from_parent(pos, tree, layout_store)))
     }
 
     let r_tree = common.render_tree_ref();
+    let layout_store = common.layout_store();
     let mut current = r_tree
       .root()
-      .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree));
+      .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree, layout_store));
     let mut hit = None;
 
     while let Some((rid, pos)) = current {
       hit = current;
       current = rid
         .reverse_children(&r_tree)
-        .find_map(|rid| down_coordinate_to(rid, pos, &r_tree));
+        .find_map(|rid| down_coordinate_to(rid, pos, &r_tree, layout_store));
     }
 
     hit.and_then(|(rid, pos)| {
@@ -247,16 +263,29 @@ impl PointerDispatcher {
 }
 
 impl WidgetId {
-  fn map_to(self, pos: Point, ancestor: WidgetId, tree: &WidgetTree, r_tree: &RenderTree) -> Point {
+  fn map_to(
+    self,
+    pos: Point,
+    ancestor: WidgetId,
+    tree: &WidgetTree,
+    r_tree: &RenderTree,
+    layout_store: &LayoutStore,
+  ) -> Point {
     let rid = self.relative_to_render(tree).expect("must have");
     let map_to = ancestor.relative_to_render(tree).expect("must have");
 
-    rid.map_to(pos, map_to, r_tree)
+    rid.map_to(pos, map_to, r_tree, layout_store)
   }
 
-  fn map_from_global(self, pos: Point, tree: &WidgetTree, r_tree: &RenderTree) -> Point {
+  fn map_from_global(
+    self,
+    pos: Point,
+    tree: &WidgetTree,
+    r_tree: &RenderTree,
+    layout_store: &LayoutStore,
+  ) -> Point {
     let rid = self.relative_to_render(tree).expect("must have");
-    rid.map_from_global(pos, r_tree)
+    rid.map_from_global(pos, r_tree, layout_store)
   }
 }
 

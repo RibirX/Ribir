@@ -56,7 +56,8 @@ impl Tessellator {
             todo!("text paint as path not ready")
           }
         };
-      })
+      });
+    self.submit(render);
   }
 
   #[inline]
@@ -71,7 +72,6 @@ impl Tessellator {
         &StrokeOptions::tolerance(tolerance).with_line_width(line_width),
         &mut BuffersBuilder::new(vertices, move |v: StrokeVertex| Vertex {
           pixel_coords: v.position().to_array(),
-          texture_coords: [-1., -1.],
           prim_id,
         }),
       )
@@ -87,7 +87,6 @@ impl Tessellator {
         &FillOptions::tolerance(tolerance),
         &mut BuffersBuilder::new(vertices, move |v: FillVertex| Vertex {
           pixel_coords: v.position().to_array(),
-          texture_coords: [-1., -1.],
           prim_id,
         }),
       )

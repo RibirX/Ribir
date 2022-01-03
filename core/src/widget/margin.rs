@@ -40,10 +40,9 @@ impl RenderObject for Margin {
     let max = (clamp.max - thickness).max(zero);
     let child_clamp = BoxClamp { min, max };
 
-    debug_assert_eq!(ctx.children().count(), 1);
-    let mut child = ctx.children().next().expect("Margin must have one child");
-    let size = child.perform_layout(child_clamp);
-    child.update_position(Point::new(self.margin.left, self.margin.top));
+    let child = ctx.single_child().expect("Margin must have one child");
+    let size = ctx.perform_child_layout(child, child_clamp);
+    ctx.update_child_position(child, Point::new(self.margin.left, self.margin.top));
 
     clamp.clamp(size + thickness)
   }

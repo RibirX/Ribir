@@ -2,7 +2,7 @@
 
 //! A 2d logic painter, generate the paint command
 pub mod color;
-pub mod painter;
+mod painter;
 pub mod path;
 pub use crate::color::*;
 
