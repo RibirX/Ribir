@@ -1,7 +1,6 @@
 pub mod embed_post;
 pub mod key_embed_post;
 pub mod recursive_row;
-use widget::window::MockRender;
 
 use crate::prelude::*;
 
@@ -13,7 +12,7 @@ pub fn widget_and_its_children_box_rect(root: BoxedWidget, window_size: Size) ->
   root_and_children_rect(&mut wnd)
 }
 
-pub fn root_and_children_rect(wnd: &mut window::Window<MockRender>) -> (Rect, Vec<Rect>) {
+pub fn root_and_children_rect(wnd: &mut window::Window) -> (Rect, Vec<Rect>) {
   let r_tree = &*wnd.render_tree;
   let layout = &mut wnd.layout_store;
   let root = r_tree.root().unwrap();

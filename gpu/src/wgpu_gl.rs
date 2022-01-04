@@ -1,4 +1,7 @@
-use crate::{mem_texture::MemTexture, CanvasRender, Primitive, RenderData, Vertex};
+use crate::{
+  mem_texture::MemTexture, tessellator::Tessellator, GlRender, GpuBackend, Primitive, RenderData,
+  Vertex,
+};
 use painter::{DeviceRect, DeviceSize, LogicUnit, PhysicUnit};
 mod img_helper;
 pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
@@ -9,6 +12,40 @@ use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
 type Transform2D = painter::Transform2D<f32, LogicUnit, PhysicUnit>;
+const TEXTURE_INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
+const TEXTURE_MAX_SIZE: DeviceSize = DeviceSize::new(4096, 4096);
+
+pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
+  window: &W,
+  size: DeviceSize,
+  tex_init_size: Option<DeviceSize>,
+  tex_max_size: Option<DeviceSize>,
+) -> GpuBackend<WgpuGl> {
+  let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
+  let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
+  let tessellator = Tessellator::new(init_size, max_size);
+  let gl = WgpuGl::from_wnd(
+    window,
+    size,
+    tessellator.atlas().texture().size(),
+    AntiAliasing::Msaa4X,
+  )
+  .await;
+
+  GpuBackend { tessellator, gl }
+}
+
+pub async fn wgpu_backend_headless(
+  size: DeviceSize,
+  tex_init_size: Option<DeviceSize>,
+  tex_max_size: Option<DeviceSize>,
+) -> GpuBackend<WgpuGl<surface::TextureSurface>> {
+  let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
+  let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
+  let tessellator = Tessellator::new(init_size, max_size);
+  let gl = WgpuGl::headless(size, tessellator.atlas().texture().size()).await;
+  GpuBackend { tessellator, gl }
+}
 
 enum PrimaryBindings {
   GlobalUniform = 0,
@@ -29,7 +66,7 @@ pub enum AntiAliasing {
   Msaa16X = 16,
 }
 
-pub struct WgpuRender<S: Surface = PhysicSurface> {
+pub struct WgpuGl<S: Surface = PhysicSurface> {
   device: wgpu::Device,
   queue: wgpu::Queue,
   surface: S,
@@ -46,11 +83,11 @@ pub struct WgpuRender<S: Surface = PhysicSurface> {
   sc_desc: wgpu::SwapChainDescriptor,
 }
 
-impl WgpuRender<PhysicSurface> {
+impl WgpuGl<PhysicSurface> {
   /// Create a canvas and bind to a native window, its size is `width` and
   /// `height`. If you want to create a headless window, use
   /// [`headless_render`](WgpuRender::headless_render).
-  pub async fn wnd_render<W: raw_window_handle::HasRawWindowHandle>(
+  pub async fn from_wnd<W: raw_window_handle::HasRawWindowHandle>(
     window: &W,
     size: DeviceSize,
     atlas_texture_size: DeviceSize,
@@ -76,10 +113,10 @@ impl WgpuRender<PhysicSurface> {
   }
 }
 
-impl WgpuRender<TextureSurface> {
-  /// Create a WgpuRender, if you want to bind to a window, use
+impl WgpuGl<TextureSurface> {
+  /// Create a headless wgpu render, if you want to bind to a window, use
   /// [`wnd_render`](WgpuRender::wnd_render).
-  pub async fn headless_render(size: DeviceSize, atlas_texture_size: DeviceSize) -> Self {
+  pub async fn headless(size: DeviceSize, atlas_texture_size: DeviceSize) -> Self {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
 
     let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -87,7 +124,7 @@ impl WgpuRender<TextureSurface> {
       compatible_surface: None,
     });
 
-    WgpuRender::new(
+    WgpuGl::new(
       size,
       atlas_texture_size,
       adapter,
@@ -127,7 +164,7 @@ impl WgpuRender<TextureSurface> {
   }
 }
 
-impl<S: Surface> CanvasRender for WgpuRender<S> {
+impl<S: Surface> GlRender for WgpuGl<S> {
   fn draw(&mut self, data: &RenderData, mem_atlas: &mut MemTexture<u32>) {
     let mut encoder = self
       .device
@@ -233,14 +270,14 @@ impl<S: Surface> CanvasRender for WgpuRender<S> {
   }
 }
 
-impl<S: Surface> WgpuRender<S> {
+impl<S: Surface> WgpuGl<S> {
   async fn new<C>(
     size: DeviceSize,
     atlas_texture_size: DeviceSize,
     adapter: impl std::future::Future<Output = Option<wgpu::Adapter>> + Send,
     surface_ctor: C,
     anti_aliasing: AntiAliasing,
-  ) -> WgpuRender<S>
+  ) -> WgpuGl<S>
   where
     C: FnOnce(&wgpu::Device) -> S,
   {
@@ -306,7 +343,7 @@ impl<S: Surface> WgpuRender<S> {
     let multisampled_framebuffer =
       Self::create_multisampled_framebuffer(&device, &sc_desc, anti_aliasing as u32);
 
-    WgpuRender {
+    WgpuGl {
       sampler,
       device,
       surface,
@@ -451,12 +488,10 @@ fn create_render_pipeline(
     push_constant_ranges: &[],
   });
 
-  let vs_module = device.create_shader_module(wgpu::include_spirv!(
-    "./wgpu_render/shaders/geometry.vert.spv"
-  ));
-  let fs_module = device.create_shader_module(wgpu::include_spirv!(
-    "./wgpu_render/shaders/geometry.frag.spv"
-  ));
+  let vs_module =
+    device.create_shader_module(wgpu::include_spirv!("./wgpu_gl/shaders/geometry.vert.spv"));
+  let fs_module =
+    device.create_shader_module(wgpu::include_spirv!("./wgpu_gl/shaders/geometry.frag.spv"));
 
   device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
     label: Some("render pipeline"),
@@ -656,9 +691,7 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn smoke_draw_circle() {
-    let (mut canvas, mut render) = block_on(create_canvas_with_render_headless(DeviceSize::new(
-      400, 400,
-    )));
+    let (mut canvas, mut render) = block_on(wgpu_backend_headless(DeviceSize::new(400, 400)));
 
     fn circle_layer<'a>(canvas: &mut Canvas) -> Rendering2DLayer<'a> {
       let path = circle_50();
@@ -689,9 +722,7 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn color_palette_texture() {
-    let (mut canvas, mut render) = block_on(create_canvas_with_render_headless(DeviceSize::new(
-      400, 400,
-    )));
+    let (mut canvas, mut render) = block_on(wgpu_backend_headless(DeviceSize::new(400, 400)));
     let path = circle_50();
     {
       let mut layer = canvas.new_2d_layer();

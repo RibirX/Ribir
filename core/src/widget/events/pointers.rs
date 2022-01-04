@@ -209,7 +209,7 @@ mod tests {
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
 
-  fn env(times: u8) -> (window::Window<window::MockRender>, Rc<RefCell<usize>>) {
+  fn env(times: u8) -> (window::Window<window::MockBackend>, Rc<RefCell<usize>>) {
     let size = Size::new(400., 400.);
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();

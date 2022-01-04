@@ -1,7 +1,6 @@
 use std::{
   cmp::Reverse,
   collections::{BinaryHeap, HashMap},
-  mem::needs_drop,
 };
 
 use crate::prelude::{BoxClamp, Rect, RenderCtx, RenderId, Size};

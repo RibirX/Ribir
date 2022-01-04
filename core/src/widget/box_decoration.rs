@@ -396,7 +396,7 @@ mod tests {
         }),
       }
     };
-    let mut window = window::Window::headless(row.box_it(), DeviceSize::new(400, 600));
+    let mut window = window::Window::wgpu_headless(row.box_it(), DeviceSize::new(400, 600));
     window.render_ready();
     window.draw_frame();
 

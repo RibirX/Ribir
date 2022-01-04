@@ -9,10 +9,10 @@ version = "0.1.0"
 [dependencies]
 algo = {path = "../algo"}
 bitflags = "1.2.1"
-canvas = {path = "../canvas", version = "*"}
 fontdb = "0.7.0"
 futures = "0.3.5"
 glyph_brush = "0.7.3"
+gpu = {path = "../gpu", version = "*"}
 indextree = "4.3.1"
 lazy_static = "1.4.0"
 log = "0.4.8"
@@ -24,6 +24,10 @@ winit = "0.24.0"
 [dependencies.blake3]
 features = ["rayon"]
 version = "0.3.4"
+
+[features]
+default = ["wgpu_gl"]
+wgpu_gl = ["gpu/wgpu_gl"]
 
 [dev-dependencies]
 env_logger = "0.7.1"

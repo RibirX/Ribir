@@ -81,7 +81,7 @@ impl TextureAtlas {
   }
 
   #[inline]
-  pub fn log_png_to(&self, path: &str) { self.texture.log_png_to(path, png::ColorType::RGBA); }
+  pub fn log_png_to(&self, path: &str) { self.texture.write_png_to(path, png::ColorType::RGBA); }
 
   fn add_color(&mut self, color: u32) -> DevicePoint {
     let index = self.palette_stored as u32;

@@ -104,7 +104,7 @@ mod tests {
   #[ignore = "gpu need"]
   fn checked_paint() {
     let c = Checkbox { checked: true, ..<_>::default() };
-    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = window::Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -115,7 +115,7 @@ mod tests {
   #[ignore = "gpu need"]
   fn unchecked_paint() {
     let mut window =
-      window::Window::headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
+      window::Window::wgpu_headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -131,7 +131,7 @@ mod tests {
       ..<_>::default()
     }
     .build();
-    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = window::Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
@@ -145,7 +145,7 @@ mod tests {
       indeterminate: true,
       ..<_>::default()
     };
-    let mut window = window::Window::headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = window::Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 

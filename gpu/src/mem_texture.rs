@@ -106,7 +106,7 @@ impl<T: Copy + Default> MemTexture<T> {
     self.updated = false;
   }
 
-  pub fn log_png_to(&self, name: &str, color: png::ColorType) {
+  pub fn write_png_to(&self, name: &str, color: png::ColorType) {
     let pkg_root = env!("CARGO_MANIFEST_DIR");
     let atlas_capture = format!("{}/.log/{}", pkg_root, name);
 

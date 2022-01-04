@@ -3,10 +3,9 @@ use crate::{
   prelude::*,
   widget::{events::dispatcher::Dispatcher, widget_tree::*},
 };
-use canvas::{surface::TextureSurface, CanvasRender, MemTexture, RenderData, WgpuRender};
 use std::{cell::RefCell, pin::Pin, ptr::NonNull, rc::Rc};
 pub use winit::window::CursorIcon;
-use winit::{event::WindowEvent, event_loop::EventLoop, window::WindowBuilder, window::WindowId};
+use winit::{event::WindowEvent, window::WindowId};
 
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
@@ -83,17 +82,17 @@ impl RawWindow for NativeWindow {
 }
 
 /// Window is the root to represent.
-pub struct Window<R: CanvasRender = WgpuRender> {
+pub struct Window {
   pub raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
   pub(crate) render_tree: Pin<Box<RenderTree>>,
   pub(crate) layout_store: layout_store::LayoutStore,
   pub(crate) widget_tree: Pin<Box<WidgetTree>>,
   painter: Painter,
-  render: R,
+  p_backend: Box<dyn PainterBackend>,
   pub(crate) dispatcher: Dispatcher,
 }
 
-impl<R: CanvasRender> Window<R> {
+impl Window {
   /// processes native events from this native window
   #[inline]
   pub fn processes_native_event(&mut self, event: WindowEvent) {
@@ -137,7 +136,7 @@ impl<R: CanvasRender> Window<R> {
     let commands =
       PaintingContext::new(&self.render_tree, &mut self.painter, &self.layout_store).draw();
     if !commands.is_empty() {
-      todo!()
+      self.p_backend.submit(commands);
     }
   }
 
@@ -162,7 +161,11 @@ impl<R: CanvasRender> Window<R> {
       })
   }
 
-  fn new<W: RawWindow + 'static>(root: BoxedWidget, wnd: W, render: R) -> Self {
+  fn new<W, P>(root: BoxedWidget, wnd: W, p_backend: P) -> Self
+  where
+    W: RawWindow + 'static,
+    P: PainterBackend + 'static,
+  {
     let render_tree = Box::pin(RenderTree::default());
     let widget_tree = Box::pin(WidgetTree::default());
     let factor = wnd.scale_factor() as f32;
@@ -179,7 +182,7 @@ impl<R: CanvasRender> Window<R> {
       widget_tree,
       layout_store: <_>::default(),
       painter,
-      render,
+      p_backend: Box::new(p_backend),
     };
 
     unsafe {
@@ -205,7 +208,7 @@ impl<R: CanvasRender> Window<R> {
         .layout_store
         .mark_needs_layout(root, &*self.render_tree);
     }
-    self.render.resize(size);
+    self.p_backend.resize(size);
     self.raw_window.borrow().request_redraw();
   }
 
@@ -219,14 +222,20 @@ impl<R: CanvasRender> Window<R> {
   pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
 
   #[cfg(test)]
-  pub fn render(&mut self) -> &mut R { &mut self.render }
+  pub fn render(&mut self) -> &mut R { &mut self.p_backend }
 }
 
 impl Window {
-  pub(crate) fn from_event_loop(root: BoxedWidget, event_loop: &EventLoop<()>) -> Self {
-    let native_window = WindowBuilder::new().build(event_loop).unwrap();
+  #[cfg(feature = "wgpu_gl")]
+  pub(crate) fn from_event_loop(
+    root: BoxedWidget,
+    event_loop: &winit::event_loop::EventLoop<()>,
+  ) -> Self {
+    let native_window = winit::window::WindowBuilder::new()
+      .build(event_loop)
+      .unwrap();
     let size = native_window.inner_size();
-    let (canvas, render) = futures::executor::block_on(canvas::create_canvas_with_render_from_wnd(
+    let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
       &native_window,
       DeviceSize::new(size.width, size.height),
       None,
@@ -236,7 +245,7 @@ impl Window {
     Self::new(
       root,
       NativeWindow { native: native_window, cursor: None },
-      render,
+      p_backend,
     )
   }
 
@@ -246,10 +255,7 @@ impl Window {
   pub(crate) fn request_redraw(&self) { self.raw_window.borrow().request_redraw(); }
 }
 
-pub type HeadlessWindow = Window<WgpuRender<TextureSurface>>;
-pub type NoRenderWindow = Window<MockRender>;
-
-pub struct MockRender;
+pub struct MockBackend;
 
 #[derive(Default)]
 pub struct MockRawWindow {
@@ -257,8 +263,8 @@ pub struct MockRawWindow {
   pub cursor: Option<CursorIcon>,
 }
 
-impl CanvasRender for MockRender {
-  fn draw(&mut self, data: &RenderData, atlas_texture: &mut MemTexture<u32>) {}
+impl PainterBackend for MockBackend {
+  fn submit(&mut self, _: Vec<PaintCommand>) {}
 
   fn resize(&mut self, _: DeviceSize) {}
 }
@@ -276,24 +282,26 @@ impl RawWindow for MockRawWindow {
   fn scale_factor(&self) -> f64 { 1. }
 }
 
-impl HeadlessWindow {
-  pub fn headless(root: BoxedWidget, size: DeviceSize) -> Self {
-    let (tessellator, render) =
-      futures::executor::block_on(canvas::create_canvas_with_render_headless(size, None, None));
+impl Window {
+  #[cfg(feature = "wgpu_gl")]
+  pub fn wgpu_headless(root: BoxedWidget, size: DeviceSize) -> Self {
+    let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(size, None, None));
     Self::new(
       root,
       MockRawWindow {
         size: Size::from_untyped(size.to_f32().to_untyped()),
         ..Default::default()
       },
-      render,
+      p_backend,
     )
   }
-}
 
-impl NoRenderWindow {
   pub fn without_render(root: BoxedWidget, size: Size) -> Self {
-    let render = MockRender;
-    Self::new(root, MockRawWindow { size, ..Default::default() }, render)
+    let p_backend = MockBackend;
+    Self::new(
+      root,
+      MockRawWindow { size, ..Default::default() },
+      p_backend,
+    )
   }
 }

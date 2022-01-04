@@ -1,4 +1,4 @@
-use crate::{atlas::TextureAtlas, CanvasRender, Primitive, RenderData, Vertex};
+use crate::{atlas::TextureAtlas, GlRender, Primitive, RenderData, Vertex};
 
 use lyon_tessellation::{path::Path, *};
 use painter::{Brush, DeviceRect, DeviceSize, PaintCommand, Point, Rect, Size, Transform};
@@ -29,7 +29,7 @@ impl Tessellator {
 
   // todo: return render data and only generate triangles , not depends on render,
   // use callback function to instead of.
-  pub fn tessellate<R: CanvasRender>(&mut self, cmd: Vec<PaintCommand>, render: &mut R) {
+  pub fn tessellate<R: GlRender>(&mut self, cmd: Vec<PaintCommand>, render: &mut R) {
     cmd
       .into_iter()
       .for_each(|PaintCommand { path, transform, brush, path_style }| {
@@ -42,7 +42,7 @@ impl Tessellator {
         let _count = match path {
           painter::PaintPath::Path(path) => {
             let style_rect = self.store_style_in_atlas(&brush, render);
-            let align_bounds = path_bounds_to_align_texture(&brush, &path);
+            let align_bounds = path_bounds_to_align_texture(&brush);
             self.add_primitive(style_rect, align_bounds, transform);
             let prim_id = self.render_data.primitives.len() as u32 - 1;
             match path_style {
@@ -61,7 +61,7 @@ impl Tessellator {
   }
 
   #[inline]
-  pub(crate) fn atlas(&self) -> &TextureAtlas { &self.atlas }
+  pub fn atlas(&self) -> &TextureAtlas { &self.atlas }
 
   fn stroke_tess(&mut self, path: Path, line_width: f32, tolerance: f32, prim_id: u32) -> Count {
     let vertices = &mut self.render_data.vertices_buffer;
@@ -106,7 +106,7 @@ impl Tessellator {
     }
   }
 
-  fn store_style_in_atlas<R: CanvasRender>(&mut self, style: &Brush, render: &mut R) -> DeviceRect {
+  fn store_style_in_atlas<R: GlRender>(&mut self, style: &Brush, render: &mut R) -> DeviceRect {
     match style {
       Brush::Color(c) => {
         let unit = DeviceSize::new(1, 1);
@@ -124,12 +124,12 @@ impl Tessellator {
 
   /// Consume all composed layer but not draw yet, then submit the output to
   /// render to draw.
-  fn submit<R: CanvasRender>(&mut self, render: &mut R) {
+  fn submit<R: GlRender>(&mut self, render: &mut R) {
     self.submit_to_render(render);
     self.render_data.clear();
   }
 
-  fn submit_to_render<R: CanvasRender>(&mut self, render: &mut R) {
+  fn submit_to_render<R: GlRender>(&mut self, render: &mut R) {
     if self.render_data.has_data() {
       render.draw(&self.render_data, self.atlas.texture_mut())
     }
@@ -140,11 +140,10 @@ impl Tessellator {
 // zero min is ok, no matter what really bounding it is.
 const COLOR_BOUNDS_TO_ALIGN_TEXTURE: Rect = Rect::new(Point::new(0., 0.), Size::new(1., 1.));
 
-fn path_bounds_to_align_texture(style: &Brush, path: &Path) -> Rect {
+fn path_bounds_to_align_texture(style: &Brush) -> Rect {
   if let Brush::Color(_) = style {
     COLOR_BOUNDS_TO_ALIGN_TEXTURE
   } else {
-    let rect = lyon_algorithms::aabb::bounding_rect(path.iter());
-    Rect::from_untyped(&rect)
+    unimplemented!();
   }
 }

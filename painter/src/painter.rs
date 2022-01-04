@@ -1,4 +1,4 @@
-use crate::{path::*, Color, FontFace, TextStyle, Transform, Vector};
+use crate::{path::*, Color, DeviceSize, FontFace, TextStyle, Transform, Vector};
 use algo::CowRc;
 use std::ops::{Deref, DerefMut};
 
@@ -12,6 +12,13 @@ pub struct Painter {
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: Builder,
+}
+
+/// `PainterBackend` use to draw the picture what the `commands` described  to
+/// the target device. Usually is implemented by graphic library.
+pub trait PainterBackend {
+  fn submit(&mut self, commands: Vec<PaintCommand>);
+  fn resize(&mut self, size: DeviceSize);
 }
 
 pub enum PaintPath {

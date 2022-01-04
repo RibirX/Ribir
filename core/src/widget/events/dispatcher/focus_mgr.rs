@@ -217,7 +217,7 @@ mod tests {
 
   fn empty_box() -> SizedBox { SizedBox { size: Size::zero() } }
 
-  fn env(widget: BoxedWidget) -> (window::Window<window::MockRender>, FocusManager) {
+  fn env(widget: BoxedWidget) -> (window::Window<window::MockBackend>, FocusManager) {
     let wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
     // use a aloneside FocusManager for test easy.
     let mut mgr = FocusManager::default();

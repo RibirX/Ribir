@@ -1,3 +1,4 @@
+// todo: deprecated
 use super::{FontId, Vertex};
 pub use font_kit::properties::{
   Properties as FontProperties, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
