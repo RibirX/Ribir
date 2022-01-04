@@ -232,9 +232,7 @@ impl PointerDispatcher {
     let mut hit = None;
 
     while let Some((rid, pos)) = current {
-      if current.is_some() {
-        hit = current;
-      }
+      hit = current;
       current = rid
         .reverse_children(&r_tree)
         .find_map(|rid| down_coordinate_to(rid, pos, &r_tree));

@@ -33,10 +33,13 @@ impl Dispatcher {
     log::info!("Dispatch winit event {:?}", event);
     match event {
       WindowEvent::ModifiersChanged(s) => self.common.modifiers_change(s),
-      WindowEvent::CursorMoved { position, .. } => self.pointer.cursor_move_to(
-        Point::new(position.x as f32, position.y as f32),
-        &self.common,
-      ),
+      WindowEvent::CursorMoved { position, .. } => {
+        let factor = self.common.window.borrow().scale_factor() as f32;
+        self.pointer.cursor_move_to(
+          Point::new(position.x as f32 / factor , position.y as f32 / factor),
+          &self.common,
+        );
+      }
       WindowEvent::CursorLeft { .. } => self.pointer.on_cursor_left(&self.common),
       WindowEvent::MouseInput { state, button, device_id, .. } => {
         self.pointer.dispatch_mouse_input(
