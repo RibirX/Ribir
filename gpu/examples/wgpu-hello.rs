@@ -1,4 +1,4 @@
-use canvas::create_canvas_with_render_from_wnd;
+use gpu::wgpu_backend_with_wnd;
 use painter::{Color, DeviceSize, Transform};
 use winit::{
   event::*,

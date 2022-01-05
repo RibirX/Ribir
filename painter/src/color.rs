@@ -1,3 +1,4 @@
+// todo: use u8 x4 replace f32
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Color {
   /// The amount of red light, where 0.0 is no red light and 1.0f
@@ -29,6 +30,8 @@ impl Color {
     ]
   }
 
+  #[inline]
+  pub fn into_arrays(self) -> [f32; 4] { [self.red, self.green, self.blue, self.alpha] }
 
   pub fn from_u32(word: u32) -> Self {
     let [r, g, b, a]: [u8; 4] = word.to_be().to_ne_bytes();

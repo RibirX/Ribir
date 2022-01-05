@@ -5,26 +5,10 @@ use lyon_path::{
   Winding,
 };
 
-use crate::{Angle, Color, Point, Rect, Vector};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Brush {
-  Color(Color),
-  Image,    // todo
-  Gradient, // todo,
-}
-
-/// The style to paint path, maybe fill or stroke.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum PathStyle {
-  /// Fill the path.
-  Fill,
-  /// Stroke path with line width.
-  Stroke(f32),
-}
+use crate::{Angle, Brush, PathStyle, Point, Rect, Vector};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Path {
   pub path: lyon_path::path::Path,
   pub brush: Brush,
@@ -44,9 +28,7 @@ impl Path {
   pub fn builder() -> Builder { Builder::default() }
 
   #[inline]
-  pub fn box_rect(&self) -> Rect {
-    lyon_algorithms::aabb::bounding_rect(self.path.iter()).cast_unit()
-  }
+  pub fn box_rect(&self) -> Rect { path_box_rect(&self.path, self.path_style) }
 }
 
 impl Builder {
@@ -157,8 +139,9 @@ impl Builder {
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
   #[inline]
-  pub fn rect(&mut self, rect: &Rect) {
+  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
     self.0.add_rectangle(&rect.to_untyped(), Winding::Positive);
+    self
   }
 
   /// Adds a sub-path containing a circle.
@@ -166,10 +149,11 @@ impl Builder {
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
   #[inline]
-  pub fn circle(&mut self, center: Point, radius: f32) {
+  pub fn circle(&mut self, center: Point, radius: f32) -> &mut Self {
     self
       .0
-      .add_circle(center.to_untyped(), radius, Winding::Positive)
+      .add_circle(center.to_untyped(), radius, Winding::Positive);
+    self
   }
 
   /// Creates a path for a rectangle by `rect` with `radius`.
@@ -201,6 +185,12 @@ impl Builder {
       path_style: PathStyle::Fill,
     }
   }
+}
+
+#[inline]
+pub fn path_box_rect(path: &lyon_path::Path, _: PathStyle) -> Rect {
+  // todo: path_style effect box rect
+  lyon_algorithms::aabb::bounding_rect(path.iter()).cast_unit()
 }
 
 impl std::ops::Deref for Radius {

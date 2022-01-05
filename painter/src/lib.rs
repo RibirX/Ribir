@@ -1,4 +1,4 @@
-#![feature(const_fn_floating_point_arithmetic)]
+#![feature(const_fn_floating_point_arithmetic, test)]
 
 //! A 2d logic painter, generate the paint command
 pub mod color;
@@ -9,7 +9,9 @@ pub use crate::color::*;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use painter::*;
 pub use path::*;
+pub mod image;
 mod style;
+pub use image::{Image, ShallowImage};
 pub use style::*;
 
 /// The tag for device unit system to prevent mixing values from different
@@ -33,5 +35,6 @@ pub type Box2D = euclid::Box2D<f32, LogicUnit>;
 pub type DeviceRect = euclid::Rect<u32, PhysicUnit>;
 pub type DevicePoint = euclid::Point2D<u32, PhysicUnit>;
 pub type DeviceSize = euclid::Size2D<u32, PhysicUnit>;
+pub type DeviceVector = euclid::Vector2D<u32, PhysicUnit>;
 
 pub use euclid::Transform2D;

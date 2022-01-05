@@ -1,4 +1,4 @@
-use crate::{Brush, Color, FontStretch, FontStyle, FontWeight, PathStyle};
+use crate::{Color, FontStretch, FontStyle, FontWeight, ShallowImage};
 use algo::CowRc;
 
 // Enum value descriptions are from the CSS spec.
@@ -53,7 +53,7 @@ pub struct FontFace {
 }
 
 /// Encapsulates the text style for painting.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct TextStyle {
   /// The size of glyphs (in logical pixels) to use when painting the text.
   pub font_size: f32,
@@ -65,6 +65,47 @@ pub struct TextStyle {
   pub letter_space: f32,
   /// The path style(fill or stroke) to use when painting.
   pub path_style: PathStyle,
+}
+
+bitflags::bitflags! {
+  /// - Repeat mode repeat the image to full tile the path, if the image greater
+  /// than the path, image will be clipped.
+  /// - Cover mode resize the image to cover the entire path, even if it has to
+  /// stretch the image or cut a little bit off one of the edges
+  pub struct TileMode: u8 {
+    const REPEAT_X = 0b00000001;
+    const REPEAT_Y = 0b00000010;
+    const REPEAT_BOTH = Self::REPEAT_X.bits | Self::REPEAT_Y.bits;
+    const COVER_X = 0b00000100;
+    const COVER_Y = 0b00001000;
+    const COVER_BOTH = Self::COVER_X.bits | Self::COVER_Y.bits;
+    const REPEAT_X_COVER_Y = Self::REPEAT_X.bits | Self::COVER_Y.bits;
+    const COVER_X_REPEAT_Y = Self::COVER_X.bits | Self::REPEAT_Y.bits;
+  }
+}
+
+impl TileMode {
+  #[inline]
+  pub fn is_cover_mode(&self) -> bool { self.bits & (TileMode::COVER_BOTH.bits) > 0 }
+}
+
+#[derive(Clone, PartialEq)]
+pub enum Brush {
+  Color(Color),
+  Image {
+    img: ShallowImage,
+    tile_mode: TileMode,
+  },
+  Gradient, // todo,
+}
+
+/// The style to paint path, maybe fill or stroke.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum PathStyle {
+  /// Fill the path.
+  Fill,
+  /// Stroke path with line width.
+  Stroke(f32),
 }
 
 impl Default for FontFace {
@@ -98,4 +139,50 @@ impl From<Color> for Brush {
 impl Default for Brush {
   #[inline]
   fn default() -> Self { Brush::Color(Color::BLACK) }
+}
+
+/// Describe the align in logic without direction.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Align {
+  Start,
+  Center,
+  End,
+}
+
+/// Horizontal Alignment
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum HAlign {
+  Left,
+  Center,
+  Right,
+}
+
+/// Vertical Alignment
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum VALign {
+  Top,
+  Center,
+  Bottom,
+}
+
+impl From<HAlign> for Align {
+  #[inline]
+  fn from(h: HAlign) -> Self {
+    match h {
+      HAlign::Left => Align::Start,
+      HAlign::Center => Align::Center,
+      HAlign::Right => Align::End,
+    }
+  }
+}
+
+impl From<VALign> for Align {
+  #[inline]
+  fn from(h: VALign) -> Self {
+    match h {
+      VALign::Top => Align::Start,
+      VALign::Center => Align::Center,
+      VALign::Bottom => Align::End,
+    }
+  }
 }

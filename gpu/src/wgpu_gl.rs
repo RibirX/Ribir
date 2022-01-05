@@ -27,7 +27,7 @@ pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
   let gl = WgpuGl::from_wnd(
     window,
     size,
-    tessellator.atlas().texture().size(),
+    tessellator.atlas.texture().size(),
     AntiAliasing::Msaa4X,
   )
   .await;
@@ -43,7 +43,7 @@ pub async fn wgpu_backend_headless(
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
   let tessellator = Tessellator::new(init_size, max_size);
-  let gl = WgpuGl::headless(size, tessellator.atlas().texture().size()).await;
+  let gl = WgpuGl::headless(size, tessellator.atlas.texture().size()).await;
   GpuBackend { tessellator, gl }
 }
 
@@ -140,6 +140,7 @@ impl WgpuGl<TextureSurface> {
     .await
   }
 
+  // todo: remove png dependency.
   /// PNG encoded the canvas then write by `writer`.
   pub async fn write_png<W: std::io::Write>(&mut self, writer: W) -> Result<(), &'static str> {
     self.ensure_rgba_converter();
@@ -165,7 +166,7 @@ impl WgpuGl<TextureSurface> {
 }
 
 impl<S: Surface> GlRender for WgpuGl<S> {
-  fn draw(&mut self, data: &RenderData, mem_atlas: &MemTexture<4>) {
+  fn submit_render_data(&mut self, data: &RenderData, mem_atlas: &MemTexture<4>) {
     let mut encoder = self
       .device
       .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") });
@@ -259,7 +260,6 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     queue.submit(Some(encoder.finish()));
   }
 
-  #[inline]
   fn resize(&mut self, size: DeviceSize) {
     self.sc_desc.width = size.width;
     self.sc_desc.height = size.height;
@@ -267,6 +267,10 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       .surface
       .update(&self.device, &self.queue, &self.sc_desc);
     self.rebuild_pipeline = true;
+  }
+
+  fn finish(&mut self) {
+    // todo: immediate draw now when render data submitted.
   }
 }
 
@@ -599,7 +603,6 @@ fn create_uniforms(
   tex_atlas: &wgpu::TextureView,
 ) -> wgpu::BindGroup {
   let uniform = GlobalUniform {
-    // todo: seems not have same layout in shader?
     texture_atlas_size: atlas_size.to_array(),
     canvas_coordinate_map: canvas_2d_to_device_matrix.to_arrays(),
   };

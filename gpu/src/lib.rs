@@ -1,17 +1,14 @@
 #![feature(decl_macro, test)]
-mod atlas;
 pub mod error;
-mod mem_texture;
 
 #[cfg(feature = "wgpu_gl")]
 pub mod wgpu_gl;
 
-pub use mem_texture::MemTexture;
 use tessellator::Tessellator;
 pub mod tessellator;
 use painter::{DeviceSize, PainterBackend};
 
-use lyon_tessellation::VertexBuffers;
+use painter::image::ColorFormat;
 use zerocopy::AsBytes;
 
 #[cfg(feature = "wgpu_gl")]
@@ -27,7 +24,10 @@ pub struct GpuBackend<R: GlRender> {
 
 impl<R: GlRender> PainterBackend for GpuBackend<R> {
   fn submit(&mut self, commands: Vec<painter::PaintCommand>) {
-    self.tessellator.tessellate(commands, &mut self.gl)
+    self.tessellator.tessellate(commands, |render_data| {
+      self.gl.submit_render_data(render_data);
+    });
+    self.gl.finish()
   }
 
   #[inline]
@@ -35,25 +35,85 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
 }
 /// The Render that support draw the canvas result render data.
 pub trait GlRender {
-  fn draw(&mut self, data: &RenderData, atlas_texture: &MemTexture<4>);
+  /// Commit the render data to gl, caller will try to as possible as batch all
+  /// render data, but also possible call `commit_render_data` multi time pre
+  /// frame.
+  fn submit_render_data(&mut self, data: RenderData);
 
+  /// Window all surface size change, need do a redraw.
   fn resize(&mut self, size: DeviceSize);
+
+  /// The render data commit finished.
+  fn finish(&mut self);
 }
 
-pub struct RenderData {
-  pub vertices_buffer: VertexBuffers<Vertex, u32>,
-  pub primitives: Vec<Primitive>,
+/// A texture for the vertexes sampler color. Every texture have identify to
+/// help reuse gpu texture in adjacent frames. The `id` is a cycle increase
+/// number, so it's always unique if the textures count is not over the
+/// [`usize::MAX`]! in an application lifetime.
+///
+/// For texture cache we only track the last frame, so if a texture use in frame
+/// one and frame three but not use in frame two, it's have different `id` in
+/// frame one and frame three.
+pub struct Texture<'a> {
+  /// The identify of the texture, unique in adjacent frames.
+  pub id: usize,
+  /// The texture size.
+  pub size: DeviceSize,
+  /// The data of the texture. A `None` value will give if the texture is not
+  /// change to latest frame, should reuse the gpu texture.
+  pub data: Option<&'a [u8]>,
+  /// The color format of the texture
+  pub format: ColorFormat,
+}
+
+/// Triangles with texture submit to gpu render
+pub struct TextureRenderData<'a> {
+  pub vertices: &'a [Vertex],
+  pub indices: &'a [u32],
+  /// Vertex extra info which contain the texture position of vertex and its
+  /// transform matrix.
+  pub primitives: &'a [TexturePrimitive],
+  /// The texture store all the pixel color from.
+  pub texture: Texture<'a>,
+}
+
+/// Triangles with color submit to gpu render
+pub struct ColorRenderData<'a> {
+  pub vertices: &'a [Vertex],
+  pub indices: &'a [u32],
+  /// Vertex extra info which contain the texture position of vertex and its
+  /// transform matrix.
+  pub primitives: &'a [ColorPrimitive],
+}
+
+pub enum RenderData<'a> {
+  Color(ColorRenderData<'a>),
+  Image(TextureRenderData<'a>),
 }
 
 #[repr(C)]
 #[derive(AsBytes, PartialEq)]
-pub struct Primitive {
-  // Texture offset in texture atlas.
+pub struct ColorPrimitive {
+  /// Rgba color
+  pub(crate) color: [f32; 4],
+  /// the transform vertex to apply
+  pub(crate) transform: [[f32; 2]; 3],
+}
+
+#[repr(C)]
+#[derive(AsBytes, PartialEq)]
+pub struct TexturePrimitive {
+  /// Texture offset in texture atlas.
   pub(crate) tex_offset: [u32; 2],
-  // Texture size in texture atlas.
-  pub(crate) tex_size: [u32; 2],
-  pub(crate) bound_min: [f32; 2],
-  pub(crate) bounding_size: [f32; 2],
+  /// The factor use to calc the texture sampler position of vertex. Vertex calc
+  /// its texture sampler position (0..1) across:  vertex position multiplied
+  /// by factor then keep fractional part of result.
+  ///
+  /// - Repeat mode should be  1 / sub_texture_size
+  /// - Cover mode should be 1 / path_size
+  pub(crate) factor: [f32; 2],
+  /// the transform vertex to apply
   pub(crate) transform: [[f32; 2]; 3],
 }
 
@@ -65,27 +125,12 @@ pub struct Vertex {
   pub prim_id: u32,
 }
 
-impl RenderData {
-  pub fn new() -> RenderData {
-    RenderData {
-      vertices_buffer: VertexBuffers::new(),
-      primitives: vec![],
-    }
-  }
-
+impl<'a> RenderData<'a> {
   #[inline]
-  pub fn has_data(&self) -> bool {
-    debug_assert_eq!(
-      self.vertices_buffer.vertices.is_empty(),
-      self.vertices_buffer.indices.is_empty()
-    );
-
-    !self.vertices_buffer.vertices.is_empty()
-  }
-
-  pub fn clear(&mut self) {
-    self.vertices_buffer.vertices.clear();
-    self.vertices_buffer.indices.clear();
-    self.primitives.clear();
+  pub fn is_empty(&self) -> bool {
+    match self {
+      RenderData::Color(c) => c.indices.is_empty(),
+      RenderData::Image(i) => i.indices.is_empty(),
+    }
   }
 }

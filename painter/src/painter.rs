@@ -1,4 +1,6 @@
-use crate::{path::*, Color, DeviceSize, FontFace, TextStyle, Transform, Vector};
+use crate::{
+  path::*, Brush, Color, DeviceSize, FontFace, PathStyle, Rect, TextStyle, Transform, Vector,
+};
 use algo::CowRc;
 use std::ops::{Deref, DerefMut};
 
@@ -21,6 +23,7 @@ pub trait PainterBackend {
   fn resize(&mut self, size: DeviceSize);
 }
 
+#[derive(Clone)]
 pub enum PaintPath {
   Path(lyon_path::Path),
   Text {
@@ -30,6 +33,7 @@ pub enum PaintPath {
     letter_space: f32,
   },
 }
+#[derive(Clone)]
 pub struct PaintCommand {
   pub path: PaintPath,
   pub transform: Transform,
@@ -37,7 +41,7 @@ pub struct PaintCommand {
   pub path_style: PathStyle,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct PainterState {
   line_width: f32,
   font_size: f32,
@@ -155,18 +159,21 @@ impl Painter {
   }
 
   /// Strokes (outlines) the current path with the current brush and line width.
-  pub fn stroke(&mut self) -> &mut Self {
+  pub fn stroke(&mut self, line_width: Option<f32>, brush: Option<Brush>) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
     let state = self.current_state();
-    let path = builder.stroke(state.line_width, state.brush.clone());
+    let line_width = line_width.unwrap_or(self.current_state().line_width);
+    let brush = brush.unwrap_or_else(|| state.brush.clone());
+    let path = builder.stroke(line_width, brush);
     self.paint_path(path);
     self
   }
 
   /// Fill the current path with current brush.
-  pub fn fill(&mut self) -> &mut Self {
+  pub fn fill(&mut self, brush: Option<Brush>) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let path = builder.fill(self.current_state().brush.clone());
+    let brush = brush.unwrap_or_else(|| self.current_state().brush.clone());
+    let path = builder.fill(brush.clone());
     self.paint_path(path);
     self
   }
@@ -311,6 +318,15 @@ impl Deref for Painter {
 
 impl DerefMut for Painter {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.path_builder }
+}
+
+impl PaintCommand {
+  pub fn box_rect_without_transform(&self) -> Rect {
+    match &self.path {
+      PaintPath::Path(path) => path_box_rect(&path, self.path_style),
+      PaintPath::Text { .. } => todo!(),
+    }
+  }
 }
 
 #[cfg(test)]

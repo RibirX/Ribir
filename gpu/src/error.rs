@@ -1,8 +1,13 @@
 #[derive(Debug)]
-pub enum CanvasError {
-  /// atlas is too full to store the texture, buf the texture is good for store
-  /// in the atlas if it's not store too many others.
-  TextureSpaceNotEnough,
-  /// The layer id is invalid, maybe its cache be cleaned.
-  InValidLayerId,
+pub enum Error {
+  /// atlas is full unable to store the texture and the texture is grow to its
+  /// limit, but the texture is good for store in the atlas if it's not store
+  /// too many others.
+  TextureSpaceToLimit,
+  /// atlas is full unable to store the texture, but not check if the texture is
+  /// growable
+  TextureFull,
+
+  /// The image is too large to good for the atlas store.
+  LargeImageAvoid,
 }

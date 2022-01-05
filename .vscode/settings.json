@@ -9,12 +9,15 @@
     "**/todo.rs"
   ],
   "cSpell.words": [
+    "ahash",
     "bitflags",
     "cond",
     "fontdb",
+    "guillotiere",
     "Monospace",
     "Msaa",
     "paren",
+    "retessellate",
     "segs",
     "subpat",
     "THROUGHLINE"

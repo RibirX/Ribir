@@ -303,7 +303,6 @@ impl SugarFields {
     Brace::default().surround(&mut decoration_build, |decoration| {
       let comma = Comma::default();
       let mut gen_decoration_field_tokens = |f: &DeclareField| -> Option<Ident> {
-        // todo state ref
         if ctx.be_followed(ref_name) {
           let bg_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
           follow_after.extend(quote! { let #bg_ref = #wrap_def_name.state_ref();});
