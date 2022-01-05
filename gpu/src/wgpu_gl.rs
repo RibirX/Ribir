@@ -165,7 +165,7 @@ impl WgpuGl<TextureSurface> {
 }
 
 impl<S: Surface> GlRender for WgpuGl<S> {
-  fn draw(&mut self, data: &RenderData, mem_atlas: &mut MemTexture<u32>) {
+  fn draw(&mut self, data: &RenderData, mem_atlas: &MemTexture<4>) {
     let mut encoder = self
       .device
       .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") });
@@ -390,10 +390,10 @@ impl<S: Surface> WgpuGl<S> {
     })
   }
 
-  fn sync_texture<T: Copy + Default>(
+  fn sync_texture(
     device: &wgpu::Device,
     wgpu_tex: &mut wgpu::Texture,
-    mem_tex: &mut MemTexture<T>,
+    mem_tex: &MemTexture<4>,
     format: wgpu::TextureFormat,
     encoder: &mut wgpu::CommandEncoder,
   ) {
@@ -413,7 +413,7 @@ impl<S: Surface> WgpuGl<S> {
           buffer: &buffer,
           layout: wgpu::TextureDataLayout {
             offset: 0,
-            bytes_per_row: width * std::mem::size_of::<T>() as u32,
+            bytes_per_row: width * 4,
             rows_per_image: height,
           },
         },
@@ -425,7 +425,6 @@ impl<S: Surface> WgpuGl<S> {
         wgpu::Extent3d { width, height, depth: 1 },
       )
     }
-    mem_tex.data_synced();
   }
 
   fn create_wgpu_texture(

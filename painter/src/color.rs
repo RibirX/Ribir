@@ -29,12 +29,6 @@ impl Color {
     ]
   }
 
-  pub fn as_u32(&self) -> u32 {
-    (Self::f32_to_u8(self.red) as u32) << 24
-      | (Self::f32_to_u8(self.green) as u32) << 16
-      | (Self::f32_to_u8(self.blue) as u32) << 8
-      | Self::f32_to_u8(self.alpha) as u32
-  }
 
   pub fn from_u32(word: u32) -> Self {
     let [r, g, b, a]: [u8; 4] = word.to_be().to_ne_bytes();

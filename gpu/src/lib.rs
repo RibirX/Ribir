@@ -35,7 +35,7 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
 }
 /// The Render that support draw the canvas result render data.
 pub trait GlRender {
-  fn draw(&mut self, data: &RenderData, atlas_texture: &mut MemTexture<u32>);
+  fn draw(&mut self, data: &RenderData, atlas_texture: &MemTexture<4>);
 
   fn resize(&mut self, size: DeviceSize);
 }

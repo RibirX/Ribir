@@ -127,11 +127,12 @@ impl Tessellator {
   fn submit<R: GlRender>(&mut self, render: &mut R) {
     self.submit_to_render(render);
     self.render_data.clear();
+    self.atlas.gpu_synced();
   }
 
   fn submit_to_render<R: GlRender>(&mut self, render: &mut R) {
     if self.render_data.has_data() {
-      render.draw(&self.render_data, self.atlas.texture_mut())
+      render.draw(&self.render_data, self.atlas.texture())
     }
   }
 }

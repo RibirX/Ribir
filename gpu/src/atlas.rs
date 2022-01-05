@@ -6,9 +6,9 @@ use guillotiere::*;
 const PALETTE_SIZE: u32 = DEFAULT_OPTIONS.small_size_threshold as u32;
 
 pub struct TextureAtlas {
-  texture: MemTexture<u32>,
+  texture: MemTexture<4>,
   atlas_allocator: AtlasAllocator,
-  indexed_colors: std::collections::HashMap<u32, DevicePoint>,
+  indexed_colors: std::collections::HashMap<[u8; 4], DevicePoint>,
   palette_stored: usize,
   palette_alloc: Allocation,
 }
@@ -31,8 +31,8 @@ impl TextureAtlas {
   }
 
   /// Store the `color` in, return the position in the texture of the color was.
-  pub fn store_color(&mut self, color: Color) -> Result<DevicePoint, CanvasError> {
-    let color = color.as_u32();
+  pub fn store_color(&mut self, color: Color) -> Result<DevicePoint, Error> {
+    let color = color.into_raw();
     if let Some(pos) = self.indexed_colors.get(&color) {
       return Ok(*pos);
     }
@@ -68,10 +68,10 @@ impl TextureAtlas {
   /// Return the reference of the soft texture of the atlas, copy it to the
   /// render engine texture to use it.
   #[inline]
-  pub fn texture(&self) -> &MemTexture<u32> { &self.texture }
+  pub fn texture(&self) -> &MemTexture<4> { &self.texture }
 
-  #[inline]
-  pub fn texture_mut(&mut self) -> &mut MemTexture<u32> { &mut self.texture }
+  /// A gpu command and data submitted.
+  pub fn gpu_synced(&mut self) { self.texture.data_synced(); }
 
   /// Clear the atlas.
   pub fn clear(&mut self) {
@@ -83,19 +83,18 @@ impl TextureAtlas {
   #[inline]
   pub fn log_png_to(&self, path: &str) { self.texture.write_png_to(path, png::ColorType::RGBA); }
 
-  fn add_color(&mut self, color: u32) -> DevicePoint {
+  fn add_color(&mut self, color: [u8; 4]) -> DevicePoint {
     let index = self.palette_stored as u32;
     let offset = euclid::Vector2D::new(index % PALETTE_SIZE, index / PALETTE_SIZE);
     let pos = self.palette_alloc.rectangle.min.to_u32() + offset;
     let pos = DevicePoint::from_untyped(pos);
 
     self.indexed_colors.insert(color, pos);
-    self.texture.set(pos, color.to_be());
+    self.texture.set(pos, color);
     self.palette_stored += 1;
     pos
   }
 
-  #[inline]
   fn is_palette_fulled(&self) -> bool {
     const PALETTE_SLOTS: usize = (PALETTE_SIZE * PALETTE_SIZE) as usize;
     self.palette_stored >= PALETTE_SLOTS

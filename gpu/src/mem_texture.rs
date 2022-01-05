@@ -1,19 +1,19 @@
 use painter::{DevicePoint, DeviceRect, DeviceSize};
 
-pub struct MemTexture<T: Copy + Default> {
+pub struct MemTexture<const N: usize> {
   max_size: DeviceSize,
-  array: Vec<T>,
+  array: Box<[[u8; N]]>,
   size: DeviceSize,
   updated: bool,
   resized: bool,
 }
 
-impl<T: Copy + Default> MemTexture<T> {
+impl<const N: usize> MemTexture<N> {
   pub fn new(size: DeviceSize, max_size: DeviceSize) -> Self {
     Self {
       size,
       max_size,
-      array: vec![T::default(); size.area() as usize],
+      array: Self::alloc_mem(size),
       updated: false,
       resized: true,
     }
@@ -23,7 +23,7 @@ impl<T: Copy + Default> MemTexture<T> {
   #[inline]
   pub fn clear(&mut self) {
     self.updated = true;
-    self.array.fill(T::default());
+    self.array.fill([0; N]);
   }
 
   #[inline]
@@ -50,11 +50,11 @@ impl<T: Copy + Default> MemTexture<T> {
 
       self.resized = true;
       self.updated = true;
-      let array = std::mem::replace(&mut self.array, vec![T::default(); size.area() as usize]);
+      let array = std::mem::replace(&mut self.array, Self::alloc_mem(size));
       if keep_old_data {
         let old_size = self.size;
         self.size = size;
-        self.update_texture(&DeviceRect::from(old_size), array.as_slice());
+        self.update_texture(&DeviceRect::from(old_size), &array);
       } else {
         self.size = size;
       }
@@ -66,27 +66,20 @@ impl<T: Copy + Default> MemTexture<T> {
 
   #[inline]
   pub fn as_bytes(&self) -> &[u8] {
-    let bytes = std::mem::size_of::<T>();
     unsafe {
-      std::slice::from_raw_parts(
-        self.array.as_slice() as *const _ as *const u8,
-        self.array.len() * bytes,
-      )
+      std::slice::from_raw_parts(&self.array as *const _ as *const u8, self.array.len() * N)
     }
   }
 
   /// Set `v` to the pixel at `pos`.
-  pub fn set(&mut self, pos: DevicePoint, v: T) {
+  pub fn set(&mut self, pos: DevicePoint, v: [u8; N]) {
     self[pos.y][pos.x as usize] = v;
     self.updated = true;
   }
 
   /// Use `data` to fill the `rect` sub range to this 2d array, `rect` should
   /// not over this 2d array's boundary.
-  pub fn update_texture(&mut self, rect: &DeviceRect, data: &[T])
-  where
-    T: Copy,
-  {
+  pub fn update_texture(&mut self, rect: &DeviceRect, data: &[[u8; N]]) {
     debug_assert_eq!(rect.area() as usize, data.len());
     debug_assert!(DeviceRect::from_size(self.size).contains_rect(rect));
     let rect = rect.to_usize();
@@ -127,10 +120,14 @@ impl<T: Copy + Default> MemTexture<T> {
 
     log::info!("Write a image of mem texture at: {}", &atlas_capture);
   }
+
+  fn alloc_mem(size: DeviceSize) -> Box<[[u8; N]]> {
+    vec![[0; N]; size.area() as usize].into_boxed_slice()
+  }
 }
 
-impl<T: Copy + Default> std::ops::Index<u32> for MemTexture<T> {
-  type Output = [T];
+impl<const N: usize> std::ops::Index<u32> for MemTexture<N> {
+  type Output = [[u8; N]];
   fn index(&self, index: u32) -> &Self::Output {
     let width = self.size.width;
     let array_offset = (index * width) as usize;
@@ -138,7 +135,7 @@ impl<T: Copy + Default> std::ops::Index<u32> for MemTexture<T> {
   }
 }
 
-impl<T: Copy + Default> std::ops::IndexMut<u32> for MemTexture<T> {
+impl<const N: usize> std::ops::IndexMut<u32> for MemTexture<N> {
   fn index_mut(&mut self, index: u32) -> &mut Self::Output {
     let width = self.size.width;
     let array_offset = (index * width) as usize;
