@@ -6,7 +6,6 @@ mod painter;
 pub mod path;
 pub use crate::color::*;
 
-pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use painter::*;
 pub use path::*;
 pub mod image;

@@ -9,7 +9,6 @@ pub trait Image {
 }
 
 pub enum ColorFormat {
-  R8Alpha,
   Rgba8,
 }
 

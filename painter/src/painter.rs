@@ -1,8 +1,7 @@
-use crate::{
-  path::*, Brush, Color, DeviceSize, FontFace, PathStyle, Rect, TextStyle, Transform, Vector,
-};
+use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
 use algo::CowRc;
 use std::ops::{Deref, DerefMut};
+use text::FontFace;
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -31,6 +30,7 @@ pub enum PaintPath {
     font_size: f32,
     font_face: CowRc<FontFace>,
     letter_space: f32,
+    line_height: Option<f32>,
   },
 }
 #[derive(Clone)]
@@ -43,11 +43,13 @@ pub struct PaintCommand {
 
 #[derive(Clone)]
 struct PainterState {
+  /// The line width use to stroke path.
   line_width: f32,
   font_size: f32,
   letter_space: f32,
   brush: Brush,
   font_face: CowRc<FontFace>,
+  text_line_height: Option<f32>,
   transform: Transform,
 }
 
@@ -124,6 +126,14 @@ impl Painter {
     self
   }
 
+  /// Set the text line height which is a factor use to multiplied by the font
+  /// size
+  #[inline]
+  pub fn set_text_line_height(&mut self, line_height: f32) -> &mut Self {
+    self.current_state_mut().text_line_height = Some(line_height);
+    self
+  }
+
   #[inline]
   pub fn get_font(&self) -> &FontFace { &self.current_state().font_face }
 
@@ -187,6 +197,7 @@ impl Painter {
       font_face,
       letter_space,
       path_style,
+      line_height,
     } = style;
     self.commands.push(PaintCommand {
       path: PaintPath::Text {
@@ -194,6 +205,7 @@ impl Painter {
         font_size,
         font_face,
         letter_space,
+        line_height,
       },
       transform,
       brush: foreground,
@@ -230,6 +242,7 @@ impl Painter {
         font_size: state.font_size,
         font_face: state.font_face.clone(),
         letter_space: state.letter_space,
+        line_height: state.text_line_height,
       },
       transform: state.transform.clone(),
       brush: state.brush.clone(),
@@ -304,6 +317,7 @@ impl Default for PainterState {
       letter_space: 0.,
       brush: Brush::Color(Color::BLACK),
       font_face: CowRc::owned(FontFace::default()),
+      text_line_height: None,
       transform: Transform::new(1., 0., 0., 1., 0., 0.),
     }
   }
@@ -470,7 +484,7 @@ mod test {
       vec![(
         Text {
           text: r#"To be, or not to be, that is the question!
-Whether it’s nobler in the mind to suffer
+Whether it's nobler in the mind to suffer
 The slings and arrows of outrageous fortune,
 Or to take arms against a sea of troubles,
 And by opposing end them? To die: to sleep;

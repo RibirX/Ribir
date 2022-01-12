@@ -93,7 +93,7 @@ pub enum RenderData<'a> {
 }
 
 #[repr(C)]
-#[derive(AsBytes, PartialEq)]
+#[derive(AsBytes, PartialEq, Clone)]
 pub struct ColorPrimitive {
   /// Rgba color
   pub(crate) color: [f32; 4],
@@ -102,7 +102,7 @@ pub struct ColorPrimitive {
 }
 
 #[repr(C)]
-#[derive(AsBytes, PartialEq)]
+#[derive(AsBytes, PartialEq, Clone)]
 pub struct TexturePrimitive {
   /// Texture offset in texture atlas.
   pub(crate) tex_offset: [u32; 2],

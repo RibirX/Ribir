@@ -1,56 +1,6 @@
-use crate::{Color, FontStretch, FontStyle, FontWeight, ShallowImage};
+use crate::{Color, ShallowImage};
 use algo::CowRc;
-
-// Enum value descriptions are from the CSS spec.
-/// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FontFamily {
-  /// The name of a font family of choice.
-  Name(CowRc<str>),
-
-  /// Serif fonts represent the formal text style for a script.
-  Serif,
-
-  /// Glyphs in sans-serif fonts, as the term is used in CSS, are generally low
-  /// contrast and have stroke endings that are plain — without any flaring,
-  /// cross stroke, or other ornamentation.
-  SansSerif,
-
-  /// Glyphs in cursive fonts generally use a more informal script style,
-  /// and the result looks more like handwritten pen or brush writing than
-  /// printed letterwork.
-  Cursive,
-
-  /// Fantasy fonts are primarily decorative or expressive fonts that
-  /// contain decorative or expressive representations of characters.
-  Fantasy,
-
-  /// The sole criterion of a monospace font is that all glyphs have the same
-  /// fixed width.
-  Monospace,
-}
-
-/// Encapsulates the font properties of font face.
-#[derive(Clone, Debug, PartialEq, Hash)]
-pub struct FontFace {
-  /// A prioritized list of font family names or generic family names.
-  ///
-  /// [font-family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family) in CSS.
-  pub family: Box<[FontFamily]>,
-  /// Selects a normal, condensed, or expanded face from a font family.
-  ///
-  /// [font-stretch](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-stretch-prop) in CSS.
-  pub stretch: FontStretch,
-  /// Allows italic or oblique faces to be selected.
-  ///
-  /// [font-style](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-style-prop) in CSS.
-  pub style: FontStyle,
-  /// Specifies the weight of glyphs in the font, their degree of blackness or
-  /// stroke thickness.
-  ///
-  /// [font-weight](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-weight-prop) in CSS.
-  pub weight: FontWeight,
-}
+use text::FontFace;
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, PartialEq)]
@@ -65,6 +15,9 @@ pub struct TextStyle {
   pub letter_space: f32,
   /// The path style(fill or stroke) to use when painting.
   pub path_style: PathStyle,
+  /// The factor use to multiplied by the font size to specify the text line
+  /// height.
+  pub line_height: Option<f32>,
 }
 
 bitflags::bitflags! {
@@ -108,17 +61,6 @@ pub enum PathStyle {
   Stroke(f32),
 }
 
-impl Default for FontFace {
-  fn default() -> Self {
-    Self {
-      family: Box::new([FontFamily::Serif]),
-      stretch: Default::default(),
-      style: Default::default(),
-      weight: Default::default(),
-    }
-  }
-}
-
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
@@ -127,10 +69,10 @@ impl Default for TextStyle {
       font_face: CowRc::owned(Default::default()),
       letter_space: 0.,
       path_style: PathStyle::Fill,
+      line_height: None,
     }
   }
 }
-
 impl From<Color> for Brush {
   #[inline]
   fn from(c: Color) -> Self { Brush::Color(c) }
@@ -139,50 +81,4 @@ impl From<Color> for Brush {
 impl Default for Brush {
   #[inline]
   fn default() -> Self { Brush::Color(Color::BLACK) }
-}
-
-/// Describe the align in logic without direction.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Align {
-  Start,
-  Center,
-  End,
-}
-
-/// Horizontal Alignment
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum HAlign {
-  Left,
-  Center,
-  Right,
-}
-
-/// Vertical Alignment
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum VALign {
-  Top,
-  Center,
-  Bottom,
-}
-
-impl From<HAlign> for Align {
-  #[inline]
-  fn from(h: HAlign) -> Self {
-    match h {
-      HAlign::Left => Align::Start,
-      HAlign::Center => Align::Center,
-      HAlign::Right => Align::End,
-    }
-  }
-}
-
-impl From<VALign> for Align {
-  #[inline]
-  fn from(h: VALign) -> Self {
-    match h {
-      VALign::Top => Align::Start,
-      VALign::Center => Align::Center,
-      VALign::Bottom => Align::End,
-    }
-  }
 }

@@ -1,4 +1,5 @@
 use painter::{DeviceRect, DeviceSize};
+use zerocopy::AsBytes;
 
 pub struct MemTexture<const N: usize> {
   max_size: DeviceSize,
@@ -26,39 +27,38 @@ impl<const N: usize> MemTexture<N> {
   /// Expand the texture.
   /// Return true if expand successful, false if this texture reach the limit.
   /// the old data will all drop.
-  pub fn expand_size(&mut self) -> Option<Box<[u8]>> {
-    let mut size = self.size;
-    self.max_size.greater_than(size).any().then(|| {
-      if size.height * 2 < self.max_size.height {
-        size.height *= 2;
+  pub fn expand_size(&mut self) -> bool {
+    let old_size = self.size;
+    let success = self.max_size.greater_than(old_size).any();
+    if success {
+      if old_size.height * 2 < self.max_size.height {
+        self.size.height *= 2;
       }
-      if size.width * 2 < self.max_size.width {
-        size.width *= 2;
+      if old_size.width * 2 < self.max_size.width {
+        self.size.width *= 2;
       }
 
+      let old = std::mem::replace(&mut self.array, Self::alloc_mem(self.size));
+      self.write_rect(&DeviceRect::from_size(old_size), &old);
       self.updated = true;
-      self.size = size;
-      std::mem::replace(&mut self.array, Self::alloc_mem(size))
-    })
+    }
+    success
   }
 
   #[inline]
-  pub fn as_bytes(&self) -> &[u8] {
-    unsafe {
-      std::slice::from_raw_parts(&self.array as *const _ as *const u8, self.array.len() * N)
-    }
-  }
+  pub fn as_bytes(&self) -> &[u8] { self.array.as_bytes() }
 
   /// Use `data` to fill the `rect` sub range to this 2d array, `rect` should
   /// not over this 2d array's boundary.
   pub fn write_rect(&mut self, rect: &DeviceRect, data: &[u8]) {
-    debug_assert_eq!(rect.area() as usize, data.len());
+    debug_assert_eq!(rect.area() as usize * N, data.len());
     debug_assert!(DeviceRect::from_size(self.size).contains_rect(rect));
     let rect = rect.to_usize();
     let row_bytes = rect.width() * N;
+    let x_range = rect.min_x() * N..rect.max_x() * N;
     rect.y_range().enumerate().for_each(|(idx, y)| {
       let offset = idx * row_bytes;
-      self[y][rect.x_range()].copy_from_slice(&data[offset..offset + row_bytes]);
+      self[y][x_range.clone()].copy_from_slice(&data[offset..offset + row_bytes]);
     });
 
     self.updated = true;
@@ -151,15 +151,19 @@ mod tests {
   fn grow() {
     let mut tex = MemTexture::<1>::new(DeviceSize::new(2, 1), DeviceSize::new(512, 512));
     tex.write_rect(&DeviceRect::new((0, 0).into(), (1, 1).into()), &[1u8]);
-    tex.expand_size();
 
     assert_eq!(tex.as_bytes().len(), 2);
     assert_eq!(tex.size().to_array(), [2, 1]);
 
+    tex.expand_size();
+    assert_eq!(tex.as_bytes(), vec![1, 0, 0, 0, 0, 0, 0, 0].as_slice());
     assert!(tex.is_updated());
 
     tex.expand_size();
-    assert_eq!(tex.as_bytes(), vec![0; 32].as_slice());
+    let mut data = vec![0; 32];
+    data[0] = 1;
+
+    assert_eq!(tex.as_bytes(), data.as_slice());
 
     tex.data_synced();
     assert!(!tex.is_updated());

@@ -1,6 +1,6 @@
-use std::{borrow::Borrow, fmt::Debug, sync::Arc};
+use std::{borrow::Borrow, fmt::Debug, hash::Hash, sync::Arc};
 
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Eq)]
 
 ///! A copy on write smart pointer shared value without deep clone .
 pub enum CowRc<B: ToOwned + ?Sized + 'static> {
@@ -104,6 +104,30 @@ impl<T: ToOwned<Owned = T>> From<T> for CowRc<T> {
 impl From<String> for CowRc<str> {
   #[inline]
   fn from(str: String) -> Self { CowRc::owned(str) }
+}
+
+impl<B: ?Sized + ToOwned> Borrow<B> for CowRc<B> {
+  fn borrow(&self) -> &B {
+    match self {
+      CowRc::Borrowed(b) => *b,
+      CowRc::Owned(o) => (&**o).borrow(),
+    }
+  }
+}
+
+impl<B: ?Sized + ToOwned + PartialEq> PartialEq for CowRc<B> {
+  fn eq(&self, other: &Self) -> bool {
+    let a: &B = self.borrow();
+    let b = other.borrow();
+    a == b
+  }
+}
+
+impl<B: ?Sized + ToOwned + Hash> Hash for CowRc<B> {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    let borrow: &B = self.borrow();
+    borrow.hash(state);
+  }
 }
 
 #[test]

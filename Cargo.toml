@@ -6,7 +6,12 @@ members = [
   "unit_test",
   "widget_derive",
   "algo",
+  "text"
 ]
 
 [profile.bench]
+debug = true
+
+
+[profile.release]
 debug = true

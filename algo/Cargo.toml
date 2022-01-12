@@ -8,3 +8,4 @@ version = "0.1.0"
 [dependencies]
 ahash = "0.7.6"
 log = "0.4.14"
+rayon = "1.5.1"

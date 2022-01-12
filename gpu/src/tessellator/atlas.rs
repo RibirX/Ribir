@@ -25,21 +25,15 @@ impl TextureAtlas {
     }
   }
 
-  /// Store a image in the atlas, and return the allocation of it. And remember
-  /// if `auto_grow` is true, the atlas will auto grow and _rearrange if
-  /// necessary, in this case, all `Allocation` returned before invalid.
-  pub fn store_image(
-    &mut self,
-    image: ShallowImage,
-    auto_grow: bool,
-  ) -> Result<&Allocation, Error> {
-    if self.is_large_img_to_me(&**image) {
+  /// Store a image in the atlas, and return the allocation of it.
+  pub fn store_image(&mut self, image: &ShallowImage) -> Result<&Allocation, Error> {
+    if self.is_large_img_to_me(image.as_ref()) {
       return Err(Error::LargeImageAvoid);
     }
 
     let mut alloc = None;
     if !self.allocated_map.contains_key(&image) {
-      let a = self.allocate(image.size(), auto_grow)?;
+      let a = self.allocate(image.size())?;
       self.texture.write_rect(
         &a.rectangle.to_u32().to_rect().cast_unit(),
         &image.pixel_bytes(),
@@ -49,7 +43,7 @@ impl TextureAtlas {
 
     let alloc = self
       .allocated_map
-      .get_or_insert_with_key(image, |_| alloc.unwrap());
+      .get_or_insert_with(&image, || alloc.unwrap());
     Ok(alloc)
   }
 
@@ -71,7 +65,7 @@ impl TextureAtlas {
 
   /// deallocate all last recently not used allocation.
   pub fn end_frame(&mut self) {
-    self.allocated_map.frame_end_with(
+    let removed = self.allocated_map.frame_end_with(
       "Texture Atlas",
       Some(|hit: bool, alloc: &mut Allocation| {
         if !hit {
@@ -79,6 +73,9 @@ impl TextureAtlas {
         };
       }),
     );
+    if removed > 0 {
+      self.rearrange()
+    }
   }
 
   /// Return the reference of the soft texture of the atlas, copy it to the
@@ -92,60 +89,68 @@ impl TextureAtlas {
   #[inline]
   pub fn log_png_to(&self, path: &str) { self.texture.write_png_to(path, png::ColorType::RGBA); }
 
-  fn allocate(&mut self, size: DeviceSize, auto_grow: bool) -> Result<Allocation, Error> {
+  pub fn clear(&mut self) {
+    self.atlas_allocator.clear();
+    self.allocated_map.clear();
+  }
+
+  fn allocate(&mut self, size: DeviceSize) -> Result<Allocation, Error> {
     loop {
       if let Some(alloc) = self.atlas_allocator.allocate(size.to_untyped().to_i32()) {
-        return Ok(alloc);
-      } else if auto_grow {
-        if !self.grow() {
-          return Err(Error::TextureSpaceToLimit);
-        }
-      } else {
-        return Err(Error::TextureFull);
+        break Ok(alloc);
+      }
+      if !self.grow() {
+        break Err(Error::TextureSpaceLimit);
       }
     }
   }
 
-  pub fn no_cache_hit_find(&self, img: &ShallowImage) -> Option<&Allocation> {
-    self.allocated_map.no_hit_get(img)
+  fn grow(&mut self) -> bool {
+    let expended = self.texture.expand_size();
+    if expended {
+      let new_size = self.texture().size().to_i32().to_untyped();
+      self.atlas_allocator.grow(new_size);
+    }
+    expended
   }
 
-  fn grow(&mut self) -> bool {
-    self.texture.expand_size().map_or(false, |old| {
-      let new_size = self.texture().size().to_i32().to_untyped();
-      let ChangeList { changes, failures } = self.atlas_allocator.resize_and_rearrange(new_size);
-      assert!(
-        failures.is_empty(),
-        "grow atlas and rearrange should not failed."
-      );
-      changes.iter().for_each(|c| {
-        let old_rect = c.old.rectangle.to_usize();
-        let new_rect = c.new.rectangle.to_usize();
-        let rect_row_bytes = old_rect.width() * TextureAtlas::UNIT;
+  fn rearrange(&mut self) {
+    let ChangeList { changes, failures } = self.atlas_allocator.rearrange();
+    assert!(
+      failures.is_empty(),
+      "grow atlas and rearrange should not failed."
+    );
+    if changes.is_empty() {
+      return;
+    }
 
-        old_rect
-          .y_range()
-          .zip(new_rect.y_range())
-          .for_each(|(old_y, new_y)| {
-            let old_offset = old_rect.min.x * TextureAtlas::UNIT + old_y * rect_row_bytes;
-            let new_offset = new_rect.min.x * TextureAtlas::UNIT + new_y * rect_row_bytes;
-            self.texture[new_y][new_offset..new_offset + rect_row_bytes]
-              .copy_from_slice(&old[old_offset..old_offset + rect_row_bytes]);
-          });
-      });
+    let old = self.texture.as_bytes().to_owned();
+    changes.iter().for_each(|c| {
+      let old_rect = c.old.rectangle.to_usize();
+      let new_rect = c.new.rectangle.to_usize();
+      let rect_row_bytes = old_rect.width() * TextureAtlas::UNIT;
 
-      // update the allocated map
-      let id_map = changes
-        .iter()
-        .map(|c| (c.old.id, c.new))
-        .collect::<HashMap<_, _>>();
-      self.allocated_map.values_mut().for_each(|alloc| {
-        if let Some(new_alloc) = id_map.get(&alloc.id) {
-          *alloc = *new_alloc;
-        }
-      });
-      true
-    })
+      old_rect
+        .y_range()
+        .zip(new_rect.y_range())
+        .for_each(|(old_y, new_y)| {
+          let old_offset = old_rect.min.x * TextureAtlas::UNIT + old_y * rect_row_bytes;
+          let new_offset = new_rect.min.x * TextureAtlas::UNIT + new_y * rect_row_bytes;
+          self.texture[new_y][new_offset..new_offset + rect_row_bytes]
+            .copy_from_slice(&old[old_offset..old_offset + rect_row_bytes]);
+        });
+    });
+
+    // update the allocated map
+    let id_map = changes
+      .iter()
+      .map(|c| (c.old.id, c.new))
+      .collect::<HashMap<_, _>>();
+    self.allocated_map.values_mut().for_each(|alloc| {
+      if let Some(new_alloc) = id_map.get(&alloc.id) {
+        *alloc = *new_alloc;
+      }
+    });
   }
 }
 
@@ -167,7 +172,8 @@ pub mod tests {
 
   impl Image for PureColorImage {
     fn pixel_bytes(&self) -> Box<[u8]> {
-      let vec = vec![self.color.clone().into_raw(); self.size.area() as usize].into_boxed_slice();
+      let vec =
+        vec![self.color.clone().into_raw(); self.size.area() as usize * 4].into_boxed_slice();
       unsafe { std::mem::transmute(vec) }
     }
 
@@ -188,23 +194,19 @@ pub mod tests {
   fn grow_alloc_keep() {
     let mut atlas = TextureAtlas::new(DeviceSize::new(64, 64), MAX_SIZE);
     let red_img = PureColorImage::shallow_img(Color::RED, DeviceSize::new(32, 32));
-    let red_alloc = *atlas.store_image(red_img.clone(), false).unwrap();
+    let red_alloc = *atlas.store_image(&red_img).unwrap();
 
     assert_eq!(red_alloc.rectangle.min.to_array(), [0, 0]);
 
     // same image should have same position in atlas
-    assert_eq!(
-      &red_alloc,
-      atlas.store_image(red_img.clone(), false).unwrap()
-    );
+    assert_eq!(&red_alloc, atlas.store_image(&red_img).unwrap());
     color_img_check(&atlas, &red_alloc, Color::RED);
 
     let yellow_img = PureColorImage::shallow_img(Color::YELLOW, DeviceSize::new(64, 64));
-    let yellow_alloc = *atlas.store_image(yellow_img, true).unwrap();
+    let yellow_alloc = *atlas.store_image(&yellow_img).unwrap();
 
-    let red_alloc = atlas.no_cache_hit_find(&red_img).unwrap();
     // the color should keep after atlas rearrange
-    color_img_check(&atlas, red_alloc, Color::RED);
+    color_img_check(&atlas, &red_alloc, Color::RED);
     color_img_check(&atlas, &yellow_alloc, Color::YELLOW);
   }
 

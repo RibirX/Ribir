@@ -18,12 +18,12 @@ impl TextureRecords {
   pub fn get_id(&mut self, image: &ShallowImage) -> Option<usize> { self.cache.get(image).cloned() }
 
   pub fn insert(&mut self, image: ShallowImage) -> usize {
-    *self.cache.get_or_insert_with_key(image, |_| {
+    *self.cache.get_or_insert_with(&image, || {
       let (id, _) = self.next_id.overflowing_add(1);
       self.next_id = id.max(self.id_from);
       self.next_id
     })
   }
 
-  pub fn frame_end(&mut self) { self.cache.frame_end("Texture"); }
+  pub fn end_frame(&mut self) { self.cache.end_frame("Texture"); }
 }

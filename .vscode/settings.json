@@ -1,6 +1,6 @@
 {
   "lldb.launch.sourceMap": {
-    "/rustc/d914f17ca71a33a89b2dc3436fca51b1a091559e": "/home/adoo/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust"
+    "/rustc/c5ecc157043ba413568b09292001a4a74b541a4e": "/home/adoo/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust"
   },
   "lldb.displayFormat": "auto",
   "lldb.dereferencePointers": true,
@@ -10,14 +10,17 @@
   ],
   "cSpell.words": [
     "ahash",
+    "bidi",
     "bitflags",
     "cond",
     "fontdb",
     "guillotiere",
+    "Harf",
     "Monospace",
     "Msaa",
     "paren",
     "retessellate",
+    "rustybuzz",
     "segs",
     "subpat",
     "THROUGHLINE"
