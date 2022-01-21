@@ -12,17 +12,17 @@ guillotiere = "0.6.0"
 lyon_tessellation = "0.17.10"
 painter = {path = "../painter"}
 png = {version = "0.16.7"}
-raw-window-handle = {version = "0.3.3", optional = true}
+raw-window-handle = {version = "0.4.2", optional = true}
 rayon = "1.5.1"
 text = {path = "../text"}
-wgpu = {version = "0.6.0", optional = true}
+wgpu = {version = "0.12.0", optional = true}
 zerocopy = "0.3"
 
 [dev-dependencies]
 env_logger = "0.7.1"
 futures = "0.3.5"
 unit_test = {path = "../unit_test"}
-winit = "0.24.0"
+winit = "0.26.0"
 
 [features]
 wgpu_gl = ["wgpu", "raw-window-handle"]

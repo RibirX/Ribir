@@ -1,4 +1,5 @@
 use super::{DeviceRect, DeviceSize};
+use std::num::NonZeroU32;
 
 pub(crate) struct RgbaConvert {
   group_layout: wgpu::BindGroupLayout,
@@ -10,10 +11,10 @@ impl RgbaConvert {
     let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
       entries: &[wgpu::BindGroupLayoutEntry {
         binding: 0,
-        visibility: wgpu::ShaderStage::COMPUTE,
-        ty: wgpu::BindingType::StorageBuffer {
-          dynamic: false,
-          readonly: false,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+          ty: wgpu::BufferBindingType::Storage{ read_only: false },
+          has_dynamic_offset: false,
           min_binding_size: None,
         },
         count: None,
@@ -22,7 +23,7 @@ impl RgbaConvert {
     });
 
     let cs_module =
-      device.create_shader_module(wgpu::include_spirv!("./shaders/bgra_2_rgba.comp.spv"));
+      device.create_shader_module(&wgpu::include_wgsl!("./shaders/bgra_2_rgba.comp.wgsl"));
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       bind_group_layouts: &[&group_layout],
@@ -33,10 +34,8 @@ impl RgbaConvert {
     let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
       label: Some("image convert pipeline"),
       layout: Some(&pipeline_layout),
-      compute_stage: wgpu::ProgrammableStageDescriptor {
-        module: &cs_module,
-        entry_point: "main",
-      },
+      module: &&cs_module,
+      entry_point: "main",
     });
 
     Self { group_layout, pipeline }
@@ -54,13 +53,15 @@ impl RgbaConvert {
       layout: &self.group_layout,
       entries: &[wgpu::BindGroupEntry {
         binding: 0,
-        resource: wgpu::BindingResource::Buffer(bgra_buffer.slice(..)),
+        resource: wgpu::BindingResource::Buffer(bgra_buffer.as_entire_buffer_binding()),
       }],
       label: None,
     });
 
     {
-      let mut c_pass = encoder.begin_compute_pass();
+      let mut c_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        label: Some("Begin compute pass"),
+      });
       c_pass.set_pipeline(&self.pipeline);
       c_pass.set_bind_group(0, &bind_group, &[]);
       c_pass.dispatch(size.area(), 1, 1);
@@ -97,13 +98,13 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   // The output buffer lets us retrieve the data as an array
   let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
     size,
-    usage: wgpu::BufferUsage::STORAGE | wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::COPY_SRC,
+    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
     mapped_at_creation: false,
     label: None,
   });
 
   encoder.copy_texture_to_buffer(
-    wgpu::TextureCopyView {
+    wgpu::ImageCopyTexture {
       texture,
       mip_level: 0,
       origin: wgpu::Origin3d {
@@ -111,16 +112,17 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
         y: rect.min_y(),
         z: 0,
       },
+      aspect: wgpu::TextureAspect::All,
     },
-    wgpu::BufferCopyView {
+    wgpu::ImageCopyBuffer {
       buffer: &output_buffer,
-      layout: wgpu::TextureDataLayout {
+      layout: wgpu::ImageDataLayout {
         offset: 0,
-        bytes_per_row: PX_BYTES as u32 * align_width as u32,
-        rows_per_image: 0,
+        bytes_per_row: NonZeroU32::new(PX_BYTES as u32 * align_width as u32),
+        rows_per_image: NonZeroU32::new(0),
       },
     },
-    wgpu::Extent3d { width, height, depth: 1 },
+    wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
   );
   convert.compute_shader_convert(
     device,
@@ -131,7 +133,7 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
 
   let map_buffer = device.create_buffer(&wgpu::BufferDescriptor {
     size,
-    usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
+    usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
     mapped_at_creation: false,
     label: None,
   });

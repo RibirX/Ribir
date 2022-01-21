@@ -80,6 +80,17 @@
       "cwd": "${workspaceFolder}"
     },
     {
+      "name": "(Windows) Debug Wgpu Demo",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/examples/wgpu-hello.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}",
+      "environment": [],
+      "externalConsole": true
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug example 'canvas_hello'",

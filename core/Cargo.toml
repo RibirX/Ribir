@@ -19,7 +19,7 @@ log = "0.4.8"
 painter = {path = "../painter", version = "*"}
 rxrust = "1.0.0-alpha.2"
 widget_derive = {path = "../widget_derive"}
-winit = "0.24.0"
+winit = "0.26.0"
 
 [dependencies.blake3]
 features = ["rayon"]

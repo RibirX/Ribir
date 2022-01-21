@@ -1,5 +1,5 @@
 use gpu::wgpu_backend_with_wnd;
-use painter::{Color, DeviceSize, Transform};
+use painter::{Color, DeviceSize, PainterBackend, Transform};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -14,7 +14,7 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
-  let (mut tessellator, mut render) = block_on(create_canvas_with_render_from_wnd(
+  let mut gpu_backend = block_on(wgpu_backend_with_wnd(
     &window,
     DeviceSize::new(size.width, size.height),
     None,
@@ -49,10 +49,10 @@ fn main() {
         .line_to((100.0, 130.0).into())
         .line_to((0.0, 130.0).into())
         .close_path();
-      painter.fill();
+      painter.fill(None);
 
       let commands = painter.finish();
-      tessellator.tessellate(commands, &mut render);
+      gpu_backend.submit(commands);
     }
     Event::MainEventsCleared => {
       window.request_redraw();

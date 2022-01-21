@@ -9,16 +9,16 @@ pub trait Surface {
     &mut self,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    sc_desc: &wgpu::SwapChainDescriptor,
+    s_config: &wgpu::SurfaceConfiguration,
   );
 
-  fn get_next_view(&mut self) -> Self::V;
+  fn get_current_view(&mut self) -> Self::V;
 }
 
 /// A `Surface` represents a platform-specific surface (e.g. a window).
 pub struct PhysicSurface {
-  swap_chain: wgpu::SwapChain,
   surface: wgpu::Surface,
+  s_config: wgpu::SurfaceConfiguration,
 }
 
 /// A `Surface` present in a texture. Usually `PhysicSurface` display things to
@@ -27,23 +27,25 @@ pub struct PhysicSurface {
 pub type TextureSurface = Texture;
 
 impl Surface for PhysicSurface {
-  type V = FrameView<wgpu::SwapChainFrame>;
+  type V = FrameView<wgpu::TextureView>;
 
   fn update(
     &mut self,
     device: &wgpu::Device,
     _queue: &wgpu::Queue,
-    sc_desc: &wgpu::SwapChainDescriptor,
+    s_config: &wgpu::SurfaceConfiguration,
   ) {
-    self.swap_chain = device.create_swap_chain(&self.surface, sc_desc);
+    self.surface.configure(device, s_config);
   }
 
-  fn get_next_view(&mut self) -> Self::V {
+  fn get_current_view(&mut self) -> Self::V {
     FrameView(
       self
-        .swap_chain
-        .get_current_frame()
-        .expect("Timeout getting texture"),
+        .surface
+        .get_current_texture()
+        .expect("Timeout getting texture")
+        .texture
+        .create_view(&wgpu::TextureViewDescriptor::default()),
     )
   }
 }
@@ -55,17 +57,17 @@ impl Surface for TextureSurface {
     &mut self,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    sc_desc: &wgpu::SwapChainDescriptor,
+    s_config: &wgpu::SurfaceConfiguration,
   ) {
     self.resize(
       device,
       queue,
-      DeviceSize::new(sc_desc.width, sc_desc.height),
+      DeviceSize::new(s_config.width, s_config.height),
     );
   }
 
   #[inline]
-  fn get_next_view(&mut self) -> Self::V {
+  fn get_current_view(&mut self) -> Self::V {
     FrameView(
       self
         .raw_texture
@@ -76,10 +78,6 @@ impl Surface for TextureSurface {
 
 pub struct FrameView<T>(T);
 
-impl Borrow<wgpu::TextureView> for FrameView<wgpu::SwapChainFrame> {
-  fn borrow(&self) -> &wgpu::TextureView { &self.0.output.view }
-}
-
 impl Borrow<wgpu::TextureView> for FrameView<wgpu::TextureView> {
   #[inline]
   fn borrow(&self) -> &wgpu::TextureView { &self.0 }
@@ -87,28 +85,28 @@ impl Borrow<wgpu::TextureView> for FrameView<wgpu::TextureView> {
 
 impl PhysicSurface {
   pub(crate) fn new(surface: wgpu::Surface, device: &wgpu::Device, size: DeviceSize) -> Self {
-    let sc_desc = wgpu::SwapChainDescriptor {
-      usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+    let s_config = wgpu::SurfaceConfiguration {
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
       width: size.width,
       height: size.height,
       present_mode: wgpu::PresentMode::Fifo,
     };
 
-    let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+    surface.configure(device, &s_config);
 
-    Self { swap_chain, surface }
+    Self { surface, s_config }
   }
 }
 
 pub struct Texture {
   pub(crate) raw_texture: wgpu::Texture,
   size: DeviceSize,
-  usage: wgpu::TextureUsage,
+  usage: wgpu::TextureUsages,
 }
 
 impl Texture {
-  pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsage) -> Self {
+  pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsages) -> Self {
     let raw_texture = Self::new_texture(device, size, usage);
     Texture { raw_texture, size, usage }
   }
@@ -123,20 +121,22 @@ impl Texture {
     let mut encoder = device
       .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") });
     encoder.copy_texture_to_texture(
-      wgpu::TextureCopyView {
+      wgpu::ImageCopyTexture {
         texture: &self.raw_texture,
         mip_level: 0,
         origin: wgpu::Origin3d::ZERO,
+        aspect: wgpu::TextureAspect::All,
       },
-      wgpu::TextureCopyView {
+      wgpu::ImageCopyTexture {
         texture: &new_texture,
         mip_level: 0,
         origin: wgpu::Origin3d::ZERO,
+        aspect: wgpu::TextureAspect::All,
       },
       wgpu::Extent3d {
         width: size.width,
         height: size.height,
-        depth: 1,
+        depth_or_array_layers: 1,
       },
     );
 
@@ -149,14 +149,14 @@ impl Texture {
   fn new_texture(
     device: &wgpu::Device,
     size: DeviceSize,
-    usage: wgpu::TextureUsage,
+    usage: wgpu::TextureUsages,
   ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
       label: Some("new texture"),
       size: wgpu::Extent3d {
         width: size.width,
         height: size.height,
-        depth: 1,
+        depth_or_array_layers: 1,
       },
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
