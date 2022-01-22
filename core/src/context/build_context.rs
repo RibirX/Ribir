@@ -1,6 +1,6 @@
-use crate::prelude::*;
+use crate::{animation::TickerAnimationCtrl, prelude::*};
 use ::text::FontFamily;
-use std::rc::Rc;
+use std::{rc::Rc, time::Duration};
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
   Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
@@ -31,6 +31,14 @@ impl<'a> BuildCtx<'a> {
   pub(crate) fn new(ctx: &'a Context, id: WidgetId) -> Self {
     Self { ctx, id, default_theme: None }
   }
+
+  pub fn ticker_ctrl(&self, duration: Duration) -> Option<Box<dyn TickerAnimationCtrl>> {
+    self
+      .ctx
+      .animation_ticker
+      .as_ref()
+      .map(|ticker| ticker.borrow_mut().ticker_ctrl(duration))
+  }
 }
 
 #[cfg(test)]
@@ -49,7 +57,7 @@ mod tests {
       }
     }
     // should panic when construct the context
-    Context::new(T.box_it(), 1.);
+    Context::new(T.box_it(), 1., None);
   }
 
   #[derive(Debug, Declare)]

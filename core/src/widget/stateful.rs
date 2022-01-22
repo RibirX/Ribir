@@ -405,7 +405,7 @@ mod tests {
     .into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
-    let ctx = Context::new(key.box_it(), 1.);
+    let ctx = Context::new(key.box_it(), 1., None);
     let tree = &ctx.widget_tree;
     let key = tree.root().assert_get(tree).get_key();
     assert!(key.is_some());

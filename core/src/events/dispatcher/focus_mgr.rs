@@ -177,7 +177,7 @@ mod tests {
       .have(empty_box().with_auto_focus(true).box_it())
       .have(empty_box().with_auto_focus(true).box_it());
 
-    let ctx = Context::new(widget.box_it(), 1.);
+    let ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
@@ -193,7 +193,7 @@ mod tests {
       .have(empty_box().box_it())
       .have(empty_box().with_auto_focus(true).box_it());
 
-    let ctx = Context::new(widget.box_it(), 1.);
+    let ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
@@ -214,7 +214,7 @@ mod tests {
       .have(empty_box().with_tab_index(2).box_it())
       .have(empty_box().with_tab_index(3).box_it());
 
-    let mut ctx = Context::new(widget.box_it(), 1.);
+    let mut ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
     mgr.update(&mut ctx);
     let tree = &ctx.widget_tree;
@@ -289,7 +289,7 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut ctx = Context::new(widget.box_it(), 1.);
+    let mut ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 

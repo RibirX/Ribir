@@ -5,13 +5,13 @@ extern crate bitflags;
 extern crate lazy_static;
 extern crate widget_derive;
 
+pub mod animation;
 mod application;
-pub mod window;
-
 mod context;
 pub mod declare;
 pub mod events;
 pub mod widget;
+pub mod window;
 
 pub mod prelude {
   #[doc(no_inline)]
