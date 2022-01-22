@@ -9,10 +9,10 @@ use text::FontFace;
 /// bottom edge of the canvas.
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
-  init_transform: Transform,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: Builder,
+  device_scale: f32,
 }
 
 /// `PainterBackend` use to draw the picture what the `commands` described  to
@@ -54,16 +54,15 @@ struct PainterState {
 }
 
 impl Painter {
-  pub fn new(transform: Transform) -> Self {
-    let mut state = PainterState::default();
-    state.transform = transform.clone();
-
-    Self {
-      init_transform: transform,
+  pub fn new(device_scale: f32) -> Self {
+    let mut p = Self {
+      device_scale,
       state_stack: vec![PainterState::default()],
       commands: vec![],
       path_builder: Path::builder(),
-    }
+    };
+    p.scale(device_scale, device_scale);
+    p
   }
 
   #[inline]
@@ -93,15 +92,16 @@ impl Painter {
   #[inline]
   pub fn restore(&mut self) { self.state_stack.pop(); }
 
-  pub fn reset(&mut self, transform: Option<Transform>) {
-    if let Some(t) = transform {
-      self.init_transform = t;
+  pub fn reset(&mut self, device_scale: Option<f32>) {
+    if let Some(scale) = device_scale {
+      self.device_scale = scale;
     }
     self.state_stack.clear();
-    let mut state = PainterState::default();
-    state.transform = self.init_transform;
-    self.state_stack.push(state);
+    self.state_stack.push(PainterState::default());
+    self.scale(self.device_scale, self.device_scale);
   }
+
+  pub fn device_scale(&self) -> f32 { self.device_scale }
 
   /// Returns the color, gradient, or pattern used for draw. Only `Color`
   /// support now.
@@ -261,8 +261,14 @@ impl Painter {
   /// * `y` - Distance to move in the vertical direction. Positive values are
   ///   down, and negative are up.
   pub fn translate(&mut self, x: f32, y: f32) -> &mut Self {
-    let t = &mut self.current_state_mut().transform;
-    *t = t.then_translate(Vector::new(x, y));
+    let t = self.get_transform().then_translate(Vector::new(x, y));
+    self.set_transform(t);
+    self
+  }
+
+  pub fn scale(&mut self, x: f32, y: f32) -> &mut Self {
+    let t = self.get_transform().then_scale(x, y);
+    self.set_transform(t);
     self
   }
 }
@@ -346,19 +352,10 @@ impl PaintCommand {
 #[cfg(test)]
 mod test {
   use super::*;
-  use canvas::{mem_texture::MemTexture, Size};
-  use futures::executor::block_on;
-
-  struct MockRender;
-
-  impl CanvasRender for MockRender {
-    fn draw(&mut self, _: &RenderData, _: &mut MemTexture<u8>, _: &mut MemTexture<u32>) {}
-    fn resize(&mut self, _: DeviceSize) {}
-  }
 
   #[test]
   fn save_guard() {
-    let mut layer = Painter::new();
+    let mut layer = Painter::new(1.);
     {
       let mut paint = layer.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
@@ -376,291 +373,5 @@ mod test {
       &Transform::new(1., 0., 0., 1., 0., 0.),
       layer.get_transform()
     );
-  }
-
-  #[test]
-  fn buffer() {
-    let mut layer = Painter::new();
-    let mut canvas = Canvas::new(None);
-    let mut builder = Builder::new();
-    builder.rect(&euclid::Rect::from_size((100., 100.).into()));
-    let path = builder.build();
-    layer.stroke_path(path.clone());
-    layer.fill_path(path);
-
-    canvas.consume_2d_layer(
-      layer,
-      &mut tessellator_2d::Tessellator::new(),
-      &mut MockRender {},
-    );
-
-    assert!(canvas.render_data().has_data());
-  }
-
-  #[test]
-  #[should_panic(expected = "not support in early develop")]
-  fn path_merge() {
-    let mut layer = Painter::new();
-
-    let mut canvas = Canvas::new(None);
-    let mut tessellator = tessellator_2d::Tessellator::new();
-    let mut mock_render = MockRender {};
-
-    let sample_path = Builder::new().build();
-    // The stroke path both style and line width same should be merge.
-    layer.stroke_path(sample_path.clone());
-    layer.stroke_path(sample_path.clone());
-    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
-    assert_eq!(canvas.render_data().primitives.len(), 1);
-
-    let mut layer = Painter::new();
-    // Different line width with same color pen can be merged.
-    layer.set_line_width(2.);
-    layer.stroke_path(sample_path.clone());
-    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
-    assert_eq!(canvas.render_data().primitives.len(), 1);
-
-    let mut layer = Painter::new();
-    // Different color can't be merged.
-    layer.set_brush(Brush::Color(Color::YELLOW));
-    layer.fill_path(sample_path.clone());
-    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
-    assert_eq!(canvas.render_data().primitives.len(), 2);
-
-    let mut layer = Painter::new();
-    // Different type style can't be merged
-    layer.set_brush(Brush::Image);
-    layer.fill_path(sample_path.clone());
-    layer.stroke_path(sample_path);
-    canvas.consume_2d_layer(layer, &mut tessellator, &mut mock_render);
-    // image not not support now, should panic.
-    assert_eq!(canvas.render_data().primitives.len(), 4);
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn fill_text_hello() {
-    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
-      DeviceSize::new(400, 400),
-    ));
-
-    let mut layer = canvas.new_2d_layer();
-    let font = FontInfo::new();
-    layer.set_font(font);
-    layer.fill_text("Nice to meet you!", None);
-    {
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-
-    unit_test::assert_canvas_eq!(render, "../../test_imgs/text_hello.png");
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn fill_text_complex() {
-    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
-      DeviceSize::new(400, 400),
-    ));
-    let serif = FontInfo::new();
-
-    let mut layer = canvas.new_2d_layer();
-    layer.fill_complex_texts(
-      vec![(
-        Text {
-          text: "Hi, nice to meet you!",
-          font: serif.clone(),
-          font_size: 36.,
-        },
-        Color::BLACK,
-      )],
-      Some(Rect::from_size(Size::new(400., 400.))),
-      None,
-    );
-
-    let arial = FontInfo::new().with_family("Arial".to_owned());
-
-    layer.fill_complex_texts(
-      vec![(
-        Text {
-          text: r#"To be, or not to be, that is the question!
-Whether it's nobler in the mind to suffer
-The slings and arrows of outrageous fortune,
-Or to take arms against a sea of troubles,
-And by opposing end them? To die: to sleep;
-"#,
-          font: arial,
-          font_size: 24.,
-        },
-        Color::GRAY,
-      )],
-      Some(Rect::from_size(Size::new(400., 400.))),
-      Some(TextLayout {
-        h_align: HorizontalAlign::Center,
-        v_align: VerticalAlign::Center,
-        wrap: LineWrap::Wrap,
-      }),
-    );
-
-    layer.fill_complex_texts(
-      vec![(
-        Text {
-          text: "Bye!",
-          font: serif,
-          font_size: 48.,
-        },
-        Color::RED,
-      )],
-      Some(Rect::from_size(Size::new(400., 400.))),
-      Some(TextLayout {
-        h_align: HorizontalAlign::Right,
-        v_align: VerticalAlign::Bottom,
-        wrap: LineWrap::SingleLine,
-      }),
-    );
-
-    {
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-
-    unit_test::assert_canvas_eq!(render, "../../test_imgs/complex_text.png");
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn fill_text_complex_single_style() {
-    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
-      DeviceSize::new(400, 400),
-    ));
-    let arial = FontInfo::new().with_family("Arial".to_owned());
-    let serif = FontInfo::new();
-    let mut layer = canvas.new_2d_layer();
-
-    layer.set_style(Brush::Color(Color::GRAY));
-    layer.fill_complex_texts_by_style(
-      vec![
-        Text {
-          text: "Hi, nice to meet you!\n",
-          font: serif.clone(),
-          font_size: 36.,
-        },
-        Text {
-          text: "\nTo be, or not to be, that is the question!
-Whether it’s nobler in the mind to suffer
-The slings and arrows of outrageous fortune,
-Or to take arms against a sea of troubles,
-And by opposing end them? To die: to sleep;\n",
-          font: arial,
-          font_size: 24.,
-        },
-        Text {
-          text: "Bye!",
-          font: serif,
-          font_size: 48.,
-        },
-      ],
-      Some(Rect::from_size(Size::new(400., 400.))),
-      Some(TextLayout {
-        h_align: HorizontalAlign::Right,
-        v_align: VerticalAlign::Bottom,
-        wrap: LineWrap::Wrap,
-      }),
-    );
-
-    {
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-
-    unit_test::assert_canvas_eq!(render, "../../test_imgs/complex_text_single_style.png");
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn update_texture_on_processing() {
-    let text = include_str!("../../fonts/loads-of-unicode.txt");
-    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
-      DeviceSize::new(400, 400),
-    ));
-    let crate_root = env!("CARGO_MANIFEST_DIR").to_owned();
-    canvas
-      .text_brush()
-      .load_font_from_path(crate_root + "/fonts/DejaVuSans.ttf", 0)
-      .unwrap();
-    let deja = FontInfo::new().with_family("DejaVu Sans".to_owned());
-    let mut layer = canvas.new_2d_layer();
-    layer.fill_complex_texts_by_style(
-      vec![Text { text, font: deja, font_size: 36. }],
-      Some(Rect::from_size(Size::new(1600., 1600.))),
-      Some(TextLayout {
-        h_align: HorizontalAlign::Right,
-        v_align: VerticalAlign::Bottom,
-        wrap: LineWrap::Wrap,
-      }),
-    );
-
-    {
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-
-    unit_test::assert_canvas_eq!(render, "../../test_imgs/texture_cache_update.png");
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn round_rect() {
-    let (mut canvas, mut render) = block_on(crate::create_canvas_with_render_headless(
-      DeviceSize::new(800, 200),
-    ));
-
-    let mut layer = canvas.new_2d_layer();
-    layer.set_style(Color::RED);
-    let rect = Rect::from_size(Size::new(80., 40.));
-
-    let radius = Vector::new(20., 10.);
-    [
-      BorderRadius::all(Vector::zero()),
-      BorderRadius::all(Vector::new(10., 10.)),
-      BorderRadius {
-        top_left: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        top_right: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        bottom_right: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        bottom_left: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        top_left: Vector::new(50., 50.),
-        bottom_right: Vector::new(50., 50.),
-        ..Default::default()
-      },
-    ]
-    .iter()
-    .for_each(|radius| {
-      layer.save_guard().rect_round(&rect, radius).stroke();
-      layer
-        .translate(0., rect.height() + 5.)
-        .rect_round(&rect, radius)
-        .fill();
-
-      layer.translate(rect.width() + 5., -(rect.height() + 5.));
-    });
-
-    {
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-
-    unit_test::assert_canvas_eq!(render, "../../test_imgs/rect_round.png");
   }
 }

@@ -1,14 +1,13 @@
 use crate::{
-  render::{layout_store::LayoutStore, render_tree::RenderTree},
-  widget::widget_tree::{WidgetId, WidgetTree},
+  context::{EventCtx, WidgetCtx},
+  prelude::Context,
+  widget::widget_tree::WidgetId,
 };
 use std::{cell::Cell, ptr::NonNull};
 
 pub(crate) mod dispatcher;
 mod pointers;
-use crate::widget::window::RawWindow;
 pub use pointers::*;
-use std::{cell::RefCell, rc::Rc};
 pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;
 pub use focus::*;
@@ -36,24 +35,20 @@ pub trait Event {
   /// Tells the user agent that if the event does not get explicitly handled,
   /// its default action should not be taken as it normally would be.
   fn prevent_default(&self);
+
   /// Represents the current state of the keyboard modifiers
   fn modifiers(&self) -> ModifiersState;
 
-  fn widget_tree(&self) -> &WidgetTree;
-
-  fn render_tree(&self) -> &RenderTree;
+  fn context<'a>(&'a self) -> EventCtx<'a>;
 }
 
 #[derive(Clone)]
 pub struct EventCommon {
   pub target: WidgetId,
   pub current_target: WidgetId,
-  pub modifiers: ModifiersState,
   pub cancel_bubble: Cell<bool>,
   pub prevent_default: Cell<bool>,
-  pub window: Rc<RefCell<Box<dyn RawWindow>>>,
-  widget_tree: NonNull<WidgetTree>,
-  render_tree: NonNull<RenderTree>,
+  context: NonNull<Context>,
 }
 
 impl<T: std::convert::AsRef<EventCommon>> Event for T {
@@ -66,11 +61,15 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   #[inline]
   fn prevent_default(&self) { self.as_ref().prevent_default.set(true) }
   #[inline]
-  fn modifiers(&self) -> ModifiersState { self.as_ref().modifiers }
+  fn modifiers(&self) -> ModifiersState { self.context().context().modifiers }
+
   #[inline]
-  fn widget_tree(&self) -> &WidgetTree { unsafe { &*self.as_ref().widget_tree.as_ref() } }
-  #[inline]
-  fn render_tree(&self) -> &RenderTree { unsafe { &*self.as_ref().render_tree.as_ref() } }
+  fn context<'a>(&'a self) -> EventCtx<'a> {
+    // Safety: framework promise event context only live in event dispatch and
+    // there is no others to share `Context`.
+    let mut ctx_ptr = self.as_ref().context;
+    EventCtx::new(self.current_target(), unsafe { ctx_ptr.as_mut() })
+  }
 }
 
 impl std::fmt::Debug for EventCommon {
@@ -78,7 +77,6 @@ impl std::fmt::Debug for EventCommon {
     f.debug_struct("CommonEvent")
       .field("target", &self.target)
       .field("current_target", &self.current_target)
-      .field("modifiers", &self.modifiers)
       .field("cancel_bubble", &self.cancel_bubble)
       .finish()
   }
@@ -95,24 +93,13 @@ impl std::convert::AsRef<EventCommon> for EventCommon {
 }
 
 impl EventCommon {
-  pub fn new(
-    modifiers: ModifiersState,
-    target: WidgetId,
-    window: Rc<RefCell<Box<dyn RawWindow>>>,
-    widget_tree: NonNull<WidgetTree>,
-    render_tree: NonNull<RenderTree>,
-  ) -> Self {
+  pub fn new(target: WidgetId, context: &mut Context) -> Self {
     Self {
-      modifiers,
       target,
       current_target: target,
       cancel_bubble: <_>::default(),
       prevent_default: <_>::default(),
-      window,
-      render_tree,
-      widget_tree,
+      context: NonNull::from(context),
     }
   }
-
-  pub fn layout_store(&self) -> &LayoutStore { todo!() }
 }

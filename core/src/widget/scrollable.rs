@@ -1,8 +1,4 @@
-use crate::{
-  prelude::{layout_store::LayoutStore, *},
-  render::render_tree::RenderTree,
-  widget::widget_tree::WidgetTree,
-};
+use crate::prelude::*;
 
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
@@ -111,7 +107,7 @@ macro scroll_render_widget_impl($widget: ty, $state: ty) {
 
     fn only_sized_by_parent(&self) -> bool { true }
 
-    fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {
+    fn paint<'a>(&'a self, _ctx: &mut PaintingCtx<'a>) {
       // nothing to paint, just a layout widget.
     }
   }
@@ -175,29 +171,12 @@ impl ScrollWorker for ScrollableBoth {
 }
 
 fn view_content(event: &WheelEvent) -> (Rect, Rect) {
-  fn widget_rect(
-    wid: WidgetId,
-    tree: &WidgetTree,
-    r_tree: &RenderTree,
-    layout_store: &LayoutStore,
-  ) -> Rect {
-    wid
-      .relative_to_render(tree)
-      .and_then(|rid| layout_store.layout_box_rect(rid))
-      .unwrap_or_else(Rect::zero)
-  }
+  let ctx = event.context();
 
-  let w_tree = event.widget_tree();
-  let r_tree = event.render_tree();
-  let target = event.current_target();
-  let layout_store = event.common.layout_store();
-  let view = widget_rect(target, w_tree, r_tree, layout_store);
-  let content = widget_rect(
-    target.first_child(w_tree).unwrap(),
-    w_tree,
-    r_tree,
-    layout_store,
-  );
+  let view = ctx.widget_rect().unwrap();
+  let child = ctx.single_child().unwrap();
+  let content = ctx.widget_rect_by_id(child).unwrap();
+
   (view, content)
 }
 
@@ -208,7 +187,7 @@ mod tests {
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(widget: BoxedWidget, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
+    let mut wnd = window::Window::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();
 

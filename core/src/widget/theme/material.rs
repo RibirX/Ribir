@@ -1,5 +1,5 @@
 pub use super::*;
-pub use painter::{Brush, Color, FontFamily, FontStyle, FontWeight};
+pub use painter::{Brush, Color};
 
 /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
 pub fn light(family: Box<[FontFamily]>) -> Theme {

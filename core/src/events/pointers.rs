@@ -204,17 +204,16 @@ impl PointerAttr {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::window::NoRenderWindow;
   use futures::executor::LocalPool;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
 
-  fn env(times: u8) -> (window::Window<window::MockBackend>, Rc<RefCell<usize>>) {
+  fn env(times: u8) -> (window::Window, Rc<RefCell<usize>>) {
     let size = Size::new(400., 400.);
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
     let sized_box = SizedBox { size }.on_tap_times(times, move |_| *c_count.borrow_mut() += 1);
-    let mut wnd = NoRenderWindow::without_render(sized_box.box_it(), size);
+    let mut wnd = Window::without_render(sized_box.box_it(), size);
     wnd.render_ready();
 
     (wnd, count)

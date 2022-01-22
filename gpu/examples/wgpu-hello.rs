@@ -19,6 +19,8 @@ fn main() {
     DeviceSize::new(size.width, size.height),
     None,
     None,
+    0.01,
+    <_>::default(),
   ));
 
   event_loop.run(move |event, _, control_flow| match event {

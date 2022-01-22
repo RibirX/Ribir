@@ -49,7 +49,7 @@ mod tests {
       }
     };
 
-    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
+    let mut wnd = window::Window::without_render(widget.box_it(), Size::new(100., 100.));
 
     wnd.render_ready();
     let device_id = unsafe { DeviceId::dummy() };

@@ -1,6 +1,5 @@
 use crate::mark_layout_assign;
 use crate::prelude::*;
-use crate::render::render_ctx::*;
 use crate::render::render_tree::*;
 use crate::render::*;
 
@@ -32,13 +31,18 @@ impl RenderWidget for Text {
 
 impl RenderObject for Text {
   #[inline]
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size { unimplemented!() }
+  fn perform_layout(&mut self, _: BoxClamp, ctx: &mut RenderCtx) -> Size {
+    let shaper = ctx.text_shaper();
+    let ids = shaper.font_db_mut().select_all_match(&self.style.font_face);
+    let glyphs = shaper.shape_text(&self.text, &ids);
+    ::text::layout::glyphs_box(&self.text, &glyphs, self.style.font_size, None, 0.).cast_unit()
+  }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
+  fn paint<'a>(&'a self, ctx: &mut PaintingCtx<'a>) {
     let painter = ctx.painter();
     painter.fill_text(self.text.clone());
   }

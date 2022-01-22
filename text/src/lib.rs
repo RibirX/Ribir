@@ -12,6 +12,7 @@ pub mod layout;
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FontFamily {
+  // todo: no need cow? or directly face ids
   /// The name of a font family of choice.
   Name(std::borrow::Cow<'static, str>),
 

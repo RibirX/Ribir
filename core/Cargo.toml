@@ -9,15 +9,14 @@ version = "0.1.0"
 [dependencies]
 algo = {path = "../algo"}
 bitflags = "1.2.1"
-fontdb = "0.7.0"
 futures = "0.3.5"
-glyph_brush = "0.7.3"
 gpu = {path = "../gpu", version = "*"}
 indextree = "4.3.1"
 lazy_static = "1.4.0"
 log = "0.4.8"
 painter = {path = "../painter", version = "*"}
 rxrust = "1.0.0-alpha.2"
+text = {path = "../text"}
 widget_derive = {path = "../widget_derive"}
 winit = "0.26.0"
 

@@ -48,7 +48,7 @@ impl RenderObject for SizedBox {
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
+  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {
     // nothing to paint, just a layout widget.
   }
 }

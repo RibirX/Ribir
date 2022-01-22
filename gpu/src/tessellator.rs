@@ -640,14 +640,14 @@ fn threshold_hash(value: f32, threshold: f32) -> u32 {
 
 use std::borrow::Borrow;
 
-// fixme: pr to lyon implement hash and eq for Path.
+// todo: a more robust and also fast way to implement hash and eq for path.
 enum Verb {
-  LineTo,
-  QuadraticTo,
-  CubicTo,
-  Begin,
-  Close,
-  End,
+  _LineTo,
+  _QuadraticTo,
+  _CubicTo,
+  _Begin,
+  _Close,
+  _End,
 }
 type LyonPoint = lyon_tessellation::geom::Point<f32>;
 struct ShadowPath {
@@ -837,7 +837,7 @@ mod tests {
   #[test]
   fn color_commands_should_batch() {
     let mut tess = tessellator();
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     circle_rectangle_color_paint(&mut painter);
     let mut render_data = vec![];
     tess.tessellate(&painter.finish(), |r| match r {
@@ -851,7 +851,7 @@ mod tests {
   #[test]
   fn img_should_batch() {
     let mut tess = tessellator();
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     two_img_paint(&mut painter);
     let mut render_data = vec![];
     tess.tessellate(&painter.finish(), |r| match r {
@@ -865,7 +865,7 @@ mod tests {
   #[test]
   fn image_color_cannot_batch() {
     let mut tess = tessellator();
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     circle_rectangle_color_paint(&mut painter);
     two_img_paint(&mut painter);
     circle_rectangle_color_paint(&mut painter);
@@ -884,7 +884,7 @@ mod tests {
   #[test]
   fn large_image_cannot_batch() {
     let mut tess = tessellator();
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
 
     two_img_paint(&mut painter);
     let large_img = PureColorImage::shallow_img(Color::YELLOW, DeviceSize::new(1024, 1024));
@@ -910,7 +910,7 @@ mod tests {
 
   #[bench]
   fn million_diff_round_rect(b: &mut Bencher) {
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     painter.set_brush(Color::RED).set_line_width(2.);
     (1..1_000_000).for_each(|i| {
       let round = (i as f32 * 0.00_001).min(0.1);
@@ -934,7 +934,7 @@ mod tests {
 
   #[test]
   fn million_diff_round_rect_x() {
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     painter.set_brush(Color::RED).set_line_width(2.);
     (1..1_000_000).for_each(|i| {
       let round = (i as f32 * 0.00_001).min(0.1);
@@ -955,7 +955,7 @@ mod tests {
 
   #[bench]
   fn million_same_round_rect(b: &mut Bencher) {
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     painter.set_brush(Color::RED).set_line_width(2.);
     painter.rect_round(
       &Rect::new(Point::zero(), Size::new(100., 100.)),
@@ -971,7 +971,7 @@ mod tests {
 
   #[bench]
   fn diff_char_30k(b: &mut Bencher) {
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     painter.set_brush(Color::RED).set_line_width(2.);
     // 30k different char
     let text = include_str!("../../fonts/loads-of-unicode.txt");
@@ -987,7 +987,7 @@ mod tests {
 
   #[bench]
   fn char_with_cache_30k(b: &mut Bencher) {
-    let mut painter = Painter::new(Transform::default());
+    let mut painter = Painter::new(1.);
     painter.set_brush(Color::RED).set_line_width(2.);
     // 30k different char
     let text = include_str!("../../fonts/loads-of-unicode.txt");

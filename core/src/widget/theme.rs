@@ -4,8 +4,8 @@
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
 pub mod material;
-pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use painter::*;
+use text::{FontFace, FontFamily, FontWeight};
 
 use super::CowRc;
 
@@ -83,7 +83,7 @@ pub struct Theme {
   pub typography_theme: TypographyTheme,
   /// The color used for widgets in their inactive (but enabled) state.
   pub unselected_widget_color: Color,
-  /// Default text font family
+  /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
   pub checkbox: CheckboxTheme,
 }
@@ -106,7 +106,7 @@ impl TypographyTheme {
   ) -> Self {
     let decoration = TextDecorationStyle { decoration, decoration_color };
     let light_title_face: CowRc<FontFace> = CowRc::owned(FontFace {
-      family: titles_family,
+      families: titles_family,
       weight: FontWeight::LIGHT,
       ..<_>::default()
     });
@@ -118,7 +118,7 @@ impl TypographyTheme {
     medium_title_face.to_mut().weight = FontWeight::MEDIUM;
 
     let body_face: CowRc<FontFace> = CowRc::owned(FontFace {
-      family: body_family,
+      families: body_family,
       ..<_>::default()
     });
 
@@ -130,6 +130,7 @@ impl TypographyTheme {
           foreground: display_style.clone(),
           font_face: light_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -140,6 +141,7 @@ impl TypographyTheme {
           foreground: display_style.clone(),
           font_face: light_title_face,
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -150,6 +152,7 @@ impl TypographyTheme {
           letter_space: 0.0,
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -161,6 +164,7 @@ impl TypographyTheme {
           letter_space: 0.25,
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -171,6 +175,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -181,6 +186,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: medium_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -192,6 +198,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -202,6 +209,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: medium_title_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -212,6 +220,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: body_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -223,6 +232,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: body_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -237,6 +247,7 @@ impl TypographyTheme {
             face
           },
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -247,6 +258,7 @@ impl TypographyTheme {
           foreground: body_style.clone(),
           font_face: body_face.clone(),
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration: decoration.clone(),
       },
@@ -257,6 +269,7 @@ impl TypographyTheme {
           foreground: body_style,
           font_face: body_face,
           path_style: PathStyle::Fill,
+          line_height: None,
         },
         decoration,
       },

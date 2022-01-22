@@ -13,7 +13,7 @@ impl RgbaConvert {
         binding: 0,
         visibility: wgpu::ShaderStages::COMPUTE,
         ty: wgpu::BindingType::Buffer {
-          ty: wgpu::BufferBindingType::Storage{ read_only: false },
+          ty: wgpu::BufferBindingType::Storage { read_only: false },
           has_dynamic_offset: false,
           min_binding_size: None,
         },
@@ -59,9 +59,8 @@ impl RgbaConvert {
     });
 
     {
-      let mut c_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-        label: Some("Begin compute pass"),
-      });
+      let mut c_pass = encoder
+        .begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("Begin compute pass") });
       c_pass.set_pipeline(&self.pipeline);
       c_pass.set_bind_group(0, &bind_group, &[]);
       c_pass.dispatch(size.area(), 1, 1);
@@ -98,7 +97,9 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
   // The output buffer lets us retrieve the data as an array
   let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
     size,
-    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+    usage: wgpu::BufferUsages::STORAGE
+      | wgpu::BufferUsages::COPY_DST
+      | wgpu::BufferUsages::COPY_SRC,
     mapped_at_creation: false,
     label: None,
   });
@@ -122,7 +123,11 @@ pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
         rows_per_image: NonZeroU32::new(0),
       },
     },
-    wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+    wgpu::Extent3d {
+      width,
+      height,
+      depth_or_array_layers: 1,
+    },
   );
   convert.compute_shader_convert(
     device,

@@ -60,9 +60,6 @@ impl RenderTree {
 
   #[cfg(test)]
   pub(crate) fn render_to_widget(&self) -> &HashMap<RenderId, WidgetId> { &self.render_to_widget }
-
-  #[cfg(test)]
-  pub fn layout_info(&self) -> &HashMap<RenderId, BoxLayout> { &self.layout_info }
 }
 
 impl RenderId {
@@ -238,7 +235,7 @@ mod tests {
       Size::zero()
     }
     fn only_sized_by_parent(&self) -> bool { false }
-    fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+    fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {}
     fn transform(&self) -> Option<Transform> { None }
   }
 

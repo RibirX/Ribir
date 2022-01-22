@@ -25,6 +25,7 @@ pub struct WidgetTree {
   widget_to_render: HashMap<WidgetId, RenderId>,
   /// A buffer to store all stateful widget which state changed but not trigger
   /// notify.
+  /// todo: should directly notify instead of batch to notify
   state_changed: std::collections::VecDeque<NonNull<StateAttr>>,
 }
 
@@ -540,14 +541,14 @@ impl WidgetId {
   }
 
   /// find the nearest render widget of its ancestors.
-  fn up_nearest_render_widget(self, tree: &WidgetTree) -> Option<WidgetId> {
+  pub(crate) fn up_nearest_render_widget(self, tree: &WidgetTree) -> Option<WidgetId> {
     self
       .ancestors(tree)
       .find(|id| matches!(id.get(tree), Some(WidgetNode::Render(_))))
   }
 
   /// find the nearest render widget in subtree, include self.
-  fn down_nearest_render_widget(self, tree: &WidgetTree) -> WidgetId {
+  pub(crate) fn down_nearest_render_widget(self, tree: &WidgetTree) -> WidgetId {
     let mut wid = self;
     while matches!(wid.assert_get(tree), WidgetNode::Combination(_)) {
       wid = wid.single_child(tree);
@@ -581,8 +582,6 @@ impl WidgetId {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }
-
-impl !Unpin for WidgetTree {}
 
 impl WidgetId {
   /// Return a dummy `WidgetId` use for unit test.

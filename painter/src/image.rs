@@ -1,4 +1,4 @@
-use std::{hash::Hash, rc::Rc};
+use std::{fmt::Debug, hash::Hash, rc::Rc};
 
 use crate::DeviceSize;
 
@@ -14,7 +14,7 @@ pub enum ColorFormat {
 
 /// A image wrap for shallow compare.
 #[derive(Clone)]
-pub struct ShallowImage(Rc<Box<dyn Image>>);
+pub struct ShallowImage(Rc<dyn Image>);
 
 impl Hash for ShallowImage {
   #[inline]
@@ -31,13 +31,21 @@ impl PartialEq for ShallowImage {
 
 impl Eq for ShallowImage {}
 
+impl Debug for ShallowImage {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let DeviceSize { width, height, .. } = self.size();
+    f.debug_tuple("ShallowImage")
+      .field(&format!("{width}x{height}"))
+      .finish()
+  }
+}
 impl ShallowImage {
   #[inline]
-  pub fn new(img: Rc<Box<dyn Image>>) -> Self { Self(img) }
+  pub fn new(img: Rc<dyn Image>) -> Self { Self(img) }
 }
 
 impl std::ops::Deref for ShallowImage {
-  type Target = Box<dyn Image>;
+  type Target = Rc<dyn Image>;
 
   #[inline]
   fn deref(&self) -> &Self::Target { &self.0 }

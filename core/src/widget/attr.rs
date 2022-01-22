@@ -324,6 +324,8 @@ pub trait AttachAttr {
     w
   }
 
+  // todo: after stateful merge into AttrWidget,  Use `Into` trait replace
+  // `into_attr_widget`
   fn into_attr_widget(self) -> Self::W;
 }
 
@@ -409,6 +411,8 @@ pub trait Attrs: AttachAttr {
 pub auto trait NoAttrs {}
 impl<W> !NoAttrs for AttrWidget<W> {}
 
+impl<'a> NoAttrs for dyn Image + 'a {}
+
 impl<W: NoAttrs> AttachAttr for W {
   type W = AttrWidget<W>;
   #[inline]
@@ -421,7 +425,7 @@ impl<W> AttachAttr for AttrWidget<W> {
   fn into_attr_widget(self) -> Self::W { self }
 }
 
-impl<W: NoAttrs> AttrsAccess for W {
+impl<W: NoAttrs + ?Sized> AttrsAccess for W {
   #[inline]
   fn get_attrs(&self) -> Option<&Attributes> { None }
 

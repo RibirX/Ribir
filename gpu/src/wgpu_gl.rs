@@ -1,11 +1,10 @@
 use crate::{
-  tessellator::Tessellator, ColorRenderData, GlRender, GpuBackend, RenderData, Texture,
-  TextureRenderData, Vertex,
+  tessellator::Tessellator, ColorPrimitive, ColorRenderData, GlRender, GpuBackend, RenderData,
+  Texture, TexturePrimitive, TextureRenderData, Vertex,
 };
 use painter::{DeviceRect, DeviceSize, LogicUnit, PhysicUnit};
-use std::iter;
 use std::num::NonZeroU32;
-use painter::{DeviceRect, DeviceSize, LogicUnit, PhysicUnit};
+use text::shaper::TextShaper;
 mod img_helper;
 pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
 pub mod surface;
@@ -19,7 +18,6 @@ use zerocopy::AsBytes;
 type Transform2D = painter::Transform2D<f32, LogicUnit, PhysicUnit>;
 const TEXTURE_INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
 const TEXTURE_MAX_SIZE: DeviceSize = DeviceSize::new(4096, 4096);
-const DEFAULT_THRESHOLD: f32 = 0.01;
 
 /// create wgpu backend with window
 pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
@@ -27,15 +25,12 @@ pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
   size: DeviceSize,
   tex_init_size: Option<DeviceSize>,
   tex_max_size: Option<DeviceSize>,
+  tolerance: f32,
+  shaper: TextShaper,
 ) -> GpuBackend<WgpuGl> {
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
-  let tessellator = Tessellator::new(
-    init_size,
-    max_size,
-    DEFAULT_THRESHOLD,
-    TextShaper::default(),
-  );
+  let tessellator = Tessellator::new(init_size, max_size, tolerance, shaper);
   let gl = WgpuGl::from_wnd(
     window,
     size,
@@ -52,15 +47,12 @@ pub async fn wgpu_backend_headless(
   size: DeviceSize,
   tex_init_size: Option<DeviceSize>,
   tex_max_size: Option<DeviceSize>,
+  tolerance: f32,
+  shaper: TextShaper,
 ) -> GpuBackend<WgpuGl<surface::TextureSurface>> {
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
-  let tessellator = Tessellator::new(
-    init_size,
-    max_size,
-    DEFAULT_THRESHOLD,
-    TextShaper::default(),
-  );
+  let tessellator = Tessellator::new(init_size, max_size, tolerance, shaper);
   let gl = WgpuGl::headless(size, tessellator.atlas.texture().size()).await;
   GpuBackend { tessellator, gl }
 }
@@ -130,7 +122,6 @@ impl WgpuGl<PhysicSurface> {
     )
     .await
   }
-
 }
 
 impl WgpuGl<TextureSurface> {
@@ -316,12 +307,7 @@ impl<S: Surface> WgpuGl<S> {
 
   pub fn render_color(&mut self, mut encoder: wgpu::CommandEncoder, data: ColorRenderData) {
     let tex_infos_bind_group = self.create_primitives_bind_group(&data.primitives);
-    let Self {
-      device,
-      surface,
-      queue,
-      ..
-    } = self;
+    let Self { device, surface, queue, .. } = self;
 
     let view = surface.get_current_view();
 
@@ -367,7 +353,7 @@ impl<S: Surface> WgpuGl<S> {
       render_pass.set_index_buffer(indices_buffer.slice(..), wgpu::IndexFormat::Uint32);
       render_pass.set_bind_group(0, &self.uniforms, &[]);
       render_pass.set_bind_group(1, &tex_infos_bind_group, &[]);
-      
+
       render_pass.draw_indexed(0..data.indices.len() as u32, 0, 0..1);
     }
 
@@ -387,7 +373,13 @@ impl<S: Surface> WgpuGl<S> {
     } = self;
 
     type Tf = wgpu::TextureFormat;
-    Self::sync_texture(device, atlas, &data.texture, Tf::Bgra8UnormSrgb, &mut encoder);
+    Self::sync_texture(
+      device,
+      atlas,
+      &data.texture,
+      Tf::Bgra8UnormSrgb,
+      &mut encoder,
+    );
 
     if self.rebuild_pipeline {
       self.uniforms = create_uniforms(
@@ -470,7 +462,7 @@ impl<S: Surface> WgpuGl<S> {
       .create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Primitive Buffer"),
         contents: primitives.as_bytes(),
-        usage:  wgpu::BufferUsages::STORAGE,
+        usage: wgpu::BufferUsages::STORAGE,
       });
     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &self.primitives_layout,
@@ -513,7 +505,11 @@ impl<S: Surface> WgpuGl<S> {
           origin: wgpu::Origin3d::ZERO,
           aspect: wgpu::TextureAspect::All,
         },
-        wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        wgpu::Extent3d {
+          width,
+          height,
+          depth_or_array_layers: 1,
+        },
       )
     }
   }
@@ -580,7 +576,6 @@ fn create_render_pipeline(
   });
 
   let module = device.create_shader_module(&wgpu::include_wgsl!("./wgpu_gl/shaders/geometry.wgsl"));
-
   device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
     label: Some("Render Pipeline"),
     layout: Some(&render_pipeline_layout),
@@ -597,7 +592,7 @@ fn create_render_pipeline(
         blend: Some(wgpu::BlendState::REPLACE),
         write_mask: wgpu::ColorWrites::all(),
       }],
-    }), 
+    }),
     primitive: wgpu::PrimitiveState {
       topology: wgpu::PrimitiveTopology::TriangleList,
       strip_index_format: None,
@@ -634,9 +629,7 @@ fn create_uniform_layout(device: &wgpu::Device) -> [wgpu::BindGroupLayout; 2] {
         binding: PrimaryBindings::TextureAtlas as u32,
         visibility: wgpu::ShaderStages::FRAGMENT,
         ty: wgpu::BindingType::Texture {
-          sample_type: wgpu::TextureSampleType::Float {
-            filterable: true,
-          },
+          sample_type: wgpu::TextureSampleType::Float { filterable: true },
           view_dimension: wgpu::TextureViewDimension::D2,
           multisampled: false,
         },
@@ -687,7 +680,7 @@ fn create_uniforms(
   };
   let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
     contents: uniform.as_bytes(),
-    usage:  wgpu::BufferUsages::UNIFORM |  wgpu::BufferUsages::COPY_DST,
+    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     label: Some("uniform buffer"),
   });
   device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -733,7 +726,7 @@ impl Vertex {
           offset: (size_of::<[f32; 2]>() * 2) as wgpu::BufferAddress,
           shader_location: 1,
           format: wgpu::VertexFormat::Uint32,
-        }
+        },
       ],
     }
   }
@@ -767,66 +760,5 @@ mod tests {
 
     let rb = matrix.transform_point(Point::new(400., 400.));
     assert_eq!((rb.x, rb.y), (1., -1.0));
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn smoke_draw_circle() {
-    let (mut canvas, mut render) = block_on(wgpu_backend_headless(DeviceSize::new(400, 400)));
-
-    fn circle_layer<'a>(canvas: &mut Canvas) -> Rendering2DLayer<'a> {
-      let path = circle_50();
-      let mut layer = canvas.new_2d_layer();
-      layer.set_style(FillStyle::Color(Color::BLACK));
-      layer.translate(50., 50.);
-      layer.fill_path(path);
-      layer
-    }
-
-    {
-      let layer = circle_layer(&mut canvas);
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-    unit_test::assert_canvas_eq!(render, "../test_imgs/smoke_draw_circle.png");
-
-    // Enable anti aliasing
-    {
-      render.set_anti_aliasing(AntiAliasing::Msaa4X);
-      let layer = circle_layer(&mut canvas);
-      let mut frame = canvas.next_frame(&mut render);
-      frame.compose_2d_layer(layer);
-    }
-    unit_test::assert_canvas_eq!(render, "../test_imgs/smoke_draw_circle_msaa.png");
-  }
-
-  #[test]
-  #[ignore = "gpu need"]
-  fn color_palette_texture() {
-    let (mut canvas, mut render) = block_on(wgpu_backend_headless(DeviceSize::new(400, 400)));
-    let path = circle_50();
-    {
-      let mut layer = canvas.new_2d_layer();
-
-      let mut fill_color_circle = |color: Color, offset_x: f32, offset_y: f32| {
-        layer
-          .set_style(FillStyle::Color(color))
-          .translate(offset_x, offset_y)
-          .fill_path(path.clone());
-      };
-
-      fill_color_circle(Color::YELLOW, 50., 50.);
-      fill_color_circle(Color::RED, 100., 0.);
-      fill_color_circle(Color::PINK, 100., 0.);
-      fill_color_circle(Color::GREEN, 100., 0.);
-      fill_color_circle(Color::BLUE, -0., 100.);
-
-      {
-        let mut frame = canvas.next_frame(&mut render);
-        frame.compose_2d_layer(layer);
-      }
-
-      unit_test::assert_canvas_eq!(render, "../test_imgs/color_palette_texture.png");
-    }
   }
 }

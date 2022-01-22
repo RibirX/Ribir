@@ -12,9 +12,10 @@ pub fn widget_and_its_children_box_rect(root: BoxedWidget, window_size: Size) ->
   root_and_children_rect(&mut wnd)
 }
 
-pub fn root_and_children_rect(wnd: &mut window::Window) -> (Rect, Vec<Rect>) {
-  let r_tree = &*wnd.render_tree;
-  let layout = &mut wnd.layout_store;
+pub fn root_and_children_rect(wnd: &window::Window) -> (Rect, Vec<Rect>) {
+  let ctx = wnd.context();
+  let r_tree = &ctx.render_tree;
+  let layout = &ctx.layout_store;
   let root = r_tree.root().unwrap();
   let rect = layout.layout_box_rect(root).unwrap();
   let children_box_rect = root

@@ -3,7 +3,7 @@ use algo::CowRc;
 use text::FontFace;
 
 /// Encapsulates the text style for painting.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   /// The size of glyphs (in logical pixels) to use when painting the text.
   pub font_size: f32,
@@ -42,7 +42,7 @@ impl TileMode {
   pub fn is_cover_mode(&self) -> bool { self.bits & (TileMode::COVER_BOTH.bits) > 0 }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Brush {
   Color(Color),
   Image {

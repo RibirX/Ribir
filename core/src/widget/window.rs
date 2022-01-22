@@ -1,93 +1,69 @@
-use super::{render_tree::*, PaintingContext};
 use crate::{
+  context::{draw_tree, Context},
+  events::dispatcher::Dispatcher,
   prelude::*,
-  widget::{events::dispatcher::Dispatcher, widget_tree::*},
 };
-use std::{cell::RefCell, pin::Pin, ptr::NonNull, rc::Rc};
+
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
 
+const TOLERANCE: f32 = 0.01;
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
   fn inner_position(&self) -> Point;
   fn outer_position(&self) -> Point;
   fn id(&self) -> WindowId;
-  /// Modifies the cursor icon of the window. Not effective immediately.
-  fn set_cursor(&mut self, cursor: CursorIcon);
-  /// The cursor set to the window, but not submit to native window yet.
-  fn updated_cursor(&self) -> Option<CursorIcon>;
+
   fn request_redraw(&self);
   /// Modify the native window if cursor modified.
-  fn submit_cursor(&mut self);
+  fn set_cursor(&mut self, cursor: CursorIcon);
   fn scale_factor(&self) -> f64;
 }
 
-pub struct NativeWindow {
-  native: winit::window::Window,
-  cursor: Option<CursorIcon>,
-}
-
-impl RawWindow for NativeWindow {
+impl RawWindow for winit::window::Window {
   fn inner_size(&self) -> Size {
-    let wnd = &self.native;
-    let size = wnd.inner_size().to_logical(wnd.scale_factor());
+    let size = self.inner_size().to_logical(self.scale_factor());
     Size::new(size.width, size.height)
   }
 
   fn outer_size(&self) -> Size {
-    let wnd = &self.native;
-    let size = wnd.outer_size().to_logical(wnd.scale_factor());
+    let size = self.outer_size().to_logical(self.scale_factor());
     Size::new(size.width, size.height)
   }
 
   fn inner_position(&self) -> Point {
-    let wnd = &self.native;
-    let pos = wnd
+    let pos = self
       .inner_position()
       .expect(" Can only be called on the main thread")
-      .to_logical(wnd.scale_factor());
+      .to_logical(self.scale_factor());
 
     Point::new(pos.x, pos.y)
   }
   #[inline]
-  fn id(&self) -> WindowId { self.native.id() }
+  fn id(&self) -> WindowId { self.id() }
 
   fn outer_position(&self) -> Point {
-    let wnd = &self.native;
-    let pos = wnd
+    let pos = self
       .outer_position()
       .expect(" Can only be called on the main thread")
-      .to_logical(wnd.scale_factor());
+      .to_logical(self.scale_factor());
     Point::new(pos.x, pos.y)
   }
 
   #[inline]
-  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor) }
+  fn request_redraw(&self) { winit::window::Window::request_redraw(self) }
+
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.set_cursor_icon(cursor) }
 
   #[inline]
-  fn updated_cursor(&self) -> Option<CursorIcon> { self.cursor }
-
-  #[inline]
-  fn request_redraw(&self) { self.native.request_redraw() }
-
-  fn submit_cursor(&mut self) {
-    if let Some(cursor) = self.cursor.take() {
-      self.native.set_cursor_icon(cursor)
-    }
-  }
-
-  #[inline]
-  fn scale_factor(&self) -> f64 { self.native.scale_factor() }
+  fn scale_factor(&self) -> f64 { winit::window::Window::scale_factor(self) }
 }
 
 /// Window is the root to represent.
 pub struct Window {
-  pub raw_window: Rc<RefCell<Box<dyn RawWindow>>>,
-  pub(crate) render_tree: Pin<Box<RenderTree>>,
-  pub(crate) layout_store: layout_store::LayoutStore,
-  pub(crate) widget_tree: Pin<Box<WidgetTree>>,
-  painter: Painter,
+  pub raw_window: Box<dyn RawWindow>,
+  context: Context,
   p_backend: Box<dyn PainterBackend>,
   pub(crate) dispatcher: Dispatcher,
 }
@@ -103,13 +79,13 @@ impl Window {
       WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
         self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
         let factor = scale_factor as f32;
-        self
-          .painter
-          .reset(Some(Transform::new(factor, 0., 0., factor, 0., 0.)));
+        self.context.painter.reset(Some(factor));
       }
-      event => self.dispatcher.dispatch(event),
+      event => self.dispatcher.dispatch(event, &mut self.context),
     };
-    self.raw_window.borrow_mut().submit_cursor();
+    if let Some(cursor) = self.context.cursor.take() {
+      self.raw_window.set_cursor(cursor);
+    }
   }
 
   /// This method ensure render tree is ready to paint, three things it's have
@@ -121,11 +97,11 @@ impl Window {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
-    unsafe { self.widget_tree.as_mut().get_unchecked_mut() }.notify_state_change_until_empty();
-    let mut changed = self.tree_repair();
-    changed = self.layout() || changed;
+    self.context.widget_tree.notify_state_change_until_empty();
+    let changed = self.context.tree_repair();
     if changed {
-      self.dispatcher.focus_mgr.update(&self.dispatcher.common);
+      self.context.layout(self.raw_window.inner_size());
+      self.dispatcher.focus_mgr.update(&mut self.context);
     }
 
     changed
@@ -133,96 +109,41 @@ impl Window {
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    let commands =
-      PaintingContext::new(&self.render_tree, &mut self.painter, &self.layout_store).draw();
+    let commands = draw_tree(&mut self.context);
     if !commands.is_empty() {
       self.p_backend.submit(commands);
     }
   }
 
-  /// Repair the gaps between widget tree represent and current data state after
-  /// some user or device inputs has been processed. The render tree will also
-  /// react widget tree's change.
-  fn tree_repair(&mut self) -> bool {
-    unsafe {
-      self.widget_tree.as_mut().get_unchecked_mut().repair(
-        self.render_tree.as_mut().get_unchecked_mut(),
-        &mut self.layout_store,
-      )
-    }
-  }
+  pub(crate) fn context(&self) -> &Context { &self.context }
 
-  /// Layout the render tree as needed
-  fn layout(&mut self) -> bool {
-    self
-      .layout_store
-      .layout(self.raw_window.borrow().inner_size(), unsafe {
-        self.render_tree.as_mut().get_unchecked_mut()
-      })
-  }
-
-  fn new<W, P>(root: BoxedWidget, wnd: W, p_backend: P) -> Self
+  fn new<W, P>(wnd: W, p_backend: P, mut context: Context) -> Self
   where
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let render_tree = Box::pin(RenderTree::default());
-    let widget_tree = Box::pin(WidgetTree::default());
     let factor = wnd.scale_factor() as f32;
-    let raw_window: Rc<RefCell<Box<dyn RawWindow>>> = Rc::new(RefCell::new(Box::new(wnd)));
-    let painter = Painter::new(Transform::new(factor, 0., 0., factor, 0., 0.));
-    let mut wnd = Self {
-      dispatcher: Dispatcher::new(
-        NonNull::from(&*render_tree),
-        NonNull::from(&*widget_tree),
-        raw_window.clone(),
-      ),
-      raw_window,
-      render_tree,
-      widget_tree,
-      layout_store: <_>::default(),
-      painter,
+    context.painter.reset(Some(factor));
+    let mut dispatcher = Dispatcher::default();
+    let focus_mgr = &mut dispatcher.focus_mgr;
+    focus_mgr.update(&mut context);
+    if let Some(auto_focusing) = focus_mgr.auto_focus(&context) {
+      focus_mgr.focus(auto_focusing, &mut context)
+    }
+
+    Self {
+      dispatcher,
+      raw_window: Box::new(wnd),
+      context,
       p_backend: Box::new(p_backend),
-    };
-
-    unsafe {
-      wnd.widget_tree.as_mut().get_unchecked_mut().set_root(
-        root,
-        wnd.render_tree.as_mut().get_unchecked_mut(),
-        &mut wnd.layout_store,
-      );
     }
-    let focus_mgr = &mut wnd.dispatcher.focus_mgr;
-    focus_mgr.update(&wnd.dispatcher.common);
-    if let Some(auto_focusing) = focus_mgr.auto_focus(&wnd.widget_tree) {
-      focus_mgr.focus(auto_focusing, &wnd.dispatcher.common)
-    }
-
-    wnd
   }
 
   fn resize(&mut self, size: DeviceSize) {
-    let r_tree = unsafe { self.render_tree.as_mut().get_unchecked_mut() };
-    if let Some(root) = r_tree.root() {
-      self
-        .layout_store
-        .mark_needs_layout(root, &*self.render_tree);
-    }
+    self.context.mark_needs_layout(None);
     self.p_backend.resize(size);
-    self.raw_window.borrow().request_redraw();
+    self.raw_window.request_redraw();
   }
-
-  pub fn render_tree(&mut self) -> Pin<&mut RenderTree> { self.render_tree.as_mut() }
-
-  pub fn widget_tree(&mut self) -> Pin<&mut WidgetTree> { self.widget_tree.as_mut() }
-
-  pub fn layout_store(&self) -> &layout_store::LayoutStore { &self.layout_store }
-
-  #[cfg(test)]
-  pub fn canvas(&mut self) -> Pin<&mut Canvas> { self.canvas.as_mut() }
-
-  #[cfg(test)]
-  pub fn render(&mut self) -> &mut R { &mut self.p_backend }
 }
 
 impl Window {
@@ -235,24 +156,23 @@ impl Window {
       .build(event_loop)
       .unwrap();
     let size = native_window.inner_size();
+    let ctx = Context::new(root, native_window.scale_factor() as f32);
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
       &native_window,
       DeviceSize::new(size.width, size.height),
       None,
       None,
+      TOLERANCE,
+      ctx.shaper.clone(),
     ));
 
-    Self::new(
-      root,
-      NativeWindow { native: native_window, cursor: None },
-      p_backend,
-    )
+    Self::new(native_window, p_backend, ctx)
   }
 
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
   /// after all OS events have been processed by the event loop.
   #[inline]
-  pub(crate) fn request_redraw(&self) { self.raw_window.borrow().request_redraw(); }
+  pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
 }
 
 pub struct MockBackend;
@@ -277,31 +197,36 @@ impl RawWindow for MockRawWindow {
   fn id(&self) -> WindowId { unsafe { WindowId::dummy() } }
   fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
   fn request_redraw(&self) {}
-  fn updated_cursor(&self) -> Option<CursorIcon> { self.cursor }
-  fn submit_cursor(&mut self) { self.cursor.take(); }
   fn scale_factor(&self) -> f64 { 1. }
 }
 
 impl Window {
   #[cfg(feature = "wgpu_gl")]
   pub fn wgpu_headless(root: BoxedWidget, size: DeviceSize) -> Self {
-    let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(size, None, None));
+    let ctx = Context::new(root, 1.);
+    let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
+      size,
+      None,
+      None,
+      TOLERANCE,
+      ctx.shaper.clone(),
+    ));
     Self::new(
-      root,
       MockRawWindow {
         size: Size::from_untyped(size.to_f32().to_untyped()),
         ..Default::default()
       },
       p_backend,
+      ctx,
     )
   }
 
   pub fn without_render(root: BoxedWidget, size: Size) -> Self {
     let p_backend = MockBackend;
     Self::new(
-      root,
       MockRawWindow { size, ..Default::default() },
       p_backend,
+      Context::new(root, 1.),
     )
   }
 }

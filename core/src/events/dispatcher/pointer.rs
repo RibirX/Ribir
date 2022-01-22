@@ -1,7 +1,8 @@
 use std::rc::Rc;
 
-use super::{CommonDispatcher, FocusManager};
-use crate::render::layout_store::LayoutStore;
+use super::FocusManager;
+use crate::context::layout_store::LayoutStore;
+use crate::context::Context;
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta};
@@ -15,17 +16,17 @@ pub(crate) struct PointerDispatcher {
 }
 
 impl PointerDispatcher {
-  pub fn cursor_move_to(&mut self, position: Point, common: &CommonDispatcher) {
+  pub fn cursor_move_to(&mut self, position: Point, ctx: &mut Context) {
     self.cursor_pos = position;
-    self.pointer_enter_leave_dispatch(common);
-    if let Some(from) = self.hit_widget(common) {
-      self.bubble_pointer_from(PointerEventType::Move, common, from);
+    self.pointer_enter_leave_dispatch(ctx);
+    if let Some(from) = self.hit_widget(ctx) {
+      self.bubble_pointer_from(PointerEventType::Move, ctx, from);
     }
   }
 
-  pub fn on_cursor_left(&mut self, common: &CommonDispatcher) {
+  pub fn on_cursor_left(&mut self, ctx: &mut Context) {
     self.cursor_pos = Point::new(-1., -1.);
-    self.pointer_enter_leave_dispatch(common);
+    self.pointer_enter_leave_dispatch(ctx);
   }
 
   pub fn dispatch_mouse_input(
@@ -33,7 +34,7 @@ impl PointerDispatcher {
     device_id: DeviceId,
     state: ElementState,
     button: MouseButton,
-    common: &CommonDispatcher,
+    ctx: &mut Context,
     focus_mgr: &mut FocusManager,
   ) -> Option<()> {
     // A mouse press/release emit during another mouse's press will ignored.
@@ -43,7 +44,7 @@ impl PointerDispatcher {
           self.mouse_button.1 |= button.into();
           // only the first button press emit event.
           if self.mouse_button.1 == button.into() {
-            self.bubble_mouse_down(common, focus_mgr);
+            self.bubble_mouse_down(ctx, focus_mgr);
           }
         }
         ElementState::Released => {
@@ -51,24 +52,24 @@ impl PointerDispatcher {
           // only the last button release emit event.
           if self.mouse_button.1.is_empty() {
             self.mouse_button.0 = None;
-            let release = self.hit_widget(common)?;
-            self.bubble_pointer_from(PointerEventType::Up, common, release);
+            let release = self.hit_widget(ctx)?;
+            self.bubble_pointer_from(PointerEventType::Up, ctx, release);
 
             let (release_on, release_pos) = release;
 
             let tap_on = self
               .pointer_down_uid
               .take()?
-              .common_ancestor_of(release_on, common.widget_tree_ref())?;
+              .common_ancestor_of(release_on, &ctx.widget_tree)?;
             let tap_pos = release_on.map_to(
               release_pos,
               tap_on,
-              common.widget_tree_ref(),
-              common.render_tree_ref(),
-              common.layout_store(),
+              &ctx.widget_tree,
+              &ctx.render_tree,
+              &ctx.layout_store,
             );
 
-            self.bubble_pointer_from(PointerEventType::Tap, common, (tap_on, tap_pos));
+            self.bubble_pointer_from(PointerEventType::Tap, ctx, (tap_on, tap_pos));
           }
         }
       };
@@ -76,13 +77,13 @@ impl PointerDispatcher {
     Some(())
   }
 
-  pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, common: &CommonDispatcher) {
-    if let Some((wid, _)) = self.hit_widget(common) {
+  pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, ctx: &mut Context) {
+    if let Some((wid, _)) = self.hit_widget(ctx) {
       let (delta_x, delta_y) = match delta {
         MouseScrollDelta::LineDelta(x, y) => (x, y),
         MouseScrollDelta::PixelDelta(delta) => {
           let winit::dpi::LogicalPosition { x, y } =
-            delta.to_logical(common.window.borrow().scale_factor());
+            delta.to_logical(ctx.painter.device_scale() as f64);
           (x, y)
         }
       };
@@ -90,16 +91,9 @@ impl PointerDispatcher {
       let event = WheelEvent {
         delta_x,
         delta_y,
-        common: EventCommon::new(
-          common.modifiers,
-          wid,
-          common.window.clone(),
-          common.widget_tree,
-          common.render_tree,
-        ),
+        common: EventCommon::new(wid, ctx),
       };
-      common.bubble_dispatch(
-        wid,
+      super::bubble_dispatch(
         |wheel_attr: &WheelAttr| wheel_attr.event_observable(),
         event,
         |_| {},
@@ -107,9 +101,9 @@ impl PointerDispatcher {
     }
   }
 
-  fn bubble_mouse_down(&mut self, common: &CommonDispatcher, focus_mgr: &mut FocusManager) {
-    let tree = common.widget_tree_ref();
-    let hit = self.hit_widget(common);
+  fn bubble_mouse_down(&mut self, ctx: &mut Context, focus_mgr: &mut FocusManager) {
+    let tree = &ctx.widget_tree;
+    let hit = self.hit_widget(ctx);
     self.pointer_down_uid = hit.map(|(wid, _)| wid);
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
@@ -121,64 +115,61 @@ impl PointerDispatcher {
       })
     });
     if let Some(focus_id) = nearest_focus {
-      focus_mgr.focus(focus_id, common);
+      focus_mgr.focus(focus_id, ctx);
     } else {
-      focus_mgr.blur(common);
+      focus_mgr.blur(ctx);
     }
     if let Some(from) = hit {
-      self.bubble_pointer_from(PointerEventType::Down, common, from);
+      self.bubble_pointer_from(PointerEventType::Down, ctx, from);
     }
   }
 
   fn bubble_pointer_from(
     &self,
     event_type: PointerEventType,
-    common: &CommonDispatcher,
+    ctx: &mut Context,
     from: (WidgetId, Point),
   ) {
     let (wid, pos) = from;
-    let event = self.mouse_pointer(wid, pos, common);
+    let event = self.mouse_pointer(wid, pos, ctx);
     let mut last_bubble_from = wid;
-    common.bubble_dispatch(
-      wid,
+    super::bubble_dispatch(
       |p_attr| PointerObserver::new(p_attr, event_type),
       event,
       move |e: &mut PointerEvent| {
         e.position = last_bubble_from.map_to(
           e.position,
           e.target(),
-          common.widget_tree_ref(),
-          common.render_tree_ref(),
-          common.layout_store(),
+          &ctx.widget_tree,
+          &ctx.render_tree,
+          &ctx.layout_store,
         );
         last_bubble_from = wid;
       },
     );
   }
 
-  fn pointer_enter_leave_dispatch(&mut self, common: &CommonDispatcher) {
-    let tree = common.widget_tree_ref();
-    let new_hit = self.hit_widget(common);
+  fn pointer_enter_leave_dispatch(&mut self, ctx: &mut Context) {
+    let new_hit = self.hit_widget(ctx);
 
     let mut already_entered = vec![];
 
     self.entered_widgets.iter().for_each(|w| {
       // if the widget is not the ancestor of the hit widget
-      if !w.is_dropped(tree) {
+      if !w.is_dropped(&ctx.widget_tree) {
         if new_hit.is_none()
           || !w
-            .ancestors(tree)
+            .ancestors(&ctx.widget_tree)
             .any(|w| Some(w) == new_hit.as_ref().map(|h| h.0))
         {
           let old_pos = w.map_from_global(
             self.cursor_pos,
-            tree,
-            common.render_tree_ref(),
-            common.layout_store(),
+            &ctx.widget_tree,
+            &ctx.render_tree,
+            &ctx.layout_store,
           );
-          let event = self.mouse_pointer(*w, old_pos, common);
-          common.dispatch_to(
-            *w,
+          let event = self.mouse_pointer(*w, old_pos, ctx);
+          dispatcher::dispatch_to(
             |p_attr| PointerObserver::new(p_attr, PointerEventType::Leave),
             event,
           );
@@ -191,9 +182,9 @@ impl PointerDispatcher {
 
     if let Some((hit_widget, _)) = new_hit {
       hit_widget
-        .ancestors(tree)
+        .ancestors(&ctx.widget_tree)
         .filter(|w| {
-          w.get(tree)
+          w.get(&ctx.widget_tree)
             .and_then(|w| w.get_attrs())
             .and_then(Attributes::find::<PointerAttr>)
             .is_some()
@@ -208,25 +199,21 @@ impl PointerDispatcher {
         .for_each(|w| {
           let old_pos = w.map_from_global(
             self.cursor_pos,
-            tree,
-            common.render_tree_ref(),
-            common.layout_store(),
+            &ctx.widget_tree,
+            &ctx.render_tree,
+            &ctx.layout_store,
           );
-          let event = self.mouse_pointer(*w, old_pos, common);
-          common.dispatch_to(
-            *w,
-            |p| PointerObserver::new(p, PointerEventType::Enter),
-            event,
-          );
+          let event = self.mouse_pointer(*w, old_pos, ctx);
+          super::dispatch_to(|p| PointerObserver::new(p, PointerEventType::Enter), event);
         });
     }
   }
 
-  fn mouse_pointer(&self, target: WidgetId, pos: Point, common: &CommonDispatcher) -> PointerEvent {
-    PointerEvent::from_mouse(target, pos, self.cursor_pos, self.mouse_button.1, common)
+  fn mouse_pointer(&self, target: WidgetId, pos: Point, ctx: &mut Context) -> PointerEvent {
+    PointerEvent::from_mouse(target, pos, self.cursor_pos, self.mouse_button.1, ctx)
   }
 
-  fn hit_widget(&self, common: &CommonDispatcher) -> Option<(WidgetId, Point)> {
+  fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
     fn down_coordinate_to(
       id: RenderId,
       pos: Point,
@@ -240,8 +227,8 @@ impl PointerDispatcher {
         .map(|_| (id, id.map_from_parent(pos, tree, layout_store)))
     }
 
-    let r_tree = common.render_tree_ref();
-    let layout_store = common.layout_store();
+    let r_tree = &ctx.render_tree;
+    let layout_store = &ctx.layout_store;
     let mut current = r_tree
       .root()
       .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree, layout_store));
@@ -256,7 +243,7 @@ impl PointerDispatcher {
 
     hit.and_then(|(rid, pos)| {
       rid
-        .relative_to_widget(common.render_tree_ref())
+        .relative_to_widget(&ctx.render_tree)
         .map(|wid| (wid, pos))
     })
   }
@@ -317,10 +304,7 @@ impl Observer for PointerObserver {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::{
-    layout::{CrossAxisAlign, Row},
-    window::NoRenderWindow,
-  };
+  use crate::widget::layout::{CrossAxisAlign, Row};
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
@@ -351,7 +335,7 @@ mod tests {
       },
     );
     let root = record_pointer(event_record.clone(), Row::default()).have(record.box_it());
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -391,7 +375,7 @@ mod tests {
         style: TextStyle::default(),
       },
     );
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -452,7 +436,7 @@ mod tests {
         style: TextStyle::default(),
       },
     );
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -531,7 +515,7 @@ mod tests {
       }
     };
 
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -574,7 +558,7 @@ mod tests {
       }
     };
 
-    let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(parent.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -636,7 +620,7 @@ mod tests {
     };
 
     // Stretch row
-    let mut wnd = NoRenderWindow::without_render(parent.box_it(), Size::new(400., 400.));
+    let mut wnd = Window::without_render(parent.box_it(), Size::new(400., 400.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -710,7 +694,7 @@ mod tests {
       }
     };
 
-    let mut wnd = NoRenderWindow::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };

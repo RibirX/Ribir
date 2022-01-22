@@ -67,11 +67,11 @@ impl RenderObject for BoxDecoration {
     size
   }
 
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>) {
-    let content_rect = ctx
-      .children_rect()
-      .next()
+  fn paint<'a>(&'a self, ctx: &mut PaintingCtx<'a>) {
+    let child = ctx
+      .single_child()
       .expect("BoxDecoration must have one child.");
+    let content_rect = ctx.child_rect(child);
 
     let painter = ctx.painter();
     if let Some(ref background) = self.background {
@@ -81,7 +81,7 @@ impl RenderObject for BoxDecoration {
       } else {
         painter.rect(&content_rect);
       }
-      painter.fill();
+      painter.fill(None);
     }
     self.paint_border(painter, &content_rect);
   }
@@ -115,7 +115,7 @@ impl BoxDecoration {
       } else {
         painter.rect(&rect);
       };
-      painter.stroke();
+      painter.stroke(None, None);
     } else {
       let w = rect.width();
       let h = rect.height();
@@ -248,7 +248,7 @@ impl BoxDecoration {
           }
         });
         painter.close_path();
-        painter.stroke();
+        painter.stroke(None, None);
       })
     }
   }
@@ -344,29 +344,13 @@ mod tests {
   fn paint() {
     let radius = Vector::new(20., 10.);
     let radius_cases = vec![
-      BorderRadius::all(Vector::zero()),
-      BorderRadius::all(Vector::new(10., 10.)),
-      BorderRadius {
-        top_left: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        top_right: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        bottom_right: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        bottom_left: radius,
-        ..Default::default()
-      },
-      BorderRadius {
-        top_left: Vector::new(50., 50.),
-        bottom_right: Vector::new(50., 50.),
-        ..Default::default()
-      },
+      Radius::all(0.),
+      Radius::all(10.),
+      Radius::top_left(radius),
+      Radius::top_right(radius),
+      Radius::bottom_right(radius),
+      Radius::bottom_left(radius),
+      Radius::top_left(50.),
     ];
 
     let row = declare! {

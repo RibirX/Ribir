@@ -19,5 +19,5 @@ impl RenderObject for Path {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) { todo!() }
+  fn paint<'a>(&'a self, ctx: &mut PaintingCtx<'a>) { ctx.painter().paint_path(self.clone()); }
 }

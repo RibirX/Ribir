@@ -16,11 +16,12 @@ where
     let cursor = Cursor::new(icon);
     let c_cursor = cursor.0.clone();
     let mut w = w.on_pointer_move(move |e| {
+      let mut ctx = e.context();
       if e.point_type == PointerType::Mouse
         && e.buttons == MouseButtons::empty()
-        && e.as_ref().window.borrow().updated_cursor().is_none()
+        && ctx.updated_cursor().is_none()
       {
-        e.as_ref().window.borrow_mut().set_cursor(c_cursor.get())
+        ctx.set_cursor(c_cursor.get());
       }
     });
     w.attrs_mut().insert(cursor);
@@ -49,15 +50,18 @@ impl Default for Cursor {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::window::{MockRawWindow, NoRenderWindow, RawWindow};
+  use crate::{
+    prelude::window::Window,
+    widget::window::{MockRawWindow, RawWindow},
+  };
   use winit::event::{DeviceId, WindowEvent};
 
-  fn submit_cursor(wnd: &mut NoRenderWindow) -> CursorIcon {
+  fn submit_cursor(wnd: &mut Window) -> CursorIcon {
     let ptr = (&mut **wnd.raw_window.borrow_mut()) as *mut dyn RawWindow;
     #[allow(clippy::cast_ptr_alignment)]
     let mock_window = unsafe { &mut *(ptr as *mut MockRawWindow) };
     let cursor = mock_window.cursor.unwrap();
-    mock_window.submit_cursor();
+    mock_window.set_cursor();
     cursor
   }
 
@@ -87,7 +91,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = NoRenderWindow::without_render(row_tree, Size::new(400., 400.));
+    let mut wnd = Window::without_render(row_tree, Size::new(400., 400.));
 
     wnd.render_ready();
 

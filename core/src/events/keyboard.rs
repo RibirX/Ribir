@@ -103,7 +103,7 @@ mod tests {
       }
     };
 
-    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
+    let mut wnd = window::Window::without_render(widget.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));

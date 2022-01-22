@@ -3,9 +3,7 @@ use std::{
   collections::{BinaryHeap, HashMap},
 };
 
-use crate::prelude::{BoxClamp, Rect, RenderCtx, RenderId, Size};
-
-use super::render_tree::RenderTree;
+use crate::prelude::{render_tree::RenderTree, BoxClamp, Rect, RenderId};
 
 /// render object's layout box, the information about layout, including box
 /// size, box position, and the clamp of render object layout.
@@ -63,23 +61,12 @@ impl LayoutStore {
       .get_or_insert_with(Rect::zero)
   }
 
-  /// Do the work of computing the layout for all node which need, always layout
-  /// from the root to leaf. Return if any node has really computing the layout.
-  pub fn layout(&mut self, win_size: Size, r_tree: &mut RenderTree) -> bool {
-    loop {
-      let needs_layout = std::mem::take(&mut self.needs_layout);
+  pub fn has_need_layout(&self) -> bool { !self.needs_layout.is_empty() }
 
-      needs_layout.iter().for_each(|Reverse((_depth, rid))| {
-        if self.layout_clamp(*rid).is_none() {
-          let clamp = BoxClamp { min: Size::zero(), max: win_size };
-          RenderCtx::new(*rid, r_tree, self).perform_layout(clamp);
-        }
-      });
-
-      if self.needs_layout.is_empty() {
-        break !needs_layout.is_empty();
-      }
-    }
+  pub fn take_needs_layout(&mut self) -> BinaryHeap<Reverse<(usize, RenderId)>> {
+    let ret = self.needs_layout.clone();
+    self.needs_layout.clear();
+    ret
   }
 
   pub fn mark_needs_layout(&mut self, rid: RenderId, r_tree: &RenderTree) {

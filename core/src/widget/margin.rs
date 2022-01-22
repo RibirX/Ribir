@@ -48,7 +48,7 @@ impl RenderObject for Margin {
   }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {}
 }
 
 impl Margin {

@@ -1,14 +1,9 @@
-pub use render_ctx::*;
-pub mod render_ctx;
 use crate::prelude::*;
-pub use painting_context::*;
 use std::any::{Any, TypeId};
-mod painting_context;
 pub mod render_tree;
 pub mod update_ctx;
 pub use render_tree::{BoxClamp, RenderId};
 pub use update_ctx::UpdateCtx;
-pub(crate) mod layout_store;
 
 /// The `Owner` is the render widget which created this object.
 pub trait RenderObject: Any {
@@ -27,7 +22,7 @@ pub trait RenderObject: Any {
   /// system. Not care about children's paint in this method, framework will
   /// call children's paint individual. And framework guarantee always paint
   /// parent before children.
-  fn paint<'a>(&'a self, ctx: &mut PaintingContext<'a>);
+  fn paint<'a>(&'a self, ctx: &mut PaintingCtx<'a>);
 
   /// Return a matrix that maps the local logic coordinate system to the local
   /// paint box coordinate system. None-Value means there is not transform

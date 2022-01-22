@@ -24,7 +24,7 @@ pub struct GpuBackend<R: GlRender> {
 
 impl<R: GlRender> PainterBackend for GpuBackend<R> {
   fn submit(&mut self, commands: Vec<painter::PaintCommand>) {
-    self.tessellator.tessellate(commands, |render_data| {
+    self.tessellator.tessellate(&commands, |render_data| {
       self.gl.submit_render_data(render_data);
     });
     self.gl.finish()

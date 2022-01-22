@@ -1,18 +1,20 @@
 use crate::prelude::*;
-use std::pin::Pin;
+use ::text::FontFamily;
+use std::{pin::Pin, rc::Rc};
 
-lazy_static::lazy_static! {
-  static ref DEFAULT_THEME: Theme =  widget::material::light(Box::new([FontFamily::Name(CowRc::borrowed( "Roboto"))]));
-}
+thread_local!(static DEFAULT_THEME: Rc<Theme> =
+  Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
+);
 
 pub struct BuildCtx<'a> {
   pub(crate) tree: Pin<&'a widget_tree::WidgetTree>,
   wid: WidgetId,
+  default_theme: Option<Rc<Theme>>,
 }
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
-  pub fn theme(&self) -> &Theme {
+  pub fn theme(&mut self) -> &Theme {
     let tree = &*self.tree;
     self
       .wid
@@ -22,12 +24,20 @@ impl<'a> BuildCtx<'a> {
           .and_then(|w| w.get_attrs())
           .and_then(Attributes::find)
       })
-      .unwrap_or(&DEFAULT_THEME)
+      .unwrap_or_else(|| {
+        self
+          .default_theme
+          .get_or_insert_with(|| DEFAULT_THEME.with(|f| f.clone()))
+      })
   }
 
   #[inline]
   pub(crate) fn new(tree: Pin<&'a widget_tree::WidgetTree>, widget: WidgetId) -> Self {
-    Self { tree, wid: widget }
+    Self {
+      tree,
+      wid: widget,
+      default_theme: None,
+    }
   }
 }
 

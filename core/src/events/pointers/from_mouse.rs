@@ -1,10 +1,5 @@
 use super::PointerId;
-use crate::{
-  prelude::*,
-  widget::{
-    dispatcher::CommonDispatcher, events::EventCommon, MouseButtons, PointerEvent, PointerType,
-  },
-};
+use crate::prelude::*;
 use winit::event::MouseButton;
 
 impl PointerEvent {
@@ -13,15 +8,9 @@ impl PointerEvent {
     position: Point,
     global_pos: Point,
     btn: MouseButtons,
-    common: &CommonDispatcher,
+    ctx: &mut Context,
   ) -> Self {
-    let event = EventCommon::new(
-      common.modifiers,
-      target,
-      common.window.clone(),
-      common.widget_tree,
-      common.render_tree,
-    );
+    let event = EventCommon::new(target, ctx);
 
     PointerEvent {
       position,

@@ -55,7 +55,7 @@ fn simple_ref_bind_work() {
   };
 
   let flex_size = Size::new(1000., 500.);
-  let mut wnd = NoRenderWindow::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
@@ -82,7 +82,7 @@ fn event_attr_sugar_work() {
     }
   };
 
-  let mut wnd = NoRenderWindow::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, before_size.into());
@@ -115,7 +115,7 @@ fn widget_wrap_bind_work() {
     }
   };
 
-  let mut wnd = NoRenderWindow::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
@@ -155,7 +155,7 @@ fn expression_for_children() {
   let mut state_ref = w.state_ref();
   let w = w.on_tap(move |_| state_ref.0 = Size::new(5., 5.));
 
-  let mut wnd = NoRenderWindow::without_render(w.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w.box_it(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -188,7 +188,7 @@ fn embed_declare_ref_outside() {
     }
   };
 
-  let mut wnd = NoRenderWindow::without_render(w.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w.box_it(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -225,7 +225,7 @@ fn data_flow_macro() {
     }
   };
 
-  let mut wnd = NoRenderWindow::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, Size::new(4., 2.));
@@ -279,7 +279,7 @@ fn with_attr_ref() {
     }
   };
 
-  let mut wnd = NoRenderWindow::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
 
   fn root_cursor(wnd: &mut NoRenderWindow) -> Option<CursorIcon> {
@@ -312,7 +312,7 @@ fn attr_bind_to_self() {
     }
   };
 
-  let mut wnd = NoRenderWindow::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();

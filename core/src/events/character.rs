@@ -47,7 +47,7 @@ mod tests {
       }
     };
 
-    let mut wnd = window::NoRenderWindow::without_render(widget.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget.box_it(), Size::new(100., 100.));
 
     let test_text_case = "Hello 世界！";
     wnd.render_ready();

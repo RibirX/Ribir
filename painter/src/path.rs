@@ -8,7 +8,7 @@ use lyon_path::{
 use crate::{Angle, Brush, PathStyle, Point, Rect, Vector};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Path {
   pub path: lyon_path::path::Path,
   pub brush: Brush,

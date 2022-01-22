@@ -53,8 +53,6 @@ pub(crate) fn stateful_derive(
       }
     }
 
-    impl #w_impl_generics !NoAttrs for #stateful_name #w_ty_generics #w_where_clause {}
-
     impl #w_impl_generics AttachAttr for #stateful_name #w_ty_generics #w_where_clause {
       type W = Self;
       #[inline]

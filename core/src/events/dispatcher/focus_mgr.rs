@@ -1,5 +1,5 @@
-use super::CommonDispatcher;
-use crate::{prelude::*, widget::widget_tree::WidgetTree};
+use crate::prelude::*;
+use dispatcher;
 use rxrust::prelude::*;
 use std::rc::Rc;
 #[derive(Debug, Default)]
@@ -17,7 +17,7 @@ struct FocusNode {
 
 impl FocusManager {
   /// Switch to the next focus widget and return it.
-  pub fn next_focus_widget(&mut self, dispatcher: &CommonDispatcher) -> Option<WidgetId> {
+  pub fn next_focus_widget(&mut self, ctx: &mut Context) -> Option<WidgetId> {
     let next = self
       .focusing
       .filter(|(_, index0)| *index0 < usize::MAX)
@@ -27,12 +27,12 @@ impl FocusManager {
       })
       .or_else(|| self.tab_orders.first().map(|node| (*node, 0)));
 
-    self.change_focusing_to(next, dispatcher);
+    self.change_focusing_to(next, ctx);
     self.focusing.map(|(node, _)| node.wid)
   }
 
   /// Switch to previous focus widget and return it.
-  pub fn prev_focus_widget(&mut self, dispatcher: &CommonDispatcher) -> Option<WidgetId> {
+  pub fn prev_focus_widget(&mut self, ctx: &mut Context) -> Option<WidgetId> {
     let prev = self
       .focusing
       .filter(|(_, index0)| *index0 > 0)
@@ -47,12 +47,12 @@ impl FocusManager {
           .map(|node| (*node, self.tab_orders.len() - 1))
       });
 
-    self.change_focusing_to(prev, dispatcher);
+    self.change_focusing_to(prev, ctx);
     self.focusing.map(|(node, _)| node.wid)
   }
 
   /// This method sets focus on the specified widget across its id `wid`.
-  pub fn focus(&mut self, wid: WidgetId, dispatcher: &CommonDispatcher) {
+  pub fn focus(&mut self, wid: WidgetId, ctx: &mut Context) {
     let node = self
       .tab_orders
       .iter()
@@ -61,33 +61,29 @@ impl FocusManager {
       .map(|(idx, node)| (*node, idx));
 
     assert!(node.is_some());
-    self.change_focusing_to(node, dispatcher);
+    self.change_focusing_to(node, ctx);
   }
 
   /// Removes keyboard focus from the current focusing widget and return its id.
-  pub fn blur(&mut self, dispatcher: &CommonDispatcher) -> Option<WidgetId> {
-    self
-      .change_focusing_to(None, dispatcher)
-      .map(|(node, _)| node.wid)
+  pub fn blur(&mut self, ctx: &mut Context) -> Option<WidgetId> {
+    self.change_focusing_to(None, ctx).map(|(node, _)| node.wid)
   }
 
   /// return the focusing widget.
   pub fn focusing(&self) -> Option<WidgetId> { self.focusing.map(|(node, _)| node.wid) }
 
   /// return the auto focus widget of the tree.
-  pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
-    tree.root().and_then(|root| {
-      root.descendants(tree).find(|id| {
-        id.get(tree)
-          .and_then(|w| w.get_attrs())
-          .and_then(Attributes::find::<FocusAttr>)
-          .map_or(false, |focus| focus.auto_focus)
-      })
+  pub fn auto_focus(&mut self, ctx: &Context) -> Option<WidgetId> {
+    ctx.descendants().find(|id| {
+      id.assert_get(&ctx.widget_tree)
+        .get_attrs()
+        .and_then(Attributes::find::<FocusAttr>)
+        .map_or(false, |focus| focus.auto_focus)
     })
   }
 
-  pub fn update(&mut self, dispatcher: &CommonDispatcher) {
-    let tree = dispatcher.widget_tree_ref();
+  pub fn update(&mut self, ctx: &mut Context) {
+    let tree = &ctx.widget_tree;
     self.tab_orders.clear();
     if let Some(root) = tree.root() {
       let mut zeros = vec![];
@@ -120,7 +116,7 @@ impl FocusManager {
           .find(|(_, node)| node.tab_index >= focusing.tab_index)
           .or_else(|| self.tab_orders.iter().enumerate().next())
           .map(|(idx, node)| (*node, idx));
-        self.change_focusing_to(node, dispatcher);
+        self.change_focusing_to(node, ctx);
       }
     }
   }
@@ -128,24 +124,19 @@ impl FocusManager {
   fn change_focusing_to(
     &mut self,
     node: Option<(FocusNode, usize)>,
-    dispatcher: &CommonDispatcher,
+    ctx: &mut Context,
   ) -> Option<(FocusNode, usize)> {
     let old = std::mem::replace(&mut self.focusing, node);
     self.focusing = node;
 
     if let Some((ref blur, _)) = old {
       // dispatch blur event
-      let event = Self::focus_event(blur.wid, dispatcher);
-      dispatcher.dispatch_to(
-        blur.wid,
-        |f| FocusObserver::new(f, FocusEventType::Blur),
-        event,
-      );
+      let event = FocusEvent::new(blur.wid, ctx);
+      dispatcher::dispatch_to(|f| FocusObserver::new(f, FocusEventType::Blur), event);
 
       // bubble focus out
-      let event = Self::focus_event(blur.wid, dispatcher);
-      dispatcher.bubble_dispatch(
-        blur.wid,
+      let event = FocusEvent::new(blur.wid, ctx);
+      dispatcher::bubble_dispatch(
         |f| FocusObserver::new(f, FocusEventType::FocusOut),
         event,
         |_| {},
@@ -153,17 +144,12 @@ impl FocusManager {
     }
 
     if let Some((focus, _)) = self.focusing {
-      let event = Self::focus_event(focus.wid, dispatcher);
-      dispatcher.dispatch_to(
-        focus.wid,
-        |f| FocusObserver::new(f, FocusEventType::Focus),
-        event,
-      );
+      let event = FocusEvent::new(focus.wid, ctx);
+      dispatcher::dispatch_to(|f| FocusObserver::new(f, FocusEventType::Focus), event);
 
       // bubble focus out
-      let event = Self::focus_event(focus.wid, dispatcher);
-      dispatcher.bubble_dispatch(
-        focus.wid,
+      let event = FocusEvent::new(focus.wid, ctx);
+      dispatcher::bubble_dispatch(
         |f| FocusObserver::new(f, FocusEventType::FocusIn),
         event,
         |_| {},
@@ -171,16 +157,6 @@ impl FocusManager {
     }
 
     old
-  }
-
-  fn focus_event(wid: WidgetId, dispatcher: &CommonDispatcher) -> FocusEvent {
-    FocusEvent::new(
-      dispatcher.modifiers,
-      wid,
-      dispatcher.window.clone(),
-      dispatcher.widget_tree,
-      dispatcher.render_tree,
-    )
   }
 }
 
@@ -217,8 +193,8 @@ mod tests {
 
   fn empty_box() -> SizedBox { SizedBox { size: Size::zero() } }
 
-  fn env(widget: BoxedWidget) -> (window::Window<window::MockBackend>, FocusManager) {
-    let wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
+  fn env(widget: BoxedWidget) -> (window::Window, FocusManager) {
+    let wnd = window::Window::without_render(widget, Size::new(100., 100.));
     // use a aloneside FocusManager for test easy.
     let mut mgr = FocusManager::default();
     mgr.update(&wnd.dispatcher.common);
