@@ -1,11 +1,7 @@
 use crate::{prelude::*, render::render_tree::*};
 
 use indextree::*;
-use std::{
-  collections::{HashMap, HashSet},
-  pin::Pin,
-  ptr::NonNull,
-};
+use std::collections::{HashMap, HashSet};
 
 use super::layout_store::LayoutStore;
 
@@ -23,15 +19,11 @@ pub struct WidgetTree {
   /// A hash map to mapping a render widget in widget tree to its corresponds
   /// render object in render tree.
   widget_to_render: HashMap<WidgetId, RenderId>,
-  /// A buffer to store all stateful widget which state changed but not trigger
-  /// notify.
-  /// todo: should directly notify instead of batch to notify
-  state_changed: std::collections::VecDeque<NonNull<StateAttr>>,
 }
 
 struct TempHold;
 impl CombinationWidget for TempHold {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+  fn build(&self, _: BuildCtx<Self>) -> BoxedWidget {
     unreachable!();
   }
 }
@@ -55,51 +47,20 @@ impl WidgetTree {
     self.root = Some(root);
     self.ensure_render_tree_root(r_tree, layout_store);
 
-    self.notify_state_change_until_empty();
-
     root
   }
 
-  pub fn new_node(&mut self, widget: WidgetNode) -> WidgetId {
+  pub(crate) fn new_node(&mut self, widget: WidgetNode) -> WidgetId {
     let tree2 = unsafe {
       let ptr = self as *mut WidgetTree;
       &mut *ptr
     };
     let id = WidgetId(self.arena.new_node(widget));
-    let state_info = id
-      .get_mut(self)
-      .unwrap()
-      .get_attrs_mut()
-      .and_then(Attributes::find_mut::<StateAttr>);
-
+    let state_info = id.assert_get_mut(self).find_attr_mut::<StateAttr>();
     if let Some(info) = state_info {
       info.assign_id(id, std::ptr::NonNull::from(tree2));
     }
     id
-  }
-
-  pub fn notify_state_change_until_empty(&mut self) {
-    while !self.state_changed.is_empty() {
-      self.state_change_notify_a_round();
-    }
-  }
-
-  fn state_change_notify_a_round(&mut self) {
-    let mut count = self.state_changed.len();
-    let mut sets = HashSet::new();
-    loop {
-      if let Some(mut s) = self.state_changed.pop_front() {
-        if !sets.contains(&s) {
-          sets.insert(s);
-          s.trigger_change();
-        }
-        count -= 1;
-      }
-
-      if count == 0 {
-        break;
-      }
-    }
   }
 
   /// inflate subtree, so every leaf should be a render widget.
@@ -118,24 +79,24 @@ impl WidgetTree {
     let mut stack = vec![(widget, parent, r_parent)];
 
     while let Some((widget, p_wid, p_rid)) = stack.pop() {
-      match widget {
-        BoxedWidget::Combination(c) => {
-          let c_ptr = &*c as *const dyn CombinationWidget;
+      match widget.0 {
+        BoxedWidgetInner::Combination(c) => {
+          let c_ptr = &*c as *const dyn CombinationNode;
           let wid = p_wid.append_widget(WidgetNode::Combination(c), self);
           let child = unsafe { &*c_ptr }.build_child(wid, self);
           stack.push((child, wid, p_rid));
         }
-        BoxedWidget::Render(rw) => {
+        BoxedWidgetInner::Render(rw) => {
           // Render has no method (state) to change its children, just update self is
           // enough.
           self.append_render_widget(rw, p_wid, p_rid, r_tree);
         }
-        BoxedWidget::SingleChild(s) => {
+        BoxedWidgetInner::SingleChild(s) => {
           let (rw, child) = s.unzip();
           let (wid, rid) = self.append_render_widget(rw, p_wid, p_rid, r_tree);
           stack.push((child, wid, Some(rid)));
         }
-        BoxedWidget::MultiChild(m) => {
+        BoxedWidgetInner::MultiChild(m) => {
           let (rw, children) = m.unzip();
           let (wid, rid) = self.append_render_widget(rw, p_wid, p_rid, r_tree);
           children.into_iter().rev().for_each(|w| {
@@ -171,15 +132,6 @@ impl WidgetTree {
     repaired
   }
 
-  /// add a state trigger into the trigger queue
-  #[inline]
-  pub(crate) fn add_state_trigger(&mut self, trigger: NonNull<StateAttr>) {
-    // Do a quick filter for the same state trigger.
-    if Some(&trigger) != self.state_changed.iter().rev().next() {
-      self.state_changed.push_back(trigger);
-    }
-  }
-
   #[cfg(test)]
   pub fn changed_widgets(&self) -> &HashSet<WidgetId> { &self.changed_widgets }
 
@@ -201,7 +153,7 @@ impl WidgetTree {
 
   fn append_render_widget(
     &mut self,
-    widget: Box<dyn RenderWidgetSafety>,
+    widget: Box<dyn RenderNode>,
     p_wid: WidgetId,
     p_rid: Option<RenderId>,
     r_tree: &mut RenderTree,
@@ -281,23 +233,23 @@ impl WidgetTree {
 
     let mut stack = vec![(child, child_id)];
     while let Some((w, wid)) = stack.pop() {
-      match w {
-        BoxedWidget::Combination(c) => {
-          let c_ptr = &*c as *const dyn CombinationWidget;
+      match w.0 {
+        BoxedWidgetInner::Combination(c) => {
+          let c_ptr = &*c as *const dyn CombinationNode;
           let new_wid = self.update_widget(WidgetNode::Combination(c), wid, r_tree, layout_store);
           let child = unsafe { &*c_ptr }.build_child(wid, self);
 
           self.try_inflate_child_or_push(wid, new_wid, child, &mut stack, r_tree, layout_store);
         }
-        BoxedWidget::Render(r) => {
+        BoxedWidgetInner::Render(r) => {
           self.update_widget(WidgetNode::Render(r), wid, r_tree, layout_store);
         }
-        BoxedWidget::SingleChild(s) => {
+        BoxedWidgetInner::SingleChild(s) => {
           let (r, child) = s.unzip();
           let new_wid = self.update_widget(WidgetNode::Render(r), wid, r_tree, layout_store);
           self.try_inflate_child_or_push(wid, new_wid, child, &mut stack, r_tree, layout_store);
         }
-        BoxedWidget::MultiChild(m) => {
+        BoxedWidgetInner::MultiChild(m) => {
           let (r, children) = m.unzip();
           let new_id = self.update_widget(WidgetNode::Render(r), wid, r_tree, layout_store);
           if let Some(new_id) = new_id {
@@ -307,7 +259,7 @@ impl WidgetTree {
           } else {
             let mut key_children = self.collect_key_children(wid, r_tree, layout_store);
             children.into_iter().for_each(|c| {
-              let k_widget = c.get_key().and_then(|k| key_children.remove(&*k));
+              let k_widget = c.0.get_key().and_then(|k| key_children.remove(&*k));
               if let Some(id) = k_widget {
                 wid.0.append(id.0, &mut self.arena);
               }
@@ -409,12 +361,12 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub fn get(self, tree: &WidgetTree) -> Option<&WidgetNode> {
+  pub(crate) fn get(self, tree: &WidgetTree) -> Option<&WidgetNode> {
     tree.arena.get(self.0).map(|node| node.get())
   }
 
   /// Returns a mutable reference to the node data.
-  pub fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut WidgetNode> {
+  pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut WidgetNode> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
@@ -574,11 +526,11 @@ impl WidgetId {
     tree.need_builds.remove(&self);
   }
 
-  pub fn assert_get(self, tree: &WidgetTree) -> &WidgetNode {
+  pub(crate) fn assert_get(self, tree: &WidgetTree) -> &WidgetNode {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut WidgetNode {
+  pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut WidgetNode {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 }
@@ -594,31 +546,52 @@ impl WidgetId {
   }
 }
 
-impl dyn CombinationWidget {
+impl dyn CombinationNode {
   fn build_child(&self, wid: WidgetId, tree: &WidgetTree) -> BoxedWidget {
-    let c_ptr = self as *const dyn CombinationWidget;
-    let mut ctx = BuildCtx::new(unsafe { Pin::new_unchecked(tree) }, wid);
-    unsafe { &*c_ptr }.build(&mut ctx)
+    todo!()
+    // let c_ptr = self as *const dyn CombinationNode;
+    // let mut ctx = BuildCtx::new(unsafe { Pin::new_unchecked(tree) }, wid);
+    // unsafe { &*c_ptr }.build(ctx.cast_type())
   }
 }
 
-pub enum WidgetNode {
-  Combination(Box<dyn CombinationWidget>),
-  Render(Box<dyn RenderWidgetSafety>),
+pub(crate) enum WidgetNode {
+  Combination(Box<dyn CombinationNode>),
+  Render(Box<dyn RenderNode>),
 }
 
-impl AttrsAccess for WidgetNode {
-  fn get_attrs(&self) -> Option<&Attributes> {
+impl AsAttrs for WidgetNode {
+  fn as_attrs(&self) -> Option<&Attributes> {
     match self {
-      WidgetNode::Combination(c) => c.get_attrs(),
-      WidgetNode::Render(r) => r.get_attrs(),
+      WidgetNode::Combination(c) => c.as_attrs(),
+      WidgetNode::Render(r) => r.as_attrs(),
     }
   }
 
-  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> {
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
     match self {
-      WidgetNode::Combination(c) => c.get_attrs_mut(),
-      WidgetNode::Render(r) => r.get_attrs_mut(),
+      WidgetNode::Combination(c) => c.as_attrs_mut(),
+      WidgetNode::Render(r) => r.as_attrs_mut(),
+    }
+  }
+}
+
+impl AsAttrs for BoxedWidgetInner {
+  fn as_attrs(&self) -> Option<&Attributes> {
+    match self {
+      BoxedWidgetInner::Combination(c) => c.as_attrs(),
+      BoxedWidgetInner::Render(r) => r.as_attrs(),
+      BoxedWidgetInner::SingleChild(s) => s.as_attrs(),
+      BoxedWidgetInner::MultiChild(m) => m.as_attrs(),
+    }
+  }
+
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
+    match self {
+      BoxedWidgetInner::Combination(c) => c.as_attrs_mut(),
+      BoxedWidgetInner::Render(r) => r.as_attrs_mut(),
+      BoxedWidgetInner::SingleChild(s) => s.as_attrs_mut(),
+      BoxedWidgetInner::MultiChild(m) => m.as_attrs_mut(),
     }
   }
 }

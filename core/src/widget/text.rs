@@ -4,7 +4,6 @@ use crate::render::render_tree::*;
 use crate::render::*;
 
 /// The text widget display text with a single style.
-#[stateful]
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
   #[declare(convert(into))]

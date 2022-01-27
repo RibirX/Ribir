@@ -2,7 +2,6 @@ use crate::prelude::*;
 
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
-#[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableX {
   pos: f32,
@@ -10,7 +9,6 @@ pub struct ScrollableX {
 
 /// A widget let its child vertical scrollable and the scroll view is as large
 /// as its parent allow.
-#[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableY {
   pos: f32,
@@ -18,7 +16,6 @@ pub struct ScrollableY {
 
 /// A widget let its child both scrollable in horizontal and vertical, and the
 /// scroll view is as large as its parent allow.
-#[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableBoth {
   pos: Point,
@@ -26,9 +23,9 @@ pub struct ScrollableBoth {
 
 impl ScrollableX {
   #[inline]
-  pub fn x_scroll(pos: f32) -> StatefulScrollableX {
+  pub fn x_scroll(pos: f32) -> Stateful<ScrollableX> {
     let scroll = ScrollableX { pos }.into_stateful();
-    let mut scroll_ref = scroll.state_ref();
+    let mut scroll_ref = unsafe { scroll.state_ref() };
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.pos;
@@ -42,9 +39,9 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn y_scroll(pos: f32) -> StatefulScrollableY {
+  pub fn y_scroll(pos: f32) -> Stateful<ScrollableY> {
     let scroll = ScrollableY { pos }.into_stateful();
-    let mut scroll_ref = scroll.state_ref();
+    let mut scroll_ref = unsafe { scroll.state_ref() };
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.pos;
@@ -58,9 +55,9 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn both_scroll(pos: Point) -> StatefulScrollableBoth {
+  pub fn both_scroll(pos: Point) -> Stateful<ScrollableBoth> {
     let scroll = ScrollableBoth { pos }.into_stateful();
-    let mut scroll_ref = scroll.state_ref();
+    let mut scroll_ref = unsafe { scroll.state_ref() };
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.pos;

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use rxrust::prelude::*;
-use std::rc::Rc;
+use std::ptr::NonNull;
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub enum KeyboardEventType {
   KeyDown,
@@ -16,31 +16,12 @@ pub struct KeyboardEvent {
 
 /// An attributes that fire event whenever press or release a key.
 #[derive(Default)]
-pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>);
-
-pub fn keyboard_listen_on<W: AttachAttr, H: FnMut(&KeyboardEvent) + 'static>(
-  widget: W,
-  event_type: KeyboardEventType,
-  handler: H,
-) -> W::W {
-  let mut w = widget.into_attr_widget();
-  // ensure focus attr attached, because a widget can accept keyboard event base
-  // on it can be focused.
-  w.attrs_mut().entry::<FocusAttr>().or_default();
-  w.attrs_mut()
-    .entry::<KeyboardAttr>()
-    .or_default()
-    .listen_on(event_type, handler);
-
-  w
-}
+pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, NonNull<KeyboardEvent>), ()>);
 
 impl KeyboardAttr {
   #[inline]
-  pub fn event_observable(
-    &self,
-  ) -> LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()> {
-    self.0.clone()
+  pub fn dispatch_event(&self, event_type: KeyboardEventType, event: &mut KeyboardEvent) {
+    self.0.clone().next((event_type, NonNull::from(event)))
   }
 
   pub fn listen_on<H: FnMut(&KeyboardEvent) + 'static>(
@@ -49,9 +30,11 @@ impl KeyboardAttr {
     mut handler: H,
   ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
     self
-      .event_observable()
+      .0
+      .clone()
       .filter(move |(t, _)| *t == event_type)
-      .subscribe(move |(_, event)| handler(&*event))
+      // Safety: Inner pointer from a mut reference and pass to handler one by one.
+      .subscribe(move |(_, mut event)| handler(unsafe { event.as_mut() }))
   }
 }
 

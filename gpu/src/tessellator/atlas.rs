@@ -186,7 +186,7 @@ pub mod tests {
     pub fn new(color: Color, size: DeviceSize) -> Self { Self { size, color } }
 
     pub fn shallow_img(color: Color, size: DeviceSize) -> ShallowImage {
-      ShallowImage::new(Rc::new(Box::new(Self::new(color, size))))
+      ShallowImage::new(Rc::new(Self::new(color, size)))
     }
   }
 

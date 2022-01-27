@@ -1,10 +1,7 @@
-use std::rc::Rc;
-
 use super::FocusManager;
 use crate::context::layout_store::LayoutStore;
 use crate::context::Context;
 use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
-use rxrust::prelude::*;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta};
 
 #[derive(Default)]
@@ -88,15 +85,14 @@ impl PointerDispatcher {
         }
       };
 
-      let event = WheelEvent {
-        delta_x,
-        delta_y,
-        common: EventCommon::new(wid, ctx),
-      };
-      super::bubble_dispatch(
-        |wheel_attr: &WheelAttr| wheel_attr.event_observable(),
-        event,
-        |_| {},
+      ctx.bubble_event(
+        wid,
+        |ctx, wid| WheelEvent {
+          delta_x,
+          delta_y,
+          common: EventCommon::new(wid, ctx),
+        },
+        |wheel: &WheelAttr, event| wheel.dispatch_event(event),
       );
     }
   }
@@ -108,7 +104,7 @@ impl PointerDispatcher {
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
         id.get(tree).map_or(false, |w| {
-          w.get_attrs()
+          w.as_attrs()
             .and_then(Attributes::find::<FocusAttr>)
             .is_some()
         })
@@ -131,12 +127,14 @@ impl PointerDispatcher {
     from: (WidgetId, Point),
   ) {
     let (wid, pos) = from;
-    let event = self.mouse_pointer(wid, pos, ctx);
     let mut last_bubble_from = wid;
-    super::bubble_dispatch(
-      |p_attr| PointerObserver::new(p_attr, event_type),
-      event,
-      move |e: &mut PointerEvent| {
+    ctx.bubble_event(
+      wid,
+      |ctx, wid| self.mouse_pointer(wid, pos, ctx),
+      |attr: &PointerAttr, e| {
+        let ctx = e.context();
+        let ctx = ctx.context();
+
         e.position = last_bubble_from.map_to(
           e.position,
           e.target(),
@@ -145,6 +143,7 @@ impl PointerDispatcher {
           &ctx.layout_store,
         );
         last_bubble_from = wid;
+        attr.dispatch_event(event_type, e)
       },
     );
   }
@@ -168,11 +167,10 @@ impl PointerDispatcher {
             &ctx.render_tree,
             &ctx.layout_store,
           );
-          let event = self.mouse_pointer(*w, old_pos, ctx);
-          dispatcher::dispatch_to(
-            |p_attr| PointerObserver::new(p_attr, PointerEventType::Leave),
-            event,
-          );
+          let mut event = self.mouse_pointer(*w, old_pos, ctx);
+          if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
+            pointer.dispatch_event(PointerEventType::Leave, &mut event)
+          }
         } else {
           already_entered.push(*w)
         }
@@ -185,8 +183,7 @@ impl PointerDispatcher {
         .ancestors(&ctx.widget_tree)
         .filter(|w| {
           w.get(&ctx.widget_tree)
-            .and_then(|w| w.get_attrs())
-            .and_then(Attributes::find::<PointerAttr>)
+            .and_then(AsAttrs::find_attr::<PointerAttr>)
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -203,13 +200,15 @@ impl PointerDispatcher {
             &ctx.render_tree,
             &ctx.layout_store,
           );
-          let event = self.mouse_pointer(*w, old_pos, ctx);
-          super::dispatch_to(|p| PointerObserver::new(p, PointerEventType::Enter), event);
+          let mut event = self.mouse_pointer(*w, old_pos, ctx);
+          if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
+            pointer.dispatch_event(PointerEventType::Enter, &mut event);
+          }
         });
     }
   }
 
-  fn mouse_pointer(&self, target: WidgetId, pos: Point, ctx: &mut Context) -> PointerEvent {
+  fn mouse_pointer(&self, target: WidgetId, pos: Point, ctx: &Context) -> PointerEvent {
     PointerEvent::from_mouse(target, pos, self.cursor_pos, self.mouse_button.1, ctx)
   }
 
@@ -276,31 +275,6 @@ impl WidgetId {
   }
 }
 
-struct PointerObserver {
-  event_type: PointerEventType,
-  subject: LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>,
-}
-
-impl PointerObserver {
-  fn new(attr: &PointerAttr, event_type: PointerEventType) -> Self {
-    Self {
-      event_type,
-      subject: attr.pointer_observable(),
-    }
-  }
-}
-
-impl Observer for PointerObserver {
-  type Item = Rc<PointerEvent>;
-  type Err = ();
-
-  fn next(&mut self, value: Self::Item) { self.subject.next((self.event_type, value)) }
-
-  fn error(&mut self, err: Self::Err) { self.subject.error(err); }
-
-  fn complete(&mut self) { self.subject.complete() }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -315,7 +289,7 @@ mod tests {
   {
     let handler_ctor = || {
       let stack = event_stack.clone();
-      move |e: &PointerEvent| stack.borrow_mut().push(e.clone())
+      move |e: &mut PointerEvent| stack.borrow_mut().push(e.clone())
     };
     widget
       .on_pointer_down(handler_ctor())

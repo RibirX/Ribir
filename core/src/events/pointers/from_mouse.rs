@@ -8,7 +8,7 @@ impl PointerEvent {
     position: Point,
     global_pos: Point,
     btn: MouseButtons,
-    ctx: &mut Context,
+    ctx: &Context,
   ) -> Self {
     let event = EventCommon::new(target, ctx);
 

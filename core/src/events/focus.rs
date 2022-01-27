@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use rxrust::prelude::*;
-use std::rc::Rc;
+use std::ptr::NonNull;
 
 /// Focus attr attach to widget to support get ability to focus in.
 #[derive(Default)]
@@ -31,7 +31,7 @@ pub struct FocusAttr {
   /// several, the widget nearest the root, get the initial
   /// focus.
   pub auto_focus: bool,
-  subject: LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()>,
+  subject: LocalSubject<'static, (FocusEventType, NonNull<FocusEvent>), ()>,
 }
 
 pub type FocusEvent = EventCommon;
@@ -58,10 +58,11 @@ pub enum FocusEventType {
 
 impl FocusAttr {
   #[inline]
-  pub fn focus_event_observable(
-    &self,
-  ) -> LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()> {
-    self.subject.clone()
+  pub fn dispatch_event(&self, event_type: FocusEventType, event: &mut FocusEvent) {
+    self
+      .subject
+      .clone()
+      .next((event_type, NonNull::from(event)))
   }
 
   pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
@@ -70,21 +71,10 @@ impl FocusAttr {
     mut handler: H,
   ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
     self
-      .focus_event_observable()
+      .subject
+      .clone()
       .filter(move |(t, _)| *t == event_type)
-      .subscribe(move |(_, event)| handler(&*event))
+      // Safety: Inner pointer from a mut reference and pass to handler one by one.
+      .subscribe(move |(_, mut event)| handler(unsafe { event.as_mut() }))
   }
-}
-
-pub fn focus_listen_on<W: AttachAttr, H: FnMut(&FocusEvent) + 'static>(
-  widget: W,
-  event_type: FocusEventType,
-  handler: H,
-) -> W::W {
-  let mut w = widget.into_attr_widget();
-  w.attrs_mut()
-    .entry::<FocusAttr>()
-    .or_default()
-    .listen_on(event_type, handler);
-  w
 }

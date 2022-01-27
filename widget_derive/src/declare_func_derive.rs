@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
@@ -96,16 +96,9 @@ impl DataFlow {
 
     let upstream = upstream_observable(follows_on);
 
-    let names = follows_on
-      .names()
-      .chain(to.follows.iter().flat_map(|f| f.names()))
-      .collect::<HashSet<_>>();
-
-    let state_refs = state_ref_tokens(names.clone());
     let assign = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr, ctx);
     tokens.extend(quote! {
       #upstream.subscribe({
-        #state_refs
         #assign
         move |_| {
           #assign
@@ -428,15 +421,15 @@ impl DeclareField {
   /// The return value is the name of the follow condition;
   pub fn gen_tokens(
     &self,
-    def_name: &Ident,
     ref_name: &Ident,
+    widget_ty: &Path,
     value_before: &mut TokenStream2,
     widget_def: &mut TokenStream2,
     follow_after: &mut TokenStream2,
     ctx: &DeclareCtx,
   ) -> Option<Ident> {
     let Self { if_guard, member, .. } = self;
-    let expr_tokens = self.field_value_tokens(ctx);
+    let expr_tokens = self.field_value_tokens(widget_ty);
     // we need to calculate field value before define widget to avoid twice
     // calculate it, only if filed  have `if guard`
     if let Some(if_guard) = if_guard {
@@ -452,21 +445,20 @@ impl DeclareField {
 
       member.to_tokens(widget_def);
 
-      if let Some(field_follow) = self.follow_tokens(ref_name, def_name, ctx) {
+      if let Some(field_follow) = self.follow_tokens(ref_name, widget_ty, ctx) {
         follow_after.extend(quote! {
           if #follow_cond {
             #field_follow
           }
         });
       }
-
       Some(follow_cond)
     } else {
       member.to_tokens(widget_def);
       let colon = self.colon_token.unwrap_or_default();
       colon.to_tokens(widget_def);
       expr_tokens.to_tokens(widget_def);
-      if let Some(follow) = self.follow_tokens(ref_name, def_name, ctx) {
+      if let Some(follow) = self.follow_tokens(ref_name, widget_ty, ctx) {
         follow_after.extend(follow);
       }
       None
@@ -476,14 +468,14 @@ impl DeclareField {
   pub fn follow_tokens(
     &self,
     ref_name: &Ident,
-    def_name: &Ident,
+    widget_ty: &Path,
     ctx: &DeclareCtx,
   ) -> Option<TokenStream2> {
     let Self {
       member, follows: depends_on, skip_nc, ..
     } = self;
 
-    let expr_tokens = self.field_value_tokens(ctx);
+    let expr_tokens = self.field_value_tokens(widget_ty);
 
     depends_on.as_ref().map(|follows| {
       let assign = skip_nc_assign(
@@ -493,24 +485,17 @@ impl DeclareField {
         ctx,
       );
       let upstream = upstream_observable(follows);
-      let state_refs = state_ref_tokens(follows.names());
-      let self_ref_tokens =
-        (!follows.contain(ref_name)).then(|| quote! {let mut #ref_name = #def_name.state_ref();});
+
       quote! {
-          #upstream.subscribe({
-            #state_refs
-            #self_ref_tokens
-            move |_|{ #assign }
-          });
+          #upstream.subscribe( move |_|{ #assign } );
       }
     })
   }
 
-  fn field_value_tokens(&self, ctx: &DeclareCtx) -> TokenStream2 {
+  fn field_value_tokens(&self, widget_ty: &Path) -> TokenStream2 {
     let Self { member, expr, .. } = self;
-    let builder_ty = ctx.no_config_builder_type_name();
     let field_converter = field_convert_method(member);
-    quote_spanned! { expr.span() => #builder_ty::#field_converter(#expr) }
+    quote_spanned! { expr.span() => <#widget_ty as Declare>::Builder::#field_converter(#expr) }
   }
 }
 
@@ -532,8 +517,8 @@ impl DeclareWidget {
       fields.pairs().for_each(|pair| {
         let (f, comma) = pair.into_tuple();
         f.gen_tokens(
-          &def_name,
           &ref_name,
+          path,
           &mut value_before,
           content,
           &mut follow_after,
@@ -545,33 +530,23 @@ impl DeclareWidget {
     });
     build_widget.extend(quote! {.build()#stateful});
 
-    let state_ref = if ctx.be_followed(&ref_name) {
-      Some(quote! { let #ref_name = #def_name.state_ref(); })
+    let state_ref = if self.is_stateful(ctx) {
+      Some(quote! { let mut #ref_name = unsafe { #def_name.state_ref() }; })
     } else if ctx.be_reference(&ref_name) {
       Some(quote! { let #ref_name = &mut #def_name; })
     } else {
       None
     };
 
-    let mut tokens = quote! { let mut #def_name = };
-    brace_token.surround(&mut tokens, |tokens| {
-      tokens.extend(quote! {
+    let mut tokens = quote! {
+      let mut #def_name = {
         type #builder_ty = <#path as Declare>::Builder;
         #value_before
-      });
-      if follow_after.is_empty() {
-        build_widget.to_tokens(tokens);
-      } else {
-        tokens.extend(quote! {
-          let #def_name = #build_widget;
-          #follow_after
-          #def_name
-        })
-      }
-    });
-    syn::token::Semi::default().to_tokens(&mut tokens);
-
-    state_ref.to_tokens(&mut tokens);
+        #build_widget
+      };
+      #state_ref
+      #follow_after
+    };
 
     self.normal_attrs_tokens(ctx, &mut tokens);
     self.listeners_tokens(ctx, &mut tokens);
@@ -707,7 +682,6 @@ impl DeclareWidget {
         let method = Ident::new(&format!("with_{}", quote! {#member}), member.span());
         let depends_tokens = follows.as_ref().map(|follows| {
           let upstream = upstream_observable(follows);
-          let refs = state_ref_tokens(follows.names());
           let set_attr = Ident::new(&format!("try_set_{}", quote! {#member}), member.span());
           let get_attr = Ident::new(&format!("get_{}", quote! {#member}), member.span());
 
@@ -722,19 +696,14 @@ impl DeclareWidget {
             };
           }
 
-          let def_name = self.widget_def_name(ctx);
-          let self_ref_tokens = (!follows.contain(&self_ref))
-            .then(|| quote! {let mut #self_ref = #def_name.state_ref();});
           quote! {
-            #upstream.subscribe({
-              #refs
-              #self_ref_tokens
+            #upstream.subscribe(
               move |_| {
                 let #value = #expr;
                 let mut #self_ref = #self_ref.silent_ref();
                 #assign_value
               }
-            });
+            );
           }
         });
         let attr_tokens = quote! {

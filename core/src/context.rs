@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use crate::prelude::{
   render_tree::{RenderEdge, RenderTree},
   widget_tree::WidgetTree,
-  BoxClamp, BoxedWidget, RenderId, WidgetId,
+  AsAttrs, BoxClamp, BoxedWidget, Event, EventCommon, RenderId, WidgetId,
 };
 use painter::{Painter, Size};
 mod painting_context;
@@ -19,6 +19,8 @@ pub(crate) mod layout_store;
 mod render_context;
 pub(crate) use layout_store::LayoutStore;
 pub use render_context::*;
+mod build_context;
+pub use build_context::BuildCtx;
 
 pub struct Context {
   pub(crate) render_tree: RenderTree,
@@ -70,6 +72,33 @@ impl Context {
     }
   }
 
+  pub fn bubble_event<D, E, F, Attr>(&mut self, widget: WidgetId, default: F, mut dispatch: D) -> E
+  where
+    F: FnOnce(&Context, WidgetId) -> E,
+    D: FnMut(&Attr, &mut E),
+    E: Event + AsMut<EventCommon>,
+    Attr: 'static,
+  {
+    let mut event = default(self, widget);
+    for wid in widget.ancestors(&self.widget_tree) {
+      if let Some(attr) = wid.assert_get(&self.widget_tree).find_attr::<Attr>() {
+        event.as_mut().current_target = wid;
+        dispatch(attr, &mut event);
+        if event.bubbling_canceled() {
+          break;
+        }
+      }
+    }
+    if let Some(icon) = event.context().updated_cursor() {
+      self.cursor = Some(icon)
+    }
+    event
+  }
+
+  pub fn find_attr<A: 'static>(&self, widget: WidgetId) -> Option<&A> {
+    widget.get(&self.widget_tree).and_then(AsAttrs::find_attr)
+  }
+
   /// Mark widget need layout, if give a None value, the root will be mark
   pub fn mark_needs_layout(&mut self, rid: Option<RenderId>) {
     let rid = rid.unwrap_or_else(|| self.render_tree.root().unwrap());
@@ -92,6 +121,7 @@ impl Context {
     wid.descendants(&self.widget_tree)
   }
 
+  // todo: remove
   /// Split self as self and an iterator of ids of `id` and its descendants, in
   /// tree order.
   pub fn split_traverse(&mut self, id: RenderId) -> (&mut Self, impl Iterator<Item = RenderEdge>) {
@@ -100,6 +130,7 @@ impl Context {
     (self, id.traverse(r_tree))
   }
 
+  // todo: remove
   fn split_r_tree(&mut self) -> (&mut Self, &mut RenderTree) {
     // Safety: split `RenderTree` as two mutable reference is safety, because it's a
     // private inner mutable and promise export only use to access inner object and

@@ -1,7 +1,6 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[stateful]
 #[derive(Default, MultiChildWidget, Declare)]
 pub struct Row {
   pub reverse: bool,

@@ -793,7 +793,7 @@ impl ToOwned for dyn KeySlice + '_ {
 #[cfg(test)]
 mod tests {
   use crate::RenderData;
-  use painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size, Transform};
+  use painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
   use text::shaper::TextShaper;
   extern crate test;
   use test::Bencher;
@@ -930,27 +930,6 @@ mod tests {
       tess.vertices_cache.clear();
       tess.tessellate(&commands, |_| {})
     })
-  }
-
-  #[test]
-  fn million_diff_round_rect_x() {
-    let mut painter = Painter::new(1.);
-    painter.set_brush(Color::RED).set_line_width(2.);
-    (1..1_000_000).for_each(|i| {
-      let round = (i as f32 * 0.00_001).min(0.1);
-      painter.rect_round(
-        &Rect::new(Point::zero(), Size::new(100. + round, 100. + round)),
-        &Radius::all(round),
-      );
-      if i % 2 == 0 {
-        painter.stroke(None, None);
-      } else {
-        painter.fill(None);
-      }
-    });
-    let commands = painter.finish();
-    let mut tess = tessellator();
-    tess.tessellate(&commands, |_| {})
   }
 
   #[bench]

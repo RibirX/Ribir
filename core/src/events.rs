@@ -32,6 +32,10 @@ pub trait Event {
   fn current_target(&self) -> WidgetId;
   /// Prevent event bubbling to parent.
   fn stop_bubbling(&self);
+
+  /// Return it the event is canceled to bubble to parent.
+  fn bubbling_canceled(&self) -> bool;
+
   /// Tells the user agent that if the event does not get explicitly handled,
   /// its default action should not be taken as it normally would be.
   fn prevent_default(&self);
@@ -44,10 +48,10 @@ pub trait Event {
 
 #[derive(Clone)]
 pub struct EventCommon {
-  pub target: WidgetId,
-  pub current_target: WidgetId,
-  pub cancel_bubble: Cell<bool>,
-  pub prevent_default: Cell<bool>,
+  pub(crate) target: WidgetId,
+  pub(crate) current_target: WidgetId,
+  pub(crate) cancel_bubble: Cell<bool>,
+  pub(crate) prevent_default: Cell<bool>,
   context: NonNull<Context>,
 }
 
@@ -59,6 +63,8 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   #[inline]
   fn stop_bubbling(&self) { self.as_ref().cancel_bubble.set(true) }
   #[inline]
+  fn bubbling_canceled(&self) -> bool { self.as_ref().cancel_bubble.get() }
+  #[inline]
   fn prevent_default(&self) { self.as_ref().prevent_default.set(true) }
   #[inline]
   fn modifiers(&self) -> ModifiersState { self.context().context().modifiers }
@@ -67,8 +73,10 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   fn context<'a>(&'a self) -> EventCtx<'a> {
     // Safety: framework promise event context only live in event dispatch and
     // there is no others to share `Context`.
-    let mut ctx_ptr = self.as_ref().context;
-    EventCtx::new(self.current_target(), unsafe { ctx_ptr.as_mut() })
+
+    EventCtx::new(self.current_target(), unsafe {
+      self.as_ref().context.as_ref()
+    })
   }
 }
 
@@ -93,7 +101,7 @@ impl std::convert::AsRef<EventCommon> for EventCommon {
 }
 
 impl EventCommon {
-  pub fn new(target: WidgetId, context: &mut Context) -> Self {
+  pub fn new(target: WidgetId, context: &Context) -> Self {
     Self {
       target,
       current_target: target,

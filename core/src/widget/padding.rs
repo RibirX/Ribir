@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[stateful]
 #[derive(SingleChildWidget, Clone, Declare)]
 pub struct Padding {
   #[declare(builtin)]

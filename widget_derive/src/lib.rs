@@ -1,4 +1,4 @@
-#![feature(proc_macro_diagnostic)]
+#![feature(proc_macro_diagnostic, unzip_option)]
 //! A derive implementation for `CombinationWidget` and `RenderWidget`. Can use
 //! `proxy` attr to specify where to derive form.
 //!
@@ -14,7 +14,7 @@
 //! use ribir::prelude::*;
 //! ##[derive(RenderWidget)]
 //! struct W {
-//!  ##[proxy]
+//!  ##[proxy]  
 //!  b: widget::Text
 //! }
 //! ```
@@ -30,64 +30,35 @@ extern crate proc_macro;
 extern crate proc_macro2;
 
 mod attr_fields;
-mod combination_derive;
 mod declare_derive;
 mod declare_func_derive;
 mod error;
-mod multi_derive;
-mod proxy_derive;
-mod render_derive;
-mod single_derive;
-mod stateful_derive;
+
 mod util;
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-
-#[proc_macro_derive(CombinationWidget, attributes(proxy))]
-pub fn combination_macro_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  combination_derive::combination_derive(&mut input).into()
-}
-
-#[proc_macro_derive(RenderWidget, attributes(proxy))]
-pub fn render_macro_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  render_derive::render_derive(&mut input).into()
-}
 
 #[proc_macro_derive(SingleChildWidget, attributes(proxy))]
 pub fn single_marco_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  single_derive::single_derive(&mut input).into()
+  let input = parse_macro_input!(input as DeriveInput);
+  let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+  let name = input.ident;
+  quote! {
+      impl #impl_generics SingleChildWidget for #name #ty_generics #where_clause {}
+  }
+  .into()
 }
 
 #[proc_macro_derive(MultiChildWidget, attributes(proxy))]
 pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  multi_derive::multi_derive(&mut input).into()
-}
-
-/// `#[stateful]` macro attr to auto implement a stateful widget named
-/// `StatefulXXX` to `XXX` stateless widget. It's a tuple struct wrap of
-/// [`StatefulImpl`][stateful_impl], and
-/// implement [`IntoStateful`][into_stateful] and
-/// [`Stateful`][stateful]. The stateful widget will as a proxy widget of the
-/// stateless widget.
-///
-/// If you want have a custom widget implementation for the
-/// stateful widget, just provide a `custom` meta, use like
-/// `#[stateful(custom)]`.
-///
-/// [stateful_impl]: ../ribir/widget/stateful/struct.StatefulImpl.html
-/// [stateful]: ../ribir/widget/stateful/trait.Stateful.html
-/// [into_stateful]: ../ribir/widget/stateful/trait.IntoStateful.html
-#[proc_macro_attribute]
-pub fn stateful(attrs: TokenStream, input: TokenStream) -> TokenStream {
-  let attrs = parse_macro_input!(attrs as syn::AttributeArgs);
-  let mut input = parse_macro_input!(input as DeriveInput);
-  stateful_derive::stateful_derive(&mut input, attrs)
-    .unwrap_or_else(|e| e)
-    .into()
+  let input = parse_macro_input!(input as DeriveInput);
+  let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+  let name = input.ident;
+  quote! {
+      impl #impl_generics MultiChildWidget for #name #ty_generics #where_clause {}
+  }
+  .into()
 }
 
 /// Macro to implement the `Declare` trait. To know how to use it see the

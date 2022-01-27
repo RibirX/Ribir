@@ -97,7 +97,6 @@ impl Window {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
-    self.context.widget_tree.notify_state_change_until_empty();
     let changed = self.context.tree_repair();
     if changed {
       self.context.layout(self.raw_window.inner_size());
@@ -144,9 +143,7 @@ impl Window {
     self.p_backend.resize(size);
     self.raw_window.request_redraw();
   }
-}
 
-impl Window {
   #[cfg(feature = "wgpu_gl")]
   pub(crate) fn from_event_loop(
     root: BoxedWidget,

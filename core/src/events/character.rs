@@ -1,11 +1,11 @@
 use crate::prelude::*;
 use rxrust::prelude::*;
-use std::rc::Rc;
+use std::ptr::NonNull;
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
 #[derive(Default)]
-pub struct CharAttr(LocalSubject<'static, Rc<CharEvent>, ()>);
+pub struct CharAttr(LocalSubject<'static, NonNull<CharEvent>, ()>);
 
 #[derive(Debug)]
 pub struct CharEvent {
@@ -25,7 +25,18 @@ impl std::convert::AsMut<EventCommon> for CharEvent {
 
 impl CharAttr {
   #[inline]
-  pub fn event_observable(&self) -> LocalSubject<'static, Rc<CharEvent>, ()> { self.0.clone() }
+  pub fn dispatch_event(&self, event: &mut CharEvent) { self.0.clone().next(NonNull::from(event)) }
+
+  pub fn listen_on<H: FnMut(&mut CharEvent) + 'static>(
+    &self,
+    mut handler: H,
+  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
+    self
+      .0
+      .clone()
+      // Safety: Inner pointer from a mut reference and pass to handler one by one.
+      .subscribe(move |mut event| handler(unsafe { event.as_mut() }))
+  }
 }
 
 #[cfg(test)]

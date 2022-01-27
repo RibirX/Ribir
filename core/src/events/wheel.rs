@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use std::rc::Rc;
+use std::ptr::NonNull;
 
 #[derive(Debug, Clone)]
 pub struct WheelEvent {
@@ -11,7 +11,7 @@ pub struct WheelEvent {
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
 #[derive(Default)]
-pub struct WheelAttr(LocalSubject<'static, Rc<WheelEvent>, ()>);
+pub struct WheelAttr(LocalSubject<'static, NonNull<WheelEvent>, ()>);
 
 impl std::convert::AsRef<EventCommon> for WheelEvent {
   #[inline]
@@ -25,7 +25,18 @@ impl std::convert::AsMut<EventCommon> for WheelEvent {
 
 impl WheelAttr {
   #[inline]
-  pub fn event_observable(&self) -> LocalSubject<'static, Rc<WheelEvent>, ()> { self.0.clone() }
+  pub fn dispatch_event(&self, event: &mut WheelEvent) { self.0.clone().next(NonNull::from(event)) }
+
+  pub fn listen_on<H: FnMut(&mut WheelEvent) + 'static>(
+    &self,
+    mut handler: H,
+  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
+    self
+      .0
+      .clone()
+      // Safety: Inner pointer from a mut reference and pass to handler one by one.
+      .subscribe(move |mut event| handler(unsafe { event.as_mut() }))
+  }
 }
 
 #[cfg(test)]

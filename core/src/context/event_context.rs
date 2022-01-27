@@ -5,17 +5,18 @@ use super::{Context, WidgetCtx};
 
 pub struct EventCtx<'a> {
   id: WidgetId,
-  ctx: &'a mut Context,
+  cursor: Option<CursorIcon>,
+  ctx: &'a Context,
 }
 
 impl<'a> EventCtx<'a> {
   #[inline]
-  pub fn new(id: WidgetId, ctx: &'a mut Context) -> Self { Self { id, ctx } }
+  pub fn new(id: WidgetId, ctx: &'a Context) -> Self { Self { id, ctx, cursor: None } }
 
   #[inline]
-  pub fn set_cursor(&mut self, cursor: CursorIcon) { self.ctx.cursor = Some(cursor); }
+  pub fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
   #[inline]
-  pub fn updated_cursor(&self) -> Option<CursorIcon> { self.ctx.cursor }
+  pub fn updated_cursor(&self) -> Option<CursorIcon> { self.cursor }
 }
 
 impl<'a> WidgetCtx<'a> for EventCtx<'a> {

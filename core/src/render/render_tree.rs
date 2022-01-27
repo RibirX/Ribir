@@ -214,8 +214,6 @@ impl RenderId {
   }
 }
 
-impl !Unpin for RenderTree {}
-
 #[cfg(test)]
 mod tests {
   use super::*;

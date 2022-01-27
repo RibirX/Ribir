@@ -304,12 +304,13 @@ impl SugarFields {
       let comma = Comma::default();
       let mut gen_decoration_field_tokens = |f: &DeclareField| -> Option<Ident> {
         if ctx.be_followed(ref_name) {
-          let bg_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
-          follow_after.extend(quote! { let #bg_ref = #wrap_def_name.state_ref();});
+          let state_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
+          follow_after.extend(quote! { let #state_ref = unsafe {#wrap_def_name.state_ref()};});
         }
+        // fixme: should use field state ref to follow others change.
         let cond = f.gen_tokens(
-          &wrap_def_name,
           &wrap_ref_name,
+          &Ident::new("BoxDecoration", Span::call_site()).into(),
           &mut value_before,
           decoration,
           &mut follow_after,
@@ -350,10 +351,8 @@ impl SugarFields {
       };
       if decoration_cond.is_empty() {
         tokens.extend(build);
-      } else if follow_after.is_empty() {
-        tokens.extend(quote! { #decoration_cond.then(|| #build ); });
       } else {
-        tokens.extend(quote! { #decoration_cond.then(||{ #build }); });
+        tokens.extend(quote! { #decoration_cond.then(|| #build ); });
       }
     });
     syn::token::Semi::default().to_tokens(&mut def_and_ref_tokens);
@@ -382,53 +381,44 @@ fn common_def_tokens(
 
   let wrap_name = ctx.no_conflict_name_with_suffix(def_name, member);
   let wrap_ref = ctx.no_conflict_name_with_suffix(ref_name, member);
-  let stateful = is_stateful(&wrap_ref, f, ctx).then(|| quote! { .into_stateful() });
-
-  let field_follow = f.follow_tokens(&wrap_ref, &wrap_name, ctx);
+  let (stateful, state_ref) = is_stateful(&wrap_ref, f, ctx)
+    .then(|| {
+      (
+        quote! { .into_stateful() },
+        quote! { let mut #wrap_ref = unsafe { #wrap_name.state_ref() }; },
+      )
+    })
+    .unzip();
+  let widget_ty = widget_ty.into();
+  let field_follow = f.follow_tokens(&wrap_ref, &widget_ty, ctx);
   let builder_ty = ctx.no_config_builder_type_name();
   let colon = colon_token.unwrap_or_default();
-  let value = f.field_value_tokens(ctx);
-  let build_widget = quote! {
-    #builder_ty {
-      #member #colon #value
-    }.build()#stateful
-  };
-  let mut widget_tokens = quote! {let #wrap_name = };
-  syn::token::Brace::default().surround(&mut widget_tokens, |tokens| {
-    tokens.extend(quote! { type #builder_ty = <#widget_ty as Declare>::Builder; });
-    if field_follow.is_none() {
-      build_widget.to_tokens(tokens);
-    } else {
-      tokens.extend(quote! {
-        let #wrap_name = #build_widget;
-        #field_follow
-        #wrap_name
-      })
-    }
-  });
-  syn::token::Semi::default().to_tokens(&mut widget_tokens);
+  let value = f.field_value_tokens(&widget_ty);
 
-  let mut def_and_ref_tokens = quote! {};
+  let mut widget_tokens = quote! {
+    let #wrap_name = {
+      type #builder_ty = <#widget_ty as Declare>::Builder;
+      #builder_ty {
+        #member #colon #value
+      }.build()#stateful
+    };
+    #state_ref
+    #field_follow
+  };
   if let Some(if_guard) = if_guard {
-    def_and_ref_tokens.extend(quote! {
+    widget_tokens = quote! {
       let #wrap_name = #if_guard {
         #widget_tokens
         Some(#wrap_name)
       } else {
         None
       };
-    });
-  } else {
-    def_and_ref_tokens.extend(widget_tokens);
-    // widget have `if guard` syntax, can not be depended.
-    if ctx.be_followed(&wrap_ref) {
-      def_and_ref_tokens.extend(quote! { let #wrap_ref =  #wrap_name.state_ref(); });
-    }
+    };
   }
 
   WrapWidgetTokens {
     compose_tokens: quote! { let #def_name = (#wrap_name, #def_name).compose(); },
     name: wrap_name,
-    def_and_ref_tokens,
+    def_and_ref_tokens: widget_tokens,
   }
 }

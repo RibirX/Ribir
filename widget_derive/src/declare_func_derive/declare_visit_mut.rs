@@ -5,10 +5,10 @@ use super::{
   DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOnVec,
 };
 use proc_macro::{Diagnostic, Level, TokenStream};
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{quote, quote_spanned};
+use proc_macro2::Span;
+use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse_quote, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident};
+use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident};
 
 const DECLARE_MACRO_NAME: &str = "declare";
 
@@ -42,39 +42,9 @@ struct LocalVariable {
   alias_of_name: Option<Ident>,
 }
 
-pub fn state_ref_tokens<'a, I: IntoIterator<Item = &'a Ident>>(follows: I) -> TokenStream2 {
-  let state_refs = follows.into_iter().map(|follow_w| {
-    quote_spanned! { follow_w.span() =>
-      #[allow(unused_mut)]
-      let mut #follow_w = #follow_w.clone();
-    }
-  });
-
-  quote! { #(#state_refs)*}
-}
-
 impl VisitMut for DeclareCtx {
   fn visit_expr_mut(&mut self, expr: &mut Expr) {
     match expr {
-      Expr::Closure(c) if c.capture.is_some() => {
-        let mut old_follows = std::mem::take(&mut self.current_follows);
-        visit_mut::visit_expr_closure_mut(self, c);
-        let closure_follows = std::mem::take(&mut self.current_follows);
-
-        if !closure_follows.is_empty() {
-          let state_refs = state_ref_tokens(closure_follows.keys());
-          let closure = quote_spanned! { c.span() => {
-            #state_refs
-            #c
-          }};
-
-          *expr = parse_quote! { #closure };
-
-          old_follows.extend(closure_follows);
-        }
-
-        self.current_follows = old_follows;
-      }
       Expr::Macro(m) if m.mac.path.is_ident(DECLARE_MACRO_NAME) => {
         let tokens = std::mem::replace(&mut m.mac.tokens, quote! {});
         *expr = self.extend_declare_macro_to_expr(tokens.into());

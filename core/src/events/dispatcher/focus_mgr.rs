@@ -1,7 +1,4 @@
 use crate::prelude::*;
-use dispatcher;
-use rxrust::prelude::*;
-use std::rc::Rc;
 #[derive(Debug, Default)]
 pub(crate) struct FocusManager {
   /// store current focusing node, and its position in tab_orders.
@@ -76,7 +73,7 @@ impl FocusManager {
   pub fn auto_focus(&mut self, ctx: &Context) -> Option<WidgetId> {
     ctx.descendants().find(|id| {
       id.assert_get(&ctx.widget_tree)
-        .get_attrs()
+        .as_attrs()
         .and_then(Attributes::find::<FocusAttr>)
         .map_or(false, |focus| focus.auto_focus)
     })
@@ -91,7 +88,7 @@ impl FocusManager {
         .descendants(tree)
         .filter_map(|id| {
           id.get(tree)
-            .and_then(|w| w.get_attrs())
+            .and_then(|w| w.as_attrs())
             .and_then(Attributes::find::<FocusAttr>)
             .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
         })
@@ -131,58 +128,35 @@ impl FocusManager {
 
     if let Some((ref blur, _)) = old {
       // dispatch blur event
-      let event = FocusEvent::new(blur.wid, ctx);
-      dispatcher::dispatch_to(|f| FocusObserver::new(f, FocusEventType::Blur), event);
+      if let Some(focus) = ctx.find_attr::<FocusAttr>(blur.wid) {
+        let mut focus_event = FocusEvent::new(blur.wid, ctx);
+        focus.dispatch_event(FocusEventType::Blur, &mut focus_event)
+      }
 
       // bubble focus out
-      let event = FocusEvent::new(blur.wid, ctx);
-      dispatcher::bubble_dispatch(
-        |f| FocusObserver::new(f, FocusEventType::FocusOut),
-        event,
-        |_| {},
+      ctx.bubble_event(
+        blur.wid,
+        |ctx, id| FocusEvent::new(id, ctx),
+        |focus: &FocusAttr, event| focus.dispatch_event(FocusEventType::FocusOut, event),
       );
     }
 
     if let Some((focus, _)) = self.focusing {
-      let event = FocusEvent::new(focus.wid, ctx);
-      dispatcher::dispatch_to(|f| FocusObserver::new(f, FocusEventType::Focus), event);
+      if let Some(focus_attr) = ctx.find_attr::<FocusAttr>(focus.wid) {
+        let mut focus_event = FocusEvent::new(focus.wid, ctx);
+        focus_attr.dispatch_event(FocusEventType::Focus, &mut focus_event)
+      }
 
       // bubble focus out
-      let event = FocusEvent::new(focus.wid, ctx);
-      dispatcher::bubble_dispatch(
-        |f| FocusObserver::new(f, FocusEventType::FocusIn),
-        event,
-        |_| {},
+      ctx.bubble_event(
+        focus.wid,
+        |ctx, id| FocusEvent::new(id, ctx),
+        |focus: &FocusAttr, event| focus.dispatch_event(FocusEventType::FocusIn, event),
       );
     }
 
     old
   }
-}
-
-struct FocusObserver {
-  event_type: FocusEventType,
-  subject: LocalSubject<'static, (FocusEventType, Rc<FocusEvent>), ()>,
-}
-
-impl FocusObserver {
-  fn new(attr: &FocusAttr, event_type: FocusEventType) -> Self {
-    Self {
-      event_type,
-      subject: attr.focus_event_observable(),
-    }
-  }
-}
-
-impl Observer for FocusObserver {
-  type Item = Rc<FocusEvent>;
-  type Err = ();
-
-  fn next(&mut self, value: Self::Item) { self.subject.next((self.event_type, value)) }
-
-  fn error(&mut self, err: Self::Err) { self.subject.error(err); }
-
-  fn complete(&mut self) { self.subject.complete() }
 }
 
 #[cfg(test)]

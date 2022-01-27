@@ -8,9 +8,6 @@ pub struct PaintingCtx<'a> {
 }
 
 impl<'a> PaintingCtx<'a> {
-  #[inline]
-  pub(crate) fn new(id: WidgetId, ctx: &'a mut Context) -> Self { Self { id, ctx } }
-
   /// Return the 2d painter to draw 2d things.
   #[inline]
   pub fn painter(&mut self) -> &mut Painter { &mut self.ctx.painter }

@@ -3,10 +3,6 @@ mod focus_mgr;
 pub(crate) use focus_mgr::FocusManager;
 mod pointer;
 pub(crate) use pointer::PointerDispatcher;
-mod util;
-use rxrust::prelude::*;
-use std::rc::Rc;
-pub(crate) use util::*;
 pub use window::RawWindow;
 use winit::event::{ElementState, WindowEvent};
 
@@ -44,20 +40,21 @@ impl Dispatcher {
   pub fn dispatch_keyboard_input(&mut self, input: winit::event::KeyboardInput, ctx: &mut Context) {
     if let Some(key) = input.virtual_keycode {
       let prevented = if let Some(focus) = self.focus_mgr.focusing() {
-        let event = KeyboardEvent {
-          key,
-          scan_code: input.scancode,
-          common: EventCommon::new(focus, ctx),
-        };
         let event_type = match input.state {
           ElementState::Pressed => KeyboardEventType::KeyDown,
           ElementState::Released => KeyboardEventType::KeyUp,
         };
-        let event = bubble_dispatch(
-          |keyboard: &KeyboardAttr| KeyBoardObserver::new(keyboard, event_type),
-          event,
-          |_| {},
+
+        let event = ctx.bubble_event(
+          focus,
+          |ctx, id| KeyboardEvent {
+            key,
+            scan_code: input.scancode,
+            common: EventCommon::new(id, ctx),
+          },
+          |keyboard: &KeyboardAttr, event| keyboard.dispatch_event(event_type, event),
         );
+
         event.common.prevent_default.get()
       } else {
         false
@@ -70,11 +67,14 @@ impl Dispatcher {
 
   pub fn dispatch_received_char(&mut self, c: char, ctx: &mut Context) {
     if let Some(focus) = self.focus_mgr.focusing() {
-      let event = CharEvent {
-        char: c,
-        common: EventCommon::new(focus, ctx),
-      };
-      util::bubble_dispatch(|attr: &CharAttr| attr.event_observable(), event, |_| {});
+      ctx.bubble_event(
+        focus,
+        |ctx, id| CharEvent {
+          char: c,
+          common: EventCommon::new(id, ctx),
+        },
+        |attr: &CharAttr, event| attr.dispatch_event(event),
+      );
     }
   }
 
@@ -87,29 +87,4 @@ impl Dispatcher {
       }
     }
   }
-}
-
-struct KeyBoardObserver {
-  event_type: KeyboardEventType,
-  subject: LocalSubject<'static, (KeyboardEventType, Rc<KeyboardEvent>), ()>,
-}
-
-impl KeyBoardObserver {
-  fn new(attr: &KeyboardAttr, event_type: KeyboardEventType) -> Self {
-    Self {
-      event_type,
-      subject: attr.event_observable(),
-    }
-  }
-}
-
-impl Observer for KeyBoardObserver {
-  type Item = Rc<KeyboardEvent>;
-  type Err = ();
-
-  fn next(&mut self, value: Self::Item) { self.subject.next((self.event_type, value)) }
-
-  fn error(&mut self, err: Self::Err) { self.subject.error(err); }
-
-  fn complete(&mut self) { self.subject.complete() }
 }

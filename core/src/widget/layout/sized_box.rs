@@ -4,7 +4,6 @@ use crate::prelude::*;
 ///
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
-#[stateful]
 #[derive(SingleChildWidget, Declare, Clone)]
 pub struct SizedBox {
   pub size: Size,

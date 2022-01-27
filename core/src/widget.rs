@@ -1,9 +1,5 @@
 #[doc(hidden)]
-pub use std::{
-  any::{Any, TypeId},
-  collections::HashMap,
-};
-pub mod build_ctx;
+pub use std::any::{Any, TypeId};
 pub mod key;
 pub mod layout;
 pub use layout::*;
@@ -11,10 +7,9 @@ pub mod stateful;
 pub mod text;
 mod theme;
 pub use theme::*;
-pub mod widget_tree;
+pub(crate) mod widget_tree;
 pub mod window;
 pub use crate::widget::text::Text;
-pub use build_ctx::BuildCtx;
 pub use key::Key;
 pub use stateful::*;
 mod cursor;
@@ -36,15 +31,17 @@ mod path;
 pub use path::*;
 
 /// A widget represented by other widget compose.
-pub trait CombinationWidget: AttrsAccess + 'static {
+pub trait CombinationWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
+  fn build(&self, ctx: BuildCtx<Self>) -> BoxedWidget
+  where
+    Self: Sized;
 }
 
 /// RenderWidget provide configuration for render object which provide actual
 /// rendering or computing layout for the application.
-pub trait RenderWidget: AttrsAccess + 'static {
+pub trait RenderWidget {
   /// The render object type will created.
   type RO: RenderObject;
 
@@ -59,11 +56,13 @@ pub trait RenderWidget: AttrsAccess + 'static {
 
 /// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
 /// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety: AttrsAccess {
+pub trait RenderWidgetSafety {
   fn create_render_object(&self) -> Box<dyn RenderObject>;
 
   fn update_render_object(&self, object: &mut dyn RenderObject, ctx: &mut UpdateCtx);
 }
+
+pub struct BoxedWidget(BoxedWidgetInner);
 
 #[macro_export]
 macro_rules! mark_layout_assign {
@@ -75,33 +74,53 @@ macro_rules! mark_layout_assign {
   };
 }
 
-pub type BoxedSingleChild = Box<SingleChild<Box<dyn RenderWidgetSafety>>>;
-pub type BoxedMultiChild = MultiChild<Box<dyn RenderWidgetSafety>>;
-pub enum BoxedWidget {
-  Combination(Box<dyn CombinationWidget>),
-  Render(Box<dyn RenderWidgetSafety>),
-  SingleChild(BoxedSingleChild),
-  MultiChild(BoxedMultiChild),
+#[marker]
+pub trait Widget {}
+impl<W: CombinationWidget> Widget for W {}
+impl<W: RenderWidget> Widget for W {}
+
+pub trait IntoRender {
+  type R: RenderWidget;
+  fn into_render(self) -> Self::R;
 }
 
-impl AttrsAccess for BoxedWidget {
-  fn get_attrs(&self) -> Option<&Attributes> {
-    match self {
-      BoxedWidget::Combination(c) => c.get_attrs(),
-      BoxedWidget::Render(r) => r.get_attrs(),
-      BoxedWidget::SingleChild(s) => s.get_attrs(),
-      BoxedWidget::MultiChild(m) => m.get_attrs(),
-    }
-  }
+pub trait IntoCombination {
+  type C: CombinationWidget;
+  fn into_combination(self) -> Self::C;
+}
 
-  fn get_attrs_mut(&mut self) -> Option<&mut Attributes> {
-    match self {
-      BoxedWidget::Combination(c) => c.get_attrs_mut(),
-      BoxedWidget::Render(r) => r.get_attrs_mut(),
-      BoxedWidget::SingleChild(s) => s.get_attrs_mut(),
-      BoxedWidget::MultiChild(m) => m.get_attrs_mut(),
-    }
+impl<W: RenderWidget> IntoRender for W {
+  type R = W;
+  #[inline]
+  fn into_render(self) -> Self::R { self }
+}
+
+impl<W: CombinationWidget> IntoCombination for W {
+  type C = W;
+  #[inline]
+  fn into_combination(self) -> Self::C { self }
+}
+
+pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
+pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
+pub(crate) trait CombinationNode: AsAttrs {
+  fn build(&self, self_id: WidgetId, ctx: &Context) -> BoxedWidget;
+}
+pub(crate) trait RenderNode: RenderWidgetSafety + AsAttrs {}
+
+impl<W: CombinationWidget + AsAttrs> CombinationNode for W {
+  fn build(&self, self_id: WidgetId, ctx: &Context) -> BoxedWidget {
+    let ctx = BuildCtx::new(ctx, self_id);
+    self.build(ctx)
   }
+}
+impl<W: RenderWidget + AsAttrs> RenderNode for W {}
+
+pub(crate) enum BoxedWidgetInner {
+  Combination(Box<dyn CombinationNode>),
+  Render(Box<dyn RenderNode>),
+  SingleChild(BoxedSingleChild),
+  MultiChild(BoxedMultiChild),
 }
 
 // Widget & BoxWidget default implementation
@@ -112,31 +131,35 @@ pub trait BoxWidget<Marker> {
   fn box_it(self) -> BoxedWidget;
 }
 
-impl<T: CombinationWidget> BoxWidget<()> for T {
+impl<T: IntoCombination + 'static> BoxWidget<CombinationMarker> for T {
   #[inline]
-  fn box_it(self) -> BoxedWidget { BoxedWidget::Combination(Box::new(self)) }
-}
-
-impl<T: RenderWidget> BoxWidget<RenderMarker> for T {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { BoxedWidget::Render(Box::new(self)) }
-}
-
-impl<S> BoxWidget<()> for SingleChild<S>
-where
-  S: RenderWidget,
-{
   fn box_it(self) -> BoxedWidget {
-    let widget: Box<dyn RenderWidgetSafety> = Box::new(self.widget);
-    let boxed = Box::new(SingleChild { widget, child: self.child });
-    BoxedWidget::SingleChild(boxed)
+    BoxedWidget(BoxedWidgetInner::Combination(Box::new(
+      self.into_combination(),
+    )))
   }
 }
 
-impl<M: MultiChildWidget> BoxWidget<()> for MultiChild<M> {
+impl<T: IntoRender + 'static> BoxWidget<RenderMarker> for T {
+  #[inline]
   fn box_it(self) -> BoxedWidget {
-    let widget: Box<dyn RenderWidgetSafety> = Box::new(self.widget);
-    BoxedWidget::MultiChild(MultiChild { widget, children: self.children })
+    BoxedWidget(BoxedWidgetInner::Render(Box::new(self.into_render())))
+  }
+}
+
+impl<S: SingleChildWidget + 'static> BoxWidget<RenderMarker> for SingleChild<S> {
+  fn box_it(self) -> BoxedWidget {
+    let widget: Box<dyn RenderNode> = Box::new(self.widget.into_render());
+    let boxed = Box::new(SingleChild { widget, child: self.child });
+    BoxedWidget(BoxedWidgetInner::SingleChild(boxed))
+  }
+}
+
+impl<M: MultiChildWidget + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
+  fn box_it(self) -> BoxedWidget {
+    let widget: Box<dyn RenderNode> = Box::new(self.widget.into_render());
+    let inner = BoxedWidgetInner::MultiChild(MultiChild { widget, children: self.children });
+    BoxedWidget(inner)
   }
 }
 

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
-#[stateful(custom)]
 #[derive(Default, Clone, Declare)]
 pub struct Checkbox {
   pub checked: bool,
@@ -11,7 +10,7 @@ pub struct Checkbox {
 }
 
 impl Checkbox {
-  fn switch_check(&mut self) {
+  pub fn switch_check(&mut self) {
     if self.indeterminate {
       self.indeterminate = false;
       self.checked = false;
@@ -22,7 +21,7 @@ impl Checkbox {
 }
 
 impl CombinationWidget for Checkbox {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+  fn build(&self, ctx: BuildCtx<Self>) -> BoxedWidget {
     let CheckboxTheme {
       mut size,
       border_width,
@@ -49,6 +48,21 @@ impl CombinationWidget for Checkbox {
           width: border_width,
         }),
         background if has_checked => : color,
+        cursor: CursorIcon::Hand,
+
+        on_tap: {
+          let mut state = unsafe { this.state_ref() };
+          move |_| state.switch_check()
+        },
+        on_key_up: {
+          let mut state = unsafe { this.state_ref() };
+          move |k| {
+            if k.key == VirtualKeyCode::Space {
+              state.switch_check()
+            }
+          }
+        },
+
         has_checked.then(||{
           if self.indeterminate {
             indeterminate_path
@@ -58,28 +72,6 @@ impl CombinationWidget for Checkbox {
         })
       }
     }
-  }
-}
-
-impl CombinationWidget for StatefulCheckbox {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-    self
-      .0
-      .clone()
-      .with_cursor(CursorIcon::Hand.into())
-      .on_tap({
-        let mut state = self.state_ref();
-        move |_| state.switch_check()
-      })
-      .on_key_up({
-        let mut state = self.state_ref();
-        move |k| {
-          if k.key == VirtualKeyCode::Space {
-            state.switch_check()
-          }
-        }
-      })
-      .box_it()
   }
 }
 

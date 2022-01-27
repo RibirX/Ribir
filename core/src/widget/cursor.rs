@@ -6,30 +6,33 @@ use winit::window::CursorIcon;
 #[derive(Debug)]
 pub struct Cursor(Rc<Cell<CursorIcon>>);
 
-pub fn cursor_attach<W: AttachAttr>(icon: CursorIcon, widget: W) -> W::W
+pub fn cursor_attach<W>(icon: CursorIcon, w: W) -> W::Target
 where
-  W::W: AttachAttr<W = W::W>,
+  W: AttachAttr,
 {
-  let mut w = widget.into_attr_widget();
-
-  if w.attrs().find::<Cursor>().is_none() {
-    let cursor = Cursor::new(icon);
-    let c_cursor = cursor.0.clone();
-    let mut w = w.on_pointer_move(move |e| {
-      let mut ctx = e.context();
-      if e.point_type == PointerType::Mouse
-        && e.buttons == MouseButtons::empty()
-        && ctx.updated_cursor().is_none()
-      {
-        ctx.set_cursor(c_cursor.get());
-      }
-    });
-    w.attrs_mut().insert(cursor);
-    w
-  } else {
-    w.attrs_mut().entry::<Cursor>().or_default().set_icon(icon);
-    w
+  let mut default = false;
+  let w = w.inspect_or_else(
+    || {
+      default = true;
+      Cursor::new(icon)
+    },
+    |attr| attr.set_icon(icon),
+  );
+  if !default {
+    return w;
   }
+
+  w.on_pointer_move(move |e| {
+    let mut ctx = e.context();
+    if e.point_type == PointerType::Mouse
+      && e.buttons == MouseButtons::empty()
+      && ctx.updated_cursor().is_none()
+    {
+      if let Some(icon) = ctx.find_attr::<Cursor>().map(|c| c.0.get()) {
+        ctx.set_cursor(icon);
+      }
+    }
+  })
 }
 
 impl Cursor {

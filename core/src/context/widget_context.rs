@@ -1,10 +1,7 @@
 use painter::Rect;
 
 use super::Context;
-use crate::prelude::{
-  widget_tree::{WidgetNode, WidgetTree},
-  WidgetId,
-};
+use crate::prelude::{widget_tree::WidgetTree, AsAttrs, WidgetId};
 
 /// common action for all context of widget.
 pub trait WidgetCtx<'a> {
@@ -48,11 +45,9 @@ pub trait WidgetCtx<'a> {
       .and_then(|rid| ctx.layout_store.layout_box_rect(rid))
   }
 
-  #[inline]
-  fn widget(&self) -> &WidgetNode { self.widget_by_id(self.id()) }
-
-  fn widget_by_id(&self, id: WidgetId) -> &WidgetNode {
-    let tree = &self.context().widget_tree;
-    id.assert_get(tree)
+  fn find_attr<A: 'static>(&self) -> Option<&A> {
+    let ctx = self.context();
+    let w_tree = &ctx.widget_tree;
+    self.id().assert_get(w_tree).find_attr()
   }
 }

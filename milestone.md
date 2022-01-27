@@ -15,7 +15,7 @@
   - [ ] benchmark comparison [#2](https://github.com/M-Adoo/Ribir/issues/2)
   - [x] merge framework branch to master.
   - [ ] gpu environment support [Test](./doc/develope.md#Test)
-- [ ] perform layout on render tree (2 week)
+- [ ] perform layout on render tree (2 weeks)
   - [x] layout flow
   - [x] base layout widget
     - [x] Row

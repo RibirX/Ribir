@@ -1,27 +1,28 @@
 use crate::prelude::*;
 use ::text::FontFamily;
-use std::{pin::Pin, rc::Rc};
+use std::{marker::PhantomData, rc::Rc};
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
   Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
 );
 
-pub struct BuildCtx<'a> {
-  pub(crate) tree: Pin<&'a widget_tree::WidgetTree>,
-  wid: WidgetId,
-  default_theme: Option<Rc<Theme>>,
+pub struct BuildCtx<'a, W> {
+  pub(crate) ctx: &'a Context,
+  pub(crate) id: WidgetId,
+  pub(crate) default_theme: Option<Rc<Theme>>,
+  _mark: PhantomData<W>,
 }
 
-impl<'a> BuildCtx<'a> {
+impl<'a, W> BuildCtx<'a, W> {
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&mut self) -> &Theme {
-    let tree = &*self.tree;
+    let tree = &self.ctx.widget_tree;
     self
-      .wid
+      .id
       .ancestors(tree)
       .find_map(|id| {
         id.get(tree)
-          .and_then(|w| w.get_attrs())
+          .and_then(|w| w.as_attrs())
           .and_then(Attributes::find)
       })
       .unwrap_or_else(|| {
@@ -32,13 +33,33 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(tree: Pin<&'a widget_tree::WidgetTree>, widget: WidgetId) -> Self {
+  pub fn state_ref(&self) -> StateRef<W> { todo!() }
+
+  #[inline]
+  pub(crate) fn new(ctx: &'a Context, widget: WidgetId) -> Self {
     Self {
-      tree,
-      wid: widget,
+      ctx,
+      id: widget,
       default_theme: None,
+      _mark: PhantomData,
     }
   }
+
+  pub(crate) fn cast_type<X>(self) -> BuildCtx<'a, X> {
+    let BuildCtx { ctx, id: wid, default_theme, .. } = self;
+    BuildCtx {
+      ctx,
+      id: wid,
+      default_theme,
+      _mark: PhantomData,
+    }
+  }
+}
+
+impl<'a, W> WidgetCtx<'a> for BuildCtx<'a, W> {
+  fn id(&self) -> WidgetId { self.id }
+
+  fn context(&self) -> &Context { self.ctx }
 }
 
 #[cfg(test)]

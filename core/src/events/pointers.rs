@@ -2,7 +2,7 @@ use super::EventCommon;
 use crate::prelude::*;
 use rxrust::prelude::*;
 use std::{
-  rc::Rc,
+  ptr::NonNull,
   time::{Duration, Instant},
 };
 
@@ -103,7 +103,7 @@ impl PointerEvent {
 
 /// An attribute that calls callbacks in response to common pointer events.
 #[derive(Default)]
-pub struct PointerAttr(LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()>);
+pub struct PointerAttr(LocalSubject<'static, (PointerEventType, NonNull<PointerEvent>), ()>);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
@@ -120,30 +120,13 @@ pub enum PointerEventType {
    * lostpointercapture: */
 }
 
-pub fn pointer_listen_on<W: AttachAttr, H: FnMut(&PointerEvent) + 'static>(
-  widget: W,
-  event_type: PointerEventType,
-  handler: H,
-) -> W::W {
-  let mut w = widget.into_attr_widget();
-  w.attrs_mut()
-    .entry::<PointerAttr>()
-    .or_default()
-    .listen_on(event_type, handler);
-
-  w
-}
-
 impl PointerAttr {
-  /// Return a `Observable` of the pointer events.
   #[inline]
-  pub fn pointer_observable(
-    &self,
-  ) -> LocalSubject<'static, (PointerEventType, Rc<PointerEvent>), ()> {
-    self.0.clone()
+  pub fn dispatch_event(&self, event_type: PointerEventType, event: &mut PointerEvent) {
+    self.0.clone().next((event_type, NonNull::from(event)))
   }
 
-  pub fn listen_on<H: FnMut(&PointerEvent) + 'static>(
+  pub fn listen_on<H: FnMut(&mut PointerEvent) + 'static>(
     &mut self,
     event_type: PointerEventType,
     mut handler: H,
@@ -151,13 +134,29 @@ impl PointerAttr {
     self
       .pointer_observable()
       .filter(move |(t, _)| *t == event_type)
-      .subscribe(move |(_, event)| handler(&*event))
+      // Safety: Inner pointer from a mut reference and pass to handler one by one.
+      .subscribe(move |(_, event)| handler(event))
   }
 
-  pub fn tap_times_observable(
+  pub fn pointer_observable<'a>(
+    &self,
+  ) -> impl LocalObservable<
+    'static,
+    Item = (PointerEventType, &'a mut PointerEvent),
+    Err = (),
+    Unsub = MutRc<SingleSubscription>,
+  > + 'static {
+    self
+      .0
+      .clone()
+      // Safety: Inner pointer from a mut reference and pass to handler one by one.
+      .map(move |(t, mut e)| (t, unsafe { e.as_mut() }))
+  }
+
+  pub fn tap_times_observable<'a>(
     &self,
     times: u8,
-  ) -> impl LocalObservable<'static, Item = Rc<PointerEvent>, Err = ()> {
+  ) -> impl LocalObservable<'static, Item = &'a mut PointerEvent, Err = ()> {
     const DUR: Duration = Duration::from_millis(250);
     #[derive(Clone)]
     struct TapInfo {
@@ -166,38 +165,35 @@ impl PointerAttr {
       pointer_type: PointerType,
       mouse_btns: MouseButtons,
     }
+    let mut tap_info: Option<TapInfo> = None;
     self
       .pointer_observable()
       .filter(|(t, _)| t == &PointerEventType::Tap)
-      .scan_initial(None, move |mut first_tap: Option<(TapInfo, _)>, (_, e)| {
-        if let Some((info, event)) = &mut first_tap {
-          if info.pointer_type == e.point_type
-            && info.mouse_btns == e.buttons
-            && info.tap_times < times
-            && info.first_tap_stamp.elapsed() < DUR
+      .filter_map(move |(_, e): (_, &mut PointerEvent)| {
+        match &mut tap_info {
+          Some(info)
+            if info.pointer_type == e.point_type
+              && info.mouse_btns == e.buttons
+              && info.tap_times < times
+              && info.first_tap_stamp.elapsed() < DUR =>
           {
             info.tap_times += 1;
-            *event = Rc::downgrade(&e);
-            return first_tap;
           }
-        }
+          _ => {
+            tap_info = Some(TapInfo {
+              first_tap_stamp: Instant::now(),
+              tap_times: 1,
+              pointer_type: e.point_type.clone(),
+              mouse_btns: e.buttons,
+            })
+          }
+        };
 
-        Some((
-          TapInfo {
-            first_tap_stamp: Instant::now(),
-            tap_times: 1,
-            pointer_type: e.point_type.clone(),
-            mouse_btns: e.buttons,
-          },
-          Rc::downgrade(&e),
-        ))
+        tap_info
+          .as_ref()
+          .filter(|info| info.tap_times == times)
+          .map(|_| e)
       })
-      .filter_map(
-        move |info: Option<(TapInfo, std::rc::Weak<PointerEvent>)>| match info {
-          Some((info, e)) if info.tap_times == times => e.upgrade(),
-          _ => None,
-        },
-      )
   }
 }
 

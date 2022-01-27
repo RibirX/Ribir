@@ -12,9 +12,9 @@ struct Todos {
   tasks: Vec<Task>,
 }
 
-impl CombinationWidget for StatefulTodos {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    let state = self.state_ref();
+impl StatefulCombination for Todos {
+  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+    let state = unsafe { this.state_ref() };
     declare! {
       Column {
         cross_align: CrossAxisAlign::Start,
