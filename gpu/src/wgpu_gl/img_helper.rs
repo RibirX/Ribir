@@ -1,4 +1,4 @@
-use super::{DeviceRect, DeviceSize};
+use super::DeviceSize;
 use std::num::NonZeroU32;
 
 pub(crate) struct RgbaConvert {
@@ -66,115 +66,89 @@ impl RgbaConvert {
       c_pass.dispatch(size.area(), 1, 1);
     }
   }
-}
 
-pub(crate) async fn bgra_texture_to_png<W: std::io::Write>(
-  texture: &wgpu::Texture,
-  rect: DeviceRect,
-  device: &wgpu::Device,
-  queue: &wgpu::Queue,
-  convert: &RgbaConvert,
-  writer: W,
-) -> Result<(), &'static str> {
-  let DeviceSize { width, height, .. } = rect.size;
-  const PX_BYTES: usize = std::mem::size_of::<u32>();
-  // align to 256 bytes by WebGPU require.
-  const WGPU_ALIGN: usize = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-  const ALIGN_BYTES: u32 = (WGPU_ALIGN / PX_BYTES) as u32;
-  let align_width = {
-    match width % ALIGN_BYTES {
-      0 => width,
-      other => width - other + ALIGN_BYTES,
-    }
-  };
+  pub(crate) async fn bgra_texture_to_rgba_data<'a>(
+    &self,
+    texture: &'a wgpu::Texture,
+    size: DeviceSize,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+  ) -> Result<Vec<u8>, &'static str> {
+    let DeviceSize { width, height, .. } = size;
+    const PX_BYTES: usize = std::mem::size_of::<u32>();
+    // align to 256 bytes by WebGPU require.
+    const WGPU_ALIGN: usize = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+    const ALIGN_BYTES: u32 = (WGPU_ALIGN / PX_BYTES) as u32;
+    let align_width = {
+      match width % ALIGN_BYTES {
+        0 => width,
+        other => width - other + ALIGN_BYTES,
+      }
+    };
 
-  let size = align_width as u64 * height as u64 * PX_BYTES as u64;
+    let size = align_width as u64 * height as u64 * PX_BYTES as u64;
 
-  let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-    label: Some("Encoder for encoding texture as png"),
-  });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("Encoder for encoding texture as png"),
+    });
 
-  // The output buffer lets us retrieve the data as an array
-  let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-    size,
-    usage: wgpu::BufferUsages::STORAGE
-      | wgpu::BufferUsages::COPY_DST
-      | wgpu::BufferUsages::COPY_SRC,
-    mapped_at_creation: false,
-    label: None,
-  });
+    // The output buffer lets us retrieve the data as an array
+    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+      size,
+      usage: wgpu::BufferUsages::STORAGE
+        | wgpu::BufferUsages::COPY_DST
+        | wgpu::BufferUsages::COPY_SRC,
+      mapped_at_creation: false,
+      label: None,
+    });
 
-  encoder.copy_texture_to_buffer(
-    wgpu::ImageCopyTexture {
-      texture,
-      mip_level: 0,
-      origin: wgpu::Origin3d {
-        x: rect.min_x(),
-        y: rect.min_y(),
-        z: 0,
+    encoder.copy_texture_to_buffer(
+      wgpu::ImageCopyTexture {
+        texture,
+        mip_level: 0,
+        origin: wgpu::Origin3d::ZERO,
+        aspect: wgpu::TextureAspect::All,
       },
-      aspect: wgpu::TextureAspect::All,
-    },
-    wgpu::ImageCopyBuffer {
-      buffer: &output_buffer,
-      layout: wgpu::ImageDataLayout {
-        offset: 0,
-        bytes_per_row: NonZeroU32::new(PX_BYTES as u32 * align_width as u32),
-        rows_per_image: NonZeroU32::new(0),
+      wgpu::ImageCopyBuffer {
+        buffer: &output_buffer,
+        layout: wgpu::ImageDataLayout {
+          offset: 0,
+          bytes_per_row: NonZeroU32::new(PX_BYTES as u32 * align_width as u32),
+          rows_per_image: NonZeroU32::new(0),
+        },
       },
-    },
-    wgpu::Extent3d {
-      width,
-      height,
-      depth_or_array_layers: 1,
-    },
-  );
-  convert.compute_shader_convert(
-    device,
-    &mut encoder,
-    &output_buffer,
-    DeviceSize::new(align_width, height),
-  );
+      wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+      },
+    );
+    self.compute_shader_convert(
+      device,
+      &mut encoder,
+      &output_buffer,
+      DeviceSize::new(align_width, height),
+    );
 
-  let map_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-    size,
-    usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-    mapped_at_creation: false,
-    label: None,
-  });
+    let map_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+      size,
+      usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+      mapped_at_creation: false,
+      label: None,
+    });
 
-  encoder.copy_buffer_to_buffer(&output_buffer, 0, &map_buffer, 0, size);
+    encoder.copy_buffer_to_buffer(&output_buffer, 0, &map_buffer, 0, size);
 
-  queue.submit(Some(encoder.finish()));
+    queue.submit(Some(encoder.finish()));
 
-  let buffer_slice = map_buffer.slice(..);
-  // Note that we're not calling `.await` here.
+    let buffer_slice = map_buffer.slice(..);
+    let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
 
-  let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
+    // Poll the device in a blocking manner so that our future resolves.
+    device.poll(wgpu::Maintain::Wait);
 
-  // Poll the device in a blocking manner so that our future resolves.
-  device.poll(wgpu::Maintain::Wait);
-  buffer_future.await.map_err(|_| "Async buffer error")?;
-
-  let data = buffer_slice.get_mapped_range();
-
-  let mut png_encoder = png::Encoder::new(writer, width, height);
-  png_encoder.set_depth(png::BitDepth::Eight);
-  png_encoder.set_color(png::ColorType::RGBA);
-
-  let data: Vec<_> = (0..height)
-    .flat_map(|i| {
-      let start = (i * align_width) as usize * PX_BYTES;
-      data[start..(start + width as usize * PX_BYTES)].iter()
-    })
-    .cloned()
-    .collect();
-
-  png_encoder
-    .write_header()
-    .unwrap()
-    .write_image_data(data.as_slice())
-    .unwrap();
-
-  Ok(())
+    buffer_future.await.map_err(|_| "Async buffer error")?;
+    let data = buffer_slice.get_mapped_range().to_owned();
+    Ok(data)
+  }
 }

@@ -504,7 +504,7 @@ impl DeclareWidget {
     let Self { fields, rest, path, brace_token, .. } = self;
 
     let builder_ty = ctx.no_config_builder_type_name();
-    let stateful = self.is_state_full(ctx).then(|| quote! { .into_stateful()});
+    let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
     let def_name = self.widget_def_name(ctx);
     let ref_name = self.widget_ref_name(ctx);
 
@@ -553,17 +553,16 @@ impl DeclareWidget {
     tokens
   }
 
-  fn is_state_full(&self, ctx: &DeclareCtx) -> bool {
+  fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
     // named widget is followed by others or its attributes.
     ctx.be_followed(&self.widget_ref_name(ctx))
       // unnamed widget is followed by its attributes.
-      || (self.named.is_none() &&  self
+      ||  self
       .fields
       .iter()
       .chain(self.sugar_fields.normal_attr_iter())
       .chain(self.sugar_fields.listeners_iter())
-      .filter_map(|f| f.follows.as_ref().map(|d| (&f.member, d))).next()
-        .is_some())
+      .any(|f| f.follows.is_some())
   }
 
   fn children_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream2) {
@@ -700,7 +699,7 @@ impl DeclareWidget {
             #upstream.subscribe(
               move |_| {
                 let #value = #expr;
-                let mut #self_ref = #self_ref.silent_ref();
+                let mut #self_ref = #self_ref.silent();
                 #assign_value
               }
             );
@@ -716,7 +715,8 @@ impl DeclareWidget {
               #attr_tokens
               #w_name
             }  else {
-              #w_name.into_attr_widget()
+              // insert a empty attr for if-else type compatibility
+              #w_name.insert_attr(())
             };
           })
         } else {
@@ -736,7 +736,8 @@ impl DeclareWidget {
             let #name =  #if_guard {
               #name.#member(#expr)
             } else {
-              #name.into_attr_widget()
+              // insert a empty attr for if-elsetype compatibility
+              #name.insert_attr(())
             };
           });
         } else {

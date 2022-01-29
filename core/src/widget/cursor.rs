@@ -53,20 +53,7 @@ impl Default for Cursor {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{
-    prelude::window::Window,
-    widget::window::{MockRawWindow, RawWindow},
-  };
   use winit::event::{DeviceId, WindowEvent};
-
-  fn submit_cursor(wnd: &mut Window) -> CursorIcon {
-    let ptr = (&mut **wnd.raw_window.borrow_mut()) as *mut dyn RawWindow;
-    #[allow(clippy::cast_ptr_alignment)]
-    let mock_window = unsafe { &mut *(ptr as *mut MockRawWindow) };
-    let cursor = mock_window.cursor.unwrap();
-    mock_window.set_cursor();
-    cursor
-  }
 
   #[test]
   fn tree_down_up() {
@@ -99,43 +86,59 @@ mod tests {
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
-      device_id,
-      position: (1, 1).into(),
-      modifiers: ModifiersState::default(),
-    });
-    assert_eq!(submit_cursor(&mut wnd), CursorIcon::Help);
+    let ctx = &mut wnd.context;
+    wnd.dispatcher.dispatch(
+      WindowEvent::CursorMoved {
+        device_id,
+        position: (1f64, 1.).into(),
+        modifiers: ModifiersState::default(),
+      },
+      ctx,
+    );
+    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
-      device_id,
-      position: (101, 1).into(),
-      modifiers: ModifiersState::default(),
-    });
-    assert_eq!(submit_cursor(&mut wnd), CursorIcon::Hand);
+    wnd.dispatcher.dispatch(
+      WindowEvent::CursorMoved {
+        device_id,
+        position: (101f64, 1.).into(),
+        modifiers: ModifiersState::default(),
+      },
+      ctx,
+    );
+    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
-      device_id,
-      position: (201, 1).into(),
-      modifiers: ModifiersState::default(),
-    });
-    assert_eq!(submit_cursor(&mut wnd), CursorIcon::AllScroll);
+    wnd.dispatcher.dispatch(
+      WindowEvent::CursorMoved {
+        device_id,
+        position: (201f64, 1.).into(),
+        modifiers: ModifiersState::default(),
+      },
+      ctx,
+    );
+    assert_eq!(ctx.cursor.take(), Some(CursorIcon::AllScroll));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
-      device_id,
-      position: (101, 1).into(),
-      modifiers: ModifiersState::default(),
-    });
-    assert_eq!(submit_cursor(&mut wnd), CursorIcon::Hand);
+    wnd.dispatcher.dispatch(
+      WindowEvent::CursorMoved {
+        device_id,
+        position: (101f64, 1.).into(),
+        modifiers: ModifiersState::default(),
+      },
+      ctx,
+    );
+    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(WindowEvent::CursorMoved {
-      device_id,
-      position: (1, 1).into(),
-      modifiers: ModifiersState::default(),
-    });
-    assert_eq!(submit_cursor(&mut wnd), CursorIcon::Help);
+    wnd.dispatcher.dispatch(
+      WindowEvent::CursorMoved {
+        device_id,
+        position: (1f64, 1.).into(),
+        modifiers: ModifiersState::default(),
+      },
+      ctx,
+    );
+    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
   }
 }

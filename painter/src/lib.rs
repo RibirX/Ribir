@@ -6,7 +6,7 @@ mod painter;
 pub mod path;
 pub use crate::color::*;
 
-pub use painter::*;
+pub use crate::painter::*;
 pub use path::*;
 pub mod image;
 mod style;

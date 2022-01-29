@@ -23,33 +23,18 @@ impl SizedBox {
 }
 
 impl RenderWidget for SizedBox {
-  type RO = Self;
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self.size != object.size {
-      object.size = self.size;
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for SizedBox {
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let size = clamp.clamp(self.size);
-    if let Some(child) = ctx.single_child() {
-      ctx.perform_child_layout(child, BoxClamp { min: size, max: size });
+    if let Some(child) = ctx.single_render_child() {
+      ctx.perform_render_child_layout(child, BoxClamp { min: size, max: size });
     }
     size
   }
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
+  fn only_sized_by_parent(&self) -> bool { true }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {
-    // nothing to paint, just a layout widget.
-  }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[cfg(test)]

@@ -8,45 +8,35 @@ pub struct Padding {
 }
 
 impl RenderWidget for Padding {
-  type RO = Self;
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let child = match ctx.single_render_child() {
+      Some(c) => c,
+      None => return Size::zero(),
+    };
 
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  #[inline]
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self.padding != object.padding {
-      ctx.mark_needs_layout();
-      object.padding = self.padding.clone();
-    }
-  }
-}
-
-impl RenderObject for Padding {
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
     let thickness = self.padding.thickness();
     let zero = Size::zero();
     let min = (clamp.min - thickness).max(zero);
     let max = (clamp.max - thickness).max(zero);
     // Shrink the clamp of child.
     let child_clamp = BoxClamp { min, max };
-    let child = ctx.single_child().expect("Margin must have one child");
-    let size = ctx.perform_child_layout(child, child_clamp);
+
+    let size = ctx.perform_render_child_layout(child, child_clamp);
 
     // Expand the size, so the child have padding.
     let size = clamp.clamp(size + thickness);
-    ctx.update_child_size(child, size);
+    ctx.update_size(child, size);
 
-    // Update child's children position, let the have a correct position after
+    // Update child's children position, let they have a correct position after
     // expanded with padding. padding.
-    let mut child_ctx = ctx.new_ctx(child);
-    let (child_ctx, grandson_iter) = child_ctx.split_children_iter();
+    let (ctx, grandson_iter) = ctx.split_render_children_by(child);
     grandson_iter.for_each(|c| {
-      let pos = child_ctx
-        .box_rect()
-        .expect("The grandson must performed layout")
-        .origin;
-      child_ctx.update_child_position(c, pos);
+      let pos = ctx
+        .widget_box_rect(c)
+        .expect("The grandson render widget must performed layout")
+        .origin
+        + Vector::new(self.padding.left, self.padding.top);
+      ctx.update_position(c, pos);
     });
 
     size
@@ -56,7 +46,7 @@ impl RenderObject for Padding {
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {}
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Padding {
@@ -77,25 +67,26 @@ mod tests {
       }
     };
 
-    let mut wnd = window::Window::without_render(widget, Size::new(200., 200.));
+    let mut wnd = Window::without_render(widget, Size::new(200., 200.));
     wnd.render_ready();
-    let r_tree = wnd.render_tree();
-    let padding_widget = r_tree.root().unwrap();
+    let ctx = wnd.context();
+    let padding_widget = ctx.widget_tree.root();
 
     assert_eq!(
-      padding_widget.layout_box_rect(&*r_tree).unwrap(),
+      ctx.layout_store.layout_box_rect(padding_widget).unwrap(),
       Rect::from_size(Size::new(101., 100.))
     );
 
-    let box_widget = padding_widget.children(&*r_tree).next().unwrap();
+    let tree = &ctx.widget_tree;
+    let row_widget = padding_widget.single_child(tree).unwrap();
     assert_eq!(
-      box_widget.layout_box_rect(&*r_tree).unwrap(),
+      ctx.layout_store.layout_box_rect(row_widget).unwrap(),
       Rect::from_size(Size::new(101., 100.))
     );
 
-    let child_box = box_widget.children(&*r_tree).next().unwrap();
+    let child_box = row_widget.single_child(tree).unwrap();
     assert_eq!(
-      child_box.layout_box_rect(&*r_tree).unwrap(),
+      ctx.layout_store.layout_box_rect(child_box).unwrap(),
       Rect::new(Point::new(1., 0.), Size::new(100., 100.))
     );
   }

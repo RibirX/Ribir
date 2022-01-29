@@ -242,6 +242,22 @@ impl Radius {
   /// the rectangle have the same radii.
   #[inline]
   pub fn vertical(top: f32, bottom: f32) -> Radius { Self::new(top, top, bottom, bottom) }
+
+  #[inline]
+  pub fn top_left(top_left: f32) -> Self { Radius(BorderRadii { top_left, ..<_>::default() }) }
+
+  #[inline]
+  pub fn top_right(top_right: f32) -> Self { Radius(BorderRadii { top_right, ..<_>::default() }) }
+
+  #[inline]
+  pub fn bottom_left(bottom_left: f32) -> Self {
+    Radius(BorderRadii { bottom_left, ..<_>::default() })
+  }
+
+  #[inline]
+  pub fn bottom_right(bottom_right: f32) -> Self {
+    Radius(BorderRadii { bottom_right, ..<_>::default() })
+  }
 }
 
 impl From<Radius> for BorderRadii {

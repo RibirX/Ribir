@@ -6,7 +6,6 @@ struct Task {
   finished: bool,
   label: String,
 }
-#[stateful(custom)]
 #[derive(Debug)]
 struct Todos {
   tasks: Vec<Task>,
@@ -19,7 +18,7 @@ impl StatefulCombination for Todos {
       Column {
         cross_align: CrossAxisAlign::Start,
         ..<_>::default(),
-        self.tasks.iter().enumerate().map(|(idx, task)|{
+        this.tasks.iter().enumerate().map(|(idx, task)|{
           let state = state.clone();
           declare!{
             Row {

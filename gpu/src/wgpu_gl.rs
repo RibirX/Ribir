@@ -2,11 +2,12 @@ use crate::{
   tessellator::Tessellator, ColorPrimitive, ColorRenderData, GlRender, GpuBackend, RenderData,
   Texture, TexturePrimitive, TextureRenderData, Vertex,
 };
-use painter::{DeviceRect, DeviceSize, LogicUnit, PhysicUnit};
+use painter::{DeviceSize, Image, LogicUnit, PhysicUnit};
+use std::iter;
 use std::num::NonZeroU32;
 use text::shaper::TextShaper;
 mod img_helper;
-pub(crate) use img_helper::{bgra_texture_to_png, RgbaConvert};
+pub(crate) use img_helper::RgbaConvert;
 pub mod surface;
 use std::borrow::Borrow;
 use surface::{PhysicSurface, Surface, TextureSurface};
@@ -85,7 +86,7 @@ pub struct WgpuGl<S: Surface = PhysicSurface> {
   primitives_layout: wgpu::BindGroupLayout,
   uniform_layout: wgpu::BindGroupLayout,
   uniforms: wgpu::BindGroup,
-  rgba_converter: Option<RgbaConvert>,
+  rgba_converter: RgbaConvert,
   sampler: wgpu::Sampler,
   atlas: wgpu::Texture,
   rebuild_pipeline: bool,
@@ -151,30 +152,6 @@ impl WgpuGl<TextureSurface> {
     )
     .await
   }
-
-  // todo: remove png dependency.
-  /// PNG encoded the canvas then write by `writer`.
-  pub async fn write_png<W: std::io::Write>(&mut self, writer: W) -> Result<(), &'static str> {
-    self.ensure_rgba_converter();
-    let rect = DeviceRect::from_size(self.surface.size());
-
-    let Self {
-      surface,
-      device,
-      queue,
-      rgba_converter,
-      ..
-    } = self;
-    bgra_texture_to_png(
-      &surface.raw_texture,
-      rect,
-      device,
-      queue,
-      rgba_converter.as_ref().unwrap(),
-      writer,
-    )
-    .await
-  }
 }
 
 impl<S: Surface> GlRender for WgpuGl<S> {
@@ -200,6 +177,41 @@ impl<S: Surface> GlRender for WgpuGl<S> {
 
   fn finish(&mut self) {
     // todo: immediate draw now when render data submitted.
+  }
+
+  fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str> {
+    let Self {
+      surface,
+      device,
+      queue,
+      rgba_converter,
+      ..
+    } = self;
+    surface.on_texture(|t| {
+      let x = rgba_converter.bgra_texture_to_rgba_data(t, surface.view_size(), device, queue);
+      futures::executor::block_on(x).map(|data| {
+        struct PixelImage {
+          size: DeviceSize,
+          data: Box<[u8]>,
+        }
+
+        impl Image for PixelImage {
+          fn color_format(&self) -> painter::image::ColorFormat {
+            painter::image::ColorFormat::Rgba8
+          }
+
+          fn size(&self) -> DeviceSize { self.size }
+
+          fn pixel_bytes(&self) -> Box<[u8]> { self.data.clone() }
+        }
+
+        let img: Box<dyn Image> = Box::new(PixelImage {
+          size: surface.view_size(),
+          data: data.into_boxed_slice(),
+        });
+        img
+      })
+    })
   }
 }
 
@@ -276,6 +288,7 @@ impl<S: Surface> WgpuGl<S> {
     let multisampled_framebuffer =
       Self::create_multisampled_framebuffer(&device, &s_config, anti_aliasing as u32);
 
+    let rgba_converter = RgbaConvert::new(&device);
     WgpuGl {
       sampler,
       device,
@@ -286,7 +299,7 @@ impl<S: Surface> WgpuGl<S> {
       primitives_layout,
       uniforms,
       atlas: texture_atlas,
-      rgba_converter: None,
+      rgba_converter,
       rebuild_pipeline: false,
       anti_aliasing,
       multisampled_framebuffer,
@@ -299,17 +312,11 @@ impl<S: Surface> WgpuGl<S> {
     self.rebuild_pipeline = true;
   }
 
-  pub(crate) fn ensure_rgba_converter(&mut self) {
-    if self.rgba_converter.is_none() {
-      self.rgba_converter = Some(RgbaConvert::new(&self.device));
-    }
-  }
-
   pub fn render_color(&mut self, mut encoder: wgpu::CommandEncoder, data: ColorRenderData) {
     let tex_infos_bind_group = self.create_primitives_bind_group(&data.primitives);
     let Self { device, surface, queue, .. } = self;
 
-    let view = surface.get_current_view();
+    let view = surface.get_texture_view();
 
     let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("Vertices buffer"),
@@ -405,7 +412,7 @@ impl<S: Surface> WgpuGl<S> {
       self.rebuild_pipeline = false;
     }
 
-    let view = surface.get_current_view();
+    let view = surface.get_texture_view();
 
     let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("Vertices buffer"),
@@ -734,16 +741,10 @@ impl Vertex {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::*;
-  use futures::executor::block_on;
-  use painter::Color;
 
-  fn circle_50() -> Path {
-    let mut path = PathBuilder::new();
-    path.circle(euclid::Point2D::new(0., 0.), 50.);
-    path.build()
-  }
+  use painter::Point;
+
+  use super::*;
 
   #[test]
   fn coordinate_2d_start() {

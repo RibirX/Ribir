@@ -1,11 +1,7 @@
 #![cfg(test)]
 use crate::{
   prelude::*,
-  render::render_tree::*,
-  widget::{
-    layout::{flex::CrossAxisAlign, Row},
-    widget_tree::*,
-  },
+  widget::layout::{flex::CrossAxisAlign, Row},
 };
 
 #[derive(Clone, Debug)]
@@ -44,13 +40,4 @@ impl CombinationWidget for EmbedPost {
       }
     }
   }
-}
-
-pub fn create_embed_app(level: usize) -> (WidgetTree, RenderTree) {
-  let post = EmbedPost::new(level);
-  let mut widget_tree = WidgetTree::default();
-  let mut render_tree = RenderTree::default();
-
-  widget_tree.set_root(post.box_it(), &mut render_tree);
-  (widget_tree, render_tree)
 }

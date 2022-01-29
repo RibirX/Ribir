@@ -1,5 +1,5 @@
 use gpu::wgpu_backend_with_wnd;
-use painter::{Color, DeviceSize, PainterBackend, Transform};
+use painter::{Color, DeviceSize, PainterBackend};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -39,7 +39,7 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let mut painter = painter::Painter::new(Transform::new(1., 0., 0., 1., 0., 0.));
+      let mut painter = painter::Painter::new(1.);
       painter.set_brush(Color::YELLOW);
 
       painter

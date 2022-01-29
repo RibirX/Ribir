@@ -42,7 +42,7 @@ impl WheelAttr {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::cell::RefCell;
+  use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   #[test]
@@ -60,7 +60,7 @@ mod tests {
       }
     };
 
-    let mut wnd = window::Window::without_render(widget.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget.box_it(), Size::new(100., 100.));
 
     wnd.render_ready();
     let device_id = unsafe { DeviceId::dummy() };

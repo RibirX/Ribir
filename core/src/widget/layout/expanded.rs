@@ -13,35 +13,18 @@ impl Expanded {
 }
 
 impl RenderWidget for Expanded {
-  type RO = Self;
-  #[inline]
-
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for Expanded {
-  #[inline]
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let child = ctx
       .single_child()
       .expect("Expanded render should always have a single child");
-    ctx.perform_child_layout(child, clamp)
+    ctx.perform_render_child_layout(child, clamp)
   }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {
-    // nothing to draw.
-  }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[cfg(test)]

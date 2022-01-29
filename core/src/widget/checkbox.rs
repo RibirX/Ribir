@@ -21,7 +21,7 @@ impl Checkbox {
 }
 
 impl CombinationWidget for Checkbox {
-  fn build(&self, ctx: BuildCtx<Self>) -> BoxedWidget {
+  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget {
     let CheckboxTheme {
       mut size,
       border_width,
@@ -34,7 +34,7 @@ impl CombinationWidget for Checkbox {
 
     let has_checked = self.indeterminate || self.checked;
     // border draw out of the box
-    if !has_checked {
+    if has_checked {
       size += border_width * 2.;
     }
 
@@ -96,22 +96,27 @@ mod tests {
   #[ignore = "gpu need"]
   fn checked_paint() {
     let c = Checkbox { checked: true, ..<_>::default() };
-    let mut window = window::Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
-    unit_test::assert_canvas_eq!(window.render(), "../test/test_imgs/checkbox_checked.png");
+    unit_test::assert_canvas_eq!(
+      window.painter_backend(),
+      "../test/test_imgs/checkbox_checked.png"
+    );
   }
 
   #[test]
   #[ignore = "gpu need"]
   fn unchecked_paint() {
-    let mut window =
-      window::Window::wgpu_headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
-    unit_test::assert_canvas_eq!(window.render(), "../test/test_imgs/checkbox_uncheck.png");
+    unit_test::assert_canvas_eq!(
+      window.painter_backend(),
+      "../test/test_imgs/checkbox_uncheck.png"
+    );
   }
 
   #[test]
@@ -123,12 +128,12 @@ mod tests {
       ..<_>::default()
     }
     .build();
-    let mut window = window::Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
     unit_test::assert_canvas_eq!(
-      window.render(),
+      window.painter_backend(),
       "../test/test_imgs/checkbox_indeterminate.png"
     );
 
@@ -137,12 +142,12 @@ mod tests {
       indeterminate: true,
       ..<_>::default()
     };
-    let mut window = window::Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();
 
     unit_test::assert_canvas_eq!(
-      window.render(),
+      window.painter_backend(),
       "../test/test_imgs/checkbox_indeterminate.png"
     );
   }

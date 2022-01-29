@@ -8,6 +8,7 @@ pub trait Image {
   fn pixel_bytes(&self) -> Box<[u8]>;
 }
 
+// todo: remove? only rgba support?
 pub enum ColorFormat {
   Rgba8,
 }

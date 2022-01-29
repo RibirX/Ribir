@@ -34,43 +34,30 @@ impl BorderSide {
   pub fn new(width: f32, color: Color) -> Self { Self { width, color } }
 }
 
-impl RenderWidget for BoxDecoration {
-  type RO = Self;
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  #[inline]
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self.border != object.border {
-      ctx.mark_needs_layout();
-    }
-    *object = self.clone();
-  }
+fn single_child<C: WidgetCtx>(ctx: &C) -> WidgetId {
+  ctx
+    .single_child()
+    .expect("BoxDecoration must have one child.")
 }
 
-impl RenderObject for BoxDecoration {
+impl RenderWidget for BoxDecoration {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    let child = ctx
-      .single_child()
-      .expect("BoxDecoration must have one child.");
-
-    let mut size = ctx.perform_child_layout(child, clamp);
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let child = single_child(ctx);
+    let mut size = ctx.perform_render_child_layout(child, clamp);
     if let Some(ref border) = self.border {
       size.width += border.left.width + border.right.width;
       size.height += border.top.width + border.bottom.width;
-      ctx.update_child_position(child, Point::new(border.left.width, border.top.width));
+      ctx.update_position(child, Point::new(border.left.width, border.top.width));
     }
     size
   }
 
-  fn paint<'a>(&'a self, ctx: &mut PaintingCtx<'a>) {
-    let child = ctx
-      .single_child()
-      .expect("BoxDecoration must have one child.");
-    let content_rect = ctx.child_rect(child);
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let child = single_child(ctx);
+    let content_rect = ctx.widget_box_rect(child).unwrap();
 
     let painter = ctx.painter();
     if let Some(ref background) = self.background {
@@ -341,14 +328,13 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn paint() {
-    let radius = Vector::new(20., 10.);
     let radius_cases = vec![
       Radius::all(0.),
       Radius::all(10.),
-      Radius::top_left(radius),
-      Radius::top_right(radius),
-      Radius::bottom_right(radius),
-      Radius::bottom_left(radius),
+      Radius::top_left(20.),
+      Radius::top_right(20.),
+      Radius::bottom_right(20.),
+      Radius::bottom_left(20.),
       Radius::top_left(50.),
     ];
 
@@ -379,10 +365,13 @@ mod tests {
         }),
       }
     };
-    let mut window = window::Window::wgpu_headless(row.box_it(), DeviceSize::new(400, 600));
+    let mut window = Window::wgpu_headless(row.box_it(), DeviceSize::new(400, 600));
     window.render_ready();
     window.draw_frame();
 
-    unit_test::assert_canvas_eq!(window.render(), "../test/test_imgs/box_decoration.png");
+    unit_test::assert_canvas_eq!(
+      window.painter_backend(),
+      "../test/test_imgs/box_decoration.png"
+    );
   }
 }

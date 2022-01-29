@@ -42,7 +42,8 @@ impl CharAttr {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::cell::RefCell;
+
+  use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
 
   #[test]

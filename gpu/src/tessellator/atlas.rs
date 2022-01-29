@@ -86,9 +86,6 @@ impl TextureAtlas {
   /// A gpu command and data submitted.
   pub fn gpu_synced(&mut self) { self.texture.data_synced(); }
 
-  #[inline]
-  pub fn log_png_to(&self, path: &str) { self.texture.write_png_to(path, png::ColorType::RGBA); }
-
   pub fn clear(&mut self) {
     self.atlas_allocator.clear();
     self.allocated_map.clear();

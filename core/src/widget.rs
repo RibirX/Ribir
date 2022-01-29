@@ -8,7 +8,6 @@ pub mod text;
 mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
-pub mod window;
 pub use crate::widget::text::Text;
 pub use key::Key;
 pub use stateful::*;
@@ -30,56 +29,55 @@ pub use scrollable::*;
 mod path;
 pub use path::*;
 
+use self::layout_store::BoxClamp;
+
 /// A widget represented by other widget compose.
 pub trait CombinationWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self, ctx: BuildCtx<Self>) -> BoxedWidget
+  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget
   where
     Self: Sized;
 }
 
-/// RenderWidget provide configuration for render object which provide actual
-/// rendering or computing layout for the application.
+/// RenderWidget is a widget which want to paint something or do a layout to
+/// calc itself size and update children positions.
+///
+/// Render Widget should at least implement one of `Layout` or `Paint`, if all
+/// of `as_layout` and `as_paint` return None, the widget will not display.
+///
+/// If `as_layout` return none, widget size will detected by its single child if
+/// it has or as large as possible.
 pub trait RenderWidget {
-  /// The render object type will created.
-  type RO: RenderObject;
+  /// Do the work of computing the layout for this widget, and return the
+  /// size it need.
+  ///
+  /// In implementing this function, You are responsible for calling every
+  /// children's perform_layout across the `LayoutCtx`
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size;
 
-  /// Creates an instance of the RenderObject that this RenderWidget
-  /// represents, using the configuration described by this RenderWidget
-  fn create_render_object(&self) -> Self::RO;
-
-  /// update the render object when the render widget is changed, and if the
-  /// change effect to the layout remember to call `ctx.mark_needs_layout()`
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx);
+  /// Whether the constraints from parent are the only input to detect the
+  /// widget size, and child nodes' size not affect its size.
+  fn only_sized_by_parent(&self) -> bool;
+  /// `paint` is a low level trait to help you draw your widget to paint device
+  /// across `PaintingCtx::painter` by itself coordinate system. Not care
+  /// about children's paint in this method, framework will call children's
+  /// paint individual. And framework guarantee always paint parent before
+  /// children.
+  fn paint(&self, ctx: &mut PaintingCtx);
 }
 
-/// RenderWidgetSafety is a object safety trait of RenderWidget, never directly
-/// implement this trait, just implement [`RenderWidget`](RenderWidget).
-pub trait RenderWidgetSafety {
-  fn create_render_object(&self) -> Box<dyn RenderObject>;
-
-  fn update_render_object(&self, object: &mut dyn RenderObject, ctx: &mut UpdateCtx);
-}
-
-pub struct BoxedWidget(BoxedWidgetInner);
-
-#[macro_export]
-macro_rules! mark_layout_assign {
-  ($left: expr, $right: expr, $ctx: ident) => {
-    if &$left != &$right {
-      $left = $right.clone();
-      $ctx.mark_needs_layout();
-    }
-  };
-}
+pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
 #[marker]
 pub trait Widget {}
 impl<W: CombinationWidget> Widget for W {}
 impl<W: RenderWidget> Widget for W {}
 
-pub trait IntoRender {
+pub(crate) trait Downcast {
+  fn downcast_to(&self, id: TypeId) -> Option<&dyn Any>;
+}
+pub(crate) trait IntoRender {
   type R: RenderWidget;
   fn into_render(self) -> Self::R;
 }
@@ -103,18 +101,12 @@ impl<W: CombinationWidget> IntoCombination for W {
 
 pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
 pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
-pub(crate) trait CombinationNode: AsAttrs {
-  fn build(&self, self_id: WidgetId, ctx: &Context) -> BoxedWidget;
-}
-pub(crate) trait RenderNode: RenderWidgetSafety + AsAttrs {}
+pub(crate) trait CombinationNode: CombinationWidget + AsAttrs + Downcast {}
+pub(crate) trait RenderNode: RenderWidget + AsAttrs + Downcast {}
 
-impl<W: CombinationWidget + AsAttrs> CombinationNode for W {
-  fn build(&self, self_id: WidgetId, ctx: &Context) -> BoxedWidget {
-    let ctx = BuildCtx::new(ctx, self_id);
-    self.build(ctx)
-  }
-}
-impl<W: RenderWidget + AsAttrs> RenderNode for W {}
+impl<W: CombinationWidget + AsAttrs + Downcast> CombinationNode for W {}
+
+impl<W: RenderWidget + AsAttrs + Downcast> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
   Combination(Box<dyn CombinationNode>),
@@ -123,8 +115,18 @@ pub(crate) enum BoxedWidgetInner {
   MultiChild(BoxedMultiChild),
 }
 
-// Widget & BoxWidget default implementation
+impl<W: Any> Downcast for W {
+  #[inline]
+  default fn downcast_to(&self, id: TypeId) -> Option<&dyn Any> {
+    if self.type_id() == id {
+      Some(self)
+    } else {
+      None
+    }
+  }
+}
 
+// Widget & BoxWidget default implementation
 pub struct CombinationMarker;
 pub struct RenderMarker;
 pub trait BoxWidget<Marker> {
@@ -166,4 +168,24 @@ impl<M: MultiChildWidget + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
 impl BoxWidget<()> for BoxedWidget {
   #[inline]
   fn box_it(self) -> BoxedWidget { self }
+}
+
+impl AsAttrs for BoxedWidget {
+  fn as_attrs(&self) -> Option<&Attributes> {
+    match &self.0 {
+      BoxedWidgetInner::Combination(c) => c.as_attrs(),
+      BoxedWidgetInner::Render(r) => r.as_attrs(),
+      BoxedWidgetInner::SingleChild(s) => s.widget.as_attrs(),
+      BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs(),
+    }
+  }
+
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
+    match &mut self.0 {
+      BoxedWidgetInner::Combination(c) => c.as_attrs_mut(),
+      BoxedWidgetInner::Render(r) => r.as_attrs_mut(),
+      BoxedWidgetInner::SingleChild(s) => s.widget.as_attrs_mut(),
+      BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs_mut(),
+    }
+  }
 }

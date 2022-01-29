@@ -3,7 +3,7 @@ mod focus_mgr;
 pub(crate) use focus_mgr::FocusManager;
 mod pointer;
 pub(crate) use pointer::PointerDispatcher;
-pub use window::RawWindow;
+
 use winit::event::{ElementState, WindowEvent};
 
 #[derive(Default)]

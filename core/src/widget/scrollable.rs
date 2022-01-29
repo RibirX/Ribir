@@ -74,29 +74,13 @@ impl ScrollableBoth {
 
 macro scroll_render_widget_impl($widget: ty, $state: ty) {
   impl RenderWidget for $widget {
-    type RO = Self;
-
-    #[inline]
-    fn create_render_object(&self) -> Self::RO { self.clone() }
-
-    #[inline]
-    fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-      if self != object {
-        *object = self.clone();
-        ctx.mark_needs_layout();
-      }
-    }
-  }
-
-  impl RenderObject for $widget {
-    #[inline]
-    fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+    fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
       let size = clamp.max;
       if let Some(child) = ctx.single_child() {
         let content_clamp = self.content_clamp(clamp);
-        let content = ctx.perform_child_layout(child, content_clamp);
+        let content = ctx.perform_render_child_layout(child, content_clamp);
         let pos = self.content_pos(content, &size);
-        ctx.update_child_position(child, pos);
+        ctx.update_position(child, pos);
       }
 
       size
@@ -104,9 +88,7 @@ macro scroll_render_widget_impl($widget: ty, $state: ty) {
 
     fn only_sized_by_parent(&self) -> bool { true }
 
-    fn paint<'a>(&'a self, _ctx: &mut PaintingCtx<'a>) {
-      // nothing to paint, just a layout widget.
-    }
+    fn paint(&self, _: &mut PaintingCtx) {}
   }
 }
 
@@ -170,9 +152,9 @@ impl ScrollWorker for ScrollableBoth {
 fn view_content(event: &WheelEvent) -> (Rect, Rect) {
   let ctx = event.context();
 
-  let view = ctx.widget_rect().unwrap();
+  let view = ctx.box_rect().unwrap();
   let child = ctx.single_child().unwrap();
-  let content = ctx.widget_rect_by_id(child).unwrap();
+  let content = ctx.widget_box_rect(child).unwrap();
 
   (view, content)
 }
@@ -184,7 +166,7 @@ mod tests {
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(widget: BoxedWidget, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let mut wnd = window::Window::without_render(widget, Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();
 

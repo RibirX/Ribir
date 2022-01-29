@@ -1,23 +1,14 @@
 use crate::prelude::*;
 
 impl RenderWidget for Path {
-  type RO = Self;
-
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, _: &mut Self::RO, _: &mut UpdateCtx) {
-    unreachable!("As a stateless widget, impossible to call this method ")
-  }
-}
-
-impl RenderObject for Path {
-  fn perform_layout(&mut self, clamp: BoxClamp, _: &mut RenderCtx) -> Size {
-    let size = self.box_rect().max().to_tuple().into();
-    clamp.clamp(size)
+  #[inline]
+  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
+    self.box_rect().max().to_vector().to_size()
   }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
-  fn paint<'a>(&'a self, ctx: &mut PaintingCtx<'a>) { ctx.painter().paint_path(self.clone()); }
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().paint_path(self.clone()); }
 }

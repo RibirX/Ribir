@@ -4,7 +4,7 @@ use ribir::{
   prelude::*,
   test::{root_and_children_rect, widget_and_its_children_box_rect},
 };
-use window::NoRenderWindow;
+
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
@@ -27,14 +27,12 @@ fn declare_builder_smoke() {
 
 #[test]
 fn declare_smoke() {
-  let w = declare! {
+  let _ = declare! {
      SizedBox {
        size: Size::new(500.,500.),
        background: Color::RED,
      }
   };
-
-  assert!(matches!(w, BoxedWidget::SingleChild(_)));
 }
 
 #[test]
@@ -99,6 +97,7 @@ fn event_attr_sugar_work() {
 #[test]
 fn widget_wrap_bind_work() {
   let size = Size::new(50., 50.);
+
   let w = declare! {
     Flex {
       ..<_>::default(),
@@ -130,7 +129,6 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_for_children() {
-  #[stateful]
   struct EmbedExpr(Size);
 
   impl CombinationWidget for EmbedExpr {
@@ -263,11 +261,18 @@ fn local_var_not_bind() {
 #[test]
 
 fn with_attr_ref() {
+  let root_ref: StateRef<Flex>;
   let w = declare! {
     Flex {
+      id: root,
       cursor: tap_box.get_cursor().unwrap().clone(),
       ..<_>::default(),
-
+      // a hack method to capture widget reference only for test, should not use
+      // it in product code.
+      {
+        root_ref = root;
+        Option::<SizedBox>::None
+      }
       SizedBox {
         id: tap_box,
         size: Size::new(5., 5.),
@@ -282,22 +287,15 @@ fn with_attr_ref() {
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
 
-  fn root_cursor(wnd: &mut NoRenderWindow) -> Option<CursorIcon> {
-    let tree = &*wnd.widget_tree();
-    tree
-      .root()
-      .and_then(|root| root.get(tree))
-      .and_then(|w| (w as &dyn BuiltinAttrs).get_cursor())
-  }
-
-  assert_eq!(root_cursor(&mut wnd), Some(CursorIcon::Hand));
+  assert_eq!(root_ref.get_cursor(), Some(CursorIcon::Hand));
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
-  assert_eq!(root_cursor(&mut wnd), Some(CursorIcon::AllScroll));
+  assert_eq!(root_ref.get_cursor(), Some(CursorIcon::AllScroll));
 }
 
 #[test]
 fn attr_bind_to_self() {
+  let root_ref: StateRef<SizedBox>;
   let w = declare! {
     SizedBox {
       id: self_id,
@@ -309,6 +307,12 @@ fn attr_bind_to_self() {
         CursorIcon::Help
       },
       on_tap: move |_|  self_id.size = Size::new(20.,20.),
+      // a hack method to capture widget reference only for test, should not use
+      // it in product code.
+      {
+        root_ref = self_id;
+        Option::<SizedBox>::None
+      }
     }
   };
 
@@ -316,12 +320,10 @@ fn attr_bind_to_self() {
   wnd.render_ready();
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
-  let w_tree = wnd.widget_tree();
-  let w = w_tree.root().and_then(|r| r.get(&*w_tree)).unwrap();
-  assert_eq!(w.get_cursor(), Some(CursorIcon::Help));
+  assert_eq!(root_ref.get_cursor(), Some(CursorIcon::Help));
 }
 
-fn tap_at(wnd: &mut NoRenderWindow, pos: (i32, i32)) {
+fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
   let device_id = unsafe { DeviceId::dummy() };
   let modifiers = ModifiersState::default();
 

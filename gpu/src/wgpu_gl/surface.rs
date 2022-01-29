@@ -1,10 +1,6 @@
 use super::DeviceSize;
-use std::borrow::Borrow;
-
 /// `Surface` is a thing presentable canvas visual display.
 pub trait Surface {
-  type V: Borrow<wgpu::TextureView>;
-
   fn update(
     &mut self,
     device: &wgpu::Device,
@@ -12,7 +8,13 @@ pub trait Surface {
     s_config: &wgpu::SurfaceConfiguration,
   );
 
-  fn get_current_view(&mut self) -> Self::V;
+  fn view_size(&self) -> DeviceSize;
+
+  fn on_texture<F: FnOnce(&wgpu::Texture) -> U, U>(&self, f: F) -> U;
+
+  fn get_texture_view(&self) -> wgpu::TextureView {
+    self.on_texture(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
+  }
 }
 
 /// A `Surface` represents a platform-specific surface (e.g. a window).
@@ -27,8 +29,6 @@ pub struct PhysicSurface {
 pub type TextureSurface = Texture;
 
 impl Surface for PhysicSurface {
-  type V = FrameView<wgpu::TextureView>;
-
   fn update(
     &mut self,
     device: &wgpu::Device,
@@ -38,21 +38,19 @@ impl Surface for PhysicSurface {
     self.surface.configure(device, s_config);
   }
 
-  fn get_current_view(&mut self) -> Self::V {
-    FrameView(
-      self
-        .surface
-        .get_current_texture()
-        .expect("Timeout getting texture")
-        .texture
-        .create_view(&wgpu::TextureViewDescriptor::default()),
-    )
+  #[inline]
+  fn view_size(&self) -> DeviceSize { DeviceSize::new(self.s_config.width, self.s_config.height) }
+
+  fn on_texture<F: FnOnce(&wgpu::Texture) -> U, U>(&self, f: F) -> U {
+    let t = self
+      .surface
+      .get_current_texture()
+      .expect("Timeout getting texture");
+    f(&t.texture)
   }
 }
 
 impl Surface for TextureSurface {
-  type V = FrameView<wgpu::TextureView>;
-
   fn update(
     &mut self,
     device: &wgpu::Device,
@@ -67,20 +65,10 @@ impl Surface for TextureSurface {
   }
 
   #[inline]
-  fn get_current_view(&mut self) -> Self::V {
-    FrameView(
-      self
-        .raw_texture
-        .create_view(&wgpu::TextureViewDescriptor::default()),
-    )
-  }
-}
+  fn view_size(&self) -> DeviceSize { self.size }
 
-pub struct FrameView<T>(T);
-
-impl Borrow<wgpu::TextureView> for FrameView<wgpu::TextureView> {
   #[inline]
-  fn borrow(&self) -> &wgpu::TextureView { &self.0 }
+  fn on_texture<F: FnOnce(&wgpu::Texture) -> U, U>(&self, f: F) -> U { f(&self.raw_texture) }
 }
 
 impl PhysicSurface {
@@ -110,9 +98,6 @@ impl Texture {
     let raw_texture = Self::new_texture(device, size, usage);
     Texture { raw_texture, size, usage }
   }
-
-  #[inline]
-  pub(crate) fn size(&self) -> DeviceSize { self.size }
 
   pub(crate) fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: DeviceSize) {
     let new_texture = Self::new_texture(device, size, self.usage);

@@ -1,5 +1,4 @@
 [workspace]
-edition = "2021"
 members = [
   "core",
   "gpu",

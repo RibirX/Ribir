@@ -19,6 +19,7 @@ rxrust = "1.0.0-alpha.2"
 text = {path = "../text"}
 widget_derive = {path = "../widget_derive"}
 winit = "0.26.0"
+ahash="0.7.6"
 
 [dependencies.blake3]
 features = ["rayon"]

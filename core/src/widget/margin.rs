@@ -16,23 +16,7 @@ pub struct Margin {
 }
 
 impl RenderWidget for Margin {
-  type RO = Self;
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for Margin {
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let thickness = self.margin.thickness();
     let zero = Size::zero();
     let min = (clamp.min - thickness).max(zero);
@@ -40,14 +24,17 @@ impl RenderObject for Margin {
     let child_clamp = BoxClamp { min, max };
 
     let child = ctx.single_child().expect("Margin must have one child");
-    let size = ctx.perform_child_layout(child, child_clamp);
-    ctx.update_child_position(child, Point::new(self.margin.left, self.margin.top));
+    let size = ctx.perform_render_child_layout(child, child_clamp);
+    ctx.update_position(child, Point::new(self.margin.left, self.margin.top));
 
-    clamp.clamp(size + thickness)
+    size + thickness
   }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {}
+  fn only_sized_by_parent(&self) -> bool { false }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Margin {

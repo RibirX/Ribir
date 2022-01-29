@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::render::render_tree::*;
 
 /// How the children should be placed along the cross axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -107,20 +106,7 @@ impl Default for MainAxisAlign {
 }
 
 impl RenderWidget for Flex {
-  type RO = Self;
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for Flex {
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let direction = self.direction;
     let mut layouter = FlexLayouter {
       max_size: FlexSize::from_size(clamp.max, direction),
@@ -141,9 +127,7 @@ impl RenderObject for Flex {
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingCtx<'a>) {
-    // Nothing to draw.
-  }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -206,7 +190,7 @@ struct FlexLayouter {
 }
 
 impl FlexLayouter {
-  fn layout(&mut self, ctx: &mut RenderCtx) -> Size {
+  fn layout(&mut self, ctx: &mut LayoutCtx) -> Size {
     macro_rules! inner_layout {
       ($method: ident) => {{
         let (ctx, iter) = ctx.$method();
@@ -220,16 +204,16 @@ impl FlexLayouter {
       }};
     }
     if self.reverse {
-      inner_layout!(split_rev_children_iter)
+      inner_layout!(split_rev_children)
     } else {
-      inner_layout!(split_children_iter)
+      inner_layout!(split_render_children)
     }
   }
 
   fn children_perform<'a>(
     &mut self,
-    ctx: &mut RenderCtx,
-    children: impl Iterator<Item = RenderId>,
+    ctx: &mut LayoutCtx,
+    children: impl Iterator<Item = WidgetId>,
   ) {
     let clamp = BoxClamp {
       max: self.max_size.to_size(self.direction),
@@ -237,7 +221,7 @@ impl FlexLayouter {
     };
 
     children.for_each(|child| {
-      let size = ctx.perform_child_layout(child, clamp);
+      let size = ctx.perform_render_child_layout(child, clamp);
       let flex_size = FlexSize::from_size(size, self.direction);
       if self.wrap
         && !self.current_line.is_empty()
@@ -245,7 +229,7 @@ impl FlexLayouter {
       {
         self.place_line();
       }
-      ctx.update_child_position(
+      ctx.update_position(
         child,
         FlexSize {
           main: self.current_line.main_width,
@@ -260,8 +244,8 @@ impl FlexLayouter {
 
   fn relayout_if_need<'a>(
     &mut self,
-    ctx: &mut RenderCtx,
-    mut children: impl Iterator<Item = RenderId>,
+    ctx: &mut LayoutCtx,
+    mut children: impl Iterator<Item = WidgetId>,
   ) {
     let Self {
       lines_info,
@@ -291,8 +275,8 @@ impl FlexLayouter {
 
   fn line_inner_align<'a>(
     &mut self,
-    ctx: &mut RenderCtx,
-    mut children: impl Iterator<Item = RenderId>,
+    ctx: &mut LayoutCtx,
+    mut children: impl Iterator<Item = WidgetId>,
     size: FlexSize,
   ) {
     let real_size = self.best_size();
@@ -331,7 +315,7 @@ impl FlexLayouter {
         .map(|_| children.next().unwrap())
         .fold(offset, |main_offset: f32, child| {
           let rect = ctx
-            .child_box_rect(child)
+            .widget_box_rect(child)
             .expect("relayout a expanded widget which not prepare layout");
           let mut origin = FlexSize::from_point(rect.origin, *direction);
           let child_size = FlexSize::from_size(rect.size, *direction);
@@ -343,13 +327,13 @@ impl FlexLayouter {
           };
           origin.main += main_offset;
           origin.cross += container_cross_offset + line_cross_offset;
-          ctx.update_child_position(child, origin.to_point(*direction));
+          ctx.update_position(child, origin.to_point(*direction));
           main_offset + step
         });
     });
   }
 
-  fn place_widget(&mut self, size: FlexSize, child: RenderId, ctx: &mut RenderCtx) {
+  fn place_widget(&mut self, size: FlexSize, child: WidgetId, ctx: &mut LayoutCtx) {
     let mut line = &mut self.current_line;
     line.main_width += size.main;
     line.cross_line_height = line.cross_line_height.max(size.cross);
@@ -376,8 +360,8 @@ impl FlexLayouter {
   // relayout child to get the real size, and return the new offset in main axis
   // for next siblings.
   fn obj_real_rect_with_main_start(
-    ctx: &mut RenderCtx,
-    child: RenderId,
+    ctx: &mut LayoutCtx,
+    child: WidgetId,
     line: &mut MainLineInfo,
     main_offset: f32,
     dir: Direction,
@@ -385,7 +369,7 @@ impl FlexLayouter {
     max_size: FlexSize,
   ) -> f32 {
     let pre_layout_rect = ctx
-      .child_box_rect(child)
+      .widget_box_rect(child)
       .expect("relayout a expanded widget which not prepare layout");
 
     let pre_size = FlexSize::from_size(pre_layout_rect.size, dir);
@@ -409,7 +393,7 @@ impl FlexLayouter {
 
     let real_size = if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
       // Relayout only if the child object size may change.
-      let new_size = ctx.perform_child_layout(
+      let new_size = ctx.perform_render_child_layout(
         child,
         BoxClamp {
           max: clamp_max.to_size(dir),
@@ -429,7 +413,7 @@ impl FlexLayouter {
     let new_pos = new_pos.to_point(dir);
 
     if pre_layout_rect.origin != new_pos {
-      ctx.update_child_position(child, new_pos);
+      ctx.update_position(child, new_pos);
     }
 
     main_offset + main_diff
@@ -446,11 +430,9 @@ impl FlexLayouter {
 
   fn box_size(&self) -> FlexSize { self.best_size().clamp(self.min_size, self.max_size) }
 
-  fn child_flex(ctx: &mut RenderCtx, child: RenderId) -> Option<f32> {
+  fn child_flex(ctx: &mut LayoutCtx, child: WidgetId) -> Option<f32> {
     ctx
-      .new_ctx(child)
-      .render_obj()
-      .downcast_ref::<<Expanded as RenderWidget>::RO>()
+      .widget_downcast_ref::<Expanded>(child)
       .map(|expanded| expanded.flex)
   }
 }
@@ -626,20 +608,17 @@ mod tests {
         }
       };
 
-      let mut wnd = window::Window::without_render(root, Size::new(500., 500.));
+      let mut wnd = Window::without_render(root, Size::new(500., 500.));
       wnd.render_ready();
-      let r_tree = wnd.render_tree();
-      let row_obj = r_tree
-        .root()
-        .unwrap()
-        .children(&*r_tree)
-        .take(1)
-        .next()
-        .unwrap();
-      let rect = row_obj.layout_box_rect(&*r_tree).unwrap();
-      let children = row_obj
-        .children(&*r_tree)
-        .map(|rid| rid.layout_box_rect(&*r_tree).unwrap())
+      let ctx = wnd.context();
+      let tree = &ctx.widget_tree;
+
+      let child = tree.root().first_child(tree).unwrap();
+
+      let rect = ctx.layout_store.layout_box_rect(child).unwrap();
+      let children = child
+        .children(tree)
+        .map(|id| ctx.layout_store.layout_box_rect(id).unwrap())
         .collect::<Vec<_>>();
 
       assert_eq!(rect.size, Size::new(500., 500.));

@@ -32,6 +32,9 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
 
   #[inline]
   fn resize(&mut self, size: DeviceSize) { self.gl.resize(size) }
+
+  #[inline]
+  fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str> { self.gl.pixels_image() }
 }
 /// The Render that support draw the canvas result render data.
 pub trait GlRender {
@@ -45,6 +48,9 @@ pub trait GlRender {
 
   /// The render data commit finished.
   fn finish(&mut self);
+
+  /// Return pixel data of the frame as an image.
+  fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str>;
 }
 
 /// A texture for the vertexes sampler color. Every texture have identify to

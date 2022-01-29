@@ -82,26 +82,26 @@ impl FocusManager {
   pub fn update(&mut self, ctx: &mut Context) {
     let tree = &ctx.widget_tree;
     self.tab_orders.clear();
-    if let Some(root) = tree.root() {
-      let mut zeros = vec![];
-      root
-        .descendants(tree)
-        .filter_map(|id| {
-          id.get(tree)
-            .and_then(|w| w.as_attrs())
-            .and_then(Attributes::find::<FocusAttr>)
-            .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
-        })
-        .for_each(|node| match node.tab_index {
-          0 => zeros.push(node),
-          i if i > 0 => {
-            self.tab_orders.push(node);
-            self.tab_orders.sort_by_key(|node| node.tab_index);
-          }
-          _ => {}
-        });
-      self.tab_orders.append(&mut zeros);
-    }
+
+    let mut zeros = vec![];
+    tree
+      .root()
+      .descendants(tree)
+      .filter_map(|id| {
+        id.get(tree)
+          .and_then(|w| w.as_attrs())
+          .and_then(Attributes::find::<FocusAttr>)
+          .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
+      })
+      .for_each(|node| match node.tab_index {
+        0 => zeros.push(node),
+        i if i > 0 => {
+          self.tab_orders.push(node);
+          self.tab_orders.sort_by_key(|node| node.tab_index);
+        }
+        _ => {}
+      });
+    self.tab_orders.append(&mut zeros);
 
     // if current focusing widget is dropped, find the next focus replace it.
     if let Some((focusing, _)) = self.focusing {
@@ -163,42 +163,43 @@ impl FocusManager {
 mod tests {
   use super::*;
   use crate::widget::SizedBox;
-  use std::cell::RefCell;
+  use std::{cell::RefCell, rc::Rc};
 
   fn empty_box() -> SizedBox { SizedBox { size: Size::zero() } }
 
-  fn env(widget: BoxedWidget) -> (window::Window, FocusManager) {
-    let wnd = window::Window::without_render(widget, Size::new(100., 100.));
-    // use a aloneside FocusManager for test easy.
-    let mut mgr = FocusManager::default();
-    mgr.update(&wnd.dispatcher.common);
-    (wnd, mgr)
-  }
-
   #[test]
-  fn auto_focus() {
+  fn two_auto_focus() {
     // two auto focus widget
     let widget = Row::default()
       .have(empty_box().with_auto_focus(true).box_it())
       .have(empty_box().with_auto_focus(true).box_it());
-    let (wnd, mut mgr) = env(widget.box_it());
-    let tree = wnd.dispatcher.common.widget_tree_ref();
-    let id = tree.root().and_then(|root| root.first_child(&tree));
-    assert!(id.is_some());
-    assert_eq!(mgr.auto_focus(&tree), id);
 
+    let ctx = Context::new(widget.box_it(), 1.);
+    let mut mgr = FocusManager::default();
+    let tree = &ctx.widget_tree;
+
+    let id = tree.root().first_child(tree);
+    assert!(id.is_some());
+    assert_eq!(mgr.auto_focus(&ctx), id);
+  }
+
+  #[test]
+  fn on_auto_focus() {
     // one auto focus widget
     let widget = Row::default()
       .have(empty_box().box_it())
       .have(empty_box().with_auto_focus(true).box_it());
-    let (wnd, mut mgr) = env(widget.box_it());
-    let tree = wnd.dispatcher.common.widget_tree_ref();
+
+    let ctx = Context::new(widget.box_it(), 1.);
+    let mut mgr = FocusManager::default();
+    let tree = &ctx.widget_tree;
+
     let id = tree
       .root()
-      .and_then(|root| root.first_child(&tree))
+      .first_child(tree)
       .and_then(|p| p.next_sibling(&tree));
     assert!(id.is_some());
-    assert_eq!(mgr.auto_focus(&tree), id);
+    assert_eq!(mgr.auto_focus(&ctx), id);
   }
 
   #[test]
@@ -210,30 +211,30 @@ mod tests {
       .have(empty_box().with_tab_index(2).box_it())
       .have(empty_box().with_tab_index(3).box_it());
 
-    let (wnd, mut mgr) = env(widget.box_it());
-    let tree = wnd.dispatcher.common.widget_tree_ref();
+    let mut ctx = Context::new(widget.box_it(), 1.);
+    let mut mgr = FocusManager::default();
+    mgr.update(&mut ctx);
+    let tree = &ctx.widget_tree;
 
-    let negative = tree.root().unwrap().first_child(&tree).unwrap();
+    let negative = tree.root().first_child(&tree).unwrap();
     let id0 = negative.next_sibling(&tree).unwrap();
     let id1 = id0.next_sibling(&tree).unwrap();
     let id2 = id1.next_sibling(&tree).unwrap();
     let id3 = id2.next_sibling(&tree).unwrap();
 
     {
-      let mut next_focus = || mgr.next_focus_widget(&wnd.dispatcher.common);
       // next focus sequential
-      assert_eq!(next_focus(), Some(id1));
-      assert_eq!(next_focus(), Some(id2));
-      assert_eq!(next_focus(), Some(id3));
-      assert_eq!(next_focus(), Some(id0));
-      assert_eq!(next_focus(), Some(id1));
+      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id1));
+      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id2));
+      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id3));
+      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id0));
+      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id1));
 
       // previous focus sequential
-      let mut prev_focus = || mgr.prev_focus_widget(&wnd.dispatcher.common);
-      assert_eq!(prev_focus(), Some(id0));
-      assert_eq!(prev_focus(), Some(id3));
-      assert_eq!(prev_focus(), Some(id2));
-      assert_eq!(prev_focus(), Some(id1));
+      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id0));
+      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id3));
+      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id2));
+      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id1));
     }
   }
 
@@ -261,9 +262,9 @@ mod tests {
       name: &'static str,
       widget: A,
       log: Rc<RefCell<Vec<String>>>,
-    ) -> A::W
+    ) -> A::Target
     where
-      A::W: AttachAttr<W = A::W>,
+      A::Target: AttachAttr<Target = A::Target>,
     {
       let log2 = log.clone();
       let log3 = log.clone();
@@ -285,19 +286,22 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let (wnd, mut mgr) = env(widget.box_it());
-    let tree = wnd.dispatcher.common.widget_tree_ref();
-    let parent = tree.root().unwrap().first_child(&tree).unwrap();
-    let child = parent.first_child(&tree).unwrap();
+    let mut ctx = Context::new(widget.box_it(), 1.);
+    let mut mgr = FocusManager::default();
+    let tree = &ctx.widget_tree;
 
-    mgr.focus(child, &wnd.dispatcher.common);
+    let parent = tree.root().first_child(&tree).unwrap();
+    let child = parent.first_child(&tree).unwrap();
+    mgr.update(&mut ctx);
+    mgr.focus(child, &mut ctx);
+
     assert_eq!(
       &*log.borrow(),
       &["focus child", "focusin child", "focusin parent"]
     );
     log.borrow_mut().clear();
 
-    mgr.focus(parent, &wnd.dispatcher.common);
+    mgr.focus(parent, &mut ctx);
     assert_eq!(
       &*log.borrow(),
       &[
@@ -310,7 +314,7 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    mgr.blur(&wnd.dispatcher.common);
+    mgr.blur(&mut ctx);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
 }

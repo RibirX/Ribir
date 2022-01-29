@@ -1,8 +1,4 @@
-use crate::{
-  context::{draw_tree, Context},
-  events::dispatcher::Dispatcher,
-  prelude::*,
-};
+use crate::{context::Context, events::dispatcher::Dispatcher, prelude::*};
 
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
@@ -63,7 +59,7 @@ impl RawWindow for winit::window::Window {
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
-  context: Context,
+  pub(crate) context: Context,
   p_backend: Box<dyn PainterBackend>,
   pub(crate) dispatcher: Dispatcher,
 }
@@ -83,8 +79,8 @@ impl Window {
       }
       event => self.dispatcher.dispatch(event, &mut self.context),
     };
-    if let Some(cursor) = self.context.cursor.take() {
-      self.raw_window.set_cursor(cursor);
+    if let Some(icon) = self.context.cursor.take() {
+      self.raw_window.set_cursor(icon);
     }
   }
 
@@ -97,18 +93,24 @@ impl Window {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
-    let changed = self.context.tree_repair();
-    if changed {
-      self.context.layout(self.raw_window.inner_size());
+    self.context.state_change_dispatch();
+
+    let tree_changed = self.context.tree_repair();
+    let performed_layout = self.context.layout_store.layout(
+      self.raw_window.inner_size(),
+      &self.context.widget_tree,
+      &mut self.context.shaper,
+    );
+
+    if tree_changed {
       self.dispatcher.focus_mgr.update(&mut self.context);
     }
-
-    changed
+    tree_changed || performed_layout
   }
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    let commands = draw_tree(&mut self.context);
+    let commands = self.context.draw_tree();
     if !commands.is_empty() {
       self.p_backend.submit(commands);
     }
@@ -139,7 +141,7 @@ impl Window {
   }
 
   fn resize(&mut self, size: DeviceSize) {
-    self.context.mark_needs_layout(None);
+    self.context.mark_layout_from_root();
     self.p_backend.resize(size);
     self.raw_window.request_redraw();
   }
@@ -170,6 +172,8 @@ impl Window {
   /// after all OS events have been processed by the event loop.
   #[inline]
   pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
+
+  pub fn painter_backend(&self) -> &dyn PainterBackend { &*self.p_backend }
 }
 
 pub struct MockBackend;
@@ -184,6 +188,10 @@ impl PainterBackend for MockBackend {
   fn submit(&mut self, _: Vec<PaintCommand>) {}
 
   fn resize(&mut self, _: DeviceSize) {}
+
+  fn pixels_image(&self) -> Result<Box<dyn Image>, &str> {
+    unreachable!("try to capture image from a mock backend")
+  }
 }
 
 impl RawWindow for MockRawWindow {

@@ -1,8 +1,4 @@
-use crate::{
-  context::{EventCtx, WidgetCtx},
-  prelude::Context,
-  widget::widget_tree::WidgetId,
-};
+use crate::{context::EventCtx, prelude::Context, widget::widget_tree::WidgetId};
 use std::{cell::Cell, ptr::NonNull};
 
 pub(crate) mod dispatcher;
@@ -67,7 +63,7 @@ impl<T: std::convert::AsRef<EventCommon>> Event for T {
   #[inline]
   fn prevent_default(&self) { self.as_ref().prevent_default.set(true) }
   #[inline]
-  fn modifiers(&self) -> ModifiersState { self.context().context().modifiers }
+  fn modifiers(&self) -> ModifiersState { self.context().modifiers() }
 
   #[inline]
   fn context<'a>(&'a self) -> EventCtx<'a> {
@@ -101,7 +97,7 @@ impl std::convert::AsRef<EventCommon> for EventCommon {
 }
 
 impl EventCommon {
-  pub fn new(target: WidgetId, context: &Context) -> Self {
+  pub(crate) fn new(target: WidgetId, context: &Context) -> Self {
     Self {
       target,
       current_target: target,

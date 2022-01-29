@@ -312,8 +312,25 @@ pub trait AttachAttr: Sized {
     F: FnOnce(&mut A);
 }
 
-/// Trait provides methods to quick access builtin attributes
-pub trait BuiltinAttrs: AsAttrs {
+pub trait AsAttrs {
+  fn as_attrs(&self) -> Option<&Attributes>;
+
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes>;
+
+  fn find_attr<A: 'static>(&self) -> Option<&A>
+  where
+    Self: Sized,
+  {
+    self.as_attrs().and_then(Attributes::find)
+  }
+
+  fn find_attr_mut<A: 'static>(&mut self) -> Option<&mut A>
+  where
+    Self: Sized,
+  {
+    self.as_attrs_mut().and_then(Attributes::find_mut)
+  }
+
   /// return reference of the cursor specified to this widget if have.
   #[inline]
   fn get_key(&self) -> Option<&Key> { get_attr!(self) }
@@ -378,26 +395,6 @@ pub trait BuiltinAttrs: AsAttrs {
   }
 }
 
-pub trait AsAttrs {
-  fn as_attrs(&self) -> Option<&Attributes>;
-
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes>;
-
-  fn find_attr<A: 'static>(&self) -> Option<&A>
-  where
-    Self: Sized,
-  {
-    self.as_attrs().and_then(Attributes::find)
-  }
-
-  fn find_attr_mut<A: 'static>(&mut self) -> Option<&mut A>
-  where
-    Self: Sized,
-  {
-    self.as_attrs_mut().and_then(Attributes::find_mut)
-  }
-}
-
 impl<W: IntoRender> IntoRender for AttrWidget<W> {
   type R = AttrWidgetWrap<W::R>;
   #[inline]
@@ -426,22 +423,35 @@ impl<W: SingleChildWidget + IntoRender> SingleChildWidget for AttrWidget<W> {}
 impl<W: MultiChildWidget + IntoRender> MultiChildWidget for AttrWidget<W> {}
 
 impl<W: Widget> AsAttrs for W {
-  fn as_attrs(&self) -> Option<&Attributes> { None }
+  #[inline]
+  default fn as_attrs(&self) -> Option<&Attributes> { None }
 
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { None }
+  #[inline]
+  default fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { None }
 }
 
 impl<W> AsAttrs for AttrWidget<W> {
-  fn as_attrs(&self) -> Option<&Attributes> { None }
+  #[inline]
+  fn as_attrs(&self) -> Option<&Attributes> { Some(&self.attrs) }
 
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { None }
+  #[inline]
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { Some(&mut self.attrs) }
 }
-
-impl<W: AsAttrs> BuiltinAttrs for W {}
 
 /// A wrap for `AttrWidget` to help we can implement all attributes ability for
 /// all widget, and avoid trait implement conflict.
 pub struct AttrWidgetWrap<W>(pub(crate) AttrWidget<W>);
+
+impl<W> AsAttrs for AttrWidgetWrap<W>
+where
+  Self: Widget,
+{
+  #[inline]
+  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
+
+  #[inline]
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.as_attrs_mut() }
+}
 
 impl<W> std::ops::Deref for AttrWidget<W> {
   type Target = W;
@@ -537,26 +547,41 @@ impl<W> AttachAttr for Stateful<W> {
 }
 
 impl<W: RenderWidget> RenderWidget for AttrWidgetWrap<W> {
-  type RO = W::RO;
-
   #[inline]
-  fn create_render_object(&self) -> Self::RO { self.0.create_render_object() }
-
-  #[inline]
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    self.0.update_render_object(object, ctx)
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.0.perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { self.0.only_sized_by_parent() }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.0.paint(ctx) }
 }
 
 impl<W: CombinationWidget> CombinationWidget for AttrWidgetWrap<W> {
   #[inline]
-  fn build(&self, ctx: BuildCtx<Self>) -> BoxedWidget { self.0.widget.build(ctx.cast_type()) }
+  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget {
+    self.0.widget.build(unsafe { ctx.cast_type() })
+  }
 }
 
 macro get_attr($name: ident) {
   $name.as_attrs().and_then(Attributes::find)
 }
 
+impl<W> Downcast for AttrWidgetWrap<W>
+where
+  Self: Any,
+{
+  fn downcast_to(&self, id: TypeId) -> Option<&dyn Any> {
+    self
+      .0
+      .widget
+      .downcast_to(id)
+      .or_else(|| self.0.downcast_to(id))
+  }
+}
 #[derive(Default)]
 pub struct Attributes(HashMap<TypeId, Box<dyn Any>>);
 
@@ -617,7 +642,7 @@ fn fix_into_stateful_keep_attrs() {
   let s = SizedBox { size: Size::zero() }.with_key(1).into_stateful();
   assert_eq!(get_attr!(s), Some(&Key::Ki4(1)));
   assert!(
-    s.get_attrs()
+    s.as_attrs()
       .and_then(Attributes::find::<StateAttr>)
       .is_some()
   );

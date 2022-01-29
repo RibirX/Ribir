@@ -1,7 +1,6 @@
 use super::FocusManager;
-use crate::context::layout_store::LayoutStore;
 use crate::context::Context;
-use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
+use crate::prelude::*;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta};
 
 #[derive(Default)]
@@ -58,13 +57,7 @@ impl PointerDispatcher {
               .pointer_down_uid
               .take()?
               .common_ancestor_of(release_on, &ctx.widget_tree)?;
-            let tap_pos = release_on.map_to(
-              release_pos,
-              tap_on,
-              &ctx.widget_tree,
-              &ctx.render_tree,
-              &ctx.layout_store,
-            );
+            let tap_pos = (release_on, &*ctx).map_to(release_pos, tap_on);
 
             self.bubble_pointer_from(PointerEventType::Tap, ctx, (tap_on, tap_pos));
           }
@@ -132,16 +125,7 @@ impl PointerDispatcher {
       wid,
       |ctx, wid| self.mouse_pointer(wid, pos, ctx),
       |attr: &PointerAttr, e| {
-        let ctx = e.context();
-        let ctx = ctx.context();
-
-        e.position = last_bubble_from.map_to(
-          e.position,
-          e.target(),
-          &ctx.widget_tree,
-          &ctx.render_tree,
-          &ctx.layout_store,
-        );
+        e.position = (last_bubble_from, &*ctx).map_to(e.position, e.target());
         last_bubble_from = wid;
         attr.dispatch_event(event_type, e)
       },
@@ -161,12 +145,7 @@ impl PointerDispatcher {
             .ancestors(&ctx.widget_tree)
             .any(|w| Some(w) == new_hit.as_ref().map(|h| h.0))
         {
-          let old_pos = w.map_from_global(
-            self.cursor_pos,
-            &ctx.widget_tree,
-            &ctx.render_tree,
-            &ctx.layout_store,
-          );
+          let old_pos = (*w, &*ctx).map_from_global(self.cursor_pos);
           let mut event = self.mouse_pointer(*w, old_pos, ctx);
           if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
             pointer.dispatch_event(PointerEventType::Leave, &mut event)
@@ -193,15 +172,10 @@ impl PointerDispatcher {
         .iter()
         .rev()
         .filter(|w| !already_entered.iter().any(|e| e != *w))
-        .for_each(|w| {
-          let old_pos = w.map_from_global(
-            self.cursor_pos,
-            &ctx.widget_tree,
-            &ctx.render_tree,
-            &ctx.layout_store,
-          );
-          let mut event = self.mouse_pointer(*w, old_pos, ctx);
-          if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
+        .for_each(|&w| {
+          let old_pos = (w, &*ctx).map_from_global(self.cursor_pos);
+          let mut event = self.mouse_pointer(w, old_pos, ctx);
+          if let Some(pointer) = ctx.find_attr::<PointerAttr>(w) {
             pointer.dispatch_event(PointerEventType::Enter, &mut event);
           }
         });
@@ -213,65 +187,25 @@ impl PointerDispatcher {
   }
 
   fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
-    fn down_coordinate_to(
-      id: RenderId,
-      pos: Point,
-      tree: &RenderTree,
-      layout_store: &LayoutStore,
-    ) -> Option<(RenderId, Point)> {
-      layout_store
-        .layout_box_rect(id)
+    fn down_coordinate_to(id: WidgetId, pos: Point, ctx: &Context) -> Option<(WidgetId, Point)> {
+      let rid = id.render_widget(&ctx.widget_tree).unwrap();
+      let w_ctx = (rid, ctx);
+      w_ctx
+        .box_rect()
         // check if contain the position
         .filter(|rect| rect.contains(pos))
-        .map(|_| (id, id.map_from_parent(pos, tree, layout_store)))
+        .map(|_| (id, w_ctx.map_from(pos, id)))
     }
 
-    let r_tree = &ctx.render_tree;
-    let layout_store = &ctx.layout_store;
-    let mut current = r_tree
-      .root()
-      .and_then(|id| down_coordinate_to(id, self.cursor_pos, &r_tree, layout_store));
+    let mut current = down_coordinate_to(ctx.widget_tree.root(), self.cursor_pos, ctx);
     let mut hit = None;
-
-    while let Some((rid, pos)) = current {
+    while let Some((id, pos)) = current {
       hit = current;
-      current = rid
-        .reverse_children(&r_tree)
-        .find_map(|rid| down_coordinate_to(rid, pos, &r_tree, layout_store));
+      current = id
+        .reverse_children(&ctx.widget_tree)
+        .find_map(|c| down_coordinate_to(c, pos, ctx));
     }
-
-    hit.and_then(|(rid, pos)| {
-      rid
-        .relative_to_widget(&ctx.render_tree)
-        .map(|wid| (wid, pos))
-    })
-  }
-}
-
-impl WidgetId {
-  fn map_to(
-    self,
-    pos: Point,
-    ancestor: WidgetId,
-    tree: &WidgetTree,
-    r_tree: &RenderTree,
-    layout_store: &LayoutStore,
-  ) -> Point {
-    let rid = self.relative_to_render(tree).expect("must have");
-    let map_to = ancestor.relative_to_render(tree).expect("must have");
-
-    rid.map_to(pos, map_to, r_tree, layout_store)
-  }
-
-  fn map_from_global(
-    self,
-    pos: Point,
-    tree: &WidgetTree,
-    r_tree: &RenderTree,
-    layout_store: &LayoutStore,
-  ) -> Point {
-    let rid = self.relative_to_render(tree).expect("must have");
-    rid.map_from_global(pos, r_tree, layout_store)
+    hit
   }
 }
 
@@ -283,9 +217,12 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer<W: AttachAttr>(event_stack: Rc<RefCell<Vec<PointerEvent>>>, widget: W) -> W::W
+  fn record_pointer<W: AttachAttr>(
+    event_stack: Rc<RefCell<Vec<PointerEvent>>>,
+    widget: W,
+  ) -> W::Target
   where
-    W::W: AttachAttr<W = W::W>,
+    W::Target: AttachAttr<Target = W::Target>,
   {
     let handler_ctor = || {
       let stack = event_stack.clone();
@@ -602,7 +539,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (50, 50).into(),
+      position: (50f64, 50f64).into(),
       modifiers,
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -626,7 +563,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (50, 50).into(),
+      position: (50f64, 50f64).into(),
       modifiers,
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -637,7 +574,7 @@ mod tests {
     });
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (50, 150).into(),
+      position: (50f64, 150f64).into(),
       modifiers,
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -675,7 +612,7 @@ mod tests {
     let modifiers = ModifiersState::default();
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (45, 45).into(),
+      position: (45f64, 45f64).into(),
       modifiers,
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -696,7 +633,7 @@ mod tests {
     });
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (80, 80).into(),
+      position: (80f64, 80f64).into(),
       modifiers,
     });
     wnd.processes_native_event(WindowEvent::MouseInput {

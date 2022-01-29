@@ -7,9 +7,10 @@ thread_local!(static DEFAULT_THEME: Rc<Theme> =
 );
 
 pub struct BuildCtx<'a, W> {
-  pub(crate) ctx: &'a Context,
-  pub(crate) id: WidgetId,
-  pub(crate) default_theme: Option<Rc<Theme>>,
+  widget: &'a dyn CombinationNode,
+  parent: Option<WidgetId>,
+  ctx: &'a Context,
+  default_theme: Option<Rc<Theme>>,
   _mark: PhantomData<W>,
 }
 
@@ -18,12 +19,14 @@ impl<'a, W> BuildCtx<'a, W> {
   pub fn theme(&mut self) -> &Theme {
     let tree = &self.ctx.widget_tree;
     self
-      .id
-      .ancestors(tree)
-      .find_map(|id| {
-        id.get(tree)
-          .and_then(|w| w.as_attrs())
-          .and_then(Attributes::find)
+      .widget
+      .as_attrs()
+      .and_then(Attributes::find)
+      .or_else(|| {
+        self.parent.and_then(|p| {
+          p.ancestors(tree)
+            .find_map(|id| id.assert_get(tree).get_theme())
+        })
       })
       .unwrap_or_else(|| {
         self
@@ -33,33 +36,25 @@ impl<'a, W> BuildCtx<'a, W> {
   }
 
   #[inline]
-  pub fn state_ref(&self) -> StateRef<W> { todo!() }
+  pub fn state_ref(&self) -> StateRef<W> { todo!("") }
 
   #[inline]
-  pub(crate) fn new(ctx: &'a Context, widget: WidgetId) -> Self {
+  pub(crate) fn new(
+    ctx: &'a Context,
+    parent: Option<WidgetId>,
+    widget: &'a dyn CombinationNode,
+  ) -> Self {
     Self {
       ctx,
-      id: widget,
+      parent,
       default_theme: None,
+      widget,
       _mark: PhantomData,
     }
   }
 
-  pub(crate) fn cast_type<X>(self) -> BuildCtx<'a, X> {
-    let BuildCtx { ctx, id: wid, default_theme, .. } = self;
-    BuildCtx {
-      ctx,
-      id: wid,
-      default_theme,
-      _mark: PhantomData,
-    }
-  }
-}
-
-impl<'a, W> WidgetCtx<'a> for BuildCtx<'a, W> {
-  fn id(&self) -> WidgetId { self.id }
-
-  fn context(&self) -> &Context { self.ctx }
+  /// Caller promise `X` And `W` are same widget.
+  pub(crate) unsafe fn cast_type<X>(&mut self) -> &mut BuildCtx<'a, X> { std::mem::transmute(self) }
 }
 
 #[cfg(test)]
@@ -68,15 +63,17 @@ mod tests {
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
-  fn default_theme() {
-    let win_size = Size::zero();
-    let sized = widget::SizedBox { size: win_size };
-    let mut wnd = window::Window::without_render(sized.box_it(), win_size);
-    wnd.render_ready();
-    let tree = wnd.widget_tree();
-
-    let ctx = BuildCtx::new(tree.as_ref(), tree.root().unwrap());
-    ctx.theme();
+  #[should_panic(expected = "Get a default theme from context")]
+  fn always_have_default_theme() {
+    struct T;
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let _ = ctx.theme();
+        panic!("Get a default theme from context");
+      }
+    }
+    // should panic when construct the context
+    Context::new(T.box_it(), 1.);
   }
 
   #[derive(Debug, Declare)]
@@ -94,7 +91,7 @@ mod tests {
   #[test]
   fn nearest_theme() {
     let track_themes: Rc<RefCell<Vec<Theme>>> = <_>::default();
-    let family = Box::new([FontFamily::Name(CowRc::borrowed("serif"))]);
+    let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
     let dark = material::dark(family.clone());
     let light = material::light(family);
 
@@ -110,12 +107,12 @@ mod tests {
       }
     };
 
-    let mut wnd = window::Window::without_render(dark_light_theme.box_it(), Size::zero());
+    let mut wnd = Window::without_render(dark_light_theme.box_it(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
       track_themes.borrow()[0].brightness,
-      widget::theme::Brightness::Light
+      widget::Brightness::Light
     );
 
     let light_dark_theme = declare! {
@@ -130,12 +127,12 @@ mod tests {
       }
     };
 
-    let mut wnd = window::Window::without_render(light_dark_theme.box_it(), Size::zero());
+    let mut wnd = Window::without_render(light_dark_theme.box_it(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 2);
     assert_eq!(
       track_themes.borrow()[1].brightness,
-      widget::theme::Brightness::Dark
+      widget::Brightness::Dark
     );
   }
 }

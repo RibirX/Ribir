@@ -1,4 +1,6 @@
-use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
+use crate::{
+  path::*, Brush, Color, DeviceSize, Image, PathStyle, Rect, TextStyle, Transform, Vector,
+};
 use algo::CowRc;
 use std::ops::{Deref, DerefMut};
 use text::FontFace;
@@ -20,6 +22,8 @@ pub struct Painter {
 pub trait PainterBackend {
   fn submit(&mut self, commands: Vec<PaintCommand>);
   fn resize(&mut self, size: DeviceSize);
+  /// Return pixel data of the frame as an image.
+  fn pixels_image(&self) -> Result<Box<dyn Image>, &str>;
 }
 
 #[derive(Clone)]

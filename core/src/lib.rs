@@ -1,10 +1,8 @@
 #![feature(
   test,
   decl_macro,
-  cell_filter_map,
-  linked_list_cursors,
+  // todo: remove `trivial_bounds`
   trivial_bounds,
-  get_mut_unchecked,
   marker_trait_attr,
   min_specialization
 )]
@@ -15,11 +13,11 @@ extern crate lazy_static;
 extern crate widget_derive;
 
 mod application;
+pub mod window;
 
 mod context;
 pub mod declare;
 pub mod events;
-mod render;
 pub mod widget;
 
 pub mod prelude {
@@ -32,11 +30,11 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
-  pub use crate::render::*;
-  #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
   pub use crate::widget::{widget_tree::WidgetId, *};
+  #[doc(no_inline)]
+  pub use crate::window::Window;
   #[doc(no_inline)]
   pub use ::painter::*;
   #[doc(no_inline)]

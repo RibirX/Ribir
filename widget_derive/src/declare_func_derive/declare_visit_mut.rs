@@ -29,9 +29,11 @@ pub struct DeclareCtx {
 
 #[derive(PartialEq, Clone, Copy)]
 enum ReferenceInfo {
-  // reference by other expression, but not follow its change.
+  // reference by other expression, but not follow its change and needn't capture its state
+  // reference
   Reference,
-  //  Followed by others, and need follow its change.
+  // Followed by others and need follow its change or need capture its state reference to modify
+  // its state.
   BeFollowed,
   // not be referenced or followed, but its wrap widget maybe.
   WrapWidgetRef,
@@ -271,13 +273,16 @@ impl DeclareCtx {
       }
       ctx.visit_sugar_field_mut(&mut w.sugar_fields);
       if let Some(Id { name, .. }) = w.named.as_ref() {
+        // named widget followed by attributes or listeners should also mark be followed
+        // because it's need capture its state reference to set value.
         let followed_by_attr = w
           .sugar_fields
           .normal_attr_iter()
           .chain(w.sugar_fields.listeners_iter())
           .any(|f| f.follows.is_some());
+
         if followed_by_attr {
-          ctx.add_follow(name.clone());
+          ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
         }
       }
 

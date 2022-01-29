@@ -71,26 +71,6 @@ impl<const N: usize> MemTexture<N> {
   // The max size the texture can grow
   pub fn max_size(&self) -> DeviceSize { self.max_size }
 
-  pub fn write_png_to(&self, name: &str, color: png::ColorType) {
-    let pkg_root = env!("CARGO_MANIFEST_DIR");
-    let atlas_capture = format!("{}/.log/{}", pkg_root, name);
-
-    let DeviceSize { width, height, .. } = self.size;
-
-    let mut png_encoder = png::Encoder::new(
-      std::fs::File::create(&atlas_capture).unwrap(),
-      width,
-      height,
-    );
-    png_encoder.set_depth(png::BitDepth::Eight);
-    png_encoder.set_color(color);
-    png_encoder
-      .write_header()
-      .unwrap()
-      .write_image_data(self.as_bytes())
-      .unwrap();
-  }
-
   fn alloc_mem(size: DeviceSize) -> Box<[u8]> {
     let bytes = size.area() as usize * N;
     vec![0; bytes].into_boxed_slice()

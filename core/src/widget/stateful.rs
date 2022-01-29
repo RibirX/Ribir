@@ -166,6 +166,7 @@ impl<W: 'static> Stateful<W> {
   pub unsafe fn silent_ref(&self) -> SilentRef<W> { SilentRef(NonNull::from(&*self.0)) }
 
   /// Event emitted when this widget modified. No mather if the widget really
+  #[inline]
   pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
     unsafe { self.state_attr.as_mut().state_subject() }
   }
@@ -188,11 +189,20 @@ impl<W: 'static> Stateful<W> {
 
 impl<W> StateRef<W> {
   // convert a `StateRef` to `SilentRef`
-  pub fn silent(&self) -> SilentRef<W> {
-    SilentRef(Stateful {
-      widget: self.widget.clone(),
-      state_attr: self.state_attr.clone(),
-    })
+  #[inline]
+  pub fn silent(self) -> SilentRef<W> { self.0 }
+
+  /// Event emitted when this widget modified. No mather if the widget really
+  #[inline]
+  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
+    assert_state_attr(self).state_subject()
+  }
+}
+
+impl<W> SilentRef<W> {
+  #[inline]
+  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
+    assert_state_attr(self).state_subject()
   }
 }
 
@@ -256,7 +266,7 @@ impl<W> std::ops::DerefMut for StateRef<W> {
     let state_attr = unsafe { self.0.state_attr.as_mut() };
     if let Some(TreeInfo { mut tree, id }) = state_attr.tree_info {
       let tree = unsafe { tree.as_mut() };
-      id.mark_changed(tree);
+      todo!("mark change")
     }
     &mut self.0
   }
@@ -290,24 +300,40 @@ impl<W: CombinationWidget> IntoCombination for Stateful<W> {
   fn into_combination(self) -> Self::C { StatefulWrap(self) }
 }
 
-impl<W> SingleChildWidget for StatefulWrap<W> where W: SingleChildWidget + RenderWidget {}
+impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
 
-impl<W> MultiChildWidget for StatefulWrap<W> where W: MultiChildWidget + RenderWidget {}
+impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
 
 impl<W: CombinationWidget> CombinationWidget for StatefulWrap<W> {
   #[inline]
-  fn build(&self, ctx: BuildCtx<Self>) -> BoxedWidget { self.0.build(ctx.cast_type()) }
+  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget {
+    unsafe { self.0.build(ctx.cast_type()) }
+  }
 }
 
 impl<W: RenderWidget> RenderWidget for StatefulWrap<W> {
-  type RO = W::RO;
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.0.perform_layout(clamp, ctx)
+  }
 
   #[inline]
-  fn create_render_object(&self) -> Self::RO { self.0.create_render_object() }
+  fn only_sized_by_parent(&self) -> bool { self.0.only_sized_by_parent() }
 
   #[inline]
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    self.0.update_render_object(object, ctx)
+  fn paint(&self, ctx: &mut PaintingCtx) { self.0.paint(ctx) }
+}
+
+impl<W> Downcast for StatefulWrap<W>
+where
+  Self: Any,
+{
+  fn downcast_to(&self, id: TypeId) -> Option<&dyn Any> {
+    self
+      .0
+      .widget
+      .downcast_to(id)
+      .or_else(|| self.0.downcast_to(id))
   }
 }
 
@@ -317,12 +343,6 @@ impl<W: Widget + 'static> IntoStateful for W {
   type S = Stateful<W>;
   #[inline]
   fn into_stateful(self) -> Self::S { Stateful::new(self) }
-}
-
-impl<W> IntoStateful for Stateful<W> {
-  type S = Self;
-  #[inline]
-  fn into_stateful(self) -> Self::S { self }
 }
 
 impl<W: IntoStateful> IntoStateful for AttrWidget<W> {
@@ -336,6 +356,33 @@ impl<W: IntoStateful> IntoStateful for AttrWidget<W> {
       widget: Rc::new(AttrWidget { widget, attrs }),
     }
   }
+}
+
+fn assert_state_attr<W>(w: &mut AttrWidget<W>) -> &mut StateAttr {
+  w.find_attr_mut::<StateAttr>()
+    .expect("stateful widget must have `StateAttr`")
+}
+
+impl<W> AsAttrs for Stateful<W> {
+  #[inline]
+  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
+
+  #[inline]
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
+    let inner = unsafe { self.0.as_mut().get_unchecked_mut() };
+    inner.as_attrs_mut()
+  }
+}
+
+impl<W> AsAttrs for StatefulWrap<W>
+where
+  Self: Widget,
+{
+  #[inline]
+  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
+
+  #[inline]
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.as_attrs_mut() }
 }
 
 #[cfg(test)]
@@ -358,10 +405,7 @@ mod tests {
   }
 
   #[test]
-  fn downcast() {
-    let mut render_tree = render_tree::RenderTree::default();
-    let mut tree = Box::pin(widget_tree::WidgetTree::default());
-
+  fn stateful_id_check() {
     let stateful = Text {
       text: "Hello".into(),
       style: TextStyle::default(),
@@ -369,13 +413,10 @@ mod tests {
     .into_stateful();
     // now key widget inherit from stateful widget.
     let key = stateful.with_key(1);
-    let tree = unsafe { tree.as_mut().get_unchecked_mut() };
-    let id = tree.set_root(key.box_it(), &mut render_tree);
-
-    let key_back = id
-      .get(tree)
-      .and_then(|w| (w as &dyn BuiltinAttrs).get_key());
-    assert!(key_back.is_some());
+    let ctx = Context::new(key.box_it(), 1.);
+    let tree = &ctx.widget_tree;
+    let key = tree.root().assert_get(tree).get_key();
+    assert!(key.is_some());
   }
 
   #[test]
@@ -384,9 +425,7 @@ mod tests {
     let notified_count = Rc::new(RefCell::new(0));
     let cnc = notified_count.clone();
 
-    let mut render_tree = render_tree::RenderTree::default();
-    let mut tree = Box::pin(widget_tree::WidgetTree::default());
-    let sized_box = SizedBox { size: Size::new(100., 100.) }.into_stateful();
+    let mut sized_box = SizedBox { size: Size::new(100., 100.) }.into_stateful();
     sized_box
       .change_stream()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -402,14 +441,14 @@ mod tests {
     wnd.render_ready();
 
     assert_eq!(*notified_count.borrow(), 0);
-    assert_eq!(tree.changed_widgets().len(), 0);
+    assert_eq!(wnd.context().is_dirty(), false);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
     {
       state.size = Size::new(1., 1.);
     }
-    tree.notify_state_change_until_empty();
+    wnd.context.state_change_dispatch();
     assert_eq!(*notified_count.borrow(), 1);
-    assert_eq!(tree.changed_widgets().len(), 1);
+    assert_eq!(wnd.context.is_dirty(), true);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
   }
 
@@ -426,9 +465,9 @@ mod tests {
       }
     }
 
-    let mut wnd = window::Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
+    let mut wnd = Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
     wnd.render_ready();
-    let tree = wnd.widget_tree();
-    assert_eq!(tree.root().unwrap().descendants(&*tree).count(), 2);
+    let tree = &wnd.context().widget_tree;
+    assert_eq!(tree.root().descendants(tree).count(), 2);
   }
 }
