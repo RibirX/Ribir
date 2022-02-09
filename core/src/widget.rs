@@ -35,9 +35,7 @@ use self::layout_store::BoxClamp;
 pub trait CombinationWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget
-  where
-    Self: Sized;
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -67,12 +65,24 @@ pub trait RenderWidget {
   fn paint(&self, ctx: &mut PaintingCtx);
 }
 
+/// A combination widget which want directly implement stateful widget and have
+/// no stateless version. Implement `StatefulCombination` only when you need a
+/// stateful widget during `build`, otherwise you should implement
+/// [`CombinationWidget`]! and a stateful version will auto provide by
+/// framework, use [`Stateful::into_stateful`]! to convert.
+pub trait StatefulCombination {
+  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
+  where
+    Self: Sized;
+}
+
 pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
 #[marker]
-pub trait Widget {}
+pub(crate) trait Widget {}
 impl<W: CombinationWidget> Widget for W {}
 impl<W: RenderWidget> Widget for W {}
+impl<W: StatefulCombination> Widget for W {}
 
 pub(crate) trait Downcast {
   fn downcast_to(&self, id: TypeId) -> Option<&dyn Any>;
@@ -82,7 +92,7 @@ pub(crate) trait IntoRender {
   fn into_render(self) -> Self::R;
 }
 
-pub trait IntoCombination {
+pub(crate) trait IntoCombination {
   type C: CombinationWidget;
   fn into_combination(self) -> Self::C;
 }
@@ -128,7 +138,9 @@ impl<W: Any> Downcast for W {
 
 // Widget & BoxWidget default implementation
 pub struct CombinationMarker;
+pub struct StatefulCombinationMarker;
 pub struct RenderMarker;
+
 pub trait BoxWidget<Marker> {
   fn box_it(self) -> BoxedWidget;
 }
@@ -149,7 +161,7 @@ impl<T: IntoRender + 'static> BoxWidget<RenderMarker> for T {
   }
 }
 
-impl<S: SingleChildWidget + 'static> BoxWidget<RenderMarker> for SingleChild<S> {
+impl<S: IntoRender + 'static> BoxWidget<RenderMarker> for SingleChild<S> {
   fn box_it(self) -> BoxedWidget {
     let widget: Box<dyn RenderNode> = Box::new(self.widget.into_render());
     let boxed = Box::new(SingleChild { widget, child: self.child });
@@ -157,7 +169,7 @@ impl<S: SingleChildWidget + 'static> BoxWidget<RenderMarker> for SingleChild<S> 
   }
 }
 
-impl<M: MultiChildWidget + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
+impl<M: IntoRender + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
   fn box_it(self) -> BoxedWidget {
     let widget: Box<dyn RenderNode> = Box::new(self.widget.into_render());
     let inner = BoxedWidgetInner::MultiChild(MultiChild { widget, children: self.children });
@@ -165,7 +177,28 @@ impl<M: MultiChildWidget + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
   }
 }
 
-impl BoxWidget<()> for BoxedWidget {
+struct StatefulCombinationWrap<W>(Stateful<W>);
+
+impl<W: StatefulCombination> CombinationWidget for StatefulCombinationWrap<W> {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget
+  where
+    Self: Sized,
+  {
+    StatefulCombination::build(&self.0, ctx)
+  }
+}
+
+impl<W: StatefulCombination + 'static> BoxWidget<StatefulCombinationMarker> for Stateful<W> {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { StatefulCombinationWrap(self).box_it() }
+}
+
+impl<W: StatefulCombination + 'static> BoxWidget<StatefulCombinationMarker> for W {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { StatefulCombinationWrap(self.into_stateful()).box_it() }
+}
+
+impl BoxWidget<StatefulCombinationMarker> for BoxedWidget {
   #[inline]
   fn box_it(self) -> BoxedWidget { self }
 }

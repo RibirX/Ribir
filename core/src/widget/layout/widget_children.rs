@@ -3,7 +3,7 @@ pub use crate::prelude::*;
 /// A marker trait to tell Ribir a widget can have one child.
 pub trait SingleChildWidget
 where
-  Self: IntoRender + Sized,
+  Self: Sized,
 {
   fn have(self, child: BoxedWidget) -> SingleChild<Self> { SingleChild { widget: self, child } }
 }
@@ -32,7 +32,7 @@ impl<S> std::ops::DerefMut for SingleChild<S> {
 /// A marker trait to tell Ribir a widget can have multi child.
 pub trait MultiChildWidget
 where
-  Self: IntoRender + Sized,
+  Self: Sized,
 {
   fn have_multi(self, children: Vec<BoxedWidget>) -> MultiChild<Self> {
     MultiChild { widget: self, children }
@@ -106,7 +106,7 @@ pub trait SingleComposeNormal<M> {
 
 impl<W, C, M> SingleComposeNormal<M> for (W, C)
 where
-  W: SingleChildWidget,
+  W: SingleChildWidget + IntoRender,
   C: BoxWidget<M>,
 {
   type R = SingleChild<W>;
@@ -120,7 +120,7 @@ pub trait SingleComposeOption<M> {
 
 impl<W, M, C> SingleComposeOption<M> for (W, Option<C>)
 where
-  W: SingleChildWidget + 'static,
+  W: SingleChildWidget + IntoRender + 'static,
   C: BoxWidget<M> + 'static,
 {
   #[inline]
@@ -135,7 +135,7 @@ where
 
 impl<W, M, C> SingleComposeOption<M> for (Option<W>, C)
 where
-  W: SingleChildWidget + 'static,
+  W: SingleChildWidget + IntoRender + 'static,
   C: BoxWidget<M>,
 {
   #[inline]

@@ -20,8 +20,8 @@ impl Checkbox {
   }
 }
 
-impl CombinationWidget for Checkbox {
-  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget {
+impl StatefulCombination for Checkbox {
+  fn build(this: &Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
     let CheckboxTheme {
       mut size,
       border_width,
@@ -30,9 +30,9 @@ impl CombinationWidget for Checkbox {
       checked_path,
       check_background: color,
       indeterminate_path,
-    } = self.style.clone();
+    } = this.style.clone();
 
-    let has_checked = self.indeterminate || self.checked;
+    let has_checked = this.indeterminate || this.checked;
     // border draw out of the box
     if has_checked {
       size += border_width * 2.;
@@ -47,9 +47,8 @@ impl CombinationWidget for Checkbox {
           color: border_color,
           width: border_width,
         }),
-        background if has_checked => : color,
+        background if has_checked =>: color,
         cursor: CursorIcon::Hand,
-
         on_tap: {
           let mut state = unsafe { this.state_ref() };
           move |_| state.switch_check()
@@ -64,7 +63,7 @@ impl CombinationWidget for Checkbox {
         },
 
         has_checked.then(||{
-          if self.indeterminate {
+          if this.indeterminate {
             indeterminate_path
           } else {
             checked_path

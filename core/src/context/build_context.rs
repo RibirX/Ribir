@@ -1,20 +1,19 @@
 use crate::prelude::*;
 use ::text::FontFamily;
-use std::{marker::PhantomData, rc::Rc};
+use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
   Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
 );
 
-pub struct BuildCtx<'a, W> {
+pub struct BuildCtx<'a> {
   widget: &'a dyn CombinationNode,
   parent: Option<WidgetId>,
   ctx: &'a Context,
   default_theme: Option<Rc<Theme>>,
-  _mark: PhantomData<W>,
 }
 
-impl<'a, W> BuildCtx<'a, W> {
+impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&mut self) -> &Theme {
     let tree = &self.ctx.widget_tree;
@@ -36,9 +35,6 @@ impl<'a, W> BuildCtx<'a, W> {
   }
 
   #[inline]
-  pub fn state_ref(&self) -> StateRef<W> { todo!("") }
-
-  #[inline]
   pub(crate) fn new(
     ctx: &'a Context,
     parent: Option<WidgetId>,
@@ -49,12 +45,8 @@ impl<'a, W> BuildCtx<'a, W> {
       parent,
       default_theme: None,
       widget,
-      _mark: PhantomData,
     }
   }
-
-  /// Caller promise `X` And `W` are same widget.
-  pub(crate) unsafe fn cast_type<X>(&mut self) -> &mut BuildCtx<'a, X> { std::mem::transmute(self) }
 }
 
 #[cfg(test)]

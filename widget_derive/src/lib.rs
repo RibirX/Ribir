@@ -29,7 +29,6 @@
 extern crate proc_macro;
 extern crate proc_macro2;
 
-mod attr_fields;
 mod declare_derive;
 mod declare_func_derive;
 mod error;

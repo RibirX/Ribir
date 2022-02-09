@@ -560,10 +560,7 @@ impl<W: RenderWidget> RenderWidget for AttrWidgetWrap<W> {
 }
 
 impl<W: CombinationWidget> CombinationWidget for AttrWidgetWrap<W> {
-  #[inline]
-  fn build(&self, ctx: &mut BuildCtx<Self>) -> BoxedWidget {
-    self.0.widget.build(unsafe { ctx.cast_type() })
-  }
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.widget.build(ctx) }
 }
 
 macro get_attr($name: ident) {

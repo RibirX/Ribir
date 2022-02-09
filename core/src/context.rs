@@ -289,7 +289,8 @@ impl Context {
       WidgetNode::Render(_) => unreachable!("rebuild widget must be combination widget."),
     };
 
-    let child = c.build(sub_tree.parent(&self.widget_tree), self);
+    let mut ctx = BuildCtx::new(self, sub_tree.parent(&self.widget_tree), &**c);
+    let child = c.build(&mut ctx);
     let child_id = sub_tree.single_child(&self.widget_tree).unwrap();
 
     let mut changed = false;

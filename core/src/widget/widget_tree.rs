@@ -9,6 +9,7 @@ pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
   arena: Arena<WidgetNode>,
   root: WidgetId,
+  changed_widget: HashMap<WidgetId, bool>,
 }
 
 struct Tmp;
@@ -50,9 +51,6 @@ impl WidgetTree {
   }
 
   #[cfg(test)]
-  pub(crate) fn changed_widgets(&self) -> &HashSet<WidgetId> { &self.changed_widgets }
-
-  #[cfg(test)]
   pub(crate) fn count(&self) -> usize { self.arena.count() }
 
   // If the widget back of `id` have same `key` with `w` Use `w`, it's will be
@@ -78,6 +76,20 @@ impl WidgetTree {
         Some(new_id)
       }
     }
+  }
+
+  pub(crate) fn record_change(&mut self, id: WidgetId, silent: bool) {
+    let s = self.changed_widget.entry(id).or_default();
+    *s = *s && silent;
+  }
+
+  pub(crate) fn pop_changed_widgets(&mut self) -> Option<(WidgetId, bool)> {
+    self
+      .changed_widget
+      .keys()
+      .next()
+      .cloned()
+      .and_then(|id| self.changed_widget.remove_entry(&id))
   }
 }
 
@@ -125,12 +137,6 @@ impl WidgetId {
   /// A proxy for [NodeId::last_child](indextree::NodeId.last_child)
   pub(crate) fn last_child(self, tree: &WidgetTree) -> Option<WidgetId> {
     self.node_feature(tree, |node| node.last_child())
-  }
-
-  /// A proxy for
-  /// [NodeId::previous_sibling](indextree::NodeId.previous_sibling)
-  pub(crate) fn previous_sibling(self, tree: &WidgetTree) -> Option<WidgetId> {
-    self.node_feature(tree, |node| node.previous_sibling())
   }
 
   /// A proxy for [NodeId::next_sibling](indextree::NodeId.next_sibling)
@@ -188,8 +194,9 @@ impl WidgetId {
       wid = match id.assert_get(tree) {
         WidgetNode::Combination(_) => id.single_child(tree),
         _ => break,
-      }
+      };
     }
+
     wid
   }
 
