@@ -82,24 +82,32 @@ mod tests {
 
   #[test]
   fn nearest_theme() {
-    let track_themes: Rc<RefCell<Vec<Theme>>> = <_>::default();
-    let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
-    let dark = material::dark(family.clone());
-    let light = material::light(family);
+    #[derive(Default, Clone)]
+    struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
-    let dark_light_theme = declare! {
-      SizedBox {
-        size: SizedBox::expanded_size(),
-        theme: dark.clone(),
-        SizedBox {
-          size: SizedBox::shrink_size(),
-          theme: light.clone(),
-          ThemeTrack { themes: track_themes.clone() }
+    impl CombinationWidget for DarkLightThemes {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
+        let dark = material::dark(family.clone());
+        let light = material::light(family);
+
+        declare! {
+          SizedBox {
+            size: SizedBox::expanded_size(),
+            theme: dark.clone(),
+            SizedBox {
+              size: SizedBox::shrink_size(),
+              theme: light.clone(),
+              ThemeTrack { themes: self.0.clone() }
+            }
+          }
         }
       }
-    };
+    }
 
-    let mut wnd = Window::without_render(dark_light_theme.box_it(), Size::zero());
+    let dark_light = DarkLightThemes::default();
+    let track_themes = dark_light.0.clone();
+    let mut wnd = Window::without_render(dark_light.box_it(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
@@ -107,23 +115,36 @@ mod tests {
       widget::Brightness::Light
     );
 
-    let light_dark_theme = declare! {
-      SizedBox {
-        size: SizedBox::expanded_size(),
-        theme: light,
-        SizedBox {
-          size: SizedBox::shrink_size(),
-          theme: dark,
-          ThemeTrack { themes: track_themes.clone() }
+    #[derive(Default, Clone)]
+    struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
+
+    impl CombinationWidget for LightDarkThemes {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
+        let dark = material::dark(family.clone());
+        let light = material::light(family);
+
+        declare! {
+          SizedBox {
+            size: SizedBox::expanded_size(),
+            theme: light,
+            SizedBox {
+              size: SizedBox::shrink_size(),
+              theme: dark,
+              ThemeTrack { themes: self.0.clone() }
+            }
+          }
         }
       }
-    };
+    }
 
-    let mut wnd = Window::without_render(light_dark_theme.box_it(), Size::zero());
+    let light_dark = LightDarkThemes::default();
+    let track_themes = light_dark.0.clone();
+    let mut wnd = Window::without_render(light_dark.box_it(), Size::zero());
     wnd.render_ready();
-    assert_eq!(track_themes.borrow().len(), 2);
+    assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
-      track_themes.borrow()[1].brightness,
+      track_themes.borrow()[0].brightness,
       widget::Brightness::Dark
     );
   }

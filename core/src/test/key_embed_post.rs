@@ -11,12 +11,11 @@ pub struct EmbedPostWithKey {
 }
 
 impl CombinationWidget for EmbedPostWithKey {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     declare! {
-      Row{
+      Row {
         key: 0,
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default(),
+        v_align: CrossAxisAlign::Start,
         Text { text: format!("Embed{} test title", self.level) , style: <_>::default(), key: 1},
         Text { text: self.author, style: <_>::default(), key: 2},
         Text { text: self.content, style: <_>::default(), key: 3},

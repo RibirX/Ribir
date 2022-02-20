@@ -44,28 +44,40 @@ mod tests {
 
   #[test]
   fn fix_size() {
-    let size = Size::new(100., 100.);
-    let sized_box = declare! {
-      SizedBox {
-        size,
-        Text { text: "", style: <_>::default() }
+    const SIZE: Size = Size::new(100., 100.);
+    struct T;
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size:SIZE,
+            Text { text: "", style: <_>::default() }
+          }
+        }
       }
-    };
+    }
 
-    let (rect, child) = widget_and_its_children_box_rect(sized_box.box_it(), Size::new(500., 500.));
-    assert_eq!(rect.size, size);
-    assert_eq!(child, vec![Rect::from_size(size)]);
+    let (rect, child) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
+    assert_eq!(rect.size, SIZE);
+    assert_eq!(child, vec![Rect::from_size(SIZE)]);
   }
 
   #[test]
   fn shrink_size() {
-    let shrink = declare! {
-      SizedBox {
-        size: SizedBox::shrink_size(),
-        Text { text: "", style: <_>::default()}
+    struct Shrink;
+
+    impl CombinationWidget for Shrink {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size: SizedBox::shrink_size(),
+            Text { text: "", style: <_>::default()}
+          }
+        }
       }
-    };
-    let (rect, child) = widget_and_its_children_box_rect(shrink.box_it(), Size::new(500., 500.));
+    }
+
+    let (rect, child) = widget_and_its_children_box_rect(Shrink.box_it(), Size::new(500., 500.));
 
     assert_eq!(rect.size, Size::zero());
     assert_eq!(child, vec![Rect::zero()]);
@@ -74,12 +86,16 @@ mod tests {
   #[test]
   fn expanded_size() {
     let wnd_size = Size::new(500., 500.);
-    let expand_box = declare! {
-      SizedBox {
-        size: SizedBox::expanded_size(),
-        Text { text:"" , style: <_>::default(),}
-      }
-    };
+    let expand_box = SizedBox { size: SizedBox::expanded_size() }
+      .have(
+        Text {
+          text: "".into(),
+          style: <_>::default(),
+        }
+        .box_it(),
+      )
+      .box_it();
+
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));
 
     assert_eq!(rect.size, wnd_size);

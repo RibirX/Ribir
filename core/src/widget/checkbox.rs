@@ -21,7 +21,7 @@ impl Checkbox {
 }
 
 impl StatefulCombination for Checkbox {
-  fn build(this: &Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     let CheckboxTheme {
       mut size,
       border_width,
@@ -81,7 +81,7 @@ mod tests {
 
   #[test]
   fn layout() {
-    let w = CheckboxBuilder::default().build();
+    let w = Checkbox::default();
     let (rect, child) = widget_and_its_children_box_rect(w.box_it(), Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
 
@@ -121,12 +121,11 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn indeterminate_paint() {
-    let c = CheckboxBuilder {
+    let c = Checkbox {
       checked: true,
       indeterminate: true,
       ..<_>::default()
-    }
-    .build();
+    };
     let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
     window.draw_frame();

@@ -3,7 +3,7 @@ use crate::prelude::*;
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
-  #[declare(convert(into))]
+  #[declare(setter(into))]
   pub text: CowRc<str>,
   pub style: TextStyle,
 }

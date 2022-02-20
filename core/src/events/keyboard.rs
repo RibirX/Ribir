@@ -70,23 +70,32 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let keys = Rc::new(RefCell::new(vec![]));
-    let down_keys = keys.clone();
-    let up_keys = keys.clone();
-    let widget = declare! {
-      SizedBox {
-        size: Size::zero(),
-        auto_focus: true,
-        on_key_down: move |key| {
-          down_keys
-            .borrow_mut()
-            .push(format!("key down {:?}", key.key))
-        },
-        on_key_up: move |key| up_keys.borrow_mut().push(format!("key up {:?}", key.key))
-      }
-    };
+    #[derive(Default)]
+    struct Keys(Rc<RefCell<Vec<String>>>);
 
-    let mut wnd = Window::without_render(widget.box_it(), Size::new(100., 100.));
+    impl CombinationWidget for Keys {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let down_keys = self.0.clone();
+        let up_keys = self.0.clone();
+        declare! {
+          SizedBox {
+            size: Size::zero(),
+            auto_focus: true,
+            on_key_down: move |key| {
+              down_keys
+                .borrow_mut()
+                .push(format!("key down {:?}", key.key))
+            },
+            on_key_up: move |key| up_keys.borrow_mut().push(format!("key up {:?}", key.key))
+          }
+        }
+      }
+    }
+
+    let w = Keys::default();
+    let keys = w.0.clone();
+
+    let mut wnd = Window::without_render(w.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));

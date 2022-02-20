@@ -60,12 +60,13 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let widget = declare! {
-      Row {
-        padding: EdgeInsets::only_left(1.), ..<_>::default(),
-        SizedBox { size: Size::new(100., 100.) }
-      }
-    };
+    let widget = Padding { padding: EdgeInsets::only_left(1.) }
+      .have(
+        Row::default()
+          .have(SizedBox { size: Size::new(100., 100.) }.box_it())
+          .box_it(),
+      )
+      .box_it();
 
     let mut wnd = Window::without_render(widget, Size::new(200., 200.));
     wnd.render_ready();

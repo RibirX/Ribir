@@ -1,6 +1,7 @@
 use crate::error::DeclareError;
 
 use super::{
+  ribir_suffix_variable,
   sugar_fields::{Id, SugarFields},
   DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOnVec,
 };
@@ -77,7 +78,7 @@ impl VisitMut for DeclareCtx {
 
     if let Some(name) = self.expr_find_name_widget(&f_expr.base).cloned() {
       if let Some(suffix) = SugarFields::as_widget_wrap_name_field(&f_expr.member) {
-        let wrap_name = self.no_conflict_name_with_suffix(&name, suffix);
+        let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
         *f_expr.base = parse_quote! { #wrap_name };
         self
           .widget_name_to_id
@@ -268,9 +269,7 @@ impl DeclareCtx {
       w.fields
         .iter_mut()
         .for_each(|f| ctx.visit_declare_field_mut(f));
-      if let Some(rest_expr) = &mut w.rest {
-        ctx.visit_expr_mut(&mut rest_expr.1);
-      }
+
       ctx.visit_sugar_field_mut(&mut w.sugar_fields);
       if let Some(Id { name, .. }) = w.named.as_ref() {
         // named widget followed by attributes or listeners should also mark be followed
@@ -363,39 +362,7 @@ impl DeclareCtx {
       });
   }
 
-  pub fn no_conflict_widget_def_name(&self, name: &Ident) -> Ident {
-    let def_name = format!("{}_def", name);
-    self.new_no_conflict_name(&def_name)
-  }
-
-  pub fn unnamed_widget_ref_name(&self) -> Ident { self.new_no_conflict_name("w") }
-
-  // Get a no conflict name for a widget wrap by the common widget like `Margin`,
-  // `Padding`.
-  pub fn no_conflict_name_with_suffix(&self, widget_name: &Ident, suffix: &Ident) -> Ident {
-    let mut wrap_name = self.new_no_conflict_name(&format!("{}_{}", widget_name, &suffix));
-    let span1 = widget_name.span();
-    let span2 = suffix.span();
-    wrap_name.set_span(span1.join(span2).unwrap_or(span2));
-    wrap_name
-  }
-
-  pub fn no_config_builder_type_name(&self) -> Ident { self.new_no_conflict_name("Builder") }
-
-  pub fn no_conflict_child_name(&self, idx: usize) -> Ident {
-    self.new_no_conflict_name(&format!("c{}", idx))
-  }
-
   pub fn forbid_warnings(&mut self, b: bool) { self.forbid_warnings = b; }
-
-  pub fn new_no_conflict_name(&self, name: &str) -> Ident {
-    let mut name = Ident::new(name, Span::call_site());
-    while self.named_widgets.contains(&name) {
-      let suffix = format! {"{}_", name};
-      name = Ident::new(&suffix, Span::call_site())
-    }
-    name
-  }
 
   fn save_follow_scope(&mut self, follow_scope: bool) { self.follow_scopes.push(follow_scope); }
 
@@ -451,11 +418,8 @@ impl DeclareCtx {
       .entry(name)
       .or_insert(ReferenceInfo::Reference);
     match (*v, ref_info) {
-      (ReferenceInfo::Reference, ReferenceInfo::Reference) => *v = ref_info,
-      (ReferenceInfo::Reference, ReferenceInfo::BeFollowed) => *v = ref_info,
-      (ReferenceInfo::Reference, ReferenceInfo::WrapWidgetRef) => *v = ref_info,
-      (ReferenceInfo::WrapWidgetRef, ReferenceInfo::Reference) => *v = ref_info,
-      (ReferenceInfo::WrapWidgetRef, ReferenceInfo::BeFollowed) => *v = ref_info,
+      (ReferenceInfo::Reference, _) => *v = ref_info,
+      (ReferenceInfo::WrapWidgetRef, _) => *v = ref_info,
       _ => {}
     }
   }

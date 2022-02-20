@@ -34,24 +34,31 @@ mod tests {
 
   #[test]
   fn one_line_expanded() {
-    let size = Size::new(100., 50.);
-    let row = declare! {
-      Row {
-        ..<_>::default(),
-        Expanded {
-          flex: 1.,
-          SizedBox { size }
-        }
-        SizedBox { size }
-        SizedBox { size }
-        Expanded {
-          flex: 2.,
-          SizedBox { size }
+    struct T(Size);
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let size = self.0;
+        declare! {
+          Row {
+            Expanded {
+              flex: 1.,
+              SizedBox { size }
+            }
+            SizedBox { size }
+            SizedBox { size }
+            Expanded {
+              flex: 2.,
+              SizedBox { size }
+            }
+          }
         }
       }
-    };
+    }
 
-    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
+    let t = T(Size::new(100., 50.));
+    let size = t.0;
+
+    let (rect, children) = widget_and_its_children_box_rect(t.box_it(), Size::new(500., 500.));
 
     assert_eq!(rect, Rect::from_size(Size::new(500., 50.)));
     assert_eq!(
@@ -68,21 +75,19 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let row = declare! {
-      Row {
-        wrap: true, ..<_>::default(),
-        Expanded {
-          flex: 1.,
-          SizedBox { size }
-        }
-        SizedBox { size }
-        SizedBox { size }
-        Expanded {
-          flex: 2.,
-          SizedBox { size }
-        }
-      }
-    };
+    let row = Row { wrap: true, ..<_>::default() }
+      .have(
+        Expanded { flex: 1. }
+          .have(SizedBox { size }.box_it())
+          .box_it(),
+      )
+      .have(SizedBox { size }.box_it())
+      .have(SizedBox { size }.box_it())
+      .have(
+        Expanded { flex: 2. }
+          .have(SizedBox { size }.box_it())
+          .box_it(),
+      );
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(350., 500.));
 

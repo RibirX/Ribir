@@ -31,6 +31,7 @@ pub use path::*;
 
 use self::layout_store::BoxClamp;
 
+// todo: consider use `Fn(ctx: &mub BuildCtx)` replace
 /// A widget represented by other widget compose.
 pub trait CombinationWidget {
   /// Describes the part of the user interface represented by this widget.

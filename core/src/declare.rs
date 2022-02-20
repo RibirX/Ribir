@@ -27,7 +27,6 @@
 //!     let text_style = ctx.theme().typography_theme.body1.text.clone();
 //!     declare! {
 //!       Column {
-//!          ..<_>::default(),
 //!          Text {
 //!            text: self.name.clone(),
 //!            style: text_style.clone()
@@ -100,17 +99,19 @@
 //!
 //! [declare_derive]: ../ribir/widget_derive/Declare.html
 
+use crate::prelude::BuildCtx;
+
 /// Trait to mark the builder type of widget. `declare!` use it to access the
 /// build type of the widget. See the [mod level document](declare) to know how
 /// to use it.
 pub trait Declare {
   type Builder: DeclareBuilder;
+  fn builder() -> Self::Builder;
 }
 
 /// widget builder use to construct a widget in  `declare!`. See the [mod level
 /// document](declare) to know how to use it.
 pub trait DeclareBuilder {
   type Target;
-
-  fn build(self) -> Self::Target;
+  fn build(self, ctx: &mut BuildCtx) -> Self::Target;
 }

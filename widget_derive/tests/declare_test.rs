@@ -1,4 +1,4 @@
-#![feature(trivial_bounds, negative_impls)]
+use std::{cell::Cell, rc::Rc};
 
 use ribir::{
   prelude::*,
@@ -8,52 +8,43 @@ use ribir::{
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
-fn declare_builder_smoke() {
-  #[derive(Declare)]
-  struct A;
-
-  #[derive(Declare, Default)]
-  struct B {
-    a: f32,
-    b: i32,
-  }
-
-  let _: A = ABuilder {}.build();
-  let b = BBuilder { b: 1, ..<_>::default() }.build();
-  let default_b = BBuilder { ..Default::default() }.build();
-  assert_eq!(b.b, 1);
-  assert_eq!(default_b.b, 0);
-}
-
-#[test]
 fn declare_smoke() {
-  let _ = declare! {
-     SizedBox {
-       size: Size::new(500.,500.),
-       background: Color::RED,
-     }
-  };
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+         SizedBox {
+           size: Size::new(500.,500.),
+           background: Color::RED,
+         }
+      }
+    }
+  }
 }
 
 #[test]
 fn simple_ref_bind_work() {
-  let size = Size::new(500., 500.);
-  let w = declare! {
-   Flex {
-     ..<_>::default(),
-     SizedBox {
-       size: size2.size,
-       on_tap: move |_| size2.size *= 2.,
-     }
-     SizedBox {
-      id: size2,
-      size,
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      let size = Size::new(500., 500.);
+      declare! {
+       Flex {
+         SizedBox {
+           size: size2.size,
+           on_tap: move |_| size2.size *= 2.,
+         }
+         SizedBox {
+          id: size2,
+          size,
+        }
+       }
+      }
     }
-   }
-  };
+  }
 
   let flex_size = Size::new(1000., 500.);
-  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(T.box_it(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
@@ -67,54 +58,61 @@ fn simple_ref_bind_work() {
 
 #[test]
 fn event_attr_sugar_work() {
-  let before_size = Size::new(50., 50.);
-  let after_tap_size = Size::new(100., 100.);
-  let w = declare! {
-    SizedBox {
-      id: size_box,
-      size: before_size,
-      SizedBox {
-        size: size_box.size,
-        on_tap: move |_| size_box.size = after_tap_size,
+  const BEFORE_SIZE: Size = Size::new(50., 50.);
+  const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        SizedBox {
+          id: sized_box,
+          size: BEFORE_SIZE,
+          SizedBox {
+            size: sized_box.size,
+            on_tap: move |_| sized_box.size = AFTER_TAP_SIZE,
+          }
+        }
       }
     }
-  };
+  }
 
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(T.box_it(), Size::new(400., 400.));
   wnd.render_ready();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, before_size.into());
-  assert_eq!(child_rect[0], before_size.into());
+  assert_eq!(rect, BEFORE_SIZE.into());
+  assert_eq!(child_rect[0], BEFORE_SIZE.into());
 
   tap_at(&mut wnd, (25, 25));
 
   wnd.render_ready();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, after_tap_size.into());
-  assert_eq!(child_rect[0], after_tap_size.into());
+  assert_eq!(rect, AFTER_TAP_SIZE.into());
+  assert_eq!(child_rect[0], AFTER_TAP_SIZE.into());
 }
 
 #[test]
 fn widget_wrap_bind_work() {
-  let size = Size::new(50., 50.);
-
-  let w = declare! {
-    Flex {
-      ..<_>::default(),
-      SizedBox {
-        id: sibling,
-        margin: EdgeInsets::all(1.0),
-        size,
-      }
-      SizedBox {
-        margin: sibling.margin.clone(),
-        size: if sibling.margin.left > 1. { Size::zero() } else { sibling.size },
-        on_tap: move |_| sibling.margin = EdgeInsets::all(5.),
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        Flex {
+          SizedBox {
+            id: sibling,
+            margin: EdgeInsets::all(1.0),
+            size: Size::new(50., 50.),
+          }
+          SizedBox {
+            margin: sibling.margin.clone(),
+            size: if sibling.margin.left > 1. { Size::zero() } else { sibling.size },
+            on_tap: move |_| sibling.margin = EdgeInsets::all(5.),
+          }
+        }
       }
     }
-  };
+  }
 
-  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(T.box_it(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
@@ -132,11 +130,10 @@ fn expression_for_children() {
   struct EmbedExpr(Size);
 
   impl CombinationWidget for EmbedExpr {
-    fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = self.0;
       declare! {
         Flex {
-          ..<_>::default(),
           SizedBox { size }
           (0..3).map(|_| declare!{
             SizedBox {
@@ -169,24 +166,27 @@ fn expression_for_children() {
 
 #[test]
 fn embed_declare_ref_outside() {
-  let size = Size::new(1., 1.);
-  let w = declare! {
-    Flex {
-      ..<_>::default(),
-      SizedBox {
-        id: first,
-        size,
-        on_tap: move |_| first.size = Size::new(2., 2.)
-      }
-      (0..3).map(|_| declare!{
-        SizedBox {
-          size: first.size,
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        Flex {
+          SizedBox {
+            id: first,
+            size: Size::new(1., 1.),
+            on_tap: move |_| first.size = Size::new(2., 2.)
+          }
+          (0..3).map(|_| declare!{
+            SizedBox {
+              size: first.size,
+            }
+          })
         }
-      })
+      }
     }
-  };
+  }
 
-  let mut wnd = Window::without_render(w.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(T.box_it(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -200,30 +200,25 @@ fn embed_declare_ref_outside() {
 
 #[test]
 fn data_flow_macro() {
-  let size = Size::new(1., 1.);
-  let w = declare! {
-    Flex {
-      on_tap: move |_| a.size *= 2.,
-      ..<_>::default(),
-      SizedBox{
-        id: c,
-        size,
-      }
-      SizedBox {
-        id: a,
-        size,
-      }
-      SizedBox{
-        id: b,
-        size: a.size
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      let size = Size::new(1., 1.);
+      declare! {
+        Flex {
+          on_tap: move |_| a.size *= 2.,
+          SizedBox { id: c, size }
+          SizedBox { id: a, size }
+          SizedBox { id: b, size: a.size }
+        }
+        data_flow! {
+          a.size + b.size ~> c.size
+        }
       }
     }
-    data_flow!{
-      a.size + b.size ~> c.size
-    }
-  };
+  }
 
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(T.box_it(), Size::new(400., 400.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, Size::new(4., 2.));
@@ -237,90 +232,119 @@ fn data_flow_macro() {
 
 #[test]
 fn local_var_not_bind() {
-  let expect_size = Size::new(5., 5.);
-  let be_clipped_size = Size::new(500., 500.);
-  let w = declare! {
-    SizedBox {
-      size: {
-        let _size_box = expect_size;
-        let _size_box_def = expect_size;
-        _size_box + _size_box_def
-      },
-      SizedBox {
-        id: _size_box,
-        size: be_clipped_size,
+  const EXPECT_SIZE: Size = Size::new(5., 5.);
+  const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
+
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        SizedBox {
+          size: {
+            let _size_box = EXPECT_SIZE;
+            let _size_box_def = EXPECT_SIZE;
+            _size_box + _size_box_def
+          },
+          SizedBox {
+            id: _size_box,
+            size: BE_CLIPPED_SIZE,
+          }
+        }
       }
     }
-  };
+  }
 
-  let (rect, child_rect) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
-  assert_eq!(rect.size, expect_size * 2.);
-  assert_eq!(child_rect[0].size, expect_size * 2.);
+  let (rect, child_rect) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
+  assert_eq!(rect.size, EXPECT_SIZE * 2.);
+  assert_eq!(child_rect[0].size, EXPECT_SIZE * 2.);
 }
 
 #[test]
 
 fn with_attr_ref() {
-  let root_ref: StateRef<Flex>;
-  let w = declare! {
-    Flex {
-      id: root,
-      cursor: tap_box.get_cursor().unwrap().clone(),
-      ..<_>::default(),
-      // a hack method to capture widget reference only for test, should not use
-      // it in product code.
-      {
-        root_ref = root;
-        Option::<SizedBox>::None
-      }
-      SizedBox {
-        id: tap_box,
-        size: Size::new(5., 5.),
-        cursor: CursorIcon::Hand,
-        on_tap: move |_| {
-          let _ = tap_box.try_set_cursor(CursorIcon::AllScroll);
+  #[derive(Default)]
+  struct Track(Rc<Cell<Option<StateRef<Flex>>>>);
+  impl CombinationWidget for Track {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        Flex {
+          id: root,
+          cursor: tap_box.get_cursor().unwrap().clone(),
+          // a hack method to capture widget reference only for test, should not use
+          // it in product code.
+          {
+            self.0.set(Some(root));
+            Option::<SizedBox>::None
+          }
+          SizedBox {
+            id: tap_box,
+            size: Size::new(5., 5.),
+            cursor: CursorIcon::Hand,
+            on_tap: move |_| {
+              let _ = tap_box.try_set_cursor(CursorIcon::AllScroll);
+            }
+          }
         }
       }
     }
-  };
+  }
+  let w = Track::default();
+  let root_ref = w.0.clone();
 
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w.box_it(), Size::new(400., 400.));
   wnd.render_ready();
 
-  assert_eq!(root_ref.get_cursor(), Some(CursorIcon::Hand));
+  assert_eq!(
+    root_ref.get().and_then(|w| w.get_cursor()),
+    Some(CursorIcon::Hand)
+  );
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
-  assert_eq!(root_ref.get_cursor(), Some(CursorIcon::AllScroll));
+  assert_eq!(
+    root_ref.get().and_then(|w| w.get_cursor()),
+    Some(CursorIcon::AllScroll)
+  );
 }
 
 #[test]
 fn attr_bind_to_self() {
-  let root_ref: StateRef<SizedBox>;
-  let w = declare! {
-    SizedBox {
-      id: self_id,
-      size: Size::new(5., 5.),
-      #[skip_nc]
-      cursor: if self_id.size.area() < 100. {
-        CursorIcon::Hand
-      } else {
-        CursorIcon::Help
-      },
-      on_tap: move |_|  self_id.size = Size::new(20.,20.),
-      // a hack method to capture widget reference only for test, should not use
-      // it in product code.
-      {
-        root_ref = self_id;
-        Option::<SizedBox>::None
+  #[derive(Default)]
+  struct Track(Rc<Cell<Option<StateRef<SizedBox>>>>);
+  impl CombinationWidget for Track {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        SizedBox {
+          id: self_id,
+          size: Size::new(5., 5.),
+          #[skip_nc]
+          cursor: if self_id.size.area() < 100. {
+            CursorIcon::Hand
+          } else {
+            CursorIcon::Help
+          },
+          on_tap: move |_|  self_id.size = Size::new(20.,20.),
+          // a hack method to capture widget reference only for test, should not use
+          // in product code.
+          {
+            self.0.set(Some(self_id));
+            Option::<SizedBox>::None
+          }
+        }
       }
     }
-  };
+  }
 
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let w = Track::default();
+  let root_ref = w.0.clone();
+
+  let mut wnd = Window::without_render(w.box_it(), Size::new(400., 400.));
   wnd.render_ready();
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
-  assert_eq!(root_ref.get_cursor(), Some(CursorIcon::Help));
+  assert_eq!(
+    root_ref.get().and_then(|w| w.get_cursor()),
+    Some(CursorIcon::Help)
+  );
 }
 
 fn tap_at(wnd: &mut Window, pos: (i32, i32)) {

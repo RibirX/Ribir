@@ -125,12 +125,11 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let widget = declare! {
-      SizedBox {
-        size: Size::new(100., 100.),
-        margin: EdgeInsets::symmetrical(1., 1.),
-      }
-    };
+    let widget = Margin {
+      margin: EdgeInsets::symmetrical(1., 1.),
+    }
+    .have(SizedBox { size: Size::new(100., 100.) }.box_it())
+    .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(widget.box_it(), Size::new(200., 200.));
 

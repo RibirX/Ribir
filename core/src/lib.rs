@@ -1,11 +1,4 @@
-#![feature(
-  test,
-  decl_macro,
-  // todo: remove `trivial_bounds`
-  trivial_bounds,
-  marker_trait_attr,
-  min_specialization
-)]
+#![feature(test, decl_macro, marker_trait_attr, min_specialization)]
 
 #[macro_use]
 extern crate bitflags;

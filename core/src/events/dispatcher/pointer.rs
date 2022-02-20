@@ -404,27 +404,35 @@ mod tests {
 
   #[test]
   fn cancel_bubble() {
-    let event_record = Rc::new(RefCell::new(vec![]));
-    let root = declare! {
-      SizedBox {
-        size: SizedBox::expanded_size(),
-        on_pointer_down: {
-          let stack = event_record.clone();
-          move |e| stack.borrow_mut().push(e.clone())
-        },
-        Text {
-          text: "pointer event test",
-          style: TextStyle::default(),
-          on_pointer_down: {
-            let stack = event_record.clone();
-            move |e| {
-              stack.borrow_mut().push(e.clone());
-              e.stop_bubbling();
+    #[derive(Default)]
+    struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
+    impl CombinationWidget for EventRecord {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size: SizedBox::expanded_size(),
+            on_pointer_down: {
+              let stack = self.0.clone();
+              move |e| stack.borrow_mut().push(e.clone())
+            },
+            Text {
+              text: "pointer event test",
+              style: TextStyle::default(),
+              on_pointer_down: {
+                let stack = self.0.clone();
+                move |e| {
+                  stack.borrow_mut().push(e.clone());
+                  e.stop_bubbling();
+                }
+              }
             }
           }
         }
       }
-    };
+    }
+
+    let root = EventRecord::default();
+    let event_record = root.0.clone();
 
     let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
@@ -441,35 +449,46 @@ mod tests {
 
   #[test]
   fn enter_leave() {
-    let enter_event = Rc::new(RefCell::new(vec![]));
-    let leave_event = Rc::new(RefCell::new(vec![]));
+    #[derive(Default)]
+    struct EnterLeave {
+      enter: Rc<RefCell<Vec<i32>>>,
+      leave: Rc<RefCell<Vec<i32>>>,
+    }
 
-    let parent = declare! {
-      SizedBox {
-        size: SizedBox::expanded_size(),
-        on_pointer_enter: {
-          let enter_event = enter_event.clone();
-          move |_| enter_event.borrow_mut().push(2)
-        },
-        on_pointer_leave: {
-          let leave_event = leave_event.clone();
-          move |_| leave_event.borrow_mut().push(2)
-        },
-        SizedBox {
-          size: SizedBox::expanded_size(),
-          on_pointer_enter: {
-            let enter_event = enter_event.clone();
-            move |_| enter_event.borrow_mut().push(1)
-          },
-          on_pointer_leave: {
-            let leave_event = leave_event.clone();
-            move |_| leave_event.borrow_mut().push(1)
+    impl CombinationWidget for EnterLeave {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size: SizedBox::expanded_size(),
+            on_pointer_enter: {
+              let enter_event = self.enter.clone();
+              move |_| enter_event.borrow_mut().push(2)
+            },
+            on_pointer_leave: {
+              let leave_event = self.leave.clone();
+              move |_| leave_event.borrow_mut().push(2)
+            },
+            SizedBox {
+              size: SizedBox::expanded_size(),
+              on_pointer_enter: {
+                let enter_event = self.enter.clone();
+                move |_| enter_event.borrow_mut().push(1)
+              },
+              on_pointer_leave: {
+                let leave_event = self.leave.clone();
+                move |_| leave_event.borrow_mut().push(1)
+              }
+            }
           }
         }
       }
-    };
+    }
 
-    let mut wnd = Window::without_render(parent.box_it(), Size::new(100., 100.));
+    let w = EnterLeave::default();
+    let enter_event = w.enter.clone();
+    let leave_event = w.leave.clone();
+
+    let mut wnd = Window::without_render(w.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -502,36 +521,43 @@ mod tests {
 
   #[test]
   fn click() {
-    let click_path = Rc::new(RefCell::new(0));
+    #[derive(Default)]
+    struct ClickPath(Rc<RefCell<i32>>);
 
-    let parent = declare! {
-      Row {
-        cross_align: CrossAxisAlign::Start,
-        on_tap: {
-          let click_path = click_path.clone();
-          move |_| {
-          let mut res = click_path.borrow_mut();
-          *res += 1;
-        }},
-        ..<_>::default(),
-        SizedBox {
-          size: Size::new(100., 100.),
-          on_tap: {
-            let click_path = click_path.clone();
-            move |_| {
-            let mut res = click_path.borrow_mut();
-            *res += 1;
+    impl CombinationWidget for ClickPath {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          Row {
+            v_align: CrossAxisAlign::Start,
+            on_tap: {
+              let click_path = self.0.clone();
+              move |_| {
+              let mut res = click_path.borrow_mut();
+              *res += 1;
+            }},
+            SizedBox {
+              size: Size::new(100., 100.),
+              on_tap: {
+                let click_path = self.0.clone();
+                move |_| {
+                let mut res = click_path.borrow_mut();
+                *res += 1;
+                }
+              }
+            }
+            SizedBox {
+              size: Size::new(100., 400.)
             }
           }
         }
-        SizedBox {
-          size: Size::new(100., 400.)
-        }
       }
-    };
+    }
+
+    let cp = ClickPath::default();
+    let click_path = cp.0.clone();
 
     // Stretch row
-    let mut wnd = Window::without_render(parent.box_it(), Size::new(400., 400.));
+    let mut wnd = Window::without_render(cp.box_it(), Size::new(400., 400.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -592,20 +618,25 @@ mod tests {
 
   #[test]
   fn focus_change_by_event() {
-    let root = declare! {
-      Row {
-        ..<_>::default(),
-        SizedBox {
-          size: Size::new(50., 50.),
-          tab_index: 0
-        }
-        SizedBox {
-          size: Size::new(50., 50.)
+    struct T;
+
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          Row {
+            SizedBox {
+              size: Size::new(50., 50.),
+              tab_index: 0
+            }
+            SizedBox {
+              size: Size::new(50., 50.)
+            }
+          }
         }
       }
-    };
+    }
 
-    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(T.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };

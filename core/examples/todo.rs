@@ -16,19 +16,16 @@ impl StatefulCombination for Todos {
     let state = unsafe { this.state_ref() };
     declare! {
       Column {
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default(),
+        h_align: CrossAxisAlign::Start,
         this.tasks.iter().enumerate().map(|(idx, task)|{
           let state = state.clone();
           declare!{
             Row {
               margin: EdgeInsets::vertical(4.),
-              ..<_>::default(),
               Checkbox{
                 id: checkbox,
                 checked: task.finished,
                 style: ctx.theme().checkbox.clone(),
-                ..<_>::default(),
               }
               Text{
                 text:task.label.clone(),

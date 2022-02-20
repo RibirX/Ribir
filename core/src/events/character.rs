@@ -51,13 +51,9 @@ mod tests {
     let receive = Rc::new(RefCell::new("".to_string()));
     let c_receive = receive.clone();
 
-    let widget = declare! {
-      SizedBox {
-        size: SizedBox::shrink_size(),
-        auto_focus: true,
-        on_char: move |key| c_receive.borrow_mut().push(key.char)
-      }
-    };
+    let widget = SizedBox { size: SizedBox::shrink_size() }
+      .with_auto_focus(true)
+      .on_char(move |key| c_receive.borrow_mut().push(key.char));
 
     let mut wnd = Window::without_render(widget.box_it(), Size::new(100., 100.));
 

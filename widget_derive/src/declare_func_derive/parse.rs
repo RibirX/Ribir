@@ -38,6 +38,8 @@ use syn::{
   Ident, Macro, Token,
 };
 
+const CTX_DEFAULT_NAME: &str = "ctx";
+
 impl Parse for DeclareMacro {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     fn parse_data_flows_tokens(input: ParseStream) -> syn::Result<Punctuated<DataFlow, Token![;]>> {
@@ -56,7 +58,15 @@ impl Parse for DeclareMacro {
       }
     }
 
+    let ctx = if !input.peek2(token::Brace) {
+      let ctx = input.parse()?;
+      input.parse::<token::Comma>()?;
+      ctx
+    } else {
+      Ident::new(CTX_DEFAULT_NAME, Span::call_site())
+    };
     let res = Self {
+      ctx,
       widget: input.parse()?,
       data_flows: parse_data_flows(input)?,
     };
@@ -97,7 +107,6 @@ impl Parse for DeclareWidget {
       named: None,
       fields: <_>::default(),
       sugar_fields: <_>::default(),
-      rest: None,
       children: vec![],
     };
 
@@ -106,7 +115,7 @@ impl Parse for DeclareWidget {
     fields
       .into_pairs()
       .try_for_each::<_, syn::Result<()>>(|pair| {
-        let (f, comma) = pair.into_tuple();
+        let (f, _) = pair.into_tuple();
 
         let member = &f.member;
         if syn::parse2::<kw::id>(quote! { #member}).is_ok() {
@@ -114,19 +123,9 @@ impl Parse for DeclareWidget {
           let _: Option<DeclareField> = assign_uninit_field!(widget.named, name)?;
         } else if let Some(f) = widget.sugar_fields.assign_field(f)? {
           widget.fields.push(f);
-          if let Some(comma) = comma {
-            widget.fields.push_punct(comma);
-          }
         }
         Ok(())
       })?;
-
-    if content.peek(Token![..]) {
-      widget.rest = Some(content.parse()?);
-      if !content.is_empty() {
-        let _: Comma = content.parse()?;
-      }
-    }
 
     loop {
       // Expr child should not a `Type` or `Path`, if it's a `Ident`（`Path`), it's
@@ -152,19 +151,6 @@ impl Parse for DeclareWidget {
             "Field should always declare before children.",
           ));
         }
-        if let Some(RestExpr(dot, expr)) = widget.rest {
-          return Err(syn::Error::new(
-            dot.span().join(expr.span()).unwrap(),
-            "The base struct must always be the last field.",
-          ));
-        }
-      }
-      if content.peek(Token![..]) && !widget.children.is_empty() && widget.rest.is_none() {
-        let rest: Token![..] = content.parse()?;
-        return Err(syn::Error::new(
-          rest.span(),
-          "The base struct must always be the last field but declare before children.",
-        ));
       }
     }
 
@@ -194,10 +180,6 @@ impl Parse for DataFlow {
       to: DataFlowExpr { expr: input.parse()?, follows: None },
     })
   }
-}
-
-impl Parse for RestExpr {
-  fn parse(input: ParseStream) -> syn::Result<Self> { Ok(Self(input.parse()?, input.parse()?)) }
 }
 
 impl Parse for Child {
@@ -270,16 +252,20 @@ mod tests {
 
   #[test]
   fn if_guard_work() {
-    let w = declare! {
-      SizedBox {
-        size if true => : Size::new(100., 100.),
-        margin if false =>: EdgeInsets::all(1.),
-        cursor if true =>: CursorIcon::Hand
+    struct T;
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size if true => : Size::new(100., 100.),
+            margin if false =>: EdgeInsets::all(1.),
+            cursor if true =>: CursorIcon::Hand
+          }
+        }
       }
-    };
+    }
 
-    assert_eq!(w.get_cursor(), Some(CursorIcon::Hand));
-    let (rect, _) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
+    let (rect, _) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 100.));
   }
 }

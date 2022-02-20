@@ -4,14 +4,14 @@ use crate::prelude::*;
 #[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[declare(builtin, convert(some, into))]
+  #[declare(builtin, setter(strip_option, into), default)]
   pub background: Option<Brush>,
   /// A border to draw above the background
-  #[declare(builtin, convert(some))]
+  #[declare(builtin, setter(strip_option), default)]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[declare(builtin, convert(some, into))]
+  #[declare(builtin, setter(strip_option, into), default)]
   pub radius: Option<Radius>,
 }
 
@@ -81,6 +81,12 @@ enum BorderPosition {
   Right,
 }
 impl BoxDecoration {
+  #[inline]
+  pub fn is_empty(&self) -> bool {
+    let Self { border, background, radius }: &BoxDecoration = self;
+    border.is_none() && background.is_none() && radius.is_none()
+  }
+
   fn paint_border(&self, painter: &mut Painter, rect: &Rect) {
     let path_to_paint = self.continues_border();
     if path_to_paint.is_empty() {
@@ -304,20 +310,25 @@ mod tests {
 
   #[test]
   fn layout() {
-    let size = Size::new(100., 100.);
-    let sized_box = declare! {
-      SizedBox {
-        size,
-        border: Border {
-          left: BorderSide::new(1., Color::BLACK),
-          right: BorderSide::new(2., Color::BLACK),
-          top: BorderSide::new(3., Color::BLACK),
-          bottom: BorderSide::new(4., Color::BLACK),
-        },
+    const SIZE: Size = Size::new(100., 100.);
+    struct T;
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size: SIZE,
+            border: Border {
+              left: BorderSide::new(1., Color::BLACK),
+              right: BorderSide::new(2., Color::BLACK),
+              top: BorderSide::new(3., Color::BLACK),
+              bottom: BorderSide::new(4., Color::BLACK),
+            },
+          }
+        }
       }
-    };
+    }
 
-    let (rect, child) = widget_and_its_children_box_rect(sized_box, Size::new(500., 500.));
+    let (rect, child) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
     assert_eq!(rect, Rect::from_size(Size::new(103., 107.)));
     assert_eq!(
       child,
@@ -328,44 +339,49 @@ mod tests {
   #[test]
   #[ignore = "gpu need"]
   fn paint() {
-    let radius_cases = vec![
-      Radius::all(0.),
-      Radius::all(10.),
-      Radius::top_left(20.),
-      Radius::top_right(20.),
-      Radius::bottom_right(20.),
-      Radius::bottom_left(20.),
-      Radius::top_left(50.),
-    ];
+    struct Paint;
+    impl CombinationWidget for Paint {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let radius_cases = vec![
+          Radius::all(0.),
+          Radius::all(10.),
+          Radius::top_left(20.),
+          Radius::top_right(20.),
+          Radius::bottom_right(20.),
+          Radius::bottom_left(20.),
+          Radius::top_left(50.),
+        ];
 
-    let row = declare! {
-      Row {
-        wrap: true,
-        margin: EdgeInsets::all(2.),
-        background: Color::PINK,
-        border: Border {
-          left: BorderSide { width: 1., color: Color::BLACK },
-          right: BorderSide { width: 2., color: Color::RED },
-          top: BorderSide { width: 3., color: Color::GREEN },
-          bottom: BorderSide { width: 4., color: Color::YELLOW },
-        },
-        ..<_>::default(),
-        radius_cases
-        .into_iter()
-        .map(|radius| {
-          declare!{
-            SizedBox {
-              size: Size::new(60., 40.),
-              background: Color::RED,
-              radius: radius,
-              border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
-              margin: EdgeInsets::all(2.)
-            }
+        declare! {
+          Row {
+            wrap: true,
+            margin: EdgeInsets::all(2.),
+            background: Color::PINK,
+            border: Border {
+              left: BorderSide { width: 1., color: Color::BLACK },
+              right: BorderSide { width: 2., color: Color::RED },
+              top: BorderSide { width: 3., color: Color::GREEN },
+              bottom: BorderSide { width: 4., color: Color::YELLOW },
+            },
+            radius_cases
+            .into_iter()
+            .map(|radius| {
+              declare!{
+                SizedBox {
+                  size: Size::new(60., 40.),
+                  background: Color::RED,
+                  radius: radius,
+                  border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
+                  margin: EdgeInsets::all(2.)
+                }
+              }
+            }),
           }
-        }),
+        }
       }
-    };
-    let mut window = Window::wgpu_headless(row.box_it(), DeviceSize::new(400, 600));
+    }
+
+    let mut window = Window::wgpu_headless(Paint.box_it(), DeviceSize::new(400, 600));
     window.render_ready();
     window.draw_frame();
 

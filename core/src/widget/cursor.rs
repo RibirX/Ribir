@@ -57,31 +57,35 @@ mod tests {
 
   #[test]
   fn tree_down_up() {
-    let row_tree = declare! {
-      SizedBox{
-        size: Size::new(f32::INFINITY, f32::INFINITY),
-        cursor: CursorIcon::AllScroll,
-        Row{
-          cross_align: CrossAxisAlign::Start,
-          main_align: MainAxisAlign::Start,
-          ..<_>::default(),
-          SizedBox {
-            size: Size::new(200., 200.),
-            cursor: CursorIcon::Hand,
-            Row {
-              cross_align: CrossAxisAlign::Start,
-              main_align: MainAxisAlign::Start,
-              ..<_>::default(),
+    struct RowTree;
+    impl CombinationWidget for RowTree {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox{
+            size: Size::new(f32::INFINITY, f32::INFINITY),
+            cursor: CursorIcon::AllScroll,
+            Row{
+              v_align: CrossAxisAlign::Start,
+              h_align: MainAxisAlign::Start,
               SizedBox {
-                size:  Size::new(100., 100.),
-                cursor: CursorIcon::Help,
+                size: Size::new(200., 200.),
+                cursor: CursorIcon::Hand,
+                Row {
+                  v_align: CrossAxisAlign::Start,
+                  h_align: MainAxisAlign::Start,
+                  SizedBox {
+                    size:  Size::new(100., 100.),
+                    cursor: CursorIcon::Help,
+                  }
+                }
               }
             }
           }
         }
       }
-    };
-    let mut wnd = Window::without_render(row_tree, Size::new(400., 400.));
+    }
+
+    let mut wnd = Window::without_render(RowTree.box_it(), Size::new(400., 400.));
 
     wnd.render_ready();
 

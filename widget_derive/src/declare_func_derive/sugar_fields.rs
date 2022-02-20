@@ -8,8 +8,7 @@ use syn::{
   parse::{Parse, ParseStream},
   parse_quote,
   spanned::Spanned,
-  token::{Brace, Comma},
-  Ident, Member, Result, Token,
+  Ident, Member, Path, Result, Token,
 };
 
 macro_rules! assign_uninit_field {
@@ -27,9 +26,14 @@ macro_rules! assign_uninit_field {
 }
 pub(crate) use assign_uninit_field;
 
-use crate::{declare_func_derive::FieldFollows, error::DeclareError};
+use crate::{
+  declare_func_derive::{widget_gen::WidgetGen, FieldFollows},
+  error::DeclareError,
+};
 
-use super::{declare_visit_mut::DeclareCtx, WidgetFollowPart};
+use super::{
+  declare_visit_mut::DeclareCtx, ribir_suffix_variable, widget_def_variable, WidgetFollowPart,
+};
 use super::{DeclareField, WidgetFollows};
 
 pub struct Id {
@@ -207,38 +211,37 @@ impl SugarFields {
   // composed.
   pub fn gen_wrap_widgets_tokens(
     &self,
-    def_name: &Ident,
-    ref_name: &Ident,
+    host_id: &Ident,
+    ctx_name: &Ident,
     ctx: &DeclareCtx,
   ) -> Vec<WrapWidgetTokens> {
     let mut tokens = vec![];
 
-    if let Some(padding) = self.padding.as_ref() {
-      let w_ty = Ident::new("Padding", Span::call_site());
-      tokens.push(common_def_tokens(padding, w_ty, def_name, ref_name, ctx));
+    if let Some(padding) = self.padding.clone() {
+      let w_ty = Ident::new("Padding", padding.member.span()).into();
+      tokens.push(common_def_tokens(padding, &w_ty, host_id, ctx_name, ctx));
     }
 
-    if let Some(d) = self.decoration_widget_tokens(def_name, ref_name, ctx) {
+    if let Some(d) = self.decoration_widget_tokens(host_id, ctx_name, ctx) {
       tokens.push(d);
     }
 
-    if let Some(margin) = self.margin.as_ref() {
-      let w_ty = Ident::new("Margin", Span::call_site());
-      tokens.push(common_def_tokens(margin, w_ty, def_name, ref_name, ctx));
+    if let Some(margin) = self.margin.clone() {
+      let w_ty = Ident::new("Margin", margin.member.span()).into();
+      tokens.push(common_def_tokens(margin, &w_ty, host_id, ctx_name, ctx));
     }
 
     tokens
   }
 
-  pub fn wrap_widget_follows<'a>(
+  pub fn collect_wrap_widget_follows<'a>(
     &'a self,
-    ref_name: &Ident,
-    ctx: &DeclareCtx,
+    host_name: &Ident,
     follows_info: &mut BTreeMap<Ident, WidgetFollows<'a>>,
   ) {
     let mut copy_follows = |f: Option<&'a DeclareField>| {
       if let Some(follows) = f.and_then(FieldFollows::clone_from) {
-        let name = ctx.no_conflict_name_with_suffix(ref_name, &follows.field.member);
+        let name = ribir_suffix_variable(host_name, &follows.field.member.to_string());
         let part = WidgetFollowPart::Field(follows);
         follows_info.insert(name, WidgetFollows::from_single_part(part));
       }
@@ -259,8 +262,7 @@ impl SugarFields {
       .collect();
 
     if !deco_follows.is_empty() {
-      let suffix = Ident::new(DECORATION, proc_macro2::Span::call_site());
-      let name = ctx.no_conflict_name_with_suffix(ref_name, &suffix);
+      let name = ribir_suffix_variable(host_name, DECORATION);
       follows_info.insert(name, deco_follows);
     }
   }
@@ -278,138 +280,77 @@ impl SugarFields {
 
   fn decoration_widget_tokens(
     &self,
-    def_name: &Ident,
-    ref_name: &Ident,
+    host_id: &Ident,
+    ctx_name: &Ident,
     ctx: &DeclareCtx,
   ) -> Option<WrapWidgetTokens> {
-    let Self { border, radius, background: bg, .. } = self;
-
-    if border.is_none() && bg.is_none() && radius.is_none() {
-      return None;
+    let Self { border, radius, background, .. } = self;
+    let mut fields = vec![];
+    if let Some(border) = border {
+      fields.push(border.clone())
+    }
+    if let Some(background) = background {
+      fields.push(background.clone())
+    }
+    if let Some(radius) = radius {
+      fields.push(radius.clone())
     }
 
-    let suffix = Ident::new(DECORATION, proc_macro2::Span::call_site());
-    let wrap_def_name = ctx.no_conflict_name_with_suffix(def_name, &suffix);
-    let wrap_ref_name = ctx.no_conflict_name_with_suffix(ref_name, &suffix);
-    let mut value_before = quote! {};
-    let mut follow_after = quote! {};
-    let builder_ty = ctx.no_config_builder_type_name();
+    (!fields.is_empty()).then(|| {
+      let name = ribir_suffix_variable(host_id, DECORATION);
+      let ty = &Ident::new("BoxDecoration", Span::call_site()).into();
+      let gen = WidgetGen { ty, name, fields: &fields, ctx_name };
+      let host_name = widget_def_variable(host_id);
+      let wrap_name = widget_def_variable(&gen.name);
+      let mut def_and_ref_tokens = gen.gen_widget_tokens(ctx, false);
 
-    // decoration can emit if all user declared field have if guard and its
-    // condition result is false.
-    let mut decoration_cond = quote! {};
-
-    let mut decoration_build = quote! { #builder_ty };
-    Brace::default().surround(&mut decoration_build, |decoration| {
-      let comma = Comma::default();
-      let mut gen_decoration_field_tokens = |f: &DeclareField| -> Option<Ident> {
-        if ctx.be_followed(ref_name) {
-          let state_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
-          follow_after.extend(quote! { let #state_ref = unsafe {#wrap_def_name.state_ref()};});
-        }
-        // fixme: should use field state ref to follow others change.
-        let cond = f.gen_tokens(
-          &wrap_ref_name,
-          &Ident::new("BoxDecoration", Span::call_site()).into(),
-          &mut value_before,
-          decoration,
-          &mut follow_after,
-          ctx,
-        );
-        comma.to_tokens(decoration);
-        cond
-      };
-
-      let bg_cond = bg.as_ref().and_then(&mut gen_decoration_field_tokens);
-      let border_cond = border.as_ref().and_then(&mut gen_decoration_field_tokens);
-      let radius_cond = radius.as_ref().and_then(&mut gen_decoration_field_tokens);
-
-      if bg.is_none() || border.is_none() || radius.is_none() {
-        decoration.extend(quote! { ..<_>::default() })
+      // If all fields have if guard and condition are false, `BoxDecoration` can
+      // emit.
+      if fields.iter().all(|f| f.if_guard.is_some()) {
+        def_and_ref_tokens = quote! {
+          let #wrap_name = #wrap_name.is_empty().then(||{
+            #def_and_ref_tokens
+            #wrap_name
+          });
+        };
       }
 
-      if bg_cond.is_some() && border_cond.is_some() && radius_cond.is_some() {
-        decoration_cond = quote! { #bg_cond || #border_cond || #radius_cond };
+      WrapWidgetTokens {
+        compose_tokens: quote! { let #host_name = (#wrap_name, #host_name).compose(); },
+        name: widget_def_variable(&gen.name),
+        def_and_ref_tokens,
       }
-    });
-
-    let stateful = (!follow_after.is_empty()).then(|| quote! { .into_stateful() });
-    decoration_build.extend(quote! {.build()#stateful});
-
-    let mut def_and_ref_tokens = quote! { let #wrap_def_name = };
-    Brace::default().surround(&mut def_and_ref_tokens, |tokens| {
-      tokens.extend(quote! { type #builder_ty = <BoxDecoration as Declare>::Builder; });
-      tokens.extend(value_before);
-      let build = if follow_after.is_empty() {
-        decoration_build
-      } else {
-        quote! {
-          let #wrap_def_name = #decoration_build;
-          #follow_after
-          #wrap_def_name
-        }
-      };
-      if decoration_cond.is_empty() {
-        tokens.extend(build);
-      } else {
-        tokens.extend(quote! { #decoration_cond.then(|| #build ); });
-      }
-    });
-    syn::token::Semi::default().to_tokens(&mut def_and_ref_tokens);
-
-    Some(WrapWidgetTokens {
-      compose_tokens: quote! { let #def_name = (#wrap_def_name, #def_name).compose(); },
-      name: wrap_def_name,
-      def_and_ref_tokens,
     })
+
+    // fixme:
+    // 1. others follow decoration
+    // if ctx.be_followed(ref_name) {
+    //   let state_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
+    //   follow_after.extend(quote! { let #state_ref = unsafe
+    // {#wrap_def_name.state_ref()};}); }
   }
 }
 
 // generate the wrapper widget define tokens and return the wrap tokens.
 fn common_def_tokens(
-  f @ DeclareField { if_guard, member, colon_token, .. }: &DeclareField,
-  widget_ty: Ident,
-  def_name: &Ident,
-  ref_name: &Ident,
+  mut f: DeclareField,
+  ty: &Path,
+  host_id: &Ident,
+  ctx_name: &Ident,
   ctx: &DeclareCtx,
 ) -> WrapWidgetTokens {
-  // wrap widget should be stateful if it's depended by other or itself need
-  // follow other change.
-  fn is_stateful(name: &Ident, f: &DeclareField, ctx: &DeclareCtx) -> bool {
-    f.follows.is_some() || ctx.be_followed(name)
-  }
+  let if_guard = f.if_guard.take();
+  let name = ribir_suffix_variable(host_id, &f.member.to_string());
+  let host_def = widget_def_variable(host_id);
+  let wrap_def = widget_def_variable(&name);
+  let widget_gen = WidgetGen { ty, name, fields: &vec![f], ctx_name };
+  let mut widget_tokens = widget_gen.gen_widget_tokens(ctx, false);
 
-  let wrap_name = ctx.no_conflict_name_with_suffix(def_name, member);
-  let wrap_ref = ctx.no_conflict_name_with_suffix(ref_name, member);
-  let (stateful, state_ref) = is_stateful(&wrap_ref, f, ctx)
-    .then(|| {
-      (
-        quote! { .into_stateful() },
-        quote! { let mut #wrap_ref = unsafe { #wrap_name.state_ref() }; },
-      )
-    })
-    .unzip();
-  let widget_ty = widget_ty.into();
-  let field_follow = f.follow_tokens(&wrap_ref, &widget_ty, ctx);
-  let builder_ty = ctx.no_config_builder_type_name();
-  let colon = colon_token.unwrap_or_default();
-  let value = f.field_value_tokens(&widget_ty);
-
-  let mut widget_tokens = quote! {
-    let #wrap_name = {
-      type #builder_ty = <#widget_ty as Declare>::Builder;
-      #builder_ty {
-        #member #colon #value
-      }.build()#stateful
-    };
-    #state_ref
-    #field_follow
-  };
   if let Some(if_guard) = if_guard {
     widget_tokens = quote! {
-      let #wrap_name = #if_guard {
+      let #wrap_def = #if_guard {
         #widget_tokens
-        Some(#wrap_name)
+        Some(#wrap_def)
       } else {
         None
       };
@@ -417,8 +358,8 @@ fn common_def_tokens(
   }
 
   WrapWidgetTokens {
-    compose_tokens: quote! { let #def_name = (#wrap_name, #def_name).compose(); },
-    name: wrap_name,
+    compose_tokens: quote! { let #host_def = (#wrap_def, #host_def).compose(); },
+    name: wrap_def,
     def_and_ref_tokens: widget_tokens,
   }
 }

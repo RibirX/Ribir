@@ -24,11 +24,10 @@ impl EmbedPost {
 }
 
 impl CombinationWidget for EmbedPost {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     declare! {
       Row {
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default(),
+        v_align: CrossAxisAlign::Start,
         Text { text: self.title, style: <_>::default() },
         Text { text: self.author, style: <_>::default() },
         Text { text: self.content, style: <_>::default() },

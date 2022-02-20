@@ -45,54 +45,22 @@ pub enum MainAxisAlign {
 #[derive(Default, MultiChildWidget, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
+  #[declare(default)]
   pub reverse: bool,
   /// Whether flex items are forced onto one line or can wrap onto multiple
   /// lines
+  #[declare(default)]
   pub wrap: bool,
   /// Sets how flex items are placed in the flex container defining the main
   /// axis and the direction
+  #[declare(default)]
   pub direction: Direction,
   /// How the children should be placed along the cross axis in a flex layout.
+  #[declare(default)]
   pub cross_align: CrossAxisAlign,
   /// How the children should be placed along the main axis in a flex layout.
+  #[declare(default)]
   pub main_align: MainAxisAlign,
-}
-
-impl Flex {
-  /// Create a new Flex like `self`, but with the give `reverse`.
-  #[inline]
-  pub fn with_reverse(mut self, reverse: bool) -> Self {
-    self.reverse = reverse;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `direction`.
-  #[inline]
-  pub fn with_direction(mut self, direction: Direction) -> Self {
-    self.direction = direction;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `cross_align`.
-  #[inline]
-  pub fn with_cross_align(mut self, cross_align: CrossAxisAlign) -> Self {
-    self.cross_align = cross_align;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `main_align`.
-  #[inline]
-  pub fn with_main_align(mut self, main_align: MainAxisAlign) -> Self {
-    self.main_align = main_align;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `wrap`.
-  #[inline]
-  pub fn with_wrap(mut self, wrap: bool) -> Self {
-    self.wrap = wrap;
-    self
-  }
 }
 
 impl Default for CrossAxisAlign {
@@ -471,12 +439,16 @@ mod tests {
 
   #[test]
   fn vertical_line() {
-    let col = declare! {
-      Flex {
-        direction: Direction::Vertical, ..<_>::default(),
-        (0..10).map(|_| SizedBox{ size: Size::new(10., 20.) })
-      }
-    };
+    let col = Flex {
+      direction: Direction::Vertical,
+      ..<_>::default()
+    }
+    .have_multi(
+      (0..10)
+        .map(|_| SizedBox { size: Size::new(10., 20.) }.box_it())
+        .collect(),
+    )
+    .box_it();
     let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
@@ -484,12 +456,8 @@ mod tests {
   #[test]
   fn row_wrap() {
     let size = Size::new(200., 20.);
-    let row = declare! {
-      Flex {
-        wrap: true, ..<_>::default(),
-        (0..3).map(|_| SizedBox { size })
-      }
-    };
+    let row = Flex { wrap: true, ..<_>::default() }
+      .have_multi((0..3).map(|_| SizedBox { size }.box_it()).collect());
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
@@ -506,12 +474,13 @@ mod tests {
   #[test]
   fn reverse_row_wrap() {
     let size = Size::new(200., 20.);
-    let row = declare! {
-      Flex {
-        wrap: true, reverse: true, ..<_>::default(),
-        (0..3).map(|_| SizedBox { size })
-      }
-    };
+    let row = Flex {
+      wrap: true,
+      reverse: true,
+      ..<_>::default()
+    }
+    .have_multi((0..3).map(|_| SizedBox { size }.box_it()).collect());
+
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -527,14 +496,11 @@ mod tests {
   #[test]
   fn cross_align() {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
-      let row = declare! {
-        Row {
-          cross_align: align, ..<_>::default(),
-          SizedBox { size: Size::new(100., 20.) }
-          SizedBox { size: Size::new(100., 30.) }
-          SizedBox { size: Size::new(100., 40.) }
-        }
-      };
+      let row = Row { v_align: align, ..<_>::default() }
+        .have(SizedBox { size: Size::new(100., 20.) }.box_it())
+        .have(SizedBox { size: Size::new(100., 30.) }.box_it())
+        .have(SizedBox { size: Size::new(100., 40.) }.box_it())
+        .box_it();
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
       assert_eq!(rect.size, Size::new(300., 40.));
@@ -560,14 +526,14 @@ mod tests {
     cross_align_check(CrossAxisAlign::Center, [10., 5., 0.]);
     cross_align_check(CrossAxisAlign::End, [20., 10., 0.]);
 
-    let row = declare! {
-      Row {
-        cross_align: CrossAxisAlign::Stretch, ..<_>::default(),
-        SizedBox { size : Size::new(100., 20.) }
-        SizedBox { size : Size::new(100., 30.) }
-        SizedBox { size : Size::new(100., 40.) }
-      }
-    };
+    let row = Row {
+      v_align: CrossAxisAlign::Stretch,
+      ..<_>::default()
+    }
+    .have(SizedBox { size: Size::new(100., 20.) }.box_it())
+    .have(SizedBox { size: Size::new(100., 30.) }.box_it())
+    .have(SizedBox { size: Size::new(100., 40.) }.box_it())
+    .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(300., 40.));
@@ -594,19 +560,21 @@ mod tests {
   fn main_align() {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
-      let root = declare! {
-        SizedBox {
-          size: SizedBox::expanded_size(),
+      let root = SizedBox { size: SizedBox::expanded_size() }
+        .have(
           Row {
-            main_align: align,
-            cross_align: CrossAxisAlign::Start,
-            ..<_>::default(),
-            SizedBox { size: item_size }
-            SizedBox { size: item_size }
-            SizedBox { size: item_size }
+            h_align: align,
+            v_align: CrossAxisAlign::Start,
+            ..<_>::default()
           }
-        }
-      };
+          .have_multi(vec![
+            SizedBox { size: item_size }.box_it(),
+            SizedBox { size: item_size }.box_it(),
+            SizedBox { size: item_size }.box_it(),
+          ])
+          .box_it(),
+        )
+        .box_it();
 
       let mut wnd = Window::without_render(root, Size::new(500., 500.));
       wnd.render_ready();

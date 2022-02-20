@@ -4,7 +4,6 @@ fn syntax_pass() {
   let size = Size::zero();
   let _ = declare! {
     Flex {
-      ..<_>::default(),
       SizedBox {
         size,
         SizedBox{

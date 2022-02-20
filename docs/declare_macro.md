@@ -327,3 +327,6 @@ The easiest way it to derive the `Declare` trait. See more detail in the [`mod l
 [declare]: ../ribir/declare/trait.Declare.html
 [builtin]: #full-builtin-fields-list
 [mod]: ../ribir/declare/index.html
+
+
+[ ] introduction default attr

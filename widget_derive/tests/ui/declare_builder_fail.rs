@@ -15,7 +15,7 @@ struct RenameReservedNames {
 
 #[derive(Declare)]
 struct Converter {
-  #[declare(convert(into, some))]
+  #[declare(setter(into, strip_option))]
   x: Option<i32>,
 }
 
