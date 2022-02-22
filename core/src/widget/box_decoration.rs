@@ -4,6 +4,7 @@ use crate::prelude::*;
 #[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
+  // todo: declare default is the inner value, not the field type
   #[declare(builtin, setter(strip_option, into), default)]
   pub background: Option<Brush>,
   /// A border to draw above the background
@@ -88,6 +89,9 @@ impl BoxDecoration {
   }
 
   fn paint_border(&self, painter: &mut Painter, rect: &Rect) {
+    // return;
+    // todo: refactor border paint, we should only support radius for uniform border
+    // line.
     let path_to_paint = self.continues_border();
     if path_to_paint.is_empty() {
       return;
@@ -356,13 +360,16 @@ mod tests {
           Row {
             wrap: true,
             margin: EdgeInsets::all(2.),
-            background: Color::PINK,
-            border: Border {
-              left: BorderSide { width: 1., color: Color::BLACK },
-              right: BorderSide { width: 2., color: Color::RED },
-              top: BorderSide { width: 3., color: Color::GREEN },
-              bottom: BorderSide { width: 4., color: Color::YELLOW },
-            },
+            SizedBox {
+              size: Size::new(60., 40.),
+              background: Color::PINK,
+              border: Border {
+                left: BorderSide { width: 1., color: Color::BLACK },
+                right: BorderSide { width: 2., color: Color::RED },
+                top: BorderSide { width: 3., color: Color::GREEN },
+                bottom: BorderSide { width: 4., color: Color::YELLOW },
+              },
+            }
             radius_cases
             .into_iter()
             .map(|radius| {
@@ -370,7 +377,7 @@ mod tests {
                 SizedBox {
                   size: Size::new(60., 40.),
                   background: Color::RED,
-                  radius: radius,
+                  radius,
                   border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
                   margin: EdgeInsets::all(2.)
                 }

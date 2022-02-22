@@ -36,6 +36,7 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
   #[inline]
   fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str> { self.gl.pixels_image() }
 }
+
 /// The Render that support draw the canvas result render data.
 pub trait GlRender {
   /// Commit the render data to gl, caller will try to as possible as batch all
@@ -93,6 +94,7 @@ pub struct ColorRenderData<'a> {
   pub primitives: &'a [ColorPrimitive],
 }
 
+// todo: we should share vertices and indices between color and image.
 pub enum RenderData<'a> {
   Color(ColorRenderData<'a>),
   Image(TextureRenderData<'a>),

@@ -14,16 +14,23 @@
     "bitflags",
     "cond",
     "fontdb",
+    "framebuffer",
     "guillotiere",
     "Harf",
     "indextree",
     "Monospace",
     "Msaa",
+    "multisample",
+    "multisampled",
+    "multiview",
     "paren",
     "retessellate",
+    "rpass",
     "rustybuzz",
     "segs",
     "subpat",
-    "THROUGHLINE"
+    "THROUGHLINE",
+    "unclipped",
+    "wgsl"
   ]
 }

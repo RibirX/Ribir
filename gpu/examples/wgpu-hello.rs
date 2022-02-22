@@ -40,7 +40,7 @@ fn main() {
     },
     Event::RedrawRequested(_) => {
       let mut painter = painter::Painter::new(1.);
-      painter.set_brush(Color::YELLOW);
+      painter.set_brush(Color::RED);
 
       painter
         .begin_path((0., 70.).into())

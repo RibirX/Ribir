@@ -5,7 +5,7 @@ use png;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 
-pub macro write_canvas_to($canvas: expr, $path: expr) {
+pub macro write_canvas_to($frame: expr, $path: expr) {
   let abs_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
     .with_file_name(file!())
     .with_file_name($path);

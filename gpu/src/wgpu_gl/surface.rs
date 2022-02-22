@@ -1,3 +1,5 @@
+use std::cell::{Ref, RefCell};
+
 use super::DeviceSize;
 /// `Surface` is a thing presentable canvas visual display.
 pub trait Surface {
@@ -10,17 +12,16 @@ pub trait Surface {
 
   fn view_size(&self) -> DeviceSize;
 
-  fn on_texture<F: FnOnce(&wgpu::Texture) -> U, U>(&self, f: F) -> U;
+  fn current_texture(&self) -> SurfaceTexture;
 
-  fn get_texture_view(&self) -> wgpu::TextureView {
-    self.on_texture(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
-  }
+  fn present(&mut self);
 }
 
 /// A `Surface` represents a platform-specific surface (e.g. a window).
-pub struct PhysicSurface {
+pub struct WindowSurface {
   surface: wgpu::Surface,
   s_config: wgpu::SurfaceConfiguration,
+  current_texture: RefCell<Option<wgpu::SurfaceTexture>>,
 }
 
 /// A `Surface` present in a texture. Usually `PhysicSurface` display things to
@@ -28,7 +29,7 @@ pub struct PhysicSurface {
 /// device, bug only in memory.
 pub type TextureSurface = Texture;
 
-impl Surface for PhysicSurface {
+impl Surface for WindowSurface {
   fn update(
     &mut self,
     device: &wgpu::Device,
@@ -38,15 +39,40 @@ impl Surface for PhysicSurface {
     self.surface.configure(device, s_config);
   }
 
-  #[inline]
   fn view_size(&self) -> DeviceSize { DeviceSize::new(self.s_config.width, self.s_config.height) }
 
-  fn on_texture<F: FnOnce(&wgpu::Texture) -> U, U>(&self, f: F) -> U {
-    let t = self
-      .surface
-      .get_current_texture()
-      .expect("Timeout getting texture");
-    f(&t.texture)
+  fn current_texture(&self) -> SurfaceTexture {
+    self.current_texture.borrow_mut().get_or_insert_with(|| {
+      self
+        .surface
+        .get_current_texture()
+        .expect("Timeout getting texture")
+    });
+    SurfaceTexture::RefCell(Ref::map(self.current_texture.borrow(), |t| {
+      &t.as_ref().unwrap().texture
+    }))
+  }
+
+  fn present(&mut self) {
+    if let Some(texture) = self.current_texture.take() {
+      texture.present()
+    }
+  }
+}
+
+pub enum SurfaceTexture<'a> {
+  RefCell(Ref<'a, wgpu::Texture>),
+  Ref(&'a wgpu::Texture),
+}
+
+impl<'a> std::ops::Deref for SurfaceTexture<'a> {
+  type Target = wgpu::Texture;
+
+  fn deref(&self) -> &Self::Target {
+    match self {
+      SurfaceTexture::RefCell(t) => &*t,
+      SurfaceTexture::Ref(t) => t,
+    }
   }
 }
 
@@ -64,18 +90,23 @@ impl Surface for TextureSurface {
     );
   }
 
-  #[inline]
   fn view_size(&self) -> DeviceSize { self.size }
 
-  #[inline]
-  fn on_texture<F: FnOnce(&wgpu::Texture) -> U, U>(&self, f: F) -> U { f(&self.raw_texture) }
+  fn current_texture(&self) -> SurfaceTexture { SurfaceTexture::Ref(&self.raw_texture) }
+
+  fn present(&mut self) {}
 }
 
-impl PhysicSurface {
-  pub(crate) fn new(surface: wgpu::Surface, device: &wgpu::Device, size: DeviceSize) -> Self {
+impl WindowSurface {
+  pub(crate) fn new(
+    surface: wgpu::Surface,
+    adapter: &wgpu::Adapter,
+    device: &wgpu::Device,
+    size: DeviceSize,
+  ) -> Self {
     let s_config = wgpu::SurfaceConfiguration {
       usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      format: wgpu::TextureFormat::Bgra8UnormSrgb,
+      format: surface.get_preferred_format(adapter).unwrap(),
       width: size.width,
       height: size.height,
       present_mode: wgpu::PresentMode::Fifo,
@@ -83,7 +114,11 @@ impl PhysicSurface {
 
     surface.configure(device, &s_config);
 
-    Self { surface, s_config }
+    Self {
+      surface,
+      s_config,
+      current_texture: RefCell::new(None),
+    }
   }
 }
 
@@ -144,7 +179,7 @@ impl Texture {
         depth_or_array_layers: 1,
       },
       dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Bgra8UnormSrgb,
+      format: wgpu::TextureFormat::Rgba8UnormSrgb,
       usage,
       mip_level_count: 1,
       sample_count: 1,

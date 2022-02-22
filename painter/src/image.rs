@@ -8,9 +8,17 @@ pub trait Image {
   fn pixel_bytes(&self) -> Box<[u8]>;
 }
 
-// todo: remove? only rgba support?
 pub enum ColorFormat {
   Rgba8,
+}
+
+impl ColorFormat {
+  /// return have many bytes per pixel need
+  pub const fn pixel_per_bytes(&self) -> u8 {
+    match self {
+      ColorFormat::Rgba8 => 4,
+    }
+  }
 }
 
 /// A image wrap for shallow compare.

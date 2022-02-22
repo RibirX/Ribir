@@ -82,7 +82,6 @@ enum PathKey<P> {
 struct VertexCache {
   vertices: Box<[[f32; 2]]>,
   indices: Box<[u32]>,
-  indices_offset: Option<u32>,
 }
 
 impl Tessellator {
@@ -143,7 +142,6 @@ impl Tessellator {
             unsafe { self.buffer.fill_vertices() };
             let atlas_tex = self.atlas.as_render_texture(ATLAS_ID);
             self.buffer.submit_vertices(&mut gpu_submit, atlas_tex);
-            self.reset_vertex_cache_offset();
             self.atlas.gpu_synced();
           }
           submitted += count;
@@ -172,13 +170,6 @@ impl Tessellator {
     }
 
     self.end_frame()
-  }
-
-  fn reset_vertex_cache_offset(&mut self) {
-    self
-      .vertices_cache
-      .values_mut()
-      .for_each(|v| v.indices_offset = None)
   }
 
   fn end_frame(&mut self) {
@@ -260,7 +251,6 @@ fn stroke_tess(path: &Path, line_width: f32, tolerance: f32) -> VertexCache {
   VertexCache {
     vertices: buffers.vertices.into_boxed_slice(),
     indices: buffers.indices.into_boxed_slice(),
-    indices_offset: None,
   }
 }
 
@@ -278,7 +268,6 @@ fn fill_tess(path: &Path, tolerance: f32) -> VertexCache {
   VertexCache {
     vertices: buffers.vertices.into_boxed_slice(),
     indices: buffers.indices.into_boxed_slice(),
-    indices_offset: None,
   }
 }
 
@@ -435,20 +424,17 @@ impl TessData {
   unsafe fn fill_vertices(&mut self) {
     while let Some(CacheItem { prim_id, cache_ptr }) = self.buffer_list.pop_front() {
       let cache = &mut *cache_ptr;
-      if let Some(offset) = cache.indices_offset {
-        self
-          .indices
-          .extend(cache.indices.iter().map(|i| i + offset))
-      } else {
-        cache.indices_offset = Some(self.vertices.len() as u32);
-        self.vertices.extend(
-          cache
-            .vertices
-            .iter()
-            .map(|pos| Vertex { pixel_coords: *pos, prim_id }),
-        );
-        self.indices.extend_from_slice(&cache.indices);
-      }
+      let offset = self.vertices.len() as u32;
+
+      self.vertices.extend(
+        cache
+          .vertices
+          .iter()
+          .map(|pos| Vertex { pixel_coords: *pos, prim_id }),
+      );
+      self
+        .indices
+        .extend(cache.indices.iter().map(|i| i + offset));
 
       if self.indices.len() > self.vertex_batch_limit {
         break;

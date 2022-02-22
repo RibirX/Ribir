@@ -281,6 +281,7 @@ impl TypographyTheme {
 pub struct CheckboxTheme {
   pub size: f32,
   pub check_background: Color,
+  // todo: use border merge border_width & border_color ~
   pub border_width: f32,
   pub radius: f32,
   pub border_color: Color,
