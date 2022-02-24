@@ -34,7 +34,12 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
   fn resize(&mut self, size: DeviceSize) { self.gl.resize(size) }
 
   #[inline]
-  fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str> { self.gl.pixels_image() }
+  fn capture<'a>(
+    &self,
+    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  ) -> Result<(), &str> {
+    self.gl.capture(f)
+  }
 }
 
 /// The Render that support draw the canvas result render data.
@@ -50,8 +55,13 @@ pub trait GlRender {
   /// The render data commit finished.
   fn finish(&mut self);
 
-  /// Return pixel data of the frame as an image.
-  fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str>;
+  /// Capture the image data of current frame, which encode as rgba(u8x4)
+  /// format, the callback provide the image size and a iterator of data row
+  /// by row.
+  fn capture<'a>(
+    &self,
+    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  ) -> Result<(), &str>;
 }
 
 /// A texture for the vertexes sampler color. Every texture have identify to

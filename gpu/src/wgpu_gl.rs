@@ -3,7 +3,7 @@ use crate::{
   Vertex,
 };
 use futures::executor::block_on;
-use painter::{DeviceSize, Image};
+use painter::DeviceSize;
 use std::{iter, num::NonZeroU32};
 use text::shaper::TextShaper;
 mod color_pass;
@@ -171,8 +171,10 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     }
   }
 
-  // todo: use a writer replace return a image.
-  fn pixels_image(&self) -> Result<Box<dyn painter::Image>, &str> {
+  fn capture<'a>(
+    &self,
+    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  ) -> Result<(), &str> {
     let Self { surface, device, queue, .. } = self;
     let t = surface.current_texture();
 
@@ -232,33 +234,16 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     device.poll(wgpu::Maintain::Wait);
 
     block_on(buffer_future).map_err(|_| "Async buffer error")?;
-    let pixel_size = size.area() * PX_BYTES;
+
     let slice = buffer_slice.get_mapped_range();
-    let mut data: Vec<u8> = Vec::with_capacity(pixel_size as usize);
     let img_bytes_pre_row = (size.width * PX_BYTES) as usize;
-    (0..size.height).for_each(|i| {
+    let rows = (0..size.height).map(|i| {
       let offset = (i * buffer_bytes_per_row) as usize;
-      data.extend(&slice.as_ref()[offset..offset + img_bytes_pre_row]);
+      &slice.as_ref()[offset..offset + img_bytes_pre_row]
     });
 
-    struct PixelImage {
-      size: DeviceSize,
-      data: Box<[u8]>,
-    }
-
-    impl Image for PixelImage {
-      fn color_format(&self) -> painter::image::ColorFormat { painter::image::ColorFormat::Rgba8 }
-
-      fn size(&self) -> DeviceSize { self.size }
-
-      fn pixel_bytes(&self) -> Box<[u8]> { self.data.clone() }
-    }
-
-    let img: Box<dyn Image> = Box::new(PixelImage {
-      size: surface.view_size(),
-      data: data.into_boxed_slice(),
-    });
-    Ok(img)
+    f(size, Box::new(rows));
+    Ok(())
   }
 }
 

@@ -2,6 +2,7 @@
 
 #[allow(unused_imports)]
 use png;
+use std::io::Write;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 
@@ -36,16 +37,20 @@ You can use `write_canvas_to` to save Canvas as png to compare.",
 }
 
 pub fn backend_write_png<W: std::io::Write>(backend: &dyn painter::PainterBackend, writer: W) {
-  let image = backend.pixels_image().unwrap();
-  let size = image.size();
-  let mut png_encoder = png::Encoder::new(writer, size.width, size.height);
-  png_encoder.set_depth(png::BitDepth::Eight);
-  png_encoder.set_color(png::ColorType::RGBA);
+  backend
+    .capture(Box::new(move |size, rows| {
+      let mut png_encoder = png::Encoder::new(writer, size.width, size.height);
+      png_encoder.set_depth(png::BitDepth::Eight);
+      png_encoder.set_color(png::ColorType::RGBA);
 
-  png_encoder
-    .write_header()
-    .unwrap()
-    .write_image_data(&*image.pixel_bytes())
+      let mut writer = png_encoder.write_header().unwrap();
+      let mut stream_writer = writer.stream_writer_with_size(size.width as usize * 4);
+
+      rows.for_each(|data| {
+        stream_writer.write(data).unwrap();
+      });
+      stream_writer.finish().unwrap();
+    }))
     .unwrap();
 }
 

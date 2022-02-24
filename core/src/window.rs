@@ -189,7 +189,10 @@ impl PainterBackend for MockBackend {
 
   fn resize(&mut self, _: DeviceSize) {}
 
-  fn pixels_image(&self) -> Result<Box<dyn Image>, &str> {
+  fn capture<'a>(
+    &self,
+    _: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  ) -> Result<(), &str> {
     unreachable!("try to capture image from a mock backend")
   }
 }

@@ -1,6 +1,4 @@
-use crate::{
-  path::*, Brush, Color, DeviceSize, Image, PathStyle, Rect, TextStyle, Transform, Vector,
-};
+use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
 use algo::CowRc;
 use std::ops::{Deref, DerefMut};
 use text::FontFace;
@@ -22,8 +20,13 @@ pub struct Painter {
 pub trait PainterBackend {
   fn submit(&mut self, commands: Vec<PaintCommand>);
   fn resize(&mut self, size: DeviceSize);
-  /// Return pixel data of the frame as an image.
-  fn pixels_image(&self) -> Result<Box<dyn Image>, &str>;
+  /// Capture the image data of current frame, which encode as rgba(u8x4)
+  /// format, the callback provide the image size and a iterator of data row
+  /// by row.
+  fn capture<'a>(
+    &self,
+    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  ) -> Result<(), &str>;
 }
 
 #[derive(Clone)]
