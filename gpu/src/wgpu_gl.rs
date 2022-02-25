@@ -67,8 +67,6 @@ pub struct WgpuGl<S: Surface = WindowSurface> {
   color_pass: ColorPass,
   img_pass: ImagePass,
   coordinate_matrix: wgpu::Buffer,
-  // todo: remove it, should get from the surface.
-  s_config: wgpu::SurfaceConfiguration,
   primitives_layout: wgpu::BindGroupLayout,
   encoder: Option<wgpu::CommandEncoder>,
 }
@@ -152,15 +150,11 @@ impl<S: Surface> GlRender for WgpuGl<S> {
   }
 
   fn resize(&mut self, size: DeviceSize) {
-    self.s_config.width = size.width;
-    self.s_config.height = size.height;
-    self
-      .surface
-      .update(&self.device, &self.queue, &self.s_config);
+    self.surface.resize(&self.device, &self.queue, size);
     self.coordinate_matrix = coordinate_matrix_buffer_2d(&self.device, size.width, size.height);
     self
       .color_pass
-      .resize(&self.s_config, &self.coordinate_matrix, &self.device)
+      .resize(size, &self.coordinate_matrix, &self.device)
   }
 
   fn finish(&mut self) {
@@ -284,7 +278,8 @@ impl<S: Surface> WgpuGl<S> {
 
     let color_pass = ColorPass::new(
       &device,
-      &s_config,
+      size,
+      surface.format(),
       &coordinate_matrix,
       &primitive_layout,
       anti_aliasing,
@@ -300,8 +295,6 @@ impl<S: Surface> WgpuGl<S> {
       coordinate_matrix,
       primitives_layout: primitive_layout,
       encoder: None,
-
-      s_config,
     }
   }
 
@@ -309,7 +302,7 @@ impl<S: Surface> WgpuGl<S> {
   pub fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
     self.color_pass.set_anti_aliasing(
       anti_aliasing,
-      &self.s_config,
+      self.surface.view_size(),
       &self.primitives_layout,
       &self.device,
     );

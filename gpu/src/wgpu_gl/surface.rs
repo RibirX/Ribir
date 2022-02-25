@@ -3,14 +3,11 @@ use std::cell::{Ref, RefCell};
 use super::DeviceSize;
 /// `Surface` is a thing presentable canvas visual display.
 pub trait Surface {
-  fn update(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    s_config: &wgpu::SurfaceConfiguration,
-  );
+  fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: DeviceSize);
 
   fn view_size(&self) -> DeviceSize;
+
+  fn format(&self) -> wgpu::TextureFormat;
 
   fn current_texture(&self) -> SurfaceTexture;
 
@@ -24,19 +21,11 @@ pub struct WindowSurface {
   current_texture: RefCell<Option<wgpu::SurfaceTexture>>,
 }
 
-/// A `Surface` present in a texture. Usually `PhysicSurface` display things to
-/// screen(window eg.), But `TextureSurface` is soft, may not display in any
-/// device, bug only in memory.
-pub type TextureSurface = Texture;
-
 impl Surface for WindowSurface {
-  fn update(
-    &mut self,
-    device: &wgpu::Device,
-    _queue: &wgpu::Queue,
-    s_config: &wgpu::SurfaceConfiguration,
-  ) {
-    self.surface.configure(device, s_config);
+  fn resize(&mut self, device: &wgpu::Device, _queue: &wgpu::Queue, size: DeviceSize) {
+    self.s_config.width = size.width;
+    self.s_config.height = size.height;
+    self.surface.configure(device, &self.s_config);
   }
 
   fn view_size(&self) -> DeviceSize { DeviceSize::new(self.s_config.width, self.s_config.height) }
@@ -58,6 +47,8 @@ impl Surface for WindowSurface {
       texture.present()
     }
   }
+
+  fn format(&self) -> wgpu::TextureFormat { self.s_config.format }
 }
 
 pub enum SurfaceTexture<'a> {
@@ -77,64 +68,7 @@ impl<'a> std::ops::Deref for SurfaceTexture<'a> {
 }
 
 impl Surface for TextureSurface {
-  fn update(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    s_config: &wgpu::SurfaceConfiguration,
-  ) {
-    self.resize(
-      device,
-      queue,
-      DeviceSize::new(s_config.width, s_config.height),
-    );
-  }
-
-  fn view_size(&self) -> DeviceSize { self.size }
-
-  fn current_texture(&self) -> SurfaceTexture { SurfaceTexture::Ref(&self.raw_texture) }
-
-  fn present(&mut self) {}
-}
-
-impl WindowSurface {
-  pub(crate) fn new(
-    surface: wgpu::Surface,
-    adapter: &wgpu::Adapter,
-    device: &wgpu::Device,
-    size: DeviceSize,
-  ) -> Self {
-    let s_config = wgpu::SurfaceConfiguration {
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      format: surface.get_preferred_format(adapter).unwrap(),
-      width: size.width,
-      height: size.height,
-      present_mode: wgpu::PresentMode::Fifo,
-    };
-
-    surface.configure(device, &s_config);
-
-    Self {
-      surface,
-      s_config,
-      current_texture: RefCell::new(None),
-    }
-  }
-}
-
-pub struct Texture {
-  pub(crate) raw_texture: wgpu::Texture,
-  size: DeviceSize,
-  usage: wgpu::TextureUsages,
-}
-
-impl Texture {
-  pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsages) -> Self {
-    let raw_texture = Self::new_texture(device, size, usage);
-    Texture { raw_texture, size, usage }
-  }
-
-  pub(crate) fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: DeviceSize) {
+  fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: DeviceSize) {
     let new_texture = Self::new_texture(device, size, self.usage);
 
     let size = size.min(self.size);
@@ -166,6 +100,56 @@ impl Texture {
     self.raw_texture = new_texture;
   }
 
+  fn view_size(&self) -> DeviceSize { self.size }
+
+  fn current_texture(&self) -> SurfaceTexture { SurfaceTexture::Ref(&self.raw_texture) }
+
+  fn present(&mut self) {}
+
+  fn format(&self) -> wgpu::TextureFormat { TextureSurface::FORMAT }
+}
+
+impl WindowSurface {
+  pub(crate) fn new(
+    surface: wgpu::Surface,
+    adapter: &wgpu::Adapter,
+    device: &wgpu::Device,
+    size: DeviceSize,
+  ) -> Self {
+    let s_config = wgpu::SurfaceConfiguration {
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+      format: surface.get_preferred_format(adapter).unwrap(),
+      width: size.width,
+      height: size.height,
+      present_mode: wgpu::PresentMode::Fifo,
+    };
+
+    surface.configure(device, &s_config);
+
+    Self {
+      surface,
+      s_config,
+      current_texture: RefCell::new(None),
+    }
+  }
+}
+
+/// A `Surface` present in a texture. Usually `PhysicSurface` display things to
+/// screen(window eg.), But `TextureSurface` is soft, may not display in any
+/// device, bug only in memory.
+pub struct TextureSurface {
+  pub(crate) raw_texture: wgpu::Texture,
+  size: DeviceSize,
+  usage: wgpu::TextureUsages,
+}
+
+impl TextureSurface {
+  const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+  pub(crate) fn new(device: &wgpu::Device, size: DeviceSize, usage: wgpu::TextureUsages) -> Self {
+    let raw_texture = Self::new_texture(device, size, usage);
+    TextureSurface { raw_texture, size, usage }
+  }
+
   fn new_texture(
     device: &wgpu::Device,
     size: DeviceSize,
@@ -179,7 +163,7 @@ impl Texture {
         depth_or_array_layers: 1,
       },
       dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Rgba8UnormSrgb,
+      format: TextureSurface::FORMAT,
       usage,
       mip_level_count: 1,
       sample_count: 1,

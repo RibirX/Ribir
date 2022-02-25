@@ -1,7 +1,6 @@
-use crate::Vertex;
-use wgpu::SurfaceConfiguration;
-
 use super::AntiAliasing;
+use crate::Vertex;
+use painter::DeviceSize;
 
 pub struct ColorPass {
   pub uniform_layout: wgpu::BindGroupLayout,
@@ -9,12 +8,14 @@ pub struct ColorPass {
   pub multisample_framebuffer: wgpu::TextureView,
   pub pipeline: wgpu::RenderPipeline,
   pub anti_aliasing: AntiAliasing,
+  format: wgpu::TextureFormat,
 }
 
 impl ColorPass {
   pub fn new(
     device: &wgpu::Device,
-    s_config: &SurfaceConfiguration,
+    size: DeviceSize,
+    format: wgpu::TextureFormat,
     coordinate_matrix: &wgpu::Buffer,
     primitive_layout: &wgpu::BindGroupLayout,
     anti_aliasing: AntiAliasing,
@@ -35,10 +36,10 @@ impl ColorPass {
 
     let msaa_count = anti_aliasing as u32;
     let uniform = uniform_bind_group(device, &uniform_layout, coordinate_matrix);
-    let multisample_framebuffer = multisample_framebuffer(device, s_config, msaa_count);
+    let multisample_framebuffer = multisample_framebuffer(device, size, format, msaa_count);
     let pipeline = pipeline(
       device,
-      s_config.format,
+      format,
       &uniform_layout,
       primitive_layout,
       msaa_count,
@@ -49,6 +50,7 @@ impl ColorPass {
       uniform,
       multisample_framebuffer,
       pipeline,
+      format,
       anti_aliasing,
     }
   }
@@ -56,17 +58,17 @@ impl ColorPass {
   pub fn set_anti_aliasing(
     &mut self,
     anti_aliasing: AntiAliasing,
-    s_config: &SurfaceConfiguration,
+    size: DeviceSize,
     primitive_layout: &wgpu::BindGroupLayout,
     device: &wgpu::Device,
   ) {
     if self.anti_aliasing != anti_aliasing {
       self.anti_aliasing = anti_aliasing;
       let msaa_count = self.anti_aliasing as u32;
-      self.multisample_framebuffer = multisample_framebuffer(device, s_config, msaa_count);
+      self.multisample_framebuffer = multisample_framebuffer(device, size, self.format, msaa_count);
       self.pipeline = pipeline(
         device,
-        s_config.format,
+        self.format,
         &self.uniform_layout,
         primitive_layout,
         msaa_count,
@@ -76,13 +78,13 @@ impl ColorPass {
 
   pub fn resize(
     &mut self,
-    s_config: &SurfaceConfiguration,
+    size: DeviceSize,
     coordinate_matrix: &wgpu::Buffer,
     device: &wgpu::Device,
   ) {
     self.uniform = uniform_bind_group(device, &self.uniform_layout, coordinate_matrix);
     self.multisample_framebuffer =
-      multisample_framebuffer(device, s_config, self.anti_aliasing as u32);
+      multisample_framebuffer(device, size, self.format, self.anti_aliasing as u32);
   }
 
   pub fn color_attachments<'a>(
@@ -118,12 +120,13 @@ fn uniform_bind_group(
 
 fn multisample_framebuffer(
   device: &wgpu::Device,
-  &SurfaceConfiguration { width, height, format, .. }: &SurfaceConfiguration,
+  size: DeviceSize,
+  format: wgpu::TextureFormat,
   sample_count: u32,
 ) -> wgpu::TextureView {
   let multisampled_texture_extent = wgpu::Extent3d {
-    width,
-    height,
+    width: size.width,
+    height: size.height,
     depth_or_array_layers: 1,
   };
 
