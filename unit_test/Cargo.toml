@@ -8,5 +8,5 @@ version = "0.1.0"
 
 [dependencies]
 gpu = {path = "../gpu"}
-painter = {path = "../painter"}
 png = {version = "0.16.7"}
+ribir = {path = "../core"}

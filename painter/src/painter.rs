@@ -18,15 +18,17 @@ pub struct Painter {
 /// `PainterBackend` use to draw the picture what the `commands` described  to
 /// the target device. Usually is implemented by graphic library.
 pub trait PainterBackend {
-  fn submit(&mut self, commands: Vec<PaintCommand>);
-  fn resize(&mut self, size: DeviceSize);
-  /// Capture the image data of current frame, which encode as rgba(u8x4)
-  /// format, the callback provide the image size and a iterator of data row
-  /// by row.
-  fn capture<'a>(
-    &self,
-    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  /// Submit the paint commands to draw, and call the `frame_data` callback to
+  /// pass the frame image data with rgba(u8 x 4) format if it is Some-Value
+  fn submit<'a>(
+    &mut self,
+    commands: Vec<PaintCommand>,
+    frame_data: Option<
+      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+    >,
   ) -> Result<(), &str>;
+
+  fn resize(&mut self, size: DeviceSize);
 }
 
 #[derive(Clone)]

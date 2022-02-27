@@ -1,4 +1,7 @@
-use std::cell::{Ref, RefCell};
+use std::{
+  cell::{Ref, RefCell},
+  num::{NonZeroU32, NonZeroU64},
+};
 
 use super::DeviceSize;
 /// `Surface` is a thing presentable canvas visual display.
@@ -10,6 +13,12 @@ pub trait Surface {
   fn format(&self) -> wgpu::TextureFormat;
 
   fn current_texture(&self) -> SurfaceTexture;
+
+  fn copy_as_rgba_buffer(
+    &self,
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+  ) -> wgpu::Buffer;
 
   fn present(&mut self);
 }
@@ -30,6 +39,8 @@ impl Surface for WindowSurface {
 
   fn view_size(&self) -> DeviceSize { DeviceSize::new(self.s_config.width, self.s_config.height) }
 
+  fn format(&self) -> wgpu::TextureFormat { self.s_config.format }
+
   fn current_texture(&self) -> SurfaceTexture {
     self.current_texture.borrow_mut().get_or_insert_with(|| {
       self
@@ -42,13 +53,90 @@ impl Surface for WindowSurface {
     }))
   }
 
+  fn copy_as_rgba_buffer(
+    &self,
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+  ) -> wgpu::Buffer {
+    let texture = self.current_texture.borrow();
+    let texture = &texture.as_ref().expect("should always have").texture;
+    let wgpu::SurfaceConfiguration { width, height, .. } = self.s_config;
+    let buffer = texture_to_buffer_4_bytes_per_pixel(device, encoder, texture, width, height);
+
+    let group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      entries: &[wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+          ty: wgpu::BufferBindingType::Storage { read_only: false },
+          has_dynamic_offset: false,
+          min_binding_size: None,
+        },
+        count: None,
+      }],
+      label: None,
+    });
+
+    let cs_module = device.create_shader_module(&wgpu::include_wgsl!("./shaders/bgra_2_rgba.wgsl"));
+
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      bind_group_layouts: &[&group_layout],
+      push_constant_ranges: &[],
+      label: Some("RGBA convert render pipeline layout"),
+    });
+
+    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+      label: Some("image convert pipeline"),
+      layout: Some(&pipeline_layout),
+      module: &cs_module,
+      entry_point: "main",
+    });
+
+    let limits = device.limits();
+    let max_group = align(
+      limits.max_compute_workgroups_per_dimension,
+      limits.min_storage_buffer_offset_alignment,
+      false,
+    );
+
+    const UNIT: u32 = 4;
+    {
+      let sum = align(width, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / 4, true) * height;
+      let mut offset = 0;
+
+      while offset < sum {
+        let size = max_group.min(sum - offset);
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+          layout: &group_layout,
+          entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+              buffer: &buffer,
+              offset: (offset * UNIT) as u64,
+              size: NonZeroU64::new((size * UNIT) as u64),
+            }),
+          }],
+          label: None,
+        });
+        let mut c_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+          label: Some("Window surface convert to rgba"),
+        });
+        c_pass.set_pipeline(&pipeline);
+        c_pass.set_bind_group(0, &bind_group, &[]);
+        c_pass.dispatch(size, 1, 1);
+
+        offset += max_group;
+      }
+    }
+
+    buffer
+  }
+
   fn present(&mut self) {
     if let Some(texture) = self.current_texture.take() {
       texture.present()
     }
   }
-
-  fn format(&self) -> wgpu::TextureFormat { self.s_config.format }
 }
 
 pub enum SurfaceTexture<'a> {
@@ -102,23 +190,81 @@ impl Surface for TextureSurface {
 
   fn view_size(&self) -> DeviceSize { self.size }
 
+  fn format(&self) -> wgpu::TextureFormat { TextureSurface::FORMAT }
+
   fn current_texture(&self) -> SurfaceTexture { SurfaceTexture::Ref(&self.raw_texture) }
 
-  fn present(&mut self) {}
+  fn copy_as_rgba_buffer(
+    &self,
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+  ) -> wgpu::Buffer {
+    let DeviceSize { width, height, .. } = self.size;
+    texture_to_buffer_4_bytes_per_pixel(device, encoder, &self.raw_texture, width, height)
+  }
 
-  fn format(&self) -> wgpu::TextureFormat { TextureSurface::FORMAT }
+  fn present(&mut self) {}
+}
+
+fn align(width: u32, align: u32, include: bool) -> u32 {
+  match width % align {
+    0 => width,
+    other => {
+      let mut aligned = width - other;
+      if include {
+        aligned += align
+      }
+      aligned
+    }
+  }
+}
+
+fn texture_to_buffer_4_bytes_per_pixel(
+  device: &wgpu::Device,
+  encoder: &mut wgpu::CommandEncoder,
+  texture: &wgpu::Texture,
+  width: u32,
+  height: u32,
+) -> wgpu::Buffer {
+  let align_width = align(width, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / 4, true);
+  let data_size = align_width as u64 * height as u64 * 4 as u64;
+
+  // The output buffer lets us retrieve the data as an array
+  let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+    size: data_size,
+    usage: wgpu::BufferUsages::COPY_DST
+      | wgpu::BufferUsages::MAP_READ
+      | wgpu::BufferUsages::STORAGE,
+    mapped_at_creation: false,
+    label: None,
+  });
+
+  let buffer_bytes_per_row = 4 * align_width;
+  encoder.copy_texture_to_buffer(
+    texture.as_image_copy(),
+    wgpu::ImageCopyBuffer {
+      buffer: &output_buffer,
+      layout: wgpu::ImageDataLayout {
+        offset: 0,
+        bytes_per_row: NonZeroU32::new(buffer_bytes_per_row),
+        rows_per_image: NonZeroU32::new(0),
+      },
+    },
+    wgpu::Extent3d {
+      width,
+      height,
+      depth_or_array_layers: 1,
+    },
+  );
+
+  output_buffer
 }
 
 impl WindowSurface {
-  pub(crate) fn new(
-    surface: wgpu::Surface,
-    adapter: &wgpu::Adapter,
-    device: &wgpu::Device,
-    size: DeviceSize,
-  ) -> Self {
+  pub(crate) fn new(surface: wgpu::Surface, device: &wgpu::Device, size: DeviceSize) -> Self {
     let s_config = wgpu::SurfaceConfiguration {
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      format: surface.get_preferred_format(adapter).unwrap(),
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      format: wgpu::TextureFormat::Bgra8UnormSrgb,
       width: size.width,
       height: size.height,
       present_mode: wgpu::PresentMode::Fifo,

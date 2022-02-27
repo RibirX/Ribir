@@ -36,9 +36,9 @@ You can use `write_canvas_to` to save Canvas as png to compare.",
   }
 }
 
-pub fn backend_write_png<W: std::io::Write>(backend: &dyn painter::PainterBackend, writer: W) {
-  backend
-    .capture(Box::new(move |size, rows| {
+pub fn backend_write_png<W: std::io::Write>(wnd: &mut ribir::prelude::Window, writer: W) {
+  wnd
+    .capture_image(move |size, rows| {
       let mut png_encoder = png::Encoder::new(writer, size.width, size.height);
       png_encoder.set_depth(png::BitDepth::Eight);
       png_encoder.set_color(png::ColorType::RGBA);
@@ -50,7 +50,7 @@ pub fn backend_write_png<W: std::io::Write>(backend: &dyn painter::PainterBacken
         stream_writer.write(data).unwrap();
       });
       stream_writer.finish().unwrap();
-    }))
+    })
     .unwrap();
 }
 

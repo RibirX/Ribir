@@ -1,6 +1,6 @@
 {
   "lldb.launch.sourceMap": {
-    "/rustc/17d29dcdce9b9e838635eb0adefd9b8b1588410b": "/home/adoo/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust"
+    "/rustc/532d3cda90b8a729cd982548649d32803d265052": "/home/adoo/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust"
   },
   "lldb.displayFormat": "auto",
   "lldb.dereferencePointers": true,

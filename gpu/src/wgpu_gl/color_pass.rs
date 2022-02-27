@@ -91,13 +91,13 @@ impl ColorPass {
     &'a self,
     view: &'a wgpu::TextureView,
   ) -> wgpu::RenderPassColorAttachment<'a> {
-    let (view, resolve_target) = match self.anti_aliasing {
-      AntiAliasing::None => (view, None),
-      _ => (&self.multisample_framebuffer, Some(view)),
+    let (view, resolve_target, store) = match self.anti_aliasing {
+      AntiAliasing::None => (view, None, true),
+      _ => (&self.multisample_framebuffer, Some(view), false),
     };
     let ops = wgpu::Operations {
       load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-      store: true,
+      store,
     };
     wgpu::RenderPassColorAttachment { view, resolve_target, ops }
   }

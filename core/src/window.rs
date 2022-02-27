@@ -112,7 +112,7 @@ impl Window {
   pub(crate) fn draw_frame(&mut self) {
     let commands = self.context.draw_tree();
     if !commands.is_empty() {
-      self.p_backend.submit(commands);
+      self.p_backend.submit(commands, None).unwrap();
     }
   }
 
@@ -173,7 +173,19 @@ impl Window {
   #[inline]
   pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
 
-  pub fn painter_backend(&self) -> &dyn PainterBackend { &*self.p_backend }
+  pub fn capture_image<F>(&mut self, image_data_callback: F) -> Result<(), &str>
+  where
+    F: for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>),
+  {
+    let commands = self.context.draw_tree();
+    if !commands.is_empty() {
+      self
+        .p_backend
+        .submit(commands, Some(Box::new(image_data_callback)))
+    } else {
+      Ok(())
+    }
+  }
 }
 
 pub struct MockBackend;
@@ -185,15 +197,14 @@ pub struct MockRawWindow {
 }
 
 impl PainterBackend for MockBackend {
-  fn submit(&mut self, _: Vec<PaintCommand>) {}
-
   fn resize(&mut self, _: DeviceSize) {}
 
-  fn capture<'a>(
-    &self,
-    _: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  fn submit<'a>(
+    &mut self,
+    _: Vec<PaintCommand>,
+    _: Option<Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>>,
   ) -> Result<(), &str> {
-    unreachable!("try to capture image from a mock backend")
+    Ok(())
   }
 }
 

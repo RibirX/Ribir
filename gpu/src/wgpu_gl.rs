@@ -4,7 +4,7 @@ use crate::{
 };
 use futures::executor::block_on;
 use painter::DeviceSize;
-use std::{iter, num::NonZeroU32};
+use std::iter;
 use text::shaper::TextShaper;
 mod color_pass;
 pub mod surface;
@@ -96,7 +96,7 @@ impl WgpuGl<WindowSurface> {
     Self::new(
       size,
       &adapter,
-      |device| WindowSurface::new(w_surface, &adapter, device, size),
+      |device| WindowSurface::new(w_surface, device, size),
       anti_aliasing,
     )
     .await
@@ -157,86 +157,47 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       .resize(size, &self.coordinate_matrix, &self.device)
   }
 
-  fn finish(&mut self) {
-    if let Some(encoder) = self.encoder.take() {
-      self.queue.submit(iter::once(encoder.finish()));
-      self.surface.present();
-      self.img_pass.end_frame();
-    }
-  }
-
-  fn capture<'a>(
-    &self,
-    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+  fn finish<'a>(
+    &mut self,
+    frame_data: Option<
+      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+    >,
   ) -> Result<(), &str> {
-    let Self { surface, device, queue, .. } = self;
-    let t = surface.current_texture();
-
-    let size = surface.view_size();
-    let DeviceSize { width, height, .. } = size;
-    // fixme: crash if the surface is screen and it's maybe not rgba format
-    // todo: pixel bytes from format
-    const PX_BYTES: u32 = 4;
-    // align to 256 bytes by WebGPU require.
-    const WGPU_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-    const ALIGN_BYTES: u32 = WGPU_ALIGN / PX_BYTES;
-    let align_width = {
-      match width % ALIGN_BYTES {
-        0 => width,
-        other => width - other + ALIGN_BYTES,
-      }
+    let mut encoder = match self.encoder.take() {
+      Some(e) => e,
+      None => return Ok(()),
     };
 
-    let data_size = align_width as u64 * height as u64 * PX_BYTES as u64;
+    if let Some(frame_data) = frame_data {
+      let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut encoder);
 
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("Encoder for encoding texture as png"),
-    });
+      self.queue.submit(iter::once(encoder.finish()));
+      self.surface.present();
 
-    // The output buffer lets us retrieve the data as an array
-    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-      size: data_size,
-      usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-      mapped_at_creation: false,
-      label: None,
-    });
+      let buffer_slice = buffer.slice(..);
+      let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
 
-    let buffer_bytes_per_row = PX_BYTES * align_width;
-    encoder.copy_texture_to_buffer(
-      t.as_image_copy(),
-      wgpu::ImageCopyBuffer {
-        buffer: &output_buffer,
-        layout: wgpu::ImageDataLayout {
-          offset: 0,
-          bytes_per_row: NonZeroU32::new(buffer_bytes_per_row),
-          rows_per_image: NonZeroU32::new(0),
-        },
-      },
-      wgpu::Extent3d {
-        width,
-        height,
-        depth_or_array_layers: 1,
-      },
-    );
+      // Poll the device in a blocking manner so that our future resolves.
+      self.device.poll(wgpu::Maintain::Wait);
+      block_on(buffer_future).map_err(|_| "Async buffer error")?;
 
-    queue.submit(Some(encoder.finish()));
+      let size = self.surface.view_size();
+      let slice = buffer_slice.get_mapped_range();
+      let buffer_bytes_per_row = slice.len() as u32 / size.height;
+      let img_bytes_pre_row = (size.width * 4) as usize;
+      let rows = (0..size.height).map(|i| {
+        let offset = (i * buffer_bytes_per_row) as usize;
+        &slice.as_ref()[offset..offset + img_bytes_pre_row]
+      });
 
-    let buffer_slice = output_buffer.slice(..);
-    let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
+      frame_data(size, Box::new(rows));
+    } else {
+      self.queue.submit(iter::once(encoder.finish()));
+      self.surface.present();
+    }
 
-    // Poll the device in a blocking manner so that our future resolves.
-    device.poll(wgpu::Maintain::Wait);
+    self.img_pass.end_frame();
 
-    block_on(buffer_future).map_err(|_| "Async buffer error")?;
-
-    let slice = buffer_slice.get_mapped_range();
-    let img_bytes_pre_row = (size.width * PX_BYTES) as usize;
-    let rows = (0..size.height).map(|i| {
-      let offset = (i * buffer_bytes_per_row) as usize;
-      &slice.as_ref()[offset..offset + img_bytes_pre_row]
-    });
-
-    f(size, Box::new(rows));
     Ok(())
   }
 }
@@ -308,7 +269,7 @@ impl<S: Surface> WgpuGl<S> {
     );
   }
 
-  pub fn render_color(&mut self, data: ColorRenderData) {
+  fn render_color(&mut self, data: ColorRenderData) {
     let prim_bind_group = self.create_primitives_bind_group(&data.primitives);
     let Self { device, surface, .. } = self;
 
@@ -351,7 +312,7 @@ impl<S: Surface> WgpuGl<S> {
     }
   }
 
-  pub fn render_image(&mut self, data: TextureRenderData) {
+  fn render_image(&mut self, data: TextureRenderData) {
     let prim_bind_group = self.create_primitives_bind_group(&data.primitives);
     let Self { device, surface, queue, .. } = self;
 

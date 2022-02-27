@@ -23,23 +23,21 @@ pub struct GpuBackend<R: GlRender> {
 }
 
 impl<R: GlRender> PainterBackend for GpuBackend<R> {
-  fn submit(&mut self, commands: Vec<painter::PaintCommand>) {
+  fn submit<'a>(
+    &mut self,
+    commands: Vec<painter::PaintCommand>,
+    frame_data: Option<
+      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+    >,
+  ) -> Result<(), &str> {
     self.tessellator.tessellate(&commands, |render_data| {
       self.gl.submit_render_data(render_data);
     });
-    self.gl.finish()
+    self.gl.finish(frame_data)
   }
 
   #[inline]
   fn resize(&mut self, size: DeviceSize) { self.gl.resize(size) }
-
-  #[inline]
-  fn capture<'a>(
-    &self,
-    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
-  ) -> Result<(), &str> {
-    self.gl.capture(f)
-  }
 }
 
 /// The Render that support draw the canvas result render data.
@@ -49,19 +47,18 @@ pub trait GlRender {
   /// frame.
   fn submit_render_data(&mut self, data: RenderData);
 
+  /// The render data commit finished and should draw into device. Call the
+  /// `frame_data` callback to pass the frame image data with rgba(u8 x 4)
+  /// format if it is Some-Value
+  fn finish<'a>(
+    &mut self,
+    frame_data: Option<
+      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
+    >,
+  ) -> Result<(), &str>;
+
   /// Window all surface size change, need do a redraw.
   fn resize(&mut self, size: DeviceSize);
-
-  /// The render data commit finished.
-  fn finish(&mut self);
-
-  /// Capture the image data of current frame, which encode as rgba(u8x4)
-  /// format, the callback provide the image size and a iterator of data row
-  /// by row.
-  fn capture<'a>(
-    &self,
-    f: Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
-  ) -> Result<(), &str>;
 }
 
 /// A texture for the vertexes sampler color. Every texture have identify to
