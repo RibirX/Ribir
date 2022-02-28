@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use syn::{spanned::Spanned, Ident};
 
 use super::Child;
-const AVOID_CONFLICT_SUFFIX: &str = "ribir_ಠ_ಠ";
+pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ribir_ಠ_ಠ";
 
 pub fn child_variable(c: &Child, idx: usize) -> Ident {
   let span = match c {
@@ -28,6 +28,11 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
   let prefix = &name_str[..prefix_size];
   let name = format!("{prefix}_{suffix}_{AVOID_CONFLICT_SUFFIX}");
   Ident::new(&name, from.span())
+}
+
+pub fn ribir_prefix_variable(name: &Ident, prefix: &str) -> Ident {
+  let prefix = Ident::new(prefix, name.span());
+  ribir_suffix_variable(&prefix, &name.to_string())
 }
 
 pub fn widget_def_variable(name: &Ident) -> Ident { ribir_suffix_variable(name, "def") }

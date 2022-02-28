@@ -3,7 +3,6 @@ members = [
   "core",
   "gpu",
   "painter",
-  "unit_test",
   "widget_derive",
   "algo",
   "text",

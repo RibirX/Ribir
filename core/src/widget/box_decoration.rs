@@ -340,8 +340,8 @@ mod tests {
     );
   }
 
+  #[cfg(feature = "png")]
   #[test]
-  #[ignore = "gpu need"]
   fn paint() {
     struct Paint;
     impl CombinationWidget for Paint {
@@ -390,11 +390,6 @@ mod tests {
 
     let mut window = Window::wgpu_headless(Paint.box_it(), DeviceSize::new(400, 600));
     window.render_ready();
-    window.draw_frame();
-
-    unit_test::assert_canvas_eq!(
-      window.painter_backend(),
-      "../test/test_imgs/box_decoration.png"
-    );
+    assert!(window.same_as_png("../test/test_imgs/box_decoration.png"));
   }
 }

@@ -1,5 +1,6 @@
 use gpu::wgpu_backend_with_wnd;
 use painter::{Color, DeviceSize, PainterBackend};
+use text::shaper::TextShaper;
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -14,13 +15,15 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
+  let shaper = TextShaper::default();
+  shaper.font_db_mut().load_system_fonts();
   let mut gpu_backend = block_on(wgpu_backend_with_wnd(
     &window,
     DeviceSize::new(size.width, size.height),
     None,
     None,
     0.01,
-    <_>::default(),
+    shaper,
   ));
 
   event_loop.run(move |event, _, control_flow| match event {
@@ -54,7 +57,7 @@ fn main() {
       painter.fill(None);
 
       let commands = painter.finish();
-      gpu_backend.submit(commands);
+      gpu_backend.submit(commands, None).unwrap();
     }
     Event::MainEventsCleared => {
       window.request_redraw();

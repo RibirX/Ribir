@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-fn circular_dependency_err() {
+fn circular_dependency_err(ctx: &mut BuildCtx) {
   declare! {
     Flex {
       ..<_>::default(),
@@ -20,8 +20,8 @@ fn circular_dependency_err() {
   };
 }
 
-fn wrap_widget_circular_err() {
-  let _x = declare! {
+fn wrap_widget_circular_err(ctx: &mut BuildCtx) {
+  declare! {
     SizedBox {
       id: parent,
       size: Size::zero(),
@@ -35,8 +35,8 @@ fn wrap_widget_circular_err() {
   };
 }
 
-fn data_flow_circular_err() {
-  let _x = declare! {
+fn data_flow_circular_err(ctx: &mut BuildCtx) {
+  declare! {
     SizedBox {
       id: a,
       size: Size::zero(),
@@ -45,8 +45,8 @@ fn data_flow_circular_err() {
   };
 }
 
-fn data_flow_circular_field_skip_nc_pass() {
-  let _x = declare! {
+fn data_flow_circular_field_skip_nc_pass(ctx: &mut BuildCtx) {
+  declare! {
     SizedBox {
       id: a,
       size: Size::zero(),
@@ -62,8 +62,8 @@ fn data_flow_circular_field_skip_nc_pass() {
   };
 }
 
-fn circular_follows_with_skip_nc_pass() {
-  let _x = declare! {
+fn circular_follows_with_skip_nc_pass(ctx: &mut BuildCtx) {
+  declare! {
     SizedBox {
       id: a,
       size: Size::zero(),

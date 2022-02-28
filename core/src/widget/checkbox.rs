@@ -91,35 +91,26 @@ mod tests {
     );
   }
 
+  #[cfg(feature = "png")]
   #[test]
-  #[ignore = "gpu need"]
   fn checked_paint() {
     let c = Checkbox { checked: true, ..<_>::default() };
     let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
-    window.draw_frame();
 
-    unit_test::assert_canvas_eq!(
-      window.painter_backend(),
-      "../test/test_imgs/checkbox_checked.png"
-    );
+    assert!(window.same_as_png("../test/test_imgs/checkbox_checked.png"));
   }
 
+  #[cfg(feature = "png")]
   #[test]
-  #[ignore = "gpu need"]
   fn unchecked_paint() {
     let mut window = Window::wgpu_headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
     window.render_ready();
-    window.draw_frame();
-
-    unit_test::assert_canvas_eq!(
-      window.painter_backend(),
-      "../test/test_imgs/checkbox_uncheck.png"
-    );
+    assert!(window.same_as_png("../test/test_imgs/checkbox_uncheck.png"));
   }
 
+  #[cfg(feature = "png")]
   #[test]
-  #[ignore = "gpu need"]
   fn indeterminate_paint() {
     let c = Checkbox {
       checked: true,
@@ -128,12 +119,8 @@ mod tests {
     };
     let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
-    window.draw_frame();
 
-    unit_test::assert_canvas_eq!(
-      window.painter_backend(),
-      "../test/test_imgs/checkbox_indeterminate.png"
-    );
+    assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));
 
     let c = Checkbox {
       checked: false,
@@ -142,11 +129,7 @@ mod tests {
     };
     let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
     window.render_ready();
-    window.draw_frame();
 
-    unit_test::assert_canvas_eq!(
-      window.painter_backend(),
-      "../test/test_imgs/checkbox_indeterminate.png"
-    );
+    assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));
   }
 }

@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-fn child_always_declare_behind_field() {
+fn child_always_declare_behind_field(ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = declare! {
     SizedBox {
@@ -17,7 +17,7 @@ fn child_always_declare_behind_field() {
   };
 }
 
-fn option_child() {
+fn option_child(ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = declare! {
     SizedBox {
@@ -30,11 +30,10 @@ fn option_child() {
   };
 }
 
-fn expr_child_use_named_widget() {
+fn expr_child_use_named_widget(ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = declare! {
     Flex {
-      ..<_>::default(),
       SizedBox {
         id: a,
         size,

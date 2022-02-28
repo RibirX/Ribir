@@ -97,19 +97,19 @@ impl DeclareError {
         diagnostic.set_message("The key attribute is not allowed to depend on others.");
       }
       DeclareError::DependOnWrapWidgetWithIfGuard { wrap_name, wrap_def_pos } => {
-        let error_spans = declare
-          .widget
-          .all_syntax_fields()
-          .filter_map(|f| {
-            f.follows
-              .as_ref()
-              .and_then(|follows| follows.iter().find(|f| &f.widget == wrap_name))
-          })
-          .flat_map(|f| f.spans.iter().map(|s| s.unwrap()))
-          .collect::<Vec<_>>();
+        let mut error_spans = vec![];
+        let _ = declare.widget.recursive_call(|w| {
+          w.all_syntax_fields()
+            .filter_map(|f| f.follows.as_ref())
+            .flat_map(|follows| follows.iter())
+            .filter(|f| &f.widget == wrap_name)
+            .for_each(|f| error_spans.extend(f.spans.iter().map(|s| s.unwrap())));
+          Ok(())
+        });
+
         diagnostic.set_spans(error_spans);
-        diagnostic.set_message( "Depends on a field which behind `if guard`, its existence depends on the `if guard` result in runtime.");
-        diagnostic = diagnostic.span_help(
+        diagnostic.set_message( "Depends on a widget field which behind `if guard`, its existence depends on the `if guard` result in runtime.");
+        diagnostic = diagnostic.span_warning(
           wrap_def_pos.iter().map(|s| s.unwrap()).collect::<Vec<_>>(),
           "field define here.",
         );

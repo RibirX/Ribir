@@ -490,7 +490,7 @@ impl DeclareWidget {
     tokens.extend(compose_tokens);
   }
 
-  fn recursive_call<'a, F>(&'a self, mut f: F) -> Result<()>
+  pub(crate) fn recursive_call<'a, F>(&'a self, mut f: F) -> Result<()>
   where
     F: FnMut(&'a DeclareWidget) -> Result<()>,
   {
@@ -510,7 +510,7 @@ impl DeclareWidget {
   fn widget_identify(&self) -> Ident {
     match &self.named {
       Some(Id { name, .. }) => name.clone(),
-      _ => ribir_variable("w", self.path.span()),
+      _ => ribir_variable(AVOID_CONFLICT_SUFFIX, self.path.span()),
     }
   }
 }
@@ -654,7 +654,7 @@ impl DeclareWidget {
       .filter(|f| f.if_guard.is_some())
       .try_for_each(|f| {
         let w_ref = self.widget_identify();
-        let wrap_ref = ribir_suffix_variable(&w_ref, &f.member.to_string());
+        let wrap_ref = ribir_prefix_variable(&f.member, &w_ref.to_string());
         if ctx.be_followed(&wrap_ref) {
           let if_guard_span = f.if_guard.as_ref().unwrap().span();
           return Err(DeclareError::DependOnWrapWidgetWithIfGuard {

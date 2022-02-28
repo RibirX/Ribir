@@ -186,6 +186,61 @@ impl Window {
       Ok(())
     }
   }
+
+  #[cfg(feature = "png")]
+  pub fn write_as_png<P>(&mut self, path: P) -> Result<(), String>
+  where
+    P: std::convert::AsRef<std::path::Path>,
+  {
+    use std::io::Write;
+    let writer = std::fs::File::create(path.as_ref()).map_err(|e| e.to_string())?;
+    self
+      .capture_image(move |size, rows| {
+        let mut png_encoder = png::Encoder::new(writer, size.width, size.height);
+        png_encoder.set_depth(png::BitDepth::Eight);
+        png_encoder.set_color(png::ColorType::Rgba);
+
+        let mut writer = png_encoder.write_header().unwrap();
+        let mut stream_writer = writer
+          .stream_writer_with_size(size.width as usize * 4)
+          .unwrap();
+
+        rows.for_each(|data| {
+          stream_writer.write(data).unwrap();
+        });
+        stream_writer.finish().unwrap();
+      })
+      .map_err(ToString::to_string)
+  }
+
+  #[cfg(feature = "png")]
+  pub fn same_as_png<P>(&mut self, path: P) -> bool
+  where
+    P: std::convert::AsRef<std::path::Path>,
+  {
+    let file = std::fs::File::open(path.as_ref());
+    file
+      .and_then(|f| {
+        let decoder = png::Decoder::new(f);
+        let mut reader = decoder.read_info()?;
+
+        let mut same = false;
+        self
+          .capture_image(|size, rows| {
+            // Allocate the output buffer.
+            let mut buf = vec![0; reader.output_buffer_size()];
+            let info = reader.next_frame(&mut buf).unwrap();
+            if info.width == size.width && info.height == size.height {
+              same = rows.enumerate().all(|(i, bytes)| {
+                let offset = i * info.line_size;
+                &buf[offset..offset + info.line_size] == bytes
+              });
+            }
+          })
+          .map_or(Ok(false), |_| Ok(same))
+      })
+      .unwrap_or(false)
+  }
 }
 
 pub struct MockBackend;

@@ -8,6 +8,7 @@ version = "0.1.0"
 
 [dependencies]
 algo = {path = "../algo"}
+futures = {version = "0.3.21", optional = true}
 guillotiere = "0.6.0"
 lyon_tessellation = "0.17.10"
 painter = {path = "../painter"}
@@ -15,14 +16,14 @@ raw-window-handle = {version = "0.4.2", optional = true}
 rayon = "1.5.1"
 text = {path = "../text"}
 wgpu = {version = "0.12.0", optional = true}
-futures= {version="0.3.21", optional= true}
 zerocopy = "0.3"
 
 [dev-dependencies]
 env_logger = "0.7.1"
 futures = "0.3.5"
-unit_test = {path = "../unit_test"}
+ribir = {path = "../core"}
 winit = "0.26.0"
+colored = "1.9.3"
 
 [features]
 wgpu_gl = ["wgpu", "raw-window-handle", "futures"]
@@ -30,3 +31,8 @@ wgpu_gl = ["wgpu", "raw-window-handle", "futures"]
 [[example]]
 name = "wgpu-hello"
 required-features = ["wgpu_gl"]
+
+[[test]]
+harness = false
+name = "main_thread"
+path = "src/tests/main_threads.rs"
