@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use syn::{spanned::Spanned, Ident};
 
 use super::Child;
-pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ribir_ಠ_ಠ";
+pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
 
 pub fn child_variable(c: &Child, idx: usize) -> Ident {
   let span = match c {

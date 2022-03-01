@@ -9,45 +9,30 @@ pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
   arena: Arena<WidgetNode>,
   root: WidgetId,
-  changed_widget: HashMap<WidgetId, bool>,
-}
-
-struct Tmp;
-impl CombinationWidget for Tmp {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget { unreachable!() }
-}
-
-impl Tmp {
-  fn node() -> WidgetNode { WidgetNode::Combination(Box::new(Tmp)) }
+  changed_widget: HashMap<WidgetId, bool, ahash::RandomState>,
 }
 
 impl WidgetTree {
   pub(crate) fn new(w: WidgetNode) -> Pin<Box<Self>> {
     let mut arena = Arena::default();
-    let tmp_root = WidgetId(arena.new_node(Tmp::node()));
+    let root = WidgetId(arena.new_node(w));
     let tree = Self {
       arena,
-      root: tmp_root,
+      root,
       changed_widget: <_>::default(),
     };
     let mut tree = Box::pin(tree);
-    tree.root = tree.as_mut().new_node(w);
-    tmp_root.remove_subtree(&mut tree);
+    tree.as_mut().state_info_assign(root);
     tree
   }
 
   #[inline]
   pub(crate) fn root(&self) -> WidgetId { self.root }
 
-  pub(crate) fn new_node(mut self: Pin<&mut Self>, mut widget: WidgetNode) -> WidgetId {
-    if let Some(state_attr) = widget.find_attr_mut::<StateAttr>() {
-      let id = WidgetId(self.arena.new_node(Tmp::node()));
-      state_attr.assign_id(id, std::ptr::NonNull::from(self.as_ref().get_ref()));
-      *id.assert_get_mut(self.get_mut()) = widget;
-      id
-    } else {
-      WidgetId(self.arena.new_node(widget))
-    }
+  pub(crate) fn new_node(mut self: Pin<&mut Self>, widget: WidgetNode) -> WidgetId {
+    let id = WidgetId(self.arena.new_node(widget));
+    self.state_info_assign(id);
+    id
   }
 
   #[cfg(test)]
@@ -90,6 +75,14 @@ impl WidgetTree {
       .next()
       .cloned()
       .and_then(|id| self.changed_widget.remove_entry(&id))
+  }
+
+  fn state_info_assign(mut self: Pin<&mut Self>, id: WidgetId) {
+    let ptr = std::ptr::NonNull::from(&*self);
+    let self_ref = self.as_mut().get_mut();
+    if let Some(state_attr) = id.assert_get_mut(self_ref).find_attr_mut::<StateAttr>() {
+      state_attr.assign_id(id, ptr);
+    }
   }
 }
 

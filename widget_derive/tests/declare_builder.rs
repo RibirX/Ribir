@@ -26,7 +26,7 @@ fn declare_builder_smoke() {
 }
 
 #[test]
-#[should_panic = "Required field `_a` not set"]
+#[should_panic = "Required field `T::_a` not set"]
 fn panic_if_miss_require_field() {
   #[derive(Declare)]
   struct T {

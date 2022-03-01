@@ -132,6 +132,7 @@ impl Window {
       focus_mgr.focus(auto_focusing, &mut context)
     }
 
+    context.shaper.font_db_mut().load_system_fonts();
     Self {
       dispatcher,
       raw_window: Box::new(wnd),

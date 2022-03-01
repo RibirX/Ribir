@@ -35,12 +35,14 @@ impl<'a> WidgetGen<'a> {
     });
 
     let ctx_name = self.ctx_name;
-    build_widget.extend(quote! { let mut #def_name = #def_name.build(#ctx_name)#stateful;});
+
+    build_widget
+      .extend(quote_spanned! { ty.span() => let #def_name = #def_name.build(#ctx_name)#stateful;});
 
     let state_ref = if force_stateful || self.is_stateful(ctx) {
       Some(quote! { let mut #ref_name = unsafe { #def_name.state_ref() }; })
     } else if ctx.be_reference(&ref_name) {
-      Some(quote! { let #ref_name = &mut #def_name; })
+      Some(quote! { let #ref_name = &#def_name; })
     } else {
       None
     };
@@ -57,15 +59,13 @@ impl<'a> WidgetGen<'a> {
   /// and the follow condition, the second part is the field value declare in
   /// struct literal, the last part is expression to follow the other widgets
   /// change.
-  ///
-  /// The return value is the name of the follow condition;
   fn gen_field_tokens(
     &self,
     f: &DeclareField,
     value_before: &mut TokenStream,
     widget_def: &mut TokenStream,
     follow_after: &mut TokenStream,
-  ) -> Option<Ident> {
+  ) {
     let DeclareField { if_guard, member, expr, .. } = f;
     let field_follow = self.field_follow_tokens(f);
     let def_name = widget_def_variable(&self.name);
@@ -77,16 +77,21 @@ impl<'a> WidgetGen<'a> {
         let guard_cond = Ident::new(&member.to_string(), guard.span());
         let guard_cond = ribir_suffix_variable(&guard_cond, "guard");
         value_before.extend(quote! {
-            let #guard_cond = #if_guard { true } else { false };
+            let #guard_cond = #guard { true } else { false };
         });
         widget_def.extend(quote! { if #guard_cond { #def_name.#member(#expr); }});
         follow_after.extend(quote! {if #guard_cond { #field_follow } });
-        Some(guard_cond)
+      }
+      (Some(guard), None) => {
+        widget_def.extend(quote! {
+          #guard {
+            #def_name.#member(#expr);
+          }
+        });
       }
       _ => {
         widget_def.extend(quote! {#def_name.#member(#expr);});
         follow_after.extend(field_follow);
-        None
       }
     }
   }

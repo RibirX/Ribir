@@ -29,7 +29,6 @@ pub fn root_and_children_rect(wnd: &Window) -> (Rect, Vec<Rect>) {
   (rect, children_box_rect)
 }
 
-
 #[allow(unused)]
 macro count {
   () => (0usize),
@@ -40,25 +39,28 @@ macro count {
 /// to pack many unit tests, and print the result like official. Should always
 /// use official test harness first, use it only when you need execute test by
 /// self.
-/// 
+///
 /// This macro depends on crate `colored`.
 ///
 /// # Example
-/// 
+///
 /// ```
-/// use colored::Colorize;
+/// use ribir::test::unit_test_describe;
+///
 /// fn test_first() {}
 ///
-/// fn test_second {}
+/// fn test_second() {}
 ///
 /// fn main() {
+///   use colored::Colorize;
+///
 ///   unit_test_describe!{
 ///     run_unit_test(test_first);
 ///     run_unit_test(test_second);
 ///   }
 /// }
-/// 
 /// ```
+
 pub macro unit_test_describe($(run_unit_test($name: ident);)* ) {{
   let panic_infos: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
 

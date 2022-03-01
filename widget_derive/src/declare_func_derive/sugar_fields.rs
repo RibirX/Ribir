@@ -298,7 +298,17 @@ impl SugarFields {
 
     (!fields.is_empty()).then(|| {
       let name = ribir_suffix_variable(host_id, DECORATION);
-      let ty = &Ident::new("BoxDecoration", Span::call_site()).into();
+      let span = fields
+        .iter()
+        .fold(None, |span: Option<Span>, f| {
+          if let Some(span) = span {
+            span.join(f.member.span())
+          } else {
+            Some(f.member.span())
+          }
+        })
+        .unwrap();
+      let ty = &Ident::new("BoxDecoration", span).into();
       let gen = WidgetGen { ty, name, fields: &fields, ctx_name };
       let host_name = widget_def_variable(host_id);
       let wrap_name = widget_def_variable(&gen.name);

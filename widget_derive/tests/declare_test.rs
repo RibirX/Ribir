@@ -305,6 +305,38 @@ fn with_attr_ref() {
     Some(CursorIcon::AllScroll)
   );
 }
+#[test]
+fn if_guard_field_true() {
+  struct GuardTrue;
+  impl CombinationWidget for GuardTrue {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        SizedBox {
+          size if true => : Size::new(100., 100.)
+        }
+      }
+    }
+  }
+
+  let (rect, _) = widget_and_its_children_box_rect(GuardTrue.box_it(), Size::new(1000., 1000.));
+  assert_eq!(rect.size, Size::new(100., 100.));
+}
+
+#[test]
+#[should_panic = "Required field `SizedBox::size` not set"]
+fn if_guard_field_false() {
+  struct GuardFalse;
+  impl CombinationWidget for GuardFalse {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        SizedBox {
+          size if false => : Size::new(100., 100.)
+        }
+      }
+    }
+  }
+  widget_and_its_children_box_rect(GuardFalse.box_it(), Size::new(1000., 1000.));
+}
 
 #[test]
 fn attr_bind_to_self() {

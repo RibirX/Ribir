@@ -32,4 +32,5 @@ png = ["dep:png"]
 wgpu_gl = ["gpu/wgpu_gl"]
 
 [dev-dependencies]
+colored = "2.0.0"
 env_logger = "0.7.1"

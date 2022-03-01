@@ -5,6 +5,7 @@ use crate::prelude::*;
 pub struct Text {
   #[declare(setter(into))]
   pub text: CowRc<str>,
+  #[declare(default = "ctx.theme().typography_theme.body1.text.clone()")]
   pub style: TextStyle,
 }
 

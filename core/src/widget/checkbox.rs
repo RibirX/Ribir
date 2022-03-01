@@ -4,8 +4,11 @@ use crate::widget::theme::CheckboxTheme;
 /// Represents a control that a user can select and clear.
 #[derive(Default, Clone, Declare)]
 pub struct Checkbox {
+  #[declare(default)]
   pub checked: bool,
+  #[declare(default)]
   pub indeterminate: bool,
+  #[declare(default = "ctx.theme().checkbox.clone()")]
   pub style: CheckboxTheme,
 }
 

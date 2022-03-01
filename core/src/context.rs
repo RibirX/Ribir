@@ -45,7 +45,7 @@ impl Context {
         let mut ctx = Context::from_tree(widget_tree, device_scale);
         let tree = &ctx.widget_tree;
         let child = match tree.root().assert_get(tree) {
-          WidgetNode::Combination(c) => c.build(&mut BuildCtx::new(&ctx, None, &**c)),
+          WidgetNode::Combination(c) => c.build(&mut BuildCtx::new(&ctx, tree.root())),
           WidgetNode::Render(_) => unreachable!(),
         };
         let root = tree.root();
@@ -75,7 +75,6 @@ impl Context {
       }
     };
     ctx.mark_layout_from_root();
-    ctx.shaper.font_db_mut().load_system_fonts();
     ctx
   }
 
@@ -85,9 +84,13 @@ impl Context {
     while let Some((widget, p_wid)) = stack.pop() {
       match widget.0 {
         BoxedWidgetInner::Combination(c) => {
-          let mut ctx = BuildCtx::new(self, Some(p_wid), &*c);
-          let child = c.build(&mut ctx);
           let wid = p_wid.append_widget(WidgetNode::Combination(c), self.widget_tree.as_mut());
+          let mut ctx = BuildCtx::new(self, wid);
+          let c = match wid.assert_get(&*self.widget_tree) {
+            WidgetNode::Combination(c) => c,
+            WidgetNode::Render(_) => unreachable!(),
+          };
+          let child = c.build(&mut ctx);
 
           stack.push((child, wid));
         }
@@ -220,15 +223,16 @@ impl Context {
 
   pub fn state_change_dispatch(&mut self) {
     while let Some((id, silent)) = self.widget_tree.pop_changed_widgets() {
-      self.mark_changed(id);
-      if !silent {
-        let attr = id
-          .assert_get_mut(&mut self.widget_tree)
-          .find_attr_mut::<StateAttr>();
+      let attr = id
+        .assert_get_mut(&mut self.widget_tree)
+        .find_attr_mut::<StateAttr>();
 
-        if let Some(attr) = attr {
-          attr.changed_notify()
-        }
+      if let Some(attr) = attr {
+        attr.changed_notify()
+      }
+
+      if !silent {
+        self.mark_changed(id);
       }
     }
   }
@@ -279,7 +283,6 @@ impl Context {
         id
       });
 
-    self.need_builds.remove(&topmost);
     Some(topmost)
   }
 
@@ -289,8 +292,9 @@ impl Context {
       WidgetNode::Render(_) => unreachable!("rebuild widget must be combination widget."),
     };
 
-    let mut ctx = BuildCtx::new(self, sub_tree.parent(&self.widget_tree), &**c);
+    let mut ctx = BuildCtx::new(self, sub_tree);
     let child = c.build(&mut ctx);
+    self.need_builds.remove(&sub_tree);
     let child_id = sub_tree.single_child(&self.widget_tree).unwrap();
 
     let mut changed = false;
@@ -298,9 +302,10 @@ impl Context {
     while let Some((w, wid)) = stack.pop() {
       match w.0 {
         BoxedWidgetInner::Combination(c) => {
-          self.need_builds.remove(&wid);
-          let mut ctx = BuildCtx::new(self, sub_tree.parent(&self.widget_tree), &*c);
+          let mut ctx = BuildCtx::new(self, wid);
           let child = c.build(&mut ctx);
+          self.need_builds.remove(&wid);
+
           let new_id = self.replace_widget(WidgetNode::Combination(c), wid);
           changed = new_id.is_some() || changed;
           match new_id {

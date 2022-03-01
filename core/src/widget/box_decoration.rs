@@ -4,7 +4,6 @@ use crate::prelude::*;
 #[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
-  // todo: declare default is the inner value, not the field type
   #[declare(builtin, setter(strip_option, into), default)]
   pub background: Option<Brush>,
   /// A border to draw above the background
@@ -311,6 +310,20 @@ impl Border {
 mod tests {
   use super::*;
   use crate::test::widget_and_its_children_box_rect;
+
+  #[test]
+  fn default_value_is_none() {
+    let dummy = std::mem::MaybeUninit::uninit();
+    // just for test, we know BoxDecoration not use `ctx` to build.
+    let mut ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
+    let w = BoxDecoration::builder().build(&mut ctx);
+
+    assert_eq!(w.border, None);
+    assert_eq!(w.radius, None);
+    assert_eq!(w.background, None);
+
+    std::mem::forget(ctx);
+  }
 
   #[test]
   fn layout() {

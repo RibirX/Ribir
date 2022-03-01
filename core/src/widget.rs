@@ -185,8 +185,22 @@ impl<W: StatefulCombination> CombinationWidget for StatefulCombinationWrap<W> {
   where
     Self: Sized,
   {
-    StatefulCombination::build(&self.0, ctx)
+    self.0.mark_during_build(true);
+    let c = StatefulCombination::build(&self.0, ctx);
+    self.0.mark_during_build(false);
+    c
   }
+}
+
+impl<W> AsAttrs for StatefulCombinationWrap<W>
+where
+  Self: Widget,
+{
+  #[inline]
+  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
+
+  #[inline]
+  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.as_attrs_mut() }
 }
 
 impl<W: StatefulCombination + 'static> BoxWidget<StatefulCombinationMarker> for Stateful<W> {

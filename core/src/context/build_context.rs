@@ -7,9 +7,8 @@ thread_local!(static DEFAULT_THEME: Rc<Theme> =
 );
 
 pub struct BuildCtx<'a> {
-  widget: &'a dyn CombinationNode,
-  parent: Option<WidgetId>,
-  ctx: &'a Context,
+  pub(crate) id: WidgetId,
+  pub(crate) ctx: &'a Context,
   default_theme: Option<Rc<Theme>>,
 }
 
@@ -18,15 +17,9 @@ impl<'a> BuildCtx<'a> {
   pub fn theme(&mut self) -> &Theme {
     let tree = &self.ctx.widget_tree;
     self
-      .widget
-      .as_attrs()
-      .and_then(Attributes::find)
-      .or_else(|| {
-        self.parent.and_then(|p| {
-          p.ancestors(tree)
-            .find_map(|id| id.assert_get(tree).get_theme())
-        })
-      })
+      .id
+      .ancestors(&self.ctx.widget_tree)
+      .find_map(|id| id.assert_get(tree).get_theme())
       .unwrap_or_else(|| {
         self
           .default_theme
@@ -35,17 +28,8 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(
-    ctx: &'a Context,
-    parent: Option<WidgetId>,
-    widget: &'a dyn CombinationNode,
-  ) -> Self {
-    Self {
-      ctx,
-      parent,
-      default_theme: None,
-      widget,
-    }
+  pub(crate) fn new(ctx: &'a Context, id: WidgetId) -> Self {
+    Self { ctx, id, default_theme: None }
   }
 }
 

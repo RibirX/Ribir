@@ -105,12 +105,7 @@ impl DataFlow {
 
     let assign = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
     tokens.extend(quote! {
-      #upstream.subscribe({
-        #assign
-        move |_| {
-          #assign
-        }
-      });
+      #upstream.subscribe(move |_| { #assign });
     });
     Ok(())
   }
@@ -510,7 +505,7 @@ impl DeclareWidget {
   fn widget_identify(&self) -> Ident {
     match &self.named {
       Some(Id { name, .. }) => name.clone(),
-      _ => ribir_variable(AVOID_CONFLICT_SUFFIX, self.path.span()),
+      _ => ribir_variable("ribir", self.path.span()),
     }
   }
 }

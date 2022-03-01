@@ -24,13 +24,11 @@ impl StatefulCombination for Todos {
               margin: EdgeInsets::vertical(4.),
               Checkbox{
                 id: checkbox,
-                checked: task.finished,
-                style: ctx.theme().checkbox.clone(),
+                checked: task.finished
               }
-              Text{
+              Text {
                 text:task.label.clone(),
-                style: ctx.theme().typography_theme.body1.text.clone() ,
-                margin: EdgeInsets::vertical(4.),
+                margin: EdgeInsets::vertical(4.)
               }
             }
             data_flow!{ checkbox.checked ~> state.silent().tasks[idx].finished }

@@ -5,9 +5,13 @@ use crate::prelude::*;
 
 #[derive(Default, MultiChildWidget, Declare, Clone)]
 pub struct Column {
+  #[declare(default)]
   pub reverse: bool,
+  #[declare(default)]
   pub wrap: bool,
+  #[declare(default)]
   pub h_align: CrossAxisAlign,
+  #[declare(default)]
   pub v_align: MainAxisAlign,
 }
 

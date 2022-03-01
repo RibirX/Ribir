@@ -41,7 +41,7 @@ pub struct LayoutStore {
   needs_layout: BinaryHeap<Reverse<(usize, WidgetId)>>,
 
   /// Store the layout info layout widget.
-  infos: HashMap<WidgetId, BoxLayout>,
+  infos: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
 }
 
 impl LayoutStore {

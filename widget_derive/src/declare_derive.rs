@@ -104,7 +104,7 @@ impl Parse for FieldBuilderAttr {
 pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
   let vis = &input.vis;
   let name = &input.ident;
-  let mut g_default = input.generics.clone();
+
   let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
 
   let stt = struct_unwrap(&mut input.data, DECLARE)?;
@@ -183,12 +183,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       }
     });
 
-  crate::util::add_where_bounds(
-    &mut g_default,
-    quote! {#name:
-    Default},
-  );
-
   // builder define
   let def_fields = builder_fields.pairs().map(|p| {
     let ((f, _), c) = p.into_tuple();
@@ -203,7 +197,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     }
   };
 
-  let mut default_tys = vec![];
   let mut methods = quote! {};
   builder_fields
     .iter()
@@ -222,12 +215,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           "Can't use meta `strip_option` for a non Option type ",
         )
       });
-
-      if strip_option.is_some() {
-        default_tys.push(strip_ty.clone()?);
-      } else {
-        default_tys.push(ty);
-      };
 
       let fn_convert_tokens = match (into.is_some(), strip_option.is_some()) {
         (true, true) => {
@@ -308,30 +295,30 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     .iter()
     .map(|(f, _)| f.ident.as_ref().unwrap());
 
-  let value = builder_fields
-    .iter()
-    .zip(default_tys.iter())
-    .map(|((f, attr), d_ty)| {
-      let name = f.ident.as_ref().unwrap();
-      let or_default = attr.as_ref().and_then(|a| a.default.as_ref()).map(|d| {
-        let expr = match &d.value {
-          Some(v) => {
-            let expr: syn::Expr = v.parse().unwrap();
-            quote! {#expr}
-          }
-          None => quote! {#d_ty::default()},
-        };
-        let fn_convert = field_convert_method(name);
-        quote! {
-          .or_else(|| { Some(Self::#fn_convert(#expr)) })
+  let value = builder_fields.iter().map(|(f, attr)| {
+    let field_name = f.ident.as_ref().unwrap();
+    let or_default = attr.as_ref().and_then(|a| a.default.as_ref()).map(|d| {
+      let expr = match &d.value {
+        Some(v) => {
+          let expr: syn::Expr = v.parse().unwrap();
+          let fn_convert = field_convert_method(field_name);
+          quote! {Self::#fn_convert(#expr)}
         }
-      });
+        None => {
+          quote! {<_>::default()}
+        }
+      };
+
       quote! {
-        self.#name
-        #or_default
-        .expect(&format!("Required field `{}` not set", stringify!(#name)))
+        .or_else(|| { Some(#expr) })
       }
     });
+    quote! {
+      self.#field_name
+      #or_default
+      .expect(&format!("Required field `{}::{}` not set", stringify!(#name), stringify!(#field_name)))
+    }
+  });
 
   tokens.extend(quote! {
     impl #g_impl Declare for #name #g_ty #g_where {

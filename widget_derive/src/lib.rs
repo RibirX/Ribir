@@ -1,31 +1,4 @@
-#![feature(proc_macro_diagnostic, unzip_option)]
-//! A derive implementation for `CombinationWidget` and `RenderWidget`. Can use
-//! `proxy` attr to specify where to derive form.
-//!
-//! ## proxy attr.
-//!
-//! `#[proxy]` attr tell the widget trait where to derive from. `Widget` can
-//! emit it to give a default implementation, but `CombinationWidget` or
-//! `RenderWidget` must specify one and only one `proxy` attr.
-
-//! Derive from field `b` which is a `Text`. Because `Text` is a render widget,
-//!
-//! ```
-//! use ribir::prelude::*;
-//! ##[derive(RenderWidget)]
-//! struct W {
-//!  ##[proxy]  
-//!  b: widget::Text
-//! }
-//! ```
-//！
-//! Derive from a generic type, and derive `RenderWidget` if it's a render
-//! widget, derive `CombinationWidget` if it's a combination widget.
-//! ```
-//! use ribir::prelude::*;
-//! ##[derive(RenderWidget, CombinationWidget)]
-//! struct ProxyWidget<W>(#[proxy] W);
-//! ```
+#![feature(proc_macro_diagnostic)]
 extern crate proc_macro;
 extern crate proc_macro2;
 
@@ -69,10 +42,11 @@ pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
 /// - implement `Declare` for `XXX`  mark `XXXBuilder` as its builder type.
 /// - implement `DeclareBuilder` for `XXXBuilder` which build `XXX` and used by
 ///   `declare！` to build the `XXX` widget.
-/// - for every field of `XXXBuilder` implement an associate method `into_xxx`
-///   use to convert a value to the `xxx` field type, which effect by the
-///   `convert` meta. `declare!` will use it to convert the field value
-///   expression.
+/// - for every field of `XXXBuilder`
+///   - implement an associate method `into_xxx`   use to convert a value to the
+///     `xxx` field type, which effect by the   `convert` meta. `declare!` will
+///     use it to convert the field value
+///   - implement method with same name of the field and use to init the field.
 ///
 ///  [declare]: ../ribir/declare/index.html
 #[proc_macro_derive(Declare, attributes(declare))]

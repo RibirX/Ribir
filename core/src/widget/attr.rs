@@ -23,10 +23,7 @@
 //! impl CombinationWidget for MyCheckbox {
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
 //!     declare!{
-//!       Checkbox {
-//!         style: ctx.theme().checkbox.clone(),
-//!         ..<_>::default()
-//!       }
+//!       Checkbox { }
 //!     }
 //!   }
 //! }
@@ -56,10 +53,9 @@
 //!   }
 //! }
 //!
-//! let mut text = Text{ text: "".into(), style:
-//! <_>::default()}.into_attr_widget(); text.attrs_mut().insert(HelloAttr);
+//! let mut text = SizedBox { size: Size::zero() }.insert_attr(HelloAttr);
 //! let w: BoxedWidget = text.box_it();
-//! w.get_attrs().and_then(Attributes::find::<HelloAttr>).unwrap().hello();
+//! w.find_attr::<HelloAttr>().unwrap().hello();
 //! ```
 
 //! [attr_impl]: crate::widget::attr::WidgetAttr
@@ -580,7 +576,7 @@ where
   }
 }
 #[derive(Default)]
-pub struct Attributes(HashMap<TypeId, Box<dyn Any>>);
+pub struct Attributes(HashMap<TypeId, Box<dyn Any>, ahash::RandomState>);
 
 impl Attributes {
   pub fn insert<A: Any>(&mut self, attr: A) -> Option<Box<A>> {

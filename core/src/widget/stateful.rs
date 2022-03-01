@@ -3,24 +3,16 @@
 //! declare and no interactive. That mean you can't modify the data of the
 //! widget, the presentation of this widget is static.
 
-//! But Ribir provide a common method to convert a widget from sateless to
-//! stateful if a widget need repaint or relayout to respond to some widget
-//! change. This depends on [`Stateful`][Stateful] and
-//! [`IntoStateful`][IntoStateful]
-//! Use the `#[stateful]` attr  to provide a stateful version widget named
-//! `StatefulXXX` which just a tuple struct wrap the
-//! [`StatefulImpl`][StatefulImpl] with the stateless version and implement
-//! [`IntoStateful`][IntoStateful]  for the stateless version widget. We
-//! needn't write any logic code to support stateful.
-
+//! But Ribir provide a stateful implementation version widget for every widget,
+//! convert widget across ` [`IntoStateful`]!. So, in most cases you implement
+//! your widget without stateful, and a stateful version will provide by Ribir.
+//!
 //! # Example
 //! This example implement a rectangle widget which support change its size and
 //! fill color.
 //! ```
-//! # #![feature(trivial_bounds, negative_impls)]
 //! # use ribir::prelude::*;
 //!
-//! #[stateful]
 //! struct Rectangle {
 //!   size: Size,
 //!   color: Color,
@@ -44,54 +36,51 @@
 //! // Rectangle support convert to stateful now.
 //! .into_stateful();
 //!
-//! let mut state_ref = rect.state_ref();
-//! rect.on_tap(move |_| {
-//!   state_ref.color = Color::BLACK;
-//! });
+//! let mut state_ref = unsafe { rect.state_ref() };
+//! rect.on_tap(move |_| { state_ref.color = Color::BLACK; });
 //! ```
 //! In the above example, we implement a widget `Rectangle`, and use it to
 //! change its color when user tapped.
 //!
-//! How to do if we want this behavior as a part of the rectangle itself. In
-//! other word, a stateless `Rectangle` is useless, we only need a stateful
-//! `Rectangle`. To implement it, we can specify `custom` meta to
-//! `#[stateful(custom)]` attr. This tell Ribir, "I want to implement
-//! RenderWidget/CombinationWidget for the stateful widget by myself instead of
-//! direct derive from the stateless version.
+//! How to do if the `on_tap` behavior should as a part of the rectangle
+//! itself, not need to user to listen. In this case we should skip to implement
+//! `CombinationWidget`, but directly implement `StatefulCombination`,
+
 //! ```
-//! # #![feature(trivial_bounds, negative_impls)]
 //! # use ribir::prelude::*;
 //!
-//! #[stateful(custom)]
 //! struct Rectangle {
 //!   size: Size,
 //!   color: Color,
 //! }
 //!
-//! impl CombinationWidget for StatefulRectangle {
-//!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     let mut state_ref = self.state_ref();
+//! impl StatefulCombination for Rectangle {
+//!   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+//!     let mut this_ref = unsafe { this.state_ref() };
 //!     declare!{
 //!       SizedBox {
-//!         size: self.size,
-//!         background: self.color.clone(),
-//!         on_tap: move |_| state_ref.color = Color::BLACK
+//!         size: this.size,
+//!         background: this.color.clone(),
+//!         on_tap: move |_| this_ref.color = Color::BLACK
 //!       }
 //!     }
 //!   }
 //! }
 //!
 //! // Remember call the 'into_stateful', the `Rectangle` is not a widget but
-//! // `StatefulRectangle` is.
+//! // its stateful version is.
 //! let rect = Rectangle {
 //!   size: Size::new(100., 100.),
 //!   color: Color::RED,
 //! }.into_stateful();
 //! ```
+//!
+//! Notice, the first argument of `build` method is `Stateful<Self>` let you can
+//! access self `sate_ref`, that the only different with `CombinationWidget`.
 
 use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
-use std::{pin::Pin, ptr::NonNull};
+use std::{cell::Cell, pin::Pin, ptr::NonNull};
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
@@ -131,6 +120,7 @@ pub(crate) struct TreeInfo {
 pub(crate) struct StateAttr {
   pub(crate) tree_info: Option<TreeInfo>,
   subject: Option<LocalSubject<'static, (), ()>>,
+  during_build: Cell<bool>,
 }
 
 impl<W> Clone for SilentRef<W> {
@@ -144,7 +134,7 @@ impl<W> Clone for StateRef<W> {
 impl<W> Copy for StateRef<W> {}
 impl<W> Copy for SilentRef<W> {}
 
-impl<W: 'static> Stateful<W> {
+impl<W> Stateful<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
   // want [`into_stateful`](IntoStateful::into_stateful)
   fn new(w: W) -> Self {
@@ -173,7 +163,10 @@ impl<W: 'static> Stateful<W> {
   pub fn state_change<T: Clone + 'static>(
     &mut self,
     pick: impl Fn(&W) -> T + 'static,
-  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()> {
+  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
+  where
+    Self: 'static,
+  {
     let state_ref = unsafe { self.state_ref() };
     let v = pick(&self.widget);
     let init = StateChange { before: v.clone(), after: v };
@@ -182,6 +175,14 @@ impl<W: 'static> Stateful<W> {
       init.after = pick(&state_ref);
       init
     })
+  }
+
+  pub(crate) fn mark_during_build(&self, flag: bool) {
+    self
+      .find_attr::<StateAttr>()
+      .unwrap()
+      .during_build
+      .set(flag);
   }
 }
 
@@ -260,7 +261,11 @@ impl StateAttr {
 
   fn record_change(&mut self, silent: bool) {
     if let Some(TreeInfo { mut tree, id }) = self.tree_info {
-      unsafe { tree.as_mut() }.record_change(id, silent);
+      if self.during_build.get() {
+        log::warn!("Modify widget state during it build child is not allowed!");
+      } else {
+        unsafe { tree.as_mut() }.record_change(id, silent);
+      }
     }
   }
 
@@ -454,5 +459,20 @@ mod tests {
     wnd.render_ready();
     let tree = &wnd.context().widget_tree;
     assert_eq!(tree.root().descendants(tree).count(), 2);
+  }
+
+  #[test]
+  fn assigned_id_after_add_in_widget() {
+    let w = SizedBox { size: Size::zero() }.into_stateful();
+    let state_ref = unsafe { w.silent_ref() };
+
+    let mut wnd = Window::without_render(w.box_it(), Size::new(500., 500.));
+
+    let state_attr = state_ref.find_attr::<StateAttr>();
+    assert!(state_attr.is_some());
+    assert!(state_attr.unwrap().tree_info.is_some());
+
+    // keep window live longer than `state_ref`
+    wnd.render_ready();
   }
 }
