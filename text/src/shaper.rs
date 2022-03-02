@@ -65,7 +65,7 @@ pub struct ParagraphShaped {
   /// How much em the line need to drawing this glyph when setting text in
   /// Vertical direction.
   pub heigh: f32,
-  /// The height of the first font use to shape the text.
+  /// The height of the first font use to shape the text in em.
   pub first_font_height: f32,
 }
 
@@ -251,7 +251,7 @@ impl TextShaper {
       let first_font_height = g.map_or(1., |g| {
         let db = self.font_db();
         let face = db.try_get_face_data(g.face_id).expect("font must existed.");
-        face.height() as f32 / face.units_per_em().expect("") as f32
+        face.height() as f32 / face.units_per_em() as f32
       });
       lines.push(ParagraphShaped {
         levels: levels.into_boxed_slice(),
@@ -353,7 +353,8 @@ impl Glyph {
   fn new(face: &font_db::Face, pos: GlyphPosition, info: &GlyphInfo) -> Self {
     let glyph_id = GlyphId(info.glyph_id as u16);
     let cluster = info.cluster;
-    let units_per_em = face.units_per_em().expect("Unexpected font units.") as f32;
+
+    let units_per_em = face.units_per_em() as f32;
     Glyph {
       face_id: face.face_id,
       glyph_id,

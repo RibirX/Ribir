@@ -1,11 +1,39 @@
+use std::rc::Rc;
+
 use gpu::wgpu_backend_with_wnd;
-use painter::{Color, DeviceSize, PainterBackend};
+use painter::{Color, DeviceSize, PainterBackend, Image, ShallowImage, Brush, TileMode, image::ColorFormat};
 use text::shaper::TextShaper;
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
   window::WindowBuilder,
 };
+
+#[derive(Clone, Debug)]
+pub struct PureColorImage {
+  pub size: DeviceSize,
+  pub color: Color,
+}
+
+impl Image for PureColorImage {
+  fn pixel_bytes(&self) -> Box<[u8]> {
+    let vec =
+      vec![self.color.clone().into_raw(); self.size.area() as usize * 4].into_boxed_slice();
+    unsafe { std::mem::transmute(vec) }
+  }
+
+  fn size(&self) -> DeviceSize { self.size }
+
+  fn color_format(&self) -> ColorFormat { ColorFormat::Rgba8 }
+}
+
+impl PureColorImage {
+  pub fn new(color: Color, size: DeviceSize) -> Self { Self { size, color } }
+
+  pub fn shallow_img(color: Color, size: DeviceSize) -> ShallowImage {
+    ShallowImage::new(Rc::new(Self::new(color, size)))
+  }
+}
 
 fn main() {
   let event_loop = EventLoop::new();
@@ -26,6 +54,8 @@ fn main() {
     shaper,
   ));
 
+  let img = PureColorImage::shallow_img(Color::BLUE, DeviceSize::new(1024, 1024));
+
   event_loop.run(move |event, _, control_flow| match event {
     Event::WindowEvent { ref event, window_id } if window_id == window.id() => match event {
       WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -43,7 +73,11 @@ fn main() {
     },
     Event::RedrawRequested(_) => {
       let mut painter = painter::Painter::new(1.);
-      painter.set_brush(Color::RED);
+      painter.set_brush(Brush::Image {
+        img: img.clone(),
+        tile_mode: TileMode::COVER_BOTH,
+      });
+      // painter.set_brush(Color::RED);
 
       painter
         .begin_path((0., 70.).into())

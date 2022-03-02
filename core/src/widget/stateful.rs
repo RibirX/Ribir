@@ -93,7 +93,7 @@ pub trait IntoStateful {
 /// stateful widget. Tracked the state change across if user mutable reference
 /// the `StateRef` and trigger state change notify and require `ribir` to
 /// rebuild or relayout inner widget.
-pub struct StateRef<W>(SilentRef<W>);
+pub struct StateRef<W>(NonNull<AttrWidget<W>>);
 
 /// A reference of stateful widget, tracked the state change across if user
 /// mutable reference the `SilentRef`. If mutable reference occur, state change
@@ -146,7 +146,7 @@ impl<W> Stateful<W> {
   /// Return a `StateRef` of the stateful widget, caller should careful not keep
   /// it live not longer than its widget.
   #[inline]
-  pub unsafe fn state_ref(&self) -> StateRef<W> { StateRef(self.silent_ref()) }
+  pub unsafe fn state_ref(&self) -> StateRef<W> { StateRef(NonNull::from(&*self.0)) }
 
   /// Return a `SilentRef` of the stateful widget. Caller should careful not
   /// keep it live not longer than its widget.
@@ -189,7 +189,7 @@ impl<W> Stateful<W> {
 impl<W: 'static> StateRef<W> {
   // convert a `StateRef` to `SilentRef`
   #[inline]
-  pub fn silent(self) -> SilentRef<W> { self.0 }
+  pub fn silent(self) -> SilentRef<W> { SilentRef(self.0) }
 
   /// Event emitted when this widget modified. No mather if the widget really
   #[inline]
@@ -233,7 +233,7 @@ impl<W> std::ops::Deref for SilentRef<W> {
 impl<W> std::ops::DerefMut for SilentRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     unsafe {
-      assert_state_attr(self.0.as_mut()).record_change(false);
+      assert_state_attr(self.0.as_mut()).record_change(true);
       self.0.as_mut()
     }
   }
@@ -243,13 +243,15 @@ impl<W> std::ops::Deref for StateRef<W> {
   type Target = AttrWidget<W>;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.0 }
+  fn deref(&self) -> &Self::Target { unsafe { self.0.as_ref() } }
 }
 
 impl<W> std::ops::DerefMut for StateRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    unsafe { assert_state_attr(self.0.0.as_mut()).record_change(true) };
-    &mut self.0
+    unsafe {
+      assert_state_attr(self.0.as_mut()).record_change(false);
+      self.0.as_mut()
+    }
   }
 }
 
@@ -474,5 +476,27 @@ mod tests {
 
     // keep window live longer than `state_ref`
     wnd.render_ready();
+  }
+
+  #[test]
+  fn state_ref_record() {
+    let w = SizedBox { size: Size::zero() }.into_stateful();
+    let mut silent_ref = unsafe { w.silent_ref() };
+    let mut state_ref = unsafe { w.state_ref() };
+    let mut tree = WidgetTree::new(widget_tree::WidgetNode::Render(Box::new(StatefulWrap(w))));
+
+    {
+      let _ = &mut state_ref.size;
+      let (_, silent) = tree.pop_changed_widgets().unwrap();
+      assert_eq!(silent, false);
+      assert!(tree.pop_changed_widgets().is_none());
+    }
+
+    {
+      let _ = &mut silent_ref.size;
+      let (_, silent) = tree.pop_changed_widgets().unwrap();
+      assert_eq!(silent, true);
+      assert!(tree.pop_changed_widgets().is_none());
+    }
   }
 }

@@ -226,14 +226,6 @@ impl<S: Surface> WgpuGl<S> {
 
     let surface = surface_ctor(&device);
 
-    let s_config = wgpu::SurfaceConfiguration {
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      format: wgpu::TextureFormat::Rgba8UnormSrgb,
-      width: size.width,
-      height: size.height,
-      present_mode: wgpu::PresentMode::Fifo,
-    };
-
     let primitive_layout = primitives_layout(&device);
     let coordinate_matrix = coordinate_matrix_buffer_2d(&device, size.width, size.height);
 
@@ -245,7 +237,7 @@ impl<S: Surface> WgpuGl<S> {
       &primitive_layout,
       anti_aliasing,
     );
-    let texture_pass = ImagePass::new(&device, s_config.format);
+    let texture_pass = ImagePass::new(&device, surface.format());
 
     WgpuGl {
       device,

@@ -160,7 +160,7 @@ pub fn pipeline(
   });
 
   let module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-    label: Some("Shader"),
+    label: Some("Image Shader"),
     source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/img_geometry.wgsl").into()),
   });
 

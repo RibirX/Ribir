@@ -1,7 +1,7 @@
 use algo::FrameCache;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
-use lyon_path::math::Point;
+use lyon_path::math::{Point, Transform};
 use std::sync::Arc;
 use ttf_parser::{GlyphId, OutlineBuilder};
 
@@ -288,8 +288,15 @@ impl Face {
       .rb_face
       .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder)?;
 
-    Some(builder.into_path())
+    // By default, outlie glyphs is an mirror.
+    let mirror = Transform::scale(1., -1.);
+    Some(
+      builder.into_path().transformed(&mirror), // .transformed(&translate),
+    )
   }
+
+  #[inline]
+  pub fn units_per_em(&self) -> i32 { self.rb_face.units_per_em() }
 }
 
 fn to_db_family(f: &FontFamily) -> Family {

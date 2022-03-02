@@ -211,9 +211,7 @@ fn data_flow_macro() {
           SizedBox { id: a, size }
           SizedBox { id: b, size: a.size }
         }
-        data_flow! {
-          a.size + b.size ~> c.size
-        }
+        data_flow! { a.size + b.size ~> c.size }
       }
     }
   }
@@ -221,9 +219,10 @@ fn data_flow_macro() {
   let mut wnd = Window::without_render(T.box_it(), Size::new(400., 400.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect.size, Size::new(4., 2.));
+  // data flow not affect on init.
+  assert_eq!(rect.size, Size::new(3., 1.));
 
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&mut wnd, (0, 0));
   wnd.render_ready();
 
   let (rect, _) = root_and_children_rect(&mut wnd);

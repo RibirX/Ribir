@@ -357,15 +357,28 @@ impl TessData {
           v_align: None,
         };
 
-        let tolerance = TOLERANCE / (font_size * scale);
+        let mut pre_face_id = None;
+        let mut pre_unit_per_em = 0;
+        let mut scaled_font_size = font_size;
+        let mut tolerance = TOLERANCE / (scaled_font_size * scale);
         text::layout::layout_text(&text, &glyphs, &cfg, None).for_each(
           |GlyphAt { glyph_id, face_id, x, y }| {
+            if Some(face_id) != pre_face_id {
+              pre_face_id = Some(face_id);
+              let db = self.shaper.font_db();
+              pre_unit_per_em = db.try_get_face_data(face_id).unwrap().units_per_em();
+              scaled_font_size = font_size / pre_unit_per_em as f32;
+              tolerance = TOLERANCE / (scaled_font_size * scale)
+            };
+
             let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
             let key = VerticesKey { tolerance, threshold, style, path };
             let cache_ptr = cache(key);
             let t = transform
-              .pre_scale(font_size, font_size)
-              .pre_translate(Vector::new(x, y));
+              // because glyph is up down mirror, this `font_size` offset help align after rotate.
+              .pre_translate(Vector::new(x, y + font_size))
+              .pre_scale(scaled_font_size, scaled_font_size);
+
             let mut p = primitive.clone();
             p.set_transform(t);
 

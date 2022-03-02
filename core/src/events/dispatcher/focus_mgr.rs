@@ -106,6 +106,9 @@ impl FocusManager {
     // if current focusing widget is dropped, find the next focus replace it.
     if let Some((focusing, _)) = self.focusing {
       if focusing.wid.is_dropped(tree) {
+        // remove the dropped focusing.
+        self.focusing = None;
+
         let node = self
           .tab_orders
           .iter()
@@ -123,7 +126,7 @@ impl FocusManager {
     node: Option<(FocusNode, usize)>,
     ctx: &mut Context,
   ) -> Option<(FocusNode, usize)> {
-    let old = std::mem::replace(&mut self.focusing, node);
+    let old = self.focusing.take();
     self.focusing = node;
 
     if let Some((ref blur, _)) = old {
@@ -163,7 +166,7 @@ impl FocusManager {
 mod tests {
   use super::*;
   use crate::widget::SizedBox;
-  use std::{cell::RefCell, rc::Rc};
+  use std::{cell::RefCell, ops::DerefMut, rc::Rc};
 
   fn empty_box() -> SizedBox { SizedBox { size: Size::zero() } }
 
@@ -316,5 +319,32 @@ mod tests {
 
     mgr.blur(&mut ctx);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
+  }
+
+  #[test]
+  fn fix_dropped_focusing() {
+    struct T;
+
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        declare! {
+          SizedBox {
+            size: Size::zero(),
+            auto_focus: true,
+          }
+        }
+      }
+    }
+
+    let w = T.into_stateful();
+    let mut state_ref = unsafe { w.state_ref() };
+
+    let mut wnd = Window::without_render(w.box_it(), Size::new(10., 10.));
+    wnd.render_ready();
+
+    // let child drop
+    let _ = state_ref.deref_mut();
+
+    wnd.render_ready();
   }
 }

@@ -64,8 +64,13 @@ impl WidgetTree {
   }
 
   pub(crate) fn record_change(&mut self, id: WidgetId, silent: bool) {
-    let s = self.changed_widget.entry(id).or_default();
-    *s = *s && silent;
+    self
+      .changed_widget
+      .entry(id)
+      .and_modify(|s| {
+        *s = *s && silent;
+      })
+      .or_insert(silent);
   }
 
   pub(crate) fn pop_changed_widgets(&mut self) -> Option<(WidgetId, bool)> {
