@@ -13,12 +13,11 @@ struct Todos {
 
 impl StatefulCombination for Todos {
   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    let state = unsafe { this.state_ref() };
+    let this_ref = unsafe { this.state_ref() };
     declare! {
       Column {
         h_align: CrossAxisAlign::Start,
         this.tasks.iter().enumerate().map(|(idx, task)|{
-          let state = state.clone();
           declare!{
             Row {
               margin: EdgeInsets::vertical(4.),
@@ -31,13 +30,16 @@ impl StatefulCombination for Todos {
                 margin: EdgeInsets::vertical(4.)
               }
             }
-            data_flow!{ checkbox.checked ~> state.silent().tasks[idx].finished }
+            data_flow!{
+              checkbox.checked ~> this_ref.silent().tasks[idx].finished;
+            }
           }
         })
       }
     }
   }
 }
+
 fn main() {
   env_logger::init();
   let todo = Todos {

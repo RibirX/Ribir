@@ -137,24 +137,23 @@ impl PointerDispatcher {
 
     let mut already_entered = vec![];
 
-    self.entered_widgets.iter().for_each(|w| {
-      // if the widget is not the ancestor of the hit widget
-      if !w.is_dropped(&ctx.widget_tree) {
-        if new_hit.is_none()
-          || !w
-            .ancestors(&ctx.widget_tree)
-            .any(|w| Some(w) == new_hit.as_ref().map(|h| h.0))
-        {
-          let old_pos = (*w, &*ctx).map_from_global(self.cursor_pos);
-          let mut event = self.mouse_pointer(*w, old_pos, ctx);
-          if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
-            pointer.dispatch_event(PointerEventType::Leave, &mut event)
+    let tree = &ctx.widget_tree;
+    self
+      .entered_widgets
+      .iter()
+      .filter(|w| !w.is_dropped(tree))
+      .for_each(|w| {
+        match new_hit {
+          Some((new_hit, _)) if w.ancestors_of(new_hit, tree) => already_entered.push(*w),
+          _ => {
+            let old_pos = (*w, &*ctx).map_from_global(self.cursor_pos);
+            let mut event = self.mouse_pointer(*w, old_pos, ctx);
+            if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
+              pointer.dispatch_event(PointerEventType::Leave, &mut event)
+            }
           }
-        } else {
-          already_entered.push(*w)
-        }
-      }
-    });
+        };
+      });
     self.entered_widgets.clear();
 
     if let Some((hit_widget, _)) = new_hit {
@@ -187,23 +186,25 @@ impl PointerDispatcher {
   }
 
   fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
-    fn down_coordinate_to(id: WidgetId, pos: Point, ctx: &Context) -> Option<(WidgetId, Point)> {
-      let rid = id.render_widget(&ctx.widget_tree).unwrap();
-      let w_ctx = (rid, ctx);
-      w_ctx
-        .box_rect()
-        // check if contain the position
-        .filter(|rect| rect.contains(pos))
-        .map(|_| (id, w_ctx.map_from(pos, id)))
-    }
-
-    let mut current = down_coordinate_to(ctx.widget_tree.root(), self.cursor_pos, ctx);
+    let tree = &ctx.widget_tree;
+    let c_rid = ctx.widget_tree.root().render_widget(tree).unwrap();
+    let mut current = (c_rid, ctx).box_rect().and_then(|rect| {
+      rect
+        .contains(self.cursor_pos)
+        .then(|| (ctx.widget_tree.root(), self.cursor_pos))
+    });
     let mut hit = None;
     while let Some((id, pos)) = current {
       hit = current;
-      current = id
-        .reverse_children(&ctx.widget_tree)
-        .find_map(|c| down_coordinate_to(c, pos, ctx));
+      current = id.reverse_children(&ctx.widget_tree).find_map(|c| {
+        let c_rid = c.render_widget(&ctx.widget_tree).unwrap();
+        let w_ctx = (c_rid, ctx);
+        w_ctx
+          .box_rect()
+          // check if contain the position
+          .filter(|rect| rect.contains(pos))
+          .map(|_| (c_rid, w_ctx.map_from(pos, id)))
+      });
     }
     hit
   }
@@ -469,6 +470,7 @@ mod tests {
               move |_| leave_event.borrow_mut().push(2)
             },
             SizedBox {
+              margin: EdgeInsets::all(4.),
               size: SizedBox::expanded_size(),
               on_pointer_enter: {
                 let enter_event = self.enter.clone();
@@ -495,14 +497,23 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (1, 1).into(),
+      position: (10, 10).into(),
       modifiers: ModifiersState::default(),
     });
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
 
+    // leave to parent
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (1000, 1000).into(),
+      position: (99, 99).into(),
+      modifiers: ModifiersState::default(),
+    });
+    assert_eq!(&*leave_event.borrow(), &[1]);
+
+    // leave all
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (999, 999).into(),
       modifiers: ModifiersState::default(),
     });
 
@@ -512,7 +523,7 @@ mod tests {
     leave_event.borrow_mut().clear();
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (1, 1).into(),
+      position: (10, 10).into(),
       modifiers: ModifiersState::default(),
     });
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
@@ -675,5 +686,16 @@ mod tests {
     });
 
     assert!(wnd.dispatcher.focus_mgr.focusing().is_none());
+  }
+
+  #[test]
+  fn fix_hit_out_window() {
+    let w = SizedBox { size: SizedBox::expanded_size() };
+    let mut wnd = Window::without_render(w.box_it(), Size::new(100., 100.));
+    wnd.render_ready();
+    wnd.dispatcher.pointer.cursor_pos = Point::new(-1., -1.);
+    let hit = wnd.dispatcher.pointer.hit_widget(&wnd.context());
+
+    assert_eq!(hit, None);
   }
 }

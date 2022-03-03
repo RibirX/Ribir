@@ -147,6 +147,11 @@ impl WidgetId {
     self.0.ancestors(&tree.arena).map(WidgetId)
   }
 
+  /// Detect if this widget is the ancestors of `w`
+  pub(crate) fn ancestors_of(self, w: WidgetId, tree: &WidgetTree) -> bool {
+    w.ancestors(tree).any(|a| a == self)
+  }
+
   pub(crate) fn children(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.children(&tree.arena).map(WidgetId)
   }

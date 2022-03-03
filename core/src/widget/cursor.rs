@@ -98,6 +98,7 @@ mod tests {
         modifiers: ModifiersState::default(),
       },
       ctx,
+      1.,
     );
     assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
 
@@ -109,6 +110,7 @@ mod tests {
         modifiers: ModifiersState::default(),
       },
       ctx,
+      1.,
     );
     assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
 
@@ -120,6 +122,7 @@ mod tests {
         modifiers: ModifiersState::default(),
       },
       ctx,
+      1.,
     );
     assert_eq!(ctx.cursor.take(), Some(CursorIcon::AllScroll));
 
@@ -131,6 +134,7 @@ mod tests {
         modifiers: ModifiersState::default(),
       },
       ctx,
+      1.,
     );
     assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
 
@@ -142,6 +146,7 @@ mod tests {
         modifiers: ModifiersState::default(),
       },
       ctx,
+      1.,
     );
     assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
   }

@@ -1,4 +1,7 @@
-use std::any::{Any, TypeId};
+use std::{
+  any::{Any, TypeId},
+  ops::ControlFlow,
+};
 
 use painter::{Point, Rect};
 
@@ -43,8 +46,8 @@ pub trait WidgetCtx {
   fn map_to(&self, pos: Point, ancestor: WidgetId) -> Point;
 
   /// Translates the render object coordinate pos from the coordinate system of
-  /// ancestor to this render object coordinate system. The parent must be a
-  /// parent of the calling render object.
+  /// ancestor to this render object coordinate system. The parent must be
+  /// ancestor of the calling render object.
   fn map_from(&self, pos: Point, ancestor: WidgetId) -> Point;
 
   /// Return the correspond render widget, if this widget is a layout render
@@ -129,19 +132,41 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn map_to(&self, pos: Point, ancestor: WidgetId) -> Point {
-    self
+    let pos = self
       .id()
       .ancestors(self.widget_tree())
-      .take_while(|id| *id == ancestor)
-      .fold(pos, |pos, id| map_from_parent(id, pos, self.layout_store()))
+      .try_fold(pos, |pos, id| {
+        if id == ancestor {
+          ControlFlow::Break(pos)
+        } else {
+          let next = map_to_parent(id, pos, self.layout_store());
+          ControlFlow::Continue(next)
+        }
+      });
+
+    match pos {
+      ControlFlow::Continue(v) => v,
+      ControlFlow::Break(v) => v,
+    }
   }
 
   fn map_from(&self, pos: Point, ancestor: WidgetId) -> Point {
-    self
+    let pos = self
       .id()
       .ancestors(self.widget_tree())
-      .take_while(|id| *id == ancestor)
-      .fold(pos, |pos, id| map_from_parent(id, pos, self.layout_store()))
+      .try_fold(pos, |pos, id| {
+        if id == ancestor {
+          ControlFlow::Break(pos)
+        } else {
+          let next = map_from_parent(id, pos, self.layout_store());
+          ControlFlow::Continue(next)
+        }
+      });
+
+    match pos {
+      ControlFlow::Continue(v) => v,
+      ControlFlow::Break(v) => v,
+    }
   }
 
   #[inline]
@@ -155,5 +180,27 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
       WidgetNode::Render(r) => r.downcast_to(type_id),
     }
     .and_then(<dyn Any>::downcast_ref)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::prelude::*;
+
+  #[test]
+  fn map_self_eq_self() {
+    let w = Margin { margin: EdgeInsets::all(2.) }.have(SizedBox { size: Size::zero() }.box_it());
+    let mut wnd = Window::without_render(w.box_it(), Size::zero());
+    wnd.render_ready();
+
+    let ctx = wnd.context();
+    let root = ctx.widget_tree.root();
+    let pos = Point::zero();
+    let child = root.single_child(&ctx.widget_tree).unwrap();
+
+    let w_ctx = (child, ctx);
+    assert_eq!(w_ctx.map_from(pos, child), pos);
+    assert_eq!(w_ctx.map_to(pos, child), pos);
   }
 }

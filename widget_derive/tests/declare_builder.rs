@@ -23,6 +23,8 @@ fn declare_builder_smoke() {
   let b = b.build(&mut ctx);
   assert_eq!(b.a, 1.);
   assert_eq!(b.b, 1);
+
+  std::mem::forget(ctx);
 }
 
 #[test]
@@ -35,6 +37,7 @@ fn panic_if_miss_require_field() {
 
   let mut ctx = dummy_ctx();
   let _ = <T as Declare>::builder().build(&mut ctx);
+  std::mem::forget(ctx);
 }
 
 #[test]
@@ -49,6 +52,7 @@ fn empty_default_field() {
   let mut ctx = dummy_ctx();
   let t = <T as Declare>::builder().build(&mut ctx);
   assert_eq!(t.a, 0.);
+  std::mem::forget(ctx);
 }
 
 #[test]
@@ -63,4 +67,6 @@ fn string_default_field() {
   let mut ctx = dummy_ctx();
   let t = <T as Declare>::builder().build(&mut ctx);
   assert_eq!(t.text, "hi!");
+
+  std::mem::forget(ctx);
 }

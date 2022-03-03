@@ -13,13 +13,14 @@ pub(crate) struct Dispatcher {
 }
 
 impl Dispatcher {
-  pub fn dispatch(&mut self, event: WindowEvent, ctx: &mut Context) {
+  pub fn dispatch(&mut self, event: WindowEvent, ctx: &mut Context, wnd_factor: f64) {
     log::info!("Dispatch winit event {:?}", event);
     match event {
       WindowEvent::ModifiersChanged(s) => ctx.modifiers = s,
-      WindowEvent::CursorMoved { position, .. } => self
-        .pointer
-        .cursor_move_to(Point::new(position.x as f32, position.y as f32), ctx),
+      WindowEvent::CursorMoved { position, .. } => {
+        let pos = position.to_logical::<f32>(wnd_factor);
+        self.pointer.cursor_move_to(Point::new(pos.x, pos.y), ctx)
+      }
       WindowEvent::CursorLeft { .. } => self.pointer.on_cursor_left(ctx),
       WindowEvent::MouseInput { state, button, device_id, .. } => {
         self

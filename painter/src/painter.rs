@@ -270,7 +270,7 @@ impl Painter {
   /// * `y` - Distance to move in the vertical direction. Positive values are
   ///   down, and negative are up.
   pub fn translate(&mut self, x: f32, y: f32) -> &mut Self {
-    let t = self.get_transform().then_translate(Vector::new(x, y));
+    let t = self.get_transform().pre_translate(Vector::new(x, y));
     self.set_transform(t);
     self
   }

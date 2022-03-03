@@ -17,7 +17,7 @@ quote = "1.0.9"
 [dev-dependencies]
 ribir = {path = "../core"}
 trybuild = "1.0.53"
-winit = "0.26.0"
+winit = "0.26.1"
 
 [build-dependencies]
 proc-macro2 = "1.0.26"

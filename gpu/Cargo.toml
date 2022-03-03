@@ -19,11 +19,11 @@ wgpu = {version = "0.12.0", optional = true}
 zerocopy = "0.3"
 
 [dev-dependencies]
+colored = "1.9.3"
 env_logger = "0.7.1"
 futures = "0.3.5"
 ribir = {path = "../core"}
-winit = "0.26.0"
-colored = "1.9.3"
+winit = "0.26.1"
 
 [features]
 wgpu_gl = ["wgpu", "raw-window-handle", "futures"]

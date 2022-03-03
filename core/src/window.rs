@@ -77,7 +77,9 @@ impl Window {
         let factor = scale_factor as f32;
         self.context.painter.reset(Some(factor));
       }
-      event => self.dispatcher.dispatch(event, &mut self.context),
+      event => self
+        .dispatcher
+        .dispatch(event, &mut self.context, self.raw_window.scale_factor()),
     };
     if let Some(icon) = self.context.cursor.take() {
       self.raw_window.set_cursor(icon);

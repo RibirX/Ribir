@@ -20,7 +20,7 @@ png = {version = "0.17.3", optional = true}
 rxrust = "1.0.0-alpha.2"
 text = {path = "../text"}
 widget_derive = {path = "../widget_derive"}
-winit = "0.26.0"
+winit = "0.26.1"
 
 [dependencies.blake3]
 features = ["rayon"]
