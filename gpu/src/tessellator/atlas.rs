@@ -4,7 +4,7 @@ use super::mem_texture::MemTexture;
 
 use algo::FrameCache;
 use guillotiere::{Allocation, AtlasAllocator, ChangeList};
-use painter::{DeviceSize, Image, ShallowImage};
+use painter::{DeviceSize, PixelImage, ShallowImage};
 use std::collections::HashMap;
 
 pub(crate) struct TextureAtlas {
@@ -47,7 +47,7 @@ impl TextureAtlas {
     Ok(alloc)
   }
 
-  pub fn is_large_img_to_me(&self, img: &dyn Image) -> bool {
+  pub fn is_large_img_to_me(&self, img: &PixelImage) -> bool {
     let max = self.texture.max_size();
     return max.lower_than(img.size() * 2).any();
   }
@@ -153,44 +153,27 @@ impl TextureAtlas {
 
 #[cfg(test)]
 pub mod tests {
-  use std::rc::Rc;
-
   use painter::Color;
+  use std::borrow::Cow;
 
   use super::*;
 
   const MAX_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
 
-  #[derive(Clone, Debug)]
-  pub struct PureColorImage {
-    pub size: DeviceSize,
-    pub color: Color,
-  }
+  pub fn color_image(color: Color, size: DeviceSize) -> ShallowImage {
+    let data = std::iter::repeat(color.into_raw())
+      .take(size.area() as usize)
+      .flatten()
+      .collect::<Vec<_>>();
 
-  impl Image for PureColorImage {
-    fn pixel_bytes(&self) -> Box<[u8]> {
-      let vec =
-        vec![self.color.clone().into_raw(); self.size.area() as usize * 4].into_boxed_slice();
-      unsafe { std::mem::transmute(vec) }
-    }
-
-    fn size(&self) -> DeviceSize { self.size }
-
-    fn color_format(&self) -> ColorFormat { ColorFormat::Rgba8 }
-  }
-
-  impl PureColorImage {
-    pub fn new(color: Color, size: DeviceSize) -> Self { Self { size, color } }
-
-    pub fn shallow_img(color: Color, size: DeviceSize) -> ShallowImage {
-      ShallowImage::new(Rc::new(Self::new(color, size)))
-    }
+    let img = PixelImage::new(Cow::Owned(data), size, ColorFormat::Rgba8);
+    ShallowImage::new(img)
   }
 
   #[test]
   fn grow_alloc_keep() {
     let mut atlas = TextureAtlas::new(DeviceSize::new(64, 64), MAX_SIZE);
-    let red_img = PureColorImage::shallow_img(Color::RED, DeviceSize::new(32, 32));
+    let red_img = color_image(Color::RED, DeviceSize::new(32, 32));
     let red_alloc = *atlas.store_image(&red_img).unwrap();
 
     assert_eq!(red_alloc.rectangle.min.to_array(), [0, 0]);
@@ -199,7 +182,7 @@ pub mod tests {
     assert_eq!(&red_alloc, atlas.store_image(&red_img).unwrap());
     color_img_check(&atlas, &red_alloc, Color::RED);
 
-    let yellow_img = PureColorImage::shallow_img(Color::YELLOW, DeviceSize::new(64, 64));
+    let yellow_img = color_image(Color::YELLOW, DeviceSize::new(64, 64));
     let yellow_alloc = *atlas.store_image(&yellow_img).unwrap();
 
     // the color should keep after atlas rearrange

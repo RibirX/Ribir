@@ -1,13 +1,8 @@
-use std::{fmt::Debug, hash::Hash, rc::Rc};
+use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
 
 use crate::DeviceSize;
 
-pub trait Image {
-  fn color_format(&self) -> ColorFormat;
-  fn size(&self) -> DeviceSize;
-  fn pixel_bytes(&self) -> Box<[u8]>;
-}
-
+#[derive(Clone, Copy)]
 pub enum ColorFormat {
   Rgba8,
 }
@@ -21,9 +16,28 @@ impl ColorFormat {
   }
 }
 
+pub struct PixelImage {
+  data: Cow<'static, [u8]>,
+  size: DeviceSize,
+  format: ColorFormat,
+}
+
+impl PixelImage {
+  #[inline]
+  pub fn new(data: Cow<'static, [u8]>, size: DeviceSize, format: ColorFormat) -> Self {
+    PixelImage { data, size, format }
+  }
+  #[inline]
+  pub fn color_format(&self) -> ColorFormat { self.format }
+  #[inline]
+  pub fn size(&self) -> DeviceSize { self.size }
+  #[inline]
+  pub fn pixel_bytes(&self) -> &[u8] { &self.data }
+}
+
 /// A image wrap for shallow compare.
 #[derive(Clone)]
-pub struct ShallowImage(Rc<dyn Image>);
+pub struct ShallowImage(Rc<PixelImage>);
 
 impl Hash for ShallowImage {
   #[inline]
@@ -48,13 +62,14 @@ impl Debug for ShallowImage {
       .finish()
   }
 }
+
 impl ShallowImage {
   #[inline]
-  pub fn new(img: Rc<dyn Image>) -> Self { Self(img) }
+  pub fn new(img: PixelImage) -> Self { Self(Rc::new(img)) }
 }
 
 impl std::ops::Deref for ShallowImage {
-  type Target = Rc<dyn Image>;
+  type Target = Rc<PixelImage>;
 
   #[inline]
   fn deref(&self) -> &Self::Target { &self.0 }

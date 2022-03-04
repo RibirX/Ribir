@@ -1,7 +1,9 @@
-use std::rc::Rc;
-
+#![feature(absolute_path)]
 use gpu::wgpu_backend_with_wnd;
-use painter::{Color, DeviceSize, PainterBackend, Image, ShallowImage, Brush, TileMode, image::ColorFormat};
+use painter::{
+  image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, ShallowImage,
+  TileMode,
+};
 use text::shaper::TextShaper;
 use winit::{
   event::*,
@@ -9,35 +11,12 @@ use winit::{
   window::WindowBuilder,
 };
 
-#[derive(Clone, Debug)]
-pub struct PureColorImage {
-  pub size: DeviceSize,
-  pub color: Color,
-}
-
-impl Image for PureColorImage {
-  fn pixel_bytes(&self) -> Box<[u8]> {
-    let vec =
-      vec![self.color.clone().into_raw(); self.size.area() as usize * 4].into_boxed_slice();
-    unsafe { std::mem::transmute(vec) }
-  }
-
-  fn size(&self) -> DeviceSize { self.size }
-
-  fn color_format(&self) -> ColorFormat { ColorFormat::Rgba8 }
-}
-
-impl PureColorImage {
-  pub fn new(color: Color, size: DeviceSize) -> Self { Self { size, color } }
-
-  pub fn shallow_img(color: Color, size: DeviceSize) -> ShallowImage {
-    ShallowImage::new(Rc::new(Self::new(color, size)))
-  }
-}
-
 fn main() {
   let event_loop = EventLoop::new();
-  let window = WindowBuilder::new().build(&event_loop).unwrap();
+  let window = WindowBuilder::new()
+    .with_inner_size(winit::dpi::LogicalSize::new(800f32, 600f32))
+    .build(&event_loop)
+    .unwrap();
 
   use futures::executor::block_on;
 
@@ -54,7 +33,29 @@ fn main() {
     shaper,
   ));
 
-  let img = PureColorImage::shallow_img(Color::BLUE, DeviceSize::new(1024, 1024));
+  let abs_path =
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).with_file_name("./gpu/examples/leaves.png");
+  let decoder = png::Decoder::new(std::fs::File::open(abs_path).unwrap());
+  let mut reader = decoder.read_info().unwrap();
+
+  let mut buf = vec![0; reader.output_buffer_size()];
+  let info = reader.next_frame(&mut buf).unwrap();
+
+  let data = if info.buffer_size() != buf.len() {
+    buf[..info.buffer_size()].to_owned()
+  } else {
+    buf
+  };
+
+  assert_eq!(info.color_type, png::ColorType::Rgba);
+  assert_eq!(info.bit_depth, png::BitDepth::Eight);
+
+  let img = PixelImage::new(
+    std::borrow::Cow::Owned(data),
+    DeviceSize::new(info.width, info.height),
+    ColorFormat::Rgba8,
+  );
+  let img = ShallowImage::new(img);
 
   event_loop.run(move |event, _, control_flow| match event {
     Event::WindowEvent { ref event, window_id } if window_id == window.id() => match event {
@@ -72,23 +73,38 @@ fn main() {
       _ => {}
     },
     Event::RedrawRequested(_) => {
-      let mut painter = painter::Painter::new(1.);
-      painter.set_brush(Brush::Image {
+      fn draw_arrow_path(painter: &mut Painter) {
+        painter
+          .begin_path((0., 70.).into())
+          .line_to((100.0, 70.0).into())
+          .line_to((100.0, 0.0).into())
+          .line_to((250.0, 100.0).into())
+          .line_to((100.0, 200.0).into())
+          .line_to((100.0, 130.0).into())
+          .line_to((0.0, 130.0).into())
+          .close_path();
+      }
+      let mut painter = Painter::new(2.);
+      let red_brush = Brush::Color(Color::RED);
+      let img_brush = Brush::Image {
         img: img.clone(),
-        tile_mode: TileMode::COVER_BOTH,
-      });
-      // painter.set_brush(Color::RED);
+        tile_mode: TileMode::REPEAT_BOTH,
+      };
 
-      painter
-        .begin_path((0., 70.).into())
-        .line_to((100.0, 70.0).into())
-        .line_to((100.0, 0.0).into())
-        .line_to((250.0, 100.0).into())
-        .line_to((100.0, 200.0).into())
-        .line_to((100.0, 130.0).into())
-        .line_to((0.0, 130.0).into())
-        .close_path();
-      painter.fill(None);
+      draw_arrow_path(&mut painter);
+      painter.fill(Some(red_brush.clone()));
+
+      painter.translate(300., 0.);
+      draw_arrow_path(&mut painter);
+      painter.stroke(Some(5.), Some(red_brush));
+
+      painter.translate(-300., 250.);
+      draw_arrow_path(&mut painter);
+      painter.fill(Some(img_brush.clone()));
+
+      painter.translate(300., 0.);
+      draw_arrow_path(&mut painter);
+      painter.stroke(Some(25.), Some(img_brush));
 
       let commands = painter.finish();
       gpu_backend.submit(commands, None).unwrap();

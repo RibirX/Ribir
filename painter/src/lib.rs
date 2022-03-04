@@ -10,7 +10,7 @@ pub use crate::painter::*;
 pub use path::*;
 pub mod image;
 mod style;
-pub use image::{Image, ShallowImage};
+pub use image::{PixelImage, ShallowImage};
 pub use style::*;
 
 /// The tag for device unit system to prevent mixing values from different
