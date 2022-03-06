@@ -40,12 +40,14 @@ pub enum PaintPath {
     font_face: CowRc<FontFace>,
     letter_space: f32,
     line_height: Option<f32>,
-  },
+  }, 
 }
 #[derive(Clone)]
 pub struct PaintCommand {
   pub path: PaintPath,
   pub transform: Transform,
+  // todo: image tile mode should only have repeat mode, fill or cover mode should support by
+  // painter across transform + repeat.
   pub brush: Brush,
   pub path_style: PathStyle,
 }

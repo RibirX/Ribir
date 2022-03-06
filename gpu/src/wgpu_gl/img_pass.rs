@@ -47,9 +47,10 @@ impl ImagePass {
         let format = match mem_texture.format {
           painter::image::ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8UnormSrgb,
         };
+        let (width, height) = mem_texture.size;
         let size = wgpu::Extent3d {
-          width: mem_texture.size.width,
-          height: mem_texture.size.height,
+          width: width as u32,
+          height: height as u32,
           depth_or_array_layers: 1,
         };
         let texture_descriptor = &wgpu::TextureDescriptor {

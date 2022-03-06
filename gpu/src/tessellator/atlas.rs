@@ -1,10 +1,10 @@
 use crate::{error::Error, ColorFormat, Texture};
 
-use super::mem_texture::MemTexture;
+use super::mem_texture::{MemTexture, Rect, Size};
 
 use algo::FrameCache;
 use guillotiere::{Allocation, AtlasAllocator, ChangeList};
-use painter::{DeviceSize, PixelImage, ShallowImage};
+use painter::{PixelImage, ShallowImage};
 use std::collections::HashMap;
 
 pub(crate) struct TextureAtlas {
@@ -15,7 +15,7 @@ pub(crate) struct TextureAtlas {
 
 impl TextureAtlas {
   const UNIT: usize = 4;
-  pub fn new(init_size: DeviceSize, max_size: DeviceSize) -> Self {
+  pub fn new(init_size: Size, max_size: Size) -> Self {
     let atlas_allocator = AtlasAllocator::new(init_size.to_untyped().to_i32());
 
     TextureAtlas {
@@ -26,30 +26,41 @@ impl TextureAtlas {
   }
 
   /// Store a image in the atlas, and return the allocation of it.
-  pub fn store_image(&mut self, image: &ShallowImage) -> Result<&Allocation, Error> {
+  pub fn store_image(&mut self, image: &ShallowImage) -> Result<Rect, Error> {
     if self.is_large_img_to_me(image.as_ref()) {
       return Err(Error::LargeImageAvoid);
     }
 
+    fn alloc_rect(alloc: &Allocation) -> Rect {
+      let rect = alloc.rectangle.to_rect();
+      guillotiere::euclid::rect(
+        rect.min_x() as u16,
+        rect.min_y() as u16,
+        rect.width() as u16,
+        rect.height() as u16,
+      )
+    }
     let mut alloc = None;
     if !self.allocated_map.contains_key(&image) {
-      let a = self.allocate(image.size())?;
-      self.texture.write_rect(
-        &a.rectangle.to_u32().to_rect().cast_unit(),
-        &image.pixel_bytes(),
-      );
+      let (w, h) = image.size();
+      let a = self.allocate(w, h)?;
+
+      self
+        .texture
+        .write_rect(&alloc_rect(&a), &image.pixel_bytes());
       alloc = Some(a);
     }
 
     let alloc = self
       .allocated_map
       .get_or_insert_with(&image, || alloc.unwrap());
-    Ok(alloc)
+    Ok(alloc_rect(&alloc))
   }
 
   pub fn is_large_img_to_me(&self, img: &PixelImage) -> bool {
     let max = self.texture.max_size();
-    return max.lower_than(img.size() * 2).any();
+    let (img_w, img_h) = img.size();
+    max.width < img_w * 2 || max.height < img_h * 2
   }
 
   pub fn as_render_texture(&self, id: usize) -> Texture {
@@ -57,7 +68,7 @@ impl TextureAtlas {
     let data = tex.is_updated().then(|| tex.as_bytes());
     Texture {
       id,
-      size: tex.size(),
+      size: tex.size().into(),
       data,
       format: ColorFormat::Rgba8,
     }
@@ -91,9 +102,12 @@ impl TextureAtlas {
     self.allocated_map.clear();
   }
 
-  fn allocate(&mut self, size: DeviceSize) -> Result<Allocation, Error> {
+  fn allocate(&mut self, width: u16, height: u16) -> Result<Allocation, Error> {
     loop {
-      if let Some(alloc) = self.atlas_allocator.allocate(size.to_untyped().to_i32()) {
+      if let Some(alloc) = self
+        .atlas_allocator
+        .allocate((width as i32, height as i32).into())
+      {
         break Ok(alloc);
       }
       if !self.grow() {

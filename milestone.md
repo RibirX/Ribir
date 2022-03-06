@@ -21,8 +21,9 @@
     - [x] Row
     - [x] Column
     - [ ] Center
+    - [x] Flex
 
-## paint & event, runnable (6.1)
+## TodoMVP
 
 - [x] Widget Derive
 - [x] paint
@@ -31,42 +32,36 @@
 - [x] Theme data.
 - [ ] event  
   - [ ] window event
+  - [ ] application event, block on multi main window support
   - [x] event loop
   - [x] bubbling framework
-  - [ ] event type
+  - [x] common events
     - [x] point event ?
-    - [ ] window event ?
     - [x] keyboard event
-      [x] wheel event
+    - [x] wheel event
+    - [x] focus event
 
+- [ ] include_svg.
 - widgets for todo demo
 - [ ] simple widget
   - [ ] Button
   - [ ] Text
-  - [ ] List
+  - [ ] ListView
   - [x] Scrollable
-  - [ ] Table scroll
   - [x] Checkbox
-- [ ] layout widget
-  - [ ] Center
-  - [x] Row
-- [ ] event widget
-  - [ ] input widget.
-  - [x] click event listener
-
+- [ ] input widget.
+- [ ] animations
 - [x] A derive macro for state impl
 - [x] refactor stateful
-  - [x] stateful should be a widget not a attr.
   - [x] into_sateful should not depend on `BuildCtx`
 - [x] auto implement declare macro to build widget.
 
-##  we need readable & learnable documents.
-
-- [ ] readme
-- [ ] contributing
-- [ ] tutorial
-- [ ] api docs cover
-- [ ] inside framework
+-## we need readable & learnable documents.
+  - [ ] readme
+  - [ ] contributing
+  - [ ] tutorial
+  - [ ] api docs cover
+  - [ ] how framework work
 
 ## cross platform
 
@@ -78,7 +73,6 @@
 - [ ] web / WebAssembly
 
 
-## animation
 
 ## parallelism layout 
 
@@ -90,5 +84,5 @@
 
 ## declare language to describe ui.
 
-provide `declare!` macro.
+provided `declare!` macro.
 

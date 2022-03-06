@@ -73,7 +73,7 @@ pub struct Texture<'a> {
   /// The identify of the texture, unique in adjacent frames.
   pub id: usize,
   /// The texture size.
-  pub size: DeviceSize,
+  pub size: (u16, u16),
   /// The data of the texture. A `None` value will give if the texture is not
   /// change to latest frame, should reuse the gpu texture.
   pub data: Option<&'a [u8]>,
@@ -119,15 +119,17 @@ pub struct ColorPrimitive {
 #[repr(C)]
 #[derive(AsBytes, PartialEq, Clone)]
 pub struct TexturePrimitive {
-  /// Texture offset in texture atlas.
-  pub(crate) tex_offset: [u32; 2],
-  /// The factor use to calc the texture sampler position of vertex. Vertex calc
-  /// its texture sampler position (0..1) across:  vertex position multiplied
-  /// by factor then keep fractional part of result.
+  /// Texture rect(x, y ,width, height) in texture, maybe placed in a
+  /// atlas.
+  pub(crate) tex_rect: [u16; 4],
+  /// The factor use to calc the texture sampler position of vertex relative to
+  /// the texture. Vertex calc its texture sampler pixel position across:
+  /// vertex position multiplied by factor then modular texture size.
   ///
-  /// - Repeat mode should be  1 / sub_texture_size
-  /// - Cover mode should be 1 / path_size
+  /// - Repeat mode should be 1
+  /// - Cover mode should be  path.max / texture.size
   pub(crate) factor: [f32; 2],
+
   /// the transform vertex to apply
   pub(crate) transform: [[f32; 2]; 3],
 }

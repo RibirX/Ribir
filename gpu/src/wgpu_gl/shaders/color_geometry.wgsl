@@ -12,11 +12,11 @@ struct Primitive {
 };
 
 struct Uniform {
-  transform: mat4x4<f32>;
+  matrix: mat4x4<f32>;
 };
 
 [[group(0), binding(0)]]
-var<uniform> global_uniform: Uniform;
+var<uniform> coord_matrix: Uniform;
 
 struct PrimitiveInfo {
   primitives: array<Primitive>;
@@ -39,8 +39,7 @@ fn vs_main([[location(0)]] pos: vec2<f32>, [[location(1)]] prim_id: u32) -> Vert
 
   var out: VertexOutput;
 
-  let pos: vec4<f32> =  global_uniform.transform * vec4<f32>(canvas_coord, 0.0, 1.0);
-  out.clip_position = pos;
+  out.clip_position = coord_matrix.matrix * vec4<f32>(canvas_coord, 0.0, 1.0);
   let rgba = prim.rgba;
   out.f_color = vec4<f32>(rgba[0], rgba[1], rgba[2], rgba[3]);
 

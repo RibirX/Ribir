@@ -4,10 +4,7 @@ use crate::{
 };
 use algo::FrameCache;
 use lyon_tessellation::{path::Path, *};
-use painter::{
-  Brush, DeviceRect, DeviceSize, PaintCommand, PaintPath, PathStyle, Rect, TileMode, Transform,
-  Vector,
-};
+use painter::{Brush, PaintCommand, PaintPath, PathStyle, Rect, TileMode, Transform, Vector};
 use std::{
   collections::VecDeque,
   hash::Hash,
@@ -89,13 +86,13 @@ impl Tessellator {
   /// size. `threshold` is the scale difference of a path need to retessellate.
   #[inline]
   pub fn new(
-    tex_init_size: DeviceSize,
-    tex_max_size: DeviceSize,
+    tex_init_size: (u16, u16),
+    tex_max_size: (u16, u16),
     threshold: f32,
     shaper: TextShaper,
   ) -> Self {
     Self {
-      atlas: TextureAtlas::new(tex_init_size, tex_max_size),
+      atlas: TextureAtlas::new(tex_init_size.into(), tex_max_size.into()),
       buffer: TessData {
         vertex_batch_limit: MAX_VERTEX_CAN_BATCH,
         threshold,
@@ -140,9 +137,11 @@ impl Tessellator {
           assert!(count > 0);
           while !self.buffer.buffer_list.is_empty() {
             unsafe { self.buffer.fill_vertices() };
-            let atlas_tex = self.atlas.as_render_texture(ATLAS_ID);
-            self.buffer.submit_vertices(&mut gpu_submit, atlas_tex);
-            self.atlas.gpu_synced();
+            self.buffer.submit_vertices(&mut gpu_submit, || {
+              // self.atlas.gpu_synced();
+              let atlas_tex = self.atlas.as_render_texture(ATLAS_ID);
+              atlas_tex
+            });
           }
           submitted += count;
         }
@@ -197,12 +196,11 @@ impl Tessellator {
     });
 
     let data = img_data.as_ref().map(|d| &**d);
-    let texture = Texture { id, data, size, format };
 
     let primitive = Primitive::texture_prim(
       tile_mode,
       cmd.transform.clone(),
-      &DeviceRect::from_size(img.size()),
+      &mem_texture::Rect::from_size(img.size().into()),
       || cmd.box_rect_without_transform(),
     );
     let shaper = self.buffer.shaper.clone();
@@ -216,7 +214,9 @@ impl Tessellator {
     });
     assert!(res);
     unsafe { self.buffer.fill_vertices() };
-    self.buffer.submit_vertices(&mut gpu_submit, texture);
+    self
+      .buffer
+      .submit_vertices(&mut gpu_submit, || Texture { id, data, size, format });
   }
 
   fn try_fill_atlas(&mut self, commands: &[PaintCommand]) -> bool {
@@ -393,7 +393,11 @@ impl TessData {
   }
 
   /// submit vertexes and return how many primitives consumed.
-  fn submit_vertices<F: FnMut(RenderData)>(&mut self, f: &mut F, texture: Texture) {
+  fn submit_vertices<'a, F: FnMut(RenderData), T>(&mut self, f: &mut F, texture: T)
+  where
+    F: FnMut(RenderData),
+    T: FnOnce() -> Texture<'a>,
+  {
     if self.indices.is_empty() {
       return;
     }
@@ -408,7 +412,7 @@ impl TessData {
         vertices: &self.vertices,
         indices: &self.indices,
         primitives: p.as_slice(),
-        texture,
+        texture: texture(),
       }),
     };
     f(render_data);
@@ -496,13 +500,10 @@ impl Primitive {
         Ok(Primitive::Color(c))
       }
       Brush::Image { img, tile_mode } => {
-        let alloc = atlas.store_image(img)?;
-        let t = Self::texture_prim(
-          tile_mode,
-          cmd.transform.clone(),
-          &alloc.rectangle.to_u32().to_rect().cast_unit(),
-          || cmd.box_rect_without_transform(),
-        );
+        let rect = atlas.store_image(img)?;
+        let t = Self::texture_prim(tile_mode, cmd.transform.clone(), &rect, || {
+          cmd.box_rect_without_transform()
+        });
         Ok(t)
       }
       Brush::Gradient => todo!(),
@@ -512,22 +513,24 @@ impl Primitive {
   fn texture_prim<F: FnOnce() -> Rect>(
     tile_mode: &TileMode,
     transform: Transform,
-    texture_rect: &DeviceRect,
+    texture_rect: &mem_texture::Rect,
     path_box: F,
   ) -> Self {
-    let (mut x_base, mut y_base) = texture_rect.size.to_f32().to_tuple();
+    let (x, y) = texture_rect.min().to_tuple();
+    let (w, h) = texture_rect.size.to_tuple();
+    let mut factor = [1., 1.];
     if tile_mode.is_cover_mode() {
       let box_rect = path_box();
       if tile_mode.contains(TileMode::COVER_X) {
-        x_base = box_rect.width();
+        factor[0] = w as f32 / box_rect.width();
       }
       if tile_mode.contains(TileMode::COVER_Y) {
-        y_base = box_rect.height()
+        factor[1] = h as f32 / box_rect.height();
       }
     }
     let t = TexturePrimitive {
-      tex_offset: texture_rect.min().to_array(),
-      factor: [1. / x_base, 1. / y_base],
+      tex_rect: [x, y, w, h],
+      factor,
       transform: transform.to_arrays(),
     };
     Primitive::Texture(t)
@@ -797,17 +800,12 @@ mod tests {
   extern crate test;
   use test::Bencher;
 
-  use super::{atlas::tests::PureColorImage, *};
+  use super::{atlas::tests::color_image, *};
 
   fn tessellator() -> Tessellator {
     let shaper = TextShaper::default();
     shaper.font_db_mut().load_system_fonts();
-    Tessellator::new(
-      DeviceSize::new(128, 128),
-      DeviceSize::new(512, 512),
-      0.01,
-      shaper,
-    )
+    Tessellator::new((128, 128), (512, 512), 0.01, shaper)
   }
 
   fn circle_rectangle_color_paint(painter: &mut Painter) {
@@ -821,7 +819,7 @@ mod tests {
   }
 
   fn two_img_paint(painter: &mut Painter) {
-    let img = PureColorImage::shallow_img(Color::YELLOW, DeviceSize::new(100, 100));
+    let img = color_image(Color::YELLOW, DeviceSize::new(100, 100));
     painter
       .set_brush(Brush::Image {
         img,
@@ -886,7 +884,7 @@ mod tests {
     let mut painter = Painter::new(1.);
 
     two_img_paint(&mut painter);
-    let large_img = PureColorImage::shallow_img(Color::YELLOW, DeviceSize::new(1024, 1024));
+    let large_img = color_image(Color::YELLOW, DeviceSize::new(1024, 1024));
     painter.set_brush(Brush::Image {
       img: large_img,
       tile_mode: TileMode::REPEAT_BOTH,

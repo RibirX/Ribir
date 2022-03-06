@@ -1,19 +1,21 @@
-use painter::{DeviceRect, DeviceSize};
 use zerocopy::AsBytes;
 
+pub type Rect = lyon_tessellation::geom::Rect<u16>;
+pub type Size = lyon_tessellation::geom::Size<u16>;
 pub struct MemTexture<const N: usize> {
-  max_size: DeviceSize,
-  size: DeviceSize,
+  // todo: not use tuple replace Size
+  max_size: Size,
+  size: Size,
   array: Box<[u8]>,
   updated: bool,
 }
 
 impl<const N: usize> MemTexture<N> {
-  pub fn new(size: DeviceSize, max_size: DeviceSize) -> Self {
+  pub fn new(size: Size, max_size: Size) -> Self {
     Self {
       size,
       max_size,
-      array: Self::alloc_mem(size),
+      array: Self::alloc_mem(size.width, size.height),
       updated: false,
     }
   }
@@ -22,7 +24,7 @@ impl<const N: usize> MemTexture<N> {
   pub fn is_updated(&self) -> bool { self.updated }
 
   #[inline]
-  pub fn size(&self) -> DeviceSize { self.size }
+  pub fn size(&self) -> Size { self.size }
 
   /// Expand the texture.
   /// Return true if expand successful, false if this texture reach the limit.
@@ -38,8 +40,11 @@ impl<const N: usize> MemTexture<N> {
         self.size.width *= 2;
       }
 
-      let old = std::mem::replace(&mut self.array, Self::alloc_mem(self.size));
-      self.write_rect(&DeviceRect::from_size(old_size), &old);
+      let old = std::mem::replace(
+        &mut self.array,
+        Self::alloc_mem(self.size.width, self.size.height),
+      );
+      self.write_rect(&Rect::from_size(old_size), &old);
       self.updated = true;
     }
     success
@@ -50,9 +55,12 @@ impl<const N: usize> MemTexture<N> {
 
   /// Use `data` to fill the `rect` sub range to this 2d array, `rect` should
   /// not over this 2d array's boundary.
-  pub fn write_rect(&mut self, rect: &DeviceRect, data: &[u8]) {
-    debug_assert_eq!(rect.area() as usize * N, data.len());
-    debug_assert!(DeviceRect::from_size(self.size).contains_rect(rect));
+  pub fn write_rect(&mut self, rect: &Rect, data: &[u8]) {
+    debug_assert_eq!(
+      rect.width() as usize * rect.height() as usize * N,
+      data.len()
+    );
+    debug_assert!(Rect::from_size(self.size).contains_rect(rect));
     let rect = rect.to_usize();
     let row_bytes = rect.width() * N;
     let x_range = rect.min_x() * N..rect.max_x() * N;
@@ -69,10 +77,10 @@ impl<const N: usize> MemTexture<N> {
   pub fn data_synced(&mut self) { self.updated = false; }
 
   // The max size the texture can grow
-  pub fn max_size(&self) -> DeviceSize { self.max_size }
+  pub fn max_size(&self) -> Size { self.max_size }
 
-  fn alloc_mem(size: DeviceSize) -> Box<[u8]> {
-    let bytes = size.area() as usize * N;
+  fn alloc_mem(width: u16, height: u16) -> Box<[u8]> {
+    let bytes = width as usize * height as usize * N;
     vec![0; bytes].into_boxed_slice()
   }
 }
@@ -101,22 +109,19 @@ mod tests {
   use super::*;
   #[test]
   fn update_texture() {
-    let mut tex = MemTexture::<1>::new(DeviceSize::new(8, 8), DeviceSize::new(512, 512));
+    let mut tex = MemTexture::<1>::new(Size::new(8, 8), Size::new(512, 512));
 
-    tex.write_rect(
-      &DeviceRect::new(DevicePoint::new(0, 0), DeviceSize::new(2, 1)),
-      &[0, 1],
-    );
+    tex.write_rect(&Rect::new(DevicePoint::new(0, 0), Size::new(2, 1)), &[0, 1]);
     assert_eq!(&tex[0][0..4], &[00, 1, 0, 0]);
 
     tex.write_rect(
-      &DeviceRect::new(DevicePoint::new(3, 7), DeviceSize::new(2, 1)),
+      &Rect::new(DevicePoint::new(3, 7), Size::new(2, 1)),
       &[73, 74],
     );
     assert_eq!(tex[7][3], 73);
 
     tex.write_rect(
-      &DeviceRect::new(DevicePoint::new(4, 3), DeviceSize::new(2, 2)),
+      &Rect::new(DevicePoint::new(4, 3), Size::new(2, 2)),
       &[34, 35, 44, 45],
     );
     assert_eq!(&tex[3][4..], &[34, 35, 0, 0]);
@@ -129,8 +134,8 @@ mod tests {
 
   #[test]
   fn grow() {
-    let mut tex = MemTexture::<1>::new(DeviceSize::new(2, 1), DeviceSize::new(512, 512));
-    tex.write_rect(&DeviceRect::new((0, 0).into(), (1, 1).into()), &[1u8]);
+    let mut tex = MemTexture::<1>::new(Size::new(2, 1), Size::new(512, 512));
+    tex.write_rect(&Rect::new((0, 0).into(), (1, 1).into()), &[1u8]);
 
     assert_eq!(tex.as_bytes().len(), 2);
     assert_eq!(tex.size().to_array(), [2, 1]);

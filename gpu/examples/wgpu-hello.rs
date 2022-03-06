@@ -1,8 +1,8 @@
 #![feature(absolute_path)]
 use gpu::wgpu_backend_with_wnd;
 use painter::{
-  image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, ShallowImage,
-  TileMode,
+  image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, Rect,
+  ShallowImage, Size, TileMode,
 };
 use text::shaper::TextShaper;
 use winit::{
@@ -52,7 +52,8 @@ fn main() {
 
   let img = PixelImage::new(
     std::borrow::Cow::Owned(data),
-    DeviceSize::new(info.width, info.height),
+    info.width as u16,
+    info.height as u16,
     ColorFormat::Rgba8,
   );
   let img = ShallowImage::new(img);
@@ -105,6 +106,10 @@ fn main() {
       painter.translate(300., 0.);
       draw_arrow_path(&mut painter);
       painter.stroke(Some(25.), Some(img_brush));
+
+      // simple rect to debug
+      // painter.rect(&Rect::from_size(Size::new(300., 300.)));
+      // painter.fill(Some(img_brush));
 
       let commands = painter.finish();
       gpu_backend.submit(commands, None).unwrap();

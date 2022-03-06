@@ -16,15 +16,15 @@ use zerocopy::AsBytes;
 mod img_pass;
 use self::{color_pass::ColorPass, img_pass::ImagePass};
 
-const TEXTURE_INIT_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
-const TEXTURE_MAX_SIZE: DeviceSize = DeviceSize::new(4096, 4096);
+const TEXTURE_INIT_SIZE: (u16, u16) = (1024, 1024);
+const TEXTURE_MAX_SIZE: (u16, u16) = (4096, 4096);
 
 /// create wgpu backend with window
 pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
   window: &W,
   size: DeviceSize,
-  tex_init_size: Option<DeviceSize>,
-  tex_max_size: Option<DeviceSize>,
+  tex_init_size: Option<(u16, u16)>,
+  tex_max_size: Option<(u16, u16)>,
   tolerance: f32,
   shaper: TextShaper,
 ) -> GpuBackend<WgpuGl> {
@@ -39,8 +39,8 @@ pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
 /// create wgpu backend windowless
 pub async fn wgpu_backend_headless(
   size: DeviceSize,
-  tex_init_size: Option<DeviceSize>,
-  tex_max_size: Option<DeviceSize>,
+  tex_init_size: Option<(u16, u16)>,
+  tex_max_size: Option<(u16, u16)>,
   tolerance: f32,
   shaper: TextShaper,
 ) -> GpuBackend<WgpuGl<surface::TextureSurface>> {

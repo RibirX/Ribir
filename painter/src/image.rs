@@ -1,7 +1,5 @@
 use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
 
-use crate::DeviceSize;
-
 #[derive(Clone, Copy)]
 pub enum ColorFormat {
   Rgba8,
@@ -18,19 +16,19 @@ impl ColorFormat {
 
 pub struct PixelImage {
   data: Cow<'static, [u8]>,
-  size: DeviceSize,
+  size: (u16, u16),
   format: ColorFormat,
 }
 
 impl PixelImage {
   #[inline]
-  pub fn new(data: Cow<'static, [u8]>, size: DeviceSize, format: ColorFormat) -> Self {
-    PixelImage { data, size, format }
+  pub fn new(data: Cow<'static, [u8]>, width: u16, height: u16, format: ColorFormat) -> Self {
+    PixelImage { data, size: (width, height), format }
   }
   #[inline]
   pub fn color_format(&self) -> ColorFormat { self.format }
   #[inline]
-  pub fn size(&self) -> DeviceSize { self.size }
+  pub fn size(&self) -> (u16, u16) { self.size }
   #[inline]
   pub fn pixel_bytes(&self) -> &[u8] { &self.data }
 }
@@ -56,7 +54,7 @@ impl Eq for ShallowImage {}
 
 impl Debug for ShallowImage {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let DeviceSize { width, height, .. } = self.size();
+    let (width, height) = self.size;
     f.debug_tuple("ShallowImage")
       .field(&format!("{width}x{height}"))
       .finish()
