@@ -79,6 +79,8 @@ where
     })
   }
 
+  pub fn remove(&mut self, key: K) -> Option<V> { self.cache.remove(&key).map(|c| c.value) }
+
   pub fn insert(&mut self, key: K, value: V) -> Option<V> {
     self
       .cache
@@ -91,6 +93,7 @@ where
       )
       .map(|c| c.value)
   }
+
   #[inline]
   pub fn as_uninit_map<A>(&mut self) -> UninitMap<K, V, A>
   where
@@ -98,6 +101,9 @@ where
   {
     UninitMap { cache: self, uninit: vec![] }
   }
+
+  #[inline]
+  pub fn is_empty(&self) -> bool { self.cache.is_empty() }
 
   #[inline]
   pub fn len(&self) -> usize { self.cache.len() }
@@ -164,7 +170,7 @@ struct SendMutPtr<T>(*mut T);
 // to a heap and promise not access it before the task finish.
 unsafe impl<T> Send for SendMutPtr<T> {}
 impl<T> Clone for SendMutPtr<T> {
-  fn clone(&self) -> Self { Self(self.0.clone()) }
+  fn clone(&self) -> Self { Self(self.0) }
 }
 impl<T> Copy for SendMutPtr<T> {}
 impl<T> SendMutPtr<T> {
@@ -212,9 +218,9 @@ where
     }
   }
 
-  /// Parallel init the uninit values, let the pointer return by
-  /// `get_or_delay_init` valid.
-  pub unsafe fn par_init_with<F>(mut self, default: F)
+  /// Parallel init the uninit values, after this method called the pointer
+  /// return by `get_or_delay_init` valid to use.
+  pub fn par_init_with<F>(mut self, default: F)
   where
     F: Fn(A) -> V::Target + Send + Sync,
     A: Send,
@@ -223,7 +229,7 @@ where
 
     to_init
       .into_par_iter()
-      .for_each(|UninitRecord { mut uninit_ptr, key: init_arg }| {
+      .for_each(|UninitRecord { mut uninit_ptr, key: init_arg }| unsafe {
         *uninit_ptr.as_mut() = default(init_arg);
       });
   }

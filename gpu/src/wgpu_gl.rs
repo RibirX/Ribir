@@ -1,7 +1,4 @@
-use crate::{
-  tessellator::Tessellator, ColorRenderData, GlRender, GpuBackend, RenderData, TextureRenderData,
-  Vertex,
-};
+use crate::{tessellator::Tessellator, GlRender, GpuBackend, TriangleLists, Vertex};
 use futures::executor::block_on;
 use painter::DeviceSize;
 use std::iter;
@@ -68,7 +65,17 @@ pub struct WgpuGl<S: Surface = WindowSurface> {
   img_pass: ImagePass,
   coordinate_matrix: wgpu::Buffer,
   primitives_layout: wgpu::BindGroupLayout,
-  encoder: Option<wgpu::CommandEncoder>,
+  vertex_buffers: Option<VertexBuffers>,
+  anti_aliasing: AntiAliasing,
+  multisample_framebuffer: Option<wgpu::TextureView>,
+  /// if the frame already draw something.
+  empty_frame: bool,
+}
+struct VertexBuffers {
+  vertices: wgpu::Buffer,
+  vertex_size: usize,
+  indices: wgpu::Buffer,
+  index_size: usize,
 }
 
 impl WgpuGl<WindowSurface> {
@@ -135,44 +142,94 @@ impl WgpuGl<TextureSurface> {
 }
 
 impl<S: Surface> GlRender for WgpuGl<S> {
-  fn submit_render_data(&mut self, data: RenderData) {
-    if self.encoder.is_none() {
-      let encoder = self
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Create Encoder") });
-      self.encoder = Some(encoder);
-    }
+  fn begin_frame(&mut self) { self.empty_frame = true; }
 
-    match data {
-      RenderData::Color(data) => self.render_color(data),
-      RenderData::Image(data) => self.render_image(data),
-    }
-  }
-
-  fn resize(&mut self, size: DeviceSize) {
-    self.surface.resize(&self.device, &self.queue, size);
-    self.coordinate_matrix = coordinate_matrix_buffer_2d(&self.device, size.width, size.height);
+  fn add_texture(&mut self, texture: crate::Texture) {
     self
-      .color_pass
-      .resize(size, &self.coordinate_matrix, &self.device)
+      .img_pass
+      .add_texture(texture, &self.device, &self.queue)
   }
 
-  fn finish<'a>(
+  fn draw_triangles(&mut self, data: TriangleLists) {
+    self.write_vertex_buffer(data.vertices, data.indices);
+    let vertex_buffers = self.vertex_buffers.as_ref().unwrap();
+
+    let mut encoder = self.create_command_encoder();
+    let prim_bind_group = self.create_primitives_bind_group(data.primitives);
+
+    let Self {
+      device,
+      coordinate_matrix,
+      color_pass,
+      img_pass,
+      ..
+    } = self;
+
+    let uniforms = data
+      .commands
+      .iter()
+      .filter_map(|cmd| match cmd {
+        crate::DrawTriangles::Texture { texture_id, .. } => {
+          let uniform = img_pass.create_texture_uniform(device, *texture_id, coordinate_matrix);
+          Some((texture_id, uniform))
+        }
+        _ => None,
+      })
+      .collect::<std::collections::HashMap<_, _>>();
+
+    let view = self
+      .surface
+      .current_texture()
+      .create_view(&wgpu::TextureViewDescriptor::default());
+
+    {
+      let (view, resolve_target, store) = self.multisample_framebuffer.as_ref().map_or_else(
+        || (&view, None, true),
+        |multi_sample| (multi_sample, Some(&view), false),
+      );
+      let load = if self.empty_frame {
+        wgpu::LoadOp::Clear(wgpu::Color::WHITE)
+      } else {
+        wgpu::LoadOp::Load
+      };
+      let ops = wgpu::Operations { load, store };
+      let rpass_color_attachment = wgpu::RenderPassColorAttachment { view, resolve_target, ops };
+
+      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("Triangles render pass"),
+        color_attachments: &[rpass_color_attachment],
+        depth_stencil_attachment: None,
+      });
+
+      render_pass.set_vertex_buffer(0, vertex_buffers.vertices.slice(..));
+      render_pass.set_index_buffer(vertex_buffers.indices.slice(..), wgpu::IndexFormat::Uint32);
+      render_pass.set_bind_group(1, &prim_bind_group, &[]);
+      data.commands.iter().for_each(|cmd| match cmd {
+        crate::DrawTriangles::Color(rg) => {
+          render_pass.set_pipeline(&color_pass.pipeline);
+          render_pass.set_bind_group(0, &color_pass.uniform, &[]);
+          render_pass.draw_indexed(rg.clone(), 0, 0..1);
+        }
+        crate::DrawTriangles::Texture { rg, texture_id } => {
+          render_pass.set_pipeline(&img_pass.pipeline);
+          render_pass.set_bind_group(0, uniforms.get(texture_id).unwrap(), &[]);
+          render_pass.draw_indexed(rg.clone(), 0, 0..1);
+        }
+      });
+    }
+    self.empty_frame = false;
+
+    self.queue.submit(iter::once(encoder.finish()));
+  }
+
+  fn end_frame<'a>(
     &mut self,
-    frame_data: Option<
-      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
-    >,
+    capture: Option<Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>>,
   ) -> Result<(), &str> {
-    let mut encoder = match self.encoder.take() {
-      Some(e) => e,
-      None => return Ok(()),
-    };
-
-    if let Some(frame_data) = frame_data {
+    if let Some(capture) = capture {
+      let mut encoder = self.create_command_encoder();
       let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut encoder);
-
       self.queue.submit(iter::once(encoder.finish()));
-      self.surface.present();
 
       let buffer_slice = buffer.slice(..);
       let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
@@ -190,15 +247,20 @@ impl<S: Surface> GlRender for WgpuGl<S> {
         &slice.as_ref()[offset..offset + img_bytes_pre_row]
       });
 
-      frame_data(size, Box::new(rows));
-    } else {
-      self.queue.submit(iter::once(encoder.finish()));
-      self.surface.present();
+      capture(size, Box::new(rows));
     }
-
+    self.surface.present();
     self.img_pass.end_frame();
 
     Ok(())
+  }
+
+  fn resize(&mut self, size: DeviceSize) {
+    self.surface.resize(&self.device, &self.queue, size);
+    self.coordinate_matrix = coordinate_matrix_buffer_2d(&self.device, size.width, size.height);
+    self
+      .color_pass
+      .resize(&self.coordinate_matrix, &self.device)
   }
 }
 
@@ -229,16 +291,18 @@ impl<S: Surface> WgpuGl<S> {
     let primitive_layout = primitives_layout(&device);
     let coordinate_matrix = coordinate_matrix_buffer_2d(&device, size.width, size.height);
 
+    let msaa_count = anti_aliasing as u32;
     let color_pass = ColorPass::new(
       &device,
-      size,
       surface.format(),
       &coordinate_matrix,
       &primitive_layout,
-      anti_aliasing,
+      msaa_count,
     );
-    let texture_pass = ImagePass::new(&device, surface.format());
+    let texture_pass = ImagePass::new(&device, surface.format(), &primitive_layout, msaa_count);
 
+    let multisample_framebuffer =
+      Self::multisample_framebuffer(&device, size, surface.format(), msaa_count);
     WgpuGl {
       device,
       surface,
@@ -247,116 +311,68 @@ impl<S: Surface> WgpuGl<S> {
       img_pass: texture_pass,
       coordinate_matrix,
       primitives_layout: primitive_layout,
-      encoder: None,
+      empty_frame: true,
+      vertex_buffers: None,
+      anti_aliasing,
+      multisample_framebuffer,
     }
   }
 
   #[inline]
   pub fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
-    self.color_pass.set_anti_aliasing(
-      anti_aliasing,
-      self.surface.view_size(),
-      &self.primitives_layout,
-      &self.device,
-    );
-  }
-
-  fn render_color(&mut self, data: ColorRenderData) {
-    let prim_bind_group = self.create_primitives_bind_group(&data.primitives);
-    let Self { device, surface, .. } = self;
-
-    // todo: we can reuse the buffer
-    let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-      label: Some("Vertices buffer"),
-      contents: data.vertices.as_bytes(),
-      usage: wgpu::BufferUsages::VERTEX,
-    });
-    let indices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-      contents: data.indices.as_bytes(),
-      usage: wgpu::BufferUsages::INDEX,
-      label: Some("Indices buffer"),
-    });
-
-    let view = surface
-      .current_texture()
-      .create_view(&wgpu::TextureViewDescriptor::default());
-    {
-      let color_pass = &self.color_pass;
-      let rpass_color_attachment = color_pass.color_attachments(&view);
-
-      let mut render_pass =
-        self
-          .encoder
-          .as_mut()
-          .unwrap()
-          .begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Color geometry render pass"),
-            color_attachments: &[rpass_color_attachment],
-            depth_stencil_attachment: None,
-          });
-      render_pass.set_pipeline(&color_pass.pipeline);
-      render_pass.set_vertex_buffer(0, vertices_buffer.slice(..));
-      render_pass.set_index_buffer(indices_buffer.slice(..), wgpu::IndexFormat::Uint32);
-      render_pass.set_bind_group(0, &color_pass.uniform, &[]);
-      render_pass.set_bind_group(1, &prim_bind_group, &[]);
-
-      render_pass.draw_indexed(0..data.indices.len() as u32, 0, 0..1);
+    if self.anti_aliasing != anti_aliasing {
+      let Self {
+        color_pass,
+        img_pass,
+        primitives_layout,
+        surface,
+        device,
+        ..
+      } = self;
+      self.anti_aliasing = anti_aliasing;
+      let msaa_count = anti_aliasing as u32;
+      let format = surface.format();
+      color_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
+      img_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
     }
   }
 
-  fn render_image(&mut self, data: TextureRenderData) {
-    let prim_bind_group = self.create_primitives_bind_group(&data.primitives);
-    let Self { device, surface, queue, .. } = self;
-
-    let vertices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-      label: Some("Vertices buffer"),
-      contents: data.vertices.as_bytes(),
-      usage: wgpu::BufferUsages::VERTEX,
-    });
-    let indices_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-      contents: data.indices.as_bytes(),
-      usage: wgpu::BufferUsages::INDEX,
-      label: Some("Indices buffer"),
-    });
-
-    let view = surface
-      .current_texture()
-      .create_view(&wgpu::TextureViewDescriptor::default());
-    {
-      let uniform =
-        self
-          .img_pass
-          .create_texture_uniform(device, data.texture, &self.coordinate_matrix, queue);
-
-      let mut render_pass =
-        self
-          .encoder
-          .as_mut()
-          .unwrap()
-          .begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Image geometry render pass"),
-            color_attachments: &[wgpu::RenderPassColorAttachment {
-              view: &view,
-              resolve_target: None,
-              ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                store: true,
-              },
-            }],
-            depth_stencil_attachment: None,
-          });
-      render_pass.set_pipeline(&self.img_pass.pipeline);
-      render_pass.set_vertex_buffer(0, vertices_buffer.slice(..));
-      render_pass.set_index_buffer(indices_buffer.slice(..), wgpu::IndexFormat::Uint32);
-
-      render_pass.set_bind_group(0, &uniform, &[]);
-      render_pass.set_bind_group(1, &prim_bind_group, &[]);
-
-      render_pass.draw_indexed(0..data.indices.len() as u32, 0, 0..1);
-    }
+  fn create_command_encoder(&self) -> wgpu::CommandEncoder {
+    self
+      .device
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Create Encoder") })
   }
 
-  fn create_primitives_bind_group<T: AsBytes>(&mut self, primitives: &[T]) -> wgpu::BindGroup {
+  fn multisample_framebuffer(
+    device: &wgpu::Device,
+    size: DeviceSize,
+    format: wgpu::TextureFormat,
+    sample_count: u32,
+  ) -> Option<wgpu::TextureView> {
+    (sample_count > 1).then(|| {
+      let multisampled_texture_extent = wgpu::Extent3d {
+        width: size.width,
+        height: size.height,
+        depth_or_array_layers: 1,
+      };
+
+      let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+        size: multisampled_texture_extent,
+        mip_level_count: 1,
+        sample_count,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        label: None,
+      };
+
+      device
+        .create_texture(multisampled_frame_descriptor)
+        .create_view(&wgpu::TextureViewDescriptor::default())
+    })
+  }
+
+  fn create_primitives_bind_group<T: AsBytes>(&self, primitives: &[T]) -> wgpu::BindGroup {
     let primitives_buffer = self
       .device
       .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -372,6 +388,50 @@ impl<S: Surface> WgpuGl<S> {
       }],
       label: Some("Primitive buffer bind group"),
     })
+  }
+
+  fn write_vertex_buffer(&mut self, vertices: &[Vertex], indices: &[u32]) {
+    let Self { device, vertex_buffers, .. } = self;
+    let new_vertex_buffer = || {
+      device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Vertices buffer"),
+        contents: vertices.as_bytes(),
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+      })
+    };
+    let new_index_buffer = || {
+      device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        contents: indices.as_bytes(),
+        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        label: Some("Indices buffer"),
+      })
+    };
+
+    if let Some(buffers) = vertex_buffers {
+      if buffers.vertex_size >= vertices.len() {
+        self
+          .queue
+          .write_buffer(&buffers.vertices, 0, vertices.as_bytes());
+      } else {
+        buffers.vertices = new_vertex_buffer();
+      }
+      buffers.vertex_size = vertices.len();
+      if buffers.index_size >= indices.len() {
+        self
+          .queue
+          .write_buffer(&buffers.indices, 0, indices.as_bytes())
+      } else {
+        buffers.indices = new_index_buffer();
+      }
+      buffers.index_size = indices.len();
+    } else {
+      *vertex_buffers = Some(VertexBuffers {
+        vertices: new_vertex_buffer(),
+        vertex_size: vertices.len(),
+        indices: new_index_buffer(),
+        index_size: indices.len(),
+      });
+    }
   }
 }
 

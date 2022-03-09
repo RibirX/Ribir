@@ -41,7 +41,7 @@ impl<'a> WidgetGen<'a> {
 
     let state_ref = if force_stateful || self.is_stateful(ctx) {
       Some(quote! { let mut #ref_name = unsafe { #def_name.state_ref() }; })
-    } else if ctx.be_reference(&ref_name) {
+    } else if ctx.be_reference(ref_name) {
       Some(quote! { let #ref_name = &#def_name; })
     } else {
       None

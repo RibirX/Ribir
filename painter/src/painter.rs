@@ -15,17 +15,17 @@ pub struct Painter {
   device_scale: f32,
 }
 
+pub type CaptureCallback<'a> =
+  Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>;
 /// `PainterBackend` use to draw the picture what the `commands` described  to
 /// the target device. Usually is implemented by graphic library.
 pub trait PainterBackend {
-  /// Submit the paint commands to draw, and call the `frame_data` callback to
+  /// Submit the paint commands to draw, and call the `capture` callback to
   /// pass the frame image data with rgba(u8 x 4) format if it is Some-Value
   fn submit<'a>(
     &mut self,
     commands: Vec<PaintCommand>,
-    frame_data: Option<
-      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
-    >,
+    capture: Option<CaptureCallback<'a>>,
   ) -> Result<(), &str>;
 
   fn resize(&mut self, size: DeviceSize);
@@ -40,14 +40,12 @@ pub enum PaintPath {
     font_face: CowRc<FontFace>,
     letter_space: f32,
     line_height: Option<f32>,
-  }, 
+  },
 }
 #[derive(Clone)]
 pub struct PaintCommand {
   pub path: PaintPath,
   pub transform: Transform,
-  // todo: image tile mode should only have repeat mode, fill or cover mode should support by
-  // painter across transform + repeat.
   pub brush: Brush,
   pub path_style: PathStyle,
 }
@@ -169,7 +167,7 @@ impl Painter {
 
   /// Paint a path with its style.
   pub fn paint_path(&mut self, path: Path) -> &mut Self {
-    let transform = self.current_state().transform.clone();
+    let transform = self.current_state().transform;
     self.commands.push(PaintCommand {
       path: PaintPath::Path(path.path),
       transform,
@@ -194,14 +192,14 @@ impl Painter {
   pub fn fill(&mut self, brush: Option<Brush>) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
     let brush = brush.unwrap_or_else(|| self.current_state().brush.clone());
-    let path = builder.fill(brush.clone());
+    let path = builder.fill(brush);
     self.paint_path(path);
     self
   }
 
   /// Paint text with its style
   pub fn paint_text<T: Into<CowRc<str>>>(&mut self, text: T, style: TextStyle) -> &mut Self {
-    let transform = self.current_state().transform.clone();
+    let transform = self.current_state().transform;
     let TextStyle {
       font_size,
       foreground,
@@ -255,7 +253,7 @@ impl Painter {
         letter_space: state.letter_space,
         line_height: state.text_line_height,
       },
-      transform: state.transform.clone(),
+      transform: state.transform,
       brush: state.brush.clone(),
       path_style: PathStyle::Fill,
     };
@@ -354,7 +352,7 @@ impl DerefMut for Painter {
 impl PaintCommand {
   pub fn box_rect_without_transform(&self) -> Rect {
     match &self.path {
-      PaintPath::Path(path) => path_box_rect(&path, self.path_style),
+      PaintPath::Path(path) => path_box_rect(path, self.path_style),
       PaintPath::Text { .. } => todo!(),
     }
   }

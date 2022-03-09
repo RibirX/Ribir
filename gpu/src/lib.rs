@@ -6,7 +6,7 @@ pub mod wgpu_gl;
 
 use tessellator::Tessellator;
 pub mod tessellator;
-use painter::{DeviceSize, PainterBackend};
+use painter::{CaptureCallback, DeviceSize, PainterBackend};
 
 use painter::image::ColorFormat;
 use zerocopy::AsBytes;
@@ -30,34 +30,34 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
       Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
     >,
   ) -> Result<(), &str> {
-    self.tessellator.tessellate(&commands, |render_data| {
-      self.gl.submit_render_data(render_data);
-    });
-    self.gl.finish(frame_data)
+    self.gl.begin_frame();
+    self.tessellator.tessellate(&commands, &mut self.gl);
+    self.gl.end_frame(frame_data)
   }
 
   #[inline]
   fn resize(&mut self, size: DeviceSize) { self.gl.resize(size) }
 }
 
-/// The Render that support draw the canvas result render data.
+/// GlRender support draw triangles to the devices.
 pub trait GlRender {
+  /// A new frame begin.
+  fn begin_frame(&mut self);
+
+  /// Add a texture which this frame will use.
+  fn add_texture(&mut self, texture: Texture);
+
   /// Commit the render data to gl, caller will try to as possible as batch all
   /// render data, but also possible call `commit_render_data` multi time pre
   /// frame.
-  fn submit_render_data(&mut self, data: RenderData);
+  fn draw_triangles(&mut self, data: TriangleLists);
 
-  /// The render data commit finished and should draw into device. Call the
-  /// `frame_data` callback to pass the frame image data with rgba(u8 x 4)
-  /// format if it is Some-Value
-  fn finish<'a>(
-    &mut self,
-    frame_data: Option<
-      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
-    >,
-  ) -> Result<(), &str>;
+  /// Draw frame finished and the render data commit finished and should ensure
+  /// draw every of this frame into device. Call the `capture` callback to
+  /// pass the frame image data with rgba(u8 x 4) format if it is Some-Value
+  fn end_frame<'a>(&mut self, capture: Option<CaptureCallback<'a>>) -> Result<(), &str>;
 
-  /// Window all surface size change, need do a redraw.
+  /// Window or surface size changed, need do a redraw.
   fn resize(&mut self, size: DeviceSize);
 }
 
@@ -66,45 +66,57 @@ pub trait GlRender {
 /// number, so it's always unique if the textures count is not over the
 /// [`usize::MAX`]! in an application lifetime.
 ///
+/// If the `id` is same with some texture of last frame, that mean they are the
+/// same texture, in this case, provide `data` or not hint whether this texture
+/// has changed.
+///
 /// For texture cache we only track the last frame, so if a texture use in frame
 /// one and frame three but not use in frame two, it's have different `id` in
 /// frame one and frame three.
+
 pub struct Texture<'a> {
   /// The identify of the texture, unique in adjacent frames.
   pub id: usize,
   /// The texture size.
   pub size: (u16, u16),
   /// The data of the texture. A `None` value will give if the texture is not
-  /// change to latest frame, should reuse the gpu texture.
+  /// change to latest frame, so we can avoid to load the texture again.
   pub data: Option<&'a [u8]>,
   /// The color format of the texture
   pub format: ColorFormat,
 }
 
-/// Triangles with texture submit to gpu render
-pub struct TextureRenderData<'a> {
-  pub vertices: &'a [Vertex],
-  pub indices: &'a [u32],
-  /// Vertex extra info which contain the texture position of vertex and its
-  /// transform matrix.
-  pub primitives: &'a [TexturePrimitive],
-  /// The texture store all the pixel color from.
-  pub texture: Texture<'a>,
+pub enum DrawTriangles {
+  /// indices range witch use pure color to draw.
+  Color(std::ops::Range<u32>),
+  /// indices range witch use texture to draw.
+  Texture {
+    rg: std::ops::Range<u32>,
+    texture_id: usize,
+  },
 }
 
-/// Triangles with color submit to gpu render
-pub struct ColorRenderData<'a> {
+/// The triangle lists data and the commands to describe how to draw it.
+pub struct TriangleLists<'a> {
+  /// vertices buffer use to draw
   pub vertices: &'a [Vertex],
+  /// indices buffer use to draw
   pub indices: &'a [u32],
-  /// Vertex extra info which contain the texture position of vertex and its
-  /// transform matrix.
-  pub primitives: &'a [ColorPrimitive],
+  /// primitive use to interpretation scheme of the vertex
+  pub primitives: &'a [Primitive],
+  /// commands describe how to draw the indices.
+  pub commands: &'a [DrawTriangles],
+  // field to support clip and gradient
 }
 
-// todo: we should share vertices and indices between color and image.
-pub enum RenderData<'a> {
-  Color(ColorRenderData<'a>),
-  Image(TextureRenderData<'a>),
+#[repr(C)]
+#[derive(AsBytes, PartialEq, Clone)]
+pub struct Primitive {
+  // Both color and texture primitive have 128 bit size, see [`ColorPrimitive`]!  and
+  // [`TexturePrimitive`]! to upstanding their struct.
+  pub data: u128,
+  /// the transform vertex to apply
+  pub(crate) transform: [[f32; 2]; 3],
 }
 
 #[repr(C)]
@@ -126,7 +138,7 @@ pub struct TexturePrimitive {
   /// the texture. Vertex calc its texture sampler pixel position across:
   /// vertex position multiplied by factor then modular texture size.
   ///
-  /// - Repeat mode should be 1
+  /// - Repeat mode should be 1.
   /// - Cover mode should be  path.max / texture.size
   pub(crate) factor: [f32; 2],
 
@@ -142,12 +154,17 @@ pub struct Vertex {
   pub prim_id: u32,
 }
 
-impl<'a> RenderData<'a> {
+impl<'a> TriangleLists<'a> {
   #[inline]
-  pub fn is_empty(&self) -> bool {
-    match self {
-      RenderData::Color(c) => c.indices.is_empty(),
-      RenderData::Image(i) => i.indices.is_empty(),
-    }
-  }
+  pub fn is_empty(&self) -> bool { self.commands.is_empty() }
+}
+
+impl From<ColorPrimitive> for Primitive {
+  #[inline]
+  fn from(c: ColorPrimitive) -> Self { unsafe { std::mem::transmute(c) } }
+}
+
+impl From<TexturePrimitive> for Primitive {
+  #[inline]
+  fn from(t: TexturePrimitive) -> Self { unsafe { std::mem::transmute(t) } }
 }

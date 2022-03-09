@@ -227,7 +227,7 @@ fn texture_to_buffer_4_bytes_per_pixel(
   height: u32,
 ) -> wgpu::Buffer {
   let align_width = align(width, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / 4, true);
-  let data_size = align_width as u64 * height as u64 * 4 as u64;
+  let data_size = align_width as u64 * height as u64 * 4u64;
 
   // The output buffer lets us retrieve the data as an array
   let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {

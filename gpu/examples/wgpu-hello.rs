@@ -1,8 +1,7 @@
-#![feature(absolute_path)]
 use gpu::wgpu_backend_with_wnd;
 use painter::{
-  image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, Rect,
-  ShallowImage, Size, TileMode,
+  image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, ShallowImage,
+  TileMode,
 };
 use text::shaper::TextShaper;
 use winit::{
@@ -106,10 +105,6 @@ fn main() {
       painter.translate(300., 0.);
       draw_arrow_path(&mut painter);
       painter.stroke(Some(25.), Some(img_brush));
-
-      // simple rect to debug
-      // painter.rect(&Rect::from_size(Size::new(300., 300.)));
-      // painter.fill(Some(img_brush));
 
       let commands = painter.finish();
       gpu_backend.submit(commands, None).unwrap();

@@ -1,4 +1,4 @@
-use crate::{error::Error, ColorFormat, Texture};
+use crate::{error::Error, ColorFormat};
 
 use super::mem_texture::{MemTexture, Rect, Size};
 
@@ -14,7 +14,9 @@ pub(crate) struct TextureAtlas {
 }
 
 impl TextureAtlas {
+  pub const FORMAT: ColorFormat = ColorFormat::Rgba8;
   const UNIT: usize = 4;
+
   pub fn new(init_size: Size, max_size: Size) -> Self {
     let atlas_allocator = AtlasAllocator::new(init_size.to_untyped().to_i32());
 
@@ -25,7 +27,7 @@ impl TextureAtlas {
     }
   }
 
-  /// Store a image in the atlas, and return the allocation of it.
+  /// Store a image in the atlas, and return the rect of its place.
   pub fn store_image(&mut self, image: &ShallowImage) -> Result<Rect, Error> {
     if self.is_large_img_to_me(image.as_ref()) {
       return Err(Error::LargeImageAvoid);
@@ -41,37 +43,26 @@ impl TextureAtlas {
       )
     }
     let mut alloc = None;
-    if !self.allocated_map.contains_key(&image) {
+    if !self.allocated_map.contains_key(image) {
       let (w, h) = image.size();
       let a = self.allocate(w, h)?;
 
       self
         .texture
-        .write_rect(&alloc_rect(&a), &image.pixel_bytes());
+        .write_rect(&alloc_rect(&a), image.pixel_bytes());
       alloc = Some(a);
     }
 
     let alloc = self
       .allocated_map
-      .get_or_insert_with(&image, || alloc.unwrap());
-    Ok(alloc_rect(&alloc))
+      .get_or_insert_with(image, || alloc.unwrap());
+    Ok(alloc_rect(alloc))
   }
 
   pub fn is_large_img_to_me(&self, img: &PixelImage) -> bool {
     let max = self.texture.max_size();
     let (img_w, img_h) = img.size();
     max.width < img_w * 2 || max.height < img_h * 2
-  }
-
-  pub fn as_render_texture(&self, id: usize) -> Texture {
-    let tex = &self.texture;
-    let data = tex.is_updated().then(|| tex.as_bytes());
-    Texture {
-      id,
-      size: tex.size().into(),
-      data,
-      format: ColorFormat::Rgba8,
-    }
   }
 
   /// deallocate all last recently not used allocation.
@@ -91,16 +82,12 @@ impl TextureAtlas {
 
   /// Return the reference of the soft texture of the atlas, copy it to the
   /// render engine texture to use it.
-  #[inline]
   pub fn texture(&self) -> &MemTexture<4> { &self.texture }
 
-  /// A gpu command and data submitted.
-  pub fn gpu_synced(&mut self) { self.texture.data_synced(); }
+  pub fn is_updated(&self) -> bool { self.texture.is_updated() }
 
-  pub fn clear(&mut self) {
-    self.atlas_allocator.clear();
-    self.allocated_map.clear();
-  }
+  /// A gpu command and data submitted.
+  pub fn data_synced(&mut self) { self.texture.data_synced(); }
 
   fn allocate(&mut self, width: u16, height: u16) -> Result<Allocation, Error> {
     loop {
@@ -167,46 +154,45 @@ impl TextureAtlas {
 
 #[cfg(test)]
 pub mod tests {
+  use super::*;
   use painter::Color;
   use std::borrow::Cow;
 
-  use super::*;
+  const MAX_SIZE: Size = Size::new(1024, 1024);
 
-  const MAX_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
-
-  pub fn color_image(color: Color, size: DeviceSize) -> ShallowImage {
+  pub fn color_image(color: Color, width: u16, height: u16) -> ShallowImage {
     let data = std::iter::repeat(color.into_raw())
-      .take(size.area() as usize)
+      .take(width as usize * height as usize)
       .flatten()
       .collect::<Vec<_>>();
 
-    let img = PixelImage::new(Cow::Owned(data), size, ColorFormat::Rgba8);
+    let img = PixelImage::new(Cow::Owned(data), width, height, ColorFormat::Rgba8);
     ShallowImage::new(img)
   }
 
   #[test]
   fn grow_alloc_keep() {
-    let mut atlas = TextureAtlas::new(DeviceSize::new(64, 64), MAX_SIZE);
-    let red_img = color_image(Color::RED, DeviceSize::new(32, 32));
-    let red_alloc = *atlas.store_image(&red_img).unwrap();
+    let mut atlas = TextureAtlas::new(Size::new(64, 64), MAX_SIZE);
+    let red_img = color_image(Color::RED, 32, 32);
+    let red_rect = atlas.store_image(&red_img).unwrap();
 
-    assert_eq!(red_alloc.rectangle.min.to_array(), [0, 0]);
+    assert_eq!(red_rect.min().to_array(), [0, 0]);
 
     // same image should have same position in atlas
-    assert_eq!(&red_alloc, atlas.store_image(&red_img).unwrap());
-    color_img_check(&atlas, &red_alloc, Color::RED);
+    assert_eq!(red_rect, atlas.store_image(&red_img).unwrap());
+    color_img_check(&atlas, &red_rect, Color::RED);
 
-    let yellow_img = color_image(Color::YELLOW, DeviceSize::new(64, 64));
-    let yellow_alloc = *atlas.store_image(&yellow_img).unwrap();
+    let yellow_img = color_image(Color::YELLOW, 64, 64);
+    let yellow_rect = atlas.store_image(&yellow_img).unwrap();
 
     // the color should keep after atlas rearrange
-    color_img_check(&atlas, &red_alloc, Color::RED);
-    color_img_check(&atlas, &yellow_alloc, Color::YELLOW);
+    color_img_check(&atlas, &red_rect, Color::RED);
+    color_img_check(&atlas, &yellow_rect, Color::YELLOW);
   }
 
-  fn color_img_check(atlas: &TextureAtlas, alloc: &Allocation, color: Color) {
+  fn color_img_check(atlas: &TextureAtlas, rect: &Rect, color: Color) {
     const UNIT: usize = TextureAtlas::UNIT;
-    let rect = alloc.rectangle.to_usize();
+    let rect = rect.to_usize();
     let color_data = color.into_raw();
     rect.y_range().for_each(|y| {
       rect.x_range().for_each(|x| {

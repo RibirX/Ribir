@@ -1,16 +1,11 @@
 use crate::{
-  error::Error, ColorPrimitive, ColorRenderData, RenderData, Texture, TexturePrimitive,
-  TextureRenderData, Vertex,
+  ColorPrimitive, DrawTriangles, GlRender, Primitive, Texture, TexturePrimitive, TriangleLists,
+  Vertex,
 };
 use algo::FrameCache;
 use lyon_tessellation::{path::Path, *};
-use painter::{Brush, PaintCommand, PaintPath, PathStyle, Rect, TileMode, Transform, Vector};
-use std::{
-  collections::VecDeque,
-  hash::Hash,
-  mem::{size_of, transmute},
-  ops::RangeBounds,
-};
+use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode, Vector};
+use std::{collections::VecDeque, hash::Hash, mem::size_of};
 use text::{
   font_db::ID,
   layout::{GlyphAt, LayoutConfig},
@@ -30,23 +25,15 @@ const TEXTURE_ID_FROM: usize = 1;
 
 /// `Tessellator` use to generate triangles from
 pub struct Tessellator {
+  // todo: only a 4 bytes pixel atlas provide, should we add a 3 bytes atlas (useful for rgb) ?
   // texture atlas for pure color and image to draw.
-  pub(crate) atlas: TextureAtlas,
-  buffer: TessData,
+  atlas: TextureAtlas,
   texture_records: TextureRecords,
-  vertices_cache: FrameCache<VerticesKey<Path>, Box<VertexCache>>,
-}
-
-enum PrimitiveVec {
-  Color(Vec<ColorPrimitive>),
-  Texture(Vec<TexturePrimitive>),
-}
-
-#[derive(Default)]
-struct TessData {
+  vertices_cache: Option<FrameCache<VerticesKey<Path>, Box<VertexCache>>>,
   vertices: Vec<Vertex>,
   indices: Vec<u32>,
-  primitives: PrimitiveVec,
+  primitives: Vec<Primitive>,
+  commands: Vec<DrawTriangles>,
   buffer_list: VecDeque<CacheItem>,
   /// The max vertex can batch. It's not a strict number, it's unaffected if
   /// it's less than the count of vertex generate by one paint command, default
@@ -57,9 +44,15 @@ struct TessData {
   shaper: TextShaper,
 }
 
+#[derive(Clone, Copy)]
+enum PrimitiveType {
+  Color,
+  Texture(usize),
+}
 struct CacheItem {
   prim_id: u32,
   cache_ptr: *mut VertexCache,
+  prim_type: PrimitiveType,
 }
 
 #[derive(Debug, Clone)]
@@ -93,140 +86,304 @@ impl Tessellator {
   ) -> Self {
     Self {
       atlas: TextureAtlas::new(tex_init_size.into(), tex_max_size.into()),
-      buffer: TessData {
-        vertex_batch_limit: MAX_VERTEX_CAN_BATCH,
-        threshold,
-        shaper,
-        ..<_>::default()
-      },
-      vertices_cache: <_>::default(),
+      vertex_batch_limit: MAX_VERTEX_CAN_BATCH,
+      threshold,
+      shaper,
+      vertices_cache: None,
       texture_records: TextureRecords::new(TEXTURE_ID_FROM),
+      vertices: vec![],
+      indices: vec![],
+      primitives: vec![],
+      commands: vec![],
+      buffer_list: <_>::default(),
     }
   }
 
   /// The vertex count to trigger a gpu submit. It's not a strict number, may
   /// exceed this limit by one paint command
-  pub fn set_vertex_batch_limit(&mut self, count: usize) { self.buffer.vertex_batch_limit = count; }
+  pub fn set_vertex_batch_limit(&mut self, count: usize) { self.vertex_batch_limit = count; }
 
-  pub fn tessellate<F>(&mut self, commands: &[PaintCommand], mut gpu_submit: F)
-  where
-    F: FnMut(RenderData),
-  {
+  pub fn tessellate<R: GlRender>(&mut self, commands: &[PaintCommand], render: &mut R) {
     if commands.is_empty() {
       return;
     }
 
-    // Try store all image brush in atlas texture , if not success, deallocate the
-    // sub texture which cache missed and then refill by auto grow mode.
-    let any_brush_fill_fail = !self.try_fill_atlas(commands);
-    if any_brush_fill_fail {
-      self.atlas.end_frame();
-    }
+    // parallel generate triangles
+    let mut vertices_cache = self.vertices_cache.take();
+    let mut uninit_vertices = vertices_cache
+      .get_or_insert_with(<_>::default)
+      .as_uninit_map();
+    commands.iter().for_each(|cmd| {
+      self.command_to_buffer(
+        cmd,
+        |key| uninit_vertices.get_or_delay_init::<dyn KeySlice>(key),
+        render,
+      )
+    });
+    uninit_vertices.par_init_with(|key| Self::gen_triangles(&self.shaper, &key));
+    self.vertices_cache = vertices_cache;
 
-    let mut submitted = 0;
-    loop {
-      // generate buffer until failed or cannot batch.
-      let count = self.buffer.generate_buffer(
-        &commands[submitted..],
-        &mut self.atlas,
-        &mut self.vertices_cache,
-      );
-
-      match count {
-        Ok(count) => {
-          assert!(count > 0);
-          while !self.buffer.buffer_list.is_empty() {
-            unsafe { self.buffer.fill_vertices() };
-            self.buffer.submit_vertices(&mut gpu_submit, || {
-              // self.atlas.gpu_synced();
-              let atlas_tex = self.atlas.as_render_texture(ATLAS_ID);
-              atlas_tex
-            });
-          }
-          submitted += count;
-        }
-        Err(Error::TextureSpaceLimit)
-          if commands[submitted..]
-            .iter()
-            .filter(|cmd| matches!(cmd.brush, Brush::Image { .. }))
-            .count()
-            > 8 =>
-        {
-          // clear atlas if there is many image brush command
-          self.atlas.clear()
-        }
-        _ => {
-          // independent submit render data, if it's a large image or few image to draw.
-          let cmd = &commands[submitted];
-          self.image_brush_independent_submit(cmd, &mut gpu_submit);
-          submitted += 1;
-        }
+    while !self.buffer_list.is_empty() {
+      let used_atlas = unsafe { self.fill_vertices() };
+      if used_atlas {
+        render.add_texture(self.atlas_texture());
+        self.atlas.data_synced();
       }
 
-      if submitted >= commands.len() {
-        break;
-      }
+      render.draw_triangles(self.get_triangle_list());
+      self.clear_buffer();
     }
 
     self.end_frame()
   }
 
   fn end_frame(&mut self) {
-    assert!(self.buffer.buffer_list.is_empty());
+    assert!(self.buffer_list.is_empty());
     // end frame to clear miss cache, atlas and vertexes clear before by itself.
     self.texture_records.end_frame();
-    self.vertices_cache.end_frame("Vertices");
+    if let Some(vertices_cache) = self.vertices_cache.as_mut() {
+      vertices_cache.end_frame("Vertices");
+    }
+    self.atlas.end_frame();
   }
 
-  fn image_brush_independent_submit<F>(&mut self, cmd: &PaintCommand, mut gpu_submit: F)
-  where
-    F: FnMut(RenderData),
-  {
-    let (img, tile_mode) = if let Brush::Image { img, tile_mode } = &cmd.brush {
-      (img, tile_mode)
-    } else {
-      unreachable!();
-    };
-    let size = img.size();
-    let format = img.color_format();
-    let mut img_data = None;
-    let id = self.texture_records.get_id(&img).unwrap_or_else(|| {
-      img_data = Some(img.pixel_bytes());
-      self.texture_records.insert(img.clone())
-    });
-
-    let data = img_data.as_ref().map(|d| &**d);
-
-    let primitive = Primitive::texture_prim(
-      tile_mode,
-      cmd.transform.clone(),
-      &mem_texture::Rect::from_size(img.size().into()),
-      || cmd.box_rect_without_transform(),
-    );
-    let shaper = self.buffer.shaper.clone();
-    let res = self.buffer.command_to_buffer(cmd, primitive, |key| {
-      self
-        .vertices_cache
-        .get_or_insert_with(&key as &dyn KeySlice, || {
-          Box::new(TessData::gen_triangles(&shaper, &key))
-        })
-        .as_mut() as *mut _
-    });
-    assert!(res);
-    unsafe { self.buffer.fill_vertices() };
-    self
-      .buffer
-      .submit_vertices(&mut gpu_submit, || Texture { id, data, size, format });
-  }
-
-  fn try_fill_atlas(&mut self, commands: &[PaintCommand]) -> bool {
-    commands.iter().all(|cmd| {
-      if let Brush::Image { img, .. } = &cmd.brush {
-        self.atlas.store_image(img).is_ok()
-      } else {
-        true
+  fn prim_from_command<R: GlRender>(
+    &mut self,
+    cmd: &PaintCommand,
+    render: &mut R,
+  ) -> (Primitive, PrimitiveType) {
+    match &cmd.brush {
+      Brush::Color(color) => {
+        let c = ColorPrimitive {
+          color: color.clone().into_arrays(),
+          transform: cmd.transform.clone().to_arrays(),
+        };
+        (c.into(), PrimitiveType::Color)
       }
-    })
+      Brush::Image { img, tile_mode } => {
+        let mut id = ATLAS_ID;
+        let rect = self.atlas.store_image(img).unwrap_or_else(|_| {
+          let size = img.size();
+
+          let format = img.color_format();
+          id = self.texture_records.get_id(img).unwrap_or_else(|| {
+            let data = Some(img.pixel_bytes());
+            let id = self.texture_records.insert(img.clone());
+            render.add_texture(Texture { id, data, size, format });
+            id
+          });
+
+          mem_texture::Rect::from_size(img.size().into())
+        });
+        let (x, y) = rect.min().to_tuple();
+        let (w, h) = rect.size.to_tuple();
+        let mut factor = [1., 1.];
+        if tile_mode.is_cover_mode() {
+          let box_rect = cmd.box_rect_without_transform();
+          if tile_mode.contains(TileMode::COVER_X) {
+            factor[0] = w as f32 / box_rect.width();
+          }
+          if tile_mode.contains(TileMode::COVER_Y) {
+            factor[1] = h as f32 / box_rect.height();
+          }
+        }
+        let t = TexturePrimitive {
+          tex_rect: [x, y, w, h],
+          factor,
+          transform: cmd.transform.to_arrays(),
+        };
+        (t.into(), PrimitiveType::Texture(id))
+      }
+      Brush::Gradient => todo!(),
+    }
+  }
+
+  fn add_primitive(&mut self, p: Primitive) -> u32 {
+    if self.primitives.last() != Some(&p) {
+      self.primitives.push(p);
+    }
+    self.primitives.len() as u32 - 1
+  }
+
+  fn command_to_buffer<'a, F, R>(&mut self, cmd: &'a PaintCommand, mut cache: F, render: &mut R)
+  where
+    F: FnMut(VerticesKey<&'a Path>) -> *mut VertexCache,
+    R: GlRender,
+  {
+    let (primitive, prim_type) = self.prim_from_command(cmd, render);
+
+    let PaintCommand { path, transform, .. } = cmd;
+    let style = cmd.path_style;
+    let scale = transform.m11.max(transform.m22).max(f32::EPSILON);
+    let threshold = self.threshold;
+    match path {
+      PaintPath::Path(path) => {
+        let path = PathKey::Path(path);
+        let tolerance = TOLERANCE / scale;
+        let key = VerticesKey { tolerance, threshold, style, path };
+        let cache_ptr = cache(key);
+        let prim_id = self.add_primitive(primitive);
+        self
+          .buffer_list
+          .push_back(CacheItem { prim_id, cache_ptr, prim_type });
+      }
+      &PaintPath::Text {
+        font_size,
+        letter_space,
+        line_height,
+        ref text,
+        ref font_face,
+        ..
+      } if font_size > f32::EPSILON => {
+        let face_ids = self.shaper.font_db_mut().select_all_match(font_face);
+        let glyphs = self.shaper.shape_text(text, &face_ids);
+        // todo: layout is a higher level work should not work here, maybe should work
+        // in texts widget layout.
+        // paint should directly shape and draw text, not care about bidi reordering,
+        // text wrap or break.
+        let cfg = LayoutConfig {
+          font_size,
+          line_height,
+          letter_space,
+          h_align: None,
+          v_align: None,
+        };
+
+        let mut pre_face_id = None;
+        let mut pre_unit_per_em = 0;
+        let mut scaled_font_size = font_size;
+        let mut tolerance = TOLERANCE / (scaled_font_size * scale);
+        text::layout::layout_text(text, &glyphs, &cfg, None).for_each(
+          |GlyphAt { glyph_id, face_id, x, y }| {
+            if Some(face_id) != pre_face_id {
+              pre_face_id = Some(face_id);
+              let db = self.shaper.font_db();
+              pre_unit_per_em = db.try_get_face_data(face_id).unwrap().units_per_em();
+              scaled_font_size = font_size / pre_unit_per_em as f32;
+              tolerance = TOLERANCE / (scaled_font_size * scale)
+            };
+
+            let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
+            let key = VerticesKey { tolerance, threshold, style, path };
+            let cache_ptr = cache(key);
+            let t = transform
+              // because glyph is up down mirror, this `font_size` offset help align after rotate.
+              .pre_translate(Vector::new(x, y + font_size))
+              .pre_scale(scaled_font_size, scaled_font_size);
+
+            let mut p = primitive.clone();
+            p.transform = t.to_arrays();
+
+            let prim_id = self.add_primitive(p);
+            self
+              .buffer_list
+              .push_back(CacheItem { prim_id, cache_ptr, prim_type });
+          },
+        );
+      }
+      _ => {}
+    };
+  }
+
+  /// Generate vertices from the buffer
+  ///
+  /// Caller also should guarantee the cache pointer is valid.
+  unsafe fn fill_vertices(&mut self) -> bool {
+    let mut use_atlas = false;
+    while let Some(CacheItem { prim_id, cache_ptr, prim_type }) = self.buffer_list.pop_front() {
+      let cache = &mut *cache_ptr;
+      let offset = self.vertices.len() as u32;
+
+      self.vertices.extend(
+        cache
+          .vertices
+          .iter()
+          .map(|pos| Vertex { pixel_coords: *pos, prim_id }),
+      );
+      let indices_start = self.indices.len() as u32;
+
+      self
+        .indices
+        .extend(cache.indices.iter().map(|i| i + offset));
+
+      let indices_count = cache.indices.len() as u32;
+
+      match (self.commands.last_mut(), prim_type) {
+        (Some(DrawTriangles::Color(rg)), PrimitiveType::Color) => {
+          rg.end += indices_count;
+        }
+        (Some(DrawTriangles::Texture { rg, texture_id }), PrimitiveType::Texture(id))
+          if *texture_id == id =>
+        {
+          rg.end += indices_count;
+        }
+        (_, PrimitiveType::Color) => self.commands.push(DrawTriangles::Color(
+          indices_start..indices_start + indices_count,
+        )),
+        (_, PrimitiveType::Texture(texture_id)) => {
+          self.commands.push(DrawTriangles::Texture {
+            rg: indices_start..indices_start + indices_count,
+            texture_id,
+          });
+        }
+      }
+
+      if self.indices.len() > self.vertex_batch_limit {
+        break;
+      }
+      use_atlas = use_atlas || matches!(prim_type, PrimitiveType::Texture(id) if id == ATLAS_ID);
+    }
+    use_atlas
+  }
+
+  fn gen_triangles(shaper: &TextShaper, key: &VerticesKey<&Path>) -> VertexCache {
+    let &VerticesKey { tolerance, style, .. } = key;
+    match key.path {
+      PathKey::Path(path) => tesselate_path(path, style, tolerance),
+      PathKey::Glyph { glyph_id, face_id } => {
+        let face = {
+          let mut font_db = shaper.font_db_mut();
+          font_db
+            .face_data_or_insert(face_id)
+            .expect("Font face not exist!")
+            .clone()
+        };
+
+        if let Some(path) = face.outline_glyph(glyph_id) {
+          tesselate_path(&path, style, tolerance)
+        } else {
+          //todo, image or svg fallback?
+          VertexCache::default()
+        }
+      }
+    }
+  }
+
+  fn get_triangle_list(&self) -> TriangleLists {
+    TriangleLists {
+      vertices: &self.vertices,
+      indices: &self.indices,
+      primitives: &self.primitives,
+      commands: &self.commands,
+    }
+  }
+
+  fn clear_buffer(&mut self) {
+    self.vertices.clear();
+    self.indices.clear();
+    self.primitives.clear();
+    self.commands.clear();
+  }
+
+  fn atlas_texture(&self) -> Texture {
+    let tex = self.atlas.texture();
+    let data = self.atlas.is_updated().then(|| tex.as_bytes());
+    Texture {
+      id: ATLAS_ID,
+      size: tex.size().into(),
+      data,
+      format: TextureAtlas::FORMAT,
+    }
   }
 }
 
@@ -269,368 +426,6 @@ fn fill_tess(path: &Path, tolerance: f32) -> VertexCache {
     vertices: buffers.vertices.into_boxed_slice(),
     indices: buffers.indices.into_boxed_slice(),
   }
-}
-
-impl TessData {
-  /// Generate commands buffer until failed or there is a different type paint
-  /// command occur.
-  ///
-  /// Return how many commands processed.
-  fn generate_buffer(
-    &mut self,
-    commands: &[PaintCommand],
-    atlas: &mut TextureAtlas,
-    vertices_cache: &mut FrameCache<VerticesKey<Path>, Box<VertexCache>>,
-  ) -> Result<usize, Error> {
-    let mut uninit_vertices = vertices_cache.as_uninit_map();
-
-    let mut count = 0;
-    for cmd in commands.iter() {
-      let primitive = match Primitive::from_command(cmd, atlas) {
-        Ok(p) => p,
-        Err(e) if count == 0 => return Err(e),
-        Err(_) => break,
-      };
-
-      let res = self.command_to_buffer(cmd, primitive, |key| {
-        uninit_vertices.get_or_delay_init::<dyn KeySlice>(key)
-      });
-      if !res {
-        break;
-      }
-      count += 1;
-    }
-
-    unsafe {
-      uninit_vertices.par_init_with(|key| Self::gen_triangles(&self.shaper, &key));
-    }
-
-    Ok(count)
-  }
-
-  fn command_to_buffer<'a, F>(
-    &mut self,
-    cmd: &'a PaintCommand,
-    primitive: Primitive,
-    mut cache: F,
-  ) -> bool
-  where
-    F: FnMut(VerticesKey<&'a Path>) -> *mut VertexCache,
-  {
-    // Check before process glyphs.
-    if !self.primitives.can_push(&primitive) {
-      return false;
-    }
-
-    let PaintCommand { path, transform, .. } = cmd;
-    let style = cmd.path_style;
-    let scale = transform.m11.max(transform.m22).max(f32::EPSILON);
-    let threshold = self.threshold;
-    match path {
-      PaintPath::Path(path) => {
-        let path = PathKey::Path(path);
-        let tolerance = TOLERANCE / scale;
-        let key = VerticesKey { tolerance, threshold, style, path };
-        let cache_ptr = cache(key);
-        let prim_id = self.primitives.push(primitive).unwrap();
-        self.buffer_list.push_back(CacheItem { prim_id, cache_ptr });
-      }
-      &PaintPath::Text {
-        font_size,
-        letter_space,
-        line_height,
-        ref text,
-        ref font_face,
-        ..
-      } if font_size > f32::EPSILON => {
-        let face_ids = self.shaper.font_db_mut().select_all_match(&font_face);
-        let glyphs = self.shaper.shape_text(&text, &face_ids);
-        // todo: layout is a higher level work should not work here, maybe should work
-        // in texts widget layout.
-        // paint should directly shape and draw text, not care about bidi reordering,
-        // text wrap or break.
-        let cfg = LayoutConfig {
-          font_size,
-          line_height,
-          letter_space,
-          h_align: None,
-          v_align: None,
-        };
-
-        let mut pre_face_id = None;
-        let mut pre_unit_per_em = 0;
-        let mut scaled_font_size = font_size;
-        let mut tolerance = TOLERANCE / (scaled_font_size * scale);
-        text::layout::layout_text(&text, &glyphs, &cfg, None).for_each(
-          |GlyphAt { glyph_id, face_id, x, y }| {
-            if Some(face_id) != pre_face_id {
-              pre_face_id = Some(face_id);
-              let db = self.shaper.font_db();
-              pre_unit_per_em = db.try_get_face_data(face_id).unwrap().units_per_em();
-              scaled_font_size = font_size / pre_unit_per_em as f32;
-              tolerance = TOLERANCE / (scaled_font_size * scale)
-            };
-
-            let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
-            let key = VerticesKey { tolerance, threshold, style, path };
-            let cache_ptr = cache(key);
-            let t = transform
-              // because glyph is up down mirror, this `font_size` offset help align after rotate.
-              .pre_translate(Vector::new(x, y + font_size))
-              .pre_scale(scaled_font_size, scaled_font_size);
-
-            let mut p = primitive.clone();
-            p.set_transform(t);
-
-            let prim_id = self.primitives.push(p).unwrap();
-            self.buffer_list.push_back(CacheItem { prim_id, cache_ptr });
-          },
-        );
-      }
-      _ => {}
-    };
-    true
-  }
-
-  /// submit vertexes and return how many primitives consumed.
-  fn submit_vertices<'a, F: FnMut(RenderData), T>(&mut self, f: &mut F, texture: T)
-  where
-    F: FnMut(RenderData),
-    T: FnOnce() -> Texture<'a>,
-  {
-    if self.indices.is_empty() {
-      return;
-    }
-
-    let render_data = match &self.primitives {
-      PrimitiveVec::Color(p) => RenderData::Color(ColorRenderData {
-        vertices: &self.vertices,
-        indices: &self.indices,
-        primitives: p.as_slice(),
-      }),
-      PrimitiveVec::Texture(p) => RenderData::Image(TextureRenderData {
-        vertices: &self.vertices,
-        indices: &self.indices,
-        primitives: p.as_slice(),
-        texture: texture(),
-      }),
-    };
-    f(render_data);
-
-    // if buffer list is not empty, we retain the last primitive, it's maybe used by
-    // others in buffer list.
-    if !self.buffer_list.is_empty() {
-      let drain_end = self.vertices.last().expect("must have").prim_id;
-      if drain_end > 0 {
-        self.primitives.drain(..drain_end as usize);
-        self.buffer_list.iter_mut().for_each(|c| {
-          c.prim_id -= drain_end;
-        });
-      }
-    } else {
-      self.primitives.clear();
-    }
-
-    self.indices.clear();
-    self.vertices.clear();
-  }
-
-  /// Generate vertices from the buffer
-  ///
-  /// Caller also should guarantee the cache pointer is valid.
-  unsafe fn fill_vertices(&mut self) {
-    while let Some(CacheItem { prim_id, cache_ptr }) = self.buffer_list.pop_front() {
-      let cache = &mut *cache_ptr;
-      let offset = self.vertices.len() as u32;
-
-      self.vertices.extend(
-        cache
-          .vertices
-          .iter()
-          .map(|pos| Vertex { pixel_coords: *pos, prim_id }),
-      );
-      self
-        .indices
-        .extend(cache.indices.iter().map(|i| i + offset));
-
-      if self.indices.len() > self.vertex_batch_limit {
-        break;
-      }
-    }
-  }
-
-  fn gen_triangles(shaper: &TextShaper, key: &VerticesKey<&Path>) -> VertexCache {
-    let &VerticesKey { tolerance, style, .. } = key;
-    match key.path {
-      PathKey::Path(path) => tesselate_path(path, style, tolerance),
-      PathKey::Glyph { glyph_id, face_id } => {
-        let face = {
-          let mut font_db = shaper.font_db_mut();
-          font_db
-            .face_data_or_insert(face_id)
-            .expect("Font face not exist!")
-            .clone()
-        };
-
-        if let Some(path) = face.outline_glyph(glyph_id) {
-          tesselate_path(&path, style, tolerance)
-        } else {
-          //todo, image or svg fallback?
-          VertexCache::default()
-        }
-      }
-    }
-  }
-}
-
-#[derive(Clone)]
-enum Primitive {
-  Color(ColorPrimitive),
-  Texture(TexturePrimitive),
-}
-
-impl Primitive {
-  fn from_command(cmd: &PaintCommand, atlas: &mut TextureAtlas) -> Result<Self, Error> {
-    match &cmd.brush {
-      Brush::Color(color) => {
-        let c = ColorPrimitive {
-          color: color.clone().into_arrays(),
-          transform: cmd.transform.clone().to_arrays(),
-        };
-        Ok(Primitive::Color(c))
-      }
-      Brush::Image { img, tile_mode } => {
-        let rect = atlas.store_image(img)?;
-        let t = Self::texture_prim(tile_mode, cmd.transform.clone(), &rect, || {
-          cmd.box_rect_without_transform()
-        });
-        Ok(t)
-      }
-      Brush::Gradient => todo!(),
-    }
-  }
-
-  fn texture_prim<F: FnOnce() -> Rect>(
-    tile_mode: &TileMode,
-    transform: Transform,
-    texture_rect: &mem_texture::Rect,
-    path_box: F,
-  ) -> Self {
-    let (x, y) = texture_rect.min().to_tuple();
-    let (w, h) = texture_rect.size.to_tuple();
-    let mut factor = [1., 1.];
-    if tile_mode.is_cover_mode() {
-      let box_rect = path_box();
-      if tile_mode.contains(TileMode::COVER_X) {
-        factor[0] = w as f32 / box_rect.width();
-      }
-      if tile_mode.contains(TileMode::COVER_Y) {
-        factor[1] = h as f32 / box_rect.height();
-      }
-    }
-    let t = TexturePrimitive {
-      tex_rect: [x, y, w, h],
-      factor,
-      transform: transform.to_arrays(),
-    };
-    Primitive::Texture(t)
-  }
-
-  fn set_transform(&mut self, t: Transform) {
-    match self {
-      Primitive::Color(c) => c.transform = t.clone().to_arrays(),
-      Primitive::Texture(tex) => tex.transform = t.clone().to_arrays(),
-    }
-  }
-}
-
-impl PrimitiveVec {
-  fn convert_to_color_primitives(&mut self) -> Option<&mut Vec<ColorPrimitive>> {
-    match self {
-      PrimitiveVec::Color(c) => Some(c),
-      PrimitiveVec::Texture(t) if t.is_empty() => {
-        assert_eq!(size_of::<ColorPrimitive>(), size_of::<TexturePrimitive>());
-
-        let vec = std::mem::take(t);
-        *self = PrimitiveVec::Color(unsafe { transmute(vec) });
-        match self {
-          PrimitiveVec::Color(c) => Some(c),
-          PrimitiveVec::Texture(_) => unreachable!(),
-        }
-      }
-      _ => None,
-    }
-  }
-
-  fn convert_to_texture_primitives(&mut self) -> Option<&mut Vec<TexturePrimitive>> {
-    match self {
-      PrimitiveVec::Color(c) if c.is_empty() => {
-        assert_eq!(size_of::<ColorPrimitive>(), size_of::<TexturePrimitive>());
-
-        let vec = std::mem::take(c);
-        *self = PrimitiveVec::Texture(unsafe { transmute(vec) });
-        match self {
-          PrimitiveVec::Color(_) => unreachable!(),
-          PrimitiveVec::Texture(t) => Some(t),
-        }
-      }
-      PrimitiveVec::Texture(t) => Some(t),
-      _ => None,
-    }
-  }
-
-  fn drain<R>(&mut self, range: R)
-  where
-    R: RangeBounds<usize>,
-  {
-    match self {
-      PrimitiveVec::Color(v) => {
-        v.drain(range);
-      }
-      PrimitiveVec::Texture(v) => {
-        v.drain(range);
-      }
-    };
-  }
-
-  // return the primitive index if it's can batch with existed primitives in
-  // buffer.
-  fn push(&mut self, prim: Primitive) -> Option<u32> {
-    match prim {
-      Primitive::Color(c) => {
-        let primitives = self.convert_to_color_primitives()?;
-        if primitives.last() != Some(&c) {
-          primitives.push(c);
-        }
-        Some(primitives.len() as u32 - 1)
-      }
-      Primitive::Texture(t) => {
-        let primitives = self.convert_to_texture_primitives()?;
-        if primitives.last() != Some(&t) {
-          primitives.push(t);
-        }
-        Some(primitives.len() as u32 - 1)
-      }
-    }
-  }
-
-  fn clear(&mut self) {
-    match self {
-      PrimitiveVec::Color(c) => c.clear(),
-      PrimitiveVec::Texture(t) => t.clear(),
-    }
-  }
-
-  fn can_push(&self, prim: &Primitive) -> bool {
-    match self {
-      PrimitiveVec::Color(c) => c.is_empty() || matches!(prim, Primitive::Color(_)),
-      PrimitiveVec::Texture(t) => t.is_empty() || matches!(prim, Primitive::Texture(_)),
-    }
-  }
-}
-
-impl Default for PrimitiveVec {
-  fn default() -> Self { PrimitiveVec::Color(vec![]) }
 }
 
 // trait implement for vertices cache
@@ -794,13 +589,30 @@ impl ToOwned for dyn KeySlice + '_ {
 }
 #[cfg(test)]
 mod tests {
-  use crate::RenderData;
+  use crate::TriangleLists;
   use painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
   use text::shaper::TextShaper;
   extern crate test;
   use test::Bencher;
 
   use super::{atlas::tests::color_image, *};
+
+  impl<F: FnMut(TriangleLists)> GlRender for F {
+    fn begin_frame(&mut self) {}
+
+    fn add_texture(&mut self, _: Texture) {}
+
+    fn draw_triangles(&mut self, data: TriangleLists) { self(data) }
+
+    fn end_frame<'a>(
+      &mut self,
+      _: Option<Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>>,
+    ) -> Result<(), &str> {
+      Ok(())
+    }
+
+    fn resize(&mut self, _: DeviceSize) {}
+  }
 
   fn tessellator() -> Tessellator {
     let shaper = TextShaper::default();
@@ -819,7 +631,7 @@ mod tests {
   }
 
   fn two_img_paint(painter: &mut Painter) {
-    let img = color_image(Color::YELLOW, DeviceSize::new(100, 100));
+    let img = color_image(Color::YELLOW, 100, 100);
     painter
       .set_brush(Brush::Image {
         img,
@@ -837,9 +649,11 @@ mod tests {
     let mut painter = Painter::new(1.);
     circle_rectangle_color_paint(&mut painter);
     let mut render_data = vec![];
-    tess.tessellate(&painter.finish(), |r| match r {
-      RenderData::Color(_) => render_data.push(true),
-      RenderData::Image(_) => render_data.push(false),
+    tess.tessellate(&painter.finish(), &mut |data: TriangleLists| {
+      data.commands.iter().for_each(|cmd| match cmd {
+        DrawTriangles::Color(_) => render_data.push(true),
+        DrawTriangles::Texture { .. } => render_data.push(false),
+      });
     });
 
     assert_eq!(&render_data, &[true]);
@@ -851,9 +665,11 @@ mod tests {
     let mut painter = Painter::new(1.);
     two_img_paint(&mut painter);
     let mut render_data = vec![];
-    tess.tessellate(&painter.finish(), |r| match r {
-      RenderData::Color(_) => render_data.push(true),
-      RenderData::Image(_) => render_data.push(false),
+    tess.tessellate(&painter.finish(), &mut |data: TriangleLists| {
+      data.commands.iter().for_each(|cmd| match cmd {
+        DrawTriangles::Color(_) => render_data.push(true),
+        DrawTriangles::Texture { .. } => render_data.push(false),
+      });
     });
 
     assert_eq!(&render_data, &[false]);
@@ -870,9 +686,11 @@ mod tests {
     two_img_paint(&mut painter);
 
     let mut render_data = vec![];
-    tess.tessellate(&painter.finish(), |r| match r {
-      RenderData::Color(_) => render_data.push(true),
-      RenderData::Image(_) => render_data.push(false),
+    tess.tessellate(&painter.finish(), &mut |data: TriangleLists| {
+      data.commands.iter().for_each(|cmd| match cmd {
+        DrawTriangles::Color(_) => render_data.push(true),
+        DrawTriangles::Texture { .. } => render_data.push(false),
+      });
     });
 
     assert_eq!(&render_data, &[true, false, true, false]);
@@ -884,7 +702,7 @@ mod tests {
     let mut painter = Painter::new(1.);
 
     two_img_paint(&mut painter);
-    let large_img = color_image(Color::YELLOW, DeviceSize::new(1024, 1024));
+    let large_img = color_image(Color::YELLOW, 1024, 1024);
     painter.set_brush(Brush::Image {
       img: large_img,
       tile_mode: TileMode::REPEAT_BOTH,
@@ -897,9 +715,11 @@ mod tests {
     two_img_paint(&mut painter);
 
     let mut render_data = vec![];
-    tess.tessellate(&painter.finish(), |r| match r {
-      RenderData::Color(_) => render_data.push(true),
-      RenderData::Image(_) => render_data.push(false),
+    tess.tessellate(&painter.finish(), &mut |data: TriangleLists| {
+      data.commands.iter().for_each(|cmd| match cmd {
+        DrawTriangles::Color(_) => render_data.push(true),
+        DrawTriangles::Texture { .. } => render_data.push(false),
+      });
     });
 
     assert_eq!(&render_data, &[false, false, false]);
@@ -924,8 +744,8 @@ mod tests {
     let commands = painter.finish();
     let mut tess = tessellator();
     b.iter(|| {
-      tess.vertices_cache.clear();
-      tess.tessellate(&commands, |_| {})
+      tess.vertices_cache.take();
+      tess.tessellate(&commands, &mut |_: TriangleLists| {})
     })
   }
 
@@ -941,8 +761,8 @@ mod tests {
     let cmd = painter.finish().pop().unwrap();
     let commands = vec![cmd; 1_000_00];
     let mut tess = tessellator();
-    tess.tessellate(&commands, |_| {});
-    b.iter(|| tess.tessellate(&commands, |_| {}))
+    tess.tessellate(&commands, &mut |_: TriangleLists| {});
+    b.iter(|| tess.tessellate(&commands, &mut |_: TriangleLists| {}))
   }
 
   #[bench]
@@ -956,8 +776,8 @@ mod tests {
     let commands = painter.finish();
     let mut tess = tessellator();
     b.iter(|| {
-      tess.vertices_cache.clear();
-      tess.tessellate(&commands, |_| {})
+      tess.vertices_cache.take();
+      tess.tessellate(&commands, &mut |_: TriangleLists| {})
     })
   }
 
@@ -971,7 +791,7 @@ mod tests {
     painter.fill_text(text);
     let commands = painter.finish();
     let mut tess = tessellator();
-    tess.tessellate(&commands, |_| {});
-    b.iter(|| tess.tessellate(&commands, |_| {}))
+    tess.tessellate(&commands, &mut |_: TriangleLists| {});
+    b.iter(|| tess.tessellate(&commands, &mut |_: TriangleLists| {}))
   }
 }

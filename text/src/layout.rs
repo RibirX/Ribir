@@ -211,13 +211,13 @@ fn calc_line_width(text: &str, l: &ParagraphShaped, letter_space: f32, font_size
   } else {
     l.runs
       .iter()
-      .filter_map(|r| {
+      .map(|r| {
         let mut w = r.width as f32 * font_size;
         if run_support_letter_space(text, r) {
           let glyph_cnt = (r.glyphs.len() as f32 - 1.).max(0.);
           w += letter_space * glyph_cnt;
         }
-        Some(w)
+        w
       })
       .sum()
   }
@@ -304,7 +304,7 @@ mod tests {
     };
 
     let layout = |cfg: &LayoutConfig, bounds: Option<Rect<f32>>| {
-      layout_text(text, &glyphs, &cfg, bounds)
+      layout_text(text, &glyphs, cfg, bounds)
         .map(|g| (g.x, g.y))
         .collect::<Vec<_>>()
     };

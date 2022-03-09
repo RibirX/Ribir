@@ -117,12 +117,7 @@ impl TextShaper {
     let (id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
 
     let (mut glyphs, mut miss_from) = Self::directly_shape(text, is_rtl, &face, buffer);
-    loop {
-      let m_start = match miss_from {
-        Some(i) => i,
-        None => break,
-      };
-
+    while let Some(m_start) = miss_from {
       let m_end = glyphs[m_start..]
         .iter()
         .position(Glyph::is_not_miss)
@@ -181,7 +176,7 @@ impl TextShaper {
     (0..output.len()).for_each(|g_idx| {
       let pos = output.glyph_positions()[g_idx];
       let info = &output.glyph_infos()[g_idx];
-      let glyph = Glyph::new(&face, pos, info);
+      let glyph = Glyph::new(face, pos, info);
       if miss_from.is_none() && glyph.is_miss() {
         miss_from = Some(g_idx);
       }
@@ -206,7 +201,7 @@ impl TextShaper {
   pub fn font_db_mut(&self) -> RwLockWriteGuard<FontDB> { self.font_db.write().unwrap() }
 
   fn reorder_and_shape(&self, text: &str, face_ids: &[ID]) -> Vec<ParagraphShaped> {
-    let bidi_info = BidiInfo::new(&text, None);
+    let bidi_info = BidiInfo::new(text, None);
     let mut buffer = Some(UnicodeBuffer::new());
     let mut lines = Vec::with_capacity(bidi_info.paragraphs.len());
 

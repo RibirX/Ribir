@@ -1,6 +1,5 @@
 use algo::FrameCache;
 
-use super::primitives_layout;
 use crate::Vertex;
 
 pub struct ImagePass {
@@ -11,7 +10,12 @@ pub struct ImagePass {
 }
 
 impl ImagePass {
-  pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+  pub fn new(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    primitive_layout: &wgpu::BindGroupLayout,
+    msaa_count: u32,
+  ) -> Self {
     let uniform_layout = uniform_layout(device);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -25,7 +29,13 @@ impl ImagePass {
       label: Some("Texture atlas sampler"),
       ..Default::default()
     });
-    let pipeline = pipeline(device, format, &uniform_layout);
+    let pipeline = pipeline(
+      device,
+      format,
+      &uniform_layout,
+      primitive_layout,
+      msaa_count,
+    );
     ImagePass {
       uniform_layout,
       resources: <_>::default(),
@@ -34,60 +44,73 @@ impl ImagePass {
     }
   }
 
-  pub fn create_texture_uniform(
+  pub fn add_texture(
     &mut self,
-    device: &wgpu::Device,
     mem_texture: crate::Texture,
-    coordinate_matrix: &wgpu::Buffer,
+    device: &wgpu::Device,
     queue: &wgpu::Queue,
+  ) {
+    if mem_texture.data.is_some() {
+      self.resources.remove(mem_texture.id);
+    }
+
+    self.resources.get_or_insert_with(&mem_texture.id, || {
+      let format = match mem_texture.format {
+        painter::image::ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8UnormSrgb,
+      };
+      let (width, height) = mem_texture.size;
+      let size = wgpu::Extent3d {
+        width: width as u32,
+        height: height as u32,
+        depth_or_array_layers: 1,
+      };
+      let texture_descriptor = &wgpu::TextureDescriptor {
+        label: Some("Create wgpu texture"),
+        size,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+        mip_level_count: 1,
+        sample_count: 1,
+      };
+      let texture = device.create_texture(texture_descriptor);
+
+      let bytes_per_pixel = mem_texture.format.pixel_per_bytes();
+      queue.write_texture(
+        // Tells wgpu where to copy the pixel data
+        wgpu::ImageCopyTexture {
+          texture: &texture,
+          mip_level: 0,
+          origin: wgpu::Origin3d::ZERO,
+          aspect: wgpu::TextureAspect::All,
+        },
+        // The actual pixel data
+        mem_texture
+          .data
+          .expect("should have image data, if no cache have"),
+        // The layout of the texture
+        wgpu::ImageDataLayout {
+          offset: 0,
+          bytes_per_row: std::num::NonZeroU32::new(bytes_per_pixel as u32 * size.width),
+          rows_per_image: std::num::NonZeroU32::new(size.height),
+        },
+        size,
+      );
+
+      texture
+    });
+  }
+
+  pub fn create_texture_uniform(
+    &self,
+    device: &wgpu::Device,
+    id: usize,
+    coordinate_matrix: &wgpu::Buffer,
   ) -> wgpu::BindGroup {
     let view = self
       .resources
-      .get_or_insert_with(&mem_texture.id, || {
-        let format = match mem_texture.format {
-          painter::image::ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8UnormSrgb,
-        };
-        let (width, height) = mem_texture.size;
-        let size = wgpu::Extent3d {
-          width: width as u32,
-          height: height as u32,
-          depth_or_array_layers: 1,
-        };
-        let texture_descriptor = &wgpu::TextureDescriptor {
-          label: Some("Create wgpu texture"),
-          size,
-          dimension: wgpu::TextureDimension::D2,
-          format,
-          usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
-          mip_level_count: 1,
-          sample_count: 1,
-        };
-        let texture = device.create_texture(texture_descriptor);
-
-        let bytes_per_pixel = mem_texture.format.pixel_per_bytes();
-        queue.write_texture(
-          // Tells wgpu where to copy the pixel data
-          wgpu::ImageCopyTexture {
-            texture: &texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-          },
-          // The actual pixel data
-          mem_texture
-            .data
-            .expect("should have image data, if no cache have"),
-          // The layout of the texture
-          wgpu::ImageDataLayout {
-            offset: 0,
-            bytes_per_row: std::num::NonZeroU32::new(bytes_per_pixel as u32 * size.width),
-            rows_per_image: std::num::NonZeroU32::new(size.height),
-          },
-          size,
-        );
-
-        texture
-      })
+      .get(&id)
+      .unwrap()
       .create_view(&wgpu::TextureViewDescriptor::default());
 
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -108,6 +131,22 @@ impl ImagePass {
       ],
       label: Some("uniform_bind_group"),
     })
+  }
+
+  pub fn set_anti_aliasing(
+    &mut self,
+    msaa_count: u32,
+    primitive_layout: &wgpu::BindGroupLayout,
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+  ) {
+    self.pipeline = pipeline(
+      device,
+      format,
+      &self.uniform_layout,
+      primitive_layout,
+      msaa_count,
+    );
   }
 
   pub fn end_frame(&mut self) { self.resources.end_frame("wgpu texture"); }
@@ -151,12 +190,12 @@ pub fn pipeline(
   device: &wgpu::Device,
   format: wgpu::TextureFormat,
   uniform_layout: &wgpu::BindGroupLayout,
+  primitive_layout: &wgpu::BindGroupLayout,
+  msaa_count: u32,
 ) -> wgpu::RenderPipeline {
-  let primitive_layout = primitives_layout(&device);
-
   let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
     label: Some("Create render pipeline"),
-    bind_group_layouts: &[uniform_layout, &primitive_layout],
+    bind_group_layouts: &[uniform_layout, primitive_layout],
     push_constant_ranges: &[],
   });
 
@@ -192,7 +231,11 @@ pub fn pipeline(
       conservative: false,
     },
     depth_stencil: None,
-    multisample: wgpu::MultisampleState::default(),
+    multisample: wgpu::MultisampleState {
+      count: msaa_count,
+      mask: !0,
+      alpha_to_coverage_enabled: false,
+    },
     multiview: None,
   })
 }

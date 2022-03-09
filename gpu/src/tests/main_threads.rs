@@ -61,7 +61,7 @@ fn wnd_smoke() {
 
 fn main() {
   use colored::Colorize;
-  
+
   ribir::test::unit_test_describe! {
     run_unit_test(headless_smoke);
     run_unit_test(wnd_smoke);

@@ -30,7 +30,7 @@ impl FontDB {
     self
       .cache
       .get_or_insert_with(&face_id, || {
-        let value = self
+        self
           .data_base
           .face_source(face_id)
           .and_then(|(src, face_index)| {
@@ -48,8 +48,7 @@ impl FontDB {
               fontdb::Source::SharedFile(_, data) => Some(data),
             }?;
             Face::from_data(face_id, source_data, face_index)
-          });
-        value
+          })
       })
       .as_ref()
   }
@@ -401,7 +400,7 @@ mod tests {
   fn load_sys_fonts() {
     let mut db = FontDB::default();
     db.load_system_fonts();
-    assert!(db.faces().len() > 0)
+    assert!(!db.faces().is_empty())
   }
 
   #[test]

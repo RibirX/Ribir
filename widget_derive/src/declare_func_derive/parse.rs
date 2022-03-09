@@ -142,15 +142,13 @@ impl Parse for DeclareWidget {
     }
 
     // syntax error hint.
-    if !content.is_empty() {
-      if is_field(&content) {
-        let f: DeclareField = content.parse()?;
-        if !widget.children.is_empty() {
-          return Err(syn::Error::new(
-            f.span(),
-            "Field should always declare before children.",
-          ));
-        }
+    if !content.is_empty() && is_field(&content) {
+      let f: DeclareField = content.parse()?;
+      if !widget.children.is_empty() {
+        return Err(syn::Error::new(
+          f.span(),
+          "Field should always declare before children.",
+        ));
       }
     }
 

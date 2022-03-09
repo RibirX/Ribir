@@ -3,7 +3,6 @@ use zerocopy::AsBytes;
 pub type Rect = lyon_tessellation::geom::Rect<u16>;
 pub type Size = lyon_tessellation::geom::Size<u16>;
 pub struct MemTexture<const N: usize> {
-  // todo: not use tuple replace Size
   max_size: Size,
   size: Size,
   array: Box<[u8]>,
@@ -104,24 +103,20 @@ impl<const N: usize> std::ops::IndexMut<usize> for MemTexture<N> {
 
 #[cfg(test)]
 mod tests {
-  use painter::DevicePoint;
 
   use super::*;
   #[test]
   fn update_texture() {
     let mut tex = MemTexture::<1>::new(Size::new(8, 8), Size::new(512, 512));
 
-    tex.write_rect(&Rect::new(DevicePoint::new(0, 0), Size::new(2, 1)), &[0, 1]);
+    tex.write_rect(&Rect::new((0, 0).into(), Size::new(2, 1)), &[0, 1]);
     assert_eq!(&tex[0][0..4], &[00, 1, 0, 0]);
 
-    tex.write_rect(
-      &Rect::new(DevicePoint::new(3, 7), Size::new(2, 1)),
-      &[73, 74],
-    );
+    tex.write_rect(&Rect::new((3, 7).into(), Size::new(2, 1)), &[73, 74]);
     assert_eq!(tex[7][3], 73);
 
     tex.write_rect(
-      &Rect::new(DevicePoint::new(4, 3), Size::new(2, 2)),
+      &Rect::new((4, 3).into(), Size::new(2, 2)),
       &[34, 35, 44, 45],
     );
     assert_eq!(&tex[3][4..], &[34, 35, 0, 0]);
