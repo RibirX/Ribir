@@ -216,7 +216,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         )
       });
 
-      let fn_convert_tokens = match (into.is_some(), strip_option.is_some()) {
+      let methods_tokens = match (into.is_some(), strip_option.is_some()) {
         (true, true) => {
           let strip_ty = strip_ty?;
           quote! {
@@ -229,7 +229,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
             }
 
             #[inline]
-            #vis fn #name<V>(&mut self, v: V) -> &mut Self
+            #vis fn #name<V>(mut self, v: V) -> Self
               where V: Into<#strip_ty>
             {
               assert!(self.#name.is_none());
@@ -245,7 +245,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
             #vis fn #fn_convert<V: Into<#ty>>(v: V) ->#ty { v.into() }
 
             #[inline]
-            #vis fn #name<V: Into<#ty>>(&mut self, v: V) -> &mut Self {
+            #vis fn #name<V: Into<#ty>>(mut self, v: V) -> Self {
               assert!(self.#name.is_none());
               self.#name = Some(Self::#fn_convert(v));
               self
@@ -260,7 +260,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
             #vis fn #fn_convert(v: #strip_ty) -> Option<#strip_ty> { Some(v) }
 
             #[inline]
-            #vis fn #name(&mut self, v: #strip_ty) -> &mut Self {
+            #vis fn #name(mut self, v: #strip_ty) -> Self {
               assert!(self.#name.is_none());
               self.#name = Some(Self::#fn_convert(v));
               self
@@ -273,7 +273,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
             #[allow(non_snake_case)]
             #vis fn #fn_convert(v: #ty) -> #ty { v }
 
-            #vis fn #name(&mut self, v: #ty) -> &mut Self {
+            #vis fn #name(mut self, v: #ty) -> Self {
               assert!(self.#name.is_none());
               self.#name = Some(Self::#fn_convert(v));
               self
@@ -282,7 +282,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
       };
       methods.extend(quote! {
-        #fn_convert_tokens
+        #methods_tokens
       });
 
       Ok(())

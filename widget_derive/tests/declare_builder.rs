@@ -18,9 +18,7 @@ fn declare_builder_smoke() {
     b: i32,
   }
 
-  let mut b = <B as Declare>::builder();
-  b.a(1.).b(1);
-  let b = b.build(&mut ctx);
+  let b = <B as Declare>::builder().a(1.).b(1).build(&mut ctx);
   assert_eq!(b.a, 1.);
   assert_eq!(b.b, 1);
 

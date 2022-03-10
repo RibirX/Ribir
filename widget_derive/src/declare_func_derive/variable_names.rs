@@ -36,3 +36,8 @@ pub fn ribir_prefix_variable(name: &Ident, prefix: &str) -> Ident {
 }
 
 pub fn widget_def_variable(name: &Ident) -> Ident { ribir_suffix_variable(name, "def") }
+
+pub fn field_guard_variable(member: &Ident, guard_span: Span) -> Ident {
+  let guard_cond = Ident::new(&member.to_string(), guard_span);
+  ribir_suffix_variable(&guard_cond, "guard")
+}

@@ -526,7 +526,6 @@ impl DeclareWidget {
   pub fn normal_attrs_tokens(&self, tokens: &mut TokenStream2) {
     let w_name = widget_def_variable(&self.widget_identify());
 
-    // todo: split fields by if it has `if-guard` and generate chain or not.
     self.sugar_fields.normal_attr_iter().for_each(
       |DeclareField {
          expr,

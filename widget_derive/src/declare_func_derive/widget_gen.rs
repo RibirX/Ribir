@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Ident, Path};
 
-use super::{ribir_suffix_variable, DeclareCtx, DeclareField};
+use super::{field_guard_variable, DeclareCtx, DeclareField};
 
 pub struct WidgetGen<'a> {
   pub ty: &'a Path,
@@ -16,6 +16,7 @@ pub struct WidgetGen<'a> {
 }
 
 impl<'a> WidgetGen<'a> {
+  // todo: check force_stateful
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx, force_stateful: bool) -> TokenStream {
     let Self { fields, ty, .. } = self;
 
@@ -23,21 +24,40 @@ impl<'a> WidgetGen<'a> {
     let def_name = widget_def_variable(&self.name);
     let ref_name = &self.name;
 
-    let mut value_before = quote! {};
-    let mut build_widget = quote! {
-      let mut #def_name = <#ty as Declare>::builder();
-    };
-    let mut follow_after = quote! {};
+    let (fields_without_guard, fields_with_guard): (Vec<_>, Vec<_>) =
+      fields.iter().partition(|f| f.if_guard.is_none());
 
-    // todo: split fields by if it has `if-guard` and generate chain or not.
-    fields.iter().for_each(|f| {
-      self.gen_field_tokens(f, &mut value_before, &mut build_widget, &mut follow_after);
+    let guard_calc = fields_with_guard.iter().map(|f| {
+      let guard = f.if_guard.as_ref().unwrap();
+      let guard_cond = field_guard_variable(&f.member, guard.span());
+      quote! { let #guard_cond = #guard { true } else { false }; }
     });
 
-    let ctx_name = self.ctx_name;
+    let build_widget = {
+      let mut_token = (!fields_with_guard.is_empty()).then(|| quote! {mut});
+      let without_guard_tokens = fields_without_guard
+        .iter()
+        .map(|f| f.build_tokens_without_guard());
+      let ctx_name = self.ctx_name;
+      if fields_with_guard.is_empty() {
+        quote_spanned! { ty.span() =>
+          let #mut_token #def_name = <#ty as Declare>::builder()
+            #(#without_guard_tokens)*.build(#ctx_name)#stateful;
+        }
+      } else {
+        let with_guard_tokens = fields_with_guard
+          .iter()
+          .map(|f| f.build_tokens_with_guard(&def_name));
 
-    build_widget
-      .extend(quote_spanned! { ty.span() => let #def_name = #def_name.build(#ctx_name)#stateful;});
+        quote_spanned! { ty.span() =>
+          let #mut_token #def_name = <#ty as Declare>::builder()#(#without_guard_tokens)*;
+          #(#with_guard_tokens)*
+          let #def_name = #def_name.build(#ctx_name)#stateful;
+        }
+      }
+    };
+
+    let fields_follow = fields.iter().filter_map(|f| self.field_follow_tokens(f));
 
     let state_ref = if force_stateful || self.is_stateful(ctx) {
       Some(quote! { let mut #ref_name = unsafe { #def_name.state_ref() }; })
@@ -48,73 +68,34 @@ impl<'a> WidgetGen<'a> {
     };
 
     quote! {
-      #value_before
+      #(#guard_calc)*
       #build_widget
       #state_ref
-      #follow_after
-    }
-  }
-
-  /// Generate field tokens with three part, the first is a tuple of field value
-  /// and the follow condition, the second part is the field value declare in
-  /// struct literal, the last part is expression to follow the other widgets
-  /// change.
-  fn gen_field_tokens(
-    &self,
-    f: &DeclareField,
-    value_before: &mut TokenStream,
-    widget_def: &mut TokenStream,
-    follow_after: &mut TokenStream,
-  ) {
-    let DeclareField { if_guard, member, expr, .. } = f;
-    let field_follow = self.field_follow_tokens(f);
-    let def_name = widget_def_variable(&self.name);
-
-    match (if_guard, field_follow.as_ref()) {
-      (Some(guard), Some(_)) => {
-        // we need to calculate `if guard` value before define widget to avoid twice
-        // calculate it
-        let guard_cond = Ident::new(&member.to_string(), guard.span());
-        let guard_cond = ribir_suffix_variable(&guard_cond, "guard");
-        value_before.extend(quote! {
-            let #guard_cond = #guard { true } else { false };
-        });
-        widget_def.extend(quote! { if #guard_cond { #def_name.#member(#expr); }});
-        follow_after.extend(quote! {if #guard_cond { #field_follow } });
-      }
-      (Some(guard), None) => {
-        widget_def.extend(quote! {
-          #guard {
-            #def_name.#member(#expr);
-          }
-        });
-      }
-      _ => {
-        widget_def.extend(quote! {#def_name.#member(#expr);});
-        follow_after.extend(field_follow);
-      }
+      #(#fields_follow)*
     }
   }
 
   fn field_follow_tokens(&self, f: &DeclareField) -> Option<TokenStream> {
     let DeclareField {
-      member, follows: depends_on, skip_nc, ..
+      member, follows, skip_nc, if_guard, ..
     } = f;
 
     let ref_name = &self.name;
     let expr_tokens = f.value_tokens(self.ty);
 
-    depends_on.as_ref().map(|follows| {
+    follows.as_ref().map(|follows| {
       let assign = skip_nc_assign(
         skip_nc.is_some(),
         &quote! { #ref_name.#member},
         &expr_tokens,
       );
       let upstream = upstream_observable(follows);
-
-      quote! {
-          #upstream.subscribe( move |_|{ #assign } );
+      let mut tokens = quote! { #upstream.subscribe( move |_|{ #assign } );};
+      if let Some(if_guard) = if_guard {
+        let guard_cond = field_guard_variable(member, if_guard.span());
+        tokens = quote! { if #guard_cond { #tokens } }
       }
+      tokens
     })
   }
 
@@ -134,5 +115,22 @@ impl DeclareField {
     let Self { member, expr, .. } = self;
     let field_converter = field_convert_method(member);
     quote_spanned! { expr.span() => <#widget_ty as Declare>::Builder::#field_converter(#expr) }
+  }
+
+  fn build_tokens_without_guard(&self) -> TokenStream {
+    assert!(self.if_guard.is_none());
+    let Self { member, expr, .. } = self;
+    quote! {.#member(#expr)}
+  }
+
+  fn build_tokens_with_guard(&self, builder: &Ident) -> TokenStream {
+    let if_guard = self.if_guard.as_ref().unwrap();
+    let Self { member, expr, .. } = self;
+    let guard_cond = field_guard_variable(member, if_guard.span());
+    quote! {
+      if #guard_cond {
+        #builder = #builder.#member(#expr);
+      }
+    }
   }
 }
