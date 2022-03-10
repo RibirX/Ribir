@@ -1,11 +1,7 @@
 #![cfg(test)]
 use crate::{
   prelude::*,
-  render::render_tree::*,
-  widget::{
-    layout::{flex::CrossAxisAlign, Row},
-    widget_tree::*,
-  },
+  widget::layout::{flex::CrossAxisAlign, Row},
 };
 
 #[derive(Clone, Debug)]
@@ -28,14 +24,13 @@ impl EmbedPost {
 }
 
 impl CombinationWidget for EmbedPost {
-  fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     declare! {
       Row {
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default(),
-        Text { text: self.title.to_string() },
-        Text { text: self.author.to_string() },
-        Text { text: self.content.to_string() },
+        v_align: CrossAxisAlign::Start,
+        Text { text: self.title, style: <_>::default() },
+        Text { text: self.author, style: <_>::default() },
+        Text { text: self.content, style: <_>::default() },
         (self.level >0).then(||{
           let mut embed = self.clone();
           embed.level -= 1;
@@ -44,13 +39,4 @@ impl CombinationWidget for EmbedPost {
       }
     }
   }
-}
-
-pub fn create_embed_app(level: usize) -> (WidgetTree, RenderTree) {
-  let post = EmbedPost::new(level);
-  let mut widget_tree = WidgetTree::default();
-  let mut render_tree = RenderTree::default();
-
-  widget_tree.set_root(post.box_it(), &mut render_tree);
-  (widget_tree, render_tree)
 }

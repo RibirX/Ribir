@@ -6,43 +6,40 @@ struct Task {
   finished: bool,
   label: String,
 }
-#[stateful(custom)]
 #[derive(Debug)]
 struct Todos {
   tasks: Vec<Task>,
 }
 
-impl CombinationWidget for StatefulTodos {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    let state = self.state_ref();
+impl StatefulCombination for Todos {
+  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+    let this_ref = unsafe { this.state_ref() };
     declare! {
       Column {
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default(),
-        self.tasks.iter().enumerate().map(|(idx, task)|{
-          let state = state.clone();
+        h_align: CrossAxisAlign::Start,
+        this.tasks.iter().enumerate().map(|(idx, task)|{
           declare!{
             Row {
               margin: EdgeInsets::vertical(4.),
-              ..<_>::default(),
               Checkbox{
                 id: checkbox,
-                checked: task.finished,
-                style: ctx.theme().checkbox.clone(),
-                ..<_>::default(),
+                checked: task.finished
               }
-              Text{
+              Text {
                 text:task.label.clone(),
-                margin: EdgeInsets::vertical(4.),
+                margin: EdgeInsets::vertical(4.)
               }
             }
-            data_flow!{ checkbox.checked ~> state.silent().tasks[idx].finished }
+            data_flow!{
+              checkbox.checked ~> this_ref.silent().tasks[idx].finished;
+            }
           }
         })
       }
     }
   }
 }
+
 fn main() {
   env_logger::init();
   let todo = Todos {

@@ -1,13 +1,11 @@
 pub use crate::prelude::*;
 
 /// A marker trait to tell Ribir a widget can have one child.
-pub trait SingleChildWidget: RenderWidget {
-  fn have(self, child: BoxedWidget) -> SingleChild<Self>
-  where
-    Self: Sized,
-  {
-    SingleChild { widget: self, child }
-  }
+pub trait SingleChildWidget
+where
+  Self: Sized,
+{
+  fn have(self, child: BoxedWidget) -> SingleChild<Self> { SingleChild { widget: self, child } }
 }
 
 pub struct SingleChild<S> {
@@ -32,7 +30,10 @@ impl<S> std::ops::DerefMut for SingleChild<S> {
 }
 
 /// A marker trait to tell Ribir a widget can have multi child.
-pub trait MultiChildWidget: RenderWidget + Sized {
+pub trait MultiChildWidget
+where
+  Self: Sized,
+{
   fn have_multi(self, children: Vec<BoxedWidget>) -> MultiChild<Self> {
     MultiChild { widget: self, children }
   }
@@ -72,18 +73,6 @@ impl<R> std::ops::DerefMut for MultiChild<R> {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.widget }
 }
 
-impl<S: Stateful> Stateful for SingleChild<S> {
-  type RawWidget = S::RawWidget;
-  #[inline]
-  fn state_ref(&self) -> StateRef<Self::RawWidget> { self.widget.state_ref() }
-}
-
-impl<M: Stateful> Stateful for MultiChild<M> {
-  type RawWidget = M::RawWidget;
-  #[inline]
-  fn state_ref(&self) -> StateRef<Self::RawWidget> { self.widget.state_ref() }
-}
-
 impl<S: IntoStateful> IntoStateful for SingleChild<S> {
   type S = SingleChild<S::S>;
   #[inline]
@@ -117,7 +106,7 @@ pub trait SingleComposeNormal<M> {
 
 impl<W, C, M> SingleComposeNormal<M> for (W, C)
 where
-  W: SingleChildWidget,
+  W: SingleChildWidget + IntoRender,
   C: BoxWidget<M>,
 {
   type R = SingleChild<W>;
@@ -131,8 +120,8 @@ pub trait SingleComposeOption<M> {
 
 impl<W, M, C> SingleComposeOption<M> for (W, Option<C>)
 where
-  W: SingleChildWidget,
-  C: BoxWidget<M>,
+  W: SingleChildWidget + IntoRender + 'static,
+  C: BoxWidget<M> + 'static,
 {
   #[inline]
   fn compose(self) -> BoxedWidget {
@@ -146,7 +135,7 @@ where
 
 impl<W, M, C> SingleComposeOption<M> for (Option<W>, C)
 where
-  W: SingleChildWidget,
+  W: SingleChildWidget + IntoRender + 'static,
   C: BoxWidget<M>,
 {
   #[inline]

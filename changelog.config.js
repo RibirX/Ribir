@@ -23,7 +23,15 @@ module.exports = {
     "issues",
     "lerna"
   ],
-  "scopes": [],
+  "scopes": [
+    "core",
+    "painter",
+    "compiler",
+    "gpu",
+    "text",
+    "algo",
+    "*"
+  ],
   "types": {
     "chore": {
       "description": "Build process or auxiliary tool changes",

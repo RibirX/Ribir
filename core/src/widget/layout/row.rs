@@ -1,51 +1,38 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(RenderWidget, MultiChildWidget)]
-pub struct Row(#[proxy] Flex);
+// todo: give a alias for `CrossAxisAlign` and `MainAxisAlign`
 
-impl Default for Row {
-  fn default() -> Self { Self(Flex::default().with_direction(Direction::Horizontal)) }
-}
-
-impl IntoStateful for Row {
-  type S = StatefulFlex;
-  fn into_stateful(self) -> Self::S { self.0.into_stateful() }
-}
-
-// declare macro  support.
-#[derive(Default)]
-pub struct RowBuilder {
+#[derive(Default, MultiChildWidget, Declare, Clone)]
+pub struct Row {
+  #[declare(default)]
   pub reverse: bool,
+  #[declare(default)]
   pub wrap: bool,
-  pub cross_align: CrossAxisAlign,
-  pub main_align: MainAxisAlign,
+  #[declare(default = "CrossAxisAlign::Center")]
+  pub v_align: CrossAxisAlign,
+  #[declare(default)]
+  pub h_align: MainAxisAlign,
 }
 
-impl Declare for Row {
-  type Builder = RowBuilder;
-}
-
-impl DeclareBuilder for RowBuilder {
-  type Target = Row;
-
+impl RenderWidget for Row {
   #[inline]
-  fn build(self) -> Self::Target {
-    let Self {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let Self { reverse, wrap, v_align, h_align } = self.clone();
+
+    Flex {
       reverse,
       wrap,
-      cross_align,
-      main_align,
-    } = self;
-    Row(
-      FlexBuilder {
-        reverse,
-        wrap,
-        direction: Direction::Horizontal,
-        cross_align,
-        main_align,
-      }
-      .build(),
-    )
+      direction: Direction::Horizontal,
+      cross_align: v_align,
+      main_align: h_align,
+    }
+    .perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { false }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }

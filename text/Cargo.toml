@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "text"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+algo = {path = "../algo"}
+fontdb = "0.7.0"
+log = "0.4.14"
+lyon_path = "0.17.7"
+rustybuzz = "0.4.0"
+ttf-parser = "0.12.3"
+unic-bidi = "0.9.0"
+unicode-script="0.5.4"

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::render::render_tree::*;
 
 /// How the children should be placed along the cross axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -43,58 +42,25 @@ pub enum MainAxisAlign {
   SpaceEvenly,
 }
 
-#[stateful]
 #[derive(Default, MultiChildWidget, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
+  #[declare(default)]
   pub reverse: bool,
   /// Whether flex items are forced onto one line or can wrap onto multiple
   /// lines
+  #[declare(default)]
   pub wrap: bool,
   /// Sets how flex items are placed in the flex container defining the main
   /// axis and the direction
+  #[declare(default)]
   pub direction: Direction,
   /// How the children should be placed along the cross axis in a flex layout.
+  #[declare(default)]
   pub cross_align: CrossAxisAlign,
   /// How the children should be placed along the main axis in a flex layout.
+  #[declare(default)]
   pub main_align: MainAxisAlign,
-}
-
-impl Flex {
-  /// Create a new Flex like `self`, but with the give `reverse`.
-  #[inline]
-  pub fn with_reverse(mut self, reverse: bool) -> Self {
-    self.reverse = reverse;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `direction`.
-  #[inline]
-  pub fn with_direction(mut self, direction: Direction) -> Self {
-    self.direction = direction;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `cross_align`.
-  #[inline]
-  pub fn with_cross_align(mut self, cross_align: CrossAxisAlign) -> Self {
-    self.cross_align = cross_align;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `main_align`.
-  #[inline]
-  pub fn with_main_align(mut self, main_align: MainAxisAlign) -> Self {
-    self.main_align = main_align;
-    self
-  }
-
-  /// Create a new Flex like `self`, but with the give `wrap`.
-  #[inline]
-  pub fn with_wrap(mut self, wrap: bool) -> Self {
-    self.wrap = wrap;
-    self
-  }
 }
 
 impl Default for CrossAxisAlign {
@@ -108,20 +74,7 @@ impl Default for MainAxisAlign {
 }
 
 impl RenderWidget for Flex {
-  type RO = Self;
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for Flex {
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let direction = self.direction;
     let mut layouter = FlexLayouter {
       max_size: FlexSize::from_size(clamp.max, direction),
@@ -142,9 +95,7 @@ impl RenderObject for Flex {
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
-    // Nothing to draw.
-  }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -207,31 +158,38 @@ struct FlexLayouter {
 }
 
 impl FlexLayouter {
-  fn layout(&mut self, ctx: &mut RenderCtx) -> Size {
+  fn layout(&mut self, ctx: &mut LayoutCtx) -> Size {
     macro_rules! inner_layout {
       ($method: ident) => {{
-        self.children_perform(ctx.$method());
-        self.relayout_if_need(ctx.$method());
+        let (ctx, iter) = ctx.$method();
+        self.children_perform(ctx, iter);
+        let (ctx, iter) = ctx.$method();
+        self.relayout_if_need(ctx, iter);
         let size = self.box_size();
-        self.line_inner_align(ctx.$method(), size);
+        let (ctx, iter) = ctx.$method();
+        self.line_inner_align(ctx, iter, size);
         size.to_size(self.direction)
       }};
     }
     if self.reverse {
-      inner_layout!(reverse_children)
+      inner_layout!(split_rev_children)
     } else {
-      inner_layout!(children)
+      inner_layout!(split_render_children)
     }
   }
 
-  fn children_perform<'a>(&mut self, children: impl Iterator<Item = RenderCtx<'a>>) {
+  fn children_perform<'a>(
+    &mut self,
+    ctx: &mut LayoutCtx,
+    children: impl Iterator<Item = WidgetId>,
+  ) {
     let clamp = BoxClamp {
       max: self.max_size.to_size(self.direction),
       min: Size::zero(),
     };
 
-    children.for_each(|mut child_ctx| {
-      let size = child_ctx.perform_layout(clamp);
+    children.for_each(|child| {
+      let size = ctx.perform_render_child_layout(child, clamp);
       let flex_size = FlexSize::from_size(size, self.direction);
       if self.wrap
         && !self.current_line.is_empty()
@@ -239,19 +197,24 @@ impl FlexLayouter {
       {
         self.place_line();
       }
-      child_ctx.update_position(
+      ctx.update_position(
+        child,
         FlexSize {
           main: self.current_line.main_width,
           cross: self.current_line.cross_pos,
         }
         .to_point(self.direction),
       );
-      self.place_widget(flex_size, &child_ctx);
+      self.place_widget(flex_size, child, ctx);
     });
     self.place_line();
   }
 
-  fn relayout_if_need<'a>(&mut self, mut children: impl Iterator<Item = RenderCtx<'a>>) {
+  fn relayout_if_need<'a>(
+    &mut self,
+    ctx: &mut LayoutCtx,
+    mut children: impl Iterator<Item = WidgetId>,
+  ) {
     let Self {
       lines_info,
       direction,
@@ -263,9 +226,10 @@ impl FlexLayouter {
     lines_info.iter_mut().for_each(|line| {
       (0..line.child_count)
         .map(|_| children.next().unwrap())
-        .fold(0.0f32, |main_offset, mut child_ctx| {
+        .fold(0.0f32, |main_offset, child| {
           Self::obj_real_rect_with_main_start(
-            &mut child_ctx,
+            ctx,
+            child,
             line,
             main_offset,
             *direction,
@@ -279,7 +243,8 @@ impl FlexLayouter {
 
   fn line_inner_align<'a>(
     &mut self,
-    mut children: impl Iterator<Item = RenderCtx<'a>>,
+    ctx: &mut LayoutCtx,
+    mut children: impl Iterator<Item = WidgetId>,
     size: FlexSize,
   ) {
     let real_size = self.best_size();
@@ -316,9 +281,9 @@ impl FlexLayouter {
 
       (0..line.child_count)
         .map(|_| children.next().unwrap())
-        .fold(offset, |main_offset: f32, mut child_ctx| {
-          let rect = child_ctx
-            .box_rect()
+        .fold(offset, |main_offset: f32, child| {
+          let rect = ctx
+            .widget_box_rect(child)
             .expect("relayout a expanded widget which not prepare layout");
           let mut origin = FlexSize::from_point(rect.origin, *direction);
           let child_size = FlexSize::from_size(rect.size, *direction);
@@ -330,18 +295,18 @@ impl FlexLayouter {
           };
           origin.main += main_offset;
           origin.cross += container_cross_offset + line_cross_offset;
-          child_ctx.update_position(origin.to_point(*direction));
+          ctx.update_position(child, origin.to_point(*direction));
           main_offset + step
         });
     });
   }
 
-  fn place_widget(&mut self, size: FlexSize, child_ctx: &RenderCtx) {
+  fn place_widget(&mut self, size: FlexSize, child: WidgetId, ctx: &mut LayoutCtx) {
     let mut line = &mut self.current_line;
     line.main_width += size.main;
     line.cross_line_height = line.cross_line_height.max(size.cross);
     line.child_count += 1;
-    if let Some(flex) = Self::child_flex(child_ctx) {
+    if let Some(flex) = Self::child_flex(ctx, child) {
       line.flex_sum += flex;
       line.flex_main_width += size.main;
     }
@@ -363,20 +328,21 @@ impl FlexLayouter {
   // relayout child to get the real size, and return the new offset in main axis
   // for next siblings.
   fn obj_real_rect_with_main_start(
-    child_ctx: &mut RenderCtx,
+    ctx: &mut LayoutCtx,
+    child: WidgetId,
     line: &mut MainLineInfo,
     main_offset: f32,
     dir: Direction,
     cross_align: CrossAxisAlign,
     max_size: FlexSize,
   ) -> f32 {
-    let pre_layout_rect = child_ctx
-      .box_rect()
+    let pre_layout_rect = ctx
+      .widget_box_rect(child)
       .expect("relayout a expanded widget which not prepare layout");
 
     let pre_size = FlexSize::from_size(pre_layout_rect.size, dir);
     let mut prefer_main = pre_size.main;
-    if let Some(flex) = Self::child_flex(&child_ctx) {
+    if let Some(flex) = Self::child_flex(ctx, child) {
       let remain_space = max_size.main - line.main_width + line.flex_main_width;
       prefer_main = remain_space * (flex / line.flex_sum);
       line.flex_sum -= flex;
@@ -395,10 +361,13 @@ impl FlexLayouter {
 
     let real_size = if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
       // Relayout only if the child object size may change.
-      let new_size = child_ctx.perform_layout(BoxClamp {
-        max: clamp_max.to_size(dir),
-        min: clamp_min.to_size(dir),
-      });
+      let new_size = ctx.perform_render_child_layout(
+        child,
+        BoxClamp {
+          max: clamp_max.to_size(dir),
+          min: clamp_min.to_size(dir),
+        },
+      );
       FlexSize::from_size(new_size, dir)
     } else {
       pre_size
@@ -412,7 +381,7 @@ impl FlexLayouter {
     let new_pos = new_pos.to_point(dir);
 
     if pre_layout_rect.origin != new_pos {
-      child_ctx.update_position(new_pos);
+      ctx.update_position(child, new_pos);
     }
 
     main_offset + main_diff
@@ -429,10 +398,9 @@ impl FlexLayouter {
 
   fn box_size(&self) -> FlexSize { self.best_size().clamp(self.min_size, self.max_size) }
 
-  fn child_flex(ctx: &RenderCtx) -> Option<f32> {
+  fn child_flex(ctx: &mut LayoutCtx, child: WidgetId) -> Option<f32> {
     ctx
-      .render_obj()
-      .downcast_ref::<<Expanded as RenderWidget>::RO>()
+      .widget_downcast_ref::<Expanded>(child)
       .map(|expanded| expanded.flex)
   }
 }
@@ -456,13 +424,13 @@ impl MainLineInfo {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::layout::row::RowBuilder, test::widget_and_its_children_box_rect};
+  use crate::test::widget_and_its_children_box_rect;
 
   #[test]
   fn horizontal_line() {
     let row = Flex::default().have_multi(
       (0..10)
-        .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
+        .map(|_| SizedBox { size: Size::new(10., 20.) }.box_it())
         .collect(),
     );
     let (rect, _) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
@@ -471,13 +439,16 @@ mod tests {
 
   #[test]
   fn vertical_line() {
-    let col = Flex::default()
-      .with_direction(Direction::Vertical)
-      .have_multi(
-        (0..10)
-          .map(|_| SizedBox::from_size(Size::new(10., 20.)).box_it())
-          .collect(),
-      );
+    let col = Flex {
+      direction: Direction::Vertical,
+      ..<_>::default()
+    }
+    .have_multi(
+      (0..10)
+        .map(|_| SizedBox { size: Size::new(10., 20.) }.box_it())
+        .collect(),
+    )
+    .box_it();
     let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
@@ -485,9 +456,9 @@ mod tests {
   #[test]
   fn row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex::default()
-      .with_wrap(true)
-      .have_multi((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
+    let row = Flex { wrap: true, ..<_>::default() }
+      .have_multi((0..3).map(|_| SizedBox { size }.box_it()).collect());
+
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -503,10 +474,13 @@ mod tests {
   #[test]
   fn reverse_row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex::default()
-      .with_wrap(true)
-      .with_reverse(true)
-      .have_multi((0..3).map(|_| SizedBox::from_size(size).box_it()).collect());
+    let row = Flex {
+      wrap: true,
+      reverse: true,
+      ..<_>::default()
+    }
+    .have_multi((0..3).map(|_| SizedBox { size }.box_it()).collect());
+
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
@@ -522,11 +496,10 @@ mod tests {
   #[test]
   fn cross_align() {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
-      let row = RowBuilder { cross_align: align, ..<_>::default() }
-        .build()
-        .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
-        .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
-        .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
+      let row = Row { v_align: align, ..<_>::default() }
+        .have(SizedBox { size: Size::new(100., 20.) }.box_it())
+        .have(SizedBox { size: Size::new(100., 30.) }.box_it())
+        .have(SizedBox { size: Size::new(100., 40.) }.box_it())
         .box_it();
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
@@ -553,14 +526,13 @@ mod tests {
     cross_align_check(CrossAxisAlign::Center, [10., 5., 0.]);
     cross_align_check(CrossAxisAlign::End, [20., 10., 0.]);
 
-    let row = RowBuilder {
-      cross_align: CrossAxisAlign::Stretch,
+    let row = Row {
+      v_align: CrossAxisAlign::Stretch,
       ..<_>::default()
     }
-    .build()
-    .have(SizedBox::from_size(Size::new(100., 20.)).box_it())
-    .have(SizedBox::from_size(Size::new(100., 30.)).box_it())
-    .have(SizedBox::from_size(Size::new(100., 40.)).box_it())
+    .have(SizedBox { size: Size::new(100., 20.) }.box_it())
+    .have(SizedBox { size: Size::new(100., 30.) }.box_it())
+    .have(SizedBox { size: Size::new(100., 40.) }.box_it())
     .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
@@ -588,34 +560,33 @@ mod tests {
   fn main_align() {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
-      let row = RowBuilder {
-        main_align: align,
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default()
-      }
-      .build()
-      .have(SizedBox::from_size(item_size).box_it())
-      .have(SizedBox::from_size(item_size).box_it())
-      .have(SizedBox::from_size(item_size).box_it())
-      .box_it();
+      let root = SizedBox { size: SizedBox::expanded_size() }
+        .have(
+          Row {
+            h_align: align,
+            v_align: CrossAxisAlign::Start,
+            ..<_>::default()
+          }
+          .have_multi(vec![
+            SizedBox { size: item_size }.box_it(),
+            SizedBox { size: item_size }.box_it(),
+            SizedBox { size: item_size }.box_it(),
+          ])
+          .box_it(),
+        )
+        .box_it();
 
-      let mut wnd = window::Window::without_render(
-        SizedBox::expanded().have(row).box_it(),
-        Size::new(500., 500.),
-      );
+      let mut wnd = Window::without_render(root, Size::new(500., 500.));
       wnd.render_ready();
-      let r_tree = wnd.render_tree();
-      let row_obj = r_tree
-        .root()
-        .unwrap()
-        .children(&*r_tree)
-        .take(1)
-        .next()
-        .unwrap();
-      let rect = row_obj.layout_box_rect(&*r_tree).unwrap();
-      let children = row_obj
-        .children(&*r_tree)
-        .map(|rid| rid.layout_box_rect(&*r_tree).unwrap())
+      let ctx = wnd.context();
+      let tree = &ctx.widget_tree;
+
+      let child = tree.root().first_child(tree).unwrap();
+
+      let rect = ctx.layout_store.layout_box_rect(child).unwrap();
+      let children = child
+        .children(tree)
+        .map(|id| ctx.layout_store.layout_box_rect(id).unwrap())
         .collect::<Vec<_>>();
 
       assert_eq!(rect.size, Size::new(500., 500.));

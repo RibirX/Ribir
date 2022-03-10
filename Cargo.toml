@@ -1,10 +1,16 @@
 [workspace]
 members = [
   "core",
-  "canvas",
-  "unit_test",
+  "gpu",
+  "painter",
   "widget_derive",
+  "algo",
+  "text",
 ]
+resolver = "2"
 
 [profile.bench]
+debug = true
+
+[profile.release]
 debug = true

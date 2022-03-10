@@ -3,8 +3,7 @@ use crate::prelude::*;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[stateful]
-#[derive(SingleChildWidget, Clone, PartialEq)]
+#[derive(SingleChildWidget, Clone, PartialEq, Declare)]
 pub struct Expanded {
   pub flex: f32,
 }
@@ -14,62 +13,52 @@ impl Expanded {
 }
 
 impl RenderWidget for Expanded {
-  type RO = Self;
-  #[inline]
-
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for Expanded {
-  #[inline]
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-    debug_assert_eq!(ctx.children().count(), 1);
-
-    ctx
-      .children()
-      .next()
-      .expect("Expanded render should always have a single child")
-      .perform_layout(clamp)
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let child = ctx
+      .single_child()
+      .expect("Expanded render should always have a single child");
+    ctx.perform_render_child_layout(child, clamp)
   }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {
-    // nothing to draw.
-  }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::layout::row::RowBuilder, test::*};
+  use crate::test::*;
 
   #[test]
   fn one_line_expanded() {
-    let size = Size::new(100., 50.);
-    let row = Row::default()
-      .have_multi(vec![
-        Expanded::new(1.)
-          .have(SizedBox::from_size(size).box_it())
-          .box_it(),
-        SizedBox::from_size(size).box_it(),
-        SizedBox::from_size(size).box_it(),
-        Expanded::new(2.)
-          .have(SizedBox::from_size(size).box_it())
-          .box_it(),
-      ])
-      .box_it();
+    struct T(Size);
+    impl CombinationWidget for T {
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        let size = self.0;
+        declare! {
+          Row {
+            Expanded {
+              flex: 1.,
+              SizedBox { size }
+            }
+            SizedBox { size }
+            SizedBox { size }
+            Expanded {
+              flex: 2.,
+              SizedBox { size }
+            }
+          }
+        }
+      }
+    }
 
-    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
+    let t = T(Size::new(100., 50.));
+    let size = t.0;
+
+    let (rect, children) = widget_and_its_children_box_rect(t.box_it(), Size::new(500., 500.));
 
     assert_eq!(rect, Rect::from_size(Size::new(500., 50.)));
     assert_eq!(
@@ -86,18 +75,19 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let row = RowBuilder { wrap: true, ..<_>::default() }
-      .build()
-      .have_multi(vec![
-        Expanded::new(1.)
-          .have(SizedBox::from_size(size).box_it())
+    let row = Row { wrap: true, ..<_>::default() }
+      .have(
+        Expanded { flex: 1. }
+          .have(SizedBox { size }.box_it())
           .box_it(),
-        SizedBox::from_size(size).box_it(),
-        SizedBox::from_size(size).box_it(),
-        Expanded::new(2.)
-          .have(SizedBox::from_size(size).box_it())
+      )
+      .have(SizedBox { size }.box_it())
+      .have(SizedBox { size }.box_it())
+      .have(
+        Expanded { flex: 2. }
+          .have(SizedBox { size }.box_it())
           .box_it(),
-      ]);
+      );
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(350., 500.));
 

@@ -1,27 +1,29 @@
 pub use super::*;
-pub use canvas::{Color, FillStyle, FontStyle, FontWeight};
+pub use painter::{Brush, Color};
 
 /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-pub fn light(family: String) -> Theme {
+pub fn light(family: Box<[FontFamily]>) -> Theme {
   let dark_text = TypographyTheme::new(
     family.clone(),
     family.clone(),
     Color::BLACK.with_alpha(0.54).into(),
     Color::BLACK.with_alpha(0.87).into(),
     TextDecoration::NONE,
-    Color::TRANSPARENT,
+    Color::TRANSPARENT.into(),
   );
   let background = Color::from_u32(0xFFFF_FFFF);
   let secondary = Color::from_u32(0x03DA_C6FF);
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
+  let mut checkbox = CheckboxTheme {
+    check_background: secondary.clone(),
+    border_color: unselected_widget_color.clone().with_alpha(0.65),
+    ..Default::default()
+  };
+  checkbox.indeterminate_path.brush = background.clone().into();
+  checkbox.checked_path.brush = background.clone().into();
   Theme {
     brightness: Brightness::Light,
-    checkbox: CheckboxTheme {
-      color: secondary.clone(),
-      border_color: unselected_widget_color.clone().with_alpha(0.65),
-      marker_color: background.clone(),
-      ..Default::default()
-    },
+    checkbox,
     primary: Color::from_u32(0x6200_EEFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary,
@@ -41,7 +43,7 @@ pub fn light(family: String) -> Theme {
 }
 
 /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-pub fn dark(family: String) -> Theme {
+pub fn dark(family: Box<[FontFamily]>) -> Theme {
   let unselected_widget_color = Color::WHITE.with_alpha(0.7);
   let background = Color::from_u32(0x1212_12FF);
   let secondary = Color::from_u32(0x03DA_C6FF);
@@ -51,16 +53,19 @@ pub fn dark(family: String) -> Theme {
     Color::WHITE.with_alpha(0.70).into(),
     Color::WHITE.into(),
     TextDecoration::NONE,
-    Color::TRANSPARENT,
+    Color::TRANSPARENT.into(),
   );
+  let mut checkbox = CheckboxTheme {
+    check_background: secondary.clone(),
+    border_color: unselected_widget_color.clone().with_alpha(0.65),
+    ..Default::default()
+  };
+  checkbox.indeterminate_path.brush = background.clone().into();
+  checkbox.checked_path.brush = background.clone().into();
+
   Theme {
     brightness: Brightness::Dark,
-    checkbox: CheckboxTheme {
-      border_color: unselected_widget_color.clone().with_alpha(0.65),
-      marker_color: background.clone(),
-      color: secondary.clone(),
-      ..Default::default()
-    },
+    checkbox,
     primary: Color::from_u32(0xBB86_FCFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary,

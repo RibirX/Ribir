@@ -9,46 +9,32 @@ pub struct EdgeInsets {
 }
 
 /// A widget that create space around its child.
-#[stateful]
-#[derive(SingleChildWidget, Default, Clone, PartialEq)]
+#[derive(SingleChildWidget, Default, Clone, PartialEq, Declare)]
 pub struct Margin {
+  #[declare(builtin)]
   pub margin: EdgeInsets,
 }
 
 impl RenderWidget for Margin {
-  type RO = Self;
-  #[inline]
-  fn create_render_object(&self) -> Self::RO { self.clone() }
-
-  fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-    if self != object {
-      *object = self.clone();
-      ctx.mark_needs_layout();
-    }
-  }
-}
-
-impl RenderObject for Margin {
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let thickness = self.margin.thickness();
     let zero = Size::zero();
     let min = (clamp.min - thickness).max(zero);
     let max = (clamp.max - thickness).max(zero);
     let child_clamp = BoxClamp { min, max };
 
-    debug_assert_eq!(ctx.children().count(), 1);
-    let mut child = ctx.children().next().expect("Margin must have one child");
-    let size = child.perform_layout(child_clamp);
-    child.update_position(Point::new(self.margin.left, self.margin.top));
+    let child = ctx.single_child().expect("Margin must have one child");
+    let size = ctx.perform_render_child_layout(child, child_clamp);
+    ctx.update_position(child, Point::new(self.margin.left, self.margin.top));
 
-    clamp.clamp(size + thickness)
+    size + thickness
   }
 
   #[inline]
-  fn paint<'a>(&'a self, _: &mut PaintingContext<'a>) {}
+  fn only_sized_by_parent(&self) -> bool { false }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Margin {
@@ -142,7 +128,8 @@ mod tests {
     let widget = Margin {
       margin: EdgeInsets::symmetrical(1., 1.),
     }
-    .have(SizedBox::from_size(Size::new(100., 100.)).box_it());
+    .have(SizedBox { size: Size::new(100., 100.) }.box_it())
+    .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(widget.box_it(), Size::new(200., 200.));
 

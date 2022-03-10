@@ -41,8 +41,6 @@ pub enum FollowOrigin<'a> {
 
 impl FollowOnVec {
   pub fn names(&self) -> impl Iterator<Item = &Ident> + Clone { self.iter().map(|f| &f.widget) }
-
-  pub fn contain(&self, name: &Ident) -> bool { self.names().any(|n| n == name) }
 }
 
 impl<'a> FieldFollows<'a> {

@@ -2,7 +2,7 @@ use ribir::prelude::*;
 
 fn main() {}
 
-fn ref_parent() {
+fn ref_parent(ctx: &mut BuildCtx) {
   declare! {
     SizedBox {
       id: size_box,
@@ -14,7 +14,7 @@ fn ref_parent() {
   };
 }
 
-fn ref_child() {
+fn ref_child(ctx: &mut BuildCtx) {
   declare! {
      SizedBox {
        size: child_box.size,
@@ -26,10 +26,9 @@ fn ref_child() {
   };
 }
 
-fn ref_sibling() {
+fn ref_sibling(ctx: &mut BuildCtx) {
   declare! {
     Flex {
-      ..<_>::default(),
       SizedBox {
         size: size2.size,
       }
@@ -45,10 +44,9 @@ fn ref_sibling() {
   };
 }
 
-fn temp_var_name_not_conflict() {
+fn temp_var_name_not_conflict(ctx: &mut BuildCtx) {
   declare! {
     Flex {
-      ..<_>::default(),
       SizedBox {
         id: c0,
         size: w.size,
@@ -64,7 +62,7 @@ fn temp_var_name_not_conflict() {
   };
 }
 
-fn wrap_widget_effect_order() {
+fn wrap_widget_effect_order(ctx: &mut BuildCtx) {
   let _x = declare! {
     SizedBox {
       size: Size::zero(),

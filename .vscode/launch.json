@@ -63,16 +63,46 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'canvas'",
+      "name": "Debug unit tests in library 'algo'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
           "--lib",
-          "--package=canvas"
+          "--package=algo"
         ],
         "filter": {
-          "name": "canvas",
+          "name": "algo",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "(Windows) Debug Wgpu Demo",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/examples/wgpu-hello.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}",
+      "environment": [],
+      "externalConsole": true
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'gpu'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=gpu"
+        ],
+        "filter": {
+          "name": "gpu",
           "kind": "lib"
         }
       },
@@ -82,15 +112,16 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug example 'canvas_hello'",
+      "name": "Debug example 'wgpu-hello'",
       "cargo": {
         "args": [
           "build",
-          "--example=canvas_hello",
-          "--package=canvas"
+          "--example=wgpu-hello",
+          "--package=gpu",
+          "--features=wgpu_gl"
         ],
         "filter": {
-          "name": "canvas_hello",
+          "name": "wgpu-hello",
           "kind": "example"
         }
       },
@@ -100,17 +131,55 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in example 'canvas_hello'",
+      "name": "Debug unit tests in example 'wgpu-hello'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--example=canvas_hello",
-          "--package=canvas"
+          "--example=wgpu-hello",
+          "--package=gpu"
         ],
         "filter": {
-          "name": "canvas_hello",
+          "name": "wgpu-hello",
           "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'painter'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=painter"
+        ],
+        "filter": {
+          "name": "painter",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'text'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=text"
+        ],
+        "filter": {
+          "name": "text",
+          "kind": "lib"
         }
       },
       "args": [],
@@ -148,6 +217,25 @@
         ],
         "filter": {
           "name": "test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'declare_builder'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=declare_builder",
+          "--package=widget_derive"
+        ],
+        "filter": {
+          "name": "declare_builder",
           "kind": "test"
         }
       },

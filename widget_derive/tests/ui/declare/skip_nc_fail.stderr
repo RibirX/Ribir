@@ -1,5 +1,5 @@
 error: Unnecessary attribute, because not depends on any others
- --> $DIR/skip_nc_fail.rs:7:7
+ --> tests/ui/declare/skip_nc_fail.rs:7:7
   |
 7 |       #[skip_nc]
   |       ^^^^^^^^^^
@@ -7,7 +7,7 @@ error: Unnecessary attribute, because not depends on any others
   = help: Try to remove it.
 
 error: Unnecessary attribute, because not depends on any others
-  --> $DIR/skip_nc_fail.rs:18:7
+  --> tests/ui/declare/skip_nc_fail.rs:18:7
    |
 18 |       #[skip_nc]
    |       ^^^^^^^^^^
@@ -15,7 +15,7 @@ error: Unnecessary attribute, because not depends on any others
    = help: Try to remove it.
 
 error: Unnecessary attribute, because not depends on any others
-  --> $DIR/skip_nc_fail.rs:29:7
+  --> tests/ui/declare/skip_nc_fail.rs:29:7
    |
 29 |       #[skip_nc]
    |       ^^^^^^^^^^

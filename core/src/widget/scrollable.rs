@@ -1,8 +1,7 @@
-use crate::{prelude::*, render::render_tree::RenderTree, widget::widget_tree::WidgetTree};
+use crate::prelude::*;
 
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
-#[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableX {
   pos: f32,
@@ -10,7 +9,6 @@ pub struct ScrollableX {
 
 /// A widget let its child vertical scrollable and the scroll view is as large
 /// as its parent allow.
-#[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableY {
   pos: f32,
@@ -18,7 +16,6 @@ pub struct ScrollableY {
 
 /// A widget let its child both scrollable in horizontal and vertical, and the
 /// scroll view is as large as its parent allow.
-#[stateful]
 #[derive(SingleChildWidget, Default, Clone, PartialEq)]
 pub struct ScrollableBoth {
   pos: Point,
@@ -26,9 +23,9 @@ pub struct ScrollableBoth {
 
 impl ScrollableX {
   #[inline]
-  pub fn x_scroll(pos: f32) -> StatefulScrollableX {
+  pub fn x_scroll(pos: f32) -> Stateful<ScrollableX> {
     let scroll = ScrollableX { pos }.into_stateful();
-    let mut scroll_ref = scroll.state_ref();
+    let mut scroll_ref = unsafe { scroll.state_ref() };
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.pos;
@@ -42,9 +39,9 @@ impl ScrollableX {
 
 impl ScrollableY {
   #[inline]
-  pub fn y_scroll(pos: f32) -> StatefulScrollableY {
+  pub fn y_scroll(pos: f32) -> Stateful<ScrollableY> {
     let scroll = ScrollableY { pos }.into_stateful();
-    let mut scroll_ref = scroll.state_ref();
+    let mut scroll_ref = unsafe { scroll.state_ref() };
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.pos;
@@ -58,9 +55,9 @@ impl ScrollableY {
 
 impl ScrollableBoth {
   #[inline]
-  pub fn both_scroll(pos: Point) -> StatefulScrollableBoth {
+  pub fn both_scroll(pos: Point) -> Stateful<ScrollableBoth> {
     let scroll = ScrollableBoth { pos }.into_stateful();
-    let mut scroll_ref = scroll.state_ref();
+    let mut scroll_ref = unsafe { scroll.state_ref() };
     scroll.on_wheel(move |event| {
       let (view, content) = view_content(event);
       let old = scroll_ref.pos;
@@ -77,30 +74,13 @@ impl ScrollableBoth {
 
 macro scroll_render_widget_impl($widget: ty, $state: ty) {
   impl RenderWidget for $widget {
-    type RO = Self;
-
-    #[inline]
-    fn create_render_object(&self) -> Self::RO { self.clone() }
-
-    #[inline]
-    fn update_render_object(&self, object: &mut Self::RO, ctx: &mut UpdateCtx) {
-      if self != object {
-        *object = self.clone();
-        ctx.mark_needs_layout();
-      }
-    }
-  }
-
-  impl RenderObject for $widget {
-    #[inline]
-    fn perform_layout(&mut self, clamp: BoxClamp, ctx: &mut RenderCtx) -> Size {
-      debug_assert_eq!(ctx.children().count(), 1);
+    fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
       let size = clamp.max;
-      if let Some(mut child) = ctx.children().next() {
+      if let Some(child) = ctx.single_child() {
         let content_clamp = self.content_clamp(clamp);
-        let content = child.perform_layout(content_clamp);
+        let content = ctx.perform_render_child_layout(child, content_clamp);
         let pos = self.content_pos(content, &size);
-        child.update_position(pos);
+        ctx.update_position(child, pos);
       }
 
       size
@@ -108,9 +88,7 @@ macro scroll_render_widget_impl($widget: ty, $state: ty) {
 
     fn only_sized_by_parent(&self) -> bool { true }
 
-    fn paint<'a>(&'a self, _ctx: &mut PaintingContext<'a>) {
-      // nothing to paint, just a layout widget.
-    }
+    fn paint(&self, _: &mut PaintingCtx) {}
   }
 }
 
@@ -172,18 +150,12 @@ impl ScrollWorker for ScrollableBoth {
 }
 
 fn view_content(event: &WheelEvent) -> (Rect, Rect) {
-  fn widget_rect(wid: WidgetId, tree: &WidgetTree, r_tree: &RenderTree) -> Rect {
-    wid
-      .relative_to_render(tree)
-      .and_then(|rid| rid.layout_box_rect(r_tree))
-      .unwrap_or_else(Rect::zero)
-  }
+  let ctx = event.context();
 
-  let w_tree = event.widget_tree();
-  let r_tree = event.render_tree();
-  let target = event.current_target();
-  let view = widget_rect(target, w_tree, r_tree);
-  let content = widget_rect(target.first_child(w_tree).unwrap(), w_tree, r_tree);
+  let view = ctx.box_rect().unwrap();
+  let child = ctx.single_child().unwrap();
+  let content = ctx.widget_box_rect(child).unwrap();
+
   (view, content)
 }
 
@@ -194,7 +166,7 @@ mod tests {
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(widget: BoxedWidget, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let mut wnd = window::NoRenderWindow::without_render(widget, Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
 
     wnd.render_ready();
 
@@ -219,7 +191,7 @@ mod tests {
     impl CombinationWidget for X {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         ScrollableX::x_scroll(0.)
-          .have(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
+          .have(SizedBox { size: Size::new(1000., 1000.) }.box_it())
           .box_it()
       }
     }
@@ -237,7 +209,7 @@ mod tests {
     impl CombinationWidget for Y {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         ScrollableY::y_scroll(0.)
-          .have(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
+          .have(SizedBox { size: Size::new(1000., 1000.) }.box_it())
           .box_it()
       }
     }
@@ -255,7 +227,7 @@ mod tests {
     impl CombinationWidget for Both {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         ScrollableBoth::both_scroll(Point::default())
-          .have(SizedBox::from_size(Size::new(1000., 1000.)).box_it())
+          .have(SizedBox { size: Size::new(1000., 1000.) }.box_it())
           .box_it()
       }
     }

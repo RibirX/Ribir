@@ -1,6 +1,6 @@
 # The `declare!` macro
 
-`declare!` macro provide a DSL language to help you to build your declare and reactive UI in a easy and expressive way which base on rust struct literal syntax but with a few extensions.
+`declare!` macro provide a DSL language to help you to build your declare and reactive UI in a easy and expressive way which base on rust struct literal syntax and with a few extensions.
 
 ## Nested struct literal syntax
 
@@ -9,20 +9,21 @@
 ```rust
 use ribir::prelude::*;
 
-let _ = declare!{
-  SizedBox {
-    size: Size::new(100., 100.),
-    Row {
-      ..<_>::default(),
-      Text {
-        text: "hello ".to_owned(),
-      }
-      Text {
-        text: "world".to_owned(),
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare! {
+      SizedBox {
+        size: Size::new(100., 100.),
+        Row {
+          Text { text: "hello " }
+          Text { text: "world" }
+        }
       }
     }
   }
-};
+}
+
 ```
 
 The above code declare a `SizedBox` widget has a `Row` child, and the `Row` widget has two `Text` child. 
@@ -36,13 +37,18 @@ In addition to using own fields of widget, `declare!` provide a dozens of built-
 ```rust
 use ribir::prelude::*;
 
-let _ = declare!{
-  SizedBox {
-    size: Size::new(100., 100.),
-    background: Color::RED,
-    on_tap: |_| println!("Tapped!")
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      SizedBox {
+        size: Size::new(100., 100.),
+        background: Color::RED,
+        on_tap: |_| println!("Tapped!")
+      }
+    }
   }
-};
+}
 ```
 
 Although, `SizedBox` not have field `background` and `on_tap`, but the code above is valid, because `declare!` macro provide built-in fields as sugar syntax to simplify use the commonly widgets or attributes.
@@ -54,37 +60,49 @@ A `if` guard can be add to use filter the field, the syntax is same with `match`
 ```rust
 use ribir::prelude::*;
 
-let size  = Size::new(1., 1.);
-let need_margin = true;
+struct T {
+  size: Size,
+  need_margin: bool
+}
 
-let _ = declare!{
-  SizedBox {
-    size,
-    margin if need_margin =>: EdgeInsets::all(1.),
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      SizedBox {
+        size: self.size,
+        margin if self.need_margin =>: EdgeInsets::all(1.),
+      }
+    }
   }
-};
+}
+
 ```
 ## Expressions as children
 
-At before we use struct literal to declare children, we also have an another option, pass any rust expression as children.
+At before we use struct literal to declare children, we also can pass any rust expression as children.
 
 ```rust
 use ribir::prelude::*;
 
-const ribir_steps: [&'static str; 5] = [
-  "declare UI", "compile to international api", "layout and paint", 
-  "generate triangles", "submit to gpu"
-];
+struct RibirSteps;
 
-let _ = declare!{
-  Row {
-    ..<_>::default(),
-    ribir_steps.iter().map(|text|  { Text { text: text.to_string() } })
+impl CombinationWidget for RibirSteps {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    const ribir_steps: [&'static str; 5] = [
+      "declare UI", "compile to international api", "layout and paint", 
+      "generate triangles", "submit to gpu"
+    ];
+
+    declare!{
+      Row {
+        ribir_steps.iter().map(|&text| declare!{ Text { text } } )
+      }
+    }
   }
-};
+}
 ```
 
-Expression children can mixed with struct literal children, can declare one child or many children, it is limited by the parent widget implemented `SingleChildWidget` or `MultiChildWidget`. 
+Expression children can mixed with struct literal children, can declare one or multi, it is limited by the parent widget implemented `SingleChildWidget` or `MultiChildWidget`. 
 
 Notice, the expression return type must be:
 - A widget type. 
@@ -99,46 +117,54 @@ A widget with an `id` can be directly accessed in its `declare!` or embed `decla
 ```rust
 use ribir::prelude::*;
 
-let _ = declare!{
-  Row {
-    ..<_>::default(),
-    Checkbox {
-      id: checkbox,
-      checked: false,
-      ..<_>::default(),
-    }
-    Text {
-      text: "Change text background by checked state.".to_string(),
-      background: if checkbox.checked { Color::BLUE } else { Color:: RED }
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      Row {
+        Checkbox {
+          id: checkbox,
+          checked: false,
+        }
+        Text {
+          text: "Change text background by checked state.",
+          background: if checkbox.checked { Color::BLUE } else { Color:: RED }
+        }
+      }
     }
   }
-};
+}
 ```
 
 In above code we declare a `Checkbox` named with `checkbox` and access it in `Text.background` field.
 
-And there is a little more knowledge we need know here, ribir has a "keep the UI always displayed as how its declared" principle. So in the above code `Text.background` will always follow the change of `checkbox`. That means when `checkbox` has changed, the `Text.background` will also assigned across calc a new value from the field value expression. We called this data follow.
+And there is a little more knowledge we need know here, ribir has a "keep the UI always displayed as how its declared" principle. So in the above code `Text.background` will always follow the change of `checkbox`. That means when `checkbox` has changed, the `Text.background` will also assigned across calc a new value from the field value expression. We called this state follow.
 
 ### Circular follow
 
 Circular follow in struct literal is not allowed.
 
-```rust ignore
+```rust compile_fail
 use ribir::prelude::*;
 
-let _ = declare!{
-  Row {
-    ..<_>::default(),
-    Text {
-      id: a,
-      text: b.text.clone()
-    }
-    Text {
-      id: b,
-      text: a.text.clone()
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      Row {
+        Text {
+          id: a,
+          text: b.text.clone(),
+        }
+        Text {
+          id: b,
+          text: a.text.clone(),
+        }
+      }
     }
   }
-};
+}
+
 ```
 
 Compiler will complain
@@ -148,22 +174,27 @@ Can't init widget because circle follow: a.text ~> b, b.text ~> a
 
 In some cases, we may want a two-way follow, that it's a circular follow but what we want and is valid in logic. I will introduce it in next section.
 
-### Widget owen fields and built-in fields not belong same widget
+### Widget fields and built-in fields not belong same widget
 
 We introduced ribir provide some built-in fields to extends the struct literal syntax. But in essence, they do not belong to the same widget，so use same `id` not always mean follow on same widget.
 
 ```rust
 use ribir::prelude::*;
 
-let _ = declare!{
-  SizedBox {
-    id: a,
-    size: Size::new(100., 100.),
-    background: if a.size.area() > 10. { Color::RED } else { Color::BLACK }
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      SizedBox {
+        id: a,
+        size: Size::new(100., 100.),
+        background: if a.size.area() > 10. { Color::RED } else { Color::BLACK }
+     }
+    }
   }
-};
+}
 ```
-This code work fine, although is looks like a circular follow (a.background ~> a) , but background is not a field of `SizedBox`, so `a.size` and `a.background` belong to different widget, it's not a circular follow.
+This code work fine, although is looks like a circular follow (a.background ~> a.size) , but if you look the [`SizedBox`]! define, you will find background is not a field of `SizedBox`, `background` is a syntax extend builtin field, so `a.size` and `a.background` belong to different widget, it's not a circular follow.
 
 ## Declare a data follow individual
 
@@ -172,32 +203,33 @@ We can declare a data follow implicitly in field value, but there is a explicit 
 ```rust
 use ribir::prelude::*;
 
-let _ = declare! {
-  Column {
-    ..<_>::default(),
-    Row {
-      ..<_>::default(),
-      Checkbox { id: task , ..<_>::default() }
-      Text { text: "Task".to_owned() }
-    }
-    Row {
-      margin: EdgeInsets::only_left(16.),
-      ..<_>::default(),
-      Checkbox { id: sub_task1 , ..<_>::default() }
-      Text { text: "SubTask 1".to_owned() }
-    }
-    Row {
-      margin: EdgeInsets::only_left(16.),
-      ..<_>::default(),
-      Checkbox { id: sub_task2 , ..<_>::default() }
-      Text { text: "SubTask 2".to_owned() }
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare! {
+      Column {
+        Row {
+          Checkbox { id: task }
+          Text { text: "Task" }
+        }
+        Row {
+          margin: EdgeInsets::only_left(16.),
+          Checkbox { id: sub_task1 }
+          Text { text: "SubTask 1" }
+        }
+        Row {
+          margin: EdgeInsets::only_left(16.),
+          Checkbox { id: sub_task2  }
+          Text { text: "SubTask 2" }
+        }
+      }
+      data_flow!{
+        sub_task1.checked && sub_task2.checked ~> task.checked;
+        sub_task1.checked != sub_task2.checked ~> task.indeterminate
+      }
     }
   }
-  data_flow!{
-    sub_task1.checked && sub_task2.checked ~> task.checked;
-    sub_task1.checked != sub_task2.checked ~> task.indeterminate
-  }
-};
+}
 ```
 Above code we implement a nested checkboxes which parent follow children change.
 ### Use `#[skip_nc]` to break circular follow.
@@ -209,20 +241,18 @@ A two-way follow work fine with `#[skip_nc]`
 ```rust
 use ribir::prelude::*;
 
-let _ = declare!{
-  Row {
-    ..<_>::default(),
-    Text {
-      id: a,
-      text: "Hi".to_owned()
-    }
-    Text {
-      id: b,
-      text: a.text.clone()
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      Row {
+        Text { id: a, text: "Hi" }
+        Text { id: b, text: a.text.clone() }
+      }
+      data_flow! { #[skip_nc] b.text.clone() ~> a.text }
     }
   }
-  data_flow! { #[skip_nc] b.text.clone() ~> a.text }
-};
+}
 ```
 
 `#[skip_nc]` can also be used in field.
@@ -231,21 +261,22 @@ let _ = declare!{
 use ribir::prelude::*;
 
 
-let _ = declare!{
-  Row {
-    ..<_>::default(),
-    Text {
-      id: a,
-      text: "Hi".to_owned(),
-    }
-    Text {
-      id: b,
-      #[skip_nc]
-      text: a.text.clone()
+struct T;
+impl CombinationWidget for T {
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    declare!{
+      Row {
+        Text { id: a, text: "Hi" }
+        Text {
+          id: b,
+          #[skip_nc]
+          text: a.text.clone(),
+        }
+      }
+      data_flow! { b.text.clone() ~> a.text }
     }
   }
-  data_flow! { b.text.clone() ~> a.text }
-};
+}
 ```
 ### Silent follow to avoid widget rebuild or layout.
 
@@ -256,7 +287,6 @@ In some specific scenarios，we know some data follow need't effect the widget r
 There is a simple todo example, to show how it use.
 
 ```rust
-#![feature(trivial_bounds, negative_impls)]
 
 use ribir::prelude::*;
 
@@ -266,36 +296,30 @@ struct Todo  {
   label: String,
 }
 
-#[stateful(custom)]
 struct Todos {
   tasks: Vec<Todo>
 };
 
-impl CombinationWidget for StatefulTodos {
-   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    let self_ref = self.state_ref();
+impl StatefulCombination for Todos {
+   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+    let this_ref = unsafe { this.state_ref() };
     declare! {
       Column {
-        cross_align: CrossAxisAlign::Start,
-        ..<_>::default(),
-        self.tasks.iter().enumerate().map(|(idx, task)|{
-          let self_ref = self_ref.clone();
+        h_align: CrossAxisAlign::Start,
+        this_ref.tasks.iter().enumerate().map(|(idx, task)|{
           declare!{
             Row {
               margin: EdgeInsets::vertical(4.),
-              ..<_>::default(),
               Checkbox{
                 id: checkbox,
                 checked: task.finished,
-                style: ctx.theme().checkbox.clone(),
-                ..<_>::default(),
               }
               Text{
                 text:task.label.clone(),
                 margin: EdgeInsets::vertical(4.),
               }
             }
-            data_flow!{ checkbox.checked ~> self_ref.silent().tasks[idx].finished }
+            data_flow!{ checkbox.checked ~> this_ref.silent().tasks[idx].finished }
           }
         })
       }
@@ -304,15 +328,37 @@ impl CombinationWidget for StatefulTodos {
 }
 ```
 
-See the `data_follow`, `self_ref` with a `silent` method call, this means when `checkbox` change, modify back  to `self_ref.silent().tasks[idx].finished`, but this modify not effect the `StatefulTodos` widget to rebuild.
+See the `data_follow`, `this_ref` with a `silent` method call, this means when `checkbox` change, modify back  to `this_ref.silent().tasks[idx].finished`, but this modify not effect the `StatefulTodos` widget to rebuild.
 
-## How to support custom widget work in `declare!` syntax
+## Specify the `BuildCtx` name
 
-Every widget can be supported to use in `declare!` macro if it implemented [`Declare`][declare] and [`DeclareBuilder`][declare_builder].
+Every widget in `declare!` will access the `BuildCtx` to build itself, as default it assume the `ctx` is the name of the `BuildCtx`,  but if its name in your `build` method is not `ctx` you can specify it across the `declare!` first arguments. For example 
+
+```rust
+use ribir::prelude::*;
+
+struct Todos;
+impl StatefulCombination for Todos {
+  fn build(this: &Stateful<Self>, ctx_name: &mut BuildCtx) -> BoxedWidget {
+    declare! { 
+      // specify the build context name 
+      ctx_name, 
+      // declare widgets struct as usually
+      Column {
+        // omitted!
+      }
+      
+    }
+  }
+}
+```
+
+## How to support widget work in `declare!` syntax ?
+
+Every widget can be supported to use in `declare!` macro if it implemented the [`Declare`](declare). 
 
 The easiest way it to derive the `Declare` trait. See more detail in the [`mod level document`][mod].
 
+[declare]: ../ribir/declare/trait.Declare.html
 [builtin]: #full-builtin-fields-list
 [mod]: ../ribir/declare/index.html
-[declare]: ../ribir/declare/trait.Declare.html
-[declare_builder]: ../ribir/declare/trait.DeclareBuilder.html

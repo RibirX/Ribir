@@ -1,8 +1,8 @@
 use ribir::prelude::*;
 
-fn normal_if_guard_pass() {
+fn normal_if_guard_pass(ctx: &mut BuildCtx) {
   let guard = Some(1);
-  let _ = declare! {
+  declare! {
     SizedBox {
       // if guard in widget's field
       size if true => : Size::zero(),
@@ -16,9 +16,9 @@ fn normal_if_guard_pass() {
   };
 }
 
-fn id_if_guard_fail() {
+fn id_if_guard_fail(ctx: &mut BuildCtx) {
   let guard = Some(1);
-  let _ = declare! {
+  declare! {
     SizedBox {
       id if true => : test,
       // if guard in widget's field
@@ -28,8 +28,8 @@ fn id_if_guard_fail() {
   };
 }
 
-fn depend_id_behind_if_guard_fail() {
-  let _ = declare! {
+fn depend_id_behind_if_guard_fail(ctx: &mut BuildCtx) {
+  declare! {
     SizedBox {
       id: a,
       size: Size::zero(),

@@ -1,14 +1,15 @@
 use crate::error::DeclareError;
 
 use super::{
+  ribir_suffix_variable,
   sugar_fields::{Id, SugarFields},
   DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOnVec,
 };
 use proc_macro::{Diagnostic, Level, TokenStream};
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{quote, quote_spanned};
+use proc_macro2::Span;
+use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse_quote, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident};
+use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident};
 
 const DECLARE_MACRO_NAME: &str = "declare";
 
@@ -29,9 +30,11 @@ pub struct DeclareCtx {
 
 #[derive(PartialEq, Clone, Copy)]
 enum ReferenceInfo {
-  // reference by other expression, but not follow its change.
+  // reference by other expression, but not follow its change and needn't capture its state
+  // reference
   Reference,
-  //  Followed by others, and need follow its change.
+  // Followed by others and need follow its change or need capture its state reference to modify
+  // its state.
   BeFollowed,
   // not be referenced or followed, but its wrap widget maybe.
   WrapWidgetRef,
@@ -42,39 +45,9 @@ struct LocalVariable {
   alias_of_name: Option<Ident>,
 }
 
-pub fn state_ref_tokens<'a, I: IntoIterator<Item = &'a Ident>>(follows: I) -> TokenStream2 {
-  let state_refs = follows.into_iter().map(|follow_w| {
-    quote_spanned! { follow_w.span() =>
-      #[allow(unused_mut)]
-      let mut #follow_w = #follow_w.clone();
-    }
-  });
-
-  quote! { #(#state_refs)*}
-}
-
 impl VisitMut for DeclareCtx {
   fn visit_expr_mut(&mut self, expr: &mut Expr) {
     match expr {
-      Expr::Closure(c) if c.capture.is_some() => {
-        let mut old_follows = std::mem::take(&mut self.current_follows);
-        visit_mut::visit_expr_closure_mut(self, c);
-        let closure_follows = std::mem::take(&mut self.current_follows);
-
-        if !closure_follows.is_empty() {
-          let state_refs = state_ref_tokens(closure_follows.keys());
-          let closure = quote_spanned! { c.span() => {
-            #state_refs
-            #c
-          }};
-
-          *expr = parse_quote! { #closure };
-
-          old_follows.extend(closure_follows);
-        }
-
-        self.current_follows = old_follows;
-      }
       Expr::Macro(m) if m.mac.path.is_ident(DECLARE_MACRO_NAME) => {
         let tokens = std::mem::replace(&mut m.mac.tokens, quote! {});
         *expr = self.extend_declare_macro_to_expr(tokens.into());
@@ -103,9 +76,10 @@ impl VisitMut for DeclareCtx {
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
     visit_mut::visit_expr_field_mut(self, f_expr);
 
-    if let Some(name) = self.expr_find_name_widget(&f_expr.base).cloned() {
+    if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
       if let Some(suffix) = SugarFields::as_widget_wrap_name_field(&f_expr.member) {
-        let wrap_name = self.no_conflict_name_with_suffix(&name, suffix);
+        name.set_span(name.span().join(suffix.span()).unwrap());
+        let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
         *f_expr.base = parse_quote! { #wrap_name };
         self
           .widget_name_to_id
@@ -296,18 +270,19 @@ impl DeclareCtx {
       w.fields
         .iter_mut()
         .for_each(|f| ctx.visit_declare_field_mut(f));
-      if let Some(rest_expr) = &mut w.rest {
-        ctx.visit_expr_mut(&mut rest_expr.1);
-      }
+
       ctx.visit_sugar_field_mut(&mut w.sugar_fields);
       if let Some(Id { name, .. }) = w.named.as_ref() {
+        // named widget followed by attributes or listeners should also mark be followed
+        // because it's need capture its state reference to set value.
         let followed_by_attr = w
           .sugar_fields
           .normal_attr_iter()
           .chain(w.sugar_fields.listeners_iter())
           .any(|f| f.follows.is_some());
+
         if followed_by_attr {
-          ctx.add_follow(name.clone());
+          ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
         }
       }
 
@@ -388,39 +363,7 @@ impl DeclareCtx {
       });
   }
 
-  pub fn no_conflict_widget_def_name(&self, name: &Ident) -> Ident {
-    let def_name = format!("{}_def", name);
-    self.new_no_conflict_name(&def_name)
-  }
-
-  pub fn unnamed_widget_ref_name(&self) -> Ident { self.new_no_conflict_name("w") }
-
-  // Get a no conflict name for a widget wrap by the common widget like `Margin`,
-  // `Padding`.
-  pub fn no_conflict_name_with_suffix(&self, widget_name: &Ident, suffix: &Ident) -> Ident {
-    let mut wrap_name = self.new_no_conflict_name(&format!("{}_{}", widget_name, &suffix));
-    let span1 = widget_name.span();
-    let span2 = suffix.span();
-    wrap_name.set_span(span1.join(span2).unwrap_or(span2));
-    wrap_name
-  }
-
-  pub fn no_config_builder_type_name(&self) -> Ident { self.new_no_conflict_name("Builder") }
-
-  pub fn no_conflict_child_name(&self, idx: usize) -> Ident {
-    self.new_no_conflict_name(&format!("c{}", idx))
-  }
-
   pub fn forbid_warnings(&mut self, b: bool) { self.forbid_warnings = b; }
-
-  pub fn new_no_conflict_name(&self, name: &str) -> Ident {
-    let mut name = Ident::new(name, Span::call_site());
-    while self.named_widgets.contains(&name) {
-      let suffix = format! {"{}_", name};
-      name = Ident::new(&suffix, Span::call_site())
-    }
-    name
-  }
 
   fn save_follow_scope(&mut self, follow_scope: bool) { self.follow_scopes.push(follow_scope); }
 
@@ -476,11 +419,8 @@ impl DeclareCtx {
       .entry(name)
       .or_insert(ReferenceInfo::Reference);
     match (*v, ref_info) {
-      (ReferenceInfo::Reference, ReferenceInfo::Reference) => *v = ref_info,
-      (ReferenceInfo::Reference, ReferenceInfo::BeFollowed) => *v = ref_info,
-      (ReferenceInfo::Reference, ReferenceInfo::WrapWidgetRef) => *v = ref_info,
-      (ReferenceInfo::WrapWidgetRef, ReferenceInfo::Reference) => *v = ref_info,
-      (ReferenceInfo::WrapWidgetRef, ReferenceInfo::BeFollowed) => *v = ref_info,
+      (ReferenceInfo::Reference, _) => *v = ref_info,
+      (ReferenceInfo::WrapWidgetRef, _) => *v = ref_info,
       _ => {}
     }
   }

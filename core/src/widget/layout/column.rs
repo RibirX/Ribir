@@ -1,51 +1,37 @@
 use super::flex::*;
 use crate::prelude::*;
 
-#[derive(RenderWidget, MultiChildWidget)]
-pub struct Column(#[proxy] Flex);
+// todo: give a alias for `CrossAxisAlign` and `MainAxisAlign`
 
-impl Default for Column {
-  fn default() -> Self { ColumnBuilder::default().build() }
-}
-
-impl IntoStateful for Column {
-  type S = StatefulFlex;
-  fn into_stateful(self) -> Self::S { self.0.into_stateful() }
-}
-
-// declare macro  support.
-#[derive(Default)]
-pub struct ColumnBuilder {
+#[derive(Default, MultiChildWidget, Declare, Clone)]
+pub struct Column {
+  #[declare(default)]
   pub reverse: bool,
+  #[declare(default)]
   pub wrap: bool,
-  pub cross_align: CrossAxisAlign,
-  pub main_align: MainAxisAlign,
+  #[declare(default)]
+  pub h_align: CrossAxisAlign,
+  #[declare(default)]
+  pub v_align: MainAxisAlign,
 }
 
-impl Declare for Column {
-  type Builder = ColumnBuilder;
-}
+impl RenderWidget for Column {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let Self { reverse, wrap, h_align, v_align } = self.clone();
 
-impl DeclareBuilder for ColumnBuilder {
-  type Target = Column;
-
-  #[inline]
-  fn build(self) -> Self::Target {
-    let Self {
+    Flex {
       reverse,
       wrap,
-      cross_align,
-      main_align,
-    } = self;
-    Column(
-      FlexBuilder {
-        reverse,
-        wrap,
-        direction: Direction::Vertical,
-        cross_align,
-        main_align,
-      }
-      .build(),
-    )
+      direction: Direction::Vertical,
+      cross_align: h_align,
+      main_align: v_align,
+    }
+    .perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { false }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }

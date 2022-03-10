@@ -1,10 +1,9 @@
 use ribir::prelude::*;
 
-fn syntax_pass() {
+fn syntax_pass(ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = declare! {
     Flex {
-      ..<_>::default(),
       SizedBox {
         size,
         SizedBox{
