@@ -175,13 +175,18 @@ macro_rules! fields_sugar_def {
         .filter_map(|v| v)
       }
 
-      pub fn as_widget_wrap_name_field(mem: &Member) -> Option<&Ident> {
+      pub fn field_belong_widget(mem: &Member) -> Option<Ident> {
         match mem {
           Member::Named(name) => {
-            match name.to_string().as_str() {
-              $(stringify!($w_wrap) => Some(name),)*
-              _ => None
-            }
+            if DECORATION_FIELDS.iter().find(|f| name == f).is_some() {
+              Some(Ident::new(DECORATION, mem.span()))
+            } else {
+              match name.to_string().as_str() {
+                $(stringify!($w_wrap) => Some(name.clone()),)*
+                _ => None
+          }
+        }
+
           }
           Member::Unnamed(_) => None,
         }
@@ -198,6 +203,7 @@ pub mod kw {
 include!("./sugar_fields_struct.rs");
 
 const DECORATION: &str = "decoration";
+const DECORATION_FIELDS: [&str; 3] = ["background", "radius", "border"];
 
 pub struct WrapWidgetTokens {
   pub name: Ident,

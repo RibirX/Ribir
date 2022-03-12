@@ -77,7 +77,7 @@ impl VisitMut for DeclareCtx {
     visit_mut::visit_expr_field_mut(self, f_expr);
 
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
-      if let Some(suffix) = SugarFields::as_widget_wrap_name_field(&f_expr.member) {
+      if let Some(suffix) = SugarFields::field_belong_widget(&f_expr.member) {
         name.set_span(name.span().join(suffix.span()).unwrap());
         let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
         *f_expr.base = parse_quote! { #wrap_name };
