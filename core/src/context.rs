@@ -1,13 +1,17 @@
 use std::{
   cell::Cell,
+  cell::RefCell,
   collections::{HashMap, HashSet},
   pin::Pin,
+  rc::Rc,
 };
 
+use crate::animation::TickerProvider;
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
   AsAttrs, BoxedWidget, BoxedWidgetInner, Event, EventCommon, Key, StateAttr, WidgetId,
 };
+
 use ahash::RandomState;
 use painter::{PaintCommand, Painter};
 mod painting_context;
@@ -35,14 +39,20 @@ pub(crate) struct Context {
   pub shaper: TextShaper,
   /// Store combination widgets changed.
   need_builds: HashSet<WidgetId, ahash::RandomState>,
+  animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
 }
 
 impl Context {
-  pub(crate) fn new(root: BoxedWidget, device_scale: f32) -> Self {
+  pub(crate) fn new(
+    root: BoxedWidget,
+    device_scale: f32,
+    animation_ticker: Option<Box<dyn TickerProvider>>,
+  ) -> Self {
+    let ticker = animation_ticker.map(|ticker| Rc::new(RefCell::new(ticker)));
     let mut ctx = match root.0 {
       BoxedWidgetInner::Combination(c) => {
         let widget_tree = WidgetTree::new(WidgetNode::Combination(c));
-        let mut ctx = Context::from_tree(widget_tree, device_scale);
+        let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
         let tree = &ctx.widget_tree;
         let child = match tree.root().assert_get(tree) {
           WidgetNode::Combination(c) => c.build(&mut BuildCtx::new(&ctx, tree.root())),
@@ -54,19 +64,19 @@ impl Context {
       }
       BoxedWidgetInner::Render(r) => {
         let widget_tree = WidgetTree::new(WidgetNode::Render(r));
-        Context::from_tree(widget_tree, device_scale)
+        Context::from_tree(widget_tree, device_scale, ticker)
       }
       BoxedWidgetInner::SingleChild(s) => {
         let (rw, child) = s.unzip();
         let widget_tree = WidgetTree::new(WidgetNode::Render(rw));
-        let mut ctx = Context::from_tree(widget_tree, device_scale);
+        let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
         ctx.inflate_append(child, ctx.widget_tree.root());
         ctx
       }
       BoxedWidgetInner::MultiChild(m) => {
         let (rw, children) = m.unzip();
         let widget_tree = WidgetTree::new(WidgetNode::Render(rw));
-        let mut ctx = Context::from_tree(widget_tree, device_scale);
+        let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
         let root = ctx.widget_tree.root();
         children
           .into_iter()
@@ -250,7 +260,11 @@ impl Context {
     self.widget_tree.root().descendants(&self.widget_tree)
   }
 
-  pub(crate) fn from_tree(widget_tree: Pin<Box<WidgetTree>>, device_scale: f32) -> Self {
+  pub(crate) fn from_tree(
+    widget_tree: Pin<Box<WidgetTree>>,
+    device_scale: f32,
+    animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+  ) -> Self {
     Context {
       layout_store: <_>::default(),
       widget_tree,
@@ -259,6 +273,7 @@ impl Context {
       modifiers: <_>::default(),
       shaper: <_>::default(),
       need_builds: <_>::default(),
+      animation_ticker,
     }
   }
 
@@ -384,6 +399,13 @@ impl Context {
     });
     id.remove_subtree(&mut self.widget_tree)
   }
+
+  pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
+    match &self.animation_ticker {
+      Some(ticker) => ticker.borrow_mut().trigger(),
+      None => false,
+    }
+  }
 }
 
 #[cfg(test)]
@@ -399,13 +421,13 @@ mod tests {
 
   fn test_sample_create(width: usize, depth: usize) -> Context {
     let root = RecursiveRow { width, depth };
-    Context::new(root.box_it(), 1.)
+    Context::new(root.box_it(), 1., None)
   }
 
   #[test]
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
-    let mut ctx = Context::new(post.box_it(), 1.);
+    let mut ctx = Context::new(post.box_it(), 1., None);
     assert_eq!(ctx.widget_tree.count(), 20);
     ctx.mark_changed(ctx.widget_tree.root());
     ctx.drop(ctx.widget_tree.root());
@@ -417,7 +439,7 @@ mod tests {
   fn inflate_5_x_1000(b: &mut Bencher) {
     b.iter(|| {
       let post = EmbedPost::new(1000);
-      Context::new(post.box_it(), 1.);
+      Context::new(post.box_it(), 1., None);
     });
   }
 
@@ -436,7 +458,7 @@ mod tests {
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
     let post = EmbedPostWithKey::new(1000);
-    let mut ctx = Context::new(post.box_it(), 1.);
+    let mut ctx = Context::new(post.box_it(), 1., None);
     b.iter(|| {
       ctx.mark_changed(ctx.widget_tree.root());
       ctx.tree_repair()

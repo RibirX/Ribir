@@ -64,5 +64,5 @@ fn main() {
   }
   .into_stateful();
 
-  Application::new().run(todo.box_it());
+  Application::new().run(todo.box_it(), None);
 }
