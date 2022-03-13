@@ -35,8 +35,8 @@
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     declare!{
 //!       PeopleCard {
-//!         name: "Mr Ribir".to_string(),
-//!         email: Some("ribir@XXX.com".to_string()),
+//!         name: "Mr Ribir",
+//!         email: "ribir@XXX.com".to_string(),
 //!         tel: None,
 //!         margin: EdgeInsets::all(8.)
 //!       }
@@ -45,32 +45,28 @@
 //! }
 //! ```
 //!
-//! ## `setter(...)` meta settings for the field setters, this tell Ribir how
-//! usr can init field by other types in `declare` macro.
+//! Notice we use `&str` to initialize `name` field and must use `String` to
+//! initialize `email`, that because its field have different type and ribir
+//! `implicit` insert an `into()` for field initialization. So we can use `&str`
+//! to initialize `String`, not to `Option<String>`.
 //!
-//! - `into`: tell Ribir accept any type that satisfy the `std::convert::Into`
-//!   trait bounds and can convert to the field type  to init the field.
-//! - `strip_option`: for Option<T> fields only, this makes user can use the
-//!   inner type `T` to init the field.
-//! - use `into` and `strip_option` both: for Option<T> fields only, accept the
-//!   init value that can convert to the inner type `T`
+//! ## use `strip_option` meta for `Option<T>` fields
 //!
 //! After derive `Declare`, the `PeopleCard` is work fine in `declare!`. But
-//! init the email with `email: Some("ribir@XXX.com".to_string())` is too
-//! verbose, if we init the `email`, is must be a `Some-Value`, so we not want
-//! write the `Some(XXX)` wrap, and we also want user can init `email` with both
-//! `&str` and `String`. `setter` is what we want.
+//! init the email with `email: "ribir@XXX.com".to_string()` is too verbose, if
+//! we try to init the `email`here, that implicitly mean we want a `Some-Value`.
+//! We want use the type `T` instead of `Option<T>` in `declare!`, `String`
+//! instead of `str` here, `strip_option` it's designed for this case.
+
 //!
 //! ```rust
 //! # use ribir::prelude::*;
 //!
 //! #[derive(Declare, Default)]
 //! struct PeopleCard {
-//!   #[declare(setter(into))]                // new!
 //!   name: String,
-//!   #[declare(setter(into, strip_option))]  // new!
+//!   #[declare(strip_option)]  // new!
 //!   email: Option<String>,
-//!   #[declare(setter(into))]                // new!
 //!   tel: Option<String>,
 //! }
 //!
@@ -119,11 +115,10 @@
 //!
 //! #[derive(Declare, Default)]
 //! struct PeopleCard {
-//!   #[declare(setter(into))]
 //!   name: String,
-//!   #[declare(setter(into, strip_option), default)]  // new!
+//!   #[declare(strip_option)]  // new!
 //!   email: Option<String>,
-//!   #[declare(setter(into, strip_option), default)]  // new!
+//!   #[declare(strip_option, default)]  // new!
 //!   tel: Option<String>,
 //! }
 //!
@@ -176,4 +171,43 @@ pub trait Declare {
 pub trait DeclareBuilder {
   type Target;
   fn build(self, ctx: &mut BuildCtx) -> Self::Target;
+}
+
+pub trait Striped<Marker, V> {
+  fn striped(self) -> Option<V>;
+}
+
+pub struct OptionInnerMarker;
+pub struct OptionMarker;
+
+impl<T: Into<V>, V> Striped<OptionInnerMarker, V> for T {
+  #[inline]
+  fn striped(self) -> Option<V> { Some(self.into()) }
+}
+
+impl<V> Striped<OptionMarker, V> for Option<V> {
+  #[inline]
+  fn striped(self) -> Option<V> { self }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use painter::{Brush, Color};
+
+  #[test]
+  fn inner_value_into() {
+    assert_eq!(
+      painter::Color::RED.striped(),
+      Some(Brush::Color(Color::RED))
+    )
+  }
+
+  #[test]
+  fn option_self_can_use_with_stripe() {
+    assert_eq!(
+      Some(Brush::Color(Color::RED)).striped(),
+      Some(Brush::Color(Color::RED))
+    )
+  }
 }
