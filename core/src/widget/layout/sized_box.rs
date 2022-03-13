@@ -51,7 +51,7 @@ mod tests {
         declare! {
           SizedBox {
             size:SIZE,
-            Text { text: "", style: <_>::default() }
+            Text { text: "" }
           }
         }
       }
@@ -71,7 +71,7 @@ mod tests {
         declare! {
           SizedBox {
             size: SizedBox::shrink_size(),
-            Text { text: "", style: <_>::default()}
+            Text { text: "" }
           }
         }
       }
