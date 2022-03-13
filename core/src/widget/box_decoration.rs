@@ -4,14 +4,14 @@ use crate::prelude::*;
 #[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[declare(builtin, setter(strip_option, into), default)]
+  #[declare(builtin, strip_option, default)]
   pub background: Option<Brush>,
   /// A border to draw above the background
-  #[declare(builtin, setter(strip_option), default)]
+  #[declare(builtin, strip_option, default)]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[declare(builtin, setter(strip_option, into), default)]
+  #[declare(builtin, strip_option, default)]
   pub radius: Option<Radius>,
 }
 

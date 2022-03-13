@@ -16,9 +16,9 @@ impl CombinationWidget for EmbedPostWithKey {
       Row {
         key: 0,
         v_align: CrossAxisAlign::Start,
-        Text { text: format!("Embed{} test title", self.level) , style: <_>::default(), key: 1},
-        Text { text: self.author, style: <_>::default(), key: 2},
-        Text { text: self.content, style: <_>::default(), key: 3},
+        Text { text: format!("Embed{} test title", self.level), key: 1},
+        Text { text: self.author, key: 2},
+        Text { text: self.content, key: 3},
         (self.level > 0).then(||{
           let mut embed = self.clone();
           embed.level -= 1;

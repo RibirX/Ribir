@@ -3,8 +3,7 @@ use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-  parenthesized, parse::Parse, parse_quote, punctuated::Punctuated, spanned::Spanned, Fields,
-  Ident, Result,
+  parse::Parse, parse_quote, punctuated::Punctuated, spanned::Spanned, Fields, Ident, Result,
 };
 
 const DECLARE: &str = "Declare";
@@ -20,17 +19,13 @@ struct DefaultValue {
 struct FieldBuilderAttr {
   rename: Option<syn::LitStr>,
   builtin: Option<kw::builtin>,
-  into_converter: Option<kw::into>,
   strip_option: Option<kw::strip_option>,
   default: Option<DefaultValue>,
 }
 
 mod kw {
   use syn::custom_keyword;
-
   custom_keyword!(rename);
-  custom_keyword!(setter);
-  custom_keyword!(into);
   custom_keyword!(strip_option);
   custom_keyword!(builtin);
   custom_keyword!(default);
@@ -62,24 +57,8 @@ impl Parse for FieldBuilderAttr {
         input.parse::<kw::rename>()?;
         input.parse::<syn::Token![=]>()?;
         attr.rename = Some(input.parse()?);
-      } else if lookahead.peek(kw::setter) {
-        input.parse::<kw::setter>()?;
-        let content;
-        parenthesized!(content in input);
-        loop {
-          let lk = content.lookahead1();
-          if lk.peek(kw::into) {
-            attr.into_converter = Some(content.parse()?);
-          } else if lk.peek(kw::strip_option) {
-            attr.strip_option = Some(content.parse()?);
-          } else {
-            return Err(lk.error());
-          }
-          if content.is_empty() {
-            break;
-          }
-          content.parse::<syn::Token![,]>()?;
-        }
+      } else if lookahead.peek(kw::strip_option) {
+        attr.strip_option = Some(input.parse()?);
       } else if lookahead.peek(kw::default) {
         attr.default = Some(input.parse()?);
       } else {
@@ -203,84 +182,47 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     .try_for_each::<_, syn::Result<()>>(|(f, attr)| {
       let name = f.ident.as_ref().unwrap();
       let fn_convert = field_convert_method(name);
-      let (into, strip_option) = match attr {
-        Some(attr) => (attr.into_converter.as_ref(), attr.strip_option.as_ref()),
-        None => (None, None),
-      };
+
       let ty = &f.ty;
-
-      let strip_ty = extract_type_from_option(ty).ok_or_else(|| {
-        syn::Error::new(
-          strip_option.span(),
-          "Can't use meta `strip_option` for a non Option type ",
-        )
-      });
-
-      let methods_tokens = match (into.is_some(), strip_option.is_some()) {
-        (true, true) => {
-          let strip_ty = strip_ty?;
+      let methods_tokens =
+        if let Some(FieldBuilderAttr { strip_option: Some(strip_option), .. }) = attr {
+          let strip_ty = extract_type_from_option(ty).ok_or_else(|| {
+            syn::Error::new(
+              strip_option.span(),
+              "Can't use meta `strip_option` for a non Option type ",
+            )
+          })?;
           quote! {
             #[inline]
             #[allow(non_snake_case)]
-            #vis fn #fn_convert<V>(v: V) -> Option<#strip_ty>
-              where V: Into<#strip_ty>
+            #vis fn #fn_convert(v: #strip_ty) -> Option<#strip_ty>
             {
-               Some(v.into())
+               Some(v)
             }
 
             #[inline]
-            #vis fn #name<V>(mut self, v: V) -> Self
-              where V: Into<#strip_ty>
+            #vis fn #name(mut self, v: #strip_ty) -> Self
             {
               assert!(self.#name.is_none());
               self.#name = Some(Self::#fn_convert(v));
               self
             }
           }
-        }
-        (true, false) => {
+        } else {
           quote! {
             #[inline]
             #[allow(non_snake_case)]
-            #vis fn #fn_convert<V: Into<#ty>>(v: V) ->#ty { v.into() }
+            #vis fn #fn_convert(v: #ty) ->#ty { v }
 
             #[inline]
-            #vis fn #name<V: Into<#ty>>(mut self, v: V) -> Self {
-              assert!(self.#name.is_none());
-              self.#name = Some(Self::#fn_convert(v));
-              self
-            }
-          }
-        }
-        (false, true) => {
-          let strip_ty = strip_ty?;
-          quote! {
-            #[inline]
-            #[allow(non_snake_case)]
-            #vis fn #fn_convert(v: #strip_ty) -> Option<#strip_ty> { Some(v) }
-
-            #[inline]
-            #vis fn #name(mut self, v: #strip_ty) -> Self {
-              assert!(self.#name.is_none());
-              self.#name = Some(Self::#fn_convert(v));
-              self
-            }
-          }
-        }
-        (false, false) => {
-          quote! {
-            #[inline]
-            #[allow(non_snake_case)]
-            #vis fn #fn_convert(v: #ty) -> #ty { v }
-
             #vis fn #name(mut self, v: #ty) -> Self {
               assert!(self.#name.is_none());
               self.#name = Some(Self::#fn_convert(v));
               self
             }
           }
-        }
-      };
+        };
+
       methods.extend(quote! {
         #methods_tokens
       });
