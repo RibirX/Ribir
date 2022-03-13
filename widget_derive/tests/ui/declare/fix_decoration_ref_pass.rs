@@ -6,9 +6,10 @@ fn syntax_pass(ctx: &mut BuildCtx) {
       SizedBox {
         id: a,
         size,
+        background: Color::RED,
         SizedBox{
-          size: grandson.size,
-          background: a.background
+          size,
+          background: a.background.clone()
         }
       }
   };

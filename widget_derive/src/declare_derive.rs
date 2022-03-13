@@ -195,16 +195,15 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           quote! {
             #[inline]
             #[allow(non_snake_case)]
-            #vis fn #fn_convert(v: #strip_ty) -> Option<#strip_ty>
+            #vis fn #fn_convert<M, V: Striped<M, #strip_ty>>(v: V) -> #ty
             {
-               Some(v)
+               v.striped()
             }
 
             #[inline]
-            #vis fn #name(mut self, v: #strip_ty) -> Self
+            #vis fn #name<M, V: Striped<M, #strip_ty>>(mut self, v: V) -> Self
             {
-              assert!(self.#name.is_none());
-              self.#name = Some(Self::#fn_convert(v));
+              self.#name = Some(v.striped());
               self
             }
           }
@@ -212,11 +211,10 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           quote! {
             #[inline]
             #[allow(non_snake_case)]
-            #vis fn #fn_convert(v: #ty) ->#ty { v }
+            #vis fn #fn_convert<V: Into<#ty>>(v: V) -> #ty { v.into() }
 
             #[inline]
-            #vis fn #name(mut self, v: #ty) -> Self {
-              assert!(self.#name.is_none());
+            #vis fn #name<V: Into<#ty>>(mut self, v: V) -> Self {
               self.#name = Some(Self::#fn_convert(v));
               self
             }

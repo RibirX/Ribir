@@ -19,7 +19,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::context::*;
   #[doc(no_inline)]
-  pub use crate::declare::{Declare, DeclareBuilder};
+  pub use crate::declare::*;
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
