@@ -7,7 +7,7 @@ use text::shaper::TextShaper;
 
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
-  Rect, Size, WidgetId,
+  Point, Rect, Size, WidgetId,
 };
 
 use super::LayoutCtx;
@@ -146,6 +146,15 @@ impl LayoutStore {
         rect.and_then(|r| (&out_clamp == clamp).then(|| r.size))
       })
       .unwrap_or_else(|| {
+        // children's position is decided by parent, no matter itself relayout or not.
+        // here before parent perform layout, we reset children's position.
+        id.children(&tree).for_each(|child| {
+          self
+            .layout_info_or_default(child)
+            .rect
+            .as_mut()
+            .map(|mut rc| rc.origin = Point::default());
+        });
         let layout = match id.assert_get(tree) {
           WidgetNode::Combination(_) => unreachable!(),
           WidgetNode::Render(r) => r,
