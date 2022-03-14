@@ -174,8 +174,8 @@ mod tests {
   fn two_auto_focus() {
     // two auto focus widget
     let widget = Row::default()
-      .have(empty_box().with_auto_focus(true).box_it())
-      .have(empty_box().with_auto_focus(true).box_it());
+      .have_child(empty_box().with_auto_focus(true).box_it())
+      .have_child(empty_box().with_auto_focus(true).box_it());
 
     let ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
@@ -190,8 +190,8 @@ mod tests {
   fn on_auto_focus() {
     // one auto focus widget
     let widget = Row::default()
-      .have(empty_box().box_it())
-      .have(empty_box().with_auto_focus(true).box_it());
+      .have_child(empty_box().box_it())
+      .have_child(empty_box().with_auto_focus(true).box_it());
 
     let ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
@@ -208,11 +208,11 @@ mod tests {
   #[test]
   fn tab_index() {
     let widget = Row::default()
-      .have(empty_box().with_tab_index(-1).box_it())
-      .have(empty_box().with_tab_index(0).with_auto_focus(true).box_it())
-      .have(empty_box().with_tab_index(1).box_it())
-      .have(empty_box().with_tab_index(2).box_it())
-      .have(empty_box().with_tab_index(3).box_it());
+      .have_child(empty_box().with_tab_index(-1).box_it())
+      .have_child(empty_box().with_tab_index(0).with_auto_focus(true).box_it())
+      .have_child(empty_box().with_tab_index(1).box_it())
+      .have_child(empty_box().with_tab_index(2).box_it())
+      .have_child(empty_box().with_tab_index(3).box_it());
 
     let mut ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
@@ -256,7 +256,7 @@ mod tests {
           SizedBox { size: SizedBox::expanded_size() },
           self.log.clone(),
         )
-        .have(child.box_it())
+        .have_child(child.box_it())
         .box_it()
       }
     }

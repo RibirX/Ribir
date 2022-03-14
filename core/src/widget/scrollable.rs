@@ -191,7 +191,7 @@ mod tests {
     impl CombinationWidget for X {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         ScrollableX::x_scroll(0.)
-          .have(SizedBox { size: Size::new(1000., 1000.) }.box_it())
+          .have_child(SizedBox { size: Size::new(1000., 1000.) }.box_it())
           .box_it()
       }
     }
@@ -209,7 +209,7 @@ mod tests {
     impl CombinationWidget for Y {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         ScrollableY::y_scroll(0.)
-          .have(SizedBox { size: Size::new(1000., 1000.) }.box_it())
+          .have_child(SizedBox { size: Size::new(1000., 1000.) }.box_it())
           .box_it()
       }
     }
@@ -227,7 +227,7 @@ mod tests {
     impl CombinationWidget for Both {
       fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
         ScrollableBoth::both_scroll(Point::default())
-          .have(SizedBox { size: Size::new(1000., 1000.) }.box_it())
+          .have_child(SizedBox { size: Size::new(1000., 1000.) }.box_it())
           .box_it()
       }
     }

@@ -91,9 +91,9 @@ impl CombinationWidget for Demo {
 
     let items = vec![
       w.box_it(),
-      (padding, (bd, target).compose()).compose().box_it(),
+      padding.have_child(bd.have_child(target)).box_it(),
     ];
-    return (col, items).compose().box_it();
+    return col.have_child(items).box_it();
   }
 }
 fn main() {
