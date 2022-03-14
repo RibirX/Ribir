@@ -428,11 +428,7 @@ mod tests {
 
   #[test]
   fn horizontal_line() {
-    let row = Flex::default().have_multi(
-      (0..10)
-        .map(|_| SizedBox { size: Size::new(10., 20.) }.box_it())
-        .collect(),
-    );
+    let row = Flex::default().have_child((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }));
     let (rect, _) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 20.));
   }
@@ -443,11 +439,7 @@ mod tests {
       direction: Direction::Vertical,
       ..<_>::default()
     }
-    .have_multi(
-      (0..10)
-        .map(|_| SizedBox { size: Size::new(10., 20.) }.box_it())
-        .collect(),
-    )
+    .have_child((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
     .box_it();
     let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
@@ -456,8 +448,7 @@ mod tests {
   #[test]
   fn row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex { wrap: true, ..<_>::default() }
-      .have_multi((0..3).map(|_| SizedBox { size }.box_it()).collect());
+    let row = Flex { wrap: true, ..<_>::default() }.have_child((0..3).map(|_| SizedBox { size }));
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
@@ -479,7 +470,7 @@ mod tests {
       reverse: true,
       ..<_>::default()
     }
-    .have_multi((0..3).map(|_| SizedBox { size }.box_it()).collect());
+    .have_child((0..3).map(|_| SizedBox { size }));
 
     let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
@@ -497,9 +488,9 @@ mod tests {
   fn cross_align() {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
       let row = Row { v_align: align, ..<_>::default() }
-        .have(SizedBox { size: Size::new(100., 20.) }.box_it())
-        .have(SizedBox { size: Size::new(100., 30.) }.box_it())
-        .have(SizedBox { size: Size::new(100., 40.) }.box_it())
+        .have_child(SizedBox { size: Size::new(100., 20.) }.box_it())
+        .have_child(SizedBox { size: Size::new(100., 30.) }.box_it())
+        .have_child(SizedBox { size: Size::new(100., 40.) }.box_it())
         .box_it();
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
@@ -530,9 +521,9 @@ mod tests {
       v_align: CrossAxisAlign::Stretch,
       ..<_>::default()
     }
-    .have(SizedBox { size: Size::new(100., 20.) }.box_it())
-    .have(SizedBox { size: Size::new(100., 30.) }.box_it())
-    .have(SizedBox { size: Size::new(100., 40.) }.box_it())
+    .have_child(SizedBox { size: Size::new(100., 20.) }.box_it())
+    .have_child(SizedBox { size: Size::new(100., 30.) }.box_it())
+    .have_child(SizedBox { size: Size::new(100., 40.) }.box_it())
     .box_it();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
@@ -561,13 +552,13 @@ mod tests {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
       let root = SizedBox { size: SizedBox::expanded_size() }
-        .have(
+        .have_child(
           Row {
             h_align: align,
             v_align: CrossAxisAlign::Start,
             ..<_>::default()
           }
-          .have_multi(vec![
+          .have_child(vec![
             SizedBox { size: item_size }.box_it(),
             SizedBox { size: item_size }.box_it(),
             SizedBox { size: item_size }.box_it(),

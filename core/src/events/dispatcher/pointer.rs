@@ -246,7 +246,7 @@ mod tests {
         style: TextStyle::default(),
       },
     );
-    let root = record_pointer(event_record.clone(), Row::default()).have(record.box_it());
+    let root = record_pointer(event_record.clone(), Row::default()).have_child(record.box_it());
     let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 

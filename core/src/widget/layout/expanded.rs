@@ -76,16 +76,16 @@ mod tests {
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
     let row = Row { wrap: true, ..<_>::default() }
-      .have(
+      .have_child(
         Expanded { flex: 1. }
-          .have(SizedBox { size }.box_it())
+          .have_child(SizedBox { size }.box_it())
           .box_it(),
       )
-      .have(SizedBox { size }.box_it())
-      .have(SizedBox { size }.box_it())
-      .have(
+      .have_child(SizedBox { size }.box_it())
+      .have_child(SizedBox { size }.box_it())
+      .have_child(
         Expanded { flex: 2. }
-          .have(SizedBox { size }.box_it())
+          .have_child(SizedBox { size }.box_it())
           .box_it(),
       );
 

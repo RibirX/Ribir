@@ -190,7 +190,7 @@ mod tests {
 
   #[test]
   fn map_self_eq_self() {
-    let w = Margin { margin: EdgeInsets::all(2.) }.have(SizedBox { size: Size::zero() }.box_it());
+    let w = Margin { margin: EdgeInsets::all(2.) }.have_child(SizedBox { size: Size::zero() });
     let mut wnd = Window::without_render(w.box_it(), Size::zero());
     wnd.render_ready();
 

@@ -5,17 +5,23 @@ pub trait SingleChildWidget
 where
   Self: Sized,
 {
-  fn have(self, child: BoxedWidget) -> SingleChild<Self> { SingleChild { widget: self, child } }
+  #[inline]
+  fn have_child<C: IntoOptionChild<M>, M>(self, child: C) -> SingleChild<Self> {
+    SingleChild {
+      widget: self,
+      child: child.into_child(),
+    }
+  }
 }
 
 pub struct SingleChild<S> {
   pub(crate) widget: S,
-  pub(crate) child: BoxedWidget,
+  pub(crate) child: Option<BoxedWidget>,
 }
 
 impl<S> SingleChild<S> {
   #[inline]
-  pub fn unzip(self) -> (S, BoxedWidget) { (self.widget, self.child) }
+  pub fn unzip(self) -> (S, Option<BoxedWidget>) { (self.widget, self.child) }
 }
 
 impl<S> std::ops::Deref for SingleChild<S> {
@@ -34,13 +40,12 @@ pub trait MultiChildWidget
 where
   Self: Sized,
 {
-  fn have_multi(self, children: Vec<BoxedWidget>) -> MultiChild<Self> {
-    MultiChild { widget: self, children }
-  }
-
   #[inline]
-  fn have(self, c: BoxedWidget) -> MultiChild<Self> {
-    MultiChild { widget: self, children: vec![c] }
+  fn have_child<'a, C: IntoChildIterator<'a, M>, M: ?Sized>(self, child: C) -> MultiChild<Self> {
+    MultiChild {
+      widget: self,
+      children: child.into_child_iter().collect(),
+    }
   }
 }
 
@@ -56,8 +61,11 @@ impl<M> MultiChild<M> {
 
 impl<M: MultiChildWidget> MultiChild<M> {
   #[inline]
-  pub fn have(mut self, c: BoxedWidget) -> Self {
-    self.children.push(c);
+  pub fn have_child<'a, C: IntoChildIterator<'a, Marker>, Marker: ?Sized>(
+    mut self,
+    child: C,
+  ) -> Self {
+    self.children.extend(child.into_child_iter());
     self
   }
 }
@@ -95,110 +103,57 @@ impl<M: IntoStateful> IntoStateful for MultiChild<M> {
   }
 }
 
-// Implementation for adding child to widget. If `specialization` finished,
-// maybe we can use a more elegant way.
-pub trait SingleComposeNormal<M> {
-  type R;
-  fn compose(self) -> Self::R
-  where
-    Self: Sized;
+pub trait IntoOptionChild<M> {
+  fn into_child(self) -> Option<BoxedWidget>;
 }
 
-impl<W, C, M> SingleComposeNormal<M> for (W, C)
-where
-  W: SingleChildWidget + IntoRender,
-  C: BoxWidget<M>,
-{
-  type R = SingleChild<W>;
+impl<W: BoxWidget<M>, M> IntoOptionChild<M> for W {
   #[inline]
-  fn compose(self) -> Self::R { self.0.have(self.1.box_it()) }
+  fn into_child(self) -> Option<BoxedWidget> { Some(self.box_it()) }
 }
 
-pub trait SingleComposeOption<M> {
-  fn compose(self) -> BoxedWidget;
-}
-
-impl<W, M, C> SingleComposeOption<M> for (W, Option<C>)
-where
-  W: SingleChildWidget + IntoRender + 'static,
-  C: BoxWidget<M> + 'static,
-{
+impl<W: BoxWidget<M>, M> IntoOptionChild<Option<M>> for Option<W> {
   #[inline]
-  fn compose(self) -> BoxedWidget {
-    let (p, c) = self;
-    match c {
-      Some(c) => (p, c).compose().box_it(),
-      None => p.box_it(),
-    }
+  fn into_child(self) -> Option<BoxedWidget> { self.map(BoxWidget::box_it) }
+}
+
+pub trait IntoChildIterator<'a, M: ?Sized> {
+  fn into_child_iter(self) -> Box<dyn Iterator<Item = BoxedWidget> + 'a>;
+}
+
+impl<'a, T: BoxWidget<M>, M> IntoChildIterator<'a, M> for T {
+  fn into_child_iter(self) -> Box<dyn Iterator<Item = BoxedWidget>> {
+    Box::new(Some(self.box_it()).into_iter())
   }
 }
 
-impl<W, M, C> SingleComposeOption<M> for (Option<W>, C)
+impl<'a, T, M> IntoChildIterator<'a, [M]> for T
 where
-  W: SingleChildWidget + IntoRender + 'static,
-  C: BoxWidget<M>,
+  T: IntoIterator + 'a,
+  T::Item: BoxWidget<M> + 'a,
+  M: 'a,
 {
-  #[inline]
-  fn compose(self) -> BoxedWidget {
-    let (p, c) = self;
-    match p {
-      Some(p) => (p, c).compose().box_it(),
-      None => c.box_it(),
-    }
+  fn into_child_iter(self) -> Box<dyn Iterator<Item = BoxedWidget> + 'a> {
+    Box::new(self.into_iter().map(BoxWidget::box_it))
   }
 }
 
-pub trait MultiComposeNormal<W, M> {
-  fn compose(self) -> W;
+pub trait OptionHaveChild {
+  type Target;
+  fn have_child<C: BoxWidget<M>, M>(self, child: C) -> BoxedWidget;
 }
 
-impl<W, C, M> MultiComposeNormal<MultiChild<W>, M> for (MultiChild<W>, C)
+impl<T> OptionHaveChild for Option<T>
 where
-  C: BoxWidget<M>,
-  W: MultiChildWidget,
+  T: SingleChildWidget,
+  SingleChild<T>: BoxWidget<RenderMarker>,
 {
-  #[inline]
-  fn compose(self) -> MultiChild<W> { self.0.have(self.1.box_it()) }
-}
+  type Target = T;
 
-impl<W, C, M> MultiComposeNormal<MultiChild<W>, M> for (W, C)
-where
-  C: BoxWidget<M>,
-  W: MultiChildWidget,
-{
-  #[inline]
-  fn compose(self) -> MultiChild<W> { self.0.have(self.1.box_it()) }
-}
-
-pub trait MultiComposeIter<W, M> {
-  fn compose(self) -> W;
-}
-
-impl<C, W, M> MultiComposeIter<MultiChild<W>, M> for (MultiChild<W>, C)
-where
-  C: IntoIterator,
-  C::Item: BoxWidget<M>,
-{
-  #[inline]
-  fn compose(self) -> MultiChild<W> {
-    let (mut p, c) = self;
-    p.children.extend(c.into_iter().map(BoxWidget::box_it));
-    p
-  }
-}
-
-impl<C, W, M> MultiComposeIter<MultiChild<W>, M> for (W, C)
-where
-  C: IntoIterator,
-  C::Item: BoxWidget<M>,
-  W: MultiChildWidget,
-{
-  #[inline]
-  fn compose(self) -> MultiChild<W> {
-    let (widget, c) = self;
-    MultiChild {
-      widget,
-      children: c.into_iter().map(BoxWidget::box_it).collect(),
+  fn have_child<C: BoxWidget<M>, M>(self, child: C) -> BoxedWidget {
+    match self {
+      Some(w) => w.have_child(child).box_it(),
+      None => child.box_it(),
     }
   }
 }

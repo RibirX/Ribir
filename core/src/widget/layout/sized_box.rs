@@ -87,13 +87,10 @@ mod tests {
   fn expanded_size() {
     let wnd_size = Size::new(500., 500.);
     let expand_box = SizedBox { size: SizedBox::expanded_size() }
-      .have(
-        Text {
-          text: "".into(),
-          style: <_>::default(),
-        }
-        .box_it(),
-      )
+      .have_child(Text {
+        text: "".into(),
+        style: <_>::default(),
+      })
       .box_it();
 
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));

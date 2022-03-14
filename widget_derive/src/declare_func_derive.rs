@@ -457,27 +457,15 @@ impl DeclareWidget {
       // compile error if wrong size child declared.
       let hint = (self.children.len() > 1).then(|| quote! {: MultiChild<_>});
 
-      self
-        .children
-        .iter()
-        .enumerate()
-        .for_each(|(idx, c)| match c {
-          Child::Declare(d) => {
-            let c_name = if d.named.is_some() {
-              d.widget_identify()
-            } else {
-              child_variable(c, idx)
-            };
-            let c_def_name = widget_def_variable(&c_name);
-            compose_tokens
-              .extend(quote! { let #def_name #hint = (#def_name, #c_def_name).compose(); });
-          }
-          Child::Expr(_) => {
-            let c_def_name = widget_def_variable(&child_variable(c, idx));
-            compose_tokens
-              .extend(quote! { let #def_name #hint = (#def_name, #c_def_name).compose(); })
-          }
-        });
+      let children = self.children.iter().enumerate().map(|(idx, c)| {
+        let c_name = match c {
+          Child::Declare(d) if d.named.is_some() => d.widget_identify(),
+          _ => child_variable(c, idx),
+        };
+        let c_def_name = widget_def_variable(&c_name);
+        quote! { .have_child(#c_def_name) }
+      });
+      compose_tokens.extend(quote! { let #def_name #hint = #def_name #(#children)*; });
     }
     compose_tokens.extend(self.sugar_fields.gen_wrap_widget_compose_tokens(&name));
 

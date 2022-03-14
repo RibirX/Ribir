@@ -70,7 +70,9 @@ impl Context {
         let (rw, child) = s.unzip();
         let widget_tree = WidgetTree::new(WidgetNode::Render(rw));
         let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
-        ctx.inflate_append(child, ctx.widget_tree.root());
+        if let Some(child) = child {
+          ctx.inflate_append(child, ctx.widget_tree.root());
+        }
         ctx
       }
       BoxedWidgetInner::MultiChild(m) => {
@@ -110,7 +112,9 @@ impl Context {
         BoxedWidgetInner::SingleChild(s) => {
           let (rw, child) = s.unzip();
           let wid = p_wid.append_widget(WidgetNode::Render(rw), self.widget_tree.as_mut());
-          stack.push((child, wid));
+          if let Some(child) = child {
+            stack.push((child, wid));
+          }
         }
         BoxedWidgetInner::MultiChild(m) => {
           let (rw, children) = m.unzip();
@@ -335,9 +339,10 @@ impl Context {
           let (r, child) = s.unzip();
           let new_id = self.replace_widget(WidgetNode::Render(r), wid);
           changed = new_id.is_some() || changed;
-          match new_id {
-            Some(new_id) => self.inflate_append(child, new_id),
-            None => stack.push((child, wid)),
+          match (new_id, child) {
+            (Some(new_id), Some(child)) => self.inflate_append(child, new_id),
+            (None, Some(child)) => stack.push((child, wid)),
+            _ => {}
           }
         }
         BoxedWidgetInner::MultiChild(m) => {

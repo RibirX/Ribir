@@ -238,9 +238,7 @@ impl SugarFields {
       let name = ribir_suffix_variable(host, suffix);
       let wrap_def = widget_def_variable(&name);
       let host_def = widget_def_variable(host);
-      quote! {
-        let #host_def = (#wrap_def, #host_def).compose();
-      }
+      quote! {let #host_def = #wrap_def.have_child(#host_def);}
     }
 
     if let Some(padding) = self.padding.as_ref() {
