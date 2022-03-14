@@ -13,7 +13,6 @@ use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident};
 
 const DECLARE_MACRO_NAME: &str = "declare";
 
-#[derive(Default)]
 pub struct DeclareCtx {
   // the key is the widget name which depends to the value
   pub named_widgets: HashSet<Ident>,
@@ -26,6 +25,8 @@ pub struct DeclareCtx {
   forbid_warnings: bool,
   widget_name_to_id: HashMap<Ident, Ident>,
   follow_scopes: Vec<bool>,
+  // tmp code
+  pub ctx_name: Ident,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -422,6 +423,21 @@ impl DeclareCtx {
       (ReferenceInfo::Reference, _) => *v = ref_info,
       (ReferenceInfo::WrapWidgetRef, _) => *v = ref_info,
       _ => {}
+    }
+  }
+}
+
+impl Default for DeclareCtx {
+  fn default() -> Self {
+    Self {
+      named_widgets: Default::default(),
+      current_follows: Default::default(),
+      be_followed: Default::default(),
+      analyze_stack: Default::default(),
+      forbid_warnings: Default::default(),
+      widget_name_to_id: Default::default(),
+      follow_scopes: Default::default(),
+      ctx_name: Ident::new("tmp", Span::call_site()),
     }
   }
 }

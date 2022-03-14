@@ -11,12 +11,11 @@ use super::{field_guard_variable, DeclareCtx, DeclareField};
 pub struct WidgetGen<'a> {
   pub ty: &'a Path,
   pub name: Ident,
-  pub fields: &'a Vec<DeclareField>,
+  pub fields: &'a [DeclareField],
   pub ctx_name: &'a Ident,
 }
 
 impl<'a> WidgetGen<'a> {
-  // todo: check force_stateful
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx, force_stateful: bool) -> TokenStream {
     let Self { fields, ty, .. } = self;
 
