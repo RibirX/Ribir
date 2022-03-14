@@ -204,50 +204,68 @@ include!("./sugar_fields_struct.rs");
 
 const DECORATION: &str = "decoration";
 const DECORATION_FIELDS: [&str; 3] = ["background", "radius", "border"];
-
-pub struct WrapWidgetTokens {
-  pub name: Ident,
-  pub def_and_ref_tokens: TokenStream,
-  pub compose_tokens: TokenStream,
-}
+const PADDING: &str = "Padding";
+const MARGIN: &str = "Margin";
+const BOX_DECORATION: &str = "BoxDecoration";
 
 impl SugarFields {
-  // generate tokens of the wrap widgets define and return token stream to compose
-  // these widgets and its host widget which should call after all children
-  // composed.
-  pub fn gen_wrap_widgets_tokens(
-    &self,
-    host_id: &Ident,
-    ctx_name: &Ident,
-    ctx: &DeclareCtx,
-  ) -> Vec<WrapWidgetTokens> {
-    let mut tokens = vec![];
-
+  pub fn gen_wrap_widgets_tokens<F>(&self, host: &Ident, ctx: &DeclareCtx, mut f: F)
+  where
+    F: FnMut(Ident, TokenStream),
+  {
     if let Some(padding) = self.padding.clone() {
-      let w_ty = Ident::new("Padding", padding.member.span()).into();
-      tokens.push(common_def_tokens(padding, &w_ty, host_id, ctx_name, ctx));
+      let w_ty = Ident::new(PADDING, padding.member.span()).into();
+      let (name, tokens) = common_def_tokens(padding, &w_ty, host, ctx);
+      f(name, tokens);
     }
 
-    if let Some(d) = self.decoration_widget_tokens(host_id, ctx_name, ctx) {
-      tokens.push(d);
+    if self.has_box_decoration_field() {
+      let (name, tokens) = self.decoration_widget_tokens(host, ctx);
+      f(name, tokens)
     }
 
     if let Some(margin) = self.margin.clone() {
-      let w_ty = Ident::new("Margin", margin.member.span()).into();
-      tokens.push(common_def_tokens(margin, &w_ty, host_id, ctx_name, ctx));
+      let w_ty = Ident::new(MARGIN, margin.member.span()).into();
+      let (name, tokens) = common_def_tokens(margin, &w_ty, host, ctx);
+      f(name, tokens)
+    }
+  }
+
+  pub fn gen_wrap_widget_compose_tokens(&self, host: &Ident) -> TokenStream {
+    let mut compose_tokens = quote! {};
+
+    fn compose(host: &Ident, suffix: &str) -> TokenStream {
+      let name = ribir_suffix_variable(host, suffix);
+      let wrap_def = widget_def_variable(&name);
+      let host_def = widget_def_variable(host);
+      quote! {
+        let #host_def = (#wrap_def, #host_def).compose();
+      }
     }
 
-    tokens
+    if let Some(padding) = self.padding.as_ref() {
+      compose_tokens.extend(compose(host, &padding.member.to_string()));
+    }
+
+    if self.has_box_decoration_field() {
+      compose_tokens.extend(compose(host, DECORATION))
+    }
+
+    if let Some(margin) = self.margin.clone() {
+      compose_tokens.extend(compose(host, &margin.member.to_string()));
+    }
+
+    compose_tokens
   }
 
   pub fn collect_wrap_widget_follows<'a>(
     &'a self,
-    host_name: &Ident,
+    host: &Ident,
     follows_info: &mut BTreeMap<Ident, WidgetFollows<'a>>,
   ) {
     let mut copy_follows = |f: Option<&'a DeclareField>| {
       if let Some(follows) = f.and_then(FieldFollows::clone_from) {
-        let name = ribir_suffix_variable(host_name, &follows.field.member.to_string());
+        let name = ribir_suffix_variable(host, &follows.field.member.to_string());
         let part = WidgetFollowPart::Field(follows);
         follows_info.insert(name, WidgetFollows::from_single_part(part));
       }
@@ -268,7 +286,7 @@ impl SugarFields {
       .collect();
 
     if !deco_follows.is_empty() {
-      let name = ribir_suffix_variable(host_name, DECORATION);
+      let name = ribir_suffix_variable(host, DECORATION);
       follows_info.insert(name, deco_follows);
     }
   }
@@ -284,66 +302,47 @@ impl SugarFields {
     }
   }
 
-  fn decoration_widget_tokens(
-    &self,
-    host_id: &Ident,
-    ctx_name: &Ident,
-    ctx: &DeclareCtx,
-  ) -> Option<WrapWidgetTokens> {
+  fn has_box_decoration_field(&self) -> bool {
     let Self { border, radius, background, .. } = self;
-    let mut fields = vec![];
-    if let Some(border) = border {
-      fields.push(border.clone())
+    border.is_some() || radius.is_some() || background.is_some()
+  }
+
+  fn decoration_widget_tokens(&self, host_id: &Ident, ctx: &DeclareCtx) -> (Ident, TokenStream) {
+    let Self { border, radius, background, .. } = self;
+    let fields = [border, radius, background]
+      .iter()
+      .filter_map(|f| (*f).clone())
+      .collect::<Vec<_>>();
+
+    let name = ribir_suffix_variable(host_id, DECORATION);
+    let span = fields
+      .iter()
+      .fold(None, |span: Option<Span>, f| {
+        if let Some(span) = span {
+          span.join(f.member.span())
+        } else {
+          Some(f.member.span())
+        }
+      })
+      .unwrap();
+    let ty = &Ident::new(BOX_DECORATION, span).into();
+    let ctx_name = &ctx.ctx_name;
+    let gen = WidgetGen { ty, name, fields: &fields, ctx_name };
+    let wrap_name = widget_def_variable(&gen.name);
+    let mut def_and_ref_tokens = gen.gen_widget_tokens(ctx, false);
+
+    // If all fields have if guard and condition are false, `BoxDecoration` can
+    // emit.
+    if fields.iter().all(|f| f.if_guard.is_some()) {
+      def_and_ref_tokens = quote! {
+        let #wrap_name = #wrap_name.is_empty().then(||{
+          #def_and_ref_tokens
+          #wrap_name
+        });
+      };
     }
-    if let Some(background) = background {
-      fields.push(background.clone())
-    }
-    if let Some(radius) = radius {
-      fields.push(radius.clone())
-    }
 
-    (!fields.is_empty()).then(|| {
-      let name = ribir_suffix_variable(host_id, DECORATION);
-      let span = fields
-        .iter()
-        .fold(None, |span: Option<Span>, f| {
-          if let Some(span) = span {
-            span.join(f.member.span())
-          } else {
-            Some(f.member.span())
-          }
-        })
-        .unwrap();
-      let ty = &Ident::new("BoxDecoration", span).into();
-      let gen = WidgetGen { ty, name, fields: &fields, ctx_name };
-      let host_name = widget_def_variable(host_id);
-      let wrap_name = widget_def_variable(&gen.name);
-      let mut def_and_ref_tokens = gen.gen_widget_tokens(ctx, false);
-
-      // If all fields have if guard and condition are false, `BoxDecoration` can
-      // emit.
-      if fields.iter().all(|f| f.if_guard.is_some()) {
-        def_and_ref_tokens = quote! {
-          let #wrap_name = #wrap_name.is_empty().then(||{
-            #def_and_ref_tokens
-            #wrap_name
-          });
-        };
-      }
-
-      WrapWidgetTokens {
-        compose_tokens: quote! { let #host_name = (#wrap_name, #host_name).compose(); },
-        name: widget_def_variable(&gen.name),
-        def_and_ref_tokens,
-      }
-    })
-
-    // fixme:
-    // 1. others follow decoration
-    // if ctx.be_followed(ref_name) {
-    //   let state_ref = ctx.no_conflict_name_with_suffix(ref_name, &f.member);
-    //   follow_after.extend(quote! { let #state_ref = unsafe
-    // {#wrap_def_name.state_ref()};}); }
+    (gen.name.clone(), def_and_ref_tokens)
   }
 }
 
@@ -351,14 +350,14 @@ impl SugarFields {
 fn common_def_tokens(
   mut f: DeclareField,
   ty: &Path,
-  host_id: &Ident,
-  ctx_name: &Ident,
+  host: &Ident,
+
   ctx: &DeclareCtx,
-) -> WrapWidgetTokens {
+) -> (Ident, TokenStream) {
   let if_guard = f.if_guard.take();
-  let name = ribir_suffix_variable(host_id, &f.member.to_string());
-  let host_def = widget_def_variable(host_id);
+  let name = ribir_suffix_variable(host, &f.member.to_string());
   let wrap_def = widget_def_variable(&name);
+  let ctx_name = &ctx.ctx_name;
   let widget_gen = WidgetGen { ty, name, fields: &vec![f], ctx_name };
   let mut widget_tokens = widget_gen.gen_widget_tokens(ctx, false);
 
@@ -373,9 +372,5 @@ fn common_def_tokens(
     };
   }
 
-  WrapWidgetTokens {
-    compose_tokens: quote! { let #host_def = (#wrap_def, #host_def).compose(); },
-    name: wrap_def,
-    def_and_ref_tokens: widget_tokens,
-  }
+  (widget_gen.name.clone(), widget_tokens)
 }

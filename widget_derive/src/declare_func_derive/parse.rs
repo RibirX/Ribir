@@ -66,7 +66,7 @@ impl Parse for DeclareMacro {
       Ident::new(CTX_DEFAULT_NAME, Span::call_site())
     };
     let res = Self {
-      ctx,
+      ctx_name: ctx,
       widget: input.parse()?,
       data_flows: parse_data_flows(input)?,
     };
