@@ -41,7 +41,7 @@ fn data_flow_circular_err(ctx: &mut BuildCtx) {
       id: a,
       size: Size::zero(),
     }
-    data_flow! { a.size ~> a.size }
+    dataflows { a.size ~> a.size }
   };
 }
 
@@ -56,7 +56,7 @@ fn data_flow_circular_field_skip_nc_pass(ctx: &mut BuildCtx) {
         size: a.size,
       }
     }
-    data_flow! {
+    dataflows {
       a.size ~> b.size
     }
   };
@@ -68,7 +68,7 @@ fn circular_follows_with_skip_nc_pass(ctx: &mut BuildCtx) {
       id: a,
       size: Size::zero(),
     }
-    data_flow! {
+    dataflows {
       #[skip_nc]
       a.size ~> a.size
     }

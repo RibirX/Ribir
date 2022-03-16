@@ -13,6 +13,7 @@
     "bidi",
     "bitflags",
     "cond",
+    "dataflows",
     "fontdb",
     "framebuffer",
     "guillotiere",

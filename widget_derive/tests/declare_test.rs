@@ -211,7 +211,7 @@ fn data_flow_macro() {
           SizedBox { id: a, size }
           SizedBox { id: b, size: a.size }
         }
-        data_flow! { a.size + b.size ~> c.size }
+        dataflows { a.size + b.size ~> c.size }
       }
     }
   }
