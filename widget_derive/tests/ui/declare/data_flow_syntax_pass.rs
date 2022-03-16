@@ -12,7 +12,7 @@ fn data_flow_simple(ctx: &mut BuildCtx) {
         size: Size::zero(),
       }
     }
-    data_flow! { a.size ~> b.size }
+    dataflows { a.size ~> b.size }
   };
 }
 
@@ -33,11 +33,11 @@ fn data_flow_embed(ctx: &mut BuildCtx) {
             id: c,
             size: Size::zero(),
           }
-          data_flow! { a.size + b.size ~> c.size }
+          dataflows { a.size + b.size ~> c.size }
         }
       })
     }
-    data_flow! { a.size ~> b.size }
+    dataflows { a.size ~> b.size }
   };
 }
 

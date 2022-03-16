@@ -196,7 +196,7 @@ macro_rules! fields_sugar_def {
 }
 pub mod kw {
   syn::custom_keyword!(id);
-  syn::custom_keyword!(data_flow);
+  syn::custom_keyword!(dataflows);
   syn::custom_keyword!(skip_nc);
 }
 

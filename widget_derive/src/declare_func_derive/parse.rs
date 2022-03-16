@@ -17,7 +17,7 @@
 //!
 //! Expr: `rust syntax`
 //!
-//! DataFlow: data_flow ! DataFlowBody
+//! DataFlow: dataflows DataFlowBody
 //!
 //! DataFlowBody: [ DataFlowExprs ]
 //!   | ( DataFlowExprs )
@@ -31,28 +31,27 @@
 use super::*;
 use syn::{
   bracketed,
-  parse::{Parse, ParseBuffer, ParseStream, Parser},
+  parse::{Parse, ParseBuffer, ParseStream},
   punctuated::Punctuated,
   spanned::Spanned,
   token::{self, Brace, Comma},
-  Ident, Macro, Token,
+  Ident, Token,
 };
 
 const CTX_DEFAULT_NAME: &str = "ctx";
 
 impl Parse for DeclareMacro {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    fn parse_data_flows_tokens(input: ParseStream) -> syn::Result<Punctuated<DataFlow, Token![;]>> {
-      Punctuated::parse_terminated(input)
-    }
     fn parse_data_flows(input: ParseStream) -> syn::Result<Punctuated<DataFlow, Token![;]>> {
       if input.is_empty() {
         return Ok(<_>::default());
       }
       let lookahead = input.lookahead1();
-      if lookahead.peek(kw::data_flow) && input.peek2(Token![!]) {
-        let mac: Macro = input.parse()?;
-        Ok(parse_data_flows_tokens.parse2(mac.tokens)?)
+      if lookahead.peek(kw::dataflows) && input.peek2(token::Brace) {
+        input.parse::<kw::dataflows>()?;
+        let content;
+        syn::braced!(content in input);
+        Punctuated::parse_terminated(&content)
       } else {
         Err(lookahead.error())
       }

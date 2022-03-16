@@ -30,7 +30,7 @@ impl StatefulCombination for Todos {
                 margin: EdgeInsets::vertical(4.)
               }
             }
-            data_flow!{
+            dataflows {
               checkbox.checked ~> this_ref.silent().tasks[idx].finished;
             }
           }
