@@ -292,8 +292,8 @@ impl SugarFields {
   pub fn key_follow_check(&self) -> crate::error::Result<()> {
     if let Some(DeclareField { member, follows: Some(follows), .. }) = self.key.as_ref() {
       Err(DeclareError::KeyDependsOnOther {
-        key: member.span(),
-        depends_on: follows.names().map(|k| k.span()).collect(),
+        key: member.span().unwrap(),
+        depends_on: follows.names().map(|k| k.span().unwrap()).collect(),
       })
     } else {
       Ok(())

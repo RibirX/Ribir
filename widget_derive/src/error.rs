@@ -1,6 +1,6 @@
-use crate::declare_func_derive::{DeclareMacro, FollowOn};
-use proc_macro::{Diagnostic, Level};
-use proc_macro2::{Span, TokenStream};
+use crate::declare_func_derive::FollowOn;
+use proc_macro::{Diagnostic, Level, Span};
+use proc_macro2::TokenStream;
 
 use quote::quote;
 use syn::Ident;
@@ -24,20 +24,21 @@ pub enum DeclareError {
   },
   DependOnWrapWidgetWithIfGuard {
     wrap_name: Ident,
-    wrap_def_pos: [Span; 3],
+    wrap_def_spans: [Span; 3],
+    use_spans: Vec<Span>,
   },
 }
 
 pub type Result<T> = std::result::Result<T, DeclareError>;
 
 impl DeclareError {
-  pub fn into_compile_error(self, declare: &DeclareMacro) -> TokenStream {
-    self.error_emit(declare);
+  pub fn into_compile_error(self) -> TokenStream {
+    self.error_emit();
     // A Valid widget return to avoid compile noise when error occur.
     quote! {}
   }
 
-  pub fn error_emit(&self, declare: &DeclareMacro) {
+  pub fn error_emit(self) {
     let mut diagnostic = Diagnostic::new(Level::Error, "");
     match self {
       DeclareError::DuplicateID([id1, id2]) => {
@@ -49,7 +50,7 @@ impl DeclareError {
         ));
       }
       DeclareError::CircleInit(path) => {
-        let (msg, spans, note_spans) = path_info(path);
+        let (msg, spans, note_spans) = path_info(&path);
         let msg = format!("Can't init widget because circle follow: {}", msg);
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);
@@ -60,7 +61,7 @@ impl DeclareError {
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::CircleFollow(path) => {
-        let (msg, spans, note_spans) = path_info(path);
+        let (msg, spans, note_spans) = path_info(&path);
         let msg = format!(
           "Circle follow will cause infinite state change trigger: {}",
           msg
@@ -73,38 +74,24 @@ impl DeclareError {
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::UnnecessarySkipNc(span) => {
-        diagnostic.set_spans(vec![span.unwrap()]);
+        diagnostic.set_spans(span);
         diagnostic.set_message("Unnecessary attribute, because not depends on any others");
         diagnostic = diagnostic.help("Try to remove it.");
       }
       DeclareError::DataFlowNoDepends(span) => {
-        diagnostic.set_spans(vec![span.unwrap()]);
+        diagnostic.set_spans(span);
         diagnostic.set_message("Declared a data flow but not depends on any others.");
         diagnostic = diagnostic.help("Try to remove it.");
       }
-      DeclareError::KeyDependsOnOther { key, depends_on } => {
-        let mut spans = vec![key.unwrap()];
-        spans.extend(depends_on.iter().map(|s| s.unwrap()));
-        diagnostic.set_spans(spans);
+      DeclareError::KeyDependsOnOther { key, mut depends_on } => {
+        depends_on.push(key);
+        diagnostic.set_spans(depends_on);
         diagnostic.set_message("The key attribute is not allowed to depend on others.");
       }
-      DeclareError::DependOnWrapWidgetWithIfGuard { wrap_name, wrap_def_pos } => {
-        let mut error_spans = vec![];
-        let _ = declare.widget.recursive_call(|w| {
-          w.all_syntax_fields()
-            .filter_map(|f| f.follows.as_ref())
-            .flat_map(|follows| follows.iter())
-            .filter(|f| &f.widget == wrap_name)
-            .for_each(|f| error_spans.extend(f.spans.iter().map(|s| s.unwrap())));
-          Ok(())
-        });
-
-        diagnostic.set_spans(error_spans);
+      DeclareError::DependOnWrapWidgetWithIfGuard { wrap_def_spans, use_spans, .. } => {
+        diagnostic.set_spans(use_spans);
         diagnostic.set_message( "Depends on a widget field which behind `if guard`, its existence depends on the `if guard` result in runtime.");
-        diagnostic = diagnostic.span_warning(
-          wrap_def_pos.iter().map(|s| s.unwrap()).collect::<Vec<_>>(),
-          "field define here.",
-        );
+        diagnostic = diagnostic.span_warning(wrap_def_spans.to_vec(), "field define here.");
       }
     };
 
@@ -114,7 +101,7 @@ impl DeclareError {
 
 // return a tuple compose by the string display of path, the path follow spans
 // and the spans of where `#[skip_nc]` can be added.
-fn path_info(path: &[FollowInfo]) -> (String, Vec<proc_macro::Span>, Vec<proc_macro::Span>) {
+fn path_info(path: &[FollowInfo]) -> (String, Vec<Span>, Vec<Span>) {
   let path = path
     .iter()
     .map(|FollowInfo { widget, member, on }| (widget, member, on));

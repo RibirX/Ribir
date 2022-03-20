@@ -225,7 +225,7 @@ impl DeclareCtx {
     let tokens = declare.gen_tokens(self).unwrap_or_else(|err| {
       // forbid warning.
       self.forbid_warnings(true);
-      err.into_compile_error(&declare)
+      err.into_compile_error()
     });
     self.pop_follow_scope();
 
