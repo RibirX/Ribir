@@ -80,7 +80,7 @@ impl VisitMut for DeclareCtx {
     visit_mut::visit_expr_field_mut(self, f_expr);
 
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
-      if let Some(suffix) = SugarFields::field_belong_widget(&f_expr.member) {
+      if let Some(suffix) = SugarFields::wrap_widget_from_member(&f_expr.member) {
         name.set_span(name.span().join(suffix.span()).unwrap());
         let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
         *f_expr.base = parse_quote! { #wrap_name };
@@ -243,9 +243,11 @@ impl DeclareCtx {
 impl DeclareCtx {
   pub fn visit_declare_macro_mut(&mut self, d: &mut DeclareMacro) {
     self.visit_declare_widget_mut(&mut d.widget);
-    d.data_flows
-      .iter_mut()
-      .for_each(|df| self.visit_data_flows_mut(df));
+    if let Some(dataflows) = d.dataflows.as_mut() {
+      dataflows
+        .iter_mut()
+        .for_each(|df| self.visit_data_flows_mut(df));
+    }
   }
 
   pub fn visit_data_flows_mut(&mut self, df: &mut DataFlow) {

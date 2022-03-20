@@ -22,7 +22,18 @@ pub use follow_on::*;
 mod variable_names;
 pub use variable_names::*;
 
-use self::widget_gen::WidgetGen;
+pub mod kw {
+  syn::custom_keyword!(id);
+  syn::custom_keyword!(dataflows);
+  syn::custom_keyword!(skip_nc);
+  syn::custom_keyword!(animations);
+  syn::custom_keyword!(Animate);
+  syn::custom_keyword!(State);
+  syn::custom_keyword!(Transition);
+}
+
+use self::{animations::Animations, widget_gen::WidgetGen};
+mod animations;
 mod widget_gen;
 pub enum Child {
   Declare(Box<DeclareWidget>),
@@ -32,7 +43,8 @@ pub enum Child {
 pub struct DeclareMacro {
   pub ctx_name: Ident,
   pub widget: DeclareWidget,
-  pub data_flows: Punctuated<DataFlow, Token![;]>,
+  pub dataflows: Option<Punctuated<DataFlow, Token![;]>>,
+  pub animations: Option<Animations>,
 }
 
 pub struct DeclareWidget {
@@ -172,21 +184,23 @@ impl DeclareMacro {
       // data flow should not effect the named widget order, and allow circle
       // follow with circle. So we clone the follow relationship and individual check
       // the circle follow error.
-      if !self.data_flows.is_empty() {
-        let mut follows = follows.clone();
-        self.analyze_data_flow_follows(&mut follows);
-        let _circle_follows_check = Self::circle_check(&follows, |stack| {
-          if stack.iter().any(|s| -> bool {
-            match &s.origin {
-              FollowOrigin::Field(f) => f.skip_nc.is_some(),
-              FollowOrigin::DataFlow(df) => df.skip_nc.is_some(),
+      if let Some(dataflows) = self.dataflows.as_ref() {
+        if !dataflows.is_empty() {
+          let mut follows = follows.clone();
+          self.analyze_data_flow_follows(&mut follows);
+          let _circle_follows_check = Self::circle_check(&follows, |stack| {
+            if stack.iter().any(|s| -> bool {
+              match &s.origin {
+                FollowOrigin::Field(f) => f.skip_nc.is_some(),
+                FollowOrigin::DataFlow(df) => df.skip_nc.is_some(),
+              }
+            }) {
+              Ok(())
+            } else {
+              Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
             }
-          }) {
-            Ok(())
-          } else {
-            Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
-          }
-        })?;
+          })?;
+        }
       }
 
       let (mut named_widgets_def, compose) = self.named_widgets_def_tokens(ctx)?;
@@ -207,10 +221,15 @@ impl DeclareMacro {
       tokens.extend(self.widget.compose_tokens());
     }
 
-    self
-      .data_flows
-      .iter_mut()
-      .try_for_each(|df| df.gen_tokens(&mut tokens))?;
+    if let Some(dataflows) = self.dataflows.as_mut() {
+      dataflows
+        .iter_mut()
+        .try_for_each(|df| df.gen_tokens(&mut tokens))?;
+    }
+
+    if let Some(ref animations) = self.animations {
+      animations.to_tokens(&mut tokens);
+    }
 
     let def_name = widget_def_variable(&self.widget.widget_identify());
     Ok(quote! {{ #tokens #def_name.box_it() }})
@@ -266,7 +285,12 @@ impl DeclareMacro {
   }
 
   fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, WidgetFollows<'a>>) {
-    self.data_flows.iter().for_each(|df| {
+    let dataflows = if let Some(dataflows) = self.dataflows.as_ref() {
+      dataflows
+    } else {
+      return;
+    };
+    dataflows.iter().for_each(|df| {
       if let Some(to) = df.to.follows.as_ref() {
         let df_follows = DataFlowFollows::clone_from(df);
         let part = WidgetFollowPart::DataFlow(df_follows);
