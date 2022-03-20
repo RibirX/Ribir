@@ -53,11 +53,8 @@ note: If the circular is your want and will finally not infinite change,you shou
    |         ^^^^^^
 
 error: Circle follow will cause infinite state change trigger: a ～> a
-  --> tests/ui/declare/circular_dependency_fail.rs:41:11
+  --> tests/ui/declare/circular_dependency_fail.rs:44:17
    |
-41 |       id: a,
-   |           ^
-...
 44 |     dataflows { a.size ~> a.size }
    |                 ^         ^
    |

@@ -118,23 +118,46 @@ struct CircleCheckStack<'a> {
   pub on: &'a FollowOn,
 }
 
+impl<'a> CircleCheckStack<'a> {
+  fn into_follow_path(&self, ctx: &DeclareCtx) -> FollowInfo {
+    let on = FollowOn {
+      widget: ctx.user_perspective_name(&self.on.widget).map_or_else(
+        || self.on.widget.clone(),
+        |user| Ident::new(&user.to_string(), self.on.widget.span()),
+      ),
+
+      spans: self.on.spans.clone(),
+    };
+
+    let widget = ctx
+      .user_perspective_name(&self.widget)
+      .unwrap_or_else(|| &self.widget);
+
+    let (widget, member) = match self.origin {
+      FollowOrigin::Field(f) => {
+        // same id, but use the one which at the define place to provide more friendly
+        // compile error.
+        let widget = ctx
+          .named_widgets
+          .get(&widget)
+          .expect("id must in named widgets")
+          .clone();
+        (widget, Some(f.member.clone()))
+      }
+      FollowOrigin::DataFlow(_) => (widget.clone(), None),
+    };
+
+    FollowInfo { widget, member, on }
+  }
+}
+
 impl DeclareMacro {
   fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream2> {
-    ctx.ctx_name = self.ctx_name.clone();
-    fn circle_stack_to_path(stack: &[CircleCheckStack]) -> Box<[FollowInfo]> {
-      stack
-        .iter()
-        .map(|o| FollowInfo {
-          widget: o.widget.clone(),
-          member: match o.origin {
-            FollowOrigin::Field(f) => Some(f.member.clone()),
-            FollowOrigin::DataFlow(_) => None,
-          },
-          on: o.on.clone(),
-        })
-        .collect()
+    fn circle_stack_to_path(stack: &[CircleCheckStack], ctx: &DeclareCtx) -> Box<[FollowInfo]> {
+      stack.iter().map(|c| c.into_follow_path(ctx)).collect()
     }
 
+    ctx.ctx_name = self.ctx_name.clone();
     ctx.id_collect(&self.widget)?;
     ctx.visit_declare_macro_mut(self);
 
@@ -143,7 +166,7 @@ impl DeclareMacro {
     if !ctx.named_widgets.is_empty() {
       let follows = self.analyze_widget_follows();
       let _init_circle_check = Self::circle_check(&follows, |stack| {
-        Err(DeclareError::CircleInit(circle_stack_to_path(stack)))
+        Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
       })?;
 
       // data flow should not effect the named widget order, and allow circle
@@ -161,7 +184,7 @@ impl DeclareMacro {
           }) {
             Ok(())
           } else {
-            Err(DeclareError::CircleFollow(circle_stack_to_path(stack)))
+            Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
           }
         })?;
       }
@@ -700,7 +723,7 @@ pub(crate) fn declare_func_macro(input: TokenStream) -> TokenStream {
   let tokens = declare.gen_tokens(&mut ctx).unwrap_or_else(|err| {
     // forbid warning.
     ctx.forbid_warnings(true);
-    err.into_compile_error(&ctx, &declare)
+    err.into_compile_error(&declare)
   });
   ctx.emit_unused_id_warning();
 
