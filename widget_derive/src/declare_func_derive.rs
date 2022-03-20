@@ -99,7 +99,7 @@ impl DataFlow {
     let follows_on = from
       .follows
       .as_ref()
-      .ok_or_else(|| DeclareError::DataFlowNoDepends(from.expr.span()))?;
+      .ok_or_else(|| DeclareError::DataFlowNoDepends(from.expr.span().unwrap()))?;
 
     let upstream = upstream_observable(follows_on);
 
@@ -658,7 +658,7 @@ impl DeclareWidget {
       DeclareField { skip_nc, follows: depends_on, .. }: &DeclareField,
     ) -> Result<()> {
       match (depends_on, skip_nc) {
-        (None, Some(attr)) => Err(DeclareError::UnnecessarySkipNc(attr.span())),
+        (None, Some(attr)) => Err(DeclareError::UnnecessarySkipNc(attr.span().unwrap())),
         _ => Ok(()),
       }
     }
@@ -685,12 +685,26 @@ impl DeclareWidget {
       .filter(|f| f.if_guard.is_some())
       .try_for_each(|f| {
         let w_ref = self.widget_identify();
-        let wrap_ref = ribir_prefix_variable(&f.member, &w_ref.to_string());
-        if ctx.be_followed(&wrap_ref) {
-          let if_guard_span = f.if_guard.as_ref().unwrap().span();
+        let wrap_name = ribir_prefix_variable(&f.member, &w_ref.to_string());
+
+        if ctx.be_followed(&wrap_name) {
+          let if_guard_span = f.if_guard.as_ref().unwrap().span().unwrap();
+          let mut use_spans = vec![];
+          self.recursive_call(|w| {
+            w.all_syntax_fields()
+              .filter_map(|f| f.follows.as_ref())
+              .flat_map(|follows| follows.iter())
+              .filter(|f| f.widget == wrap_name)
+              .for_each(|f| use_spans.extend(f.spans.iter().map(|s| s.unwrap())));
+            Ok(())
+          })?;
+
+          let host_span = w_ref.span().unwrap();
+          let wrap_span = wrap_name.span().unwrap();
           return Err(DeclareError::DependOnWrapWidgetWithIfGuard {
-            wrap_def_pos: [w_ref.span(), wrap_ref.span(), if_guard_span],
-            wrap_name: wrap_ref,
+            wrap_def_spans: [host_span, wrap_span, if_guard_span],
+            use_spans,
+            wrap_name,
           });
         }
         Ok(())
@@ -723,7 +737,7 @@ pub(crate) fn declare_func_macro(input: TokenStream) -> TokenStream {
   let tokens = declare.gen_tokens(&mut ctx).unwrap_or_else(|err| {
     // forbid warning.
     ctx.forbid_warnings(true);
-    err.into_compile_error(&declare)
+    err.into_compile_error()
   });
   ctx.emit_unused_id_warning();
 
