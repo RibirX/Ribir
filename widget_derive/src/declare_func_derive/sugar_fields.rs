@@ -32,7 +32,7 @@ use crate::{
 };
 
 use super::{
-  declare_visit_mut::DeclareCtx, ribir_suffix_variable, widget_def_variable, WidgetFollowPart,
+  declare_visit_mut::DeclareCtx, kw, ribir_suffix_variable, widget_def_variable, WidgetFollowPart,
 };
 use super::{DeclareField, WidgetFollows};
 
@@ -119,6 +119,8 @@ macro_rules! fields_sugar_def {
     }
 
     impl SugarFields {
+      pub const BUILTIN_LISTENERS:  [&'static str; 16] = [$(stringify!($listeners)),*];
+      pub const BUILTIN_DATA_ATTRS:  [&'static str; 5] = [$(stringify!($attrs)),*];
 
       pub fn assign_field(&mut self, f: DeclareField) -> Result<Option<DeclareField>> {
         $(
@@ -157,6 +159,8 @@ macro_rules! fields_sugar_def {
         )*
       }
 
+
+
       pub fn listeners_iter(&self) -> impl Iterator<Item = &DeclareField> {
         vec![$(self.$listeners.as_ref(),)*]
         .into_iter()
@@ -175,29 +179,27 @@ macro_rules! fields_sugar_def {
         .filter_map(|v| v)
       }
 
-      pub fn field_belong_widget(mem: &Member) -> Option<Ident> {
-        match mem {
-          Member::Named(name) => {
-            if DECORATION_FIELDS.iter().find(|f| name == f).is_some() {
-              Some(Ident::new(DECORATION, mem.span()))
-            } else {
-              match name.to_string().as_str() {
-                $(stringify!($w_wrap) => Some(name.clone()),)*
-                _ => None
+      pub fn wrap_widget_from_field_name(name: &Ident) -> Option<Ident> {
+        if DECORATION_FIELDS.iter().find(|f| name == f).is_some() {
+          Some(Ident::new(DECORATION, name.span()))
+        } else {
+          match name.to_string().as_str() {
+            $(stringify!($w_wrap) => Some(name.clone()),)*
+            _ => None
           }
         }
+      }
 
+      pub fn wrap_widget_from_member(mem: &Member) -> Option<Ident> {
+        match mem {
+          Member::Named(name) => {
+            Self::wrap_widget_from_field_name(name)
           }
           Member::Unnamed(_) => None,
         }
       }
     }
   }
-}
-pub mod kw {
-  syn::custom_keyword!(id);
-  syn::custom_keyword!(dataflows);
-  syn::custom_keyword!(skip_nc);
 }
 
 include!("./sugar_fields_struct.rs");

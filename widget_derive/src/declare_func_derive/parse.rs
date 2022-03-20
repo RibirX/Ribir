@@ -27,7 +27,6 @@
 //!
 //! DataFlowExpr: Expr ～> Expr  | Expr < Expr
 //! ```
-
 use super::*;
 use syn::{
   bracketed,
@@ -42,21 +41,6 @@ const CTX_DEFAULT_NAME: &str = "ctx";
 
 impl Parse for DeclareMacro {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    fn parse_data_flows(input: ParseStream) -> syn::Result<Punctuated<DataFlow, Token![;]>> {
-      if input.is_empty() {
-        return Ok(<_>::default());
-      }
-      let lookahead = input.lookahead1();
-      if lookahead.peek(kw::dataflows) && input.peek2(token::Brace) {
-        input.parse::<kw::dataflows>()?;
-        let content;
-        syn::braced!(content in input);
-        Punctuated::parse_terminated(&content)
-      } else {
-        Err(lookahead.error())
-      }
-    }
-
     let ctx = if !input.peek2(token::Brace) {
       let ctx = input.parse()?;
       input.parse::<token::Comma>()?;
@@ -64,13 +48,34 @@ impl Parse for DeclareMacro {
     } else {
       Ident::new(CTX_DEFAULT_NAME, Span::call_site())
     };
-    let res = Self {
-      ctx_name: ctx,
-      widget: input.parse()?,
-      data_flows: parse_data_flows(input)?,
-    };
 
-    Ok(res)
+    let widget = input.parse()?;
+
+    let mut dataflows = None;
+    let mut animations = None;
+    loop {
+      if input.is_empty() {
+        break;
+      }
+      let lookahead = input.lookahead1();
+      if lookahead.peek(kw::dataflows) && input.peek2(token::Brace) {
+        input.parse::<kw::dataflows>()?;
+        let content;
+        syn::braced!(content in input);
+        dataflows = Some(Punctuated::parse_terminated(&content)?);
+      } else if lookahead.peek(kw::animations) && input.peek2(token::Brace) {
+        animations = Some(input.parse()?);
+      } else {
+        Err(lookahead.error())?
+      }
+    }
+
+    Ok(Self {
+      ctx_name: ctx,
+      widget,
+      dataflows,
+      animations,
+    })
   }
 }
 

@@ -25,6 +25,7 @@
     "multisampled",
     "multiview",
     "paren",
+    "punct",
     "retessellate",
     "rpass",
     "rustybuzz",

@@ -60,3 +60,30 @@ pub trait TickerProvider {
 
   fn ticker_ctrl(&mut self, duration: Duration) -> Box<dyn TickerAnimationCtrl>;
 }
+
+/// AnimateState is the bridge of animate and widgets states. It tell animate
+/// where it starts and ends, and how to write back the progress.
+pub struct AnimateState<I, T, S> {
+  pub state_from: I,
+  pub state_to: T,
+  pub state_writer: S,
+}
+
+impl<I, S, T, V> AnimateState<I, T, S>
+where
+  I: Fn() -> V,
+  T: Fn() -> V,
+  S: Fn(V),
+{
+  /// When a animate trigger, where it the state starts.
+  #[inline]
+  pub fn animate_from_state(&self) -> V { (self.state_from)() }
+
+  /// When a animate trigger, where it the state ends.
+  #[inline]
+  pub fn animate_end_state(&self) -> V { (self.state_to)() }
+
+  /// Write back the state.
+  #[inline]
+  pub fn write_state(&self, v: V) { (self.state_writer)(v) }
+}
