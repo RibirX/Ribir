@@ -1,4 +1,4 @@
-use crate::declare_func_derive::{DeclareCtx, DeclareMacro, FollowOn};
+use crate::declare_func_derive::{DeclareMacro, FollowOn};
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 
@@ -31,21 +31,13 @@ pub enum DeclareError {
 pub type Result<T> = std::result::Result<T, DeclareError>;
 
 impl DeclareError {
-  pub fn into_compile_error(self, ctx: &DeclareCtx, declare: &DeclareMacro) -> TokenStream {
-    self.error_emit(ctx, declare);
+  pub fn into_compile_error(self, declare: &DeclareMacro) -> TokenStream {
+    self.error_emit(declare);
     // A Valid widget return to avoid compile noise when error occur.
-    quote! {{
-      struct __Tmp;
-      impl CombinationWidget for __Tmp {
-        fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-          unreachable!();
-          }
-      }
-      __Tmp.box_it()
-    }}
+    quote! {}
   }
 
-  pub fn error_emit(&self, ctx: &DeclareCtx, declare: &DeclareMacro) {
+  pub fn error_emit(&self, declare: &DeclareMacro) {
     let mut diagnostic = Diagnostic::new(Level::Error, "");
     match self {
       DeclareError::DuplicateID([id1, id2]) => {
@@ -57,7 +49,7 @@ impl DeclareError {
         ));
       }
       DeclareError::CircleInit(path) => {
-        let (msg, spans, note_spans) = path_info(path, ctx);
+        let (msg, spans, note_spans) = path_info(path);
         let msg = format!("Can't init widget because circle follow: {}", msg);
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);
@@ -68,7 +60,7 @@ impl DeclareError {
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::CircleFollow(path) => {
-        let (msg, spans, note_spans) = path_info(path, ctx);
+        let (msg, spans, note_spans) = path_info(path);
         let msg = format!(
           "Circle follow will cause infinite state change trigger: {}",
           msg
@@ -121,19 +113,15 @@ impl DeclareError {
 }
 
 // return a tuple compose by the string display of path, the path follow spans
-// and the spans of will `#[skip_nc]` can add.
-fn path_info(
-  path: &[FollowInfo],
-  ctx: &DeclareCtx,
-) -> (String, Vec<proc_macro::Span>, Vec<proc_macro::Span>) {
-  let path = path.iter().map(|FollowInfo { widget, member, on }| {
-    let widget = ctx.widget_name_to_id(widget);
-    (widget, member, on)
-  });
+// and the spans of where `#[skip_nc]` can be added.
+fn path_info(path: &[FollowInfo]) -> (String, Vec<proc_macro::Span>, Vec<proc_macro::Span>) {
+  let path = path
+    .iter()
+    .map(|FollowInfo { widget, member, on }| (widget, member, on));
   let msg = path
     .clone()
     .map(|(widget, member, on)| {
-      let on_widget = ctx.widget_name_to_id(&on.widget);
+      let on_widget = &on.widget;
       if let Some(m) = member {
         format!("{}.{} ～> {} ", widget, m, on_widget)
       } else {
@@ -144,18 +132,12 @@ fn path_info(
     .join(", ");
 
   let spans = path.clone().fold(vec![], |mut res, (widget, member, on)| {
-    // extra add the widget define position, tell user will the id define.
-    let src_def = ctx
-      .named_widgets
-      .get(widget)
-      .expect("id must in named widgets");
-    res.push(src_def.span().unwrap());
-
     res.push(widget.span().unwrap());
     if let Some(m) = member {
       res.push(m.span().unwrap());
     }
 
+    res.push(on.widget.span().unwrap());
     let t_spans = on.spans.iter().map(|s| s.unwrap());
     res.extend(t_spans);
     res

@@ -10,7 +10,7 @@ pub struct FollowOnVec(Box<[FollowOn]>);
 #[derive(Clone, Debug)]
 pub struct FollowOn {
   pub widget: Ident,
-  pub spans: Box<[Span]>,
+  pub spans: Vec<Span>,
 }
 
 #[derive(Clone)]

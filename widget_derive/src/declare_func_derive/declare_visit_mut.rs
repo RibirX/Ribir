@@ -23,7 +23,9 @@ pub struct DeclareCtx {
   be_followed: HashMap<Ident, ReferenceInfo>,
   analyze_stack: Vec<Vec<LocalVariable>>,
   forbid_warnings: bool,
-  widget_name_to_id: HashMap<Ident, Ident>,
+  /// Some wrap widget (like margin, padding) implicit defined by user, shared
+  /// the `id` with host widget in user perspective.
+  user_perspective_name: HashMap<Ident, Ident>,
   follow_scopes: Vec<bool>,
   // tmp code
   pub ctx_name: Ident,
@@ -83,7 +85,7 @@ impl VisitMut for DeclareCtx {
         let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
         *f_expr.base = parse_quote! { #wrap_name };
         self
-          .widget_name_to_id
+          .user_perspective_name
           .insert(wrap_name.clone(), name.clone());
         self.add_follow(wrap_name);
         self.add_reference(name, ReferenceInfo::WrapWidgetRef);
@@ -223,7 +225,7 @@ impl DeclareCtx {
     let tokens = declare.gen_tokens(self).unwrap_or_else(|err| {
       // forbid warning.
       self.forbid_warnings(true);
-      err.into_compile_error(self, &declare)
+      err.into_compile_error(&declare)
     });
     self.pop_follow_scope();
 
@@ -337,8 +339,8 @@ impl DeclareCtx {
       .unwrap_or(false)
   }
 
-  pub fn widget_name_to_id<'a>(&'a self, name: &'a Ident) -> &'a Ident {
-    self.widget_name_to_id.get(name).unwrap_or(name)
+  pub fn user_perspective_name(&self, name: &Ident) -> Option<&Ident> {
+    self.user_perspective_name.get(name)
   }
 
   pub fn take_current_follows(&mut self) -> Option<FollowOnVec> {
@@ -435,7 +437,7 @@ impl Default for DeclareCtx {
       be_followed: Default::default(),
       analyze_stack: Default::default(),
       forbid_warnings: Default::default(),
-      widget_name_to_id: Default::default(),
+      user_perspective_name: Default::default(),
       follow_scopes: Default::default(),
       ctx_name: Ident::new("tmp", Span::call_site()),
     }
