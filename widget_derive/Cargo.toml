@@ -13,6 +13,7 @@ proc-macro = true
 lazy_static = "1.4.0"
 proc-macro2 = "1.0.26"
 quote = "1.0.9"
+smallvec = "1.8.0"
 
 [dev-dependencies]
 ribir = {path = "../core"}
