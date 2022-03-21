@@ -14,8 +14,8 @@ use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident};
 const DECLARE_MACRO_NAME: &str = "declare";
 
 pub struct DeclareCtx {
-  // the key is the widget name which depends to the value
-  pub named_widgets: HashSet<Ident>,
+  /// All name defined in `declare!` by `id`.
+  pub named_objects: HashSet<Ident>,
   pub current_follows: HashMap<Ident, Vec<Span>>,
   // Key is the name of widget which has been depended by other, and value is a bool represent if
   // it's depended directly or just be depended by its wrap widget, if guard or child gen
@@ -220,7 +220,7 @@ impl VisitMut for DeclareCtx {
 impl DeclareCtx {
   fn extend_declare_macro_to_expr(&mut self, tokens: TokenStream) -> Expr {
     let mut declare: DeclareMacro = syn::parse(tokens).expect("extend declare macro failed!");
-    let named = self.named_widgets.clone();
+    let named = self.named_objects.clone();
     self.save_follow_scope(true);
     let tokens = declare.gen_tokens(self).unwrap_or_else(|err| {
       // forbid warning.
@@ -231,10 +231,10 @@ impl DeclareCtx {
 
     // trigger warning and restore named widget.
     named.iter().for_each(|k| {
-      self.named_widgets.remove(k);
+      self.named_objects.remove(k);
     });
     self.emit_unused_id_warning();
-    self.named_widgets = named;
+    self.named_objects = named;
 
     parse_quote!(#tokens)
   }
@@ -312,14 +312,15 @@ impl DeclareCtx {
 }
 
 impl DeclareCtx {
-  pub fn id_collect(&mut self, widget: &DeclareWidget) -> super::Result<()> {
-    widget.recursive_call(|w| {
+  pub fn id_collect(&mut self, d: &DeclareMacro) -> super::Result<()> {
+    if let Some(animations) = d.animations.as_ref() {
+      animations
+        .object_names_iter()
+        .try_for_each(|name| self.add_named_object(name))?;
+    }
+    d.widget.recursive_call(|w| {
       if let Some(Id { name, .. }) = w.named.as_ref() {
-        if let Some(old) = self.named_widgets.get(name) {
-          return Err(DeclareError::DuplicateID([(*old).clone(), name.clone()]));
-        } else {
-          self.named_widgets.insert(name.clone());
-        }
+        self.add_named_object(name)?;
       }
       Ok(())
     })
@@ -354,7 +355,7 @@ impl DeclareCtx {
       return;
     }
     self
-      .named_widgets
+      .named_objects
       .iter()
       .filter(|k| !self.be_followed.contains_key(k) && !k.to_string().starts_with('_'))
       .for_each(|id| {
@@ -387,7 +388,7 @@ impl DeclareCtx {
       .flat_map(|local| local.iter().rev())
       .find(|v| &v.name == ident)
       .and_then(|v| v.alias_of_name.as_ref())
-      .or_else(|| self.named_widgets.contains(ident).then(|| ident))
+      .or_else(|| self.named_objects.contains(ident).then(|| ident))
   }
 
   fn expr_find_name_widget<'a>(&'a self, expr: &'a Expr) -> Option<&'a Ident> {
@@ -429,12 +430,21 @@ impl DeclareCtx {
       _ => {}
     }
   }
+
+  fn add_named_object(&mut self, name: &Ident) -> super::Result<()> {
+    if let Some(old) = self.named_objects.get(name) {
+      Err(DeclareError::DuplicateID([(*old).clone(), name.clone()]))
+    } else {
+      self.named_objects.insert(name.clone());
+      Ok(())
+    }
+  }
 }
 
 impl Default for DeclareCtx {
   fn default() -> Self {
     Self {
-      named_widgets: Default::default(),
+      named_objects: Default::default(),
       current_follows: Default::default(),
       be_followed: Default::default(),
       analyze_stack: Default::default(),

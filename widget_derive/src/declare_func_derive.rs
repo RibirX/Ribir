@@ -150,7 +150,7 @@ impl<'a> CircleCheckStack<'a> {
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
         let widget = ctx
-          .named_widgets
+          .named_objects
           .get(&widget)
           .expect("id must in named widgets")
           .clone();
@@ -170,12 +170,12 @@ impl DeclareMacro {
     }
 
     ctx.ctx_name = self.ctx_name.clone();
-    ctx.id_collect(&self.widget)?;
+    ctx.id_collect(self)?;
     ctx.visit_declare_macro_mut(self);
 
     self.before_generate_check(ctx)?;
     let mut tokens = quote! {};
-    if !ctx.named_widgets.is_empty() {
+    if !ctx.named_objects.is_empty() {
       let follows = self.analyze_widget_follows();
       let _init_circle_check = Self::circle_check(&follows, |stack| {
         Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
@@ -203,7 +203,7 @@ impl DeclareMacro {
         }
       }
 
-      let (mut named_widgets_def, compose) = self.named_widgets_def_tokens(ctx)?;
+      let (mut named_widgets_def, compose) = self.named_objects_def_tokens(ctx)?;
 
       Self::deep_follow_iter(&follows, |name| {
         tokens.extend(named_widgets_def.remove(name));
@@ -310,7 +310,7 @@ impl DeclareMacro {
   }
 
   // return the key-value map of the named widget define tokens.
-  fn named_widgets_def_tokens(
+  fn named_objects_def_tokens(
     &self,
     ctx: &DeclareCtx,
   ) -> Result<(HashMap<Ident, TokenStream2>, TokenStream2)> {

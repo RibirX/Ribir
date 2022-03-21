@@ -45,8 +45,8 @@ struct Animate {
   animate_token: kw::Animate,
   brace_token: token::Brace,
   id: Option<Id>,
-  from: Option<StateField>,
-  transition: Option<SimpleField>,
+  from: StateField,
+  transition: TransitionField,
 }
 
 mod animate_kw {
@@ -62,6 +62,16 @@ struct StateField {
   from_token: animate_kw::from,
   colon_token: Option<token::Colon>,
   expr: Option<StateExpr>,
+}
+
+enum TransitionExpr {
+  Transition(Transition),
+  Expr(syn::Expr),
+}
+struct TransitionField {
+  transition_token: animate_kw::transition,
+  colon_token: Option<token::Colon>,
+  expr: Option<TransitionExpr>,
 }
 
 struct Trigger {
@@ -235,14 +245,17 @@ impl Parse for Transition {
 
 impl Parse for Animate {
   fn parse(input: ParseStream) -> syn::Result<Self> {
+    let animate_token: kw::Animate = input.parse()?;
     let content;
-    let mut animate = Animate {
-      animate_token: input.parse()?,
-      brace_token: braced!(content in input),
-      id: None,
-      from: None,
-      transition: None,
-    };
+    let brace_token = braced!(content in input);
+    #[derive(Default)]
+    struct Fields {
+      id: Option<Id>,
+      from: Option<StateField>,
+      transition: Option<TransitionField>,
+    }
+
+    let mut fields = Fields::default();
 
     loop {
       if content.is_empty() {
@@ -251,13 +264,13 @@ impl Parse for Animate {
       let lk = content.lookahead1();
       if lk.peek(kw::id) {
         let id = content.parse()?;
-        let _: Option<Id> = assign_uninit_field!(animate.id, id)?;
+        let _: Option<Id> = assign_uninit_field!(fields.id, id)?;
       } else if lk.peek(animate_kw::from) {
         let from = content.parse()?;
-        let _: Option<StateField> = assign_uninit_field!(animate.from, from)?;
+        let _: Option<StateField> = assign_uninit_field!(fields.from, from)?;
       } else if lk.peek(animate_kw::transition) {
         let transition = content.parse()?;
-        let _: Option<SimpleField> = assign_uninit_field!(animate.transition, transition)?;
+        let _: Option<SimpleField> = assign_uninit_field!(fields.transition, transition)?;
       } else {
         Err(lk.error())?;
       }
@@ -267,7 +280,18 @@ impl Parse for Animate {
       }
     }
 
-    Ok(animate)
+    let Fields { id, from, transition } = fields;
+    let from = from.ok_or_else(|| Error::new(animate_token.span(), "miss `from` field."))?;
+    let transition =
+      transition.ok_or_else(|| Error::new(animate_token.span(), "miss `transition` field."))?;
+
+    Ok(Animate {
+      animate_token,
+      brace_token,
+      id,
+      from,
+      transition,
+    })
   }
 }
 
@@ -302,6 +326,29 @@ impl Parse for StateExpr {
       StateExpr::State(input.parse()?)
     } else {
       StateExpr::Expr(input.parse()?)
+    };
+    Ok(expr)
+  }
+}
+
+impl Parse for TransitionField {
+  fn parse(input: ParseStream) -> Result<Self> {
+    let transition_token = input.parse()?;
+    let colon_token: Option<_> = input.parse()?;
+    let mut expr = None;
+    if colon_token.is_some() {
+      expr = Some(input.parse()?);
+    }
+    Ok(TransitionField { transition_token, colon_token, expr })
+  }
+}
+
+impl Parse for TransitionExpr {
+  fn parse(input: ParseStream) -> Result<Self> {
+    let expr = if input.peek(kw::Transition) {
+      TransitionExpr::Transition(input.parse()?)
+    } else {
+      TransitionExpr::Expr(input.parse()?)
     };
     Ok(expr)
   }
@@ -386,6 +433,23 @@ impl ToTokens for StateExpr {
     match self {
       StateExpr::State(s) => s.to_tokens(tokens),
       StateExpr::Expr(e) => e.to_tokens(tokens),
+    }
+  }
+}
+
+impl ToTokens for TransitionField {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    self.transition_token.to_tokens(tokens);
+    self.colon_token.to_tokens(tokens);
+    self.expr.to_tokens(tokens);
+  }
+}
+
+impl ToTokens for TransitionExpr {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    match self {
+      TransitionExpr::Transition(t) => t.to_tokens(tokens),
+      TransitionExpr::Expr(e) => e.to_tokens(tokens),
     }
   }
 }
@@ -478,5 +542,42 @@ impl ToTokens for SimpleField {
       colon.to_tokens(tokens);
       self.expr.to_tokens(tokens);
     }
+  }
+}
+
+impl Animations {
+  pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
+    let Self {
+      animates_def,
+      states_def,
+      transitions_def,
+      triggers,
+      ..
+    } = self;
+
+    animates_def
+      .iter()
+      .map(|a| &a.id.as_ref().unwrap().name)
+      .chain(states_def.iter().map(|s| &s.id.as_ref().unwrap().name))
+      .chain(transitions_def.iter().map(|t| &t.id.as_ref().unwrap().name))
+      .chain(triggers.iter().flat_map(|t| {
+        let ids = match &t.expr {
+          AnimateExpr::Animate(a) => {
+            let animate_id = a.id.as_ref();
+            let state_id = a.from.expr.as_ref().and_then(|e| match e {
+              StateExpr::State(s) => s.id.as_ref(),
+              StateExpr::Expr(_) => None,
+            });
+            let transition_id = a.transition.expr.as_ref().and_then(|t| match t {
+              TransitionExpr::Transition(t) => t.id.as_ref(),
+              TransitionExpr::Expr(_) => None,
+            });
+            [animate_id, state_id, transition_id]
+          }
+          AnimateExpr::Transition(Transition { id, .. }) => [id.as_ref(), None, None],
+          _ => [None, None, None],
+        };
+        ids.into_iter().filter_map(|id| id.map(|id| &id.name))
+      }))
   }
 }
