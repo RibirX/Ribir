@@ -3,7 +3,7 @@ use crate::error::DeclareError;
 use super::{
   ribir_suffix_variable,
   sugar_fields::{Id, SugarFields},
-  DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOnVec,
+  DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOn,
 };
 use proc_macro::{Diagnostic, Level, TokenStream};
 use proc_macro2::Span;
@@ -346,8 +346,17 @@ impl DeclareCtx {
     self.user_perspective_name.get(name)
   }
 
-  pub fn take_current_follows(&mut self) -> Option<FollowOnVec> {
-    (!self.current_follows.is_empty()).then(|| self.current_follows.drain().into())
+  pub fn take_current_follows(&mut self) -> Option<Vec<FollowOn>> {
+    (!self.current_follows.is_empty()).then(|| {
+      self
+        .current_follows
+        .drain()
+        .map(|(widget, spans)| FollowOn {
+          widget,
+          spans: spans.into_iter().collect(),
+        })
+        .collect()
+    })
   }
 
   pub fn emit_unused_id_warning(&self) {

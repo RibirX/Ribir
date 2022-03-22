@@ -1,0 +1,47 @@
+error: Can't init widget because circle follow: a.cursor ～> b , b.cursor ～> a
+  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:6:11
+   |
+6  |       id: a,
+   |           ^
+7  |       size: Size::zero(),
+8  |       cursor: b.cursor,
+   |       ^^^^^^  ^
+9  |       SizedBox {
+10 |         id: b,
+   |             ^
+11 |         size: Size::zero(),
+12 |         cursor: if a.size.area() > 0 {
+   |         ^^^^^^     ^
+   |
+note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
+  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:8:7
+   |
+8  |       cursor: b.cursor,
+   |       ^^^^^^
+...
+12 |         cursor: if a.size.area() > 0 {
+   |         ^^^^^^
+
+error: Can't init widget because circle follow: a.cursor ～> b , b.cursor ～> a
+  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:25:11
+   |
+25 |       id: a,
+   |           ^
+26 |       size: Size::zero(),
+27 |       cursor: b.cursor,
+   |       ^^^^^^  ^
+28 |       SizedBox {
+29 |         id: b,
+   |             ^
+30 |         size: Size::zero(),
+31 |         cursor: a.cursor
+   |         ^^^^^^  ^
+   |
+note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
+  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:27:7
+   |
+27 |       cursor: b.cursor,
+   |       ^^^^^^
+...
+31 |         cursor: a.cursor
+   |         ^^^^^^

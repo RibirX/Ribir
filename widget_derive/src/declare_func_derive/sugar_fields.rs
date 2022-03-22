@@ -26,15 +26,12 @@ macro_rules! assign_uninit_field {
 }
 pub(crate) use assign_uninit_field;
 
-use crate::{
-  declare_func_derive::{widget_gen::WidgetGen, FieldFollows},
-  error::DeclareError,
-};
+use crate::{declare_func_derive::widget_gen::WidgetGen, error::DeclareError};
 
 use super::{
-  declare_visit_mut::DeclareCtx, kw, ribir_suffix_variable, widget_def_variable, WidgetFollowPart,
+  declare_visit_mut::DeclareCtx, kw, ribir_suffix_variable, widget_def_variable, FollowPart,
 };
-use super::{DeclareField, WidgetFollows};
+use super::{DeclareField, Follows};
 
 pub struct Id {
   pub id_token: kw::id,
@@ -261,28 +258,29 @@ impl SugarFields {
   pub fn collect_wrap_widget_follows<'a>(
     &'a self,
     host: &Ident,
-    follows_info: &mut BTreeMap<Ident, WidgetFollows<'a>>,
+    follows_info: &mut BTreeMap<Ident, Follows<'a>>,
   ) {
     let mut copy_follows = |f: Option<&'a DeclareField>| {
-      if let Some(follows) = f.and_then(FieldFollows::clone_from) {
-        let name = ribir_suffix_variable(host, &follows.field.member.to_string());
-        let part = WidgetFollowPart::Field(follows);
-        follows_info.insert(name, WidgetFollows::from_single_part(part));
+      if let Some(part) = f.and_then(FollowPart::from_widget_field) {
+        let name = ribir_suffix_variable(host, &f.unwrap().member.to_string());
+        follows_info.insert(name, Follows::from_single_part(part));
       }
     };
 
     copy_follows(self.margin.as_ref());
     copy_follows(self.padding.as_ref());
 
-    let bg_follows = self.background.as_ref().and_then(FieldFollows::clone_from);
-    let border_follows = self.border.as_ref().and_then(FieldFollows::clone_from);
-    let radius_follows = self.radius.as_ref().and_then(FieldFollows::clone_from);
+    let bg_follows = self
+      .background
+      .as_ref()
+      .and_then(FollowPart::from_widget_field);
+    let border_follows = self.border.as_ref().and_then(FollowPart::from_widget_field);
+    let radius_follows = self.radius.as_ref().and_then(FollowPart::from_widget_field);
 
-    let deco_follows: WidgetFollows = bg_follows
+    let deco_follows: Follows = bg_follows
       .into_iter()
       .chain(border_follows.into_iter())
       .chain(radius_follows.into_iter())
-      .map(WidgetFollowPart::Field)
       .collect();
 
     if !deco_follows.is_empty() {
@@ -295,7 +293,7 @@ impl SugarFields {
     if let Some(DeclareField { member, follows: Some(follows), .. }) = self.key.as_ref() {
       Err(DeclareError::KeyDependsOnOther {
         key: member.span().unwrap(),
-        depends_on: follows.names().map(|k| k.span().unwrap()).collect(),
+        depends_on: follows.iter().map(|fo| fo.widget.span().unwrap()).collect(),
       })
     } else {
       Ok(())

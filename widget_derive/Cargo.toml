@@ -10,10 +10,10 @@ version = "0.1.0"
 proc-macro = true
 
 [dependencies]
+ahash = "0.7.6"
 lazy_static = "1.4.0"
-proc-macro2 = "1.0.26"
-quote = "1.0.9"
-smallvec = "1.8.0"
+proc-macro2 = "1.0.36"
+quote = "1.0.16"
 
 [dev-dependencies]
 ribir = {path = "../core"}
@@ -21,7 +21,7 @@ trybuild = "1.0.53"
 winit = "0.26.1"
 
 [build-dependencies]
-proc-macro2 = "1.0.26"
+proc-macro2 = "1.0.36"
 syn = "1.0.83"
 
 [dependencies.syn]
