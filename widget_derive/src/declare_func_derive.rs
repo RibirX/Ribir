@@ -57,24 +57,24 @@ pub struct DeclareWidget {
   children: Vec<Child>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SkipNcAttr {
   pound_token: token::Pound,
   bracket_token: token::Bracket,
   skip_nc_meta: kw::skip_nc,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DeclareField {
   skip_nc: Option<SkipNcAttr>,
   pub member: Ident,
   pub if_guard: Option<IfGuard>,
   pub colon_token: Option<Token![:]>,
   pub expr: Expr,
-  pub follows: Option<FollowOnVec>,
+  pub follows: Option<Vec<FollowOn>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IfGuard {
   pub if_token: Token![if],
   pub cond: Expr,
@@ -85,10 +85,13 @@ mod ct {
   syn::custom_punctuation!(RightArrow, ~>);
 }
 
+#[derive(Debug)]
 pub struct DataFlowExpr {
   expr: Expr,
-  follows: Option<FollowOnVec>,
+  follows: Option<Vec<FollowOn>>,
 }
+
+#[derive(Debug)]
 pub struct DataFlow {
   skip_nc: Option<SkipNcAttr>,
   from: DataFlowExpr,
@@ -123,10 +126,10 @@ impl DataFlow {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct CircleCheckStack<'a> {
   pub widget: &'a Ident,
-  pub origin: FollowOrigin<'a>,
+  pub origin: FollowPlace<'a>,
   pub on: &'a FollowOn,
 }
 
@@ -146,7 +149,7 @@ impl<'a> CircleCheckStack<'a> {
       .unwrap_or_else(|| &self.widget);
 
     let (widget, member) = match self.origin {
-      FollowOrigin::Field(f) => {
+      FollowPlace::Field(f) => {
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
         let widget = ctx
@@ -156,10 +159,23 @@ impl<'a> CircleCheckStack<'a> {
           .clone();
         (widget, Some(f.member.clone()))
       }
-      FollowOrigin::DataFlow(_) => (widget.clone(), None),
+      FollowPlace::DataFlow(_) => (widget.clone(), None),
     };
 
     FollowInfo { widget, member, on }
+  }
+}
+
+fn is_widget_attr(origin: FollowPlace) -> bool {
+  if let FollowPlace::Field(f) = origin {
+    SugarFields::BUILTIN_LISTENERS
+      .iter()
+      .any(|name| f.member == name)
+      || SugarFields::BUILTIN_DATA_ATTRS
+        .iter()
+        .any(|name| f.member == name)
+  } else {
+    false
   }
 }
 
@@ -178,7 +194,18 @@ impl DeclareMacro {
     if !ctx.named_objects.is_empty() {
       let follows = self.analyze_widget_follows();
       let _init_circle_check = Self::circle_check(&follows, |stack| {
-        Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
+        let head_is_attr = is_widget_attr(stack[0].origin);
+        // fixme: we allow widget attr dependence widget self when init, but not support
+        // indirect follow now.
+        // `!is_widget_attr(stack.last().unwrap().on.widget.spans.all_widget_field)`
+        // unit case `fix_attr_indirect_follow_host_fail.rs`, update its stderr if
+        // fixed.
+        let tail_on_widget = head_is_attr && false;
+        if head_is_attr && stack.len() == 1 || tail_on_widget {
+          Ok(())
+        } else {
+          Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
+        }
       })?;
 
       // data flow should not effect the named widget order, and allow circle
@@ -189,11 +216,9 @@ impl DeclareMacro {
           let mut follows = follows.clone();
           self.analyze_data_flow_follows(&mut follows);
           let _circle_follows_check = Self::circle_check(&follows, |stack| {
-            if stack.iter().any(|s| -> bool {
-              match &s.origin {
-                FollowOrigin::Field(f) => f.skip_nc.is_some(),
-                FollowOrigin::DataFlow(df) => df.skip_nc.is_some(),
-              }
+            if stack.iter().any(|s| match &s.origin {
+              FollowPlace::Field(f) => f.skip_nc.is_some(),
+              FollowPlace::DataFlow(df) => df.skip_nc.is_some(),
             }) {
               Ok(())
             } else {
@@ -242,36 +267,26 @@ impl DeclareMacro {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  fn analyze_widget_follows(&self) -> BTreeMap<Ident, WidgetFollows> {
-    let mut follows: BTreeMap<Ident, WidgetFollows> = BTreeMap::new();
+  fn analyze_widget_follows(&self) -> BTreeMap<Ident, Follows> {
+    let mut follows: BTreeMap<Ident, Follows> = BTreeMap::new();
     self
       .widget
       .recursive_call(|w| {
-        let ref_name = w.widget_identify();
-        w.sugar_fields
-          .collect_wrap_widget_follows(&ref_name, &mut follows);
-
         if w.named.is_some() {
-          let w_follows: WidgetFollows = w
+          let ref_name = w.widget_identify();
+          w.sugar_fields
+            .collect_wrap_widget_follows(&ref_name, &mut follows);
+
+          let w_follows: Follows = w
             .fields
             .iter()
-            .filter_map(FieldFollows::clone_from)
+            .filter_map(FollowPart::from_widget_field)
             .chain(
               w.sugar_fields
                 .normal_attr_iter()
                 .chain(w.sugar_fields.listeners_iter())
-                .filter_map(FieldFollows::clone_from)
-                .filter_map(|mut f_follows| {
-                  let follows = &mut f_follows.follows;
-                  *follows = follows
-                    .iter()
-                    .filter(|f| f.widget != ref_name)
-                    .cloned()
-                    .collect();
-                  (!follows.is_empty()).then(|| f_follows)
-                }),
+                .filter_map(FollowPart::from_widget_field),
             )
-            .map(WidgetFollowPart::Field)
             .collect();
           if !w_follows.is_empty() {
             follows.insert(ref_name, w_follows);
@@ -284,7 +299,7 @@ impl DeclareMacro {
     follows
   }
 
-  fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, WidgetFollows<'a>>) {
+  fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, Follows<'a>>) {
     let dataflows = if let Some(dataflows) = self.dataflows.as_ref() {
       dataflows
     } else {
@@ -292,9 +307,9 @@ impl DeclareMacro {
     };
     dataflows.iter().for_each(|df| {
       if let Some(to) = df.to.follows.as_ref() {
-        let df_follows = DataFlowFollows::clone_from(df);
-        let part = WidgetFollowPart::DataFlow(df_follows);
-        to.names().for_each(|name| {
+        let part = FollowPart::from_data_flow(df);
+        to.iter().for_each(|fo| {
+          let name = &fo.widget;
           if let Some(w_follows) = follows.get_mut(name) {
             *w_follows = w_follows
               .iter()
@@ -302,7 +317,7 @@ impl DeclareMacro {
               .chain(Some(part.clone()).into_iter())
               .collect();
           } else {
-            follows.insert(name.clone(), WidgetFollows::from_single_part(part.clone()));
+            follows.insert(name.clone(), Follows::from_single_part(part.clone()));
           }
         })
       }
@@ -313,8 +328,11 @@ impl DeclareMacro {
   fn named_objects_def_tokens(
     &self,
     ctx: &DeclareCtx,
-  ) -> Result<(HashMap<Ident, TokenStream2>, TokenStream2)> {
-    let mut named_defs = HashMap::new();
+  ) -> Result<(
+    HashMap<Ident, TokenStream2, ahash::RandomState>,
+    TokenStream2,
+  )> {
+    let mut named_defs = HashMap::default();
 
     let mut compose_tokens = quote! {};
     self.widget.recursive_call(|w| {
@@ -334,9 +352,9 @@ impl DeclareMacro {
     Ok((named_defs, compose_tokens))
   }
 
-  fn circle_check<F>(follow_infos: &BTreeMap<Ident, WidgetFollows>, err_detect: F) -> Result<()>
+  fn circle_check<F>(follow_infos: &BTreeMap<Ident, Follows>, err_detect: F) -> Result<()>
   where
-    F: Fn(&Vec<CircleCheckStack>) -> Result<()>,
+    F: Fn(&[CircleCheckStack]) -> Result<()>,
   {
     #[derive(PartialEq, Debug)]
     enum CheckState {
@@ -350,19 +368,19 @@ impl DeclareMacro {
     // return if the widget follow contain circle.
     fn widget_follow_circle_check<'a, F>(
       name: &'a Ident,
-      follow_infos: &'a BTreeMap<Ident, WidgetFollows>,
+      follow_infos: &'a BTreeMap<Ident, Follows>,
       check_info: &mut HashMap<&'a Ident, CheckState>,
       stack: &mut Vec<CircleCheckStack<'a>>,
       err_detect: &F,
     ) -> Result<()>
     where
-      F: Fn(&Vec<CircleCheckStack>) -> Result<()>,
+      F: Fn(&[CircleCheckStack]) -> Result<()>,
     {
-      match check_info.get(&name) {
+      match check_info.get(name) {
         None => {
           if let Some(follows) = follow_infos.get(name) {
-            check_info.insert(name, CheckState::Checking);
             follows.follow_iter().try_for_each(|(origin, on)| {
+              check_info.insert(name, CheckState::Checking);
               stack.push(CircleCheckStack { widget: name, origin, on });
               widget_follow_circle_check(&on.widget, follow_infos, check_info, stack, err_detect)?;
               stack.pop();
@@ -371,11 +389,14 @@ impl DeclareMacro {
             debug_assert_eq!(check_info.get(name), Some(&CheckState::Checking));
             check_info.insert(name, CheckState::Checked);
           };
-          Ok(())
         }
-        Some(CheckState::Checking) => err_detect(stack),
-        Some(CheckState::Checked) => Ok(()),
-      }
+        Some(CheckState::Checking) => {
+          let start = stack.iter().position(|v| v.widget == name).unwrap();
+          err_detect(&stack[start..])?;
+        }
+        Some(CheckState::Checked) => {}
+      };
+      Ok(())
     }
 
     follow_infos.keys().try_for_each(|name| {
@@ -383,23 +404,21 @@ impl DeclareMacro {
     })
   }
 
-  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, WidgetFollows>, mut callback: F) {
-    fn widget_deep_iter<F: FnMut(&Ident)>(
-      name: &Ident,
-      follows: &BTreeMap<Ident, WidgetFollows>,
-      callback: &mut F,
-    ) {
-      if let Some(f) = follows.get(name) {
-        f.follow_iter().for_each(|(_, target)| {
-          widget_deep_iter(&target.widget, follows, callback);
-          callback(&target.widget);
-        });
-      }
-    }
+  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, Follows>, mut callback: F) {
+    // circular may exist widget attr follow widget self to init.
+    let mut stacked = std::collections::HashSet::<_, ahash::RandomState>::default();
 
-    follows
-      .keys()
-      .for_each(|name| widget_deep_iter(name, follows, &mut callback));
+    let mut stack = follows.keys().rev().collect::<Vec<_>>();
+    while let Some(w) = stack.pop() {
+      match follows.get(w) {
+        Some(f) if !stacked.contains(w) => {
+          stack.push(w);
+          stack.extend(f.follow_iter().map(|(_, target)| &target.widget));
+        }
+        _ => callback(w),
+      }
+      stacked.insert(w);
+    }
   }
 
   fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
@@ -559,10 +578,11 @@ impl DeclareWidget {
   }
 }
 
-pub fn upstream_observable(depends_on: &FollowOnVec) -> TokenStream2 {
-  let upstream = depends_on
-    .names()
-    .map(|depend_w| quote! { #depend_w.change_stream() });
+pub fn upstream_observable(depends_on: &[FollowOn]) -> TokenStream2 {
+  let upstream = depends_on.iter().map(|fo| {
+    let depend_w = &fo.widget;
+    quote! { #depend_w.change_stream() }
+  });
 
   if depends_on.len() > 1 {
     quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
