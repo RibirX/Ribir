@@ -14,6 +14,7 @@ pub mod widget;
 pub mod window;
 
 pub mod prelude {
+  pub use crate::animation::*;
   #[doc(no_inline)]
   pub use crate::application::Application;
   #[doc(no_inline)]

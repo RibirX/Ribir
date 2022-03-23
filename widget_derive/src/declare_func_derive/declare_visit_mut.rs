@@ -5,6 +5,7 @@ use super::{
   sugar_fields::{Id, SugarFields},
   DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOn,
 };
+
 use proc_macro::{Diagnostic, Level, TokenStream};
 use proc_macro2::Span;
 use quote::quote;
@@ -26,7 +27,7 @@ pub struct DeclareCtx {
   /// Some wrap widget (like margin, padding) implicit defined by user, shared
   /// the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
-  follow_scopes: Vec<bool>,
+  id_capture_scope: Vec<bool>,
   // tmp code
   pub ctx_name: Ident,
 }
@@ -221,13 +222,16 @@ impl DeclareCtx {
   fn extend_declare_macro_to_expr(&mut self, tokens: TokenStream) -> Expr {
     let mut declare: DeclareMacro = syn::parse(tokens).expect("extend declare macro failed!");
     let named = self.named_objects.clone();
-    self.save_follow_scope(true);
-    let tokens = declare.gen_tokens(self).unwrap_or_else(|err| {
-      // forbid warning.
-      self.forbid_warnings(true);
-      err.into_compile_error()
-    });
-    self.pop_follow_scope();
+
+    let tokens = {
+      let mut ctx = self.borrow_capture_scope(true);
+
+      declare.gen_tokens(&mut *ctx).unwrap_or_else(|err| {
+        // forbid warning.
+        ctx.forbid_warnings(true);
+        err.into_compile_error()
+      })
+    };
 
     // trigger warning and restore named widget.
     named.iter().for_each(|k| {
@@ -248,6 +252,9 @@ impl DeclareCtx {
         .iter_mut()
         .for_each(|df| self.visit_data_flows_mut(df));
     }
+    if let Some(animations) = d.animations.as_mut() {
+      self.visit_animations_mut(animations);
+    }
   }
 
   pub fn visit_data_flows_mut(&mut self, df: &mut DataFlow) {
@@ -260,9 +267,9 @@ impl DeclareCtx {
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
     self.visit_ident_mut(&mut f.member);
     if let Some(if_guard) = f.if_guard.as_mut() {
-      self.save_follow_scope(false);
-      self.visit_expr_mut(&mut if_guard.cond);
-      self.pop_follow_scope()
+      self
+        .borrow_capture_scope(false)
+        .visit_expr_mut(&mut if_guard.cond);
     }
     self.visit_expr_mut(&mut f.expr);
 
@@ -298,9 +305,7 @@ impl DeclareCtx {
       super::Child::Declare(d) => visit_self_only(d, self),
       super::Child::Expr(expr) => {
         self.stack_push();
-        self.save_follow_scope(false);
-        self.visit_expr_mut(expr);
-        self.pop_follow_scope();
+        self.borrow_capture_scope(false).visit_expr_mut(expr);
         self.stack_pop();
       }
     })
@@ -380,16 +385,16 @@ impl DeclareCtx {
 
   pub fn forbid_warnings(&mut self, b: bool) { self.forbid_warnings = b; }
 
-  fn save_follow_scope(&mut self, follow_scope: bool) { self.follow_scopes.push(follow_scope); }
-
-  fn pop_follow_scope(&mut self) { self.follow_scopes.pop(); }
+  pub fn borrow_capture_scope(&mut self, capture_scope: bool) -> CaptureScopeGuard {
+    CaptureScopeGuard::new(self, capture_scope)
+  }
 
   fn stack_push(&mut self) { self.analyze_stack.push(vec![]); }
 
   fn stack_pop(&mut self) { self.analyze_stack.pop(); }
 
   // return the name of widget that `ident` point to if it's have.
-  fn find_named_widget<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
+  pub fn find_named_widget<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
     self
       .analyze_stack
       .iter()
@@ -410,14 +415,14 @@ impl DeclareCtx {
     }
   }
 
-  fn add_follow(&mut self, name: Ident) {
+  pub fn add_follow(&mut self, name: Ident) {
     self
       .current_follows
       .entry(name.clone())
       .or_default()
       .push(name.span());
 
-    let in_follow_scope = self.follow_scopes.last().cloned().unwrap_or(true);
+    let in_follow_scope = self.id_capture_scope.last().cloned().unwrap_or(true);
     self.add_reference(
       name,
       if in_follow_scope {
@@ -459,8 +464,33 @@ impl Default for DeclareCtx {
       analyze_stack: Default::default(),
       forbid_warnings: Default::default(),
       user_perspective_name: Default::default(),
-      follow_scopes: Default::default(),
+      id_capture_scope: Default::default(),
       ctx_name: Ident::new("tmp", Span::call_site()),
     }
   }
+}
+
+pub struct CaptureScopeGuard<'a> {
+  ctx: &'a mut DeclareCtx,
+}
+
+impl<'a> CaptureScopeGuard<'a> {
+  pub fn new(ctx: &'a mut DeclareCtx, follow_scope: bool) -> Self {
+    ctx.id_capture_scope.push(follow_scope);
+    CaptureScopeGuard { ctx }
+  }
+}
+
+impl<'a> Drop for CaptureScopeGuard<'a> {
+  fn drop(&mut self) { self.ctx.id_capture_scope.pop(); }
+}
+
+impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
+  type Target = DeclareCtx;
+
+  fn deref(&self) -> &Self::Target { self.ctx }
+}
+
+impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
+  fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
 }

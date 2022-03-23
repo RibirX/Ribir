@@ -33,6 +33,7 @@ use super::{
 };
 use super::{DeclareField, Follows};
 
+#[derive(Debug)]
 pub struct Id {
   pub id_token: kw::id,
   pub colon_token: Token![:],
