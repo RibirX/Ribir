@@ -45,6 +45,7 @@ impl StatefulCombination for Todos {
 
 fn main() {
   env_logger::init();
+
   let todo = Todos {
     tasks: vec![
       Task {

@@ -263,7 +263,7 @@ fn texture_to_buffer_4_bytes_per_pixel(
 impl WindowSurface {
   pub(crate) fn new(surface: wgpu::Surface, device: &wgpu::Device, size: DeviceSize) -> Self {
     let s_config = wgpu::SurfaceConfiguration {
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
       format: wgpu::TextureFormat::Bgra8UnormSrgb,
       width: size.width,
       height: size.height,

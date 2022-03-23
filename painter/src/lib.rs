@@ -37,3 +37,5 @@ pub type DeviceSize = euclid::Size2D<u32, PhysicUnit>;
 pub type DeviceVector = euclid::Vector2D<u32, PhysicUnit>;
 
 pub use euclid::Transform2D;
+
+pub use lyon_tessellation::{StrokeOptions, LineCap, LineJoin};

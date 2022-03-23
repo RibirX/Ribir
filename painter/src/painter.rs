@@ -308,7 +308,7 @@ impl Painter {
   }
 
   pub fn scale(&mut self, x: f32, y: f32) -> &mut Self {
-    let t = self.get_transform().then_scale(x, y);
+    let t = self.get_transform().pre_scale(x, y);
     self.set_transform(t);
     self
   }
