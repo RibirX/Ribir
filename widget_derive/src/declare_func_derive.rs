@@ -20,6 +20,7 @@ mod parse;
 
 pub use follow_on::*;
 mod variable_names;
+use ahash::RandomState;
 pub use variable_names::*;
 
 pub mod kw {
@@ -159,7 +160,7 @@ impl<'a> CircleCheckStack<'a> {
           .clone();
         (widget, Some(f.member.clone()))
       }
-      FollowPlace::DataFlow(_) => (widget.clone(), None),
+      _ => (widget.clone(), None),
     };
 
     FollowInfo { widget, member, on }
@@ -192,7 +193,7 @@ impl DeclareMacro {
     self.before_generate_check(ctx)?;
     let mut tokens = quote! {};
     if !ctx.named_objects.is_empty() {
-      let follows = self.analyze_widget_follows();
+      let mut follows = self.analyze_object_follows();
       let _init_circle_check = Self::circle_check(&follows, |stack| {
         let head_is_attr = is_widget_attr(stack[0].origin);
         // fixme: we allow widget attr dependence widget self when init, but not support
@@ -208,27 +209,7 @@ impl DeclareMacro {
         }
       })?;
 
-      // data flow should not effect the named widget order, and allow circle
-      // follow with circle. So we clone the follow relationship and individual check
-      // the circle follow error.
-      if let Some(dataflows) = self.dataflows.as_ref() {
-        if !dataflows.is_empty() {
-          let mut follows = follows.clone();
-          self.analyze_data_flow_follows(&mut follows);
-          let _circle_follows_check = Self::circle_check(&follows, |stack| {
-            if stack.iter().any(|s| match &s.origin {
-              FollowPlace::Field(f) => f.skip_nc.is_some(),
-              FollowPlace::DataFlow(df) => df.skip_nc.is_some(),
-            }) {
-              Ok(())
-            } else {
-              Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
-            }
-          })?;
-        }
-      }
-
-      let (mut named_widgets_def, compose) = self.named_objects_def_tokens(ctx)?;
+      let (mut named_widgets_def, children_of_named_objects) = self.named_objects_def_tokens(ctx);
 
       Self::deep_follow_iter(&follows, |name| {
         tokens.extend(named_widgets_def.remove(name));
@@ -237,7 +218,27 @@ impl DeclareMacro {
       named_widgets_def
         .into_values()
         .for_each(|def_tokens| tokens.extend(def_tokens));
-      tokens.extend(compose);
+      tokens.extend(children_of_named_objects);
+
+      // data flow should not effect the named object init order, and we allow circle
+      // follow with skip_nc attribute. So we add the data flow relationship and
+      // individual check the circle follow error.
+      if let Some(dataflows) = self.dataflows.as_ref() {
+        if !dataflows.is_empty() {
+          self.analyze_data_flow_follows(&mut follows);
+          let _circle_follows_check = Self::circle_check(&follows, |stack| {
+            if stack.iter().any(|s| match &s.origin {
+              FollowPlace::Field(f) => f.skip_nc.is_some(),
+              FollowPlace::DataFlow(df) => df.skip_nc.is_some(),
+              _ => false,
+            }) {
+              Ok(())
+            } else {
+              Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
+            }
+          })?;
+        }
+      }
     }
 
     if self.widget.named.is_none() {
@@ -267,7 +268,7 @@ impl DeclareMacro {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  fn analyze_widget_follows(&self) -> BTreeMap<Ident, Follows> {
+  fn analyze_object_follows(&self) -> BTreeMap<Ident, Follows> {
     let mut follows: BTreeMap<Ident, Follows> = BTreeMap::new();
     self
       .widget
@@ -296,6 +297,9 @@ impl DeclareMacro {
       })
       .expect("should always success.");
 
+    if let Some(animations) = self.animations.as_ref() {
+      follows.extend(animations.follows_iter());
+    }
     follows
   }
 
@@ -328,14 +332,11 @@ impl DeclareMacro {
   fn named_objects_def_tokens(
     &self,
     ctx: &DeclareCtx,
-  ) -> Result<(
-    HashMap<Ident, TokenStream2, ahash::RandomState>,
-    TokenStream2,
-  )> {
+  ) -> (HashMap<Ident, TokenStream2, RandomState>, TokenStream2) {
     let mut named_defs = HashMap::default();
 
-    let mut compose_tokens = quote! {};
-    self.widget.recursive_call(|w| {
+    let mut children_tokens = quote! {};
+    let _ = self.widget.recursive_call(|w| {
       if w.named.is_some() {
         let (name, def_tokens) = w.host_widget_tokens(ctx);
         named_defs.insert(name.clone(), def_tokens);
@@ -344,12 +345,16 @@ impl DeclareMacro {
           .gen_wrap_widgets_tokens(&name, ctx, |name, wrap_tokens| {
             named_defs.insert(name, wrap_tokens);
           });
-        w.children_tokens(ctx, &mut compose_tokens);
+        w.children_tokens(ctx, &mut children_tokens);
       }
       Ok(())
-    })?;
+    });
 
-    Ok((named_defs, compose_tokens))
+    if let Some(ref a) = self.animations {
+      a.named_objects_def_tokens(&mut named_defs);
+    }
+
+    (named_defs, children_tokens)
   }
 
   fn circle_check<F>(follow_infos: &BTreeMap<Ident, Follows>, err_detect: F) -> Result<()>
@@ -362,14 +367,14 @@ impl DeclareMacro {
       Checked,
     }
 
-    let mut check_info = HashMap::new();
+    let mut check_info: HashMap<_, _, RandomState> = HashMap::default();
     let mut stack = vec![];
 
     // return if the widget follow contain circle.
     fn widget_follow_circle_check<'a, F>(
       name: &'a Ident,
       follow_infos: &'a BTreeMap<Ident, Follows>,
-      check_info: &mut HashMap<&'a Ident, CheckState>,
+      check_info: &mut HashMap<&'a Ident, CheckState, RandomState>,
       stack: &mut Vec<CircleCheckStack<'a>>,
       err_detect: &F,
     ) -> Result<()>
@@ -406,7 +411,7 @@ impl DeclareMacro {
 
   fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, Follows>, mut callback: F) {
     // circular may exist widget attr follow widget self to init.
-    let mut stacked = std::collections::HashSet::<_, ahash::RandomState>::default();
+    let mut stacked = std::collections::HashSet::<_, RandomState>::default();
 
     let mut stack = follows.keys().rev().collect::<Vec<_>>();
     while let Some(w) = stack.pop() {

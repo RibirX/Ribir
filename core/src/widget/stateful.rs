@@ -168,13 +168,7 @@ impl<W> Stateful<W> {
     Self: 'static,
   {
     let state_ref = unsafe { self.state_ref() };
-    let v = pick(&self.widget);
-    let init = StateChange { before: v.clone(), after: v };
-    self.change_stream().scan_initial(init, move |mut init, _| {
-      init.before = init.after;
-      init.after = pick(&state_ref);
-      init
-    })
+    state_ref.state_change(pick)
   }
 
   pub(crate) fn mark_during_build(&self, flag: bool) {
@@ -196,12 +190,40 @@ impl<W: 'static> StateRef<W> {
   pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
     assert_state_attr(self).state_subject()
   }
+
+  /// Pick field change stream from the widget change
+  pub fn state_change<T: Clone + 'static>(
+    mut self,
+    pick: impl Fn(&W) -> T + 'static,
+  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
+  where
+    Self: 'static,
+  {
+    let v = pick(&self.widget);
+    let init = StateChange { before: v.clone(), after: v };
+    self.change_stream().scan_initial(init, move |mut init, _| {
+      init.before = init.after;
+      init.after = pick(&self);
+      init
+    })
+  }
 }
 
 impl<W> SilentRef<W> {
   #[inline]
   pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
     assert_state_attr(self).state_subject()
+  }
+
+  /// Pick field change stream from the widget change
+  pub fn state_change<T: Clone + 'static>(
+    &mut self,
+    pick: impl Fn(&W) -> T + 'static,
+  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
+  where
+    Self: 'static,
+  {
+    StateRef(self.0).state_change(pick)
   }
 }
 
@@ -376,7 +398,6 @@ where
   #[inline]
   fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.as_attrs_mut() }
 }
-
 #[cfg(test)]
 mod tests {
   use super::*;

@@ -1,4 +1,7 @@
-use super::{DataFlow, DeclareField};
+use super::{
+  animations::{Animate, State, Transition},
+  DataFlow, DeclareField,
+};
 use proc_macro2::Span;
 use syn::Ident;
 
@@ -20,6 +23,9 @@ pub struct Follows<'a>(Box<[FollowPart<'a>]>);
 pub enum FollowPlace<'a> {
   Field(&'a DeclareField),
   DataFlow(&'a DataFlow),
+  Animate(&'a Animate),
+  State(&'a State),
+  Transition(&'a Transition),
 }
 
 impl<'a> FollowPart<'a> {

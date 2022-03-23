@@ -542,6 +542,16 @@ impl<W> AttachAttr for Stateful<W> {
   attr_widget_attach_impl!();
 }
 
+impl<W> AttachAttr for StateRef<W> {
+  type Target = Self;
+  attr_widget_attach_impl!();
+}
+
+impl<W> AttachAttr for SilentRef<W> {
+  type Target = Self;
+  attr_widget_attach_impl!();
+}
+
 impl<W: RenderWidget> RenderWidget for AttrWidgetWrap<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
