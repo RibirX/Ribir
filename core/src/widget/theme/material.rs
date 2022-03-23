@@ -54,6 +54,7 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
     default_font_family: family,
     unselected_widget_color,
     scrollbar,
+    icon: IconTheme::default(),
   }
 }
 
@@ -111,5 +112,6 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
     default_font_family: family,
     unselected_widget_color,
     scrollbar,
+    icon: IconTheme::default(),
   }
 }

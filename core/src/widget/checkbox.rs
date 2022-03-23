@@ -26,32 +26,14 @@ impl Checkbox {
 impl StatefulCombination for Checkbox {
   #[widget]
   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    let CheckboxTheme {
-      mut size,
-      border_width,
-      radius,
-      border_color,
-      checked_path,
-      check_background: color,
-      indeterminate_path,
-    } = this.style.clone();
+    let CheckboxTheme { size, .. } = this.style.clone();
 
     let has_checked = this.indeterminate || this.checked;
-    // border draw out of the box
-    if has_checked {
-      size += border_width * 2.;
-    }
 
     widget! {
       declare SizedBox {
         size: Size::new(size, size),
         margin: EdgeInsets::all(4.),
-        radius: Radius::all(radius),
-        border if !has_checked =>: Border::all(BorderSide {
-          color: border_color,
-          width: border_width,
-        }),
-        background if has_checked =>: color,
         cursor: CursorIcon::Hand,
         on_tap: {
           let mut state = unsafe { this.state_ref() };
@@ -66,13 +48,24 @@ impl StatefulCombination for Checkbox {
           }
         },
         ExprChild {
-          has_checked.then(||{
+          if has_checked {
             if this.indeterminate {
-              indeterminate_path
+              Icon {
+                src: "./core/src/widget/theme/checkbox/indeterminate.svg",
+                size: Size::new(size, size),
+              }
             } else {
-              checked_path
+              Icon {
+                src: "./core/src/widget/theme/checkbox/checked.svg",
+                size: Size::new(size, size),
+              }
             }
-          })
+          } else {
+            Icon {
+              src: "./core/src/widget/theme/checkbox/unchecked.svg",
+              size: Size::new(size, size),
+            }
+          }
         }
       }
     }

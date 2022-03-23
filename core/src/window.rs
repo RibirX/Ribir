@@ -181,6 +181,7 @@ impl Window {
     animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
     let native_window = winit::window::WindowBuilder::new()
+      .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
       .build(event_loop)
       .unwrap();
     let size = native_window.inner_size();

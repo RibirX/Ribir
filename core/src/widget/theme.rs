@@ -106,6 +106,7 @@ pub struct Theme {
   pub default_font_family: Box<[FontFamily]>,
   pub checkbox: CheckboxTheme,
   pub scrollbar: ScrollBarTheme,
+  pub icon: IconTheme,
 }
 
 impl TypographyTheme {
@@ -340,6 +341,25 @@ impl Default for CheckboxTheme {
       border_color: Color::BLACK,
       checked_path,
       indeterminate_path,
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct IconTheme {
+  pub width: f32,
+  pub height: f32,
+  pub fill_color: Color,
+  pub stroke_color: Color,
+}
+
+impl Default for IconTheme {
+  fn default() -> Self {
+    Self {
+      width: 16.0,
+      height: 16.0,
+      fill_color: Color::WHITE,
+      stroke_color: Color::BLACK,
     }
   }
 }

@@ -11,4 +11,5 @@ bitflags = "1.3.2"
 euclid = "0.22.6"
 lyon_algorithms = "0.17.7"
 lyon_path = "0.17.7"
+lyon_tessellation = "0.17.10"
 text = {path = "../text"}

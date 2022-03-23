@@ -91,6 +91,17 @@
       "externalConsole": true
     },
     {
+      "name": "(Windows) Debug Todo Demo",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/examples/todo.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}",
+      "environment": [],
+      "externalConsole": true
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug unit tests in library 'gpu'",
