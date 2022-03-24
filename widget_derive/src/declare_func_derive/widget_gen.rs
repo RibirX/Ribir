@@ -1,6 +1,6 @@
 use crate::{
   declare_derive::field_convert_method,
-  declare_func_derive::{skip_nc_assign, upstream_observable, widget_def_variable},
+  declare_func_derive::{build_ctx_name, skip_nc_assign, upstream_observable, widget_def_variable},
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
@@ -12,7 +12,6 @@ pub struct WidgetGen<'a> {
   pub ty: &'a Path,
   pub name: Ident,
   pub fields: &'a [DeclareField],
-  pub ctx_name: &'a Ident,
 }
 
 impl<'a> WidgetGen<'a> {
@@ -37,7 +36,7 @@ impl<'a> WidgetGen<'a> {
       let without_guard_tokens = fields_without_guard
         .iter()
         .map(|f| f.build_tokens_without_guard());
-      let ctx_name = self.ctx_name;
+      let ctx_name = build_ctx_name(self.name.span());
       if fields_with_guard.is_empty() {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()

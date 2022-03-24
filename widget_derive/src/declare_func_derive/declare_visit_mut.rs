@@ -28,8 +28,6 @@ pub struct DeclareCtx {
   /// the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
   id_capture_scope: Vec<bool>,
-  // tmp code
-  pub ctx_name: Ident,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -56,6 +54,14 @@ impl VisitMut for DeclareCtx {
         let tokens = std::mem::replace(&mut m.mac.tokens, quote! {});
         *expr = self.extend_declare_macro_to_expr(tokens.into());
       }
+      Expr::Path(p) => {
+        visit_mut::visit_expr_path_mut(self, p);
+        if let Some(name) = p.path.get_ident() {
+          if let Some(name) = self.find_named_widget(name).cloned() {
+            self.add_follow(name)
+          }
+        }
+      }
       _ => {
         visit_mut::visit_expr_mut(self, expr);
       }
@@ -78,8 +84,6 @@ impl VisitMut for DeclareCtx {
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
-    visit_mut::visit_expr_field_mut(self, f_expr);
-
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
       if let Some(suffix) = SugarFields::wrap_widget_from_member(&f_expr.member) {
         name.set_span(name.span().join(suffix.span()).unwrap());
@@ -90,10 +94,10 @@ impl VisitMut for DeclareCtx {
           .insert(wrap_name.clone(), name.clone());
         self.add_follow(wrap_name);
         self.add_reference(name, ReferenceInfo::WrapWidgetRef);
-      } else {
-        self.add_follow(name);
+        return;
       }
     }
+    visit_mut::visit_expr_field_mut(self, f_expr);
   }
 
   fn visit_expr_assign_mut(&mut self, assign: &mut syn::ExprAssign) {
@@ -174,13 +178,6 @@ impl VisitMut for DeclareCtx {
     self.stack_push();
     visit_mut::visit_arm_mut(self, i);
     self.stack_pop();
-  }
-
-  fn visit_expr_method_call_mut(&mut self, i: &mut syn::ExprMethodCall) {
-    visit_mut::visit_expr_method_call_mut(self, i);
-    if let Some(name) = self.expr_find_name_widget(&i.receiver).cloned() {
-      self.add_follow(name);
-    }
   }
 
   fn visit_expr_unsafe_mut(&mut self, i: &mut syn::ExprUnsafe) {
@@ -307,6 +304,7 @@ impl DeclareCtx {
         self.stack_push();
         self.borrow_capture_scope(false).visit_expr_mut(expr);
         self.stack_pop();
+        self.take_current_follows();
       }
     })
   }
@@ -405,7 +403,7 @@ impl DeclareCtx {
       .or_else(|| self.named_objects.contains(ident).then(|| ident))
   }
 
-  fn expr_find_name_widget<'a>(&'a self, expr: &'a Expr) -> Option<&'a Ident> {
+  pub fn expr_find_name_widget<'a>(&'a self, expr: &'a Expr) -> Option<&'a Ident> {
     if let Expr::Path(syn::ExprPath { path, .. }) = expr {
       path
         .get_ident()
@@ -465,7 +463,6 @@ impl Default for DeclareCtx {
       forbid_warnings: Default::default(),
       user_perspective_name: Default::default(),
       id_capture_scope: Default::default(),
-      ctx_name: Ident::new("tmp", Span::call_site()),
     }
   }
 }

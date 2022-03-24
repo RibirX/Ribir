@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-fn id_must_be_unique_err() {
+fn id_must_be_unique_err(ctx: &mut BuildCtx) {
   declare! {
     SizedBox {
       id: key1,

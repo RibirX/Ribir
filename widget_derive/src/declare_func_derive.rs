@@ -186,11 +186,10 @@ impl DeclareMacro {
       stack.iter().map(|c| c.into_follow_path(ctx)).collect()
     }
 
-    ctx.ctx_name = self.ctx_name.clone();
     ctx.id_collect(self)?;
     ctx.visit_declare_macro_mut(self);
-
     self.before_generate_check(ctx)?;
+
     let mut tokens = quote! {};
     if !ctx.named_objects.is_empty() {
       let mut follows = self.analyze_object_follows();
@@ -486,8 +485,7 @@ impl DeclareWidget {
       .any(|f| f.follows.is_some());
 
     let name = self.widget_identify();
-    let ctx_name = &ctx.ctx_name;
-    let gen = WidgetGen { ty, name, fields, ctx_name };
+    let gen = WidgetGen { ty, name, fields };
 
     let mut tokens = gen.gen_widget_tokens(ctx, attrs_follow);
     self.normal_attrs_tokens(&mut tokens);
@@ -790,5 +788,13 @@ pub(crate) fn declare_func_macro(input: TokenStream) -> TokenStream {
   });
   ctx.emit_unused_id_warning();
 
-  tokens.into()
+  let ctx_name = &declare.ctx_name;
+  let build_ctx = build_ctx_name(declare.ctx_name.span());
+  let tokens = quote! {{
+    let #build_ctx = #ctx_name;
+    #tokens
+  }}
+  .into();
+
+  tokens
 }
