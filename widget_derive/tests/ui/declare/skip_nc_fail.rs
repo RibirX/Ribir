@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-fn fields_no_follow_with_skip_nc() {
+fn fields_no_follow_with_skip_nc(ctx: &mut BuildCtx) {
   declare! {
     SizedBox {
       id: self_id,
@@ -10,7 +10,7 @@ fn fields_no_follow_with_skip_nc() {
   };
 }
 
-fn attrs_no_follow_with_skip_nc() {
+fn attrs_no_follow_with_skip_nc(ctx: &mut BuildCtx) {
   declare! {
     SizedBox {
       id: self_id,
@@ -21,7 +21,7 @@ fn attrs_no_follow_with_skip_nc() {
   };
 }
 
-fn wrap_widget_no_follow_with_skip_nc() {
+fn wrap_widget_no_follow_with_skip_nc(ctx: &mut BuildCtx) {
   declare! {
     SizedBox {
       id: self_id,

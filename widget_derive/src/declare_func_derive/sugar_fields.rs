@@ -325,8 +325,7 @@ impl SugarFields {
       })
       .unwrap();
     let ty = &Ident::new(BOX_DECORATION, span).into();
-    let ctx_name = &ctx.ctx_name;
-    let gen = WidgetGen { ty, name, fields: &fields, ctx_name };
+    let gen = WidgetGen { ty, name, fields: &fields };
     let wrap_name = widget_def_variable(&gen.name);
     let mut def_and_ref_tokens = gen.gen_widget_tokens(ctx, false);
 
@@ -356,8 +355,7 @@ fn common_def_tokens(
   let if_guard = f.if_guard.take();
   let name = ribir_suffix_variable(host, &f.member.to_string());
   let wrap_def = widget_def_variable(&name);
-  let ctx_name = &ctx.ctx_name;
-  let widget_gen = WidgetGen { ty, name, fields: &vec![f], ctx_name };
+  let widget_gen = WidgetGen { ty, name, fields: &vec![f] };
   let mut widget_tokens = widget_gen.gen_widget_tokens(ctx, false);
 
   if let Some(if_guard) = if_guard {
