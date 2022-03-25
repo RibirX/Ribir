@@ -1,6 +1,7 @@
 use super::{
   animations::{Animate, State, Transition},
-  DataFlow, DeclareField,
+  dataflows::Dataflow,
+  DeclareField,
 };
 use proc_macro2::Span;
 use syn::Ident;
@@ -22,7 +23,7 @@ pub struct Follows<'a>(Box<[FollowPart<'a>]>);
 #[derive(Clone, Copy, Debug)]
 pub enum FollowPlace<'a> {
   Field(&'a DeclareField),
-  DataFlow(&'a DataFlow),
+  DataFlow(&'a Dataflow),
   Animate(&'a Animate),
   State(&'a State),
   Transition(&'a Transition),
@@ -34,19 +35,6 @@ impl<'a> FollowPart<'a> {
       origin: FollowPlace::Field(field),
       follows: &follows,
     })
-  }
-
-  pub fn from_data_flow(data_flow: &'a DataFlow) -> Self {
-    let follows = data_flow
-      .from
-      .follows
-      .as_ref()
-      .expect("data flow must depends on some widget");
-
-    Self {
-      origin: FollowPlace::DataFlow(data_flow),
-      follows: &follows,
-    }
   }
 }
 
