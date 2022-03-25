@@ -223,7 +223,7 @@ impl CombinationWidget for T {
           Text { text: "SubTask 2" }
         }
       }
-      data_flow!{
+      dataflows {
         sub_task1.checked && sub_task2.checked ~> task.checked;
         sub_task1.checked != sub_task2.checked ~> task.indeterminate
       }
@@ -249,7 +249,7 @@ impl CombinationWidget for T {
         Text { id: a, text: "Hi" }
         Text { id: b, text: a.text.clone() }
       }
-      data_flow! { #[skip_nc] b.text.clone() ~> a.text }
+      dataflows  { #[skip_nc] b.text.clone() ~> a.text }
     }
   }
 }
@@ -273,7 +273,7 @@ impl CombinationWidget for T {
           text: a.text.clone(),
         }
       }
-      data_flow! { b.text.clone() ~> a.text }
+      dataflows  { b.text.clone() ~> a.text }
     }
   }
 }
@@ -319,7 +319,7 @@ impl StatefulCombination for Todos {
                 margin: EdgeInsets::vertical(4.),
               }
             }
-            data_flow!{ checkbox.checked ~> this_ref.silent().tasks[idx].finished }
+            dataflows { checkbox.checked ~> this_ref.silent().tasks[idx].finished }
           }
         })
       }

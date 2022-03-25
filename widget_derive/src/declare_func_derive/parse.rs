@@ -59,10 +59,7 @@ impl Parse for DeclareMacro {
       }
       let lookahead = input.lookahead1();
       if lookahead.peek(kw::dataflows) && input.peek2(token::Brace) {
-        input.parse::<kw::dataflows>()?;
-        let content;
-        syn::braced!(content in input);
-        dataflows = Some(Punctuated::parse_terminated(&content)?);
+        dataflows = Some(input.parse()?);
       } else if lookahead.peek(kw::animations) && input.peek2(token::Brace) {
         animations = Some(input.parse()?);
       } else {
@@ -173,17 +170,6 @@ impl Parse for SkipNcAttr {
   }
 }
 
-impl Parse for DataFlow {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(Self {
-      skip_nc: try_parse_skip_nc(input)?,
-      from: DataFlowExpr { expr: input.parse()?, follows: None },
-      _arrow_token: input.parse()?,
-      to: DataFlowExpr { expr: input.parse()?, follows: None },
-    })
-  }
-}
-
 impl Parse for Child {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     if input.peek(Ident) && input.peek2(Brace) {
@@ -240,7 +226,7 @@ impl Parse for DeclareField {
   }
 }
 
-fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> {
+pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> {
   if input.peek(token::Pound) {
     Ok(Some(input.parse()?))
   } else {

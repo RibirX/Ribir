@@ -5,7 +5,6 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, ToTokens};
 use syn::{
   parse_macro_input,
-  punctuated::Punctuated,
   spanned::Spanned,
   token::{self, Brace},
   Expr, Ident, Path, Token,
@@ -20,9 +19,12 @@ mod parse;
 
 pub use follow_on::*;
 mod variable_names;
+use self::{animations::Animations, dataflows::Dataflows, widget_gen::WidgetGen};
 use ahash::RandomState;
 pub use variable_names::*;
-
+mod animations;
+mod dataflows;
+mod widget_gen;
 pub mod kw {
   syn::custom_keyword!(id);
   syn::custom_keyword!(dataflows);
@@ -33,9 +35,6 @@ pub mod kw {
   syn::custom_keyword!(Transition);
 }
 
-use self::{animations::Animations, widget_gen::WidgetGen};
-mod animations;
-mod widget_gen;
 pub enum Child {
   Declare(Box<DeclareWidget>),
   Expr(Box<syn::Expr>),
@@ -44,7 +43,7 @@ pub enum Child {
 pub struct DeclareMacro {
   pub ctx_name: Ident,
   pub widget: DeclareWidget,
-  pub dataflows: Option<Punctuated<DataFlow, Token![;]>>,
+  pub dataflows: Option<Dataflows>,
   pub animations: Option<Animations>,
 }
 
@@ -82,48 +81,12 @@ pub struct IfGuard {
   pub fat_arrow_token: Token![=>],
 }
 
-mod ct {
-  syn::custom_punctuation!(RightArrow, ~>);
-}
-
-#[derive(Debug)]
-pub struct DataFlowExpr {
-  expr: Expr,
-  follows: Option<Vec<FollowOn>>,
-}
-
-#[derive(Debug)]
-pub struct DataFlow {
-  skip_nc: Option<SkipNcAttr>,
-  from: DataFlowExpr,
-  _arrow_token: ct::RightArrow,
-  to: DataFlowExpr,
-}
-
 impl ToTokens for SkipNcAttr {
   fn to_tokens(&self, tokens: &mut TokenStream2) {
     self.pound_token.to_tokens(tokens);
     self.bracket_token.surround(tokens, |tokens| {
       self.skip_nc_meta.to_tokens(tokens);
     })
-  }
-}
-
-impl DataFlow {
-  fn gen_tokens(&mut self, tokens: &mut TokenStream2) -> Result<()> {
-    let Self { from, to, .. } = self;
-    let follows_on = from
-      .follows
-      .as_ref()
-      .ok_or_else(|| DeclareError::DataFlowNoDepends(from.expr.span().unwrap()))?;
-
-    let upstream = upstream_observable(follows_on);
-
-    let assign = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
-    tokens.extend(quote! {
-      #upstream.subscribe(move |_| { #assign });
-    });
-    Ok(())
   }
 }
 
@@ -223,20 +186,18 @@ impl DeclareMacro {
       // follow with skip_nc attribute. So we add the data flow relationship and
       // individual check the circle follow error.
       if let Some(dataflows) = self.dataflows.as_ref() {
-        if !dataflows.is_empty() {
-          self.analyze_data_flow_follows(&mut follows);
-          let _circle_follows_check = Self::circle_check(&follows, |stack| {
-            if stack.iter().any(|s| match &s.origin {
-              FollowPlace::Field(f) => f.skip_nc.is_some(),
-              FollowPlace::DataFlow(df) => df.skip_nc.is_some(),
-              _ => false,
-            }) {
-              Ok(())
-            } else {
-              Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
-            }
-          })?;
-        }
+        dataflows.analyze_data_flow_follows(&mut follows);
+        let _circle_follows_check = Self::circle_check(&follows, |stack| {
+          if stack.iter().any(|s| match &s.origin {
+            FollowPlace::Field(f) => f.skip_nc.is_some(),
+            FollowPlace::DataFlow(df) => df.skip_nc.is_some(),
+            _ => false,
+          }) {
+            Ok(())
+          } else {
+            Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
+          }
+        })?;
       }
     }
 
@@ -247,9 +208,7 @@ impl DeclareMacro {
     }
 
     if let Some(dataflows) = self.dataflows.as_mut() {
-      dataflows
-        .iter_mut()
-        .try_for_each(|df| df.gen_tokens(&mut tokens))?;
+      dataflows.to_tokens(&mut tokens);
     }
 
     if let Some(ref animations) = self.animations {
@@ -300,31 +259,6 @@ impl DeclareMacro {
       follows.extend(animations.follows_iter());
     }
     follows
-  }
-
-  fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, Follows<'a>>) {
-    let dataflows = if let Some(dataflows) = self.dataflows.as_ref() {
-      dataflows
-    } else {
-      return;
-    };
-    dataflows.iter().for_each(|df| {
-      if let Some(to) = df.to.follows.as_ref() {
-        let part = FollowPart::from_data_flow(df);
-        to.iter().for_each(|fo| {
-          let name = &fo.widget;
-          if let Some(w_follows) = follows.get_mut(name) {
-            *w_follows = w_follows
-              .iter()
-              .cloned()
-              .chain(Some(part.clone()).into_iter())
-              .collect();
-          } else {
-            follows.insert(name.clone(), Follows::from_single_part(part.clone()));
-          }
-        })
-      }
-    });
   }
 
   // return the key-value map of the named widget define tokens.

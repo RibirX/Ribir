@@ -3,7 +3,7 @@ use crate::error::DeclareError;
 use super::{
   ribir_suffix_variable,
   sugar_fields::{Id, SugarFields},
-  DataFlow, DeclareField, DeclareMacro, DeclareWidget, FollowOn,
+  DeclareField, DeclareMacro, DeclareWidget, FollowOn,
 };
 
 use proc_macro::{Diagnostic, Level, TokenStream};
@@ -245,20 +245,11 @@ impl DeclareCtx {
   pub fn visit_declare_macro_mut(&mut self, d: &mut DeclareMacro) {
     self.visit_declare_widget_mut(&mut d.widget);
     if let Some(dataflows) = d.dataflows.as_mut() {
-      dataflows
-        .iter_mut()
-        .for_each(|df| self.visit_data_flows_mut(df));
+      self.visit_dataflows_mut(dataflows)
     }
     if let Some(animations) = d.animations.as_mut() {
       self.visit_animations_mut(animations);
     }
-  }
-
-  pub fn visit_data_flows_mut(&mut self, df: &mut DataFlow) {
-    self.visit_expr_mut(&mut df.from.expr);
-    df.from.follows = self.take_current_follows();
-    self.visit_expr_mut(&mut df.to.expr);
-    df.to.follows = self.take_current_follows();
   }
 
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
