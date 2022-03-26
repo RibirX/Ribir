@@ -14,12 +14,11 @@ use syn::{
   Error, Expr, Ident, Result,
 };
 
-use crate::declare_func_derive::build_ctx_name;
+use crate::declare_func_derive::{build_ctx_name, Id};
 
 use super::{
-  ribir_suffix_variable, ribir_variable,
-  sugar_fields::{assign_uninit_field, Id},
-  DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows, SugarFields,
+  declare_widget::{assign_uninit_field, SugarFields},
+  ribir_suffix_variable, ribir_variable, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
 };
 
 use super::kw;

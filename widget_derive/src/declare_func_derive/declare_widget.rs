@@ -12,16 +12,19 @@ use syn::{
   visit_mut::VisitMut,
   Expr, Ident, Path,
 };
-
+mod sugar_fields;
+mod widget_gen;
 use crate::{
   declare_func_derive::{ribir_prefix_variable, ReferenceInfo},
   error::DeclareError,
 };
 
+pub use sugar_fields::*;
+use widget_gen::WidgetGen;
+
 use super::{
-  child_variable, kw, ribir_variable, sugar_fields::assign_uninit_field, sugar_fields::Id,
-  widget_def_variable, widget_gen::WidgetGen, widget_macro::IfGuard, DeclareCtx, FollowOn,
-  FollowPart, Follows, Result, SugarFields,
+  child_variable, kw, ribir_variable, widget_def_variable, widget_macro::IfGuard, DeclareCtx,
+  FollowOn, FollowPart, Follows, Id, Result,
 };
 
 pub struct DeclareWidget {

@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 
 use lazy_static::lazy_static;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::quote;
 
-use syn::{
-  parse::{Parse, ParseStream},
-  parse_quote,
-  spanned::Spanned,
-  Ident, Member, Path, Result, Token,
+use syn::{spanned::Spanned, Ident, Member, Path, Result};
+
+use super::{widget_gen::WidgetGen, DeclareField, FollowPart, Follows};
+use crate::{
+  declare_func_derive::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
+  error::DeclareError,
 };
 
 macro_rules! assign_uninit_field {
@@ -28,57 +29,6 @@ macro_rules! assign_uninit_field {
   };
 }
 pub(crate) use assign_uninit_field;
-
-use crate::{declare_func_derive::widget_gen::WidgetGen, error::DeclareError};
-
-use super::{
-  declare_visit_mut::DeclareCtx, kw, ribir_suffix_variable, widget_def_variable, FollowPart,
-};
-use super::{declare_widget::DeclareField, Follows};
-
-#[derive(Debug)]
-pub struct Id {
-  pub id_token: kw::id,
-  pub colon_token: Token![:],
-  pub name: Ident,
-}
-
-impl Parse for Id {
-  fn parse(input: ParseStream) -> Result<Self> {
-    Ok(Self {
-      id_token: input.parse()?,
-      colon_token: input.parse()?,
-      name: input.parse()?,
-    })
-  }
-}
-
-impl ToTokens for Id {
-  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    self.id_token.to_tokens(tokens);
-    self.colon_token.to_tokens(tokens);
-    self.name.to_tokens(tokens);
-  }
-}
-
-impl Id {
-  pub fn from_declare_field(field: DeclareField) -> syn::Result<Id> {
-    if field.skip_nc.is_some() {
-      return Err(syn::Error::new(
-        field.skip_nc.span(),
-        "Attribute `#[skip_nc]` is not supported in `id`",
-      ));
-    }
-    if field.if_guard.is_some() {
-      return Err(syn::Error::new(
-        field.if_guard.span(),
-        "if guard is not supported in `id`",
-      ));
-    }
-
-    Ok(parse_quote! {#field})
-  }
-}
 
 macro_rules! fields_sugar_def {
   (
