@@ -11,9 +11,9 @@ use syn::{
 };
 
 use super::{
-  animations::Animations, dataflows::Dataflows, kw, sugar_fields::assign_uninit_field,
-  widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace, Follows,
-  Result, SugarFields,
+  animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field,
+  declare_widget::SugarFields, kw, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo,
+  FollowOn, FollowPlace, Follows, Result,
 };
 use crate::error::DeclareError;
 

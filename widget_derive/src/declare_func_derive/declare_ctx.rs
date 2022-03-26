@@ -1,6 +1,6 @@
 use crate::error::DeclareError;
 
-use super::{ribir_suffix_variable, sugar_fields::SugarFields, FollowOn, WidgetMacro};
+use super::{declare_widget::SugarFields, ribir_suffix_variable, FollowOn, WidgetMacro};
 
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::Span;

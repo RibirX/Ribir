@@ -1,15 +1,19 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, ToTokens};
-use syn::{parse_macro_input, spanned::Spanned};
-pub mod sugar_fields;
+use syn::{
+  parse::{Parse, ParseStream},
+  parse_macro_input, parse_quote,
+  spanned::Spanned,
+  token, Ident,
+};
+
 use crate::{
   declare_func_derive::declare_widget::DeclareField,
   error::{FollowInfo, Result},
 };
-use sugar_fields::*;
-mod declare_visit_mut;
-pub use declare_visit_mut::*;
+mod declare_ctx;
+pub use declare_ctx::*;
 mod follow_on;
 
 pub use follow_on::*;
@@ -19,7 +23,8 @@ pub use variable_names::*;
 mod animations;
 mod dataflows;
 mod declare_widget;
-mod widget_gen;
+pub use declare_widget::RESERVE_IDENT;
+
 mod widget_macro;
 pub mod kw {
   syn::custom_keyword!(widget);
@@ -71,4 +76,48 @@ pub(crate) fn declare_func_macro(input: TokenStream) -> TokenStream {
   .into();
 
   tokens
+}
+
+#[derive(Debug)]
+pub struct Id {
+  pub id_token: kw::id,
+  pub colon_token: token::Colon,
+  pub name: Ident,
+}
+
+impl Parse for Id {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    Ok(Self {
+      id_token: input.parse()?,
+      colon_token: input.parse()?,
+      name: input.parse()?,
+    })
+  }
+}
+
+impl ToTokens for Id {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    self.id_token.to_tokens(tokens);
+    self.colon_token.to_tokens(tokens);
+    self.name.to_tokens(tokens);
+  }
+}
+
+impl Id {
+  pub fn from_declare_field(field: DeclareField) -> syn::Result<Id> {
+    if field.skip_nc.is_some() {
+      return Err(syn::Error::new(
+        field.skip_nc.span(),
+        "Attribute `#[skip_nc]` is not supported in `id`",
+      ));
+    }
+    if field.if_guard.is_some() {
+      return Err(syn::Error::new(
+        field.if_guard.span(),
+        "if guard is not supported in `id`",
+      ));
+    }
+
+    Ok(parse_quote! {#field})
+  }
 }
