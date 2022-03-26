@@ -20,8 +20,8 @@ use crate::{
 
 use super::{
   child_variable, kw, ribir_variable, sugar_fields::assign_uninit_field, sugar_fields::Id,
-  widget_def_variable, widget_gen::WidgetGen, Child, DeclareCtx, FollowOn, FollowPart, Follows,
-  IfGuard, Result, SugarFields,
+  widget_def_variable, widget_gen::WidgetGen, widget_macro::IfGuard, DeclareCtx, FollowOn,
+  FollowPart, Follows, Result, SugarFields,
 };
 
 pub struct DeclareWidget {
@@ -34,6 +34,10 @@ pub struct DeclareWidget {
   children: Vec<Child>,
 }
 
+pub enum Child {
+  Declare(Box<DeclareWidget>),
+  Expr(Box<syn::Expr>),
+}
 #[derive(Clone, Debug)]
 pub struct DeclareField {
   pub skip_nc: Option<SkipNcAttr>,
@@ -248,8 +252,8 @@ impl DeclareCtx {
     }
     visit_self_only(w, self);
     w.children.iter_mut().for_each(|c| match c {
-      super::Child::Declare(d) => visit_self_only(d, self),
-      super::Child::Expr(expr) => {
+      Child::Declare(d) => visit_self_only(d, self),
+      Child::Expr(expr) => {
         self.stack_push();
         self.borrow_capture_scope(false).visit_expr_mut(expr);
         self.stack_pop();
@@ -268,6 +272,10 @@ impl DeclareCtx {
     self.visit_expr_mut(&mut f.expr);
 
     f.follows = self.take_current_follows();
+  }
+
+  pub fn visit_sugar_field_mut(&mut self, sugar_field: &mut SugarFields) {
+    sugar_field.visit_sugar_field_mut(self);
   }
 }
 
@@ -578,6 +586,12 @@ impl DeclareWidget {
       })
   }
 
+  pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
+    self
+      .traverses_declare()
+      .filter_map(|w| w.named.as_ref().map(|id| &id.name))
+  }
+
   /// pre-order traversals declare widget, this will skip the expression child.
   pub fn traverses_declare(&self) -> impl Iterator<Item = &DeclareWidget> {
     let children = self.children.iter().filter_map(|c| match c {
@@ -607,5 +621,24 @@ pub fn upstream_observable(depends_on: &[FollowOn]) -> TokenStream {
     quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
   } else {
     quote! { #(#upstream)* }
+  }
+}
+
+impl Spanned for Child {
+  fn span(&self) -> Span {
+    match self {
+      Child::Declare(d) => d.span(),
+      Child::Expr(e) => e.span(),
+    }
+  }
+}
+
+impl Parse for Child {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    if input.peek(Ident) && input.peek2(Brace) {
+      Ok(Child::Declare(input.parse()?))
+    } else {
+      Ok(Child::Expr(input.parse()?))
+    }
   }
 }

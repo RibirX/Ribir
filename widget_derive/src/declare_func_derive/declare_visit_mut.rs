@@ -1,12 +1,8 @@
 use crate::error::DeclareError;
 
-use super::{
-  ribir_suffix_variable,
-  sugar_fields::{Id, SugarFields},
-  DeclareMacro, FollowOn,
-};
+use super::{ribir_suffix_variable, sugar_fields::SugarFields, FollowOn, WidgetMacro};
 
-use proc_macro::{Diagnostic, Level, TokenStream};
+use proc_macro::{Diagnostic, Level};
 use proc_macro2::Span;
 use quote::quote;
 use std::collections::{HashMap, HashSet};
@@ -216,58 +212,12 @@ impl VisitMut for DeclareCtx {
 }
 
 impl DeclareCtx {
-  fn extend_declare_macro_to_expr(&mut self, tokens: TokenStream) -> Expr {
-    let mut declare: DeclareMacro = syn::parse(tokens).expect("extend declare macro failed!");
-    let named = self.named_objects.clone();
-
-    let tokens = {
-      let mut ctx = self.borrow_capture_scope(true);
-
-      declare.gen_tokens(&mut *ctx).unwrap_or_else(|err| {
-        // forbid warning.
-        ctx.forbid_warnings(true);
-        err.into_compile_error()
-      })
-    };
-
-    // trigger warning and restore named widget.
-    named.iter().for_each(|k| {
-      self.named_objects.remove(k);
-    });
-    self.emit_unused_id_warning();
-    self.named_objects = named;
-
-    parse_quote!(#tokens)
-  }
-}
-
-impl DeclareCtx {
-  pub fn visit_declare_macro_mut(&mut self, d: &mut DeclareMacro) {
-    self.visit_declare_widget_mut(&mut d.widget);
-    if let Some(dataflows) = d.dataflows.as_mut() {
-      self.visit_dataflows_mut(dataflows)
-    }
-    if let Some(animations) = d.animations.as_mut() {
-      self.visit_animations_mut(animations);
-    }
-  }
-
-  pub fn visit_sugar_field_mut(&mut self, sugar_field: &mut SugarFields) {
-    sugar_field.visit_sugar_field_mut(self);
-  }
-}
-
-impl DeclareCtx {
-  pub fn id_collect(&mut self, d: &DeclareMacro) -> super::Result<()> {
-    if let Some(animations) = d.animations.as_ref() {
-      animations
-        .object_names_iter()
-        .try_for_each(|name| self.add_named_object(name))?;
-    }
-    d.widget.traverses_declare().try_for_each(|w| {
-      if let Some(Id { name, .. }) = w.named.as_ref() {
-        self.add_named_object(name)
+  pub fn id_collect(&mut self, d: &WidgetMacro) -> super::Result<()> {
+    d.object_names_iter().try_for_each(|name| {
+      if let Some(old) = self.named_objects.get(name) {
+        Err(DeclareError::DuplicateID([(*old).clone(), name.clone()]))
       } else {
+        self.named_objects.insert(name.clone());
         Ok(())
       }
     })
@@ -384,15 +334,6 @@ impl DeclareCtx {
       (ReferenceInfo::Reference, _) => *v = ref_info,
       (ReferenceInfo::WrapWidgetRef, _) => *v = ref_info,
       _ => {}
-    }
-  }
-
-  fn add_named_object(&mut self, name: &Ident) -> super::Result<()> {
-    if let Some(old) = self.named_objects.get(name) {
-      Err(DeclareError::DuplicateID([(*old).clone(), name.clone()]))
-    } else {
-      self.named_objects.insert(name.clone());
-      Ok(())
     }
   }
 }
