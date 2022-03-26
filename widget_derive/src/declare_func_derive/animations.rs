@@ -151,7 +151,7 @@ where
       }
       if content.peek(kw::id) {
         let id: Id = content.parse()?;
-        let _: Option<Id> = assign_uninit_field!(res.id, id)?;
+        assign_uninit_field!(res.id, id)?;
         if content.is_empty() {
           break;
         }
@@ -284,13 +284,13 @@ impl Parse for Animate {
       let lk = content.lookahead1();
       if lk.peek(kw::id) {
         let id = content.parse()?;
-        let _: Option<Id> = assign_uninit_field!(fields.id, id)?;
+        assign_uninit_field!(fields.id, id)?;
       } else if lk.peek(animate_kw::from) {
         let from = content.parse()?;
-        let _: Option<FromStateField> = assign_uninit_field!(fields.from, from)?;
+        assign_uninit_field!(fields.from, from)?;
       } else if lk.peek(animate_kw::transition) {
         let transition = content.parse()?;
-        let _: Option<SimpleField> = assign_uninit_field!(fields.transition, transition)?;
+        assign_uninit_field!(fields.transition, transition)?;
       } else {
         Err(lk.error())?;
       }

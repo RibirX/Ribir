@@ -1,6 +1,6 @@
 use super::{
-  kw, parse::try_parse_skip_nc, skip_nc_assign, upstream_observable, DeclareCtx, FollowOn,
-  FollowPart, FollowPlace, Follows, SkipNcAttr,
+  declare_widget::{try_parse_skip_nc, upstream_observable, SkipNcAttr},
+  kw, skip_nc_assign, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};

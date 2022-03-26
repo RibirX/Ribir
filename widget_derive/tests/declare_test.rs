@@ -378,6 +378,25 @@ fn attr_bind_to_self() {
   );
 }
 
+#[test]
+fn if_guard_work() {
+  struct T;
+  impl CombinationWidget for T {
+    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      declare! {
+        SizedBox {
+          size if true => : Size::new(100., 100.),
+          margin if false =>: EdgeInsets::all(1.),
+          cursor if true =>: CursorIcon::Hand
+        }
+      }
+    }
+  }
+
+  let (rect, _) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
+  assert_eq!(rect.size, Size::new(100., 100.));
+}
+
 fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
   let device_id = unsafe { DeviceId::dummy() };
   let modifiers = ModifiersState::default();
