@@ -3,14 +3,12 @@ use std::collections::{BTreeMap, HashMap};
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, ToTokens};
-use syn::{
-  parse_macro_input,
-  spanned::Spanned,
-  token::{self, Brace},
-  Expr, Ident, Path, Token,
-};
+use syn::{parse_macro_input, spanned::Spanned, Expr, Ident, Token};
 pub mod sugar_fields;
-use crate::error::{DeclareError, FollowInfo, Result};
+use crate::{
+  declare_func_derive::declare_widget::DeclareField,
+  error::{DeclareError, FollowInfo, Result},
+};
 use sugar_fields::*;
 mod declare_visit_mut;
 pub use declare_visit_mut::*;
@@ -19,17 +17,20 @@ mod parse;
 
 pub use follow_on::*;
 mod variable_names;
-use self::{animations::Animations, dataflows::Dataflows, widget_gen::WidgetGen};
+use self::{animations::Animations, dataflows::Dataflows, declare_widget::DeclareWidget};
 use ahash::RandomState;
 pub use variable_names::*;
 mod animations;
 mod dataflows;
+mod declare_widget;
 mod widget_gen;
 pub mod kw {
-  syn::custom_keyword!(id);
+  syn::custom_keyword!(widget);
+  syn::custom_keyword!(declare);
   syn::custom_keyword!(dataflows);
-  syn::custom_keyword!(skip_nc);
   syn::custom_keyword!(animations);
+  syn::custom_keyword!(id);
+  syn::custom_keyword!(skip_nc);
   syn::custom_keyword!(Animate);
   syn::custom_keyword!(State);
   syn::custom_keyword!(Transition);
@@ -47,47 +48,11 @@ pub struct DeclareMacro {
   pub animations: Option<Animations>,
 }
 
-pub struct DeclareWidget {
-  path: Path,
-  brace_token: Brace,
-  // the name of this widget specified by `id` attr.
-  named: Option<Id>,
-  fields: Vec<DeclareField>,
-  sugar_fields: SugarFields,
-  children: Vec<Child>,
-}
-
-#[derive(Clone, Debug)]
-pub struct SkipNcAttr {
-  pound_token: token::Pound,
-  bracket_token: token::Bracket,
-  skip_nc_meta: kw::skip_nc,
-}
-
-#[derive(Clone, Debug)]
-pub struct DeclareField {
-  skip_nc: Option<SkipNcAttr>,
-  pub member: Ident,
-  pub if_guard: Option<IfGuard>,
-  pub colon_token: Option<Token![:]>,
-  pub expr: Expr,
-  pub follows: Option<Vec<FollowOn>>,
-}
-
 #[derive(Clone, Debug)]
 pub struct IfGuard {
   pub if_token: Token![if],
   pub cond: Expr,
   pub fat_arrow_token: Token![=>],
-}
-
-impl ToTokens for SkipNcAttr {
-  fn to_tokens(&self, tokens: &mut TokenStream2) {
-    self.pound_token.to_tokens(tokens);
-    self.bracket_token.surround(tokens, |tokens| {
-      self.skip_nc_meta.to_tokens(tokens);
-    })
-  }
 }
 
 #[derive(Clone, Debug)]
@@ -151,7 +116,7 @@ impl DeclareMacro {
 
     ctx.id_collect(self)?;
     ctx.visit_declare_macro_mut(self);
-    self.before_generate_check(ctx)?;
+    self.widget.before_generate_check(ctx)?;
 
     let mut tokens = quote! {};
     if !ctx.named_objects.is_empty() {
@@ -171,7 +136,7 @@ impl DeclareMacro {
         }
       })?;
 
-      let (mut named_widgets_def, children_of_named_objects) = self.named_objects_def_tokens(ctx);
+      let mut named_widgets_def = self.named_objects_def_tokens(ctx);
 
       Self::deep_follow_iter(&follows, |name| {
         tokens.extend(named_widgets_def.remove(name));
@@ -180,7 +145,12 @@ impl DeclareMacro {
       named_widgets_def
         .into_values()
         .for_each(|def_tokens| tokens.extend(def_tokens));
-      tokens.extend(children_of_named_objects);
+
+      self
+        .widget
+        .traverses_declare()
+        .filter(|w| w.named.is_some())
+        .for_each(|w| w.children_tokens(ctx, &mut tokens));
 
       // data flow should not effect the named object init order, and we allow circle
       // follow with skip_nc attribute. So we add the data flow relationship and
@@ -227,33 +197,7 @@ impl DeclareMacro {
   /// }
   /// ```
   fn analyze_object_follows(&self) -> BTreeMap<Ident, Follows> {
-    let mut follows: BTreeMap<Ident, Follows> = BTreeMap::new();
-    self
-      .widget
-      .recursive_call(|w| {
-        if w.named.is_some() {
-          let ref_name = w.widget_identify();
-          w.sugar_fields
-            .collect_wrap_widget_follows(&ref_name, &mut follows);
-
-          let w_follows: Follows = w
-            .fields
-            .iter()
-            .filter_map(FollowPart::from_widget_field)
-            .chain(
-              w.sugar_fields
-                .normal_attr_iter()
-                .chain(w.sugar_fields.listeners_iter())
-                .filter_map(FollowPart::from_widget_field),
-            )
-            .collect();
-          if !w_follows.is_empty() {
-            follows.insert(ref_name, w_follows);
-          }
-        }
-        Ok(())
-      })
-      .expect("should always success.");
+    let mut follows = self.widget.analyze_object_follows();
 
     if let Some(animations) = self.animations.as_ref() {
       follows.extend(animations.follows_iter());
@@ -265,29 +209,13 @@ impl DeclareMacro {
   fn named_objects_def_tokens(
     &self,
     ctx: &DeclareCtx,
-  ) -> (HashMap<Ident, TokenStream2, RandomState>, TokenStream2) {
+  ) -> HashMap<Ident, TokenStream2, RandomState> {
     let mut named_defs = HashMap::default();
-
-    let mut children_tokens = quote! {};
-    let _ = self.widget.recursive_call(|w| {
-      if w.named.is_some() {
-        let (name, def_tokens) = w.host_widget_tokens(ctx);
-        named_defs.insert(name.clone(), def_tokens);
-
-        w.sugar_fields
-          .gen_wrap_widgets_tokens(&name, ctx, |name, wrap_tokens| {
-            named_defs.insert(name, wrap_tokens);
-          });
-        w.children_tokens(ctx, &mut children_tokens);
-      }
-      Ok(())
-    });
-
+    self.widget.named_objects_def_tokens(&mut named_defs, ctx);
     if let Some(ref a) = self.animations {
       a.named_objects_def_tokens(&mut named_defs);
     }
-
-    (named_defs, children_tokens)
+    named_defs
   }
 
   fn circle_check<F>(follow_infos: &BTreeMap<Ident, Follows>, err_detect: F) -> Result<()>
@@ -358,21 +286,6 @@ impl DeclareMacro {
       stacked.insert(w);
     }
   }
-
-  fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
-    self.widget.recursive_call(|w| {
-      if w.named.is_some() {
-        w.unnecessary_skip_nc_check()?;
-        w.wrap_widget_if_guard_check(ctx)?;
-      }
-      w.sugar_fields.key_follow_check()?;
-      Ok(())
-    })
-  }
-}
-
-impl Spanned for DeclareWidget {
-  fn span(&self) -> Span { self.path.span().join(self.brace_token.span).unwrap() }
 }
 
 impl Spanned for Child {
@@ -388,308 +301,6 @@ impl ToTokens for IfGuard {
   fn to_tokens(&self, tokens: &mut TokenStream2) {
     self.if_token.to_tokens(tokens);
     self.cond.to_tokens(tokens);
-  }
-}
-
-impl ToTokens for DeclareField {
-  fn to_tokens(&self, tokens: &mut TokenStream2) {
-    self.member.to_tokens(tokens);
-    self.colon_token.to_tokens(tokens);
-    let expr = &self.expr;
-    if let Some(if_guard) = self.if_guard.as_ref() {
-      tokens.extend(quote! {
-        #if_guard {
-          #expr
-        } else {
-          <_>::default()
-        }
-      })
-    } else if self.colon_token.is_some() {
-      expr.to_tokens(tokens)
-    }
-  }
-}
-
-impl DeclareWidget {
-  fn host_widget_tokens(&self, ctx: &DeclareCtx) -> (Ident, TokenStream2) {
-    let Self { path: ty, fields, .. } = self;
-    let attrs_follow = self
-      .sugar_fields
-      .normal_attr_iter()
-      .any(|f| f.follows.is_some());
-
-    let name = self.widget_identify();
-    let gen = WidgetGen { ty, name, fields };
-
-    let mut tokens = gen.gen_widget_tokens(ctx, attrs_follow);
-    self.normal_attrs_tokens(&mut tokens);
-    self.listeners_tokens(&mut tokens);
-    (gen.name.clone(), tokens)
-  }
-
-  fn children_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream2) {
-    self
-      .children
-      .iter()
-      .enumerate()
-      .for_each(|(idx, c)| match c {
-        Child::Declare(d) => {
-          if d.named.is_none() {
-            let child_widget_name = widget_def_variable(&d.widget_identify());
-            let c_def_name = widget_def_variable(&child_variable(c, idx));
-            let mut child_tokens = quote! {};
-            d.widget_full_tokens(ctx, &mut child_tokens);
-            tokens.extend(quote! { let #c_def_name = { #child_tokens  #child_widget_name }; });
-          } else {
-            tokens.extend(d.compose_tokens());
-          }
-        }
-        Child::Expr(expr) => {
-          let c_name = widget_def_variable(&child_variable(c, idx));
-          tokens.extend(quote! { let #c_name = #expr; });
-        }
-      });
-  }
-
-  fn compose_tokens(&self) -> TokenStream2 {
-    let mut compose_tokens = quote! {};
-    let name = &self.widget_identify();
-    let def_name = widget_def_variable(name);
-    if !self.children.is_empty() {
-      // Must be MultiChild if there are multi child. Give this hint for better
-      // compile error if wrong size child declared.
-      let hint = (self.children.len() > 1).then(|| quote! {: MultiChild<_>});
-
-      let children = self.children.iter().enumerate().map(|(idx, c)| {
-        let c_name = match c {
-          Child::Declare(d) if d.named.is_some() => d.widget_identify(),
-          _ => child_variable(c, idx),
-        };
-        let c_def_name = widget_def_variable(&c_name);
-        quote! { .have_child(#c_def_name) }
-      });
-      compose_tokens.extend(quote! { let #def_name #hint = #def_name #(#children)*; });
-    }
-    compose_tokens.extend(self.sugar_fields.gen_wrap_widget_compose_tokens(&name));
-
-    compose_tokens
-  }
-
-  // return this widget tokens and its def name;
-  fn widget_full_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream2) {
-    let (name, widget_tokens) = self.host_widget_tokens(ctx);
-    tokens.extend(widget_tokens);
-
-    self
-      .sugar_fields
-      .gen_wrap_widgets_tokens(&name, ctx, |_, wrap_widget| {
-        tokens.extend(wrap_widget);
-      });
-
-    self.children_tokens(ctx, tokens);
-    tokens.extend(self.compose_tokens());
-  }
-
-  pub(crate) fn recursive_call<'a, F>(&'a self, mut f: F) -> Result<()>
-  where
-    F: FnMut(&'a DeclareWidget) -> Result<()>,
-  {
-    fn inner<'a, F>(w: &'a DeclareWidget, f: &mut F) -> Result<()>
-    where
-      F: FnMut(&'a DeclareWidget) -> Result<()>,
-    {
-      f(w)?;
-      w.children.iter().try_for_each(|w| match w {
-        Child::Declare(w) => inner(w, f),
-        Child::Expr(_) => Ok(()), // embed declare in express will extend tokens individual.
-      })
-    }
-    inner(self, &mut f)
-  }
-
-  fn widget_identify(&self) -> Ident {
-    match &self.named {
-      Some(Id { name, .. }) => name.clone(),
-      _ => ribir_variable("ribir", self.path.span()),
-    }
-  }
-}
-
-pub fn upstream_observable(depends_on: &[FollowOn]) -> TokenStream2 {
-  let upstream = depends_on.iter().map(|fo| {
-    let depend_w = &fo.widget;
-    quote! { #depend_w.change_stream() }
-  });
-
-  if depends_on.len() > 1 {
-    quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
-  } else {
-    quote! { #(#upstream)* }
-  }
-}
-
-impl DeclareWidget {
-  pub fn normal_attrs_tokens(&self, tokens: &mut TokenStream2) {
-    let w_name = widget_def_variable(&self.widget_identify());
-
-    self.sugar_fields.normal_attr_iter().for_each(
-      |DeclareField {
-         expr,
-         member,
-         follows,
-         skip_nc,
-         if_guard,
-         ..
-       }| {
-        let method = Ident::new(&format!("with_{}", quote! {#member}), member.span());
-        let depends_tokens = follows.as_ref().map(|follows| {
-          let upstream = upstream_observable(follows);
-          let set_attr = Ident::new(&format!("try_set_{}", quote! {#member}), member.span());
-          let get_attr = Ident::new(&format!("get_{}", quote! {#member}), member.span());
-
-          let self_ref = self.widget_identify();
-          let value = ribir_variable("v", expr.span());
-          let mut assign_value = quote! { #self_ref.silent().#set_attr(#value); };
-          if skip_nc.is_some() {
-            assign_value = quote! {
-              if #self_ref.#get_attr().as_ref() != Some(&#value) {
-                #assign_value
-              }
-            };
-          }
-
-          quote! {
-            #upstream.subscribe(
-              move |_| {
-                let #value = #expr;
-                #assign_value
-              }
-            );
-          }
-        });
-        let attr_tokens = quote! {
-          #depends_tokens
-          let #w_name = #w_name.#method(#expr);
-        };
-        if let Some(if_guard) = if_guard {
-          tokens.extend(quote! {
-            let #w_name = #if_guard {
-              #attr_tokens
-              #w_name
-            }  else {
-              // insert a empty attr for if-else type compatibility
-              #w_name.insert_attr(())
-            };
-          })
-        } else {
-          tokens.extend(attr_tokens)
-        }
-      },
-    )
-  }
-
-  pub fn listeners_tokens(&self, tokens: &mut TokenStream2) {
-    let name = widget_def_variable(&self.widget_identify());
-
-    let (guards, without_guards) = self
-      .sugar_fields
-      .listeners_iter()
-      .partition::<Vec<_>, _>(|f| f.if_guard.is_some());
-    guards
-      .iter()
-      .for_each(|DeclareField { expr, member, if_guard, .. }| {
-        let if_guard = if_guard.as_ref().unwrap();
-        tokens.extend(quote! {
-          let #name =  #if_guard {
-            #name.#member(#expr)
-          } else {
-            // insert a empty attr for if-else type compatibility
-            #name.insert_attr(())
-          };
-        });
-      });
-
-    if !without_guards.is_empty() {
-      let attrs = without_guards
-        .iter()
-        .map(|DeclareField { expr, member, .. }| {
-          quote! {
-            .#member(#expr)
-          }
-        });
-
-      tokens.extend(quote! { let #name = #name #(#attrs)*; });
-    }
-  }
-
-  /// Return a iterator of all syntax fields, include attributes and wrap
-  /// widget.
-  pub fn all_syntax_fields(&self) -> impl Iterator<Item = &DeclareField> {
-    self
-      .fields
-      .iter()
-      .chain(self.sugar_fields.normal_attr_iter())
-      .chain(self.sugar_fields.listeners_iter())
-      .chain(self.sugar_fields.widget_wrap_field_iter())
-  }
-
-  fn unnecessary_skip_nc_check(&self) -> Result<()> {
-    debug_assert!(self.named.is_some());
-    fn unnecessary_skip_nc(
-      DeclareField { skip_nc, follows: depends_on, .. }: &DeclareField,
-    ) -> Result<()> {
-      match (depends_on, skip_nc) {
-        (None, Some(attr)) => Err(DeclareError::UnnecessarySkipNc(attr.span().unwrap())),
-        _ => Ok(()),
-      }
-    }
-
-    // normal widget
-    self
-      .fields
-      .iter()
-      .chain(self.sugar_fields.normal_attr_iter())
-      .try_for_each(unnecessary_skip_nc)?;
-
-    self
-      .sugar_fields
-      .widget_wrap_field_iter()
-      .try_for_each(unnecessary_skip_nc)
-  }
-
-  fn wrap_widget_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
-    debug_assert!(self.named.is_some());
-
-    self
-      .sugar_fields
-      .widget_wrap_field_iter()
-      .filter(|f| f.if_guard.is_some())
-      .try_for_each(|f| {
-        let w_ref = self.widget_identify();
-        let wrap_name = ribir_prefix_variable(&f.member, &w_ref.to_string());
-
-        if ctx.be_followed(&wrap_name) {
-          let if_guard_span = f.if_guard.as_ref().unwrap().span().unwrap();
-          let mut use_spans = vec![];
-          self.recursive_call(|w| {
-            w.all_syntax_fields()
-              .filter_map(|f| f.follows.as_ref())
-              .flat_map(|follows| follows.iter())
-              .filter(|f| f.widget == wrap_name)
-              .for_each(|f| use_spans.extend(f.spans.iter().map(|s| s.unwrap())));
-            Ok(())
-          })?;
-
-          let host_span = w_ref.span().unwrap();
-          let wrap_span = wrap_name.span().unwrap();
-          return Err(DeclareError::DependOnWrapWidgetWithIfGuard {
-            wrap_def_spans: [host_span, wrap_span, if_guard_span],
-            use_spans,
-            wrap_name,
-          });
-        }
-        Ok(())
-      })
   }
 }
 

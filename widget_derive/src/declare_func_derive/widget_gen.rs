@@ -1,12 +1,15 @@
 use crate::{
   declare_derive::field_convert_method,
-  declare_func_derive::{build_ctx_name, skip_nc_assign, upstream_observable, widget_def_variable},
+  declare_func_derive::{build_ctx_name, skip_nc_assign, widget_def_variable},
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Ident, Path};
 
-use super::{field_guard_variable, DeclareCtx, DeclareField};
+use super::{
+  declare_widget::{upstream_observable, DeclareField},
+  field_guard_variable, DeclareCtx,
+};
 
 pub struct WidgetGen<'a> {
   pub ty: &'a Path,

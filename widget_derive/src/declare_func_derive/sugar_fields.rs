@@ -13,12 +13,15 @@ use syn::{
 
 macro_rules! assign_uninit_field {
   ($self: ident.$name: ident, $field: ident) => {
-    if $self.$name.is_none() {
-      $self.$name = Some($field);
-      Ok(None)
+    assign_uninit_field!($self.$name, $field, $name)
+  };
+  ($left: expr, $right: ident, $name: ident) => {
+    if $left.is_none() {
+      $left = Some($right);
+      Ok(())
     } else {
       Err(syn::Error::new(
-        $field.span(),
+        $right.span(),
         format!("field `{}` specified more than once", stringify!($name)).as_str(),
       ))
     }
@@ -31,7 +34,7 @@ use crate::{declare_func_derive::widget_gen::WidgetGen, error::DeclareError};
 use super::{
   declare_visit_mut::DeclareCtx, kw, ribir_suffix_variable, widget_def_variable, FollowPart,
 };
-use super::{DeclareField, Follows};
+use super::{declare_widget::DeclareField, Follows};
 
 #[derive(Debug)]
 pub struct Id {
@@ -123,17 +126,20 @@ macro_rules! fields_sugar_def {
       pub fn assign_field(&mut self, f: DeclareField) -> Result<Option<DeclareField>> {
         $(
           if f.member == stringify!($attrs) {
-            return assign_uninit_field!(self.$attrs, f)
+            assign_uninit_field!(self.$attrs, f)?;
+            return Ok(None);
           }
         )*
         $(
           if f.member == stringify!($listeners) {
-            return assign_uninit_field!(self.$listeners, f)
+            assign_uninit_field!(self.$listeners, f)?;
+            return Ok(None);
           }
         )*
         $(
           if f.member == stringify!($w_wrap) {
-            return assign_uninit_field!(self.$w_wrap, f)
+            assign_uninit_field!(self.$w_wrap, f)?;
+            return Ok(None);
           }
         )*
         Ok(Some(f))

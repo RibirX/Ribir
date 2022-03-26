@@ -3,7 +3,7 @@ use crate::error::DeclareError;
 use super::{
   ribir_suffix_variable,
   sugar_fields::{Id, SugarFields},
-  DeclareField, DeclareMacro, DeclareWidget, FollowOn,
+  DeclareMacro, FollowOn,
 };
 
 use proc_macro::{Diagnostic, Level, TokenStream};
@@ -31,7 +31,7 @@ pub struct DeclareCtx {
 }
 
 #[derive(PartialEq, Clone, Copy)]
-enum ReferenceInfo {
+pub enum ReferenceInfo {
   // reference by other expression, but not follow its change and needn't capture its state
   // reference
   Reference,
@@ -252,54 +252,6 @@ impl DeclareCtx {
     }
   }
 
-  pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
-    self.visit_ident_mut(&mut f.member);
-    if let Some(if_guard) = f.if_guard.as_mut() {
-      self
-        .borrow_capture_scope(false)
-        .visit_expr_mut(&mut if_guard.cond);
-    }
-    self.visit_expr_mut(&mut f.expr);
-
-    f.follows = self.take_current_follows();
-  }
-
-  pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
-    fn visit_self_only(w: &mut DeclareWidget, ctx: &mut DeclareCtx) {
-      ctx.stack_push();
-      w.fields
-        .iter_mut()
-        .for_each(|f| ctx.visit_declare_field_mut(f));
-
-      ctx.visit_sugar_field_mut(&mut w.sugar_fields);
-      if let Some(Id { name, .. }) = w.named.as_ref() {
-        // named widget followed by attributes or listeners should also mark be followed
-        // because it's need capture its state reference to set value.
-        let followed_by_attr = w
-          .sugar_fields
-          .normal_attr_iter()
-          .chain(w.sugar_fields.listeners_iter())
-          .any(|f| f.follows.is_some());
-
-        if followed_by_attr {
-          ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
-        }
-      }
-
-      ctx.stack_pop()
-    }
-    visit_self_only(w, self);
-    w.children.iter_mut().for_each(|c| match c {
-      super::Child::Declare(d) => visit_self_only(d, self),
-      super::Child::Expr(expr) => {
-        self.stack_push();
-        self.borrow_capture_scope(false).visit_expr_mut(expr);
-        self.stack_pop();
-        self.take_current_follows();
-      }
-    })
-  }
-
   pub fn visit_sugar_field_mut(&mut self, sugar_field: &mut SugarFields) {
     sugar_field.visit_sugar_field_mut(self);
   }
@@ -312,11 +264,12 @@ impl DeclareCtx {
         .object_names_iter()
         .try_for_each(|name| self.add_named_object(name))?;
     }
-    d.widget.recursive_call(|w| {
+    d.widget.traverses_declare().try_for_each(|w| {
       if let Some(Id { name, .. }) = w.named.as_ref() {
-        self.add_named_object(name)?;
+        self.add_named_object(name)
+      } else {
+        Ok(())
       }
-      Ok(())
     })
   }
 
@@ -378,9 +331,9 @@ impl DeclareCtx {
     CaptureScopeGuard::new(self, capture_scope)
   }
 
-  fn stack_push(&mut self) { self.analyze_stack.push(vec![]); }
+  pub fn stack_push(&mut self) { self.analyze_stack.push(vec![]); }
 
-  fn stack_pop(&mut self) { self.analyze_stack.pop(); }
+  pub fn stack_pop(&mut self) { self.analyze_stack.pop(); }
 
   // return the name of widget that `ident` point to if it's have.
   pub fn find_named_widget<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
@@ -422,7 +375,7 @@ impl DeclareCtx {
     );
   }
 
-  fn add_reference(&mut self, name: Ident, ref_info: ReferenceInfo) {
+  pub fn add_reference(&mut self, name: Ident, ref_info: ReferenceInfo) {
     let v = self
       .be_followed
       .entry(name)
