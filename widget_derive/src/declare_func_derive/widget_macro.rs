@@ -1,12 +1,11 @@
-use std::collections::{BTreeMap, HashMap};
-
 use ahash::RandomState;
-use proc_macro2::TokenStream;
+use proc_macro2::{Delimiter, Group, Punct, Spacing, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
+use std::collections::{BTreeMap, HashMap};
 use syn::{
   braced,
-  parse::{Parse, ParseStream},
-  parse_quote,
+  buffer::Cursor,
+  parse::{discouraged::Speculative, Parse, ParseStream},
   spanned::Spanned,
   token, Expr, Ident, Token,
 };
@@ -16,7 +15,7 @@ use super::{
   declare_widget::SugarFields, kw, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo,
   FollowOn, FollowPlace, Follows, Result,
 };
-use crate::error::DeclareError;
+use crate::{declare_func_derive::DECLARE_WRAP_MACRO, error::DeclareError};
 
 pub struct WidgetMacro {
   _widget_token: kw::widget,
@@ -56,19 +55,34 @@ impl Parse for WidgetMacro {
         break;
       }
       let lk = content.lookahead1();
-      if lk.peek(kw::dataflows) {
+      if lk.peek(kw::declare) {
+        let macro_wrap = content.fork();
+        let declare = macro_wrap.parse::<Ident>()?;
+        let name = macro_wrap.parse::<Ident>()?;
+        let declare_content;
+        let braced = braced!(declare_content in macro_wrap);
+        let wrapped_tokens =
+          declare_content.step(|step_cursor| Ok(macro_wrap_declare_keyword(*step_cursor)))?;
+        let w: DeclareWidget = if let Some(tts) = wrapped_tokens {
+          let mut tokens = quote! { #declare #name };
+          braced.surround(&mut tokens, |tokens| tokens.extend(tts));
+          content.advance_to(&macro_wrap);
+          syn::parse2(tokens)?
+        } else {
+          content.parse()?
+        };
+        assign_uninit_field!(widget, w, declare)?;
+      } else if lk.peek(kw::dataflows) {
         let d = content.parse()?;
         assign_uninit_field!(dataflows, d, dataflows)?;
       } else if lk.peek(kw::animations) {
         let a = content.parse()?;
         assign_uninit_field!(animations, a, animations)?;
-      } else if lk.peek(kw::declare) {
-        let w = content.parse()?;
-        assign_uninit_field!(widget, w, declare)?;
       } else {
         return Err(lk.error());
       }
     }
+
     let widget = widget.ok_or_else(|| {
       syn::Error::new(
         widget_token.span(),
@@ -332,33 +346,6 @@ impl DeclareCtx {
       ctx.visit_animations_mut(animations);
     }
   }
-
-  pub fn expand_widget_macro(&mut self, tokens: TokenStream) -> Expr {
-    let mut widget: WidgetMacro = match syn::parse2(tokens) {
-      Ok(e) => e,
-      Err(e) => {
-        let tokens = e.into_compile_error();
-        return syn::parse2(tokens).expect("expand widget macro failed");
-      }
-    };
-
-    let named = self.named_objects.clone();
-
-    let mut ctx = self.borrow_capture_scope(true);
-    let tokens = widget
-      .gen_tokens(&mut *ctx)
-      .unwrap_or_else(|err| err.into_compile_error());
-
-    // trigger warning and restore named widget.
-    named.iter().for_each(|k| {
-      ctx.named_objects.remove(k);
-    });
-
-    ctx.emit_unused_id_warning();
-    ctx.named_objects = named;
-
-    parse_quote!(#tokens)
-  }
 }
 
 fn is_widget_attr(origin: FollowPlace) -> bool {
@@ -389,4 +376,111 @@ impl Parse for IfGuard {
       fat_arrow_token: input.parse()?,
     })
   }
+}
+
+// todo: only expr child need wrap, 
+/// Wrap `declare Row {...}` with macro `ribir_declare_ಠ_ಠ!`, let our syntax
+/// as a valid rust expression,  so we can use rust syntax to parse and
+/// needn't reimplemented, and easy to interop with rust syntax.
+///
+/// return new tokens if do any wrap else
+fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cursor) {
+  fn sub_token_stream(mut begin: Cursor, end: Option<Cursor>, tts: &mut Vec<TokenTree>) {
+    while Some(begin) != end {
+      match begin.token_tree() {
+        Some((tt, rest)) => {
+          tts.push(tt);
+          begin = rest;
+        }
+        None => break,
+      }
+    }
+  }
+
+  fn group_inner_wrap(cursor: Cursor, delim: Delimiter) -> Option<(Group, Cursor)> {
+    cursor
+      .group(delim)
+      .and_then(|(group_cursor, span, cursor)| {
+        macro_wrap_declare_keyword(group_cursor).0.map(|tts| {
+          let mut group = Group::new(delim, tts.into_iter().collect());
+          group.set_span(span);
+          (group, cursor)
+        })
+      })
+  }
+
+  let mut tts = vec![];
+  let mut stream_cursor = cursor.clone();
+  loop {
+    if let Some((n, c)) = cursor.ident() {
+      if n == "widget" {
+        let widget_macro = c
+          .punct()
+          .filter(|(p, _)| p.as_char() == '!')
+          .and_then(|(_, c)| {
+            c.group(Delimiter::Brace)
+              .or_else(|| c.group(Delimiter::Parenthesis))
+              .or_else(|| c.group(Delimiter::Bracket))
+          });
+        if let Some((_, _, c)) = widget_macro {
+          // skip inner widget! macro, wrap wait itself parse.
+          cursor = c;
+          continue;
+        }
+      } else if n == "declare" {
+        let declare_group =
+          c.ident()
+            .map(|(name, c)| (n, name, c))
+            .and_then(|(declare, name, c)| {
+              c.group(Delimiter::Brace)
+                .map(|(body_cursor, span, cursor)| (declare, name, body_cursor, span, cursor))
+            });
+        if let Some((declare, name, body_cursor, body_span, c)) = declare_group {
+          sub_token_stream(stream_cursor, Some(cursor), &mut tts);
+          let body = macro_wrap_declare_keyword(body_cursor).0.map_or_else(
+            || body_cursor.token_stream(),
+            |tokens| tokens.into_iter().collect(),
+          );
+
+          tts.push(TokenTree::Ident(Ident::new(
+            DECLARE_WRAP_MACRO,
+            declare.span(),
+          )));
+          let mut bang = Punct::new('!', Spacing::Alone);
+          bang.set_span(declare.span());
+          tts.push(TokenTree::Punct(bang));
+
+          let mut declare_group = Group::new(Delimiter::Brace, body);
+          declare_group.set_span(body_span);
+          let mut macro_group =
+            Group::new(Delimiter::Brace, quote! { #declare #name #declare_group});
+          macro_group.set_span(declare.span());
+          tts.push(TokenTree::Group(macro_group));
+
+          cursor = c;
+          stream_cursor = c;
+          continue;
+        }
+      }
+      cursor = c;
+    } else if let Some((group, c)) = group_inner_wrap(cursor, Delimiter::Brace)
+      .or_else(|| group_inner_wrap(cursor, Delimiter::Bracket))
+      .or_else(|| group_inner_wrap(cursor, Delimiter::Parenthesis))
+    {
+      sub_token_stream(stream_cursor, Some(cursor), &mut tts);
+      tts.push(TokenTree::Group(group));
+      cursor = c;
+      stream_cursor = c;
+    } else if let Some((_, c)) = cursor.token_tree() {
+      cursor = c;
+    } else {
+      break;
+    }
+  }
+
+  let tts = (!tts.is_empty()).then(|| {
+    sub_token_stream(stream_cursor, None, &mut tts);
+    tts.into_iter().collect()
+  });
+  (tts, cursor)
 }

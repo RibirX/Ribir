@@ -10,7 +10,7 @@ impl CombinationWidget for RecursiveRow {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
-      Row{
+      declare Row{
         (0..self.width)
           .map(|_| {
             if self.depth > 1 {

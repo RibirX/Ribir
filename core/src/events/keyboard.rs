@@ -79,7 +79,7 @@ mod tests {
         let down_keys = self.0.clone();
         let up_keys = self.0.clone();
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: Size::zero(),
             auto_focus: true,
             on_key_down: move |key| {

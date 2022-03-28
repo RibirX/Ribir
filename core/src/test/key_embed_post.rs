@@ -15,7 +15,7 @@ impl CombinationWidget for EmbedPostWithKey {
 
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
-      Row {
+      declare Row {
         key: 0,
         v_align: CrossAxisAlign::Start,
         Text { text: format!("Embed{} test title", self.level), key: 1},

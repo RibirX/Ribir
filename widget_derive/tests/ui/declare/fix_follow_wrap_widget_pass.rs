@@ -3,7 +3,7 @@ use ribir::prelude::*;
 #[widget]
 fn build(_this: (), ctx: &mut BuildCtx) -> BoxedWidget {
   widget! {
-    Row {
+    declare Row {
       id: _parent,
       background: son.background.clone(),
       margin: son.margin.clone(),

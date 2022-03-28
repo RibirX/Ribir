@@ -51,7 +51,7 @@ macro_rules! fields_sugar_def {
       $w_wrap:ident : $w_ty: literal
     ),*
   ) => {
-    #[derive(Default)]
+    #[derive(Default, Debug)]
     pub struct SugarFields {
       $($attrs : Option<DeclareField>,)*
       $($listeners: Option<DeclareField>,)*

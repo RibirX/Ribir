@@ -5,7 +5,7 @@ fn main() {}
 #[widget]
 fn ref_parent(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: size_box,
       size: Size::new(50., 50.),
       SizedBox {
@@ -18,7 +18,7 @@ fn ref_parent(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn ref_child(_this: (), ctx: &mut BuildCtx) {
   widget! {
-     SizedBox {
+     declare SizedBox {
        size: child_box.size,
        SizedBox {
         id: child_box,
@@ -31,7 +31,7 @@ fn ref_child(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn ref_sibling(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    Flex {
+    declare Flex {
       SizedBox {
         size: size2.size,
       }
@@ -50,7 +50,7 @@ fn ref_sibling(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn temp_var_name_not_conflict(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    Flex {
+    declare Flex {
       SizedBox {
         id: c0,
         size: w.size,
@@ -69,7 +69,7 @@ fn temp_var_name_not_conflict(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn wrap_widget_effect_order(_this: (), ctx: &mut BuildCtx) {
   let _x = widget! {
-    SizedBox {
+    declare SizedBox {
       size: Size::zero(),
       margin: child.margin.clone(),
       SizedBox{

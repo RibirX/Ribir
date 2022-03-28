@@ -35,7 +35,7 @@
 //!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     widget!{
-//!       PeopleCard {
+//!       declare PeopleCard {
 //!         name: "Mr Ribir",
 //!         email: "ribir@XXX.com".to_string(),
 //!         tel: None,
@@ -85,7 +85,7 @@
 //!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     widget!{
-//!       PeopleCard {
+//!       declare PeopleCard {
 //!         name: "Mr Ribir",
 //!         email: "ribir@XXX.com",
 //!         tel: None,
@@ -138,7 +138,7 @@
 //!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     widget!{
-//!       PeopleCard {
+//!       declare PeopleCard {
 //!         name: "Mr Ribir",
 //!         email: "ribir@XXX.com",
 //!         margin: EdgeInsets::all(8.)

@@ -27,7 +27,7 @@ impl CombinationWidget for EmbedPost {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
-      Row {
+      declare Row {
         v_align: CrossAxisAlign::Start,
         Text { text: self.title },
         Text { text: self.author },

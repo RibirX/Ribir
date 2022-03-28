@@ -62,7 +62,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox{
+          declare SizedBox{
             size: Size::new(f32::INFINITY, f32::INFINITY),
             cursor: CursorIcon::AllScroll,
             Row{

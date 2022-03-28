@@ -22,7 +22,7 @@
 //!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     widget!{
-//!       SizedBox {
+//!       declare SizedBox {
 //!         size: self.size,
 //!         background: self.color.clone()
 //!       }
@@ -60,7 +60,7 @@
 //!   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     let mut this_ref = unsafe { this.state_ref() };
 //!     widget!{
-//!       SizedBox {
+//!       declare SizedBox {
 //!         size: this.size,
 //!         background: this.color.clone(),
 //!         on_tap: move |_| this_ref.color = Color::BLACK

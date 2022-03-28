@@ -7,7 +7,7 @@ fn main() {
 #[widget]
 fn unused_id_warning(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: test_id,
       size: Size::zero()
     }
@@ -17,7 +17,7 @@ fn unused_id_warning(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn used_id_no_warning(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: id1,
       size: Size::new(100., 100.),
       SizedBox {

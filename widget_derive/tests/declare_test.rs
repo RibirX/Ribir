@@ -15,9 +15,9 @@ fn declare_smoke() {
 
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-         SizedBox {
-           size: Size::new(500.,500.),
-           background: Color::RED,
+        declare SizedBox {
+          size: Size::new(500.,500.),
+          background: Color::RED,
          }
       }
     }
@@ -32,7 +32,7 @@ fn simple_ref_bind_work() {
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = Size::new(500., 500.);
       widget! {
-       Flex {
+       declare Flex {
          SizedBox {
            size: size2.size,
            on_tap: move |_| size2.size *= 2.,
@@ -68,7 +68,7 @@ fn event_attr_sugar_work() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        SizedBox {
+        declare SizedBox {
           id: sized_box,
           size: BEFORE_SIZE,
           SizedBox {
@@ -102,7 +102,7 @@ fn widget_wrap_bind_work() {
 
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        Flex {
+        declare Flex {
           SizedBox {
             id: sibling,
             margin: EdgeInsets::all(1.0),
@@ -140,13 +140,9 @@ fn expression_for_children() {
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = self.0;
       widget! {
-        Flex {
+        declare Flex {
           SizedBox { size }
-          (0..3).map(|_| widget!{
-            SizedBox {
-              size,
-            }
-          }),
+          (0..3).map(|_| SizedBox { size}),
           (self.0.area() > 2.).then(|| SizedBox { size } )
         }
       }
@@ -172,23 +168,21 @@ fn expression_for_children() {
 }
 
 #[test]
-fn embed_declare_ref_outside() {
+fn embed_widget_ref_outside() {
   struct T;
   impl CombinationWidget for T {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        Flex {
+        declare Flex {
           SizedBox {
             id: first,
             size: Size::new(1., 1.),
             on_tap: move |_| first.size = Size::new(2., 2.)
           }
-          (0..3).map(|_| widget!{
-            SizedBox {
-              size: first.size,
-            }
-          })
+          // todo: should warning use id in embed expression widget without declare keyword.
+          // without `declare` compile pass but unit test pass.
+          (0..3).map(|_| declare SizedBox { size: first.size } )
         }
       }
     }
@@ -214,7 +208,7 @@ fn data_flow_macro() {
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = Size::new(1., 1.);
       widget! {
-        Flex {
+        declare Flex {
           on_tap: move |_| a.size *= 2.,
           SizedBox { id: c, size }
           SizedBox { id: a, size }
@@ -248,7 +242,7 @@ fn local_var_not_bind() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        SizedBox {
+        declare SizedBox {
           size: {
             let _size_box = EXPECT_SIZE;
             let _size_box_def = EXPECT_SIZE;
@@ -277,7 +271,7 @@ fn with_attr_ref() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        Flex {
+        declare Flex {
           id: root,
           cursor: tap_box.get_cursor().unwrap().clone(),
           // a hack method to capture widget reference only for test, should not use
@@ -322,7 +316,7 @@ fn if_guard_field_true() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        SizedBox {
+        declare SizedBox {
           size if true => : Size::new(100., 100.)
         }
       }
@@ -341,7 +335,7 @@ fn if_guard_field_false() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        SizedBox {
+        declare SizedBox {
           size if false => : Size::new(100., 100.)
         }
       }
@@ -358,7 +352,7 @@ fn attr_bind_to_self() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        SizedBox {
+        declare SizedBox {
           id: self_id,
           size: Size::new(5., 5.),
           #[skip_nc]
@@ -399,7 +393,7 @@ fn if_guard_work() {
     #[widget]
     fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
-        SizedBox {
+        declare SizedBox {
           size if true => : Size::new(100., 100.),
           margin if false =>: EdgeInsets::all(1.),
           cursor if true =>: CursorIcon::Hand

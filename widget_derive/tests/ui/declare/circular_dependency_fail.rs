@@ -3,8 +3,7 @@ use ribir::prelude::*;
 #[widget]
 fn circular_dependency_err(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    Flex {
-      ..<_>::default(),
+    declare Flex {
       SizedBox {
         id: id1,
         size: id2.size,
@@ -24,7 +23,7 @@ fn circular_dependency_err(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn wrap_widget_circular_err(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: parent,
       size: Size::zero(),
       margin: child.margin.clone(),
@@ -40,7 +39,7 @@ fn wrap_widget_circular_err(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn data_flow_circular_err(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: a,
       size: Size::zero(),
     }
@@ -51,7 +50,7 @@ fn data_flow_circular_err(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn data_flow_circular_field_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: a,
       size: Size::zero(),
       SizedBox {
@@ -69,7 +68,7 @@ fn data_flow_circular_field_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn circular_follows_with_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: a,
       size: Size::zero(),
     }
