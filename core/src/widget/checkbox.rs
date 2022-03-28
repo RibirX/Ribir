@@ -24,6 +24,7 @@ impl Checkbox {
 }
 
 impl StatefulCombination for Checkbox {
+  #[widget]
   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     let CheckboxTheme {
       mut size,
@@ -41,7 +42,7 @@ impl StatefulCombination for Checkbox {
       size += border_width * 2.;
     }
 
-    declare! {
+    widget! {
       SizedBox {
         size: Size::new(size, size),
         margin: EdgeInsets::all(4.),

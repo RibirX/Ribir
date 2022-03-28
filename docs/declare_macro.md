@@ -1,18 +1,19 @@
-# The `declare!` macro
+# The `widget!` macro
 
-`declare!` macro provide a DSL language to help you to build your declare and reactive UI in a easy and expressive way which base on rust struct literal syntax and with a few extensions.
+`widget!` macro provide a DSL language to help you to build your declare and reactive UI in a easy and expressive way which base on rust struct literal syntax and with a few extensions.
 
 ## Nested struct literal syntax
 
-`declare!` macro support all rust struct literal syntax and can nested other struct literal as its children if it can accept children.
+`widget!` macro support all rust struct literal syntax and can nested other struct literal as its children if it can accept children.
 
 ```rust
 use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare! {
+    widget! {
       SizedBox {
         size: Size::new(100., 100.),
         Row {
@@ -32,15 +33,16 @@ Notice, the nested children must declare after the fields.
 
 ## Built-in fields to extend the literal syntax
 
-In addition to using own fields of widget, `declare!` provide a dozens of built-in common fields that can used to any widget, like `padding` `margin` `background` and so on. [See the full list of built-in fields][builtin] to know what you can use.
+In addition to using own fields of widget, `widget!` provide a dozens of built-in common fields that can used to any widget, like `padding` `margin` `background` and so on. [See the full list of built-in fields][builtin] to know what you can use.
 
 ```rust
 use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       SizedBox {
         size: Size::new(100., 100.),
         background: Color::RED,
@@ -51,7 +53,7 @@ impl CombinationWidget for T {
 }
 ```
 
-Although, `SizedBox` not have field `background` and `on_tap`, but the code above is valid, because `declare!` macro provide built-in fields as sugar syntax to simplify use the commonly widgets or attributes.
+Although, `SizedBox` not have field `background` and `on_tap`, but the code above is valid, because `widget!` macro provide built-in fields as sugar syntax to simplify use the commonly widgets or attributes.
 
 ## `if` guard syntax for field.
 
@@ -66,8 +68,9 @@ struct T {
 }
 
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       SizedBox {
         size: self.size,
         margin if self.need_margin =>: EdgeInsets::all(1.),
@@ -87,15 +90,16 @@ use ribir::prelude::*;
 struct RibirSteps;
 
 impl CombinationWidget for RibirSteps {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     const ribir_steps: [&'static str; 5] = [
       "declare UI", "compile to international api", "layout and paint", 
       "generate triangles", "submit to gpu"
     ];
 
-    declare!{
+    widget!{
       Row {
-        ribir_steps.iter().map(|&text| declare!{ Text { text } } )
+        ribir_steps.iter().map(|&text| widget!{ Text { text } } )
       }
     }
   }
@@ -109,18 +113,19 @@ Notice, the expression return type must be:
 - A `Option` of widget type
 - A type which implemented `IntoIterator` and its iterate item is a widget type.
 
-## Use `id` to access and follow widget in the whole `declare!`
+## Use `id` to access and follow widget in the whole `widget!`
 
-`id` is a very special built-in field, it's use to named and identify the widget in the whole `declare!` scope and must be unique.
-A widget with an `id` can be directly accessed in its `declare!` or embed `declare!` across the `id`. 
+`id` is a very special built-in field, it's use to named and identify the widget in the whole `widget!` scope and must be unique.
+A widget with an `id` can be directly accessed in its `widget!` or embed `widget!` across the `id`. 
 
 ```rust
 use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       Row {
         Checkbox {
           id: checkbox,
@@ -149,8 +154,9 @@ use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       Row {
         Text {
           id: a,
@@ -183,8 +189,9 @@ use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       SizedBox {
         id: a,
         size: Size::new(100., 100.),
@@ -205,8 +212,9 @@ use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare! {
+    widget! {
       Column {
         Row {
           Checkbox { id: task }
@@ -243,8 +251,9 @@ use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       Row {
         Text { id: a, text: "Hi" }
         Text { id: b, text: a.text.clone() }
@@ -263,8 +272,9 @@ use ribir::prelude::*;
 
 struct T;
 impl CombinationWidget for T {
+  #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare!{
+    widget!{
       Row {
         Text { id: a, text: "Hi" }
         Text {
@@ -301,61 +311,40 @@ struct Todos {
 };
 
 impl StatefulCombination for Todos {
-   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    let this_ref = unsafe { this.state_ref() };
-    declare! {
-      Column {
-        h_align: CrossAxisAlign::Start,
-        this_ref.tasks.iter().enumerate().map(|(idx, task)|{
-          declare!{
-            Row {
-              margin: EdgeInsets::vertical(4.),
-              Checkbox{
-                id: checkbox,
-                checked: task.finished,
-              }
-              Text{
-                text:task.label.clone(),
+    #[widget]
+    fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      let this_ref = unsafe { this.state_ref() };
+      widget! {
+        Column {
+          h_align: CrossAxisAlign::Start,
+          this_ref.tasks.iter().enumerate().map(|(idx, task)|{
+            widget!{
+              Row {
                 margin: EdgeInsets::vertical(4.),
+                Checkbox{
+                  id: checkbox,
+                  checked: task.finished,
+                }
+                Text{
+                  text:task.label.clone(),
+                  margin: EdgeInsets::vertical(4.),
+                }
               }
+              dataflows { checkbox.checked ~> this_ref.silent().tasks[idx].finished }
             }
-            dataflows { checkbox.checked ~> this_ref.silent().tasks[idx].finished }
-          }
-        })
+          })
+        }
       }
     }
-   }
 }
 ```
 
 See the `data_follow`, `this_ref` with a `silent` method call, this means when `checkbox` change, modify back  to `this_ref.silent().tasks[idx].finished`, but this modify not effect the `StatefulTodos` widget to rebuild.
 
-## Specify the `BuildCtx` name
 
-Every widget in `declare!` will access the `BuildCtx` to build itself, as default it assume the `ctx` is the name of the `BuildCtx`,  but if its name in your `build` method is not `ctx` you can specify it across the `declare!` first arguments. For example 
+## How to support widget work in `widget!` syntax ?
 
-```rust
-use ribir::prelude::*;
-
-struct Todos;
-impl StatefulCombination for Todos {
-  fn build(this: &Stateful<Self>, ctx_name: &mut BuildCtx) -> BoxedWidget {
-    declare! { 
-      // specify the build context name 
-      ctx_name, 
-      // declare widgets struct as usually
-      Column {
-        // omitted!
-      }
-      
-    }
-  }
-}
-```
-
-## How to support widget work in `declare!` syntax ?
-
-Every widget can be supported to use in `declare!` macro if it implemented the [`Declare`](declare). 
+Every widget can be supported to use in `widget!` macro if it implemented the [`Declare`](declare). 
 
 The easiest way it to derive the `Declare` trait. See more detail in the [`mod level document`][mod].
 

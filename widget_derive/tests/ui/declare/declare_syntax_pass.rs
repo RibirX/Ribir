@@ -2,8 +2,9 @@ use ribir::prelude::*;
 
 fn main() {}
 
-fn ref_parent(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn ref_parent(_this: (), ctx: &mut BuildCtx) {
+  widget! {
     SizedBox {
       id: size_box,
       size: Size::new(50., 50.),
@@ -14,8 +15,9 @@ fn ref_parent(ctx: &mut BuildCtx) {
   };
 }
 
-fn ref_child(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn ref_child(_this: (), ctx: &mut BuildCtx) {
+  widget! {
      SizedBox {
        size: child_box.size,
        SizedBox {
@@ -26,8 +28,9 @@ fn ref_child(ctx: &mut BuildCtx) {
   };
 }
 
-fn ref_sibling(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn ref_sibling(_this: (), ctx: &mut BuildCtx) {
+  widget! {
     Flex {
       SizedBox {
         size: size2.size,
@@ -44,8 +47,9 @@ fn ref_sibling(ctx: &mut BuildCtx) {
   };
 }
 
-fn temp_var_name_not_conflict(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn temp_var_name_not_conflict(_this: (), ctx: &mut BuildCtx) {
+  widget! {
     Flex {
       SizedBox {
         id: c0,
@@ -62,8 +66,9 @@ fn temp_var_name_not_conflict(ctx: &mut BuildCtx) {
   };
 }
 
-fn wrap_widget_effect_order(ctx: &mut BuildCtx) {
-  let _x = declare! {
+#[widget]
+fn wrap_widget_effect_order(_this: (), ctx: &mut BuildCtx) {
+  let _x = widget! {
     SizedBox {
       size: Size::zero(),
       margin: child.margin.clone(),

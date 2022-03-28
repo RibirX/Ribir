@@ -74,10 +74,11 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl CombinationWidget for Keys {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let down_keys = self.0.clone();
         let up_keys = self.0.clone();
-        declare! {
+        widget! {
           SizedBox {
             size: Size::zero(),
             auto_focus: true,

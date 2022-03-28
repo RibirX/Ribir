@@ -1,9 +1,8 @@
-use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
-  parse_macro_input, parse_quote,
+  parse_quote,
   spanned::Spanned,
   token, Ident,
 };
@@ -54,28 +53,6 @@ where
   } else {
     quote! { #left = #right; }
   }
-}
-
-pub(crate) fn declare_func_macro(input: TokenStream) -> TokenStream {
-  let mut declare = parse_macro_input! { input as WidgetMacro };
-  let mut ctx = DeclareCtx::default();
-
-  let tokens = declare.gen_tokens(&mut ctx).unwrap_or_else(|err| {
-    // forbid warning.
-    ctx.forbid_warnings(true);
-    err.into_compile_error()
-  });
-  ctx.emit_unused_id_warning();
-
-  let ctx_name = &declare.ctx_name;
-  let build_ctx = build_ctx_name(declare.ctx_name.span());
-  let tokens = quote! {{
-    let #build_ctx = #ctx_name;
-    #tokens
-  }}
-  .into();
-
-  tokens
 }
 
 #[derive(Debug)]

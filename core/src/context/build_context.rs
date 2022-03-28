@@ -78,14 +78,15 @@ mod tests {
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl CombinationWidget for DarkLightThemes {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
 
-        declare! {
+        widget! {
           SizedBox {
-            size: SizedBox::expanded_size(),
+          size: SizedBox::expanded_size(),
             theme: dark.clone(),
             SizedBox {
               size: SizedBox::shrink_size(),
@@ -111,12 +112,13 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl CombinationWidget for LightDarkThemes {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
 
-        declare! {
+        widget! {
           SizedBox {
             size: SizedBox::expanded_size(),
             theme: light,

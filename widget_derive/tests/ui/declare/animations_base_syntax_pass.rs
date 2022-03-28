@@ -1,7 +1,8 @@
 use ribir::prelude::*;
 
-fn def_ref(ctx: &mut BuildCtx) {
-  let _ = declare! {
+#[widget]
+fn def_ref(_this: (), ctx: &mut BuildCtx) {
+  let _ = widget! {
     SizedBox {
       id: sized_box,
       size: Size::zero()
@@ -24,8 +25,9 @@ fn def_ref(ctx: &mut BuildCtx) {
   };
 }
 
-fn standard(ctx: &mut BuildCtx) {
-  let _ = declare! {
+#[widget]
+fn standard(_this: (), ctx: &mut BuildCtx) {
+  let _ = widget! {
     SizedBox {
       id: sized_box,
       size: Size::zero()
@@ -39,8 +41,9 @@ fn standard(ctx: &mut BuildCtx) {
   };
 }
 
-fn implicit_from_state(ctx: &mut BuildCtx) {
-  let _ = declare! {
+#[widget]
+fn implicit_from_state(_this: (), ctx: &mut BuildCtx) {
+  let _ = widget! {
     SizedBox {
       id: sized_box,
       size: Size::zero()

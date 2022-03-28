@@ -1,8 +1,9 @@
 use ribir::prelude::*;
 
-fn child_always_declare_behind_field() {
+#[widget]
+fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
   let size = Size::zero();
-  let _ = declare! {
+  let _ = widget! {
     SizedBox {
       SizedBox { size },
       size

@@ -1,7 +1,8 @@
 use ribir::prelude::*;
 
-fn id_must_be_unique_err(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn id_must_be_unique_err(_this: (), ctx: &mut BuildCtx) {
+  widget! {
     SizedBox {
       id: key1,
       key: "key1",

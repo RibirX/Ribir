@@ -21,8 +21,9 @@
 //! pub struct MyCheckbox;
 //!
 //! impl CombinationWidget for MyCheckbox {
+//!   #[widget]
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
-//!     declare!{
+//!     widget!{
 //!       Checkbox { }
 //!     }
 //!   }

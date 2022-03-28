@@ -326,8 +326,9 @@ mod tests {
     struct T;
 
     impl CombinationWidget for T {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        declare! {
+        widget! {
           SizedBox {
             size: Size::zero(),
             auto_focus: true,

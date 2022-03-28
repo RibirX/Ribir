@@ -1,8 +1,6 @@
 use crate::{
   declare_derive::field_convert_method,
-  declare_func_derive::{
-    build_ctx_name, field_guard_variable, skip_nc_assign, widget_def_variable, DeclareCtx,
-  },
+  declare_func_derive::{field_guard_variable, skip_nc_assign, widget_def_variable, DeclareCtx},
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
@@ -38,7 +36,7 @@ impl<'a> WidgetGen<'a> {
       let without_guard_tokens = fields_without_guard
         .iter()
         .map(|f| f.build_tokens_without_guard());
-      let ctx_name = build_ctx_name(self.name.span());
+      let ctx_name = ctx.ctx_name();
       if fields_with_guard.is_empty() {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()

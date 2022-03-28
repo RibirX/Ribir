@@ -1,8 +1,20 @@
 error: Same id(`same_id`) assign to multiple widgets, id must be unique.
-  --> tests/ui/declare/duplicate_id_fail.rs:6:11
+  --> tests/ui/declare/duplicate_id_fail.rs:7:11
    |
-6  |       id: same_id,
+7  |       id: same_id,
    |           ^^^^^^^
 ...
-10 |         id: same_id,
+11 |         id: same_id,
    |             ^^^^^^^
+
+warning: `same_id` does not be used
+ --> tests/ui/declare/duplicate_id_fail.rs:7:11
+  |
+7 |       id: same_id,
+  |           ^^^^^^^
+  |
+help: Remove this line.
+ --> tests/ui/declare/duplicate_id_fail.rs:7:11
+  |
+7 |       id: same_id,
+  |           ^^^^^^^

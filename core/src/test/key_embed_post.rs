@@ -11,8 +11,10 @@ pub struct EmbedPostWithKey {
 }
 
 impl CombinationWidget for EmbedPostWithKey {
+  #[widget]
+
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-    declare! {
+    widget! {
       Row {
         key: 0,
         v_align: CrossAxisAlign::Start,

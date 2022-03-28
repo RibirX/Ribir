@@ -4,8 +4,9 @@ fn main() {
   compile_error!("Test for declare syntax warning.");
 }
 
-fn unused_id_warning(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn unused_id_warning(_this: (), ctx: &mut BuildCtx) {
+  widget! {
     SizedBox {
       id: test_id,
       size: Size::zero()
@@ -13,8 +14,9 @@ fn unused_id_warning(ctx: &mut BuildCtx) {
   };
 }
 
-fn used_id_no_warning(ctx: &mut BuildCtx) {
-  declare! {
+#[widget]
+fn used_id_no_warning(_this: (), ctx: &mut BuildCtx) {
+  widget! {
     SizedBox {
       id: id1,
       size: Size::new(100., 100.),

@@ -1,65 +1,65 @@
 error: Can't init widget because circle follow: id1.size ～> id2 , id2.size ～> id3 , id3.size ～> id1
-  --> tests/ui/declare/circular_dependency_fail.rs:8:13
+  --> tests/ui/declare/circular_dependency_fail.rs:9:13
    |
-8  |         id: id1,
+9  |         id: id1,
    |             ^^^
-9  |         size: id2.size,
+10 |         size: id2.size,
    |         ^^^^  ^^^
 ...
-12 |         id: id2,
+13 |         id: id2,
    |             ^^^
-13 |         size: id3.size,
+14 |         size: id3.size,
    |         ^^^^  ^^^
 ...
-16 |         id: id3,
+17 |         id: id3,
    |             ^^^
-17 |         size: id1.size,
+18 |         size: id1.size,
    |         ^^^^  ^^^
    |
 note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:9:9
+  --> tests/ui/declare/circular_dependency_fail.rs:10:9
    |
-9  |         size: id2.size,
+10 |         size: id2.size,
    |         ^^^^
 ...
-13 |         size: id3.size,
+14 |         size: id3.size,
    |         ^^^^
 ...
-17 |         size: id1.size,
+18 |         size: id1.size,
    |         ^^^^
 
 error: Can't init widget because circle follow: child.margin ～> parent , parent.margin ～> child
-  --> tests/ui/declare/circular_dependency_fail.rs:26:11
+  --> tests/ui/declare/circular_dependency_fail.rs:28:11
    |
-26 |       id: parent,
+28 |       id: parent,
    |           ^^^^^^
-27 |       size: Size::zero(),
-28 |       margin: child.margin.clone(),
+29 |       size: Size::zero(),
+30 |       margin: child.margin.clone(),
    |       ^^^^^^  ^^^^^^^^^^^^
-29 |       SizedBox{
-30 |         id: child,
+31 |       SizedBox{
+32 |         id: child,
    |             ^^^^^
-31 |         size: Size::zero(),
-32 |         margin: parent.margin.clone(),
+33 |         size: Size::zero(),
+34 |         margin: parent.margin.clone(),
    |         ^^^^^^  ^^^^^^^^^^^^^
    |
 note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:28:7
+  --> tests/ui/declare/circular_dependency_fail.rs:30:7
    |
-28 |       margin: child.margin.clone(),
+30 |       margin: child.margin.clone(),
    |       ^^^^^^
 ...
-32 |         margin: parent.margin.clone(),
+34 |         margin: parent.margin.clone(),
    |         ^^^^^^
 
 error: Circle follow will cause infinite state change trigger: a ～> a
-  --> tests/ui/declare/circular_dependency_fail.rs:44:17
+  --> tests/ui/declare/circular_dependency_fail.rs:47:17
    |
-44 |     dataflows { a.size ~> a.size }
+47 |     dataflows { a.size ~> a.size }
    |                 ^         ^
    |
 note: If the circular is your want, use `#[skip_nc]` attribute before field or data_flow to skip the no change trigger of the field modify to ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:44:17
+  --> tests/ui/declare/circular_dependency_fail.rs:47:17
    |
-44 |     dataflows { a.size ~> a.size }
+47 |     dataflows { a.size ~> a.size }
    |                 ^^^^^^^^^^^
