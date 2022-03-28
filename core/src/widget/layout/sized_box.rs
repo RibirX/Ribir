@@ -50,7 +50,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox {
+          declare SizedBox {
             size:SIZE,
             Text { text: "" }
           }
@@ -71,7 +71,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: SizedBox::shrink_size(),
             Text { text: "" }
           }

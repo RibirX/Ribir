@@ -3,7 +3,7 @@ use ribir::prelude::*;
 #[widget]
 fn fix_attr_indirect_follow_host_widget_pass(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: a,
       size: Size::zero(),
       cursor: b.cursor,
@@ -23,7 +23,7 @@ fn fix_attr_indirect_follow_host_widget_pass(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn fix_attr_indirect_follow_host_attr_fail(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: a,
       size: Size::zero(),
       cursor: b.cursor,

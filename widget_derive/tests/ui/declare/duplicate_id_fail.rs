@@ -3,7 +3,7 @@ use ribir::prelude::*;
 #[widget]
 fn id_must_be_unique_err(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    BoxDecoration {
+    declare BoxDecoration {
       id: same_id,
       background: Some(Color::RED.into()),
       ..<_>::default(),

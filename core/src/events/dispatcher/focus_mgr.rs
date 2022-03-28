@@ -329,7 +329,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: Size::zero(),
             auto_focus: true,
           }

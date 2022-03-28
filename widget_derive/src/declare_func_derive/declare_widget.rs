@@ -26,7 +26,10 @@ use super::{
   FollowOn, FollowPart, Follows, Id, Result,
 };
 
+#[derive(Debug)]
 pub struct DeclareWidget {
+  // todo: warning for unnecessary declare keyword for declare child.
+  _declare_token: Option<kw::declare>,
   pub path: Path,
   brace_token: Brace,
   // the name of this widget specified by `id` attr.
@@ -36,6 +39,7 @@ pub struct DeclareWidget {
   children: Vec<Child>,
 }
 
+#[derive(Debug)]
 pub enum Child {
   Declare(Box<DeclareWidget>),
   Expr(Box<syn::Expr>),
@@ -116,6 +120,7 @@ impl Parse for DeclareWidget {
 
     let content;
     let mut widget = DeclareWidget {
+      _declare_token: input.parse()?,
       path: input.parse()?,
       brace_token: syn::braced!(content in input),
       named: None,

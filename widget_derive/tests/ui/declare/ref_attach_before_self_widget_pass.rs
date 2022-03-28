@@ -4,7 +4,7 @@ use ribir::prelude::*;
 fn syntax_pass(_this: (), ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = widget! {
-    Flex {
+    declare Flex {
       SizedBox {
         size,
         SizedBox{

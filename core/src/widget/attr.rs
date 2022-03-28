@@ -24,7 +24,7 @@
 //!   #[widget]
 //!   fn build(&self, ctx: &mut  BuildCtx) -> BoxedWidget {
 //!     widget!{
-//!       Checkbox { }
+//!       declare Checkbox { }
 //!     }
 //!   }
 //! }

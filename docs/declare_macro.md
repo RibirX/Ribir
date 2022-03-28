@@ -14,7 +14,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
-      SizedBox {
+      declare SizedBox {
         size: Size::new(100., 100.),
         Row {
           Text { text: "hello " }
@@ -43,7 +43,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      SizedBox {
+      declare SizedBox {
         size: Size::new(100., 100.),
         background: Color::RED,
         on_tap: |_| println!("Tapped!")
@@ -71,7 +71,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      SizedBox {
+      declare SizedBox {
         size: self.size,
         margin if self.need_margin =>: EdgeInsets::all(1.),
       }
@@ -98,8 +98,8 @@ impl CombinationWidget for RibirSteps {
     ];
 
     widget!{
-      Row {
-        ribir_steps.iter().map(|&text| widget!{ Text { text } } )
+      declare Row {
+        ribir_steps.iter().map(|&text| declare Text { text }  )
       }
     }
   }
@@ -126,7 +126,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      Row {
+      declare Row {
         Checkbox {
           id: checkbox,
           checked: false,
@@ -157,7 +157,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      Row {
+      declare Row {
         Text {
           id: a,
           text: b.text.clone(),
@@ -192,7 +192,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      SizedBox {
+      declare SizedBox {
         id: a,
         size: Size::new(100., 100.),
         background: if a.size.area() > 10. { Color::RED } else { Color::BLACK }
@@ -215,7 +215,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
-      Column {
+      declare Column {
         Row {
           Checkbox { id: task }
           Text { text: "Task" }
@@ -254,7 +254,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      Row {
+      declare Row {
         Text { id: a, text: "Hi" }
         Text { id: b, text: a.text.clone() }
       }
@@ -275,7 +275,7 @@ impl CombinationWidget for T {
   #[widget]
   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget!{
-      Row {
+      declare Row {
         Text { id: a, text: "Hi" }
         Text {
           id: b,
@@ -315,11 +315,11 @@ impl StatefulCombination for Todos {
     fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
       let this_ref = unsafe { this.state_ref() };
       widget! {
-        Column {
+        declare Column {
           h_align: CrossAxisAlign::Start,
           this_ref.tasks.iter().enumerate().map(|(idx, task)|{
             widget!{
-              Row {
+              declare Row {
                 margin: EdgeInsets::vertical(4.),
                 Checkbox{
                   id: checkbox,

@@ -4,7 +4,7 @@ use ribir::prelude::*;
 fn normal_if_guard_pass(_this: (), ctx: &mut BuildCtx) {
   let guard = Some(1);
   widget! {
-    SizedBox {
+    declare SizedBox {
       // if guard in widget's field
       size if true => : Size::zero(),
       // if guard in data atribute
@@ -21,7 +21,7 @@ fn normal_if_guard_pass(_this: (), ctx: &mut BuildCtx) {
 fn id_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
   let guard = Some(1);
   widget! {
-    SizedBox {
+    declare SizedBox {
       id if true => : test,
       // if guard in widget's field
       size if true => : Size::zero(),
@@ -33,7 +33,7 @@ fn id_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn depend_id_behind_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
   widget! {
-    SizedBox {
+    declare SizedBox {
       id: a,
       size: Size::zero(),
       margin if true =>:  EdgeInsets::all(0.),

@@ -3,7 +3,7 @@ use ribir::prelude::*;
 #[widget]
 fn data_flow_simple(_this: (), ctx: &mut BuildCtx) {
   let _ = widget! {
-    Flex {
+    declare Flex {
       SizedBox {
         id: a,
         size: Size::zero(),
@@ -20,7 +20,7 @@ fn data_flow_simple(_this: (), ctx: &mut BuildCtx) {
 #[widget]
 fn data_flow_embed(_this: (), ctx: &mut BuildCtx) {
   let _ = widget! {
-    Flex {
+    declare Flex {
       SizedBox {
         id: a,
         size: Size::zero(),
@@ -31,7 +31,7 @@ fn data_flow_embed(_this: (), ctx: &mut BuildCtx) {
       }
       true.then(||{
         widget!{
-          SizedBox {
+          declare SizedBox {
             id: c,
             size: Size::zero(),
           }

@@ -43,7 +43,7 @@ impl StatefulCombination for Checkbox {
     }
 
     widget! {
-      SizedBox {
+      declare SizedBox {
         size: Size::new(size, size),
         margin: EdgeInsets::all(4.),
         radius: Radius::all(radius),

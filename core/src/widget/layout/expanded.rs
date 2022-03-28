@@ -40,7 +40,7 @@ mod tests {
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let size = self.0;
         widget! {
-          Row {
+          declare Row {
             Expanded {
               flex: 1.,
               SizedBox { size }

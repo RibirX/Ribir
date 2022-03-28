@@ -4,16 +4,13 @@ use ribir::prelude::*;
 fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = widget! {
-    SizedBox {
+    declare SizedBox {
       size,
       if size.area() > 0. {
-        SizedBox { size }.box_it()
+        SizedBox { size }
       } else {
-        widget!{
-          SizedBox { size }
-        }
+        SizedBox { size }
       }
-
     }
   };
 }
@@ -22,7 +19,7 @@ fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
 fn option_child(_this: (), ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = widget! {
-    SizedBox {
+    declare SizedBox {
       size,
       background: Color::RED,
       (size.area() == 0.).then(||{
@@ -36,7 +33,7 @@ fn option_child(_this: (), ctx: &mut BuildCtx) {
 fn expr_child_use_named_widget(_this: (), ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = widget! {
-    Flex {
+    declare Flex {
       SizedBox {
         id: a,
         size,

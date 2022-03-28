@@ -1,12 +1,18 @@
-use crate::{error::DeclareError, WIDGET_MACRO_NAME};
+use crate::{
+  declare_func_derive::{declare_widget::DeclareWidget, widget_def_variable},
+  error::DeclareError,
+  WIDGET_MACRO_NAME,
+};
 
-use super::{declare_widget::SugarFields, ribir_suffix_variable, FollowOn, WidgetMacro};
+use super::{
+  declare_widget::SugarFields, ribir_suffix_variable, FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
+};
 
 use proc_macro::{Diagnostic, Level};
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident};
+use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident, ItemMacro};
 
 pub struct DeclareCtx {
   /// All name defined in `widget!` by `id`.
@@ -45,9 +51,15 @@ struct LocalVariable {
 impl VisitMut for DeclareCtx {
   fn visit_expr_mut(&mut self, expr: &mut Expr) {
     match expr {
-      Expr::Macro(m) if m.mac.path.is_ident(WIDGET_MACRO_NAME) => {
+      Expr::Macro(m) => {
         let mac = &m.mac;
-        *expr = self.expand_widget_macro(quote! {#mac});
+        if mac.path.is_ident(WIDGET_MACRO_NAME) {
+          *expr = unwrap_expr(self.expand_widget_macro(quote! {#mac}));
+        } else if mac.path.is_ident(DECLARE_WRAP_MACRO) {
+          *expr = unwrap_expr(self.expand_declare_wrap_macro(mac.tokens.clone()));
+        } else {
+          visit_mut::visit_expr_macro_mut(self, m);
+        }
       }
       Expr::Path(p) => {
         visit_mut::visit_expr_path_mut(self, p);
@@ -64,22 +76,25 @@ impl VisitMut for DeclareCtx {
   }
 
   fn visit_stmt_mut(&mut self, i: &mut syn::Stmt) {
-    match i {
-      syn::Stmt::Item(syn::Item::Macro(m))
-        if m.ident.is_none() && m.mac.path.is_ident(WIDGET_MACRO_NAME) =>
-      {
-        let mac = &m.mac;
-        let e = self.expand_widget_macro(quote! {#mac});
-        *i = if let Some(semi) = m.semi_token.take() {
-          syn::Stmt::Semi(e, semi.clone())
+    if let syn::Stmt::Item(syn::Item::Macro(ItemMacro { ident: None, mac, semi_token, .. })) = i {
+      let mut expr_to_stmt = |expr| {
+        if let Some(semi) = semi_token.take() {
+          syn::Stmt::Semi(expr, semi)
         } else {
-          syn::Stmt::Expr(e)
-        };
-      }
-      _ => {
-        visit_mut::visit_stmt_mut(self, i);
+          syn::Stmt::Expr(expr)
+        }
+      };
+      if mac.path.is_ident(WIDGET_MACRO_NAME) {
+        let res = self.expand_widget_macro(quote! {#mac});
+        *i = expr_to_stmt(unwrap_expr(res));
+        return;
+      } else if mac.path.is_ident(DECLARE_WRAP_MACRO) {
+        let res = self.expand_declare_wrap_macro(mac.tokens.clone());
+        *i = expr_to_stmt(unwrap_expr(res));
+        return;
       }
     }
+    visit_mut::visit_stmt_mut(self, i);
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
@@ -183,7 +198,6 @@ impl VisitMut for DeclareCtx {
     visit_mut::visit_expr_while_mut(&mut *ctx, i);
   }
 
-  #[track_caller]
   fn visit_pat_ident_mut(&mut self, i: &mut syn::PatIdent) {
     visit_mut::visit_pat_ident_mut(self, i);
 
@@ -345,6 +359,45 @@ impl DeclareCtx {
       (ReferenceInfo::Reference, _) => *v = ref_info,
       (ReferenceInfo::WrapWidgetRef, _) => *v = ref_info,
       _ => {}
+    }
+  }
+
+  fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
+    let mut widget: WidgetMacro = syn::parse2(tokens)?;
+    let named = self.named_objects.clone();
+
+    let mut ctx = self.borrow_capture_scope(true);
+    let tokens = widget
+      .gen_tokens(&mut *ctx)
+      .unwrap_or_else(|err| err.into_compile_error());
+
+    // trigger warning and restore named widget.
+    named.iter().for_each(|k| {
+      ctx.named_objects.remove(k);
+    });
+
+    ctx.emit_unused_id_warning();
+    ctx.named_objects = named;
+    syn::parse2(tokens)
+  }
+
+  fn expand_declare_wrap_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
+    let mut widget: DeclareWidget = syn::parse2(tokens)?;
+    let mut ctx = self.borrow_capture_scope(true);
+    ctx.visit_declare_widget_mut(&mut widget);
+    let tokens = widget.widget_full_tokens(&mut *ctx);
+    let name = widget.widget_identify();
+    let name = widget_def_variable(&name);
+    syn::parse2(quote! {{ #tokens #name }})
+  }
+}
+
+fn unwrap_expr(res: syn::Result<Expr>) -> Expr {
+  match res {
+    Ok(expr) => expr,
+    Err(e) => {
+      let tokens = e.into_compile_error();
+      parse_quote!(#tokens)
     }
   }
 }

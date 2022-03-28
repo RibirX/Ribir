@@ -333,7 +333,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: SIZE,
             border: Border {
               left: BorderSide::new(1., Color::BLACK),
@@ -372,7 +372,7 @@ mod tests {
         ];
 
         widget! {
-          Row {
+          declare Row {
             wrap: true,
             margin: EdgeInsets::all(2.),
             SizedBox {
@@ -386,18 +386,16 @@ mod tests {
               },
             }
             radius_cases
-            .into_iter()
-            .map(|radius| {
-              widget!{
-                SizedBox {
+              .into_iter()
+              .map(|radius| {
+                declare SizedBox {
                   size: Size::new(60., 40.),
                   background: Color::RED,
                   radius,
                   border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
                   margin: EdgeInsets::all(2.)
                 }
-              }
-            }),
+              }),
           }
         }
       }

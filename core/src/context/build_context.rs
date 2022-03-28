@@ -85,14 +85,14 @@ mod tests {
         let light = material::light(family);
 
         widget! {
-          SizedBox {
-          size: SizedBox::expanded_size(),
-            theme: dark.clone(),
-            SizedBox {
-              size: SizedBox::shrink_size(),
-              theme: light.clone(),
-              ThemeTrack { themes: self.0.clone() }
-            }
+          declare SizedBox {
+            size: SizedBox::expanded_size(),
+              theme: dark.clone(),
+              SizedBox {
+                size: SizedBox::shrink_size(),
+                theme: light.clone(),
+                ThemeTrack { themes: self.0.clone() }
+              }
           }
         }
       }
@@ -119,7 +119,7 @@ mod tests {
         let light = material::light(family);
 
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: SizedBox::expanded_size(),
             theme: light,
             SizedBox {

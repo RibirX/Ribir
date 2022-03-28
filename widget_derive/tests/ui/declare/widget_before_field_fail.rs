@@ -4,7 +4,7 @@ use ribir::prelude::*;
 fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
   let size = Size::zero();
   let _ = widget! {
-    SizedBox {
+    declare SizedBox {
       SizedBox { size },
       size
     }

@@ -411,7 +411,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: SizedBox::expanded_size(),
             on_pointer_down: {
               let stack = self.0.clone();
@@ -462,7 +462,7 @@ mod tests {
 
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          SizedBox {
+          declare SizedBox {
             size: SizedBox::expanded_size(),
             on_pointer_enter: {
               let enter_event = self.enter.clone();
@@ -542,7 +542,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          Row {
+          declare Row {
             v_align: CrossAxisAlign::Start,
             on_tap: {
               let click_path = self.0.clone();
@@ -639,7 +639,7 @@ mod tests {
       #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          Row {
+          declare Row {
             SizedBox {
               size: Size::new(50., 50.),
               tab_index: 0
