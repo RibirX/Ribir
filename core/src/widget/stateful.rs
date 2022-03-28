@@ -19,8 +19,9 @@
 //! }
 //!
 //! impl CombinationWidget for Rectangle {
+//!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     declare!{
+//!     widget!{
 //!       SizedBox {
 //!         size: self.size,
 //!         background: self.color.clone()
@@ -55,9 +56,10 @@
 //! }
 //!
 //! impl StatefulCombination for Rectangle {
+//!   #[widget]
 //!   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
 //!     let mut this_ref = unsafe { this.state_ref() };
-//!     declare!{
+//!     widget!{
 //!       SizedBox {
 //!         size: this.size,
 //!         background: this.color.clone(),
@@ -239,8 +241,8 @@ impl<W> std::ops::DerefMut for Stateful<W> {
     // Safety
     // - `Stateful` is not support clone, so as a widget it's unique and safe to get
     //   inner mutable reference。
-    // - StateRef may hold a pointer of this in the `declare!` macro, ribir
-    //   guarantee the generate code have not data race.
+    // - StateRef may hold a pointer of this in the `widget!` macro, ribir guarantee
+    //   the generate code have not data race.
     unsafe { self.0.as_mut().get_unchecked_mut() }
   }
 }

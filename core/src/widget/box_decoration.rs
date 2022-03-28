@@ -330,8 +330,9 @@ mod tests {
     const SIZE: Size = Size::new(100., 100.);
     struct T;
     impl CombinationWidget for T {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        declare! {
+        widget! {
           SizedBox {
             size: SIZE,
             border: Border {
@@ -358,6 +359,7 @@ mod tests {
   fn paint() {
     struct Paint;
     impl CombinationWidget for Paint {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let radius_cases = vec![
           Radius::all(0.),
@@ -369,7 +371,7 @@ mod tests {
           Radius::top_left(50.),
         ];
 
-        declare! {
+        widget! {
           Row {
             wrap: true,
             margin: EdgeInsets::all(2.),
@@ -386,7 +388,7 @@ mod tests {
             radius_cases
             .into_iter()
             .map(|radius| {
-              declare!{
+              widget!{
                 SizedBox {
                   size: Size::new(60., 40.),
                   background: Color::RED,

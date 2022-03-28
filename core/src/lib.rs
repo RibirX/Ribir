@@ -38,7 +38,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use widget::layout::{MultiChild, SingleChild};
   #[doc(no_inline)]
-  pub use widget_derive::{declare, Declare, MultiChildWidget, SingleChildWidget};
+  pub use widget_derive::{widget, Declare, MultiChildWidget, SingleChildWidget};
 }
 
 pub mod test;

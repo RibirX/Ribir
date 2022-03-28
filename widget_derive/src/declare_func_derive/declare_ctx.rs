@@ -1,4 +1,4 @@
-use crate::error::DeclareError;
+use crate::{error::DeclareError, WIDGET_MACRO_NAME};
 
 use super::{declare_widget::SugarFields, ribir_suffix_variable, FollowOn, WidgetMacro};
 
@@ -8,10 +8,8 @@ use quote::quote;
 use std::collections::{HashMap, HashSet};
 use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident};
 
-const DECLARE_MACRO_NAME: &str = "declare";
-
 pub struct DeclareCtx {
-  /// All name defined in `declare!` by `id`.
+  /// All name defined in `widget!` by `id`.
   pub named_objects: HashSet<Ident>,
   pub current_follows: HashMap<Ident, Vec<Span>>,
   // Key is the name of widget which has been depended by other, and value is a bool represent if
@@ -19,11 +17,12 @@ pub struct DeclareCtx {
   // expression.
   be_followed: HashMap<Ident, ReferenceInfo>,
   analyze_stack: Vec<Vec<LocalVariable>>,
-  forbid_warnings: bool,
   /// Some wrap widget (like margin, padding) implicit defined by user, shared
   /// the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
   id_capture_scope: Vec<bool>,
+  ctx_name: Ident,
+  _self_name: Ident,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -37,7 +36,7 @@ pub enum ReferenceInfo {
   // not be referenced or followed, but its wrap widget maybe.
   WrapWidgetRef,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LocalVariable {
   name: Ident,
   alias_of_name: Option<Ident>,
@@ -46,9 +45,9 @@ struct LocalVariable {
 impl VisitMut for DeclareCtx {
   fn visit_expr_mut(&mut self, expr: &mut Expr) {
     match expr {
-      Expr::Macro(m) if m.mac.path.is_ident(DECLARE_MACRO_NAME) => {
-        let tokens = std::mem::replace(&mut m.mac.tokens, quote! {});
-        *expr = self.extend_declare_macro_to_expr(tokens.into());
+      Expr::Macro(m) if m.mac.path.is_ident(WIDGET_MACRO_NAME) => {
+        let mac = &m.mac;
+        *expr = self.expand_widget_macro(quote! {#mac});
       }
       Expr::Path(p) => {
         visit_mut::visit_expr_path_mut(self, p);
@@ -67,11 +66,15 @@ impl VisitMut for DeclareCtx {
   fn visit_stmt_mut(&mut self, i: &mut syn::Stmt) {
     match i {
       syn::Stmt::Item(syn::Item::Macro(m))
-        if m.ident.is_none() && m.mac.path.is_ident(DECLARE_MACRO_NAME) =>
+        if m.ident.is_none() && m.mac.path.is_ident(WIDGET_MACRO_NAME) =>
       {
-        let tokens = std::mem::replace(&mut m.mac.tokens, quote! {});
-        let expr = self.extend_declare_macro_to_expr(tokens.into());
-        *i = syn::Stmt::Expr(expr);
+        let mac = &m.mac;
+        let e = self.expand_widget_macro(quote! {#mac});
+        *i = if let Some(semi) = m.semi_token.take() {
+          syn::Stmt::Semi(e, semi.clone())
+        } else {
+          syn::Stmt::Expr(e)
+        };
       }
       _ => {
         visit_mut::visit_stmt_mut(self, i);
@@ -118,9 +121,8 @@ impl VisitMut for DeclareCtx {
   }
 
   fn visit_block_mut(&mut self, i: &mut syn::Block) {
-    self.stack_push();
-    visit_mut::visit_block_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_block_mut(&mut *ctx, i);
   }
 
   fn visit_item_const_mut(&mut self, i: &mut syn::ItemConst) {
@@ -147,45 +149,38 @@ impl VisitMut for DeclareCtx {
   }
 
   fn visit_expr_block_mut(&mut self, i: &mut syn::ExprBlock) {
-    self.stack_push();
-    visit_mut::visit_expr_block_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_expr_block_mut(&mut *ctx, i);
   }
 
   fn visit_expr_for_loop_mut(&mut self, i: &mut syn::ExprForLoop) {
-    self.stack_push();
-    visit_mut::visit_expr_for_loop_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_expr_for_loop_mut(&mut *ctx, i);
   }
 
   fn visit_expr_loop_mut(&mut self, i: &mut syn::ExprLoop) {
-    self.stack_push();
-    visit_mut::visit_expr_loop_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_expr_loop_mut(&mut *ctx, i);
   }
 
   fn visit_expr_if_mut(&mut self, i: &mut syn::ExprIf) {
-    self.stack_push();
-    visit_mut::visit_expr_if_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_expr_if_mut(&mut *ctx, i);
   }
 
   fn visit_arm_mut(&mut self, i: &mut syn::Arm) {
-    self.stack_push();
-    visit_mut::visit_arm_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_arm_mut(&mut *ctx, i);
   }
 
   fn visit_expr_unsafe_mut(&mut self, i: &mut syn::ExprUnsafe) {
-    self.stack_push();
-    visit_mut::visit_expr_unsafe_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_expr_unsafe_mut(&mut *ctx, i);
   }
 
   fn visit_expr_while_mut(&mut self, i: &mut syn::ExprWhile) {
-    self.stack_push();
-    visit_mut::visit_expr_while_mut(self, i);
-    self.stack_pop();
+    let mut ctx = self.stack_push();
+    visit_mut::visit_expr_while_mut(&mut *ctx, i);
   }
 
   #[track_caller]
@@ -212,6 +207,19 @@ impl VisitMut for DeclareCtx {
 }
 
 impl DeclareCtx {
+  pub fn new(self_name: Ident, ctx_name: Ident) -> Self {
+    Self {
+      named_objects: Default::default(),
+      current_follows: Default::default(),
+      be_followed: Default::default(),
+      analyze_stack: vec![],
+      user_perspective_name: Default::default(),
+      id_capture_scope: Default::default(),
+      ctx_name,
+      _self_name: self_name,
+    }
+  }
+
   pub fn id_collect(&mut self, d: &WidgetMacro) -> super::Result<()> {
     d.object_names_iter().try_for_each(|name| {
       if let Some(old) = self.named_objects.get(name) {
@@ -221,6 +229,16 @@ impl DeclareCtx {
         Ok(())
       }
     })
+  }
+
+  pub fn ctx_name(&self) -> &Ident {
+    // todo: track ctx rename
+    &self.ctx_name
+  }
+
+  pub fn _self_name(&self) -> &Ident {
+    // todo: track self rename
+    &self._self_name
   }
 
   pub fn be_followed(&self, name: &Ident) -> bool {
@@ -257,9 +275,6 @@ impl DeclareCtx {
   }
 
   pub fn emit_unused_id_warning(&self) {
-    if self.forbid_warnings {
-      return;
-    }
     self
       .named_objects
       .iter()
@@ -275,15 +290,11 @@ impl DeclareCtx {
       });
   }
 
-  pub fn forbid_warnings(&mut self, b: bool) { self.forbid_warnings = b; }
-
   pub fn borrow_capture_scope(&mut self, capture_scope: bool) -> CaptureScopeGuard {
     CaptureScopeGuard::new(self, capture_scope)
   }
 
-  pub fn stack_push(&mut self) { self.analyze_stack.push(vec![]); }
-
-  pub fn stack_pop(&mut self) { self.analyze_stack.pop(); }
+  pub fn stack_push(&mut self) -> StackGuard { StackGuard::new(self) }
 
   // return the name of widget that `ident` point to if it's have.
   pub fn find_named_widget<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
@@ -338,22 +349,33 @@ impl DeclareCtx {
   }
 }
 
-impl Default for DeclareCtx {
-  fn default() -> Self {
-    Self {
-      named_objects: Default::default(),
-      current_follows: Default::default(),
-      be_followed: Default::default(),
-      analyze_stack: Default::default(),
-      forbid_warnings: Default::default(),
-      user_perspective_name: Default::default(),
-      id_capture_scope: Default::default(),
-    }
-  }
+pub struct StackGuard<'a> {
+  ctx: &'a mut DeclareCtx,
 }
 
 pub struct CaptureScopeGuard<'a> {
   ctx: &'a mut DeclareCtx,
+}
+
+impl<'a> StackGuard<'a> {
+  pub fn new(ctx: &'a mut DeclareCtx) -> Self {
+    ctx.analyze_stack.push(vec![]);
+    StackGuard { ctx }
+  }
+}
+
+impl<'a> Drop for StackGuard<'a> {
+  fn drop(&mut self) { self.ctx.analyze_stack.pop(); }
+}
+
+impl<'a> std::ops::Deref for StackGuard<'a> {
+  type Target = DeclareCtx;
+
+  fn deref(&self) -> &Self::Target { self.ctx }
+}
+
+impl<'a> std::ops::DerefMut for StackGuard<'a> {
+  fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
 }
 
 impl<'a> CaptureScopeGuard<'a> {

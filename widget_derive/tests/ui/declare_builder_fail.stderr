@@ -4,7 +4,7 @@ error: the identify `margin` is reserved to expand space around widget wrapped.
 7 |   margin: i32,
   |   ^^^^^^
   |
-  = help: use `rename` meta to avoid the name conflict in `declare!` macro.
+  = help: use `rename` meta to avoid the name conflict in `widget!` macro.
 
           #[declare(rename = "xxx")]
           margin : i32

@@ -1,7 +1,8 @@
 use ribir::prelude::*;
 
-fn data_flow_simple(ctx: &mut BuildCtx) {
-  let _ = declare! {
+#[widget]
+fn data_flow_simple(_this: (), ctx: &mut BuildCtx) {
+  let _ = widget! {
     Flex {
       SizedBox {
         id: a,
@@ -16,8 +17,9 @@ fn data_flow_simple(ctx: &mut BuildCtx) {
   };
 }
 
-fn data_flow_embed(ctx: &mut BuildCtx) {
-  let _ = declare! {
+#[widget]
+fn data_flow_embed(_this: (), ctx: &mut BuildCtx) {
+  let _ = widget! {
     Flex {
       SizedBox {
         id: a,
@@ -28,7 +30,7 @@ fn data_flow_embed(ctx: &mut BuildCtx) {
         size: Size::zero(),
       }
       true.then(||{
-        declare!{
+        widget!{
           SizedBox {
             id: c,
             size: Size::zero(),

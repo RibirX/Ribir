@@ -82,7 +82,3 @@
 
 ## debug, test and productive develop tools
 
-## declare language to describe ui.
-
-provided `declare!` macro.
-

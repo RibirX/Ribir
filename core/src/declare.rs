@@ -1,4 +1,4 @@
-//! Widget can be supported in `declare!` across implement [`Declare`]!
+//! Widget can be supported in `widget!` across implement [`Declare`]!
 //! [`DeclareBuilder`]!
 //!
 //! We provide a derive macro and recommend you use it, you needn't implement it
@@ -32,8 +32,9 @@
 //! struct UsePerson;
 //!
 //! impl CombinationWidget for UsePerson {
+//!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     declare!{
+//!     widget!{
 //!       PeopleCard {
 //!         name: "Mr Ribir",
 //!         email: "ribir@XXX.com".to_string(),
@@ -52,10 +53,10 @@
 //!
 //! ## use `strip_option` meta for `Option<T>` fields
 //!
-//! After derive `Declare`, the `PeopleCard` is work fine in `declare!`. But
+//! After derive `Declare`, the `PeopleCard` is work fine in `widget!`. But
 //! init the email with `email: "ribir@XXX.com".to_string()` is too verbose, if
 //! we try to init the `email`here, that implicitly mean we want a `Some-Value`.
-//! We want use the type `T` instead of `Option<T>` in `declare!`, `String`
+//! We want use the type `T` instead of `Option<T>` in `widget!`, `String`
 //! instead of `str` here, `strip_option` it's designed for this case.
 
 //!
@@ -76,13 +77,14 @@
 //! #  }
 //! # }
 //!
-//! // Now, we can declare a `PeopleCard` in `declare!` more elegant:
+//! // Now, we can declare a `PeopleCard` in `widget!` more elegant:
 //!
 //! struct UsePerson;
 //!
 //! impl CombinationWidget for UsePerson {
+//!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     declare!{
+//!     widget!{
 //!       PeopleCard {
 //!         name: "Mr Ribir",
 //!         email: "ribir@XXX.com",
@@ -94,7 +96,7 @@
 //! }
 //! ```
 //!
-//! ## `default` meta make the field optional in `declare!` macro, and Ribir use
+//! ## `default` meta make the field optional in `widget!` macro, and Ribir use
 //! its 'default' value to init it. The 'default' value can be:
 //!
 //! - `default` without init expression, the field type must implemented
@@ -133,8 +135,9 @@
 //! struct UsePerson;
 //!
 //! impl CombinationWidget for UsePerson {
+//!   #[widget]
 //!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     declare!{
+//!     widget!{
 //!       PeopleCard {
 //!         name: "Mr Ribir",
 //!         email: "ribir@XXX.com",
@@ -150,7 +153,7 @@
 //! Field with attribute `#[declare(rename="xxx")]` tell Ribir that `xxx` will
 //! as the field name when init the widget in `declare`. If your field name
 //! conflict with the builtin field names, you must use `rename` to avoid it,
-//! when you want user can init it in `declare!`. Sell [all builtin
+//! when you want user can init it in `widget!`. Sell [all builtin
 //! fields](builtin_fields).
 //!
 //! [declare_derive]: ../ribir/widget_derive/Declare.html
@@ -158,7 +161,7 @@
 
 use crate::prelude::BuildCtx;
 
-/// Trait to mark the builder type of widget. `declare!` use it to access the
+/// Trait to mark the builder type of widget. `widget!` use it to access the
 /// build type of the widget. See the [mod level document](declare) to know how
 /// to use it.
 pub trait Declare {
@@ -166,7 +169,7 @@ pub trait Declare {
   fn builder() -> Self::Builder;
 }
 
-/// widget builder use to construct a widget in  `declare!`. See the [mod level
+/// widget builder use to construct a widget in  `widget!`. See the [mod level
 /// document](declare) to know how to use it.
 pub trait DeclareBuilder {
   type Target;

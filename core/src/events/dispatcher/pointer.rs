@@ -408,8 +408,9 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl CombinationWidget for EventRecord {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        declare! {
+        widget! {
           SizedBox {
             size: SizedBox::expanded_size(),
             on_pointer_down: {
@@ -457,8 +458,10 @@ mod tests {
     }
 
     impl CombinationWidget for EnterLeave {
+      #[widget]
+
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        declare! {
+        widget! {
           SizedBox {
             size: SizedBox::expanded_size(),
             on_pointer_enter: {
@@ -536,8 +539,9 @@ mod tests {
     struct ClickPath(Rc<RefCell<i32>>);
 
     impl CombinationWidget for ClickPath {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        declare! {
+        widget! {
           Row {
             v_align: CrossAxisAlign::Start,
             on_tap: {
@@ -632,8 +636,9 @@ mod tests {
     struct T;
 
     impl CombinationWidget for T {
+      #[widget]
       fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        declare! {
+        widget! {
           Row {
             SizedBox {
               size: Size::new(50., 50.),

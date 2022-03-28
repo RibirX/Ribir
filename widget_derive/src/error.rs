@@ -34,16 +34,7 @@ pub type Result<T> = std::result::Result<T, DeclareError>;
 impl DeclareError {
   pub fn into_compile_error(self) -> TokenStream {
     self.error_emit();
-    // A Valid widget return to avoid compile noise when error occur.
-    quote! {{
-      struct __Tmp;
-      impl CombinationWidget for __Tmp {
-        fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-          unreachable!();
-          }
-      }
-      __Tmp.box_it()
-    }}
+    quote! { unreachable!() }
   }
 
   pub fn error_emit(self) {

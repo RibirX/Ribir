@@ -1,7 +1,8 @@
 use ribir::prelude::*;
 
-fn build(ctx: &mut BuildCtx) -> BoxedWidget {
-  declare! {
+#[widget]
+fn build(_this: (), ctx: &mut BuildCtx) -> BoxedWidget {
+  widget! {
     Row {
       id: _parent,
       background: son.background.clone(),

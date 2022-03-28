@@ -154,7 +154,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         f.attrs.clear();
         Diagnostic::spanned(vec![field_name.span().unwrap()], Level::Error, msg)
           .help(format! {
-            "use `rename` meta to avoid the name conflict in `declare!` macro.\n\n\
+            "use `rename` meta to avoid the name conflict in `widget!` macro.\n\n\
             #[declare(rename = \"xxx\")] \n\
             {}", quote!{ #f }
           })

@@ -1,23 +1,59 @@
 error: Unnecessary attribute, because not depends on any others
- --> tests/ui/declare/skip_nc_fail.rs:7:7
+ --> tests/ui/declare/skip_nc_fail.rs:8:7
   |
-7 |       #[skip_nc]
+8 |       #[skip_nc]
   |       ^^^^^^^^^^
   |
   = help: Try to remove it.
 
+warning: `self_id` does not be used
+ --> tests/ui/declare/skip_nc_fail.rs:7:11
+  |
+7 |       id: self_id,
+  |           ^^^^^^^
+  |
+help: Remove this line.
+ --> tests/ui/declare/skip_nc_fail.rs:7:11
+  |
+7 |       id: self_id,
+  |           ^^^^^^^
+
 error: Unnecessary attribute, because not depends on any others
-  --> tests/ui/declare/skip_nc_fail.rs:18:7
+  --> tests/ui/declare/skip_nc_fail.rs:20:7
    |
-18 |       #[skip_nc]
+20 |       #[skip_nc]
    |       ^^^^^^^^^^
    |
    = help: Try to remove it.
 
-error: Unnecessary attribute, because not depends on any others
-  --> tests/ui/declare/skip_nc_fail.rs:29:7
+warning: `self_id` does not be used
+  --> tests/ui/declare/skip_nc_fail.rs:18:11
    |
-29 |       #[skip_nc]
+18 |       id: self_id,
+   |           ^^^^^^^
+   |
+help: Remove this line.
+  --> tests/ui/declare/skip_nc_fail.rs:18:11
+   |
+18 |       id: self_id,
+   |           ^^^^^^^
+
+error: Unnecessary attribute, because not depends on any others
+  --> tests/ui/declare/skip_nc_fail.rs:32:7
+   |
+32 |       #[skip_nc]
    |       ^^^^^^^^^^
    |
    = help: Try to remove it.
+
+warning: `self_id` does not be used
+  --> tests/ui/declare/skip_nc_fail.rs:30:11
+   |
+30 |       id: self_id,
+   |           ^^^^^^^
+   |
+help: Remove this line.
+  --> tests/ui/declare/skip_nc_fail.rs:30:11
+   |
+30 |       id: self_id,
+   |           ^^^^^^^

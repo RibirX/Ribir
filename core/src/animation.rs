@@ -151,3 +151,14 @@ where
 
   pub fn start(&mut self) { todo!() }
 }
+
+impl TransitionBuilder {
+  pub fn build_without_ctx(self) -> Transition {
+    // Safety: we know build `Transition` will never read the ctx.
+    #[allow(invalid_value)]
+    let mut uninit_ctx: &mut BuildCtx = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    let t = self.build(&mut uninit_ctx);
+    std::mem::forget(uninit_ctx);
+    t
+  }
+}

@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use ahash::RandomState;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
+  braced,
   parse::{Parse, ParseStream},
   parse_quote,
   spanned::Spanned,
@@ -18,11 +19,9 @@ use super::{
 use crate::error::DeclareError;
 
 pub struct WidgetMacro {
-  // todo: remove this
-  pub ctx_name: Ident,
-  // widget_token: kw::widget,
-  // bang_token: token::Bang,
-  // brace_token: token::Brace,
+  _widget_token: kw::widget,
+  _bang_token: token::Bang,
+  _brace_token: token::Brace,
   widget: DeclareWidget,
   dataflows: Option<Dataflows>,
   animations: Option<Animations>,
@@ -44,19 +43,10 @@ struct CircleCheckStack<'a> {
 
 impl Parse for WidgetMacro {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    // let widget_token = input.parse::<kw::widget>()?;
-    // let bang_token = input.parse()?;
-    // let content;
-    // let brace_token = braced!(content in input);
-
-    let content = input;
-    let ctx = if !input.peek2(token::Brace) {
-      let ctx = input.parse()?;
-      input.parse::<token::Comma>()?;
-      ctx
-    } else {
-      Ident::new(CTX_DEFAULT_NAME, Span::call_site())
-    };
+    let widget_token = input.parse::<kw::widget>()?;
+    let bang_token = input.parse()?;
+    let content;
+    let brace_token = braced!(content in input);
 
     let mut widget: Option<DeclareWidget> = None;
     let mut dataflows: Option<Dataflows> = None;
@@ -72,24 +62,25 @@ impl Parse for WidgetMacro {
       } else if lk.peek(kw::animations) {
         let a = content.parse()?;
         assign_uninit_field!(animations, a, animations)?;
-      } else {
+      } else if lk.peek(kw::declare) {
         let w = content.parse()?;
         assign_uninit_field!(widget, w, declare)?;
+      } else {
+        return Err(lk.error());
       }
     }
-    // let declare = declare.ok_or_else(|| {
-    //   syn::Error::new(
-    //     widget_token.span(),
-    //     "must have a `declare { ... }` in `widget!`",
-    //   )
-    // })?;
+    let widget = widget.ok_or_else(|| {
+      syn::Error::new(
+        widget_token.span(),
+        "must have a `declare { ... }` in `widget!`",
+      )
+    })?;
 
     Ok(Self {
-      ctx_name: ctx,
-      // widget_token,
-      // bang_token,
-      // brace_token,
-      widget: widget.unwrap(),
+      _widget_token: widget_token,
+      _bang_token: bang_token,
+      _brace_token: brace_token,
+      widget,
       dataflows,
       animations,
     })
@@ -103,10 +94,10 @@ impl WidgetMacro {
     }
 
     ctx.id_collect(self)?;
-    ctx.visit_declare_macro_mut(self);
+    ctx.visit_widget_macro_mut(self);
     self.widget.before_generate_check(ctx)?;
 
-    let mut tokens = quote! {};
+    let mut named_objects_tokens = quote! {};
     if !ctx.named_objects.is_empty() {
       let mut follows = self.analyze_object_follows();
       let _init_circle_check = Self::circle_check(&follows, |stack| {
@@ -127,18 +118,18 @@ impl WidgetMacro {
       let mut named_widgets_def = self.named_objects_def_tokens(ctx);
 
       Self::deep_follow_iter(&follows, |name| {
-        tokens.extend(named_widgets_def.remove(name));
+        named_objects_tokens.extend(named_widgets_def.remove(name));
       });
 
       named_widgets_def
         .into_values()
-        .for_each(|def_tokens| tokens.extend(def_tokens));
+        .for_each(|def_tokens| named_objects_tokens.extend(def_tokens));
 
       self
         .widget
         .traverses_declare()
         .filter(|w| w.named.is_some())
-        .for_each(|w| w.children_tokens(ctx, &mut tokens));
+        .for_each(|w| w.children_tokens(ctx, &mut named_objects_tokens));
 
       // data flow should not effect the named object init order, and we allow circle
       // follow with skip_nc attribute. So we add the data flow relationship and
@@ -159,29 +150,39 @@ impl WidgetMacro {
       }
     }
 
-    if self.widget.named.is_none() {
-      self.widget.widget_full_tokens(ctx, &mut tokens);
+    let declare_widget = if self.widget.named.is_none() {
+      self.widget.widget_full_tokens(ctx)
     } else {
-      tokens.extend(self.widget.compose_tokens());
-    }
+      self.widget.compose_tokens()
+    };
 
-    if let Some(dataflows) = self.dataflows.as_mut() {
-      dataflows.to_tokens(&mut tokens);
-    }
+    let ctx_name = ctx.ctx_name();
 
-    if let Some(ref animations) = self.animations {
-      animations.to_tokens(&mut tokens);
-    }
+    let dataflows_tokens = self
+      .dataflows
+      .as_ref()
+      .map(|dataflows| quote! { #dataflows});
+
+    let animations_tokens = self
+      .animations
+      .as_ref()
+      .map(|animations| animations.to_tokens(ctx_name));
 
     let def_name = widget_def_variable(&self.widget.widget_identify());
-    Ok(quote! {{ #tokens #def_name.box_it() }})
+    Ok(quote! {{
+      #named_objects_tokens
+      #declare_widget
+      #dataflows_tokens
+      #animations_tokens
+      #def_name.box_it()
+    }})
   }
 
   pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
     self
       .widget
       .object_names_iter()
-      .chain(self.animations.iter().flat_map(|a| a.object_names_iter()))
+      .chain(self.animations.iter().flat_map(|a| a.names()))
   }
 
   /// return follow relationship of the named widgets,it is a key-value map,
@@ -202,12 +203,19 @@ impl WidgetMacro {
 
   // return the key-value map of the named widget define tokens.
   fn named_objects_def_tokens(&self, ctx: &DeclareCtx) -> HashMap<Ident, TokenStream, RandomState> {
-    let mut named_defs = HashMap::default();
-    self.widget.named_objects_def_tokens(&mut named_defs, ctx);
-    if let Some(ref a) = self.animations {
-      a.named_objects_def_tokens(&mut named_defs);
-    }
-    named_defs
+    let ctx_name = ctx.ctx_name();
+    self
+      .widget
+      .named_objects_def_tokens_iter(ctx)
+      .chain(
+        self
+          .animations
+          .as_ref()
+          .map(|a| a.named_objects_def_tokens_iter(ctx_name))
+          .into_iter()
+          .flatten(),
+      )
+      .collect()
   }
 
   fn circle_check<F>(follow_infos: &BTreeMap<Ident, Follows>, err_detect: F) -> Result<()>
@@ -313,39 +321,41 @@ impl<'a> CircleCheckStack<'a> {
   }
 }
 
-const CTX_DEFAULT_NAME: &str = "ctx";
-
 impl DeclareCtx {
-  pub fn visit_declare_macro_mut(&mut self, d: &mut WidgetMacro) {
-    self.visit_declare_widget_mut(&mut d.widget);
+  pub fn visit_widget_macro_mut(&mut self, d: &mut WidgetMacro) {
+    let mut ctx = self.stack_push();
+    ctx.visit_declare_widget_mut(&mut d.widget);
     if let Some(dataflows) = d.dataflows.as_mut() {
-      self.visit_dataflows_mut(dataflows)
+      ctx.visit_dataflows_mut(dataflows)
     }
     if let Some(animations) = d.animations.as_mut() {
-      self.visit_animations_mut(animations);
+      ctx.visit_animations_mut(animations);
     }
   }
 
-  pub fn extend_declare_macro_to_expr(&mut self, tokens: proc_macro::TokenStream) -> Expr {
-    let mut declare: WidgetMacro = syn::parse(tokens).expect("extend declare macro failed!");
+  pub fn expand_widget_macro(&mut self, tokens: TokenStream) -> Expr {
+    let mut widget: WidgetMacro = match syn::parse2(tokens) {
+      Ok(e) => e,
+      Err(e) => {
+        let tokens = e.into_compile_error();
+        return syn::parse2(tokens).expect("expand widget macro failed");
+      }
+    };
+
     let named = self.named_objects.clone();
 
-    let tokens = {
-      let mut ctx = self.borrow_capture_scope(true);
-
-      declare.gen_tokens(&mut *ctx).unwrap_or_else(|err| {
-        // forbid warning.
-        ctx.forbid_warnings(true);
-        err.into_compile_error()
-      })
-    };
+    let mut ctx = self.borrow_capture_scope(true);
+    let tokens = widget
+      .gen_tokens(&mut *ctx)
+      .unwrap_or_else(|err| err.into_compile_error());
 
     // trigger warning and restore named widget.
     named.iter().for_each(|k| {
-      self.named_objects.remove(k);
+      ctx.named_objects.remove(k);
     });
-    self.emit_unused_id_warning();
-    self.named_objects = named;
+
+    ctx.emit_unused_id_warning();
+    ctx.named_objects = named;
 
     parse_quote!(#tokens)
   }

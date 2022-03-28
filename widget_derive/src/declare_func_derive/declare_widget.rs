@@ -1,6 +1,5 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
-use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
@@ -231,7 +230,7 @@ pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> 
 impl DeclareCtx {
   pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
     fn visit_self_only(w: &mut DeclareWidget, ctx: &mut DeclareCtx) {
-      ctx.stack_push();
+      let mut ctx = ctx.stack_push();
       w.fields
         .iter_mut()
         .for_each(|f| ctx.visit_declare_field_mut(f));
@@ -250,17 +249,14 @@ impl DeclareCtx {
           ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
         }
       }
-
-      ctx.stack_pop()
     }
     visit_self_only(w, self);
     w.children.iter_mut().for_each(|c| match c {
       Child::Declare(d) => visit_self_only(d, self),
       Child::Expr(expr) => {
-        self.stack_push();
-        self.borrow_capture_scope(false).visit_expr_mut(expr);
-        self.stack_pop();
-        self.take_current_follows();
+        let mut ctx = self.stack_push();
+        ctx.borrow_capture_scope(false).visit_expr_mut(expr);
+        ctx.take_current_follows();
       }
     })
   }
@@ -309,8 +305,7 @@ impl DeclareWidget {
           if d.named.is_none() {
             let child_widget_name = widget_def_variable(&d.widget_identify());
             let c_def_name = widget_def_variable(&child_variable(c, idx));
-            let mut child_tokens = quote! {};
-            d.widget_full_tokens(ctx, &mut child_tokens);
+            let child_tokens = d.widget_full_tokens(ctx);
             tokens.extend(quote! { let #c_def_name = { #child_tokens  #child_widget_name }; });
           } else {
             tokens.extend(d.compose_tokens());
@@ -348,37 +343,36 @@ impl DeclareWidget {
   }
 
   // return this widget tokens and its def name;
-  pub fn widget_full_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
-    let (name, widget_tokens) = self.host_widget_tokens(ctx);
-    tokens.extend(widget_tokens);
+  pub fn widget_full_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
+    let (name, mut tokens) = self.host_widget_tokens(ctx);
 
     self
       .sugar_fields
-      .gen_wrap_widgets_tokens(&name, ctx, |_, wrap_widget| {
+      .gen_wrap_widgets_tokens(&name, ctx)
+      .for_each(|(_, wrap_widget)| {
         tokens.extend(wrap_widget);
       });
 
-    self.children_tokens(ctx, tokens);
+    self.children_tokens(ctx, &mut tokens);
     tokens.extend(self.compose_tokens());
+    tokens
   }
 
   // return the key-value map of the named widget define tokens.
-  pub fn named_objects_def_tokens(
-    &self,
-    named_defs: &mut HashMap<Ident, TokenStream, RandomState>,
-    ctx: &DeclareCtx,
-  ) {
-    self.traverses_declare().for_each(|w| {
-      if w.named.is_some() {
-        let (name, def_tokens) = w.host_widget_tokens(ctx);
-        named_defs.insert(name.clone(), def_tokens);
-
-        w.sugar_fields
-          .gen_wrap_widgets_tokens(&name, ctx, |name, wrap_tokens| {
-            named_defs.insert(name, wrap_tokens);
-          });
-      }
-    });
+  pub fn named_objects_def_tokens_iter<'a>(
+    &'a self,
+    ctx: &'a DeclareCtx,
+  ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
+    self
+      .traverses_declare()
+      .filter_map(|w| {
+        w.named.as_ref().map(|_| {
+          let host = w.host_widget_tokens(ctx);
+          let wraps = w.sugar_fields.gen_wrap_widgets_tokens(&host.0, ctx);
+          std::iter::once(host).chain(wraps)
+        })
+      })
+      .flatten()
   }
 
   pub fn normal_attrs_tokens(&self, tokens: &mut TokenStream) {

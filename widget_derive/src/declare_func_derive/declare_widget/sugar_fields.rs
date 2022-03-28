@@ -165,26 +165,35 @@ const MARGIN: &str = "Margin";
 const BOX_DECORATION: &str = "BoxDecoration";
 
 impl SugarFields {
-  pub fn gen_wrap_widgets_tokens<F>(&self, host: &Ident, ctx: &DeclareCtx, mut f: F)
-  where
-    F: FnMut(Ident, TokenStream),
-  {
-    if let Some(padding) = self.padding.clone() {
-      let w_ty = Ident::new(PADDING, padding.member.span()).into();
-      let (name, tokens) = common_def_tokens(padding, &w_ty, host, ctx);
-      f(name, tokens);
-    }
-
-    if self.has_box_decoration_field() {
-      let (name, tokens) = self.decoration_widget_tokens(host, ctx);
-      f(name, tokens)
-    }
-
-    if let Some(margin) = self.margin.clone() {
-      let w_ty = Ident::new(MARGIN, margin.member.span()).into();
-      let (name, tokens) = common_def_tokens(margin, &w_ty, host, ctx);
-      f(name, tokens)
-    }
+  pub fn gen_wrap_widgets_tokens(
+    &self,
+    host: &Ident,
+    ctx: &DeclareCtx,
+  ) -> impl Iterator<Item = (Ident, TokenStream)> {
+    self
+      .padding
+      .clone()
+      .map(|padding| {
+        let w_ty = Ident::new(PADDING, padding.member.span()).into();
+        common_def_tokens(padding, &w_ty, host, ctx)
+      })
+      .into_iter()
+      .chain(
+        self
+          .has_box_decoration_field()
+          .then(|| self.decoration_widget_tokens(host, ctx))
+          .into_iter(),
+      )
+      .chain(
+        self
+          .margin
+          .clone()
+          .map(|margin| {
+            let w_ty = Ident::new(MARGIN, margin.member.span()).into();
+            common_def_tokens(margin, &w_ty, host, ctx)
+          })
+          .into_iter(),
+      )
   }
 
   pub fn gen_wrap_widget_compose_tokens(&self, host: &Ident) -> TokenStream {

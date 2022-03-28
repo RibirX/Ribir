@@ -12,13 +12,14 @@ struct Todos {
 }
 
 impl StatefulCombination for Todos {
+  #[widget]
   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     let this_ref = unsafe { this.state_ref() };
-    declare! {
+    widget! {
       Column {
         h_align: CrossAxisAlign::Start,
         this.tasks.iter().enumerate().map(|(idx, task)|{
-          declare!{
+          widget!{
             Row {
               margin: EdgeInsets::vertical(4.),
               Checkbox{

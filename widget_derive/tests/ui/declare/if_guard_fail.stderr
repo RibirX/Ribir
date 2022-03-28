@@ -1,20 +1,20 @@
 error: if guard is not supported in `id`
-  --> tests/ui/declare/if_guard_fail.rs:23:10
+  --> tests/ui/declare/if_guard_fail.rs:25:10
    |
-23 |       id if true => : test,
+25 |       id if true => : test,
    |          ^^^^^^^
 
 error: Depends on a widget field which behind `if guard`, its existence depends on the `if guard` result in runtime.
-  --> tests/ui/declare/if_guard_fail.rs:40:17
+  --> tests/ui/declare/if_guard_fail.rs:43:17
    |
-40 |         margin: a.margin
+43 |         margin: a.margin
    |                 ^^^^^^^^
    |
 warning: field define here.
-  --> tests/ui/declare/if_guard_fail.rs:34:11
+  --> tests/ui/declare/if_guard_fail.rs:37:11
    |
-34 |       id: a,
+37 |       id: a,
    |           ^
-35 |       size: Size::zero(),
-36 |       margin if true =>:  EdgeInsets::all(0.),
+38 |       size: Size::zero(),
+39 |       margin if true =>:  EdgeInsets::all(0.),
    |       ^^^^^^ ^^^^^^^
