@@ -29,15 +29,17 @@ fn data_flow_embed(_this: (), ctx: &mut BuildCtx) {
         id: b,
         size: Size::zero(),
       }
-      true.then(||{
-        widget!{
-          declare SizedBox {
-            id: c,
-            size: Size::zero(),
+      ExprChild {
+        true.then(||{
+          widget!{
+            declare SizedBox {
+              id: c,
+              size: Size::zero(),
+            }
+            dataflows { a.size + b.size ~> c.size }
           }
-          dataflows { a.size + b.size ~> c.size }
-        }
-      })
+        })
+      }
     }
     dataflows { a.size ~> b.size }
   };

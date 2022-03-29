@@ -4,7 +4,7 @@ error: Same id(`same_id`) assign to multiple widgets, id must be unique.
 7  |       id: same_id,
    |           ^^^^^^^
 ...
-11 |         id: same_id,
+10 |         id: same_id,
    |             ^^^^^^^
 
 warning: `same_id` does not be used

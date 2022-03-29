@@ -29,14 +29,16 @@ impl CombinationWidget for EmbedPost {
     widget! {
       declare Row {
         v_align: CrossAxisAlign::Start,
-        Text { text: self.title },
-        Text { text: self.author },
-        Text { text: self.content },
-        (self.level >0).then(||{
-          let mut embed = self.clone();
-          embed.level -= 1;
-          embed
-        })
+        Text { text: self.title }
+        Text { text: self.author }
+        Text { text: self.content }
+        ExprChild {
+          (self.level >0).then(||{
+            let mut embed = self.clone();
+            embed.level -= 1;
+            embed
+          })
+        }
       }
     }
   }

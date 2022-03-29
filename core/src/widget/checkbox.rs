@@ -65,14 +65,15 @@ impl StatefulCombination for Checkbox {
             }
           }
         },
-
-        has_checked.then(||{
-          if this.indeterminate {
-            indeterminate_path
-          } else {
-            checked_path
-          }
-        })
+        ExprChild {
+          has_checked.then(||{
+            if this.indeterminate {
+              indeterminate_path
+            } else {
+              checked_path
+            }
+          })
+        }
       }
     }
   }

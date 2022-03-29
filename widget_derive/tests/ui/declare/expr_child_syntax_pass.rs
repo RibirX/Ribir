@@ -6,10 +6,12 @@ fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
   let _ = widget! {
     declare SizedBox {
       size,
-      if size.area() > 0. {
-        SizedBox { size }
-      } else {
-        SizedBox { size }
+      ExprChild {
+        if size.area() > 0. {
+          SizedBox { size }
+        } else {
+          SizedBox { size }
+        }
       }
     }
   };
@@ -22,9 +24,11 @@ fn option_child(_this: (), ctx: &mut BuildCtx) {
     declare SizedBox {
       size,
       background: Color::RED,
-      (size.area() == 0.).then(||{
-        SizedBox { size }
-      })
+      ExprChild {
+        (size.area() == 0.).then(||{
+          SizedBox { size }
+        })
+      }
     }
   };
 }
@@ -38,11 +42,12 @@ fn expr_child_use_named_widget(_this: (), ctx: &mut BuildCtx) {
         id: a,
         size,
       }
-      (a.size.area() > 0.).then(||
-        SizedBox {
-          size,
-        }
-      )
+      ExprChild {
+        (a.size.area() > 0.).then(||
+          SizedBox {
+            size,
+        })
+      }
     }
   };
 }

@@ -87,12 +87,12 @@ mod tests {
         widget! {
           declare SizedBox {
             size: SizedBox::expanded_size(),
-              theme: dark.clone(),
-              SizedBox {
-                size: SizedBox::shrink_size(),
-                theme: light.clone(),
-                ThemeTrack { themes: self.0.clone() }
-              }
+            theme: dark.clone(),
+            SizedBox {
+              size: SizedBox::shrink_size(),
+              theme: light.clone(),
+              ThemeTrack { themes: self.0.clone() }
+            }
           }
         }
       }

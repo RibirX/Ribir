@@ -142,8 +142,8 @@ fn expression_for_children() {
       widget! {
         declare Flex {
           SizedBox { size }
-          (0..3).map(|_| SizedBox { size}),
-          (self.0.area() > 2.).then(|| SizedBox { size } )
+          ExprChild { (0..3).map(|_| SizedBox { size}) }
+          ExprChild { (self.0.area() > 2.).then(|| SizedBox { size } ) }
         }
       }
     }
@@ -180,9 +180,11 @@ fn embed_widget_ref_outside() {
             size: Size::new(1., 1.),
             on_tap: move |_| first.size = Size::new(2., 2.)
           }
-          // todo: should warning use id in embed expression widget without declare keyword.
-          // without `declare` compile pass but unit test pass.
-          (0..3).map(|_| declare SizedBox { size: first.size } )
+          ExprChild {
+            // todo: should warning use id in embed expression widget without declare keyword.
+            // without `declare` compile pass but unit test pass.
+            (0..3).map(|_| declare SizedBox { size: first.size } )
+          }
         }
       }
     }
@@ -276,7 +278,7 @@ fn with_attr_ref() {
           cursor: tap_box.get_cursor().unwrap().clone(),
           // a hack method to capture widget reference only for test, should not use
           // it in product code.
-          {
+          ExprChild {
             self.0.set(Some(root));
             Option::<SizedBox>::None
           }
@@ -364,7 +366,7 @@ fn attr_bind_to_self() {
           on_tap: move |_|  self_id.size = Size::new(20.,20.),
           // a hack method to capture widget reference only for test, should not use
           // in product code.
-          {
+          ExprChild {
             self.0.set(Some(self_id));
             Option::<SizedBox>::None
           }

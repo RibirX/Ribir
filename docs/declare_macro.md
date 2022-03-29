@@ -99,7 +99,7 @@ impl CombinationWidget for RibirSteps {
 
     widget!{
       declare Row {
-        ribir_steps.iter().map(|&text| declare Text { text }  )
+        ExprChild { ribir_steps.iter().map(|&text| declare Text { text }) }
       }
     }
   }
@@ -317,23 +317,25 @@ impl StatefulCombination for Todos {
       widget! {
         declare Column {
           h_align: CrossAxisAlign::Start,
-          this_ref.tasks.iter().enumerate().map(|(idx, task)|{
-            widget!{
-              declare Row {
-                margin: EdgeInsets::vertical(4.),
-                Checkbox{
-                  id: checkbox,
-                  checked: task.finished,
-                }
-                Text{
-                  text:task.label.clone(),
+          ExprChild {
+            this_ref.tasks.iter().enumerate().map(|(idx, task)|{
+              widget!{
+                declare Row {
                   margin: EdgeInsets::vertical(4.),
+                  Checkbox{
+                    id: checkbox,
+                    checked: task.finished,
+                  }
+                  Text{
+                    text:task.label.clone(),
+                    margin: EdgeInsets::vertical(4.),
+                  }
                 }
+                dataflows { checkbox.checked ~> this_ref.silent().tasks[idx].finished }
               }
-              dataflows { checkbox.checked ~> this_ref.silent().tasks[idx].finished }
-            }
-          })
-        }
+            })
+          }
+        } 
       }
     }
 }
