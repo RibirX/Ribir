@@ -11,6 +11,7 @@ pub struct FollowInfo {
   pub member: Option<Ident>,
   pub on: FollowOn,
 }
+
 #[derive(Debug)]
 pub enum DeclareError {
   DuplicateID([Ident; 2]),
@@ -27,6 +28,11 @@ pub enum DeclareError {
     wrap_def_spans: [Span; 3],
     use_spans: Vec<Span>,
   },
+}
+
+#[derive(Debug)]
+pub enum DeclareWarning {
+  
 }
 
 pub type Result<T> = std::result::Result<T, DeclareError>;

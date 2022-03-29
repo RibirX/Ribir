@@ -120,7 +120,7 @@ impl Dataflow {
 
     FollowPart {
       origin: FollowPlace::DataFlow(self),
-      follows: &follows,
+      follows,
     }
   }
 }

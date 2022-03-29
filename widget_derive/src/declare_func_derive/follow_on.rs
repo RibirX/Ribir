@@ -33,7 +33,7 @@ impl<'a> FollowPart<'a> {
   pub fn from_widget_field(field: &'a DeclareField) -> Option<Self> {
     field.follows.as_ref().map(|follows| Self {
       origin: FollowPlace::Field(field),
-      follows: &follows,
+      follows,
     })
   }
 }

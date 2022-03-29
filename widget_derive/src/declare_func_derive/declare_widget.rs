@@ -40,7 +40,7 @@ pub struct DeclareWidget {
 
 #[derive(Debug)]
 pub enum Child {
-  Declare(DeclareWidget),
+  Declare(Box<DeclareWidget>),
   Expr(ExprChild),
 }
 
@@ -295,7 +295,7 @@ impl DeclareWidget {
     let mut tokens = gen.gen_widget_tokens(ctx, attrs_follow);
     self.normal_attrs_tokens(&mut tokens);
     self.listeners_tokens(&mut tokens);
-    (gen.name.clone(), tokens)
+    (gen.name, tokens)
   }
 
   pub fn children_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
@@ -340,7 +340,7 @@ impl DeclareWidget {
       });
       compose_tokens.extend(quote! { let #def_name #hint = #def_name #(#children)*; });
     }
-    compose_tokens.extend(self.sugar_fields.gen_wrap_widget_compose_tokens(&name));
+    compose_tokens.extend(self.sugar_fields.gen_wrap_widget_compose_tokens(name));
 
     compose_tokens
   }
@@ -675,7 +675,7 @@ fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cu
   }
 
   let mut tts = vec![];
-  let mut stream_cursor = cursor.clone();
+  let mut stream_cursor = cursor;
   loop {
     if let Some((n, c)) = cursor.ident() {
       if n == "widget" {

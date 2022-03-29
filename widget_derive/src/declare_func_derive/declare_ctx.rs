@@ -385,7 +385,7 @@ impl DeclareCtx {
     let mut widget: DeclareWidget = syn::parse2(tokens)?;
     let mut ctx = self.borrow_capture_scope(true);
     ctx.visit_declare_widget_mut(&mut widget);
-    let tokens = widget.widget_full_tokens(&mut *ctx);
+    let tokens = widget.widget_full_tokens(&*ctx);
     let name = widget.widget_identify();
     let name = widget_def_variable(&name);
     syn::parse2(quote! {{ #tokens #name }})
