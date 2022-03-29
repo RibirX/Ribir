@@ -2,7 +2,6 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
-  parse_quote,
   spanned::Spanned,
   token, Ident,
 };
@@ -30,6 +29,7 @@ pub mod kw {
   syn::custom_keyword!(declare);
   syn::custom_keyword!(dataflows);
   syn::custom_keyword!(animations);
+  syn::custom_keyword!(ExprChild);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);
   syn::custom_keyword!(Animate);
@@ -95,6 +95,6 @@ impl Id {
       ));
     }
 
-    Ok(parse_quote! {#field})
+    Ok(syn::parse_quote! {#field})
   }
 }

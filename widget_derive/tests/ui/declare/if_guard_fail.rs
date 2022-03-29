@@ -42,7 +42,6 @@ fn depend_id_behind_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
         size: Size::zero(),
         margin: a.margin
       }
-
     }
   };
 }

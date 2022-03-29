@@ -18,24 +18,26 @@ impl StatefulCombination for Todos {
     widget! {
       declare Column {
         h_align: CrossAxisAlign::Start,
-        this.tasks.iter().enumerate().map(|(idx, task)|{
-          widget!{
-            declare Row {
-              margin: EdgeInsets::vertical(4.),
-              Checkbox{
-                id: checkbox,
-                checked: task.finished
+        ExprChild {
+          this.tasks.iter().enumerate().map(|(idx, task)|{
+            widget!{
+              declare Row {
+                margin: EdgeInsets::vertical(4.),
+                Checkbox{
+                  id: checkbox,
+                  checked: task.finished
+                }
+                Text {
+                  text:task.label.clone(),
+                  margin: EdgeInsets::vertical(4.)
+                }
               }
-              Text {
-                text:task.label.clone(),
-                margin: EdgeInsets::vertical(4.)
+              dataflows {
+                checkbox.checked ~> this_ref.silent().tasks[idx].finished;
               }
             }
-            dataflows {
-              checkbox.checked ~> this_ref.silent().tasks[idx].finished;
-            }
-          }
-        })
+          })
+        }
       }
     }
   }

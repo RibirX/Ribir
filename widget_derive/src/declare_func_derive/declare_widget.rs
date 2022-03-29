@@ -1,11 +1,10 @@
-use std::collections::BTreeMap;
-
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Delimiter, Group, Punct, Spacing, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
+use std::collections::BTreeMap;
 use syn::{
   bracketed,
-  parse::{Parse, ParseBuffer, ParseStream},
-  punctuated::Punctuated,
+  buffer::Cursor,
+  parse::{discouraged::Speculative, Parse, ParseStream},
   spanned::Spanned,
   token::{self, Brace},
   visit_mut::VisitMut,
@@ -14,7 +13,7 @@ use syn::{
 mod sugar_fields;
 mod widget_gen;
 use crate::{
-  declare_func_derive::{ribir_prefix_variable, ReferenceInfo},
+  declare_func_derive::{ribir_prefix_variable, ReferenceInfo, DECLARE_WRAP_MACRO},
   error::DeclareError,
 };
 
@@ -36,13 +35,19 @@ pub struct DeclareWidget {
   pub named: Option<Id>,
   fields: Vec<DeclareField>,
   sugar_fields: SugarFields,
-  children: Vec<Child>,
+  pub children: Vec<Child>,
 }
 
 #[derive(Debug)]
 pub enum Child {
-  Declare(Box<DeclareWidget>),
-  Expr(Box<syn::Expr>),
+  Declare(DeclareWidget),
+  Expr(ExprChild),
+}
+
+#[derive(Debug)]
+pub struct ExprChild {
+  _expr_child: kw::ExprChild,
+  expr: syn::ExprBlock,
 }
 #[derive(Clone, Debug)]
 pub struct DeclareField {
@@ -89,89 +94,65 @@ impl ToTokens for DeclareField {
   }
 }
 
+impl ToTokens for ExprChild {
+  fn to_tokens(&self, tokens: &mut TokenStream) { self.expr.to_tokens(tokens) }
+}
+
 impl Spanned for DeclareWidget {
   fn span(&self) -> Span { self.path.span().join(self.brace_token.span).unwrap() }
 }
 
 impl Parse for DeclareWidget {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    fn peek2_none(input: ParseBuffer) -> bool { input.parse::<Ident>().is_ok() && input.is_empty() }
-
-    fn is_field(input: ParseStream) -> bool {
-      input.peek(Ident)
-        && (input.peek2(token::If)
-          || input.peek2(token::Colon)
-          || input.peek2(token::Comma)
-          || peek2_none(input.fork()))
-        || input.fork().parse::<SkipNcAttr>().is_ok()
-    }
-
-    fn parse_fields(input: ParseStream) -> syn::Result<Punctuated<DeclareField, token::Comma>> {
-      let mut punctuated = Punctuated::new();
-      while is_field(input) {
-        punctuated.push(input.parse()?);
-        if input.is_empty() {
-          break;
-        }
-        punctuated.push_punct(input.parse()?);
-      }
-      Ok(punctuated)
-    }
-
+    let _declare_token = input.parse()?;
+    let path = input.parse()?;
     let content;
-    let mut widget = DeclareWidget {
-      _declare_token: input.parse()?,
-      path: input.parse()?,
-      brace_token: syn::braced!(content in input),
-      named: None,
-      fields: <_>::default(),
-      sugar_fields: <_>::default(),
-      children: vec![],
-    };
-
-    let fields = parse_fields(&content)?;
-
-    fields
-      .into_pairs()
-      .try_for_each::<_, syn::Result<()>>(|pair| {
-        let (f, _) = pair.into_tuple();
-
-        let member = &f.member;
-        if syn::parse2::<kw::id>(quote! { #member}).is_ok() {
-          let name = Id::from_declare_field(f)?;
-          assign_uninit_field!(widget.named, name)?;
-        } else if let Some(f) = widget.sugar_fields.assign_field(f)? {
-          widget.fields.push(f);
-        }
-        Ok(())
-      })?;
-
+    let brace_token = syn::braced!(content in input);
+    let mut named: Option<Id> = None;
+    let mut fields = vec![];
+    let mut sugar_fields = SugarFields::default();
+    let mut children = vec![];
     loop {
-      // Expr child should not a `Type` or `Path`, if it's a `Ident`（`Path`), it's
-      // ambiguous  with `DeclareChild`, and prefer as `DeclareField`.
-      match content.fork().parse() {
-        Err(_) if !(content.peek(Ident) && content.peek2(Brace)) => break,
-        Ok(Child::Expr(c)) if matches!(*c, Expr::Path(_)) || matches!(*c, Expr::Type(_)) => break,
-        _ => {}
+      if content.is_empty() {
+        break;
       }
 
-      widget.children.push(content.parse()?);
-      // Comma follow Child is option.
-      let _: Option<token::Comma> = content.parse()?;
-    }
+      if (content.peek(Ident) && content.peek2(token::Brace))
+        || (content.peek(kw::declare) && content.peek2(Ident) && content.peek3(token::Brace))
+      {
+        children.push(content.parse()?);
+      } else {
+        let is_id = content.peek(kw::id);
+        let f: DeclareField = content.parse()?;
+        if !children.is_empty() {
+          return Err(syn::Error::new(
+            f.span(),
+            "Field should always declare before children.",
+          ));
+        }
 
-    // syntax error hint.
-    if !content.is_empty() && is_field(&content) {
-      let f: DeclareField = content.parse()?;
-      if !widget.children.is_empty() {
-        return Err(syn::Error::new(
-          f.span(),
-          "Field should always declare before children.",
-        ));
+        if is_id {
+          let id = Id::from_declare_field(f)?;
+          assign_uninit_field!(named, id, id)?;
+        } else if let Some(f) = sugar_fields.assign_field(f)? {
+          fields.push(f);
+        }
+
+        if !content.is_empty() {
+          content.parse::<token::Comma>()?;
+        }
       }
     }
 
-    Ok(widget)
+    Ok(DeclareWidget {
+      _declare_token,
+      path,
+      brace_token,
+      named,
+      fields,
+      sugar_fields,
+      children,
+    })
   }
 }
 
@@ -232,35 +213,52 @@ pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> 
   }
 }
 
+impl Parse for ExprChild {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    let _expr_child = input.parse()?;
+    let wrap_fork = input.fork();
+    let expr = if let Some(tokens) =
+      wrap_fork.step(|step_cursor| Ok(macro_wrap_declare_keyword(*step_cursor)))?
+    {
+      input.advance_to(&wrap_fork);
+      syn::parse2(tokens.into_iter().collect())?
+    } else {
+      input.parse()?
+    };
+
+    Ok(ExprChild { _expr_child, expr })
+  }
+}
+
 impl DeclareCtx {
   pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
-    fn visit_self_only(w: &mut DeclareWidget, ctx: &mut DeclareCtx) {
-      let mut ctx = ctx.stack_push();
-      w.fields
-        .iter_mut()
-        .for_each(|f| ctx.visit_declare_field_mut(f));
+    let mut ctx = self.stack_push();
+    w.fields
+      .iter_mut()
+      .for_each(|f| ctx.visit_declare_field_mut(f));
 
-      ctx.visit_sugar_field_mut(&mut w.sugar_fields);
-      if let Some(Id { name, .. }) = w.named.as_ref() {
-        // named widget followed by attributes or listeners should also mark be followed
-        // because it's need capture its state reference to set value.
-        let followed_by_attr = w
-          .sugar_fields
-          .normal_attr_iter()
-          .chain(w.sugar_fields.listeners_iter())
-          .any(|f| f.follows.is_some());
+    ctx.visit_sugar_field_mut(&mut w.sugar_fields);
+    if let Some(Id { name, .. }) = w.named.as_ref() {
+      // named widget followed by attributes or listeners should also mark be followed
+      // because it's need capture its state reference to set value.
+      let followed_by_attr = w
+        .sugar_fields
+        .normal_attr_iter()
+        .chain(w.sugar_fields.listeners_iter())
+        .any(|f| f.follows.is_some());
 
-        if followed_by_attr {
-          ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
-        }
+      if followed_by_attr {
+        ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
       }
     }
-    visit_self_only(w, self);
+
     w.children.iter_mut().for_each(|c| match c {
-      Child::Declare(d) => visit_self_only(d, self),
+      Child::Declare(d) => ctx.visit_declare_widget_mut(d),
       Child::Expr(expr) => {
-        let mut ctx = self.stack_push();
-        ctx.borrow_capture_scope(false).visit_expr_mut(expr);
+        let mut ctx = ctx.stack_push();
+        ctx
+          .borrow_capture_scope(false)
+          .visit_expr_block_mut(&mut expr.expr);
         ctx.take_current_follows();
       }
     })
@@ -597,11 +595,12 @@ impl DeclareWidget {
   /// pre-order traversals declare widget, this will skip the expression child.
   pub fn traverses_declare(&self) -> impl Iterator<Item = &DeclareWidget> {
     let children = self.children.iter().filter_map(|c| match c {
-      Child::Declare(w) => Some(&**w),
+      Child::Declare(w) => Some(w),
       Child::Expr(_) => None,
     });
     let children: Box<dyn Iterator<Item = &DeclareWidget>> =
       Box::new(children.flat_map(|w| w.traverses_declare()));
+
     std::iter::once(self).chain(children)
   }
 
@@ -637,10 +636,116 @@ impl Spanned for Child {
 
 impl Parse for Child {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    if input.peek(Ident) && input.peek2(Brace) {
-      Ok(Child::Declare(input.parse()?))
-    } else {
+    if input.peek(kw::ExprChild) {
       Ok(Child::Expr(input.parse()?))
+    } else {
+      Ok(Child::Declare(input.parse()?))
     }
   }
+}
+
+/// Wrap `declare Row {...}` with macro `ribir_declare_ಠ_ಠ!`, let our syntax
+/// as a valid rust expression,  so we can use rust syntax to parse and
+/// needn't reimplemented, and easy to interop with rust syntax.
+///
+/// return new tokens if do any wrap else
+fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cursor) {
+  fn sub_token_stream(mut begin: Cursor, end: Option<Cursor>, tts: &mut Vec<TokenTree>) {
+    while Some(begin) != end {
+      match begin.token_tree() {
+        Some((tt, rest)) => {
+          tts.push(tt);
+          begin = rest;
+        }
+        None => break,
+      }
+    }
+  }
+
+  fn group_inner_wrap(cursor: Cursor, delim: Delimiter) -> Option<(Group, Cursor)> {
+    cursor
+      .group(delim)
+      .and_then(|(group_cursor, span, cursor)| {
+        macro_wrap_declare_keyword(group_cursor).0.map(|tts| {
+          let mut group = Group::new(delim, tts.into_iter().collect());
+          group.set_span(span);
+          (group, cursor)
+        })
+      })
+  }
+
+  let mut tts = vec![];
+  let mut stream_cursor = cursor.clone();
+  loop {
+    if let Some((n, c)) = cursor.ident() {
+      if n == "widget" {
+        let widget_macro = c
+          .punct()
+          .filter(|(p, _)| p.as_char() == '!')
+          .and_then(|(_, c)| {
+            c.group(Delimiter::Brace)
+              .or_else(|| c.group(Delimiter::Parenthesis))
+              .or_else(|| c.group(Delimiter::Bracket))
+          });
+        if let Some((_, _, c)) = widget_macro {
+          // skip inner widget! macro, wrap wait itself parse.
+          cursor = c;
+          continue;
+        }
+      } else if n == "declare" {
+        let declare_group =
+          c.ident()
+            .map(|(name, c)| (n, name, c))
+            .and_then(|(declare, name, c)| {
+              c.group(Delimiter::Brace)
+                .map(|(body_cursor, span, cursor)| (declare, name, body_cursor, span, cursor))
+            });
+        if let Some((declare, name, body_cursor, body_span, c)) = declare_group {
+          sub_token_stream(stream_cursor, Some(cursor), &mut tts);
+          let body = macro_wrap_declare_keyword(body_cursor).0.map_or_else(
+            || body_cursor.token_stream(),
+            |tokens| tokens.into_iter().collect(),
+          );
+
+          tts.push(TokenTree::Ident(Ident::new(
+            DECLARE_WRAP_MACRO,
+            declare.span(),
+          )));
+          let mut bang = Punct::new('!', Spacing::Alone);
+          bang.set_span(declare.span());
+          tts.push(TokenTree::Punct(bang));
+
+          let mut declare_group = Group::new(Delimiter::Brace, body);
+          declare_group.set_span(body_span);
+          let mut macro_group =
+            Group::new(Delimiter::Brace, quote! { #declare #name #declare_group});
+          macro_group.set_span(declare.span());
+          tts.push(TokenTree::Group(macro_group));
+
+          cursor = c;
+          stream_cursor = c;
+          continue;
+        }
+      }
+      cursor = c;
+    } else if let Some((group, c)) = group_inner_wrap(cursor, Delimiter::Brace)
+      .or_else(|| group_inner_wrap(cursor, Delimiter::Bracket))
+      .or_else(|| group_inner_wrap(cursor, Delimiter::Parenthesis))
+    {
+      sub_token_stream(stream_cursor, Some(cursor), &mut tts);
+      tts.push(TokenTree::Group(group));
+      cursor = c;
+      stream_cursor = c;
+    } else if let Some((_, c)) = cursor.token_tree() {
+      cursor = c;
+    } else {
+      break;
+    }
+  }
+
+  let tts = (!tts.is_empty()).then(|| {
+    sub_token_stream(stream_cursor, None, &mut tts);
+    tts.into_iter().collect()
+  });
+  (tts, cursor)
 }
