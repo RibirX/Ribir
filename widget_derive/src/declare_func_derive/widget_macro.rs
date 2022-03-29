@@ -89,7 +89,7 @@ impl Parse for WidgetMacro {
 impl WidgetMacro {
   pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream> {
     fn circle_stack_to_path(stack: &[CircleCheckStack], ctx: &DeclareCtx) -> Box<[FollowInfo]> {
-      stack.iter().map(|c| c.into_follow_path(ctx)).collect()
+      stack.iter().map(|c| c.to_follow_path(ctx)).collect()
     }
 
     ctx.id_collect(self)?;
@@ -106,8 +106,7 @@ impl WidgetMacro {
         // `!is_widget_attr(stack.last().unwrap().on.widget.spans.all_widget_field)`
         // unit case `fix_attr_indirect_follow_host_fail.rs`, update its stderr if
         // fixed.
-        let tail_on_widget = head_is_attr && false;
-        if head_is_attr && stack.len() == 1 || tail_on_widget {
+        if head_is_attr && stack.len() == 1 {
           Ok(())
         } else {
           Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
@@ -288,7 +287,7 @@ impl WidgetMacro {
 }
 
 impl<'a> CircleCheckStack<'a> {
-  fn into_follow_path(&self, ctx: &DeclareCtx) -> FollowInfo {
+  fn to_follow_path(&self, ctx: &DeclareCtx) -> FollowInfo {
     let on = FollowOn {
       widget: ctx.user_perspective_name(&self.on.widget).map_or_else(
         || self.on.widget.clone(),
@@ -299,8 +298,8 @@ impl<'a> CircleCheckStack<'a> {
     };
 
     let widget = ctx
-      .user_perspective_name(&self.widget)
-      .unwrap_or_else(|| &self.widget);
+      .user_perspective_name(self.widget)
+      .unwrap_or(self.widget);
 
     let (widget, member) = match self.origin {
       FollowPlace::Field(f) => {
@@ -308,7 +307,7 @@ impl<'a> CircleCheckStack<'a> {
         // compile error.
         let widget = ctx
           .named_objects
-          .get(&widget)
+          .get(widget)
           .expect("id must in named widgets")
           .clone();
         (widget, Some(f.member.clone()))

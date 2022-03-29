@@ -305,7 +305,7 @@ impl SugarFields {
       };
     }
 
-    (gen.name.clone(), def_and_ref_tokens)
+    (gen.name, def_and_ref_tokens)
   }
 }
 
@@ -334,5 +334,5 @@ fn common_def_tokens(
     };
   }
 
-  (widget_gen.name.clone(), widget_tokens)
+  (widget_gen.name, widget_tokens)
 }

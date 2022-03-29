@@ -12,7 +12,7 @@ module.exports = {
     "release",
     "perf"
   ],
-  "maxMessageLength": 64,
+  "maxMessageLength": 96,
   "minMessageLength": 3,
   "questions": [
     "type",

@@ -93,7 +93,7 @@ struct Trigger {
 
 enum AnimateExpr {
   /// a.on_click: Animate { ... }
-  Animate(Animate),
+  Animate(Box<Animate>),
   /// a.color: Transition { ... }
   Transition(Transition),
   /// a.color: if xxx { fade_in_animate } else { fly_in_animate }
@@ -288,7 +288,7 @@ impl Parse for Animate {
         let transition = content.parse()?;
         assign_uninit_field!(fields.transition, transition)?;
       } else {
-        Err(lk.error())?;
+        return Err(lk.error());
       }
 
       if !content.is_empty() {
@@ -453,6 +453,14 @@ impl Animate {
     }
     animate_tokens
   }
+
+  fn embed_as_expr_tokens(&self, ctx_name: &Ident) -> TokenStream {
+    if let Some(Id { name, .. }) = self.id.as_ref() {
+      quote! { #name }
+    } else {
+      self.to_tokens(ctx_name)
+    }
+  }
 }
 
 impl ToTokens for FromStateField {
@@ -517,7 +525,7 @@ impl ToTokens for State {
       let init_value = fields.iter().map(|f| &f.expr);
       let path_members = fields.iter().map(|f| &f.path);
       let path_members2 = fields.iter().map(|f| &f.path);
-      let indexes = (0..fields.len()).map(|i| syn::Index::from(i));
+      let indexes = (0..fields.len()).map(syn::Index::from);
       let hints = (0..fields.len()).map(|_| quote! {_});
 
       quote_spanned! { state_span =>
@@ -583,8 +591,7 @@ impl Trigger {
 
     if SugarFields::BUILTIN_LISTENERS.iter().any(|v| member == v) {
       let expr = match expr {
-        AnimateExpr::Animate(Animate { id: Some(Id { name, .. }), .. }) => quote! {#name},
-        AnimateExpr::Animate(a) => a.to_tokens(ctx_name),
+        AnimateExpr::Animate(a) => a.embed_as_expr_tokens(ctx_name),
         AnimateExpr::Transition(t) => quote_spanned! { t.transition_token.span() =>
           compile_error!("`Transition can not directly use for listener trigger, use `Animate` instead of.`")
         },
@@ -607,8 +614,7 @@ impl Trigger {
       };
 
       let expr = match expr {
-        AnimateExpr::Animate(Animate { id: Some(Id { name, .. }), .. }) => quote! {#name},
-        AnimateExpr::Animate(a) => a.to_tokens(ctx_name),
+        AnimateExpr::Animate(a) => a.embed_as_expr_tokens(ctx_name),
         AnimateExpr::Transition(t) => {
           let transition = if let Some(Id { name, .. }) = t.id.as_ref() {
             quote! {#name}
@@ -860,7 +866,7 @@ impl Animate {
   fn as_follow_part(&self) -> Option<FollowPart> {
     self.follows.as_ref().map(|follows| FollowPart {
       origin: FollowPlace::Animate(self),
-      follows: &*&follows,
+      follows: &*follows,
     })
   }
 }
@@ -869,7 +875,7 @@ impl State {
   fn as_follow_part(&self) -> Option<FollowPart> {
     self.follows.as_ref().map(|follows| FollowPart {
       origin: FollowPlace::State(self),
-      follows: &*&follows,
+      follows: &*follows,
     })
   }
 }
@@ -878,7 +884,7 @@ impl Transition {
   fn as_follow_part(&self) -> Option<FollowPart> {
     self.follows.as_ref().map(|follows| FollowPart {
       origin: FollowPlace::Transition(self),
-      follows: &*&follows,
+      follows: &*follows,
     })
   }
 }
