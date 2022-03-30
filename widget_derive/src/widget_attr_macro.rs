@@ -7,8 +7,8 @@ use syn::{
 };
 
 use crate::{
-  declare_func_derive::declare_widget::DeclareField,
   error::{FollowInfo, Result},
+  widget_attr_macro::declare_widget::DeclareField,
 };
 mod declare_ctx;
 pub use declare_ctx::*;

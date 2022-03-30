@@ -1,6 +1,6 @@
 use crate::{
   declare_derive::field_convert_method,
-  declare_func_derive::{field_guard_variable, skip_nc_assign, widget_def_variable, DeclareCtx},
+  widget_attr_macro::{field_guard_variable, skip_nc_assign, widget_def_variable, DeclareCtx},
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};

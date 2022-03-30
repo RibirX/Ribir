@@ -41,7 +41,7 @@ fn expr_child_use_named_widget(_this: (), ctx: &mut BuildCtx) {
         size,
       }
       ExprChild {
-        (a.size.area() > 0.).then( SizedBox {s ize })
+        (a.size.area() > 0.).then(|| SizedBox { size })
       }
     }
   };

@@ -139,7 +139,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     })?;
 
   // reverse name check.
-  let reserve_ident = &crate::declare_func_derive::RESERVE_IDENT;
+  let reserve_ident = &crate::widget_attr_macro::RESERVE_IDENT;
   builder_fields
     .iter_mut()
     .filter_map(|(f, attr)| {
