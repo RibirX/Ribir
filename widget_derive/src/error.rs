@@ -17,7 +17,6 @@ pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleInit(Box<[FollowInfo]>),
   CircleFollow(Box<[FollowInfo]>),
-  UnnecessarySkipNc(Span),
   DataFlowNoDepends(Span),
   KeyDependsOnOther {
     key: Span,
@@ -33,6 +32,7 @@ pub enum DeclareError {
 #[derive(Debug)]
 pub enum DeclareWarning {
   NeedlessDeclare(Span),
+  NeedlessSkipNc(Span),
 }
 
 pub type Result<T> = std::result::Result<T, DeclareError>;
@@ -78,11 +78,7 @@ impl DeclareError {
         change trigger.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
-      DeclareError::UnnecessarySkipNc(span) => {
-        diagnostic.set_spans(span);
-        diagnostic.set_message("Unnecessary attribute, because not depends on any others");
-        diagnostic = diagnostic.help("Try to remove it.");
-      }
+
       DeclareError::DataFlowNoDepends(span) => {
         diagnostic.set_spans(span);
         diagnostic.set_message("Declared a data flow but not depends on any others.");
@@ -157,7 +153,13 @@ impl DeclareWarning {
     match self {
       DeclareWarning::NeedlessDeclare(span) => {
         d.set_message("Unnecessary `declare` for nested declare child.");
-        d.set_spans(vec![*span])
+        d.set_spans(*span);
+        d = d.help("Try to remove it.");
+      }
+      DeclareWarning::NeedlessSkipNc(span) => {
+        d.set_spans(*span);
+        d.set_message("Unnecessary attribute, because not depends on any others");
+        d = d.help("Try to remove it.");
       }
     };
     d.emit();
