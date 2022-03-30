@@ -14,7 +14,7 @@ mod sugar_fields;
 mod widget_gen;
 use crate::{
   declare_func_derive::{ribir_prefix_variable, ReferenceInfo, DECLARE_WRAP_MACRO},
-  error::DeclareError,
+  error::{DeclareError, DeclareWarning},
 };
 
 pub use sugar_fields::*;
@@ -27,8 +27,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct DeclareWidget {
-  // todo: warning for unnecessary declare keyword for declare child.
-  _declare_token: Option<kw::declare>,
+  declare_token: Option<kw::declare>,
   pub path: Path,
   brace_token: Brace,
   // the name of this widget specified by `id` attr.
@@ -145,7 +144,7 @@ impl Parse for DeclareWidget {
     }
 
     Ok(DeclareWidget {
-      _declare_token,
+      declare_token: _declare_token,
       path,
       brace_token,
       named,
@@ -492,6 +491,10 @@ impl DeclareWidget {
     })
   }
 
+  pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {
+    self.children.iter().filter_map(Child::declare_warning)
+  }
+
   /// return follow relationship of the named widgets,it is a key-value map,
   /// schema like
   /// ``` ascii
@@ -748,4 +751,16 @@ fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cu
     tts.into_iter().collect()
   });
   (tts, cursor)
+}
+
+impl Child {
+  fn declare_warning(&self) -> Option<DeclareWarning> {
+    match self {
+      Child::Declare(d) => d
+        .declare_token
+        .as_ref()
+        .map(|d| DeclareWarning::NeedlessDeclare(d.span().unwrap())),
+      Child::Expr(_) => None,
+    }
+  }
 }

@@ -385,18 +385,20 @@ mod tests {
                 bottom: BorderSide { width: 4., color: Color::YELLOW },
               },
             }
-            radius_cases
-              .into_iter()
-              .map(|radius| {
-                declare SizedBox {
-                  size: Size::new(60., 40.),
-                  background: Color::RED,
-                  radius,
-                  border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
-                  margin: EdgeInsets::all(2.)
-                }
-              }),
-          }
+            ExprChild {
+              radius_cases
+                .into_iter()
+                .map(|radius| {
+                  declare SizedBox {
+                    size: Size::new(60., 40.),
+                    background: Color::RED,
+                    radius,
+                    border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
+                    margin: EdgeInsets::all(2.)
+                  }
+                })
+            }
+         }
         }
       }
     }

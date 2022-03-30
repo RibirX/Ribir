@@ -14,7 +14,7 @@ use super::{
   declare_widget::SugarFields, kw, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo,
   FollowOn, FollowPlace, Follows, Result,
 };
-use crate::error::DeclareError;
+use crate::error::{DeclareError, DeclareWarning};
 
 pub struct WidgetMacro {
   _widget_token: kw::widget,
@@ -182,6 +182,8 @@ impl WidgetMacro {
       .object_names_iter()
       .chain(self.animations.iter().flat_map(|a| a.names()))
   }
+
+  pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ { self.widget.warnings() }
 
   /// return follow relationship of the named widgets,it is a key-value map,
   /// schema like

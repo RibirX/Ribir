@@ -181,8 +181,8 @@ fn embed_widget_ref_outside() {
             on_tap: move |_| first.size = Size::new(2., 2.)
           }
           ExprChild {
-            // todo: should warning use id in embed expression widget without declare keyword.
-            // without `declare` compile pass but unit test pass.
+            // todo: should document warning use id in embed expression widget without declare keyword.
+            // without `declare` compile pass but unit test fail.
             (0..3).map(|_| declare SizedBox { size: first.size } )
           }
         }
