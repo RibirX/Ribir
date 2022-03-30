@@ -1,11 +1,5 @@
-#[test]
-fn ui() {
-  let t = trybuild::TestCases::new();
-  t.compile_fail("tests/ui/**/*fail.rs");
-  t.pass("tests/ui/**/*pass.rs");
-}
-
 use ribir::prelude::*;
+
 struct T;
 impl CombinationWidget for T {
   #[widget]
@@ -18,3 +12,5 @@ impl CombinationWidget for T {
     }
   }
 }
+
+fn main() {}

@@ -25,9 +25,7 @@ fn option_child(_this: (), ctx: &mut BuildCtx) {
       size,
       background: Color::RED,
       ExprChild {
-        (size.area() == 0.).then(||{
-          SizedBox { size }
-        })
+        (size.area() == 0.).then(|| SizedBox { size } )
       }
     }
   };
@@ -43,10 +41,7 @@ fn expr_child_use_named_widget(_this: (), ctx: &mut BuildCtx) {
         size,
       }
       ExprChild {
-        (a.size.area() > 0.).then(||
-          SizedBox {
-            size,
-        })
+        (a.size.area() > 0.).then( SizedBox {s ize })
       }
     }
   };

@@ -298,10 +298,8 @@ impl SugarFields {
     // emit.
     if fields.iter().all(|f| f.if_guard.is_some()) {
       def_and_ref_tokens = quote! {
-        let #wrap_name = #wrap_name.is_empty().then(||{
-          #def_and_ref_tokens
-          #wrap_name
-        });
+        #def_and_ref_tokens
+        let #wrap_name = (!#wrap_name.is_empty()).then(|| #wrap_name);
       };
     }
 
