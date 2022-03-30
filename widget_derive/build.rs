@@ -83,7 +83,7 @@ impl Display for BuiltinFields {
 
 fn main() {
   let tokens = proc_macro2::TokenStream::from_str(include_str!(
-    "./src/declare_func_derive/declare_widget/sugar_fields_struct.rs"
+    "./src/widget_attr_macro/declare_widget/sugar_fields_struct.rs"
   ))
   .unwrap();
 

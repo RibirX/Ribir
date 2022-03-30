@@ -8,7 +8,7 @@ use syn::{spanned::Spanned, Ident, Member, Path, Result};
 
 use super::{widget_gen::WidgetGen, DeclareField, FollowPart, Follows};
 use crate::{
-  declare_func_derive::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
+  widget_attr_macro::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
   error::DeclareError,
 };
 

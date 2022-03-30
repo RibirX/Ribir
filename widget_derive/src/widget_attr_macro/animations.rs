@@ -11,7 +11,7 @@ use syn::{
   Error, Expr, Ident, Result,
 };
 
-use crate::declare_func_derive::Id;
+use crate::widget_attr_macro::Id;
 
 use super::{
   declare_widget::{assign_uninit_field, SugarFields},

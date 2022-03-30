@@ -3,12 +3,12 @@ extern crate proc_macro;
 extern crate proc_macro2;
 
 mod declare_derive;
-mod declare_func_derive;
+mod widget_attr_macro;
 mod error;
 
 mod util;
 
-use declare_func_derive::DeclareCtx;
+use widget_attr_macro::DeclareCtx;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
