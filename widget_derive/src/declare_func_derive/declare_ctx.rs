@@ -363,11 +363,11 @@ impl DeclareCtx {
   }
 
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
-    let mut widget: WidgetMacro = syn::parse2(tokens)?;
+    let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
     let named = self.named_objects.clone();
 
     let mut ctx = self.borrow_capture_scope(true);
-    let tokens = widget
+    let tokens = widget_macro
       .gen_tokens(&mut *ctx)
       .unwrap_or_else(|err| err.into_compile_error());
 
@@ -377,6 +377,7 @@ impl DeclareCtx {
     });
 
     ctx.emit_unused_id_warning();
+    widget_macro.warnings().for_each(|w| w.emit_warning());
     ctx.named_objects = named;
     syn::parse2(tokens)
   }

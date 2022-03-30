@@ -32,7 +32,7 @@ pub enum DeclareError {
 
 #[derive(Debug)]
 pub enum DeclareWarning {
-  
+  NeedlessDeclare(Span),
 }
 
 pub type Result<T> = std::result::Result<T, DeclareError>;
@@ -149,4 +149,17 @@ fn path_info(path: &[FollowInfo]) -> (String, Vec<Span>, Vec<Span>) {
     .collect::<Vec<_>>();
 
   (msg, spans, note_spans)
+}
+
+impl DeclareWarning {
+  pub fn emit_warning(&self) {
+    let mut d = Diagnostic::new(Level::Warning, "");
+    match self {
+      DeclareWarning::NeedlessDeclare(span) => {
+        d.set_message("Unnecessary `declare` for nested declare child.");
+        d.set_spans(vec![*span])
+      }
+    };
+    d.emit();
+  }
 }

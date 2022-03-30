@@ -1,0 +1,13 @@
+error: Test for declare syntax warning.
+ --> tests/ui/declare/needless_declare_warning_fail.rs:4:3
+  |
+4 |   compile_error!("Test for declare syntax warning.");
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: Unnecessary `declare` for nested declare child.
+  --> tests/ui/declare/needless_declare_warning_fail.rs:15:9
+   |
+15 |         declare SizedBox { size }
+   |         ^^^^^^^
+   |
+   = help: Try to remove it.
