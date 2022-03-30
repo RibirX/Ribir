@@ -30,9 +30,11 @@ fn wrap_widget_no_follow_with_skip_nc(_this: (), ctx: &mut BuildCtx) {
       id: self_id,
       size: Size::new(5., 5.),
       #[skip_nc]
-      margin: Margin::all(1.)
+      margin: EdgeInsets::all(1.)
     }
   };
 }
 
-fn main() {}
+fn main() {
+  compile_error!("Test for declare syntax warning.");
+}

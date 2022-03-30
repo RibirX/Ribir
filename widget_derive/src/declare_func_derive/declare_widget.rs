@@ -484,7 +484,6 @@ impl DeclareWidget {
   pub fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
     self.traverses_declare().try_for_each(|w| {
       if w.named.is_some() {
-        w.unnecessary_skip_nc_check()?;
         w.wrap_widget_if_guard_check(ctx)?;
       }
       w.sugar_fields.key_follow_check()
@@ -492,7 +491,26 @@ impl DeclareWidget {
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {
-    self.children.iter().filter_map(Child::declare_warning)
+    fn needless_skip_nc(f: &DeclareField) -> Option<DeclareWarning> {
+      f.skip_nc
+        .as_ref()
+        .map(|attr| DeclareWarning::NeedlessSkipNc(attr.span().unwrap()))
+    }
+
+    self
+      .sugar_fields
+      .listeners_iter()
+      .filter_map(needless_skip_nc)
+      .chain(
+        self
+          .fields
+          .iter()
+          .chain(self.sugar_fields.normal_attr_iter())
+          .chain(self.sugar_fields.widget_wrap_field_iter())
+          .filter(|f| self.named.is_none() || f.follows.is_none())
+          .filter_map(needless_skip_nc),
+      )
+      .chain(self.children.iter().flat_map(Child::warnings))
   }
 
   /// return follow relationship of the named widgets,it is a key-value map,
@@ -529,30 +547,6 @@ impl DeclareWidget {
       });
 
     follows
-  }
-
-  fn unnecessary_skip_nc_check(&self) -> Result<()> {
-    debug_assert!(self.named.is_some());
-    fn unnecessary_skip_nc(
-      DeclareField { skip_nc, follows: depends_on, .. }: &DeclareField,
-    ) -> Result<()> {
-      match (depends_on, skip_nc) {
-        (None, Some(attr)) => Err(DeclareError::UnnecessarySkipNc(attr.span().unwrap())),
-        _ => Ok(()),
-      }
-    }
-
-    // normal widget
-    self
-      .fields
-      .iter()
-      .chain(self.sugar_fields.normal_attr_iter())
-      .try_for_each(unnecessary_skip_nc)?;
-
-    self
-      .sugar_fields
-      .widget_wrap_field_iter()
-      .try_for_each(unnecessary_skip_nc)
   }
 
   fn wrap_widget_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
@@ -754,13 +748,18 @@ fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cu
 }
 
 impl Child {
-  fn declare_warning(&self) -> Option<DeclareWarning> {
+  fn warnings(&self) -> Box<dyn Iterator<Item = DeclareWarning> + '_> {
     match self {
-      Child::Declare(d) => d
-        .declare_token
-        .as_ref()
-        .map(|d| DeclareWarning::NeedlessDeclare(d.span().unwrap())),
-      Child::Expr(_) => None,
+      Child::Declare(d) => {
+        let iter = d
+          .declare_token
+          .as_ref()
+          .map(|d| DeclareWarning::NeedlessDeclare(d.span().unwrap()))
+          .into_iter()
+          .chain(d.warnings());
+        Box::new(iter)
+      }
+      Child::Expr(_) => Box::new(std::iter::empty()),
     }
   }
 }

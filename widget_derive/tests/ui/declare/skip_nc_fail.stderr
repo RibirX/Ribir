@@ -1,4 +1,16 @@
-error: Unnecessary attribute, because not depends on any others
+warning: `self_id` does not be used
+ --> tests/ui/declare/skip_nc_fail.rs:7:11
+  |
+7 |       id: self_id,
+  |           ^^^^^^^
+  |
+help: Remove this line.
+ --> tests/ui/declare/skip_nc_fail.rs:7:11
+  |
+7 |       id: self_id,
+  |           ^^^^^^^
+
+warning: Unnecessary attribute, because not depends on any others
  --> tests/ui/declare/skip_nc_fail.rs:8:7
   |
 8 |       #[skip_nc]
@@ -7,18 +19,18 @@ error: Unnecessary attribute, because not depends on any others
   = help: Try to remove it.
 
 warning: `self_id` does not be used
- --> tests/ui/declare/skip_nc_fail.rs:7:11
-  |
-7 |       id: self_id,
-  |           ^^^^^^^
-  |
+  --> tests/ui/declare/skip_nc_fail.rs:18:11
+   |
+18 |       id: self_id,
+   |           ^^^^^^^
+   |
 help: Remove this line.
- --> tests/ui/declare/skip_nc_fail.rs:7:11
-  |
-7 |       id: self_id,
-  |           ^^^^^^^
+  --> tests/ui/declare/skip_nc_fail.rs:18:11
+   |
+18 |       id: self_id,
+   |           ^^^^^^^
 
-error: Unnecessary attribute, because not depends on any others
+warning: Unnecessary attribute, because not depends on any others
   --> tests/ui/declare/skip_nc_fail.rs:20:7
    |
 20 |       #[skip_nc]
@@ -27,18 +39,18 @@ error: Unnecessary attribute, because not depends on any others
    = help: Try to remove it.
 
 warning: `self_id` does not be used
-  --> tests/ui/declare/skip_nc_fail.rs:18:11
+  --> tests/ui/declare/skip_nc_fail.rs:30:11
    |
-18 |       id: self_id,
+30 |       id: self_id,
    |           ^^^^^^^
    |
 help: Remove this line.
-  --> tests/ui/declare/skip_nc_fail.rs:18:11
+  --> tests/ui/declare/skip_nc_fail.rs:30:11
    |
-18 |       id: self_id,
+30 |       id: self_id,
    |           ^^^^^^^
 
-error: Unnecessary attribute, because not depends on any others
+warning: Unnecessary attribute, because not depends on any others
   --> tests/ui/declare/skip_nc_fail.rs:32:7
    |
 32 |       #[skip_nc]
@@ -46,14 +58,8 @@ error: Unnecessary attribute, because not depends on any others
    |
    = help: Try to remove it.
 
-warning: `self_id` does not be used
-  --> tests/ui/declare/skip_nc_fail.rs:30:11
+error: Test for declare syntax warning.
+  --> tests/ui/declare/skip_nc_fail.rs:39:3
    |
-30 |       id: self_id,
-   |           ^^^^^^^
-   |
-help: Remove this line.
-  --> tests/ui/declare/skip_nc_fail.rs:30:11
-   |
-30 |       id: self_id,
-   |           ^^^^^^^
+39 |   compile_error!("Test for declare syntax warning.");
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
