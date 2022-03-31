@@ -4,30 +4,28 @@ use std::{
   sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use crate::font_db::{self, Face, FontDB, ID};
-use algo::{CowRc, FrameCache};
+use crate::{
+  font_db::{self, Face, FontDB, ID},
+  TextDirection,
+};
+use algo::FrameCache;
 
+use arcstr::Substr;
 use rustybuzz::{GlyphInfo, GlyphPosition, UnicodeBuffer};
 pub use ttf_parser::GlyphId;
-use unic_bidi::{BidiInfo, Level, LevelRun};
 
 /// A glyph information returned by text shaped, include a glyph
 #[derive(Debug, Clone)]
 pub struct Glyph {
   /// The font face id of the glyph.
   pub face_id: ID,
-  /// How much em the line advances after drawing this glyph when setting text
-  /// in horizontal direction.
-  pub x_advance: f32,
-  /// How much em the line advances after drawing this glyph when setting text
-  /// in vertical direction.
-  pub y_advance: f32,
-  /// How much ems the glyph moves on the X-axis before drawing it, this should
-  /// not affect how much the line advances.
-  pub x_offset: f32,
-  /// How much em the glyph moves on the Y-axis before drawing it, this should
-  /// not affect how much the line advances.
-  pub y_offset: f32,
+  /// How much em the line advances after drawing this glyph, x-axis advance
+  /// when setting text in horizontal direction, y-axis in vertical direction.
+  pub advance: f32,
+  /// How much em the glyph moves before drawing it, this should not affect how
+  /// much the line advances.
+  pub offset: f32,
+  /// The id of the glyph.
   pub glyph_id: GlyphId,
   /// An cluster of origin text as byte index.
   pub cluster: u32,
@@ -40,39 +38,24 @@ pub struct Glyph {
 #[derive(Default, Clone)]
 pub struct TextShaper {
   font_db: Arc<RwLock<FontDB>>,
-  shape_cache: Arc<RwLock<FrameCache<ShapeKey, Arc<[ParagraphShaped]>>>>,
+  shape_cache: Arc<RwLock<FrameCache<ShapeKey, Arc<ShapeResult>>>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct RunShaped {
-  pub run: LevelRun,
-  pub glyphs: Box<[Glyph]>,
-  /// How much em the line need to drawing this glyph when setting text in
-  /// horizontal direction.
-  pub width: f32,
-  /// How much em the line need to drawing this glyph when setting text in
-  /// Vertical direction.
-  pub heigh: f32,
-}
-/// Shape result of a paragraph, correspond to `ParagraphVisualRuns`
-#[derive(Clone, Debug)]
-pub struct ParagraphShaped {
-  pub levels: Box<[Level]>,
-  pub runs: Box<[RunShaped]>,
-  /// How much em the line need to drawing this glyph when setting text in
-  /// horizontal direction.
-  pub width: f32,
-  /// How much em the line need to drawing this glyph when setting text in
-  /// Vertical direction.
-  pub heigh: f32,
-  /// The height of the first font use to shape the text in em.
-  pub first_font_height: f32,
+pub struct ShapeResult {
+  pub text: Substr,
+  pub glyphs: Vec<Glyph>,
+  pub direction: TextDirection,
+  /// The biggest height of font use to shape the text in em. For vertical font
+  /// is its "width".
+  pub max_line_size: f32,
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 struct ShapeKey {
   face_ids: Box<[ID]>,
-  text: CowRc<str>,
+  text: Substr,
+  direction: TextDirection,
 }
 
 impl TextShaper {
@@ -81,42 +64,81 @@ impl TextShaper {
     self.font_db.write().unwrap().end_frame()
   }
 
-  /// Shape text with bidi reordering.
-  pub fn shape_text(&self, text: &str, face_ids: &[ID]) -> Arc<[ParagraphShaped]> {
-    match self.get(text, face_ids) {
-      Some(v) => v,
-      None => {
-        let glyphs: Arc<[ParagraphShaped]> = if !cover_all_glyphs(text, face_ids, &*self.font_db) {
-          log::warn!("Text shape: some glyphs not covered in the text: {}", text);
+  /// Shape text and return the glyphs, caller should do text reorder before
+  /// call this method.
+  pub fn shape_text(
+    &self,
+    text: &Substr,
+    face_ids: &[ID],
+    direction: TextDirection,
+  ) -> Arc<ShapeResult> {
+    self
+      .get_from_cache(text, face_ids, direction)
+      .unwrap_or_else(|| {
+        let (glyphs, line_height) = if !cover_all_glyphs(text, face_ids, &*self.font_db) {
+          log::warn!(
+            "Text shape: some glyphs not covered in the text: {}",
+            &**text
+          );
           let ids = db_fallback_fonts(face_ids, &*self.font_db);
-          self.reorder_and_shape(text, &ids).into()
-        } else {
-          self.reorder_and_shape(text, face_ids).into()
-        };
 
+          self.shape_text_with_fallback(text, direction, &ids, &mut None)
+        } else {
+          self.shape_text_with_fallback(text, direction, face_ids, &mut None)
+        }
+        .unwrap_or_else(|| {
+          log::warn!("There is no font can shape the text: \"{}\"", &**text);
+          // if no font can shape the text use the first font shape it with miss glyph.
+          let face = {
+            let mut font_db = self.font_db_mut();
+            face_ids
+              .iter()
+              .find_map(|id| font_db.face_data_or_insert(*id).cloned())
+              .unwrap_or_else(|| {
+                font_db
+                  .faces()
+                  .iter()
+                  .find_map(|info| font_db.try_get_face_data(info.id))
+                  .expect("No font can use.")
+                  .clone()
+              })
+          };
+          let (glyphs, _) = Self::directly_shape(text, direction, &face, &mut None);
+
+          (glyphs, line_size(direction, &face))
+        });
+
+        let glyphs = Arc::new(ShapeResult {
+          text: text.clone(),
+          glyphs,
+          max_line_size: line_height,
+          direction,
+        });
         self.shape_cache.write().unwrap().insert(
           ShapeKey {
             face_ids: face_ids.into(),
-            text: text.to_owned().into(),
+            text: text.clone(),
+            direction,
           },
           glyphs.clone(),
         );
         glyphs
-      }
-    }
+      })
   }
 
   /// Directly shape text without bidi reordering.
-  pub fn shape_text_without_bidi(
+  pub fn shape_text_with_fallback(
     &self,
     text: &str,
-    is_rtl: bool,
+    dir: TextDirection,
     face_ids: &[ID],
+    // todo: remove it
     buffer: &mut Option<UnicodeBuffer>,
-  ) -> Option<Vec<Glyph>> {
+  ) -> Option<(Vec<Glyph>, f32)> {
     let (id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
 
-    let (mut glyphs, mut miss_from) = Self::directly_shape(text, is_rtl, &face, buffer);
+    let (mut glyphs, mut miss_from) = Self::directly_shape(text, dir, &face, buffer);
+    let mut line_height = line_size(dir, &face);
     while let Some(m_start) = miss_from {
       let m_end = glyphs[m_start..]
         .iter()
@@ -133,13 +155,14 @@ impl TextShaper {
       };
 
       let fallback_glyphs =
-        self.shape_text_without_bidi(miss_text, is_rtl, &face_ids[id_idx + 1..], buffer);
+        self.shape_text_with_fallback(miss_text, dir, &face_ids[id_idx + 1..], buffer);
 
-      if let Some(fallback) = fallback_glyphs {
+      if let Some((fallback, lh)) = fallback_glyphs {
         match m_end {
           Some(m_end) => glyphs.splice(m_start..m_end, fallback),
           None => glyphs.splice(m_start.., fallback),
         };
+        line_height = line_height.max(lh);
       }
 
       // skip to next miss glyphs
@@ -151,21 +174,22 @@ impl TextShaper {
       });
     }
 
-    Some(glyphs)
+    Some((glyphs, line_height))
   }
 
   pub fn directly_shape(
     text: &str,
-    is_rtl: bool,
+    direction: TextDirection,
     face: &Face,
     buffer: &mut Option<UnicodeBuffer>,
   ) -> (Vec<Glyph>, Option<usize>) {
     let mut run_buffer = buffer.take().unwrap_or_default();
     run_buffer.push_str(text);
-    let hb_direction = if is_rtl {
-      rustybuzz::Direction::RightToLeft
-    } else {
-      rustybuzz::Direction::LeftToRight
+    let hb_direction = match direction {
+      TextDirection::LeftToRight => rustybuzz::Direction::LeftToRight,
+      TextDirection::RightToLeft => rustybuzz::Direction::RightToLeft,
+      TextDirection::TopToBottom => rustybuzz::Direction::TopToBottom,
+      TextDirection::BottomToTop => rustybuzz::Direction::BottomToTop,
     };
     run_buffer.set_direction(hb_direction);
     let output = rustybuzz::shape(face.as_rb_face(), &[], run_buffer);
@@ -173,92 +197,67 @@ impl TextShaper {
     let mut miss_from = None;
 
     let mut glyphs = Vec::with_capacity(output.len());
-    (0..output.len()).for_each(|g_idx| {
-      let pos = output.glyph_positions()[g_idx];
-      let info = &output.glyph_infos()[g_idx];
-      let glyph = Glyph::new(face, pos, info);
-      if miss_from.is_none() && glyph.is_miss() {
-        miss_from = Some(g_idx);
-      }
-      glyphs.push(glyph);
-    });
+
+    let glyphs_iter = output
+      .glyph_infos()
+      .iter()
+      .zip(output.glyph_positions().iter())
+      .enumerate()
+      .inspect(|(g_idx, (info, _))| {
+        if miss_from.is_none() && is_miss_glyph_id(info.glyph_id as u16) {
+          miss_from = Some(*g_idx);
+        }
+      });
+
+    let units_per_em = face.units_per_em() as f32;
+
+    match direction {
+      TextDirection::LeftToRight | TextDirection::RightToLeft => glyphs_iter.for_each(
+        |(_, (GlyphInfo { glyph_id, cluster, .. }, GlyphPosition { x_advance, x_offset, .. }))| {
+          glyphs.push(Glyph {
+            face_id: face.face_id,
+            advance: *x_advance as f32 / units_per_em,
+            offset: *x_offset as f32 / units_per_em,
+            glyph_id: GlyphId(*glyph_id as u16),
+            cluster: *cluster,
+          });
+        },
+      ),
+      TextDirection::TopToBottom | TextDirection::BottomToTop => glyphs_iter.for_each(
+        |(_, (GlyphInfo { glyph_id, cluster, .. }, GlyphPosition { y_advance, y_offset, .. }))| {
+          glyphs.push(Glyph {
+            face_id: face.face_id,
+            advance: *y_advance as f32 / units_per_em,
+            offset: *y_offset as f32 / units_per_em,
+            glyph_id: GlyphId(*glyph_id as u16),
+            cluster: *cluster,
+          });
+        },
+      ),
+    }
+
     buffer.replace(output.clear());
 
     (glyphs, miss_from)
   }
 
-  pub fn get(&self, text: &str, face_ids: &[ID]) -> Option<Arc<[ParagraphShaped]>> {
+  pub fn get_from_cache(
+    &self,
+    text: &str,
+    face_ids: &[ID],
+    direction: TextDirection,
+  ) -> Option<Arc<ShapeResult>> {
     self
       .shape_cache
       .read()
       .unwrap()
-      .get(&(face_ids, text) as &(dyn ShapeKeySlice))
+      .get(&(face_ids, text, direction) as &(dyn ShapeKeySlice))
       .cloned()
   }
 
   pub fn font_db(&self) -> RwLockReadGuard<'_, FontDB> { self.font_db.read().unwrap() }
 
   pub fn font_db_mut(&self) -> RwLockWriteGuard<FontDB> { self.font_db.write().unwrap() }
-
-  fn reorder_and_shape(&self, text: &str, face_ids: &[ID]) -> Vec<ParagraphShaped> {
-    let bidi_info = BidiInfo::new(text, None);
-    let mut buffer = Some(UnicodeBuffer::new());
-    let mut lines = Vec::with_capacity(bidi_info.paragraphs.len());
-
-    bidi_info.paragraphs.iter().for_each(|p| {
-      let line = p.range.clone();
-      let (levels, runs) = bidi_info.visual_runs(p, line);
-      let mut line = Vec::with_capacity(runs.len());
-
-      let (mut line_w, mut line_h) = (0., 0.);
-      for r in runs {
-        let run_text = &text[r.clone()];
-        let glyphs = self
-          .shape_text_without_bidi(run_text, levels[r.start].is_rtl(), face_ids, &mut buffer)
-          .unwrap_or_else(|| {
-            // if not font can shape the text use the first font shape it with miss glyph.
-            let face = {
-              let mut font_db = self.font_db_mut();
-              face_ids
-                .iter()
-                .find_map(|id| font_db.face_data_or_insert(*id).cloned())
-                .expect("No font can use.")
-            };
-            let (glyphs, _) =
-              Self::directly_shape(run_text, levels[r.start].is_rtl(), &face, &mut buffer);
-            glyphs
-          });
-        let (width, heigh) = glyphs
-          .iter()
-          .map(|g| (g.x_offset + g.x_advance, g.y_offset + g.y_advance))
-          .fold((0., 0.), |(sw, sh), (w, h)| (sw + w, sh + h));
-        line_w += width;
-        line_h += heigh;
-        line.push(RunShaped {
-          run: r.clone(),
-          glyphs: glyphs.into_boxed_slice(),
-          width,
-          heigh,
-        });
-      }
-
-      let g = line.iter().flat_map(|g| g.glyphs.iter()).next();
-      let first_font_height = g.map_or(1., |g| {
-        let db = self.font_db();
-        let face = db.try_get_face_data(g.face_id).expect("font must existed.");
-        face.height() as f32 / face.units_per_em() as f32
-      });
-      lines.push(ParagraphShaped {
-        levels: levels.into_boxed_slice(),
-        runs: line.into_boxed_slice(),
-        width: line_w,
-        heigh: line_h,
-        first_font_height,
-      });
-    });
-
-    lines
-  }
 }
 
 fn cover_all_glyphs(text: &str, ids: &[ID], font_db: &RwLock<FontDB>) -> bool {
@@ -281,6 +280,16 @@ fn cover_all_glyphs(text: &str, ids: &[ID], font_db: &RwLock<FontDB>) -> bool {
   })
 }
 
+fn line_size(dir: TextDirection, face: &Face) -> f32 {
+  let height = match dir {
+    TextDirection::LeftToRight | TextDirection::RightToLeft => face.height(),
+    TextDirection::TopToBottom | TextDirection::BottomToTop => {
+      face.vertical_height().unwrap_or_else(|| face.height())
+    }
+  };
+  height as f32 / face.units_per_em() as f32
+}
+
 fn db_fallback_fonts(high_prior: &[ID], font_db: &RwLock<FontDB>) -> Vec<ID> {
   let db = font_db.read().unwrap();
   let faces = db.faces();
@@ -296,6 +305,7 @@ fn db_fallback_fonts(high_prior: &[ID], font_db: &RwLock<FontDB>) -> Vec<ID> {
 trait ShapeKeySlice {
   fn face_ids(&self) -> &[ID];
   fn text(&self) -> &str;
+  fn direction(&self) -> TextDirection;
 }
 
 impl<'a> Borrow<dyn ShapeKeySlice + 'a> for ShapeKey {
@@ -324,6 +334,7 @@ impl ToOwned for dyn ShapeKeySlice + '_ {
     ShapeKey {
       face_ids: self.face_ids().into(),
       text: self.text().to_owned().into(),
+      direction: self.direction(),
     }
   }
 }
@@ -332,34 +343,24 @@ impl ShapeKeySlice for ShapeKey {
   fn face_ids(&self) -> &[ID] { &self.face_ids }
 
   fn text(&self) -> &str { &self.text }
+
+  fn direction(&self) -> TextDirection { self.direction }
 }
 
-impl ShapeKeySlice for (&[ID], &str) {
+impl ShapeKeySlice for (&[ID], &str, TextDirection) {
   fn face_ids(&self) -> &[ID] { self.0 }
 
   fn text(&self) -> &str { self.1 }
+
+  fn direction(&self) -> TextDirection { self.2 }
 }
 
+fn is_miss_glyph_id(id: u16) -> bool { id == 0 }
+
 impl Glyph {
-  fn is_miss(&self) -> bool { self.glyph_id.0 == 0 }
+  fn is_miss(&self) -> bool { is_miss_glyph_id(self.glyph_id.0) }
 
   fn is_not_miss(&self) -> bool { !self.is_miss() }
-
-  fn new(face: &font_db::Face, pos: GlyphPosition, info: &GlyphInfo) -> Self {
-    let glyph_id = GlyphId(info.glyph_id as u16);
-    let cluster = info.cluster;
-
-    let units_per_em = face.units_per_em() as f32;
-    Glyph {
-      face_id: face.face_id,
-      glyph_id,
-      cluster,
-      x_advance: pos.x_advance as f32 / units_per_em,
-      y_advance: pos.y_advance as f32 / units_per_em,
-      x_offset: pos.x_offset as f32 / units_per_em,
-      y_offset: pos.y_offset as f32 / units_per_em,
-    }
-  }
 }
 
 #[cfg(test)]
@@ -382,7 +383,7 @@ mod tests {
     });
 
     // No cache exists
-    assert!(shaper.get(text, &ids).is_none());
+    assert!(shaper.get_from_cache(text, &ids).is_none());
 
     let lines = shaper.shape_text(text, &ids);
     assert_eq!(lines.len(), 1);
@@ -400,11 +401,11 @@ mod tests {
     assert_eq!(runs[1].run, 0..6);
     assert_eq!(runs[0].glyphs.len(), 3);
 
-    assert!(shaper.get(text, &ids).is_some());
+    assert!(shaper.get_from_cache(text, &ids).is_some());
 
     shaper.end_frame();
     shaper.end_frame();
-    assert!(shaper.get(text, &ids).is_none());
+    assert!(shaper.get_from_cache(text, &ids).is_none());
   }
 
   #[test]

@@ -1,4 +1,4 @@
-use std::ops::Range;
+use arcstr::Substr;
 
 use fontdb::ID;
 use lyon_path::geom::{Point, Rect, Size};
@@ -6,43 +6,63 @@ use ttf_parser::GlyphId;
 use unicode_script::{Script, UnicodeScript};
 
 use crate::{
-  shaper::{Glyph, ParagraphShaped, RunShaped},
-  HAlign, VAlign,
+  shaper::{Glyph, TextShaper},
+  HAlign, TextDirection, VAlign,
 };
 
-/// Return the tight box of glyphs
-pub fn glyphs_box(
-  text: &str,
-  glyph_lines: &[ParagraphShaped],
-  font_size: f32,
-  line_height: Option<f32>,
-  letter_space: f32,
-) -> Size<f32> {
-  let (mut width, mut height) = (0f32, 0f32);
-  glyph_lines.iter().for_each(|l| {
-    let line_width = calc_line_width(text, l, letter_space, font_size);
-    width = width.max(line_width);
-    height += line_height.unwrap_or(l.first_font_height) * font_size;
-  });
-  Size::new(width, height)
+pub struct GlyphAt {
+  pub glyph_id: GlyphId,
+  /// The font face id of the glyph.
+  pub face_id: ID,
+  /// The glyph draw offset of its axis by pixel
+  pub offset: f32,
+  /// How much pixel the line advances after drawing this glyph
+  pub advance: f32,
+  /// An cluster of origin text as byte index.
+  pub cluster: u32,
 }
 
+pub struct TextLayouter {}
+
+pub fn text_box(text: &Substr, font_size: f32, line_size: Option<f32>) -> Size<f32> { todo!() }
+
+pub fn glyphs_position_iter<'a>(
+  text: &'a str,
+  glyphs: &'a [Glyph],
+  font_size: f32,
+  letter_space: f32,
+  pos_start_at: f32,
+) -> Box<dyn Iterator<Item = GlyphAt> + 'a> {
+  if letter_space != 0. {
+    let iter = glyphs.iter().scan(pos_start_at, move |pos, g| {
+      let at = GlyphAt::from_glyph(*pos, g, font_size);
+      *pos = at.offset + at.advance;
+
+      let c = text[g.cluster as usize..].chars().next().unwrap();
+      if letter_spacing_char(c) {
+        *pos += letter_space
+      }
+
+      Some(at)
+    });
+    Box::new(iter)
+  } else {
+    let iter = glyphs.iter().scan(0f32, move |pos, g| {
+      let at = GlyphAt::from_glyph(*pos, g, font_size);
+      *pos = at.offset + at.advance;
+      Some(at)
+    });
+    Box::new(iter)
+  }
+}
+
+/*
 pub struct LayoutConfig {
   pub font_size: f32,
   pub line_height: Option<f32>,
   pub letter_space: f32,
   pub h_align: Option<HAlign>,
   pub v_align: Option<VAlign>,
-}
-
-pub struct GlyphAt {
-  pub glyph_id: GlyphId,
-  /// The font face id of the glyph.
-  pub face_id: ID,
-  /// The glyph draw start at x-axis by pixel
-  pub x: f32,
-  /// The glyph draw start at y-axis by pixel
-  pub y: f32,
 }
 
 /// Layout glyphs with its glyphs and return a iterator of positioned glyph.
@@ -126,7 +146,7 @@ fn layout_line<'a>(
   y: f32,
 ) -> Box<dyn Iterator<Item = GlyphAt> + 'a> {
   fn run_letter_space(text: &str, run: &RunShaped, letter_space: f32) -> f32 {
-    if run_support_letter_space(text, run) {
+    if run_has_multi_chars(text, run) {
       letter_space
     } else {
       0.
@@ -197,7 +217,7 @@ fn layout_line<'a>(
   }
 }
 
-fn run_support_letter_space(text: &str, run: &RunShaped) -> bool {
+fn run_has_multi_chars(text: &str, run: &RunShaped) -> bool {
   run
     .glyphs
     .first()
@@ -213,7 +233,7 @@ fn calc_line_width(text: &str, l: &ParagraphShaped, letter_space: f32, font_size
       .iter()
       .map(|r| {
         let mut w = r.width as f32 * font_size;
-        if run_support_letter_space(text, r) {
+        if run_has_multi_chars(text, r) {
           let glyph_cnt = (r.glyphs.len() as f32 - 1.).max(0.);
           w += letter_space * glyph_cnt;
         }
@@ -231,6 +251,7 @@ fn step_glyph(g: &Glyph, x: f32, y: f32, font_size: f32, letter_space: f32) -> (
   x += font_size * g.x_advance + letter_space;
   (g_at, x)
 }
+ */
 
 /// Check if a char support apply letter spacing.
 fn letter_spacing_char(c: char) -> bool {
@@ -257,169 +278,182 @@ fn letter_spacing_char(c: char) -> bool {
   )
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{shaper::*, FontFace, FontFamily};
-
-  #[test]
-  fn simple_text_bounds() {
-    let shaper = TextShaper::default();
-    let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
-    let _ = shaper.font_db_mut().load_font_file(path);
-
-    let ids = shaper.font_db().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-      ..<_>::default()
-    });
-
-    let text = "Hello
-    
-    
-    
-    world!";
-    let glyphs = shaper.shape_text(text, &ids);
-    let size = glyphs_box(text, glyphs.as_ref(), 14., None, 1.);
-    assert_eq!(size, Size::new(70.96094, 81.484375));
-  }
-
-  #[test]
-  fn simple_layout_text() {
-    let shaper = TextShaper::default();
-    let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
-    let _ = shaper.font_db_mut().load_font_file(path);
-
-    let ids = shaper.font_db().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-      ..<_>::default()
-    });
-    let text = "Hello--------\nworld!";
-    let glyphs = shaper.shape_text(text, &ids);
-    let mut cfg = LayoutConfig {
-      font_size: 10.,
-      letter_space: 2.,
-      h_align: None,
-      v_align: None,
-      line_height: None,
-    };
-
-    let layout = |cfg: &LayoutConfig, bounds: Option<Rect<f32>>| {
-      layout_text(text, &glyphs, cfg, bounds)
-        .map(|g| (g.x, g.y))
-        .collect::<Vec<_>>()
-    };
-
-    let not_bounds = layout(&cfg, None);
-    assert_eq!(
-      &not_bounds,
-      &[
-        (0.0, 0.0),
-        (9.519531, 0.0),
-        (17.671875, 0.0),
-        (22.450195, 0.0),
-        (27.228516, 0.0),
-        (35.532227, 0.0),
-        (41.140625, 0.0),
-        (46.749023, 0.0),
-        (52.35742, 0.0),
-        (57.96582, 0.0),
-        (63.57422, 0.0),
-        (69.18262, 0.0),
-        (74.791016, 0.0),
-        (80.399414, 0.0),
-        // second line
-        (0.0, 11.640625),
-        (10.178711, 11.640625),
-        (18.296875, 11.640625),
-        (24.408203, 11.640625),
-        (29.186523, 11.640625),
-        (37.53418, 11.640625)
-      ]
-    );
-
-    cfg.h_align = Some(HAlign::Right);
-    let r_align = layout(&cfg, None);
-    assert_eq!(
-      &r_align,
-      &[
-        (80.399414, 0.0),
-        (74.791016, 0.0),
-        (69.18262, 0.0),
-        (63.57422, 0.0),
-        (57.96582, 0.0),
-        (52.35742, 0.0),
-        (46.749023, 0.0),
-        (41.140625, 0.0),
-        (35.532227, 0.0),
-        (27.228516, 0.0),
-        (22.450195, 0.0),
-        (17.671875, 0.0),
-        (9.519531, 0.0),
-        (0.0, 0.0),
-        // second line.
-        (82.3916, 11.640625),
-        (74.043945, 11.640625),
-        (69.265625, 11.640625),
-        (63.154297, 11.640625),
-        (55.036133, 11.640625),
-        (44.85742, 11.640625)
-      ]
-    );
-
-    cfg.h_align = None;
-    cfg.v_align = Some(VAlign::Bottom);
-
-    let bottom = layout(&cfg, None);
-    assert_eq!(
-      &bottom,
-      &[
-        // second line
-        (0.0, 11.640625),
-        (10.178711, 11.640625),
-        (18.296875, 11.640625),
-        (24.408203, 11.640625),
-        (29.186523, 11.640625),
-        (37.53418, 11.640625),
-        (0.0, 0.0),
-        // first line
-        (9.519531, 0.0),
-        (17.671875, 0.0),
-        (22.450195, 0.0),
-        (27.228516, 0.0),
-        (35.532227, 0.0),
-        (41.140625, 0.0),
-        (46.749023, 0.0),
-        (52.35742, 0.0),
-        (57.96582, 0.0),
-        (63.57422, 0.0),
-        (69.18262, 0.0),
-        (74.791016, 0.0),
-        (80.399414, 0.0)
-      ]
-    );
-
-    cfg.h_align = Some(HAlign::Center);
-    cfg.v_align = Some(VAlign::Center);
-    let center_clip = layout(&cfg, Some(Rect::from_size(Size::new(40., 15.))));
-    assert_eq!(
-      &center_clip,
-      &[
-        // first line
-        (-0.75, -4.140625),
-        (4.0283203, -4.140625),
-        (12.332031, -4.140625),
-        (17.94043, -4.140625),
-        (23.548828, -4.140625),
-        (29.157227, -4.140625),
-        (34.765625, -4.140625),
-        // second line
-        (-0.7714844, 7.5),
-        (9.407227, 7.5),
-        (17.52539, 7.5),
-        (23.636719, 7.5),
-        (28.41504, 7.5),
-        (36.762695, 7.5)
-      ]
-    );
+impl GlyphAt {
+  pub fn from_glyph(
+    start: f32,
+    &Glyph {
+      face_id,
+      advance,
+      offset,
+      glyph_id,
+      cluster,
+    }: &Glyph,
+    font_size: f32,
+  ) -> GlyphAt {
+    GlyphAt {
+      glyph_id,
+      face_id,
+      offset: start + offset * font_size,
+      advance: advance * font_size,
+      cluster,
+    }
   }
 }
+
+// #[cfg(test)]
+// mod tests {
+//   use super::*;
+//   use crate::{shaper::*, FontFace, FontFamily};
+
+//   #[test]
+//   fn simple_text_bounds() {
+//     let shaper = TextShaper::default();
+//     let path = env!("CARGO_MANIFEST_DIR").to_owned() +
+// "/../fonts/DejaVuSans.ttf";     let _ =
+// shaper.font_db_mut().load_font_file(path);
+
+//     let ids = shaper.font_db().select_all_match(&FontFace {
+//       families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
+//       ..<_>::default()
+//     });
+
+//     let text = "Hello
+
+//     world!";
+//     let glyphs = shaper.shape_text(text, &ids);
+//     let size = glyphs_box(text, glyphs.as_ref(), 14., None, 1.);
+//     assert_eq!(size, Size::new(70.96094, 81.484375));
+//   }
+
+//   #[test]
+//   fn simple_layout_text() {
+//     let shaper = TextShaper::default();
+//     let path = env!("CARGO_MANIFEST_DIR").to_owned() +
+// "/../fonts/DejaVuSans.ttf";     let _ =
+// shaper.font_db_mut().load_font_file(path);
+
+//     let ids = shaper.font_db().select_all_match(&FontFace {
+//       families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
+//       ..<_>::default()
+//     });
+//     let text = "Hello--------\nworld!";
+//     let glyphs = shaper.shape_text(text, &ids);
+//     let mut cfg = LayoutConfig {
+//       font_size: 10.,
+//       letter_space: 2.,
+//       h_align: None,
+//       v_align: None,
+//       line_height: None,
+//     };
+
+//     let layout = |cfg: &LayoutConfig, bounds: Option<Rect<f32>>| {
+//       layout_text(text, &glyphs, cfg, bounds)
+//         .map(|g| (g.x, g.y))
+//         .collect::<Vec<_>>()
+//     };
+
+//     let not_bounds = layout(&cfg, None);
+//     assert_eq!(
+//       &not_bounds,
+//       &[
+//         (0.0, 0.0),
+//         (9.519531, 0.0),
+//         (17.671875, 0.0),
+//         (22.450195, 0.0),
+//         (27.228516, 0.0),
+//         (35.532227, 0.0),
+//         (41.140625, 0.0),
+//         (46.749023, 0.0),
+//         (52.35742, 0.0),
+//         (57.96582, 0.0),
+//         (63.57422, 0.0),
+//         (69.18262, 0.0),
+//         (74.791016, 0.0),
+//         (80.399414, 0.0),
+//         // second line
+//         (0.0, 11.640625),
+//         (10.178711, 11.640625),
+//         (18.296875, 11.640625),
+//         (24.408203, 11.640625),
+//         (29.186523, 11.640625),
+//         (37.53418, 11.640625)
+//       ]
+//     );
+
+//     cfg.h_align = Some(HAlign::Right);
+//     let r_align = layout(&cfg, None);
+//     assert_eq!(
+//       &r_align,
+//       &[
+//         (80.399414, 0.0),
+//         (74.791016, 0.0),
+//         (69.18262, 0.0),
+//         (63.57422, 0.0),
+//         (57.96582, 0.0),
+//         (52.35742, 0.0),
+//         (46.749023, 0.0),
+//         (41.140625, 0.0),
+//         (35.532227, 0.0),
+//         (27.228516, 0.0),
+//         (22.450195, 0.0),
+//         (17.671875, 0.0),
+//         (9.519531, 0.0),
+//         (0.0, 0.0),
+//         // second line.
+//         (82.3916, 11.640625),
+//         (74.043945, 11.640625),
+//         (69.265625, 11.640625),
+//         (63.154297, 11.640625),
+//         (55.036133, 11.640625),
+//         (44.85742, 11.640625)
+//       ]
+//     );
+
+//     cfg.h_align = None;
+//     cfg.v_align = Some(VAlign::Bottom);
+
+//     let bottom = layout(&cfg, None);
+//     assert_eq!(
+//       &bottom,
+//       &[
+//         // second line
+//         (0.0, 11.640625),
+//         (10.178711, 11.640625),
+//         (18.296875, 11.640625),
+//         (24.408203, 11.640625),
+//         (29.186523, 11.640625),
+//         (37.53418, 11.640625),
+//         (0.0, 0.0),
+//         // first line
+//         (9.519531, 0.0),
+//         (17.671875, 0.0),
+//         (22.450195, 0.0),
+//         (27.228516, 0.0),
+//         (35.532227, 0.0),
+//         (41.140625, 0.0),
+//         (46.749023, 0.0),
+//         (52.35742, 0.0),
+//         (57.96582, 0.0),
+//         (63.57422, 0.0),
+//         (69.18262, 0.0),
+//         (74.791016, 0.0),
+//         (80.399414, 0.0)
+//       ]
+//     );
+
+//     cfg.h_align = Some(HAlign::Center);
+//     cfg.v_align = Some(VAlign::Center);
+//     let center_clip = layout(&cfg, Some(Rect::from_size(Size::new(40.,
+// 15.))));     assert_eq!(
+//       &center_clip,
+//       &[
+//         // first line
+//         (-0.75, -4.140625)  if let Some(letter_space) = letter_space {
+//         (17.52539, 7.5),
+//         (23.636719, 7.5),
+//         (28.41504, 7.5),
+//         (36.762695, 7.5)
+//       ]
+//     );
+//   }
+// }

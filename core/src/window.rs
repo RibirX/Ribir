@@ -116,6 +116,10 @@ impl Window {
     let commands = self.context.draw_tree();
     if !commands.is_empty() {
       self.p_backend.submit(commands, None).unwrap();
+      // todo: frame cache is not a good choice? because not every text will relayout
+      // in every frame.
+      self.context.shaper.end_frame();
+      self.context.text_reorder.end_frame();
     }
   }
 
