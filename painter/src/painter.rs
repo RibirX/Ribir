@@ -1,7 +1,8 @@
 use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
 use algo::CowRc;
+use text::Substr;
 use std::ops::{Deref, DerefMut};
-use text::FontFace;
+use text::{FontFace, TextDirection};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -35,11 +36,12 @@ pub trait PainterBackend {
 pub enum PaintPath {
   Path(lyon_path::Path),
   Text {
-    text: CowRc<str>,
+    text: Substr,
     font_size: f32,
     font_face: CowRc<FontFace>,
     letter_space: f32,
     line_height: Option<f32>,
+    direction: TextDirection,
   },
 }
 #[derive(Clone)]
@@ -198,7 +200,12 @@ impl Painter {
   }
 
   /// Paint text with its style
-  pub fn paint_text<T: Into<CowRc<str>>>(&mut self, text: T, style: TextStyle) -> &mut Self {
+  pub fn paint_text_with_style<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    style: TextStyle,
+    direction: TextDirection,
+  ) -> &mut Self {
     let transform = self.current_state().transform;
     let TextStyle {
       font_size,
@@ -215,6 +222,7 @@ impl Painter {
         font_face,
         letter_space,
         line_height,
+        direction,
       },
       transform,
       brush: foreground,
@@ -224,26 +232,16 @@ impl Painter {
     self
   }
 
-  /// Stroke `text` from left to right, start at let top position, use
-  /// [`translate`](Painter::translate) move to the position what you want.
-  /// Partially hitting the `max_width` will end the draw. Use `font` and
-  /// `font_size` to specify the font and font size. Use
-  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
-  /// fill complex text.
-  pub fn stroke_text<T: Into<CowRc<str>>>(&mut self, text: T) -> &mut Self {
-    self.fill_text(text);
-    self.commands.last_mut().unwrap().path_style =
-      PathStyle::Stroke(self.current_state().line_width);
-    self
-  }
-
-  /// Fill `text` from left to right, start at let top position, use
-  /// [`translate`](Painter::translate) move to the position what you want.
-  /// Partially hitting the `max_width` will end the draw. Use `font` and
-  /// `font_size` to specify the font and font size. Use
-  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
-  /// fill complex text.
-  pub fn fill_text<T: Into<CowRc<str>>>(&mut self, text: T) -> &mut Self {
+  /// Paint text without specify text style. The text style will come from the
+  /// current state of this painter. Draw from left to right, start at let top
+  /// position, use [`translate`](Painter::translate) move to the
+  /// position what you want.
+  pub fn paint_text_without_style<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    path_style: PathStyle,
+    direction: TextDirection,
+  ) -> &mut Self {
     let state = self.current_state();
     let cmd = PaintCommand {
       path: PaintPath::Text {
@@ -252,13 +250,38 @@ impl Painter {
         font_face: state.font_face.clone(),
         letter_space: state.letter_space,
         line_height: state.text_line_height,
+        direction,
       },
       transform: state.transform,
       brush: state.brush.clone(),
-      path_style: PathStyle::Fill,
+      path_style,
     };
     self.commands.push(cmd);
     self
+  }
+
+  /// Stroke `text` from left to right, start at let top position, use
+  /// [`translate`](Painter::translate) move to the position what you want.
+  /// Partially hitting the `max_width` will end the draw. Use `font` and
+  /// `font_size` to specify the font and font size. Use
+  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
+  /// fill complex text.
+  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T, direction: TextDirection) -> &mut Self {
+    self.paint_text_without_style(
+      text,
+      PathStyle::Stroke(self.current_state().line_width),
+      direction,
+    )
+  }
+
+  /// Fill `text` from left to right, start at let top position, use
+  /// [`translate`](Painter::translate) move to the position what you want.
+  /// Partially hitting the `max_width` will end the draw. Use `font` and
+  /// `font_size` to specify the font and font size. Use
+  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
+  /// fill complex text.
+  pub fn fill_text<T: Into<Substr>>(&mut self, text: T, direction: TextDirection) -> &mut Self {
+    self.paint_text_without_style(text, PathStyle::Fill, direction)
   }
 
   /// Adds a translation transformation to the current matrix by moving the

@@ -6,7 +6,10 @@
 pub mod font_db;
 pub mod shaper;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
-pub mod layout;
+pub mod layouter;
+pub mod text_reorder;
+pub use arcstr::{ArcStr, Substr};
+pub use text_reorder::TextReorder;
 
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
@@ -93,6 +96,18 @@ pub enum VAlign {
   Top,
   Center,
   Bottom,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TextDirection {
+  /// Text is set horizontally from left to right.
+  LeftToRight,
+  /// Text is set horizontally from right to left.
+  RightToLeft,
+  /// Text is set vertically from top to bottom.
+  TopToBottom,
+  /// Text is set vertically from bottom to top.
+  BottomToTop,
 }
 
 impl From<HAlign> for Align {

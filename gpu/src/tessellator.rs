@@ -8,7 +8,6 @@ use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode, Vector};
 use std::{collections::VecDeque, hash::Hash, mem::size_of};
 use text::{
   font_db::ID,
-  layout::{GlyphAt, LayoutConfig},
   shaper::{GlyphId, TextShaper},
 };
 mod atlas;
@@ -233,28 +232,33 @@ impl Tessellator {
         line_height,
         ref text,
         ref font_face,
+        direction,
         ..
       } if font_size > f32::EPSILON => {
         let face_ids = self.shaper.font_db_mut().select_all_match(font_face);
-        let glyphs = self.shaper.shape_text(text, &face_ids);
-        // todo: layout is a higher level work should not work here, maybe should work
-        // in texts widget layout.
-        // paint should directly shape and draw text, not care about bidi reordering,
-        // text wrap or break.
-        let cfg = LayoutConfig {
-          font_size,
-          line_height,
-          letter_space,
-          h_align: None,
-          v_align: None,
-        };
+        let shaped_glyphs = self.shaper.shape_text(text, &face_ids, direction);
 
         let mut pre_face_id = None;
         let mut pre_unit_per_em = 0;
         let mut scaled_font_size = font_size;
         let mut tolerance = TOLERANCE / (scaled_font_size * scale);
-        text::layout::layout_text(text, &glyphs, &cfg, None).for_each(
-          |GlyphAt { glyph_id, face_id, x, y }| {
+
+        let horizontal_draw = match direction {
+          text::TextDirection::LeftToRight | text::TextDirection::RightToLeft => true,
+          text::TextDirection::TopToBottom | text::TextDirection::BottomToTop => false,
+        };
+
+        text::layouter::glyphs_position_iter(
+          text,
+          &shaped_glyphs.glyphs,
+          font_size,
+          letter_space,
+          0.,
+        )
+        .for_each(
+          |text::layouter::GlyphAt {
+             glyph_id, face_id, offset, advance, ..
+           }| {
             if Some(face_id) != pre_face_id {
               pre_face_id = Some(face_id);
               let db = self.shaper.font_db();
@@ -266,9 +270,14 @@ impl Tessellator {
             let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
             let key = VerticesKey { tolerance, threshold, style, path };
             let cache_ptr = cache(key);
+            let vector = if horizontal_draw {
+              Vector::new(offset, font_size)
+            } else {
+              Vector::new(font_size, offset)
+            };
             let t = transform
               // because glyph is up down mirror, this `font_size` offset help align after rotate.
-              .pre_translate(Vector::new(x, y + font_size))
+              .pre_translate(vector)
               .pre_scale(scaled_font_size, scaled_font_size);
 
             let mut p = primitive.clone();
