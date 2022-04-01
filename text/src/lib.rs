@@ -110,6 +110,24 @@ pub enum TextDirection {
   BottomToTop,
 }
 
+impl TextDirection {
+  #[inline]
+  pub fn is_vertical(&self) -> bool {
+    matches!(
+      self,
+      TextDirection::TopToBottom | TextDirection::BottomToTop
+    )
+  }
+
+  #[inline]
+  pub fn is_horizontal(&self) -> bool {
+    matches!(
+      self,
+      TextDirection::LeftToRight | TextDirection::RightToLeft
+    )
+  }
+}
+
 impl From<HAlign> for Align {
   #[inline]
   fn from(h: HAlign) -> Self {

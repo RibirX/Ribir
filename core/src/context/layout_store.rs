@@ -3,7 +3,7 @@ use std::{
   collections::{BinaryHeap, HashMap},
 };
 
-use text::shaper::TextShaper;
+use text::{shaper::TextShaper, TextReorder};
 
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
@@ -107,7 +107,8 @@ impl LayoutStore {
     &mut self,
     win_size: Size,
     tree: &WidgetTree,
-    shaper: &mut TextShaper,
+    shaper: &TextShaper,
+    text_reorder: &TextReorder,
   ) -> bool {
     let mut performed_layout = false;
     loop {
@@ -120,7 +121,7 @@ impl LayoutStore {
         if !wid.is_dropped(tree) {
           performed_layout = true;
           let clamp = BoxClamp { min: Size::zero(), max: win_size };
-          self.perform_layout(*wid, clamp, tree, shaper);
+          self.perform_layout(*wid, clamp, tree, shaper, text_reorder);
         }
       });
     }
@@ -137,7 +138,8 @@ impl LayoutStore {
     id: WidgetId,
     out_clamp: BoxClamp,
     tree: &WidgetTree,
-    shaper: &mut TextShaper,
+    shaper: &TextShaper,
+    text_reorder: &TextReorder,
   ) -> Size {
     self
       .infos
@@ -161,7 +163,13 @@ impl LayoutStore {
         };
         let size = layout.perform_layout(
           out_clamp,
-          &mut LayoutCtx { id, tree, layout_store: self, shaper },
+          &mut LayoutCtx {
+            id,
+            tree,
+            layout_store: self,
+            shaper,
+            text_reorder,
+          },
         );
         let size = out_clamp.clamp(size);
         let info = self.layout_info_or_default(id);
