@@ -13,8 +13,8 @@ use syn::{
 mod sugar_fields;
 mod widget_gen;
 use crate::{
-  widget_attr_macro::{ribir_prefix_variable, ReferenceInfo, DECLARE_WRAP_MACRO},
   error::{DeclareError, DeclareWarning},
+  widget_attr_macro::{ribir_prefix_variable, ReferenceInfo, DECLARE_WRAP_MACRO},
 };
 
 pub use sugar_fields::*;

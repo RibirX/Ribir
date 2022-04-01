@@ -96,17 +96,23 @@ impl Window {
   /// 3. every render objet need layout has done, so every render object is in
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
-    self.context.state_change_dispatch();
+    let Self { raw_window, context, dispatcher, .. } = self;
+    context.state_change_dispatch();
+    let tree_changed = context.tree_repair();
 
-    let tree_changed = self.context.tree_repair();
-    let performed_layout = self.context.layout_store.layout(
-      self.raw_window.inner_size(),
-      &self.context.widget_tree,
-      &mut self.context.shaper,
-    );
+    let Context {
+      layout_store,
+      widget_tree,
+      shaper,
+      reorder,
+      ..
+    } = context;
+
+    let wnd_size = raw_window.inner_size();
+    let performed_layout = layout_store.layout(wnd_size, widget_tree, shaper, reorder);
 
     if tree_changed {
-      self.dispatcher.focus_mgr.update(&mut self.context);
+      dispatcher.focus_mgr.update(context);
     }
     tree_changed || performed_layout
   }
@@ -119,7 +125,7 @@ impl Window {
       // todo: frame cache is not a good choice? because not every text will relayout
       // in every frame.
       self.context.shaper.end_frame();
-      self.context.text_reorder.end_frame();
+      self.context.reorder.end_frame();
     }
   }
 

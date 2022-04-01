@@ -1,7 +1,7 @@
 use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
 use algo::CowRc;
-use text::Substr;
 use std::ops::{Deref, DerefMut};
+use text::Substr;
 use text::{FontFace, TextDirection};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the

@@ -38,7 +38,7 @@ pub(crate) struct Context {
   pub modifiers: ModifiersState,
   pub cursor: Cell<Option<CursorIcon>>,
   pub shaper: TextShaper,
-  pub text_reorder: TextReorder,
+  pub reorder: TextReorder,
   /// Store combination widgets changed.
   need_builds: HashSet<WidgetId, ahash::RandomState>,
   animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
@@ -278,7 +278,7 @@ impl Context {
       cursor: <_>::default(),
       modifiers: <_>::default(),
       shaper: <_>::default(),
-      text_reorder: <_>::default(),
+      reorder: <_>::default(),
       need_builds: <_>::default(),
       animation_ticker,
     }

@@ -1,8 +1,9 @@
-use arcstr::Substr;
+use arcstr::ArcStr;
 
 use fontdb::ID;
-use lyon_path::geom::{Point, Rect, Size};
-use ttf_parser::GlyphId;
+use lyon_path::geom::{Point, Rect, Size, Vector};
+use ttf_parser::{fonts_in_collection, GlyphId};
+use unic_bidi::{BidiInfo, ParagraphInfo};
 use unicode_script::{Script, UnicodeScript};
 
 use crate::{
@@ -10,50 +11,184 @@ use crate::{
   HAlign, TextDirection, VAlign,
 };
 
-pub struct GlyphAt {
-  pub glyph_id: GlyphId,
+#[derive(Debug, Clone)]
+pub struct PixelGlyph {
   /// The font face id of the glyph.
   pub face_id: ID,
-  /// The glyph draw offset of its axis by pixel
-  pub offset: f32,
-  /// How much pixel the line advances after drawing this glyph
-  pub advance: f32,
+  /// How many pixels the line advances after drawing this glyph when setting
+  /// text in horizontal direction.
+  pub x_advance: f32,
+  /// How many pixels the line advances after drawing this glyph when setting
+  /// text in vertical direction.
+  pub y_advance: f32,
+  /// How many pixels the glyph moves on the X-axis before drawing it, this
+  /// should not affect how many the line advances.
+  pub x_pos: f32,
+  /// How many pixels the glyph moves on the Y-axis before drawing it, this
+  /// should not affect how many the line advances.
+  pub y_pos: f32,
+  /// The id of the glyph.
+  pub glyph_id: GlyphId,
   /// An cluster of origin text as byte index.
   pub cluster: u32,
 }
 
-pub struct TextLayouter {}
+pub struct LayoutConfig {
+  pub bounds: Rect<f32>,
+  pub h_align: Option<HAlign>,
+  pub v_align: Option<VAlign>,
+}
 
-pub fn text_box(text: &Substr, font_size: f32, line_size: Option<f32>) -> Size<f32> { todo!() }
+pub trait Cursor {
+  /// advance the cursor by a glyph, the `glyph` position is relative to self
+  /// before call this method,  and relative to the cursor coordinate after
+  /// call.
+  /// return if the glyph is over boundary.
+  fn advance_glyph(&mut self, glyph: &mut PixelGlyph, origin_text: &str) -> bool;
+  fn advance_x(&mut self, x_offset: f32) -> bool;
+  fn advance_y(&mut self, y_offset: f32) -> bool;
+}
 
-pub fn glyphs_position_iter<'a>(
-  text: &'a str,
-  glyphs: &'a [Glyph],
-  font_size: f32,
-  letter_space: f32,
-  pos_start_at: f32,
-) -> Box<dyn Iterator<Item = GlyphAt> + 'a> {
-  if letter_space != 0. {
-    let iter = glyphs.iter().scan(pos_start_at, move |pos, g| {
-      let at = GlyphAt::from_glyph(*pos, g, font_size);
-      *pos = at.offset + at.advance;
+pub struct VisualLine {
+  pos_x: f32,
+  pos_y: f32,
+}
+pub struct Layout<Inputs, C> {
+  inputs: Inputs,
+  anchor_x: f32,
+  anchor_y: f32,
+  visual_lines: Vec<VisualLine>,
+  cursor: C,
+}
 
-      let c = text[g.cluster as usize..].chars().next().unwrap();
-      if letter_spacing_char(c) {
-        *pos += letter_space
+impl<'a, Inputs, Runs, C> Layout<Inputs, C>
+where
+  Inputs: DoubleEndedIterator<Item = (ParagraphInfo, Runs)>,
+  Runs: Iterator<Item = InputRun<'a>>,
+{
+  pub fn new(inputs: Inputs) -> Self { todo!() }
+
+  pub fn layout_para(&mut self) {
+    if let Some((info, runs)) = self.inputs.next() {
+      for r in runs {
+        for g in r.glyphs.iter() {
+          // todo
+        }
       }
-
-      Some(at)
-    });
-    Box::new(iter)
-  } else {
-    let iter = glyphs.iter().scan(0f32, move |pos, g| {
-      let at = GlyphAt::from_glyph(*pos, g, font_size);
-      *pos = at.offset + at.advance;
-      Some(at)
-    });
-    Box::new(iter)
+    }
   }
+}
+
+/// A text run with its glyphs and style
+#[derive(Clone)]
+pub struct InputRun<'a> {
+  pub text: &'a str,
+  pub glyphs: &'a [Glyph],
+  pub font_size: f32,
+  pub letter_space: f32,
+}
+
+impl<'a> InputRun<'a> {
+  pub fn pixel_glyphs<'b, C>(&'b self, mut cursor: C) -> impl Iterator<Item = PixelGlyph> + 'b
+  where
+    C: Cursor + 'b,
+  {
+    self.glyphs.iter().map(move |g| {
+      let font_size = self.font_size;
+      let mut at = PixelGlyph::new(font_size, g);
+      cursor.advance_glyph(&mut at, self.text);
+      at
+    })
+  }
+}
+
+impl PixelGlyph {
+  fn new(font_size: f32, g: &Glyph) -> Self {
+    Self {
+      face_id: g.face_id,
+      x_advance: g.x_advance * font_size,
+      y_advance: g.y_advance * font_size,
+      x_pos: g.x_offset * font_size,
+      y_pos: g.y_offset * font_size,
+      glyph_id: g.glyph_id,
+      cluster: g.cluster,
+    }
+  }
+}
+
+pub struct LinearCursor {
+  x_cursor: f32,
+  y_cursor: f32,
+}
+
+pub struct LetterSpaceCursor<I> {
+  inner_cursor: I,
+  letter_space: f32,
+  is_horizontal: bool,
+}
+
+impl LinearCursor {
+  #[inline]
+  pub fn new(x_start: f32, y_start: f32) -> Self { Self { x_cursor: x_start, y_cursor: y_start } }
+}
+
+impl<I> LetterSpaceCursor<I> {
+  #[inline]
+  pub fn new(inner_cursor: I, letter_space: f32, is_horizontal: bool) -> Self {
+    Self {
+      inner_cursor,
+      letter_space,
+      is_horizontal,
+    }
+  }
+}
+
+impl Cursor for LinearCursor {
+  #[inline]
+  fn advance_glyph(&mut self, g: &mut PixelGlyph, _: &str) -> bool {
+    g.x_pos += self.x_cursor;
+    g.y_pos += self.y_cursor;
+    self.x_cursor += g.x_advance;
+    self.y_cursor += g.y_advance;
+
+    false
+  }
+
+  #[inline]
+  fn advance_x(&mut self, x_offset: f32) -> bool {
+    self.x_cursor += x_offset;
+    false
+  }
+
+  #[inline]
+  fn advance_y(&mut self, y_offset: f32) -> bool {
+    self.y_cursor += y_offset;
+    false
+  }
+}
+
+impl<I: Cursor> Cursor for LetterSpaceCursor<I> {
+  fn advance_glyph(&mut self, g: &mut PixelGlyph, origin_text: &str) -> bool {
+    let cursor = &mut self.inner_cursor;
+    let res = cursor.advance_glyph(g, origin_text);
+
+    let c = origin_text[g.cluster as usize..].chars().next().unwrap();
+    if letter_spacing_char(c) {
+      if self.is_horizontal {
+        return cursor.advance_x(self.letter_space);
+      } else {
+        return cursor.advance_y(self.letter_space);
+      };
+    }
+
+    res
+  }
+
+  #[inline]
+  fn advance_x(&mut self, x_offset: f32) -> bool { self.inner_cursor.advance_x(x_offset) }
+
+  #[inline]
+  fn advance_y(&mut self, y_offset: f32) -> bool { self.inner_cursor.advance_y(y_offset) }
 }
 
 /*
@@ -276,28 +411,6 @@ fn letter_spacing_char(c: char) -> bool {
       | Script::Tirhuta
       | Script::Ogham
   )
-}
-
-impl GlyphAt {
-  pub fn from_glyph(
-    start: f32,
-    &Glyph {
-      face_id,
-      advance,
-      offset,
-      glyph_id,
-      cluster,
-    }: &Glyph,
-    font_size: f32,
-  ) -> GlyphAt {
-    GlyphAt {
-      glyph_id,
-      face_id,
-      offset: start + offset * font_size,
-      advance: advance * font_size,
-      cluster,
-    }
-  }
 }
 
 // #[cfg(test)]

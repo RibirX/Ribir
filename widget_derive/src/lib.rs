@@ -3,12 +3,11 @@ extern crate proc_macro;
 extern crate proc_macro2;
 
 mod declare_derive;
-mod widget_attr_macro;
 mod error;
+mod widget_attr_macro;
 
 mod util;
 
-use widget_attr_macro::DeclareCtx;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
@@ -16,6 +15,7 @@ use syn::{
   parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Comma, visit_mut::VisitMut,
   DeriveInput, FnArg, Ident,
 };
+use widget_attr_macro::DeclareCtx;
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
 #[proc_macro_derive(SingleChildWidget, attributes(proxy))]

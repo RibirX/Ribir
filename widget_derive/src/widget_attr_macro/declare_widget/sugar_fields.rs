@@ -8,8 +8,8 @@ use syn::{spanned::Spanned, Ident, Member, Path, Result};
 
 use super::{widget_gen::WidgetGen, DeclareField, FollowPart, Follows};
 use crate::{
-  widget_attr_macro::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
   error::DeclareError,
+  widget_attr_macro::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
 };
 
 macro_rules! assign_uninit_field {

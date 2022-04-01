@@ -1,5 +1,6 @@
 use painter::{Point, Size};
 use text::shaper::TextShaper;
+use text::TextReorder;
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::prelude::widget_tree::WidgetTree;
@@ -13,12 +14,16 @@ pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
   pub(crate) tree: &'a WidgetTree,
   pub(crate) layout_store: &'a mut LayoutStore,
-  pub(crate) shaper: &'a mut TextShaper,
+  pub(crate) shaper: &'a TextShaper,
+  pub(crate) text_reorder: &'a TextReorder,
 }
 
 impl<'a> LayoutCtx<'a> {
   #[inline]
-  pub fn text_shaper(&mut self) -> &mut TextShaper { &mut self.shaper }
+  pub fn text_shaper(&self) -> &TextShaper { &self.shaper }
+
+  #[inline]
+  pub fn text_reorder(&self) -> &TextReorder { &self.text_reorder }
 
   /// Update the position of the child render object should place. Relative to
   /// parent.
@@ -43,7 +48,7 @@ impl<'a> LayoutCtx<'a> {
   pub fn perform_render_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
     self
       .layout_store
-      .perform_layout(child, clamp, self.tree, self.shaper)
+      .perform_layout(child, clamp, self.tree, self.shaper, self.text_reorder)
   }
 
   /// Return a tuple of [`LayoutCtx`]! and an iterator of self children, notice

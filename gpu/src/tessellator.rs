@@ -8,6 +8,7 @@ use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode, Vector};
 use std::{collections::VecDeque, hash::Hash, mem::size_of};
 use text::{
   font_db::ID,
+  layouter::{InputRun, LetterSpaceCursor, LinearCursor},
   shaper::{GlyphId, TextShaper},
 };
 mod atlas;
@@ -229,7 +230,6 @@ impl Tessellator {
       &PaintPath::Text {
         font_size,
         letter_space,
-        line_height,
         ref text,
         ref font_face,
         direction,
@@ -243,52 +243,48 @@ impl Tessellator {
         let mut scaled_font_size = font_size;
         let mut tolerance = TOLERANCE / (scaled_font_size * scale);
 
-        let horizontal_draw = match direction {
-          text::TextDirection::LeftToRight | text::TextDirection::RightToLeft => true,
-          text::TextDirection::TopToBottom | text::TextDirection::BottomToTop => false,
+        let add_glyph = |text::layouter::PixelGlyph { glyph_id, face_id, x_pos, y_pos, .. }| {
+          if Some(face_id) != pre_face_id {
+            pre_face_id = Some(face_id);
+            let db = self.shaper.font_db();
+            pre_unit_per_em = db.try_get_face_data(face_id).unwrap().units_per_em();
+            scaled_font_size = font_size / pre_unit_per_em as f32;
+            tolerance = TOLERANCE / (scaled_font_size * scale)
+          };
+
+          let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
+          let key = VerticesKey { tolerance, threshold, style, path };
+          let cache_ptr = cache(key);
+
+          let t = transform
+            // because glyph is up down mirror, this `font_size` offset help align after rotate.
+            .pre_translate((x_pos, y_pos).into())
+            .pre_scale(scaled_font_size, scaled_font_size);
+
+          let mut p = primitive.clone();
+          p.transform = t.to_arrays();
+
+          let prim_id = self.add_primitive(p);
+          self
+            .buffer_list
+            .push_back(CacheItem { prim_id, cache_ptr, prim_type });
         };
 
-        text::layouter::glyphs_position_iter(
+        let glyphs = &shaped_glyphs.glyphs;
+        let run = InputRun {
           text,
-          &shaped_glyphs.glyphs,
+          glyphs,
           font_size,
           letter_space,
-          0.,
-        )
-        .for_each(
-          |text::layouter::GlyphAt {
-             glyph_id, face_id, offset, advance, ..
-           }| {
-            if Some(face_id) != pre_face_id {
-              pre_face_id = Some(face_id);
-              let db = self.shaper.font_db();
-              pre_unit_per_em = db.try_get_face_data(face_id).unwrap().units_per_em();
-              scaled_font_size = font_size / pre_unit_per_em as f32;
-              tolerance = TOLERANCE / (scaled_font_size * scale)
-            };
-
-            let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
-            let key = VerticesKey { tolerance, threshold, style, path };
-            let cache_ptr = cache(key);
-            let vector = if horizontal_draw {
-              Vector::new(offset, font_size)
-            } else {
-              Vector::new(font_size, offset)
-            };
-            let t = transform
-              // because glyph is up down mirror, this `font_size` offset help align after rotate.
-              .pre_translate(vector)
-              .pre_scale(scaled_font_size, scaled_font_size);
-
-            let mut p = primitive.clone();
-            p.transform = t.to_arrays();
-
-            let prim_id = self.add_primitive(p);
-            self
-              .buffer_list
-              .push_back(CacheItem { prim_id, cache_ptr, prim_type });
-          },
-        );
+        };
+        let linear_cursor = LinearCursor::new(0., font_size);
+        if letter_space != 0. {
+          run.pixel_glyphs(linear_cursor).for_each(add_glyph);
+        } else {
+          let cursor =
+            LetterSpaceCursor::new(linear_cursor, letter_space, direction.is_horizontal());
+          run.pixel_glyphs(cursor).for_each(add_glyph);
+        }
       }
       _ => {}
     };

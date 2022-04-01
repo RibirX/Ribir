@@ -1,4 +1,5 @@
-use algo::{CowRc, FrameCache};
+use algo::FrameCache;
+use arcstr::Substr;
 use std::sync::{Arc, RwLock};
 use unic_bidi::{BidiClass, BidiInfo, Level, ParagraphInfo};
 
@@ -9,15 +10,15 @@ pub struct ReorderResult {
 }
 #[derive(Clone, Default)]
 pub struct TextReorder {
-  cache: Arc<RwLock<FrameCache<CowRc<str>, Arc<ReorderResult>>>>,
+  cache: Arc<RwLock<FrameCache<Substr, Arc<ReorderResult>>>>,
 }
 
 impl TextReorder {
-  pub fn get_from_cache(&self, text: &CowRc<str>) -> Option<Arc<ReorderResult>> {
+  pub fn get_from_cache(&self, text: &Substr) -> Option<Arc<ReorderResult>> {
     self.cache.read().unwrap().get(text).cloned()
   }
 
-  pub fn reorder_text(&self, text: &CowRc<str>) -> Arc<ReorderResult> {
+  pub fn reorder_text(&self, text: &Substr) -> Arc<ReorderResult> {
     self.get_from_cache(text).unwrap_or_else(|| {
       let BidiInfo {
         original_classes, levels, paragraphs, ..

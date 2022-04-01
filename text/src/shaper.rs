@@ -5,13 +5,13 @@ use std::{
 };
 
 use crate::{
-  font_db::{self, Face, FontDB, ID},
+  font_db::{Face, FontDB, ID},
   TextDirection,
 };
 use algo::FrameCache;
 
 use arcstr::Substr;
-use rustybuzz::{GlyphInfo, GlyphPosition, UnicodeBuffer};
+use rustybuzz::{GlyphInfo, UnicodeBuffer};
 pub use ttf_parser::GlyphId;
 
 /// A glyph information returned by text shaped, include a glyph
@@ -19,12 +19,18 @@ pub use ttf_parser::GlyphId;
 pub struct Glyph {
   /// The font face id of the glyph.
   pub face_id: ID,
-  /// How much em the line advances after drawing this glyph, x-axis advance
-  /// when setting text in horizontal direction, y-axis in vertical direction.
-  pub advance: f32,
-  /// How much em the glyph moves before drawing it, this should not affect how
-  /// much the line advances.
-  pub offset: f32,
+  /// How many ems the line advances after drawing this glyph when setting text
+  /// in horizontal direction.
+  pub x_advance: f32,
+  /// How many ems the line advances after drawing this glyph when setting text
+  /// in vertical direction.
+  pub y_advance: f32,
+  /// How many ems the glyph moves on the X-axis before drawing it, this should
+  /// not affect how many the line advances.
+  pub x_offset: f32,
+  /// How many ems the glyph moves on the Y-axis before drawing it, this should
+  /// not affect how many the line advances.
+  pub y_offset: f32,
   /// The id of the glyph.
   pub glyph_id: GlyphId,
   /// An cluster of origin text as byte index.
@@ -139,6 +145,7 @@ impl TextShaper {
 
     let (mut glyphs, mut miss_from) = Self::directly_shape(text, dir, &face, buffer);
     let mut line_height = line_size(dir, &face);
+    // todo: we need align baseline.
     while let Some(m_start) = miss_from {
       let m_end = glyphs[m_start..]
         .iter()
@@ -198,43 +205,25 @@ impl TextShaper {
 
     let mut glyphs = Vec::with_capacity(output.len());
 
-    let glyphs_iter = output
-      .glyph_infos()
-      .iter()
-      .zip(output.glyph_positions().iter())
-      .enumerate()
-      .inspect(|(g_idx, (info, _))| {
-        if miss_from.is_none() && is_miss_glyph_id(info.glyph_id as u16) {
-          miss_from = Some(*g_idx);
-        }
-      });
-
+    let infos = output.glyph_infos();
+    let positions = output.glyph_positions();
     let units_per_em = face.units_per_em() as f32;
-
-    match direction {
-      TextDirection::LeftToRight | TextDirection::RightToLeft => glyphs_iter.for_each(
-        |(_, (GlyphInfo { glyph_id, cluster, .. }, GlyphPosition { x_advance, x_offset, .. }))| {
-          glyphs.push(Glyph {
-            face_id: face.face_id,
-            advance: *x_advance as f32 / units_per_em,
-            offset: *x_offset as f32 / units_per_em,
-            glyph_id: GlyphId(*glyph_id as u16),
-            cluster: *cluster,
-          });
-        },
-      ),
-      TextDirection::TopToBottom | TextDirection::BottomToTop => glyphs_iter.for_each(
-        |(_, (GlyphInfo { glyph_id, cluster, .. }, GlyphPosition { y_advance, y_offset, .. }))| {
-          glyphs.push(Glyph {
-            face_id: face.face_id,
-            advance: *y_advance as f32 / units_per_em,
-            offset: *y_offset as f32 / units_per_em,
-            glyph_id: GlyphId(*glyph_id as u16),
-            cluster: *cluster,
-          });
-        },
-      ),
-    }
+    (0..output.len()).for_each(|idx| {
+      let &GlyphInfo { glyph_id, cluster, .. } = &infos[idx];
+      let p = &positions[idx];
+      if miss_from.is_none() && is_miss_glyph_id(glyph_id as u16) {
+        miss_from = Some(idx);
+      }
+      glyphs.push(Glyph {
+        face_id: face.face_id,
+        x_advance: p.x_advance as f32 / units_per_em,
+        y_advance: p.y_advance as f32 / units_per_em,
+        x_offset: p.x_offset as f32 / units_per_em,
+        y_offset: p.y_offset as f32 / units_per_em,
+        glyph_id: GlyphId(glyph_id as u16),
+        cluster,
+      })
+    });
 
     buffer.replace(output.clear());
 

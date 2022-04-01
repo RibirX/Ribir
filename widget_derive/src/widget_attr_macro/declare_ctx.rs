@@ -1,6 +1,6 @@
 use crate::{
-  widget_attr_macro::{declare_widget::DeclareWidget, widget_def_variable},
   error::DeclareError,
+  widget_attr_macro::{declare_widget::DeclareWidget, widget_def_variable},
   WIDGET_MACRO_NAME,
 };
 
