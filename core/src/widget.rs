@@ -28,6 +28,11 @@ mod scrollable;
 pub use scrollable::*;
 mod path;
 pub use path::*;
+mod grid_view;
+pub use grid_view::*;
+mod scroll_view;
+pub use scroll_view::ScrollView;
+mod scrollbar;
 
 use self::layout_store::BoxClamp;
 

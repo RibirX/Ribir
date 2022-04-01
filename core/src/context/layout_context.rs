@@ -74,6 +74,13 @@ impl<'a> LayoutCtx<'a> {
     (self, iter)
   }
 
+  /// Return a tuple of [`LayoutCtx`]! and  an iterator of children, so
+  /// you can avoid the lifetime problem when precess on child.
+  pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
+    let iter = self.id.children(self.tree);
+    (self, iter)
+  }
+
   /// Return the single render child of `widget`, panic if have more than once
   /// child.
   pub fn single_render_child(&self) -> Option<WidgetId> {

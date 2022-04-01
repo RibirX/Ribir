@@ -57,19 +57,19 @@ impl RenderWidget for BoxDecoration {
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let child = single_child(ctx);
-    let content_rect = ctx.widget_box_rect(child).unwrap();
-
-    let painter = ctx.painter();
-    if let Some(ref background) = self.background {
-      painter.set_brush(background.clone());
-      if let Some(radius) = &self.radius {
-        painter.rect_round(&content_rect, radius);
-      } else {
-        painter.rect(&content_rect);
+    if let Some(content_rect) = ctx.widget_box_rect(child) {
+      let painter = ctx.painter();
+      if let Some(ref background) = self.background {
+        painter.set_brush(background.clone());
+        if let Some(radius) = &self.radius {
+          painter.rect_round(&content_rect, radius);
+        } else {
+          painter.rect(&content_rect);
+        }
+        painter.fill(None);
       }
-      painter.fill(None);
+      self.paint_border(painter, &content_rect);
     }
-    self.paint_border(painter, &content_rect);
   }
 }
 

@@ -21,6 +21,20 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
   };
   checkbox.indeterminate_path.brush = background.clone().into();
   checkbox.checked_path.brush = background.clone().into();
+
+  let scrollbar = ScrollBarTheme {
+    track_box: ScrollBoxDecorationStyle {
+      background: Brush::Color(Color::SILVER),
+      radius: None,
+    },
+    track_width: 12.,
+
+    thumb_box: ScrollBoxDecorationStyle {
+      background: Brush::Color(Color::GRAY),
+      radius: None,
+    },
+    thumb_width: 12.,
+  };
   Theme {
     brightness: Brightness::Light,
     checkbox,
@@ -39,6 +53,7 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
     typography_theme: dark_text,
     default_font_family: family,
     unselected_widget_color,
+    scrollbar,
   }
 }
 
@@ -63,6 +78,20 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
   checkbox.indeterminate_path.brush = background.clone().into();
   checkbox.checked_path.brush = background.clone().into();
 
+  let scrollbar = ScrollBarTheme {
+    track_box: ScrollBoxDecorationStyle {
+      background: Brush::Color(Color::BLACK),
+      radius: None,
+    },
+    track_width: 12.,
+
+    thumb_box: ScrollBoxDecorationStyle {
+      background: Brush::Color(Color::GRAY),
+      radius: None,
+    },
+    thumb_width: 12.,
+  };
+
   Theme {
     brightness: Brightness::Dark,
     checkbox,
@@ -81,5 +110,6 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
     typography_theme: light_text,
     default_font_family: family,
     unselected_widget_color,
+    scrollbar,
   }
 }

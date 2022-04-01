@@ -103,6 +103,10 @@ pub trait ScrollWorker {
   fn content_clamp(&self, clamp: BoxClamp) -> BoxClamp;
 
   fn content_pos(&self, content: Size, view: &Size) -> Point;
+
+  fn offset_x(&self) -> f32;
+
+  fn offset_y(&self) -> f32;
 }
 
 impl ScrollWorker for ScrollableX {
@@ -117,6 +121,10 @@ impl ScrollWorker for ScrollableX {
   fn content_pos(&self, content: Size, view: &Size) -> Point {
     Point::new(validate_pos(view.width, content.width, self.pos), 0.)
   }
+
+  fn offset_x(&self) -> f32 { self.pos }
+
+  fn offset_y(&self) -> f32 { 0.0 }
 }
 
 impl ScrollWorker for ScrollableY {
@@ -131,6 +139,10 @@ impl ScrollWorker for ScrollableY {
   fn content_pos(&self, content: Size, view: &Size) -> Point {
     Point::new(0., validate_pos(view.height, content.height, self.pos))
   }
+
+  fn offset_x(&self) -> f32 { 0.0 }
+
+  fn offset_y(&self) -> f32 { self.pos }
 }
 
 impl ScrollWorker for ScrollableBoth {
@@ -147,6 +159,10 @@ impl ScrollWorker for ScrollableBoth {
       validate_pos(view.height, content.height, self.pos.y),
     )
   }
+
+  fn offset_x(&self) -> f32 { self.pos.x }
+
+  fn offset_y(&self) -> f32 { self.pos.y }
 }
 
 fn view_content(event: &WheelEvent) -> (Rect, Rect) {

@@ -43,6 +43,25 @@ pub struct TextTheme {
   pub text: TextStyle,
   pub decoration: TextDecorationStyle,
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScrollBoxDecorationStyle {
+  pub background: Brush,
+
+  /// The corners of this box are rounded by this `BorderRadius`. The round
+  /// corner only work if the two borders beside it are same style.]
+  pub radius: Option<Radius>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScrollBarTheme {
+  pub track_box: ScrollBoxDecorationStyle,
+  pub track_width: f32,
+
+  pub thumb_box: ScrollBoxDecorationStyle,
+  pub thumb_width: f32,
+}
+
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
 /// spec](https://material.io/design/typography/the-type-system.html#applying-the-type-scale)
@@ -86,6 +105,7 @@ pub struct Theme {
   /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
   pub checkbox: CheckboxTheme,
+  pub scrollbar: ScrollBarTheme,
 }
 
 impl TypographyTheme {
