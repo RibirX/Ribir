@@ -4,11 +4,11 @@ use crate::{
 };
 use algo::FrameCache;
 use lyon_tessellation::{path::Path, *};
-use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode, Vector};
+use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode};
 use std::{collections::VecDeque, hash::Hash, mem::size_of};
 use text::{
   font_db::ID,
-  layouter::{InputRun, LetterSpaceCursor, LinearCursor},
+  layouter::{InputRun, LeftToRightCursor, LetterSpaceCursor, TopToBottomCursor},
   shaper::{GlyphId, TextShaper},
 };
 mod atlas;
@@ -243,7 +243,7 @@ impl Tessellator {
         let mut scaled_font_size = font_size;
         let mut tolerance = TOLERANCE / (scaled_font_size * scale);
 
-        let add_glyph = |text::layouter::PixelGlyph { glyph_id, face_id, x_pos, y_pos, .. }| {
+        let add_glyph = |text::layouter::TGlyph { glyph_id, face_id, position, .. }| {
           if Some(face_id) != pre_face_id {
             pre_face_id = Some(face_id);
             let db = self.shaper.font_db();
@@ -258,7 +258,7 @@ impl Tessellator {
 
           let t = transform
             // because glyph is up down mirror, this `font_size` offset help align after rotate.
-            .pre_translate((x_pos, y_pos).into())
+            .pre_translate(position.to_vector().cast_unit())
             .pre_scale(scaled_font_size, scaled_font_size);
 
           let mut p = primitive.clone();
@@ -275,15 +275,36 @@ impl Tessellator {
           text,
           glyphs,
           font_size,
-          letter_space,
+          letter_space: Some(letter_space),
         };
-        let linear_cursor = LinearCursor::new(0., font_size);
-        if letter_space != 0. {
-          run.pixel_glyphs(linear_cursor).for_each(add_glyph);
-        } else {
-          let cursor =
-            LetterSpaceCursor::new(linear_cursor, letter_space, direction.is_horizontal());
-          run.pixel_glyphs(cursor).for_each(add_glyph);
+        let pos = lyon_tessellation::geom::Point::new(0., font_size);
+        match (direction.is_horizontal(), letter_space != 0.) {
+          (true, true) => {
+            run
+              .pixel_glyphs(LetterSpaceCursor::new(
+                LeftToRightCursor { pos },
+                letter_space,
+              ))
+              .for_each(add_glyph);
+          }
+          (true, false) => {
+            run
+              .pixel_glyphs(LeftToRightCursor { pos })
+              .for_each(add_glyph);
+          }
+          (false, true) => {
+            run
+              .pixel_glyphs(LetterSpaceCursor::new(
+                TopToBottomCursor { pos },
+                letter_space,
+              ))
+              .for_each(add_glyph);
+          }
+          (false, false) => {
+            run
+              .pixel_glyphs(TopToBottomCursor { pos })
+              .for_each(add_glyph);
+          }
         }
       }
       _ => {}

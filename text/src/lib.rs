@@ -2,14 +2,42 @@
 //! shape and do simple layout for text. It's focus
 //!
 //! Some detail processing learn from [usvg](https://github.com/RazrFalcon/resvg/blob/master/usvg/src/text)
-#![feature(test)]
+#![feature(test, generic_associated_types)]
 pub mod font_db;
 pub mod shaper;
+use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub mod layouter;
 pub mod text_reorder;
 pub use arcstr::{ArcStr, Substr};
 pub use text_reorder::TextReorder;
+mod typography_cache;
+// pub use typography_cache::TypographyFrameCache;
+
+/// Unit for convert between pixel and em.
+pub const PIXELS_PER_EM: f32 = 16.;
+
+/// `Pixels is an absolute length unit and relative to the view device
+#[derive(
+  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign,
+)]
+pub struct Pixel(f32);
+
+///  `Em` is relative length unit relative to `Pixel`. We stipulate Em(1.) equal
+/// to Pixel(16.)
+#[derive(
+  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign,
+)]
+pub struct Em(f32);
+
+/// The size of font. `Pixels is an absolute length unit and relative to the
+/// view device, and `Em` is relative length unit relative to `Pixel`. We
+/// stipulate FontSize::Em(1.) equal to FontSize::Pixel(16.)
+#[derive(Debug, Clone, Copy, Add)]
+pub enum FontSize {
+  Pixel(Pixel),
+  Em(Em),
+}
 
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
@@ -148,4 +176,85 @@ impl From<VAlign> for Align {
       VAlign::Bottom => Align::End,
     }
   }
+}
+
+impl From<Pixel> for Em {
+  #[inline]
+  fn from(p: Pixel) -> Self { Em(p.0 / PIXELS_PER_EM) }
+}
+
+impl From<Em> for Pixel {
+  #[inline]
+  fn from(e: Em) -> Self { Pixel(e.0 * PIXELS_PER_EM) }
+}
+
+impl PartialEq<Em> for Pixel {
+  #[inline]
+  fn eq(&self, other: &Em) -> bool {
+    let p: Pixel = (*other).into();
+    *self == p
+  }
+}
+
+impl PartialEq<Pixel> for Em {
+  #[inline]
+  fn eq(&self, other: &Pixel) -> bool {
+    let p: Pixel = (*self).into();
+    p == *other
+  }
+}
+
+impl FontSize {
+  #[inline]
+  pub fn into_pixel(self) -> Pixel {
+    match self {
+      FontSize::Pixel(p) => p,
+      FontSize::Em(e) => e.into(),
+    }
+  }
+
+  #[inline]
+  pub fn into_em(self) -> Em {
+    match self {
+      FontSize::Pixel(p) => p.into(),
+      FontSize::Em(e) => e,
+    }
+  }
+}
+
+impl PartialEq for FontSize {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self.into_pixel() == other.into_pixel() }
+}
+
+impl lyon_path::geom::euclid::num::Zero for Em {
+  #[inline]
+  fn zero() -> Self { Em(f32::zero()) }
+}
+
+impl lyon_path::geom::euclid::num::Zero for Pixel {
+  #[inline]
+  fn zero() -> Self { Pixel(f32::zero()) }
+}
+
+impl Em {
+  #[inline]
+  pub fn value(self) -> f32 { self.0 }
+}
+
+impl Pixel {
+  #[inline]
+  pub fn value(self) -> f32 { self.0 }
+}
+
+impl std::ops::Mul<Em> for Em {
+  type Output = Em;
+  #[inline]
+  fn mul(self, rhs: Em) -> Self::Output { Em(self.0 * rhs.0) }
+}
+
+impl std::ops::Mul<Pixel> for Pixel {
+  type Output = Pixel;
+  #[inline]
+  fn mul(self, rhs: Pixel) -> Self::Output { Pixel(self.0 * rhs.0) }
 }
