@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
   font_db::{Face, FontDB, ID},
-  TextDirection,
+  Em, TextDirection,
 };
 use algo::FrameCache;
 
@@ -14,23 +14,24 @@ use arcstr::Substr;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 pub use ttf_parser::GlyphId;
 
-/// A glyph information returned by text shaped, include a glyph
+/// A glyph information returned by text shaped, axis relative self, not effect
+/// by the glyphs before it.
 #[derive(Debug, Clone)]
 pub struct Glyph {
   /// The font face id of the glyph.
   pub face_id: ID,
   /// How many ems the line advances after drawing this glyph when setting text
   /// in horizontal direction.
-  pub x_advance: f32,
+  pub x_advance: Em,
   /// How many ems the line advances after drawing this glyph when setting text
   /// in vertical direction.
-  pub y_advance: f32,
+  pub y_advance: Em,
   /// How many ems the glyph moves on the X-axis before drawing it, this should
   /// not affect how many the line advances.
-  pub x_offset: f32,
+  pub x_offset: Em,
   /// How many ems the glyph moves on the Y-axis before drawing it, this should
   /// not affect how many the line advances.
-  pub y_offset: f32,
+  pub y_offset: Em,
   /// The id of the glyph.
   pub glyph_id: GlyphId,
   /// An cluster of origin text as byte index.
@@ -52,9 +53,6 @@ pub struct ShapeResult {
   pub text: Substr,
   pub glyphs: Vec<Glyph>,
   pub direction: TextDirection,
-  /// The biggest height of font use to shape the text in em. For vertical font
-  /// is its "width".
-  pub max_line_size: f32,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -81,7 +79,7 @@ impl TextShaper {
     self
       .get_from_cache(text, face_ids, direction)
       .unwrap_or_else(|| {
-        let (glyphs, line_height) = if !cover_all_glyphs(text, face_ids, &*self.font_db) {
+        let glyphs = if !cover_all_glyphs(text, face_ids, &*self.font_db) {
           log::warn!(
             "Text shape: some glyphs not covered in the text: {}",
             &**text
@@ -109,15 +107,12 @@ impl TextShaper {
                   .clone()
               })
           };
-          let (glyphs, _) = Self::directly_shape(text, direction, &face, &mut None);
-
-          (glyphs, line_size(direction, &face))
+          Self::directly_shape(text, direction, &face, &mut None).0
         });
 
         let glyphs = Arc::new(ShapeResult {
           text: text.clone(),
           glyphs,
-          max_line_size: line_height,
           direction,
         });
         self.shape_cache.write().unwrap().insert(
@@ -140,11 +135,10 @@ impl TextShaper {
     face_ids: &[ID],
     // todo: remove it
     buffer: &mut Option<UnicodeBuffer>,
-  ) -> Option<(Vec<Glyph>, f32)> {
+  ) -> Option<Vec<Glyph>> {
     let (id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
 
     let (mut glyphs, mut miss_from) = Self::directly_shape(text, dir, &face, buffer);
-    let mut line_height = line_size(dir, &face);
     // todo: we need align baseline.
     while let Some(m_start) = miss_from {
       let m_end = glyphs[m_start..]
@@ -164,12 +158,11 @@ impl TextShaper {
       let fallback_glyphs =
         self.shape_text_with_fallback(miss_text, dir, &face_ids[id_idx + 1..], buffer);
 
-      if let Some((fallback, lh)) = fallback_glyphs {
+      if let Some(fallback) = fallback_glyphs {
         match m_end {
           Some(m_end) => glyphs.splice(m_start..m_end, fallback),
           None => glyphs.splice(m_start.., fallback),
         };
-        line_height = line_height.max(lh);
       }
 
       // skip to next miss glyphs
@@ -181,7 +174,7 @@ impl TextShaper {
       });
     }
 
-    Some((glyphs, line_height))
+    Some(glyphs)
   }
 
   pub fn directly_shape(
@@ -216,10 +209,10 @@ impl TextShaper {
       }
       glyphs.push(Glyph {
         face_id: face.face_id,
-        x_advance: p.x_advance as f32 / units_per_em,
-        y_advance: p.y_advance as f32 / units_per_em,
-        x_offset: p.x_offset as f32 / units_per_em,
-        y_offset: p.y_offset as f32 / units_per_em,
+        x_advance: Em(p.x_advance as f32 / units_per_em),
+        y_advance: Em(p.y_advance as f32 / units_per_em),
+        x_offset: Em(p.x_offset as f32 / units_per_em),
+        y_offset: Em(p.y_offset as f32 / units_per_em),
         glyph_id: GlyphId(glyph_id as u16),
         cluster,
       })
@@ -267,16 +260,6 @@ fn cover_all_glyphs(text: &str, ids: &[ID], font_db: &RwLock<FontDB>) -> bool {
         faces.last().unwrap().has_char(c)
       })
   })
-}
-
-fn line_size(dir: TextDirection, face: &Face) -> f32 {
-  let height = match dir {
-    TextDirection::LeftToRight | TextDirection::RightToLeft => face.height(),
-    TextDirection::TopToBottom | TextDirection::BottomToTop => {
-      face.vertical_height().unwrap_or_else(|| face.height())
-    }
-  };
-  height as f32 / face.units_per_em() as f32
 }
 
 fn db_fallback_fonts(high_prior: &[ID], font_db: &RwLock<FontDB>) -> Vec<ID> {

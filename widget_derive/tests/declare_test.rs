@@ -142,7 +142,7 @@ fn expression_for_children() {
       widget! {
         declare Flex {
           SizedBox { size }
-          ExprChild { (0..3).map(|_| SizedBox { size}) }
+          ExprChild { (0..3).map(|_| SizedBox { size }) }
           ExprChild { (self.0.area() > 2.).then(|| SizedBox { size } ) }
         }
       }

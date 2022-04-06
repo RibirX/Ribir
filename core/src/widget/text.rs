@@ -15,7 +15,7 @@ impl RenderWidget for Text {
     let shaper = ctx.text_shaper();
     let ids = shaper.font_db_mut().select_all_match(&self.style.font_face);
     let reorder = ctx.text_reorder();
-    let info = reorder.reorder_text(&self.text.substr(..));
+    // let info = reorder.reorder_text(&self.text.substr(..));
     // let glyphs = shaper.shape_text(&self.text, &ids);
     // ::text::layouter::glyphs_box(&self.text, &glyphs, self.style.font_size,
     // None, 0.).cast_unit()

@@ -8,6 +8,8 @@ pub struct ReorderResult {
   pub levels: Vec<Level>,
   pub paragraphs: Vec<ParagraphInfo>,
 }
+
+// unnecessary cache
 #[derive(Clone, Default)]
 pub struct TextReorder {
   cache: Arc<RwLock<FrameCache<Substr, Arc<ReorderResult>>>>,
