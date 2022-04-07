@@ -5,30 +5,63 @@
 #![feature(test, generic_associated_types)]
 pub mod font_db;
 pub mod shaper;
+use std::hash::Hash;
+
 use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
-pub mod layouter;
 pub mod text_reorder;
+pub mod typography;
 pub use arcstr::{ArcStr, Substr};
+use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
+use ttf_parser::GlyphId;
 mod typography_cache;
-// pub use typography_cache::TypographyFrameCache;
+pub use typography_cache::TypographyFrameCache;
 
 /// Unit for convert between pixel and em.
 pub const PIXELS_PER_EM: f32 = 16.;
 
 /// `Pixels is an absolute length unit and relative to the view device
 #[derive(
-  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign,
+  Debug,
+  Default,
+  Clone,
+  Copy,
+  PartialEq,
+  PartialOrd,
+  Add,
+  Sub,
+  Div,
+  AddAssign,
+  Mul,
+  SubAssign,
+  Eq,
+  Ord,
+  Hash,
 )]
-pub struct Pixel(f32);
+pub struct Pixel(pub OrderedFloat<f32>);
 
 ///  `Em` is relative length unit relative to `Pixel`. We stipulate Em(1.) equal
 /// to Pixel(16.)
 #[derive(
-  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign,
+  Debug,
+  Default,
+  Clone,
+  Copy,
+  PartialEq,
+  PartialOrd,
+  Add,
+  Sub,
+  Div,
+  AddAssign,
+  Mul,
+  SubAssign,
+  Eq,
+  Ord,
+  Hash,
 )]
-pub struct Em(f32);
+pub struct Em(OrderedFloat<f32>);
 
 /// The size of font. `Pixels is an absolute length unit and relative to the
 /// view device, and `Em` is relative length unit relative to `Pixel`. We
@@ -89,6 +122,28 @@ pub struct FontFace {
   ///
   /// [font-weight](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-weight-prop) in CSS.
   pub weight: FontWeight,
+}
+
+#[derive(Debug, Clone)]
+pub struct Glyph<Unit> {
+  /// The font face id of the glyph.
+  pub face_id: ID,
+  /// How many units the line advances after drawing this glyph when setting
+  /// text in horizontal direction.
+  pub x_advance: Unit,
+  /// How many units the line advances after drawing this glyph when setting
+  /// text in vertical direction.
+  pub y_advance: Unit,
+  /// How many units the glyph moves on the X-axis before drawing it, this
+  /// should not affect how many the line advances.
+  pub x_offset: Unit,
+  /// How many units the glyph moves on the Y-axis before drawing it, this
+  /// should not affect how many the line advances.
+  pub y_offset: Unit,
+  /// The id of the glyph.
+  pub glyph_id: GlyphId,
+  /// An cluster of origin text as byte index.
+  pub cluster: u32,
 }
 
 impl Default for FontFace {
@@ -178,6 +233,11 @@ impl From<VAlign> for Align {
   }
 }
 
+impl From<f32> for Pixel {
+  #[inline]
+  fn from(v: f32) -> Self { Pixel(v.into()) }
+}
+
 impl From<Pixel> for Em {
   #[inline]
   fn from(p: Pixel) -> Self { Em(p.0 / PIXELS_PER_EM) }
@@ -220,6 +280,10 @@ impl FontSize {
       FontSize::Em(e) => e,
     }
   }
+
+  /// Em scale by font size.
+  #[inline]
+  pub fn relative_em(self, em: f32) -> Em { self.into_em() * em }
 }
 
 impl PartialEq for FontSize {
@@ -229,22 +293,28 @@ impl PartialEq for FontSize {
 
 impl lyon_path::geom::euclid::num::Zero for Em {
   #[inline]
-  fn zero() -> Self { Em(f32::zero()) }
+  fn zero() -> Self { Em(f32::zero().into()) }
 }
 
 impl lyon_path::geom::euclid::num::Zero for Pixel {
   #[inline]
-  fn zero() -> Self { Pixel(f32::zero()) }
+  fn zero() -> Self { Pixel(f32::zero().into()) }
 }
 
 impl Em {
   #[inline]
-  pub fn value(self) -> f32 { self.0 }
+  pub fn value(self) -> f32 { self.0.into() }
+
+  #[inline]
+  pub fn absolute(em: f32) -> Self { Self(em.into()) }
+
+  #[inline]
+  pub fn relative_to(em: f32, font_size: FontSize) -> Self { font_size.relative_em(em) }
 }
 
 impl Pixel {
   #[inline]
-  pub fn value(self) -> f32 { self.0 }
+  pub fn value(self) -> f32 { *self.0 }
 }
 
 impl std::ops::Mul<Em> for Em {
@@ -257,4 +327,36 @@ impl std::ops::Mul<Pixel> for Pixel {
   type Output = Pixel;
   #[inline]
   fn mul(self, rhs: Pixel) -> Self::Output { Pixel(self.0 * rhs.0) }
+}
+
+impl std::ops::MulAssign<f32> for Em {
+  #[inline]
+  fn mul_assign(&mut self, rhs: f32) { self.0 *= rhs; }
+}
+
+impl<U> Glyph<U> {
+  pub fn cast<T>(self) -> Glyph<T>
+  where
+    U: Into<T>,
+  {
+    let Glyph {
+      face_id,
+      x_advance,
+      y_advance,
+      x_offset,
+      y_offset,
+      glyph_id,
+      cluster,
+    } = self;
+
+    Glyph {
+      face_id,
+      x_advance: x_advance.into(),
+      y_advance: y_advance.into(),
+      x_offset: x_offset.into(),
+      y_offset: y_offset.into(),
+      glyph_id,
+      cluster,
+    }
+  }
 }

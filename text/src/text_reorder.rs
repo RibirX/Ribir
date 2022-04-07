@@ -1,12 +1,16 @@
 use algo::FrameCache;
 use arcstr::Substr;
 use std::sync::{Arc, RwLock};
-use unic_bidi::{BidiClass, BidiInfo, Level, ParagraphInfo};
+use unicode_bidi::{BidiClass, BidiInfo, Level, LevelRun};
 
+pub struct Paragraph {
+  pub levels: Vec<Level>,
+  pub runs: Vec<LevelRun>,
+}
 pub struct ReorderResult {
   pub original_classes: Vec<BidiClass>,
-  pub levels: Vec<Level>,
-  pub paragraphs: Vec<ParagraphInfo>,
+
+  pub paras: Vec<Paragraph>,
 }
 
 // unnecessary cache
@@ -22,10 +26,20 @@ impl TextReorder {
 
   pub fn reorder_text(&self, text: &Substr) -> Arc<ReorderResult> {
     self.get_from_cache(text).unwrap_or_else(|| {
-      let BidiInfo {
-        original_classes, levels, paragraphs, ..
-      } = BidiInfo::new(text, None);
-      let result = Arc::new(ReorderResult { original_classes, levels, paragraphs });
+      let info = BidiInfo::new(text, None);
+      let paras = info
+        .paragraphs
+        .iter()
+        .map(|p| {
+          let (levels, runs) = info.visual_runs(p, p.range.clone());
+          Paragraph { levels, runs }
+        })
+        .collect();
+
+      let result = Arc::new(ReorderResult {
+        original_classes: info.original_classes,
+        paras,
+      });
       let mut cache = self.cache.write().unwrap();
       cache.insert(text.clone(), result.clone());
       result

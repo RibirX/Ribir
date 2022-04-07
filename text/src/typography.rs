@@ -4,36 +4,18 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use fontdb::ID;
-use lyon_path::geom::{euclid::num::Zero, Point, Rect, Size};
-use ttf_parser::GlyphId;
-use unic_bidi::Level;
+use lyon_path::geom::{euclid::num::Zero, Rect};
+use unicode_bidi::Level;
 use unicode_script::{Script, UnicodeScript};
 
-use crate::{font_db::FontDB, shaper::Glyph, Align, Em, FontSize, HAlign, VAlign};
+use crate::{font_db::FontDB, Align, Em, FontSize, Glyph, HAlign, VAlign};
 
-/// Describe the glyph information, and axis relative to the typography bounds.
-#[derive(Debug, Clone)]
-pub struct TGlyph {
-  /// The font face id of the glyph.
-  pub face_id: ID,
-  /// Where the glyph drawing start.
-  pub position: Point<Em>,
-  /// How many pixels the line advances after drawing this glyph when setting
-  /// text in horizontal direction, advance on x-axis, else y-axis.
-  pub advance: Size<Em>,
-  /// The id of the glyph.
-  pub glyph_id: GlyphId,
-  /// An cluster of origin text as byte index.
-  pub cluster: u32,
-}
-
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Overflow {
   Clip,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PlaceLineDirection {
   /// place the line from left to right, the direction use to shape text must be
   /// vertical
@@ -66,21 +48,21 @@ pub trait InlineCursor {
   /// before call this method,  and relative to the cursor coordinate after
   /// call.
   /// return if the glyph is over boundary.
-  fn advance_glyph(&mut self, glyph: &mut TGlyph, origin_text: &str) -> bool;
+  fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, origin_text: &str) -> bool;
 
   fn advance(&mut self, offset: Em) -> bool;
 
   /// cursor position relative of inline.
   fn position(&self) -> Em;
 
-  fn cursor(&self) -> Point<Em>;
+  fn cursor(&self) -> (Em, Em);
 }
 
 #[derive(Default)]
 pub struct VisualLine {
   // todo: not set
   pub line_rect: Rect<Em>,
-  pub glyphs: VecDeque<TGlyph>,
+  pub glyphs: VecDeque<Glyph<Em>>,
 }
 
 #[derive(Default)]
@@ -98,7 +80,8 @@ pub struct TypographyMan<Inputs> {
   /// because both simple text and rich text can custom compose its glyph runs
   /// by text reorder result and its style .
   inputs: Inputs,
-  cursor: Point<Em>,
+  x_cursor: Em,
+  y_cursor: Em,
   visual_info: VisualInfos,
 }
 
@@ -110,18 +93,19 @@ where
   pub fn new(inputs: Inputs, cfg: TypographyCfg, font_db: Arc<RwLock<FontDB>>) -> Self {
     let x_cursor = match (cfg.h_align, cfg.line_dir) {
       (Some(HAlign::Right), _) | (_, PlaceLineDirection::RightToLeft) => cfg.bounds.max_x(),
-      _ => Em(0.),
+      _ => Em::zero(),
     };
     let y_cursor = cfg
       .v_align
       .and_then(|v| (matches!(v, VAlign::Bottom)).then(|| cfg.bounds.max_y()))
-      .unwrap_or(Em(0.));
+      .unwrap_or(Em::zero());
 
     Self {
       font_db,
       cfg,
       inputs,
-      cursor: (x_cursor, y_cursor).into(),
+      x_cursor,
+      y_cursor,
       visual_info: <_>::default(),
     }
   }
@@ -129,7 +113,11 @@ where
   pub fn typography_all(&mut self) -> Rect<Em> {
     while let Some(p) = self.next_input_paragraph() {
       self.consume_paragraph(p);
-      if !self.cfg.bounds.contains(self.cursor) {
+      if !self
+        .cfg
+        .bounds
+        .contains((self.x_cursor, self.y_cursor).into())
+      {
         break;
       }
     }
@@ -192,19 +180,20 @@ where
         self.advance_to_new_line(line_height * r.font_size.into_em());
       }
     }
+    let Self { x_cursor, y_cursor, .. } = *self;
     if self.cfg.should_rev_place_glyph() {
       runs.rev().for_each(|r| {
-        let cursor = RightToLeftCursor { pos: self.cursor };
+        let cursor = RightToLeftCursor { x_pos: x_cursor, y_pos: y_cursor };
         self.consume_run_with_letter_space_cursor(&r, cursor)
       });
     } else if self.cfg.line_dir.is_horizontal() {
       runs.for_each(|r| {
-        let cursor = LeftToRightCursor { pos: self.cursor };
+        let cursor = LeftToRightCursor { x_pos: x_cursor, y_pos: y_cursor };
         self.consume_run_with_letter_space_cursor(&r, cursor)
       });
     } else {
       runs.for_each(|r| {
-        let cursor = TopToBottomCursor { pos: self.cursor };
+        let cursor = TopToBottomCursor { x_pos: x_cursor, y_pos: y_cursor };
         self.consume_run_with_letter_space_cursor(&r, cursor)
       });
     }
@@ -256,20 +245,23 @@ where
     mut cursor: impl InlineCursor,
     font_size: FontSize,
     text: &str,
-    runs: impl Iterator<Item = &'b Glyph>,
+    runs: impl Iterator<Item = &'b Glyph<Em>>,
   ) {
     for g in runs {
-      let mut at = TGlyph::new(font_size, g);
+      let mut at = g.clone();
+      at.scale(font_size.into_em().value());
       let over_boundary = cursor.advance_glyph(&mut at, text);
       self.push_glyph(at);
       if over_boundary {
         break;
       }
     }
-    self.cursor = cursor.cursor();
+    let (x_cursor, y_cursor) = cursor.cursor();
+    self.x_cursor = x_cursor;
+    self.y_cursor = y_cursor;
   }
 
-  fn push_glyph(&mut self, g: TGlyph) {
+  fn push_glyph(&mut self, g: Glyph<Em>) {
     let line = self.visual_info.visual_lines.last_mut();
     if self.cfg.should_rev_place_glyph() {
       line.unwrap().glyphs.push_front(g)
@@ -278,7 +270,7 @@ where
     }
   }
 
-  fn line_height_with_glyph(&self, g: Option<&Glyph>) -> Em {
+  fn line_height_with_glyph(&self, g: Option<&Glyph<Em>>) -> Em {
     self
       .cfg
       .line_height
@@ -292,32 +284,32 @@ where
               }
               PlaceLineDirection::TopToBottom => face.line_gap(),
             };
-            Em(p_gap as f32 / face.units_per_em() as f32)
+            Em::absolute(p_gap as f32 / face.units_per_em() as f32)
           })
         })
       })
-      .unwrap_or(Em(1.))
+      .unwrap_or(Em::absolute(1.))
   }
 
   fn advance_to_new_line(&mut self, offset: Em) {
     match self.cfg.line_dir {
-      PlaceLineDirection::LeftToRight => self.cursor.x += offset,
-      PlaceLineDirection::RightToLeft => self.cursor.x -= offset,
-      PlaceLineDirection::TopToBottom => self.cursor.y += offset,
+      PlaceLineDirection::LeftToRight => self.x_cursor += offset,
+      PlaceLineDirection::RightToLeft => self.x_cursor -= offset,
+      PlaceLineDirection::TopToBottom => self.y_cursor += offset,
     }
 
     // reset inline cursor
     if self.cfg.line_dir.is_horizontal() {
       if let Some(VAlign::Bottom) = self.cfg.v_align {
-        self.cursor.y = self.cfg.bounds.max_y();
+        self.y_cursor = self.cfg.bounds.max_y();
       } else {
-        self.cursor.y = Em::zero();
+        self.y_cursor = Em::zero();
       }
     } else {
       if let Some(HAlign::Right) = self.cfg.h_align {
-        self.cursor.x = self.cfg.bounds.max_x();
+        self.x_cursor = self.cfg.bounds.max_x();
       } else {
-        self.cursor.x = Em::zero();
+        self.x_cursor = Em::zero();
       }
     }
 
@@ -330,54 +322,45 @@ pub struct InputParagraph<Runs> {
   /// paragraph in vertical layouter.
   pub align: Option<Align>,
   pub runs: Runs,
-  pub level: Level,
 }
 
 /// A text run with its glyphs and style
 #[derive(Clone)]
 pub struct InputRun<'a> {
   pub text: &'a str,
-  pub glyphs: &'a [Glyph],
+  pub glyphs: &'a [Glyph<Em>],
   pub font_size: FontSize,
   pub letter_space: Option<Em>,
 }
 
 impl<'a> InputRun<'a> {
-  pub fn pixel_glyphs<'b, C>(&'b self, mut cursor: C) -> impl Iterator<Item = TGlyph> + 'b
+  pub fn pixel_glyphs<'b, C>(&'b self, mut cursor: C) -> impl Iterator<Item = Glyph<Em>> + 'b
   where
     C: InlineCursor + 'b,
   {
     self.glyphs.iter().map(move |g| {
       let font_size = self.font_size;
-      let mut at = TGlyph::new(font_size, g);
+      let mut at = g.clone();
+      at.scale(font_size.into_em().value());
       cursor.advance_glyph(&mut at, self.text);
       at
     })
   }
 }
 
-impl TGlyph {
-  fn new(font_size: FontSize, g: &Glyph) -> Self {
-    Self {
-      face_id: g.face_id,
-      advance: Size::new(g.x_advance, g.y_advance) * font_size.into_em(),
-      position: Point::new(g.x_offset, g.y_offset) * font_size.into_em(),
-      glyph_id: g.glyph_id,
-      cluster: g.cluster,
-    }
-  }
-}
-
 pub struct LeftToRightCursor {
-  pub pos: Point<Em>,
+  pub x_pos: Em,
+  pub y_pos: Em,
 }
 
 pub struct RightToLeftCursor {
-  pos: Point<Em>,
+  pub x_pos: Em,
+  pub y_pos: Em,
 }
 
 pub struct TopToBottomCursor {
-  pub pos: Point<Em>,
+  pub x_pos: Em,
+  pub y_pos: Em,
 }
 
 pub struct LetterSpaceCursor<I> {
@@ -395,63 +378,65 @@ impl<I> LetterSpaceCursor<I> {
 }
 
 impl InlineCursor for LeftToRightCursor {
-  fn advance_glyph(&mut self, g: &mut TGlyph, _: &str) -> bool {
-    g.position += self.pos.to_vector();
-    self.pos.x = g.position.x + g.advance.width;
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, _: &str) -> bool {
+    g.x_offset += self.x_pos;
+    g.y_offset += self.y_pos;
+    self.x_pos = g.x_offset + g.x_advance;
 
     false
   }
 
   fn advance(&mut self, offset: Em) -> bool {
-    self.pos.x += offset;
+    self.x_pos += offset;
     false
   }
 
-  fn position(&self) -> Em { self.pos.x }
+  fn position(&self) -> Em { self.x_pos }
 
-  fn cursor(&self) -> Point<Em> { self.pos }
+  fn cursor(&self) -> (Em, Em) { (self.x_pos, self.y_pos) }
 }
 
 impl InlineCursor for RightToLeftCursor {
-  fn advance_glyph(&mut self, g: &mut TGlyph, _: &str) -> bool {
-    let cursor_offset = g.position.x + g.advance.width;
-    g.position.x = self.pos.x - g.advance.width;
-    g.position.y += self.pos.y;
-    self.pos.x -= cursor_offset;
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, _: &str) -> bool {
+    let cursor_offset = g.x_offset + g.x_advance;
+    g.x_offset = self.x_pos - g.x_advance;
+    g.y_offset += self.y_pos;
+    self.x_pos -= cursor_offset;
 
     false
   }
 
   fn advance(&mut self, offset: Em) -> bool {
-    self.pos.x += offset;
+    self.x_pos += offset;
     false
   }
 
-  fn position(&self) -> Em { self.pos.x }
+  fn position(&self) -> Em { self.x_pos }
 
-  fn cursor(&self) -> Point<Em> { self.pos }
+  fn cursor(&self) -> (Em, Em) { (self.x_pos, self.y_pos) }
 }
 
 impl InlineCursor for TopToBottomCursor {
-  fn advance_glyph(&mut self, g: &mut TGlyph, _: &str) -> bool {
-    g.position += self.pos.to_vector();
-    self.pos.y = g.position.y + g.advance.height;
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, _: &str) -> bool {
+    g.x_offset += self.x_pos;
+    g.y_offset += self.y_pos;
+    self.x_pos = g.y_offset + g.y_advance;
 
     false
   }
 
   fn advance(&mut self, offset: Em) -> bool {
-    self.pos.y += offset;
+    self.y_pos += offset;
     false
   }
 
-  fn position(&self) -> Em { self.pos.y }
+  fn position(&self) -> Em { self.y_pos }
 
-  fn cursor(&self) -> Point<Em> { self.pos }
+  fn cursor(&self) -> (Em, Em) { (self.x_pos, self.y_pos) }
 }
 
 impl<I: InlineCursor> InlineCursor for LetterSpaceCursor<I> {
-  fn advance_glyph(&mut self, g: &mut TGlyph, origin_text: &str) -> bool {
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, origin_text: &str) -> bool {
     let cursor = &mut self.inner_cursor;
     let res = cursor.advance_glyph(g, origin_text);
 
@@ -467,11 +452,11 @@ impl<I: InlineCursor> InlineCursor for LetterSpaceCursor<I> {
 
   fn position(&self) -> Em { self.inner_cursor.position() }
 
-  fn cursor(&self) -> Point<Em> { self.inner_cursor.cursor() }
+  fn cursor(&self) -> (Em, Em) { self.inner_cursor.cursor() }
 }
 
 impl<I: InlineCursor> InlineCursor for BoundsCursor<I> {
-  fn advance_glyph(&mut self, glyph: &mut TGlyph, origin_text: &str) -> bool {
+  fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, origin_text: &str) -> bool {
     self.inner_cursor.advance_glyph(glyph, origin_text);
     self.bounds.contains(&self.position())
   }
@@ -483,7 +468,7 @@ impl<I: InlineCursor> InlineCursor for BoundsCursor<I> {
 
   fn position(&self) -> Em { self.inner_cursor.position() }
 
-  fn cursor(&self) -> Point<Em> { self.inner_cursor.cursor() }
+  fn cursor(&self) -> (Em, Em) { self.inner_cursor.cursor() }
 }
 
 impl PlaceLineDirection {

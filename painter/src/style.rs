@@ -1,23 +1,24 @@
 use crate::{Color, ShallowImage};
 use algo::CowRc;
-use text::FontFace;
+use euclid::num::Zero;
+use text::{Em, FontFace, FontSize, Pixel};
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   /// The size of glyphs (in logical pixels) to use when painting the text.
-  pub font_size: f32,
+  pub font_size: FontSize,
   /// The style drawn as a foreground for the text.
   pub foreground: Brush,
   /// The font face to use when painting the text.
   pub font_face: CowRc<FontFace>,
   /// Not support now.
-  pub letter_space: f32,
+  pub letter_space: Em,
   /// The path style(fill or stroke) to use when painting.
   pub path_style: PathStyle,
   /// The factor use to multiplied by the font size to specify the text line
   /// height.
-  pub line_height: Option<f32>,
+  pub line_height: Option<Em>,
 }
 
 bitflags::bitflags! {
@@ -64,10 +65,10 @@ pub enum PathStyle {
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
-      font_size: 14.,
+      font_size: FontSize::Pixel(14.0.into()),
       foreground: Color::BLACK.into(),
       font_face: CowRc::owned(Default::default()),
-      letter_space: 0.,
+      letter_space: Em::zero(),
       path_style: PathStyle::Fill,
       line_height: None,
     }
