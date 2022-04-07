@@ -1,8 +1,9 @@
 use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
 use algo::CowRc;
+use euclid::num::Zero;
 use std::ops::{Deref, DerefMut};
-use text::Substr;
-use text::{FontFace, TextDirection};
+use text::{Em, FontFace, Pixel, TextDirection};
+use text::{FontSize, Substr};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -37,10 +38,10 @@ pub enum PaintPath {
   Path(lyon_path::Path),
   Text {
     text: Substr,
-    font_size: f32,
+    font_size: FontSize,
     font_face: CowRc<FontFace>,
-    letter_space: f32,
-    line_height: Option<f32>,
+    letter_space: Em,
+    line_height: Option<Em>,
     direction: TextDirection,
   },
 }
@@ -56,11 +57,11 @@ pub struct PaintCommand {
 struct PainterState {
   /// The line width use to stroke path.
   line_width: f32,
-  font_size: f32,
-  letter_space: f32,
+  font_size: FontSize,
+  letter_space: Em,
   brush: Brush,
   font_face: CowRc<FontFace>,
-  text_line_height: Option<f32>,
+  text_line_height: Option<Em>,
   transform: Transform,
 }
 
@@ -140,7 +141,7 @@ impl Painter {
   /// Set the text line height which is a factor use to multiplied by the font
   /// size
   #[inline]
-  pub fn set_text_line_height(&mut self, line_height: f32) -> &mut Self {
+  pub fn set_text_line_height(&mut self, line_height: Em) -> &mut Self {
     self.current_state_mut().text_line_height = Some(line_height);
     self
   }
@@ -351,8 +352,8 @@ impl Default for PainterState {
   fn default() -> Self {
     Self {
       line_width: 1.,
-      font_size: 14.,
-      letter_space: 0.,
+      font_size: FontSize::Pixel(14.0.into()),
+      letter_space: Em::zero(),
       brush: Brush::Color(Color::BLACK),
       font_face: CowRc::owned(FontFace::default()),
       text_line_height: None,

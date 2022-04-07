@@ -3,13 +3,15 @@ use crate::{
   Vertex,
 };
 use algo::FrameCache;
+use guillotiere::euclid::num::Zero;
 use lyon_tessellation::{path::Path, *};
 use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode};
 use std::{collections::VecDeque, hash::Hash, mem::size_of};
 use text::{
   font_db::ID,
-  layouter::{InputRun, LeftToRightCursor, LetterSpaceCursor, TopToBottomCursor},
+  typography::{InputRun, LeftToRightCursor, LetterSpaceCursor, TopToBottomCursor},
   shaper::{GlyphId, TextShaper},
+  Em, Glyph, Pixel,
 };
 mod atlas;
 use atlas::TextureAtlas;
@@ -234,23 +236,21 @@ impl Tessellator {
         ref font_face,
         direction,
         ..
-      } if font_size > f32::EPSILON => {
+      } => {
         let face_ids = self.shaper.font_db_mut().select_all_match(font_face);
         let shaped_glyphs = self.shaper.shape_text(text, &face_ids, direction);
 
-        let mut pre_face_id = None;
-        let mut pre_unit_per_em = 0;
-        let mut scaled_font_size = font_size;
-        let mut tolerance = TOLERANCE / (scaled_font_size * scale);
+        let tolerance = TOLERANCE / (font_size.into_pixel().value() * scale);
+        let font_size_ems = font_size.into_em().value();
 
-        let add_glyph = |text::layouter::TGlyph { glyph_id, face_id, position, .. }| {
-          if Some(face_id) != pre_face_id {
-            pre_face_id = Some(face_id);
-            let db = self.shaper.font_db();
-            pre_unit_per_em = db.try_get_face_data(face_id).unwrap().units_per_em();
-            scaled_font_size = font_size / pre_unit_per_em as f32;
-            tolerance = TOLERANCE / (scaled_font_size * scale)
-          };
+        let add_glyph = |g: Glyph<Em>| {
+          let text::Glyph {
+            glyph_id,
+            face_id,
+            x_offset,
+            y_offset,
+            ..
+          } = g.cast::<Pixel>();
 
           let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
           let key = VerticesKey { tolerance, threshold, style, path };
@@ -258,8 +258,8 @@ impl Tessellator {
 
           let t = transform
             // because glyph is up down mirror, this `font_size` offset help align after rotate.
-            .pre_translate(position.to_vector().cast_unit())
-            .pre_scale(scaled_font_size, scaled_font_size);
+            .pre_translate((x_offset.value(), y_offset.value()).into())
+            .pre_scale(font_size_ems, font_size_ems);
 
           let mut p = primitive.clone();
           p.transform = t.to_arrays();
@@ -277,37 +277,37 @@ impl Tessellator {
           font_size,
           letter_space: Some(letter_space),
         };
-        let pos = lyon_tessellation::geom::Point::new(0., font_size);
-        match (direction.is_horizontal(), letter_space != 0.) {
+        let x_pos = Em::zero();
+        let y_pos = font_size.into_em();
+        match (direction.is_horizontal(), letter_space != Em::zero()) {
           (true, true) => {
             run
               .pixel_glyphs(LetterSpaceCursor::new(
-                LeftToRightCursor { pos },
+                LeftToRightCursor { x_pos, y_pos },
                 letter_space,
               ))
               .for_each(add_glyph);
           }
           (true, false) => {
             run
-              .pixel_glyphs(LeftToRightCursor { pos })
+              .pixel_glyphs(LeftToRightCursor { x_pos, y_pos })
               .for_each(add_glyph);
           }
           (false, true) => {
             run
               .pixel_glyphs(LetterSpaceCursor::new(
-                TopToBottomCursor { pos },
+                TopToBottomCursor { x_pos, y_pos },
                 letter_space,
               ))
               .for_each(add_glyph);
           }
           (false, false) => {
             run
-              .pixel_glyphs(TopToBottomCursor { pos })
+              .pixel_glyphs(TopToBottomCursor { x_pos, y_pos })
               .for_each(add_glyph);
           }
         }
       }
-      _ => {}
     };
   }
 

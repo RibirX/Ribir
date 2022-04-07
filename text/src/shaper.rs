@@ -6,37 +6,13 @@ use std::{
 
 use crate::{
   font_db::{Face, FontDB, ID},
-  Em, TextDirection,
+  Em, Glyph, TextDirection,
 };
 use algo::FrameCache;
 
 use arcstr::Substr;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 pub use ttf_parser::GlyphId;
-
-/// A glyph information returned by text shaped, axis relative self, not effect
-/// by the glyphs before it.
-#[derive(Debug, Clone)]
-pub struct Glyph {
-  /// The font face id of the glyph.
-  pub face_id: ID,
-  /// How many ems the line advances after drawing this glyph when setting text
-  /// in horizontal direction.
-  pub x_advance: Em,
-  /// How many ems the line advances after drawing this glyph when setting text
-  /// in vertical direction.
-  pub y_advance: Em,
-  /// How many ems the glyph moves on the X-axis before drawing it, this should
-  /// not affect how many the line advances.
-  pub x_offset: Em,
-  /// How many ems the glyph moves on the Y-axis before drawing it, this should
-  /// not affect how many the line advances.
-  pub y_offset: Em,
-  /// The id of the glyph.
-  pub glyph_id: GlyphId,
-  /// An cluster of origin text as byte index.
-  pub cluster: u32,
-}
 
 /// Shaper to shape the `text` using provided font faces, and will do BIDI
 /// reordering before to shape text.
@@ -51,7 +27,7 @@ pub struct TextShaper {
 #[derive(Debug, Clone)]
 pub struct ShapeResult {
   pub text: Substr,
-  pub glyphs: Vec<Glyph>,
+  pub glyphs: Vec<Glyph<Em>>,
   pub direction: TextDirection,
 }
 
@@ -135,7 +111,7 @@ impl TextShaper {
     face_ids: &[ID],
     // todo: remove it
     buffer: &mut Option<UnicodeBuffer>,
-  ) -> Option<Vec<Glyph>> {
+  ) -> Option<Vec<Glyph<Em>>> {
     let (id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
 
     let (mut glyphs, mut miss_from) = Self::directly_shape(text, dir, &face, buffer);
@@ -182,7 +158,7 @@ impl TextShaper {
     direction: TextDirection,
     face: &Face,
     buffer: &mut Option<UnicodeBuffer>,
-  ) -> (Vec<Glyph>, Option<usize>) {
+  ) -> (Vec<Glyph<Em>>, Option<usize>) {
     let mut run_buffer = buffer.take().unwrap_or_default();
     run_buffer.push_str(text);
     let hb_direction = match direction {
@@ -209,10 +185,10 @@ impl TextShaper {
       }
       glyphs.push(Glyph {
         face_id: face.face_id,
-        x_advance: Em(p.x_advance as f32 / units_per_em),
-        y_advance: Em(p.y_advance as f32 / units_per_em),
-        x_offset: Em(p.x_offset as f32 / units_per_em),
-        y_offset: Em(p.y_offset as f32 / units_per_em),
+        x_advance: Em::absolute(p.x_advance as f32 / units_per_em),
+        y_advance: Em::absolute(p.y_advance as f32 / units_per_em),
+        x_offset: Em::absolute(p.x_offset as f32 / units_per_em),
+        y_offset: Em::absolute(p.y_offset as f32 / units_per_em),
         glyph_id: GlyphId(glyph_id as u16),
         cluster,
       })
@@ -329,10 +305,17 @@ impl ShapeKeySlice for (&[ID], &str, TextDirection) {
 
 fn is_miss_glyph_id(id: u16) -> bool { id == 0 }
 
-impl Glyph {
+impl<U: std::ops::MulAssign<f32>> Glyph<U> {
   fn is_miss(&self) -> bool { is_miss_glyph_id(self.glyph_id.0) }
 
   fn is_not_miss(&self) -> bool { !self.is_miss() }
+
+  pub fn scale(&mut self, scale: f32) {
+    self.x_advance *= scale;
+    self.y_advance *= scale;
+    self.x_offset *= scale;
+    self.y_offset *= scale;
+  }
 }
 
 #[cfg(test)]
