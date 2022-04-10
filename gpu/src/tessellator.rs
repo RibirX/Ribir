@@ -3,15 +3,13 @@ use crate::{
   Vertex,
 };
 use algo::FrameCache;
-use guillotiere::euclid::num::Zero;
 use lyon_tessellation::{path::Path, *};
 use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode};
 use std::{collections::VecDeque, hash::Hash, mem::size_of};
 use text::{
   font_db::ID,
-  typography::{InputRun, LeftToRightCursor, LetterSpaceCursor, TopToBottomCursor},
   shaper::{GlyphId, TextShaper},
-  Em, Glyph, Pixel,
+  Glyph,
 };
 mod atlas;
 use atlas::TextureAtlas;
@@ -229,84 +227,35 @@ impl Tessellator {
           .buffer_list
           .push_back(CacheItem { prim_id, cache_ptr, prim_type });
       }
-      &PaintPath::Text {
-        font_size,
-        letter_space,
-        ref text,
-        ref font_face,
-        direction,
-        ..
-      } => {
-        let face_ids = self.shaper.font_db_mut().select_all_match(font_face);
-        let shaped_glyphs = self.shaper.shape_text(text, &face_ids, direction);
-
+      PaintPath::Text { font_size, glyphs } => {
         let tolerance = TOLERANCE / (font_size.into_pixel().value() * scale);
         let font_size_ems = font_size.into_em().value();
+        glyphs.iter().for_each(
+          |&Glyph {
+             face_id,
+             x_offset,
+             y_offset,
+             glyph_id,
+             ..
+           }| {
+            let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
+            let key = VerticesKey { tolerance, threshold, style, path };
+            let cache_ptr = cache(key);
 
-        let add_glyph = |g: Glyph<Em>| {
-          let text::Glyph {
-            glyph_id,
-            face_id,
-            x_offset,
-            y_offset,
-            ..
-          } = g.cast::<Pixel>();
+            let t = transform
+              // because glyph is up down mirror, this `font_size` offset help align after rotate.
+              .pre_translate((x_offset.value(), y_offset.value()).into())
+              .pre_scale(font_size_ems, font_size_ems);
 
-          let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
-          let key = VerticesKey { tolerance, threshold, style, path };
-          let cache_ptr = cache(key);
+            let mut p = primitive.clone();
+            p.transform = t.to_arrays();
 
-          let t = transform
-            // because glyph is up down mirror, this `font_size` offset help align after rotate.
-            .pre_translate((x_offset.value(), y_offset.value()).into())
-            .pre_scale(font_size_ems, font_size_ems);
-
-          let mut p = primitive.clone();
-          p.transform = t.to_arrays();
-
-          let prim_id = self.add_primitive(p);
-          self
-            .buffer_list
-            .push_back(CacheItem { prim_id, cache_ptr, prim_type });
-        };
-
-        let glyphs = &shaped_glyphs.glyphs;
-        let run = InputRun {
-          text,
-          glyphs,
-          font_size,
-          letter_space: Some(letter_space),
-        };
-        let x_pos = Em::zero();
-        let y_pos = font_size.into_em();
-        match (direction.is_horizontal(), letter_space != Em::zero()) {
-          (true, true) => {
-            run
-              .pixel_glyphs(LetterSpaceCursor::new(
-                LeftToRightCursor { x_pos, y_pos },
-                letter_space,
-              ))
-              .for_each(add_glyph);
-          }
-          (true, false) => {
-            run
-              .pixel_glyphs(LeftToRightCursor { x_pos, y_pos })
-              .for_each(add_glyph);
-          }
-          (false, true) => {
-            run
-              .pixel_glyphs(LetterSpaceCursor::new(
-                TopToBottomCursor { x_pos, y_pos },
-                letter_space,
-              ))
-              .for_each(add_glyph);
-          }
-          (false, false) => {
-            run
-              .pixel_glyphs(TopToBottomCursor { x_pos, y_pos })
-              .for_each(add_glyph);
-          }
-        }
+            let prim_id = self.add_primitive(p);
+            self
+              .buffer_list
+              .push_back(CacheItem { prim_id, cache_ptr, prim_type });
+          },
+        );
       }
     };
   }

@@ -1,7 +1,5 @@
 use crate::{Color, ShallowImage};
-use algo::CowRc;
-use euclid::num::Zero;
-use text::{Em, FontFace, FontSize, Pixel};
+use text::{Em, FontFace, FontSize};
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, Debug, PartialEq)]
@@ -11,9 +9,10 @@ pub struct TextStyle {
   /// The style drawn as a foreground for the text.
   pub foreground: Brush,
   /// The font face to use when painting the text.
-  pub font_face: CowRc<FontFace>,
+  // todo: use ids instead of
+  pub font_face: FontFace,
   /// Not support now.
-  pub letter_space: Em,
+  pub letter_space: Option<Em>,
   /// The path style(fill or stroke) to use when painting.
   pub path_style: PathStyle,
   /// The factor use to multiplied by the font size to specify the text line
@@ -67,8 +66,8 @@ impl Default for TextStyle {
     Self {
       font_size: FontSize::Pixel(14.0.into()),
       foreground: Color::BLACK.into(),
-      font_face: CowRc::owned(Default::default()),
-      letter_space: Em::zero(),
+      font_face: Default::default(),
+      letter_space: None,
       path_style: PathStyle::Fill,
       line_height: None,
     }

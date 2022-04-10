@@ -1,8 +1,11 @@
-use crate::{path::*, Brush, Color, DeviceSize, PathStyle, Rect, TextStyle, Transform, Vector};
+use crate::{
+  path::*, Brush, Color, DeviceSize, PathStyle, Rect, Size, TextStyle, Transform, Vector,
+};
 use algo::CowRc;
-use euclid::num::Zero;
+use euclid::Size2D;
 use std::ops::{Deref, DerefMut};
-use text::{Em, FontFace, Pixel, TextDirection};
+use text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
+use text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
 use text::{FontSize, Substr};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
@@ -15,6 +18,7 @@ pub struct Painter {
   commands: Vec<PaintCommand>,
   path_builder: Builder,
   device_scale: f32,
+  typography_store: TypographyStore,
 }
 
 pub type CaptureCallback<'a> =
@@ -37,12 +41,8 @@ pub trait PainterBackend {
 pub enum PaintPath {
   Path(lyon_path::Path),
   Text {
-    text: Substr,
     font_size: FontSize,
-    font_face: CowRc<FontFace>,
-    letter_space: Em,
-    line_height: Option<Em>,
-    direction: TextDirection,
+    glyphs: Vec<Glyph<Pixel>>,
   },
 }
 #[derive(Clone)]
@@ -58,20 +58,21 @@ struct PainterState {
   /// The line width use to stroke path.
   line_width: f32,
   font_size: FontSize,
-  letter_space: Em,
+  letter_space: Option<Em>,
   brush: Brush,
-  font_face: CowRc<FontFace>,
+  font_face: FontFace,
   text_line_height: Option<Em>,
   transform: Transform,
 }
 
 impl Painter {
-  pub fn new(device_scale: f32) -> Self {
+  pub fn new(device_scale: f32, typography_store: TypographyStore) -> Self {
     let mut p = Self {
       device_scale,
       state_stack: vec![PainterState::default()],
       commands: vec![],
       path_builder: Path::builder(),
+      typography_store,
     };
     p.scale(device_scale, device_scale);
     p
@@ -204,30 +205,19 @@ impl Painter {
   pub fn paint_text_with_style<T: Into<Substr>>(
     &mut self,
     text: T,
-    style: TextStyle,
-    direction: TextDirection,
+    style: &TextStyle,
+    bounds: Option<Size>,
   ) -> &mut Self {
     let transform = self.current_state().transform;
-    let TextStyle {
-      font_size,
-      foreground,
-      font_face,
-      letter_space,
-      path_style,
-      line_height,
-    } = style;
+    let visual_glyphs = typography_with_text_style(&self.typography_store, text, style, bounds);
     self.commands.push(PaintCommand {
       path: PaintPath::Text {
-        text: text.into(),
-        font_size,
-        font_face,
-        letter_space,
-        line_height,
-        direction,
+        font_size: style.font_size,
+        glyphs: visual_glyphs.pixel_glyphs().collect(),
       },
       transform,
-      brush: foreground,
-      path_style,
+      brush: style.foreground.clone(),
+      path_style: style.path_style,
     });
 
     self
@@ -241,20 +231,38 @@ impl Painter {
     &mut self,
     text: T,
     path_style: PathStyle,
-    direction: TextDirection,
+    bounds: Option<Size>,
   ) -> &mut Self {
-    let state = self.current_state();
+    let &PainterState {
+      font_size,
+      letter_space,
+      ref brush,
+      ref font_face,
+      text_line_height,
+      transform,
+      ..
+    } = self.current_state();
+    let visual_glyphs = typography_with_text_style(
+      &self.typography_store,
+      text,
+      &TextStyle {
+        font_size,
+        foreground: brush.clone(),
+        font_face: font_face.clone(),
+        letter_space,
+        path_style,
+        line_height: text_line_height,
+      },
+      bounds,
+    );
+
     let cmd = PaintCommand {
       path: PaintPath::Text {
-        text: text.into(),
-        font_size: state.font_size,
-        font_face: state.font_face.clone(),
-        letter_space: state.letter_space,
-        line_height: state.text_line_height,
-        direction,
+        font_size,
+        glyphs: visual_glyphs.pixel_glyphs().collect(),
       },
-      transform: state.transform,
-      brush: state.brush.clone(),
+      transform,
+      brush: brush.clone(),
       path_style,
     };
     self.commands.push(cmd);
@@ -267,11 +275,11 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T, direction: TextDirection) -> &mut Self {
+  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T) -> &mut Self {
     self.paint_text_without_style(
       text,
       PathStyle::Stroke(self.current_state().line_width),
-      direction,
+      None,
     )
   }
 
@@ -281,8 +289,8 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn fill_text<T: Into<Substr>>(&mut self, text: T, direction: TextDirection) -> &mut Self {
-    self.paint_text_without_style(text, PathStyle::Fill, direction)
+  pub fn fill_text<T: Into<Substr>>(&mut self, text: T, bounds: Option<Size>) -> &mut Self {
+    self.paint_text_without_style(text, PathStyle::Fill, bounds)
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -353,9 +361,9 @@ impl Default for PainterState {
     Self {
       line_width: 1.,
       font_size: FontSize::Pixel(14.0.into()),
-      letter_space: Em::zero(),
+      letter_space: None,
       brush: Brush::Color(Color::BLACK),
-      font_face: CowRc::owned(FontFace::default()),
+      font_face: FontFace::default(),
       text_line_height: None,
       transform: Transform::new(1., 0., 0., 1., 0., 0.),
     }
@@ -380,6 +388,44 @@ impl PaintCommand {
       PaintPath::Text { .. } => todo!(),
     }
   }
+}
+
+pub fn typography_with_text_style<T: Into<Substr>>(
+  store: &TypographyStore,
+  text: T,
+  style: &TextStyle,
+  bounds: Option<Size>,
+) -> VisualGlyphs {
+  let &TextStyle {
+    font_size,
+    letter_space,
+    line_height,
+    ref font_face,
+    ..
+  } = style;
+
+  let bounds = if let Some(b) = bounds {
+    let width: Em = Pixel(b.width.into()).into();
+    let height: Em = Pixel(b.width.into()).into();
+    Size2D::new(width, height)
+  } else {
+    let max = Em::absolute(f32::MAX);
+    Size2D::new(max, max)
+  };
+
+  store.typography(
+    text.into(),
+    font_size,
+    font_face,
+    TypographyCfg {
+      line_height,
+      letter_space,
+      text_align: None,
+      bounds,
+      line_dir: PlaceLineDirection::TopToBottom,
+      overflow: Overflow::Clip,
+    },
+  )
 }
 
 #[cfg(test)]

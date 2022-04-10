@@ -1,9 +1,10 @@
 use std::{
   cmp::Reverse,
   collections::{BinaryHeap, HashMap},
+  sync::{Arc, RwLock},
 };
 
-use text::{shaper::TextShaper, TextReorder};
+use text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
 
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
@@ -109,6 +110,8 @@ impl LayoutStore {
     tree: &WidgetTree,
     shaper: &TextShaper,
     text_reorder: &TextReorder,
+    typography_store: &TypographyStore,
+    font_db: &Arc<RwLock<FontDB>>,
   ) -> bool {
     let mut performed_layout = false;
     loop {
@@ -121,7 +124,15 @@ impl LayoutStore {
         if !wid.is_dropped(tree) {
           performed_layout = true;
           let clamp = BoxClamp { min: Size::zero(), max: win_size };
-          self.perform_layout(*wid, clamp, tree, shaper, text_reorder);
+          self.perform_layout(
+            *wid,
+            clamp,
+            tree,
+            shaper,
+            text_reorder,
+            typography_store,
+            font_db,
+          );
         }
       });
     }
@@ -140,6 +151,8 @@ impl LayoutStore {
     tree: &WidgetTree,
     shaper: &TextShaper,
     text_reorder: &TextReorder,
+    typography_store: &TypographyStore,
+    font_db: &Arc<RwLock<FontDB>>,
   ) -> Size {
     self
       .infos
@@ -169,6 +182,8 @@ impl LayoutStore {
             layout_store: self,
             shaper,
             text_reorder,
+            typography_store,
+            font_db,
           },
         );
         let size = out_clamp.clamp(size);

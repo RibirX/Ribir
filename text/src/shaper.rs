@@ -18,7 +18,7 @@ pub use ttf_parser::GlyphId;
 /// reordering before to shape text.
 ///
 /// This shaper will cache shaper result for per frame.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct TextShaper {
   font_db: Arc<RwLock<FontDB>>,
   shape_cache: Arc<RwLock<FrameCache<ShapeKey, Arc<ShapeResult>>>>,
@@ -38,7 +38,16 @@ struct ShapeKey {
   direction: TextDirection,
 }
 
+struct GlyphsWithoutFallback {
+  glyphs: Vec<Glyph<Em>>,
+  miss_from: Option<usize>,
+  buffer: UnicodeBuffer,
+}
+
 impl TextShaper {
+  #[inline]
+  pub fn new(font_db: Arc<RwLock<FontDB>>) -> Self { Self { font_db, shape_cache: <_>::default() } }
+
   pub fn end_frame(&mut self) {
     self.shape_cache.write().unwrap().end_frame("Text shape");
     self.font_db.write().unwrap().end_frame()
@@ -62,9 +71,9 @@ impl TextShaper {
           );
           let ids = db_fallback_fonts(face_ids, &*self.font_db);
 
-          self.shape_text_with_fallback(text, direction, &ids, &mut None)
+          self.shape_text_with_fallback(text, direction, &ids)
         } else {
-          self.shape_text_with_fallback(text, direction, face_ids, &mut None)
+          self.shape_text_with_fallback(text, direction, face_ids)
         }
         .unwrap_or_else(|| {
           log::warn!("There is no font can shape the text: \"{}\"", &**text);
@@ -83,7 +92,10 @@ impl TextShaper {
                   .clone()
               })
           };
-          Self::directly_shape(text, direction, &face, &mut None).0
+          let mut buffer = UnicodeBuffer::new();
+          buffer.push_str(text);
+          buffer.set_direction(direction.into());
+          Self::directly_shape(buffer, &face).glyphs
         });
 
         let glyphs = Arc::new(ShapeResult {
@@ -109,12 +121,20 @@ impl TextShaper {
     text: &str,
     dir: TextDirection,
     face_ids: &[ID],
-    // todo: remove it
-    buffer: &mut Option<UnicodeBuffer>,
   ) -> Option<Vec<Glyph<Em>>> {
-    let (id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
+    let (mut id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
 
-    let (mut glyphs, mut miss_from) = Self::directly_shape(text, dir, &face, buffer);
+    let mut buffer = UnicodeBuffer::new();
+    buffer.push_str(text);
+    let hb_direction = dir.into();
+    buffer.set_direction(hb_direction);
+
+    let GlyphsWithoutFallback {
+      mut glyphs,
+      mut miss_from,
+      mut buffer,
+    } = Self::directly_shape(buffer, &face);
+
     // todo: we need align baseline.
     while let Some(m_start) = miss_from {
       let m_end = glyphs[m_start..]
@@ -123,52 +143,36 @@ impl TextShaper {
         .map(|i| m_start + i);
 
       let start_byte = glyphs[m_start].cluster as usize;
-      let miss_text = match m_end {
-        Some(miss_end) => {
-          let end_byte = glyphs[miss_end].cluster as usize;
-          &text[start_byte..end_byte]
-        }
-        None => &text[start_byte..],
+      let miss_text = if let Some(miss_end) = m_end {
+        let end_byte = glyphs[miss_end].cluster as usize;
+        &text[start_byte..end_byte]
+      } else {
+        &text[start_byte..]
       };
 
-      let fallback_glyphs =
-        self.shape_text_with_fallback(miss_text, dir, &face_ids[id_idx + 1..], buffer);
+      let fallback_face = {
+        self
+          .font_db_mut()
+          .shapeable_face(miss_text, &face_ids[id_idx + 1..])
+      }?;
+      id_idx = fallback_face.0;
 
-      if let Some(fallback) = fallback_glyphs {
-        match m_end {
-          Some(m_end) => glyphs.splice(m_start..m_end, fallback),
-          None => glyphs.splice(m_start.., fallback),
-        };
-      }
-
-      // skip to next miss glyphs
-      miss_from = m_end.and_then(|idx| {
-        glyphs[idx..]
-          .iter()
-          .position(Glyph::is_miss)
-          .map(|i| i + idx)
-      });
+      buffer.push_str(miss_text);
+      buffer.set_direction(hb_direction);
+      let res = Self::directly_shape(buffer, &fallback_face.1);
+      buffer = res.buffer;
+      match m_end {
+        Some(m_end) => glyphs.splice(m_start..m_end, res.glyphs),
+        None => glyphs.splice(m_start.., res.glyphs),
+      };
+      miss_from = res.miss_from;
     }
 
     Some(glyphs)
   }
 
-  pub fn directly_shape(
-    text: &str,
-    direction: TextDirection,
-    face: &Face,
-    buffer: &mut Option<UnicodeBuffer>,
-  ) -> (Vec<Glyph<Em>>, Option<usize>) {
-    let mut run_buffer = buffer.take().unwrap_or_default();
-    run_buffer.push_str(text);
-    let hb_direction = match direction {
-      TextDirection::LeftToRight => rustybuzz::Direction::LeftToRight,
-      TextDirection::RightToLeft => rustybuzz::Direction::RightToLeft,
-      TextDirection::TopToBottom => rustybuzz::Direction::TopToBottom,
-      TextDirection::BottomToTop => rustybuzz::Direction::BottomToTop,
-    };
-    run_buffer.set_direction(hb_direction);
-    let output = rustybuzz::shape(face.as_rb_face(), &[], run_buffer);
+  fn directly_shape(text: UnicodeBuffer, face: &Face) -> GlyphsWithoutFallback {
+    let output = rustybuzz::shape(face.as_rb_face(), &[], text);
 
     let mut miss_from = None;
 
@@ -194,9 +198,11 @@ impl TextShaper {
       })
     });
 
-    buffer.replace(output.clear());
-
-    (glyphs, miss_from)
+    GlyphsWithoutFallback {
+      glyphs,
+      miss_from,
+      buffer: output.clear(),
+    }
   }
 
   pub fn get_from_cache(
@@ -315,6 +321,16 @@ impl<U: std::ops::MulAssign<f32>> Glyph<U> {
     self.y_advance *= scale;
     self.x_offset *= scale;
     self.y_offset *= scale;
+  }
+}
+impl From<TextDirection> for rustybuzz::Direction {
+  fn from(dir: TextDirection) -> Self {
+    match dir {
+      TextDirection::LeftToRight => rustybuzz::Direction::LeftToRight,
+      TextDirection::RightToLeft => rustybuzz::Direction::RightToLeft,
+      TextDirection::TopToBottom => rustybuzz::Direction::TopToBottom,
+      TextDirection::BottomToTop => rustybuzz::Direction::BottomToTop,
+    }
   }
 }
 
