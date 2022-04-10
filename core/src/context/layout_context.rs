@@ -1,6 +1,9 @@
+use std::sync::{Arc, RwLock};
+
 use painter::{Point, Size};
+use text::font_db::FontDB;
 use text::shaper::TextShaper;
-use text::TextReorder;
+use text::{TextReorder, TypographyStore};
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::prelude::widget_tree::WidgetTree;
@@ -16,6 +19,8 @@ pub struct LayoutCtx<'a> {
   pub(crate) layout_store: &'a mut LayoutStore,
   pub(crate) shaper: &'a TextShaper,
   pub(crate) text_reorder: &'a TextReorder,
+  pub(crate) typography_store: &'a TypographyStore,
+  pub(crate) font_db: &'a Arc<RwLock<FontDB>>,
 }
 
 impl<'a> LayoutCtx<'a> {
@@ -24,6 +29,12 @@ impl<'a> LayoutCtx<'a> {
 
   #[inline]
   pub fn text_reorder(&self) -> &TextReorder { &self.text_reorder }
+
+  #[inline]
+  pub fn typography_store(&self) -> &TypographyStore { &self.typography_store }
+
+  #[inline]
+  pub fn font_db(&self) -> Arc<RwLock<FontDB>> { self.font_db.clone() }
 
   /// Update the position of the child render object should place. Relative to
   /// parent.
@@ -46,9 +57,15 @@ impl<'a> LayoutCtx<'a> {
   /// Do the work of computing the layout for render child, and return its size
   /// it should have. Should called from parent.
   pub fn perform_render_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    self
-      .layout_store
-      .perform_layout(child, clamp, self.tree, self.shaper, self.text_reorder)
+    self.layout_store.perform_layout(
+      child,
+      clamp,
+      self.tree,
+      self.shaper,
+      self.text_reorder,
+      self.typography_store,
+      self.font_db,
+    )
   }
 
   /// Return a tuple of [`LayoutCtx`]! and an iterator of self children, notice

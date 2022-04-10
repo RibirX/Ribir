@@ -16,8 +16,8 @@ pub use arcstr::{ArcStr, Substr};
 use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
 use ttf_parser::GlyphId;
-mod typography_cache;
-pub use typography_cache::TypographyFrameCache;
+mod typography_store;
+pub use typography_store::{TypographyStore, VisualGlyphs};
 
 /// Unit for convert between pixel and em.
 pub const PIXELS_PER_EM: f32 = 16.;
@@ -157,28 +157,12 @@ impl Default for FontFace {
   }
 }
 
-/// Describe the align in logic without direction.
+/// Horizontal Alignment
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Align {
+pub enum TextAlign {
   Start,
   Center,
   End,
-}
-
-/// Horizontal Alignment
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum HAlign {
-  Left,
-  Center,
-  Right,
-}
-
-/// Vertical Alignment
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum VAlign {
-  Top,
-  Center,
-  Bottom,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -208,28 +192,6 @@ impl TextDirection {
       self,
       TextDirection::LeftToRight | TextDirection::RightToLeft
     )
-  }
-}
-
-impl From<HAlign> for Align {
-  #[inline]
-  fn from(h: HAlign) -> Self {
-    match h {
-      HAlign::Left => Align::Start,
-      HAlign::Center => Align::Center,
-      HAlign::Right => Align::End,
-    }
-  }
-}
-
-impl From<VAlign> for Align {
-  #[inline]
-  fn from(h: VAlign) -> Self {
-    match h {
-      VAlign::Top => Align::Start,
-      VAlign::Center => Align::Center,
-      VAlign::Bottom => Align::End,
-    }
   }
 }
 
@@ -332,6 +294,13 @@ impl std::ops::Mul<Pixel> for Pixel {
 impl std::ops::MulAssign<f32> for Em {
   #[inline]
   fn mul_assign(&mut self, rhs: f32) { self.0 *= rhs; }
+}
+
+impl std::ops::Div<Em> for Em {
+  type Output = Em;
+
+  #[inline]
+  fn div(self, rhs: Em) -> Self::Output { Em(self.0 / rhs.0) }
 }
 
 impl<U> Glyph<U> {

@@ -105,11 +105,20 @@ impl Window {
       widget_tree,
       shaper,
       reorder,
+      typography_store,
+      font_db,
       ..
     } = context;
 
     let wnd_size = raw_window.inner_size();
-    let performed_layout = layout_store.layout(wnd_size, widget_tree, shaper, reorder);
+    let performed_layout = layout_store.layout(
+      wnd_size,
+      widget_tree,
+      shaper,
+      reorder,
+      typography_store,
+      font_db,
+    );
 
     if tree_changed {
       dispatcher.focus_mgr.update(context);

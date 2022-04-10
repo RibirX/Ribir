@@ -4,6 +4,7 @@ use std::{
   collections::{HashMap, HashSet},
   pin::Pin,
   rc::Rc,
+  sync::{Arc, RwLock},
 };
 
 use crate::animation::TickerProvider;
@@ -20,7 +21,7 @@ mod event_context;
 pub use event_context::EventCtx;
 mod widget_context;
 use ::text::shaper::TextShaper;
-use text::TextReorder;
+use text::{font_db::FontDB, TextReorder, TypographyStore};
 pub use widget_context::*;
 use winit::{event::ModifiersState, window::CursorIcon};
 mod layout_context;
@@ -37,8 +38,10 @@ pub(crate) struct Context {
   pub painter: Painter,
   pub modifiers: ModifiersState,
   pub cursor: Cell<Option<CursorIcon>>,
+  pub font_db: Arc<RwLock<FontDB>>,
   pub shaper: TextShaper,
   pub reorder: TextReorder,
+  pub typography_store: TypographyStore,
   /// Store combination widgets changed.
   need_builds: HashSet<WidgetId, ahash::RandomState>,
   animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
@@ -271,14 +274,21 @@ impl Context {
     device_scale: f32,
     animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
   ) -> Self {
+    let font_db = Arc::new(RwLock::new(FontDB::default()));
+    let shaper = TextShaper::new(font_db.clone());
+    let reorder = TextReorder::default();
+    let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
+    let painter = Painter::new(device_scale, typography_store.clone());
     Context {
       layout_store: <_>::default(),
       widget_tree,
-      painter: Painter::new(device_scale),
+      painter,
       cursor: <_>::default(),
       modifiers: <_>::default(),
-      shaper: <_>::default(),
-      reorder: <_>::default(),
+      font_db: <_>::default(),
+      shaper,
+      reorder,
+      typography_store,
       need_builds: <_>::default(),
       animation_ticker,
     }

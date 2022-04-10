@@ -5,9 +5,7 @@
 //! windows.
 pub mod material;
 pub use painter::*;
-use text::{Em, FontFace, FontFamily, FontSize, FontWeight, Pixel};
-
-use super::CowRc;
+use text::{Em, FontFace, FontFamily, FontSize, FontWeight};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -82,6 +80,8 @@ pub struct TypographyTheme {
   pub overline: TextTheme,
 }
 
+// todo: theme can provide fonts folder.
+
 /// Properties from [Material Theme](https://material.io/design/material-theming/implementing-your-theme.html)
 #[derive(Clone, Debug)]
 pub struct Theme {
@@ -125,28 +125,28 @@ impl TypographyTheme {
     decoration_color: Brush,
   ) -> Self {
     let decoration = TextDecorationStyle { decoration, decoration_color };
-    let light_title_face: CowRc<FontFace> = CowRc::owned(FontFace {
+    let light_title_face = FontFace {
       families: titles_family,
       weight: FontWeight::LIGHT,
       ..<_>::default()
-    });
+    };
 
     let mut normal_title_face = light_title_face.clone();
-    normal_title_face.to_mut().weight = FontWeight::NORMAL;
+    normal_title_face.weight = FontWeight::NORMAL;
 
     let mut medium_title_face = light_title_face.clone();
-    medium_title_face.to_mut().weight = FontWeight::MEDIUM;
+    medium_title_face.weight = FontWeight::MEDIUM;
 
-    let body_face: CowRc<FontFace> = CowRc::owned(FontFace {
+    let body_face = FontFace {
       families: body_family,
       ..<_>::default()
-    });
+    };
 
     Self {
       headline1: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(96.0.into()),
-          letter_space: Em::absolute(-1.5),
+          letter_space: Some(Em::absolute(-1.5)),
           foreground: display_style.clone(),
           font_face: light_title_face.clone(),
           path_style: PathStyle::Fill,
@@ -157,7 +157,7 @@ impl TypographyTheme {
       headline2: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(60.0.into()),
-          letter_space: Em::absolute(-0.5),
+          letter_space: Some(Em::absolute(-0.5)),
           foreground: display_style.clone(),
           font_face: light_title_face,
           path_style: PathStyle::Fill,
@@ -169,7 +169,7 @@ impl TypographyTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(48.0.into()),
           foreground: display_style.clone(),
-          letter_space: Em::absolute(0.),
+          letter_space: Some(Em::absolute(0.)),
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
           line_height: None,
@@ -181,7 +181,7 @@ impl TypographyTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(34.0.into()),
           foreground: display_style.clone(),
-          letter_space: Em::absolute(0.25),
+          letter_space: Some(Em::absolute(0.25)),
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
           line_height: None,
@@ -191,7 +191,7 @@ impl TypographyTheme {
       headline5: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(24.0.into()),
-          letter_space: Em::absolute(0.),
+          letter_space: Some(Em::absolute(0.)),
           foreground: body_style.clone(),
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
@@ -202,7 +202,7 @@ impl TypographyTheme {
       headline6: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(20.0.into()),
-          letter_space: Em::absolute(0.15),
+          letter_space: Some(Em::absolute(0.15)),
           foreground: body_style.clone(),
           font_face: medium_title_face.clone(),
           path_style: PathStyle::Fill,
@@ -214,7 +214,7 @@ impl TypographyTheme {
       subtitle1: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(16.0.into()),
-          letter_space: Em::absolute(0.15),
+          letter_space: Some(Em::absolute(0.15)),
           foreground: body_style.clone(),
           font_face: normal_title_face.clone(),
           path_style: PathStyle::Fill,
@@ -225,7 +225,7 @@ impl TypographyTheme {
       subtitle2: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(14.0.into()),
-          letter_space: Em::absolute(0.1),
+          letter_space: Some(Em::absolute(0.1)),
           foreground: body_style.clone(),
           font_face: medium_title_face.clone(),
           path_style: PathStyle::Fill,
@@ -236,7 +236,7 @@ impl TypographyTheme {
       body1: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(16.0.into()),
-          letter_space: Em::absolute(0.5),
+          letter_space: Some(Em::absolute(0.5)),
           foreground: body_style.clone(),
           font_face: body_face.clone(),
           path_style: PathStyle::Fill,
@@ -248,7 +248,7 @@ impl TypographyTheme {
       body2: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(14.0.into()),
-          letter_space: Em::absolute(0.25),
+          letter_space: Some(Em::absolute(0.25)),
           foreground: body_style.clone(),
           font_face: body_face.clone(),
           path_style: PathStyle::Fill,
@@ -259,11 +259,11 @@ impl TypographyTheme {
       button: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(14.0.into()),
-          letter_space: Em::absolute(1.25),
+          letter_space: Some(Em::absolute(1.25)),
           foreground: body_style.clone(),
           font_face: {
             let mut face = body_face.clone();
-            face.to_mut().weight = FontWeight::MEDIUM;
+            face.weight = FontWeight::MEDIUM;
             face
           },
           path_style: PathStyle::Fill,
@@ -274,7 +274,7 @@ impl TypographyTheme {
       caption: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(12.0.into()),
-          letter_space: Em::absolute(0.4),
+          letter_space: Some(Em::absolute(0.4)),
           foreground: body_style.clone(),
           font_face: body_face.clone(),
           path_style: PathStyle::Fill,
@@ -285,7 +285,7 @@ impl TypographyTheme {
       overline: TextTheme {
         text: TextStyle {
           font_size: FontSize::Pixel(10.0.into()),
-          letter_space: Em::absolute(1.5),
+          letter_space: Some(Em::absolute(1.5)),
           foreground: body_style,
           font_face: body_face,
           path_style: PathStyle::Fill,

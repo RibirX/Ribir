@@ -1,4 +1,7 @@
-use ::text::ArcStr;
+use ::text::{
+  typography::{Overflow, PlaceLineDirection, TypographyCfg},
+  ArcStr, Em, Pixel,
+};
 
 use crate::prelude::*;
 
@@ -11,15 +14,33 @@ pub struct Text {
 }
 
 impl RenderWidget for Text {
-  fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let shaper = ctx.text_shaper();
-    let ids = shaper.font_db_mut().select_all_match(&self.style.font_face);
-    let reorder = ctx.text_reorder();
-    // let info = reorder.reorder_text(&self.text.substr(..));
-    // let glyphs = shaper.shape_text(&self.text, &ids);
-    // ::text::layouter::glyphs_box(&self.text, &glyphs, self.style.font_size,
-    // None, 0.).cast_unit()
-    todo!();
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let t_store = ctx.typography_store();
+    let TextStyle {
+      font_size,
+      letter_space,
+      line_height,
+      ref font_face,
+      ..
+    } = self.style;
+
+    let width: Em = Pixel(clamp.max.width.into()).into();
+    let height: Em = Pixel(clamp.max.width.into()).into();
+
+    let visual_info = t_store.typography(
+      self.text.substr(..),
+      font_size,
+      font_face,
+      TypographyCfg {
+        line_height,
+        letter_space,
+        text_align: None,
+        bounds: (width, height).into(),
+        line_dir: PlaceLineDirection::TopToBottom,
+        overflow: Overflow::Clip,
+      },
+    );
+    visual_info.visual_rect().size.cast_unit()
   }
 
   #[inline]
@@ -27,7 +48,9 @@ impl RenderWidget for Text {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
-    // tod: fill_text should have a bounds
-    // ctx.painter().fill_text(self.text.clone());
+    let rect = ctx.box_rect().unwrap();
+    ctx
+      .painter()
+      .paint_text_with_style(self.text.substr(..), &self.style, Some(rect.size));
   }
 }
