@@ -28,7 +28,7 @@ pub struct TextShaper {
 pub struct ShapeResult {
   pub text: Substr,
   pub glyphs: Vec<Glyph<Em>>,
-  pub direction: TextDirection,
+  pub line_height: Em,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -40,7 +40,6 @@ struct ShapeKey {
 
 struct GlyphsWithoutFallback {
   glyphs: Vec<Glyph<Em>>,
-  miss_from: Option<usize>,
   buffer: UnicodeBuffer,
 }
 
@@ -64,44 +63,57 @@ impl TextShaper {
     self
       .get_from_cache(text, face_ids, direction)
       .unwrap_or_else(|| {
-        let glyphs = if !cover_all_glyphs(text, face_ids, &*self.font_db) {
-          log::warn!(
-            "Text shape: some glyphs not covered in the text: {}",
-            &**text
-          );
-          let ids = db_fallback_fonts(face_ids, &*self.font_db);
+        let glyphs = self
+          .shape_text_with_fallback(text, direction, face_ids)
+          .unwrap_or_else(|| {
+            log::warn!("There is no font can shape the text: \"{}\"", &**text);
+            // if no font can shape the text use the first font shape it with miss glyph.
+            let face = {
+              let mut font_db = self.font_db_mut();
+              face_ids
+                .iter()
+                .find_map(|id| font_db.face_data_or_insert(*id).cloned())
+                .unwrap_or_else(|| {
+                  font_db
+                    .faces()
+                    .iter()
+                    .find_map(|info| font_db.try_get_face_data(info.id))
+                    .expect("No font can use.")
+                    .clone()
+                })
+            };
+            let mut buffer = UnicodeBuffer::new();
+            buffer.push_str(text);
+            buffer.set_direction(direction.into());
+            Self::directly_shape(buffer, &face).glyphs
+          });
 
-          self.shape_text_with_fallback(text, direction, &ids)
-        } else {
-          self.shape_text_with_fallback(text, direction, face_ids)
-        }
-        .unwrap_or_else(|| {
-          log::warn!("There is no font can shape the text: \"{}\"", &**text);
-          // if no font can shape the text use the first font shape it with miss glyph.
-          let face = {
-            let mut font_db = self.font_db_mut();
-            face_ids
-              .iter()
-              .find_map(|id| font_db.face_data_or_insert(*id).cloned())
-              .unwrap_or_else(|| {
-                font_db
-                  .faces()
-                  .iter()
-                  .find_map(|info| font_db.try_get_face_data(info.id))
-                  .expect("No font can use.")
-                  .clone()
-              })
+        let line_height = {
+          let font_db = self.font_db.read().unwrap();
+          let font_line_height = |id: &ID| {
+            font_db.try_get_face_data(*id).map(|face| {
+              let height = if direction.is_horizontal() {
+                face.vertical_height().unwrap_or_else(|| face.height())
+              } else {
+                face.height()
+              };
+              Em::absolute(height as f32 / face.units_per_em() as f32)
+            })
           };
-          let mut buffer = UnicodeBuffer::new();
-          buffer.push_str(text);
-          buffer.set_direction(direction.into());
-          Self::directly_shape(buffer, &face).glyphs
-        });
+          face_ids
+            .iter()
+            .find_map(font_line_height)
+            .or_else(|| {
+              log::warn!("Not provide an available font, use another font to instead of.");
+              font_db.faces().iter().find_map(|f| font_line_height(&f.id))
+            })
+            .expect("Fonts are not available.")
+        };
 
         let glyphs = Arc::new(ShapeResult {
           text: text.clone(),
           glyphs,
-          direction,
+          line_height,
         });
         self.shape_cache.write().unwrap().insert(
           ShapeKey {
@@ -122,50 +134,64 @@ impl TextShaper {
     dir: TextDirection,
     face_ids: &[ID],
   ) -> Option<Vec<Glyph<Em>>> {
-    let (mut id_idx, face) = { self.font_db_mut().shapeable_face(text, face_ids) }?;
+    macro_rules! unwrap_or_break {
+      ($option: expr) => {
+        match $option {
+          Some(o) => o,
+          None => break,
+        }
+      };
+    }
+    let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
+
+    let mut font_fallback = FallBackFaceHelper::new(face_ids, &*self.font_db);
 
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text);
     let hb_direction = dir.into();
     buffer.set_direction(hb_direction);
 
-    let GlyphsWithoutFallback {
-      mut glyphs,
-      mut miss_from,
-      mut buffer,
-    } = Self::directly_shape(buffer, &face);
+    let face = font_fallback.next_fallback_face(text)?;
+    let GlyphsWithoutFallback { mut glyphs, mut buffer } = Self::directly_shape(buffer, &face);
 
-    // todo: we need align baseline.
-    while let Some(m_start) = miss_from {
-      let m_end = glyphs[m_start..]
-        .iter()
-        .position(Glyph::is_not_miss)
-        .map(|i| m_start + i);
+    let mut miss_part_stack = vec![(0, None, font_fallback)];
 
-      let start_byte = glyphs[m_start].cluster as usize;
-      let miss_text = if let Some(miss_end) = m_end {
-        let end_byte = glyphs[miss_end].cluster as usize;
-        &text[start_byte..end_byte]
-      } else {
-        &text[start_byte..]
+    while let Some((mut miss_start, miss_end, mut fallback)) = miss_part_stack.pop() {
+      let skip = glyphs[miss_start..].iter().position(Glyph::is_miss);
+      miss_start += unwrap_or_break!(skip);
+      if miss_end.is_some() && Some(miss_start) >= miss_end {
+        continue;
+      }
+
+      let miss_size = glyphs[miss_start..].iter().position(Glyph::is_not_miss);
+      let miss_part_end = miss_size.map(|size| miss_start + size);
+      if miss_part_end != miss_end {
+        miss_part_stack.push((miss_part_end.unwrap(), miss_end, fallback.clone()));
+      }
+
+      let start_byte = glyphs[miss_start].cluster as usize;
+      let miss_range = match (miss_part_end, is_rtl) {
+        (None, true) => 0..start_byte,
+        (None, false) => start_byte..text.len(),
+        (Some(end), true) => glyphs[end].cluster as usize..start_byte,
+        (Some(end), false) => start_byte..glyphs[end].cluster as usize,
       };
-
-      let fallback_face = {
-        self
-          .font_db_mut()
-          .shapeable_face(miss_text, &face_ids[id_idx + 1..])
-      }?;
-      id_idx = fallback_face.0;
-
+      let miss_text = &text[miss_range.clone()];
+      let fallback_face = unwrap_or_break!(fallback.next_fallback_face(miss_text));
       buffer.push_str(miss_text);
       buffer.set_direction(hb_direction);
-      let res = Self::directly_shape(buffer, &fallback_face.1);
+      let mut res = Self::directly_shape(buffer, &fallback_face);
       buffer = res.buffer;
-      match m_end {
-        Some(m_end) => glyphs.splice(m_start..m_end, res.glyphs),
-        None => glyphs.splice(m_start.., res.glyphs),
+      for g in res.glyphs.iter_mut() {
+        g.cluster += miss_range.start as u32;
+      }
+
+      // todo: we need align baseline.
+      match miss_part_end {
+        Some(part_end) => glyphs.splice(miss_start..part_end, res.glyphs),
+        None => glyphs.splice(miss_start.., res.glyphs),
       };
-      miss_from = res.miss_from;
+      miss_part_stack.push((miss_start, miss_part_end, fallback));
     }
 
     Some(glyphs)
@@ -173,9 +199,6 @@ impl TextShaper {
 
   fn directly_shape(text: UnicodeBuffer, face: &Face) -> GlyphsWithoutFallback {
     let output = rustybuzz::shape(face.as_rb_face(), &[], text);
-
-    let mut miss_from = None;
-
     let mut glyphs = Vec::with_capacity(output.len());
 
     let infos = output.glyph_infos();
@@ -184,9 +207,6 @@ impl TextShaper {
     (0..output.len()).for_each(|idx| {
       let &GlyphInfo { glyph_id, cluster, .. } = &infos[idx];
       let p = &positions[idx];
-      if miss_from.is_none() && is_miss_glyph_id(glyph_id as u16) {
-        miss_from = Some(idx);
-      }
       glyphs.push(Glyph {
         face_id: face.face_id,
         x_advance: Em::absolute(p.x_advance as f32 / units_per_em),
@@ -198,11 +218,7 @@ impl TextShaper {
       })
     });
 
-    GlyphsWithoutFallback {
-      glyphs,
-      miss_from,
-      buffer: output.clear(),
-    }
+    GlyphsWithoutFallback { glyphs, buffer: output.clear() }
   }
 
   pub fn get_from_cache(
@@ -224,38 +240,6 @@ impl TextShaper {
   pub fn font_db_mut(&self) -> RwLockWriteGuard<FontDB> { self.font_db.write().unwrap() }
 }
 
-fn cover_all_glyphs(text: &str, ids: &[ID], font_db: &RwLock<FontDB>) -> bool {
-  let mut faces = Vec::with_capacity(ids.len());
-  let mut lazy_faces = ids.iter().filter_map(|id| {
-    let mut db = font_db.write().unwrap();
-    db.face_data_or_insert(*id).cloned()
-  });
-
-  if let Some(f) = lazy_faces.next() {
-    faces.push(f);
-  }
-
-  text.chars().all(move |c| {
-    faces.iter_mut().any(|f| f.has_char(c))
-      || lazy_faces.any(|f| {
-        faces.push(f);
-        faces.last().unwrap().has_char(c)
-      })
-  })
-}
-
-fn db_fallback_fonts(high_prior: &[ID], font_db: &RwLock<FontDB>) -> Vec<ID> {
-  let db = font_db.read().unwrap();
-  let faces = db.faces();
-  let mut ids = Vec::with_capacity(faces.len());
-  ids.extend(high_prior);
-  for f in faces {
-    if high_prior.iter().all(|id| *id != f.id) {
-      ids.push(f.id);
-    }
-  }
-  ids
-}
 trait ShapeKeySlice {
   fn face_ids(&self) -> &[ID];
   fn text(&self) -> &str;
@@ -270,12 +254,15 @@ impl Hash for dyn ShapeKeySlice + '_ {
   fn hash<H: Hasher>(&self, state: &mut H) {
     self.face_ids().hash(state);
     self.text().hash(state);
+    self.direction().hash(state);
   }
 }
 
 impl PartialEq for dyn ShapeKeySlice + '_ {
   fn eq(&self, other: &Self) -> bool {
-    self.face_ids() == other.face_ids() && self.text() == other.text()
+    self.face_ids() == other.face_ids()
+      && self.text() == other.text()
+      && self.direction() == other.direction()
   }
 }
 
@@ -334,6 +321,35 @@ impl From<TextDirection> for rustybuzz::Direction {
   }
 }
 
+#[derive(Clone)]
+struct FallBackFaceHelper<'a> {
+  ids: &'a [ID],
+  font_db: &'a RwLock<FontDB>,
+  face_idx: usize,
+}
+
+impl<'a> FallBackFaceHelper<'a> {
+  fn new(ids: &'a [ID], font_db: &'a RwLock<FontDB>) -> Self { Self { ids, font_db, face_idx: 0 } }
+
+  fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
+    let Self { ids, font_db, face_idx } = self;
+    let mut font_db = font_db.write().unwrap();
+    while *face_idx < ids.len() + font_db.faces().len() {
+      let id = if *face_idx < ids.len() {
+        ids[*face_idx]
+      } else {
+        font_db.faces()[*face_idx - ids.len()].id
+      };
+      *face_idx += 1;
+      let face = font_db.face_data_or_insert(id);
+      if face.map_or(false, |f| text.chars().any(|c| f.has_char(c))) {
+        return face.cloned();
+      }
+    }
+    None
+  }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -344,44 +360,32 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let mut shaper = TextShaper::default();
+    let mut shaper = TextShaper::new(<_>::default());
     shaper.font_db_mut().load_system_fonts();
 
-    let text = concat!["א", "ב", "ג", "a", "b", "c",];
+    let text = arcstr::literal!(concat!["א", "ב", "ג", "a", "b", "c",]).substr(..);
     let ids = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
       ..<_>::default()
     });
+    let dir = TextDirection::LeftToRight;
 
     // No cache exists
-    assert!(shaper.get_from_cache(text, &ids).is_none());
+    assert!(shaper.get_from_cache(&text, &ids, dir).is_none());
 
-    let lines = shaper.shape_text(text, &ids);
-    assert_eq!(lines.len(), 1);
+    let result = shaper.shape_text(&text, &ids, dir);
+    assert_eq!(result.glyphs.len(), 6);
 
-    let ParagraphShaped { levels, runs, .. } = &lines[0];
-    assert_eq!(
-      &levels.iter().map(|l| l.number()).collect::<Vec<_>>(),
-      &[1, 1, 1, 1, 1, 1, 2, 2, 2]
-    );
-
-    assert_eq!(runs.len(), 2);
-    assert_eq!(runs[0].run, 6..9);
-    assert_eq!(runs[0].glyphs.len(), 3);
-
-    assert_eq!(runs[1].run, 0..6);
-    assert_eq!(runs[0].glyphs.len(), 3);
-
-    assert!(shaper.get_from_cache(text, &ids).is_some());
+    assert!(shaper.get_from_cache(&text, &ids, dir).is_some());
 
     shaper.end_frame();
     shaper.end_frame();
-    assert!(shaper.get_from_cache(text, &ids).is_none());
+    assert!(shaper.get_from_cache(&text, &ids, dir).is_none());
   }
 
   #[test]
   fn font_fallback() {
-    let shaper = TextShaper::default();
+    let shaper = TextShaper::new(<_>::default());
     shaper.font_db_mut().load_system_fonts();
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = shaper.font_db_mut().load_font_file(path);
@@ -391,40 +395,50 @@ mod tests {
       ..<_>::default()
     });
 
-    let shape_latin = shaper.shape_text("hello world!", &ids);
-    let latin1 = shape_latin[0].runs[0].glyphs.as_ref();
-    assert_eq!(latin1.len(), 12);
-    let fallback_chinese = shaper.shape_text("hello world! 你好，世界", &ids);
-    let latin2 = fallback_chinese[0].runs[0].glyphs.as_ref();
-    let b = &latin2[..latin1.len()];
+    let dir = TextDirection::LeftToRight;
+    let latin1 = shaper.shape_text(&"hello world!".into(), &ids, dir);
+    assert_eq!(latin1.glyphs.len(), 12);
+    let fallback_chinese = shaper.shape_text(&"hello world! 你好，世界".into(), &ids, dir);
+    let latin2 = &fallback_chinese.glyphs[..latin1.glyphs.len()];
+    assert_eq!(fallback_chinese.glyphs.len(), 18);
     assert!(Iterator::eq(
-      latin1.iter().map(|g| { (g.glyph_id, g.x_advance) }),
-      b.iter().map(|g| { (g.glyph_id, g.x_advance) })
+      latin1.glyphs.iter().map(|g| { (g.glyph_id, g.x_advance) }),
+      latin2.iter().map(|g| { (g.glyph_id, g.x_advance) })
     ));
+    assert!(fallback_chinese.glyphs.iter().all(|g| g.is_not_miss()));
+    let clusters = fallback_chinese
+      .glyphs
+      .iter()
+      .map(|g| g.cluster)
+      .collect::<Vec<_>>();
+    assert_eq!(
+      &clusters,
+      &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 19, 22, 25]
+    );
   }
 
   #[test]
   fn slice_unicode() {
-    let shaper = TextShaper::default();
-    shaper.font_db_mut().load_system_fonts();
+    let font_db = Arc::new(RwLock::new(<_>::default()));
+    let shaper = TextShaper::new(font_db.clone());
+    font_db.write().unwrap().load_system_fonts();
 
-    let text = "⚛∩∗∔⋅⋖⊵⊶⊇≺∹⊈⋫⋷⋝⊿⋌⊷⋖⊐≑⊢⊷⋧";
+    let text = arcstr::literal!("⚛∩∗∔⋅⋖⊵⊶⊇≺∹⊈⋫⋷⋝⊿⋌⊷⋖⊐≑⊢⊷⋧");
     let ids = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
       ..<_>::default()
     });
 
     shaper.shape_cache.write().unwrap().clear();
-    let glyphs = shaper.shape_text(text, &ids);
-    assert_eq!(glyphs[0].runs[0].glyphs.as_ref().len(), 24);
+    let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
+    assert_eq!(res.glyphs.len(), 24);
   }
 
   #[bench]
   fn shape_1k(bencher: &mut Bencher) {
-    let shaper = TextShaper::default();
+    let shaper = TextShaper::new(<_>::default());
     shaper.font_db_mut().load_system_fonts();
 
-    let text = include_str!("../../LICENSE");
     let ids = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
       ..<_>::default()
@@ -432,7 +446,8 @@ mod tests {
 
     bencher.iter(|| {
       shaper.shape_cache.write().unwrap().clear();
-      shaper.shape_text(text, &ids)
+      let str = arcstr::literal_substr!(include_str!("../../LICENSE"));
+      shaper.shape_text(&str, &ids, TextDirection::LeftToRight)
     })
   }
 }

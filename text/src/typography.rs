@@ -1,13 +1,9 @@
-use std::{
-  borrow::Borrow,
-  ops::Range,
-  sync::{Arc, RwLock},
-};
+use std::{borrow::Borrow, ops::Range};
 
 use lyon_path::geom::{euclid::num::Zero, Rect, Size};
 use unicode_script::{Script, UnicodeScript};
 
-use crate::{font_db::FontDB, Em, FontSize, Glyph, TextAlign};
+use crate::{Em, FontSize, Glyph, Pixel, TextAlign};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Overflow {
@@ -16,22 +12,21 @@ pub enum Overflow {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PlaceLineDirection {
-  /// place the line from left to right, the direction use to shape text must be
-  /// vertical
+  /// place the line from left to right
   LeftToRight,
-  /// place the line from right to let, the direction use to shape text must be
-  /// vertical
+  /// place the line from right to let
   RightToLeft,
-  /// place the line from top to bottom, the direction use to shape text must be
-  /// vertical
+  /// place the line from top to bottom
   TopToBottom,
+  /// place the line from bottom to top
+  BottomToTop,
 }
 /// `mode` should match the direction use to shape text, not check if layout
 /// inputs mix horizontal & vertical.
 #[derive(Clone)]
 pub struct TypographyCfg {
   pub line_height: Option<Em>,
-  pub letter_space: Option<Em>,
+  pub letter_space: Option<Pixel>,
   pub text_align: Option<TextAlign>,
   // The size glyphs can place, and hint `TypographyMan` where to early return.
   // the result of typography may over bounds.
@@ -58,22 +53,20 @@ pub trait InlineCursor {
 
 #[derive(Default)]
 pub struct VisualLine {
-  // todo: unset
   pub line_height: Em,
   pub glyphs: Vec<Glyph<Em>>,
 }
 
-#[derive(Default)]
 pub struct VisualInfos {
   pub visual_lines: Vec<VisualLine>,
   pub box_rect: Rect<Em>,
   /// if the typography result over the bounds provide by caller.
   pub over_bounds: bool,
+  pub line_dir: PlaceLineDirection,
 }
 
 /// pixel
 pub struct TypographyMan<Inputs> {
-  font_db: Arc<RwLock<FontDB>>,
   cfg: TypographyCfg,
   /// Not directly use text as inputs, but accept glyphs after text shape
   /// because both simple text and rich text can custom compose its glyph runs
@@ -91,27 +84,28 @@ where
   Runs: DoubleEndedIterator,
   Runs::Item: InputRun,
 {
-  pub fn new(inputs: Inputs, cfg: TypographyCfg, font_db: Arc<RwLock<FontDB>>) -> Self {
+  pub fn new(inputs: Inputs, cfg: TypographyCfg) -> Self {
     Self {
-      font_db,
       cfg,
       inputs,
       x_cursor: Em::zero(),
       y_cursor: Em::zero(),
-      visual_lines: <_>::default(),
+      visual_lines: vec![],
       over_bounds: false,
     }
   }
 
   pub fn typography_all(mut self) -> VisualInfos {
     let TypographyCfg { bounds, text_align, line_dir, .. } = self.cfg;
-    while let Some(p) = self.next_input_paragraph() {
+
+    while let Some(p) = self.inputs.next() {
       self.consume_paragraph(p);
-      if !bounds.contains((self.x_cursor, self.y_cursor).into()) {
+      if !self.is_line_over() {
         self.over_bounds = true;
         break;
       }
     }
+    self.lines_reorder();
     let lines = &mut self.visual_lines;
 
     fn adjust_y(lines: &mut Vec<VisualLine>, f: impl Fn(&Glyph<Em>) -> Em) {
@@ -132,16 +126,16 @@ where
       });
     }
     match (text_align, line_dir.is_horizontal()) {
-      (Some(TextAlign::Center), false) => {
+      (Some(TextAlign::Center), true) => {
         adjust_y(lines, |g| (bounds.height - (g.y_offset + g.y_advance)) / 2.)
       }
-      (Some(TextAlign::End), false) => {
+      (Some(TextAlign::End), true) => {
         adjust_y(lines, |g| bounds.height - (g.y_offset + g.y_advance))
       }
-      (Some(TextAlign::Center), true) => {
+      (Some(TextAlign::Center), false) => {
         adjust_x(lines, |g| (bounds.width - (g.x_offset + g.x_advance)) / 2.)
       }
-      (Some(TextAlign::End), true) => {
+      (Some(TextAlign::End), false) => {
         adjust_x(lines, |g| bounds.width - (g.x_offset + g.x_advance))
       }
       _ => {}
@@ -176,40 +170,33 @@ where
       box_rect,
       visual_lines: self.visual_lines,
       over_bounds: self.over_bounds,
-    }
-  }
-
-  pub fn next_input_paragraph(&mut self) -> Option<InputParagraph<Runs>> {
-    if self.cfg.is_rev_place_line() {
-      self.inputs.next_back()
-    } else {
-      self.inputs.next()
+      line_dir,
     }
   }
 
   /// consume paragraph and return if early break because over boundary.
   fn consume_paragraph(&mut self, p: InputParagraph<Runs>) -> bool {
-    let mut runs = p.runs.peekable();
-    if !self.visual_lines.is_empty() || self.cfg.is_rev_place_line() {
-      if let Some(r) = runs.peek() {
-        let input_run = r.borrow();
-        let line_height = self.line_height_with_glyph(input_run.glyphs().first());
-        self.advance_to_new_line(line_height * input_run.font_size().into_em());
-      }
+    if let Some(&VisualLine { line_height, .. }) = self.visual_lines.last() {
+      self.advance_to_new_line(line_height);
     }
-
+    self.visual_lines.push(<_>::default());
     let Self { x_cursor, y_cursor, .. } = *self;
     if self.cfg.line_dir.is_horizontal() {
-      runs.for_each(|r| {
-        let cursor = HInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
-        self.consume_run_with_letter_space_cursor(r.borrow(), cursor)
-      });
-    } else {
-      runs.for_each(|r| {
+      p.runs.for_each(|r| {
         let cursor = VInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
         self.consume_run_with_letter_space_cursor(r.borrow(), cursor)
       });
+    } else {
+      p.runs.for_each(|r| {
+        let cursor = HInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
+        self.consume_run_with_letter_space_cursor(r.borrow(), cursor)
+      });
     }
+
+    if let Some(line_height) = self.cfg.line_height {
+      self.visual_lines.last_mut().unwrap().line_height = line_height;
+    }
+
     false
   }
 
@@ -221,9 +208,9 @@ where
     let letter_space = run
       .letter_space()
       .or(self.cfg.letter_space)
-      .unwrap_or(Em::zero());
+      .unwrap_or(Pixel::zero());
     if letter_space != Em::zero() {
-      let cursor = LetterSpaceCursor::new(inner_cursor, letter_space);
+      let cursor = LetterSpaceCursor::new(inner_cursor, letter_space.into());
       self.consume_run_with_bounds_cursor(run, cursor);
     } else {
       self.consume_run_with_bounds_cursor(run, inner_cursor);
@@ -252,6 +239,8 @@ where
     let text = run.text();
     let glyphs = run.glyphs();
 
+    let line = self.visual_lines.last_mut().unwrap();
+    line.line_height = line.line_height.max(run.line_height());
     self.place_glyphs(cursor, font_size, text, glyphs.iter());
   }
 
@@ -282,46 +271,69 @@ where
     line.unwrap().glyphs.push(g)
   }
 
-  fn line_height_with_glyph(&self, g: Option<&Glyph<Em>>) -> Em {
-    self
-      .cfg
-      .line_height
-      .or_else(|| {
-        g.and_then(|g| {
-          let face = self.font_db.read().unwrap();
-          face.try_get_face_data(g.face_id).map(|face| {
-            let p_gap = match self.cfg.line_dir {
-              PlaceLineDirection::LeftToRight | PlaceLineDirection::RightToLeft => {
-                face.vertical_line_gap().unwrap_or_else(|| face.line_gap())
-              }
-              PlaceLineDirection::TopToBottom => face.line_gap(),
-            };
-            Em::absolute(p_gap as f32 / face.units_per_em() as f32)
-          })
-        })
-      })
-      .unwrap_or(Em::absolute(1.))
-  }
-
-  fn advance_to_new_line(&mut self, c: Em) {
+  fn advance_to_new_line(&mut self, line_height: Em) {
+    // we will reorder the line after consumed all inputs.
     match self.cfg.line_dir {
-      PlaceLineDirection::LeftToRight => self.x_cursor += c,
-      PlaceLineDirection::RightToLeft => self.x_cursor -= c,
-      PlaceLineDirection::TopToBottom => self.y_cursor += c,
+      PlaceLineDirection::LeftToRight | PlaceLineDirection::RightToLeft => {
+        self.x_cursor += line_height;
+        self.y_cursor = Em::zero();
+      }
+      PlaceLineDirection::TopToBottom | PlaceLineDirection::BottomToTop => {
+        self.y_cursor += line_height;
+        self.x_cursor = Em::zero();
+      }
     }
 
     // reset inline cursor
     if self.cfg.line_dir.is_horizontal() {
       self.y_cursor = Em::zero();
     } else {
-      if let Some(TextAlign::End) = self.cfg.text_align {
-        self.x_cursor = self.cfg.bounds.width;
-      } else {
-        self.x_cursor = Em::zero();
-      }
+      self.x_cursor = Em::zero();
     }
+  }
 
-    self.visual_lines.push(VisualLine::default())
+  #[inline]
+  fn lines_reorder(&mut self) {
+    let TypographyCfg { line_dir, bounds, .. } = self.cfg;
+    match line_dir {
+      PlaceLineDirection::RightToLeft => {
+        let o_line_cursor = Em::zero();
+        let n_line_cursor = bounds.width;
+
+        self
+          .visual_lines
+          .iter_mut()
+          .fold((o_line_cursor, n_line_cursor), |(o, mut n), l| {
+            n -= l.line_height;
+            l.glyphs.iter_mut().for_each(|g| g.x_offset += n - o);
+            (o + l.line_height, n)
+          });
+        self.visual_lines.reverse();
+      }
+      PlaceLineDirection::BottomToTop => {
+        let o_line_cursor = Em::zero();
+        let n_line_cursor = bounds.height;
+
+        self
+          .visual_lines
+          .iter_mut()
+          .fold((o_line_cursor, n_line_cursor), |(o, mut n), l| {
+            n -= l.line_height;
+            l.glyphs.iter_mut().for_each(|g| g.y_offset += n - o);
+            (o + l.line_height, n)
+          });
+        self.visual_lines.reverse();
+      }
+      _ => {}
+    }
+  }
+
+  fn is_line_over(&self) -> bool {
+    if self.cfg.line_dir.is_horizontal() {
+      self.cfg.bounds.width > self.x_cursor
+    } else {
+      self.cfg.bounds.height > self.y_cursor
+    }
   }
 }
 
@@ -334,7 +346,8 @@ pub trait InputRun {
   fn text(&self) -> &str;
   fn glyphs(&self) -> &[Glyph<Em>];
   fn font_size(&self) -> FontSize;
-  fn letter_space(&self) -> Option<Em>;
+  fn line_height(&self) -> Em;
+  fn letter_space(&self) -> Option<Pixel>;
 }
 
 pub struct HInlineCursor {
@@ -422,7 +435,7 @@ impl<I: InlineCursor> InlineCursor for LetterSpaceCursor<I> {
 impl<I: InlineCursor> InlineCursor for BoundsCursor<I> {
   fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, origin_text: &str) -> bool {
     self.inner_cursor.advance_glyph(glyph, origin_text);
-    self.bounds.contains(&self.position())
+    !self.bounds.contains(&self.position())
   }
 
   fn advance(&mut self, c: Em) -> bool {
@@ -472,161 +485,3 @@ fn letter_spacing_char(c: char) -> bool {
       | Script::Ogham
   )
 }
-
-// #[cfg(test)]
-// mod tests {
-//   use super::*;
-//   use crate::{shaper::*, FontFace, FontFamily};
-
-//   #[test]
-//   fn simple_text_bounds() {
-//     let shaper = TextShaper::default();
-//     let path = env!("CARGO_MANIFEST_DIR").to_owned() +
-// "/../fonts/DejaVuSans.ttf";     let _ =
-// shaper.font_db_mut().load_font_file(path);
-
-//     let ids = shaper.font_db().select_all_match(&FontFace {
-//       families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-//       ..<_>::default()
-//     });
-
-//     let text = "Hello
-
-//     world!";
-//     let glyphs = shaper.shape_text(text, &ids);
-//     let size = glyphs_box(text, glyphs.as_ref(), 14., None, 1.);
-//     assert_eq!(size, Size::new(70.96094, 81.484375));
-//   }
-
-//   #[test]
-//   fn simple_layout_text() {
-//     let shaper = TextShaper::default();
-//     let path = env!("CARGO_MANIFEST_DIR").to_owned() +
-// "/../fonts/DejaVuSans.ttf";     let _ =
-// shaper.font_db_mut().load_font_file(path);
-
-//     let ids = shaper.font_db().select_all_match(&FontFace {
-//       families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-//       ..<_>::default()
-//     });
-//     let text = "Hello--------\nworld!";
-//     let glyphs = shaper.shape_text(text, &ids);
-//     let mut cfg = LayoutConfig {
-//       font_size: 10.,
-//       letter_space: 2.,
-//       h_align: None,
-//       v_align: None,
-//       line_height: None,
-//     };
-
-//     let layout = |cfg: &LayoutConfig, bounds: Option<Rect<f32>>| {
-//       layout_text(text, &glyphs, cfg, bounds)
-//         .map(|g| (g.x, g.y))
-//         .collect::<Vec<_>>()
-//     };
-
-//     let not_bounds = layout(&cfg, None);
-//     assert_eq!(
-//       &not_bounds,
-//       &[
-//         (0.0, 0.0),
-//         (9.519531, 0.0),
-//         (17.671875, 0.0),
-//         (22.450195, 0.0),
-//         (27.228516, 0.0),
-//         (35.532227, 0.0),
-//         (41.140625, 0.0),
-//         (46.749023, 0.0),
-//         (52.35742, 0.0),
-//         (57.96582, 0.0),
-//         (63.57422, 0.0),
-//         (69.18262, 0.0),
-//         (74.791016, 0.0),
-//         (80.399414, 0.0),
-//         // second line
-//         (0.0, 11.640625),
-//         (10.178711, 11.640625),
-//         (18.296875, 11.640625),
-//         (24.408203, 11.640625),
-//         (29.186523, 11.640625),
-//         (37.53418, 11.640625)
-//       ]
-//     );
-
-//     cfg.h_align = Some(HAlign::Right);
-//     let r_align = layout(&cfg, None);
-//     assert_eq!(
-//       &r_align,
-//       &[
-//         (80.399414, 0.0),
-//         (74.791016, 0.0),
-//         (69.18262, 0.0),
-//         (63.57422, 0.0),
-//         (57.96582, 0.0),
-//         (52.35742, 0.0),
-//         (46.749023, 0.0),
-//         (41.140625, 0.0),
-//         (35.532227, 0.0),
-//         (27.228516, 0.0),
-//         (22.450195, 0.0),
-//         (17.671875, 0.0),
-//         (9.519531, 0.0),
-//         (0.0, 0.0),
-//         // second line.
-//         (82.3916, 11.640625),
-//         (74.043945, 11.640625),
-//         (69.265625, 11.640625),
-//         (63.154297, 11.640625),
-//         (55.036133, 11.640625),
-//         (44.85742, 11.640625)
-//       ]
-//     );
-
-//     cfg.h_align = None;
-//     cfg.v_align = Some(VAlign::Bottom);
-
-//     let bottom = layout(&cfg, None);
-//     assert_eq!(
-//       &bottom,
-//       &[
-//         // second line
-//         (0.0, 11.640625),
-//         (10.178711, 11.640625),
-//         (18.296875, 11.640625),
-//         (24.408203, 11.640625),
-//         (29.186523, 11.640625),
-//         (37.53418, 11.640625),
-//         (0.0, 0.0),
-//         // first line
-//         (9.519531, 0.0),
-//         (17.671875, 0.0),
-//         (22.450195, 0.0),
-//         (27.228516, 0.0),
-//         (35.532227, 0.0),
-//         (41.140625, 0.0),
-//         (46.749023, 0.0),
-//         (52.35742, 0.0),
-//         (57.96582, 0.0),
-//         (63.57422, 0.0),
-//         (69.18262, 0.0),
-//         (74.791016, 0.0),
-//         (80.399414, 0.0)
-//       ]
-//     );
-
-//     cfg.h_align = Some(HAlign::Center);
-//     cfg.v_align = Some(VAlign::Center);
-//     let center_clip = layout(&cfg, Some(Rect::from_size(Size::new(40.,
-// 15.))));     assert_eq!(
-//       &center_clip,
-//       &[
-//         // first line
-//         (-0.75, -4.140625)  if let Some(letter_space) = letter_space {
-//         (17.52539, 7.5),
-//         (23.636719, 7.5),
-//         (28.41504, 7.5),
-//         (36.762695, 7.5)
-//       ]
-//     );
-//   }
-// }

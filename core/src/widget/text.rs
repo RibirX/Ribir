@@ -1,7 +1,5 @@
-use ::text::{
-  typography::{Overflow, PlaceLineDirection, TypographyCfg},
-  ArcStr, Em, Pixel,
-};
+use ::text::typography::{PlaceLineDirection, TypographyCfg};
+pub use ::text::{typography::Overflow, *};
 
 use crate::prelude::*;
 

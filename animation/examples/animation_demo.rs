@@ -19,13 +19,13 @@ impl CombinationWidget for Demo {
     let col = Column::default();
 
     let ins = Text {
-      text: CowRc::from("click me to begin the animation"),
+      text: "click me to begin the animation".into(),
       style: <_>::default(),
     }
     .into_stateful();
 
     let target = Text {
-      text: CowRc::from("0"),
+      text: text::literal!("0"),
       style: <_>::default(),
     }
     .into_stateful();
@@ -77,7 +77,7 @@ impl CombinationWidget for Demo {
       })
       .subscribe(move |text| {
         if *target_state.text != text {
-          target_state.text = CowRc::from(text);
+          target_state.text = text.into();
         }
       });
 

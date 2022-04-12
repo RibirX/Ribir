@@ -58,7 +58,7 @@ struct PainterState {
   /// The line width use to stroke path.
   line_width: f32,
   font_size: FontSize,
-  letter_space: Option<Em>,
+  letter_space: Option<Pixel>,
   brush: Brush,
   font_face: FontFace,
   text_line_height: Option<Em>,
@@ -430,11 +430,20 @@ pub fn typography_with_text_style<T: Into<Substr>>(
 
 #[cfg(test)]
 mod test {
+  use text::shaper::TextShaper;
+
   use super::*;
 
   #[test]
   fn save_guard() {
-    let mut layer = Painter::new(1.);
+    let mut layer = Painter::new(
+      1.,
+      TypographyStore::new(
+        <_>::default(),
+        <_>::default(),
+        TextShaper::new(<_>::default()),
+      ),
+    );
     {
       let mut paint = layer.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
