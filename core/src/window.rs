@@ -135,6 +135,7 @@ impl Window {
       // in every frame.
       self.context.shaper.end_frame();
       self.context.reorder.end_frame();
+      self.context.typography_store.end_frame();
     }
   }
 

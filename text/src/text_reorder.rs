@@ -1,15 +1,18 @@
 use algo::FrameCache;
 use arcstr::Substr;
-use std::sync::{Arc, RwLock};
+use std::{
+  ops::Range,
+  sync::{Arc, RwLock},
+};
 use unicode_bidi::{BidiClass, BidiInfo, Level, LevelRun};
 
 pub struct Paragraph {
   pub levels: Vec<Level>,
   pub runs: Vec<LevelRun>,
+  pub range: Range<usize>,
 }
 pub struct ReorderResult {
   pub original_classes: Vec<BidiClass>,
-
   pub paras: Vec<Paragraph>,
 }
 
@@ -32,7 +35,7 @@ impl TextReorder {
         .iter()
         .map(|p| {
           let (levels, runs) = info.visual_runs(p, p.range.clone());
-          Paragraph { levels, runs }
+          Paragraph { levels, runs, range: p.range.clone() }
         })
         .collect();
 
@@ -47,4 +50,37 @@ impl TextReorder {
   }
 
   pub fn end_frame(&mut self) { self.cache.write().unwrap().end_frame("Text Reorder") }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn smoke() {
+    let mut reorder = TextReorder::default();
+    let text = crate::literal_substr!(concat!["א", "ב", "ג", "a", "b", "c",]).substr(..);
+    // No cache exists
+    assert!(reorder.get_from_cache(&text).is_none());
+
+    let result = reorder.reorder_text(&text);
+    assert_eq!(result.paras.len(), 1);
+
+    let Paragraph { runs, levels, .. } = &result.paras[0];
+
+    assert_eq!(
+      &levels.iter().map(|l| l.number()).collect::<Vec<_>>(),
+      &[1, 1, 1, 1, 1, 1, 2, 2, 2]
+    );
+
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0], 6..9);
+    assert_eq!(runs[1], 0..6);
+
+    assert!(reorder.get_from_cache(&text).is_some());
+
+    reorder.end_frame();
+    reorder.end_frame();
+    assert!(reorder.get_from_cache(&text).is_none());
+  }
 }

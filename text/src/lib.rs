@@ -12,7 +12,7 @@ use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub mod text_reorder;
 pub mod typography;
-pub use arcstr::{ArcStr, Substr};
+pub use arcstr::{literal, literal_substr, ArcStr, Substr};
 use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
 use ttf_parser::GlyphId;
@@ -264,6 +264,8 @@ impl lyon_path::geom::euclid::num::Zero for Pixel {
 }
 
 impl Em {
+  pub const MAX: Em = Em(OrderedFloat(f32::MAX));
+
   #[inline]
   pub fn value(self) -> f32 { self.0.into() }
 
@@ -301,6 +303,13 @@ impl std::ops::Div<Em> for Em {
 
   #[inline]
   fn div(self, rhs: Em) -> Self::Output { Em(self.0 / rhs.0) }
+}
+
+impl std::ops::Div<Pixel> for Pixel {
+  type Output = Pixel;
+
+  #[inline]
+  fn div(self, rhs: Pixel) -> Self::Output { Pixel(self.0 / rhs.0) }
 }
 
 impl<U> Glyph<U> {

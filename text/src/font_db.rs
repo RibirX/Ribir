@@ -123,18 +123,6 @@ impl FontDB {
       .collect()
   }
 
-  /// Find the first face can shape the `text`, return its index in the slice
-  /// and the face.
-  pub fn shapeable_face(&mut self, text: &str, face_ids: &[ID]) -> Option<(usize, Face)> {
-    face_ids.iter().enumerate().find_map(|(idx, id)| {
-      let face = self.face_data_or_insert(*id)?;
-      text
-        .chars()
-        .any(|c| face.has_char(c))
-        .then(|| (idx, face.clone()))
-    })
-  }
-
   pub fn end_frame(&mut self) { self.cache.end_frame("Font DB") }
 
   fn static_generic_families(&mut self) {
@@ -277,6 +265,7 @@ impl Face {
     })
   }
 
+  #[inline]
   pub fn has_char(&self, c: char) -> bool { self.rb_face.as_ref().glyph_index(c).is_some() }
 
   pub fn as_rb_face(&self) -> &rustybuzz::Face { &self.rb_face }
@@ -288,10 +277,10 @@ impl Face {
       .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder)?;
 
     // By default, outlie glyphs is an mirror.
-    let mirror = Transform::scale(1., -1.);
-    Some(
-      builder.into_path().transformed(&mirror), // .transformed(&translate),
-    )
+    let units_per_em = self.units_per_em() as f32;
+    let mirror =
+      Transform::scale(1. / units_per_em, -1. / units_per_em).then_translate((0., 1.).into());
+    Some(builder.into_path().transformed(&mirror))
   }
 
   #[inline]

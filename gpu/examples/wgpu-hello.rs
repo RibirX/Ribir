@@ -1,9 +1,11 @@
+use std::sync::{Arc, RwLock};
+
 use gpu::wgpu_backend_with_wnd;
 use painter::{
   image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, ShallowImage,
   TileMode,
 };
-use text::shaper::TextShaper;
+use text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},
@@ -21,8 +23,9 @@ fn main() {
 
   // Since main can't be async, we're going to need to block
   let size = window.inner_size();
-  let shaper = TextShaper::default();
-  shaper.font_db_mut().load_system_fonts();
+  let font_db = Arc::new(RwLock::new(FontDB::default()));
+  font_db.write().unwrap().load_system_fonts();
+  let shaper = TextShaper::new(font_db);
   let mut gpu_backend = block_on(wgpu_backend_with_wnd(
     &window,
     DeviceSize::new(size.width, size.height),
@@ -84,7 +87,9 @@ fn main() {
           .line_to((0.0, 130.0).into())
           .close_path();
       }
-      let mut painter = Painter::new(2.);
+      let font_db = Arc::new(RwLock::new(FontDB::default()));
+      let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
+      let mut painter = Painter::new(2., store);
       let red_brush = Brush::Color(Color::RED);
       let img_brush = Brush::Image {
         img: img.clone(),

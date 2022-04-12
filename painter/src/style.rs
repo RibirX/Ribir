@@ -1,5 +1,5 @@
 use crate::{Color, ShallowImage};
-use text::{Em, FontFace, FontSize};
+use text::{Em, FontFace, FontSize, Pixel};
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, Debug, PartialEq)]
@@ -12,7 +12,7 @@ pub struct TextStyle {
   // todo: use ids instead of
   pub font_face: FontFace,
   /// Not support now.
-  pub letter_space: Option<Em>,
+  pub letter_space: Option<Pixel>,
   /// The path style(fill or stroke) to use when painting.
   pub path_style: PathStyle,
   /// The factor use to multiplied by the font size to specify the text line

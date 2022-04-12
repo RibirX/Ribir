@@ -43,9 +43,9 @@
 
 - [ ] include_svg.
 - widgets for todo demo
-- [ ] simple widget
+- [ ] base widget
   - [ ] Button
-  - [ ] Text
+  - [x] Text
   - [ ] ListView
   - [x] Scrollable
   - [x] Checkbox

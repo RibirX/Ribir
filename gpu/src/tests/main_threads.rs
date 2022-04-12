@@ -1,10 +1,14 @@
-use painter::{Brush, Color, DeviceSize, PainterBackend, Rect, Size};
+use painter::{Brush, Color, DeviceSize, Painter, PainterBackend, Rect, Size};
+use ribir::prelude::text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
+use std::sync::{Arc, RwLock};
 use winit::{event_loop::EventLoop, window::WindowBuilder};
 
 use gpu::wgpu_backend_headless;
 
 fn red_img_test<B: PainterBackend>(mut backend: B) {
-  let mut painter = painter::Painter::new(1.);
+  let font_db = Arc::new(RwLock::new(FontDB::default()));
+  let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
+  let mut painter = Painter::new(1., store);
   painter.set_brush(Color::RED);
   painter.rect(&Rect::from_size(Size::new(100., 100.)));
   painter.fill(Brush::Color(Color::RED).into());
@@ -38,7 +42,7 @@ fn headless_smoke() {
     None,
     None,
     0.01,
-    <_>::default(),
+    TextShaper::new(<_>::default()),
   ));
 
   red_img_test(backend);
@@ -53,7 +57,7 @@ fn wnd_smoke() {
     None,
     None,
     0.01,
-    <_>::default(),
+    TextShaper::new(<_>::default()),
   ));
 
   red_img_test(backend);
