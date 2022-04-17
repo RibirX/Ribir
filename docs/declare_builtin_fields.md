@@ -52,3 +52,5 @@
  	 - specify the border of the widget which draw above the background
 - radius : [`BorderRadius`](../doc/canvas/layer/struct.BorderRadius.html) 
  	 - specify how rounded the corners have of the widget.
+- scrollable : [`Scrollable`](../doc/widget/struct.Scrollable.html) 
+ 	 - enumerate to describe which direction allow widget to scroll.

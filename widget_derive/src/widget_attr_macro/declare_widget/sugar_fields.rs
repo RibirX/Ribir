@@ -8,8 +8,8 @@ use syn::{spanned::Spanned, Ident, Member, Path, Result};
 
 use super::{widget_gen::WidgetGen, DeclareField, FollowPart, Follows};
 use crate::{
-  widget_attr_macro::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
   error::DeclareError,
+  widget_attr_macro::{ribir_suffix_variable, widget_def_variable, DeclareCtx},
 };
 
 macro_rules! assign_uninit_field {
@@ -49,6 +49,7 @@ macro_rules! fields_sugar_def {
     $(
       #[doc=$w_wrap_doc: literal]
       $w_wrap:ident : $w_ty: literal
+      -> $widget_ty: ident
     ),*
   ) => {
     #[derive(Default, Debug)]
@@ -67,6 +68,11 @@ macro_rules! fields_sugar_def {
           $((stringify!($listeners), $listener_doc), )*
           $((stringify!($w_wrap), $w_wrap_doc)),*
       ]);
+
+      pub static ref FIELD_WIDGET_NAME: std::collections::HashMap<&'static str, &'static str>
+      = std::collections::HashMap::from([
+        $((stringify!($w_wrap), stringify!($widget_ty))),*
+    ]);
     }
 
     impl SugarFields {
@@ -133,7 +139,7 @@ macro_rules! fields_sugar_def {
         .filter_map(|v| v)
       }
 
-      pub fn wrap_widget_from_field_name(name: &Ident) -> Option<Ident> {
+      pub fn widget_name_from_field(name: &Ident) -> Option<Ident> {
         if DECORATION_FIELDS.iter().find(|f| name == f).is_some() {
           Some(Ident::new(DECORATION, name.span()))
         } else {
@@ -147,7 +153,7 @@ macro_rules! fields_sugar_def {
       pub fn wrap_widget_from_member(mem: &Member) -> Option<Ident> {
         match mem {
           Member::Named(name) => {
-            Self::wrap_widget_from_field_name(name)
+            Self::widget_name_from_field(name)
           }
           Member::Unnamed(_) => None,
         }
@@ -160,8 +166,6 @@ include!("./sugar_fields_struct.rs");
 
 const DECORATION: &str = "decoration";
 const DECORATION_FIELDS: [&str; 3] = ["background", "radius", "border"];
-const PADDING: &str = "Padding";
-const MARGIN: &str = "Margin";
 const BOX_DECORATION: &str = "BoxDecoration";
 
 impl SugarFields {
@@ -170,30 +174,20 @@ impl SugarFields {
     host: &Ident,
     ctx: &DeclareCtx,
   ) -> impl Iterator<Item = (Ident, TokenStream)> {
-    self
-      .padding
-      .clone()
-      .map(|padding| {
-        let w_ty = Ident::new(PADDING, padding.member.span()).into();
-        common_def_tokens(padding, &w_ty, host, ctx)
-      })
-      .into_iter()
+    let field_widget_iter = |f: &Option<DeclareField>| {
+      f.as_ref()
+        .map(|f| common_def_tokens(f.clone(), host, ctx))
+        .into_iter()
+    };
+    field_widget_iter(&self.padding)
       .chain(
         self
           .has_box_decoration_field()
           .then(|| self.decoration_widget_tokens(host, ctx))
           .into_iter(),
       )
-      .chain(
-        self
-          .margin
-          .clone()
-          .map(|margin| {
-            let w_ty = Ident::new(MARGIN, margin.member.span()).into();
-            common_def_tokens(margin, &w_ty, host, ctx)
-          })
-          .into_iter(),
-      )
+      .chain(field_widget_iter(&self.margin))
+      .chain(field_widget_iter(&self.scrollable))
   }
 
   pub fn gen_wrap_widget_compose_tokens(&self, host: &Ident) -> TokenStream {
@@ -216,6 +210,10 @@ impl SugarFields {
 
     if let Some(margin) = self.margin.clone() {
       compose_tokens.extend(compose(host, &margin.member.to_string()));
+    }
+
+    if let Some(scrollable) = self.scrollable.clone() {
+      compose_tokens.extend(compose(host, &scrollable.member.to_string()));
     }
 
     compose_tokens
@@ -308,17 +306,17 @@ impl SugarFields {
 }
 
 // generate the wrapper widget define tokens and return the wrap tokens.
-fn common_def_tokens(
-  mut f: DeclareField,
-  ty: &Path,
-  host: &Ident,
+fn common_def_tokens(mut f: DeclareField, host: &Ident, ctx: &DeclareCtx) -> (Ident, TokenStream) {
+  let ty = FIELD_WIDGET_NAME
+    .get(f.member.to_string().as_str())
+    .map(|ty| Ident::new(ty, f.member.span()))
+    .unwrap();
+  let ty = Path::from(ty);
 
-  ctx: &DeclareCtx,
-) -> (Ident, TokenStream) {
   let if_guard = f.if_guard.take();
   let name = ribir_suffix_variable(host, &f.member.to_string());
   let wrap_def = widget_def_variable(&name);
-  let widget_gen = WidgetGen { ty, name, fields: &vec![f] };
+  let widget_gen = WidgetGen { ty: &ty, name, fields: &vec![f] };
   let mut widget_tokens = widget_gen.gen_widget_tokens(ctx, false);
 
   if let Some(if_guard) = if_guard {

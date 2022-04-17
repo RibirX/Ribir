@@ -604,7 +604,7 @@ impl Trigger {
         #path (move |_|{ #animate.start();} );
       })
     } else {
-      let widget = if let Some(suffix) = SugarFields::wrap_widget_from_field_name(member) {
+      let widget = if let Some(suffix) = SugarFields::widget_name_from_field(member) {
         let mut w = widget.clone();
         w.set_span(w.span().join(suffix.span()).unwrap());
         let wrap_name = ribir_suffix_variable(&w, &suffix.to_string());
