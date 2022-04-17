@@ -37,8 +37,6 @@ mod scrollbar;
 use self::layout_store::BoxClamp;
 
 // todo: rename to compose?
-// todo: consider use `Fn(ctx: &mub BuildCtx)` replace
-/// A widget represented by other widget compose.
 pub trait CombinationWidget {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -243,4 +241,9 @@ impl AsAttrs for BoxedWidget {
       BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs_mut(),
     }
   }
+}
+
+impl<W: Fn(&mut BuildCtx) -> BoxedWidget> CombinationWidget for W {
+  #[inline]
+  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self(ctx) }
 }

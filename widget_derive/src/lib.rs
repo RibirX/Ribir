@@ -3,12 +3,11 @@ extern crate proc_macro;
 extern crate proc_macro2;
 
 mod declare_derive;
-mod widget_attr_macro;
 mod error;
+mod widget_attr_macro;
 
 mod util;
 
-use widget_attr_macro::DeclareCtx;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
@@ -16,6 +15,7 @@ use syn::{
   parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Comma, visit_mut::VisitMut,
   DeriveInput, FnArg, Ident,
 };
+use widget_attr_macro::DeclareCtx;
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
 #[proc_macro_derive(SingleChildWidget, attributes(proxy))]
@@ -71,31 +71,10 @@ pub fn widget(_attr: TokenStream, input: TokenStream) -> TokenStream {
   let mut compose_fn = parse_macro_input! { input as syn::ImplItemMethod };
   let inputs = &compose_fn.sig.inputs;
 
-  fn this_and_ctx_args(inputs: &Punctuated<FnArg, Comma>) -> Result<(Ident, Ident), TokenStream> {
-    if inputs.len() != 2 {
-      let compile_err = format!(
-        "`#[{WIDGET_MACRO_NAME}]` expected 2 parameters, found {}",
-        inputs.len()
-      );
-      return Err(
-        quote_spanned! {
-          inputs.span() =>compile_error!(stringify!(#compile_err));
-        }
-        .into(),
-      );
-    }
-
-    fn unknown_arguments_err(span: Span) -> Result<(Ident, Ident), TokenStream> {
+  fn ctx_args(inputs: &Punctuated<FnArg, Comma>) -> Result<Ident, TokenStream> {
+    fn unknown_arguments_err(span: Span) -> Result<Ident, TokenStream> {
       Err(quote_spanned! { span => compile_err!("unknown arguments name") }.into())
     }
-
-    let self_name = match inputs.first().unwrap() {
-      FnArg::Receiver(r) => syn::Ident::new("self", r.self_token.span),
-      FnArg::Typed(t) => match *t.pat {
-        syn::Pat::Ident(ref name) => name.ident.clone(),
-        _ => return unknown_arguments_err(t.span()),
-      },
-    };
 
     let ctx_name = match inputs.last().unwrap() {
       FnArg::Receiver(r) => return unknown_arguments_err(r.span()),
@@ -105,15 +84,15 @@ pub fn widget(_attr: TokenStream, input: TokenStream) -> TokenStream {
       },
     };
 
-    Ok((self_name, ctx_name))
+    Ok(ctx_name)
   }
 
-  let (self_name, ctx_name) = match this_and_ctx_args(inputs) {
+  let ctx_name = match ctx_args(inputs) {
     Ok(names) => names,
     Err(err) => return err,
   };
 
-  let mut ctx = DeclareCtx::new(self_name, ctx_name);
+  let mut ctx = DeclareCtx::new(ctx_name);
 
   ctx.stack_push().visit_impl_item_method_mut(&mut compose_fn);
   quote! { #compose_fn }.into()
