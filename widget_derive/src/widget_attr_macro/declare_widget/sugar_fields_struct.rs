@@ -51,13 +51,15 @@ fields_sugar_def! {
   // padding should always before margin, it widget have margin & padding both
   // margin should wrap padding.
   #[doc="set the padding area on all four sides of the widget."]
-  padding: "[`EdgeInsets`](../ribir/widget/struct.EdgeInsets.html)",
+  padding: "[`EdgeInsets`](../ribir/widget/struct.EdgeInsets.html)" -> Padding,
   #[doc="expand space around widget wrapped."]
-  margin: "[`EdgeInsets`](../ribir/widget/struct.EdgeInsets.html)",
+  margin: "[`EdgeInsets`](../ribir/widget/struct.EdgeInsets.html)" -> Margin,
   #[doc="specify the background of the widget box."]
-  background: "type which implement Into<[`FillStyle`](../ribir/widget/enum.FillStyle.html)>",
+  background: "type which implement Into<[`FillStyle`](../ribir/widget/enum.FillStyle.html)>" -> BoxDecoration,
   #[doc="specify the border of the widget which draw above the background"]
-  border: "[`Border`](ribir/widget/struct.Border.html)",
+  border: "[`Border`](ribir/widget/struct.Border.html)" -> BoxDecoration,
   #[doc= "specify how rounded the corners have of the widget."]
-  radius: "[`BorderRadius`](../doc/canvas/layer/struct.BorderRadius.html)"
+  radius: "[`BorderRadius`](../doc/canvas/layer/struct.BorderRadius.html)" -> BoxDecoration,
+  #[doc= "enumerate to describe which direction allow widget to scroll."]
+  scrollable: "[`Scrollable`](../doc/widget/struct.Scrollable.html)" -> ScrollableDeclare
 }

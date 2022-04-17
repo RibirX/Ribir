@@ -14,6 +14,8 @@ struct BuiltinField {
   field_name: Ident,
   _colon_token: Token!(:),
   type_comment: LitStr,
+  _arrow: Option<Token!(->)>,
+  _widget_ty: Option<Ident>,
 }
 
 impl Parse for BuiltinField {
@@ -24,11 +26,23 @@ impl Parse for BuiltinField {
     content.parse::<Ident>()?;
     content.parse::<Token![=]>()?;
 
+    let comment = content.parse()?;
+    let field_name = input.parse()?;
+    let _colon_token = input.parse()?;
+    let type_comment = input.parse()?;
+    let _arrow: Option<_> = input.parse()?;
+    let _widget_ty = if _arrow.is_some() {
+      input.parse()?
+    } else {
+      None
+    };
     Ok(BuiltinField {
-      comment: content.parse()?,
-      field_name: input.parse()?,
-      _colon_token: input.parse()?,
-      type_comment: input.parse()?,
+      comment,
+      field_name,
+      _colon_token,
+      type_comment,
+      _arrow,
+      _widget_ty,
     })
   }
 }
@@ -81,6 +95,15 @@ impl Display for BuiltinFields {
   }
 }
 
+// todo: use a declare macro lib parse the builtin fields describe file to
+// generate code and doc ```
+// Padding {
+//   ....
+// }
+// Margin {
+//   ...
+// }
+/// ```
 fn main() {
   let tokens = proc_macro2::TokenStream::from_str(include_str!(
     "./src/widget_attr_macro/declare_widget/sugar_fields_struct.rs"

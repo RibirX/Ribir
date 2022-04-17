@@ -21,6 +21,22 @@ pub struct ScrollableBoth {
   pos: Point,
 }
 
+/// Enumerate to describe which direction allow widget to scroll.
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
+pub enum Scrollable {
+  X,
+  Y,
+  Both,
+}
+
+/// Helper struct for builtin scrollable field.
+#[derive(SingleChildWidget, Declare)]
+pub struct ScrollableDeclare {
+  #[declare(builtin)]
+  scrollable: Scrollable,
+}
+
 impl ScrollableX {
   #[inline]
   pub fn x_scroll(pos: f32) -> Stateful<ScrollableX> {
@@ -175,14 +191,48 @@ fn view_content(event: &WheelEvent) -> (Rect, Rect) {
   (view, content)
 }
 
+impl BoxWidget<RenderMarker> for SingleChild<ScrollableDeclare> {
+  fn box_it(self) -> BoxedWidget {
+    match self.scrollable {
+      Scrollable::X => SingleChild {
+        widget: ScrollableX::x_scroll(0.),
+        child: self.child,
+      }
+      .box_it(),
+      Scrollable::Y => SingleChild {
+        widget: ScrollableY::y_scroll(0.),
+        child: self.child,
+      }
+      .box_it(),
+      Scrollable::Both => SingleChild {
+        widget: ScrollableBoth::both_scroll(Point::zero()),
+        child: self.child,
+      }
+      .box_it(),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::test::root_and_children_rect;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  fn test_assert(widget: BoxedWidget, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
+  fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
+    impl CombinationWidget for Scrollable {
+      #[widget]
+      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+        widget! {
+          declare SizedBox {
+            size: Size::new(1000., 1000.),
+            scrollable: *self,
+          }
+        }
+      }
+    }
+
+    let mut wnd = Window::without_render(scrollable.box_it(), Size::new(100., 100.));
 
     wnd.render_ready();
 
@@ -201,55 +251,22 @@ mod tests {
 
   #[test]
   fn x_scroll() {
-    #[derive(Debug)]
-    struct X;
-
-    impl CombinationWidget for X {
-      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        ScrollableX::x_scroll(0.)
-          .have_child(SizedBox { size: Size::new(1000., 1000.) }.box_it())
-          .box_it()
-      }
-    }
-
-    test_assert(X.box_it(), 10., 10., Point::new(-10., 0.));
-    test_assert(X.box_it(), 10000., 10., Point::new(-900., 0.));
-    test_assert(X.box_it(), -100., 10., Point::new(0., 0.));
+    test_assert(Scrollable::X, 10., 10., Point::new(-10., 0.));
+    test_assert(Scrollable::X, 10000., 10., Point::new(-900., 0.));
+    test_assert(Scrollable::X, -100., 10., Point::new(0., 0.));
   }
 
   #[test]
   fn y_scroll() {
-    #[derive(Debug)]
-    struct Y;
-
-    impl CombinationWidget for Y {
-      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        ScrollableY::y_scroll(0.)
-          .have_child(SizedBox { size: Size::new(1000., 1000.) }.box_it())
-          .box_it()
-      }
-    }
-
-    test_assert(Y.box_it(), 10., 10., Point::new(0., -10.));
-    test_assert(Y.box_it(), 10., 10000., Point::new(0., -900.));
-    test_assert(Y.box_it(), -10., -100., Point::new(0., 0.));
+    test_assert(Scrollable::Y, 10., 10., Point::new(0., -10.));
+    test_assert(Scrollable::Y, 10., 10000., Point::new(0., -900.));
+    test_assert(Scrollable::Y, -10., -100., Point::new(0., 0.));
   }
 
   #[test]
   fn both_scroll() {
-    #[derive(Debug)]
-    struct Both;
-
-    impl CombinationWidget for Both {
-      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
-        ScrollableBoth::both_scroll(Point::default())
-          .have_child(SizedBox { size: Size::new(1000., 1000.) }.box_it())
-          .box_it()
-      }
-    }
-
-    test_assert(Both.box_it(), 10., 10., Point::new(-10., -10.));
-    test_assert(Both.box_it(), 10000., 10000., Point::new(-900., -900.));
-    test_assert(Both.box_it(), -100., -100., Point::new(0., 0.));
+    test_assert(Scrollable::Both, 10., 10., Point::new(-10., -10.));
+    test_assert(Scrollable::Both, 10000., 10000., Point::new(-900., -900.));
+    test_assert(Scrollable::Both, -100., -100., Point::new(0., 0.));
   }
 }
