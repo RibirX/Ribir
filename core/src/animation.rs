@@ -1,11 +1,15 @@
+mod animation_ctrl;
 mod progress_state;
 mod repeat_mode;
-use std::time::Duration;
+mod tween;
+use std::{marker::PhantomData, time::Duration};
 
 use crate::prelude::*;
+pub use animation_ctrl::*;
 pub use progress_state::ProgressState;
 pub use repeat_mode::RepeatMode;
-use rxrust::ops::box_it::LocalBoxOp;
+use rxrust::ops::box_it::LocalCloneBoxOp;
+pub use tween::Tween;
 
 /// the ctrl handle return by TickerRunningCtrl.listen
 /// after dispose is call, the call_back would'n be call again
@@ -16,11 +20,12 @@ pub trait TickerRunningHandle {
 pub trait TickerRunningCtrl {
   fn state(&self) -> ProgressState;
   fn reverse(&mut self);
-  fn run(&mut self);
+  fn start(&mut self);
   fn pause(&mut self);
   fn is_run(&self) -> bool;
   fn is_complete(&self) -> bool;
   fn restart(&mut self, run: bool);
+  fn force_done(&mut self);
 
   /// the call_back will be call every ticker frame when running
   fn listen(&mut self, call_back: Box<dyn FnMut(ProgressState)>) -> Box<dyn TickerRunningHandle>;
@@ -46,7 +51,7 @@ pub trait AnimationCtrl {
   fn value(&self) -> f32;
 
   /// from subject animation can observe the value when progress change
-  fn subject(&mut self) -> LocalBoxOp<'static, f32, ()>;
+  fn subject(&mut self) -> LocalCloneBoxOp<'static, f32, ()>;
 
   fn step(&mut self, step: f32);
 
@@ -62,98 +67,93 @@ pub trait TickerProvider {
   fn ticker_ctrl(&mut self, duration: Duration) -> Box<dyn TickerAnimationCtrl>;
 }
 
-/// AnimateState is the bridge of animate and widgets states. It tell animate
-/// where it starts and ends, and how to write back the progress.
-
-pub trait AnimateState {
-  type Value;
-
-  /// When a animate trigger, where it the state starts.
-  fn state_init_value(&self) -> Self::Value;
-
-  /// When a animate trigger, where it the state ends.
-  fn state_final_value(&self) -> Self::Value;
-
-  /// Write back the state.
-  fn write_state(&mut self, v: Self::Value);
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ClosureAnimateState<I, F, W> {
-  pub state_init: I,
-  pub state_final: F,
-  pub state_writer: W,
-}
-
-pub struct ValueAnimateState<V, W: FnMut(V)> {
-  pub init_value: Option<V>,
-  pub final_value: Option<V>,
-  pub value_writer: W,
-}
-
-impl<I, F, W, V> AnimateState for ClosureAnimateState<I, F, W>
-where
-  I: Fn() -> V,
-  F: Fn() -> V,
-  W: FnMut(V),
-{
-  type Value = V;
-  #[inline]
-  fn state_init_value(&self) -> V { (self.state_init)() }
-
-  #[inline]
-  fn state_final_value(&self) -> V { (self.state_final)() }
-
-  #[inline]
-  fn write_state(&mut self, v: V) { (self.state_writer)(v) }
-}
-
-impl<V, W> AnimateState for ValueAnimateState<V, W>
-where
-  W: FnMut(V),
-  V: Clone,
-{
-  type Value = V;
-
-  #[inline]
-  fn state_init_value(&self) -> Self::Value {
-    self.init_value.clone().expect("init_value is not init.")
-  }
-  #[inline]
-  fn state_final_value(&self) -> Self::Value {
-    self.final_value.clone().expect("final_value is not init.")
-  }
-  #[inline]
-  fn write_state(&mut self, v: Self::Value) { (self.value_writer)(v) }
+// Transform the Region from [0.0 - 1.0] to [0.0 - 1.0]
+// animation use the curve map to implement ease effect
+pub trait Curve {
+  fn transform(&self, t: f32) -> f32;
 }
 
 /// Transition describe how the state change form init to final smoothly.
-#[derive(Debug, Clone, Copy, Declare)]
+#[derive(Declare)]
 pub struct Transition {
   /// delay how long to start.
-  #[declare(strip_option)]
-  pub delay: Option<std::time::Duration>,
+  // #[declare(strip_option)]
+  // pub delay: Option<std::time::Duration>,
+  pub duration: std::time::Duration,
+
+  pub repeat: RepeatMode,
+
+  pub ease: Option<fn() -> Box<dyn Curve + 'static>>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Animate<S> {
-  pub transition: Transition,
-  pub from: S,
-}
-
-impl<S> Animate<S>
+pub struct Animate<V, S, R>
 where
-  S: AnimateState,
+  S: FnMut(V, V) -> R + 'static + Clone,
+  R: FnMut(f32) + 'static + Clone,
 {
-  pub fn register(self, _: &mut BuildCtx) -> Self {
-    todo!("register animate and hold the handle");
+  update_animate: S,
+  tick: Box<dyn TickerRunningCtrl>,
+  observable: LocalCloneBoxOp<'static, f32, ()>,
+  guard: Option<SubscriptionGuard<Box<dyn SubscriptionLike>>>,
+  __: PhantomData<R>,
+  ___: PhantomData<V>,
+}
+
+impl<V, S, R> Animate<V, S, R>
+where
+  S: FnMut(V, V) -> R + 'static + Clone,
+  R: FnMut(f32) + 'static + Clone,
+  V: std::fmt::Debug,
+{
+  pub fn new(update_animate: S, transition: &Transition, ctx: &mut BuildCtx) -> Self {
+    let mut tick = ctx
+      .ticker_ctrl(transition.duration)
+      .unwrap()
+      .with_repeat(transition.repeat);
+
+    let mut animation = new_animation_ctrl(transition.ease.as_ref().map(|f| f()));
+
+    let observable = animation.subject();
+
+    tick.listen(Box::new(move |p| animation.update_to(p)));
+
+    Animate {
+      update_animate,
+      tick,
+      observable,
+      guard: None,
+      __: PhantomData,
+      ___: PhantomData,
+    }
   }
 
-  pub fn start(&mut self) { todo!() }
+  pub fn default() -> Self { todo!() }
+
+  pub fn restart(&mut self, init_v: V, final_v: V) {
+    let mut update = (self.update_animate)(init_v, final_v);
+
+    self.guard = Some(
+      self
+        .observable
+        .clone()
+        .subscribe(move |p| {
+          update(p);
+        })
+        .unsubscribe_when_dropped(),
+    );
+
+    self.tick.restart(true);
+  }
+
+  pub fn cancel(&mut self) { self.tick.force_done(); }
 }
 
 impl TransitionBuilder {
   pub fn build_without_ctx(self) -> Transition {
+    self
+      .duration
+      .expect(&format!("Required field Transition::duration` not set"));
+
     // Safety: we know build `Transition` will never read the ctx.
     #[allow(invalid_value)]
     let mut uninit_ctx: &mut BuildCtx = unsafe { std::mem::MaybeUninit::uninit().assume_init() };

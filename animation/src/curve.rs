@@ -1,10 +1,5 @@
 use lyon::{geom::CubicBezierSegment, math::Point};
-
-// Transform the Region from [0.0 - 1.0] to [0.0 - 1.0]
-// animation use the curve map to implement ease effect
-pub trait Curve {
-  fn transform(&self, t: f32) -> f32;
-}
+use ribir::prelude::Curve;
 
 pub struct CurveBezier(CubicBezierSegment<f32>);
 impl CurveBezier {

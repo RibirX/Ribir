@@ -1,6 +1,6 @@
 #[derive(PartialEq, Copy, Clone)]
 pub enum RepeatMode {
-  Normal,
+  None,
   Repeat(u32),
   Infinity,
 }
@@ -8,7 +8,7 @@ pub enum RepeatMode {
 impl RepeatMode {
   pub fn val(&self) -> u32 {
     match self {
-      RepeatMode::Normal => 1,
+      RepeatMode::None => 1,
       RepeatMode::Repeat(val) => *val,
       RepeatMode::Infinity => u32::MAX,
     }

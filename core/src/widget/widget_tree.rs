@@ -1,14 +1,23 @@
 use crate::prelude::*;
+use bitflags::bitflags;
+use indextree::*;
 use std::{collections::HashMap, pin::Pin};
 
-use indextree::*;
+bitflags! {
+  pub struct WidgetChangeFlags: u8 {
+      const UNSILENT  = 0b00000001;
+      const DIFFUSE = 0b00000010;
+
+      const ALL = WidgetChangeFlags::UNSILENT.bits | WidgetChangeFlags::DIFFUSE.bits;
+  }
+}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
   arena: Arena<WidgetNode>,
   root: WidgetId,
-  changed_widget: HashMap<WidgetId, bool, ahash::RandomState>,
+  changed_widget: HashMap<WidgetId, WidgetChangeFlags, ahash::RandomState>,
 }
 
 impl WidgetTree {
@@ -62,17 +71,17 @@ impl WidgetTree {
     }
   }
 
-  pub(crate) fn record_change(&mut self, id: WidgetId, silent: bool) {
+  pub(crate) fn record_change(&mut self, id: WidgetId, flag: WidgetChangeFlags) {
     self
       .changed_widget
       .entry(id)
       .and_modify(|s| {
-        *s = *s && silent;
+        *s = *s | flag;
       })
-      .or_insert(silent);
+      .or_insert(flag);
   }
 
-  pub(crate) fn pop_changed_widgets(&mut self) -> Option<(WidgetId, bool)> {
+  pub(crate) fn pop_changed_widgets(&mut self) -> Option<(WidgetId, WidgetChangeFlags)> {
     self
       .changed_widget
       .keys()

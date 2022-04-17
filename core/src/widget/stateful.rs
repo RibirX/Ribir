@@ -84,6 +84,8 @@ use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{cell::Cell, pin::Pin, ptr::NonNull};
 
+use super::widget_tree::WidgetChangeFlags;
+
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
 pub trait IntoStateful {
@@ -103,6 +105,13 @@ pub struct StateRef<W>(NonNull<AttrWidget<W>>);
 ///
 /// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
 pub struct SilentRef<W>(NonNull<AttrWidget<W>>);
+
+/// A reference of stateful widget, tracked the relayout or rebuild if user
+/// mutable reference the `ShallowRef`, but state change notify will not
+/// trigger. Now used in animation's render change, which is just a
+/// temporary change in render and not expect to change the data.
+/// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
+pub struct ShallowRef<W>(NonNull<AttrWidget<W>>);
 
 /// The stateful widget generic implementation.
 pub struct Stateful<W>(Pin<Box<AttrWidget<W>>>);
@@ -133,8 +142,13 @@ impl<W> Clone for StateRef<W> {
   fn clone(&self) -> Self { Self(self.0) }
 }
 
+impl<W> Clone for ShallowRef<W> {
+  fn clone(&self) -> Self { Self(self.0) }
+}
+
 impl<W> Copy for StateRef<W> {}
 impl<W> Copy for SilentRef<W> {}
+impl<W> Copy for ShallowRef<W> {}
 
 impl<W> Stateful<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
@@ -154,6 +168,9 @@ impl<W> Stateful<W> {
   /// keep it live not longer than its widget.
   #[inline]
   pub unsafe fn silent_ref(&self) -> SilentRef<W> { SilentRef(NonNull::from(&*self.0)) }
+
+  #[inline]
+  pub unsafe fn shallow_ref(&self) -> ShallowRef<W> { ShallowRef(NonNull::from(&*self.0)) }
 
   /// Event emitted when this widget modified. No mather if the widget really
   #[inline]
@@ -186,6 +203,9 @@ impl<W: 'static> StateRef<W> {
   // convert a `StateRef` to `SilentRef`
   #[inline]
   pub fn silent(self) -> SilentRef<W> { SilentRef(self.0) }
+
+  #[inline]
+  pub fn shallow(self) -> ShallowRef<W> { ShallowRef(self.0) }
 
   /// Event emitted when this widget modified. No mather if the widget really
   #[inline]
@@ -257,7 +277,23 @@ impl<W> std::ops::Deref for SilentRef<W> {
 impl<W> std::ops::DerefMut for SilentRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     unsafe {
-      assert_state_attr(self.0.as_mut()).record_change(true);
+      assert_state_attr(self.0.as_mut()).record_change(WidgetChangeFlags::DIFFUSE);
+      self.0.as_mut()
+    }
+  }
+}
+
+impl<W> std::ops::Deref for ShallowRef<W> {
+  type Target = AttrWidget<W>;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { unsafe { self.0.as_ref() } }
+}
+
+impl<W> std::ops::DerefMut for ShallowRef<W> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    unsafe {
+      assert_state_attr(self.0.as_mut()).record_change(WidgetChangeFlags::UNSILENT);
       self.0.as_mut()
     }
   }
@@ -273,7 +309,7 @@ impl<W> std::ops::Deref for StateRef<W> {
 impl<W> std::ops::DerefMut for StateRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     unsafe {
-      assert_state_attr(self.0.as_mut()).record_change(false);
+      assert_state_attr(self.0.as_mut()).record_change(WidgetChangeFlags::ALL);
       self.0.as_mut()
     }
   }
@@ -285,12 +321,12 @@ impl StateAttr {
     self.tree_info = Some(TreeInfo { tree, id })
   }
 
-  fn record_change(&mut self, silent: bool) {
+  fn record_change(&mut self, flag: WidgetChangeFlags) {
     if let Some(TreeInfo { mut tree, id }) = self.tree_info {
       if self.during_build.get() {
         log::warn!("Modify widget state during it build child is not allowed!");
       } else {
-        unsafe { tree.as_mut() }.record_change(id, silent);
+        unsafe { tree.as_mut() }.record_change(id, flag);
       }
     }
   }
@@ -511,14 +547,14 @@ mod tests {
     {
       let _ = &mut state_ref.size;
       let (_, silent) = tree.pop_changed_widgets().unwrap();
-      assert_eq!(silent, false);
+      assert_eq!(silent, WidgetChangeFlags::ALL);
       assert!(tree.pop_changed_widgets().is_none());
     }
 
     {
       let _ = &mut silent_ref.size;
       let (_, silent) = tree.pop_changed_widgets().unwrap();
-      assert_eq!(silent, true);
+      assert_eq!(silent, WidgetChangeFlags::DIFFUSE);
       assert!(tree.pop_changed_widgets().is_none());
     }
   }

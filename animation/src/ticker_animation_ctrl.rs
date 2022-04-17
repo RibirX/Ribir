@@ -13,7 +13,7 @@ impl TickerRunningCtrl for TickerHandle {
 
   fn reverse(&mut self) { self.0.borrow_mut().reverse() }
 
-  fn run(&mut self) { self.0.borrow_mut().run(); }
+  fn start(&mut self) { self.0.borrow_mut().start(); }
 
   fn pause(&mut self) { self.0.borrow_mut().pause(); }
 
@@ -26,6 +26,8 @@ impl TickerRunningCtrl for TickerHandle {
   fn listen(&mut self, f: Box<dyn FnMut(ProgressState)>) -> Box<dyn TickerRunningHandle> {
     self.0.borrow_mut().listen(f)
   }
+
+  fn force_done(&mut self) { self.0.borrow_mut().force_done() }
 }
 
 impl TickerAnimationCtrl for TickerHandle {
