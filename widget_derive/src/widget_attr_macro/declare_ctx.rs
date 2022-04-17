@@ -1,6 +1,6 @@
 use crate::{
-  widget_attr_macro::{declare_widget::DeclareWidget, widget_def_variable},
   error::DeclareError,
+  widget_attr_macro::{declare_widget::DeclareWidget, widget_def_variable},
   WIDGET_MACRO_NAME,
 };
 
@@ -28,7 +28,6 @@ pub struct DeclareCtx {
   user_perspective_name: HashMap<Ident, Ident>,
   id_capture_scope: Vec<bool>,
   ctx_name: Ident,
-  _self_name: Ident,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -221,7 +220,7 @@ impl VisitMut for DeclareCtx {
 }
 
 impl DeclareCtx {
-  pub fn new(self_name: Ident, ctx_name: Ident) -> Self {
+  pub fn new(ctx_name: Ident) -> Self {
     Self {
       named_objects: Default::default(),
       current_follows: Default::default(),
@@ -230,7 +229,6 @@ impl DeclareCtx {
       user_perspective_name: Default::default(),
       id_capture_scope: Default::default(),
       ctx_name,
-      _self_name: self_name,
     }
   }
 
@@ -248,11 +246,6 @@ impl DeclareCtx {
   pub fn ctx_name(&self) -> &Ident {
     // todo: track ctx rename
     &self.ctx_name
-  }
-
-  pub fn _self_name(&self) -> &Ident {
-    // todo: track self rename
-    &self._self_name
   }
 
   pub fn be_followed(&self, name: &Ident) -> bool {
