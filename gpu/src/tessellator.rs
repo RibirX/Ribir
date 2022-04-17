@@ -750,9 +750,8 @@ mod tests {
         let mut painter = default_painter();
         painter.fill_text($text, None);
         let commands = painter.finish();
-        let mut tess = tessellator();
         b.iter(|| {
-          tess.vertices_cache.take();
+          let mut tess = tessellator();
           tess.tessellate(&commands, &mut |_: TriangleLists| {})
         })
       }
