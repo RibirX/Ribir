@@ -400,7 +400,7 @@ impl FlexLayouter {
 
   fn child_flex(ctx: &mut LayoutCtx, child: WidgetId) -> Option<f32> {
     ctx
-      .widget_downcast_ref::<Expanded>(child)
+      .query_type::<Expanded>(child)
       .map(|expanded| expanded.flex)
   }
 }

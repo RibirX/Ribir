@@ -574,18 +574,6 @@ macro get_attr($name: ident) {
   $name.as_attrs().and_then(Attributes::find)
 }
 
-impl<W> Downcast for AttrWidgetWrap<W>
-where
-  Self: Any,
-{
-  fn downcast_to(&self, id: TypeId) -> Option<&dyn Any> {
-    self
-      .0
-      .widget
-      .downcast_to(id)
-      .or_else(|| self.0.downcast_to(id))
-  }
-}
 #[derive(Default)]
 pub struct Attributes(HashMap<TypeId, Box<dyn Any>, ahash::RandomState>);
 
