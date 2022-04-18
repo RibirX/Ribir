@@ -92,8 +92,26 @@ impl<W: CombinationWidget> Widget for W {}
 impl<W: RenderWidget> Widget for W {}
 impl<W: StatefulCombination> Widget for W {}
 
-pub(crate) trait Downcast {
-  fn downcast_to(&self, id: TypeId) -> Option<&dyn Any>;
+/// A trait to query dynamic type and its inner type on runtime.
+pub(crate) trait QueryType {
+  /// query self type by type id, and return a reference of `Any` trait to cast
+  /// to target type if type match.
+  fn query_any(&self, type_id: TypeId) -> Option<&dyn Any>;
+  /// query self type by type id, and return a mut reference of `Any` trait to
+  /// cast to target type if type match.
+  fn query_any_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
+  /// A type can composed by others, this method query all type(include self)
+  /// match the type id, and call the callback one by one. The callback accept
+  /// an `& dyn Any` of the target type, and return if it want to continue.
+  fn query_all_inner_any(&self, type_id: TypeId, callback: &dyn Fn(&dyn Any) -> bool);
+  /// A type can composed by others, this method query all type(include self)
+  /// match the type id, and call the callback one by one. The callback accept
+  /// an `&mut dyn Any` of the target type, and return if it want to continue.
+  fn query_all_inner_any_mut(
+    &mut self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+  );
 }
 pub(crate) trait IntoRender {
   type R: RenderWidget;
@@ -119,12 +137,12 @@ impl<W: CombinationWidget> IntoCombination for W {
 
 pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
 pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
-pub(crate) trait CombinationNode: CombinationWidget + AsAttrs + Downcast {}
-pub(crate) trait RenderNode: RenderWidget + AsAttrs + Downcast {}
+pub(crate) trait CombinationNode: CombinationWidget + AsAttrs + QueryType {}
+pub(crate) trait RenderNode: RenderWidget + AsAttrs + QueryType {}
 
-impl<W: CombinationWidget + AsAttrs + Downcast> CombinationNode for W {}
+impl<W: CombinationWidget + AsAttrs + QueryType> CombinationNode for W {}
 
-impl<W: RenderWidget + AsAttrs + Downcast> RenderNode for W {}
+impl<W: RenderWidget + AsAttrs + QueryType> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
   Combination(Box<dyn CombinationNode>),
@@ -133,17 +151,63 @@ pub(crate) enum BoxedWidgetInner {
   MultiChild(BoxedMultiChild),
 }
 
-impl<W: Any> Downcast for W {
+impl<W: Any + Widget> QueryType for W {
   #[inline]
-  default fn downcast_to(&self, id: TypeId) -> Option<&dyn Any> {
-    if self.type_id() == id {
-      Some(self)
-    } else {
-      None
+  default fn query_any(&self, type_id: TypeId) -> Option<&dyn Any> {
+    (self.type_id() == type_id).then(|| self as &dyn Any)
+  }
+
+  #[inline]
+  default fn query_any_mut(&mut self, type_id: TypeId) -> Option<&mut (dyn Any + '_)> {
+    ((&*self).type_id() == type_id).then(|| self as &mut dyn Any)
+  }
+
+  #[inline]
+  default fn query_all_inner_any(&self, type_id: TypeId, callback: &dyn Fn(&dyn Any) -> bool) {
+    if let Some(a) = self.query_any(type_id) {
+      callback(a);
+    }
+  }
+
+  #[inline]
+  default fn query_all_inner_any_mut(
+    &mut self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+  ) {
+    if let Some(a) = self.query_any_mut(type_id) {
+      callback(a);
     }
   }
 }
 
+impl dyn QueryType {
+  #[inline]
+  pub fn query_type<T: Any>(&self) -> Option<&T> {
+    self
+      .query_any(TypeId::of::<T>())
+      .and_then(|a| a.downcast_ref())
+  }
+
+  #[inline]
+  pub fn query_type_mut<T: Any>(&mut self) -> Option<&mut T> {
+    self
+      .query_any_mut(TypeId::of::<T>())
+      .and_then(|a| a.downcast_mut())
+  }
+
+  #[inline]
+  pub fn query_all_inner_type<T: Any>(&self, callback: impl Fn(&T) -> bool) {
+    let callback = |a: &dyn Any| a.downcast_ref().map_or(true, |t| callback(t));
+    self.query_all_inner_any(TypeId::of::<T>(), &callback)
+  }
+
+  #[inline]
+  fn query_all_inner_type_mut<T: Any>(&mut self, mut callback: impl FnMut(&mut T) -> bool) {
+    let mut callback = |a: &mut dyn Any| a.downcast_mut().map_or(true, |t| callback(t));
+    self.query_all_inner_any_mut(TypeId::of::<T>(), &mut callback)
+  }
+}
 // Widget & BoxWidget default implementation
 pub struct CombinationMarker;
 pub struct StatefulCombinationMarker;

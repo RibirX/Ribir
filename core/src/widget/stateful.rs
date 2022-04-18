@@ -344,19 +344,6 @@ impl<W: RenderWidget> RenderWidget for StatefulWrap<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.0.paint(ctx) }
 }
 
-impl<W> Downcast for StatefulWrap<W>
-where
-  Self: Any,
-{
-  fn downcast_to(&self, id: TypeId) -> Option<&dyn Any> {
-    self
-      .0
-      .widget
-      .downcast_to(id)
-      .or_else(|| self.0.downcast_to(id))
-  }
-}
-
 // Implement IntoStateful for all widget
 
 impl<W: Widget + 'static> IntoStateful for W {

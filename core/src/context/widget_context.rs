@@ -57,7 +57,7 @@ pub trait WidgetCtx {
 
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
-  fn widget_downcast_ref<T: 'static>(&self, id: WidgetId) -> Option<&T>;
+  fn query_type<T: 'static>(&self, id: WidgetId) -> Option<&T>;
 }
 
 fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
@@ -172,12 +172,12 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   #[inline]
   fn render_widget(&self) -> Option<WidgetId> { self.id().render_widget(self.widget_tree()) }
 
-  fn widget_downcast_ref<W: 'static>(&self, id: WidgetId) -> Option<&W> {
+  fn query_type<W: 'static>(&self, id: WidgetId) -> Option<&W> {
     let type_id = TypeId::of::<W>();
 
     match id.assert_get(self.widget_tree()) {
-      WidgetNode::Combination(c) => c.downcast_to(type_id),
-      WidgetNode::Render(r) => r.downcast_to(type_id),
+      WidgetNode::Combination(c) => c.query_any(type_id),
+      WidgetNode::Render(r) => r.query_any(type_id),
     }
     .and_then(<dyn Any>::downcast_ref)
   }
