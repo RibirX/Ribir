@@ -1,12 +1,10 @@
-use ribir::{
-  animation::{AnimationCtrl, ProgressState, TickerAnimationCtrl, TickerRunningHandle},
-  prelude::Observable,
-  widget::LocalSubject,
-  widget::Observer,
+use rxrust::{
+  observable::Observable,
+  ops::box_it::LocalCloneBoxOp,
+  prelude::{LocalSubject, Observer},
 };
-use rxrust::ops::box_it::LocalBoxOp;
 
-use crate::curve::Curve;
+use super::{AnimationCtrl, Curve, ProgressState, TickerAnimationCtrl, TickerRunningHandle};
 
 struct AnimationCtrlImpl {
   last_state: ProgressState,
@@ -24,7 +22,7 @@ impl AnimationCtrl for AnimationCtrlImpl {
     };
   }
 
-  fn subject(&mut self) -> LocalBoxOp<'static, f32, ()> { self.subject.clone().box_it() }
+  fn subject(&mut self) -> LocalCloneBoxOp<'static, f32, ()> { self.subject.clone().box_it() }
 
   fn step(&mut self, step: f32) {
     let state = match step + self.last_state.val() {
@@ -68,9 +66,10 @@ pub fn new_animation_ctrl(curve: Option<Box<dyn Curve>>) -> Box<dyn AnimationCtr
 
 #[cfg(test)]
 mod tests {
-  use ribir::prelude::SubscribeNext;
+  use rxrust::observable::SubscribeNext;
 
-  use crate::animation_ctrl::*;
+  use crate::prelude::{new_animation_ctrl, ProgressState};
+
   #[test]
   fn test_animation_ctrl() {
     let mut ctrl = new_animation_ctrl(None);

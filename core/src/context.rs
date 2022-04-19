@@ -7,11 +7,11 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use crate::animation::TickerProvider;
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
   AsAttrs, BoxedWidget, BoxedWidgetInner, Event, EventCommon, Key, StateAttr, WidgetId,
 };
+use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
 use ahash::RandomState;
 use painter::{PaintCommand, Painter};
@@ -241,16 +241,18 @@ impl Context {
   }
 
   pub fn state_change_dispatch(&mut self) {
-    while let Some((id, silent)) = self.widget_tree.pop_changed_widgets() {
+    while let Some((id, flag)) = self.widget_tree.pop_changed_widgets() {
       let attr = id
         .assert_get_mut(&mut self.widget_tree)
         .find_attr_mut::<StateAttr>();
 
-      if let Some(attr) = attr {
-        attr.changed_notify()
+      if flag.contains(WidgetChangeFlags::DIFFUSE) {
+        if let Some(attr) = attr {
+          attr.changed_notify()
+        }
       }
 
-      if !silent {
+      if flag.contains(WidgetChangeFlags::UNSILENT) {
         self.mark_changed(id);
       }
     }

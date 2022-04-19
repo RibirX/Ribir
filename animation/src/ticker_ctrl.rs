@@ -82,7 +82,7 @@ impl RawTickerCtrl {
 
   pub fn pause(&mut self) { self.at = None; }
 
-  pub fn run(&mut self) {
+  pub fn start(&mut self) {
     if self.at.is_none() {
       self.at = Some(Instant::now());
     }
@@ -112,6 +112,13 @@ impl RawTickerCtrl {
     self.last_state = self.progress.val(0.);
     self.reversed = false;
     self.at = if run { Some(Instant::now()) } else { None };
+  }
+
+  pub fn force_done(&mut self) {
+    if self.is_complete() {
+      return;
+    }
+    self.update_to(self.span_secs());
   }
 }
 
@@ -161,7 +168,7 @@ mod tests {
   #[test]
   fn test_progress() {
     let mut ctrl = RawTickerCtrl::new(Duration::from_millis(500));
-    ctrl.run();
+    ctrl.start();
     let mut to = Instant::now() + Duration::from_millis(100);
     ctrl.update(Some(to));
     assert!(progress_eq(ctrl.state(), ProgressState::Between(0.2)));
@@ -174,7 +181,7 @@ mod tests {
   fn test_repeat() {
     let mut ctrl = RawTickerCtrl::new(Duration::from_millis(500));
     ctrl.with_repeat(RepeatMode::Repeat(5));
-    ctrl.run();
+    ctrl.start();
 
     let mut to = Instant::now() + Duration::from_millis(600);
     ctrl.update(Some(to));
@@ -187,7 +194,7 @@ mod tests {
   #[test]
   fn test_stop() {
     let mut ctrl = RawTickerCtrl::new(Duration::from_millis(500));
-    ctrl.run();
+    ctrl.start();
 
     let mut now = Instant::now();
     ctrl.update(Some(now + Duration::from_millis(100)));
@@ -197,7 +204,7 @@ mod tests {
     ctrl.update(Some(now + Duration::from_millis(2000)));
     assert!(progress_eq(ctrl.state(), ProgressState::Between(0.2)));
 
-    ctrl.run();
+    ctrl.start();
     now = Instant::now();
 
     now += Duration::from_millis(100);

@@ -1,5 +1,11 @@
-#![feature(test, decl_macro, marker_trait_attr, min_specialization)]
-
+#![feature(
+  test,
+  decl_macro,
+  marker_trait_attr,
+  min_specialization,
+  trait_upcasting
+)]
+#![allow(incomplete_features)]
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;
