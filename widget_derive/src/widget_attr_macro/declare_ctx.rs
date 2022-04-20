@@ -15,6 +15,7 @@ use quote::quote;
 use std::collections::{HashMap, HashSet};
 use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident, ItemMacro, Member};
 
+#[derive(Default)]
 pub struct DeclareCtx {
   /// All name defined in `widget!` by `id`.
   pub named_objects: HashSet<Ident>,
@@ -28,7 +29,6 @@ pub struct DeclareCtx {
   /// the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
   id_capture_scope: Vec<bool>,
-  ctx_name: Ident,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -223,18 +223,6 @@ impl VisitMut for DeclareCtx {
 }
 
 impl DeclareCtx {
-  pub fn new(ctx_name: Ident) -> Self {
-    Self {
-      named_objects: Default::default(),
-      current_follows: Default::default(),
-      be_followed: Default::default(),
-      analyze_stack: vec![],
-      user_perspective_name: Default::default(),
-      id_capture_scope: Default::default(),
-      ctx_name,
-    }
-  }
-
   pub fn id_collect(&mut self, d: &WidgetMacro) -> super::Result<()> {
     d.object_names_iter().try_for_each(|name| {
       if let Some(old) = self.named_objects.get(name) {
@@ -244,11 +232,6 @@ impl DeclareCtx {
         Ok(())
       }
     })
-  }
-
-  pub fn ctx_name(&self) -> &Ident {
-    // todo: track ctx rename
-    &self.ctx_name
   }
 
   pub fn be_followed(&self, name: &Ident) -> bool {

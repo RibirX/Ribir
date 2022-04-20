@@ -1,6 +1,9 @@
 use crate::{
   declare_derive::field_convert_method,
-  widget_attr_macro::{field_guard_variable, skip_nc_assign, widget_def_variable, DeclareCtx},
+  widget_attr_macro::{
+    field_guard_variable, ribir_variable, skip_nc_assign, widget_def_variable, DeclareCtx,
+    BUILD_CTX,
+  },
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
@@ -31,16 +34,17 @@ impl<'a> WidgetGen<'a> {
       quote! { let #guard_cond = #guard { true } else { false }; }
     });
 
+    let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
     let build_widget = {
       let mut_token = (!fields_with_guard.is_empty()).then(|| quote! {mut});
       let without_guard_tokens = fields_without_guard
         .iter()
         .map(|f| f.build_tokens_without_guard());
-      let ctx_name = ctx.ctx_name();
+
       if fields_with_guard.is_empty() {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()
-            #(#without_guard_tokens)*.build(#ctx_name).into_widget()#stateful;
+            #(#without_guard_tokens)*.build(#build_ctx).into_widget()#stateful;
         }
       } else {
         let with_guard_tokens = fields_with_guard
@@ -50,7 +54,7 @@ impl<'a> WidgetGen<'a> {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()#(#without_guard_tokens)*;
           #(#with_guard_tokens)*
-          let #def_name = #def_name.build(#ctx_name).into_widget()#stateful;
+          let #def_name = #def_name.build(#build_ctx).into_widget()#stateful;
         }
       }
     };

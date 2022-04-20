@@ -9,12 +9,8 @@ mod widget_attr_macro;
 mod util;
 
 use proc_macro::TokenStream;
-use proc_macro2::Span;
-use quote::{quote, quote_spanned};
-use syn::{
-  parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Comma, visit_mut::VisitMut,
-  DeriveInput, FnArg, Ident,
-};
+use quote::quote;
+use syn::{parse_macro_input, visit_mut::VisitMut, DeriveInput};
 use widget_attr_macro::DeclareCtx;
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
@@ -67,30 +63,8 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn widget(_attr: TokenStream, input: TokenStream) -> TokenStream {
   let mut compose_fn = parse_macro_input! { input as syn::ImplItemMethod };
-  let inputs = &compose_fn.sig.inputs;
 
-  fn ctx_args(inputs: &Punctuated<FnArg, Comma>) -> Result<Ident, TokenStream> {
-    fn unknown_arguments_err(span: Span) -> Result<Ident, TokenStream> {
-      Err(quote_spanned! { span => compile_err!("unknown arguments name") }.into())
-    }
-
-    let ctx_name = match inputs.last().unwrap() {
-      FnArg::Receiver(r) => return unknown_arguments_err(r.span()),
-      FnArg::Typed(t) => match *t.pat {
-        syn::Pat::Ident(ref name) => name.ident.clone(),
-        _ => return unknown_arguments_err(t.span()),
-      },
-    };
-
-    Ok(ctx_name)
-  }
-
-  let ctx_name = match ctx_args(inputs) {
-    Ok(names) => names,
-    Err(err) => return err,
-  };
-
-  let mut ctx = DeclareCtx::new(ctx_name);
+  let mut ctx = DeclareCtx::default();
 
   ctx.stack_push().visit_impl_item_method_mut(&mut compose_fn);
   quote! { #compose_fn }.into()
