@@ -75,7 +75,7 @@ macro_rules! assign_uninit_field {
     } else {
       Err(syn::Error::new(
         $right.span(),
-        format!("field `{}` specified more than once", stringify!($name)).as_str(),
+        format!("`{}` declare more than once", stringify!($name)).as_str(),
       ))
     }
   };

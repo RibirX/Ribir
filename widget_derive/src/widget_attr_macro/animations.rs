@@ -111,7 +111,7 @@ struct PathField {
 }
 
 #[derive(Debug)]
-struct SimpleField {
+pub struct SimpleField {
   member: Ident,
   colon_token: Option<token::Colon>,
   expr: Expr,
