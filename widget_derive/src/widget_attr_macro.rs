@@ -23,12 +23,14 @@ mod dataflows;
 mod declare_widget;
 pub use declare_widget::RESERVE_IDENT;
 
+mod track;
 mod widget_macro;
 pub mod kw {
   syn::custom_keyword!(widget);
   syn::custom_keyword!(declare);
   syn::custom_keyword!(dataflows);
   syn::custom_keyword!(animations);
+  syn::custom_keyword!(track);
   syn::custom_keyword!(ExprChild);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);

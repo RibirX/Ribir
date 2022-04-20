@@ -10,8 +10,8 @@ use syn::{
 
 use super::{
   animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
-  widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace, Follows,
-  Result,
+  track::Track, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace,
+  Follows, Result,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -20,6 +20,7 @@ use crate::{
 
 pub struct WidgetMacro {
   widget: DeclareWidget,
+  track: Option<Track>,
   dataflows: Option<Dataflows>,
   animations: Option<Animations>,
 }
@@ -43,6 +44,7 @@ impl Parse for WidgetMacro {
     let mut widget: Option<DeclareWidget> = None;
     let mut dataflows: Option<Dataflows> = None;
     let mut animations: Option<Animations> = None;
+    let mut track: Option<Track> = None;
     loop {
       if content.is_empty() {
         break;
@@ -57,6 +59,9 @@ impl Parse for WidgetMacro {
       } else if lk.peek(kw::animations) {
         let a = content.parse()?;
         assign_uninit_field!(animations, a, animations)?;
+      } else if lk.peek(kw::track) {
+        let t = content.parse()?;
+        assign_uninit_field!(track, t, track)?;
       } else {
         return Err(lk.error());
       }
@@ -66,7 +71,7 @@ impl Parse for WidgetMacro {
       syn::Error::new(content.span(), "must have a `declare { ... }` in `widget!`")
     })?;
 
-    Ok(Self { widget, dataflows, animations })
+    Ok(Self { widget, dataflows, animations, track })
   }
 }
 
@@ -149,6 +154,7 @@ impl WidgetMacro {
       .widget
       .object_names_iter()
       .chain(self.animations.iter().flat_map(|a| a.names()))
+      .chain(self.track.iter().flat_map(|t| t.track_names()))
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ { self.widget.warnings() }
