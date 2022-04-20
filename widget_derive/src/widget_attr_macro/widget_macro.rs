@@ -14,10 +14,13 @@ use super::{
   widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace, Follows,
   Result,
 };
-use crate::error::{DeclareError, DeclareWarning};
+use crate::{
+  error::{DeclareError, DeclareWarning},
+  widget_attr_macro::{ribir_variable, BUILD_CTX},
+};
 
 pub struct WidgetMacro {
-  _widget_token: kw::widget,
+  widget_token: kw::widget,
   _bang_token: token::Bang,
   _brace_token: token::Brace,
   widget: DeclareWidget,
@@ -42,9 +45,9 @@ struct CircleCheckStack<'a> {
 impl Parse for WidgetMacro {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let widget_token = input.parse::<kw::widget>()?;
-    let bang_token = input.parse()?;
+    let _bang_token = input.parse()?;
     let content;
-    let brace_token = braced!(content in input);
+    let _brace_token = braced!(content in input);
 
     let mut widget: Option<DeclareWidget> = None;
     let mut dataflows: Option<Dataflows> = None;
@@ -76,9 +79,9 @@ impl Parse for WidgetMacro {
     })?;
 
     Ok(Self {
-      _widget_token: widget_token,
-      _bang_token: bang_token,
-      _brace_token: brace_token,
+      widget_token,
+      _bang_token,
+      _brace_token,
       widget,
       dataflows,
       animations,
@@ -144,26 +147,20 @@ impl WidgetMacro {
       self.widget.compose_tokens()
     };
 
-    let ctx_name = ctx.ctx_name();
+    let Self { dataflows, animations, .. } = self;
 
-    let dataflows_tokens = self
-      .dataflows
-      .as_ref()
-      .map(|dataflows| quote! { #dataflows});
-
-    let animations_tokens = self
-      .animations
-      .as_ref()
-      .map(|animations| animations.to_tokens(ctx_name));
-
+    let ctx_name = ribir_variable(BUILD_CTX, self.widget_token.span());
     let def_name = widget_def_variable(&self.widget.widget_identify());
-    Ok(quote! {{
-      #named_objects_tokens
-      #declare_widget
-      #dataflows_tokens
-      #animations_tokens
-      #def_name.box_it()
-    }})
+
+    Ok(quote! {
+      (move |#ctx_name: &mut BuildCtx| {
+        #named_objects_tokens
+        #declare_widget
+        #dataflows
+        #animations
+        #def_name.box_it()
+      }).box_it()
+    })
   }
 
   pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
@@ -193,7 +190,6 @@ impl WidgetMacro {
 
   // return the key-value map of the named widget define tokens.
   fn named_objects_def_tokens(&self, ctx: &DeclareCtx) -> HashMap<Ident, TokenStream, RandomState> {
-    let ctx_name = ctx.ctx_name();
     self
       .widget
       .named_objects_def_tokens_iter(ctx)
@@ -201,7 +197,7 @@ impl WidgetMacro {
         self
           .animations
           .as_ref()
-          .map(|a| a.named_objects_def_tokens_iter(ctx_name))
+          .map(|a| a.named_objects_def_tokens_iter())
           .into_iter()
           .flatten(),
       )

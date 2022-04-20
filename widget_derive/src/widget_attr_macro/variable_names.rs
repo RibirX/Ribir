@@ -5,6 +5,7 @@ use super::declare_widget::Child;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
 pub(crate) const DECLARE_WRAP_MACRO: &str = "ribir_declare_ಠ_ಠ";
+pub(crate) const BUILD_CTX: &str = "build_ctx";
 
 pub fn child_variable(c: &Child, idx: usize) -> Ident {
   let span = match c {

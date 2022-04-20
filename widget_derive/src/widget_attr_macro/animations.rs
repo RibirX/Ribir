@@ -16,6 +16,7 @@ use crate::widget_attr_macro::Id;
 use super::{
   declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
   ribir_suffix_variable, ribir_variable, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
+  BUILD_CTX,
 };
 
 use super::kw;
@@ -423,27 +424,22 @@ impl Parse for AnimateExpr {
   }
 }
 
-impl Animations {
-  pub fn to_tokens(&self, ctx_name: &Ident) -> TokenStream {
-    let mut tokens = quote! {};
-    self.brace_token.surround(&mut tokens, |tokens| {
-      self
-        .triggers
-        .iter()
-        .for_each(|t| t.to_tokens(ctx_name, tokens));
+impl ToTokens for Animations {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    self.brace_token.surround(tokens, |tokens| {
+      self.triggers.iter().for_each(|t| t.to_tokens(tokens));
     });
-    tokens
   }
 }
 
-impl Animate {
-  fn to_tokens(&self, ctx_name: &Ident) -> TokenStream {
+impl ToTokens for Animate {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self {
       animate_token, id, from, transition, ..
     } = self;
 
     let animate_span = animate_token.span();
-
+    let ctx_name = ribir_variable(BUILD_CTX, animate_span);
     let mut animate_tokens = quote_spanned! { animate_span =>
       #animate_token::new(
         #from,
@@ -458,14 +454,16 @@ impl Animate {
       };
     }
 
-    return animate_tokens;
+    tokens.extend(animate_tokens);
   }
+}
 
-  fn embed_as_expr_tokens(&self, ctx_name: &Ident) -> TokenStream {
+impl Animate {
+  fn embed_as_expr_tokens(&self, tokens: &mut TokenStream) {
     if let Some(Id { name, .. }) = self.id.as_ref() {
-      quote! { #name }
+      name.to_tokens(tokens)
     } else {
-      self.to_tokens(ctx_name)
+      self.to_tokens(tokens)
     }
   }
 }
@@ -576,8 +574,8 @@ impl ToTokens for Transition {
   }
 }
 
-impl Trigger {
-  fn to_tokens(&self, ctx_name: &Ident, tokens: &mut TokenStream) {
+impl ToTokens for Trigger {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self {
       path: path @ MemberPath { widget, member, dot_token },
       expr,
@@ -591,7 +589,11 @@ impl Trigger {
     let is_listener = false;
     if is_listener {
       let expr = match expr {
-        AnimateExpr::Animate(a) => a.embed_as_expr_tokens(ctx_name),
+        AnimateExpr::Animate(a) => {
+          let mut tokens = quote! {};
+          a.embed_as_expr_tokens(&mut tokens);
+          tokens
+        }
         AnimateExpr::Transition(t) => quote_spanned! { t.transition_token.span() =>
           compile_error!("`Transition can not directly use for listener trigger, use `Animate` instead of.`")
         },
@@ -607,13 +609,18 @@ impl Trigger {
       let widget = widget_from_field_name(&widget, &member);
 
       let expr = match expr {
-        AnimateExpr::Animate(a) => a.embed_as_expr_tokens(ctx_name),
+        AnimateExpr::Animate(a) => {
+          let mut tokens = quote! {};
+          a.embed_as_expr_tokens(&mut tokens);
+          tokens
+        }
         AnimateExpr::Transition(t) => {
           let transition = if let Some(Id { name, .. }) = t.id.as_ref() {
             quote! {#name}
           } else {
             quote! {#t}
           };
+          let ctx_name = ribir_variable(BUILD_CTX, t.span());
           quote_spanned! { t.transition_token.span() =>
             Animate::new(
               move |init_v, final_v| move |p| {
@@ -757,13 +764,10 @@ impl Animations {
   }
 
   // return the key-value map of the named widget define tokens.
-  pub fn named_objects_def_tokens_iter<'a>(
-    &'a self,
-    ctx_name: &'a Ident,
-  ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
+  pub fn named_objects_def_tokens_iter(&self) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
     self.named_objects_iter().map(|o| {
       let tokens = match o {
-        AnimationObject::Animate(a) => a.to_tokens(ctx_name),
+        AnimationObject::Animate(a) => quote! { #a },
         AnimationObject::Transition(t) => quote! {#t},
         AnimationObject::State(s) => quote! {#s},
       };
@@ -891,15 +895,5 @@ impl Spanned for AnimateExpr {
       AnimateExpr::Transition(t) => t.span(),
       AnimateExpr::Expr(e) => e.span(),
     }
-  }
-}
-
-impl Spanned for Animations {
-  fn span(&self) -> proc_macro2::Span {
-    self
-      .animations_token
-      .span()
-      .join(self.brace_token.span)
-      .unwrap()
   }
 }

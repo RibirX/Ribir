@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use painter::{StrokeOptions, LineCap, LineJoin};
+use painter::{LineCap, LineJoin, StrokeOptions};
 use path_clean::PathClean;
 use std::{env, io, path::PathBuf};
 use usvg::Tree;
@@ -116,7 +116,7 @@ pub fn load_src(path: impl AsRef<std::path::Path>) -> io::Result<PathBuf> {
   Ok(absolute_path)
 }
 
-impl RenderWidget for Svg {
+impl Render for Svg {
   #[inline]
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { self.size }
 
