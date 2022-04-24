@@ -8,7 +8,7 @@ use painter::{Point, Rect};
 use super::Context;
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
-  LayoutStore, WidgetId,
+  LayoutStore, QueryType, WidgetId,
 };
 
 /// common action for all context of widget.

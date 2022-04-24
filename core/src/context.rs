@@ -52,7 +52,7 @@ impl Context {
   ) -> Self {
     let ticker = animation_ticker.map(|ticker| Rc::new(RefCell::new(ticker)));
     let mut ctx = match root.0 {
-      BoxedWidgetInner::Combination(c) => {
+      BoxedWidgetInner::Compose(c) => {
         let widget_tree = WidgetTree::new(WidgetNode::Combination(c));
         let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
         let tree = &ctx.widget_tree;
@@ -100,7 +100,7 @@ impl Context {
 
     while let Some((widget, p_wid)) = stack.pop() {
       match widget.0 {
-        BoxedWidgetInner::Combination(c) => {
+        BoxedWidgetInner::Compose(c) => {
           let wid = p_wid.append_child(WidgetNode::Combination(c), self.widget_tree.as_mut());
           let mut ctx = BuildCtx::new(self, wid);
           let c = match wid.assert_get(&*self.widget_tree) {

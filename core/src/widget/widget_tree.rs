@@ -263,7 +263,7 @@ impl WidgetId {
 }
 
 pub(crate) enum WidgetNode {
-  Combination(Box<dyn CombinationNode>),
+  Combination(Box<dyn Compose<W = Box<dyn RenderNode>>>),
   Render(Box<dyn RenderNode>),
 }
 
@@ -304,7 +304,7 @@ impl WidgetNode {
 impl AsAttrs for BoxedWidgetInner {
   fn as_attrs(&self) -> Option<&Attributes> {
     match self {
-      BoxedWidgetInner::Combination(c) => c.as_attrs(),
+      BoxedWidgetInner::Compose(c) => c.as_attrs(),
       BoxedWidgetInner::Render(r) => r.as_attrs(),
       BoxedWidgetInner::SingleChild(s) => s.as_attrs(),
       BoxedWidgetInner::MultiChild(m) => m.as_attrs(),
@@ -313,7 +313,7 @@ impl AsAttrs for BoxedWidgetInner {
 
   fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
     match self {
-      BoxedWidgetInner::Combination(c) => c.as_attrs_mut(),
+      BoxedWidgetInner::Compose(c) => c.as_attrs_mut(),
       BoxedWidgetInner::Render(r) => r.as_attrs_mut(),
       BoxedWidgetInner::SingleChild(s) => s.as_attrs_mut(),
       BoxedWidgetInner::MultiChild(m) => m.as_attrs_mut(),

@@ -363,8 +363,10 @@ impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
 
 impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
 
-impl<W: Compose> Compose for StatefulWrap<W> {
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.compose(ctx) }
+impl<C: Compose> Compose for StatefulWrap<C> {
+  type W = C::W;
+  #[inline]
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self.0.compose(ctx) }
 }
 
 impl<W: Render> Render for StatefulWrap<W> {
