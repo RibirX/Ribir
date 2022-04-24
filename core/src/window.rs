@@ -98,7 +98,8 @@ impl Window {
   pub fn render_ready(&mut self) -> bool {
     let Self { raw_window, context, dispatcher, .. } = self;
     context.state_change_dispatch();
-    let tree_changed = context.tree_repair();
+    let tree_changed = context.is_dirty();
+    context.tree_repair();
 
     let Context {
       layout_store,
