@@ -346,7 +346,7 @@ impl StateAttr {
 /// for all widget, and avoid trait implement conflict.
 pub(crate) struct StatefulWrap<W>(Stateful<W>);
 
-impl<W: RenderWidget> IntoRender for Stateful<W> {
+impl<W: Render> IntoRender for Stateful<W> {
   type R = StatefulWrap<W>;
 
   #[inline]
@@ -367,7 +367,7 @@ impl<W: Compose> Compose for StatefulWrap<W> {
   fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.compose(ctx) }
 }
 
-impl<W: RenderWidget> RenderWidget for StatefulWrap<W> {
+impl<W: Render> Render for StatefulWrap<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.0.perform_layout(clamp, ctx)

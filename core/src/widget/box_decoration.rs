@@ -40,7 +40,7 @@ fn single_child<C: WidgetCtx>(ctx: &C) -> WidgetId {
     .expect("BoxDecoration must have one child.")
 }
 
-impl RenderWidget for BoxDecoration {
+impl Render for BoxDecoration {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 

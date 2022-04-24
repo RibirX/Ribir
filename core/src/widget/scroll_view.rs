@@ -132,7 +132,7 @@ impl ViewContainer {
   }
 }
 
-impl RenderWidget for ViewContainer {
+impl Render for ViewContainer {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let (new_ctx, it) = self.iter_children(ctx);

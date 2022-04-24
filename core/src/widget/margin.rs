@@ -15,7 +15,7 @@ pub struct Margin {
   pub margin: EdgeInsets,
 }
 
-impl RenderWidget for Margin {
+impl Render for Margin {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let thickness = self.margin.thickness();
     let zero = Size::zero();

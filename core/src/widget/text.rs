@@ -11,7 +11,7 @@ pub struct Text {
   pub style: TextStyle,
 }
 
-impl RenderWidget for Text {
+impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let t_store = ctx.typography_store();
     let TextStyle {

@@ -15,7 +15,7 @@ pub struct Row {
   pub h_align: MainAxisAlign,
 }
 
-impl RenderWidget for Row {
+impl Render for Row {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let Self { reverse, wrap, v_align, h_align } = self.clone();

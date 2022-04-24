@@ -25,7 +25,7 @@ impl ScrollBarTrack {
   }
 }
 
-impl RenderWidget for ScrollBarTrack {
+impl Render for ScrollBarTrack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     if !self.layout.is_show() {
       return Size::default();
@@ -52,7 +52,7 @@ pub struct ScrollBarThumb {
   cross_width: f32,
 }
 
-impl RenderWidget for ScrollBarThumb {
+impl Render for ScrollBarThumb {
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
     if !self.layout.is_show() {
       return Size::default();
