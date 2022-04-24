@@ -10,9 +10,9 @@ use std::time::Duration;
 
 struct Demo {}
 
-impl CombinationWidget for Demo {
+impl Compose for Demo {
   #[widget]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare Row {
           SizedBox {

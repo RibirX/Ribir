@@ -59,7 +59,7 @@ impl Context {
         let child = match tree.root().assert_get(tree) {
           WidgetNode::Combination(c) => {
             let mut build_ctx = BuildCtx::new(&ctx, tree.root());
-            c.build(&mut build_ctx)
+            c.compose(&mut build_ctx)
           }
           WidgetNode::Render(_) => unreachable!(),
         };
@@ -107,7 +107,7 @@ impl Context {
             WidgetNode::Combination(c) => c,
             WidgetNode::Render(_) => unreachable!(),
           };
-          let child = c.build(&mut ctx);
+          let child = c.compose(&mut ctx);
 
           stack.push((child, wid));
         }

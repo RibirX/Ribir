@@ -46,9 +46,9 @@ mod tests {
   fn fix_size() {
     const SIZE: Size = Size::new(100., 100.);
     struct T;
-    impl CombinationWidget for T {
+    impl Compose for T {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size:SIZE,
@@ -67,9 +67,9 @@ mod tests {
   fn shrink_size() {
     struct Shrink;
 
-    impl CombinationWidget for Shrink {
+    impl Compose for Shrink {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: SizedBox::shrink_size(),

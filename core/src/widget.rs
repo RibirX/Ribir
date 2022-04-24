@@ -40,11 +40,10 @@ mod scrollbar;
 
 use self::layout_store::BoxClamp;
 
-// todo: rename to compose?
-pub trait CombinationWidget {
+pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget;
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget;
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -90,7 +89,7 @@ pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
 #[marker]
 pub(crate) trait Widget {}
-impl<W: CombinationWidget> Widget for W {}
+impl<W: Compose> Widget for W {}
 impl<W: RenderWidget> Widget for W {}
 impl<W: StatefulCombination> Widget for W {}
 
@@ -122,7 +121,7 @@ pub(crate) trait IntoRender {
 }
 
 pub(crate) trait IntoCombination {
-  type C: CombinationWidget;
+  type C: Compose;
   fn into_combination(self) -> Self::C;
 }
 
@@ -132,7 +131,7 @@ impl<W: RenderWidget> IntoRender for W {
   fn into_render(self) -> Self::R { self }
 }
 
-impl<W: CombinationWidget> IntoCombination for W {
+impl<W: Compose> IntoCombination for W {
   type C = W;
   #[inline]
   fn into_combination(self) -> Self::C { self }
@@ -140,10 +139,10 @@ impl<W: CombinationWidget> IntoCombination for W {
 
 pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
 pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
-pub(crate) trait CombinationNode: CombinationWidget + AsAttrs + QueryType {}
+pub(crate) trait CombinationNode: Compose + AsAttrs + QueryType {}
 pub(crate) trait RenderNode: RenderWidget + AsAttrs + QueryType {}
 
-impl<W: CombinationWidget + AsAttrs + QueryType> CombinationNode for W {}
+impl<W: Compose + AsAttrs + QueryType> CombinationNode for W {}
 
 impl<W: RenderWidget + AsAttrs + QueryType> RenderNode for W {}
 
@@ -254,8 +253,8 @@ impl<M: IntoRender + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
 
 struct StatefulCombinationWrap<W>(Stateful<W>);
 
-impl<W: StatefulCombination> CombinationWidget for StatefulCombinationWrap<W> {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget
+impl<W: StatefulCombination> Compose for StatefulCombinationWrap<W> {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget
   where
     Self: Sized,
   {
@@ -312,7 +311,7 @@ impl AsAttrs for BoxedWidget {
   }
 }
 
-impl<W: Fn(&mut BuildCtx) -> BoxedWidget> CombinationWidget for W {
+impl<W: Fn(&mut BuildCtx) -> BoxedWidget> Compose for W {
   #[inline]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self(ctx) }
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self(ctx) }
 }

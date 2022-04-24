@@ -7,9 +7,9 @@ fn ui() {
 
 use ribir::prelude::*;
 struct T;
-impl CombinationWidget for T {
+impl Compose for T {
   #[widget]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare SizedBox {
         size: Size::zero(),

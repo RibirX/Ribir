@@ -220,9 +220,9 @@ mod tests {
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
-    impl CombinationWidget for Scrollable {
+    impl Compose for Scrollable {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: Size::new(1000., 1000.),

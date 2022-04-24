@@ -101,9 +101,9 @@ impl ScrollBar {
   }
 }
 
-impl CombinationWidget for ScrollBar {
+impl Compose for ScrollBar {
   #[widget]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare ScrollBarTrack {
         layout: self.info.clone(),
