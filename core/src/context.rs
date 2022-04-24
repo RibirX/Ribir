@@ -1,6 +1,5 @@
 use std::{
   cell::{Cell, RefCell},
-  collections::{HashMap, HashSet},
   pin::Pin,
   rc::Rc,
   sync::{Arc, RwLock},
@@ -8,7 +7,7 @@ use std::{
 
 use crate::prelude::{
   widget_tree::{WidgetNode, WidgetTree},
-  AsAttrs, BoxedWidget, BoxedWidgetInner, Event, EventCommon, Key, StateAttr, WidgetId,
+  AsAttrs, BoxedWidget, BoxedWidgetInner, Event, EventCommon, StateAttr, WidgetId,
 };
 use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
@@ -41,8 +40,6 @@ pub(crate) struct Context {
   pub shaper: TextShaper,
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
-  /// Store combination widgets changed.
-  need_builds: HashSet<WidgetId, ahash::RandomState>,
   animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
   generator_store: generator_store::GeneratorStore,
 }
@@ -218,8 +215,6 @@ impl Context {
       self.layout_store.mark_needs_layout(id, &self.widget_tree);
       // paint widget not effect widget size, it's detect by single child or
       // parent max limit.
-    } else {
-      self.need_builds.insert(id);
     }
   }
 
@@ -232,18 +227,10 @@ impl Context {
 
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
-  pub fn tree_repair(&mut self) -> bool {
-    let mut changed = false;
+  pub fn tree_repair(&mut self) {
     self
       .generator_store
       .update_dynamic_widgets(self.widget_tree.as_mut());
-
-    while let Some(need_build) = self.pop_need_build_widget() {
-      changed = self.repair_subtree(need_build) || changed;
-      let rid = need_build.render_widget(&self.widget_tree).unwrap();
-      self.layout_store.mark_needs_layout(rid, &self.widget_tree)
-    }
-    changed
   }
 
   pub fn state_change_dispatch(&mut self) {
@@ -266,12 +253,7 @@ impl Context {
 
   #[allow(dead_code)]
   pub fn is_dirty(&self) -> bool {
-    self
-      .need_builds
-      .iter()
-      .any(|id| !id.is_dropped(&self.widget_tree))
-      || self.layout_store.is_dirty(&self.widget_tree)
-      || self.generator_store.is_dirty()
+    self.layout_store.is_dirty(&self.widget_tree) || self.generator_store.is_dirty()
   }
 
   pub fn descendants(&self) -> impl Iterator<Item = WidgetId> + '_ {
@@ -298,137 +280,9 @@ impl Context {
       shaper,
       reorder,
       typography_store,
-      need_builds: <_>::default(),
       animation_ticker,
       generator_store: <_>::default(),
     }
-  }
-
-  /// Return the topmost need rebuild
-  fn pop_need_build_widget(&mut self) -> Option<WidgetId> {
-    let id = loop {
-      let id = *self.need_builds.iter().next()?;
-      if id.is_dropped(&self.widget_tree) {
-        self.need_builds.remove(&id);
-        continue;
-      }
-      break id;
-    };
-
-    let topmost = id
-      .ancestors(&self.widget_tree)
-      .skip(1)
-      .fold(id, |mut id, p| {
-        if self.need_builds.contains(&p) && !p.is_dropped(&self.widget_tree) {
-          id = p
-        }
-        id
-      });
-
-    Some(topmost)
-  }
-
-  pub(crate) fn repair_subtree(&mut self, sub_tree: WidgetId) -> bool {
-    let c = match sub_tree.assert_get(&self.widget_tree) {
-      WidgetNode::Combination(c) => c,
-      WidgetNode::Render(_) => unreachable!("rebuild widget must be combination widget."),
-    };
-
-    let mut ctx = BuildCtx::new(self, sub_tree);
-    let child = c.build(&mut ctx);
-    self.need_builds.remove(&sub_tree);
-    let child_id = sub_tree.single_child(&self.widget_tree).unwrap();
-
-    let mut changed = false;
-    let mut stack = vec![(child, child_id)];
-    while let Some((w, wid)) = stack.pop() {
-      match w.0 {
-        BoxedWidgetInner::Combination(c) => {
-          let mut ctx = BuildCtx::new(self, wid);
-          let child = c.build(&mut ctx);
-          self.need_builds.remove(&wid);
-
-          let new_id = self.replace_widget(WidgetNode::Combination(c), wid);
-          changed = new_id.is_some() || changed;
-          match new_id {
-            Some(new_id) => self.inflate_append(child, new_id),
-            None => stack.push((child, wid)),
-          }
-        }
-        BoxedWidgetInner::Render(r) => {
-          changed = self.replace_widget(WidgetNode::Render(r), wid).is_some() || changed;
-        }
-        BoxedWidgetInner::SingleChild(s) => {
-          let (r, child) = s.unzip();
-          let new_id = self.replace_widget(WidgetNode::Render(r), wid);
-          changed = new_id.is_some() || changed;
-          match (new_id, child) {
-            (Some(new_id), Some(child)) => self.inflate_append(child, new_id),
-            (None, Some(child)) => stack.push((child, wid)),
-            _ => {}
-          }
-        }
-        BoxedWidgetInner::MultiChild(m) => {
-          let (r, children) = m.unzip();
-          let new_id = self.replace_widget(WidgetNode::Render(r), wid);
-          changed = new_id.is_some() || changed;
-          match new_id {
-            Some(new_id) => children
-              .into_iter()
-              .for_each(|c| self.inflate_append(c, new_id)),
-            None => {
-              let mut key_children = self.detach_key_children(wid);
-              children.into_iter().for_each(|c| {
-                match c.0.get_key().and_then(|k| key_children.remove(&*k)) {
-                  Some(c_id) => {
-                    wid.attach(c_id, &mut self.widget_tree);
-                    stack.push((c, c_id));
-                  }
-                  None => self.inflate_append(c, wid),
-                }
-              });
-              key_children.into_iter().for_each(|(_, k)| self.drop(k));
-            }
-          }
-        }
-      }
-    }
-    changed
-  }
-
-  // Collect and detach the child has key, and drop the others.
-  pub(crate) fn detach_key_children(
-    &mut self,
-    wid: WidgetId,
-  ) -> HashMap<Key, WidgetId, ahash::RandomState> {
-    let mut key_children = HashMap::default();
-    let mut child = wid.first_child(&self.widget_tree);
-    while let Some(id) = child {
-      child = id.next_sibling(&self.widget_tree);
-
-      if let Some(key) = id.assert_get(&self.widget_tree).get_key().cloned() {
-        id.detach(&mut self.widget_tree);
-        key_children.insert(key, id);
-      } else {
-        self.drop(id)
-      }
-    }
-    key_children
-  }
-
-  fn replace_widget(&mut self, w: WidgetNode, id: WidgetId) -> Option<WidgetId> {
-    let new_id = self.widget_tree.as_mut().replace_widget(w, id);
-    if new_id.is_some() {
-      self.drop(id)
-    }
-    new_id
-  }
-
-  pub(crate) fn drop(&mut self, id: WidgetId) {
-    id.descendants(&self.widget_tree).for_each(|c| {
-      self.layout_store.remove(c);
-    });
-    id.remove_subtree(&mut self.widget_tree)
   }
 
   pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
