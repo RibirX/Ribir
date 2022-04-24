@@ -89,7 +89,7 @@ impl ScrollableBoth {
 }
 
 macro scroll_render_widget_impl($widget: ty, $state: ty) {
-  impl RenderWidget for $widget {
+  impl Render for $widget {
     fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
       let size = clamp.max;
       if let Some(child) = ctx.single_child() {

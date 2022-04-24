@@ -81,9 +81,10 @@ impl<W: Render> Render for WidgetWithGenerator<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.widget.paint(ctx) }
 }
 
-impl<W: Compose> Compose for WidgetWithGenerator<W> {
+impl<C: Compose> Compose for WidgetWithGenerator<C> {
+  type W = C::W;
   #[inline]
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.compose(ctx) }
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self.widget.compose(ctx) }
 }
 
 impl<W: Render> Render for DynamicWidget<W> {
@@ -99,9 +100,10 @@ impl<W: Render> Render for DynamicWidget<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.widget.paint(ctx) }
 }
 
-impl<W: Compose> Compose for DynamicWidget<W> {
+impl<C: Compose> Compose for DynamicWidget<C> {
+  type W = C::W;
   #[inline]
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.compose(ctx) }
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self.widget.compose(ctx) }
 }
 
 impl<W> QueryType for DynamicWidget<W>

@@ -566,8 +566,9 @@ impl<W: Render> Render for AttrWidgetWrap<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.0.paint(ctx) }
 }
 
-impl<W: Compose> Compose for AttrWidgetWrap<W> {
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.widget.compose(ctx) }
+impl<C: Compose> Compose for AttrWidgetWrap<C> {
+  type W = C::W;
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self.0.widget.compose(ctx) }
 }
 
 macro get_attr($name: ident) {

@@ -1,5 +1,8 @@
 #[doc(hidden)]
-pub use std::any::{Any, TypeId};
+pub use std::{
+  any::{Any, TypeId},
+  marker::PhantomData,
+};
 pub mod key;
 pub mod layout;
 pub use layout::*;
@@ -41,9 +44,10 @@ mod scrollbar;
 use self::layout_store::BoxClamp;
 
 pub trait Compose {
+  type W;
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget;
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W;
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -73,11 +77,11 @@ pub trait Render {
   fn paint(&self, ctx: &mut PaintingCtx);
 }
 
-// todo: deprecated, remove it after optimistic CombinationWidget.
+// todo: deprecated, remove it after optimistic Compose.
 /// A combination widget which want directly implement stateful widget and have
 /// no stateless version. Implement `StatefulCombination` only when you need a
 /// stateful widget during `build`, otherwise you should implement
-/// [`CombinationWidget`]! and a stateful version will auto provide by
+/// [`Compose`]! and a stateful version will auto provide by
 /// framework, use [`Stateful::into_stateful`]! to convert.
 pub trait StatefulCombination {
   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
@@ -85,7 +89,60 @@ pub trait StatefulCombination {
     Self: Sized;
 }
 
+/// A generic widget wrap for all compose widget result, and keep its type info.
+pub struct ComposedWidget<C: Compose> {
+  composed: C::W,
+  by: PhantomData<C>,
+}
+
+trait ConcreteCompose<Target> {
+  fn concrete_compose(self, ctx: &mut BuildCtx) -> Target;
+}
+
 pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
+
+impl<C: Compose> ConcreteCompose<ComposedWidget<C>> for C {
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> ComposedWidget<C> {
+    ComposedWidget {
+      composed: self.compose(ctx),
+      by: PhantomData,
+    }
+  }
+}
+
+impl<C: RenderNode + 'static> ConcreteCompose<Box<dyn RenderNode>> for C {
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> Box<dyn RenderNode> { Box::new(self) }
+}
+
+impl<C: Compose> Compose for ComposedWidget<C> {
+  type W = ComposedWidget<Self>;
+
+  #[inline]
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W {
+    ComposedWidget {
+      composed: self.compose(ctx),
+      by: PhantomData,
+    }
+  }
+}
+
+impl<C: Compose> Render for ComposedWidget<C>
+where
+  C::W: Render,
+{
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.composed.perform_layout(clamp, ctx)
+  }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { self.composed.only_sized_by_parent() }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
+}
 
 #[marker]
 pub(crate) trait Widget {}
@@ -147,7 +204,7 @@ impl<W: Compose + AsAttrs + QueryType> CombinationNode for W {}
 impl<W: Render + AsAttrs + QueryType> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
-  Combination(Box<dyn CombinationNode>),
+  Compose(Box<dyn ConcreteCompose<Box<dyn RenderNode>>>),
   Render(Box<dyn RenderNode>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
@@ -211,7 +268,7 @@ impl dyn QueryType {
   }
 }
 // Widget & BoxWidget default implementation
-pub struct CombinationMarker;
+pub struct ComposeMarker;
 pub struct StatefulCombinationMarker;
 pub struct RenderMarker;
 
@@ -219,13 +276,9 @@ pub trait BoxWidget<Marker> {
   fn box_it(self) -> BoxedWidget;
 }
 
-impl<T: IntoCombination + 'static> BoxWidget<CombinationMarker> for T {
+impl<T: ConcreteCompose<Box<dyn RenderNode>> + 'static> BoxWidget<ComposeMarker> for T {
   #[inline]
-  fn box_it(self) -> BoxedWidget {
-    BoxedWidget(BoxedWidgetInner::Combination(Box::new(
-      self.into_combination(),
-    )))
-  }
+  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
 }
 
 impl<T: IntoRender + 'static> BoxWidget<RenderMarker> for T {
@@ -253,8 +306,9 @@ impl<M: IntoRender + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
 
 struct StatefulCombinationWrap<W>(Stateful<W>);
 
-impl<W: StatefulCombination> Compose for StatefulCombinationWrap<W> {
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget
+impl<C: StatefulCombination> Compose for StatefulCombinationWrap<C> {
+  type W = BoxedWidget;
+  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget
   where
     Self: Sized,
   {
@@ -294,7 +348,7 @@ impl BoxWidget<StatefulCombinationMarker> for BoxedWidget {
 impl AsAttrs for BoxedWidget {
   fn as_attrs(&self) -> Option<&Attributes> {
     match &self.0 {
-      BoxedWidgetInner::Combination(c) => c.as_attrs(),
+      BoxedWidgetInner::Compose(c) => c.as_attrs(),
       BoxedWidgetInner::Render(r) => r.as_attrs(),
       BoxedWidgetInner::SingleChild(s) => s.widget.as_attrs(),
       BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs(),
@@ -303,7 +357,7 @@ impl AsAttrs for BoxedWidget {
 
   fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
     match &mut self.0 {
-      BoxedWidgetInner::Combination(c) => c.as_attrs_mut(),
+      BoxedWidgetInner::Compose(c) => c.as_attrs_mut(),
       BoxedWidgetInner::Render(r) => r.as_attrs_mut(),
       BoxedWidgetInner::SingleChild(s) => s.widget.as_attrs_mut(),
       BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs_mut(),
@@ -311,7 +365,8 @@ impl AsAttrs for BoxedWidget {
   }
 }
 
-impl<W: Fn(&mut BuildCtx) -> BoxedWidget> Compose for W {
+impl<R, C: FnOnce(&mut BuildCtx) -> R> Compose for C {
+  type W = R;
   #[inline]
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self(ctx) }
+  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self(ctx) }
 }
