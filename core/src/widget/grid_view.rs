@@ -50,7 +50,7 @@ impl GridView {
   }
 }
 
-impl RenderWidget for GridView {
+impl Render for GridView {
   #[inline]
   fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let (ctx, children) = ctx.split_children();

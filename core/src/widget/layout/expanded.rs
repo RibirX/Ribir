@@ -12,7 +12,7 @@ impl Expanded {
   pub fn new(flex: f32) -> Self { Self { flex } }
 }
 
-impl RenderWidget for Expanded {
+impl Render for Expanded {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let child = ctx
       .single_child()

@@ -553,7 +553,7 @@ impl<W> AttachAttr for SilentRef<W> {
   attr_widget_attach_impl!();
 }
 
-impl<W: RenderWidget> RenderWidget for AttrWidgetWrap<W> {
+impl<W: Render> Render for AttrWidgetWrap<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.0.perform_layout(clamp, ctx)

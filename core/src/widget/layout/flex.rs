@@ -73,7 +73,7 @@ impl Default for MainAxisAlign {
   fn default() -> Self { MainAxisAlign::Start }
 }
 
-impl RenderWidget for Flex {
+impl Render for Flex {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let direction = self.direction;
     let mut layouter = FlexLayouter {

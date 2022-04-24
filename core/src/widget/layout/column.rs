@@ -15,7 +15,7 @@ pub struct Column {
   pub v_align: MainAxisAlign,
 }
 
-impl RenderWidget for Column {
+impl Render for Column {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let Self { reverse, wrap, h_align, v_align } = self.clone();
 

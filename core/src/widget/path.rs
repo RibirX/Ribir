@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-impl RenderWidget for Path {
+impl Render for Path {
   #[inline]
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
     self.box_rect().max().to_vector().to_size()

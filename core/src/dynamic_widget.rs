@@ -68,7 +68,7 @@ impl GenerateInfo {
   }
 }
 
-impl<W: RenderWidget> RenderWidget for WidgetWithGenerator<W> {
+impl<W: Render> Render for WidgetWithGenerator<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.widget.perform_layout(clamp, ctx)
@@ -86,7 +86,7 @@ impl<W: Compose> Compose for WidgetWithGenerator<W> {
   fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.compose(ctx) }
 }
 
-impl<W: RenderWidget> RenderWidget for DynamicWidget<W> {
+impl<W: Render> Render for DynamicWidget<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.widget.perform_layout(clamp, ctx)

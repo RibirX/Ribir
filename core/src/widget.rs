@@ -54,7 +54,7 @@ pub trait Compose {
 ///
 /// If `as_layout` return none, widget size will detected by its single child if
 /// it has or as large as possible.
-pub trait RenderWidget {
+pub trait Render {
   /// Do the work of computing the layout for this widget, and return the
   /// size it need.
   ///
@@ -90,7 +90,7 @@ pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 #[marker]
 pub(crate) trait Widget {}
 impl<W: Compose> Widget for W {}
-impl<W: RenderWidget> Widget for W {}
+impl<W: Render> Widget for W {}
 impl<W: StatefulCombination> Widget for W {}
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
@@ -116,7 +116,7 @@ pub(crate) trait QueryType {
   );
 }
 pub(crate) trait IntoRender {
-  type R: RenderWidget;
+  type R: Render;
   fn into_render(self) -> Self::R;
 }
 
@@ -125,7 +125,7 @@ pub(crate) trait IntoCombination {
   fn into_combination(self) -> Self::C;
 }
 
-impl<W: RenderWidget> IntoRender for W {
+impl<W: Render> IntoRender for W {
   type R = W;
   #[inline]
   fn into_render(self) -> Self::R { self }
@@ -140,11 +140,11 @@ impl<W: Compose> IntoCombination for W {
 pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
 pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
 pub(crate) trait CombinationNode: Compose + AsAttrs + QueryType {}
-pub(crate) trait RenderNode: RenderWidget + AsAttrs + QueryType {}
+pub(crate) trait RenderNode: Render + AsAttrs + QueryType {}
 
 impl<W: Compose + AsAttrs + QueryType> CombinationNode for W {}
 
-impl<W: RenderWidget + AsAttrs + QueryType> RenderNode for W {}
+impl<W: Render + AsAttrs + QueryType> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
   Combination(Box<dyn CombinationNode>),

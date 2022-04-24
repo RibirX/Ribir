@@ -7,7 +7,7 @@ pub struct Padding {
   pub padding: EdgeInsets,
 }
 
-impl RenderWidget for Padding {
+impl Render for Padding {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let child = match ctx.single_render_child() {
       Some(c) => c,

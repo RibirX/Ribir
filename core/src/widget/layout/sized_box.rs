@@ -22,7 +22,7 @@ impl SizedBox {
   pub fn shrink_size() -> Size { Size::zero() }
 }
 
-impl RenderWidget for SizedBox {
+impl Render for SizedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let size = clamp.clamp(self.size);
     if let Some(child) = ctx.single_render_child() {
