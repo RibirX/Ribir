@@ -10,10 +10,10 @@ use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 #[test]
 fn declare_smoke() {
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
 
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           size: Size::new(500.,500.),
@@ -27,9 +27,9 @@ fn declare_smoke() {
 #[test]
 fn simple_ref_bind_work() {
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = Size::new(500., 500.);
       widget! {
        declare Flex {
@@ -64,9 +64,9 @@ fn event_attr_sugar_work() {
   const BEFORE_SIZE: Size = Size::new(50., 50.);
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           id: sized_box,
@@ -97,10 +97,10 @@ fn event_attr_sugar_work() {
 #[test]
 fn widget_wrap_bind_work() {
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
 
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare Flex {
           SizedBox {
@@ -135,9 +135,9 @@ fn widget_wrap_bind_work() {
 fn expression_for_children() {
   struct EmbedExpr(Size);
 
-  impl CombinationWidget for EmbedExpr {
+  impl Compose for EmbedExpr {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = self.0;
       widget! {
         declare Flex {
@@ -170,9 +170,9 @@ fn expression_for_children() {
 #[test]
 fn embed_widget_ref_outside() {
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare Flex {
           SizedBox {
@@ -205,9 +205,9 @@ fn embed_widget_ref_outside() {
 #[test]
 fn data_flow_macro() {
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       let size = Size::new(1., 1.);
       widget! {
         declare Flex {
@@ -240,9 +240,9 @@ fn local_var_not_bind() {
   const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           size: {
@@ -269,9 +269,9 @@ fn local_var_not_bind() {
 fn with_attr_ref() {
   #[derive(Default)]
   struct Track(Rc<Cell<Option<StateRef<Flex>>>>);
-  impl CombinationWidget for Track {
+  impl Compose for Track {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare Flex {
           id: root,
@@ -314,9 +314,9 @@ fn with_attr_ref() {
 #[test]
 fn if_guard_field_true() {
   struct GuardTrue;
-  impl CombinationWidget for GuardTrue {
+  impl Compose for GuardTrue {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           size if true => : Size::new(100., 100.)
@@ -333,9 +333,9 @@ fn if_guard_field_true() {
 #[should_panic = "Required field `SizedBox::size` not set"]
 fn if_guard_field_false() {
   struct GuardFalse;
-  impl CombinationWidget for GuardFalse {
+  impl Compose for GuardFalse {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           size if false => : Size::new(100., 100.)
@@ -350,9 +350,9 @@ fn if_guard_field_false() {
 fn attr_bind_to_self() {
   #[derive(Default)]
   struct Track(Rc<Cell<Option<StateRef<SizedBox>>>>);
-  impl CombinationWidget for Track {
+  impl Compose for Track {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           id: self_id,
@@ -391,9 +391,9 @@ fn attr_bind_to_self() {
 #[test]
 fn if_guard_work() {
   struct T;
-  impl CombinationWidget for T {
+  impl Compose for T {
     #[widget]
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare SizedBox {
           size if true => : Size::new(100., 100.),

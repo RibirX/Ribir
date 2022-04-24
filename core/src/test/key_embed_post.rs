@@ -10,10 +10,10 @@ pub struct EmbedPostWithKey {
   level: usize,
 }
 
-impl CombinationWidget for EmbedPostWithKey {
+impl Compose for EmbedPostWithKey {
   #[widget]
 
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare Row {
         key: 0,

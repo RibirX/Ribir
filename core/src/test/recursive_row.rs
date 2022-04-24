@@ -6,9 +6,9 @@ pub struct RecursiveRow {
   pub depth: usize,
 }
 
-impl CombinationWidget for RecursiveRow {
+impl Compose for RecursiveRow {
   #[widget]
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare Row {
         ExprChild {

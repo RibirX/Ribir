@@ -329,9 +329,9 @@ mod tests {
   fn layout() {
     const SIZE: Size = Size::new(100., 100.);
     struct T;
-    impl CombinationWidget for T {
+    impl Compose for T {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: SIZE,
@@ -358,9 +358,9 @@ mod tests {
   #[test]
   fn paint() {
     struct Paint;
-    impl CombinationWidget for Paint {
+    impl Compose for Paint {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let radius_cases = vec![
           Radius::all(0.),
           Radius::all(10.),

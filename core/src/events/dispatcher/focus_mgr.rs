@@ -248,8 +248,8 @@ mod tests {
       log: Rc<RefCell<Vec<String>>>,
     }
 
-    impl CombinationWidget for EmbedFocus {
-      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+    impl Compose for EmbedFocus {
+      fn compose(&self, _: &mut BuildCtx) -> BoxedWidget {
         let child = log_focus_event("child", empty_box(), self.log.clone());
         log_focus_event(
           "parent",
@@ -325,9 +325,9 @@ mod tests {
   fn fix_dropped_focusing() {
     struct T;
 
-    impl CombinationWidget for T {
+    impl Compose for T {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: Size::zero(),

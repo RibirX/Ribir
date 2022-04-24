@@ -407,9 +407,9 @@ mod tests {
   fn cancel_bubble() {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
-    impl CombinationWidget for EventRecord {
+    impl Compose for EventRecord {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: SizedBox::expanded_size(),
@@ -457,10 +457,10 @@ mod tests {
       leave: Rc<RefCell<Vec<i32>>>,
     }
 
-    impl CombinationWidget for EnterLeave {
+    impl Compose for EnterLeave {
       #[widget]
 
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: SizedBox::expanded_size(),
@@ -538,9 +538,9 @@ mod tests {
     #[derive(Default)]
     struct ClickPath(Rc<RefCell<i32>>);
 
-    impl CombinationWidget for ClickPath {
+    impl Compose for ClickPath {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare Row {
             v_align: CrossAxisAlign::Start,
@@ -635,9 +635,9 @@ mod tests {
   fn focus_change_by_event() {
     struct T;
 
-    impl CombinationWidget for T {
+    impl Compose for T {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare Row {
             SizedBox {

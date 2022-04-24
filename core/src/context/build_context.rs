@@ -55,8 +55,8 @@ mod tests {
   #[should_panic(expected = "Get a default theme from context")]
   fn always_have_default_theme() {
     struct T;
-    impl CombinationWidget for T {
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    impl Compose for T {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let _ = ctx.theme();
         panic!("Get a default theme from context");
       }
@@ -70,8 +70,8 @@ mod tests {
     themes: Rc<RefCell<Vec<Theme>>>,
   }
 
-  impl CombinationWidget for ThemeTrack {
-    fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  impl Compose for ThemeTrack {
+    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       self.themes.borrow_mut().push(ctx.theme().clone());
       SizedBox { size: Size::zero() }.box_it()
     }
@@ -82,9 +82,9 @@ mod tests {
     #[derive(Default, Clone)]
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
-    impl CombinationWidget for DarkLightThemes {
+    impl Compose for DarkLightThemes {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
@@ -116,9 +116,9 @@ mod tests {
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
-    impl CombinationWidget for LightDarkThemes {
+    impl Compose for LightDarkThemes {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);

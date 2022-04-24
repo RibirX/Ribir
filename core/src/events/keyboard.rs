@@ -73,9 +73,9 @@ mod tests {
     #[derive(Default)]
     struct Keys(Rc<RefCell<Vec<String>>>);
 
-    impl CombinationWidget for Keys {
+    impl Compose for Keys {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let down_keys = self.0.clone();
         let up_keys = self.0.clone();
         widget! {

@@ -566,8 +566,8 @@ impl<W: RenderWidget> RenderWidget for AttrWidgetWrap<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.0.paint(ctx) }
 }
 
-impl<W: CombinationWidget> CombinationWidget for AttrWidgetWrap<W> {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.widget.build(ctx) }
+impl<W: Compose> Compose for AttrWidgetWrap<W> {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.widget.compose(ctx) }
 }
 
 macro get_attr($name: ident) {

@@ -353,7 +353,7 @@ impl<W: RenderWidget> IntoRender for Stateful<W> {
   fn into_render(self) -> Self::R { StatefulWrap(self) }
 }
 
-impl<W: CombinationWidget> IntoCombination for Stateful<W> {
+impl<W: Compose> IntoCombination for Stateful<W> {
   type C = StatefulWrap<W>;
   #[inline]
   fn into_combination(self) -> Self::C { StatefulWrap(self) }
@@ -363,8 +363,8 @@ impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
 
 impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
 
-impl<W: CombinationWidget> CombinationWidget for StatefulWrap<W> {
-  fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.build(ctx) }
+impl<W: Compose> Compose for StatefulWrap<W> {
+  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget { self.0.compose(ctx) }
 }
 
 impl<W: RenderWidget> RenderWidget for StatefulWrap<W> {
@@ -495,8 +495,8 @@ mod tests {
     #[derive(Debug)]
     struct TestWidget;
 
-    impl CombinationWidget for TestWidget {
-      fn build(&self, _: &mut BuildCtx) -> BoxedWidget {
+    impl Compose for TestWidget {
+      fn compose(&self, _: &mut BuildCtx) -> BoxedWidget {
         SizedBox { size: Size::new(100., 100.) }
           .into_stateful()
           .box_it()

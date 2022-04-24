@@ -58,9 +58,9 @@ mod tests {
   #[test]
   fn tree_down_up() {
     struct RowTree;
-    impl CombinationWidget for RowTree {
+    impl Compose for RowTree {
       #[widget]
-      fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox{
             size: Size::new(f32::INFINITY, f32::INFINITY),
