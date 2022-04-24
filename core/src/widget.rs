@@ -94,7 +94,8 @@ impl<W: CombinationWidget> Widget for W {}
 impl<W: RenderWidget> Widget for W {}
 impl<W: StatefulCombination> Widget for W {}
 
-/// A trait to query dynamic type and its inner type on runtime.
+/// A trait to query dynamic type and its inner type on runtime, use this trait
+/// to provide type information you want framework know.
 pub(crate) trait QueryType {
   /// query self type by type id, and return a reference of `Any` trait to cast
   /// to target type if type match.
@@ -104,11 +105,11 @@ pub(crate) trait QueryType {
   fn query_any_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
-  /// an `& dyn Any` of the target type, and return if it want to continue.
+  /// an `& dyn Any` of the target type, and return if  want to continue.
   fn query_all_inner_any(&self, type_id: TypeId, callback: &dyn Fn(&dyn Any) -> bool);
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
-  /// an `&mut dyn Any` of the target type, and return if it want to continue.
+  /// an `&mut dyn Any` of the target type, and return if want to continue.
   fn query_all_inner_any_mut(
     &mut self,
     type_id: TypeId,
@@ -153,7 +154,7 @@ pub(crate) enum BoxedWidgetInner {
   MultiChild(BoxedMultiChild),
 }
 
-impl<W: Any + Widget> QueryType for W {
+impl<W: Any> QueryType for W {
   #[inline]
   default fn query_any(&self, type_id: TypeId) -> Option<&dyn Any> {
     (self.type_id() == type_id).then(|| self as &dyn Any)

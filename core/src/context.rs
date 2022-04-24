@@ -1,6 +1,5 @@
 use std::{
-  cell::Cell,
-  cell::RefCell,
+  cell::{Cell, RefCell},
   collections::{HashMap, HashSet},
   pin::Pin,
   rc::Rc,
@@ -13,7 +12,6 @@ use crate::prelude::{
 };
 use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
-use ahash::RandomState;
 use painter::{PaintCommand, Painter};
 mod painting_context;
 pub use painting_context::PaintingCtx;
@@ -31,6 +29,7 @@ pub use layout_store::BoxClamp;
 pub(crate) use layout_store::LayoutStore;
 mod build_context;
 pub use build_context::BuildCtx;
+mod generator_store;
 
 pub(crate) struct Context {
   pub layout_store: LayoutStore,
@@ -45,6 +44,7 @@ pub(crate) struct Context {
   /// Store combination widgets changed.
   need_builds: HashSet<WidgetId, ahash::RandomState>,
   animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+  generator_store: generator_store::GeneratorStore,
 }
 
 impl Context {
@@ -60,7 +60,10 @@ impl Context {
         let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
         let tree = &ctx.widget_tree;
         let child = match tree.root().assert_get(tree) {
-          WidgetNode::Combination(c) => c.build(&mut BuildCtx::new(&ctx, tree.root())),
+          WidgetNode::Combination(c) => {
+            let mut build_ctx = BuildCtx::new(&ctx, tree.root());
+            c.build(&mut build_ctx)
+          }
           WidgetNode::Render(_) => unreachable!(),
         };
         let root = tree.root();
@@ -101,7 +104,7 @@ impl Context {
     while let Some((widget, p_wid)) = stack.pop() {
       match widget.0 {
         BoxedWidgetInner::Combination(c) => {
-          let wid = p_wid.append_widget(WidgetNode::Combination(c), self.widget_tree.as_mut());
+          let wid = p_wid.append_child(WidgetNode::Combination(c), self.widget_tree.as_mut());
           let mut ctx = BuildCtx::new(self, wid);
           let c = match wid.assert_get(&*self.widget_tree) {
             WidgetNode::Combination(c) => c,
@@ -112,18 +115,18 @@ impl Context {
           stack.push((child, wid));
         }
         BoxedWidgetInner::Render(rw) => {
-          p_wid.append_widget(WidgetNode::Render(rw), self.widget_tree.as_mut());
+          p_wid.append_child(WidgetNode::Render(rw), self.widget_tree.as_mut());
         }
         BoxedWidgetInner::SingleChild(s) => {
           let (rw, child) = s.unzip();
-          let wid = p_wid.append_widget(WidgetNode::Render(rw), self.widget_tree.as_mut());
+          let wid = p_wid.append_child(WidgetNode::Render(rw), self.widget_tree.as_mut());
           if let Some(child) = child {
             stack.push((child, wid));
           }
         }
         BoxedWidgetInner::MultiChild(m) => {
           let (rw, children) = m.unzip();
-          let wid = p_wid.append_widget(WidgetNode::Render(rw), self.widget_tree.as_mut());
+          let wid = p_wid.append_child(WidgetNode::Render(rw), self.widget_tree.as_mut());
           children
             .into_iter()
             .rev()
@@ -132,7 +135,6 @@ impl Context {
       };
     }
   }
-
   pub(crate) fn bubble_event<D, E, F, Attr>(
     &self,
     widget: WidgetId,
@@ -232,6 +234,10 @@ impl Context {
   /// some user or device inputs has been processed.
   pub fn tree_repair(&mut self) -> bool {
     let mut changed = false;
+    self
+      .generator_store
+      .update_dynamic_widgets(self.widget_tree.as_mut());
+
     while let Some(need_build) = self.pop_need_build_widget() {
       changed = self.repair_subtree(need_build) || changed;
       let rid = need_build.render_widget(&self.widget_tree).unwrap();
@@ -265,6 +271,7 @@ impl Context {
       .iter()
       .any(|id| !id.is_dropped(&self.widget_tree))
       || self.layout_store.is_dirty(&self.widget_tree)
+      || self.generator_store.is_dirty()
   }
 
   pub fn descendants(&self) -> impl Iterator<Item = WidgetId> + '_ {
@@ -293,6 +300,7 @@ impl Context {
       typography_store,
       need_builds: <_>::default(),
       animation_ticker,
+      generator_store: <_>::default(),
     }
   }
 
@@ -320,7 +328,7 @@ impl Context {
     Some(topmost)
   }
 
-  fn repair_subtree(&mut self, sub_tree: WidgetId) -> bool {
+  pub(crate) fn repair_subtree(&mut self, sub_tree: WidgetId) -> bool {
     let c = match sub_tree.assert_get(&self.widget_tree) {
       WidgetNode::Combination(c) => c,
       WidgetNode::Render(_) => unreachable!("rebuild widget must be combination widget."),
@@ -389,7 +397,10 @@ impl Context {
   }
 
   // Collect and detach the child has key, and drop the others.
-  fn detach_key_children(&mut self, wid: WidgetId) -> HashMap<Key, WidgetId, RandomState> {
+  pub(crate) fn detach_key_children(
+    &mut self,
+    wid: WidgetId,
+  ) -> HashMap<Key, WidgetId, ahash::RandomState> {
     let mut key_children = HashMap::default();
     let mut child = wid.first_child(&self.widget_tree);
     while let Some(id) = child {
@@ -413,7 +424,7 @@ impl Context {
     new_id
   }
 
-  fn drop(&mut self, id: WidgetId) {
+  pub(crate) fn drop(&mut self, id: WidgetId) {
     id.descendants(&self.widget_tree).for_each(|c| {
       self.layout_store.remove(c);
     });

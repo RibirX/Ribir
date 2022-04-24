@@ -18,6 +18,7 @@ log = "0.4.8"
 painter = {path = "../painter", version = "*"}
 png = {version = "0.17.3", optional = true}
 rxrust = "1.0.0-alpha.2"
+smallvec = "1.8.0"
 text = {path = "../text"}
 widget_derive = {path = "../widget_derive"}
 winit = "0.26.1"

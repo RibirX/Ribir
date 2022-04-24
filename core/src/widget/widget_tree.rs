@@ -1,4 +1,7 @@
-use crate::prelude::*;
+use crate::{
+  dynamic_widget::{GenerateInfo, GeneratorHandler},
+  prelude::*,
+};
 use bitflags::bitflags;
 use indextree::*;
 use std::{collections::HashMap, pin::Pin};
@@ -30,7 +33,7 @@ impl WidgetTree {
       changed_widget: <_>::default(),
     };
     let mut tree = Box::pin(tree);
-    tree.as_mut().state_info_assign(root);
+    tree.as_mut().widget_info_assign(root);
     tree
   }
 
@@ -39,7 +42,6 @@ impl WidgetTree {
 
   pub(crate) fn new_node(mut self: Pin<&mut Self>, widget: WidgetNode) -> WidgetId {
     let id = WidgetId(self.arena.new_node(widget));
-    self.state_info_assign(id);
     id
   }
 
@@ -65,7 +67,7 @@ impl WidgetTree {
         let parent = id
           .parent(self.as_ref().get_ref())
           .expect("parent should exists!");
-        let new_id = parent.append_widget(w, self);
+        let new_id = parent.append_child(w, self);
         Some(new_id)
       }
     }
@@ -90,11 +92,31 @@ impl WidgetTree {
       .and_then(|id| self.changed_widget.remove_entry(&id))
   }
 
-  fn state_info_assign(mut self: Pin<&mut Self>, id: WidgetId) {
+  fn widget_info_assign(mut self: Pin<&mut Self>, id: WidgetId) {
     let ptr = std::ptr::NonNull::from(&*self);
     let self_ref = self.as_mut().get_mut();
-    if let Some(state_attr) = id.assert_get_mut(self_ref).find_attr_mut::<StateAttr>() {
+    let p = id.parent(self_ref);
+    let node = id.assert_get_mut(self_ref);
+
+    if let Some(state_attr) = node.find_attr_mut::<StateAttr>() {
       state_attr.assign_id(id, ptr);
+    }
+
+    let q = match node {
+      WidgetNode::Combination(c) => (&mut **c as &mut dyn QueryType),
+      WidgetNode::Render(r) => (&mut **r as &mut dyn QueryType),
+    };
+
+    q.query_all_inner_type_mut(|g: &mut GenerateInfo| {
+      g.add_generated_widget_id(id);
+      true
+    });
+
+    if let Some(p) = p {
+      q.query_all_inner_type_mut(|g: &mut GeneratorHandler| {
+        g.assign_parent(p);
+        true
+      });
     }
   }
 }
@@ -185,9 +207,21 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn append_widget(self, data: WidgetNode, mut tree: Pin<&mut WidgetTree>) -> WidgetId {
+  pub(crate) fn insert_child_after(
+    self,
+    after: WidgetId,
+    data: WidgetNode,
+    mut tree: Pin<&mut WidgetTree>,
+  ) {
     let id = tree.as_mut().new_node(data);
-    self.0.append(id.0, &mut tree.get_mut().arena);
+    after.0.insert_after(id.0, &mut tree.arena);
+    tree.widget_info_assign(id);
+  }
+
+  pub(crate) fn append_child(self, data: WidgetNode, mut tree: Pin<&mut WidgetTree>) -> WidgetId {
+    let id = tree.as_mut().new_node(data);
+    self.0.append(id.0, &mut tree.arena);
+    tree.widget_info_assign(id);
     id
   }
 
