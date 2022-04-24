@@ -15,6 +15,7 @@ pub mod animation;
 mod application;
 mod context;
 pub mod declare;
+pub mod dynamic_widget;
 pub mod events;
 pub mod widget;
 pub mod window;

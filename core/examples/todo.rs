@@ -28,7 +28,7 @@ impl StatefulCombination for Todos {
                   checked: task.finished
                 }
                 Text {
-                  text:task.label.clone(),
+                  text: task.label.clone(),
                   margin: EdgeInsets::vertical(4.)
                 }
               }

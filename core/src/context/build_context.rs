@@ -1,4 +1,4 @@
-use crate::{animation::TickerAnimationCtrl, prelude::*};
+use crate::{animation::TickerAnimationCtrl, dynamic_widget::GenerateInfo, prelude::*};
 use ::text::FontFamily;
 use std::{rc::Rc, time::Duration};
 
@@ -38,6 +38,11 @@ impl<'a> BuildCtx<'a> {
       .animation_ticker
       .as_ref()
       .map(|ticker| ticker.borrow_mut().ticker_ctrl(duration))
+  }
+
+  #[inline]
+  pub(crate) fn new_generator_info(&mut self) -> GenerateInfo {
+    self.ctx.generator_store.new_generator_info()
   }
 }
 
