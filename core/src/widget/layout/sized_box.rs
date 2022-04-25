@@ -25,7 +25,7 @@ impl SizedBox {
 impl Render for SizedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let size = clamp.clamp(self.size);
-    if let Some(child) = ctx.single_render_child() {
+    if let Some(child) = ctx.single_child() {
       ctx.perform_render_child_layout(child, BoxClamp { min: size, max: size });
     }
     size

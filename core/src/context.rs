@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::prelude::{
-  widget_tree::{WidgetNode, WidgetTree},
-  AsAttrs, BoxedWidget, BoxedWidgetInner, Event, EventCommon, StateAttr, WidgetId,
+  widget_tree::WidgetTree, Attributes, BoxedWidget, BoxedWidgetInner, Event, EventCommon, Render,
+  StateAttr, WidgetId,
 };
 use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
@@ -26,9 +26,11 @@ pub(crate) mod layout_store;
 pub use layout_context::*;
 pub use layout_store::BoxClamp;
 pub(crate) use layout_store::LayoutStore;
-mod build_context;
+pub(crate) mod build_context;
 pub use build_context::BuildCtx;
-mod generator_store;
+
+use self::build_context::Parent;
+pub(crate) mod generator_store;
 
 pub(crate) struct Context {
   pub layout_store: LayoutStore,
@@ -50,88 +52,27 @@ impl Context {
     device_scale: f32,
     animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
+    struct TmpRoot;
+    impl Render for TmpRoot {
+      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> painter::Size {
+        unreachable!()
+      }
+      fn only_sized_by_parent(&self) -> bool { unreachable!() }
+
+      fn paint(&self, ctx: &mut PaintingCtx) { unreachable!() }
+    }
+    let tree = WidgetTree::new(Box::new(TmpRoot));
+    let tmp_root = tree.root();
     let ticker = animation_ticker.map(|ticker| Rc::new(RefCell::new(ticker)));
-    let mut ctx = match root.0 {
-      BoxedWidgetInner::Compose(c) => {
-        let widget_tree = WidgetTree::new(WidgetNode::Combination(c));
-        let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
-        let tree = &ctx.widget_tree;
-        let child = match tree.root().assert_get(tree) {
-          WidgetNode::Combination(c) => {
-            let mut build_ctx = BuildCtx::new(&ctx, tree.root());
-            c.compose(&mut build_ctx)
-          }
-          WidgetNode::Render(_) => unreachable!(),
-        };
-        let root = tree.root();
-        ctx.inflate_append(child, root);
-        ctx
-      }
-      BoxedWidgetInner::Render(r) => {
-        let widget_tree = WidgetTree::new(WidgetNode::Render(r));
-        Context::from_tree(widget_tree, device_scale, ticker)
-      }
-      BoxedWidgetInner::SingleChild(s) => {
-        let (rw, child) = s.unzip();
-        let widget_tree = WidgetTree::new(WidgetNode::Render(rw));
-        let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
-        if let Some(child) = child {
-          ctx.inflate_append(child, ctx.widget_tree.root());
-        }
-        ctx
-      }
-      BoxedWidgetInner::MultiChild(m) => {
-        let (rw, children) = m.unzip();
-        let widget_tree = WidgetTree::new(WidgetNode::Render(rw));
-        let mut ctx = Context::from_tree(widget_tree, device_scale, ticker);
-        let root = ctx.widget_tree.root();
-        children
-          .into_iter()
-          .for_each(|w| ctx.inflate_append(w, root));
-        ctx
-      }
-    };
+    let mut ctx = Context::from_tree(tree, device_scale, ticker);
+    tmp_root.append_child(root, ctx.widget_tree.as_mut(), ticker, &ctx.generator_store);
+    let tree = ctx.widget_tree.as_mut().get_mut();
+    let real_root = tmp_root.single_child(tree).unwrap();
+    tree.reset_root(real_root);
     ctx.mark_layout_from_root();
     ctx
   }
 
-  pub(crate) fn inflate_append(&mut self, widget: BoxedWidget, parent: WidgetId) {
-    let mut stack = vec![(widget, parent)];
-
-    while let Some((widget, p_wid)) = stack.pop() {
-      match widget.0 {
-        BoxedWidgetInner::Compose(c) => {
-          let wid = p_wid.append_child(WidgetNode::Combination(c), self.widget_tree.as_mut());
-          let mut ctx = BuildCtx::new(self, wid);
-          let c = match wid.assert_get(&*self.widget_tree) {
-            WidgetNode::Combination(c) => c,
-            WidgetNode::Render(_) => unreachable!(),
-          };
-          let child = c.compose(&mut ctx);
-
-          stack.push((child, wid));
-        }
-        BoxedWidgetInner::Render(rw) => {
-          p_wid.append_child(WidgetNode::Render(rw), self.widget_tree.as_mut());
-        }
-        BoxedWidgetInner::SingleChild(s) => {
-          let (rw, child) = s.unzip();
-          let wid = p_wid.append_child(WidgetNode::Render(rw), self.widget_tree.as_mut());
-          if let Some(child) = child {
-            stack.push((child, wid));
-          }
-        }
-        BoxedWidgetInner::MultiChild(m) => {
-          let (rw, children) = m.unzip();
-          let wid = p_wid.append_child(WidgetNode::Render(rw), self.widget_tree.as_mut());
-          children
-            .into_iter()
-            .rev()
-            .for_each(|w| stack.push((w, wid)));
-        }
-      };
-    }
-  }
   pub(crate) fn bubble_event<D, E, F, Attr>(
     &self,
     widget: WidgetId,
@@ -146,7 +87,11 @@ impl Context {
   {
     let mut event = default(self, widget);
     for wid in widget.ancestors(&self.widget_tree) {
-      if let Some(attr) = wid.assert_get(&self.widget_tree).find_attr::<Attr>() {
+      if let Some(attr) = wid
+        .assert_get(&self.widget_tree)
+        .as_attrs()
+        .and_then(Attributes::find::<Attr>)
+      {
         event.as_mut().current_target = wid;
         dispatch(attr, &mut event);
         if event.bubbling_canceled() {
@@ -167,15 +112,13 @@ impl Context {
         self.painter.save();
         self.painter.translate(rect.min_x(), rect.min_y());
       }
-      let n = id.assert_get(&tree);
-      if let WidgetNode::Render(ref r) = n {
-        r.paint(&mut PaintingCtx {
-          id,
-          tree,
-          layout_store: &self.layout_store,
-          painter: &mut self.painter,
-        })
-      }
+      let rw = id.assert_get(&tree);
+      rw.paint(&mut PaintingCtx {
+        id,
+        tree,
+        layout_store: &self.layout_store,
+        painter: &mut self.painter,
+      });
 
       // try to access child
       wid = id.first_child(tree);
@@ -204,26 +147,19 @@ impl Context {
     self.painter.finish()
   }
 
+  // todo: deprecated, remove it after remove all attributes.
   pub fn find_attr<A: 'static>(&self, widget: WidgetId) -> Option<&A> {
-    widget.get(&self.widget_tree).and_then(AsAttrs::find_attr)
+    widget
+      .get(&self.widget_tree)
+      .and_then(|w| w.as_attrs())
+      .and_then(Attributes::find)
   }
 
-  /// mark this id combination widget has changed
   fn mark_changed(&mut self, id: WidgetId) {
-    let tree = &mut self.widget_tree;
-    if let WidgetNode::Render(_) = id.assert_get(tree) {
-      self.layout_store.mark_needs_layout(id, &self.widget_tree);
-      // paint widget not effect widget size, it's detect by single child or
-      // parent max limit.
-    }
+    self.layout_store.mark_needs_layout(id, &self.widget_tree);
   }
 
-  pub fn mark_layout_from_root(&mut self) {
-    let tree = &self.widget_tree;
-    if let Some(root) = tree.root().render_widget(tree) {
-      self.layout_store.mark_needs_layout(root, tree);
-    }
-  }
+  pub fn mark_layout_from_root(&mut self) { self.mark_changed(self.widget_tree.root()); }
 
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
@@ -237,7 +173,8 @@ impl Context {
     while let Some((id, flag)) = self.widget_tree.pop_changed_widgets() {
       let attr = id
         .assert_get_mut(&mut self.widget_tree)
-        .find_attr_mut::<StateAttr>();
+        .as_attrs()
+        .and_then(Attributes::find::<StateAttr>);
 
       if flag.contains(WidgetChangeFlags::DIFFUSE) {
         if let Some(attr) = attr {

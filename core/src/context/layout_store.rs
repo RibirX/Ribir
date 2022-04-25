@@ -6,10 +6,7 @@ use std::{
 
 use text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
 
-use crate::prelude::{
-  widget_tree::{WidgetNode, WidgetTree},
-  Point, Rect, Size, WidgetId,
-};
+use crate::prelude::{widget_tree::WidgetTree, Point, Rect, Size, WidgetId};
 
 use super::LayoutCtx;
 
@@ -75,20 +72,16 @@ impl LayoutStore {
       self.remove(id);
       // All ancestors of this render object should relayout until the one which only
       // sized by parent.
-      id.ancestors(tree)
-        .skip(1)
-        .all(|id| match id.assert_get(tree) {
-          WidgetNode::Combination(_) => true,
-          WidgetNode::Render(r) => {
-            let sized_by_parent = r.only_sized_by_parent();
-            if !sized_by_parent {
-              self.remove(id);
-              relayout_root = id;
-            }
+      id.ancestors(tree).skip(1).all(|id| {
+        let r = id.assert_get(tree);
+        let sized_by_parent = r.only_sized_by_parent();
+        if !sized_by_parent {
+          self.remove(id);
+          relayout_root = id;
+        }
 
-            !sized_by_parent
-          }
-        });
+        !sized_by_parent
+      });
     }
     self.needs_layout.push(Reverse((
       relayout_root.ancestors(tree).count(),
@@ -171,10 +164,7 @@ impl LayoutStore {
             .as_mut()
             .map(|mut rc| rc.origin = Point::default());
         });
-        let layout = match id.assert_get(tree) {
-          WidgetNode::Combination(_) => unreachable!(),
-          WidgetNode::Render(r) => r,
-        };
+        let layout = id.assert_get(tree);
         let size = layout.perform_layout(
           out_clamp,
           &mut LayoutCtx {

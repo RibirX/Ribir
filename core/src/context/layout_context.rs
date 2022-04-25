@@ -5,7 +5,7 @@ use text::font_db::FontDB;
 use text::shaper::TextShaper;
 use text::{TextReorder, TypographyStore};
 
-use super::{WidgetCtx, WidgetCtxImpl};
+use super::WidgetCtxImpl;
 use crate::prelude::widget_tree::WidgetTree;
 use crate::prelude::{BoxClamp, LayoutStore, WidgetId};
 
@@ -40,8 +40,7 @@ impl<'a> LayoutCtx<'a> {
   /// parent.
   #[inline]
   pub fn update_position(&mut self, child: WidgetId, pos: Point) {
-    let id = child.render_widget(self.tree).expect("must have");
-    self.layout_store.layout_box_rect_mut(id).origin = pos;
+    self.layout_store.layout_box_rect_mut(child).origin = pos;
   }
 
   /// Update the size of layout widget. Use this method to directly change the
@@ -50,8 +49,7 @@ impl<'a> LayoutCtx<'a> {
   /// know what you are doing.
   #[inline]
   pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    let id = child.render_widget(self.tree).expect("must have");
-    self.layout_store.layout_box_rect_mut(id).size = size;
+    self.layout_store.layout_box_rect_mut(child).size = size;
   }
 
   /// Do the work of computing the layout for render child, and return its size
@@ -83,9 +81,7 @@ impl<'a> LayoutCtx<'a> {
     &mut self,
     id: WidgetId,
   ) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    let children = id
-      .children(self.tree)
-      .map(|c| c.render_widget(self.tree).unwrap());
+    let children = id.children(self.tree);
     (self, children)
   }
 
@@ -101,14 +97,6 @@ impl<'a> LayoutCtx<'a> {
   pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
     let iter = self.id.children(self.tree);
     (self, iter)
-  }
-
-  /// Return the single render child of `widget`, panic if have more than once
-  /// child.
-  pub fn single_render_child(&self) -> Option<WidgetId> {
-    self
-      .single_child()
-      .and_then(|id| id.render_widget(self.tree))
   }
 }
 
