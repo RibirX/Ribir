@@ -1,12 +1,13 @@
 use crate::{
   dynamic_widget::{DynamicWidgetGenerator, GenerateInfo, GeneratorID},
-  prelude::widget_tree::WidgetTree,
+  prelude::{widget_tree::WidgetTree, TickerProvider},
 };
 use std::{
-  cell::Cell,
+  cell::{Cell, RefCell},
   cmp::Reverse,
   collections::{BinaryHeap, HashMap},
   pin::Pin,
+  rc::Rc,
 };
 
 #[derive(Default)]
@@ -41,7 +42,11 @@ impl GeneratorStore {
     }
   }
 
-  pub(crate) fn update_dynamic_widgets(&mut self, mut tree: Pin<&mut WidgetTree>) {
+  pub(crate) fn update_dynamic_widgets(
+    &mut self,
+    mut tree: Pin<&mut WidgetTree>,
+    ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+  ) {
     let updating_generators = self.need_update_generators.clone();
     self.need_update_generators.clear();
 
@@ -55,7 +60,9 @@ impl GeneratorStore {
         self.generators.remove(&gid);
         continue;
       } else {
-        generator.unwrap().update_generated_widgets(tree.as_mut());
+        generator
+          .unwrap()
+          .update_generated_widgets(tree.as_mut(), ticker, self);
       }
     }
   }

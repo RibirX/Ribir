@@ -6,8 +6,7 @@ use std::{
 };
 
 use crate::prelude::{
-  widget_tree::WidgetTree, Attributes, BoxedWidget, BoxedWidgetInner, Event, EventCommon, Render,
-  StateAttr, WidgetId,
+  widget_tree::WidgetTree, Attributes, BoxedWidget, Event, EventCommon, StateAttr, WidgetId,
 };
 use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
@@ -29,7 +28,6 @@ pub(crate) use layout_store::LayoutStore;
 pub(crate) mod build_context;
 pub use build_context::BuildCtx;
 
-use self::build_context::Parent;
 pub(crate) mod generator_store;
 
 pub(crate) struct Context {
@@ -52,23 +50,35 @@ impl Context {
     device_scale: f32,
     animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
-    struct TmpRoot;
-    impl Render for TmpRoot {
-      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> painter::Size {
-        unreachable!()
-      }
-      fn only_sized_by_parent(&self) -> bool { unreachable!() }
+    let animation_ticker = animation_ticker.map(|ticker| Rc::new(RefCell::new(ticker)));
+    let font_db = Arc::new(RwLock::new(FontDB::default()));
+    let shaper = TextShaper::new(font_db.clone());
+    let reorder = TextReorder::default();
+    let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
+    let painter = Painter::new(device_scale, typography_store.clone());
+    let generator_store = generator_store::GeneratorStore::default();
 
-      fn paint(&self, ctx: &mut PaintingCtx) { unreachable!() }
-    }
-    let tree = WidgetTree::new(Box::new(TmpRoot));
-    let tmp_root = tree.root();
-    let ticker = animation_ticker.map(|ticker| Rc::new(RefCell::new(ticker)));
-    let mut ctx = Context::from_tree(tree, device_scale, ticker);
-    tmp_root.append_child(root, ctx.widget_tree.as_mut(), ticker, &ctx.generator_store);
-    let tree = ctx.widget_tree.as_mut().get_mut();
-    let real_root = tmp_root.single_child(tree).unwrap();
+    let tree = WidgetTree::new();
+    tree
+      .root()
+      .append_widget(root, tree.as_mut(), animation_ticker, &generator_store);
+    let real_root = tree.root().single_child(&tree).unwrap();
     tree.reset_root(real_root);
+
+    let ctx = Context {
+      layout_store: <_>::default(),
+      widget_tree: WidgetTree::new(),
+      painter,
+      cursor: <_>::default(),
+      modifiers: <_>::default(),
+      font_db: <_>::default(),
+      shaper,
+      reorder,
+      typography_store,
+      animation_ticker,
+      generator_store,
+    };
+
     ctx.mark_layout_from_root();
     ctx
   }
@@ -166,7 +176,7 @@ impl Context {
   pub fn tree_repair(&mut self) {
     self
       .generator_store
-      .update_dynamic_widgets(self.widget_tree.as_mut());
+      .update_dynamic_widgets(self.widget_tree.as_mut(), self.animation_ticker.clone());
   }
 
   pub fn state_change_dispatch(&mut self) {
@@ -195,31 +205,6 @@ impl Context {
 
   pub fn descendants(&self) -> impl Iterator<Item = WidgetId> + '_ {
     self.widget_tree.root().descendants(&self.widget_tree)
-  }
-
-  pub(crate) fn from_tree(
-    widget_tree: Pin<Box<WidgetTree>>,
-    device_scale: f32,
-    animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
-  ) -> Self {
-    let font_db = Arc::new(RwLock::new(FontDB::default()));
-    let shaper = TextShaper::new(font_db.clone());
-    let reorder = TextReorder::default();
-    let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
-    let painter = Painter::new(device_scale, typography_store.clone());
-    Context {
-      layout_store: <_>::default(),
-      widget_tree,
-      painter,
-      cursor: <_>::default(),
-      modifiers: <_>::default(),
-      font_db: <_>::default(),
-      shaper,
-      reorder,
-      typography_store,
-      animation_ticker,
-      generator_store: <_>::default(),
-    }
   }
 
   pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
