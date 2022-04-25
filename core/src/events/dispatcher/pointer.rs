@@ -161,7 +161,8 @@ impl PointerDispatcher {
         .ancestors(&ctx.widget_tree)
         .filter(|w| {
           w.get(&ctx.widget_tree)
-            .and_then(AsAttrs::find_attr::<PointerAttr>)
+            .and_then(|w| w.as_attrs())
+            .and_then(Attributes::find::<PointerAttr>)
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -187,7 +188,7 @@ impl PointerDispatcher {
 
   fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
     let tree = &ctx.widget_tree;
-    let c_rid = ctx.widget_tree.root().render_widget(tree).unwrap();
+    let c_rid = ctx.widget_tree.root();
     let mut current = (c_rid, ctx).box_rect().and_then(|rect| {
       rect
         .contains(self.cursor_pos)
@@ -197,8 +198,7 @@ impl PointerDispatcher {
     while let Some((id, pos)) = current {
       hit = current;
       current = id.reverse_children(&ctx.widget_tree).find_map(|c| {
-        let c_rid = c.render_widget(&ctx.widget_tree).unwrap();
-        let w_ctx = (c_rid, ctx);
+        let w_ctx = (c, ctx);
         w_ctx
           .box_rect()
           // check if contain the position

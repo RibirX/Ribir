@@ -1,15 +1,9 @@
-use std::{
-  any::{Any, TypeId},
-  ops::ControlFlow,
-};
+use std::ops::ControlFlow;
 
 use painter::{Point, Rect};
 
 use super::Context;
-use crate::prelude::{
-  widget_tree::{WidgetNode, WidgetTree},
-  LayoutStore, QueryType, WidgetId,
-};
+use crate::prelude::{widget_tree::WidgetTree, Attributes, LayoutStore, QueryType, WidgetId};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -49,11 +43,6 @@ pub trait WidgetCtx {
   /// ancestor to this render object coordinate system. The parent must be
   /// ancestor of the calling render object.
   fn map_from(&self, pos: Point, ancestor: WidgetId) -> Point;
-
-  /// Return the correspond render widget, if this widget is a layout render
-  /// widget return self, otherwise find a nearest layout render widget from its
-  /// single descendants.
-  fn render_widget(&self) -> Option<WidgetId>;
 
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
@@ -102,9 +91,14 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     self.layout_store().layout_box_rect(wid)
   }
 
+  // todo: deprecated,
   #[inline]
   fn find_attr<A: 'static>(&self) -> Option<&A> {
-    self.id().assert_get(self.widget_tree()).find_attr()
+    self
+      .id()
+      .assert_get(self.widget_tree())
+      .as_attrs()
+      .and_then(Attributes::find)
   }
 
   fn map_to_global(&self, pos: Point) -> Point {
@@ -169,17 +163,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     }
   }
 
-  #[inline]
-  fn render_widget(&self) -> Option<WidgetId> { self.id().render_widget(self.widget_tree()) }
-
   fn query_type<W: 'static>(&self, id: WidgetId) -> Option<&W> {
-    let type_id = TypeId::of::<W>();
-
-    match id.assert_get(self.widget_tree()) {
-      WidgetNode::Combination(c) => c.query_any(type_id),
-      WidgetNode::Render(r) => r.query_any(type_id),
-    }
-    .and_then(<dyn Any>::downcast_ref)
+    let w = id.assert_get(self.widget_tree());
+    (w as &dyn QueryType).query_type()
   }
 }
 

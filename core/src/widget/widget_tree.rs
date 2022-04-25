@@ -4,7 +4,9 @@ use crate::{
 };
 use bitflags::bitflags;
 use indextree::*;
-use std::{collections::HashMap, pin::Pin};
+use std::{cell::RefCell, collections::HashMap, pin::Pin, rc::Rc};
+
+use super::{build_context::Parent, generator_store::GeneratorStore};
 
 bitflags! {
   pub struct WidgetChangeFlags: u8 {
@@ -18,13 +20,13 @@ bitflags! {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
-  arena: Arena<WidgetNode>,
+  arena: Arena<Box<dyn RenderNode>>,
   root: WidgetId,
   changed_widget: HashMap<WidgetId, WidgetChangeFlags, ahash::RandomState>,
 }
 
 impl WidgetTree {
-  pub(crate) fn new(w: WidgetNode) -> Pin<Box<Self>> {
+  pub(crate) fn new(w: Box<dyn RenderNode>) -> Pin<Box<Self>> {
     let mut arena = Arena::default();
     let root = WidgetId(arena.new_node(w));
     let tree = Self {
@@ -37,41 +39,21 @@ impl WidgetTree {
     tree
   }
 
-  #[inline]
   pub(crate) fn root(&self) -> WidgetId { self.root }
 
-  pub(crate) fn new_node(mut self: Pin<&mut Self>, widget: WidgetNode) -> WidgetId {
+  pub(crate) fn reset_root(&mut self, new_root: WidgetId) {
+    new_root.detach(self);
+    self.root.remove_subtree(self);
+    self.root = new_root;
+  }
+
+  pub(crate) fn new_node(mut self: Pin<&mut Self>, widget: Box<dyn RenderNode>) -> WidgetId {
     let id = WidgetId(self.arena.new_node(widget));
     id
   }
 
   #[cfg(test)]
   pub(crate) fn count(&self) -> usize { self.arena.count() }
-
-  // If the widget back of `id` have same `key` with `w` Use `w`, it's will be
-  // replaced, otherwise the sub tree of `id` will be detached and insert `w` to
-  // replace it.
-  pub(crate) fn replace_widget(
-    mut self: Pin<&mut Self>,
-    w: WidgetNode,
-    id: WidgetId,
-  ) -> Option<WidgetId> {
-    let old = id.assert_get_mut(self.as_mut().get_mut());
-
-    match (old.get_key(), w.get_key()) {
-      (Some(k1), Some(k2)) if k1 == k2 => {
-        *old = w;
-        None
-      }
-      _ => {
-        let parent = id
-          .parent(self.as_ref().get_ref())
-          .expect("parent should exists!");
-        let new_id = parent.append_child(w, self);
-        Some(new_id)
-      }
-    }
-  }
 
   pub(crate) fn record_change(&mut self, id: WidgetId, flag: WidgetChangeFlags) {
     self
@@ -98,15 +80,14 @@ impl WidgetTree {
     let p = id.parent(self_ref);
     let node = id.assert_get_mut(self_ref);
 
-    if let Some(state_attr) = node.find_attr_mut::<StateAttr>() {
+    if let Some(state_attr) = node
+      .as_attrs_mut()
+      .and_then(Attributes::find_mut::<StateAttr>)
+    {
       state_attr.assign_id(id, ptr);
     }
 
-    let q = match node {
-      WidgetNode::Combination(c) => (&mut **c as &mut dyn QueryType),
-      WidgetNode::Render(r) => (&mut **r as &mut dyn QueryType),
-    };
-
+    let q = &mut *node as &mut dyn QueryType;
     q.query_all_inner_type_mut(|g: &mut GenerateInfo| {
       g.add_generated_widget_id(id);
       true
@@ -123,12 +104,12 @@ impl WidgetTree {
 
 impl WidgetId {
   /// Returns a reference to the node data.
-  pub(crate) fn get(self, tree: &WidgetTree) -> Option<&WidgetNode> {
-    tree.arena.get(self.0).map(|node| node.get())
+  pub(crate) fn get(self, tree: &WidgetTree) -> Option<&dyn RenderNode> {
+    tree.arena.get(self.0).map(|node| node.get().as_ref())
   }
 
   /// Returns a mutable reference to the node data.
-  pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut WidgetNode> {
+  pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn RenderNode>> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
@@ -207,22 +188,51 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn insert_child_after(
+  pub(crate) fn back_insert_sibling(
     self,
-    after: WidgetId,
-    data: WidgetNode,
+    widget: BoxedWidget,
     mut tree: Pin<&mut WidgetTree>,
-  ) {
-    let id = tree.as_mut().new_node(data);
-    after.0.insert_after(id.0, &mut tree.arena);
-    tree.widget_info_assign(id);
+    ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+    generator_store: &GeneratorStore,
+  ) -> WidgetId {
+    let parent = self.parent(&tree).unwrap();
+
+    parent.insert_child(
+      widget,
+      tree,
+      |wid, tree| {
+        self.0.insert_after(wid.0, &mut tree.arena);
+      },
+      |id, w, tree| {
+        id.append_child(w, tree, ticker, generator_store);
+      },
+      ticker,
+      generator_store,
+    )
   }
 
-  pub(crate) fn append_child(self, data: WidgetNode, mut tree: Pin<&mut WidgetTree>) -> WidgetId {
-    let id = tree.as_mut().new_node(data);
-    self.0.append(id.0, &mut tree.arena);
-    tree.widget_info_assign(id);
-    id
+  pub(crate) fn append_child(
+    self,
+    widget: BoxedWidget,
+    mut tree: Pin<&mut WidgetTree>,
+    ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+    generator_store: &GeneratorStore,
+  ) -> WidgetId {
+    let mut stack = vec![(widget, self)];
+
+    while let Some((widget, p_wid)) = stack.pop() {
+      p_wid.insert_child(
+        widget,
+        tree,
+        |wid, tree| {
+          self.0.append(wid.0, &mut tree.arena);
+        },
+        |id, child, _| stack.push((child, id)),
+        ticker,
+        generator_store,
+      );
+    }
+    self.last_child(&tree).unwrap()
   }
 
   /// Return the single child of `widget`, panic if have more than once child.
@@ -231,21 +241,7 @@ impl WidgetId {
     self.first_child(tree)
   }
 
-  /// Return the correspond render widget, or down to its single child to find a
-  /// nearest render widget from its single descendants.
-  pub(crate) fn render_widget(self, tree: &WidgetTree) -> Option<WidgetId> {
-    let mut wid = Some(self);
-    while let Some(id) = wid {
-      wid = match id.assert_get(tree) {
-        WidgetNode::Combination(_) => id.single_child(tree),
-        _ => break,
-      };
-    }
-
-    wid
-  }
-
-  fn node_feature<F: Fn(&Node<WidgetNode>) -> Option<NodeId>>(
+  fn node_feature<F: Fn(&Node<Box<dyn RenderNode>>) -> Option<NodeId>>(
     self,
     tree: &WidgetTree,
     method: F,
@@ -253,70 +249,57 @@ impl WidgetId {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
   }
 
-  pub(crate) fn assert_get(self, tree: &WidgetTree) -> &WidgetNode {
+  pub(crate) fn assert_get(self, tree: &WidgetTree) -> &dyn RenderNode {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut WidgetNode {
+  pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn RenderNode> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
-}
 
-pub(crate) enum WidgetNode {
-  Combination(Box<dyn Compose<W = Box<dyn RenderNode>>>),
-  Render(Box<dyn RenderNode>),
-}
-
-impl AsAttrs for WidgetNode {
-  fn as_attrs(&self) -> Option<&Attributes> {
-    match self {
-      WidgetNode::Combination(c) => c.as_attrs(),
-      WidgetNode::Render(r) => r.as_attrs(),
-    }
-  }
-
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
-    match self {
-      WidgetNode::Combination(c) => c.as_attrs_mut(),
-      WidgetNode::Render(r) => r.as_attrs_mut(),
-    }
-  }
-}
-
-impl WidgetNode {
-  pub fn find_attr<A: 'static>(&self) -> Option<&A> {
-    match self {
-      WidgetNode::Combination(c) => c.as_attrs(),
-      WidgetNode::Render(r) => r.as_attrs(),
-    }
-    .and_then(Attributes::find)
-  }
-
-  pub fn find_attr_mut<A: 'static>(&mut self) -> Option<&mut A> {
-    match self {
-      WidgetNode::Combination(c) => c.as_attrs_mut(),
-      WidgetNode::Render(r) => r.as_attrs_mut(),
-    }
-    .and_then(Attributes::find_mut)
-  }
-}
-
-impl AsAttrs for BoxedWidgetInner {
-  fn as_attrs(&self) -> Option<&Attributes> {
-    match self {
-      BoxedWidgetInner::Compose(c) => c.as_attrs(),
-      BoxedWidgetInner::Render(r) => r.as_attrs(),
-      BoxedWidgetInner::SingleChild(s) => s.as_attrs(),
-      BoxedWidgetInner::MultiChild(m) => m.as_attrs(),
-    }
-  }
-
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
-    match self {
-      BoxedWidgetInner::Compose(c) => c.as_attrs_mut(),
-      BoxedWidgetInner::Render(r) => r.as_attrs_mut(),
-      BoxedWidgetInner::SingleChild(s) => s.as_attrs_mut(),
-      BoxedWidgetInner::MultiChild(m) => m.as_attrs_mut(),
+  fn insert_child(
+    self,
+    widget: BoxedWidget,
+    tree: Pin<&mut WidgetTree>,
+    insert: impl Fn(WidgetId, &mut WidgetTree),
+    consume_child: impl FnMut(WidgetId, BoxedWidget, Pin<&mut WidgetTree>),
+    ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+    generator_store: &GeneratorStore,
+  ) -> WidgetId {
+    let insert_widget = |node, tree: Pin<&mut WidgetTree>| {
+      let id = tree.as_mut().new_node(node);
+      insert(id, tree.get_mut());
+      tree.widget_info_assign(id);
+      id
+    };
+    match widget.0 {
+      BoxedWidgetInner::Compose(c) => {
+        let mut build_ctx = BuildCtx::new(
+          Some(Parent { id: self, tree: &mut tree }),
+          ticker,
+          generator_store,
+        );
+        let c = c.concrete_compose(&mut build_ctx);
+        self.insert_child(widget, tree, insert, consume_child, ticker, generator_store)
+      }
+      BoxedWidgetInner::Render(rw) => insert_widget(rw, tree),
+      BoxedWidgetInner::SingleChild(s) => {
+        let (rw, child) = s.unzip();
+        let id = insert_widget(rw, tree);
+        if let Some(child) = child {
+          consume_child(id, child, tree);
+        }
+        id
+      }
+      BoxedWidgetInner::MultiChild(m) => {
+        let (rw, children) = m.unzip();
+        let id = insert_widget(rw, tree);
+        children
+          .into_iter()
+          .rev()
+          .for_each(|child| consume_child(id, child, tree));
+        id
+      }
     }
   }
 }

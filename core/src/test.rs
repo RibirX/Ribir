@@ -16,14 +16,11 @@ pub fn root_and_children_rect(wnd: &Window) -> (Rect, Vec<Rect>) {
   let ctx = wnd.context();
   let tree = &ctx.widget_tree;
   let layout = &ctx.layout_store;
-  let r_root = tree.root().render_widget(tree).unwrap();
-  let rect = layout.layout_box_rect(r_root).unwrap();
-  let children_box_rect = r_root
+  let root = tree.root();
+  let rect = layout.layout_box_rect(root).unwrap();
+  let children_box_rect = root
     .children(tree)
-    .map(|c| {
-      let rid = c.render_widget(tree).unwrap();
-      layout.layout_box_rect(rid).unwrap()
-    })
+    .map(|c| layout.layout_box_rect(c).unwrap())
     .collect();
 
   (rect, children_box_rect)

@@ -29,17 +29,17 @@ mod box_decoration;
 pub use box_decoration::*;
 pub mod attr;
 pub use attr::*;
-mod checkbox;
-pub use checkbox::*;
-mod scrollable;
-pub use scrollable::*;
+// mod checkbox;
+// pub use checkbox::*;
+// mod scrollable;
+// pub use scrollable::*;
 mod path;
 pub use path::*;
-mod grid_view;
-pub use grid_view::*;
-mod scroll_view;
-pub use scroll_view::ScrollView;
-mod scrollbar;
+// mod grid_view;
+// pub use grid_view::*;
+// mod scroll_view;
+// pub use scroll_view::ScrollView;
+// mod scrollbar;
 
 use self::layout_store::BoxClamp;
 
@@ -90,47 +90,82 @@ pub trait StatefulCombination {
 }
 
 /// A generic widget wrap for all compose widget result, and keep its type info.
-pub struct ComposedWidget<C: Compose> {
-  composed: C::W,
-  by: PhantomData<C>,
+pub struct ComposedWidget<W, B> {
+  composed: W,
+  by: PhantomData<B>,
 }
 
-trait ConcreteCompose<Target> {
+pub(crate) trait ConcreteCompose<Target> {
   fn concrete_compose(self, ctx: &mut BuildCtx) -> Target;
 }
 
 pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
-impl<C: Compose> ConcreteCompose<ComposedWidget<C>> for C {
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> ComposedWidget<C> {
-    ComposedWidget {
-      composed: self.compose(ctx),
-      by: PhantomData,
-    }
-  }
-}
-
-impl<C: RenderNode + 'static> ConcreteCompose<Box<dyn RenderNode>> for C {
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> Box<dyn RenderNode> { Box::new(self) }
-}
-
-impl<C: Compose> Compose for ComposedWidget<C> {
-  type W = ComposedWidget<Self>;
-
-  #[inline]
-  fn compose(self, ctx: &mut BuildCtx) -> Self::W {
-    ComposedWidget {
-      composed: self.compose(ctx),
-      by: PhantomData,
-    }
-  }
-}
-
-impl<C: Compose> Render for ComposedWidget<C>
+impl<C: Compose, X> ConcreteCompose<ComposedWidget<X, ComposedWidget<C::W, C>>> for C
 where
-  C::W: Render,
+  C::W: ConcreteCompose<X>,
+{
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> ComposedWidget<X, ComposedWidget<C::W, C>> {
+    // todo: we need wrap the build context let logic child can query type of
+    // self.
+    ComposedWidget {
+      composed: self.compose(ctx),
+      by: PhantomData::<C>,
+    }
+    .concrete_compose(ctx)
+  }
+}
+
+impl<R: Render> ConcreteCompose<R> for R {
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> R { self }
+}
+
+impl<W, B, X> ConcreteCompose<ComposedWidget<X, Self>> for ComposedWidget<W, B>
+where
+  W: ConcreteCompose<X>,
+{
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> ComposedWidget<X, Self> {
+    ComposedWidget {
+      composed: self.composed.concrete_compose(ctx),
+      by: PhantomData,
+    }
+  }
+}
+
+impl<W, B> ConcreteCompose<SingleChild<ComposedWidget<W, B>>>
+  for ComposedWidget<SingleChild<W>, B>
+{
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> SingleChild<ComposedWidget<W, B>> {
+    SingleChild {
+      widget: ComposedWidget {
+        composed: self.composed.widget,
+        by: self.by,
+      },
+      child: self.composed.child,
+    }
+  }
+}
+
+impl<W, B> ConcreteCompose<MultiChild<ComposedWidget<W, B>>> for ComposedWidget<MultiChild<W>, B> {
+  #[inline]
+  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> MultiChild<ComposedWidget<W, B>> {
+    MultiChild {
+      widget: ComposedWidget {
+        composed: self.composed.widget,
+        by: self.by,
+      },
+      children: self.composed.children,
+    }
+  }
+}
+
+impl<R: Render, B> Render for ComposedWidget<R, B>
+where
+  R: Render,
 {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -204,7 +239,7 @@ impl<W: Compose + AsAttrs + QueryType> CombinationNode for W {}
 impl<W: Render + AsAttrs + QueryType> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
-  Compose(Box<dyn ConcreteCompose<Box<dyn RenderNode>>>),
+  Compose(Box<dyn ConcreteCompose<BoxedWidget>>),
   Render(Box<dyn RenderNode>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
@@ -240,7 +275,7 @@ impl<W: Any> QueryType for W {
   }
 }
 
-impl dyn QueryType {
+impl<'a> dyn QueryType + 'a {
   #[inline]
   pub fn query_type<T: Any>(&self) -> Option<&T> {
     self
@@ -268,17 +303,11 @@ impl dyn QueryType {
   }
 }
 // Widget & BoxWidget default implementation
-pub struct ComposeMarker;
 pub struct StatefulCombinationMarker;
 pub struct RenderMarker;
 
 pub trait BoxWidget<Marker> {
   fn box_it(self) -> BoxedWidget;
-}
-
-impl<T: ConcreteCompose<Box<dyn RenderNode>> + 'static> BoxWidget<ComposeMarker> for T {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
 }
 
 impl<T: IntoRender + 'static> BoxWidget<RenderMarker> for T {
@@ -343,26 +372,6 @@ impl<W: StatefulCombination + 'static> BoxWidget<StatefulCombinationMarker> for 
 impl BoxWidget<StatefulCombinationMarker> for BoxedWidget {
   #[inline]
   fn box_it(self) -> BoxedWidget { self }
-}
-
-impl AsAttrs for BoxedWidget {
-  fn as_attrs(&self) -> Option<&Attributes> {
-    match &self.0 {
-      BoxedWidgetInner::Compose(c) => c.as_attrs(),
-      BoxedWidgetInner::Render(r) => r.as_attrs(),
-      BoxedWidgetInner::SingleChild(s) => s.widget.as_attrs(),
-      BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs(),
-    }
-  }
-
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
-    match &mut self.0 {
-      BoxedWidgetInner::Compose(c) => c.as_attrs_mut(),
-      BoxedWidgetInner::Render(r) => r.as_attrs_mut(),
-      BoxedWidgetInner::SingleChild(s) => s.widget.as_attrs_mut(),
-      BoxedWidgetInner::MultiChild(m) => m.widget.as_attrs_mut(),
-    }
-  }
 }
 
 impl<R, C: FnOnce(&mut BuildCtx) -> R> Compose for C {

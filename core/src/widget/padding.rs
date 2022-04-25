@@ -9,7 +9,7 @@ pub struct Padding {
 
 impl Render for Padding {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = match ctx.single_render_child() {
+    let child = match ctx.single_child() {
       Some(c) => c,
       None => return Size::zero(),
     };
