@@ -1,7 +1,7 @@
 # Full builtin fields list 
 
 - key : [`Key`](../ribir/widget/key/enum.Key.html) 
- 	 - assign a key to the widget use for track it when tree rebuild.
+ 	 - assign a key to widget, use for track if two widget is same widget in two frames.
 - cursor : [`CursorIcon`](../ribir/widget/enum.CursorIcon.html) 
  	 - assign cursor to the widget.
 - theme : [`Theme`](../ribir/widget/struct.Theme.html) 

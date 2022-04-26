@@ -96,11 +96,9 @@ impl PointerDispatcher {
     self.pointer_down_uid = hit.map(|(wid, _)| wid);
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
-        id.get(tree).map_or(false, |w| {
-          w.as_attrs()
-            .and_then(Attributes::find::<FocusAttr>)
-            .is_some()
-        })
+        id.get(tree)
+          .and_then(|w| w.query_first_type::<FocusAttr>(QueryOrder::InnerFirst))
+          .is_some()
       })
     });
     if let Some(focus_id) = nearest_focus {
@@ -148,9 +146,13 @@ impl PointerDispatcher {
           _ => {
             let old_pos = (*w, &*ctx).map_from_global(self.cursor_pos);
             let mut event = self.mouse_pointer(*w, old_pos, ctx);
-            if let Some(pointer) = ctx.find_attr::<PointerAttr>(*w) {
-              pointer.dispatch_event(PointerEventType::Leave, &mut event)
-            }
+            w.assert_get(tree).query_all_type(
+              |pointer: &PointerAttr| {
+                pointer.dispatch_event(PointerEventType::Leave, &mut event);
+                !event.bubbling_canceled()
+              },
+              QueryOrder::InnerFirst,
+            );
           }
         };
       });
@@ -161,8 +163,7 @@ impl PointerDispatcher {
         .ancestors(&ctx.widget_tree)
         .filter(|w| {
           w.get(&ctx.widget_tree)
-            .and_then(|w| w.as_attrs())
-            .and_then(Attributes::find::<PointerAttr>)
+            .and_then(|w| w.query_first_type::<PointerAttr>(QueryOrder::OutsideFirst))
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -175,9 +176,14 @@ impl PointerDispatcher {
         .for_each(|&w| {
           let old_pos = (w, &*ctx).map_from_global(self.cursor_pos);
           let mut event = self.mouse_pointer(w, old_pos, ctx);
-          if let Some(pointer) = ctx.find_attr::<PointerAttr>(w) {
-            pointer.dispatch_event(PointerEventType::Enter, &mut event);
-          }
+
+          w.assert_get(tree).query_all_type(
+            |pointer: &PointerAttr| {
+              pointer.dispatch_event(PointerEventType::Enter, &mut event);
+              !event.bubbling_canceled()
+            },
+            QueryOrder::OutsideFirst,
+          );
         });
     }
   }
@@ -187,7 +193,6 @@ impl PointerDispatcher {
   }
 
   fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
-    let tree = &ctx.widget_tree;
     let c_rid = ctx.widget_tree.root();
     let mut current = (c_rid, ctx).box_rect().and_then(|rect| {
       rect

@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 use painter::{Point, Rect};
 
 use super::Context;
-use crate::prelude::{widget_tree::WidgetTree, Attributes, LayoutStore, QueryType, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, LayoutStore, QueryOrder, WidgetId};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -15,10 +15,6 @@ pub trait WidgetCtx {
 
   /// Return the box rect of the widget `wid` point to.
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect>;
-
-  fn find_attr<A: 'static>(&self) -> Option<&A>
-  where
-    Self: Sized;
 
   /// Translates the global window coordinate pos to widget coordinates.
   fn map_to_global(&self, pos: Point) -> Point;
@@ -91,16 +87,6 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     self.layout_store().layout_box_rect(wid)
   }
 
-  // todo: deprecated,
-  #[inline]
-  fn find_attr<A: 'static>(&self) -> Option<&A> {
-    self
-      .id()
-      .assert_get(self.widget_tree())
-      .as_attrs()
-      .and_then(Attributes::find)
-  }
-
   fn map_to_global(&self, pos: Point) -> Point {
     self
       .id()
@@ -163,9 +149,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     }
   }
 
-  fn query_type<W: 'static>(&self, id: WidgetId) -> Option<&W> {
-    let w = id.assert_get(self.widget_tree());
-    (w as &dyn QueryType).query_type()
+  #[inline]
+  fn query_type<W: 'static>(&self, id: WidgetId, ) -> Option<&W> {
+    id.assert_get(self.widget_tree()).query_first_type(QueryOrder::OutsideFirst)
   }
 }
 

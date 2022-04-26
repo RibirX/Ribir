@@ -54,7 +54,7 @@ impl<'a> LayoutCtx<'a> {
 
   /// Do the work of computing the layout for render child, and return its size
   /// it should have. Should called from parent.
-  pub fn perform_render_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
+  pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
     self.layout_store.perform_layout(
       child,
       clamp,
@@ -66,18 +66,8 @@ impl<'a> LayoutCtx<'a> {
     )
   }
 
-  /// Return a tuple of [`LayoutCtx`]! and an iterator of self children, notice
-  /// the element of iterator is not its child if it's a combination Widget, but
-  /// instead of down to a render widget when precess on child.
-  #[inline]
-  pub fn split_render_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    self.split_render_children_by(self.id)
-  }
-
   /// Return a tuple of [`LayoutCtx`]! and an iterator of `id`'s children.
-  /// Notice the element of iterator is not its child if it's a combination
-  /// Widget, but instead of down to a render widget when precess on child.
-  pub fn split_render_children_by(
+  pub fn split_children_by(
     &mut self,
     id: WidgetId,
   ) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {

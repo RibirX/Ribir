@@ -73,8 +73,7 @@ impl FocusManager {
   pub fn auto_focus(&mut self, ctx: &Context) -> Option<WidgetId> {
     ctx.descendants().find(|id| {
       id.assert_get(&ctx.widget_tree)
-        .as_attrs()
-        .and_then(Attributes::find::<FocusAttr>)
+        .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
         .map_or(false, |focus| focus.auto_focus)
     })
   }
@@ -89,8 +88,7 @@ impl FocusManager {
       .descendants(tree)
       .filter_map(|id| {
         id.get(tree)
-          .and_then(|w| w.as_attrs())
-          .and_then(Attributes::find::<FocusAttr>)
+          .and_then(|w| w.query_type::<FocusAttr>())
           .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
       })
       .for_each(|node| match node.tab_index {
@@ -129,9 +127,14 @@ impl FocusManager {
     let old = self.focusing.take();
     self.focusing = node;
 
+    let tree = &ctx.widget_tree;
     if let Some((ref blur, _)) = old {
       // dispatch blur event
-      if let Some(focus) = ctx.find_attr::<FocusAttr>(blur.wid) {
+      if let Some(focus) = blur
+        .wid
+        .assert_get(tree)
+        .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
+      {
         let mut focus_event = FocusEvent::new(blur.wid, ctx);
         focus.dispatch_event(FocusEventType::Blur, &mut focus_event)
       }
@@ -145,7 +148,11 @@ impl FocusManager {
     }
 
     if let Some((focus, _)) = self.focusing {
-      if let Some(focus_attr) = ctx.find_attr::<FocusAttr>(focus.wid) {
+      if let Some(focus_attr) = focus
+        .wid
+        .assert_get(tree)
+        .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
+      {
         let mut focus_event = FocusEvent::new(focus.wid, ctx);
         focus_attr.dispatch_event(FocusEventType::Focus, &mut focus_event)
       }

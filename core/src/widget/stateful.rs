@@ -84,7 +84,7 @@ use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{cell::Cell, pin::Pin, ptr::NonNull};
 
-use super::widget_tree::WidgetChangeFlags;
+use super::{widget_tree::WidgetChangeFlags, ComposedWidget};
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
@@ -97,25 +97,29 @@ pub trait IntoStateful {
 /// stateful widget. Tracked the state change across if user mutable reference
 /// the `StateRef` and trigger state change notify and require `ribir` to
 /// rebuild or relayout inner widget.
-pub struct StateRef<W>(NonNull<AttrWidget<W>>);
+pub struct StateRef<W>(NonNull<StatefulInner<W>>);
 
 /// A reference of stateful widget, tracked the state change across if user
 /// mutable reference the `SilentRef`. If mutable reference occur, state change
 /// notify will trigger, but not effect the inner widget relayout or rebuild.
 ///
 /// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
-pub struct SilentRef<W>(NonNull<AttrWidget<W>>);
+pub struct SilentRef<W>(NonNull<StatefulInner<W>>);
 
 /// A reference of stateful widget, tracked the relayout or rebuild if user
 /// mutable reference the `ShallowRef`, but state change notify will not
 /// trigger. Now used in animation's render change, which is just a
 /// temporary change in render and not expect to change the data.
 /// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
-pub struct ShallowRef<W>(NonNull<AttrWidget<W>>);
+pub struct ShallowRef<W>(NonNull<StatefulInner<W>>);
 
 /// The stateful widget generic implementation.
-pub struct Stateful<W>(Pin<Box<AttrWidget<W>>>);
+pub struct Stateful<W>(Pin<Box<StatefulInner<W>>>);
 
+struct StatefulInner<W> {
+  widget: W,
+  info: StateInfo,
+}
 #[derive(Clone)]
 pub struct StateChange<T: Clone> {
   pub before: T,
@@ -128,7 +132,7 @@ pub(crate) struct TreeInfo {
 }
 
 #[derive(Default)]
-pub(crate) struct StateAttr {
+pub(crate) struct StateInfo {
   pub(crate) tree_info: Option<TreeInfo>,
   subject: Option<LocalSubject<'static, (), ()>>,
   during_build: Cell<bool>,
@@ -153,10 +157,9 @@ impl<W> Copy for ShallowRef<W> {}
 impl<W> Stateful<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
   // want [`into_stateful`](IntoStateful::into_stateful)
-  fn new(w: W) -> Self {
-    let mut attrs: Attributes = <_>::default();
-    attrs.insert(StateAttr::default());
-    Stateful(Box::pin(AttrWidget { widget: w, attrs }))
+  fn new(widget: W) -> Self {
+    let info = StateInfo::default();
+    Stateful(Box::pin(StatefulInner { widget, info }))
   }
 
   /// Return a `StateRef` of the stateful widget, caller should careful not keep
@@ -174,8 +177,11 @@ impl<W> Stateful<W> {
 
   /// Event emitted when this widget modified. No mather if the widget really
   #[inline]
-  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
-    assert_state_attr(self).state_subject()
+  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()>
+  where
+    W: std::marker::Unpin,
+  {
+    self.0.as_mut().get_mut().info.state_subject()
   }
 
   /// Pick field change stream from the widget change
@@ -190,13 +196,7 @@ impl<W> Stateful<W> {
     state_ref.state_change(pick)
   }
 
-  pub(crate) fn mark_during_build(&self, flag: bool) {
-    self
-      .find_attr::<StateAttr>()
-      .unwrap()
-      .during_build
-      .set(flag);
-  }
+  pub(crate) fn mark_during_build(&self, flag: bool) { self.0.info.during_build.set(flag); }
 }
 
 impl<W: 'static> StateRef<W> {
@@ -210,7 +210,7 @@ impl<W: 'static> StateRef<W> {
   /// Event emitted when this widget modified. No mather if the widget really
   #[inline]
   pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
-    assert_state_attr(self).state_subject()
+    unsafe { self.0.as_mut().info.state_subject() }
   }
 
   /// Pick field change stream from the widget change
@@ -221,7 +221,7 @@ impl<W: 'static> StateRef<W> {
   where
     Self: 'static,
   {
-    let v = pick(&self.widget);
+    let v = pick(&*self);
     let init = StateChange { before: v.clone(), after: v };
     self.change_stream().scan_initial(init, move |mut init, _| {
       init.before = init.after;
@@ -234,7 +234,7 @@ impl<W: 'static> StateRef<W> {
 impl<W> SilentRef<W> {
   #[inline]
   pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
-    assert_state_attr(self).state_subject()
+    unsafe { self.0.as_mut().info.state_subject() }
   }
 
   /// Pick field change stream from the widget change
@@ -250,72 +250,65 @@ impl<W> SilentRef<W> {
 }
 
 impl<W> std::ops::Deref for Stateful<W> {
-  type Target = AttrWidget<W>;
+  type Target = W;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { &*self.0 }
+  fn deref(&self) -> &Self::Target { &self.0.widget }
 }
 
-impl<W> std::ops::DerefMut for Stateful<W> {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    // Safety
-    // - `Stateful` is not support clone, so as a widget it's unique and safe to get
-    //   inner mutable reference。
-    // - StateRef may hold a pointer of this in the `widget!` macro, ribir guarantee
-    //   the generate code have not data race.
-    unsafe { self.0.as_mut().get_unchecked_mut() }
-  }
+impl<W: std::marker::Unpin> std::ops::DerefMut for Stateful<W> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0.as_mut().get_mut().widget }
 }
 
 impl<W> std::ops::Deref for SilentRef<W> {
-  type Target = AttrWidget<W>;
+  type Target = W;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { unsafe { self.0.as_ref() } }
+  fn deref(&self) -> &Self::Target { unsafe { &self.0.as_ref().widget } }
 }
 
 impl<W> std::ops::DerefMut for SilentRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     unsafe {
-      assert_state_attr(self.0.as_mut()).record_change(WidgetChangeFlags::DIFFUSE);
-      self.0.as_mut()
+      let inner = self.0.as_mut();
+      inner.info.record_change(WidgetChangeFlags::DIFFUSE);
+      &mut inner.widget
     }
   }
 }
 
 impl<W> std::ops::Deref for ShallowRef<W> {
-  type Target = AttrWidget<W>;
+  type Target = W;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { unsafe { self.0.as_ref() } }
+  fn deref(&self) -> &Self::Target { unsafe { &self.0.as_ref().widget } }
 }
 
 impl<W> std::ops::DerefMut for ShallowRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    unsafe {
-      assert_state_attr(self.0.as_mut()).record_change(WidgetChangeFlags::UNSILENT);
-      self.0.as_mut()
-    }
+    let inner = unsafe { self.0.as_mut() };
+    inner.info.record_change(WidgetChangeFlags::UNSILENT);
+    &mut inner.widget
   }
 }
 
 impl<W> std::ops::Deref for StateRef<W> {
-  type Target = AttrWidget<W>;
+  type Target = W;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { unsafe { self.0.as_ref() } }
+  fn deref(&self) -> &Self::Target { unsafe { &self.0.as_ref().widget } }
 }
 
 impl<W> std::ops::DerefMut for StateRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    unsafe {
-      assert_state_attr(self.0.as_mut()).record_change(WidgetChangeFlags::ALL);
-      self.0.as_mut()
-    }
+    let inner = unsafe { self.0.as_mut() };
+    inner.info.record_change(WidgetChangeFlags::ALL);
+    &mut inner.widget
   }
 }
 
-impl StateAttr {
+impl StateInfo {
   pub(crate) fn assign_id(&mut self, id: WidgetId, tree: NonNull<WidgetTree>) {
     debug_assert!(self.tree_info.is_none());
     self.tree_info = Some(TreeInfo { tree, id })
@@ -342,44 +335,32 @@ impl StateAttr {
   }
 }
 
-/// A wrap for `Stateful` to help we can implement stateful version widget for
-/// for all widget, and avoid trait implement conflict.
-pub(crate) struct StatefulWrap<W>(Stateful<W>);
-
-impl<W: Render> IntoRender for Stateful<W> {
-  type R = StatefulWrap<W>;
-
-  #[inline]
-  fn into_render(self) -> Self::R { StatefulWrap(self) }
-}
-
-impl<W: Compose> IntoCombination for Stateful<W> {
-  type C = StatefulWrap<W>;
-  #[inline]
-  fn into_combination(self) -> Self::C { StatefulWrap(self) }
-}
-
 impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
 
 impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
 
-impl<C: Compose> Compose for StatefulWrap<C> {
-  type W = C::W;
+impl<C: Compose + Clone + 'static> RecursiveCompose for Stateful<C> {
   #[inline]
-  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self.0.compose(ctx) }
+  fn recursive_compose(self: Box<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+    ComposedWidget {
+      composed: self.clone().compose(ctx),
+      by: self,
+    }
+    .into_boxed(ctx)
+  }
 }
 
-impl<W: Render> Render for StatefulWrap<W> {
+impl<W: Render> Render for Stateful<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.0.perform_layout(clamp, ctx)
+    (&**self).perform_layout(clamp, ctx)
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.0.only_sized_by_parent() }
+  fn only_sized_by_parent(&self) -> bool { (&**self).only_sized_by_parent() }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.0.paint(ctx) }
+  fn paint(&self, ctx: &mut PaintingCtx) { (&**self).paint(ctx) }
 }
 
 // Implement IntoStateful for all widget
@@ -390,41 +371,6 @@ impl<W: Widget + 'static> IntoStateful for W {
   fn into_stateful(self) -> Self::S { Stateful::new(self) }
 }
 
-impl<W: IntoStateful> IntoStateful for AttrWidget<W> {
-  type S = Stateful<W>;
-
-  fn into_stateful(mut self) -> Self::S {
-    self.attrs.insert(StateAttr::default());
-    Stateful(Box::pin(self))
-  }
-}
-
-fn assert_state_attr<W>(w: &mut AttrWidget<W>) -> &mut StateAttr {
-  w.find_attr_mut::<StateAttr>()
-    .expect("stateful widget must have `StateAttr`")
-}
-
-impl<W> AsAttrs for Stateful<W> {
-  #[inline]
-  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
-
-  #[inline]
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> {
-    let inner = unsafe { self.0.as_mut().get_unchecked_mut() };
-    inner.as_attrs_mut()
-  }
-}
-
-impl<W> AsAttrs for StatefulWrap<W>
-where
-  Self: Widget,
-{
-  #[inline]
-  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
-
-  #[inline]
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.as_attrs_mut() }
-}
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -518,7 +464,7 @@ mod tests {
 
     let mut wnd = Window::without_render(w.box_it(), Size::new(500., 500.));
 
-    let state_attr = state_ref.find_attr::<StateAttr>();
+    let state_attr = state_ref.find_attr::<StateInfo>();
     assert!(state_attr.is_some());
     assert!(state_attr.unwrap().tree_info.is_some());
 
