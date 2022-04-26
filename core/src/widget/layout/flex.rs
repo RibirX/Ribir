@@ -174,7 +174,7 @@ impl FlexLayouter {
     if self.reverse {
       inner_layout!(split_rev_children)
     } else {
-      inner_layout!(split_render_children)
+      inner_layout!(split_children)
     }
   }
 
@@ -189,7 +189,7 @@ impl FlexLayouter {
     };
 
     children.for_each(|child| {
-      let size = ctx.perform_render_child_layout(child, clamp);
+      let size = ctx.perform_child_layout(child, clamp);
       let flex_size = FlexSize::from_size(size, self.direction);
       if self.wrap
         && !self.current_line.is_empty()
@@ -361,7 +361,7 @@ impl FlexLayouter {
 
     let real_size = if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
       // Relayout only if the child object size may change.
-      let new_size = ctx.perform_render_child_layout(
+      let new_size = ctx.perform_child_layout(
         child,
         BoxClamp {
           max: clamp_max.to_size(dir),

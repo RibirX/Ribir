@@ -3,7 +3,7 @@ use std::{cell::Cell, rc::Rc};
 use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
-#[derive(Debug)]
+#[derive(Debug, SingleChildWidget)]
 pub struct Cursor(Rc<Cell<CursorIcon>>);
 
 pub fn cursor_attach<W>(icon: CursorIcon, w: W) -> W::Target

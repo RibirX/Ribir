@@ -1,6 +1,6 @@
 fields_sugar_def! {
   #attributes
-  #[doc="assign a key to the widget use for track it when tree rebuild."]
+  #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
   key: "[`Key`](../ribir/widget/key/enum.Key.html)",
   #[doc="assign cursor to the widget."]
   cursor: "[`CursorIcon`](../ribir/widget/enum.CursorIcon.html)",

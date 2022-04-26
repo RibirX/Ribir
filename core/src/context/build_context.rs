@@ -1,38 +1,29 @@
-use crate::{
-  animation::TickerAnimationCtrl,
-  dynamic_widget::GenerateInfo,
-  prelude::{widget_tree::WidgetTree, *},
-};
+use crate::{animation::TickerAnimationCtrl, dynamic_widget::GenerateInfo, prelude::*};
 use ::text::FontFamily;
-use std::{cell::RefCell, rc::Rc, time::Duration};
-
-use super::generator_store::GeneratorStore;
+use std::{rc::Rc, time::Duration};
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
   Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
 );
 
 pub struct BuildCtx<'a> {
-  pub(crate) parent: Option<Parent<'a>>,
+  parent: Option<WidgetId>,
   default_theme: Option<Rc<Theme>>,
-  animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
-  generator_store: &'a GeneratorStore,
-}
-
-pub(crate) struct Parent<'a> {
-  id: WidgetId,
-  tree: &'a WidgetTree,
+  ctx: &'a mut Context,
 }
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&mut self) -> &Theme {
+    let tree = &*self.ctx.widget_tree;
     self
       .parent
+      .as_ref()
       .and_then(|p| {
-        p.id
-          .ancestors(p.tree)
-          .find_map(|id| id.assert_get(p.tree).get_theme())
+        p.ancestors(tree).find_map(|id| {
+          id.assert_get(tree)
+            .query_first_type::<Theme>(QueryOrder::InnerFirst)
+        })
       })
       .unwrap_or_else(|| {
         self
@@ -42,29 +33,21 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(
-    parent: Option<Parent<'a>>,
-    animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
-    generator_store: &'a GeneratorStore,
-  ) -> Self {
-    Self {
-      parent,
-      default_theme: None,
-      animation_ticker,
-      generator_store,
-    }
+  pub(crate) fn new(parent: Option<WidgetId>, ctx: &'a mut Context) -> Self {
+    Self { parent, default_theme: None, ctx }
   }
 
-  pub fn ticker_ctrl(&self, duration: Duration) -> Option<Box<dyn TickerAnimationCtrl>> {
+  pub fn ticker_ctrl(&mut self, duration: Duration) -> Option<Box<dyn TickerAnimationCtrl>> {
     self
+      .ctx
       .animation_ticker
-      .as_ref()
-      .map(|ticker| ticker.borrow_mut().ticker_ctrl(duration))
+      .as_mut()
+      .map(|ticker| ticker.ticker_ctrl(duration))
   }
 
   #[inline]
   pub(crate) fn new_generator_info(&self) -> GenerateInfo {
-    self.generator_store.new_generator_info()
+    self.ctx.generator_store.new_generator_info()
   }
 }
 

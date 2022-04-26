@@ -1,6 +1,9 @@
-use std::{any::Any, cell::RefCell, collections::HashMap, pin::Pin, rc::Rc};
+use std::{any::Any, cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::prelude::{generator_store::GeneratorStore, widget_tree::WidgetTree, *};
+use crate::{
+  impl_query_type,
+  prelude::{key::Key, widget_tree::WidgetTree, *},
+};
 use rxrust::{
   prelude::MutRc,
   subscription::{SingleSubscription, SubscriptionGuard},
@@ -10,12 +13,7 @@ use smallvec::SmallVec;
 /// Trait use to update dynamic widgets at real time should present
 pub(crate) trait DynamicWidgetGenerator {
   fn parent(&self) -> Option<WidgetId>;
-  fn update_generated_widgets(
-    &mut self,
-    tree: Pin<&mut WidgetTree>,
-    ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
-    generator_store: &GeneratorStore,
-  );
+  fn update_generated_widgets(&mut self, ctx: &mut Context);
   fn info(&self) -> &GenerateInfo;
 }
 
@@ -47,11 +45,11 @@ pub type GeneratorStaticNextSibling<W> = AssociatedGenerator<W, StaticPrevSiblin
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GeneratorID(usize);
 
-pub(crate) struct DynamicWidgetInfo(GenerateInfo);
-pub(crate) struct PrevSiblingInfo(GenerateInfo);
+pub struct DynamicWidgetInfo(GenerateInfo);
+pub struct PrevSiblingInfo(GenerateInfo);
 
-pub(crate) struct StaticPrevSibling(GenerateInfo);
-pub(crate) struct GeneratorParentInfo(SmallVec<[GeneratorHandler; 1]>);
+pub struct StaticPrevSibling(GenerateInfo);
+pub struct GeneratorParentInfo(SmallVec<[GeneratorHandler; 1]>);
 pub(crate) struct GeneratorHandler {
   info: GenerateInfo,
   subscription: SubscriptionGuard<MutRc<SingleSubscription>>,
@@ -87,6 +85,31 @@ impl GenerateInfo {
   pub(crate) fn parent(&self) -> Option<WidgetId> { self.0.borrow().parent }
 
   pub(crate) fn generate_id(&self) -> GeneratorID { self.0.borrow().id }
+
+  fn add_dynamic_widget_tmp_anchor(&self, tree: &mut WidgetTree) -> WidgetId {
+    let inner = self.0.borrow_mut();
+    let prev_sibling = inner
+      .generated_widgets
+      .first()
+      .cloned()
+      .and_then(|id| id.prev_sibling(tree));
+
+    let parent = inner
+      .parent
+      .expect("parent of expr child should always exist.");
+    let prev_sibling = prev_sibling
+      .or(inner.prev_sibling)
+      .or(inner.static_prev_sibling)
+      .or_else(|| parent.first_child(tree));
+
+    let holder = tree.place_holder();
+    if let Some(prev_sibling) = prev_sibling {
+      prev_sibling.insert_next(holder, tree)
+    } else {
+      parent.append(holder, tree)
+    }
+    holder
+  }
 }
 
 impl<W: Render, Info> Render for AssociatedGenerator<W, Info> {
@@ -103,40 +126,15 @@ impl<W: Render, Info> Render for AssociatedGenerator<W, Info> {
 }
 
 impl<C: Compose, Info> Compose for AssociatedGenerator<C, Info> {
-  type W = C::W;
   #[inline]
-  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self.widget.compose(ctx) }
+  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.compose(ctx) }
 }
 
 impl<W, Info> QueryType for AssociatedGenerator<W, Info>
 where
   Self: Any,
 {
-  fn query_any(&self, type_id: std::any::TypeId) -> Option<&dyn Any> {
-    self.widget.query_any(type_id)
-  }
-
-  fn query_any_mut(&mut self, type_id: std::any::TypeId) -> Option<&mut dyn Any> {
-    self.widget.query_any_mut(type_id)
-  }
-
-  fn query_all_inner_any(&self, type_id: std::any::TypeId, callback: &dyn Fn(&dyn Any) -> bool) {
-    let Self { info, widget } = self;
-    if info.type_id() == type_id && callback(info) {
-      widget.query_all_inner_any(type_id, callback)
-    }
-  }
-
-  fn query_all_inner_any_mut(
-    &mut self,
-    type_id: std::any::TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-  ) {
-    let Self { info, widget } = self;
-    if (&*info).type_id() == type_id && callback(info) {
-      widget.query_all_inner_any_mut(type_id, callback)
-    }
-  }
+  impl_query_type!(info, widget);
 }
 
 impl<G: FnMut() -> W, W> ExprChild<G> {
@@ -162,74 +160,66 @@ where
   W: IntoIterator<Item = BoxedWidget>,
 {
   #[inline]
-  fn update_generated_widgets(
-    &mut self,
-    mut tree: Pin<&mut WidgetTree>,
-    ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
-    generator_store: &GeneratorStore,
-  ) {
+  fn update_generated_widgets(&mut self, ctx: &mut Context) {
     let new_widgets_iter = self.generator();
-    let info = self.info.0.borrow_mut();
 
-    let tmp_anchor = self.dynamic_widget_tmp_anchor(tree.get_mut());
+    let tmp_anchor = self.info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
+    let info = self.info.0.borrow_mut();
     let mut key_widgets = info
       .generated_widgets
       .iter()
       .filter_map(|id| {
-        if let Some(key) = id.assert_get(&*tree).get_key().cloned() {
-          id.detach(&mut *tree);
+        let tree = ctx.tree_mut();
+        if let Some(key) = id
+          .assert_get(tree)
+          .query_first_type::<Key>(QueryOrder::OutsideFirst)
+          .cloned()
+        {
+          id.detach(tree);
           Some((key.clone(), *id))
         } else {
-          id.remove_subtree(&mut *tree);
+          id.remove_subtree(tree);
           None
         }
       })
       .collect::<HashMap<_, _, ahash::RandomState>>();
 
+    let parent = info.parent.unwrap();
     let mut insert_at = tmp_anchor;
     new_widgets_iter.into_iter().for_each(|c| {
-      insert_at = match c.0.get_key().and_then(|k| key_widgets.remove(&*k)) {
-        Some(c_id) => c_id.replace_widget(c, tree, ticker, generator_store),
-        None => insert_at = insert_at.insert_next_widget(c, tree, ticker, generator_store),
-      }
+      insert_at = parent.insert_child(
+        c,
+        |node, tree| {
+          let old = node
+            .query_first_type::<Key>(QueryOrder::OutsideFirst)
+            .and_then(|k| key_widgets.remove(k));
+          let id = match old {
+            Some(c_id) => {
+              *c_id.assert_get_mut(tree) = node;
+              c_id
+            }
+            None => tree.new_node(node),
+          };
+          insert_at.insert_next(id, tree);
+          id
+        },
+        |wid, child, ctx| {
+          wid.append_widget(child, ctx);
+        },
+        ctx,
+      );
     });
 
+    let tree = ctx.tree_mut();
     key_widgets
       .into_iter()
-      .for_each(|(_, k)| k.remove_subtree(tree.get_mut()));
-    tmp_anchor.remove_subtree(tree.get_mut());
+      .for_each(|(_, k)| k.remove_subtree(tree));
+    tmp_anchor.remove_subtree(tree);
   }
 
   fn parent(&self) -> Option<WidgetId> { self.info.parent() }
 
   fn info(&self) -> &GenerateInfo { &self.info }
-}
-impl<G> ExprChild<G> {
-  fn dynamic_widget_tmp_anchor(&self, tree: &mut WidgetTree) -> WidgetId {
-    let info = self.info.0.borrow_mut();
-    let parent = info.parent.unwrap();
-    let prev_sibling = info
-      .generated_widgets
-      .first()
-      .cloned()
-      .and_then(|id| id.prev_sibling(tree));
-
-    let parent = info
-      .parent
-      .expect("parent of expr child should always exist.");
-    let prev_sibling = prev_sibling
-      .or(info.prev_sibling)
-      .or(info.static_prev_sibling)
-      .or_else(|| parent.first_child(tree));
-
-    let holder = tree.place_holder();
-    if let Some(prev_sibling) = prev_sibling {
-      prev_sibling.insert_next(holder, tree)
-    } else {
-      parent.append(holder, tree)
-    }
-    holder
-  }
 }
 
 impl GeneratorParentInfo {

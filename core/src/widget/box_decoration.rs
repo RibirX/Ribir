@@ -46,7 +46,7 @@ impl Render for BoxDecoration {
 
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let child = single_child(ctx);
-    let mut size = ctx.perform_render_child_layout(child, clamp);
+    let mut size = ctx.perform_child_layout(child, clamp);
     if let Some(ref border) = self.border {
       size.width += border.left.width + border.right.width;
       size.height += border.top.width + border.bottom.width;

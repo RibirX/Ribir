@@ -14,8 +14,8 @@ pub(crate) mod widget_tree;
 pub use crate::widget::text::Text;
 pub use key::Key;
 pub use stateful::*;
-mod cursor;
-pub use cursor::Cursor;
+// mod cursor;
+// pub use cursor::Cursor;
 pub use winit::window::CursorIcon;
 mod margin;
 pub use margin::*;
@@ -27,8 +27,6 @@ mod svg;
 pub use svg::*;
 mod box_decoration;
 pub use box_decoration::*;
-pub mod attr;
-pub use attr::*;
 // mod checkbox;
 // pub use checkbox::*;
 // mod scrollable;
@@ -44,10 +42,10 @@ pub use path::*;
 use self::layout_store::BoxClamp;
 
 pub trait Compose {
-  type W;
+  // todo: use associated type replace BoxedWidget is friendly?
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(self, ctx: &mut BuildCtx) -> Self::W;
+  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget;
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -66,15 +64,16 @@ pub trait Render {
   /// children's perform_layout across the `LayoutCtx`
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size;
 
-  /// Whether the constraints from parent are the only input to detect the
-  /// widget size, and child nodes' size not affect its size.
-  fn only_sized_by_parent(&self) -> bool;
   /// `paint` is a low level trait to help you draw your widget to paint device
   /// across `PaintingCtx::painter` by itself coordinate system. Not care
   /// about children's paint in this method, framework will call children's
   /// paint individual. And framework guarantee always paint parent before
   /// children.
   fn paint(&self, ctx: &mut PaintingCtx);
+
+  /// Whether the constraints from parent are the only input to detect the
+  /// widget size, and child nodes' size not affect its size.
+  fn only_sized_by_parent(&self) -> bool { false }
 }
 
 // todo: deprecated, remove it after optimistic Compose.
@@ -90,83 +89,53 @@ pub trait StatefulCombination {
 }
 
 /// A generic widget wrap for all compose widget result, and keep its type info.
-pub struct ComposedWidget<W, B> {
-  composed: W,
-  by: PhantomData<B>,
+struct ComposedWidget<R, B> {
+  composed: R,
+  by: B,
 }
 
-pub(crate) trait ConcreteCompose<Target> {
-  fn concrete_compose(self, ctx: &mut BuildCtx) -> Target;
+pub(crate) trait RecursiveCompose {
+  fn recursive_compose(self: Box<Self>, ctx: &mut BuildCtx) -> BoxedWidget;
 }
 
-pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
+impl<C: Compose + 'static> RecursiveCompose for C {
+  fn recursive_compose(self: Box<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+    // todo: we need wrap the build context let logic child can query type of ?
+    // or keep theme as a individual widget is enough.
 
-impl<C: Compose, X> ConcreteCompose<ComposedWidget<X, ComposedWidget<C::W, C>>> for C
-where
-  C::W: ConcreteCompose<X>,
-{
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> ComposedWidget<X, ComposedWidget<C::W, C>> {
-    // todo: we need wrap the build context let logic child can query type of
-    // self.
     ComposedWidget {
       composed: self.compose(ctx),
       by: PhantomData::<C>,
     }
-    .concrete_compose(ctx)
+    .into_boxed(ctx)
   }
 }
 
-impl<R: Render> ConcreteCompose<R> for R {
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> R { self }
-}
-
-impl<W, B, X> ConcreteCompose<ComposedWidget<X, Self>> for ComposedWidget<W, B>
-where
-  W: ConcreteCompose<X>,
-{
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> ComposedWidget<X, Self> {
-    ComposedWidget {
-      composed: self.composed.concrete_compose(ctx),
-      by: PhantomData,
+impl<B: 'static> ComposedWidget<BoxedWidget, B> {
+  fn into_boxed(self, ctx: &mut BuildCtx) -> BoxedWidget {
+    let by = self.by;
+    match self.composed.0 {
+      BoxedWidgetInner::Compose(c) => ComposedWidget {
+        composed: c.recursive_compose(ctx),
+        by,
+      }
+      .into_boxed(ctx),
+      BoxedWidgetInner::Render(r) => ComposedWidget { composed: r, by }.box_it(),
+      BoxedWidgetInner::SingleChild(s) => SingleChild {
+        widget: ComposedWidget { composed: s.widget, by },
+        child: s.child,
+      }
+      .box_it(),
+      BoxedWidgetInner::MultiChild(m) => MultiChild {
+        widget: ComposedWidget { composed: m.widget, by },
+        children: m.children,
+      }
+      .box_it(),
     }
   }
 }
 
-impl<W, B> ConcreteCompose<SingleChild<ComposedWidget<W, B>>>
-  for ComposedWidget<SingleChild<W>, B>
-{
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> SingleChild<ComposedWidget<W, B>> {
-    SingleChild {
-      widget: ComposedWidget {
-        composed: self.composed.widget,
-        by: self.by,
-      },
-      child: self.composed.child,
-    }
-  }
-}
-
-impl<W, B> ConcreteCompose<MultiChild<ComposedWidget<W, B>>> for ComposedWidget<MultiChild<W>, B> {
-  #[inline]
-  fn concrete_compose(self, ctx: &mut BuildCtx<'_>) -> MultiChild<ComposedWidget<W, B>> {
-    MultiChild {
-      widget: ComposedWidget {
-        composed: self.composed.widget,
-        by: self.by,
-      },
-      children: self.composed.children,
-    }
-  }
-}
-
-impl<R: Render, B> Render for ComposedWidget<R, B>
-where
-  R: Render,
-{
+impl<B> Render for ComposedWidget<Box<dyn RenderNode>, B> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.composed.perform_layout(clamp, ctx)
@@ -178,6 +147,7 @@ where
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
 }
+pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
 #[marker]
 pub(crate) trait Widget {}
@@ -190,56 +160,47 @@ impl<W: StatefulCombination> Widget for W {}
 pub(crate) trait QueryType {
   /// query self type by type id, and return a reference of `Any` trait to cast
   /// to target type if type match.
-  fn query_any(&self, type_id: TypeId) -> Option<&dyn Any>;
+  fn query(&self, type_id: TypeId) -> Option<&dyn Any>;
   /// query self type by type id, and return a mut reference of `Any` trait to
   /// cast to target type if type match.
-  fn query_any_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
+  fn query_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `& dyn Any` of the target type, and return if  want to continue.
-  fn query_all_inner_any(&self, type_id: TypeId, callback: &dyn Fn(&dyn Any) -> bool);
+  fn query_all<'a>(
+    &'a self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&'a dyn Any) -> bool,
+    order: QueryOrder,
+  );
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `&mut dyn Any` of the target type, and return if want to continue.
-  fn query_all_inner_any_mut(
-    &mut self,
+  fn query_all_mut<'a>(
+    &'a mut self,
     type_id: TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+    callback: &mut dyn FnMut(&'a mut dyn Any) -> bool,
+    order: QueryOrder,
   );
 }
-pub(crate) trait IntoRender {
-  type R: Render;
-  fn into_render(self) -> Self::R;
-}
 
-pub(crate) trait IntoCombination {
-  type C: Compose;
-  fn into_combination(self) -> Self::C;
-}
-
-impl<W: Render> IntoRender for W {
-  type R = W;
-  #[inline]
-  fn into_render(self) -> Self::R { self }
-}
-
-impl<W: Compose> IntoCombination for W {
-  type C = W;
-  #[inline]
-  fn into_combination(self) -> Self::C { self }
+#[derive(Clone, Copy)]
+pub(crate) enum QueryOrder {
+  InnerFirst,
+  OutsideFirst,
 }
 
 pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
 pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
-pub(crate) trait CombinationNode: Compose + AsAttrs + QueryType {}
-pub(crate) trait RenderNode: Render + AsAttrs + QueryType {}
+pub(crate) trait CombinationNode: Compose + QueryType {}
+pub(crate) trait RenderNode: Render + QueryType {}
 
-impl<W: Compose + AsAttrs + QueryType> CombinationNode for W {}
+impl<W: Compose + QueryType> CombinationNode for W {}
 
-impl<W: Render + AsAttrs + QueryType> RenderNode for W {}
+impl<W: Render + QueryType> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
-  Compose(Box<dyn ConcreteCompose<BoxedWidget>>),
+  Compose(Box<dyn RecursiveCompose>),
   Render(Box<dyn RenderNode>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
@@ -247,87 +208,145 @@ pub(crate) enum BoxedWidgetInner {
 
 impl<W: Any> QueryType for W {
   #[inline]
-  default fn query_any(&self, type_id: TypeId) -> Option<&dyn Any> {
+  default fn query(&self, type_id: TypeId) -> Option<&dyn Any> {
     (self.type_id() == type_id).then(|| self as &dyn Any)
   }
 
   #[inline]
-  default fn query_any_mut(&mut self, type_id: TypeId) -> Option<&mut (dyn Any + '_)> {
+  default fn query_mut(&mut self, type_id: TypeId) -> Option<&mut (dyn Any)> {
     ((&*self).type_id() == type_id).then(|| self as &mut dyn Any)
   }
 
   #[inline]
-  default fn query_all_inner_any(&self, type_id: TypeId, callback: &dyn Fn(&dyn Any) -> bool) {
-    if let Some(a) = self.query_any(type_id) {
+  default fn query_all<'a>(
+    &'a self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&'a dyn Any) -> bool,
+    _: QueryOrder,
+  ) {
+    if let Some(a) = self.query(type_id) {
       callback(a);
     }
   }
 
   #[inline]
-  default fn query_all_inner_any_mut(
-    &mut self,
+  default fn query_all_mut<'a>(
+    &'a mut self,
     type_id: TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+    callback: &mut dyn FnMut(&'a mut dyn Any) -> bool,
+    _: QueryOrder,
   ) {
-    if let Some(a) = self.query_any_mut(type_id) {
+    if let Some(a) = self.query_mut(type_id) {
       callback(a);
     }
   }
 }
 
-impl<'a> dyn QueryType + 'a {
+impl<'a> dyn RenderNode + 'a {
   #[inline]
   pub fn query_type<T: Any>(&self) -> Option<&T> {
-    self
-      .query_any(TypeId::of::<T>())
-      .and_then(|a| a.downcast_ref())
+    let q = self as &dyn QueryType;
+    q.query(TypeId::of::<T>()).and_then(|a| a.downcast_ref())
   }
 
   #[inline]
   pub fn query_type_mut<T: Any>(&mut self) -> Option<&mut T> {
-    self
-      .query_any_mut(TypeId::of::<T>())
+    let q = self as &mut dyn QueryType;
+    q.query_mut(TypeId::of::<T>())
       .and_then(|a| a.downcast_mut())
   }
 
   #[inline]
-  pub fn query_all_inner_type<T: Any>(&self, callback: impl Fn(&T) -> bool) {
-    let callback = |a: &dyn Any| a.downcast_ref().map_or(true, |t| callback(t));
-    self.query_all_inner_any(TypeId::of::<T>(), &callback)
+  pub fn query_all_type<'b, T: Any>(
+    &'b self,
+    mut callback: impl FnMut(&'b T) -> bool,
+    order: QueryOrder,
+  ) {
+    let q = self as &dyn QueryType;
+    q.query_all(
+      TypeId::of::<T>(),
+      &mut |a: &dyn Any| a.downcast_ref().map_or(true, |t| callback(t)),
+      order,
+    )
   }
 
   #[inline]
-  fn query_all_inner_type_mut<T: Any>(&mut self, mut callback: impl FnMut(&mut T) -> bool) {
-    let mut callback = |a: &mut dyn Any| a.downcast_mut().map_or(true, |t| callback(t));
-    self.query_all_inner_any_mut(TypeId::of::<T>(), &mut callback)
+  pub fn query_all_type_mut<'b, T: Any>(
+    &'b mut self,
+    mut callback: impl FnMut(&'b mut T) -> bool,
+    order: QueryOrder,
+  ) {
+    let q = self as &mut dyn QueryType;
+    q.query_all_mut(
+      TypeId::of::<T>(),
+      &mut |a: &mut dyn Any| a.downcast_mut().map_or(true, |t| callback(t)),
+      order,
+    )
+  }
+
+  /// Query the first match type in all type by special order, and return a
+  /// reference of it.
+
+  pub fn query_first_type<T: Any>(&self, order: QueryOrder) -> Option<&T> {
+    let mut target = None;
+    self.query_all_type(
+      |a| {
+        target = Some(a);
+        false
+      },
+      order,
+    );
+    target
+  }
+
+  /// Query the first match type in all type by special order. and return a mut
+  /// reference of it.
+
+  pub fn query_first_type_mut<T: Any>(&mut self, order: QueryOrder) -> Option<&mut T> {
+    let mut target = None;
+    self.query_all_type_mut(
+      |a| {
+        target = Some(a);
+        false
+      },
+      order,
+    );
+    target
   }
 }
-// Widget & BoxWidget default implementation
-pub struct StatefulCombinationMarker;
-pub struct RenderMarker;
 
-pub trait BoxWidget<Marker> {
+// todo: does we can directly  extend the sub tree in compose method, and remove
+// box widget?
+
+pub struct RenderMarker;
+pub struct ComposeMarker;
+pub trait BoxWidget<M> {
   fn box_it(self) -> BoxedWidget;
 }
 
-impl<T: IntoRender + 'static> BoxWidget<RenderMarker> for T {
+impl<C: Compose + 'static> BoxWidget<ComposeMarker> for C {
   #[inline]
-  fn box_it(self) -> BoxedWidget {
-    BoxedWidget(BoxedWidgetInner::Render(Box::new(self.into_render())))
-  }
+  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
 }
 
-impl<S: IntoRender + 'static> BoxWidget<RenderMarker> for SingleChild<S> {
+impl<R: Render + 'static> BoxWidget<RenderMarker> for R {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Render(Box::new(self))) }
+}
+
+impl<S: Render + 'static> BoxWidget<RenderMarker> for SingleChild<S> {
+  #[inline]
   fn box_it(self) -> BoxedWidget {
-    let widget: Box<dyn RenderNode> = Box::new(self.widget.into_render());
+    let widget: Box<dyn RenderNode> = Box::new(self.widget);
     let boxed = Box::new(SingleChild { widget, child: self.child });
     BoxedWidget(BoxedWidgetInner::SingleChild(boxed))
   }
 }
 
-impl<M: IntoRender + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
+impl<M: Render + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
+  #[inline]
   fn box_it(self) -> BoxedWidget {
-    let widget: Box<dyn RenderNode> = Box::new(self.widget.into_render());
+    let widget: Box<dyn RenderNode> = Box::new(self.widget);
     let inner = BoxedWidgetInner::MultiChild(MultiChild { widget, children: self.children });
     BoxedWidget(inner)
   }
@@ -336,7 +355,6 @@ impl<M: IntoRender + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
 struct StatefulCombinationWrap<W>(Stateful<W>);
 
 impl<C: StatefulCombination> Compose for StatefulCombinationWrap<C> {
-  type W = BoxedWidget;
   fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget
   where
     Self: Sized,
@@ -348,34 +366,90 @@ impl<C: StatefulCombination> Compose for StatefulCombinationWrap<C> {
   }
 }
 
-impl<W> AsAttrs for StatefulCombinationWrap<W>
-where
-  Self: Widget,
-{
+impl<C: FnOnce(&mut BuildCtx) -> BoxedWidget> Compose for C {
   #[inline]
-  fn as_attrs(&self) -> Option<&Attributes> { self.0.as_attrs() }
-
-  #[inline]
-  fn as_attrs_mut(&mut self) -> Option<&mut Attributes> { self.0.as_attrs_mut() }
+  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget { self(ctx) }
 }
 
-impl<W: StatefulCombination + 'static> BoxWidget<StatefulCombinationMarker> for Stateful<W> {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { StatefulCombinationWrap(self).box_it() }
-}
+#[macro_export]
+macro_rules! impl_query_type {
+  ($info: ident, $inner_widget: ident) => {
+    fn query_all<'a>(
+      &'a self,
+      type_id: std::any::TypeId,
+      callback: &mut dyn FnMut(&'a dyn Any) -> bool,
+      order: QueryOrder,
+    ) {
+      let info = &self.$info;
+      let widget = &self.$inner_widget;
+      let mut continue_query = true;
+      match order {
+        QueryOrder::InnerFirst => {
+          widget.query_all(
+            type_id,
+            &mut |t| {
+              continue_query = callback(t);
+              continue_query
+            },
+            order,
+          );
+          if continue_query {
+            info.query_all(type_id, callback, order);
+          }
+        }
+        QueryOrder::OutsideFirst => {
+          info.query_all(type_id, callback, order);
+          if continue_query {
+            widget.query_all(
+              type_id,
+              &mut |t| {
+                continue_query = callback(t);
+                continue_query
+              },
+              order,
+            );
+          }
+        }
+      }
+    }
 
-impl<W: StatefulCombination + 'static> BoxWidget<StatefulCombinationMarker> for W {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { StatefulCombinationWrap(self.into_stateful()).box_it() }
-}
-
-impl BoxWidget<StatefulCombinationMarker> for BoxedWidget {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { self }
-}
-
-impl<R, C: FnOnce(&mut BuildCtx) -> R> Compose for C {
-  type W = R;
-  #[inline]
-  fn compose(self, ctx: &mut BuildCtx) -> Self::W { self(ctx) }
+    fn query_all_mut<'a>(
+      &'a mut self,
+      type_id: std::any::TypeId,
+      callback: &mut dyn FnMut(&'a mut dyn Any) -> bool,
+      order: QueryOrder,
+    ) {
+      let info = &mut self.$info;
+      let widget = &mut self.$inner_widget;
+      let mut continue_query = true;
+      match order {
+        QueryOrder::InnerFirst => {
+          widget.query_all_mut(
+            type_id,
+            &mut |t| {
+              continue_query = callback(t);
+              continue_query
+            },
+            order,
+          );
+          if continue_query {
+            info.query_all_mut(type_id, callback, order);
+          }
+        }
+        QueryOrder::OutsideFirst => {
+          info.query_all_mut(type_id, callback, order);
+          if continue_query {
+            widget.query_all_mut(
+              type_id,
+              &mut |t| {
+                continue_query = callback(t);
+                continue_query
+              },
+              order,
+            );
+          }
+        }
+      }
+    }
+  };
 }

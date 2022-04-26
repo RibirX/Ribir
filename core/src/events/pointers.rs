@@ -102,6 +102,7 @@ impl PointerEvent {
 }
 
 /// An attribute that calls callbacks in response to common pointer events.
+// todo: use unicast subject replace
 #[derive(Default)]
 pub struct PointerAttr(LocalSubject<'static, (PointerEventType, NonNull<PointerEvent>), ()>);
 

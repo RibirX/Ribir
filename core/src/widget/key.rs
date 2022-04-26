@@ -1,11 +1,12 @@
+use crate::prelude::*;
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
 };
 
-/// `Key` help `Ribir` to track if two widget is a same widget in two frame.
+/// `Key` help `Ribir` to track if two widget is a same widget in two frames.
 /// Abstract all builtin key into a same type.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, SingleChildWidget)]
 pub enum Key {
   Kusize(usize),
   Ku1(u8),
@@ -26,6 +27,15 @@ pub enum Key {
 
   Kstring(String),
   K32([u8; 32]),
+}
+
+impl Render for Key {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let child = ctx.single_child().expect("Margin must have one child");
+    ctx.perform_child_layout(child, clamp)
+  }
+
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {

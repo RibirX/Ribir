@@ -17,7 +17,7 @@ impl Render for Expanded {
     let child = ctx
       .single_child()
       .expect("Expanded render should always have a single child");
-    ctx.perform_render_child_layout(child, clamp)
+    ctx.perform_child_layout(child, clamp)
   }
 
   #[inline]

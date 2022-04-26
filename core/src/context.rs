@@ -1,12 +1,12 @@
 use std::{
-  cell::{Cell, RefCell},
+  cell::Cell,
+  cmp::Reverse,
   pin::Pin,
-  rc::Rc,
   sync::{Arc, RwLock},
 };
 
 use crate::prelude::{
-  widget_tree::WidgetTree, Attributes, BoxedWidget, Event, EventCommon, StateAttr, WidgetId,
+  widget_tree::WidgetTree, BoxedWidget, Event, EventCommon, QueryOrder, StateInfo, WidgetId,
 };
 use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
@@ -40,7 +40,7 @@ pub(crate) struct Context {
   pub shaper: TextShaper,
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
-  animation_ticker: Option<Rc<RefCell<Box<dyn TickerProvider>>>>,
+  animation_ticker: Option<Box<dyn TickerProvider>>,
   generator_store: generator_store::GeneratorStore,
 }
 
@@ -50,7 +50,6 @@ impl Context {
     device_scale: f32,
     animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
-    let animation_ticker = animation_ticker.map(|ticker| Rc::new(RefCell::new(ticker)));
     let font_db = Arc::new(RwLock::new(FontDB::default()));
     let shaper = TextShaper::new(font_db.clone());
     let reorder = TextReorder::default();
@@ -58,14 +57,9 @@ impl Context {
     let painter = Painter::new(device_scale, typography_store.clone());
     let generator_store = generator_store::GeneratorStore::default();
 
-    let tree = WidgetTree::new();
-    tree
-      .root()
-      .append_widget(root, tree.as_mut(), animation_ticker, &generator_store);
-    let real_root = tree.root().single_child(&tree).unwrap();
-    tree.reset_root(real_root);
-
-    let ctx = Context {
+    let mut tree = WidgetTree::new();
+    let tmp_root = tree.root();
+    let mut ctx = Context {
       layout_store: <_>::default(),
       widget_tree: WidgetTree::new(),
       painter,
@@ -79,9 +73,19 @@ impl Context {
       generator_store,
     };
 
+    tmp_root.append_widget(root, &mut ctx);
+    let real_root = tree.root().single_child(&tree).unwrap();
+    tree.reset_root(real_root);
+
     ctx.mark_layout_from_root();
     ctx
   }
+
+  #[inline]
+  pub(crate) fn tree(&self) -> &WidgetTree { &self.widget_tree }
+
+  #[inline]
+  pub(crate) fn tree_mut(&mut self) -> &mut WidgetTree { &mut self.widget_tree }
 
   pub(crate) fn bubble_event<D, E, F, Attr>(
     &self,
@@ -96,17 +100,19 @@ impl Context {
     Attr: 'static,
   {
     let mut event = default(self, widget);
-    for wid in widget.ancestors(&self.widget_tree) {
-      if let Some(attr) = wid
-        .assert_get(&self.widget_tree)
-        .as_attrs()
-        .and_then(Attributes::find::<Attr>)
-      {
-        event.as_mut().current_target = wid;
-        dispatch(attr, &mut event);
-        if event.bubbling_canceled() {
-          break;
-        }
+    let tree = &self.widget_tree;
+    for wid in widget.ancestors(tree) {
+      wid.assert_get(tree).query_all_type(
+        |attr| {
+          event.as_mut().current_target = wid;
+          dispatch(attr, &mut event);
+          !event.bubbling_canceled()
+        },
+        QueryOrder::InnerFirst,
+      );
+
+      if event.bubbling_canceled() {
+        break;
       }
     }
 
@@ -157,43 +163,53 @@ impl Context {
     self.painter.finish()
   }
 
-  // todo: deprecated, remove it after remove all attributes.
-  pub fn find_attr<A: 'static>(&self, widget: WidgetId) -> Option<&A> {
-    widget
-      .get(&self.widget_tree)
-      .and_then(|w| w.as_attrs())
-      .and_then(Attributes::find)
+  pub fn mark_layout_from_root(&mut self) {
+    self
+      .layout_store
+      .mark_needs_layout(self.widget_tree.root(), &self.widget_tree);
   }
-
-  fn mark_changed(&mut self, id: WidgetId) {
-    self.layout_store.mark_needs_layout(id, &self.widget_tree);
-  }
-
-  pub fn mark_layout_from_root(&mut self) { self.mark_changed(self.widget_tree.root()); }
 
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub fn tree_repair(&mut self) {
-    self
-      .generator_store
-      .update_dynamic_widgets(self.widget_tree.as_mut(), self.animation_ticker.clone());
+    let needs_regen = self.generator_store.take_needs_regen();
+
+    for Reverse((_, gid)) in needs_regen {
+      let generator = self.generator_store.remove_generator(gid);
+      let is_dropped = generator
+        .as_ref()
+        .and_then(|g| g.parent())
+        .map_or(true, |p| p.is_dropped(self.tree()));
+      if is_dropped {
+        continue;
+      } else {
+        let mut g = generator.unwrap();
+        g.update_generated_widgets(self);
+        self.generator_store.add_widget_generator(g);
+      }
+    }
   }
 
   pub fn state_change_dispatch(&mut self) {
     while let Some((id, flag)) = self.widget_tree.pop_changed_widgets() {
-      let attr = id
-        .assert_get_mut(&mut self.widget_tree)
-        .as_attrs()
-        .and_then(Attributes::find::<StateAttr>);
-
+      let tree = self.widget_tree.as_mut().get_mut();
       if flag.contains(WidgetChangeFlags::DIFFUSE) {
-        if let Some(attr) = attr {
-          attr.changed_notify()
-        }
+        id.assert_get_mut(tree).query_all_type_mut(
+          |attr: &mut StateInfo| {
+            attr.changed_notify();
+            true
+          },
+          QueryOrder::OutsideFirst,
+        );
       }
-
       if flag.contains(WidgetChangeFlags::UNSILENT) {
-        self.mark_changed(id);
+        id.assert_get(tree).query_all_type(
+          |_: &StateInfo| {
+            self.layout_store.mark_needs_layout(id, tree);
+            true
+          },
+          QueryOrder::OutsideFirst,
+        );
       }
     }
   }
@@ -208,9 +224,10 @@ impl Context {
   }
 
   pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
-    match &self.animation_ticker {
-      Some(ticker) => ticker.borrow_mut().trigger(),
-      None => false,
+    if let Some(ticker) = self.animation_ticker.as_mut() {
+      ticker.trigger()
+    } else {
+      false
     }
   }
 }

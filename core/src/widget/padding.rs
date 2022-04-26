@@ -21,7 +21,7 @@ impl Render for Padding {
     // Shrink the clamp of child.
     let child_clamp = BoxClamp { min, max };
 
-    let size = ctx.perform_render_child_layout(child, child_clamp);
+    let size = ctx.perform_child_layout(child, child_clamp);
 
     // Expand the size, so the child have padding.
     let size = clamp.clamp(size + thickness);
@@ -29,7 +29,7 @@ impl Render for Padding {
 
     // Update child's children position, let they have a correct position after
     // expanded with padding. padding.
-    let (ctx, grandson_iter) = ctx.split_render_children_by(child);
+    let (ctx, grandson_iter) = ctx.split_children_by(child);
     grandson_iter.for_each(|c| {
       let pos = ctx
         .widget_box_rect(c)

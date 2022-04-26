@@ -24,7 +24,7 @@ impl Render for Margin {
     let child_clamp = BoxClamp { min, max };
 
     let child = ctx.single_child().expect("Margin must have one child");
-    let size = ctx.perform_render_child_layout(child, child_clamp);
+    let size = ctx.perform_child_layout(child, child_clamp);
     ctx.update_position(child, Point::new(self.margin.left, self.margin.top));
 
     size + thickness
