@@ -150,8 +150,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   #[inline]
-  fn query_type<W: 'static>(&self, id: WidgetId, ) -> Option<&W> {
-    id.assert_get(self.widget_tree()).query_first_type(QueryOrder::OutsideFirst)
+  fn query_type<W: 'static>(&self, id: WidgetId) -> Option<&W> {
+    id.assert_get(self.widget_tree())
+      .query_first_type(QueryOrder::OutsideFirst)
   }
 }
 

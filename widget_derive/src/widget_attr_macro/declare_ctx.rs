@@ -5,14 +5,15 @@ use crate::{
 };
 
 use super::{
-  declare_widget::SugarFields, ribir_suffix_variable, FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
+  declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, FollowOn, WidgetMacro,
+  DECLARE_WRAP_MACRO,
 };
 
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident, ItemMacro};
+use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident, ItemMacro, Member};
 
 pub struct DeclareCtx {
   /// All name defined in `widget!` by `id`.
@@ -98,16 +99,18 @@ impl VisitMut for DeclareCtx {
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
-      if let Some(suffix) = SugarFields::wrap_widget_from_member(&f_expr.member) {
-        name.set_span(name.span().join(suffix.span()).unwrap());
-        let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
-        *f_expr.base = parse_quote! { #wrap_name };
-        self
-          .user_perspective_name
-          .insert(wrap_name.clone(), name.clone());
-        self.add_follow(wrap_name);
-        self.add_reference(name, ReferenceInfo::WrapWidgetRef);
-        return;
+      if let Member::Named(ref f_name) = f_expr.member {
+        if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(f_name) {
+          name.set_span(name.span().join(f_name.span()).unwrap());
+          let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
+          *f_expr.base = parse_quote! { #wrap_name };
+          self
+            .user_perspective_name
+            .insert(wrap_name.clone(), name.clone());
+          self.add_follow(wrap_name);
+          self.add_reference(name, ReferenceInfo::WrapWidgetRef);
+          return;
+        }
       }
     }
     visit_mut::visit_expr_field_mut(self, f_expr);

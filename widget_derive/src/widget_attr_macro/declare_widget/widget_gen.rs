@@ -15,7 +15,7 @@ pub struct WidgetGen<'a> {
 }
 
 impl<'a> WidgetGen<'a> {
-  pub fn gen_widget_tokens(&self, ctx: &DeclareCtx, force_stateful: bool) -> TokenStream {
+  pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     let Self { fields, ty, .. } = self;
 
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
@@ -40,7 +40,7 @@ impl<'a> WidgetGen<'a> {
       if fields_with_guard.is_empty() {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()
-            #(#without_guard_tokens)*.build(#ctx_name)#stateful;
+            #(#without_guard_tokens)*.build(#ctx_name).into_widget()#stateful;
         }
       } else {
         let with_guard_tokens = fields_with_guard
@@ -50,14 +50,14 @@ impl<'a> WidgetGen<'a> {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()#(#without_guard_tokens)*;
           #(#with_guard_tokens)*
-          let #def_name = #def_name.build(#ctx_name)#stateful;
+          let #def_name = #def_name.build(#ctx_name).into_widget()#stateful;
         }
       }
     };
 
     let fields_follow = fields.iter().filter_map(|f| self.field_follow_tokens(f));
 
-    let state_ref = if force_stateful || self.is_stateful(ctx) {
+    let state_ref = if self.is_stateful(ctx) {
       Some(quote! { let mut #ref_name = unsafe { #def_name.state_ref() }; })
     } else if ctx.be_reference(ref_name) {
       Some(quote! { let #ref_name = &#def_name; })

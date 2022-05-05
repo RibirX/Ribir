@@ -64,8 +64,6 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[doc = include_str!("../../docs/declare_macro.md")]
-#[doc = include_str!("../../docs/declare_builtin_fields.md")]
 #[proc_macro_attribute]
 pub fn widget(_attr: TokenStream, input: TokenStream) -> TokenStream {
   let mut compose_fn = parse_macro_input! { input as syn::ImplItemMethod };

@@ -10,9 +10,9 @@ use syn::{
 };
 
 use super::{
-  animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field,
-  declare_widget::SugarFields, kw, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo,
-  FollowOn, FollowPlace, Follows, Result,
+  animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
+  widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace, Follows,
+  Result,
 };
 use crate::error::{DeclareError, DeclareWarning};
 
@@ -100,17 +100,7 @@ impl WidgetMacro {
     if !ctx.named_objects.is_empty() {
       let mut follows = self.analyze_object_follows();
       let _init_circle_check = Self::circle_check(&follows, |stack| {
-        let head_is_attr = is_widget_attr(stack[0].origin);
-        // fixme: we allow widget attr dependence widget self when init, but not support
-        // indirect follow now.
-        // `!is_widget_attr(stack.last().unwrap().on.widget.spans.all_widget_field)`
-        // unit case `fix_attr_indirect_follow_host_fail.rs`, update its stderr if
-        // fixed.
-        if head_is_attr && stack.len() == 1 {
-          Ok(())
-        } else {
-          Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
-        }
+        Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
       })?;
 
       let mut named_widgets_def = self.named_objects_def_tokens(ctx);
@@ -331,19 +321,6 @@ impl DeclareCtx {
     if let Some(animations) = d.animations.as_mut() {
       ctx.visit_animations_mut(animations);
     }
-  }
-}
-
-fn is_widget_attr(origin: FollowPlace) -> bool {
-  if let FollowPlace::Field(f) = origin {
-    SugarFields::BUILTIN_LISTENERS
-      .iter()
-      .any(|name| f.member == name)
-      || SugarFields::BUILTIN_DATA_ATTRS
-        .iter()
-        .any(|name| f.member == name)
-  } else {
-    false
   }
 }
 
