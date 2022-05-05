@@ -159,7 +159,7 @@
 //! [declare_derive]: ../ribir/widget_derive/Declare.html
 //! [builtin_fields]: ../ribir/widget_derive/declare_builtin_fields.html
 
-use crate::prelude::BuildCtx;
+use crate::prelude::{BuildCtx, Widget};
 
 /// Trait to mark the builder type of widget. `widget!` use it to access the
 /// build type of the widget. See the [mod level document](declare) to know how
@@ -174,6 +174,18 @@ pub trait Declare {
 pub trait DeclareBuilder {
   type Target;
   fn build(self, ctx: &mut BuildCtx) -> Self::Target;
+}
+
+pub trait IntoWidget {
+  type W;
+  fn into_widget(self) -> Self::W;
+}
+
+impl<W: Widget> IntoWidget for W {
+  type W = Self;
+
+  #[inline]
+  fn into_widget(self) -> Self::W { self }
 }
 
 pub trait Striped<Marker, V> {

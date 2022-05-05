@@ -10,14 +10,13 @@ use syn::{
   visit_mut::VisitMut,
   Expr, Ident, Path,
 };
-mod sugar_fields;
 mod widget_gen;
 use crate::{
   error::{DeclareError, DeclareWarning},
-  widget_attr_macro::{ribir_prefix_variable, ReferenceInfo, DECLARE_WRAP_MACRO},
+  widget_attr_macro::{ribir_prefix_variable, DECLARE_WRAP_MACRO},
 };
-
-pub use sugar_fields::*;
+mod builtin_fields;
+pub use builtin_fields::*;
 use widget_gen::WidgetGen;
 
 use super::{
@@ -33,7 +32,7 @@ pub struct DeclareWidget {
   // the name of this widget specified by `id` attr.
   pub named: Option<Id>,
   fields: Vec<DeclareField>,
-  sugar_fields: SugarFields,
+  builtin: BuiltinFieldWidgets,
   pub children: Vec<Child>,
 }
 
@@ -64,6 +63,25 @@ pub struct SkipNcAttr {
   bracket_token: token::Bracket,
   skip_nc_meta: kw::skip_nc,
 }
+
+macro_rules! assign_uninit_field {
+  ($self: ident.$name: ident, $field: ident) => {
+    assign_uninit_field!($self.$name, $field, $name)
+  };
+  ($left: expr, $right: ident, $name: ident) => {
+    if $left.is_none() {
+      $left = Some($right);
+      Ok(())
+    } else {
+      Err(syn::Error::new(
+        $right.span(),
+        format!("field `{}` specified more than once", stringify!($name)).as_str(),
+      ))
+    }
+  };
+}
+
+pub(crate) use assign_uninit_field;
 
 impl ToTokens for SkipNcAttr {
   fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -109,7 +127,7 @@ impl Parse for DeclareWidget {
     let brace_token = syn::braced!(content in input);
     let mut named: Option<Id> = None;
     let mut fields = vec![];
-    let mut sugar_fields = SugarFields::default();
+    let mut builtin = BuiltinFieldWidgets::default();
     let mut children = vec![];
     loop {
       if content.is_empty() {
@@ -133,7 +151,9 @@ impl Parse for DeclareWidget {
         if is_id {
           let id = Id::from_declare_field(f)?;
           assign_uninit_field!(named, id, id)?;
-        } else if let Some(f) = sugar_fields.assign_field(f)? {
+        } else if let Some(ty) = FIELD_WIDGET_TYPE.get(f.member.to_string().as_str()) {
+          builtin.assign_builtin_field(ty, f)?;
+        } else {
           fields.push(f);
         }
 
@@ -149,7 +169,7 @@ impl Parse for DeclareWidget {
       brace_token,
       named,
       fields,
-      sugar_fields,
+      builtin,
       children,
     })
   }
@@ -236,20 +256,7 @@ impl DeclareCtx {
       .iter_mut()
       .for_each(|f| ctx.visit_declare_field_mut(f));
 
-    ctx.visit_sugar_field_mut(&mut w.sugar_fields);
-    if let Some(Id { name, .. }) = w.named.as_ref() {
-      // named widget followed by attributes or listeners should also mark be followed
-      // because it's need capture its state reference to set value.
-      let followed_by_attr = w
-        .sugar_fields
-        .normal_attr_iter()
-        .chain(w.sugar_fields.listeners_iter())
-        .any(|f| f.follows.is_some());
-
-      if followed_by_attr {
-        ctx.add_reference(name.clone(), ReferenceInfo::BeFollowed);
-      }
-    }
+    ctx.visit_builtin_field_widgets(&mut w.builtin);
 
     w.children.iter_mut().for_each(|c| match c {
       Child::Declare(d) => ctx.visit_declare_widget_mut(d),
@@ -275,25 +282,18 @@ impl DeclareCtx {
     f.follows = self.take_current_follows();
   }
 
-  pub fn visit_sugar_field_mut(&mut self, sugar_field: &mut SugarFields) {
-    sugar_field.visit_sugar_field_mut(self);
+  pub fn visit_builtin_field_widgets(&mut self, builtin: &mut BuiltinFieldWidgets) {
+    builtin.visit_builtin_fields_mut(self);
   }
 }
 
 impl DeclareWidget {
   pub fn host_widget_tokens(&self, ctx: &DeclareCtx) -> (Ident, TokenStream) {
     let Self { path: ty, fields, .. } = self;
-    let attrs_follow = self
-      .sugar_fields
-      .normal_attr_iter()
-      .any(|f| f.follows.is_some());
 
     let name = self.widget_identify();
     let gen = WidgetGen { ty, name, fields };
-
-    let mut tokens = gen.gen_widget_tokens(ctx, attrs_follow);
-    self.normal_attrs_tokens(&mut tokens);
-    self.listeners_tokens(&mut tokens);
+    let tokens = gen.gen_widget_tokens(ctx);
     (gen.name, tokens)
   }
 
@@ -339,7 +339,7 @@ impl DeclareWidget {
       });
       compose_tokens.extend(quote! { let #def_name #hint = #def_name #(#children)*; });
     }
-    compose_tokens.extend(self.sugar_fields.gen_wrap_widget_compose_tokens(name));
+    compose_tokens.extend(self.builtin.compose_tokens(name));
 
     compose_tokens
   }
@@ -349,8 +349,8 @@ impl DeclareWidget {
     let (name, mut tokens) = self.host_widget_tokens(ctx);
 
     self
-      .sugar_fields
-      .gen_wrap_widgets_tokens(&name, ctx)
+      .builtin
+      .widget_tokens_iter(name, ctx)
       .for_each(|(_, wrap_widget)| {
         tokens.extend(wrap_widget);
       });
@@ -370,146 +370,33 @@ impl DeclareWidget {
       .filter_map(|w| {
         w.named.as_ref().map(|_| {
           let host = w.host_widget_tokens(ctx);
-          let wraps = w.sugar_fields.gen_wrap_widgets_tokens(&host.0, ctx);
-          std::iter::once(host).chain(wraps)
+          let builtin = w.builtin.widget_tokens_iter(host.0.clone(), ctx);
+          std::iter::once(host).chain(builtin)
         })
       })
       .flatten()
   }
 
-  pub fn normal_attrs_tokens(&self, tokens: &mut TokenStream) {
-    let w_name = widget_def_variable(&self.widget_identify());
-
-    self.sugar_fields.normal_attr_iter().for_each(
-      |DeclareField {
-         expr,
-         member,
-         follows,
-         skip_nc,
-         if_guard,
-         ..
-       }| {
-        let method = Ident::new(&format!("with_{}", quote! {#member}), member.span());
-        let depends_tokens = follows.as_ref().map(|follows| {
-          let upstream = upstream_observable(follows);
-          let set_attr = Ident::new(&format!("try_set_{}", quote! {#member}), member.span());
-          let get_attr = Ident::new(&format!("get_{}", quote! {#member}), member.span());
-
-          let self_ref = self.widget_identify();
-          let value = ribir_variable("v", expr.span());
-          let mut assign_value = quote! { #self_ref.silent().#set_attr(#value); };
-          if skip_nc.is_some() {
-            assign_value = quote! {
-              if #self_ref.#get_attr().as_ref() != Some(&#value) {
-                #assign_value
-              }
-            };
-          }
-
-          quote! {
-            #upstream.subscribe(
-              move |_| {
-                let #value = #expr;
-                #assign_value
-              }
-            );
-          }
-        });
-        let attr_tokens = quote! {
-          #depends_tokens
-          let #w_name = #w_name.#method(#expr);
-        };
-        if let Some(if_guard) = if_guard {
-          tokens.extend(quote! {
-            let #w_name = #if_guard {
-              #attr_tokens
-              #w_name
-            }  else {
-              // insert a empty attr for if-else type compatibility
-              #w_name.insert_attr(())
-            };
-          })
-        } else {
-          tokens.extend(attr_tokens)
-        }
-      },
-    )
-  }
-
-  pub fn listeners_tokens(&self, tokens: &mut TokenStream) {
-    let name = widget_def_variable(&self.widget_identify());
-
-    let (guards, without_guards) = self
-      .sugar_fields
-      .listeners_iter()
-      .partition::<Vec<_>, _>(|f| f.if_guard.is_some());
-    guards
-      .iter()
-      .for_each(|DeclareField { expr, member, if_guard, .. }| {
-        let if_guard = if_guard.as_ref().unwrap();
-        tokens.extend(quote! {
-          let #name =  #if_guard {
-            #name.#member(#expr)
-          } else {
-            // insert a empty attr for if-else type compatibility
-            #name.insert_attr(())
-          };
-        });
-      });
-
-    if !without_guards.is_empty() {
-      let attrs = without_guards
-        .iter()
-        .map(|DeclareField { expr, member, .. }| {
-          quote! {
-            .#member(#expr)
-          }
-        });
-
-      tokens.extend(quote! { let #name = #name #(#attrs)*; });
-    }
-  }
-
-  /// Return a iterator of all syntax fields, include attributes and wrap
-  /// widget.
-  pub fn all_syntax_fields(&self) -> impl Iterator<Item = &DeclareField> {
-    self
-      .fields
-      .iter()
-      .chain(self.sugar_fields.normal_attr_iter())
-      .chain(self.sugar_fields.listeners_iter())
-      .chain(self.sugar_fields.widget_wrap_field_iter())
-  }
-
   pub fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
     self.traverses_declare().try_for_each(|w| {
       if w.named.is_some() {
-        w.wrap_widget_if_guard_check(ctx)?;
+        w.builtin_field_if_guard_check(ctx)?;
       }
-      w.sugar_fields.key_follow_check()
+      w.builtin.key_follow_check()
     })
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {
-    fn needless_skip_nc(f: &DeclareField) -> Option<DeclareWarning> {
-      f.skip_nc
-        .as_ref()
-        .map(|attr| DeclareWarning::NeedlessSkipNc(attr.span().unwrap()))
-    }
-
     self
-      .sugar_fields
-      .listeners_iter()
-      .filter_map(needless_skip_nc)
-      .chain(
-        self
-          .fields
-          .iter()
-          .chain(self.sugar_fields.normal_attr_iter())
-          .chain(self.sugar_fields.widget_wrap_field_iter())
-          .filter(|f| self.named.is_none() || f.follows.is_none())
-          .filter_map(needless_skip_nc),
-      )
+      .fields
+      .iter()
+      .chain(self.builtin.all_builtin_fields())
+      .filter(|f| self.named.is_none() || f.follows.is_none())
+      .filter_map(|f| {
+        f.skip_nc
+          .as_ref()
+          .map(|attr| DeclareWarning::NeedlessSkipNc(attr.span().unwrap()))
+      })
       .chain(self.children.iter().flat_map(Child::warnings))
   }
 
@@ -527,19 +414,13 @@ impl DeclareWidget {
       .filter(|w| w.named.is_some())
       .for_each(|w| {
         let ref_name = w.widget_identify();
-        w.sugar_fields
+        w.builtin
           .collect_wrap_widget_follows(&ref_name, &mut follows);
 
         let w_follows: Follows = w
           .fields
           .iter()
           .filter_map(FollowPart::from_widget_field)
-          .chain(
-            w.sugar_fields
-              .normal_attr_iter()
-              .chain(w.sugar_fields.listeners_iter())
-              .filter_map(FollowPart::from_widget_field),
-          )
           .collect();
         if !w_follows.is_empty() {
           follows.insert(ref_name, w_follows);
@@ -549,12 +430,12 @@ impl DeclareWidget {
     follows
   }
 
-  fn wrap_widget_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
+  fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
     debug_assert!(self.named.is_some());
 
     self
-      .sugar_fields
-      .widget_wrap_field_iter()
+      .builtin
+      .all_builtin_fields()
       .filter(|f| f.if_guard.is_some())
       .try_for_each(|f| {
         let w_ref = self.widget_identify();
@@ -564,7 +445,8 @@ impl DeclareWidget {
           let if_guard_span = f.if_guard.as_ref().unwrap().span().unwrap();
           let mut use_spans = vec![];
           self.traverses_declare().for_each(|w| {
-            w.all_syntax_fields()
+            w.builtin
+              .all_builtin_fields()
               .filter_map(|f| f.follows.as_ref())
               .flat_map(|follows| follows.iter())
               .filter(|f| f.widget == wrap_name)
@@ -573,7 +455,7 @@ impl DeclareWidget {
 
           let host_span = w_ref.span().unwrap();
           let wrap_span = wrap_name.span().unwrap();
-          return Err(DeclareError::DependOnWrapWidgetWithIfGuard {
+          return Err(DeclareError::DependOBuiltinFieldWithIfGuard {
             wrap_def_spans: [host_span, wrap_span, if_guard_span],
             use_spans,
             wrap_name,

@@ -14,6 +14,10 @@ extern crate widget_derive;
 pub mod animation;
 mod application;
 mod context;
+
+// todo: reorganize document
+#[doc = include_str!("../../docs/declare_macro.md")]
+#[doc = include_str!("../../docs/declare_builtin_fields.md")]
 pub mod declare;
 pub mod dynamic_widget;
 pub mod events;

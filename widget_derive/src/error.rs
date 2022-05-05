@@ -22,7 +22,7 @@ pub enum DeclareError {
     key: Span,
     depends_on: Vec<Span>,
   },
-  DependOnWrapWidgetWithIfGuard {
+  DependOBuiltinFieldWithIfGuard {
     wrap_name: Ident,
     wrap_def_spans: [Span; 3],
     use_spans: Vec<Span>,
@@ -89,7 +89,7 @@ impl DeclareError {
         diagnostic.set_spans(depends_on);
         diagnostic.set_message("The key attribute is not allowed to depend on others.");
       }
-      DeclareError::DependOnWrapWidgetWithIfGuard { wrap_def_spans, use_spans, .. } => {
+      DeclareError::DependOBuiltinFieldWithIfGuard { wrap_def_spans, use_spans, .. } => {
         diagnostic.set_spans(use_spans);
         diagnostic.set_message( "Depends on a widget field which behind `if guard`, its existence depends on the `if guard` result in runtime.");
         diagnostic = diagnostic.span_warning(wrap_def_spans.to_vec(), "field define here.");

@@ -4,6 +4,7 @@ members = [
   "gpu",
   "painter",
   "widget_derive",
+  "widget_derive/builtin",
   "algo",
   "text",
   "animation",

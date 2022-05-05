@@ -14,7 +14,7 @@ use syn::{
 use crate::widget_attr_macro::Id;
 
 use super::{
-  declare_widget::{assign_uninit_field, SugarFields},
+  declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
   ribir_suffix_variable, ribir_variable, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
 };
 
@@ -123,9 +123,8 @@ struct SimpleStruct<KW, F> {
   fields: Punctuated<F, token::Comma>,
 }
 
-
 fn widget_from_field_name(widget: &Ident, field: &Ident) -> Ident {
-  if let Some(suffix) = SugarFields::widget_name_from_field(field) {
+  if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(field) {
     let mut w = widget.clone();
     w.set_span(w.span().join(suffix.span()).unwrap());
     ribir_suffix_variable(&w, &suffix.to_string())
@@ -133,7 +132,6 @@ fn widget_from_field_name(widget: &Ident, field: &Ident) -> Ident {
     widget.clone()
   }
 }
-
 
 impl<KW, F> Parse for SimpleStruct<KW, F>
 where
@@ -342,7 +340,7 @@ impl Parse for FromStateField {
       parse_quote!(#from_token)
     };
 
-    Ok(FromStateField {  expr })
+    Ok(FromStateField { expr })
   }
 }
 
@@ -359,7 +357,7 @@ impl Parse for StateExpr {
 
 impl Parse for TransitionField {
   fn parse(input: ParseStream) -> Result<Self> {
-    let transition_token:animate_kw::transition = input.parse()?;
+    let transition_token: animate_kw::transition = input.parse()?;
     let colon_token: Option<token::Colon> = input.parse()?;
     let expr = if colon_token.is_some() {
       input.parse()?
@@ -473,9 +471,7 @@ impl Animate {
 }
 
 impl ToTokens for FromStateField {
-  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    self.expr.to_tokens(tokens);
-  }
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) { self.expr.to_tokens(tokens); }
 }
 
 impl ToTokens for StateExpr {
@@ -524,7 +520,9 @@ impl ToTokens for State {
     let mut state_tokens = if fields.len() > 1 {
       let init_value = fields.iter().map(|f| &f.expr);
       // let path_members = fields.iter().map(|f| &f.path);
-      let widgets = fields.iter().map(|f| widget_from_field_name(&f.path.widget, &f.path.member));
+      let widgets = fields
+        .iter()
+        .map(|f| widget_from_field_name(&f.path.widget, &f.path.member));
       let widgets2 = widgets.clone();
       let members = fields.iter().map(|f| &f.path.member);
       let members2 = members.clone();
@@ -533,13 +531,16 @@ impl ToTokens for State {
       quote_spanned! { state_span =>{ move |_, _| {
             let state_init = (#(#init_value),*);
             let state_final = (#(#widgets2.#members2.clone()),*);
-            move |p: f32| { #(#widgets .shallow(). #members = Tween::tween(&state_init.#indexes, &state_final.#indexes, p);)* }
+            move |p: f32| {
+              #(#widgets .shallow().#members
+                = Tween::tween(&state_init.#indexes, &state_final.#indexes, p);)*
+            }
           }
-        } 
+        }
       }
     } else {
       let PathField { path, _colon_token, expr } = &fields[0];
-      let MemberPath { widget, member, dot_token} = &path;
+      let MemberPath { widget, member, dot_token } = &path;
       let widget = widget_from_field_name(&widget, &member);
       quote_spanned! { state_span =>
       move |_, _|  {
@@ -582,24 +583,20 @@ impl Trigger {
       expr,
       ..
     } = self;
-    // todo: not support use attr as trigger, because we may remove attribute
-    // concept in future.  else if SugarFields::BUILTIN_DATA_ATTRS.iter().
-    // any(|v| member == v) {   let get_attr = Ident::new(&format!("get_{}",
-    // quote! {#member}), member.span());   let member = quote_spanned!
-    // {member.span() => #get_attr() };   subscribe_tokens(&widget, &member,
-    // dot_token, quote! {#expr_tokens}) }
 
     let trigger_span = widget.span().join(expr.span()).unwrap();
     let animate = ribir_variable("animate", expr.span());
 
-    if SugarFields::BUILTIN_LISTENERS.iter().any(|v| member == v) {
+    // todo: need a way to detect if it trigger by listener.
+    let is_listener = false;
+    if is_listener {
       let expr = match expr {
         AnimateExpr::Animate(a) => a.embed_as_expr_tokens(ctx_name),
         AnimateExpr::Transition(t) => quote_spanned! { t.transition_token.span() =>
           compile_error!("`Transition can not directly use for listener trigger, use `Animate` instead of.`")
         },
         AnimateExpr::Expr(e) => {
-          quote! {#e}
+          quote! { #e }
         }
       };
       tokens.extend(quote_spanned! { trigger_span =>
@@ -747,7 +744,9 @@ impl DeclareCtx {
     self.take_current_follows();
   }
 
-  fn visit_member_path(&mut self, path: &mut MemberPath) { self.add_follow(widget_from_field_name(&path.widget, &path.member)); }
+  fn visit_member_path(&mut self, path: &mut MemberPath) {
+    self.add_follow(widget_from_field_name(&path.widget, &path.member));
+  }
 
   fn visit_simple_field_mut(&mut self, f: &mut SimpleField) { self.visit_expr_mut(&mut f.expr); }
 }
