@@ -122,7 +122,7 @@ impl PointerDispatcher {
     ctx.bubble_event(
       wid,
       |ctx, wid| self.mouse_pointer(wid, pos, ctx),
-      |attr: &PointerAttr, e| {
+      |attr: &PointerListener, e| {
         e.position = (last_bubble_from, &*ctx).map_to(e.position, e.target());
         last_bubble_from = wid;
         attr.dispatch_event(event_type, e)
@@ -147,7 +147,7 @@ impl PointerDispatcher {
             let old_pos = (*w, &*ctx).map_from_global(self.cursor_pos);
             let mut event = self.mouse_pointer(*w, old_pos, ctx);
             w.assert_get(tree).query_all_type(
-              |pointer: &PointerAttr| {
+              |pointer: &PointerListener| {
                 pointer.dispatch_event(PointerEventType::Leave, &mut event);
                 !event.bubbling_canceled()
               },
@@ -163,7 +163,7 @@ impl PointerDispatcher {
         .ancestors(&ctx.widget_tree)
         .filter(|w| {
           w.get(&ctx.widget_tree)
-            .and_then(|w| w.query_first_type::<PointerAttr>(QueryOrder::OutsideFirst))
+            .and_then(|w| w.query_first_type::<PointerListener>(QueryOrder::OutsideFirst))
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -178,7 +178,7 @@ impl PointerDispatcher {
           let mut event = self.mouse_pointer(w, old_pos, ctx);
 
           w.assert_get(tree).query_all_type(
-            |pointer: &PointerAttr| {
+            |pointer: &PointerListener| {
               pointer.dispatch_event(PointerEventType::Enter, &mut event);
               !event.bubbling_canceled()
             },

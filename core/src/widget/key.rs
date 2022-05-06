@@ -35,6 +35,12 @@ pub struct KeyDeclarer {
   pub key: Key,
 }
 
+impl Declare for Key {
+  type Builder = KeyDeclarerBuilder;
+  #[inline]
+  fn builder() -> Self::Builder { KeyDeclarerBuilder { key: None } }
+}
+
 impl IntoWidget for KeyDeclarer {
   type W = Key;
 

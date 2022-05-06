@@ -16,7 +16,7 @@ mod follow_on;
 
 pub use follow_on::*;
 mod variable_names;
-use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
+pub use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
 pub use variable_names::*;
 mod animations;
 mod dataflows;

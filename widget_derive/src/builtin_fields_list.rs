@@ -31,6 +31,8 @@ builtin! {
   // on_pointer_enter: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
   // #[doc="specify the event handler when pointer leave this widget."]
   // on_pointer_leave: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+
+  
   // #[doc="specify the event handler to process focus event."]
   // on_focus: "FnMut(&[`FocusEvent`](../ribir/widget/events/type.FocusEvent.html))",
   // #[doc="specify the event handler to process blur event."]

@@ -75,10 +75,9 @@ mod tests {
   fn tree_down_up() {
     struct RowTree;
     impl Compose for RowTree {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
-          declare SizedBox{
+          declare SizedBox {
             size: Size::new(f32::INFINITY, f32::INFINITY),
             cursor: CursorIcon::AllScroll,
             Row{

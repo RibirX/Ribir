@@ -27,7 +27,6 @@ struct PlaceHolder;
 impl Render for PlaceHolder {
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> painter::Size { unreachable!() }
   fn only_sized_by_parent(&self) -> bool { unreachable!() }
-
   fn paint(&self, _: &mut PaintingCtx) { unreachable!() }
 }
 

@@ -54,7 +54,7 @@ impl VisitMut for DeclareCtx {
       Expr::Macro(m) => {
         let mac = &m.mac;
         if mac.path.is_ident(WIDGET_MACRO_NAME) {
-          *expr = unwrap_expr(self.expand_widget_macro(quote! {#mac}));
+          *expr = unwrap_expr(self.expand_widget_macro(mac.tokens.clone()));
         } else if mac.path.is_ident(DECLARE_WRAP_MACRO) {
           *expr = unwrap_expr(self.expand_declare_wrap_macro(mac.tokens.clone()));
         } else {

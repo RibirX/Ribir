@@ -10,8 +10,8 @@ mod util;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, visit_mut::VisitMut, DeriveInput};
-use widget_attr_macro::DeclareCtx;
+use syn::{parse_macro_input, DeriveInput};
+use widget_attr_macro::{DeclareCtx, WidgetMacro};
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
 #[proc_macro_derive(SingleChildWidget, attributes(proxy))]
@@ -60,12 +60,12 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[proc_macro_attribute]
-pub fn widget(_attr: TokenStream, input: TokenStream) -> TokenStream {
-  let mut compose_fn = parse_macro_input! { input as syn::ImplItemMethod };
-
+#[proc_macro]
+pub fn widget(input: TokenStream) -> TokenStream {
+  let mut w = parse_macro_input! { input as WidgetMacro };
   let mut ctx = DeclareCtx::default();
-
-  ctx.stack_push().visit_impl_item_method_mut(&mut compose_fn);
-  quote! { #compose_fn }.into()
+  ctx.visit_widget_macro_mut(&mut w);
+  w.gen_tokens(&mut ctx)
+    .unwrap_or_else(|e| e.into_compile_error())
+    .into()
 }

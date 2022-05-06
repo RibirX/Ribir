@@ -22,7 +22,7 @@ use super::{
 use super::kw;
 
 pub struct Animations {
-  animations_token: kw::animations,
+  _animations_token: kw::animations,
   brace_token: token::Brace,
   animates_def: Vec<Animate>,
   states_def: Vec<State>,
@@ -244,7 +244,7 @@ impl Parse for Animations {
     }
 
     Ok(Animations {
-      animations_token,
+      _animations_token: animations_token,
       brace_token,
       animates_def,
       states_def,
