@@ -1,9 +1,8 @@
 use ahash::RandomState;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{
-  braced,
   parse::{Parse, ParseStream},
   spanned::Spanned,
   token, Expr, Ident, Token,
@@ -20,9 +19,6 @@ use crate::{
 };
 
 pub struct WidgetMacro {
-  widget_token: kw::widget,
-  _bang_token: token::Bang,
-  _brace_token: token::Brace,
   widget: DeclareWidget,
   dataflows: Option<Dataflows>,
   animations: Option<Animations>,
@@ -43,12 +39,7 @@ struct CircleCheckStack<'a> {
 }
 
 impl Parse for WidgetMacro {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let widget_token = input.parse::<kw::widget>()?;
-    let _bang_token = input.parse()?;
-    let content;
-    let _brace_token = braced!(content in input);
-
+  fn parse(content: syn::parse::ParseStream) -> syn::Result<Self> {
     let mut widget: Option<DeclareWidget> = None;
     let mut dataflows: Option<Dataflows> = None;
     let mut animations: Option<Animations> = None;
@@ -72,20 +63,10 @@ impl Parse for WidgetMacro {
     }
 
     let widget = widget.ok_or_else(|| {
-      syn::Error::new(
-        widget_token.span(),
-        "must have a `declare { ... }` in `widget!`",
-      )
+      syn::Error::new(content.span(), "must have a `declare { ... }` in `widget!`")
     })?;
 
-    Ok(Self {
-      widget_token,
-      _bang_token,
-      _brace_token,
-      widget,
-      dataflows,
-      animations,
-    })
+    Ok(Self { widget, dataflows, animations })
   }
 }
 
@@ -149,7 +130,7 @@ impl WidgetMacro {
 
     let Self { dataflows, animations, .. } = self;
 
-    let ctx_name = ribir_variable(BUILD_CTX, self.widget_token.span());
+    let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
     let def_name = widget_def_variable(&self.widget.widget_identify());
 
     Ok(quote! {

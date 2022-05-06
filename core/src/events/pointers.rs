@@ -104,7 +104,36 @@ impl PointerEvent {
 /// An attribute that calls callbacks in response to common pointer events.
 // todo: use unicast subject replace
 #[derive(Default)]
-pub struct PointerAttr(LocalSubject<'static, (PointerEventType, NonNull<PointerEvent>), ()>);
+pub struct PointerListener(LocalSubject<'static, (PointerEventType, NonNull<PointerEvent>), ()>);
+
+// pub struct PointerDownDeclarer<F> {
+//   on_pointer_down:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+
+// }
+// pub struct PointerDeclarer {
+
+//   #[doc="specify the event handler for the pointer up event."]
+//   on_pointer_up:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+//   #[doc="specify the event handler for the pointer move event."]
+//   on_pointer_move:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+//   #[doc="specify the event handler for the pointer tap event."]
+//   on_tap: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.
+// PointerEvent.html))",   #[doc="specify the event handler for processing the
+// specified times tap."]   on_tap_times:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+//   #[doc="specify the event handler to process pointer cancel event."]
+//   on_pointer_cancel:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+//   #[doc="specify the event handler when pointer enter this widget."]
+//   on_pointer_enter:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+//   #[doc="specify the event handler when pointer leave this widget."]
+//   on_pointer_leave:
+// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+// }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
@@ -121,7 +150,7 @@ pub enum PointerEventType {
    * lostpointercapture: */
 }
 
-impl PointerAttr {
+impl PointerListener {
   #[inline]
   pub fn dispatch_event(&self, event_type: PointerEventType, event: &mut PointerEvent) {
     self.0.clone().next((event_type, NonNull::from(event)))

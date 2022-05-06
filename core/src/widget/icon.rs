@@ -7,8 +7,7 @@ pub struct Icon {
 }
 
 impl StatefulCombination for Icon {
-  #[widget]
-  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn build(this: &Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
     let Size { width, height, .. } = this.size;
     let svg = Svg::new(load_src(this.src).unwrap());
     widget! {
