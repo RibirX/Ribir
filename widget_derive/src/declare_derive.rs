@@ -3,7 +3,8 @@ use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-  parse::Parse, parse_quote, punctuated::Punctuated, spanned::Spanned, Fields, Ident, Result,
+  parse::Parse, parse_quote, punctuated::Punctuated, spanned::Spanned, token, DataStruct, Fields,
+  Ident, Result,
 };
 
 const DECLARE: &str = "Declare";
@@ -15,25 +16,27 @@ struct DefaultValue {
   _eq_token: Option<syn::token::Eq>,
   value: Option<syn::LitStr>,
 }
+
 #[derive(Default)]
-struct FieldBuilderAttr {
+struct DeclareAttr {
   rename: Option<syn::LitStr>,
   builtin: Option<kw::builtin>,
-  strip_option: Option<kw::strip_option>,
   default: Option<DefaultValue>,
+  custom_convert: Option<kw::custom_convert>,
 }
 
 mod kw {
   use syn::custom_keyword;
   custom_keyword!(rename);
-  custom_keyword!(strip_option);
   custom_keyword!(builtin);
   custom_keyword!(default);
+  custom_keyword!(custom_convert);
 }
 
 pub fn field_convert_method(field_name: &Ident) -> Ident {
-  Ident::new(&format!("{}{}", "into_", field_name), field_name.span())
+  Ident::new(&format!("{field_name}_convert",), field_name.span())
 }
+
 impl Parse for DefaultValue {
   fn parse(input: syn::parse::ParseStream) -> Result<Self> {
     Ok(Self {
@@ -43,9 +46,10 @@ impl Parse for DefaultValue {
     })
   }
 }
-impl Parse for FieldBuilderAttr {
+
+impl Parse for DeclareAttr {
   fn parse(input: syn::parse::ParseStream) -> Result<Self> {
-    let mut attr = FieldBuilderAttr::default();
+    let mut attr = DeclareAttr::default();
     while !input.is_empty() {
       let lookahead = input.lookahead1();
 
@@ -57,8 +61,8 @@ impl Parse for FieldBuilderAttr {
         input.parse::<kw::rename>()?;
         input.parse::<syn::Token![=]>()?;
         attr.rename = Some(input.parse()?);
-      } else if lookahead.peek(kw::strip_option) {
-        attr.strip_option = Some(input.parse()?);
+      } else if lookahead.peek(kw::custom_convert) {
+        attr.custom_convert = Some(input.parse()?);
       } else if lookahead.peek(kw::default) {
         attr.default = Some(input.parse()?);
       } else {
@@ -87,44 +91,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
 
   let stt = struct_unwrap(&mut input.data, DECLARE)?;
-
-  let mut builder_fields = Punctuated::default();
-  match &mut stt.fields {
-    Fields::Named(named) => {
-      named
-        .named
-        .pairs_mut()
-        .try_for_each::<_, syn::Result<()>>(|mut pair| {
-          let idx = pair
-            .value()
-            .attrs
-            .iter()
-            .position(|attr| attr.path.is_ident(DECLARE_ATTR));
-          let builder_attr = if let Some(idx) = idx {
-            let attr = pair.value_mut().attrs.remove(idx);
-            let args: FieldBuilderAttr = attr.parse_args()?;
-            Some(args)
-          } else {
-            None
-          };
-
-          builder_fields.push(((*pair.value()).clone(), builder_attr));
-          if let Some(c) = pair.punct() {
-            builder_fields.push_punct(**c);
-          }
-
-          Ok(())
-        })?;
-    }
-    Fields::Unit => <_>::default(),
-    Fields::Unnamed(unnamed) => {
-      let err = syn::Error::new(
-        unnamed.span(),
-        format!("`{}` not be supported to derive for tuple struct", DECLARE),
-      );
-      return Err(err);
-    }
-  };
+  let mut builder_fields = collect_filed_and_attrs(stt)?;
 
   let builder = Ident::new(&format!("{}{}", name, BUILDER), name.span());
 
@@ -170,63 +137,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     f.ty = parse_quote!(Option<#ty>);
     syn::punctuated::Pair::new(f, c)
   });
-  let mut tokens = quote! {
-    #vis struct #builder #g_ty #g_where {
-      #(#def_fields)*
-    }
-  };
-
-  let mut methods = quote! {};
-  builder_fields
-    .iter()
-    .try_for_each::<_, syn::Result<()>>(|(f, attr)| {
-      let name = f.ident.as_ref().unwrap();
-      let fn_convert = field_convert_method(name);
-
-      let ty = &f.ty;
-      let methods_tokens =
-        if let Some(FieldBuilderAttr { strip_option: Some(strip_option), .. }) = attr {
-          let strip_ty = extract_type_from_option(ty).ok_or_else(|| {
-            syn::Error::new(
-              strip_option.span(),
-              "Can't use meta `strip_option` for a non Option type ",
-            )
-          })?;
-          quote! {
-            #[inline]
-            #[allow(non_snake_case)]
-            #vis fn #fn_convert<M, V: Striped<M, #strip_ty>>(v: V) -> #ty
-            {
-               v.striped()
-            }
-
-            #[inline]
-            #vis fn #name<M, V: Striped<M, #strip_ty>>(mut self, v: V) -> Self
-            {
-              self.#name = Some(v.striped());
-              self
-            }
-          }
-        } else {
-          quote! {
-            #[inline]
-            #[allow(non_snake_case)]
-            #vis fn #fn_convert<V: Into<#ty>>(v: V) -> #ty { v.into() }
-
-            #[inline]
-            #vis fn #name<V: Into<#ty>>(mut self, v: V) -> Self {
-              self.#name = Some(Self::#fn_convert(v));
-              self
-            }
-          }
-        };
-
-      methods.extend(quote! {
-        #methods_tokens
-      });
-
-      Ok(())
-    })?;
 
   // implement declare trait
   let fields_ident = stt.fields.iter().map(|f| f.ident.as_ref());
@@ -241,8 +151,8 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       let expr = match &d.value {
         Some(v) => {
           let expr: syn::Expr = v.parse().unwrap();
-          let fn_convert = field_convert_method(field_name);
-          quote! {Self::#fn_convert(#expr)}
+          let field_convert =  field_convert_method(field_name);
+          quote! {Self::#field_convert(#expr)}
         }
         None => {
           quote! {<_>::default()}
@@ -260,74 +170,105 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     }
   });
 
-  tokens.extend(quote! {
-    impl #g_impl Declare for #name #g_ty #g_where {
-      type Builder = #builder #g_ty;
+  let methods = builder_fields.iter().map(|(f, attr)| {
+    let field_name = f.ident.as_ref().unwrap();
+    let ty = &f.ty;
+    let convert_method = field_convert_method(field_name);
 
-      fn builder() -> Self::Builder {
-        #builder { #(#builder_fields_ident : None ),*}
+    if let Some(DeclareAttr { custom_convert: Some(_), .. }) = attr {
+      quote! {
+        #[inline]
+        #vis fn #field_name(mut self, v: #ty) -> Self {
+          self.#field_name = Some(v);
+          self
+        }
       }
-    }
-
-    impl #g_impl DeclareBuilder for #builder #g_ty #g_where {
-      type Target = #name #g_ty;
-      #[inline]
-      #[allow(dead_code)]
-      fn build(self, ctx: &mut BuildCtx) -> Self::Target {
-        #name {
-          #(#fields_ident : #value),* }
+    } else {
+      quote! {
+        #[inline]
+        #vis fn #field_name(mut self, v: #ty) -> Self {
+          self.#field_name = Some(v);
+          self
+        }
+        #[inline]
+        #vis fn #convert_method(v: #ty) -> #ty {
+          v
+        }
       }
     }
   });
-  // field converter
-  tokens.extend(quote! {
-    impl #g_impl #builder #g_ty #g_where {
-      #methods
-    }
-  });
+
+  let tokens = quote! {
+
+      #vis struct #builder #g_ty #g_where {
+        #(#def_fields)*
+      }
+
+      impl #g_impl Declare for #name #g_ty #g_where {
+        type Builder = #builder #g_ty;
+
+        fn builder() -> Self::Builder {
+          #builder { #(#builder_fields_ident : None ),*}
+        }
+      }
+
+      impl #g_impl DeclareBuilder for #builder #g_ty #g_where {
+        type Target = #name #g_ty;
+        #[inline]
+        #[allow(dead_code)]
+        fn build(self, ctx: &mut BuildCtx) -> Self::Target {
+          #name {
+            #(#fields_ident : #value),* }
+        }
+      }
+
+      impl #g_impl #builder #g_ty #g_where {
+        #(#methods)*
+      }
+  };
 
   Ok(tokens)
 }
 
-// code from https://stackoverflow.com/questions/55271857/how-can-i-get-the-t-from-an-optiont-when-using-syn
-fn extract_type_from_option(ty: &syn::Type) -> Option<&syn::Type> {
-  use syn::{GenericArgument, Path, PathArguments, PathSegment};
+fn collect_filed_and_attrs(
+  stt: &mut DataStruct,
+) -> Result<Punctuated<(syn::Field, Option<DeclareAttr>), token::Comma>> {
+  let mut builder_fields = Punctuated::default();
+  match &mut stt.fields {
+    Fields::Named(named) => {
+      named
+        .named
+        .pairs_mut()
+        .try_for_each::<_, syn::Result<()>>(|mut pair| {
+          let idx = pair
+            .value()
+            .attrs
+            .iter()
+            .position(|attr| attr.path.is_ident(DECLARE_ATTR));
+          let builder_attr = if let Some(idx) = idx {
+            let attr = pair.value_mut().attrs.remove(idx);
+            let args: DeclareAttr = attr.parse_args()?;
+            Some(args)
+          } else {
+            None
+          };
 
-  fn extract_type_path(ty: &syn::Type) -> Option<&Path> {
-    match *ty {
-      syn::Type::Path(ref typepath) if typepath.qself.is_none() => Some(&typepath.path),
-      _ => None,
+          builder_fields.push(((*pair.value()).clone(), builder_attr));
+          if let Some(c) = pair.punct() {
+            builder_fields.push_punct(**c);
+          }
+
+          Ok(())
+        })?;
     }
-  }
-
-  fn extract_option_segment(path: &Path) -> Option<&PathSegment> {
-    let idents_of_path = path
-      .segments
-      .iter()
-      .into_iter()
-      .fold(String::new(), |mut acc, v| {
-        acc.push_str(&v.ident.to_string());
-        acc.push('|');
-        acc
-      });
-    vec!["Option|", "std|option|Option|", "core|option|Option|"]
-      .into_iter()
-      .find(|s| idents_of_path == *s)
-      .and_then(|_| path.segments.last())
-  }
-
-  extract_type_path(ty)
-    .and_then(extract_option_segment)
-    .and_then(|path_seg| {
-      let type_params = &path_seg.arguments;
-      // It should have only on angle-bracketed param ("<String>"):
-      match *type_params {
-        PathArguments::AngleBracketed(ref params) => params.args.first(),
-        _ => None,
-      }
-    })
-    .and_then(|generic_arg| match *generic_arg {
-      GenericArgument::Type(ref ty) => Some(ty),
-      _ => None,
-    })
+    Fields::Unit => <_>::default(),
+    Fields::Unnamed(unnamed) => {
+      let err = syn::Error::new(
+        unnamed.span(),
+        format!("`{}` not be supported to derive for tuple struct", DECLARE),
+      );
+      return Err(err);
+    }
+  };
+  Ok(builder_fields)
 }

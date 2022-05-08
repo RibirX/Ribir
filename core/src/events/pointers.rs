@@ -113,7 +113,7 @@ impl Render for PointerListener {
   }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) {}
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

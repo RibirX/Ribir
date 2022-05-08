@@ -12,7 +12,7 @@ impl Render for Empty {
     ctx.perform_child_layout(ctx.single_child().unwrap(), clamp)
   }
 
-  fn paint(&self, ctx: &mut PaintingCtx) {
+  fn paint(&self, _: &mut PaintingCtx) {
     // todo: should drop this widget after tree build.
     // unreachable!()
   }

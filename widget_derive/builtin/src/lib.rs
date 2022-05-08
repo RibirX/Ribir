@@ -3,7 +3,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, ToTokens};
 use syn::{
   braced, bracketed, parse::Parse, parse_macro_input, punctuated::Punctuated, token, Ident,
-  MetaNameValue, Type,
+  MetaNameValue, Path,
 };
 
 mod kw {
@@ -19,7 +19,7 @@ struct Field {
   ty: syn::Type,
 }
 struct BuiltinWidget {
-  ty: Type,
+  ty: Path,
   _brace_token: token::Brace,
   fields: Punctuated<Field, token::Comma>,
 }
@@ -44,7 +44,6 @@ impl Parse for Field {
 impl Parse for BuiltinWidget {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
-
     Ok(BuiltinWidget {
       ty: input.parse()?,
       _brace_token: braced!(content in input),

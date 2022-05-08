@@ -7,12 +7,12 @@ use crate::{
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{spanned::Spanned, Ident};
+use syn::{spanned::Spanned, Ident, Path};
 
 use super::{upstream_observable, DeclareField};
 
 pub struct WidgetGen<'a> {
-  pub ty: &'a syn::Type,
+  pub ty: &'a Path,
   pub name: Ident,
   pub fields: &'a [DeclareField],
 }
@@ -113,7 +113,7 @@ impl<'a> WidgetGen<'a> {
 }
 
 impl DeclareField {
-  fn value_tokens(&self, widget_ty: &syn::Type) -> TokenStream {
+  fn value_tokens(&self, widget_ty: &Path) -> TokenStream {
     let Self { member, expr, .. } = self;
     let field_converter = field_convert_method(member);
     quote_spanned! { expr.span() => <#widget_ty as Declare>::Builder::#field_converter(#expr) }

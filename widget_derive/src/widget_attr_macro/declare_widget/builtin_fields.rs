@@ -115,7 +115,7 @@ impl BuiltinFieldWidgets {
         .unwrap();
 
       let tt = TokenStream::from_str(w_ty).unwrap();
-      let ty: syn::Type = parse_quote_spanned! { span => #tt };
+      let ty: syn::Path = parse_quote_spanned! { span => #tt };
 
       let gen = WidgetGen { ty: &ty, name, fields: &fields };
       let wrap_name = widget_def_variable(&gen.name);

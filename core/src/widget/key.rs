@@ -30,24 +30,12 @@ pub enum Key {
 }
 
 #[derive(Declare)]
-pub struct KeyDeclarer {
+pub struct KeyWidget {
   #[declare(builtin)]
   pub key: Key,
 }
 
-impl Declare for Key {
-  type Builder = KeyDeclarerBuilder;
-  #[inline]
-  fn builder() -> Self::Builder { KeyDeclarerBuilder { key: None } }
-}
-
-impl IntoWidget for KeyDeclarer {
-  type W = Key;
-
-  fn into_widget(self) -> Self::W { self.key }
-}
-
-impl Render for Key {
+impl Render for KeyWidget {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let child = ctx.single_child().expect("Margin must have one child");
     ctx.perform_child_layout(child, clamp)
