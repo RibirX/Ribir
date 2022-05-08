@@ -6,7 +6,7 @@ where
   Self: Sized,
 {
   #[inline]
-  fn have_child<C: IntoOptionChild<M>, M>(self, child: C) -> SingleChild<Self> {
+  fn have_child<C: IntoOptionChild<M> + 'static, M>(self, child: C) -> SingleChild<Self> {
     SingleChild {
       widget: self,
       child: child.into_child(),
@@ -140,7 +140,7 @@ where
 
 pub trait OptionHaveChild {
   type Target;
-  fn have_child<C: BoxWidget<M>, M>(self, child: C) -> BoxedWidget;
+  fn have_child<C: BoxWidget<M> + 'static, M>(self, child: C) -> BoxedWidget;
 }
 
 impl<T> OptionHaveChild for Option<T>
@@ -150,7 +150,7 @@ where
 {
   type Target = T;
 
-  fn have_child<C: BoxWidget<M>, M>(self, child: C) -> BoxedWidget {
+  fn have_child<C: BoxWidget<M> + 'static, M>(self, child: C) -> BoxedWidget {
     match self {
       Some(w) => w.have_child(child).box_it(),
       None => child.box_it(),

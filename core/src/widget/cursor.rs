@@ -1,24 +1,26 @@
 use crate::prelude::*;
-use std::{cell::Cell, rc::Rc};
+use std::{
+  cell::{Cell, RefCell},
+  rc::Rc,
+};
 use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 
 #[derive(Declare, Debug)]
 pub struct Cursor {
-  // todo: declare support convert.
-  // #[declare(setter = Self::new_icon )]
+  #[declare(custom_convert)]
   cursor: Rc<Cell<CursorIcon>>,
 }
 
 impl SingleChildWidget for Cursor {
-  fn have_child<C: IntoOptionChild<M>, M>(self, child: C) -> SingleChild<Self> {
+  fn have_child<C: IntoOptionChild<M> + 'static, M>(self, child: C) -> SingleChild<Self> {
     let c = self.cursor.clone();
     SingleChild {
       widget: self,
       child: Some(widget! {
         declare Empty {
-          on_pointer_move: |e: &mut PointerEvent| {
+          on_pointer_move: move |e: &mut PointerEvent| {
             let mut ctx = e.context();
             if e.point_type == PointerType::Mouse
               && e.buttons == MouseButtons::empty()
@@ -32,6 +34,11 @@ impl SingleChildWidget for Cursor {
       }),
     }
   }
+}
+
+impl CursorBuilder {
+  #[inline]
+  pub fn cursor_convert(icon: CursorIcon) -> Rc<RefCell<CursorIcon>> { Rc::new(RefCell::new(icon)) }
 }
 
 impl Cursor {
