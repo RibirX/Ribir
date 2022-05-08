@@ -205,6 +205,18 @@ impl<V> Striped<OptionMarker, V> for Option<V> {
   fn striped(self) -> Option<V> { self }
 }
 
+pub struct StripedOption<V>(pub Option<V>);
+
+impl<V> From<V> for StripedOption<V> {
+  #[inline]
+  fn from(v: V) -> Self { Self(Some(v)) }
+}
+
+impl<V> From<Option<V>> for StripedOption<V> {
+  #[inline]
+  fn from(v: Option<V>) -> Self { Self(v) }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

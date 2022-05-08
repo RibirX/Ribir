@@ -87,22 +87,23 @@ impl Context {
   #[inline]
   pub(crate) fn tree_mut(&mut self) -> &mut WidgetTree { &mut self.widget_tree }
 
-  pub(crate) fn bubble_event<D, E, F, Attr>(
-    &self,
-    widget: WidgetId,
+  pub(crate) fn bubble_event<D, E, F, Ty>(
+    &mut self,
+    wid: WidgetId,
     default: F,
     mut dispatch: D,
   ) -> E
   where
     F: FnOnce(&Context, WidgetId) -> E,
-    D: FnMut(&Attr, &mut E),
+    D: FnMut(&mut Ty, &mut E),
     E: Event + AsMut<EventCommon>,
-    Attr: 'static,
+    Ty: 'static,
   {
-    let mut event = default(self, widget);
-    let tree = &self.widget_tree;
-    for wid in widget.ancestors(tree) {
-      wid.assert_get(tree).query_all_type(
+    let mut event = default(self, wid);
+
+    let mut p = Some(wid);
+    while let Some(w) = p {
+      w.assert_get_mut(&mut self.widget_tree).query_all_type_mut(
         |attr| {
           event.as_mut().current_target = wid;
           dispatch(attr, &mut event);
@@ -114,6 +115,7 @@ impl Context {
       if event.bubbling_canceled() {
         break;
       }
+      p = w.parent(&self.widget_tree)
     }
 
     event

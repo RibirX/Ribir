@@ -4,8 +4,11 @@ use lazy_static::lazy_static;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use smallvec::SmallVec;
-use std::collections::{BTreeMap, HashMap};
-use syn::spanned::Spanned;
+use std::{
+  collections::{BTreeMap, HashMap},
+  str::FromStr,
+};
+use syn::{parse_quote_spanned, spanned::Spanned};
 
 use crate::{
   error::DeclareError,
@@ -110,8 +113,11 @@ impl BuiltinFieldWidgets {
           }
         })
         .unwrap();
-      let ty = &Ident::new(suffix, span).into();
-      let gen = WidgetGen { ty, name, fields: &fields };
+
+      let tt = TokenStream::from_str(w_ty).unwrap();
+      let ty: syn::Type = parse_quote_spanned! { span => #tt };
+
+      let gen = WidgetGen { ty: &ty, name, fields: &fields };
       let wrap_name = widget_def_variable(&gen.name);
       let mut def_and_ref_tokens = gen.gen_widget_tokens(ctx);
 

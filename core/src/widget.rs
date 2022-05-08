@@ -39,7 +39,9 @@ pub use path::*;
 // pub use scroll_view::ScrollView;
 // mod scrollbar;
 
+mod empty;
 use self::layout_store::BoxClamp;
+pub use empty::Empty;
 
 pub trait Compose {
   // todo: use associated type replace BoxedWidget is friendly?

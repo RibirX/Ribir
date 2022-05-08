@@ -85,7 +85,9 @@ impl PointerDispatcher {
           delta_y,
           common: EventCommon::new(wid, ctx),
         },
-        |wheel: &WheelAttr, event| wheel.dispatch_event(event),
+        |wheel: &mut WheelListener<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>, event| {
+          wheel.dispatch_event(event)
+        },
       );
     }
   }
@@ -112,7 +114,7 @@ impl PointerDispatcher {
   }
 
   fn bubble_pointer_from(
-    &self,
+    &mut self,
     event_type: PointerEventType,
     ctx: &mut Context,
     from: (WidgetId, Point),
@@ -121,9 +123,9 @@ impl PointerDispatcher {
     let mut last_bubble_from = wid;
     ctx.bubble_event(
       wid,
-      |ctx, wid| self.mouse_pointer(wid, pos, ctx),
-      |attr: &PointerListener, e| {
-        e.position = (last_bubble_from, &*ctx).map_to(e.position, e.target());
+      |ctx, wid| PointerEvent::from_mouse(wid, pos, self.cursor_pos, self.mouse_button.1, ctx),
+      |attr: &mut PointerListener, e| {
+        e.position = e.context().map_from(e.position, last_bubble_from);
         last_bubble_from = wid;
         attr.dispatch_event(event_type, e)
       },
@@ -135,28 +137,26 @@ impl PointerDispatcher {
 
     let mut already_entered = vec![];
 
-    let tree = &ctx.widget_tree;
-    self
-      .entered_widgets
-      .iter()
-      .filter(|w| !w.is_dropped(tree))
-      .for_each(|w| {
-        match new_hit {
-          Some((new_hit, _)) if w.ancestors_of(new_hit, tree) => already_entered.push(*w),
-          _ => {
-            let old_pos = (*w, &*ctx).map_from_global(self.cursor_pos);
-            let mut event = self.mouse_pointer(*w, old_pos, ctx);
-            w.assert_get(tree).query_all_type(
-              |pointer: &PointerListener| {
-                pointer.dispatch_event(PointerEventType::Leave, &mut event);
-                !event.bubbling_canceled()
-              },
-              QueryOrder::InnerFirst,
-            );
-          }
-        };
-      });
-    self.entered_widgets.clear();
+    for w in self.entered_widgets.drain(..) {
+      if !w.is_dropped(&ctx.widget_tree) {
+        continue;
+      }
+      match new_hit {
+        Some((new_hit, _)) if w.ancestors_of(new_hit, &ctx.widget_tree) => already_entered.push(w),
+        _ => {
+          let old_pos = (w, &*ctx).map_from_global(self.cursor_pos);
+          let mut event =
+            PointerEvent::from_mouse(w, old_pos, self.cursor_pos, self.mouse_button.1, ctx);
+          w.assert_get_mut(&mut ctx.widget_tree).query_all_type_mut(
+            |pointer: &mut PointerListener| {
+              pointer.dispatch_event(PointerEventType::Leave, &mut event);
+              !event.bubbling_canceled()
+            },
+            QueryOrder::InnerFirst,
+          );
+        }
+      };
+    }
 
     if let Some((hit_widget, _)) = new_hit {
       hit_widget
@@ -175,10 +175,11 @@ impl PointerDispatcher {
         .filter(|w| !already_entered.iter().any(|e| e != *w))
         .for_each(|&w| {
           let old_pos = (w, &*ctx).map_from_global(self.cursor_pos);
-          let mut event = self.mouse_pointer(w, old_pos, ctx);
+          let mut event =
+            PointerEvent::from_mouse(w, old_pos, self.cursor_pos, self.mouse_button.1, ctx);
 
-          w.assert_get(tree).query_all_type(
-            |pointer: &PointerListener| {
+          w.assert_get_mut(&mut ctx.widget_tree).query_all_type_mut(
+            |pointer: &mut PointerListener| {
               pointer.dispatch_event(PointerEventType::Enter, &mut event);
               !event.bubbling_canceled()
             },
@@ -186,10 +187,6 @@ impl PointerDispatcher {
           );
         });
     }
-  }
-
-  fn mouse_pointer(&self, target: WidgetId, pos: Point, ctx: &Context) -> PointerEvent {
-    PointerEvent::from_mouse(target, pos, self.cursor_pos, self.mouse_button.1, ctx)
   }
 
   fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
