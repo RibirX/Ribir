@@ -53,7 +53,7 @@ impl Dispatcher {
             scan_code: input.scancode,
             common: EventCommon::new(id, ctx),
           },
-          |keyboard: &KeyboardAttr, event| keyboard.dispatch_event(event_type, event),
+          |keyboard: &mut KeyboardAttr, event| keyboard.dispatch_event(event_type, event),
         );
 
         event.common.prevent_default.get()
@@ -74,7 +74,7 @@ impl Dispatcher {
           char: c,
           common: EventCommon::new(id, ctx),
         },
-        |attr: &CharAttr, event| attr.dispatch_event(event),
+        |attr: &mut CharAttr, event| attr.dispatch_event(event),
       );
     }
   }

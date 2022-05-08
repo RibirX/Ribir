@@ -143,14 +143,14 @@ impl FocusManager {
       ctx.bubble_event(
         blur.wid,
         |ctx, id| FocusEvent::new(id, ctx),
-        |focus: &FocusAttr, event| focus.dispatch_event(FocusEventType::FocusOut, event),
+        |focus: &mut FocusAttr, event| focus.dispatch_event(FocusEventType::FocusOut, event),
       );
     }
 
     if let Some((focus, _)) = self.focusing {
       if let Some(focus_attr) = focus
         .wid
-        .assert_get(tree)
+        .assert_get(&ctx.widget_tree)
         .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
       {
         let mut focus_event = FocusEvent::new(focus.wid, ctx);
@@ -161,7 +161,7 @@ impl FocusManager {
       ctx.bubble_event(
         focus.wid,
         |ctx, id| FocusEvent::new(id, ctx),
-        |focus: &FocusAttr, event| focus.dispatch_event(FocusEventType::FocusIn, event),
+        |focus: &mut FocusAttr, event| focus.dispatch_event(FocusEventType::FocusIn, event),
       );
     }
 

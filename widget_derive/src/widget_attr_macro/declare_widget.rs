@@ -8,7 +8,7 @@ use syn::{
   spanned::Spanned,
   token::{self, Brace},
   visit_mut::VisitMut,
-  Expr, Ident, Path,
+  Expr, Ident, Path, Type,
 };
 mod widget_gen;
 use crate::{
@@ -27,7 +27,7 @@ use super::{
 #[derive(Debug)]
 pub struct DeclareWidget {
   declare_token: Option<kw::declare>,
-  pub path: Path,
+  pub path: Type,
   brace_token: Brace,
   // the name of this widget specified by `id` attr.
   pub named: Option<Id>,

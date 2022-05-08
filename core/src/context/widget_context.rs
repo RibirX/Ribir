@@ -1,5 +1,3 @@
-use std::ops::ControlFlow;
-
 use painter::{Point, Rect};
 
 use super::Context;
@@ -31,14 +29,12 @@ pub trait WidgetCtx {
   fn map_from_parent(&self, pos: Point) -> Point;
 
   /// Translates the render object coordinate pos to the coordinate system of
-  /// `ancestor`. The `ancestor` must be a ancestor of the calling render
-  /// object.
+  /// `p`.
   fn map_to(&self, pos: Point, ancestor: WidgetId) -> Point;
 
   /// Translates the render object coordinate pos from the coordinate system of
-  /// ancestor to this render object coordinate system. The parent must be
-  /// ancestor of the calling render object.
-  fn map_from(&self, pos: Point, ancestor: WidgetId) -> Point;
+  /// `p` to this render object coordinate system.
+  fn map_from(&self, pos: Point, p: WidgetId) -> Point;
 
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
@@ -57,6 +53,19 @@ fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
     .layout_box_rect(id)
     .map_or(pos, |rect| pos - rect.min().to_vector())
   // todo: should effect by transform widget.
+}
+
+fn map_to_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
+  id.ancestors(tree)
+    .fold(pos, |pos, p| map_to_parent(p, pos, store))
+}
+
+fn map_from_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
+  let stack = id.ancestors(tree).collect::<Vec<_>>();
+  stack
+    .iter()
+    .rev()
+    .fold(pos, |pos, p| map_from_parent(*p, pos, store))
 }
 
 impl<'a> WidgetCtxImpl for (WidgetId, &'a Context) {
@@ -87,18 +96,14 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     self.layout_store().layout_box_rect(wid)
   }
 
+  #[inline]
   fn map_to_global(&self, pos: Point) -> Point {
-    self
-      .id()
-      .ancestors(self.widget_tree())
-      .fold(pos, |pos, id| map_to_parent(id, pos, self.layout_store()))
+    map_to_global(self.id(), pos, self.widget_tree(), self.layout_store())
   }
 
+  #[inline]
   fn map_from_global(&self, pos: Point) -> Point {
-    self
-      .id()
-      .ancestors(self.widget_tree())
-      .fold(pos, |pos, id| map_from_parent(id, pos, self.layout_store()))
+    map_from_global(self.id(), pos, self.widget_tree(), self.layout_store())
   }
 
   #[inline]
@@ -111,42 +116,14 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     map_from_parent(self.id(), pos, self.layout_store())
   }
 
-  fn map_to(&self, pos: Point, ancestor: WidgetId) -> Point {
-    let pos = self
-      .id()
-      .ancestors(self.widget_tree())
-      .try_fold(pos, |pos, id| {
-        if id == ancestor {
-          ControlFlow::Break(pos)
-        } else {
-          let next = map_to_parent(id, pos, self.layout_store());
-          ControlFlow::Continue(next)
-        }
-      });
-
-    match pos {
-      ControlFlow::Continue(v) => v,
-      ControlFlow::Break(v) => v,
-    }
+  fn map_to(&self, pos: Point, w: WidgetId) -> Point {
+    let global = self.map_to_global(pos);
+    map_from_global(w, global, self.widget_tree(), self.layout_store())
   }
 
-  fn map_from(&self, pos: Point, ancestor: WidgetId) -> Point {
-    let pos = self
-      .id()
-      .ancestors(self.widget_tree())
-      .try_fold(pos, |pos, id| {
-        if id == ancestor {
-          ControlFlow::Break(pos)
-        } else {
-          let next = map_from_parent(id, pos, self.layout_store());
-          ControlFlow::Continue(next)
-        }
-      });
-
-    match pos {
-      ControlFlow::Continue(v) => v,
-      ControlFlow::Break(v) => v,
-    }
+  fn map_from(&self, pos: Point, w: WidgetId) -> Point {
+    let global = map_to_global(w, pos, self.widget_tree(), self.layout_store());
+    self.map_from_global(global)
   }
 
   #[inline]

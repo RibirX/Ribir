@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use std::ptr::NonNull;
 
 #[derive(Debug, Clone)]
 pub struct WheelEvent {
@@ -10,8 +9,20 @@ pub struct WheelEvent {
 
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
-#[derive(Default)]
-pub struct WheelAttr(LocalSubject<'static, NonNull<WheelEvent>, ()>);
+
+#[derive(Declare)]
+pub struct WheelListener<F: for<'r> FnMut(&'r mut WheelEvent)> {
+  #[declare(builtin)]
+  on_wheel: F,
+}
+
+impl<F: for<'r> FnMut(&'r mut WheelEvent) + 'static> IntoWidget for WheelListener<F> {
+  type W = WheelListener<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>;
+
+  #[inline]
+
+  fn into_widget(self) -> Self::W { WheelListener { on_wheel: Box::new(self.on_wheel) } }
+}
 
 impl std::convert::AsRef<EventCommon> for WheelEvent {
   #[inline]
@@ -23,20 +34,9 @@ impl std::convert::AsMut<EventCommon> for WheelEvent {
   fn as_mut(&mut self) -> &mut EventCommon { self.common.as_mut() }
 }
 
-impl WheelAttr {
+impl WheelListener<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>> {
   #[inline]
-  pub fn dispatch_event(&self, event: &mut WheelEvent) { self.0.clone().next(NonNull::from(event)) }
-
-  pub fn listen_on<H: FnMut(&mut WheelEvent) + 'static>(
-    &self,
-    mut handler: H,
-  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
-    self
-      .0
-      .clone()
-      // Safety: Inner pointer from a mut reference and pass to handler one by one.
-      .subscribe(move |mut event| handler(unsafe { event.as_mut() }))
-  }
+  pub fn dispatch_event(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
 }
 
 #[cfg(test)]

@@ -1,10 +1,6 @@
 use super::EventCommon;
 use crate::prelude::*;
-use rxrust::prelude::*;
-use std::{
-  ptr::NonNull,
-  time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 mod from_mouse;
 #[derive(Debug, Clone)]
@@ -101,39 +97,24 @@ impl PointerEvent {
   pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
 }
 
-/// An attribute that calls callbacks in response to common pointer events.
 // todo: use unicast subject replace
-#[derive(Default)]
-pub struct PointerListener(LocalSubject<'static, (PointerEventType, NonNull<PointerEvent>), ()>);
+#[derive(SingleChildWidget)]
+pub struct PointerListener(Box<dyn for<'r> FnMut(PointerEventType, &'r mut PointerEvent)>);
 
-// pub struct PointerDownDeclarer<F> {
-//   on_pointer_down:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+impl Render for PointerListener {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx.perform_child_layout(
+      ctx
+        .single_child()
+        .expect("`PointerListener` must have a child."),
+      clamp,
+    )
+  }
 
-// }
-// pub struct PointerDeclarer {
-
-//   #[doc="specify the event handler for the pointer up event."]
-//   on_pointer_up:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-//   #[doc="specify the event handler for the pointer move event."]
-//   on_pointer_move:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-//   #[doc="specify the event handler for the pointer tap event."]
-//   on_tap: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.
-// PointerEvent.html))",   #[doc="specify the event handler for processing the
-// specified times tap."]   on_tap_times:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-//   #[doc="specify the event handler to process pointer cancel event."]
-//   on_pointer_cancel:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-//   #[doc="specify the event handler when pointer enter this widget."]
-//   on_pointer_enter:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-//   #[doc="specify the event handler when pointer leave this widget."]
-//   on_pointer_leave:
-// "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-// }
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) {}
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PointerEventType {
@@ -150,43 +131,127 @@ pub enum PointerEventType {
    * lostpointercapture: */
 }
 
+#[derive(Declare)]
+pub struct PointerDown<F> {
+  #[declare(builtin)]
+  on_pointer_down: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerDown<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W {
+    PointerListener::listen_on(PointerEventType::Down, self.on_pointer_down)
+  }
+}
+
+#[derive(Declare)]
+pub struct PointerUp<F> {
+  #[declare(builtin)]
+  on_pointer_up: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerUp<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W {
+    PointerListener::listen_on(PointerEventType::Up, self.on_pointer_up)
+  }
+}
+
+#[derive(Declare)]
+pub struct PointerMove<F> {
+  #[declare(builtin)]
+  on_pointer_move: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerMove<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W {
+    PointerListener::listen_on(PointerEventType::Move, self.on_pointer_move)
+  }
+}
+
+#[derive(Declare)]
+pub struct PointerTap<F> {
+  #[declare(builtin)]
+  on_tap: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerTap<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W { PointerListener::listen_on(PointerEventType::Tap, self.on_tap) }
+}
+
+#[derive(Declare)]
+pub struct PointerCancel<F> {
+  #[declare(builtin)]
+  on_pointer_cancel: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerCancel<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W {
+    PointerListener::listen_on(PointerEventType::Tap, self.on_pointer_cancel)
+  }
+}
+
+#[derive(Declare)]
+pub struct PointerEnter<F> {
+  #[declare(builtin)]
+  on_pointer_enter: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerEnter<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W {
+    PointerListener::listen_on(PointerEventType::Tap, self.on_pointer_enter)
+  }
+}
+
+#[derive(Declare)]
+pub struct PointerLeave<F> {
+  #[declare(builtin)]
+  on_pointer_leave: F,
+}
+
+impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerLeave<F> {
+  type W = PointerListener;
+
+  #[inline]
+  fn into_widget(self) -> Self::W {
+    PointerListener::listen_on(PointerEventType::Tap, self.on_pointer_leave)
+  }
+}
+
 impl PointerListener {
   #[inline]
-  pub fn dispatch_event(&self, event_type: PointerEventType, event: &mut PointerEvent) {
-    self.0.clone().next((event_type, NonNull::from(event)))
+  pub fn dispatch_event(&mut self, event_type: PointerEventType, event: &mut PointerEvent) {
+    (self.0)(event_type, event)
   }
 
   pub fn listen_on<H: FnMut(&mut PointerEvent) + 'static>(
-    &mut self,
     event_type: PointerEventType,
     mut handler: H,
-  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
-    self
-      .pointer_observable()
-      .filter(move |(t, _)| *t == event_type)
-      // Safety: Inner pointer from a mut reference and pass to handler one by one.
-      .subscribe(move |(_, event)| handler(event))
+  ) -> Self {
+    Self(Box::new(move |ty, e| {
+      if ty == event_type {
+        handler(e)
+      }
+    }))
   }
 
-  pub fn pointer_observable<'a>(
-    &self,
-  ) -> impl LocalObservable<
-    'static,
-    Item = (PointerEventType, &'a mut PointerEvent),
-    Err = (),
-    Unsub = MutRc<SingleSubscription>,
-  > + 'static {
-    self
-      .0
-      .clone()
-      // Safety: Inner pointer from a mut reference and pass to handler one by one.
-      .map(move |(t, mut e)| (t, unsafe { e.as_mut() }))
-  }
-
-  pub fn tap_times_observable<'a>(
-    &self,
-    times: u8,
-  ) -> impl LocalObservable<'static, Item = &'a mut PointerEvent, Err = ()> {
+  pub fn tap_times<H: FnMut(&mut PointerEvent) + 'static>(times: u8, mut handler: H) -> Self {
     const DUR: Duration = Duration::from_millis(250);
     #[derive(Clone)]
     struct TapInfo {
@@ -196,34 +261,32 @@ impl PointerListener {
       mouse_btns: MouseButtons,
     }
     let mut tap_info: Option<TapInfo> = None;
-    self
-      .pointer_observable()
-      .filter(|(t, _)| t == &PointerEventType::Tap)
-      .filter_map(move |(_, e): (_, &mut PointerEvent)| {
-        match &mut tap_info {
-          Some(info)
-            if info.pointer_type == e.point_type
-              && info.mouse_btns == e.buttons
-              && info.tap_times < times
-              && info.first_tap_stamp.elapsed() < DUR =>
-          {
-            info.tap_times += 1;
-          }
-          _ => {
-            tap_info = Some(TapInfo {
-              first_tap_stamp: Instant::now(),
-              tap_times: 1,
-              pointer_type: e.point_type.clone(),
-              mouse_btns: e.buttons,
-            })
-          }
-        };
+    Self::listen_on(PointerEventType::Tap, move |e| {
+      match &mut tap_info {
+        Some(info)
+          if info.pointer_type == e.point_type
+            && info.mouse_btns == e.buttons
+            && info.tap_times < times
+            && info.first_tap_stamp.elapsed() < DUR =>
+        {
+          info.tap_times += 1;
+        }
+        _ => {
+          tap_info = Some(TapInfo {
+            first_tap_stamp: Instant::now(),
+            tap_times: 1,
+            pointer_type: e.point_type.clone(),
+            mouse_btns: e.buttons,
+          })
+        }
+      };
 
-        tap_info
-          .as_ref()
-          .filter(|info| info.tap_times == times)
-          .map(|_| e)
-      })
+      let info = tap_info.as_mut().unwrap();
+      if info.tap_times == times {
+        info.tap_times = 0;
+        handler(e)
+      }
+    })
   }
 }
 

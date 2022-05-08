@@ -13,26 +13,45 @@ builtin! {
   //       sequential keyboard navigation (usually with the Tab key, hence the name."]
   // tab_index: "i16",
 
-  // #listeners
+  PointerDown {
+    #[doc="specify the event handler for the pointer down event."]
+    on_pointer_down: impl FnMut(&mut PointerEvent),
+  }
 
-  // #[doc="specify the event handler for the pointer down event."]
-  // on_pointer_down: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-  // #[doc="specify the event handler for the pointer up event."]
-  // on_pointer_up: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-  // #[doc="specify the event handler for the pointer move event."]
-  // on_pointer_move: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-  // #[doc="specify the event handler for the pointer tap event."]
-  // on_tap: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
+  PointerUp {
+    #[doc="specify the event handler for the pointer up event."]
+    on_pointer_up: impl FnMut(&mut PointerEvent),
+  }
+
+  PointerMove<_> {
+    #[doc="specify the event handler for the pointer move event."]
+    on_pointer_move: impl FnMut(&mut PointerEvent),
+  }
+
+  PointerTap {
+    #[doc="specify the event handler for the pointer tap event."]
+    on_tap: impl FnMut(&mut PointerEvent),
+  }
+
+  PointerCancel {
+    #[doc="specify the event handler to process pointer cancel event."]
+    on_pointer_cancel: impl FnMut(&mut PointerEvent),
+  }
+
+  PointerEnter {
+    #[doc="specify the event handler when pointer enter this widget."]
+    on_pointer_enter: impl FnMut(&mut PointerEvent),
+  }
+
+  PointerLeave {
+    #[doc="specify the event handler when pointer leave this widget."]
+    on_pointer_leave: impl FnMut(&mut PointerEvent),
+  }
+
   // #[doc="specify the event handler for processing the specified times tap."]
   // on_tap_times: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-  // #[doc="specify the event handler to process pointer cancel event."]
-  // on_pointer_cancel: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-  // #[doc="specify the event handler when pointer enter this widget."]
-  // on_pointer_enter: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-  // #[doc="specify the event handler when pointer leave this widget."]
-  // on_pointer_leave: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
 
-  
+
   // #[doc="specify the event handler to process focus event."]
   // on_focus: "FnMut(&[`FocusEvent`](../ribir/widget/events/type.FocusEvent.html))",
   // #[doc="specify the event handler to process blur event."]
@@ -47,8 +66,10 @@ builtin! {
   // on_key_up: "FnMut(&[`KeyboardEvent`](../ribir/widget/events/struct.KeyboardEvent.html))",
   // #[doc="specify the event handler when received a unicode character."]
   // on_char: "FnMut(&[`CharEvent`](../ribir/widget/events/struct.CharEvent.html))",
-  // #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
-  // on_wheel: "FnMut(&[`WheelEvent`](../ribir/widget/events/struct.WheelEvent.html))",
+  WheelListener {
+    #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
+    on_wheel: FnMut(&mut WheelEvent),
+  }
 
   // #widget_wrap
   // // padding should always before margin, it widget have margin & padding both

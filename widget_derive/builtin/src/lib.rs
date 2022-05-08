@@ -3,7 +3,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, ToTokens};
 use syn::{
   braced, bracketed, parse::Parse, parse_macro_input, punctuated::Punctuated, token, Ident,
-  MetaNameValue,
+  MetaNameValue, Type,
 };
 
 mod kw {
@@ -16,10 +16,10 @@ struct Field {
   doc_attr: MetaNameValue,
   mem: Ident,
   _colon: token::Colon,
-  ty: Ident,
+  ty: syn::Type,
 }
 struct BuiltinWidget {
-  ty: Ident,
+  ty: Type,
   _brace_token: token::Brace,
   fields: Punctuated<Field, token::Comma>,
 }
@@ -69,7 +69,7 @@ impl Parse for BuiltinWidgets {
 impl ToTokens for Field {
   fn to_tokens(&self, tokens: &mut TokenStream2) {
     let Self { doc_attr, mem, ty, .. } = self;
-    let ty = ty.to_string();
+    let ty = quote! { #ty }.to_string();
     let name = mem.to_string();
     let doc = match &doc_attr.lit {
       syn::Lit::Str(str) => str,
@@ -87,7 +87,7 @@ impl ToTokens for Field {
 
 impl ToTokens for BuiltinWidget {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let ty = self.ty.to_string();
+    let ty = self.ty.to_token_stream().to_string();
     let fields = &self.fields;
     tokens.extend(quote! {
       BuiltinWidget {
