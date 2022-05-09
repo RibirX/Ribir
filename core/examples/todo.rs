@@ -11,15 +11,14 @@ struct Todos {
   tasks: Vec<Task>,
 }
 
-impl StatefulCombination for Todos {
-  #[widget]
-  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    let this_ref = unsafe { this.state_ref() };
+impl Compose for Stateful<Todos> {
+  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget {
+    let this_ref = unsafe { self.state_ref() };
     widget! {
       declare Column {
         h_align: CrossAxisAlign::Start,
         ExprChild {
-          this.tasks.iter().enumerate().map(|(idx, task)|{
+          self.tasks.iter().enumerate().map(|(idx, task)|{
             widget!{
               declare Row {
                 margin: EdgeInsets::vertical(4.),

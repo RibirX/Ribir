@@ -1,10 +1,8 @@
 use crate::prelude::*;
-use rxrust::prelude::*;
-use std::ptr::NonNull;
 
 /// Focus attr attach to widget to support get ability to focus in.
-#[derive(Default)]
-pub struct FocusAttr {
+#[derive(Default, Declare, SingleChildWidget)]
+pub struct FocusListener {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
   ///
@@ -23,6 +21,7 @@ pub struct FocusAttr {
   ///   tab_index value, their order relative to each other follows their
   ///   position in the tree source. The maximum value for tab_index is 32767.
   ///   If not specified, it takes the default value 0.
+  #[declare(default, builtin)]
   pub tab_index: i16,
   /// Indicates whether the `widget` should automatically get focus when the
   /// window loads.
@@ -30,8 +29,16 @@ pub struct FocusAttr {
   /// Only one widget should have this attribute specified.  If there are
   /// several, the widget nearest the root, get the initial
   /// focus.
+  #[declare(default, builtin)]
   pub auto_focus: bool,
-  subject: LocalSubject<'static, (FocusEventType, NonNull<FocusEvent>), ()>,
+  #[declare(builtin, custom_convert)]
+  on_focus: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(builtin, custom_convert)]
+  on_blur: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(builtin, custom_convert)]
+  on_focus_in: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(builtin, custom_convert)]
+  on_focus_out: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
 }
 
 pub type FocusEvent = EventCommon;
@@ -56,25 +63,58 @@ pub enum FocusEventType {
   FocusOut,
 }
 
-impl FocusAttr {
-  #[inline]
-  pub fn dispatch_event(&self, event_type: FocusEventType, event: &mut FocusEvent) {
-    self
-      .subject
-      .clone()
-      .next((event_type, NonNull::from(event)))
+impl Render for FocusListener {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp))
+      .unwrap_or_default()
   }
 
-  pub fn listen_on<H: FnMut(&FocusEvent) + 'static>(
-    &self,
-    event_type: FocusEventType,
-    mut handler: H,
-  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
-    self
-      .subject
-      .clone()
-      .filter(move |(t, _)| *t == event_type)
-      // Safety: Inner pointer from a mut reference and pass to handler one by one.
-      .subscribe(move |(_, mut event)| handler(unsafe { event.as_mut() }))
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl FocusListener {
+  #[inline]
+  pub fn dispatch_event(&mut self, event_type: FocusEventType, event: &mut FocusEvent) {
+    let callback = match event_type {
+      FocusEventType::Focus => self.on_focus.as_mut(),
+      FocusEventType::Blur => self.on_blur.as_mut(),
+      FocusEventType::FocusIn => self.on_focus_in.as_mut(),
+      FocusEventType::FocusOut => self.on_focus_out.as_mut(),
+    };
+    if let Some(callback) = callback {
+      callback(event)
+    }
+  }
+}
+
+impl FocusListenerBuilder {
+  #[inline]
+  pub fn on_focus_convert(
+    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
+    Box::new(f)
+  }
+
+  #[inline]
+  pub fn on_blur_convert(
+    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
+    Box::new(f)
+  }
+
+  #[inline]
+  pub fn on_focus_in_convert(
+    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
+    Box::new(f)
+  }
+
+  #[inline]
+  pub fn on_focus_out_convert(
+    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
+    Box::new(f)
   }
 }

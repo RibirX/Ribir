@@ -47,7 +47,6 @@ mod tests {
     const SIZE: Size = Size::new(100., 100.);
     struct T;
     impl Compose for T {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
@@ -68,7 +67,6 @@ mod tests {
     struct Shrink;
 
     impl Compose for Shrink {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {

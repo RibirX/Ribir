@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::prelude::{
-  widget_tree::WidgetTree, BoxedWidget, Event, EventCommon, QueryOrder, StateInfo, WidgetId,
+  widget_tree::WidgetTree, BoxedWidget, EventCommon, QueryOrder, StateInfo, WidgetId,
 };
 use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
 
@@ -87,38 +87,28 @@ impl Context {
   #[inline]
   pub(crate) fn tree_mut(&mut self) -> &mut WidgetTree { &mut self.widget_tree }
 
-  pub(crate) fn bubble_event<D, E, F, Ty>(
-    &mut self,
-    wid: WidgetId,
-    default: F,
-    mut dispatch: D,
-  ) -> E
+  pub(crate) fn bubble_event<D, E, Ty>(&mut self, wid: WidgetId, event: &mut E, mut dispatch: D)
   where
-    F: FnOnce(&Context, WidgetId) -> E,
     D: FnMut(&mut Ty, &mut E),
-    E: Event + AsMut<EventCommon>,
+    E: std::borrow::BorrowMut<EventCommon>,
     Ty: 'static,
   {
-    let mut event = default(self, wid);
-
     let mut p = Some(wid);
     while let Some(w) = p {
       w.assert_get_mut(&mut self.widget_tree).query_all_type_mut(
         |attr| {
-          event.as_mut().current_target = wid;
-          dispatch(attr, &mut event);
-          !event.bubbling_canceled()
+          event.borrow_mut().current_target = wid;
+          dispatch(attr, event);
+          !event.borrow_mut().bubbling_canceled()
         },
         QueryOrder::InnerFirst,
       );
 
-      if event.bubbling_canceled() {
+      if event.borrow_mut().bubbling_canceled() {
         break;
       }
       p = w.parent(&self.widget_tree)
     }
-
-    event
   }
 
   pub(crate) fn draw_tree(&mut self) -> Vec<PaintCommand> {

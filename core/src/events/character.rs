@@ -13,14 +13,14 @@ pub struct CharEvent {
   pub common: EventCommon,
 }
 
-impl std::convert::AsRef<EventCommon> for CharEvent {
+impl std::borrow::Borrow<EventCommon> for CharEvent {
   #[inline]
-  fn as_ref(&self) -> &EventCommon { &self.common }
+  fn borrow(&self) -> &EventCommon { &self.common }
 }
 
-impl std::convert::AsMut<EventCommon> for CharEvent {
+impl std::borrow::BorrowMut<EventCommon> for CharEvent {
   #[inline]
-  fn as_mut(&mut self) -> &mut EventCommon { &mut self.common }
+  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
 }
 
 impl CharAttr {

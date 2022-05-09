@@ -36,7 +36,6 @@ mod tests {
   fn one_line_expanded() {
     struct T(Size);
     impl Compose for T {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let size = self.0;
         widget! {

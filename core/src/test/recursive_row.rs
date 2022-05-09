@@ -7,7 +7,6 @@ pub struct RecursiveRow {
 }
 
 impl Compose for RecursiveRow {
-  #[widget]
   fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare Row {

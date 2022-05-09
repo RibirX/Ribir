@@ -73,7 +73,7 @@ impl FocusManager {
   pub fn auto_focus(&mut self, ctx: &Context) -> Option<WidgetId> {
     ctx.descendants().find(|id| {
       id.assert_get(&ctx.widget_tree)
-        .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
+        .query_first_type::<FocusListener>(QueryOrder::OutsideFirst)
         .map_or(false, |focus| focus.auto_focus)
     })
   }
@@ -88,7 +88,7 @@ impl FocusManager {
       .descendants(tree)
       .filter_map(|id| {
         id.get(tree)
-          .and_then(|w| w.query_type::<FocusAttr>())
+          .and_then(|w| w.query_first_type::<FocusListener>(QueryOrder::OutsideFirst))
           .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
       })
       .for_each(|node| match node.tab_index {
@@ -127,41 +127,43 @@ impl FocusManager {
     let old = self.focusing.take();
     self.focusing = node;
 
-    let tree = &ctx.widget_tree;
-    if let Some((ref blur, _)) = old {
+    if let Some((blur, _)) = old {
+      let mut focus_event = FocusEvent::new(blur.wid, ctx);
       // dispatch blur event
       if let Some(focus) = blur
         .wid
-        .assert_get(tree)
-        .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
+        .assert_get_mut(&mut ctx.widget_tree)
+        .query_first_type_mut::<FocusListener>(QueryOrder::OutsideFirst)
       {
-        let mut focus_event = FocusEvent::new(blur.wid, ctx);
         focus.dispatch_event(FocusEventType::Blur, &mut focus_event)
       }
 
+      let mut focus_event = FocusEvent::new(blur.wid, ctx);
       // bubble focus out
       ctx.bubble_event(
         blur.wid,
-        |ctx, id| FocusEvent::new(id, ctx),
-        |focus: &mut FocusAttr, event| focus.dispatch_event(FocusEventType::FocusOut, event),
+        &mut focus_event,
+        |focus: &mut FocusListener, event| focus.dispatch_event(FocusEventType::FocusOut, event),
       );
     }
 
     if let Some((focus, _)) = self.focusing {
-      if let Some(focus_attr) = focus
+      let mut focus_event = FocusEvent::new(focus.wid, ctx);
+      if let Some(focus_listener) = focus
         .wid
-        .assert_get(&ctx.widget_tree)
-        .query_first_type::<FocusAttr>(QueryOrder::OutsideFirst)
+        .assert_get_mut(&mut ctx.widget_tree)
+        .query_first_type_mut::<FocusListener>(QueryOrder::OutsideFirst)
       {
-        let mut focus_event = FocusEvent::new(focus.wid, ctx);
-        focus_attr.dispatch_event(FocusEventType::Focus, &mut focus_event)
+        focus_listener.dispatch_event(FocusEventType::Focus, &mut focus_event)
       }
+
+      let mut focus_event = FocusEvent::new(focus.wid, ctx);
 
       // bubble focus out
       ctx.bubble_event(
         focus.wid,
-        |ctx, id| FocusEvent::new(id, ctx),
-        |focus: &mut FocusAttr, event| focus.dispatch_event(FocusEventType::FocusIn, event),
+        &mut focus_event,
+        |focus: &mut FocusListener, event| focus.dispatch_event(FocusEventType::FocusIn, event),
       );
     }
 
@@ -333,7 +335,6 @@ mod tests {
     struct T;
 
     impl Compose for T {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {

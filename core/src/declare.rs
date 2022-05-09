@@ -159,7 +159,9 @@
 //! [declare_derive]: ../ribir/widget_derive/Declare.html
 //! [builtin_fields]: ../ribir/widget_derive/declare_builtin_fields.html
 
-use crate::prelude::{BuildCtx, Widget};
+use std::marker::PhantomData;
+
+use crate::prelude::BuildCtx;
 
 /// Trait to mark the builder type of widget. `widget!` use it to access the
 /// build type of the widget. See the [mod level document](declare) to know how
@@ -176,50 +178,28 @@ pub trait DeclareBuilder {
   fn build(self, ctx: &mut BuildCtx) -> Self::Target;
 }
 
-pub trait IntoWidget {
-  type W;
-  fn into_widget(self) -> Self::W;
+pub struct StripedOption<V, M> {
+  pub value: Option<V>,
+  _marker: PhantomData<M>,
 }
 
-impl<W: Widget> IntoWidget for W {
-  type W = Self;
-
+impl<T, V: Into<T>> From<V> for StripedOption<T, V> {
   #[inline]
-  fn into_widget(self) -> Self::W { self }
+  fn from(v: V) -> Self {
+    Self {
+      value: Some(v.into()),
+      _marker: PhantomData,
+    }
+  }
 }
 
-pub trait Striped<Marker, V> {
-  fn striped(self) -> Option<V>;
-}
-
-pub struct OptionInnerMarker;
-pub struct OptionMarker;
-
-impl<T: Into<V>, V> Striped<OptionInnerMarker, V> for T {
+impl<V> From<Option<V>> for StripedOption<V, V> {
   #[inline]
-  fn striped(self) -> Option<V> { Some(self.into()) }
-}
-
-impl<V> Striped<OptionMarker, V> for Option<V> {
-  #[inline]
-  fn striped(self) -> Option<V> { self }
-}
-
-pub struct StripedOption<V>(pub Option<V>);
-
-impl<V> From<V> for StripedOption<V> {
-  #[inline]
-  fn from(v: V) -> Self { Self(Some(v)) }
-}
-
-impl<V> From<Option<V>> for StripedOption<V> {
-  #[inline]
-  fn from(v: Option<V>) -> Self { Self(v) }
+  fn from(value: Option<V>) -> Self { Self { value, _marker: PhantomData } }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::*;
   use painter::{Brush, Color};
 
   #[test]

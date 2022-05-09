@@ -10,31 +10,55 @@ pub struct WheelEvent {
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
 
-#[derive(Declare)]
-pub struct WheelListener<F: for<'r> FnMut(&'r mut WheelEvent)> {
-  #[declare(builtin)]
-  on_wheel: F,
+#[derive(Declare, SingleChildWidget)]
+pub struct WheelListener {
+  #[declare(builtin, custom_convert)]
+  on_wheel: Box<dyn for<'r> FnMut(&'r mut WheelEvent)>,
 }
 
-impl<F: for<'r> FnMut(&'r mut WheelEvent) + 'static> IntoWidget for WheelListener<F> {
-  type W = WheelListener<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>;
+impl Render for WheelListener {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp))
+      .unwrap_or_default()
+  }
 
   #[inline]
-
-  fn into_widget(self) -> Self::W { WheelListener { on_wheel: Box::new(self.on_wheel) } }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl std::convert::AsRef<EventCommon> for WheelEvent {
+impl WheelListenerBuilder {
   #[inline]
-  fn as_ref(&self) -> &EventCommon { self.common.as_ref() }
+  pub fn on_wheel_convert(
+    f: impl for<'r> FnMut(&'r mut WheelEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut WheelEvent)> {
+    Box::new(f)
+  }
 }
 
-impl std::convert::AsMut<EventCommon> for WheelEvent {
+impl std::borrow::Borrow<EventCommon> for WheelEvent {
   #[inline]
-  fn as_mut(&mut self) -> &mut EventCommon { self.common.as_mut() }
+  fn borrow(&self) -> &EventCommon { &self.common }
 }
 
-impl WheelListener<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>> {
+impl std::borrow::BorrowMut<EventCommon> for WheelEvent {
+  #[inline]
+  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
+}
+
+impl std::ops::Deref for WheelEvent {
+  type Target = EventCommon;
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.common }
+}
+
+impl std::ops::DerefMut for WheelEvent {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
+}
+
+impl WheelListener {
   #[inline]
   pub fn dispatch_event(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
 }

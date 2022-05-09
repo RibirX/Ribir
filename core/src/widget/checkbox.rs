@@ -23,47 +23,45 @@ impl Checkbox {
   }
 }
 
-impl StatefulCombination for Checkbox {
-  #[widget]
-  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    let CheckboxTheme { size, .. } = this.style.clone();
+impl Compose for Stateful<Checkbox> {
+  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
+    let CheckboxTheme { size, .. } = self.style.clone();
+    let has_checked = self.indeterminate || self.checked;
+    let mut state_ref = unsafe { self.state_ref() };
 
-    let has_checked = this.indeterminate || this.checked;
-
+    // todo: track self
     widget! {
-      declare SizedBox {
-        size: Size::new(size, size),
+      declare Empty {
         margin: EdgeInsets::all(4.),
         cursor: CursorIcon::Hand,
         on_tap: {
-          let mut state = unsafe { this.state_ref() };
-          move |_| state.switch_check()
+          move |_| state_ref.switch_check()
         },
         on_key_up: {
-          let mut state = unsafe { this.state_ref() };
           move |k| {
             if k.key == VirtualKeyCode::Space {
-              state.switch_check()
+              state_ref.switch_check()
             }
           }
         },
         ExprChild {
+          let size = Size::new(size, size);
           if has_checked {
-            if this.indeterminate {
+            if self.indeterminate {
               Icon {
                 src: "./core/src/widget/theme/checkbox/indeterminate.svg",
-                size: Size::new(size, size),
+                size
               }
             } else {
               Icon {
                 src: "./core/src/widget/theme/checkbox/checked.svg",
-                size: Size::new(size, size),
+                size
               }
             }
           } else {
             Icon {
               src: "./core/src/widget/theme/checkbox/unchecked.svg",
-              size: Size::new(size, size),
+              size
             }
           }
         }
@@ -72,6 +70,9 @@ impl StatefulCombination for Checkbox {
   }
 }
 
+impl BoxWidget<ComposeMarker> for Checkbox {
+  fn box_it(self) -> BoxedWidget { Stateful::new(self).box_it() }
+}
 #[cfg(test)]
 mod tests {
   use super::*;

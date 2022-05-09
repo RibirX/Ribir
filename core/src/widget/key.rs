@@ -37,7 +37,7 @@ pub struct KeyWidget {
 
 impl Render for KeyWidget {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.single_child().expect("Margin must have one child");
+    let child = ctx.single_child().expect("Key must have single child");
     ctx.perform_child_layout(child, clamp)
   }
 

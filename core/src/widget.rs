@@ -27,17 +27,17 @@ mod svg;
 pub use svg::*;
 mod box_decoration;
 pub use box_decoration::*;
-// mod checkbox;
-// pub use checkbox::*;
-// mod scrollable;
-// pub use scrollable::*;
+mod checkbox;
+pub use checkbox::*;
+mod scrollable;
+pub use scrollable::*;
 mod path;
 pub use path::*;
-// mod grid_view;
-// pub use grid_view::*;
-// mod scroll_view;
-// pub use scroll_view::ScrollView;
-// mod scrollbar;
+mod grid_view;
+pub use grid_view::*;
+mod scroll_view;
+pub use scroll_view::ScrollView;
+mod scrollbar;
 
 mod empty;
 use self::layout_store::BoxClamp;
@@ -78,14 +78,13 @@ pub trait Render {
   fn only_sized_by_parent(&self) -> bool { false }
 }
 
-// todo: deprecated, remove it after optimistic Compose.
-/// A combination widget which want directly implement stateful widget and have
-/// no stateless version. Implement `StatefulCombination` only when you need a
+/// A compose widget which want directly implement stateful widget and have no
+/// stateless version. Implement `StatefulCombination` only when you need a
 /// stateful widget during `build`, otherwise you should implement
 /// [`Compose`]! and a stateful version will auto provide by
 /// framework, use [`Stateful::into_stateful`]! to convert.
-pub trait StatefulCombination {
-  fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
+pub trait StatefulCompose {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
   where
     Self: Sized;
 }
@@ -155,7 +154,6 @@ pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 pub(crate) trait Widget {}
 impl<W: Compose> Widget for W {}
 impl<W: Render> Widget for W {}
-impl<W: StatefulCombination> Widget for W {}
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
@@ -246,19 +244,6 @@ impl<W: Any> QueryType for W {
 
 impl<'a> dyn RenderNode + 'a {
   #[inline]
-  pub fn query_type<T: Any>(&self) -> Option<&T> {
-    let q = self as &dyn QueryType;
-    q.query(TypeId::of::<T>()).and_then(|a| a.downcast_ref())
-  }
-
-  #[inline]
-  pub fn query_type_mut<T: Any>(&mut self) -> Option<&mut T> {
-    let q = self as &mut dyn QueryType;
-    q.query_mut(TypeId::of::<T>())
-      .and_then(|a| a.downcast_mut())
-  }
-
-  #[inline]
   pub fn query_all_type<'b, T: Any>(
     &'b self,
     mut callback: impl FnMut(&'b T) -> bool,
@@ -288,7 +273,6 @@ impl<'a> dyn RenderNode + 'a {
 
   /// Query the first match type in all type by special order, and return a
   /// reference of it.
-
   pub fn query_first_type<T: Any>(&self, order: QueryOrder) -> Option<&T> {
     let mut target = None;
     self.query_all_type(
@@ -328,7 +312,7 @@ pub trait BoxWidget<M> {
 
 impl<C: Compose + 'static> BoxWidget<ComposeMarker> for C {
   #[inline]
-  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
+  default fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
 }
 
 impl<R: Render + 'static> BoxWidget<RenderMarker> for R {
@@ -354,18 +338,9 @@ impl<M: Render + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
   }
 }
 
-struct StatefulCombinationWrap<W>(Stateful<W>);
-
-impl<C: StatefulCombination> Compose for StatefulCombinationWrap<C> {
-  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget
-  where
-    Self: Sized,
-  {
-    self.0.mark_during_build(true);
-    let c = StatefulCombination::build(&self.0, ctx);
-    self.0.mark_during_build(false);
-    c
-  }
+impl BoxWidget<()> for BoxedWidget {
+  #[inline]
+  fn box_it(self) -> BoxedWidget { self }
 }
 
 impl<C: FnOnce(&mut BuildCtx) -> BoxedWidget> Compose for C {

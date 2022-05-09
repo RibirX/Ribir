@@ -84,7 +84,7 @@ use crate::{prelude::*, widget::widget_tree::WidgetTree};
 use rxrust::prelude::*;
 use std::{cell::Cell, pin::Pin, ptr::NonNull};
 
-use super::{widget_tree::WidgetChangeFlags, ComposedWidget};
+use super::widget_tree::WidgetChangeFlags;
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
@@ -125,6 +125,8 @@ pub struct StateChange<T: Clone> {
   pub before: T,
   pub after: T,
 }
+// todo: needn't hold widget tree, but widget tree listen on stateful widget
+// change notify.
 pub(crate) struct TreeInfo {
   // use rc pointer replace NonNull pointer
   pub tree: NonNull<widget_tree::WidgetTree>,
@@ -157,7 +159,7 @@ impl<W> Copy for ShallowRef<W> {}
 impl<W> Stateful<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
   // want [`into_stateful`](IntoStateful::into_stateful)
-  fn new(widget: W) -> Self {
+  pub fn new(widget: W) -> Self {
     let info = StateInfo::default();
     Stateful(Box::pin(StatefulInner { widget, info }))
   }
@@ -195,8 +197,6 @@ impl<W> Stateful<W> {
     let state_ref = unsafe { self.state_ref() };
     state_ref.state_change(pick)
   }
-
-  pub(crate) fn mark_during_build(&self, flag: bool) { self.0.info.during_build.set(flag); }
 }
 
 impl<W: 'static> StateRef<W> {
@@ -339,14 +339,15 @@ impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
 
 impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
 
-impl<C: Compose + Clone + 'static> RecursiveCompose for Stateful<C> {
+impl<C: Compose + Clone + 'static> Compose for Stateful<C> {
   #[inline]
-  fn recursive_compose(self: Box<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    ComposedWidget {
-      composed: self.clone().compose(ctx),
-      by: self,
+  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
+    // todo: track self
+    widget! {
+      declare Empty {
+        ExprChild { self.clone() }
+      }
     }
-    .into_boxed(ctx)
   }
 }
 
@@ -365,7 +366,10 @@ impl<W: Render> Render for Stateful<W> {
 
 // Implement IntoStateful for all widget
 
-impl<W: Widget + 'static> IntoStateful for W {
+impl<W> IntoStateful for W
+where
+  Stateful<W>: Widget + 'static,
+{
   type S = Stateful<W>;
   #[inline]
   fn into_stateful(self) -> Self::S { Stateful::new(self) }
@@ -477,7 +481,7 @@ mod tests {
     let w = SizedBox { size: Size::zero() }.into_stateful();
     let mut silent_ref = unsafe { w.silent_ref() };
     let mut state_ref = unsafe { w.state_ref() };
-    let mut tree = WidgetTree::new(widget_tree::WidgetNode::Render(Box::new(StatefulWrap(w))));
+    let mut tree = WidgetTree::new(Box::new(w));
 
     {
       let _ = &mut state_ref.size;

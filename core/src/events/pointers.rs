@@ -81,14 +81,25 @@ pub enum PointerType {
   Touch,
 }
 
-impl std::convert::AsRef<EventCommon> for PointerEvent {
+impl std::borrow::Borrow<EventCommon> for PointerEvent {
   #[inline]
-  fn as_ref(&self) -> &EventCommon { &self.common }
+  fn borrow(&self) -> &EventCommon { &self.common }
 }
 
-impl std::convert::AsMut<EventCommon> for PointerEvent {
+impl std::borrow::BorrowMut<EventCommon> for PointerEvent {
   #[inline]
-  fn as_mut(&mut self) -> &mut EventCommon { &mut self.common }
+  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
+}
+
+impl std::ops::Deref for PointerEvent {
+  type Target = EventCommon;
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.common }
+}
+
+impl std::ops::DerefMut for PointerEvent {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
 impl PointerEvent {
@@ -97,161 +108,91 @@ impl PointerEvent {
   pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
 }
 
-// todo: use unicast subject replace
-#[derive(SingleChildWidget)]
-pub struct PointerListener(Box<dyn for<'r> FnMut(PointerEventType, &'r mut PointerEvent)>);
+macro_rules! impl_pointer_listener {
+  ($name: ident, $field: ident, $convert: ident, $builder: ident) => {
+    #[derive(Declare, SingleChildWidget)]
+    pub struct $name {
+      #[declare(builtin, custom_convert)]
+      $field: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+    }
 
-impl Render for PointerListener {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.perform_child_layout(
-      ctx
-        .single_child()
-        .expect("`PointerListener` must have a child."),
-      clamp,
-    )
-  }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum PointerEventType {
-  Down,
-  Move,
-  Up,
-  Tap,
-  Cancel,
-  Enter,
-  Leave,
-  /* onpointerover:
-   * onpointerout:
-   * gotpointercapture:
-   * lostpointercapture: */
-}
-
-#[derive(Declare)]
-pub struct PointerDown<F> {
-  #[declare(builtin)]
-  on_pointer_down: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerDown<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W {
-    PointerListener::listen_on(PointerEventType::Down, self.on_pointer_down)
-  }
-}
-
-#[derive(Declare)]
-pub struct PointerUp<F> {
-  #[declare(builtin)]
-  on_pointer_up: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerUp<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W {
-    PointerListener::listen_on(PointerEventType::Up, self.on_pointer_up)
-  }
-}
-
-#[derive(Declare)]
-pub struct PointerMove<F> {
-  #[declare(builtin)]
-  on_pointer_move: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerMove<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W {
-    PointerListener::listen_on(PointerEventType::Move, self.on_pointer_move)
-  }
-}
-
-#[derive(Declare)]
-pub struct PointerTap<F> {
-  #[declare(builtin)]
-  on_tap: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerTap<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W { PointerListener::listen_on(PointerEventType::Tap, self.on_tap) }
-}
-
-#[derive(Declare)]
-pub struct PointerCancel<F> {
-  #[declare(builtin)]
-  on_pointer_cancel: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerCancel<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W {
-    PointerListener::listen_on(PointerEventType::Tap, self.on_pointer_cancel)
-  }
-}
-
-#[derive(Declare)]
-pub struct PointerEnter<F> {
-  #[declare(builtin)]
-  on_pointer_enter: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerEnter<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W {
-    PointerListener::listen_on(PointerEventType::Tap, self.on_pointer_enter)
-  }
-}
-
-#[derive(Declare)]
-pub struct PointerLeave<F> {
-  #[declare(builtin)]
-  on_pointer_leave: F,
-}
-
-impl<F: FnMut(&mut PointerEvent) + 'static> IntoWidget for PointerLeave<F> {
-  type W = PointerListener;
-
-  #[inline]
-  fn into_widget(self) -> Self::W {
-    PointerListener::listen_on(PointerEventType::Tap, self.on_pointer_leave)
-  }
-}
-
-impl PointerListener {
-  #[inline]
-  pub fn dispatch_event(&mut self, event_type: PointerEventType, event: &mut PointerEvent) {
-    (self.0)(event_type, event)
-  }
-
-  pub fn listen_on<H: FnMut(&mut PointerEvent) + 'static>(
-    event_type: PointerEventType,
-    mut handler: H,
-  ) -> Self {
-    Self(Box::new(move |ty, e| {
-      if ty == event_type {
-        handler(e)
+    impl $builder {
+      #[inline]
+      pub fn $convert(
+        f: impl for<'r> FnMut(&'r mut PointerEvent) + 'static,
+      ) -> Box<dyn for<'r> FnMut(&'r mut PointerEvent)> {
+        Box::new(f)
       }
-    }))
-  }
+    }
 
-  pub fn tap_times<H: FnMut(&mut PointerEvent) + 'static>(times: u8, mut handler: H) -> Self {
+    impl Render for $name {
+      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+        ctx
+          .single_child()
+          .map(|c| ctx.perform_child_layout(c, clamp))
+          .unwrap_or_default()
+      }
+
+      #[inline]
+      fn paint(&self, _: &mut PaintingCtx) {}
+    }
+
+    impl $name {
+      #[inline]
+      pub fn dispatch_event(&mut self, event: &mut PointerEvent) { (self.$field)(event) }
+    }
+  };
+}
+
+impl_pointer_listener!(
+  PointerDownListener,
+  on_pointer_down,
+  on_pointer_down_convert,
+  PointerDownListenerBuilder
+);
+
+impl_pointer_listener!(
+  PointerUpListener,
+  on_pointer_up,
+  on_pointer_up_convert,
+  PointerUpListenerBuilder
+);
+
+impl_pointer_listener!(
+  PointerMoveListener,
+  on_pointer_move,
+  on_pointer_move_convert,
+  PointerMoveListenerBuilder
+);
+
+impl_pointer_listener!(TapListener, on_tap, on_tap_convert, TapListenerBuilder);
+
+impl_pointer_listener!(
+  PointerCancelListener,
+  on_pointer_cancel,
+  on_pointer_cancel_convert,
+  PointerCancelListenerBuilder
+);
+
+impl_pointer_listener!(
+  PointerEnterListener,
+  on_pointer_enter,
+  on_pointer_enter_convert,
+  PointerEnterListenerBuilder
+);
+
+impl_pointer_listener!(
+  PointerLeaveListener,
+  on_pointer_leave,
+  on_pointer_leave_convert,
+  PointerLeaveListenerBuilder
+);
+
+impl TapListener {
+  pub fn on_tap_times<H: FnMut(&mut PointerEvent) + 'static>(
+    times: u8,
+    mut handler: H,
+  ) -> impl FnMut(&mut PointerEvent) + 'static {
     const DUR: Duration = Duration::from_millis(250);
     #[derive(Clone)]
     struct TapInfo {
@@ -261,7 +202,7 @@ impl PointerListener {
       mouse_btns: MouseButtons,
     }
     let mut tap_info: Option<TapInfo> = None;
-    Self::listen_on(PointerEventType::Tap, move |e| {
+    move |e| {
       match &mut tap_info {
         Some(info)
           if info.pointer_type == e.point_type
@@ -286,7 +227,7 @@ impl PointerListener {
         info.tap_times = 0;
         handler(e)
       }
-    })
+    }
   }
 }
 

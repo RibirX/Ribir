@@ -11,8 +11,6 @@ pub struct EmbedPostWithKey {
 }
 
 impl Compose for EmbedPostWithKey {
-  #[widget]
-
   fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare Row {
