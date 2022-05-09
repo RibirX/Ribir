@@ -4,14 +4,14 @@ use crate::prelude::*;
 #[derive(SingleChildWidget, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[declare(builtin, default)]
+  #[declare(builtin, default, custom_convert)]
   pub background: Option<Brush>,
   /// A border to draw above the background
-  #[declare(builtin, default)]
+  #[declare(builtin, default, custom_convert)]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[declare(builtin, default)]
+  #[declare(builtin, default, custom_convert)]
   pub radius: Option<Radius>,
 }
 
@@ -70,6 +70,23 @@ impl Render for BoxDecoration {
       }
       self.paint_border(painter, &content_rect);
     }
+  }
+}
+
+impl BoxDecorationBuilder {
+  #[inline]
+  pub fn background_convert<M, B: Into<StripedOption<Brush, M>>>(b: B) -> Option<Brush> {
+    b.into().value
+  }
+
+  #[inline]
+  pub fn border_convert<M, B: Into<StripedOption<Border, M>>>(b: B) -> Option<Border> {
+    b.into().value
+  }
+
+  #[inline]
+  pub fn radius_convert<M, B: Into<StripedOption<Radius, M>>>(b: B) -> Option<Radius> {
+    b.into().value
   }
 }
 
@@ -330,7 +347,6 @@ mod tests {
     const SIZE: Size = Size::new(100., 100.);
     struct T;
     impl Compose for T {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {

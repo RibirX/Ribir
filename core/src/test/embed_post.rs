@@ -24,7 +24,6 @@ impl EmbedPost {
 }
 
 impl Compose for EmbedPost {
-  #[widget]
   fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare Row {

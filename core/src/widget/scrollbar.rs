@@ -30,11 +30,9 @@ impl Render for ScrollBarTrack {
     if !self.layout.is_show() {
       return Size::default();
     }
-    let child = ctx
-      .single_render_child()
-      .expect("Margin must have one child");
+    let child = ctx.single_child().expect("Margin must have one child");
     let size = self.size(clamp);
-    ctx.perform_render_child_layout(child, clamp);
+    ctx.perform_child_layout(child, clamp);
     ctx.update_position(child, self.offset());
     size
   }
@@ -102,8 +100,7 @@ impl ScrollBar {
 }
 
 impl Compose for ScrollBar {
-  #[widget]
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
     widget! {
       declare ScrollBarTrack {
         layout: self.info.clone(),

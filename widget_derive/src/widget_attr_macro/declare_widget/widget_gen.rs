@@ -39,22 +39,22 @@ impl<'a> WidgetGen<'a> {
       let mut_token = (!fields_with_guard.is_empty()).then(|| quote! {mut});
       let without_guard_tokens = fields_without_guard
         .iter()
-        .map(|f| f.build_tokens_without_guard());
+        .map(|f| f.build_tokens_without_guard(ty));
 
       if fields_with_guard.is_empty() {
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()
-            #(#without_guard_tokens)*.build(#build_ctx).into_widget()#stateful;
+            #(#without_guard_tokens)*.build(#build_ctx)#stateful;
         }
       } else {
         let with_guard_tokens = fields_with_guard
           .iter()
-          .map(|f| f.build_tokens_with_guard(&def_name));
+          .map(|f| f.build_tokens_with_guard(&def_name, ty));
 
         quote_spanned! { ty.span() =>
           let #mut_token #def_name = <#ty as Declare>::builder()#(#without_guard_tokens)*;
           #(#with_guard_tokens)*
-          let #def_name = #def_name.build(#build_ctx).into_widget()#stateful;
+          let #def_name = #def_name.build(#build_ctx)#stateful;
         }
       }
     };
@@ -119,19 +119,21 @@ impl DeclareField {
     quote_spanned! { expr.span() => <#widget_ty as Declare>::Builder::#field_converter(#expr) }
   }
 
-  fn build_tokens_without_guard(&self) -> TokenStream {
+  fn build_tokens_without_guard(&self, widget_ty: &Path) -> TokenStream {
     assert!(self.if_guard.is_none());
-    let Self { member, expr, .. } = self;
-    quote! {.#member(#expr)}
+    let member = &self.member;
+    let value = self.value_tokens(widget_ty);
+    quote! {.#member(#value)}
   }
 
-  fn build_tokens_with_guard(&self, builder: &Ident) -> TokenStream {
+  fn build_tokens_with_guard(&self, builder: &Ident, widget_ty: &Path) -> TokenStream {
     let if_guard = self.if_guard.as_ref().unwrap();
-    let Self { member, expr, .. } = self;
+    let member = &self.member;
+    let value = self.value_tokens(widget_ty);
     let guard_cond = field_guard_variable(member, if_guard.span());
     quote! {
       if #guard_cond {
-        #builder = #builder.#member(#expr);
+        #builder = #builder.#member(#value);
       }
     }
   }

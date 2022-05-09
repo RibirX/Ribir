@@ -114,7 +114,7 @@ impl ViewContainer {
     &'b mut LayoutCtx<'a>,
     impl Iterator<Item = (WidgetId, ElemType)> + 'b,
   ) {
-    let (new_ctx, children) = ctx.split_render_children();
+    let (new_ctx, children) = ctx.split_children();
     let types = [
       ElemType::Content,
       ElemType::VScrollBar,
@@ -139,7 +139,7 @@ impl Render for ViewContainer {
 
     let mut self_size = clamp.min.clone();
     for (wid, elem_type) in it {
-      let child_size = new_ctx.perform_render_child_layout(wid, clamp);
+      let child_size = new_ctx.perform_child_layout(wid, clamp);
       self_size = self_size.max(child_size);
       new_ctx.update_position(wid, self.calc_position(elem_type, child_size, self_size));
 
@@ -165,7 +165,7 @@ impl ScrollView {
     Self: Sized,
   {
     let container = ViewContainer::default();
-    let mut scroll = ScrollableBoth::both_scroll(Point::zero());
+    let mut scroll = ScrollableBoth { pos: Point::zero() }.into_stateful();
 
     let v_bar = ScrollBar::new(container.vertical.clone(), ctx).into_stateful();
     let mut v_bar_ref = unsafe { v_bar.state_ref() };

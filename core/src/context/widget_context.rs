@@ -29,38 +29,38 @@ pub trait WidgetCtx {
   fn map_from_parent(&self, pos: Point) -> Point;
 
   /// Translates the render object coordinate pos to the coordinate system of
-  /// `p`.
-  fn map_to(&self, pos: Point, ancestor: WidgetId) -> Point;
+  /// `w`.
+  fn map_to(&self, pos: Point, w: WidgetId) -> Point;
 
   /// Translates the render object coordinate pos from the coordinate system of
-  /// `p` to this render object coordinate system.
-  fn map_from(&self, pos: Point, p: WidgetId) -> Point;
+  /// `w` to this render object coordinate system.
+  fn map_from(&self, pos: Point, w: WidgetId) -> Point;
 
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
   fn query_type<T: 'static>(&self, id: WidgetId) -> Option<&T>;
 }
 
-fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
+pub fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
   // todo: should effect by transform widget.
   store
     .layout_box_rect(id)
     .map_or(pos, |rect| pos + rect.min().to_vector())
 }
 
-fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
+pub fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
   store
     .layout_box_rect(id)
     .map_or(pos, |rect| pos - rect.min().to_vector())
   // todo: should effect by transform widget.
 }
 
-fn map_to_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
+pub(crate) fn map_to_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
   id.ancestors(tree)
     .fold(pos, |pos, p| map_to_parent(p, pos, store))
 }
 
-fn map_from_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
+pub(crate) fn map_from_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
   let stack = id.ancestors(tree).collect::<Vec<_>>();
   stack
     .iter()

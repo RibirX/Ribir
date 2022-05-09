@@ -41,22 +41,25 @@ impl Dispatcher {
   pub fn dispatch_keyboard_input(&mut self, input: winit::event::KeyboardInput, ctx: &mut Context) {
     if let Some(key) = input.virtual_keycode {
       let prevented = if let Some(focus) = self.focus_mgr.focusing() {
-        let event_type = match input.state {
-          ElementState::Pressed => KeyboardEventType::KeyDown,
-          ElementState::Released => KeyboardEventType::KeyUp,
+        let mut event = KeyboardEvent {
+          key,
+          scan_code: input.scancode,
+          common: EventCommon::new(focus, ctx),
+        };
+        match input.state {
+          ElementState::Pressed => ctx.bubble_event(
+            focus,
+            &mut event,
+            |keyboard: &mut KeyDownListener, event| keyboard.dispatch_event(event),
+          ),
+          ElementState::Released => {
+            ctx.bubble_event(focus, &mut event, |keyboard: &mut KeyUpListener, event| {
+              keyboard.dispatch_event(event)
+            })
+          }
         };
 
-        let event = ctx.bubble_event(
-          focus,
-          |ctx, id| KeyboardEvent {
-            key,
-            scan_code: input.scancode,
-            common: EventCommon::new(id, ctx),
-          },
-          |keyboard: &mut KeyboardAttr, event| keyboard.dispatch_event(event_type, event),
-        );
-
-        event.common.prevent_default.get()
+        event.common.prevent_default
       } else {
         false
       };
@@ -68,14 +71,13 @@ impl Dispatcher {
 
   pub fn dispatch_received_char(&mut self, c: char, ctx: &mut Context) {
     if let Some(focus) = self.focus_mgr.focusing() {
-      ctx.bubble_event(
-        focus,
-        |ctx, id| CharEvent {
-          char: c,
-          common: EventCommon::new(id, ctx),
-        },
-        |attr: &mut CharAttr, event| attr.dispatch_event(event),
-      );
+      let mut char_event = CharEvent {
+        char: c,
+        common: EventCommon::new(focus, ctx),
+      };
+      ctx.bubble_event(focus, &mut char_event, |attr: &mut CharAttr, event| {
+        attr.dispatch_event(event)
+      });
     }
   }
 

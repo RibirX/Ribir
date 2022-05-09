@@ -270,7 +270,6 @@ fn with_attr_ref() {
   #[derive(Default)]
   struct Track(Rc<Cell<Option<StateRef<Flex>>>>);
   impl Compose for Track {
-    #[widget]
     fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
       widget! {
         declare Flex {

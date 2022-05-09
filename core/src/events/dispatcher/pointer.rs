@@ -11,12 +11,24 @@ pub(crate) struct PointerDispatcher {
   pointer_down_uid: Option<WidgetId>,
 }
 
+macro_rules! bubble_pointer_event {
+  ($ctx: ident, $event: ident, $Listener: ident) => {
+    let target = $event.target();
+    let mut last_bubble_from = target;
+    $ctx.bubble_event(target, &mut $event, |listener: &mut $Listener, e| {
+      e.position = e.context().map_from(e.position, last_bubble_from);
+      last_bubble_from = target;
+      listener.dispatch_event(e)
+    });
+  };
+}
+
 impl PointerDispatcher {
   pub fn cursor_move_to(&mut self, position: Point, ctx: &mut Context) {
     self.cursor_pos = position;
     self.pointer_enter_leave_dispatch(ctx);
-    if let Some(from) = self.hit_widget(ctx) {
-      self.bubble_pointer_from(PointerEventType::Move, ctx, from);
+    if let Some(mut event) = self.pointer_event_for_hit_widget(ctx) {
+      bubble_pointer_event!(ctx, event, PointerMoveListener);
     }
   }
 
@@ -48,18 +60,20 @@ impl PointerDispatcher {
           // only the last button release emit event.
           if self.mouse_button.1.is_empty() {
             self.mouse_button.0 = None;
-            let release = self.hit_widget(ctx)?;
-            self.bubble_pointer_from(PointerEventType::Up, ctx, release);
-
-            let (release_on, release_pos) = release;
+            let mut release_event = self.pointer_event_for_hit_widget(ctx)?;
+            bubble_pointer_event!(ctx, release_event, PointerUpListener);
 
             let tap_on = self
               .pointer_down_uid
               .take()?
-              .common_ancestor_of(release_on, &ctx.widget_tree)?;
-            let tap_pos = (release_on, &*ctx).map_to(release_pos, tap_on);
+              .common_ancestor_of(release_event.target(), &ctx.widget_tree)?;
+            let tap_pos = release_event
+              .context()
+              .map_to(release_event.position, tap_on);
+            let mut tap_event =
+              PointerEvent::from_mouse(tap_on, tap_pos, self.cursor_pos, self.mouse_button.1, ctx);
 
-            self.bubble_pointer_from(PointerEventType::Tap, ctx, (tap_on, tap_pos));
+            bubble_pointer_event!(ctx, tap_event, TapListener);
           }
         }
       };
@@ -78,28 +92,25 @@ impl PointerDispatcher {
         }
       };
 
-      ctx.bubble_event(
-        wid,
-        |ctx, wid| WheelEvent {
-          delta_x,
-          delta_y,
-          common: EventCommon::new(wid, ctx),
-        },
-        |wheel: &mut WheelListener<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>, event| {
-          wheel.dispatch_event(event)
-        },
-      );
+      let mut wheel_event = WheelEvent {
+        delta_x,
+        delta_y,
+        common: EventCommon::new(wid, ctx),
+      };
+      ctx.bubble_event(wid, &mut wheel_event, |wheel: &mut WheelListener, event| {
+        wheel.dispatch_event(event)
+      });
     }
   }
 
   fn bubble_mouse_down(&mut self, ctx: &mut Context, focus_mgr: &mut FocusManager) {
+    let event = self.pointer_event_for_hit_widget(ctx);
+    self.pointer_down_uid = event.as_ref().map(|e| e.target());
     let tree = &ctx.widget_tree;
-    let hit = self.hit_widget(ctx);
-    self.pointer_down_uid = hit.map(|(wid, _)| wid);
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
         id.get(tree)
-          .and_then(|w| w.query_first_type::<FocusAttr>(QueryOrder::InnerFirst))
+          .and_then(|w| w.query_first_type::<FocusListener>(QueryOrder::InnerFirst))
           .is_some()
       })
     });
@@ -108,28 +119,9 @@ impl PointerDispatcher {
     } else {
       focus_mgr.blur(ctx);
     }
-    if let Some(from) = hit {
-      self.bubble_pointer_from(PointerEventType::Down, ctx, from);
+    if let Some(mut event) = event {
+      bubble_pointer_event!(ctx, event, PointerDownListener);
     }
-  }
-
-  fn bubble_pointer_from(
-    &mut self,
-    event_type: PointerEventType,
-    ctx: &mut Context,
-    from: (WidgetId, Point),
-  ) {
-    let (wid, pos) = from;
-    let mut last_bubble_from = wid;
-    ctx.bubble_event(
-      wid,
-      |ctx, wid| PointerEvent::from_mouse(wid, pos, self.cursor_pos, self.mouse_button.1, ctx),
-      |attr: &mut PointerListener, e| {
-        e.position = e.context().map_from(e.position, last_bubble_from);
-        last_bubble_from = wid;
-        attr.dispatch_event(event_type, e)
-      },
-    );
   }
 
   fn pointer_enter_leave_dispatch(&mut self, ctx: &mut Context) {
@@ -148,8 +140,8 @@ impl PointerDispatcher {
           let mut event =
             PointerEvent::from_mouse(w, old_pos, self.cursor_pos, self.mouse_button.1, ctx);
           w.assert_get_mut(&mut ctx.widget_tree).query_all_type_mut(
-            |pointer: &mut PointerListener| {
-              pointer.dispatch_event(PointerEventType::Leave, &mut event);
+            |pointer: &mut PointerLeaveListener| {
+              pointer.dispatch_event(&mut event);
               !event.bubbling_canceled()
             },
             QueryOrder::InnerFirst,
@@ -163,7 +155,7 @@ impl PointerDispatcher {
         .ancestors(&ctx.widget_tree)
         .filter(|w| {
           w.get(&ctx.widget_tree)
-            .and_then(|w| w.query_first_type::<PointerListener>(QueryOrder::OutsideFirst))
+            .and_then(|w| w.query_first_type::<PointerEnterListener>(QueryOrder::OutsideFirst))
             .is_some()
         })
         .for_each(|w| self.entered_widgets.push(w));
@@ -179,8 +171,8 @@ impl PointerDispatcher {
             PointerEvent::from_mouse(w, old_pos, self.cursor_pos, self.mouse_button.1, ctx);
 
           w.assert_get_mut(&mut ctx.widget_tree).query_all_type_mut(
-            |pointer: &mut PointerListener| {
-              pointer.dispatch_event(PointerEventType::Enter, &mut event);
+            |pointer: &mut PointerEnterListener| {
+              pointer.dispatch_event(&mut event);
               !event.bubbling_canceled()
             },
             QueryOrder::OutsideFirst,
@@ -209,6 +201,12 @@ impl PointerDispatcher {
       });
     }
     hit
+  }
+
+  fn pointer_event_for_hit_widget(&self, ctx: &Context) -> Option<PointerEvent> {
+    self.hit_widget(ctx).map(|(target, pos)| {
+      PointerEvent::from_mouse(target, pos, self.cursor_pos, self.mouse_button.1, ctx)
+    })
   }
 }
 
@@ -410,7 +408,6 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
@@ -460,8 +457,6 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      #[widget]
-
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
@@ -541,7 +536,6 @@ mod tests {
     struct ClickPath(Rc<RefCell<i32>>);
 
     impl Compose for ClickPath {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare Row {
@@ -638,7 +632,6 @@ mod tests {
     struct T;
 
     impl Compose for T {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare Row {

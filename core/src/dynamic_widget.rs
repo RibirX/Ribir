@@ -20,7 +20,7 @@ pub(crate) trait DynamicWidgetGenerator {
 /// ExprChild is a virtual child used in `widget!`, which use to generate
 /// dynamic widgets and provide ability to keep them up to date in their
 /// lifetime.
-pub struct ExprChild<G> {
+pub struct ExprWidget<G> {
   info: GenerateInfo,
   generator: G,
 }
@@ -137,7 +137,7 @@ where
   impl_query_type!(info, widget);
 }
 
-impl<G: FnMut() -> W, W> ExprChild<G> {
+impl<G: FnMut() -> W, W> ExprWidget<G> {
   pub fn new(ctx: &mut BuildCtx, generator: G) -> Self {
     Self {
       info: ctx.new_generator_info(),
@@ -154,7 +154,7 @@ impl<G: FnMut() -> W, W> ExprChild<G> {
   }
 }
 
-impl<G, W> DynamicWidgetGenerator for ExprChild<G>
+impl<G, W> DynamicWidgetGenerator for ExprWidget<G>
 where
   G: FnMut() -> W,
   W: IntoIterator<Item = BoxedWidget>,

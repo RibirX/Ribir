@@ -1,16 +1,24 @@
 use crate::prelude::*;
-use std::{
-  cell::{Cell, RefCell},
-  rc::Rc,
-};
+use std::{cell::Cell, rc::Rc};
 use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 
 #[derive(Declare, Debug)]
 pub struct Cursor {
-  #[declare(custom_convert)]
+  #[declare(custom_convert, builtin)]
   cursor: Rc<Cell<CursorIcon>>,
+}
+
+impl Render for Cursor {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let child = ctx.single_child().expect("`Margin` must have single child");
+    ctx.perform_child_layout(child, clamp)
+  }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl SingleChildWidget for Cursor {
@@ -38,7 +46,7 @@ impl SingleChildWidget for Cursor {
 
 impl CursorBuilder {
   #[inline]
-  pub fn cursor_convert(icon: CursorIcon) -> Rc<RefCell<CursorIcon>> { Rc::new(RefCell::new(icon)) }
+  pub fn cursor_convert(icon: CursorIcon) -> Rc<Cell<CursorIcon>> { Rc::new(Cell::new(icon)) }
 }
 
 impl Cursor {

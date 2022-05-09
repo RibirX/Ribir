@@ -58,7 +58,7 @@ impl Render for GridView {
     let mut idx = 0;
     for child in children {
       ctx.update_position(child, self.calc_child_pos(idx));
-      ctx.perform_render_child_layout(
+      ctx.perform_child_layout(
         child,
         BoxClamp {
           min: Size::new(self.child_x_extent, self.child_y_extent),

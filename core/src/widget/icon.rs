@@ -6,13 +6,12 @@ pub struct Icon {
   pub size: Size,
 }
 
-impl StatefulCombination for Icon {
-  fn build(this: &Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
-    let Size { width, height, .. } = this.size;
-    let svg = Svg::new(load_src(this.src).unwrap());
+impl Compose for Icon {
+  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
+    let svg = Svg::new(load_src(self.src).unwrap());
     widget! {
       declare SizedBox {
-        size: Size::new(width, height),
+        size: self.size,
         ExprChild { svg }
       }
     }

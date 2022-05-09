@@ -23,17 +23,10 @@ pub(crate) struct WidgetTree {
   changed_widget: HashMap<WidgetId, WidgetChangeFlags, ahash::RandomState>,
 }
 
-struct PlaceHolder;
-impl Render for PlaceHolder {
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> painter::Size { unreachable!() }
-  fn only_sized_by_parent(&self) -> bool { unreachable!() }
-  fn paint(&self, _: &mut PaintingCtx) { unreachable!() }
-}
-
 impl WidgetTree {
   pub(crate) fn new() -> Pin<Box<Self>> {
     let mut arena = Arena::default();
-    let node: Box<dyn RenderNode> = Box::new(PlaceHolder);
+    let node: Box<dyn RenderNode> = Box::new(Empty);
     let root = WidgetId(arena.new_node(node));
     let tree = Self {
       arena,
@@ -53,7 +46,7 @@ impl WidgetTree {
     self.root = new_root;
   }
 
-  pub(crate) fn place_holder(&mut self) -> WidgetId { self.new_node(Box::new(PlaceHolder)) }
+  pub(crate) fn place_holder(&mut self) -> WidgetId { self.new_node(Box::new(Empty)) }
 
   pub(crate) fn new_node(&mut self, widget: Box<dyn RenderNode>) -> WidgetId {
     let id = WidgetId(self.arena.new_node(widget));
@@ -196,23 +189,6 @@ impl WidgetId {
 
   pub(crate) fn append(self, child: WidgetId, tree: &mut WidgetTree) {
     self.0.append(child.0, &mut tree.arena);
-  }
-
-  pub(crate) fn insert_next_widget(self, widget: BoxedWidget, ctx: &mut Context) -> WidgetId {
-    let parent = self.parent(ctx.tree()).unwrap();
-
-    parent.insert_child(
-      widget,
-      |node, tree| {
-        let wid = tree.new_node(node);
-        self.insert_next(wid, tree);
-        wid
-      },
-      |id, w, ctx| {
-        id.append_widget(w, ctx);
-      },
-      ctx,
-    )
   }
 
   pub(crate) fn append_widget(self, widget: BoxedWidget, ctx: &mut Context) -> WidgetId {

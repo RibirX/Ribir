@@ -88,7 +88,6 @@ mod tests {
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for DarkLightThemes {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
@@ -122,7 +121,6 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for LightDarkThemes {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());

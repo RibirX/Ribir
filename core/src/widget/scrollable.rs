@@ -2,23 +2,26 @@ use crate::prelude::*;
 
 /// A widget let its child horizontal scrollable and the scroll view is as large
 /// as its parent allow.
-#[derive(SingleChildWidget, Default, Clone, PartialEq)]
+#[derive(Declare, Default, Clone, PartialEq)]
 pub struct ScrollableX {
-  pos: f32,
+  #[declare(default)]
+  pub pos: f32,
 }
 
 /// A widget let its child vertical scrollable and the scroll view is as large
 /// as its parent allow.
-#[derive(SingleChildWidget, Default, Clone, PartialEq)]
+#[derive(Declare, Default, Clone, PartialEq)]
 pub struct ScrollableY {
-  pos: f32,
+  #[declare(default)]
+  pub pos: f32,
 }
 
 /// A widget let its child both scrollable in horizontal and vertical, and the
 /// scroll view is as large as its parent allow.
-#[derive(SingleChildWidget, Default, Clone, PartialEq)]
+#[derive(Declare, Default, Clone, PartialEq)]
 pub struct ScrollableBoth {
-  pos: Point,
+  #[declare(default)]
+  pub pos: Point,
 }
 
 /// Enumerate to describe which direction allow widget to scroll.
@@ -31,60 +34,97 @@ pub enum Scrollable {
 }
 
 /// Helper struct for builtin scrollable field.
-#[derive(SingleChildWidget, Declare)]
-pub struct ScrollableDeclare {
+#[derive(Declare)]
+pub struct ScrollableWidget {
   #[declare(builtin)]
   scrollable: Scrollable,
 }
 
-impl ScrollableX {
+impl Render for ScrollableWidget {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp))
+      .unwrap_or_default()
+  }
+
   #[inline]
-  pub fn x_scroll(pos: f32) -> Stateful<ScrollableX> {
-    let scroll = ScrollableX { pos }.into_stateful();
-    let mut scroll_ref = unsafe { scroll.state_ref() };
-    scroll.on_wheel(move |event| {
-      let (view, content) = view_content(event);
-      let old = scroll_ref.pos;
-      let new = validate_pos(view.width(), content.width(), old - event.delta_x);
-      if (new - old).abs() > f32::EPSILON {
-        scroll_ref.pos = new;
-      }
-    })
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl SingleChildWidget for ScrollableWidget {
+  fn have_child<C: IntoOptionChild<M> + 'static, M>(self, child: C) -> SingleChild<Self> {
+    // todo: stateful self to generate different widget?
+
+    let child = match self.scrollable {
+      Scrollable::X => widget! { declare ScrollableX { ExprChild {child}} },
+      Scrollable::Y => widget! { declare ScrollableY { ExprChild {child}} },
+      Scrollable::Both => widget! { declare ScrollableBoth { ExprChild {child}} },
+    };
+    SingleChild { widget: self, child: Some(child) }
   }
 }
 
-impl ScrollableY {
-  #[inline]
-  pub fn y_scroll(pos: f32) -> Stateful<ScrollableY> {
-    let scroll = ScrollableY { pos }.into_stateful();
-    let mut scroll_ref = unsafe { scroll.state_ref() };
-    scroll.on_wheel(move |event| {
-      let (view, content) = view_content(event);
-      let old = scroll_ref.pos;
-      let new = validate_pos(view.height(), content.height(), old - event.delta_y);
-      if (new - old).abs() > f32::EPSILON {
-        scroll_ref.pos = new;
-      }
-    })
+impl SingleChildWidget for ScrollableX {
+  fn have_child<C: IntoOptionChild<M> + 'static, M>(mut self, child: C) -> SingleChild<Self> {
+    let child = widget! {
+        declare Empty {
+          // todo: track self
+          on_wheel: move |e| {
+            let (view, content) = view_content(e);
+            let old = self.pos;
+            let new = validate_pos(view.width(), content.width(), old - e.delta_x);
+            if (new - old).abs() > f32::EPSILON {
+              self.pos = new;
+            }
+          },
+          ExprChild { child }
+        }
+    };
+    SingleChild { widget: self, child: Some(child) }
   }
 }
 
-impl ScrollableBoth {
-  #[inline]
-  pub fn both_scroll(pos: Point) -> Stateful<ScrollableBoth> {
-    let scroll = ScrollableBoth { pos }.into_stateful();
-    let mut scroll_ref = unsafe { scroll.state_ref() };
-    scroll.on_wheel(move |event| {
-      let (view, content) = view_content(event);
-      let old = scroll_ref.pos;
-      let new = Point::new(
-        validate_pos(view.width(), content.width(), old.x - event.delta_x),
-        validate_pos(view.height(), content.height(), old.y - event.delta_y),
-      );
-      if new != old {
-        scroll_ref.pos = new;
+impl SingleChildWidget for ScrollableY {
+  fn have_child<C: IntoOptionChild<M> + 'static, M>(mut self, child: C) -> SingleChild<Self> {
+    let child = widget! {
+      declare Empty {
+        // todo: track self
+        on_wheel: move |event| {
+          let (view, content) = view_content(event);
+          let old = self.pos;
+          let new = validate_pos(view.height(), content.height(), old - event.delta_y);
+          if (new - old).abs() > f32::EPSILON {
+            self.pos = new;
+          }
+        },
+        ExprChild { child }
       }
-    })
+    };
+    SingleChild { widget: self, child: Some(child) }
+  }
+}
+
+impl SingleChildWidget for ScrollableBoth {
+  fn have_child<C: IntoOptionChild<M> + 'static, M>(mut self, child: C) -> SingleChild<Self> {
+    let child = widget! {
+      declare Empty  {
+        // todo: track self
+        on_wheel: move |event| {
+          let (view, content) = view_content(event);
+          let old = self.pos;
+          let new = Point::new(
+            validate_pos(view.width(), content.width(), old.x - event.delta_x),
+            validate_pos(view.height(), content.height(), old.y - event.delta_y),
+          );
+          if new != old {
+            self.pos = new;
+          }
+        },
+        ExprChild { child }
+      }
+    };
+    SingleChild { widget: self, child: Some(child) }
   }
 }
 
@@ -94,7 +134,7 @@ macro scroll_render_widget_impl($widget: ty, $state: ty) {
       let size = clamp.max;
       if let Some(child) = ctx.single_child() {
         let content_clamp = self.content_clamp(clamp);
-        let content = ctx.perform_render_child_layout(child, content_clamp);
+        let content = ctx.perform_child_layout(child, content_clamp);
         let pos = self.content_pos(content, &size);
         ctx.update_position(child, pos);
       }
@@ -191,28 +231,6 @@ fn view_content(event: &WheelEvent) -> (Rect, Rect) {
   (view, content)
 }
 
-impl BoxWidget<RenderMarker> for SingleChild<ScrollableDeclare> {
-  fn box_it(self) -> BoxedWidget {
-    match self.scrollable {
-      Scrollable::X => SingleChild {
-        widget: ScrollableX::x_scroll(0.),
-        child: self.child,
-      }
-      .box_it(),
-      Scrollable::Y => SingleChild {
-        widget: ScrollableY::y_scroll(0.),
-        child: self.child,
-      }
-      .box_it(),
-      Scrollable::Both => SingleChild {
-        widget: ScrollableBoth::both_scroll(Point::zero()),
-        child: self.child,
-      }
-      .box_it(),
-    }
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -221,7 +239,6 @@ mod tests {
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
     impl Compose for Scrollable {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {

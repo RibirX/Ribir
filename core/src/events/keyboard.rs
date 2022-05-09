@@ -1,11 +1,4 @@
 use crate::prelude::*;
-use rxrust::prelude::*;
-use std::ptr::NonNull;
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub enum KeyboardEventType {
-  KeyDown,
-  KeyUp,
-}
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -14,38 +7,91 @@ pub struct KeyboardEvent {
   pub common: EventCommon,
 }
 
-/// An attributes that fire event whenever press or release a key.
-#[derive(Default)]
-pub struct KeyboardAttr(LocalSubject<'static, (KeyboardEventType, NonNull<KeyboardEvent>), ()>);
+/// Widget fire event whenever press or release a key.
+#[derive(Declare, SingleChildWidget)]
+pub struct KeyDownListener {
+  #[declare(builtin, custom_convert)]
+  on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
+}
 
-impl KeyboardAttr {
+#[derive(Declare, SingleChildWidget)]
+pub struct KeyUpListener {
+  #[declare(builtin, custom_convert)]
+  on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
+}
+
+impl KeyDownListener {
   #[inline]
-  pub fn dispatch_event(&self, event_type: KeyboardEventType, event: &mut KeyboardEvent) {
-    self.0.clone().next((event_type, NonNull::from(event)))
+  pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_down)(event) }
+}
+
+impl KeyUpListener {
+  #[inline]
+  pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
+}
+
+impl Render for KeyDownListener {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp))
+      .unwrap_or_default()
   }
 
-  pub fn listen_on<H: FnMut(&KeyboardEvent) + 'static>(
-    &self,
-    event_type: KeyboardEventType,
-    mut handler: H,
-  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
-    self
-      .0
-      .clone()
-      .filter(move |(t, _)| *t == event_type)
-      // Safety: Inner pointer from a mut reference and pass to handler one by one.
-      .subscribe(move |(_, mut event)| handler(unsafe { event.as_mut() }))
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Render for KeyUpListener {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp))
+      .unwrap_or_default()
+  }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl KeyDownListenerBuilder {
+  #[inline]
+  pub fn on_key_down_convert(
+    f: impl for<'r> FnMut(&'r mut KeyboardEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)> {
+    Box::new(f)
   }
 }
 
-impl std::convert::AsRef<EventCommon> for KeyboardEvent {
+impl KeyUpListenerBuilder {
   #[inline]
-  fn as_ref(&self) -> &EventCommon { &self.common }
+  pub fn on_key_up_convert(
+    f: impl for<'r> FnMut(&'r mut KeyboardEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)> {
+    Box::new(f)
+  }
 }
 
-impl std::convert::AsMut<EventCommon> for KeyboardEvent {
+impl std::borrow::Borrow<EventCommon> for KeyboardEvent {
   #[inline]
-  fn as_mut(&mut self) -> &mut EventCommon { &mut self.common }
+  fn borrow(&self) -> &EventCommon { &self.common }
+}
+
+impl std::borrow::BorrowMut<EventCommon> for KeyboardEvent {
+  #[inline]
+  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
+}
+
+impl std::ops::Deref for KeyboardEvent {
+  type Target = EventCommon;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.common }
+}
+
+impl std::ops::DerefMut for KeyboardEvent {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
 #[cfg(test)]
@@ -74,7 +120,6 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      #[widget]
       fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
         let down_keys = self.0.clone();
         let up_keys = self.0.clone();
