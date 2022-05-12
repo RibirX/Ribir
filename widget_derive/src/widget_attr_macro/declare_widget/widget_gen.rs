@@ -1,8 +1,10 @@
+use std::collections::HashSet;
+
 use crate::{
   declare_derive::field_convert_method,
   widget_attr_macro::{
-    field_guard_variable, ribir_variable, skip_nc_assign, widget_def_variable, DeclareCtx,
-    BUILD_CTX,
+    capture_widgets, field_guard_variable, ribir_variable, skip_nc_assign, state_refs,
+    widget_def_variable, DeclareCtx, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
@@ -37,24 +39,33 @@ impl<'a> WidgetGen<'a> {
     let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
     let build_widget = {
       let mut_token = (!fields_with_guard.is_empty()).then(|| quote! {mut});
-      let without_guard_tokens = fields_without_guard
+      let without_guard_fields = fields_without_guard
         .iter()
         .map(|f| f.build_tokens_without_guard(ty));
 
-      if fields_with_guard.is_empty() {
+      let with_guard_tokens = fields_with_guard
+        .iter()
+        .map(|f| f.build_tokens_with_guard(&def_name, ty));
+      let build_tokens = quote! {
+        let #mut_token #def_name = <#ty as Declare>::builder()#(#without_guard_fields)*;
+        #(#with_guard_tokens)*
+      };
+
+      let used_widgets = self.widget_used_names();
+      if used_widgets.is_empty() {
         quote_spanned! { ty.span() =>
-          let #mut_token #def_name = <#ty as Declare>::builder()
-            #(#without_guard_tokens)*.build(#build_ctx)#stateful;
+          #build_tokens
+          let #def_name = #def_name.build(#build_ctx)#stateful;
         }
       } else {
-        let with_guard_tokens = fields_with_guard
-          .iter()
-          .map(|f| f.build_tokens_with_guard(&def_name, ty));
-
+        let used_widgets = used_widgets.iter();
         quote_spanned! { ty.span() =>
-          let #mut_token #def_name = <#ty as Declare>::builder()#(#without_guard_tokens)*;
-          #(#with_guard_tokens)*
-          let #def_name = #def_name.build(#build_ctx)#stateful;
+          let #def_name = {
+            #[allow(unused_mut)]
+            let #(mut #used_widgets = #used_widgets.state_ref())*;
+            #build_tokens
+            #def_name.build(#build_ctx)#stateful
+          };
         }
       }
     };
@@ -92,7 +103,14 @@ impl<'a> WidgetGen<'a> {
         &expr_tokens,
       );
       let upstream = upstream_observable(follows);
-      let mut tokens = quote! { #upstream.subscribe( move |_|{ #assign } );};
+      let capture_widgets = f.capture_widgets();
+      let state_refs = f.state_refs();
+      let mut tokens = quote_spanned! { f.span() =>
+        #upstream.subscribe( {
+          #(#capture_widgets)*
+          move |_|{ #(#state_refs)*  #assign }
+        });
+      };
       if let Some(if_guard) = if_guard {
         let guard_cond = field_guard_variable(member, if_guard.span());
         tokens = quote! { if #guard_cond { #tokens } }
@@ -109,6 +127,15 @@ impl<'a> WidgetGen<'a> {
       .fields
       .iter()
       .any(|f| f.follows.is_some())
+  }
+
+  fn widget_used_names(&self) -> HashSet<&Ident, ahash::RandomState> {
+    self
+      .fields
+      .iter()
+      .filter_map(|f| f.follows.as_ref())
+      .flat_map(|f| f.iter().map(|fo| &fo.widget))
+      .collect()
   }
 }
 
@@ -136,5 +163,19 @@ impl DeclareField {
         #builder = #builder.#member(#value);
       }
     }
+  }
+
+  fn state_refs(&self) -> impl Iterator<Item = TokenStream> + '_ {
+    self
+      .follows
+      .iter()
+      .flat_map(|follows| state_refs(follows.iter().map(|f| (&f.widget, f.spans.as_slice()))))
+  }
+
+  pub fn capture_widgets(&self) -> impl Iterator<Item = TokenStream> + '_ {
+    self
+      .follows
+      .iter()
+      .flat_map(|follows| capture_widgets(follows.iter().map(|f| (&f.widget, f.spans.as_slice()))))
   }
 }

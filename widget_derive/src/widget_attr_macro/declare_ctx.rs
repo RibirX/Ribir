@@ -5,15 +5,18 @@ use crate::{
 };
 
 use super::{
-  declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, FollowOn, WidgetMacro,
-  DECLARE_WRAP_MACRO,
+  capture_widgets, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, state_refs,
+  FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
 };
 
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::collections::{HashMap, HashSet};
-use syn::{parse_quote, visit_mut, visit_mut::VisitMut, Expr, Ident, ItemMacro, Member};
+use syn::{
+  parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident,
+  ItemMacro, Member,
+};
 
 #[derive(Default)]
 pub struct DeclareCtx {
@@ -28,6 +31,7 @@ pub struct DeclareCtx {
   /// Some wrap widget (like margin, padding) implicit defined by user, shared
   /// the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
+  // todo: all should be capture;
   id_capture_scope: Vec<bool>,
 }
 
@@ -69,6 +73,25 @@ impl VisitMut for DeclareCtx {
           }
         }
       }
+      Expr::Closure(c) => {
+        let old = std::mem::take(&mut self.current_follows);
+        visit_mut::visit_expr_closure_mut(self, c);
+        if !self.current_follows.is_empty() {
+          let used_widgets = self
+            .current_follows
+            .iter()
+            .map(|(w, spans)| (w, spans.as_slice()));
+          let used_widgets2 = used_widgets.clone();
+
+          let body = &c.body;
+          let refs = state_refs(used_widgets);
+          c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
+
+          let captures = capture_widgets(used_widgets2);
+          *expr = parse_quote_spanned! { c.span() =>  { #(#captures)* #c }};
+        }
+        self.current_follows = old;
+      }
       _ => {
         visit_mut::visit_expr_mut(self, expr);
       }
@@ -85,7 +108,7 @@ impl VisitMut for DeclareCtx {
         }
       };
       if mac.path.is_ident(WIDGET_MACRO_NAME) {
-        let res = self.expand_widget_macro(quote! {#mac});
+        let res = self.expand_widget_macro(mac.tokens.clone());
         *i = expr_to_stmt(unwrap_expr(res));
         return;
       } else if mac.path.is_ident(DECLARE_WRAP_MACRO) {
@@ -259,10 +282,7 @@ impl DeclareCtx {
       self
         .current_follows
         .drain()
-        .map(|(widget, spans)| FollowOn {
-          widget,
-          spans: spans.into_iter().collect(),
-        })
+        .map(|(widget, spans)| FollowOn { widget, spans })
         .collect()
     })
   }

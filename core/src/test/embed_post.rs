@@ -16,7 +16,7 @@ impl EmbedPost {
   pub fn new(level: usize) -> Self {
     EmbedPost {
       title: "Simple demo",
-      author: "Adoo",
+      author: "Ribir",
       content: "Recursive x times",
       level,
     }
@@ -24,19 +24,16 @@ impl EmbedPost {
 }
 
 impl Compose for EmbedPost {
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
+      track { this }
       declare Row {
         v_align: CrossAxisAlign::Start,
-        Text { text: self.title }
-        Text { text: self.author }
-        Text { text: self.content }
-        ExprChild {
-          (self.level >0).then(||{
-            let mut embed = self.clone();
-            embed.level -= 1;
-            embed
-          })
+        Text { text: this.title }
+        Text { text: this.author }
+        Text { text: this.content }
+        ExprWidget {
+          (this.level > 0).then(move || EmbedPost::new(this.leave - 1 ))
         }
       }
     }

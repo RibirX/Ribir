@@ -125,11 +125,6 @@ impl<W: Render, Info> Render for AssociatedGenerator<W, Info> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.widget.paint(ctx) }
 }
 
-impl<C: Compose, Info> Compose for AssociatedGenerator<C, Info> {
-  #[inline]
-  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget { self.widget.compose(ctx) }
-}
-
 impl<W, Info> QueryType for AssociatedGenerator<W, Info>
 where
   Self: Any,
@@ -159,6 +154,8 @@ where
   G: FnMut() -> W,
   W: IntoIterator<Item = BoxedWidget>,
 {
+  // todo: update method can provide by use case? like margin with if
+  // guard, can directly replace widget not instead of whole subtree.
   #[inline]
   fn update_generated_widgets(&mut self, ctx: &mut Context) {
     let new_widgets_iter = self.generator();

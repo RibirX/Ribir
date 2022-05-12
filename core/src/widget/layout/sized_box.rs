@@ -44,40 +44,28 @@ mod tests {
 
   #[test]
   fn fix_size() {
-    const SIZE: Size = Size::new(100., 100.);
-    struct T;
-    impl Compose for T {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        widget! {
-          declare SizedBox {
-            size:SIZE,
-            Text { text: "" }
-          }
-        }
+    let size: Size = Size::new(100., 100.);
+    let w = widget! {
+      declare SizedBox {
+        size,
+        Text { text: "" }
       }
-    }
+    };
 
-    let (rect, child) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
-    assert_eq!(rect.size, SIZE);
-    assert_eq!(child, vec![Rect::from_size(SIZE)]);
+    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
+    assert_eq!(rect.size, size);
+    assert_eq!(child, vec![Rect::from_size(size)]);
   }
 
   #[test]
   fn shrink_size() {
-    struct Shrink;
-
-    impl Compose for Shrink {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        widget! {
-          declare SizedBox {
-            size: SizedBox::shrink_size(),
-            Text { text: "" }
-          }
-        }
+    let w = widget! {
+      declare SizedBox {
+        size: SizedBox::shrink_size(),
+        Text { text: "" }
       }
-    }
-
-    let (rect, child) = widget_and_its_children_box_rect(Shrink.box_it(), Size::new(500., 500.));
+    };
+    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
 
     assert_eq!(rect.size, Size::zero());
     assert_eq!(child, vec![Rect::zero()]);

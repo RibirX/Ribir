@@ -7,16 +7,17 @@ pub struct RecursiveRow {
 }
 
 impl Compose for RecursiveRow {
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
+      track { this }
       declare Row {
-        ExprChild {
-          (0..self.width)
+        ExprWidget {
+          (0..this.width)
             .map(|_| {
-              if self.depth > 1 {
+              if this.depth > 1 {
                 RecursiveRow {
-                  width: self.width,
-                  depth: self.depth - 1,
+                  width: this.width,
+                  depth: this.depth - 1,
                 }
                 .box_it()
               } else {

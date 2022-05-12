@@ -80,11 +80,12 @@
 //! Notice, the first argument of `build` method is `Stateful<Self>` let you can
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
-use crate::{prelude::*, widget::widget_tree::WidgetTree};
+use crate::prelude::*;
 use rxrust::prelude::*;
-use std::{cell::Cell, pin::Pin, ptr::NonNull};
-
-use super::widget_tree::WidgetChangeFlags;
+use std::{
+  cell::{RefCell, RefMut},
+  rc::Rc,
+};
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
@@ -97,241 +98,150 @@ pub trait IntoStateful {
 /// stateful widget. Tracked the state change across if user mutable reference
 /// the `StateRef` and trigger state change notify and require `ribir` to
 /// rebuild or relayout inner widget.
-pub struct StateRef<W>(NonNull<StatefulInner<W>>);
+pub struct StateRef<'a, W> {
+  inner_ref: RefMut<'a, W>,
+  guard: StateRefGuard,
+}
 
 /// A reference of stateful widget, tracked the state change across if user
 /// mutable reference the `SilentRef`. If mutable reference occur, state change
 /// notify will trigger, but not effect the inner widget relayout or rebuild.
 ///
 /// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
-pub struct SilentRef<W>(NonNull<StatefulInner<W>>);
-
-/// A reference of stateful widget, tracked the relayout or rebuild if user
-/// mutable reference the `ShallowRef`, but state change notify will not
-/// trigger. Now used in animation's render change, which is just a
-/// temporary change in render and not expect to change the data.
-/// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
-pub struct ShallowRef<W>(NonNull<StatefulInner<W>>);
+pub struct SilentRef<'a, W> {
+  inner_ref: RefMut<'a, W>,
+  guard: SilentRefGuard,
+}
 
 /// The stateful widget generic implementation.
-pub struct Stateful<W>(Pin<Box<StatefulInner<W>>>);
-
-struct StatefulInner<W> {
-  widget: W,
-  info: StateInfo,
+pub struct Stateful<W> {
+  widget: Rc<RefCell<W>>,
+  change_notifier: ChangeNotifier,
 }
+
+#[derive(Default, Clone)]
+pub(crate) struct ChangeNotifier(Rc<RefCell<LocalSubject<'static, bool, ()>>>);
+
+struct StateRefGuard {
+  accessed: bool,
+  notifier: ChangeNotifier,
+}
+
+struct SilentRefGuard {
+  accessed: bool,
+  notifier: ChangeNotifier,
+}
+
 #[derive(Clone)]
 pub struct StateChange<T: Clone> {
   pub before: T,
   pub after: T,
 }
-// todo: needn't hold widget tree, but widget tree listen on stateful widget
-// change notify.
-pub(crate) struct TreeInfo {
-  // use rc pointer replace NonNull pointer
-  pub tree: NonNull<widget_tree::WidgetTree>,
-  pub id: WidgetId,
-}
 
-#[derive(Default)]
-pub(crate) struct StateInfo {
-  pub(crate) tree_info: Option<TreeInfo>,
-  subject: Option<LocalSubject<'static, (), ()>>,
-  during_build: Cell<bool>,
+impl<W> Clone for Stateful<W> {
+  #[inline]
+  fn clone(&self) -> Self {
+    Self {
+      widget: self.widget.clone(),
+      change_notifier: self.change_notifier.clone(),
+    }
+  }
 }
-
-impl<W> Clone for SilentRef<W> {
-  fn clone(&self) -> Self { Self(self.0) }
-}
-
-impl<W> Clone for StateRef<W> {
-  fn clone(&self) -> Self { Self(self.0) }
-}
-
-impl<W> Clone for ShallowRef<W> {
-  fn clone(&self) -> Self { Self(self.0) }
-}
-
-impl<W> Copy for StateRef<W> {}
-impl<W> Copy for SilentRef<W> {}
-impl<W> Copy for ShallowRef<W> {}
 
 impl<W> Stateful<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
   // want [`into_stateful`](IntoStateful::into_stateful)
   pub fn new(widget: W) -> Self {
-    let info = StateInfo::default();
-    Stateful(Box::pin(StatefulInner { widget, info }))
+    Stateful {
+      widget: Rc::new(RefCell::new(widget)),
+      change_notifier: <_>::default(),
+    }
   }
 
-  /// Return a `StateRef` of the stateful widget, caller should careful not keep
-  /// it live not longer than its widget.
+  /// Return a `StateRef` of the stateful widget.
   #[inline]
-  pub unsafe fn state_ref(&self) -> StateRef<W> { StateRef(NonNull::from(&*self.0)) }
+  pub fn state_ref(&self) -> StateRef<W> {
+    StateRef {
+      inner_ref: self.widget.borrow_mut(),
+      guard: StateRefGuard {
+        accessed: false,
+        notifier: self.change_notifier.clone(),
+      },
+    }
+  }
 
-  /// Return a `SilentRef` of the stateful widget. Caller should careful not
-  /// keep it live not longer than its widget.
+  /// Return a `SilentMut` of the stateful widget.
   #[inline]
-  pub unsafe fn silent_ref(&self) -> SilentRef<W> { SilentRef(NonNull::from(&*self.0)) }
+  pub fn silent_ref(&self) -> SilentRef<W> {
+    SilentRef {
+      inner_ref: self.widget.borrow_mut(),
+      guard: SilentRefGuard {
+        accessed: false,
+        notifier: self.change_notifier.clone(),
+      },
+    }
+  }
 
+  /// Return a shallow reference to the stateful widget which modify the widget
+  /// and not notify state change.
   #[inline]
-  pub unsafe fn shallow_ref(&self) -> ShallowRef<W> { ShallowRef(NonNull::from(&*self.0)) }
+  pub fn shallow_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
 
-  /// Event emitted when this widget modified. No mather if the widget really
+  /// Notify when this widget be mutable accessed, no mather if the widget
+  /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()>
-  where
-    W: std::marker::Unpin,
-  {
-    self.0.as_mut().get_mut().info.state_subject()
+  pub fn change_stream(&self) -> LocalSubject<'static, bool, ()> {
+    self.change_notifier.0.borrow().clone()
   }
 
   /// Pick field change stream from the widget change
+
+  /// Pick field change stream from the widget change
   pub fn state_change<T: Clone + 'static>(
-    &mut self,
+    &self,
     pick: impl Fn(&W) -> T + 'static,
   ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
   where
     Self: 'static,
   {
-    let state_ref = unsafe { self.state_ref() };
-    state_ref.state_change(pick)
-  }
-}
-
-impl<W: 'static> StateRef<W> {
-  // convert a `StateRef` to `SilentRef`
-  #[inline]
-  pub fn silent(self) -> SilentRef<W> { SilentRef(self.0) }
-
-  #[inline]
-  pub fn shallow(self) -> ShallowRef<W> { ShallowRef(self.0) }
-
-  /// Event emitted when this widget modified. No mather if the widget really
-  #[inline]
-  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
-    unsafe { self.0.as_mut().info.state_subject() }
-  }
-
-  /// Pick field change stream from the widget change
-  pub fn state_change<T: Clone + 'static>(
-    mut self,
-    pick: impl Fn(&W) -> T + 'static,
-  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
-  where
-    Self: 'static,
-  {
-    let v = pick(&*self);
+    let v = pick(&self.state_ref());
     let init = StateChange { before: v.clone(), after: v };
+    let stateful = self.clone();
     self.change_stream().scan_initial(init, move |mut init, _| {
       init.before = init.after;
-      init.after = pick(&self);
+      init.after = pick(&stateful.state_ref());
       init
     })
   }
 }
 
-impl<W> SilentRef<W> {
-  #[inline]
-  pub fn change_stream(&mut self) -> LocalSubject<'static, (), ()> {
-    unsafe { self.0.as_mut().info.state_subject() }
-  }
-
-  /// Pick field change stream from the widget change
-  pub fn state_change<T: Clone + 'static>(
-    &mut self,
-    pick: impl Fn(&W) -> T + 'static,
-  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
-  where
-    Self: 'static,
-  {
-    StateRef(self.0).state_change(pick)
-  }
-}
-
-impl<W> std::ops::Deref for Stateful<W> {
+impl<'a, W> std::ops::Deref for SilentRef<'a, W> {
   type Target = W;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.0.widget }
+  fn deref(&self) -> &Self::Target { self.inner_ref.deref() }
 }
 
-impl<W: std::marker::Unpin> std::ops::DerefMut for Stateful<W> {
+impl<'a, W> std::ops::DerefMut for SilentRef<'a, W> {
   #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0.as_mut().get_mut().widget }
-}
-
-impl<W> std::ops::Deref for SilentRef<W> {
-  type Target = W;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { unsafe { &self.0.as_ref().widget } }
-}
-
-impl<W> std::ops::DerefMut for SilentRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    unsafe {
-      let inner = self.0.as_mut();
-      inner.info.record_change(WidgetChangeFlags::DIFFUSE);
-      &mut inner.widget
-    }
+    self.guard.accessed = true;
+    self.inner_ref.deref_mut()
   }
 }
 
-impl<W> std::ops::Deref for ShallowRef<W> {
+impl<'a, W> std::ops::Deref for StateRef<'a, W> {
   type Target = W;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { unsafe { &self.0.as_ref().widget } }
+  fn deref(&self) -> &Self::Target { self.inner_ref.deref() }
 }
 
-impl<W> std::ops::DerefMut for ShallowRef<W> {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    let inner = unsafe { self.0.as_mut() };
-    inner.info.record_change(WidgetChangeFlags::UNSILENT);
-    &mut inner.widget
-  }
-}
-
-impl<W> std::ops::Deref for StateRef<W> {
-  type Target = W;
-
+impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
   #[inline]
-  fn deref(&self) -> &Self::Target { unsafe { &self.0.as_ref().widget } }
-}
-
-impl<W> std::ops::DerefMut for StateRef<W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    let inner = unsafe { self.0.as_mut() };
-    inner.info.record_change(WidgetChangeFlags::ALL);
-    &mut inner.widget
-  }
-}
-
-impl StateInfo {
-  pub(crate) fn assign_id(&mut self, id: WidgetId, tree: NonNull<WidgetTree>) {
-    debug_assert!(self.tree_info.is_none());
-    self.tree_info = Some(TreeInfo { tree, id })
-  }
-
-  fn record_change(&mut self, flag: WidgetChangeFlags) {
-    if let Some(TreeInfo { mut tree, id }) = self.tree_info {
-      if self.during_build.get() {
-        log::warn!("Modify widget state during it build child is not allowed!");
-      } else {
-        unsafe { tree.as_mut() }.record_change(id, flag);
-      }
-    }
-  }
-
-  pub(crate) fn changed_notify(&mut self) {
-    if let Some(s) = self.subject.as_mut() {
-      s.next(())
-    }
-  }
-
-  fn state_subject(&mut self) -> LocalSubject<'static, (), ()> {
-    self.subject.get_or_insert_with(<_>::default).clone()
+    self.guard.accessed = true;
+    self.inner_ref.deref_mut()
   }
 }
 
@@ -339,36 +249,40 @@ impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
 
 impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
 
-impl<C: Compose + Clone + 'static> Compose for Stateful<C> {
+impl<W: Render> Render for Stateful<W> {
   #[inline]
-  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
-    // todo: track self
-    widget! {
-      declare Empty {
-        ExprChild { self.clone() }
-      }
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.state_ref().perform_layout(clamp, ctx)
+  }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { self.state_ref().only_sized_by_parent() }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
+}
+
+impl Drop for StateRefGuard {
+  fn drop(&mut self) {
+    if self.accessed {
+      self.notifier.0.borrow_mut().next(false)
     }
   }
 }
 
-impl<W: Render> Render for Stateful<W> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    (&**self).perform_layout(clamp, ctx)
+impl Drop for SilentRefGuard {
+  fn drop(&mut self) {
+    if self.accessed {
+      self.notifier.0.borrow_mut().next(true)
+    }
   }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { (&**self).only_sized_by_parent() }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { (&**self).paint(ctx) }
 }
 
 // Implement IntoStateful for all widget
 
 impl<W> IntoStateful for W
 where
-  Stateful<W>: Widget + 'static,
+  W: Widget + 'static,
 {
   type S = Stateful<W>;
   #[inline]
@@ -377,6 +291,8 @@ where
 
 #[cfg(test)]
 mod tests {
+  use lazy_static::__Deref;
+
   use super::*;
 
   #[test]
@@ -389,23 +305,27 @@ mod tests {
     }
     .into_stateful();
     {
-      unsafe { stateful.state_ref() }.text = "World!".into();
+      stateful.state_ref().text = "World!".into();
     }
-    assert_eq!(&*stateful.text, "World!");
+    assert_eq!(&*stateful.state_ref().text, "World!");
   }
 
   #[test]
   fn stateful_id_check() {
-    let stateful = Text {
-      text: "Hello".into(),
-      style: TextStyle::default(),
-    }
-    .into_stateful();
-    // now key widget inherit from stateful widget.
-    let key = stateful.with_key(1);
-    let ctx = Context::new(key.box_it(), 1., None);
+    let stateful = widget! {
+      declare Text {
+        text: "Hello",
+        style: TextStyle::default(),
+        key: 1,
+      }
+    };
+
+    let ctx = Context::new(stateful, 1., None);
     let tree = &ctx.widget_tree;
-    let key = tree.root().assert_get(tree).get_key();
+    let key = tree
+      .root()
+      .assert_get(tree)
+      .query_first_type::<Key>(QueryOrder::InnerFirst);
     assert!(key.is_some());
   }
 
@@ -426,7 +346,7 @@ mod tests {
       *c_changed_size.borrow_mut() = size.after;
     });
 
-    let mut state = unsafe { sized_box.state_ref() };
+    let mut state = sized_box.state_ref();
     let mut wnd = Window::without_render(sized_box.box_it(), Size::new(500., 500.));
     wnd.render_ready();
 
@@ -436,7 +356,7 @@ mod tests {
     {
       state.size = Size::new(1., 1.);
     }
-    wnd.context.state_change_dispatch();
+    wnd.context.tree_repair();
     assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(wnd.context.is_dirty(), true);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
@@ -444,57 +364,40 @@ mod tests {
 
   #[test]
   fn fix_pin_widget_node() {
-    #[derive(Debug)]
-    struct TestWidget;
-
-    impl Compose for TestWidget {
-      fn compose(&self, _: &mut BuildCtx) -> BoxedWidget {
-        SizedBox { size: Size::new(100., 100.) }
-          .into_stateful()
-          .box_it()
-      }
-    }
-
-    let mut wnd = Window::without_render(TestWidget.box_it(), Size::new(500., 500.));
+    let mut wnd = Window::without_render(
+      widget! { declare SizedBox { size: Size::new(100., 100.) } },
+      Size::new(500., 500.),
+    );
     wnd.render_ready();
     let tree = &wnd.context().widget_tree;
     assert_eq!(tree.root().descendants(tree).count(), 2);
   }
 
   #[test]
-  fn assigned_id_after_add_in_widget() {
+  fn change_notify() {
+    let notified = Rc::new(RefCell::new(vec![]));
     let w = SizedBox { size: Size::zero() }.into_stateful();
-    let state_ref = unsafe { w.silent_ref() };
-
-    let mut wnd = Window::without_render(w.box_it(), Size::new(500., 500.));
-
-    let state_attr = state_ref.find_attr::<StateInfo>();
-    assert!(state_attr.is_some());
-    assert!(state_attr.unwrap().tree_info.is_some());
-
-    // keep window live longer than `state_ref`
-    wnd.render_ready();
-  }
-
-  #[test]
-  fn state_ref_record() {
-    let w = SizedBox { size: Size::zero() }.into_stateful();
-    let mut silent_ref = unsafe { w.silent_ref() };
-    let mut state_ref = unsafe { w.state_ref() };
-    let mut tree = WidgetTree::new(Box::new(w));
+    w.change_stream()
+      .subscribe(|b| notified.borrow_mut().push(b));
 
     {
-      let _ = &mut state_ref.size;
-      let (_, silent) = tree.pop_changed_widgets().unwrap();
-      assert_eq!(silent, WidgetChangeFlags::ALL);
-      assert!(tree.pop_changed_widgets().is_none());
+      let _ = &mut w.state_ref().size;
     }
+    assert_eq!(notified.borrow().deref(), &[false]);
 
     {
-      let _ = &mut silent_ref.size;
-      let (_, silent) = tree.pop_changed_widgets().unwrap();
-      assert_eq!(silent, WidgetChangeFlags::DIFFUSE);
-      assert!(tree.pop_changed_widgets().is_none());
+      let _ = &mut w.silent_ref().size;
     }
+    assert_eq!(notified.borrow().deref(), &[false, true]);
+
+    {
+      let state_ref = w.state_ref();
+      let silent_ref = w.silent_ref();
+      &mut state_ref;
+      &mut state_ref;
+      &mut silent_ref;
+      &mut silent_ref;
+    }
+    assert_eq!(notified.borrow().deref(), &[false, true, false, true]);
   }
 }

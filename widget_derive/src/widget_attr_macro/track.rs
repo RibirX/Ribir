@@ -31,9 +31,9 @@ impl Parse for NameAlias {
     let _name: Ident = input.parse()?;
     let _colon_token: Option<token::Colon> = input.parse()?;
     let alias = if _colon_token.is_some() {
-      _name.clone()
-    } else {
       input.parse()?
+    } else {
+      _name.clone()
     };
     Ok(Self { _name, _colon_token, alias })
   }

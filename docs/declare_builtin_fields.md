@@ -12,6 +12,8 @@
  	 - assign a key to widget, use for track if two widget is same widget in two frames.
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.
+- theme : [`Theme`] 
+ 	 - assign theme to the widget.
 - on_pointer_down : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer down event.
 - on_pointer_up : [`impl FnMut(& mut PointerEvent)`] 
@@ -42,6 +44,8 @@
  	 - specify the event handler when keyboard press down.
 - on_key_up : [`impl FnMut(& mut KeyboardEvent)`] 
  	 - specify the event handler when a key is released.
+- on_char : [`impl FnMut(& mut CharEvent)`] 
+ 	 - specify the event handler when received a unicode character.
 - on_wheel : [`impl FnMut(& mut WheelEvent)`] 
  	 - specify the event handler when user moving a mouse wheel or similar input device.
 - scrollable : [`Scrollable`] 
@@ -60,6 +64,8 @@
 [`Key`]: prelude::Key
 
 [`CursorIcon`]: prelude::CursorIcon
+
+[`Theme`]: prelude::Theme
 
 [`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
 
@@ -90,6 +96,8 @@
 [`impl FnMut(& mut KeyboardEvent)`]: prelude::impl FnMut(& mut KeyboardEvent)
 
 [`impl FnMut(& mut KeyboardEvent)`]: prelude::impl FnMut(& mut KeyboardEvent)
+
+[`impl FnMut(& mut CharEvent)`]: prelude::impl FnMut(& mut CharEvent)
 
 [`impl FnMut(& mut WheelEvent)`]: prelude::impl FnMut(& mut WheelEvent)
 

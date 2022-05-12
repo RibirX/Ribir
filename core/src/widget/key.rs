@@ -6,7 +6,7 @@ use std::{
 
 /// `Key` help `Ribir` to track if two widget is a same widget in two frames.
 /// Abstract all builtin key into a same type.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, SingleChildWidget)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Key {
   Kusize(usize),
   Ku1(u8),
@@ -29,9 +29,9 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-#[derive(Declare)]
+#[derive(Declare, SingleChildWidget)]
 pub struct KeyWidget {
-  #[declare(builtin)]
+  #[declare(builtin, custom_convert)]
   pub key: Key,
 }
 
@@ -42,6 +42,11 @@ impl Render for KeyWidget {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl KeyWidgetBuilder {
+  #[inline]
+  pub fn key_convert<K: Into<Key>>(key: K) -> Key { key.into() }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {
@@ -140,36 +145,13 @@ impl_bytes_consume_by_hasher!(
 #[test]
 fn key_detect() {
   use crate::widget::*;
-  impl<W> AttrWidget<W> {
-    fn key(&self) -> Option<&Key> { self.attrs.find() }
-  }
-  let k1 = Text {
-    text: "".into(),
-    style: <_>::default(),
-  }
-  .with_key(0);
-  let k2 = Text {
-    text: "".into(),
-    style: <_>::default(),
-  }
-  .with_key(String::new());
-  let k3 = Text {
-    text: "".into(),
-    style: <_>::default(),
-  }
-  .with_key("");
-  let ck1 = Text {
-    text: "".into(),
-    style: <_>::default(),
-  }
-  .with_key(complex_key!("asd", true, 1));
-  let ck2 = Text {
-    text: "".into(),
-    style: <_>::default(),
-  }
-  .with_key(complex_key!("asd", true, 1));
-  assert!(k1.key() != k2.key());
-  assert!(k2.key() == k3.key());
-  assert!(k3.key() != k1.key());
-  assert!(ck1.key() == ck2.key());
+  let k1: Key = 0i32.into();
+  let k2: Key = String::new().into();
+  let k3: Key = "".into();
+  let ck1 = complex_key!("asd", true, 1);
+  let ck2 = complex_key!("asd", true, 1);
+  assert!(k1 != k2);
+  assert!(k2 == k3);
+  assert!(k3 != k1);
+  assert!(ck1 == ck2);
 }

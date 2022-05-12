@@ -11,15 +11,15 @@ struct Todos {
   tasks: Vec<Task>,
 }
 
-impl Compose for Stateful<Todos> {
-  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget {
-    let this_ref = unsafe { self.state_ref() };
+impl Compose for Todos {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
+      track { this }
       declare Column {
         h_align: CrossAxisAlign::Start,
-        ExprChild {
-          self.tasks.iter().enumerate().map(|(idx, task)|{
-            widget!{
+        ExprWidget {
+          this.tasks.iter().enumerate().map(|(idx, task)| {
+            widget! {
               declare Row {
                 margin: EdgeInsets::vertical(4.),
                 Checkbox{

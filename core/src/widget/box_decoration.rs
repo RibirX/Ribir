@@ -345,24 +345,19 @@ mod tests {
   #[test]
   fn layout() {
     const SIZE: Size = Size::new(100., 100.);
-    struct T;
-    impl Compose for T {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        widget! {
-          declare SizedBox {
-            size: SIZE,
-            border: Border {
-              left: BorderSide::new(1., Color::BLACK),
-              right: BorderSide::new(2., Color::BLACK),
-              top: BorderSide::new(3., Color::BLACK),
-              bottom: BorderSide::new(4., Color::BLACK),
-            },
-          }
-        }
+    let w = widget! {
+      declare SizedBox {
+        size: SIZE,
+        border: Border {
+          left: BorderSide::new(1., Color::BLACK),
+          right: BorderSide::new(2., Color::BLACK),
+          top: BorderSide::new(3., Color::BLACK),
+          bottom: BorderSide::new(4., Color::BLACK),
+        },
       }
-    }
+    };
 
-    let (rect, child) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
+    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
     assert_eq!(rect, Rect::from_size(Size::new(103., 107.)));
     assert_eq!(
       child,

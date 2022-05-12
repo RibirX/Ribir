@@ -57,9 +57,9 @@ impl SingleChildWidget for ScrollableWidget {
     // todo: stateful self to generate different widget?
 
     let child = match self.scrollable {
-      Scrollable::X => widget! { declare ScrollableX { ExprChild {child}} },
-      Scrollable::Y => widget! { declare ScrollableY { ExprChild {child}} },
-      Scrollable::Both => widget! { declare ScrollableBoth { ExprChild {child}} },
+      Scrollable::X => widget! { declare ScrollableX { ExprWidget {child}} },
+      Scrollable::Y => widget! { declare ScrollableY { ExprWidget {child}} },
+      Scrollable::Both => widget! { declare ScrollableBoth { ExprWidget {child}} },
     };
     SingleChild { widget: self, child: Some(child) }
   }
@@ -78,7 +78,7 @@ impl SingleChildWidget for ScrollableX {
               self.pos = new;
             }
           },
-          ExprChild { child }
+          ExprWidget { child }
         }
     };
     SingleChild { widget: self, child: Some(child) }
@@ -98,7 +98,7 @@ impl SingleChildWidget for ScrollableY {
             self.pos = new;
           }
         },
-        ExprChild { child }
+        ExprWidget { child }
       }
     };
     SingleChild { widget: self, child: Some(child) }
@@ -121,7 +121,7 @@ impl SingleChildWidget for ScrollableBoth {
             self.pos = new;
           }
         },
-        ExprChild { child }
+        ExprWidget { child }
       }
     };
     SingleChild { widget: self, child: Some(child) }
@@ -238,18 +238,14 @@ mod tests {
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
-    impl Compose for Scrollable {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        widget! {
-          declare SizedBox {
-            size: Size::new(1000., 1000.),
-            scrollable: *self,
-          }
-        }
-      }
-    }
+    let w = widget! {
+     declare SizedBox {
+       size: Size::new(1000., 1000.),
+       scrollable,
+     }
+    };
 
-    let mut wnd = Window::without_render(scrollable.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(w, Size::new(100., 100.));
 
     wnd.render_ready();
 

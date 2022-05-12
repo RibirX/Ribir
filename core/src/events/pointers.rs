@@ -113,7 +113,7 @@ macro_rules! impl_pointer_listener {
     #[derive(Declare, SingleChildWidget)]
     pub struct $name {
       #[declare(builtin, custom_convert)]
-      $field: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+      pub $field: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
     }
 
     impl $builder {
@@ -242,8 +242,13 @@ mod tests {
     let size = Size::new(400., 400.);
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
-    let sized_box = SizedBox { size }.on_tap_times(times, move |_| *c_count.borrow_mut() += 1);
-    let mut wnd = Window::without_render(sized_box.box_it(), size);
+    let w = widget! {
+      declare SizedBox {
+        size,
+        on_tap: TapListener::on_tap_times(times, move |_| *c_count.borrow_mut() += 1)
+      }
+    };
+    let mut wnd = Window::without_render(w, size);
     wnd.render_ready();
 
     (wnd, count)
