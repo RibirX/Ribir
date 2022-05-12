@@ -7,12 +7,12 @@ pub struct Icon {
 }
 
 impl Compose for Icon {
-  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
-    let svg = Svg::new(load_src(self.src).unwrap());
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+    let svg = Svg::new(load_src(this.state_ref().src).unwrap());
     widget! {
       declare SizedBox {
-        size: self.size,
-        ExprChild { svg }
+        size: this.state_ref().size,
+        ExprWidget { svg }
       }
     }
   }

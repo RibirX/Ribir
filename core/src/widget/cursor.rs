@@ -37,7 +37,7 @@ impl SingleChildWidget for Cursor {
                 ctx.set_cursor(c.get());
             }
           },
-          ExprChild { child }
+          ExprWidget { child }
         }
       }),
     }
@@ -78,7 +78,7 @@ mod tests {
   fn tree_down_up() {
     struct RowTree;
     impl Compose for RowTree {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
           declare SizedBox {
             size: Size::new(f32::INFINITY, f32::INFINITY),

@@ -218,22 +218,23 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer<W: AttachAttr>(
+  fn record_pointer(
     event_stack: Rc<RefCell<Vec<PointerEvent>>>,
-    widget: W,
-  ) -> W::Target
-  where
-    W::Target: AttachAttr<Target = W::Target>,
-  {
+    widget: BoxedWidget,
+  ) -> BoxedWidget {
     let handler_ctor = || {
       let stack = event_stack.clone();
       move |e: &mut PointerEvent| stack.borrow_mut().push(e.clone())
     };
-    widget
-      .on_pointer_down(handler_ctor())
-      .on_pointer_move(handler_ctor())
-      .on_pointer_up(handler_ctor())
-      .on_pointer_cancel(handler_ctor())
+    widget! {
+      declare Empty {
+        on_pointer_down : handler_ctor(),
+        on_pointer_move: handler_ctor(),
+        on_pointer_up: handler_ctor(),
+        on_pointer_cancel: handler_ctor(),
+        ExprWidget { widget }
+      }
+    }
   }
 
   #[test]
@@ -241,19 +242,19 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      Text {
-        text: "pointer event test".into(),
-        style: TextStyle::default(),
-      },
+      widget! { declare Text { text: "pointer event test" }},
     );
-    let root = record_pointer(event_record.clone(), Row::default()).have_child(record.box_it());
+    let root = record_pointer(
+      event_record.clone(),
+      widget! { declare Row { ExprWidget  { record } } },
+    );
     let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: (1, 1).into(),
+      position: (1., 1.).into(),
       modifiers: ModifiersState::default(),
     });
 
@@ -282,12 +283,9 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      Text {
-        text: "pointer event test".into(),
-        style: TextStyle::default(),
-      },
+      widget! { declare Text { text: "pointer event test" }},
     );
-    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -343,12 +341,9 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      Text {
-        text: "pointer event test".into(),
-        style: TextStyle::default(),
-      },
+      widget! { declare Text { text: "pointer event test"}},
     );
-    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -408,23 +403,18 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
+          track { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
-            on_pointer_down: {
-              let stack = self.0.clone();
-              move |e| stack.borrow_mut().push(e.clone())
-            },
+            on_pointer_down: move |e| this.0.borrow_mut().push(e.clone()),
             Text {
               text: "pointer event test",
               style: TextStyle::default(),
-              on_pointer_down: {
-                let stack = self.0.clone();
-                move |e| {
-                  stack.borrow_mut().push(e.clone());
-                  e.stop_bubbling();
-                }
+              on_pointer_down: move |e| {
+                this.0.borrow_mut().push(e.clone());
+                e.stop_bubbling();
               }
             }
           }
@@ -457,29 +447,19 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
+          track { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
-            on_pointer_enter: {
-              let enter_event = self.enter.clone();
-              move |_| enter_event.borrow_mut().push(2)
-            },
-            on_pointer_leave: {
-              let leave_event = self.leave.clone();
-              move |_| leave_event.borrow_mut().push(2)
-            },
+            on_pointer_enter: move |_| this.enter.borrow_mut().push(2),
+            on_pointer_leave: move |_| this.leave.borrow_mut().push(2),
             SizedBox {
               margin: EdgeInsets::all(4.),
               size: SizedBox::expanded_size(),
-              on_pointer_enter: {
-                let enter_event = self.enter.clone();
-                move |_| enter_event.borrow_mut().push(1)
-              },
-              on_pointer_leave: {
-                let leave_event = self.leave.clone();
-                move |_| leave_event.borrow_mut().push(1)
-              }
+              on_pointer_enter: move |_| this.enter.borrow_mut().push(1),
+              on_pointer_leave: move |_| this.leave.borrow_mut().push(1)
+
             }
           }
         }
@@ -536,24 +516,20 @@ mod tests {
     struct ClickPath(Rc<RefCell<i32>>);
 
     impl Compose for ClickPath {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
+          track { this }
           declare Row {
             v_align: CrossAxisAlign::Start,
-            on_tap: {
-              let click_path = self.0.clone();
-              move |_| {
-              let mut res = click_path.borrow_mut();
+            on_tap: move |_| {
+              let mut res = this.0.borrow_mut();
               *res += 1;
-            }},
+            },
             SizedBox {
               size: Size::new(100., 100.),
-              on_tap: {
-                let click_path = self.0.clone();
-                move |_| {
-                let mut res = click_path.borrow_mut();
+              on_tap: move |_| {
+                let mut res = this.0.borrow_mut();
                 *res += 1;
-                }
               }
             }
             SizedBox {
@@ -629,25 +605,18 @@ mod tests {
 
   #[test]
   fn focus_change_by_event() {
-    struct T;
-
-    impl Compose for T {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        widget! {
-          declare Row {
-            SizedBox {
-              size: Size::new(50., 50.),
-              tab_index: 0
-            }
-            SizedBox {
-              size: Size::new(50., 50.)
-            }
-          }
+    let w = widget! {
+      declare Row {
+        SizedBox {
+          size: Size::new(50., 50.),
+          tab_index: 0
+        }
+        SizedBox {
+          size: Size::new(50., 50.)
         }
       }
-    }
-
-    let mut wnd = Window::without_render(T.box_it(), Size::new(100., 100.));
+    };
+    let mut wnd = Window::without_render(w, Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };

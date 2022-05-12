@@ -61,7 +61,7 @@ mod tests {
   fn always_have_default_theme() {
     struct T;
     impl Compose for T {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         let _ = ctx.theme();
         panic!("Get a default theme from context");
       }
@@ -76,8 +76,12 @@ mod tests {
   }
 
   impl Compose for ThemeTrack {
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-      self.themes.borrow_mut().push(ctx.theme().clone());
+    fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      this
+        .shallow_ref()
+        .themes
+        .borrow_mut()
+        .push(ctx.theme().clone());
       SizedBox { size: Size::zero() }.box_it()
     }
   }
@@ -88,19 +92,20 @@ mod tests {
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for DarkLightThemes {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
 
         widget! {
+          track { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
             theme: dark.clone(),
             SizedBox {
               size: SizedBox::shrink_size(),
               theme: light.clone(),
-              ThemeTrack { themes: self.0.clone() }
+              ThemeTrack { themes: this.0.clone() }
             }
           }
         }
@@ -121,19 +126,20 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for LightDarkThemes {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
 
         widget! {
+          track { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
             theme: light,
             SizedBox {
               size: SizedBox::shrink_size(),
               theme: dark,
-              ThemeTrack { themes: self.0.clone() }
+              ThemeTrack { themes: this.0.clone() }
             }
           }
         }

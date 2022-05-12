@@ -100,17 +100,18 @@ impl ScrollBar {
 }
 
 impl Compose for ScrollBar {
-  fn compose(self, _: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+    let state = this.state_ref();
     widget! {
       declare ScrollBarTrack {
-        layout: self.info.clone(),
-        cross_width: self.track_width,
-        background: self.track_box.background.clone(),
+        layout: state.info.clone(),
+        cross_width: state.track_width,
+        background: state.track_box.background.clone(),
 
         ScrollBarThumb {
-          layout: self.info.clone(),
-          cross_width: self.thumb_width,
-          background: self.thumb_box.background.clone(),
+          layout: state.info.clone(),
+          cross_width: state.thumb_width,
+          background: state.thumb_box.background.clone(),
         }
       }
     }

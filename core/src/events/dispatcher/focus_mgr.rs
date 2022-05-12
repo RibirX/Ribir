@@ -175,16 +175,20 @@ impl FocusManager {
 mod tests {
   use super::*;
   use crate::widget::SizedBox;
-  use std::{cell::RefCell, ops::DerefMut, rc::Rc};
+  use std::{cell::RefCell, rc::Rc};
 
-  fn empty_box() -> SizedBox { SizedBox { size: Size::zero() } }
+  fn empty_box() -> BoxedWidget { SizedBox { size: Size::zero() }.box_it() }
 
   #[test]
   fn two_auto_focus() {
     // two auto focus widget
-    let widget = Row::default()
-      .have_child(empty_box().with_auto_focus(true).box_it())
-      .have_child(empty_box().with_auto_focus(true).box_it());
+    let size = Size::zero();
+    let widget = widget! {
+      declare Row  {
+        SizedBox { size, auto_focus: true, }
+        SizedBox { size, auto_focus: true, }
+      }
+    };
 
     let ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
@@ -198,9 +202,13 @@ mod tests {
   #[test]
   fn on_auto_focus() {
     // one auto focus widget
-    let widget = Row::default()
-      .have_child(empty_box().box_it())
-      .have_child(empty_box().with_auto_focus(true).box_it());
+    let size = Size::zero();
+    let widget = widget! {
+      declare Row {
+        SizedBox { size }
+        SizedBox { size, auto_focus: true}
+      }
+    };
 
     let ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
@@ -216,12 +224,16 @@ mod tests {
 
   #[test]
   fn tab_index() {
-    let widget = Row::default()
-      .have_child(empty_box().with_tab_index(-1).box_it())
-      .have_child(empty_box().with_tab_index(0).with_auto_focus(true).box_it())
-      .have_child(empty_box().with_tab_index(1).box_it())
-      .have_child(empty_box().with_tab_index(2).box_it())
-      .have_child(empty_box().with_tab_index(3).box_it());
+    let size = Size::zero();
+    let widget = widget! {
+      declare Row {
+        SizedBox { size, tab_index: -1, }
+        SizedBox { size, tab_index: 0, auto_focus: true }
+        SizedBox { size, tab_index: 1, }
+        SizedBox { size, tab_index: 2, }
+        SizedBox { size, tab_index: 3, }
+      }
+    };
 
     let mut ctx = Context::new(widget.box_it(), 1., None);
     let mut mgr = FocusManager::default();
@@ -254,46 +266,29 @@ mod tests {
   fn focus_event() {
     #[derive(Debug, Default)]
     struct EmbedFocus {
-      log: Rc<RefCell<Vec<String>>>,
+      log: Rc<RefCell<Vec<&'static str>>>,
     }
 
     impl Compose for EmbedFocus {
-      fn compose(&self, _: &mut BuildCtx) -> BoxedWidget {
-        let child = log_focus_event("child", empty_box(), self.log.clone());
-        log_focus_event(
-          "parent",
-          SizedBox { size: SizedBox::expanded_size() },
-          self.log.clone(),
-        )
-        .have_child(child.box_it())
-        .box_it()
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+        widget! {
+          track  { this }
+          declare SizedBox {
+            size: SizedBox::expanded_size(),
+            on_focus: move |_| this.log.borrow_mut().push("focus parent"),
+            on_blur: move |_| this.log.borrow_mut().push("blur parent"),
+            on_focus_in: move |_| this.log.borrow_mut().push("focusin parent"),
+            on_focus_out: move |_| this.log.borrow_mut().push("focusout parent"),
+            SizedBox {
+              size: Size::zero(),
+              on_focus: move |_| this.log.borrow_mut().push("focus child"),
+              on_blur: move |_| this.log.borrow_mut().push("blur child"),
+              on_focus_in: move |_| this.log.borrow_mut().push("focusin child"),
+              on_focus_out: move |_| this.log.borrow_mut().push("focusout child"),
+            }
+          }
+        }
       }
-    }
-
-    fn log_focus_event<A: AttachAttr>(
-      name: &'static str,
-      widget: A,
-      log: Rc<RefCell<Vec<String>>>,
-    ) -> A::Target
-    where
-      A::Target: AttachAttr<Target = A::Target>,
-    {
-      let log2 = log.clone();
-      let log3 = log.clone();
-      let log4 = log.clone();
-      widget
-        .on_focus(move |_| {
-          log.borrow_mut().push(format!("focus {}", name));
-        })
-        .on_blur(move |_| {
-          log2.borrow_mut().push(format!("blur {}", name));
-        })
-        .on_focus_in(move |_| {
-          log3.borrow_mut().push(format!("focusin {}", name));
-        })
-        .on_focus_out(move |_| {
-          log4.borrow_mut().push(format!("focusout {}", name));
-        })
     }
 
     let widget = EmbedFocus::default();
@@ -328,32 +323,5 @@ mod tests {
 
     mgr.blur(&mut ctx);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
-  }
-
-  #[test]
-  fn fix_dropped_focusing() {
-    struct T;
-
-    impl Compose for T {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        widget! {
-          declare SizedBox {
-            size: Size::zero(),
-            auto_focus: true,
-          }
-        }
-      }
-    }
-
-    let w = T.into_stateful();
-    let mut state_ref = unsafe { w.state_ref() };
-
-    let mut wnd = Window::without_render(w.box_it(), Size::new(10., 10.));
-    wnd.render_ready();
-
-    // let child drop
-    let _ = state_ref.deref_mut();
-
-    wnd.render_ready();
   }
 }

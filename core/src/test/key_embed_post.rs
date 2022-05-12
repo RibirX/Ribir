@@ -3,7 +3,7 @@ use crate::{
   prelude::*,
   widget::{layout::flex::CrossAxisAlign, Row},
 };
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Declare)]
 pub struct EmbedPostWithKey {
   author: &'static str,
   content: &'static str,
@@ -11,20 +11,26 @@ pub struct EmbedPostWithKey {
 }
 
 impl Compose for EmbedPostWithKey {
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
     widget! {
+      track { this }
       declare Row {
-        key: 0,
+        key: 0i32,
         v_align: CrossAxisAlign::Start,
-        Text { text: format!("Embed{} test title", self.level), key: 1}
-        Text { text: self.author, key: 2}
-        Text { text: self.content, key: 3}
-        ExprChild {
-          (self.level > 0).then(||{
-            let mut embed = self.clone();
-            embed.level -= 1;
-            embed.with_key("embed")
-          })
+        Text { text: format!("Embed{} test title", this.level), key: 1i32}
+          Text { text: this.author, key: 2i32}
+          Text { text: this.content, key: 3i32}
+          ExprWidget {
+            (this.level > 0).then(|| {
+                widget! {
+                  declare EmbedPostWithKey {
+                    key: "embed",
+                    author: this.author,
+                    content: this.content,
+                    level: this.leave - 1,
+                  }
+                }
+            })
         }
       }
     }

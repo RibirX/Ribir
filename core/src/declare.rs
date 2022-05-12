@@ -178,6 +178,7 @@ pub trait DeclareBuilder {
   fn build(self, ctx: &mut BuildCtx) -> Self::Target;
 }
 
+#[derive(Debug, PartialEq, Hash)]
 pub struct StripedOption<V, M> {
   pub value: Option<V>,
   _marker: PhantomData<M>,
@@ -200,21 +201,28 @@ impl<V> From<Option<V>> for StripedOption<V, V> {
 
 #[cfg(test)]
 mod tests {
+  use super::*;
   use painter::{Brush, Color};
 
   #[test]
   fn inner_value_into() {
     assert_eq!(
-      painter::Color::RED.striped(),
-      Some(Brush::Color(Color::RED))
+      StripedOption::from(Color::RED),
+      StripedOption {
+        value: Some(Brush::Color(Color::RED)),
+        _marker: PhantomData
+      }
     )
   }
 
   #[test]
   fn option_self_can_use_with_stripe() {
     assert_eq!(
-      Some(Brush::Color(Color::RED)).striped(),
-      Some(Brush::Color(Color::RED))
+      StripedOption::from(Some(Brush::Color(Color::RED))),
+      StripedOption {
+        value: Some(Brush::Color(Color::RED)),
+        _marker: PhantomData
+      }
     )
   }
 }

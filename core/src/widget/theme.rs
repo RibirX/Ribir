@@ -4,6 +4,10 @@
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
 pub mod material;
+use crate::prelude::{
+  BoxClamp, BuildCtx, Declare, DeclareBuilder, LayoutCtx, PaintingCtx, Render, SingleChildWidget,
+  WidgetCtx,
+};
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
@@ -107,6 +111,21 @@ pub struct Theme {
   pub checkbox: CheckboxTheme,
   pub scrollbar: ScrollBarTheme,
   pub icon: IconTheme,
+}
+
+#[derive(Declare, SingleChildWidget)]
+pub struct ThemeWidget {
+  #[declare(builtin)]
+  pub theme: Theme,
+}
+
+impl Render for ThemeWidget {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let child = ctx.single_child().expect("Key must have single child");
+    ctx.perform_child_layout(child, clamp)
+  }
+
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl TypographyTheme {

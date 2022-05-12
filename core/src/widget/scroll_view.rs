@@ -168,10 +168,10 @@ impl ScrollView {
     let mut scroll = ScrollableBoth { pos: Point::zero() }.into_stateful();
 
     let v_bar = ScrollBar::new(container.vertical.clone(), ctx).into_stateful();
-    let mut v_bar_ref = unsafe { v_bar.state_ref() };
+    let mut v_bar_ref = v_bar.state_ref();
 
     let h_bar = ScrollBar::new(container.horizontal.clone(), ctx).into_stateful();
-    let mut h_bar_ref = unsafe { h_bar.state_ref() };
+    let mut h_bar_ref = h_bar.state_ref();
 
     scroll
       .state_change(|w| w.offset_x())

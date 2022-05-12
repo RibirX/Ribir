@@ -1,5 +1,5 @@
-use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, ToTokens};
+use proc_macro2::{Span, TokenStream as TokenStream2};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
@@ -31,7 +31,7 @@ pub mod kw {
   syn::custom_keyword!(dataflows);
   syn::custom_keyword!(animations);
   syn::custom_keyword!(track);
-  syn::custom_keyword!(ExprChild);
+  syn::custom_keyword!(ExprWidget);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);
   syn::custom_keyword!(Animate);
@@ -99,4 +99,25 @@ impl Id {
 
     Ok(syn::parse_quote! {#field})
   }
+}
+
+fn state_refs<'a>(
+  follows: impl IntoIterator<Item = (&'a Ident, &'a [Span])> + 'a,
+) -> impl Iterator<Item = TokenStream2> + 'a {
+  follows.into_iter().map(|(widget, spans)| {
+    let span = spans.first().unwrap();
+    quote_spanned!(span.clone() =>
+      #[allow(unused_mut)]
+      let mut #widget = #widget.state_ref();
+    )
+  })
+}
+
+pub fn capture_widgets<'a>(
+  follows: impl IntoIterator<Item = (&'a Ident, &'a [Span])> + 'a,
+) -> impl Iterator<Item = TokenStream2> + 'a {
+  follows.into_iter().map(|(widget, spans)| {
+    let span = spans.first().unwrap();
+    quote_spanned!(span.clone() => let #widget = #widget.clone();)
+  })
 }

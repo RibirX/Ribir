@@ -11,13 +11,13 @@ pub struct KeyboardEvent {
 #[derive(Declare, SingleChildWidget)]
 pub struct KeyDownListener {
   #[declare(builtin, custom_convert)]
-  on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
+  pub on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
 #[derive(Declare, SingleChildWidget)]
 pub struct KeyUpListener {
   #[declare(builtin, custom_convert)]
-  on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
+  pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
 impl KeyDownListener {
@@ -120,19 +120,18 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        let down_keys = self.0.clone();
-        let up_keys = self.0.clone();
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
         widget! {
+          track { this }
           declare SizedBox {
             size: Size::zero(),
             auto_focus: true,
             on_key_down: move |key| {
-              down_keys
+              this.0
                 .borrow_mut()
                 .push(format!("key down {:?}", key.key))
             },
-            on_key_up: move |key| up_keys.borrow_mut().push(format!("key up {:?}", key.key))
+            on_key_up: move |key| this.0.borrow_mut().push(format!("key up {:?}", key.key))
           }
         }
       }

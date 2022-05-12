@@ -34,31 +34,26 @@ mod tests {
 
   #[test]
   fn one_line_expanded() {
-    struct T(Size);
-    impl Compose for T {
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-        let size = self.0;
-        widget! {
-          declare Row {
-            Expanded {
-              flex: 1.,
-              SizedBox { size }
-            }
+    let widget = |size| {
+      widget! {
+        declare Row {
+          Expanded {
+            flex: 1.,
             SizedBox { size }
+          }
+          SizedBox { size }
+          SizedBox { size }
+          Expanded {
+            flex: 2.,
             SizedBox { size }
-            Expanded {
-              flex: 2.,
-              SizedBox { size }
-            }
           }
         }
       }
-    }
+    };
 
-    let t = T(Size::new(100., 50.));
-    let size = t.0;
+    let size = Size::new(100., 50.);
 
-    let (rect, children) = widget_and_its_children_box_rect(t.box_it(), Size::new(500., 500.));
+    let (rect, children) = widget_and_its_children_box_rect(widget(size), Size::new(500., 500.));
 
     assert_eq!(rect, Rect::from_size(Size::new(500., 50.)));
     assert_eq!(

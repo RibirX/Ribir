@@ -2,25 +2,14 @@ use crate::{
   dynamic_widget::{DynamicWidgetInfo, GeneratorParentInfo, PrevSiblingInfo, StaticPrevSibling},
   prelude::*,
 };
-use bitflags::bitflags;
 use indextree::*;
-use std::{collections::HashMap, pin::Pin};
-
-bitflags! {
-  pub struct WidgetChangeFlags: u8 {
-      const UNSILENT  = 0b00000001;
-      const DIFFUSE = 0b00000010;
-
-      const ALL = WidgetChangeFlags::UNSILENT.bits | WidgetChangeFlags::DIFFUSE.bits;
-  }
-}
+use std::pin::Pin;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
   arena: Arena<Box<dyn RenderNode>>,
   root: WidgetId,
-  changed_widget: HashMap<WidgetId, WidgetChangeFlags, ahash::RandomState>,
 }
 
 impl WidgetTree {
@@ -28,11 +17,7 @@ impl WidgetTree {
     let mut arena = Arena::default();
     let node: Box<dyn RenderNode> = Box::new(Empty);
     let root = WidgetId(arena.new_node(node));
-    let tree = Self {
-      arena,
-      root,
-      changed_widget: <_>::default(),
-    };
+    let tree = Self { arena, root };
     let mut tree = Box::pin(tree);
     tree.as_mut().widget_info_assign(root);
     tree
@@ -56,36 +41,8 @@ impl WidgetTree {
   #[cfg(test)]
   pub(crate) fn count(&self) -> usize { self.arena.count() }
 
-  pub(crate) fn record_change(&mut self, id: WidgetId, flag: WidgetChangeFlags) {
-    self
-      .changed_widget
-      .entry(id)
-      .and_modify(|s| {
-        *s = *s | flag;
-      })
-      .or_insert(flag);
-  }
-
-  pub(crate) fn pop_changed_widgets(&mut self) -> Option<(WidgetId, WidgetChangeFlags)> {
-    self
-      .changed_widget
-      .keys()
-      .next()
-      .cloned()
-      .and_then(|id| self.changed_widget.remove_entry(&id))
-  }
-
   fn widget_info_assign(&mut self, id: WidgetId) {
-    let ptr = std::ptr::NonNull::from(&*self);
     let node = id.assert_get_mut(self);
-
-    node.query_all_type_mut(
-      |state_attr: &mut StateInfo| {
-        state_attr.assign_id(id, ptr);
-        true
-      },
-      QueryOrder::OutsideFirst,
-    );
 
     if let Some(d) = node.query_first_type_mut::<DynamicWidgetInfo>(QueryOrder::OutsideFirst) {
       d.assign_dynamic_widget_id(id);
@@ -247,7 +204,7 @@ impl WidgetId {
     match widget.0 {
       BoxedWidgetInner::Compose(c) => {
         let mut build_ctx = BuildCtx::new(Some(self), ctx);
-        let c = c.recursive_compose(&mut build_ctx);
+        let c = c(&mut build_ctx);
         self.insert_child(c, insert, consume_child, ctx)
       }
       BoxedWidgetInner::Render(rw) => insert_widget(rw, tree),

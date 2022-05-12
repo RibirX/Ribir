@@ -5,10 +5,8 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use crate::prelude::{
-  widget_tree::WidgetTree, BoxedWidget, EventCommon, QueryOrder, StateInfo, WidgetId,
-};
-use crate::{animation::TickerProvider, prelude::widget_tree::WidgetChangeFlags};
+use crate::animation::TickerProvider;
+use crate::prelude::{widget_tree::WidgetTree, BoxedWidget, EventCommon, QueryOrder, WidgetId};
 
 use painter::{PaintCommand, Painter};
 mod painting_context;
@@ -182,30 +180,6 @@ impl Context {
     }
   }
 
-  pub fn state_change_dispatch(&mut self) {
-    while let Some((id, flag)) = self.widget_tree.pop_changed_widgets() {
-      let tree = self.widget_tree.as_mut().get_mut();
-      if flag.contains(WidgetChangeFlags::DIFFUSE) {
-        id.assert_get_mut(tree).query_all_type_mut(
-          |attr: &mut StateInfo| {
-            attr.changed_notify();
-            true
-          },
-          QueryOrder::OutsideFirst,
-        );
-      }
-      if flag.contains(WidgetChangeFlags::UNSILENT) {
-        id.assert_get(tree).query_all_type(
-          |_: &StateInfo| {
-            self.layout_store.mark_needs_layout(id, tree);
-            true
-          },
-          QueryOrder::OutsideFirst,
-        );
-      }
-    }
-  }
-
   #[allow(dead_code)]
   pub fn is_dirty(&self) -> bool {
     self.layout_store.is_dirty(&self.widget_tree) || self.generator_store.is_dirty()
@@ -245,9 +219,7 @@ mod tests {
     let post = EmbedPost::new(3);
     let mut ctx = Context::new(post.box_it(), 1., None);
     assert_eq!(ctx.widget_tree.count(), 20);
-    ctx.mark_changed(ctx.widget_tree.root());
-    ctx.drop(ctx.widget_tree.root());
-
+    ctx.mark_layout_from_root();
     assert_eq!(ctx.is_dirty(), false);
   }
 
@@ -276,7 +248,7 @@ mod tests {
     let post = EmbedPostWithKey::new(1000);
     let mut ctx = Context::new(post.box_it(), 1., None);
     b.iter(|| {
-      ctx.mark_changed(ctx.widget_tree.root());
+      ctx.mark_layout_from_root();
       ctx.tree_repair()
     });
   }
@@ -285,7 +257,7 @@ mod tests {
   fn repair_50_pow_2(b: &mut Bencher) {
     let mut ctx = test_sample_create(50, 2);
     b.iter(|| {
-      ctx.mark_changed(ctx.widget_tree.root());
+      ctx.mark_layout_from_root();
       ctx.tree_repair();
     })
   }
@@ -294,7 +266,7 @@ mod tests {
   fn repair_100_pow_2(b: &mut Bencher) {
     let mut ctx = test_sample_create(100, 2);
     b.iter(|| {
-      ctx.mark_changed(ctx.widget_tree.root());
+      ctx.mark_layout_from_root();
       ctx.tree_repair();
     })
   }
@@ -303,7 +275,7 @@ mod tests {
   fn repair_10_pow_4(b: &mut Bencher) {
     let mut ctx = test_sample_create(10, 4);
     b.iter(|| {
-      ctx.mark_changed(ctx.widget_tree.root());
+      ctx.mark_layout_from_root();
       ctx.tree_repair();
     })
   }
@@ -312,17 +284,8 @@ mod tests {
   fn repair_10_pow_5(b: &mut Bencher) {
     let mut ctx = test_sample_create(10, 5);
     b.iter(|| {
-      ctx.mark_changed(ctx.widget_tree.root());
+      ctx.mark_layout_from_root();
       ctx.tree_repair();
     })
-  }
-
-  #[test]
-  fn repair() {
-    let mut ctx = test_sample_create(1, 1);
-    ctx.mark_changed(ctx.widget_tree.root());
-    assert!(!ctx.need_builds.is_empty());
-    ctx.tree_repair();
-    assert!(ctx.need_builds.is_empty());
   }
 }

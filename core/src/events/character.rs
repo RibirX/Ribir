@@ -1,16 +1,29 @@
 use crate::prelude::*;
-use rxrust::prelude::*;
-use std::ptr::NonNull;
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
-#[derive(Default)]
-pub struct CharAttr(LocalSubject<'static, NonNull<CharEvent>, ()>);
+#[derive(Declare, SingleChildWidget)]
+pub struct CharListener {
+  #[declare(builtin, custom_convert)]
+  on_char: Box<dyn for<'r> FnMut(&'r mut CharEvent)>,
+}
 
 #[derive(Debug)]
 pub struct CharEvent {
   pub char: char,
   pub common: EventCommon,
+}
+
+impl Render for CharListener {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp))
+      .unwrap_or_default()
+  }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl std::borrow::Borrow<EventCommon> for CharEvent {
@@ -23,19 +36,29 @@ impl std::borrow::BorrowMut<EventCommon> for CharEvent {
   fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
 }
 
-impl CharAttr {
-  #[inline]
-  pub fn dispatch_event(&self, event: &mut CharEvent) { self.0.clone().next(NonNull::from(event)) }
+impl std::ops::Deref for CharEvent {
+  type Target = EventCommon;
 
-  pub fn listen_on<H: FnMut(&mut CharEvent) + 'static>(
-    &self,
-    mut handler: H,
-  ) -> SubscriptionWrapper<MutRc<SingleSubscription>> {
-    self
-      .0
-      .clone()
-      // Safety: Inner pointer from a mut reference and pass to handler one by one.
-      .subscribe(move |mut event| handler(unsafe { event.as_mut() }))
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.common }
+}
+
+impl std::ops::DerefMut for CharEvent {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
+}
+
+impl CharListener {
+  #[inline]
+  pub fn dispatch_event(&mut self, event: &mut CharEvent) { (self.on_char)(event) }
+}
+
+impl CharListenerBuilder {
+  #[inline]
+  pub fn on_char_convert(
+    f: impl for<'r> FnMut(&'r mut CharEvent) + 'static,
+  ) -> Box<dyn for<'r> FnMut(&'r mut CharEvent)> {
+    Box::new(f)
   }
 }
 
@@ -51,10 +74,13 @@ mod tests {
     let receive = Rc::new(RefCell::new("".to_string()));
     let c_receive = receive.clone();
 
-    let widget = SizedBox { size: SizedBox::shrink_size() }
-      .with_auto_focus(true)
-      .on_char(move |key| c_receive.borrow_mut().push(key.char));
-
+    let widget = widget! {
+      declare SizedBox {
+        size: SizedBox::shrink_size(),
+        auto_focus: true,
+        on_char: move |key| c_receive.borrow_mut().push(key.char)
+      }
+    };
     let mut wnd = Window::without_render(widget.box_it(), Size::new(100., 100.));
 
     let test_text_case = "Hello 世界！";

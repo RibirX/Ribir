@@ -13,7 +13,7 @@ builtin! {
     radius: Radius,
   }
 
-  Key {
+  KeyWidget {
     #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
     key: Key
   }
@@ -23,8 +23,10 @@ builtin! {
     cursor: CursorIcon
   }
 
-  // theme: "[`Theme`](../ribir/widget/struct.Theme.html)",
-
+  ThemeWidget {
+    #[doc="assign theme to the widget."]
+    theme: Theme
+  }
 
   PointerDownListener {
     #[doc="specify the event handler for the pointer down event."]
@@ -89,8 +91,11 @@ builtin! {
     #[doc="specify the event handler when a key is released."]
     on_key_up: impl FnMut(&mut KeyboardEvent),
   }
-  // #[doc="specify the event handler when received a unicode character."]
-  // on_char: "FnMut(&[`CharEvent`](../ribir/widget/events/struct.CharEvent.html))",
+
+  CharListener {
+    #[doc="specify the event handler when received a unicode character."]
+    on_char: impl FnMut(&mut CharEvent)
+  }
 
   WheelListener {
     #[doc="specify the event handler when user moving a mouse wheel or similar input device."]

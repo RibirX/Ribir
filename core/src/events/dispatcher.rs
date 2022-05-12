@@ -75,7 +75,7 @@ impl Dispatcher {
         char: c,
         common: EventCommon::new(focus, ctx),
       };
-      ctx.bubble_event(focus, &mut char_event, |attr: &mut CharAttr, event| {
+      ctx.bubble_event(focus, &mut char_event, |attr: &mut CharListener, event| {
         attr.dispatch_event(event)
       });
     }

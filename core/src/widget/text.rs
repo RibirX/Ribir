@@ -6,6 +6,7 @@ use crate::prelude::*;
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
+  #[declare(custom_convert)]
   pub text: ArcStr,
   #[declare(default = "ctx.theme().typography_theme.body1.text.clone()")]
   pub style: TextStyle,
@@ -51,4 +52,9 @@ impl Render for Text {
       .painter()
       .paint_text_with_style(self.text.substr(..), &self.style, Some(rect.size));
   }
+}
+
+impl TextBuilder {
+  #[inline]
+  pub fn text_convert<T: Into<ArcStr>>(text: T) -> ArcStr { text.into() }
 }

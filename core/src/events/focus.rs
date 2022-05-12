@@ -93,28 +93,28 @@ impl FocusListenerBuilder {
   #[inline]
   pub fn on_focus_convert(
     f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
-    Box::new(f)
+  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
+    Some(Box::new(f))
   }
 
   #[inline]
   pub fn on_blur_convert(
     f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
-    Box::new(f)
+  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
+    Some(Box::new(f))
   }
 
   #[inline]
   pub fn on_focus_in_convert(
     f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
-    Box::new(f)
+  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
+    Some(Box::new(f))
   }
 
   #[inline]
   pub fn on_focus_out_convert(
     f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut FocusEvent)> {
-    Box::new(f)
+  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
+    Some(Box::new(f))
   }
 }

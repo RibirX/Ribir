@@ -1,5 +1,5 @@
 use proc_macro2::{Delimiter, Group, Punct, Spacing, Span, TokenStream, TokenTree};
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use std::collections::BTreeMap;
 use syn::{
   bracketed,
@@ -39,13 +39,14 @@ pub struct DeclareWidget {
 #[derive(Debug)]
 pub enum Child {
   Declare(Box<DeclareWidget>),
-  Expr(ExprChild),
+  Expr(ExprWidget),
 }
 
 #[derive(Debug)]
-pub struct ExprChild {
-  _expr_child: kw::ExprChild,
+pub struct ExprWidget {
+  expr_widget_token: kw::ExprWidget,
   expr: syn::ExprBlock,
+  pub follows: Option<Vec<FollowOn>>,
 }
 #[derive(Clone, Debug)]
 pub struct DeclareField {
@@ -111,8 +112,19 @@ impl ToTokens for DeclareField {
   }
 }
 
-impl ToTokens for ExprChild {
-  fn to_tokens(&self, tokens: &mut TokenStream) { self.expr.to_tokens(tokens) }
+impl ToTokens for ExprWidget {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    if let Some(follows) = self.follows.as_ref() {
+      let refs = follows.iter().map(|f| &f.widget);
+      let expr = &self.expr;
+      tokens.extend(quote_spanned! { self.expr_widget_token.span() => {
+        #(let #refs = #refs.state_ref();)*
+        #expr
+      }});
+    } else {
+      self.expr.to_tokens(tokens)
+    }
+  }
 }
 
 impl Spanned for DeclareWidget {
@@ -232,7 +244,7 @@ pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> 
   }
 }
 
-impl Parse for ExprChild {
+impl Parse for ExprWidget {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let _expr_child = input.parse()?;
     let wrap_fork = input.fork();
@@ -245,7 +257,11 @@ impl Parse for ExprChild {
       input.parse()?
     };
 
-    Ok(ExprChild { _expr_child, expr })
+    Ok(ExprWidget {
+      expr_widget_token: _expr_child,
+      expr,
+      follows: None,
+    })
   }
 }
 
@@ -265,7 +281,7 @@ impl DeclareCtx {
         ctx
           .borrow_capture_scope(false)
           .visit_expr_block_mut(&mut expr.expr);
-        ctx.take_current_follows();
+        expr.follows = ctx.take_current_follows();
       }
     })
   }
@@ -515,7 +531,7 @@ impl Spanned for Child {
 
 impl Parse for Child {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    if input.peek(kw::ExprChild) {
+    if input.peek(kw::ExprWidget) {
       Ok(Child::Expr(input.parse()?))
     } else {
       Ok(Child::Declare(input.parse()?))

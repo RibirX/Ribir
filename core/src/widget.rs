@@ -12,7 +12,7 @@ mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
 pub use crate::widget::text::Text;
-pub use key::Key;
+pub use key::{Key, KeyWidget};
 pub use stateful::*;
 mod cursor;
 pub use cursor::Cursor;
@@ -35,9 +35,9 @@ mod path;
 pub use path::*;
 mod grid_view;
 pub use grid_view::*;
-mod scroll_view;
-pub use scroll_view::ScrollView;
-mod scrollbar;
+// mod scroll_view;
+// pub use scroll_view::ScrollView;
+// mod scrollbar;
 
 mod empty;
 use self::layout_store::BoxClamp;
@@ -47,7 +47,9 @@ pub trait Compose {
   // todo: use associated type replace BoxedWidget is friendly?
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget;
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
+  where
+    Self: Sized;
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -78,49 +80,33 @@ pub trait Render {
   fn only_sized_by_parent(&self) -> bool { false }
 }
 
-/// A compose widget which want directly implement stateful widget and have no
-/// stateless version. Implement `StatefulCombination` only when you need a
-/// stateful widget during `build`, otherwise you should implement
-/// [`Compose`]! and a stateful version will auto provide by
-/// framework, use [`Stateful::into_stateful`]! to convert.
-pub trait StatefulCompose {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
-  where
-    Self: Sized;
-}
-
 /// A generic widget wrap for all compose widget result, and keep its type info.
 struct ComposedWidget<R, B> {
   composed: R,
   by: B,
 }
 
-pub(crate) trait RecursiveCompose {
-  fn recursive_compose(self: Box<Self>, ctx: &mut BuildCtx) -> BoxedWidget;
-}
-
-impl<C: Compose + 'static> RecursiveCompose for C {
-  fn recursive_compose(self: Box<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-    // todo: we need wrap the build context let logic child can query type of ?
-    // or keep theme as a individual widget is enough.
-
-    ComposedWidget {
-      composed: self.compose(ctx),
-      by: PhantomData::<C>,
-    }
-    .into_boxed(ctx)
+impl<B> Render for ComposedWidget<Box<dyn RenderNode>, B> {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.composed.perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { self.composed.only_sized_by_parent() }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
 }
 
 impl<B: 'static> ComposedWidget<BoxedWidget, B> {
-  fn into_boxed(self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn into_boxed(self) -> BoxedWidget {
     let by = self.by;
     match self.composed.0 {
-      BoxedWidgetInner::Compose(c) => ComposedWidget {
-        composed: c.recursive_compose(ctx),
-        by,
+      BoxedWidgetInner::Compose(c) => {
+        { |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_boxed() }.box_it()
       }
-      .into_boxed(ctx),
+
       BoxedWidgetInner::Render(r) => ComposedWidget { composed: r, by }.box_it(),
       BoxedWidgetInner::SingleChild(s) => SingleChild {
         widget: ComposedWidget { composed: s.widget, by },
@@ -136,18 +122,6 @@ impl<B: 'static> ComposedWidget<BoxedWidget, B> {
   }
 }
 
-impl<B> Render for ComposedWidget<Box<dyn RenderNode>, B> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.composed.perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.composed.only_sized_by_parent() }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
-}
 pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
 #[marker]
@@ -200,7 +174,7 @@ impl<W: Compose + QueryType> CombinationNode for W {}
 impl<W: Render + QueryType> RenderNode for W {}
 
 pub(crate) enum BoxedWidgetInner {
-  Compose(Box<dyn RecursiveCompose>),
+  Compose(Box<dyn FnOnce(&mut BuildCtx) -> BoxedWidget>),
   Render(Box<dyn RenderNode>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
@@ -302,7 +276,7 @@ impl<'a> dyn RenderNode + 'a {
 }
 
 // todo: does we can directly  extend the sub tree in compose method, and remove
-// box widget?
+// box widget? A Inflate trait ?
 
 pub struct RenderMarker;
 pub struct ComposeMarker;
@@ -312,7 +286,28 @@ pub trait BoxWidget<M> {
 
 impl<C: Compose + 'static> BoxWidget<ComposeMarker> for C {
   #[inline]
-  default fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
+  fn box_it(self) -> BoxedWidget {
+    BoxedWidget(BoxedWidgetInner::Compose(Box::new(|ctx| {
+      ComposedWidget {
+        composed: Compose::compose(self.into_stateful(), ctx),
+        by: PhantomData::<C>,
+      }
+      .into_boxed()
+    })))
+  }
+}
+
+impl<C: Compose + 'static> BoxWidget<ComposeMarker> for Stateful<C> {
+  #[inline]
+  fn box_it(self) -> BoxedWidget {
+    BoxedWidget(BoxedWidgetInner::Compose(Box::new(|ctx| {
+      ComposedWidget {
+        composed: Compose::compose(self, ctx),
+        by: PhantomData::<C>,
+      }
+      .into_boxed()
+    })))
+  }
 }
 
 impl<R: Render + 'static> BoxWidget<RenderMarker> for R {
@@ -343,9 +338,9 @@ impl BoxWidget<()> for BoxedWidget {
   fn box_it(self) -> BoxedWidget { self }
 }
 
-impl<C: FnOnce(&mut BuildCtx) -> BoxedWidget> Compose for C {
+impl<F: FnOnce(&mut BuildCtx) -> BoxedWidget + 'static> BoxWidget<F> for F {
   #[inline]
-  fn compose(self, ctx: &mut BuildCtx) -> BoxedWidget { self(ctx) }
+  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
 }
 
 #[macro_export]
