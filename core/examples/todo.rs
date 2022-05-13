@@ -12,13 +12,13 @@ struct Todos {
 }
 
 impl Compose for Todos {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
     widget! {
       track { this }
       declare Column {
         h_align: CrossAxisAlign::Start,
         ExprWidget {
-          this.tasks.iter().enumerate().map(|(idx, task)| {
+          this.tasks.iter().enumerate().map(move |(idx, task)| {
             widget! {
               declare Row {
                 margin: EdgeInsets::vertical(4.),
@@ -32,7 +32,7 @@ impl Compose for Todos {
                 }
               }
               dataflows {
-                checkbox.checked ~> this_ref.silent().tasks[idx].finished;
+                checkbox.checked ~> this.silent().tasks[idx].finished;
               }
             }
           })

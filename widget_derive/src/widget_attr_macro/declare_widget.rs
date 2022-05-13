@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use syn::{
   bracketed,
   buffer::Cursor,
-  parse::{discouraged::Speculative, Parse, ParseStream},
+  parse::{Parse, ParseStream},
   spanned::Spanned,
   token::{self, Brace},
   visit_mut::VisitMut,
@@ -20,8 +20,8 @@ pub use builtin_fields::*;
 use widget_gen::WidgetGen;
 
 use super::{
-  child_variable, kw, ribir_variable, widget_def_variable, widget_macro::IfGuard, DeclareCtx,
-  FollowOn, FollowPart, Follows, Id, Result,
+  capture_widget, child_variable, kw, ribir_variable, widget_def_variable, widget_macro::IfGuard,
+  widget_state_ref, DeclareCtx, ExprWidget, FollowOn, FollowPart, Follows, Id, Result,
 };
 
 #[derive(Debug)]
@@ -42,12 +42,6 @@ pub enum Child {
   Expr(ExprWidget),
 }
 
-#[derive(Debug)]
-pub struct ExprWidget {
-  expr_widget_token: kw::ExprWidget,
-  expr: syn::ExprBlock,
-  pub follows: Option<Vec<FollowOn>>,
-}
 #[derive(Clone, Debug)]
 pub struct DeclareField {
   pub skip_nc: Option<SkipNcAttr>,
@@ -108,21 +102,6 @@ impl ToTokens for DeclareField {
       })
     } else if self.colon_token.is_some() {
       expr.to_tokens(tokens)
-    }
-  }
-}
-
-impl ToTokens for ExprWidget {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
-    if let Some(follows) = self.follows.as_ref() {
-      let refs = follows.iter().map(|f| &f.widget);
-      let expr = &self.expr;
-      tokens.extend(quote_spanned! { self.expr_widget_token.span() => {
-        #(let #refs = #refs.state_ref();)*
-        #expr
-      }});
-    } else {
-      self.expr.to_tokens(tokens)
     }
   }
 }
@@ -244,27 +223,6 @@ pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> 
   }
 }
 
-impl Parse for ExprWidget {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    let _expr_child = input.parse()?;
-    let wrap_fork = input.fork();
-    let expr = if let Some(tokens) =
-      wrap_fork.step(|step_cursor| Ok(macro_wrap_declare_keyword(*step_cursor)))?
-    {
-      input.advance_to(&wrap_fork);
-      syn::parse2(tokens.into_iter().collect())?
-    } else {
-      input.parse()?
-    };
-
-    Ok(ExprWidget {
-      expr_widget_token: _expr_child,
-      expr,
-      follows: None,
-    })
-  }
-}
-
 impl DeclareCtx {
   pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
     let mut ctx = self.stack_push();
@@ -278,9 +236,7 @@ impl DeclareCtx {
       Child::Declare(d) => ctx.visit_declare_widget_mut(d),
       Child::Expr(expr) => {
         let mut ctx = ctx.stack_push();
-        ctx
-          .borrow_capture_scope(false)
-          .visit_expr_block_mut(&mut expr.expr);
+        ctx.borrow_capture_scope(false).visit_expr_widget_mut(expr);
         expr.follows = ctx.take_current_follows();
       }
     })
@@ -331,7 +287,7 @@ impl DeclareWidget {
         }
         Child::Expr(expr) => {
           let c_name = widget_def_variable(&child_variable(c, idx));
-          tokens.extend(quote! { let #c_name = #expr; });
+          tokens.extend(quote_spanned! { expr.span() => let #c_name = #expr; });
         }
       });
   }
@@ -507,16 +463,26 @@ impl DeclareWidget {
   }
 }
 
-pub fn upstream_observable(depends_on: &[FollowOn]) -> TokenStream {
-  let upstream = depends_on.iter().map(|fo| {
-    let depend_w = &fo.widget;
-    quote! { #depend_w.change_stream() }
+pub fn used_widgets_subscribe<'a>(
+  used_widgets: impl Iterator<Item = &'a Ident> + Clone,
+  subscribe_do: TokenStream,
+) -> TokenStream {
+  let upstream = used_widgets.clone().map(|w| {
+    let w = widget_def_variable(w);
+    quote_spanned! { w.span() =>  #w.change_stream() }
   });
-
-  if depends_on.len() > 1 {
+  let upstream = if used_widgets.clone().count() > 1 {
     quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
   } else {
     quote! { #(#upstream)* }
+  };
+
+  let capture_widgets = used_widgets.clone().map(capture_widget);
+  let state_refs = used_widgets.clone().map(widget_state_ref);
+
+  quote! {
+    #(#capture_widgets)*
+    #upstream.subscribe(move |_| { #(#state_refs)* #subscribe_do });
   }
 }
 
@@ -544,7 +510,7 @@ impl Parse for Child {
 /// needn't reimplemented, and easy to interop with rust syntax.
 ///
 /// return new tokens if do any wrap else
-fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cursor) {
+pub fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cursor) {
   fn sub_token_stream(mut begin: Cursor, end: Option<Cursor>, tts: &mut Vec<TokenTree>) {
     while Some(begin) != end {
       match begin.token_tree() {
@@ -659,5 +625,14 @@ impl Child {
       }
       Child::Expr(_) => Box::new(std::iter::empty()),
     }
+  }
+}
+
+impl DeclareField {
+  pub fn used_widgets(&self) -> impl Iterator<Item = &Ident> + Clone + '_ {
+    self
+      .follows
+      .iter()
+      .flat_map(|follows| follows.iter().map(|f| &f.widget))
   }
 }

@@ -1,15 +1,16 @@
-use super::kw;
+use super::{kw, widget_def_variable};
 use proc_macro2::Ident;
-use syn::{braced, parse::Parse, punctuated::Punctuated, spanned::Spanned, token};
+use quote::{quote_spanned, ToTokens};
+use syn::{braced, parse::Parse, punctuated::Punctuated, token};
 
 pub struct Track {
-  track_token: kw::track,
-  brace: token::Brace,
+  _track_token: kw::track,
+  _brace: token::Brace,
   pub track_externs: Punctuated<NameAlias, token::Comma>,
 }
 
 pub struct NameAlias {
-  _name: Ident,
+  name: Ident,
   _colon_token: Option<token::Colon>,
   alias: Ident,
 }
@@ -18,8 +19,8 @@ impl Parse for Track {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
     let track = Track {
-      track_token: input.parse()?,
-      brace: braced!(content in input),
+      _track_token: input.parse()?,
+      _brace: braced!(content in input),
       track_externs: content.parse_terminated(NameAlias::parse)?,
     };
     Ok(track)
@@ -28,19 +29,27 @@ impl Parse for Track {
 
 impl Parse for NameAlias {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let _name: Ident = input.parse()?;
+    let name: Ident = input.parse()?;
     let _colon_token: Option<token::Colon> = input.parse()?;
     let alias = if _colon_token.is_some() {
       input.parse()?
     } else {
-      _name.clone()
+      name.clone()
     };
-    Ok(Self { _name, _colon_token, alias })
+    Ok(Self { name, _colon_token, alias })
   }
 }
 
-impl Spanned for Track {
-  fn span(&self) -> proc_macro2::Span { self.track_token.span().join(self.brace.span).unwrap() }
+impl ToTokens for Track {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    self
+      .track_externs
+      .iter()
+      .for_each(|NameAlias { name, alias, .. }| {
+        let def_name = widget_def_variable(alias);
+        tokens.extend(quote_spanned!(alias.span() => let #def_name: Stateful<_> = #name.clone(); ));
+      });
+  }
 }
 
 impl Track {

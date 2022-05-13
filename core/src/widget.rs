@@ -44,7 +44,6 @@ use self::layout_store::BoxClamp;
 pub use empty::Empty;
 
 pub trait Compose {
-  // todo: use associated type replace BoxedWidget is friendly?
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
   fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
@@ -125,9 +124,9 @@ impl<B: 'static> ComposedWidget<BoxedWidget, B> {
 pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
 
 #[marker]
-pub(crate) trait Widget {}
-impl<W: Compose> Widget for W {}
-impl<W: Render> Widget for W {}
+pub(crate) trait WidgetMarker {}
+impl<W: Compose> WidgetMarker for W {}
+impl<W: Render> WidgetMarker for W {}
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
@@ -274,9 +273,6 @@ impl<'a> dyn RenderNode + 'a {
     target
   }
 }
-
-// todo: does we can directly  extend the sub tree in compose method, and remove
-// box widget? A Inflate trait ?
 
 pub struct RenderMarker;
 pub struct ComposeMarker;

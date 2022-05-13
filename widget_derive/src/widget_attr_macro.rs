@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
@@ -22,6 +22,8 @@ mod animations;
 mod dataflows;
 mod declare_widget;
 pub use declare_widget::RESERVE_IDENT;
+mod expr_widget;
+pub use expr_widget::*;
 
 mod track;
 mod widget_macro;
@@ -101,23 +103,15 @@ impl Id {
   }
 }
 
-fn state_refs<'a>(
-  follows: impl IntoIterator<Item = (&'a Ident, &'a [Span])> + 'a,
-) -> impl Iterator<Item = TokenStream2> + 'a {
-  follows.into_iter().map(|(widget, spans)| {
-    let span = spans.first().unwrap();
-    quote_spanned!(span.clone() =>
-      #[allow(unused_mut)]
-      let mut #widget = #widget.state_ref();
-    )
-  })
+fn widget_state_ref(widget: &Ident) -> TokenStream2 {
+  let def_name = widget_def_variable(widget);
+  quote_spanned!(widget.span() =>
+    #[allow(unused_mut)]
+    let mut #widget = #def_name.state_ref();
+  )
 }
 
-pub fn capture_widgets<'a>(
-  follows: impl IntoIterator<Item = (&'a Ident, &'a [Span])> + 'a,
-) -> impl Iterator<Item = TokenStream2> + 'a {
-  follows.into_iter().map(|(widget, spans)| {
-    let span = spans.first().unwrap();
-    quote_spanned!(span.clone() => let #widget = #widget.clone();)
-  })
+pub fn capture_widget(widget: &Ident) -> TokenStream2 {
+  let def_name = widget_def_variable(widget);
+  quote_spanned!(widget.span() => let #def_name = #def_name.clone();)
 }

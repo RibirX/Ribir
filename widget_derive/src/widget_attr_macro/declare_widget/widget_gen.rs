@@ -3,15 +3,15 @@ use std::collections::HashSet;
 use crate::{
   declare_derive::field_convert_method,
   widget_attr_macro::{
-    capture_widgets, field_guard_variable, ribir_variable, skip_nc_assign, state_refs,
-    widget_def_variable, DeclareCtx, BUILD_CTX,
+    field_guard_variable, ribir_variable, skip_nc_assign, widget_def_variable, DeclareCtx,
+    BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Ident, Path};
 
-use super::{upstream_observable, DeclareField};
+use super::{used_widgets_subscribe, DeclareField};
 
 pub struct WidgetGen<'a> {
   pub ty: &'a Path,
@@ -25,7 +25,6 @@ impl<'a> WidgetGen<'a> {
 
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
     let def_name = widget_def_variable(&self.name);
-    let ref_name = &self.name;
 
     let (fields_without_guard, fields_with_guard): (Vec<_>, Vec<_>) =
       fields.iter().partition(|f| f.if_guard.is_none());
@@ -72,18 +71,9 @@ impl<'a> WidgetGen<'a> {
 
     let fields_follow = fields.iter().filter_map(|f| self.field_follow_tokens(f));
 
-    let state_ref = if self.is_stateful(ctx) {
-      Some(quote! { let mut #ref_name = unsafe { #def_name.state_ref() }; })
-    } else if ctx.be_reference(ref_name) {
-      Some(quote! { let #ref_name = &#def_name; })
-    } else {
-      None
-    };
-
     quote! {
       #(#guard_calc)*
       #build_widget
-      #state_ref
       #(#fields_follow)*
     }
   }
@@ -96,21 +86,16 @@ impl<'a> WidgetGen<'a> {
     let ref_name = &self.name;
     let expr_tokens = f.value_tokens(self.ty);
 
-    follows.as_ref().map(|follows| {
+    follows.is_some().then(|| {
       let assign = skip_nc_assign(
         skip_nc.is_some(),
         &quote! { #ref_name.#member},
         &expr_tokens,
       );
-      let upstream = upstream_observable(follows);
-      let capture_widgets = f.capture_widgets();
-      let state_refs = f.state_refs();
-      let mut tokens = quote_spanned! { f.span() =>
-        #upstream.subscribe( {
-          #(#capture_widgets)*
-          move |_|{ #(#state_refs)*  #assign }
-        });
-      };
+
+      let mut tokens =
+        used_widgets_subscribe(f.used_widgets().chain(std::iter::once(ref_name)), assign);
+
       if let Some(if_guard) = if_guard {
         let guard_cond = field_guard_variable(member, if_guard.span());
         tokens = quote! { if #guard_cond { #tokens } }
@@ -163,19 +148,5 @@ impl DeclareField {
         #builder = #builder.#member(#value);
       }
     }
-  }
-
-  fn state_refs(&self) -> impl Iterator<Item = TokenStream> + '_ {
-    self
-      .follows
-      .iter()
-      .flat_map(|follows| state_refs(follows.iter().map(|f| (&f.widget, f.spans.as_slice()))))
-  }
-
-  pub fn capture_widgets(&self) -> impl Iterator<Item = TokenStream> + '_ {
-    self
-      .follows
-      .iter()
-      .flat_map(|follows| capture_widgets(follows.iter().map(|f| (&f.widget, f.spans.as_slice()))))
   }
 }
