@@ -90,8 +90,9 @@ use std::{
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
 pub trait IntoStateful {
-  type S;
-  fn into_stateful(self) -> Self::S;
+  fn into_stateful(self) -> Stateful<Self>
+  where
+    Self: Sized;
 }
 
 /// A reference of stateful widget, can use it to directly access and modify
@@ -108,8 +109,8 @@ pub struct StateRef<'a, W> {
 /// notify will trigger, but not effect the inner widget relayout or rebuild.
 ///
 /// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
-pub struct SilentRef<'a, W> {
-  inner_ref: RefMut<'a, W>,
+pub struct SilentRef<W> {
+  inner_ref: W,
   guard: SilentRefGuard,
 }
 
@@ -151,7 +152,7 @@ impl<W> Clone for Stateful<W> {
 impl<W> Stateful<W> {
   // Convert a widget to a stateful widget, only called by framework. Maybe you
   // want [`into_stateful`](IntoStateful::into_stateful)
-  pub fn new(widget: W) -> Self {
+  pub(crate) fn new(widget: W) -> Self {
     Stateful {
       widget: Rc::new(RefCell::new(widget)),
       change_notifier: <_>::default(),
@@ -172,7 +173,7 @@ impl<W> Stateful<W> {
 
   /// Return a `SilentMut` of the stateful widget.
   #[inline]
-  pub fn silent_ref(&self) -> SilentRef<W> {
+  pub fn silent_ref(&self) -> SilentRef<RefMut<W>> {
     SilentRef {
       inner_ref: self.widget.borrow_mut(),
       guard: SilentRefGuard {
@@ -215,14 +216,29 @@ impl<W> Stateful<W> {
   }
 }
 
-impl<'a, W> std::ops::Deref for SilentRef<'a, W> {
-  type Target = W;
+impl<'a, W> StateRef<'a, W> {
+  pub fn silent(&mut self) -> SilentRef<&mut RefMut<'a, W>> {
+    SilentRef {
+      inner_ref: &mut self.inner_ref,
+      guard: SilentRefGuard {
+        accessed: false,
+        notifier: self.guard.notifier.clone(),
+      },
+    }
+  }
+
+  #[inline]
+  pub fn shallow(&mut self) -> &mut RefMut<'a, W> { &mut self.inner_ref }
+}
+
+impl<W: std::ops::Deref> std::ops::Deref for SilentRef<W> {
+  type Target = W::Target;
 
   #[inline]
   fn deref(&self) -> &Self::Target { self.inner_ref.deref() }
 }
 
-impl<'a, W> std::ops::DerefMut for SilentRef<'a, W> {
+impl<W: std::ops::DerefMut> std::ops::DerefMut for SilentRef<W> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target {
     self.guard.accessed = true;
@@ -282,11 +298,10 @@ impl Drop for SilentRefGuard {
 
 impl<W> IntoStateful for W
 where
-  W: Widget + 'static,
+  W: WidgetMarker,
 {
-  type S = Stateful<W>;
   #[inline]
-  fn into_stateful(self) -> Self::S { Stateful::new(self) }
+  fn into_stateful(self) -> Stateful<W> { Stateful::new(self) }
 }
 
 #[cfg(test)]

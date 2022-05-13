@@ -1,9 +1,9 @@
 use super::{
-  declare_widget::{try_parse_skip_nc, upstream_observable, SkipNcAttr},
+  declare_widget::{try_parse_skip_nc, used_widgets_subscribe, SkipNcAttr},
   kw, skip_nc_assign, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
 };
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::ToTokens;
 use std::collections::BTreeMap;
 use syn::{
   braced,
@@ -59,11 +59,11 @@ impl ToTokens for Dataflow {
     let Self { from, to, .. } = self;
     match from.follows.as_ref() {
       Some(follows_on) => {
-        let upstream = upstream_observable(follows_on);
-        let assign = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
-        tokens.extend(quote! {
-          #upstream.subscribe(move |_| { #assign });
-        });
+        let subscribe_tokens = used_widgets_subscribe(
+          follows_on.iter().map(|f| &f.widget),
+          skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr),
+        );
+        tokens.extend(subscribe_tokens);
       }
       None => DeclareError::DataFlowNoDepends(syn::spanned::Spanned::span(&from.expr).unwrap())
         .error_emit(),

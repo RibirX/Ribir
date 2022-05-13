@@ -5,7 +5,7 @@ use crate::{
 };
 
 use super::{
-  capture_widgets, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, state_refs,
+  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, widget_state_ref,
   FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
 };
 
@@ -77,17 +77,12 @@ impl VisitMut for DeclareCtx {
         let old = std::mem::take(&mut self.current_follows);
         visit_mut::visit_expr_closure_mut(self, c);
         if !self.current_follows.is_empty() {
-          let used_widgets = self
-            .current_follows
-            .iter()
-            .map(|(w, spans)| (w, spans.as_slice()));
-          let used_widgets2 = used_widgets.clone();
-
+          let used_widgets = self.current_follows.keys();
           let body = &c.body;
-          let refs = state_refs(used_widgets);
+          let refs = used_widgets.map(widget_state_ref);
           c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
 
-          let captures = capture_widgets(used_widgets2);
+          let captures = self.current_follows.keys().map(capture_widget);
           *expr = parse_quote_spanned! { c.span() =>  { #(#captures)* #c }};
         }
         self.current_follows = old;
@@ -262,14 +257,6 @@ impl DeclareCtx {
       .be_followed
       .get(name)
       .map(|r| r == &ReferenceInfo::BeFollowed)
-      .unwrap_or(false)
-  }
-
-  pub fn be_reference(&self, name: &Ident) -> bool {
-    self
-      .be_followed
-      .get(name)
-      .map(|r| r == &ReferenceInfo::Reference)
       .unwrap_or(false)
   }
 

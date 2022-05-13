@@ -138,12 +138,14 @@ impl WidgetMacro {
     let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
     let def_name = widget_def_variable(&self.widget.widget_identify());
 
+    let extern_track = self.track.as_ref();
     Ok(quote! {
       (move |#ctx_name: &mut BuildCtx| {
+        #extern_track
         #named_objects_tokens
-        #declare_widget
         #dataflows
         #animations
+        #declare_widget
         #def_name.box_it()
       }).box_it()
     })
