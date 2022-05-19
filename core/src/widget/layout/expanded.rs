@@ -3,7 +3,7 @@ use crate::prelude::*;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(SingleChildWidget, Clone, PartialEq, Declare)]
+#[derive(SingleChild, Clone, PartialEq, Declare)]
 pub struct Expanded {
   pub flex: f32,
 }
@@ -73,18 +73,19 @@ mod tests {
     let row = Row { wrap: true, ..<_>::default() }
       .have_child(
         Expanded { flex: 1. }
-          .have_child(SizedBox { size }.box_it())
-          .box_it(),
+          .have_child(SizedBox { size }.into_widget())
+          .into_widget(),
       )
-      .have_child(SizedBox { size }.box_it())
-      .have_child(SizedBox { size }.box_it())
+      .have_child(SizedBox { size }.into_widget())
+      .have_child(SizedBox { size }.into_widget())
       .have_child(
         Expanded { flex: 2. }
-          .have_child(SizedBox { size }.box_it())
-          .box_it(),
+          .have_child(SizedBox { size }.into_widget())
+          .into_widget(),
       );
 
-    let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(350., 500.));
+    let (rect, children) =
+      widget_and_its_children_box_rect(row.into_widget(), Size::new(350., 500.));
 
     assert_eq!(rect, Rect::from_size(Size::new(350., 100.)));
     assert_eq!(

@@ -5,7 +5,7 @@
 //! windows.
 pub mod material;
 use crate::prelude::{
-  BoxClamp, BuildCtx, Declare, DeclareBuilder, LayoutCtx, PaintingCtx, Render, SingleChildWidget,
+  BoxClamp, BuildCtx, Declare, DeclareBuilder, LayoutCtx, PaintingCtx, Render, SingleChild,
   WidgetCtx,
 };
 pub use painter::*;
@@ -113,7 +113,7 @@ pub struct Theme {
   pub icon: IconTheme,
 }
 
-#[derive(Declare, SingleChildWidget)]
+#[derive(Declare, SingleChild)]
 pub struct ThemeWidget {
   #[declare(builtin)]
   pub theme: Theme,

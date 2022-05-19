@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
-#[derive(Declare, SingleChildWidget)]
+#[derive(Declare, SingleChild)]
 pub struct CharListener {
   #[declare(builtin, custom_convert)]
   on_char: Box<dyn for<'r> FnMut(&'r mut CharEvent)>,
@@ -81,7 +81,7 @@ mod tests {
         on_char: move |key| c_receive.borrow_mut().push(key.char)
       }
     };
-    let mut wnd = Window::without_render(widget.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));
 
     let test_text_case = "Hello 世界！";
     wnd.render_ready();

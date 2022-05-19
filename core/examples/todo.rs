@@ -12,7 +12,7 @@ struct Todos {
 }
 
 impl Compose for Todos {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare Column {
@@ -67,5 +67,5 @@ fn main() {
   }
   .into_stateful();
 
-  Application::new().run(todo.box_it(), None);
+  Application::new().run(todo.into_widget(), None);
 }

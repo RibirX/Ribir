@@ -11,6 +11,7 @@ pub mod text;
 mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
+pub use crate::dynamic_widget::ExprWidget;
 pub use crate::widget::text::Text;
 pub use key::{Key, KeyWidget};
 pub use stateful::*;
@@ -39,14 +40,14 @@ pub use grid_view::*;
 // pub use scroll_view::ScrollView;
 // mod scrollbar;
 
-mod empty;
+mod void;
 use self::layout_store::BoxClamp;
-pub use empty::Empty;
+pub use void::Void;
 
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget
   where
     Self: Sized;
 }
@@ -79,12 +80,6 @@ pub trait Render {
   fn only_sized_by_parent(&self) -> bool { false }
 }
 
-/// A generic widget wrap for all compose widget result, and keep its type info.
-struct ComposedWidget<R, B> {
-  composed: R,
-  by: B,
-}
-
 impl<B> Render for ComposedWidget<Box<dyn RenderNode>, B> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -98,34 +93,17 @@ impl<B> Render for ComposedWidget<Box<dyn RenderNode>, B> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
 }
 
-impl<B: 'static> ComposedWidget<BoxedWidget, B> {
-  fn into_boxed(self) -> BoxedWidget {
-    let by = self.by;
-    match self.composed.0 {
-      BoxedWidgetInner::Compose(c) => {
-        { |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_boxed() }.box_it()
-      }
+impl<W: SingleChild, B> SingleChild for ComposedWidget<W, B> {}
 
-      BoxedWidgetInner::Render(r) => ComposedWidget { composed: r, by }.box_it(),
-      BoxedWidgetInner::SingleChild(s) => SingleChild {
-        widget: ComposedWidget { composed: s.widget, by },
-        child: s.child,
-      }
-      .box_it(),
-      BoxedWidgetInner::MultiChild(m) => MultiChild {
-        widget: ComposedWidget { composed: m.widget, by },
-        children: m.children,
-      }
-      .box_it(),
-    }
-  }
-}
+impl<W: MultiChild, B> MultiChild for ComposedWidget<W, B> {}
 
-pub struct BoxedWidget(pub(crate) BoxedWidgetInner);
+pub struct Widget(pub(crate) WidgetInner);
 
 #[marker]
 pub(crate) trait WidgetMarker {}
 impl<W: Compose> WidgetMarker for W {}
+impl<W: ComposeSingleChild> WidgetMarker for W {}
+impl<W: ComposeMultiChild> WidgetMarker for W {}
 impl<W: Render> WidgetMarker for W {}
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
@@ -162,9 +140,6 @@ pub(crate) enum QueryOrder {
   InnerFirst,
   OutsideFirst,
 }
-
-pub(crate) type BoxedSingleChild = Box<SingleChild<Box<dyn RenderNode>>>;
-pub(crate) type BoxedMultiChild = MultiChild<Box<dyn RenderNode>>;
 pub(crate) trait CombinationNode: Compose + QueryType {}
 pub(crate) trait RenderNode: Render + QueryType {}
 
@@ -172,11 +147,44 @@ impl<W: Compose + QueryType> CombinationNode for W {}
 
 impl<W: Render + QueryType> RenderNode for W {}
 
-pub(crate) enum BoxedWidgetInner {
-  Compose(Box<dyn FnOnce(&mut BuildCtx) -> BoxedWidget>),
+/// A generic widget wrap for all compose widget result, and keep its type info.
+pub(crate) struct ComposedWidget<R, B> {
+  composed: R,
+  by: B,
+}
+
+impl<B: 'static> ComposedWidget<Widget, B> {
+  fn into_widget(self) -> Widget {
+    let by = self.by;
+    match self.composed.0 {
+      WidgetInner::Compose(c) => {
+        { |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget() }.into_widget()
+      }
+      WidgetInner::Render(r) => ComposedWidget { composed: r, by }.into_widget(),
+      WidgetInner::SingleChild(s) => {
+        let widget: Box<dyn RenderNode> = Box::new(ComposedWidget { composed: s.widget, by });
+        let single = Box::new(SingleChildWidget { widget, child: s.child });
+        Widget(WidgetInner::SingleChild(single))
+      }
+      WidgetInner::MultiChild(m) => {
+        let widget: Box<dyn RenderNode> = Box::new(ComposedWidget { composed: m.widget, by });
+        let multi = MultiChildWidget { widget, children: m.children };
+        Widget(WidgetInner::MultiChild(multi))
+      }
+      WidgetInner::Expr(_) => unreachable!(),
+    }
+  }
+}
+
+pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn RenderNode>>>;
+pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn RenderNode>>;
+
+pub(crate) enum WidgetInner {
+  Compose(Box<dyn FnOnce(&mut BuildCtx) -> Widget>),
   Render(Box<dyn RenderNode>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
+  Expr(ExprWidget<Box<dyn FnMut() -> Box<dyn Iterator<Item = Widget>>>>),
 }
 
 impl<W: Any> QueryType for W {
@@ -274,69 +282,35 @@ impl<'a> dyn RenderNode + 'a {
   }
 }
 
-pub struct RenderMarker;
-pub struct ComposeMarker;
-pub trait BoxWidget<M> {
-  fn box_it(self) -> BoxedWidget;
+pub trait IntoWidget<M: ?Sized> {
+  fn into_widget(self) -> Widget;
 }
 
-impl<C: Compose + 'static> BoxWidget<ComposeMarker> for C {
+impl IntoWidget<Widget> for Widget {
   #[inline]
-  fn box_it(self) -> BoxedWidget {
-    BoxedWidget(BoxedWidgetInner::Compose(Box::new(|ctx| {
+  fn into_widget(self) -> Widget { self }
+}
+
+impl<C: Compose + 'static> IntoWidget<dyn Compose> for C {
+  fn into_widget(self) -> Widget {
+    Widget(WidgetInner::Compose(Box::new(|ctx| {
       ComposedWidget {
         composed: Compose::compose(self.into_stateful(), ctx),
         by: PhantomData::<C>,
       }
-      .into_boxed()
+      .into_widget()
     })))
   }
 }
 
-impl<C: Compose + 'static> BoxWidget<ComposeMarker> for Stateful<C> {
+impl<R: Render + 'static> IntoWidget<dyn Render> for R {
   #[inline]
-  fn box_it(self) -> BoxedWidget {
-    BoxedWidget(BoxedWidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget {
-        composed: Compose::compose(self, ctx),
-        by: PhantomData::<C>,
-      }
-      .into_boxed()
-    })))
-  }
+  fn into_widget(self) -> Widget { Widget(WidgetInner::Render(Box::new(self))) }
 }
 
-impl<R: Render + 'static> BoxWidget<RenderMarker> for R {
+impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
   #[inline]
-  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Render(Box::new(self))) }
-}
-
-impl<S: Render + 'static> BoxWidget<RenderMarker> for SingleChild<S> {
-  #[inline]
-  fn box_it(self) -> BoxedWidget {
-    let widget: Box<dyn RenderNode> = Box::new(self.widget);
-    let boxed = Box::new(SingleChild { widget, child: self.child });
-    BoxedWidget(BoxedWidgetInner::SingleChild(boxed))
-  }
-}
-
-impl<M: Render + 'static> BoxWidget<RenderMarker> for MultiChild<M> {
-  #[inline]
-  fn box_it(self) -> BoxedWidget {
-    let widget: Box<dyn RenderNode> = Box::new(self.widget);
-    let inner = BoxedWidgetInner::MultiChild(MultiChild { widget, children: self.children });
-    BoxedWidget(inner)
-  }
-}
-
-impl BoxWidget<()> for BoxedWidget {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { self }
-}
-
-impl<F: FnOnce(&mut BuildCtx) -> BoxedWidget + 'static> BoxWidget<F> for F {
-  #[inline]
-  fn box_it(self) -> BoxedWidget { BoxedWidget(BoxedWidgetInner::Compose(Box::new(self))) }
+  fn into_widget(self) -> Widget { Widget(WidgetInner::Compose(Box::new(self))) }
 }
 
 #[macro_export]

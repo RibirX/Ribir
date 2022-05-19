@@ -10,7 +10,7 @@ pub struct WheelEvent {
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
 
-#[derive(Declare, SingleChildWidget)]
+#[derive(Declare, SingleChild)]
 pub struct WheelListener {
   #[declare(builtin, custom_convert)]
   on_wheel: Box<dyn for<'r> FnMut(&'r mut WheelEvent)>,

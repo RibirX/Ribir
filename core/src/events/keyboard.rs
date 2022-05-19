@@ -8,13 +8,13 @@ pub struct KeyboardEvent {
 }
 
 /// Widget fire event whenever press or release a key.
-#[derive(Declare, SingleChildWidget)]
+#[derive(Declare, SingleChild)]
 pub struct KeyDownListener {
   #[declare(builtin, custom_convert)]
   pub on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
-#[derive(Declare, SingleChildWidget)]
+#[derive(Declare, SingleChild)]
 pub struct KeyUpListener {
   #[declare(builtin, custom_convert)]
   pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
@@ -120,7 +120,7 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare SizedBox {
@@ -140,7 +140,7 @@ mod tests {
     let w = Keys::default();
     let keys = w.0.clone();
 
-    let mut wnd = Window::without_render(w.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));

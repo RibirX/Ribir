@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
-  token, Expr, Ident, Token,
+  token, Expr, Ident, Path, Token,
 };
 
 use super::{
@@ -17,6 +17,8 @@ use crate::{
   error::{DeclareError, DeclareWarning},
   widget_attr_macro::{ribir_variable, BUILD_CTX},
 };
+pub const EXPR_WIDGET: &str = "ExprWidget";
+pub const EXPR_FIELD: &str = "expr";
 
 pub struct WidgetMacro {
   widget: DeclareWidget,
@@ -38,6 +40,8 @@ struct CircleCheckStack<'a> {
   pub origin: FollowPlace<'a>,
   pub on: &'a FollowOn,
 }
+
+pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
 
 impl Parse for WidgetMacro {
   fn parse(content: syn::parse::ParseStream) -> syn::Result<Self> {
@@ -102,12 +106,6 @@ impl WidgetMacro {
         .into_values()
         .for_each(|def_tokens| named_objects_tokens.extend(def_tokens));
 
-      self
-        .widget
-        .traverses_declare()
-        .filter(|w| w.named.is_some())
-        .for_each(|w| w.children_tokens(ctx, &mut named_objects_tokens));
-
       // data flow should not effect the named object init order, and we allow circle
       // follow with skip_nc attribute. So we add the data flow relationship and
       // individual check the circle follow error.
@@ -127,16 +125,17 @@ impl WidgetMacro {
       }
     }
 
-    let declare_widget = if self.widget.named.is_none() {
-      self.widget.widget_full_tokens(ctx)
-    } else {
-      self.widget.compose_tokens()
-    };
-
     let Self { dataflows, animations, .. } = self;
 
     let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
     let def_name = widget_def_variable(&self.widget.widget_identify());
+
+    let declare_widget = self
+      .widget
+      .named
+      .is_none()
+      .then(|| self.widget.host_and_builtin_tokens(ctx));
+    let compos_tokens = self.widget.compose_tokens(ctx);
 
     let extern_track = self.track.as_ref();
     Ok(quote! {
@@ -146,17 +145,24 @@ impl WidgetMacro {
         #dataflows
         #animations
         #declare_widget
-        #def_name.box_it()
-      }).box_it()
+        #compos_tokens
+        #def_name.into_widget()
+      }).into_widget()
     })
   }
 
-  pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
+  pub fn object_names_iter(&self) -> impl Iterator<Item = (&Ident, bool)> {
     self
       .widget
       .object_names_iter()
       .chain(self.animations.iter().flat_map(|a| a.names()))
-      .chain(self.track.iter().flat_map(|t| t.track_names()))
+      .map(|name| (name, false))
+      .chain(
+        self
+          .track
+          .iter()
+          .flat_map(|t| t.track_names().map(|n| (n, true))),
+      )
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ { self.widget.warnings() }
@@ -282,12 +288,12 @@ impl<'a> CircleCheckStack<'a> {
       FollowPlace::Field(f) => {
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
-        let widget = ctx
+        let (widget, _) = ctx
           .named_objects
-          .get(widget)
+          .get_key_value(widget)
           .expect("id must in named widgets")
           .clone();
-        (widget, Some(f.member.clone()))
+        (widget.clone(), Some(f.member.clone()))
       }
       _ => (widget.clone(), None),
     };

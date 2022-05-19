@@ -1,5 +1,5 @@
 use crate::prelude::*;
-#[derive(Declare, MultiChildWidget)]
+#[derive(Declare, MultiChild)]
 pub struct GridView {
   axis_dir: Direction,
   cross_axis_cnt: u32,

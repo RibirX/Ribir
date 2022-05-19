@@ -13,7 +13,7 @@ fn declare_smoke() {
   impl Compose for T {
     #[widget]
 
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           size: Size::new(500.,500.),
@@ -29,7 +29,7 @@ fn simple_ref_bind_work() {
   struct T;
   impl Compose for T {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       let size = Size::new(500., 500.);
       widget! {
        declare Flex {
@@ -47,7 +47,7 @@ fn simple_ref_bind_work() {
   }
 
   let flex_size = Size::new(1000., 500.);
-  let mut wnd = Window::without_render(T.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(T.into_widget(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
@@ -66,7 +66,7 @@ fn event_attr_sugar_work() {
   struct T;
   impl Compose for T {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           id: sized_box,
@@ -80,7 +80,7 @@ fn event_attr_sugar_work() {
     }
   }
 
-  let mut wnd = Window::without_render(T.box_it(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(T.into_widget(), Size::new(400., 400.));
   wnd.render_ready();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, BEFORE_SIZE.into());
@@ -100,7 +100,7 @@ fn widget_wrap_bind_work() {
   impl Compose for T {
     #[widget]
 
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare Flex {
           SizedBox {
@@ -118,7 +118,7 @@ fn widget_wrap_bind_work() {
     }
   }
 
-  let mut wnd = Window::without_render(T.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(T.into_widget(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
@@ -137,7 +137,7 @@ fn expression_for_children() {
 
   impl Compose for EmbedExpr {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       let size = self.0;
       widget! {
         declare Flex {
@@ -172,7 +172,7 @@ fn embed_widget_ref_outside() {
   struct T;
   impl Compose for T {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare Flex {
           SizedBox {
@@ -190,7 +190,7 @@ fn embed_widget_ref_outside() {
     }
   }
 
-  let mut wnd = Window::without_render(T.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(T.into_widget(), Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -207,7 +207,7 @@ fn data_flow_macro() {
   struct T;
   impl Compose for T {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       let size = Size::new(1., 1.);
       widget! {
         declare Flex {
@@ -221,7 +221,7 @@ fn data_flow_macro() {
     }
   }
 
-  let mut wnd = Window::without_render(T.box_it(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(T.into_widget(), Size::new(400., 400.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   // data flow not affect on init.
@@ -242,7 +242,7 @@ fn local_var_not_bind() {
   struct T;
   impl Compose for T {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           size: {
@@ -259,7 +259,7 @@ fn local_var_not_bind() {
     }
   }
 
-  let (rect, child_rect) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
+  let (rect, child_rect) = widget_and_its_children_box_rect(T.into_widget(), Size::new(500., 500.));
   assert_eq!(rect.size, EXPECT_SIZE * 2.);
   assert_eq!(child_rect[0].size, EXPECT_SIZE * 2.);
 }
@@ -270,7 +270,7 @@ fn with_attr_ref() {
   #[derive(Default)]
   struct Track(Rc<Cell<Option<StateRef<Flex>>>>);
   impl Compose for Track {
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare Flex {
           id: root,
@@ -296,7 +296,7 @@ fn with_attr_ref() {
   let w = Track::default();
   let root_ref = w.0.clone();
 
-  let mut wnd = Window::without_render(w.box_it(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
   wnd.render_ready();
 
   assert_eq!(
@@ -315,7 +315,7 @@ fn if_guard_field_true() {
   struct GuardTrue;
   impl Compose for GuardTrue {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           size if true => : Size::new(100., 100.)
@@ -324,7 +324,8 @@ fn if_guard_field_true() {
     }
   }
 
-  let (rect, _) = widget_and_its_children_box_rect(GuardTrue.box_it(), Size::new(1000., 1000.));
+  let (rect, _) =
+    widget_and_its_children_box_rect(GuardTrue.into_widget(), Size::new(1000., 1000.));
   assert_eq!(rect.size, Size::new(100., 100.));
 }
 
@@ -334,7 +335,7 @@ fn if_guard_field_false() {
   struct GuardFalse;
   impl Compose for GuardFalse {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           size if false => : Size::new(100., 100.)
@@ -342,7 +343,7 @@ fn if_guard_field_false() {
       }
     }
   }
-  widget_and_its_children_box_rect(GuardFalse.box_it(), Size::new(1000., 1000.));
+  widget_and_its_children_box_rect(GuardFalse.into_widget(), Size::new(1000., 1000.));
 }
 
 #[test]
@@ -351,7 +352,7 @@ fn attr_bind_to_self() {
   struct Track(Rc<Cell<Option<StateRef<SizedBox>>>>);
   impl Compose for Track {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           id: self_id,
@@ -377,7 +378,7 @@ fn attr_bind_to_self() {
   let w = Track::default();
   let root_ref = w.0.clone();
 
-  let mut wnd = Window::without_render(w.box_it(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
   wnd.render_ready();
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
@@ -392,7 +393,7 @@ fn if_guard_work() {
   struct T;
   impl Compose for T {
     #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
       widget! {
         declare SizedBox {
           size if true => : Size::new(100., 100.),
@@ -403,7 +404,7 @@ fn if_guard_work() {
     }
   }
 
-  let (rect, _) = widget_and_its_children_box_rect(T.box_it(), Size::new(500., 500.));
+  let (rect, _) = widget_and_its_children_box_rect(T.into_widget(), Size::new(500., 500.));
   assert_eq!(rect.size, Size::new(100., 100.));
 }
 

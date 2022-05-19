@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChildWidget, Default, Clone, Declare)]
+#[derive(SingleChild, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[declare(builtin, default, custom_convert)]
@@ -98,12 +98,6 @@ enum BorderPosition {
   Right,
 }
 impl BoxDecoration {
-  #[inline]
-  pub fn is_empty(&self) -> bool {
-    let Self { border, background, radius }: &BoxDecoration = self;
-    border.is_none() && background.is_none() && radius.is_none()
-  }
-
   fn paint_border(&self, painter: &mut Painter, rect: &Rect) {
     // return;
     // todo: refactor border paint, we should only support radius for uniform border
@@ -371,7 +365,7 @@ mod tests {
     struct Paint;
     impl Compose for Paint {
       #[widget]
-      fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(&self, ctx: &mut BuildCtx) -> Widget {
         let radius_cases = vec![
           Radius::all(0.),
           Radius::all(10.),
@@ -414,7 +408,7 @@ mod tests {
       }
     }
 
-    let mut window = Window::wgpu_headless(Paint.box_it(), DeviceSize::new(400, 600));
+    let mut window = Window::wgpu_headless(Paint.into_widget(), DeviceSize::new(400, 600));
     window.render_ready();
     assert!(window.same_as_png("../test/test_imgs/box_decoration.png"));
   }

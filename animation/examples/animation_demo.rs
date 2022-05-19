@@ -12,7 +12,7 @@ struct Demo {}
 
 impl Compose for Demo {
   #[widget]
-  fn compose(&self, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(&self, ctx: &mut BuildCtx) -> Widget {
     widget! {
       declare Row {
           SizedBox {
@@ -64,5 +64,5 @@ impl Compose for Demo {
 fn main() {
   let demo = Demo {}.into_stateful();
 
-  Application::new().run(demo.box_it(), Some(new_ticker_animation_mgr()));
+  Application::new().run(demo.into_widget(), Some(new_ticker_animation_mgr()));
 }

@@ -1,12 +1,11 @@
 use std::{
   cell::Cell,
-  cmp::Reverse,
   pin::Pin,
   sync::{Arc, RwLock},
 };
 
 use crate::animation::TickerProvider;
-use crate::prelude::{widget_tree::WidgetTree, BoxedWidget, EventCommon, QueryOrder, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, EventCommon, QueryOrder, Widget, WidgetId};
 
 use painter::{PaintCommand, Painter};
 mod painting_context;
@@ -39,12 +38,12 @@ pub(crate) struct Context {
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
   animation_ticker: Option<Box<dyn TickerProvider>>,
-  generator_store: generator_store::GeneratorStore,
+  pub(crate) generator_store: generator_store::GeneratorStore,
 }
 
 impl Context {
   pub(crate) fn new(
-    root: BoxedWidget,
+    root: Widget,
     device_scale: f32,
     animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
@@ -73,7 +72,8 @@ impl Context {
 
     tmp_root.append_widget(root, &mut ctx);
     let real_root = tree.root().single_child(&tree).unwrap();
-    tree.reset_root(real_root);
+    let old = tree.reset_root(real_root);
+    ctx.drop_subtree(old);
 
     ctx.mark_layout_from_root();
     ctx
@@ -162,22 +162,14 @@ impl Context {
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub fn tree_repair(&mut self) {
-    let needs_regen = self.generator_store.take_needs_regen();
+    let mut needs_regen = self.generator_store.take_needs_regen(&self.widget_tree);
 
-    for Reverse((_, gid)) in needs_regen {
-      let generator = self.generator_store.remove_generator(gid);
-      let is_dropped = generator
-        .as_ref()
-        .and_then(|g| g.parent())
-        .map_or(true, |p| p.is_dropped(self.tree()));
-      if is_dropped {
-        continue;
-      } else {
-        let mut g = generator.unwrap();
-        g.update_generated_widgets(self);
-        self.generator_store.add_widget_generator(g);
-      }
-    }
+    needs_regen.iter_mut().rev().for_each(|g| {
+      g.update_generated_widgets(self);
+    });
+    needs_regen
+      .into_iter()
+      .for_each(|g| self.generator_store.add_generator(g));
   }
 
   #[allow(dead_code)]
@@ -187,6 +179,15 @@ impl Context {
 
   pub fn descendants(&self) -> impl Iterator<Item = WidgetId> + '_ {
     self.widget_tree.root().descendants(&self.widget_tree)
+  }
+
+  pub fn drop_subtree(&mut self, id: WidgetId) {
+    let tree = &self.widget_tree;
+    tree.root().descendants(tree).for_each(|w| {
+      self.generator_store.on_widget_drop(w);
+      self.layout_store.remove(id);
+    });
+    id.remove_subtree(self.tree_mut());
   }
 
   pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
@@ -205,19 +206,19 @@ mod tests {
 
   use super::*;
   use crate::{
-    prelude::BoxWidget,
+    prelude::IntoWidget,
     test::{embed_post::EmbedPost, key_embed_post::EmbedPostWithKey, recursive_row::RecursiveRow},
   };
 
   fn test_sample_create(width: usize, depth: usize) -> Context {
     let root = RecursiveRow { width, depth };
-    Context::new(root.box_it(), 1., None)
+    Context::new(root.into_widget(), 1., None)
   }
 
   #[test]
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
-    let mut ctx = Context::new(post.box_it(), 1., None);
+    let mut ctx = Context::new(post.into_widget(), 1., None);
     assert_eq!(ctx.widget_tree.count(), 20);
     ctx.mark_layout_from_root();
     assert_eq!(ctx.is_dirty(), false);
@@ -227,7 +228,7 @@ mod tests {
   fn inflate_5_x_1000(b: &mut Bencher) {
     b.iter(|| {
       let post = EmbedPost::new(1000);
-      Context::new(post.box_it(), 1., None);
+      Context::new(post.into_widget(), 1., None);
     });
   }
 
@@ -246,7 +247,7 @@ mod tests {
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
     let post = EmbedPostWithKey::new(1000);
-    let mut ctx = Context::new(post.box_it(), 1., None);
+    let mut ctx = Context::new(post.into_widget(), 1., None);
     b.iter(|| {
       ctx.mark_layout_from_root();
       ctx.tree_repair()

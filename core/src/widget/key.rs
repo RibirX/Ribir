@@ -29,7 +29,7 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-#[derive(Declare, SingleChildWidget)]
+#[derive(Declare, SingleChild)]
 pub struct KeyWidget {
   #[declare(builtin, custom_convert)]
   pub key: Key,

@@ -7,7 +7,7 @@ pub struct RecursiveRow {
 }
 
 impl Compose for RecursiveRow {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare Row {
@@ -19,9 +19,9 @@ impl Compose for RecursiveRow {
                   width: this.width,
                   depth: this.depth - 1,
                 }
-                .box_it()
+                .into_widget()
               } else {
-                Text { text: "leaf".into(), style: <_>::default() }.box_it()
+                Text { text: "leaf".into(), style: <_>::default() }.into_widget()
               }
             })
         }

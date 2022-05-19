@@ -20,8 +20,9 @@ pub use builtin_fields::*;
 use widget_gen::WidgetGen;
 
 use super::{
-  capture_widget, child_variable, kw, ribir_variable, widget_def_variable, widget_macro::IfGuard,
-  widget_state_ref, DeclareCtx, ExprWidget, FollowOn, FollowPart, Follows, Id, Result,
+  capture_widget, child_variable, kw, ribir_variable, widget_def_variable,
+  widget_macro::{is_expr_keyword, IfGuard, EXPR_FIELD, EXPR_WIDGET},
+  widget_state_ref, DeclareCtx, FollowOn, FollowPart, Follows, Id, Result,
 };
 
 #[derive(Debug)]
@@ -33,13 +34,7 @@ pub struct DeclareWidget {
   pub named: Option<Id>,
   fields: Vec<DeclareField>,
   builtin: BuiltinFieldWidgets,
-  pub children: Vec<Child>,
-}
-
-#[derive(Debug)]
-pub enum Child {
-  Declare(Box<DeclareWidget>),
-  Expr(ExprWidget),
+  pub children: Vec<Box<DeclareWidget>>,
 }
 
 #[derive(Clone, Debug)]
@@ -232,14 +227,9 @@ impl DeclareCtx {
 
     ctx.visit_builtin_field_widgets(&mut w.builtin);
 
-    w.children.iter_mut().for_each(|c| match c {
-      Child::Declare(d) => ctx.visit_declare_widget_mut(d),
-      Child::Expr(expr) => {
-        let mut ctx = ctx.stack_push();
-        ctx.borrow_capture_scope(false).visit_expr_widget_mut(expr);
-        expr.follows = ctx.take_current_follows();
-      }
-    })
+    w.children
+      .iter_mut()
+      .for_each(|c| ctx.visit_declare_widget_mut(c))
   }
 
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
@@ -269,55 +259,47 @@ impl DeclareWidget {
     (gen.name, tokens)
   }
 
-  pub fn children_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
-    self
-      .children
-      .iter()
-      .enumerate()
-      .for_each(|(idx, c)| match c {
-        Child::Declare(d) => {
-          if d.named.is_none() {
-            let child_widget_name = widget_def_variable(&d.widget_identify());
-            let c_def_name = widget_def_variable(&child_variable(c, idx));
-            let child_tokens = d.widget_full_tokens(ctx);
-            tokens.extend(quote! { let #c_def_name = { #child_tokens  #child_widget_name }; });
-          } else {
-            tokens.extend(d.compose_tokens());
-          }
-        }
-        Child::Expr(expr) => {
-          let c_name = widget_def_variable(&child_variable(c, idx));
-          tokens.extend(quote_spanned! { expr.span() => let #c_name = #expr; });
-        }
-      });
-  }
-
-  pub fn compose_tokens(&self) -> TokenStream {
+  pub fn compose_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     let mut compose_tokens = quote! {};
     let name = &self.widget_identify();
     let def_name = widget_def_variable(name);
-    if !self.children.is_empty() {
+
+    let children = &self.children;
+    if !children.is_empty() {
       // Must be MultiChild if there are multi child. Give this hint for better
       // compile error if wrong size child declared.
-      let hint = (self.children.len() > 1).then(|| quote! {: MultiChild<_>});
+      let hint = (self.children.len() > 1).then(|| quote! {: MultiChildWidget<_>});
 
-      let children = self.children.iter().enumerate().map(|(idx, c)| {
-        let c_name = match c {
-          Child::Declare(d) if d.named.is_some() => d.widget_identify(),
-          _ => child_variable(c, idx),
+      let children = children.iter().enumerate().map(|(idx, c)| {
+        let c_name = widget_def_variable(&child_variable(c, idx));
+
+        let child_widget_name = widget_def_variable(&c.widget_identify());
+        let child_name = if c.named.is_none() {
+          let child_tokens = c.host_and_builtin_tokens(ctx);
+          let child_compose = c.compose_tokens(ctx);
+          compose_tokens
+            .extend(quote! { let #c_name = { #child_tokens  #child_widget_name #child_compose}; });
+          c_name
+        } else {
+          let child_compose = c.compose_tokens(ctx);
+          compose_tokens.extend(child_compose);
+          child_widget_name
         };
-        let c_def_name = widget_def_variable(&c_name);
-        quote! { .have_child(#c_def_name) }
+        if c.builtin.finally_is_expr_widget() {
+          quote_spanned! { c.span() => .have_expr_child(#child_name)  }
+        } else {
+          quote_spanned! { c.span() => .have_child(#child_name.into_widget()) }
+        }
       });
-      compose_tokens.extend(quote! { let #def_name #hint = #def_name #(#children)*; });
+      let compose_children = quote! { let #def_name #hint = #def_name #(#children)*; };
+      compose_tokens.extend(compose_children);
     }
-    compose_tokens.extend(self.builtin.compose_tokens(name));
-
+    compose_tokens.extend(self.builtin.compose_tokens(self));
     compose_tokens
   }
 
   // return this widget tokens and its def name;
-  pub fn widget_full_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
+  pub fn host_and_builtin_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     let (name, mut tokens) = self.host_widget_tokens(ctx);
 
     self
@@ -327,8 +309,6 @@ impl DeclareWidget {
         tokens.extend(wrap_widget);
       });
 
-    self.children_tokens(ctx, &mut tokens);
-    tokens.extend(self.compose_tokens());
     tokens
   }
 
@@ -338,7 +318,7 @@ impl DeclareWidget {
     ctx: &'a DeclareCtx,
   ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
     self
-      .traverses_declare()
+      .traverses_widget()
       .filter_map(|w| {
         w.named.as_ref().map(|_| {
           let host = w.host_widget_tokens(ctx);
@@ -350,10 +330,23 @@ impl DeclareWidget {
   }
 
   pub fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
-    self.traverses_declare().try_for_each(|w| {
+    self.traverses_widget().try_for_each(|w| {
       if w.named.is_some() {
         w.builtin_field_if_guard_check(ctx)?;
       }
+      if w.is_host_expr_widget() {
+        if w.fields.len() != 1 || w.fields[0].member != EXPR_FIELD {
+          let spans = w.fields.iter().map(|f| f.member.span().unwrap()).collect();
+          return Err(DeclareError::ExprWidgetInvalidField(spans));
+        }
+        if let Some(guard) = w.fields[0].if_guard.as_ref() {
+          return Err(DeclareError::UnsupportedIfGuard {
+            name: format!("field {EXPR_FIELD} of  {EXPR_WIDGET}"),
+            span: guard.span().unwrap(),
+          });
+        }
+      }
+
       w.builtin.key_follow_check()
     })
   }
@@ -369,7 +362,14 @@ impl DeclareWidget {
           .as_ref()
           .map(|attr| DeclareWarning::NeedlessSkipNc(attr.span().unwrap()))
       })
-      .chain(self.children.iter().flat_map(Child::warnings))
+      .chain(self.children.iter().flat_map(|c| {
+        let iter1: Box<dyn Iterator<Item = DeclareWarning>> = Box::new(c.warnings());
+        c.declare_token
+          .as_ref()
+          .map(|d| DeclareWarning::NeedlessDeclare(d.span().unwrap()))
+          .into_iter()
+          .chain(iter1)
+      }))
   }
 
   /// return follow relationship of the named widgets,it is a key-value map,
@@ -382,7 +382,7 @@ impl DeclareWidget {
   pub fn analyze_object_follows(&self) -> BTreeMap<Ident, Follows> {
     let mut follows: BTreeMap<Ident, Follows> = BTreeMap::new();
     self
-      .traverses_declare()
+      .traverses_widget()
       .filter(|w| w.named.is_some())
       .for_each(|w| {
         let ref_name = w.widget_identify();
@@ -402,6 +402,11 @@ impl DeclareWidget {
     follows
   }
 
+  pub(crate) fn is_host_expr_widget(&self) -> bool {
+    // only expression used other widget need as a `ExprWidget`
+    is_expr_keyword(&self.path) && self.fields.first().map_or(false, |f| f.follows.is_some())
+  }
+
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
     debug_assert!(self.named.is_some());
 
@@ -416,7 +421,7 @@ impl DeclareWidget {
         if ctx.be_followed(&wrap_name) {
           let if_guard_span = f.if_guard.as_ref().unwrap().span().unwrap();
           let mut use_spans = vec![];
-          self.traverses_declare().for_each(|w| {
+          self.traverses_widget().for_each(|w| {
             w.builtin
               .all_builtin_fields()
               .filter_map(|f| f.follows.as_ref())
@@ -439,18 +444,13 @@ impl DeclareWidget {
 
   pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
     self
-      .traverses_declare()
+      .traverses_widget()
       .filter_map(|w| w.named.as_ref().map(|id| &id.name))
   }
 
-  /// pre-order traversals declare widget, this will skip the expression child.
-  pub fn traverses_declare(&self) -> impl Iterator<Item = &DeclareWidget> {
-    let children = self.children.iter().filter_map(|c| match c {
-      Child::Declare(w) => Some(w),
-      Child::Expr(_) => None,
-    });
+  pub fn traverses_widget(&self) -> impl Iterator<Item = &DeclareWidget> {
     let children: Box<dyn Iterator<Item = &DeclareWidget>> =
-      Box::new(children.flat_map(|w| w.traverses_declare()));
+      Box::new(self.children.iter().flat_map(|w| w.traverses_widget()));
 
     std::iter::once(self).chain(children)
   }
@@ -467,16 +467,7 @@ pub fn used_widgets_subscribe<'a>(
   used_widgets: impl Iterator<Item = &'a Ident> + Clone,
   subscribe_do: TokenStream,
 ) -> TokenStream {
-  let upstream = used_widgets.clone().map(|w| {
-    let w = widget_def_variable(w);
-    quote_spanned! { w.span() =>  #w.change_stream() }
-  });
-  let upstream = if used_widgets.clone().count() > 1 {
-    quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
-  } else {
-    quote! { #(#upstream)* }
-  };
-
+  let upstream = upstream_by_used_widgets(used_widgets.clone());
   let capture_widgets = used_widgets.clone().map(capture_widget);
   let state_refs = used_widgets.clone().map(widget_state_ref);
 
@@ -486,22 +477,17 @@ pub fn used_widgets_subscribe<'a>(
   }
 }
 
-impl Spanned for Child {
-  fn span(&self) -> Span {
-    match self {
-      Child::Declare(d) => d.span(),
-      Child::Expr(e) => e.span(),
-    }
-  }
-}
-
-impl Parse for Child {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    if input.peek(kw::ExprWidget) {
-      Ok(Child::Expr(input.parse()?))
-    } else {
-      Ok(Child::Declare(input.parse()?))
-    }
+pub fn upstream_by_used_widgets<'a>(
+  used_widgets: impl Iterator<Item = &'a Ident> + Clone,
+) -> TokenStream {
+  let upstream = used_widgets.clone().map(|w| {
+    let w = widget_def_variable(w);
+    quote_spanned! { w.span() =>  #w.change_stream() }
+  });
+  if used_widgets.count() > 1 {
+    quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
+  } else {
+    quote! { #(#upstream)* }
   }
 }
 
@@ -609,23 +595,6 @@ pub fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>
     tts.into_iter().collect()
   });
   (tts, cursor)
-}
-
-impl Child {
-  fn warnings(&self) -> Box<dyn Iterator<Item = DeclareWarning> + '_> {
-    match self {
-      Child::Declare(d) => {
-        let iter = d
-          .declare_token
-          .as_ref()
-          .map(|d| DeclareWarning::NeedlessDeclare(d.span().unwrap()))
-          .into_iter()
-          .chain(d.warnings());
-        Box::new(iter)
-      }
-      Child::Expr(_) => Box::new(std::iter::empty()),
-    }
-  }
 }
 
 impl DeclareField {

@@ -24,10 +24,10 @@ impl Checkbox {
 }
 
 impl Compose for Checkbox {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare Empty {
+      declare ExprWidget {
         margin: EdgeInsets::all(4.),
         cursor: CursorIcon::Hand,
         on_tap: move |_| this.switch_check(),
@@ -36,7 +36,7 @@ impl Compose for Checkbox {
             this.switch_check()
           }
         },
-        ExprWidget {
+        expr: {
           let size = this.style.size;
           let size = Size::new(size, size);
             if this.indeterminate {
@@ -69,7 +69,7 @@ mod tests {
   #[test]
   fn layout() {
     let w = Checkbox::default();
-    let (rect, child) = widget_and_its_children_box_rect(w.box_it(), Size::new(200., 200.));
+    let (rect, child) = widget_and_its_children_box_rect(w.into_widget(), Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
 
     debug_assert_eq!(
@@ -82,7 +82,7 @@ mod tests {
   #[test]
   fn checked_paint() {
     let c = Checkbox { checked: true, ..<_>::default() };
-    let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
 
     assert!(window.same_as_png("../test/test_imgs/checkbox_checked.png"));
@@ -91,7 +91,8 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn unchecked_paint() {
-    let mut window = Window::wgpu_headless(Checkbox::default().box_it(), DeviceSize::new(100, 100));
+    let mut window =
+      Window::wgpu_headless(Checkbox::default().into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
     assert!(window.same_as_png("../test/test_imgs/checkbox_uncheck.png"));
   }
@@ -104,7 +105,7 @@ mod tests {
       indeterminate: true,
       ..<_>::default()
     };
-    let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
 
     assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));
@@ -114,7 +115,7 @@ mod tests {
       indeterminate: true,
       ..<_>::default()
     };
-    let mut window = Window::wgpu_headless(c.box_it(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
 
     assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));

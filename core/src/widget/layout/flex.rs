@@ -42,7 +42,7 @@ pub enum MainAxisAlign {
   SpaceEvenly,
 }
 
-#[derive(Default, MultiChildWidget, Declare, Clone, PartialEq)]
+#[derive(Default, MultiChild, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
   #[declare(default)]
@@ -429,7 +429,7 @@ mod tests {
   #[test]
   fn horizontal_line() {
     let row = Flex::default().have_child((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }));
-    let (rect, _) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
+    let (rect, _) = widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 20.));
   }
 
@@ -440,8 +440,8 @@ mod tests {
       ..<_>::default()
     }
     .have_child((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
-    .box_it();
-    let (rect, _) = widget_and_its_children_box_rect(col.box_it(), Size::new(500., 500.));
+    .into_widget();
+    let (rect, _) = widget_and_its_children_box_rect(col.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
 
@@ -450,7 +450,8 @@ mod tests {
     let size = Size::new(200., 20.);
     let row = Flex { wrap: true, ..<_>::default() }.have_child((0..3).map(|_| SizedBox { size }));
 
-    let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
+    let (rect, children) =
+      widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
       children,
@@ -472,7 +473,8 @@ mod tests {
     }
     .have_child((0..3).map(|_| SizedBox { size }));
 
-    let (rect, children) = widget_and_its_children_box_rect(row.box_it(), Size::new(500., 500.));
+    let (rect, children) =
+      widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(400., 40.));
     assert_eq!(
       children,
@@ -488,10 +490,10 @@ mod tests {
   fn cross_align() {
     fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
       let row = Row { v_align: align, ..<_>::default() }
-        .have_child(SizedBox { size: Size::new(100., 20.) }.box_it())
-        .have_child(SizedBox { size: Size::new(100., 30.) }.box_it())
-        .have_child(SizedBox { size: Size::new(100., 40.) }.box_it())
-        .box_it();
+        .have_child(SizedBox { size: Size::new(100., 20.) }.into_widget())
+        .have_child(SizedBox { size: Size::new(100., 30.) }.into_widget())
+        .have_child(SizedBox { size: Size::new(100., 40.) }.into_widget())
+        .into_widget();
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
       assert_eq!(rect.size, Size::new(300., 40.));
@@ -521,10 +523,10 @@ mod tests {
       v_align: CrossAxisAlign::Stretch,
       ..<_>::default()
     }
-    .have_child(SizedBox { size: Size::new(100., 20.) }.box_it())
-    .have_child(SizedBox { size: Size::new(100., 30.) }.box_it())
-    .have_child(SizedBox { size: Size::new(100., 40.) }.box_it())
-    .box_it();
+    .have_child(SizedBox { size: Size::new(100., 20.) }.into_widget())
+    .have_child(SizedBox { size: Size::new(100., 30.) }.into_widget())
+    .have_child(SizedBox { size: Size::new(100., 40.) }.into_widget())
+    .into_widget();
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(300., 40.));
@@ -559,13 +561,13 @@ mod tests {
             ..<_>::default()
           }
           .have_child(vec![
-            SizedBox { size: item_size }.box_it(),
-            SizedBox { size: item_size }.box_it(),
-            SizedBox { size: item_size }.box_it(),
+            SizedBox { size: item_size }.into_widget(),
+            SizedBox { size: item_size }.into_widget(),
+            SizedBox { size: item_size }.into_widget(),
           ])
-          .box_it(),
+          .into_widget(),
         )
-        .box_it();
+        .into_widget();
 
       let mut wnd = Window::without_render(root, Size::new(500., 500.));
       wnd.render_ready();

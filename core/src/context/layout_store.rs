@@ -38,8 +38,6 @@ pub struct LayoutStore {
   /// node's depth.
   needs_layout: BinaryHeap<Reverse<(usize, WidgetId)>>,
 
-  // todo: should remove layout info after widget dropped.
-  /// Store the layout info layout widget.
   infos: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
 }
 

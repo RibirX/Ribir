@@ -55,12 +55,22 @@ pub fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
   // todo: should effect by transform widget.
 }
 
-pub(crate) fn map_to_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
+pub(crate) fn map_to_global(
+  id: WidgetId,
+  pos: Point,
+  tree: &WidgetTree,
+  store: &LayoutStore,
+) -> Point {
   id.ancestors(tree)
     .fold(pos, |pos, p| map_to_parent(p, pos, store))
 }
 
-pub(crate) fn map_from_global(id: WidgetId, pos: Point, tree: &WidgetTree, store: &LayoutStore) -> Point {
+pub(crate) fn map_from_global(
+  id: WidgetId,
+  pos: Point,
+  tree: &WidgetTree,
+  store: &LayoutStore,
+) -> Point {
   let stack = id.ancestors(tree).collect::<Vec<_>>();
   stack
     .iter()
@@ -141,7 +151,7 @@ mod tests {
   #[test]
   fn map_self_eq_self() {
     let w = Margin { margin: EdgeInsets::all(2.) }.have_child(SizedBox { size: Size::zero() });
-    let mut wnd = Window::without_render(w.box_it(), Size::zero());
+    let mut wnd = Window::without_render(w.into_widget(), Size::zero());
     wnd.render_ready();
 
     let ctx = wnd.context();

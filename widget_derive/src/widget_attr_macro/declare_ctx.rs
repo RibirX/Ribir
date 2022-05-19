@@ -12,7 +12,7 @@ use super::{
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use syn::{
   parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident,
   ItemMacro, Member,
@@ -20,9 +20,11 @@ use syn::{
 
 #[derive(Default)]
 pub struct DeclareCtx {
-  /// All name defined in `widget!` by `id`.
-  pub named_objects: HashSet<Ident>,
-  pub current_follows: HashMap<Ident, Vec<Span>>,
+  /// All name we need to reactive to its change, The value hint it a outside
+  /// define name,  pass by `track { ... }` all as true, and defined in
+  /// `widget!` by `id` is false.
+  pub named_objects: HashMap<Ident, bool, ahash::RandomState>,
+  pub current_follows: HashMap<Ident, Vec<Span>, ahash::RandomState>,
   // Key is the name of widget which has been depended by other, and value is a bool represent if
   // it's depended directly or just be depended by its wrap widget, if guard or child gen
   // expression.
@@ -119,15 +121,17 @@ impl VisitMut for DeclareCtx {
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
       if let Member::Named(ref f_name) = f_expr.member {
         if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(f_name) {
-          name.set_span(name.span().join(f_name.span()).unwrap());
-          let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
-          *f_expr.base = parse_quote! { #wrap_name };
-          self
-            .user_perspective_name
-            .insert(wrap_name.clone(), name.clone());
-          self.add_follow(wrap_name);
-          self.add_reference(name, ReferenceInfo::WrapWidgetRef);
-          return;
+          if self.named_objects.get(f_name) == Some(&false) {
+            name.set_span(name.span().join(f_name.span()).unwrap());
+            let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
+            *f_expr.base = parse_quote! { #wrap_name };
+            self
+              .user_perspective_name
+              .insert(wrap_name.clone(), name.clone());
+            self.add_follow(wrap_name);
+            self.add_reference(name, ReferenceInfo::WrapWidgetRef);
+            return;
+          }
         }
       }
     }
@@ -242,11 +246,11 @@ impl VisitMut for DeclareCtx {
 
 impl DeclareCtx {
   pub fn id_collect(&mut self, d: &WidgetMacro) -> super::Result<()> {
-    d.object_names_iter().try_for_each(|name| {
-      if let Some(old) = self.named_objects.get(name) {
-        Err(DeclareError::DuplicateID([(*old).clone(), name.clone()]))
+    d.object_names_iter().try_for_each(|(name, track)| {
+      if self.named_objects.contains_key(name) {
+        Err(DeclareError::DuplicateID([(*name).clone(), name.clone()]))
       } else {
-        self.named_objects.insert(name.clone());
+        self.named_objects.insert(name.clone(), track);
         Ok(())
       }
     })
@@ -277,7 +281,7 @@ impl DeclareCtx {
   pub fn emit_unused_id_warning(&self) {
     self
       .named_objects
-      .iter()
+      .keys()
       .filter(|k| !self.be_followed.contains_key(k) && !k.to_string().starts_with('_'))
       .for_each(|id| {
         Diagnostic::spanned(
@@ -305,7 +309,7 @@ impl DeclareCtx {
       .flat_map(|local| local.iter().rev())
       .find(|v| &v.name == ident)
       .and_then(|v| v.alias_of_name.as_ref())
-      .or_else(|| self.named_objects.contains(ident).then(|| ident))
+      .or_else(|| self.named_objects.contains_key(ident).then(|| ident))
   }
 
   pub fn expr_find_name_widget<'a>(&'a self, expr: &'a Expr) -> Option<&'a Ident> {
@@ -358,7 +362,7 @@ impl DeclareCtx {
       .unwrap_or_else(|err| err.into_compile_error());
 
     // trigger warning and restore named widget.
-    named.iter().for_each(|k| {
+    named.keys().for_each(|k| {
       ctx.named_objects.remove(k);
     });
 
@@ -372,10 +376,11 @@ impl DeclareCtx {
     let mut widget: DeclareWidget = syn::parse2(tokens)?;
     let mut ctx = self.borrow_capture_scope(true);
     ctx.visit_declare_widget_mut(&mut widget);
-    let tokens = widget.widget_full_tokens(&*ctx);
-    let name = widget.widget_identify();
-    let name = widget_def_variable(&name);
-    syn::parse2(quote! {{ #tokens #name }})
+    let tokens = widget.host_and_builtin_tokens(&*ctx);
+    let compos_tokens = widget.compose_tokens(&*ctx);
+    let def_name = widget_def_variable(&widget.widget_identify());
+
+    syn::parse2(quote! {{ #tokens # compos_tokens #def_name.into_widget()}})
   }
 }
 

@@ -4,7 +4,7 @@ use crate::prelude::*;
 ///
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
-#[derive(SingleChildWidget, Declare, Clone)]
+#[derive(SingleChild, Declare, Clone)]
 pub struct SizedBox {
   pub size: Size,
 }
@@ -79,7 +79,7 @@ mod tests {
         text: "".into(),
         style: <_>::default(),
       })
-      .box_it();
+      .into_widget();
 
     let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));
 
@@ -91,7 +91,8 @@ mod tests {
   fn empty_box() {
     let size = Size::new(10., 10.);
     let empty_box = SizedBox { size };
-    let (rect, child) = widget_and_its_children_box_rect(empty_box.box_it(), Size::new(500., 500.));
+    let (rect, child) =
+      widget_and_its_children_box_rect(empty_box.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, size);
     assert_eq!(child, vec![]);
   }

@@ -22,8 +22,6 @@ mod animations;
 mod dataflows;
 mod declare_widget;
 pub use declare_widget::RESERVE_IDENT;
-mod expr_widget;
-pub use expr_widget::*;
 
 mod track;
 mod widget_macro;

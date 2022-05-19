@@ -47,9 +47,9 @@ pub mod prelude {
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   #[doc(no_inline)]
-  pub use widget::layout::{MultiChild, SingleChild};
+  pub use widget::layout::{MultiChildWidget, SingleChildWidget};
   #[doc(no_inline)]
-  pub use widget_derive::{widget, Declare, MultiChildWidget, SingleChildWidget};
+  pub use widget_derive::{widget, Declare, MultiChild, SingleChild};
 }
 
 pub mod test;

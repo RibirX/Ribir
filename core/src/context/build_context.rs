@@ -1,4 +1,4 @@
-use crate::{animation::TickerAnimationCtrl, dynamic_widget::GenerateInfo, prelude::*};
+use crate::{animation::TickerAnimationCtrl, prelude::*};
 use ::text::FontFamily;
 use std::{rc::Rc, time::Duration};
 
@@ -44,11 +44,6 @@ impl<'a> BuildCtx<'a> {
       .as_mut()
       .map(|ticker| ticker.ticker_ctrl(duration))
   }
-
-  #[inline]
-  pub(crate) fn new_generator_info(&self) -> GenerateInfo {
-    self.ctx.generator_store.new_generator_info()
-  }
 }
 
 #[cfg(test)]
@@ -61,13 +56,13 @@ mod tests {
   fn always_have_default_theme() {
     struct T;
     impl Compose for T {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         let _ = ctx.theme();
         panic!("Get a default theme from context");
       }
     }
     // should panic when construct the context
-    Context::new(T.box_it(), 1., None);
+    Context::new(T.into_widget(), 1., None);
   }
 
   #[derive(Debug, Declare)]
@@ -76,13 +71,13 @@ mod tests {
   }
 
   impl Compose for ThemeTrack {
-    fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+    fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
       this
         .shallow_ref()
         .themes
         .borrow_mut()
         .push(ctx.theme().clone());
-      SizedBox { size: Size::zero() }.box_it()
+      SizedBox { size: Size::zero() }.into_widget()
     }
   }
 
@@ -92,7 +87,7 @@ mod tests {
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for DarkLightThemes {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
@@ -114,7 +109,7 @@ mod tests {
 
     let dark_light = DarkLightThemes::default();
     let track_themes = dark_light.0.clone();
-    let mut wnd = Window::without_render(dark_light.box_it(), Size::zero());
+    let mut wnd = Window::without_render(dark_light.into_widget(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
@@ -126,7 +121,7 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for LightDarkThemes {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
@@ -148,7 +143,7 @@ mod tests {
 
     let light_dark = LightDarkThemes::default();
     let track_themes = light_dark.0.clone();
-    let mut wnd = Window::without_render(light_dark.box_it(), Size::zero());
+    let mut wnd = Window::without_render(light_dark.into_widget(), Size::zero());
     wnd.render_ready();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
