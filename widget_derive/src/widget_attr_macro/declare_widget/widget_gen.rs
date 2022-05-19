@@ -3,15 +3,16 @@ use std::collections::HashSet;
 use crate::{
   declare_derive::field_convert_method,
   widget_attr_macro::{
-    field_guard_variable, ribir_variable, skip_nc_assign, widget_def_variable, DeclareCtx,
-    BUILD_CTX,
+    capture_widget, field_guard_variable, ribir_variable, skip_nc_assign, widget_def_variable,
+    widget_macro::{is_expr_keyword, EXPR_FIELD},
+    widget_state_ref, DeclareCtx, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Ident, Path};
 
-use super::{used_widgets_subscribe, DeclareField};
+use super::{upstream_by_used_widgets, used_widgets_subscribe, DeclareField};
 
 pub struct WidgetGen<'a> {
   pub ty: &'a Path,
@@ -21,6 +22,14 @@ pub struct WidgetGen<'a> {
 
 impl<'a> WidgetGen<'a> {
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
+    if is_expr_keyword(&self.ty) {
+      self.expr_widget_token()
+    } else {
+      self.normal_widget_token(ctx)
+    }
+  }
+
+  fn normal_widget_token(&self, ctx: &DeclareCtx) -> TokenStream {
     let Self { fields, ty, .. } = self;
 
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
@@ -78,6 +87,35 @@ impl<'a> WidgetGen<'a> {
     }
   }
 
+  fn expr_widget_token(&self) -> TokenStream {
+    let Self { ty, name, fields } = self;
+    let expr_field = fields.last().unwrap();
+    assert_eq!(expr_field.member, EXPR_FIELD);
+
+    let DeclareField { member: expr_mem, expr, follows, .. } = expr_field;
+    let def_name = widget_def_variable(&name);
+    let build_ctx = ribir_variable(BUILD_CTX, ty.span());
+    if let Some(follows) = follows.as_ref() {
+      let used_widgets = follows.iter().map(|f| &f.widget);
+      let refs = used_widgets.clone().map(widget_state_ref);
+      let captures = used_widgets.clone().map(capture_widget);
+      let upstream = upstream_by_used_widgets(used_widgets);
+      quote_spanned! { ty.span() =>
+        let #def_name = {
+          #(#captures)*
+          #ty::<_>::builder()
+            .upstream(Some(#upstream.box_it()))
+            .#expr_mem(move || { #(#refs)* #expr })
+            .build(#build_ctx)
+          };
+      }
+    } else {
+      quote_spanned! { ty.span() =>
+         let #def_name = #expr;
+      }
+    }
+  }
+
   fn field_follow_tokens(&self, f: &DeclareField) -> Option<TokenStream> {
     let DeclareField {
       member, follows, skip_nc, if_guard, ..
@@ -131,14 +169,14 @@ impl DeclareField {
     quote_spanned! { expr.span() => <#widget_ty as Declare>::Builder::#field_converter(#expr) }
   }
 
-  fn build_tokens_without_guard(&self, widget_ty: &Path) -> TokenStream {
+  pub(crate) fn build_tokens_without_guard(&self, widget_ty: &Path) -> TokenStream {
     assert!(self.if_guard.is_none());
     let member = &self.member;
     let value = self.value_tokens(widget_ty);
     quote! {.#member(#value)}
   }
 
-  fn build_tokens_with_guard(&self, builder: &Ident, widget_ty: &Path) -> TokenStream {
+  pub(crate) fn build_tokens_with_guard(&self, builder: &Ident, widget_ty: &Path) -> TokenStream {
     let if_guard = self.if_guard.as_ref().unwrap();
     let member = &self.member;
     let value = self.value_tokens(widget_ty);

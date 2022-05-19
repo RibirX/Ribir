@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 // todo: give a alias for `CrossAxisAlign` and `MainAxisAlign`
 
-#[derive(Default, MultiChildWidget, Declare, Clone)]
+#[derive(Default, MultiChild, Declare, Clone)]
 pub struct Column {
   #[declare(default)]
   pub reverse: bool,

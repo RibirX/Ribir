@@ -12,7 +12,7 @@ impl Application {
   #[inline]
   pub fn new() -> Application { <_>::default() }
 
-  pub fn run(mut self, w: BoxedWidget, animation_mgr: Option<Box<dyn TickerProvider>>) {
+  pub fn run(mut self, w: Widget, animation_mgr: Option<Box<dyn TickerProvider>>) {
     let wnd_id = self.new_window(w, animation_mgr);
     let Self { event_loop, mut windows, .. } = self;
 
@@ -46,7 +46,7 @@ impl Application {
 
   pub(crate) fn new_window(
     &mut self,
-    w: BoxedWidget,
+    w: Widget,
     animation_mgr: Option<Box<dyn TickerProvider>>,
   ) -> WindowId {
     let window = Window::from_event_loop(w, &self.event_loop, animation_mgr);

@@ -1,17 +1,17 @@
 use proc_macro2::Span;
 use syn::{spanned::Spanned, Ident};
 
-use super::declare_widget::Child;
+use super::DeclareWidget;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
 pub(crate) const DECLARE_WRAP_MACRO: &str = "ribir_declare_ಠ_ಠ";
 pub(crate) const BUILD_CTX: &str = "build_ctx";
 
-pub fn child_variable(c: &Child, idx: usize) -> Ident {
-  let span = match c {
-    Child::Declare(d) => d.path.span(),
-    Child::Expr(e) => e.span(),
-  };
+pub fn child_variable(c: &DeclareWidget, idx: usize) -> Ident {
+  if c.named.is_some() {
+    return c.widget_identify();
+  }
+  let span = c.path.span();
   let child = Ident::new("c", span);
   ribir_suffix_variable(&child, &idx.to_string())
 }

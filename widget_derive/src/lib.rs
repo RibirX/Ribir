@@ -14,24 +14,24 @@ use syn::{parse_macro_input, DeriveInput};
 use widget_attr_macro::{DeclareCtx, WidgetMacro};
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
-#[proc_macro_derive(SingleChildWidget, attributes(proxy))]
+#[proc_macro_derive(SingleChild, attributes(proxy))]
 pub fn single_marco_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;
   quote! {
-      impl #impl_generics SingleChildWidget for #name #ty_generics #where_clause {}
+      impl #impl_generics SingleChild for #name #ty_generics #where_clause {}
   }
   .into()
 }
 
-#[proc_macro_derive(MultiChildWidget, attributes(proxy))]
+#[proc_macro_derive(MultiChild, attributes(proxy))]
 pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;
   quote! {
-      impl #impl_generics MultiChildWidget for #name #ty_generics #where_clause {}
+      impl #impl_generics MultiChild for #name #ty_generics #where_clause {}
   }
   .into()
 }

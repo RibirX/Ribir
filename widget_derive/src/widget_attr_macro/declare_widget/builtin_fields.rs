@@ -2,22 +2,20 @@ use ::builtin::builtin;
 use inflector::Inflector;
 use lazy_static::lazy_static;
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote;
-use smallvec::SmallVec;
-use std::{
-  collections::{BTreeMap, HashMap},
-  str::FromStr,
-};
+use quote::{quote, quote_spanned};
+use smallvec::{smallvec, SmallVec};
+use std::collections::{BTreeMap, HashMap};
 use syn::{parse_quote_spanned, spanned::Spanned};
 
 use crate::{
   error::DeclareError,
   widget_attr_macro::{
-    ribir_suffix_variable, widget_def_variable, DeclareCtx, FollowPart, Follows,
+    field_guard_variable, ribir_suffix_variable, widget_def_variable, widget_macro::EXPR_WIDGET,
+    DeclareCtx, FollowPart, Follows,
   },
 };
 
-use super::{widget_gen::WidgetGen, DeclareField};
+use super::{widget_gen::WidgetGen, DeclareField, DeclareWidget};
 
 include!("../../builtin_fields_list.rs");
 
@@ -40,7 +38,13 @@ lazy_static! {
 
 #[derive(Debug, Default)]
 pub struct BuiltinFieldWidgets {
-  widgets: HashMap<&'static str, SmallVec<[DeclareField; 1]>, ahash::RandomState>,
+  widgets: Vec<BuiltinWidgetInfo>,
+}
+
+#[derive(Debug)]
+struct BuiltinWidgetInfo {
+  name: &'static str,
+  fields: SmallVec<[DeclareField; 1]>,
 }
 
 impl BuiltinFieldWidgets {
@@ -53,13 +57,13 @@ impl BuiltinFieldWidgets {
   pub fn visit_builtin_fields_mut(&mut self, ctx: &mut DeclareCtx) {
     self
       .widgets
-      .values_mut()
-      .flat_map(|v| v.iter_mut())
+      .iter_mut()
+      .flat_map(|info| info.fields.iter_mut())
       .for_each(|f| ctx.visit_declare_field_mut(f))
   }
 
   pub fn all_builtin_fields(&self) -> impl Iterator<Item = &DeclareField> {
-    self.widgets.values().flat_map(|v| v.iter())
+    self.widgets.iter().flat_map(|info| info.fields.iter())
   }
 
   pub fn collect_wrap_widget_follows<'a>(
@@ -67,23 +71,24 @@ impl BuiltinFieldWidgets {
     host: &Ident,
     follows_info: &mut BTreeMap<Ident, Follows<'a>>,
   ) {
-    self.widgets.iter().for_each(|(widget_ty, fields)| {
-      let follows: Follows = fields
+    self.widgets.iter().for_each(|info| {
+      let follows: Follows = info
+        .fields
         .iter()
         .filter_map(FollowPart::from_widget_field)
         .collect();
 
       if !follows.is_empty() {
-        let name = ribir_suffix_variable(host, BUILTIN_WIDGET_SUFFIX.get(widget_ty).unwrap());
+        let name = ribir_suffix_variable(host, BUILTIN_WIDGET_SUFFIX.get(info.name).unwrap());
         follows_info.insert(name, follows);
       }
     });
   }
 
   pub fn key_follow_check(&self) -> crate::error::Result<()> {
-    if let Some(fields) = self.widgets.get("Key") {
-      assert_eq!(fields.len(), 1);
-      let DeclareField { member, follows, .. } = &fields[0];
+    if let Some(info) = self.widgets.iter().find(|info| info.name == "Key") {
+      assert_eq!(info.fields.len(), 1);
+      let DeclareField { member, follows, .. } = &info.fields[0];
       if let Some(follows) = follows {
         return Err(DeclareError::KeyDependsOnOther {
           key: member.span().unwrap(),
@@ -100,51 +105,90 @@ impl BuiltinFieldWidgets {
     host_id: Ident,
     ctx: &'a DeclareCtx,
   ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
-    self.widgets.iter().map(move |(w_ty, fields)| {
-      let suffix = BUILTIN_WIDGET_SUFFIX.get(w_ty).unwrap();
+    self.widgets.iter().map(move |info| {
+      let suffix = BUILTIN_WIDGET_SUFFIX.get(info.name).unwrap();
       let name = ribir_suffix_variable(&host_id, suffix);
-      let span = fields
-        .iter()
-        .fold(None, |span: Option<Span>, f| {
-          if let Some(span) = span {
-            span.join(f.member.span())
-          } else {
-            Some(f.member.span())
-          }
-        })
-        .unwrap();
 
-      let tt = TokenStream::from_str(w_ty).unwrap();
-      let ty: syn::Path = parse_quote_spanned! { span => #tt };
-
-      let gen = WidgetGen { ty: &ty, name, fields: &fields };
-      let wrap_name = widget_def_variable(&gen.name);
-      let mut def_and_ref_tokens = gen.gen_widget_tokens(ctx);
-
+      let span = info.span();
+      let ty = Ident::new(&info.name, span).into();
+      let fields = &info.fields;
       // If all fields have if guard and condition are false,  widget can
       // emit
-      // todo:  use dynamic widget implement if guard?
-      if fields.iter().all(|f| f.if_guard.is_some()) {
-        def_and_ref_tokens = quote! {
-          #def_and_ref_tokens
-          let #wrap_name = (!#wrap_name.is_empty()).then(|| #wrap_name);
-        };
-      }
 
-      (gen.name, def_and_ref_tokens)
+      let def_and_ref_tokens = if let Some(conditions) = info.widget_guard_conditions() {
+        let follows = fields.iter().filter_map(|f| f.follows.clone()).fold(
+          None,
+          |res: Option<Vec<_>>, follows| {
+            if let Some(mut res) = res {
+              res.extend(follows);
+              Some(res)
+            } else {
+              Some(follows)
+            }
+          },
+        );
+
+        let gen = WidgetGen {
+          ty: &ty,
+          name: name.clone(),
+          fields: &fields,
+        };
+        let widget_tokens = gen.gen_widget_tokens(ctx);
+        if let Some(follows) = follows {
+          let ty = Ident::new(EXPR_WIDGET, span).into();
+          let wrap_name = widget_def_variable(&name);
+          let mut expr_field: DeclareField = parse_quote_spanned! { span =>
+            expr: { #conditions.then(|| { #widget_tokens #wrap_name}) }
+          };
+          expr_field.follows = Some(follows);
+          let gen = WidgetGen {
+            ty: &ty,
+            name: name.clone(),
+            fields: &[expr_field],
+          };
+          gen.gen_widget_tokens(ctx)
+        } else {
+          widget_tokens
+        }
+      } else {
+        let gen = WidgetGen {
+          ty: &ty,
+          name: name.clone(),
+          fields: &fields,
+        };
+        gen.gen_widget_tokens(ctx)
+      };
+
+      (name, def_and_ref_tokens)
     })
   }
 
-  pub fn compose_tokens(&self, host: &Ident) -> TokenStream {
-    let compose_iter = self.widgets.iter().map(|(ty, _)| {
-      let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).unwrap();
-      let name = ribir_suffix_variable(host, suffix);
-      let wrap_def = widget_def_variable(&name);
-      let host_def = widget_def_variable(host);
-      quote! {let #host_def = #wrap_def.have_child(#host_def);}
-    });
-
-    quote! {#(#compose_iter)*}
+  /// return builtin fields composed tokens, and the upstream tokens if the
+  /// finally widget as a expr widget.
+  pub fn compose_tokens(&self, host: &DeclareWidget) -> TokenStream {
+    let host_name = host.widget_identify();
+    let mut compose_tokens = quote! {};
+    self
+      .widgets
+      .iter()
+      .fold(host.is_host_expr_widget(), |is_expr_widget, info| {
+        let suffix = BUILTIN_WIDGET_SUFFIX.get(info.name).unwrap();
+        let name = ribir_suffix_variable(&host_name, suffix);
+        let wrap_def = widget_def_variable(&name);
+        let host_def = widget_def_variable(&host_name);
+        let span = info.span();
+        if is_expr_widget {
+          compose_tokens.extend(
+            quote_spanned! { span => let #host_def = SingleChildWidget::from_expr_child(#wrap_def, #host_def); },
+          )
+        } else {
+          compose_tokens.extend(
+            quote_spanned! { span =>  let #host_def = SingleChildWidget::new(#wrap_def, #host_def.into_widget()); },
+          )
+        }
+        info.is_expr_widget()
+      });
+    compose_tokens
   }
 
   pub fn assign_builtin_field(
@@ -157,7 +201,15 @@ impl BuiltinFieldWidgets {
       Some(&widget_ty)
     );
 
-    let fields = self.widgets.entry(widget_ty).or_default();
+    let fields: &mut SmallVec<_> =
+      if let Some(info) = self.widgets.iter_mut().find(|info| info.name == widget_ty) {
+        &mut info.fields
+      } else {
+        let info = BuiltinWidgetInfo { name: widget_ty, fields: smallvec![] };
+        self.widgets.push(info);
+        let w = self.widgets.last_mut();
+        &mut w.unwrap().fields
+      };
     if fields.iter().find(|f| f.member == field.member).is_some() {
       return Err(syn::Error::new(
         field.span(),
@@ -166,5 +218,41 @@ impl BuiltinFieldWidgets {
     }
     fields.push(field);
     Ok(())
+  }
+
+  pub fn finally_is_expr_widget(&self) -> bool {
+    self.widgets.last().map_or(false, BuiltinWidgetInfo::is_expr_widget)
+  }
+}
+
+
+
+impl BuiltinWidgetInfo {
+  fn is_expr_widget(&self) -> bool {
+    self.fields.iter().all(|f| f.if_guard.is_some())
+  }
+
+  fn widget_guard_conditions(&self) -> Option<TokenStream> {
+    self.is_expr_widget().then(|| {
+      let conditions = self.fields
+        .iter()
+        .map(|f| field_guard_variable(&f.member, f.if_guard.span()));
+      quote! {( #(#conditions) || * )}
+    })
+    
+  }
+
+  fn span(&self) -> Span {
+    self
+      .fields
+      .iter()
+      .fold(None, |span: Option<Span>, f| {
+        if let Some(span) = span {
+          span.join(f.member.span())
+        } else {
+          Some(f.member.span())
+        }
+      })
+      .unwrap()
   }
 }

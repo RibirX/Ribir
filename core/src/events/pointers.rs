@@ -110,7 +110,7 @@ impl PointerEvent {
 
 macro_rules! impl_pointer_listener {
   ($name: ident, $field: ident, $convert: ident, $builder: ident) => {
-    #[derive(Declare, SingleChildWidget)]
+    #[derive(Declare, SingleChild)]
     pub struct $name {
       #[declare(builtin, custom_convert)]
       pub $field: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,

@@ -10,36 +10,22 @@ pub struct Cursor {
   cursor: Rc<Cell<CursorIcon>>,
 }
 
-impl Render for Cursor {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.single_child().expect("`Margin` must have single child");
-    ctx.perform_child_layout(child, clamp)
-  }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-impl SingleChildWidget for Cursor {
-  fn have_child<C: IntoOptionChild<M> + 'static, M>(self, child: C) -> SingleChild<Self> {
-    let c = self.cursor.clone();
-    SingleChild {
-      widget: self,
-      child: Some(widget! {
-        declare Empty {
-          on_pointer_move: move |e: &mut PointerEvent| {
-            let mut ctx = e.context();
-            if e.point_type == PointerType::Mouse
-              && e.buttons == MouseButtons::empty()
-              && ctx.updated_cursor().is_none()
-            {
-                ctx.set_cursor(c.get());
-            }
-          },
-          ExprWidget { child }
-        }
-      }),
+impl ComposeSingleChild for Cursor {
+  fn compose_single_child(this: Stateful<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+    widget! {
+      track { this }
+      declare ExprWidget {
+        expr: child,
+        on_pointer_move: move |e: &mut PointerEvent| {
+          let mut ctx = e.context();
+          if e.point_type == PointerType::Mouse
+            && e.buttons == MouseButtons::empty()
+            && ctx.updated_cursor().is_none()
+          {
+            ctx.set_cursor(this.cursor.get());
+          }
+        },
+      }
     }
   }
 }
@@ -78,7 +64,7 @@ mod tests {
   fn tree_down_up() {
     struct RowTree;
     impl Compose for RowTree {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         widget! {
           declare SizedBox {
             size: Size::new(f32::INFINITY, f32::INFINITY),
@@ -104,7 +90,7 @@ mod tests {
       }
     }
 
-    let mut wnd = Window::without_render(RowTree.box_it(), Size::new(400., 400.));
+    let mut wnd = Window::without_render(RowTree.into_widget(), Size::new(400., 400.));
 
     wnd.render_ready();
 

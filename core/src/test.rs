@@ -5,7 +5,7 @@ pub mod recursive_row;
 use crate::prelude::*;
 
 // return the flex box rect, and rect of its children.
-pub fn widget_and_its_children_box_rect(root: BoxedWidget, window_size: Size) -> (Rect, Vec<Rect>) {
+pub fn widget_and_its_children_box_rect(root: Widget, window_size: Size) -> (Rect, Vec<Rect>) {
   let mut wnd = Window::without_render(root, window_size);
   wnd.render_ready();
 

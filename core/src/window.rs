@@ -176,7 +176,7 @@ impl Window {
 
   #[cfg(feature = "wgpu_gl")]
   pub(crate) fn from_event_loop(
-    root: BoxedWidget,
+    root: Widget,
     event_loop: &winit::event_loop::EventLoop<()>,
     animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
@@ -306,7 +306,7 @@ impl RawWindow for MockRawWindow {
 
 impl Window {
   #[cfg(feature = "wgpu_gl")]
-  pub fn wgpu_headless(root: BoxedWidget, size: DeviceSize) -> Self {
+  pub fn wgpu_headless(root: Widget, size: DeviceSize) -> Self {
     let ctx = Context::new(root, 1., None);
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
       size,
@@ -325,7 +325,7 @@ impl Window {
     )
   }
 
-  pub fn without_render(root: BoxedWidget, size: Size) -> Self {
+  pub fn without_render(root: Widget, size: Size) -> Self {
     let p_backend = MockBackend;
     Self::new(
       MockRawWindow { size, ..Default::default() },

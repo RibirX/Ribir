@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Focus attr attach to widget to support get ability to focus in.
-#[derive(Default, Declare, SingleChildWidget)]
+#[derive(Default, Declare, SingleChild)]
 pub struct FocusListener {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.

@@ -177,7 +177,7 @@ mod tests {
   use crate::widget::SizedBox;
   use std::{cell::RefCell, rc::Rc};
 
-  fn empty_box() -> BoxedWidget { SizedBox { size: Size::zero() }.box_it() }
+  fn empty_box() -> Widget { SizedBox { size: Size::zero() }.into_widget() }
 
   #[test]
   fn two_auto_focus() {
@@ -190,7 +190,7 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(widget.box_it(), 1., None);
+    let ctx = Context::new(widget.into_widget(), 1., None);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
@@ -210,7 +210,7 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(widget.box_it(), 1., None);
+    let ctx = Context::new(widget.into_widget(), 1., None);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
@@ -235,7 +235,7 @@ mod tests {
       }
     };
 
-    let mut ctx = Context::new(widget.box_it(), 1., None);
+    let mut ctx = Context::new(widget.into_widget(), 1., None);
     let mut mgr = FocusManager::default();
     mgr.update(&mut ctx);
     let tree = &ctx.widget_tree;
@@ -270,7 +270,7 @@ mod tests {
     }
 
     impl Compose for EmbedFocus {
-      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track  { this }
           declare SizedBox {
@@ -293,7 +293,7 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut ctx = Context::new(widget.box_it(), 1., None);
+    let mut ctx = Context::new(widget.into_widget(), 1., None);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 

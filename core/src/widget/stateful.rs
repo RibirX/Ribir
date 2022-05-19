@@ -87,6 +87,8 @@ use std::{
   rc::Rc,
 };
 
+use super::ComposedWidget;
+
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
 pub trait IntoStateful {
@@ -116,10 +118,12 @@ pub struct SilentRef<W> {
 
 /// The stateful widget generic implementation.
 pub struct Stateful<W> {
-  widget: Rc<RefCell<W>>,
-  change_notifier: ChangeNotifier,
+  pub(crate) widget: Rc<RefCell<W>>,
+  pub(crate) change_notifier: ChangeNotifier,
 }
 
+/// notify downstream when widget state changed, the value mean if the change it
+/// as silent or not.
 #[derive(Default, Clone)]
 pub(crate) struct ChangeNotifier(Rc<RefCell<LocalSubject<'static, bool, ()>>>);
 
@@ -261,10 +265,6 @@ impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
   }
 }
 
-impl<W> SingleChildWidget for Stateful<W> where W: SingleChildWidget {}
-
-impl<W> MultiChildWidget for Stateful<W> where W: MultiChildWidget {}
-
 impl<W: Render> Render for Stateful<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -276,6 +276,19 @@ impl<W: Render> Render for Stateful<W> {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
+}
+
+impl<C: Compose + 'static> IntoWidget<&dyn Compose> for Stateful<C> {
+  #[inline]
+  fn into_widget(self) -> Widget {
+    Widget(WidgetInner::Compose(Box::new(|ctx| {
+      ComposedWidget {
+        composed: Compose::compose(self, ctx),
+        by: PhantomData::<C>,
+      }
+      .into_widget()
+    })))
+  }
 }
 
 impl Drop for StateRefGuard {
@@ -362,7 +375,7 @@ mod tests {
     });
 
     let mut state = sized_box.state_ref();
-    let mut wnd = Window::without_render(sized_box.box_it(), Size::new(500., 500.));
+    let mut wnd = Window::without_render(sized_box.into_widget(), Size::new(500., 500.));
     wnd.render_ready();
 
     assert_eq!(*notified_count.borrow(), 0);

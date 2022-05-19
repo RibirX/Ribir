@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[derive(SingleChildWidget, Clone, Declare)]
+#[derive(SingleChild, Clone, Declare)]
 pub struct Padding {
   #[declare(builtin)]
   pub padding: EdgeInsets,
@@ -60,13 +60,14 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let widget = Padding { padding: EdgeInsets::only_left(1.) }
-      .have_child(
-        Row::default()
-          .have_child(SizedBox { size: Size::new(100., 100.) }.box_it())
-          .box_it(),
-      )
-      .box_it();
+    let widget = widget! {
+      declare Row {
+        SizedBox {
+           size: Size::new(100., 100.),
+           padding: EdgeInsets::only_left(1.)
+        }
+      }
+    };
 
     let mut wnd = Window::without_render(widget, Size::new(200., 200.));
     wnd.render_ready();

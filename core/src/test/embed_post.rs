@@ -24,7 +24,7 @@ impl EmbedPost {
 }
 
 impl Compose for EmbedPost {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare Row {

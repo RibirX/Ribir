@@ -218,16 +218,13 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer(
-    event_stack: Rc<RefCell<Vec<PointerEvent>>>,
-    widget: BoxedWidget,
-  ) -> BoxedWidget {
+  fn record_pointer(event_stack: Rc<RefCell<Vec<PointerEvent>>>, widget: Widget) -> Widget {
     let handler_ctor = || {
       let stack = event_stack.clone();
       move |e: &mut PointerEvent| stack.borrow_mut().push(e.clone())
     };
     widget! {
-      declare Empty {
+      declare Void {
         on_pointer_down : handler_ctor(),
         on_pointer_move: handler_ctor(),
         on_pointer_up: handler_ctor(),
@@ -248,7 +245,7 @@ mod tests {
       event_record.clone(),
       widget! { declare Row { ExprWidget  { record } } },
     );
-    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -403,7 +400,7 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare SizedBox {
@@ -425,7 +422,7 @@ mod tests {
     let root = EventRecord::default();
     let event_record = root.0.clone();
 
-    let mut wnd = Window::without_render(root.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -447,7 +444,7 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare SizedBox {
@@ -470,7 +467,7 @@ mod tests {
     let enter_event = w.enter.clone();
     let leave_event = w.leave.clone();
 
-    let mut wnd = Window::without_render(w.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -516,7 +513,7 @@ mod tests {
     struct ClickPath(Rc<RefCell<i32>>);
 
     impl Compose for ClickPath {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
+      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare Row {
@@ -544,7 +541,7 @@ mod tests {
     let click_path = cp.0.clone();
 
     // Stretch row
-    let mut wnd = Window::without_render(cp.box_it(), Size::new(400., 400.));
+    let mut wnd = Window::without_render(cp.into_widget(), Size::new(400., 400.));
     wnd.render_ready();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -660,7 +657,7 @@ mod tests {
   #[test]
   fn fix_hit_out_window() {
     let w = SizedBox { size: SizedBox::expanded_size() };
-    let mut wnd = Window::without_render(w.box_it(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
     wnd.dispatcher.pointer.cursor_pos = Point::new(-1., -1.);
     let hit = wnd.dispatcher.pointer.hit_widget(&wnd.context());

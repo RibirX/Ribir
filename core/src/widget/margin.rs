@@ -9,7 +9,7 @@ pub struct EdgeInsets {
 }
 
 /// A widget that create space around its child.
-#[derive(SingleChildWidget, Default, Clone, PartialEq, Declare)]
+#[derive(SingleChild, Default, Clone, PartialEq, Declare)]
 pub struct Margin {
   #[declare(builtin)]
   pub margin: EdgeInsets,
@@ -128,10 +128,11 @@ mod tests {
     let widget = Margin {
       margin: EdgeInsets::symmetrical(1., 1.),
     }
-    .have_child(SizedBox { size: Size::new(100., 100.) }.box_it())
-    .box_it();
+    .have_child(SizedBox { size: Size::new(100., 100.) }.into_widget())
+    .into_widget();
 
-    let (rect, children) = widget_and_its_children_box_rect(widget.box_it(), Size::new(200., 200.));
+    let (rect, children) =
+      widget_and_its_children_box_rect(widget.into_widget(), Size::new(200., 200.));
 
     assert_eq!(rect, Rect::from_size(Size::new(102., 102.)));
     assert_eq!(
