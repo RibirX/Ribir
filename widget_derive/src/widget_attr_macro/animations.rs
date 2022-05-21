@@ -678,7 +678,6 @@ pub enum AnimationObject<'a> {
 
 impl DeclareCtx {
   pub fn visit_animations_mut(&mut self, animations: &mut Animations) {
-    let mut ctx = self.borrow_capture_scope(true);
     let Animations {
       animates_def,
       states_def,
@@ -689,12 +688,12 @@ impl DeclareCtx {
 
     animates_def
       .iter_mut()
-      .for_each(|a| ctx.visit_animate_mut(a));
-    states_def.iter_mut().for_each(|s| ctx.visit_state_mut(s));
+      .for_each(|a| self.visit_animate_mut(a));
+    states_def.iter_mut().for_each(|s| self.visit_state_mut(s));
     transitions_def
       .iter_mut()
-      .for_each(|t| ctx.visit_transition_mut(t));
-    triggers.iter_mut().for_each(|t| ctx.visit_trigger_mut(t));
+      .for_each(|t| self.visit_transition_mut(t));
+    triggers.iter_mut().for_each(|t| self.visit_trigger_mut(t));
   }
 
   fn visit_animate_mut(&mut self, animate: &mut Animate) {

@@ -149,7 +149,7 @@ impl<'a> WidgetGen<'a> {
 
   fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
     // widget is followed by others.
-    ctx.be_followed(&self.name)
+    ctx.is_used(&self.name)
       // or its fields follow others
       ||  self
       .fields

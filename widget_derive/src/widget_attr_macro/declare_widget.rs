@@ -235,9 +235,7 @@ impl DeclareCtx {
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
     self.visit_ident_mut(&mut f.member);
     if let Some(if_guard) = f.if_guard.as_mut() {
-      self
-        .borrow_capture_scope(false)
-        .visit_expr_mut(&mut if_guard.cond);
+      self.visit_expr_mut(&mut if_guard.cond);
     }
     self.visit_expr_mut(&mut f.expr);
 
@@ -419,7 +417,7 @@ impl DeclareWidget {
         let w_ref = self.widget_identify();
         let wrap_name = ribir_prefix_variable(&f.member, &w_ref.to_string());
 
-        if ctx.be_followed(&wrap_name) {
+        if ctx.is_used(&wrap_name) {
           let if_guard_span = f.if_guard.as_ref().unwrap().span().unwrap();
           let mut use_spans = vec![];
           self.traverses_widget().for_each(|w| {
