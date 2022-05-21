@@ -219,17 +219,17 @@ mod tests {
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
   fn record_pointer(event_stack: Rc<RefCell<Vec<PointerEvent>>>, widget: Widget) -> Widget {
-    let handler_ctor = || {
+    let handler_ctor = move || {
       let stack = event_stack.clone();
       move |e: &mut PointerEvent| stack.borrow_mut().push(e.clone())
     };
     widget! {
-      declare Void {
+      declare ExprWidget {
+        expr: widget,
         on_pointer_down : handler_ctor(),
         on_pointer_move: handler_ctor(),
         on_pointer_up: handler_ctor(),
         on_pointer_cancel: handler_ctor(),
-        ExprWidget { widget }
       }
     }
   }
@@ -243,7 +243,7 @@ mod tests {
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { declare Row { ExprWidget  { record } } },
+      widget! { declare Row { ExprWidget  { expr: record } } },
     );
     let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
@@ -400,12 +400,12 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
-            on_pointer_down: move |e| this.0.borrow_mut().push(e.clone()),
+            on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
             Text {
               text: "pointer event test",
               style: TextStyle::default(),
@@ -444,18 +444,18 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
-            on_pointer_enter: move |_| this.enter.borrow_mut().push(2),
-            on_pointer_leave: move |_| this.leave.borrow_mut().push(2),
+            on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
+            on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
             SizedBox {
               margin: EdgeInsets::all(4.),
               size: SizedBox::expanded_size(),
-              on_pointer_enter: move |_| this.enter.borrow_mut().push(1),
-              on_pointer_leave: move |_| this.leave.borrow_mut().push(1)
+              on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
+              on_pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
 
             }
           }
@@ -513,7 +513,7 @@ mod tests {
     struct ClickPath(Rc<RefCell<i32>>);
 
     impl Compose for ClickPath {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare Row {

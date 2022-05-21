@@ -428,19 +428,27 @@ mod tests {
 
   #[test]
   fn horizontal_line() {
-    let row = Flex::default().have_child((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }));
+    let row = widget! {
+      declare Flex {
+        ExprWidget {
+          expr: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
+        }
+      }
+    };
     let (rect, _) = widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(100., 20.));
   }
 
   #[test]
   fn vertical_line() {
-    let col = Flex {
-      direction: Direction::Vertical,
-      ..<_>::default()
-    }
-    .have_child((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
-    .into_widget();
+    let col = widget! {
+      declare Flex {
+        direction: Direction::Vertical,
+        ExprWidget  {
+         expr: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
+        }
+      }
+    };
     let (rect, _) = widget_and_its_children_box_rect(col.into_widget(), Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(10., 200.));
   }
@@ -448,7 +456,14 @@ mod tests {
   #[test]
   fn row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex { wrap: true, ..<_>::default() }.have_child((0..3).map(|_| SizedBox { size }));
+    let row = widget! {
+      declare Flex {
+        wrap: true,
+        ExprWidget {
+          expr: (0..3).map(|_| SizedBox { size })
+        }
+      }
+    };
 
     let (rect, children) =
       widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
@@ -466,12 +481,15 @@ mod tests {
   #[test]
   fn reverse_row_wrap() {
     let size = Size::new(200., 20.);
-    let row = Flex {
-      wrap: true,
-      reverse: true,
-      ..<_>::default()
-    }
-    .have_child((0..3).map(|_| SizedBox { size }));
+    let row = widget! {
+      declare Flex {
+        wrap: true,
+        reverse: true,
+        ExprWidget {
+          expr: (0..3).map(|_| SizedBox { size })
+        }
+      }
+    };
 
     let (rect, children) =
       widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
@@ -553,21 +571,18 @@ mod tests {
   fn main_align() {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
-      let root = SizedBox { size: SizedBox::expanded_size() }
-        .have_child(
+      let root = widget! {
+        declare SizedBox {
+          size: SizedBox::expanded_size(),
           Row {
             h_align: align,
             v_align: CrossAxisAlign::Start,
-            ..<_>::default()
+            SizedBox { size: item_size }
+            SizedBox { size: item_size }
+            SizedBox { size: item_size }
           }
-          .have_child(vec![
-            SizedBox { size: item_size }.into_widget(),
-            SizedBox { size: item_size }.into_widget(),
-            SizedBox { size: item_size }.into_widget(),
-          ])
-          .into_widget(),
-        )
-        .into_widget();
+        }
+      };
 
       let mut wnd = Window::without_render(root, Size::new(500., 500.));
       wnd.render_ready();

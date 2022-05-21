@@ -363,7 +363,7 @@ mod tests {
     let notified_count = Rc::new(RefCell::new(0));
     let cnc = notified_count.clone();
 
-    let mut sized_box = SizedBox { size: Size::new(100., 100.) }.into_stateful();
+    let sized_box = SizedBox { size: Size::new(100., 100.) }.into_stateful();
     sized_box
       .change_stream()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -374,7 +374,7 @@ mod tests {
       *c_changed_size.borrow_mut() = size.after;
     });
 
-    let mut state = sized_box.state_ref();
+    let state = sized_box.clone();
     let mut wnd = Window::without_render(sized_box.into_widget(), Size::new(500., 500.));
     wnd.render_ready();
 
@@ -382,7 +382,7 @@ mod tests {
     assert_eq!(wnd.context().is_dirty(), false);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
     {
-      state.size = Size::new(1., 1.);
+      state.state_ref().size = Size::new(1., 1.);
     }
     wnd.context.tree_repair();
     assert_eq!(*notified_count.borrow(), 1);
@@ -404,12 +404,13 @@ mod tests {
   #[test]
   fn change_notify() {
     let notified = Rc::new(RefCell::new(vec![]));
+    let c_notified = notified.clone();
     let w = SizedBox { size: Size::zero() }.into_stateful();
     w.change_stream()
-      .subscribe(|b| notified.borrow_mut().push(b));
+      .subscribe(move |b| c_notified.borrow_mut().push(b));
 
     {
-      let _ = &mut w.state_ref().size;
+      let _ = &mut w.state_ref();
     }
     assert_eq!(notified.borrow().deref(), &[false]);
 
@@ -419,12 +420,12 @@ mod tests {
     assert_eq!(notified.borrow().deref(), &[false, true]);
 
     {
-      let state_ref = w.state_ref();
-      let silent_ref = w.silent_ref();
-      &mut state_ref;
-      &mut state_ref;
-      &mut silent_ref;
-      &mut silent_ref;
+      let mut state_ref = w.state_ref();
+      let mut silent_ref = w.silent_ref();
+      let _ = &mut state_ref;
+      let _ = &mut state_ref;
+      let _ = &mut silent_ref;
+      let _ = &mut silent_ref;
     }
     assert_eq!(notified.borrow().deref(), &[false, true, false, true]);
   }

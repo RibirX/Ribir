@@ -11,17 +11,23 @@ pub struct EmbedPostWithKey {
 }
 
 impl Compose for EmbedPostWithKey {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare Row {
         key: 0i32,
         v_align: CrossAxisAlign::Start,
-        Text { text: format!("Embed{} test title", this.level), key: 1i32}
+        Text {
+          text: {
+            let level = this.level;
+            format!("Embed{} test title", level)
+          },
+          key: 1i32
+        }
         Text { text: this.author, key: 2i32}
         Text { text: this.content, key: 3i32}
         ExprWidget {
-          (this.level > 0).then(|| {
+          expr:(this.level > 0).then(|| {
               widget! {
                 declare EmbedPostWithKey {
                   key: "embed",

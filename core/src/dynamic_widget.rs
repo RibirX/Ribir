@@ -83,7 +83,7 @@ where
 impl<F, R, M: ?Sized> IntoWidget<dyn Iterator<Item = M>> for ExprWidget<F>
 where
   F: FnMut() -> R + 'static,
-  R: Iterator + 'static,
+  R: IntoIterator + 'static,
   R::Item: IntoWidget<M>,
   M: 'static,
 {

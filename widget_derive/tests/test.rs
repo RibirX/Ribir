@@ -8,7 +8,6 @@ fn ui() {
 use ribir::prelude::*;
 struct T;
 impl Compose for T {
-  #[widget]
   fn compose(&self, ctx: &mut BuildCtx) -> Widget {
     widget! {
       declare SizedBox {

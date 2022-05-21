@@ -11,7 +11,7 @@ pub struct Cursor {
 }
 
 impl ComposeSingleChild for Cursor {
-  fn compose_single_child(this: Stateful<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare ExprWidget {
@@ -62,35 +62,30 @@ mod tests {
 
   #[test]
   fn tree_down_up() {
-    struct RowTree;
-    impl Compose for RowTree {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
-        widget! {
-          declare SizedBox {
-            size: Size::new(f32::INFINITY, f32::INFINITY),
-            cursor: CursorIcon::AllScroll,
-            Row{
+    let row_tree = widget! {
+      declare SizedBox {
+        size: Size::new(f32::INFINITY, f32::INFINITY),
+        cursor: CursorIcon::AllScroll,
+        Row{
+          v_align: CrossAxisAlign::Start,
+          h_align: MainAxisAlign::Start,
+          SizedBox {
+            size: Size::new(200., 200.),
+            cursor: CursorIcon::Hand,
+            Row {
               v_align: CrossAxisAlign::Start,
               h_align: MainAxisAlign::Start,
               SizedBox {
-                size: Size::new(200., 200.),
-                cursor: CursorIcon::Hand,
-                Row {
-                  v_align: CrossAxisAlign::Start,
-                  h_align: MainAxisAlign::Start,
-                  SizedBox {
-                    size:  Size::new(100., 100.),
-                    cursor: CursorIcon::Help,
-                  }
-                }
+                size:  Size::new(100., 100.),
+                cursor: CursorIcon::Help,
               }
             }
           }
         }
       }
-    }
+    };
 
-    let mut wnd = Window::without_render(RowTree.into_widget(), Size::new(400., 400.));
+    let mut wnd = Window::without_render(row_tree, Size::new(400., 400.));
 
     wnd.render_ready();
 

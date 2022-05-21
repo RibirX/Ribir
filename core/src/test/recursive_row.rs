@@ -7,13 +7,13 @@ pub struct RecursiveRow {
 }
 
 impl Compose for RecursiveRow {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare Row {
         ExprWidget {
-          (0..this.width)
-            .map(|_| {
+          expr: (0..this.width)
+            .map(move |_| {
               if this.depth > 1 {
                 RecursiveRow {
                   width: this.width,

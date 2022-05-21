@@ -278,15 +278,19 @@ impl DeclareWidget {
           let child_tokens = c.host_and_builtin_tokens(ctx);
           let child_compose = c.compose_tokens(ctx);
           compose_tokens
-            .extend(quote! { let #c_name = { #child_tokens  #child_widget_name #child_compose}; });
+            .extend(quote! { let #c_name = { #child_tokens #child_compose  #child_widget_name }; });
           c_name
         } else {
           let child_compose = c.compose_tokens(ctx);
           compose_tokens.extend(child_compose);
           child_widget_name
         };
-        if c.builtin.finally_is_expr_widget() {
-          quote_spanned! { c.span() => .have_expr_child(#child_name)  }
+        if c
+          .builtin
+          .finally_is_expr_widget()
+          .unwrap_or_else(|| c.is_host_expr_widget())
+        {
+          quote_spanned! { c.span() => .have_child(#child_name)  }
         } else {
           quote_spanned! { c.span() => .have_child(#child_name.into_widget()) }
         }
@@ -334,7 +338,7 @@ impl DeclareWidget {
       if w.named.is_some() {
         w.builtin_field_if_guard_check(ctx)?;
       }
-      if w.is_host_expr_widget() {
+      if is_expr_keyword(&w.path) {
         if w.fields.len() != 1 || w.fields[0].member != EXPR_FIELD {
           let spans = w.fields.iter().map(|f| f.member.span().unwrap()).collect();
           return Err(DeclareError::ExprWidgetInvalidField(spans));
@@ -402,10 +406,7 @@ impl DeclareWidget {
     follows
   }
 
-  pub(crate) fn is_host_expr_widget(&self) -> bool {
-    // only expression used other widget need as a `ExprWidget`
-    is_expr_keyword(&self.path) && self.fields.first().map_or(false, |f| f.follows.is_some())
-  }
+  pub(crate) fn is_host_expr_widget(&self) -> bool { is_expr_keyword(&self.path) }
 
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
     debug_assert!(self.named.is_some());
@@ -477,7 +478,7 @@ pub fn used_widgets_subscribe<'a>(
   }
 }
 
-pub fn upstream_by_used_widgets<'a>(
+fn upstream_by_used_widgets<'a>(
   used_widgets: impl Iterator<Item = &'a Ident> + Clone,
 ) -> TokenStream {
   let upstream = used_widgets.clone().map(|w| {

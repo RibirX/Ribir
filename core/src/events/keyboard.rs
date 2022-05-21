@@ -120,7 +120,7 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
           declare SizedBox {
@@ -129,9 +129,11 @@ mod tests {
             on_key_down: move |key| {
               this.0
                 .borrow_mut()
-                .push(format!("key down {:?}", key.key))
+                .push(format!("key down {:?}", key.key));
             },
-            on_key_up: move |key| this.0.borrow_mut().push(format!("key up {:?}", key.key))
+            on_key_up: move |key| {
+              this.0.borrow_mut().push(format!("key up {:?}", key.key));
+            }
           }
         }
       }

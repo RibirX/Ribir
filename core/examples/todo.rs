@@ -18,14 +18,11 @@ impl Compose for Todos {
       declare Column {
         h_align: CrossAxisAlign::Start,
         ExprWidget {
-          this.tasks.iter().enumerate().map(move |(idx, task)| {
+          expr: this.tasks.iter().enumerate().map(|(idx, task)| {
             widget! {
               declare Row {
                 margin: EdgeInsets::vertical(4.),
-                Checkbox{
-                  id: checkbox,
-                  checked: task.finished
-                }
+                Checkbox{  id: checkbox, checked: task.finished }
                 Text {
                   text: task.label.clone(),
                   margin: EdgeInsets::vertical(4.)

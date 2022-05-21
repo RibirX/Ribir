@@ -24,7 +24,7 @@ impl EmbedPost {
 }
 
 impl Compose for EmbedPost {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       declare Row {
@@ -33,7 +33,7 @@ impl Compose for EmbedPost {
         Text { text: this.author }
         Text { text: this.content }
         ExprWidget {
-          (this.level > 0).then(move || EmbedPost::new(this.level - 1 ))
+          expr: (this.level > 0).then(move || EmbedPost::new(this.level - 1 ))
         }
       }
     }
