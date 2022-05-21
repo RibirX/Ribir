@@ -177,8 +177,6 @@ mod tests {
   use crate::widget::SizedBox;
   use std::{cell::RefCell, rc::Rc};
 
-  fn empty_box() -> Widget { SizedBox { size: Size::zero() }.into_widget() }
-
   #[test]
   fn two_auto_focus() {
     // two auto focus widget
@@ -275,16 +273,16 @@ mod tests {
           track  { this }
           declare SizedBox {
             size: SizedBox::expanded_size(),
-            on_focus: move |_| this.log.borrow_mut().push("focus parent"),
-            on_blur: move |_| this.log.borrow_mut().push("blur parent"),
-            on_focus_in: move |_| this.log.borrow_mut().push("focusin parent"),
-            on_focus_out: move |_| this.log.borrow_mut().push("focusout parent"),
+            on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },
+            on_blur: move |_| { this.log.borrow_mut().push("blur parent"); },
+            on_focus_in: move |_| { this.log.borrow_mut().push("focusin parent"); },
+            on_focus_out: move |_| { this.log.borrow_mut().push("focusout parent"); },
             SizedBox {
               size: Size::zero(),
-              on_focus: move |_| this.log.borrow_mut().push("focus child"),
-              on_blur: move |_| this.log.borrow_mut().push("blur child"),
-              on_focus_in: move |_| this.log.borrow_mut().push("focusin child"),
-              on_focus_out: move |_| this.log.borrow_mut().push("focusout child"),
+              on_focus: move |_| { this.log.borrow_mut().push("focus child"); },
+              on_blur: move |_| { this.log.borrow_mut().push("blur child"); },
+              on_focus_in: move |_| { this.log.borrow_mut().push("focusin child"); },
+              on_focus_out: move |_| { this.log.borrow_mut().push("focusout child"); },
             }
           }
         }

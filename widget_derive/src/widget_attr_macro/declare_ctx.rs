@@ -18,12 +18,18 @@ use syn::{
   ItemMacro, Member,
 };
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum IdType {
+  OutsideWidgetMacroPass,
+  UserSpecifyTrack,
+  DeclareDefine,
+}
 #[derive(Default)]
 pub struct DeclareCtx {
   /// All name we need to reactive to its change, The value hint it a outside
   /// define name,  pass by `track { ... }` all as true, and defined in
   /// `widget!` by `id` is false.
-  pub named_objects: HashMap<Ident, bool, ahash::RandomState>,
+  pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
   pub current_follows: HashMap<Ident, Vec<Span>, ahash::RandomState>,
   // Key is the name of widget which has been depended by other, and value is a bool represent if
   // it's depended directly or just be depended by its wrap widget, if guard or child gen
@@ -81,13 +87,19 @@ impl VisitMut for DeclareCtx {
         if !self.current_follows.is_empty() {
           let used_widgets = self.current_follows.keys();
           let body = &c.body;
+
           let refs = used_widgets.map(widget_state_ref);
           c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
-
-          let captures = self.current_follows.keys().map(capture_widget);
-          *expr = parse_quote_spanned! { c.span() =>  { #(#captures)* #c }};
+          if c.capture.is_some() {
+            let captures = self.current_follows.keys().map(capture_widget);
+            *expr = parse_quote_spanned! { c.span() =>  { #(#captures)* #c }};
+          } else {
+            *expr = parse_quote_spanned! { c.span() =>  #c };
+          }
         }
         self.current_follows = old;
+        // todo: closure self not directly follow change instead of inner
+        // capture. But need to tell outside it be used.
       }
       _ => {
         visit_mut::visit_expr_mut(self, expr);
@@ -121,7 +133,7 @@ impl VisitMut for DeclareCtx {
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
       if let Member::Named(ref f_name) = f_expr.member {
         if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(f_name) {
-          if self.named_objects.get(f_name) == Some(&false) {
+          if self.named_objects.get(f_name) == Some(&IdType::DeclareDefine) {
             name.set_span(name.span().join(f_name.span()).unwrap());
             let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
             *f_expr.base = parse_quote! { #wrap_name };
@@ -281,9 +293,13 @@ impl DeclareCtx {
   pub fn emit_unused_id_warning(&self) {
     self
       .named_objects
-      .keys()
-      .filter(|k| !self.be_followed.contains_key(k) && !k.to_string().starts_with('_'))
-      .for_each(|id| {
+      .iter()
+      .filter(|(id, ty)| {
+        !self.be_followed.contains_key(id)
+          && !id.to_string().starts_with('_')
+          && *ty != &IdType::OutsideWidgetMacroPass
+      })
+      .for_each(|(id, _)| {
         Diagnostic::spanned(
           vec![id.span().unwrap()],
           Level::Warning,
@@ -355,21 +371,42 @@ impl DeclareCtx {
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
     let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
     let named = self.named_objects.clone();
+    let be_followed = self.be_followed.clone();
+    self.be_followed.clear();
+    // all named objects should as outside define for embed `widget!` macro.
+    self
+      .named_objects
+      .values_mut()
+      .for_each(|v| *v = IdType::OutsideWidgetMacroPass);
 
     let mut ctx = self.borrow_capture_scope(true);
     let tokens = widget_macro
       .gen_tokens(&mut *ctx)
       .unwrap_or_else(|err| err.into_compile_error());
 
-    // trigger warning and restore named widget.
-    named.keys().for_each(|k| {
-      ctx.named_objects.remove(k);
-    });
+    let outside_named_objects = ctx
+      .be_followed
+      .iter()
+      .filter_map(|(name, _)| named.contains_key(name).then(|| capture_widget(name)));
+
+    let outside_capture = quote! { #(#outside_named_objects)*};
 
     ctx.emit_unused_id_warning();
     widget_macro.warnings().for_each(|w| w.emit_warning());
-    ctx.named_objects = named;
-    syn::parse2(tokens)
+
+    ctx.named_objects.extend(named);
+    be_followed.into_iter().for_each(|(name, info)| {
+      ctx.be_followed.entry(name).or_insert(info);
+    });
+
+    if outside_capture.is_empty() {
+      syn::parse2(tokens)
+    } else {
+      syn::parse2(quote! {{
+        #outside_capture
+        #tokens
+      }})
+    }
   }
 
   fn expand_declare_wrap_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {

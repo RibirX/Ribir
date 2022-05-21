@@ -112,9 +112,9 @@ struct PathField {
 
 #[derive(Debug)]
 pub struct SimpleField {
-  member: Ident,
-  colon_token: Option<token::Colon>,
-  expr: Expr,
+  pub(crate) member: Ident,
+  pub(crate) colon_token: Option<token::Colon>,
+  pub(crate) expr: Expr,
 }
 
 struct SimpleStruct<KW, F> {

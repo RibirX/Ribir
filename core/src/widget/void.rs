@@ -7,11 +7,6 @@ use crate::prelude::*;
 #[derive(Declare)]
 pub struct Void;
 
-impl ComposeSingleChild for Void {
-  #[inline]
-  fn compose_single_child(_: Stateful<Self>, child: Widget, _: &mut BuildCtx) -> Widget { child }
-}
-
 impl Render for Void {
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { Size::zero() }
 

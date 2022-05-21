@@ -192,7 +192,9 @@ impl WidgetId {
       WidgetInner::SingleChild(s) => {
         let (rw, child) = s.unzip();
         let id = insert_widget(rw, tree);
-        consume_child(id, child, ctx);
+        if let Some(child) = child {
+          consume_child(id, child, ctx);
+        }
         id
       }
       WidgetInner::MultiChild(m) => {

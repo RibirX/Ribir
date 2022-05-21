@@ -64,7 +64,6 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
 pub fn widget(input: TokenStream) -> TokenStream {
   let mut w = parse_macro_input! { input as WidgetMacro };
   let mut ctx = DeclareCtx::default();
-  ctx.visit_widget_macro_mut(&mut w);
   w.gen_tokens(&mut ctx)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()

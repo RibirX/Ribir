@@ -9,7 +9,6 @@ pub struct Icon {
 impl Compose for Icon {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     let svg = Svg::new(load_src(this.state_ref().src).unwrap());
-
     widget! {
       declare SizedBox {
         size: this.state_ref().size,

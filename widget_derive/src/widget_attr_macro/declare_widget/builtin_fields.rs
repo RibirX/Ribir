@@ -179,11 +179,11 @@ impl BuiltinFieldWidgets {
         let span = info.span();
         if is_expr_widget {
           compose_tokens.extend(
-            quote_spanned! { span => let #host_def = SingleChildWidget::from_expr_child(#wrap_def, #host_def); },
+            quote_spanned! { span => let #host_def = SingleChildWidget::new(#wrap_def, #host_def.into_single_child()); },
           )
         } else {
           compose_tokens.extend(
-            quote_spanned! { span =>  let #host_def = SingleChildWidget::new(#wrap_def, #host_def.into_widget()); },
+            quote_spanned! { span =>  let #host_def = SingleChildWidget::new(#wrap_def, Some(#host_def.into_widget())); },
           )
         }
         info.is_expr_widget()
@@ -220,8 +220,8 @@ impl BuiltinFieldWidgets {
     Ok(())
   }
 
-  pub fn finally_is_expr_widget(&self) -> bool {
-    self.widgets.last().map_or(false, BuiltinWidgetInfo::is_expr_widget)
+  pub fn finally_is_expr_widget(&self) -> Option<bool> {
+    self.widgets.last().map(BuiltinWidgetInfo::is_expr_widget)
   }
 }
 

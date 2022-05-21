@@ -11,7 +11,7 @@ use syn::{
 use super::{
   animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
   track::Track, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace,
-  Follows, Result,
+  Follows, IdType, Result,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -137,10 +137,11 @@ impl WidgetMacro {
       .then(|| self.widget.host_and_builtin_tokens(ctx));
     let compos_tokens = self.widget.compose_tokens(ctx);
 
-    let extern_track = self.track.as_ref();
+    let track = self.track.as_ref();
+
     Ok(quote! {
       (move |#ctx_name: &mut BuildCtx| {
-        #extern_track
+        #track
         #named_objects_tokens
         #dataflows
         #animations
@@ -151,17 +152,17 @@ impl WidgetMacro {
     })
   }
 
-  pub fn object_names_iter(&self) -> impl Iterator<Item = (&Ident, bool)> {
+  pub fn object_names_iter(&self) -> impl Iterator<Item = (&Ident, IdType)> {
     self
       .widget
       .object_names_iter()
       .chain(self.animations.iter().flat_map(|a| a.names()))
-      .map(|name| (name, false))
+      .map(|name| (name, IdType::DeclareDefine))
       .chain(
         self
           .track
           .iter()
-          .flat_map(|t| t.track_names().map(|n| (n, true))),
+          .flat_map(|t| t.track_names().map(|n| (n, IdType::UserSpecifyTrack))),
       )
   }
 

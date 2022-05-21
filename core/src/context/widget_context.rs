@@ -150,7 +150,12 @@ mod tests {
 
   #[test]
   fn map_self_eq_self() {
-    let w = Margin { margin: EdgeInsets::all(2.) }.have_child(SizedBox { size: Size::zero() });
+    let w = widget! {
+      declare SizedBox {
+        size: Size::zero(),
+        margin: EdgeInsets::all(2.),
+      }
+    };
     let mut wnd = Window::without_render(w.into_widget(), Size::zero());
     wnd.render_ready();
 

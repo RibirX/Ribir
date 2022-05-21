@@ -66,11 +66,10 @@ impl<'a> WidgetGen<'a> {
           let #def_name = #def_name.build(#build_ctx)#stateful;
         }
       } else {
-        let used_widgets = used_widgets.iter();
+        let state_refs = used_widgets.iter().map(|name| widget_state_ref(&name));
         quote_spanned! { ty.span() =>
           let #def_name = {
-            #[allow(unused_mut)]
-            let #(mut #used_widgets = #used_widgets.state_ref())*;
+            #(#state_refs)*
             #build_tokens
             #def_name.build(#build_ctx)#stateful
           };
@@ -101,17 +100,22 @@ impl<'a> WidgetGen<'a> {
       let captures = used_widgets.clone().map(capture_widget);
       let upstream = upstream_by_used_widgets(used_widgets);
       quote_spanned! { ty.span() =>
-        let #def_name = {
-          #(#captures)*
-          #ty::<_>::builder()
-            .upstream(Some(#upstream.box_it()))
-            .#expr_mem(move || { #(#refs)* #expr })
-            .build(#build_ctx)
-          };
+        let #def_name = #ty::<_>::builder()
+          .upstream(Some(#upstream.box_it()))
+          .#expr_mem({
+            #(#captures)*
+            move || { #(#refs)* #expr }
+          })
+          .build(#build_ctx);
       }
     } else {
       quote_spanned! { ty.span() =>
-         let #def_name = #expr;
+        let #def_name = {
+          #ty::<_>::builder()
+            .upstream(None)
+            .#expr_mem(#expr)
+            .build(#build_ctx)
+          };
       }
     }
   }
@@ -131,14 +135,15 @@ impl<'a> WidgetGen<'a> {
         &expr_tokens,
       );
 
-      let mut tokens =
+      let tokens =
         used_widgets_subscribe(f.used_widgets().chain(std::iter::once(ref_name)), assign);
 
       if let Some(if_guard) = if_guard {
         let guard_cond = field_guard_variable(member, if_guard.span());
-        tokens = quote! { if #guard_cond { #tokens } }
+        quote! { if #guard_cond { #tokens } }
+      } else {
+        quote! {{ #tokens }}
       }
-      tokens
     })
   }
 
@@ -176,6 +181,7 @@ impl DeclareField {
     quote! {.#member(#value)}
   }
 
+  // todo: if guard should be track with field
   pub(crate) fn build_tokens_with_guard(&self, builder: &Ident, widget_ty: &Path) -> TokenStream {
     let if_guard = self.if_guard.as_ref().unwrap();
     let member = &self.member;

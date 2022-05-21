@@ -1,52 +1,30 @@
 use crate::dynamic_widget::ExprWidget;
 pub use crate::prelude::*;
-
 /// Trait to tell Ribir a widget can have one child.
 pub trait SingleChild {
   #[inline]
-  fn have_child(self, child: Widget) -> SingleChildWidget<Self>
+  fn have_child<C, M>(self, child: C) -> SingleChildWidget<Self>
   where
+    C: IntoSingleChild<M>,
+    M: ?Sized,
     Self: Sized,
   {
-    SingleChildWidget { widget: self, child }
-  }
-
-  #[inline]
-  fn have_expr_child<M: ?Sized, F: IntoWidgetSingleChild<M>>(
-    self,
-    child: F,
-  ) -> SingleChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    SingleChildWidget {
-      widget: self,
-      child: child.into_widget_single_child(),
-    }
+    SingleChildWidget::new(self, child.into_single_child())
   }
 }
 
 /// Trait to tell Ribir a widget can have multi child.
 pub trait MultiChild {
   #[inline]
-  fn have_child(self, child: Widget) -> MultiChildWidget<Self>
+  fn have_child<M, C>(self, child: C) -> MultiChildWidget<Self>
   where
+    C: IntoMultiChild<M>,
+    M: ?Sized,
     Self: Sized,
   {
     MultiChildWidget {
       widget: self,
-      children: vec![child.into_widget()],
-    }
-  }
-
-  #[inline]
-  fn have_expr_child<M: ?Sized, F: IntoWidget<M>>(self, child: Widget) -> MultiChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    MultiChildWidget {
-      widget: self,
-      children: vec![child.into_widget()],
+      children: child.into_multi_child().collect(),
     }
   }
 }
@@ -54,30 +32,22 @@ pub trait MultiChild {
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its child.
 pub trait ComposeSingleChild {
-  fn compose_single_child(this: Stateful<Self>, child: Widget, ctx: &mut BuildCtx) -> Widget
+  fn compose_single_child(
+    this: Stateful<Self>,
+    child: Option<Widget>,
+    ctx: &mut BuildCtx,
+  ) -> Widget
   where
     Self: Sized;
 
   #[inline]
-  fn have_child(self, child: Widget) -> SingleChildWidget<Self>
+  fn have_child<C, M>(self, child: C) -> SingleChildWidget<Self>
   where
+    C: IntoSingleChild<M>,
+    M: ?Sized,
     Self: Sized,
   {
-    SingleChildWidget { widget: self, child }
-  }
-
-  #[inline]
-  fn have_expr_child<M: ?Sized, F: IntoWidgetSingleChild<M>>(
-    self,
-    child: F,
-  ) -> SingleChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    SingleChildWidget {
-      widget: self,
-      child: child.into_widget_single_child(),
-    }
+    SingleChildWidget::new(self, child.into_single_child())
   }
 }
 
@@ -89,59 +59,30 @@ pub trait ComposeMultiChild {
     Self: Sized;
 
   #[inline]
-  fn have_child(self, child: Widget) -> MultiChildWidget<Self>
+  fn have_child<M, C>(self, child: C) -> MultiChildWidget<Self>
   where
+    C: IntoMultiChild<M>,
+    M: ?Sized,
     Self: Sized,
   {
     MultiChildWidget {
       widget: self,
-      children: vec![child.into_widget()],
-    }
-  }
-
-  #[inline]
-  fn have_expr_child<M: ?Sized, F: IntoWidget<M>>(self, child: Widget) -> MultiChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    MultiChildWidget {
-      widget: self,
-      children: vec![child.into_widget()],
+      children: child.into_multi_child().collect(),
     }
   }
 }
-
-/// trait use to limit expr at most one widget generate.
-pub trait IntoWidgetSingleChild<M: ?Sized> {
-  fn into_widget_single_child(self) -> Widget;
-}
-
 pub struct SingleChildWidget<W> {
   pub(crate) widget: W,
-  pub(crate) child: Widget,
+  pub(crate) child: Option<Widget>,
 }
 
 impl<S> SingleChildWidget<S> {
   #[inline]
-  pub fn unzip(self) -> (S, Widget) { (self.widget, self.child) }
+  pub fn unzip(self) -> (S, Option<Widget>) { (self.widget, self.child) }
 
   #[inline]
-  pub fn new(widget: S, child: Widget) -> SingleChildWidget<S> {
+  pub fn new(widget: S, child: Option<Widget>) -> SingleChildWidget<S> {
     SingleChildWidget { widget, child }
-  }
-
-  #[inline]
-  pub fn from_expr_child<M: ?Sized, F: IntoWidgetSingleChild<M>>(
-    widget: S,
-    child: F,
-  ) -> SingleChildWidget<S>
-  where
-    Self: Sized,
-  {
-    SingleChildWidget {
-      widget,
-      child: child.into_widget_single_child(),
-    }
   }
 }
 
@@ -157,20 +98,14 @@ impl<M> MultiChildWidget<M> {
 
 impl<W> MultiChildWidget<W> {
   #[inline]
-  pub fn have_child(mut self, widget: Widget) -> Self {
-    self.children.push(widget);
-    self
-  }
-
-  #[inline]
-  pub fn have_expr_child<M: ?Sized, F: IntoWidget<M>>(self, child: Widget) -> MultiChildWidget<Self>
+  pub fn have_child<M, C>(mut self, child: C) -> MultiChildWidget<W>
   where
+    C: IntoMultiChild<M>,
+    M: ?Sized,
     Self: Sized,
   {
-    MultiChildWidget {
-      widget: self,
-      children: vec![child.into_widget()],
-    }
+    self.children.extend(child.into_multi_child());
+    self
   }
 }
 
@@ -207,34 +142,111 @@ where
   }
 }
 
-impl<F, R, M: ?Sized> IntoWidgetSingleChild<dyn IntoWidget<M>> for ExprWidget<F>
+pub trait IntoSingleChild<M: ?Sized> {
+  fn into_single_child(self) -> Option<Widget>;
+}
+
+pub trait IntoMultiChild<M: ?Sized> {
+  type IntoIter: Iterator<Item = Widget>;
+  fn into_multi_child(self) -> Self::IntoIter;
+}
+
+impl IntoSingleChild<Widget> for Widget {
+  #[inline]
+  fn into_single_child(self) -> Option<Widget> { Some(self) }
+}
+
+impl<W: IntoWidget<M>, M: ?Sized> IntoSingleChild<(Self, M)> for ExprWidget<W> {
+  #[inline]
+  fn into_single_child(self) -> Option<Widget> { self.expr.into_widget().into() }
+}
+
+impl<W: IntoWidget<M>, M: ?Sized> IntoSingleChild<Option<&M>> for ExprWidget<Option<W>> {
+  #[inline]
+  fn into_single_child(self) -> Option<Widget> { self.expr.map(IntoWidget::into_widget) }
+}
+
+impl<F, R, M> IntoSingleChild<dyn FnMut() -> M> for ExprWidget<F>
 where
   F: FnMut() -> R + 'static,
   R: IntoWidget<M> + 'static,
-  M: 'static,
+  M: ?Sized + 'static,
 {
-  fn into_widget_single_child(self) -> Widget {
-    let ExprWidget { mut expr, upstream } = self;
-    ExprWidget {
-      expr: move || std::iter::once(expr()),
-      upstream,
-    }
-    .into_widget()
-  }
+  #[inline]
+  fn into_single_child(self) -> Option<Widget> { self.into_widget().into() }
 }
 
-impl<F, R, M: ?Sized> IntoWidgetSingleChild<dyn FnMut() -> M> for ExprWidget<F>
+impl<F, R, M> IntoSingleChild<(&dyn FnMut(), Option<&M>)> for ExprWidget<F>
 where
   F: FnMut() -> Option<R> + 'static,
   R: IntoWidget<M> + 'static,
-  M: 'static,
+  M: ?Sized + 'static,
 {
-  fn into_widget_single_child(self) -> Widget {
-    let ExprWidget { mut expr, upstream } = self;
-    ExprWidget {
-      expr: move || expr().into_iter(),
-      upstream,
-    }
-    .into_widget()
+  fn into_single_child(self) -> Option<Widget> { self.into_widget().into() }
+}
+
+impl IntoMultiChild<Widget> for Widget {
+  type IntoIter = std::iter::Once<Widget>;
+  #[inline]
+  fn into_multi_child(self) -> Self::IntoIter { std::iter::once(self) }
+}
+
+impl<W: IntoWidget<M>, M: ?Sized> IntoMultiChild<(Self, M)> for ExprWidget<W> {
+  type IntoIter = std::iter::Once<Widget>;
+  #[inline]
+  fn into_multi_child(self) -> Self::IntoIter { std::iter::once(self.expr.into_widget()) }
+}
+
+impl<M, W> IntoMultiChild<dyn Iterator<Item = &M>> for ExprWidget<W>
+where
+  M: ?Sized,
+  W: IntoIterator,
+  W::Item: IntoWidget<M>,
+{
+  type IntoIter = std::iter::Map<W::IntoIter, fn(W::Item) -> Widget>;
+  #[inline]
+  fn into_multi_child(self) -> Self::IntoIter { self.expr.into_iter().map(IntoWidget::into_widget) }
+}
+
+impl<M, W> IntoMultiChild<ExprWidget<&M>> for ExprWidget<W>
+where
+  M: ?Sized,
+  Self: IntoWidget<M>,
+{
+  type IntoIter = std::iter::Once<Widget>;
+  #[inline]
+  fn into_multi_child(self) -> Self::IntoIter { std::iter::once(self.into_widget()) }
+}
+
+impl<W> IntoWidget<dyn Render> for MultiChildWidget<W>
+where
+  W: MultiChild + Render + 'static,
+{
+  fn into_widget(self) -> Widget {
+    let widget: Box<dyn RenderNode> = Box::new(self.widget);
+    let multi_child = MultiChildWidget { widget, children: self.children };
+    Widget(WidgetInner::MultiChild(multi_child))
+  }
+}
+
+impl<W> IntoWidget<dyn Compose> for MultiChildWidget<W>
+where
+  W: ComposeMultiChild + 'static,
+{
+  fn into_widget(self) -> Widget {
+    Widget(WidgetInner::Compose(Box::new(move |ctx| {
+      ComposeMultiChild::compose_multi_child(self.widget.into_stateful(), self.children, ctx)
+    })))
+  }
+}
+
+impl<W> IntoWidget<dyn Compose> for MultiChildWidget<Stateful<W>>
+where
+  W: ComposeMultiChild + 'static,
+{
+  fn into_widget(self) -> Widget {
+    Widget(WidgetInner::Compose(Box::new(move |ctx| {
+      ComposeMultiChild::compose_multi_child(self.widget, self.children, ctx)
+    })))
   }
 }

@@ -56,7 +56,7 @@ mod tests {
   fn always_have_default_theme() {
     struct T;
     impl Compose for T {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(_: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
         let _ = ctx.theme();
         panic!("Get a default theme from context");
       }
@@ -87,7 +87,7 @@ mod tests {
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for DarkLightThemes {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);
@@ -121,7 +121,7 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for LightDarkThemes {
-      fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
         let dark = material::dark(family.clone());
         let light = material::light(family);

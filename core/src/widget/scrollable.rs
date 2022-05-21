@@ -41,34 +41,30 @@ impl Render for ScrollableWidget {
 }
 
 impl ComposeSingleChild for ScrollableWidget {
-  fn compose_single_child(this: Stateful<Self>, child: Widget, _: &mut BuildCtx) -> Widget
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
   where
     Self: Sized,
   {
-    SingleChildWidget {
-      widget: this.clone(),
-      child: widget! {
-        track { this }
-        declare ExprWidget {
-          expr: child,
-          on_wheel: move |e| {
-            let (view, content) = view_content(e);
-            let old = this.pos;
-            let mut new = old;
-            if this.scrollable != Scrollable::X {
-              new.x = validate_pos(view.width(), content.width(), old.x - e.delta_x);
-            }
-            if this.scrollable != Scrollable::Y {
-              new.y = validate_pos(view.height(), content.height(), old.y - e.delta_y)
-            }
-            if new != old {
-              this.pos = new;
-            }
+    widget! {
+      track { this }
+      declare ExprWidget {
+        expr: child,
+        on_wheel: move |e| {
+          let (view, content) = view_content(e);
+          let old = this.pos;
+          let mut new = old;
+          if this.scrollable != Scrollable::X {
+            new.x = validate_pos(view.width(), content.width(), old.x - e.delta_x);
+          }
+          if this.scrollable != Scrollable::Y {
+            new.y = validate_pos(view.height(), content.height(), old.y - e.delta_y)
+          }
+          if new != old {
+            this.pos = new;
           }
         }
-      },
+      }
     }
-    .into_widget()
   }
 }
 
