@@ -12,7 +12,7 @@ use super::{
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use syn::{
   parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident,
   ItemMacro, Member,
@@ -20,40 +20,26 @@ use syn::{
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum IdType {
+  /// name pass by outside `widget!` macro.
   OutsideWidgetMacroPass,
+  /// name provide in `track { ... }`
   UserSpecifyTrack,
+  /// Declared by `id: name`,
   DeclareDefine,
 }
 #[derive(Default)]
 pub struct DeclareCtx {
-  /// All name we need to reactive to its change, The value hint it a outside
-  /// define name,  pass by `track { ... }` all as true, and defined in
-  /// `widget!` by `id` is false.
+  /// All name we need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
   pub current_follows: HashMap<Ident, Vec<Span>, ahash::RandomState>,
-  // Key is the name of widget which has been depended by other, and value is a bool represent if
-  // it's depended directly or just be depended by its wrap widget, if guard or child gen
-  // expression.
-  be_followed: HashMap<Ident, ReferenceInfo>,
+  /// name object has by used.
+  used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
   /// Some wrap widget (like margin, padding) implicit defined by user, shared
   /// the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
-  // todo: all should be capture;
-  id_capture_scope: Vec<bool>,
 }
 
-#[derive(PartialEq, Clone, Copy)]
-pub enum ReferenceInfo {
-  // reference by other expression, but not follow its change and needn't capture its state
-  // reference
-  Reference,
-  // Followed by others and need follow its change or need capture its state reference to modify
-  // its state.
-  BeFollowed,
-  // not be referenced or followed, but its wrap widget maybe.
-  WrapWidgetRef,
-}
 #[derive(Debug, Clone)]
 struct LocalVariable {
   name: Ident,
@@ -141,7 +127,6 @@ impl VisitMut for DeclareCtx {
               .user_perspective_name
               .insert(wrap_name.clone(), name.clone());
             self.add_follow(wrap_name);
-            self.add_reference(name, ReferenceInfo::WrapWidgetRef);
             return;
           }
         }
@@ -268,13 +253,7 @@ impl DeclareCtx {
     })
   }
 
-  pub fn be_followed(&self, name: &Ident) -> bool {
-    self
-      .be_followed
-      .get(name)
-      .map(|r| r == &ReferenceInfo::BeFollowed)
-      .unwrap_or(false)
-  }
+  pub fn is_used(&self, name: &Ident) -> bool { self.used_widgets.contains(name) }
 
   pub fn user_perspective_name(&self, name: &Ident) -> Option<&Ident> {
     self.user_perspective_name.get(name)
@@ -295,7 +274,7 @@ impl DeclareCtx {
       .named_objects
       .iter()
       .filter(|(id, ty)| {
-        !self.be_followed.contains_key(id)
+        !self.used_widgets.contains(id)
           && !id.to_string().starts_with('_')
           && *ty != &IdType::OutsideWidgetMacroPass
       })
@@ -308,10 +287,6 @@ impl DeclareCtx {
         .span_help(vec![id.span().unwrap()], "Remove this line.")
         .emit()
       });
-  }
-
-  pub fn borrow_capture_scope(&mut self, capture_scope: bool) -> CaptureScopeGuard {
-    CaptureScopeGuard::new(self, capture_scope)
   }
 
   pub fn stack_push(&mut self) -> StackGuard { StackGuard::new(self) }
@@ -345,58 +320,38 @@ impl DeclareCtx {
       .or_default()
       .push(name.span());
 
-    let in_follow_scope = self.id_capture_scope.last().cloned().unwrap_or(true);
-    self.add_reference(
-      name,
-      if in_follow_scope {
-        ReferenceInfo::BeFollowed
-      } else {
-        ReferenceInfo::Reference
-      },
-    );
-  }
-
-  pub fn add_reference(&mut self, name: Ident, ref_info: ReferenceInfo) {
-    let v = self
-      .be_followed
-      .entry(name)
-      .or_insert(ReferenceInfo::Reference);
-    match (*v, ref_info) {
-      (ReferenceInfo::Reference, _) => *v = ref_info,
-      (ReferenceInfo::WrapWidgetRef, _) => *v = ref_info,
-      _ => {}
-    }
+    self.used_widgets.insert(name);
   }
 
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
     let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
     let named = self.named_objects.clone();
-    let be_followed = self.be_followed.clone();
-    self.be_followed.clear();
+
+    let be_followed = self.used_widgets.clone();
+    self.used_widgets.clear();
     // all named objects should as outside define for embed `widget!` macro.
     self
       .named_objects
       .values_mut()
       .for_each(|v| *v = IdType::OutsideWidgetMacroPass);
 
-    let mut ctx = self.borrow_capture_scope(true);
     let tokens = widget_macro
-      .gen_tokens(&mut *ctx)
+      .gen_tokens(self)
       .unwrap_or_else(|err| err.into_compile_error());
 
-    let outside_named_objects = ctx
-      .be_followed
+    let outside_named_objects = self
+      .used_widgets
       .iter()
-      .filter_map(|(name, _)| named.contains_key(name).then(|| capture_widget(name)));
+      .filter_map(|name| named.contains_key(name).then(|| capture_widget(name)));
 
     let outside_capture = quote! { #(#outside_named_objects)*};
 
-    ctx.emit_unused_id_warning();
+    self.emit_unused_id_warning();
     widget_macro.warnings().for_each(|w| w.emit_warning());
 
-    ctx.named_objects.extend(named);
-    be_followed.into_iter().for_each(|(name, info)| {
-      ctx.be_followed.entry(name).or_insert(info);
+    self.named_objects.extend(named);
+    be_followed.into_iter().for_each(|name| {
+      self.used_widgets.insert(name);
     });
 
     if outside_capture.is_empty() {
@@ -411,10 +366,9 @@ impl DeclareCtx {
 
   fn expand_declare_wrap_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
     let mut widget: DeclareWidget = syn::parse2(tokens)?;
-    let mut ctx = self.borrow_capture_scope(true);
-    ctx.visit_declare_widget_mut(&mut widget);
-    let tokens = widget.host_and_builtin_tokens(&*ctx);
-    let compos_tokens = widget.compose_tokens(&*ctx);
+    self.visit_declare_widget_mut(&mut widget);
+    let tokens = widget.host_and_builtin_tokens(self);
+    let compos_tokens = widget.compose_tokens(self);
     let def_name = widget_def_variable(&widget.widget_identify());
 
     syn::parse2(quote! {{ #tokens # compos_tokens #def_name.into_widget()}})
@@ -458,17 +412,6 @@ impl<'a> std::ops::Deref for StackGuard<'a> {
 
 impl<'a> std::ops::DerefMut for StackGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
-}
-
-impl<'a> CaptureScopeGuard<'a> {
-  pub fn new(ctx: &'a mut DeclareCtx, follow_scope: bool) -> Self {
-    ctx.id_capture_scope.push(follow_scope);
-    CaptureScopeGuard { ctx }
-  }
-}
-
-impl<'a> Drop for CaptureScopeGuard<'a> {
-  fn drop(&mut self) { self.ctx.id_capture_scope.pop(); }
 }
 
 impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
