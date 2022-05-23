@@ -15,8 +15,9 @@ use crate::widget_attr_macro::Id;
 
 use super::{
   declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
-  ribir_suffix_variable, ribir_variable, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
-  BUILD_CTX,
+  ribir_suffix_variable, ribir_variable,
+  widget_macro::UsedNameInfo,
+  DeclareCtx, FollowPart, FollowPlace, Follows, BUILD_CTX,
 };
 
 use super::kw;
@@ -36,7 +37,7 @@ pub struct State {
   _brace_token: token::Brace,
   id: Option<Id>,
   fields: Punctuated<PathField, token::Comma>,
-  follows: Option<Vec<FollowOn>>,
+  used_name_info: UsedNameInfo,
 }
 
 #[derive(Debug)]
@@ -45,7 +46,7 @@ pub struct Transition {
   _brace_token: token::Brace,
   id: Option<Id>,
   fields: Punctuated<SimpleField, token::Comma>,
-  follows: Option<Vec<FollowOn>>,
+  used_name_info: UsedNameInfo,
 }
 
 #[derive(Debug)]
@@ -55,7 +56,7 @@ pub struct Animate {
   id: Option<Id>,
   from: FromStateField,
   transition: TransitionField,
-  follows: Option<Vec<FollowOn>>,
+  used_name_info: UsedNameInfo,
 }
 
 mod animate_kw {
@@ -182,7 +183,7 @@ impl From<SimpleStruct<kw::State, PathField>> for State {
       _brace_token: brace_token,
       id,
       fields,
-      follows: None,
+      used_name_info: <_>::default(),
     }
   }
 }
@@ -195,7 +196,7 @@ impl From<SimpleStruct<kw::Transition, SimpleField>> for Transition {
       _brace_token: brace_token,
       id,
       fields,
-      follows: None,
+      used_name_info: <_>::default(),
     }
   }
 }
@@ -314,7 +315,7 @@ impl Parse for Animate {
       id,
       from,
       transition,
-      follows: None,
+      used_name_info: <_>::default(),
     })
   }
 }
@@ -697,7 +698,7 @@ impl DeclareCtx {
   }
 
   fn visit_animate_mut(&mut self, animate: &mut Animate) {
-    let Animate { from, transition, follows, .. } = animate;
+    let Animate { from, transition, used_name_info, .. } = animate;
     match &mut from.expr {
       StateExpr::State(state) => {
         self.visit_state_mut(state);
@@ -716,7 +717,7 @@ impl DeclareCtx {
       }
       TransitionExpr::Expr(e) => self.visit_expr_mut(e),
     }
-    *follows = self.take_current_follows();
+    *used_name_info = self.take_current_used_info();
   }
 
   fn visit_state_mut(&mut self, state: &mut State) {
@@ -724,7 +725,7 @@ impl DeclareCtx {
       self.visit_member_path(&mut p.path);
       self.visit_expr_mut(&mut p.expr);
     });
-    state.follows = self.take_current_follows();
+    state.used_name_info = self.take_current_used_info();
   }
 
   fn visit_transition_mut(&mut self, transition: &mut Transition) {
@@ -732,7 +733,7 @@ impl DeclareCtx {
       .fields
       .iter_mut()
       .for_each(|f| self.visit_simple_field_mut(f));
-    transition.follows = self.take_current_follows();
+    transition.used_name_info = self.take_current_used_info();
   }
 
   fn visit_trigger_mut(&mut self, trigger: &mut Trigger) {
@@ -747,7 +748,7 @@ impl DeclareCtx {
       }
       AnimateExpr::Expr(expr) => self.visit_expr_mut(expr),
     }
-    self.take_current_follows();
+    self.take_current_used_info();
   }
 
   fn visit_member_path(&mut self, path: &mut MemberPath) {
@@ -851,7 +852,7 @@ impl<'a> AnimationObject<'a> {
     &id.unwrap().name
   }
 
-  pub fn as_follow_part(&self) -> Option<FollowPart<'a>> {
+  fn as_follow_part(&self) -> Option<FollowPart<'a>> {
     match self {
       AnimationObject::Animate(a) => a.as_follow_part(),
       AnimationObject::Transition(t) => t.as_follow_part(),
@@ -862,28 +863,40 @@ impl<'a> AnimationObject<'a> {
 
 impl Animate {
   fn as_follow_part(&self) -> Option<FollowPart> {
-    self.follows.as_ref().map(|follows| FollowPart {
-      origin: FollowPlace::Animate(self),
-      follows: &*follows,
-    })
+    self
+      .used_name_info
+      .follows
+      .as_ref()
+      .map(|follows| FollowPart {
+        origin: FollowPlace::Animate(self),
+        follows: &*follows,
+      })
   }
 }
 
 impl State {
   fn as_follow_part(&self) -> Option<FollowPart> {
-    self.follows.as_ref().map(|follows| FollowPart {
-      origin: FollowPlace::State(self),
-      follows: &*follows,
-    })
+    self
+      .used_name_info
+      .follows
+      .as_ref()
+      .map(|follows| FollowPart {
+        origin: FollowPlace::State(self),
+        follows: &*follows,
+      })
   }
 }
 
 impl Transition {
   fn as_follow_part(&self) -> Option<FollowPart> {
-    self.follows.as_ref().map(|follows| FollowPart {
-      origin: FollowPlace::Transition(self),
-      follows: &*follows,
-    })
+    self
+      .used_name_info
+      .follows
+      .as_ref()
+      .map(|follows| FollowPart {
+        origin: FollowPlace::Transition(self),
+        follows: &*follows,
+      })
   }
 }
 

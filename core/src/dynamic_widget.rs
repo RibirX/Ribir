@@ -14,12 +14,16 @@ pub struct ExprWidget<F> {
 /// lifetime.
 pub(crate) struct Generator {
   pub(crate) info: GeneratorInfo,
-  pub(crate) expr: Box<dyn FnMut() -> Box<dyn Iterator<Item = Widget>>>,
+  pub(crate) expr: Box<dyn DynamicWidgetGenerator>,
 }
 
 /// The unique id of widget generator in application
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct GeneratorID(usize);
+pub(crate) struct GeneratorID(usize);
+
+pub(crate) trait DynamicWidgetGenerator {
+  fn generate_dynamic_widget(&mut self, cb: &mut dyn FnMut(Widget));
+}
 
 struct GenerateInfoInner {
   id: GeneratorID,
@@ -67,8 +71,7 @@ impl GeneratorInfo {
 impl<F, R, M: ?Sized> IntoWidget<dyn FnMut() -> M> for ExprWidget<F>
 where
   F: FnMut() -> R + 'static,
-  R: IntoWidget<M> + 'static,
-  M: 'static,
+  R: IntoWidget<M>,
 {
   fn into_widget(self) -> Widget {
     let ExprWidget { mut expr, upstream } = self;
@@ -83,9 +86,8 @@ where
 impl<F, R, M: ?Sized> IntoWidget<dyn Iterator<Item = M>> for ExprWidget<F>
 where
   F: FnMut() -> R + 'static,
-  R: IntoIterator + 'static,
+  R: IntoIterator,
   R::Item: IntoWidget<M>,
-  M: 'static,
 {
   fn into_widget(self) -> Widget {
     let ExprWidget { mut expr, upstream } = self;
@@ -98,14 +100,19 @@ where
   }
 }
 
+impl<F, R> DynamicWidgetGenerator for F
+where
+  F: FnMut() -> R,
+  R: IntoIterator<Item = Widget>,
+{
+  fn generate_dynamic_widget(&mut self, cb: &mut dyn FnMut(Widget)) {
+    self().into_iter().for_each(cb);
+  }
+}
+
 impl Generator {
-  // todo: update method can provide by use case? like margin with if
-  // guard, can directly replace widget not instead of whole subtree.
   #[inline]
   pub(crate) fn update_generated_widgets(&mut self, ctx: &mut Context) {
-    let new_widgets_iter = (self.expr)();
-
-    let tmp_anchor = self.info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
     let mut info = self.info.0.borrow_mut();
     let mut key_widgets = info
       .generated_widgets
@@ -127,33 +134,33 @@ impl Generator {
       .collect::<HashMap<_, _, ahash::RandomState>>();
     info.generated_widgets.clear();
 
-    new_widgets_iter
-      .into_iter()
-      .fold(tmp_anchor, |insert_at, c| {
-        let id = info.parent.insert_child(
-          c,
-          &mut |node, tree| {
-            let old = node
-              .query_first_type::<Key>(QueryOrder::OutsideFirst)
-              .and_then(|k| key_widgets.remove(k));
-            let id = match old {
-              Some(c_id) => {
-                *c_id.assert_get_mut(tree) = node;
-                c_id
-              }
-              None => tree.new_node(node),
-            };
-            insert_at.insert_next(id, tree);
-            id
-          },
-          &mut |wid, child, ctx| {
-            wid.append_widget(child, ctx);
-          },
-          ctx,
-        );
-        info.generated_widgets.push(id);
-        id
-      });
+    let tmp_anchor = self.info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
+    let mut insert_at = tmp_anchor;
+    self.expr.generate_dynamic_widget(&mut |c| {
+      let id = info.parent.insert_child(
+        c,
+        &mut |node, tree| {
+          let old = node
+            .query_first_type::<Key>(QueryOrder::OutsideFirst)
+            .and_then(|k| key_widgets.remove(k));
+          let id = match old {
+            Some(c_id) => {
+              *c_id.assert_get_mut(tree) = node;
+              c_id
+            }
+            None => tree.new_node(node),
+          };
+          insert_at.insert_next(id, tree);
+          id
+        },
+        &mut |wid, child, ctx| {
+          wid.append_widget(child, ctx);
+        },
+        ctx,
+      );
+      info.generated_widgets.push(id);
+      insert_at = id;
+    });
 
     key_widgets
       .into_iter()

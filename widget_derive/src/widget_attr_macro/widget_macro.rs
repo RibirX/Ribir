@@ -1,7 +1,7 @@
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
@@ -34,6 +34,11 @@ pub struct IfGuard {
   pub fat_arrow_token: Token![=>],
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct UsedNameInfo {
+  pub(crate) captures: Option<HashSet<Ident, ahash::RandomState>>,
+  pub(crate) follows: Option<Vec<FollowOn>>,
+}
 #[derive(Clone, Debug)]
 struct CircleCheckStack<'a> {
   pub widget: &'a Ident,
@@ -330,5 +335,28 @@ impl Parse for IfGuard {
       cond: input.parse()?,
       fat_arrow_token: input.parse()?,
     })
+  }
+}
+
+impl UsedNameInfo {
+  pub fn used_any_name(&self) -> bool { self.follows.is_some() || self.captures.is_some() }
+
+  pub fn used_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
+    self.capture_widgets().chain(
+      self
+        .follow_widgets()
+        .filter(|f| self.capture_widgets().find(|c| f == c).is_none()),
+    )
+  }
+
+  pub fn capture_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
+    self.captures.iter().flat_map(|cs| cs.iter())
+  }
+
+  pub fn follow_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
+    self
+      .follows
+      .iter()
+      .flat_map(|fs| fs.iter().map(|f| &f.widget))
   }
 }

@@ -5,12 +5,12 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap};
-use syn::{parse_quote_spanned, spanned::Spanned};
+use syn::{ spanned::Spanned};
 
 use crate::{
   error::DeclareError,
   widget_attr_macro::{
-    field_guard_variable, ribir_suffix_variable, widget_def_variable, widget_macro::EXPR_WIDGET,
+    ribir_suffix_variable, widget_def_variable,
     DeclareCtx, FollowPart, Follows,
   },
 };
@@ -88,8 +88,8 @@ impl BuiltinFieldWidgets {
   pub fn key_follow_check(&self) -> crate::error::Result<()> {
     if let Some(info) = self.widgets.iter().find(|info| info.name == "Key") {
       assert_eq!(info.fields.len(), 1);
-      let DeclareField { member, follows, .. } = &info.fields[0];
-      if let Some(follows) = follows {
+      let DeclareField { member, used_name_info, .. } = &info.fields[0];
+      if let Some(follows) = used_name_info.follows.as_ref() {
         return Err(DeclareError::KeyDependsOnOther {
           key: member.span().unwrap(),
           depends_on: follows.iter().map(|fo| fo.widget.span().unwrap()).collect(),
@@ -112,54 +112,13 @@ impl BuiltinFieldWidgets {
       let span = info.span();
       let ty = Ident::new(&info.name, span).into();
       let fields = &info.fields;
-      // If all fields have if guard and condition are false,  widget can
-      // emit
-
-      let def_and_ref_tokens = if let Some(conditions) = info.widget_guard_conditions() {
-        let follows = fields.iter().filter_map(|f| f.follows.clone()).fold(
-          None,
-          |res: Option<Vec<_>>, follows| {
-            if let Some(mut res) = res {
-              res.extend(follows);
-              Some(res)
-            } else {
-              Some(follows)
-            }
-          },
-        );
-
-        let gen = WidgetGen {
-          ty: &ty,
-          name: name.clone(),
-          fields: &fields,
-        };
-        let widget_tokens = gen.gen_widget_tokens(ctx);
-        if let Some(follows) = follows {
-          let ty = Ident::new(EXPR_WIDGET, span).into();
-          let wrap_name = widget_def_variable(&name);
-          let mut expr_field: DeclareField = parse_quote_spanned! { span =>
-            expr: { #conditions.then(|| { #widget_tokens #wrap_name}) }
-          };
-          expr_field.follows = Some(follows);
-          let gen = WidgetGen {
-            ty: &ty,
-            name: name.clone(),
-            fields: &[expr_field],
-          };
-          gen.gen_widget_tokens(ctx)
-        } else {
-          widget_tokens
-        }
-      } else {
-        let gen = WidgetGen {
-          ty: &ty,
-          name: name.clone(),
-          fields: &fields,
-        };
-        gen.gen_widget_tokens(ctx)
+      
+      let gen = WidgetGen {
+        ty: &ty,
+        name: name.clone(),
+        fields: &fields,
       };
-
-      (name, def_and_ref_tokens)
+      (name, gen.gen_widget_tokens(ctx))
     })
   }
 
@@ -232,15 +191,7 @@ impl BuiltinWidgetInfo {
     self.fields.iter().all(|f| f.if_guard.is_some())
   }
 
-  fn widget_guard_conditions(&self) -> Option<TokenStream> {
-    self.is_expr_widget().then(|| {
-      let conditions = self.fields
-        .iter()
-        .map(|f| field_guard_variable(&f.member, f.if_guard.span()));
-      quote! {( #(#conditions) || * )}
-    })
-    
-  }
+
 
   fn span(&self) -> Span {
     self

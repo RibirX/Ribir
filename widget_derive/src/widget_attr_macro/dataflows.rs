@@ -1,9 +1,11 @@
 use super::{
-  declare_widget::{try_parse_skip_nc, used_widgets_subscribe, SkipNcAttr},
-  kw, skip_nc_assign, DeclareCtx, FollowOn, FollowPart, FollowPlace, Follows,
+  declare_widget::{try_parse_skip_nc, upstream_by_used_widgets, SkipNcAttr},
+  kw, skip_nc_assign,
+  widget_macro::UsedNameInfo,
+  DeclareCtx, FollowPart, FollowPlace, Follows,
 };
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use std::collections::BTreeMap;
 use syn::{
   braced,
@@ -14,7 +16,10 @@ use syn::{
   Expr, Ident,
 };
 
-use crate::error::DeclareError;
+use crate::{
+  error::DeclareError,
+  widget_attr_macro::{capture_widget, widget_state_ref},
+};
 
 mod ct {
   syn::custom_punctuation!(RightArrow, ~>);
@@ -57,30 +62,48 @@ impl ToTokens for Dataflows {
 impl ToTokens for Dataflow {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self { from, to, .. } = self;
-    match from.follows.as_ref() {
-      Some(follows_on) => {
-        let subscribe_tokens = used_widgets_subscribe(
-          follows_on.iter().map(|f| &f.widget),
-          skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr),
-        );
-        tokens.extend(subscribe_tokens);
-      }
-      None => DeclareError::DataFlowNoDepends(syn::spanned::Spanned::span(&from.expr).unwrap())
-        .error_emit(),
+    if from.used_name_info.follows.is_none() {
+      DeclareError::DataFlowNoDepends(syn::spanned::Spanned::span(&from.expr).unwrap()).error_emit()
     }
+
+    let upstream = upstream_by_used_widgets(from.used_name_info.follow_widgets());
+    let from_used_name = &from.used_name_info;
+    let to_used_name = &to.used_name_info;
+    let state_refs = from_used_name
+      .follow_widgets()
+      .chain(
+        to_used_name
+          .follow_widgets()
+          .filter(|w| from_used_name.follow_widgets().find(|n| w == n).is_none()),
+      )
+      .map(widget_state_ref);
+    let captures = from_used_name
+      .used_widgets()
+      .chain(
+        to_used_name
+          .used_widgets()
+          .filter(|w| from_used_name.used_widgets().find(|n| w == n).is_none()),
+      )
+      .map(capture_widget);
+
+    let subscribe_do = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
+    tokens.extend(quote! {
+      #(#captures)*
+      #upstream.subscribe(move |_| { #(#state_refs)* #subscribe_do });
+    });
   }
 }
 
 #[derive(Debug)]
 pub struct DataFlowExpr {
   expr: Expr,
-  follows: Option<Vec<FollowOn>>,
+  used_name_info: UsedNameInfo,
 }
 
 impl Dataflows {
   pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, Follows<'a>>) {
     self.flows.iter().for_each(|df| {
-      if let Some(to) = df.to.follows.as_ref() {
+      if let Some(to) = df.to.used_name_info.follows.as_ref() {
         let part = df.as_follow_part();
         to.iter().for_each(|fo| {
           let name = &fo.widget;
@@ -103,9 +126,15 @@ impl Parse for Dataflow {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     Ok(Self {
       skip_nc: try_parse_skip_nc(input)?,
-      from: DataFlowExpr { expr: input.parse()?, follows: None },
+      from: DataFlowExpr {
+        expr: input.parse()?,
+        used_name_info: <_>::default(),
+      },
       _arrow_token: input.parse()?,
-      to: DataFlowExpr { expr: input.parse()?, follows: None },
+      to: DataFlowExpr {
+        expr: input.parse()?,
+        used_name_info: <_>::default(),
+      },
     })
   }
 }
@@ -114,6 +143,7 @@ impl Dataflow {
   pub fn as_follow_part(&self) -> FollowPart {
     let follows = self
       .from
+      .used_name_info
       .follows
       .as_ref()
       .expect("data flow must depends on some widget");
@@ -134,8 +164,8 @@ impl DeclareCtx {
 
   fn visit_dataflow_mut(&mut self, df: &mut Dataflow) {
     self.visit_expr_mut(&mut df.from.expr);
-    df.from.follows = self.take_current_follows();
+    df.from.used_name_info = self.take_current_used_info();
     self.visit_expr_mut(&mut df.to.expr);
-    df.to.follows = self.take_current_follows();
+    df.to.used_name_info = self.take_current_used_info();
   }
 }

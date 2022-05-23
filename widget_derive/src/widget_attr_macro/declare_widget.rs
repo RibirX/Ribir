@@ -20,9 +20,9 @@ pub use builtin_fields::*;
 use widget_gen::WidgetGen;
 
 use super::{
-  capture_widget, child_variable, kw, ribir_variable, widget_def_variable,
-  widget_macro::{is_expr_keyword, IfGuard, EXPR_FIELD, EXPR_WIDGET},
-  widget_state_ref, DeclareCtx, FollowOn, FollowPart, Follows, Id, Result,
+  child_variable, kw, ribir_variable, widget_def_variable,
+  widget_macro::{is_expr_keyword, IfGuard, UsedNameInfo, EXPR_FIELD, EXPR_WIDGET},
+  DeclareCtx, FollowPart, Follows, Id, Result,
 };
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ pub struct DeclareField {
   pub if_guard: Option<IfGuard>,
   pub colon_token: Option<token::Colon>,
   pub expr: Expr,
-  pub follows: Option<Vec<FollowOn>>,
+  pub used_name_info: UsedNameInfo,
 }
 
 #[derive(Clone, Debug)]
@@ -205,7 +205,7 @@ impl Parse for DeclareField {
       if_guard,
       colon_token,
       expr,
-      follows: None,
+      used_name_info: <_>::default(),
     })
   }
 }
@@ -239,7 +239,7 @@ impl DeclareCtx {
     }
     self.visit_expr_mut(&mut f.expr);
 
-    f.follows = self.take_current_follows();
+    f.used_name_info = self.take_current_used_info();
   }
 
   pub fn visit_builtin_field_widgets(&mut self, builtin: &mut BuiltinFieldWidgets) {
@@ -358,7 +358,7 @@ impl DeclareWidget {
       .fields
       .iter()
       .chain(self.builtin.all_builtin_fields())
-      .filter(|f| self.named.is_none() || f.follows.is_none())
+      .filter(|f| self.named.is_none() || !f.used_name_info.used_any_name())
       .filter_map(|f| {
         f.skip_nc
           .as_ref()
@@ -423,7 +423,7 @@ impl DeclareWidget {
           self.traverses_widget().for_each(|w| {
             w.builtin
               .all_builtin_fields()
-              .filter_map(|f| f.follows.as_ref())
+              .filter_map(|f| f.used_name_info.follows.as_ref())
               .flat_map(|follows| follows.iter())
               .filter(|f| f.widget == wrap_name)
               .for_each(|f| use_spans.extend(f.spans.iter().map(|s| s.unwrap())))
@@ -462,21 +462,7 @@ impl DeclareWidget {
   }
 }
 
-pub fn used_widgets_subscribe<'a>(
-  used_widgets: impl Iterator<Item = &'a Ident> + Clone,
-  subscribe_do: TokenStream,
-) -> TokenStream {
-  let upstream = upstream_by_used_widgets(used_widgets.clone());
-  let capture_widgets = used_widgets.clone().map(capture_widget);
-  let state_refs = used_widgets.clone().map(widget_state_ref);
-
-  quote! {
-    #(#capture_widgets)*
-    #upstream.subscribe(move |_| { #(#state_refs)* #subscribe_do });
-  }
-}
-
-fn upstream_by_used_widgets<'a>(
+pub fn upstream_by_used_widgets<'a>(
   used_widgets: impl Iterator<Item = &'a Ident> + Clone,
 ) -> TokenStream {
   let upstream = used_widgets.clone().map(|w| {
@@ -594,13 +580,4 @@ pub fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>
     tts.into_iter().collect()
   });
   (tts, cursor)
-}
-
-impl DeclareField {
-  pub fn used_widgets(&self) -> impl Iterator<Item = &Ident> + Clone + '_ {
-    self
-      .follows
-      .iter()
-      .flat_map(|follows| follows.iter().map(|f| &f.widget))
-  }
 }

@@ -5,13 +5,13 @@ use crate::{
 };
 
 use super::{
-  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, widget_state_ref,
-  FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
+  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable,
+  widget_macro::UsedNameInfo, widget_state_ref, FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
 };
 
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, quote_spanned};
 use std::collections::{HashMap, HashSet};
 use syn::{
   parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident,
@@ -32,6 +32,7 @@ pub struct DeclareCtx {
   /// All name we need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
   pub current_follows: HashMap<Ident, Vec<Span>, ahash::RandomState>,
+  pub current_capture: HashSet<Ident, ahash::RandomState>,
   /// name object has by used.
   used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
@@ -68,24 +69,31 @@ impl VisitMut for DeclareCtx {
         }
       }
       Expr::Closure(c) => {
-        let old = std::mem::take(&mut self.current_follows);
+        let old_follows = std::mem::take(&mut self.current_follows);
+        let outside_capture = self.current_capture.drain().collect::<Vec<_>>();
         visit_mut::visit_expr_closure_mut(self, c);
         if !self.current_follows.is_empty() {
           let used_widgets = self.current_follows.keys();
-          let body = &c.body;
-
           let refs = used_widgets.map(widget_state_ref);
+          let body = &c.body;
           c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
-          if c.capture.is_some() {
-            let captures = self.current_follows.keys().map(capture_widget);
-            *expr = parse_quote_spanned! { c.span() =>  { #(#captures)* #c }};
-          } else {
-            *expr = parse_quote_spanned! { c.span() =>  #c };
-          }
         }
-        self.current_follows = old;
-        // todo: closure self not directly follow change instead of inner
-        // capture. But need to tell outside it be used.
+        if c.capture.is_some() {
+          self
+            .current_capture
+            .extend(self.current_follows.keys().cloned())
+        }
+        if !self.current_capture.is_empty() {
+          let captures = self.current_capture.iter().map(capture_widget);
+          *expr = parse_quote_spanned! {c.span() => {
+            #(#captures)*
+            #c
+          }}
+        }
+
+        // needn't follow anything of closure inner.
+        self.current_follows = old_follows;
+        self.current_capture.extend(outside_capture);
       }
       _ => {
         visit_mut::visit_expr_mut(self, expr);
@@ -259,14 +267,18 @@ impl DeclareCtx {
     self.user_perspective_name.get(name)
   }
 
-  pub fn take_current_follows(&mut self) -> Option<Vec<FollowOn>> {
-    (!self.current_follows.is_empty()).then(|| {
+  pub fn take_current_used_info(&mut self) -> UsedNameInfo {
+    let follows = (!self.current_follows.is_empty()).then(|| {
       self
         .current_follows
         .drain()
         .map(|(widget, spans)| FollowOn { widget, spans })
         .collect()
-    })
+    });
+    let captures =
+      (!self.current_capture.is_empty()).then(|| self.current_capture.drain().collect());
+
+    UsedNameInfo { follows, captures }
   }
 
   pub fn emit_unused_id_warning(&self) {
@@ -323,12 +335,15 @@ impl DeclareCtx {
     self.used_widgets.insert(name);
   }
 
+  pub fn add_capture(&mut self, name: Ident) {
+    self.current_capture.insert(name.clone());
+    self.used_widgets.insert(name);
+  }
+
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
     let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
     let named = self.named_objects.clone();
-
-    let be_followed = self.used_widgets.clone();
-    self.used_widgets.clear();
+    let outside_used = std::mem::take(&mut self.used_widgets);
     // all named objects should as outside define for embed `widget!` macro.
     self
       .named_objects
@@ -339,29 +354,20 @@ impl DeclareCtx {
       .gen_tokens(self)
       .unwrap_or_else(|err| err.into_compile_error());
 
-    let outside_named_objects = self
-      .used_widgets
-      .iter()
-      .filter_map(|name| named.contains_key(name).then(|| capture_widget(name)));
-
-    let outside_capture = quote! { #(#outside_named_objects)*};
+    // inner `widget!` used means need be captured.
+    let inner_used = std::mem::replace(&mut self.used_widgets, outside_used);
+    let inner_captures = inner_used.iter().filter(|w| named.contains_key(&w));
+    inner_captures
+      .clone()
+      .cloned()
+      .for_each(|name| self.add_capture(name));
 
     self.emit_unused_id_warning();
     widget_macro.warnings().for_each(|w| w.emit_warning());
-
-    self.named_objects.extend(named);
-    be_followed.into_iter().for_each(|name| {
-      self.used_widgets.insert(name);
-    });
-
-    if outside_capture.is_empty() {
-      syn::parse2(tokens)
-    } else {
-      syn::parse2(quote! {{
-        #outside_capture
-        #tokens
-      }})
-    }
+    let captures = inner_captures.clone().map(capture_widget);
+    let tokens = quote_spanned!(tokens.span()=> {#(#captures)* #tokens} );
+    self.named_objects = named;
+    syn::parse2(tokens)
   }
 
   fn expand_declare_wrap_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {

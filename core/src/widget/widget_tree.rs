@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use indextree::*;
-use smallvec::SmallVec;
+use smallvec::smallvec;
 use std::pin::Pin;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -207,11 +207,11 @@ impl WidgetId {
         id
       }
       WidgetInner::Expr(mut e) => {
-        let widgets = (e.expr)().collect::<Vec<_>>();
-        let mut ids = widgets
-          .into_iter()
-          .map(|x| self.insert_child(x, insert, consume_child, ctx))
-          .collect::<SmallVec<_>>();
+        let mut ids = smallvec![];
+        e.expr.generate_dynamic_widget(&mut |w| {
+          let id = self.insert_child(w, insert, consume_child, ctx);
+          ids.push(id);
+        });
 
         // expr widget, generate at least one widget to anchor itself place.
         if ids.len() == 0 {

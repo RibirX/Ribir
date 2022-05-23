@@ -109,7 +109,17 @@ fn widget_state_ref(widget: &Ident) -> TokenStream2 {
   )
 }
 
-pub fn capture_widget(widget: &Ident) -> TokenStream2 {
+fn capture_widget(widget: &Ident) -> TokenStream2 {
   let def_name = widget_def_variable(widget);
   quote_spanned!(widget.span() => let #def_name = #def_name.clone();)
+}
+
+fn split_ref(widget: &Ident) -> TokenStream2 {
+  let def_name = widget_def_variable(widget);
+  let tmp = ribir_prefix_variable(&def_name, "tmp");
+  quote_spanned!(widget.span() =>
+    let #tmp = #def_name.clone();
+    #[allow(unused_mut)]
+    let mut #widget = #tmp.state_ref();
+  )
 }
