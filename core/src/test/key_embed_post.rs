@@ -27,7 +27,7 @@ impl Compose for EmbedPostWithKey {
         Text { text: this.author, key: 2i32}
         Text { text: this.content, key: 3i32}
         ExprWidget {
-          expr:(this.level > 0).then(|| {
+          expr:(this.level > 0).then(move || {
               widget! {
                 declare EmbedPostWithKey {
                   key: "embed",

@@ -169,8 +169,8 @@ impl<W: IntoWidget<M>, M: ?Sized> IntoSingleChild<Option<&M>> for ExprWidget<Opt
 impl<F, R, M> IntoSingleChild<dyn FnMut() -> M> for ExprWidget<F>
 where
   F: FnMut() -> R + 'static,
-  R: IntoWidget<M> + 'static,
-  M: ?Sized + 'static,
+  R: IntoWidget<M>,
+  M: ?Sized,
 {
   #[inline]
   fn into_single_child(self) -> Option<Widget> { self.into_widget().into() }
@@ -179,8 +179,8 @@ where
 impl<F, R, M> IntoSingleChild<(&dyn FnMut(), Option<&M>)> for ExprWidget<F>
 where
   F: FnMut() -> Option<R> + 'static,
-  R: IntoWidget<M> + 'static,
-  M: ?Sized + 'static,
+  R: IntoWidget<M>,
+  M: ?Sized,
 {
   fn into_single_child(self) -> Option<Widget> { self.into_widget().into() }
 }

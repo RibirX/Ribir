@@ -1,9 +1,12 @@
-use rxrust::observable::{Observable, SubscribeNext};
+use rxrust::{
+  observable::{Observable, SubscribeNext},
+  subscription::{SubscriptionGuard, SubscriptionLike},
+};
 use smallvec::SmallVec;
 
 use crate::{
-  dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
-  prelude::{widget_tree::WidgetTree, Widget, WidgetId},
+  dynamic_widget::{DynamicWidgetGenerator, ExprWidget, Generator, GeneratorID, GeneratorInfo},
+  prelude::{widget_tree::WidgetTree, WidgetId},
 };
 use std::{
   cell::RefCell,
@@ -16,13 +19,18 @@ pub(crate) struct GeneratorStore {
   next_generator_id: GeneratorID,
   generators: HashMap<GeneratorID, Generator, ahash::RandomState>,
   needs_regen: Rc<RefCell<HashSet<GeneratorID, ahash::RandomState>>>,
-  lifetime: HashMap<WidgetId, SmallVec<[GeneratorID; 1]>>,
+  lifetime: HashMap<WidgetId, SmallVec<[GeneratorHandle; 1]>>,
+}
+
+struct GeneratorHandle {
+  id: GeneratorID,
+  _subscription: SubscriptionGuard<Box<dyn SubscriptionLike>>,
 }
 
 impl GeneratorStore {
   pub(crate) fn new_generator(
     &mut self,
-    ExprWidget { expr, upstream }: ExprWidget<Box<dyn FnMut() -> Box<dyn Iterator<Item = Widget>>>>,
+    ExprWidget { expr, upstream }: ExprWidget<Box<dyn DynamicWidgetGenerator>>,
     parent: WidgetId,
     generated_widgets: SmallVec<[WidgetId; 1]>,
   ) -> Option<GeneratorID> {
@@ -31,11 +39,18 @@ impl GeneratorStore {
       self.next_generator_id = id.next_id();
       let info = GeneratorInfo::new(id, parent, generated_widgets);
       let needs_regen = self.needs_regen.clone();
-      upstream.filter(|b| !b).subscribe(move |_| {
-        needs_regen.borrow_mut().insert(id);
-      });
+      let _subscription = upstream
+        .filter(|b| !b)
+        .subscribe(move |_| {
+          needs_regen.borrow_mut().insert(id);
+        })
+        .unsubscribe_when_dropped();
       self.add_generator(Generator { info: info.clone(), expr });
-      self.lifetime.entry(parent).or_default().push(id);
+      self
+        .lifetime
+        .entry(parent)
+        .or_default()
+        .push(GeneratorHandle { id, _subscription });
       info.generate_id()
     })
   }
@@ -61,8 +76,8 @@ impl GeneratorStore {
 
   pub(crate) fn on_widget_drop(&mut self, widget: WidgetId) {
     if let Some(ids) = self.lifetime.remove(&widget) {
-      ids.iter().for_each(|id| {
-        self.generators.remove(id);
+      ids.iter().for_each(|h| {
+        self.generators.remove(&h.id);
       });
     }
   }

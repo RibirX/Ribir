@@ -31,7 +31,7 @@ pub enum FollowPlace<'a> {
 
 impl<'a> FollowPart<'a> {
   pub fn from_widget_field(field: &'a DeclareField) -> Option<Self> {
-    field.follows.as_ref().map(|follows| Self {
+    field.used_name_info.follows.as_ref().map(|follows| Self {
       origin: FollowPlace::Field(field),
       follows,
     })
