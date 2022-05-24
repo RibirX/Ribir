@@ -208,7 +208,7 @@ impl WidgetId {
       }
       WidgetInner::Expr(mut e) => {
         let mut ids = smallvec![];
-        e.expr.generate_dynamic_widget(&mut |w| {
+        (e.expr)(&mut |w| {
           let id = self.insert_child(w, insert, consume_child, ctx);
           ids.push(id);
         });

@@ -5,13 +5,12 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap};
-use syn::{ spanned::Spanned};
+use syn::spanned::Spanned;
 
 use crate::{
   error::DeclareError,
   widget_attr_macro::{
-    ribir_suffix_variable, widget_def_variable,
-    DeclareCtx, FollowPart, Follows,
+    ribir_suffix_variable, widget_def_variable, DeclareCtx, FollowPart, Follows,
   },
 };
 
@@ -112,7 +111,7 @@ impl BuiltinFieldWidgets {
       let span = info.span();
       let ty = Ident::new(&info.name, span).into();
       let fields = &info.fields;
-      
+
       let gen = WidgetGen {
         ty: &ty,
         name: name.clone(),
@@ -138,12 +137,12 @@ impl BuiltinFieldWidgets {
         let span = info.span();
         if is_expr_widget {
           compose_tokens.extend(
-            quote_spanned! { span => let #host_def = SingleChildWidget::new(#wrap_def, #host_def.into_single_child()); },
-          )
+            quote_spanned! { span =>  let #host_def = SingleChildWidget::from_expr_child(#wrap_def, #host_def); },
+          );
         } else {
           compose_tokens.extend(
-            quote_spanned! { span =>  let #host_def = SingleChildWidget::new(#wrap_def, Some(#host_def.into_widget())); },
-          )
+            quote_spanned! { span =>  let #host_def = SingleChildWidget::new(#wrap_def, #host_def); },
+          );
         }
         info.is_expr_widget()
       });
@@ -184,14 +183,9 @@ impl BuiltinFieldWidgets {
   }
 }
 
-
-
 impl BuiltinWidgetInfo {
-  fn is_expr_widget(&self) -> bool {
-    self.fields.iter().all(|f| f.if_guard.is_some())
-  }
-
-
+  // todo: only if guard track others should as `ExprWidget`
+  fn is_expr_widget(&self) -> bool { self.fields.iter().all(|f| f.if_guard.is_some()) }
 
   fn span(&self) -> Span {
     self
