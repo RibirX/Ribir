@@ -5,25 +5,22 @@ use rxrust::ops::box_it::LocalBoxOp;
 use smallvec::SmallVec;
 
 #[derive(Declare)]
-pub struct ExprWidget<F> {
-  pub(crate) expr: F,
-  pub(crate) upstream: Option<LocalBoxOp<'static, bool, ()>>,
+pub struct ExprWidget<R> {
+  #[declare(custom_convert)]
+  pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
+  pub(crate) upstream: LocalBoxOp<'static, bool, ()>,
 }
 /// Generator is a virtual child used in `widget!`, which use to generate
 /// dynamic widgets and provide ability to keep them up to date in their
 /// lifetime.
 pub(crate) struct Generator {
   pub(crate) info: GeneratorInfo,
-  pub(crate) expr: Box<dyn DynamicWidgetGenerator>,
+  pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget))>,
 }
 
 /// The unique id of widget generator in application
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct GeneratorID(usize);
-
-pub(crate) trait DynamicWidgetGenerator {
-  fn generate_dynamic_widget(&mut self, cb: &mut dyn FnMut(Widget));
-}
 
 struct GenerateInfoInner {
   id: GeneratorID,
@@ -68,45 +65,21 @@ impl GeneratorInfo {
   }
 }
 
-impl<F, R, M: ?Sized> IntoWidget<dyn FnMut() -> M> for ExprWidget<F>
-where
-  F: FnMut() -> R + 'static,
-  R: IntoWidget<M>,
-{
+impl IntoWidget<SingleConsumer> for ExprWidget<SingleConsumer> {
+  #[inline]
   fn into_widget(self) -> Widget {
-    let ExprWidget { mut expr, upstream } = self;
-    ExprWidget {
-      expr: move || std::iter::once(expr()),
-      upstream,
-    }
-    .into_widget()
+    // #Safety
+    // Only erase the function return type `SingleConsumer` which is unit struct
+    Widget(WidgetInner::Expr(unsafe { std::mem::transmute(self) }))
   }
 }
 
-impl<F, R, M: ?Sized> IntoWidget<dyn Iterator<Item = M>> for ExprWidget<F>
-where
-  F: FnMut() -> R + 'static,
-  R: IntoIterator,
-  R::Item: IntoWidget<M>,
-{
+impl IntoWidget<MultiConsumer> for ExprWidget<MultiConsumer> {
+  #[inline]
   fn into_widget(self) -> Widget {
-    let ExprWidget { mut expr, upstream } = self;
-    let expr = move || -> Box<dyn Iterator<Item = Widget>> {
-      let iter = expr().into_iter().map(IntoWidget::into_widget);
-      Box::new(iter)
-    };
-    let expr: Box<_> = Box::new(expr);
-    Widget(WidgetInner::Expr(ExprWidget { expr, upstream }))
-  }
-}
-
-impl<F, R> DynamicWidgetGenerator for F
-where
-  F: FnMut() -> R,
-  R: IntoIterator<Item = Widget>,
-{
-  fn generate_dynamic_widget(&mut self, cb: &mut dyn FnMut(Widget)) {
-    self().into_iter().for_each(cb);
+    // #Safety
+    // Only erase the function return type `MultiConsumer` which is unit struct
+    Widget(WidgetInner::Expr(unsafe { std::mem::transmute(self) }))
   }
 }
 
@@ -136,7 +109,7 @@ impl Generator {
 
     let tmp_anchor = self.info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
     let mut insert_at = tmp_anchor;
-    self.expr.generate_dynamic_widget(&mut |c| {
+    (self.expr)(&mut |c| {
       let id = info.parent.insert_child(
         c,
         &mut |node, tree| {
@@ -174,4 +147,14 @@ impl Generator {
 impl GeneratorID {
   #[inline]
   pub(crate) fn next_id(self) -> Self { Self(self.0 + 1) }
+}
+
+impl<R> ExprWidgetBuilder<R> {
+  #[inline]
+  pub fn expr_convert<F>(func: F) -> Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>
+  where
+    F: FnMut(&mut dyn FnMut(Widget)) -> R + 'static,
+  {
+    Box::new(func)
+  }
 }

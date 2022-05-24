@@ -5,7 +5,7 @@ use rxrust::{
 use smallvec::SmallVec;
 
 use crate::{
-  dynamic_widget::{DynamicWidgetGenerator, ExprWidget, Generator, GeneratorID, GeneratorInfo},
+  dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
   prelude::{widget_tree::WidgetTree, WidgetId},
 };
 use std::{
@@ -30,29 +30,27 @@ struct GeneratorHandle {
 impl GeneratorStore {
   pub(crate) fn new_generator(
     &mut self,
-    ExprWidget { expr, upstream }: ExprWidget<Box<dyn DynamicWidgetGenerator>>,
+    ExprWidget { expr, upstream }: ExprWidget<()>,
     parent: WidgetId,
     generated_widgets: SmallVec<[WidgetId; 1]>,
-  ) -> Option<GeneratorID> {
-    upstream.map(|upstream| {
-      let id = self.next_generator_id;
-      self.next_generator_id = id.next_id();
-      let info = GeneratorInfo::new(id, parent, generated_widgets);
-      let needs_regen = self.needs_regen.clone();
-      let _subscription = upstream
-        .filter(|b| !b)
-        .subscribe(move |_| {
-          needs_regen.borrow_mut().insert(id);
-        })
-        .unsubscribe_when_dropped();
-      self.add_generator(Generator { info: info.clone(), expr });
-      self
-        .lifetime
-        .entry(parent)
-        .or_default()
-        .push(GeneratorHandle { id, _subscription });
-      info.generate_id()
-    })
+  ) -> GeneratorID {
+    let id = self.next_generator_id;
+    self.next_generator_id = id.next_id();
+    let info = GeneratorInfo::new(id, parent, generated_widgets);
+    let needs_regen = self.needs_regen.clone();
+    let _subscription = upstream
+      .filter(|b| !b)
+      .subscribe(move |_| {
+        needs_regen.borrow_mut().insert(id);
+      })
+      .unsubscribe_when_dropped();
+    self.add_generator(Generator { info: info.clone(), expr });
+    self
+      .lifetime
+      .entry(parent)
+      .or_default()
+      .push(GeneratorHandle { id, _subscription });
+    info.generate_id()
   }
 
   pub(crate) fn add_generator(&mut self, g: Generator) {

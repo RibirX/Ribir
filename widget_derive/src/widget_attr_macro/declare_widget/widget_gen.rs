@@ -1,7 +1,7 @@
 use crate::{
   declare_derive::field_convert_method,
   widget_attr_macro::{
-    capture_widget, ribir_variable, skip_nc_assign, split_ref, widget_def_variable,
+    capture_widget, ribir_variable, skip_nc_assign, widget_def_variable,
     widget_macro::{is_expr_keyword, EXPR_FIELD},
     widget_state_ref, DeclareCtx, BUILD_CTX,
   },
@@ -62,36 +62,26 @@ impl<'a> WidgetGen<'a> {
     let build_ctx = ribir_variable(BUILD_CTX, ty.span());
     if let Some(follows) = used_name_info.follows.as_ref() {
       let follow_names = follows.iter().map(|f| &f.widget);
-      let refs = follow_names.clone().map(split_ref);
+      let refs = follow_names.clone().map(widget_state_ref);
       let upstream = upstream_by_used_widgets(follow_names);
       let captures = used_name_info.used_widgets().map(capture_widget);
+      let field_converter = field_convert_method(expr_mem);
       quote_spanned! { ty.span() =>
         let #def_name = #ty::<_>::builder()
-          .upstream(Some(#upstream.box_it()))
+          .upstream(#upstream.box_it())
           .#expr_mem({
             #(#captures)*
-            move || {
-              #(#refs)* #expr
-            }
+            <ExprWidget::<_> as Declare>::Builder::#field_converter(
+              move |cb: &mut dyn FnMut(Widget)| {
+                #(#refs)*
+                ChildConsumer::<_>::consume(#expr, cb)
+              }
+            )
           })
           .build(#build_ctx);
       }
     } else {
-      let expr = if used_name_info.captures.is_some() {
-        let captures = used_name_info.capture_widgets().map(capture_widget);
-        quote! {{ #(#captures)* expr }}
-      } else {
-        quote! { #expr }
-      };
-
-      quote_spanned! { ty.span() =>
-        let #def_name = {
-          #ty::<_>::builder()
-            .upstream(None)
-            .#expr_mem(#expr)
-            .build(#build_ctx)
-          };
-      }
+      quote_spanned! { ty.span() => let #def_name = #expr; }
     }
   }
 

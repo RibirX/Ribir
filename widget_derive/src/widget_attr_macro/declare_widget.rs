@@ -288,9 +288,9 @@ impl DeclareWidget {
           .finally_is_expr_widget()
           .unwrap_or_else(|| c.is_host_expr_widget())
         {
-          quote_spanned! { c.span() => .have_child(#child_name)  }
+          quote_spanned! { c.span() => .have_expr_child(#child_name)  }
         } else {
-          quote_spanned! { c.span() => .have_child(#child_name.into_widget()) }
+          quote_spanned! { c.span() => .have_child(#child_name) }
         }
       });
       let compose_children = quote! { let #def_name #hint = #def_name #(#children)*; };
@@ -404,7 +404,11 @@ impl DeclareWidget {
     follows
   }
 
-  pub(crate) fn is_host_expr_widget(&self) -> bool { is_expr_keyword(&self.path) }
+  pub(crate) fn is_host_expr_widget(&self) -> bool {
+    // if `ExprWidget` track nothing, will not as a `ExprWidget`, but use its
+    // directly return value.
+    is_expr_keyword(&self.path) && self.fields.iter().any(|f| f.used_name_info.used_any_name())
+  }
 
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
     debug_assert!(self.named.is_some());

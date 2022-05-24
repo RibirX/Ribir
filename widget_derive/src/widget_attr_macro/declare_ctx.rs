@@ -81,14 +81,14 @@ impl VisitMut for DeclareCtx {
         if c.capture.is_some() {
           self
             .current_capture
-            .extend(self.current_follows.keys().cloned())
-        }
-        if !self.current_capture.is_empty() {
-          let captures = self.current_capture.iter().map(capture_widget);
-          *expr = parse_quote_spanned! {c.span() => {
-            #(#captures)*
-            #c
-          }}
+            .extend(self.current_follows.keys().cloned());
+          if !self.current_capture.is_empty() {
+            let captures = self.current_capture.iter().map(capture_widget);
+            *expr = parse_quote_spanned! {c.span() => {
+              #(#captures)*
+              #c
+            }}
+          }
         }
 
         // needn't follow anything of closure inner.

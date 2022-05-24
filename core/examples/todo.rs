@@ -19,12 +19,14 @@ impl Compose for Todos {
         h_align: CrossAxisAlign::Start,
         ExprWidget {
           expr: this.tasks.iter().enumerate().map(|(idx, task)| {
+            let checked = task.finished;
+            let label = task.label.clone();
             widget! {
               declare Row {
                 margin: EdgeInsets::vertical(4.),
-                Checkbox{  id: checkbox, checked: task.finished }
+                Checkbox{  id: checkbox, checked }
                 Text {
-                  text: task.label.clone(),
+                  text: label,
                   margin: EdgeInsets::vertical(4.)
                 }
               }

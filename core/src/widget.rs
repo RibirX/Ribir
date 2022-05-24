@@ -11,7 +11,6 @@ pub mod text;
 mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
-use crate::dynamic_widget::DynamicWidgetGenerator;
 pub use crate::dynamic_widget::ExprWidget;
 pub use crate::widget::text::Text;
 pub use key::{Key, KeyWidget};
@@ -185,7 +184,7 @@ pub(crate) enum WidgetInner {
   Render(Box<dyn RenderNode>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
-  Expr(ExprWidget<Box<dyn DynamicWidgetGenerator>>),
+  Expr(ExprWidget<()>),
 }
 
 impl<W: Any> QueryType for W {
