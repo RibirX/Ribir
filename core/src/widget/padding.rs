@@ -61,7 +61,7 @@ mod tests {
   #[test]
   fn smoke() {
     let widget = widget! {
-      declare Row {
+      Row {
         SizedBox {
            size: Size::new(100., 100.),
            padding: EdgeInsets::only_left(1.)

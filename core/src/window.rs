@@ -169,7 +169,7 @@ impl Window {
   }
 
   fn resize(&mut self, size: DeviceSize) {
-    self.context.mark_layout_from_root();
+    self.context.mark_root_dirty();
     self.p_backend.resize(size);
     self.raw_window.request_redraw();
   }

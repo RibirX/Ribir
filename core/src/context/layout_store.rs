@@ -1,6 +1,6 @@
 use std::{
   cmp::Reverse,
-  collections::{BinaryHeap, HashMap},
+  collections::HashMap,
   sync::{Arc, RwLock},
 };
 
@@ -34,10 +34,6 @@ pub struct BoxLayout {
 /// clamp passed from parent.
 #[derive(Default)]
 pub struct LayoutStore {
-  /// root of sub tree which needed to perform layout, store as min-head by the
-  /// node's depth.
-  needs_layout: BinaryHeap<Reverse<(usize, WidgetId)>>,
-
   infos: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
 }
 
@@ -62,38 +58,6 @@ impl LayoutStore {
       .get_or_insert_with(Rect::zero)
   }
 
-  /// Mark layout widget need relayout, caller guarantee `id` is a layout
-  /// widget.
-  pub(crate) fn mark_needs_layout(&mut self, id: WidgetId, tree: &WidgetTree) {
-    let mut relayout_root = id;
-    if self.layout_box_rect(id).is_some() {
-      self.remove(id);
-      // All ancestors of this render object should relayout until the one which only
-      // sized by parent.
-      id.ancestors(tree).skip(1).all(|id| {
-        let r = id.assert_get(tree);
-        let sized_by_parent = r.only_sized_by_parent();
-        if !sized_by_parent {
-          self.remove(id);
-          relayout_root = id;
-        }
-
-        !sized_by_parent
-      });
-    }
-    self.needs_layout.push(Reverse((
-      relayout_root.ancestors(tree).count(),
-      relayout_root,
-    )));
-  }
-
-  pub(crate) fn is_dirty(&self, tree: &WidgetTree) -> bool {
-    self
-      .needs_layout
-      .iter()
-      .any(|Reverse((_, id))| !id.is_dropped(tree))
-  }
-
   /// Do the work of computing the layout for all node which need, Return if any
   /// node has really computing the layout.
   pub(crate) fn layout(
@@ -106,15 +70,11 @@ impl LayoutStore {
     font_db: &Arc<RwLock<FontDB>>,
   ) -> bool {
     let mut performed_layout = false;
-    loop {
-      if self.needs_layout.is_empty() {
-        break;
-      }
-      let needs_layout = self.take_needs_layout();
 
-      needs_layout.iter().for_each(|Reverse((_, wid))| {
-        if !wid.is_dropped(tree) {
-          performed_layout = true;
+    loop {
+      if let Some(needs_layout) = self.layout_list(tree) {
+        performed_layout = performed_layout || !needs_layout.is_empty();
+        needs_layout.iter().for_each(|wid| {
           let clamp = BoxClamp { min: Size::zero(), max: win_size };
           self.perform_layout(
             *wid,
@@ -125,8 +85,10 @@ impl LayoutStore {
             typography_store,
             font_db,
           );
-        }
-      });
+        });
+      } else {
+        break;
+      }
     }
     performed_layout
   }
@@ -191,10 +153,39 @@ impl LayoutStore {
     self.infos.entry(id).or_insert_with(BoxLayout::default)
   }
 
-  fn take_needs_layout(&mut self) -> BinaryHeap<Reverse<(usize, WidgetId)>> {
-    let ret = self.needs_layout.clone();
-    self.needs_layout.clear();
-    ret
+  pub(crate) fn layout_list(&mut self, tree: &WidgetTree) -> Option<Vec<WidgetId>> {
+    if tree.state_changed.borrow().is_empty() {
+      return None;
+    }
+
+    let mut needs_layout = vec![];
+    tree
+      .state_changed
+      .borrow_mut()
+      .drain()
+      .filter(|id| !id.is_dropped(tree))
+      .for_each(|id| {
+        let mut relayout_root = id;
+        if self.layout_box_rect(id).is_some() {
+          self.remove(id);
+          // All ancestors of this render object should relayout until the one which only
+          // sized by parent.
+          id.ancestors(tree).skip(1).all(|id| {
+            let r = id.assert_get(tree);
+            let sized_by_parent = r.only_sized_by_parent();
+            if !sized_by_parent {
+              self.remove(id);
+              relayout_root = id;
+            }
+
+            !sized_by_parent
+          });
+          needs_layout.push(relayout_root);
+        }
+      });
+
+    needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(tree).count()));
+    Some(needs_layout)
   }
 }
 

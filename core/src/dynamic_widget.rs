@@ -92,11 +92,12 @@ impl Generator {
       .iter()
       .filter_map(|id| {
         let tree = ctx.tree_mut();
-        if let Some(key) = id
-          .assert_get(tree)
-          .query_first_type::<Key>(QueryOrder::OutsideFirst)
-          .cloned()
-        {
+        let mut key = None;
+        id.assert_get(tree)
+          .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
+            key = Some(k.clone());
+          });
+        if let Some(key) = key {
           id.detach(tree);
           Some((key.clone(), *id))
         } else {
@@ -113,9 +114,10 @@ impl Generator {
       let id = info.parent.insert_child(
         c,
         &mut |node, tree| {
-          let old = node
-            .query_first_type::<Key>(QueryOrder::OutsideFirst)
-            .and_then(|k| key_widgets.remove(k));
+          let mut old = None;
+          node.query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
+            old = key_widgets.remove(k);
+          });
           let id = match old {
             Some(c_id) => {
               *c_id.assert_get_mut(tree) = node;

@@ -5,12 +5,14 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap};
-use syn::spanned::Spanned;
+use syn::{parse_quote_spanned, spanned::Spanned};
 
 use crate::{
   error::DeclareError,
   widget_attr_macro::{
-    ribir_suffix_variable, widget_def_variable, DeclareCtx, FollowPart, Follows,
+    ribir_suffix_variable, widget_def_variable,
+    widget_macro::{UsedNameInfo, EXPR_WIDGET},
+    DeclareCtx,  Depends, MergeDepends, 
   },
 };
 
@@ -65,16 +67,17 @@ impl BuiltinFieldWidgets {
     self.widgets.iter().flat_map(|info| info.fields.iter())
   }
 
-  pub fn collect_wrap_widget_follows<'a>(
+  pub fn collect_builtin_widget_follows<'a>(
     &'a self,
     host: &Ident,
-    follows_info: &mut BTreeMap<Ident, Follows<'a>>,
+    follows_info: &mut BTreeMap<Ident, Depends<'a>>,
   ) {
     self.widgets.iter().for_each(|info| {
-      let follows: Follows = info
+      let follows: Depends = info
         .fields
         .iter()
-        .filter_map(FollowPart::from_widget_field)
+        .filter(|f| f.used_name_info.use_or_capture_any_name())
+        .flat_map(|f| f.depend_parts( ))
         .collect();
 
       if !follows.is_empty() {
@@ -88,7 +91,7 @@ impl BuiltinFieldWidgets {
     if let Some(info) = self.widgets.iter().find(|info| info.name == "Key") {
       assert_eq!(info.fields.len(), 1);
       let DeclareField { member, used_name_info, .. } = &info.fields[0];
-      if let Some(follows) = used_name_info.follows.as_ref() {
+      if let Some(follows) = used_name_info.used_names.as_ref() {
         return Err(DeclareError::KeyDependsOnOther {
           key: member.span().unwrap(),
           depends_on: follows.iter().map(|fo| fo.widget.span().unwrap()).collect(),
@@ -117,7 +120,34 @@ impl BuiltinFieldWidgets {
         name: name.clone(),
         fields: &fields,
       };
-      (name, gen.gen_widget_tokens(ctx))
+
+      let mut widget_tokens = gen.gen_widget_tokens(ctx);
+      // builtin widget all fields have if guard correspond to a `ExprWidget` syntax
+      if info.is_expr_widget() {
+        let ty = Ident::new(EXPR_WIDGET, span).into();
+        let wrap_name = widget_def_variable(&name);
+
+        let mut expr_field: DeclareField = parse_quote_spanned! { span =>
+          expr: { #widget_tokens #wrap_name }
+        };
+
+        let if_guards = info.fields.iter().filter_map(|f| f.if_guard.as_ref());
+        let captures = if_guards.clone()
+          .filter_map(|g| g.used_name_info.captures.as_ref())
+          .merge_depends();
+          let follows = if_guards
+          .filter_map(|g| g.used_name_info.used_names.as_ref())
+          .merge_depends();
+        let used_name_info = UsedNameInfo { captures, used_names: follows };
+        expr_field.used_name_info = used_name_info;
+        let expr_widget_gen = WidgetGen {
+          ty: &ty,
+          name: name.clone(),
+          fields: &[expr_field],
+        };
+        widget_tokens = expr_widget_gen.gen_widget_tokens(ctx);
+      }
+      (name, widget_tokens)
     })
   }
 
@@ -184,8 +214,13 @@ impl BuiltinFieldWidgets {
 }
 
 impl BuiltinWidgetInfo {
-  // todo: only if guard track others should as `ExprWidget`
-  fn is_expr_widget(&self) -> bool { self.fields.iter().all(|f| f.if_guard.is_some()) }
+  fn is_expr_widget(&self) -> bool {
+    self.fields.iter().all(|f| {
+      f.if_guard
+        .as_ref()
+        .map_or(false, |f| f.used_name_info.used_names.is_some())
+    })
+  }
 
   fn span(&self) -> Span {
     self

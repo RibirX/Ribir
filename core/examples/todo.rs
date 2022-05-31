@@ -15,14 +15,14 @@ impl Compose for Todos {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare Column {
+      Column {
         h_align: CrossAxisAlign::Start,
         ExprWidget {
           expr: this.tasks.iter().enumerate().map(|(idx, task)| {
             let checked = task.finished;
             let label = task.label.clone();
             widget! {
-              declare Row {
+              Row {
                 margin: EdgeInsets::vertical(4.),
                 Checkbox{  id: checkbox, checked }
                 Text {

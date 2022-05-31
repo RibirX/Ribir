@@ -75,7 +75,7 @@ impl Context {
     let old = tree.reset_root(real_root);
     ctx.drop_subtree(old);
 
-    ctx.mark_layout_from_root();
+    ctx.mark_root_dirty();
     ctx
   }
 
@@ -153,10 +153,12 @@ impl Context {
     self.painter.finish()
   }
 
-  pub fn mark_layout_from_root(&mut self) {
+  pub fn mark_root_dirty(&mut self) {
     self
-      .layout_store
-      .mark_needs_layout(self.widget_tree.root(), &self.widget_tree);
+      .widget_tree
+      .state_changed
+      .borrow_mut()
+      .insert(self.widget_tree.root());
   }
 
   /// Repair the gaps between widget tree represent and current data state after
@@ -174,7 +176,7 @@ impl Context {
 
   #[allow(dead_code)]
   pub fn is_dirty(&self) -> bool {
-    self.layout_store.is_dirty(&self.widget_tree) || self.generator_store.is_dirty()
+    self.widget_tree.any_state_modified() || self.generator_store.is_dirty()
   }
 
   pub fn descendants(&self) -> impl Iterator<Item = WidgetId> + '_ {
@@ -220,7 +222,7 @@ mod tests {
     let post = EmbedPost::new(3);
     let mut ctx = Context::new(post.into_widget(), 1., None);
     assert_eq!(ctx.widget_tree.count(), 20);
-    ctx.mark_layout_from_root();
+    ctx.mark_root_dirty();
     assert_eq!(ctx.is_dirty(), false);
   }
 
@@ -249,7 +251,7 @@ mod tests {
     let post = EmbedPostWithKey::new(1000);
     let mut ctx = Context::new(post.into_widget(), 1., None);
     b.iter(|| {
-      ctx.mark_layout_from_root();
+      ctx.mark_root_dirty();
       ctx.tree_repair()
     });
   }
@@ -258,7 +260,7 @@ mod tests {
   fn repair_50_pow_2(b: &mut Bencher) {
     let mut ctx = test_sample_create(50, 2);
     b.iter(|| {
-      ctx.mark_layout_from_root();
+      ctx.mark_root_dirty();
       ctx.tree_repair();
     })
   }
@@ -267,7 +269,7 @@ mod tests {
   fn repair_100_pow_2(b: &mut Bencher) {
     let mut ctx = test_sample_create(100, 2);
     b.iter(|| {
-      ctx.mark_layout_from_root();
+      ctx.mark_root_dirty();
       ctx.tree_repair();
     })
   }
@@ -276,7 +278,7 @@ mod tests {
   fn repair_10_pow_4(b: &mut Bencher) {
     let mut ctx = test_sample_create(10, 4);
     b.iter(|| {
-      ctx.mark_layout_from_root();
+      ctx.mark_root_dirty();
       ctx.tree_repair();
     })
   }
@@ -285,7 +287,7 @@ mod tests {
   fn repair_10_pow_5(b: &mut Bencher) {
     let mut ctx = test_sample_create(10, 5);
     b.iter(|| {
-      ctx.mark_layout_from_root();
+      ctx.mark_root_dirty();
       ctx.tree_repair();
     })
   }

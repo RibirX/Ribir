@@ -27,7 +27,7 @@ impl Compose for EmbedPost {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare Row {
+      Row {
         v_align: CrossAxisAlign::Start,
         Text { text: this.title }
         Text { text: this.author }

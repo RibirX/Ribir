@@ -14,10 +14,11 @@ use syn::{
 use crate::widget_attr_macro::Id;
 
 use super::{
+  capture_widget,
   declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
-  ribir_suffix_variable, ribir_variable,
+  ribir_suffix_variable, ribir_variable, widget_def_variable,
   widget_macro::UsedNameInfo,
-  DeclareCtx, FollowPart, FollowPlace, Follows, BUILD_CTX,
+  widget_state_ref, DeclareCtx, DependIn, Depends, BUILD_CTX,
 };
 
 use super::kw;
@@ -436,26 +437,37 @@ impl ToTokens for Animations {
 impl ToTokens for Animate {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self {
-      animate_token, id, from, transition, ..
+      animate_token,
+      id,
+      from,
+      transition,
+      used_name_info,
+      ..
     } = self;
 
     let animate_span = animate_token.span();
     let ctx_name = ribir_variable(BUILD_CTX, animate_span);
-    let mut animate_tokens = quote_spanned! { animate_span =>
-      #animate_token::new(
-        #from,
-        &#transition,
-        #ctx_name)
+
+    let mut animate_def_tokens = quote_spanned! { animate_span =>
+      #animate_token::new(#from, &#transition, #ctx_name)
     };
 
+    if used_name_info.captures.is_some() {
+      let captures = used_name_info.capture_widgets().map(capture_widget);
+      animate_def_tokens = quote_spanned!(animate_span => {
+        #(#captures)*
+        #animate_def_tokens
+      });
+    }
+
     if let Some(Id { name, .. }) = id.as_ref() {
-      animate_tokens = quote_spanned! {animate_span =>
+      animate_def_tokens = quote_spanned! {animate_span =>
         #[allow(unused_mut)]
-        let mut #name = #animate_tokens;
+        let mut #name = #animate_def_tokens;
       };
     }
 
-    tokens.extend(animate_tokens);
+    tokens.extend(animate_def_tokens);
   }
 }
 
@@ -513,9 +525,18 @@ impl ToTokens for TransitionExpr {
 
 impl ToTokens for State {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let Self { state_token, id, fields, .. } = self;
+    let Self {
+      state_token,
+      id,
+      fields,
+      used_name_info,
+      ..
+    } = self;
 
     let state_span = state_token.span();
+
+    let refs = self.used_name_info.used_widgets().map(widget_state_ref);
+
     let mut state_tokens = if fields.len() > 1 {
       let init_value = fields.iter().map(|f| &f.expr);
       // let path_members = fields.iter().map(|f| &f.path);
@@ -527,27 +548,37 @@ impl ToTokens for State {
       let members2 = members.clone();
       let indexes = (0..fields.len()).map(syn::Index::from);
 
-      quote_spanned! { state_span =>{ move |_, _| {
-            let state_init = (#(#init_value),*);
-            let state_final = (#(#widgets2.#members2.clone()),*);
-            move |p: f32| {
-              #(#widgets .shallow().#members
-                = Tween::tween(&state_init.#indexes, &state_final.#indexes, p);)*
-            }
-          }
+      quote! {
+        #(#refs)*;
+        let state_init = (#(#init_value),*);
+        let state_final = (#(#widgets2.#members2.clone()),*);
+        move |p: f32| {
+          #(#widgets.shallow().#members
+            = Tween::tween(&state_init.#indexes, &state_final.#indexes, p);)*
         }
       }
     } else {
       let PathField { path, _colon_token, expr } = &fields[0];
       let MemberPath { widget, member, dot_token } = &path;
       let widget = widget_from_field_name(&widget, &member);
-      quote_spanned! { state_span =>
-      move |_, _|  {
-          let state_init = #expr;
-          let state_final = #widget #dot_token #member.clone();
-          move |p: f32| { #widget.shallow().#member =  Tween::tween(&state_init, &state_final, p); }
-        }
+      quote! {
+        #(#refs)*;
+        let state_init = #expr;
+        let state_final = #widget #dot_token #member.clone();
+        move |p: f32| { #widget.shallow().#member =  Tween::tween(&state_init, &state_final, p); }
       }
+    };
+
+    state_tokens = if self.used_name_info.use_or_capture_any_name() {
+      let captures = used_name_info.use_or_capture_name().map(capture_widget);
+      quote_spanned! { state_span => move |_, _| {
+        #(#captures)*
+        #state_tokens
+      }}
+    } else {
+      quote_spanned! { state_span => move |_, _| {
+        #state_tokens
+      }}
     };
 
     if let Some(Id { name, .. }) = id.as_ref() {
@@ -636,9 +667,10 @@ impl ToTokens for Trigger {
         }
       };
 
+      let w_def = widget_def_variable(&widget);
       tokens.extend(quote_spanned! { trigger_span =>
         let mut #animate = #expr;
-        #widget
+        #w_def
         .state_change(move |w| w #dot_token #member.clone())
         .subscribe(move |change| {
           // todo: should remove after support state change hook before change notify
@@ -703,7 +735,7 @@ impl DeclareCtx {
       StateExpr::State(state) => {
         self.visit_state_mut(state);
         if let Some(Id { name, .. }) = state.id.as_ref() {
-          self.add_follow(name.clone());
+          self.add_used_widget(name.clone());
         }
       }
       StateExpr::Expr(expr) => self.visit_expr_mut(expr),
@@ -712,7 +744,7 @@ impl DeclareCtx {
       TransitionExpr::Transition(t) => {
         self.visit_transition_mut(t);
         if let Some(Id { name, .. }) = t.id.as_ref() {
-          self.add_follow(name.clone());
+          self.add_used_widget(name.clone());
         }
       }
       TransitionExpr::Expr(e) => self.visit_expr_mut(e),
@@ -752,7 +784,7 @@ impl DeclareCtx {
   }
 
   fn visit_member_path(&mut self, path: &mut MemberPath) {
-    self.add_follow(widget_from_field_name(&path.widget, &path.member));
+    self.add_used_widget(widget_from_field_name(&path.widget, &path.member));
   }
 
   fn visit_simple_field_mut(&mut self, f: &mut SimpleField) { self.visit_expr_mut(&mut f.expr); }
@@ -775,14 +807,13 @@ impl Animations {
     })
   }
 
-  pub fn follows_iter(&self) -> impl Iterator<Item = (Ident, Follows)> {
-    self.named_objects_iter().filter_map(|n| {
-      n.as_follow_part()
-        .map(|p| (n.name().clone(), Follows::from_single_part(p)))
-    })
+  pub fn follows_iter(&self) -> impl Iterator<Item = (Ident, Depends)> + '_ {
+    self
+      .named_objects_iter()
+      .filter_map(|n| n.depends().map(|d| (n.name().clone(), d)))
   }
 
-  pub fn named_objects_iter(&self) -> impl Iterator<Item = AnimationObject> {
+  pub fn named_objects_iter(&self) -> impl Iterator<Item = AnimationObject> + '_ {
     fn named_objects_in_animate<'a>(a: &'a Animate) -> impl Iterator<Item = AnimationObject> {
       let Animate { id, from, transition, .. } = a;
       id.as_ref()
@@ -852,55 +883,34 @@ impl<'a> AnimationObject<'a> {
     &id.unwrap().name
   }
 
-  fn as_follow_part(&self) -> Option<FollowPart<'a>> {
+  fn depends(&self) -> Option<Depends<'a>> {
     match self {
-      AnimationObject::Animate(a) => a.as_follow_part(),
-      AnimationObject::Transition(t) => t.as_follow_part(),
-      AnimationObject::State(s) => s.as_follow_part(),
+      AnimationObject::Animate(a) => a.depends(),
+      AnimationObject::Transition(t) => t.depends(),
+      AnimationObject::State(s) => s.depends(),
     }
   }
 }
 
 impl Animate {
-  fn as_follow_part(&self) -> Option<FollowPart> {
-    self
-      .used_name_info
-      .follows
-      .as_ref()
-      .map(|follows| FollowPart {
-        origin: FollowPlace::Animate(self),
-        follows: &*follows,
-      })
-  }
+  #[inline]
+  pub fn depends(&self) -> Option<Depends> { self.used_name_info.depends(DependIn::Animate(self)) }
 }
 
 impl State {
-  fn as_follow_part(&self) -> Option<FollowPart> {
-    self
-      .used_name_info
-      .follows
-      .as_ref()
-      .map(|follows| FollowPart {
-        origin: FollowPlace::State(self),
-        follows: &*follows,
-      })
-  }
+  #[inline]
+  pub fn depends(&self) -> Option<Depends> { self.used_name_info.depends(DependIn::State(self)) }
 }
 
 impl Transition {
-  fn as_follow_part(&self) -> Option<FollowPart> {
-    self
-      .used_name_info
-      .follows
-      .as_ref()
-      .map(|follows| FollowPart {
-        origin: FollowPlace::Transition(self),
-        follows: &*follows,
-      })
+  #[inline]
+  pub fn depends(&self) -> Option<Depends> {
+    self.used_name_info.depends(DependIn::Transition(self))
   }
 }
 
 impl Spanned for AnimateExpr {
+  #[inline]
   fn span(&self) -> proc_macro2::Span {
     match self {
       AnimateExpr::Animate(a) => a.animate_token.span().join(a.brace_token.span).unwrap(),

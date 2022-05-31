@@ -75,7 +75,7 @@ mod tests {
     let c_receive = receive.clone();
 
     let widget = widget! {
-      declare SizedBox {
+      SizedBox {
         SizedBox {
           size: Size::new(100., 100.),
           auto_focus: true,

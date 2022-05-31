@@ -2,7 +2,7 @@ use super::{
   declare_widget::{try_parse_skip_nc, upstream_by_used_widgets, SkipNcAttr},
   kw, skip_nc_assign,
   widget_macro::UsedNameInfo,
-  DeclareCtx, FollowPart, FollowPlace, Follows,
+  DeclareCtx, DependIn, DependPart, Depends, MergeDepends,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -62,29 +62,30 @@ impl ToTokens for Dataflows {
 impl ToTokens for Dataflow {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self { from, to, .. } = self;
-    if from.used_name_info.follows.is_none() {
+    if from.used_name_info.used_names.is_none() {
       DeclareError::DataFlowNoDepends(syn::spanned::Spanned::span(&from.expr).unwrap()).error_emit()
     }
 
-    let upstream = upstream_by_used_widgets(from.used_name_info.follow_widgets());
+    let upstream = upstream_by_used_widgets(from.used_name_info.used_widgets());
     let from_used_name = &from.used_name_info;
     let to_used_name = &to.used_name_info;
     let state_refs = from_used_name
-      .follow_widgets()
-      .chain(
-        to_used_name
-          .follow_widgets()
-          .filter(|w| from_used_name.follow_widgets().find(|n| w == n).is_none()),
-      )
-      .map(widget_state_ref);
+      .used_names
+      .iter()
+      .chain(to_used_name.used_names.iter())
+      .unique_widget()
+      .into_iter()
+      .flat_map(|widgets| widgets.into_iter().map(widget_state_ref));
+
     let captures = from_used_name
-      .used_widgets()
-      .chain(
-        to_used_name
-          .used_widgets()
-          .filter(|w| from_used_name.used_widgets().find(|n| w == n).is_none()),
-      )
-      .map(capture_widget);
+      .used_names
+      .iter()
+      .chain(from_used_name.captures.iter())
+      .chain(to_used_name.used_names.iter())
+      .chain(to_used_name.captures.iter())
+      .unique_widget()
+      .into_iter()
+      .flat_map(|widgets| widgets.into_iter().map(capture_widget));
 
     let subscribe_do = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
     tokens.extend(quote! {
@@ -101,10 +102,10 @@ pub struct DataFlowExpr {
 }
 
 impl Dataflows {
-  pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, Follows<'a>>) {
+  pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, Depends<'a>>) {
     self.flows.iter().for_each(|df| {
-      if let Some(to) = df.to.used_name_info.follows.as_ref() {
-        let part = df.as_follow_part();
+      if let Some(to) = df.to.used_name_info.used_names.as_ref() {
+        let part = df.as_depend_part();
         to.iter().for_each(|fo| {
           let name = &fo.widget;
           if let Some(w_follows) = follows.get_mut(name) {
@@ -114,7 +115,7 @@ impl Dataflows {
               .chain(Some(part.clone()).into_iter())
               .collect();
           } else {
-            follows.insert(name.clone(), Follows::from_single_part(part.clone()));
+            follows.insert(name.clone(), Depends::from_single_part(part.clone()));
           }
         })
       }
@@ -140,17 +141,17 @@ impl Parse for Dataflow {
 }
 
 impl Dataflow {
-  pub fn as_follow_part(&self) -> FollowPart {
-    let follows = self
+  pub fn as_depend_part(&self) -> DependPart {
+    let place_info = self
       .from
       .used_name_info
-      .follows
+      .used_names
       .as_ref()
       .expect("data flow must depends on some widget");
 
-    FollowPart {
-      origin: FollowPlace::DataFlow(self),
-      follows,
+    DependPart {
+      origin: DependIn::DataFlow(self),
+      place_info,
     }
   }
 }

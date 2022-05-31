@@ -1,9 +1,8 @@
-use proc_macro2::{Delimiter, Group, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use std::collections::BTreeMap;
 use syn::{
   bracketed,
-  buffer::Cursor,
   parse::{Parse, ParseStream},
   spanned::Spanned,
   token::{self, Brace},
@@ -13,7 +12,7 @@ use syn::{
 mod widget_gen;
 use crate::{
   error::{DeclareError, DeclareWarning},
-  widget_attr_macro::{ribir_prefix_variable, DECLARE_WRAP_MACRO},
+  widget_attr_macro::ribir_prefix_variable,
 };
 mod builtin_fields;
 pub use builtin_fields::*;
@@ -22,12 +21,11 @@ use widget_gen::WidgetGen;
 use super::{
   child_variable, kw, ribir_variable, widget_def_variable,
   widget_macro::{is_expr_keyword, IfGuard, UsedNameInfo, EXPR_FIELD, EXPR_WIDGET},
-  DeclareCtx, FollowPart, Follows, Id, Result,
+  DeclareCtx, DependIn, DependPart, Depends, Id, Result,
 };
 
 #[derive(Debug)]
 pub struct DeclareWidget {
-  declare_token: Option<kw::declare>,
   pub path: Path,
   brace_token: Brace,
   // the name of this widget specified by `id` attr.
@@ -107,7 +105,6 @@ impl Spanned for DeclareWidget {
 
 impl Parse for DeclareWidget {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    let _declare_token = input.parse()?;
     let path = input.parse()?;
     let content;
     let brace_token = syn::braced!(content in input);
@@ -120,9 +117,7 @@ impl Parse for DeclareWidget {
         break;
       }
 
-      if (content.peek(Ident) && content.peek2(token::Brace))
-        || (content.peek(kw::declare) && content.peek2(Ident) && content.peek3(token::Brace))
-      {
+      if content.peek(Ident) && content.peek2(token::Brace) {
         children.push(content.parse()?);
       } else {
         let is_id = content.peek(kw::id);
@@ -150,7 +145,6 @@ impl Parse for DeclareWidget {
     }
 
     Ok(DeclareWidget {
-      declare_token: _declare_token,
       path,
       brace_token,
       named,
@@ -210,6 +204,12 @@ impl Parse for DeclareField {
   }
 }
 
+impl DeclareField {
+  pub fn depend_parts(&self) -> impl Iterator<Item = DependPart> + '_ {
+    self.used_name_info.depend_parts(DependIn::Field(self))
+  }
+}
+
 pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> {
   if input.peek(token::Pound) {
     Ok(Some(input.parse()?))
@@ -235,7 +235,7 @@ impl DeclareCtx {
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
     self.visit_ident_mut(&mut f.member);
     if let Some(if_guard) = f.if_guard.as_mut() {
-      self.visit_expr_mut(&mut if_guard.cond);
+      self.visit_if_guard_mut(if_guard);
     }
     self.visit_expr_mut(&mut f.expr);
 
@@ -261,28 +261,23 @@ impl DeclareWidget {
     let mut compose_tokens = quote! {};
     let name = &self.widget_identify();
     let def_name = widget_def_variable(name);
-
     let children = &self.children;
+
     if !children.is_empty() {
       // Must be MultiChild if there are multi child. Give this hint for better
       // compile error if wrong size child declared.
       let hint = (self.children.len() > 1).then(|| quote! {: MultiChildWidget<_>});
 
       let children = children.iter().enumerate().map(|(idx, c)| {
-        let c_name = widget_def_variable(&child_variable(c, idx));
-
-        let child_widget_name = widget_def_variable(&c.widget_identify());
         let child_name = if c.named.is_none() {
-          let child_tokens = c.host_and_builtin_tokens(ctx);
-          let child_compose = c.compose_tokens(ctx);
-          compose_tokens
-            .extend(quote! { let #c_name = { #child_tokens #child_compose  #child_widget_name }; });
-          c_name
+          widget_def_variable(&child_variable(c, idx))
         } else {
+          let child_widget_name = widget_def_variable(&c.widget_identify());
           let child_compose = c.compose_tokens(ctx);
           compose_tokens.extend(child_compose);
           child_widget_name
         };
+
         if c
           .builtin
           .finally_is_expr_widget()
@@ -300,18 +295,36 @@ impl DeclareWidget {
     compose_tokens
   }
 
-  // return this widget tokens and its def name;
-  pub fn host_and_builtin_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
-    let (name, mut tokens) = self.host_widget_tokens(ctx);
+  pub fn gen_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
+    // only generate anonyms widget tokens, named widget pre-generate before.
+    if self.named.is_none() {
+      let (name, host_widget) = self.host_widget_tokens(ctx);
+      tokens.extend(host_widget);
+      self
+        .builtin
+        .widget_tokens_iter(name, ctx)
+        .for_each(|(_, builtin_widget)| {
+          tokens.extend(builtin_widget);
+        })
+    }
 
     self
-      .builtin
-      .widget_tokens_iter(name, ctx)
-      .for_each(|(_, wrap_widget)| {
-        tokens.extend(wrap_widget);
+      .children
+      .iter()
+      .enumerate()
+      .filter(|(_, c)| c.named.is_none())
+      .for_each(|(idx, c)| {
+        let c_name = widget_def_variable(&child_variable(c, idx));
+        let child_widget_name = widget_def_variable(&c.widget_identify());
+        tokens.extend(quote_spanned! { c.path.span() =>  let #c_name = });
+        c.brace_token.surround(tokens, |tokens| {
+          c.gen_tokens(ctx, tokens);
+          child_widget_name.to_tokens(tokens);
+        });
+        token::Semi::default().to_tokens(tokens);
       });
 
-    tokens
+    tokens.extend(self.compose_tokens(ctx));
   }
 
   // return the key-value map of the named widget define tokens.
@@ -358,19 +371,15 @@ impl DeclareWidget {
       .fields
       .iter()
       .chain(self.builtin.all_builtin_fields())
-      .filter(|f| self.named.is_none() || !f.used_name_info.used_any_name())
+      .filter(|f| self.named.is_none() || !f.used_name_info.use_or_capture_any_name())
       .filter_map(|f| {
         f.skip_nc
           .as_ref()
           .map(|attr| DeclareWarning::NeedlessSkipNc(attr.span().unwrap()))
       })
       .chain(self.children.iter().flat_map(|c| {
-        let iter1: Box<dyn Iterator<Item = DeclareWarning>> = Box::new(c.warnings());
-        c.declare_token
-          .as_ref()
-          .map(|d| DeclareWarning::NeedlessDeclare(d.span().unwrap()))
-          .into_iter()
-          .chain(iter1)
+        let iter: Box<dyn Iterator<Item = DeclareWarning>> = Box::new(c.warnings());
+        iter
       }))
   }
 
@@ -381,21 +390,18 @@ impl DeclareWidget {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  pub fn analyze_object_follows(&self) -> BTreeMap<Ident, Follows> {
-    let mut follows: BTreeMap<Ident, Follows> = BTreeMap::new();
+  pub fn analyze_object_follows(&self) -> BTreeMap<Ident, Depends> {
+    let mut follows: BTreeMap<Ident, Depends> = BTreeMap::new();
     self
       .traverses_widget()
       .filter(|w| w.named.is_some())
       .for_each(|w| {
         let ref_name = w.widget_identify();
         w.builtin
-          .collect_wrap_widget_follows(&ref_name, &mut follows);
+          .collect_builtin_widget_follows(&ref_name, &mut follows);
 
-        let w_follows: Follows = w
-          .fields
-          .iter()
-          .filter_map(FollowPart::from_widget_field)
-          .collect();
+        let w_follows: Depends = w.fields.iter().flat_map(|f| f.depend_parts()).collect();
+
         if !w_follows.is_empty() {
           follows.insert(ref_name, w_follows);
         }
@@ -407,7 +413,11 @@ impl DeclareWidget {
   pub(crate) fn is_host_expr_widget(&self) -> bool {
     // if `ExprWidget` track nothing, will not as a `ExprWidget`, but use its
     // directly return value.
-    is_expr_keyword(&self.path) && self.fields.iter().any(|f| f.used_name_info.used_any_name())
+    is_expr_keyword(&self.path)
+      && self
+        .fields
+        .iter()
+        .any(|f| f.used_name_info.used_names.is_some())
   }
 
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
@@ -427,7 +437,7 @@ impl DeclareWidget {
           self.traverses_widget().for_each(|w| {
             w.builtin
               .all_builtin_fields()
-              .filter_map(|f| f.used_name_info.follows.as_ref())
+              .filter_map(|f| f.used_name_info.used_names.as_ref())
               .flat_map(|follows| follows.iter())
               .filter(|f| f.widget == wrap_name)
               .for_each(|f| use_spans.extend(f.spans.iter().map(|s| s.unwrap())))
@@ -478,110 +488,4 @@ pub fn upstream_by_used_widgets<'a>(
   } else {
     quote! { #(#upstream)* }
   }
-}
-
-/// Wrap `declare Row {...}` with macro `ribir_declare_ಠ_ಠ!`, let our syntax
-/// as a valid rust expression,  so we can use rust syntax to parse and
-/// needn't reimplemented, and easy to interop with rust syntax.
-///
-/// return new tokens if do any wrap else
-pub fn macro_wrap_declare_keyword(mut cursor: Cursor) -> (Option<Vec<TokenTree>>, Cursor) {
-  fn sub_token_stream(mut begin: Cursor, end: Option<Cursor>, tts: &mut Vec<TokenTree>) {
-    while Some(begin) != end {
-      match begin.token_tree() {
-        Some((tt, rest)) => {
-          tts.push(tt);
-          begin = rest;
-        }
-        None => break,
-      }
-    }
-  }
-
-  fn group_inner_wrap(cursor: Cursor, delim: Delimiter) -> Option<(Group, Cursor)> {
-    cursor
-      .group(delim)
-      .and_then(|(group_cursor, span, cursor)| {
-        macro_wrap_declare_keyword(group_cursor).0.map(|tts| {
-          let mut group = Group::new(delim, tts.into_iter().collect());
-          group.set_span(span);
-          (group, cursor)
-        })
-      })
-  }
-
-  let mut tts = vec![];
-  let mut stream_cursor = cursor;
-  loop {
-    if let Some((n, c)) = cursor.ident() {
-      if n == "widget" {
-        let widget_macro = c
-          .punct()
-          .filter(|(p, _)| p.as_char() == '!')
-          .and_then(|(_, c)| {
-            c.group(Delimiter::Brace)
-              .or_else(|| c.group(Delimiter::Parenthesis))
-              .or_else(|| c.group(Delimiter::Bracket))
-          });
-        if let Some((_, _, c)) = widget_macro {
-          // skip inner widget! macro, wrap wait itself parse.
-          cursor = c;
-          continue;
-        }
-      } else if n == "declare" {
-        let declare_group =
-          c.ident()
-            .map(|(name, c)| (n, name, c))
-            .and_then(|(declare, name, c)| {
-              c.group(Delimiter::Brace)
-                .map(|(body_cursor, span, cursor)| (declare, name, body_cursor, span, cursor))
-            });
-        if let Some((declare, name, body_cursor, body_span, c)) = declare_group {
-          sub_token_stream(stream_cursor, Some(cursor), &mut tts);
-          let body = macro_wrap_declare_keyword(body_cursor).0.map_or_else(
-            || body_cursor.token_stream(),
-            |tokens| tokens.into_iter().collect(),
-          );
-
-          tts.push(TokenTree::Ident(Ident::new(
-            DECLARE_WRAP_MACRO,
-            declare.span(),
-          )));
-          let mut bang = Punct::new('!', Spacing::Alone);
-          bang.set_span(declare.span());
-          tts.push(TokenTree::Punct(bang));
-
-          let mut declare_group = Group::new(Delimiter::Brace, body);
-          declare_group.set_span(body_span);
-          let mut macro_group =
-            Group::new(Delimiter::Brace, quote! { #declare #name #declare_group});
-          macro_group.set_span(declare.span());
-          tts.push(TokenTree::Group(macro_group));
-
-          cursor = c;
-          stream_cursor = c;
-          continue;
-        }
-      }
-      cursor = c;
-    } else if let Some((group, c)) = group_inner_wrap(cursor, Delimiter::Brace)
-      .or_else(|| group_inner_wrap(cursor, Delimiter::Bracket))
-      .or_else(|| group_inner_wrap(cursor, Delimiter::Parenthesis))
-    {
-      sub_token_stream(stream_cursor, Some(cursor), &mut tts);
-      tts.push(TokenTree::Group(group));
-      cursor = c;
-      stream_cursor = c;
-    } else if let Some((_, c)) = cursor.token_tree() {
-      cursor = c;
-    } else {
-      break;
-    }
-  }
-
-  let tts = (!tts.is_empty()).then(|| {
-    sub_token_stream(stream_cursor, None, &mut tts);
-    tts.into_iter().collect()
-  });
-  (tts, cursor)
 }

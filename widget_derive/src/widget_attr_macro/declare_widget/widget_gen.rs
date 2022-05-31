@@ -1,5 +1,5 @@
 use crate::{
-  declare_derive::field_convert_method,
+  declare_derive::{field_convert_method, field_default_method},
   widget_attr_macro::{
     capture_widget, ribir_variable, skip_nc_assign, widget_def_variable,
     widget_macro::{is_expr_keyword, EXPR_FIELD},
@@ -60,11 +60,11 @@ impl<'a> WidgetGen<'a> {
     } = expr_field;
     let def_name = widget_def_variable(&name);
     let build_ctx = ribir_variable(BUILD_CTX, ty.span());
-    if let Some(follows) = used_name_info.follows.as_ref() {
+    if let Some(follows) = used_name_info.used_names.as_ref() {
       let follow_names = follows.iter().map(|f| &f.widget);
       let refs = follow_names.clone().map(widget_state_ref);
       let upstream = upstream_by_used_widgets(follow_names);
-      let captures = used_name_info.used_widgets().map(capture_widget);
+      let captures = used_name_info.use_or_capture_name().map(capture_widget);
       let field_converter = field_convert_method(expr_mem);
       quote_spanned! { ty.span() =>
         let #def_name = #ty::<_>::builder()
@@ -91,16 +91,16 @@ impl<'a> WidgetGen<'a> {
     let ref_name = &self.name;
     let expr_tokens = f.value_tokens(self.ty);
 
-    used_name_info.follows.is_some().then(|| {
+    used_name_info.used_names.is_some().then(|| {
       let assign = skip_nc_assign(
         skip_nc.is_some(),
         &quote! { #ref_name.#member},
         &expr_tokens,
       );
 
-      let upstream = upstream_by_used_widgets(used_name_info.follow_widgets());
+      let upstream = upstream_by_used_widgets(used_name_info.used_widgets());
       let capture_widgets = used_name_info
-        .follow_widgets()
+        .used_widgets()
         .chain(std::iter::once(ref_name))
         .map(capture_widget);
 
@@ -122,7 +122,7 @@ impl<'a> WidgetGen<'a> {
       ||  self
       .fields
       .iter()
-      .any(|f| f.used_name_info.follows.is_some())
+      .any(|f| f.used_name_info.used_names.is_some())
   }
 }
 
@@ -134,21 +134,20 @@ impl DeclareField {
     let mut expr =
       quote_spanned! { span => <#widget_ty as Declare>::Builder::#field_converter(#expr) };
 
-    if self.used_name_info.follows.is_some() {
-      let refs = self.used_name_info.follow_widgets().map(widget_state_ref);
-      expr = quote_spanned! { span =>
-        #(#refs)*
-        <#widget_ty as Declare>::Builder::#field_converter(#expr)
-      };
+    if self.used_name_info.used_names.is_some() {
+      let refs = self.used_name_info.used_widgets().map(widget_state_ref);
+      expr = quote_spanned! { span => #(#refs)* #expr };
     }
 
     if let Some(if_guard) = self.if_guard.as_ref() {
+      let default_method = field_default_method(member);
+      let build_ctx = ribir_variable(BUILD_CTX, if_guard.span());
       quote_spanned!(span => #if_guard {
         #expr
       } else {
-        <_>::default()
+        <#widget_ty as Declare>::Builder::#default_method(#build_ctx)
       })
-    } else if self.used_name_info.follows.is_some() {
+    } else if self.used_name_info.used_names.is_some() {
       quote_spanned! { span => { #expr }}
     } else {
       expr
@@ -156,7 +155,6 @@ impl DeclareField {
   }
 
   pub(crate) fn field_tokens(&self, widget_ty: &Path) -> TokenStream {
-    assert!(self.if_guard.is_none());
     let member = &self.member;
     let value = self.value_tokens(widget_ty);
     quote! {.#member(#value)}

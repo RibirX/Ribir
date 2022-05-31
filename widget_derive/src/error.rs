@@ -1,4 +1,4 @@
-use crate::widget_attr_macro::FollowOn;
+use crate::widget_attr_macro::DependPlaceInfo;
 use proc_macro::{Diagnostic, Level, Span};
 use proc_macro2::TokenStream;
 
@@ -9,7 +9,7 @@ use syn::Ident;
 pub struct FollowInfo {
   pub widget: Ident,
   pub member: Option<Ident>,
-  pub on: FollowOn,
+  pub on: DependPlaceInfo,
 }
 
 #[derive(Debug)]
@@ -36,7 +36,6 @@ pub enum DeclareError {
 
 #[derive(Debug)]
 pub enum DeclareWarning {
-  NeedlessDeclare(Span),
   NeedlessSkipNc(Span),
 }
 
@@ -164,11 +163,6 @@ impl DeclareWarning {
   pub fn emit_warning(&self) {
     let mut d = Diagnostic::new(Level::Warning, "");
     match self {
-      DeclareWarning::NeedlessDeclare(span) => {
-        d.set_message("Unnecessary `declare` for nested declare child.");
-        d.set_spans(*span);
-        d = d.help("Try to remove it.");
-      }
       DeclareWarning::NeedlessSkipNc(span) => {
         d.set_spans(*span);
         d.set_message("Unnecessary attribute, because not depends on any others");

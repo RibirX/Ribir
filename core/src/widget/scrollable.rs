@@ -47,7 +47,7 @@ impl ComposeSingleChild for ScrollableWidget {
   {
     widget! {
       track { this }
-      declare ExprWidget {
+      ExprWidget {
         expr: child,
         on_wheel: move |e| {
           let (view, content) = view_content(e);
@@ -105,7 +105,7 @@ mod tests {
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
     let w = widget! {
-     declare SizedBox {
+     SizedBox {
        size: Size::new(1000., 1000.),
        scrollable,
      }

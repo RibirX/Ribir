@@ -112,25 +112,26 @@ pub(crate) trait QueryType {
   /// query self type by type id, and return a reference of `Any` trait to cast
   /// to target type if type match.
   fn query(&self, type_id: TypeId) -> Option<&dyn Any>;
+
   /// query self type by type id, and return a mut reference of `Any` trait to
   /// cast to target type if type match.
   fn query_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `& dyn Any` of the target type, and return if  want to continue.
-  fn query_all<'a>(
-    &'a self,
+  fn query_all(
+    &self,
     type_id: TypeId,
-    callback: &mut dyn FnMut(&'a dyn Any) -> bool,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
     order: QueryOrder,
   );
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `&mut dyn Any` of the target type, and return if want to continue.
-  fn query_all_mut<'a>(
-    &'a mut self,
+  fn query_all_mut(
+    &mut self,
     type_id: TypeId,
-    callback: &mut dyn FnMut(&'a mut dyn Any) -> bool,
+    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
     order: QueryOrder,
   );
 }
@@ -199,10 +200,10 @@ impl<W: Any> QueryType for W {
   }
 
   #[inline]
-  default fn query_all<'a>(
-    &'a self,
+  default fn query_all(
+    &self,
     type_id: TypeId,
-    callback: &mut dyn FnMut(&'a dyn Any) -> bool,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
     _: QueryOrder,
   ) {
     if let Some(a) = self.query(type_id) {
@@ -211,10 +212,10 @@ impl<W: Any> QueryType for W {
   }
 
   #[inline]
-  default fn query_all_mut<'a>(
-    &'a mut self,
+  default fn query_all_mut(
+    &mut self,
     type_id: TypeId,
-    callback: &mut dyn FnMut(&'a mut dyn Any) -> bool,
+    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
     _: QueryOrder,
   ) {
     if let Some(a) = self.query_mut(type_id) {
@@ -225,11 +226,7 @@ impl<W: Any> QueryType for W {
 
 impl<'a> dyn RenderNode + 'a {
   #[inline]
-  pub fn query_all_type<'b, T: Any>(
-    &'b self,
-    mut callback: impl FnMut(&'b T) -> bool,
-    order: QueryOrder,
-  ) {
+  pub fn query_all_type<T: Any>(&self, mut callback: impl FnMut(&T) -> bool, order: QueryOrder) {
     let q = self as &dyn QueryType;
     q.query_all(
       TypeId::of::<T>(),
@@ -239,9 +236,9 @@ impl<'a> dyn RenderNode + 'a {
   }
 
   #[inline]
-  pub fn query_all_type_mut<'b, T: Any>(
-    &'b mut self,
-    mut callback: impl FnMut(&'b mut T) -> bool,
+  pub fn query_all_type_mut<T: Any>(
+    &mut self,
+    mut callback: impl FnMut(&mut T) -> bool,
     order: QueryOrder,
   ) {
     let q = self as &mut dyn QueryType;
@@ -252,33 +249,49 @@ impl<'a> dyn RenderNode + 'a {
     )
   }
 
-  /// Query the first match type in all type by special order, and return a
-  /// reference of it.
-  pub fn query_first_type<T: Any>(&self, order: QueryOrder) -> Option<&T> {
-    let mut target = None;
+  /// Query the first match type in all type by special order, and call
+  /// `callback`
+  pub fn query_on_first_type<T: Any>(&self, order: QueryOrder, callback: impl FnOnce(&T)) {
+    let mut callback = Some(callback);
     self.query_all_type(
-      |a| {
-        target = Some(a);
+      move |a| {
+        let cb = callback.take().expect("should only call once");
+        cb(a);
         false
       },
       order,
     );
-    target
   }
 
-  /// Query the first match type in all type by special order. and return a mut
-  /// reference of it.
+  /// Query the first match type in all type by special order then call
+  /// `callback`.
 
-  pub fn query_first_type_mut<T: Any>(&mut self, order: QueryOrder) -> Option<&mut T> {
-    let mut target = None;
+  pub fn query_on_first_type_mut<T: Any>(
+    &mut self,
+    order: QueryOrder,
+    callback: impl FnOnce(&mut T),
+  ) {
+    let mut callback = Some(callback);
     self.query_all_type_mut(
-      |a| {
-        target = Some(a);
+      move |a| {
+        let cb = callback.take().expect("should only call once");
+        cb(a);
         false
       },
       order,
     );
-    target
+  }
+
+  pub fn contain_type<T: Any>(&self, order: QueryOrder) -> bool {
+    let mut hit = false;
+    self.query_all_type(
+      |_: &T| {
+        hit = true;
+        false
+      },
+      order,
+    );
+    hit
   }
 }
 
@@ -311,87 +324,4 @@ impl<R: Render + 'static> IntoWidget<dyn Render> for R {
 impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
   #[inline]
   fn into_widget(self) -> Widget { Widget(WidgetInner::Compose(Box::new(self))) }
-}
-
-#[macro_export]
-macro_rules! impl_query_type {
-  ($info: ident, $inner_widget: ident) => {
-    fn query_all<'a>(
-      &'a self,
-      type_id: std::any::TypeId,
-      callback: &mut dyn FnMut(&'a dyn Any) -> bool,
-      order: QueryOrder,
-    ) {
-      let info = &self.$info;
-      let widget = &self.$inner_widget;
-      let mut continue_query = true;
-      match order {
-        QueryOrder::InnerFirst => {
-          widget.query_all(
-            type_id,
-            &mut |t| {
-              continue_query = callback(t);
-              continue_query
-            },
-            order,
-          );
-          if continue_query {
-            info.query_all(type_id, callback, order);
-          }
-        }
-        QueryOrder::OutsideFirst => {
-          info.query_all(type_id, callback, order);
-          if continue_query {
-            widget.query_all(
-              type_id,
-              &mut |t| {
-                continue_query = callback(t);
-                continue_query
-              },
-              order,
-            );
-          }
-        }
-      }
-    }
-
-    fn query_all_mut<'a>(
-      &'a mut self,
-      type_id: std::any::TypeId,
-      callback: &mut dyn FnMut(&'a mut dyn Any) -> bool,
-      order: QueryOrder,
-    ) {
-      let info = &mut self.$info;
-      let widget = &mut self.$inner_widget;
-      let mut continue_query = true;
-      match order {
-        QueryOrder::InnerFirst => {
-          widget.query_all_mut(
-            type_id,
-            &mut |t| {
-              continue_query = callback(t);
-              continue_query
-            },
-            order,
-          );
-          if continue_query {
-            info.query_all_mut(type_id, callback, order);
-          }
-        }
-        QueryOrder::OutsideFirst => {
-          info.query_all_mut(type_id, callback, order);
-          if continue_query {
-            widget.query_all_mut(
-              type_id,
-              &mut |t| {
-                continue_query = callback(t);
-                continue_query
-              },
-              order,
-            );
-          }
-        }
-      }
-    }
-  };
 }

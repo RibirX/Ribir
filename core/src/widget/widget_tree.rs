@@ -1,12 +1,13 @@
 use crate::prelude::*;
 use indextree::*;
 use smallvec::smallvec;
-use std::pin::Pin;
+use std::{cell::RefCell, collections::HashSet, pin::Pin, rc::Rc};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
   arena: Arena<Box<dyn RenderNode>>,
+  pub(crate) state_changed: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
   root: WidgetId,
 }
 
@@ -15,10 +16,12 @@ impl WidgetTree {
     let mut arena = Arena::default();
     let node: Box<dyn RenderNode> = Box::new(Void);
     let root = WidgetId(arena.new_node(node));
-    let tree = Self { arena, root };
-    let mut tree = Box::pin(tree);
-    tree.as_mut().widget_info_assign(root);
-    tree
+    let tree = Self {
+      arena,
+      root,
+      state_changed: <_>::default(),
+    };
+    Box::pin(tree)
   }
 
   pub(crate) fn root(&self) -> WidgetId { self.root }
@@ -34,13 +37,25 @@ impl WidgetTree {
 
   pub(crate) fn new_node(&mut self, widget: Box<dyn RenderNode>) -> WidgetId {
     let id = WidgetId(self.arena.new_node(widget));
+
+    id.assert_get(self).query_all_type(
+      |notifier: &StateChangeNotifier| {
+        let state_changed = self.state_changed.clone();
+        notifier.change_stream().filter(|b| !b).subscribe(move |_| {
+          state_changed.borrow_mut().insert(id);
+        });
+        true
+      },
+      QueryOrder::OutsideFirst,
+    );
+
     id
   }
 
+  pub(crate) fn any_state_modified(&self) -> bool { !self.state_changed.borrow().is_empty() }
+
   #[cfg(test)]
   pub(crate) fn count(&self) -> usize { self.arena.count() }
-
-  fn widget_info_assign(&mut self, _id: WidgetId) { todo!("stateful subscribe") }
 }
 
 impl WidgetId {
@@ -177,21 +192,16 @@ impl WidgetId {
     ctx: &mut Context,
   ) -> WidgetId {
     let tree = ctx.widget_tree.as_mut().get_mut();
-    let mut insert_widget = |node, tree: &mut WidgetTree| {
-      let id = insert(node, tree);
-      tree.widget_info_assign(id);
-      id
-    };
     match widget.0 {
       WidgetInner::Compose(c) => {
         let mut build_ctx = BuildCtx::new(Some(self), ctx);
         let c = c(&mut build_ctx);
         self.insert_child(c, insert, consume_child, ctx)
       }
-      WidgetInner::Render(rw) => insert_widget(rw, tree),
+      WidgetInner::Render(rw) => insert(rw, tree),
       WidgetInner::SingleChild(s) => {
         let (rw, child) = s.unzip();
-        let id = insert_widget(rw, tree);
+        let id = insert(rw, tree);
         if let Some(child) = child {
           consume_child(id, child, ctx);
         }
@@ -199,7 +209,7 @@ impl WidgetId {
       }
       WidgetInner::MultiChild(m) => {
         let (rw, children) = m.unzip();
-        let id = insert_widget(rw, tree);
+        let id = insert(rw, tree);
         children
           .into_iter()
           .rev()

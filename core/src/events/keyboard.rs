@@ -123,7 +123,7 @@ mod tests {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
-          declare SizedBox {
+          SizedBox {
             size: Size::zero(),
             auto_focus: true,
             on_key_down: move |key| {

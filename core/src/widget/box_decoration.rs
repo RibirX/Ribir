@@ -340,7 +340,7 @@ mod tests {
   fn layout() {
     const SIZE: Size = Size::new(100., 100.);
     let w = widget! {
-      declare SizedBox {
+      SizedBox {
         size: SIZE,
         border: Border {
           left: BorderSide::new(1., Color::BLACK),

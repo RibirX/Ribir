@@ -1,7 +1,7 @@
 use crate::util::struct_unwrap;
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
   parse::Parse, parse_quote, punctuated::Punctuated, spanned::Spanned, token, DataStruct, Fields,
   Ident, Result,
@@ -12,7 +12,7 @@ const BUILDER: &str = "Builder";
 const DECLARE_ATTR: &str = "declare";
 
 struct DefaultValue {
-  _default_token: kw::default,
+  default_token: kw::default,
   _eq_token: Option<syn::token::Eq>,
   value: Option<syn::LitStr>,
 }
@@ -37,10 +37,14 @@ pub fn field_convert_method(field_name: &Ident) -> Ident {
   Ident::new(&format!("{field_name}_convert",), field_name.span())
 }
 
+pub fn field_default_method(field_name: &Ident) -> Ident {
+  Ident::new(&format!("{field_name}_default",), field_name.span())
+}
+
 impl Parse for DefaultValue {
   fn parse(input: syn::parse::ParseStream) -> Result<Self> {
     Ok(Self {
-      _default_token: input.parse()?,
+      default_token: input.parse()?,
       _eq_token: input.parse()?,
       value: input.parse()?,
     })
@@ -145,57 +149,53 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     .iter()
     .map(|(f, _)| f.ident.as_ref().unwrap());
 
-  let value = builder_fields.iter().map(|(f, attr)| {
+  let init_values = builder_fields.iter().map(|(f, attr)| {
     let field_name = f.ident.as_ref().unwrap();
-    let or_default = attr.as_ref().and_then(|a| a.default.as_ref()).map(|d| {
-      let expr = match &d.value {
-        Some(v) => {
-          let expr: syn::Expr = v.parse().unwrap();
-          let field_convert =  field_convert_method(field_name);
-          quote! {Self::#field_convert(#expr)}
-        }
-        None => {
-          quote! {<_>::default()}
-        }
-      };
 
-      quote! {
-        .or_else(|| { Some(#expr) })
-      }
+    let or_default = attr.as_ref().and_then(|a| a.default.as_ref()).map_or_else(
+      || {
+        quote_spanned! { f.span() => expect(&format!("Required field `{}::{}` not set", stringify!(#name), stringify!(#field_name)))}
+      },
+      |d| {
+      let default_method = field_default_method(field_name);
+      quote_spanned!{d.default_token.span() =>  unwrap_or_else(|| Self::#default_method(ctx))}
     });
-    quote! {
-      self.#field_name
-      #or_default
-      .expect(&format!("Required field `{}::{}` not set", stringify!(#name), stringify!(#field_name)))
-    }
+    
+
+    quote_spanned! { f.span() => self.#field_name.#or_default }
   });
 
   let methods = builder_fields.iter().map(|(f, attr)| {
     let field_name = f.ident.as_ref().unwrap();
     let ty = &f.ty;
-    let convert_method = field_convert_method(field_name);
+    let mut method_tokens = quote! {
+      #[inline]
+      #vis fn #field_name(mut self, v: #ty) -> Self {
+        self.#field_name = Some(v);
+        self
+      }
+    };
 
-    if let Some(DeclareAttr { custom_convert: Some(_), .. }) = attr {
-      quote! {
+    if attr
+      .as_ref()
+      .map_or(true, |attr| attr.custom_convert.is_none())
+    {
+      let convert_method = field_convert_method(field_name);
+      method_tokens.extend(quote! {
         #[inline]
-        #vis fn #field_name(mut self, v: #ty) -> Self {
-          self.#field_name = Some(v);
-          self
-        }
-      }
-    } else {
-      quote! {
-        #[inline]
-        #vis fn #field_name(mut self, v: #ty) -> Self {
-          self.#field_name = Some(v);
-          self
-        }
-        #[inline]
-        #vis fn #convert_method(v: #ty) -> #ty {
-          v
-        }
-      }
+        #vis fn #convert_method(v: #ty) -> #ty { v }
+      });
     }
+
+    if let Some(DeclareAttr { default: Some(d), .. }) = attr.as_ref() {
+      let value = d.default_value(field_name);
+      let default_method = field_default_method(field_name);
+      method_tokens.extend(quote! {
+        #vis fn #default_method(ctx: &mut BuildCtx) -> #ty { #value }
+      });
+    }
+
+    method_tokens
   });
 
   let tokens = quote! {
@@ -218,7 +218,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         #[allow(dead_code)]
         fn build(self, ctx: &mut BuildCtx) -> Self::Target {
           #name {
-            #(#fields_ident : #value),* }
+            #(#fields_ident : #init_values),* }
         }
       }
 
@@ -227,9 +227,24 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       }
   };
 
+  // println!("declare gen tokens {tokens}");
   Ok(tokens)
 }
 
+impl DefaultValue {
+  fn default_value(&self, field_name: &Ident) -> TokenStream {
+    match &self.value {
+      Some(v) => {
+        let expr: syn::Expr = v.parse().unwrap();
+        let field_convert = field_convert_method(field_name);
+        quote! {Self::#field_convert(#expr)}
+      }
+      None => {
+        quote! {<_>::default()}
+      }
+    }
+  }
+}
 fn collect_filed_and_attrs(
   stt: &mut DataStruct,
 ) -> Result<Punctuated<(syn::Field, Option<DeclareAttr>), token::Comma>> {

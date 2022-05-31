@@ -12,9 +12,9 @@ use crate::{
 };
 mod declare_ctx;
 pub use declare_ctx::*;
-mod follow_on;
+mod named_depends;
 
-pub use follow_on::*;
+pub use named_depends::*;
 mod variable_names;
 pub use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
 pub use variable_names::*;
@@ -27,7 +27,6 @@ mod track;
 mod widget_macro;
 pub mod kw {
   syn::custom_keyword!(widget);
-  syn::custom_keyword!(declare);
   syn::custom_keyword!(dataflows);
   syn::custom_keyword!(animations);
   syn::custom_keyword!(track);
