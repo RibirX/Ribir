@@ -81,9 +81,11 @@
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
 use crate::prelude::*;
+use lazy_static::__Deref;
 use rxrust::prelude::*;
 use std::{
   cell::{RefCell, RefMut},
+  ops::DerefMut,
   rc::Rc,
 };
 
@@ -119,22 +121,22 @@ pub struct SilentRef<W> {
 /// The stateful widget generic implementation.
 pub struct Stateful<W> {
   pub(crate) widget: Rc<RefCell<W>>,
-  pub(crate) change_notifier: ChangeNotifier,
+  pub(crate) change_notifier: StateChangeNotifier,
 }
 
 /// notify downstream when widget state changed, the value mean if the change it
 /// as silent or not.
 #[derive(Default, Clone)]
-pub(crate) struct ChangeNotifier(Rc<RefCell<LocalSubject<'static, bool, ()>>>);
+pub(crate) struct StateChangeNotifier(LocalSubject<'static, bool, ()>);
 
 struct StateRefGuard {
   accessed: bool,
-  notifier: ChangeNotifier,
+  notifier: StateChangeNotifier,
 }
 
 struct SilentRefGuard {
   accessed: bool,
-  notifier: ChangeNotifier,
+  notifier: StateChangeNotifier,
 }
 
 #[derive(Clone)]
@@ -195,9 +197,7 @@ impl<W> Stateful<W> {
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn change_stream(&self) -> LocalSubject<'static, bool, ()> {
-    self.change_notifier.0.borrow().clone()
-  }
+  pub fn change_stream(&self) -> LocalSubject<'static, bool, ()> { self.change_notifier.0.clone() }
 
   /// Pick field change stream from the widget change
 
@@ -278,6 +278,10 @@ impl<W: Render> Render for Stateful<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
 }
 
+impl<W: SingleChild> SingleChild for Stateful<W> {}
+
+impl<W: MultiChild> MultiChild for Stateful<W> {}
+
 impl<C: Compose + 'static> IntoWidget<&dyn Compose> for Stateful<C> {
   #[inline]
   fn into_widget(self) -> Widget {
@@ -294,7 +298,7 @@ impl<C: Compose + 'static> IntoWidget<&dyn Compose> for Stateful<C> {
 impl Drop for StateRefGuard {
   fn drop(&mut self) {
     if self.accessed {
-      self.notifier.0.borrow_mut().next(false)
+      self.notifier.0.next(false)
     }
   }
 }
@@ -302,19 +306,96 @@ impl Drop for StateRefGuard {
 impl Drop for SilentRefGuard {
   fn drop(&mut self) {
     if self.accessed {
-      self.notifier.0.borrow_mut().next(true)
+      self.notifier.0.next(true)
     }
   }
 }
 
 // Implement IntoStateful for all widget
-
 impl<W> IntoStateful for W
 where
   W: WidgetMarker,
 {
   #[inline]
   fn into_stateful(self) -> Stateful<W> { Stateful::new(self) }
+}
+
+impl<W: 'static> QueryType for Stateful<W> {
+  fn query_all(
+    &self,
+    type_id: std::any::TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    order: QueryOrder,
+  ) {
+    let w = self.widget.borrow();
+    let widget = w.deref();
+    let mut continue_query = true;
+    match order {
+      QueryOrder::InnerFirst => {
+        widget.query_all(
+          type_id,
+          &mut |t| {
+            continue_query = callback(t);
+            continue_query
+          },
+          order,
+        );
+        if continue_query {
+          if let Some(a) = self.change_notifier.query(type_id) {
+            callback(a);
+          }
+        }
+      }
+      QueryOrder::OutsideFirst => {
+        if let Some(a) = self.change_notifier.query(type_id) {
+          continue_query = callback(a);
+        }
+        if continue_query {
+          widget.query_all(type_id, callback, order);
+        }
+      }
+    }
+  }
+
+  fn query_all_mut(
+    &mut self,
+    type_id: std::any::TypeId,
+    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+    order: QueryOrder,
+  ) {
+    let mut continue_query = true;
+    let mut w = self.widget.borrow_mut();
+    let widget = w.deref_mut();
+    match order {
+      QueryOrder::InnerFirst => {
+        widget.query_all_mut(
+          type_id,
+          &mut |t| {
+            continue_query = callback(t);
+            continue_query
+          },
+          order,
+        );
+        if continue_query {
+          if let Some(a) = self.change_notifier.query_mut(type_id) {
+            callback(a);
+          }
+        }
+      }
+      QueryOrder::OutsideFirst => {
+        if let Some(a) = self.change_notifier.query_mut(type_id) {
+          continue_query = callback(a);
+        }
+        if continue_query {
+          widget.query_all_mut(type_id, callback, order);
+        }
+      }
+    }
+  }
+}
+
+impl StateChangeNotifier {
+  pub(crate) fn change_stream(&self) -> LocalSubject<'static, bool, ()> { self.0.clone() }
 }
 
 #[cfg(test)]
@@ -341,7 +422,7 @@ mod tests {
   #[test]
   fn stateful_id_check() {
     let stateful = widget! {
-      declare Text {
+      Text {
         text: "Hello",
         style: TextStyle::default(),
         key: 1,
@@ -350,10 +431,11 @@ mod tests {
 
     let ctx = Context::new(stateful, 1., None);
     let tree = &ctx.widget_tree;
-    let key = tree
+    let mut key = None;
+    tree
       .root()
       .assert_get(tree)
-      .query_first_type::<Key>(QueryOrder::InnerFirst);
+      .query_on_first_type(QueryOrder::InnerFirst, |k: &Key| key = Some(k.clone()));
     assert!(key.is_some());
   }
 
@@ -393,7 +475,7 @@ mod tests {
   #[test]
   fn fix_pin_widget_node() {
     let mut wnd = Window::without_render(
-      widget! { declare SizedBox { size: Size::new(100., 100.) } },
+      widget! { SizedBox { size: Size::new(100., 100.) } },
       Size::new(500., 500.),
     );
     wnd.render_ready();

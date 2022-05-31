@@ -6,15 +6,15 @@ use winit::window::CursorIcon;
 
 #[derive(Declare, Debug)]
 pub struct Cursor {
-  #[declare(custom_convert, builtin)]
-  cursor: Rc<Cell<CursorIcon>>,
+  #[declare(custom_convert, builtin, default)]
+  pub cursor: Rc<Cell<CursorIcon>>,
 }
 
 impl ComposeSingleChild for Cursor {
   fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare ExprWidget {
+      ExprWidget {
         expr: child,
         on_pointer_move: move |e: &mut PointerEvent| {
           let mut ctx = e.context();
@@ -30,9 +30,25 @@ impl ComposeSingleChild for Cursor {
   }
 }
 
+pub trait IntoCursorIcon {
+  fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>>;
+}
+
+impl IntoCursorIcon for Rc<Cell<CursorIcon>> {
+  #[inline]
+  fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>> { self }
+}
+
+impl IntoCursorIcon for CursorIcon {
+  #[inline]
+  fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>> { Rc::new(Cell::new(self)) }
+}
+
 impl CursorBuilder {
   #[inline]
-  pub fn cursor_convert(icon: CursorIcon) -> Rc<Cell<CursorIcon>> { Rc::new(Cell::new(icon)) }
+  pub fn cursor_convert<C: IntoCursorIcon>(icon: C) -> Rc<Cell<CursorIcon>> {
+    icon.into_cursor_icon()
+  }
 }
 
 impl Cursor {
@@ -63,7 +79,7 @@ mod tests {
   #[test]
   fn tree_down_up() {
     let row_tree = widget! {
-      declare SizedBox {
+      SizedBox {
         size: Size::new(f32::INFINITY, f32::INFINITY),
         cursor: CursorIcon::AllScroll,
         Row{

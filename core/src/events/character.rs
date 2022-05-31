@@ -75,7 +75,7 @@ mod tests {
     let c_receive = receive.clone();
 
     let widget = widget! {
-      declare SizedBox {
+      SizedBox {
         size: SizedBox::shrink_size(),
         auto_focus: true,
         on_char: move |key| c_receive.borrow_mut().push(key.char)

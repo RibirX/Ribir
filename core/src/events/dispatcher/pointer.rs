@@ -109,9 +109,9 @@ impl PointerDispatcher {
     let tree = &ctx.widget_tree;
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
-        id.get(tree)
-          .and_then(|w| w.query_first_type::<FocusListener>(QueryOrder::InnerFirst))
-          .is_some()
+        id.get(tree).map_or(false, |w| {
+          w.contain_type::<FocusListener>(QueryOrder::InnerFirst)
+        })
       })
     });
     if let Some(focus_id) = nearest_focus {
@@ -154,9 +154,9 @@ impl PointerDispatcher {
       hit_widget
         .ancestors(&ctx.widget_tree)
         .filter(|w| {
-          w.get(&ctx.widget_tree)
-            .and_then(|w| w.query_first_type::<PointerEnterListener>(QueryOrder::OutsideFirst))
-            .is_some()
+          w.get(&ctx.widget_tree).map_or(false, |w| {
+            w.contain_type::<PointerEnterListener>(QueryOrder::OutsideFirst)
+          })
         })
         .for_each(|w| self.entered_widgets.push(w));
 
@@ -224,7 +224,7 @@ mod tests {
       move |e: &mut PointerEvent| stack.borrow_mut().push(e.clone())
     };
     widget! {
-      declare ExprWidget {
+      ExprWidget {
         expr: widget,
         on_pointer_down : handler_ctor(),
         on_pointer_move: handler_ctor(),
@@ -239,11 +239,11 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      widget! { declare Text { text: "pointer event test" }},
+      widget! { Text { text: "pointer event test" }},
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { declare Row { ExprWidget  { expr: record } } },
+      widget! { Row { ExprWidget  { expr: record } } },
     );
     let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
@@ -280,7 +280,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { declare Text { text: "pointer event test" }},
+      widget! { Text { text: "pointer event test" }},
     );
     let mut wnd = Window::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
@@ -338,7 +338,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { declare Text { text: "pointer event test"}},
+      widget! { Text { text: "pointer event test"}},
     );
     let mut wnd = Window::without_render(root, Size::new(100., 100.));
     wnd.render_ready();
@@ -403,7 +403,7 @@ mod tests {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
-          declare SizedBox {
+          SizedBox {
             size: SizedBox::expanded_size(),
             on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
             Text {
@@ -447,7 +447,7 @@ mod tests {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
-          declare SizedBox {
+          SizedBox {
             size: SizedBox::expanded_size(),
             on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
             on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
@@ -516,7 +516,7 @@ mod tests {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track { this }
-          declare Row {
+          Row {
             v_align: CrossAxisAlign::Start,
             on_tap: move |_| {
               let mut res = this.0.borrow_mut();
@@ -603,7 +603,7 @@ mod tests {
   #[test]
   fn focus_change_by_event() {
     let w = widget! {
-      declare Row {
+      Row {
         SizedBox {
           size: Size::new(50., 50.),
           tab_index: 0

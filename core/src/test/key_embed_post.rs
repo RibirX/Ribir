@@ -14,7 +14,7 @@ impl Compose for EmbedPostWithKey {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare Row {
+      Row {
         key: 0i32,
         v_align: CrossAxisAlign::Start,
         Text {
@@ -29,7 +29,7 @@ impl Compose for EmbedPostWithKey {
         ExprWidget {
           expr:(this.level > 0).then(move || {
               widget! {
-                declare EmbedPostWithKey {
+                EmbedPostWithKey {
                   key: "embed",
                   author: this.author,
                   content: this.content,

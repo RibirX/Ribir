@@ -46,7 +46,7 @@ mod tests {
   fn fix_size() {
     let size: Size = Size::new(100., 100.);
     let w = widget! {
-      declare SizedBox {
+      SizedBox {
         size,
         Text { text: "" }
       }
@@ -60,7 +60,7 @@ mod tests {
   #[test]
   fn shrink_size() {
     let w = widget! {
-      declare SizedBox {
+      SizedBox {
         size: SizedBox::shrink_size(),
         Text { text: "" }
       }
@@ -75,7 +75,7 @@ mod tests {
   fn expanded_size() {
     let wnd_size = Size::new(500., 500.);
     let expand_box = widget! {
-      declare SizedBox {
+      SizedBox {
         size: SizedBox::expanded_size(),
         Text { text: "" }
       }

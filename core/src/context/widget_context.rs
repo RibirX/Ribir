@@ -1,7 +1,7 @@
 use painter::{Point, Rect};
 
 use super::Context;
-use crate::prelude::{widget_tree::WidgetTree, LayoutStore, QueryOrder, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, LayoutStore, WidgetId};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -138,8 +138,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
 
   #[inline]
   fn query_type<W: 'static>(&self, id: WidgetId) -> Option<&W> {
-    id.assert_get(self.widget_tree())
-      .query_first_type(QueryOrder::OutsideFirst)
+    todo!()
+    // id.assert_get(self.widget_tree())
+    //   .query_on_first_type(QueryOrder::OutsideFirst)
   }
 }
 
@@ -151,7 +152,7 @@ mod tests {
   #[test]
   fn map_self_eq_self() {
     let w = widget! {
-      declare SizedBox {
+      SizedBox {
         size: Size::zero(),
         margin: EdgeInsets::all(2.),
       }

@@ -72,9 +72,14 @@ impl FocusManager {
   /// return the auto focus widget of the tree.
   pub fn auto_focus(&mut self, ctx: &Context) -> Option<WidgetId> {
     ctx.descendants().find(|id| {
-      id.assert_get(&ctx.widget_tree)
-        .query_first_type::<FocusListener>(QueryOrder::OutsideFirst)
-        .map_or(false, |focus| focus.auto_focus)
+      let mut auto_focus = false;
+      id.assert_get(&ctx.widget_tree).query_on_first_type(
+        QueryOrder::OutsideFirst,
+        |focus: &FocusListener| {
+          auto_focus = focus.auto_focus;
+        },
+      );
+      auto_focus
     })
   }
 
@@ -87,9 +92,13 @@ impl FocusManager {
       .root()
       .descendants(tree)
       .filter_map(|id| {
-        id.get(tree)
-          .and_then(|w| w.query_first_type::<FocusListener>(QueryOrder::OutsideFirst))
-          .map(|focus| FocusNode { tab_index: focus.tab_index, wid: id })
+        let mut node = None;
+        id.get(tree).map(|w| {
+          w.query_on_first_type(QueryOrder::OutsideFirst, |focus: &FocusListener| {
+            node = Some(FocusNode { tab_index: focus.tab_index, wid: id });
+          })
+        });
+        node
       })
       .for_each(|node| match node.tab_index {
         0 => zeros.push(node),
@@ -130,13 +139,12 @@ impl FocusManager {
     if let Some((blur, _)) = old {
       let mut focus_event = FocusEvent::new(blur.wid, ctx);
       // dispatch blur event
-      if let Some(focus) = blur
+      blur
         .wid
         .assert_get_mut(&mut ctx.widget_tree)
-        .query_first_type_mut::<FocusListener>(QueryOrder::OutsideFirst)
-      {
-        focus.dispatch_event(FocusEventType::Blur, &mut focus_event)
-      }
+        .query_on_first_type_mut(QueryOrder::OutsideFirst, |focus: &mut FocusListener| {
+          focus.dispatch_event(FocusEventType::Blur, &mut focus_event)
+        });
 
       let mut focus_event = FocusEvent::new(blur.wid, ctx);
       // bubble focus out
@@ -149,13 +157,16 @@ impl FocusManager {
 
     if let Some((focus, _)) = self.focusing {
       let mut focus_event = FocusEvent::new(focus.wid, ctx);
-      if let Some(focus_listener) = focus
+
+      focus
         .wid
         .assert_get_mut(&mut ctx.widget_tree)
-        .query_first_type_mut::<FocusListener>(QueryOrder::OutsideFirst)
-      {
-        focus_listener.dispatch_event(FocusEventType::Focus, &mut focus_event)
-      }
+        .query_on_first_type_mut(
+          QueryOrder::OutsideFirst,
+          |focus_listener: &mut FocusListener| {
+            focus_listener.dispatch_event(FocusEventType::Focus, &mut focus_event)
+          },
+        );
 
       let mut focus_event = FocusEvent::new(focus.wid, ctx);
 
@@ -182,7 +193,7 @@ mod tests {
     // two auto focus widget
     let size = Size::zero();
     let widget = widget! {
-      declare Row  {
+      Row  {
         SizedBox { size, auto_focus: true, }
         SizedBox { size, auto_focus: true, }
       }
@@ -202,7 +213,7 @@ mod tests {
     // one auto focus widget
     let size = Size::zero();
     let widget = widget! {
-      declare Row {
+      Row {
         SizedBox { size }
         SizedBox { size, auto_focus: true}
       }
@@ -224,7 +235,7 @@ mod tests {
   fn tab_index() {
     let size = Size::zero();
     let widget = widget! {
-      declare Row {
+      Row {
         SizedBox { size, tab_index: -1, }
         SizedBox { size, tab_index: 0, auto_focus: true }
         SizedBox { size, tab_index: 1, }
@@ -271,7 +282,7 @@ mod tests {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
           track  { this }
-          declare SizedBox {
+          SizedBox {
             size: SizedBox::expanded_size(),
             on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },
             on_blur: move |_| { this.log.borrow_mut().push("blur parent"); },

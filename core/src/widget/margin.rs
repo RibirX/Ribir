@@ -11,7 +11,7 @@ pub struct EdgeInsets {
 /// A widget that create space around its child.
 #[derive(SingleChild, Default, Clone, PartialEq, Declare)]
 pub struct Margin {
-  #[declare(builtin)]
+  #[declare(builtin, default)]
   pub margin: EdgeInsets,
 }
 
@@ -126,7 +126,7 @@ mod tests {
   #[test]
   fn smoke() {
     let widget = widget! {
-      declare SizedBox {
+      SizedBox {
         margin: EdgeInsets::symmetrical(1., 1.),
         size: Size::new(100., 100.)
       }

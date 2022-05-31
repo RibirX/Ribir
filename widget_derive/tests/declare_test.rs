@@ -9,45 +9,32 @@ use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
 fn declare_smoke() {
-  struct T;
-  impl Compose for T {
-    #[widget]
-
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          size: Size::new(500.,500.),
-          background: Color::RED,
-         }
-      }
-    }
-  }
+  let _ = widget! {
+    SizedBox {
+      size: Size::new(500.,500.),
+      background: Color::RED,
+     }
+  };
 }
 
 #[test]
 fn simple_ref_bind_work() {
-  struct T;
-  impl Compose for T {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      let size = Size::new(500., 500.);
-      widget! {
-       declare Flex {
-         SizedBox {
-           size: size2.size,
-           on_tap: move |_| size2.size *= 2.,
-         }
-         SizedBox {
-          id: size2,
-          size,
-        }
-       }
-      }
+  let size = Size::new(500., 500.);
+  let w = widget! {
+    Flex {
+     SizedBox {
+       size: size2.size,
+       on_tap: move |_| size2.size *= 2.,
+     }
+     SizedBox {
+      id: size2,
+      size,
     }
-  }
+   }
+  };
 
   let flex_size = Size::new(1000., 500.);
-  let mut wnd = Window::without_render(T.into_widget(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
@@ -63,24 +50,18 @@ fn simple_ref_bind_work() {
 fn event_attr_sugar_work() {
   const BEFORE_SIZE: Size = Size::new(50., 50.);
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
-  struct T;
-  impl Compose for T {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          id: sized_box,
-          size: BEFORE_SIZE,
-          SizedBox {
-            size: sized_box.size,
-            on_tap: move |_| sized_box.size = AFTER_TAP_SIZE,
-          }
-        }
+  let w = widget! {
+    SizedBox {
+      id: sized_box,
+      size: BEFORE_SIZE,
+      SizedBox {
+        size: sized_box.size,
+        on_tap: move |_| sized_box.size = AFTER_TAP_SIZE,
       }
     }
-  }
+  };
 
-  let mut wnd = Window::without_render(T.into_widget(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
   wnd.render_ready();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, BEFORE_SIZE.into());
@@ -96,29 +77,22 @@ fn event_attr_sugar_work() {
 
 #[test]
 fn widget_wrap_bind_work() {
-  struct T;
-  impl Compose for T {
-    #[widget]
-
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare Flex {
-          SizedBox {
-            id: sibling,
-            margin: EdgeInsets::all(1.0),
-            size: Size::new(50., 50.),
-          }
-          SizedBox {
-            margin: sibling.margin.clone(),
-            size: if sibling.margin.left > 1. { Size::zero() } else { sibling.size },
-            on_tap: move |_| sibling.margin = EdgeInsets::all(5.),
-          }
-        }
+  let w = widget! {
+    Flex {
+      SizedBox {
+        id: sibling,
+        margin: EdgeInsets::all(1.0),
+        size: Size::new(50., 50.),
+      }
+      SizedBox {
+        margin: sibling.margin.clone(),
+        size: if sibling.margin.left > 1. { Size::zero() } else { sibling.size },
+        on_tap: move |_| sibling.margin = EdgeInsets::all(5.),
       }
     }
-  }
+  };
 
-  let mut wnd = Window::without_render(T.into_widget(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
@@ -133,27 +107,16 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_for_children() {
-  struct EmbedExpr(Size);
-
-  impl Compose for EmbedExpr {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      let size = self.0;
-      widget! {
-        declare Flex {
-          SizedBox { size }
-          ExprChild { (0..3).map(|_| SizedBox { size }) }
-          ExprChild { (self.0.area() > 2.).then(|| SizedBox { size } ) }
-        }
-      }
+  let embed_expr = widget! {
+    Flex {
+      on_tap: move |_| sized_box.size = Size::new(5., 5.),
+      SizedBox { id: sized_box, size: Size::new(1., 1.) }
+      ExprWidget { expr: (0..3).map(move |_| SizedBox { size: sized_box.size }) }
+      ExprWidget { expr: (sized_box.size.area() > 2.).then(|| SizedBox { size: sized_box.size } ) }
     }
-  }
+  };
 
-  let w = EmbedExpr(Size::new(1., 1.)).into_stateful();
-  let mut state_ref = unsafe { w.state_ref() };
-  let w = w.on_tap(move |_| state_ref.0 = Size::new(5., 5.));
-
-  let mut wnd = Window::without_render(w.box_it(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(embed_expr, Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -169,28 +132,20 @@ fn expression_for_children() {
 
 #[test]
 fn embed_widget_ref_outside() {
-  struct T;
-  impl Compose for T {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare Flex {
-          SizedBox {
-            id: first,
-            size: Size::new(1., 1.),
-            on_tap: move |_| first.size = Size::new(2., 2.)
-          }
-          ExprChild {
-            // todo: should document warning use id in embed expression widget without declare keyword.
-            // without `declare` compile pass but unit test fail.
-            (0..3).map(|_| declare SizedBox { size: first.size } )
-          }
-        }
+  let w = widget! {
+    Flex {
+      SizedBox {
+        id: first,
+        size: Size::new(1., 1.),
+        on_tap: move |_| first.size = Size::new(2., 2.)
+      }
+      ExprWidget {
+        expr: (0..3).map(move |_| widget!{ SizedBox { size: first.size } } )
       }
     }
-  }
+  };
 
-  let mut wnd = Window::without_render(T.into_widget(), Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -204,24 +159,17 @@ fn embed_widget_ref_outside() {
 
 #[test]
 fn data_flow_macro() {
-  struct T;
-  impl Compose for T {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      let size = Size::new(1., 1.);
-      widget! {
-        declare Flex {
-          on_tap: move |_| a.size *= 2.,
-          SizedBox { id: c, size }
-          SizedBox { id: a, size }
-          SizedBox { id: b, size: a.size }
-        }
-        dataflows { a.size + b.size ~> c.size }
-      }
+  let size = Size::new(1., 1.);
+  let w = widget! {
+    Flex {
+      on_tap: move |_| a.size *= 2.,
+      SizedBox { id: c, size }
+      SizedBox { id: a, size }
+      SizedBox { id: b, size: a.size }
     }
-  }
-
-  let mut wnd = Window::without_render(T.into_widget(), Size::new(400., 400.));
+    dataflows { a.size + b.size ~> c.size }
+  };
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
   let (rect, _) = root_and_children_rect(&mut wnd);
   // data flow not affect on init.
@@ -239,172 +187,118 @@ fn local_var_not_bind() {
   const EXPECT_SIZE: Size = Size::new(5., 5.);
   const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
-  struct T;
-  impl Compose for T {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          size: {
-            let _size_box = EXPECT_SIZE;
-            let _size_box_def = EXPECT_SIZE;
-            _size_box + _size_box_def
-          },
-          SizedBox {
-            id: _size_box,
-            size: BE_CLIPPED_SIZE,
-          }
-        }
+  let w = widget! {
+    SizedBox {
+      size: {
+        let _size_box = EXPECT_SIZE;
+        let _size_box_def = EXPECT_SIZE;
+        _size_box + _size_box_def
+      },
+      SizedBox {
+        id: _size_box,
+        size: BE_CLIPPED_SIZE,
       }
     }
-  }
-
-  let (rect, child_rect) = widget_and_its_children_box_rect(T.into_widget(), Size::new(500., 500.));
+  };
+  let (rect, child_rect) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
   assert_eq!(rect.size, EXPECT_SIZE * 2.);
   assert_eq!(child_rect[0].size, EXPECT_SIZE * 2.);
 }
 
 #[test]
 
-fn with_attr_ref() {
-  #[derive(Default)]
-  struct Track(Rc<Cell<Option<StateRef<Flex>>>>);
-  impl Compose for Track {
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare Flex {
-          id: root,
-          cursor: tap_box.get_cursor().unwrap().clone(),
-          // a hack method to capture widget reference only for test, should not use
-          // it in product code.
-          ExprChild {
-            self.0.set(Some(root));
-            Option::<SizedBox>::None
-          }
-          SizedBox {
-            id: tap_box,
-            size: Size::new(5., 5.),
-            cursor: CursorIcon::Hand,
-            on_tap: move |_| {
-              let _ = tap_box.try_set_cursor(CursorIcon::AllScroll);
-            }
-          }
+fn builtin_ref() {
+  let icon_track = Rc::new(Cell::new(CursorIcon::default()));
+  let c_icon_track = icon_track.clone();
+
+  let w = widget! {
+    Flex {
+      cursor: tap_box.cursor.clone(),
+      SizedBox {
+        id: tap_box,
+        size: Size::new(5., 5.),
+        cursor: CursorIcon::Hand,
+        on_tap: move |_| {
+          tap_box.cursor.set(CursorIcon::AllScroll);
+          c_icon_track.set(tap_box.cursor.get());
         }
       }
     }
-  }
-  let w = Track::default();
-  let root_ref = w.0.clone();
+  };
 
-  let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
 
-  assert_eq!(
-    root_ref.get().and_then(|w| w.get_cursor()),
-    Some(CursorIcon::Hand)
-  );
+  assert_eq!(icon_track.get(), CursorIcon::Hand);
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
-  assert_eq!(
-    root_ref.get().and_then(|w| w.get_cursor()),
-    Some(CursorIcon::AllScroll)
-  );
+  assert_eq!(icon_track.get(), CursorIcon::AllScroll);
 }
 #[test]
 fn if_guard_field_true() {
-  struct GuardTrue;
-  impl Compose for GuardTrue {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          size if true => : Size::new(100., 100.)
-        }
-      }
+  let guard_true = widget! {
+    SizedBox {
+      size : Size::new(100., 100.),
+      margin if true => : EdgeInsets::horizontal(5.),
     }
-  }
+  };
 
-  let (rect, _) =
-    widget_and_its_children_box_rect(GuardTrue.into_widget(), Size::new(1000., 1000.));
-  assert_eq!(rect.size, Size::new(100., 100.));
+  let (rect, _) = widget_and_its_children_box_rect(guard_true, Size::new(1000., 1000.));
+  assert_eq!(rect.size, Size::new(110., 100.));
 }
 
 #[test]
 #[should_panic = "Required field `SizedBox::size` not set"]
 fn if_guard_field_false() {
-  struct GuardFalse;
-  impl Compose for GuardFalse {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          size if false => : Size::new(100., 100.)
-        }
-      }
+  let guard_false = widget! {
+    SizedBox {
+      size : Size::new(100., 100.),
     }
-  }
-  widget_and_its_children_box_rect(GuardFalse.into_widget(), Size::new(1000., 1000.));
+  };
+  let (rect, _) = widget_and_its_children_box_rect(guard_false, Size::new(1000., 1000.));
+  assert_eq!(rect.size, Size::new(110., 100.));
 }
 
 #[test]
-fn attr_bind_to_self() {
-  #[derive(Default)]
-  struct Track(Rc<Cell<Option<StateRef<SizedBox>>>>);
-  impl Compose for Track {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          id: self_id,
-          size: Size::new(5., 5.),
-          #[skip_nc]
-          cursor: if self_id.size.area() < 100. {
-            CursorIcon::Hand
-          } else {
-            CursorIcon::Help
-          },
-          on_tap: move |_|  self_id.size = Size::new(20.,20.),
-          // a hack method to capture widget reference only for test, should not use
-          // in product code.
-          ExprChild {
-            self.0.set(Some(self_id));
-            Option::<SizedBox>::None
-          }
-        }
-      }
+fn builtin_bind_to_self() {
+  let icon_track = Rc::new(Cell::new(CursorIcon::default()));
+  let c_icon_track = icon_track.clone();
+  let w = widget! {
+    SizedBox {
+      id: sized_box,
+      size: Size::new(5., 5.),
+      #[skip_nc]
+      cursor: {
+        let icon = if sized_box.size.area() < 100. {
+          CursorIcon::Hand
+        } else {
+          CursorIcon::Help
+        };
+        c_icon_track.set(icon);
+        icon
+      },
+      on_tap: move |_|  sized_box.size = Size::new(20.,20.),
     }
-  }
+  };
 
-  let w = Track::default();
-  let root_ref = w.0.clone();
-
-  let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
-  assert_eq!(
-    root_ref.get().and_then(|w| w.get_cursor()),
-    Some(CursorIcon::Help)
-  );
+  assert_eq!(icon_track.get(), CursorIcon::Help);
 }
 
 #[test]
 fn if_guard_work() {
-  struct T;
-  impl Compose for T {
-    #[widget]
-    fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-      widget! {
-        declare SizedBox {
-          size if true => : Size::new(100., 100.),
-          margin if false =>: EdgeInsets::all(1.),
-          cursor if true =>: CursorIcon::Hand
-        }
-      }
+  let w = widget! {
+    SizedBox {
+      size : Size::new(100., 100.),
+      margin if false =>: EdgeInsets::all(1.),
+      cursor if true =>: CursorIcon::Hand
     }
-  }
+  };
 
-  let (rect, _) = widget_and_its_children_box_rect(T.into_widget(), Size::new(500., 500.));
+  let (rect, _) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
   assert_eq!(rect.size, Size::new(100., 100.));
 }
 

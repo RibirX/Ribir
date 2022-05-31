@@ -27,7 +27,7 @@ impl Compose for Checkbox {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare ExprWidget {
+      ExprWidget {
         margin: EdgeInsets::all(4.),
         cursor: CursorIcon::Hand,
         on_tap: move |_| this.switch_check(),

@@ -429,7 +429,7 @@ mod tests {
   #[test]
   fn horizontal_line() {
     let row = widget! {
-      declare Flex {
+      Flex {
         ExprWidget {
           expr: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
@@ -442,7 +442,7 @@ mod tests {
   #[test]
   fn vertical_line() {
     let col = widget! {
-      declare Flex {
+      Flex {
         direction: Direction::Vertical,
         ExprWidget  {
          expr: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
@@ -457,7 +457,7 @@ mod tests {
   fn row_wrap() {
     let size = Size::new(200., 20.);
     let row = widget! {
-      declare Flex {
+      Flex {
         wrap: true,
         ExprWidget {
           expr: (0..3).map(|_| SizedBox { size })
@@ -482,7 +482,7 @@ mod tests {
   fn reverse_row_wrap() {
     let size = Size::new(200., 20.);
     let row = widget! {
-      declare Flex {
+      Flex {
         wrap: true,
         reverse: true,
         ExprWidget {
@@ -572,7 +572,7 @@ mod tests {
     fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
       let root = widget! {
-        declare SizedBox {
+        SizedBox {
           size: SizedBox::expanded_size(),
           Row {
             h_align: align,

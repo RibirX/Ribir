@@ -1,12 +1,8 @@
-use crate::{
-  error::DeclareError,
-  widget_attr_macro::{declare_widget::DeclareWidget, widget_def_variable},
-  WIDGET_MACRO_NAME,
-};
+use crate::{error::DeclareError, WIDGET_MACRO_NAME};
 
 use super::{
   capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable,
-  widget_macro::UsedNameInfo, widget_state_ref, FollowOn, WidgetMacro, DECLARE_WRAP_MACRO,
+  widget_macro::UsedNameInfo, widget_state_ref, DependPlaceInfo, WidgetMacro,
 };
 
 use proc_macro::{Diagnostic, Level};
@@ -31,13 +27,13 @@ pub enum IdType {
 pub struct DeclareCtx {
   /// All name we need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
-  pub current_follows: HashMap<Ident, Vec<Span>, ahash::RandomState>,
-  pub current_capture: HashSet<Ident, ahash::RandomState>,
+  pub current_used: HashMap<Ident, Vec<Span>, ahash::RandomState>,
+  pub current_capture: HashMap<Ident, Vec<Span>, ahash::RandomState>,
   /// name object has by used.
   used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
-  /// Some wrap widget (like margin, padding) implicit defined by user, shared
-  /// the `id` with host widget in user perspective.
+  /// Some builtin widget (like margin, padding) implicit defined by user,
+  /// shared the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident>,
 }
 
@@ -54,8 +50,6 @@ impl VisitMut for DeclareCtx {
         let mac = &m.mac;
         if mac.path.is_ident(WIDGET_MACRO_NAME) {
           *expr = unwrap_expr(self.expand_widget_macro(mac.tokens.clone()));
-        } else if mac.path.is_ident(DECLARE_WRAP_MACRO) {
-          *expr = unwrap_expr(self.expand_declare_wrap_macro(mac.tokens.clone()));
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -64,26 +58,24 @@ impl VisitMut for DeclareCtx {
         visit_mut::visit_expr_path_mut(self, p);
         if let Some(name) = p.path.get_ident() {
           if let Some(name) = self.find_named_widget(name).cloned() {
-            self.add_follow(name)
+            self.add_used_widget(name)
           }
         }
       }
       Expr::Closure(c) => {
-        let old_follows = std::mem::take(&mut self.current_follows);
+        let old_follows = std::mem::take(&mut self.current_used);
         let outside_capture = self.current_capture.drain().collect::<Vec<_>>();
         visit_mut::visit_expr_closure_mut(self, c);
-        if !self.current_follows.is_empty() {
-          let used_widgets = self.current_follows.keys();
+        if !self.current_used.is_empty() {
+          let used_widgets = self.current_used.keys();
           let refs = used_widgets.map(widget_state_ref);
           let body = &c.body;
           c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
         }
         if c.capture.is_some() {
-          self
-            .current_capture
-            .extend(self.current_follows.keys().cloned());
+          self.current_capture.extend(self.current_used.clone());
           if !self.current_capture.is_empty() {
-            let captures = self.current_capture.iter().map(capture_widget);
+            let captures = self.current_capture.keys().map(capture_widget);
             *expr = parse_quote_spanned! {c.span() => {
               #(#captures)*
               #c
@@ -92,7 +84,7 @@ impl VisitMut for DeclareCtx {
         }
 
         // needn't follow anything of closure inner.
-        self.current_follows = old_follows;
+        self.current_used = old_follows;
         self.current_capture.extend(outside_capture);
       }
       _ => {
@@ -114,10 +106,6 @@ impl VisitMut for DeclareCtx {
         let res = self.expand_widget_macro(mac.tokens.clone());
         *i = expr_to_stmt(unwrap_expr(res));
         return;
-      } else if mac.path.is_ident(DECLARE_WRAP_MACRO) {
-        let res = self.expand_declare_wrap_macro(mac.tokens.clone());
-        *i = expr_to_stmt(unwrap_expr(res));
-        return;
       }
     }
     visit_mut::visit_stmt_mut(self, i);
@@ -125,16 +113,17 @@ impl VisitMut for DeclareCtx {
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
-      if let Member::Named(ref f_name) = f_expr.member {
-        if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(f_name) {
-          if self.named_objects.get(f_name) == Some(&IdType::DeclareDefine) {
-            name.set_span(name.span().join(f_name.span()).unwrap());
+      if let Member::Named(ref field_name) = f_expr.member {
+        if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(field_name) {
+          // fixme: outside pass widget maybe also was declared by user
+          if self.named_objects.get(&name) == Some(&IdType::DeclareDefine) {
+            name.set_span(name.span().join(field_name.span()).unwrap());
             let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
             *f_expr.base = parse_quote! { #wrap_name };
             self
               .user_perspective_name
               .insert(wrap_name.clone(), name.clone());
-            self.add_follow(wrap_name);
+            self.add_used_widget(wrap_name);
             return;
           }
         }
@@ -268,17 +257,22 @@ impl DeclareCtx {
   }
 
   pub fn take_current_used_info(&mut self) -> UsedNameInfo {
-    let follows = (!self.current_follows.is_empty()).then(|| {
-      self
-        .current_follows
-        .drain()
-        .map(|(widget, spans)| FollowOn { widget, spans })
-        .collect()
-    });
-    let captures =
-      (!self.current_capture.is_empty()).then(|| self.current_capture.drain().collect());
+    let follows =
+      (!self.current_used.is_empty()).then(|| solid_depends_info(self.current_used.drain()));
 
-    UsedNameInfo { follows, captures }
+    let captures =
+      (!self.current_capture.is_empty()).then(|| solid_depends_info(self.current_capture.drain()));
+
+    UsedNameInfo { used_names: follows, captures }
+  }
+
+  pub fn clone_current_used_info(&mut self) -> UsedNameInfo {
+    let follows = (!self.current_used.is_empty())
+      .then(|| solid_depends_info(self.current_used.clone().into_iter()));
+    let captures = (!self.current_capture.is_empty())
+      .then(|| solid_depends_info(self.current_capture.clone().into_iter()));
+
+    UsedNameInfo { used_names: follows, captures }
   }
 
   pub fn emit_unused_id_warning(&self) {
@@ -325,19 +319,22 @@ impl DeclareCtx {
     }
   }
 
-  pub fn add_follow(&mut self, name: Ident) {
-    self
-      .current_follows
-      .entry(name.clone())
-      .or_default()
-      .push(name.span());
-
-    self.used_widgets.insert(name);
+  pub fn add_used_widget(&mut self, name: Ident) {
+    Self::add_info(name, &mut self.current_used, &mut self.used_widgets)
   }
 
   pub fn add_capture(&mut self, name: Ident) {
-    self.current_capture.insert(name.clone());
-    self.used_widgets.insert(name);
+    Self::add_info(name, &mut self.current_capture, &mut self.used_widgets)
+  }
+
+  fn add_info(
+    name: Ident,
+    info: &mut HashMap<Ident, Vec<Span>, ahash::RandomState>,
+    used_widgets: &mut HashSet<Ident, ahash::RandomState>,
+  ) {
+    info.entry(name.clone()).or_default().push(name.span());
+
+    used_widgets.insert(name);
   }
 
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
@@ -362,22 +359,11 @@ impl DeclareCtx {
       .cloned()
       .for_each(|name| self.add_capture(name));
 
-    self.emit_unused_id_warning();
     widget_macro.warnings().for_each(|w| w.emit_warning());
     let captures = inner_captures.clone().map(capture_widget);
     let tokens = quote_spanned!(tokens.span()=> {#(#captures)* #tokens} );
     self.named_objects = named;
     syn::parse2(tokens)
-  }
-
-  fn expand_declare_wrap_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
-    let mut widget: DeclareWidget = syn::parse2(tokens)?;
-    self.visit_declare_widget_mut(&mut widget);
-    let tokens = widget.host_and_builtin_tokens(self);
-    let compos_tokens = widget.compose_tokens(self);
-    let def_name = widget_def_variable(&widget.widget_identify());
-
-    syn::parse2(quote! {{ #tokens # compos_tokens #def_name.into_widget()}})
   }
 }
 
@@ -428,4 +414,13 @@ impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
 
 impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
+}
+
+fn solid_depends_info(info: impl Iterator<Item = (Ident, Vec<Span>)>) -> Vec<DependPlaceInfo> {
+  info
+    .map(|(widget, spans)| DependPlaceInfo {
+      widget,
+      spans: spans.into_boxed_slice(),
+    })
+    .collect()
 }

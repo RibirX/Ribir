@@ -1,17 +1,19 @@
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
-  token, Expr, Ident, Path, Token,
+  token,
+  visit_mut::VisitMut,
+  Expr, Ident, Path, Token,
 };
 
 use super::{
   animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
-  track::Track, widget_def_variable, DeclareCtx, DeclareWidget, FollowInfo, FollowOn, FollowPlace,
-  Follows, IdType, Result,
+  track::Track, widget_def_variable, DeclareCtx, DeclareWidget, DependIn, DependPart,
+  DependPlaceInfo, Depends, FollowInfo, IdType, MergeDepends, Result,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -32,18 +34,19 @@ pub struct IfGuard {
   pub if_token: token::If,
   pub cond: Expr,
   pub fat_arrow_token: Token![=>],
+  pub used_name_info: UsedNameInfo,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct UsedNameInfo {
-  pub(crate) captures: Option<HashSet<Ident, ahash::RandomState>>,
-  pub(crate) follows: Option<Vec<FollowOn>>,
+  pub(crate) captures: Option<Vec<DependPlaceInfo>>,
+  pub(crate) used_names: Option<Vec<DependPlaceInfo>>,
 }
 #[derive(Clone, Debug)]
 struct CircleCheckStack<'a> {
   pub widget: &'a Ident,
-  pub origin: FollowPlace<'a>,
-  pub on: &'a FollowOn,
+  pub origin: DependIn<'a>,
+  pub on: &'a DependPlaceInfo,
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -59,10 +62,7 @@ impl Parse for WidgetMacro {
         break;
       }
       let lk = content.lookahead1();
-      if lk.peek(kw::declare) {
-        let w = content.parse()?;
-        assign_uninit_field!(widget, w, declare)?;
-      } else if lk.peek(kw::dataflows) {
+      if lk.peek(kw::dataflows) {
         let d = content.parse()?;
         assign_uninit_field!(dataflows, d, dataflows)?;
       } else if lk.peek(kw::animations) {
@@ -71,6 +71,9 @@ impl Parse for WidgetMacro {
       } else if lk.peek(kw::track) {
         let t = content.parse()?;
         assign_uninit_field!(track, t, track)?;
+      } else if lk.peek(Ident) && content.peek2(token::Brace) {
+        let w = content.parse()?;
+        assign_uninit_field!(widget, w, declare)?;
       } else {
         return Err(lk.error());
       }
@@ -94,32 +97,21 @@ impl WidgetMacro {
     ctx.visit_widget_macro_mut(self);
     self.widget.before_generate_check(ctx)?;
 
-    let mut named_objects_tokens = quote! {};
-    if !ctx.named_objects.is_empty() {
-      let mut follows = self.analyze_object_follows();
+    let mut follows = (!ctx.named_objects.is_empty()).then(|| self.analyze_object_dependencies());
+    if let Some(follows) = follows.as_mut() {
       let _init_circle_check = Self::circle_check(&follows, |stack| {
         Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
       })?;
-
-      let mut named_widgets_def = self.named_objects_def_tokens(ctx);
-
-      Self::deep_follow_iter(&follows, |name| {
-        named_objects_tokens.extend(named_widgets_def.remove(name));
-      });
-
-      named_widgets_def
-        .into_values()
-        .for_each(|def_tokens| named_objects_tokens.extend(def_tokens));
 
       // data flow should not effect the named object init order, and we allow circle
       // follow with skip_nc attribute. So we add the data flow relationship and
       // individual check the circle follow error.
       if let Some(dataflows) = self.dataflows.as_ref() {
-        dataflows.analyze_data_flow_follows(&mut follows);
+        dataflows.analyze_data_flow_follows(follows);
         let _circle_follows_check = Self::circle_check(&follows, |stack| {
           if stack.iter().any(|s| match &s.origin {
-            FollowPlace::Field(f) => f.skip_nc.is_some(),
-            FollowPlace::DataFlow(df) => df.skip_nc.is_some(),
+            DependIn::Field(f) => f.skip_nc.is_some(),
+            DependIn::DataFlow(df) => df.skip_nc.is_some(),
             _ => false,
           }) {
             Ok(())
@@ -130,31 +122,35 @@ impl WidgetMacro {
       }
     }
 
-    let Self { dataflows, animations, .. } = self;
-
     let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
     let def_name = widget_def_variable(&self.widget.widget_identify());
 
-    let declare_widget = self
-      .widget
-      .named
-      .is_none()
-      .then(|| self.widget.host_and_builtin_tokens(ctx));
-    let compos_tokens = self.widget.compose_tokens(ctx);
+    let mut tokens = quote! {};
+    token::Paren::default().surround(&mut tokens, |tokens| {
+      tokens.extend(quote! { move |#ctx_name: &mut BuildCtx| });
+      token::Brace::default().surround(tokens, |tokens| {
+        self.track.to_tokens(tokens);
+        if !ctx.named_objects.is_empty() {
+          let mut named_widgets_def = self.named_objects_def_tokens(ctx);
 
-    let track = self.track.as_ref();
-
-    Ok(quote! {
-      (move |#ctx_name: &mut BuildCtx| {
-        #track
-        #named_objects_tokens
-        #dataflows
-        #animations
-        #declare_widget
-        #compos_tokens
-        #def_name.into_widget()
-      }).into_widget()
-    })
+          if let Some(follows) = follows.as_ref() {
+            Self::deep_follow_iter(&follows, |name| {
+              tokens.extend(named_widgets_def.remove(name));
+            });
+          }
+          named_widgets_def
+            .into_values()
+            .for_each(|def_tokens| tokens.extend(def_tokens));
+        }
+        self.dataflows.to_tokens(tokens);
+        self.animations.to_tokens(tokens);
+        self.widget.gen_tokens(ctx, tokens);
+        tokens.extend(quote! {  #def_name.into_widget() })
+      });
+    });
+    tokens.extend(quote! { .into_widget() });
+    ctx.emit_unused_id_warning();
+    Ok(tokens)
   }
 
   pub fn object_names_iter(&self) -> impl Iterator<Item = (&Ident, IdType)> {
@@ -180,7 +176,7 @@ impl WidgetMacro {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  fn analyze_object_follows(&self) -> BTreeMap<Ident, Follows> {
+  fn analyze_object_dependencies(&self) -> BTreeMap<Ident, Depends> {
     let mut follows = self.widget.analyze_object_follows();
 
     if let Some(animations) = self.animations.as_ref() {
@@ -205,7 +201,7 @@ impl WidgetMacro {
       .collect()
   }
 
-  fn circle_check<F>(follow_infos: &BTreeMap<Ident, Follows>, err_detect: F) -> Result<()>
+  fn circle_check<F>(follow_infos: &BTreeMap<Ident, Depends>, err_detect: F) -> Result<()>
   where
     F: Fn(&[CircleCheckStack]) -> Result<()>,
   {
@@ -221,7 +217,7 @@ impl WidgetMacro {
     // return if the widget follow contain circle.
     fn widget_follow_circle_check<'a, F>(
       name: &'a Ident,
-      follow_infos: &'a BTreeMap<Ident, Follows>,
+      follow_infos: &'a BTreeMap<Ident, Depends>,
       check_info: &mut HashMap<&'a Ident, CheckState, RandomState>,
       stack: &mut Vec<CircleCheckStack<'a>>,
       err_detect: &F,
@@ -257,7 +253,7 @@ impl WidgetMacro {
     })
   }
 
-  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, Follows>, mut callback: F) {
+  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, Depends>, mut callback: F) {
     // circular may exist widget attr follow widget self to init.
     let mut stacked = std::collections::HashSet::<_, RandomState>::default();
 
@@ -277,7 +273,7 @@ impl WidgetMacro {
 
 impl<'a> CircleCheckStack<'a> {
   fn to_follow_path(&self, ctx: &DeclareCtx) -> FollowInfo {
-    let on = FollowOn {
+    let on = DependPlaceInfo {
       widget: ctx.user_perspective_name(&self.on.widget).map_or_else(
         || self.on.widget.clone(),
         |user| Ident::new(&user.to_string(), self.on.widget.span()),
@@ -291,7 +287,7 @@ impl<'a> CircleCheckStack<'a> {
       .unwrap_or(self.widget);
 
     let (widget, member) = match self.origin {
-      FollowPlace::Field(f) => {
+      DependIn::Field(f) => {
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
         let (widget, _) = ctx
@@ -319,6 +315,11 @@ impl DeclareCtx {
       ctx.visit_animations_mut(animations);
     }
   }
+
+  pub fn visit_if_guard_mut(&mut self, if_guard: &mut IfGuard) {
+    self.visit_expr_mut(&mut if_guard.cond);
+    if_guard.used_name_info = self.clone_current_used_info();
+  }
 }
 
 impl ToTokens for IfGuard {
@@ -334,29 +335,51 @@ impl Parse for IfGuard {
       if_token: input.parse()?,
       cond: input.parse()?,
       fat_arrow_token: input.parse()?,
+      used_name_info: <_>::default(),
     })
   }
 }
 
 impl UsedNameInfo {
-  pub fn used_any_name(&self) -> bool { self.follows.is_some() || self.captures.is_some() }
+  pub fn use_or_capture_name(&self) -> impl Iterator<Item = &Ident> + '_ {
+    self
+      .used_names
+      .iter()
+      .chain(self.captures.iter())
+      .unique_widget()
+      .unwrap()
+      .into_iter()
+  }
+
+  pub fn use_or_capture_any_name(&self) -> bool {
+    self.used_names.is_some() || self.captures.is_some()
+  }
 
   pub fn used_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
-    self.capture_widgets().chain(
-      self
-        .follow_widgets()
-        .filter(|f| self.capture_widgets().find(|c| f == c).is_none()),
-    )
+    self
+      .used_names
+      .iter()
+      .flat_map(|fs| fs.iter().map(|f| &f.widget))
   }
 
   pub fn capture_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
-    self.captures.iter().flat_map(|cs| cs.iter())
-  }
-
-  pub fn follow_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
     self
-      .follows
+      .captures
       .iter()
       .flat_map(|fs| fs.iter().map(|f| &f.widget))
+  }
+
+  pub fn depends<'a>(&'a self, origin: DependIn<'a>) -> Option<Depends> {
+    self
+      .use_or_capture_any_name()
+      .then(|| self.depend_parts(origin).collect())
+  }
+
+  pub fn depend_parts<'a>(&'a self, origin: DependIn<'a>) -> impl Iterator<Item = DependPart> + '_ {
+    self
+      .used_names
+      .iter()
+      .chain(self.captures.iter())
+      .map(move |place_info| DependPart { origin, place_info })
   }
 }

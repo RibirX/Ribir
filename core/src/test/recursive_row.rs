@@ -10,7 +10,7 @@ impl Compose for RecursiveRow {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      declare Row {
+      Row {
         ExprWidget {
           expr: (0..this.width)
             .map(move |_| {

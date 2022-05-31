@@ -243,7 +243,7 @@ mod tests {
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
     let w = widget! {
-      declare SizedBox {
+      SizedBox {
         size,
         on_tap: TapListener::on_tap_times(times, move |_| *c_count.borrow_mut() += 1)
       }

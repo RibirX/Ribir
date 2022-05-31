@@ -36,7 +36,7 @@ mod tests {
   fn one_line_expanded() {
     let widget = |size| {
       widget! {
-        declare Row {
+        Row {
           Expanded {
             flex: 1.,
             SizedBox { size }

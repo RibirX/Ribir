@@ -21,8 +21,13 @@ impl<'a> BuildCtx<'a> {
       .as_ref()
       .and_then(|p| {
         p.ancestors(tree).find_map(|id| {
+          let mut theme: Option<&Theme> = None;
           id.assert_get(tree)
-            .query_first_type::<Theme>(QueryOrder::InnerFirst)
+            .query_on_first_type(QueryOrder::InnerFirst, |t: &Theme| {
+              // Safety: we known the theme in the widget node should always live longer than the `BuildCtx`
+              theme = unsafe { Some(std::mem::transmute(t)) };
+            });
+          theme
         })
       })
       .unwrap_or_else(|| {
@@ -94,7 +99,7 @@ mod tests {
 
         widget! {
           track { this }
-          declare SizedBox {
+          SizedBox {
             size: SizedBox::expanded_size(),
             theme: dark.clone(),
             SizedBox {
@@ -128,7 +133,7 @@ mod tests {
 
         widget! {
           track { this }
-          declare SizedBox {
+          SizedBox {
             size: SizedBox::expanded_size(),
             theme: light,
             SizedBox {
