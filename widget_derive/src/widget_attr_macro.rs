@@ -101,14 +101,12 @@ impl Id {
 }
 
 fn widget_state_ref(widget: &Ident) -> TokenStream2 {
-  let def_name = widget_def_variable(widget);
   quote_spanned!(widget.span() =>
     #[allow(unused_mut)]
-    let mut #widget = #def_name.state_ref();
+    let mut #widget = #widget.state_ref();
   )
 }
 
 fn capture_widget(widget: &Ident) -> TokenStream2 {
-  let def_name = widget_def_variable(widget);
-  quote_spanned!(widget.span() => let #def_name = #def_name.clone();)
+  quote_spanned!(widget.span() => let #widget = #widget.clone();)
 }

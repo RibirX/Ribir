@@ -36,5 +36,3 @@ pub fn ribir_prefix_variable(name: &Ident, prefix: &str) -> Ident {
   let prefix = Ident::new(prefix, name.span());
   ribir_suffix_variable(&prefix, &name.to_string())
 }
-
-pub fn widget_def_variable(name: &Ident) -> Ident { ribir_suffix_variable(name, "def") }

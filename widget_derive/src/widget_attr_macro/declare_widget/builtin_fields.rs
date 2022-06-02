@@ -10,7 +10,7 @@ use syn::{parse_quote_spanned, spanned::Spanned};
 use crate::{
   error::DeclareError,
   widget_attr_macro::{
-    ribir_suffix_variable, widget_def_variable,
+    ribir_suffix_variable, 
     widget_macro::{UsedNameInfo, EXPR_WIDGET},
     DeclareCtx,  Depends, MergeDepends, 
   },
@@ -125,10 +125,8 @@ impl BuiltinFieldWidgets {
       // builtin widget all fields have if guard correspond to a `ExprWidget` syntax
       if info.is_expr_widget() {
         let ty = Ident::new(EXPR_WIDGET, span).into();
-        let wrap_name = widget_def_variable(&name);
-
         let mut expr_field: DeclareField = parse_quote_spanned! { span =>
-          expr: { #widget_tokens #wrap_name }
+          expr: { #widget_tokens #name }
         };
 
         let if_guards = info.fields.iter().filter_map(|f| f.if_guard.as_ref());
@@ -162,16 +160,14 @@ impl BuiltinFieldWidgets {
       .fold(host.is_host_expr_widget(), |is_expr_widget, info| {
         let suffix = BUILTIN_WIDGET_SUFFIX.get(info.name).unwrap();
         let name = ribir_suffix_variable(&host_name, suffix);
-        let wrap_def = widget_def_variable(&name);
-        let host_def = widget_def_variable(&host_name);
         let span = info.span();
         if is_expr_widget {
           compose_tokens.extend(
-            quote_spanned! { span =>  let #host_def = SingleChildWidget::from_expr_child(#wrap_def, #host_def); },
+            quote_spanned! { span =>  let #host_name = SingleChildWidget::from_expr_child(#name, #host_name); },
           );
         } else {
           compose_tokens.extend(
-            quote_spanned! { span =>  let #host_def = SingleChildWidget::new(#wrap_def, #host_def); },
+            quote_spanned! { span =>  let #host_name = SingleChildWidget::new(#name, #host_name); },
           );
         }
         info.is_expr_widget()

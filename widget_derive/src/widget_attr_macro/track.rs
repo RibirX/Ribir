@@ -1,4 +1,4 @@
-use super::{animations::SimpleField, kw, widget_def_variable};
+use super::{animations::SimpleField, kw};
 use proc_macro2::Ident;
 use quote::{quote_spanned, ToTokens};
 use syn::{braced, parse::Parse, punctuated::Punctuated, spanned::Spanned, token};
@@ -25,8 +25,7 @@ impl ToTokens for Track {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     self.track_externs.iter().for_each(|field| {
       let SimpleField { member, expr, .. } = field;
-      let def_name = widget_def_variable(member);
-      tokens.extend(quote_spanned!(field.span() => let #def_name: Stateful<_> = #expr; ));
+      tokens.extend(quote_spanned!(field.span() => let #member: Stateful<_> = #expr; ));
     });
   }
 }

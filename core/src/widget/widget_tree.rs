@@ -28,7 +28,7 @@ impl WidgetTree {
 
   pub(crate) fn reset_root(&mut self, new_root: WidgetId) -> WidgetId {
     let old = self.root;
-    old.detach(self);
+    new_root.detach(self);
     self.root = new_root;
     old
   }
