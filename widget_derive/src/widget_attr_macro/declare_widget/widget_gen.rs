@@ -1,7 +1,7 @@
 use crate::{
   declare_derive::{field_convert_method, field_default_method},
   widget_attr_macro::{
-    capture_widget, ribir_variable, skip_nc_assign, widget_def_variable,
+    capture_widget, ribir_variable, skip_nc_assign,
     widget_macro::{is_expr_keyword, EXPR_FIELD},
     widget_state_ref, DeclareCtx, BUILD_CTX,
   },
@@ -28,15 +28,14 @@ impl<'a> WidgetGen<'a> {
   }
 
   fn normal_widget_token(&self, ctx: &DeclareCtx) -> TokenStream {
-    let Self { fields, ty, .. } = self;
+    let Self { fields, ty, name, .. } = self;
 
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
-    let def_name = widget_def_variable(&self.name);
 
     let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
     let fields_tokens = self.fields.iter().map(|f| f.field_tokens(ty));
     let build_widget = quote_spanned! { ty.span() =>
-      let  #def_name = <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful;
+      let #name = <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful;
     };
     let fields_follow = fields.iter().filter_map(|f| self.field_follow_tokens(f));
 
@@ -58,7 +57,6 @@ impl<'a> WidgetGen<'a> {
       used_name_info,
       ..
     } = expr_field;
-    let def_name = widget_def_variable(&name);
     let build_ctx = ribir_variable(BUILD_CTX, ty.span());
     if let Some(follows) = used_name_info.used_names.as_ref() {
       let follow_names = follows.iter().map(|f| &f.widget);
@@ -67,7 +65,7 @@ impl<'a> WidgetGen<'a> {
       let captures = used_name_info.use_or_capture_name().map(capture_widget);
       let field_converter = field_convert_method(expr_mem);
       quote_spanned! { ty.span() =>
-        let #def_name = #ty::<_>::builder()
+        let #name = #ty::<_>::builder()
           .upstream(#upstream.box_it())
           .#expr_mem({
             #(#captures)*
@@ -81,34 +79,29 @@ impl<'a> WidgetGen<'a> {
           .build(#build_ctx);
       }
     } else {
-      quote_spanned! { ty.span() => let #def_name = #expr; }
+      quote_spanned! { ty.span() => let #name = #expr; }
     }
   }
 
   fn field_follow_tokens(&self, f: &DeclareField) -> Option<TokenStream> {
     let DeclareField { member, used_name_info, skip_nc, .. } = f;
 
-    let ref_name = &self.name;
+    let name = &self.name;
     let expr_tokens = f.value_tokens(self.ty);
 
     used_name_info.used_names.is_some().then(|| {
-      let assign = skip_nc_assign(
-        skip_nc.is_some(),
-        &quote! { #ref_name.#member},
-        &expr_tokens,
-      );
+      let assign = skip_nc_assign(skip_nc.is_some(), &quote! { #name.#member}, &expr_tokens);
 
       let upstream = upstream_by_used_widgets(used_name_info.used_widgets());
       let capture_widgets = used_name_info
         .used_widgets()
-        .chain(std::iter::once(ref_name))
+        .chain(std::iter::once(name))
         .map(capture_widget);
 
-      let def_name = widget_def_variable(ref_name);
       quote_spanned! { f.span() => {
         #(#capture_widgets)*
         #upstream.subscribe(move |_| {
-          let mut #ref_name = #def_name.state_ref();
+          let mut #name = #name.state_ref();
           #assign
         });
       }}

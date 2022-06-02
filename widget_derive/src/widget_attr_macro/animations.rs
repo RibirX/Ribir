@@ -16,7 +16,7 @@ use crate::widget_attr_macro::Id;
 use super::{
   capture_widget,
   declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
-  ribir_suffix_variable, ribir_variable, widget_def_variable,
+  ribir_suffix_variable, ribir_variable,
   widget_macro::UsedNameInfo,
   widget_state_ref, DeclareCtx, DependIn, Depends, BUILD_CTX,
 };
@@ -667,10 +667,9 @@ impl ToTokens for Trigger {
         }
       };
 
-      let w_def = widget_def_variable(&widget);
       tokens.extend(quote_spanned! { trigger_span =>
         let mut #animate = #expr;
-        #w_def
+        #widget
         .state_change(move |w| w #dot_token #member.clone())
         .subscribe(move |change| {
           // todo: should remove after support state change hook before change notify

@@ -12,8 +12,8 @@ use syn::{
 
 use super::{
   animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
-  track::Track, widget_def_variable, DeclareCtx, DeclareWidget, DependIn, DependPart,
-  DependPlaceInfo, Depends, FollowInfo, IdType, MergeDepends, Result,
+  track::Track, DeclareCtx, DeclareWidget, DependIn, DependPart, DependPlaceInfo, Depends,
+  FollowInfo, IdType, MergeDepends, Result,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -123,8 +123,6 @@ impl WidgetMacro {
     }
 
     let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
-    let def_name = widget_def_variable(&self.widget.widget_identify());
-
     let mut tokens = quote! {};
     token::Paren::default().surround(&mut tokens, |tokens| {
       tokens.extend(quote! { move |#ctx_name: &mut BuildCtx| });
@@ -145,7 +143,8 @@ impl WidgetMacro {
         self.dataflows.to_tokens(tokens);
         self.animations.to_tokens(tokens);
         self.widget.gen_tokens(ctx, tokens);
-        tokens.extend(quote! {  #def_name.into_widget() })
+        let name = self.widget.widget_identify();
+        tokens.extend(quote! {  #name.into_widget() })
       });
     });
     tokens.extend(quote! { .into_widget() });

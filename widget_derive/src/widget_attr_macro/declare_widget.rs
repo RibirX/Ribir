@@ -19,7 +19,7 @@ pub use builtin_fields::*;
 use widget_gen::WidgetGen;
 
 use super::{
-  child_variable, kw, ribir_variable, widget_def_variable,
+  child_variable, kw, ribir_variable,
   widget_macro::{is_expr_keyword, IfGuard, UsedNameInfo, EXPR_FIELD, EXPR_WIDGET},
   DeclareCtx, DependIn, DependPart, Depends, Id, Result,
 };
@@ -259,8 +259,6 @@ impl DeclareWidget {
 
   pub fn compose_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     let mut compose_tokens = quote! {};
-    let name = &self.widget_identify();
-    let def_name = widget_def_variable(name);
     let children = &self.children;
 
     if !children.is_empty() {
@@ -270,9 +268,9 @@ impl DeclareWidget {
 
       let children = children.iter().enumerate().map(|(idx, c)| {
         let child_name = if c.named.is_none() {
-          widget_def_variable(&child_variable(c, idx))
+          child_variable(c, idx)
         } else {
-          let child_widget_name = widget_def_variable(&c.widget_identify());
+          let child_widget_name = c.widget_identify();
           let child_compose = c.compose_tokens(ctx);
           compose_tokens.extend(child_compose);
           child_widget_name
@@ -288,7 +286,8 @@ impl DeclareWidget {
           quote_spanned! { c.span() => .have_child(#child_name) }
         }
       });
-      let compose_children = quote! { let #def_name #hint = #def_name #(#children)*; };
+      let name = &self.widget_identify();
+      let compose_children = quote! { let #name #hint = #name #(#children)*; };
       compose_tokens.extend(compose_children);
     }
     compose_tokens.extend(self.builtin.compose_tokens(self));
@@ -314,8 +313,8 @@ impl DeclareWidget {
       .enumerate()
       .filter(|(_, c)| c.named.is_none())
       .for_each(|(idx, c)| {
-        let c_name = widget_def_variable(&child_variable(c, idx));
-        let child_widget_name = widget_def_variable(&c.widget_identify());
+        let c_name = child_variable(c, idx);
+        let child_widget_name = c.widget_identify();
         tokens.extend(quote_spanned! { c.path.span() =>  let #c_name = });
         c.brace_token.surround(tokens, |tokens| {
           c.gen_tokens(ctx, tokens);
@@ -480,7 +479,6 @@ pub fn upstream_by_used_widgets<'a>(
   used_widgets: impl Iterator<Item = &'a Ident> + Clone,
 ) -> TokenStream {
   let upstream = used_widgets.clone().map(|w| {
-    let w = widget_def_variable(w);
     quote_spanned! { w.span() =>  #w.change_stream() }
   });
   if used_widgets.count() > 1 {

@@ -54,8 +54,6 @@ impl Context {
     let painter = Painter::new(device_scale, typography_store.clone());
     let generator_store = generator_store::GeneratorStore::default();
 
-    let mut tree = WidgetTree::new();
-    let tmp_root = tree.root();
     let mut ctx = Context {
       layout_store: <_>::default(),
       widget_tree: WidgetTree::new(),
@@ -70,9 +68,10 @@ impl Context {
       generator_store,
     };
 
+    let tmp_root = ctx.widget_tree.root();
     tmp_root.append_widget(root, &mut ctx);
-    let real_root = tree.root().single_child(&tree).unwrap();
-    let old = tree.reset_root(real_root);
+    let real_root = tmp_root.single_child(&ctx.widget_tree).unwrap();
+    let old = ctx.widget_tree.reset_root(real_root);
     ctx.drop_subtree(old);
 
     ctx.mark_root_dirty();
@@ -221,7 +220,7 @@ mod tests {
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
     let mut ctx = Context::new(post.into_widget(), 1., None);
-    assert_eq!(ctx.widget_tree.count(), 20);
+    assert_eq!(ctx.widget_tree.count(), 18);
     ctx.mark_root_dirty();
     assert_eq!(ctx.is_dirty(), false);
   }

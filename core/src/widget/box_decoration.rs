@@ -362,53 +362,48 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn paint() {
-    struct Paint;
-    impl Compose for Paint {
-      #[widget]
-      fn compose(&self, ctx: &mut BuildCtx) -> Widget {
-        let radius_cases = vec![
-          Radius::all(0.),
-          Radius::all(10.),
-          Radius::top_left(20.),
-          Radius::top_right(20.),
-          Radius::bottom_right(20.),
-          Radius::bottom_left(20.),
-          Radius::top_left(50.),
-        ];
+    let radius_cases = vec![
+      Radius::all(0.),
+      Radius::all(10.),
+      Radius::top_left(20.),
+      Radius::top_right(20.),
+      Radius::bottom_right(20.),
+      Radius::bottom_left(20.),
+      Radius::top_left(50.),
+    ];
 
-        widget! {
-          declare Row {
-            wrap: true,
-            margin: EdgeInsets::all(2.),
-            SizedBox {
-              size: Size::new(60., 40.),
-              background: Color::PINK,
-              border: Border {
-                left: BorderSide { width: 1., color: Color::BLACK },
-                right: BorderSide { width: 2., color: Color::RED },
-                top: BorderSide { width: 3., color: Color::GREEN },
-                bottom: BorderSide { width: 4., color: Color::YELLOW },
-              },
-            }
-            ExprChild {
-              radius_cases
-                .into_iter()
-                .map(|radius| {
-                  declare SizedBox {
-                    size: Size::new(60., 40.),
-                    background: Color::RED,
-                    radius,
-                    border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
-                    margin: EdgeInsets::all(2.)
-                  }
-                })
-            }
-         }
+    let w = widget! {
+      Row {
+        wrap: true,
+        margin: EdgeInsets::all(2.),
+        SizedBox {
+          size: Size::new(60., 40.),
+          background: Color::PINK,
+          border: Border {
+            left: BorderSide { width: 1., color: Color::BLACK },
+            right: BorderSide { width: 2., color: Color::RED },
+            top: BorderSide { width: 3., color: Color::GREEN },
+            bottom: BorderSide { width: 4., color: Color::YELLOW },
+          },
         }
-      }
-    }
-
-    let mut window = Window::wgpu_headless(Paint.into_widget(), DeviceSize::new(400, 600));
+        ExprWidget {
+          expr: radius_cases
+            .into_iter()
+            .map(|radius| {
+              widget! {
+                SizedBox {
+                  size: Size::new(60., 40.),
+                  background: Color::RED,
+                  radius,
+                  border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
+                  margin: EdgeInsets::all(2.)
+                }
+            }
+          })
+        }
+     }
+    };
+    let mut window = Window::wgpu_headless(w, DeviceSize::new(400, 600));
     window.render_ready();
     assert!(window.same_as_png("../test/test_imgs/box_decoration.png"));
   }

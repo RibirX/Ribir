@@ -33,7 +33,7 @@ impl Compose for EmbedPost {
         Text { text: this.author }
         Text { text: this.content }
         ExprWidget {
-          expr: (this.level > 0).then(move || EmbedPost::new(this.level - 1 ))
+          expr: (this.level > 0).then(|| EmbedPost::new(this.level - 1 ))
         }
       }
     }
