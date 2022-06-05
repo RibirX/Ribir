@@ -180,8 +180,8 @@ impl LayoutStore {
 
             !sized_by_parent
           });
-          needs_layout.push(relayout_root);
         }
+        needs_layout.push(relayout_root);
       });
 
     needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(tree).count()));

@@ -131,6 +131,10 @@ impl WidgetId {
   }
 
   pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
+    let mut changed = tree.state_changed.borrow_mut();
+    self.descendants(tree).for_each(|id| {
+      changed.remove(&id);
+    });
     self.0.remove_subtree(&mut tree.arena);
   }
 
