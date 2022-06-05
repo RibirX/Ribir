@@ -14,7 +14,8 @@ struct Todos {
 impl Compose for Todos {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
-      track { this }
+      // split this to avoid mutable borrow conflict in `ExprWidget`.
+      track { this, this2: this.clone() }
       Column {
         h_align: CrossAxisAlign::Start,
         ExprWidget {
@@ -31,7 +32,7 @@ impl Compose for Todos {
                 }
               }
               dataflows {
-                checkbox.checked ~> this.silent().tasks[idx].finished;
+                checkbox.checked ~> this2.silent().tasks[idx].finished;
               }
             }
           })

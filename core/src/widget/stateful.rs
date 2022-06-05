@@ -128,7 +128,7 @@ pub(crate) struct StateChangeNotifier(LocalSubject<'static, bool, ()>);
 /// not bind to struct lifetime. Useful to avoid borrow conflict. For example
 ///
 /// ```ignore
-/// (this.xxx() > 0).then(move || this.mut_y());
+/// (this.ref_y() > 0).then(move || this.mut_y());
 /// ```
 ///
 /// Assume above code in `widget!` macro and `this` is a tracked stateful
@@ -223,14 +223,10 @@ impl<'a, W> StateRef<'a, W> {
   /// Clone the stateful widget of which the reference point to. Require mutable
   /// reference because we try to early release inner borrow when clone occur.
   #[inline]
-  pub fn clone(&self) -> Stateful<W> {
-    // todo
-    // self.0.release_current_borrow();
+  pub fn clone(&mut self) -> Stateful<W> {
+    self.0.release_current_borrow();
     self.0.widget.clone()
   }
-
-  #[inline]
-  pub fn state_ref(self) -> Self { self }
 }
 
 impl<'a, W> std::ops::Deref for SilentRef<'a, W> {

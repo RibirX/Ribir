@@ -66,13 +66,13 @@ impl VisitMut for DeclareCtx {
         let old_follows = std::mem::take(&mut self.current_used);
         let outside_capture = self.current_capture.drain().collect::<Vec<_>>();
         visit_mut::visit_expr_closure_mut(self, c);
-        if !self.current_used.is_empty() {
-          let used_widgets = self.current_used.keys();
-          let refs = used_widgets.map(widget_state_ref);
-          let body = &c.body;
-          c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
-        }
         if c.capture.is_some() {
+          if !self.current_used.is_empty() {
+            let used_widgets = self.current_used.keys();
+            let refs = used_widgets.map(widget_state_ref);
+            let body = &c.body;
+            c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
+          }
           self.current_capture.extend(self.current_used.clone());
           if !self.current_capture.is_empty() {
             let captures = self.current_capture.keys().map(capture_widget);
@@ -333,36 +333,39 @@ impl DeclareCtx {
     used_widgets: &mut HashSet<Ident, ahash::RandomState>,
   ) {
     info.entry(name.clone()).or_default().push(name.span());
-
     used_widgets.insert(name);
   }
 
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
     let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
-    let named = self.named_objects.clone();
-    let outside_used = std::mem::take(&mut self.used_widgets);
+    let mut new_ctx = DeclareCtx::default();
+    new_ctx.analyze_stack = self.analyze_stack.clone();
     // all named objects should as outside define for embed `widget!` macro.
-    self
-      .named_objects
-      .values_mut()
-      .for_each(|v| *v = IdType::OutsideWidgetMacroPass);
+    self.named_objects.keys().for_each(|name| {
+      new_ctx
+        .named_objects
+        .insert(name.clone(), IdType::OutsideWidgetMacroPass);
+    });
 
     let tokens = widget_macro
-      .gen_tokens(self)
+      .gen_tokens(&mut new_ctx)
       .unwrap_or_else(|err| err.into_compile_error());
 
-    // inner `widget!` used means need be captured.
-    let inner_used = std::mem::replace(&mut self.used_widgets, outside_used);
-    let inner_captures = inner_used.iter().filter(|w| named.contains_key(&w));
-    inner_captures
-      .clone()
-      .cloned()
-      .for_each(|name| self.add_capture(name));
-
     widget_macro.warnings().for_each(|w| w.emit_warning());
-    let captures = inner_captures.clone().map(capture_widget);
-    let tokens = quote_spanned!(tokens.span()=> {#(#captures)* #tokens} );
-    self.named_objects = named;
+    // inner `widget!` used means need be captured.
+
+    new_ctx.used_widgets.iter().for_each(|name| {
+      if self.named_objects.contains_key(name) {
+        self.add_capture(name.clone())
+      }
+    });
+    let inner_captures = new_ctx
+      .used_widgets
+      .iter()
+      .filter(|w| self.named_objects.contains_key(w))
+      .map(capture_widget);
+    let tokens = quote_spanned!(tokens.span()=> {#(#inner_captures)* #tokens} );
+
     syn::parse2(tokens)
   }
 }
