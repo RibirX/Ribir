@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// The BoxDecoration provides a variety of ways to draw a box.
 #[derive(SingleChild, Default, Clone, Declare)]
@@ -71,6 +71,10 @@ impl Render for BoxDecoration {
       self.paint_border(painter, &content_rect);
     }
   }
+}
+
+impl Query for BoxDecoration {
+  impl_query_self_only!();
 }
 
 impl BoxDecorationBuilder {

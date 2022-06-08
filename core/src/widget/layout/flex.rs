@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// How the children should be placed along the cross axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -96,6 +96,10 @@ impl Render for Flex {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for Flex {
+  impl_query_self_only!();
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -399,9 +403,9 @@ impl FlexLayouter {
   fn box_size(&self) -> FlexSize { self.best_size().clamp(self.min_size, self.max_size) }
 
   fn child_flex(ctx: &mut LayoutCtx, child: WidgetId) -> Option<f32> {
-    ctx
-      .query_type::<Expanded>(child)
-      .map(|expanded| expanded.flex)
+    let mut flex = None;
+    ctx.query_widget_type(child, |expanded: &Expanded| flex = Some(expanded.flex));
+    flex
   }
 }
 

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// Focus attr attach to widget to support get ability to focus in.
 #[derive(Default, Declare, SingleChild)]
@@ -31,13 +31,13 @@ pub struct FocusListener {
   /// focus.
   #[declare(default, builtin)]
   pub auto_focus: bool,
-  #[declare(builtin, custom_convert)]
+  #[declare(default, builtin, custom_convert)]
   on_focus: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
-  #[declare(builtin, custom_convert)]
+  #[declare(default, builtin, custom_convert)]
   on_blur: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
-  #[declare(builtin, custom_convert)]
+  #[declare(default, builtin, custom_convert)]
   on_focus_in: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
-  #[declare(builtin, custom_convert)]
+  #[declare(default, builtin, custom_convert)]
   on_focus_out: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
 }
 
@@ -63,6 +63,8 @@ pub enum FocusEventType {
   FocusOut,
 }
 
+// FocusListener must be a widget node to avoid two FocusListener in same
+// widget.
 impl Render for FocusListener {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     ctx
@@ -72,6 +74,10 @@ impl Render for FocusListener {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for FocusListener {
+  impl_query_self_only!();
 }
 
 impl FocusListener {

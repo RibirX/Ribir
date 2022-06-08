@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EdgeInsets {
@@ -35,6 +35,10 @@ impl Render for Margin {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for Margin {
+  impl_query_self_only!();
 }
 
 impl Margin {

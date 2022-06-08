@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 #[derive(Declare, MultiChild)]
 pub struct GridView {
   axis_dir: Direction,
@@ -75,4 +75,8 @@ impl Render for GridView {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for GridView {
+  impl_query_self_only!();
 }

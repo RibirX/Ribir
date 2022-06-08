@@ -130,15 +130,15 @@ impl PointerDispatcher {
     let mut already_entered = vec![];
 
     for w in self.entered_widgets.drain(..) {
-      if !w.is_dropped(&ctx.widget_tree) {
+      if w.is_dropped(&ctx.widget_tree) {
         continue;
       }
       match new_hit {
         Some((new_hit, _)) if w.ancestors_of(new_hit, &ctx.widget_tree) => already_entered.push(w),
         _ => {
-          let old_pos = (w, &*ctx).map_from_global(self.cursor_pos);
+          let pos = map_from_global(w, self.cursor_pos, ctx.tree(), &ctx.layout_store);
           let mut event =
-            PointerEvent::from_mouse(w, old_pos, self.cursor_pos, self.mouse_button.1, ctx);
+            PointerEvent::from_mouse(w, pos, self.cursor_pos, self.mouse_button.1, ctx);
           w.assert_get_mut(&mut ctx.widget_tree).query_all_type_mut(
             |pointer: &mut PointerLeaveListener| {
               pointer.dispatch_event(&mut event);
@@ -166,9 +166,9 @@ impl PointerDispatcher {
         .rev()
         .filter(|w| !already_entered.iter().any(|e| e != *w))
         .for_each(|&w| {
-          let old_pos = (w, &*ctx).map_from_global(self.cursor_pos);
+          let pos = map_from_global(w, self.cursor_pos, ctx.tree(), &ctx.layout_store);
           let mut event =
-            PointerEvent::from_mouse(w, old_pos, self.cursor_pos, self.mouse_button.1, ctx);
+            PointerEvent::from_mouse(w, pos, self.cursor_pos, self.mouse_button.1, ctx);
 
           w.assert_get_mut(&mut ctx.widget_tree).query_all_type_mut(
             |pointer: &mut PointerEnterListener| {
@@ -182,23 +182,22 @@ impl PointerDispatcher {
   }
 
   fn hit_widget(&self, ctx: &Context) -> Option<(WidgetId, Point)> {
-    let c_rid = ctx.widget_tree.root();
-    let mut current = (c_rid, ctx).box_rect().and_then(|rect| {
-      rect
-        .contains(self.cursor_pos)
-        .then(|| (ctx.widget_tree.root(), self.cursor_pos))
-    });
-    let mut hit = None;
+    fn down_coordinate(id: WidgetId, pos: Point, store: &LayoutStore) -> Option<(WidgetId, Point)> {
+      store
+        .layout_box_rect(id)
+        .filter(|rect| rect.contains(pos))
+        .map(|_| (id, map_from_parent(id, pos, store)))
+    }
+
+    let tree = ctx.tree();
+    let store = &ctx.layout_store;
+    let mut current = down_coordinate(tree.root(), self.cursor_pos, store);
+    let mut hit = current;
     while let Some((id, pos)) = current {
       hit = current;
-      current = id.reverse_children(&ctx.widget_tree).find_map(|c| {
-        let w_ctx = (c, ctx);
-        w_ctx
-          .box_rect()
-          // check if contain the position
-          .filter(|rect| rect.contains(pos))
-          .map(|_| (c_rid, w_ctx.map_from(pos, id)))
-      });
+      current = id
+        .reverse_children(&ctx.widget_tree)
+        .find_map(|c| down_coordinate(c, pos, store));
     }
     hit
   }
@@ -456,7 +455,6 @@ mod tests {
               size: SizedBox::expanded_size(),
               on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
               on_pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
-
             }
           }
         }

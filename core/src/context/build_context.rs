@@ -24,7 +24,8 @@ impl<'a> BuildCtx<'a> {
           let mut theme: Option<&Theme> = None;
           id.assert_get(tree)
             .query_on_first_type(QueryOrder::InnerFirst, |t: &Theme| {
-              // Safety: we known the theme in the widget node should always live longer than the `BuildCtx`
+              // Safety: we known the theme in the widget node should always live longer than
+              // the `BuildCtx`
               theme = unsafe { Some(std::mem::transmute(t)) };
             });
           theme

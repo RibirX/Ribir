@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::HashSet, pin::Pin, rc::Rc};
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
-  arena: Arena<Box<dyn RenderNode>>,
+  arena: Arena<Box<dyn Render>>,
   pub(crate) state_changed: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
   root: WidgetId,
 }
@@ -14,7 +14,7 @@ pub(crate) struct WidgetTree {
 impl WidgetTree {
   pub(crate) fn new() -> Pin<Box<Self>> {
     let mut arena = Arena::default();
-    let node: Box<dyn RenderNode> = Box::new(Void);
+    let node: Box<dyn Render> = Box::new(Void);
     let root = WidgetId(arena.new_node(node));
     let tree = Self {
       arena,
@@ -35,7 +35,7 @@ impl WidgetTree {
 
   pub(crate) fn place_holder(&mut self) -> WidgetId { self.new_node(Box::new(Void)) }
 
-  pub(crate) fn new_node(&mut self, widget: Box<dyn RenderNode>) -> WidgetId {
+  pub(crate) fn new_node(&mut self, widget: Box<dyn Render>) -> WidgetId {
     let id = WidgetId(self.arena.new_node(widget));
 
     id.assert_get(self).query_all_type(
@@ -60,12 +60,12 @@ impl WidgetTree {
 
 impl WidgetId {
   /// Returns a reference to the node data.
-  pub(crate) fn get(self, tree: &WidgetTree) -> Option<&dyn RenderNode> {
+  pub(crate) fn get(self, tree: &WidgetTree) -> Option<&dyn Render> {
     tree.arena.get(self.0).map(|node| node.get().as_ref())
   }
 
   /// Returns a mutable reference to the node data.
-  pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn RenderNode>> {
+  pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn Render>> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
   }
 
@@ -172,7 +172,7 @@ impl WidgetId {
     self.first_child(tree)
   }
 
-  fn node_feature<F: Fn(&Node<Box<dyn RenderNode>>) -> Option<NodeId>>(
+  fn node_feature<F: Fn(&Node<Box<dyn Render>>) -> Option<NodeId>>(
     self,
     tree: &WidgetTree,
     method: F,
@@ -180,18 +180,18 @@ impl WidgetId {
     tree.arena.get(self.0).map(method).flatten().map(WidgetId)
   }
 
-  pub(crate) fn assert_get(self, tree: &WidgetTree) -> &dyn RenderNode {
+  pub(crate) fn assert_get(self, tree: &WidgetTree) -> &dyn Render {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn RenderNode> {
+  pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 
   pub(crate) fn insert_child(
     self,
     widget: Widget,
-    insert: &mut impl FnMut(Box<dyn RenderNode>, &mut WidgetTree) -> WidgetId,
+    insert: &mut impl FnMut(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
     consume_child: &mut impl FnMut(WidgetId, Widget, &mut Context),
     ctx: &mut Context,
   ) -> WidgetId {

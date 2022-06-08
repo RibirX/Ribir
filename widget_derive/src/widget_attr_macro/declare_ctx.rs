@@ -2,7 +2,7 @@ use crate::{error::DeclareError, WIDGET_MACRO_NAME};
 
 use super::{
   capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable,
-  widget_macro::UsedNameInfo, widget_state_ref, DependPlaceInfo, WidgetMacro,
+  widget_macro::UsedNameInfo, widget_state_ref, NameUsedSpans, WidgetMacro,
 };
 
 use proc_macro::{Diagnostic, Level};
@@ -83,7 +83,8 @@ impl VisitMut for DeclareCtx {
           }
         }
 
-        // needn't follow anything of closure inner.
+        // todo: not capture closure should keep used widget, but not need track its
+        // inner used. needn't follow anything of closure inner.
         self.current_used = old_follows;
         self.current_capture.extend(outside_capture);
       }
@@ -419,9 +420,9 @@ impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
 }
 
-fn solid_depends_info(info: impl Iterator<Item = (Ident, Vec<Span>)>) -> Vec<DependPlaceInfo> {
+fn solid_depends_info(info: impl Iterator<Item = (Ident, Vec<Span>)>) -> Vec<NameUsedSpans> {
   info
-    .map(|(widget, spans)| DependPlaceInfo {
+    .map(|(widget, spans)| NameUsedSpans {
       widget,
       spans: spans.into_boxed_slice(),
     })

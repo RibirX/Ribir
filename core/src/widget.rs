@@ -39,10 +39,14 @@ pub use grid_view::*;
 // mod scroll_view;
 // pub use scroll_view::ScrollView;
 // mod scrollbar;
+pub mod data_widget;
+pub use data_widget::DataWidget;
 
 mod void;
 use self::layout_store::BoxClamp;
 pub use void::Void;
+mod composed_widget;
+pub(crate) use composed_widget::ComposedWidget;
 
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
@@ -60,7 +64,7 @@ pub trait Compose {
 ///
 /// If `as_layout` return none, widget size will detected by its single child if
 /// it has or as large as possible.
-pub trait Render {
+pub trait Render: Query {
   /// Do the work of computing the layout for this widget, and return the
   /// size it need.
   ///
@@ -80,23 +84,6 @@ pub trait Render {
   fn only_sized_by_parent(&self) -> bool { false }
 }
 
-impl<B> Render for ComposedWidget<Box<dyn RenderNode>, B> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.composed.perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.composed.only_sized_by_parent() }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
-}
-
-impl<W: SingleChild, B> SingleChild for ComposedWidget<W, B> {}
-
-impl<W: MultiChild, B> MultiChild for ComposedWidget<W, B> {}
-
 pub struct Widget(pub(crate) WidgetInner);
 
 #[marker]
@@ -108,14 +95,7 @@ impl<W: Render> WidgetMarker for W {}
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
-pub(crate) trait QueryType {
-  /// query self type by type id, and return a reference of `Any` trait to cast
-  /// to target type if type match.
-  fn query(&self, type_id: TypeId) -> Option<&dyn Any>;
-
-  /// query self type by type id, and return a mut reference of `Any` trait to
-  /// cast to target type if type match.
-  fn query_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
+pub trait Query {
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `& dyn Any` of the target type, and return if  want to continue.
@@ -137,98 +117,48 @@ pub(crate) trait QueryType {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum QueryOrder {
+pub enum QueryOrder {
   InnerFirst,
   OutsideFirst,
 }
-pub(crate) trait CombinationNode: Compose + QueryType {}
-pub(crate) trait RenderNode: Render + QueryType {}
 
-impl<W: Compose + QueryType> CombinationNode for W {}
-
-impl<W: Render + QueryType> RenderNode for W {}
-
-/// A generic widget wrap for all compose widget result, and keep its type info.
-pub(crate) struct ComposedWidget<R, B> {
-  composed: R,
-  by: B,
-}
-
-impl<B: 'static> ComposedWidget<Widget, B> {
-  fn into_widget(self) -> Widget {
-    let by = self.by;
-    match self.composed.0 {
-      WidgetInner::Compose(c) => {
-        { |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget() }.into_widget()
-      }
-      WidgetInner::Render(r) => ComposedWidget { composed: r, by }.into_widget(),
-      WidgetInner::SingleChild(s) => {
-        let widget: Box<dyn RenderNode> = Box::new(ComposedWidget { composed: s.widget, by });
-        let single = Box::new(SingleChildWidget { widget, child: s.child });
-        Widget(WidgetInner::SingleChild(single))
-      }
-      WidgetInner::MultiChild(m) => {
-        let widget: Box<dyn RenderNode> = Box::new(ComposedWidget { composed: m.widget, by });
-        let multi = MultiChildWidget { widget, children: m.children };
-        Widget(WidgetInner::MultiChild(multi))
-      }
-      WidgetInner::Expr(_) => unreachable!(),
-    }
-  }
-}
-
-pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn RenderNode>>>;
-pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn RenderNode>>;
+pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn Render>>>;
+pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn Render>>;
 
 pub(crate) enum WidgetInner {
   Compose(Box<dyn FnOnce(&mut BuildCtx) -> Widget>),
-  Render(Box<dyn RenderNode>),
+  Render(Box<dyn Render>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
   Expr(ExprWidget<()>),
 }
 
-impl<W: Any> QueryType for W {
+/// Trait to detect if a type is match the `type_id`.
+pub trait QueryFiler {
+  /// query self type by type id, and return a reference of `Any` trait to cast
+  /// to target type if type match.
+  fn query_filter(&self, type_id: TypeId) -> Option<&dyn Any>;
+  /// query self type by type id, and return a mut reference of `Any` trait to
+  /// cast to target type if type match.
+  fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
+}
+
+impl<W: 'static> QueryFiler for W {
   #[inline]
-  default fn query(&self, type_id: TypeId) -> Option<&dyn Any> {
+  fn query_filter(&self, type_id: TypeId) -> Option<&dyn Any> {
     (self.type_id() == type_id).then(|| self as &dyn Any)
   }
 
   #[inline]
-  default fn query_mut(&mut self, type_id: TypeId) -> Option<&mut (dyn Any)> {
+  fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
     ((&*self).type_id() == type_id).then(|| self as &mut dyn Any)
-  }
-
-  #[inline]
-  default fn query_all(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
-    _: QueryOrder,
-  ) {
-    if let Some(a) = self.query(type_id) {
-      callback(a);
-    }
-  }
-
-  #[inline]
-  default fn query_all_mut(
-    &mut self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-    _: QueryOrder,
-  ) {
-    if let Some(a) = self.query_mut(type_id) {
-      callback(a);
-    }
   }
 }
 
-impl<'a> dyn RenderNode + 'a {
+impl<'a> dyn Render + 'a {
   #[inline]
   pub fn query_all_type<T: Any>(&self, mut callback: impl FnMut(&T) -> bool, order: QueryOrder) {
-    let q = self as &dyn QueryType;
-    q.query_all(
+    self.query_all(
       TypeId::of::<T>(),
       &mut |a: &dyn Any| a.downcast_ref().map_or(true, |t| callback(t)),
       order,
@@ -241,8 +171,7 @@ impl<'a> dyn RenderNode + 'a {
     mut callback: impl FnMut(&mut T) -> bool,
     order: QueryOrder,
   ) {
-    let q = self as &mut dyn QueryType;
-    q.query_all_mut(
+    self.query_all_mut(
       TypeId::of::<T>(),
       &mut |a: &mut dyn Any| a.downcast_mut().map_or(true, |t| callback(t)),
       order,
@@ -307,11 +236,7 @@ impl IntoWidget<Widget> for Widget {
 impl<C: Compose + 'static> IntoWidget<dyn Compose> for C {
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget {
-        composed: Compose::compose(self.into_stateful(), ctx),
-        by: PhantomData::<C>,
-      }
-      .into_widget()
+      ComposedWidget::<Widget, C>::new(Compose::compose(self.into_stateful(), ctx)).into_widget()
     })))
   }
 }
@@ -324,4 +249,58 @@ impl<R: Render + 'static> IntoWidget<dyn Render> for R {
 impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
   #[inline]
   fn into_widget(self) -> Widget { Widget(WidgetInner::Compose(Box::new(self))) }
+}
+
+#[macro_export]
+macro_rules! impl_proxy_query {
+  ($field: tt) => {
+    #[inline]
+    fn query_all(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+      order: QueryOrder,
+    ) {
+      self.$field.query_all(type_id, callback, order)
+    }
+
+    #[inline]
+    fn query_all_mut(
+      &mut self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+      order: QueryOrder,
+    ) {
+      self.$field.query_all_mut(type_id, callback, order)
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! impl_query_self_only {
+  () => {
+    #[inline]
+    fn query_all(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+      _: QueryOrder,
+    ) {
+      if let Some(a) = self.query_filter(type_id) {
+        callback(a);
+      }
+    }
+
+    #[inline]
+    fn query_all_mut(
+      &mut self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&mut dyn Any) -> bool,
+      _: QueryOrder,
+    ) {
+      if let Some(a) = self.query_filter_mut(type_id) {
+        callback(a);
+      }
+    }
+  };
 }

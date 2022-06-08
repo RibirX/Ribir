@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 use painter::{LineCap, LineJoin, StrokeOptions};
 use path_clean::PathClean;
 use std::{env, io, path::PathBuf};
@@ -135,6 +135,10 @@ impl Render for Svg {
       ctx.painter().paint_path(path.clone());
     });
   }
+}
+
+impl Query for Svg {
+  impl_query_self_only!();
 }
 
 fn point(x: &f64, y: &f64) -> Point { Point::new((*x) as f32, (*y) as f32) }

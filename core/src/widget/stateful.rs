@@ -4,7 +4,7 @@
 //! widget, the presentation of this widget is static.
 
 //! But Ribir provide a stateful implementation version widget for every widget,
-//! convert widget across ` [`IntoStateful`]!. So, in most cases you implement
+//! convert widget across [`IntoStateful`]!. So, in most cases you implement
 //! your widget without stateful, and a stateful version will provide by Ribir.
 //!
 //! # Example
@@ -80,7 +80,7 @@
 //! Notice, the first argument of `build` method is `Stateful<Self>` let you can
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
-use crate::prelude::*;
+use crate::{impl_proxy_query, prelude::*};
 use lazy_static::__Deref;
 use rxrust::prelude::*;
 use std::{
@@ -176,8 +176,8 @@ impl<W> Stateful<W> {
   #[inline]
   pub fn silent_ref(&self) -> SilentRef<W> { SilentRef(InnerRef::new(self)) }
 
-  /// Return a shallow reference to the stateful widget which modify the widget
-  /// and not notify state change.
+  /// Return a shallow reference to the stateful widget which directly modify
+  /// the widget and not notify state change.
   #[inline]
   pub fn shallow_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
 
@@ -204,6 +204,17 @@ impl<W> Stateful<W> {
       init.after = pick(&stateful.state_ref());
       init
     })
+  }
+
+  pub(crate) fn into_render_node(self) -> Box<dyn Render>
+  where
+    W: Render + 'static,
+  {
+    let Self { widget, change_notifier } = self;
+    match Rc::try_unwrap(widget) {
+      Ok(w) => Box::new(w.into_inner()),
+      Err(widget) => Box::new(RenderWrap(Stateful { widget, change_notifier })),
+    }
   }
 }
 
@@ -292,32 +303,39 @@ impl<'a, W> InnerRef<'a, W> {
   fn release_current_borrow(&mut self) { self.current_ref.get_mut().take(); }
 }
 
-impl<W: Render> Render for Stateful<W> {
+struct RenderWrap<W>(Stateful<W>);
+
+impl<T: Render> Query for RenderWrap<T> {
+  impl_proxy_query!(0);
+}
+
+impl<W: Render + 'static> Render for RenderWrap<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.state_ref().perform_layout(clamp, ctx)
+    self.0.silent_ref().perform_layout(clamp, ctx)
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.state_ref().only_sized_by_parent() }
+  fn only_sized_by_parent(&self) -> bool { self.0.silent_ref().only_sized_by_parent() }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
+  fn paint(&self, ctx: &mut PaintingCtx) { self.0.silent_ref().paint(ctx) }
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
 
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
-impl<C: Compose + 'static> IntoWidget<&dyn Compose> for Stateful<C> {
+impl<C: Render + 'static> IntoWidget<dyn Render> for Stateful<C> {
+  #[inline]
+  fn into_widget(self) -> Widget { Widget(WidgetInner::Render(self.into_render_node())) }
+}
+
+impl<C: Compose + 'static> IntoWidget<dyn Compose> for Stateful<C> {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget {
-        composed: Compose::compose(self, ctx),
-        by: PhantomData::<C>,
-      }
-      .into_widget()
+      ComposedWidget::<_, C>::new(Compose::compose(self, ctx)).into_widget()
     })))
   }
 }
@@ -325,6 +343,7 @@ impl<C: Compose + 'static> IntoWidget<&dyn Compose> for Stateful<C> {
 impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) {
     if self.0.mut_accessed {
+      self.0.release_current_borrow();
       self.0.widget.change_stream().next(false)
     }
   }
@@ -333,6 +352,7 @@ impl<'a, W> Drop for StateRef<'a, W> {
 impl<'a, W> Drop for SilentRef<'a, W> {
   fn drop(&mut self) {
     if self.0.mut_accessed {
+      self.0.release_current_borrow();
       self.0.widget.change_stream().next(true)
     }
   }
@@ -347,7 +367,7 @@ where
   fn into_stateful(self) -> Stateful<W> { Stateful::new(self) }
 }
 
-impl<W: 'static> QueryType for Stateful<W> {
+impl<W: Query> Query for Stateful<W> {
   fn query_all(
     &self,
     type_id: std::any::TypeId,
@@ -368,13 +388,13 @@ impl<W: 'static> QueryType for Stateful<W> {
           order,
         );
         if continue_query {
-          if let Some(a) = self.change_notifier.query(type_id) {
+          if let Some(a) = self.change_notifier.query_filter(type_id) {
             callback(a);
           }
         }
       }
       QueryOrder::OutsideFirst => {
-        if let Some(a) = self.change_notifier.query(type_id) {
+        if let Some(a) = self.change_notifier.query_filter(type_id) {
           continue_query = callback(a);
         }
         if continue_query {
@@ -404,13 +424,13 @@ impl<W: 'static> QueryType for Stateful<W> {
           order,
         );
         if continue_query {
-          if let Some(a) = self.change_notifier.query_mut(type_id) {
+          if let Some(a) = self.change_notifier.query_filter_mut(type_id) {
             callback(a);
           }
         }
       }
       QueryOrder::OutsideFirst => {
-        if let Some(a) = self.change_notifier.query_mut(type_id) {
+        if let Some(a) = self.change_notifier.query_filter_mut(type_id) {
           continue_query = callback(a);
         }
         if continue_query {
@@ -507,7 +527,7 @@ mod tests {
     );
     wnd.render_ready();
     let tree = &wnd.context().widget_tree;
-    assert_eq!(tree.root().descendants(tree).count(), 2);
+    assert_eq!(tree.root().descendants(tree).count(), 1);
   }
 
   #[test]
@@ -519,7 +539,7 @@ mod tests {
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 
     {
-      let _ = &mut w.state_ref();
+      let _ = &mut w.state_ref().size;
     }
     assert_eq!(notified.borrow().deref(), &[false]);
 
@@ -536,6 +556,6 @@ mod tests {
       let _ = &mut silent_ref;
       let _ = &mut silent_ref;
     }
-    assert_eq!(notified.borrow().deref(), &[false, true, false, true]);
+    assert_eq!(notified.borrow().deref(), &[false, true]);
   }
 }

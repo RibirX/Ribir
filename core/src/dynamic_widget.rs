@@ -4,11 +4,14 @@ use crate::prelude::{key::Key, widget_tree::WidgetTree, *};
 use rxrust::ops::box_it::LocalBoxOp;
 use smallvec::SmallVec;
 
+/// Dynamic widgets generate by expression , `expr` hold the expression and wrap
+/// as a widget generate callback. The return type hint the origin expression
+/// info, maybe [`SingleConsumer`]! or [`MultiConsumer`]!
 #[derive(Declare)]
 pub struct ExprWidget<R> {
   #[declare(custom_convert)]
   pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
-  pub(crate) upstream: LocalBoxOp<'static, bool, ()>,
+  pub(crate) upstream: Option<LocalBoxOp<'static, bool, ()>>,
 }
 /// Generator is a virtual child used in `widget!`, which use to generate
 /// dynamic widgets and provide ability to keep them up to date in their

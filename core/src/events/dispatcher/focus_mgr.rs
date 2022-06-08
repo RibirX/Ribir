@@ -306,8 +306,12 @@ mod tests {
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
-    let parent = tree.root().first_child(&tree).unwrap();
-    let child = parent.first_child(&tree).unwrap();
+    let parent = tree.root();
+    let child = parent
+      .first_child(&tree)
+      .unwrap()
+      .first_child(&tree)
+      .unwrap();
     mgr.update(&mut ctx);
     mgr.focus(child, &mut ctx);
 

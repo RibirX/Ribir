@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -29,19 +29,25 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct KeyWidget {
   #[declare(builtin, custom_convert)]
   pub key: Key,
 }
 
-impl Render for KeyWidget {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.single_child().expect("Key must have single child");
-    ctx.perform_child_layout(child, clamp)
+impl ComposeSingleChild for KeyWidget {
+  #[inline]
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w.key)
   }
+}
 
-  fn paint(&self, _: &mut PaintingCtx) {}
+impl Query for KeyWidget {
+  impl_query_self_only!();
+}
+
+impl Query for Key {
+  impl_query_self_only!();
 }
 
 impl KeyWidgetBuilder {

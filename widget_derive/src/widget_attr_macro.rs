@@ -12,9 +12,9 @@ use crate::{
 };
 mod declare_ctx;
 pub use declare_ctx::*;
-mod named_depends;
+mod name_used_info;
 
-pub use named_depends::*;
+pub use name_used_info::*;
 mod variable_names;
 pub use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
 pub use variable_names::*;

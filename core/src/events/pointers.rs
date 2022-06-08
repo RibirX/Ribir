@@ -1,5 +1,5 @@
 use super::EventCommon;
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 use std::time::{Duration, Instant};
 
 mod from_mouse;
@@ -110,7 +110,7 @@ impl PointerEvent {
 
 macro_rules! impl_pointer_listener {
   ($name: ident, $field: ident, $convert: ident, $builder: ident) => {
-    #[derive(Declare, SingleChild)]
+    #[derive(Declare)]
     pub struct $name {
       #[declare(builtin, custom_convert)]
       pub $field: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
@@ -125,16 +125,18 @@ macro_rules! impl_pointer_listener {
       }
     }
 
-    impl Render for $name {
-      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-        ctx
-          .single_child()
-          .map(|c| ctx.perform_child_layout(c, clamp))
-          .unwrap_or_default()
+    impl ComposeSingleChild for $name {
+      fn compose_single_child(
+        this: Stateful<Self>,
+        child: Option<Widget>,
+        _: &mut BuildCtx,
+      ) -> Widget {
+        compose_child_as_data_widget(child, this, |w| w)
       }
+    }
 
-      #[inline]
-      fn paint(&self, _: &mut PaintingCtx) {}
+    impl Query for $name {
+      impl_query_self_only!();
     }
 
     impl $name {

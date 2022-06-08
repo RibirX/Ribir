@@ -1,10 +1,4 @@
-#![feature(
-  test,
-  decl_macro,
-  marker_trait_attr,
-  min_specialization,
-  trait_upcasting
-)]
+#![feature(test, decl_macro, marker_trait_attr, trait_upcasting)]
 #![allow(incomplete_features)]
 #[macro_use]
 extern crate bitflags;

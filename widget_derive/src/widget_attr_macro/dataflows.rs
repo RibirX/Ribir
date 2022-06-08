@@ -2,7 +2,7 @@ use super::{
   declare_widget::{try_parse_skip_nc, upstream_by_used_widgets, SkipNcAttr},
   kw, skip_nc_assign,
   widget_macro::UsedNameInfo,
-  DeclareCtx, DependIn, DependPart, Depends, MergeDepends,
+  DeclareCtx, MergeDepends, NameUsed, UsedPart, UsedScope,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -102,7 +102,7 @@ pub struct DataFlowExpr {
 }
 
 impl Dataflows {
-  pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, Depends<'a>>) {
+  pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, NameUsed<'a>>) {
     self.flows.iter().for_each(|df| {
       if let Some(to) = df.to.used_name_info.used_names.as_ref() {
         let part = df.as_depend_part();
@@ -115,7 +115,7 @@ impl Dataflows {
               .chain(Some(part.clone()).into_iter())
               .collect();
           } else {
-            follows.insert(name.clone(), Depends::from_single_part(part.clone()));
+            follows.insert(name.clone(), NameUsed::from_single_part(part.clone()));
           }
         })
       }
@@ -141,7 +141,7 @@ impl Parse for Dataflow {
 }
 
 impl Dataflow {
-  pub fn as_depend_part(&self) -> DependPart {
+  pub fn as_depend_part(&self) -> UsedPart {
     let place_info = self
       .from
       .used_name_info
@@ -149,8 +149,8 @@ impl Dataflow {
       .as_ref()
       .expect("data flow must depends on some widget");
 
-    DependPart {
-      origin: DependIn::DataFlow(self),
+    UsedPart {
+      origin: UsedScope::DataFlow(self),
       place_info,
     }
   }

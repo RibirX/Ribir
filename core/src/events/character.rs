@@ -1,8 +1,8 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct CharListener {
   #[declare(builtin, custom_convert)]
   on_char: Box<dyn for<'r> FnMut(&'r mut CharEvent)>,
@@ -14,16 +14,15 @@ pub struct CharEvent {
   pub common: EventCommon,
 }
 
-impl Render for CharListener {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .single_child()
-      .map(|c| ctx.perform_child_layout(c, clamp))
-      .unwrap_or_default()
-  }
-
+impl ComposeSingleChild for CharListener {
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w)
+  }
+}
+
+impl Query for CharListener {
+  impl_query_self_only!();
 }
 
 impl std::borrow::Borrow<EventCommon> for CharEvent {

@@ -12,8 +12,8 @@ use syn::{
 
 use super::{
   animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
-  track::Track, DeclareCtx, DeclareWidget, DependIn, DependPart, DependPlaceInfo, Depends,
-  FollowInfo, IdType, MergeDepends, Result,
+  track::Track, DeclareCtx, DeclareWidget, FollowInfo, IdType, MergeDepends, NameUsed,
+  NameUsedSpans, Result, UsedPart, UsedScope,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -39,14 +39,16 @@ pub struct IfGuard {
 
 #[derive(Debug, Default, Clone)]
 pub struct UsedNameInfo {
-  pub(crate) captures: Option<Vec<DependPlaceInfo>>,
-  pub(crate) used_names: Option<Vec<DependPlaceInfo>>,
+  /// named widget was captured by move closure
+  pub(crate) captures: Option<Vec<NameUsedSpans>>,
+  /// named widget was used in expression.
+  pub(crate) used_names: Option<Vec<NameUsedSpans>>,
 }
 #[derive(Clone, Debug)]
 struct CircleCheckStack<'a> {
   pub widget: &'a Ident,
-  pub origin: DependIn<'a>,
-  pub on: &'a DependPlaceInfo,
+  pub origin: UsedScope<'a>,
+  pub on: &'a NameUsedSpans,
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -110,8 +112,8 @@ impl WidgetMacro {
         dataflows.analyze_data_flow_follows(follows);
         let _circle_follows_check = Self::circle_check(&follows, |stack| {
           if stack.iter().any(|s| match &s.origin {
-            DependIn::Field(f) => f.skip_nc.is_some(),
-            DependIn::DataFlow(df) => df.skip_nc.is_some(),
+            UsedScope::Field(f) => f.skip_nc.is_some(),
+            UsedScope::DataFlow(df) => df.skip_nc.is_some(),
             _ => false,
           }) {
             Ok(())
@@ -124,31 +126,43 @@ impl WidgetMacro {
 
     let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
     let mut tokens = quote! {};
-    token::Paren::default().surround(&mut tokens, |tokens| {
-      tokens.extend(quote! { move |#ctx_name: &mut BuildCtx| });
-      token::Brace::default().surround(tokens, |tokens| {
-        self.track.to_tokens(tokens);
-        if !ctx.named_objects.is_empty() {
-          let mut named_widgets_def = self.named_objects_def_tokens(ctx);
+    let closure_widget = |tokens: &mut TokenStream| {
+      token::Paren::default().surround(tokens, |tokens| {
+        tokens.extend(quote! { move |#ctx_name: &mut BuildCtx| });
+        token::Brace::default().surround(tokens, |tokens| {
+          if !ctx.named_objects.is_empty() {
+            let mut named_widgets_def = self.named_objects_def_tokens(ctx);
 
-          if let Some(follows) = follows.as_ref() {
-            Self::deep_follow_iter(&follows, |name| {
-              tokens.extend(named_widgets_def.remove(name));
-            });
+            if let Some(follows) = follows.as_ref() {
+              Self::deep_follow_iter(&follows, |name| {
+                tokens.extend(named_widgets_def.remove(name));
+              });
+            }
+            named_widgets_def
+              .into_values()
+              .for_each(|def_tokens| tokens.extend(def_tokens));
           }
-          named_widgets_def
-            .into_values()
-            .for_each(|def_tokens| tokens.extend(def_tokens));
-        }
-        self.dataflows.to_tokens(tokens);
-        self.animations.to_tokens(tokens);
-        self.widget.gen_tokens(ctx, tokens);
-        let name = self.widget.widget_identify();
-        tokens.extend(quote! {  #name.into_widget() })
+          self.dataflows.to_tokens(tokens);
+          self.animations.to_tokens(tokens);
+          self.widget.gen_tokens(ctx, tokens);
+          let name = self.widget.widget_identify();
+          tokens.extend(quote! {  #name.into_widget() })
+        });
       });
-    });
-    tokens.extend(quote! { .into_widget() });
+      tokens.extend(quote! { .into_widget() });
+    };
+
+    if self.track.is_some() {
+      token::Brace::default().surround(&mut tokens, |tokens| {
+        self.track.to_tokens(tokens);
+        closure_widget(tokens)
+      });
+    } else {
+      closure_widget(&mut tokens);
+    }
+
     ctx.emit_unused_id_warning();
+
     Ok(tokens)
   }
 
@@ -175,7 +189,7 @@ impl WidgetMacro {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  fn analyze_object_dependencies(&self) -> BTreeMap<Ident, Depends> {
+  fn analyze_object_dependencies(&self) -> BTreeMap<Ident, NameUsed> {
     let mut follows = self.widget.analyze_object_follows();
 
     if let Some(animations) = self.animations.as_ref() {
@@ -200,7 +214,7 @@ impl WidgetMacro {
       .collect()
   }
 
-  fn circle_check<F>(follow_infos: &BTreeMap<Ident, Depends>, err_detect: F) -> Result<()>
+  fn circle_check<F>(follow_infos: &BTreeMap<Ident, NameUsed>, err_detect: F) -> Result<()>
   where
     F: Fn(&[CircleCheckStack]) -> Result<()>,
   {
@@ -216,7 +230,7 @@ impl WidgetMacro {
     // return if the widget follow contain circle.
     fn widget_follow_circle_check<'a, F>(
       name: &'a Ident,
-      follow_infos: &'a BTreeMap<Ident, Depends>,
+      follow_infos: &'a BTreeMap<Ident, NameUsed>,
       check_info: &mut HashMap<&'a Ident, CheckState, RandomState>,
       stack: &mut Vec<CircleCheckStack<'a>>,
       err_detect: &F,
@@ -252,7 +266,7 @@ impl WidgetMacro {
     })
   }
 
-  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, Depends>, mut callback: F) {
+  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, NameUsed>, mut callback: F) {
     // circular may exist widget attr follow widget self to init.
     let mut stacked = std::collections::HashSet::<_, RandomState>::default();
 
@@ -272,7 +286,7 @@ impl WidgetMacro {
 
 impl<'a> CircleCheckStack<'a> {
   fn to_follow_path(&self, ctx: &DeclareCtx) -> FollowInfo {
-    let on = DependPlaceInfo {
+    let on = NameUsedSpans {
       widget: ctx.user_perspective_name(&self.on.widget).map_or_else(
         || self.on.widget.clone(),
         |user| Ident::new(&user.to_string(), self.on.widget.span()),
@@ -286,7 +300,7 @@ impl<'a> CircleCheckStack<'a> {
       .unwrap_or(self.widget);
 
     let (widget, member) = match self.origin {
-      DependIn::Field(f) => {
+      UsedScope::Field(f) => {
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
         let (widget, _) = ctx
@@ -368,17 +382,17 @@ impl UsedNameInfo {
       .flat_map(|fs| fs.iter().map(|f| &f.widget))
   }
 
-  pub fn depends<'a>(&'a self, origin: DependIn<'a>) -> Option<Depends> {
+  pub fn depends<'a>(&'a self, origin: UsedScope<'a>) -> Option<NameUsed> {
     self
       .use_or_capture_any_name()
       .then(|| self.depend_parts(origin).collect())
   }
 
-  pub fn depend_parts<'a>(&'a self, origin: DependIn<'a>) -> impl Iterator<Item = DependPart> + '_ {
+  pub fn depend_parts<'a>(&'a self, origin: UsedScope<'a>) -> impl Iterator<Item = UsedPart> + '_ {
     self
       .used_names
       .iter()
       .chain(self.captures.iter())
-      .map(move |place_info| DependPart { origin, place_info })
+      .map(move |place_info| UsedPart { origin, place_info })
   }
 }
