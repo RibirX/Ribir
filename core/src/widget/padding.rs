@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// A widget that insets its child by the given padding.
 #[derive(SingleChild, Clone, Declare)]
@@ -49,6 +49,10 @@ impl Render for Padding {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
+impl Query for Padding {
+  impl_query_self_only!();
+}
+
 impl Padding {
   #[inline]
   pub fn new(padding: EdgeInsets) -> Self { Self { padding } }
@@ -62,9 +66,9 @@ mod tests {
   fn smoke() {
     let widget = widget! {
       Row {
+        padding: EdgeInsets::only_left(1.),
         SizedBox {
            size: Size::new(100., 100.),
-           padding: EdgeInsets::only_left(1.)
         }
       }
     };

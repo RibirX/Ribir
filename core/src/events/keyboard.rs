@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -8,13 +8,13 @@ pub struct KeyboardEvent {
 }
 
 /// Widget fire event whenever press or release a key.
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct KeyDownListener {
   #[declare(builtin, custom_convert)]
   pub on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct KeyUpListener {
   #[declare(builtin, custom_convert)]
   pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
@@ -30,28 +30,26 @@ impl KeyUpListener {
   pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
 }
 
-impl Render for KeyDownListener {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .single_child()
-      .map(|c| ctx.perform_child_layout(c, clamp))
-      .unwrap_or_default()
-  }
-
+impl ComposeSingleChild for KeyDownListener {
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w)
+  }
 }
 
-impl Render for KeyUpListener {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .single_child()
-      .map(|c| ctx.perform_child_layout(c, clamp))
-      .unwrap_or_default()
-  }
-
+impl ComposeSingleChild for KeyUpListener {
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w)
+  }
+}
+
+impl Query for KeyDownListener {
+  impl_query_self_only!();
+}
+
+impl Query for KeyUpListener {
+  impl_query_self_only!();
 }
 
 impl KeyDownListenerBuilder {

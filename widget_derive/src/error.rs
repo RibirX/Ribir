@@ -1,4 +1,4 @@
-use crate::widget_attr_macro::DependPlaceInfo;
+use crate::widget_attr_macro::NameUsedSpans;
 use proc_macro::{Diagnostic, Level, Span};
 use proc_macro2::TokenStream;
 
@@ -9,7 +9,7 @@ use syn::Ident;
 pub struct FollowInfo {
   pub widget: Ident,
   pub member: Option<Ident>,
-  pub on: DependPlaceInfo,
+  pub on: NameUsedSpans,
 }
 
 #[derive(Debug)]

@@ -4,9 +4,13 @@
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
 pub mod material;
-use crate::prelude::{
-  BoxClamp, BuildCtx, Declare, DeclareBuilder, LayoutCtx, PaintingCtx, Render, SingleChild,
-  WidgetCtx,
+
+use crate::{
+  impl_proxy_query, impl_query_self_only,
+  prelude::{
+    compose_child_as_data_widget, Any, BuildCtx, ComposeSingleChild, Declare, DeclareBuilder,
+    Query, QueryFiler, QueryOrder, Stateful, TypeId, Widget,
+  },
 };
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
@@ -113,19 +117,25 @@ pub struct Theme {
   pub icon: IconTheme,
 }
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct ThemeWidget {
   #[declare(builtin)]
   pub theme: Theme,
 }
 
-impl Render for ThemeWidget {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.single_child().expect("Key must have single child");
-    ctx.perform_child_layout(child, clamp)
+impl ComposeSingleChild for ThemeWidget {
+  #[inline]
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w.theme)
   }
+}
 
-  fn paint(&self, _: &mut PaintingCtx) {}
+impl Query for Theme {
+  impl_query_self_only!();
+}
+
+impl Query for ThemeWidget {
+  impl_proxy_query!(theme);
 }
 
 impl TypographyTheme {

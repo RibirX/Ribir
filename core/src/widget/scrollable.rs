@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// Enumerate to describe which direction allow widget to scroll.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
@@ -40,31 +40,41 @@ impl Render for ScrollableWidget {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
+impl Query for ScrollableWidget {
+  impl_query_self_only!();
+}
+
 impl ComposeSingleChild for ScrollableWidget {
   fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
   where
     Self: Sized,
   {
-    widget! {
-      track { this }
+    let child = widget! {
+      track { this: this.clone() }
       ExprWidget {
         expr: child,
         on_wheel: move |e| {
-          let (view, content) = view_content(e);
+          let ctx = e.context();
+          let content = e.current_target();
+          let view = ctx.widget_parent(content).expect("must have a scrollable widget");
+          let content_area = ctx.widget_box_rect(content).unwrap();
+          let view_area = ctx.widget_box_rect(view).unwrap();
           let old = this.pos;
           let mut new = old;
           if this.scrollable != Scrollable::X {
-            new.x = validate_pos(view.width(), content.width(), old.x - e.delta_x);
+            new.y = validate_pos(view_area.height(), content_area.height(), old.y - e.delta_y)
           }
           if this.scrollable != Scrollable::Y {
-            new.y = validate_pos(view.height(), content.height(), old.y - e.delta_y)
+            new.x = validate_pos(view_area.width(), content_area.width(), old.x - e.delta_x);
           }
           if new != old {
             this.pos = new;
           }
         }
       }
-    }
+    };
+    let widget = this.into_render_node();
+    SingleChildWidget { widget, child: Some(child) }.into_widget()
   }
 }
 
@@ -85,16 +95,6 @@ impl ScrollableWidget {
       validate_pos(view.height, content.height, self.pos.y),
     )
   }
-}
-
-fn view_content(event: &WheelEvent) -> (Rect, Rect) {
-  let ctx = event.context();
-
-  let view = ctx.box_rect().unwrap();
-  let child = ctx.single_child().unwrap();
-  let content = ctx.widget_box_rect(child).unwrap();
-
-  (view, content)
 }
 
 #[cfg(test)]

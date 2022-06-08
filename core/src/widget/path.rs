@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 impl Render for Path {
   #[inline]
@@ -11,4 +11,8 @@ impl Render for Path {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().paint_path(self.clone()); }
+}
+
+impl Query for Path {
+  impl_query_self_only!();
 }

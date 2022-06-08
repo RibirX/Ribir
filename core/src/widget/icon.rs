@@ -10,8 +10,9 @@ impl Compose for Icon {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     let svg = Svg::new(load_src(this.state_ref().src).unwrap());
     widget! {
+      track { this }
       SizedBox {
-        size: this.state_ref().size,
+        size: this.size,
         ExprWidget { expr: svg }
       }
     }

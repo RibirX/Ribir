@@ -18,7 +18,7 @@ use super::{
   declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
   ribir_suffix_variable, ribir_variable,
   widget_macro::UsedNameInfo,
-  widget_state_ref, DeclareCtx, DependIn, Depends, BUILD_CTX,
+  widget_state_ref, DeclareCtx, NameUsed, UsedScope, BUILD_CTX,
 };
 
 use super::kw;
@@ -806,7 +806,7 @@ impl Animations {
     })
   }
 
-  pub fn follows_iter(&self) -> impl Iterator<Item = (Ident, Depends)> + '_ {
+  pub fn follows_iter(&self) -> impl Iterator<Item = (Ident, NameUsed)> + '_ {
     self
       .named_objects_iter()
       .filter_map(|n| n.depends().map(|d| (n.name().clone(), d)))
@@ -882,7 +882,7 @@ impl<'a> AnimationObject<'a> {
     &id.unwrap().name
   }
 
-  fn depends(&self) -> Option<Depends<'a>> {
+  fn depends(&self) -> Option<NameUsed<'a>> {
     match self {
       AnimationObject::Animate(a) => a.depends(),
       AnimationObject::Transition(t) => t.depends(),
@@ -893,18 +893,20 @@ impl<'a> AnimationObject<'a> {
 
 impl Animate {
   #[inline]
-  pub fn depends(&self) -> Option<Depends> { self.used_name_info.depends(DependIn::Animate(self)) }
+  pub fn depends(&self) -> Option<NameUsed> {
+    self.used_name_info.depends(UsedScope::Animate(self))
+  }
 }
 
 impl State {
   #[inline]
-  pub fn depends(&self) -> Option<Depends> { self.used_name_info.depends(DependIn::State(self)) }
+  pub fn depends(&self) -> Option<NameUsed> { self.used_name_info.depends(UsedScope::State(self)) }
 }
 
 impl Transition {
   #[inline]
-  pub fn depends(&self) -> Option<Depends> {
-    self.used_name_info.depends(DependIn::Transition(self))
+  pub fn depends(&self) -> Option<NameUsed> {
+    self.used_name_info.depends(UsedScope::Transition(self))
   }
 }
 

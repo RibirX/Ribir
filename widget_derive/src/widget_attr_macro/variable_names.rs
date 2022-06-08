@@ -4,6 +4,7 @@ use syn::{spanned::Spanned, Ident};
 use super::DeclareWidget;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
+// todo: reserve `ctx` name in widget `macro`; Error if user use it.
 pub(crate) const BUILD_CTX: &str = "build_ctx";
 
 pub fn child_variable(c: &DeclareWidget, idx: usize) -> Ident {

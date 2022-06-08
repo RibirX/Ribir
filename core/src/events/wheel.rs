@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct WheelEvent {
@@ -10,23 +10,20 @@ pub struct WheelEvent {
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct WheelListener {
   #[declare(builtin, custom_convert)]
   on_wheel: Box<dyn for<'r> FnMut(&'r mut WheelEvent)>,
 }
 
-impl Render for WheelListener {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .single_child()
-      .map(|c| ctx.perform_child_layout(c, clamp))
-      .unwrap_or_default()
+impl ComposeSingleChild for WheelListener {
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w)
   }
+}
 
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+impl Query for WheelListener {
+  impl_query_self_only!();
 }
 
 impl WheelListenerBuilder {
@@ -76,11 +73,9 @@ mod tests {
 
     let widget = widget! {
       SizedBox {
-        SizedBox {
-          size: Size::new(100., 100.),
-          auto_focus: true,
-          on_wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
-        }
+        size: Size::new(100., 100.),
+        auto_focus: true,
+        on_wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
       }
     };
 

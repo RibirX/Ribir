@@ -1,7 +1,7 @@
 use ::text::typography::{PlaceLineDirection, TypographyCfg};
 pub use ::text::{typography::Overflow, *};
 
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
@@ -52,6 +52,10 @@ impl Render for Text {
       .painter()
       .paint_text_with_style(self.text.substr(..), &self.style, Some(rect.size));
   }
+}
+
+impl Query for Text {
+  impl_query_self_only!();
 }
 
 impl TextBuilder {

@@ -66,7 +66,7 @@ impl<'a> WidgetGen<'a> {
       let field_converter = field_convert_method(expr_mem);
       quote_spanned! { ty.span() =>
         let #name = #ty::<_>::builder()
-          .upstream(#upstream.box_it())
+          .upstream(Some(#upstream.box_it()))
           .#expr_mem({
             #(#captures)*
             <ExprWidget::<_> as Declare>::Builder::#field_converter(

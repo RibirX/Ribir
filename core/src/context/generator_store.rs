@@ -33,12 +33,12 @@ impl GeneratorStore {
     ExprWidget { expr, upstream }: ExprWidget<()>,
     parent: WidgetId,
     generated_widgets: SmallVec<[WidgetId; 1]>,
-  ) -> GeneratorID {
+  ) -> Option<GeneratorID> {
     let id = self.next_generator_id;
     self.next_generator_id = id.next_id();
     let info = GeneratorInfo::new(id, parent, generated_widgets);
     let needs_regen = self.needs_regen.clone();
-    let _subscription = upstream
+    let _subscription = upstream?
       .filter(|b| !b)
       .subscribe(move |_| {
         needs_regen.borrow_mut().insert(id);
@@ -50,7 +50,7 @@ impl GeneratorStore {
       .entry(parent)
       .or_default()
       .push(GeneratorHandle { id, _subscription });
-    info.generate_id()
+    Some(info.generate_id())
   }
 
   pub(crate) fn add_generator(&mut self, g: Generator) {

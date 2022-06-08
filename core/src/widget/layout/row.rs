@@ -1,5 +1,5 @@
 use super::flex::*;
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 // todo: give a alias for `CrossAxisAlign` and `MainAxisAlign`
 
@@ -35,4 +35,8 @@ impl Render for Row {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for Row {
+  impl_query_self_only!();
 }

@@ -1,11 +1,14 @@
 use painter::{Point, Rect};
 
-use super::Context;
-use crate::prelude::{widget_tree::WidgetTree, LayoutStore, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, LayoutStore, QueryOrder, WidgetId};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
-  /// Return the single child of `widget`, panic if have more than once child.
+  /// Return parent of widget of this context.
+  fn parent(&self) -> Option<WidgetId>;
+  /// Return parent of widget `w`.
+  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId>;
+  /// Return the single child of `widget`.
   fn single_child(&self) -> Option<WidgetId>;
 
   /// Return the widget box rect of the widget of the context.
@@ -20,25 +23,23 @@ pub trait WidgetCtx {
   /// Translates the global screen coordinate pos to widget coordinates.
   fn map_from_global(&self, pos: Point) -> Point;
 
-  /// Translates the render object coordinate pos to the coordinate system of
-  /// `parent`.
+  /// Translates the widget pos to the coordinate system of `parent`.
   fn map_to_parent(&self, pos: Point) -> Point;
 
-  /// Translates the render object coordinate pos from the coordinate system of
-  /// parent to this render object coordinate system.
+  /// Translates the widget pos from the coordinate system of parent to this
+  /// widget system.
   fn map_from_parent(&self, pos: Point) -> Point;
 
-  /// Translates the render object coordinate pos to the coordinate system of
-  /// `w`.
+  /// Translates the widget pos to the coordinate system of `w`.
   fn map_to(&self, pos: Point, w: WidgetId) -> Point;
 
-  /// Translates the render object coordinate pos from the coordinate system of
-  /// `w` to this render object coordinate system.
+  /// Translates the widget pos from the coordinate system of `w` to this widget
+  /// system.
   fn map_from(&self, pos: Point, w: WidgetId) -> Point;
 
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
-  fn query_type<T: 'static>(&self, id: WidgetId) -> Option<&T>;
+  fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
 }
 
 pub fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
@@ -78,14 +79,6 @@ pub(crate) fn map_from_global(
     .fold(pos, |pos, p| map_from_parent(*p, pos, store))
 }
 
-impl<'a> WidgetCtxImpl for (WidgetId, &'a Context) {
-  fn id(&self) -> WidgetId { self.0 }
-
-  fn widget_tree(&self) -> &WidgetTree { &self.1.widget_tree }
-
-  fn layout_store(&self) -> &LayoutStore { &self.1.layout_store }
-}
-
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
@@ -95,6 +88,12 @@ pub(crate) trait WidgetCtxImpl {
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
+  #[inline]
+  fn parent(&self) -> Option<WidgetId> { self.id().parent(self.widget_tree()) }
+
+  #[inline]
+  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { w.parent(self.widget_tree()) }
+
   #[inline]
   fn single_child(&self) -> Option<WidgetId> { self.id().single_child(self.widget_tree()) }
 
@@ -137,10 +136,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   #[inline]
-  fn query_type<W: 'static>(&self, id: WidgetId) -> Option<&W> {
-    todo!()
-    // id.assert_get(self.widget_tree())
-    //   .query_on_first_type(QueryOrder::OutsideFirst)
+  fn query_widget_type<W: 'static>(&self, id: WidgetId, callback: impl FnOnce(&W)) {
+    id.assert_get(self.widget_tree())
+      .query_on_first_type(QueryOrder::OutsideFirst, callback);
   }
 }
 
@@ -151,6 +149,14 @@ mod tests {
 
   #[test]
   fn map_self_eq_self() {
+    impl<'a> WidgetCtxImpl for (WidgetId, &'a Context) {
+      fn id(&self) -> WidgetId { self.0 }
+
+      fn widget_tree(&self) -> &WidgetTree { &self.1.widget_tree }
+
+      fn layout_store(&self) -> &LayoutStore { &self.1.layout_store }
+    }
+
     let w = widget! {
       SizedBox {
         size: Size::zero(),

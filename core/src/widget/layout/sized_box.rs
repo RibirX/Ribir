@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// A box with a specified size.
 ///
@@ -35,6 +35,10 @@ impl Render for SizedBox {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for SizedBox {
+  impl_query_self_only!();
 }
 
 #[cfg(test)]

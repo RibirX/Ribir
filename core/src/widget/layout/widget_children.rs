@@ -185,12 +185,9 @@ impl<W> MultiChildWidget<W> {
   where
     C: ChildConsumer<M>,
   {
-    let mut child = None;
-    c.consume(&mut |w| child = Some(w));
-    Self {
-      widget,
-      children: child.into_iter().collect(),
-    }
+    let mut children = vec![];
+    c.consume(&mut |w| children.push(w));
+    Self { widget, children }
   }
 
   #[inline]
@@ -220,12 +217,28 @@ impl<W> MultiChildWidget<W> {
   }
 }
 
+impl IntoWidget<dyn SingleChild> for SingleChildWidget<Box<dyn Render>> {
+  #[inline]
+  fn into_widget(self) -> Widget { Widget(WidgetInner::SingleChild(Box::new(self))) }
+}
+
 impl<W> IntoWidget<dyn Render> for SingleChildWidget<W>
 where
   W: SingleChild + Render + 'static,
 {
   fn into_widget(self) -> Widget {
-    let widget: Box<dyn RenderNode> = Box::new(self.widget);
+    let widget: Box<dyn Render> = Box::new(self.widget);
+    let single_child = SingleChildWidget { widget, child: self.child };
+    Widget(WidgetInner::SingleChild(Box::new(single_child)))
+  }
+}
+
+impl<W> IntoWidget<dyn Render> for SingleChildWidget<Stateful<W>>
+where
+  W: SingleChild + Render + 'static,
+{
+  fn into_widget(self) -> Widget {
+    let widget: Box<dyn Render> = self.widget.into_render_node();
     let single_child = SingleChildWidget { widget, child: self.child };
     Widget(WidgetInner::SingleChild(Box::new(single_child)))
   }
@@ -253,12 +266,28 @@ where
   }
 }
 
+impl IntoWidget<dyn MultiChild> for MultiChildWidget<Box<dyn Render>> {
+  #[inline]
+  fn into_widget(self) -> Widget { Widget(WidgetInner::MultiChild(self)) }
+}
+
 impl<W> IntoWidget<dyn Render> for MultiChildWidget<W>
 where
   W: MultiChild + Render + 'static,
 {
   fn into_widget(self) -> Widget {
-    let widget: Box<dyn RenderNode> = Box::new(self.widget);
+    let widget: Box<dyn Render> = Box::new(self.widget);
+    let multi_child = MultiChildWidget { widget, children: self.children };
+    Widget(WidgetInner::MultiChild(multi_child))
+  }
+}
+
+impl<W> IntoWidget<dyn Render> for MultiChildWidget<Stateful<W>>
+where
+  W: MultiChild + Render + 'static,
+{
+  fn into_widget(self) -> Widget {
+    let widget: Box<dyn Render> = self.widget.into_render_node();
     let multi_child = MultiChildWidget { widget, children: self.children };
     Widget(WidgetInner::MultiChild(multi_child))
   }
@@ -283,5 +312,21 @@ where
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
       ComposeMultiChild::compose_multi_child(self.widget, self.children, ctx)
     })))
+  }
+}
+
+pub fn compose_child_as_data_widget<W: Query + 'static, D: Query + 'static>(
+  child: Option<Widget>,
+  data: Stateful<W>,
+  pick_data: impl FnOnce(W) -> D + Clone + 'static,
+) -> Widget {
+  if let Some(child) = child {
+    DataWidget::new(child, data).into_widget_and_try_unwrap_data(pick_data)
+  } else {
+    ExprWidget {
+      expr: Box::new(|_| SingleConsumer),
+      upstream: None,
+    }
+    .into_widget()
   }
 }

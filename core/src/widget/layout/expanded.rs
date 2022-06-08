@@ -1,30 +1,22 @@
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(SingleChild, Clone, PartialEq, Declare)]
+#[derive(Clone, PartialEq, Declare)]
 pub struct Expanded {
   pub flex: f32,
 }
 
-impl Expanded {
-  pub fn new(flex: f32) -> Self { Self { flex } }
+impl ComposeSingleChild for Expanded {
+  #[inline]
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w)
+  }
 }
 
-impl Render for Expanded {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx
-      .single_child()
-      .expect("Expanded render should always have a single child");
-    ctx.perform_child_layout(child, clamp)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+impl Query for Expanded {
+  impl_query_self_only!();
 }
 
 #[cfg(test)]
