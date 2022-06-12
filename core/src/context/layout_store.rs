@@ -117,6 +117,7 @@ impl LayoutStore {
       .unwrap_or_else(|| {
         // children's position is decided by parent, no matter itself relayout or not.
         // here before parent perform layout, we reset children's position.
+        // todo: why?
         id.children(&tree).for_each(|child| {
           self
             .layout_info_or_default(child)

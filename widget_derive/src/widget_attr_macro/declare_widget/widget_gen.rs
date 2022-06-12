@@ -3,14 +3,14 @@ use crate::{
   widget_attr_macro::{
     capture_widget, ribir_variable, skip_nc_assign,
     widget_macro::{is_expr_keyword, EXPR_FIELD},
-    widget_state_ref, DeclareCtx, BUILD_CTX,
+    DeclareCtx, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{spanned::Spanned, Ident, Path};
 
-use super::{upstream_by_used_widgets, DeclareField};
+use super::{upstream_tokens, DeclareField};
 
 pub struct WidgetGen<'a> {
   pub ty: &'a Path,
@@ -58,11 +58,13 @@ impl<'a> WidgetGen<'a> {
       ..
     } = expr_field;
     let build_ctx = ribir_variable(BUILD_CTX, ty.span());
-    if let Some(follows) = used_name_info.used_names.as_ref() {
-      let follow_names = follows.iter().map(|f| &f.widget);
-      let refs = follow_names.clone().map(widget_state_ref);
-      let upstream = upstream_by_used_widgets(follow_names);
-      let captures = used_name_info.use_or_capture_name().map(capture_widget);
+    if let Some(directly_used) = used_name_info.directly_used_widgets() {
+      let upstream = upstream_tokens(directly_used);
+      let refs = used_name_info.refs_tokens().into_iter().flatten();
+      let captures = used_name_info
+        .all_widgets()
+        .into_iter()
+        .flat_map(|widgets| widgets.map(capture_widget));
       let field_converter = field_convert_method(expr_mem);
       quote_spanned! { ty.span() =>
         let #name = #ty::<_>::builder()
@@ -89,12 +91,14 @@ impl<'a> WidgetGen<'a> {
     let name = &self.name;
     let expr_tokens = f.value_tokens(self.ty);
 
-    used_name_info.used_names.is_some().then(|| {
+    used_name_info.directly_used_widgets().map(|directly_used| {
       let assign = skip_nc_assign(skip_nc.is_some(), &quote! { #name.#member}, &expr_tokens);
 
-      let upstream = upstream_by_used_widgets(used_name_info.used_widgets());
+      let upstream = upstream_tokens(directly_used);
       let capture_widgets = used_name_info
-        .used_widgets()
+        .all_widgets()
+        .into_iter()
+        .flatten()
         .chain(std::iter::once(name))
         .map(capture_widget);
 
@@ -115,7 +119,7 @@ impl<'a> WidgetGen<'a> {
       ||  self
       .fields
       .iter()
-      .any(|f| f.used_name_info.used_names.is_some())
+      .any(|f| f.used_name_info.directly_used_widgets().is_some())
   }
 }
 
@@ -127,8 +131,9 @@ impl DeclareField {
     let mut expr =
       quote_spanned! { span => <#widget_ty as Declare>::Builder::#field_converter(#expr) };
 
-    if self.used_name_info.used_names.is_some() {
-      let refs = self.used_name_info.used_widgets().map(widget_state_ref);
+    let mut insert_ref_tokens = false;
+    if let Some(refs) = self.used_name_info.refs_tokens() {
+      insert_ref_tokens = true;
       expr = quote_spanned! { span => #(#refs)* #expr };
     }
 
@@ -140,7 +145,7 @@ impl DeclareField {
       } else {
         <#widget_ty as Declare>::Builder::#default_method(#build_ctx)
       })
-    } else if self.used_name_info.used_names.is_some() {
+    } else if insert_ref_tokens {
       quote_spanned! { span => { #expr }}
     } else {
       expr

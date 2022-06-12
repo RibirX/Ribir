@@ -16,9 +16,8 @@ use crate::widget_attr_macro::Id;
 use super::{
   capture_widget,
   declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
-  ribir_suffix_variable, ribir_variable,
-  widget_macro::UsedNameInfo,
-  widget_state_ref, DeclareCtx, NameUsed, UsedScope, BUILD_CTX,
+  ribir_suffix_variable, ribir_variable, widget_state_ref, DeclareCtx, NameUsed, Scope,
+  ScopeUsedInfo, UsedPart, UsedType, BUILD_CTX,
 };
 
 use super::kw;
@@ -38,7 +37,7 @@ pub struct State {
   _brace_token: token::Brace,
   id: Option<Id>,
   fields: Punctuated<PathField, token::Comma>,
-  used_name_info: UsedNameInfo,
+  used_name_info: ScopeUsedInfo,
 }
 
 #[derive(Debug)]
@@ -47,7 +46,7 @@ pub struct Transition {
   _brace_token: token::Brace,
   id: Option<Id>,
   fields: Punctuated<SimpleField, token::Comma>,
-  used_name_info: UsedNameInfo,
+  used_name_info: ScopeUsedInfo,
 }
 
 #[derive(Debug)]
@@ -57,7 +56,7 @@ pub struct Animate {
   id: Option<Id>,
   from: FromStateField,
   transition: TransitionField,
-  used_name_info: UsedNameInfo,
+  used_name_info: ScopeUsedInfo,
 }
 
 mod animate_kw {
@@ -452,8 +451,8 @@ impl ToTokens for Animate {
       #animate_token::new(#from, &#transition, #ctx_name)
     };
 
-    if used_name_info.captures.is_some() {
-      let captures = used_name_info.capture_widgets().map(capture_widget);
+    if let Some(captures) = used_name_info.move_capture_widgets() {
+      let captures = captures.map(capture_widget);
       animate_def_tokens = quote_spanned!(animate_span => {
         #(#captures)*
         #animate_def_tokens
@@ -535,7 +534,11 @@ impl ToTokens for State {
 
     let state_span = state_token.span();
 
-    let refs = self.used_name_info.used_widgets().map(widget_state_ref);
+    let refs = used_name_info
+      .directly_used_widgets()
+      .into_iter()
+      .flatten()
+      .map(widget_state_ref);
 
     let mut state_tokens = if fields.len() > 1 {
       let init_value = fields.iter().map(|f| &f.expr);
@@ -569,8 +572,8 @@ impl ToTokens for State {
       }
     };
 
-    state_tokens = if self.used_name_info.use_or_capture_any_name() {
-      let captures = used_name_info.use_or_capture_name().map(capture_widget);
+    state_tokens = if let Some(all) = used_name_info.all_widgets() {
+      let captures = all.map(capture_widget);
       quote_spanned! { state_span => move |_, _| {
         #(#captures)*
         #state_tokens
@@ -734,7 +737,7 @@ impl DeclareCtx {
       StateExpr::State(state) => {
         self.visit_state_mut(state);
         if let Some(Id { name, .. }) = state.id.as_ref() {
-          self.add_used_widget(name.clone());
+          self.add_used_widget(name.clone(), UsedType::USED);
         }
       }
       StateExpr::Expr(expr) => self.visit_expr_mut(expr),
@@ -743,7 +746,7 @@ impl DeclareCtx {
       TransitionExpr::Transition(t) => {
         self.visit_transition_mut(t);
         if let Some(Id { name, .. }) = t.id.as_ref() {
-          self.add_used_widget(name.clone());
+          self.add_used_widget(name.clone(), UsedType::USED);
         }
       }
       TransitionExpr::Expr(e) => self.visit_expr_mut(e),
@@ -783,7 +786,10 @@ impl DeclareCtx {
   }
 
   fn visit_member_path(&mut self, path: &mut MemberPath) {
-    self.add_used_widget(widget_from_field_name(&path.widget, &path.member));
+    self.add_used_widget(
+      widget_from_field_name(&path.widget, &path.member),
+      UsedType::USED,
+    );
   }
 
   fn visit_simple_field_mut(&mut self, f: &mut SimpleField) { self.visit_expr_mut(&mut f.expr); }
@@ -807,9 +813,10 @@ impl Animations {
   }
 
   pub fn follows_iter(&self) -> impl Iterator<Item = (Ident, NameUsed)> + '_ {
-    self
-      .named_objects_iter()
-      .filter_map(|n| n.depends().map(|d| (n.name().clone(), d)))
+    self.named_objects_iter().filter_map(|n| {
+      n.used_part()
+        .map(|d| (n.name().clone(), NameUsed::from_single_part(d)))
+    })
   }
 
   pub fn named_objects_iter(&self) -> impl Iterator<Item = AnimationObject> + '_ {
@@ -882,31 +889,28 @@ impl<'a> AnimationObject<'a> {
     &id.unwrap().name
   }
 
-  fn depends(&self) -> Option<NameUsed<'a>> {
+  fn used_part(&self) -> Option<UsedPart<'a>> {
     match self {
-      AnimationObject::Animate(a) => a.depends(),
-      AnimationObject::Transition(t) => t.depends(),
-      AnimationObject::State(s) => s.depends(),
+      AnimationObject::Animate(a) => a.used_part(),
+      AnimationObject::Transition(t) => t.used_part(),
+      AnimationObject::State(s) => s.used_part(),
     }
   }
 }
 
 impl Animate {
-  #[inline]
-  pub fn depends(&self) -> Option<NameUsed> {
-    self.used_name_info.depends(UsedScope::Animate(self))
+  pub fn used_part(&self) -> Option<UsedPart> {
+    self.used_name_info.user_part(Scope::Animate(self))
   }
 }
 
 impl State {
-  #[inline]
-  pub fn depends(&self) -> Option<NameUsed> { self.used_name_info.depends(UsedScope::State(self)) }
+  pub fn used_part(&self) -> Option<UsedPart> { self.used_name_info.user_part(Scope::State(self)) }
 }
 
 impl Transition {
-  #[inline]
-  pub fn depends(&self) -> Option<NameUsed> {
-    self.used_name_info.depends(UsedScope::Transition(self))
+  pub fn used_part(&self) -> Option<UsedPart> {
+    self.used_name_info.user_part(Scope::Transition(self))
   }
 }
 

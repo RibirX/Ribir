@@ -8,11 +8,31 @@ use crate::{impl_query_self_only, prelude::*};
 pub struct Void;
 
 impl Render for Void {
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { unreachable!() }
+  fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    assert_eq!(
+      ctx.single_child(),
+      None,
+      "Void only used to hold a node place."
+    );
+    Size::zero()
+  }
 
-  fn paint(&self, _: &mut PaintingCtx) { unreachable!() }
+  fn paint(&self, _: &mut PaintingCtx) {}
 
-  fn only_sized_by_parent(&self) -> bool { unreachable!() }
+  fn only_sized_by_parent(&self) -> bool { true }
+}
+
+impl crate::prelude::ComposeSingleChild for Void {
+  fn compose_single_child(_: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
+  where
+    Self: Sized,
+  {
+    if let Some(child) = child {
+      child
+    } else {
+      Void.into_widget()
+    }
+  }
 }
 
 impl Query for Void {

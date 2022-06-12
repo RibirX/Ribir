@@ -12,7 +12,7 @@ use syn::{
 mod widget_gen;
 use crate::{
   error::{DeclareError, DeclareWarning},
-  widget_attr_macro::ribir_prefix_variable,
+  widget_attr_macro::{ribir_prefix_variable, UsedType},
 };
 mod builtin_fields;
 pub use builtin_fields::*;
@@ -20,8 +20,8 @@ use widget_gen::WidgetGen;
 
 use super::{
   child_variable, kw, ribir_variable,
-  widget_macro::{is_expr_keyword, IfGuard, UsedNameInfo, EXPR_FIELD, EXPR_WIDGET},
-  DeclareCtx, Id, NameUsed, Result, UsedPart, UsedScope,
+  widget_macro::{is_expr_keyword, IfGuard, EXPR_FIELD, EXPR_WIDGET},
+  DeclareCtx, Id, NameUsed, Result, Scope, ScopeUsedInfo, UsedPart,
 };
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ pub struct DeclareField {
   pub if_guard: Option<IfGuard>,
   pub colon_token: Option<token::Colon>,
   pub expr: Expr,
-  pub used_name_info: UsedNameInfo,
+  pub used_name_info: ScopeUsedInfo,
 }
 
 #[derive(Clone, Debug)]
@@ -199,15 +199,13 @@ impl Parse for DeclareField {
       if_guard,
       colon_token,
       expr,
-      used_name_info: <_>::default(),
+      used_name_info: ScopeUsedInfo::default(),
     })
   }
 }
 
 impl DeclareField {
-  pub fn depend_parts(&self) -> impl Iterator<Item = UsedPart> + '_ {
-    self.used_name_info.depend_parts(UsedScope::Field(self))
-  }
+  pub fn used_part(&self) -> Option<UsedPart> { self.used_name_info.user_part(Scope::Field(self)) }
 }
 
 pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> {
@@ -370,7 +368,7 @@ impl DeclareWidget {
       .fields
       .iter()
       .chain(self.builtin.all_builtin_fields())
-      .filter(|f| self.named.is_none() || !f.used_name_info.use_or_capture_any_name())
+      .filter(|f| self.named.is_none() || f.used_name_info.all_widgets().is_none())
       .filter_map(|f| {
         f.skip_nc
           .as_ref()
@@ -399,7 +397,7 @@ impl DeclareWidget {
         w.builtin
           .collect_builtin_widget_follows(&ref_name, &mut follows);
 
-        let w_follows: NameUsed = w.fields.iter().flat_map(|f| f.depend_parts()).collect();
+        let w_follows: NameUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
 
         if !w_follows.is_empty() {
           follows.insert(ref_name, w_follows);
@@ -416,7 +414,7 @@ impl DeclareWidget {
       && self
         .fields
         .iter()
-        .any(|f| f.used_name_info.used_names.is_some())
+        .any(|f| f.used_name_info.directly_used_widgets().is_some())
   }
 
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
@@ -436,10 +434,13 @@ impl DeclareWidget {
           self.traverses_widget().for_each(|w| {
             w.builtin
               .all_builtin_fields()
-              .filter_map(|f| f.used_name_info.used_names.as_ref())
-              .flat_map(|follows| follows.iter())
-              .filter(|f| f.widget == wrap_name)
-              .for_each(|f| use_spans.extend(f.spans.iter().map(|s| s.unwrap())))
+              .filter_map(|f| {
+                f.used_name_info
+                  .filter_item(|info| info.used_type.contains(UsedType::USED))
+              })
+              .flatten()
+              .filter(|(name, _)| *name == &wrap_name)
+              .for_each(|(_, info)| use_spans.extend(info.spans.iter().map(|s| s.unwrap())))
           });
 
           let host_span = w_ref.span().unwrap();
@@ -475,9 +476,7 @@ impl DeclareWidget {
   }
 }
 
-pub fn upstream_by_used_widgets<'a>(
-  used_widgets: impl Iterator<Item = &'a Ident> + Clone,
-) -> TokenStream {
+pub fn upstream_tokens<'a>(used_widgets: impl Iterator<Item = &'a Ident> + Clone) -> TokenStream {
   let upstream = used_widgets.clone().map(|w| {
     quote_spanned! { w.span() =>  #w.change_stream() }
   });

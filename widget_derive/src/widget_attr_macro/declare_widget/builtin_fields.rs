@@ -10,9 +10,7 @@ use syn::{parse_quote_spanned, spanned::Spanned};
 use crate::{
   error::DeclareError,
   widget_attr_macro::{
-    ribir_suffix_variable,
-    widget_macro::{UsedNameInfo, EXPR_WIDGET},
-    DeclareCtx, MergeDepends, NameUsed,
+    ribir_suffix_variable, widget_macro::EXPR_WIDGET, DeclareCtx, NameUsed, ScopeUsedInfo,
   },
 };
 
@@ -70,13 +68,7 @@ impl BuiltinFieldWidgets {
     follows_info: &mut BTreeMap<Ident, NameUsed<'a>>,
   ) {
     self.widgets.iter().for_each(|(name, info)| {
-      let follows: NameUsed = info
-        .0
-        .iter()
-        .filter(|f| f.used_name_info.use_or_capture_any_name())
-        .flat_map(|f| f.depend_parts())
-        .collect();
-
+      let follows: NameUsed = info.0.iter().filter_map(|f| f.used_part()).collect();
       if !follows.is_empty() {
         let name = ribir_suffix_variable(host, BUILTIN_WIDGET_SUFFIX.get(name).unwrap());
         follows_info.insert(name, follows);
@@ -88,10 +80,10 @@ impl BuiltinFieldWidgets {
     if let Some((_, info)) = self.widgets.iter().find(|(name, _)| "Key" == **name) {
       assert_eq!(info.0.len(), 1);
       let DeclareField { member, used_name_info, .. } = &info.0[0];
-      if let Some(follows) = used_name_info.used_names.as_ref() {
+      if let Some(follows) = used_name_info.directly_used_widgets() {
         return Err(DeclareError::KeyDependsOnOther {
           key: member.span().unwrap(),
-          depends_on: follows.iter().map(|fo| fo.widget.span().unwrap()).collect(),
+          depends_on: follows.map(|w| w.span().unwrap()).collect(),
         });
       }
     }
@@ -123,23 +115,33 @@ impl BuiltinFieldWidgets {
         };
 
         let mut widget_tokens = gen.gen_widget_tokens(ctx);
-        // todo: seems needn't
         // builtin widget all fields have if guard correspond to a `ExprWidget` syntax
         if info.is_expr_widget() {
           let ty = Ident::new(EXPR_WIDGET, span).into();
+
+          let guards = info.0.iter().filter_map(|f| f.if_guard.as_ref()).map(|g| {
+            quote! {
+              #[allow(dead_code)]
+              #g { true }
+            }
+          });
           let mut expr_field: DeclareField = parse_quote_spanned! { span =>
-            expr: { #widget_tokens #name }
+            expr: {
+               let guard_result = #(#guards) else * else { false };
+               guard_result.then(|| {
+                 #widget_tokens #name
+               })
+              }
           };
 
-          let if_guards = info.0.iter().filter_map(|f| f.if_guard.as_ref());
-          let captures = if_guards
-            .clone()
-            .filter_map(|g| g.used_name_info.captures.as_ref())
-            .merge_depends();
-          let follows = if_guards
-            .filter_map(|g| g.used_name_info.used_names.as_ref())
-            .merge_depends();
-          let used_name_info = UsedNameInfo { captures, used_names: follows };
+          let used_name_info = info.0.iter().filter_map(|f| f.if_guard.as_ref()).fold(
+            ScopeUsedInfo::default(),
+            |mut res, info| {
+              res.merge(&info.used_name_info);
+              res
+            },
+          );
+
           expr_field.used_name_info = used_name_info;
           let expr_widget_gen = WidgetGen {
             ty: &ty,
@@ -217,7 +219,7 @@ impl BuiltinWidgetInfo {
     self.0.iter().all(|f| {
       f.if_guard
         .as_ref()
-        .map_or(false, |f| f.used_name_info.used_names.is_some())
+        .map_or(false, |f| f.used_name_info.refs_widgets().is_some())
     })
   }
 

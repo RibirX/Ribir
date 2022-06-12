@@ -12,8 +12,8 @@ use syn::{
 
 use super::{
   animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
-  track::Track, DeclareCtx, DeclareWidget, FollowInfo, IdType, MergeDepends, NameUsed,
-  NameUsedSpans, Result, UsedPart, UsedScope,
+  track::Track, DeclareCtx, DeclareWidget, IdType, NameUsed, NameUsedInfo, Result, Scope,
+  ScopeUsedInfo, UsedInfo,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -34,21 +34,15 @@ pub struct IfGuard {
   pub if_token: token::If,
   pub cond: Expr,
   pub fat_arrow_token: Token![=>],
-  pub used_name_info: UsedNameInfo,
+  pub used_name_info: ScopeUsedInfo,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct UsedNameInfo {
-  /// named widget was captured by move closure
-  pub(crate) captures: Option<Vec<NameUsedSpans>>,
-  /// named widget was used in expression.
-  pub(crate) used_names: Option<Vec<NameUsedSpans>>,
-}
 #[derive(Clone, Debug)]
 struct CircleCheckStack<'a> {
   pub widget: &'a Ident,
-  pub origin: UsedScope<'a>,
-  pub on: &'a NameUsedSpans,
+  pub scope: Scope<'a>,
+  pub used_widget: &'a Ident,
+  pub used_info: &'a NameUsedInfo,
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -91,7 +85,7 @@ impl Parse for WidgetMacro {
 
 impl WidgetMacro {
   pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream> {
-    fn circle_stack_to_path(stack: &[CircleCheckStack], ctx: &DeclareCtx) -> Box<[FollowInfo]> {
+    fn circle_stack_to_path(stack: &[CircleCheckStack], ctx: &DeclareCtx) -> Box<[UsedInfo]> {
       stack.iter().map(|c| c.to_follow_path(ctx)).collect()
     }
 
@@ -111,9 +105,9 @@ impl WidgetMacro {
       if let Some(dataflows) = self.dataflows.as_ref() {
         dataflows.analyze_data_flow_follows(follows);
         let _circle_follows_check = Self::circle_check(&follows, |stack| {
-          if stack.iter().any(|s| match &s.origin {
-            UsedScope::Field(f) => f.skip_nc.is_some(),
-            UsedScope::DataFlow(df) => df.skip_nc.is_some(),
+          if stack.iter().any(|s| match &s.scope {
+            Scope::Field(f) => f.skip_nc.is_some(),
+            Scope::DataFlow(df) => df.skip_nc.is_some(),
             _ => false,
           }) {
             Ok(())
@@ -241,13 +235,20 @@ impl WidgetMacro {
       match check_info.get(name) {
         None => {
           if let Some(follows) = follow_infos.get(name) {
-            follows.follow_iter().try_for_each(|(origin, on)| {
-              check_info.insert(name, CheckState::Checking);
-              stack.push(CircleCheckStack { widget: name, origin, on });
-              widget_follow_circle_check(&on.widget, follow_infos, check_info, stack, err_detect)?;
-              stack.pop();
-              Ok(())
-            })?;
+            follows
+              .follow_iter()
+              .try_for_each(|(scope, used_widget, used_info)| {
+                check_info.insert(name, CheckState::Checking);
+                stack.push(CircleCheckStack {
+                  widget: name,
+                  scope,
+                  used_widget,
+                  used_info,
+                });
+                widget_follow_circle_check(used_widget, follow_infos, check_info, stack, err_detect)?;
+                stack.pop();
+                Ok(())
+              })?;
             debug_assert_eq!(check_info.get(name), Some(&CheckState::Checking));
             check_info.insert(name, CheckState::Checked);
           };
@@ -275,7 +276,7 @@ impl WidgetMacro {
       match follows.get(w) {
         Some(f) if !stacked.contains(w) => {
           stack.push(w);
-          stack.extend(f.follow_iter().map(|(_, target)| &target.widget));
+          stack.extend(f.follow_iter().map(|(_, name, _)| name));
         }
         _ => callback(w),
       }
@@ -285,22 +286,14 @@ impl WidgetMacro {
 }
 
 impl<'a> CircleCheckStack<'a> {
-  fn to_follow_path(&self, ctx: &DeclareCtx) -> FollowInfo {
-    let on = NameUsedSpans {
-      widget: ctx.user_perspective_name(&self.on.widget).map_or_else(
-        || self.on.widget.clone(),
-        |user| Ident::new(&user.to_string(), self.on.widget.span()),
-      ),
-
-      spans: self.on.spans.clone(),
-    };
-
+  fn to_follow_path(&self, ctx: &DeclareCtx) -> UsedInfo {
     let widget = ctx
       .user_perspective_name(self.widget)
       .unwrap_or(self.widget);
 
-    let (widget, member) = match self.origin {
-      UsedScope::Field(f) => {
+    let (widget, member) = match self.scope {
+      Scope::Field(f) => {
+        println!("circle `{widget}` ");
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
         let (widget, _) = ctx
@@ -313,7 +306,16 @@ impl<'a> CircleCheckStack<'a> {
       _ => (widget.clone(), None),
     };
 
-    FollowInfo { widget, member, on }
+    let used_widget = ctx.user_perspective_name(&self.used_widget).map_or_else(
+      || self.used_widget.clone(),
+      |user| Ident::new(&user.to_string(), self.used_widget.span()),
+    );
+    UsedInfo {
+      widget,
+      member,
+      used_widget,
+      used_info: self.used_info.clone(),
+    }
   }
 }
 
@@ -350,49 +352,5 @@ impl Parse for IfGuard {
       fat_arrow_token: input.parse()?,
       used_name_info: <_>::default(),
     })
-  }
-}
-
-impl UsedNameInfo {
-  pub fn use_or_capture_name(&self) -> impl Iterator<Item = &Ident> + '_ {
-    self
-      .used_names
-      .iter()
-      .chain(self.captures.iter())
-      .unique_widget()
-      .unwrap()
-      .into_iter()
-  }
-
-  pub fn use_or_capture_any_name(&self) -> bool {
-    self.used_names.is_some() || self.captures.is_some()
-  }
-
-  pub fn used_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
-    self
-      .used_names
-      .iter()
-      .flat_map(|fs| fs.iter().map(|f| &f.widget))
-  }
-
-  pub fn capture_widgets(&self) -> impl Iterator<Item = &Ident> + Clone {
-    self
-      .captures
-      .iter()
-      .flat_map(|fs| fs.iter().map(|f| &f.widget))
-  }
-
-  pub fn depends<'a>(&'a self, origin: UsedScope<'a>) -> Option<NameUsed> {
-    self
-      .use_or_capture_any_name()
-      .then(|| self.depend_parts(origin).collect())
-  }
-
-  pub fn depend_parts<'a>(&'a self, origin: UsedScope<'a>) -> impl Iterator<Item = UsedPart> + '_ {
-    self
-      .used_names
-      .iter()
-      .chain(self.captures.iter())
-      .map(move |place_info| UsedPart { origin, place_info })
   }
 }
