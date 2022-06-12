@@ -1,5 +1,16 @@
 use ribir::prelude::*;
 
+
+fn if_guard_require_declare_default() {
+  let guard_false = widget! {
+    SizedBox {
+      size if false => : Size::new(100., 100.)
+    }
+  };
+  let (rect, _) = widget_and_its_children_box_rect(guard_false, Size::new(1000., 1000.));
+}
+
+
 #[widget]
 fn normal_if_guard_pass(_this: (), ctx: &mut BuildCtx) {
   let guard = Some(1);

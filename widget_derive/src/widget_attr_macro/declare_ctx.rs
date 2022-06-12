@@ -1,12 +1,12 @@
 use crate::{error::DeclareError, WIDGET_MACRO_NAME};
 
 use super::{
-  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable,
-  widget_macro::UsedNameInfo, widget_state_ref, NameUsedSpans, WidgetMacro,
+  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, ScopeUsedInfo,
+  UsedType, WidgetMacro,
 };
 
 use proc_macro::{Diagnostic, Level};
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use std::collections::{HashMap, HashSet};
 use syn::{
@@ -25,10 +25,9 @@ pub enum IdType {
 }
 #[derive(Default)]
 pub struct DeclareCtx {
-  /// All name we need to reactive to its change
+  /// All name we can use in macro and need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
-  pub current_used: HashMap<Ident, Vec<Span>, ahash::RandomState>,
-  pub current_capture: HashMap<Ident, Vec<Span>, ahash::RandomState>,
+  pub current_used_info: ScopeUsedInfo,
   /// name object has by used.
   used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
@@ -58,35 +57,35 @@ impl VisitMut for DeclareCtx {
         visit_mut::visit_expr_path_mut(self, p);
         if let Some(name) = p.path.get_ident() {
           if let Some(name) = self.find_named_widget(name).cloned() {
-            self.add_used_widget(name)
+            self.add_used_widget(name, UsedType::USED)
           }
         }
       }
       Expr::Closure(c) => {
-        let old_follows = std::mem::take(&mut self.current_used);
-        let outside_capture = self.current_capture.drain().collect::<Vec<_>>();
+        let mut outside_used = self.current_used_info.take();
         visit_mut::visit_expr_closure_mut(self, c);
+        let mut overwrite_inner_used = UsedType::CAPTURE;
         if c.capture.is_some() {
-          if !self.current_used.is_empty() {
-            let used_widgets = self.current_used.keys();
-            let refs = used_widgets.map(widget_state_ref);
+          if let Some(refs) = self.current_used_info.refs_tokens() {
             let body = &c.body;
             c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
           }
-          self.current_capture.extend(self.current_used.clone());
-          if !self.current_capture.is_empty() {
-            let captures = self.current_capture.keys().map(capture_widget);
+          if let Some(all) = self.current_used_info.all_widgets() {
+            let captures = all.map(capture_widget);
             *expr = parse_quote_spanned! {c.span() => {
               #(#captures)*
               #c
             }}
           }
+          overwrite_inner_used = UsedType::MOVE_CAPTURE;
         }
 
-        // todo: not capture closure should keep used widget, but not need track its
-        // inner used. needn't follow anything of closure inner.
-        self.current_used = old_follows;
-        self.current_capture.extend(outside_capture);
+        self.current_used_info.iter_mut().for_each(|(_, info)| {
+          info.used_type = overwrite_inner_used;
+        });
+
+        outside_used.merge(&self.current_used_info);
+        self.current_used_info = outside_used;
       }
       _ => {
         visit_mut::visit_expr_mut(self, expr);
@@ -124,7 +123,7 @@ impl VisitMut for DeclareCtx {
             self
               .user_perspective_name
               .insert(wrap_name.clone(), name.clone());
-            self.add_used_widget(wrap_name);
+            self.add_used_widget(wrap_name, UsedType::USED);
             return;
           }
         }
@@ -257,24 +256,9 @@ impl DeclareCtx {
     self.user_perspective_name.get(name)
   }
 
-  pub fn take_current_used_info(&mut self) -> UsedNameInfo {
-    let follows =
-      (!self.current_used.is_empty()).then(|| solid_depends_info(self.current_used.drain()));
+  pub fn take_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.take() }
 
-    let captures =
-      (!self.current_capture.is_empty()).then(|| solid_depends_info(self.current_capture.drain()));
-
-    UsedNameInfo { used_names: follows, captures }
-  }
-
-  pub fn clone_current_used_info(&mut self) -> UsedNameInfo {
-    let follows = (!self.current_used.is_empty())
-      .then(|| solid_depends_info(self.current_used.clone().into_iter()));
-    let captures = (!self.current_capture.is_empty())
-      .then(|| solid_depends_info(self.current_capture.clone().into_iter()));
-
-    UsedNameInfo { used_names: follows, captures }
-  }
+  pub fn clone_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.clone() }
 
   pub fn emit_unused_id_warning(&self) {
     self
@@ -320,21 +304,12 @@ impl DeclareCtx {
     }
   }
 
-  pub fn add_used_widget(&mut self, name: Ident) {
-    Self::add_info(name, &mut self.current_used, &mut self.used_widgets)
-  }
-
-  pub fn add_capture(&mut self, name: Ident) {
-    Self::add_info(name, &mut self.current_capture, &mut self.used_widgets)
-  }
-
-  fn add_info(
-    name: Ident,
-    info: &mut HashMap<Ident, Vec<Span>, ahash::RandomState>,
-    used_widgets: &mut HashSet<Ident, ahash::RandomState>,
-  ) {
-    info.entry(name.clone()).or_default().push(name.span());
-    used_widgets.insert(name);
+  pub fn add_used_widget(&mut self, name: Ident, used_type: UsedType) {
+    if let Some(u) = self.user_perspective_name.get(&name) {
+      self.used_widgets.insert(u.clone());
+    }
+    self.used_widgets.insert(name.clone());
+    self.current_used_info.add_used(name, used_type);
   }
 
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
@@ -357,7 +332,7 @@ impl DeclareCtx {
 
     new_ctx.used_widgets.iter().for_each(|name| {
       if self.named_objects.contains_key(name) {
-        self.add_capture(name.clone())
+        self.add_used_widget(name.clone(), UsedType::MOVE_CAPTURE)
       }
     });
     let inner_captures = new_ctx
@@ -418,13 +393,4 @@ impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
 
 impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
-}
-
-fn solid_depends_info(info: impl Iterator<Item = (Ident, Vec<Span>)>) -> Vec<NameUsedSpans> {
-  info
-    .map(|(widget, spans)| NameUsedSpans {
-      widget,
-      spans: spans.into_boxed_slice(),
-    })
-    .collect()
 }

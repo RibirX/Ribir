@@ -120,7 +120,7 @@ fn expression_for_children() {
   wnd.render_ready();
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
-  assert_eq!(children.len(), 4);
+  assert_eq!(children.len(), 5);
 
   tap_at(&mut wnd, (0, 0));
   wnd.render_ready();
@@ -234,6 +234,7 @@ fn builtin_ref() {
   wnd.render_ready();
   assert_eq!(icon_track.get(), CursorIcon::AllScroll);
 }
+
 #[test]
 fn if_guard_field_true() {
   let guard_true = widget! {
@@ -244,18 +245,6 @@ fn if_guard_field_true() {
   };
 
   let (rect, _) = widget_and_its_children_box_rect(guard_true, Size::new(1000., 1000.));
-  assert_eq!(rect.size, Size::new(110., 100.));
-}
-
-#[test]
-#[should_panic = "Required field `SizedBox::size` not set"]
-fn if_guard_field_false() {
-  let guard_false = widget! {
-    SizedBox {
-      size : Size::new(100., 100.),
-    }
-  };
-  let (rect, _) = widget_and_its_children_box_rect(guard_false, Size::new(1000., 1000.));
   assert_eq!(rect.size, Size::new(110., 100.));
 }
 

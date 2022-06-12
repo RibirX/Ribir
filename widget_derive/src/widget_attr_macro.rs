@@ -7,7 +7,7 @@ use syn::{
 };
 
 use crate::{
-  error::{FollowInfo, Result},
+  error::{Result, UsedInfo},
   widget_attr_macro::declare_widget::DeclareField,
 };
 mod declare_ctx;

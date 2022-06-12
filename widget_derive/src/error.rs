@@ -1,4 +1,4 @@
-use crate::widget_attr_macro::NameUsedSpans;
+use crate::widget_attr_macro::NameUsedInfo;
 use proc_macro::{Diagnostic, Level, Span};
 use proc_macro2::TokenStream;
 
@@ -6,17 +6,18 @@ use quote::quote;
 use syn::Ident;
 
 #[derive(Debug)]
-pub struct FollowInfo {
+pub struct UsedInfo {
   pub widget: Ident,
   pub member: Option<Ident>,
-  pub on: NameUsedSpans,
+  pub used_widget: Ident,
+  pub used_info: NameUsedInfo,
 }
 
 #[derive(Debug)]
 pub enum DeclareError {
   DuplicateID([Ident; 2]),
-  CircleInit(Box<[FollowInfo]>),
-  CircleFollow(Box<[FollowInfo]>),
+  CircleInit(Box<[UsedInfo]>),
+  CircleFollow(Box<[UsedInfo]>),
   DataFlowNoDepends(Span),
   KeyDependsOnOther {
     key: Span,
@@ -114,43 +115,42 @@ impl DeclareError {
 
 // return a tuple compose by the string display of path, the path follow spans
 // and the spans of where `#[skip_nc]` can be added.
-fn path_info(path: &[FollowInfo]) -> (String, Vec<Span>, Vec<Span>) {
-  let path = path
-    .iter()
-    .map(|FollowInfo { widget, member, on }| (widget, member, on));
+fn path_info(path: &[UsedInfo]) -> (String, Vec<Span>, Vec<Span>) {
   let msg = path
-    .clone()
-    .map(|(widget, member, on)| {
-      let on_widget = &on.widget;
-      if let Some(m) = member {
-        format!("{}.{} ～> {} ", widget, m, on_widget)
+    .iter()
+    .map(|info| {
+      if let Some(m) = info.member.as_ref() {
+        format!("{}.{} ～> {} ", info.widget, m, info.used_widget)
       } else {
-        format!("{} ～> {} ", widget, on_widget)
+        format!("{} ～> {} ", info.widget, info.used_widget)
       }
     })
     .collect::<Vec<_>>()
     .join(", ");
 
-  let spans = path.clone().fold(vec![], |mut res, (widget, member, on)| {
-    res.push(widget.span().unwrap());
-    if let Some(m) = member {
+  let spans = path.iter().fold(vec![], |mut res, info| {
+    res.push(info.widget.span().unwrap());
+    if let Some(m) = info.member.as_ref() {
       res.push(m.span().unwrap());
     }
 
-    res.push(on.widget.span().unwrap());
-    let t_spans = on.spans.iter().map(|s| s.unwrap());
+    res.push(info.used_widget.span().unwrap());
+    let t_spans = info.used_info.spans.iter().map(|s| s.unwrap());
     res.extend(t_spans);
     res
   });
 
   let note_spans = path
-    .map(|(widget, member, on)| {
-      if let Some(m) = member {
+    .iter()
+    .map(|info| {
+      if let Some(m) = info.member.as_ref() {
         m.span().unwrap()
       } else {
-        on.spans
+        info
+          .used_info
+          .spans
           .iter()
-          .fold(widget.span(), |s1, s2| s2.join(s1).unwrap())
+          .fold(info.widget.span(), |s1, s2| s2.join(s1).unwrap())
           .unwrap()
       }
     })

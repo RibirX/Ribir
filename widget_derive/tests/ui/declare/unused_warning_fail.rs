@@ -1,4 +1,4 @@
-use ribir::prelude::*;
+  use ribir::prelude::*;
 
 fn main() {
   compile_error!("Test for declare syntax warning.");

@@ -323,10 +323,6 @@ pub fn compose_child_as_data_widget<W: Query + 'static, D: Query + 'static>(
   if let Some(child) = child {
     DataWidget::new(child, data).into_widget_and_try_unwrap_data(pick_data)
   } else {
-    ExprWidget {
-      expr: Box::new(|_| SingleConsumer),
-      upstream: None,
-    }
-    .into_widget()
+    Void.into_widget()
   }
 }
