@@ -41,7 +41,7 @@ impl WidgetTree {
     id.assert_get(self).query_all_type(
       |notifier: &StateChangeNotifier| {
         let state_changed = self.state_changed.clone();
-        notifier.change_stream().filter(|b| !b).subscribe(move |_| {
+        notifier.change_stream().filter(|b| b.contains(ChangeScope::FRAMEWORK)).subscribe(move |_| {
           state_changed.borrow_mut().insert(id);
         });
         true

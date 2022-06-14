@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 pub struct ExprWidget<R> {
   #[declare(custom_convert)]
   pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
-  pub(crate) upstream: Option<LocalBoxOp<'static, bool, ()>>,
+  pub(crate) upstream: Option<LocalBoxOp<'static, (), ()>>,
 }
 /// Generator is a virtual child used in `widget!`, which use to generate
 /// dynamic widgets and provide ability to keep them up to date in their
