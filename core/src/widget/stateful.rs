@@ -82,7 +82,7 @@
 
 use crate::{impl_proxy_query, prelude::*};
 use lazy_static::__Deref;
-use rxrust::prelude::*;
+use rxrust::{prelude::*, ops::box_it::LocalCloneBoxOp};
 use std::{
   cell::{RefCell, RefMut, UnsafeCell},
   ops::DerefMut,
@@ -100,17 +100,25 @@ pub trait IntoStateful {
 }
 
 /// A reference of stateful widget, can use it to directly access and modify
-/// stateful widget. Tracked the state change across if user mutable reference
-/// the `StateRef` and trigger state change notify and require `ribir` to
-/// rebuild or relayout inner widget.
+/// stateful widget. Tracked the state change across if user mutable deref the
+/// `StateRef`.
 pub struct StateRef<'a, W>(InnerRef<'a, W>);
 
 /// A reference of stateful widget, tracked the state change across if user
-/// mutable reference the `SilentRef`. If mutable reference occur, state change
-/// notify will trigger, but not effect the inner widget relayout or rebuild.
+/// mutable deref the `SilentRef`. If mutable reference occur, state change
+/// notify will trigger, but not effect to framework, relayout or paint not be
+/// effected.
 ///
 /// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
 pub struct SilentRef<'a, W>(InnerRef<'a, W>);
+
+/// A reference of stateful widget, tracked the state change across if user
+/// mutable reference the `ShallowRef`. If mutable reference occur, state change
+/// only notify to the framework but no data change notify. And usually use it
+/// to temporary to modify the state.
+///
+/// If you not very clear how `ShallowRef` work, use [`ShallowRef`]! instead of.
+pub struct ShallowRef<'a, W>(InnerRef<'a, W>);
 
 /// The stateful widget generic implementation.
 pub struct Stateful<W> {
@@ -121,7 +129,7 @@ pub struct Stateful<W> {
 /// notify downstream when widget state changed, the value mean if the change it
 /// as silent or not.
 #[derive(Default, Clone)]
-pub(crate) struct StateChangeNotifier(LocalSubject<'static, bool, ()>);
+pub(crate) struct StateChangeNotifier(LocalSubject<'static, ChangeScope, ()>);
 
 /// `InnerRef` help implicit borrow inner widget mutable or not by deref or
 /// deref_mut. And early drop the inner borrow if need, so the borrow lifetime
@@ -140,6 +148,17 @@ struct InnerRef<'a, W> {
   widget: &'a Stateful<W>,
   current_ref: UnsafeCell<Option<RefMut<'a, W>>>,
   mut_accessed: bool,
+}
+
+bitflags! {
+  pub(crate) struct ChangeScope: u8 {
+    /// state change only effect the data, transparent to ribir framework.
+    const DATA  = 0x001;
+    /// state change only effect to framework, transparent to widget data.
+    const FRAMEWORK = 0x010;
+    /// state change effect both widget data and framework.
+    const BOTH = Self::DATA.bits | Self::FRAMEWORK.bits;
+  }
 }
 
 #[derive(Clone)]
@@ -179,14 +198,17 @@ impl<W> Stateful<W> {
   /// Return a shallow reference to the stateful widget which directly modify
   /// the widget and not notify state change.
   #[inline]
-  pub fn shallow_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
+  pub fn shallow_ref(&self) -> ShallowRef<W> { ShallowRef(InnerRef::new(self)) }
 
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn change_stream(&self) -> LocalSubject<'static, bool, ()> { self.change_notifier.0.clone() }
-
-  /// Pick field change stream from the widget change
+  pub fn change_stream(&self) -> LocalCloneBoxOp<'static, (), ()> {
+    self
+      .inner_change_stream()
+      .filter_map(|s: ChangeScope| s.contains(ChangeScope::DATA).then(|| ()))
+      .box_it()
+  }
 
   /// Pick field change stream from the widget change
   pub fn state_change<T: Clone + 'static>(
@@ -204,6 +226,10 @@ impl<W> Stateful<W> {
       init.after = pick(&stateful.state_ref());
       init
     })
+  }
+
+  pub(crate) fn inner_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
+    self.change_notifier.0.clone()
   }
 
   pub(crate) fn into_render_node(self) -> Box<dyn Render>
@@ -226,9 +252,9 @@ impl<'a, W> StateRef<'a, W> {
   }
 
   #[inline]
-  pub fn shallow(&mut self) -> RefMut<'a, W> {
+  pub fn shallow(&mut self) -> ShallowRef<'a, W> {
     self.0.release_current_borrow();
-    self.0.widget.widget.borrow_mut()
+    ShallowRef(InnerRef::new(self.0.widget))
   }
 
   /// Clone the stateful widget of which the reference point to. Require mutable
@@ -260,6 +286,18 @@ impl<'a, W> std::ops::Deref for StateRef<'a, W> {
 }
 
 impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { self.0.deref_mut() }
+}
+
+impl<'a, W> std::ops::Deref for ShallowRef<'a, W> {
+  type Target = W;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { self.0.deref() }
+}
+
+impl<'a, W> std::ops::DerefMut for ShallowRef<'a, W> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { self.0.deref_mut() }
 }
@@ -344,7 +382,7 @@ impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) {
     if self.0.mut_accessed {
       self.0.release_current_borrow();
-      self.0.widget.change_stream().next(false)
+      self.0.widget.inner_change_stream().next(ChangeScope::BOTH)
     }
   }
 }
@@ -353,7 +391,20 @@ impl<'a, W> Drop for SilentRef<'a, W> {
   fn drop(&mut self) {
     if self.0.mut_accessed {
       self.0.release_current_borrow();
-      self.0.widget.change_stream().next(true)
+      self.0.widget.inner_change_stream().next(ChangeScope::DATA)
+    }
+  }
+}
+
+impl<'a, W> Drop for ShallowRef<'a, W> {
+  fn drop(&mut self) {
+    if self.0.mut_accessed {
+      self.0.release_current_borrow();
+      self
+        .0
+        .widget
+        .inner_change_stream()
+        .next(ChangeScope::FRAMEWORK)
     }
   }
 }
@@ -442,7 +493,7 @@ impl<W: Query> Query for Stateful<W> {
 }
 
 impl StateChangeNotifier {
-  pub(crate) fn change_stream(&self) -> LocalSubject<'static, bool, ()> { self.0.clone() }
+  pub(crate) fn change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> { self.0.clone() }
 }
 
 #[cfg(test)]
@@ -535,18 +586,21 @@ mod tests {
     let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
     let w = SizedBox { size: Size::zero() }.into_stateful();
-    w.change_stream()
+    w.inner_change_stream()
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 
     {
       let _ = &mut w.state_ref().size;
     }
-    assert_eq!(notified.borrow().deref(), &[false]);
+    assert_eq!(notified.borrow().deref(), &[ChangeScope::BOTH]);
 
     {
       let _ = &mut w.silent_ref().size;
     }
-    assert_eq!(notified.borrow().deref(), &[false, true]);
+    assert_eq!(
+      notified.borrow().deref(),
+      &[ChangeScope::BOTH, ChangeScope::FRAMEWORK]
+    );
 
     {
       let mut state_ref = w.state_ref();
@@ -556,6 +610,9 @@ mod tests {
       let _ = &mut silent_ref;
       let _ = &mut silent_ref;
     }
-    assert_eq!(notified.borrow().deref(), &[false, true]);
+    assert_eq!(
+      notified.borrow().deref(),
+      &[ChangeScope::BOTH, ChangeScope::FRAMEWORK]
+    );
   }
 }
