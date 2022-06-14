@@ -2,19 +2,17 @@ use ::builtin::builtin;
 use inflector::Inflector;
 use lazy_static::lazy_static;
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, quote_spanned};
+use quote::quote_spanned;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, HashMap};
-use syn::{parse_quote_spanned, spanned::Spanned};
+use syn::spanned::Spanned;
 
 use crate::{
   error::DeclareError,
-  widget_attr_macro::{
-    ribir_suffix_variable, widget_macro::EXPR_WIDGET, DeclareCtx, NameUsed, ScopeUsedInfo,
-  },
+  widget_attr_macro::{ribir_suffix_variable, DeclareCtx, NameUsed},
 };
 
-use super::{widget_gen::WidgetGen, DeclareField, DeclareWidget};
+use super::{widget_gen::WidgetGen, DeclareField};
 
 include!("../../builtin_fields_list.rs");
 
@@ -77,7 +75,7 @@ impl BuiltinFieldWidgets {
   }
 
   pub fn key_follow_check(&self) -> crate::error::Result<()> {
-    if let Some((_, info)) = self.widgets.iter().find(|(name, _)| "Key" == **name) {
+    if let Some((_, info)) = self.widgets.iter().find(|(name, _)| "KeyWidget" == **name) {
       assert_eq!(info.0.len(), 1);
       let DeclareField { member, used_name_info, .. } = &info.0[0];
       if let Some(follows) = used_name_info.directly_used_widgets() {
@@ -93,94 +91,49 @@ impl BuiltinFieldWidgets {
 
   pub fn widget_tokens_iter<'a>(
     &'a self,
-    host_id: Ident,
+    host_id: &'a Ident,
     ctx: &'a DeclareCtx,
-  ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
+  ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
     // builtin widgets compose in special order.
     WIDGETS
       .iter()
       .filter_map(|builtin| self.widgets.get_key_value(builtin.ty))
       .map(move |(ty_name, info)| {
         let suffix = BUILTIN_WIDGET_SUFFIX.get(ty_name).unwrap();
-        let name = ribir_suffix_variable(&host_id, suffix);
+        let name = ribir_suffix_variable(host_id, suffix);
 
         let span = info.span();
         let ty = Ident::new(ty_name, span).into();
+
         let fields = &info.0;
+        let gen = WidgetGen::new(&ty, &name, &fields);
+        let tokens = gen.gen_widget_tokens(ctx);
 
-        let gen = WidgetGen {
-          ty: &ty,
-          name: name.clone(),
-          fields: &fields,
-        };
-
-        let mut widget_tokens = gen.gen_widget_tokens(ctx);
-        // builtin widget all fields have if guard correspond to a `ExprWidget` syntax
-        if info.is_expr_widget() {
-          let ty = Ident::new(EXPR_WIDGET, span).into();
-
-          let guards = info.0.iter().filter_map(|f| f.if_guard.as_ref()).map(|g| {
-            quote! {
-              #[allow(dead_code)]
-              #g { true }
-            }
-          });
-          let mut expr_field: DeclareField = parse_quote_spanned! { span =>
-            expr: {
-               let guard_result = #(#guards) else * else { false };
-               guard_result.then(|| {
-                 #widget_tokens #name
-               })
-              }
-          };
-
-          let used_name_info = info.0.iter().filter_map(|f| f.if_guard.as_ref()).fold(
-            ScopeUsedInfo::default(),
-            |mut res, info| {
-              res.merge(&info.used_name_info);
-              res
-            },
-          );
-
-          expr_field.used_name_info = used_name_info;
-          let expr_widget_gen = WidgetGen {
-            ty: &ty,
-            name: name.clone(),
-            fields: &[expr_field],
-          };
-          widget_tokens = expr_widget_gen.gen_widget_tokens(ctx);
-        }
-        (name, widget_tokens)
+        (name, tokens)
       })
   }
 
   /// return builtin fields composed tokens, and the upstream tokens if the
   /// finally widget as a expr widget.
-  pub fn compose_tokens(&self, host: &DeclareWidget) -> TokenStream {
-    let host_name = host.widget_identify();
-    let mut compose_tokens = quote! {};
+  pub fn compose_tokens(&self, name: &Ident, is_expr_host: bool, tokens: &mut TokenStream) {
     WIDGETS
       .iter()
       .filter_map(|builtin| self.widgets.get_key_value(builtin.ty))
-      .fold(
-        host.is_host_expr_widget(),
-        |is_expr_widget, (name, info)| {
-          let suffix = BUILTIN_WIDGET_SUFFIX.get(name).unwrap();
-          let name = ribir_suffix_variable(&host_name, suffix);
-          let span = info.span();
-          if is_expr_widget {
-            compose_tokens.extend(quote_spanned! { span =>
-               let #host_name = SingleChildWidget::from_expr_child(#name, #host_name);
-            });
-          } else {
-            compose_tokens.extend(quote_spanned! { span =>
-              let #host_name = SingleChildWidget::new(#name, #host_name);
-            });
-          }
-          info.is_expr_widget()
-        },
-      );
-    compose_tokens
+      .fold(is_expr_host, |is_expr_widget, (builtin_ty, info)| {
+        let suffix = BUILTIN_WIDGET_SUFFIX.get(builtin_ty).unwrap();
+        let builtin_name = ribir_suffix_variable(&name, suffix);
+        let span = info.span();
+        if is_expr_widget {
+          tokens.extend(quote_spanned! { span =>
+             let #name = SingleChildWidget::from_expr_child(#builtin_name, #name);
+          });
+        } else {
+          tokens.extend(quote_spanned! { span =>
+            let #name = SingleChildWidget::new(#builtin_name, #name);
+          });
+        }
+        false
+      });
   }
 
   pub fn assign_builtin_field(
@@ -205,24 +158,10 @@ impl BuiltinFieldWidgets {
     Ok(())
   }
 
-  pub fn finally_is_expr_widget(&self) -> Option<bool> {
-    WIDGETS
-      .iter()
-      .rev()
-      .find_map(|w| self.widgets.get(w.ty))
-      .map(BuiltinWidgetInfo::is_expr_widget)
-  }
+  pub fn is_empty(&self) -> bool { self.widgets.is_empty() }
 }
 
 impl BuiltinWidgetInfo {
-  fn is_expr_widget(&self) -> bool {
-    self.0.iter().all(|f| {
-      f.if_guard
-        .as_ref()
-        .map_or(false, |f| f.used_name_info.refs_widgets().is_some())
-    })
-  }
-
   fn span(&self) -> Span {
     self
       .0

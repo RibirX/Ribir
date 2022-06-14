@@ -1,5 +1,5 @@
 use rxrust::{
-  observable::{Observable, SubscribeNext},
+  observable::SubscribeNext,
   subscription::{SubscriptionGuard, SubscriptionLike},
 };
 use smallvec::SmallVec;
@@ -39,18 +39,18 @@ impl GeneratorStore {
     let info = GeneratorInfo::new(id, parent, generated_widgets);
     let needs_regen = self.needs_regen.clone();
     let _subscription = upstream?
-      .filter(|b| !b)
+      // .filter(|b| !b)
       .subscribe(move |_| {
         needs_regen.borrow_mut().insert(id);
       })
       .unsubscribe_when_dropped();
-    self.add_generator(Generator { info: info.clone(), expr });
+    self.add_generator(Generator { info, expr });
     self
       .lifetime
       .entry(parent)
       .or_default()
       .push(GeneratorHandle { id, _subscription });
-    Some(info.generate_id())
+    Some(id)
   }
 
   pub(crate) fn add_generator(&mut self, g: Generator) {
@@ -59,13 +59,12 @@ impl GeneratorStore {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.generators.is_empty() }
 
-  pub(crate) fn take_needs_regen(&mut self, tree: &WidgetTree) -> Vec<Generator> {
+  pub(crate) fn take_needs_regen_generator(&mut self, tree: &WidgetTree) -> Vec<Generator> {
     let mut generators = self
       .needs_regen
       .borrow_mut()
       .drain()
       .filter_map(|id| self.generators.remove(&id))
-      .filter(|g| g.info().parent().is_dropped(tree))
       .collect::<Vec<_>>();
 
     generators.sort_by_cached_key(|g| g.info.parent().ancestors(tree).count());

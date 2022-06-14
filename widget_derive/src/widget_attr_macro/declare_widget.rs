@@ -19,7 +19,7 @@ pub use builtin_fields::*;
 use widget_gen::WidgetGen;
 
 use super::{
-  child_variable, kw, ribir_variable,
+  kw,
   widget_macro::{is_expr_keyword, IfGuard, EXPR_FIELD, EXPR_WIDGET},
   DeclareCtx, Id, NameUsed, Result, Scope, ScopeUsedInfo, UsedPart,
 };
@@ -31,7 +31,7 @@ pub struct DeclareWidget {
   // the name of this widget specified by `id` attr.
   pub named: Option<Id>,
   fields: Vec<DeclareField>,
-  builtin: BuiltinFieldWidgets,
+  pub builtin: BuiltinFieldWidgets,
   pub children: Vec<Box<DeclareWidget>>,
 }
 
@@ -246,99 +246,16 @@ impl DeclareCtx {
 }
 
 impl DeclareWidget {
-  pub fn host_widget_tokens(&self, ctx: &DeclareCtx) -> (Ident, TokenStream) {
-    let Self { path: ty, fields, .. } = self;
-
-    let name = self.widget_identify();
-    let gen = WidgetGen { ty, name, fields };
-    let tokens = gen.gen_widget_tokens(ctx);
-    (gen.name, tokens)
-  }
-
-  pub fn compose_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
-    let mut compose_tokens = quote! {};
-    let children = &self.children;
-
-    if !children.is_empty() {
-      // Must be MultiChild if there are multi child. Give this hint for better
-      // compile error if wrong size child declared.
-      let hint = (self.children.len() > 1).then(|| quote! {: MultiChildWidget<_>});
-
-      let children = children.iter().enumerate().map(|(idx, c)| {
-        let child_name = if c.named.is_none() {
-          child_variable(c, idx)
-        } else {
-          let child_widget_name = c.widget_identify();
-          let child_compose = c.compose_tokens(ctx);
-          compose_tokens.extend(child_compose);
-          child_widget_name
-        };
-
-        if c
-          .builtin
-          .finally_is_expr_widget()
-          .unwrap_or_else(|| c.is_host_expr_widget())
-        {
-          quote_spanned! { c.span() => .have_expr_child(#child_name)  }
-        } else {
-          quote_spanned! { c.span() => .have_child(#child_name) }
-        }
-      });
-      let name = &self.widget_identify();
-      let compose_children = quote! { let #name #hint = #name #(#children)*; };
-      compose_tokens.extend(compose_children);
-    }
-    compose_tokens.extend(self.builtin.compose_tokens(self));
-    compose_tokens
-  }
-
-  pub fn gen_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
-    // only generate anonyms widget tokens, named widget pre-generate before.
-    if self.named.is_none() {
-      let (name, host_widget) = self.host_widget_tokens(ctx);
-      tokens.extend(host_widget);
-      self
-        .builtin
-        .widget_tokens_iter(name, ctx)
-        .for_each(|(_, builtin_widget)| {
-          tokens.extend(builtin_widget);
-        })
-    }
-
-    self
-      .children
-      .iter()
-      .enumerate()
-      .filter(|(_, c)| c.named.is_none())
-      .for_each(|(idx, c)| {
-        let c_name = child_variable(c, idx);
-        let child_widget_name = c.widget_identify();
-        tokens.extend(quote_spanned! { c.path.span() =>  let #c_name = });
-        c.brace_token.surround(tokens, |tokens| {
-          c.gen_tokens(ctx, tokens);
-          child_widget_name.to_tokens(tokens);
-        });
-        token::Semi::default().to_tokens(tokens);
-      });
-
-    tokens.extend(self.compose_tokens(ctx));
-  }
-
-  // return the key-value map of the named widget define tokens.
-  pub fn named_objects_def_tokens_iter<'a>(
+  pub fn host_and_builtin_widgets_tokens<'a>(
     &'a self,
+    name: &'a Ident,
     ctx: &'a DeclareCtx,
-  ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
-    self
-      .traverses_widget()
-      .filter_map(|w| {
-        w.named.as_ref().map(|_| {
-          let host = w.host_widget_tokens(ctx);
-          let builtin = w.builtin.widget_tokens_iter(host.0.clone(), ctx);
-          std::iter::once(host).chain(builtin)
-        })
-      })
-      .flatten()
+  ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
+    let Self { path: ty, fields, .. } = self;
+    let gen = WidgetGen::new(ty, name, fields);
+    let host = gen.gen_widget_tokens(ctx);
+    let builtin = self.builtin.widget_tokens_iter(name, ctx);
+    std::iter::once((name.clone(), host)).chain(builtin)
   }
 
   pub fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
@@ -389,25 +306,23 @@ impl DeclareWidget {
   /// ```
   pub fn analyze_object_follows(&self) -> BTreeMap<Ident, NameUsed> {
     let mut follows: BTreeMap<Ident, NameUsed> = BTreeMap::new();
-    self
-      .traverses_widget()
-      .filter(|w| w.named.is_some())
-      .for_each(|w| {
-        let ref_name = w.widget_identify();
+    self.traverses_widget().for_each(|w| {
+      if let Some(name) = w.name() {
         w.builtin
-          .collect_builtin_widget_follows(&ref_name, &mut follows);
+          .collect_builtin_widget_follows(&name, &mut follows);
 
         let w_follows: NameUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
 
         if !w_follows.is_empty() {
-          follows.insert(ref_name, w_follows);
+          follows.insert(name.clone(), w_follows);
         }
-      });
+      }
+    });
 
     follows
   }
 
-  pub(crate) fn is_host_expr_widget(&self) -> bool {
+  pub(crate) fn is_expr_widget(&self) -> bool {
     // if `ExprWidget` track nothing, will not as a `ExprWidget`, but use its
     // directly return value.
     is_expr_keyword(&self.path)
@@ -418,14 +333,12 @@ impl DeclareWidget {
   }
 
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
-    debug_assert!(self.named.is_some());
-
+    let w_ref = self.name().expect("should not check anonymous widget.");
     self
       .builtin
       .all_builtin_fields()
       .filter(|f| f.if_guard.is_some())
       .try_for_each(|f| {
-        let w_ref = self.widget_identify();
         let wrap_name = ribir_prefix_variable(&f.member, &w_ref.to_string());
 
         if ctx.is_used(&wrap_name) {
@@ -468,12 +381,7 @@ impl DeclareWidget {
     std::iter::once(self).chain(children)
   }
 
-  pub fn widget_identify(&self) -> Ident {
-    match &self.named {
-      Some(Id { name, .. }) => name.clone(),
-      _ => ribir_variable("ribir", self.path.span()),
-    }
-  }
+  pub fn name(&self) -> Option<&Ident> { self.named.as_ref().map(|id| &id.name) }
 }
 
 pub fn upstream_tokens<'a>(used_widgets: impl Iterator<Item = &'a Ident> + Clone) -> TokenStream {

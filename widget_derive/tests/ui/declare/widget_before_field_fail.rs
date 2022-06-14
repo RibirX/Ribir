@@ -1,14 +1,11 @@
 use ribir::prelude::*;
 
-#[widget]
-fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
+fn main() {
   let size = Size::zero();
-  let _ = widget! {
-    declare SizedBox {
+  let _child_always_declare_behind_field = widget! {
+    SizedBox {
       SizedBox { size }
       size
     }
   };
 }
-
-fn main() {}

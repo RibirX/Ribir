@@ -163,11 +163,14 @@ impl Context {
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub fn tree_repair(&mut self) {
-    let mut needs_regen = self.generator_store.take_needs_regen(&self.widget_tree);
+    let mut needs_regen = self
+      .generator_store
+      .take_needs_regen_generator(&self.widget_tree);
 
     needs_regen.iter_mut().rev().for_each(|g| {
       g.update_generated_widgets(self);
     });
+
     needs_regen
       .into_iter()
       .for_each(|g| self.generator_store.add_generator(g));
@@ -184,7 +187,7 @@ impl Context {
 
   pub fn drop_subtree(&mut self, id: WidgetId) {
     let tree = &self.widget_tree;
-    tree.root().descendants(tree).for_each(|w| {
+    id.descendants(tree).for_each(|w| {
       self.generator_store.on_widget_drop(w);
       self.layout_store.remove(id);
     });

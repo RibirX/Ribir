@@ -88,6 +88,15 @@ impl<'a> LayoutCtx<'a> {
     let iter = self.id.children(self.tree);
     (self, iter)
   }
+
+  /// Clear the child layout information, so the `child` will be force layout
+  /// when call `[LayoutCtx::perform_child_layout]!` even if it has layout cache
+  /// information with same input.
+  #[inline]
+  pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
+    assert_eq!(child.parent(self.widget_tree()), Some(self.id));
+    self.layout_store.remove(child).is_some()
+  }
 }
 
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {

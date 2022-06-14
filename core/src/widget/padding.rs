@@ -20,7 +20,7 @@ impl Render for Padding {
     let max = (clamp.max - thickness).max(zero);
     // Shrink the clamp of child.
     let child_clamp = BoxClamp { min, max };
-
+    ctx.force_child_relayout(child);
     let size = ctx.perform_child_layout(child, child_clamp);
 
     // Expand the size, so the child have padding.

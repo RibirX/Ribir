@@ -13,12 +13,16 @@ use syn::{spanned::Spanned, Ident, Path};
 use super::{upstream_tokens, DeclareField};
 
 pub struct WidgetGen<'a> {
-  pub ty: &'a Path,
-  pub name: Ident,
-  pub fields: &'a [DeclareField],
+  ty: &'a Path,
+  name: &'a Ident,
+  fields: &'a [DeclareField],
 }
 
 impl<'a> WidgetGen<'a> {
+  pub fn new(ty: &'a Path, name: &'a Ident, fields: &'a [DeclareField]) -> Self {
+    Self { ty, name, fields }
+  }
+
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     if is_expr_keyword(&self.ty) {
       self.expr_widget_token()
@@ -99,7 +103,7 @@ impl<'a> WidgetGen<'a> {
         .all_widgets()
         .into_iter()
         .flatten()
-        .chain(std::iter::once(name))
+        .chain(std::iter::once(name.clone()))
         .map(capture_widget);
 
       quote_spanned! { f.span() => {

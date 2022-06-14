@@ -15,8 +15,12 @@ struct RenameReservedNames {
 
 #[derive(Declare)]
 struct Converter {
-  #[declare(strip_option)]
+  #[declare(custom_convert)]
   x: Option<i32>,
 }
 
+impl ConverterBuilder {
+  #[inline]
+  pub fn x_convert<M, X: Into<StripedOption<i32, M>>>(x: X) -> Option<i32> { x.into().value }
+}
 fn main() {}

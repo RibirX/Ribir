@@ -111,8 +111,11 @@ fn expression_for_children() {
     Flex {
       on_tap: move |_| sized_box.size = Size::new(5., 5.),
       SizedBox { id: sized_box, size: Size::new(1., 1.) }
-      ExprWidget { expr: (0..3).map(move |_| SizedBox { size: sized_box.size }) }
-      ExprWidget { expr: (sized_box.size.area() > 2.).then(|| SizedBox { size: sized_box.size } ) }
+      // todo: how should we hint user, he/she need wrap inner widget of `ExprWidget` to track named widget change.
+      ExprWidget { expr: (0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }) }
+      ExprWidget {
+         expr: (sized_box.size.area() > 2.).then(|| widget!{ SizedBox { size: sized_box.size } })
+      }
     }
   };
 
@@ -229,7 +232,6 @@ fn builtin_ref() {
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.render_ready();
 
-  assert_eq!(icon_track.get(), CursorIcon::Hand);
   tap_at(&mut wnd, (1, 1));
   wnd.render_ready();
   assert_eq!(icon_track.get(), CursorIcon::AllScroll);

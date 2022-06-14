@@ -1,65 +1,89 @@
 error: Can't init widget because circle follow: id1.size ～> id2 , id2.size ～> id3 , id3.size ～> id1
-  --> tests/ui/declare/circular_dependency_fail.rs:8:13
+  --> tests/ui/declare/circular_dependency_fail.rs:7:13
    |
-8  |         id: id1,
+7  |         id: id1,
    |             ^^^
-9  |         size: id2.size,
+8  |         size: id2.size,
    |         ^^^^  ^^^
 ...
-12 |         id: id2,
+11 |         id: id2,
    |             ^^^
-13 |         size: id3.size,
+12 |         size: id3.size,
    |         ^^^^  ^^^
 ...
-16 |         id: id3,
+15 |         id: id3,
    |             ^^^
-17 |         size: id1.size,
+16 |         size: id1.size,
    |         ^^^^  ^^^
    |
 note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:9:9
+  --> tests/ui/declare/circular_dependency_fail.rs:8:9
    |
-9  |         size: id2.size,
+8  |         size: id2.size,
    |         ^^^^
 ...
-13 |         size: id3.size,
+12 |         size: id3.size,
    |         ^^^^
 ...
-17 |         size: id1.size,
+16 |         size: id1.size,
    |         ^^^^
 
 error: Can't init widget because circle follow: child.margin ～> parent , parent.margin ～> child
-  --> tests/ui/declare/circular_dependency_fail.rs:27:11
+  --> tests/ui/declare/circular_dependency_fail.rs:23:11
    |
-27 |       id: parent,
+23 |       id: parent,
    |           ^^^^^^
-28 |       size: Size::zero(),
-29 |       margin: child.margin.clone(),
+24 |       size: Size::zero(),
+25 |       margin: child.margin.clone(),
    |       ^^^^^^  ^^^^^^^^^^^^
-30 |       SizedBox{
-31 |         id: child,
+26 |       SizedBox{
+27 |         id: child,
    |             ^^^^^
-32 |         size: Size::zero(),
-33 |         margin: parent.margin.clone(),
+28 |         size: Size::zero(),
+29 |         margin: parent.margin.clone(),
    |         ^^^^^^  ^^^^^^^^^^^^^
    |
 note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:29:7
+  --> tests/ui/declare/circular_dependency_fail.rs:25:7
    |
-29 |       margin: child.margin.clone(),
+25 |       margin: child.margin.clone(),
    |       ^^^^^^
 ...
-33 |         margin: parent.margin.clone(),
+29 |         margin: parent.margin.clone(),
    |         ^^^^^^
 
 error: Circle follow will cause infinite state change trigger: a ～> a
-  --> tests/ui/declare/circular_dependency_fail.rs:46:17
+  --> tests/ui/declare/circular_dependency_fail.rs:39:17
    |
-46 |     dataflows { a.size ~> a.size }
+39 |     dataflows { a.size ~> a.size }
    |                 ^         ^
    |
 note: If the circular is your want, use `#[skip_nc]` attribute before field or data_flow to skip the no change trigger of the field modify to ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:46:17
+  --> tests/ui/declare/circular_dependency_fail.rs:39:17
    |
-46 |     dataflows { a.size ~> a.size }
+39 |     dataflows { a.size ~> a.size }
    |                 ^^^^^^^^^^^
+
+warning: unreachable statement
+  --> tests/ui/declare/circular_dependency_fail.rs:21:3
+   |
+4  |     let _circular_dependency_err = widget! {
+   |  __________________________________-
+5  | |     Flex {
+6  | |       SizedBox {
+7  | |         id: id1,
+...  |
+18 | |     }
+19 | |   };
+   | |___- any code following this expression is unreachable
+20 |
+21 | /   let _wrap_widget_circular_err = widget! {
+22 | |     SizedBox {
+23 | |       id: parent,
+24 | |       size: Size::zero(),
+...  |
+31 | |     }
+32 | |   };
+   | |____^ unreachable statement
+   |
+   = note: `#[warn(unreachable_code)]` on by default

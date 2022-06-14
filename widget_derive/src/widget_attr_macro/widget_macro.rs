@@ -1,6 +1,6 @@
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{
   parse::{Parse, ParseStream},
@@ -11,12 +11,12 @@ use syn::{
 };
 
 use super::{
-  animations::Animations, dataflows::Dataflows, declare_widget::assign_uninit_field, kw,
-  track::Track, DeclareCtx, DeclareWidget, IdType, NameUsed, NameUsedInfo, Result, Scope,
-  ScopeUsedInfo, UsedInfo,
+  animations::Animations, child_variable, dataflows::Dataflows,
+  declare_widget::assign_uninit_field, kw, track::Track, DeclareCtx, DeclareWidget, IdType,
+  NameUsed, NameUsedInfo, Result, Scope, ScopeUsedInfo, UsedInfo,
 };
 use crate::{
-  error::{DeclareError, DeclareWarning},
+  error::DeclareError,
   widget_attr_macro::{ribir_variable, BUILD_CTX},
 };
 pub const EXPR_WIDGET: &str = "ExprWidget";
@@ -136,10 +136,11 @@ impl WidgetMacro {
               .into_values()
               .for_each(|def_tokens| tokens.extend(def_tokens));
           }
+          self.all_anonyms_widgets_tokens(ctx, tokens);
           self.dataflows.to_tokens(tokens);
           self.animations.to_tokens(tokens);
-          self.widget.gen_tokens(ctx, tokens);
-          let name = self.widget.widget_identify();
+          self.compose_tokens(ctx, tokens);
+          let name = self.widget_identify();
           tokens.extend(quote! {  #name.into_widget() })
         });
       });
@@ -155,7 +156,10 @@ impl WidgetMacro {
       closure_widget(&mut tokens);
     }
 
-    ctx.emit_unused_id_warning();
+    ctx
+      .unused_id_warning()
+      .chain(self.widget.warnings())
+      .for_each(|w| w.emit_warning());
 
     Ok(tokens)
   }
@@ -173,8 +177,6 @@ impl WidgetMacro {
           .flat_map(|t| t.track_names().map(|n| (n, IdType::UserSpecifyTrack))),
       )
   }
-
-  pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ { self.widget.warnings() }
 
   /// return follow relationship of the named widgets,it is a key-value map,
   /// schema like
@@ -196,7 +198,12 @@ impl WidgetMacro {
   fn named_objects_def_tokens(&self, ctx: &DeclareCtx) -> HashMap<Ident, TokenStream, RandomState> {
     self
       .widget
-      .named_objects_def_tokens_iter(ctx)
+      .traverses_widget()
+      .filter_map(|w| {
+        w.name()
+          .map(|name| w.host_and_builtin_widgets_tokens(name, ctx))
+      })
+      .flatten()
       .chain(
         self
           .animations
@@ -206,6 +213,70 @@ impl WidgetMacro {
           .flatten(),
       )
       .collect()
+  }
+
+  pub fn all_anonyms_widgets_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
+    fn anonyms_widgets_tokens(
+      name: &Ident,
+      w: &DeclareWidget,
+      ctx: &DeclareCtx,
+      tokens: &mut TokenStream,
+    ) {
+      if w.name().is_none() {
+        w.host_and_builtin_widgets_tokens(&name, ctx)
+          .for_each(|(_, widget)| tokens.extend(widget));
+      }
+
+      w.children
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.name().is_none())
+        .for_each(|(idx, c)| {
+          let c_name = child_variable(&name, idx);
+          anonyms_widgets_tokens(&c_name, c, ctx, tokens);
+        })
+    }
+    let name = self.widget_identify();
+    anonyms_widgets_tokens(&name, &self.widget, ctx, tokens)
+  }
+
+  pub fn compose_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
+    fn compose_widget(w: &DeclareWidget, name: &Ident, ctx: &DeclareCtx, tokens: &mut TokenStream) {
+      let mut compose_children = quote! {};
+      w.children.iter().enumerate().for_each(|(idx, c)| {
+        let c_name = c
+          .name()
+          .cloned()
+          .unwrap_or_else(|| child_variable(name, idx));
+
+        // deep compose first.
+        compose_widget(c, &c_name, ctx, tokens);
+
+        let compose_child = if c.builtin.is_empty() && c.is_expr_widget() {
+          quote_spanned! { c.span() => .have_expr_child(#c_name)  }
+        } else {
+          quote_spanned! { c.span() => .have_child(#c_name) }
+        };
+        compose_children.extend(compose_child);
+      });
+      if !compose_children.is_empty() {
+        let hint = (w.children.len() > 1).then(|| quote! {: MultiChildWidget<_>});
+        tokens.extend(quote! { let #name #hint = #name #compose_children; });
+      }
+
+      w.builtin.compose_tokens(name, w.is_expr_widget(), tokens);
+    }
+
+    let name = self.widget_identify();
+    compose_widget(&self.widget, &name, ctx, tokens);
+  }
+
+  pub fn widget_identify(&self) -> Ident {
+    if let Some(name) = self.widget.name() {
+      name.clone()
+    } else {
+      ribir_variable("ribir", self.widget.path.span())
+    }
   }
 
   fn circle_check<F>(follow_infos: &BTreeMap<Ident, NameUsed>, err_detect: F) -> Result<()>
@@ -245,7 +316,13 @@ impl WidgetMacro {
                   used_widget,
                   used_info,
                 });
-                widget_follow_circle_check(used_widget, follow_infos, check_info, stack, err_detect)?;
+                widget_follow_circle_check(
+                  used_widget,
+                  follow_infos,
+                  check_info,
+                  stack,
+                  err_detect,
+                )?;
                 stack.pop();
                 Ok(())
               })?;
@@ -293,7 +370,6 @@ impl<'a> CircleCheckStack<'a> {
 
     let (widget, member) = match self.scope {
       Scope::Field(f) => {
-        println!("circle `{widget}` ");
         // same id, but use the one which at the define place to provide more friendly
         // compile error.
         let (widget, _) = ctx

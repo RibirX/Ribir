@@ -30,7 +30,7 @@ pub struct UsedPart<'a> {
   pub used_info: &'a HashMap<Ident, NameUsedInfo, ahash::RandomState>,
 }
 #[derive(Clone, Debug)]
-pub struct NameUsed<'a>(Box<[UsedPart<'a>]>);
+pub struct NameUsed<'a>(pub Box<[UsedPart<'a>]>);
 
 #[derive(Clone, Copy, Debug)]
 pub enum Scope<'a> {

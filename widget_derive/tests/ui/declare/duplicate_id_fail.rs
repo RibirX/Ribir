@@ -1,9 +1,8 @@
 use ribir::prelude::*;
 
-#[widget]
-fn id_must_be_unique_err(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare BoxDecoration {
+fn main() {
+  let _id_must_be_unique_err = widget! {
+    BoxDecoration {
       id: same_id,
       background: Some(Color::RED.into()),
       SizedBox {
@@ -13,5 +12,3 @@ fn id_must_be_unique_err(_this: (), ctx: &mut BuildCtx) {
     }
   };
 }
-
-fn main() {}

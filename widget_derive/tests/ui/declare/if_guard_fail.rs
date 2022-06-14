@@ -1,50 +1,34 @@
 use ribir::prelude::*;
 
-
-fn if_guard_require_declare_default() {
-  let guard_false = widget! {
+fn main() {
+  let _if_guard_require_declare_default = widget! {
     SizedBox {
       size if false => : Size::new(100., 100.)
     }
   };
-  let (rect, _) = widget_and_its_children_box_rect(guard_false, Size::new(1000., 1000.));
-}
 
-
-#[widget]
-fn normal_if_guard_pass(_this: (), ctx: &mut BuildCtx) {
   let guard = Some(1);
-  widget! {
-    declare SizedBox {
-      // if guard in widget's field
-      size if true => : Size::zero(),
-      // if guard in data atribute
+  let _normal_if_guard_pass = widget! {
+    Checkbox {
+      // if guard for widget's field
+      checked if true => : true,
+      // if guard for built in fields
       cursor if true => : CursorIcon::Hand,
-      // if guard in listener attibute
-      on_tap if let Some(_) = guard  => : |_| {},
-      // if guard in wrap widget.
       margin if true => : EdgeInsets::all(1.)
     }
   };
-}
 
-#[widget]
-fn id_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
-  let guard = Some(1);
-  widget! {
-    declare SizedBox {
+  let _id_if_guard_fail = widget! {
+    Checkbox {
       id if true => : test,
       // if guard in widget's field
-      size if true => : Size::zero(),
+      check if true => : true,
 
     }
   };
-}
 
-#[widget]
-fn depend_id_behind_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare SizedBox {
+  let _depend_id_behind_if_guard_fail = widget! {
+    Checkbox {
       id: a,
       size: Size::zero(),
       margin if true =>:  EdgeInsets::all(0.),
@@ -56,5 +40,3 @@ fn depend_id_behind_if_guard_fail(_this: (), ctx: &mut BuildCtx) {
     }
   };
 }
-
-fn main() {}

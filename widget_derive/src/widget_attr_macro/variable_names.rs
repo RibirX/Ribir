@@ -1,19 +1,12 @@
 use proc_macro2::Span;
-use syn::{spanned::Spanned, Ident};
-
-use super::DeclareWidget;
+use syn::Ident;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
 // todo: reserve `ctx` name in widget `macro`; Error if user use it.
 pub(crate) const BUILD_CTX: &str = "build_ctx";
 
-pub fn child_variable(c: &DeclareWidget, idx: usize) -> Ident {
-  if c.named.is_some() {
-    return c.widget_identify();
-  }
-  let span = c.path.span();
-  let child = Ident::new("c", span);
-  ribir_suffix_variable(&child, &idx.to_string())
+pub fn child_variable(name: &Ident, idx: usize) -> Ident {
+  ribir_suffix_variable(&name, &format!("c_{idx}"))
 }
 
 pub fn ribir_variable(name: &str, span: Span) -> Ident {

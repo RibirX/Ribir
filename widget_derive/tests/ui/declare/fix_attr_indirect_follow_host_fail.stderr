@@ -1,47 +1,23 @@
 error: Can't init widget because circle follow: a.cursor ～> b , b.cursor ～> a
-  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:7:11
+  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:23:11
    |
-7  |       id: a,
+23 |       id: a,
    |           ^
-8  |       size: Size::zero(),
-9  |       cursor: b.cursor,
-   |       ^^^^^^  ^
-10 |       SizedBox {
-11 |         id: b,
+24 |       size: Size::zero(),
+25 |       cursor: b.cursor,
+   |       ^^^^^^  ^^^^^^^^
+26 |       SizedBox {
+27 |         id: b,
    |             ^
-12 |         size: Size::zero(),
-13 |         cursor: if a.size.area() > 0 {
-   |         ^^^^^^     ^
+28 |         size: Size::zero(),
+29 |         cursor: a.cursor
+   |         ^^^^^^  ^^^^^^^^
    |
 note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
-  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:9:7
+  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:25:7
    |
-9  |       cursor: b.cursor,
+25 |       cursor: b.cursor,
    |       ^^^^^^
 ...
-13 |         cursor: if a.size.area() > 0 {
-   |         ^^^^^^
-
-error: Can't init widget because circle follow: a.cursor ～> b , b.cursor ～> a
-  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:27:11
-   |
-27 |       id: a,
-   |           ^
-28 |       size: Size::zero(),
-29 |       cursor: b.cursor,
-   |       ^^^^^^  ^
-30 |       SizedBox {
-31 |         id: b,
-   |             ^
-32 |         size: Size::zero(),
-33 |         cursor: a.cursor
-   |         ^^^^^^  ^
-   |
-note: If the circular is your want and will finally not infinite change,you should break the init circle and declare some follow relationship in `data_flow`, and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modifyto ignore infinite state change trigger.
-  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:29:7
-   |
-29 |       cursor: b.cursor,
-   |       ^^^^^^
-...
-33 |         cursor: a.cursor
+29 |         cursor: a.cursor
    |         ^^^^^^
