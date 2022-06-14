@@ -36,8 +36,9 @@ pub enum DeclareError {
 }
 
 #[derive(Debug)]
-pub enum DeclareWarning {
+pub enum DeclareWarning<'a> {
   NeedlessSkipNc(Span),
+  UnusedName(&'a Ident),
 }
 
 pub type Result<T> = std::result::Result<T, DeclareError>;
@@ -92,7 +93,7 @@ impl DeclareError {
       DeclareError::KeyDependsOnOther { key, mut depends_on } => {
         depends_on.push(key);
         diagnostic.set_spans(depends_on);
-        diagnostic.set_message("The key attribute is not allowed to depend on others.");
+        diagnostic.set_message("The `key` field is not allowed to depend on others.");
       }
       DeclareError::DependOBuiltinFieldWithIfGuard { wrap_def_spans, use_spans, .. } => {
         diagnostic.set_spans(use_spans);
@@ -159,7 +160,7 @@ fn path_info(path: &[UsedInfo]) -> (String, Vec<Span>, Vec<Span>) {
   (msg, spans, note_spans)
 }
 
-impl DeclareWarning {
+impl<'a> DeclareWarning<'a> {
   pub fn emit_warning(&self) {
     let mut d = Diagnostic::new(Level::Warning, "");
     match self {
@@ -167,6 +168,11 @@ impl DeclareWarning {
         d.set_spans(*span);
         d.set_message("Unnecessary attribute, because not depends on any others");
         d = d.help("Try to remove it.");
+      }
+      DeclareWarning::UnusedName(name) => {
+        d.set_spans(name.span().unwrap());
+        d.set_message(format!("`{name}` does not be used"));
+        d = d.span_help(vec![name.span().unwrap()], "Remove this line.");
       }
     };
     d.emit();

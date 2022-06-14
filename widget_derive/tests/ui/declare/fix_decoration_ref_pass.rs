@@ -1,10 +1,9 @@
 use ribir::prelude::*;
 
-#[widget]
-fn syntax_pass(_this: (), ctx: &mut BuildCtx) {
+fn main() {
   let size = Size::zero();
   let _ = widget! {
-    declare SizedBox {
+    SizedBox {
       id: a,
       size,
       background: Color::RED,
@@ -15,5 +14,3 @@ fn syntax_pass(_this: (), ctx: &mut BuildCtx) {
     }
   };
 }
-
-fn main() {}

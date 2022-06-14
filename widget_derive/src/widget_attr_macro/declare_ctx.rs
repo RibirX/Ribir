@@ -1,11 +1,13 @@
-use crate::{error::DeclareError, WIDGET_MACRO_NAME};
+use crate::{
+  error::{DeclareError, DeclareWarning},
+  WIDGET_MACRO_NAME,
+};
 
 use super::{
   capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, ScopeUsedInfo,
   UsedType, WidgetMacro,
 };
 
-use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use std::collections::{HashMap, HashSet};
@@ -260,7 +262,7 @@ impl DeclareCtx {
 
   pub fn clone_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.clone() }
 
-  pub fn emit_unused_id_warning(&self) {
+  pub fn unused_id_warning(&self) -> impl Iterator<Item = DeclareWarning> {
     self
       .named_objects
       .iter()
@@ -269,15 +271,7 @@ impl DeclareCtx {
           && !id.to_string().starts_with('_')
           && *ty != &IdType::OutsideWidgetMacroPass
       })
-      .for_each(|(id, _)| {
-        Diagnostic::spanned(
-          vec![id.span().unwrap()],
-          Level::Warning,
-          format!("`{}` does not be used", id),
-        )
-        .span_help(vec![id.span().unwrap()], "Remove this line.")
-        .emit()
-      });
+      .map(|(id, _)| DeclareWarning::UnusedName(id))
   }
 
   pub fn stack_push(&mut self) -> StackGuard { StackGuard::new(self) }
@@ -327,9 +321,7 @@ impl DeclareCtx {
       .gen_tokens(&mut new_ctx)
       .unwrap_or_else(|err| err.into_compile_error());
 
-    widget_macro.warnings().for_each(|w| w.emit_warning());
     // inner `widget!` used means need be captured.
-
     new_ctx.used_widgets.iter().for_each(|name| {
       if self.named_objects.contains_key(name) {
         self.add_used_widget(name.clone(), UsedType::MOVE_CAPTURE)

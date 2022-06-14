@@ -1,22 +1,14 @@
 use ribir::prelude::*;
 
-#[widget]
-fn syntax_pass(_this: (), ctx: &mut BuildCtx) {
+fn main() {
   let size = Size::zero();
-  let _ = widget! {
-    declare Flex {
+  let _use_id_declare_later = widget! {
+    Flex {
       SizedBox {
         size,
-        SizedBox{
-          id: grandson,
-          size
-        }
+        SizedBox{ id: grandson, size }
       }
-      SizedBox{
-        size: grandson.size
-      }
+      SizedBox { size: grandson.size }
     }
   };
 }
-
-fn main() {}

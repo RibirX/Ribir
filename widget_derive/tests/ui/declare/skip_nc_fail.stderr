@@ -1,65 +1,65 @@
 warning: `self_id` does not be used
- --> tests/ui/declare/skip_nc_fail.rs:7:11
+ --> tests/ui/declare/skip_nc_fail.rs:6:11
   |
-7 |       id: self_id,
+6 |       id: self_id,
   |           ^^^^^^^
   |
 help: Remove this line.
- --> tests/ui/declare/skip_nc_fail.rs:7:11
+ --> tests/ui/declare/skip_nc_fail.rs:6:11
   |
-7 |       id: self_id,
+6 |       id: self_id,
   |           ^^^^^^^
 
 warning: Unnecessary attribute, because not depends on any others
- --> tests/ui/declare/skip_nc_fail.rs:8:7
+ --> tests/ui/declare/skip_nc_fail.rs:7:7
   |
-8 |       #[skip_nc]
+7 |       #[skip_nc]
   |       ^^^^^^^^^^
   |
   = help: Try to remove it.
 
 warning: `self_id` does not be used
-  --> tests/ui/declare/skip_nc_fail.rs:18:11
+  --> tests/ui/declare/skip_nc_fail.rs:14:11
    |
-18 |       id: self_id,
+14 |       id: self_id,
    |           ^^^^^^^
    |
 help: Remove this line.
-  --> tests/ui/declare/skip_nc_fail.rs:18:11
+  --> tests/ui/declare/skip_nc_fail.rs:14:11
    |
-18 |       id: self_id,
+14 |       id: self_id,
    |           ^^^^^^^
 
 warning: Unnecessary attribute, because not depends on any others
-  --> tests/ui/declare/skip_nc_fail.rs:20:7
+  --> tests/ui/declare/skip_nc_fail.rs:16:7
    |
-20 |       #[skip_nc]
+16 |       #[skip_nc]
    |       ^^^^^^^^^^
    |
    = help: Try to remove it.
 
 warning: `self_id` does not be used
-  --> tests/ui/declare/skip_nc_fail.rs:30:11
+  --> tests/ui/declare/skip_nc_fail.rs:23:11
    |
-30 |       id: self_id,
+23 |       id: self_id,
    |           ^^^^^^^
    |
 help: Remove this line.
-  --> tests/ui/declare/skip_nc_fail.rs:30:11
+  --> tests/ui/declare/skip_nc_fail.rs:23:11
    |
-30 |       id: self_id,
+23 |       id: self_id,
    |           ^^^^^^^
 
 warning: Unnecessary attribute, because not depends on any others
-  --> tests/ui/declare/skip_nc_fail.rs:32:7
+  --> tests/ui/declare/skip_nc_fail.rs:25:7
    |
-32 |       #[skip_nc]
+25 |       #[skip_nc]
    |       ^^^^^^^^^^
    |
    = help: Try to remove it.
 
 error: Test for declare syntax warning.
-  --> tests/ui/declare/skip_nc_fail.rs:39:3
+  --> tests/ui/declare/skip_nc_fail.rs:30:3
    |
-39 |   compile_error!("Test for declare syntax warning.");
+30 |   compile_error!("Test for declare syntax warning.");
    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

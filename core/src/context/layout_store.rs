@@ -6,7 +6,7 @@ use std::{
 
 use text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
 
-use crate::prelude::{widget_tree::WidgetTree, Point, Rect, Size, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, Rect, Size, WidgetId};
 
 use super::LayoutCtx;
 
@@ -115,16 +115,6 @@ impl LayoutStore {
         rect.and_then(|r| (&out_clamp == clamp).then(|| r.size))
       })
       .unwrap_or_else(|| {
-        // children's position is decided by parent, no matter itself relayout or not.
-        // here before parent perform layout, we reset children's position.
-        // todo: why?
-        id.children(&tree).for_each(|child| {
-          self
-            .layout_info_or_default(child)
-            .rect
-            .as_mut()
-            .map(|mut rc| rc.origin = Point::default());
-        });
         let layout = id.assert_get(tree);
         let size = layout.perform_layout(
           out_clamp,

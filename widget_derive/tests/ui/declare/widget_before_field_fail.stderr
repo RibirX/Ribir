@@ -1,5 +1,5 @@
 error: Field should always declare before children.
- --> tests/ui/declare/widget_before_field_fail.rs:9:7
+ --> tests/ui/declare/widget_before_field_fail.rs:8:7
   |
-9 |       size
+8 |       size
   |       ^^^^

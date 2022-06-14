@@ -160,7 +160,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       let default_method = field_default_method(field_name);
       quote_spanned!{d.default_token.span() =>  unwrap_or_else(|| Self::#default_method(ctx))}
     });
-    
 
     quote_spanned! { f.span() => self.#field_name.#or_default }
   });

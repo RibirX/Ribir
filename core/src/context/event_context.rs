@@ -11,12 +11,10 @@ pub struct EventCtx<'a> {
 impl<'a> EventCtx<'a> {
   #[inline]
   pub(crate) fn new(id: WidgetId, ctx: &'a Context) -> Self { Self { id, ctx } }
-
   #[inline]
   pub fn set_cursor(&mut self, cursor: CursorIcon) { self.ctx.cursor.set(Some(cursor)); }
   #[inline]
   pub fn updated_cursor(&self) -> Option<CursorIcon> { self.ctx.cursor.get() }
-
   #[inline]
   pub fn modifiers(&self) -> ModifiersState { self.ctx.modifiers }
 }

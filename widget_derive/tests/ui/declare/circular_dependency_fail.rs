@@ -1,9 +1,8 @@
 use ribir::prelude::*;
 
-#[widget]
-fn circular_dependency_err(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare Flex {
+fn main() {
+  let _circular_dependency_err = widget! {
+    Flex {
       SizedBox {
         id: id1,
         size: id2.size,
@@ -18,12 +17,9 @@ fn circular_dependency_err(_this: (), ctx: &mut BuildCtx) {
       }
     }
   };
-}
 
-#[widget]
-fn wrap_widget_circular_err(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare SizedBox {
+  let _wrap_widget_circular_err = widget! {
+    SizedBox {
       id: parent,
       size: Size::zero(),
       margin: child.margin.clone(),
@@ -34,23 +30,17 @@ fn wrap_widget_circular_err(_this: (), ctx: &mut BuildCtx) {
       }
     }
   };
-}
 
-#[widget]
-fn data_flow_circular_err(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare SizedBox {
+  let _data_flow_circular_err = widget! {
+    SizedBox {
       id: a,
       size: Size::zero(),
     }
     dataflows { a.size ~> a.size }
   };
-}
 
-#[widget]
-fn data_flow_circular_field_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare SizedBox {
+  let _data_flow_circular_field_skip_nc_pass = widget! {
+    SizedBox {
       id: a,
       size: Size::zero(),
       SizedBox {
@@ -63,12 +53,9 @@ fn data_flow_circular_field_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
       a.size ~> b.size
     }
   };
-}
 
-#[widget]
-fn circular_follows_with_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
-  widget! {
-    declare SizedBox {
+  let _circular_follows_with_skip_nc_pass = widget! {
+    SizedBox {
       id: a,
       size: Size::zero(),
     }
@@ -78,5 +65,3 @@ fn circular_follows_with_skip_nc_pass(_this: (), ctx: &mut BuildCtx) {
     }
   };
 }
-
-fn main() {}

@@ -1,13 +1,12 @@
 use ribir::prelude::*;
 
-#[widget]
-fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
+fn main() {
   let size = Size::zero();
-  let _ = widget! {
-    declare SizedBox {
+  let _child_always_declare_behind_field = widget! {
+    SizedBox {
       size,
-      ExprChild {
-        if size.area() > 0. {
+      ExprWidget {
+        expr: if size.area() > 0. {
           SizedBox { size }
         } else {
           SizedBox { size }
@@ -15,36 +14,23 @@ fn child_always_declare_behind_field(_this: (), ctx: &mut BuildCtx) {
       }
     }
   };
-}
 
-#[widget]
-fn option_child(_this: (), ctx: &mut BuildCtx) {
-  let size = Size::zero();
-  let _ = widget! {
-    declare SizedBox {
+  let _option_child = widget! {
+    SizedBox {
       size,
       background: Color::RED,
-      ExprChild {
-        (size.area() == 0.).then(|| SizedBox { size } )
+      ExprWidget {
+        expr: (size.area() == 0.).then(|| SizedBox { size } )
+      }
+    }
+  };
+
+  let _expr_child_use_named_widget = widget! {
+    Flex {
+      SizedBox { id: a, size }
+      ExprWidget {
+        expr: (a.size.area() > 0.).then(|| SizedBox { size })
       }
     }
   };
 }
-
-#[widget]
-fn expr_child_use_named_widget(_this: (), ctx: &mut BuildCtx) {
-  let size = Size::zero();
-  let _ = widget! {
-    declare Flex {
-      SizedBox {
-        id: a,
-        size,
-      }
-      ExprChild {
-        (a.size.area() > 0.).then(|| SizedBox { size })
-      }
-    }
-  };
-}
-
-fn main() {}

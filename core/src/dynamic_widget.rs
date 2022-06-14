@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use crate::prelude::{key::Key, widget_tree::WidgetTree, *};
 use rxrust::ops::box_it::LocalBoxOp;
@@ -25,7 +25,7 @@ pub(crate) struct Generator {
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct GeneratorID(usize);
 
-struct GenerateInfoInner {
+pub struct GeneratorInfo {
   id: GeneratorID,
   /// The parent of the generator.
   parent: WidgetId,
@@ -33,26 +33,21 @@ struct GenerateInfoInner {
   generated_widgets: SmallVec<[WidgetId; 1]>,
 }
 
-#[derive(Clone)]
-pub(crate) struct GeneratorInfo(Rc<RefCell<GenerateInfoInner>>);
-
 impl GeneratorInfo {
   pub(crate) fn new(
     id: GeneratorID,
     parent: WidgetId,
     generated_widgets: SmallVec<[WidgetId; 1]>,
   ) -> Self {
-    let inner = GenerateInfoInner { id, parent, generated_widgets };
-    GeneratorInfo(Rc::new(RefCell::new(inner)))
+    GeneratorInfo { id, parent, generated_widgets }
   }
 
-  pub(crate) fn parent(&self) -> WidgetId { self.0.borrow().parent }
+  pub(crate) fn parent(&self) -> WidgetId { self.parent }
 
-  pub(crate) fn generate_id(&self) -> GeneratorID { self.0.borrow().id }
+  pub(crate) fn generate_id(&self) -> GeneratorID { self.id }
 
   fn add_dynamic_widget_tmp_anchor(&self, tree: &mut WidgetTree) -> WidgetId {
-    let inner = self.0.borrow_mut();
-    let prev_sibling = inner
+    let prev_sibling = self
       .generated_widgets
       .first()
       .cloned()
@@ -62,7 +57,7 @@ impl GeneratorInfo {
     if let Some(prev_sibling) = prev_sibling {
       prev_sibling.insert_next(holder, tree)
     } else {
-      inner.parent.append(holder, tree)
+      self.parent.append(holder, tree)
     }
     holder
   }
@@ -89,10 +84,13 @@ impl IntoWidget<MultiConsumer> for ExprWidget<MultiConsumer> {
 impl Generator {
   #[inline]
   pub(crate) fn update_generated_widgets(&mut self, ctx: &mut Context) {
-    let mut info = self.info.0.borrow_mut();
-    let mut key_widgets = info
-      .generated_widgets
-      .iter()
+    let Self { info, expr } = self;
+    let tmp_anchor = info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
+    let mut insert_at = tmp_anchor;
+
+    let GeneratorInfo { parent, generated_widgets, .. } = info;
+    let mut key_widgets = generated_widgets
+      .drain(..)
       .filter_map(|id| {
         let tree = ctx.tree_mut();
         let mut key = None;
@@ -102,19 +100,16 @@ impl Generator {
           });
         if let Some(key) = key {
           id.detach(tree);
-          Some((key.clone(), *id))
+          Some((key.clone(), id))
         } else {
-          ctx.drop_subtree(*id);
+          ctx.drop_subtree(id);
           None
         }
       })
       .collect::<HashMap<_, _, ahash::RandomState>>();
-    info.generated_widgets.clear();
 
-    let tmp_anchor = self.info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
-    let mut insert_at = tmp_anchor;
-    (self.expr)(&mut |c| {
-      let id = info.parent.insert_child(
+    expr(&mut |c| {
+      let id = parent.insert_child(
         c,
         &mut |node, tree| {
           let mut old = None;
@@ -136,7 +131,7 @@ impl Generator {
         },
         ctx,
       );
-      info.generated_widgets.push(id);
+      generated_widgets.push(id);
       insert_at = id;
     });
 

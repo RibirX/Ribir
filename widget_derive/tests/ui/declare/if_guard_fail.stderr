@@ -1,20 +1,26 @@
 error: if guard is not supported in `id`
-  --> tests/ui/declare/if_guard_fail.rs:25:10
+  --> tests/ui/declare/if_guard_fail.rs:23:10
    |
-25 |       id if true => : test,
+23 |       id if true => : test,
    |          ^^^^^^^
 
 error: Depends on a widget field which behind `if guard`, its existence depends on the `if guard` result in runtime.
-  --> tests/ui/declare/if_guard_fail.rs:43:17
+  --> tests/ui/declare/if_guard_fail.rs:38:17
    |
-43 |         margin: a.margin
+38 |         margin: a.margin
    |                 ^^^^^^^^
    |
 warning: field define here.
-  --> tests/ui/declare/if_guard_fail.rs:37:11
+  --> tests/ui/declare/if_guard_fail.rs:32:11
    |
-37 |       id: a,
+32 |       id: a,
    |           ^
-38 |       size: Size::zero(),
-39 |       margin if true =>:  EdgeInsets::all(0.),
+33 |       size: Size::zero(),
+34 |       margin if true =>:  EdgeInsets::all(0.),
    |       ^^^^^^ ^^^^^^^
+
+error[E0599]: no function or associated item named `size_default` found for struct `layout::sized_box::SizedBoxBuilder` in the current scope
+ --> tests/ui/declare/if_guard_fail.rs:6:7
+  |
+6 |       size if false => : Size::new(100., 100.)
+  |       ^^^^ function or associated item not found in `layout::sized_box::SizedBoxBuilder`

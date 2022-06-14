@@ -5,13 +5,13 @@ error: Test for declare syntax warning.
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: `test_id` does not be used
-  --> tests/ui/declare/unused_warning_fail.rs:11:11
-   |
-11 |       id: test_id,
-   |           ^^^^^^^
-   |
+ --> tests/ui/declare/unused_warning_fail.rs:7:11
+  |
+7 |       id: test_id,
+  |           ^^^^^^^
+  |
 help: Remove this line.
-  --> tests/ui/declare/unused_warning_fail.rs:11:11
-   |
-11 |       id: test_id,
-   |           ^^^^^^^
+ --> tests/ui/declare/unused_warning_fail.rs:7:11
+  |
+7 |       id: test_id,
+  |           ^^^^^^^
