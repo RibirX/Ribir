@@ -16,15 +16,17 @@ use syn::{
   ItemMacro, Member,
 };
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum IdType {
-  /// name pass by outside `widget!` macro.
-  OutsideWidgetMacroPass,
-  /// name provide in `track { ... }`
-  UserSpecifyTrack,
-  /// Declared by `id: name`,
-  DeclareDefine,
+bitflags::bitflags! {
+  pub struct IdType: u16 {
+    /// Declared by `id: name`,
+    const DECLARE = 0x001;
+    /// name provide in `track { ... }`
+    const USER_SPECIFY = 0x010;
+      /// name pass by outside `widget!` macro.
+    const FROM_ANCESTOR = 0x100;
+  }
 }
+
 #[derive(Default)]
 pub struct DeclareCtx {
   /// All name we can use in macro and need to reactive to its change
@@ -117,14 +119,14 @@ impl VisitMut for DeclareCtx {
     if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
       if let Member::Named(ref field_name) = f_expr.member {
         if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(field_name) {
-          // fixme: outside pass widget maybe also was declared by user
-          if self.named_objects.get(&name) == Some(&IdType::DeclareDefine) {
+          if self
+            .named_objects
+            .get(&name)
+            .map_or(false, |t| t.contains(IdType::DECLARE))
+          {
             name.set_span(name.span().join(field_name.span()).unwrap());
             let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
             *f_expr.base = parse_quote! { #wrap_name };
-            self
-              .user_perspective_name
-              .insert(wrap_name.clone(), name.clone());
             self.add_used_widget(wrap_name, UsedType::USED);
             return;
           }
@@ -258,6 +260,10 @@ impl DeclareCtx {
     self.user_perspective_name.get(name)
   }
 
+  pub fn add_user_perspective_pair(&mut self, def_name: Ident, show_name: Ident) {
+    self.user_perspective_name.insert(def_name, show_name);
+  }
+
   pub fn take_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.take() }
 
   pub fn clone_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.clone() }
@@ -268,8 +274,8 @@ impl DeclareCtx {
       .iter()
       .filter(|(id, ty)| {
         !self.used_widgets.contains(id)
+          && !ty.contains(IdType::FROM_ANCESTOR)
           && !id.to_string().starts_with('_')
-          && *ty != &IdType::OutsideWidgetMacroPass
       })
       .map(|(id, _)| DeclareWarning::UnusedName(id))
   }
@@ -311,10 +317,9 @@ impl DeclareCtx {
     let mut new_ctx = DeclareCtx::default();
     new_ctx.analyze_stack = self.analyze_stack.clone();
     // all named objects should as outside define for embed `widget!` macro.
-    self.named_objects.keys().for_each(|name| {
-      new_ctx
-        .named_objects
-        .insert(name.clone(), IdType::OutsideWidgetMacroPass);
+    self.named_objects.iter().for_each(|(name, id_ty)| {
+      let ty = *id_ty | IdType::FROM_ANCESTOR;
+      new_ctx.named_objects.insert(name.clone(), ty);
     });
 
     let tokens = widget_macro
@@ -323,14 +328,14 @@ impl DeclareCtx {
 
     // inner `widget!` used means need be captured.
     new_ctx.used_widgets.iter().for_each(|name| {
-      if self.named_objects.contains_key(name) {
+      if self.named_objects.contains_key(name) || self.user_perspective_name.contains_key(name) {
         self.add_used_widget(name.clone(), UsedType::MOVE_CAPTURE)
       }
     });
     let inner_captures = new_ctx
       .used_widgets
       .iter()
-      .filter(|w| self.named_objects.contains_key(w))
+      .filter(|w| self.named_objects.contains_key(w) || self.user_perspective_name.contains_key(w))
       .map(capture_widget);
     let tokens = quote_spanned!(tokens.span()=> {#(#inner_captures)* #tokens} );
 
