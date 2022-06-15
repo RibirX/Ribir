@@ -90,6 +90,21 @@ impl WidgetMacro {
     }
 
     ctx.id_collect(self)?;
+
+    self
+      .widget
+      .traverses_widget()
+      // .flat_map(|w| w.name().map(|name| w.builtin.builtin_widget_names(name)))
+      .for_each(|w| {
+        if let Some(name) = w.name() {
+          w.builtin
+            .builtin_widget_names(name)
+            .for_each(|builtin_name| {
+              ctx.add_user_perspective_pair(builtin_name, name.clone());
+            });
+        }
+      });
+
     ctx.visit_widget_macro_mut(self);
     self.widget.before_generate_check(ctx)?;
 
@@ -167,14 +182,15 @@ impl WidgetMacro {
   pub fn object_names_iter(&self) -> impl Iterator<Item = (&Ident, IdType)> {
     self
       .widget
-      .object_names_iter()
+      .traverses_widget()
+      .filter_map(|w| w.named.as_ref().map(|id| &id.name))
       .chain(self.animations.iter().flat_map(|a| a.names()))
-      .map(|name| (name, IdType::DeclareDefine))
+      .map(|name| (name, IdType::DECLARE))
       .chain(
         self
           .track
           .iter()
-          .flat_map(|t| t.track_names().map(|n| (n, IdType::UserSpecifyTrack))),
+          .flat_map(|t| t.track_names().map(|n| (n, IdType::USER_SPECIFY))),
       )
   }
 

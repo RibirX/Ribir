@@ -113,6 +113,16 @@ impl BuiltinFieldWidgets {
       })
   }
 
+  pub fn builtin_widget_names<'a>(
+    &'a self,
+    host_name: &'a Ident,
+  ) -> impl Iterator<Item = Ident> + '_ {
+    self.widgets.keys().map(|w| {
+      let suffix = BUILTIN_WIDGET_SUFFIX.get(w).unwrap();
+      ribir_suffix_variable(host_name, suffix)
+    })
+  }
+
   /// return builtin fields composed tokens, and the upstream tokens if the
   /// finally widget as a expr widget.
   pub fn compose_tokens(&self, name: &Ident, is_expr_host: bool, tokens: &mut TokenStream) {

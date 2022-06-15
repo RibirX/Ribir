@@ -368,12 +368,6 @@ impl DeclareWidget {
       })
   }
 
-  pub fn object_names_iter(&self) -> impl Iterator<Item = &Ident> {
-    self
-      .traverses_widget()
-      .filter_map(|w| w.named.as_ref().map(|id| &id.name))
-  }
-
   pub fn traverses_widget(&self) -> impl Iterator<Item = &DeclareWidget> {
     let children: Box<dyn Iterator<Item = &DeclareWidget>> =
       Box::new(self.children.iter().flat_map(|w| w.traverses_widget()));
