@@ -32,7 +32,7 @@ impl Compose for Todos {
                 }
               }
               dataflows {
-                checkbox.checked ~> this2.silent().tasks[idx].finished;
+                checkbox.checked ~> this2.silent().tasks[idx].finished
               }
             }
           })

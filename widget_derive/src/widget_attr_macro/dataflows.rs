@@ -26,8 +26,7 @@ mod ct {
 pub struct Dataflows {
   _dataflows_token: kw::dataflows,
   brace_token: token::Brace,
-  // todo: use ',' replace ';'?
-  flows: Punctuated<Dataflow, token::Semi>,
+  flows: Punctuated<Dataflow, token::Comma>,
 }
 
 #[derive(Debug)]
