@@ -48,6 +48,21 @@ builtin! {
     on_tap: impl FnMut(&mut PointerEvent),
   }
 
+  DoubleTapListener {
+    #[doc="specify the event handler for the pointer double tap event."]
+    on_double_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+  }
+
+  TripleTapListener {
+    #[doc="specify the event handler for the pointer triple tap event."]
+    on_tripe_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+  }
+
+  XTimesTapListener {
+    #[doc="specify the event handler for the pointer `x` times tap event."]
+    on_x_times_tap: (u8, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>),
+  }
+
   PointerCancelListener {
     #[doc="specify the event handler to process pointer cancel event."]
     on_pointer_cancel: impl FnMut(&mut PointerEvent),
