@@ -82,7 +82,7 @@
 
 use crate::{impl_proxy_query, prelude::*};
 use lazy_static::__Deref;
-use rxrust::{prelude::*, ops::box_it::LocalCloneBoxOp};
+use rxrust::{ops::box_it::LocalCloneBoxOp, prelude::*};
 use std::{
   cell::{RefCell, RefMut, UnsafeCell},
   ops::DerefMut,
@@ -228,6 +228,14 @@ impl<W> Stateful<W> {
     })
   }
 
+  pub fn try_into_stateless(self) -> Result<W, Self> {
+    let Self { widget, change_notifier } = self;
+    match Rc::try_unwrap(widget) {
+      Ok(w) => Ok(w.into_inner()),
+      Err(widget) => Err(Stateful { widget, change_notifier }),
+    }
+  }
+
   pub(crate) fn inner_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
     self.change_notifier.0.clone()
   }
@@ -236,10 +244,9 @@ impl<W> Stateful<W> {
   where
     W: Render + 'static,
   {
-    let Self { widget, change_notifier } = self;
-    match Rc::try_unwrap(widget) {
-      Ok(w) => Box::new(w.into_inner()),
-      Err(widget) => Box::new(RenderWrap(Stateful { widget, change_notifier })),
+    match self.try_into_stateless() {
+      Ok(w) => Box::new(w),
+      Err(e) => Box::new(RenderWrap(e)),
     }
   }
 }
@@ -599,7 +606,7 @@ mod tests {
     }
     assert_eq!(
       notified.borrow().deref(),
-      &[ChangeScope::BOTH, ChangeScope::FRAMEWORK]
+      &[ChangeScope::BOTH, ChangeScope::DATA]
     );
 
     {
@@ -612,7 +619,7 @@ mod tests {
     }
     assert_eq!(
       notified.borrow().deref(),
-      &[ChangeScope::BOTH, ChangeScope::FRAMEWORK]
+      &[ChangeScope::BOTH, ChangeScope::DATA]
     );
   }
 }

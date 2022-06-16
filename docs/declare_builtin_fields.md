@@ -22,6 +22,12 @@
  	 - specify the event handler for the pointer move event.
 - on_tap : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer tap event.
+- on_double_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
+ 	 - specify the event handler for the pointer double tap event.
+- on_tripe_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
+ 	 - specify the event handler for the pointer triple tap event.
+- on_x_times_tap : [`(u8, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
+ 	 - specify the event handler for the pointer `x` times tap event.
 - on_pointer_cancel : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler to process pointer cancel event.
 - on_pointer_enter : [`impl FnMut(& mut PointerEvent)`] 
@@ -74,6 +80,12 @@
 [`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
 
 [`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
+
+[`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`]: prelude::Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >
+
+[`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`]: prelude::Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >
+
+[`(u8, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`]: prelude::(u8, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)
 
 [`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
 
