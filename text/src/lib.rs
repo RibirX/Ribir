@@ -103,7 +103,7 @@ pub enum FontFamily {
 }
 
 /// Encapsulates the font properties of font face.
-#[derive(Clone, Debug, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FontFace {
   /// A prioritized list of font family names or generic family names.
   ///

@@ -24,7 +24,7 @@ impl<'a> WidgetGen<'a> {
   }
 
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
-    if is_expr_keyword(&self.ty) {
+    if is_expr_keyword(self.ty) {
       self.expr_widget_token()
     } else {
       self.normal_widget_token(ctx)
@@ -103,7 +103,7 @@ impl<'a> WidgetGen<'a> {
         .all_widgets()
         .into_iter()
         .flatten()
-        .chain(std::iter::once(name.clone()))
+        .chain(std::iter::once(<&Ident>::clone(name)))
         .map(capture_widget);
 
       quote_spanned! { f.span() => {
@@ -118,7 +118,7 @@ impl<'a> WidgetGen<'a> {
 
   fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
     // widget is followed by others.
-    ctx.is_used(&self.name)
+    ctx.is_used(self.name)
       // or its fields follow others
       ||  self
       .fields

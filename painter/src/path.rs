@@ -163,7 +163,7 @@ impl Builder {
     let rect = unsafe { std::mem::transmute(rect) };
     self
       .0
-      .add_rounded_rectangle(rect, &*radius, Winding::Positive)
+      .add_rounded_rectangle(rect, radius, Winding::Positive)
   }
 
   /// Build a stroke path with `width` size, and `style`.

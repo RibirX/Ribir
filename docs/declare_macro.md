@@ -31,7 +31,7 @@ The above code declare a `SizedBox` widget has a `Row` child, and the `Row` widg
 
 Notice, the nested children must declare after the fields.
 
-## Built-in fields to extend the literal syntax
+## Built-in fields to extend your widget
 
 In addition to using own fields of widget, `widget!` provide a dozens of built-in common fields that can used to any widget, like `padding` `margin` `background` and so on. [See the full list of built-in fields][builtin] to know what you can use.
 
@@ -80,7 +80,7 @@ impl CombinationWidget for T {
 }
 
 ```
-## Expressions as children
+## Use `ExprWidget` to dynamic generate widget.
 
 At before we use struct literal to declare children, we also can pass any rust expression as children.
 
@@ -113,7 +113,7 @@ Notice, the expression return type must be:
 - A `Option` of widget type
 - A type which implemented `IntoIterator` and its iterate item is a widget type.
 
-## Use `id` to access and follow widget in the whole `widget!`
+## Use `id` to access and directly reactive to widget change.
 
 `id` is a very special built-in field, it's use to named and identify the widget in the whole `widget!` scope and must be unique.
 A widget with an `id` can be directly accessed in its `widget!` or embed `widget!` across the `id`. 
@@ -344,6 +344,7 @@ impl StatefulCombination for Todos {
 See the `data_follow`, `this_ref` with a `silent` method call, this means when `checkbox` change, modify back  to `this_ref.silent().tasks[idx].finished`, but this modify not effect the `StatefulTodos` widget to rebuild.
 
 
+## use `ctx`
 ## How to support widget work in `widget!` syntax ?
 
 Every widget can be supported to use in `widget!` macro if it implemented the [`Declare`](declare). 

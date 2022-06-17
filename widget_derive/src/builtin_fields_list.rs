@@ -21,7 +21,7 @@ builtin! {
   Cursor {
     #[doc="assign cursor to the widget."]
     cursor: CursorIcon
-  }
+  } 
 
   ThemeWidget {
     #[doc="assign theme to the widget."]
@@ -77,10 +77,6 @@ builtin! {
     #[doc="specify the event handler when pointer leave this widget."]
     on_pointer_leave: impl FnMut(&mut PointerEvent),
   }
-
-  // #[doc="specify the event handler for processing the specified times tap."]
-  // on_tap_times: "FnMut(&[`PointerEvent`](../ribir/widget/events/struct.PointerEvent.html))",
-
 
   FocusListener {
     #[doc="Indicates whether the widget should automatically get focus when the window loads."]

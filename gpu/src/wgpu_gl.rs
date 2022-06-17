@@ -48,7 +48,7 @@ pub async fn wgpu_backend_headless(
   GpuBackend { tessellator, gl }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum AntiAliasing {
   None = 1,
   Msaa2X = 2,

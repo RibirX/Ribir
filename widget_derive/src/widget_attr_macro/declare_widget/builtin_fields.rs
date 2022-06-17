@@ -106,7 +106,7 @@ impl BuiltinFieldWidgets {
         let ty = Ident::new(ty_name, span).into();
 
         let fields = &info.0;
-        let gen = WidgetGen::new(&ty, &name, &fields);
+        let gen = WidgetGen::new(&ty, &name, fields);
         let tokens = gen.gen_widget_tokens(ctx);
 
         (name, tokens)
@@ -131,7 +131,7 @@ impl BuiltinFieldWidgets {
       .filter_map(|builtin| self.widgets.get_key_value(builtin.ty))
       .fold(is_expr_host, |is_expr_widget, (builtin_ty, info)| {
         let suffix = BUILTIN_WIDGET_SUFFIX.get(builtin_ty).unwrap();
-        let builtin_name = ribir_suffix_variable(&name, suffix);
+        let builtin_name = ribir_suffix_variable(name, suffix);
         let span = info.span();
         if is_expr_widget {
           tokens.extend(quote_spanned! { span =>
@@ -158,7 +158,7 @@ impl BuiltinFieldWidgets {
 
     let info = self.widgets.entry(widget_ty).or_default();
 
-    if info.0.iter().find(|f| f.member == field.member).is_some() {
+    if info.0.iter().any(|f| f.member == field.member) {
       return Err(syn::Error::new(
         field.span(),
         format!("field `{}` specified more than once", stringify!($name)).as_str(),

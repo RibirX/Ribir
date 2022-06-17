@@ -289,7 +289,7 @@ impl Face {
 
 fn to_db_family(f: &FontFamily) -> Family {
   match f {
-    FontFamily::Name(name) => Family::Name(&*name),
+    FontFamily::Name(name) => Family::Name(name),
     FontFamily::Serif => Family::Serif,
     FontFamily::SansSerif => Family::SansSerif,
     FontFamily::Cursive => Family::Cursive,
