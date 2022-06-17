@@ -15,7 +15,7 @@ use crate::widget_attr_macro::Id;
 
 use super::{
   capture_widget,
-  declare_widget::{assign_uninit_field, BuiltinFieldWidgets},
+  declare_widget::{assign_uninit_field, BuiltinFieldWidgets, WidgetGen, FIELD_WIDGET_TYPE},
   ribir_suffix_variable, ribir_variable, widget_state_ref, DeclareCtx, NameUsed, Scope,
   ScopeUsedInfo, UsedPart, UsedType, BUILD_CTX,
 };
@@ -23,7 +23,7 @@ use super::{
 use super::kw;
 
 pub struct Animations {
-  _animations_token: kw::animations,
+  animations_token: kw::animations,
   brace_token: token::Brace,
   animates_def: Vec<Animate>,
   states_def: Vec<State>,
@@ -245,13 +245,23 @@ impl Parse for Animations {
     }
 
     Ok(Animations {
-      _animations_token: animations_token,
+      animations_token,
       brace_token,
       animates_def,
       states_def,
       transitions_def,
       triggers,
     })
+  }
+}
+
+impl Spanned for Animations {
+  fn span(&self) -> proc_macro2::Span {
+    self
+      .animations_token
+      .span
+      .join(self.brace_token.span)
+      .unwrap()
   }
 }
 
@@ -425,10 +435,10 @@ impl Parse for AnimateExpr {
   }
 }
 
-impl ToTokens for Animations {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
+impl Animations {
+  pub fn to_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
     self.brace_token.surround(tokens, |tokens| {
-      self.triggers.iter().for_each(|t| t.to_tokens(tokens));
+      self.triggers.iter().for_each(|t| t.to_tokens(ctx, tokens));
     });
   }
 }
@@ -563,7 +573,7 @@ impl ToTokens for State {
     } else {
       let PathField { path, _colon_token, expr } = &fields[0];
       let MemberPath { widget, member, dot_token } = &path;
-      let widget = widget_from_field_name(&widget, &member);
+      let widget = widget_from_field_name(widget, member);
       quote! {
         #(#refs)*;
         let state_init = #expr;
@@ -579,9 +589,7 @@ impl ToTokens for State {
         #state_tokens
       }}
     } else {
-      quote_spanned! { state_span => move |_, _| {
-        #state_tokens
-      }}
+      quote_spanned! { state_span => move |_, _| { #state_tokens }}
     };
 
     if let Some(Id { name, .. }) = id.as_ref() {
@@ -609,8 +617,8 @@ impl ToTokens for Transition {
   }
 }
 
-impl ToTokens for Trigger {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
+impl Trigger {
+  fn to_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
     let Self {
       path: path @ MemberPath { widget, member, dot_token },
       expr,
@@ -620,9 +628,9 @@ impl ToTokens for Trigger {
     let trigger_span = widget.span().join(expr.span()).unwrap();
     let animate = ribir_variable("animate", expr.span());
 
-    // todo: need a way to detect if it trigger by listener.
-    let is_listener = false;
-    if is_listener {
+    let ty_name = FIELD_WIDGET_TYPE.get(member.to_string().as_str());
+
+    if ty_name.map_or(false, |ty| ty.ends_with("Listener")) {
       let expr = match expr {
         AnimateExpr::Animate(a) => {
           let mut tokens = quote! {};
@@ -636,12 +644,20 @@ impl ToTokens for Trigger {
           quote! { #e }
         }
       };
+
+      let ty = Ident::new(ty_name.unwrap(), path.span()).into();
+      let fields = [parse_quote! { #member: move |_| { #expr.start();}}];
+      let trigger_listener = ribir_variable("trigger_by", member.span());
+      let gen = WidgetGen::new(&ty, &trigger_listener, &fields);
+      let listener_widget = gen.gen_widget_tokens(ctx);
       tokens.extend(quote_spanned! { trigger_span =>
-        let mut #animate = #expr;
-        #path (move |_|{ #animate.start();} );
+        let mut #widget = {
+          #listener_widget;
+          SingleChild::new(#trigger_listener, #widget)
+        };
       })
     } else {
-      let widget = widget_from_field_name(&widget, &member);
+      let widget = widget_from_field_name(widget, member);
 
       let expr = match expr {
         AnimateExpr::Animate(a) => {
@@ -812,7 +828,7 @@ impl Animations {
     })
   }
 
-  pub fn follows_iter(&self) -> impl Iterator<Item = (Ident, NameUsed)> + '_ {
+  pub fn dependencies(&self) -> impl Iterator<Item = (Ident, NameUsed)> + '_ {
     self.named_objects_iter().filter_map(|n| {
       n.used_part()
         .map(|d| (n.name().clone(), NameUsed::from_single_part(d)))

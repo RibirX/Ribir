@@ -110,7 +110,8 @@ impl WidgetMacro {
 
     let mut follows = (!ctx.named_objects.is_empty()).then(|| self.analyze_object_dependencies());
     if let Some(follows) = follows.as_mut() {
-      let _init_circle_check = Self::circle_check(&follows, |stack| {
+      // init circle check
+      Self::circle_check(follows, |stack| {
         Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
       })?;
 
@@ -119,7 +120,8 @@ impl WidgetMacro {
       // individual check the circle follow error.
       if let Some(dataflows) = self.dataflows.as_ref() {
         dataflows.analyze_data_flow_follows(follows);
-        let _circle_follows_check = Self::circle_check(&follows, |stack| {
+        // circle dependencies check
+        Self::circle_check(follows, |stack| {
           if stack.iter().any(|s| match &s.scope {
             Scope::Field(f) => f.skip_nc.is_some(),
             Scope::DataFlow(df) => df.skip_nc.is_some(),
@@ -143,7 +145,7 @@ impl WidgetMacro {
             let mut named_widgets_def = self.named_objects_def_tokens(ctx);
 
             if let Some(follows) = follows.as_ref() {
-              Self::deep_follow_iter(&follows, |name| {
+              Self::deep_follow_iter(follows, |name| {
                 tokens.extend(named_widgets_def.remove(name));
               });
             }
@@ -153,7 +155,9 @@ impl WidgetMacro {
           }
           self.all_anonyms_widgets_tokens(ctx, tokens);
           self.dataflows.to_tokens(tokens);
-          self.animations.to_tokens(tokens);
+          if let Some(a) = self.animations.as_ref() {
+            a.to_tokens(ctx, tokens);
+          }
           self.compose_tokens(ctx, tokens);
           let name = self.widget_identify();
           tokens.extend(quote! {  #name.into_widget() })
@@ -202,10 +206,10 @@ impl WidgetMacro {
   /// }
   /// ```
   fn analyze_object_dependencies(&self) -> BTreeMap<Ident, NameUsed> {
-    let mut follows = self.widget.analyze_object_follows();
+    let mut follows = self.widget.analyze_object_dependencies();
 
     if let Some(animations) = self.animations.as_ref() {
-      follows.extend(animations.follows_iter());
+      follows.extend(animations.dependencies());
     }
     follows
   }
@@ -239,7 +243,7 @@ impl WidgetMacro {
       tokens: &mut TokenStream,
     ) {
       if w.name().is_none() {
-        w.host_and_builtin_widgets_tokens(&name, ctx)
+        w.host_and_builtin_widgets_tokens(name, ctx)
           .for_each(|(_, widget)| tokens.extend(widget));
       }
 
@@ -248,7 +252,7 @@ impl WidgetMacro {
         .enumerate()
         .filter(|(_, c)| c.name().is_none())
         .for_each(|(idx, c)| {
-          let c_name = child_variable(&name, idx);
+          let c_name = child_variable(name, idx);
           anonyms_widgets_tokens(&c_name, c, ctx, tokens);
         })
     }
@@ -299,7 +303,7 @@ impl WidgetMacro {
   where
     F: Fn(&[CircleCheckStack]) -> Result<()>,
   {
-    #[derive(PartialEq, Debug)]
+    #[derive(PartialEq, Eq, Debug)]
     enum CheckState {
       Checking,
       Checked,
@@ -391,14 +395,13 @@ impl<'a> CircleCheckStack<'a> {
         let (widget, _) = ctx
           .named_objects
           .get_key_value(widget)
-          .expect("id must in named widgets")
-          .clone();
+          .expect("id must in named widgets");
         (widget.clone(), Some(f.member.clone()))
       }
       _ => (widget.clone(), None),
     };
 
-    let used_widget = ctx.user_perspective_name(&self.used_widget).map_or_else(
+    let used_widget = ctx.user_perspective_name(self.used_widget).map_or_else(
       || self.used_widget.clone(),
       |user| Ident::new(&user.to_string(), self.used_widget.span()),
     );

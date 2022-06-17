@@ -108,7 +108,7 @@ where
     self.lines_reorder();
     let lines = &mut self.visual_lines;
 
-    fn adjust_y(lines: &mut Vec<VisualLine>, f: impl Fn(&Glyph<Em>) -> Em) {
+    fn adjust_y(lines: &mut [VisualLine], f: impl Fn(&Glyph<Em>) -> Em) {
       lines.iter_mut().for_each(|l| {
         if let Some(g) = l.glyphs.last() {
           let offset = f(g);
@@ -117,7 +117,7 @@ where
       });
     }
 
-    fn adjust_x(lines: &mut Vec<VisualLine>, f: impl Fn(&Glyph<Em>) -> Em) {
+    fn adjust_x(lines: &mut [VisualLine], f: impl Fn(&Glyph<Em>) -> Em) {
       lines.iter_mut().for_each(|l| {
         if let Some(g) = l.glyphs.last() {
           let offset = f(g);
@@ -208,7 +208,7 @@ where
     let letter_space = run
       .letter_space()
       .or(self.cfg.letter_space)
-      .unwrap_or(Pixel::zero());
+      .unwrap_or_else(Pixel::zero);
     if letter_space != Em::zero() {
       let cursor = LetterSpaceCursor::new(inner_cursor, letter_space.into());
       self.consume_run_with_bounds_cursor(run, cursor);

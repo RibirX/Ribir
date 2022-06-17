@@ -81,11 +81,10 @@ impl TypographyStore {
 
     if let Some(res) = self.get_from_cache(text.clone(), font_size, &cfg) {
       if !res.infos.over_bounds || res.bounds == bounds || res.bounds.greater_than(bounds).all() {
-        let visual_info = res.infos.clone();
         return VisualGlyphs {
           scale: font_size.into_em().value(),
           bounds,
-          visual_info,
+          visual_info: res.infos,
         };
       }
 
@@ -330,7 +329,7 @@ mod tests {
     }
 
     let mut cfg = TypographyCfg {
-      letter_space: Some(Pixel::from(2.).into()),
+      letter_space: Some(Pixel::from(2.)),
       line_height: None,
       text_align: None,
       bounds: (Em::MAX, Em::MAX).into(),
@@ -432,7 +431,7 @@ mod tests {
     cfg.text_align = Some(TextAlign::Center);
     cfg.line_dir = PlaceLineDirection::TopToBottom;
     cfg.bounds = Size::new(Pixel::from(40.).into(), Pixel::from(15.).into());
-    let center_clip = glyphs(cfg.clone());
+    let center_clip = glyphs(cfg);
     assert_eq!(
       &center_clip,
       &[
@@ -494,10 +493,6 @@ mod tests {
     store.end_frame();
     store.end_frame();
 
-    assert!(
-      store
-        .get_from_cache(text.clone(), font_size, &cfg)
-        .is_none()
-    );
+    assert!(store.get_from_cache(text, font_size, &cfg).is_none());
   }
 }

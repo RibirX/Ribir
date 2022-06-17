@@ -175,7 +175,7 @@ impl VisitMut for DeclareCtx {
     visit_mut::visit_local_mut(self, local);
 
     if let Some((_, init)) = &local.init {
-      let right_name = self.expr_find_name_widget(&*init).cloned();
+      let right_name = self.expr_find_name_widget(init).cloned();
       let var_name = self.analyze_stack.last_mut().unwrap().last_mut();
       // var_name maybe none if
       // `let _ = xxx`
@@ -314,8 +314,10 @@ impl DeclareCtx {
 
   fn expand_widget_macro(&mut self, tokens: TokenStream) -> syn::Result<Expr> {
     let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
-    let mut new_ctx = DeclareCtx::default();
-    new_ctx.analyze_stack = self.analyze_stack.clone();
+    let mut new_ctx = DeclareCtx {
+      analyze_stack: self.analyze_stack.clone(),
+      ..<_>::default()
+    };
     // all named objects should as outside define for embed `widget!` macro.
     self.named_objects.iter().for_each(|(name, id_ty)| {
       let ty = *id_ty | IdType::FROM_ANCESTOR;

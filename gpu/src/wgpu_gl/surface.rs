@@ -149,7 +149,7 @@ impl<'a> std::ops::Deref for SurfaceTexture<'a> {
 
   fn deref(&self) -> &Self::Target {
     match self {
-      SurfaceTexture::RefCell(t) => &*t,
+      SurfaceTexture::RefCell(t) => t,
       SurfaceTexture::Ref(t) => t,
     }
   }

@@ -2,11 +2,10 @@ use proc_macro2::Span;
 use syn::Ident;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
-// todo: reserve `ctx` name in widget `macro`; Error if user use it.
-pub(crate) const BUILD_CTX: &str = "build_ctx";
+pub(crate) const BUILD_CTX: &str = "ctx";
 
 pub fn child_variable(name: &Ident, idx: usize) -> Ident {
-  ribir_suffix_variable(&name, &format!("c_{idx}"))
+  ribir_suffix_variable(name, &format!("c_{idx}"))
 }
 
 pub fn ribir_variable(name: &str, span: Span) -> Ident {

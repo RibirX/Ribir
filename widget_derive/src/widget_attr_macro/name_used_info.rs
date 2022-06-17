@@ -110,7 +110,7 @@ impl ScopeUsedInfo {
     match (self.0.as_mut(), other.0.as_ref()) {
       (Some(a), Some(b)) => b.iter().for_each(|(name, info)| {
         a.entry(name.clone())
-          .and_modify(|i| i.merge(&info))
+          .and_modify(|i| i.merge(info))
           .or_insert_with(|| info.clone());
       }),
       (None, b @ Some(_)) => self.0 = b.cloned(),

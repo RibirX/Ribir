@@ -152,7 +152,7 @@ impl Painter {
 
   #[inline]
   pub fn set_font<F: Into<CowRc<FontFace>>>(&mut self, font: FontFace) -> &mut Self {
-    self.current_state_mut().font_face = font.into();
+    self.current_state_mut().font_face = font;
     self
   }
 
@@ -350,7 +350,7 @@ impl<'a> Deref for PainterGuard<'a> {
   fn deref(&self) -> &Self::Target { self.0 }
 }
 
-impl<'a, 'b> DerefMut for PainterGuard<'a> {
+impl<'a> DerefMut for PainterGuard<'a> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }

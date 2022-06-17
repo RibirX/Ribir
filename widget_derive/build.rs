@@ -11,11 +11,11 @@ fn main() -> std::io::Result<()> {
   let out_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
   let dest_path = Path::new(&out_dir).join("../docs/declare_builtin_fields.md");
   let mut f = fs::File::create(&dest_path)?;
-  f.write(b"# Full builtin fields list \n\n")?;
+  f.write_all(b"# Full builtin fields list \n\n")?;
 
   for w in WIDGETS.iter() {
     for field in w.fields.iter() {
-      f.write(
+      f.write_all(
         format!(
           "- {} : [`{}`] \n \t - {}\n",
           field.name, field.ty, field.doc
@@ -28,7 +28,7 @@ fn main() -> std::io::Result<()> {
   for w in WIDGETS.iter() {
     for field in w.fields.iter() {
       let ty_name = field.ty;
-      f.write(format!("\n[`{ty_name}`]: prelude::{ty_name}\n",).as_bytes())?;
+      f.write_all(format!("\n[`{ty_name}`]: prelude::{ty_name}\n",).as_bytes())?;
     }
   }
 

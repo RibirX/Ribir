@@ -16,7 +16,7 @@ use crate::{
 };
 mod builtin_fields;
 pub use builtin_fields::*;
-use widget_gen::WidgetGen;
+pub use widget_gen::WidgetGen;
 
 use super::{
   kw,
@@ -32,7 +32,7 @@ pub struct DeclareWidget {
   pub named: Option<Id>,
   fields: Vec<DeclareField>,
   pub builtin: BuiltinFieldWidgets,
-  pub children: Vec<Box<DeclareWidget>>,
+  pub children: Vec<DeclareWidget>,
 }
 
 #[derive(Clone, Debug)]
@@ -304,12 +304,11 @@ impl DeclareWidget {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  pub fn analyze_object_follows(&self) -> BTreeMap<Ident, NameUsed> {
+  pub fn analyze_object_dependencies(&self) -> BTreeMap<Ident, NameUsed> {
     let mut follows: BTreeMap<Ident, NameUsed> = BTreeMap::new();
     self.traverses_widget().for_each(|w| {
       if let Some(name) = w.name() {
-        w.builtin
-          .collect_builtin_widget_follows(&name, &mut follows);
+        w.builtin.collect_builtin_widget_follows(name, &mut follows);
 
         let w_follows: NameUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
 

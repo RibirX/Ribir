@@ -8,7 +8,6 @@ use syn::{
 
 mod kw {
   use syn::custom_keyword;
-
   custom_keyword!(by);
 }
 
