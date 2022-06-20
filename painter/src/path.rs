@@ -5,14 +5,13 @@ use lyon_path::{
   Winding,
 };
 
-use crate::{Angle, Brush, PathStyle, Point, Rect, Vector};
+use crate::{Angle, PathStyle, Point, Rect, Vector};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone)]
 pub struct Path {
   pub path: lyon_path::path::Path,
-  pub brush: Brush,
-  pub path_style: PathStyle,
+  pub style: PathStyle,
 }
 
 /// The radius of each corner of a rounded rectangle.
@@ -28,7 +27,10 @@ impl Path {
   pub fn builder() -> Builder { Builder::default() }
 
   #[inline]
-  pub fn box_rect(&self) -> Rect { path_box_rect(&self.path, self.path_style) }
+  pub fn box_rect(&self) -> Rect {
+    // todo: path_style effect box rect
+    lyon_algorithms::aabb::bounding_rect(self.path.iter()).cast_unit()
+  }
 }
 
 impl Builder {
@@ -158,39 +160,32 @@ impl Builder {
 
   /// Creates a path for a rectangle by `rect` with `radius`.
   /// #[inline]
-  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) {
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
     // Safety, just a unit type convert, it's same type.
     let rect = unsafe { std::mem::transmute(rect) };
     self
       .0
-      .add_rounded_rectangle(rect, radius, Winding::Positive)
+      .add_rounded_rectangle(rect, radius, Winding::Positive);
+    self
   }
 
   /// Build a stroke path with `width` size, and `style`.
   #[inline]
-  pub fn stroke(self, line_width: f32, style: Brush) -> Path {
+  pub fn stroke(self, line_width: f32) -> Path {
     Path {
       path: self.0.build(),
-      brush: style,
-      path_style: PathStyle::Stroke(line_width),
+      style: PathStyle::Stroke(line_width),
     }
   }
 
   /// Build a fill path, witch should fill with `style`
   #[inline]
-  pub fn fill(self, style: Brush) -> Path {
+  pub fn fill(self) -> Path {
     Path {
       path: self.0.build(),
-      brush: style,
-      path_style: PathStyle::Fill,
+      style: PathStyle::Fill,
     }
   }
-}
-
-#[inline]
-pub fn path_box_rect(path: &lyon_path::Path, _: PathStyle) -> Rect {
-  // todo: path_style effect box rect
-  lyon_algorithms::aabb::bounding_rect(path.iter()).cast_unit()
 }
 
 impl std::ops::Deref for Radius {

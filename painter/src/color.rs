@@ -292,7 +292,7 @@ impl Color {
     (f.to_bits().saturating_sub(C23)) as u8
   }
 
-  const fn const_rgb_from(red: u8, green: u8, blue: u8) -> Self {
+  pub const fn const_rgb_from(red: u8, green: u8, blue: u8) -> Self {
     Color {
       red: red as f32 / u8::MAX as f32,
       green: green as f32 / u8::MAX as f32,

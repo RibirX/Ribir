@@ -6,7 +6,7 @@ use usvg::Tree;
 
 #[derive(Declare)]
 pub struct Svg {
-  paths: Box<Vec<Path>>,
+  paths: PathsPaintKit,
   size: Size,
 }
 
@@ -22,7 +22,7 @@ impl Svg {
     let vb_width = svg_size.width();
     let vb_height = svg_size.height();
 
-    let mut paths = Box::new(vec![]);
+    let mut paths = vec![];
 
     for node in tree.root().descendants() {
       if let usvg::NodeKind::Path(ref p) = *node.borrow() {
@@ -34,34 +34,24 @@ impl Svg {
           };
 
           let usvg::Color { red, green, blue } = fill_color;
-          let style = Brush::Color(Color {
-            red: red as f32,
-            green: green as f32,
-            blue: blue as f32,
-            alpha: 1.,
-          });
-          paths.push(builder.fill(style));
+          let brush = Brush::Color(Color::const_rgb_from(red, green, blue));
+          paths.push(PathPaintKit { brush, path: builder.fill() });
         }
 
         if let Some(ref stroke) = p.stroke {
           let builder = Svg::build_path(p);
           let (stroke_color, stroke_opts) = convert_stroke(stroke);
           let usvg::Color { red, green, blue } = stroke_color;
-          let style = Brush::Color(Color {
-            red: red as f32,
-            green: green as f32,
-            blue: blue as f32,
-            alpha: 1.,
-          });
+          let brush = Brush::Color(Color::const_rgb_from(red, green, blue));
           let width = stroke_opts.line_width;
-          paths.push(builder.stroke(width, style))
+          paths.push(PathPaintKit { path: builder.stroke(width), brush })
         }
       }
     }
 
     let size = Size::new(vb_width as f32, vb_height as f32);
 
-    Self { paths, size }
+    Self { paths: PathsPaintKit { paths }, size }
   }
 
   fn build_path(p: &usvg::Path) -> Builder {
@@ -131,9 +121,7 @@ impl Render for Svg {
       real_size.height / self.size.height,
     );
 
-    self.paths.iter().for_each(|path| {
-      ctx.painter().paint_path(path.clone());
-    });
+    self.paths.paint(ctx);
   }
 }
 

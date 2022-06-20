@@ -97,19 +97,19 @@ fn main() {
       };
 
       draw_arrow_path(&mut painter);
-      painter.fill(Some(red_brush.clone()));
+      painter.set_brush(red_brush.clone()).fill();
 
       painter.translate(300., 0.);
       draw_arrow_path(&mut painter);
-      painter.stroke(Some(5.), Some(red_brush));
+      painter.set_brush(red_brush).set_line_width(5.).stroke();
 
       painter.translate(-300., 250.);
       draw_arrow_path(&mut painter);
-      painter.fill(Some(img_brush.clone()));
+      painter.set_brush(img_brush.clone()).fill();
 
       painter.translate(300., 0.);
       draw_arrow_path(&mut painter);
-      painter.stroke(Some(25.), Some(img_brush));
+      painter.set_brush(img_brush).set_line_width(25.).stroke();
 
       let commands = painter.finish();
       gpu_backend.submit(commands, None).unwrap();

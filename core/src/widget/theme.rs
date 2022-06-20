@@ -335,32 +335,12 @@ pub struct CheckboxTheme {
   pub border_width: f32,
   pub radius: f32,
   pub border_color: Color,
-  pub checked_path: Path,
-  pub indeterminate_path: Path,
 }
 
 impl Default for CheckboxTheme {
   fn default() -> Self {
     let size: f32 = 12.;
     let border_width = 2.;
-    let checked_path = {
-      let mut builder = Path::builder();
-      let start = Point::new(2.733_333_3, 8.466_667);
-      let mid = Point::new(6., 11.733_333);
-      let end = Point::new(13.533_333, 4.2);
-      builder.segment(start, mid).segment(mid, end);
-      builder.stroke(1.422_222, Color::WHITE.into())
-    };
-
-    let center_y = size / 2. + border_width;
-    let indeterminate_path = {
-      let mut builder = Path::builder();
-      builder
-        .begin_path(Point::new(3., center_y))
-        .line_to(Point::new(size + border_width * 2. - 3., center_y))
-        .close_path();
-      builder.stroke(border_width, Color::WHITE.into())
-    };
 
     Self {
       size,
@@ -368,8 +348,6 @@ impl Default for CheckboxTheme {
       check_background: Color::BLACK,
       radius: 2.,
       border_color: Color::BLACK,
-      checked_path,
-      indeterminate_path,
     }
   }
 }
