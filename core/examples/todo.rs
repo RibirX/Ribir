@@ -1,4 +1,3 @@
-#![feature(negative_impls)]
 use ribir::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,7 +24,7 @@ impl Compose for Todos {
             widget! {
               Row {
                 margin: EdgeInsets::vertical(4.),
-                Checkbox{  id: checkbox, checked }
+                Checkbox { id: checkbox, checked }
                 Text {
                   text: label,
                   margin: EdgeInsets::vertical(4.)

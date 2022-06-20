@@ -2,10 +2,11 @@ use crate::{
   ColorPrimitive, DrawTriangles, GlRender, Primitive, Texture, TexturePrimitive, TriangleLists,
   Vertex,
 };
-use algo::FrameCache;
-use lyon_tessellation::{path::Path, *};
-use painter::{Brush, PaintCommand, PaintPath, PathStyle, TileMode};
-use std::{collections::VecDeque, hash::Hash, mem::size_of};
+use algo::{FrameCache, Resource, ShareResource};
+use lyon_tessellation::{path::Path as LyonPath, *};
+use painter::{Brush, PaintCommand, PaintPath, Path, PathStyle, TileMode};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use std::{collections::VecDeque, hash::Hash};
 use text::{
   font_db::ID,
   shaper::{GlyphId, TextShaper},
@@ -29,7 +30,7 @@ pub struct Tessellator {
   // texture atlas for pure color and image to draw.
   atlas: TextureAtlas,
   texture_records: TextureRecords,
-  vertices_cache: Option<FrameCache<VerticesKey<Path>, Box<VertexCache>>>,
+  vertices_cache: Option<FrameCache<VerticesKey, Box<VertexCache>>>,
   vertices: Vec<Vertex>,
   indices: Vec<u32>,
   primitives: Vec<Primitive>,
@@ -56,17 +57,20 @@ struct CacheItem {
 }
 
 #[derive(Debug, Clone)]
-struct VerticesKey<P> {
+struct VerticesKey {
   tolerance: f32,
   threshold: f32,
-  style: PathStyle,
-  path: PathKey<P>,
+  path: PathKey,
 }
 
 #[derive(Debug, Clone)]
-enum PathKey<P> {
-  Path(P),
-  Glyph { glyph_id: GlyphId, face_id: ID },
+enum PathKey {
+  Path(ShareResource<Path>),
+  Glyph {
+    glyph_id: GlyphId,
+    face_id: ID,
+    style: PathStyle,
+  },
 }
 #[derive(Default)]
 struct VertexCache {
@@ -113,14 +117,27 @@ impl Tessellator {
     let mut uninit_vertices = vertices_cache
       .get_or_insert_with(<_>::default)
       .as_uninit_map();
+    let mut no_cache_paths = vec![];
     commands.iter().for_each(|cmd| {
       self.command_to_buffer(
         cmd,
-        |key| uninit_vertices.get_or_delay_init::<dyn KeySlice>(key),
+        |key| uninit_vertices.get_or_delay_init(key),
+        |tolerance, path| {
+          let mut vc = Box::new(VertexCache::default());
+          let ptr = &mut *vc as *mut VertexCache;
+          no_cache_paths.push((tolerance, path, vc));
+          ptr
+        },
         render,
       )
     });
     uninit_vertices.par_init_with(|key| Self::gen_triangles(&self.shaper, &key));
+    no_cache_paths
+      .par_iter_mut()
+      .for_each(|(tolerance, path, cache)| {
+        let valid = tesselate_path(&path.path, path.style, *tolerance);
+        **cache = valid;
+      });
     self.vertices_cache = vertices_cache;
 
     while !self.buffer_list.is_empty() {
@@ -205,29 +222,40 @@ impl Tessellator {
     self.primitives.len() as u32 - 1
   }
 
-  fn command_to_buffer<'a, F, R>(&mut self, cmd: &'a PaintCommand, mut cache: F, render: &mut R)
-  where
-    F: FnMut(VerticesKey<&'a Path>) -> *mut VertexCache,
+  fn command_to_buffer<'a, F, F2, R>(
+    &mut self,
+    cmd: &'a PaintCommand,
+    mut cache: F,
+    mut not_cache: F2,
+    render: &mut R,
+  ) where
+    F: FnMut(VerticesKey) -> *mut VertexCache,
+    F2: FnMut(f32, &'a Path) -> *mut VertexCache,
     R: GlRender,
   {
     let (primitive, prim_type) = self.prim_from_command(cmd, render);
 
     let PaintCommand { path, transform, .. } = cmd;
-    let style = cmd.path_style;
     let scale = transform.m11.max(transform.m22).max(f32::EPSILON);
     let threshold = self.threshold;
     match path {
       PaintPath::Path(path) => {
-        let path = PathKey::Path(path);
-        let tolerance = TOLERANCE / scale;
-        let key = VerticesKey { tolerance, threshold, style, path };
-        let cache_ptr = cache(key);
         let prim_id = self.add_primitive(primitive);
+        let tolerance = TOLERANCE / scale;
+        let cache_ptr = match path {
+          Resource::Share(path) => {
+            let path = PathKey::Path(path.clone());
+            let key = VerticesKey { tolerance, threshold, path };
+            cache(key)
+          }
+          Resource::Local(path) => not_cache(tolerance, path),
+        };
+
         self
           .buffer_list
           .push_back(CacheItem { prim_id, cache_ptr, prim_type });
       }
-      PaintPath::Text { font_size, glyphs } => {
+      PaintPath::Text { font_size, glyphs, style } => {
         let tolerance = TOLERANCE / (font_size.into_pixel().value() * scale);
         let font_size_ems = font_size.into_pixel().value();
         glyphs.iter().for_each(
@@ -238,8 +266,8 @@ impl Tessellator {
              glyph_id,
              ..
            }| {
-            let path = PathKey::<&Path>::Glyph { face_id, glyph_id };
-            let key = VerticesKey { tolerance, threshold, style, path };
+            let path = PathKey::Glyph { face_id, glyph_id, style: *style };
+            let key = VerticesKey { tolerance, threshold, path };
             let cache_ptr = cache(key);
 
             let t = transform
@@ -311,11 +339,11 @@ impl Tessellator {
     use_atlas
   }
 
-  fn gen_triangles(shaper: &TextShaper, key: &VerticesKey<&Path>) -> VertexCache {
-    let &VerticesKey { tolerance, style, .. } = key;
-    match key.path {
-      PathKey::Path(path) => tesselate_path(path, style, tolerance),
-      PathKey::Glyph { glyph_id, face_id } => {
+  fn gen_triangles(shaper: &TextShaper, key: &VerticesKey) -> VertexCache {
+    let &VerticesKey { tolerance, ref path, .. } = key;
+    match path {
+      PathKey::Path(path) => tesselate_path(&path.path, path.style, tolerance),
+      &PathKey::Glyph { glyph_id, face_id, style } => {
         let face = {
           let mut font_db = shaper.font_db_mut();
           font_db
@@ -362,14 +390,14 @@ impl Tessellator {
   }
 }
 
-fn tesselate_path(path: &Path, style: PathStyle, tolerance: f32) -> VertexCache {
+fn tesselate_path(path: &LyonPath, style: PathStyle, tolerance: f32) -> VertexCache {
   match style {
     painter::PathStyle::Fill => fill_tess(path, tolerance),
     painter::PathStyle::Stroke(line_width) => stroke_tess(path, line_width, tolerance),
   }
 }
 
-fn stroke_tess(path: &Path, line_width: f32, tolerance: f32) -> VertexCache {
+fn stroke_tess(path: &LyonPath, line_width: f32, tolerance: f32) -> VertexCache {
   let mut buffers = VertexBuffers::new();
   let mut stroke_tess = StrokeTessellator::default();
   stroke_tess
@@ -386,7 +414,7 @@ fn stroke_tess(path: &Path, line_width: f32, tolerance: f32) -> VertexCache {
   }
 }
 
-fn fill_tess(path: &Path, tolerance: f32) -> VertexCache {
+fn fill_tess(path: &LyonPath, tolerance: f32) -> VertexCache {
   let mut buffers = VertexBuffers::new();
   let mut fill_tess = FillTessellator::default();
   fill_tess
@@ -410,158 +438,62 @@ fn threshold_hash(value: f32, threshold: f32) -> u32 {
   (value * precisest) as u32
 }
 
-use std::borrow::Borrow;
-
-// todo: a more robust and also fast way to implement hash and eq for path.
-enum Verb {
-  _LineTo,
-  _QuadraticTo,
-  _CubicTo,
-  _Begin,
-  _Close,
-  _End,
-}
-type LyonPoint = lyon_tessellation::geom::Point<f32>;
-struct ShadowPath {
-  points: Box<[LyonPoint]>,
-  verbs: Box<[Verb]>,
-  _num_attributes: usize,
-}
-
-fn as_bytes<T>(t: &[T]) -> &[u8] {
-  let len = t.len() * size_of::<T>();
-  unsafe { std::slice::from_raw_parts(t.as_ptr() as *const u8, len) }
-}
-
-impl Hash for VerticesKey<Path> {
+impl Hash for VerticesKey {
   #[inline]
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { (self as &dyn KeySlice).hash(state) }
-}
-impl PartialEq for VerticesKey<Path> {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { self as &dyn KeySlice == other as &dyn KeySlice }
-}
-
-impl Eq for VerticesKey<Path> {}
-
-trait KeySlice {
-  fn threshold(&self) -> f32;
-  fn tolerance(&self) -> f32;
-  fn style(&self) -> PathStyle;
-  fn path(&self) -> PathKey<&Path>;
-  fn to_key(&self) -> VerticesKey<Path>;
-}
-
-impl KeySlice for VerticesKey<Path> {
-  fn threshold(&self) -> f32 { self.threshold }
-
-  fn tolerance(&self) -> f32 { self.tolerance }
-
-  fn style(&self) -> PathStyle { self.style }
-
-  fn path(&self) -> PathKey<&Path> {
-    match &self.path {
-      PathKey::Path(path) => PathKey::Path(path),
-      &PathKey::Glyph { glyph_id, face_id } => PathKey::Glyph { glyph_id, face_id },
-    }
-  }
-
-  fn to_key(&self) -> VerticesKey<Path> { self.clone() }
-}
-
-impl<'a> KeySlice for VerticesKey<&'a Path> {
-  #[inline]
-  fn threshold(&self) -> f32 { self.threshold }
-
-  #[inline]
-  fn tolerance(&self) -> f32 { self.tolerance }
-
-  #[inline]
-  fn style(&self) -> PathStyle { self.style }
-
-  #[inline]
-  fn path(&self) -> PathKey<&Path> { self.path.clone() }
-
-  fn to_key(&self) -> VerticesKey<Path> {
-    VerticesKey {
-      tolerance: self.tolerance,
-      threshold: self.threshold,
-      style: self.style,
-      path: match self.path {
-        PathKey::Path(path) => PathKey::Path(path.clone()),
-        PathKey::Glyph { glyph_id, face_id } => PathKey::Glyph { glyph_id, face_id },
-      },
-    }
-  }
-}
-
-impl<'a> Borrow<dyn KeySlice + 'a> for VerticesKey<Path> {
-  fn borrow(&self) -> &(dyn KeySlice + 'a) { self }
-}
-
-impl<'a> Borrow<dyn KeySlice + 'a> for VerticesKey<&'a Path> {
-  fn borrow(&self) -> &(dyn KeySlice + 'a) { self }
-}
-
-impl Hash for dyn KeySlice + '_ {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    threshold_hash(self.tolerance(), self.threshold()).hash(state);
-    match self.style() {
-      PathStyle::Fill => (-1).hash(state),
-      PathStyle::Stroke(line_width) => threshold_hash(line_width, self.threshold()).hash(state),
-    }
-    match self.path() {
-      PathKey::Path(path) => {
-        let path: &ShadowPath = unsafe { std::mem::transmute(path) };
-        as_bytes::<LyonPoint>(path.points.as_ref()).hash(state);
-        as_bytes::<Verb>(path.verbs.as_ref()).hash(state);
-      }
-      PathKey::Glyph { glyph_id, face_id } => {
+    threshold_hash(self.tolerance, self.threshold).hash(state);
+    core::mem::discriminant(&self.path).hash(state);
+    match &self.path {
+      PathKey::Path(p) => p.hash(state),
+      PathKey::Glyph { glyph_id, face_id, style } => {
         glyph_id.hash(state);
         face_id.hash(state);
+        core::mem::discriminant(style).hash(state);
+        match style {
+          PathStyle::Fill => {}
+          PathStyle::Stroke(s) => threshold_hash(*s, self.threshold).hash(state),
+        }
       }
     }
   }
 }
 
-impl PartialEq for dyn KeySlice + '_ {
+impl PartialEq for VerticesKey {
+  #[inline]
   fn eq(&self, other: &Self) -> bool {
-    threshold_hash(self.tolerance(), self.threshold())
-      == threshold_hash(other.tolerance(), other.threshold())
-      && match (self.style(), other.style()) {
-        (PathStyle::Fill, PathStyle::Fill) => true,
-        (PathStyle::Stroke(l1), PathStyle::Stroke(l2)) => {
-          threshold_hash(l1, self.threshold()) == threshold_hash(l2, other.threshold())
-        }
-        _ => false,
-      }
-      && match (self.path(), other.path()) {
-        (PathKey::Path(path1), PathKey::Path(path2)) => {
-          let path1: &ShadowPath = unsafe { std::mem::transmute(path1.borrow()) };
-          let path2: &ShadowPath = unsafe { std::mem::transmute(path2.borrow()) };
-          as_bytes::<LyonPoint>(path1.points.as_ref())
-            == as_bytes::<LyonPoint>(path2.points.as_ref())
-            && as_bytes::<Verb>(path1.verbs.as_ref()) == as_bytes::<Verb>(path2.verbs.as_ref())
-        }
+    threshold_hash(self.tolerance, self.threshold)
+      == threshold_hash(other.tolerance, other.threshold)
+      && match (&self.path, &other.path) {
+        (PathKey::Path(l_p), PathKey::Path(r_p)) => l_p == r_p,
         (
-          PathKey::Glyph { glyph_id, face_id },
           PathKey::Glyph {
-            glyph_id: glyph_id2,
-            face_id: face_id2,
+            glyph_id: l_id,
+            face_id: l_face,
+            style: l_style,
           },
-        ) => glyph_id == glyph_id2 && face_id == face_id2,
+          PathKey::Glyph {
+            glyph_id: r_id,
+            face_id: r_face,
+            style: r_style,
+          },
+        ) => {
+          l_id == r_id
+            && l_face == r_face
+            && match (l_style, r_style) {
+              (PathStyle::Fill, PathStyle::Fill) => true,
+              (PathStyle::Stroke(l), PathStyle::Stroke(r)) => {
+                threshold_hash(*l, self.threshold) == threshold_hash(*r, self.threshold)
+              }
+              _ => false,
+            }
+        }
         _ => false,
       }
   }
 }
 
-impl Eq for dyn KeySlice + '_ {}
+impl Eq for VerticesKey {}
 
-impl ToOwned for dyn KeySlice + '_ {
-  type Owned = VerticesKey<Path>;
-
-  fn to_owned(&self) -> Self::Owned { self.to_key() }
-}
 #[cfg(test)]
 mod tests {
   use std::sync::{Arc, RwLock};
@@ -602,10 +534,12 @@ mod tests {
     painter
       .set_brush(Color::RED)
       .circle(Point::new(10., 10.), 5.);
-    painter.fill(None);
+    painter.fill();
 
-    painter.rect(&Rect::new(Point::new(0., 0.), Size::new(10., 10.)));
-    painter.stroke(Some(2.), None);
+    painter
+      .rect(&Rect::new(Point::new(0., 0.), Size::new(10., 10.)))
+      .set_line_width(2.)
+      .stroke();
   }
 
   fn two_img_paint(painter: &mut Painter) {
@@ -616,9 +550,11 @@ mod tests {
         tile_mode: TileMode::REPEAT_BOTH,
       })
       .circle(Point::new(10., 10.), 5.);
-    painter.fill(None);
-    painter.rect(&Rect::new(Point::new(0., 0.), Size::new(10., 10.)));
-    painter.stroke(Some(2.), None);
+    painter.fill();
+    painter
+      .rect(&Rect::new(Point::new(0., 0.), Size::new(10., 10.)))
+      .set_line_width(2.)
+      .stroke();
   }
 
   #[test]
@@ -689,7 +625,7 @@ mod tests {
     struct PathHash(Path);
 
     painter.rect(&Rect::new(Point::new(0., 0.), Size::new(512., 512.)));
-    painter.fill(None);
+    painter.fill();
     two_img_paint(&mut painter);
 
     let mut render_data = vec![];
@@ -714,9 +650,9 @@ mod tests {
         &Radius::all(round),
       );
       if i % 2 == 0 {
-        painter.stroke(None, None);
+        painter.stroke();
       } else {
-        painter.fill(None);
+        painter.fill();
       }
     });
     let commands = painter.finish();
@@ -731,13 +667,16 @@ mod tests {
   fn million_same_round_rect(b: &mut Bencher) {
     let mut painter = default_painter();
     painter.set_brush(Color::RED).set_line_width(2.);
-    painter.rect_round(
+    let mut builder = Path::builder();
+    builder.rect_round(
       &Rect::new(Point::zero(), Size::new(100., 100.)),
       &Radius::all(2.),
     );
-    painter.fill(None);
+
+    let path = ShareResource::new(builder.fill());
+    painter.paint_path(path);
     let cmd = painter.finish().pop().unwrap();
-    let commands = vec![cmd; 1_000_00];
+    let commands = vec![cmd; 1_000_000];
     let mut tess = tessellator();
     tess.tessellate(&commands, &mut |_: TriangleLists| {});
     b.iter(|| tess.tessellate(&commands, &mut |_: TriangleLists| {}))

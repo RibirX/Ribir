@@ -66,7 +66,7 @@ impl Render for BoxDecoration {
         } else {
           painter.rect(&content_rect);
         }
-        painter.fill(None);
+        painter.fill();
       }
       self.paint_border(painter, &content_rect);
     }
@@ -125,7 +125,7 @@ impl BoxDecoration {
       } else {
         painter.rect(&rect);
       };
-      painter.stroke(None, None);
+      painter.stroke();
     } else {
       let w = rect.width();
       let h = rect.height();
@@ -257,8 +257,7 @@ impl BoxDecoration {
             }
           }
         });
-        painter.close_path();
-        painter.stroke(None, None);
+        painter.close_path().stroke();
       })
     }
   }

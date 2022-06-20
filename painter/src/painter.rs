@@ -1,7 +1,8 @@
 use crate::{
-  path::*, Brush, Color, DeviceSize, PathStyle, Rect, Size, TextStyle, Transform, Vector,
+  path::*, Angle, Brush, Color, DeviceSize, PathStyle, Point, Rect, Size, TextStyle, Transform,
+  Vector,
 };
-use algo::CowRc;
+use algo::{CowRc, Resource};
 use euclid::Size2D;
 use std::ops::{Deref, DerefMut};
 use text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
@@ -39,10 +40,11 @@ pub trait PainterBackend {
 
 #[derive(Clone)]
 pub enum PaintPath {
-  Path(lyon_path::Path),
+  Path(Resource<Path>),
   Text {
     font_size: FontSize,
     glyphs: Vec<Glyph<Pixel>>,
+    style: PathStyle,
   },
 }
 #[derive(Clone)]
@@ -50,7 +52,6 @@ pub struct PaintCommand {
   pub path: PaintPath,
   pub transform: Transform,
   pub brush: Brush,
-  pub path_style: PathStyle,
 }
 
 #[derive(Clone)]
@@ -170,33 +171,30 @@ impl Painter {
   }
 
   /// Paint a path with its style.
-  pub fn paint_path(&mut self, path: Path) -> &mut Self {
+  pub fn paint_path<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
     let transform = self.current_state().transform;
+    let brush = self.current_state().brush.clone();
     self.commands.push(PaintCommand {
-      path: PaintPath::Path(path.path),
+      path: PaintPath::Path(path.into()),
       transform,
-      brush: path.brush.clone(),
-      path_style: path.path_style,
+      brush,
     });
     self
   }
 
   /// Strokes (outlines) the current path with the current brush and line width.
-  pub fn stroke(&mut self, line_width: Option<f32>, brush: Option<Brush>) -> &mut Self {
+  pub fn stroke(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let state = self.current_state();
-    let line_width = line_width.unwrap_or(self.current_state().line_width);
-    let brush = brush.unwrap_or_else(|| state.brush.clone());
-    let path = builder.stroke(line_width, brush);
+    let line_width = self.current_state().line_width;
+    let path = builder.stroke(line_width);
     self.paint_path(path);
     self
   }
 
   /// Fill the current path with current brush.
-  pub fn fill(&mut self, brush: Option<Brush>) -> &mut Self {
+  pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let brush = brush.unwrap_or_else(|| self.current_state().brush.clone());
-    let path = builder.fill(brush);
+    let path = builder.fill();
     self.paint_path(path);
     self
   }
@@ -214,10 +212,10 @@ impl Painter {
       path: PaintPath::Text {
         font_size: style.font_size,
         glyphs: visual_glyphs.pixel_glyphs().collect(),
+        style: style.path_style,
       },
-      transform,
       brush: style.foreground.clone(),
-      path_style: style.path_style,
+      transform,
     });
 
     self
@@ -260,10 +258,10 @@ impl Painter {
       path: PaintPath::Text {
         font_size,
         glyphs: visual_glyphs.pixel_glyphs().collect(),
+        style: path_style,
       },
       transform,
       brush: brush.clone(),
-      path_style,
     };
     self.commands.push(cmd);
     self
@@ -310,6 +308,124 @@ impl Painter {
   pub fn scale(&mut self, x: f32, y: f32) -> &mut Self {
     let t = self.get_transform().pre_scale(x, y);
     self.set_transform(t);
+    self
+  }
+
+  /// Starts a new path by emptying the list of sub-paths.
+  /// Call this method when you want to create a new path.
+  #[inline]
+  pub fn begin_path(&mut self, at: Point) -> &mut Self {
+    self.path_builder.begin_path(at);
+    self
+  }
+
+  /// Causes the point of the pen to move back to the start of the current
+  /// sub-path. It tries to draw a straight line from the current point to the
+  /// start. If the shape has already been closed or has only one point, this
+  #[inline]
+  pub fn close_path(&mut self) -> &mut Self {
+    self.path_builder.close_path();
+    self
+  }
+
+  /// Connects the last point in the current sub-path to the specified (x, y)
+  /// coordinates with a straight line.
+  #[inline]
+  pub fn line_to(&mut self, to: Point) -> &mut Self {
+    self.path_builder.line_to(to);
+    self
+  }
+
+  /// Adds a cubic Bezier curve to the current path.
+  #[inline]
+  pub fn bezier_curve_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) -> &mut Self {
+    self.path_builder.bezier_curve_to(ctrl1, ctrl2, to);
+    self
+  }
+
+  /// Adds a quadratic Bézier curve to the current path.
+  #[inline]
+  pub fn quadratic_curve_to(&mut self, ctrl: Point, to: Point) -> &mut Self {
+    self.path_builder.quadratic_curve_to(ctrl, to);
+    self
+  }
+
+  /// adds a circular arc to the current sub-path, using the given control
+  /// points and radius. The arc is automatically connected to the path's latest
+  /// point with a straight line, if necessary for the specified
+  #[inline]
+  pub fn arc_to(
+    &mut self,
+    center: Point,
+    radius: f32,
+    start_angle: Angle,
+    end_angle: Angle,
+  ) -> &mut Self {
+    self
+      .path_builder
+      .arc_to(center, radius, start_angle, end_angle);
+    self
+  }
+
+  /// The ellipse_to() method creates an elliptical arc centered at `center`
+  /// with the `radius`. The path starts at startAngle and ends at endAngle, and
+  /// travels in the direction given by anticlockwise (defaulting to
+  /// clockwise).
+  #[inline]
+  pub fn ellipse_to(
+    &mut self,
+    center: Point,
+    radius: Vector,
+    start_angle: Angle,
+    end_angle: Angle,
+  ) -> &mut Self {
+    self
+      .path_builder
+      .ellipse_to(center, radius, start_angle, end_angle);
+    self
+  }
+
+  #[inline]
+  pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
+    self.path_builder.segment(from, to);
+    self
+  }
+
+  /// Adds a sub-path containing an ellipse.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  #[inline]
+  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32) -> &mut Self {
+    self.path_builder.ellipse(center, radius, rotation);
+    self
+  }
+
+  /// Adds a sub-path containing a rectangle.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  #[inline]
+  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
+    self.path_builder.rect(rect);
+    self
+  }
+
+  /// Adds a sub-path containing a circle.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  #[inline]
+  pub fn circle(&mut self, center: Point, radius: f32) -> &mut Self {
+    self.path_builder.circle(center, radius);
+    self
+  }
+
+  /// Creates a path for a rectangle by `rect` with `radius`.
+  /// #[inline]
+  #[inline]
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
+    self.path_builder.rect_round(rect, radius);
     self
   }
 }
@@ -370,21 +486,10 @@ impl Default for PainterState {
   }
 }
 
-impl Deref for Painter {
-  type Target = Builder;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.path_builder }
-}
-
-impl DerefMut for Painter {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.path_builder }
-}
-
 impl PaintCommand {
   pub fn box_rect_without_transform(&self) -> Rect {
     match &self.path {
-      PaintPath::Path(path) => path_box_rect(path, self.path_style),
+      PaintPath::Path(path) => path.box_rect(),
       PaintPath::Text { .. } => todo!(),
     }
   }
@@ -426,6 +531,15 @@ pub fn typography_with_text_style<T: Into<Substr>>(
       overflow: Overflow::Clip,
     },
   )
+}
+
+impl PaintCommand {
+  pub fn style(&self) -> PathStyle {
+    match &self.path {
+      PaintPath::Path(p) => p.style,
+      PaintPath::Text { style, .. } => *style,
+    }
+  }
 }
 
 #[cfg(test)]
