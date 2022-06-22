@@ -21,7 +21,7 @@ use texture_records::TextureRecords;
 
 const ATLAS_ID: usize = 0;
 const TOLERANCE: f32 = 0.01;
-const MAX_VERTEX_CAN_BATCH: usize = 1_000_000;
+const MAX_VERTEX_CAN_BATCH: usize = 256 * 1024;
 const TEXTURE_ID_FROM: usize = 1;
 
 /// `Tessellator` use to generate triangles from
@@ -74,7 +74,7 @@ enum PathKey {
 }
 #[derive(Default)]
 struct VertexCache {
-  vertices: Box<[[f32; 2]]>,
+  vertices: Box<[Vertex]>,
   indices: Box<[u32]>,
 }
 
@@ -293,22 +293,48 @@ impl Tessellator {
   /// Caller also should guarantee the cache pointer is valid.
   unsafe fn fill_vertices(&mut self) -> bool {
     let mut use_atlas = false;
-    while let Some(CacheItem { prim_id, cache_ptr, prim_type }) = self.buffer_list.pop_front() {
+    let mut vertices_count = 0;
+    let mut indices_count = 0;
+    for item in &self.buffer_list {
+      let cache = &mut *item.cache_ptr;
+      vertices_count += cache.vertices.len();
+      indices_count += cache.indices.len();
+      if indices_count >= self.vertex_batch_limit {
+        indices_count = self.vertex_batch_limit;
+        break;
+      }
+    }
+    self.vertices.reserve(vertices_count);
+    self.indices.reserve(indices_count);
+
+    let mut count = 0;
+    for &CacheItem { prim_id, cache_ptr, prim_type } in self.buffer_list.iter() {
       let cache = &mut *cache_ptr;
+      if self.indices.len() + cache.indices.len() > self.vertex_batch_limit {
+        if cache.indices.len() > self.vertex_batch_limit {
+          panic!("A paint command generate vertexes over the limit.")
+        } else {
+          break;
+        }
+      }
+
+      unsafe fn copy_append<T>(vec: &mut Vec<T>, other: &[T]) {
+        let start = vec.len();
+        std::ptr::copy(other.as_ptr(), vec[start..].as_mut_ptr(), other.len());
+        vec.set_len(start + other.len());
+      }
+
       let offset = self.vertices.len() as u32;
+      let indices_start = self.indices.len();
+      copy_append(&mut self.indices, &cache.indices);
+      self.indices[indices_start..]
+        .iter_mut()
+        .for_each(|i| *i += offset);
 
-      self.vertices.extend(
-        cache
-          .vertices
-          .iter()
-          .map(|pos| Vertex { pixel_coords: *pos, prim_id }),
-      );
-      let indices_start = self.indices.len() as u32;
+      cache.vertices.iter_mut().for_each(|v| v.prim_id = prim_id);
+      copy_append(&mut self.vertices, &cache.vertices);
 
-      self
-        .indices
-        .extend(cache.indices.iter().map(|i| i + offset));
-
+      let indices_start = indices_start as u32;
       let indices_count = cache.indices.len() as u32;
 
       match (self.commands.last_mut(), prim_type) {
@@ -331,11 +357,11 @@ impl Tessellator {
         }
       }
 
-      if self.indices.len() > self.vertex_batch_limit {
-        break;
-      }
       use_atlas = use_atlas || matches!(prim_type, PrimitiveType::Texture(id) if id == ATLAS_ID);
+      count += 1;
     }
+
+    self.buffer_list.drain(..count);
     use_atlas
   }
 
@@ -404,7 +430,10 @@ fn stroke_tess(path: &LyonPath, line_width: f32, tolerance: f32) -> VertexCache 
     .tessellate_path(
       path,
       &StrokeOptions::tolerance(tolerance).with_line_width(line_width),
-      &mut BuffersBuilder::new(&mut buffers, move |v: StrokeVertex| v.position().to_array()),
+      &mut BuffersBuilder::new(&mut buffers, move |v: StrokeVertex| Vertex {
+        pixel_coords: v.position().to_array(),
+        prim_id: u32::MAX,
+      }),
     )
     .unwrap();
 
@@ -421,7 +450,10 @@ fn fill_tess(path: &LyonPath, tolerance: f32) -> VertexCache {
     .tessellate_path(
       path,
       &FillOptions::tolerance(tolerance),
-      &mut BuffersBuilder::new(&mut buffers, move |v: FillVertex| v.position().to_array()),
+      &mut BuffersBuilder::new(&mut buffers, move |v: FillVertex| Vertex {
+        pixel_coords: v.position().to_array(),
+        prim_id: u32::MAX,
+      }),
     )
     .unwrap();
 
@@ -433,10 +465,7 @@ fn fill_tess(path: &LyonPath, tolerance: f32) -> VertexCache {
 
 // trait implement for vertices cache
 
-fn threshold_hash(value: f32, threshold: f32) -> u32 {
-  let precisest = 1. / (threshold.max(f32::EPSILON));
-  (value * precisest) as u32
-}
+fn threshold_hash(value: f32, threshold: f32) -> u32 { (value / threshold) as u32 }
 
 impl Hash for VerticesKey {
   #[inline]
@@ -639,24 +668,30 @@ mod tests {
     assert_eq!(&render_data, &[false, false, false]);
   }
 
+  fn bench_rect_round() -> painter::Builder {
+    let mut builder = Path::builder();
+    builder.rect_round(
+      &Rect::new(Point::zero(), Size::new(100., 100.)),
+      &Radius::all(2.),
+    );
+    builder
+  }
+
   #[bench]
   fn million_diff_round_rect(b: &mut Bencher) {
     let mut painter = default_painter();
-    painter.set_brush(Color::RED).set_line_width(2.);
-    (1..1_000_000).for_each(|i| {
-      let round = (i as f32 * 0.00_001).min(0.1);
-      painter.rect_round(
-        &Rect::new(Point::zero(), Size::new(100. + round, 100. + round)),
-        &Radius::all(round),
-      );
-      if i % 2 == 0 {
-        painter.stroke();
-      } else {
-        painter.fill();
-      }
-    });
+    painter.set_brush(Color::RED);
+    let fill_path = bench_rect_round().fill();
+    let stroke_path = bench_rect_round().stroke(2.);
+    painter.paint_path(fill_path).paint_path(stroke_path);
     let commands = painter.finish();
     let mut tess = tessellator();
+    let commands = commands
+      .into_iter()
+      .cycle()
+      .take(500_000)
+      .collect::<Vec<_>>();
+    tess.tessellate(&commands, &mut |_: TriangleLists| {});
     b.iter(|| {
       tess.vertices_cache.take();
       tess.tessellate(&commands, &mut |_: TriangleLists| {})
@@ -666,18 +701,19 @@ mod tests {
   #[bench]
   fn million_same_round_rect(b: &mut Bencher) {
     let mut painter = default_painter();
-    painter.set_brush(Color::RED).set_line_width(2.);
-    let mut builder = Path::builder();
-    builder.rect_round(
-      &Rect::new(Point::zero(), Size::new(100., 100.)),
-      &Radius::all(2.),
-    );
-
-    let path = ShareResource::new(builder.fill());
-    painter.paint_path(path);
-    let cmd = painter.finish().pop().unwrap();
-    let commands = vec![cmd; 1_000_000];
+    painter.set_brush(Color::RED);
+    let fill_path = bench_rect_round().fill();
+    let stroke_path = bench_rect_round().stroke(2.);
+    let fill_path = ShareResource::new(fill_path);
+    let stroke_path = ShareResource::new(stroke_path);
+    painter.paint_path(fill_path).paint_path(stroke_path);
+    let commands = painter.finish();
     let mut tess = tessellator();
+    let commands = commands
+      .into_iter()
+      .cycle()
+      .take(500_000)
+      .collect::<Vec<_>>();
     tess.tessellate(&commands, &mut |_: TriangleLists| {});
     b.iter(|| tess.tessellate(&commands, &mut |_: TriangleLists| {}))
   }
