@@ -28,6 +28,7 @@ winit = "0.26.1"
 
 [features]
 wgpu_gl = ["wgpu", "raw-window-handle", "futures"]
+ui_window = []
 
 [[example]]
 name = "wgpu-hello"

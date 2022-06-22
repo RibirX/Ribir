@@ -148,7 +148,7 @@ pub struct TexturePrimitive {
 
 /// We use a texture atlas to shader vertices, even if a pure color path.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, AsBytes)]
+#[derive(Copy, Clone, Debug, AsBytes, Default)]
 pub struct Vertex {
   pub pixel_coords: [f32; 2],
   pub prim_id: u32,

@@ -1,7 +1,6 @@
 use painter::{Brush, Color, DeviceSize, Painter, PainterBackend, Rect, Size};
 use ribir::prelude::text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
 use std::sync::{Arc, RwLock};
-use winit::{event_loop::EventLoop, window::WindowBuilder};
 
 use gpu::wgpu_backend_headless;
 
@@ -49,6 +48,7 @@ fn headless_smoke() {
   red_img_test(backend);
 }
 
+#[cfg(feature = "event_loop")]
 fn wnd_smoke() {
   let event_loop = EventLoop::new();
   let window = WindowBuilder::new().build(&event_loop).unwrap();
@@ -69,6 +69,9 @@ fn main() {
 
   ribir::test::unit_test_describe! {
     run_unit_test(headless_smoke);
-    run_unit_test(wnd_smoke);
   }
+
+  #[cfg(feature = "ui_window")]
+  use winit::{event_loop::EventLoop, window::WindowBuilder};
+  ribir::test::unit_test_describe! {}
 }
