@@ -101,10 +101,10 @@ mod tests {
         widget! {
           track { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             theme: dark.clone(),
             SizedBox {
-              size: SizedBox::shrink_size(),
+              size: ZERO_SIZE,
               theme: light.clone(),
               ThemeTrack { themes: this.0.clone() }
             }
@@ -135,10 +135,10 @@ mod tests {
         widget! {
           track { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             theme: light,
             SizedBox {
-              size: SizedBox::shrink_size(),
+              size: ZERO_SIZE,
               theme: dark,
               ThemeTrack { themes: this.0.clone() }
             }

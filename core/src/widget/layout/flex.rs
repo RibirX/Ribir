@@ -577,7 +577,7 @@ mod tests {
       let item_size = Size::new(100., 20.);
       let root = widget! {
         SizedBox {
-          size: SizedBox::expanded_size(),
+          size: INFINITY_SIZE,
           Row {
             h_align: align,
             v_align: CrossAxisAlign::Start,

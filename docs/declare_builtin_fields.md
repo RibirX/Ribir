@@ -1,5 +1,7 @@
 # Full builtin fields list 
 
+- box_fit : [`BoxFit`] 
+ 	 -  set how its child should be resized to its box.
 - padding : [`EdgeInsets`] 
  	 - set the padding area on all four sides of a widget.
 - background : [`Brush`] 
@@ -58,6 +60,8 @@
  	 - enumerate to describe which direction allow widget to scroll.
 - margin : [`impl EdgeInsets`] 
  	 - expand space around widget wrapped.
+
+[`BoxFit`]: prelude::BoxFit
 
 [`EdgeInsets`]: prelude::EdgeInsets
 

@@ -75,7 +75,7 @@ mod tests {
 
     let widget = widget! {
       SizedBox {
-        size: SizedBox::shrink_size(),
+        size: ZERO_SIZE,
         auto_focus: true,
         on_char: move |key| c_receive.borrow_mut().push(key.char)
       }

@@ -39,3 +39,6 @@ pub type DeviceVector = euclid::Vector2D<u32, PhysicUnit>;
 pub use euclid::Transform2D;
 
 pub use lyon_tessellation::{LineCap, LineJoin, StrokeOptions};
+
+pub const INFINITY_SIZE: Size = Size::new(f32::INFINITY, f32::INFINITY);
+pub const ZERO_SIZE: Size = Size::new(0., 0.);

@@ -18,3 +18,5 @@ pub use anchor::*;
 pub use container::Container;
 pub use unconstrained_box::*;
 pub use widget_children::*;
+pub mod fitted_box;
+pub use fitted_box::*;

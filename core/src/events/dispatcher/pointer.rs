@@ -403,7 +403,7 @@ mod tests {
         widget! {
           track { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
             Text {
               text: "pointer event test",
@@ -447,12 +447,12 @@ mod tests {
         widget! {
           track { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
             on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
             SizedBox {
               margin: EdgeInsets::all(4.),
-              size: SizedBox::expanded_size(),
+              size: INFINITY_SIZE,
               on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
               on_pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
             }
@@ -654,7 +654,7 @@ mod tests {
 
   #[test]
   fn fix_hit_out_window() {
-    let w = SizedBox { size: SizedBox::expanded_size() };
+    let w = SizedBox { size: INFINITY_SIZE };
     let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
     wnd.render_ready();
     wnd.dispatcher.pointer.cursor_pos = Point::new(-1., -1.);
