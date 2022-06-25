@@ -9,34 +9,33 @@ pub trait WidgetCtx {
   /// Return parent of widget `w`.
   fn widget_parent(&self, w: WidgetId) -> Option<WidgetId>;
   /// Return the single child of `widget`.
+  /// # Panic
+  /// panic if widget have multi child.
   fn single_child(&self) -> Option<WidgetId>;
-
+  /// Return the box rect of the single child of widget.
+  /// # Panic
+  /// panic if widget have multi child.
+  fn single_child_box(&self) -> Option<Rect> {
+    self.single_child().and_then(|c| self.widget_box_rect(c))
+  }
   /// Return the widget box rect of the widget of the context.
   fn box_rect(&self) -> Option<Rect>;
-
   /// Return the box rect of the widget `wid` point to.
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect>;
-
   /// Translates the global window coordinate pos to widget coordinates.
   fn map_to_global(&self, pos: Point) -> Point;
-
   /// Translates the global screen coordinate pos to widget coordinates.
   fn map_from_global(&self, pos: Point) -> Point;
-
   /// Translates the widget pos to the coordinate system of `parent`.
   fn map_to_parent(&self, pos: Point) -> Point;
-
   /// Translates the widget pos from the coordinate system of parent to this
   /// widget system.
   fn map_from_parent(&self, pos: Point) -> Point;
-
   /// Translates the widget pos to the coordinate system of `w`.
   fn map_to(&self, pos: Point, w: WidgetId) -> Point;
-
   /// Translates the widget pos from the coordinate system of `w` to this widget
   /// system.
   fn map_from(&self, pos: Point, w: WidgetId) -> Point;
-
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));

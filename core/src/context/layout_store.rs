@@ -6,7 +6,7 @@ use std::{
 
 use text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
 
-use crate::prelude::{widget_tree::WidgetTree, Rect, Size, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, Rect, Size, WidgetId, INFINITY_SIZE};
 
 use super::LayoutCtx;
 
@@ -186,7 +186,7 @@ impl BoxClamp {
 
   #[inline]
   pub fn expand(mut self) -> Self {
-    self.max = crate::prelude::SizedBox::expanded_size();
+    self.max = INFINITY_SIZE;
     self
   }
 }

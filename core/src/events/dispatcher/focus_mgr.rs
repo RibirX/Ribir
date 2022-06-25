@@ -283,7 +283,7 @@ mod tests {
         widget! {
           track  { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },
             on_blur: move |_| { this.log.borrow_mut().push("blur parent"); },
             on_focus_in: move |_| { this.log.borrow_mut().push("focusin parent"); },

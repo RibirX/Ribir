@@ -9,19 +9,6 @@ pub struct SizedBox {
   pub size: Size,
 }
 
-impl SizedBox {
-  /// Creates a box that will become as large as its parent allows.
-  #[inline]
-  pub fn expanded_size() -> Size {
-    const INFINITY: f32 = f32::INFINITY;
-    Size::new(INFINITY, INFINITY)
-  }
-
-  /// Creates a box that will become as small as its parent allows.
-  #[inline]
-  pub fn shrink_size() -> Size { Size::zero() }
-}
-
 impl Render for SizedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     if let Some(child) = ctx.single_child() {
@@ -65,7 +52,7 @@ mod tests {
   fn shrink_size() {
     let w = widget! {
       SizedBox {
-        size: SizedBox::shrink_size(),
+        size: ZERO_SIZE,
         Text { text: "" }
       }
     };
@@ -80,7 +67,7 @@ mod tests {
     let wnd_size = Size::new(500., 500.);
     let expand_box = widget! {
       SizedBox {
-        size: SizedBox::expanded_size(),
+        size: INFINITY_SIZE,
         Text { text: "" }
       }
     };

@@ -1,5 +1,3 @@
-// todo: support the direction in horizontal and vertical
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Direction {
   /// Left and right.
