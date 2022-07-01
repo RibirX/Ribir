@@ -4,7 +4,6 @@ use crate::animation::TickerProvider;
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
 
-const TOLERANCE: f32 = 0.01;
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
@@ -191,7 +190,6 @@ impl Window {
       DeviceSize::new(size.width, size.height),
       None,
       None,
-      TOLERANCE,
       ctx.shaper.clone(),
     ));
 
@@ -312,7 +310,6 @@ impl Window {
       size,
       None,
       None,
-      TOLERANCE,
       ctx.shaper.clone(),
     ));
     Self::new(

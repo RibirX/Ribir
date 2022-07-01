@@ -31,7 +31,6 @@ fn main() {
     DeviceSize::new(size.width, size.height),
     None,
     None,
-    0.01,
     shaper,
   ));
 

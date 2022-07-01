@@ -22,12 +22,11 @@ pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
   size: DeviceSize,
   tex_init_size: Option<(u16, u16)>,
   tex_max_size: Option<(u16, u16)>,
-  tolerance: f32,
   shaper: TextShaper,
 ) -> GpuBackend<WgpuGl> {
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
-  let tessellator = Tessellator::new(init_size, max_size, tolerance, shaper);
+  let tessellator = Tessellator::new(init_size, max_size, shaper);
   let gl = WgpuGl::from_wnd(window, size, AntiAliasing::Msaa4X).await;
 
   GpuBackend { tessellator, gl }
@@ -38,12 +37,11 @@ pub async fn wgpu_backend_headless(
   size: DeviceSize,
   tex_init_size: Option<(u16, u16)>,
   tex_max_size: Option<(u16, u16)>,
-  tolerance: f32,
   shaper: TextShaper,
 ) -> GpuBackend<WgpuGl<surface::TextureSurface>> {
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
-  let tessellator = Tessellator::new(init_size, max_size, tolerance, shaper);
+  let tessellator = Tessellator::new(init_size, max_size, shaper);
   let gl = WgpuGl::headless(size).await;
   GpuBackend { tessellator, gl }
 }
