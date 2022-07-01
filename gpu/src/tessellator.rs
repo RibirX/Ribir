@@ -40,8 +40,6 @@ pub struct Tessellator {
   /// it's less than the count of vertex generate by one paint command, default
   /// value is [`MAX_VERTEX_CAN_BATCH`]!
   vertex_batch_limit: usize,
-  /// The scaling difference of a same path need to retessellate.
-  threshold: f32,
   shaper: TextShaper,
 }
 
@@ -59,7 +57,6 @@ struct CacheItem {
 #[derive(Debug, Clone)]
 struct VerticesKey {
   tolerance: f32,
-  threshold: f32,
   path: PathKey,
 }
 
@@ -82,16 +79,10 @@ impl Tessellator {
   /// Create a `Tessellator` with the init texture size and the maximum texture
   /// size. `threshold` is the scale difference of a path need to retessellate.
   #[inline]
-  pub fn new(
-    tex_init_size: (u16, u16),
-    tex_max_size: (u16, u16),
-    threshold: f32,
-    shaper: TextShaper,
-  ) -> Self {
+  pub fn new(tex_init_size: (u16, u16), tex_max_size: (u16, u16), shaper: TextShaper) -> Self {
     Self {
       atlas: TextureAtlas::new(tex_init_size.into(), tex_max_size.into()),
       vertex_batch_limit: MAX_VERTEX_CAN_BATCH,
-      threshold,
       shaper,
       vertices_cache: None,
       texture_records: TextureRecords::new(TEXTURE_ID_FROM),
@@ -237,7 +228,6 @@ impl Tessellator {
 
     let PaintCommand { path, transform, .. } = cmd;
     let scale = transform.m11.max(transform.m22).max(f32::EPSILON);
-    let threshold = self.threshold;
     match path {
       PaintPath::Path(path) => {
         let prim_id = self.add_primitive(primitive);
@@ -245,7 +235,7 @@ impl Tessellator {
         let cache_ptr = match path {
           Resource::Share(path) => {
             let path = PathKey::Path(path.clone());
-            let key = VerticesKey { tolerance, threshold, path };
+            let key = VerticesKey { tolerance, path };
             cache(key)
           }
           Resource::Local(path) => not_cache(tolerance, path),
@@ -267,7 +257,7 @@ impl Tessellator {
              ..
            }| {
             let path = PathKey::Glyph { face_id, glyph_id, style: *style };
-            let key = VerticesKey { tolerance, threshold, path };
+            let key = VerticesKey { tolerance, path };
             let cache_ptr = cache(key);
 
             let t = transform
@@ -429,7 +419,9 @@ fn stroke_tess(path: &LyonPath, line_width: f32, tolerance: f32) -> VertexCache 
   stroke_tess
     .tessellate_path(
       path,
-      &StrokeOptions::tolerance(tolerance).with_line_width(line_width),
+      &StrokeOptions::default()
+        .with_line_width(line_width)
+        .with_tolerance(tolerance),
       &mut BuffersBuilder::new(&mut buffers, move |v: StrokeVertex| Vertex {
         pixel_coords: v.position().to_array(),
         prim_id: u32::MAX,
@@ -463,14 +455,9 @@ fn fill_tess(path: &LyonPath, tolerance: f32) -> VertexCache {
   }
 }
 
-// trait implement for vertices cache
-
-fn threshold_hash(value: f32, threshold: f32) -> u32 { (value / threshold) as u32 }
-
 impl Hash for VerticesKey {
-  #[inline]
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    threshold_hash(self.tolerance, self.threshold).hash(state);
+    self.tolerance.to_bits().hash(state);
     core::mem::discriminant(&self.path).hash(state);
     match &self.path {
       PathKey::Path(p) => p.hash(state),
@@ -480,7 +467,7 @@ impl Hash for VerticesKey {
         core::mem::discriminant(style).hash(state);
         match style {
           PathStyle::Fill => {}
-          PathStyle::Stroke(s) => threshold_hash(*s, self.threshold).hash(state),
+          PathStyle::Stroke(line_width) => line_width.to_bits().hash(state),
         }
       }
     }
@@ -488,10 +475,8 @@ impl Hash for VerticesKey {
 }
 
 impl PartialEq for VerticesKey {
-  #[inline]
   fn eq(&self, other: &Self) -> bool {
-    threshold_hash(self.tolerance, self.threshold)
-      == threshold_hash(other.tolerance, other.threshold)
+    self.tolerance == other.tolerance
       && match (&self.path, &other.path) {
         (PathKey::Path(l_p), PathKey::Path(r_p)) => l_p == r_p,
         (
@@ -505,17 +490,7 @@ impl PartialEq for VerticesKey {
             face_id: r_face,
             style: r_style,
           },
-        ) => {
-          l_id == r_id
-            && l_face == r_face
-            && match (l_style, r_style) {
-              (PathStyle::Fill, PathStyle::Fill) => true,
-              (PathStyle::Stroke(l), PathStyle::Stroke(r)) => {
-                threshold_hash(*l, self.threshold) == threshold_hash(*r, self.threshold)
-              }
-              _ => false,
-            }
-        }
+        ) => l_id == r_id && l_face == r_face && l_style == r_style,
         _ => false,
       }
   }
@@ -556,7 +531,7 @@ mod tests {
   fn tessellator() -> Tessellator {
     let shaper = TextShaper::new(<_>::default());
     shaper.font_db_mut().load_system_fonts();
-    Tessellator::new((128, 128), (512, 512), 0.01, shaper)
+    Tessellator::new((128, 128), (512, 512), shaper)
   }
 
   fn circle_rectangle_color_paint(painter: &mut Painter) {

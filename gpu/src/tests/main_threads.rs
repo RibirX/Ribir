@@ -41,7 +41,6 @@ fn headless_smoke() {
     DeviceSize::new(100, 100),
     None,
     None,
-    0.01,
     TextShaper::new(<_>::default()),
   ));
 
