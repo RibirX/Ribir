@@ -4,6 +4,7 @@ use lyon_path::{
   traits::PathBuilder,
   Winding,
 };
+pub use lyon_tessellation::StrokeOptions;
 
 use crate::{Angle, PathStyle, Point, Rect, Vector};
 
@@ -42,11 +43,13 @@ impl Builder {
     self
   }
 
-  /// Causes the point of the pen to move back to the start of the current
-  /// sub-path. It tries to draw a straight line from the current point to the
-  /// start. If the shape has already been closed or has only one point, this
+  /// Tell the builder the sub-path is finished.
+  /// if `close` is true,  causes the point of the pen to move back to the start
+  /// of the current sub-path. It tries to draw a straight line from the
+  /// current point to the start. If the shape has already been closed or has
+  /// only one point, nothing to do.
   #[inline]
-  pub fn close_path(&mut self) { self.0.close(); }
+  pub fn end_path(&mut self, close: bool) { self.0.end(close); }
 
   /// Connects the last point in the current sub-path to the specified (x, y)
   /// coordinates with a straight line.
@@ -171,10 +174,10 @@ impl Builder {
 
   /// Build a stroke path with `width` size, and `style`.
   #[inline]
-  pub fn stroke(self, line_width: f32) -> Path {
+  pub fn stroke(self, options: StrokeOptions) -> Path {
     Path {
       path: self.0.build(),
-      style: PathStyle::Stroke(line_width),
+      style: PathStyle::Stroke(options),
     }
   }
 

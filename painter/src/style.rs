@@ -1,4 +1,5 @@
 use crate::{Color, ShallowImage};
+use lyon_tessellation::StrokeOptions;
 use text::{Em, FontFace, FontSize, Pixel};
 
 /// Encapsulates the text style for painting.
@@ -58,7 +59,7 @@ pub enum PathStyle {
   /// Fill the path.
   Fill,
   /// Stroke path with line width.
-  Stroke(f32),
+  Stroke(StrokeOptions),
 }
 
 impl Default for TextStyle {

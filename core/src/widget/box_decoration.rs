@@ -257,7 +257,7 @@ impl BoxDecoration {
             }
           }
         });
-        painter.close_path().stroke();
+        painter.close_path(true).stroke();
       })
     }
   }

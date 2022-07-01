@@ -43,8 +43,10 @@ impl Svg {
           let (stroke_color, stroke_opts) = convert_stroke(stroke);
           let usvg::Color { red, green, blue } = stroke_color;
           let brush = Brush::Color(Color::const_rgb_from(red, green, blue));
-          let width = stroke_opts.line_width;
-          paths.push(PathPaintKit { path: builder.stroke(width), brush })
+          paths.push(PathPaintKit {
+            path: builder.stroke(stroke_opts),
+            brush,
+          })
         }
       }
     }
@@ -86,7 +88,7 @@ impl Svg {
         }
         usvg::PathSegment::ClosePath => {
           need_end = false;
-          builder.close_path();
+          builder.end_path(true);
         }
       }
     }
