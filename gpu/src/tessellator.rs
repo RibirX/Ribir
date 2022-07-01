@@ -409,19 +409,20 @@ impl Tessellator {
 fn tesselate_path(path: &LyonPath, style: PathStyle, tolerance: f32) -> VertexCache {
   match style {
     painter::PathStyle::Fill => fill_tess(path, tolerance),
-    painter::PathStyle::Stroke(line_width) => stroke_tess(path, line_width, tolerance),
+    painter::PathStyle::Stroke(mut options) => {
+      options.tolerance = tolerance;
+      stroke_tess(path, &options)
+    }
   }
 }
 
-fn stroke_tess(path: &LyonPath, line_width: f32, tolerance: f32) -> VertexCache {
+fn stroke_tess(path: &LyonPath, options: &StrokeOptions) -> VertexCache {
   let mut buffers = VertexBuffers::new();
   let mut stroke_tess = StrokeTessellator::default();
   stroke_tess
     .tessellate_path(
       path,
-      &StrokeOptions::default()
-        .with_line_width(line_width)
-        .with_tolerance(tolerance),
+      options,
       &mut BuffersBuilder::new(&mut buffers, move |v: StrokeVertex| Vertex {
         pixel_coords: v.position().to_array(),
         prim_id: u32::MAX,
@@ -467,7 +468,7 @@ impl Hash for VerticesKey {
         core::mem::discriminant(style).hash(state);
         match style {
           PathStyle::Fill => {}
-          PathStyle::Stroke(line_width) => line_width.to_bits().hash(state),
+          PathStyle::Stroke(options) => stroke_options_hash(options, state),
         }
       }
     }
@@ -497,6 +498,14 @@ impl PartialEq for VerticesKey {
 }
 
 impl Eq for VerticesKey {}
+
+fn stroke_options_hash<H: std::hash::Hasher>(options: &StrokeOptions, state: &mut H) {
+  options.line_width.to_bits().hash(state);
+  core::mem::discriminant(&options.start_cap).hash(state);
+  core::mem::discriminant(&options.end_cap).hash(state);
+  core::mem::discriminant(&options.line_join).hash(state);
+  options.miter_limit.to_bits().hash(state);
+}
 
 #[cfg(test)]
 mod tests {
@@ -657,7 +666,7 @@ mod tests {
     let mut painter = default_painter();
     painter.set_brush(Color::RED);
     let fill_path = bench_rect_round().fill();
-    let stroke_path = bench_rect_round().stroke(2.);
+    let stroke_path = bench_rect_round().stroke(StrokeOptions::default().with_line_width(2.));
     painter.paint_path(fill_path).paint_path(stroke_path);
     let commands = painter.finish();
     let mut tess = tessellator();
@@ -678,7 +687,7 @@ mod tests {
     let mut painter = default_painter();
     painter.set_brush(Color::RED);
     let fill_path = bench_rect_round().fill();
-    let stroke_path = bench_rect_round().stroke(2.);
+    let stroke_path = bench_rect_round().stroke(StrokeOptions::default().with_line_width(2.));
     let fill_path = ShareResource::new(fill_path);
     let stroke_path = ShareResource::new(stroke_path);
     painter.paint_path(fill_path).paint_path(stroke_path);

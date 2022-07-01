@@ -1,4 +1,4 @@
-use painter::{Brush, Color, DeviceSize, Painter, PainterBackend, Rect, Size};
+use painter::{Color, DeviceSize, Painter, PainterBackend, Rect, Size};
 use ribir::prelude::text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
 use std::sync::{Arc, RwLock};
 

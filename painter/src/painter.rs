@@ -4,6 +4,7 @@ use crate::{
 };
 use algo::{CowRc, Resource};
 use euclid::Size2D;
+pub use lyon_tessellation::{LineCap, LineJoin};
 use std::ops::{Deref, DerefMut};
 use text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
 use text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
@@ -57,7 +58,7 @@ pub struct PaintCommand {
 #[derive(Clone)]
 struct PainterState {
   /// The line width use to stroke path.
-  line_width: f32,
+  stroke_options: StrokeOptions,
   font_size: FontSize,
   letter_space: Option<Pixel>,
   brush: Brush,
@@ -80,9 +81,14 @@ impl Painter {
   }
 
   #[inline]
+  pub fn append_commands(&mut self, commands: impl IntoIterator<Item = PaintCommand>) {
+    self.commands.extend(commands)
+  }
+
+  #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
     self.reset(None);
-    std::mem::take(&mut self.commands)
+    self.commands.drain(..).collect()
   }
 
   /// Saves the entire state and return a guard to auto restore the state when
@@ -131,12 +137,48 @@ impl Painter {
 
   /// Return the line width of the stroke pen.
   #[inline]
-  pub fn get_line_width(&self) -> f32 { self.current_state().line_width }
+  pub fn get_line_width(&self) -> f32 { self.stroke_options().line_width }
 
   /// Set the line width of the stroke pen with `line_width`
   #[inline]
   pub fn set_line_width(&mut self, line_width: f32) -> &mut Self {
-    self.current_state_mut().line_width = line_width;
+    self.current_state_mut().stroke_options.line_width = line_width;
+    self
+  }
+
+  #[inline]
+  pub fn get_line_join(&self) -> LineJoin { self.stroke_options().line_join }
+
+  #[inline]
+  pub fn set_line_join(&mut self, line_join: LineJoin) -> &mut Self {
+    self.current_state_mut().stroke_options.line_join = line_join;
+    self
+  }
+
+  #[inline]
+  pub fn get_start_line_cap(&self) -> LineCap { self.stroke_options().start_cap }
+
+  #[inline]
+  pub fn set_start_line_cap(&mut self, start_cap: LineCap) -> &mut Self {
+    self.current_state_mut().stroke_options.start_cap = start_cap;
+    self
+  }
+
+  #[inline]
+  pub fn get_end_line_cap(&self) -> LineCap { self.stroke_options().end_cap }
+
+  #[inline]
+  pub fn set_end_line_cap(&mut self, end_cap: LineCap) -> &mut Self {
+    self.current_state_mut().stroke_options.end_cap = end_cap;
+    self
+  }
+
+  #[inline]
+  pub fn get_miter_limit(&self) -> f32 { self.stroke_options().miter_limit }
+
+  #[inline]
+  pub fn set_miter_limit(&mut self, miter_limit: f32) -> &mut Self {
+    self.current_state_mut().stroke_options.miter_limit = miter_limit;
     self
   }
 
@@ -170,6 +212,14 @@ impl Painter {
     self
   }
 
+  /// Multiplies the current transformation with the matrix. This lets you
+  /// scale, rotate, translate (move), and skew the context.
+  pub fn apply_transform(&mut self, transform: &Transform) -> &mut Self {
+    let t = &mut self.current_state_mut().transform;
+    *t = t.then(transform);
+    self
+  }
+
   /// Paint a path with its style.
   pub fn paint_path<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
     let transform = self.current_state().transform;
@@ -185,8 +235,7 @@ impl Painter {
   /// Strokes (outlines) the current path with the current brush and line width.
   pub fn stroke(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let line_width = self.current_state().line_width;
-    let path = builder.stroke(line_width);
+    let path = builder.stroke(self.stroke_options());
     self.paint_path(path);
     self
   }
@@ -274,11 +323,7 @@ impl Painter {
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
   pub fn stroke_text<T: Into<Substr>>(&mut self, text: T) -> &mut Self {
-    self.paint_text_without_style(
-      text,
-      PathStyle::Stroke(self.current_state().line_width),
-      None,
-    )
+    self.paint_text_without_style(text, PathStyle::Stroke(self.stroke_options()), None)
   }
 
   /// Fill `text` from left to right, start at let top position, use
@@ -319,12 +364,14 @@ impl Painter {
     self
   }
 
-  /// Causes the point of the pen to move back to the start of the current
-  /// sub-path. It tries to draw a straight line from the current point to the
-  /// start. If the shape has already been closed or has only one point, this
+  /// Tell the painter the sub-path is finished.
+  /// if `close` is true,  causes the point of the pen to move back to the start
+  /// of the current sub-path. It tries to draw a straight line from the
+  /// current point to the start. If the shape has already been closed or has
+  /// only one point, nothing to do.
   #[inline]
-  pub fn close_path(&mut self) -> &mut Self {
-    self.path_builder.close_path();
+  pub fn close_path(&mut self, close: bool) -> &mut Self {
+    self.path_builder.end_path(close);
     self
   }
 
@@ -444,6 +491,8 @@ impl Painter {
       .last_mut()
       .expect("Must have one state in stack!")
   }
+
+  fn stroke_options(&self) -> StrokeOptions { self.current_state().stroke_options }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -475,7 +524,7 @@ impl Default for PainterState {
   #[inline]
   fn default() -> Self {
     Self {
-      line_width: 1.,
+      stroke_options: <_>::default(),
       font_size: FontSize::Pixel(14.0.into()),
       letter_space: None,
       brush: Brush::Color(Color::BLACK),
