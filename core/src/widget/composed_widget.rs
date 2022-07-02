@@ -31,7 +31,19 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
         let multi = MultiChildWidget { widget, children: m.children };
         Widget(WidgetInner::MultiChild(multi))
       }
-      WidgetInner::Expr(_) => unreachable!(),
+      WidgetInner::Expr(ExprWidget { mut expr, upstream }) => {
+        // Expr widget from composed widget, must be generate single child.
+        let new_expr = move |cb: &mut dyn FnMut(Widget)| {
+          expr(&mut |w| {
+            let w = ComposedWidget { composed: w, by }.into_widget();
+            cb(w)
+          })
+        };
+        Widget(WidgetInner::Expr(ExprWidget {
+          expr: Box::new(new_expr),
+          upstream,
+        }))
+      }
     }
   }
 }
@@ -58,4 +70,34 @@ where
   Self: Render + 'static,
 {
   impl_proxy_query!(composed);
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test::widget_and_its_children_box_rect;
+
+  #[test]
+  fn fix_compose_expr_crash() {
+    #[derive(Debug)]
+    struct T;
+
+    impl Compose for T {
+      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+        widget! {
+          track { this }
+          ExprWidget {
+            expr: {
+               // explicit capture `this` to avoid `ExprWidget` to be optimized`.
+              let x = &*this;
+              println!("{:?}", x);
+              Void
+            },
+          }
+        }
+      }
+    }
+
+    let _ = widget_and_its_children_box_rect(T.into_widget(), Size::zero());
+  }
 }
