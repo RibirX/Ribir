@@ -339,7 +339,7 @@ pub struct CheckboxTheme {
 
 impl Default for CheckboxTheme {
   fn default() -> Self {
-    let size: f32 = 12.;
+    let size: f32 = 16.;
     let border_width = 2.;
 
     Self {

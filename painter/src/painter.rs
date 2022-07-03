@@ -81,11 +81,6 @@ impl Painter {
   }
 
   #[inline]
-  pub fn append_commands(&mut self, commands: impl IntoIterator<Item = PaintCommand>) {
-    self.commands.extend(commands)
-  }
-
-  #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
     self.reset(None);
     self.commands.drain(..).collect()
@@ -101,9 +96,10 @@ impl Painter {
 
   /// Saves the entire state of the canvas by pushing the current drawing state
   /// onto a stack.
-  pub fn save(&mut self) {
+  pub fn save(&mut self) -> &mut Self {
     let new_state = self.current_state().clone();
     self.state_stack.push(new_state);
+    self
   }
 
   /// Restores the most recently saved canvas state by popping the top entry in
@@ -171,6 +167,11 @@ impl Painter {
   pub fn set_end_line_cap(&mut self, end_cap: LineCap) -> &mut Self {
     self.current_state_mut().stroke_options.end_cap = end_cap;
     self
+  }
+
+  #[inline]
+  pub fn set_line_cap(&mut self, line_cap: LineCap) -> &mut Self {
+    self.set_start_line_cap(line_cap).set_end_line_cap(line_cap)
   }
 
   #[inline]

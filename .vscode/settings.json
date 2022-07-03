@@ -35,6 +35,7 @@
     "substr",
     "THROUGHLINE",
     "unclipped",
+    "usvg",
     "wgsl"
   ]
 }

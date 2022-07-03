@@ -112,11 +112,13 @@ impl Context {
     let tree = &self.widget_tree;
     let mut wid = Some(tree.root());
 
-    while let Some(mut id) = wid {
-      if let Some(rect) = self.layout_store.layout_box_rect(id) {
-        self.painter.save();
-        self.painter.translate(rect.min_x(), rect.min_y());
-      }
+    while let Some(id) = wid {
+      let rect = self
+        .layout_store
+        .layout_box_rect(id)
+        .expect("when paint node, it's mut be already layout.");
+      self.painter.save();
+      self.painter.translate(rect.min_x(), rect.min_y());
       let rw = id.assert_get(&tree);
       rw.paint(&mut PaintingCtx {
         id,
@@ -125,28 +127,25 @@ impl Context {
         painter: &mut self.painter,
       });
 
-      // try to access child
-      wid = id.first_child(tree);
-
-      loop {
-        if wid.is_some() {
-          break;
-        }
-        // if child is none, try to access sibling
-        if self.layout_store.layout_box_rect(id).is_some() {
-          self.painter.restore()
-        }
-        wid = id.next_sibling(tree);
-
-        // if there is no more sibling, parent subtree finished, try to access
-        // parent sibling
-        if wid.is_none() {
-          match id.parent(tree) {
-            Some(p) => id = p,
-            None => break,
+      wid = id
+        // deep first.
+        .first_child(tree)
+        // goto sibling or back to parent sibling
+        .or_else(|| {
+          let mut node = wid;
+          while let Some(p) = node {
+            // self node sub-tree paint finished, goto sibling
+            self.painter.restore();
+            node = p.next_sibling(tree);
+            if node.is_some() {
+              break;
+            } else {
+              // if there is no more sibling, back to parent to find sibling.
+              node = p.parent(tree);
+            }
           }
-        }
-      }
+          node
+        });
     }
 
     self.painter.finish()

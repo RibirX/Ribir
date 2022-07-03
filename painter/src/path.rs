@@ -19,7 +19,6 @@ pub struct Path {
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Default)]
 pub struct Radius(BorderRadii);
 
-/// The builder for path
 #[derive(Default)]
 pub struct Builder(lyon_path::path::Builder);
 
