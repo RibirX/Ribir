@@ -13,3 +13,9 @@ lyon_algorithms = "0.17.7"
 lyon_path = "0.17.7"
 lyon_tessellation = "0.17.10"
 text = {path = "../text"}
+log ="0.4.17"
+
+
+[dependencies.usvg]
+version ="0.23.0"
+features =["text"]

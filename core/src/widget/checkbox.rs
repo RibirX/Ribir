@@ -39,20 +39,19 @@ impl Compose for Checkbox {
         expr: {
           let size = this.style.size;
           let size = Size::new(size, size);
-          if this.indeterminate {
-            Icon {
-              src: "./core/src/widget/theme/checkbox/indeterminate.svg",
-              size
-            }
+          // todo: should not directly include file, but query form theme.
+          let svg_bytes = if this.indeterminate {
+            include_bytes!("./theme/checkbox/indeterminate.svg").to_vec()
           } else if this.checked {
-            Icon {
-              src: "./core/src/widget/theme/checkbox/checked.svg",
-              size
-            }
+            include_bytes!("./theme/checkbox/checked.svg").to_vec()
           } else {
+            include_bytes!("./theme/checkbox/unchecked.svg").to_vec()
+          };
+
+          widget! {
             Icon {
-              src: "./core/src/widget/theme/checkbox/unchecked.svg",
-              size
+              size,
+              Svg { bytes: svg_bytes }
             }
           }
         }
