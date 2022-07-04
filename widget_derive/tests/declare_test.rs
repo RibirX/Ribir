@@ -315,3 +315,15 @@ fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
     modifiers,
   });
 }
+
+#[test]
+fn fix_builtin_field_can_declare_as_widget() {
+  let w = widget! {
+    ScrollableWidget {
+      scrollable: Scrollable::Both
+    }
+  };
+
+  let (_, children) = widget_and_its_children_box_rect(w, Size::zero());
+  assert!(children.is_empty())
+}
