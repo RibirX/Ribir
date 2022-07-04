@@ -1,5 +1,6 @@
 pub mod anchor;
 mod column;
+pub mod container;
 pub mod flex;
 mod row;
 mod sized_box;
@@ -14,4 +15,5 @@ mod direction;
 pub use direction::*;
 pub mod widget_children;
 pub use anchor::*;
+pub use container::Container;
 pub use widget_children::*;
