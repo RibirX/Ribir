@@ -1,3 +1,4 @@
+pub mod anchor;
 mod column;
 pub mod flex;
 mod row;
@@ -11,4 +12,5 @@ pub use expanded::Expanded;
 mod direction;
 pub use direction::*;
 pub mod widget_children;
+pub use anchor::*;
 pub use widget_children::*;
