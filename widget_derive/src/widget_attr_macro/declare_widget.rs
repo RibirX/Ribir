@@ -132,8 +132,8 @@ impl Parse for DeclareWidget {
         if is_id {
           let id = Id::from_declare_field(f)?;
           assign_uninit_field!(named, id, id)?;
-        } else if let Some(ty) = FIELD_WIDGET_TYPE.get(f.member.to_string().as_str()) {
-          builtin.assign_builtin_field(ty, f)?;
+        } else if let Some(ty) = BuiltinFieldWidgets::is_builtin_field(&path, &f) {
+          builtin.fill_as_builtin_field(ty, f)?;
         } else {
           fields.push(f);
         }

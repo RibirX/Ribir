@@ -146,7 +146,14 @@ impl BuiltinFieldWidgets {
       });
   }
 
-  pub fn assign_builtin_field(
+  pub fn is_builtin_field(host: &syn::Path, field: &DeclareField) -> Option<&'static str> {
+    FIELD_WIDGET_TYPE
+      .get(field.member.to_string().as_str())
+      .filter(|ty| !host.is_ident(ty))
+      .cloned()
+  }
+
+  pub fn fill_as_builtin_field(
     &mut self,
     widget_ty: &'static str,
     field: DeclareField,
