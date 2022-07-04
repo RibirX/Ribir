@@ -1,6 +1,13 @@
 pub use crate::prelude::*;
 /// Trait to tell Ribir a widget can have one child.
-pub trait SingleChild {
+#[marker]
+pub trait SingleChild {}
+
+/// Trait to tell Ribir a widget can have multi child.
+#[marker]
+pub trait MultiChild {}
+
+pub trait SingleChildHave {
   #[inline]
   fn have_child<C, M>(self, child: C) -> SingleChildWidget<Self>
   where
@@ -20,8 +27,7 @@ pub trait SingleChild {
   }
 }
 
-/// Trait to tell Ribir a widget can have multi child.
-pub trait MultiChild {
+pub trait MultiChildHave {
   #[inline]
   fn have_child<M, C>(self, child: C) -> MultiChildWidget<Self>
   where
@@ -41,7 +47,6 @@ pub trait MultiChild {
     self.have_child(w.into_widget())
   }
 }
-
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its child.
 pub trait ComposeSingleChild {
@@ -52,24 +57,6 @@ pub trait ComposeSingleChild {
   ) -> Widget
   where
     Self: Sized;
-
-  #[inline]
-  fn have_child<C, M>(self, child: C) -> SingleChildWidget<Self>
-  where
-    C: ChildConsumer<M, Target = SingleConsumer>,
-    M: ?Sized,
-    Self: Sized,
-  {
-    SingleChildWidget::new(self, child)
-  }
-
-  #[inline]
-  fn have_expr_child(self, c: ExprWidget<SingleConsumer>) -> SingleChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    SingleChildWidget::from_expr_child(self, c)
-  }
 }
 
 /// Trait mark widget can have one child and also have compose logic for widget
@@ -78,25 +65,6 @@ pub trait ComposeMultiChild {
   fn compose_multi_child(this: Stateful<Self>, children: Vec<Widget>, ctx: &mut BuildCtx) -> Widget
   where
     Self: Sized;
-
-  #[inline]
-  fn have_child<M, C>(self, child: C) -> MultiChildWidget<Self>
-  where
-    C: ChildConsumer<M>,
-    M: ?Sized,
-    Self: Sized,
-  {
-    MultiChildWidget::new(self, child)
-  }
-
-  #[inline]
-  fn have_expr_child<R>(self, w: ExprWidget<R>) -> MultiChildWidget<Self>
-  where
-    ExprWidget<R>: IntoWidget<R>,
-    Self: Sized,
-  {
-    self.have_child(w.into_widget())
-  }
 }
 
 pub trait ChildConsumer<M: ?Sized> {
@@ -324,5 +292,27 @@ pub fn compose_child_as_data_widget<W: Query + 'static, D: Query + 'static>(
     DataWidget::new(child, data).into_widget_and_try_unwrap_data(pick_data)
   } else {
     Void.into_widget()
+  }
+}
+
+impl<T: SingleChild> SingleChildHave for T {}
+
+impl<T: MultiChild> MultiChildHave for T {}
+
+impl<T: ComposeSingleChild> SingleChild for T {}
+
+impl<T: ComposeMultiChild> MultiChild for T {}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  #[test]
+  fn fix_stateful_compose_single_have_child() {
+    let _ = ScrollableWidget {
+      scrollable: Scrollable::Both,
+      pos: Point::zero(),
+    }
+    .into_stateful()
+    .have_child(Void);
   }
 }
