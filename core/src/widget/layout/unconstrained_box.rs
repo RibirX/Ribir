@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[derive(Declare, SingleChild)]
 /// A widget that imposes no constraints on its child, allowing it to layout and
-/// display as its "natural" size.
+/// display as its "natural" size. Its size is equal to its child.
 pub struct UnconstrainedBox;
 
 impl Render for UnconstrainedBox {
