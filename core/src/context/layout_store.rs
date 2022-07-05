@@ -183,6 +183,12 @@ impl LayoutStore {
 impl BoxClamp {
   #[inline]
   pub fn clamp(self, size: Size) -> Size { size.clamp(self.min, self.max) }
+
+  #[inline]
+  pub fn expand(mut self) -> Self {
+    self.max = crate::prelude::SizedBox::expanded_size();
+    self
+  }
 }
 
 impl Default for BoxClamp {
