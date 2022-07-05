@@ -57,8 +57,7 @@ impl WidgetTree {
 
   pub(crate) fn any_state_modified(&self) -> bool { !self.state_changed.borrow().is_empty() }
 
-  #[cfg(test)]
-  pub(crate) fn count(&self) -> usize { self.arena.count() }
+  pub(crate) fn count(&self) -> usize { self.root.descendants(&self).count() }
 }
 
 impl WidgetId {

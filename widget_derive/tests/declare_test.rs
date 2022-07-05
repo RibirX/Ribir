@@ -319,11 +319,12 @@ fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
 #[test]
 fn fix_builtin_field_can_declare_as_widget() {
   let w = widget! {
-    ScrollableWidget {
-      scrollable: Scrollable::Both
+    Margin {
+      margin: EdgeInsets::all(1.),
+      Void {}
     }
   };
 
-  let (_, children) = widget_and_its_children_box_rect(w, Size::zero());
-  assert!(children.is_empty())
+  let wnd = Window::without_render(w, Size::zero());
+  assert_eq!(wnd.widget_count(), 2);
 }
