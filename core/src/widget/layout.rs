@@ -3,6 +3,7 @@ mod column;
 pub mod flex;
 mod row;
 mod sized_box;
+pub mod unconstrained_box;
 pub use column::Column;
 pub use flex::*;
 pub use row::Row;
