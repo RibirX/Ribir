@@ -16,4 +16,5 @@ pub use direction::*;
 pub mod widget_children;
 pub use anchor::*;
 pub use container::Container;
+pub use unconstrained_box::*;
 pub use widget_children::*;

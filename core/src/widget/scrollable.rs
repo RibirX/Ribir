@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 /// Enumerate to describe which direction allow widget to scroll.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
@@ -18,30 +18,9 @@ pub enum Scrollable {
 #[derive(Declare)]
 pub struct ScrollableWidget {
   #[declare(builtin)]
-  scrollable: Scrollable,
+  pub scrollable: Scrollable,
   #[declare(default)]
-  pos: Point,
-}
-
-impl Render for ScrollableWidget {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let size = clamp.max;
-    if let Some(child) = ctx.single_child() {
-      let content_clamp = self.content_clamp(clamp);
-      let content = ctx.perform_child_layout(child, content_clamp);
-      let pos = self.content_pos(content, &size);
-      ctx.update_position(child, pos);
-    }
-
-    size
-  }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-impl Query for ScrollableWidget {
-  impl_query_self_only!();
+  pub pos: Point,
 }
 
 impl ComposeSingleChild for ScrollableWidget {
@@ -49,10 +28,11 @@ impl ComposeSingleChild for ScrollableWidget {
   where
     Self: Sized,
   {
-    let child = widget! {
-      track { this: this.clone() }
-      ExprWidget {
-        expr: child,
+    widget! {
+      track { this }
+      Anchor {
+        x: this.pos.x,
+        y: this.pos.y,
         on_wheel: move |e| {
           let ctx = e.context();
           let content = e.current_target();
@@ -70,37 +50,24 @@ impl ComposeSingleChild for ScrollableWidget {
           if new != old {
             this.pos = new;
           }
+        },
+        UnconstrainedBox {
+          ExprWidget { expr: child }
         }
       }
-    };
-    let widget = this.into_render_node();
-    SingleChildWidget { widget, child: Some(child) }.into_widget()
+
+    }
   }
 }
 
 #[inline]
 fn validate_pos(view: f32, content: f32, pos: f32) -> f32 { pos.min(0.).max(view - content) }
 
-impl ScrollableWidget {
-  fn content_clamp(&self, _: BoxClamp) -> BoxClamp {
-    BoxClamp {
-      min: Size::zero(),
-      max: Size::new(f32::MAX, f32::MAX),
-    }
-  }
-
-  fn content_pos(&self, content: Size, view: &Size) -> Point {
-    Point::new(
-      validate_pos(view.width, content.width, self.pos.x),
-      validate_pos(view.height, content.height, self.pos.y),
-    )
-  }
-}
-
 #[cfg(test)]
 mod tests {
-  use super::*;
   use crate::test::root_and_children_rect;
+
+  use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
