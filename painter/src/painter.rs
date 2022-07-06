@@ -48,6 +48,9 @@ pub enum PaintPath {
     style: PathStyle,
   },
 }
+
+// todo: need a way to batch commands as a single resource. so we can cache
+// their vertexes as a whole. useful for svg, animation and paint layers.
 #[derive(Clone)]
 pub struct PaintCommand {
   pub path: PaintPath,

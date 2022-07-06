@@ -1,5 +1,7 @@
-use painter::{Color, DeviceSize, Painter, PainterBackend, Rect, Size};
-use ribir::prelude::text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
+use painter::{
+  text::{font_db::FontDB, shaper::TextShaper, TypographyStore},
+  Color, DeviceSize, Painter, PainterBackend, Rect, Size,
+};
 use std::sync::{Arc, RwLock};
 
 use gpu::wgpu_backend_headless;

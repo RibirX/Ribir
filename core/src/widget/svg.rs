@@ -9,7 +9,15 @@ impl Compose for Svg {
   fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
-      ExprWidget { expr: SvgRender::new(&this.bytes) }
+      ExprWidget {
+        expr: match SvgRender::from_svg_bytes(&this.bytes) {
+          Ok(reader) => Some(reader),
+          Err(err) =>  {
+            log::warn!("Parse svg failed: {err}");
+            None
+          }
+        }
+      }
     }
   }
 }

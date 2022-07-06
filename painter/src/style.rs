@@ -1,5 +1,6 @@
 use crate::{Color, ShallowImage};
 use lyon_tessellation::StrokeOptions;
+use serde::{Deserialize, Serialize};
 use text::{Em, FontFace, FontSize, Pixel};
 
 /// Encapsulates the text style for painting.
@@ -26,6 +27,7 @@ bitflags::bitflags! {
   /// than the path, image will be clipped.
   /// - Cover mode resize the image to cover the entire path, even if it has to
   /// stretch the image or cut a little bit off one of the edges
+  #[derive(Serialize, Deserialize)]
   pub struct TileMode: u8 {
     const REPEAT_X = 0b00000001;
     const REPEAT_Y = 0b00000010;
@@ -43,7 +45,7 @@ impl TileMode {
   pub fn is_cover_mode(&self) -> bool { self.bits & (TileMode::COVER_BOTH.bits) > 0 }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Brush {
   Color(Color),
   Image {
@@ -54,7 +56,7 @@ pub enum Brush {
 }
 
 /// The style to paint path, maybe fill or stroke.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub enum PathStyle {
   /// Fill the path.
   Fill,

@@ -1,17 +1,21 @@
-use lyon_path::{
-  builder::BorderRadii,
-  geom::{Arc, LineSegment},
-  traits::PathBuilder,
-  Winding,
+pub use lyon_tessellation::{
+  path::{
+    builder::BorderRadii,
+    geom::{Arc, LineSegment},
+    path::Builder as LyonBuilder,
+    traits::PathBuilder,
+    Path as LyonPath, Winding,
+  },
+  StrokeOptions,
 };
-pub use lyon_tessellation::StrokeOptions;
+use serde::{Deserialize, Serialize};
 
 use crate::{Angle, PathStyle, Point, Rect, Vector};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Path {
-  pub path: lyon_path::path::Path,
+  pub path: LyonPath,
   pub style: PathStyle,
 }
 
@@ -20,7 +24,7 @@ pub struct Path {
 pub struct Radius(BorderRadii);
 
 #[derive(Default)]
-pub struct Builder(lyon_path::path::Builder);
+pub struct Builder(LyonBuilder);
 
 impl Path {
   #[inline]

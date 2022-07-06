@@ -1,6 +1,8 @@
 use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
 
-#[derive(Clone, Copy)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum ColorFormat {
   Rgba8,
 }
@@ -14,6 +16,7 @@ impl ColorFormat {
   }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct PixelImage {
   data: Cow<'static, [u8]>,
   size: (u16, u16),
@@ -34,7 +37,7 @@ impl PixelImage {
 }
 
 /// A image wrap for shallow compare.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ShallowImage(Rc<PixelImage>);
 
 impl Hash for ShallowImage {

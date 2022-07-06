@@ -11,7 +11,9 @@
   "cSpell.words": [
     "ahash",
     "bidi",
+    "bincode",
     "bitflags",
+    "clippy",
     "cond",
     "dataflows",
     "fontdb",
