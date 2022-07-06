@@ -14,6 +14,7 @@ pub use image::{PixelImage, ShallowImage};
 pub use style::*;
 mod svg_render;
 pub use svg_render::SvgRender;
+pub use text;
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.

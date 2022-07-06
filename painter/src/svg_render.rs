@@ -1,13 +1,16 @@
 use crate::{Brush, Color, LineCap, LineJoin, Path, PathStyle, Point, Size, Transform};
 use euclid::approxeq::ApproxEq;
-use lyon_tessellation::StrokeOptions;
+use lyon_tessellation::{math::Point as LyonPoint, path::Path as LyonPath, StrokeOptions};
+use serde::{Deserialize, Serialize};
+use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
-
+#[derive(Serialize, Deserialize)]
 pub struct SvgRender {
   pub size: Size,
   pub paths: Vec<SvgRenderPath>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SvgRenderPath {
   pub path: Path,
   pub transform: Transform,
@@ -15,7 +18,7 @@ pub struct SvgRenderPath {
 }
 
 impl SvgRender {
-  pub fn new(svg_data: &[u8]) -> Self {
+  pub fn from_svg_bytes(svg_data: &[u8]) -> Result<Self, Box<dyn Error>> {
     // todo: font_db to parse text
     // But `Options` need own the font db, need a pr for usvg.
     let opt = Options { ..<_>::default() };
@@ -124,12 +127,25 @@ impl SvgRender {
     }
 
     assert_eq!(t_stack.stack.len(), 1);
-    SvgRender { size, paths }
+    Ok(SvgRender { size, paths })
+  }
+
+  pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    let mut file = std::fs::File::open(path)?;
+    let mut bytes = vec![];
+    file.read_to_end(&mut bytes)?;
+    Self::from_svg_bytes(&bytes)
+  }
+
+  pub fn serialize(&self) -> Result<Vec<u8>, Box<dyn Error>> { Ok(bincode::serialize(self)?) }
+
+  pub fn deserialize(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+    Ok(bincode::deserialize(bytes)?)
   }
 }
 
-fn usvg_path_to_lyon_path(path: &usvg::Path) -> lyon_path::Path {
-  let mut builder = lyon_path::Path::svg_builder();
+fn usvg_path_to_lyon_path(path: &usvg::Path) -> LyonPath {
+  let mut builder = LyonPath::svg_builder();
   path.data.iter().for_each(|seg| match *seg {
     usvg::PathSegment::MoveTo { x, y } => {
       builder.move_to(point(x, y));
@@ -146,7 +162,7 @@ fn usvg_path_to_lyon_path(path: &usvg::Path) -> lyon_path::Path {
   builder.build()
 }
 
-fn point(x: f64, y: f64) -> lyon_path::math::Point { Point::new(x as f32, y as f32).to_untyped() }
+fn point(x: f64, y: f64) -> LyonPoint { Point::new(x as f32, y as f32).to_untyped() }
 
 fn matrix_convert(t: usvg::Transform) -> Transform {
   let usvg::Transform { a, b, c, d, e, f } = t;

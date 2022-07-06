@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 // todo: use u8 x4 replace f32
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Color {
   /// The amount of red light, where 0.0 is no red light and 1.0f
   /// is the highest displayable amount.
