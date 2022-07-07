@@ -122,6 +122,16 @@ builtin! {
     scrollable: Scrollable
   }
 
+  // HAlignWidget {
+  //   #[doc="describe how widget align to its box in x-axis."]
+  //   h_align: HAlign,
+  // }
+
+  // VAlignWidget {
+  //   #[doc="describe how widget align to its box in y-axis."]
+  //   v_align: VAlign,
+  // }
+
   Margin {
     #[doc="expand space around widget wrapped."]
     margin: impl EdgeInsets,
