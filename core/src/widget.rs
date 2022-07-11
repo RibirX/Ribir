@@ -5,6 +5,7 @@ pub use std::{
 };
 pub mod key;
 pub mod layout;
+use algo::ShareResource;
 pub use layout::*;
 pub mod stateful;
 pub mod text;
@@ -304,4 +305,29 @@ macro_rules! impl_query_self_only {
       }
     }
   };
+}
+
+impl<T: Render> Render for algo::ShareResource<T> {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    T::perform_layout(&*self, clamp, ctx)
+  }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl<T: Query> Query for ShareResource<T> {
+  fn query_all(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    order: QueryOrder,
+  ) {
+    (&**self).query_all(type_id, callback, order)
+  }
+
+  fn query_all_mut(&mut self, _: TypeId, _: &mut dyn FnMut(&mut dyn Any) -> bool, _: QueryOrder) {
+    // resource can not be queried as mut.
+  }
 }

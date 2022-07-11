@@ -1,4 +1,5 @@
 pub use super::*;
+use crate::prelude::include_svg;
 pub use painter::{Brush, Color};
 
 /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
@@ -14,11 +15,6 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
   let background = Color::from_u32(0xFFFF_FFFF);
   let secondary = Color::from_u32(0x03DA_C6FF);
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
-  let checkbox = CheckboxTheme {
-    check_background: secondary.clone(),
-    border_color: unselected_widget_color.clone().with_alpha(0.65),
-    ..Default::default()
-  };
 
   let scrollbar = ScrollBarTheme {
     track_box: ScrollBoxDecorationStyle {
@@ -35,7 +31,6 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
   };
   Theme {
     brightness: Brightness::Light,
-    checkbox,
     primary: Color::from_u32(0x6200_EEFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary,
@@ -52,7 +47,16 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
     default_font_family: family,
     unselected_widget_color,
     scrollbar,
-    icon: IconTheme::default(),
+    icon_theme: IconTheme {
+      icon_size: IconSize {
+        tiny: Size::new(18., 18.),
+        small: Size::new(24., 24.),
+        medium: Size::new(36., 36.),
+        large: Size::new(48., 48.),
+        huge: Size::new(64., 64.),
+      },
+      builtin_icons: material_icons(),
+    },
   }
 }
 
@@ -69,11 +73,6 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
     TextDecoration::NONE,
     Color::TRANSPARENT.into(),
   );
-  let checkbox = CheckboxTheme {
-    check_background: secondary.clone(),
-    border_color: unselected_widget_color.clone().with_alpha(0.65),
-    ..Default::default()
-  };
 
   let scrollbar = ScrollBarTheme {
     track_box: ScrollBoxDecorationStyle {
@@ -91,7 +90,6 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
 
   Theme {
     brightness: Brightness::Dark,
-    checkbox,
     primary: Color::from_u32(0xBB86_FCFF),
     primary_variant: Color::from_u32(0x3700_B3FF),
     secondary,
@@ -108,6 +106,28 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
     default_font_family: family,
     unselected_widget_color,
     scrollbar,
-    icon: IconTheme::default(),
+    icon_theme: IconTheme {
+      icon_size: IconSize {
+        tiny: Size::new(18., 18.),
+        small: Size::new(24., 24.),
+        medium: Size::new(36., 36.),
+        large: Size::new(48., 48.),
+        huge: Size::new(64., 64.),
+      },
+      builtin_icons: material_icons(),
+    },
+  }
+}
+
+fn material_icons() -> SvgIcons {
+  macro_rules! include_icon {
+    ($path: literal) => {
+      ShareResource::new(include_svg!($path))
+    };
+  }
+  SvgIcons {
+    checked: include_icon!("./material/checked.svg"),
+    unchecked: include_icon!("./material/unchecked_box.svg"),
+    indeterminate: include_icon!("./material/indeterminate_check_box.svg"),
   }
 }

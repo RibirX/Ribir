@@ -12,6 +12,7 @@ use crate::{
     Query, QueryFiler, QueryOrder, Stateful, TypeId, Widget,
   },
 };
+use algo::ShareResource;
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
@@ -112,11 +113,40 @@ pub struct Theme {
   pub unselected_widget_color: Color,
   /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
-  pub checkbox: CheckboxTheme,
   pub scrollbar: ScrollBarTheme,
-  pub icon: IconTheme,
+  pub icon_theme: IconTheme,
 }
 
+#[derive(Debug, Clone)]
+pub struct IconTheme {
+  pub icon_size: IconSize,
+  pub builtin_icons: SvgIcons,
+}
+
+#[derive(Debug, Clone)]
+pub struct IconSize {
+  pub tiny: Size,
+  pub small: Size,
+  pub medium: Size,
+  pub large: Size,
+  pub huge: Size,
+}
+
+impl IconSize {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.icon_size }
+}
+
+impl SvgIcons {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.builtin_icons }
+}
+#[derive(Debug, Clone)]
+pub struct SvgIcons {
+  pub checked: ShareResource<SvgRender>,
+  pub unchecked: ShareResource<SvgRender>,
+  pub indeterminate: ShareResource<SvgRender>,
+}
 #[derive(Declare)]
 pub struct ThemeWidget {
   #[declare(builtin)]
@@ -323,50 +353,6 @@ impl TypographyTheme {
         },
         decoration,
       },
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct CheckboxTheme {
-  pub size: f32,
-  pub check_background: Color,
-  // todo: use border merge border_width & border_color ~
-  pub border_width: f32,
-  pub radius: f32,
-  pub border_color: Color,
-}
-
-impl Default for CheckboxTheme {
-  fn default() -> Self {
-    let size: f32 = 16.;
-    let border_width = 2.;
-
-    Self {
-      size,
-      border_width,
-      check_background: Color::BLACK,
-      radius: 2.,
-      border_color: Color::BLACK,
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct IconTheme {
-  pub width: f32,
-  pub height: f32,
-  pub fill_color: Color,
-  pub stroke_color: Color,
-}
-
-impl Default for IconTheme {
-  fn default() -> Self {
-    Self {
-      width: 16.0,
-      height: 16.0,
-      fill_color: Color::WHITE,
-      stroke_color: Color::BLACK,
     }
   }
 }

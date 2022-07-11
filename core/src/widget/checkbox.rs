@@ -1,15 +1,14 @@
 use crate::prelude::*;
-use crate::widget::theme::CheckboxTheme;
 
 /// Represents a control that a user can select and clear.
-#[derive(Default, Clone, Declare)]
+#[derive(Clone, Declare)]
 pub struct Checkbox {
   #[declare(default)]
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default = "ctx.theme().checkbox.clone()")]
-  pub style: CheckboxTheme,
+  #[declare(default = "IconSize::of(ctx).small")]
+  pub size: Size,
 }
 
 impl Checkbox {
@@ -24,11 +23,16 @@ impl Checkbox {
 }
 
 impl Compose for Checkbox {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+    let icons = SvgIcons::of(ctx);
+    let checked = icons.checked.clone();
+    let unchecked = icons.unchecked.clone();
+    let indeterminate = icons.indeterminate.clone();
+
     widget! {
       track { this }
-      ExprWidget {
-        margin: EdgeInsets::all(4.),
+      Icon {
+        size: this.size,
         cursor: CursorIcon::Hand,
         on_tap: move |_| this.switch_check(),
         on_key_up: move |k| {
@@ -36,23 +40,13 @@ impl Compose for Checkbox {
             this.switch_check()
           }
         },
-        expr: {
-          let size = this.style.size;
-          let size = Size::new(size, size);
-          // todo: should not directly include file, but query form theme.
-          let svg_bytes = if this.indeterminate {
-            include_bytes!("./theme/checkbox/indeterminate.svg").to_vec()
+        ExprWidget {
+          expr: if this.indeterminate {
+            indeterminate.clone()
           } else if this.checked {
-            include_bytes!("./theme/checkbox/checked.svg").to_vec()
+            checked.clone()
           } else {
-            include_bytes!("./theme/checkbox/unchecked.svg").to_vec()
-          };
-
-          widget! {
-            Icon {
-              size,
-              Svg { bytes: svg_bytes }
-            }
+            unchecked.clone()
           }
         }
       }
@@ -67,21 +61,16 @@ mod tests {
 
   #[test]
   fn layout() {
-    let w = Checkbox::default();
-    let (rect, child) = widget_and_its_children_box_rect(w.into_widget(), Size::new(200., 200.));
+    let w = widget! { Checkbox {} };
+    let (rect, _) = widget_and_its_children_box_rect(w.into_widget(), Size::new(200., 200.));
     debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
-
-    debug_assert_eq!(
-      child,
-      vec![Rect::new(Point::new(4., 4.), Size::new(16., 16.))]
-    );
   }
 
   #[cfg(feature = "png")]
   #[test]
   fn checked_paint() {
-    let c = Checkbox { checked: true, ..<_>::default() };
-    let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
+    let c = widget! { Checkbox { checked: true } };
+    let mut window = Window::wgpu_headless(c, DeviceSize::new(100, 100));
     window.render_ready();
 
     assert!(window.same_as_png("../test/test_imgs/checkbox_checked.png"));
@@ -90,8 +79,7 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn unchecked_paint() {
-    let mut window =
-      Window::wgpu_headless(Checkbox::default().into_widget(), DeviceSize::new(100, 100));
+    let mut window = Window::wgpu_headless(widget! { Checkbox {} }, DeviceSize::new(100, 100));
     window.render_ready();
     assert!(window.same_as_png("../test/test_imgs/checkbox_uncheck.png"));
   }
@@ -99,20 +87,22 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn indeterminate_paint() {
-    let c = Checkbox {
-      checked: true,
-      indeterminate: true,
-      ..<_>::default()
+    let c = widget! {
+      Checkbox {
+        checked: true,
+        indeterminate: true,
+      }
     };
     let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
 
     assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));
 
-    let c = Checkbox {
-      checked: false,
-      indeterminate: true,
-      ..<_>::default()
+    let c = widget! {
+      Checkbox {
+        checked: false,
+        indeterminate: true,
+      }
     };
     let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
