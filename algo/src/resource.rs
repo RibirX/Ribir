@@ -20,11 +20,16 @@ pub enum Resource<T> {
 /// # Notice
 /// Compare two `ShareResource` just compare if it come form same resource not
 /// compare its content.
-#[derive(Clone, Debug, Eq)]
+#[derive(Debug, Eq)]
 pub struct ShareResource<T>(Arc<T>);
 
 impl<T> ShareResource<T> {
   pub fn new(v: T) -> Self { ShareResource(Arc::new(v)) }
+}
+
+impl<T> Clone for ShareResource<T> {
+  #[inline]
+  fn clone(&self) -> Self { Self(self.0.clone()) }
 }
 
 impl<T> Deref for Resource<T> {

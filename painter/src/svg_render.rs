@@ -4,13 +4,14 @@ use lyon_tessellation::{math::Point as LyonPoint, path::Path as LyonPath, Stroke
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SvgRender {
   pub size: Size,
   pub paths: Vec<SvgRenderPath>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+// todo: we need to support currentColor to change svg color.
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SvgRenderPath {
   pub path: Path,
   pub transform: Transform,

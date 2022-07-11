@@ -76,7 +76,6 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   let mut file = span.source_file().path();
   file.pop();
   file.push(w.value());
-  println!("include_svg! called at {:?}", file.to_str());
   let encoded_bytes = painter::SvgRender::open(file).and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
