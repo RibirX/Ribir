@@ -1,6 +1,7 @@
 use crate::{Brush, Color, LineCap, LineJoin, Path, PathStyle, Point, Size, Transform};
 use euclid::approxeq::ApproxEq;
 use lyon_tessellation::{math::Point as LyonPoint, path::Path as LyonPath, StrokeOptions};
+use palette::FromComponent;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
@@ -177,8 +178,8 @@ fn brush_from_usvg_paint(
 ) -> Option<Brush> {
   match paint {
     usvg::Paint::Color(usvg::Color { red, green, blue }) => {
-      let mut color = Color::const_rgb_from(*red, *green, *blue);
-      color.alpha = opacity.value() as f32;
+      let alpha = u8::from_component(opacity.value());
+      let color = Color::new(*red, *green, *blue, alpha);
       Some(Brush::Color(color))
     }
     usvg::Paint::Link(ref id) => {

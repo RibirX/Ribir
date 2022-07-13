@@ -89,7 +89,7 @@ fn main() {
       let font_db = Arc::new(RwLock::new(FontDB::default()));
       let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
       let mut painter = Painter::new(2., store);
-      let red_brush = Brush::Color(Color::RED);
+      let red_brush = Brush::from(Color::RED);
       let img_brush = Brush::Image {
         img: img.clone(),
         tile_mode: TileMode::REPEAT_BOTH,

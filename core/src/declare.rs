@@ -159,9 +159,8 @@
 //! [declare_derive]: ../ribir/widget_derive/Declare.html
 //! [builtin_fields]: ../ribir/widget_derive/declare_builtin_fields.html
 
-use std::marker::PhantomData;
-
 use crate::prelude::BuildCtx;
+use std::marker::PhantomData;
 
 /// Trait to mark the builder type of widget. `widget!` use it to access the
 /// build type of the widget. See the [mod level document](declare) to know how
@@ -209,7 +208,7 @@ mod tests {
     assert_eq!(
       StripedOption::from(Color::RED),
       StripedOption {
-        value: Some(Brush::Color(Color::RED)),
+        value: Some(Brush::from(Color::RED)),
         _marker: PhantomData
       }
     )
@@ -218,9 +217,9 @@ mod tests {
   #[test]
   fn option_self_can_use_with_stripe() {
     assert_eq!(
-      StripedOption::from(Some(Brush::Color(Color::RED))),
+      StripedOption::from(Color::RED),
       StripedOption {
-        value: Some(Brush::Color(Color::RED)),
+        value: Some(Brush::from(Color::RED)),
         _marker: PhantomData
       }
     )

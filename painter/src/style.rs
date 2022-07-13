@@ -76,6 +76,7 @@ impl Default for TextStyle {
     }
   }
 }
+
 impl From<Color> for Brush {
   #[inline]
   fn from(c: Color) -> Self { Brush::Color(c) }
@@ -83,5 +84,5 @@ impl From<Color> for Brush {
 
 impl Default for Brush {
   #[inline]
-  fn default() -> Self { Brush::Color(Color::BLACK) }
+  fn default() -> Self { Color::BLACK.into() }
 }
