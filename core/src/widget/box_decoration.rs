@@ -306,7 +306,7 @@ impl BoxDecoration {
 }
 
 impl BorderSide {
-  fn is_visible(&self) -> bool { self.width > 0. && self.color.alpha != 0. }
+  fn is_visible(&self) -> bool { self.width > 0. && self.color.alpha > 0 }
 }
 
 impl Border {
@@ -346,10 +346,10 @@ mod tests {
       SizedBox {
         size: SIZE,
         border: Border {
-          left: BorderSide::new(1., Color::BLACK),
-          right: BorderSide::new(2., Color::BLACK),
-          top: BorderSide::new(3., Color::BLACK),
-          bottom: BorderSide::new(4., Color::BLACK),
+          left: BorderSide::new(1., Color::BLACK.into()),
+          right: BorderSide::new(2., Color::BLACK.into()),
+          top: BorderSide::new(3., Color::BLACK.into()),
+          bottom: BorderSide::new(4., Color::BLACK.into()),
         },
       }
     };

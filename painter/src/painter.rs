@@ -531,7 +531,7 @@ impl Default for PainterState {
       stroke_options: <_>::default(),
       font_size: FontSize::Pixel(14.0.into()),
       letter_space: None,
-      brush: Brush::Color(Color::BLACK),
+      brush: Color::BLACK.into(),
       font_face: FontFace::default(),
       text_line_height: None,
       transform: Transform::new(1., 0., 0., 1., 0., 0.),

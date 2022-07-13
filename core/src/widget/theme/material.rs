@@ -10,21 +10,21 @@ pub fn light(family: Box<[FontFamily]>) -> Theme {
     Color::BLACK.with_alpha(0.54).into(),
     Color::BLACK.with_alpha(0.87).into(),
     TextDecoration::NONE,
-    Color::TRANSPARENT.into(),
+    Color::BLACK.with_alpha(0.87).into(),
   );
-  let background = Color::from_u32(0xFFFF_FFFF);
+  let background = Color::WHEAT.into();
   let secondary = Color::from_u32(0x03DA_C6FF);
   let unselected_widget_color = Color::BLACK.with_alpha(0.7);
 
   let scrollbar = ScrollBarTheme {
     track_box: ScrollBoxDecorationStyle {
-      background: Brush::Color(Color::SILVER),
+      background: Color::SILVER.into(),
       radius: None,
     },
     track_width: 12.,
 
     thumb_box: ScrollBoxDecorationStyle {
-      background: Brush::Color(Color::GRAY),
+      background: Color::GRAY.into(),
       radius: None,
     },
     thumb_width: 12.,
@@ -71,18 +71,18 @@ pub fn dark(family: Box<[FontFamily]>) -> Theme {
     Color::WHITE.with_alpha(0.70).into(),
     Color::WHITE.into(),
     TextDecoration::NONE,
-    Color::TRANSPARENT.into(),
+    Color::WHITE.into(),
   );
 
   let scrollbar = ScrollBarTheme {
     track_box: ScrollBoxDecorationStyle {
-      background: Brush::Color(Color::BLACK),
+      background: Color::BLACK.into(),
       radius: None,
     },
     track_width: 12.,
 
     thumb_box: ScrollBoxDecorationStyle {
-      background: Brush::Color(Color::GRAY),
+      background: Color::GRAY.into(),
       radius: None,
     },
     thumb_width: 12.,

@@ -163,7 +163,7 @@ impl Tessellator {
     match &cmd.brush {
       Brush::Color(color) => {
         let c = ColorPrimitive {
-          color: color.clone().into_arrays(),
+          color: color.into_f32_components(),
           transform: cmd.transform.clone().to_arrays(),
         };
         (c.into(), PrimitiveType::Color)
@@ -556,7 +556,7 @@ mod tests {
   }
 
   fn two_img_paint(painter: &mut Painter) {
-    let img = color_image(Color::YELLOW, 100, 100);
+    let img = color_image(Color::YELLOW.into(), 100, 100);
     painter
       .set_brush(Brush::Image {
         img,
