@@ -63,6 +63,8 @@
   - [ ] api docs cover
   - [ ] how framework work
 
+- [ ] compose trait accept stateless/stateful enum so we not always convert a widget to stateful.
+
 ## cross platform
 
 - [x] osx
@@ -73,6 +75,17 @@
 - [ ] web / WebAssembly
 
 
+##  keep type information to optimize tree.
+
+For now, we have `Widget` as an abstract node to hold everything user declare, and then construct a tree from it. When user declare tree convert to `Widget` information have be erased. 
+
+if we omit this pre box and build widget tree directly one by one, so we can keep all type information when build the tree, and can do many optimistic across the type information.
+
+- all compose widget have be consumed.
+- stateless parent and son render widget can be merged until not only sized by parent.
+- some stateless render sibling can be merged.
+
+
 
 ## parallelism layout 
 
@@ -81,4 +94,31 @@
 ## infinite / virtual scroll
 
 ## debug, test and productive develop tools
+
+## declare language to describe ui.
+
+provided `declare!` macro.
+
+
+## zero cost compose widget
+
+a. compose widget can support directly update its subtree by compile time analyze
+  - block by d
+b. compose widget not exist in widget tree
+  - block by d
+c. compose widget should be concrete type
+  - after c & b finished, compose widget should be zero cost.
+  - block by b & i.
+d. we can remove `Attribute` concept and use compose widget to implement it.
+  - compose widget can be zero cost after b & c
+  - block by i.
+e. we can use compose widget to implement animate, should it not depends on `BuildCtx` in dsl
+f. we can use compose widget as DeclareBuilder so it can not depends on `BuildCtx` in dsl
+g. `widget!` macro should not depends on `BuildCtx`
+  - block by e & f
+h. `widget!` macro can use anywhere, and not depends on any context.
+  - should add a reactive blocks to track outside widget change.
+  - block by e & f & g
+  - remove `#[widget]` attr
+i. add `QueryType` trait to find type information 
 

@@ -195,7 +195,10 @@ pub mod tests {
     let rect = rect.to_usize();
     rect.y_range().for_each(|y| {
       rect.x_range().for_each(|x| {
-        assert_eq!(atlas.texture[y][UNIT * x..UNIT * (x + 1)], color.into_components());
+        assert_eq!(
+          atlas.texture[y][UNIT * x..UNIT * (x + 1)],
+          color.into_components()
+        );
       })
     })
   }

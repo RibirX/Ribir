@@ -1,5 +1,6 @@
 # Ribir
 
+Pay for only what you need.
 ## Example
 
 ```

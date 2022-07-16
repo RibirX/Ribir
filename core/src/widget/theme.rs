@@ -4,6 +4,8 @@
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
 pub mod material;
+mod palette;
+pub use palette::Palette;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
@@ -89,28 +91,12 @@ pub struct TypographyTheme {
   pub overline: TextTheme,
 }
 
-// todo: theme can provide fonts folder.
-
-/// Properties from [Material Theme](https://material.io/design/material-theming/implementing-your-theme.html)
 #[derive(Clone, Debug)]
 pub struct Theme {
   // Dark or light theme.
   pub brightness: Brightness,
-  pub primary: Color,
-  pub primary_variant: Color,
-  pub secondary: Color,
-  pub secondary_variant: Color,
-  pub background: Color,
-  pub surface: Color,
-  pub error: Color,
-  pub on_primary: Color,
-  pub on_secondary: Color,
-  pub on_background: Color,
-  pub on_surface: Color,
-  pub on_error: Color,
+  pub palette: Palette,
   pub typography_theme: TypographyTheme,
-  /// The color used for widgets in their inactive (but enabled) state.
-  pub unselected_widget_color: Color,
   /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
   pub scrollbar: ScrollBarTheme,
@@ -156,6 +142,7 @@ pub struct ThemeWidget {
 impl ComposeSingleChild for ThemeWidget {
   #[inline]
   fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    // todo: theme can provide fonts to load, blocked by a async widget?
     compose_child_as_data_widget(child, this, |w| w.theme)
   }
 }
