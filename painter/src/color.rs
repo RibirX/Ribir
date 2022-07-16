@@ -1,6 +1,6 @@
 use palette::{
   rgb::{channels::Rgba, Rgb},
-  Alpha, IntoComponent,
+  Alpha, IntoColor, IntoComponent, Lab, Srgba,
 };
 use serde::{Deserialize, Serialize};
 
@@ -49,6 +49,17 @@ impl Color {
   pub fn with_alpha(mut self, alpha: f32) -> Self {
     self.0.alpha = alpha.into_component();
     self
+  }
+
+  /// `l` is the lightness of the color. 0.0 gives absolute black and 1.0
+  /// give the brightest white.
+  #[inline]
+  pub fn with_lightness(self, l: f32) -> Self {
+    let color: Srgba = self.0.into_format();
+    let mut lab: Lab = color.into_color();
+    lab.l = (l * 100.).clamp(0., 100.);
+    let rgba: Srgba = lab.into_color();
+    Color(rgba.into_format())
   }
 
   #[inline]

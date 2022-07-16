@@ -1,9 +1,8 @@
 use crate::{animation::TickerAnimationCtrl, prelude::*};
-use ::text::FontFamily;
 use std::{rc::Rc, time::Duration};
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
-  Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
+  Rc::new(widget::material::purple::light())
 );
 
 pub struct BuildCtx<'a> {
@@ -94,9 +93,8 @@ mod tests {
 
     impl Compose for DarkLightThemes {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
-        let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
-        let dark = material::dark(family.clone());
-        let light = material::light(family);
+        let dark = material::purple::dark();
+        let light = material::purple::light();
 
         widget! {
           track { this }
@@ -128,9 +126,8 @@ mod tests {
 
     impl Compose for LightDarkThemes {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
-        let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
-        let dark = material::dark(family.clone());
-        let light = material::light(family);
+        let dark = material::purple::dark();
+        let light = material::purple::light();
 
         widget! {
           track { this }

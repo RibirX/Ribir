@@ -23,6 +23,7 @@ pub enum YAnchor {
 #[derive(Declare, SingleChild)]
 pub struct Anchor {
   // todo: declare convert meta `convert=(custom)`, `convert=(into)`.
+  // todo: use pos_x & pos_y as a builtin field
   #[declare(custom_convert, default = "XAnchor::Left(0.)")]
   pub x: XAnchor,
   #[declare(custom_convert, default = "YAnchor::Top(0.)")]
