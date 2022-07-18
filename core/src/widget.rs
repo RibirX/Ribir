@@ -310,11 +310,13 @@ macro_rules! impl_query_self_only {
 impl<T: Render> Render for algo::ShareResource<T> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    T::perform_layout(&*self, clamp, ctx)
+    T::perform_layout(self, clamp, ctx)
   }
 
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn paint(&self, ctx: &mut PaintingCtx) { T::paint(self, ctx) }
+
+  fn only_sized_by_parent(&self) -> bool { T::only_sized_by_parent(self) }
 }
 
 impl<T: Query> Query for ShareResource<T> {
