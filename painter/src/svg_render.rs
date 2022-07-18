@@ -136,11 +136,12 @@ impl SvgRender {
     Self::from_svg_bytes(&bytes)
   }
 
-  pub fn serialize(&self) -> Result<Vec<u8>, Box<dyn Error>> { Ok(bincode::serialize(self)?) }
-
-  pub fn deserialize(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
-    Ok(bincode::deserialize(bytes)?)
+  pub fn serialize(&self) -> Result<String, Box<dyn Error>> {
+    // use json replace bincode, because https://github.com/Ogeon/palette/issues/130
+    Ok(serde_json::to_string(self)?)
   }
+
+  pub fn deserialize(str: &str) -> Result<Self, Box<dyn Error>> { Ok(serde_json::from_str(str)?) }
 }
 
 fn usvg_path_to_lyon_path(path: &usvg::Path) -> LyonPath {

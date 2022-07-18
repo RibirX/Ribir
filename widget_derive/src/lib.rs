@@ -79,7 +79,7 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   let encoded_bytes = painter::SvgRender::open(file).and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
-      SvgRender::deserialize(&[#(#data),*]).unwrap()
+      SvgRender::deserialize(#data).unwrap()
     }
     .into(),
     Err(err) => {
