@@ -106,29 +106,26 @@ impl SvgRender {
         _ => process_children = false,
       }
 
-      if process_children {
+      if process_children && n.first_child().is_some() {
         node = n.first_child();
-      } else {
-        node = None;
+        continue;
       }
-      if node.is_none() {
-        let mut find_sibling = node;
-        while let Some(f) = find_sibling {
-          // self node sub-tree paint finished, goto sibling
-          t_stack.pop();
-          find_sibling = f.next_sibling();
-          if find_sibling.is_some() {
-            break;
-          } else {
-            // if there is no more sibling, back to parent to find sibling.
-            find_sibling = f.parent();
-          }
+
+      let mut find_sibling = node;
+      while let Some(f) = find_sibling {
+        // self node sub-tree paint finished, goto sibling
+        t_stack.pop();
+        find_sibling = f.next_sibling();
+        if find_sibling.is_some() {
+          break;
+        } else {
+          // if there is no more sibling, back to parent to find sibling.
+          find_sibling = f.parent();
         }
-        node = find_sibling;
       }
+      node = find_sibling;
     }
 
-    assert_eq!(t_stack.stack.len(), 1);
     Ok(SvgRender { size, paths })
   }
 
