@@ -152,11 +152,8 @@ impl Context {
   }
 
   pub fn mark_root_dirty(&mut self) {
-    self
-      .widget_tree
-      .state_changed
-      .borrow_mut()
-      .insert(self.widget_tree.root());
+    let root = self.widget_tree.root();
+    self.widget_tree.mark_dirty(root);
   }
 
   /// Repair the gaps between widget tree represent and current data state after
@@ -168,7 +165,9 @@ impl Context {
 
     if let Some(mut needs_regen) = needs_regen {
       needs_regen.iter_mut().for_each(|g| {
-        g.update_generated_widgets(self);
+        if !g.info.parent().is_dropped(self.tree()) {
+          g.update_generated_widgets(self);
+        }
       });
 
       needs_regen

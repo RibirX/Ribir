@@ -55,6 +55,8 @@ impl WidgetTree {
     id
   }
 
+  pub(crate) fn mark_dirty(&self, id: WidgetId) { self.state_changed.borrow_mut().insert(id); }
+
   pub(crate) fn any_state_modified(&self) -> bool { !self.state_changed.borrow().is_empty() }
 
   pub(crate) fn count(&self) -> usize { self.root.descendants(&self).count() }
@@ -131,6 +133,9 @@ impl WidgetId {
   pub(crate) fn descendants(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.descendants(&tree.arena).map(WidgetId)
   }
+
+  /// directly remove the widget and not clear any other information.
+  pub(crate) fn inner_remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena) }
 
   pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
     let mut changed = tree.state_changed.borrow_mut();
