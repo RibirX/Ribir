@@ -162,20 +162,21 @@ impl Context {
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub fn tree_repair(&mut self) {
-    let mut needs_regen = self
+    let needs_regen = self
       .generator_store
       .take_needs_regen_generator(&self.widget_tree);
 
-    needs_regen.iter_mut().rev().for_each(|g| {
-      g.update_generated_widgets(self);
-    });
+    if let Some(mut needs_regen) = needs_regen {
+      needs_regen.iter_mut().for_each(|g| {
+        g.update_generated_widgets(self);
+      });
 
-    needs_regen
-      .into_iter()
-      .for_each(|g| self.generator_store.add_generator(g));
+      needs_regen
+        .into_iter()
+        .for_each(|g| self.generator_store.add_generator(g));
+    }
   }
 
-  #[allow(dead_code)]
   pub fn is_dirty(&self) -> bool {
     self.widget_tree.any_state_modified() || self.generator_store.is_dirty()
   }
