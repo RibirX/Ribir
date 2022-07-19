@@ -57,18 +57,20 @@ impl GeneratorStore {
     self.generators.insert(g.info().generate_id(), g);
   }
 
-  pub(crate) fn is_dirty(&self) -> bool { !self.generators.is_empty() }
+  pub(crate) fn is_dirty(&self) -> bool { !self.needs_regen.borrow().is_empty() }
 
-  pub(crate) fn take_needs_regen_generator(&mut self, tree: &WidgetTree) -> Vec<Generator> {
-    let mut generators = self
-      .needs_regen
-      .borrow_mut()
-      .drain()
-      .filter_map(|id| self.generators.remove(&id))
-      .collect::<Vec<_>>();
+  pub(crate) fn take_needs_regen_generator(&mut self, tree: &WidgetTree) -> Option<Vec<Generator>> {
+    (self.is_dirty()).then(|| {
+      let mut generators = self
+        .needs_regen
+        .borrow_mut()
+        .drain()
+        .filter_map(|id| self.generators.remove(&id))
+        .collect::<Vec<_>>();
 
-    generators.sort_by_cached_key(|g| g.info.parent().ancestors(tree).count());
-    generators
+      generators.sort_by_cached_key(|g| g.info.parent().ancestors(tree).count());
+      generators
+    })
   }
 
   pub(crate) fn on_widget_drop(&mut self, widget: WidgetId) {

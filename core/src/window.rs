@@ -96,33 +96,36 @@ impl Window {
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
     let Self { raw_window, context, dispatcher, .. } = self;
-    let tree_changed = context.is_dirty();
-    context.tree_repair();
+    if context.is_dirty() {
+      context.tree_repair();
 
-    let Context {
-      layout_store,
-      widget_tree,
-      shaper,
-      reorder,
-      typography_store,
-      font_db,
-      ..
-    } = context;
+      let Context {
+        layout_store,
+        widget_tree,
+        shaper,
+        reorder,
+        typography_store,
+        font_db,
+        ..
+      } = context;
 
-    let wnd_size = raw_window.inner_size();
-    let performed_layout = layout_store.layout(
-      wnd_size,
-      widget_tree,
-      shaper,
-      reorder,
-      typography_store,
-      font_db,
-    );
+      let wnd_size = raw_window.inner_size();
+      layout_store.layout(
+        wnd_size,
+        widget_tree,
+        shaper,
+        reorder,
+        typography_store,
+        font_db,
+      );
 
-    if tree_changed {
-      dispatcher.focus_mgr.update(context);
+      if context.generator_store.is_dirty() {
+        dispatcher.focus_mgr.update(context);
+      }
+      true
+    } else {
+      false
     }
-    tree_changed || performed_layout
   }
 
   /// Draw an image what current render tree represent.
