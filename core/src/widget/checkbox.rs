@@ -63,7 +63,7 @@ mod tests {
   fn layout() {
     let w = widget! { Checkbox {} };
     let (rect, _) = widget_and_its_children_box_rect(w.into_widget(), Size::new(200., 200.));
-    debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(24., 24.)));
+    debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(18., 18.)));
   }
 
   #[cfg(feature = "png")]
