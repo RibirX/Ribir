@@ -15,11 +15,10 @@ use crate::widget_attr_macro::Id;
 
 use super::{
   capture_widget,
-  declare_widget::{assign_uninit_field, BuiltinFieldWidgets, WidgetGen, FIELD_WIDGET_TYPE},
+  declare_widget::{assign_uninit_field, BuiltinFieldWidgets, FIELD_WIDGET_TYPE},
   ribir_suffix_variable, ribir_variable, widget_state_ref, DeclareCtx, NameUsed, Scope,
   ScopeUsedInfo, UsedPart, UsedType, BUILD_CTX,
 };
-
 use super::kw;
 
 pub struct Animations {
@@ -62,6 +61,8 @@ pub struct Animate {
 mod animate_kw {
   syn::custom_keyword!(from);
   syn::custom_keyword!(transition);
+
+  syn::custom_keyword!(animation);
 }
 
 #[derive(Debug)]
@@ -455,10 +456,13 @@ impl ToTokens for Animate {
     } = self;
 
     let animate_span = animate_token.span();
-    let ctx_name = ribir_variable(BUILD_CTX, animate_span);
-
+    let build_ctx = ribir_variable(BUILD_CTX, animate_span.span());
     let mut animate_def_tokens = quote_spanned! { animate_span =>
-      #animate_token::new(#from, &#transition, #ctx_name)
+      { 
+        let mut animate = Animation::new(#transition, #build_ctx);
+        animate.shallow_ref().add_animation(#from);
+        animate
+      }
     };
 
     if let Some(captures) = used_name_info.move_capture_widgets() {
@@ -544,11 +548,14 @@ impl ToTokens for State {
 
     let state_span = state_token.span();
 
-    let refs = used_name_info
+      
+    let refs =  (used_name_info)
       .directly_used_widgets()
-      .into_iter()
-      .flatten()
-      .map(widget_state_ref);
+      .into_iter().flatten().map(widget_state_ref);
+    let captures =  (used_name_info)
+      .directly_used_widgets()
+      .into_iter().flatten().map(capture_widget);
+      
 
     let mut state_tokens = if fields.len() > 1 {
       let init_value = fields.iter().map(|f| &f.expr);
@@ -561,35 +568,62 @@ impl ToTokens for State {
       let members2 = members.clone();
       let indexes = (0..fields.len()).map(syn::Index::from);
 
+      let refs1 = refs.clone();
+      let refs2 = refs.clone();
+      let refs3 = refs.clone();
+
+      let captures1 = captures.clone();
+      let captures2 = captures.clone();
+      let captures3 = captures.clone();
       quote! {
-        #(#refs)*;
-        let state_init = (#(#init_value),*);
-        let state_final = (#(#widgets2.#members2.clone()),*);
-        move |p: f32| {
-          #(#widgets.shallow().#members
-            = Tween::tween(&state_init.#indexes, &state_final.#indexes, p);)*
-        }
+        StateWidget::new(
+          {
+            #(#captures1)*;
+            move || {
+              #(#refs1)*;
+              (#(#init_value),*)
+            }
+          },
+          {
+            #(#captures2)*;
+            move || {
+              #(#refs2)*;
+              (#(#widgets2.#members2.clone()),*)
+            }
+          },
+          {
+            #(#captures3)*;
+            move |val| {
+              #(#refs3)*; 
+              #({#widgets .shallow(). #members = val.#indexes;})*
+            } 
+          }
+        )
       }
     } else {
       let PathField { path, _colon_token, expr } = &fields[0];
       let MemberPath { widget, member, dot_token } = &path;
-      let widget = widget_from_field_name(widget, member);
+      let widget = widget_from_field_name(&widget, &member);
       quote! {
-        #(#refs)*;
-        let state_init = #expr;
-        let state_final = #widget #dot_token #member.clone();
-        move |p: f32| { #widget.shallow().#member =  Tween::tween(&state_init, &state_final, p); }
+        let widget = #widget.state_ref();
+        Box::new(move ||  {
+          let state_init = #expr;
+          let state_final = #widget #dot_token #member.clone();
+          Box::new(move |p: f32| { widget.shallow().#member =  Tween::tween(&state_init, &state_final, p); }) as Box<dyn FnMut(f32)>
+        })
       }
     };
 
     state_tokens = if let Some(all) = used_name_info.all_widgets() {
       let captures = all.map(capture_widget);
-      quote_spanned! { state_span => move |_, _| {
+      quote_spanned! { state_span => {
         #(#captures)*
         #state_tokens
       }}
     } else {
-      quote_spanned! { state_span => move |_, _| { #state_tokens }}
+      quote_spanned! { state_span => {
+        #state_tokens
+      }}
     };
 
     if let Some(Id { name, .. }) = id.as_ref() {
@@ -603,11 +637,12 @@ impl ToTokens for Transition {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     let Self { transition_token, id, fields, .. } = self;
 
+    let build_ctx = ribir_variable(BUILD_CTX, transition_token.span());
     let fields = fields.iter();
     let mut transition = quote_spanned! { transition_token.span() =>
       <#transition_token as Declare>::builder()
         #(#fields)*
-        .build_without_ctx()
+        .build(#build_ctx)
     };
 
     if let Some(Id { name, .. }) = id.as_ref() {
@@ -618,7 +653,7 @@ impl ToTokens for Transition {
 }
 
 impl Trigger {
-  fn to_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
+  pub fn to_tokens(&self, _ctx: &DeclareCtx, tokens: &mut TokenStream) {
     let Self {
       path: path @ MemberPath { widget, member, dot_token },
       expr,
@@ -645,16 +680,9 @@ impl Trigger {
         }
       };
 
-      let ty = Ident::new(ty_name.unwrap(), path.span()).into();
-      let fields = [parse_quote! { #member: move |_| { #expr.start();}}];
-      let trigger_listener = ribir_variable("trigger_by", member.span());
-      let gen = WidgetGen::new(&ty, &trigger_listener, &fields);
-      let listener_widget = gen.gen_widget_tokens(ctx);
       tokens.extend(quote_spanned! { trigger_span =>
-        let mut #widget = {
-          #listener_widget;
-          SingleChild::new(#trigger_listener, #widget)
-        };
+        let mut #animate = #expr;
+        #path (move |_|{ #animate.restart();} );
       })
     } else {
       let widget = widget_from_field_name(widget, member);
@@ -671,14 +699,8 @@ impl Trigger {
           } else {
             quote! {#t}
           };
-          let ctx_name = ribir_variable(BUILD_CTX, t.span());
           quote_spanned! { t.transition_token.span() =>
-            Animate::new(
-              move |init_v, final_v| move |p| {
-                #widget.shallow().#member = Tween::tween(&init_v, &final_v, p);
-              },
-              &#transition,
-              #ctx_name)
+            Animation::new(#transition)
           }
         }
         AnimateExpr::Expr(e) => {
@@ -687,15 +709,20 @@ impl Trigger {
       };
 
       tokens.extend(quote_spanned! { trigger_span =>
+        #[allow(unused_mut)]
         let mut #animate = #expr;
-        #widget
-        .state_change(move |w| w #dot_token #member.clone())
-        .subscribe(move |change| {
-          // todo: should remove after support state change hook before change notify
-          #animate.cancel();
+        let target_widget = #widget.clone();
+        let field_animation = #animate.shallow_ref().add_animation(AnimationValueTrigger::new(
+          #widget.state_ref().#member.clone(), 
+          move |val| {
+            target_widget.shallow_ref().#member = val;
+          }));
+
+        #widget.clone().state_change(|w| w #dot_token #member.clone()).subscribe(move |change| {
           if change.before != change.after {
-            #animate.restart(change.before, change.after);
-          }
+              field_animation.borrow_mut().val = change.after.clone();
+              #animate.retrigger();
+          } 
         });
       })
     }

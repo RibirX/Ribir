@@ -4,8 +4,8 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use crate::animation::TickerProvider;
 use crate::prelude::{widget_tree::WidgetTree, EventCommon, QueryOrder, Widget, WidgetId};
+use crate::ticker::TickerProvider;
 
 use painter::{PaintCommand, Painter};
 mod painting_context;
@@ -37,23 +37,19 @@ pub(crate) struct Context {
   pub shaper: TextShaper,
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
-  animation_ticker: Option<Box<dyn TickerProvider>>,
   pub(crate) generator_store: generator_store::GeneratorStore,
+  pub ticker_provider: TickerProvider,
 }
 
 impl Context {
-  pub(crate) fn new(
-    root: Widget,
-    device_scale: f32,
-    animation_ticker: Option<Box<dyn TickerProvider>>,
-  ) -> Self {
+  pub(crate) fn new(root: Widget, device_scale: f32) -> Self {
     let font_db = Arc::new(RwLock::new(FontDB::default()));
     let shaper = TextShaper::new(font_db.clone());
     let reorder = TextReorder::default();
     let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
     let painter = Painter::new(device_scale, typography_store.clone());
     let generator_store = generator_store::GeneratorStore::default();
-
+    let ticker_provider = TickerProvider::default();
     let mut ctx = Context {
       layout_store: <_>::default(),
       widget_tree: WidgetTree::new(),
@@ -64,8 +60,8 @@ impl Context {
       shaper,
       reorder,
       typography_store,
-      animation_ticker,
       generator_store,
+      ticker_provider,
     };
 
     let tmp_root = ctx.widget_tree.root();
@@ -194,13 +190,7 @@ impl Context {
     id.remove_subtree(self.tree_mut());
   }
 
-  pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
-    if let Some(ticker) = self.animation_ticker.as_mut() {
-      ticker.trigger()
-    } else {
-      false
-    }
-  }
+  pub(crate) fn trigger_ticker(&mut self) -> bool { self.ticker_provider.trigger() }
 }
 
 #[cfg(test)]
@@ -216,13 +206,13 @@ mod tests {
 
   fn test_sample_create(width: usize, depth: usize) -> Context {
     let root = RecursiveRow { width, depth };
-    Context::new(root.into_widget(), 1., None)
+    Context::new(root.into_widget(), 1.)
   }
 
   #[test]
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
-    let mut ctx = Context::new(post.into_widget(), 1., None);
+    let mut ctx = Context::new(post.into_widget(), 1.);
     assert_eq!(ctx.widget_tree.count(), 18);
     ctx.mark_root_dirty();
     ctx.drop_subtree(ctx.widget_tree.root());
@@ -234,7 +224,7 @@ mod tests {
   fn inflate_5_x_1000(b: &mut Bencher) {
     b.iter(|| {
       let post = EmbedPost::new(1000);
-      Context::new(post.into_widget(), 1., None);
+      Context::new(post.into_widget(), 1.);
     });
   }
 
@@ -253,7 +243,7 @@ mod tests {
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
     let post = EmbedPostWithKey::new(1000);
-    let mut ctx = Context::new(post.into_widget(), 1., None);
+    let mut ctx = Context::new(post.into_widget(), 1.);
     b.iter(|| {
       ctx.mark_root_dirty();
       ctx.tree_repair()

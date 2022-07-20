@@ -97,55 +97,56 @@ impl ScrollableWidget {
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test::root_and_children_rect;
-  use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
+// #[cfg(test)]
+// mod tests {
+//   use super::*;
+//   use crate::test::root_and_children_rect;
+//   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase,
+// WindowEvent};
 
-  fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
-    let w = widget! {
-     SizedBox {
-       size: Size::new(1000., 1000.),
-       scrollable,
-     }
-    };
+// fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos:
+// Point) {   let w = widget! {
+//    SizedBox {
+//      size: Size::new(1000., 1000.),
+//      scrollable,
+//    }
+//   };
 
-    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+//   let mut wnd = Window::without_render(w, Size::new(100., 100.));
 
-    wnd.render_ready();
+//   wnd.render_ready();
 
-    let device_id = unsafe { DeviceId::dummy() };
-    wnd.processes_native_event(WindowEvent::MouseWheel {
-      device_id,
-      delta: MouseScrollDelta::LineDelta(delta_x, delta_y),
-      phase: TouchPhase::Started,
-      modifiers: ModifiersState::default(),
-    });
-    wnd.render_ready();
+//   let device_id = unsafe { DeviceId::dummy() };
+//   wnd.processes_native_event(WindowEvent::MouseWheel {
+//     device_id,
+//     delta: MouseScrollDelta::LineDelta(delta_x, delta_y),
+//     phase: TouchPhase::Started,
+//     modifiers: ModifiersState::default(),
+//   });
+//   wnd.render_ready();
 
-    let (_, children) = root_and_children_rect(&mut wnd);
-    assert_eq!(children[0].origin, child_pos);
-  }
+//   let (_, children) = root_and_children_rect(&mut wnd);
+//   assert_eq!(children[0].origin, child_pos);
+// }
 
-  #[test]
-  fn x_scroll() {
-    test_assert(Scrollable::X, 10., 10., Point::new(-10., 0.));
-    test_assert(Scrollable::X, 10000., 10., Point::new(-900., 0.));
-    test_assert(Scrollable::X, -100., 10., Point::new(0., 0.));
-  }
+//   #[test]
+//   fn x_scroll() {
+//     test_assert(Scrollable::X, 10., 10., Point::new(-10., 0.));
+//     test_assert(Scrollable::X, 10000., 10., Point::new(-900., 0.));
+//     test_assert(Scrollable::X, -100., 10., Point::new(0., 0.));
+//   }
 
-  #[test]
-  fn y_scroll() {
-    test_assert(Scrollable::Y, 10., 10., Point::new(0., -10.));
-    test_assert(Scrollable::Y, 10., 10000., Point::new(0., -900.));
-    test_assert(Scrollable::Y, -10., -100., Point::new(0., 0.));
-  }
+//   #[test]
+//   fn y_scroll() {
+//     test_assert(Scrollable::Y, 10., 10., Point::new(0., -10.));
+//     test_assert(Scrollable::Y, 10., 10000., Point::new(0., -900.));
+//     test_assert(Scrollable::Y, -10., -100., Point::new(0., 0.));
+//   }
 
-  #[test]
-  fn both_scroll() {
-    test_assert(Scrollable::Both, 10., 10., Point::new(-10., -10.));
-    test_assert(Scrollable::Both, 10000., 10000., Point::new(-900., -900.));
-    test_assert(Scrollable::Both, -100., -100., Point::new(0., 0.));
-  }
-}
+//   #[test]
+//   fn both_scroll() {
+//     test_assert(Scrollable::Both, 10., 10., Point::new(-10., -10.));
+//     test_assert(Scrollable::Both, 10000., 10000., Point::new(-900., -900.));
+//     test_assert(Scrollable::Both, -100., -100., Point::new(0., 0.));
+//   }
+// }

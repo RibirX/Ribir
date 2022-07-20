@@ -1,97 +1,51 @@
+use std::{cell::RefCell, rc::Rc};
+
 use rxrust::{
-  observable::Observable,
   ops::box_it::LocalCloneBoxOp,
-  prelude::{LocalSubject, Observer},
+  prelude::{LocalSubject, MutRc, Observable, Observer, SubscribeNext},
+  subscription::{SingleSubscription, SubscriptionGuard},
 };
 
-use super::{AnimationCtrl, Curve, ProgressState, TickerAnimationCtrl, TickerRunningHandle};
+use crate::ticker::Ticker;
 
-struct AnimationCtrlImpl {
-  last_state: ProgressState,
-  subject: LocalSubject<'static, f32, ()>,
-  curve: Option<Box<dyn Curve>>,
+use super::{animation_state::AnimationState, AnimationObservable, Curve};
+
+pub struct AnimationController {
+  ticker: Ticker,
+  state: Rc<RefCell<AnimationState>>,
+  obser: LocalSubject<'static, f32, ()>,
+  #[allow(dead_code)]
+  guard: SubscriptionGuard<MutRc<SingleSubscription>>,
 }
 
-impl AnimationCtrl for AnimationCtrlImpl {
-  fn state(&self) -> ProgressState { self.last_state }
+impl AnimationController {
+  pub fn new(ticker: Ticker, state: Rc<RefCell<AnimationState>>, curve: Box<dyn Curve>) -> Self {
+    let state2 = state.clone();
+    let obser = LocalSubject::default();
+    let mut obser2 = obser.clone();
+    let guard = ticker
+      .observable()
+      .subscribe(move |t| {
+        if let Some(state) = state2.borrow_mut().update(Some(t)) {
+          obser2.next(curve.transform(state.val()));
+        }
+      })
+      .unsubscribe_when_dropped();
 
-  fn value(&self) -> f32 {
-    return match &self.curve {
-      Some(c) => c.transform(self.last_state.val()),
-      None => self.last_state.val(),
-    };
-  }
-
-  fn subject(&mut self) -> LocalCloneBoxOp<'static, f32, ()> { self.subject.clone().box_it() }
-
-  fn step(&mut self, step: f32) {
-    let state = match step + self.last_state.val() {
-      val if val <= 0. => ProgressState::Dismissed,
-      val if val >= 1. => ProgressState::Finish,
-      val => ProgressState::Between(val),
-    };
-
-    self.update_to(state);
-  }
-
-  fn update_to(&mut self, state: ProgressState) {
-    self.last_state = state;
-    self.subject.next(self.value());
+    Self { ticker, state, obser, guard }
   }
 }
 
-pub trait AnimationByTicker {
-  fn trigger_by(
-    self: Box<Self>,
-    ticker: &mut dyn TickerAnimationCtrl,
-  ) -> Box<dyn TickerRunningHandle>;
-}
+impl AnimationObservable for AnimationController {
+  fn observable(&mut self) -> LocalCloneBoxOp<'static, f32, ()> { self.obser.clone().box_it() }
 
-impl AnimationByTicker for dyn AnimationCtrl {
-  fn trigger_by(
-    mut self: Box<Self>,
-    ticker: &mut dyn TickerAnimationCtrl,
-  ) -> Box<dyn TickerRunningHandle> {
-    ticker.listen(Box::new(move |p| self.update_to(p)))
-  }
-}
-
-pub fn new_animation_ctrl(curve: Option<Box<dyn Curve>>) -> Box<dyn AnimationCtrl> {
-  Box::new(AnimationCtrlImpl {
-    last_state: ProgressState::Dismissed,
-    subject: <_>::default(),
-    curve,
-  })
-}
-
-#[cfg(test)]
-mod tests {
-  use rxrust::observable::SubscribeNext;
-
-  use crate::prelude::{new_animation_ctrl, ProgressState};
-
-  #[test]
-  fn test_animation_ctrl() {
-    let mut ctrl = new_animation_ctrl(None);
-    assert!(ctrl.state() == ProgressState::Dismissed);
-    ctrl.step(0.5);
-    assert!(ctrl.state() == ProgressState::Between(0.5));
-    ctrl.step(0.6);
-    assert!(ctrl.state() == ProgressState::Finish);
+  fn start(&mut self) {
+    self.ticker.start();
+    self.state.borrow_mut().start();
   }
 
-  #[test]
-  fn test_animation_ctrl_subject() {
-    let mut ctrl = new_animation_ctrl(None);
-    let mut progress: f32 = 0.;
-    let ptr = &mut progress as *mut f32;
-    ctrl.subject().subscribe(move |v| unsafe { *ptr = v });
-
-    ctrl.step(0.2);
-    assert!(progress == 0.2);
-    ctrl.step(-0.1);
-    assert!(progress == 0.1);
-    ctrl.step(2.);
-    assert!(progress == 1.);
+  fn stop(&mut self) {
+    self.ticker.stop();
+    self.state.borrow_mut().stop();
   }
 }

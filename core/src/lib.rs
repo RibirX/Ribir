@@ -1,4 +1,11 @@
-#![feature(test, decl_macro, marker_trait_attr, trait_upcasting)]
+#![feature(
+  test,
+  decl_macro,
+  marker_trait_attr,
+  min_specialization,
+  derive_default_enum,
+  drain_filter
+)]
 #![allow(incomplete_features)]
 #[macro_use]
 extern crate bitflags;
@@ -15,6 +22,7 @@ mod context;
 pub mod declare;
 pub mod dynamic_widget;
 pub mod events;
+pub mod ticker;
 pub mod widget;
 pub mod window;
 

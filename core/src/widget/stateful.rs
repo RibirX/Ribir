@@ -534,7 +534,7 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(stateful, 1., None);
+    let ctx = Context::new(stateful, 1.);
     let tree = &ctx.widget_tree;
     let mut key = None;
     tree

@@ -102,11 +102,14 @@ impl Id {
 
 fn widget_state_ref(widget: &Ident) -> TokenStream2 {
   quote_spanned!(widget.span() =>
-    #[allow(unused_mut)]
+    #[allow(unused_mut, unused_variables)]
     let mut #widget = #widget.state_ref();
   )
 }
 
 fn capture_widget(widget: &Ident) -> TokenStream2 {
-  quote_spanned!(widget.span() => let #widget = #widget.clone();)
+  quote_spanned!(widget.span() =>
+    #[allow(unused_variables)]
+    let #widget = #widget.clone();
+  )
 }

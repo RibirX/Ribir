@@ -26,7 +26,7 @@ impl Curve for CurveBezier {
 
 macro_rules! CurveByBezier {
   ($func: ident => {$x1: expr, $y1: expr, $x2: expr, $y2: expr}) => {
-    pub fn $func() -> Box<dyn Curve> { Box::new(CurveBezier::new($x1, $y1, $x2, $y2)) }
+    pub fn $func() -> Box<dyn Curve + 'static> { Box::new(CurveBezier::new($x1, $y1, $x2, $y2)) }
   };
 }
 

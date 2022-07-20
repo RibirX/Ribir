@@ -28,6 +28,13 @@ impl Tween for f64 {
   }
 }
 
+impl Tween for bool {
+  fn tween(begin: &Self, end: &Self, p: f32) -> Self {
+    tween_check!(begin, end, p);
+    if p == 0. { *begin } else { *end }
+  }
+}
+
 impl<V: Tween + Clone> Tween for Option<V> {
   fn tween(begin: &Self, end: &Self, p: f32) -> Self {
     tween_check!(begin, end, p);
@@ -38,9 +45,38 @@ impl<V: Tween + Clone> Tween for Option<V> {
   }
 }
 
+macro_rules! tween_tuple_def {
+  ($({$param: ident, $index: tt},)*) => {
+    impl <$($param: Tween,)*> Tween for ($($param),*,)
+    {
+      fn tween(begin: &Self, end: &Self, p: f32) -> Self {
+        ($(Tween::tween(&begin.$index, &end.$index, p),)*)
+      }
+    }
+  }
+}
+
+macro_rules! tween_tuple {
+    () => {
+      tween_tuple_def!({T0, 0},);
+      tween_tuple_def!({T0, 0}, {T1, 1},);
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2},);
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3},);
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4},);
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5},) ;
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6},) ;
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7},) ;
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8},) ;
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8}, {T9, 9},) ;
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8}, {T9, 9}, {T10, 10},) ;
+      tween_tuple_def!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8}, {T9, 9}, {T10, 10}, {T11, 11},) ;
+    };
+}
+tween_tuple!();
+
 #[macro_export]
 macro_rules! tween_field {
-  ($target: ident, $s1: ident, $s2: ident, $p: ident, {$($field: ident),*}) => {
+  ($target: ident, $s1: ident, $s2: ident, $p: ident, {$($field: tt),*}) => {
     $(
         $target.$field = Tween::tween(&$s1.$field, &$s2.$field, $p);
     )*
@@ -49,7 +85,7 @@ macro_rules! tween_field {
 
 #[macro_export]
 macro_rules! impl_tween_struct_default {
-    ($struct: ident, {$($field: ident),*}) => {
+    ($struct: ident, {$($field: tt),*}) => {
         impl Tween for $struct {
             fn tween(begin: &$struct, end: &$struct, p: f32) -> $struct {
             tween_check!(begin, end, p);
@@ -111,6 +147,17 @@ mod tests {
       Tween::tween(&Point::new(10., 0.), &Point::new(0., 10.), 2.),
       Point::new(0., 10.)
     ));
+  }
+
+
+  #[test]
+  fn test_tween_tuple() {
+    let t1 = (0., 0.5, Point::new(10., 0.));
+    let t2 = (1., 1., Point::new(10., 10.));
+
+    assert!((0.5, 0.75, Point::new(10., 5.)) == Tween::tween(&t1, &t2, 0.5));
+    assert!(t2 == Tween::tween(&t1, &t2, 1.));
+    assert!(t1 == Tween::tween(&t1, &t2, 0.));
   }
 
   #[bench]

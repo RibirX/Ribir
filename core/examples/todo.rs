@@ -67,5 +67,5 @@ fn main() {
   }
   .into_stateful();
 
-  Application::new().run(todo.into_widget(), None);
+  Application::new().run(todo.into_widget());
 }

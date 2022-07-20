@@ -1,6 +1,5 @@
 use crate::{context::Context, events::dispatcher::Dispatcher, prelude::*};
 
-use crate::animation::TickerProvider;
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
 
@@ -97,6 +96,7 @@ impl Window {
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
     let Self { raw_window, context, dispatcher, .. } = self;
+    context.trigger_ticker();
     let tree_changed = context.is_dirty();
     context.tree_repair();
 
@@ -139,10 +139,6 @@ impl Window {
     }
   }
 
-  pub(crate) fn trigger_animation_ticker(&mut self) -> bool {
-    self.context.trigger_animation_ticker()
-  }
-
   pub(crate) fn context(&self) -> &Context { &self.context }
 
   fn new<W, P>(wnd: W, p_backend: P, mut context: Context) -> Self
@@ -178,14 +174,13 @@ impl Window {
   pub(crate) fn from_event_loop(
     root: Widget,
     event_loop: &winit::event_loop::EventLoop<()>,
-    animation_ticker: Option<Box<dyn TickerProvider>>,
   ) -> Self {
     let native_window = winit::window::WindowBuilder::new()
       .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
       .build(event_loop)
       .unwrap();
     let size = native_window.inner_size();
-    let ctx = Context::new(root, native_window.scale_factor() as f32, animation_ticker);
+    let ctx = Context::new(root, native_window.scale_factor() as f32);
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
       &native_window,
       DeviceSize::new(size.width, size.height),
@@ -307,7 +302,7 @@ impl RawWindow for MockRawWindow {
 impl Window {
   #[cfg(feature = "wgpu_gl")]
   pub fn wgpu_headless(root: Widget, size: DeviceSize) -> Self {
-    let ctx = Context::new(root, 1., None);
+    let ctx = Context::new(root, 1.);
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
       size,
       None,
@@ -330,7 +325,7 @@ impl Window {
     Self::new(
       MockRawWindow { size, ..Default::default() },
       p_backend,
-      Context::new(root, 1., None),
+      Context::new(root, 1.),
     )
   }
 }

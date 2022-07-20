@@ -199,7 +199,7 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(widget.into_widget(), 1., None);
+    let ctx = Context::new(widget.into_widget(), 1.);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
@@ -219,7 +219,7 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(widget.into_widget(), 1., None);
+    let ctx = Context::new(widget.into_widget(), 1.);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 
@@ -244,7 +244,7 @@ mod tests {
       }
     };
 
-    let mut ctx = Context::new(widget.into_widget(), 1., None);
+    let mut ctx = Context::new(widget.into_widget(), 1.);
     let mut mgr = FocusManager::default();
     mgr.update(&mut ctx);
     let tree = &ctx.widget_tree;
@@ -302,7 +302,7 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut ctx = Context::new(widget.into_widget(), 1., None);
+    let mut ctx = Context::new(widget.into_widget(), 1.);
     let mut mgr = FocusManager::default();
     let tree = &ctx.widget_tree;
 

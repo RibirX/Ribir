@@ -1,49 +1,54 @@
-use ribir::animation::{ProgressState, RepeatMode};
+use super::{ProgressState, RepeatMode};
 
 struct ProgressWithRepeat(Box<dyn AnimationProgress>, RepeatMode);
 
 struct ProgressWithReverse(Box<dyn AnimationProgress>);
 
-pub(crate) trait AnimationProgress {
+pub trait AnimationProgress {
   fn val(&self, v: f32) -> ProgressState;
   fn span(&self) -> f32;
 
   fn reverse(&self) -> Box<dyn AnimationProgress>;
   fn round(&self) -> Box<dyn AnimationProgress>;
-  fn repeat(&self, mode: RepeatMode) -> Box<dyn AnimationProgress>;
+  #[inline]
+  fn repeat(&self, mode: RepeatMode) -> Box<dyn AnimationProgress> {
+    if mode.val() == 1 {
+      self.clone_box()
+    } else {
+      Box::new(ProgressWithRepeat(self.clone_box(), mode))
+    }
+  }
 
   fn clone_box(&self) -> Box<dyn AnimationProgress>;
 }
 
-pub(crate) fn new_animation_progress(width: f32) -> Box<dyn AnimationProgress> {
-  Box::new(Span { width })
+pub(crate) fn new_animation_progress(span: f32) -> Box<dyn AnimationProgress> {
+  Box::new(Span { span })
 }
 
 #[derive(Copy, Clone)]
 struct Span {
-  width: f32,
+  span: f32,
 }
 impl AnimationProgress for Span {
   fn val(&self, v: f32) -> ProgressState {
-    if v >= self.width {
+    if v >= self.span {
       ProgressState::Finish
     } else if v <= 0. {
       ProgressState::Dismissed
     } else {
-      ProgressState::Between(v / self.width)
+      ProgressState::Between(v / self.span)
     }
   }
 
-  fn span(&self) -> f32 { self.width }
+  fn span(&self) -> f32 { self.span }
 
   fn reverse(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithReverse(self.clone_box()))
   }
+
   fn round(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithRound(self.clone_box(), self.reverse()))
-  }
-  fn repeat(&self, mode: RepeatMode) -> Box<dyn AnimationProgress> {
-    Box::new(ProgressWithRepeat(self.clone_box(), mode))
   }
 
   fn clone_box(&self) -> Box<dyn AnimationProgress> { Box::new(*self) }
@@ -63,9 +68,6 @@ impl AnimationProgress for ProgressWithReverse {
   fn reverse(&self) -> Box<dyn AnimationProgress> { self.0.clone_box() }
   fn round(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithRound(self.clone_box(), self.reverse()))
-  }
-  fn repeat(&self, mode: RepeatMode) -> Box<dyn AnimationProgress> {
-    Box::new(ProgressWithRepeat(self.clone_box(), mode))
   }
 
   fn clone_box(&self) -> Box<dyn AnimationProgress> {
@@ -99,9 +101,6 @@ impl AnimationProgress for ProgressWithRepeat {
   fn round(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithRound(self.clone_box(), self.reverse()))
   }
-  fn repeat(&self, mode: RepeatMode) -> Box<dyn AnimationProgress> {
-    Box::new(ProgressWithRepeat(self.clone_box(), mode))
-  }
 
   fn clone_box(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithRepeat(self.0.clone_box(), self.1))
@@ -129,10 +128,8 @@ impl AnimationProgress for ProgressWithRound {
   fn reverse(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithReverse(self.clone_box()))
   }
+
   fn round(&self) -> Box<dyn AnimationProgress> { self.clone_box() }
-  fn repeat(&self, mode: RepeatMode) -> Box<dyn AnimationProgress> {
-    Box::new(ProgressWithRepeat(self.clone_box(), mode))
-  }
 
   fn clone_box(&self) -> Box<dyn AnimationProgress> {
     Box::new(ProgressWithRound(self.0.clone_box(), self.1.clone_box()))
@@ -141,7 +138,8 @@ impl AnimationProgress for ProgressWithRound {
 
 #[cfg(test)]
 mod tests {
-  use crate::animation_progress::*;
+  use super::{new_animation_progress, ProgressState, RepeatMode};
+
   #[test]
   fn test_progress() {
     let calc = new_animation_progress(5.);
