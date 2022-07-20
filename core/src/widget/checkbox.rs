@@ -73,7 +73,9 @@ mod tests {
     let mut window = Window::wgpu_headless(c, DeviceSize::new(100, 100));
     window.render_ready();
 
-    assert!(window.same_as_png("../test/test_imgs/checkbox_checked.png"));
+    let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    expected.push("src/test_imgs/checkbox_checked.png");
+    assert!(window.same_as_png(expected));
   }
 
   #[cfg(feature = "png")]
@@ -81,7 +83,9 @@ mod tests {
   fn unchecked_paint() {
     let mut window = Window::wgpu_headless(widget! { Checkbox {} }, DeviceSize::new(100, 100));
     window.render_ready();
-    assert!(window.same_as_png("../test/test_imgs/checkbox_uncheck.png"));
+    let mut unchecked_expect = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    unchecked_expect.push("src/test_imgs/checkbox_uncheck.png");
+    assert!(window.same_as_png(unchecked_expect));
   }
 
   #[cfg(feature = "png")]
@@ -96,7 +100,9 @@ mod tests {
     let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
 
-    assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));
+    let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    expected.push("src/test_imgs/checkbox_indeterminate.png");
+    assert!(window.same_as_png(expected.clone()));
 
     let c = widget! {
       Checkbox {
@@ -107,6 +113,6 @@ mod tests {
     let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
     window.render_ready();
 
-    assert!(window.same_as_png("../test/test_imgs/checkbox_indeterminate.png"));
+    assert!(window.same_as_png(expected));
   }
 }
