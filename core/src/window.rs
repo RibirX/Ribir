@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::{context::Context, events::dispatcher::Dispatcher, prelude::*};
 
 use crate::animation::TickerProvider;
@@ -132,7 +134,7 @@ impl Window {
   pub(crate) fn draw_frame(&mut self) {
     let commands = self.context.draw_tree();
     if !commands.is_empty() {
-      self.p_backend.submit(commands, None).unwrap();
+      self.p_backend.submit(commands);
       // todo: frame cache is not a good choice? because not every text will relayout
       // in every frame.
       self.context.shaper.end_frame();
@@ -204,44 +206,38 @@ impl Window {
   #[inline]
   pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
 
-  pub fn capture_image<F>(&mut self, image_data_callback: F) -> Result<(), &str>
+  pub fn capture_image<F>(&mut self, image_data_callback: F) -> Result<(), Box<dyn Error>>
   where
     F: for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>),
   {
     let commands = self.context.draw_tree();
-    if !commands.is_empty() {
-      self
-        .p_backend
-        .submit(commands, Some(Box::new(image_data_callback)))
-    } else {
-      Ok(())
-    }
+    self
+      .p_backend
+      .commands_to_image(commands, Box::new(image_data_callback))
   }
 
   #[cfg(feature = "png")]
-  pub fn write_as_png<P>(&mut self, path: P) -> Result<(), String>
+  pub fn write_as_png<P>(&mut self, path: P) -> Result<(), Box<dyn Error>>
   where
     P: std::convert::AsRef<std::path::Path>,
   {
     use std::io::Write;
     let writer = std::fs::File::create(path.as_ref()).map_err(|e| e.to_string())?;
-    self
-      .capture_image(move |size, rows| {
-        let mut png_encoder = png::Encoder::new(writer, size.width, size.height);
-        png_encoder.set_depth(png::BitDepth::Eight);
-        png_encoder.set_color(png::ColorType::Rgba);
+    self.capture_image(move |size, rows| {
+      let mut png_encoder = png::Encoder::new(writer, size.width, size.height);
+      png_encoder.set_depth(png::BitDepth::Eight);
+      png_encoder.set_color(png::ColorType::Rgba);
 
-        let mut writer = png_encoder.write_header().unwrap();
-        let mut stream_writer = writer
-          .stream_writer_with_size(size.width as usize * 4)
-          .unwrap();
+      let mut writer = png_encoder.write_header().unwrap();
+      let mut stream_writer = writer
+        .stream_writer_with_size(size.width as usize * 4)
+        .unwrap();
 
-        rows.for_each(|data| {
-          stream_writer.write(data).unwrap();
-        });
-        stream_writer.finish().unwrap();
-      })
-      .map_err(ToString::to_string)
+      rows.for_each(|data| {
+        stream_writer.write(data).unwrap();
+      });
+      stream_writer.finish().unwrap();
+    })
   }
 
   #[cfg(feature = "png")]
@@ -283,13 +279,15 @@ pub struct MockRawWindow {
 }
 
 impl PainterBackend for MockBackend {
+  fn submit<'a>(&mut self, _: Vec<PaintCommand>) {}
+
   fn resize(&mut self, _: DeviceSize) {}
 
-  fn submit<'a>(
+  fn commands_to_image(
     &mut self,
     _: Vec<PaintCommand>,
-    _: Option<Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>>,
-  ) -> Result<(), &str> {
+    _: CaptureCallback,
+  ) -> Result<(), Box<dyn Error>> {
     Ok(())
   }
 }
