@@ -18,15 +18,13 @@ fn red_img_test<B: PainterBackend>(mut backend: B) {
   let commands = painter.finish();
   let mut img_size = DeviceSize::zero();
   let mut img_data: Vec<u8> = vec![];
-  backend
-    .submit(
-      commands,
-      Some(Box::new(|size, rows| {
-        img_size = size;
-        rows.for_each(|r| img_data.extend(r))
-      })),
-    )
-    .unwrap();
+  backend.commands_to_image(
+    commands,
+    Box::new(|size, rows| {
+      img_size = size;
+      rows.for_each(|r| img_data.extend(r))
+    }),
+  );
 
   let expect_data = std::iter::repeat([255, 0, 0, 255])
     .take(10000)

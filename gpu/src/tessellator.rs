@@ -509,7 +509,10 @@ fn stroke_options_hash<H: std::hash::Hasher>(options: &StrokeOptions, state: &mu
 
 #[cfg(test)]
 mod tests {
-  use std::sync::{Arc, RwLock};
+  use std::{
+    error::Error,
+    sync::{Arc, RwLock},
+  };
 
   use crate::TriangleLists;
   use painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
@@ -527,12 +530,9 @@ mod tests {
 
     fn draw_triangles(&mut self, data: TriangleLists) { self(data) }
 
-    fn end_frame<'a>(
-      &mut self,
-      _: Option<Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>>,
-    ) -> Result<(), &str> {
-      Ok(())
-    }
+    fn end_frame<'a>(&mut self, cancel: bool) {}
+
+    fn capture(&self, _: crate::CaptureCallback) -> Result<(), Box<dyn Error>> { Ok(()) }
 
     fn resize(&mut self, _: DeviceSize) {}
   }

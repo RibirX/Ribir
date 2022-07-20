@@ -5,6 +5,7 @@ use crate::{
 use algo::{CowRc, Resource};
 use euclid::Size2D;
 pub use lyon_tessellation::{LineCap, LineJoin};
+use std::error::Error;
 use std::ops::{Deref, DerefMut};
 use text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
 use text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
@@ -28,13 +29,14 @@ pub type CaptureCallback<'a> =
 /// `PainterBackend` use to draw the picture what the `commands` described  to
 /// the target device. Usually is implemented by graphic library.
 pub trait PainterBackend {
-  /// Submit the paint commands to draw, and call the `capture` callback to
-  /// pass the frame image data with rgba(u8 x 4) format if it is Some-Value
-  fn submit<'a>(
+  /// Submit the paint commands to draw
+  fn submit(&mut self, commands: Vec<PaintCommand>);
+
+  fn commands_to_image(
     &mut self,
     commands: Vec<PaintCommand>,
-    capture: Option<CaptureCallback<'a>>,
-  ) -> Result<(), &str>;
+    capture: CaptureCallback,
+  ) -> Result<(), Box<dyn Error>>;
 
   fn resize(&mut self, size: DeviceSize);
 }

@@ -111,7 +111,7 @@ fn main() {
       painter.set_brush(img_brush).set_line_width(25.).stroke();
 
       let commands = painter.finish();
-      gpu_backend.submit(commands, None).unwrap();
+      gpu_backend.submit(commands);
     }
     Event::MainEventsCleared => {
       window.request_redraw();
