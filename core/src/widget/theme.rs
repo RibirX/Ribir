@@ -4,6 +4,8 @@
 //! application's theme. Application theme is use `Theme` widget as root of all
 //! windows.
 pub mod material;
+mod palette;
+pub use palette::Palette;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
@@ -12,6 +14,7 @@ use crate::{
     Query, QueryFiler, QueryOrder, Stateful, TypeId, Widget,
   },
 };
+use algo::ShareResource;
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
@@ -88,35 +91,48 @@ pub struct TypographyTheme {
   pub overline: TextTheme,
 }
 
-// todo: theme can provide fonts folder.
-
-/// Properties from [Material Theme](https://material.io/design/material-theming/implementing-your-theme.html)
 #[derive(Clone, Debug)]
 pub struct Theme {
   // Dark or light theme.
   pub brightness: Brightness,
-  pub primary: Color,
-  pub primary_variant: Color,
-  pub secondary: Color,
-  pub secondary_variant: Color,
-  pub background: Color,
-  pub surface: Color,
-  pub error: Color,
-  pub on_primary: Color,
-  pub on_secondary: Color,
-  pub on_background: Color,
-  pub on_surface: Color,
-  pub on_error: Color,
+  pub palette: Palette,
   pub typography_theme: TypographyTheme,
-  /// The color used for widgets in their inactive (but enabled) state.
-  pub unselected_widget_color: Color,
   /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
-  pub checkbox: CheckboxTheme,
   pub scrollbar: ScrollBarTheme,
-  pub icon: IconTheme,
+  pub icon_theme: IconTheme,
 }
 
+#[derive(Debug, Clone)]
+pub struct IconTheme {
+  pub icon_size: IconSize,
+  pub builtin_icons: SvgIcons,
+}
+
+#[derive(Debug, Clone)]
+pub struct IconSize {
+  pub tiny: Size,
+  pub small: Size,
+  pub medium: Size,
+  pub large: Size,
+  pub huge: Size,
+}
+
+impl IconSize {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.icon_size }
+}
+
+impl SvgIcons {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.builtin_icons }
+}
+#[derive(Debug, Clone)]
+pub struct SvgIcons {
+  pub checked: ShareResource<SvgRender>,
+  pub unchecked: ShareResource<SvgRender>,
+  pub indeterminate: ShareResource<SvgRender>,
+}
 #[derive(Declare)]
 pub struct ThemeWidget {
   #[declare(builtin)]
@@ -126,6 +142,7 @@ pub struct ThemeWidget {
 impl ComposeSingleChild for ThemeWidget {
   #[inline]
   fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    // todo: theme can provide fonts to load, blocked by a async widget?
     compose_child_as_data_widget(child, this, |w| w.theme)
   }
 }
@@ -323,72 +340,6 @@ impl TypographyTheme {
         },
         decoration,
       },
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct CheckboxTheme {
-  pub size: f32,
-  pub check_background: Color,
-  // todo: use border merge border_width & border_color ~
-  pub border_width: f32,
-  pub radius: f32,
-  pub border_color: Color,
-  pub checked_path: Path,
-  pub indeterminate_path: Path,
-}
-
-impl Default for CheckboxTheme {
-  fn default() -> Self {
-    let size: f32 = 12.;
-    let border_width = 2.;
-    let checked_path = {
-      let mut builder = Path::builder();
-      let start = Point::new(2.733_333_3, 8.466_667);
-      let mid = Point::new(6., 11.733_333);
-      let end = Point::new(13.533_333, 4.2);
-      builder.segment(start, mid).segment(mid, end);
-      builder.stroke(1.422_222, Color::WHITE.into())
-    };
-
-    let center_y = size / 2. + border_width;
-    let indeterminate_path = {
-      let mut builder = Path::builder();
-      builder
-        .begin_path(Point::new(3., center_y))
-        .line_to(Point::new(size + border_width * 2. - 3., center_y))
-        .close_path();
-      builder.stroke(border_width, Color::WHITE.into())
-    };
-
-    Self {
-      size,
-      border_width,
-      check_background: Color::BLACK,
-      radius: 2.,
-      border_color: Color::BLACK,
-      checked_path,
-      indeterminate_path,
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct IconTheme {
-  pub width: f32,
-  pub height: f32,
-  pub fill_color: Color,
-  pub stroke_color: Color,
-}
-
-impl Default for IconTheme {
-  fn default() -> Self {
-    Self {
-      width: 16.0,
-      height: 16.0,
-      fill_color: Color::WHITE,
-      stroke_color: Color::BLACK,
     }
   }
 }

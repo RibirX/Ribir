@@ -12,12 +12,13 @@ proc-macro = true
 [dependencies]
 Inflector = "0.11.4"
 ahash = "0.7.6"
+bitflags = "1.3.2"
 builtin = {path = "./builtin"}
 lazy_static = "1.4.0"
+painter = {path = "../painter"}
 proc-macro2 = "1.0.36"
 quote = "1.0.16"
 smallvec = "1.8.0"
-bitflags="1.3.2"
 
 [dev-dependencies]
 ribir = {path = "../core"}

@@ -31,7 +31,6 @@ fn main() {
     DeviceSize::new(size.width, size.height),
     None,
     None,
-    0.01,
     shaper,
   ));
 
@@ -85,34 +84,34 @@ fn main() {
           .line_to((100.0, 200.0).into())
           .line_to((100.0, 130.0).into())
           .line_to((0.0, 130.0).into())
-          .close_path();
+          .close_path(true);
       }
       let font_db = Arc::new(RwLock::new(FontDB::default()));
       let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
       let mut painter = Painter::new(2., store);
-      let red_brush = Brush::Color(Color::RED);
+      let red_brush = Brush::from(Color::RED);
       let img_brush = Brush::Image {
         img: img.clone(),
         tile_mode: TileMode::REPEAT_BOTH,
       };
 
       draw_arrow_path(&mut painter);
-      painter.fill(Some(red_brush.clone()));
+      painter.set_brush(red_brush.clone()).fill();
 
       painter.translate(300., 0.);
       draw_arrow_path(&mut painter);
-      painter.stroke(Some(5.), Some(red_brush));
+      painter.set_brush(red_brush).set_line_width(5.).stroke();
 
       painter.translate(-300., 250.);
       draw_arrow_path(&mut painter);
-      painter.fill(Some(img_brush.clone()));
+      painter.set_brush(img_brush.clone()).fill();
 
       painter.translate(300., 0.);
       draw_arrow_path(&mut painter);
-      painter.stroke(Some(25.), Some(img_brush));
+      painter.set_brush(img_brush).set_line_width(25.).stroke();
 
       let commands = painter.finish();
-      gpu_backend.submit(commands, None).unwrap();
+      gpu_backend.submit(commands);
     }
     Event::MainEventsCleared => {
       window.request_redraw();

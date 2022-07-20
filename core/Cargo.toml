@@ -22,7 +22,6 @@ smallvec = "1.8.0"
 text = {path = "../text"}
 widget_derive = {path = "../widget_derive"}
 winit = "0.26.1"
-usvg = "0.22.0"
 path-clean = "0.1.0"
 
 [dependencies.blake3]

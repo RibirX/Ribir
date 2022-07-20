@@ -395,12 +395,16 @@ mod tests {
   #[test]
   fn match_font() {
     let mut fonts = FontDB::default();
+    fonts.load_system_fonts();
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = fonts.load_font_file(path);
-    fonts.load_system_fonts();
 
     let mut face = FontFace {
-      families: vec![FontFamily::Name("DejaVu Sans".into()), FontFamily::Serif].into_boxed_slice(),
+      families: vec![
+        FontFamily::Name("DejaVu Sans".into()),
+        FontFamily::SansSerif,
+      ]
+      .into_boxed_slice(),
       ..<_>::default()
     };
 

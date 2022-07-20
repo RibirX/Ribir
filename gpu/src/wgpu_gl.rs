@@ -1,7 +1,7 @@
 use crate::{tessellator::Tessellator, GlRender, GpuBackend, TriangleLists, Vertex};
 use futures::executor::block_on;
 use painter::DeviceSize;
-use std::iter;
+use std::{error::Error, iter};
 use text::shaper::TextShaper;
 mod color_pass;
 pub mod surface;
@@ -22,12 +22,11 @@ pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
   size: DeviceSize,
   tex_init_size: Option<(u16, u16)>,
   tex_max_size: Option<(u16, u16)>,
-  tolerance: f32,
   shaper: TextShaper,
 ) -> GpuBackend<WgpuGl> {
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
-  let tessellator = Tessellator::new(init_size, max_size, tolerance, shaper);
+  let tessellator = Tessellator::new(init_size, max_size, shaper);
   let gl = WgpuGl::from_wnd(window, size, AntiAliasing::Msaa4X).await;
 
   GpuBackend { tessellator, gl }
@@ -38,12 +37,11 @@ pub async fn wgpu_backend_headless(
   size: DeviceSize,
   tex_init_size: Option<(u16, u16)>,
   tex_max_size: Option<(u16, u16)>,
-  tolerance: f32,
   shaper: TextShaper,
 ) -> GpuBackend<WgpuGl<surface::TextureSurface>> {
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
-  let tessellator = Tessellator::new(init_size, max_size, tolerance, shaper);
+  let tessellator = Tessellator::new(init_size, max_size, shaper);
   let gl = WgpuGl::headless(size).await;
   GpuBackend { tessellator, gl }
 }
@@ -222,37 +220,11 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     self.queue.submit(iter::once(encoder.finish()));
   }
 
-  fn end_frame<'a>(
-    &mut self,
-    capture: Option<Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>>,
-  ) -> Result<(), &str> {
-    if let Some(capture) = capture {
-      let mut encoder = self.create_command_encoder();
-      let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut encoder);
-      self.queue.submit(iter::once(encoder.finish()));
-
-      let buffer_slice = buffer.slice(..);
-      let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
-
-      // Poll the device in a blocking manner so that our future resolves.
-      self.device.poll(wgpu::Maintain::Wait);
-      block_on(buffer_future).map_err(|_| "Async buffer error")?;
-
-      let size = self.surface.view_size();
-      let slice = buffer_slice.get_mapped_range();
-      let buffer_bytes_per_row = slice.len() as u32 / size.height;
-      let img_bytes_pre_row = (size.width * 4) as usize;
-      let rows = (0..size.height).map(|i| {
-        let offset = (i * buffer_bytes_per_row) as usize;
-        &slice.as_ref()[offset..offset + img_bytes_pre_row]
-      });
-
-      capture(size, Box::new(rows));
+  fn end_frame<'a>(&mut self, cancel: bool) {
+    if !cancel {
+      self.surface.present();
     }
-    self.surface.present();
     self.img_pass.end_frame();
-
-    Ok(())
   }
 
   fn resize(&mut self, size: DeviceSize) {
@@ -261,6 +233,31 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     self
       .color_pass
       .resize(&self.coordinate_matrix, &self.device)
+  }
+
+  fn capture(&self, capture: painter::CaptureCallback) -> Result<(), Box<dyn Error>> {
+    let mut encoder = self.create_command_encoder();
+    let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut encoder);
+    self.queue.submit(iter::once(encoder.finish()));
+
+    let buffer_slice = buffer.slice(..);
+    let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
+
+    // Poll the device in a blocking manner so that our future resolves.
+    self.device.poll(wgpu::Maintain::Wait);
+    block_on(buffer_future)?;
+
+    let size = self.surface.view_size();
+    let slice = buffer_slice.get_mapped_range();
+    let buffer_bytes_per_row = slice.len() as u32 / size.height;
+    let img_bytes_pre_row = (size.width * 4) as usize;
+    let rows = (0..size.height).map(|i| {
+      let offset = (i * buffer_bytes_per_row) as usize;
+      &slice.as_ref()[offset..offset + img_bytes_pre_row]
+    });
+
+    capture(size, Box::new(rows));
+    Ok(())
   }
 }
 

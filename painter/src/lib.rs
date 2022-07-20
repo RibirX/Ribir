@@ -4,7 +4,7 @@
 pub mod color;
 mod painter;
 pub mod path;
-pub use crate::color::*;
+pub use crate::color::Color;
 
 pub use crate::painter::*;
 pub use path::*;
@@ -12,6 +12,9 @@ pub mod image;
 mod style;
 pub use image::{PixelImage, ShallowImage};
 pub use style::*;
+mod svg_render;
+pub use svg_render::SvgRender;
+pub use text;
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.
@@ -39,3 +42,6 @@ pub type DeviceVector = euclid::Vector2D<u32, PhysicUnit>;
 pub use euclid::Transform2D;
 
 pub use lyon_tessellation::{LineCap, LineJoin, StrokeOptions};
+
+pub const INFINITY_SIZE: Size = Size::new(f32::INFINITY, f32::INFINITY);
+pub const ZERO_SIZE: Size = Size::new(0., 0.);

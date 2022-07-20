@@ -161,7 +161,7 @@ pub mod tests {
   const MAX_SIZE: Size = Size::new(1024, 1024);
 
   pub fn color_image(color: Color, width: u16, height: u16) -> ShallowImage {
-    let data = std::iter::repeat(color.into_raw())
+    let data = std::iter::repeat(color.into_components())
       .take(width as usize * height as usize)
       .flatten()
       .collect::<Vec<_>>();
@@ -193,10 +193,12 @@ pub mod tests {
   fn color_img_check(atlas: &TextureAtlas, rect: &Rect, color: Color) {
     const UNIT: usize = TextureAtlas::UNIT;
     let rect = rect.to_usize();
-    let color_data = color.into_raw();
     rect.y_range().for_each(|y| {
       rect.x_range().for_each(|x| {
-        assert_eq!(atlas.texture[y][UNIT * x..UNIT * (x + 1)], color_data);
+        assert_eq!(
+          atlas.texture[y][UNIT * x..UNIT * (x + 1)],
+          color.into_components()
+        );
       })
     })
   }

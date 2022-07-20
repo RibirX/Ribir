@@ -1,41 +1,32 @@
 use super::flex::*;
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
-// todo: give a alias for `CrossAxisAlign` and `MainAxisAlign`
-
-#[derive(Default, MultiChild, Declare, Clone)]
+#[derive(Default, Declare, Clone)]
 pub struct Column {
   #[declare(default)]
   pub reverse: bool,
   #[declare(default)]
   pub wrap: bool,
   #[declare(default)]
-  pub h_align: CrossAxisAlign,
+  pub align_items: Align,
   #[declare(default)]
-  pub v_align: MainAxisAlign,
+  pub justify_content: JustifyContent,
 }
 
-impl Render for Column {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let Self { reverse, wrap, h_align, v_align } = self.clone();
-
-    Flex {
-      reverse,
-      wrap,
-      direction: Direction::Vertical,
-      cross_align: h_align,
-      main_align: v_align,
+impl ComposeMultiChild for Column {
+  fn compose_multi_child(this: Stateful<Self>, children: Vec<Widget>, _: &mut BuildCtx) -> Widget {
+    widget! {
+      track { this }
+      Flex {
+        reverse: this.reverse,
+        wrap: this.wrap,
+        direction: Direction::Vertical,
+        align_items: this.align_items,
+        justify_content: this.justify_content,
+        ExprWidget {
+          expr: children.into_iter()
+        }
+      }
     }
-    .perform_layout(clamp, ctx)
   }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-impl Query for Column {
-  impl_query_self_only!();
 }

@@ -1,25 +1,10 @@
 use crate::{impl_query_self_only, prelude::*};
 
-/// How the children should be placed along the cross axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum CrossAxisAlign {
-  /// Place the children with their start edge aligned with the start side of
-  /// the cross axis.
-  Start,
-  /// Place the children so that their centers align with the middle of the
-  /// cross axis.This is the default cross-axis alignment.
-  Center,
-  /// Place the children as close to the end of the cross axis as possible.
-  End,
-  /// Require the children to fill the cross axis. This causes the constraints
-  /// passed to the children to be tight in the cross axis.
-  Stretch,
-}
-
 /// How the children should be placed along the main axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum MainAxisAlign {
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
+pub enum JustifyContent {
   /// Place the children as close to the start of the main axis as possible.
+  #[default]
   Start,
   ///Place the children as close to the middle of the main axis as possible.
   Center,
@@ -57,20 +42,10 @@ pub struct Flex {
   pub direction: Direction,
   /// How the children should be placed along the cross axis in a flex layout.
   #[declare(default)]
-  pub cross_align: CrossAxisAlign,
+  pub align_items: Align,
   /// How the children should be placed along the main axis in a flex layout.
   #[declare(default)]
-  pub main_align: MainAxisAlign,
-}
-
-impl Default for CrossAxisAlign {
-  #[inline]
-  fn default() -> Self { CrossAxisAlign::Center }
-}
-
-impl Default for MainAxisAlign {
-  #[inline]
-  fn default() -> Self { MainAxisAlign::Start }
+  pub justify_content: JustifyContent,
 }
 
 impl Render for Flex {
@@ -85,8 +60,8 @@ impl Render for Flex {
       main_max: 0.,
       current_line: <_>::default(),
       lines_info: vec![],
-      cross_align: self.cross_align,
-      main_align: self.main_align,
+      align_items: self.align_items,
+      justify_content: self.justify_content,
     };
     layouter.layout(ctx)
   }
@@ -157,8 +132,8 @@ struct FlexLayouter {
   wrap: bool,
   current_line: MainLineInfo,
   lines_info: Vec<MainLineInfo>,
-  cross_align: CrossAxisAlign,
-  main_align: MainAxisAlign,
+  align_items: Align,
+  justify_content: JustifyContent,
 }
 
 impl FlexLayouter {
@@ -222,7 +197,7 @@ impl FlexLayouter {
     let Self {
       lines_info,
       direction,
-      cross_align,
+      align_items,
       max_size,
       main_max,
       ..
@@ -237,7 +212,7 @@ impl FlexLayouter {
             line,
             main_offset,
             *direction,
-            *cross_align,
+            *align_items,
             *max_size,
           )
         });
@@ -254,30 +229,26 @@ impl FlexLayouter {
     let real_size = self.best_size();
     let Self {
       lines_info,
-      main_align,
+      justify_content: main_align,
       direction,
-      cross_align,
+      align_items: cross_align,
       ..
     } = self;
-    let container_cross_offset = match cross_align {
-      CrossAxisAlign::Start | CrossAxisAlign::Stretch => 0.,
-      CrossAxisAlign::Center => (size.cross - real_size.cross) / 2.,
-      CrossAxisAlign::End => size.cross - real_size.cross,
-    };
+    let container_cross_offset = cross_align.align_value(real_size.cross, size.cross);
     lines_info.iter_mut().for_each(|line| {
       let (offset, step) = match main_align {
-        MainAxisAlign::Start => (0., 0.),
-        MainAxisAlign::Center => ((size.main - line.main_width) / 2., 0.),
-        MainAxisAlign::End => (size.main - line.main_width, 0.),
-        MainAxisAlign::SpaceAround => {
+        JustifyContent::Start => (0., 0.),
+        JustifyContent::Center => ((size.main - line.main_width) / 2., 0.),
+        JustifyContent::End => (size.main - line.main_width, 0.),
+        JustifyContent::SpaceAround => {
           let step = (size.main - line.main_width) / line.child_count as f32;
           (step / 2., step)
         }
-        MainAxisAlign::SpaceBetween => {
+        JustifyContent::SpaceBetween => {
           let step = (size.main - line.main_width) / (line.child_count - 1) as f32;
           (0., step)
         }
-        MainAxisAlign::SpaceEvenly => {
+        JustifyContent::SpaceEvenly => {
           let step = (size.main - line.main_width) / (line.child_count + 1) as f32;
           (step, step)
         }
@@ -292,11 +263,7 @@ impl FlexLayouter {
           let mut origin = FlexSize::from_point(rect.origin, *direction);
           let child_size = FlexSize::from_size(rect.size, *direction);
 
-          let line_cross_offset = match cross_align {
-            CrossAxisAlign::Start | CrossAxisAlign::Stretch => 0.,
-            CrossAxisAlign::Center => (line.cross_line_height - child_size.cross) / 2.,
-            CrossAxisAlign::End => line.cross_line_height - child_size.cross,
-          };
+          let line_cross_offset = cross_align.align_value(child_size.cross, line.cross_line_height);
           origin.main += main_offset;
           origin.cross += container_cross_offset + line_cross_offset;
           ctx.update_position(child, origin.to_point(*direction));
@@ -337,7 +304,7 @@ impl FlexLayouter {
     line: &mut MainLineInfo,
     main_offset: f32,
     dir: Direction,
-    cross_align: CrossAxisAlign,
+    cross_align: Align,
     max_size: FlexSize,
   ) -> f32 {
     let pre_layout_rect = ctx
@@ -359,7 +326,7 @@ impl FlexLayouter {
       cross: line.cross_line_height,
     };
     let mut clamp_min = FlexSize { main: prefer_main, cross: 0. };
-    if CrossAxisAlign::Stretch == cross_align {
+    if Align::Stretch == cross_align {
       clamp_min.cross = line.cross_line_height;
     }
 
@@ -510,8 +477,8 @@ mod tests {
 
   #[test]
   fn cross_align() {
-    fn cross_align_check(align: CrossAxisAlign, y_pos: [f32; 3]) {
-      let row = Row { v_align: align, ..<_>::default() }
+    fn cross_align_check(align: Align, y_pos: [f32; 3]) {
+      let row = Row { align_items: align, ..<_>::default() }
         .have_child(SizedBox { size: Size::new(100., 20.) }.into_widget())
         .have_child(SizedBox { size: Size::new(100., 30.) }.into_widget())
         .have_child(SizedBox { size: Size::new(100., 40.) }.into_widget())
@@ -537,12 +504,12 @@ mod tests {
         ]
       );
     }
-    cross_align_check(CrossAxisAlign::Start, [0., 0., 0.]);
-    cross_align_check(CrossAxisAlign::Center, [10., 5., 0.]);
-    cross_align_check(CrossAxisAlign::End, [20., 10., 0.]);
+    cross_align_check(Align::Start, [0., 0., 0.]);
+    cross_align_check(Align::Center, [10., 5., 0.]);
+    cross_align_check(Align::End, [20., 10., 0.]);
 
     let row = Row {
-      v_align: CrossAxisAlign::Stretch,
+      align_items: Align::Stretch,
       ..<_>::default()
     }
     .have_child(SizedBox { size: Size::new(100., 20.) }.into_widget())
@@ -573,14 +540,14 @@ mod tests {
 
   #[test]
   fn main_align() {
-    fn main_align_check(align: MainAxisAlign, pos: [(f32, f32); 3]) {
+    fn main_align_check(justify_content: JustifyContent, pos: [(f32, f32); 3]) {
       let item_size = Size::new(100., 20.);
       let root = widget! {
         SizedBox {
-          size: SizedBox::expanded_size(),
+          size: INFINITY_SIZE,
           Row {
-            h_align: align,
-            v_align: CrossAxisAlign::Start,
+            justify_content,
+            align_items: Align::Start,
             SizedBox { size: item_size }
             SizedBox { size: item_size }
             SizedBox { size: item_size }
@@ -621,16 +588,16 @@ mod tests {
       );
     }
 
-    main_align_check(MainAxisAlign::Start, [(0., 0.), (100., 0.), (200., 0.)]);
-    main_align_check(MainAxisAlign::Center, [(100., 0.), (200., 0.), (300., 0.)]);
-    main_align_check(MainAxisAlign::End, [(200., 0.), (300., 0.), (400., 0.)]);
+    main_align_check(JustifyContent::Start, [(0., 0.), (100., 0.), (200., 0.)]);
+    main_align_check(JustifyContent::Center, [(100., 0.), (200., 0.), (300., 0.)]);
+    main_align_check(JustifyContent::End, [(200., 0.), (300., 0.), (400., 0.)]);
     main_align_check(
-      MainAxisAlign::SpaceBetween,
+      JustifyContent::SpaceBetween,
       [(0., 0.), (200., 0.), (400., 0.)],
     );
     let space = 200.0 / 3.0;
     main_align_check(
-      MainAxisAlign::SpaceAround,
+      JustifyContent::SpaceAround,
       [
         (0.5 * space, 0.),
         (100. + space * 1.5, 0.),
@@ -638,7 +605,7 @@ mod tests {
       ],
     );
     main_align_check(
-      MainAxisAlign::SpaceEvenly,
+      JustifyContent::SpaceEvenly,
       [(50., 0.), (200., 0.), (350., 0.)],
     );
   }

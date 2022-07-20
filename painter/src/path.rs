@@ -1,34 +1,40 @@
-use lyon_path::{
-  builder::BorderRadii,
-  geom::{Arc, LineSegment},
-  traits::PathBuilder,
-  Winding,
+pub use lyon_tessellation::{
+  path::{
+    builder::BorderRadii,
+    geom::{Arc, LineSegment},
+    path::Builder as LyonBuilder,
+    traits::PathBuilder,
+    Path as LyonPath, Winding,
+  },
+  StrokeOptions,
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{Angle, Brush, PathStyle, Point, Rect, Vector};
+use crate::{Angle, PathStyle, Point, Rect, Vector};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Path {
-  pub path: lyon_path::path::Path,
-  pub brush: Brush,
-  pub path_style: PathStyle,
+  pub path: LyonPath,
+  pub style: PathStyle,
 }
 
 /// The radius of each corner of a rounded rectangle.
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Default)]
 pub struct Radius(BorderRadii);
 
-/// The builder for path
 #[derive(Default)]
-pub struct Builder(lyon_path::path::Builder);
+pub struct Builder(LyonBuilder);
 
 impl Path {
   #[inline]
   pub fn builder() -> Builder { Builder::default() }
 
   #[inline]
-  pub fn box_rect(&self) -> Rect { path_box_rect(&self.path, self.path_style) }
+  pub fn box_rect(&self) -> Rect {
+    // todo: path_style effect box rect
+    lyon_algorithms::aabb::bounding_rect(self.path.iter()).cast_unit()
+  }
 }
 
 impl Builder {
@@ -40,11 +46,13 @@ impl Builder {
     self
   }
 
-  /// Causes the point of the pen to move back to the start of the current
-  /// sub-path. It tries to draw a straight line from the current point to the
-  /// start. If the shape has already been closed or has only one point, this
+  /// Tell the builder the sub-path is finished.
+  /// if `close` is true,  causes the point of the pen to move back to the start
+  /// of the current sub-path. It tries to draw a straight line from the
+  /// current point to the start. If the shape has already been closed or has
+  /// only one point, nothing to do.
   #[inline]
-  pub fn close_path(&mut self) { self.0.close(); }
+  pub fn end_path(&mut self, close: bool) { self.0.end(close); }
 
   /// Connects the last point in the current sub-path to the specified (x, y)
   /// coordinates with a straight line.
@@ -158,39 +166,32 @@ impl Builder {
 
   /// Creates a path for a rectangle by `rect` with `radius`.
   /// #[inline]
-  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) {
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
     // Safety, just a unit type convert, it's same type.
     let rect = unsafe { std::mem::transmute(rect) };
     self
       .0
-      .add_rounded_rectangle(rect, radius, Winding::Positive)
+      .add_rounded_rectangle(rect, radius, Winding::Positive);
+    self
   }
 
   /// Build a stroke path with `width` size, and `style`.
   #[inline]
-  pub fn stroke(self, line_width: f32, style: Brush) -> Path {
+  pub fn stroke(self, options: StrokeOptions) -> Path {
     Path {
       path: self.0.build(),
-      brush: style,
-      path_style: PathStyle::Stroke(line_width),
+      style: PathStyle::Stroke(options),
     }
   }
 
   /// Build a fill path, witch should fill with `style`
   #[inline]
-  pub fn fill(self, style: Brush) -> Path {
+  pub fn fill(self) -> Path {
     Path {
       path: self.0.build(),
-      brush: style,
-      path_style: PathStyle::Fill,
+      style: PathStyle::Fill,
     }
   }
-}
-
-#[inline]
-pub fn path_box_rect(path: &lyon_path::Path, _: PathStyle) -> Rect {
-  // todo: path_style effect box rect
-  lyon_algorithms::aabb::bounding_rect(path.iter()).cast_unit()
 }
 
 impl std::ops::Deref for Radius {

@@ -116,14 +116,14 @@ impl Generator {
           node.query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
             old = key_widgets.remove(k);
           });
-          let id = match old {
-            Some(c_id) => {
-              *c_id.assert_get_mut(tree) = node;
-              c_id
-            }
-            None => tree.new_node(node),
+          let id = if let Some(c_id) = old {
+            *c_id.assert_get_mut(tree) = node;
+            c_id
+          } else {
+            tree.new_node(node)
           };
           insert_at.insert_next(id, tree);
+          tree.mark_dirty(id);
           id
         },
         &mut |wid, child, ctx| {
@@ -138,7 +138,8 @@ impl Generator {
     key_widgets
       .into_iter()
       .for_each(|(_, k)| ctx.drop_subtree(k));
-    ctx.drop_subtree(tmp_anchor);
+
+    tmp_anchor.inner_remove(&mut ctx.widget_tree);
   }
 
   pub(crate) fn info(&self) -> &GeneratorInfo { &self.info }

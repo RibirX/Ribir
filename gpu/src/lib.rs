@@ -4,6 +4,8 @@ pub mod error;
 #[cfg(feature = "wgpu_gl")]
 pub mod wgpu_gl;
 
+use std::error::Error;
+
 use tessellator::Tessellator;
 pub mod tessellator;
 use painter::{CaptureCallback, DeviceSize, PainterBackend};
@@ -23,20 +25,26 @@ pub struct GpuBackend<R: GlRender> {
 }
 
 impl<R: GlRender> PainterBackend for GpuBackend<R> {
-  fn submit<'a>(
-    &mut self,
-    commands: Vec<painter::PaintCommand>,
-    frame_data: Option<
-      Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>,
-    >,
-  ) -> Result<(), &str> {
+  fn submit<'a>(&mut self, commands: Vec<painter::PaintCommand>) {
     self.gl.begin_frame();
     self.tessellator.tessellate(&commands, &mut self.gl);
-    self.gl.end_frame(frame_data)
+    self.gl.end_frame(false);
   }
 
   #[inline]
   fn resize(&mut self, size: DeviceSize) { self.gl.resize(size) }
+
+  fn commands_to_image(
+    &mut self,
+    commands: Vec<painter::PaintCommand>,
+    capture: CaptureCallback,
+  ) -> Result<(), Box<dyn Error>> {
+    self.gl.begin_frame();
+    self.tessellator.tessellate(&commands, &mut self.gl);
+    self.gl.capture(capture)?;
+    self.gl.end_frame(true);
+    Ok(())
+  }
 }
 
 /// GlRender support draw triangles to the devices.
@@ -52,10 +60,17 @@ pub trait GlRender {
   /// frame.
   fn draw_triangles(&mut self, data: TriangleLists);
 
+  /// Capture the current frame image data, the `capture` callback will be
+  /// called to pass the frame image data with rgba(u8 x 4) format.
+  /// # Note
+  /// Only capture stuff of the frame not ended, so should always call this
+  /// method after `draw_triangles` and before `end_frame`.
+  fn capture(&self, capture: CaptureCallback) -> Result<(), Box<dyn Error>>;
+
   /// Draw frame finished and the render data commit finished and should ensure
-  /// draw every of this frame into device. Call the `capture` callback to
-  /// pass the frame image data with rgba(u8 x 4) format if it is Some-Value
-  fn end_frame<'a>(&mut self, capture: Option<CaptureCallback<'a>>) -> Result<(), &str>;
+  /// draw every of this frame into device. Cancel current frame if `cancel` is
+  /// true.
+  fn end_frame<'a>(&mut self, cancel: bool);
 
   /// Window or surface size changed, need do a redraw.
   fn resize(&mut self, size: DeviceSize);
@@ -148,7 +163,7 @@ pub struct TexturePrimitive {
 
 /// We use a texture atlas to shader vertices, even if a pure color path.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, AsBytes)]
+#[derive(Copy, Clone, Debug, AsBytes, Default)]
 pub struct Vertex {
   pub pixel_coords: [f32; 2],
   pub prim_id: u32,

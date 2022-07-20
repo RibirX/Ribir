@@ -1,8 +1,11 @@
 use crate::{
-  path::*, Brush, Color, DeviceSize, PathStyle, Rect, Size, TextStyle, Transform, Vector,
+  path::*, Angle, Brush, Color, DeviceSize, PathStyle, Point, Rect, Size, TextStyle, Transform,
+  Vector,
 };
-use algo::CowRc;
+use algo::{CowRc, Resource};
 use euclid::Size2D;
+pub use lyon_tessellation::{LineCap, LineJoin};
+use std::error::Error;
 use std::ops::{Deref, DerefMut};
 use text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
 use text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
@@ -26,37 +29,41 @@ pub type CaptureCallback<'a> =
 /// `PainterBackend` use to draw the picture what the `commands` described  to
 /// the target device. Usually is implemented by graphic library.
 pub trait PainterBackend {
-  /// Submit the paint commands to draw, and call the `capture` callback to
-  /// pass the frame image data with rgba(u8 x 4) format if it is Some-Value
-  fn submit<'a>(
+  /// Submit the paint commands to draw
+  fn submit(&mut self, commands: Vec<PaintCommand>);
+
+  fn commands_to_image(
     &mut self,
     commands: Vec<PaintCommand>,
-    capture: Option<CaptureCallback<'a>>,
-  ) -> Result<(), &str>;
+    capture: CaptureCallback,
+  ) -> Result<(), Box<dyn Error>>;
 
   fn resize(&mut self, size: DeviceSize);
 }
 
 #[derive(Clone)]
 pub enum PaintPath {
-  Path(lyon_path::Path),
+  Path(Resource<Path>),
   Text {
     font_size: FontSize,
     glyphs: Vec<Glyph<Pixel>>,
+    style: PathStyle,
   },
 }
+
+// todo: need a way to batch commands as a single resource. so we can cache
+// their vertexes as a whole. useful for svg, animation and paint layers.
 #[derive(Clone)]
 pub struct PaintCommand {
   pub path: PaintPath,
   pub transform: Transform,
   pub brush: Brush,
-  pub path_style: PathStyle,
 }
 
 #[derive(Clone)]
 struct PainterState {
   /// The line width use to stroke path.
-  line_width: f32,
+  stroke_options: StrokeOptions,
   font_size: FontSize,
   letter_space: Option<Pixel>,
   brush: Brush,
@@ -81,7 +88,7 @@ impl Painter {
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
     self.reset(None);
-    std::mem::take(&mut self.commands)
+    self.commands.drain(..).collect()
   }
 
   /// Saves the entire state and return a guard to auto restore the state when
@@ -94,9 +101,10 @@ impl Painter {
 
   /// Saves the entire state of the canvas by pushing the current drawing state
   /// onto a stack.
-  pub fn save(&mut self) {
+  pub fn save(&mut self) -> &mut Self {
     let new_state = self.current_state().clone();
     self.state_stack.push(new_state);
+    self
   }
 
   /// Restores the most recently saved canvas state by popping the top entry in
@@ -130,12 +138,53 @@ impl Painter {
 
   /// Return the line width of the stroke pen.
   #[inline]
-  pub fn get_line_width(&self) -> f32 { self.current_state().line_width }
+  pub fn get_line_width(&self) -> f32 { self.stroke_options().line_width }
 
   /// Set the line width of the stroke pen with `line_width`
   #[inline]
   pub fn set_line_width(&mut self, line_width: f32) -> &mut Self {
-    self.current_state_mut().line_width = line_width;
+    self.current_state_mut().stroke_options.line_width = line_width;
+    self
+  }
+
+  #[inline]
+  pub fn get_line_join(&self) -> LineJoin { self.stroke_options().line_join }
+
+  #[inline]
+  pub fn set_line_join(&mut self, line_join: LineJoin) -> &mut Self {
+    self.current_state_mut().stroke_options.line_join = line_join;
+    self
+  }
+
+  #[inline]
+  pub fn get_start_line_cap(&self) -> LineCap { self.stroke_options().start_cap }
+
+  #[inline]
+  pub fn set_start_line_cap(&mut self, start_cap: LineCap) -> &mut Self {
+    self.current_state_mut().stroke_options.start_cap = start_cap;
+    self
+  }
+
+  #[inline]
+  pub fn get_end_line_cap(&self) -> LineCap { self.stroke_options().end_cap }
+
+  #[inline]
+  pub fn set_end_line_cap(&mut self, end_cap: LineCap) -> &mut Self {
+    self.current_state_mut().stroke_options.end_cap = end_cap;
+    self
+  }
+
+  #[inline]
+  pub fn set_line_cap(&mut self, line_cap: LineCap) -> &mut Self {
+    self.set_start_line_cap(line_cap).set_end_line_cap(line_cap)
+  }
+
+  #[inline]
+  pub fn get_miter_limit(&self) -> f32 { self.stroke_options().miter_limit }
+
+  #[inline]
+  pub fn set_miter_limit(&mut self, miter_limit: f32) -> &mut Self {
+    self.current_state_mut().stroke_options.miter_limit = miter_limit;
     self
   }
 
@@ -169,34 +218,38 @@ impl Painter {
     self
   }
 
+  /// Multiplies the current transformation with the matrix. This lets you
+  /// scale, rotate, translate (move), and skew the context.
+  pub fn apply_transform(&mut self, transform: &Transform) -> &mut Self {
+    let t = &mut self.current_state_mut().transform;
+    *t = t.then(transform);
+    self
+  }
+
   /// Paint a path with its style.
-  pub fn paint_path(&mut self, path: Path) -> &mut Self {
+  pub fn paint_path<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
     let transform = self.current_state().transform;
+    let brush = self.current_state().brush.clone();
     self.commands.push(PaintCommand {
-      path: PaintPath::Path(path.path),
+      path: PaintPath::Path(path.into()),
       transform,
-      brush: path.brush.clone(),
-      path_style: path.path_style,
+      brush,
     });
     self
   }
 
   /// Strokes (outlines) the current path with the current brush and line width.
-  pub fn stroke(&mut self, line_width: Option<f32>, brush: Option<Brush>) -> &mut Self {
+  pub fn stroke(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let state = self.current_state();
-    let line_width = line_width.unwrap_or(self.current_state().line_width);
-    let brush = brush.unwrap_or_else(|| state.brush.clone());
-    let path = builder.stroke(line_width, brush);
+    let path = builder.stroke(self.stroke_options());
     self.paint_path(path);
     self
   }
 
   /// Fill the current path with current brush.
-  pub fn fill(&mut self, brush: Option<Brush>) -> &mut Self {
+  pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let brush = brush.unwrap_or_else(|| self.current_state().brush.clone());
-    let path = builder.fill(brush);
+    let path = builder.fill();
     self.paint_path(path);
     self
   }
@@ -214,10 +267,10 @@ impl Painter {
       path: PaintPath::Text {
         font_size: style.font_size,
         glyphs: visual_glyphs.pixel_glyphs().collect(),
+        style: style.path_style,
       },
-      transform,
       brush: style.foreground.clone(),
-      path_style: style.path_style,
+      transform,
     });
 
     self
@@ -260,10 +313,10 @@ impl Painter {
       path: PaintPath::Text {
         font_size,
         glyphs: visual_glyphs.pixel_glyphs().collect(),
+        style: path_style,
       },
       transform,
       brush: brush.clone(),
-      path_style,
     };
     self.commands.push(cmd);
     self
@@ -276,11 +329,7 @@ impl Painter {
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
   pub fn stroke_text<T: Into<Substr>>(&mut self, text: T) -> &mut Self {
-    self.paint_text_without_style(
-      text,
-      PathStyle::Stroke(self.current_state().line_width),
-      None,
-    )
+    self.paint_text_without_style(text, PathStyle::Stroke(self.stroke_options()), None)
   }
 
   /// Fill `text` from left to right, start at let top position, use
@@ -312,6 +361,126 @@ impl Painter {
     self.set_transform(t);
     self
   }
+
+  /// Starts a new path by emptying the list of sub-paths.
+  /// Call this method when you want to create a new path.
+  #[inline]
+  pub fn begin_path(&mut self, at: Point) -> &mut Self {
+    self.path_builder.begin_path(at);
+    self
+  }
+
+  /// Tell the painter the sub-path is finished.
+  /// if `close` is true,  causes the point of the pen to move back to the start
+  /// of the current sub-path. It tries to draw a straight line from the
+  /// current point to the start. If the shape has already been closed or has
+  /// only one point, nothing to do.
+  #[inline]
+  pub fn close_path(&mut self, close: bool) -> &mut Self {
+    self.path_builder.end_path(close);
+    self
+  }
+
+  /// Connects the last point in the current sub-path to the specified (x, y)
+  /// coordinates with a straight line.
+  #[inline]
+  pub fn line_to(&mut self, to: Point) -> &mut Self {
+    self.path_builder.line_to(to);
+    self
+  }
+
+  /// Adds a cubic Bezier curve to the current path.
+  #[inline]
+  pub fn bezier_curve_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) -> &mut Self {
+    self.path_builder.bezier_curve_to(ctrl1, ctrl2, to);
+    self
+  }
+
+  /// Adds a quadratic Bézier curve to the current path.
+  #[inline]
+  pub fn quadratic_curve_to(&mut self, ctrl: Point, to: Point) -> &mut Self {
+    self.path_builder.quadratic_curve_to(ctrl, to);
+    self
+  }
+
+  /// adds a circular arc to the current sub-path, using the given control
+  /// points and radius. The arc is automatically connected to the path's latest
+  /// point with a straight line, if necessary for the specified
+  #[inline]
+  pub fn arc_to(
+    &mut self,
+    center: Point,
+    radius: f32,
+    start_angle: Angle,
+    end_angle: Angle,
+  ) -> &mut Self {
+    self
+      .path_builder
+      .arc_to(center, radius, start_angle, end_angle);
+    self
+  }
+
+  /// The ellipse_to() method creates an elliptical arc centered at `center`
+  /// with the `radius`. The path starts at startAngle and ends at endAngle, and
+  /// travels in the direction given by anticlockwise (defaulting to
+  /// clockwise).
+  #[inline]
+  pub fn ellipse_to(
+    &mut self,
+    center: Point,
+    radius: Vector,
+    start_angle: Angle,
+    end_angle: Angle,
+  ) -> &mut Self {
+    self
+      .path_builder
+      .ellipse_to(center, radius, start_angle, end_angle);
+    self
+  }
+
+  #[inline]
+  pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
+    self.path_builder.segment(from, to);
+    self
+  }
+
+  /// Adds a sub-path containing an ellipse.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  #[inline]
+  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32) -> &mut Self {
+    self.path_builder.ellipse(center, radius, rotation);
+    self
+  }
+
+  /// Adds a sub-path containing a rectangle.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  #[inline]
+  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
+    self.path_builder.rect(rect);
+    self
+  }
+
+  /// Adds a sub-path containing a circle.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  #[inline]
+  pub fn circle(&mut self, center: Point, radius: f32) -> &mut Self {
+    self.path_builder.circle(center, radius);
+    self
+  }
+
+  /// Creates a path for a rectangle by `rect` with `radius`.
+  /// #[inline]
+  #[inline]
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
+    self.path_builder.rect_round(rect, radius);
+    self
+  }
 }
 
 impl Painter {
@@ -328,6 +497,8 @@ impl Painter {
       .last_mut()
       .expect("Must have one state in stack!")
   }
+
+  fn stroke_options(&self) -> StrokeOptions { self.current_state().stroke_options }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -359,10 +530,10 @@ impl Default for PainterState {
   #[inline]
   fn default() -> Self {
     Self {
-      line_width: 1.,
+      stroke_options: <_>::default(),
       font_size: FontSize::Pixel(14.0.into()),
       letter_space: None,
-      brush: Brush::Color(Color::BLACK),
+      brush: Color::BLACK.into(),
       font_face: FontFace::default(),
       text_line_height: None,
       transform: Transform::new(1., 0., 0., 1., 0., 0.),
@@ -370,21 +541,10 @@ impl Default for PainterState {
   }
 }
 
-impl Deref for Painter {
-  type Target = Builder;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.path_builder }
-}
-
-impl DerefMut for Painter {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.path_builder }
-}
-
 impl PaintCommand {
   pub fn box_rect_without_transform(&self) -> Rect {
     match &self.path {
-      PaintPath::Path(path) => path_box_rect(path, self.path_style),
+      PaintPath::Path(path) => path.box_rect(),
       PaintPath::Text { .. } => todo!(),
     }
   }
@@ -426,6 +586,15 @@ pub fn typography_with_text_style<T: Into<Substr>>(
       overflow: Overflow::Clip,
     },
   )
+}
+
+impl PaintCommand {
+  pub fn style(&self) -> PathStyle {
+    match &self.path {
+      PaintPath::Path(p) => p.style,
+      PaintPath::Text { style, .. } => *style,
+    }
+  }
 }
 
 #[cfg(test)]

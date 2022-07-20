@@ -1,4 +1,4 @@
-#![feature(proc_macro_diagnostic)]
+#![feature(proc_macro_diagnostic, proc_macro_span)]
 extern crate proc_macro;
 extern crate proc_macro2;
 
@@ -67,4 +67,24 @@ pub fn widget(input: TokenStream) -> TokenStream {
   w.gen_tokens(&mut ctx)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
+}
+
+#[proc_macro]
+pub fn include_svg(input: TokenStream) -> TokenStream {
+  let w = parse_macro_input! { input as syn::LitStr };
+  let span = proc_macro::Span::call_site();
+  let mut file = span.source_file().path();
+  file.pop();
+  file.push(w.value());
+  let encoded_bytes = painter::SvgRender::open(file).and_then(|reader| reader.serialize());
+  match encoded_bytes {
+    Ok(data) => quote! {
+      SvgRender::deserialize(#data).unwrap()
+    }
+    .into(),
+    Err(err) => {
+      let err = format!("{err}");
+      quote! { compile_error!(#err)}.into()
+    }
+  }
 }

@@ -108,11 +108,13 @@ impl Context {
     let tree = &self.widget_tree;
     let mut wid = Some(tree.root());
 
-    while let Some(mut id) = wid {
-      if let Some(rect) = self.layout_store.layout_box_rect(id) {
-        self.painter.save();
-        self.painter.translate(rect.min_x(), rect.min_y());
-      }
+    while let Some(id) = wid {
+      let rect = self
+        .layout_store
+        .layout_box_rect(id)
+        .expect("when paint node, it's mut be already layout.");
+      self.painter.save();
+      self.painter.translate(rect.min_x(), rect.min_y());
       let rw = id.assert_get(&tree);
       rw.paint(&mut PaintingCtx {
         id,
@@ -121,58 +123,55 @@ impl Context {
         painter: &mut self.painter,
       });
 
-      // try to access child
-      wid = id.first_child(tree);
-
-      loop {
-        if wid.is_some() {
-          break;
-        }
-        // if child is none, try to access sibling
-        if self.layout_store.layout_box_rect(id).is_some() {
-          self.painter.restore()
-        }
-        wid = id.next_sibling(tree);
-
-        // if there is no more sibling, parent subtree finished, try to access
-        // parent sibling
-        if wid.is_none() {
-          match id.parent(tree) {
-            Some(p) => id = p,
-            None => break,
+      wid = id
+        // deep first.
+        .first_child(tree)
+        // goto sibling or back to parent sibling
+        .or_else(|| {
+          let mut node = wid;
+          while let Some(p) = node {
+            // self node sub-tree paint finished, goto sibling
+            self.painter.restore();
+            node = p.next_sibling(tree);
+            if node.is_some() {
+              break;
+            } else {
+              // if there is no more sibling, back to parent to find sibling.
+              node = p.parent(tree);
+            }
           }
-        }
-      }
+          node
+        });
     }
 
     self.painter.finish()
   }
 
   pub fn mark_root_dirty(&mut self) {
-    self
-      .widget_tree
-      .state_changed
-      .borrow_mut()
-      .insert(self.widget_tree.root());
+    let root = self.widget_tree.root();
+    self.widget_tree.mark_dirty(root);
   }
 
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub fn tree_repair(&mut self) {
-    let mut needs_regen = self
+    let needs_regen = self
       .generator_store
       .take_needs_regen_generator(&self.widget_tree);
 
-    needs_regen.iter_mut().rev().for_each(|g| {
-      g.update_generated_widgets(self);
-    });
+    if let Some(mut needs_regen) = needs_regen {
+      needs_regen.iter_mut().for_each(|g| {
+        if !g.info.parent().is_dropped(self.tree()) {
+          g.update_generated_widgets(self);
+        }
+      });
 
-    needs_regen
-      .into_iter()
-      .for_each(|g| self.generator_store.add_generator(g));
+      needs_regen
+        .into_iter()
+        .for_each(|g| self.generator_store.add_generator(g));
+    }
   }
 
-  #[allow(dead_code)]
   pub fn is_dirty(&self) -> bool {
     self.widget_tree.any_state_modified() || self.generator_store.is_dirty()
   }
@@ -213,7 +212,7 @@ mod tests {
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
     let mut ctx = Context::new(post.into_widget(), 1.);
-    assert_eq!(ctx.widget_tree.count(), 18);
+    assert_eq!(ctx.widget_tree.count(), 17);
     ctx.mark_root_dirty();
     ctx.drop_subtree(ctx.widget_tree.root());
 

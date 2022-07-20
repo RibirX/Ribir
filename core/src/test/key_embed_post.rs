@@ -1,8 +1,5 @@
 #![cfg(test)]
-use crate::{
-  prelude::*,
-  widget::{layout::flex::CrossAxisAlign, Row},
-};
+use crate::prelude::*;
 #[derive(Clone, Default, Debug, Declare)]
 pub struct EmbedPostWithKey {
   author: &'static str,
@@ -16,7 +13,7 @@ impl Compose for EmbedPostWithKey {
       track { this }
       Row {
         key: 0i32,
-        v_align: CrossAxisAlign::Start,
+        align_items: Align::Start,
         Text {
           text: {
             let level = this.level;

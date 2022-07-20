@@ -1,9 +1,8 @@
 use crate::{prelude::*, ticker::Ticker};
-use ::text::FontFamily;
 use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
-  Rc::new(  widget::material::light(Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))])))
+  Rc::new(widget::material::purple::light())
 );
 
 pub struct BuildCtx<'a> {
@@ -88,17 +87,16 @@ mod tests {
 
     impl Compose for DarkLightThemes {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
-        let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
-        let dark = material::dark(family.clone());
-        let light = material::light(family);
+        let dark = material::purple::dark();
+        let light = material::purple::light();
 
         widget! {
           track { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             theme: dark.clone(),
             SizedBox {
-              size: SizedBox::shrink_size(),
+              size: ZERO_SIZE,
               theme: light.clone(),
               ThemeTrack { themes: this.0.clone() }
             }
@@ -122,17 +120,16 @@ mod tests {
 
     impl Compose for LightDarkThemes {
       fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
-        let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("serif"))]);
-        let dark = material::dark(family.clone());
-        let light = material::light(family);
+        let dark = material::purple::dark();
+        let light = material::purple::light();
 
         widget! {
           track { this }
           SizedBox {
-            size: SizedBox::expanded_size(),
+            size: INFINITY_SIZE,
             theme: light,
             SizedBox {
-              size: SizedBox::shrink_size(),
+              size: ZERO_SIZE,
               theme: dark,
               ThemeTrack { themes: this.0.clone() }
             }

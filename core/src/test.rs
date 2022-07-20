@@ -26,6 +26,11 @@ pub fn root_and_children_rect(wnd: &Window) -> (Rect, Vec<Rect>) {
   (rect, children_box_rect)
 }
 
+impl Window {
+  #[inline]
+  pub fn widget_count(&self) -> usize { self.context().tree().count() }
+}
+
 #[allow(unused)]
 macro count {
   () => (0usize),

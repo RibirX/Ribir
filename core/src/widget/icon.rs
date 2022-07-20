@@ -1,19 +1,27 @@
 use crate::prelude::*;
 
+/// Widget that let child paint as a icon with special size. Unlike icon in
+/// classic frameworks, it's not draw anything and not require you to provide
+/// image or font fot it to draw, it just center align and fit size of its
+/// child. So you can declare any widget as its child to display as a icon.
 #[derive(Declare, Default, Clone)]
 pub struct Icon {
-  pub src: &'static str,
+  #[declare(default = "IconSize::of(ctx).small")]
   pub size: Size,
 }
 
-impl Compose for Icon {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
-    let svg = Svg::new(load_src(this.state_ref().src).unwrap());
+impl ComposeSingleChild for Icon {
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       SizedBox {
         size: this.size,
-        ExprWidget { expr: svg }
+        ExprWidget {
+          expr: child,
+          box_fit: BoxFit::Contain,
+          h_align: HAlign::Center,
+          v_align: VAlign::Center,
+        }
       }
     }
   }

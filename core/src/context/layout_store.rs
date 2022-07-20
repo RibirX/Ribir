@@ -6,7 +6,7 @@ use std::{
 
 use text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
 
-use crate::prelude::{widget_tree::WidgetTree, Rect, Size, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, Rect, Size, WidgetId, INFINITY_SIZE};
 
 use super::LayoutCtx;
 
@@ -183,6 +183,12 @@ impl LayoutStore {
 impl BoxClamp {
   #[inline]
   pub fn clamp(self, size: Size) -> Size { size.clamp(self.min, self.max) }
+
+  #[inline]
+  pub fn expand(mut self) -> Self {
+    self.max = INFINITY_SIZE;
+    self
+  }
 }
 
 impl Default for BoxClamp {

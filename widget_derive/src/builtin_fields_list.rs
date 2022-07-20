@@ -1,4 +1,8 @@
 builtin! {
+  FittedBox {
+    #[doc=" set how its child should be resized to its box."]
+    box_fit: BoxFit,
+  }
   Padding {
     #[doc="set the padding area on all four sides of a widget."]
     padding: EdgeInsets
@@ -21,7 +25,7 @@ builtin! {
   Cursor {
     #[doc="assign cursor to the widget."]
     cursor: CursorIcon
-  } 
+  }
 
   ThemeWidget {
     #[doc="assign theme to the widget."]
@@ -116,6 +120,16 @@ builtin! {
   ScrollableWidget {
     #[doc= "enumerate to describe which direction allow widget to scroll."]
     scrollable: Scrollable
+  }
+
+  HAlignWidget {
+    #[doc="describe how widget align to its box in x-axis."]
+    h_align: HAlign,
+  }
+
+  VAlignWidget {
+    #[doc="describe how widget align to its box in y-axis."]
+    v_align: VAlign,
   }
 
   Margin {

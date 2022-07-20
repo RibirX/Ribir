@@ -66,7 +66,7 @@ impl Render for BoxDecoration {
         } else {
           painter.rect(&content_rect);
         }
-        painter.fill(None);
+        painter.fill();
       }
       self.paint_border(painter, &content_rect);
     }
@@ -125,7 +125,7 @@ impl BoxDecoration {
       } else {
         painter.rect(&rect);
       };
-      painter.stroke(None, None);
+      painter.stroke();
     } else {
       let w = rect.width();
       let h = rect.height();
@@ -257,8 +257,7 @@ impl BoxDecoration {
             }
           }
         });
-        painter.close_path();
-        painter.stroke(None, None);
+        painter.close_path(true).stroke();
       })
     }
   }
@@ -307,7 +306,7 @@ impl BoxDecoration {
 }
 
 impl BorderSide {
-  fn is_visible(&self) -> bool { self.width > 0. && self.color.alpha != 0. }
+  fn is_visible(&self) -> bool { self.width > 0. && self.color.alpha > 0 }
 }
 
 impl Border {
@@ -347,10 +346,10 @@ mod tests {
       SizedBox {
         size: SIZE,
         border: Border {
-          left: BorderSide::new(1., Color::BLACK),
-          right: BorderSide::new(2., Color::BLACK),
-          top: BorderSide::new(3., Color::BLACK),
-          bottom: BorderSide::new(4., Color::BLACK),
+          left: BorderSide::new(1., Color::BLACK.into()),
+          right: BorderSide::new(2., Color::BLACK.into()),
+          top: BorderSide::new(3., Color::BLACK.into()),
+          bottom: BorderSide::new(4., Color::BLACK.into()),
         },
       }
     };
@@ -409,6 +408,8 @@ mod tests {
     };
     let mut window = Window::wgpu_headless(w, DeviceSize::new(400, 600));
     window.render_ready();
-    assert!(window.same_as_png("../test/test_imgs/box_decoration.png"));
+    let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    expected.push("src/test_imgs/box_decoration.png");
+    assert!(window.same_as_png(expected));
   }
 }

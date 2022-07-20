@@ -14,6 +14,13 @@ pub trait Tween {
   fn tween(begin: &Self, end: &Self, p: f32) -> Self;
 }
 
+impl Tween for u8 {
+  fn tween(begin: &Self, end: &Self, p: f32) -> Self {
+    tween_check!(begin, end, p);
+    begin + ((end - begin) as f32 * p) as u8
+  }
+}
+
 impl Tween for f32 {
   fn tween(begin: &Self, end: &Self, p: f32) -> Self {
     tween_check!(begin, end, p);
@@ -117,6 +124,7 @@ impl Tween for Brush {
 #[cfg(test)]
 mod tests {
   use super::*;
+
   extern crate test;
   use test::Bencher;
   #[test]
@@ -164,7 +172,7 @@ mod tests {
   fn bench_tween_color(b: &mut Bencher) {
     b.iter(|| {
       let sum: u32 = (0..100)
-        .map(|i| Tween::tween(&Color::from_u32(i), &Color::from_u32(0xff_ff_ff), 0.3).as_u32())
+        .map(|i| Tween::tween(&Color::from_u32(i), &Color::from_u32(0xff_ff_ff), 0.3).into_u32())
         .sum();
       sum
     })
