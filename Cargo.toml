@@ -7,7 +7,6 @@ members = [
   "widget_derive/builtin",
   "algo",
   "text",
-  "animation",
 ]
 resolver = "2"
 

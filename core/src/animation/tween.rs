@@ -157,7 +157,6 @@ mod tests {
     ));
   }
 
-
   #[test]
   fn test_tween_tuple() {
     let t1 = (0., 0.5, Point::new(10., 0.));

@@ -1,4 +1,4 @@
-use crate::{prelude::*, ticker::Ticker};
+use crate::prelude::*;
 use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
@@ -38,11 +38,12 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
+  pub fn animate_store(&mut self) -> &mut AnimationStore { &mut self.ctx.animations_store }
+
+  #[inline]
   pub(crate) fn new(parent: Option<WidgetId>, ctx: &'a mut Context) -> Self {
     Self { parent, default_theme: None, ctx }
   }
-
-  pub fn ticker(&mut self) -> Ticker { self.ctx.ticker_provider.ticker() }
 }
 
 #[cfg(test)]

@@ -106,7 +106,7 @@ impl BuiltinFieldWidgets {
         let ty = Ident::new(ty_name, span).into();
 
         let fields = &info.0;
-        let gen = WidgetGen::new(&ty, &name, fields);
+        let gen = WidgetGen::new(&ty, &name, fields.iter());
         let tokens = gen.gen_widget_tokens(ctx);
 
         (name, tokens)

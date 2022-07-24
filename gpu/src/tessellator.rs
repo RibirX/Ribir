@@ -530,7 +530,7 @@ mod tests {
 
     fn draw_triangles(&mut self, data: TriangleLists) { self(data) }
 
-    fn end_frame<'a>(&mut self, cancel: bool) {}
+    fn end_frame(&mut self, _: bool) {}
 
     fn capture(&self, _: crate::CaptureCallback) -> Result<(), Box<dyn Error>> { Ok(()) }
 

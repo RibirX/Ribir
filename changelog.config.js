@@ -30,7 +30,6 @@ module.exports = {
     "gpu",
     "text",
     "algo",
-    "animation",
     "*"
   ],
   "types": {

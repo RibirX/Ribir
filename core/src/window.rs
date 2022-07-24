@@ -1,6 +1,6 @@
-use std::error::Error;
+use std::{error::Error, time::Instant};
 
-use crate::{context::Context, events::dispatcher::Dispatcher, prelude::*};
+use crate::{context::Context, events::dispatcher::Dispatcher, prelude::*, ticker::FrameMsg};
 
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
@@ -97,7 +97,7 @@ impl Window {
   /// the correct position.
   pub fn render_ready(&mut self) -> bool {
     let Self { raw_window, context, dispatcher, .. } = self;
-    context.trigger_ticker();
+
     if context.is_dirty() {
       context.tree_repair();
 
@@ -108,9 +108,11 @@ impl Window {
         reorder,
         typography_store,
         font_db,
+        frame_ticker,
         ..
       } = context;
 
+      frame_ticker.emit(FrameMsg::Ready(Instant::now()));
       let wnd_size = raw_window.inner_size();
       layout_store.layout(
         wnd_size,
@@ -124,6 +126,8 @@ impl Window {
       if context.generator_store.is_dirty() {
         dispatcher.focus_mgr.update(context);
       }
+
+      context.frame_ticker.emit(FrameMsg::Finish);
       true
     } else {
       false

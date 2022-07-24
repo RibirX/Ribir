@@ -15,14 +15,15 @@ gpu = {path = "../gpu", version = "*"}
 indextree = "4.3.1"
 lazy_static = "1.4.0"
 log = "0.4.8"
+lyon_geom = "0.17.7"
 painter = {path = "../painter", version = "*"}
+path-clean = "0.1.0"
 png = {version = "0.17.3", optional = true}
 rxrust = "1.0.0-alpha.2"
 smallvec = "1.8.0"
 text = {path = "../text"}
 widget_derive = {path = "../widget_derive"}
 winit = "0.26.1"
-path-clean = "0.1.0"
 
 [dependencies.blake3]
 features = ["rayon"]

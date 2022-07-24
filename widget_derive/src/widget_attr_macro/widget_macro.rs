@@ -228,7 +228,7 @@ impl WidgetMacro {
         self
           .animations
           .as_ref()
-          .map(|a| a.named_objects_def_tokens_iter())
+          .map(|a| a.named_objects_def_tokens_iter(ctx))
           .into_iter()
           .flatten(),
       )

@@ -12,16 +12,14 @@ use syn::{spanned::Spanned, Ident, Path};
 
 use super::{upstream_tokens, DeclareField};
 
-pub struct WidgetGen<'a> {
+pub struct WidgetGen<'a, F> {
   ty: &'a Path,
   name: &'a Ident,
-  fields: &'a [DeclareField],
+  fields: F,
 }
 
-impl<'a> WidgetGen<'a> {
-  pub fn new(ty: &'a Path, name: &'a Ident, fields: &'a [DeclareField]) -> Self {
-    Self { ty, name, fields }
-  }
+impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
+  pub fn new(ty: &'a Path, name: &'a Ident, fields: F) -> Self { Self { ty, name, fields } }
 
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     if is_expr_keyword(self.ty) {
@@ -37,11 +35,11 @@ impl<'a> WidgetGen<'a> {
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
 
     let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
-    let fields_tokens = self.fields.iter().map(|f| f.field_tokens(ty));
+    let fields_tokens = self.fields.clone().map(|f| f.field_tokens(ty));
     let build_widget = quote_spanned! { ty.span() =>
       let #name = <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful;
     };
-    let fields_follow = fields.iter().filter_map(|f| self.field_follow_tokens(f));
+    let fields_follow = fields.clone().filter_map(|f| self.field_follow_tokens(f));
 
     quote! {
 
@@ -52,7 +50,7 @@ impl<'a> WidgetGen<'a> {
 
   fn expr_widget_token(&self) -> TokenStream {
     let Self { ty, name, fields } = self;
-    let expr_field = fields.last().unwrap();
+    let expr_field = fields.clone().last().unwrap();
     assert_eq!(expr_field.member, EXPR_FIELD);
 
     let DeclareField {
@@ -121,8 +119,7 @@ impl<'a> WidgetGen<'a> {
     ctx.is_used(self.name)
       // or its fields follow others
       ||  self
-      .fields
-      .iter()
+      .fields.clone()
       .any(|f| f.used_name_info.directly_used_widgets().is_some())
   }
 }

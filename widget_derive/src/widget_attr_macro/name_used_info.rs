@@ -118,10 +118,6 @@ impl ScopeUsedInfo {
     }
   }
 
-  pub fn move_capture_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
-    self.filter_widget(|info| info.used_type.contains(UsedType::MOVE_CAPTURE))
-  }
-
   pub fn directly_used_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
     self.filter_widget(|info| info.used_type.contains(UsedType::USED))
   }

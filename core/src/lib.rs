@@ -1,12 +1,5 @@
-#![feature(
-  test,
-  decl_macro,
-  marker_trait_attr,
-  min_specialization,
-  derive_default_enum,
-  drain_filter
-)]
-#![allow(incomplete_features)]
+#![feature(test, decl_macro, marker_trait_attr, min_specialization, drain_filter)]
+
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;

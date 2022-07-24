@@ -4,8 +4,10 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use crate::prelude::{widget_tree::WidgetTree, EventCommon, QueryOrder, Widget, WidgetId};
-use crate::ticker::TickerProvider;
+use crate::prelude::{
+  widget_tree::WidgetTree, AnimationStore, EventCommon, QueryOrder, Widget, WidgetId,
+};
+use crate::ticker::FrameTicker;
 
 use painter::{PaintCommand, Painter};
 mod painting_context;
@@ -37,8 +39,9 @@ pub(crate) struct Context {
   pub shaper: TextShaper,
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
-  pub(crate) generator_store: generator_store::GeneratorStore,
-  pub ticker_provider: TickerProvider,
+  pub generator_store: generator_store::GeneratorStore,
+  pub frame_ticker: FrameTicker,
+  pub animations_store: AnimationStore,
 }
 
 impl Context {
@@ -49,7 +52,8 @@ impl Context {
     let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
     let painter = Painter::new(device_scale, typography_store.clone());
     let generator_store = generator_store::GeneratorStore::default();
-    let ticker_provider = TickerProvider::default();
+    let frame_ticker = FrameTicker::default();
+    let animations_store = AnimationStore::new(frame_ticker.frame_tick_stream());
     let mut ctx = Context {
       layout_store: <_>::default(),
       widget_tree: WidgetTree::new(),
@@ -61,7 +65,8 @@ impl Context {
       reorder,
       typography_store,
       generator_store,
-      ticker_provider,
+      frame_ticker,
+      animations_store,
     };
 
     let tmp_root = ctx.widget_tree.root();
@@ -188,8 +193,6 @@ impl Context {
     });
     id.remove_subtree(self.tree_mut());
   }
-
-  pub(crate) fn trigger_ticker(&mut self) -> bool { self.ticker_provider.trigger() }
 }
 
 #[cfg(test)]
