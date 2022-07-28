@@ -1,11 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use syn::{
   bracketed,
   parse::{Parse, ParseStream},
+  punctuated::{Pair, Punctuated},
   spanned::Spanned,
-  token::{self, Brace},
+  token::{self, Brace, Comma},
   visit_mut::VisitMut,
   Expr, Ident, Path,
 };
@@ -30,7 +31,7 @@ pub struct DeclareWidget {
   brace_token: Brace,
   // the name of this widget specified by `id` attr.
   pub named: Option<Id>,
-  fields: Vec<DeclareField>,
+  fields: Punctuated<DeclareField, Comma>,
   pub builtin: BuiltinFieldWidgets,
   pub children: Vec<DeclareWidget>,
 }
@@ -105,53 +106,52 @@ impl Spanned for DeclareWidget {
 
 impl Parse for DeclareWidget {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    let path = input.parse()?;
     let content;
-    let brace_token = syn::braced!(content in input);
-    let mut named: Option<Id> = None;
-    let mut fields = vec![];
-    let mut builtin = BuiltinFieldWidgets::default();
-    let mut children = vec![];
+    let mut widget = DeclareWidget {
+      path: input.parse()?,
+      brace_token: syn::braced!(content in input),
+      named: None,
+      fields: Punctuated::default(),
+      builtin: BuiltinFieldWidgets::default(),
+      children: vec![],
+    };
     loop {
       if content.is_empty() {
         break;
       }
 
       if content.peek(Ident) && content.peek2(token::Brace) {
-        children.push(content.parse()?);
+        widget.children.push(content.parse()?);
       } else {
-        let is_id = content.peek(kw::id);
         let f: DeclareField = content.parse()?;
-        if !children.is_empty() {
+        if !widget.children.is_empty() {
           return Err(syn::Error::new(
             f.span(),
             "Field should always declare before children.",
           ));
         }
-
-        if is_id {
-          let id = Id::from_declare_field(f)?;
-          assign_uninit_field!(named, id, id)?;
-        } else if let Some(ty) = BuiltinFieldWidgets::is_builtin_field(&path, &f) {
-          builtin.fill_as_builtin_field(ty, f)?;
-        } else {
-          fields.push(f);
-        }
-
+        widget.fields.push(f);
         if !content.is_empty() {
           content.parse::<token::Comma>()?;
         }
       }
     }
 
-    Ok(DeclareWidget {
-      path,
-      brace_token,
-      named,
-      fields,
-      builtin,
-      children,
-    })
+    check_duplicate_field(&widget.fields)?;
+    pick_fields_by(&mut widget.fields, |p| {
+      let p = if p.value().is_id_field() {
+        widget.named = Some(Id::from_field_pair(p)?);
+        None
+      } else if let Some(ty) = BuiltinFieldWidgets::is_builtin_field(&widget.path, p.value()) {
+        widget.builtin.fill_as_builtin_field(ty, p.into_value());
+        None
+      } else {
+        Some(p)
+      };
+      Ok(p)
+    })?;
+
+    Ok(widget)
   }
 }
 
@@ -206,6 +206,11 @@ impl Parse for DeclareField {
 
 impl DeclareField {
   pub fn used_part(&self) -> Option<UsedPart> { self.used_name_info.user_part(Scope::Field(self)) }
+
+  pub fn is_id_field(&self) -> bool {
+    let mem = &self.member;
+    syn::parse2::<kw::id>(quote! {#mem}).is_ok()
+  }
 }
 
 pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> {
@@ -386,4 +391,34 @@ pub fn upstream_tokens<'a>(used_widgets: impl Iterator<Item = &'a Ident> + Clone
   } else {
     quote! { #(#upstream)* }
   }
+}
+
+pub fn check_duplicate_field(fields: &Punctuated<DeclareField, Comma>) -> syn::Result<()> {
+  let mut sets = HashSet::<&Ident, ahash::RandomState>::default();
+  for f in fields {
+    if !sets.insert(&f.member) {
+      return Err(syn::Error::new(
+        f.member.span(),
+        format!("`{}` declare more than once", f.member.to_string()).as_str(),
+      ));
+    }
+  }
+  Ok(())
+}
+
+pub fn pick_fields_by(
+  fields: &mut Punctuated<DeclareField, Comma>,
+  mut f: impl FnMut(Pair<DeclareField, Comma>) -> syn::Result<Option<Pair<DeclareField, Comma>>>,
+) -> syn::Result<()> {
+  let coll = std::mem::take(fields);
+  for p in coll.into_pairs() {
+    if let Some(p) = f(p)? {
+      let (field, comma) = p.into_tuple();
+      fields.push(field);
+      if let Some(comma) = comma {
+        fields.push_punct(comma);
+      }
+    }
+  }
+  Ok(())
 }

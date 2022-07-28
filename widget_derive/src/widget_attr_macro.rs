@@ -3,7 +3,8 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
-  token, Ident,
+  token::{self, Comma},
+  Ident,
 };
 
 use crate::{
@@ -61,6 +62,7 @@ pub struct Id {
   pub id_token: kw::id,
   pub colon_token: token::Colon,
   pub name: Ident,
+  pub tail_comma: Option<token::Comma>,
 }
 
 impl Parse for Id {
@@ -69,6 +71,7 @@ impl Parse for Id {
       id_token: input.parse()?,
       colon_token: input.parse()?,
       name: input.parse()?,
+      tail_comma: input.parse()?,
     })
   }
 }
@@ -82,7 +85,8 @@ impl ToTokens for Id {
 }
 
 impl Id {
-  pub fn from_declare_field(field: DeclareField) -> syn::Result<Id> {
+  pub fn from_field_pair(p: syn::punctuated::Pair<DeclareField, Comma>) -> syn::Result<Id> {
+    let field = p.value();
     if field.skip_nc.is_some() {
       return Err(syn::Error::new(
         field.skip_nc.span(),
@@ -96,7 +100,7 @@ impl Id {
       ));
     }
 
-    Ok(syn::parse_quote! {#field})
+    Ok(syn::parse_quote! {#p})
   }
 }
 

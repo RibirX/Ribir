@@ -1,5 +1,5 @@
 use super::{
-  animations::{Animate, State, Transition},
+  animations::{Animate, Transition},
   dataflows::Dataflow,
   widget_state_ref, DeclareField,
 };
@@ -37,7 +37,6 @@ pub enum Scope<'a> {
   Field(&'a DeclareField),
   DataFlow(&'a Dataflow),
   Animate(&'a Animate),
-  State(&'a State),
   Transition(&'a Transition),
 }
 

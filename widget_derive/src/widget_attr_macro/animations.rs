@@ -15,9 +15,12 @@ use crate::widget_attr_macro::Id;
 
 use super::{
   capture_widget,
-  declare_widget::{assign_uninit_field, BuiltinFieldWidgets, WidgetGen, FIELD_WIDGET_TYPE},
-  ribir_suffix_variable, ribir_variable, widget_state_ref, DeclareCtx, NameUsed, Scope,
-  ScopeUsedInfo, UsedPart, UsedType, BUILD_CTX,
+  declare_widget::{
+    assign_uninit_field, check_duplicate_field, pick_fields_by, BuiltinFieldWidgets, WidgetGen,
+    FIELD_WIDGET_TYPE,
+  },
+  ribir_suffix_variable, ribir_variable, DeclareCtx, NameUsed, Scope, ScopeUsedInfo, UsedPart,
+  UsedType, BUILD_CTX,
 };
 use super::{declare_widget::DeclareField, kw};
 
@@ -25,7 +28,6 @@ pub struct Animations {
   animations_token: kw::animations,
   brace_token: token::Brace,
   animates_def: Vec<Animate>,
-  states_def: Vec<State>,
   transitions_def: Vec<Transition>,
   triggers: Punctuated<Trigger, token::Comma>,
 }
@@ -34,10 +36,8 @@ pub struct Animations {
 pub struct State {
   state_token: kw::State,
   _brace_token: token::Brace,
-  // todo: state should not support shared across id, share state, it's useless.
-  id: Option<Id>,
-  fields: Punctuated<PathField, token::Comma>,
-  used_name_info: ScopeUsedInfo,
+  fields: Punctuated<StateField, token::Comma>,
+  expr_used: ScopeUsedInfo,
 }
 
 #[derive(Debug)]
@@ -67,14 +67,12 @@ mod animate_kw {
 }
 
 #[derive(Debug)]
-enum StateExpr {
-  State(State),
-  Expr(syn::Expr),
-}
-#[derive(Debug)]
 struct FromStateField {
-  expr: StateExpr,
+  _from_token: animate_kw::from,
+  _colon_token: token::Colon,
+  expr: State,
 }
+
 #[derive(Debug)]
 enum TransitionExpr {
   Transition(Transition),
@@ -82,6 +80,8 @@ enum TransitionExpr {
 }
 #[derive(Debug)]
 struct TransitionField {
+  _transition_token: animate_kw::transition,
+  _colon_token: Option<token::Colon>,
   expr: TransitionExpr,
 }
 
@@ -107,7 +107,7 @@ struct MemberPath {
 }
 
 #[derive(Debug)]
-struct PathField {
+struct StateField {
   path: MemberPath,
   _colon_token: token::Colon,
   expr: Expr,
@@ -120,86 +120,28 @@ pub struct SimpleField {
   pub(crate) expr: Expr,
 }
 
-struct SimpleStruct<KW, F> {
-  name: KW,
-  brace_token: token::Brace,
-  id: Option<Id>,
-  fields: Punctuated<F, token::Comma>,
-}
-
-fn widget_from_field_name(widget: &Ident, field: &Ident) -> Ident {
-  if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(field) {
-    let mut w = widget.clone();
-    w.set_span(w.span().join(suffix.span()).unwrap());
-    ribir_suffix_variable(&w, &suffix.to_string())
-  } else {
-    widget.clone()
-  }
-}
-
-impl<KW, F> Parse for SimpleStruct<KW, F>
-where
-  KW: Parse,
-  F: Parse,
-{
-  fn parse(input: ParseStream) -> syn::Result<Self> {
+impl Parse for Transition {
+  fn parse(input: ParseStream) -> Result<Self> {
     let content;
-    let mut res = SimpleStruct {
-      name: input.parse()?,
+    let mut res = Self {
+      transition_token: input.parse()?,
       brace_token: braced!( content in input),
       id: None,
-      fields: Punctuated::new(),
+      fields: content.parse_terminated(DeclareField::parse)?,
+      used_name_info: <_>::default(),
     };
 
-    loop {
-      if content.is_empty() {
-        break;
-      }
-      if content.peek(kw::id) {
-        let id: Id = content.parse()?;
-        assign_uninit_field!(res.id, id)?;
-        if content.is_empty() {
-          break;
-        }
-        content.parse::<token::Comma>()?;
+    check_duplicate_field(&res.fields)?;
+    pick_fields_by(&mut res.fields, |p| {
+      if p.value().is_id_field() {
+        res.id = Some(Id::from_field_pair(p)?);
+        Ok(None)
       } else {
-        let value = content.parse()?;
-        res.fields.push_value(value);
-        if content.is_empty() {
-          break;
-        }
-        let punct = content.parse()?;
-        res.fields.push_punct(punct);
+        Ok(Some(p))
       }
-    }
+    })?;
 
     Ok(res)
-  }
-}
-
-impl From<SimpleStruct<kw::State, PathField>> for State {
-  fn from(s: SimpleStruct<kw::State, PathField>) -> Self {
-    let SimpleStruct { id, name, brace_token, fields } = s;
-    State {
-      state_token: name,
-      _brace_token: brace_token,
-      id,
-      fields,
-      used_name_info: <_>::default(),
-    }
-  }
-}
-
-impl From<SimpleStruct<kw::Transition, DeclareField>> for Transition {
-  fn from(s: SimpleStruct<kw::Transition, DeclareField>) -> Self {
-    let SimpleStruct { id, name, brace_token, fields } = s;
-    Transition {
-      transition_token: name,
-      brace_token,
-      id,
-      fields,
-      used_name_info: <_>::default(),
-    }
   }
 }
 
@@ -210,7 +152,6 @@ impl Parse for Animations {
     let brace_token = braced!(content in input);
 
     let mut animates_def: Vec<Animate> = vec![];
-    let mut states_def: Vec<State> = vec![];
     let mut transitions_def: Vec<Transition> = vec![];
     let mut triggers = Punctuated::new();
 
@@ -226,12 +167,6 @@ impl Parse for Animations {
           return Err(Error::new(animate.animate_token.span(), "miss id"));
         }
         animates_def.push(animate);
-      } else if lk.peek(kw::State) {
-        let state = content.parse::<State>()?;
-        if state.id.is_none() {
-          return Err(Error::new(state.state_token.span(), "miss id"));
-        }
-        states_def.push(state);
       } else if lk.peek(kw::Transition) {
         let transition = content.parse::<Transition>()?;
         if transition.id.is_none() {
@@ -250,7 +185,6 @@ impl Parse for Animations {
       animations_token,
       brace_token,
       animates_def,
-      states_def,
       transitions_def,
       triggers,
     })
@@ -267,15 +201,41 @@ impl Spanned for Animations {
   }
 }
 
-impl Parse for State {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(input.parse::<SimpleStruct<_, _>>()?.into())
+impl MemberPath {
+  fn on_real_widget_name(&self, mut cb: impl FnMut(&Ident)) {
+    let Self { widget, member, .. } = self;
+    if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(member) {
+      cb(&ribir_suffix_variable(widget, suffix))
+    } else {
+      cb(widget)
+    }
   }
 }
 
-impl Parse for Transition {
+impl State {
+  // return the capture tokens of the widgets the state want to modify.
+  fn capture_target_tokens(&self) -> TokenStream {
+    let mut tokens = quote! {};
+    self.fields.iter().for_each(|f| {
+      f.path
+        .on_real_widget_name(|w| capture_widget(w).to_tokens(&mut tokens))
+    });
+    tokens
+  }
+}
+
+impl Parse for State {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(input.parse::<SimpleStruct<_, _>>()?.into())
+    let state_token = input.parse()?;
+    let content;
+    let _brace_token = braced!(content in input);
+
+    Ok(Self {
+      state_token,
+      _brace_token,
+      fields: Punctuated::parse_separated_nonempty(&content)?,
+      expr_used: <_>::default(),
+    })
   }
 }
 
@@ -346,39 +306,28 @@ impl Parse for SimpleField {
 
 impl Parse for FromStateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    let from_token: animate_kw::from = input.parse()?;
-    let colon_token: Option<token::Colon> = input.parse()?;
-    let expr = if colon_token.is_some() {
-      input.parse()?
-    } else {
-      parse_quote!(#from_token)
-    };
-
-    Ok(FromStateField { expr })
-  }
-}
-
-impl Parse for StateExpr {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    let expr = if input.peek(kw::State) {
-      StateExpr::State(input.parse()?)
-    } else {
-      StateExpr::Expr(input.parse()?)
-    };
-    Ok(expr)
+    Ok(FromStateField {
+      _from_token: input.parse()?,
+      _colon_token: input.parse()?,
+      expr: input.parse()?,
+    })
   }
 }
 
 impl Parse for TransitionField {
   fn parse(input: ParseStream) -> Result<Self> {
-    let transition_token: animate_kw::transition = input.parse()?;
-    let colon_token: Option<token::Colon> = input.parse()?;
-    let expr = if colon_token.is_some() {
+    let _transition_token: animate_kw::transition = input.parse()?;
+    let _colon_token: Option<token::Colon> = input.parse()?;
+    let expr = if _colon_token.is_some() {
       input.parse()?
     } else {
-      parse_quote! {#transition_token}
+      parse_quote! {#_transition_token}
     };
-    Ok(TransitionField { expr })
+    Ok(TransitionField {
+      _transition_token,
+      _colon_token,
+      expr,
+    })
   }
 }
 
@@ -403,7 +352,7 @@ impl Parse for MemberPath {
   }
 }
 
-impl Parse for PathField {
+impl Parse for StateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     Ok(Self {
       path: input.parse()?,
@@ -490,21 +439,6 @@ impl ToTokens for FromStateField {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) { self.expr.to_tokens(tokens); }
 }
 
-impl ToTokens for StateExpr {
-  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    match self {
-      StateExpr::State(s) => {
-        if let Some(Id { name, .. }) = s.id.as_ref() {
-          name.to_tokens(tokens);
-        } else {
-          s.to_tokens(tokens);
-        }
-      }
-      StateExpr::Expr(e) => e.to_tokens(tokens),
-    }
-  }
-}
-
 impl TransitionField {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream, ctx: &DeclareCtx) {
     match &self.expr {
@@ -535,87 +469,50 @@ impl Spanned for TransitionField {
 
 impl ToTokens for State {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let Self {
-      state_token, fields, used_name_info, ..
-    } = self;
+    let Self { state_token, fields, expr_used, .. } = self;
 
-    let state_span = state_token.span();
-
-    // todo: every field should have name widget
-    let used_widgets = used_name_info.directly_used_widgets().into_iter().flatten();
-
-    let refs = used_widgets.clone().map(widget_state_ref);
-    let captures = used_widgets.clone().map(capture_widget);
-
+    // because wrap by move closure, so all widgets should as capture widgets.
+    let init_capture = expr_used.all_widgets().unwrap().map(capture_widget);
     let init_value = fields.iter().map(|f| &f.expr);
-    let widgets = fields
-      .iter()
-      .map(|f| widget_from_field_name(&f.path.widget, &f.path.member));
+    let init_refs = expr_used.refs_tokens().into_iter().flatten();
 
-    let widgets2 = widgets.clone();
-    let members = fields.iter().map(|f| &f.path.member);
-    let members2 = members.clone();
+    let target_captures = self.capture_target_tokens();
+    let target_value = fields.iter().map(
+      |StateField {
+         path: MemberPath { widget, dot_token, member, .. },
+         ..
+       }| {
+        quote! { #widget #dot_token state_ref() #dot_token #member #dot_token clone() }
+      },
+    );
+    let shallow_access = fields.iter().map(
+      |StateField {
+         path: MemberPath { widget, dot_token, member, .. },
+         ..
+       }| {
+        quote! { #widget #dot_token shallow_ref() #dot_token #member}
+      },
+    );
     let indexes = (0..fields.len()).map(syn::Index::from);
-
-    let refs1 = refs.clone();
-    let refs2 = refs.clone();
-    let refs3 = refs.clone();
-
-    let captures1 = captures.clone();
-    let captures2 = captures.clone();
-    let captures3 = captures.clone();
-
-    let (init_value, finial_value, update) = if fields.len() > 1 {
-      (
-        quote! {(#(#init_value),*)},
-        quote! { (#(#widgets2.#members2.clone()),*) },
-        quote! { #(#widgets .shallow(). #members = val.#indexes;)*},
-      )
-    } else {
-      (
-        quote! { #(#init_value),*},
-        quote! { #(#widgets2.#members2.clone()),* },
-        quote! { #(#widgets.shallow().#members = val;)*},
-      )
-    };
-
-    let mut state_tokens = quote! {
+    tokens.extend(quote_spanned! { state_token.span() =>
       AnimationState::new(
         {
-          #(#captures1)*;
+          #(#init_capture)*
           move || {
-            #(#refs1)*;
-            (#init_value)
-          }
-        },
-        {
-          #(#captures2)*;
-          move || {
-            #(#refs2)*;
-            (#finial_value)
-          }
-        },
-        {
-          #(#captures3)*;
-          move |val| {
-            #(#refs3)*;
-            #update
+            #(#init_refs)*;
+            (#(#init_value), *)
           }
         }
+        {
+          #target_captures
+          move || { #(#target_value)*}
+        },
+        {
+          #target_captures
+          move |val| { #(#shallow_access = val.#indexes;)*}
+        }
       )
-    };
-
-    state_tokens = if let Some(all) = used_name_info.all_widgets() {
-      let captures = all.map(capture_widget);
-      quote_spanned! { state_span => {
-        #(#captures)*
-        #state_tokens
-      }}
-    } else {
-      quote_spanned! { state_span => { #state_tokens }}
-    };
-
-    tokens.extend(state_tokens);
+    });
   }
 }
 
@@ -637,8 +534,6 @@ impl ToTokens for Transition {
     self.transition_token.to_tokens(tokens);
     self.brace_token.surround(tokens, |tokens| {
       self.id.to_tokens(tokens);
-      // todo: keep comma from source code.
-      token::Comma::default().to_tokens(tokens);
       self.fields.to_tokens(tokens);
     });
   }
@@ -739,7 +634,7 @@ impl Trigger {
 
 impl ToTokens for MemberPath {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    self.widget.to_tokens(tokens);
+    self.on_real_widget_name(|w| w.to_tokens(tokens));
     self.dot_token.to_tokens(tokens);
     self.member.to_tokens(tokens);
   }
@@ -759,14 +654,12 @@ impl ToTokens for SimpleField {
 pub enum AnimationObject<'a> {
   Animate(&'a Animate),
   Transition(&'a Transition),
-  State(&'a State),
 }
 
 impl DeclareCtx {
   pub fn visit_animations_mut(&mut self, animations: &mut Animations) {
     let Animations {
       animates_def,
-      states_def,
       transitions_def,
       triggers,
       ..
@@ -775,7 +668,6 @@ impl DeclareCtx {
     animates_def
       .iter_mut()
       .for_each(|a| self.visit_animate_mut(a));
-    states_def.iter_mut().for_each(|s| self.visit_state_mut(s));
     transitions_def
       .iter_mut()
       .for_each(|t| self.visit_transition_mut(t));
@@ -784,15 +676,7 @@ impl DeclareCtx {
 
   fn visit_animate_mut(&mut self, animate: &mut Animate) {
     let Animate { from, transition, used_name_info, .. } = animate;
-    match &mut from.expr {
-      StateExpr::State(state) => {
-        self.visit_state_mut(state);
-        if let Some(Id { name, .. }) = state.id.as_ref() {
-          self.add_used_widget(name.clone(), UsedType::USED);
-        }
-      }
-      StateExpr::Expr(expr) => self.visit_expr_mut(expr),
-    };
+    self.visit_state_mut(&mut from.expr);
     match &mut transition.expr {
       TransitionExpr::Transition(t) => {
         self.visit_transition_mut(t);
@@ -806,11 +690,17 @@ impl DeclareCtx {
   }
 
   fn visit_state_mut(&mut self, state: &mut State) {
-    state.fields.iter_mut().for_each(|p| {
-      self.visit_member_path(&mut p.path);
-      self.visit_expr_mut(&mut p.expr);
-    });
-    state.used_name_info = self.take_current_used_info();
+    state
+      .fields
+      .iter_mut()
+      .for_each(|p| self.visit_expr_mut(&mut p.expr));
+
+    state.expr_used = self.clone_current_used_info();
+
+    state
+      .fields
+      .iter_mut()
+      .for_each(|p| self.visit_member_path(&mut p.path));
   }
 
   fn visit_transition_mut(&mut self, transition: &mut Transition) {
@@ -837,10 +727,9 @@ impl DeclareCtx {
   }
 
   fn visit_member_path(&mut self, path: &mut MemberPath) {
-    self.add_used_widget(
-      widget_from_field_name(&path.widget, &path.member),
-      UsedType::USED,
-    );
+    path.on_real_widget_name(|w| {
+      self.add_used_widget(w.clone(), UsedType::USED);
+    })
   }
 }
 
@@ -859,7 +748,6 @@ impl Animations {
       match o {
         AnimationObject::Animate(a) => a.to_tokens(&mut tokens, ctx),
         AnimationObject::Transition(t) => t.gen_tokens(&mut tokens, ctx),
-        AnimationObject::State(s) => s.to_tokens(&mut tokens),
       };
       (o.name().clone(), tokens)
     })
@@ -874,22 +762,10 @@ impl Animations {
 
   pub fn named_objects_iter(&self) -> impl Iterator<Item = AnimationObject> + '_ {
     fn named_objects_in_animate<'a>(a: &'a Animate) -> impl Iterator<Item = AnimationObject> {
-      let Animate { id, from, transition, .. } = a;
+      let Animate { id, transition, .. } = a;
       id.as_ref()
         .map(|_| AnimationObject::Animate(a))
         .into_iter()
-        .chain(
-          if let FromStateField {
-            expr: StateExpr::State(s @ State { id: Some(_), .. }),
-            ..
-          } = from
-          {
-            Some(AnimationObject::State(s))
-          } else {
-            None
-          }
-          .into_iter(),
-        )
         .chain(
           if let TransitionField {
             expr: TransitionExpr::Transition(t @ Transition { id: Some(_), .. }),
@@ -908,7 +784,6 @@ impl Animations {
       .animates_def
       .iter()
       .flat_map(named_objects_in_animate)
-      .chain(self.states_def.iter().map(AnimationObject::State))
       .chain(self.transitions_def.iter().map(AnimationObject::Transition))
       .chain(
         self
@@ -937,7 +812,6 @@ impl<'a> AnimationObject<'a> {
     let id = match self {
       AnimationObject::Animate(a) => a.id.as_ref(),
       AnimationObject::Transition(t) => t.id.as_ref(),
-      AnimationObject::State(s) => s.id.as_ref(),
     };
     &id.unwrap().name
   }
@@ -946,7 +820,6 @@ impl<'a> AnimationObject<'a> {
     match self {
       AnimationObject::Animate(a) => a.used_part(),
       AnimationObject::Transition(t) => t.used_part(),
-      AnimationObject::State(s) => s.used_part(),
     }
   }
 }
@@ -955,10 +828,6 @@ impl Animate {
   pub fn used_part(&self) -> Option<UsedPart> {
     self.used_name_info.user_part(Scope::Animate(self))
   }
-}
-
-impl State {
-  pub fn used_part(&self) -> Option<UsedPart> { self.used_name_info.user_part(Scope::State(self)) }
 }
 
 impl Transition {

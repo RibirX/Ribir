@@ -5,7 +5,6 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote_spanned;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, HashMap};
-use syn::spanned::Spanned;
 
 use crate::{
   error::DeclareError,
@@ -153,26 +152,14 @@ impl BuiltinFieldWidgets {
       .cloned()
   }
 
-  pub fn fill_as_builtin_field(
-    &mut self,
-    widget_ty: &'static str,
-    field: DeclareField,
-  ) -> syn::Result<()> {
+  pub fn fill_as_builtin_field(&mut self, widget_ty: &'static str, field: DeclareField) {
     assert_eq!(
       FIELD_WIDGET_TYPE.get(field.member.to_string().as_str()),
       Some(&widget_ty)
     );
 
     let info = self.widgets.entry(widget_ty).or_default();
-
-    if info.0.iter().any(|f| f.member == field.member) {
-      return Err(syn::Error::new(
-        field.span(),
-        format!("field `{}` specified more than once", stringify!($name)).as_str(),
-      ));
-    }
     info.0.push(field);
-    Ok(())
   }
 
   pub fn is_empty(&self) -> bool { self.widgets.is_empty() }
