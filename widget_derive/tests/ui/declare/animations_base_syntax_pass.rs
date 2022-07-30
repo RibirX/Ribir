@@ -7,16 +7,14 @@ fn main() {
       size: Size::zero()
     }
     animations {
-      State {
-        id: state1,
-        sized_box.size: Size::new(10., 10.),
-      }
       Transition {
         id: transition1,
       }
       Animate {
         id: animate1,
-        from: state1,
+        from: State {
+          sized_box.size: Size::new(10., 10.),
+        },
         transition: transition1,
       }
       sized_box.size: animate1

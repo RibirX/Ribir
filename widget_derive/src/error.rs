@@ -6,8 +6,8 @@ use quote::quote;
 use syn::Ident;
 
 #[derive(Debug)]
-pub struct UsedInfo {
-  pub widget: Ident,
+pub struct CircleUsedPath {
+  pub obj: Ident,
   pub member: Option<Ident>,
   pub used_widget: Ident,
   pub used_info: NameUsedInfo,
@@ -16,8 +16,8 @@ pub struct UsedInfo {
 #[derive(Debug)]
 pub enum DeclareError {
   DuplicateID([Ident; 2]),
-  CircleInit(Box<[UsedInfo]>),
-  CircleFollow(Box<[UsedInfo]>),
+  CircleInit(Box<[CircleUsedPath]>),
+  CircleFollow(Box<[CircleUsedPath]>),
   DataFlowNoDepends(Span),
   KeyDependsOnOther {
     key: Span,
@@ -116,21 +116,21 @@ impl DeclareError {
 
 // return a tuple compose by the string display of path, the path follow spans
 // and the spans of where `#[skip_nc]` can be added.
-fn path_info(path: &[UsedInfo]) -> (String, Vec<Span>, Vec<Span>) {
+fn path_info(path: &[CircleUsedPath]) -> (String, Vec<Span>, Vec<Span>) {
   let msg = path
     .iter()
     .map(|info| {
       if let Some(m) = info.member.as_ref() {
-        format!("{}.{} ～> {} ", info.widget, m, info.used_widget)
+        format!("{}.{} ～> {} ", info.obj, m, info.used_widget)
       } else {
-        format!("{} ～> {} ", info.widget, info.used_widget)
+        format!("{} ～> {} ", info.obj, info.used_widget)
       }
     })
     .collect::<Vec<_>>()
     .join(", ");
 
   let spans = path.iter().fold(vec![], |mut res, info| {
-    res.push(info.widget.span().unwrap());
+    res.push(info.obj.span().unwrap());
     if let Some(m) = info.member.as_ref() {
       res.push(m.span().unwrap());
     }
@@ -151,7 +151,7 @@ fn path_info(path: &[UsedInfo]) -> (String, Vec<Span>, Vec<Span>) {
           .used_info
           .spans
           .iter()
-          .fold(info.widget.span(), |s1, s2| s2.join(s1).unwrap())
+          .fold(info.obj.span(), |s1, s2| s2.join(s1).unwrap())
           .unwrap()
       }
     })

@@ -22,7 +22,7 @@ pub use widget_gen::WidgetGen;
 use super::{
   kw,
   widget_macro::{is_expr_keyword, IfGuard, EXPR_FIELD, EXPR_WIDGET},
-  DeclareCtx, Id, NameUsed, Result, Scope, ScopeUsedInfo, UsedPart,
+  DeclareCtx, Id, ObjectUsed, Result, ScopeUsedInfo, UsedPart,
 };
 
 #[derive(Debug)]
@@ -205,7 +205,11 @@ impl Parse for DeclareField {
 }
 
 impl DeclareField {
-  pub fn used_part(&self) -> Option<UsedPart> { self.used_name_info.user_part(Scope::Field(self)) }
+  pub fn used_part(&self) -> Option<UsedPart> {
+    self
+      .used_name_info
+      .used_part(Some(&self.member), self.skip_nc.is_some())
+  }
 
   pub fn is_id_field(&self) -> bool {
     let mem = &self.member;
@@ -309,13 +313,13 @@ impl DeclareWidget {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  pub fn analyze_object_dependencies(&self) -> BTreeMap<Ident, NameUsed> {
-    let mut follows: BTreeMap<Ident, NameUsed> = BTreeMap::new();
+  pub fn analyze_object_dependencies(&self) -> BTreeMap<Ident, ObjectUsed> {
+    let mut follows: BTreeMap<Ident, ObjectUsed> = BTreeMap::new();
     self.traverses_widget().for_each(|w| {
       if let Some(name) = w.name() {
         w.builtin.collect_builtin_widget_follows(name, &mut follows);
 
-        let w_follows: NameUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
+        let w_follows: ObjectUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
 
         if !w_follows.is_empty() {
           follows.insert(name.clone(), w_follows);

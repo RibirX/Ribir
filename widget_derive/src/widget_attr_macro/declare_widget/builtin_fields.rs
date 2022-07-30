@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::{
   error::DeclareError,
-  widget_attr_macro::{ribir_suffix_variable, DeclareCtx, NameUsed},
+  widget_attr_macro::{ribir_suffix_variable, DeclareCtx, ObjectUsed},
 };
 
 use super::{widget_gen::WidgetGen, DeclareField};
@@ -62,10 +62,10 @@ impl BuiltinFieldWidgets {
   pub fn collect_builtin_widget_follows<'a>(
     &'a self,
     host: &Ident,
-    follows_info: &mut BTreeMap<Ident, NameUsed<'a>>,
+    follows_info: &mut BTreeMap<Ident, ObjectUsed<'a>>,
   ) {
     self.widgets.iter().for_each(|(name, info)| {
-      let follows: NameUsed = info.0.iter().filter_map(|f| f.used_part()).collect();
+      let follows: ObjectUsed = info.0.iter().filter_map(|f| f.used_part()).collect();
       if !follows.is_empty() {
         let name = ribir_suffix_variable(host, BUILTIN_WIDGET_SUFFIX.get(name).unwrap());
         follows_info.insert(name, follows);

@@ -7,10 +7,7 @@ use syn::{
   Ident,
 };
 
-use crate::{
-  error::{Result, UsedInfo},
-  widget_attr_macro::declare_widget::DeclareField,
-};
+use crate::{error::Result, widget_attr_macro::declare_widget::DeclareField};
 mod declare_ctx;
 pub use declare_ctx::*;
 mod name_used_info;

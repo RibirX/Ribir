@@ -1,6 +1,6 @@
 use super::{
   declare_widget::{try_parse_skip_nc, upstream_tokens, SkipNcAttr},
-  kw, skip_nc_assign, DeclareCtx, NameUsed, Scope, ScopeUsedInfo, UsedPart,
+  kw, skip_nc_assign, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedPart,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -102,7 +102,7 @@ pub struct DataFlowExpr {
 }
 
 impl Dataflows {
-  pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, NameUsed<'a>>) {
+  pub fn analyze_data_flow_follows<'a>(&'a self, follows: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
     self.flows.iter().for_each(|df| {
       if let Some(widgets) = df.to.used_name_info.all_widgets() {
         let part = df.as_depend_part();
@@ -114,7 +114,7 @@ impl Dataflows {
               .chain(std::iter::once(part.clone()))
               .collect();
           } else {
-            follows.insert(name.clone(), NameUsed::from_single_part(part.clone()));
+            follows.insert(name.clone(), ObjectUsed::from_single_part(part.clone()));
           }
         })
       }
@@ -144,7 +144,7 @@ impl Dataflow {
     self
       .from
       .used_name_info
-      .user_part(Scope::DataFlow(self))
+      .used_part(None, self.skip_nc.is_some())
       .expect("data flow must depends on some widget")
   }
 }
