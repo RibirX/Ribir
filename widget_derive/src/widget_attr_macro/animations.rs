@@ -3,7 +3,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   braced,
   parse::{Parse, ParseStream},
-  parse_quote,
+  parse_quote, parse_quote_spanned,
   punctuated::Punctuated,
   spanned::Spanned,
   token,
@@ -35,7 +35,7 @@ pub struct Animations {
 #[derive(Debug)]
 pub struct State {
   state_token: kw::State,
-  _brace_token: token::Brace,
+  brace_token: token::Brace,
   fields: Punctuated<StateField, token::Comma>,
   expr_used: ScopeUsedInfo,
 }
@@ -226,7 +226,7 @@ impl Parse for State {
     let content;
     let state = Self {
       state_token: input.parse()?,
-      _brace_token: braced!(content in input),
+      brace_token: braced!(content in input),
       fields: Punctuated::parse_terminated(&content)?,
       expr_used: <_>::default(),
     };
@@ -404,11 +404,13 @@ impl Animate {
     transition.gen_tokens(&mut transition_token, ctx);
     tokens.extend(quote_spanned! { animate_span =>
       let #name = #build_ctx.animate_store().register(
-        <#animate_token<_, _, _, _, _> as Declare>::builder()
-          .from(#from)
-          .transition(#transition_token)
-          .build(#build_ctx)
-      )
+        Box::new(
+          <#animate_token<_, _, _, _, _> as Declare>::builder()
+            .from(#from)
+            .transition(#transition_token)
+            .build(#build_ctx)
+          )
+      );
     });
   }
 }
@@ -468,14 +470,26 @@ impl Spanned for TransitionField {
 
 impl ToTokens for State {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let Self { state_token, fields, expr_used, .. } = self;
+    let Self {
+      state_token,
+      fields,
+      expr_used,
+      brace_token,
+    } = self;
+    let state_span = state_token.span.join(brace_token.span).unwrap();
 
-    let init_value = fields.iter().map(|f| &f.expr);
+    let init_expr = fields.iter().map(|f| &f.expr);
+
+    let init_value = if fields.len() > 1 {
+      quote! { (#(#init_expr), *)}
+    } else {
+      quote! { #(#init_expr), *}
+    };
     let init_refs = expr_used.refs_tokens().into_iter().flatten();
     let mut init_fn = quote! {
       move || {
         #(#init_refs)*;
-        (#(#init_value), *)
+        #init_value
       }
     };
     // because wrap by move closure, so all widgets should as capture widgets.
@@ -496,7 +510,7 @@ impl ToTokens for State {
         quote! { #widget #dot_token state_ref() #dot_token #member #dot_token clone() }
       },
     );
-    let shallow_access = fields.iter().map(
+    let mut shallow_access = fields.iter().map(
       |StateField {
          path: MemberPath { widget, dot_token, member, .. },
          ..
@@ -504,9 +518,15 @@ impl ToTokens for State {
         quote! { #widget #dot_token shallow_ref() #dot_token #member}
       },
     );
-    let indexes = (0..fields.len()).map(syn::Index::from);
-    tokens.extend(quote_spanned! { state_token.span() =>
-      AnimationState::new(
+    let update_fn = if fields.len() > 1 {
+      let indexes = (0..fields.len()).map(syn::Index::from);
+      quote! { move |val| { #(#shallow_access = val.#indexes;)*} }
+    } else {
+      let state = shallow_access.next();
+      quote! { move |val| { #state = val; } }
+    };
+    tokens.extend(quote_spanned! { state_span =>
+      AnimateState::new(
         #init_fn,
         {
           #target_captures
@@ -514,7 +534,7 @@ impl ToTokens for State {
         },
         {
           #target_captures
-          move |val| { #(#shallow_access = val.#indexes;)*}
+          #update_fn
         }
       )
     });
@@ -526,7 +546,7 @@ impl Transition {
     let Self { transition_token, fields, .. } = self;
     let name = self.variable_name();
 
-    let ty = parse_quote! {#transition_token <_>};
+    let ty = parse_quote_spanned! { transition_token.span => #transition_token <_>};
     let gen = WidgetGen::new(&ty, &name, fields.iter());
     let transition_tokens = gen.gen_widget_tokens(ctx);
 
@@ -565,23 +585,22 @@ impl Trigger {
         }
       }
       AnimateExpr::Expr(e) => {
-        tokens.extend(quote! {let #animate_name = #e;});
+        tokens.extend(quote_spanned! { e.span() => let #animate_name = #e;});
         self.animate_subscribe_tokens(tokens);
       }
     }
   }
 
   fn animate_subscribe_tokens(&self, tokens: &mut TokenStream) {
-    let span = self.path.span();
     let animate_name = self.expr.variable_name();
     if self.is_listener_trigger() {
-      tokens.extend(quote_spanned! { span =>
+      tokens.extend(quote_spanned! { self.span() =>
         // todo: widget wrap with listener to trigger animate
         move |_|{ #animate_name.start();}
       })
     } else {
       let MemberPath { widget, dot_token, member } = &self.path;
-      tokens.extend(quote_spanned! { span =>
+      tokens.extend(quote_spanned! { self.span() =>
         #widget.clone()
           .state_change(|w| &w #dot_token #member)
           .subscribe(move |change| {
@@ -876,4 +895,8 @@ impl Spanned for Animate {
       .join(self._brace_token.span)
       .unwrap()
   }
+}
+
+impl Spanned for Trigger {
+  fn span(&self) -> Span { self.path.span().join(self.expr.span()).unwrap() }
 }

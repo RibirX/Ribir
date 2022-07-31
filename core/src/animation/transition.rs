@@ -19,20 +19,30 @@ pub struct Transition<E> {
 /// Calc the rate of change over time.
 pub trait Tween {
   /// Calc the rate of change of the duration from animation start.
-  fn tween(&self, dur: Duration) -> AnimationProgress;
+  fn tween(&self, dur: Duration) -> AnimateProgress;
 }
 
 impl<E: Easing> Tween for Transition<E> {
-  fn tween(&self, dur: Duration) -> AnimationProgress {
+  fn tween(&self, dur: Duration) -> AnimateProgress {
     let delay = self.delay.unwrap_or_default();
     if dur < self.delay.unwrap_or_default() {
-      AnimationProgress::Dismissed
+      AnimateProgress::Dismissed
     } else if dur > delay + self.duration {
-      AnimationProgress::Finish
+      AnimateProgress::Finish
     } else {
       let time_rate = dur.as_secs_f32() / self.duration.as_secs_f32();
       let p = self.easing.easing(time_rate);
-      AnimationProgress::Between(p)
+      AnimateProgress::Between(p)
     }
   }
+}
+
+impl<E> IntoStateful for Transition<E> {
+  #[inline]
+  fn into_stateful(self) -> Stateful<Self> { Stateful::new(self) }
+}
+
+impl<E: Easing> Tween for Stateful<Transition<E>> {
+  #[inline]
+  fn tween(&self, dur: Duration) -> AnimateProgress { self.state_ref().tween(dur) }
 }

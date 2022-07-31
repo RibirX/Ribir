@@ -1,25 +1,25 @@
 #[derive(PartialEq, Copy, Clone)]
-pub enum AnimationProgress {
+pub enum AnimateProgress {
   Dismissed,
   Between(f32),
   Finish,
 }
 
-impl AnimationProgress {
+impl AnimateProgress {
   pub fn value(&self) -> f32 {
     match self {
-      AnimationProgress::Dismissed => 0.,
-      AnimationProgress::Between(val) => *val,
-      AnimationProgress::Finish => 1.,
+      AnimateProgress::Dismissed => 0.,
+      AnimateProgress::Between(val) => *val,
+      AnimateProgress::Finish => 1.,
     }
   }
 
   #[inline]
-  pub fn is_dismissed(&self) -> bool { matches!(self, AnimationProgress::Dismissed) }
+  pub fn is_dismissed(&self) -> bool { matches!(self, AnimateProgress::Dismissed) }
 
   #[inline]
-  pub fn is_between(&self) -> bool { matches!(self, AnimationProgress::Between(_)) }
+  pub fn is_between(&self) -> bool { matches!(self, AnimateProgress::Between(_)) }
 
   #[inline]
-  pub fn is_finish(&self) -> bool { matches!(self, AnimationProgress::Finish) }
+  pub fn is_finish(&self) -> bool { matches!(self, AnimateProgress::Finish) }
 }

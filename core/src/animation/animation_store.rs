@@ -5,7 +5,7 @@ use rxrust::{
   subscription::{SingleSubscription, SubscriptionGuard},
 };
 
-use super::{AnimationCtrl, AnimationProgress};
+use super::{AnimateProgress, AnimationCtrl};
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
@@ -41,7 +41,7 @@ impl AnimationId {
             let mut finished = vec![];
             runnings.iter().for_each(|id| {
               let p = id.running_animation(&mut *animations).lerp_by(time);
-              if matches!(p, AnimationProgress::Finish) {
+              if matches!(p, AnimateProgress::Finish) {
                 finished.push(*id);
               }
             });

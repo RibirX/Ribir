@@ -1,10 +1,10 @@
-pub struct AnimationState<I, F, W> {
+pub struct AnimateState<I, F, W> {
   init_fn: I,
   final_fn: F,
   write_fn: W,
 }
 
-impl<I, F, W, R> AnimationState<I, F, W>
+impl<I, F, W, R> AnimateState<I, F, W>
 where
   I: Fn() -> R,
   F: Fn() -> R,

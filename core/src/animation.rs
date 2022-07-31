@@ -13,21 +13,21 @@ use std::{
 use crate::prelude::*;
 pub use animation_store::*;
 pub use easing::Easing;
-pub use progress::AnimationProgress;
+pub use progress::AnimateProgress;
 pub use repeat_mode::RepeatMode;
 pub use state::*;
 pub use transition::*;
 
 #[derive(Declare)]
-pub struct Animation<E, I, F, W, R>
+pub struct Animate<T, I, F, W, R>
 where
   I: Fn() -> R,
   F: Fn() -> R,
   W: FnMut(R) + 'static,
 {
-  transition: Transition<E>,
+  transition: T,
   #[declare(rename = "from")]
-  state: AnimationState<I, F, W>,
+  state: AnimateState<I, F, W>,
   /// Store the running information of this animation.  
   #[declare(default)]
   running_info: Option<AnimateInfo<R>>,
@@ -38,21 +38,21 @@ pub struct AnimateInfo<S> {
   from: S,
   to: S,
   start_at: Instant,
-  last_progress: AnimationProgress,
+  last_progress: AnimateProgress,
 }
 
 pub trait AnimationCtrl {
   fn start(&mut self, at: Instant);
-  fn lerp_by(&mut self, now: Instant) -> AnimationProgress;
+  fn lerp_by(&mut self, now: Instant) -> AnimateProgress;
   fn frame_finished(&mut self);
 }
 
-impl<E, I, F, W, R> AnimationCtrl for Animation<E, I, F, W, R>
+impl<T, I, F, W, R> AnimationCtrl for Animate<T, I, F, W, R>
 where
   I: Fn() -> R,
   F: Fn() -> R,
   W: FnMut(R) + 'static,
-  E: Easing,
+  T: Tween,
   R: Sub<R, Output = R> + Add<R, Output = R> + Mul<f32, Output = R> + Clone,
 {
   fn start(&mut self, start_at: Instant) {
@@ -64,11 +64,11 @@ where
       from: self.state.init_value(),
       to: self.state.finial_value(),
       start_at,
-      last_progress: AnimationProgress::Dismissed,
+      last_progress: AnimateProgress::Dismissed,
     });
   }
 
-  fn lerp_by(&mut self, now: Instant) -> AnimationProgress {
+  fn lerp_by(&mut self, now: Instant) -> AnimateProgress {
     let info = self
       .running_info
       .as_mut()
@@ -76,7 +76,7 @@ where
     let elapsed = now - info.start_at;
     let progress = self.transition.tween(elapsed);
 
-    if let AnimationProgress::Between(rate) = self.transition.tween(elapsed) {
+    if let AnimateProgress::Between(rate) = self.transition.tween(elapsed) {
       let animate_state = info.from.clone() + (info.to.clone() - info.from.clone()) * rate;
       self.state.update(animate_state);
     }
@@ -91,7 +91,7 @@ where
       .clone()
       .expect("This animation is not running.");
 
-    if matches!(info.last_progress, AnimationProgress::Between(_)) {
+    if matches!(info.last_progress, AnimateProgress::Between(_)) {
       self.state.update(info.to.clone())
     }
   }

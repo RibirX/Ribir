@@ -42,7 +42,6 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let fields_follow = fields.clone().filter_map(|f| self.field_follow_tokens(f));
 
     quote! {
-
       #build_widget
       #(#fields_follow)*
     }
