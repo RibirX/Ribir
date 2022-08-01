@@ -1,6 +1,6 @@
 use painter::{Point, Rect};
 
-use crate::prelude::{widget_tree::WidgetTree, LayoutStore, QueryOrder, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, Context, LayoutStore, QueryOrder, WidgetId};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -41,41 +41,35 @@ pub trait WidgetCtx {
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
 }
 
-pub fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
+pub(crate) fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
   // todo: should effect by transform widget.
   store
     .layout_box_rect(id)
     .map_or(pos, |rect| pos + rect.min().to_vector())
 }
 
-pub fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
+pub(crate) fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
   store
     .layout_box_rect(id)
     .map_or(pos, |rect| pos - rect.min().to_vector())
   // todo: should effect by transform widget.
 }
 
-pub(crate) fn map_to_global(
-  id: WidgetId,
-  pos: Point,
-  tree: &WidgetTree,
-  store: &LayoutStore,
-) -> Point {
+pub(crate) fn map_to_global(id: WidgetId, pos: Point, tree: &WidgetTree) -> Point {
+  let ctx = tree.context();
+  let ctx = ctx.borrow();
   id.ancestors(tree)
-    .fold(pos, |pos, p| map_to_parent(p, pos, store))
+    .fold(pos, |pos, p| map_to_parent(p, pos, &ctx.layout_store))
 }
 
-pub(crate) fn map_from_global(
-  id: WidgetId,
-  pos: Point,
-  tree: &WidgetTree,
-  store: &LayoutStore,
-) -> Point {
+pub(crate) fn map_from_global(id: WidgetId, pos: Point, tree: &WidgetTree) -> Point {
   let stack = id.ancestors(tree).collect::<Vec<_>>();
+  let binding = tree.context();
+  let ctx = binding.borrow();
   stack
     .iter()
     .rev()
-    .fold(pos, |pos, p| map_from_parent(*p, pos, store))
+    .fold(pos, |pos, p| map_from_parent(*p, pos, &ctx.layout_store))
 }
 
 pub(crate) trait WidgetCtxImpl {
@@ -83,7 +77,12 @@ pub(crate) trait WidgetCtxImpl {
 
   fn widget_tree(&self) -> &WidgetTree;
 
-  fn layout_store(&self) -> &LayoutStore;
+  /// The return `Context` should ba same one in `WidgetTree` return by
+  /// [`widget_tree`](WidgetCtxImpl::widget_tree), this method help
+  /// implementation can cache the context to avoid frequently upgrade weak
+  /// pointer from `WidgetTree`, see the implementation of
+  /// [`WidgetTree::Context`]!.
+  fn context(&self) -> Option<&Context>;
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
@@ -101,36 +100,36 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
 
   #[inline]
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
-    self.layout_store().layout_box_rect(wid)
+    inspect_on_context(self, |ctx| ctx.layout_store.layout_box_rect(wid))
   }
 
   #[inline]
-  fn map_to_global(&self, pos: Point) -> Point {
-    map_to_global(self.id(), pos, self.widget_tree(), self.layout_store())
-  }
+  fn map_to_global(&self, pos: Point) -> Point { map_to_global(self.id(), pos, self.widget_tree()) }
 
   #[inline]
   fn map_from_global(&self, pos: Point) -> Point {
-    map_from_global(self.id(), pos, self.widget_tree(), self.layout_store())
+    map_from_global(self.id(), pos, self.widget_tree())
   }
 
   #[inline]
   fn map_to_parent(&self, pos: Point) -> Point {
-    map_to_parent(self.id(), pos, self.layout_store())
+    inspect_on_context(self, |ctx| map_to_parent(self.id(), pos, &ctx.layout_store))
   }
 
   #[inline]
   fn map_from_parent(&self, pos: Point) -> Point {
-    map_from_parent(self.id(), pos, self.layout_store())
+    inspect_on_context(self, |ctx| {
+      map_from_parent(self.id(), pos, &ctx.layout_store)
+    })
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
     let global = self.map_to_global(pos);
-    map_from_global(w, global, self.widget_tree(), self.layout_store())
+    map_from_global(w, global, self.widget_tree())
   }
 
   fn map_from(&self, pos: Point, w: WidgetId) -> Point {
-    let global = map_to_global(w, pos, self.widget_tree(), self.layout_store());
+    let global = map_to_global(w, pos, self.widget_tree());
     self.map_from_global(global)
   }
 
@@ -141,6 +140,15 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 }
 
+fn inspect_on_context<T: WidgetCtxImpl, F: FnOnce(&Context) -> R, R>(w_ctx: &T, f: F) -> R {
+  if let Some(ctx) = w_ctx.context() {
+    f(ctx)
+  } else {
+    let binding = w_ctx.widget_tree().context();
+    let ctx = binding.borrow();
+    f(&*ctx)
+  }
+}
 #[cfg(test)]
 mod tests {
   use super::*;

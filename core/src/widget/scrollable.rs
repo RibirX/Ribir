@@ -34,8 +34,8 @@ impl ComposeSingleChild for ScrollableWidget {
         x: this.pos.x,
         y: this.pos.y,
         on_wheel: move |e| {
-          let ctx = e.context();
           let content = e.current_target();
+          let ctx = e.context();
           let view = ctx.widget_parent(content).expect("must have a scrollable widget");
           let content_area = ctx.widget_box_rect(content).unwrap();
           let view_area = ctx.widget_box_rect(view).unwrap();

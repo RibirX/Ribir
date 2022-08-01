@@ -63,17 +63,11 @@ pub enum FocusEventType {
   FocusOut,
 }
 
-// FocusListener must be a widget node to avoid two FocusListener in same
-// widget.
-impl Render for FocusListener {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .single_child()
-      .map(|c| ctx.perform_child_layout(c, clamp))
-      .unwrap_or_default()
+impl ComposeSingleChild for FocusListener {
+  #[inline]
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+    compose_child_as_data_widget(child, this, |w| w)
   }
-
-  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Query for FocusListener {

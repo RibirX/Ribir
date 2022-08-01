@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::prelude::{widget_tree::WidgetTree, *};
 use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
@@ -7,21 +7,21 @@ thread_local!(static DEFAULT_THEME: Rc<Theme> =
 
 pub struct BuildCtx<'a> {
   parent: Option<WidgetId>,
+  // todo: use as store current theme?
   default_theme: Option<Rc<Theme>>,
-  ctx: &'a mut Context,
+  tree: &'a WidgetTree,
 }
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&mut self) -> &Theme {
-    let tree = &*self.ctx.widget_tree;
     self
       .parent
       .as_ref()
       .and_then(|p| {
-        p.ancestors(tree).find_map(|id| {
+        p.ancestors(self.tree).find_map(|id| {
           let mut theme: Option<&Theme> = None;
-          id.assert_get(tree)
+          id.assert_get(self.tree)
             .query_on_first_type(QueryOrder::InnerFirst, |t: &Theme| {
               // Safety: we known the theme in the widget node should always live longer than
               // the `BuildCtx`
@@ -38,11 +38,13 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub fn animate_store(&mut self) -> &mut AnimationStore { &mut self.ctx.animations_store }
+  pub fn register_animate(&mut self, animate: Box<dyn AnimationCtrl>) -> AnimationId {
+    self.tree.context().borrow_mut().register_animate(animate)
+  }
 
   #[inline]
-  pub(crate) fn new(parent: Option<WidgetId>, ctx: &'a mut Context) -> Self {
-    Self { parent, default_theme: None, ctx }
+  pub(crate) fn new(parent: Option<WidgetId>, tree: &'a mut WidgetTree) -> Self {
+    Self { parent, default_theme: None, tree }
   }
 }
 

@@ -47,9 +47,10 @@ impl std::ops::DerefMut for CharEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
-impl CharListener {
+impl EventListener for CharListener {
+  type Event = CharEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut CharEvent) { (self.on_char)(event) }
+  fn dispatch(&mut self, event: &mut CharEvent) { (self.on_char)(event) }
 }
 
 impl CharListenerBuilder {

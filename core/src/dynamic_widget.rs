@@ -83,16 +83,15 @@ impl IntoWidget<MultiConsumer> for ExprWidget<MultiConsumer> {
 
 impl Generator {
   #[inline]
-  pub(crate) fn update_generated_widgets(&mut self, ctx: &mut Context) {
+  pub(crate) fn update_generated_widgets(&mut self, tree: &mut WidgetTree) {
     let Self { info, expr } = self;
-    let tmp_anchor = info.add_dynamic_widget_tmp_anchor(ctx.tree_mut());
+    let tmp_anchor = info.add_dynamic_widget_tmp_anchor(tree);
     let mut insert_at = tmp_anchor;
 
     let GeneratorInfo { parent, generated_widgets, .. } = info;
     let mut key_widgets = generated_widgets
       .drain(..)
       .filter_map(|id| {
-        let tree = ctx.tree_mut();
         let mut key = None;
         id.assert_get(tree)
           .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
@@ -102,7 +101,7 @@ impl Generator {
           id.detach(tree);
           Some((key.clone(), id))
         } else {
-          ctx.drop_subtree(id);
+          id.remove_subtree(tree);
           None
         }
       })
@@ -126,10 +125,10 @@ impl Generator {
           tree.mark_dirty(id);
           id
         },
-        &mut |wid, child, ctx| {
-          wid.append_widget(child, ctx);
+        &mut |wid, child, tree| {
+          wid.append_widget(child, tree);
         },
-        ctx,
+        tree,
       );
       generated_widgets.push(id);
       insert_at = id;
@@ -137,9 +136,9 @@ impl Generator {
 
     key_widgets
       .into_iter()
-      .for_each(|(_, k)| ctx.drop_subtree(k));
+      .for_each(|(_, k)| k.remove_subtree(tree));
 
-    tmp_anchor.inner_remove(&mut ctx.widget_tree);
+    tmp_anchor.inner_remove(tree);
   }
 
   pub(crate) fn info(&self) -> &GeneratorInfo { &self.info }

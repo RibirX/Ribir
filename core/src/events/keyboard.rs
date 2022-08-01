@@ -20,14 +20,16 @@ pub struct KeyUpListener {
   pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
-impl KeyDownListener {
+impl EventListener for KeyDownListener {
+  type Event = KeyboardEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_down)(event) }
+  fn dispatch(&mut self, event: &mut KeyboardEvent) { (self.on_key_down)(event) }
 }
 
-impl KeyUpListener {
+impl EventListener for KeyUpListener {
+  type Event = KeyboardEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
+  fn dispatch(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
 }
 
 impl ComposeSingleChild for KeyDownListener {

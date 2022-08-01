@@ -6,8 +6,7 @@ use text::shaper::TextShaper;
 use text::{TextReorder, TypographyStore};
 
 use super::WidgetCtxImpl;
-use crate::prelude::widget_tree::WidgetTree;
-use crate::prelude::{BoxClamp, LayoutStore, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, BoxClamp, Context, WidgetId};
 
 /// A place to compute the render object's layout. Rather than holding children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx`
@@ -16,31 +15,27 @@ use crate::prelude::{BoxClamp, LayoutStore, WidgetId};
 pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
   pub(crate) tree: &'a WidgetTree,
-  pub(crate) layout_store: &'a mut LayoutStore,
-  pub(crate) shaper: &'a TextShaper,
-  pub(crate) text_reorder: &'a TextReorder,
-  pub(crate) typography_store: &'a TypographyStore,
-  pub(crate) font_db: &'a Arc<RwLock<FontDB>>,
+  pub(crate) ctx: &'a mut Context,
 }
 
 impl<'a> LayoutCtx<'a> {
   #[inline]
-  pub fn text_shaper(&self) -> &TextShaper { &self.shaper }
+  pub fn text_shaper(&self) -> &TextShaper { &self.ctx.shaper }
 
   #[inline]
-  pub fn text_reorder(&self) -> &TextReorder { &self.text_reorder }
+  pub fn text_reorder(&self) -> &TextReorder { &self.ctx.reorder }
 
   #[inline]
-  pub fn typography_store(&self) -> &TypographyStore { &self.typography_store }
+  pub fn typography_store(&self) -> &TypographyStore { &self.ctx.typography_store }
 
   #[inline]
-  pub fn font_db(&self) -> Arc<RwLock<FontDB>> { self.font_db.clone() }
+  pub fn font_db(&self) -> Arc<RwLock<FontDB>> { self.ctx.font_db.clone() }
 
   /// Update the position of the child render object should place. Relative to
   /// parent.
   #[inline]
   pub fn update_position(&mut self, child: WidgetId, pos: Point) {
-    self.layout_store.layout_box_rect_mut(child).origin = pos;
+    self.ctx.layout_store.layout_box_rect_mut(child).origin = pos;
   }
 
   /// Update the size of layout widget. Use this method to directly change the
@@ -49,21 +44,13 @@ impl<'a> LayoutCtx<'a> {
   /// know what you are doing.
   #[inline]
   pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    self.layout_store.layout_box_rect_mut(child).size = size;
+    self.ctx.layout_store.layout_box_rect_mut(child).size = size;
   }
 
   /// Do the work of computing the layout for render child, and return its size
   /// it should have. Should called from parent.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    self.layout_store.perform_layout(
-      child,
-      clamp,
-      self.tree,
-      self.shaper,
-      self.text_reorder,
-      self.typography_store,
-      self.font_db,
-    )
+    child.perform_layout(clamp, self.tree, self.ctx)
   }
 
   /// Return a tuple of [`LayoutCtx`]! and an iterator of `id`'s children.
@@ -95,7 +82,7 @@ impl<'a> LayoutCtx<'a> {
   #[inline]
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
     assert_eq!(child.parent(self.widget_tree()), Some(self.id));
-    self.layout_store.remove(child).is_some()
+    self.ctx.layout_store.remove(child).is_some()
   }
 }
 
@@ -104,5 +91,5 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
 
   fn widget_tree(&self) -> &WidgetTree { self.tree }
 
-  fn layout_store(&self) -> &crate::prelude::LayoutStore { self.layout_store }
+  fn context(&self) -> Option<&Context> { Some(self.ctx) }
 }

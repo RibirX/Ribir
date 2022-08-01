@@ -21,7 +21,6 @@ impl Application {
     let this = &mut self as *mut Self;
 
     if let Some(wnd) = self.windows.get_mut(&wnd_id) {
-      wnd.render_ready();
       wnd.draw_frame();
     }
 
@@ -42,7 +41,7 @@ impl Application {
             }
           }
           Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
-            if wnd.render_ready() {
+            if wnd.need_draw() {
               wnd.request_redraw();
             }
           }),

@@ -1,15 +1,17 @@
 use std::{
-  cell::Cell,
-  pin::Pin,
   sync::{Arc, RwLock},
+  time::Instant,
 };
 
-use crate::prelude::{
-  widget_tree::WidgetTree, AnimationStore, EventCommon, QueryOrder, Widget, WidgetId,
+use crate::{
+  prelude::{AnimationCtrl, AnimationId},
+  ticker::FrameTicker,
 };
-use crate::ticker::FrameTicker;
+use crate::{
+  prelude::{AnimationStore, WidgetId},
+  ticker::FrameMsg,
+};
 
-use painter::{PaintCommand, Painter};
 mod painting_context;
 pub use painting_context::PaintingCtx;
 mod event_context;
@@ -18,7 +20,6 @@ mod widget_context;
 use ::text::shaper::TextShaper;
 use text::{font_db::FontDB, TextReorder, TypographyStore};
 pub use widget_context::*;
-use winit::{event::ModifiersState, window::CursorIcon};
 mod layout_context;
 pub(crate) mod layout_store;
 pub use layout_context::*;
@@ -31,10 +32,6 @@ pub(crate) mod generator_store;
 
 pub(crate) struct Context {
   pub layout_store: LayoutStore,
-  pub widget_tree: Pin<Box<WidgetTree>>,
-  pub painter: Painter,
-  pub modifiers: ModifiersState,
-  pub cursor: Cell<Option<CursorIcon>>,
   pub font_db: Arc<RwLock<FontDB>>,
   pub shaper: TextShaper,
   pub reorder: TextReorder,
@@ -45,21 +42,43 @@ pub(crate) struct Context {
 }
 
 impl Context {
-  pub(crate) fn new(root: Widget, device_scale: f32) -> Self {
-    let font_db = Arc::new(RwLock::new(FontDB::default()));
+  pub fn expr_widgets_dirty(&self) -> bool { self.generator_store.is_dirty() }
+
+  pub fn on_widget_drop(&mut self, id: WidgetId) {
+    self.generator_store.on_widget_drop(id);
+    self.layout_store.remove(id);
+  }
+
+  pub fn begin_frame(&mut self) { self.frame_ticker.emit(FrameMsg::Ready(Instant::now())); }
+
+  pub fn end_frame(&mut self) {
+    // todo: frame cache is not a good choice? because not every text will relayout
+    // in every frame.
+    self.shaper.end_frame();
+    self.reorder.end_frame();
+    self.typography_store.end_frame();
+
+    self.frame_ticker.emit(FrameMsg::Finish);
+  }
+
+  pub fn register_animate(&mut self, animate: Box<dyn AnimationCtrl>) -> AnimationId {
+    self.animations_store.register(animate)
+  }
+}
+
+impl Default for Context {
+  fn default() -> Self {
+    let mut font_db = FontDB::default();
+    font_db.load_system_fonts();
+    let font_db = Arc::new(RwLock::new(font_db));
     let shaper = TextShaper::new(font_db.clone());
     let reorder = TextReorder::default();
     let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
-    let painter = Painter::new(device_scale, typography_store.clone());
     let generator_store = generator_store::GeneratorStore::default();
     let frame_ticker = FrameTicker::default();
     let animations_store = AnimationStore::new(frame_ticker.frame_tick_stream());
-    let mut ctx = Context {
+    Context {
       layout_store: <_>::default(),
-      widget_tree: WidgetTree::new(),
-      painter,
-      cursor: <_>::default(),
-      modifiers: <_>::default(),
       font_db: <_>::default(),
       shaper,
       reorder,
@@ -67,131 +86,7 @@ impl Context {
       generator_store,
       frame_ticker,
       animations_store,
-    };
-
-    let tmp_root = ctx.widget_tree.root();
-    tmp_root.append_widget(root, &mut ctx);
-    let real_root = tmp_root.single_child(&ctx.widget_tree).unwrap();
-    let old = ctx.widget_tree.reset_root(real_root);
-    ctx.drop_subtree(old);
-
-    ctx.mark_root_dirty();
-    ctx
-  }
-
-  #[inline]
-  pub(crate) fn tree(&self) -> &WidgetTree { &self.widget_tree }
-
-  #[inline]
-  pub(crate) fn tree_mut(&mut self) -> &mut WidgetTree { &mut self.widget_tree }
-
-  pub(crate) fn bubble_event<D, E, Ty>(&mut self, wid: WidgetId, event: &mut E, mut dispatch: D)
-  where
-    D: FnMut(&mut Ty, &mut E),
-    E: std::borrow::BorrowMut<EventCommon>,
-    Ty: 'static,
-  {
-    let mut p = Some(wid);
-    while let Some(w) = p {
-      w.assert_get_mut(&mut self.widget_tree).query_all_type_mut(
-        |attr| {
-          event.borrow_mut().current_target = wid;
-          dispatch(attr, event);
-          !event.borrow_mut().bubbling_canceled()
-        },
-        QueryOrder::InnerFirst,
-      );
-
-      if event.borrow_mut().bubbling_canceled() {
-        break;
-      }
-      p = w.parent(&self.widget_tree)
     }
-  }
-
-  pub(crate) fn draw_tree(&mut self) -> Vec<PaintCommand> {
-    let tree = &self.widget_tree;
-    let mut wid = Some(tree.root());
-
-    while let Some(id) = wid {
-      let rect = self
-        .layout_store
-        .layout_box_rect(id)
-        .expect("when paint node, it's mut be already layout.");
-      self.painter.save();
-      self.painter.translate(rect.min_x(), rect.min_y());
-      let rw = id.assert_get(&tree);
-      rw.paint(&mut PaintingCtx {
-        id,
-        tree,
-        layout_store: &self.layout_store,
-        painter: &mut self.painter,
-      });
-
-      wid = id
-        // deep first.
-        .first_child(tree)
-        // goto sibling or back to parent sibling
-        .or_else(|| {
-          let mut node = wid;
-          while let Some(p) = node {
-            // self node sub-tree paint finished, goto sibling
-            self.painter.restore();
-            node = p.next_sibling(tree);
-            if node.is_some() {
-              break;
-            } else {
-              // if there is no more sibling, back to parent to find sibling.
-              node = p.parent(tree);
-            }
-          }
-          node
-        });
-    }
-
-    self.painter.finish()
-  }
-
-  pub fn mark_root_dirty(&mut self) {
-    let root = self.widget_tree.root();
-    self.widget_tree.mark_dirty(root);
-  }
-
-  /// Repair the gaps between widget tree represent and current data state after
-  /// some user or device inputs has been processed.
-  pub fn tree_repair(&mut self) {
-    let needs_regen = self
-      .generator_store
-      .take_needs_regen_generator(&self.widget_tree);
-
-    if let Some(mut needs_regen) = needs_regen {
-      needs_regen.iter_mut().for_each(|g| {
-        if !g.info.parent().is_dropped(self.tree()) {
-          g.update_generated_widgets(self);
-        }
-      });
-
-      needs_regen
-        .into_iter()
-        .for_each(|g| self.generator_store.add_generator(g));
-    }
-  }
-
-  pub fn is_dirty(&self) -> bool {
-    self.widget_tree.any_state_modified() || self.generator_store.is_dirty()
-  }
-
-  pub fn descendants(&self) -> impl Iterator<Item = WidgetId> + '_ {
-    self.widget_tree.root().descendants(&self.widget_tree)
-  }
-
-  pub fn drop_subtree(&mut self, id: WidgetId) {
-    let tree = &self.widget_tree;
-    id.descendants(tree).for_each(|w| {
-      self.generator_store.on_widget_drop(w);
-      self.layout_store.remove(id);
-    });
-    id.remove_subtree(self.tree_mut());
   }
 }
 

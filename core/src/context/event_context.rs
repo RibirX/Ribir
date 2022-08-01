@@ -1,28 +1,33 @@
-use crate::prelude::WidgetId;
+use super::WidgetCtxImpl;
+use crate::prelude::{dispatcher::DispatchInfo, widget_tree::WidgetTree, WidgetId};
 use winit::{event::ModifiersState, window::CursorIcon};
-
-use super::{Context, WidgetCtxImpl};
 
 pub struct EventCtx<'a> {
   id: WidgetId,
-  ctx: &'a Context,
+  tree: &'a WidgetTree,
+  info: &'a mut DispatchInfo,
 }
 
 impl<'a> EventCtx<'a> {
   #[inline]
-  pub(crate) fn new(id: WidgetId, ctx: &'a Context) -> Self { Self { id, ctx } }
+  pub(crate) fn new(id: WidgetId, tree: &'a WidgetTree, info: &'a mut DispatchInfo) -> Self {
+    Self { id, tree, info }
+  }
+  /// Set window cursor icon.
   #[inline]
-  pub fn set_cursor(&mut self, cursor: CursorIcon) { self.ctx.cursor.set(Some(cursor)); }
+  pub fn set_cursor_icon(&mut self, cursor: CursorIcon) { self.info.set_cursor_icon(cursor) }
+  /// Return the cursor icon that will submit to window.
   #[inline]
-  pub fn updated_cursor(&self) -> Option<CursorIcon> { self.ctx.cursor.get() }
+  pub fn stage_cursor_icon(&self) -> Option<CursorIcon> { self.info.stage_cursor_icon() }
+
   #[inline]
-  pub fn modifiers(&self) -> ModifiersState { self.ctx.modifiers }
+  pub fn modifiers(&self) -> ModifiersState { self.info.modifiers() }
 }
 
 impl<'a> WidgetCtxImpl for EventCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
-  fn widget_tree(&self) -> &crate::prelude::widget_tree::WidgetTree { &self.ctx.widget_tree }
+  fn widget_tree(&self) -> &crate::prelude::widget_tree::WidgetTree { self.tree }
 
-  fn layout_store(&self) -> &crate::prelude::LayoutStore { &self.ctx.layout_store }
+  fn context(&self) -> Option<&super::Context> { None }
 }

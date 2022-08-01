@@ -17,12 +17,14 @@ impl ComposeSingleChild for Cursor {
       ExprWidget {
         expr: child,
         on_pointer_move: move |e: &mut PointerEvent| {
-          let mut ctx = e.context();
+
           if e.point_type == PointerType::Mouse
-            && e.buttons == MouseButtons::empty()
-            && ctx.updated_cursor().is_none()
+            && e.mouse_buttons() == MouseButtons::empty()
           {
-            ctx.set_cursor(this.cursor.get());
+            let mut ctx = e.context();
+            if ctx.stage_cursor_icon().is_none () {
+              ctx.set_cursor_icon(this.cursor.get());
+            }
           }
         },
       }

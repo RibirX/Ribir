@@ -1,7 +1,13 @@
 use crate::prelude::*;
 use indextree::*;
 use smallvec::smallvec;
-use std::{cell::RefCell, collections::HashSet, pin::Pin, rc::Rc};
+use std::{
+  cell::RefCell,
+  collections::HashSet,
+  rc::{Rc, Weak},
+};
+
+use super::layout_store::BoxLayout;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
@@ -9,28 +15,117 @@ pub(crate) struct WidgetTree {
   arena: Arena<Box<dyn Render>>,
   pub(crate) state_changed: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
   root: WidgetId,
+  ctx: Weak<RefCell<Context>>,
 }
 
 impl WidgetTree {
-  pub(crate) fn new() -> Pin<Box<Self>> {
+  pub(crate) fn root(&self) -> WidgetId { self.root }
+
+  pub(crate) fn new(root_widget: Widget, ctx: Weak<RefCell<Context>>) -> WidgetTree {
     let mut arena = Arena::default();
     let node: Box<dyn Render> = Box::new(Void);
     let root = WidgetId(arena.new_node(node));
-    let tree = Self {
+    let mut tree = WidgetTree {
       arena,
       root,
       state_changed: <_>::default(),
+      ctx,
     };
-    Box::pin(tree)
+
+    let tmp_root = tree.root();
+    tmp_root.append_widget(root_widget, &mut tree);
+    let real_root = tmp_root.single_child(&tree).unwrap();
+
+    real_root.detach(&mut tree);
+    tree.root = real_root;
+    tmp_root.remove_subtree(&mut tree);
+    tree.mark_dirty(real_root);
+    tree
   }
 
-  pub(crate) fn root(&self) -> WidgetId { self.root }
+  /// Draw current tree by painter.
+  pub(crate) fn draw(&self, painter: &mut Painter) {
+    let mut w = Some(self.root());
 
-  pub(crate) fn reset_root(&mut self, new_root: WidgetId) -> WidgetId {
-    let old = self.root;
-    new_root.detach(self);
-    self.root = new_root;
-    old
+    let ctx = self.context();
+    let ctx = ctx.borrow();
+
+    let mut paint_ctx = PaintingCtx::new(self.root(), self, painter, &*ctx);
+    while let Some(id) = w {
+      paint_ctx.id = id;
+      let rect = paint_ctx
+        .box_rect()
+        .expect("when paint node, it's mut be already layout.");
+      paint_ctx
+        .painter
+        .save()
+        .translate(rect.min_x(), rect.min_y());
+      let rw = id.assert_get(self);
+      rw.paint(&mut paint_ctx);
+
+      w = id
+        // deep first.
+        .first_child(self)
+        // goto sibling or back to parent sibling
+        .or_else(|| {
+          let mut node = w;
+          while let Some(p) = node {
+            // self node sub-tree paint finished, goto sibling
+            paint_ctx.painter.restore();
+            node = p.next_sibling(self);
+            if node.is_some() {
+              break;
+            } else {
+              // if there is no more sibling, back to parent to find sibling.
+              node = p.parent(self);
+            }
+          }
+          node
+        });
+    }
+  }
+
+  /// Repair the gaps between widget tree represent and current data state after
+  /// some user or device inputs has been processed.
+  pub(crate) fn tree_repair(&mut self) {
+    let ctx = self.context();
+    let needs_regen = ctx
+      .borrow_mut()
+      .generator_store
+      .take_needs_regen_generator(self);
+
+    if let Some(mut needs_regen) = needs_regen {
+      needs_regen.iter_mut().for_each(|g| {
+        if !g.info.parent().is_dropped(self) {
+          g.update_generated_widgets(self);
+        }
+      });
+
+      let generator_store = &mut ctx.borrow_mut().generator_store;
+      needs_regen
+        .into_iter()
+        .for_each(|g| generator_store.add_generator(g));
+    }
+  }
+
+  /// Do the work of computing the layout for all node which need, Return if any
+  /// node has really computing the layout.
+  pub(crate) fn layout(&self, win_size: Size) -> bool {
+    let mut performed_layout = false;
+    let ctx = self.context();
+    let ctx = &mut ctx.borrow_mut();
+    loop {
+      if let Some(needs_layout) = ctx.layout_store.layout_list(self) {
+        performed_layout = performed_layout || !needs_layout.is_empty();
+        needs_layout.iter().for_each(|wid| {
+          let clamp = BoxClamp { min: Size::zero(), max: win_size };
+          wid.perform_layout(clamp, self, ctx);
+        });
+      } else {
+        break;
+      }
+    }
+    performed_layout
   }
 
   pub(crate) fn place_holder(&mut self) -> WidgetId { self.new_node(Box::new(Void)) }
@@ -60,6 +155,10 @@ impl WidgetTree {
   pub(crate) fn any_state_modified(&self) -> bool { !self.state_changed.borrow().is_empty() }
 
   pub(crate) fn count(&self) -> usize { self.root.descendants(&self).count() }
+
+  pub(crate) fn context(&self) -> Rc<RefCell<Context>> {
+    self.ctx.upgrade().expect("Context already released.")
+  }
 }
 
 impl WidgetId {
@@ -71,6 +170,33 @@ impl WidgetId {
   /// Returns a mutable reference to the node data.
   pub(crate) fn get_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn Render>> {
     tree.arena.get_mut(self.0).map(|node| node.get_mut())
+  }
+
+  /// Compute layout of the render widget `id`, and store its result in the
+  /// store.
+  /// `ctx` and the `ctx` member of `tree`is same, pass it to avoid frequently
+  /// upgrade a weak pointer.
+  pub(crate) fn perform_layout(
+    self,
+    out_clamp: BoxClamp,
+    tree: &WidgetTree,
+    ctx: &mut Context,
+  ) -> Size {
+    ctx
+      .layout_store
+      .layout_info(self)
+      .and_then(|BoxLayout { clamp, rect }| {
+        rect.and_then(|r| (&out_clamp == clamp).then(|| r.size))
+      })
+      .unwrap_or_else(|| {
+        let layout = self.assert_get(tree);
+        let size = layout.perform_layout(out_clamp, &mut LayoutCtx { id: self, tree, ctx });
+        let size = out_clamp.clamp(size);
+        let info = ctx.layout_store.layout_info_or_default(self);
+        info.clamp = out_clamp;
+        info.rect.get_or_insert_with(Rect::zero).size = size;
+        size
+      })
   }
 
   /// detect if the widget of this id point to is dropped.
@@ -138,9 +264,12 @@ impl WidgetId {
   pub(crate) fn inner_remove(self, tree: &mut WidgetTree) { self.0.remove(&mut tree.arena) }
 
   pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
+    let ctx = tree.context();
+    let mut ctx = ctx.borrow_mut();
     let mut changed = tree.state_changed.borrow_mut();
     self.descendants(tree).for_each(|id| {
       changed.remove(&id);
+      ctx.on_widget_drop(id)
     });
     self.0.remove_subtree(&mut tree.arena);
   }
@@ -155,7 +284,7 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn append_widget(self, widget: Widget, ctx: &mut Context) -> WidgetId {
+  pub(crate) fn append_widget(self, widget: Widget, tree: &mut WidgetTree) -> WidgetId {
     let mut stack = vec![(widget, self)];
 
     while let Some((widget, p_wid)) = stack.pop() {
@@ -167,10 +296,10 @@ impl WidgetId {
           wid
         },
         &mut |id, child, _| stack.push((child, id)),
-        ctx,
+        tree,
       );
     }
-    self.last_child(ctx.tree()).unwrap()
+    self.last_child(tree).unwrap()
   }
 
   /// Return the single child of `widget`, panic if have more than once child.
@@ -199,22 +328,21 @@ impl WidgetId {
     self,
     widget: Widget,
     insert: &mut impl FnMut(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
-    consume_child: &mut impl FnMut(WidgetId, Widget, &mut Context),
-    ctx: &mut Context,
+    consume_child: &mut impl FnMut(WidgetId, Widget, &mut WidgetTree),
+    tree: &mut WidgetTree,
   ) -> WidgetId {
-    let tree = ctx.widget_tree.as_mut().get_mut();
     match widget.0 {
       WidgetInner::Compose(c) => {
-        let mut build_ctx = BuildCtx::new(Some(self), ctx);
+        let mut build_ctx = BuildCtx::new(Some(self), tree);
         let c = c(&mut build_ctx);
-        self.insert_child(c, insert, consume_child, ctx)
+        self.insert_child(c, insert, consume_child, tree)
       }
       WidgetInner::Render(rw) => insert(rw, tree),
       WidgetInner::SingleChild(s) => {
         let (rw, child) = s.unzip();
         let id = insert(rw, tree);
         if let Some(child) = child {
-          consume_child(id, child, ctx);
+          consume_child(id, child, tree);
         }
         id
       }
@@ -224,22 +352,23 @@ impl WidgetId {
         children
           .into_iter()
           .rev()
-          .for_each(|child| consume_child(id, child, ctx));
+          .for_each(|child| consume_child(id, child, tree));
         id
       }
       WidgetInner::Expr(mut e) => {
         let mut ids = smallvec![];
         (e.expr)(&mut |w| {
-          let id = self.insert_child(w, insert, consume_child, ctx);
+          let id = self.insert_child(w, insert, consume_child, tree);
           ids.push(id);
         });
 
         // expr widget, generate at least one widget to anchor itself place.
         if ids.len() == 0 {
-          ids.push(self.insert_child(Void.into_widget(), insert, consume_child, ctx));
+          ids.push(self.insert_child(Void.into_widget(), insert, consume_child, tree));
         }
         let last = ids.last().cloned().unwrap();
-        ctx.generator_store.new_generator(e, self, ids);
+        let ctx = tree.ctx.upgrade().expect("Context already released!");
+        ctx.borrow_mut().generator_store.new_generator(e, self, ids);
         last
       }
     }

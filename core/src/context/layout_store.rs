@@ -1,14 +1,6 @@
-use std::{
-  cmp::Reverse,
-  collections::HashMap,
-  sync::{Arc, RwLock},
-};
-
-use text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
+use std::{cmp::Reverse, collections::HashMap};
 
 use crate::prelude::{widget_tree::WidgetTree, Rect, Size, WidgetId, INFINITY_SIZE};
-
-use super::LayoutCtx;
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -33,7 +25,7 @@ pub struct BoxLayout {
 /// Store the render object's place relative to parent coordinate and the
 /// clamp passed from parent.
 #[derive(Default)]
-pub struct LayoutStore {
+pub(crate) struct LayoutStore {
   infos: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
 }
 
@@ -44,8 +36,10 @@ impl LayoutStore {
   /// Return the box rect of layout result of render widget, if it's a
   /// combination widget return None.
   pub(crate) fn layout_box_rect(&self, id: WidgetId) -> Option<Rect> {
-    self.infos.get(&id).and_then(|info| info.rect)
+    self.layout_info(id).and_then(|info| info.rect)
   }
+
+  pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&BoxLayout> { self.infos.get(&id) }
 
   /// Return the mut reference of box rect of the layout widget(create if not
   /// have), notice
@@ -58,89 +52,11 @@ impl LayoutStore {
       .get_or_insert_with(Rect::zero)
   }
 
-  /// Do the work of computing the layout for all node which need, Return if any
-  /// node has really computing the layout.
-  pub(crate) fn layout(
-    &mut self,
-    win_size: Size,
-    tree: &WidgetTree,
-    shaper: &TextShaper,
-    text_reorder: &TextReorder,
-    typography_store: &TypographyStore,
-    font_db: &Arc<RwLock<FontDB>>,
-  ) -> bool {
-    let mut performed_layout = false;
-
-    loop {
-      if let Some(needs_layout) = self.layout_list(tree) {
-        performed_layout = performed_layout || !needs_layout.is_empty();
-        needs_layout.iter().for_each(|wid| {
-          let clamp = BoxClamp { min: Size::zero(), max: win_size };
-          self.perform_layout(
-            *wid,
-            clamp,
-            tree,
-            shaper,
-            text_reorder,
-            typography_store,
-            font_db,
-          );
-        });
-      } else {
-        break;
-      }
-    }
-    performed_layout
-  }
-
-  /// Compute layout of the render widget `id`, and store its result in the
-  /// store.
-  ///
-  /// # Safety
-  /// Panic if `id` is not a render widget.
-  pub(crate) fn perform_layout(
-    &mut self,
-    id: WidgetId,
-    out_clamp: BoxClamp,
-    tree: &WidgetTree,
-    shaper: &TextShaper,
-    text_reorder: &TextReorder,
-    typography_store: &TypographyStore,
-    font_db: &Arc<RwLock<FontDB>>,
-  ) -> Size {
-    self
-      .infos
-      .get(&id)
-      .and_then(|BoxLayout { clamp, rect }| {
-        rect.and_then(|r| (&out_clamp == clamp).then(|| r.size))
-      })
-      .unwrap_or_else(|| {
-        let layout = id.assert_get(tree);
-        let size = layout.perform_layout(
-          out_clamp,
-          &mut LayoutCtx {
-            id,
-            tree,
-            layout_store: self,
-            shaper,
-            text_reorder,
-            typography_store,
-            font_db,
-          },
-        );
-        let size = out_clamp.clamp(size);
-        let info = self.layout_info_or_default(id);
-        info.clamp = out_clamp;
-        info.rect.get_or_insert_with(Rect::zero).size = size;
-        size
-      })
-  }
-
   // pub(crate) fn need_layout(&self) -> bool { !self.needs_layout.is_empty() }
 
   /// return a mutable reference of the layout info  of `id`, if it's not exist
   /// insert a default value before return
-  fn layout_info_or_default(&mut self, id: WidgetId) -> &mut BoxLayout {
+  pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut BoxLayout {
     self.infos.entry(id).or_insert_with(BoxLayout::default)
   }
 

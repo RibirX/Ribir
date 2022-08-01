@@ -1,6 +1,10 @@
-use std::{error::Error, time::Instant};
+use std::{cell::RefCell, error::Error, rc::Rc};
 
-use crate::{context::Context, events::dispatcher::Dispatcher, prelude::*, ticker::FrameMsg};
+use crate::{
+  context::Context,
+  events::dispatcher::Dispatcher,
+  prelude::{widget_tree::WidgetTree, *},
+};
 
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
@@ -60,9 +64,11 @@ impl RawWindow for winit::window::Window {
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
-  pub(crate) context: Context,
-  p_backend: Box<dyn PainterBackend>,
+  pub(crate) context: Rc<RefCell<Context>>,
+  pub(crate) painter: Painter,
   pub(crate) dispatcher: Dispatcher,
+  pub(crate) widget_tree: WidgetTree,
+  p_backend: Box<dyn PainterBackend>,
 }
 
 impl Window {
@@ -76,104 +82,79 @@ impl Window {
       WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
         self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
         let factor = scale_factor as f32;
-        self.context.painter.reset(Some(factor));
+        self.painter.reset(Some(factor));
       }
-      event => self
-        .dispatcher
-        .dispatch(event, &mut self.context, self.raw_window.scale_factor()),
+      event => {
+        self
+          .dispatcher
+          .dispatch(event, &mut self.widget_tree, self.raw_window.scale_factor())
+      }
     };
-    if let Some(icon) = self.context.cursor.take() {
+    if let Some(icon) = self.dispatcher.take_cursor_icon() {
       self.raw_window.set_cursor(icon);
-    }
-  }
-
-  /// This method ensure render tree is ready to paint, three things it's have
-  /// to do:
-  /// 1. every need rebuild widgets has rebuild and correspond render tree
-  /// construct.
-  /// 2. every dirty widget has flush to render tree so render tree's data
-  /// represent the latest application state.
-  /// 3. every render objet need layout has done, so every render object is in
-  /// the correct position.
-  pub fn render_ready(&mut self) -> bool {
-    let Self { raw_window, context, dispatcher, .. } = self;
-
-    if context.is_dirty() {
-      context.tree_repair();
-
-      let Context {
-        layout_store,
-        widget_tree,
-        shaper,
-        reorder,
-        typography_store,
-        font_db,
-        frame_ticker,
-        ..
-      } = context;
-
-      frame_ticker.emit(FrameMsg::Ready(Instant::now()));
-      let wnd_size = raw_window.inner_size();
-      layout_store.layout(
-        wnd_size,
-        widget_tree,
-        shaper,
-        reorder,
-        typography_store,
-        font_db,
-      );
-
-      if context.generator_store.is_dirty() {
-        dispatcher.focus_mgr.update(context);
-      }
-
-      context.frame_ticker.emit(FrameMsg::Finish);
-      true
-    } else {
-      false
     }
   }
 
   /// Draw an image what current render tree represent.
   pub(crate) fn draw_frame(&mut self) {
-    let commands = self.context.draw_tree();
-    if !commands.is_empty() {
-      self.p_backend.submit(commands);
-      // todo: frame cache is not a good choice? because not every text will relayout
-      // in every frame.
-      self.context.shaper.end_frame();
-      self.context.reorder.end_frame();
-      self.context.typography_store.end_frame();
+    if self.need_draw() {
+      let Self {
+        raw_window,
+        context,
+        dispatcher,
+        widget_tree,
+        p_backend,
+        painter,
+      } = self;
+
+      context.borrow_mut().begin_frame();
+
+      widget_tree.tree_repair();
+      widget_tree.layout(raw_window.inner_size());
+      if context.borrow().expr_widgets_dirty() {
+        dispatcher.refresh_focus(widget_tree);
+      }
+      widget_tree.draw(painter);
+      let commands = painter.finish();
+      p_backend.submit(commands);
+
+      context.borrow_mut().end_frame();
     }
   }
 
-  pub(crate) fn context(&self) -> &Context { &self.context }
+  pub(crate) fn need_draw(&self) -> bool {
+    self.widget_tree.any_state_modified() || self.context.borrow().expr_widgets_dirty()
+  }
 
-  fn new<W, P>(wnd: W, p_backend: P, mut context: Context) -> Self
+  pub(crate) fn context(&self) -> &Rc<RefCell<Context>> { &self.context }
+
+  fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: Rc<RefCell<Context>>) -> Self
   where
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let factor = wnd.scale_factor() as f32;
-    context.painter.reset(Some(factor));
+    let mut widget_tree = WidgetTree::new(root, Rc::downgrade(&context));
     let mut dispatcher = Dispatcher::default();
-    let focus_mgr = &mut dispatcher.focus_mgr;
-    focus_mgr.update(&mut context);
-    if let Some(auto_focusing) = focus_mgr.auto_focus(&context) {
-      focus_mgr.focus(auto_focusing, &mut context)
+    dispatcher.refresh_focus(&mut widget_tree);
+    if let Some(auto_focusing) = dispatcher.auto_focus(&widget_tree) {
+      dispatcher.focus(auto_focusing, &mut widget_tree)
     }
-
-    context.shaper.font_db_mut().load_system_fonts();
+    let painter = Painter::new(
+      wnd.scale_factor() as f32,
+      context.borrow().typography_store.clone(),
+    );
     Self {
       dispatcher,
       raw_window: Box::new(wnd),
       context,
+      widget_tree,
       p_backend: Box::new(p_backend),
+      painter,
     }
   }
 
   fn resize(&mut self, size: DeviceSize) {
-    self.context.mark_root_dirty();
+    self.widget_tree.mark_dirty(self.widget_tree.root());
     self.p_backend.resize(size);
     self.raw_window.request_redraw();
   }
@@ -187,17 +168,16 @@ impl Window {
       .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
       .build(event_loop)
       .unwrap();
+    let ctx = Rc::new(RefCell::new(Context::default()));
     let size = native_window.inner_size();
-    let ctx = Context::new(root, native_window.scale_factor() as f32);
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
       &native_window,
       DeviceSize::new(size.width, size.height),
       None,
       None,
-      ctx.shaper.clone(),
+      ctx.borrow().shaper.clone(),
     ));
-
-    Self::new(native_window, p_backend, ctx)
+    Self::new(native_window, p_backend, root, ctx)
   }
 
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
@@ -209,7 +189,8 @@ impl Window {
   where
     F: for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>),
   {
-    let commands = self.context.draw_tree();
+    self.widget_tree.draw(&mut self.painter);
+    let commands = self.painter.finish();
     self
       .p_backend
       .commands_to_image(commands, Box::new(image_data_callback))
@@ -305,12 +286,12 @@ impl RawWindow for MockRawWindow {
 impl Window {
   #[cfg(feature = "wgpu_gl")]
   pub fn wgpu_headless(root: Widget, size: DeviceSize) -> Self {
-    let ctx = Context::new(root, 1.);
+    let ctx = Rc::new(RefCell::new(Context::default()));
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
       size,
       None,
       None,
-      ctx.shaper.clone(),
+      ctx.borrow().shaper.clone(),
     ));
     Self::new(
       MockRawWindow {
@@ -318,16 +299,17 @@ impl Window {
         ..Default::default()
       },
       p_backend,
+      root,
       ctx,
     )
   }
 
   pub fn without_render(root: Widget, size: Size) -> Self {
-    let p_backend = MockBackend;
     Self::new(
       MockRawWindow { size, ..Default::default() },
-      p_backend,
-      Context::new(root, 1.),
+      MockBackend,
+      root,
+      <_>::default(),
     )
   }
 }

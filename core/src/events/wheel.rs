@@ -55,9 +55,10 @@ impl std::ops::DerefMut for WheelEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
-impl WheelListener {
+impl EventListener for WheelListener {
+  type Event = WheelEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
+  fn dispatch(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
 }
 
 #[cfg(test)]

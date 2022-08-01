@@ -15,10 +15,6 @@ pub struct PointerId(usize);
 /// Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
 #[derive(Debug, Clone)]
 pub struct PointerEvent {
-  /// The X, Y coordinate of the pointer in current target widget.
-  pub position: Point,
-  // The X, Y coordinate of the mouse pointer in global (window) coordinates.
-  pub global_pos: Point,
   /// A unique identifier for the pointer causing the event.
   pub id: PointerId,
   /// The width (magnitude on the X axis), in pixels, of the contact geometry of
@@ -50,8 +46,7 @@ pub struct PointerEvent {
   /// Indicates if the pointer represents the primary pointer of this pointer
   /// type.
   pub is_primary: bool,
-  /// The buttons being depressed (if any) when the mouse event was fired.
-  pub buttons: MouseButtons,
+
   pub common: EventCommon,
 }
 
@@ -102,12 +97,6 @@ impl std::ops::DerefMut for PointerEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
-impl PointerEvent {
-  /// The button number that was pressed (if applicable) when the mouse event
-  /// was fired.
-  pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
-}
-
 macro_rules! impl_pointer_listener {
   ($name: ident, $field: ident, $convert: ident, $builder: ident) => {
     #[derive(Declare)]
@@ -139,9 +128,10 @@ macro_rules! impl_pointer_listener {
       impl_query_self_only!();
     }
 
-    impl $name {
+    impl EventListener for $name {
+      type Event = PointerEvent;
       #[inline]
-      pub fn dispatch_event(&mut self, event: &mut PointerEvent) { (self.$field)(event) }
+      fn dispatch(&mut self, event: &mut PointerEvent) { (self.$field)(event) }
     }
   };
 }
@@ -303,7 +293,7 @@ impl TapListener {
       match &mut tap_info {
         Some(info)
           if info.pointer_type == e.point_type
-            && info.mouse_btns == e.buttons
+            && info.mouse_btns == e.mouse_buttons()
             && info.tap_times < times
             && info.first_tap_stamp.elapsed() < DUR =>
         {
@@ -314,7 +304,7 @@ impl TapListener {
             first_tap_stamp: Instant::now(),
             tap_times: 1,
             pointer_type: e.point_type.clone(),
-            mouse_btns: e.buttons,
+            mouse_btns: e.mouse_buttons(),
           })
         }
       };
