@@ -105,67 +105,68 @@ mod tests {
 
     let mut wnd = Window::without_render(row_tree, Size::new(400., 400.));
 
-    wnd.render_ready();
+    wnd.draw_frame();
+    let tree = &mut wnd.widget_tree;
 
     let device_id = unsafe { DeviceId::dummy() };
-    let ctx = &mut wnd.context;
-    wnd.dispatcher.dispatch(
+    let dispatcher = &mut wnd.dispatcher;
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (201f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::AllScroll));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::AllScroll));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
   }
 }

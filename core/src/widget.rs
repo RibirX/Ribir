@@ -44,7 +44,7 @@ pub mod data_widget;
 pub use data_widget::DataWidget;
 
 mod void;
-use self::layout_store::BoxClamp;
+use self::widget_tree::BoxClamp;
 pub use void::Void;
 mod composed_widget;
 pub(crate) use composed_widget::ComposedWidget;

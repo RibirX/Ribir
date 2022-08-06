@@ -15,7 +15,7 @@ struct FocusNode {
 }
 
 impl Dispatcher {
-  /// Switch to the next focus widget and return it.
+  /// Switch to the next focus widget.
   pub fn next_focus_widget(&mut self, tree: &mut WidgetTree) {
     let focus_mgr = &mut self.focus_mgr;
     let next = focus_mgr
@@ -30,7 +30,7 @@ impl Dispatcher {
     self.change_focusing_to(next, tree);
   }
 
-  /// Switch to previous focus widget and return it.
+  /// Switch to previous focus widget.
   pub fn prev_focus_widget(&mut self, tree: &mut WidgetTree) {
     let focus_mgr = &mut self.focus_mgr;
     let prev = focus_mgr
@@ -196,13 +196,12 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(widget.into_widget(), 1.);
-    let mut mgr = FocusManager::default();
-    let tree = &ctx.widget_tree;
+    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
+    let tree = &wnd.widget_tree;
 
     let id = tree.root().first_child(tree);
     assert!(id.is_some());
-    assert_eq!(mgr.auto_focus(&ctx), id);
+    assert_eq!(wnd.dispatcher.auto_focus(tree), id);
   }
 
   #[test]
@@ -216,16 +215,15 @@ mod tests {
       }
     };
 
-    let ctx = Context::new(widget.into_widget(), 1.);
-    let mut mgr = FocusManager::default();
-    let tree = &ctx.widget_tree;
+    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
+    let tree = &wnd.widget_tree;
 
     let id = tree
       .root()
       .first_child(tree)
-      .and_then(|p| p.next_sibling(&tree));
+      .and_then(|p| p.next_sibling(tree));
     assert!(id.is_some());
-    assert_eq!(mgr.auto_focus(&ctx), id);
+    assert_eq!(wnd.dispatcher.auto_focus(tree), id);
   }
 
   #[test]
@@ -241,30 +239,38 @@ mod tests {
       }
     };
 
-    let mut ctx = Context::new(widget.into_widget(), 1.);
-    let mut mgr = FocusManager::default();
-    mgr.refresh_focus(&mut ctx);
-    let tree = &ctx.widget_tree;
+    let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));
+    let Window { dispatcher, widget_tree, .. } = &mut wnd;
+    dispatcher.refresh_focus(widget_tree);
 
-    let negative = tree.root().first_child(&tree).unwrap();
-    let id0 = negative.next_sibling(&tree).unwrap();
-    let id1 = id0.next_sibling(&tree).unwrap();
-    let id2 = id1.next_sibling(&tree).unwrap();
-    let id3 = id2.next_sibling(&tree).unwrap();
+    let negative = widget_tree.root().first_child(widget_tree).unwrap();
+    let id0 = negative.next_sibling(widget_tree).unwrap();
+    let id1 = id0.next_sibling(widget_tree).unwrap();
+    let id2 = id1.next_sibling(widget_tree).unwrap();
+    let id3 = id2.next_sibling(widget_tree).unwrap();
 
     {
       // next focus sequential
-      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id1));
-      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id2));
-      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id3));
-      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id0));
-      assert_eq!(mgr.next_focus_widget(&mut ctx), Some(id1));
+      dispatcher.next_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id1));
+      dispatcher.next_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id2));
+      dispatcher.next_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id3));
+      dispatcher.next_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id0));
+      dispatcher.next_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id1));
 
       // previous focus sequential
-      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id0));
-      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id3));
-      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id2));
-      assert_eq!(mgr.prev_focus_widget(&mut ctx), Some(id1));
+      dispatcher.prev_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id0));
+      dispatcher.prev_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id3));
+      dispatcher.prev_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id2));
+      dispatcher.prev_focus_widget(widget_tree);
+      assert_eq!(dispatcher.focusing(), Some(id1));
     }
   }
 
@@ -299,18 +305,14 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut ctx = Context::new(widget.into_widget(), 1.);
-    let mut mgr = FocusManager::default();
-    let tree = &ctx.widget_tree;
+    let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));
+    let Window { dispatcher, widget_tree, .. } = &mut wnd;
 
-    let parent = tree.root();
-    let child = parent
-      .first_child(&tree)
-      .unwrap()
-      .first_child(&tree)
-      .unwrap();
-    mgr.refresh_focus(&mut ctx);
-    mgr.focus(child, &mut ctx);
+    let parent = widget_tree.root();
+    let child = parent.first_child(widget_tree).unwrap();
+
+    dispatcher.refresh_focus(widget_tree);
+    dispatcher.focus(child, widget_tree);
 
     assert_eq!(
       &*log.borrow(),
@@ -318,7 +320,7 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    mgr.focus(parent, &mut ctx);
+    dispatcher.focus(parent, widget_tree);
     assert_eq!(
       &*log.borrow(),
       &[
@@ -331,7 +333,7 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    mgr.blur(&mut ctx);
+    dispatcher.blur(widget_tree);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
 }

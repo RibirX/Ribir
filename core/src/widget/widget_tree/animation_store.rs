@@ -1,11 +1,14 @@
-use crate::ticker::FrameMsg;
+use crate::{
+  prelude::{AnimateProgress, AnimationCtrl},
+  ticker::FrameMsg,
+};
 use algo::id_map::{Id, IdMap};
 use rxrust::{
   prelude::{LocalSubject, MutRc, SubscribeNext},
   subscription::{SingleSubscription, SubscriptionGuard},
 };
 
-use super::{AnimateProgress, AnimationCtrl};
+use super::WidgetTree;
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
@@ -98,10 +101,14 @@ impl AnimationStore {
       tick_msg_guard: None,
     }
   }
-}
 
-impl AnimationStore {
   pub fn register(&mut self, animation: Box<dyn AnimationCtrl>) -> AnimationId {
     AnimationId(self.animations.borrow_mut().insert(animation))
+  }
+}
+
+impl WidgetTree {
+  pub fn register_animate(&mut self, animate: Box<dyn AnimationCtrl>) -> AnimationId {
+    self.animations_store.register(animate)
   }
 }

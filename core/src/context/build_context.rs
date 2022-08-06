@@ -1,4 +1,7 @@
-use crate::prelude::{widget_tree::WidgetTree, *};
+use crate::prelude::{
+  widget_tree::{AnimationId, WidgetTree},
+  *,
+};
 use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
@@ -9,7 +12,7 @@ pub struct BuildCtx<'a> {
   parent: Option<WidgetId>,
   // todo: use as store current theme?
   default_theme: Option<Rc<Theme>>,
-  tree: &'a WidgetTree,
+  tree: &'a mut WidgetTree,
 }
 
 impl<'a> BuildCtx<'a> {
@@ -39,7 +42,7 @@ impl<'a> BuildCtx<'a> {
 
   #[inline]
   pub fn register_animate(&mut self, animate: Box<dyn AnimationCtrl>) -> AnimationId {
-    self.tree.context().borrow_mut().register_animate(animate)
+    self.tree.register_animate(animate)
   }
 
   #[inline]
@@ -63,8 +66,9 @@ mod tests {
         panic!("Get a default theme from context");
       }
     }
-    // should panic when construct the context
-    Context::new(T.into_widget(), 1.);
+
+    // should panic when construct widget tree
+    WidgetTree::new(T.into_widget(), <_>::default());
   }
 
   #[derive(Debug, Declare)]
@@ -111,7 +115,7 @@ mod tests {
     let dark_light = DarkLightThemes::default();
     let track_themes = dark_light.0.clone();
     let mut wnd = Window::without_render(dark_light.into_widget(), Size::zero());
-    wnd.render_ready();
+    wnd.draw_frame();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
       track_themes.borrow()[0].brightness,
@@ -144,7 +148,7 @@ mod tests {
     let light_dark = LightDarkThemes::default();
     let track_themes = light_dark.0.clone();
     let mut wnd = Window::without_render(light_dark.into_widget(), Size::zero());
-    wnd.render_ready();
+    wnd.draw_frame();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
       track_themes.borrow()[0].brightness,

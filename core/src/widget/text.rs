@@ -1,7 +1,6 @@
+use crate::{impl_query_self_only, prelude::*};
 use ::text::typography::{PlaceLineDirection, TypographyCfg};
 pub use ::text::{typography::Overflow, *};
-
-use crate::{impl_query_self_only, prelude::*};
 
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
@@ -14,7 +13,6 @@ pub struct Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let t_store = ctx.typography_store();
     let TextStyle {
       font_size,
       letter_space,
@@ -26,7 +24,8 @@ impl Render for Text {
     let width: Em = Pixel(clamp.max.width.into()).into();
     let height: Em = Pixel(clamp.max.width.into()).into();
 
-    let visual_info = t_store.typography(
+    let app_ctx = ctx.app_context();
+    let visual_info = app_ctx.borrow().typography_store.typography(
       self.text.substr(..),
       font_size,
       font_face,

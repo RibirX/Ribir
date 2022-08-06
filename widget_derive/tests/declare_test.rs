@@ -35,13 +35,13 @@ fn simple_ref_bind_work() {
 
   let flex_size = Size::new(1000., 500.);
   let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
 
   tap_at(&mut wnd, (1, 1));
 
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size * 2.);
 }
@@ -62,14 +62,14 @@ fn event_attr_sugar_work() {
   };
 
   let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, BEFORE_SIZE.into());
   assert_eq!(child_rect[0], BEFORE_SIZE.into());
 
   tap_at(&mut wnd, (25, 25));
 
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, AFTER_TAP_SIZE.into());
   assert_eq!(child_rect[0], AFTER_TAP_SIZE.into());
@@ -93,14 +93,14 @@ fn widget_wrap_bind_work() {
   };
 
   let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
   assert_eq!(rect.size, Size::new(104., 52.));
 
   tap_at(&mut wnd, (60, 1));
 
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, Size::new(70., 60.));
 }
@@ -120,13 +120,13 @@ fn expression_for_children() {
   };
 
   let mut wnd = Window::without_render(embed_expr, Size::new(2000., 2000.));
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
   assert_eq!(children.len(), 5);
 
   tap_at(&mut wnd, (0, 0));
-  wnd.render_ready();
+  wnd.draw_frame();
 
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(25., 5.)));
@@ -149,12 +149,12 @@ fn embed_widget_ref_outside() {
   };
 
   let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
 
   tap_at(&mut wnd, (0, 0));
-  wnd.render_ready();
+  wnd.draw_frame();
 
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(8., 2.)));
@@ -173,13 +173,13 @@ fn data_flow_macro() {
     dataflows { a.size + b.size ~> c.size }
   };
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
-  wnd.render_ready();
+  wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   // data flow not affect on init.
   assert_eq!(rect.size, Size::new(3., 1.));
 
   tap_at(&mut wnd, (0, 0));
-  wnd.render_ready();
+  wnd.draw_frame();
 
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, Size::new(8., 4.));
@@ -230,10 +230,10 @@ fn builtin_ref() {
   };
 
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
-  wnd.render_ready();
+  wnd.draw_frame();
 
   tap_at(&mut wnd, (1, 1));
-  wnd.render_ready();
+  wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::AllScroll);
 }
 
@@ -273,9 +273,9 @@ fn builtin_bind_to_self() {
   };
 
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
-  wnd.render_ready();
+  wnd.draw_frame();
   tap_at(&mut wnd, (1, 1));
-  wnd.render_ready();
+  wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::Help);
 }
 
@@ -339,6 +339,7 @@ fn x() {
     animations {
       Transition {
         id: transition1,
+        easing: easing::EASE
       }
       Animate {
         id: animate1,

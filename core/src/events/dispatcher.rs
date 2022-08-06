@@ -247,22 +247,20 @@ impl Dispatcher {
   }
 
   fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
-    fn down_coordinate(id: WidgetId, pos: Point, store: &LayoutStore) -> Option<(WidgetId, Point)> {
-      store
+    fn down_coordinate(id: WidgetId, pos: Point, tree: &WidgetTree) -> Option<(WidgetId, Point)> {
+      tree
         .layout_box_rect(id)
         .filter(|rect| rect.contains(pos))
-        .map(|_| (id, map_from_parent(id, pos, store)))
+        .map(|_| (id, tree.map_from_parent(id, pos)))
     }
 
-    let ctx = tree.context();
-    let ctx = ctx.borrow();
-    let mut current = down_coordinate(tree.root(), self.info.cursor_pos, &ctx.layout_store);
+    let mut current = down_coordinate(tree.root(), self.info.cursor_pos, tree);
     let mut hit = current;
     while let Some((id, pos)) = current {
       hit = current;
       current = id
         .reverse_children(tree)
-        .find_map(|c| down_coordinate(c, pos, &ctx.layout_store));
+        .find_map(|c| down_coordinate(c, pos, tree));
     }
     hit.map(|(w, _)| w)
   }
@@ -306,8 +304,8 @@ impl WidgetTree {
     Ty: 'static,
   {
     loop {
-      let target = event.borrow().target;
-      target.assert_get_mut(self).query_all_type_mut(
+      let current_target = event.borrow().current_target;
+      current_target.assert_get_mut(self).query_all_type_mut(
         |listener: &mut Ty| {
           dispatcher(listener, event);
           !event.borrow_mut().bubbling_canceled()
@@ -319,7 +317,7 @@ impl WidgetTree {
         break;
       }
 
-      if let Some(p) = event.borrow().target.parent(self) {
+      if let Some(p) = current_target.parent(self) {
         event.borrow_mut().current_target = p;
       } else {
         break;
@@ -335,10 +333,21 @@ mod tests {
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
 
-  fn record_pointer(event_stack: Rc<RefCell<Vec<PointerEvent>>>, widget: Widget) -> Widget {
+  struct Info {
+    pos: Point,
+    btns: MouseButtons,
+  }
+
+  fn record_pointer(event_stack: Rc<RefCell<Vec<Info>>>, widget: Widget) -> Widget {
     let handler_ctor = move || {
       let stack = event_stack.clone();
-      move |e: &mut PointerEvent| stack.borrow_mut().push(e.clone())
+
+      move |e: &mut PointerEvent| {
+        stack.borrow_mut().push(Info {
+          pos: e.position(),
+          btns: e.mouse_buttons(),
+        })
+      }
     };
     widget! {
       ExprWidget {
@@ -363,7 +372,7 @@ mod tests {
       widget! { Row { ExprWidget  { expr: record } } },
     );
     let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -375,7 +384,7 @@ mod tests {
     {
       let mut records = event_record.borrow_mut();
       assert_eq!(records.len(), 2);
-      assert_eq!(records[0].button_num(), 0);
+      assert_eq!(records[0].btns.bits().count_ones(), 0);
       records.clear();
     }
 
@@ -387,8 +396,8 @@ mod tests {
     });
 
     let mut records = event_record.borrow_mut();
-    assert_eq!(records[0].button_num(), 1);
-    assert_eq!(records[0].position, (1., 1.).into());
+    assert_eq!(records[0].btns.bits().count_ones(), 1);
+    assert_eq!(records[0].pos, (1., 1.).into());
     records.clear();
   }
 
@@ -400,7 +409,7 @@ mod tests {
       widget! { Text { text: "pointer event test" }},
     );
     let mut wnd = Window::without_render(root, Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -440,12 +449,12 @@ mod tests {
     let records = event_record.borrow();
     assert_eq!(records.len(), 3);
 
-    assert_eq!(records[0].buttons, MouseButtons::PRIMARY);
+    assert_eq!(records[0].btns, MouseButtons::PRIMARY);
     assert_eq!(
-      records[1].buttons,
+      records[1].btns,
       MouseButtons::PRIMARY | MouseButtons::SECONDARY
     );
-    assert_eq!(records[2].buttons, MouseButtons::default());
+    assert_eq!(records[2].btns, MouseButtons::default());
   }
 
   // Can not mock two different device id for macos.
@@ -458,7 +467,7 @@ mod tests {
       widget! { Text { text: "pointer event test"}},
     );
     let mut wnd = Window::without_render(root, Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -500,7 +509,7 @@ mod tests {
     // but cursor move processed.
     assert_eq!(event_record.borrow().len(), 2);
     assert_eq!(event_record.borrow().len(), 2);
-    assert_eq!(event_record.borrow()[1].buttons, MouseButtons::PRIMARY);
+    assert_eq!(event_record.borrow()[1].btns, MouseButtons::PRIMARY);
 
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
@@ -540,7 +549,7 @@ mod tests {
     let event_record = root.0.clone();
 
     let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: unsafe { DeviceId::dummy() },
@@ -584,7 +593,7 @@ mod tests {
     let leave_event = w.leave.clone();
 
     let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
 
@@ -658,7 +667,7 @@ mod tests {
 
     // Stretch row
     let mut wnd = Window::without_render(cp.into_widget(), Size::new(400., 400.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     let modifiers = ModifiersState::default();
@@ -730,7 +739,7 @@ mod tests {
       }
     };
     let mut wnd = Window::without_render(w, Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     let modifiers = ModifiersState::default();
@@ -747,7 +756,7 @@ mod tests {
     });
 
     // point down on a focus widget
-    assert!(wnd.dispatcher.focus_mgr.focusing().is_some());
+    assert!(wnd.dispatcher.focusing().is_some());
 
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
@@ -767,16 +776,16 @@ mod tests {
       modifiers,
     });
 
-    assert!(wnd.dispatcher.focus_mgr.focusing().is_none());
+    assert!(wnd.dispatcher.focusing().is_none());
   }
 
   #[test]
   fn fix_hit_out_window() {
     let w = SizedBox { size: INFINITY_SIZE };
     let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
-    wnd.render_ready();
-    wnd.dispatcher.pointer.cursor_pos = Point::new(-1., -1.);
-    let hit = wnd.dispatcher.pointer.hit_widget(&wnd.context());
+    wnd.draw_frame();
+    wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
+    let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);
 
     assert_eq!(hit, None);
   }

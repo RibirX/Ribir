@@ -1,8 +1,4 @@
-use crate::{
-  context::EventCtx,
-  prelude::{map_from_global, widget_tree::WidgetTree},
-  widget::widget_tree::WidgetId,
-};
+use crate::{context::EventCtx, prelude::widget_tree::WidgetTree, widget::widget_tree::WidgetId};
 use std::ptr::NonNull;
 
 pub(crate) mod dispatcher;
@@ -67,9 +63,8 @@ impl EventCommon {
   /// The X, Y coordinate of the pointer in current target widget.
   #[inline]
   pub fn position(&self) -> Point {
-    map_from_global(self.current_target, self.global_pos(), unsafe {
-      self.tree.as_ref()
-    })
+    let tree = unsafe { self.tree.as_ref() };
+    tree.map_from_global(self.current_target, self.global_pos())
   }
 
   /// The buttons being depressed (if any) in current state.

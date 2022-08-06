@@ -1,4 +1,3 @@
-mod animation_store;
 pub mod easing;
 mod progress;
 mod repeat_mode;
@@ -11,7 +10,6 @@ use std::{
 };
 
 use crate::prelude::*;
-pub use animation_store::*;
 pub use easing::Easing;
 pub use progress::AnimateProgress;
 pub use repeat_mode::RepeatMode;

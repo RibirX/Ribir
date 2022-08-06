@@ -82,7 +82,7 @@ mod tests {
 
     let mut wnd = Window::without_render(widget, Size::new(100., 100.));
 
-    wnd.render_ready();
+    wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,

@@ -32,7 +32,10 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
-  pub use crate::widget::{widget_tree::WidgetId, *};
+  pub use crate::widget::{
+    widget_tree::{BoxClamp, WidgetId},
+    *,
+  };
   #[doc(no_inline)]
   pub use crate::window::Window;
   #[doc(no_inline)]

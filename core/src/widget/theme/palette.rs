@@ -6,8 +6,7 @@ use crate::prelude::BuildCtx;
 /// your brand. `Palette` provide colors base on the 8 key colors with different
 /// light tone.
 ///
-/// Note: `Palette` mainly learn from Material design color system, because its
-/// clear logic.
+/// Note: `Palette` mainly learn from Material design color system
 /// Reference https://m3.material.io/styles/color/
 #[derive(Clone, Debug)]
 pub struct Palette {

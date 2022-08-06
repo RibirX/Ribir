@@ -1,12 +1,7 @@
-use std::sync::{Arc, RwLock};
-
 use painter::{Point, Size};
-use text::font_db::FontDB;
-use text::shaper::TextShaper;
-use text::{TextReorder, TypographyStore};
 
 use super::WidgetCtxImpl;
-use crate::prelude::{widget_tree::WidgetTree, BoxClamp, Context, WidgetId};
+use crate::prelude::{widget_tree::WidgetTree, BoxClamp, WidgetId};
 
 /// A place to compute the render object's layout. Rather than holding children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx`
@@ -14,28 +9,15 @@ use crate::prelude::{widget_tree::WidgetTree, BoxClamp, Context, WidgetId};
 /// descendants position.
 pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
-  pub(crate) tree: &'a WidgetTree,
-  pub(crate) ctx: &'a mut Context,
+  pub(crate) tree: &'a mut WidgetTree,
 }
 
 impl<'a> LayoutCtx<'a> {
-  #[inline]
-  pub fn text_shaper(&self) -> &TextShaper { &self.ctx.shaper }
-
-  #[inline]
-  pub fn text_reorder(&self) -> &TextReorder { &self.ctx.reorder }
-
-  #[inline]
-  pub fn typography_store(&self) -> &TypographyStore { &self.ctx.typography_store }
-
-  #[inline]
-  pub fn font_db(&self) -> Arc<RwLock<FontDB>> { self.ctx.font_db.clone() }
-
   /// Update the position of the child render object should place. Relative to
   /// parent.
   #[inline]
   pub fn update_position(&mut self, child: WidgetId, pos: Point) {
-    self.ctx.layout_store.layout_box_rect_mut(child).origin = pos;
+    self.tree.layout_box_rect_mut(child).origin = pos;
   }
 
   /// Update the size of layout widget. Use this method to directly change the
@@ -44,36 +26,50 @@ impl<'a> LayoutCtx<'a> {
   /// know what you are doing.
   #[inline]
   pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    self.ctx.layout_store.layout_box_rect_mut(child).size = size;
+    self.tree.layout_box_rect_mut(child).size = size;
   }
 
   /// Do the work of computing the layout for render child, and return its size
   /// it should have. Should called from parent.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    child.perform_layout(clamp, self.tree, self.ctx)
+    child.perform_layout(clamp, self.tree)
   }
 
   /// Return a tuple of [`LayoutCtx`]! and an iterator of `id`'s children.
-  pub fn split_children_by(
+  pub fn split_children_for(
     &mut self,
     id: WidgetId,
   ) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    let children = id.children(self.tree);
+    let tree = self.tree as *mut WidgetTree;
+    // Safety: layout context will never mutable access the inner tree. So the
+    // iterator is safe.
+    let children = id.children(unsafe { &mut *tree });
+    (self, children)
+  }
+
+  /// Return a tuple of [`LayoutCtx`]! and an reverse iterator of `id`'s
+  /// children.
+  pub fn split_rev_children_for(
+    &mut self,
+    id: WidgetId,
+  ) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
+    let tree = self.tree as *mut WidgetTree;
+    // Safety: layout context will never mutable access the inner tree. So the
+    // iterator is safe.
+    let children = id.reverse_children(unsafe { &mut *tree });
     (self, children)
   }
 
   /// Return a tuple of [`LayoutCtx`]! and  an reverse iterator of children, so
   /// you can avoid the lifetime problem when precess on child.
   pub fn split_rev_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    let iter = self.id.reverse_children(self.tree);
-    (self, iter)
+    self.split_rev_children_for(self.id)
   }
 
   /// Return a tuple of [`LayoutCtx`]! and  an iterator of children, so
   /// you can avoid the lifetime problem when precess on child.
   pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    let iter = self.id.children(self.tree);
-    (self, iter)
+    self.split_children_for(self.id)
   }
 
   /// Clear the child layout information, so the `child` will be force layout
@@ -82,7 +78,7 @@ impl<'a> LayoutCtx<'a> {
   #[inline]
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
     assert_eq!(child.parent(self.widget_tree()), Some(self.id));
-    self.ctx.layout_store.remove(child).is_some()
+    self.tree.force_layout(child).is_some()
   }
 }
 
@@ -90,6 +86,4 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
   fn widget_tree(&self) -> &WidgetTree { self.tree }
-
-  fn context(&self) -> Option<&Context> { Some(self.ctx) }
 }

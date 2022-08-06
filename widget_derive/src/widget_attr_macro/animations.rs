@@ -403,14 +403,13 @@ impl Animate {
     let name = self.variable_name();
     transition.gen_tokens(&mut transition_token, ctx);
     tokens.extend(quote_spanned! { animate_span =>
-      let #name = #build_ctx.animate_store().register(
-        Box::new(
-          <#animate_token<_, _, _, _, _> as Declare>::builder()
-            .from(#from)
-            .transition(#transition_token)
-            .build(#build_ctx)
-          )
-      );
+      let #name = {
+        let animate = <#animate_token<_, _, _, _, _> as Declare>::builder()
+          .from(#from)
+          .transition(#transition_token)
+          .build(#build_ctx);
+        #build_ctx.register_animate(Box::new(animate))
+      };
     });
   }
 }
@@ -602,10 +601,10 @@ impl Trigger {
       let MemberPath { widget, dot_token, member } = &self.path;
       tokens.extend(quote_spanned! { self.span() =>
         #widget.clone()
-          .state_change(|w| &w #dot_token #member)
-          .subscribe(move |change| {
+          .state_change(|w| w #dot_token #member #dot_token clone())
+          .subscribe(move |mut change| {
             if change.before != change.after {
-              #animate_name.start();
+              change.context().start_animate(#animate_name);
             }
           });
       })

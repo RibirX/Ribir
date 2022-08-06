@@ -407,7 +407,7 @@ mod tests {
      }
     };
     let mut window = Window::wgpu_headless(w, DeviceSize::new(400, 600));
-    window.render_ready();
+    window.draw_frame();
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     expected.push("src/test_imgs/box_decoration.png");
     assert!(window.same_as_png(expected));

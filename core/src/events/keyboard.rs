@@ -143,7 +143,7 @@ mod tests {
     let keys = w.0.clone();
 
     let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Released));

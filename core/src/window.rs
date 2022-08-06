@@ -1,7 +1,7 @@
 use std::{cell::RefCell, error::Error, rc::Rc};
 
 use crate::{
-  context::Context,
+  context::AppContext,
   events::dispatcher::Dispatcher,
   prelude::{widget_tree::WidgetTree, *},
 };
@@ -64,7 +64,7 @@ impl RawWindow for winit::window::Window {
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
-  pub(crate) context: Rc<RefCell<Context>>,
+  pub(crate) context: Rc<RefCell<AppContext>>,
   pub(crate) painter: Painter,
   pub(crate) dispatcher: Dispatcher,
   pub(crate) widget_tree: WidgetTree,
@@ -96,7 +96,7 @@ impl Window {
   }
 
   /// Draw an image what current render tree represent.
-  pub(crate) fn draw_frame(&mut self) {
+  pub fn draw_frame(&mut self) {
     if self.need_draw() {
       let Self {
         raw_window,
@@ -108,10 +108,11 @@ impl Window {
       } = self;
 
       context.borrow_mut().begin_frame();
+      let struct_dirty = widget_tree.any_struct_dirty();
 
       widget_tree.tree_repair();
       widget_tree.layout(raw_window.inner_size());
-      if context.borrow().expr_widgets_dirty() {
+      if struct_dirty {
         dispatcher.refresh_focus(widget_tree);
       }
       widget_tree.draw(painter);
@@ -122,27 +123,21 @@ impl Window {
     }
   }
 
-  pub(crate) fn need_draw(&self) -> bool {
-    self.widget_tree.any_state_modified() || self.context.borrow().expr_widgets_dirty()
-  }
+  pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 
-  pub(crate) fn context(&self) -> &Rc<RefCell<Context>> { &self.context }
-
-  fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: Rc<RefCell<Context>>) -> Self
+  fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: Rc<RefCell<AppContext>>) -> Self
   where
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let mut widget_tree = WidgetTree::new(root, Rc::downgrade(&context));
+    let mut widget_tree = WidgetTree::new(root, context.clone());
     let mut dispatcher = Dispatcher::default();
     dispatcher.refresh_focus(&mut widget_tree);
     if let Some(auto_focusing) = dispatcher.auto_focus(&widget_tree) {
       dispatcher.focus(auto_focusing, &mut widget_tree)
     }
-    let painter = Painter::new(
-      wnd.scale_factor() as f32,
-      context.borrow().typography_store.clone(),
-    );
+    let typography = context.borrow().typography_store.clone();
+    let painter = Painter::new(wnd.scale_factor() as f32, typography);
     Self {
       dispatcher,
       raw_window: Box::new(wnd),
@@ -168,7 +163,7 @@ impl Window {
       .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
       .build(event_loop)
       .unwrap();
-    let ctx = Rc::new(RefCell::new(Context::default()));
+    let ctx = Rc::new(RefCell::new(AppContext::default()));
     let size = native_window.inner_size();
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
       &native_window,
@@ -286,7 +281,7 @@ impl RawWindow for MockRawWindow {
 impl Window {
   #[cfg(feature = "wgpu_gl")]
   pub fn wgpu_headless(root: Widget, size: DeviceSize) -> Self {
-    let ctx = Rc::new(RefCell::new(Context::default()));
+    let ctx = Rc::new(RefCell::new(AppContext::default()));
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
       size,
       None,

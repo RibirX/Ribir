@@ -507,6 +507,8 @@ impl StateChangeNotifier {
 mod tests {
   use lazy_static::__Deref;
 
+  use crate::prelude::widget_tree::WidgetTree;
+
   use super::*;
 
   #[test]
@@ -533,13 +535,11 @@ mod tests {
         key: 1,
       }
     };
-
-    let ctx = Context::new(stateful, 1.);
-    let tree = &ctx.widget_tree;
+    let tree = WidgetTree::new(stateful, <_>::default());
     let mut key = None;
     tree
       .root()
-      .assert_get(tree)
+      .assert_get(&tree)
       .query_on_first_type(QueryOrder::InnerFirst, |k: &Key| key = Some(k.clone()));
     assert!(key.is_some());
   }
@@ -563,17 +563,17 @@ mod tests {
 
     let state = sized_box.clone();
     let mut wnd = Window::without_render(sized_box.into_widget(), Size::new(500., 500.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     assert_eq!(*notified_count.borrow(), 0);
-    assert_eq!(wnd.context().is_dirty(), false);
+    assert_eq!(wnd.widget_tree.any_state_modified(), false);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
     {
       state.state_ref().size = Size::new(1., 1.);
     }
-    wnd.context.tree_repair();
+    wnd.widget_tree.tree_repair();
     assert_eq!(*notified_count.borrow(), 1);
-    assert_eq!(wnd.context.is_dirty(), true);
+    assert_eq!(wnd.widget_tree.any_state_modified(), true);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
   }
 
@@ -583,8 +583,8 @@ mod tests {
       widget! { SizedBox { size: Size::new(100., 100.) } },
       Size::new(500., 500.),
     );
-    wnd.render_ready();
-    let tree = &wnd.context().widget_tree;
+    wnd.draw_frame();
+    let tree = &wnd.widget_tree;
     assert_eq!(tree.root().descendants(tree).count(), 1);
   }
 

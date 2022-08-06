@@ -32,7 +32,7 @@ pub struct Anchor {
 
 impl Render for Anchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if let Some(c) = ctx.single_child() {
+    ctx.single_child().map_or_else(Size::zero, |c| {
       let child_size = ctx.perform_child_layout(c, clamp);
       let x = match self.x {
         XAnchor::Left(l) => l,
@@ -44,9 +44,7 @@ impl Render for Anchor {
       };
       ctx.update_position(c, Point::new(x, y));
       child_size
-    } else {
-      Size::zero()
-    }
+    })
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}

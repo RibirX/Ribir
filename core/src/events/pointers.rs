@@ -336,7 +336,7 @@ mod tests {
       }
     };
     let mut wnd = Window::without_render(w, size);
-    wnd.render_ready();
+    wnd.draw_frame();
 
     (wnd, count)
   }

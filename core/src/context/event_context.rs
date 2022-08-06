@@ -28,6 +28,4 @@ impl<'a> WidgetCtxImpl for EventCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
   fn widget_tree(&self) -> &crate::prelude::widget_tree::WidgetTree { self.tree }
-
-  fn context(&self) -> Option<&super::Context> { None }
 }
