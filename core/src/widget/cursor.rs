@@ -83,14 +83,14 @@ mod tests {
         size: Size::new(f32::INFINITY, f32::INFINITY),
         cursor: CursorIcon::AllScroll,
         Row{
-          v_align: CrossAxisAlign::Start,
-          h_align: MainAxisAlign::Start,
+          align_items: Align::Start,
+          justify_content: JustifyContent::Start,
           SizedBox {
             size: Size::new(200., 200.),
             cursor: CursorIcon::Hand,
             Row {
-              v_align: CrossAxisAlign::Start,
-              h_align: MainAxisAlign::Start,
+              align_items: Align::Start,
+              justify_content: JustifyContent::Start,
               SizedBox {
                 size:  Size::new(100., 100.),
                 cursor: CursorIcon::Help,

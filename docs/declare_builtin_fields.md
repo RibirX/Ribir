@@ -58,6 +58,10 @@
  	 - specify the event handler when user moving a mouse wheel or similar input device.
 - scrollable : [`Scrollable`] 
  	 - enumerate to describe which direction allow widget to scroll.
+- h_align : [`HAlign`] 
+ 	 - describe how widget align to its box in x-axis.
+- v_align : [`VAlign`] 
+ 	 - describe how widget align to its box in y-axis.
 - margin : [`impl EdgeInsets`] 
  	 - expand space around widget wrapped.
 
@@ -118,5 +122,9 @@
 [`impl FnMut(& mut WheelEvent)`]: prelude::impl FnMut(& mut WheelEvent)
 
 [`Scrollable`]: prelude::Scrollable
+
+[`HAlign`]: prelude::HAlign
+
+[`VAlign`]: prelude::VAlign
 
 [`impl EdgeInsets`]: prelude::impl EdgeInsets
