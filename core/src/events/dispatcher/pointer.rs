@@ -212,7 +212,6 @@ impl PointerDispatcher {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::layout::{CrossAxisAlign, Row};
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
@@ -515,7 +514,7 @@ mod tests {
         widget! {
           track { this }
           Row {
-            v_align: CrossAxisAlign::Start,
+            align_items: Align::Start,
             on_tap: move |_| {
               let mut res = this.0.borrow_mut();
               *res += 1;

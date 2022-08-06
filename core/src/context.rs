@@ -222,7 +222,7 @@ mod tests {
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
     let mut ctx = Context::new(post.into_widget(), 1., None);
-    assert_eq!(ctx.widget_tree.count(), 18);
+    assert_eq!(ctx.widget_tree.count(), 17);
     ctx.mark_root_dirty();
     ctx.drop_subtree(ctx.widget_tree.root());
 

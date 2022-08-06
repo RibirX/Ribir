@@ -1,8 +1,5 @@
 #![cfg(test)]
-use crate::{
-  prelude::*,
-  widget::layout::{flex::CrossAxisAlign, Row},
-};
+use crate::prelude::*;
 
 #[derive(Clone, Debug)]
 pub struct EmbedPost {
@@ -28,7 +25,7 @@ impl Compose for EmbedPost {
     widget! {
       track { this }
       Row {
-        v_align: CrossAxisAlign::Start,
+        align_items: Align::Start,
         Text { text: this.title }
         Text { text: this.author }
         Text { text: this.content }

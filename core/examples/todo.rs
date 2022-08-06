@@ -16,7 +16,7 @@ impl Compose for Todos {
       // split this to avoid mutable borrow conflict in `ExprWidget`.
       track { this, this2: this.clone() }
       Column {
-        h_align: CrossAxisAlign::Start,
+        align_items: Align::Start,
         ExprWidget {
           expr: this.tasks.iter().enumerate().map(|(idx, task)| {
             let checked = task.finished;

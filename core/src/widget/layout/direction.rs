@@ -1,12 +1,8 @@
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub enum Direction {
+  #[default]
   /// Left and right.
   Horizontal,
   /// Up and down.
   Vertical,
-}
-
-impl Default for Direction {
-  #[inline]
-  fn default() -> Self { Direction::Horizontal }
 }

@@ -51,6 +51,7 @@ pub(crate) use composed_widget::ComposedWidget;
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
+  // todo: use  enum replace Stateful?
   fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget
   where
     Self: Sized;
