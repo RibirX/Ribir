@@ -604,7 +604,7 @@ impl Trigger {
           .state_change(|w| w #dot_token #member #dot_token clone())
           .subscribe(move |mut change| {
             if change.before != change.after {
-              change.context().start_animate(#animate_name);
+              #animate_name.start();
             }
           });
       })

@@ -10,8 +10,8 @@ use std::{
 mod animation_store;
 mod generator_store;
 mod layout_info;
-pub use animation_store::AnimationId;
-use animation_store::AnimationStore;
+pub use animation_store::AnimateHandler;
+use animation_store::AnimateStore;
 pub use layout_info::*;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
@@ -25,7 +25,7 @@ pub(crate) struct WidgetTree {
   /// clamp passed from parent.
   layout_store: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
   pub(crate) generator_store: generator_store::GeneratorStore,
-  animations_store: AnimationStore,
+  animations_store: Rc<RefCell<AnimateStore>>,
 }
 
 impl WidgetTree {
@@ -36,7 +36,7 @@ impl WidgetTree {
     let node: Box<dyn Render> = Box::new(Void);
     let root = WidgetId(arena.new_node(node));
     let ticker = ctx.borrow().frame_ticker.frame_tick_stream();
-    let animations_store = AnimationStore::new(ticker);
+    let animations_store = Rc::new(RefCell::new(AnimateStore::new(ticker)));
     let mut tree = WidgetTree {
       arena,
       root,

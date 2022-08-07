@@ -1,5 +1,5 @@
 use crate::prelude::{
-  widget_tree::{AnimationId, WidgetTree},
+  widget_tree::{AnimateHandler, WidgetTree},
   *,
 };
 use std::rc::Rc;
@@ -41,7 +41,7 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub fn register_animate(&mut self, animate: Box<dyn AnimationCtrl>) -> AnimationId {
+  pub fn register_animate(&mut self, animate: Box<dyn AnimateCtrl>) -> AnimateHandler {
     self.tree.register_animate(animate)
   }
 

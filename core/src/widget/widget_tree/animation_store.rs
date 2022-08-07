@@ -1,5 +1,5 @@
 use crate::{
-  prelude::{AnimateProgress, AnimationCtrl},
+  prelude::{AnimateCtrl, AnimateProgress},
   ticker::FrameMsg,
 };
 use algo::id_map::{Id, IdMap};
@@ -11,88 +11,75 @@ use rxrust::{
 use super::WidgetTree;
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
-pub struct AnimationId(Id);
+#[derive(Clone)]
+pub struct AnimateHandler {
+  id: Id,
+  store: Rc<RefCell<AnimateStore>>,
+}
 
-pub struct AnimationStore {
-  animations: Rc<RefCell<IdMap<Box<dyn AnimationCtrl>>>>,
-  running: Rc<RefCell<HashSet<AnimationId, ahash::RandomState>>>,
+pub struct AnimateStore {
+  animations: IdMap<Box<dyn AnimateCtrl>>,
+  running: HashSet<Id, ahash::RandomState>,
   frame_ticker: LocalSubject<'static, FrameMsg, ()>,
   tick_msg_guard: Option<SubscriptionGuard<MutRc<SingleSubscription>>>,
 }
 
-impl AnimationId {
-  pub fn start(self, mgr: &mut AnimationStore) {
-    let AnimationStore {
-      animations,
-      running,
-      frame_ticker,
-      tick_msg_guard,
-    } = mgr;
-    running.borrow_mut().insert(self);
-
-    if tick_msg_guard.is_none() {
-      let runnings = running.clone();
-      let animations = animations.clone();
-      let guard = frame_ticker
+impl AnimateHandler {
+  pub fn start(&self) {
+    let c_store = self.store.clone();
+    let mut store = self.store.borrow_mut();
+    store.running.insert(self.id);
+    if store.tick_msg_guard.is_none() {
+      let guard = store
+        .frame_ticker
         .clone()
-        .subscribe(move |msg| match msg {
-          FrameMsg::Ready(time) => {
-            let mut animations = animations.borrow_mut();
-            let mut runnings = runnings.borrow_mut();
+        .subscribe(move |msg| {
+          let mut store = c_store.borrow_mut();
+          match msg {
+            FrameMsg::Ready(time) => {
+              let mut finished = vec![];
+              store.inspect_running_animate(|id, animate| {
+                let p = animate.lerp_by(time);
+                if matches!(p, AnimateProgress::Finish) {
+                  finished.push(id);
+                }
+              });
 
-            let mut finished = vec![];
-            runnings.iter().for_each(|id| {
-              let p = id.running_animation(&mut *animations).lerp_by(time);
-              if matches!(p, AnimateProgress::Finish) {
-                finished.push(*id);
-              }
-            });
-            finished.iter().for_each(|id| {
-              runnings.remove(id);
-            });
-          }
-          FrameMsg::Finish => {
-            let mut animations = animations.borrow_mut();
-            let runnings = runnings.borrow_mut();
-
-            runnings
-              .iter()
-              .for_each(|id| id.running_animation(&mut *animations).frame_finished());
+              finished.iter().for_each(|id| {
+                store.running.remove(id);
+              });
+            }
+            FrameMsg::Finish => {
+              store.inspect_running_animate(|_, animate| animate.frame_finished())
+            }
           }
         })
         .unsubscribe_when_dropped();
-      *tick_msg_guard = Some(guard)
+      store.tick_msg_guard = Some(guard)
     }
   }
 
-  pub fn stop(self, mgr: &mut AnimationStore) {
-    mgr.running.borrow_mut().remove(&self);
+  pub fn stop(&self) {
+    let mut store = self.store.borrow_mut();
+    store.running.remove(&self.id);
     // if there isn't running  animation, cancel the ticker subscription.
-    if mgr.running.borrow().is_empty() {
-      mgr.tick_msg_guard.take();
+    if store.running.is_empty() {
+      store.tick_msg_guard.take();
     }
   }
 
   #[inline]
-  pub fn is_running(self, mgr: &mut AnimationStore) -> bool { mgr.running.borrow().contains(&self) }
+  pub fn is_running(self) -> bool { self.store.borrow().running.contains(&self.id) }
 
-  pub fn drop(self, mgr: &mut AnimationStore) {
-    mgr.animations.borrow_mut().remove(self.0);
-    mgr.running.borrow_mut().remove(&self);
-  }
-
-  fn running_animation(
-    self,
-    animations: &mut IdMap<Box<dyn AnimationCtrl>>,
-  ) -> &mut dyn AnimationCtrl {
-    &mut **animations
-      .get_mut(self.0)
-      .expect("Running animation not found.")
+  #[inline]
+  pub fn unregister(self) -> Option<Box<dyn AnimateCtrl>> {
+    let mut store = self.store.borrow_mut();
+    store.running.remove(&self.id);
+    store.animations.remove(self.id)
   }
 }
 
-impl AnimationStore {
+impl AnimateStore {
   pub fn new(frame_ticker: LocalSubject<'static, FrameMsg, ()>) -> Self {
     Self {
       animations: <_>::default(),
@@ -102,13 +89,21 @@ impl AnimationStore {
     }
   }
 
-  pub fn register(&mut self, animation: Box<dyn AnimationCtrl>) -> AnimationId {
-    AnimationId(self.animations.borrow_mut().insert(animation))
+  pub fn register(this: Rc<RefCell<Self>>, animate: Box<dyn AnimateCtrl>) -> AnimateHandler {
+    let id = this.borrow_mut().animations.insert(animate);
+    AnimateHandler { id, store: this }
+  }
+
+  fn inspect_running_animate(&mut self, mut f: impl FnMut(Id, &mut dyn AnimateCtrl)) {
+    self.running.iter().for_each(|id| {
+      let animate = &mut **self.animations.get_mut(*id).expect(" Animate not found.");
+      f(*id, animate)
+    });
   }
 }
 
 impl WidgetTree {
-  pub fn register_animate(&mut self, animate: Box<dyn AnimationCtrl>) -> AnimationId {
-    self.animations_store.register(animate)
+  pub fn register_animate(&mut self, animate: Box<dyn AnimateCtrl>) -> AnimateHandler {
+    AnimateStore::register(self.animations_store.clone(), animate)
   }
 }
