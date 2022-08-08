@@ -11,3 +11,5 @@ pub use state::*;
 pub use transition::*;
 mod animate;
 pub use animate::*;
+mod lerp;
+pub use lerp::Lerp;

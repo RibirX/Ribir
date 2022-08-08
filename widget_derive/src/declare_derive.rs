@@ -89,12 +89,10 @@ impl Parse for DeclareAttr {
 }
 
 pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
-  let vis = &input.vis;
-  let name = &input.ident;
+  let syn::DeriveInput { vis, ident: name, generics, data, .. } = input;
+  let (g_impl, g_ty, g_where) = generics.split_for_impl();
 
-  let (g_impl, g_ty, g_where) = input.generics.split_for_impl();
-
-  let stt = struct_unwrap(&mut input.data, DECLARE)?;
+  let stt = struct_unwrap(data, DECLARE)?;
   let mut builder_fields = collect_filed_and_attrs(stt)?;
 
   let builder = Ident::new(&format!("{}{}", name, BUILDER), name.span());

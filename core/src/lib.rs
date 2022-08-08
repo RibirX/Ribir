@@ -47,7 +47,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use widget::layout::{MultiChildWidget, SingleChildWidget};
   #[doc(no_inline)]
-  pub use widget_derive::{include_svg, widget, Declare, MultiChild, SingleChild};
+  pub use widget_derive::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild};
 }
 
 pub mod test;

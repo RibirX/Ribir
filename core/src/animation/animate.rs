@@ -1,9 +1,5 @@
-use std::{
-  ops::{Add, Mul, Sub},
-  time::Instant,
-};
-
 use crate::prelude::*;
+use std::time::Instant;
 
 #[derive(Declare)]
 pub struct Animate<T, I, F, W, R>
@@ -40,8 +36,8 @@ where
   I: Fn() -> R,
   F: Fn() -> R,
   W: FnMut(R) + 'static,
-  T: Tween,
-  R: Sub<R, Output = R> + Add<R, Output = R> + Mul<f32, Output = R> + Clone,
+  T: Roc,
+  R: Lerp + Clone,
 {
   fn start(&mut self, start_at: Instant) {
     assert!(
@@ -62,10 +58,10 @@ where
       .as_mut()
       .expect("This animation is not running.");
     let elapsed = now - info.start_at;
-    let progress = self.transition.tween(elapsed);
+    let progress = self.transition.rate_of_change(elapsed);
 
-    if let AnimateProgress::Between(rate) = self.transition.tween(elapsed) {
-      let animate_state = info.from.clone() + (info.to.clone() - info.from.clone()) * rate;
+    if let AnimateProgress::Between(rate) = progress {
+      let animate_state = info.from.lerp(&info.to, rate);
       self.state.update(animate_state);
     }
     info.last_progress = progress;

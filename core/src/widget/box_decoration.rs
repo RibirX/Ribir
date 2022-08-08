@@ -23,7 +23,7 @@ pub struct Border {
   pub bottom: BorderSide,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Lerp)]
 pub struct BorderSide {
   pub color: Color,
   pub width: f32,

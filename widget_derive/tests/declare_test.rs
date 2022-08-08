@@ -328,27 +328,3 @@ fn fix_builtin_field_can_declare_as_widget() {
   let wnd = Window::without_render(w, Size::zero());
   assert_eq!(wnd.widget_count(), 2);
 }
-
-#[test]
-fn x() {
-  let _def_ref = widget! {
-    SizedBox {
-      id: sized_box,
-      size: Size::zero()
-    }
-    animations {
-      Transition {
-        id: transition1,
-        easing: easing::EASE
-      }
-      Animate {
-        id: animate1,
-        from: State {
-          sized_box.size: Size::new(10., 10.)
-        },
-        transition: transition1,
-      }
-      sized_box.size: animate1
-    }
-  };
-}

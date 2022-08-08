@@ -219,6 +219,15 @@ impl State {
     });
     tokens
   }
+
+  fn maybe_tuple_value(&self, value_by_field: impl Fn(&StateField) -> TokenStream) -> TokenStream {
+    let value_tokens = self.fields.iter().map(|s| value_by_field(s));
+    if self.fields.len() > 1 {
+      quote! { (#(#value_tokens), *)}
+    } else {
+      quote! { #(#value_tokens), *}
+    }
+  }
 }
 
 impl Parse for State {
@@ -477,13 +486,8 @@ impl ToTokens for State {
     } = self;
     let state_span = state_token.span.join(brace_token.span).unwrap();
 
-    let init_expr = fields.iter().map(|f| &f.expr);
+    let init_value = self.maybe_tuple_value(|StateField { expr, .. }| quote! {#expr});
 
-    let init_value = if fields.len() > 1 {
-      quote! { (#(#init_expr), *)}
-    } else {
-      quote! { #(#init_expr), *}
-    };
     let init_refs = expr_used.refs_tokens().into_iter().flatten();
     let mut init_fn = quote! {
       move || {
@@ -501,22 +505,25 @@ impl ToTokens for State {
     };
 
     let target_captures = self.capture_target_tokens();
-    let target_value = fields.iter().map(
-      |StateField {
-         path: MemberPath { widget, dot_token, member, .. },
-         ..
-       }| {
-        quote! { #widget #dot_token state_ref() #dot_token #member #dot_token clone() }
-      },
-    );
-    let mut shallow_access = fields.iter().map(
-      |StateField {
-         path: MemberPath { widget, dot_token, member, .. },
-         ..
-       }| {
-        quote! { #widget #dot_token shallow_ref() #dot_token #member}
-      },
-    );
+    let target_value = self.maybe_tuple_value(|StateField { path, .. }| {
+      let dot_token = &path.dot_token;
+      let member = &path.member;
+      let mut tokens = quote! {};
+      path.on_real_widget_name(|widget| {
+        tokens = quote! { #widget #dot_token state_ref() #dot_token #member #dot_token clone() }
+      });
+      tokens
+    });
+
+    let mut shallow_access = fields.iter().map(|StateField { path, .. }| {
+      let dot_token = &path.dot_token;
+      let member = &path.member;
+      let mut tokens = quote! {};
+      path.on_real_widget_name(|widget| {
+        tokens = quote! { #widget #dot_token shallow_ref() #dot_token #member }
+      });
+      tokens
+    });
     let update_fn = if fields.len() > 1 {
       let indexes = (0..fields.len()).map(syn::Index::from);
       quote! { move |val| { #(#shallow_access = val.#indexes;)*} }
@@ -529,7 +536,7 @@ impl ToTokens for State {
         #init_fn,
         {
           #target_captures
-          move || { #(#target_value)*}
+          move || { #target_value}
         },
         {
           #target_captures
