@@ -6,7 +6,7 @@ use winit::window::CursorIcon;
 
 #[derive(Declare, Debug)]
 pub struct Cursor {
-  #[declare(custom_convert, builtin, default)]
+  #[declare(convert=custom, builtin, default)]
   pub cursor: Rc<Cell<CursorIcon>>,
 }
 
@@ -48,8 +48,16 @@ impl IntoCursorIcon for CursorIcon {
 
 impl CursorBuilder {
   #[inline]
-  pub fn cursor_convert<C: IntoCursorIcon>(icon: C) -> Rc<Cell<CursorIcon>> {
-    icon.into_cursor_icon()
+  pub fn cursor<C: IntoCursorIcon>(mut self, icon: C) -> Self {
+    self.cursor = Some(icon.into_cursor_icon());
+    self
+  }
+}
+
+impl Cursor {
+  #[inline]
+  pub fn set_declare_cursor<C: IntoCursorIcon>(&mut self, icon: C) {
+    self.cursor = icon.into_cursor_icon();
   }
 }
 

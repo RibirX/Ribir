@@ -4,7 +4,7 @@ use crate::{impl_query_self_only, prelude::*};
 /// pushed to the end of a string.
 #[derive(Declare)]
 pub struct CharListener {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut CharEvent)))]
   on_char: Box<dyn for<'r> FnMut(&'r mut CharEvent)>,
 }
 
@@ -51,15 +51,6 @@ impl EventListener for CharListener {
   type Event = CharEvent;
   #[inline]
   fn dispatch(&mut self, event: &mut CharEvent) { (self.on_char)(event) }
-}
-
-impl CharListenerBuilder {
-  #[inline]
-  pub fn on_char_convert(
-    f: impl for<'r> FnMut(&'r mut CharEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut CharEvent)> {
-    Box::new(f)
-  }
 }
 
 #[cfg(test)]

@@ -1,52 +1,128 @@
 use crate::util::struct_unwrap;
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-  parse::Parse, parse_quote, punctuated::Punctuated, spanned::Spanned, token, DataStruct, Fields,
-  Ident, Result,
+  parse::{discouraged::Speculative, Parse},
+  parse_quote,
+  punctuated::Punctuated,
+  spanned::Spanned,
+  token, DataStruct, Fields, Ident, Result,
 };
 
 const DECLARE: &str = "Declare";
 const BUILDER: &str = "Builder";
 const DECLARE_ATTR: &str = "declare";
 
-struct DefaultValue {
-  default_token: kw::default,
+struct DefaultMeta {
+  _default_kw: kw::default,
   _eq_token: Option<syn::token::Eq>,
-  value: Option<syn::LitStr>,
+  value: Option<syn::Expr>,
+}
+
+struct BoxTraitValue {
+  _box_trait_kw: kw::box_trait,
+  _paren: token::Paren,
+  value: syn::TraitBound,
+}
+enum ConvertValue {
+  Into(kw::into),
+  BoxTrait(BoxTraitValue),
+  Custom(kw::custom),
+  Stipe(kw::strip_option),
+}
+struct ConvertMeta {
+  _convert_kw: kw::convert,
+  _eq_token: Option<syn::token::Eq>,
+  value: ConvertValue,
 }
 
 #[derive(Default)]
 struct DeclareAttr {
-  rename: Option<syn::LitStr>,
+  rename: Option<syn::Ident>,
   builtin: Option<kw::builtin>,
-  default: Option<DefaultValue>,
-  custom_convert: Option<kw::custom_convert>,
+  default: Option<DefaultMeta>,
+  convert: Option<ConvertMeta>,
 }
 
+struct DeclareField<'a> {
+  attr: Option<DeclareAttr>,
+  field: &'a syn::Field,
+}
 mod kw {
   use syn::custom_keyword;
   custom_keyword!(rename);
   custom_keyword!(builtin);
   custom_keyword!(default);
-  custom_keyword!(custom_convert);
+  custom_keyword!(convert);
+  custom_keyword!(into);
+  custom_keyword!(box_trait);
+  custom_keyword!(custom);
+  custom_keyword!(strip_option);
 }
 
-pub fn field_convert_method(field_name: &Ident) -> Ident {
-  Ident::new(&format!("{field_name}_convert",), field_name.span())
+#[inline]
+pub fn declare_field_name(field_name: &Ident) -> Ident {
+  Ident::new(&format!("set_declare_{field_name}",), field_name.span())
 }
 
+// todo: remove this method after `if guard` syntax removed from `widget!`
+// macro.
 pub fn field_default_method(field_name: &Ident) -> Ident {
   Ident::new(&format!("{field_name}_default",), field_name.span())
 }
 
-impl Parse for DefaultValue {
+impl Parse for DefaultMeta {
   fn parse(input: syn::parse::ParseStream) -> Result<Self> {
     Ok(Self {
-      default_token: input.parse()?,
+      _default_kw: input.parse()?,
+      _eq_token: input.parse()?,
+      value: {
+        let ahead = input.fork();
+        let expr = ahead.parse::<syn::Expr>();
+        if expr.is_ok() {
+          input.advance_to(&ahead);
+        }
+        expr.ok()
+      },
+    })
+  }
+}
+
+impl Parse for ConvertMeta {
+  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
+    Ok(Self {
+      _convert_kw: input.parse()?,
       _eq_token: input.parse()?,
       value: input.parse()?,
+    })
+  }
+}
+
+impl Parse for ConvertValue {
+  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
+    let lk = input.lookahead1();
+    if lk.peek(kw::into) {
+      input.parse().map(ConvertValue::Into)
+    } else if lk.peek(kw::custom) {
+      input.parse().map(ConvertValue::Custom)
+    } else if lk.peek(kw::box_trait) {
+      input.parse().map(ConvertValue::BoxTrait)
+    } else if lk.peek(kw::strip_option) {
+      input.parse().map(ConvertValue::Stipe)
+    } else {
+      Err(lk.error())
+    }
+  }
+}
+
+impl Parse for BoxTraitValue {
+  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
+    let content;
+    Ok(Self {
+      _box_trait_kw: input.parse()?,
+      _paren: syn::parenthesized!(content in input),
+      value: content.parse()?,
     })
   }
 }
@@ -65,8 +141,8 @@ impl Parse for DeclareAttr {
         input.parse::<kw::rename>()?;
         input.parse::<syn::Token![=]>()?;
         attr.rename = Some(input.parse()?);
-      } else if lookahead.peek(kw::custom_convert) {
-        attr.custom_convert = Some(input.parse()?);
+      } else if lookahead.peek(kw::convert) {
+        attr.convert = Some(input.parse()?);
       } else if lookahead.peek(kw::default) {
         attr.default = Some(input.parse()?);
       } else {
@@ -95,105 +171,92 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let stt = struct_unwrap(data, DECLARE)?;
   let mut builder_fields = collect_filed_and_attrs(stt)?;
 
-  let builder = Ident::new(&format!("{}{}", name, BUILDER), name.span());
-
-  // rename fields if need
-  builder_fields
-    .iter_mut()
-    .try_for_each::<_, syn::Result<()>>(|(f, attr)| {
-      if let Some(new_name) = attr.as_ref().and_then(|attr| attr.rename.as_ref()) {
-        f.ident = Some(syn::Ident::new(new_name.value().as_str(), new_name.span()));
-      }
-      Ok(())
-    })?;
-
   // reverse name check.
-  let reserve_ident = &crate::widget_attr_macro::RESERVE_IDENT;
   builder_fields
     .iter_mut()
-    .filter_map(|(f, attr)| {
-      let not_builtin = attr.as_ref().map_or(true, |attr| attr.builtin.is_none());
-      not_builtin.then(|| f)
-    })
-    .for_each(|f| {
-      let field_name = f.ident.as_ref().unwrap();
-      if let Some(doc) = reserve_ident.get(field_name.to_string().as_str()) {
-        let msg = format!("the identify `{}` is reserved to {}", field_name, &doc);
-        // not display the attrs in the help code.
-        f.attrs.clear();
-        Diagnostic::spanned(vec![field_name.span().unwrap()], Level::Error, msg)
-          .help(format! {
-            "use `rename` meta to avoid the name conflict in `widget!` macro.\n\n\
-            #[declare(rename = \"xxx\")] \n\
-            {}", quote!{ #f }
-          })
-          .emit();
-      }
-    });
+    .for_each(DeclareField::check_reserve);
 
+  let builder = Ident::new(&format!("{}{}", name, BUILDER), name.span());
   // builder define
   let def_fields = builder_fields.pairs().map(|p| {
-    let ((f, _), c) = p.into_tuple();
-    let mut f = f.clone();
+    let (f, c) = p.into_tuple();
+    let mut f = f.field.clone();
     let ty = &f.ty;
     f.ty = parse_quote!(Option<#ty>);
     syn::punctuated::Pair::new(f, c)
   });
 
   // implement declare trait
-  let fields_ident = stt.fields.iter().map(|f| f.ident.as_ref());
+  let fields_ident = builder_fields.iter().map(|f| f.field.ident.as_ref());
+  let builder_fields_ident = fields_ident.clone();
 
-  let builder_fields_ident = builder_fields
-    .iter()
-    .map(|(f, _)| f.ident.as_ref().unwrap());
-
-  let init_values = builder_fields.iter().map(|(f, attr)| {
-    let field_name = f.ident.as_ref().unwrap();
-
-    let or_default = attr.as_ref().and_then(|a| a.default.as_ref()).map_or_else(
-      || {
-        quote_spanned! { f.span() => expect(&format!("Required field `{}::{}` not set", stringify!(#name), stringify!(#field_name)))}
-      },
-      |d| {
-      let default_method = field_default_method(field_name);
-      quote_spanned!{d.default_token.span() =>  unwrap_or_else(|| Self::#default_method(ctx))}
-    });
-
-    quote_spanned! { f.span() => self.#field_name.#or_default }
+  let fill_default = builder_fields.iter().filter_map(|f| {
+    let field_name = f.member();
+    let method = f.set_method_name();
+    f.attr.as_ref().and_then(|attr| {
+      attr.default.as_ref().map(|df| {
+        let set_default_value = if let Some(v) = df.value.as_ref() {
+          quote! { self = self.#method(#v); }
+        } else {
+          quote! { self.#field_name = Some(<_>::default()) }
+        };
+        quote! {
+          if self.#field_name.is_none() {
+            #set_default_value
+          }
+        }
+      })
+    })
   });
 
-  let methods = builder_fields.iter().map(|(f, attr)| {
-    let field_name = f.ident.as_ref().unwrap();
-    let ty = &f.ty;
-    let mut method_tokens = quote! {
-      #[inline]
-      #vis fn #field_name(mut self, v: #ty) -> Self {
-        self.#field_name = Some(v);
-        self
+  let init_values = builder_fields.iter().map(|df| {
+    let field_name = df.field.ident.as_ref().unwrap();
+    let method = df.set_method_name();
+    quote_spanned! { field_name.span() =>
+      self.#field_name.expect(&format!(
+        "Required field `{}::{}` not set, use method `{}` init it",
+        stringify!(#name), stringify!(#field_name), stringify!(#method)
+      ))
+    }
+  });
+
+  let mut builder_methods = quote! {};
+  let mut methods = quote! {};
+  builder_fields.iter().for_each(
+    |f @ DeclareField {
+       attr,
+       field: syn::Field { vis: f_vis, ident, ty, .. },
+     }| {
+      let field_name = ident.as_ref().unwrap();
+      let set_method = f.set_method_name();
+      let declare_set = declare_field_name(set_method);
+      if let Some((value_arg, expr)) = f.setter_value_arg_and_expr() {
+        builder_methods.extend(quote! {
+          #[inline]
+          #vis fn #set_method(mut self, #value_arg) -> Self {
+            self.#field_name = Some(#expr);
+            self
+          }
+        });
+        methods.extend(quote! {
+          #[inline]
+          #f_vis fn #declare_set(&mut self, #value_arg) {
+            self.#field_name = #expr;
+          }
+        });
       }
-    };
 
-    if attr
-      .as_ref()
-      .map_or(true, |attr| attr.custom_convert.is_none())
-    {
-      let convert_method = field_convert_method(field_name);
-      method_tokens.extend(quote! {
-        #[inline]
-        #vis fn #convert_method(v: #ty) -> #ty { v }
-      });
-    }
-
-    if let Some(DeclareAttr { default: Some(d), .. }) = attr.as_ref() {
-      let value = d.default_value(field_name);
-      let default_method = field_default_method(field_name);
-      method_tokens.extend(quote! {
-        #vis fn #default_method(ctx: &mut BuildCtx) -> #ty { #value }
-      });
-    }
-
-    method_tokens
-  });
+      if let Some(DeclareAttr { default, .. }) = attr {
+        if let Some(default) = default {
+          let value = default.default_value(field_name);
+          let default_method = field_default_method(field_name);
+          builder_methods.extend(quote! {
+            #vis fn #default_method(ctx: &mut BuildCtx) -> #ty { #value }
+          });
+        }
+      }
+    },
+  );
 
   let tokens = quote! {
 
@@ -212,29 +275,29 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       impl #g_impl DeclareBuilder for #builder #g_ty #g_where {
         type Target = #name #g_ty;
         #[inline]
-        #[allow(dead_code)]
-        fn build(self, ctx: &mut BuildCtx) -> Self::Target {
+        fn build(mut self, ctx: &mut BuildCtx) -> Self::Target {
+          #(#fill_default)*
           #name {
             #(#fields_ident : #init_values),* }
         }
       }
 
+      impl #g_impl #name #g_ty #g_where {
+        #methods
+      }
+
       impl #g_impl #builder #g_ty #g_where {
-        #(#methods)*
+        #builder_methods
       }
   };
-
-  // println!("declare gen tokens {tokens}");
   Ok(tokens)
 }
 
-impl DefaultValue {
-  fn default_value(&self, field_name: &Ident) -> TokenStream {
+impl DefaultMeta {
+  fn default_value(&self, _: &Ident) -> TokenStream {
     match &self.value {
       Some(v) => {
-        let expr: syn::Expr = v.parse().unwrap();
-        let field_convert = field_convert_method(field_name);
-        quote! {Self::#field_convert(#expr)}
+        quote! { #v }
       }
       None => {
         quote! {<_>::default()}
@@ -242,32 +305,30 @@ impl DefaultValue {
     }
   }
 }
-fn collect_filed_and_attrs(
-  stt: &mut DataStruct,
-) -> Result<Punctuated<(syn::Field, Option<DeclareAttr>), token::Comma>> {
+fn collect_filed_and_attrs(stt: &mut DataStruct) -> Result<Punctuated<DeclareField, token::Comma>> {
   let mut builder_fields = Punctuated::default();
   match &mut stt.fields {
     Fields::Named(named) => {
       named
         .named
         .pairs_mut()
-        .try_for_each::<_, syn::Result<()>>(|mut pair| {
-          let idx = pair
-            .value()
+        .try_for_each::<_, syn::Result<()>>(|pair| {
+          let (field, comma) = pair.into_tuple();
+          let idx = field
             .attrs
             .iter()
             .position(|attr| attr.path.is_ident(DECLARE_ATTR));
           let builder_attr = if let Some(idx) = idx {
-            let attr = pair.value_mut().attrs.remove(idx);
+            let attr = field.attrs.remove(idx);
             let args: DeclareAttr = attr.parse_args()?;
             Some(args)
           } else {
             None
           };
 
-          builder_fields.push(((*pair.value()).clone(), builder_attr));
-          if let Some(c) = pair.punct() {
-            builder_fields.push_punct(**c);
+          builder_fields.push(DeclareField { attr: builder_attr, field });
+          if let Some(c) = comma {
+            builder_fields.push_punct(c.clone());
           }
 
           Ok(())
@@ -283,4 +344,70 @@ fn collect_filed_and_attrs(
     }
   };
   Ok(builder_fields)
+}
+
+impl<'a> DeclareField<'a> {
+  fn member(&self) -> &Ident { self.field.ident.as_ref().unwrap() }
+
+  fn set_method_name(&self) -> &Ident {
+    self
+      .attr
+      .as_ref()
+      .and_then(|attr| attr.rename.as_ref())
+      .or(self.field.ident.as_ref())
+      .unwrap()
+  }
+
+  fn setter_value_arg_and_expr(&self) -> Option<(TokenStream, TokenStream)> {
+    let ty = &self.field.ty;
+    let cv = self
+      .attr
+      .as_ref()
+      .and_then(|attr| attr.convert.as_ref())
+      .map(|meta| &meta.value);
+    match cv {
+      Some(ConvertValue::Into(_)) => Some((
+        quote! { v: impl std::convert::Into<#ty> },
+        quote! { v.into() },
+      )),
+      Some(ConvertValue::Stipe(_)) => Some((
+        quote! { v: impl std::convert::Into<DeclareStripOption<#ty>> },
+        quote! { v.into().into_option_value() },
+      )),
+      Some(ConvertValue::BoxTrait(BoxTraitValue { ref value, .. })) => {
+        Some((quote! { v: impl #value + 'static }, quote! { Box::new(v)}))
+      }
+      // custom
+      Some(ConvertValue::Custom(_)) => None,
+      None => Some((quote! { v: #ty}, quote! {v})),
+    }
+  }
+
+  fn check_reserve(&mut self) {
+    // reverse name check.
+    let reserve_ident = &crate::widget_attr_macro::RESERVE_IDENT;
+
+    let not_builtin = self
+      .attr
+      .as_ref()
+      .map_or(true, |attr| attr.builtin.is_none());
+
+    if not_builtin {
+      let method_name = self.set_method_name();
+      if let Some(r) = reserve_ident.get(method_name.to_string().as_str()) {
+        let msg = format!("the identify `{}` is reserved to {}", method_name, &r);
+        let mut field = self.field.clone();
+        // not display the attrs in the help code.
+
+        field.attrs.clear();
+        Diagnostic::spanned(vec![method_name.span().unwrap()], Level::Error, msg)
+          .help(format! {
+            "use `rename` meta to avoid the name conflict in `widget!` macro.\n\n\
+            #[declare(rename = \"xxx\")] \n\
+            {}", field.into_token_stream()
+          })
+          .emit();
+      }
+    }
+  }
 }

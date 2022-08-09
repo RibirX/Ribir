@@ -31,7 +31,7 @@ pub enum Key {
 
 #[derive(Declare)]
 pub struct KeyWidget {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=into)]
   pub key: Key,
 }
 
@@ -48,11 +48,6 @@ impl Query for KeyWidget {
 
 impl Query for Key {
   impl_query_self_only!();
-}
-
-impl KeyWidgetBuilder {
-  #[inline]
-  pub fn key_convert<K: Into<Key>>(key: K) -> Key { key.into() }
 }
 
 macro from_key_impl($($ty: ty : $name: ident)*) {

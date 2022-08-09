@@ -5,9 +5,9 @@ pub use ::text::{typography::Overflow, *};
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
-  #[declare(custom_convert)]
+  #[declare(convert=into)]
   pub text: ArcStr,
-  #[declare(default = "ctx.theme().typography_theme.body1.text.clone()")]
+  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
 }
 
@@ -55,9 +55,4 @@ impl Render for Text {
 
 impl Query for Text {
   impl_query_self_only!();
-}
-
-impl TextBuilder {
-  #[inline]
-  pub fn text_convert<T: Into<ArcStr>>(text: T) -> ArcStr { text.into() }
 }

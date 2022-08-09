@@ -7,7 +7,7 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default = "IconSize::of(ctx).tiny")]
+  #[declare(default = IconSize::of(ctx).tiny)]
   pub size: Size,
 }
 

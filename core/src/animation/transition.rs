@@ -11,7 +11,7 @@ pub struct Transition<E> {
   #[declare(default)]
   pub delay: Option<Duration>,
   pub duration: Duration,
-  #[declare(default = "RepeatMode::None")]
+  #[declare(default = RepeatMode::None)]
   pub repeat: RepeatMode,
   pub easing: E,
 }

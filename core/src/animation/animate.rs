@@ -9,7 +9,7 @@ where
   W: FnMut(R) + 'static,
 {
   transition: T,
-  #[declare(rename = "from")]
+  #[declare(rename = from)]
   state: AnimateState<I, F, W>,
   /// Store the running information of this animation.  
   #[declare(default)]

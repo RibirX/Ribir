@@ -191,7 +191,8 @@ impl<W> Stateful<W> {
   #[inline]
   pub fn state_ref(&self) -> StateRef<W> { StateRef(InnerRef::new(self)) }
 
-  /// Return a `SilentMut` of the stateful widget.
+  /// Return a `SilentMut` of the stateful widget. Which tell the framework,
+  /// modify from here will not effect ui.
   #[inline]
   pub fn silent_ref(&self) -> SilentRef<W> { SilentRef(InnerRef::new(self)) }
 
@@ -199,6 +200,12 @@ impl<W> Stateful<W> {
   /// the widget and not notify state change.
   #[inline]
   pub fn shallow_ref(&self) -> ShallowRef<W> { ShallowRef(InnerRef::new(self)) }
+
+  /// Directly mutable borrow the inner widget and control on it, nothing will
+  /// be know by framework, use it only if you know how the four kind of ref
+  /// (state, silent, shallow, raw) of stateful widget work.
+  #[inline]
+  pub fn raw_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
 
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.

@@ -7,7 +7,7 @@ pub struct Row {
   pub reverse: bool,
   #[declare(default)]
   pub wrap: bool,
-  #[declare(default = "Align::Center")]
+  #[declare(default = Align::Center)]
   pub align_items: Align,
   #[declare(default)]
   pub justify_content: JustifyContent,

@@ -4,14 +4,14 @@ use crate::{impl_query_self_only, prelude::*};
 #[derive(SingleChild, Default, Clone, Declare)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[declare(builtin, default, custom_convert)]
+  #[declare(builtin, default, convert=custom)]
   pub background: Option<Brush>,
   /// A border to draw above the background
-  #[declare(builtin, default, custom_convert)]
+  #[declare(builtin, default, convert=strip_option)]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[declare(builtin, default, custom_convert)]
+  #[declare(builtin, default, convert=strip_option)]
   pub radius: Option<Radius>,
 }
 
@@ -77,20 +77,32 @@ impl Query for BoxDecoration {
   impl_query_self_only!();
 }
 
+pub trait IntoBackground<M> {
+  fn into_background(self) -> Option<Brush>;
+}
+
+impl<T: Into<Brush>> IntoBackground<Brush> for T {
+  #[inline]
+  fn into_background(self) -> Option<Brush> { Some(self.into()) }
+}
+
+impl IntoBackground<Option<Brush>> for Option<Brush> {
+  #[inline]
+  fn into_background(self) -> Option<Brush> { self }
+}
+
 impl BoxDecorationBuilder {
   #[inline]
-  pub fn background_convert<M, B: Into<StripedOption<Brush, M>>>(b: B) -> Option<Brush> {
-    b.into().value
+  pub fn background<M>(mut self, b: impl IntoBackground<M>) -> Self {
+    self.background = Some(b.into_background());
+    self
   }
+}
 
+impl BoxDecoration {
   #[inline]
-  pub fn border_convert<M, B: Into<StripedOption<Border, M>>>(b: B) -> Option<Border> {
-    b.into().value
-  }
-
-  #[inline]
-  pub fn radius_convert<M, B: Into<StripedOption<Radius, M>>>(b: B) -> Option<Radius> {
-    b.into().value
+  pub fn set_declare_background<M>(&mut self, b: impl IntoBackground<M>) {
+    self.background = b.into_background();
   }
 }
 

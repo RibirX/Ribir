@@ -1,7 +1,7 @@
 use crate::{
-  declare_derive::{field_convert_method, field_default_method},
+  declare_derive::{declare_field_name, field_default_method},
   widget_attr_macro::{
-    capture_widget, ribir_variable, skip_nc_assign,
+    capture_widget, ribir_variable,
     widget_macro::{is_expr_keyword, EXPR_FIELD},
     DeclareCtx, BUILD_CTX,
   },
@@ -66,18 +66,15 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
         .all_widgets()
         .into_iter()
         .flat_map(|widgets| widgets.map(capture_widget));
-      let field_converter = field_convert_method(expr_mem);
       quote_spanned! { ty.span() =>
         let #name = #ty::<_>::builder()
           .upstream(Some(#upstream.box_it()))
           .#expr_mem({
             #(#captures)*
-            <ExprWidget::<_> as Declare>::Builder::#field_converter(
-              move |cb: &mut dyn FnMut(Widget)| {
-                #(#refs)*
-                ChildConsumer::<_>::consume(#expr, cb)
-              }
-            )
+            move |cb: &mut dyn FnMut(Widget)| {
+              #(#refs)*
+              ChildConsumer::<_>::consume(#expr, cb)
+            }
           })
           .build(#build_ctx);
       }
@@ -93,7 +90,24 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let expr_tokens = f.value_tokens(self.ty);
 
     used_name_info.directly_used_widgets().map(|directly_used| {
-      let assign = skip_nc_assign(skip_nc.is_some(), &quote! { #name.#member}, &expr_tokens);
+      let declare_set = declare_field_name(member);
+      let assign = if skip_nc.is_some() {
+        let old = ribir_variable("old", expr_tokens.span());
+        quote! {{
+           let diff = {
+            let #name = #name.raw_ref();
+            let #old = #name.#member.clone();
+            #name.#declare_set(#expr_tokens);
+            #name.#member != #old
+          };
+          if diff {
+            // if value really changed, trigger state change
+            #name.state_ref()
+          }
+        }}
+      } else {
+        quote! { #name.state_ref().#declare_set(#expr_tokens) }
+      };
 
       let upstream = upstream_tokens(directly_used);
       let capture_widgets = used_name_info
@@ -105,10 +119,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 
       quote_spanned! { f.span() => {
         #(#capture_widgets)*
-        #upstream.subscribe(move |_| {
-          let mut #name = #name.state_ref();
-          #assign
-        });
+        #upstream.subscribe(move |_| #assign );
       }}
     })
   }
@@ -126,10 +137,8 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 impl DeclareField {
   fn value_tokens(&self, widget_ty: &Path) -> TokenStream {
     let Self { member, expr, .. } = self;
-    let field_converter = field_convert_method(member);
     let span = expr.span();
-    let mut expr =
-      quote_spanned! { span => <#widget_ty as Declare>::Builder::#field_converter(#expr) };
+    let mut expr = quote! { #expr};
 
     let mut insert_ref_tokens = false;
     if let Some(refs) = self.used_name_info.refs_tokens() {

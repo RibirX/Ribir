@@ -118,6 +118,11 @@ pub struct IconSize {
   pub huge: Size,
 }
 
+impl TypographyTheme {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().typography_theme }
+}
+
 impl IconSize {
   #[inline]
   pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.icon_size }

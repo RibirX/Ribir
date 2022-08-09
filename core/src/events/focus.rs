@@ -31,14 +31,14 @@ pub struct FocusListener {
   /// focus.
   #[declare(default, builtin)]
   pub auto_focus: bool,
-  #[declare(default, builtin, custom_convert)]
-  on_focus: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
-  #[declare(default, builtin, custom_convert)]
-  on_blur: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
-  #[declare(default, builtin, custom_convert)]
-  on_focus_in: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
-  #[declare(default, builtin, custom_convert)]
-  on_focus_out: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(default, builtin, convert=custom)]
+  pub on_focus: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(default, builtin, convert=custom)]
+  pub on_blur: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(default, builtin, convert=custom)]
+  pub on_focus_in: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  #[declare(default, builtin, convert=custom)]
+  pub on_focus_out: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
 }
 
 pub type FocusEvent = EventCommon;
@@ -91,30 +91,48 @@ impl FocusListener {
 
 impl FocusListenerBuilder {
   #[inline]
-  pub fn on_focus_convert(
-    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
-    Some(Box::new(f))
+  pub fn on_focus(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.on_focus = Some(Some(Box::new(f)));
+    self
   }
 
   #[inline]
-  pub fn on_blur_convert(
-    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
-    Some(Box::new(f))
+  pub fn on_blur(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.on_blur = Some(Some(Box::new(f)));
+    self
   }
 
   #[inline]
-  pub fn on_focus_in_convert(
-    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
-    Some(Box::new(f))
+  pub fn on_focus_in(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.on_focus_in = Some(Some(Box::new(f)));
+    self
   }
 
   #[inline]
-  pub fn on_focus_out_convert(
-    f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static,
-  ) -> Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>> {
-    Some(Box::new(f))
+  pub fn on_focus_out(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.on_focus_out = Some(Some(Box::new(f)));
+    self
+  }
+}
+
+impl FocusListener {
+  #[inline]
+  pub fn set_declare_on_focus(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.on_focus = Some(Box::new(f));
+  }
+
+  #[inline]
+  pub fn set_declare_on_blur(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.on_blur = Some(Box::new(f));
+  }
+
+  #[inline]
+  pub fn set_declare_on_focus_in(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.on_focus_in = Some(Box::new(f));
+  }
+
+  #[inline]
+  pub fn set_declare_on_focus_out(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.on_focus_out = Some(Box::new(f));
   }
 }

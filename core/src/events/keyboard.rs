@@ -10,13 +10,13 @@ pub struct KeyboardEvent {
 /// Widget fire event whenever press or release a key.
 #[derive(Declare)]
 pub struct KeyDownListener {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent)))]
   pub on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
 #[derive(Declare)]
 pub struct KeyUpListener {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent)))]
   pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
@@ -52,24 +52,6 @@ impl Query for KeyDownListener {
 
 impl Query for KeyUpListener {
   impl_query_self_only!();
-}
-
-impl KeyDownListenerBuilder {
-  #[inline]
-  pub fn on_key_down_convert(
-    f: impl for<'r> FnMut(&'r mut KeyboardEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)> {
-    Box::new(f)
-  }
-}
-
-impl KeyUpListenerBuilder {
-  #[inline]
-  pub fn on_key_up_convert(
-    f: impl for<'r> FnMut(&'r mut KeyboardEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)> {
-    Box::new(f)
-  }
 }
 
 impl std::borrow::Borrow<EventCommon> for KeyboardEvent {

@@ -9,8 +9,9 @@ use smallvec::SmallVec;
 /// info, maybe [`SingleConsumer`]! or [`MultiConsumer`]!
 #[derive(Declare)]
 pub struct ExprWidget<R> {
-  #[declare(custom_convert)]
+  #[declare(convert = box_trait(FnMut(&mut dyn FnMut(Widget)) -> R))]
   pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
+  // todo: `Declare` should provide `skip` attribute for private field.
   pub(crate) upstream: Option<LocalBoxOp<'static, (), ()>>,
 }
 /// Generator is a virtual child used in `widget!`, which use to generate
@@ -147,14 +148,4 @@ impl Generator {
 impl GeneratorID {
   #[inline]
   pub(crate) fn next_id(self) -> Self { Self(self.0 + 1) }
-}
-
-impl<R> ExprWidgetBuilder<R> {
-  #[inline]
-  pub fn expr_convert<F>(func: F) -> Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>
-  where
-    F: FnMut(&mut dyn FnMut(Widget)) -> R + 'static,
-  {
-    Box::new(func)
-  }
 }

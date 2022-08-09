@@ -6,7 +6,7 @@ use crate::prelude::*;
 /// child. So you can declare any widget as its child to display as a icon.
 #[derive(Declare, Default, Clone)]
 pub struct Icon {
-  #[declare(default = "IconSize::of(ctx).small")]
+  #[declare(default = IconSize::of(ctx).small)]
   pub size: Size,
 }
 

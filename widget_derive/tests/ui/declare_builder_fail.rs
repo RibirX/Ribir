@@ -1,5 +1,3 @@
-#![feature(trivial_bounds)]
-
 use ribir::prelude::*;
 
 #[derive(Declare)]
@@ -15,12 +13,8 @@ struct RenameReservedNames {
 
 #[derive(Declare)]
 struct Converter {
-  #[declare(custom_convert)]
+  #[declare(convert=into)]
   x: Option<i32>,
 }
 
-impl ConverterBuilder {
-  #[inline]
-  pub fn x_convert<M, X: Into<StripedOption<i32, M>>>(x: X) -> Option<i32> { x.into().value }
-}
 fn main() {}
