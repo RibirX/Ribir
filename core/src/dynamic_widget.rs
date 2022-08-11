@@ -34,6 +34,16 @@ pub struct GeneratorInfo {
   generated_widgets: SmallVec<[WidgetId; 1]>,
 }
 
+impl<R> ExprWidgetBuilder<R> {
+  pub fn upstream(
+    mut self,
+    stream: impl LocalObservable<'static, Item = (), Err = ()> + 'static,
+  ) -> Self {
+    self.upstream = Some(Some(stream.box_it()));
+    self
+  }
+}
+
 impl GeneratorInfo {
   pub(crate) fn new(
     id: GeneratorID,

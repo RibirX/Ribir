@@ -42,7 +42,7 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
   lerp_derive::lerp_derive(&mut input)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
-  }
+}
 
 /// Macro to implement the `Declare` trait. To know how to use it see the
 /// [`declare` mod document](declare)

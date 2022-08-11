@@ -1,5 +1,5 @@
 use crate::{
-  prelude::{AnimateCtrl, AnimateProgress},
+  prelude::{AnimateCtrl, AnimateProgress, Stateful},
   ticker::FrameMsg,
 };
 use algo::id_map::{Id, IdMap};
@@ -8,16 +8,20 @@ use rxrust::{
   subscription::{SingleSubscription, SubscriptionGuard},
 };
 
-use super::WidgetTree;
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::{
+  cell::RefCell,
+  collections::HashSet,
+  rc::{Rc, Weak},
+};
 
+// todo: should be a pub(crate) type, not leak as public.
 #[derive(Clone)]
 pub struct AnimateHandler {
   id: Id,
-  store: Rc<RefCell<AnimateStore>>,
+  store: Weak<RefCell<AnimateStore>>,
 }
 
-pub struct AnimateStore {
+pub(crate) struct AnimateStore {
   animations: IdMap<Box<dyn AnimateCtrl>>,
   running: HashSet<Id, ahash::RandomState>,
   frame_ticker: LocalSubject<'static, FrameMsg, ()>,
@@ -25,9 +29,14 @@ pub struct AnimateStore {
 }
 
 impl AnimateHandler {
-  pub fn start(&self) {
-    let c_store = self.store.clone();
-    let mut store = self.store.borrow_mut();
+  pub fn running_start(&self) {
+    let store = if let Some(store) = self.store.upgrade() {
+      store
+    } else {
+      return;
+    };
+    let c_store = store.clone();
+    let mut store = store.borrow_mut();
     store.running.insert(self.id);
     if store.tick_msg_guard.is_none() {
       let guard = store
@@ -39,7 +48,7 @@ impl AnimateHandler {
             FrameMsg::Ready(time) => {
               let mut finished = vec![];
               store.inspect_running_animate(|id, animate| {
-                let p = animate.lerp_by(time);
+                let p = animate.lerp(time);
                 if matches!(p, AnimateProgress::Finish) {
                   finished.push(id);
                 }
@@ -59,21 +68,21 @@ impl AnimateHandler {
     }
   }
 
-  pub fn stop(&self) {
-    let mut store = self.store.borrow_mut();
-    store.running.remove(&self.id);
-    // if there isn't running  animation, cancel the ticker subscription.
-    if store.running.is_empty() {
-      store.tick_msg_guard.take();
+  pub fn stopped(&self) {
+    if let Some(store) = self.store.upgrade() {
+      let mut store = store.borrow_mut();
+      store.running.remove(&self.id);
+      // if there isn't running  animation, cancel the ticker subscription.
+      if store.running.is_empty() {
+        store.tick_msg_guard.take();
+      }
     }
   }
 
   #[inline]
-  pub fn is_running(self) -> bool { self.store.borrow().running.contains(&self.id) }
-
-  #[inline]
   pub fn unregister(self) -> Option<Box<dyn AnimateCtrl>> {
-    let mut store = self.store.borrow_mut();
+    let store = self.store.upgrade()?;
+    let mut store = store.borrow_mut();
     store.running.remove(&self.id);
     store.animations.remove(self.id)
   }
@@ -89,9 +98,15 @@ impl AnimateStore {
     }
   }
 
-  pub fn register(this: Rc<RefCell<Self>>, animate: Box<dyn AnimateCtrl>) -> AnimateHandler {
-    let id = this.borrow_mut().animations.insert(animate);
-    AnimateHandler { id, store: this }
+  pub fn register<A: AnimateCtrl + 'static>(
+    this: &Rc<RefCell<Self>>,
+    animate: Stateful<A>,
+  ) -> AnimateHandler {
+    let id = this
+      .borrow_mut()
+      .animations
+      .insert(Box::new(animate.clone()));
+    AnimateHandler { id, store: Rc::downgrade(this) }
   }
 
   fn inspect_running_animate(&mut self, mut f: impl FnMut(Id, &mut dyn AnimateCtrl)) {
@@ -99,11 +114,5 @@ impl AnimateStore {
       let animate = &mut **self.animations.get_mut(*id).expect(" Animate not found.");
       f(*id, animate)
     });
-  }
-}
-
-impl WidgetTree {
-  pub fn register_animate(&mut self, animate: Box<dyn AnimateCtrl>) -> AnimateHandler {
-    AnimateStore::register(self.animations_store.clone(), animate)
   }
 }

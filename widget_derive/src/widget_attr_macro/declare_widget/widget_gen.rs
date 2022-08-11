@@ -3,7 +3,7 @@ use crate::{
   widget_attr_macro::{
     capture_widget, ribir_variable,
     widget_macro::{is_expr_keyword, EXPR_FIELD},
-    DeclareCtx, BUILD_CTX,
+    DeclareCtx, UsedType, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
@@ -52,16 +52,12 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let expr_field = fields.clone().last().unwrap();
     assert_eq!(expr_field.member, EXPR_FIELD);
 
-    let DeclareField {
-      member: expr_mem,
-      expr,
-      used_name_info,
-      ..
-    } = expr_field;
+    let DeclareField { member, used_name_info, .. } = expr_field;
     let build_ctx = ribir_variable(BUILD_CTX, ty.span());
+
+    let value_tokens = expr_field.value_tokens(ty);
     if let Some(directly_used) = used_name_info.directly_used_widgets() {
       let upstream = upstream_tokens(directly_used);
-      let refs = used_name_info.refs_tokens().into_iter().flatten();
       let captures = used_name_info
         .all_widgets()
         .into_iter()
@@ -69,17 +65,14 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
       quote_spanned! { ty.span() =>
         let #name = #ty::<_>::builder()
           .upstream(Some(#upstream.box_it()))
-          .#expr_mem({
+          .#member({
             #(#captures)*
-            move |cb: &mut dyn FnMut(Widget)| {
-              #(#refs)*
-              ChildConsumer::<_>::consume(#expr, cb)
-            }
+            move |cb: &mut dyn FnMut(Widget)| ChildConsumer::<_>::consume(#value_tokens, cb)
           })
           .build(#build_ctx);
       }
     } else {
-      quote_spanned! { ty.span() => let #name = #expr; }
+      quote_spanned! { ty.span() => let #name = #value_tokens; }
     }
   }
 
@@ -88,40 +81,43 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 
     let name = &self.name;
     let expr_tokens = f.value_tokens(self.ty);
+    let directly_used = used_name_info.directly_used_widgets()?;
 
-    used_name_info.directly_used_widgets().map(|directly_used| {
-      let declare_set = declare_field_name(member);
-      let assign = if skip_nc.is_some() {
-        let old = ribir_variable("old", expr_tokens.span());
-        quote! {{
-           let diff = {
-            let #name = #name.raw_ref();
-            let #old = #name.#member.clone();
-            #name.#declare_set(#expr_tokens);
-            #name.#member != #old
-          };
-          if diff {
-            // if value really changed, trigger state change
-            #name.state_ref()
-          }
-        }}
-      } else {
-        quote! { #name.state_ref().#declare_set(#expr_tokens) }
-      };
+    if f.expr_as_an_id().is_some() {
+      return None;
+    }
 
-      let upstream = upstream_tokens(directly_used);
-      let capture_widgets = used_name_info
-        .all_widgets()
-        .into_iter()
-        .flatten()
-        .chain(std::iter::once(<&Ident>::clone(name)))
-        .map(capture_widget);
-
-      quote_spanned! { f.span() => {
-        #(#capture_widgets)*
-        #upstream.subscribe(move |_| #assign );
+    let declare_set = declare_field_name(member);
+    let assign = if skip_nc.is_some() {
+      let old = ribir_variable("old", expr_tokens.span());
+      quote! {{
+         let diff = {
+          let mut #name = #name.raw_ref();
+          let #old = #name.#member.clone();
+          #name.#declare_set(#expr_tokens);
+          #name.#member != #old
+        };
+        if diff {
+          // if value really changed, trigger state change
+          #name.state_ref();
+        }
       }}
-    })
+    } else {
+      quote! { #name.state_ref().#declare_set(#expr_tokens) }
+    };
+
+    let upstream = upstream_tokens(directly_used);
+    let capture_widgets = used_name_info
+      .all_widgets()
+      .into_iter()
+      .flatten()
+      .chain(std::iter::once(<&Ident>::clone(name)))
+      .map(capture_widget);
+
+    Some(quote_spanned! { f.span() => {
+      #(#capture_widgets)*
+      #upstream.subscribe(move |_| #assign );
+    }})
   }
 
   fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
@@ -138,12 +134,13 @@ impl DeclareField {
   fn value_tokens(&self, widget_ty: &Path) -> TokenStream {
     let Self { member, expr, .. } = self;
     let span = expr.span();
-    let mut expr = quote! { #expr};
+    let mut expr = quote! { #expr };
 
-    let mut insert_ref_tokens = false;
-    if let Some(refs) = self.used_name_info.refs_tokens() {
-      insert_ref_tokens = true;
-      expr = quote_spanned! { span => #(#refs)* #expr };
+    if let Some(name) = self.expr_as_an_id() {
+      expr = quote_spanned! { span => { #name.clone() }};
+    } else if let Some(refs) = self.used_name_info.refs_tokens() {
+      // todo: we should declare reference for all widget.
+      expr = quote_spanned! { span => { #(#refs)* #expr }};
     }
 
     if let Some(if_guard) = self.if_guard.as_ref() {
@@ -154,8 +151,6 @@ impl DeclareField {
       } else {
         <#widget_ty as Declare>::Builder::#default_method(#build_ctx)
       })
-    } else if insert_ref_tokens {
-      quote_spanned! { span => { #expr }}
     } else {
       expr
     }
@@ -165,5 +160,17 @@ impl DeclareField {
     let member = &self.member;
     let value = self.value_tokens(widget_ty);
     quote! {.#member(#value)}
+  }
+
+  fn expr_as_an_id(&self) -> Option<&Ident> {
+    if let syn::Expr::Path(path) = &self.expr {
+      let name = path.path.get_ident()?;
+      let used_info = self.used_name_info.get(name)?;
+      assert_eq!(used_info.used_type, UsedType::USED);
+      assert_eq!(self.used_name_info.len(), 1);
+      Some(name)
+    } else {
+      None
+    }
   }
 }

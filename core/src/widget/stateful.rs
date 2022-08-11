@@ -258,6 +258,14 @@ impl<W> Stateful<W> {
   }
 }
 
+impl<T: Clone + std::cmp::PartialEq> StateChange<T> {
+  #[inline]
+  pub fn is_same(&self) -> bool { self.after == self.before }
+
+  #[inline]
+  pub fn not_same(&self) -> bool { self.before != self.after }
+}
+
 impl<'a, W> StateRef<'a, W> {
   /// Fork a silent reference
   pub fn silent(&mut self) -> SilentRef<'a, W> {

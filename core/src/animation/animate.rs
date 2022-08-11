@@ -1,4 +1,7 @@
-use crate::prelude::*;
+use crate::prelude::{
+  widget_tree::animation_store::{AnimateHandler, AnimateStore},
+  *,
+};
 use std::time::Instant;
 
 #[derive(Declare)]
@@ -8,12 +11,14 @@ where
   F: Fn() -> R,
   W: FnMut(R) + 'static,
 {
-  transition: T,
+  pub transition: T,
   #[declare(rename = from)]
   state: AnimateState<I, F, W>,
-  /// Store the running information of this animation.  
+  /// todo: declare skip fields, Store the running information of this
+  /// animation.
   #[declare(default)]
   running_info: Option<AnimateInfo<R>>,
+  handler: Option<AnimateHandler>,
 }
 
 #[derive(Clone)]
@@ -25,8 +30,8 @@ pub struct AnimateInfo<S> {
 }
 
 pub trait AnimateCtrl {
-  fn start(&mut self, at: Instant);
-  fn lerp_by(&mut self, now: Instant) -> AnimateProgress;
+  /// lerp animate value at `now`
+  fn lerp(&mut self, now: Instant) -> AnimateProgress;
   /// State data should be rollback after draw.
   fn frame_finished(&mut self);
 }
@@ -39,20 +44,7 @@ where
   T: Roc,
   R: Lerp + Clone,
 {
-  fn start(&mut self, start_at: Instant) {
-    assert!(
-      self.running_info.is_none(),
-      "Try to start an animation which already running."
-    );
-    self.running_info = Some(AnimateInfo {
-      from: self.state.init_value(),
-      to: self.state.finial_value(),
-      start_at,
-      last_progress: AnimateProgress::Dismissed,
-    });
-  }
-
-  fn lerp_by(&mut self, now: Instant) -> AnimateProgress {
+  fn lerp(&mut self, now: Instant) -> AnimateProgress {
     let info = self
       .running_info
       .as_mut()
@@ -78,5 +70,80 @@ where
     if matches!(info.last_progress, AnimateProgress::Between(_)) {
       self.state.update(info.to.clone())
     }
+  }
+}
+
+impl<T, I, F, W, R> IntoStateful for Animate<T, I, F, W, R>
+where
+  I: Fn() -> R,
+  F: Fn() -> R,
+  W: FnMut(R) + 'static,
+{
+  #[inline]
+  fn into_stateful(self) -> Stateful<Self> { Stateful::new(self) }
+}
+
+impl<T: AnimateCtrl> AnimateCtrl for Stateful<T> {
+  #[inline]
+  fn lerp(&mut self, now: Instant) -> AnimateProgress { self.state_ref().lerp(now) }
+
+  #[inline]
+  fn frame_finished(&mut self) { self.state_ref().frame_finished() }
+}
+
+impl<T, I, F, W, R> Animate<T, I, F, W, R>
+where
+  I: Fn() -> R,
+  F: Fn() -> R,
+  W: FnMut(R),
+  T: Roc,
+  R: Lerp + Clone,
+  Self: 'static,
+{
+  pub fn register(this: &Stateful<Self>, ctx: &BuildCtx) {
+    assert!(this.raw_ref().handler.is_none());
+
+    let handler = AnimateStore::register(&ctx.tree.animations_store, this.clone());
+    this.raw_ref().handler = Some(handler);
+  }
+
+  pub fn run(&mut self) {
+    let from = if let Some(info) = self.running_info.take() {
+      info.to
+    } else {
+      self.state.init_value()
+    };
+
+    self.running_info = Some(AnimateInfo {
+      from,
+      to: self.state.finial_value(),
+      start_at: Instant::now(),
+      last_progress: AnimateProgress::Dismissed,
+    });
+    self.register_handler().running_start();
+  }
+
+  pub fn stop(&mut self) {
+    self.running_info.take();
+    self.register_handler().stopped();
+  }
+
+  #[inline]
+  pub fn is_running(&self) -> bool { self.running_info.is_some() }
+
+  /// Unregister the animate.
+  pub fn unregister(&mut self) {
+    if let Some(handler) = self.handler.take() {
+      handler.unregister();
+    } else {
+      log::warn!("Unregister an animate which not registered.")
+    }
+  }
+
+  fn register_handler(&self) -> &AnimateHandler {
+    self
+      .handler
+      .as_ref()
+      .expect("Can't call on an unregister animate.")
   }
 }

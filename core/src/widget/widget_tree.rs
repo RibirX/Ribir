@@ -7,10 +7,9 @@ use std::{
   rc::Rc,
 };
 
-mod animation_store;
+pub(crate) mod animation_store;
 mod generator_store;
 mod layout_info;
-pub use animation_store::AnimateHandler;
 use animation_store::AnimateStore;
 pub use layout_info::*;
 
@@ -25,7 +24,7 @@ pub(crate) struct WidgetTree {
   /// clamp passed from parent.
   layout_store: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
   pub(crate) generator_store: generator_store::GeneratorStore,
-  animations_store: Rc<RefCell<AnimateStore>>,
+  pub(crate) animations_store: Rc<RefCell<AnimateStore>>,
 }
 
 impl WidgetTree {

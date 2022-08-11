@@ -1,7 +1,4 @@
-use crate::prelude::{
-  widget_tree::{AnimateHandler, WidgetTree},
-  *,
-};
+use crate::prelude::{widget_tree::WidgetTree, *};
 use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
@@ -12,7 +9,7 @@ pub struct BuildCtx<'a> {
   parent: Option<WidgetId>,
   // todo: use as store current theme?
   default_theme: Option<Rc<Theme>>,
-  tree: &'a mut WidgetTree,
+  pub(crate) tree: &'a mut WidgetTree,
 }
 
 impl<'a> BuildCtx<'a> {
@@ -38,11 +35,6 @@ impl<'a> BuildCtx<'a> {
           .default_theme
           .get_or_insert_with(|| DEFAULT_THEME.with(|f| f.clone()))
       })
-  }
-
-  #[inline]
-  pub fn register_animate(&mut self, animate: Box<dyn AnimateCtrl>) -> AnimateHandler {
-    self.tree.register_animate(animate)
   }
 
   #[inline]

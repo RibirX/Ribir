@@ -17,6 +17,7 @@ use std::{
 #[derive(Default)]
 pub(crate) struct GeneratorStore {
   next_generator_id: GeneratorID,
+  // todo: use id_map
   generators: HashMap<GeneratorID, Generator, ahash::RandomState>,
   needs_regen: Rc<RefCell<HashSet<GeneratorID, ahash::RandomState>>>,
   lifetime: HashMap<WidgetId, SmallVec<[GeneratorHandle; 1]>>,

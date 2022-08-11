@@ -166,13 +166,6 @@ impl ScopeUsedInfo {
       .map(|used_info| UsedPart { scope_label, used_info, skip_nc_cfg })
   }
 
-  fn filter_widget(
-    &self,
-    filter: impl Fn(&NameUsedInfo) -> bool + Clone,
-  ) -> Option<impl Iterator<Item = &Ident> + Clone> {
-    self.filter_item(filter).map(|iter| iter.map(|(w, _)| w))
-  }
-
   pub fn filter_item(
     &self,
     filter: impl Fn(&NameUsedInfo) -> bool + Clone,
@@ -184,6 +177,19 @@ impl ScopeUsedInfo {
       .filter(move |(_, info)| filter(info));
 
     widgets.clone().next().is_some().then(move || widgets)
+  }
+
+  pub fn len(&self) -> usize { self.0.as_ref().map_or(0, |map| map.len()) }
+
+  pub fn get(&self, id: &Ident) -> Option<&NameUsedInfo> {
+    self.0.as_ref().and_then(|map| map.get(id))
+  }
+
+  fn filter_widget(
+    &self,
+    filter: impl Fn(&NameUsedInfo) -> bool + Clone,
+  ) -> Option<impl Iterator<Item = &Ident> + Clone> {
+    self.filter_item(filter).map(|iter| iter.map(|(w, _)| w))
   }
 }
 
