@@ -12,7 +12,7 @@ pub mod text;
 mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
-pub use crate::dynamic_widget::ExprWidget;
+pub use crate::dynamic_widget::{ConstExprWidget, ExprWidget};
 pub use crate::widget::text::Text;
 pub use key::{Key, KeyWidget};
 pub use stateful::*;

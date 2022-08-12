@@ -19,6 +19,8 @@ use crate::{
   error::{CircleUsedPath, DeclareError},
   widget_attr_macro::{ribir_variable, ObjectUsedPath, UsedType, BUILD_CTX},
 };
+
+pub const CONST_EXPR_WIDGET: &str = "ConstExprWidget";
 pub const EXPR_WIDGET: &str = "ExprWidget";
 pub const EXPR_FIELD: &str = "expr";
 
@@ -35,6 +37,10 @@ pub struct IfGuard {
   pub cond: Expr,
   pub fat_arrow_token: Token![=>],
   pub used_name_info: ScopeUsedInfo,
+}
+
+pub fn is_const_expr_keyword(ty: &Path) -> bool {
+  ty.get_ident().map_or(false, |ty| ty == CONST_EXPR_WIDGET)
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }

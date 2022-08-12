@@ -12,8 +12,18 @@ pub struct ExprWidget<R> {
   #[declare(convert = box_trait(FnMut(&mut dyn FnMut(Widget)) -> R))]
   pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
   // todo: `Declare` should provide `skip` attribute for private field.
+  #[declare(convert = custom)]
   pub(crate) upstream: Option<LocalBoxOp<'static, (), ()>>,
 }
+
+/// ConstExprWidget is convert from uer declared  `ExprWidget` which but its
+/// expression not following anything.
+#[derive(Declare)]
+pub struct ConstExprWidget<W> {
+  #[allow(unused)]
+  pub(crate) expr: W,
+}
+
 /// Generator is a virtual child used in `widget!`, which use to generate
 /// dynamic widgets and provide ability to keep them up to date in their
 /// lifetime.
@@ -37,7 +47,7 @@ pub struct GeneratorInfo {
 impl<R> ExprWidgetBuilder<R> {
   pub fn upstream(
     mut self,
-    stream: impl LocalObservable<'static, Item = (), Err = ()> + 'static,
+    stream: impl LocalObservable<'static, Item = (), Err = ()> + Clone + 'static,
   ) -> Self {
     self.upstream = Some(Some(stream.box_it()));
     self

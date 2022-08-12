@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashSet};
 use syn::{
   bracketed,
   parse::{Parse, ParseStream},
+  parse_quote, parse_quote_spanned,
   punctuated::{Pair, Punctuated},
   spanned::Spanned,
   token::{self, Brace, Comma},
@@ -228,13 +229,48 @@ pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> 
 impl DeclareCtx {
   pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
     let mut ctx = self.stack_push();
-    w.fields
-      .iter_mut()
-      .for_each(|f| ctx.visit_declare_field_mut(f));
+    let DeclareWidget { path, fields, builtin, children, .. } = w;
 
-    ctx.visit_builtin_field_widgets(&mut w.builtin);
+    if is_expr_keyword(path) {
+      if fields.len() != 1 || fields[0].member != EXPR_FIELD {
+        let spans = fields.iter().map(|f| f.member.span().unwrap()).collect();
+        let error = DeclareError::ExprWidgetInvalidField(spans).into_compile_error();
+        fields.clear();
+        fields.push(parse_quote! { expr: #error});
+      } else {
+        let expr_field = fields.first_mut().unwrap();
+        let origin_expr = expr_field.expr.clone();
+        ctx.visit_declare_field_mut(expr_field);
 
-    w.children
+        let upstream = expr_field.used_name_info.all_widgets().map(upstream_tokens);
+        if let Some(upstream) = upstream {
+          expr_field.expr = parse_quote_spanned! { origin_expr.span() =>
+            move |cb: &mut dyn FnMut(Widget)| ChildConsumer::<_>::consume(#origin_expr, cb)
+          };
+
+          // we convert the field expr to a closure, revisit again.
+          expr_field.used_name_info.take();
+          ctx.visit_declare_field_mut(expr_field);
+
+          *path = parse_quote_spanned! { path.span() => #path::<_> };
+          if !fields.trailing_punct() {
+            fields.push_punct(Comma::default());
+          }
+          fields.push(parse_quote! {upstream: #upstream});
+        } else {
+          *path = parse_quote_spanned! { path.span() => ConstExprWidget };
+          assert!(expr_field.used_name_info.is_empty())
+        }
+      }
+    } else {
+      fields
+        .iter_mut()
+        .for_each(|f| ctx.visit_declare_field_mut(f));
+    }
+
+    ctx.visit_builtin_field_widgets(builtin);
+
+    children
       .iter_mut()
       .for_each(|c| ctx.visit_declare_widget_mut(c))
   }
@@ -273,10 +309,6 @@ impl DeclareWidget {
         w.builtin_field_if_guard_check(ctx)?;
       }
       if is_expr_keyword(&w.path) {
-        if w.fields.len() != 1 || w.fields[0].member != EXPR_FIELD {
-          let spans = w.fields.iter().map(|f| f.member.span().unwrap()).collect();
-          return Err(DeclareError::ExprWidgetInvalidField(spans));
-        }
         if let Some(guard) = w.fields[0].if_guard.as_ref() {
           return Err(DeclareError::UnsupportedIfGuard {
             name: format!("field {EXPR_FIELD} of  {EXPR_WIDGET}"),
@@ -331,13 +363,11 @@ impl DeclareWidget {
   }
 
   pub(crate) fn is_expr_widget(&self) -> bool {
-    // if `ExprWidget` track nothing, will not as a `ExprWidget`, but use its
-    // directly return value.
-    is_expr_keyword(&self.path)
-      && self
-        .fields
-        .iter()
-        .any(|f| f.used_name_info.directly_used_widgets().is_some())
+    self
+      .path
+      .segments
+      .first()
+      .map_or(false, |s| s.ident == EXPR_WIDGET)
   }
 
   fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {

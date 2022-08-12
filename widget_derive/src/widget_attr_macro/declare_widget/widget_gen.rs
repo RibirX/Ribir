@@ -2,7 +2,7 @@ use crate::{
   declare_derive::{declare_field_name, field_default_method},
   widget_attr_macro::{
     capture_widget, ribir_variable,
-    widget_macro::{is_expr_keyword, EXPR_FIELD},
+    widget_macro::{is_const_expr_keyword, EXPR_FIELD},
     DeclareCtx, UsedType, BUILD_CTX,
   },
 };
@@ -22,8 +22,8 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
   pub fn new(ty: &'a Path, name: &'a Ident, fields: F) -> Self { Self { ty, name, fields } }
 
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
-    if is_expr_keyword(self.ty) {
-      self.expr_widget_token()
+    if is_const_expr_keyword(self.ty) {
+      self.const_expr_widget_tokens()
     } else {
       self.normal_widget_token(ctx)
     }
@@ -47,33 +47,13 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     }
   }
 
-  fn expr_widget_token(&self) -> TokenStream {
+  fn const_expr_widget_tokens(&self) -> TokenStream {
     let Self { ty, name, fields } = self;
     let expr_field = fields.clone().last().unwrap();
     assert_eq!(expr_field.member, EXPR_FIELD);
 
-    let DeclareField { member, used_name_info, .. } = expr_field;
-    let build_ctx = ribir_variable(BUILD_CTX, ty.span());
-
     let value_tokens = expr_field.value_tokens(ty);
-    if let Some(directly_used) = used_name_info.directly_used_widgets() {
-      let upstream = upstream_tokens(directly_used);
-      let captures = used_name_info
-        .all_widgets()
-        .into_iter()
-        .flat_map(|widgets| widgets.map(capture_widget));
-      quote_spanned! { ty.span() =>
-        let #name = #ty::<_>::builder()
-          .upstream(Some(#upstream.box_it()))
-          .#member({
-            #(#captures)*
-            move |cb: &mut dyn FnMut(Widget)| ChildConsumer::<_>::consume(#value_tokens, cb)
-          })
-          .build(#build_ctx);
-      }
-    } else {
-      quote_spanned! { ty.span() => let #name = #value_tokens; }
-    }
+    quote_spanned! { ty.span() => let #name = #value_tokens; }
   }
 
   fn field_follow_tokens(&self, f: &DeclareField) -> Option<TokenStream> {
@@ -83,7 +63,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let expr_tokens = f.value_tokens(self.ty);
     let directly_used = used_name_info.directly_used_widgets()?;
 
-    if f.expr_as_an_id().is_some() {
+    if f.value_is_an_id().is_some() {
       return None;
     }
 
@@ -136,7 +116,7 @@ impl DeclareField {
     let span = expr.span();
     let mut expr = quote! { #expr };
 
-    if let Some(name) = self.expr_as_an_id() {
+    if let Some(name) = self.value_is_an_id() {
       expr = quote_spanned! { span => { #name.clone() }};
     } else if let Some(refs) = self.used_name_info.refs_tokens() {
       // todo: we should declare reference for all widget.
@@ -162,7 +142,7 @@ impl DeclareField {
     quote! {.#member(#value)}
   }
 
-  fn expr_as_an_id(&self) -> Option<&Ident> {
+  fn value_is_an_id(&self) -> Option<&Ident> {
     if let syn::Expr::Path(path) = &self.expr {
       let name = path.path.get_ident()?;
       let used_info = self.used_name_info.get(name)?;

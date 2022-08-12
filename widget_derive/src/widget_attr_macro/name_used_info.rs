@@ -150,7 +150,7 @@ impl ScopeUsedInfo {
     self.0.iter_mut().flat_map(|m| m.iter_mut())
   }
 
-  pub fn all_widgets(&self) -> Option<impl Iterator<Item = &Ident> + '_> {
+  pub fn all_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
     let used = self.0.as_ref()?;
     (!used.is_empty()).then(|| used.keys())
   }
@@ -180,6 +180,8 @@ impl ScopeUsedInfo {
   }
 
   pub fn len(&self) -> usize { self.0.as_ref().map_or(0, |map| map.len()) }
+
+  pub fn is_empty(&self) -> bool { self.0.as_ref().map_or(true, |map| map.is_empty()) }
 
   pub fn get(&self, id: &Ident) -> Option<&NameUsedInfo> {
     self.0.as_ref().and_then(|map| map.get(id))

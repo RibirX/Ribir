@@ -897,7 +897,7 @@ impl<'a> AnimationObject<'a> {
 }
 
 impl Animate {
-  pub fn used_part(&self) -> Option<ObjectUsed> {
+  fn used_part(&self) -> Option<ObjectUsed> {
     let FromStateField { from_token, expr, .. } = &self.from;
     let state_expr_used = expr.expr_used.used_part(Some(from_token), false);
     let state_target_used = expr.target_used.used_part(Some(from_token), false);
