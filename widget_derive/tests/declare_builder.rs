@@ -58,7 +58,7 @@ fn empty_default_field() {
 fn string_default_field() {
   #[derive(Declare)]
   struct T {
-    #[declare(default = "\"hi!\"")]
+    #[declare(default = "hi!")]
     text: &'static str,
   }
 

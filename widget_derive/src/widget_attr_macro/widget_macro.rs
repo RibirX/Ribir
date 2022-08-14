@@ -106,10 +106,12 @@ impl WidgetMacro {
     ctx.visit_widget_macro_mut(self);
     self.widget.before_generate_check(ctx)?;
 
-    let mut follows = (!ctx.named_objects.is_empty()).then(|| self.analyze_object_dependencies());
-    if let Some(follows) = follows.as_mut() {
+    let mut tokens = quote!();
+    // named object define.
+    if !ctx.named_objects.is_empty() {
+      let mut follows = self.analyze_object_dependencies();
       // init circle check
-      Self::circle_check(follows, |stack| {
+      Self::circle_check(&follows, |stack| {
         Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
       })?;
 
@@ -117,9 +119,9 @@ impl WidgetMacro {
       // follow with skip_nc attribute. So we add the data flow relationship and
       // individual check the circle follow error.
       if let Some(dataflows) = self.dataflows.as_ref() {
-        dataflows.analyze_data_flow_follows(follows);
+        dataflows.analyze_data_flow_follows(&mut follows);
         // circle dependencies check
-        Self::circle_check(follows, |stack| {
+        Self::circle_check(&follows, |stack| {
           let weak_depends = stack
             .iter()
             .any(|s| !s.used_info.used_type.contains(UsedType::USED) || s.skip_nc_cfg);
@@ -131,46 +133,40 @@ impl WidgetMacro {
           }
         })?;
       }
+
+      let mut named_widgets_def = self.named_objects_def_tokens(ctx);
+
+      Self::deep_used_iter(&follows, |name| {
+        tokens.extend(named_widgets_def.remove(name));
+      });
+
+      named_widgets_def
+        .into_values()
+        .for_each(|def_tokens| tokens.extend(def_tokens));
     }
 
-    let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
-    let mut tokens = quote! {};
-    let closure_widget = |tokens: &mut TokenStream| {
-      token::Paren::default().surround(tokens, |tokens| {
-        tokens.extend(quote! { move |#ctx_name: &mut BuildCtx| });
-        token::Brace::default().surround(tokens, |tokens| {
-          if !ctx.named_objects.is_empty() {
-            let mut named_widgets_def = self.named_objects_def_tokens(ctx);
+    self.all_anonyms_widgets_tokens(ctx, &mut tokens);
+    self.dataflows.to_tokens(&mut tokens);
+    if let Some(a) = self.animations.as_mut() {
+      a.gen_tokens(ctx, &mut tokens);
+    }
+    self.compose_tokens(ctx, &mut tokens);
 
-            if let Some(follows) = follows.as_ref() {
-              Self::deep_used_iter(follows, |name| {
-                tokens.extend(named_widgets_def.remove(name));
-              });
-            }
-            named_widgets_def
-              .into_values()
-              .for_each(|def_tokens| tokens.extend(def_tokens));
-          }
-          self.all_anonyms_widgets_tokens(ctx, tokens);
-          self.dataflows.to_tokens(tokens);
-          if let Some(a) = self.animations.as_ref() {
-            a.gen_tokens(ctx, tokens);
-          }
-          self.compose_tokens(ctx, tokens);
-          let name = self.widget_identify();
-          tokens.extend(quote! {  #name.into_widget() })
-        });
-      });
-      tokens.extend(quote! { .into_widget() });
+    let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
+    let name = self.widget_identify();
+    let mut tokens = quote! {
+      (move |#ctx_name: &mut BuildCtx| {
+        #tokens
+        #name.into_widget()
+      }).into_widget()
     };
 
+    let track = self.track.as_ref();
     if self.track.is_some() {
-      token::Brace::default().surround(&mut tokens, |tokens| {
-        self.track.to_tokens(tokens);
-        closure_widget(tokens)
-      });
-    } else {
-      closure_widget(&mut tokens);
+      tokens = quote! {{
+        #track
+        #tokens
+      }};
     }
 
     ctx

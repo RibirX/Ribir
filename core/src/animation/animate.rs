@@ -18,6 +18,7 @@ where
   /// animation.
   #[declare(default)]
   running_info: Option<AnimateInfo<R>>,
+  #[declare(default)]
   handler: Option<AnimateHandler>,
 }
 

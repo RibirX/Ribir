@@ -109,6 +109,9 @@ impl AnimateStore {
     AnimateHandler { id, store: Rc::downgrade(this) }
   }
 
+  #[inline]
+  pub fn any_animate_running(&self) -> bool { !self.running.is_empty() }
+
   fn inspect_running_animate(&mut self, mut f: impl FnMut(Id, &mut dyn AnimateCtrl)) {
     self.running.iter().for_each(|id| {
       let animate = &mut **self.animations.get_mut(*id).expect(" Animate not found.");

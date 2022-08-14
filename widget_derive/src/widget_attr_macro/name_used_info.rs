@@ -200,13 +200,17 @@ impl<'a> ObjectUsedPath<'a> {
     let obj = ctx
       .user_perspective_name(self.obj)
       .unwrap_or_else(|| {
-        // same id, but use the one which at the define place to provide more friendly
-        // compile error.
-        ctx
-          .named_objects
-          .get_key_value(self.obj)
-          .expect("Leak some named object not collect.")
-          .0
+        if self.scope_label.is_none() {
+          self.obj
+        } else {
+          // same id, but use the one which at the define place to provide more friendly
+          // compile error.
+          ctx
+            .named_objects
+            .get_key_value(self.obj)
+            .expect("Some named object not collect.")
+            .0
+        }
       })
       .clone();
 

@@ -121,7 +121,7 @@ impl DeclareField {
     let mut expr = quote! { #expr };
 
     if let Some(name) = self.value_is_an_id() {
-      expr = quote_spanned! { span => { #name.clone() }};
+      expr = quote_spanned! { span => #name.clone() };
     } else if let Some(refs) = self.used_name_info.refs_tokens() {
       // todo: we should declare reference for all widget.
       expr = quote_spanned! { span => { #(#refs)* #expr }};

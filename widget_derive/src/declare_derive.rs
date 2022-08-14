@@ -63,7 +63,12 @@ mod kw {
 
 #[inline]
 pub fn declare_field_name(field_name: &Ident) -> Ident {
-  Ident::new(&format!("set_declare_{field_name}",), field_name.span())
+  let name = if field_name.to_string().starts_with("_") {
+    format!("set_declare{field_name}",)
+  } else {
+    format!("set_declare_{field_name}",)
+  };
+  Ident::new(&name, field_name.span())
 }
 
 // todo: remove this method after `if guard` syntax removed from `widget!`
@@ -403,7 +408,7 @@ impl<'a> DeclareField<'a> {
         Diagnostic::spanned(vec![method_name.span().unwrap()], Level::Error, msg)
           .help(format! {
             "use `rename` meta to avoid the name conflict in `widget!` macro.\n\n\
-            #[declare(rename = \"xxx\")] \n\
+            #[declare(rename = xxx)] \n\
             {}", field.into_token_stream()
           })
           .emit();

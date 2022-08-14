@@ -88,9 +88,10 @@ impl WidgetTree {
     for id in dirty_widgets.iter() {
       let mut relayout_root = *id;
       if self.layout_box_rect(*id).is_some() {
+        self.layout_store.remove(id);
         // All ancestors of this render object should relayout until the one which only
         // sized by parent.
-        for p in id.0.ancestors(&self.arena).map(WidgetId) {
+        for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
           let r = self.arena.get(p.0).unwrap().get();
           if !r.only_sized_by_parent() {
             self.layout_store.remove(&p);

@@ -123,6 +123,15 @@ impl Window {
     }
   }
 
+  #[inline]
+  pub fn any_animate_running(&self) -> bool {
+    self
+      .widget_tree
+      .animations_store
+      .borrow()
+      .any_animate_running()
+  }
+
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 
   fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: Rc<RefCell<AppContext>>) -> Self

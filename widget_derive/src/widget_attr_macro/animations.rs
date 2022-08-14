@@ -411,8 +411,11 @@ impl Parse for AnimateExpr {
 }
 
 impl Animations {
-  pub fn gen_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
-    self.triggers.iter().for_each(|t| t.gen_tokens(tokens, ctx));
+  pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx, tokens: &mut TokenStream) {
+    self
+      .triggers
+      .iter_mut()
+      .for_each(|t| t.gen_tokens(tokens, ctx));
   }
 }
 
@@ -604,12 +607,11 @@ impl ToTokens for Transition {
 }
 
 impl Trigger {
-  pub fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &DeclareCtx) {
+  pub fn gen_tokens(&mut self, tokens: &mut TokenStream, ctx: &mut DeclareCtx) {
     // define animation
     let animate_name = self.expr.variable_name();
     let trigger = match &self.expr {
       AnimateExpr::Animate(a) => {
-        // todo: animate must be stateful, trigger is be user of
         if a.id.is_none() {
           a.gen_tokens(tokens, ctx);
         }
@@ -679,9 +681,9 @@ impl Trigger {
   /// This method helper to generate animate code for that case, and return the
   /// trigger closure.
   fn gen_transition_as_animate_tokens(
-    &self,
+    &mut self,
     tokens: &mut TokenStream,
-    ctx: &DeclareCtx,
+    ctx: &mut DeclareCtx,
   ) -> TokenStream {
     let init = ribir_variable("init_state", self.path.member.span());
     let path = &self.path;
@@ -689,9 +691,16 @@ impl Trigger {
       AnimateExpr::Transition(t) => t,
       _ => panic!("Caller should guarantee be `AnimateExpr::Transition`!"),
     };
+    let init_2 = ribir_suffix_variable(&init, "2");
 
-    tokens.extend(quote! {
-      let #init = std::rc::Rc::new(std::cell::RefCell::new(#path.clone()));
+    path.on_real_widget_name(|name| {
+      let MemberPath { dot_token, member, .. } = path;
+      tokens.extend(quote_spanned! { path.span() =>
+        let #init = std::rc::Rc::new(std::cell::RefCell::new(
+          #name #dot_token raw_ref() #dot_token #member #dot_token clone()
+        ));
+        let #init_2 = #init.clone();
+      });
     });
     let mut animate: Animate = parse_quote! {
       Animate {
@@ -701,13 +710,14 @@ impl Trigger {
         transition: #transition
       }
     };
+    ctx.visit_animate_mut(&mut animate);
     animate.trigger_inline = true;
 
     animate.gen_tokens(tokens, ctx);
 
     let animate_name = Animate::anonymous_name(transition.span());
-    quote! {move |_| {
-      #init.borrow_mut().set(change.before.clone());
+    quote! {move |change| {
+      *#init_2.borrow_mut() = change.before.clone();
       #animate_name.raw_ref().run()
     }}
   }

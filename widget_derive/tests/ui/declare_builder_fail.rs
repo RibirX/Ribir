@@ -7,7 +7,7 @@ struct ReservedNames {
 
 #[derive(Declare)]
 struct RenameReservedNames {
-  #[declare(rename = "margin_data")]
+  #[declare(rename = margin_data)]
   margin: i32,
 }
 

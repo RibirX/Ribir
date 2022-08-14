@@ -1,4 +1,5 @@
 use ribir::prelude::*;
+use std::time::Duration;
 
 fn main() {
   let _ = widget! {
