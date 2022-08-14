@@ -16,10 +16,13 @@ pub struct WidgetGen<'a, F> {
   ty: &'a Path,
   name: &'a Ident,
   fields: F,
+  force_stateful: bool,
 }
 
 impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
-  pub fn new(ty: &'a Path, name: &'a Ident, fields: F) -> Self { Self { ty, name, fields } }
+  pub fn new(ty: &'a Path, name: &'a Ident, fields: F, force_stateful: bool) -> Self {
+    Self { ty, name, fields, force_stateful }
+  }
 
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
     if is_const_expr_keyword(self.ty) {
@@ -48,7 +51,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
   }
 
   fn const_expr_widget_tokens(&self) -> TokenStream {
-    let Self { ty, name, fields } = self;
+    let Self { ty, name, fields,.. } = self;
     let expr_field = fields.clone().last().unwrap();
     assert_eq!(expr_field.member, EXPR_FIELD);
 
@@ -100,9 +103,10 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     }})
   }
 
-  fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
+  pub(crate) fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
+    self.force_stateful 
     // widget is followed by others.
-    ctx.is_used(self.name)
+    || ctx.is_used(self.name)
       // or its fields follow others
       ||  self
       .fields.clone()

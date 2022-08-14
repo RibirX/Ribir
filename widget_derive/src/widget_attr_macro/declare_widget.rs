@@ -297,7 +297,7 @@ impl DeclareWidget {
     ctx: &'a DeclareCtx,
   ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
     let Self { path: ty, fields, .. } = self;
-    let gen = WidgetGen::new(ty, name, fields.iter());
+    let gen = WidgetGen::new(ty, name, fields.iter(), false);
     let host = gen.gen_widget_tokens(ctx);
     let builtin = self.builtin.widget_tokens_iter(name, ctx);
     std::iter::once((name.clone(), host)).chain(builtin)

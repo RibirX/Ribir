@@ -56,6 +56,7 @@ pub struct Animate {
   id: Option<Id>,
   from: FromStateField,
   transition: TransitionField,
+  trigger_inline: bool,
 }
 mod animate_kw {
   syn::custom_keyword!(from);
@@ -301,6 +302,7 @@ impl Parse for Animate {
       id,
       from,
       transition,
+      trigger_inline: false,
     })
   }
 }
@@ -393,7 +395,9 @@ impl Parse for AnimateExpr {
   fn parse(input: ParseStream) -> Result<Self> {
     let lk = input.lookahead1();
     let expr = if lk.peek(kw::Animate) {
-      AnimateExpr::Animate(input.parse()?)
+      let mut a = input.parse::<Animate>()?;
+      a.trigger_inline = true;
+      AnimateExpr::Animate(Box::new(a))
     } else if lk.peek(kw::Transition) {
       AnimateExpr::Transition(input.parse()?)
     } else {
@@ -425,10 +429,16 @@ impl Animate {
     let name = self.variable_name();
     let ty = parse_quote! {#animate_token<_, _, _, _, _>};
     let fields = [from_field, transition_field];
-    let gen = WidgetGen::new(&ty, &name, fields.iter());
+    let gen = WidgetGen::new(&ty, &name, fields.iter(), self.trigger_inline);
     let animate_def = gen.gen_widget_tokens(ctx);
     animate_def.to_tokens(tokens);
-    quote_spanned! { animate_span => Animate::register(&#name, #build_ctx);}.to_tokens(tokens);
+    // if animate is not stateful, means no way to trigger or others capture it, we
+    // needn't register it, and let compile warning user.
+    if gen.is_stateful(ctx) {
+      tokens.extend(quote_spanned! { animate_span =>
+        Animate::register(&#name, #build_ctx);
+      });
+    }
   }
 }
 
@@ -576,7 +586,7 @@ impl Transition {
     let name = self.variable_name();
 
     let ty = parse_quote_spanned! { transition_token.span => #transition_token <_>};
-    let gen = WidgetGen::new(&ty, &name, fields.iter());
+    let gen = WidgetGen::new(&ty, &name, fields.iter(), false);
     let transition_tokens = gen.gen_widget_tokens(ctx);
 
     tokens.extend(transition_tokens)
@@ -599,6 +609,7 @@ impl Trigger {
     let animate_name = self.expr.variable_name();
     let trigger = match &self.expr {
       AnimateExpr::Animate(a) => {
+        // todo: animate must be stateful, trigger is be user of
         if a.id.is_none() {
           a.gen_tokens(tokens, ctx);
         }
@@ -608,7 +619,7 @@ impl Trigger {
         }}
       }
       AnimateExpr::Transition(transition) => {
-        if self.listener_trigger().is_some() {
+        if self.listener_trigger_ty().is_some() {
           tokens.extend(quote_spanned! { transition.span() =>
             compile_error!("`Transition can not directly use for listener trigger, use `Animate` instead of.`")
           });
@@ -638,13 +649,18 @@ impl Trigger {
     tokens: &mut TokenStream,
     ctx: &DeclareCtx,
   ) {
-    if let Some(listener) = self.listener_trigger() {
+    if let Some(listener) = self.listener_trigger_ty() {
       self.path.on_real_widget_name(|name| {
+        let host_name = &self.path.widget;
         let ty = Ident::new(listener, self.path.span()).into();
         let member = &self.path.member;
         let fields = [parse_quote! {#member: #run_fn}];
-        let gen = WidgetGen::new(&ty, name, fields.iter());
+        let name = &ribir_suffix_variable(name, "trigger");
+        let gen = WidgetGen::new(&ty, name, fields.iter(), false);
         tokens.extend(gen.gen_widget_tokens(ctx));
+        tokens.extend(quote! {
+          let #host_name = SingleChildWidget::new(#name, #host_name);
+        });
       });
     } else {
       let MemberPath { widget, dot_token, member } = &self.path;
@@ -674,7 +690,10 @@ impl Trigger {
       _ => panic!("Caller should guarantee be `AnimateExpr::Transition`!"),
     };
 
-    let animate: Animate = parse_quote! {
+    tokens.extend(quote! {
+      let #init = std::rc::Rc::new(std::cell::RefCell::new(#path.clone()));
+    });
+    let mut animate: Animate = parse_quote! {
       Animate {
         from: State {
           #path: #init.borrow().clone()
@@ -682,9 +701,8 @@ impl Trigger {
         transition: #transition
       }
     };
-    tokens.extend(quote! {
-      let #init = std::rc::Rc::new(std::cell::RefCell::new(#path.clone()));
-    });
+    animate.trigger_inline = true;
+
     animate.gen_tokens(tokens, ctx);
 
     let animate_name = Animate::anonymous_name(transition.span());
@@ -694,7 +712,7 @@ impl Trigger {
     }}
   }
 
-  fn listener_trigger(&self) -> Option<&str> {
+  fn listener_trigger_ty(&self) -> Option<&str> {
     FIELD_WIDGET_TYPE
       .get(self.path.member.to_string().as_str())
       .filter(|name| name.ends_with("Listener"))
@@ -787,6 +805,10 @@ impl DeclareCtx {
     match &mut trigger.expr {
       AnimateExpr::Animate(a) => {
         self.visit_animate_mut(a);
+        // animate declare in trigger will used by trigger.
+        if let Some(id) = a.id.as_ref() {
+          self.add_used_widget(id.name.clone(), UsedType::USED)
+        }
       }
       AnimateExpr::Transition(t) => {
         self.visit_transition_mut(t);
@@ -796,6 +818,7 @@ impl DeclareCtx {
         *used_name_info = self.take_current_used_info();
       }
     }
+    self.visit_member_path(&mut trigger.path);
     self.take_current_used_info();
   }
 
@@ -909,7 +932,7 @@ impl Animate {
       None
     };
 
-    (state_expr_used.is_some() || transition_used.is_some() || state_target_used.is_none()).then(
+    (state_expr_used.is_some() || transition_used.is_some() || state_target_used.is_some()).then(
       || {
         state_expr_used
           .into_iter()

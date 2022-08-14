@@ -47,7 +47,7 @@ pub struct GeneratorInfo {
 impl<R> ExprWidgetBuilder<R> {
   pub fn upstream(
     mut self,
-    stream: impl LocalObservable<'static, Item = (), Err = ()> + Clone + 'static,
+    stream: impl LocalObservable<'static, Item = (), Err = ()> + 'static,
   ) -> Self {
     self.upstream = Some(Some(stream.box_it()));
     self
