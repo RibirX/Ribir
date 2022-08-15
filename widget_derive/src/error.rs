@@ -19,20 +19,8 @@ pub enum DeclareError {
   CircleInit(Box<[CircleUsedPath]>),
   CircleFollow(Box<[CircleUsedPath]>),
   DataFlowNoDepends(Span),
-  KeyDependsOnOther {
-    key: Span,
-    depends_on: Vec<Span>,
-  },
-  DependOBuiltinFieldWithIfGuard {
-    wrap_name: Ident,
-    wrap_def_spans: [Span; 3],
-    use_spans: Vec<Span>,
-  },
+  KeyDependsOnOther { key: Span, depends_on: Vec<Span> },
   ExprWidgetInvalidField(Vec<Span>),
-  UnsupportedIfGuard {
-    name: String,
-    span: Span,
-  },
 }
 
 #[derive(Debug)]
@@ -95,18 +83,9 @@ impl DeclareError {
         diagnostic.set_spans(depends_on);
         diagnostic.set_message("The `key` field is not allowed to depend on others.");
       }
-      DeclareError::DependOBuiltinFieldWithIfGuard { wrap_def_spans, use_spans, .. } => {
-        diagnostic.set_spans(use_spans);
-        diagnostic.set_message( "Depends on a widget field which behind `if guard`, its existence depends on the `if guard` result in runtime.");
-        diagnostic = diagnostic.span_warning(wrap_def_spans.to_vec(), "field define here.");
-      }
       DeclareError::ExprWidgetInvalidField(spans) => {
         diagnostic.set_spans(spans);
         diagnostic.set_message("`ExprWidget` only accept `expr` field.");
-      }
-      DeclareError::UnsupportedIfGuard { name, span } => {
-        diagnostic.set_spans(span);
-        diagnostic.set_message(format!("{name}  not support if guard"));
       }
     };
 

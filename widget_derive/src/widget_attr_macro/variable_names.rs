@@ -24,8 +24,3 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
   let name = format!("{prefix}_{suffix}_{AVOID_CONFLICT_SUFFIX}");
   Ident::new(&name, from.span())
 }
-
-pub fn ribir_prefix_variable(name: &Ident, prefix: &str) -> Ident {
-  let prefix = Ident::new(prefix, name.span());
-  ribir_suffix_variable(&prefix, &name.to_string())
-}

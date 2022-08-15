@@ -71,12 +71,6 @@ pub fn declare_field_name(field_name: &Ident) -> Ident {
   Ident::new(&name, field_name.span())
 }
 
-// todo: remove this method after `if guard` syntax removed from `widget!`
-// macro.
-pub fn field_default_method(field_name: &Ident) -> Ident {
-  Ident::new(&format!("{field_name}_default",), field_name.span())
-}
-
 impl Parse for DefaultMeta {
   fn parse(input: syn::parse::ParseStream) -> Result<Self> {
     Ok(Self {
@@ -229,8 +223,8 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let mut methods = quote! {};
   builder_fields.iter().for_each(
     |f @ DeclareField {
-       attr,
-       field: syn::Field { vis: f_vis, ident, ty, .. },
+       attr: _,
+       field: syn::Field { vis: f_vis, ident, .. },
      }| {
       let field_name = ident.as_ref().unwrap();
       let set_method = f.set_method_name();
@@ -249,16 +243,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
             self.#field_name = #expr;
           }
         });
-      }
-
-      if let Some(DeclareAttr { default, .. }) = attr {
-        if let Some(default) = default {
-          let value = default.default_value(field_name);
-          let default_method = field_default_method(field_name);
-          builder_methods.extend(quote! {
-            #vis fn #default_method(ctx: &mut BuildCtx) -> #ty { #value }
-          });
-        }
       }
     },
   );
@@ -298,18 +282,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   Ok(tokens)
 }
 
-impl DefaultMeta {
-  fn default_value(&self, _: &Ident) -> TokenStream {
-    match &self.value {
-      Some(v) => {
-        quote! { #v }
-      }
-      None => {
-        quote! {<_>::default()}
-      }
-    }
-  }
-}
 fn collect_filed_and_attrs(stt: &mut DataStruct) -> Result<Punctuated<DeclareField, token::Comma>> {
   let mut builder_fields = Punctuated::default();
   match &mut stt.fields {
