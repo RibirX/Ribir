@@ -266,8 +266,6 @@ impl DeclareCtx {
 
   pub fn take_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.take() }
 
-  pub fn clone_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.clone() }
-
   pub fn unused_id_warning(&self) -> impl Iterator<Item = DeclareWarning> {
     self
       .named_objects

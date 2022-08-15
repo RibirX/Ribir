@@ -496,7 +496,6 @@ impl TransitionField {
       AnimateTransitionValue::Expr { expr, used_name_info } => DeclareField {
         skip_nc: None,
         member: transition_token.clone(),
-        if_guard: None,
         colon_token: colon_token.clone(),
         expr: expr.clone(),
         used_name_info: used_name_info.clone(),

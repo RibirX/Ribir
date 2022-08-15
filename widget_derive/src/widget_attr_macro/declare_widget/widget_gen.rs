@@ -1,5 +1,5 @@
 use crate::{
-  declare_derive::{declare_field_name, field_default_method},
+  declare_derive::declare_field_name,
   widget_attr_macro::{
     capture_widget, ribir_variable,
     widget_macro::{is_const_expr_keyword, EXPR_FIELD},
@@ -7,7 +7,7 @@ use crate::{
   },
 };
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::{quote, quote_spanned, };
 use syn::{spanned::Spanned, Ident, Path};
 
 use super::{upstream_tokens, DeclareField};
@@ -38,7 +38,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
 
     let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
-    let fields_tokens = self.fields.clone().map(|f| f.field_tokens(ty));
+    let fields_tokens = self.fields.clone().map(|f| f.field_tokens());
     let build_widget = quote_spanned! { ty.span() =>
       let #name = <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful;
     };
@@ -51,11 +51,11 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
   }
 
   fn const_expr_widget_tokens(&self) -> TokenStream {
-    let Self { ty, name, fields,.. } = self;
+    let Self { ty, name, fields, .. } = self;
     let expr_field = fields.clone().last().unwrap();
     assert_eq!(expr_field.member, EXPR_FIELD);
 
-    let value_tokens = expr_field.value_tokens(ty);
+    let value_tokens = expr_field.value_tokens();
     quote_spanned! { ty.span() => let #name = #value_tokens; }
   }
 
@@ -63,7 +63,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let DeclareField { member, used_name_info, skip_nc, .. } = f;
 
     let name = &self.name;
-    let expr_tokens = f.value_tokens(self.ty);
+    let expr_tokens = f.value_tokens();
     let directly_used = used_name_info.directly_used_widgets()?;
 
     if f.value_is_an_id().is_some() {
@@ -115,34 +115,22 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 }
 
 impl DeclareField {
-  fn value_tokens(&self, widget_ty: &Path) -> TokenStream {
-    let Self { member, expr, .. } = self;
-    let span = expr.span();
-    let mut expr = quote! { #expr };
+  fn value_tokens(&self) -> TokenStream {
+   let expr = &self.expr;
 
     if let Some(name) = self.value_is_an_id() {
-      expr = quote_spanned! { span => #name.clone() };
+      quote_spanned! { name.span() => #name.clone() }
     } else if let Some(refs) = self.used_name_info.refs_tokens() {
       // todo: we should declare reference for all widget.
-      expr = quote_spanned! { span => { #(#refs)* #expr }};
-    }
-
-    if let Some(if_guard) = self.if_guard.as_ref() {
-      let default_method = field_default_method(member);
-      let build_ctx = ribir_variable(BUILD_CTX, if_guard.span());
-      quote_spanned!(span => #if_guard {
-        #expr
-      } else {
-        <#widget_ty as Declare>::Builder::#default_method(#build_ctx)
-      })
+      quote_spanned! { expr.span() => { #(#refs)* #expr }}
     } else {
-      expr
+      quote! { #expr }
     }
   }
 
-  pub(crate) fn field_tokens(&self, widget_ty: &Path) -> TokenStream {
+  pub(crate) fn field_tokens(&self) -> TokenStream {
     let member = &self.member;
-    let value = self.value_tokens(widget_ty);
+    let value = self.value_tokens();
     quote! {.#member(#value)}
   }
 

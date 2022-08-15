@@ -90,12 +90,6 @@ impl Id {
         "Attribute `#[skip_nc]` is not supported in `id`",
       ));
     }
-    if field.if_guard.is_some() {
-      return Err(syn::Error::new(
-        field.if_guard.span(),
-        "if guard is not supported in `id`",
-      ));
-    }
 
     Ok(syn::parse_quote! {#p})
   }

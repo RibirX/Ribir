@@ -12,17 +12,14 @@ use syn::{
   Expr, Ident, Path,
 };
 mod widget_gen;
-use crate::{
-  error::{DeclareError, DeclareWarning},
-  widget_attr_macro::{ribir_prefix_variable, UsedType},
-};
+use crate::error::{DeclareError, DeclareWarning};
 mod builtin_fields;
 pub use builtin_fields::*;
 pub use widget_gen::WidgetGen;
 
 use super::{
   kw,
-  widget_macro::{is_expr_keyword, IfGuard, EXPR_FIELD, EXPR_WIDGET},
+  widget_macro::{is_expr_keyword, EXPR_FIELD, EXPR_WIDGET},
   DeclareCtx, Id, ObjectUsed, Result, ScopeUsedInfo, UsedPart,
 };
 
@@ -41,7 +38,6 @@ pub struct DeclareWidget {
 pub struct DeclareField {
   pub skip_nc: Option<SkipNcAttr>,
   pub member: Ident,
-  pub if_guard: Option<IfGuard>,
   pub colon_token: Option<token::Colon>,
   pub expr: Expr,
   pub used_name_info: ScopeUsedInfo,
@@ -85,18 +81,9 @@ impl ToTokens for SkipNcAttr {
 impl ToTokens for DeclareField {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     self.member.to_tokens(tokens);
-    self.colon_token.to_tokens(tokens);
-    let expr = &self.expr;
-    if let Some(if_guard) = self.if_guard.as_ref() {
-      tokens.extend(quote! {
-        #if_guard {
-          #expr
-        } else {
-          <_>::default()
-        }
-      })
-    } else if self.colon_token.is_some() {
-      expr.to_tokens(tokens)
+    if self.colon_token.is_some() {
+      self.colon_token.to_tokens(tokens);
+      self.expr.to_tokens(tokens);
     }
   }
 }
@@ -173,17 +160,7 @@ impl Parse for DeclareField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let skip_nc = try_parse_skip_nc(input)?;
     let member: Ident = input.parse()?;
-    let if_guard = if input.peek(token::If) {
-      Some(input.parse()?)
-    } else {
-      None
-    };
-    let colon_token: Option<_> = if if_guard.is_some() {
-      Some(input.parse()?)
-    } else {
-      input.parse()?
-    };
-
+    let colon_token: Option<_> = input.parse()?;
     let expr = if colon_token.is_some() {
       input.parse()?
     } else {
@@ -197,7 +174,6 @@ impl Parse for DeclareField {
     Ok(DeclareField {
       skip_nc,
       member,
-      if_guard,
       colon_token,
       expr,
       used_name_info: ScopeUsedInfo::default(),
@@ -277,9 +253,6 @@ impl DeclareCtx {
 
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
     self.visit_ident_mut(&mut f.member);
-    if let Some(if_guard) = f.if_guard.as_mut() {
-      self.visit_if_guard_mut(if_guard);
-    }
     self.visit_expr_mut(&mut f.expr);
 
     f.used_name_info = self.take_current_used_info();
@@ -303,22 +276,10 @@ impl DeclareWidget {
     std::iter::once((name.clone(), host)).chain(builtin)
   }
 
-  pub fn before_generate_check(&self, ctx: &DeclareCtx) -> Result<()> {
-    self.traverses_widget().try_for_each(|w| {
-      if w.named.is_some() {
-        w.builtin_field_if_guard_check(ctx)?;
-      }
-      if is_expr_keyword(&w.path) {
-        if let Some(guard) = w.fields[0].if_guard.as_ref() {
-          return Err(DeclareError::UnsupportedIfGuard {
-            name: format!("field {EXPR_FIELD} of  {EXPR_WIDGET}"),
-            span: guard.span().unwrap(),
-          });
-        }
-      }
-
-      w.builtin.key_follow_check()
-    })
+  pub fn before_generate_check(&self) -> Result<()> {
+    self
+      .traverses_widget()
+      .try_for_each(|w| w.builtin.key_follow_check())
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {
@@ -368,42 +329,6 @@ impl DeclareWidget {
       .segments
       .first()
       .map_or(false, |s| s.ident == EXPR_WIDGET)
-  }
-
-  fn builtin_field_if_guard_check(&self, ctx: &DeclareCtx) -> Result<()> {
-    let w_ref = self.name().expect("should not check anonymous widget.");
-    self
-      .builtin
-      .all_builtin_fields()
-      .filter(|f| f.if_guard.is_some())
-      .try_for_each(|f| {
-        let wrap_name = ribir_prefix_variable(&f.member, &w_ref.to_string());
-
-        if ctx.is_used(&wrap_name) {
-          let if_guard_span = f.if_guard.as_ref().unwrap().span().unwrap();
-          let mut use_spans = vec![];
-          self.traverses_widget().for_each(|w| {
-            w.builtin
-              .all_builtin_fields()
-              .filter_map(|f| {
-                f.used_name_info
-                  .filter_item(|info| info.used_type.contains(UsedType::USED))
-              })
-              .flatten()
-              .filter(|(name, _)| *name == &wrap_name)
-              .for_each(|(_, info)| use_spans.extend(info.spans.iter().map(|s| s.unwrap())))
-          });
-
-          let host_span = w_ref.span().unwrap();
-          let wrap_span = wrap_name.span().unwrap();
-          return Err(DeclareError::DependOBuiltinFieldWithIfGuard {
-            wrap_def_spans: [host_span, wrap_span, if_guard_span],
-            use_spans,
-            wrap_name,
-          });
-        }
-        Ok(())
-      })
   }
 
   pub fn traverses_widget(&self) -> impl Iterator<Item = &DeclareWidget> {

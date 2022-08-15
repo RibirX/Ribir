@@ -238,19 +238,6 @@ fn builtin_ref() {
 }
 
 #[test]
-fn if_guard_field_true() {
-  let guard_true = widget! {
-    SizedBox {
-      size : Size::new(100., 100.),
-      margin if true => : EdgeInsets::horizontal(5.),
-    }
-  };
-
-  let (rect, _) = widget_and_its_children_box_rect(guard_true, Size::new(1000., 1000.));
-  assert_eq!(rect.size, Size::new(110., 100.));
-}
-
-#[test]
 fn builtin_bind_to_self() {
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
@@ -277,20 +264,6 @@ fn builtin_bind_to_self() {
   tap_at(&mut wnd, (1, 1));
   wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::Help);
-}
-
-#[test]
-fn if_guard_work() {
-  let w = widget! {
-    SizedBox {
-      size : Size::new(100., 100.),
-      margin if false =>: EdgeInsets::all(1.),
-      cursor if true =>: CursorIcon::Hand
-    }
-  };
-
-  let (rect, _) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
-  assert_eq!(rect.size, Size::new(100., 100.));
 }
 
 fn tap_at(wnd: &mut Window, pos: (i32, i32)) {

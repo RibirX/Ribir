@@ -2,18 +2,12 @@ use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use std::collections::{BTreeMap, HashMap};
-use syn::{
-  parse::{Parse, ParseStream},
-  spanned::Spanned,
-  token,
-  visit_mut::VisitMut,
-  Expr, Ident, Path, Token,
-};
+use syn::{parse::Parse, spanned::Spanned, token, Ident, Path};
 
 use super::{
   animations::Animations, child_variable, dataflows::Dataflows,
   declare_widget::assign_uninit_field, kw, track::Track, DeclareCtx, DeclareWidget, IdType,
-  ObjectUsed, Result, ScopeUsedInfo,
+  ObjectUsed, Result,
 };
 use crate::{
   error::{CircleUsedPath, DeclareError},
@@ -29,14 +23,6 @@ pub struct WidgetMacro {
   track: Option<Track>,
   dataflows: Option<Dataflows>,
   animations: Option<Animations>,
-}
-
-#[derive(Clone, Debug)]
-pub struct IfGuard {
-  pub if_token: token::If,
-  pub cond: Expr,
-  pub fat_arrow_token: Token![=>],
-  pub used_name_info: ScopeUsedInfo,
 }
 
 pub fn is_const_expr_keyword(ty: &Path) -> bool {
@@ -104,7 +90,7 @@ impl WidgetMacro {
       });
 
     ctx.visit_widget_macro_mut(self);
-    self.widget.before_generate_check(ctx)?;
+    self.widget.before_generate_check()?;
 
     let mut tokens = quote!();
     // named object define.
@@ -374,28 +360,5 @@ impl DeclareCtx {
     if let Some(animations) = d.animations.as_mut() {
       ctx.visit_animations_mut(animations);
     }
-  }
-
-  pub fn visit_if_guard_mut(&mut self, if_guard: &mut IfGuard) {
-    self.visit_expr_mut(&mut if_guard.cond);
-    if_guard.used_name_info = self.clone_current_used_info();
-  }
-}
-
-impl ToTokens for IfGuard {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
-    self.if_token.to_tokens(tokens);
-    self.cond.to_tokens(tokens);
-  }
-}
-
-impl Parse for IfGuard {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(IfGuard {
-      if_token: input.parse()?,
-      cond: input.parse()?,
-      fat_arrow_token: input.parse()?,
-      used_name_info: <_>::default(),
-    })
   }
 }
