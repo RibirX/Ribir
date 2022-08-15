@@ -24,8 +24,8 @@ where
 
 #[derive(Clone)]
 pub struct AnimateInfo<S> {
-  from: S,
-  to: S,
+  from: Option<S>,
+  to: Option<S>,
   start_at: Instant,
   last_progress: AnimateProgress,
 }
@@ -53,8 +53,11 @@ where
     let elapsed = now - info.start_at;
     let progress = self.transition.rate_of_change(elapsed);
 
+    let from = info.from.get_or_insert_with(|| self.state.init_value());
+    let to = info.to.get_or_insert_with(|| self.state.finial_value());
+
     if let AnimateProgress::Between(rate) = progress {
-      let animate_state = info.from.lerp(&info.to, rate);
+      let animate_state = from.lerp(to, rate);
       self.state.update(animate_state);
     }
     info.last_progress = progress;
@@ -69,7 +72,11 @@ where
       .expect("This animation is not running.");
 
     if matches!(info.last_progress, AnimateProgress::Between(_)) {
-      self.state.update(info.to.clone())
+      let to = info.to.clone().expect(
+        "Try to finished an animate frame which not running, 
+        / ensure called `lerp` before this method.",
+      );
+      self.state.update(to)
     }
   }
 }
@@ -109,15 +116,15 @@ where
   }
 
   pub fn run(&mut self) {
-    let from = if let Some(info) = self.running_info.take() {
-      info.to
-    } else {
-      self.state.init_value()
-    };
+    // if animate is running, animate start from current value.
+    let from = self
+      .running_info
+      .take()
+      .and_then(|info| Some(info.from?.lerp(&info.to?, info.last_progress.value())));
 
     self.running_info = Some(AnimateInfo {
       from,
-      to: self.state.finial_value(),
+      to: None,
       start_at: Instant::now(),
       last_progress: AnimateProgress::Dismissed,
     });
