@@ -101,7 +101,7 @@ impl Id {
   }
 }
 
-fn widget_state_ref(widget: &Ident) -> TokenStream2 {
+fn obj_state_ref(widget: &Ident) -> TokenStream2 {
   quote_spanned!(widget.span() =>
     #[allow(unused_mut)]
     let mut #widget = #widget.state_ref();

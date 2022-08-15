@@ -1,6 +1,6 @@
 use crate::error::CircleUsedPath;
 
-use super::{widget_state_ref, DeclareCtx};
+use super::{obj_state_ref, DeclareCtx};
 use proc_macro2::{Span, TokenStream};
 use std::collections::HashMap;
 use syn::Ident;
@@ -143,7 +143,7 @@ impl ScopeUsedInfo {
   }
 
   pub fn refs_tokens(&self) -> Option<impl Iterator<Item = TokenStream> + '_> {
-    self.refs_widgets().map(|iter| iter.map(widget_state_ref))
+    self.refs_widgets().map(|iter| iter.map(obj_state_ref))
   }
 
   pub fn iter_mut(&mut self) -> impl Iterator<Item = (&Ident, &mut NameUsedInfo)> {

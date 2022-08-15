@@ -218,12 +218,15 @@ impl MemberPath {
 impl State {
   // return the capture tokens of the widgets the state want to modify.
   fn capture_target_tokens(&self) -> TokenStream {
-    let captures = self
+    let captures = self.target_objs().map(capture_widget);
+    quote! { #(#captures)*}
+  }
+
+  fn target_objs(&self) -> impl Iterator<Item = &Ident> {
+    self
       .target_used
       .all_widgets()
       .expect("State target widget muse not be empty.")
-      .map(capture_widget);
-    quote! { #(#captures)*}
   }
 
   fn maybe_tuple_value(&self, value_by_field: impl Fn(&StateField) -> TokenStream) -> TokenStream {
@@ -514,17 +517,18 @@ impl Spanned for TransitionField {
 impl ToTokens for State {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     let Self {
-      state_token,
-      fields,
-      expr_used,
-      brace_token,
-      ..
+      state_token, expr_used, brace_token, ..
     } = self;
     let state_span = state_token.span.join(brace_token.span).unwrap();
 
     let init_value = self.maybe_tuple_value(|StateField { value: expr, .. }| quote! {#expr});
 
-    let init_refs = expr_used.refs_tokens().into_iter().flatten();
+    let init_refs = expr_used
+      .directly_used_widgets()
+      .into_iter()
+      .flat_map(|names| {
+        names.map(|name| quote_spanned! { name.span() =>  let #name = #name.raw_ref(); })
+      });
     let mut init_fn = quote! {
       move || {
         #(#init_refs)*;
@@ -541,42 +545,33 @@ impl ToTokens for State {
     };
 
     let target_captures = self.capture_target_tokens();
-    let target_value = self.maybe_tuple_value(|StateField { path, .. }| {
-      let dot_token = &path.dot_token;
-      let member = &path.member;
-      let mut tokens = quote! {};
-      path.on_real_widget_name(|widget| {
-        tokens = quote! { #widget #dot_token state_ref() #dot_token #member #dot_token clone() }
-      });
-      tokens
-    });
+    let target_refs = self
+      .target_objs()
+      .map(|name| quote_spanned! { name.span() =>  let #name = #name.raw_ref(); });
 
-    let mut shallow_access = fields.iter().map(|StateField { path, .. }| {
-      let dot_token = &path.dot_token;
-      let member = &path.member;
-      let mut tokens = quote! {};
-      path.on_real_widget_name(|widget| {
-        tokens = quote! { #widget #dot_token shallow_ref() #dot_token #member }
-      });
-      tokens
-    });
-    let update_fn = if fields.len() > 1 {
-      let indexes = (0..fields.len()).map(syn::Index::from);
-      quote! { move |val| { #(#shallow_access = val.#indexes;)*} }
-    } else {
-      let state = shallow_access.next();
-      quote! { move |val| { #state = val; } }
-    };
+    let target_mut_refs = self
+      .target_objs()
+      .map(|name| quote_spanned! { name.span() =>  let mut #name = #name.shallow_ref(); });
+    let target_value = self.maybe_tuple_value(|StateField { path, .. }| quote! {#path.clone()});
+    let target_assign = self.maybe_tuple_value(|StateField { path, .. }| quote! {#path});
+
+    let v = ribir_variable("v", state_span);
     tokens.extend(quote_spanned! { state_span =>
       AnimateState::new(
         #init_fn,
         {
           #target_captures
-          move || { #target_value}
+          move || {
+            #(#target_refs)*
+            #target_value
+          }
         },
         {
           #target_captures
-          #update_fn
+          move |#v| {
+            #(#target_mut_refs)*
+            #target_assign = #v;
+          }
         }
       )
     });

@@ -16,7 +16,7 @@ use syn::{
 
 use crate::{
   error::DeclareError,
-  widget_attr_macro::{capture_widget, widget_state_ref},
+  widget_attr_macro::{capture_widget, obj_state_ref},
 };
 
 mod ct {
@@ -77,7 +77,7 @@ impl ToTokens for Dataflow {
       .chain(to_used_name.refs_widgets().into_iter())
       .flatten()
       .collect();
-    let refs_tokens = state_refs.into_iter().map(widget_state_ref);
+    let refs_tokens = state_refs.into_iter().map(obj_state_ref);
 
     let captures: HashSet<&Ident, ahash::RandomState> = from_used_name
       .all_widgets()
