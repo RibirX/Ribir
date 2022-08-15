@@ -148,7 +148,7 @@ impl WidgetMacro {
     };
 
     let track = self.track.as_ref();
-    if self.track.is_some() {
+    if track.map_or(false, Track::has_def_names) {
       tokens = quote! {{
         #track
         #tokens

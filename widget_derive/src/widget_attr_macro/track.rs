@@ -21,17 +21,22 @@ impl Parse for Track {
   }
 }
 
-// todo: sometimes needn't declare track
 impl ToTokens for Track {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    self.track_externs.iter().for_each(|field| {
-      let SimpleField { member, expr, .. } = field;
-      tokens.extend(quote_spanned!(field.span() => let #member: Stateful<_> = #expr; ));
-    });
+    self
+      .track_externs
+      .iter()
+      .filter(|f| f.colon_token.is_some())
+      .for_each(|field| {
+        let SimpleField { member, expr, .. } = field;
+        tokens.extend(quote_spanned!(field.span() => let #member: Stateful<_> = #expr; ));
+      });
   }
 }
 
 impl Track {
+  pub fn has_def_names(&self) -> bool { self.track_externs.iter().any(|f| f.colon_token.is_some()) }
+
   pub fn track_names(&self) -> impl Iterator<Item = &Ident> {
     self.track_externs.iter().map(|f| &f.member)
   }

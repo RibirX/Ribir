@@ -734,12 +734,8 @@ impl ToTokens for MemberPath {
 
 impl ToTokens for SimpleField {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let Self { member, colon_token, expr } = self;
-    if colon_token.is_some() {
-      tokens.extend(quote! { .#member(#expr) })
-    } else {
-      tokens.extend(quote! { .#member(#member) })
-    }
+    let Self { member, expr, .. } = self;
+    tokens.extend(quote! { .#member(#expr) });
   }
 }
 
