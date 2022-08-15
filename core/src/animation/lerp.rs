@@ -16,7 +16,7 @@ macro_rules! impl_lerp_for_integer {
       impl Lerp for $ty {
         #[inline]
         fn lerp(&self, to: &Self, factor: f32) -> Self{
-          self + ((to - self) as f32 * factor )as $ty
+        (*self as f32 * (1. - factor)   +  *to as f32 * factor) as $ty
         }
       }
     )*
@@ -194,6 +194,11 @@ mod tests {
     assert!((0.5, 0.75, Point::new(10., 5.)) == Lerp::lerp(&t1, &t2, 0.5));
     assert!(t2 == Lerp::lerp(&t1, &t2, 1.));
     assert!(t1 == Lerp::lerp(&t1, &t2, 0.));
+  }
+
+  #[test]
+  fn fix_avoid_calc_overflow() {
+    assert_eq!(255u8.lerp(&0u8, 0.), 255);
   }
 
   #[bench]
