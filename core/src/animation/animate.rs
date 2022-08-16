@@ -14,11 +14,9 @@ where
   pub transition: T,
   #[declare(rename = from)]
   state: AnimateState<I, F, W>,
-  /// todo: declare skip fields, Store the running information of this
-  /// animation.
-  #[declare(default)]
+  #[declare(skip)]
   running_info: Option<AnimateInfo<R>>,
-  #[declare(default)]
+  #[declare(skip)]
   handler: Option<AnimateHandler>,
 }
 

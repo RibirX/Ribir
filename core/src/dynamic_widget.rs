@@ -11,7 +11,6 @@ use smallvec::SmallVec;
 pub struct ExprWidget<R> {
   #[declare(convert = box_trait(FnMut(&mut dyn FnMut(Widget)) -> R))]
   pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
-  // todo: `Declare` should provide `skip` attribute for private field.
   #[declare(convert = custom)]
   pub(crate) upstream: Option<LocalBoxOp<'static, (), ()>>,
 }
