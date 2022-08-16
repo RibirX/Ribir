@@ -43,6 +43,8 @@ struct DeclareAttr {
   builtin: Option<kw::builtin>,
   default: Option<DefaultMeta>,
   convert: Option<ConvertMeta>,
+  // field with `skip` attr, will not generate setter method and use default to init value.
+  skip: Option<kw::skip>,
 }
 
 struct DeclareField<'a> {
@@ -58,6 +60,7 @@ mod kw {
   custom_keyword!(into);
   custom_keyword!(box_trait);
   custom_keyword!(custom);
+  custom_keyword!(skip);
   custom_keyword!(strip_option);
 }
 
@@ -144,6 +147,8 @@ impl Parse for DeclareAttr {
         attr.convert = Some(input.parse()?);
       } else if lookahead.peek(kw::default) {
         attr.default = Some(input.parse()?);
+      } else if lookahead.peek(kw::skip) {
+        attr.skip = Some(input.parse()?);
       } else {
         return Err(lookahead.error());
       }
@@ -176,56 +181,14 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     .for_each(DeclareField::check_reserve);
 
   let builder = Ident::new(&format!("{}{}", name, BUILDER), name.span());
-  // builder define
-  let def_fields = builder_fields.pairs().map(|p| {
-    let (f, c) = p.into_tuple();
-    let mut f = f.field.clone();
-    let ty = &f.ty;
-    f.ty = parse_quote!(Option<#ty>);
-    syn::punctuated::Pair::new(f, c)
-  });
-
-  // implement declare trait
-  let fields_ident = builder_fields.iter().map(|f| f.field.ident.as_ref());
-  let builder_fields_ident = fields_ident.clone();
-
-  let fill_default = builder_fields.iter().filter_map(|f| {
-    let field_name = f.member();
-    let method = f.set_method_name();
-    f.attr.as_ref().and_then(|attr| {
-      attr.default.as_ref().map(|df| {
-        let set_default_value = if let Some(v) = df.value.as_ref() {
-          quote! { self = self.#method(#v); }
-        } else {
-          quote! { self.#field_name = Some(<_>::default()) }
-        };
-        quote! {
-          if self.#field_name.is_none() {
-            #set_default_value
-          }
-        }
-      })
-    })
-  });
-
-  let init_values = builder_fields.iter().map(|df| {
-    let field_name = df.field.ident.as_ref().unwrap();
-    let method = df.set_method_name();
-    quote_spanned! { field_name.span() =>
-      self.#field_name.expect(&format!(
-        "Required field `{}::{}` not set, use method `{}` init it",
-        stringify!(#name), stringify!(#field_name), stringify!(#method)
-      ))
-    }
-  });
 
   let mut builder_methods = quote! {};
   let mut methods = quote! {};
-  builder_fields.iter().for_each(
-    |f @ DeclareField {
-       attr: _,
-       field: syn::Field { vis: f_vis, ident, .. },
-     }| {
+  builder_fields
+    .iter()
+    .filter(|f| f.attr.as_ref().map_or(true, |attr| attr.skip.is_none()))
+    .for_each(|f| {
+      let syn::Field { vis: f_vis, ident, .. } = &f.field;
       let field_name = ident.as_ref().unwrap();
       let set_method = f.set_method_name();
       let declare_set = declare_field_name(set_method);
@@ -244,8 +207,53 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           }
         });
       }
-    },
-  );
+    });
+
+  // builder define
+  let def_fields = builder_fields.pairs().map(|p| {
+    let (f, c) = p.into_tuple();
+    let mut f = f.field.clone();
+    let ty = &f.ty;
+    f.ty = parse_quote!(Option<#ty>);
+    syn::punctuated::Pair::new(f, c)
+  });
+
+  // implement declare trait
+  let fields_ident = builder_fields.iter().map(|f| f.field.ident.as_ref());
+  let builder_fields_ident = fields_ident.clone();
+
+  let fill_default = builder_fields.iter().filter_map(|f| {
+    let field_name = f.member();
+    let method = f.set_method_name();
+    f.attr.as_ref().and_then(|attr| {
+      let set_default_value = match (&attr.default, &attr.skip) {
+        (Some(df), _) if df.value.is_some() => {
+          let v = df.value.as_ref();
+          Some(quote! { self = self.#method(#v); })
+        }
+        (Some(_), _) | (_, Some(_)) => Some(quote! { self.#field_name = Some(<_>::default()) }),
+        (None, None) => None,
+      };
+      set_default_value.map(|set_default_value| {
+        quote! {
+          if self.#field_name.is_none() {
+            #set_default_value
+          }
+        }
+      })
+    })
+  });
+
+  let builder_values = builder_fields.iter().map(|df| {
+    let field_name = df.field.ident.as_ref().unwrap();
+    let method = df.set_method_name();
+    quote_spanned! { field_name.span() =>
+      self.#field_name.expect(&format!(
+        "Required field `{}::{}` not set, use method `{}` init it",
+        stringify!(#name), stringify!(#field_name), stringify!(#method)
+      ))
+    }
+  });
 
   let tokens = quote! {
 
@@ -267,7 +275,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         fn build(mut self, ctx: &mut BuildCtx) -> Self::Target {
           #(#fill_default)*
           #name {
-            #(#fields_ident : #init_values),* }
+            #(#fields_ident : #builder_values),* }
         }
       }
 
