@@ -3,11 +3,11 @@ use crate::{
   widget_attr_macro::{
     capture_widget, ribir_variable,
     widget_macro::{is_const_expr_keyword, EXPR_FIELD},
-    DeclareCtx, UsedType, BUILD_CTX,
+    widget_state_ref, DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, };
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, Ident, Path};
 
 use super::{upstream_tokens, DeclareField};
@@ -39,9 +39,21 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 
     let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
     let fields_tokens = self.fields.clone().map(|f| f.field_tokens());
-    let build_widget = quote_spanned! { ty.span() =>
-      let #name = <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful;
+    let mut build_widget = quote! {
+      <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful
     };
+    let used_info = self.whole_used_info();
+    if let Some(refs) = used_info.directly_used_widgets() {
+      let refs = refs.map(widget_state_ref);
+      build_widget = quote_spanned! { ty.span() =>
+        let #name = {
+          #(#refs)*
+          #build_widget
+        };
+      };
+    } else {
+      build_widget = quote_spanned! { ty.span() => let #name = #build_widget; };
+    }
     let fields_follow = fields.clone().filter_map(|f| self.field_follow_tokens(f));
 
     quote! {
@@ -71,7 +83,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     }
 
     let declare_set = declare_field_name(member);
-    let assign = if skip_nc.is_some() {
+    let mut assign = if skip_nc.is_some() {
       let old = ribir_variable("old", expr_tokens.span());
       quote! {{
          let diff = {
@@ -88,6 +100,9 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     } else {
       quote! { #name.state_ref().#declare_set(#expr_tokens) }
     };
+    if let Some(refs) = f.used_name_info.refs_tokens() {
+      assign = quote! {{ #(#refs)* #assign }};
+    }
 
     let upstream = upstream_tokens(directly_used);
     let capture_widgets = used_name_info
@@ -104,27 +119,37 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
   }
 
   pub(crate) fn is_stateful(&self, ctx: &DeclareCtx) -> bool {
-    self.force_stateful 
+    self.force_stateful
     // widget is followed by others.
     || ctx.is_used(self.name)
-      // or its fields follow others
-      ||  self
-      .fields.clone()
-      .any(|f| f.used_name_info.directly_used_widgets().is_some())
+    // or its fields follow others
+    ||  self.used_other_objs()
+  }
+
+  fn used_other_objs(&self) -> bool {
+    self
+      .fields
+      .clone()
+      .any(move |f| f.used_name_info.directly_used_widgets().is_some())
+  }
+
+  fn whole_used_info(&self) -> ScopeUsedInfo {
+    self
+      .fields
+      .clone()
+      .fold(ScopeUsedInfo::default(), |mut acc, f| {
+        acc.merge(&f.used_name_info);
+        acc
+      })
   }
 }
 
 impl DeclareField {
   fn value_tokens(&self) -> TokenStream {
-   let expr = &self.expr;
-
     if let Some(name) = self.value_is_an_id() {
       quote_spanned! { name.span() => #name.clone() }
-    } else if let Some(refs) = self.used_name_info.refs_tokens() {
-      // todo: we should declare reference for all widget.
-      quote_spanned! { expr.span() => { #(#refs)* #expr }}
     } else {
-      quote! { #expr }
+      self.expr.to_token_stream()
     }
   }
 
