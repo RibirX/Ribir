@@ -23,14 +23,14 @@ impl Checkbox {
 }
 
 impl Compose for Checkbox {
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
     let icons = SvgIcons::of(ctx);
     let checked = icons.checked.clone();
     let unchecked = icons.unchecked.clone();
     let indeterminate = icons.indeterminate.clone();
 
     widget! {
-      track { this }
+      track { this: this.into_stateful() }
       Icon {
         size: this.size,
         cursor: CursorIcon::Hand,

@@ -14,9 +14,13 @@ pub struct Column {
 }
 
 impl ComposeMultiChild for Column {
-  fn compose_multi_child(this: Stateful<Self>, children: Vec<Widget>, _: &mut BuildCtx) -> Widget {
-    widget! {
-      track { this }
+  fn compose_multi_child(
+    this: StateWidget<Self>,
+    children: Vec<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    widget_try_track! {
+      try_track { this }
       Flex {
         reverse: this.reverse,
         wrap: this.wrap,

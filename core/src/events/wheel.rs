@@ -1,4 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  impl_query_self_only,
+  prelude::{data_widget::compose_child_as_data_widget, *},
+};
 
 #[derive(Debug, Clone)]
 pub struct WheelEvent {
@@ -17,8 +20,12 @@ pub struct WheelListener {
 }
 
 impl ComposeSingleChild for WheelListener {
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    compose_child_as_data_widget(child, this, |w| w)
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    compose_child_as_data_widget(child, this)
   }
 }
 

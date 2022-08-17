@@ -32,7 +32,7 @@ pub struct DeclareCtx {
   /// All name we can use in macro and need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
   pub current_used_info: ScopeUsedInfo,
-  /// name object has by used.
+  /// name object has be used.
   used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
   /// Some builtin widget (like margin, padding) implicit defined by user,

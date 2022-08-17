@@ -69,9 +69,8 @@ impl Parse for WidgetMacro {
       }
     }
 
-    let widget = widget.ok_or_else(|| {
-      syn::Error::new(content.span(), "must have a `declare { ... }` in `widget!`")
-    })?;
+    let widget =
+      widget.ok_or_else(|| syn::Error::new(content.span(), "must declare widget in `widget!`"))?;
 
     Ok(Self { widget, dataflows, animations, track })
   }

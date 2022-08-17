@@ -52,8 +52,7 @@ pub(crate) use composed_widget::ComposedWidget;
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  // todo: use  enum replace Stateful?
-  fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget
+  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget
   where
     Self: Sized;
 }
@@ -86,6 +85,11 @@ pub trait Render: Query {
   fn only_sized_by_parent(&self) -> bool { false }
 }
 
+/// Enum to store both stateless and stateful widget.
+pub enum StateWidget<W> {
+  Stateless(W),
+  Stateful(Stateful<W>),
+}
 pub struct Widget(pub(crate) WidgetInner);
 
 #[marker]
@@ -235,10 +239,10 @@ impl IntoWidget<Widget> for Widget {
   fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + 'static> IntoWidget<dyn Compose> for C {
+impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C {
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget::<Widget, C>::new(Compose::compose(self.into_stateful(), ctx)).into_widget()
+      ComposedWidget::<Widget, C>::new(Compose::compose(self.into(), ctx)).into_widget()
     })))
   }
 }
@@ -331,5 +335,24 @@ impl<T: Query> Query for ShareResource<T> {
 
   fn query_all_mut(&mut self, _: TypeId, _: &mut dyn FnMut(&mut dyn Any) -> bool, _: QueryOrder) {
     // resource can not be queried as mut.
+  }
+}
+
+impl<W> From<W> for StateWidget<W> {
+  #[inline]
+  fn from(w: W) -> Self { StateWidget::Stateless(w) }
+}
+
+impl<W> From<Stateful<W>> for StateWidget<W> {
+  #[inline]
+  fn from(w: Stateful<W>) -> Self { StateWidget::Stateful(w) }
+}
+
+impl<W: IntoStateful> StateWidget<W> {
+  pub fn into_stateful(self) -> Stateful<W> {
+    match self {
+      StateWidget::Stateless(w) => w.into_stateful(),
+      StateWidget::Stateful(w) => w,
+    }
   }
 }
