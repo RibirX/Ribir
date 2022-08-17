@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 use crate::prelude::BuildCtx;
 
-use super::{easing::Easing, RepeatMode};
+use super::easing::Easing;
 use std::time::Duration;
 
 /// Transition describe how the state change form init to final smoothly.
@@ -11,8 +11,6 @@ pub struct Transition<E> {
   #[declare(default)]
   pub delay: Option<Duration>,
   pub duration: Duration,
-  #[declare(default = RepeatMode::None)]
-  pub repeat: RepeatMode,
   pub easing: E,
 }
 
