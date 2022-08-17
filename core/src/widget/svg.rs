@@ -6,15 +6,15 @@ pub struct Svg {
 }
 
 impl Compose for Svg {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
-    widget! {
-      track { this }
+  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+    widget_try_track! {
+      try_track { this }
       ExprWidget {
         expr: match SvgRender::from_svg_bytes(&this.bytes) {
-          Ok(reader) => Some(reader),
+          Ok(reader) => reader.into_widget(),
           Err(err) =>  {
             log::warn!("Parse svg failed: {err}");
-            None
+            Void.into_widget()
           }
         }
       }

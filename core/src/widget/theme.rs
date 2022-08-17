@@ -10,13 +10,15 @@ pub use palette::Palette;
 use crate::{
   impl_proxy_query, impl_query_self_only,
   prelude::{
-    compose_child_as_data_widget, Any, BuildCtx, ComposeSingleChild, Declare, DeclareBuilder,
-    Query, QueryFiler, QueryOrder, Stateful, TypeId, Widget,
+    Any, BuildCtx, ComposeSingleChild, Declare, DeclareBuilder, Query, QueryFiler, QueryOrder,
+    TypeId, Widget,
   },
 };
 use algo::ShareResource;
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
+
+use super::{data_widget::compose_child_as_data_widget, StateWidget};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -146,9 +148,13 @@ pub struct ThemeWidget {
 
 impl ComposeSingleChild for ThemeWidget {
   #[inline]
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
     // todo: theme can provide fonts to load.
-    compose_child_as_data_widget(child, this, |w| w.theme)
+    compose_child_as_data_widget(child, this)
   }
 }
 

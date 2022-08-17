@@ -1,4 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  impl_proxy_query, impl_query_self_only,
+  prelude::{data_widget::compose_child_as_data_widget, *},
+};
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -37,13 +40,17 @@ pub struct KeyWidget {
 
 impl ComposeSingleChild for KeyWidget {
   #[inline]
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    compose_child_as_data_widget(child, this, |w| w.key)
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    compose_child_as_data_widget(child, this)
   }
 }
 
 impl Query for KeyWidget {
-  impl_query_self_only!();
+  impl_proxy_query!(key);
 }
 
 impl Query for Key {

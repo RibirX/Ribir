@@ -11,10 +11,10 @@ struct Todos {
 }
 
 impl Compose for Todos {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       // split this to avoid mutable borrow conflict in `ExprWidget`.
-      track { this, this2: this.clone() }
+      track { this: this.into_stateful(), this2: this.clone() }
       Column {
         align_items: Align::Start,
         ExprWidget {

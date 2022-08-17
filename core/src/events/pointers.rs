@@ -1,5 +1,8 @@
 use super::EventCommon;
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  impl_query_self_only,
+  prelude::{data_widget::compose_child_as_data_widget, *},
+};
 use std::time::{Duration, Instant};
 
 mod from_mouse;
@@ -101,11 +104,11 @@ macro_rules! impl_pointer_listener {
   ($name: ident, $field: ident) => {
     impl ComposeSingleChild for $name {
       fn compose_single_child(
-        this: Stateful<Self>,
+        this: StateWidget<Self>,
         child: Option<Widget>,
         _: &mut BuildCtx,
       ) -> Widget {
-        compose_child_as_data_widget(child, this, |w| w)
+        compose_child_as_data_widget(child, this)
       }
     }
 
@@ -189,13 +192,17 @@ pub struct TripleTapListener {
 }
 
 impl ComposeSingleChild for XTimesTapListener {
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this.try_into_stateless() {
-      Ok(w) => {
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this {
+      StateWidget::Stateless(w) => {
         let (times, on_x_times_tap) = w.on_x_times_tap;
         Box::new(TapListener::on_tap_times(times, on_x_times_tap))
       }
-      Err(this) => {
+      StateWidget::Stateful(this) => {
         let times = this.shallow_ref().on_x_times_tap.0;
         let handler =
           TapListener::on_tap_times(times, move |e| (this.state_ref().on_x_times_tap.1)(e));
@@ -209,10 +216,14 @@ impl ComposeSingleChild for XTimesTapListener {
 }
 
 impl ComposeSingleChild for DoubleTapListener {
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this.try_into_stateless() {
-      Ok(w) => Box::new(TapListener::on_tap_times(2, w.on_double_tap)),
-      Err(this) => {
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this {
+      StateWidget::Stateless(w) => Box::new(TapListener::on_tap_times(2, w.on_double_tap)),
+      StateWidget::Stateful(this) => {
         let handler = TapListener::on_tap_times(2, move |e| (this.state_ref().on_double_tap)(e));
         Box::new(handler)
       }
@@ -224,10 +235,14 @@ impl ComposeSingleChild for DoubleTapListener {
 }
 
 impl ComposeSingleChild for TripleTapListener {
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this.try_into_stateless() {
-      Ok(w) => Box::new(TapListener::on_tap_times(3, w.on_tripe_tap)),
-      Err(this) => {
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this {
+      StateWidget::Stateless(w) => Box::new(TapListener::on_tap_times(3, w.on_tripe_tap)),
+      StateWidget::Stateful(this) => {
         let handler = TapListener::on_tap_times(3, move |e| (this.state_ref().on_tripe_tap)(e));
         Box::new(handler)
       }

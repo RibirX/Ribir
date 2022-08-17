@@ -1,4 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  impl_query_self_only,
+  prelude::{data_widget::compose_child_as_data_widget, *},
+};
 
 /// Focus attr attach to widget to support get ability to focus in.
 #[derive(Default, Declare, SingleChild)]
@@ -65,8 +68,12 @@ pub enum FocusEventType {
 
 impl ComposeSingleChild for FocusListener {
   #[inline]
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    compose_child_as_data_widget(child, this, |w| w)
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    compose_child_as_data_widget(child, this)
   }
 }
 

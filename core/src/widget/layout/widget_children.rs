@@ -51,7 +51,7 @@ pub trait MultiChildHave {
 /// and its child.
 pub trait ComposeSingleChild {
   fn compose_single_child(
-    this: Stateful<Self>,
+    this: StateWidget<Self>,
     child: Option<Widget>,
     ctx: &mut BuildCtx,
   ) -> Widget
@@ -62,7 +62,11 @@ pub trait ComposeSingleChild {
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its children.
 pub trait ComposeMultiChild {
-  fn compose_multi_child(this: Stateful<Self>, children: Vec<Widget>, ctx: &mut BuildCtx) -> Widget
+  fn compose_multi_child(
+    this: StateWidget<Self>,
+    children: Vec<Widget>,
+    ctx: &mut BuildCtx,
+  ) -> Widget
   where
     Self: Sized;
 }
@@ -206,8 +210,10 @@ where
   W: SingleChild + Render + 'static,
 {
   fn into_widget(self) -> Widget {
-    let widget: Box<dyn Render> = self.widget.into_render_node();
-    let single_child = SingleChildWidget { widget, child: self.child };
+    let single_child = SingleChildWidget {
+      widget: self.widget.into_render_node(),
+      child: self.child,
+    };
     Widget(WidgetInner::SingleChild(Box::new(single_child)))
   }
 }
@@ -218,7 +224,7 @@ where
 {
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeSingleChild::compose_single_child(self.widget.into_stateful(), self.child, ctx)
+      ComposeSingleChild::compose_single_child(self.widget.into(), self.child, ctx)
     })))
   }
 }
@@ -229,7 +235,7 @@ where
 {
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeSingleChild::compose_single_child(self.widget, self.child, ctx)
+      ComposeSingleChild::compose_single_child(StateWidget::Stateful(self.widget), self.child, ctx)
     })))
   }
 }
@@ -267,7 +273,7 @@ where
 {
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeMultiChild::compose_multi_child(self.widget.into_stateful(), self.children, ctx)
+      ComposeMultiChild::compose_multi_child(self.widget.into(), self.children, ctx)
     })))
   }
 }
@@ -278,20 +284,8 @@ where
 {
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeMultiChild::compose_multi_child(self.widget, self.children, ctx)
+      ComposeMultiChild::compose_multi_child(StateWidget::Stateful(self.widget), self.children, ctx)
     })))
-  }
-}
-
-pub fn compose_child_as_data_widget<W: Query + 'static, D: Query + 'static>(
-  child: Option<Widget>,
-  data: Stateful<W>,
-  pick_data: impl FnOnce(W) -> D + Clone + 'static,
-) -> Widget {
-  if let Some(child) = child {
-    DataWidget::new(child, data).into_widget_and_try_unwrap_data(pick_data)
-  } else {
-    Void.into_widget()
   }
 }
 
@@ -303,16 +297,16 @@ impl<T: ComposeSingleChild> SingleChild for T {}
 
 impl<T: ComposeMultiChild> MultiChild for T {}
 
-// #[cfg(test)]
-// mod tests {
-//   use super::*;
-//   #[test]
-//   fn fix_stateful_compose_single_have_child() {
-//     let _ = ScrollableWidget {
-//       scrollable: Scrollable::Both,
-//       pos: Point::zero(),
-//     }
-//     .into_stateful()
-//     .have_child(Void);
-//   }
-// }
+#[cfg(test)]
+mod tests {
+  use super::*;
+  #[test]
+  fn fix_stateful_compose_single_have_child() {
+    let _ = ScrollableWidget {
+      scrollable: Scrollable::Both,
+      pos: Point::zero(),
+    }
+    .into_stateful()
+    .have_child(Void);
+  }
+}

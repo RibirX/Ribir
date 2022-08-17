@@ -16,7 +16,7 @@ pub use name_used_info::*;
 mod variable_names;
 pub use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
 pub use variable_names::*;
-mod animations;
+pub mod animations;
 mod dataflows;
 mod declare_widget;
 pub use declare_widget::RESERVE_IDENT;

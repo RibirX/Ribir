@@ -1,4 +1,4 @@
-#![feature(test, decl_macro, marker_trait_attr, min_specialization, drain_filter)]
+#![feature(test, decl_macro, marker_trait_attr, drain_filter)]
 
 #[macro_use]
 extern crate bitflags;
@@ -47,7 +47,9 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use widget::layout::{MultiChildWidget, SingleChildWidget};
   #[doc(no_inline)]
-  pub use widget_derive::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild};
+  pub use widget_derive::{
+    include_svg, widget, widget_try_track, Declare, Lerp, MultiChild, SingleChild,
+  };
 }
 
 pub mod test;

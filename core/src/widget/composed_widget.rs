@@ -83,9 +83,9 @@ mod tests {
     struct T;
 
     impl Compose for T {
-      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
-          track { this }
+          track { this: this.into_stateful() }
           ExprWidget {
             expr: {
                // explicit capture `this` to avoid `ExprWidget` to be optimized`.

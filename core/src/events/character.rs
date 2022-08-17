@@ -1,4 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  impl_query_self_only,
+  prelude::{data_widget::compose_child_as_data_widget, *},
+};
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
@@ -16,8 +19,12 @@ pub struct CharEvent {
 
 impl ComposeSingleChild for CharListener {
   #[inline]
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    compose_child_as_data_widget(child, this, |w| w)
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    compose_child_as_data_widget(child, this)
   }
 }
 

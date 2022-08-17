@@ -53,7 +53,7 @@ mod tests {
   fn always_have_default_theme() {
     struct T;
     impl Compose for T {
-      fn compose(_: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+      fn compose(_: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
         let _ = ctx.theme();
         panic!("Get a default theme from context");
       }
@@ -69,8 +69,9 @@ mod tests {
   }
 
   impl Compose for ThemeTrack {
-    fn compose(this: Stateful<Self>, ctx: &mut BuildCtx) -> Widget {
+    fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
       this
+        .into_stateful()
         .shallow_ref()
         .themes
         .borrow_mut()
@@ -85,12 +86,12 @@ mod tests {
     struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for DarkLightThemes {
-      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
         let dark = material::purple::dark();
         let light = material::purple::light();
 
         widget! {
-          track { this }
+          track { this: this.into_stateful() }
           SizedBox {
             size: INFINITY_SIZE,
             theme: dark.clone(),
@@ -118,12 +119,12 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     impl Compose for LightDarkThemes {
-      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
         let dark = material::purple::dark();
         let light = material::purple::light();
 
         widget! {
-          track { this }
+          track { this: this.into_stateful() }
           SizedBox {
             size: INFINITY_SIZE,
             theme: light,

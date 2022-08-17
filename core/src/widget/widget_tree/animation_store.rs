@@ -14,9 +14,8 @@ use std::{
   rc::{Rc, Weak},
 };
 
-// todo: should be a pub(crate) type, not leak as public.
 #[derive(Clone)]
-pub struct AnimateHandler {
+pub(crate) struct AnimateHandler {
   id: Id,
   store: Weak<RefCell<AnimateStore>>,
 }

@@ -282,9 +282,9 @@ mod tests {
     }
 
     impl Compose for EmbedFocus {
-      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
-          track  { this }
+          track  { this: this.into_stateful() }
           SizedBox {
             size: INFINITY_SIZE,
             on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },

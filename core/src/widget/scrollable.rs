@@ -24,9 +24,13 @@ pub struct ScrollableWidget {
 }
 
 impl ComposeSingleChild for ScrollableWidget {
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
     widget! {
-      track { this }
+      track { this: this.into_stateful() }
       Anchor {
         x: this.pos.x,
         y: this.pos.y,

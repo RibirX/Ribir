@@ -235,26 +235,16 @@ impl<W> Stateful<W> {
     })
   }
 
-  pub fn try_into_stateless(self) -> Result<W, Self> {
-    let Self { widget, change_notifier } = self;
-    match Rc::try_unwrap(widget) {
-      Ok(w) => Ok(w.into_inner()),
-      Err(widget) => Err(Stateful { widget, change_notifier }),
-    }
-  }
-
   pub(crate) fn inner_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
     self.change_notifier.0.clone()
   }
 
+  #[inline]
   pub(crate) fn into_render_node(self) -> Box<dyn Render>
   where
     W: Render + 'static,
   {
-    match self.try_into_stateless() {
-      Ok(w) => Box::new(w),
-      Err(e) => Box::new(RenderWrap(e)),
-    }
+    Box::new(RenderWrap(self))
   }
 }
 
@@ -372,14 +362,14 @@ impl<T: Render> Query for RenderWrap<T> {
 impl<W: Render + 'static> Render for RenderWrap<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.0.silent_ref().perform_layout(clamp, ctx)
+    self.0.widget.borrow().perform_layout(clamp, ctx)
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.0.silent_ref().only_sized_by_parent() }
+  fn only_sized_by_parent(&self) -> bool { self.0.widget.borrow().only_sized_by_parent() }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.0.silent_ref().paint(ctx) }
+  fn paint(&self, ctx: &mut PaintingCtx) { self.0.widget.borrow().paint(ctx) }
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
@@ -388,14 +378,14 @@ impl<W: MultiChild> MultiChild for Stateful<W> {}
 
 impl<C: Render + 'static> IntoWidget<dyn Render> for Stateful<C> {
   #[inline]
-  fn into_widget(self) -> Widget { Widget(WidgetInner::Render(self.into_render_node())) }
+  fn into_widget(self) -> Widget { Widget(WidgetInner::Render(Box::new(RenderWrap(self)))) }
 }
 
 impl<C: Compose + 'static> IntoWidget<dyn Compose> for Stateful<C> {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget::<_, C>::new(Compose::compose(self, ctx)).into_widget()
+      ComposedWidget::<_, C>::new(Compose::compose(StateWidget::Stateful(self), ctx)).into_widget()
     })))
   }
 }

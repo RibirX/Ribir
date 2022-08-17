@@ -1,4 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  impl_query_self_only,
+  prelude::{data_widget::compose_child_as_data_widget, *},
+};
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -34,15 +37,23 @@ impl EventListener for KeyUpListener {
 
 impl ComposeSingleChild for KeyDownListener {
   #[inline]
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    compose_child_as_data_widget(child, this, |w| w)
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    compose_child_as_data_widget(child, this)
   }
 }
 
 impl ComposeSingleChild for KeyUpListener {
   #[inline]
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    compose_child_as_data_widget(child, this, |w| w)
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    _: &mut BuildCtx,
+  ) -> Widget {
+    compose_child_as_data_widget(child, this)
   }
 }
 
@@ -102,9 +113,9 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
         widget! {
-          track { this }
+          track { this: this.into_stateful() }
           SizedBox {
             size: Size::zero(),
             auto_focus: true,

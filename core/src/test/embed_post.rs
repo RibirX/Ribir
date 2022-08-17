@@ -21,9 +21,9 @@ impl EmbedPost {
 }
 
 impl Compose for EmbedPost {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
-      track { this }
+      track { this: this.into_stateful() }
       Row {
         align_items: Align::Start,
         Text { text: this.title }

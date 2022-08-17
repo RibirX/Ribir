@@ -23,7 +23,7 @@ impl Render for Void {
 }
 
 impl crate::prelude::ComposeSingleChild for Void {
-  fn compose_single_child(_: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
+  fn compose_single_child(_: StateWidget<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
   where
     Self: Sized,
   {
