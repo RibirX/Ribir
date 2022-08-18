@@ -87,19 +87,20 @@ impl WidgetTree {
 
     for id in dirty_widgets.iter() {
       let mut relayout_root = *id;
-      if self.layout_box_rect(*id).is_some() {
-        self.layout_store.remove(id);
-        // All ancestors of this render object should relayout until the one which only
-        // sized by parent.
-        for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
-          let r = self.arena.get(p.0).unwrap().get();
-          if !r.only_sized_by_parent() {
-            self.layout_store.remove(&p);
-            relayout_root = p
-          } else {
-            break;
-          }
+      self.layout_store.remove(id);
+      // All ancestors of this render widget should relayout until the one which only
+      // sized by parent.
+      for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
+        if self.layout_box_rect(p).is_none() {
+          break;
         }
+        let r = self.arena.get(p.0).unwrap().get();
+        if r.only_sized_by_parent() {
+          break;
+        }
+
+        self.layout_store.remove(&p);
+        relayout_root = p
       }
       needs_layout.push(relayout_root);
     }
@@ -142,5 +143,38 @@ impl Default for BoxClamp {
       min: Size::new(0., 0.),
       max: Size::new(f32::INFINITY, f32::INFINITY),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::prelude::*;
+
+  #[test]
+  fn fix_incorrect_relayout_root() {
+    // Can't use layout info of dirty widget to detect if the ancestors path have
+    // in relayout list. Because new widget insert by `ExprWidget` not have layout
+    // info, but its parent have.
+    let child_box = SizedBox { size: Size::zero() }.into_stateful();
+    let w = widget! {
+      track { child_box: child_box.clone() }
+      Row {
+        ExprWidget {
+          expr: if child_box.size.is_empty() {
+            SizedBox { size: Size::new(1., 1.) }.into_widget()
+          } else {
+            child_box.clone().into_widget()
+          }
+        }
+      }
+    };
+    let mut tree = WidgetTree::new(w, <_>::default());
+    tree.layout(Size::zero());
+    {
+      child_box.state_ref().size = Size::new(2., 2.);
+    }
+    tree.tree_repair();
+    assert_eq!(tree.layout_list().unwrap().first(), Some(&tree.root()));
   }
 }
