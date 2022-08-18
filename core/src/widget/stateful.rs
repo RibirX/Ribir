@@ -151,7 +151,7 @@ struct InnerRef<'a, W> {
 }
 
 bitflags! {
-  pub(crate) struct ChangeScope: u8 {
+  pub struct ChangeScope: u8 {
     /// state change only effect the data, transparent to ribir framework.
     const DATA  = 0x001;
     /// state change only effect to framework, transparent to widget data.
@@ -212,7 +212,7 @@ impl<W> Stateful<W> {
   #[inline]
   pub fn change_stream(&self) -> LocalCloneBoxOp<'static, (), ()> {
     self
-      .inner_change_stream()
+      .raw_change_stream()
       .filter_map(|s: ChangeScope| s.contains(ChangeScope::DATA).then(|| ()))
       .box_it()
   }
@@ -235,11 +235,10 @@ impl<W> Stateful<W> {
     })
   }
 
-  pub(crate) fn inner_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
+  pub fn raw_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
     self.change_notifier.0.clone()
   }
 
-  #[inline]
   pub(crate) fn into_render_node(self) -> Box<dyn Render>
   where
     W: Render + 'static,
@@ -394,7 +393,7 @@ impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) {
     if self.0.mut_accessed {
       self.0.release_current_borrow();
-      self.0.widget.inner_change_stream().next(ChangeScope::BOTH)
+      self.0.widget.raw_change_stream().next(ChangeScope::BOTH)
     }
   }
 }
@@ -403,7 +402,7 @@ impl<'a, W> Drop for SilentRef<'a, W> {
   fn drop(&mut self) {
     if self.0.mut_accessed {
       self.0.release_current_borrow();
-      self.0.widget.inner_change_stream().next(ChangeScope::DATA)
+      self.0.widget.raw_change_stream().next(ChangeScope::DATA)
     }
   }
 }
@@ -415,7 +414,7 @@ impl<'a, W> Drop for ShallowRef<'a, W> {
       self
         .0
         .widget
-        .inner_change_stream()
+        .raw_change_stream()
         .next(ChangeScope::FRAMEWORK)
     }
   }
@@ -598,7 +597,7 @@ mod tests {
     let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
     let w = SizedBox { size: Size::zero() }.into_stateful();
-    w.inner_change_stream()
+    w.raw_change_stream()
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 
     {

@@ -68,7 +68,7 @@ impl ToTokens for Dataflow {
       Some(d) => d,
     };
 
-    let upstream = upstream_tokens(directly_used);
+    let upstream = upstream_tokens(directly_used, quote!(change_stream));
     let from_used_name = &from.used_name_info;
     let to_used_name = &to.used_name_info;
     let state_refs: HashSet<&Ident, ahash::RandomState> = from_used_name
