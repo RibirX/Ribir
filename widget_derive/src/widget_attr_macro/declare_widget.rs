@@ -218,7 +218,10 @@ impl DeclareCtx {
         let origin_expr = expr_field.expr.clone();
         ctx.visit_declare_field_mut(expr_field);
 
-        let upstream = expr_field.used_name_info.all_widgets().map(upstream_tokens);
+        let upstream = expr_field
+          .used_name_info
+          .all_widgets()
+          .map(|objs| upstream_tokens(objs, quote! {raw_change_stream}));
         if let Some(upstream) = upstream {
           expr_field.expr = parse_quote_spanned! { origin_expr.span() =>
             move |cb: &mut dyn FnMut(Widget)| ChildConsumer::<_>::consume(#origin_expr, cb)
@@ -341,9 +344,12 @@ impl DeclareWidget {
   pub fn name(&self) -> Option<&Ident> { self.named.as_ref().map(|id| &id.name) }
 }
 
-pub fn upstream_tokens<'a>(used_widgets: impl Iterator<Item = &'a Ident> + Clone) -> TokenStream {
+pub fn upstream_tokens<'a>(
+  used_widgets: impl Iterator<Item = &'a Ident> + Clone,
+  stream_name: TokenStream,
+) -> TokenStream {
   let upstream = used_widgets.clone().map(|w| {
-    quote_spanned! { w.span() =>  #w.change_stream() }
+    quote_spanned! { w.span() =>  #w.#stream_name() }
   });
   if used_widgets.count() > 1 {
     quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }

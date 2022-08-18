@@ -104,7 +104,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
       assign = quote! {{ #(#refs)* #assign }};
     }
 
-    let upstream = upstream_tokens(directly_used);
+    let upstream = upstream_tokens(directly_used, quote! {change_stream});
     let capture_widgets = used_name_info
       .all_widgets()
       .into_iter()

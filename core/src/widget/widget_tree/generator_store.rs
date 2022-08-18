@@ -1,12 +1,13 @@
 use rxrust::{
   observable::SubscribeNext,
+  prelude::Observable,
   subscription::{SubscriptionGuard, SubscriptionLike},
 };
 use smallvec::SmallVec;
 
 use crate::{
   dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
-  prelude::WidgetId,
+  prelude::{ChangeScope, WidgetId},
 };
 use std::{
   cell::RefCell,
@@ -40,7 +41,7 @@ impl GeneratorStore {
     let info = GeneratorInfo::new(id, parent, generated_widgets);
     let needs_regen = self.needs_regen.clone();
     let _subscription = upstream?
-      // .filter(|b| !b)
+      .filter(|scope| scope.contains(ChangeScope::FRAMEWORK))
       .subscribe(move |_| {
         needs_regen.borrow_mut().insert(id);
       })
@@ -79,3 +80,34 @@ impl GeneratorStore {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use crate::prelude::{widget_tree::WidgetTree, *};
+
+  #[test]
+  fn perf_silent_ref_should_not_dirty_expr_widget() {
+    let trigger = Stateful::new(1);
+    let widget = widget! {
+      track { trigger: trigger.clone() }
+      Row {
+        ExprWidget {
+          expr: (0..3).map(|_| if *trigger > 0 {
+            SizedBox { size: Size::new(1., 1.)}
+          } else {
+            SizedBox { size: Size::zero()}
+          })
+        }
+      }
+    };
+
+    let mut tree = WidgetTree::new(widget, <_>::default());
+    tree.tree_repair();
+    tree.layout(Size::new(100., 100.));
+    {
+      *trigger.silent_ref() = 2;
+    }
+    assert!(!tree.generator_store.is_dirty())
+  }
+}
+
