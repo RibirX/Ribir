@@ -52,8 +52,18 @@ impl Parse for WidgetMacro {
         let t = content.parse()?;
         assign_uninit_field!(track, t, track)?;
       } else if lk.peek(Ident) && content.peek2(token::Brace) {
-        let w = content.parse()?;
-        assign_uninit_field!(widget, w, declare)?;
+        let w: DeclareWidget = content.parse()?;
+        if let Some(first) = widget.as_ref() {
+          let err = syn::Error::new(
+            w.span(),
+            &format!(
+              "Only one root widget can declare, but `{}` already declared.",
+              first.path.to_token_stream()
+            ),
+          );
+          return Err(err);
+        }
+        widget = Some(w);
       } else {
         return Err(lk.error());
       }

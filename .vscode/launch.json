@@ -1,7 +1,4 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
@@ -26,15 +23,15 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug example 'todo'",
+      "name": "Debug example 'animation_demo'",
       "cargo": {
         "args": [
           "build",
-          "--example=todo",
+          "--example=animation_demo",
           "--package=ribir"
         ],
         "filter": {
-          "name": "todo",
+          "name": "animation_demo",
           "kind": "example"
         }
       },
@@ -44,16 +41,53 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in example 'todo'",
+      "name": "Debug unit tests in example 'animation_demo'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--example=todo",
+          "--example=animation_demo",
           "--package=ribir"
         ],
         "filter": {
-          "name": "todo",
+          "name": "animation_demo",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'todo_mvp'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=todo_mvp",
+          "--package=ribir"
+        ],
+        "filter": {
+          "name": "todo_mvp",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'todo_mvp'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=todo_mvp",
+          "--package=ribir"
+        ],
+        "filter": {
+          "name": "todo_mvp",
           "kind": "example"
         }
       },
@@ -78,28 +112,6 @@
       },
       "args": [],
       "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "(Windows) Debug Wgpu Demo",
-      "type": "cppvsdbg",
-      "request": "launch",
-      "program": "${workspaceRoot}/target/debug/examples/wgpu-hello.exe",
-      "args": [],
-      "stopAtEntry": false,
-      "cwd": "${workspaceRoot}",
-      "environment": [],
-      "externalConsole": true
-    },
-    {
-      "name": "(Windows) Debug Todo Demo",
-      "type": "cppvsdbg",
-      "request": "launch",
-      "program": "${workspaceRoot}/target/debug/examples/todo.exe",
-      "args": [],
-      "stopAtEntry": false,
-      "cwd": "${workspaceRoot}",
-      "environment": [],
-      "externalConsole": true
     },
     {
       "type": "lldb",
@@ -128,8 +140,7 @@
         "args": [
           "build",
           "--example=wgpu-hello",
-          "--package=gpu",
-          "--features=wgpu_gl"
+          "--package=gpu"
         ],
         "filter": {
           "name": "wgpu-hello",
@@ -153,6 +164,25 @@
         "filter": {
           "name": "wgpu-hello",
           "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'main_thread'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=main_thread",
+          "--package=gpu"
+        ],
+        "filter": {
+          "name": "main_thread",
+          "kind": "test"
         }
       },
       "args": [],
@@ -199,17 +229,17 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'unit_test'",
+      "name": "Debug integration test 'declare_builder'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--lib",
-          "--package=unit_test"
+          "--test=declare_builder",
+          "--package=widget_derive"
         ],
         "filter": {
-          "name": "unit_test",
-          "kind": "lib"
+          "name": "declare_builder",
+          "kind": "test"
         }
       },
       "args": [],
@@ -237,16 +267,16 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug integration test 'declare_builder'",
+      "name": "Debug integration test 'animations_syntax_test'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--test=declare_builder",
+          "--test=animations_syntax_test",
           "--package=widget_derive"
         ],
         "filter": {
-          "name": "declare_builder",
+          "name": "animations_syntax_test",
           "kind": "test"
         }
       },
