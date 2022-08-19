@@ -12,7 +12,7 @@ pub struct ExprWidget<R> {
   #[declare(convert = box_trait(FnMut(&mut dyn FnMut(Widget)) -> R))]
   pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
   #[declare(convert = custom)]
-  pub(crate) upstream: Option<LocalBoxOp<'static, ChangeScope, ()>>,
+  pub(crate) upstream: LocalBoxOp<'static, ChangeScope, ()>,
 }
 
 /// ConstExprWidget is convert from uer declared  `ExprWidget` which but its
@@ -48,7 +48,7 @@ impl<R> ExprWidgetBuilder<R> {
     mut self,
     stream: impl LocalObservable<'static, Item = ChangeScope, Err = ()> + 'static,
   ) -> Self {
-    self.upstream = Some(Some(stream.box_it()));
+    self.upstream = Some(stream.box_it());
     self
   }
 }
