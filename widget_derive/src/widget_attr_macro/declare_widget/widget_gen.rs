@@ -1,9 +1,9 @@
 use crate::{
   declare_derive::declare_field_name,
   widget_attr_macro::{
-    capture_widget, ribir_variable,
+    capture_widget, obj_state_ref, ribir_variable,
     widget_macro::{is_const_expr_keyword, EXPR_FIELD},
-    widget_state_ref, DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
+    DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
@@ -44,7 +44,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     };
     let used_info = self.whole_used_info();
     if let Some(refs) = used_info.directly_used_widgets() {
-      let refs = refs.map(widget_state_ref);
+      let refs = refs.map(obj_state_ref);
       build_widget = quote_spanned! { ty.span() =>
         let #name = {
           #(#refs)*
