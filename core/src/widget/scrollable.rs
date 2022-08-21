@@ -24,34 +24,29 @@ pub struct ScrollableWidget {
 }
 
 impl ComposeSingleChild for ScrollableWidget {
-  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
-  where
-    Self: Sized,
-  {
+  fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this }
       Anchor {
         x: this.pos.x,
         y: this.pos.y,
-        on_wheel: move |e| {
-          let ctx = e.context();
-          let content = e.current_target();
-          let view = ctx.widget_parent(content).expect("must have a scrollable widget");
-          let content_area = ctx.widget_box_rect(content).unwrap();
-          let view_area = ctx.widget_box_rect(view).unwrap();
-          let old = this.pos;
-          let mut new = old;
-          if this.scrollable != Scrollable::X {
-            new.y = validate_pos(view_area.height(), content_area.height(), old.y - e.delta_y)
-          }
-          if this.scrollable != Scrollable::Y {
-            new.x = validate_pos(view_area.width(), content_area.width(), old.x - e.delta_x);
-          }
-          if new != old {
-            this.pos = new;
-          }
-        },
         UnconstrainedBox {
+          on_wheel: move |e| {
+            let ctx = e.context();
+            let view_area = ctx.box_rect().unwrap();
+            let content_area =  ctx.single_child_box().expect("must have a scrollable widget");
+            let old = this.pos;
+            let mut new = old;
+            if this.scrollable != Scrollable::X {
+              new.y = validate_pos(view_area.height(), content_area.height(), old.y - e.delta_y)
+            }
+            if this.scrollable != Scrollable::Y {
+              new.x = validate_pos(view_area.width(), content_area.width(), old.x - e.delta_x);
+            }
+            if new != old {
+              this.pos = new;
+            }
+          },
           ExprWidget { expr: child }
         }
       }
@@ -80,7 +75,7 @@ mod tests {
 
     let mut wnd = Window::without_render(w, Size::new(100., 100.));
 
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseWheel {
@@ -89,7 +84,7 @@ mod tests {
       phase: TouchPhase::Started,
       modifiers: ModifiersState::default(),
     });
-    wnd.render_ready();
+    wnd.draw_frame();
 
     let (_, children) = root_and_children_rect(&mut wnd);
     assert_eq!(children[0].origin, child_pos);

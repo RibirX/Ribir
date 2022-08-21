@@ -12,7 +12,7 @@ pub struct WheelEvent {
 
 #[derive(Declare)]
 pub struct WheelListener {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent)))]
   on_wheel: Box<dyn for<'r> FnMut(&'r mut WheelEvent)>,
 }
 
@@ -24,15 +24,6 @@ impl ComposeSingleChild for WheelListener {
 
 impl Query for WheelListener {
   impl_query_self_only!();
-}
-
-impl WheelListenerBuilder {
-  #[inline]
-  pub fn on_wheel_convert(
-    f: impl for<'r> FnMut(&'r mut WheelEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut WheelEvent)> {
-    Box::new(f)
-  }
 }
 
 impl std::borrow::Borrow<EventCommon> for WheelEvent {
@@ -55,9 +46,10 @@ impl std::ops::DerefMut for WheelEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
-impl WheelListener {
+impl EventListener for WheelListener {
+  type Event = WheelEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
+  fn dispatch(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
 }
 
 #[cfg(test)]
@@ -81,7 +73,7 @@ mod tests {
 
     let mut wnd = Window::without_render(widget, Size::new(100., 100.));
 
-    wnd.render_ready();
+    wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,

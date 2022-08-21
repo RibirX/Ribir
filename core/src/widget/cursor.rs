@@ -6,7 +6,7 @@ use winit::window::CursorIcon;
 
 #[derive(Declare, Debug)]
 pub struct Cursor {
-  #[declare(custom_convert, builtin, default)]
+  #[declare(convert=custom, builtin, default)]
   pub cursor: Rc<Cell<CursorIcon>>,
 }
 
@@ -17,12 +17,14 @@ impl ComposeSingleChild for Cursor {
       ExprWidget {
         expr: child,
         on_pointer_move: move |e: &mut PointerEvent| {
-          let mut ctx = e.context();
+
           if e.point_type == PointerType::Mouse
-            && e.buttons == MouseButtons::empty()
-            && ctx.updated_cursor().is_none()
+            && e.mouse_buttons() == MouseButtons::empty()
           {
-            ctx.set_cursor(this.cursor.get());
+            let mut ctx = e.context();
+            if ctx.stage_cursor_icon().is_none () {
+              ctx.set_cursor_icon(this.cursor.get());
+            }
           }
         },
       }
@@ -46,8 +48,16 @@ impl IntoCursorIcon for CursorIcon {
 
 impl CursorBuilder {
   #[inline]
-  pub fn cursor_convert<C: IntoCursorIcon>(icon: C) -> Rc<Cell<CursorIcon>> {
-    icon.into_cursor_icon()
+  pub fn cursor<C: IntoCursorIcon>(mut self, icon: C) -> Self {
+    self.cursor = Some(icon.into_cursor_icon());
+    self
+  }
+}
+
+impl Cursor {
+  #[inline]
+  pub fn set_declare_cursor<C: IntoCursorIcon>(&mut self, icon: C) {
+    self.cursor = icon.into_cursor_icon();
   }
 }
 
@@ -103,67 +113,68 @@ mod tests {
 
     let mut wnd = Window::without_render(row_tree, Size::new(400., 400.));
 
-    wnd.render_ready();
+    wnd.draw_frame();
+    let tree = &mut wnd.widget_tree;
 
     let device_id = unsafe { DeviceId::dummy() };
-    let ctx = &mut wnd.context;
-    wnd.dispatcher.dispatch(
+    let dispatcher = &mut wnd.dispatcher;
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (201f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::AllScroll));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::AllScroll));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Hand));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.dispatch(
+    dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      ctx,
+      tree,
       1.,
     );
-    assert_eq!(ctx.cursor.take(), Some(CursorIcon::Help));
+    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
   }
 }

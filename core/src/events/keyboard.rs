@@ -10,24 +10,26 @@ pub struct KeyboardEvent {
 /// Widget fire event whenever press or release a key.
 #[derive(Declare)]
 pub struct KeyDownListener {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent)))]
   pub on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
 #[derive(Declare)]
 pub struct KeyUpListener {
-  #[declare(builtin, custom_convert)]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent)))]
   pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
 }
 
-impl KeyDownListener {
+impl EventListener for KeyDownListener {
+  type Event = KeyboardEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_down)(event) }
+  fn dispatch(&mut self, event: &mut KeyboardEvent) { (self.on_key_down)(event) }
 }
 
-impl KeyUpListener {
+impl EventListener for KeyUpListener {
+  type Event = KeyboardEvent;
   #[inline]
-  pub fn dispatch_event(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
+  fn dispatch(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
 }
 
 impl ComposeSingleChild for KeyDownListener {
@@ -50,24 +52,6 @@ impl Query for KeyDownListener {
 
 impl Query for KeyUpListener {
   impl_query_self_only!();
-}
-
-impl KeyDownListenerBuilder {
-  #[inline]
-  pub fn on_key_down_convert(
-    f: impl for<'r> FnMut(&'r mut KeyboardEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)> {
-    Box::new(f)
-  }
-}
-
-impl KeyUpListenerBuilder {
-  #[inline]
-  pub fn on_key_up_convert(
-    f: impl for<'r> FnMut(&'r mut KeyboardEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)> {
-    Box::new(f)
-  }
 }
 
 impl std::borrow::Borrow<EventCommon> for KeyboardEvent {
@@ -141,7 +125,7 @@ mod tests {
     let keys = w.0.clone();
 
     let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Released));

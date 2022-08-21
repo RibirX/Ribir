@@ -1,20 +1,18 @@
+use crate::{impl_query_self_only, prelude::*};
 use ::text::typography::{PlaceLineDirection, TypographyCfg};
 pub use ::text::{typography::Overflow, *};
-
-use crate::{impl_query_self_only, prelude::*};
 
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
-  #[declare(custom_convert)]
+  #[declare(convert=into)]
   pub text: ArcStr,
-  #[declare(default = "ctx.theme().typography_theme.body1.text.clone()")]
+  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
 }
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let t_store = ctx.typography_store();
     let TextStyle {
       font_size,
       letter_space,
@@ -26,7 +24,8 @@ impl Render for Text {
     let width: Em = Pixel(clamp.max.width.into()).into();
     let height: Em = Pixel(clamp.max.width.into()).into();
 
-    let visual_info = t_store.typography(
+    let app_ctx = ctx.app_context();
+    let visual_info = app_ctx.borrow().typography_store.typography(
       self.text.substr(..),
       font_size,
       font_face,
@@ -56,9 +55,4 @@ impl Render for Text {
 
 impl Query for Text {
   impl_query_self_only!();
-}
-
-impl TextBuilder {
-  #[inline]
-  pub fn text_convert<T: Into<ArcStr>>(text: T) -> ArcStr { text.into() }
 }

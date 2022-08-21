@@ -556,16 +556,13 @@ mod tests {
       };
 
       let mut wnd = Window::without_render(root, Size::new(500., 500.));
-      wnd.render_ready();
-      let ctx = wnd.context();
-      let tree = &ctx.widget_tree;
-
+      wnd.draw_frame();
+      let tree = &wnd.widget_tree;
       let child = tree.root().first_child(tree).unwrap();
-
-      let rect = ctx.layout_store.layout_box_rect(child).unwrap();
+      let rect = tree.layout_box_rect(child).unwrap();
       let children = child
         .children(tree)
-        .map(|id| ctx.layout_store.layout_box_rect(id).unwrap())
+        .map(|id| tree.layout_box_rect(id).unwrap())
         .collect::<Vec<_>>();
 
       assert_eq!(rect.size, Size::new(500., 500.));

@@ -6,15 +6,15 @@ mod declare_derive;
 mod error;
 mod widget_attr_macro;
 
+mod lerp_derive;
 mod util;
-
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 use widget_attr_macro::{DeclareCtx, WidgetMacro};
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
-#[proc_macro_derive(SingleChild, attributes(proxy))]
+#[proc_macro_derive(SingleChild)]
 pub fn single_marco_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -25,7 +25,7 @@ pub fn single_marco_derive(input: TokenStream) -> TokenStream {
   .into()
 }
 
-#[proc_macro_derive(MultiChild, attributes(proxy))]
+#[proc_macro_derive(MultiChild)]
 pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -34,6 +34,14 @@ pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
       impl #impl_generics MultiChild for #name #ty_generics #where_clause {}
   }
   .into()
+}
+
+#[proc_macro_derive(Lerp)]
+pub fn lerp_derive(input: TokenStream) -> TokenStream {
+  let mut input = parse_macro_input!(input as DeriveInput);
+  lerp_derive::lerp_derive(&mut input)
+    .unwrap_or_else(|e| e.into_compile_error())
+    .into()
 }
 
 /// Macro to implement the `Declare` trait. To know how to use it see the

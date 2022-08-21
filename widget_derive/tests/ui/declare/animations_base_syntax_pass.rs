@@ -7,16 +7,15 @@ fn main() {
       size: Size::zero()
     }
     animations {
-      State {
-        id: state1,
-        sized_box.size: Size::new(10., 10.),
-      }
       Transition {
         id: transition1,
+        easing: easing::LINEAR
       }
       Animate {
         id: animate1,
-        from: state1,
+        from: State {
+          sized_box.size: Size::new(10., 10.),
+        },
         transition: transition1,
       }
       sized_box.size: animate1
@@ -31,7 +30,9 @@ fn main() {
     animations {
       sized_box.size: Animate {
         from: State { sized_box.size: Size::new(10., 10.) },
-        transition: Transition { }
+        transition: Transition {
+          easing: easing::LINEAR
+        }
       }
     }
   };
@@ -42,7 +43,9 @@ fn main() {
       size: Size::zero()
     }
     animations {
-      sized_box.size: Transition { },
+      sized_box.size: Transition {
+        easing: easing::LINEAR
+      },
     }
   };
 }

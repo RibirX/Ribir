@@ -1,5 +1,5 @@
-#![feature(test, decl_macro, marker_trait_attr, trait_upcasting)]
-#![allow(incomplete_features)]
+#![feature(test, decl_macro, marker_trait_attr, min_specialization, drain_filter)]
+
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;
@@ -15,6 +15,7 @@ mod context;
 pub mod declare;
 pub mod dynamic_widget;
 pub mod events;
+pub mod ticker;
 pub mod widget;
 pub mod window;
 
@@ -31,7 +32,10 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
-  pub use crate::widget::{widget_tree::WidgetId, *};
+  pub use crate::widget::{
+    widget_tree::{BoxClamp, WidgetId},
+    *,
+  };
   #[doc(no_inline)]
   pub use crate::window::Window;
   #[doc(no_inline)]
@@ -43,7 +47,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use widget::layout::{MultiChildWidget, SingleChildWidget};
   #[doc(no_inline)]
-  pub use widget_derive::{include_svg, widget, Declare, MultiChild, SingleChild};
+  pub use widget_derive::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild};
 }
 
 pub mod test;

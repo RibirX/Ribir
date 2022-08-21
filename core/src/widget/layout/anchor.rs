@@ -22,17 +22,16 @@ pub enum YAnchor {
 /// Widget use to anchor child by relative position.
 #[derive(Declare, SingleChild)]
 pub struct Anchor {
-  // todo: declare convert meta `convert=(custom)`, `convert=(into)`.
   // todo: use pos_x & pos_y as a builtin field
-  #[declare(custom_convert, default = "XAnchor::Left(0.)")]
+  #[declare(convert=into, default = XAnchor::Left(0.))]
   pub x: XAnchor,
-  #[declare(custom_convert, default = "YAnchor::Top(0.)")]
+  #[declare(convert=into, default = YAnchor::Top(0.))]
   pub y: YAnchor,
 }
 
 impl Render for Anchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if let Some(c) = ctx.single_child() {
+    ctx.single_child().map_or_else(Size::zero, |c| {
       let child_size = ctx.perform_child_layout(c, clamp);
       let x = match self.x {
         XAnchor::Left(l) => l,
@@ -44,9 +43,7 @@ impl Render for Anchor {
       };
       ctx.update_position(c, Point::new(x, y));
       child_size
-    } else {
-      Size::zero()
-    }
+    })
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -54,14 +51,6 @@ impl Render for Anchor {
 
 impl Query for Anchor {
   crate::impl_query_self_only!();
-}
-
-impl AnchorBuilder {
-  #[inline]
-  pub fn x_convert<T: Into<XAnchor>>(v: T) -> XAnchor { v.into() }
-
-  #[inline]
-  pub fn y_convert<T: Into<YAnchor>>(v: T) -> YAnchor { v.into() }
 }
 
 impl From<f32> for XAnchor {

@@ -15,10 +15,6 @@ pub struct PointerId(usize);
 /// Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
 #[derive(Debug, Clone)]
 pub struct PointerEvent {
-  /// The X, Y coordinate of the pointer in current target widget.
-  pub position: Point,
-  // The X, Y coordinate of the mouse pointer in global (window) coordinates.
-  pub global_pos: Point,
   /// A unique identifier for the pointer causing the event.
   pub id: PointerId,
   /// The width (magnitude on the X axis), in pixels, of the contact geometry of
@@ -50,8 +46,7 @@ pub struct PointerEvent {
   /// Indicates if the pointer represents the primary pointer of this pointer
   /// type.
   pub is_primary: bool,
-  /// The buttons being depressed (if any) when the mouse event was fired.
-  pub buttons: MouseButtons,
+
   pub common: EventCommon,
 }
 
@@ -102,29 +97,8 @@ impl std::ops::DerefMut for PointerEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
 
-impl PointerEvent {
-  /// The button number that was pressed (if applicable) when the mouse event
-  /// was fired.
-  pub fn button_num(&self) -> u32 { self.buttons.bits().count_ones() }
-}
-
 macro_rules! impl_pointer_listener {
-  ($name: ident, $field: ident, $convert: ident, $builder: ident) => {
-    #[derive(Declare)]
-    pub struct $name {
-      #[declare(builtin, custom_convert)]
-      pub $field: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
-    }
-
-    impl $builder {
-      #[inline]
-      pub fn $convert(
-        f: impl for<'r> FnMut(&'r mut PointerEvent) + 'static,
-      ) -> Box<dyn for<'r> FnMut(&'r mut PointerEvent)> {
-        Box::new(f)
-      }
-    }
-
+  ($name: ident, $field: ident) => {
     impl ComposeSingleChild for $name {
       fn compose_single_child(
         this: Stateful<Self>,
@@ -139,72 +113,78 @@ macro_rules! impl_pointer_listener {
       impl_query_self_only!();
     }
 
-    impl $name {
+    impl EventListener for $name {
+      type Event = PointerEvent;
       #[inline]
-      pub fn dispatch_event(&mut self, event: &mut PointerEvent) { (self.$field)(event) }
+      fn dispatch(&mut self, event: &mut PointerEvent) { (self.$field)(event) }
     }
   };
 }
 
-impl_pointer_listener!(
-  PointerDownListener,
-  on_pointer_down,
-  on_pointer_down_convert,
-  PointerDownListenerBuilder
-);
+#[derive(Declare)]
+pub struct PointerDownListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_pointer_down: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(PointerDownListener, on_pointer_down);
 
-impl_pointer_listener!(
-  PointerUpListener,
-  on_pointer_up,
-  on_pointer_up_convert,
-  PointerUpListenerBuilder
-);
+#[derive(Declare)]
+pub struct PointerUpListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_pointer_up: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(PointerUpListener, on_pointer_up);
 
-impl_pointer_listener!(
-  PointerMoveListener,
-  on_pointer_move,
-  on_pointer_move_convert,
-  PointerMoveListenerBuilder
-);
+#[derive(Declare)]
+pub struct PointerMoveListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_pointer_move: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(PointerMoveListener, on_pointer_move);
 
-impl_pointer_listener!(TapListener, on_tap, on_tap_convert, TapListenerBuilder);
+#[derive(Declare)]
+pub struct TapListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(TapListener, on_tap);
 
-impl_pointer_listener!(
-  PointerCancelListener,
-  on_pointer_cancel,
-  on_pointer_cancel_convert,
-  PointerCancelListenerBuilder
-);
+#[derive(Declare)]
+pub struct PointerCancelListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_pointer_cancel: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(PointerCancelListener, on_pointer_cancel);
 
-impl_pointer_listener!(
-  PointerEnterListener,
-  on_pointer_enter,
-  on_pointer_enter_convert,
-  PointerEnterListenerBuilder
-);
+#[derive(Declare)]
+pub struct PointerEnterListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_pointer_enter: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(PointerEnterListener, on_pointer_enter);
 
-impl_pointer_listener!(
-  PointerLeaveListener,
-  on_pointer_leave,
-  on_pointer_leave_convert,
-  PointerLeaveListenerBuilder
-);
+#[derive(Declare)]
+pub struct PointerLeaveListener {
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)))]
+  pub on_pointer_leave: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+}
+impl_pointer_listener!(PointerLeaveListener, on_pointer_leave);
 
 #[derive(Declare)]
 pub struct XTimesTapListener {
-  #[declare(custom_convert, builtin)]
+  #[declare(convert=custom, builtin)]
   pub on_x_times_tap: (u8, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>),
 }
 
 #[derive(Declare)]
 pub struct DoubleTapListener {
-  #[declare(custom_convert, builtin)]
+  #[declare(convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)), builtin)]
   pub on_double_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
 }
 
 #[derive(Declare)]
 pub struct TripleTapListener {
-  #[declare(custom_convert, builtin)]
+  #[declare(convert=box_trait(for<'r> FnMut(&'r mut PointerEvent)), builtin)]
   pub on_tripe_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
 }
 
@@ -260,28 +240,22 @@ impl ComposeSingleChild for TripleTapListener {
 
 impl XTimesTapListenerBuilder {
   #[inline]
-  pub fn on_x_times_tap_convert(
+  pub fn on_x_times_tap(
+    mut self,
     f: (u8, impl for<'r> FnMut(&'r mut PointerEvent) + 'static),
-  ) -> (u8, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>) {
-    (f.0, Box::new(f.1))
+  ) -> Self {
+    self.on_x_times_tap = Some((f.0, Box::new(f.1)));
+    self
   }
 }
 
-impl DoubleTapListener {
+impl XTimesTapListener {
   #[inline]
-  pub fn on_double_tap_convert(
-    f: impl for<'r> FnMut(&'r mut PointerEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut PointerEvent)> {
-    Box::new(f)
-  }
-}
-
-impl TripleTapListener {
-  #[inline]
-  pub fn on_triple_tap_convert(
-    f: impl for<'r> FnMut(&'r mut PointerEvent) + 'static,
-  ) -> Box<dyn for<'r> FnMut(&'r mut PointerEvent)> {
-    Box::new(f)
+  pub fn set_declare_on_x_times_tap(
+    &mut self,
+    f: (u8, impl for<'r> FnMut(&'r mut PointerEvent) + 'static),
+  ) {
+    self.on_x_times_tap = (f.0, Box::new(f.1));
   }
 }
 
@@ -303,7 +277,7 @@ impl TapListener {
       match &mut tap_info {
         Some(info)
           if info.pointer_type == e.point_type
-            && info.mouse_btns == e.buttons
+            && info.mouse_btns == e.mouse_buttons()
             && info.tap_times < times
             && info.first_tap_stamp.elapsed() < DUR =>
         {
@@ -314,7 +288,7 @@ impl TapListener {
             first_tap_stamp: Instant::now(),
             tap_times: 1,
             pointer_type: e.point_type.clone(),
-            mouse_btns: e.buttons,
+            mouse_btns: e.mouse_buttons(),
           })
         }
       };
@@ -346,7 +320,7 @@ mod tests {
       }
     };
     let mut wnd = Window::without_render(w, size);
-    wnd.render_ready();
+    wnd.draw_frame();
 
     (wnd, count)
   }

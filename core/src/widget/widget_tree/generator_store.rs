@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use crate::{
   dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
-  prelude::{widget_tree::WidgetTree, WidgetId},
+  prelude::WidgetId,
 };
 use std::{
   cell::RefCell,
@@ -17,6 +17,7 @@ use std::{
 #[derive(Default)]
 pub(crate) struct GeneratorStore {
   next_generator_id: GeneratorID,
+  // todo: use id_map
   generators: HashMap<GeneratorID, Generator, ahash::RandomState>,
   needs_regen: Rc<RefCell<HashSet<GeneratorID, ahash::RandomState>>>,
   lifetime: HashMap<WidgetId, SmallVec<[GeneratorHandle; 1]>>,
@@ -59,17 +60,14 @@ impl GeneratorStore {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.needs_regen.borrow().is_empty() }
 
-  pub(crate) fn take_needs_regen_generator(&mut self, tree: &WidgetTree) -> Option<Vec<Generator>> {
+  pub(crate) fn take_needs_regen_generator(&mut self) -> Option<Vec<Generator>> {
     (self.is_dirty()).then(|| {
-      let mut generators = self
+      self
         .needs_regen
         .borrow_mut()
         .drain()
         .filter_map(|id| self.generators.remove(&id))
-        .collect::<Vec<_>>();
-
-      generators.sort_by_cached_key(|g| g.info.parent().ancestors(tree).count());
-      generators
+        .collect::<Vec<_>>()
     })
   }
 

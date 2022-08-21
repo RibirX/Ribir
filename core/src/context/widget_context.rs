@@ -1,6 +1,7 @@
+use super::AppContext;
+use crate::prelude::{widget_tree::WidgetTree, QueryOrder, WidgetId};
 use painter::{Point, Rect};
-
-use crate::prelude::{widget_tree::WidgetTree, LayoutStore, QueryOrder, WidgetId};
+use std::{cell::RefCell, rc::Rc};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -15,9 +16,7 @@ pub trait WidgetCtx {
   /// Return the box rect of the single child of widget.
   /// # Panic
   /// panic if widget have multi child.
-  fn single_child_box(&self) -> Option<Rect> {
-    self.single_child().and_then(|c| self.widget_box_rect(c))
-  }
+  fn single_child_box(&self) -> Option<Rect>;
   /// Return the widget box rect of the widget of the context.
   fn box_rect(&self) -> Option<Rect>;
   /// Return the box rect of the widget `wid` point to.
@@ -39,51 +38,14 @@ pub trait WidgetCtx {
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
-}
 
-pub fn map_to_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
-  // todo: should effect by transform widget.
-  store
-    .layout_box_rect(id)
-    .map_or(pos, |rect| pos + rect.min().to_vector())
-}
-
-pub fn map_from_parent(id: WidgetId, pos: Point, store: &LayoutStore) -> Point {
-  store
-    .layout_box_rect(id)
-    .map_or(pos, |rect| pos - rect.min().to_vector())
-  // todo: should effect by transform widget.
-}
-
-pub(crate) fn map_to_global(
-  id: WidgetId,
-  pos: Point,
-  tree: &WidgetTree,
-  store: &LayoutStore,
-) -> Point {
-  id.ancestors(tree)
-    .fold(pos, |pos, p| map_to_parent(p, pos, store))
-}
-
-pub(crate) fn map_from_global(
-  id: WidgetId,
-  pos: Point,
-  tree: &WidgetTree,
-  store: &LayoutStore,
-) -> Point {
-  let stack = id.ancestors(tree).collect::<Vec<_>>();
-  stack
-    .iter()
-    .rev()
-    .fold(pos, |pos, p| map_from_parent(*p, pos, store))
+  fn app_context(&self) -> &Rc<RefCell<AppContext>>;
 }
 
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
   fn widget_tree(&self) -> &WidgetTree;
-
-  fn layout_store(&self) -> &LayoutStore;
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
@@ -100,37 +62,38 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
 
   #[inline]
-  fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
-    self.layout_store().layout_box_rect(wid)
+  fn single_child_box(&self) -> Option<Rect> {
+    self.single_child().and_then(|c| self.widget_box_rect(c))
   }
 
   #[inline]
-  fn map_to_global(&self, pos: Point) -> Point {
-    map_to_global(self.id(), pos, self.widget_tree(), self.layout_store())
+  fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
+    self.widget_tree().layout_box_rect(wid)
   }
+
+  #[inline]
+  fn map_to_global(&self, pos: Point) -> Point { self.widget_tree().map_to_global(self.id(), pos) }
 
   #[inline]
   fn map_from_global(&self, pos: Point) -> Point {
-    map_from_global(self.id(), pos, self.widget_tree(), self.layout_store())
+    self.widget_tree().map_from_global(self.id(), pos)
   }
 
   #[inline]
-  fn map_to_parent(&self, pos: Point) -> Point {
-    map_to_parent(self.id(), pos, self.layout_store())
-  }
+  fn map_to_parent(&self, pos: Point) -> Point { self.widget_tree().map_to_parent(self.id(), pos) }
 
   #[inline]
   fn map_from_parent(&self, pos: Point) -> Point {
-    map_from_parent(self.id(), pos, self.layout_store())
+    self.widget_tree().map_from_parent(self.id(), pos)
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
     let global = self.map_to_global(pos);
-    map_from_global(w, global, self.widget_tree(), self.layout_store())
+    self.widget_tree().map_from_global(w, global)
   }
 
   fn map_from(&self, pos: Point, w: WidgetId) -> Point {
-    let global = map_to_global(w, pos, self.widget_tree(), self.layout_store());
+    let global = self.widget_tree().map_to_global(w, pos);
     self.map_from_global(global)
   }
 
@@ -139,6 +102,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     id.assert_get(self.widget_tree())
       .query_on_first_type(QueryOrder::OutsideFirst, callback);
   }
+
+  #[inline]
+  fn app_context(&self) -> &Rc<RefCell<AppContext>> { self.widget_tree().context() }
 }
 
 #[cfg(test)]
@@ -148,12 +114,10 @@ mod tests {
 
   #[test]
   fn map_self_eq_self() {
-    impl<'a> WidgetCtxImpl for (WidgetId, &'a Context) {
+    impl<'a> WidgetCtxImpl for (WidgetId, &'a WidgetTree) {
       fn id(&self) -> WidgetId { self.0 }
 
-      fn widget_tree(&self) -> &WidgetTree { &self.1.widget_tree }
-
-      fn layout_store(&self) -> &LayoutStore { &self.1.layout_store }
+      fn widget_tree(&self) -> &WidgetTree { self.1 }
     }
 
     let w = widget! {
@@ -163,14 +127,14 @@ mod tests {
       }
     };
     let mut wnd = Window::without_render(w.into_widget(), Size::zero());
-    wnd.render_ready();
+    wnd.draw_frame();
 
-    let ctx = wnd.context();
-    let root = ctx.widget_tree.root();
+    let tree = &wnd.widget_tree;
+    let root = tree.root();
     let pos = Point::zero();
-    let child = root.single_child(&ctx.widget_tree).unwrap();
+    let child = root.single_child(tree).unwrap();
 
-    let w_ctx = (child, ctx);
+    let w_ctx = (child, tree);
     assert_eq!(w_ctx.map_from(pos, child), pos);
     assert_eq!(w_ctx.map_to(pos, child), pos);
   }

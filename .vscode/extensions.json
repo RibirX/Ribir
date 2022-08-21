@@ -1,6 +1,5 @@
 {
   "recommendations": [
-    "matklad.rust-analyzer",
     "gruntfuggly.todo-tree"
   ]
 }

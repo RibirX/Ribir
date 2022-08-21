@@ -13,12 +13,14 @@ use syn::{
 use super::{
   animations::Animations, child_variable, dataflows::Dataflows,
   declare_widget::assign_uninit_field, kw, track::Track, DeclareCtx, DeclareWidget, IdType,
-  NameUsed, NameUsedInfo, Result, Scope, ScopeUsedInfo, UsedInfo,
+  ObjectUsed, Result, ScopeUsedInfo,
 };
 use crate::{
-  error::DeclareError,
-  widget_attr_macro::{ribir_variable, BUILD_CTX},
+  error::{CircleUsedPath, DeclareError},
+  widget_attr_macro::{ribir_variable, ObjectUsedPath, UsedType, BUILD_CTX},
 };
+
+pub const CONST_EXPR_WIDGET: &str = "ConstExprWidget";
 pub const EXPR_WIDGET: &str = "ExprWidget";
 pub const EXPR_FIELD: &str = "expr";
 
@@ -37,12 +39,8 @@ pub struct IfGuard {
   pub used_name_info: ScopeUsedInfo,
 }
 
-#[derive(Clone, Debug)]
-struct CircleCheckStack<'a> {
-  pub widget: &'a Ident,
-  pub scope: Scope<'a>,
-  pub used_widget: &'a Ident,
-  pub used_info: &'a NameUsedInfo,
+pub fn is_const_expr_keyword(ty: &Path) -> bool {
+  ty.get_ident().map_or(false, |ty| ty == CONST_EXPR_WIDGET)
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -85,8 +83,8 @@ impl Parse for WidgetMacro {
 
 impl WidgetMacro {
   pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream> {
-    fn circle_stack_to_path(stack: &[CircleCheckStack], ctx: &DeclareCtx) -> Box<[UsedInfo]> {
-      stack.iter().map(|c| c.to_follow_path(ctx)).collect()
+    fn circle_stack_to_path(stack: &[ObjectUsedPath], ctx: &DeclareCtx) -> Box<[CircleUsedPath]> {
+      stack.iter().map(|c| c.to_used_path(ctx)).collect()
     }
 
     ctx.id_collect(self)?;
@@ -108,10 +106,12 @@ impl WidgetMacro {
     ctx.visit_widget_macro_mut(self);
     self.widget.before_generate_check(ctx)?;
 
-    let mut follows = (!ctx.named_objects.is_empty()).then(|| self.analyze_object_dependencies());
-    if let Some(follows) = follows.as_mut() {
+    let mut tokens = quote!();
+    // named object define.
+    if !ctx.named_objects.is_empty() {
+      let mut follows = self.analyze_object_dependencies();
       // init circle check
-      Self::circle_check(follows, |stack| {
+      Self::circle_check(&follows, |stack| {
         Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
       })?;
 
@@ -119,60 +119,54 @@ impl WidgetMacro {
       // follow with skip_nc attribute. So we add the data flow relationship and
       // individual check the circle follow error.
       if let Some(dataflows) = self.dataflows.as_ref() {
-        dataflows.analyze_data_flow_follows(follows);
+        dataflows.analyze_data_flow_follows(&mut follows);
         // circle dependencies check
-        Self::circle_check(follows, |stack| {
-          if stack.iter().any(|s| match &s.scope {
-            Scope::Field(f) => f.skip_nc.is_some(),
-            Scope::DataFlow(df) => df.skip_nc.is_some(),
-            _ => false,
-          }) {
+        Self::circle_check(&follows, |stack| {
+          let weak_depends = stack
+            .iter()
+            .any(|s| !s.used_info.used_type.contains(UsedType::USED) || s.skip_nc_cfg);
+
+          if weak_depends {
             Ok(())
           } else {
             Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
           }
         })?;
       }
+
+      let mut named_widgets_def = self.named_objects_def_tokens(ctx);
+
+      Self::deep_used_iter(&follows, |name| {
+        tokens.extend(named_widgets_def.remove(name));
+      });
+
+      named_widgets_def
+        .into_values()
+        .for_each(|def_tokens| tokens.extend(def_tokens));
     }
 
-    let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
-    let mut tokens = quote! {};
-    let closure_widget = |tokens: &mut TokenStream| {
-      token::Paren::default().surround(tokens, |tokens| {
-        tokens.extend(quote! { move |#ctx_name: &mut BuildCtx| });
-        token::Brace::default().surround(tokens, |tokens| {
-          if !ctx.named_objects.is_empty() {
-            let mut named_widgets_def = self.named_objects_def_tokens(ctx);
+    self.all_anonyms_widgets_tokens(ctx, &mut tokens);
+    self.dataflows.to_tokens(&mut tokens);
+    if let Some(a) = self.animations.as_mut() {
+      a.gen_tokens(ctx, &mut tokens);
+    }
+    self.compose_tokens(ctx, &mut tokens);
 
-            if let Some(follows) = follows.as_ref() {
-              Self::deep_follow_iter(follows, |name| {
-                tokens.extend(named_widgets_def.remove(name));
-              });
-            }
-            named_widgets_def
-              .into_values()
-              .for_each(|def_tokens| tokens.extend(def_tokens));
-          }
-          self.all_anonyms_widgets_tokens(ctx, tokens);
-          self.dataflows.to_tokens(tokens);
-          if let Some(a) = self.animations.as_ref() {
-            a.to_tokens(ctx, tokens);
-          }
-          self.compose_tokens(ctx, tokens);
-          let name = self.widget_identify();
-          tokens.extend(quote! {  #name.into_widget() })
-        });
-      });
-      tokens.extend(quote! { .into_widget() });
+    let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
+    let name = self.widget_identify();
+    let mut tokens = quote! {
+      (move |#ctx_name: &mut BuildCtx| {
+        #tokens
+        #name.into_widget()
+      }).into_widget()
     };
 
+    let track = self.track.as_ref();
     if self.track.is_some() {
-      token::Brace::default().surround(&mut tokens, |tokens| {
-        self.track.to_tokens(tokens);
-        closure_widget(tokens)
-      });
-    } else {
-      closure_widget(&mut tokens);
+      tokens = quote! {{
+        #track
+        #tokens
+      }};
     }
 
     ctx
@@ -205,7 +199,7 @@ impl WidgetMacro {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  fn analyze_object_dependencies(&self) -> BTreeMap<Ident, NameUsed> {
+  fn analyze_object_dependencies(&self) -> BTreeMap<Ident, ObjectUsed> {
     let mut follows = self.widget.analyze_object_dependencies();
 
     if let Some(animations) = self.animations.as_ref() {
@@ -228,7 +222,7 @@ impl WidgetMacro {
         self
           .animations
           .as_ref()
-          .map(|a| a.named_objects_def_tokens_iter())
+          .map(|a| a.named_objects_def_tokens_iter(ctx))
           .into_iter()
           .flatten(),
       )
@@ -299,9 +293,9 @@ impl WidgetMacro {
     }
   }
 
-  fn circle_check<F>(follow_infos: &BTreeMap<Ident, NameUsed>, err_detect: F) -> Result<()>
+  fn circle_check<F>(follow_infos: &BTreeMap<Ident, ObjectUsed>, err_detect: F) -> Result<()>
   where
-    F: Fn(&[CircleCheckStack]) -> Result<()>,
+    F: Fn(&[ObjectUsedPath]) -> Result<()>,
   {
     #[derive(PartialEq, Eq, Debug)]
     enum CheckState {
@@ -315,43 +309,31 @@ impl WidgetMacro {
     // return if the widget follow contain circle.
     fn widget_follow_circle_check<'a, F>(
       name: &'a Ident,
-      follow_infos: &'a BTreeMap<Ident, NameUsed>,
+      follow_infos: &'a BTreeMap<Ident, ObjectUsed>,
       check_info: &mut HashMap<&'a Ident, CheckState, RandomState>,
-      stack: &mut Vec<CircleCheckStack<'a>>,
+      stack: &mut Vec<ObjectUsedPath<'a>>,
       err_detect: &F,
     ) -> Result<()>
     where
-      F: Fn(&[CircleCheckStack]) -> Result<()>,
+      F: Fn(&[ObjectUsedPath]) -> Result<()>,
     {
       match check_info.get(name) {
         None => {
           if let Some(follows) = follow_infos.get(name) {
-            follows
-              .follow_iter()
-              .try_for_each(|(scope, used_widget, used_info)| {
-                check_info.insert(name, CheckState::Checking);
-                stack.push(CircleCheckStack {
-                  widget: name,
-                  scope,
-                  used_widget,
-                  used_info,
-                });
-                widget_follow_circle_check(
-                  used_widget,
-                  follow_infos,
-                  check_info,
-                  stack,
-                  err_detect,
-                )?;
-                stack.pop();
-                Ok(())
-              })?;
+            follows.used_full_path_iter(name).try_for_each(|path| {
+              let next_obj = path.used_obj;
+              check_info.insert(name, CheckState::Checking);
+              stack.push(path);
+              widget_follow_circle_check(next_obj, follow_infos, check_info, stack, err_detect)?;
+              stack.pop();
+              Ok(())
+            })?;
             debug_assert_eq!(check_info.get(name), Some(&CheckState::Checking));
             check_info.insert(name, CheckState::Checked);
           };
         }
         Some(CheckState::Checking) => {
-          let start = stack.iter().position(|v| v.widget == name).unwrap();
+          let start = stack.iter().position(|v| v.obj == name).unwrap();
           err_detect(&stack[start..])?;
         }
         Some(CheckState::Checked) => {}
@@ -364,7 +346,7 @@ impl WidgetMacro {
     })
   }
 
-  fn deep_follow_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, NameUsed>, mut callback: F) {
+  fn deep_used_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, ObjectUsed>, mut callback: F) {
     // circular may exist widget attr follow widget self to init.
     let mut stacked = std::collections::HashSet::<_, RandomState>::default();
 
@@ -373,43 +355,11 @@ impl WidgetMacro {
       match follows.get(w) {
         Some(f) if !stacked.contains(w) => {
           stack.push(w);
-          stack.extend(f.follow_iter().map(|(_, name, _)| name));
+          stack.extend(f.used_obj_iter());
         }
         _ => callback(w),
       }
       stacked.insert(w);
-    }
-  }
-}
-
-impl<'a> CircleCheckStack<'a> {
-  fn to_follow_path(&self, ctx: &DeclareCtx) -> UsedInfo {
-    let widget = ctx
-      .user_perspective_name(self.widget)
-      .unwrap_or(self.widget);
-
-    let (widget, member) = match self.scope {
-      Scope::Field(f) => {
-        // same id, but use the one which at the define place to provide more friendly
-        // compile error.
-        let (widget, _) = ctx
-          .named_objects
-          .get_key_value(widget)
-          .expect("id must in named widgets");
-        (widget.clone(), Some(f.member.clone()))
-      }
-      _ => (widget.clone(), None),
-    };
-
-    let used_widget = ctx.user_perspective_name(self.used_widget).map_or_else(
-      || self.used_widget.clone(),
-      |user| Ident::new(&user.to_string(), self.used_widget.span()),
-    );
-    UsedInfo {
-      widget,
-      member,
-      used_widget,
-      used_info: self.used_info.clone(),
     }
   }
 }

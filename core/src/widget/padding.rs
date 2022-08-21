@@ -29,7 +29,7 @@ impl Render for Padding {
 
     // Update child's children position, let they have a correct position after
     // expanded with padding. padding.
-    let (ctx, grandson_iter) = ctx.split_children_by(child);
+    let (ctx, grandson_iter) = ctx.split_children_for(child);
     grandson_iter.for_each(|c| {
       let pos = ctx
         .widget_box_rect(c)
@@ -74,25 +74,24 @@ mod tests {
     };
 
     let mut wnd = Window::without_render(widget, Size::new(200., 200.));
-    wnd.render_ready();
-    let ctx = wnd.context();
-    let padding_widget = ctx.widget_tree.root();
+    wnd.draw_frame();
 
+    let tree = &wnd.widget_tree;
+    let padding_widget = tree.root();
     assert_eq!(
-      ctx.layout_store.layout_box_rect(padding_widget).unwrap(),
+      tree.layout_box_rect(padding_widget).unwrap(),
       Rect::from_size(Size::new(101., 100.))
     );
 
-    let tree = &ctx.widget_tree;
     let row_widget = padding_widget.single_child(tree).unwrap();
     assert_eq!(
-      ctx.layout_store.layout_box_rect(row_widget).unwrap(),
+      tree.layout_box_rect(row_widget).unwrap(),
       Rect::from_size(Size::new(101., 100.))
     );
 
     let child_box = row_widget.single_child(tree).unwrap();
     assert_eq!(
-      ctx.layout_store.layout_box_rect(child_box).unwrap(),
+      tree.layout_box_rect(child_box).unwrap(),
       Rect::new(Point::new(1., 0.), Size::new(100., 100.))
     );
   }

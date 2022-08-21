@@ -7,7 +7,7 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default = "IconSize::of(ctx).tiny")]
+  #[declare(default = IconSize::of(ctx).tiny)]
   pub size: Size,
 }
 
@@ -71,7 +71,7 @@ mod tests {
   fn checked_paint() {
     let c = widget! { Checkbox { checked: true } };
     let mut window = Window::wgpu_headless(c, DeviceSize::new(100, 100));
-    window.render_ready();
+    window.draw_frame();
 
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     expected.push("src/test_imgs/checkbox_checked.png");
@@ -82,7 +82,7 @@ mod tests {
   #[test]
   fn unchecked_paint() {
     let mut window = Window::wgpu_headless(widget! { Checkbox {} }, DeviceSize::new(100, 100));
-    window.render_ready();
+    window.draw_frame();
     let mut unchecked_expect = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     unchecked_expect.push("src/test_imgs/checkbox_uncheck.png");
     assert!(window.same_as_png(unchecked_expect));
@@ -98,7 +98,7 @@ mod tests {
       }
     };
     let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
-    window.render_ready();
+    window.draw_frame();
 
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     expected.push("src/test_imgs/checkbox_indeterminate.png");
@@ -111,7 +111,7 @@ mod tests {
       }
     };
     let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
-    window.render_ready();
+    window.draw_frame();
 
     assert!(window.same_as_png(expected));
   }

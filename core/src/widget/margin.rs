@@ -1,6 +1,6 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Lerp)]
 pub struct EdgeInsets {
   pub left: f32,
   pub right: f32,

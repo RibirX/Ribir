@@ -160,7 +160,6 @@
 //! [builtin_fields]: ../ribir/widget_derive/declare_builtin_fields.html
 
 use crate::prelude::BuildCtx;
-use std::marker::PhantomData;
 
 /// Trait to mark the builder type of widget. `widget!` use it to access the
 /// build type of the widget. See the [mod level document](declare) to know how
@@ -178,24 +177,21 @@ pub trait DeclareBuilder {
 }
 
 #[derive(Debug, PartialEq, Hash)]
-pub struct StripedOption<V, M> {
-  pub value: Option<V>,
-  _marker: PhantomData<M>,
+pub struct DeclareStripOption<O>(O);
+
+impl<V> From<V> for DeclareStripOption<Option<V>> {
+  #[inline]
+  fn from(value: V) -> Self { Self(Some(value)) }
 }
 
-impl<T, V: Into<T>> From<V> for StripedOption<T, V> {
+impl<V> From<Option<V>> for DeclareStripOption<Option<V>> {
   #[inline]
-  fn from(v: V) -> Self {
-    Self {
-      value: Some(v.into()),
-      _marker: PhantomData,
-    }
-  }
+  fn from(value: Option<V>) -> Self { Self(value) }
 }
 
-impl<V> From<Option<V>> for StripedOption<V, V> {
+impl<V> DeclareStripOption<Option<V>> {
   #[inline]
-  fn from(value: Option<V>) -> Self { Self { value, _marker: PhantomData } }
+  pub fn into_option_value(self) -> Option<V> { self.0 }
 }
 
 #[cfg(test)]
@@ -206,22 +202,16 @@ mod tests {
   #[test]
   fn inner_value_into() {
     assert_eq!(
-      StripedOption::from(Color::RED),
-      StripedOption {
-        value: Some(Brush::from(Color::RED)),
-        _marker: PhantomData
-      }
-    )
+      DeclareStripOption::from(Brush::from(Color::RED)),
+      DeclareStripOption(Some(Brush::from(Color::RED)))
+    );
   }
 
   #[test]
-  fn option_self_can_use_with_stripe() {
+  fn option_self_can_use_with_strip() {
     assert_eq!(
-      StripedOption::from(Color::RED),
-      StripedOption {
-        value: Some(Brush::from(Color::RED)),
-        _marker: PhantomData
-      }
+      DeclareStripOption::from(Some(Brush::from(Color::RED))),
+      DeclareStripOption(Some(Brush::from(Color::RED)))
     )
   }
 }

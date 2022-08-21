@@ -3,13 +3,11 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
-  token, Ident,
+  token::{self, Comma},
+  Ident,
 };
 
-use crate::{
-  error::{Result, UsedInfo},
-  widget_attr_macro::declare_widget::DeclareField,
-};
+use crate::{error::Result, widget_attr_macro::declare_widget::DeclareField};
 mod declare_ctx;
 pub use declare_ctx::*;
 mod name_used_info;
@@ -61,6 +59,7 @@ pub struct Id {
   pub id_token: kw::id,
   pub colon_token: token::Colon,
   pub name: Ident,
+  pub tail_comma: Option<token::Comma>,
 }
 
 impl Parse for Id {
@@ -69,6 +68,7 @@ impl Parse for Id {
       id_token: input.parse()?,
       colon_token: input.parse()?,
       name: input.parse()?,
+      tail_comma: input.parse()?,
     })
   }
 }
@@ -82,7 +82,8 @@ impl ToTokens for Id {
 }
 
 impl Id {
-  pub fn from_declare_field(field: DeclareField) -> syn::Result<Id> {
+  pub fn from_field_pair(p: syn::punctuated::Pair<DeclareField, Comma>) -> syn::Result<Id> {
+    let field = p.value();
     if field.skip_nc.is_some() {
       return Err(syn::Error::new(
         field.skip_nc.span(),
@@ -96,11 +97,11 @@ impl Id {
       ));
     }
 
-    Ok(syn::parse_quote! {#field})
+    Ok(syn::parse_quote! {#p})
   }
 }
 
-fn widget_state_ref(widget: &Ident) -> TokenStream2 {
+fn obj_state_ref(widget: &Ident) -> TokenStream2 {
   quote_spanned!(widget.span() =>
     #[allow(unused_mut)]
     let mut #widget = #widget.state_ref();

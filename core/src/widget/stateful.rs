@@ -191,7 +191,8 @@ impl<W> Stateful<W> {
   #[inline]
   pub fn state_ref(&self) -> StateRef<W> { StateRef(InnerRef::new(self)) }
 
-  /// Return a `SilentMut` of the stateful widget.
+  /// Return a `SilentMut` of the stateful widget. Which tell the framework,
+  /// modify from here will not effect ui.
   #[inline]
   pub fn silent_ref(&self) -> SilentRef<W> { SilentRef(InnerRef::new(self)) }
 
@@ -199,6 +200,12 @@ impl<W> Stateful<W> {
   /// the widget and not notify state change.
   #[inline]
   pub fn shallow_ref(&self) -> ShallowRef<W> { ShallowRef(InnerRef::new(self)) }
+
+  /// Directly mutable borrow the inner widget and control on it, nothing will
+  /// be know by framework, use it only if you know how the four kind of ref
+  /// (state, silent, shallow, raw) of stateful widget work.
+  #[inline]
+  pub fn raw_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
 
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
@@ -249,6 +256,14 @@ impl<W> Stateful<W> {
       Err(e) => Box::new(RenderWrap(e)),
     }
   }
+}
+
+impl<T: Clone + std::cmp::PartialEq> StateChange<T> {
+  #[inline]
+  pub fn is_same(&self) -> bool { self.after == self.before }
+
+  #[inline]
+  pub fn not_same(&self) -> bool { self.before != self.after }
 }
 
 impl<'a, W> StateRef<'a, W> {
@@ -507,6 +522,8 @@ impl StateChangeNotifier {
 mod tests {
   use lazy_static::__Deref;
 
+  use crate::prelude::widget_tree::WidgetTree;
+
   use super::*;
 
   #[test]
@@ -533,13 +550,11 @@ mod tests {
         key: 1,
       }
     };
-
-    let ctx = Context::new(stateful, 1., None);
-    let tree = &ctx.widget_tree;
+    let tree = WidgetTree::new(stateful, <_>::default());
     let mut key = None;
     tree
       .root()
-      .assert_get(tree)
+      .assert_get(&tree)
       .query_on_first_type(QueryOrder::InnerFirst, |k: &Key| key = Some(k.clone()));
     assert!(key.is_some());
   }
@@ -563,17 +578,17 @@ mod tests {
 
     let state = sized_box.clone();
     let mut wnd = Window::without_render(sized_box.into_widget(), Size::new(500., 500.));
-    wnd.render_ready();
+    wnd.draw_frame();
 
     assert_eq!(*notified_count.borrow(), 0);
-    assert_eq!(wnd.context().is_dirty(), false);
+    assert_eq!(wnd.widget_tree.any_state_modified(), false);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
     {
       state.state_ref().size = Size::new(1., 1.);
     }
-    wnd.context.tree_repair();
+    wnd.widget_tree.tree_repair();
     assert_eq!(*notified_count.borrow(), 1);
-    assert_eq!(wnd.context.is_dirty(), true);
+    assert_eq!(wnd.widget_tree.any_state_modified(), true);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
   }
 
@@ -583,8 +598,8 @@ mod tests {
       widget! { SizedBox { size: Size::new(100., 100.) } },
       Size::new(500., 500.),
     );
-    wnd.render_ready();
-    let tree = &wnd.context().widget_tree;
+    wnd.draw_frame();
+    let tree = &wnd.widget_tree;
     assert_eq!(tree.root().descendants(tree).count(), 1);
   }
 

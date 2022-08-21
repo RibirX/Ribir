@@ -1,8 +1,9 @@
-use crate::{context::EventCtx, prelude::Context, widget::widget_tree::WidgetId};
+use crate::{context::EventCtx, prelude::widget_tree::WidgetTree, widget::widget_tree::WidgetId};
 use std::ptr::NonNull;
 
 pub(crate) mod dispatcher;
 mod pointers;
+use painter::Point;
 pub use pointers::*;
 pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;
@@ -14,6 +15,8 @@ pub use character::*;
 mod wheel;
 pub use wheel::*;
 
+use self::dispatcher::DispatchInfo;
+
 /// Event itself contains the properties and methods which are common to all
 /// events
 #[derive(Clone)]
@@ -22,7 +25,9 @@ pub struct EventCommon {
   pub(crate) current_target: WidgetId,
   pub(crate) cancel_bubble: bool,
   pub(crate) prevent_default: bool,
-  context: NonNull<Context>,
+  // todo: we need to support lifetime in event.
+  tree: NonNull<WidgetTree>,
+  info: NonNull<DispatchInfo>,
 }
 
 impl EventCommon {
@@ -49,15 +54,55 @@ impl EventCommon {
   pub fn prevent_default(&mut self) { self.prevent_default = true; }
   /// Represents the current state of the keyboard modifiers
   #[inline]
-  pub fn modifiers(&self) -> ModifiersState { self.context().modifiers() }
+  pub fn modifiers(&self) -> ModifiersState { self.dispatch_info().modifiers() }
+
+  /// The X, Y coordinate of the mouse pointer in global (window) coordinates.
+  #[inline]
+  pub fn global_pos(&self) -> Point { self.dispatch_info().global_pos() }
+
+  /// The X, Y coordinate of the pointer in current target widget.
+  #[inline]
+  pub fn position(&self) -> Point {
+    let tree = unsafe { self.tree.as_ref() };
+    tree.map_from_global(self.current_target, self.global_pos())
+  }
+
+  /// The buttons being depressed (if any) in current state.
+  #[inline]
+  pub fn mouse_buttons(&self) -> MouseButtons { self.dispatch_info().mouse_buttons() }
+
+  /// The button number that was pressed (if applicable) when the mouse event
+  /// was fired.
+  #[inline]
+  pub fn button_num(&self) -> u32 { self.mouse_buttons().bits().count_ones() }
 
   #[inline]
-  pub fn context<'a>(&'a self) -> EventCtx<'a> {
+  pub fn context<'a>(&'a mut self) -> EventCtx<'a> {
     // Safety: framework promise event context only live in event dispatch and
     // there is no others to share `Context`.
-
-    EventCtx::new(self.current_target(), unsafe { self.context.as_ref() })
+    EventCtx::new(
+      self.current_target(),
+      unsafe { self.tree.as_ref() },
+      self.dispatch_info_mut(),
+    )
   }
+
+  fn dispatch_info_mut(&mut self) -> &mut DispatchInfo {
+    // Safety: framework promise `info` only live in event dispatch and
+    // there is no others borrow `info`.
+    unsafe { self.info.as_mut() }
+  }
+
+  fn dispatch_info(&self) -> &DispatchInfo {
+    // Safety: framework promise `info` only live in event dispatch and
+    // there is no others mutable borrow `info`.
+    unsafe { self.info.as_ref() }
+  }
+}
+
+pub trait EventListener {
+  type Event: std::borrow::BorrowMut<EventCommon>;
+  fn dispatch(&mut self, event: &mut Self::Event);
 }
 
 impl std::fmt::Debug for EventCommon {
@@ -71,13 +116,14 @@ impl std::fmt::Debug for EventCommon {
 }
 
 impl EventCommon {
-  pub(crate) fn new(target: WidgetId, context: &Context) -> Self {
+  pub(crate) fn new(target: WidgetId, tree: &WidgetTree, info: &DispatchInfo) -> Self {
     Self {
       target,
       current_target: target,
       cancel_bubble: <_>::default(),
       prevent_default: <_>::default(),
-      context: NonNull::from(context),
+      tree: NonNull::from(tree),
+      info: NonNull::from(info),
     }
   }
 }

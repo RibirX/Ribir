@@ -1,5 +1,5 @@
-use crate::{animation::TickerAnimationCtrl, prelude::*};
-use std::{rc::Rc, time::Duration};
+use crate::prelude::{widget_tree::WidgetTree, *};
+use std::rc::Rc;
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
   Rc::new(widget::material::purple::light())
@@ -7,21 +7,21 @@ thread_local!(static DEFAULT_THEME: Rc<Theme> =
 
 pub struct BuildCtx<'a> {
   parent: Option<WidgetId>,
+  // todo: use as store current theme?
   default_theme: Option<Rc<Theme>>,
-  ctx: &'a mut Context,
+  pub(crate) tree: &'a mut WidgetTree,
 }
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
   pub fn theme(&mut self) -> &Theme {
-    let tree = &*self.ctx.widget_tree;
     self
       .parent
       .as_ref()
       .and_then(|p| {
-        p.ancestors(tree).find_map(|id| {
+        p.ancestors(self.tree).find_map(|id| {
           let mut theme: Option<&Theme> = None;
-          id.assert_get(tree)
+          id.assert_get(self.tree)
             .query_on_first_type(QueryOrder::InnerFirst, |t: &Theme| {
               // Safety: we known the theme in the widget node should always live longer than
               // the `BuildCtx`
@@ -38,16 +38,8 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(parent: Option<WidgetId>, ctx: &'a mut Context) -> Self {
-    Self { parent, default_theme: None, ctx }
-  }
-
-  pub fn ticker_ctrl(&mut self, duration: Duration) -> Option<Box<dyn TickerAnimationCtrl>> {
-    self
-      .ctx
-      .animation_ticker
-      .as_mut()
-      .map(|ticker| ticker.ticker_ctrl(duration))
+  pub(crate) fn new(parent: Option<WidgetId>, tree: &'a mut WidgetTree) -> Self {
+    Self { parent, default_theme: None, tree }
   }
 }
 
@@ -66,8 +58,9 @@ mod tests {
         panic!("Get a default theme from context");
       }
     }
-    // should panic when construct the context
-    Context::new(T.into_widget(), 1., None);
+
+    // should panic when construct widget tree
+    WidgetTree::new(T.into_widget(), <_>::default());
   }
 
   #[derive(Debug, Declare)]
@@ -114,7 +107,7 @@ mod tests {
     let dark_light = DarkLightThemes::default();
     let track_themes = dark_light.0.clone();
     let mut wnd = Window::without_render(dark_light.into_widget(), Size::zero());
-    wnd.render_ready();
+    wnd.draw_frame();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
       track_themes.borrow()[0].brightness,
@@ -147,7 +140,7 @@ mod tests {
     let light_dark = LightDarkThemes::default();
     let track_themes = light_dark.0.clone();
     let mut wnd = Window::without_render(light_dark.into_widget(), Size::zero());
-    wnd.render_ready();
+    wnd.draw_frame();
     assert_eq!(track_themes.borrow().len(), 1);
     assert_eq!(
       track_themes.borrow()[0].brightness,

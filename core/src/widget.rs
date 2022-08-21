@@ -12,7 +12,7 @@ pub mod text;
 mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
-pub use crate::dynamic_widget::ExprWidget;
+pub use crate::dynamic_widget::{ConstExprWidget, ExprWidget};
 pub use crate::widget::text::Text;
 pub use key::{Key, KeyWidget};
 pub use stateful::*;
@@ -44,7 +44,7 @@ pub mod data_widget;
 pub use data_widget::DataWidget;
 
 mod void;
-use self::layout_store::BoxClamp;
+use self::widget_tree::BoxClamp;
 pub use void::Void;
 mod composed_widget;
 pub(crate) use composed_widget::ComposedWidget;

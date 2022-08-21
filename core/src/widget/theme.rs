@@ -118,6 +118,11 @@ pub struct IconSize {
   pub huge: Size,
 }
 
+impl TypographyTheme {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().typography_theme }
+}
+
 impl IconSize {
   #[inline]
   pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.icon_size }
@@ -142,7 +147,7 @@ pub struct ThemeWidget {
 impl ComposeSingleChild for ThemeWidget {
   #[inline]
   fn compose_single_child(this: Stateful<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget {
-    // todo: theme can provide fonts to load, blocked by a async widget?
+    // todo: theme can provide fonts to load.
     compose_child_as_data_widget(child, this, |w| w.theme)
   }
 }
