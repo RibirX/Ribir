@@ -205,19 +205,6 @@ where
   }
 }
 
-impl<W> IntoWidget<dyn Render> for SingleChildWidget<Stateful<W>>
-where
-  W: SingleChild + Render + 'static,
-{
-  fn into_widget(self) -> Widget {
-    let single_child = SingleChildWidget {
-      widget: self.widget.into_render_node(),
-      child: self.child,
-    };
-    Widget(WidgetInner::SingleChild(Box::new(single_child)))
-  }
-}
-
 impl<W> IntoWidget<dyn Compose> for SingleChildWidget<W>
 where
   W: ComposeSingleChild + 'static,
@@ -225,17 +212,6 @@ where
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
       ComposeSingleChild::compose_single_child(self.widget.into(), self.child, ctx)
-    })))
-  }
-}
-
-impl<W> IntoWidget<dyn Compose> for SingleChildWidget<Stateful<W>>
-where
-  W: ComposeSingleChild + 'static,
-{
-  fn into_widget(self) -> Widget {
-    Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeSingleChild::compose_single_child(StateWidget::Stateful(self.widget), self.child, ctx)
     })))
   }
 }
@@ -256,17 +232,6 @@ where
   }
 }
 
-impl<W> IntoWidget<dyn Render> for MultiChildWidget<Stateful<W>>
-where
-  W: MultiChild + Render + 'static,
-{
-  fn into_widget(self) -> Widget {
-    let widget: Box<dyn Render> = self.widget.into_render_node();
-    let multi_child = MultiChildWidget { widget, children: self.children };
-    Widget(WidgetInner::MultiChild(multi_child))
-  }
-}
-
 impl<W> IntoWidget<dyn Compose> for MultiChildWidget<W>
 where
   W: ComposeMultiChild + 'static,
@@ -274,17 +239,6 @@ where
   fn into_widget(self) -> Widget {
     Widget(WidgetInner::Compose(Box::new(move |ctx| {
       ComposeMultiChild::compose_multi_child(self.widget.into(), self.children, ctx)
-    })))
-  }
-}
-
-impl<W> IntoWidget<dyn Compose> for MultiChildWidget<Stateful<W>>
-where
-  W: ComposeMultiChild + 'static,
-{
-  fn into_widget(self) -> Widget {
-    Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeMultiChild::compose_multi_child(StateWidget::Stateful(self.widget), self.children, ctx)
     })))
   }
 }
