@@ -1,5 +1,11 @@
 # Full builtin fields list 
 
+- on_performed_layout : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
+ 	 - action perform after widget performed layout.
+- on_mounted : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
+ 	 - action perform after widget be added to the widget tree.
+- on_disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
+ 	 - action perform after widget remove from widget tree.
 - box_fit : [`BoxFit`] 
  	 -  set how its child should be resized to its box.
 - padding : [`EdgeInsets`] 
@@ -64,6 +70,12 @@
  	 - describe how widget align to its box in y-axis.
 - margin : [`impl EdgeInsets`] 
  	 - expand space around widget wrapped.
+
+[`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
+
+[`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
+
+[`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
 
 [`BoxFit`]: prelude::BoxFit
 

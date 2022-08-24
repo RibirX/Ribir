@@ -22,8 +22,8 @@ impl<'a> LayoutCtx<'a> {
 
   /// Update the size of layout widget. Use this method to directly change the
   /// size of a widget, in most cast you needn't call this method, use clamp to
-  /// limit the child size is enough. Use this method only it you
-  /// know what you are doing.
+  /// limit the child size is enough. Use this method only it you know what you
+  /// are doing.
   #[inline]
   pub fn update_size(&mut self, child: WidgetId, size: Size) {
     self.tree.layout_box_rect_mut(child).size = size;

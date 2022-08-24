@@ -48,6 +48,8 @@ use self::widget_tree::BoxClamp;
 pub use void::Void;
 mod composed_widget;
 pub(crate) use composed_widget::ComposedWidget;
+mod lifecycle;
+pub use lifecycle::*;
 
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
@@ -104,13 +106,14 @@ impl<W: Render> WidgetMarker for W {}
 pub trait Query {
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
-  /// an `& dyn Any` of the target type, and return if  want to continue.
+  /// an `& dyn Any` of the target type, and return if it want to continue.
   fn query_all(
     &self,
     type_id: TypeId,
     callback: &mut dyn FnMut(&dyn Any) -> bool,
     order: QueryOrder,
   );
+  // todo: remove mut access
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `&mut dyn Any` of the target type, and return if want to continue.

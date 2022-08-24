@@ -1,8 +1,24 @@
 builtin! {
+  PerformedLayoutListener {
+    #[doc="action perform after widget performed layout."]
+    on_performed_layout: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+  }
+
+  MountedListener {
+    #[doc="action perform after widget be added to the widget tree."]
+    on_mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+  }
+
+  DisposedListener {
+    #[doc="action perform after widget remove from widget tree."]
+    on_disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+  }
+
   FittedBox {
     #[doc=" set how its child should be resized to its box."]
     box_fit: BoxFit,
   }
+
   Padding {
     #[doc="set the padding area on all four sides of a widget."]
     padding: EdgeInsets
