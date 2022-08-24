@@ -129,7 +129,7 @@ pub struct TriangleLists<'a> {
 pub struct Primitive {
   // Both color and texture primitive have 128 bit size, see [`ColorPrimitive`]!  and
   // [`TexturePrimitive`]! to upstanding their struct.
-  pub data: u128,
+  pub data: [u32; 4],
   /// the transform vertex to apply
   pub(crate) transform: [[f32; 2]; 3],
 }
