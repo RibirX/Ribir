@@ -1,7 +1,7 @@
 use crate::{
   declare_derive::declare_field_name,
   widget_attr_macro::{
-    capture_widget, obj_state_ref, ribir_variable,
+    capture_widget, ribir_variable,
     widget_macro::{is_const_expr_keyword, EXPR_FIELD},
     DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
   },
@@ -43,8 +43,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
       <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful
     };
     let used_info = self.whole_used_info();
-    if let Some(refs) = used_info.directly_used_widgets() {
-      let refs = refs.map(obj_state_ref);
+    if let Some(refs) = used_info.refs_tokens() {
       build_widget = quote_spanned! { ty.span() =>
         let #name = {
           #(#refs)*
