@@ -80,7 +80,7 @@
 //! Notice, the first argument of `build` method is `Stateful<Self>` let you can
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
-use crate::{impl_proxy_query, prelude::*};
+use crate::prelude::*;
 use lazy_static::__Deref;
 use rxrust::{ops::box_it::LocalCloneBoxOp, prelude::*};
 use std::{
@@ -88,8 +88,6 @@ use std::{
   ops::DerefMut,
   rc::Rc,
 };
-
-use super::ComposedWidget;
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
@@ -238,13 +236,6 @@ impl<W> Stateful<W> {
   pub fn raw_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
     self.change_notifier.0.clone()
   }
-
-  pub(crate) fn into_render_node(self) -> Box<dyn Render>
-  where
-    W: Render + 'static,
-  {
-    Box::new(RenderWrap(self))
-  }
 }
 
 impl<T: Clone + std::cmp::PartialEq> StateChange<T> {
@@ -352,40 +343,58 @@ impl<'a, W> InnerRef<'a, W> {
   fn release_current_borrow(&mut self) { self.current_ref.get_mut().take(); }
 }
 
-struct RenderWrap<W>(Stateful<W>);
-
-impl<T: Render> Query for RenderWrap<T> {
-  impl_proxy_query!(0);
-}
-
-impl<W: Render + 'static> Render for RenderWrap<W> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.0.widget.borrow().perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.0.widget.borrow().only_sized_by_parent() }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.0.widget.borrow().paint(ctx) }
-}
-
 impl<W: SingleChild> SingleChild for Stateful<W> {}
 
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
-impl<C: Render + 'static> IntoWidget<dyn Render> for Stateful<C> {
+impl<W: Render + 'static> Render for Stateful<W> {
   #[inline]
-  fn into_widget(self) -> Widget { Widget(WidgetInner::Render(Box::new(RenderWrap(self)))) }
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.widget.borrow().perform_layout(clamp, ctx)
+  }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { self.widget.borrow().only_sized_by_parent() }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.widget.borrow().paint(ctx) }
 }
 
-impl<C: Compose + 'static> IntoWidget<dyn Compose> for Stateful<C> {
-  #[inline]
-  fn into_widget(self) -> Widget {
-    Widget(WidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget::<_, C>::new(Compose::compose(StateWidget::Stateful(self), ctx)).into_widget()
-    })))
+impl<W: Compose> Compose for Stateful<W> {
+  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
+    let w = match this {
+      StateWidget::Stateless(s) => StateWidget::Stateful(s),
+      StateWidget::Stateful(_) => unreachable!(),
+    };
+    Compose::compose(w, ctx)
+  }
+}
+
+impl<W: ComposeSingleChild> ComposeSingleChild for Stateful<W> {
+  fn compose_single_child(
+    this: StateWidget<Self>,
+    child: Option<Widget>,
+    ctx: &mut BuildCtx,
+  ) -> Widget {
+    let w = match this {
+      StateWidget::Stateless(s) => StateWidget::Stateful(s),
+      StateWidget::Stateful(_) => unreachable!(),
+    };
+    ComposeSingleChild::compose_single_child(w, child, ctx)
+  }
+}
+
+impl<W: ComposeMultiChild> ComposeMultiChild for Stateful<W> {
+  fn compose_multi_child(
+    this: StateWidget<Self>,
+    children: Vec<Widget>,
+    ctx: &mut BuildCtx,
+  ) -> Widget {
+    let w = match this {
+      StateWidget::Stateless(s) => StateWidget::Stateful(s),
+      StateWidget::Stateful(_) => unreachable!(),
+    };
+    ComposeMultiChild::compose_multi_child(w, children, ctx)
   }
 }
 
