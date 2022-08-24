@@ -236,14 +236,13 @@ impl WidgetMacro {
           .for_each(|(_, widget)| tokens.extend(widget));
       }
 
-      w.children
-        .iter()
-        .enumerate()
-        .filter(|(_, c)| c.name().is_none())
-        .for_each(|(idx, c)| {
-          let c_name = child_variable(name, idx);
-          anonyms_widgets_tokens(&c_name, c, ctx, tokens);
-        })
+      w.children.iter().enumerate().for_each(|(idx, c)| {
+        if let Some(name) = c.name() {
+          anonyms_widgets_tokens(&name, c, ctx, tokens);
+        } else {
+          anonyms_widgets_tokens(&child_variable(name, idx), c, ctx, tokens);
+        }
+      })
     }
     let name = self.widget_identify();
     anonyms_widgets_tokens(&name, &self.widget, ctx, tokens)

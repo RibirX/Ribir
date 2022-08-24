@@ -143,6 +143,7 @@ impl ScopeUsedInfo {
   }
 
   pub fn refs_tokens(&self) -> Option<impl Iterator<Item = TokenStream> + '_> {
+    // fixme: only top move capture of field needn't declare state ref.
     self.refs_widgets().map(|iter| iter.map(obj_state_ref))
   }
 
