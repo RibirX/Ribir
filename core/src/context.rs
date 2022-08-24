@@ -6,6 +6,8 @@ use std::{
 use crate::ticker::FrameMsg;
 use crate::ticker::FrameTicker;
 
+mod lifecycle_context;
+pub use lifecycle_context::LifeCycleCtx;
 mod painting_context;
 pub use painting_context::PaintingCtx;
 mod event_context;

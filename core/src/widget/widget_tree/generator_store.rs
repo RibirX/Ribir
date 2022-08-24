@@ -33,13 +33,14 @@ impl GeneratorStore {
   pub(crate) fn new_generator(
     &mut self,
     ExprWidget { expr, upstream }: ExprWidget<()>,
-    parent: WidgetId,
+    parent: Option<WidgetId>,
     generated_widgets: SmallVec<[WidgetId; 1]>,
   ) -> GeneratorID {
     let id = self.next_generator_id;
     self.next_generator_id = id.next_id();
     let info = GeneratorInfo::new(id, parent, generated_widgets);
     let needs_regen = self.needs_regen.clone();
+    needs_regen.borrow_mut().insert(id);
     let _subscription = upstream
       .filter(|scope| scope.contains(ChangeScope::FRAMEWORK))
       .subscribe(move |_| {
@@ -47,11 +48,14 @@ impl GeneratorStore {
       })
       .unsubscribe_when_dropped();
     self.add_generator(Generator { info, expr });
-    self
-      .lifetime
-      .entry(parent)
-      .or_default()
-      .push(GeneratorHandle { id, _subscription });
+
+    if let Some(p) = parent {
+      self
+        .lifetime
+        .entry(p)
+        .or_default()
+        .push(GeneratorHandle { id, _subscription });
+    }
     id
   }
 
@@ -76,6 +80,7 @@ impl GeneratorStore {
     if let Some(ids) = self.lifetime.remove(&widget) {
       ids.iter().for_each(|h| {
         self.generators.remove(&h.id);
+        self.needs_regen.borrow_mut().remove(&h.id);
       });
     }
   }
