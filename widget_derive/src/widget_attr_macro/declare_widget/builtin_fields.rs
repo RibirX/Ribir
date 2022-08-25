@@ -161,8 +161,6 @@ impl BuiltinFieldWidgets {
     let info = self.widgets.entry(widget_ty).or_default();
     info.0.push(field);
   }
-
-  pub fn is_empty(&self) -> bool { self.widgets.is_empty() }
 }
 
 impl BuiltinWidgetInfo {

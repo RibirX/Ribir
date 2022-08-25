@@ -224,7 +224,7 @@ impl DeclareCtx {
           .map(|objs| upstream_tokens(objs, quote! {raw_change_stream}));
         if let Some(upstream) = upstream {
           expr_field.expr = parse_quote_spanned! { origin_expr.span() =>
-            move |cb: &mut dyn FnMut(Widget)| ChildConsumer::<_>::consume(#origin_expr, cb)
+            move |cb: &mut dyn FnMut(Widget)| IntoExprGen::<_>::into_expr_gen(#origin_expr, cb)
           };
 
           // we convert the field expr to a closure, revisit again.
@@ -237,7 +237,7 @@ impl DeclareCtx {
           }
           fields.push(parse_quote! {upstream: #upstream});
         } else {
-          *path = parse_quote_spanned! { path.span() => ConstExprWidget };
+          *path = parse_quote_spanned! { path.span() => ConstExprWidget<_> };
           assert!(expr_field.used_name_info.is_empty())
         }
       }

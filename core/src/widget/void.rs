@@ -23,16 +23,8 @@ impl Render for Void {
 }
 
 impl crate::prelude::ComposeSingleChild for Void {
-  fn compose_single_child(_: StateWidget<Self>, child: Option<Widget>, _: &mut BuildCtx) -> Widget
-  where
-    Self: Sized,
-  {
-    if let Some(child) = child {
-      child
-    } else {
-      Void.into_widget()
-    }
-  }
+  #[inline]
+  fn compose_single_child(_: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget { child }
 }
 
 impl Query for Void {

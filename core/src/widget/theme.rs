@@ -148,11 +148,7 @@ pub struct ThemeWidget {
 
 impl ComposeSingleChild for ThemeWidget {
   #[inline]
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     // todo: theme can provide fonts to load.
     compose_child_as_data_widget(child, this)
   }

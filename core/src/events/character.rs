@@ -19,11 +19,7 @@ pub struct CharEvent {
 
 impl ComposeSingleChild for CharListener {
   #[inline]
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

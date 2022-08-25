@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::prelude::{key::Key, widget_tree::WidgetTree, *};
+use crate::{
+  impl_proxy_query,
+  prelude::{key::Key, widget_tree::WidgetTree, *},
+};
 use rxrust::ops::box_it::LocalBoxOp;
 use smallvec::SmallVec;
 
@@ -14,6 +17,9 @@ pub struct ExprWidget<R> {
   #[declare(convert = custom)]
   pub(crate) upstream: LocalBoxOp<'static, ChangeScope, ()>,
 }
+
+pub struct GenMostOne;
+pub struct GenMulti;
 
 /// ConstExprWidget is convert from uer declared  `ExprWidget` which but its
 /// expression not following anything.
@@ -67,22 +73,131 @@ impl GeneratorInfo {
   pub(crate) fn generate_id(&self) -> GeneratorID { self.id }
 }
 
-impl IntoWidget<SingleConsumer> for ExprWidget<SingleConsumer> {
+pub trait IntoExprGen<M: ?Sized> {
+  type G;
+  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G;
+}
+
+impl<W, M: ?Sized> IntoExprGen<(GenMostOne, &M)> for W
+where
+  W: IntoWidget<M>,
+{
+  type G = GenMostOne;
   #[inline]
-  fn into_widget(self) -> Widget {
-    // #Safety
-    // Only erase the function return type `SingleConsumer` which is unit struct
-    Widget(WidgetInner::Expr(unsafe { std::mem::transmute(self) }))
+  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G {
+    cb(self.into_widget());
+    GenMostOne
   }
 }
 
-impl IntoWidget<MultiConsumer> for ExprWidget<MultiConsumer> {
+impl<W, M: ?Sized> IntoExprGen<(Option<GenMostOne>, &M)> for Option<W>
+where
+  W: IntoWidget<M>,
+{
+  type G = GenMostOne;
   #[inline]
-  fn into_widget(self) -> Widget {
-    // #Safety
-    // Only erase the function return type `MultiConsumer` which is unit struct
-    Widget(WidgetInner::Expr(unsafe { std::mem::transmute(self) }))
+  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G {
+    if let Some(w) = self {
+      cb(w.into_widget());
+    }
+    GenMostOne
   }
+}
+
+impl<R, M: ?Sized> IntoExprGen<(GenMulti, &M)> for R
+where
+  R: Iterator,
+  R::Item: IntoWidget<M>,
+{
+  type G = GenMulti;
+  #[inline]
+  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G {
+    self.for_each(|w| {
+      cb(w.into_widget());
+    });
+    GenMulti
+  }
+}
+
+// only implement `GenMoistOne`, `ExprWidget<GenMulti>` only valid as child of
+// `SingleMultiWidget`.
+impl ExprWidget<GenMostOne> {
+  #[inline]
+  pub fn into_widget(self) -> Widget {
+    let Self { mut expr, upstream } = self;
+    let new_expr = move |cb: &mut dyn FnMut(Widget)| {
+      expr(&mut |w: Widget| {
+        if matches!(w.0, WidgetInner::ExprGenMulti(_)) {
+          panic!("`ExprWidget<GenMostOne>` generate `ExprWidget<GenMulti>` is not allowed.")
+        }
+        cb(w)
+      })
+    };
+
+    Widget(WidgetInner::ExprGenOnce(ExprWidget {
+      expr: Box::new(new_expr),
+      upstream,
+    }))
+  }
+}
+
+impl<C: SingleChild> SingleChild for ConstExprWidget<Option<C>> {}
+impl<C: SingleChild> SingleChild for ConstExprWidget<C> {}
+impl<C: MultiChild> MultiChild for ConstExprWidget<C> {}
+impl<C: ComposeSingleChild> ComposeSingleChild for ConstExprWidget<C> {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, ctx: &mut BuildCtx) -> Widget {
+    match this {
+      StateWidget::Stateless(c) => {
+        ComposeSingleChild::compose_single_child(c.expr.into(), child, ctx)
+      }
+      StateWidget::Stateful(_) => unreachable!("ExprWidget should not be stateful."),
+    }
+  }
+}
+impl<C: ComposeMultiChild> ComposeMultiChild for ConstExprWidget<C> {
+  fn compose_multi_child(
+    this: StateWidget<Self>,
+    children: Vec<Widget>,
+    ctx: &mut BuildCtx,
+  ) -> Widget {
+    match this {
+      StateWidget::Stateless(c) => {
+        ComposeMultiChild::compose_multi_child(c.expr.into(), children, ctx)
+      }
+      StateWidget::Stateful(_) => unreachable!("ExprWidget should not be stateful."),
+    }
+  }
+}
+
+impl<W: Render + 'static> Render for ConstExprWidget<W> {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.expr.perform_layout(clamp, ctx)
+  }
+
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { self.expr.only_sized_by_parent() }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.expr.paint(ctx) }
+}
+
+impl<W: Compose> Compose for ConstExprWidget<W> {
+  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
+    let w = match this {
+      StateWidget::Stateless(s) => StateWidget::Stateless(s.expr),
+      StateWidget::Stateful(_) => unreachable!(),
+    };
+    Compose::compose(w, ctx)
+  }
+}
+
+impl IntoWidget<Widget> for ConstExprWidget<Widget> {
+  #[inline]
+  fn into_widget(self) -> Widget { self.expr }
+}
+impl<W: Query> Query for ConstExprWidget<W> {
+  impl_proxy_query!(expr);
 }
 
 impl Generator {

@@ -11,11 +11,7 @@ pub struct Icon {
 }
 
 impl ComposeSingleChild for Icon {
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     widget_try_track! {
       try_track { this }
       SizedBox {

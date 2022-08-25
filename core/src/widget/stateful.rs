@@ -371,11 +371,7 @@ impl<W: Compose> Compose for Stateful<W> {
 }
 
 impl<W: ComposeSingleChild> ComposeSingleChild for Stateful<W> {
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    ctx: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, ctx: &mut BuildCtx) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => StateWidget::Stateful(s),
       StateWidget::Stateful(_) => unreachable!(),

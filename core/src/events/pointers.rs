@@ -103,11 +103,7 @@ impl std::ops::DerefMut for PointerEvent {
 macro_rules! impl_pointer_listener {
   ($name: ident, $field: ident) => {
     impl ComposeSingleChild for $name {
-      fn compose_single_child(
-        this: StateWidget<Self>,
-        child: Option<Widget>,
-        _: &mut BuildCtx,
-      ) -> Widget {
+      fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
         compose_child_as_data_widget(child, this)
       }
     }
@@ -192,11 +188,7 @@ pub struct TripleTapListener {
 }
 
 impl ComposeSingleChild for XTimesTapListener {
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this {
       StateWidget::Stateless(w) => {
         let (times, on_x_times_tap) = w.on_x_times_tap;
@@ -216,11 +208,7 @@ impl ComposeSingleChild for XTimesTapListener {
 }
 
 impl ComposeSingleChild for DoubleTapListener {
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this {
       StateWidget::Stateless(w) => Box::new(TapListener::on_tap_times(2, w.on_double_tap)),
       StateWidget::Stateful(this) => {
@@ -235,11 +223,7 @@ impl ComposeSingleChild for DoubleTapListener {
 }
 
 impl ComposeSingleChild for TripleTapListener {
-  fn compose_single_child(
-    this: StateWidget<Self>,
-    child: Option<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     let on_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)> = match this {
       StateWidget::Stateless(w) => Box::new(TapListener::on_tap_times(3, w.on_tripe_tap)),
       StateWidget::Stateful(this) => {
