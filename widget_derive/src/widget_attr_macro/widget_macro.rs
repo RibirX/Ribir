@@ -14,7 +14,6 @@ use crate::{
   widget_attr_macro::{ribir_variable, ObjectUsedPath, UsedType, BUILD_CTX},
 };
 
-pub const CONST_EXPR_WIDGET: &str = "ConstExprWidget";
 pub const EXPR_WIDGET: &str = "ExprWidget";
 pub const EXPR_FIELD: &str = "expr";
 
@@ -23,10 +22,6 @@ pub struct WidgetMacro {
   track: Option<Track>,
   dataflows: Option<Dataflows>,
   animations: Option<Animations>,
-}
-
-pub fn is_const_expr_keyword(ty: &Path) -> bool {
-  ty.get_ident().map_or(false, |ty| ty == CONST_EXPR_WIDGET)
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -259,13 +254,7 @@ impl WidgetMacro {
 
         // deep compose first.
         compose_widget(c, &c_name, ctx, tokens);
-
-        let compose_child = if c.builtin.is_empty() && c.is_expr_widget() {
-          quote_spanned! { c.span() => .have_expr_child(#c_name)  }
-        } else {
-          quote_spanned! { c.span() => .have_child(#c_name) }
-        };
-        compose_children.extend(compose_child);
+        compose_children.extend(quote_spanned! { c.span() => .have_child(#c_name) });
       });
       if !compose_children.is_empty() {
         let hint = (w.children.len() > 1).then(|| quote! {: MultiChildWidget<_>});

@@ -102,71 +102,72 @@ impl<D: Query> Query for DataWidget<Box<dyn Render>, D> {
   }
 }
 
-fn widget_with_data<D: Query + 'static>(
-  widget: Widget,
-  data: D,
-  expr_wrap: impl FnOnce(
-    Box<dyn FnMut(&mut dyn FnMut(Widget))>,
-    D,
-  ) -> Box<dyn FnMut(&mut dyn FnMut(Widget))>
-  + 'static,
-) -> Widget {
+fn widget_with_data<D: Query + 'static>(widget: Widget, data: D) -> Widget {
+  match widget.0 {
+    WidgetInner::Compose(c) => (|ctx: &mut BuildCtx| widget_with_data(c(ctx), data)).into_widget(),
+    WidgetInner::Render(widget) => DataWidget { widget, data }.into_widget(),
+    WidgetInner::SingleChild(s) => single_child_with_data(s, data),
+    WidgetInner::MultiChild(m) => multi_child_with_data(m, data),
+    WidgetInner::ExprGenOnce(_) | WidgetInner::ExprGenMulti(_) => {
+      let data = Stateful::new(data);
+      widget_with_clone_data(widget, data)
+    }
+  }
+}
+
+fn widget_with_clone_data<D: Query + Clone + 'static>(widget: Widget, data: D) -> Widget {
   match widget.0 {
     WidgetInner::Compose(c) => {
-      (|ctx: &mut BuildCtx| widget_with_data(c(ctx), data, expr_wrap)).into_widget()
+      (|ctx: &mut BuildCtx| widget_with_clone_data(c(ctx), data)).into_widget()
     }
-    WidgetInner::Render(widget) => {
-      let r = Box::new(DataWidget { widget, data });
-      Widget(WidgetInner::Render(r))
+    WidgetInner::Render(widget) => DataWidget { widget, data }.into_widget(),
+    WidgetInner::SingleChild(s) => single_child_with_data(s, data),
+    WidgetInner::MultiChild(m) => multi_child_with_data(m, data),
+    WidgetInner::ExprGenOnce(ExprWidget { mut expr, upstream }) => {
+      let new_expr = move |cb: &mut dyn FnMut(Widget)| {
+        expr(&mut |widget| {
+          let w = widget_with_clone_data(widget, data.clone());
+          cb(w)
+        })
+      };
+      Widget(WidgetInner::ExprGenOnce(ExprWidget {
+        expr: Box::new(new_expr),
+        upstream,
+      }))
     }
-    WidgetInner::SingleChild(s) => {
-      let widget: Box<dyn Render> = Box::new(DataWidget { widget: s.widget, data });
-      let single = Box::new(SingleChildWidget { widget, child: s.child });
-      Widget(WidgetInner::SingleChild(single))
-    }
-    WidgetInner::MultiChild(m) => {
-      let widget: Box<dyn Render> = Box::new(DataWidget { widget: m.widget, data });
-      let multi = MultiChildWidget { widget, children: m.children };
-      Widget(WidgetInner::MultiChild(multi))
-    }
-    WidgetInner::Expr(ExprWidget { expr, upstream }) => {
-      let new_expr = expr_wrap(expr, data);
-
-      Widget(WidgetInner::Expr(ExprWidget { expr: new_expr, upstream }))
+    WidgetInner::ExprGenMulti(ExprWidget { mut expr, upstream }) => {
+      let new_expr = move |cb: &mut dyn FnMut(Widget)| {
+        expr(&mut |widget| {
+          let w = widget_with_clone_data(widget, data.clone());
+          cb(w)
+        })
+      };
+      Widget(WidgetInner::ExprGenMulti(ExprWidget {
+        expr: Box::new(new_expr),
+        upstream,
+      }))
     }
   }
 }
 
 pub fn compose_child_as_data_widget<D: Query + 'static>(
-  child: Option<Widget>,
+  child: Widget,
   data: StateWidget<D>,
 ) -> Widget {
-  if let Some(child) = child {
-    match data {
-      StateWidget::Stateless(data) => widget_with_data(child, data, data_wrap),
-      StateWidget::Stateful(data) => widget_with_data(child, data, clone_data_wrap),
-    }
-  } else {
-    Void.into_widget()
+  match data {
+    StateWidget::Stateless(data) => widget_with_data(child, data),
+    StateWidget::Stateful(data) => widget_with_clone_data(child, data),
   }
 }
-fn data_wrap<D: Query + 'static>(
-  expr: Box<dyn FnMut(&mut dyn FnMut(Widget))>,
-  data: D,
-) -> Box<dyn FnMut(&mut dyn FnMut(Widget))> {
-  let data = Stateful::new(data);
-  clone_data_wrap(expr, data)
+
+fn single_child_with_data<D: Query + 'static>(s: BoxedSingleChild, data: D) -> Widget {
+  let widget: Box<dyn Render> = Box::new(DataWidget { widget: s.widget, data });
+  let single = Box::new(SingleChildWidget { widget, child: s.child });
+  Widget(WidgetInner::SingleChild(single))
 }
 
-fn clone_data_wrap<D: Query + Clone + 'static>(
-  mut expr: Box<dyn FnMut(&mut dyn FnMut(Widget))>,
-  data: D,
-) -> Box<dyn FnMut(&mut dyn FnMut(Widget))> {
-  let new_expr = move |cb: &mut dyn FnMut(Widget)| {
-    expr(&mut |widget| {
-      let w = widget_with_data(widget, data.clone(), clone_data_wrap);
-      cb(w)
-    })
-  };
-  Box::new(new_expr)
+fn multi_child_with_data<D: Query + 'static>(m: BoxedMultiChild, data: D) -> Widget {
+  let widget: Box<dyn Render> = Box::new(DataWidget { widget: m.widget, data });
+  let multi = MultiChildWidget { widget, children: m.children };
+  Widget(WidgetInner::MultiChild(multi))
 }

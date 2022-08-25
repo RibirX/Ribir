@@ -31,18 +31,20 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
         let multi = MultiChildWidget { widget, children: m.children };
         Widget(WidgetInner::MultiChild(multi))
       }
-      WidgetInner::Expr(ExprWidget { mut expr, upstream }) => {
-        // Expr widget from composed widget, must be generate single child.
+      WidgetInner::ExprGenOnce(ExprWidget { mut expr, upstream }) => {
         let new_expr = move |cb: &mut dyn FnMut(Widget)| {
           expr(&mut |w| {
             let w = ComposedWidget { composed: w, by }.into_widget();
             cb(w)
           })
         };
-        Widget(WidgetInner::Expr(ExprWidget {
+        Widget(WidgetInner::ExprGenOnce(ExprWidget {
           expr: Box::new(new_expr),
           upstream,
         }))
+      }
+      WidgetInner::ExprGenMulti(_) => {
+        unreachable!("`ExprWidget` from compose widget, must be generate single child.")
       }
     }
   }

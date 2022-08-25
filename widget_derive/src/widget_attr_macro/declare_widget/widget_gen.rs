@@ -1,9 +1,7 @@
 use crate::{
   declare_derive::declare_field_name,
   widget_attr_macro::{
-    capture_widget, ribir_variable,
-    widget_macro::{is_const_expr_keyword, EXPR_FIELD},
-    DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
+    capture_widget, ribir_variable, DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
   },
 };
 use proc_macro2::TokenStream;
@@ -25,14 +23,6 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
   }
 
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
-    if is_const_expr_keyword(self.ty) {
-      self.const_expr_widget_tokens()
-    } else {
-      self.normal_widget_token(ctx)
-    }
-  }
-
-  fn normal_widget_token(&self, ctx: &DeclareCtx) -> TokenStream {
     let Self { fields, ty, name, .. } = self;
 
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
@@ -59,15 +49,6 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
       #build_widget
       #(#fields_follow)*
     }
-  }
-
-  fn const_expr_widget_tokens(&self) -> TokenStream {
-    let Self { ty, name, fields, .. } = self;
-    let expr_field = fields.clone().last().unwrap();
-    assert_eq!(expr_field.member, EXPR_FIELD);
-
-    let value_tokens = expr_field.value_tokens();
-    quote_spanned! { ty.span() => let #name = #value_tokens; }
   }
 
   fn field_follow_tokens(&self, f: &DeclareField) -> Option<TokenStream> {
