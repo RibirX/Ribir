@@ -31,30 +31,27 @@ impl ComposeSingleChild for ScrollableWidget {
   ) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      Anchor {
-        x: this.pos.x,
-        y: this.pos.y,
-        UnconstrainedBox {
-          on_wheel: move |e| {
-            let ctx = e.context();
-            let view_area = ctx.box_rect().unwrap();
-            let content_area =  ctx.single_child_box().expect("must have a scrollable widget");
-            let old = this.pos;
-            let mut new = old;
-            if this.scrollable != Scrollable::X {
-              new.y = validate_pos(view_area.height(), content_area.height(), old.y - e.delta_y)
-            }
-            if this.scrollable != Scrollable::Y {
-              new.x = validate_pos(view_area.width(), content_area.width(), old.x - e.delta_x);
-            }
-            if new != old {
-              this.pos = new;
-            }
-          },
-          ExprWidget { expr: child }
-        }
+      UnconstrainedBox {
+        left_anchor: this.pos.x,
+        top_anchor: this.pos.y,
+        on_wheel: move |e| {
+          let ctx = e.context();
+          let view_area = ctx.box_rect().unwrap();
+          let content_area =  ctx.single_child_box().expect("must have a scrollable widget");
+          let old = this.pos;
+          let mut new = old;
+          if this.scrollable != Scrollable::X {
+            new.y = validate_pos(view_area.height(), content_area.height(), old.y - e.delta_y)
+          }
+          if this.scrollable != Scrollable::Y {
+            new.x = validate_pos(view_area.width(), content_area.width(), old.x - e.delta_x);
+          }
+          if new != old {
+            this.pos = new;
+          }
+        },
+        ExprWidget { expr: child }
       }
-
     }
   }
 }
@@ -64,12 +61,12 @@ fn validate_pos(view: f32, content: f32, pos: f32) -> f32 { pos.min(0.).max(view
 
 #[cfg(test)]
 mod tests {
-  use crate::test::root_and_children_rect;
+  use crate::test::layout_info_by_path;
 
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, child_pos: Point) {
+  fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let w = widget! {
      SizedBox {
        size: Size::new(1000., 1000.),
@@ -90,28 +87,28 @@ mod tests {
     });
     wnd.draw_frame();
 
-    let (_, children) = root_and_children_rect(&mut wnd);
-    assert_eq!(children[0].origin, child_pos);
+    assert_eq!(layout_info_by_path(&wnd, &[0, 0]).min_y(), expect_y);
+    assert_eq!(layout_info_by_path(&wnd, &[0, 0, 0]).min_x(), expect_x);
   }
 
   #[test]
   fn x_scroll() {
-    test_assert(Scrollable::X, 10., 10., Point::new(-10., 0.));
-    test_assert(Scrollable::X, 10000., 10., Point::new(-900., 0.));
-    test_assert(Scrollable::X, -100., 10., Point::new(0., 0.));
+    test_assert(Scrollable::X, 10., 10., -10., 0.);
+    test_assert(Scrollable::X, 10000., 10., -900., 0.);
+    test_assert(Scrollable::X, -100., 10., 0., 0.);
   }
 
   #[test]
   fn y_scroll() {
-    test_assert(Scrollable::Y, 10., 10., Point::new(0., -10.));
-    test_assert(Scrollable::Y, 10., 10000., Point::new(0., -900.));
-    test_assert(Scrollable::Y, -10., -100., Point::new(0., 0.));
+    test_assert(Scrollable::Y, 10., 10., 0., -10.);
+    test_assert(Scrollable::Y, 10., 10000., 0., -900.);
+    test_assert(Scrollable::Y, -10., -100., 0., 0.);
   }
 
   #[test]
   fn both_scroll() {
-    test_assert(Scrollable::Both, 10., 10., Point::new(-10., -10.));
-    test_assert(Scrollable::Both, 10000., 10000., Point::new(-900., -900.));
-    test_assert(Scrollable::Both, -100., -100., Point::new(0., 0.));
+    test_assert(Scrollable::Both, 10., 10., -10., -10.);
+    test_assert(Scrollable::Both, 10000., 10000., -900., -900.);
+    test_assert(Scrollable::Both, -100., -100., 0., 0.);
   }
 }

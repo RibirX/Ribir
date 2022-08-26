@@ -6,22 +6,6 @@
  	 - action perform after widget be added to the widget tree.
 - on_disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
  	 - action perform after widget remove from widget tree.
-- box_fit : [`BoxFit`] 
- 	 -  set how its child should be resized to its box.
-- padding : [`EdgeInsets`] 
- 	 - set the padding area on all four sides of a widget.
-- background : [`Brush`] 
- 	 - specify the background of the widget box.
-- border : [`Border`] 
- 	 - specify the border of the widget which draw above the background
-- radius : [`Radius`] 
- 	 - specify how rounded the corners have of the widget.
-- key : [`Key`] 
- 	 - assign a key to widget, use for track if two widget is same widget in two frames.
-- cursor : [`CursorIcon`] 
- 	 - assign cursor to the widget.
-- theme : [`Theme`] 
- 	 - assign theme to the widget.
 - on_pointer_down : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer down event.
 - on_pointer_up : [`impl FnMut(& mut PointerEvent)`] 
@@ -62,36 +46,44 @@
  	 - specify the event handler when received a unicode character.
 - on_wheel : [`impl FnMut(& mut WheelEvent)`] 
  	 - specify the event handler when user moving a mouse wheel or similar input device.
-- scrollable : [`Scrollable`] 
- 	 - enumerate to describe which direction allow widget to scroll.
+- cursor : [`CursorIcon`] 
+ 	 - assign cursor to the widget.
+- theme : [`Theme`] 
+ 	 - assign theme to the widget.
+- padding : [`EdgeInsets`] 
+ 	 - set the padding area on all four sides of a widget.
+- background : [`Brush`] 
+ 	 - specify the background of the widget box.
+- border : [`Border`] 
+ 	 - specify the border of the widget which draw above the background
+- radius : [`Radius`] 
+ 	 - specify how rounded the corners have of the widget.
+- margin : [`impl EdgeInsets`] 
+ 	 - expand space around widget wrapped.
 - h_align : [`HAlign`] 
  	 - describe how widget align to its box in x-axis.
 - v_align : [`VAlign`] 
  	 - describe how widget align to its box in y-axis.
-- margin : [`impl EdgeInsets`] 
- 	 - expand space around widget wrapped.
+- box_fit : [`BoxFit`] 
+ 	 -  set how its child should be resized to its box.
+- left_anchor : [`PositionUnit`] 
+ 	 - use to anchor child constraints with the left edge of parent widget.
+- right_anchor : [`PositionUnit`] 
+ 	 - use to anchor child constraints with the right edge of parent widget.
+- top_anchor : [`PositionUnit`] 
+ 	 - use to anchor child constraints with the top edge of parent widget
+- bottom_anchor : [`PositionUnit`] 
+ 	 - use to anchor child constraints with the bottom edge of parent widget.
+- scrollable : [`Scrollable`] 
+ 	 - enumerate to describe which direction allow widget to scroll.
+- key : [`Key`] 
+ 	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
 [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
 
 [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
 
 [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
-
-[`BoxFit`]: prelude::BoxFit
-
-[`EdgeInsets`]: prelude::EdgeInsets
-
-[`Brush`]: prelude::Brush
-
-[`Border`]: prelude::Border
-
-[`Radius`]: prelude::Radius
-
-[`Key`]: prelude::Key
-
-[`CursorIcon`]: prelude::CursorIcon
-
-[`Theme`]: prelude::Theme
 
 [`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
 
@@ -133,10 +125,34 @@
 
 [`impl FnMut(& mut WheelEvent)`]: prelude::impl FnMut(& mut WheelEvent)
 
-[`Scrollable`]: prelude::Scrollable
+[`CursorIcon`]: prelude::CursorIcon
+
+[`Theme`]: prelude::Theme
+
+[`EdgeInsets`]: prelude::EdgeInsets
+
+[`Brush`]: prelude::Brush
+
+[`Border`]: prelude::Border
+
+[`Radius`]: prelude::Radius
+
+[`impl EdgeInsets`]: prelude::impl EdgeInsets
 
 [`HAlign`]: prelude::HAlign
 
 [`VAlign`]: prelude::VAlign
 
-[`impl EdgeInsets`]: prelude::impl EdgeInsets
+[`BoxFit`]: prelude::BoxFit
+
+[`PositionUnit`]: prelude::PositionUnit
+
+[`PositionUnit`]: prelude::PositionUnit
+
+[`PositionUnit`]: prelude::PositionUnit
+
+[`PositionUnit`]: prelude::PositionUnit
+
+[`Scrollable`]: prelude::Scrollable
+
+[`Key`]: prelude::Key

@@ -14,40 +14,6 @@ builtin! {
     on_disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
   }
 
-  FittedBox {
-    #[doc=" set how its child should be resized to its box."]
-    box_fit: BoxFit,
-  }
-
-  Padding {
-    #[doc="set the padding area on all four sides of a widget."]
-    padding: EdgeInsets
-  }
-
-  BoxDecoration {
-    #[doc="specify the background of the widget box."]
-    background: Brush,
-    #[doc="specify the border of the widget which draw above the background"]
-    border: Border,
-    #[doc= "specify how rounded the corners have of the widget."]
-    radius: Radius,
-  }
-
-  KeyWidget {
-    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
-    key: Key
-  }
-
-  Cursor {
-    #[doc="assign cursor to the widget."]
-    cursor: CursorIcon
-  }
-
-  ThemeWidget {
-    #[doc="assign theme to the widget."]
-    theme: Theme
-  }
-
   PointerDownListener {
     #[doc="specify the event handler for the pointer down event."]
     on_pointer_down: impl FnMut(&mut PointerEvent),
@@ -118,6 +84,7 @@ builtin! {
     #[doc="specify the event handler when keyboard press down."]
     on_key_down: impl FnMut(&mut KeyboardEvent),
   }
+
   KeyUpListener {
     #[doc="specify the event handler when a key is released."]
     on_key_up: impl FnMut(&mut KeyboardEvent),
@@ -133,9 +100,33 @@ builtin! {
     on_wheel: impl FnMut(&mut WheelEvent),
   }
 
-  ScrollableWidget {
-    #[doc= "enumerate to describe which direction allow widget to scroll."]
-    scrollable: Scrollable
+  Cursor {
+    #[doc="assign cursor to the widget."]
+    cursor: CursorIcon
+  }
+
+  ThemeWidget {
+    #[doc="assign theme to the widget."]
+    theme: Theme
+  }
+
+  Padding {
+    #[doc="set the padding area on all four sides of a widget."]
+    padding: EdgeInsets
+  }
+
+  BoxDecoration {
+    #[doc="specify the background of the widget box."]
+    background: Brush,
+    #[doc="specify the border of the widget which draw above the background"]
+    border: Border,
+    #[doc= "specify how rounded the corners have of the widget."]
+    radius: Radius,
+  }
+
+  Margin {
+    #[doc="expand space around widget wrapped."]
+    margin: impl EdgeInsets,
   }
 
   HAlignWidget {
@@ -148,8 +139,39 @@ builtin! {
     v_align: VAlign,
   }
 
-  Margin {
-    #[doc="expand space around widget wrapped."]
-    margin: impl EdgeInsets,
+
+  FittedBox {
+    #[doc=" set how its child should be resized to its box."]
+    box_fit: BoxFit,
+  }
+
+  LeftAnchor {
+    #[doc="use to anchor child constraints with the left edge of parent widget."]
+    left_anchor: PositionUnit,
+  }
+
+  RightAnchor {
+    #[doc="use to anchor child constraints with the right edge of parent widget."]
+    right_anchor: PositionUnit,
+  }
+
+  TopAnchor {
+    #[doc="use to anchor child constraints with the top edge of parent widget"]
+    top_anchor: PositionUnit,
+  }
+
+  BottomAnchor {
+    #[doc="use to anchor child constraints with the bottom edge of parent widget."]
+    bottom_anchor: PositionUnit,
+  }
+
+  ScrollableWidget {
+    #[doc= "enumerate to describe which direction allow widget to scroll."]
+    scrollable: Scrollable
+  }
+
+  KeyWidget {
+    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
+    key: Key
   }
 }
