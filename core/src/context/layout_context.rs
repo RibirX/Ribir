@@ -10,6 +10,7 @@ use crate::prelude::{widget_tree::WidgetTree, BoxClamp, WidgetId};
 pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
   pub(crate) tree: &'a mut WidgetTree,
+  pub(crate) performed: &'a mut Vec<WidgetId>,
 }
 
 impl<'a> LayoutCtx<'a> {
@@ -32,7 +33,7 @@ impl<'a> LayoutCtx<'a> {
   /// Do the work of computing the layout for render child, and return its size
   /// it should have. Should called from parent.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    child.perform_layout(clamp, self.tree)
+    child.perform_layout(clamp, self.tree, self.performed)
   }
 
   /// Return a tuple of [`LayoutCtx`]! and an iterator of `id`'s children.

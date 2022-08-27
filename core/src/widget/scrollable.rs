@@ -21,53 +21,71 @@ pub struct ScrollableWidget {
   pub scrollable: Scrollable,
   #[declare(default)]
   pub pos: Point,
+  #[declare(skip)]
+  page: Size,
+  #[declare(skip)]
+  content_size: Size,
 }
 
 impl ComposeSingleChild for ScrollableWidget {
   fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      UnconstrainedBox {
-        left_anchor: this.pos.x,
-        top_anchor: this.pos.y,
-        on_wheel: move |e| {
-          let ctx = e.context();
-          let view_area = ctx.box_rect().unwrap();
-          let content_area =  ctx.single_child_box().expect("must have a scrollable widget");
-          let old = this.pos;
-          let mut new = old;
-          if this.scrollable != Scrollable::X {
-            new.y = validate_pos(view_area.height(), content_area.height(), old.y - e.delta_y)
-          }
-          if this.scrollable != Scrollable::Y {
-            new.x = validate_pos(view_area.width(), content_area.width(), old.x - e.delta_x);
-          }
-          if new != old {
-            this.pos = new;
-          }
-        },
-        ExprWidget { expr: child }
+      LayoutBox {
+        id: view,
+        on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+        UnconstrainedBox { LayoutBox {
+          id: content,
+          left_anchor: this.pos.x,
+          top_anchor: this.pos.y,
+          ExprWidget { expr: child }
+        }}
+      }
+
+      dataflows {
+        #[skip_nc]
+        content.box_rect().size ~> this.content_size,
+        #[skip_nc]
+        view.box_rect().size ~> this.page
       }
     }
   }
 }
 
-#[inline]
-fn validate_pos(view: f32, content: f32, pos: f32) -> f32 { pos.min(0.).max(view - content) }
+impl ScrollableWidget {
+  #[inline]
+  pub fn page_size(&self) -> Size { self.page }
+
+  #[inline]
+  pub fn content_size(&self) -> Size { self.content_size }
+
+  fn validate_scroll(&mut self, delta: Point) {
+    let mut new = self.pos;
+    if self.scrollable != Scrollable::X {
+      new.y -= delta.y;
+    }
+    if self.scrollable != Scrollable::Y {
+      new.x -= delta.x;
+    }
+    let min = self.page_size() - self.content_size();
+    self.pos = new.clamp(min.to_vector().to_point(), Point::zero());
+  }
+}
 
 #[cfg(test)]
 mod tests {
-  use crate::test::layout_info_by_path;
-
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
+    let global_pos = Stateful::new(Point::zero());
     let w = widget! {
-     SizedBox {
-       size: Size::new(1000., 1000.),
-       scrollable,
-     }
+      track { global_pos: global_pos.clone() }
+      SizedBox {
+        size: Size::new(1000., 1000.),
+        scrollable,
+        on_performed_layout: move|ctx| *global_pos = ctx.map_to_global(Point::zero())
+      }
     };
 
     let mut wnd = Window::without_render(w, Size::new(100., 100.));
@@ -83,8 +101,8 @@ mod tests {
     });
     wnd.draw_frame();
 
-    assert_eq!(layout_info_by_path(&wnd, &[0, 0]).min_y(), expect_y);
-    assert_eq!(layout_info_by_path(&wnd, &[0, 0, 0]).min_x(), expect_x);
+    assert_eq!(global_pos.raw_ref().x, expect_x);
+    assert_eq!(global_pos.raw_ref().y, expect_y);
   }
 
   #[test]

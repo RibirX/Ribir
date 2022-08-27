@@ -108,10 +108,13 @@ impl Window {
       } = self;
 
       context.borrow_mut().begin_frame();
-      let struct_dirty = widget_tree.any_struct_dirty();
+      let mut struct_dirty = false;
 
-      widget_tree.tree_repair();
-      widget_tree.layout(raw_window.inner_size());
+      while widget_tree.is_dirty() {
+        struct_dirty |= widget_tree.any_struct_dirty();
+        widget_tree.tree_repair();
+        widget_tree.layout(raw_window.inner_size());
+      }
       if struct_dirty {
         dispatcher.refresh_focus(widget_tree);
       }

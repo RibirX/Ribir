@@ -116,20 +116,30 @@ impl WidgetTree {
 
   /// Do the work of computing the layout for all node which need, Return if any
   /// node has really computing the layout.
-  pub(crate) fn layout(&mut self, win_size: Size) -> bool {
-    let mut performed_layout = false;
+  pub(crate) fn layout(&mut self, win_size: Size) {
+    let mut performed = vec![];
+
     loop {
       if let Some(needs_layout) = self.layout_list() {
-        performed_layout = performed_layout || !needs_layout.is_empty();
         needs_layout.iter().for_each(|wid| {
           let clamp = BoxClamp { min: Size::zero(), max: win_size };
-          wid.perform_layout(clamp, self);
+          wid.perform_layout(clamp, self, &mut performed);
         });
       } else {
         break;
       }
     }
-    performed_layout
+
+    performed.drain(..).for_each(|id| {
+      let (tree1, tree2) = unsafe { self.split_tree() };
+      id.assert_get_mut(tree1).query_all_type_mut(
+        |l: &mut PerformedLayoutListener| {
+          (l.on_performed_layout)(LifeCycleCtx { id, tree: tree2 });
+          true
+        },
+        QueryOrder::OutsideFirst,
+      );
+    });
   }
 
   pub(crate) fn set_root(&mut self, root: WidgetId) {
@@ -248,7 +258,12 @@ impl WidgetId {
 
   /// Compute layout of the render widget `id`, and store its result in the
   /// store.
-  pub(crate) fn perform_layout(self, out_clamp: BoxClamp, tree: &mut WidgetTree) -> Size {
+  pub(crate) fn perform_layout(
+    self,
+    out_clamp: BoxClamp,
+    tree: &mut WidgetTree,
+    performed: &mut Vec<WidgetId>,
+  ) -> Size {
     tree
       .layout_info(self)
       .and_then(|BoxLayout { clamp, rect }| {
@@ -258,7 +273,7 @@ impl WidgetId {
         // Safety: `LayoutCtx` will never mutable access widget tree, so split a node is
         // safe.
         let (tree1, tree2) = unsafe { tree.split_tree() };
-        let mut ctx = LayoutCtx { id: self, tree: tree1 };
+        let mut ctx = LayoutCtx { id: self, tree: tree1, performed };
         let layout = self.assert_get(tree2);
         let size = layout.perform_layout(out_clamp, &mut ctx);
         let size = out_clamp.clamp(size);
@@ -267,9 +282,9 @@ impl WidgetId {
         info.rect.get_or_insert_with(Rect::zero).size = size;
 
         self.assert_get_mut(tree1).query_all_type_mut(
-          |l: &mut PerformedLayoutListener| {
-            (l.on_performed_layout)(LifeCycleCtx { id: self, tree: tree2 });
-            true
+          |_: &mut PerformedLayoutListener| {
+            performed.push(self);
+            false
           },
           QueryOrder::OutsideFirst,
         );
