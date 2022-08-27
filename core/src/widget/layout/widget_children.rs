@@ -336,17 +336,3 @@ impl MultiChildMarker<GenMulti> for ExprWidget<GenMulti> {
     multi.children.push(w)
   }
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  #[test]
-  fn fix_stateful_compose_single_have_child() {
-    let _ = ScrollableWidget {
-      scrollable: Scrollable::Both,
-      pos: Point::zero(),
-    }
-    .into_stateful()
-    .have_child(Void);
-  }
-}

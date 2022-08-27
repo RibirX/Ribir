@@ -25,7 +25,7 @@ mod ct {
 
 pub struct Dataflows {
   _dataflows_token: kw::dataflows,
-  brace_token: token::Brace,
+  _brace_token: token::Brace,
   flows: Punctuated<Dataflow, token::Comma>,
 }
 
@@ -42,7 +42,7 @@ impl Parse for Dataflows {
     let content;
     Ok(Self {
       _dataflows_token: input.parse()?,
-      brace_token: braced!(content in input),
+      _brace_token: braced!(content in input),
       flows: Punctuated::parse_terminated(&content)?,
     })
   }
@@ -50,9 +50,7 @@ impl Parse for Dataflows {
 
 impl ToTokens for Dataflows {
   fn to_tokens(&self, tokens: &mut TokenStream) {
-    self.brace_token.surround(tokens, |tokens| {
-      self.flows.iter().for_each(|t| t.to_tokens(tokens));
-    });
+    self.flows.iter().for_each(|t| t.to_tokens(tokens));
   }
 }
 
@@ -88,10 +86,10 @@ impl ToTokens for Dataflow {
     let capture_tokens = captures.into_iter().into_iter().map(capture_widget);
 
     let subscribe_do = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
-    tokens.extend(quote! {
+    tokens.extend(quote! {{
       #(#capture_tokens)*
       #upstream.subscribe(move |_| { #(#refs_tokens)* #subscribe_do });
-    });
+    }});
   }
 }
 

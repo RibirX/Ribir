@@ -20,25 +20,55 @@ impl ComposeSingleChild for LayoutBox {
   }
 }
 
+impl LayoutBox {
+  #[inline]
+  pub fn box_rect(&self) -> Rect { self.rect }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::Window, test::root_and_children_rect};
+  use crate::test::{expect_layout_result, ExpectRect, LayoutTestItem};
 
   #[test]
   fn smoke() {
-    let w = widget! {
-      Row {
-        LayoutBox {
-          id: layout_box,
-          SizedBox { size: Size::new(100., 200.) }
+    expect_layout_result(
+      Size::new(500., 500.),
+      widget! {
+        Row {
+          LayoutBox {
+            id: layout_box,
+            SizedBox { size: Size::new(100., 200.) }
+          }
+          SizedBox { size: layout_box.rect.size }
         }
-        SizedBox { size: layout_box.rect.size }
-      }
-    };
-    let mut wnd = Window::wgpu_headless(w, DeviceSize::new(500, 500));
-    wnd.draw_frame();
-    let (rect, _) = root_and_children_rect(&wnd);
-    assert_eq!(rect.size, Size::new(200., 200.));
+      },
+      &[
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect {
+            width: Some(200.),
+            height: Some(200.),
+            ..<_>::default()
+          },
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect {
+            width: Some(100.),
+            height: Some(200.),
+            ..<_>::default()
+          },
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect {
+            width: Some(100.),
+            height: Some(200.),
+            ..<_>::default()
+          },
+        },
+      ],
+    );
   }
 }
