@@ -14,11 +14,11 @@ mod context;
 #[doc = include_str!("../../docs/declare_builtin_fields.md")]
 pub mod declare;
 pub mod dynamic_widget;
+pub mod enum_widget;
 pub mod events;
 pub mod ticker;
 pub mod widget;
 pub mod window;
-
 pub mod prelude {
   pub use crate::animation::*;
   #[doc(no_inline)]
@@ -27,6 +27,7 @@ pub mod prelude {
   pub use crate::context::*;
   #[doc(no_inline)]
   pub use crate::declare::*;
+  pub use crate::enum_widget::*;
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
