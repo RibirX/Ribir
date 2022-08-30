@@ -108,7 +108,7 @@ fn widget_with_data<D: Query + 'static>(widget: Widget, data: D) -> Widget {
     WidgetInner::Render(widget) => DataWidget { widget, data }.into_widget(),
     WidgetInner::SingleChild(s) => single_child_with_data(s, data),
     WidgetInner::MultiChild(m) => multi_child_with_data(m, data),
-    WidgetInner::ExprGenOnce(_) | WidgetInner::ExprGenMulti(_) => {
+    WidgetInner::ExprWidget(_) => {
       let data = Stateful::new(data);
       widget_with_clone_data(widget, data)
     }
@@ -123,26 +123,23 @@ fn widget_with_clone_data<D: Query + Clone + 'static>(widget: Widget, data: D) -
     WidgetInner::Render(widget) => DataWidget { widget, data }.into_widget(),
     WidgetInner::SingleChild(s) => single_child_with_data(s, data),
     WidgetInner::MultiChild(m) => multi_child_with_data(m, data),
-    WidgetInner::ExprGenOnce(ExprWidget { mut expr, upstream }) => {
-      let new_expr = move |cb: &mut dyn FnMut(Widget)| {
-        expr(&mut |widget| {
-          let w = widget_with_clone_data(widget, data.clone());
-          cb(w)
-        })
+    WidgetInner::ExprWidget(ExprWidget { mut expr, upstream }) => {
+      let new_expr = move || match expr() {
+        ExprResult::Single(w) => {
+          let w = w.map(|w| widget_with_clone_data(w, data.clone()));
+          ExprResult::Single(w)
+        }
+        ExprResult::Multi(mut v) => {
+          v.iter_mut().for_each(|w| {
+            let mut inner = std::mem::replace(w, Void.into_widget());
+            inner = widget_with_clone_data(inner, data.clone());
+            let _ = std::mem::replace(w, inner);
+          });
+          ExprResult::Multi(v)
+        }
       };
-      Widget(WidgetInner::ExprGenOnce(ExprWidget {
-        expr: Box::new(new_expr),
-        upstream,
-      }))
-    }
-    WidgetInner::ExprGenMulti(ExprWidget { mut expr, upstream }) => {
-      let new_expr = move |cb: &mut dyn FnMut(Widget)| {
-        expr(&mut |widget| {
-          let w = widget_with_clone_data(widget, data.clone());
-          cb(w)
-        })
-      };
-      Widget(WidgetInner::ExprGenMulti(ExprWidget {
+
+      Widget(WidgetInner::ExprWidget(ExprWidget {
         expr: Box::new(new_expr),
         upstream,
       }))

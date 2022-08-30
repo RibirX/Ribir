@@ -12,7 +12,7 @@ pub mod text;
 mod theme;
 pub use theme::*;
 pub(crate) mod widget_tree;
-pub use crate::dynamic_widget::{ConstExprWidget, ExprWidget, GenMostOne, GenMulti, IntoExprGen};
+pub use crate::dynamic_widget::*;
 pub use crate::widget::text::Text;
 pub use key::{Key, KeyWidget};
 pub use stateful::*;
@@ -134,13 +134,16 @@ pub enum QueryOrder {
 pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn Render>, Widget>>;
 pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn Render>>;
 
+pub enum ExprResult {
+  Single(Option<Widget>),
+  Multi(Vec<Widget>),
+}
 pub(crate) enum WidgetInner {
   Compose(Box<dyn FnOnce(&mut BuildCtx) -> Widget>),
   Render(Box<dyn Render>),
   SingleChild(BoxedSingleChild),
   MultiChild(BoxedMultiChild),
-  ExprGenOnce(ExprWidget<GenMostOne>),
-  ExprGenMulti(ExprWidget<GenMulti>),
+  ExprWidget(ExprWidget<Box<dyn FnMut() -> ExprResult>>),
 }
 
 /// Trait to detect if a type is match the `type_id`.

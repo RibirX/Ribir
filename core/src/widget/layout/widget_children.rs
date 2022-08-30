@@ -231,9 +231,11 @@ where
   }
 }
 
-impl<W, M: ?Sized> IntoWidget<(&M, GenMostOne)> for SingleChildWidget<W, ExprWidget<GenMostOne>>
+impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, &M2)> for SingleChildWidget<W, ExprWidget<E>>
 where
-  SingleChildWidget<W, Widget>: IntoWidget<M>,
+  SingleChildWidget<W, Widget>: IntoWidget<M1>,
+  E: FnMut() -> Option<R> + 'static,
+  R: IntoWidget<M2>,
 {
   #[inline]
   fn into_widget(self) -> Widget {
@@ -321,18 +323,22 @@ where
   }
 }
 
-impl MultiChildMarker<GenMostOne> for ExprWidget<GenMostOne> {
+impl<M: ?Sized, E, R> MultiChildMarker<ExprWidget<&M>> for ExprWidget<E>
+where
+  E: FnMut() -> Option<R> + 'static,
+  R: IntoWidget<M>,
+{
   #[inline]
-  fn fill<W>(self, multi: &mut MultiChildWidget<W>) {
-    let w = Widget(WidgetInner::ExprGenOnce(self));
-    multi.children.push(w)
-  }
+  fn fill<W>(self, multi: &mut MultiChildWidget<W>) { multi.children.push(self.into_widget()) }
 }
 
-impl MultiChildMarker<GenMulti> for ExprWidget<GenMulti> {
+impl<E> MultiChildMarker<Widget> for ExprWidget<E>
+where
+  E: FnMut() -> Vec<Widget> + 'static,
+{
   #[inline]
   fn fill<W>(self, multi: &mut MultiChildWidget<W>) {
-    let w = Widget(WidgetInner::ExprGenMulti(self));
+    let w = self.into_multi_widget();
     multi.children.push(w)
   }
 }

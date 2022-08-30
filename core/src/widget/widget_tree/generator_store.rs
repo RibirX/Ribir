@@ -8,6 +8,7 @@ use smallvec::SmallVec;
 use crate::{
   dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
   prelude::{ChangeScope, WidgetId},
+  widget::ExprResult,
 };
 use std::{
   cell::RefCell,
@@ -32,7 +33,7 @@ struct GeneratorHandle {
 impl GeneratorStore {
   pub(crate) fn new_generator(
     &mut self,
-    ExprWidget { expr, upstream }: ExprWidget<()>,
+    ExprWidget { expr, upstream }: ExprWidget<Box<dyn FnMut() -> ExprResult>>,
     parent: Option<WidgetId>,
     generated_widgets: SmallVec<[WidgetId; 1]>,
   ) -> GeneratorID {
