@@ -199,13 +199,6 @@ impl WidgetTree {
     mut on_node: impl FnMut(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
     stack: &mut Vec<(Widget, WidgetId)>,
   ) -> WidgetId {
-    let mut expr_to_node = |e: ExprWidget<()>| {
-      let road_sign = on_node(Box::new(Void), self);
-      self
-        .generator_store
-        .new_generator(e, parent, smallvec![road_sign]);
-      road_sign
-    };
     match widget.0 {
       WidgetInner::Compose(c) => {
         let mut build_ctx = BuildCtx::new(parent, self);
@@ -229,17 +222,12 @@ impl WidgetTree {
           .for_each(|child| stack.push((child, p)));
         p
       }
-      WidgetInner::ExprGenOnce(e) => {
-        // #Safety
-        // Only erase the function return type `SingleConsumer` which is unit struct
-        let e = unsafe { std::mem::transmute(e) };
-        expr_to_node(e)
-      }
-      WidgetInner::ExprGenMulti(e) => {
-        // #Safety
-        // Only erase the function return type `SingleConsumer` which is unit struct
-        let e = unsafe { std::mem::transmute(e) };
-        expr_to_node(e)
+      WidgetInner::ExprWidget(e) => {
+        let road_sign = on_node(Box::new(Void), self);
+        self
+          .generator_store
+          .new_generator(e, parent, smallvec![road_sign]);
+        road_sign
       }
     }
   }

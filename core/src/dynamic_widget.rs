@@ -11,15 +11,11 @@ use smallvec::SmallVec;
 /// as a widget generate callback. The return type hint the origin expression
 /// info, maybe [`SingleConsumer`]! or [`MultiConsumer`]!
 #[derive(Declare)]
-pub struct ExprWidget<R> {
-  #[declare(convert = box_trait(FnMut(&mut dyn FnMut(Widget)) -> R))]
-  pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget)) -> R>,
+pub struct ExprWidget<E> {
+  pub(crate) expr: E,
   #[declare(convert = custom)]
   pub(crate) upstream: LocalBoxOp<'static, ChangeScope, ()>,
 }
-
-pub struct GenMostOne;
-pub struct GenMulti;
 
 /// ConstExprWidget is convert from uer declared  `ExprWidget` which but its
 /// expression not following anything.
@@ -34,7 +30,7 @@ pub struct ConstExprWidget<W> {
 /// lifetime.
 pub(crate) struct Generator {
   pub(crate) info: GeneratorInfo,
-  pub(crate) expr: Box<dyn FnMut(&mut dyn FnMut(Widget))>,
+  pub(crate) expr: Box<dyn FnMut() -> ExprResult>,
 }
 
 /// The unique id of widget generator in application
@@ -73,71 +69,63 @@ impl GeneratorInfo {
   pub(crate) fn generate_id(&self) -> GeneratorID { self.id }
 }
 
-pub trait IntoExprGen<M: ?Sized> {
+pub trait IntoGenResult<M: ?Sized> {
   type G;
-  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G;
+  fn into_gen_result(self) -> Self::G;
 }
 
-impl<W, M: ?Sized> IntoExprGen<(GenMostOne, &M)> for W
+impl<W, M: ?Sized> IntoGenResult<&M> for W
 where
   W: IntoWidget<M>,
 {
-  type G = GenMostOne;
+  type G = Option<W>;
+
   #[inline]
-  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G {
-    cb(self.into_widget());
-    GenMostOne
-  }
+  fn into_gen_result(self) -> Self::G { Some(self) }
 }
 
-impl<W, M: ?Sized> IntoExprGen<(Option<GenMostOne>, &M)> for Option<W>
+impl<W, M: ?Sized> IntoGenResult<Option<&M>> for Option<W>
 where
   W: IntoWidget<M>,
 {
-  type G = GenMostOne;
+  type G = Option<W>;
+
   #[inline]
-  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G {
-    if let Some(w) = self {
-      cb(w.into_widget());
-    }
-    GenMostOne
-  }
+  fn into_gen_result(self) -> Self::G { self }
 }
 
-impl<R, M: ?Sized> IntoExprGen<(GenMulti, &M)> for R
+impl<I, M: ?Sized> IntoGenResult<Vec<&M>> for I
 where
-  R: Iterator,
-  R::Item: IntoWidget<M>,
+  I: Iterator,
+  I::Item: IntoWidget<M>,
 {
-  type G = GenMulti;
+  type G = Vec<Widget>;
   #[inline]
-  fn into_expr_gen(self, cb: &mut dyn FnMut(Widget)) -> Self::G {
-    self.for_each(|w| {
-      cb(w.into_widget());
-    });
-    GenMulti
-  }
+  fn into_gen_result(self) -> Self::G { self.map(IntoWidget::into_widget).collect() }
 }
 
-// only implement `GenMoistOne`, `ExprWidget<GenMulti>` only valid as child of
-// `SingleMultiWidget`.
-impl ExprWidget<GenMostOne> {
-  #[inline]
-  pub fn into_widget(self) -> Widget {
+impl<E: 'static> ExprWidget<E> {
+  pub fn into_widget<R, M: ?Sized>(self) -> Widget
+  where
+    E: FnMut() -> Option<R>,
+    R: IntoWidget<M>,
+  {
     let Self { mut expr, upstream } = self;
-    let new_expr = move |cb: &mut dyn FnMut(Widget)| {
-      expr(&mut |w: Widget| {
-        if matches!(w.0, WidgetInner::ExprGenMulti(_)) {
-          panic!("`ExprWidget<GenMostOne>` generate `ExprWidget<GenMulti>` is not allowed.")
-        }
-        cb(w)
-      })
-    };
+    let new_expr = move || ExprResult::Single(expr().map(IntoWidget::into_widget));
 
-    Widget(WidgetInner::ExprGenOnce(ExprWidget {
+    Widget(WidgetInner::ExprWidget(ExprWidget {
       expr: Box::new(new_expr),
       upstream,
     }))
+  }
+}
+
+impl<E: FnMut() -> Vec<Widget> + 'static> ExprWidget<E> {
+  #[inline]
+  pub fn into_multi_widget(self) -> Widget {
+    let Self { mut expr, upstream } = self;
+    let expr: Box<dyn FnMut() -> ExprResult> = Box::new(move || ExprResult::Multi(expr()));
+    Widget(WidgetInner::ExprWidget(ExprWidget { expr, upstream }))
   }
 }
 
@@ -225,7 +213,7 @@ impl Generator {
       })
       .collect::<HashMap<_, _, ahash::RandomState>>();
 
-    expr(&mut |c| {
+    let mut add_dynamic_widget = |c| {
       tree.insert_widget_to(info.parent, c, |node, tree| {
         let mut old = None;
         node.query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
@@ -247,7 +235,16 @@ impl Generator {
         }
         id
       });
-    });
+    };
+    match expr() {
+      ExprResult::Single(w) => {
+        if let Some(w) = w {
+          add_dynamic_widget(w);
+        }
+      }
+      ExprResult::Multi(m) => m.into_iter().for_each(add_dynamic_widget),
+    };
+
     key_widgets
       .into_iter()
       .for_each(|(_, k)| k.remove_subtree(tree));
