@@ -69,6 +69,13 @@ impl GeneratorInfo {
   pub(crate) fn generate_id(&self) -> GeneratorID { self.id }
 }
 
+pub enum ExprResult {
+  Single(Option<Widget>),
+  Multi(Vec<Widget>),
+}
+pub struct SingleResult<W>(Option<W>);
+pub struct MultiResult(Vec<Widget>);
+
 pub trait IntoGenResult<M: ?Sized> {
   type G;
   fn into_gen_result(self) -> Self::G;
@@ -78,20 +85,20 @@ impl<W, M: ?Sized> IntoGenResult<&M> for W
 where
   W: IntoWidget<M>,
 {
-  type G = Option<W>;
+  type G = SingleResult<W>;
 
   #[inline]
-  fn into_gen_result(self) -> Self::G { Some(self) }
+  fn into_gen_result(self) -> Self::G { SingleResult(Some(self)) }
 }
 
 impl<W, M: ?Sized> IntoGenResult<Option<&M>> for Option<W>
 where
   W: IntoWidget<M>,
 {
-  type G = Option<W>;
+  type G = SingleResult<W>;
 
   #[inline]
-  fn into_gen_result(self) -> Self::G { self }
+  fn into_gen_result(self) -> Self::G { SingleResult(self) }
 }
 
 impl<I, M: ?Sized> IntoGenResult<Vec<&M>> for I
@@ -99,35 +106,37 @@ where
   I: Iterator,
   I::Item: IntoWidget<M>,
 {
-  type G = Vec<Widget>;
+  type G = MultiResult;
   #[inline]
-  fn into_gen_result(self) -> Self::G { self.map(IntoWidget::into_widget).collect() }
+  fn into_gen_result(self) -> Self::G { MultiResult(self.map(IntoWidget::into_widget).collect()) }
 }
 
 impl<E: 'static> ExprWidget<E> {
   pub fn into_widget<R, M: ?Sized>(self) -> Widget
   where
-    E: FnMut() -> Option<R>,
+    E: FnMut() -> SingleResult<R>,
     R: IntoWidget<M>,
   {
     let Self { mut expr, upstream } = self;
-    let new_expr = move || ExprResult::Single(expr().map(IntoWidget::into_widget));
 
     Widget(WidgetInner::ExprWidget(ExprWidget {
-      expr: Box::new(new_expr),
+      expr: Box::new(move || expr().into_dyn_result()),
       upstream,
     }))
   }
 }
 
-impl<E: FnMut() -> Vec<Widget> + 'static> ExprWidget<E> {
+impl<E: FnMut() -> MultiResult + 'static> ExprWidget<E> {
   #[inline]
   pub fn into_multi_widget(self) -> Widget {
     let Self { mut expr, upstream } = self;
-    let expr: Box<dyn FnMut() -> ExprResult> = Box::new(move || ExprResult::Multi(expr()));
+    let expr: Box<dyn FnMut() -> ExprResult> = Box::new(move || expr().into_dyn_result());
     Widget(WidgetInner::ExprWidget(ExprWidget { expr, upstream }))
   }
 }
+
+impl<R: SingleChild, E> SingleChild for ExprWidget<E> where E: FnMut() -> SingleResult<R> {}
+impl<R: MultiChild, E> MultiChild for ExprWidget<E> where E: FnMut() -> SingleResult<R> {}
 
 impl<C: SingleChild> SingleChild for ConstExprWidget<Option<C>> {}
 impl<C: SingleChild> SingleChild for ConstExprWidget<C> {}
@@ -311,4 +320,19 @@ impl GeneratorCursor {
       }
     }
   }
+}
+
+impl<W> SingleResult<W> {
+  #[inline]
+  fn into_dyn_result<M: ?Sized>(self) -> ExprResult
+  where
+    W: IntoWidget<M>,
+  {
+    ExprResult::Single(self.0.map(IntoWidget::into_widget))
+  }
+}
+
+impl MultiResult {
+  #[inline]
+  fn into_dyn_result(self) -> ExprResult { ExprResult::Multi(self.0) }
 }
