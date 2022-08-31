@@ -138,10 +138,6 @@ pub enum QueryOrder {
 pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn Render>, Widget>>;
 pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn Render>>;
 
-pub enum ExprResult {
-  Single(Option<Widget>),
-  Multi(Vec<Widget>),
-}
 pub(crate) enum WidgetInner {
   Compose(Box<dyn FnOnce(&mut BuildCtx) -> Widget>),
   Render(Box<dyn Render>),

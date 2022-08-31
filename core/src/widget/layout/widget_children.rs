@@ -234,7 +234,7 @@ where
 impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, &M2)> for SingleChildWidget<W, ExprWidget<E>>
 where
   SingleChildWidget<W, Widget>: IntoWidget<M1>,
-  E: FnMut() -> Option<R> + 'static,
+  E: FnMut() -> SingleResult<R> + 'static,
   R: IntoWidget<M2>,
 {
   #[inline]
@@ -325,7 +325,7 @@ where
 
 impl<M: ?Sized, E, R> MultiChildMarker<ExprWidget<&M>> for ExprWidget<E>
 where
-  E: FnMut() -> Option<R> + 'static,
+  E: FnMut() -> SingleResult<R> + 'static,
   R: IntoWidget<M>,
 {
   #[inline]
@@ -334,7 +334,7 @@ where
 
 impl<E> MultiChildMarker<Widget> for ExprWidget<E>
 where
-  E: FnMut() -> Vec<Widget> + 'static,
+  E: FnMut() -> MultiResult + 'static,
 {
   #[inline]
   fn fill<W>(self, multi: &mut MultiChildWidget<W>) {
