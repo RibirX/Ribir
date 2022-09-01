@@ -96,7 +96,23 @@ pub enum StateWidget<W> {
   Stateless(W),
   Stateful(Stateful<W>),
 }
-pub struct Widget(pub(crate) WidgetInner);
+
+pub struct Widget {
+  pub(crate) node: Option<WidgetNode>,
+  pub(crate) children: Children,
+}
+
+pub(crate) enum WidgetNode {
+  Compose(Box<dyn for<'r> FnOnce(&'r mut BuildCtx) -> Widget>),
+  Render(Box<dyn Render>),
+  Dynamic(ExprWidget<Box<dyn FnMut() -> ExprResult>>),
+}
+
+pub(crate) enum Children {
+  None,
+  Single(Box<Widget>),
+  Multi(Vec<Widget>),
+}
 
 #[marker]
 pub(crate) trait WidgetMarker {}
@@ -137,14 +153,6 @@ pub enum QueryOrder {
 
 pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn Render>, Widget>>;
 pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn Render>>;
-
-pub(crate) enum WidgetInner {
-  Compose(Box<dyn FnOnce(&mut BuildCtx) -> Widget>),
-  Render(Box<dyn Render>),
-  SingleChild(BoxedSingleChild),
-  MultiChild(BoxedMultiChild),
-  ExprWidget(ExprWidget<Box<dyn FnMut() -> ExprResult>>),
-}
 
 /// Trait to detect if a type is match the `type_id`.
 pub trait QueryFiler {
@@ -248,20 +256,33 @@ impl IntoWidget<Widget> for Widget {
 
 impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C {
   fn into_widget(self) -> Widget {
-    Widget(WidgetInner::Compose(Box::new(|ctx| {
-      ComposedWidget::<Widget, C>::new(Compose::compose(self.into(), ctx)).into_widget()
-    })))
+    Widget {
+      node: Some(WidgetNode::Compose(Box::new(|ctx| {
+        ComposedWidget::<Widget, C>::new(Compose::compose(self.into(), ctx)).into_widget()
+      }))),
+      children: Children::None,
+    }
   }
 }
 
 impl<R: Render + 'static> IntoWidget<dyn Render> for R {
   #[inline]
-  fn into_widget(self) -> Widget { Widget(WidgetInner::Render(Box::new(self))) }
+  fn into_widget(self) -> Widget {
+    Widget {
+      node: Some(WidgetNode::Render(Box::new(self))),
+      children: Children::None,
+    }
+  }
 }
 
 impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
   #[inline]
-  fn into_widget(self) -> Widget { Widget(WidgetInner::Compose(Box::new(self))) }
+  fn into_widget(self) -> Widget {
+    Widget {
+      node: Some(WidgetNode::Compose(Box::new(self))),
+      children: Children::None,
+    }
+  }
 }
 
 #[macro_export]
@@ -360,6 +381,18 @@ impl<W: IntoStateful> StateWidget<W> {
     match self {
       StateWidget::Stateless(w) => w.into_stateful(),
       StateWidget::Stateful(w) => w,
+    }
+  }
+}
+
+impl Children {
+  pub(crate) fn is_none(&self) -> bool { matches!(self, Children::None) }
+
+  pub(crate) fn for_each(self, mut cb: impl FnMut(Widget)) {
+    match self {
+      Children::None => {}
+      Children::Single(w) => cb(*w),
+      Children::Multi(m) => m.into_iter().for_each(cb),
     }
   }
 }

@@ -13,6 +13,8 @@ mod layout_info;
 use animation_store::AnimateStore;
 pub use layout_info::*;
 
+use super::Children;
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
@@ -47,12 +49,7 @@ impl WidgetTree {
       animations_store,
     };
 
-    tree.insert_widget_to(None, root_widget, |node, tree| {
-      let root = tree.new_node(node);
-      tree.set_root(root);
-      root.on_mounted(tree);
-      root
-    });
+    tree.set_root(root_widget);
     tree.mark_dirty(tree.root());
     tree
   }
@@ -142,35 +139,47 @@ impl WidgetTree {
     });
   }
 
-  pub(crate) fn set_root(&mut self, root: WidgetId) {
+  pub(crate) fn set_root(&mut self, widget: Widget) {
     assert!(self.root.is_none());
-    self.root = Some(root);
+
+    let (root, children) = widget.consume_node(
+      None,
+      |r, tree| {
+        let root = tree.new_node(r);
+        tree.set_root_id(root);
+        root.on_mounted(tree);
+        root
+      },
+      self,
+    );
+
+    let root = root.expect("must have a root");
+    let mut pairs = vec![];
+    children.for_each(|w| pairs.push((root, w)));
+    self.prepend_pairs(&mut pairs);
   }
 
-  pub(crate) fn insert_widget_to(
-    &mut self,
-    parent: Option<WidgetId>,
-    widget: Widget,
-    mount_node: impl FnMut(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
-  ) -> WidgetId {
-    let mut stack = vec![];
-    let id = self.widget_to_node(widget, parent, mount_node, &mut stack);
+  pub(crate) fn set_root_id(&mut self, id: WidgetId) {
+    assert!(self.root.is_none());
+    self.root = Some(id);
+  }
 
-    while let Some((widget, parent)) = stack.pop() {
-      self.widget_to_node(
-        widget,
+  pub(crate) fn prepend_pairs(&mut self, pairs: &mut Vec<(WidgetId, Widget)>) {
+    while let Some((mut parent, widget)) = pairs.pop() {
+      let (p, children) = widget.consume_node(
         Some(parent),
-        |c, tree| {
-          let child = tree.new_node(c);
-          parent.append(child, tree);
+        |r, tree| {
+          let child = tree.new_node(r);
+          parent.prepend(child, tree);
           child.on_mounted(tree);
-          child
+          parent = child;
+          parent
         },
-        &mut stack,
+        self,
       );
-    }
 
-    id
+      children.for_each(|w| pairs.push((p.unwrap_or(parent), w)));
+    }
   }
 
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.state_changed.borrow_mut().insert(id); }
@@ -190,46 +199,6 @@ impl WidgetTree {
   pub(crate) unsafe fn split_tree(&mut self) -> (&mut WidgetTree, &mut WidgetTree) {
     let ptr = self as *mut WidgetTree;
     (&mut *ptr, &mut *ptr)
-  }
-
-  fn widget_to_node(
-    &mut self,
-    widget: Widget,
-    parent: Option<WidgetId>,
-    mut on_node: impl FnMut(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
-    stack: &mut Vec<(Widget, WidgetId)>,
-  ) -> WidgetId {
-    match widget.0 {
-      WidgetInner::Compose(c) => {
-        let mut build_ctx = BuildCtx::new(parent, self);
-        let c = c(&mut build_ctx);
-        self.widget_to_node(c, parent, on_node, stack)
-      }
-      WidgetInner::Render(rw) => on_node(rw, self),
-      WidgetInner::SingleChild(s) => {
-        let (rw, child) = s.unzip();
-        let id = on_node(rw, self);
-        stack.push((child, id));
-
-        id
-      }
-      WidgetInner::MultiChild(m) => {
-        let (rw, children) = m.unzip();
-        let p = on_node(rw, self);
-        children
-          .into_iter()
-          .rev()
-          .for_each(|child| stack.push((child, p)));
-        p
-      }
-      WidgetInner::ExprWidget(e) => {
-        let road_sign = on_node(Box::new(Void), self);
-        self
-          .generator_store
-          .new_generator(e, parent, smallvec![road_sign]);
-        road_sign
-      }
-    }
   }
 }
 
@@ -383,6 +352,10 @@ impl WidgetId {
     self.0.insert_after(next.0, &mut tree.arena);
   }
 
+  pub(crate) fn prepend(self, child: WidgetId, tree: &mut WidgetTree) {
+    self.0.prepend(child.0, &mut tree.arena);
+  }
+
   pub(crate) fn append(self, child: WidgetId, tree: &mut WidgetTree) {
     self.0.append(child.0, &mut tree.arena);
   }
@@ -436,6 +409,41 @@ impl WidgetId {
   }
 }
 
+impl Widget {
+  pub(crate) fn consume_node(
+    self,
+    parent: Option<WidgetId>,
+    on_render: impl FnOnce(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
+    tree: &mut WidgetTree,
+  ) -> (Option<WidgetId>, Children) {
+    let Self { node, children } = self;
+
+    if let Some(node) = node {
+      match node {
+        WidgetNode::Compose(c) => {
+          assert!(children.is_none(), "compose widget shouldn't have child.");
+          let mut build_ctx = BuildCtx::new(parent, tree);
+          let c = c(&mut build_ctx);
+          c.consume_node(parent, on_render, tree)
+        }
+        WidgetNode::Render(r) => (Some(on_render(r, tree)), children),
+        WidgetNode::Dynamic(e) => {
+          let road_sign = on_render(Box::new(Void), tree);
+          tree
+            .generator_store
+            .new_generator(e, parent, smallvec![road_sign]);
+          (Some(road_sign), children)
+        }
+      }
+    } else {
+      match children {
+        Children::None => (None, Children::None),
+        Children::Single(s) => s.consume_node(parent, on_render, tree),
+        Children::Multi(m) => (None, Children::Multi(m)),
+      }
+    }
+  }
+}
 #[cfg(test)]
 mod tests {
   extern crate test;

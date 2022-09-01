@@ -105,9 +105,9 @@ where
 {
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    let widget: Box<dyn Render> = Box::new(widget);
-    let single_child = SingleChildWidget { widget, child };
-    Widget(WidgetInner::SingleChild(Box::new(single_child)))
+    let node = WidgetNode::Render(Box::new(widget));
+    let children = Children::Single(Box::new(child));
+    Widget { node: Some(node), children }
   }
 }
 
@@ -116,9 +116,12 @@ where
   W: ComposeSingleChild + 'static,
 {
   fn into_widget(self) -> Widget {
-    Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeSingleChild::compose_single_child(self.widget.into(), self.child, ctx)
-    })))
+    let Self { widget, child } = self;
+    let node = WidgetNode::Compose(Box::new(move |ctx| {
+      ComposeSingleChild::compose_single_child(widget.into(), child, ctx)
+    }));
+    let children = Children::None;
+    Widget { node: Some(node), children }
   }
 }
 
@@ -288,9 +291,10 @@ where
   W: MultiChild + Render + 'static,
 {
   fn into_widget(self) -> Widget {
-    let widget: Box<dyn Render> = Box::new(self.widget);
-    let multi_child = MultiChildWidget { widget, children: self.children };
-    Widget(WidgetInner::MultiChild(multi_child))
+    let MultiChildWidget { widget, children } = self;
+    let node = WidgetNode::Render(Box::new(widget));
+    let children = Children::Multi(children);
+    Widget { node: Some(node), children }
   }
 }
 
@@ -299,9 +303,14 @@ where
   W: ComposeMultiChild + 'static,
 {
   fn into_widget(self) -> Widget {
-    Widget(WidgetInner::Compose(Box::new(move |ctx| {
-      ComposeMultiChild::compose_multi_child(self.widget.into(), self.children, ctx)
-    })))
+    let MultiChildWidget { widget, children } = self;
+    let node = WidgetNode::Compose(Box::new(move |ctx| {
+      ComposeMultiChild::compose_multi_child(widget.into(), children, ctx)
+    }));
+    Widget {
+      node: Some(node),
+      children: Children::None,
+    }
   }
 }
 
@@ -338,7 +347,7 @@ where
 {
   #[inline]
   fn fill<W>(self, multi: &mut MultiChildWidget<W>) {
-    let w = self.into_multi_widget();
+    let w = self.into_multi_child();
     multi.children.push(w)
   }
 }
