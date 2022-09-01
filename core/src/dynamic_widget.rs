@@ -118,20 +118,24 @@ impl<E: 'static> ExprWidget<E> {
     R: IntoWidget<M>,
   {
     let Self { mut expr, upstream } = self;
-
-    Widget(WidgetInner::ExprWidget(ExprWidget {
-      expr: Box::new(move || expr().into_dyn_result()),
-      upstream,
-    }))
+    let expr = Box::new(move || expr().into_dyn_result());
+    Widget {
+      node: Some(WidgetNode::Dynamic(ExprWidget { expr, upstream })),
+      children: Children::None,
+    }
   }
 }
 
 impl<E: FnMut() -> MultiResult + 'static> ExprWidget<E> {
   #[inline]
-  pub fn into_multi_widget(self) -> Widget {
+  pub fn into_multi_child(self) -> Widget {
     let Self { mut expr, upstream } = self;
     let expr: Box<dyn FnMut() -> ExprResult> = Box::new(move || expr().into_dyn_result());
-    Widget(WidgetInner::ExprWidget(ExprWidget { expr, upstream }))
+
+    Widget {
+      node: Some(WidgetNode::Dynamic(ExprWidget { expr, upstream })),
+      children: Children::None,
+    }
   }
 }
 
@@ -200,71 +204,7 @@ impl<W: Query> Query for ConstExprWidget<W> {
 impl Generator {
   #[inline]
   pub(crate) fn update_generated_widgets(&mut self, tree: &mut WidgetTree) {
-    let Self { info, expr } = self;
-
-    let mut cursor = GeneratorCursor::new(&info, tree);
-    let mut key_widgets = info
-      .generated_widgets
-      .drain(..)
-      .filter_map(|id| {
-        let mut key = None;
-        id.assert_get(tree)
-          .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
-            key = Some(k.clone());
-          });
-        if let Some(key) = key {
-          id.detach(tree);
-          Some((key.clone(), id))
-        } else {
-          id.remove_subtree(tree);
-          None
-        }
-      })
-      .collect::<HashMap<_, _, ahash::RandomState>>();
-
-    let mut add_dynamic_widget = |c| {
-      tree.insert_widget_to(info.parent, c, |node, tree| {
-        let mut old = None;
-        node.query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
-          old = key_widgets.remove(k);
-        });
-
-        let id = if let Some(id) = old {
-          *id.assert_get_mut(tree) = node;
-          id
-        } else {
-          tree.new_node(node)
-        };
-
-        cursor.add(id, tree);
-        tree.mark_dirty(id);
-        info.generated_widgets.push(id);
-        if old.is_none() {
-          id.on_mounted(tree);
-        }
-        id
-      });
-    };
-    match expr() {
-      ExprResult::Single(w) => {
-        if let Some(w) = w {
-          add_dynamic_widget(w);
-        }
-      }
-      ExprResult::Multi(m) => m.into_iter().for_each(add_dynamic_widget),
-    };
-
-    key_widgets
-      .into_iter()
-      .for_each(|(_, k)| k.remove_subtree(tree));
-
-    if info.generated_widgets.is_empty() {
-      // add void widget for generator, so we can always know where to replace dynamic
-      // widget.
-      let road_sign = tree.new_node(Box::new(Void));
-      info.generated_widgets.push(road_sign);
-      cursor.add(road_sign, tree);
-    }
+    DynamicWidgetRefresh::new(self, tree).refresh()
   }
 
   pub(crate) fn info(&self) -> &GeneratorInfo { &self.info }
@@ -312,13 +252,14 @@ impl GeneratorCursor {
         *sibling = id;
       }
       GeneratorCursor::AsRoot => {
-        tree.set_root(id);
+        tree.set_root_id(id);
         *self = GeneratorCursor::MultiRoot;
       }
       GeneratorCursor::MultiRoot => {
         panic!("ExprWidget as root, but generate more than once widget.")
       }
     }
+    tree.mark_dirty(id);
   }
 }
 
@@ -335,4 +276,114 @@ impl<W> SingleResult<W> {
 impl MultiResult {
   #[inline]
   fn into_dyn_result(self) -> ExprResult { ExprResult::Multi(self.0) }
+}
+
+struct DynamicWidgetRefresh<'a> {
+  cursor: GeneratorCursor,
+  tree: &'a mut WidgetTree,
+  key_widgets: HashMap<Key, WidgetId, ahash::RandomState>,
+  pairs: Vec<(WidgetId, Widget)>,
+  generator: &'a mut Generator,
+}
+
+impl<'a> DynamicWidgetRefresh<'a> {
+  fn new(generator: &'a mut Generator, tree: &'a mut WidgetTree) -> Self {
+    let cursor = GeneratorCursor::new(generator.info(), tree);
+    let key_widgets = generator
+      .info
+      .generated_widgets
+      .drain(..)
+      .filter_map(|id| {
+        let mut key = None;
+        id.assert_get(tree)
+          .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
+            key = Some(k.clone());
+          });
+        if let Some(key) = key {
+          id.detach(tree);
+          Some((key.clone(), id))
+        } else {
+          id.remove_subtree(tree);
+          None
+        }
+      })
+      .collect();
+    Self {
+      cursor,
+      tree,
+      key_widgets,
+      pairs: vec![],
+      generator,
+    }
+  }
+
+  fn refresh(&mut self) {
+    let parent = self.generator.info.parent();
+    match (self.generator.expr)() {
+      ExprResult::Single(w) => {
+        if let Some(w) = w {
+          self.add_dynamic_widget(w, parent);
+        }
+      }
+      ExprResult::Multi(m) => m
+        .into_iter()
+        .for_each(|w| self.add_dynamic_widget(w, parent)),
+    };
+
+    let Self {
+      cursor,
+      tree,
+      pairs,
+      generator,
+      key_widgets,
+    } = self;
+
+    key_widgets
+      .into_iter()
+      .for_each(|(_, k)| k.remove_subtree(tree));
+
+    if generator.info.generated_widgets.is_empty() {
+      // add void widget for generator, so we can always know where to replace dynamic
+      // widget.
+      let road_sign = tree.new_node(Box::new(Void));
+      generator.info.generated_widgets.push(road_sign);
+      cursor.add(road_sign, tree);
+    }
+    tree.prepend_pairs(pairs);
+  }
+
+  fn add_dynamic_widget(&mut self, widget: Widget, parent: Option<WidgetId>) {
+    let Self {
+      cursor, tree, key_widgets, generator, ..
+    } = self;
+    let (id, children) = widget.consume_node(
+      parent,
+      |render, tree| {
+        let mut old = None;
+        render.query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
+          old = key_widgets.remove(k);
+        });
+
+        let id = if let Some(id) = old {
+          *id.assert_get_mut(tree) = render;
+          id
+        } else {
+          tree.new_node(render)
+        };
+        cursor.add(id, tree);
+        generator.info.generated_widgets.push(id);
+        if old.is_none() {
+          id.on_mounted(tree);
+        }
+        id
+      },
+      tree,
+    );
+
+    if let Some(id) = id {
+      children.for_each(|w| self.pairs.push((id, w)));
+    } else {
+      children.for_each(move |w| self.add_dynamic_widget(w, parent))
+    }
+  }
 }

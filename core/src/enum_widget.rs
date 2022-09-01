@@ -69,7 +69,7 @@ macro_rules! impl_enum_widget {
         }
       }
     }
-    
+
     impl<$($var_ty: ComposeMultiChild),+> ComposeMultiChild for $name <$($var_ty),+> {
       fn compose_multi_child(
         this: StateWidget<Self>,

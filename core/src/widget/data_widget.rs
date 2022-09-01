@@ -102,49 +102,29 @@ impl<D: Query> Query for DataWidget<Box<dyn Render>, D> {
   }
 }
 
-fn widget_with_data<D: Query + 'static>(widget: Widget, data: D) -> Widget {
-  match widget.0 {
-    WidgetInner::Compose(c) => (|ctx: &mut BuildCtx| widget_with_data(c(ctx), data)).into_widget(),
-    WidgetInner::Render(widget) => DataWidget { widget, data }.into_widget(),
-    WidgetInner::SingleChild(s) => single_child_with_data(s, data),
-    WidgetInner::MultiChild(m) => multi_child_with_data(m, data),
-    WidgetInner::ExprWidget(_) => {
-      let data = Stateful::new(data);
-      widget_with_clone_data(widget, data)
+fn expr_attach_data<D: Query + Clone + 'static>(
+  expr: ExprWidget<Box<dyn FnMut() -> ExprResult>>,
+  children: Children,
+  data: D,
+) -> Widget {
+  let ExprWidget { mut expr, upstream } = expr;
+  let new_expr = move || match expr() {
+    ExprResult::Single(w) => {
+      let w = w.map(|w| widget_attach_data(w, data.clone(), expr_attach_data));
+      ExprResult::Single(w)
     }
-  }
-}
+    ExprResult::Multi(mut v) => {
+      v.iter_mut().for_each(|w| {
+        let mut inner = std::mem::replace(w, Void.into_widget());
+        inner = widget_attach_data(inner, data.clone(), expr_attach_data);
+        let _ = std::mem::replace(w, inner);
+      });
+      ExprResult::Multi(v)
+    }
+  };
 
-fn widget_with_clone_data<D: Query + Clone + 'static>(widget: Widget, data: D) -> Widget {
-  match widget.0 {
-    WidgetInner::Compose(c) => {
-      (|ctx: &mut BuildCtx| widget_with_clone_data(c(ctx), data)).into_widget()
-    }
-    WidgetInner::Render(widget) => DataWidget { widget, data }.into_widget(),
-    WidgetInner::SingleChild(s) => single_child_with_data(s, data),
-    WidgetInner::MultiChild(m) => multi_child_with_data(m, data),
-    WidgetInner::ExprWidget(ExprWidget { mut expr, upstream }) => {
-      let new_expr = move || match expr() {
-        ExprResult::Single(w) => {
-          let w = w.map(|w| widget_with_clone_data(w, data.clone()));
-          ExprResult::Single(w)
-        }
-        ExprResult::Multi(mut v) => {
-          v.iter_mut().for_each(|w| {
-            let mut inner = std::mem::replace(w, Void.into_widget());
-            inner = widget_with_clone_data(inner, data.clone());
-            let _ = std::mem::replace(w, inner);
-          });
-          ExprResult::Multi(v)
-        }
-      };
-
-      Widget(WidgetInner::ExprWidget(ExprWidget {
-        expr: Box::new(new_expr),
-        upstream,
-      }))
-    }
-  }
+  let node = WidgetNode::Dynamic(ExprWidget { expr: Box::new(new_expr), upstream });
+  Widget { node: Some(node), children }
 }
 
 pub fn compose_child_as_data_widget<D: Query + 'static>(
@@ -152,19 +132,41 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
   data: StateWidget<D>,
 ) -> Widget {
   match data {
-    StateWidget::Stateless(data) => widget_with_data(child, data),
-    StateWidget::Stateful(data) => widget_with_clone_data(child, data),
+    StateWidget::Stateless(data) => widget_attach_data(
+      child,
+      data,
+      |expr: ExprWidget<Box<dyn FnMut() -> ExprResult>>, children: Children, data: D| {
+        let data = Stateful::new(data);
+        expr_attach_data(expr, children, data)
+      },
+    ),
+    StateWidget::Stateful(data) => widget_attach_data(child, data, expr_attach_data),
   }
 }
 
-fn single_child_with_data<D: Query + 'static>(s: BoxedSingleChild, data: D) -> Widget {
-  let widget: Box<dyn Render> = Box::new(DataWidget { widget: s.widget, data });
-  let single = Box::new(SingleChildWidget { widget, child: s.child });
-  Widget(WidgetInner::SingleChild(single))
-}
-
-fn multi_child_with_data<D: Query + 'static>(m: BoxedMultiChild, data: D) -> Widget {
-  let widget: Box<dyn Render> = Box::new(DataWidget { widget: m.widget, data });
-  let multi = MultiChildWidget { widget, children: m.children };
-  Widget(WidgetInner::MultiChild(multi))
+fn widget_attach_data<D: Query + 'static>(
+  widget: Widget,
+  data: D,
+  attach_expr: impl FnOnce(ExprWidget<Box<dyn FnMut() -> ExprResult>>, Children, D) -> Widget + 'static,
+) -> Widget {
+  let Widget { node, children } = widget;
+  if let Some(node) = node {
+    match node {
+      WidgetNode::Compose(c) => {
+        assert!(children.is_none());
+        (|ctx: &mut BuildCtx| widget_attach_data(c(ctx), data, attach_expr)).into_widget()
+      }
+      WidgetNode::Render(r) => {
+        let node = WidgetNode::Render(Box::new(DataWidget { widget: r, data }));
+        Widget { node: Some(node), children }
+      }
+      WidgetNode::Dynamic(expr) => attach_expr(expr, children, data),
+    }
+  } else {
+    match children {
+      Children::None => Widget { node: None, children: Children::None },
+      Children::Single(s) => widget_attach_data(*s, data, attach_expr),
+      Children::Multi(_) => unreachable!("Compiler should not allow attach data to many widget."),
+    }
+  }
 }

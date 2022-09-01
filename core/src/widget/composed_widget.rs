@@ -14,36 +14,43 @@ impl<B> ComposedWidget<Widget, B> {
 
 impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
   fn into_widget(self) -> Widget {
+    let Widget { node, children } = self.composed;
     let by = self.by;
-    match self.composed.0 {
-      WidgetInner::Compose(c) => {
-        { move |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget() }
-          .into_widget()
-      }
-      WidgetInner::Render(r) => ComposedWidget { composed: r, by }.into_widget(),
-      WidgetInner::SingleChild(s) => {
-        let widget: Box<dyn Render> = Box::new(ComposedWidget { composed: s.widget, by });
-        let single = Box::new(SingleChildWidget { widget, child: s.child });
-        Widget(WidgetInner::SingleChild(single))
-      }
-      WidgetInner::MultiChild(m) => {
-        let widget: Box<dyn Render> = Box::new(ComposedWidget { composed: m.widget, by });
-        let multi = MultiChildWidget { widget, children: m.children };
-        Widget(WidgetInner::MultiChild(multi))
-      }
-      WidgetInner::ExprWidget(ExprWidget { mut expr, upstream }) => {
-        let new_expr = move || match expr() {
-          ExprResult::Single(w) => {
-            ExprResult::Single(w.map(|w| ComposedWidget { composed: w, by }.into_widget()))
+    if let Some(node) = node {
+      match node {
+        WidgetNode::Compose(c) => {
+          assert!(children.is_none());
+          let composed =
+            { move |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget() };
+          composed.into_widget()
+        }
+        WidgetNode::Render(r) => {
+          let node = WidgetNode::Render(Box::new(ComposedWidget { composed: r, by }));
+          Widget { node: Some(node), children }
+        }
+        WidgetNode::Dynamic(ExprWidget { mut expr, upstream }) => {
+          let new_expr = move || match expr() {
+            ExprResult::Single(w) => {
+              ExprResult::Single(w.map(|w| ComposedWidget { composed: w, by }.into_widget()))
+            }
+            ExprResult::Multi(_) => {
+              unreachable!("`ExprWidget` from compose widget, must be generate single child.")
+            }
+          };
+          Widget {
+            node: Some(WidgetNode::Dynamic(ExprWidget {
+              expr: Box::new(new_expr),
+              upstream,
+            })),
+            children,
           }
-          ExprResult::Multi(_) => {
-            unreachable!("`ExprWidget` from compose widget, must be generate single child.")
-          }
-        };
-        Widget(WidgetInner::ExprWidget(ExprWidget {
-          expr: Box::new(new_expr),
-          upstream,
-        }))
+        }
+      }
+    } else {
+      match children {
+        Children::None => Widget { node: None, children: Children::None },
+        Children::Single(s) => Self { composed: *s, by }.into_widget(),
+        Children::Multi(_) => unreachable!("Compose return multi widget, should compile failed."),
       }
     }
   }
