@@ -44,8 +44,11 @@ impl Parse for WidgetMacro {
         let a = content.parse()?;
         assign_uninit_field!(animations, a, animations)?;
       } else if lk.peek(kw::track) {
-        let t = content.parse()?;
-        assign_uninit_field!(track, t, track)?;
+        let mut t = content.parse::<Track>()?;
+        if let Some(ot) = track.take() {
+          t.track_externs.extend(ot.track_externs);
+        }
+        track = Some(t);
       } else if lk.peek(Ident) && content.peek2(token::Brace) {
         let w: DeclareWidget = content.parse()?;
         if let Some(first) = widget.as_ref() {

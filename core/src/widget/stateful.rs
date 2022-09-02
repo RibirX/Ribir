@@ -236,6 +236,11 @@ impl<W> Stateful<W> {
   pub fn raw_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
     self.change_notifier.0.clone()
   }
+
+  /// Clone the stateful widget of which the reference point to. Require mutable
+  /// reference because we try to early release inner borrow when clone occur.
+  #[inline]
+  pub fn clone_stateful(&self) -> Stateful<W> { self.clone() }
 }
 
 impl<T: Clone + std::cmp::PartialEq> StateChange<T> {
@@ -262,9 +267,17 @@ impl<'a, W> StateRef<'a, W> {
   /// Clone the stateful widget of which the reference point to. Require mutable
   /// reference because we try to early release inner borrow when clone occur.
   #[inline]
-  pub fn clone(&mut self) -> Stateful<W> {
+  pub fn clone_stateful(&mut self) -> Stateful<W> {
     self.0.release_current_borrow();
     self.0.widget.clone()
+  }
+
+  #[inline]
+  pub fn into_inner(self) -> W
+  where
+    W: Copy,
+  {
+    *self
   }
 }
 
@@ -426,10 +439,7 @@ impl<'a, W> Drop for ShallowRef<'a, W> {
 }
 
 // Implement IntoStateful for all widget
-impl<W> IntoStateful for W
-where
-  W: WidgetMarker,
-{
+impl<W> IntoStateful for W {
   #[inline]
   fn into_stateful(self) -> Stateful<W> { Stateful::new(self) }
 }

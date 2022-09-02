@@ -164,7 +164,7 @@ mod tests {
           expr: if child_box.size.is_empty() {
             SizedBox { size: Size::new(1., 1.) }.into_widget()
           } else {
-            child_box.clone().into_widget()
+            child_box.clone_stateful().into_widget()
           }
         }
       }

@@ -103,5 +103,5 @@ fn obj_state_ref(widget: &Ident) -> TokenStream2 {
 }
 
 fn capture_widget(widget: &Ident) -> TokenStream2 {
-  quote_spanned!(widget.span() => let #widget = #widget.clone();)
+  quote_spanned!(widget.span() => let #widget = #widget.clone_stateful();)
 }

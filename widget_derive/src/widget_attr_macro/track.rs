@@ -1,21 +1,32 @@
 use super::{animations::SimpleField, kw};
 use proc_macro2::Ident;
 use quote::{quote_spanned, ToTokens};
-use syn::{braced, parse::Parse, punctuated::Punctuated, spanned::Spanned, token};
+use syn::{
+  braced,
+  parse::Parse,
+  punctuated::Punctuated,
+  spanned::Spanned,
+  token::{self, Comma},
+};
 
 pub struct Track {
   _track_token: kw::track,
   _brace: token::Brace,
-  pub track_externs: Punctuated<SimpleField, token::Comma>,
+  pub track_externs: Vec<SimpleField>,
 }
 
 impl Parse for Track {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
+
     let track = Track {
       _track_token: input.parse()?,
       _brace: braced!(content in input),
-      track_externs: content.parse_terminated(SimpleField::parse)?,
+      track_externs: {
+        let fields: Punctuated<SimpleField, Comma> =
+          content.parse_terminated(SimpleField::parse)?;
+        fields.into_iter().collect()
+      },
     };
     Ok(track)
   }

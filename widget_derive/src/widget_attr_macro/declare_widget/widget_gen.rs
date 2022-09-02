@@ -127,7 +127,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 impl DeclareField {
   fn value_tokens(&self) -> TokenStream {
     if let Some(name) = self.value_is_an_id() {
-      quote_spanned! { name.span() => #name.clone() }
+      quote_spanned! { name.span() => #name.clone_stateful() }
     } else {
       self.expr.to_token_stream()
     }
