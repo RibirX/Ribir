@@ -50,6 +50,8 @@
  	 - assign cursor to the widget.
 - theme : [`Theme`] 
  	 - assign theme to the widget.
+- box_fit : [`BoxFit`] 
+ 	 -  set how its child should be resized to its box.
 - padding : [`EdgeInsets`] 
  	 - set the padding area on all four sides of a widget.
 - background : [`Brush`] 
@@ -64,8 +66,6 @@
  	 - describe how widget align to its box in x-axis.
 - v_align : [`VAlign`] 
  	 - describe how widget align to its box in y-axis.
-- box_fit : [`BoxFit`] 
- 	 -  set how its child should be resized to its box.
 - left_anchor : [`PositionUnit`] 
  	 - use to anchor child constraints with the left edge of parent widget.
 - right_anchor : [`PositionUnit`] 
@@ -131,6 +131,8 @@
 
 [`Theme`]: prelude::Theme
 
+[`BoxFit`]: prelude::BoxFit
+
 [`EdgeInsets`]: prelude::EdgeInsets
 
 [`Brush`]: prelude::Brush
@@ -144,8 +146,6 @@
 [`HAlign`]: prelude::HAlign
 
 [`VAlign`]: prelude::VAlign
-
-[`BoxFit`]: prelude::BoxFit
 
 [`PositionUnit`]: prelude::PositionUnit
 
