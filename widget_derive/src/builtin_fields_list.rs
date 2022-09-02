@@ -110,6 +110,11 @@ builtin! {
     theme: Theme
   }
 
+  FittedBox {
+    #[doc=" set how its child should be resized to its box."]
+    box_fit: BoxFit,
+  }
+
   Padding {
     #[doc="set the padding area on all four sides of a widget."]
     padding: EdgeInsets
@@ -139,11 +144,6 @@ builtin! {
     v_align: VAlign,
   }
 
-
-  FittedBox {
-    #[doc=" set how its child should be resized to its box."]
-    box_fit: BoxFit,
-  }
 
   LeftAnchor {
     #[doc="use to anchor child constraints with the left edge of parent widget."]

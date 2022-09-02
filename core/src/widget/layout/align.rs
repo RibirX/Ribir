@@ -78,7 +78,7 @@ impl Render for HAlignWidget {
       let child_size = ctx.perform_child_layout(c, clamp);
       let x = align.align_value(child_size.width, box_width);
       ctx.update_position(c, Point::new(x, 0.));
-      Size::new(box_width, child_size.height)
+      child_size
     })
   }
 
@@ -100,7 +100,7 @@ impl Render for VAlignWidget {
       let child_size = ctx.perform_child_layout(c, clamp);
       let y = align.align_value(child_size.height, box_height);
       ctx.update_position(c, Point::new(0., y));
-      Size::new(child_size.width, box_height)
+      child_size
     })
   }
 
