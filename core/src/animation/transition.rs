@@ -35,11 +35,6 @@ impl<E: Easing> Roc for Transition<E> {
   }
 }
 
-impl<E> IntoStateful for Transition<E> {
-  #[inline]
-  fn into_stateful(self) -> Stateful<Self> { Stateful::new(self) }
-}
-
 impl<E: Easing> Roc for Stateful<Transition<E>> {
   #[inline]
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress {

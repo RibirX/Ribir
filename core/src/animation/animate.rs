@@ -79,16 +79,6 @@ where
   }
 }
 
-impl<T, I, F, W, R> IntoStateful for Animate<T, I, F, W, R>
-where
-  I: Fn() -> R,
-  F: Fn() -> R,
-  W: FnMut(R) + 'static,
-{
-  #[inline]
-  fn into_stateful(self) -> Stateful<Self> { Stateful::new(self) }
-}
-
 impl<T: AnimateCtrl> AnimateCtrl for Stateful<T> {
   #[inline]
   fn lerp(&mut self, now: Instant) -> AnimateProgress { self.state_ref().lerp(now) }

@@ -610,7 +610,7 @@ impl Trigger {
           a.gen_tokens(tokens, ctx);
         }
         quote! {{
-          let #animate_name = #animate_name.clone();
+          let #animate_name = #animate_name.clone_stateful();
           move |_| #animate_name.raw_ref().run()
         }}
       }
@@ -661,7 +661,7 @@ impl Trigger {
     } else {
       let MemberPath { widget, dot_token, member } = &self.path;
       tokens.extend(quote_spanned! { self.span() =>
-        #widget.clone()
+        #widget.clone_stateful()
           .state_change(|w| w #dot_token #member #dot_token clone())
           .filter(StateChange::not_same)
           .subscribe(#run_fn);
