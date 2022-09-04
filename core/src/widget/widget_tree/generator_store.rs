@@ -1,9 +1,4 @@
-use rxrust::{
-  observable::SubscribeNext,
-  prelude::Observable,
-  subscription::{SubscriptionGuard, SubscriptionLike},
-};
-use smallvec::SmallVec;
+use rxrust::{observable::SubscribeNext, prelude::Observable};
 
 use crate::{
   dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
@@ -22,12 +17,6 @@ pub(crate) struct GeneratorStore {
   // todo: use id_map
   generators: HashMap<GeneratorID, Generator, ahash::RandomState>,
   needs_regen: Rc<RefCell<HashSet<GeneratorID, ahash::RandomState>>>,
-  lifetime: HashMap<WidgetId, SmallVec<[GeneratorHandle; 1]>>,
-}
-
-struct GeneratorHandle {
-  id: GeneratorID,
-  _subscription: SubscriptionGuard<Box<dyn SubscriptionLike>>,
 }
 
 impl GeneratorStore {
@@ -35,28 +24,22 @@ impl GeneratorStore {
     &mut self,
     ExprWidget { expr, upstream }: ExprWidget<Box<dyn FnMut() -> ExprResult>>,
     parent: Option<WidgetId>,
-    generated_widgets: SmallVec<[WidgetId; 1]>,
+    road_sign: WidgetId,
+    has_child: bool,
   ) -> GeneratorID {
     let id = self.next_generator_id;
     self.next_generator_id = id.next_id();
-    let info = GeneratorInfo::new(id, parent, generated_widgets);
+    let info = GeneratorInfo::new(id, parent, road_sign, has_child);
     let needs_regen = self.needs_regen.clone();
     needs_regen.borrow_mut().insert(id);
-    let _subscription = upstream
+    let _upstream_handle = upstream
       .filter(|scope| scope.contains(ChangeScope::FRAMEWORK))
       .subscribe(move |_| {
         needs_regen.borrow_mut().insert(id);
       })
       .unsubscribe_when_dropped();
-    self.add_generator(Generator { info, expr });
+    self.add_generator(Generator { info, expr, _upstream_handle });
 
-    if let Some(p) = parent {
-      self
-        .lifetime
-        .entry(p)
-        .or_default()
-        .push(GeneratorHandle { id, _subscription });
-    }
     id
   }
 
@@ -75,15 +58,6 @@ impl GeneratorStore {
         .filter_map(|id| self.generators.remove(&id))
         .collect::<Vec<_>>()
     })
-  }
-
-  pub(crate) fn on_widget_drop(&mut self, widget: WidgetId) {
-    if let Some(ids) = self.lifetime.remove(&widget) {
-      ids.iter().for_each(|h| {
-        self.generators.remove(&h.id);
-        self.needs_regen.borrow_mut().remove(&h.id);
-      });
-    }
   }
 }
 
