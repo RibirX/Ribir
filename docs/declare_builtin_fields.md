@@ -76,6 +76,8 @@
  	 - use to anchor child constraints with the bottom edge of parent widget.
 - scrollable : [`Scrollable`] 
  	 - enumerate to describe which direction allow widget to scroll.
+- transform : [`Transform`] 
+ 	 - A widget that applies a transformation its child. Doesn't change size, only apply painting
 - key : [`Key`] 
  	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
@@ -154,5 +156,7 @@
 [`PositionUnit`]: prelude::PositionUnit
 
 [`Scrollable`]: prelude::Scrollable
+
+[`Transform`]: prelude::Transform
 
 [`Key`]: prelude::Key
