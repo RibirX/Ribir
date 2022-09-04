@@ -234,7 +234,24 @@ where
   }
 }
 
-impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, &M2)> for SingleChildWidget<W, ExprWidget<E>>
+impl<W, E, R, M: ?Sized> IntoWidget<(SingleResult<R>, &M)> for SingleChildWidget<ExprWidget<E>, W>
+where
+  E: FnMut() -> SingleResult<R> + 'static,
+  R: SingleChild + Render + 'static,
+  W: IntoWidget<M>,
+{
+  #[inline]
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    let mut widget = widget.into_widget();
+    widget.children = Children::Single(Box::new(child.into_widget()));
+
+    widget
+  }
+}
+
+impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, SingleResult<&M2>)>
+  for SingleChildWidget<W, ExprWidget<E>>
 where
   SingleChildWidget<W, Widget>: IntoWidget<M1>,
   E: FnMut() -> SingleResult<R> + 'static,

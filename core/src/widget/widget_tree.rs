@@ -1,6 +1,7 @@
 use crate::prelude::*;
+use ahash::RandomState;
 use indextree::*;
-use smallvec::smallvec;
+use smallvec::SmallVec;
 use std::{
   cell::RefCell,
   collections::{HashMap, HashSet},
@@ -36,6 +37,8 @@ impl WidgetTree {
     WidgetId(self.arena.new_node(node))
   }
 
+  pub(crate) fn empty_node(&mut self) -> WidgetId { self.new_node(Box::new(Void)) }
+
   pub(crate) fn new(root_widget: Widget, ctx: Rc<RefCell<AppContext>>) -> WidgetTree {
     let ticker = ctx.borrow().frame_ticker.frame_tick_stream();
     let animations_store = Rc::new(RefCell::new(AnimateStore::new(ticker)));
@@ -50,7 +53,6 @@ impl WidgetTree {
     };
 
     tree.set_root(root_widget);
-    tree.mark_dirty(tree.root());
     tree
   }
 
@@ -101,7 +103,7 @@ impl WidgetTree {
         .sort_by_cached_key(|g| g.info.parent().map_or(0, |wid| wid.ancestors(self).count()));
       needs_regen.iter_mut().for_each(|g| {
         if !g.info.parent().map_or(false, |p| p.is_dropped(self)) {
-          g.update_generated_widgets(self);
+          g.refresh(self);
         }
       });
 
@@ -142,21 +144,10 @@ impl WidgetTree {
   pub(crate) fn set_root(&mut self, widget: Widget) {
     assert!(self.root.is_none());
 
-    let (root, children) = widget.consume_node(
-      None,
-      |r, tree| {
-        let root = tree.new_node(r);
-        tree.set_root_id(root);
-        root.on_mounted(tree);
-        root
-      },
-      self,
-    );
-
-    let root = root.expect("must have a root");
-    let mut pairs = vec![];
-    children.for_each(|w| pairs.push((root, w)));
-    self.prepend_pairs(&mut pairs);
+    let root = widget.into_subtree(None, self).expect("must have a root");
+    self.set_root_id(root);
+    root.on_mounted_subtree(self, true);
+    self.mark_dirty(root);
   }
 
   pub(crate) fn set_root_id(&mut self, id: WidgetId) {
@@ -164,22 +155,10 @@ impl WidgetTree {
     self.root = Some(id);
   }
 
-  pub(crate) fn prepend_pairs(&mut self, pairs: &mut Vec<(WidgetId, Widget)>) {
-    while let Some((mut parent, widget)) = pairs.pop() {
-      let (p, children) = widget.consume_node(
-        Some(parent),
-        |r, tree| {
-          let child = tree.new_node(r);
-          parent.prepend(child, tree);
-          child.on_mounted(tree);
-          parent = child;
-          parent
-        },
-        self,
-      );
-
-      children.for_each(|w| pairs.push((p.unwrap_or(parent), w)));
-    }
+  pub(crate) fn swap_node_data(&mut self, a: WidgetId, b: WidgetId) {
+    let a_node = std::mem::replace(a.assert_get_mut(self), Box::new(Void));
+    let b_node = std::mem::replace(b.assert_get_mut(self), a_node);
+    let _ = std::mem::replace(a.assert_get_mut(self), b_node);
   }
 
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.state_changed.borrow_mut().insert(id); }
@@ -195,6 +174,99 @@ impl WidgetTree {
   pub(crate) fn count(&self) -> usize { self.root().descendants(&self).count() }
 
   pub(crate) fn context(&self) -> &Rc<RefCell<AppContext>> { &self.ctx }
+
+  /// #panic
+  /// dst should not be empty.
+  pub(crate) fn replace_children(
+    &mut self,
+    dst: &[WidgetId],
+    widgets: Vec<Widget>,
+  ) -> SmallVec<[WidgetId; 1]> {
+    fn collect_same_key_pairs(
+      old_widgets: impl Iterator<Item = WidgetId>,
+      new_widgets: impl Iterator<Item = WidgetId>,
+      tree: &WidgetTree,
+      same_key_pairs: &mut Vec<(WidgetId, WidgetId)>,
+    ) {
+      let new_keys = new_widgets
+        .filter_map(|n| n.key(tree).map(|k| (k, n)))
+        .collect::<HashMap<_, _, RandomState>>();
+
+      for o in old_widgets {
+        if let Some(n) = o.key(tree).and_then(|k| new_keys.get(&k)) {
+          same_key_pairs.push((o, *n));
+          collect_same_key_pairs(o.children(tree), n.children(tree), tree, same_key_pairs);
+        }
+      }
+    }
+
+    let mut sign = *dst.last().expect("replace target at least have one widget");
+    let parent = sign.parent(self);
+    let mut new_widgets = widgets
+      .into_iter()
+      .flat_map(|w| w.into_subtree(parent, self))
+      .collect::<SmallVec<[WidgetId; 1]>>();
+
+    if new_widgets.is_empty() {
+      // gen root at least have a void widget as road sign.
+      new_widgets.push(self.empty_node());
+    }
+
+    for w in new_widgets.iter().cloned() {
+      sign.insert_after(w, self);
+      sign = w;
+    }
+
+    let mut same_key_pairs = vec![];
+    collect_same_key_pairs(
+      dst.iter().cloned(),
+      new_widgets.iter().cloned(),
+      self,
+      &mut same_key_pairs,
+    );
+
+    if same_key_pairs.is_empty() {
+      dst.iter().for_each(|o| o.remove_subtree(self));
+      new_widgets
+        .iter()
+        .for_each(|n| n.on_mounted_subtree(self, true));
+    } else {
+      let mut swapped = HashMap::<_, _, RandomState>::default();
+      for &(o, n) in same_key_pairs.iter() {
+        n.swap(o, self);
+        self.swap_node_data(n, o);
+        swapped.insert(o, n);
+        swapped.insert(n, o);
+      }
+
+      let (tree1, tree2) = unsafe { self.split_tree() };
+      dst.iter().for_each(|o| {
+        let old = swapped.get(o).unwrap_or(o);
+        old.descendants(tree1).for_each(|o| {
+          if !swapped.contains_key(&o) {
+            o.on_disposed(tree2);
+          }
+        });
+        old.0.remove_subtree(&mut tree1.arena);
+      });
+
+      new_widgets
+        .iter_mut()
+        .flat_map(|n| {
+          if let Some(s) = swapped.get(n) {
+            *n = *s;
+          }
+          n.descendants(tree1)
+        })
+        .for_each(|n| n.on_mounted(tree2, !swapped.contains_key(&n)));
+    }
+
+    if self.root.is_none() {
+      assert_eq!(new_widgets.len(), 1, "must have one widget as root");
+      self.set_root_id(new_widgets[0]);
+    }
+    new_widgets
+  }
 
   pub(crate) unsafe fn split_tree(&mut self) -> (&mut WidgetTree, &mut WidgetTree) {
     let ptr = self as *mut WidgetTree;
@@ -285,10 +357,6 @@ impl WidgetId {
     self.node_feature(tree, |node| node.next_sibling())
   }
 
-  pub(crate) fn prev_sibling(self, tree: &WidgetTree) -> Option<WidgetId> {
-    self.node_feature(tree, |node| node.previous_sibling())
-  }
-
   pub(crate) fn ancestors(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(&tree.arena).map(WidgetId)
   }
@@ -310,42 +378,39 @@ impl WidgetId {
     self.0.descendants(&tree.arena).map(WidgetId)
   }
 
+  pub(crate) fn swap(self, other: WidgetId, tree: &mut WidgetTree) {
+    let first_child = self.first_child(tree);
+    let mut cursor = first_child;
+    while let Some(c) = cursor {
+      cursor = c.next_sibling(tree);
+      other.append(c, tree);
+    }
+    let mut other_child = other.first_child(tree);
+    while other_child.is_some() && other_child != first_child {
+      let o_c = other_child.unwrap();
+      other_child = o_c.next_sibling(tree);
+      self.append(o_c, tree);
+    }
+
+    let guard = tree.empty_node();
+    self.insert_after(guard, tree);
+    other.insert_after(self, tree);
+    guard.insert_after(other, tree);
+    guard.0.remove(&mut tree.arena);
+  }
+
   pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
     // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
-    let (tree1, tree3) = unsafe { tree1.split_tree() };
-    let mut changed = tree1.state_changed.borrow_mut();
     self
       .0
       .descendants(&tree1.arena)
       .map(WidgetId)
-      .for_each(|id| {
-        changed.remove(&id);
-        tree1.generator_store.on_widget_drop(id);
-        tree1.layout_store.remove(&id);
-        id.assert_get_mut(tree2).query_all_type_mut(
-          |d: &mut DisposedListener| {
-            (d.on_disposed)(LifeCycleCtx { id, tree: tree3 });
-            true
-          },
-          QueryOrder::OutsideFirst,
-        )
-      });
+      .for_each(|id| id.on_disposed(tree2));
     self.0.remove_subtree(&mut tree1.arena);
     if tree1.root() == self {
       tree1.root.take();
     }
-  }
-
-  pub(crate) fn detach(self, tree: &mut WidgetTree) {
-    if Some(self) == tree.root {
-      tree.root.take();
-    }
-    self.0.detach(&mut tree.arena);
-  }
-
-  pub(crate) fn insert_before(self, before: WidgetId, tree: &mut WidgetTree) {
-    self.0.insert_before(before.0, &mut tree.arena);
   }
 
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut WidgetTree) {
@@ -360,7 +425,15 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn on_mounted(self, tree: &mut WidgetTree) {
+  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree, brand_new: bool) {
+    let (tree1, tree2) = unsafe { tree.split_tree() };
+
+    self
+      .descendants(tree1)
+      .for_each(|w| w.on_mounted(tree2, brand_new));
+  }
+
+  pub(crate) fn on_mounted(self, tree: &mut WidgetTree, brand_new: bool) {
     self.assert_get(tree).query_all_type(
       |notifier: &StateChangeNotifier| {
         let state_changed = tree.state_changed.clone();
@@ -375,15 +448,30 @@ impl WidgetId {
       QueryOrder::OutsideFirst,
     );
 
-    // Safety: lifecycle context have no way to change tree struct.
+    if brand_new {
+      // Safety: lifecycle context have no way to change tree struct.
+      let (tree1, tree2) = unsafe { tree.split_tree() };
+      self.assert_get_mut(tree1).query_all_type_mut(
+        |m: &mut MountedListener| {
+          (m.on_mounted)(LifeCycleCtx { id: self, tree: tree2 });
+          true
+        },
+        QueryOrder::OutsideFirst,
+      );
+    }
+  }
+
+  pub(crate) fn on_disposed(self, tree: &mut WidgetTree) {
+    tree.layout_store.remove(&self);
+    // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self.assert_get_mut(tree1).query_all_type_mut(
-      |m: &mut MountedListener| {
-        (m.on_mounted)(LifeCycleCtx { id: self, tree: tree2 });
+      |d: &mut DisposedListener| {
+        (d.on_disposed)(LifeCycleCtx { id: self, tree: tree2 });
         true
       },
       QueryOrder::OutsideFirst,
-    );
+    )
   }
 
   /// Return the single child of `widget`, panic if have more than once child.
@@ -407,13 +495,46 @@ impl WidgetId {
   pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
+
+  pub(crate) fn key(self, tree: &WidgetTree) -> Option<Key> {
+    let mut key = None;
+    self
+      .assert_get(tree)
+      .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| key = Some(k.clone()));
+    key
+  }
 }
 
 impl Widget {
-  pub(crate) fn consume_node(
+  pub(crate) fn into_subtree(
     self,
     parent: Option<WidgetId>,
-    on_render: impl FnOnce(Box<dyn Render>, &mut WidgetTree) -> WidgetId,
+    tree: &mut WidgetTree,
+  ) -> Option<WidgetId> {
+    let (id, children) = self.place_node_in_tree(parent, tree);
+    if let Some(id) = id {
+      let mut pairs = vec![];
+      children.for_each(|w| pairs.push((id, w)));
+
+      while let Some((parent, widget)) = pairs.pop() {
+        let (child, children) = widget.place_node_in_tree(Some(parent), tree);
+        if let Some(child) = child {
+          parent.prepend(child, tree);
+        }
+        children.for_each(|w| pairs.push((child.unwrap_or(parent), w)));
+      }
+      Some(id)
+    } else {
+      match children {
+        Children::None => None,
+        _ => unreachable!(),
+      }
+    }
+  }
+
+  fn place_node_in_tree(
+    self,
+    parent: Option<WidgetId>,
     tree: &mut WidgetTree,
   ) -> (Option<WidgetId>, Children) {
     let Self { node, children } = self;
@@ -424,22 +545,22 @@ impl Widget {
           assert!(children.is_none(), "compose widget shouldn't have child.");
           let mut build_ctx = BuildCtx::new(parent, tree);
           let c = c(&mut build_ctx);
-          c.consume_node(parent, on_render, tree)
+          c.place_node_in_tree(parent, tree)
         }
-        WidgetNode::Render(r) => (Some(on_render(r, tree)), children),
+        WidgetNode::Render(r) => (Some(tree.new_node(r)), children),
         WidgetNode::Dynamic(e) => {
-          let road_sign = on_render(Box::new(Void), tree);
+          let road_sign = tree.empty_node();
           tree
             .generator_store
-            .new_generator(e, parent, smallvec![road_sign]);
+            .new_generator(e, parent, road_sign, !children.is_none());
           (Some(road_sign), children)
         }
       }
     } else {
       match children {
         Children::None => (None, Children::None),
-        Children::Single(s) => s.consume_node(parent, on_render, tree),
-        Children::Multi(m) => (None, Children::Multi(m)),
+        Children::Single(s) => s.place_node_in_tree(parent, tree),
+        Children::Multi(_) => unreachable!("None parent with multi child is forbidden."),
       }
     }
   }

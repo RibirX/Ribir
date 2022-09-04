@@ -8,13 +8,10 @@ use crate::{impl_query_self_only, prelude::*};
 pub struct Void;
 
 impl Render for Void {
-  fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    assert_eq!(
-      ctx.single_child(),
-      None,
-      "Void only used to hold a node place."
-    );
-    Size::zero()
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map_or_else(Size::zero, |c| ctx.perform_child_layout(c, clamp))
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
