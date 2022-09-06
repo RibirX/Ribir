@@ -43,9 +43,18 @@ fn main() {
       size: Size::zero()
     }
     animations {
-      sized_box.size: Transition {
-        easing: easing::LINEAR
-      },
+      sized_box.size: Transition { easing: easing::LINEAR },
+    }
+  };
+
+  let _fix_shorthand_with_builtin_field = widget! {
+    SizedBox {
+      id: sized_box,
+      background: Color::RED,
+      size: Size::zero()
+    }
+    animations {
+      sized_box.background: Transition { easing: easing::LINEAR },
     }
   };
 }
