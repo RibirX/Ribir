@@ -1,117 +1,199 @@
 use crate::prelude::*;
 
-use super::scroll_view::ScrollInfo;
-#[derive(Declare, Clone, SingleChildWidget)]
-struct ScrollBarTrack {
-  layout: ScrollInfo,
-  #[declare(default = "ctx.theme().scrollbar.track_width")]
-  cross_width: f32,
-}
-
-impl ScrollBarTrack {
-  fn offset(&self) -> Point {
-    let offset = self.layout.scrollbar_offset();
-    match self.layout.direction() {
-      Direction::Horizontal => Point::new(-offset, 0.),
-      Direction::Vertical => Point::new(0., -offset),
-    }
-  }
-
-  fn size(&self, clamp: BoxClamp) -> Size {
-    match self.layout.direction() {
-      Direction::Horizontal => Size::new(clamp.max.width, self.cross_width),
-      Direction::Vertical => Size::new(self.cross_width, clamp.max.height),
-    }
-  }
-}
-
-impl Render for ScrollBarTrack {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if !self.layout.is_show() {
-      return Size::default();
-    }
-    let child = ctx.single_child().expect("Margin must have one child");
-    let size = self.size(clamp);
-    ctx.perform_child_layout(child, clamp);
-    ctx.update_position(child, self.offset());
-    size
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
+/// A control widget that enables the user to access horizontal parts child that
+/// is larger than the box rect.
 #[derive(Declare, Clone)]
-pub struct ScrollBarThumb {
-  layout: ScrollInfo,
-  cross_width: f32,
+pub struct HScrollBar {
+  /// Scrolled pixels of child content.
+  #[declare(default)]
+  pub offset: f32,
+  #[declare(default=ScrollBarTheme::of(ctx).clone())]
+  pub style: ScrollBarTheme,
 }
 
-impl Render for ScrollBarThumb {
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
-    if !self.layout.is_show() {
-      return Size::default();
-    }
-    let bar_size = self.layout.scrollbar_size();
-    match self.layout.direction() {
-      Direction::Horizontal => Size::new(bar_size, self.cross_width),
-      Direction::Vertical => Size::new(self.cross_width, bar_size),
-    }
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-#[derive(Declare, Clone)]
-pub struct ScrollBar {
-  pub info: ScrollInfo,
-
-  #[declare(default = "ctx.theme().scrollbar.track_box.clone()")]
-  pub track_box: ScrollBoxDecorationStyle,
-
-  #[declare(default = "ctx.theme().scrollbar.track_width")]
-  pub track_width: f32,
-
-  #[declare(default = "ctx.theme().scrollbar.thumb_box.clone()")]
-  pub thumb_box: ScrollBoxDecorationStyle,
-
-  #[declare(default = "ctx.theme().scrollbar.thumb_width")]
-  pub thumb_width: f32,
-}
-
-impl ScrollBar {
-  // todo: remove me after scroll view build from declare
-  pub fn new(info: ScrollInfo, ctx: &mut BuildCtx) -> Self {
-    ScrollBar {
-      info,
-      track_box: ctx.theme().scrollbar.track_box.clone(),
-      track_width: ctx.theme().scrollbar.track_width,
-      thumb_box: ctx.theme().scrollbar.thumb_box.clone(),
-      thumb_width: ctx.theme().scrollbar.thumb_width,
-    }
-  }
-}
-
-impl Compose for ScrollBar {
-  fn compose(this: Stateful<Self>, _: &mut BuildCtx) -> BoxedWidget {
-    let state = this.state_ref();
+impl ComposeSingleChild for HScrollBar {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
     widget! {
-      declare ScrollBarTrack {
-        layout: state.info.clone(),
-        cross_width: state.track_width,
-        background: state.track_box.background.clone(),
+      track { this: this.into_stateful() }
+      Stack {
+        ScrollableWidget {
+          id: scrolling,
+          scrollable: Scrollable::X,
+          pos: Point::new(this.offset, 0.),
+          ExprWidget { expr: child}
+        }
+        HRawScrollbar {
+          style: this.style.clone(),
+          scrolling: scrolling.clone_stateful(),
+          v_align: VAlign::Bottom,
+        }
+      }
+      dataflows {
+        #[skip_nc]
+        scrolling.pos.x ~> this.offset
+      }
+    }
+  }
+}
 
-        ScrollBarThumb {
-          layout: state.info.clone(),
-          cross_width: state.thumb_width,
-          background: state.thumb_box.background.clone(),
+/// A control widget that enables the user to access vertical parts child that
+/// is larger than the box rect.
+#[derive(Declare, Clone)]
+pub struct VScrollBar {
+  /// Scrolled pixels of child content.
+  #[declare(default)]
+  pub offset: f32,
+  #[declare(default=ScrollBarTheme::of(ctx).clone())]
+  pub style: ScrollBarTheme,
+}
+
+impl ComposeSingleChild for VScrollBar {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+    widget! {
+      track { this: this.into_stateful() }
+      Stack {
+        ScrollableWidget {
+          id: scrolling,
+          scrollable: Scrollable::Y,
+          pos: Point::new(0., this.offset),
+          ExprWidget { expr: child}
+        }
+        VRawScrollbar {
+          style: this.style.clone(),
+          scrolling: scrolling.clone_stateful(),
+          h_align: HAlign::Right
+        }
+      }
+      dataflows {
+        #[skip_nc]
+        scrolling.pos.y ~> this.offset
+      }
+    }
+  }
+}
+/// A control widget that enables the user to access horizontal parts child that
+/// is larger than the box rect.
+#[derive(Declare, Clone)]
+pub struct BothScrollbar {
+  /// Scrolled pixels of child content.
+  #[declare(default)]
+  pub offset: Point,
+  #[declare(default=ScrollBarTheme::of(ctx).clone())]
+  pub style: ScrollBarTheme,
+}
+
+impl ComposeSingleChild for BothScrollbar {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+    widget! {
+      track { this: this.into_stateful() }
+      Stack {
+        ScrollableWidget {
+          id: scrolling,
+          scrollable: Scrollable::Both,
+          pos: this.offset,
+          ExprWidget { expr: child}
+        }
+        HRawScrollbar {
+          style: this.style.clone(),
+          scrolling: scrolling.clone_stateful(),
+          v_align: VAlign::Bottom,
+          margin: EdgeInsets::only_right(this.style.track.thickness )
+        }
+        VRawScrollbar {
+          style: this.style.clone(),
+          scrolling: scrolling.clone_stateful(),
+          h_align: HAlign::Right,
+          margin: EdgeInsets::only_bottom(this.style.track.thickness )
+        }
+      }
+      dataflows {
+        #[skip_nc]
+        scrolling.pos ~> this.offset
+      }
+    }
+  }
+}
+
+/// A widget that display the horizontal scrolling information of the
+/// `scrolling` widget.
+#[derive(Declare)]
+pub struct HRawScrollbar {
+  #[declare(default=ScrollBarTheme::of(ctx).clone())]
+  pub style: ScrollBarTheme,
+  scrolling: Stateful<ScrollableWidget>,
+}
+
+impl Compose for HRawScrollbar {
+  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+    let this = this.into_stateful();
+    let scrolling = this.raw_ref().scrolling.clone();
+    widget! {
+      track { scrolling, this }
+      Stack {
+        LayoutBox {
+          id: track_box,
+          SizedBox {
+            size: Size::new(f32::MAX, this.style.track.thickness),
+            background: this.style.track.background.clone(),
+            radius: this.style.track.radius,
+          }
+        }
+        SizedBox {
+          size: {
+            let page_width = scrolling.page_size().width;
+            let content_width = scrolling.content_size().width;
+            let width = page_width / content_width * track_box.width();
+            Size::new(width.max(this.style.thumb_min_size), this.style.thumb.thickness)
+          },
+          background: this.style.thumb.background.clone(),
+          radius: this.style.thumb.radius,
+          left_anchor: {
+            let content_width = scrolling.content_size().width;
+             -scrolling.pos.x / content_width * track_box.width()
+          }
+        }
+      }
+    }
+  }
+}
+
+/// A widget that display the vertical scrolling information of the
+/// `scrolling` widget.
+#[derive(Declare)]
+pub struct VRawScrollbar {
+  #[declare(default=ScrollBarTheme::of(ctx).clone())]
+  pub style: ScrollBarTheme,
+  scrolling: Stateful<ScrollableWidget>,
+}
+
+impl Compose for VRawScrollbar {
+  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+    let this = this.into_stateful();
+    let scrolling = this.raw_ref().scrolling.clone();
+    widget! {
+      track { scrolling, this }
+      Stack {
+        LayoutBox {
+          id: track_box,
+          SizedBox {
+            size: Size::new(this.style.track.thickness, f32::MAX),
+            background: this.style.track.background.clone(),
+            radius: this.style.track.radius,
+          }
+        }
+        SizedBox {
+          size: {
+            let page_height = scrolling.page_size().height;
+            let content_height = scrolling.content_size().height;
+            let height = page_height / content_height * track_box.height();
+            Size::new( this.style.thumb.thickness, height.max(this.style.thumb_min_size))
+          },
+          background: this.style.thumb.background.clone(),
+          radius: this.style.thumb.radius,
+          top_anchor: {
+            let content_height = scrolling.content_size().height;
+            -scrolling.pos.y / content_height * track_box.height()
+          }
         }
       }
     }

@@ -41,7 +41,6 @@ impl ComposeSingleChild for ScrollableWidget {
           ExprWidget { expr: child }
         }}
       }
-
       dataflows {
         #[skip_nc]
         content.box_rect().size ~> this.content_size,
@@ -59,13 +58,22 @@ impl ScrollableWidget {
   #[inline]
   pub fn content_size(&self) -> Size { self.content_size }
 
+  /// return if the content greater than the view.
+  pub fn can_scroll(&self) -> bool {
+    match self.scrollable {
+      Scrollable::X => self.content_size().width > self.page_size().width,
+      Scrollable::Y => self.content_size().height > self.page_size().height,
+      Scrollable::Both => self.content_size().greater_than(self.page_size()).any(),
+    }
+  }
+
   fn validate_scroll(&mut self, delta: Point) {
     let mut new = self.pos;
     if self.scrollable != Scrollable::X {
-      new.y -= delta.y;
+      new.y += delta.y;
     }
     if self.scrollable != Scrollable::Y {
-      new.x -= delta.x;
+      new.x += delta.x;
     }
     let min = self.page_size() - self.content_size();
     self.pos = new.clamp(min.to_vector().to_point(), Point::zero());
@@ -95,7 +103,7 @@ mod tests {
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
-      delta: MouseScrollDelta::LineDelta(delta_x, delta_y),
+      delta: MouseScrollDelta::PixelDelta((delta_x, delta_y).into()),
       phase: TouchPhase::Started,
       modifiers: ModifiersState::default(),
     });
@@ -107,22 +115,22 @@ mod tests {
 
   #[test]
   fn x_scroll() {
-    test_assert(Scrollable::X, 10., 10., -10., 0.);
-    test_assert(Scrollable::X, 10000., 10., -900., 0.);
-    test_assert(Scrollable::X, -100., 10., 0., 0.);
+    test_assert(Scrollable::X, -10., -10., -10., 0.);
+    test_assert(Scrollable::X, -10000., -10., -900., 0.);
+    test_assert(Scrollable::X, 100., -10., 0., 0.);
   }
 
   #[test]
   fn y_scroll() {
-    test_assert(Scrollable::Y, 10., 10., 0., -10.);
-    test_assert(Scrollable::Y, 10., 10000., 0., -900.);
-    test_assert(Scrollable::Y, -10., -100., 0., 0.);
+    test_assert(Scrollable::Y, -10., -10., 0., -10.);
+    test_assert(Scrollable::Y, -10., -10000., 0., -900.);
+    test_assert(Scrollable::Y, 10., 100., 0., 0.);
   }
 
   #[test]
   fn both_scroll() {
-    test_assert(Scrollable::Both, 10., 10., -10., -10.);
-    test_assert(Scrollable::Both, 10000., 10000., -900., -900.);
-    test_assert(Scrollable::Both, -100., -100., 0., 0.);
+    test_assert(Scrollable::Both, -10., -10., -10., -10.);
+    test_assert(Scrollable::Both, -10000., -10000., -900., -900.);
+    test_assert(Scrollable::Both, 100., 100., 0., 0.);
   }
 }

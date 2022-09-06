@@ -58,19 +58,19 @@ pub struct TextTheme {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollBoxDecorationStyle {
   pub background: Brush,
-
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.]
   pub radius: Option<Radius>,
+  /// The thickness of scrollbar element.
+  pub thickness: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollBarTheme {
-  pub track_box: ScrollBoxDecorationStyle,
-  pub track_width: f32,
-
-  pub thumb_box: ScrollBoxDecorationStyle,
-  pub thumb_width: f32,
+  pub track: ScrollBoxDecorationStyle,
+  pub thumb: ScrollBoxDecorationStyle,
+  /// The min size of the thumb have.
+  pub thumb_min_size: f32,
 }
 
 /// Use typography to present your design and content as clearly and efficiently
@@ -133,6 +133,11 @@ impl IconSize {
 impl SvgIcons {
   #[inline]
   pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.builtin_icons }
+}
+
+impl ScrollBarTheme {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().scrollbar }
 }
 #[derive(Debug, Clone)]
 pub struct SvgIcons {

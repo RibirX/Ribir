@@ -14,7 +14,7 @@ impl ComposeSingleChild for LayoutBox {
       track { this: this.into_stateful() }
       ExprWidget {
         expr: child,
-        on_performed_layout: move |ctx| this.rect = ctx.box_rect().unwrap()
+        on_performed_layout: move |ctx| this.silent().rect = ctx.box_rect().unwrap()
       }
     }
   }
@@ -23,6 +23,13 @@ impl ComposeSingleChild for LayoutBox {
 impl LayoutBox {
   #[inline]
   pub fn box_rect(&self) -> Rect { self.rect }
+}
+
+impl std::ops::Deref for LayoutBox {
+  type Target = Rect;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.rect }
 }
 
 #[cfg(test)]

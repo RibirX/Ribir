@@ -41,7 +41,7 @@
     - [x] wheel event
     - [x] focus event
 
-- [ ] include_svg.
+- [x] include_svg.
 - widgets for todo demo
 - [ ] base widget
   - [ ] Button
@@ -63,7 +63,7 @@
   - [ ] api docs cover
   - [ ] how framework work
 
-- [ ] compose trait accept stateless/stateful enum so we not always convert a widget to stateful.
+- [x] compose trait accept stateless/stateful enum so we not always convert a widget to stateful.
 
 ## cross platform
 

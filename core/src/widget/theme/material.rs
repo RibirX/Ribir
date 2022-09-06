@@ -16,17 +16,18 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   );
 
   let scrollbar = ScrollBarTheme {
-    track_box: ScrollBoxDecorationStyle {
+    track: ScrollBoxDecorationStyle {
       background: Color::SILVER.into(),
       radius: None,
+      thickness: 12.,
     },
-    track_width: 12.,
 
-    thumb_box: ScrollBoxDecorationStyle {
+    thumb: ScrollBoxDecorationStyle {
       background: Color::GRAY.into(),
-      radius: None,
+      radius: Some(Radius::all(4.)),
+      thickness: 12.,
     },
-    thumb_width: 12.,
+    thumb_min_size: 12.,
   };
   Theme {
     brightness,

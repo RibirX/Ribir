@@ -2,6 +2,7 @@ use crate::prelude::{widget_tree::WidgetTree, *};
 mod focus_mgr;
 pub(crate) use focus_mgr::FocusManager;
 
+use ::text::PIXELS_PER_EM;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 #[derive(Default)]
@@ -155,7 +156,7 @@ impl Dispatcher {
   ) {
     if let Some(wid) = self.hit_widget(tree) {
       let (delta_x, delta_y) = match delta {
-        MouseScrollDelta::LineDelta(x, y) => (x, y),
+        MouseScrollDelta::LineDelta(x, y) => (x * PIXELS_PER_EM, y * PIXELS_PER_EM),
         MouseScrollDelta::PixelDelta(delta) => {
           let winit::dpi::LogicalPosition { x, y } = delta.to_logical(wnd_factor);
           (x, y)

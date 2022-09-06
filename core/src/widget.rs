@@ -45,7 +45,9 @@ pub use transform_box::*;
 // pub use scroll_view::ScrollView;
 // mod scrollbar;
 pub mod data_widget;
+mod scrollbar;
 pub use data_widget::DataWidget;
+pub use scrollbar::*;
 
 mod void;
 use self::widget_tree::BoxClamp;
