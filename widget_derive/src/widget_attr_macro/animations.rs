@@ -659,13 +659,15 @@ impl Trigger {
         });
       });
     } else {
-      let MemberPath { widget, dot_token, member } = &self.path;
-      tokens.extend(quote_spanned! { self.span() =>
-        #widget.clone_stateful()
-          .state_change(|w| w #dot_token #member #dot_token clone())
-          .filter(StateChange::not_same)
-          .subscribe(#run_fn);
-      })
+      self.path.on_real_widget_name(|name| {
+        let MemberPath { dot_token, member, .. } = &self.path;
+        tokens.extend(quote_spanned! { self.span() =>
+          #name.clone_stateful()
+            .state_change(|w| w #dot_token #member #dot_token clone())
+            .filter(StateChange::not_same)
+            .subscribe(#run_fn);
+        })
+      });
     }
   }
 
@@ -687,8 +689,8 @@ impl Trigger {
     };
     let init_2 = ribir_suffix_variable(&init, "2");
 
+    let MemberPath { dot_token, member, widget } = path;
     path.on_real_widget_name(|name| {
-      let MemberPath { dot_token, member, .. } = path;
       tokens.extend(quote_spanned! { path.span() =>
         let #init = std::rc::Rc::new(std::cell::RefCell::new(
           #name #dot_token raw_ref() #dot_token #member #dot_token clone()
@@ -699,7 +701,7 @@ impl Trigger {
     let mut animate: Animate = parse_quote! {
       Animate {
         from: State {
-          #path: #init.borrow().clone()
+          #widget #dot_token #member: #init.borrow().clone()
         },
         transition: #transition
       }
