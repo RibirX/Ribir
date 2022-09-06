@@ -98,14 +98,10 @@ impl WidgetTree {
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub(crate) fn tree_repair(&mut self) {
-    while let Some(mut needs_regen) = self.generator_store.take_needs_regen_generator() {
+    while let Some(mut needs_regen) = self.take_needs_regen_generator() {
       needs_regen
         .sort_by_cached_key(|g| g.info.parent().map_or(0, |wid| wid.ancestors(self).count()));
-      needs_regen.iter_mut().for_each(|g| {
-        if !g.info.parent().map_or(false, |p| p.is_dropped(self)) {
-          g.refresh(self);
-        }
-      });
+      needs_regen.iter_mut().for_each(|g| g.refresh(self));
 
       needs_regen
         .into_iter()
@@ -592,8 +588,8 @@ mod tests {
 
     tree.mark_dirty(tree.root());
     tree.root().remove_subtree(&mut tree);
-
-    assert_eq!(tree.is_dirty(), false);
+    assert_eq!(tree.layout_list(), None);
+    assert!(tree.take_needs_regen_generator().is_none());
   }
 
   #[bench]

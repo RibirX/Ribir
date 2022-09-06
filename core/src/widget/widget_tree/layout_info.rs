@@ -86,6 +86,10 @@ impl WidgetTree {
     };
 
     for id in dirty_widgets.iter() {
+      if id.is_dropped(self) {
+        continue;
+      }
+
       let mut relayout_root = *id;
       self.layout_store.remove(id);
       // All ancestors of this render widget should relayout until the one which only
@@ -105,8 +109,10 @@ impl WidgetTree {
       needs_layout.push(relayout_root);
     }
 
-    needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
-    Some(needs_layout)
+    (!needs_layout.is_empty()).then(|| {
+      needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
+      needs_layout
+    })
   }
 
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {

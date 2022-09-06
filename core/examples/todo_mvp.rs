@@ -6,35 +6,37 @@ struct Task {
   label: String,
 }
 #[derive(Debug)]
-struct Todos {
+struct TodoMVP {
   tasks: Vec<Task>,
 }
 
-impl Compose for Todos {
+impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
     widget! {
       // split this to avoid mutable borrow conflict in `ExprWidget`.
       track { this: this.into_stateful(), this2: this.clone() }
-      Column {
-        align_items: Align::Start,
-        ExprWidget {
-          expr: this.tasks.iter().enumerate().map(|(idx, task)| {
-            let checked = task.finished;
-            let label = task.label.clone();
-            widget! {
-              Row {
-                margin: EdgeInsets::vertical(4.),
-                Checkbox { id: checkbox, checked }
-                Text {
-                  text: label,
-                  margin: EdgeInsets::vertical(4.)
+      VScrollBar {
+        Column {
+          align_items: Align::Start,
+          ExprWidget {
+            expr: this.tasks.iter().enumerate().map(|(idx, task)| {
+              let checked = task.finished;
+              let label = task.label.clone();
+              widget! {
+                Row {
+                  margin: EdgeInsets::vertical(4.),
+                  Checkbox { id: checkbox, checked }
+                  Text {
+                    text: label,
+                    margin: EdgeInsets::vertical(4.)
+                  }
+                }
+                dataflows {
+                  checkbox.checked ~> this2.silent().tasks[idx].finished
                 }
               }
-              dataflows {
-                checkbox.checked ~> this2.silent().tasks[idx].finished
-              }
-            }
-          })
+            })
+          }
         }
       }
     }
@@ -44,7 +46,7 @@ impl Compose for Todos {
 fn main() {
   env_logger::init();
 
-  let todo = Todos {
+  let todo = TodoMVP {
     tasks: vec![
       Task {
         finished: true,

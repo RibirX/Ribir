@@ -164,10 +164,7 @@ mod tests {
       };
 
       let (rect, child) = widget_and_its_children_box_rect(w, WND_SIZE);
-      assert_eq!(
-        rect,
-        Rect::new(Point::zero(), Size::new(WND_SIZE.width, CHILD_SIZE.height))
-      );
+      assert_eq!(rect, Rect::new(Point::zero(), expect.size));
       assert_eq!(child[0], expect);
     }
 
@@ -191,10 +188,7 @@ mod tests {
       };
 
       let (rect, child) = widget_and_its_children_box_rect(w, WND_SIZE);
-      assert_eq!(
-        rect,
-        Rect::new(Point::zero(), Size::new(CHILD_SIZE.width, WND_SIZE.height))
-      );
+      assert_eq!(rect, Rect::new(Point::zero(), expect.size));
       assert_eq!(child[0], expect);
     }
 

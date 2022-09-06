@@ -11,6 +11,8 @@ use std::{
   rc::Rc,
 };
 
+use super::WidgetTree;
+
 #[derive(Default)]
 pub(crate) struct GeneratorStore {
   next_generator_id: GeneratorID,
@@ -48,19 +50,29 @@ impl GeneratorStore {
   }
 
   pub(crate) fn is_dirty(&self) -> bool { !self.needs_regen.borrow().is_empty() }
-
-  pub(crate) fn take_needs_regen_generator(&mut self) -> Option<Vec<Generator>> {
-    (self.is_dirty()).then(|| {
-      self
-        .needs_regen
-        .borrow_mut()
-        .drain()
-        .filter_map(|id| self.generators.remove(&id))
-        .collect::<Vec<_>>()
-    })
-  }
 }
 
+impl WidgetTree {
+  pub(crate) fn take_needs_regen_generator(&mut self) -> Option<Vec<Generator>> {
+    let store = &mut self.generator_store;
+    if !store.is_dirty() {
+      return None;
+    }
+    let g = store
+      .needs_regen
+      .borrow_mut()
+      .drain()
+      .filter_map(|id| store.generators.remove(&id))
+      .filter(|g| {
+        g.info
+          .parent()
+          .map_or(true, |p| !p.0.is_removed(&mut self.arena))
+      })
+      .collect::<Vec<_>>();
+
+    (!g.is_empty()).then(|| g)
+  }
+}
 #[cfg(test)]
 mod tests {
   use crate::prelude::{widget_tree::WidgetTree, *};

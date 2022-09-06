@@ -80,7 +80,7 @@ mod tests {
     let device_id = unsafe { DeviceId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
-      delta: MouseScrollDelta::LineDelta(1.0, 1.0),
+      delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),
       phase: TouchPhase::Started,
       modifiers: ModifiersState::default(),
     });

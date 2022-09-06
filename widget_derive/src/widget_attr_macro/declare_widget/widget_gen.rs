@@ -55,7 +55,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let DeclareField { member, used_name_info, skip_nc, .. } = f;
 
     let name = &self.name;
-    let expr_tokens = f.value_tokens();
+    let mut expr_tokens = f.value_tokens();
     let directly_used = used_name_info.directly_used_widgets()?;
 
     if f.value_is_an_id().is_some() {
@@ -63,7 +63,10 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     }
 
     let declare_set = declare_field_name(member);
-    let mut assign = if skip_nc.is_some() {
+    if let Some(refs) = f.used_name_info.refs_tokens() {
+      expr_tokens = quote! {{ #(#refs)* #expr_tokens }};
+    }
+    let assign = if skip_nc.is_some() {
       let old = ribir_variable("old", expr_tokens.span());
       quote! {{
          let diff = {
@@ -80,9 +83,6 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     } else {
       quote! { #name.state_ref().#declare_set(#expr_tokens) }
     };
-    if let Some(refs) = f.used_name_info.refs_tokens() {
-      assign = quote! {{ #(#refs)* #assign }};
-    }
 
     let upstream = upstream_tokens(directly_used, quote! {change_stream});
     let capture_widgets = used_name_info
