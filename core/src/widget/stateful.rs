@@ -85,7 +85,6 @@ use lazy_static::__Deref;
 use rxrust::{ops::box_it::LocalCloneBoxOp, prelude::*};
 use std::{
   cell::{RefCell, RefMut, UnsafeCell},
-  ops::DerefMut,
   rc::Rc,
 };
 
@@ -476,42 +475,6 @@ impl<W: Query> Query for Stateful<W> {
         }
         if continue_query {
           widget.query_all(type_id, callback, order);
-        }
-      }
-    }
-  }
-
-  fn query_all_mut(
-    &mut self,
-    type_id: std::any::TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-    order: QueryOrder,
-  ) {
-    let mut continue_query = true;
-    let mut w = self.widget.borrow_mut();
-    let widget = w.deref_mut();
-    match order {
-      QueryOrder::InnerFirst => {
-        widget.query_all_mut(
-          type_id,
-          &mut |t| {
-            continue_query = callback(t);
-            continue_query
-          },
-          order,
-        );
-        if continue_query {
-          if let Some(a) = self.change_notifier.query_filter_mut(type_id) {
-            callback(a);
-          }
-        }
-      }
-      QueryOrder::OutsideFirst => {
-        if let Some(a) = self.change_notifier.query_filter_mut(type_id) {
-          continue_query = callback(a);
-        }
-        if continue_query {
-          widget.query_all_mut(type_id, callback, order);
         }
       }
     }

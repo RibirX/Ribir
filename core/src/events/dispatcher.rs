@@ -207,8 +207,8 @@ impl Dispatcher {
         Some(new_hit) if w.ancestors_of(new_hit, tree) => already_entered.push(w),
         _ => {
           let mut event = PointerEvent::from_mouse(w, tree, &mut self.info);
-          w.assert_get_mut(tree).query_all_type_mut(
-            |pointer: &mut PointerLeaveListener| {
+          w.assert_get(tree).query_all_type(
+            |pointer: &PointerLeaveListener| {
               pointer.dispatch(&mut event);
               !event.bubbling_canceled()
             },
@@ -236,8 +236,8 @@ impl Dispatcher {
         .for_each(|&w| {
           let mut event = PointerEvent::from_mouse(w, tree, &mut self.info);
 
-          w.assert_get_mut(tree).query_all_type_mut(
-            |pointer: &mut PointerEnterListener| {
+          w.assert_get(tree).query_all_type(
+            |pointer: &PointerEnterListener| {
               pointer.dispatch(&mut event);
               !event.bubbling_canceled()
             },
@@ -295,19 +295,19 @@ impl WidgetTree {
   where
     Ty: EventListener + 'static,
   {
-    self.bubble_event_with(event, |listener: &mut Ty, event| listener.dispatch(event));
+    self.bubble_event_with(event, |listener: &Ty, event| listener.dispatch(event));
   }
 
   pub(crate) fn bubble_event_with<Ty, D, E>(&mut self, event: &mut E, mut dispatcher: D)
   where
-    D: FnMut(&mut Ty, &mut E),
+    D: FnMut(&Ty, &mut E),
     E: std::borrow::BorrowMut<EventCommon>,
     Ty: 'static,
   {
     loop {
       let current_target = event.borrow().current_target;
-      current_target.assert_get_mut(self).query_all_type_mut(
-        |listener: &mut Ty| {
+      current_target.assert_get(self).query_all_type(
+        |listener: &Ty| {
           dispatcher(listener, event);
           !event.borrow_mut().bubbling_canceled()
         },

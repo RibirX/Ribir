@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::{
   impl_query_self_only,
   prelude::{data_widget::compose_child_as_data_widget, *},
@@ -15,8 +17,8 @@ pub struct WheelEvent {
 
 #[derive(Declare)]
 pub struct WheelListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent)))]
-  on_wheel: Box<dyn for<'r> FnMut(&'r mut WheelEvent)>,
+  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut WheelEvent)))]
+  on_wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
 }
 
 impl ComposeSingleChild for WheelListener {
@@ -52,7 +54,7 @@ impl std::ops::DerefMut for WheelEvent {
 impl EventListener for WheelListener {
   type Event = WheelEvent;
   #[inline]
-  fn dispatch(&mut self, event: &mut WheelEvent) { (self.on_wheel)(event) }
+  fn dispatch(&self, event: &mut WheelEvent) { (self.on_wheel.borrow_mut())(event) }
 }
 
 #[cfg(test)]

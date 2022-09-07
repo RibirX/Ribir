@@ -63,43 +63,6 @@ impl<D: Query> Query for DataWidget<Box<dyn Render>, D> {
       }
     }
   }
-
-  fn query_all_mut(
-    &mut self,
-    type_id: std::any::TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-    order: QueryOrder,
-  ) {
-    let mut continue_query = true;
-    match order {
-      QueryOrder::InnerFirst => {
-        self.widget.query_all_mut(
-          type_id,
-          &mut |t| {
-            continue_query = callback(t);
-            continue_query
-          },
-          order,
-        );
-        if continue_query {
-          self.data.query_all_mut(type_id, callback, order);
-        }
-      }
-      QueryOrder::OutsideFirst => {
-        self.data.query_all_mut(
-          type_id,
-          &mut |t| {
-            continue_query = callback(t);
-            continue_query
-          },
-          order,
-        );
-        if continue_query {
-          self.widget.query_all_mut(type_id, callback, order);
-        }
-      }
-    }
-  }
 }
 
 fn expr_attach_data<D: Query + Clone + 'static>(

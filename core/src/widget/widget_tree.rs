@@ -127,9 +127,9 @@ impl WidgetTree {
 
     performed.drain(..).for_each(|id| {
       let (tree1, tree2) = unsafe { self.split_tree() };
-      id.assert_get_mut(tree1).query_all_type_mut(
-        |l: &mut PerformedLayoutListener| {
-          (l.on_performed_layout)(LifeCycleCtx { id, tree: tree2 });
+      id.assert_get(tree1).query_all_type(
+        |l: &PerformedLayoutListener| {
+          (l.on_performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
           true
         },
         QueryOrder::OutsideFirst,
@@ -306,8 +306,8 @@ impl WidgetId {
         info.clamp = out_clamp;
         info.rect.get_or_insert_with(Rect::zero).size = size;
 
-        self.assert_get_mut(tree1).query_all_type_mut(
-          |_: &mut PerformedLayoutListener| {
+        self.assert_get(tree1).query_all_type(
+          |_: &PerformedLayoutListener| {
             performed.push(self);
             false
           },
@@ -447,9 +447,9 @@ impl WidgetId {
     if brand_new {
       // Safety: lifecycle context have no way to change tree struct.
       let (tree1, tree2) = unsafe { tree.split_tree() };
-      self.assert_get_mut(tree1).query_all_type_mut(
-        |m: &mut MountedListener| {
-          (m.on_mounted)(LifeCycleCtx { id: self, tree: tree2 });
+      self.assert_get(tree1).query_all_type(
+        |m: &MountedListener| {
+          (m.on_mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
           true
         },
         QueryOrder::OutsideFirst,
@@ -461,9 +461,9 @@ impl WidgetId {
     tree.layout_store.remove(&self);
     // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
-    self.assert_get_mut(tree1).query_all_type_mut(
-      |d: &mut DisposedListener| {
-        (d.on_disposed)(LifeCycleCtx { id: self, tree: tree2 });
+    self.assert_get(tree1).query_all_type(
+      |d: &DisposedListener| {
+        (d.on_disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
         true
       },
       QueryOrder::OutsideFirst,

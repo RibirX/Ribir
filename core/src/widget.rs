@@ -135,16 +135,6 @@ pub trait Query {
     callback: &mut dyn FnMut(&dyn Any) -> bool,
     order: QueryOrder,
   );
-  // todo: remove mut access
-  /// A type can composed by others, this method query all type(include self)
-  /// match the type id, and call the callback one by one. The callback accept
-  /// an `&mut dyn Any` of the target type, and return if want to continue.
-  fn query_all_mut(
-    &mut self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-    order: QueryOrder,
-  );
 }
 
 #[derive(Clone, Copy)]
@@ -188,43 +178,11 @@ impl<'a> dyn Render + 'a {
     )
   }
 
-  #[inline]
-  pub fn query_all_type_mut<T: Any>(
-    &mut self,
-    mut callback: impl FnMut(&mut T) -> bool,
-    order: QueryOrder,
-  ) {
-    self.query_all_mut(
-      TypeId::of::<T>(),
-      &mut |a: &mut dyn Any| a.downcast_mut().map_or(true, |t| callback(t)),
-      order,
-    )
-  }
-
   /// Query the first match type in all type by special order, and call
   /// `callback`
   pub fn query_on_first_type<T: Any>(&self, order: QueryOrder, callback: impl FnOnce(&T)) {
     let mut callback = Some(callback);
     self.query_all_type(
-      move |a| {
-        let cb = callback.take().expect("should only call once");
-        cb(a);
-        false
-      },
-      order,
-    );
-  }
-
-  /// Query the first match type in all type by special order then call
-  /// `callback`.
-
-  pub fn query_on_first_type_mut<T: Any>(
-    &mut self,
-    order: QueryOrder,
-    callback: impl FnOnce(&mut T),
-  ) {
-    let mut callback = Some(callback);
-    self.query_all_type_mut(
       move |a| {
         let cb = callback.take().expect("should only call once");
         cb(a);
@@ -299,16 +257,6 @@ macro_rules! impl_proxy_query {
     ) {
       self.$field.query_all(type_id, callback, order)
     }
-
-    #[inline]
-    fn query_all_mut(
-      &mut self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-      order: QueryOrder,
-    ) {
-      self.$field.query_all_mut(type_id, callback, order)
-    }
   };
 }
 
@@ -323,18 +271,6 @@ macro_rules! impl_query_self_only {
       _: QueryOrder,
     ) {
       if let Some(a) = self.query_filter(type_id) {
-        callback(a);
-      }
-    }
-
-    #[inline]
-    fn query_all_mut(
-      &mut self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-      _: QueryOrder,
-    ) {
-      if let Some(a) = self.query_filter_mut(type_id) {
         callback(a);
       }
     }
@@ -361,10 +297,6 @@ impl<T: Query> Query for ShareResource<T> {
     order: QueryOrder,
   ) {
     (&**self).query_all(type_id, callback, order)
-  }
-
-  fn query_all_mut(&mut self, _: TypeId, _: &mut dyn FnMut(&mut dyn Any) -> bool, _: QueryOrder) {
-    // resource can not be queried as mut.
   }
 }
 

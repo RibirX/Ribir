@@ -20,17 +20,6 @@ macro_rules! impl_enum_widget {
           $($name::$var_ty(w) => w.query_all(type_id, callback, order)),+
         }
       }
-
-      fn query_all_mut(
-        &mut self,
-        type_id: TypeId,
-        callback: &mut dyn FnMut(&mut dyn Any) -> bool,
-        order: QueryOrder,
-      ) {
-        match self {
-          $($name::$var_ty(w) => w.query_all_mut(type_id, callback, order)),+
-        }
-      }
     }
 
     impl< $($var_ty: Render),+> Render for $name <$($var_ty),+> {

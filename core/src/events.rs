@@ -102,7 +102,7 @@ impl EventCommon {
 
 pub trait EventListener {
   type Event: std::borrow::BorrowMut<EventCommon>;
-  fn dispatch(&mut self, event: &mut Self::Event);
+  fn dispatch(&self, event: &mut Self::Event);
 }
 
 impl std::fmt::Debug for EventCommon {

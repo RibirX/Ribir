@@ -2,13 +2,14 @@ use crate::{
   impl_query_self_only,
   prelude::{data_widget::compose_child_as_data_widget, *},
 };
+use std::cell::RefCell;
 
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
 #[derive(Declare)]
 pub struct CharListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut CharEvent)))]
-  on_char: Box<dyn for<'r> FnMut(&'r mut CharEvent)>,
+  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut CharEvent)))]
+  on_char: RefCell<Box<dyn for<'r> FnMut(&'r mut CharEvent)>>,
 }
 
 #[derive(Debug)]
@@ -53,7 +54,7 @@ impl std::ops::DerefMut for CharEvent {
 impl EventListener for CharListener {
   type Event = CharEvent;
   #[inline]
-  fn dispatch(&mut self, event: &mut CharEvent) { (self.on_char)(event) }
+  fn dispatch(&self, event: &mut CharEvent) { (self.on_char.borrow_mut())(event) }
 }
 
 #[cfg(test)]
