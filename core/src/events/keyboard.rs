@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::{
   impl_query_self_only,
   prelude::{data_widget::compose_child_as_data_widget, *},
@@ -10,29 +12,31 @@ pub struct KeyboardEvent {
   pub common: EventCommon,
 }
 
+type Callback = RefCell<Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>>;
+
 /// Widget fire event whenever press or release a key.
 #[derive(Declare)]
 pub struct KeyDownListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent)))]
-  pub on_key_down: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
+  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut KeyboardEvent)))]
+  pub on_key_down: Callback,
 }
 
 #[derive(Declare)]
 pub struct KeyUpListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent)))]
-  pub on_key_up: Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>,
+  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut KeyboardEvent)))]
+  pub on_key_up: Callback,
 }
 
 impl EventListener for KeyDownListener {
   type Event = KeyboardEvent;
   #[inline]
-  fn dispatch(&mut self, event: &mut KeyboardEvent) { (self.on_key_down)(event) }
+  fn dispatch(&self, event: &mut KeyboardEvent) { (self.on_key_down.borrow_mut())(event) }
 }
 
 impl EventListener for KeyUpListener {
   type Event = KeyboardEvent;
   #[inline]
-  fn dispatch(&mut self, event: &mut KeyboardEvent) { (self.on_key_up)(event) }
+  fn dispatch(&self, event: &mut KeyboardEvent) { (self.on_key_up.borrow_mut())(event) }
 }
 
 impl ComposeSingleChild for KeyDownListener {

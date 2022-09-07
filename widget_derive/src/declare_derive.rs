@@ -20,14 +20,14 @@ struct DefaultMeta {
   value: Option<syn::Expr>,
 }
 
-struct BoxTraitValue {
-  _box_trait_kw: kw::box_trait,
+struct ListenerCallbackValue {
+  _box_trait_kw: kw::listener_callback,
   _paren: token::Paren,
   value: syn::TraitBound,
 }
 enum ConvertValue {
   Into(kw::into),
-  BoxTrait(BoxTraitValue),
+  BoxTrait(ListenerCallbackValue),
   Custom(kw::custom),
   Stipe(kw::strip_option),
 }
@@ -58,7 +58,7 @@ mod kw {
   custom_keyword!(default);
   custom_keyword!(convert);
   custom_keyword!(into);
-  custom_keyword!(box_trait);
+  custom_keyword!(listener_callback);
   custom_keyword!(custom);
   custom_keyword!(skip);
   custom_keyword!(strip_option);
@@ -108,7 +108,7 @@ impl Parse for ConvertValue {
       input.parse().map(ConvertValue::Into)
     } else if lk.peek(kw::custom) {
       input.parse().map(ConvertValue::Custom)
-    } else if lk.peek(kw::box_trait) {
+    } else if lk.peek(kw::listener_callback) {
       input.parse().map(ConvertValue::BoxTrait)
     } else if lk.peek(kw::strip_option) {
       input.parse().map(ConvertValue::Stipe)
@@ -118,7 +118,7 @@ impl Parse for ConvertValue {
   }
 }
 
-impl Parse for BoxTraitValue {
+impl Parse for ListenerCallbackValue {
   fn parse(input: syn::parse::ParseStream) -> Result<Self> {
     let content;
     Ok(Self {
@@ -359,9 +359,10 @@ impl<'a> DeclareField<'a> {
         quote! { v: impl std::convert::Into<DeclareStripOption<#ty>> },
         quote! { v.into().into_option_value() },
       )),
-      Some(ConvertValue::BoxTrait(BoxTraitValue { ref value, .. })) => {
-        Some((quote! { v: impl #value + 'static }, quote! { Box::new(v)}))
-      }
+      Some(ConvertValue::BoxTrait(ListenerCallbackValue { ref value, .. })) => Some((
+        quote! { v: impl #value + 'static },
+        quote! { std::cell::RefCell::new(Box::new(v))},
+      )),
       // custom
       Some(ConvertValue::Custom(_)) => None,
       None => Some((quote! { v: #ty}, quote! {v})),

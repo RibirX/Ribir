@@ -2,6 +2,7 @@ use crate::{
   impl_query_self_only,
   prelude::{data_widget::compose_child_as_data_widget, *},
 };
+use std::cell::RefCell;
 
 /// Focus attr attach to widget to support get ability to focus in.
 #[derive(Default, Declare, SingleChild)]
@@ -35,14 +36,15 @@ pub struct FocusListener {
   #[declare(default, builtin)]
   pub auto_focus: bool,
   #[declare(default, builtin, convert=custom)]
-  pub on_focus: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  pub on_focus: Callback,
   #[declare(default, builtin, convert=custom)]
-  pub on_blur: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  pub on_blur: Callback,
   #[declare(default, builtin, convert=custom)]
-  pub on_focus_in: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  pub on_focus_in: Callback,
   #[declare(default, builtin, convert=custom)]
-  pub on_focus_out: Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>,
+  pub on_focus_out: Callback,
 }
+type Callback = RefCell<Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>>;
 
 pub type FocusEvent = EventCommon;
 
@@ -79,14 +81,14 @@ impl Query for FocusListener {
 
 impl FocusListener {
   #[inline]
-  pub fn dispatch_event(&mut self, event_type: FocusEventType, event: &mut FocusEvent) {
-    let callback = match event_type {
-      FocusEventType::Focus => self.on_focus.as_mut(),
-      FocusEventType::Blur => self.on_blur.as_mut(),
-      FocusEventType::FocusIn => self.on_focus_in.as_mut(),
-      FocusEventType::FocusOut => self.on_focus_out.as_mut(),
+  pub fn dispatch_event(&self, event_type: FocusEventType, event: &mut FocusEvent) {
+    let mut callback = match event_type {
+      FocusEventType::Focus => self.on_focus.borrow_mut(),
+      FocusEventType::Blur => self.on_blur.borrow_mut(),
+      FocusEventType::FocusIn => self.on_focus_in.borrow_mut(),
+      FocusEventType::FocusOut => self.on_focus_out.borrow_mut(),
     };
-    if let Some(callback) = callback {
+    if let Some(callback) = callback.as_mut() {
       callback(event)
     }
   }
@@ -95,47 +97,51 @@ impl FocusListener {
 impl FocusListenerBuilder {
   #[inline]
   pub fn on_focus(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_focus = Some(Some(Box::new(f)));
+    self.on_focus = Some(into_callback(f));
     self
   }
 
   #[inline]
   pub fn on_blur(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_blur = Some(Some(Box::new(f)));
+    self.on_blur = Some(into_callback(f));
     self
   }
 
   #[inline]
   pub fn on_focus_in(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_focus_in = Some(Some(Box::new(f)));
+    self.on_focus_in = Some(into_callback(f));
     self
   }
 
   #[inline]
   pub fn on_focus_out(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_focus_out = Some(Some(Box::new(f)));
+    self.on_focus_out = Some(into_callback(f));
     self
   }
+}
+
+fn into_callback(f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Callback {
+  RefCell::new(Some(Box::new(f)))
 }
 
 impl FocusListener {
   #[inline]
   pub fn set_declare_on_focus(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_focus = Some(Box::new(f));
+    self.on_focus = into_callback(f);
   }
 
   #[inline]
   pub fn set_declare_on_blur(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_blur = Some(Box::new(f));
+    self.on_blur = into_callback(f);
   }
 
   #[inline]
   pub fn set_declare_on_focus_in(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_focus_in = Some(Box::new(f));
+    self.on_focus_in = into_callback(f);
   }
 
   #[inline]
   pub fn set_declare_on_focus_out(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_focus_out = Some(Box::new(f));
+    self.on_focus_out = into_callback(f);
   }
 }
