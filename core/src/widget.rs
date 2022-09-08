@@ -60,7 +60,7 @@ pub use lifecycle::*;
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget
+  fn compose(this: StateWidget<Self>) -> Widget
   where
     Self: Sized;
 }
@@ -107,7 +107,7 @@ pub struct Widget {
 pub(crate) enum WidgetNode {
   Compose(Box<dyn for<'r> FnOnce(&'r mut BuildCtx) -> Widget>),
   Render(Box<dyn Render>),
-  Dynamic(ExprWidget<Box<dyn FnMut() -> ExprResult>>),
+  Dynamic(ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> ExprResult>>),
 }
 
 pub(crate) enum Children {
@@ -217,8 +217,8 @@ impl IntoWidget<Widget> for Widget {
 impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C {
   fn into_widget(self) -> Widget {
     Widget {
-      node: Some(WidgetNode::Compose(Box::new(|ctx| {
-        ComposedWidget::<Widget, C>::new(Compose::compose(self.into(), ctx)).into_widget()
+      node: Some(WidgetNode::Compose(Box::new(|_| {
+        ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
       }))),
       children: Children::None,
     }

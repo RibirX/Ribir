@@ -8,7 +8,7 @@ pub struct EmbedPostWithKey {
 }
 
 impl Compose for EmbedPostWithKey {
-  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Row {

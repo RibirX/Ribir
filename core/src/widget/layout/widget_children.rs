@@ -41,7 +41,7 @@ pub trait ComposeSingleChild {
     SingleChildWidget::new(self, child)
   }
 
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, ctx: &mut BuildCtx) -> Widget
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget
   where
     Self: Sized;
 }
@@ -59,11 +59,7 @@ pub trait ComposeMultiChild {
     multi
   }
 
-  fn compose_multi_child(
-    this: StateWidget<Self>,
-    children: Vec<Widget>,
-    ctx: &mut BuildCtx,
-  ) -> Widget
+  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget
   where
     Self: Sized;
 }
@@ -117,8 +113,8 @@ where
 {
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    let node = WidgetNode::Compose(Box::new(move |ctx| {
-      ComposeSingleChild::compose_single_child(widget.into(), child, ctx)
+    let node = WidgetNode::Compose(Box::new(move |_| {
+      ComposeSingleChild::compose_single_child(widget.into(), child)
     }));
     let children = Children::None;
     Widget { node: Some(node), children }
@@ -236,7 +232,7 @@ where
 
 impl<W, E, R, M: ?Sized> IntoWidget<(SingleResult<R>, &M)> for SingleChildWidget<ExprWidget<E>, W>
 where
-  E: FnMut() -> SingleResult<R> + 'static,
+  E: FnMut(&mut BuildCtx) -> SingleResult<R> + 'static,
   R: SingleChild + Render + 'static,
   W: IntoWidget<M>,
 {
@@ -254,7 +250,7 @@ impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, SingleResult<&M2>)>
   for SingleChildWidget<W, ExprWidget<E>>
 where
   SingleChildWidget<W, Widget>: IntoWidget<M1>,
-  E: FnMut() -> SingleResult<R> + 'static,
+  E: FnMut(&mut BuildCtx) -> SingleResult<R> + 'static,
   R: IntoWidget<M2>,
 {
   #[inline]
@@ -321,8 +317,8 @@ where
 {
   fn into_widget(self) -> Widget {
     let MultiChildWidget { widget, children } = self;
-    let node = WidgetNode::Compose(Box::new(move |ctx| {
-      ComposeMultiChild::compose_multi_child(widget.into(), children, ctx)
+    let node = WidgetNode::Compose(Box::new(move |_| {
+      ComposeMultiChild::compose_multi_child(widget.into(), children)
     }));
     Widget {
       node: Some(node),
@@ -351,7 +347,7 @@ where
 
 impl<M: ?Sized, E, R> MultiChildMarker<ExprWidget<&M>> for ExprWidget<E>
 where
-  E: FnMut() -> SingleResult<R> + 'static,
+  E: FnMut(&mut BuildCtx) -> SingleResult<R> + 'static,
   R: IntoWidget<M>,
 {
   #[inline]
@@ -360,7 +356,7 @@ where
 
 impl<E> MultiChildMarker<Widget> for ExprWidget<E>
 where
-  E: FnMut() -> MultiResult + 'static,
+  E: FnMut(&mut BuildCtx) -> MultiResult + 'static,
 {
   #[inline]
   fn fill<W>(self, multi: &mut MultiChildWidget<W>) {

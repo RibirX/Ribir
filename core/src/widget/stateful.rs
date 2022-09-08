@@ -373,36 +373,32 @@ impl<W: Render + 'static> Render for Stateful<W> {
 }
 
 impl<W: Compose> Compose for Stateful<W> {
-  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => StateWidget::Stateful(s),
       StateWidget::Stateful(_) => unreachable!(),
     };
-    Compose::compose(w, ctx)
+    Compose::compose(w)
   }
 }
 
 impl<W: ComposeSingleChild> ComposeSingleChild for Stateful<W> {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, ctx: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => StateWidget::Stateful(s),
       StateWidget::Stateful(_) => unreachable!(),
     };
-    ComposeSingleChild::compose_single_child(w, child, ctx)
+    ComposeSingleChild::compose_single_child(w, child)
   }
 }
 
 impl<W: ComposeMultiChild> ComposeMultiChild for Stateful<W> {
-  fn compose_multi_child(
-    this: StateWidget<Self>,
-    children: Vec<Widget>,
-    ctx: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => StateWidget::Stateful(s),
       StateWidget::Stateful(_) => unreachable!(),
     };
-    ComposeMultiChild::compose_multi_child(w, children, ctx)
+    ComposeMultiChild::compose_multi_child(w, children)
   }
 }
 

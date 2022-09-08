@@ -23,12 +23,7 @@ impl Checkbox {
 }
 
 impl Compose for Checkbox {
-  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
-    let icons = SvgIcons::of(ctx);
-    let checked = icons.checked.clone();
-    let unchecked = icons.unchecked.clone();
-    let indeterminate = icons.indeterminate.clone();
-
+  fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Icon {
@@ -41,14 +36,19 @@ impl Compose for Checkbox {
           }
         },
         ExprWidget {
-          expr: if this.indeterminate {
-            indeterminate.clone()
-          } else if this.checked {
-            checked.clone()
-          } else {
-            unchecked.clone()
-          }
-        }
+          expr: {
+            let icons = SvgIcons::of(ctx);
+            let checked = icons.checked.clone();
+            let unchecked = icons.unchecked.clone();
+            let indeterminate = icons.indeterminate.clone();
+            if this.indeterminate {
+              indeterminate.clone()
+            } else if this.checked {
+              checked.clone()
+            } else {
+              unchecked.clone()
+            }
+        }}
       }
     }
   }

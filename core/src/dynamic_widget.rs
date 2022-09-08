@@ -28,7 +28,7 @@ pub struct ConstExprWidget<W> {
 /// lifetime.
 pub(crate) struct Generator {
   pub(crate) info: GeneratorInfo,
-  pub(crate) expr: Box<dyn FnMut() -> ExprResult>,
+  pub(crate) expr: Box<dyn FnMut(&mut BuildCtx) -> ExprResult>,
   pub(crate) _upstream_handle: SubscriptionGuard<Box<dyn SubscriptionLike>>,
 }
 
@@ -127,11 +127,11 @@ where
 impl<E: 'static> ExprWidget<E> {
   pub fn into_widget<R, M: ?Sized>(self) -> Widget
   where
-    E: FnMut() -> SingleResult<R>,
+    E: FnMut(&mut BuildCtx) -> SingleResult<R>,
     R: IntoWidget<M>,
   {
     let Self { mut expr, upstream } = self;
-    let expr = Box::new(move || expr().into_dyn_result());
+    let expr = Box::new(move |ctx: &mut BuildCtx| expr(ctx).into_dyn_result());
     Widget {
       node: Some(WidgetNode::Dynamic(ExprWidget { expr, upstream })),
       children: Children::None,
@@ -139,11 +139,12 @@ impl<E: 'static> ExprWidget<E> {
   }
 }
 
-impl<E: FnMut() -> MultiResult + 'static> ExprWidget<E> {
+impl<E: FnMut(&mut BuildCtx) -> MultiResult + 'static> ExprWidget<E> {
   #[inline]
   pub fn into_multi_child(self) -> Widget {
     let Self { mut expr, upstream } = self;
-    let expr: Box<dyn FnMut() -> ExprResult> = Box::new(move || expr().into_dyn_result());
+    let expr: Box<dyn FnMut(&mut BuildCtx) -> ExprResult> =
+      Box::new(move |ctx| expr(ctx).into_dyn_result());
 
     Widget {
       node: Some(WidgetNode::Dynamic(ExprWidget { expr, upstream })),
@@ -152,32 +153,27 @@ impl<E: FnMut() -> MultiResult + 'static> ExprWidget<E> {
   }
 }
 
-impl<R: SingleChild, E> SingleChild for ExprWidget<E> where E: FnMut() -> SingleResult<R> {}
-impl<R: MultiChild, E> MultiChild for ExprWidget<E> where E: FnMut() -> SingleResult<R> {}
+impl<R: SingleChild, E> SingleChild for ExprWidget<E> where
+  E: FnMut(&mut BuildCtx) -> SingleResult<R>
+{
+}
+impl<R: MultiChild, E> MultiChild for ExprWidget<E> where E: FnMut(&mut BuildCtx) -> SingleResult<R> {}
 
 impl<C: SingleChild> SingleChild for ConstExprWidget<Option<C>> {}
 impl<C: SingleChild> SingleChild for ConstExprWidget<C> {}
 impl<C: MultiChild> MultiChild for ConstExprWidget<C> {}
 impl<C: ComposeSingleChild> ComposeSingleChild for ConstExprWidget<C> {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, ctx: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     match this {
-      StateWidget::Stateless(c) => {
-        ComposeSingleChild::compose_single_child(c.expr.into(), child, ctx)
-      }
+      StateWidget::Stateless(c) => ComposeSingleChild::compose_single_child(c.expr.into(), child),
       StateWidget::Stateful(_) => unreachable!("ExprWidget should not be stateful."),
     }
   }
 }
 impl<C: ComposeMultiChild> ComposeMultiChild for ConstExprWidget<C> {
-  fn compose_multi_child(
-    this: StateWidget<Self>,
-    children: Vec<Widget>,
-    ctx: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
     match this {
-      StateWidget::Stateless(c) => {
-        ComposeMultiChild::compose_multi_child(c.expr.into(), children, ctx)
-      }
+      StateWidget::Stateless(c) => ComposeMultiChild::compose_multi_child(c.expr.into(), children),
       StateWidget::Stateful(_) => unreachable!("ExprWidget should not be stateful."),
     }
   }
@@ -197,12 +193,12 @@ impl<W: Render + 'static> Render for ConstExprWidget<W> {
 }
 
 impl<W: Compose> Compose for ConstExprWidget<W> {
-  fn compose(this: StateWidget<Self>, ctx: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => StateWidget::Stateless(s.expr),
       StateWidget::Stateful(_) => unreachable!(),
     };
-    Compose::compose(w, ctx)
+    Compose::compose(w)
   }
 }
 
@@ -218,8 +214,10 @@ impl Generator {
   pub(crate) fn info(&self) -> &GeneratorInfo { &self.info }
 
   pub fn refresh(&mut self, tree: &mut WidgetTree) {
+    let parent = self.info.parent();
     let gen_result = &mut self.info.gen_dyn_widgets;
-    let new_gen = (self.expr)();
+    let mut ctx = BuildCtx::new(parent, tree);
+    let new_gen = (self.expr)(&mut ctx);
 
     match (gen_result, new_gen) {
       (&mut DynamicWidgetInfo::SingleDynWithChild { gen_root, depth }, ExprResult::Single(w)) => {

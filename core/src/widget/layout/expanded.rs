@@ -13,7 +13,7 @@ pub struct Expanded {
 
 impl ComposeSingleChild for Expanded {
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

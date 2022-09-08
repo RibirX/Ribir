@@ -21,7 +21,7 @@ impl Render for Void {
 
 impl crate::prelude::ComposeSingleChild for Void {
   #[inline]
-  fn compose_single_child(_: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget { child }
+  fn compose_single_child(_: StateWidget<Self>, child: Widget) -> Widget { child }
 }
 
 impl Query for Void {

@@ -1,7 +1,7 @@
 use crate::{
   declare_derive::declare_field_name,
   widget_attr_macro::{
-    capture_widget, ribir_variable, DeclareCtx, ScopeUsedInfo, UsedType, BUILD_CTX,
+    capture_widget, ctx_ident, ribir_variable, DeclareCtx, ScopeUsedInfo, UsedType,
   },
 };
 use proc_macro2::TokenStream;
@@ -27,7 +27,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
 
     let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
 
-    let build_ctx = ribir_variable(BUILD_CTX, self.ty.span());
+    let build_ctx = ctx_ident(self.ty.span());
     let fields_tokens = self.fields.clone().map(|f| f.field_tokens());
     let mut build_widget = quote! {
       <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful

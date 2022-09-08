@@ -11,7 +11,7 @@ pub struct Cursor {
 }
 
 impl ComposeSingleChild for Cursor {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     widget_try_track! {
       try_track { this }
       ExprWidget {

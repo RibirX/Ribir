@@ -14,11 +14,7 @@ pub struct Row {
 }
 
 impl ComposeMultiChild for Row {
-  fn compose_multi_child(
-    this: StateWidget<Self>,
-    children: Vec<Widget>,
-    _: &mut BuildCtx,
-  ) -> Widget {
+  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
     widget_try_track! {
       try_track { this }
       Flex {

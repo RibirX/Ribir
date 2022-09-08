@@ -45,7 +45,7 @@ macro_rules! impl_enum_widget {
     impl<$($var_ty: SingleChild),+> SingleChild for $name <$($var_ty),+> {}
     impl<$($var_ty: MultiChild),+> MultiChild for $name <$($var_ty),+> {}
     impl<$($var_ty: ComposeSingleChild),+> ComposeSingleChild for $name <$($var_ty),+> {
-      fn compose_single_child(this: StateWidget<Self>, child: Widget, ctx: &mut BuildCtx)
+      fn compose_single_child(this: StateWidget<Self>, child: Widget)
          -> Widget {
         let w = match this {
          StateWidget::  Stateless(w) => w,
@@ -54,17 +54,13 @@ macro_rules! impl_enum_widget {
          }
         };
         match w {
-          $($name::$var_ty(w) => $var_ty::compose_single_child(w.into(), child, ctx)),+
+          $($name::$var_ty(w) => $var_ty::compose_single_child(w.into(), child)),+
         }
       }
     }
 
     impl<$($var_ty: ComposeMultiChild),+> ComposeMultiChild for $name <$($var_ty),+> {
-      fn compose_multi_child(
-        this: StateWidget<Self>,
-        children: Vec<Widget>,
-        ctx: &mut BuildCtx,
-      ) -> Widget {
+      fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
         let w = match this {
          StateWidget::  Stateless(w) => w,
          StateWidget:: Stateful(_) =>  {
@@ -73,7 +69,7 @@ macro_rules! impl_enum_widget {
         };
 
         match w {
-          $($name::$var_ty(w) => $var_ty::compose_multi_child(w.into(), children, ctx)),+
+          $($name::$var_ty(w) => $var_ty::compose_multi_child(w.into(), children, )),+
         }
       }
     }

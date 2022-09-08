@@ -29,7 +29,7 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
           Widget { node: Some(node), children }
         }
         WidgetNode::Dynamic(ExprWidget { mut expr, upstream }) => {
-          let new_expr = move || match expr() {
+          let new_expr = move |ctx: &mut BuildCtx| match expr(ctx) {
             ExprResult::Single(w) => {
               ExprResult::Single(w.map(|w| ComposedWidget { composed: w, by }.into_widget()))
             }
@@ -91,7 +91,7 @@ mod tests {
     struct T;
 
     impl Compose for T {
-      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
           ExprWidget {

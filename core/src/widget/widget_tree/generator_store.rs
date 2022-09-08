@@ -3,7 +3,7 @@ use rxrust::{observable::SubscribeNext, prelude::Observable};
 use crate::{
   dynamic_widget::{ExprWidget, Generator, GeneratorID, GeneratorInfo},
   prelude::{ChangeScope, WidgetId},
-  widget::ExprResult,
+  widget::{BuildCtx, ExprResult},
 };
 use std::{
   cell::RefCell,
@@ -24,7 +24,7 @@ pub(crate) struct GeneratorStore {
 impl GeneratorStore {
   pub(crate) fn new_generator(
     &mut self,
-    ExprWidget { expr, upstream }: ExprWidget<Box<dyn FnMut() -> ExprResult>>,
+    ExprWidget { expr, upstream }: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> ExprResult>>,
     parent: Option<WidgetId>,
     road_sign: WidgetId,
     has_child: bool,

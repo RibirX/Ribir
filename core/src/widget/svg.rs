@@ -6,7 +6,7 @@ pub struct Svg {
 }
 
 impl Compose for Svg {
-  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     widget_try_track! {
       try_track { this }
       ExprWidget {
