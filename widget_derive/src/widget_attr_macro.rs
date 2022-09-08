@@ -95,13 +95,6 @@ impl Id {
   }
 }
 
-fn obj_state_ref(widget: &Ident) -> TokenStream2 {
-  quote_spanned!(widget.span() =>
-    #[allow(unused_mut)]
-    let mut #widget = #widget.state_ref();
-  )
-}
-
 fn capture_widget(widget: &Ident) -> TokenStream2 {
   quote_spanned!(widget.span() => let #widget = #widget.clone_stateful();)
 }

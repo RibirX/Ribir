@@ -9,7 +9,7 @@ use super::{
 };
 
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::{quote, quote_spanned, ToTokens};
 use std::collections::{HashMap, HashSet};
 use syn::{
   parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr, Ident,
@@ -70,10 +70,13 @@ impl VisitMut for DeclareCtx {
         visit_mut::visit_expr_closure_mut(self, c);
         let mut overwrite_inner_used = UsedType::CAPTURE;
         if c.capture.is_some() {
-          if let Some(refs) = self.current_used_info.refs_tokens() {
-            let body = &c.body;
-            c.body = parse_quote_spanned! { body.span() => { #(#refs)*  #body }};
+          if self.current_used_info.refs_widgets().is_some() {
+            let body = self
+              .current_used_info
+              .expr_refs_wrap(c.body.to_token_stream());
+            c.body = parse_quote!(#body);
           }
+
           if let Some(all) = self.current_used_info.all_widgets() {
             let captures = all.map(capture_widget);
             *expr = parse_quote_spanned! {c.span() => {

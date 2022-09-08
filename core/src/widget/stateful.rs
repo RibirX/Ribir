@@ -278,6 +278,9 @@ impl<'a, W> StateRef<'a, W> {
   {
     *self
   }
+
+  #[inline]
+  pub fn release_current_borrow(&mut self) { self.0.release_current_borrow(); }
 }
 
 impl<'a, W> std::ops::Deref for SilentRef<'a, W> {

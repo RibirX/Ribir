@@ -1,7 +1,7 @@
+use super::DeclareCtx;
 use crate::error::CircleUsedPath;
-
-use super::{obj_state_ref, DeclareCtx};
 use proc_macro2::{Span, TokenStream};
+use quote::{quote, quote_spanned, spanned::Spanned};
 use std::collections::HashMap;
 use syn::Ident;
 
@@ -142,9 +142,12 @@ impl ScopeUsedInfo {
     self.filter_widget(|info| info.used_type != UsedType::MOVE_CAPTURE)
   }
 
-  pub fn refs_tokens(&self) -> Option<impl Iterator<Item = TokenStream> + '_> {
-    // fixme: only top move capture of field needn't declare state ref.
-    self.refs_widgets().map(|iter| iter.map(obj_state_ref))
+  pub fn expr_refs_wrap(&self, tokens: TokenStream) -> TokenStream {
+    if let Some(name) = self.refs_widgets() {
+      expr_refs_wrap(name, tokens)
+    } else {
+      quote! { #tokens }
+    }
   }
 
   pub fn iter_mut(&mut self) -> impl Iterator<Item = (&Ident, &mut NameUsedInfo)> {
@@ -194,6 +197,23 @@ impl ScopeUsedInfo {
   ) -> Option<impl Iterator<Item = &Ident> + Clone> {
     self.filter_item(filter).map(|iter| iter.map(|(w, _)| w))
   }
+}
+
+pub fn expr_refs_wrap<'a>(
+  name: impl Iterator<Item = &'a Ident> + Clone,
+  tokens: TokenStream,
+) -> TokenStream {
+  let name2 = name.clone();
+  quote_spanned! {tokens.__span() => {
+    #(
+      let mut #name = #name.state_ref();
+    )*
+    let v= { #tokens } ;
+    #(
+      #name2.release_current_borrow();
+    )*
+    v
+  }}
 }
 
 impl<'a> ObjectUsedPath<'a> {
