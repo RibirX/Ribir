@@ -33,16 +33,9 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
       <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful
     };
     let used_info = self.whole_used_info();
-    if let Some(refs) = used_info.refs_tokens() {
-      build_widget = quote_spanned! { ty.span() =>
-        let #name = {
-          #(#refs)*
-          #build_widget
-        };
-      };
-    } else {
-      build_widget = quote_spanned! { ty.span() => let #name = #build_widget; };
-    }
+    build_widget = used_info.expr_refs_wrap(build_widget);
+
+    build_widget = quote_spanned! { ty.span() => let #name = #build_widget; };
     let fields_follow = fields.clone().filter_map(|f| self.field_follow_tokens(f));
 
     quote! {
@@ -55,7 +48,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     let DeclareField { member, used_name_info, skip_nc, .. } = f;
 
     let name = &self.name;
-    let mut expr_tokens = f.value_tokens();
+    let expr_tokens = f.used_name_info.expr_refs_wrap(f.value_tokens());
     let directly_used = used_name_info.directly_used_widgets()?;
 
     if f.value_is_an_id().is_some() {
@@ -63,9 +56,6 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     }
 
     let declare_set = declare_field_name(member);
-    if let Some(refs) = f.used_name_info.refs_tokens() {
-      expr_tokens = quote! {{ #(#refs)* #expr_tokens }};
-    }
     let assign = if skip_nc.is_some() {
       let old = ribir_variable("old", expr_tokens.span());
       quote! {{

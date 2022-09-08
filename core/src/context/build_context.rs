@@ -51,24 +51,18 @@ mod tests {
   #[test]
   #[should_panic(expected = "Get a default theme from context")]
   fn always_have_default_theme() {
-    struct T;
-    impl Compose for T {
-      fn compose(_: StateWidget<Self>) -> Widget {
-        widget! {
-          ExprWidget {
-            expr: {
-              let _ = ctx.theme();
-              panic!("Get a default theme from context");
-              #[allow(unreachable_code)]
-              Void {}
-            }
-          }
+    let w = widget! {
+      ExprWidget {
+        expr: {
+          let _ = ctx.theme();
+          panic!("Get a default theme from context");
+          #[allow(unreachable_code)]
+          Void {}
         }
       }
-    }
-
+    };
     // should panic when construct widget tree
-    WidgetTree::new(T.into_widget(), <_>::default());
+    WidgetTree::new(w, <_>::default());
   }
 
   #[derive(Debug, Declare)]

@@ -1,6 +1,6 @@
 use super::{
   declare_widget::{try_parse_skip_nc, upstream_tokens, SkipNcAttr},
-  kw, skip_nc_assign, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedPart,
+  expr_refs_wrap, kw, skip_nc_assign, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedPart,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -14,10 +14,7 @@ use syn::{
   Expr, Ident,
 };
 
-use crate::{
-  error::DeclareError,
-  widget_attr_macro::{capture_widget, obj_state_ref},
-};
+use crate::{error::DeclareError, widget_attr_macro::capture_widget};
 
 mod ct {
   syn::custom_punctuation!(RightArrow, ~>);
@@ -75,7 +72,8 @@ impl ToTokens for Dataflow {
       .chain(to_used_name.refs_widgets().into_iter())
       .flatten()
       .collect();
-    let refs_tokens = state_refs.into_iter().map(obj_state_ref);
+    let mut subscribe_do = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
+    subscribe_do = expr_refs_wrap(state_refs.iter().cloned(), subscribe_do);
 
     let captures: HashSet<&Ident, ahash::RandomState> = from_used_name
       .all_widgets()
@@ -85,10 +83,9 @@ impl ToTokens for Dataflow {
       .collect();
     let capture_tokens = captures.into_iter().into_iter().map(capture_widget);
 
-    let subscribe_do = skip_nc_assign(self.skip_nc.is_some(), &to.expr, &from.expr);
     tokens.extend(quote! {{
       #(#capture_tokens)*
-      #upstream.subscribe(move |_| { #(#refs_tokens)* #subscribe_do });
+      #upstream.subscribe(move |_| #subscribe_do );
     }});
   }
 }
