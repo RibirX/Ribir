@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
   error::{CircleUsedPath, DeclareError},
-  widget_attr_macro::{ribir_variable, ObjectUsedPath, UsedType, BUILD_CTX},
+  widget_attr_macro::{ctx_ident, ribir_variable, ObjectUsedPath, UsedType},
 };
 
 pub const EXPR_WIDGET: &str = "ExprWidget";
@@ -145,7 +145,7 @@ impl WidgetMacro {
     }
     self.compose_tokens(ctx, &mut tokens);
 
-    let ctx_name = ribir_variable(BUILD_CTX, Span::call_site());
+    let ctx_name = ctx_ident(Span::call_site());
     let name = self.widget_identify();
     let mut tokens = quote! {
       (move |#ctx_name: &mut BuildCtx| {

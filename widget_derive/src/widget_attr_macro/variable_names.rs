@@ -2,7 +2,6 @@ use proc_macro2::Span;
 use syn::Ident;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
-pub(crate) const BUILD_CTX: &str = "ctx";
 
 pub fn child_variable(name: &Ident, idx: usize) -> Ident {
   ribir_suffix_variable(name, &format!("c_{idx}"))
@@ -24,3 +23,5 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
   let name = format!("{prefix}_{suffix}_{AVOID_CONFLICT_SUFFIX}");
   Ident::new(&name, from.span())
 }
+
+pub fn ctx_ident(span: Span) -> Ident { Ident::new("ctx", span) }

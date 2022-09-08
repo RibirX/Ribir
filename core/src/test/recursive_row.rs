@@ -7,7 +7,7 @@ pub struct RecursiveRow {
 }
 
 impl Compose for RecursiveRow {
-  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Row {

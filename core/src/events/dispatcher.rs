@@ -527,7 +527,7 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
           SizedBox {
@@ -571,7 +571,7 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
           SizedBox {
@@ -639,7 +639,7 @@ mod tests {
     struct ClickPath(Rc<RefCell<i32>>);
 
     impl Compose for ClickPath {
-      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
           Row {

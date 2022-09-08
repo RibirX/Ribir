@@ -12,7 +12,7 @@ pub struct HScrollBar {
 }
 
 impl ComposeSingleChild for HScrollBar {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Stack {
@@ -48,7 +48,7 @@ pub struct VScrollBar {
 }
 
 impl ComposeSingleChild for VScrollBar {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Stack {
@@ -83,7 +83,7 @@ pub struct BothScrollbar {
 }
 
 impl ComposeSingleChild for BothScrollbar {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Stack {
@@ -124,7 +124,7 @@ pub struct HRawScrollbar {
 }
 
 impl Compose for HRawScrollbar {
-  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
     let scrolling = this.raw_ref().scrolling.clone();
     widget! {
@@ -167,7 +167,7 @@ pub struct VRawScrollbar {
 }
 
 impl Compose for VRawScrollbar {
-  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
     let scrolling = this.raw_ref().scrolling.clone();
     widget! {

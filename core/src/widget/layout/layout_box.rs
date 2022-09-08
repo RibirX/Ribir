@@ -9,7 +9,7 @@ pub struct LayoutBox {
 }
 
 impl ComposeSingleChild for LayoutBox {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       ExprWidget {

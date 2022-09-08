@@ -223,8 +223,9 @@ impl DeclareCtx {
           .all_widgets()
           .map(|objs| upstream_tokens(objs, quote! {raw_change_stream}));
         if let Some(upstream) = upstream {
-          expr_field.expr =
-            parse_quote_spanned! { origin_expr.span() => move || #origin_expr.into_gen_result() };
+          expr_field.expr = parse_quote_spanned! { origin_expr.span() =>
+            move |#[allow(unused)] ctx: &mut BuildCtx| #origin_expr.into_gen_result()
+          };
 
           // we convert the field expr to a closure, revisit again.
           expr_field.used_name_info.take();

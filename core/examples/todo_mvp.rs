@@ -11,7 +11,7 @@ struct TodoMVP {
 }
 
 impl Compose for TodoMVP {
-  fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+  fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       // split this to avoid mutable borrow conflict in `ExprWidget`.
       track { this: this.into_stateful(), this2: this.clone() }

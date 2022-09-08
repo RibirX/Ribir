@@ -14,13 +14,12 @@ use syn::{
 use crate::widget_attr_macro::Id;
 
 use super::{
-  capture_widget,
+  capture_widget, ctx_ident,
   declare_widget::{
     assign_uninit_field, check_duplicate_field, pick_fields_by, BuiltinFieldWidgets, WidgetGen,
     FIELD_WIDGET_TYPE,
   },
   ribir_suffix_variable, ribir_variable, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
-  BUILD_CTX,
 };
 use super::{declare_widget::DeclareField, kw};
 
@@ -427,7 +426,7 @@ impl Animate {
     let Self { animate_token, from, transition, .. } = self;
 
     let animate_span = animate_token.span();
-    let build_ctx = ribir_variable(BUILD_CTX, animate_span);
+    let build_ctx = ctx_ident(animate_span);
 
     let from_field = parse_quote! { #from };
     let transition_field = transition.to_declare_field(ctx);

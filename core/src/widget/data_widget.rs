@@ -66,12 +66,12 @@ impl<D: Query> Query for DataWidget<Box<dyn Render>, D> {
 }
 
 fn expr_attach_data<D: Query + Clone + 'static>(
-  expr: ExprWidget<Box<dyn FnMut() -> ExprResult>>,
+  expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> ExprResult>>,
   children: Children,
   data: D,
 ) -> Widget {
   let ExprWidget { mut expr, upstream } = expr;
-  let new_expr = move || match expr() {
+  let new_expr = move |ctx: &mut BuildCtx| match expr(ctx) {
     ExprResult::Single(w) => {
       let w = w.map(|w| widget_attach_data(w, data.clone(), expr_attach_data));
       ExprResult::Single(w)
@@ -98,7 +98,9 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
     StateWidget::Stateless(data) => widget_attach_data(
       child,
       data,
-      |expr: ExprWidget<Box<dyn FnMut() -> ExprResult>>, children: Children, data: D| {
+      |expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> ExprResult>>,
+       children: Children,
+       data: D| {
         let data = Stateful::new(data);
         expr_attach_data(expr, children, data)
       },
@@ -110,7 +112,12 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
 fn widget_attach_data<D: Query + 'static>(
   widget: Widget,
   data: D,
-  attach_expr: impl FnOnce(ExprWidget<Box<dyn FnMut() -> ExprResult>>, Children, D) -> Widget + 'static,
+  attach_expr: impl FnOnce(
+    ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> ExprResult>>,
+    Children,
+    D,
+  ) -> Widget
+  + 'static,
 ) -> Widget {
   let Widget { node, children } = widget;
   if let Some(node) = node {

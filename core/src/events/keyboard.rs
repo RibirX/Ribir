@@ -41,14 +41,14 @@ impl EventListener for KeyUpListener {
 
 impl ComposeSingleChild for KeyDownListener {
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }
 
 impl ComposeSingleChild for KeyUpListener {
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget, _: &mut BuildCtx) -> Widget {
+  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }
@@ -109,7 +109,7 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: StateWidget<Self>, _: &mut BuildCtx) -> Widget {
+      fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
           SizedBox {
