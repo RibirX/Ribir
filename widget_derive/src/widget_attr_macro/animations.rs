@@ -114,7 +114,7 @@ struct MemberPath {
 #[derive(Debug)]
 struct StateField {
   path: MemberPath,
-  _colon_token: token::Colon,
+  _colon_token: Option<token::Colon>,
   value: Expr,
 }
 
@@ -387,11 +387,15 @@ impl Parse for MemberPath {
 
 impl Parse for StateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(Self {
-      path: input.parse()?,
-      _colon_token: input.parse()?,
-      value: input.parse()?,
-    })
+    let path = input.parse()?;
+    let _colon_token: Option<_> = input.parse()?;
+    let value = if _colon_token.is_some() {
+      input.parse()?
+    } else {
+      parse_quote!(#path)
+    };
+
+    Ok(Self { path, _colon_token, value })
   }
 }
 
@@ -568,8 +572,11 @@ impl ToTokens for State {
     let target_mut_refs = self
       .target_objs()
       .map(|name| quote_spanned! { name.span() =>  let mut #name = #name.shallow_ref(); });
-    let target_value = self.maybe_tuple_value(|StateField { path, .. }| quote! {#path.clone()});
-    let target_assign = self.maybe_tuple_value(|StateField { path, .. }| quote! {#path});
+    let target_value = self.maybe_tuple_value(|field| {
+      let value = field.path.to_real_widget_tokens();
+      quote! { #value.clone()}
+    });
+    let target_assign = self.maybe_tuple_value(|field| field.path.to_real_widget_tokens());
 
     let v = ribir_variable("v", state_span);
     tokens.extend(quote_spanned! { state_span =>
@@ -743,11 +750,22 @@ impl Trigger {
   }
 }
 
+impl MemberPath {
+  fn to_real_widget_tokens(&self) -> TokenStream {
+    let mut tokens = quote! {};
+    self.on_real_widget_name(|w| w.to_tokens(&mut tokens));
+    self.dot_token.to_tokens(&mut tokens);
+    self.member.to_tokens(&mut tokens);
+    tokens
+  }
+}
+
 impl ToTokens for MemberPath {
-  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    self.on_real_widget_name(|w| w.to_tokens(tokens));
-    self.dot_token.to_tokens(tokens);
-    self.member.to_tokens(tokens);
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    let Self { widget, dot_token, member } = self;
+    widget.to_tokens(tokens);
+    dot_token.to_tokens(tokens);
+    member.to_tokens(tokens);
   }
 }
 
@@ -803,7 +821,7 @@ impl DeclareCtx {
     state
       .fields
       .iter_mut()
-      .for_each(|p| self.visit_expr_mut(&mut p.value));
+      .for_each(|f| self.visit_expr_mut(&mut f.value));
 
     state.expr_used = self.take_current_used_info();
 

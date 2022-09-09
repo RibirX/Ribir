@@ -57,4 +57,14 @@ fn main() {
       sized_box.background: Transition { easing: easing::LINEAR },
     }
   };
+
+  let _state_field_shorthand = widget! {
+    SizedBox { id: sized_box, size: Size::zero() }
+    animations {
+      sized_box.size: Animate {
+        from: State { sized_box.size },
+        transition: Transition { easing: easing::LINEAR }
+      },
+    }
+  };
 }
