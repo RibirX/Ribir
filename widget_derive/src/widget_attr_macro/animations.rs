@@ -55,12 +55,14 @@ pub struct Animate {
   id: Option<Id>,
   from: FromStateField,
   transition: TransitionField,
+  lerp_fn: DeclareField,
   trigger_inline: bool,
 }
 mod animate_kw {
   syn::custom_keyword!(from);
   syn::custom_keyword!(transition);
   syn::custom_keyword!(animation);
+  syn::custom_keyword!(lerp_fn);
 }
 
 #[derive(Debug)]
@@ -266,6 +268,7 @@ impl Parse for Animate {
       id: Option<Id>,
       from: Option<FromStateField>,
       transition: Option<TransitionField>,
+      lerp_fn: Option<DeclareField>,
     }
 
     let mut fields = Fields::default();
@@ -282,6 +285,9 @@ impl Parse for Animate {
       } else if lk.peek(animate_kw::transition) {
         let transition = content.parse()?;
         assign_uninit_field!(fields.transition, transition)?;
+      } else if lk.peek(animate_kw::lerp_fn) {
+        let lerp_fn = content.parse()?;
+        assign_uninit_field!(fields.lerp_fn, lerp_fn)?;
       } else {
         return Err(lk.error());
       }
@@ -293,17 +299,23 @@ impl Parse for Animate {
       }
     }
 
-    let Fields { id, from, transition } = fields;
+    let Fields { id, from, transition, lerp_fn } = fields;
     let from = from.ok_or_else(|| Error::new(animate_token.span(), "miss `from` field."))?;
     let transition =
       transition.ok_or_else(|| Error::new(animate_token.span(), "miss `transition` field."))?;
 
+    let lerp_fn = lerp_fn.unwrap_or_else(|| {
+      parse_quote! {
+       lerp_fn: |from, to, rate| Lerp::lerp(from, to, rate)
+      }
+    });
     Ok(Animate {
       animate_token,
       _brace_token: brace_token,
       id,
       from,
       transition,
+      lerp_fn,
       trigger_inline: false,
     })
   }
@@ -423,7 +435,13 @@ impl Animations {
 
 impl Animate {
   fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &DeclareCtx) {
-    let Self { animate_token, from, transition, .. } = self;
+    let Self {
+      animate_token,
+      from,
+      transition,
+      lerp_fn,
+      ..
+    } = self;
 
     let animate_span = animate_token.span();
     let build_ctx = ctx_ident(animate_span);
@@ -432,9 +450,9 @@ impl Animate {
     let transition_field = transition.to_declare_field(ctx);
 
     let name = self.variable_name();
-    let ty = parse_quote! {#animate_token<_, _, _, _, _>};
-    let fields = [from_field, transition_field];
-    let gen = WidgetGen::new(&ty, &name, fields.iter(), self.trigger_inline);
+    let ty = parse_quote! {#animate_token<_, _, _, _, _, _>};
+    let fields = [&from_field, &transition_field, lerp_fn];
+    let gen = WidgetGen::new(&ty, &name, fields.into_iter(), self.trigger_inline);
     let animate_def = gen.gen_widget_tokens(ctx);
     animate_def.to_tokens(tokens);
     // if animate is not stateful, means no way to trigger or others capture it, we
@@ -764,7 +782,7 @@ impl DeclareCtx {
   }
 
   fn visit_animate_mut(&mut self, animate: &mut Animate) {
-    let Animate { from, transition, .. } = animate;
+    let Animate { from, transition, lerp_fn, .. } = animate;
     self.visit_state_mut(&mut from.expr);
     match &mut transition.value {
       AnimateTransitionValue::Transition(t) => {
@@ -778,6 +796,7 @@ impl DeclareCtx {
         *used_name_info = self.take_current_used_info();
       }
     }
+    self.visit_declare_field_mut(lerp_fn);
   }
 
   fn visit_state_mut(&mut self, state: &mut State) {
