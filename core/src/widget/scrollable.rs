@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::time::Duration;
 
 /// Enumerate to describe which direction allow widget to scroll.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
@@ -46,6 +47,35 @@ impl ComposeSingleChild for ScrollableWidget {
         content.box_rect().size ~> this.content_size,
         #[skip_nc]
         view.box_rect().size ~> this.page
+      }
+      animations {
+        Transition {
+          id: scroll,
+          duration: Duration::from_millis(200),
+          easing: easing::EASE_OUT
+        }
+        content.left_anchor: Animate {
+          from: State {
+            content.left_anchor: content.left_anchor,
+          },
+          transition: scroll,
+          lerp_fn: move |from, to, rate| {
+            let from = from.abs_value(content.width());
+            let to = to.abs_value(content.width());
+            PositionUnit::Pixel(from.lerp(&to, rate))
+          }
+        },
+        content.top_anchor: Animate {
+          from: State {
+            content.top_anchor: content.top_anchor,
+          },
+          transition: scroll,
+          lerp_fn: move |from, to, rate| {
+            let from = from.abs_value(content.height());
+            let to = to.abs_value(content.height());
+            PositionUnit::Pixel(from.lerp(&to, rate))
+          }
+        },
       }
     }
   }

@@ -5,15 +5,20 @@ use crate::prelude::{
 use std::time::Instant;
 
 #[derive(Declare)]
-pub struct Animate<T, I, F, W, R>
+pub struct Animate<T, I, F, W, R, L>
 where
   I: Fn() -> R,
   F: Fn() -> R,
   W: FnMut(R) + 'static,
+  L: FnMut(&R, &R, f32) -> R,
 {
   pub transition: T,
   #[declare(rename = from)]
   state: AnimateState<I, F, W>,
+  /// function calc the linearly lerp value by rate, three arguments are
+  /// `from` `to` and `rate`, specify `lerp_fn` when the animate state not
+  /// implement `Lerp` trait or you want to specify a custom lerp function.
+  lerp_fn: L,
   #[declare(skip)]
   running_info: Option<AnimateInfo<R>>,
   #[declare(skip)]
@@ -35,13 +40,14 @@ pub trait AnimateCtrl {
   fn frame_finished(&mut self);
 }
 
-impl<T, I, F, W, R> AnimateCtrl for Animate<T, I, F, W, R>
+impl<T, I, F, W, R, L> AnimateCtrl for Animate<T, I, F, W, R, L>
 where
   I: Fn() -> R,
   F: Fn() -> R,
   W: FnMut(R) + 'static,
   T: Roc,
-  R: Lerp + Clone,
+  R: Clone,
+  L: FnMut(&R, &R, f32) -> R,
 {
   fn lerp(&mut self, now: Instant) -> AnimateProgress {
     let info = self
@@ -55,7 +61,7 @@ where
     let to = info.to.get_or_insert_with(|| self.state.finial_value());
 
     if let AnimateProgress::Between(rate) = progress {
-      let animate_state = from.lerp(to, rate);
+      let animate_state = (self.lerp_fn)(from, to, rate);
       self.state.update(animate_state);
     }
     info.last_progress = progress;
@@ -87,13 +93,14 @@ impl<T: AnimateCtrl> AnimateCtrl for Stateful<T> {
   fn frame_finished(&mut self) { self.state_ref().frame_finished() }
 }
 
-impl<T, I, F, W, R> Animate<T, I, F, W, R>
+impl<T, I, F, W, R, L> Animate<T, I, F, W, R, L>
 where
   I: Fn() -> R,
   F: Fn() -> R,
   W: FnMut(R),
   T: Roc,
-  R: Lerp + Clone,
+  R: Clone,
+  L: FnMut(&R, &R, f32) -> R,
   Self: 'static,
 {
   pub fn register(this: &Stateful<Self>, ctx: &BuildCtx) {
@@ -105,10 +112,12 @@ where
 
   pub fn run(&mut self) {
     // if animate is running, animate start from current value.
-    let from = self
-      .running_info
-      .take()
-      .and_then(|info| Some(info.from?.lerp(&info.to?, info.last_progress.value())));
+    let from = self.running_info.take().and_then(|info| {
+      let from = info.from?;
+      let to = info.to?;
+      let l = (self.lerp_fn)(&from, &to, info.last_progress.value());
+      Some(l)
+    });
 
     self.running_info = Some(AnimateInfo {
       from,
