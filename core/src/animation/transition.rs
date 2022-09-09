@@ -6,7 +6,7 @@ use super::easing::Easing;
 use std::time::Duration;
 
 /// Transition describe how the state change form init to final smoothly.
-#[derive(Declare, Clone, Copy)]
+#[derive(Declare, Clone, Debug, PartialEq)]
 pub struct Transition<E> {
   #[declare(default)]
   pub delay: Option<Duration>,

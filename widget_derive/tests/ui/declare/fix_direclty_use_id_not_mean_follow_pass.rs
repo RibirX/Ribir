@@ -8,7 +8,7 @@ fn main() {
       size: Size::zero(),
     }
     animations {
-      Animate {
+      sized_box.size: Animate {
         id: size_animate,
         from: State {
           sized_box.size: Size::new(10., 10.),
@@ -17,8 +17,8 @@ fn main() {
           duration: Duration::from_secs(5),
           easing: easing::EASE_IN_OUT,
         },
-      }
-      sized_box.size: size_animate
+      },
+      sized_box.on_tap: size_animate
     }
   };
 }

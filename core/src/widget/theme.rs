@@ -18,7 +18,9 @@ use algo::ShareResource;
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
-use super::{data_widget::compose_child_as_data_widget, StateWidget};
+use super::{
+  data_widget::compose_child_as_data_widget, easing::QuadraticBezierEasing, StateWidget, Transition,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -71,6 +73,7 @@ pub struct ScrollBarTheme {
   pub thumb: ScrollBoxDecorationStyle,
   /// The min size of the thumb have.
   pub thumb_min_size: f32,
+  pub scroll_transition: Transition<QuadraticBezierEasing>,
 }
 
 /// Use typography to present your design and content as clearly and efficiently

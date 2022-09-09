@@ -7,18 +7,16 @@ fn main() {
       size: Size::zero()
     }
     animations {
-      Transition {
-        id: transition1,
-        easing: easing::LINEAR
-      }
-      Animate {
+      sized_box.size: Animate {
         id: animate1,
         from: State {
           sized_box.size: Size::new(10., 10.),
         },
-        transition: transition1,
+        transition:  Transition {
+          id: transition1,
+          easing: easing::LINEAR
+        },
       }
-      sized_box.size: animate1
     }
   };
 
@@ -63,6 +61,14 @@ fn main() {
     animations {
       sized_box.size: Animate {
         from: State { sized_box.size },
+        transition: Transition { easing: easing::LINEAR }
+      },
+    }
+  };
+  let _default_from_state = widget! {
+    SizedBox { id: sized_box, size: Size::zero() }
+    animations {
+      sized_box.size: Animate {
         transition: Transition { easing: easing::LINEAR }
       },
     }

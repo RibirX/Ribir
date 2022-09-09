@@ -17,6 +17,7 @@ pub struct CubicBezierEasing(CubicBezierSegment<f32>);
 ///
 /// Construct `CubicBezierEasing` with two control pointer, the curve always
 /// start from (0., 0.) to (1., 1.).
+#[derive(Clone, Debug, PartialEq)]
 pub struct QuadraticBezierEasing(QuadraticBezierSegment<f32>);
 
 /// Animates at an even speed

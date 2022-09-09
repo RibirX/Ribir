@@ -20,21 +20,19 @@ fn main() {
       }
     }
     animations {
-      Transition {
-        id: transition1,
-        duration: Duration::from_secs(5),
-        easing: easing::EASE_IN_OUT,
-      }
-      Animate {
+      sized_box.size:  Animate {
         id: animate1,
         from: State {
           sized_box.size: Size::new(10., 10.),
           sized_box.radius: Some(Radius::all(0.)),
           sized_box.background: Some(Brush::Color(Color::RED)),
         },
-        transition: transition1,
+        transition: Transition {
+          id: transition1,
+          duration: Duration::from_secs(5),
+          easing: easing::EASE_IN_OUT,
+        },
       }
-      sized_box.size: animate1
     }
   };
 

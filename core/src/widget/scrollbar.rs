@@ -139,6 +139,7 @@ impl Compose for HRawScrollbar {
           }
         }
         SizedBox {
+          id: thumb,
           size: {
             let page_width = scrolling.page_size().width;
             let content_width = scrolling.content_size().width;
@@ -149,9 +150,19 @@ impl Compose for HRawScrollbar {
           radius: this.style.thumb.radius,
           left_anchor: {
             let content_width = scrolling.content_size().width;
-             -scrolling.pos.x / content_width * track_box.width()
+            -scrolling.pos.x * safe_recip(content_width) * track_box.width()
           }
         }
+      }
+      animations {
+        thumb.left_anchor: Animate {
+          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+          lerp_fn: move |from, to, rate| {
+            let from = from.abs_value(thumb.size.width);
+            let to = to.abs_value(thumb.size.width);
+            PositionUnit::Pixel(from.lerp(&to, rate))
+          }
+        },
       }
     }
   }
@@ -182,6 +193,7 @@ impl Compose for VRawScrollbar {
           }
         }
         SizedBox {
+          id: thumb,
           size: {
             let page_height = scrolling.page_size().height;
             let content_height = scrolling.content_size().height;
@@ -192,10 +204,25 @@ impl Compose for VRawScrollbar {
           radius: this.style.thumb.radius,
           top_anchor: {
             let content_height = scrolling.content_size().height;
-            -scrolling.pos.y / content_height * track_box.height()
+            -scrolling.pos.y * safe_recip(content_height) * track_box.height()
           }
         }
       }
+      animations {
+        thumb.top_anchor: Animate {
+          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+          lerp_fn: move |from, to, rate| {
+            let from = from.abs_value(thumb.size.height);
+            let to = to.abs_value(thumb.size.height);
+            PositionUnit::Pixel(from.lerp(&to, rate))
+          }
+        },
+      }
     }
   }
+}
+
+fn safe_recip(v: f32) -> f32 {
+  let v = v.recip();
+  if v.is_infinite() || v.is_nan() { 0. } else { v }
 }
