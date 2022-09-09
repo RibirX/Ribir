@@ -204,7 +204,6 @@ pub fn try_parse_skip_nc(input: ParseStream) -> syn::Result<Option<SkipNcAttr>> 
 
 impl DeclareCtx {
   pub fn visit_declare_widget_mut(&mut self, w: &mut DeclareWidget) {
-    let mut ctx = self.stack_push();
     let DeclareWidget { path, fields, builtin, children, .. } = w;
 
     if is_expr_keyword(path) {
@@ -216,7 +215,7 @@ impl DeclareCtx {
       } else {
         let expr_field = fields.first_mut().unwrap();
         let origin_expr = expr_field.expr.clone();
-        ctx.visit_declare_field_mut(expr_field);
+        self.visit_declare_field_mut(expr_field);
 
         let upstream = expr_field
           .used_name_info
@@ -229,7 +228,7 @@ impl DeclareCtx {
 
           // we convert the field expr to a closure, revisit again.
           expr_field.used_name_info.take();
-          ctx.visit_declare_field_mut(expr_field);
+          self.visit_declare_field_mut(expr_field);
 
           *path = parse_quote_spanned! { path.span() => #path::<_> };
           if !fields.trailing_punct() {
@@ -244,14 +243,14 @@ impl DeclareCtx {
     } else {
       fields
         .iter_mut()
-        .for_each(|f| ctx.visit_declare_field_mut(f));
+        .for_each(|f| self.visit_declare_field_mut(f));
     }
 
-    ctx.visit_builtin_field_widgets(builtin);
+    self.visit_builtin_field_widgets(builtin);
 
     children
       .iter_mut()
-      .for_each(|c| ctx.visit_declare_widget_mut(c))
+      .for_each(|c| self.visit_declare_widget_mut(c))
   }
 
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {

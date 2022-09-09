@@ -27,7 +27,6 @@ bitflags::bitflags! {
   }
 }
 
-#[derive(Default)]
 pub struct DeclareCtx {
   /// All name we can use in macro and need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
@@ -44,6 +43,18 @@ pub struct DeclareCtx {
 struct LocalVariable {
   name: Ident,
   alias_of_name: Option<Ident>,
+}
+
+impl Default for DeclareCtx {
+  fn default() -> Self {
+    Self {
+      named_objects: Default::default(),
+      current_used_info: Default::default(),
+      used_widgets: Default::default(),
+      analyze_stack: vec![vec![]],
+      user_perspective_name: Default::default(),
+    }
+  }
 }
 
 impl VisitMut for DeclareCtx {
