@@ -352,13 +352,12 @@ impl WidgetMacro {
 
 impl DeclareCtx {
   pub fn visit_widget_macro_mut(&mut self, d: &mut WidgetMacro) {
-    let mut ctx = self.stack_push();
-    ctx.visit_declare_widget_mut(&mut d.widget);
+    self.visit_declare_widget_mut(&mut d.widget);
     if let Some(dataflows) = d.dataflows.as_mut() {
-      ctx.visit_dataflows_mut(dataflows)
+      self.visit_dataflows_mut(dataflows)
     }
     if let Some(animations) = d.animations.as_mut() {
-      ctx.visit_animations_mut(animations);
+      self.visit_animations_mut(animations);
     }
   }
 }
