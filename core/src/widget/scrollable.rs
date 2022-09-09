@@ -51,13 +51,11 @@ impl ComposeSingleChild for ScrollableWidget {
       animations {
         Transition {
           id: scroll,
-          duration: Duration::from_millis(200),
+          duration: Duration::from_millis(150),
           easing: easing::EASE_OUT
         }
         content.left_anchor: Animate {
-          from: State {
-            content.left_anchor: content.left_anchor,
-          },
+          from: State { content.left_anchor },
           transition: scroll,
           lerp_fn: move |from, to, rate| {
             let from = from.abs_value(content.width());
@@ -66,9 +64,7 @@ impl ComposeSingleChild for ScrollableWidget {
           }
         },
         content.top_anchor: Animate {
-          from: State {
-            content.top_anchor: content.top_anchor,
-          },
+          from: State { content.top_anchor },
           transition: scroll,
           lerp_fn: move |from, to, rate| {
             let from = from.abs_value(content.height());
