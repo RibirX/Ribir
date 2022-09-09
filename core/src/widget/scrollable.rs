@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use std::time::Duration;
-
 /// Enumerate to describe which direction allow widget to scroll.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
 pub enum Scrollable {
@@ -50,12 +48,7 @@ impl ComposeSingleChild for ScrollableWidget {
       }
       animations {
         content.left_anchor: Animate {
-          from: State { content.left_anchor },
-          transition: Transition {
-            id: scroll,
-            duration: Duration::from_millis(150),
-            easing: easing::EASE_OUT
-          },
+          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
           lerp_fn: move |from, to, rate| {
             let from = from.abs_value(content.width());
             let to = to.abs_value(content.width());
@@ -63,8 +56,7 @@ impl ComposeSingleChild for ScrollableWidget {
           }
         },
         content.top_anchor: Animate {
-          from: State { content.top_anchor },
-          transition: scroll,
+          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
           lerp_fn: move |from, to, rate| {
             let from = from.abs_value(content.height());
             let to = to.abs_value(content.height());
@@ -110,6 +102,7 @@ mod tests {
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
+  // todo: need disable animate to test.
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let global_pos = Stateful::new(Point::zero());
     let w = widget! {

@@ -1,7 +1,8 @@
 use self::palette::LightnessCfg;
 pub use super::*;
-use crate::prelude::include_svg;
+use crate::{prelude::include_svg, widget::easing};
 pub use painter::{Brush, Color};
+use std::time::Duration;
 
 /// Crate a material theme with palette.
 pub fn new(brightness: Brightness, palette: Palette) -> Theme {
@@ -28,6 +29,11 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
       thickness: 12.,
     },
     thumb_min_size: 12.,
+    scroll_transition: Transition {
+      delay: None,
+      duration: Duration::from_millis(150),
+      easing: easing::EASE_OUT,
+    },
   };
   Theme {
     brightness,
