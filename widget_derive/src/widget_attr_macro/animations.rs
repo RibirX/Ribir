@@ -26,8 +26,6 @@ use super::{declare_widget::DeclareField, kw};
 pub struct Animations {
   animations_token: kw::animations,
   brace_token: token::Brace,
-  animates_def: Vec<Animate>,
-  transitions_def: Vec<Transition>,
   triggers: Punctuated<Trigger, token::Comma>,
 }
 
@@ -151,46 +149,11 @@ impl Parse for Transition {
 
 impl Parse for Animations {
   fn parse(input: ParseStream) -> Result<Self> {
-    let animations_token = input.parse()?;
     let content;
-    let brace_token = braced!(content in input);
-
-    let mut animates_def: Vec<Animate> = vec![];
-    let mut transitions_def: Vec<Transition> = vec![];
-    let mut triggers = Punctuated::new();
-
-    loop {
-      if content.is_empty() {
-        break;
-      }
-
-      let lk = content.lookahead1();
-      if lk.peek(kw::Animate) {
-        let animate = content.parse::<Animate>()?;
-        if animate.id.is_none() {
-          return Err(Error::new(animate.animate_token.span(), "miss id"));
-        }
-        animates_def.push(animate);
-      } else if lk.peek(kw::Transition) {
-        let transition = content.parse::<Transition>()?;
-        if transition.id.is_none() {
-          return Err(Error::new(transition.transition_token.span(), "miss id"));
-        }
-        transitions_def.push(transition);
-      } else {
-        triggers.push(content.parse()?);
-        if !content.is_empty() {
-          triggers.push_punct(content.parse()?);
-        }
-      }
-    }
-
     Ok(Animations {
-      animations_token,
-      brace_token,
-      animates_def,
-      transitions_def,
-      triggers,
+      animations_token: input.parse()?,
+      brace_token: braced!(content in input),
+      triggers: content.parse_terminated(Trigger::parse)?,
     })
   }
 }
@@ -506,7 +469,7 @@ impl TransitionField {
       AnimateTransitionValue::Transition(t) => {
         // named object is already define before
         if let Some(Id { name, .. }) = t.id.as_ref() {
-          parse_quote! { #transition_token #colon_token #name }
+          parse_quote! { #transition_token #colon_token #name.clone() }
         } else {
           let mut transition_tokens = quote! {};
           t.gen_tokens(&mut transition_tokens, ctx);
@@ -783,19 +746,7 @@ pub enum AnimationObject<'a> {
 
 impl DeclareCtx {
   pub fn visit_animations_mut(&mut self, animations: &mut Animations) {
-    let Animations {
-      animates_def,
-      transitions_def,
-      triggers,
-      ..
-    } = animations;
-
-    animates_def
-      .iter_mut()
-      .for_each(|a| self.visit_animate_mut(a));
-    transitions_def
-      .iter_mut()
-      .for_each(|t| self.visit_transition_mut(t));
+    let Animations { triggers, .. } = animations;
     triggers.iter_mut().for_each(|t| self.visit_trigger_mut(t));
   }
 
@@ -805,9 +756,6 @@ impl DeclareCtx {
     match &mut transition.value {
       AnimateTransitionValue::Transition(t) => {
         self.visit_transition_mut(t);
-        if let Some(Id { name, .. }) = t.id.as_ref() {
-          self.add_used_widget(name.clone(), UsedType::USED);
-        }
       }
       AnimateTransitionValue::Expr { expr, used_name_info } => {
         self.visit_expr_mut(expr);
@@ -914,29 +862,22 @@ impl Animations {
     }
 
     self
-      .animates_def
+      .triggers
       .iter()
-      .flat_map(named_objects_in_animate)
-      .chain(self.transitions_def.iter().map(AnimationObject::Transition))
-      .chain(
-        self
-          .triggers
-          .iter()
-          .filter_map(|t| match &t.expr {
-            AnimateExpr::Animate(a) => {
-              let iter: Box<dyn Iterator<Item = AnimationObject>> =
-                Box::new(named_objects_in_animate(a));
-              Some(iter)
-            }
-            AnimateExpr::Transition(t @ Transition { id: Some(_), .. }) => {
-              let iter: Box<dyn Iterator<Item = AnimationObject>> =
-                Box::new(std::iter::once(AnimationObject::Transition(t)));
-              Some(iter)
-            }
-            _ => None,
-          })
-          .flatten(),
-      )
+      .filter_map(|t| match &t.expr {
+        AnimateExpr::Animate(a) => {
+          let iter: Box<dyn Iterator<Item = AnimationObject>> =
+            Box::new(named_objects_in_animate(a));
+          Some(iter)
+        }
+        AnimateExpr::Transition(t @ Transition { id: Some(_), .. }) => {
+          let iter: Box<dyn Iterator<Item = AnimationObject>> =
+            Box::new(std::iter::once(AnimationObject::Transition(t)));
+          Some(iter)
+        }
+        _ => None,
+      })
+      .flatten()
   }
 }
 

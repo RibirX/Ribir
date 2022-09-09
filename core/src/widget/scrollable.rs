@@ -49,14 +49,13 @@ impl ComposeSingleChild for ScrollableWidget {
         view.box_rect().size ~> this.page
       }
       animations {
-        Transition {
-          id: scroll,
-          duration: Duration::from_millis(150),
-          easing: easing::EASE_OUT
-        }
         content.left_anchor: Animate {
           from: State { content.left_anchor },
-          transition: scroll,
+          transition: Transition {
+            id: scroll,
+            duration: Duration::from_millis(150),
+            easing: easing::EASE_OUT
+          },
           lerp_fn: move |from, to, rate| {
             let from = from.abs_value(content.width());
             let to = to.abs_value(content.width());
