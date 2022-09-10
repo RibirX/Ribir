@@ -224,12 +224,17 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
 
   let fill_default = builder_fields.iter().filter_map(|f| {
     let field_name = f.member();
-    let method = f.set_method_name();
+
     f.attr.as_ref().and_then(|attr| {
       let set_default_value = match (&attr.default, &attr.skip) {
-        (Some(df), _) if df.value.is_some() => {
+        (Some(df), None) if df.value.is_some() => {
           let v = df.value.as_ref();
+          let method = f.set_method_name();
           Some(quote! { self = self.#method(#v); })
+        }
+        (Some(df), Some(_)) if df.value.is_some() => {
+          let v = df.value.as_ref();
+          Some(quote! { self.#field_name = Some(#v); })
         }
         (Some(_), _) | (_, Some(_)) => Some(quote! { self.#field_name = Some(<_>::default()) }),
         (None, None) => None,

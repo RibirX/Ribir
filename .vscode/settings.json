@@ -28,6 +28,7 @@
     "multiview",
     "paren",
     "punct",
+    "recip",
     "regen",
     "retessellate",
     "rpass",

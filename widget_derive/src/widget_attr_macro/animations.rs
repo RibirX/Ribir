@@ -14,7 +14,7 @@ use syn::{
 use crate::widget_attr_macro::Id;
 
 use super::{
-  capture_widget, ctx_ident,
+  capture_widget,
   declare_widget::{
     assign_uninit_field, check_duplicate_field, pick_fields_by, BuiltinFieldWidgets, WidgetGen,
     FIELD_WIDGET_TYPE,
@@ -419,9 +419,6 @@ impl Animate {
       ..
     } = self;
 
-    let animate_span = animate_token.span();
-    let build_ctx = ctx_ident(animate_span);
-
     let from_field = parse_quote! { #from };
     let transition_field = transition.to_declare_field(ctx);
 
@@ -431,13 +428,6 @@ impl Animate {
     let gen = WidgetGen::new(&ty, &name, fields.into_iter(), true);
     let animate_def = gen.gen_widget_tokens(ctx);
     animate_def.to_tokens(tokens);
-    // if animate is not stateful, means no way to trigger or others capture it, we
-    // needn't register it, and let compile warning user.
-    if gen.is_stateful(ctx) {
-      tokens.extend(quote_spanned! { animate_span =>
-        Animate::register(&#name, #build_ctx);
-      });
-    }
   }
 }
 
@@ -612,14 +602,14 @@ impl Trigger {
           let #animate_name = #animate_name.clone_stateful();
           move |change| {
             #eval_before_trigger
-            #animate_name.raw_ref().run()
+            #animate_name.run()
           }
         }}
       }
       AnimateExpr::Expr { expr, used_name_info } => {
         let mut run_fn = quote! { move |change| {
           #eval_before_trigger
-          (#expr).raw_ref().run()
+          (#expr).run()
         }};
         if let Some(captures) = used_name_info.all_widgets() {
           let captures = captures.map(capture_widget);

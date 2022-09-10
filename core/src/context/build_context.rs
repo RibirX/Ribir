@@ -1,5 +1,5 @@
 use crate::prelude::{widget_tree::WidgetTree, *};
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 thread_local!(static DEFAULT_THEME: Rc<Theme> =
   Rc::new(widget::material::purple::light())
@@ -36,6 +36,9 @@ impl<'a> BuildCtx<'a> {
           .get_or_insert_with(|| DEFAULT_THEME.with(|f| f.clone()))
       })
   }
+
+  #[inline]
+  pub fn app_ctx(&self) -> &Rc<RefCell<AppContext>> { self.tree.app_ctx() }
 
   #[inline]
   pub(crate) fn new(parent: Option<WidgetId>, tree: &'a mut WidgetTree) -> Self {
