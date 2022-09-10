@@ -104,7 +104,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   #[inline]
-  fn app_context(&self) -> &Rc<RefCell<AppContext>> { self.widget_tree().context() }
+  fn app_context(&self) -> &Rc<RefCell<AppContext>> { self.widget_tree().app_ctx() }
 }
 
 #[cfg(test)]

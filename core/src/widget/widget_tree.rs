@@ -8,10 +8,8 @@ use std::{
   rc::Rc,
 };
 
-pub(crate) mod animation_store;
 mod generator_store;
 mod layout_info;
-use animation_store::AnimateStore;
 pub use layout_info::*;
 
 use super::Children;
@@ -27,7 +25,6 @@ pub(crate) struct WidgetTree {
   /// clamp passed from parent.
   layout_store: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
   pub(crate) generator_store: generator_store::GeneratorStore,
-  pub(crate) animations_store: Rc<RefCell<AnimateStore>>,
 }
 
 impl WidgetTree {
@@ -40,8 +37,6 @@ impl WidgetTree {
   pub(crate) fn empty_node(&mut self) -> WidgetId { self.new_node(Box::new(Void)) }
 
   pub(crate) fn new(root_widget: Widget, ctx: Rc<RefCell<AppContext>>) -> WidgetTree {
-    let ticker = ctx.borrow().frame_ticker.frame_tick_stream();
-    let animations_store = Rc::new(RefCell::new(AnimateStore::new(ticker)));
     let mut tree = WidgetTree {
       arena: Arena::default(),
       root: None,
@@ -49,7 +44,6 @@ impl WidgetTree {
       ctx,
       layout_store: <_>::default(),
       generator_store: <_>::default(),
-      animations_store,
     };
 
     tree.set_root(root_widget);
@@ -169,7 +163,7 @@ impl WidgetTree {
 
   pub(crate) fn count(&self) -> usize { self.root().descendants(&self).count() }
 
-  pub(crate) fn context(&self) -> &Rc<RefCell<AppContext>> { &self.ctx }
+  pub(crate) fn app_ctx(&self) -> &Rc<RefCell<AppContext>> { &self.ctx }
 
   /// #panic
   /// dst should not be empty.

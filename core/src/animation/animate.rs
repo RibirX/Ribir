@@ -1,6 +1,6 @@
-use crate::prelude::{
-  widget_tree::animation_store::{AnimateHandler, AnimateStore},
-  *,
+use crate::{
+  prelude::*,
+  ticker::{FrameMsg, FrameTicker},
 };
 use std::time::Instant;
 
@@ -21,76 +21,70 @@ where
   lerp_fn: L,
   #[declare(skip)]
   running_info: Option<AnimateInfo<R>>,
-  #[declare(skip)]
-  handler: Option<AnimateHandler>,
+  #[declare(skip, default = ctx.app_ctx().borrow().frame_ticker.clone())]
+  frame_ticker: FrameTicker,
 }
 
-#[derive(Clone)]
 pub struct AnimateInfo<S> {
-  from: Option<S>,
-  to: Option<S>,
+  from: S,
+  to: S,
   start_at: Instant,
   last_progress: AnimateProgress,
+  // Determines if lerp value in current frame.
+  already_lerp: bool,
+  _tick_msg_guard: Option<SubscriptionGuard<MutRc<SingleSubscription>>>,
 }
 
-pub trait AnimateCtrl {
-  /// lerp animate value at `now`
-  fn lerp(&mut self, now: Instant) -> AnimateProgress;
-  /// State data should be rollback after draw.
-  fn frame_finished(&mut self);
-}
-
-impl<T, I, F, W, R, L> AnimateCtrl for Animate<T, I, F, W, R, L>
+impl<T, I, F, W, R, L> Stateful<Animate<T, I, F, W, R, L>>
 where
   I: Fn() -> R,
   F: Fn() -> R,
-  W: FnMut(R) + 'static,
+  W: FnMut(R),
   T: Roc,
   R: Clone,
   L: FnMut(&R, &R, f32) -> R,
+  Self: 'static,
 {
-  fn lerp(&mut self, now: Instant) -> AnimateProgress {
-    let info = self
-      .running_info
-      .as_mut()
-      .expect("This animation is not running.");
-    let elapsed = now - info.start_at;
-    let progress = self.transition.rate_of_change(elapsed);
+  pub fn run(&self) {
+    // if animate is running, animate start from current value.
+    let mut inner = self.raw_ref();
 
-    let from = info.from.get_or_insert_with(|| self.state.init_value());
-    let to = info.to.get_or_insert_with(|| self.state.finial_value());
-
-    if let AnimateProgress::Between(rate) = progress {
-      let animate_state = (self.lerp_fn)(from, to, rate);
-      self.state.update(animate_state);
+    let new_to = inner.state.finial_value();
+    let Animate { lerp_fn, running_info, .. } = &mut *inner;
+    if let Some(info) = running_info {
+      let AnimateInfo { from, to, last_progress, .. } = info;
+      *from = (lerp_fn)(from, to, last_progress.value());
+      *to = new_to;
+    } else {
+      drop(inner);
+      let animate = self.clone();
+      let mut inner = self.silent_ref();
+      let ticker = inner.frame_ticker.frame_tick_stream();
+      let guard = ticker
+        .subscribe(move |msg| match msg {
+          FrameMsg::NewFrame(_) => {}
+          FrameMsg::LayoutReady(time) => {
+            let mut inner = animate.raw_ref();
+            let p = inner.lerp(time);
+            if matches!(p, AnimateProgress::Finish) {
+              inner.stop();
+            }
+          }
+          // use silent_ref because the state of animate change, bu no need to effect the framework.
+          FrameMsg::Finish(_) => animate.silent_ref().frame_finished(),
+        })
+        .unsubscribe_when_dropped();
+      let from = inner.state.init_value();
+      inner.running_info = Some(AnimateInfo {
+        from,
+        to: new_to,
+        start_at: Instant::now(),
+        last_progress: AnimateProgress::Dismissed,
+        _tick_msg_guard: Some(guard),
+        already_lerp: false,
+      });
     }
-    info.last_progress = progress;
-
-    progress
   }
-
-  fn frame_finished(&mut self) {
-    let info = self
-      .running_info
-      .clone()
-      .expect("This animation is not running.");
-
-    if matches!(info.last_progress, AnimateProgress::Between(_)) {
-      let to = info.to.clone().expect(
-        "Try to finished an animate frame which not running, 
-        / ensure called `lerp` before this method.",
-      );
-      self.state.update(to)
-    }
-  }
-}
-
-impl<T: AnimateCtrl> AnimateCtrl for Stateful<T> {
-  #[inline]
-  fn lerp(&mut self, now: Instant) -> AnimateProgress { self.state_ref().lerp(now) }
-
-  #[inline]
-  fn frame_finished(&mut self) { self.state_ref().frame_finished() }
 }
 
 impl<T, I, F, W, R, L> Animate<T, I, F, W, R, L>
@@ -101,54 +95,53 @@ where
   T: Roc,
   R: Clone,
   L: FnMut(&R, &R, f32) -> R,
-  Self: 'static,
 {
-  pub fn register(this: &Stateful<Self>, ctx: &BuildCtx) {
-    assert!(this.raw_ref().handler.is_none());
-
-    let handler = AnimateStore::register(&ctx.tree.animations_store, this.clone());
-    this.raw_ref().handler = Some(handler);
-  }
-
-  pub fn run(&mut self) {
-    // if animate is running, animate start from current value.
-    let from = self.running_info.take().and_then(|info| {
-      let from = info.from?;
-      let to = info.to?;
-      let l = (self.lerp_fn)(&from, &to, info.last_progress.value());
-      Some(l)
-    });
-
-    self.running_info = Some(AnimateInfo {
+  fn lerp(&mut self, now: Instant) -> AnimateProgress {
+    let AnimateInfo {
       from,
-      to: None,
-      start_at: Instant::now(),
-      last_progress: AnimateProgress::Dismissed,
-    });
-    self.register_handler().running_start();
+      to,
+      start_at,
+      last_progress,
+      already_lerp,
+      ..
+    } = self
+      .running_info
+      .as_mut()
+      .expect("This animation is not running.");
+
+    if *already_lerp {
+      return *last_progress;
+    }
+
+    let elapsed = now - *start_at;
+    let progress = self.transition.rate_of_change(elapsed);
+
+    if let AnimateProgress::Between(rate) = progress {
+      // the state may change during animate.
+      *to = self.state.finial_value();
+      let animate_state = (self.lerp_fn)(from, to, rate);
+      self.state.update(animate_state);
+    }
+    *last_progress = progress;
+    *already_lerp = true;
+
+    progress
   }
 
-  pub fn stop(&mut self) {
-    self.running_info.take();
-    self.register_handler().stopped();
+  fn frame_finished(&mut self) {
+    let info = self
+      .running_info
+      .as_mut()
+      .expect("This animation is not running.");
+
+    if matches!(info.last_progress, AnimateProgress::Between(_)) {
+      self.state.update(info.to.clone())
+    }
+    info.already_lerp = false;
   }
+
+  pub fn stop(&mut self) { self.running_info.take(); }
 
   #[inline]
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
-
-  /// Unregister the animate.
-  pub fn unregister(&mut self) {
-    if let Some(handler) = self.handler.take() {
-      handler.unregister();
-    } else {
-      log::warn!("Unregister an animate which not registered.")
-    }
-  }
-
-  fn register_handler(&self) -> &AnimateHandler {
-    self
-      .handler
-      .as_ref()
-      .expect("Can't call on an unregister animate.")
-  }
 }

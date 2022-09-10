@@ -20,7 +20,10 @@ fn wheel_widget(w: Widget) -> Window {
 fn listener_trigger_have_handler() {
   let handler_call_times = Rc::new(Cell::new(0));
   let h1 = handler_call_times.clone();
+  let animate_state = false.into_stateful();
+
   let w = widget! {
+    track { animate_state:  animate_state.clone() }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
@@ -38,17 +41,21 @@ fn listener_trigger_have_handler() {
         }
       }
     }
+    dataflows { leak_animate.is_running() ~> *animate_state }
   };
 
-  let wnd = wheel_widget(w);
+  wheel_widget(w);
 
-  assert!(wnd.any_animate_running());
+  assert_eq!(true, *animate_state.raw_ref());
   assert_eq!(handler_call_times.get(), 1);
 }
 
 #[test]
 fn listener_trigger() {
+  let animate_state = false.into_stateful();
+
   let w = widget! {
+    track { animate_state:  animate_state.clone() }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
@@ -65,9 +72,10 @@ fn listener_trigger() {
         }
       }
     }
+    dataflows { leak_animate.is_running() ~> *animate_state }
   };
 
-  let wnd = wheel_widget(w);
+  wheel_widget(w);
 
-  assert!(wnd.any_animate_running());
+  assert_eq!(true, *animate_state.raw_ref());
 }

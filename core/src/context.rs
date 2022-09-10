@@ -30,7 +30,12 @@ pub struct AppContext {
 }
 
 impl AppContext {
-  pub fn begin_frame(&mut self) { self.frame_ticker.emit(FrameMsg::Ready(Instant::now())); }
+  pub fn begin_frame(&mut self) { self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now())); }
+  pub fn layout_ready(&mut self) {
+    self
+      .frame_ticker
+      .emit(FrameMsg::LayoutReady(Instant::now()));
+  }
 
   pub fn end_frame(&mut self) {
     // todo: frame cache is not a good choice? because not every text will relayout
@@ -39,7 +44,7 @@ impl AppContext {
     self.reorder.end_frame();
     self.typography_store.end_frame();
 
-    self.frame_ticker.emit(FrameMsg::Finish);
+    self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
   }
 }
 

@@ -108,13 +108,21 @@ impl Window {
       } = self;
 
       context.borrow_mut().begin_frame();
-      let mut struct_dirty = false;
 
-      while widget_tree.is_dirty() {
-        struct_dirty |= widget_tree.any_struct_dirty();
-        widget_tree.tree_repair();
-        widget_tree.layout(raw_window.inner_size());
+      let mut struct_dirty = false;
+      loop {
+        while widget_tree.is_dirty() {
+          struct_dirty |= widget_tree.any_struct_dirty();
+          widget_tree.tree_repair();
+          widget_tree.layout(raw_window.inner_size());
+        }
+
+        context.borrow_mut().layout_ready();
+        if !widget_tree.is_dirty() {
+          break;
+        }
       }
+
       if struct_dirty {
         dispatcher.refresh_focus(widget_tree);
       }
@@ -124,15 +132,6 @@ impl Window {
 
       context.borrow_mut().end_frame();
     }
-  }
-
-  #[inline]
-  pub fn any_animate_running(&self) -> bool {
-    self
-      .widget_tree
-      .animations_store
-      .borrow()
-      .any_animate_running()
   }
 
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
