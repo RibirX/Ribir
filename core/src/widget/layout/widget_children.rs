@@ -1,30 +1,19 @@
 pub use crate::prelude::*;
 /// Trait to tell Ribir a widget can have one child.
-pub trait SingleChild {
-  #[inline]
-  fn have_child<C, M: ?Sized>(self, child: C) -> SingleChildWidget<Self, C>
-  where
-    Self: Sized,
-    SingleChildWidget<Self, C>: IntoWidget<M>,
-  {
-    SingleChildWidget::new(self, child)
-  }
-}
+pub trait SingleChild {}
 
 /// Trait to tell Ribir a widget can have multi child.
-pub trait MultiChild {
-  #[inline]
-  fn have_child<M: ?Sized, C: MultiChildMarker<M>>(self, child: C) -> MultiChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    let mut multi = MultiChildWidget { widget: self, children: vec![] };
-    child.fill(&mut multi);
-    multi
-  }
+pub trait MultiChild {}
+
+pub trait SingleHaveChild<M: ?Sized> {
+  type Target<C>;
+  fn have_child<C>(self, child: C) -> Self::Target<C>;
 }
 
-pub trait Child<M: ?Sized> {}
+pub trait MultiHaveChild<M: ?Sized, C> {
+  type W;
+  fn have_child(self, child: C) -> MultiChildWidget<Self::W>;
+}
 
 pub trait MultiChildMarker<M: ?Sized> {
   fn fill<W>(self, multi: &mut MultiChildWidget<W>);
@@ -32,15 +21,6 @@ pub trait MultiChildMarker<M: ?Sized> {
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its child.
 pub trait ComposeSingleChild {
-  #[inline]
-  fn have_child<C, M: ?Sized>(self, child: C) -> SingleChildWidget<Self, C>
-  where
-    Self: Sized,
-    SingleChildWidget<Self, C>: IntoWidget<M>,
-  {
-    SingleChildWidget::new(self, child)
-  }
-
   fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget
   where
     Self: Sized;
@@ -49,16 +29,6 @@ pub trait ComposeSingleChild {
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its children.
 pub trait ComposeMultiChild {
-  #[inline]
-  fn have_child<M: ?Sized, C: MultiChildMarker<M>>(self, child: C) -> MultiChildWidget<Self>
-  where
-    Self: Sized,
-  {
-    let mut multi = MultiChildWidget { widget: self, children: vec![] };
-    child.fill(&mut multi);
-    multi
-  }
-
   fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget
   where
     Self: Sized;
@@ -71,9 +41,6 @@ pub struct SingleChildWidget<W, C> {
 
 impl<W, C> SingleChildWidget<W, C> {
   #[inline]
-  pub fn new(widget: W, child: C) -> Self { Self { widget, child } }
-
-  #[inline]
   pub fn unzip(self) -> (W, C) { (self.widget, self.child) }
 }
 
@@ -85,14 +52,6 @@ pub struct MultiChildWidget<W> {
 impl<W> MultiChildWidget<W> {
   #[inline]
   pub fn unzip(self) -> (W, Vec<Widget>) { (self.widget, self.children) }
-}
-
-impl<W> MultiChildWidget<W> {
-  #[inline]
-  pub fn have_child<M: ?Sized, C: MultiChildMarker<M>>(mut self, child: C) -> Self {
-    child.fill(&mut self);
-    self
-  }
 }
 
 impl<W> IntoWidget<(&dyn Render, Widget)> for SingleChildWidget<W, Widget>
@@ -362,5 +321,67 @@ where
   fn fill<W>(self, multi: &mut MultiChildWidget<W>) {
     let w = self.into_multi_child();
     multi.children.push(w)
+  }
+}
+
+impl<W: SingleChild> SingleHaveChild<dyn SingleChild> for W {
+  type Target<C> = SingleChildWidget<W, C>;
+
+  #[inline]
+  fn have_child<C>(self, child: C) -> Self::Target<C> { SingleChildWidget { widget: self, child } }
+}
+
+impl<W: ComposeSingleChild> SingleHaveChild<dyn ComposeSingleChild> for W {
+  type Target<C> = SingleChildWidget<W, C>;
+
+  #[inline]
+  fn have_child<C>(self, child: C) -> Self::Target<C> { SingleChildWidget { widget: self, child } }
+}
+
+impl<W1, W2: SingleHaveChild<M>, M: ?Sized> SingleHaveChild<M> for SingleChildWidget<W1, W2> {
+  type Target<C> = SingleChildWidget<W1, SingleChildWidget<W2, C>>;
+
+  fn have_child<C>(self, child: C) -> Self::Target<C> {
+    let SingleChildWidget { widget, child: w2 } = self;
+    SingleChildWidget {
+      widget,
+      child: SingleChildWidget { widget: w2, child },
+    }
+  }
+}
+
+impl<W: MultiChild, M: ?Sized, C: MultiChildMarker<M>> MultiHaveChild<(&dyn MultiChild, &M), C>
+  for W
+{
+  type W = W;
+
+  #[inline]
+  fn have_child(self, child: C) -> MultiChildWidget<Self::W> {
+    let mut multi = MultiChildWidget { widget: self, children: vec![] };
+    child.fill(&mut multi);
+    multi
+  }
+}
+
+impl<W: ComposeMultiChild, M: ?Sized, C: MultiChildMarker<M>>
+  MultiHaveChild<(&dyn ComposeMultiChild, &M), C> for W
+{
+  type W = W;
+
+  #[inline]
+  fn have_child(self, child: C) -> MultiChildWidget<Self::W> {
+    let mut multi = MultiChildWidget { widget: self, children: vec![] };
+    child.fill(&mut multi);
+    multi
+  }
+}
+
+impl<W, M: ?Sized, C: MultiChildMarker<M>> MultiHaveChild<M, C> for MultiChildWidget<W> {
+  type W = W;
+
+  #[inline]
+  fn have_child(mut self, child: C) -> MultiChildWidget<Self::W> {
+    child.fill(&mut self);
+    self
   }
 }

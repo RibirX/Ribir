@@ -6,7 +6,7 @@ use syn::{parse::Parse, spanned::Spanned, token, Ident, Path};
 
 use super::{
   animations::Animations, child_variable, dataflows::Dataflows,
-  declare_widget::assign_uninit_field, kw, track::Track, DeclareCtx, DeclareWidget, IdType,
+  declare_widget::assign_uninit_field, kw, track::Track, DeclareCtx, DeclareWidget, Id, IdType,
   ObjectUsed, Result,
 };
 use crate::{
@@ -80,21 +80,13 @@ impl WidgetMacro {
       stack.iter().map(|c| c.to_used_path(ctx)).collect()
     }
 
-    ctx.id_collect(self)?;
+    self.id_collect(ctx)?;
 
-    self
-      .widget
-      .traverses_widget()
-      // .flat_map(|w| w.name().map(|name| w.builtin.builtin_widget_names(name)))
-      .for_each(|w| {
-        if let Some(name) = w.name() {
-          w.builtin
-            .builtin_widget_names(name)
-            .for_each(|builtin_name| {
-              ctx.add_user_perspective_pair(builtin_name, name.clone());
-            });
-        }
-      });
+    self.widget.traverses_widget().for_each(|w| {
+      if let Some(name) = w.name() {
+        w.builtin.add_user_perspective_pairs(name, ctx);
+      }
+    });
 
     ctx.visit_widget_macro_mut(self);
     self.widget.before_generate_check()?;
@@ -170,19 +162,21 @@ impl WidgetMacro {
     Ok(tokens)
   }
 
-  pub fn object_names_iter(&self) -> impl Iterator<Item = (&Ident, IdType)> {
-    self
-      .widget
-      .traverses_widget()
-      .filter_map(|w| w.named.as_ref().map(|id| &id.name))
-      .chain(self.animations.iter().flat_map(|a| a.names()))
-      .map(|name| (name, IdType::DECLARE))
-      .chain(
-        self
-          .track
-          .iter()
-          .flat_map(|t| t.track_names().map(|n| (n, IdType::USER_SPECIFY))),
-      )
+  pub fn id_collect(&self, ctx: &mut DeclareCtx) -> super::Result<()> {
+    for w in self.widget.traverses_widget() {
+      if let Some(Id { name, .. }) = w.named.as_ref() {
+        ctx.add_named_obj(name.clone(), IdType::DECLARE)?;
+        w.builtin.collect_names(name, ctx)?;
+      }
+    }
+    for name in self.animations.iter().flat_map(|a| a.names()) {
+      ctx.add_named_obj(name.clone(), IdType::DECLARE)?;
+    }
+    for name in self.track.iter().flat_map(|t| t.track_names()) {
+      ctx.add_named_obj(name.clone(), IdType::USER_SPECIFY)?;
+    }
+
+    Ok(())
   }
 
   /// return follow relationship of the named widgets,it is a key-value map,
@@ -264,7 +258,7 @@ impl WidgetMacro {
         tokens.extend(quote! { let #name #hint = #name #compose_children; });
       }
 
-      w.builtin.compose_tokens(name, tokens);
+      w.builtin.compose_tokens(name, ctx, tokens);
     }
 
     let name = self.widget_identify();

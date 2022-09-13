@@ -1,4 +1,10 @@
-#![feature(test, decl_macro, marker_trait_attr, drain_filter)]
+#![feature(
+  test,
+  decl_macro,
+  generic_associated_types,
+  marker_trait_attr,
+  drain_filter
+)]
 
 #[macro_use]
 extern crate bitflags;

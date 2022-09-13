@@ -11,13 +11,13 @@ use syn::{
   Error, Expr, Ident, Result,
 };
 
-use crate::widget_attr_macro::Id;
+use crate::widget_attr_macro::{Id, IdType};
 
 use super::{
   capture_widget,
   declare_widget::{
-    assign_uninit_field, check_duplicate_field, pick_fields_by, BuiltinFieldWidgets, WidgetGen,
-    FIELD_WIDGET_TYPE,
+    assign_uninit_field, check_duplicate_field, is_listener, pick_fields_by, BuiltinFieldWidgets,
+    WidgetGen, FIELD_WIDGET_TYPE,
   },
   ribir_suffix_variable, ribir_variable, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
 };
@@ -633,16 +633,27 @@ impl Trigger {
   ) {
     if let Some(listener) = self.listener_trigger_ty() {
       self.path.on_real_widget_name(|name| {
-        let host_name = &self.path.widget;
         let ty = Ident::new(listener, self.path.span()).into();
         let member = &self.path.member;
         let fields = [parse_quote! {#member: #run_fn}];
-        let name = &ribir_suffix_variable(name, "trigger");
         let gen = WidgetGen::new(&ty, name, fields.iter(), false);
-        tokens.extend(gen.gen_widget_tokens(ctx));
-        tokens.extend(quote! {
-          let #host_name = SingleChildWidget::new(#name, #host_name);
-        });
+
+        if ctx
+          .named_objects
+          .get(name)
+          .map_or(false, |id_ty| id_ty.contains(IdType::DECLARE))
+        {
+          let listener = gen.gen_widget_tokens(ctx);
+          tokens.extend(quote! {
+            let #name: SingleChildWidget<_, _> = {
+              let tmp = #name;
+              #listener
+              #name.have_child(tmp)
+            };
+          });
+        } else {
+          tokens.extend(gen.gen_widget_tokens(ctx));
+        }
       });
     } else {
       self.path.on_real_widget_name(|name| {
@@ -711,7 +722,7 @@ impl MemberPath {
   fn is_listener(&self) -> Option<&str> {
     FIELD_WIDGET_TYPE
       .get(self.member.to_string().as_str())
-      .filter(|name| name.ends_with("Listener"))
+      .filter(|ty_name| is_listener(ty_name))
       .cloned()
   }
 }
@@ -811,9 +822,18 @@ impl DeclareCtx {
   }
 
   fn visit_member_path(&mut self, path: &mut MemberPath) {
-    path.on_real_widget_name(|w| {
-      self.add_used_widget(w.clone(), UsedType::USED);
-    })
+    let MemberPath { widget, member, .. } = path;
+    if let Some(builtin) = self.find_builtin_access(widget, member) {
+      // listener trigger is not be used and follow change, but gen be animate self,
+      // but need to tell builtin compose.
+      if path.is_listener().is_some() {
+        self.animate_listener_triggers.insert(builtin);
+      } else {
+        self.add_used_widget(builtin, UsedType::USED);
+      }
+    } else {
+      self.add_used_widget(widget.clone(), UsedType::USED);
+    }
   }
 }
 

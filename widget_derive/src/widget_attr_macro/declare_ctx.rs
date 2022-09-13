@@ -31,12 +31,13 @@ pub struct DeclareCtx {
   /// All name we can use in macro and need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
   pub current_used_info: ScopeUsedInfo,
+  pub animate_listener_triggers: HashSet<Ident, ahash::RandomState>,
   /// name object has be used.
   used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
   /// Some builtin widget (like margin, padding) implicit defined by user,
   /// shared the `id` with host widget in user perspective.
-  user_perspective_name: HashMap<Ident, Ident>,
+  user_perspective_name: HashMap<Ident, Ident, ahash::RandomState>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +54,7 @@ impl Default for DeclareCtx {
       used_widgets: Default::default(),
       analyze_stack: vec![vec![]],
       user_perspective_name: Default::default(),
+      animate_listener_triggers: <_>::default(),
     }
   }
 }
@@ -130,21 +132,16 @@ impl VisitMut for DeclareCtx {
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
-    if let Some(mut name) = self.expr_find_name_widget(&f_expr.base).cloned() {
-      if let Member::Named(ref field_name) = f_expr.member {
-        if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(field_name) {
-          if self
-            .named_objects
-            .get(&name)
-            .map_or(false, |t| t.contains(IdType::DECLARE))
-          {
-            name.set_span(name.span().join(field_name.span()).unwrap());
-            let wrap_name = ribir_suffix_variable(&name, &suffix.to_string());
-            *f_expr.base = parse_quote! { #wrap_name };
-            self.add_used_widget(wrap_name, UsedType::USED);
-            return;
-          }
-        }
+    if let (Expr::Path(syn::ExprPath { path, .. }), Member::Named(member)) =
+      (&*f_expr.base, &f_expr.member)
+    {
+      if let Some(builtin) = path
+        .get_ident()
+        .and_then(|name| self.find_builtin_access(name, member))
+      {
+        *f_expr.base = parse_quote! { #builtin };
+        self.add_used_widget(builtin, UsedType::USED);
+        return;
       }
     }
     visit_mut::visit_expr_field_mut(self, f_expr);
@@ -257,21 +254,32 @@ impl VisitMut for DeclareCtx {
 }
 
 impl DeclareCtx {
-  pub fn id_collect(&mut self, d: &WidgetMacro) -> super::Result<()> {
-    d.object_names_iter().try_for_each(|(name, track)| {
-      if self.named_objects.contains_key(name) {
-        Err(DeclareError::DuplicateID([(*name).clone(), name.clone()]))
-      } else {
-        self.named_objects.insert(name.clone(), track);
-        Ok(())
-      }
-    })
+  pub fn find_builtin_access(&self, base: &Ident, member: &Ident) -> Option<Ident> {
+    let mut name = self.find_named_widget(base).cloned()?;
+    let suffix = BuiltinFieldWidgets::as_builtin_widget(member)?;
+    self
+      .named_objects
+      .get(&name)
+      .filter(|t| t.contains(IdType::DECLARE))
+      .map(|_| {
+        name.set_span(name.span().join(member.span()).unwrap());
+        ribir_suffix_variable(&name, &suffix.to_string())
+      })
   }
 
   pub fn is_used(&self, name: &Ident) -> bool { self.used_widgets.contains(name) }
 
   pub fn user_perspective_name(&self, name: &Ident) -> Option<&Ident> {
     self.user_perspective_name.get(name)
+  }
+
+  pub fn add_named_obj(&mut self, name: Ident, used_type: IdType) -> Result<(), DeclareError> {
+    if self.named_objects.contains_key(&name) {
+      Err(DeclareError::DuplicateID([name.clone(), name]))
+    } else {
+      self.named_objects.insert(name, used_type);
+      Ok(())
+    }
   }
 
   pub fn add_user_perspective_pair(&mut self, def_name: Ident, show_name: Ident) {
@@ -285,11 +293,22 @@ impl DeclareCtx {
       .named_objects
       .iter()
       .filter(|(id, ty)| {
-        !self.used_widgets.contains(id)
+        // Needn't check builtin named widget
+        self.user_perspective_name(id).is_none()
+          && !self.is_user_perspective_name_used(id)
           && !ty.contains(IdType::FROM_ANCESTOR)
           && !id.to_string().starts_with('_')
       })
       .map(|(id, _)| DeclareWarning::UnusedName(id))
+  }
+
+  fn is_user_perspective_name_used(&self, name: &Ident) -> bool {
+    self.is_used(name)
+      || self
+        .user_perspective_name
+        .iter()
+        .filter_map(|(builtin, host)| (name == host).then(|| builtin))
+        .any(|b| self.is_used(b))
   }
 
   pub fn stack_push(&mut self) -> StackGuard { StackGuard::new(self) }
@@ -317,9 +336,6 @@ impl DeclareCtx {
   }
 
   pub fn add_used_widget(&mut self, name: Ident, used_type: UsedType) {
-    if let Some(u) = self.user_perspective_name.get(&name) {
-      self.used_widgets.insert(u.clone());
-    }
     self.used_widgets.insert(name.clone());
     self.current_used_info.add_used(name, used_type);
   }

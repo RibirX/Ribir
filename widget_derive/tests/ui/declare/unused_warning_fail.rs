@@ -17,4 +17,18 @@ fn main() {
       }
     }
   };
+
+  let _animate_used_builtin_no_warning = widget! {
+    SizedBox {
+      id: id1,
+      size: Size::zero(),
+      background: Color::RED,
+    }
+    animations {
+      id1.on_tap: Animate {
+        from: State { id1.background },
+        transition: Transition { easing: easing::LINEAR }
+      }
+    }
+  };
 }

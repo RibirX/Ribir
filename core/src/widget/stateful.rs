@@ -378,20 +378,20 @@ impl<W: Render + 'static> Render for Stateful<W> {
 impl<W: Compose> Compose for Stateful<W> {
   fn compose(this: StateWidget<Self>) -> Widget {
     let w = match this {
-      StateWidget::Stateless(s) => StateWidget::Stateful(s),
-      StateWidget::Stateful(_) => unreachable!(),
+      StateWidget::Stateless(s) => s,
+      StateWidget::Stateful(s) => s.widget.borrow().clone(),
     };
-    Compose::compose(w)
+    Compose::compose(StateWidget::Stateful(w))
   }
 }
 
 impl<W: ComposeSingleChild> ComposeSingleChild for Stateful<W> {
   fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
     let w = match this {
-      StateWidget::Stateless(s) => StateWidget::Stateful(s),
-      StateWidget::Stateful(_) => unreachable!(),
+      StateWidget::Stateless(s) => s,
+      StateWidget::Stateful(s) => s.widget.borrow().clone(),
     };
-    ComposeSingleChild::compose_single_child(w, child)
+    ComposeSingleChild::compose_single_child(StateWidget::Stateful(w), child)
   }
 }
 
