@@ -264,7 +264,7 @@ impl WidgetMacro {
         tokens.extend(quote! { let #name #hint = #name #compose_children; });
       }
 
-      w.builtin.compose_tokens(name, w.is_expr_widget(), tokens);
+      w.builtin.compose_tokens(name, tokens);
     }
 
     let name = self.widget_identify();

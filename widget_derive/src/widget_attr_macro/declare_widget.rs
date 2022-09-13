@@ -19,7 +19,7 @@ pub use widget_gen::WidgetGen;
 
 use super::{
   kw,
-  widget_macro::{is_expr_keyword, EXPR_FIELD, EXPR_WIDGET},
+  widget_macro::{is_expr_keyword, EXPR_FIELD, },
   DeclareCtx, Id, ObjectUsed, Result, ScopeUsedInfo, UsedPart,
 };
 
@@ -323,14 +323,6 @@ impl DeclareWidget {
     });
 
     follows
-  }
-
-  pub(crate) fn is_expr_widget(&self) -> bool {
-    self
-      .path
-      .segments
-      .first()
-      .map_or(false, |s| s.ident == EXPR_WIDGET)
   }
 
   pub fn traverses_widget(&self) -> impl Iterator<Item = &DeclareWidget> {

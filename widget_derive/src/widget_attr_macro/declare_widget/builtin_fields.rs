@@ -124,24 +124,17 @@ impl BuiltinFieldWidgets {
 
   /// return builtin fields composed tokens, and the upstream tokens if the
   /// finally widget as a expr widget.
-  pub fn compose_tokens(&self, name: &Ident, is_expr_host: bool, tokens: &mut TokenStream) {
+  pub fn compose_tokens(&self, name: &Ident, tokens: &mut TokenStream) {
     WIDGETS
       .iter()
       .filter_map(|builtin| self.widgets.get_key_value(builtin.ty))
-      .fold(is_expr_host, |is_expr_widget, (builtin_ty, info)| {
+      .for_each(|(builtin_ty, info)| {
         let suffix = BUILTIN_WIDGET_SUFFIX.get(builtin_ty).unwrap();
         let builtin_name = ribir_suffix_variable(name, suffix);
         let span = info.span();
-        if is_expr_widget {
-          tokens.extend(quote_spanned! { span =>
-             let #name = SingleChildWidget::from_expr_child(#builtin_name, #name);
-          });
-        } else {
-          tokens.extend(quote_spanned! { span =>
-            let #name = SingleChildWidget::new(#builtin_name, #name);
-          });
-        }
-        false
+        tokens.extend(quote_spanned! { span =>
+          let #name = SingleChildWidget::new(#builtin_name, #name);
+        });
       });
   }
 
