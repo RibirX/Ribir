@@ -175,9 +175,7 @@ impl<W> Clone for Stateful<W> {
 }
 
 impl<W> Stateful<W> {
-  // Convert a widget to a stateful widget, only called by framework. Maybe you
-  // want [`into_stateful`](IntoStateful::into_stateful)
-  pub(crate) fn new(widget: W) -> Self {
+  pub fn new(widget: W) -> Self {
     Stateful {
       widget: Rc::new(RefCell::new(widget)),
       change_notifier: <_>::default(),

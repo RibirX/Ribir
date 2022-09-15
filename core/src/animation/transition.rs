@@ -8,7 +8,7 @@ use std::time::Duration;
 /// Transition describe how the state change form init to final smoothly.
 #[derive(Declare, Clone, Debug, PartialEq)]
 pub struct Transition<E> {
-  #[declare(default)]
+  #[declare(default, convert=strip_option)]
   pub delay: Option<Duration>,
   pub duration: Duration,
   pub easing: E,
@@ -23,12 +23,12 @@ pub trait Roc {
 impl<E: Easing> Roc for Transition<E> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
     let delay = self.delay.unwrap_or_default();
-    if dur < self.delay.unwrap_or_default() {
+    if dur < delay {
       AnimateProgress::Dismissed
     } else if dur > delay + self.duration {
       AnimateProgress::Finish
     } else {
-      let time_rate = dur.as_secs_f32() / self.duration.as_secs_f32();
+      let time_rate = (dur - delay).as_secs_f32() / self.duration.as_secs_f32();
       let p = self.easing.easing(time_rate);
       AnimateProgress::Between(p)
     }

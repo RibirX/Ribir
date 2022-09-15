@@ -19,7 +19,7 @@ pub use widget_gen::WidgetGen;
 
 use super::{
   kw,
-  widget_macro::{is_expr_keyword, EXPR_FIELD, },
+  widget_macro::{is_expr_keyword, EXPR_FIELD},
   DeclareCtx, Id, ObjectUsed, Result, ScopeUsedInfo, UsedPart,
 };
 
@@ -219,7 +219,7 @@ impl DeclareCtx {
 
         let upstream = expr_field
           .used_name_info
-          .all_widgets()
+          .directly_used_widgets()
           .map(|objs| upstream_tokens(objs, quote! {raw_change_stream}));
         if let Some(upstream) = upstream {
           expr_field.expr = parse_quote_spanned! { origin_expr.span() =>

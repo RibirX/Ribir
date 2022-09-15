@@ -1,3 +1,5 @@
+use painter::Transform;
+
 use crate::prelude::{
   Angle, Box2D, Brush, Color, DevicePoint, DeviceRect, DeviceSize, DeviceVector, Point, Radius,
   Rect, Size, Vector,
@@ -142,6 +144,19 @@ impl Lerp for Brush {
         to.clone()
       }
     }
+  }
+}
+
+impl Lerp for Transform {
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    let m11 = self.m11.lerp(&to.m11, factor);
+    let m12 = self.m12.lerp(&to.m12, factor);
+    let m21 = self.m21.lerp(&to.m21, factor);
+    let m22 = self.m22.lerp(&to.m22, factor);
+    let m31 = self.m31.lerp(&to.m31, factor);
+    let m32 = self.m32.lerp(&to.m32, factor);
+
+    Transform::new(m11, m12, m21, m22, m31, m32)
   }
 }
 

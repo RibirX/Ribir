@@ -116,12 +116,17 @@ where
     let elapsed = now - *start_at;
     let progress = self.transition.rate_of_change(elapsed);
 
-    if let AnimateProgress::Between(rate) = progress {
-      // the state may change during animate.
-      *to = self.state.finial_value();
-      let animate_state = (self.lerp_fn)(from, to, rate);
-      self.state.update(animate_state);
+    match progress {
+      AnimateProgress::Between(rate) => {
+        // the state may change during animate.
+        *to = self.state.finial_value();
+        let animate_state = (self.lerp_fn)(from, to, rate);
+        self.state.update(animate_state);
+      }
+      AnimateProgress::Dismissed => self.state.update(from.clone()),
+      AnimateProgress::Finish => {}
     }
+
     *last_progress = progress;
     *already_lerp = true;
 
@@ -134,7 +139,7 @@ where
       .as_mut()
       .expect("This animation is not running.");
 
-    if matches!(info.last_progress, AnimateProgress::Between(_)) {
+    if !matches!(info.last_progress, AnimateProgress::Finish) {
       self.state.update(info.to.clone())
     }
     info.already_lerp = false;
