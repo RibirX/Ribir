@@ -95,11 +95,13 @@ impl WidgetTree {
     while let Some(mut needs_regen) = self.take_needs_regen_generator() {
       needs_regen
         .sort_by_cached_key(|g| g.info.parent().map_or(0, |wid| wid.ancestors(self).count()));
-      needs_regen.iter_mut().for_each(|g| g.refresh(self));
-
-      needs_regen
-        .into_iter()
-        .for_each(|g| self.generator_store.add_generator(g));
+      for mut g in needs_regen.into_iter() {
+        // child expr widget may removed by parent ancestor expr widget refresh.
+        if g.info.parent().map_or(true, |p| !p.is_dropped(self)) {
+          g.refresh(self);
+          self.generator_store.add_generator(g)
+        }
+      }
     }
   }
 
@@ -572,6 +574,35 @@ mod tests {
     WidgetTree::new(RecursiveRow { width, depth }.into_widget(), <_>::default())
   }
 
+  #[test]
+  fn fix_dropped_child_expr_widget() {
+    let parent = Stateful::new(true);
+    let child = Stateful::new(true);
+    let w = widget! {
+      track { parent: parent.clone(), child: child.clone() }
+      ExprWidget {
+        expr: parent.then(|| {
+          widget!{
+            SizedBox {
+              size: Size::zero(),
+              ExprWidget { expr: child.then(|| Void )}
+            }
+          }
+        })
+      }
+    };
+
+    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    wnd.draw_frame();
+
+    {
+      *child.state_ref() = false;
+      *parent.state_ref() = false;
+    }
+
+    // fix crash here.
+    wnd.draw_frame();
+  }
   #[test]
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
