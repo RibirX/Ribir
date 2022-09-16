@@ -31,4 +31,12 @@ fn main() {
       }
     }
   };
+
+  let _fix_use_no_declared_builtin_no_warning = widget! {
+    SizedBox {
+      id: sized_box,
+      size: Size::zero(),
+      SizedBox { size: Size::zero(), background: sized_box.background }
+    }
+  };
 }

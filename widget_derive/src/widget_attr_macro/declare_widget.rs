@@ -237,7 +237,7 @@ impl DeclareCtx {
           fields.push(parse_quote! {upstream: #upstream});
         } else {
           *path = parse_quote_spanned! { path.span() => ConstExprWidget<_> };
-          assert!(expr_field.used_name_info.is_empty())
+          assert!(expr_field.used_name_info.directly_used_widgets().is_none())
         }
       }
     } else {

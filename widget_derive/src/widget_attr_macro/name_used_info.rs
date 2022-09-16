@@ -185,8 +185,6 @@ impl ScopeUsedInfo {
 
   pub fn len(&self) -> usize { self.0.as_ref().map_or(0, |map| map.len()) }
 
-  pub fn is_empty(&self) -> bool { self.0.as_ref().map_or(true, |map| map.is_empty()) }
-
   pub fn get(&self, id: &Ident) -> Option<&NameUsedInfo> {
     self.0.as_ref().and_then(|map| map.get(id))
   }
