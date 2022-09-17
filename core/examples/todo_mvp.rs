@@ -59,7 +59,7 @@ impl Compose for TodoMVP {
                   }
                 }
               }
-            })
+            }).collect::<Vec<_>>()
           }
         }
       }

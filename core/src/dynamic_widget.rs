@@ -1,7 +1,4 @@
-use crate::{
-  impl_proxy_query,
-  prelude::{widget_tree::WidgetTree, *},
-};
+use crate::prelude::{widget_tree::WidgetTree, *};
 use rxrust::ops::box_it::LocalBoxOp;
 use smallvec::{smallvec, SmallVec};
 
@@ -19,7 +16,6 @@ pub struct ExprWidget<E> {
 /// expression not following anything.
 #[derive(Declare)]
 pub struct ConstExprWidget<W> {
-  #[allow(unused)]
   pub(crate) expr: W,
 }
 
@@ -28,7 +24,7 @@ pub struct ConstExprWidget<W> {
 /// lifetime.
 pub(crate) struct Generator {
   pub(crate) info: GeneratorInfo,
-  pub(crate) expr: Box<dyn FnMut(&mut BuildCtx) -> ExprResult>,
+  pub(crate) expr: Box<dyn FnMut(&mut BuildCtx) -> DynamicWidget>,
   pub(crate) _upstream_handle: SubscriptionGuard<Box<dyn SubscriptionLike>>,
 }
 
@@ -82,132 +78,74 @@ impl GeneratorInfo {
   pub(crate) fn generate_id(&self) -> GeneratorID { self.id }
 }
 
-pub enum ExprResult {
+pub enum DynamicWidget {
   Single(Option<Widget>),
-  Multi(Vec<Widget>),
-}
-pub struct SingleResult<W>(Option<W>);
-pub struct MultiResult(Vec<Widget>);
-
-pub trait IntoGenResult<M: ?Sized> {
-  type G;
-  fn into_gen_result(self) -> Self::G;
+  Multi(Box<dyn Iterator<Item = Widget>>),
 }
 
-impl<W, M: ?Sized> IntoGenResult<&M> for W
+pub trait IntoDynWidget<M: ?Sized> {
+  fn into_dyn_widget(self) -> DynamicWidget;
+}
+
+// mark the expr of `ExprWidget` only generate at most one widget.
+pub trait SingleDyn<M: ?Sized>: IntoDynWidget<M> {}
+impl<W, M: ?Sized> IntoDynWidget<&M> for W
 where
   W: IntoWidget<M>,
 {
-  type G = SingleResult<W>;
-
   #[inline]
-  fn into_gen_result(self) -> Self::G { SingleResult(Some(self)) }
+  fn into_dyn_widget(self) -> DynamicWidget { DynamicWidget::Single(Some(self.into_widget())) }
 }
 
-impl<W, M: ?Sized> IntoGenResult<Option<&M>> for Option<W>
+impl<I, M> IntoDynWidget<dyn Iterator<Item = M>> for I
 where
-  W: IntoWidget<M>,
-{
-  type G = SingleResult<W>;
-
-  #[inline]
-  fn into_gen_result(self) -> Self::G { SingleResult(self) }
-}
-
-impl<I, M: ?Sized> IntoGenResult<Vec<&M>> for I
-where
-  I: Iterator,
+  M: ?Sized,
+  I: IntoIterator + 'static,
   I::Item: IntoWidget<M>,
 {
-  type G = MultiResult;
   #[inline]
-  fn into_gen_result(self) -> Self::G { MultiResult(self.map(IntoWidget::into_widget).collect()) }
+  fn into_dyn_widget(self) -> DynamicWidget {
+    DynamicWidget::Multi(Box::new(self.into_iter().map(|w| w.into_widget())))
+  }
 }
 
-impl<E: 'static> ExprWidget<E> {
-  pub fn into_widget<R, M: ?Sized>(self) -> Widget
+impl<W, M: ?Sized> SingleDyn<&M> for W where W: IntoWidget<M> {}
+impl<W, M: ?Sized> SingleDyn<dyn Iterator<Item = M>> for Option<W> where W: IntoWidget<M> +'static{}
+
+impl<E, R> ExprWidget<E>
+where
+  E: FnMut(&mut BuildCtx) -> R + 'static,
+{
+  /// Only if `ExprWidget` generate at most one widget can as a normal widget,
+  /// otherwise it must been children of multi child widget.
+  #[inline]
+  pub fn into_widget<M: ?Sized>(self) -> Widget
   where
-    E: FnMut(&mut BuildCtx) -> SingleResult<R>,
-    R: IntoWidget<M>,
+    R: SingleDyn<M>,
+  {
+    self.into_child()
+  }
+
+  #[inline]
+  pub fn into_child<M: ?Sized>(self) -> Widget
+  where
+    R: IntoDynWidget<M>,
   {
     let Self { mut expr, upstream } = self;
-    let expr = Box::new(move |ctx: &mut BuildCtx| expr(ctx).into_dyn_result());
+
     Widget {
-      node: Some(WidgetNode::Dynamic(ExprWidget { expr, upstream })),
+      node: Some(WidgetNode::Dynamic(ExprWidget {
+        expr: Box::new(move |ctx| expr(ctx).into_dyn_widget()),
+        upstream,
+      })),
       children: Children::None,
     }
   }
 }
 
-impl<E: FnMut(&mut BuildCtx) -> MultiResult + 'static> ExprWidget<E> {
+impl<W>  ConstExprWidget<W> {
   #[inline]
-  pub fn into_multi_child(self) -> Widget {
-    let Self { mut expr, upstream } = self;
-    let expr: Box<dyn FnMut(&mut BuildCtx) -> ExprResult> =
-      Box::new(move |ctx| expr(ctx).into_dyn_result());
-
-    Widget {
-      node: Some(WidgetNode::Dynamic(ExprWidget { expr, upstream })),
-      children: Children::None,
-    }
-  }
-}
-
-impl<R: SingleChild, E> SingleChild for ExprWidget<E> where
-  E: FnMut(&mut BuildCtx) -> SingleResult<R>
-{
-}
-impl<R: MultiChild, E> MultiChild for ExprWidget<E> where E: FnMut(&mut BuildCtx) -> SingleResult<R> {}
-
-impl<C: SingleChild> SingleChild for ConstExprWidget<Option<C>> {}
-impl<C: SingleChild> SingleChild for ConstExprWidget<C> {}
-impl<C: MultiChild> MultiChild for ConstExprWidget<C> {}
-impl<C: ComposeSingleChild> ComposeSingleChild for ConstExprWidget<C> {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
-    match this {
-      StateWidget::Stateless(c) => ComposeSingleChild::compose_single_child(c.expr.into(), child),
-      StateWidget::Stateful(_) => unreachable!("ExprWidget should not be stateful."),
-    }
-  }
-}
-impl<C: ComposeMultiChild> ComposeMultiChild for ConstExprWidget<C> {
-  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
-    match this {
-      StateWidget::Stateless(c) => ComposeMultiChild::compose_multi_child(c.expr.into(), children),
-      StateWidget::Stateful(_) => unreachable!("ExprWidget should not be stateful."),
-    }
-  }
-}
-
-impl<W: Render + 'static> Render for ConstExprWidget<W> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.expr.perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.expr.only_sized_by_parent() }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.expr.paint(ctx) }
-}
-
-impl<W: Compose> Compose for ConstExprWidget<W> {
-  fn compose(this: StateWidget<Self>) -> Widget {
-    let w = match this {
-      StateWidget::Stateless(s) => StateWidget::Stateless(s.expr),
-      StateWidget::Stateful(_) => unreachable!(),
-    };
-    Compose::compose(w)
-  }
-}
-
-impl IntoWidget<Widget> for ConstExprWidget<Widget> {
-  #[inline]
-  fn into_widget(self) -> Widget { self.expr }
-}
-impl<W: Query> Query for ConstExprWidget<W> {
-  impl_proxy_query!(expr);
+  pub fn into_widget< M: ?Sized>(self) -> Widget where W: IntoWidget<M>, { self.expr.into_widget() }
 }
 
 impl Generator {
@@ -220,16 +158,19 @@ impl Generator {
     let new_gen = (self.expr)(&mut ctx);
 
     match (gen_result, new_gen) {
-      (&mut DynamicWidgetInfo::SingleDynWithChild { gen_root, depth }, ExprResult::Single(w)) => {
+      (
+        &mut DynamicWidgetInfo::SingleDynWithChild { gen_root, depth },
+        DynamicWidget::Single(w),
+      ) => {
         self.refresh_single_with_child(gen_root, w, depth, tree);
       }
       (DynamicWidgetInfo::WholeSubtree(ref old_widgets), result) => {
         let new_widgets = match result {
-          ExprResult::Single(w) => {
+          DynamicWidget::Single(w) => {
             let w = w.unwrap_or_else(|| Void.into_widget());
-            tree.replace_children(old_widgets, vec![w])
+            tree.replace_children(old_widgets, std::iter::once(w))
           }
-          ExprResult::Multi(m) => tree.replace_children(old_widgets, m),
+          DynamicWidget::Multi(m) => tree.replace_children(old_widgets, m),
         };
 
         new_widgets.iter().for_each(|n| tree.mark_dirty(*n));
@@ -352,21 +293,6 @@ fn single_on_mounted(
 impl GeneratorID {
   #[inline]
   pub(crate) fn next_id(self) -> Self { Self(self.0 + 1) }
-}
-
-impl<W> SingleResult<W> {
-  #[inline]
-  fn into_dyn_result<M: ?Sized>(self) -> ExprResult
-  where
-    W: IntoWidget<M>,
-  {
-    ExprResult::Single(self.0.map(IntoWidget::into_widget))
-  }
-}
-
-impl MultiResult {
-  #[inline]
-  fn into_dyn_result(self) -> ExprResult { ExprResult::Multi(self.0) }
 }
 
 #[cfg(test)]

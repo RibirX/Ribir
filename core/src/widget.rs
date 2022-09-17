@@ -107,7 +107,7 @@ pub struct Widget {
 pub(crate) enum WidgetNode {
   Compose(Box<dyn for<'r> FnOnce(&'r mut BuildCtx) -> Widget>),
   Render(Box<dyn Render>),
-  Dynamic(ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> ExprResult>>),
+  Dynamic(ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> DynamicWidget>>),
 }
 
 pub(crate) enum Children {

@@ -172,7 +172,7 @@ impl WidgetTree {
   pub(crate) fn replace_children(
     &mut self,
     dst: &[WidgetId],
-    widgets: Vec<Widget>,
+    widgets: impl Iterator<Item = Widget>,
   ) -> SmallVec<[WidgetId; 1]> {
     fn collect_same_key_pairs(
       old_widgets: impl Iterator<Item = WidgetId>,
