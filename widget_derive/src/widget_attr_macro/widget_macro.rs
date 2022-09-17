@@ -81,7 +81,6 @@ impl WidgetMacro {
     }
 
     self.id_collect(ctx)?;
-    
     ctx.visit_widget_macro_mut(self);
 
     self.widget.traverses_widget().for_each(|w| {

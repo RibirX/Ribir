@@ -13,7 +13,7 @@ impl<W, D> DataWidget<W, D> {
   pub fn new(widget: W, data: D) -> Self { Self { widget, data } }
 }
 
-impl<D: Query> Render for DataWidget<Box<dyn Render>, D> {
+impl<W: Render, D: Query> Render for DataWidget<W, D> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.widget.perform_layout(clamp, ctx)
@@ -26,7 +26,7 @@ impl<D: Query> Render for DataWidget<Box<dyn Render>, D> {
   fn only_sized_by_parent(&self) -> bool { self.widget.only_sized_by_parent() }
 }
 
-impl<D: Query> Query for DataWidget<Box<dyn Render>, D> {
+impl<W: Query, D: Query> Query for DataWidget<W, D> {
   fn query_all(
     &self,
     type_id: std::any::TypeId,

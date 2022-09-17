@@ -102,7 +102,6 @@ mod tests {
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  // todo: need disable animate to test.
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let global_pos = Stateful::new(Point::zero());
     let w = widget! {
@@ -125,7 +124,8 @@ mod tests {
       phase: TouchPhase::Started,
       modifiers: ModifiersState::default(),
     });
-    wnd.draw_frame();
+
+    wnd.layout_ready();
 
     assert_eq!(global_pos.raw_ref().x, expect_x);
     assert_eq!(global_pos.raw_ref().y, expect_y);

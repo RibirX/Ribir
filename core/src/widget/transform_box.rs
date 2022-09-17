@@ -1,4 +1,4 @@
-use crate::{prelude::*, impl_query_self_only};
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(SingleChild, Declare, Clone)]
 pub struct TransformBox {
@@ -53,8 +53,7 @@ mod tests {
       }
     };
 
-    let (rect, _) =
-      widget_and_its_children_box_rect(widget.into_widget(), Size::new(800., 800.));
+    let (rect, _) = widget_and_its_children_box_rect(widget.into_widget(), Size::new(800., 800.));
 
     assert_eq!(rect, Rect::from_size(Size::new(200., 200.)));
   }

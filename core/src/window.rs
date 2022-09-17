@@ -111,11 +111,7 @@ impl Window {
 
       let mut struct_dirty = false;
       loop {
-        while widget_tree.is_dirty() {
-          struct_dirty |= widget_tree.any_struct_dirty();
-          widget_tree.tree_repair();
-          widget_tree.layout(raw_window.inner_size());
-        }
+        struct_dirty |= widget_tree.tree_ready(raw_window.inner_size());
 
         context.borrow_mut().layout_ready();
         if !widget_tree.is_dirty() {
@@ -133,6 +129,8 @@ impl Window {
       context.borrow_mut().end_frame();
     }
   }
+
+  pub fn layout_ready(&mut self) { self.widget_tree.tree_ready(self.raw_window.inner_size()); }
 
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 

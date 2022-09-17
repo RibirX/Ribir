@@ -2,7 +2,9 @@
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
+  ops::Deref,
 };
+use std::{cell::RefCell, rc::Rc};
 pub mod key;
 pub mod layout;
 use algo::ShareResource;
@@ -247,7 +249,7 @@ impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
 
 #[macro_export]
 macro_rules! impl_proxy_query {
-  ($field: tt) => {
+  ($($field: tt)*) => {
     #[inline]
     fn query_all(
       &self,
@@ -255,7 +257,7 @@ macro_rules! impl_proxy_query {
       callback: &mut dyn FnMut(&dyn Any) -> bool,
       order: QueryOrder,
     ) {
-      self.$field.query_all(type_id, callback, order)
+      self.$($field)*.query_all(type_id, callback, order)
     }
   };
 }
@@ -329,4 +331,44 @@ impl Children {
       Children::Multi(m) => m.into_iter().for_each(cb),
     }
   }
+}
+
+#[macro_export]
+macro_rules! impl_proxy_render {
+  ($($proxy: tt)*) => {
+      #[inline]
+      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+        self.$($proxy)*.perform_layout(clamp, ctx)
+      }
+
+      #[inline]
+      fn paint(&self, ctx: &mut PaintingCtx) { self.$($proxy)*.paint(ctx) }
+
+      #[inline]
+      fn only_sized_by_parent(&self) -> bool { self.$($proxy)*.only_sized_by_parent() }
+  };
+}
+
+impl<W: Render> Render for RefCell<W> {
+  impl_proxy_render!(borrow());
+}
+
+impl<W: Query> Query for RefCell<W> {
+  impl_proxy_query!(borrow());
+}
+
+impl<W: Render> Render for Rc<W> {
+  impl_proxy_render!(deref());
+}
+
+impl<W: Query> Query for Rc<W> {
+  impl_proxy_query!(deref());
+}
+
+impl Render for Box<dyn Render> {
+  impl_proxy_render!(deref());
+}
+
+impl Query for Box<dyn Render> {
+  impl_proxy_query!(deref());
 }
