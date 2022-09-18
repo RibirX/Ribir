@@ -175,6 +175,11 @@ builtin! {
     transform: Transform
   }
 
+  Visibility {
+    #[doc="Whether to show or hide a child"]
+    visible: bool
+  }
+
   KeyWidget {
     #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
     key: Key

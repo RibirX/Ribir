@@ -43,6 +43,12 @@ mod transform_box;
 pub use transform_box::*;
 mod input;
 pub use input::*;
+mod visibility;
+pub use visibility::*;
+mod offstage;
+pub use offstage::*;
+mod ignore_pointer;
+pub use ignore_pointer::*;
 pub mod data_widget;
 mod scrollbar;
 pub use data_widget::DataWidget;
@@ -62,6 +68,11 @@ pub trait Compose {
   fn compose(this: StateWidget<Self>) -> Widget
   where
     Self: Sized;
+}
+
+pub struct HitTest {
+  pub(crate) hit: bool,
+  pub(crate) can_hit_child: bool,
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -90,6 +101,23 @@ pub trait Render: Query {
   /// Whether the constraints from parent are the only input to detect the
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
+
+  /// Determines the set of render widgets located at the given position.
+  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+    let is_hit = hit_test_impl(ctx, pos);
+    HitTest {
+      hit: is_hit,
+      can_hit_child: is_hit,
+    }
+  }
+
+}
+
+pub(crate) fn hit_test_impl(ctx: &TreeCtx, pos: Point) -> bool {
+  let id = ctx.id();
+  ctx.widget_tree()
+    .layout_box_rect(id)
+    .map_or(false, |rect| rect.contains(pos))
 }
 
 /// Enum to store both stateless and stateful widget.
