@@ -31,9 +31,14 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     thumb_min_size: 12.,
     scroll_transition: Transition {
       delay: None,
+      repeat: <_>::default(),
       duration: Duration::from_millis(150),
       easing: easing::EASE_OUT,
     },
+  };
+  let text_selected_background = TextSelectedBackground {
+    focus: Color::from_rgb(50, 150, 255).with_alpha(0.9),
+    blur: Color::GRAY.with_alpha(0.9),
   };
   Theme {
     brightness,
@@ -42,6 +47,8 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     default_font_family: family,
     scrollbar,
     icon_theme: icon_theme(),
+    text_selected_background,
+    caret_color: Color::BLACK,
   }
 }
 pub mod purple {

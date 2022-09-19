@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock};
+use std::{
+  ops::{Add, Range, Sub},
+  sync::{Arc, RwLock},
+};
 
 use algo::FrameCache;
 use arcstr::Substr;
@@ -7,6 +10,7 @@ use lyon_path::geom::{euclid::num::Zero, Point, Rect, Size};
 use crate::{
   font_db::FontDB,
   shaper::{ShapeResult, TextShaper},
+  text_reorder::ReorderResult,
   typography::{
     InputParagraph, InputRun, Overflow, PlaceLineDirection, TypographyCfg, TypographyMan,
     VisualInfos,
@@ -49,12 +53,14 @@ pub struct VisualGlyphs {
   scale: f32,
   bounds: Size<Em>,
   visual_info: Arc<VisualInfos>,
+  order_info: Arc<ReorderResult>,
 }
 
 struct ShapeRun {
   shape_result: Arc<ShapeResult>,
   font_size: FontSize,
   letter_space: Option<Pixel>,
+  range: Range<usize>,
 }
 
 impl TypographyStore {
@@ -85,6 +91,7 @@ impl TypographyStore {
           scale: font_size.into_em().value(),
           bounds,
           visual_info: res.infos,
+          order_info: self.reorder.reorder_text(&text),
         };
       }
 
@@ -113,6 +120,7 @@ impl TypographyStore {
           shape_result,
           font_size: FontSize::Em(Em::absolute(1.0)),
           letter_space: input.letter_space,
+          range: r.clone(),
         }
       });
 
@@ -137,6 +145,7 @@ impl TypographyStore {
       scale: font_size.into_em().value(),
       bounds,
       visual_info,
+      order_info: info,
     }
   }
 
@@ -202,6 +211,9 @@ impl InputRun for ShapeRun {
 
   #[inline]
   fn line_height(&self) -> Em { self.shape_result.line_height }
+
+  #[inline]
+  fn range(&self) -> Range<usize> { self.range.clone() }
 }
 
 impl VisualGlyphs {
@@ -219,6 +231,197 @@ impl VisualGlyphs {
         self.to_pixel_value(em_rect.height()),
       ),
     )
+  }
+
+  pub fn nearest_glyph(&self, offset_x: f32, offset_y: f32) -> (usize, usize) {
+    let rc = self.visual_rect();
+
+    let mut bottom: Em = Pixel(rc.height().into()).into();
+
+    let x: Em = Pixel(offset_x.into()).into();
+    let y: Em = Pixel(offset_y.into()).into();
+
+    let mut iter = self
+      .visual_info
+      .visual_lines
+      .iter()
+      .enumerate()
+      .rev()
+      .skip_while(move |(_, line)| {
+        bottom = bottom.max(line.line_height) - line.line_height;
+        y < bottom
+      });
+
+    if let Some((row, line)) = iter.next() {
+      let idx = line
+        .glyphs
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, g)| g.x_offset <= x)
+        .map(|(i, g)| {
+          if x - g.x_offset >= g.x_offset + g.x_advance - x {
+            return i + 1;
+          } else {
+            return i;
+          }
+        })
+        .unwrap_or(0);
+      return (row, idx);
+    }
+
+    return (0, 0);
+  }
+
+  pub fn position_by_cluster(&self, cluster: u32) -> (usize, usize) {
+    struct RangeLocator<'a, Idx>
+    where
+      Idx: Ord + Copy,
+    {
+      ranges: Vec<(&'a Range<Idx>, usize)>,
+    }
+
+    impl<'a, Idx> RangeLocator<'a, Idx>
+    where
+      Idx: Ord + Copy,
+    {
+      fn from_unorder_ranges(rgs: impl Iterator<Item = &'a Range<Idx>>) -> Self
+      where
+        Idx: 'static,
+      {
+        let mut ranges: Vec<_> = rgs.enumerate().map(|(idx, item)| (item, idx)).collect();
+        ranges.sort_by(|lh, rh| lh.0.start.cmp(&rh.0.start));
+        RangeLocator { ranges }
+      }
+
+      fn range_index(&self, val: Idx) -> Option<usize> {
+        let idx = self.ranges.partition_point(|item| item.0.end <= val);
+        if idx < self.ranges.len() && self.ranges[idx].0.contains(&val) {
+          Some(self.ranges[idx].1)
+        } else {
+          None
+        }
+      }
+    }
+
+    let visual_lines = &self.visual_info.visual_lines;
+    let para = self.get_para(cluster);
+    let order_info = &self.order_info.paras[para];
+    let line = &visual_lines[para];
+    let locator = RangeLocator::from_unorder_ranges(order_info.runs.iter());
+    if let Some(dst_run) = locator.range_index(cluster as usize) {
+      let is_ltr = order_info.levels[order_info.runs[dst_run].start].is_ltr();
+      let offset = line.glyphs.partition_point(|glyph| {
+        let glyph_run = locator.range_index(glyph.cluster as usize);
+        let glyph_run = glyph_run.unwrap();
+        if dst_run == glyph_run {
+          if is_ltr {
+            return glyph.cluster < cluster;
+          } else {
+            return glyph.cluster > cluster;
+          }
+        }
+        return glyph_run < dst_run;
+      });
+      return (para, offset);
+    } else {
+      return (para, order_info.range.end);
+    }
+  }
+
+  pub fn position_to_cluster(&self, para: usize, offset: usize) -> u32 {
+    let lines = &self.visual_info.visual_lines;
+    let paras = &self.order_info.paras;
+    if para >= lines.len() {
+      return paras.last().map_or(0, |p| p.range.end as u32);
+    } else {
+      return lines[para]
+        .glyphs
+        .get(offset)
+        .map_or(paras[para].range.end as u32, |g| g.cluster);
+    }
+  }
+
+  pub fn glyph_rect(&self, para: usize, offset: usize) -> (Rect<f32>, f32) {
+    let visual_lines = &self.visual_info.visual_lines;
+    let idx = (offset).min(visual_lines[para].glyphs.len() - 1);
+    let glyph = &visual_lines[para].glyphs[idx];
+
+    if offset > idx {
+      (
+        Rect::new(
+          Point::new(
+            self.to_pixel_value(glyph.x_offset + glyph.x_advance),
+            self.to_pixel_value(glyph.y_offset),
+          ),
+          Size::new(0., self.to_pixel_value(glyph.y_advance)),
+        ),
+        self.to_pixel_value(visual_lines[para].line_height),
+      )
+    } else {
+      (
+        Rect::new(
+          Point::new(
+            self.to_pixel_value(glyph.x_offset),
+            self.to_pixel_value(glyph.y_offset),
+          ),
+          Size::new(
+            self.to_pixel_value(glyph.x_advance),
+            self.to_pixel_value(glyph.y_advance),
+          ),
+        ),
+        self.to_pixel_value(visual_lines[para].line_height),
+      )
+    }
+  }
+
+  pub fn select_range(&self, rg: Range<usize>) -> Vec<Rect<Pixel>> {
+    struct TypoRectJointer<T>
+    where
+      T: Add<T, Output = T> + Sub<T, Output = T> + Copy + PartialEq,
+    {
+      acc: Vec<Rect<T>>,
+      cur: Option<Rect<T>>,
+    }
+
+    impl<T> TypoRectJointer<T>
+    where
+      T: Add<T, Output = T> + Sub<T, Output = T> + Copy + PartialEq,
+    {
+      fn new() -> Self { Self { acc: vec![], cur: None } }
+      fn join_x(&mut self, next: Rect<T>) {
+        if let Some(rc) = &mut self.cur {
+          rc.size.width = next.max_x() - rc.min_x();
+        } else {
+          self.cur = Some(next.clone());
+        }
+      }
+      fn new_rect(&mut self) {
+        let cur = self.cur.take();
+        if let Some(rc) = cur {
+          self.acc.push(rc);
+        }
+      }
+      fn rects(self) -> Vec<Rect<T>> { self.acc }
+    }
+    let mut jointer = TypoRectJointer::new();
+    for line in &self.visual_info.visual_lines {
+      let height = (line.line_height * self.scale).into();
+      for glyph in &line.glyphs {
+        if rg.contains(&(glyph.cluster as usize)) {
+          let glyph = self.scale_to_pixel_glyph(&glyph);
+          let rc = Rect::new(
+            Point::new(glyph.x_offset, glyph.y_offset),
+            Size::new(glyph.x_advance, height),
+          );
+          jointer.join_x(rc);
+        } else {
+          jointer.new_rect();
+        }
+      }
+      jointer.new_rect();
+    }
+    jointer.rects()
   }
 
   fn to_pixel_value(&self, v: Em) -> f32 {
@@ -261,6 +464,14 @@ impl VisualGlyphs {
       glyph_id,
       cluster,
     }
+  }
+
+  fn get_para(&self, cluster: u32) -> usize {
+    self
+      .order_info
+      .paras
+      .partition_point(|p| p.range.end <= cluster as usize)
+      .min(self.order_info.paras.len() - 1)
   }
 }
 
@@ -494,5 +705,25 @@ mod tests {
     store.end_frame();
 
     assert!(store.get_from_cache(text, font_size, &cfg).is_none());
+  }
+
+  #[test]
+  fn typo_cluster_test() {
+    let cfg = TypographyCfg {
+      line_height: None,
+      letter_space: None,
+      text_align: None,
+      bounds: (Em::MAX, Em::MAX).into(),
+      line_dir: PlaceLineDirection::TopToBottom,
+      overflow: Overflow::Clip,
+    };
+    let text = literal_substr!(
+      "abcd \u{202e} right_to_left_1 \u{202d} embed \u{202c} right_to_left_2 \u{202c} end"
+    );
+    let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg);
+    assert!((0, 4) == graphys.position_by_cluster(4));
+    assert!((0, 35) == graphys.position_by_cluster(22));
+    assert!((0, 27) == graphys.position_by_cluster(31));
+    assert!((0, 8) == graphys.position_by_cluster(53));
   }
 }

@@ -19,6 +19,14 @@ use ttf_parser::GlyphId;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
 
+mod text_writer;
+pub use text_writer::{CharacterCursor, ControlChar, TextWriter};
+
+mod grapheme_cursor;
+pub use grapheme_cursor::GraphemeCursor;
+
+pub mod unicode_help;
+
 /// Unit for convert between pixel and em.
 pub const PIXELS_PER_EM: f32 = 16.;
 

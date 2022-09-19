@@ -238,10 +238,11 @@ where
     let font_size = run.font_size();
     let text = run.text();
     let glyphs = run.glyphs();
+    let base = run.range().start as u32;
 
     let line = self.visual_lines.last_mut().unwrap();
     line.line_height = line.line_height.max(run.line_height());
-    self.place_glyphs(cursor, font_size, text, glyphs.iter());
+    self.place_glyphs(cursor, font_size, text, glyphs.iter(), base);
   }
 
   fn place_glyphs<'b>(
@@ -250,11 +251,13 @@ where
     font_size: FontSize,
     text: &str,
     runs: impl Iterator<Item = &'b Glyph<Em>>,
+    base_cluster: u32,
   ) {
     for g in runs {
       let mut at = g.clone();
       at.scale(font_size.into_em().value());
       let over_boundary = cursor.advance_glyph(&mut at, text);
+      at.cluster = g.cluster + base_cluster;
       self.push_glyph(at);
       if over_boundary {
         self.over_bounds = true;
@@ -348,6 +351,7 @@ pub trait InputRun {
   fn font_size(&self) -> FontSize;
   fn line_height(&self) -> Em;
   fn letter_space(&self) -> Option<Pixel>;
+  fn range(&self) -> Range<usize>;
 }
 
 pub struct HInlineCursor {

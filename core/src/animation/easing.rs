@@ -97,6 +97,12 @@ impl Easing for CubicBezierEasing {
   }
 }
 
+pub struct Throld(pub f32);
+impl Easing for Throld {
+  #[inline]
+  fn easing(&self, time_rate: f32) -> f32 { if time_rate < self.0 { 0. } else { 1. } }
+}
+
 #[cfg(test)]
 mod tests {
   extern crate test;

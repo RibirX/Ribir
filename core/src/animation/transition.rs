@@ -12,6 +12,8 @@ pub struct Transition<E> {
   pub delay: Option<Duration>,
   pub duration: Duration,
   pub easing: E,
+  #[declare(default)]
+  pub repeat: Repeat,
 }
 
 /// Calc the rate of change over time.
@@ -21,15 +23,17 @@ pub trait Roc {
 }
 
 impl<E: Easing> Roc for Transition<E> {
-  fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
+  fn rate_of_change(&self, mut dur: Duration) -> AnimateProgress {
     let delay = self.delay.unwrap_or_default();
+    let repeat = self.repeat.repeat_cnt();
     if dur < self.delay.unwrap_or_default() {
       AnimateProgress::Dismissed
-    } else if dur > delay + self.duration {
+    } else if !self.repeat.is_infinite() && dur > delay + self.duration * repeat {
       AnimateProgress::Finish
     } else {
+      dur -= delay;
       let time_rate = dur.as_secs_f32() / self.duration.as_secs_f32();
-      let p = self.easing.easing(time_rate);
+      let p = self.easing.easing(time_rate - time_rate.floor());
       AnimateProgress::Between(p)
     }
   }

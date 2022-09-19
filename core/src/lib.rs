@@ -1,4 +1,4 @@
-#![feature(test, decl_macro, marker_trait_attr, drain_filter)]
+#![feature(test, decl_macro, marker_trait_attr, drain_filter, derive_default_enum)]
 
 #[macro_use]
 extern crate bitflags;
