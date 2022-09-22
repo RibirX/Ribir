@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote_spanned, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
@@ -17,15 +17,14 @@ mod variable_names;
 pub use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
 pub use variable_names::*;
 pub mod animations;
-mod dataflows;
 mod declare_widget;
+mod on_change;
 pub use declare_widget::RESERVE_IDENT;
 
 mod track;
 mod widget_macro;
 pub mod kw {
   syn::custom_keyword!(widget);
-  syn::custom_keyword!(dataflows);
   syn::custom_keyword!(animations);
   syn::custom_keyword!(track);
   syn::custom_keyword!(ExprWidget);
@@ -34,24 +33,9 @@ pub mod kw {
   syn::custom_keyword!(Animate);
   syn::custom_keyword!(State);
   syn::custom_keyword!(Transition);
-}
-
-fn skip_nc_assign<L, R>(skip_nc: bool, left: &L, right: &R) -> TokenStream2
-where
-  L: ToTokens,
-  R: ToTokens,
-{
-  if skip_nc {
-    let v = ribir_variable("v", left.span());
-    quote! {
-      let #v = #right;
-      if #v != #left {
-        #left = #v;
-      }
-    }
-  } else {
-    quote! { #left = #right; }
-  }
+  syn::custom_punctuation!(FlowArrow, ~>);
+  syn::custom_keyword!(on);
+  syn::custom_keyword!(change);
 }
 
 #[derive(Debug)]

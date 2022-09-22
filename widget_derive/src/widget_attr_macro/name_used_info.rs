@@ -1,9 +1,12 @@
-use super::DeclareCtx;
+use super::{ribir_variable, DeclareCtx};
 use crate::error::CircleUsedPath;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, spanned::Spanned};
+use quote::{quote_spanned, ToTokens};
 use std::collections::HashMap;
-use syn::Ident;
+use syn::{
+  token::{Brace, Semi},
+  Ident,
+};
 
 #[derive(Clone, Debug)]
 pub struct NameUsedInfo {
@@ -142,11 +145,33 @@ impl ScopeUsedInfo {
     self.filter_widget(|info| info.used_type != UsedType::MOVE_CAPTURE)
   }
 
-  pub fn expr_refs_wrap(&self, tokens: TokenStream) -> TokenStream {
-    if let Some(name) = self.refs_widgets() {
-      expr_refs_wrap(name, tokens)
+  pub fn refs_surround<'a>(&self, tokens: &mut TokenStream, f: impl FnOnce(&mut TokenStream)) {
+    if let Some(refs) = self.refs_widgets() {
+      refs_surround(refs, tokens, f)
     } else {
-      quote! { #tokens }
+      f(tokens)
+    }
+  }
+
+  pub fn value_expr_surround_refs(
+    &self,
+    tokens: &mut TokenStream,
+    span: Span,
+    // add value expression tokens.
+    f: impl FnOnce(&mut TokenStream),
+  ) {
+    if self.refs_widgets().is_none() {
+      f(tokens);
+    } else {
+      Brace(span).surround(tokens, |tokens| {
+        let v = ribir_variable("v", span);
+        self.refs_surround(tokens, |tokens| {
+          tokens.extend(quote_spanned! {span => let #v = });
+          f(tokens);
+          Semi(span).to_tokens(tokens);
+        });
+        v.to_tokens(tokens);
+      })
     }
   }
 
@@ -183,12 +208,6 @@ impl ScopeUsedInfo {
     widgets.clone().next().is_some().then(move || widgets)
   }
 
-  pub fn len(&self) -> usize { self.0.as_ref().map_or(0, |map| map.len()) }
-
-  pub fn get(&self, id: &Ident) -> Option<&NameUsedInfo> {
-    self.0.as_ref().and_then(|map| map.get(id))
-  }
-
   fn filter_widget(
     &self,
     filter: impl Fn(&NameUsedInfo) -> bool + Clone,
@@ -197,21 +216,25 @@ impl ScopeUsedInfo {
   }
 }
 
-pub fn expr_refs_wrap<'a>(
-  name: impl Iterator<Item = &'a Ident> + Clone,
-  tokens: TokenStream,
-) -> TokenStream {
-  let name2 = name.clone();
-  quote_spanned! {tokens.__span() => {
-    #(
+pub fn refs_surround<'a>(
+  names: impl Iterator<Item = &'a Ident> + Clone,
+  tokens: &mut TokenStream,
+  f: impl FnOnce(&mut TokenStream),
+) {
+  let names2 = names.clone();
+  for name in names {
+    tokens.extend(quote_spanned! { name.span() =>
       let mut #name = #name.state_ref();
-    )*
-    let v= { #tokens } ;
-    #(
-      #name2.release_current_borrow();
-    )*
-    v
-  }}
+    });
+  }
+
+  f(tokens);
+
+  for name in names2 {
+    tokens.extend(quote_spanned! { name.span() =>
+      #name.release_current_borrow();
+    });
+  }
 }
 
 impl<'a> ObjectUsedPath<'a> {

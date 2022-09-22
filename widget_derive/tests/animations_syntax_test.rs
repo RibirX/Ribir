@@ -41,7 +41,7 @@ fn listener_trigger_have_handler() {
         }
       }
     }
-    dataflows { leak_animate.is_running() ~> *animate_state }
+    on leak_animate.is_running() ~> *animate_state
   };
 
   wheel_widget(w);
@@ -72,7 +72,7 @@ fn listener_trigger() {
         }
       }
     }
-    dataflows { leak_animate.is_running() ~> *animate_state }
+    on leak_animate.is_running() ~> *animate_state
   };
 
   wheel_widget(w);

@@ -75,11 +75,12 @@ impl BuiltinFieldWidgets {
     });
   }
 
+  // todo: key should not as a builtin widget again.
   pub fn key_follow_check(&self) -> crate::error::Result<()> {
     if let Some((_, info)) = self.widgets.iter().find(|(name, _)| "KeyWidget" == **name) {
       assert_eq!(info.0.len(), 1);
-      let DeclareField { member, used_name_info, .. } = &info.0[0];
-      if let Some(follows) = used_name_info.directly_used_widgets() {
+      let DeclareField { member, expr, .. } = &info.0[0];
+      if let Some(follows) = expr.used_name_info.directly_used_widgets() {
         return Err(DeclareError::KeyDependsOnOther {
           key: member.span().unwrap(),
           depends_on: follows.map(|w| w.span().unwrap()).collect(),

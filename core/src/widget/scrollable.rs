@@ -40,12 +40,12 @@ impl ComposeSingleChild for ScrollableWidget {
           ExprWidget { expr: child }
         }}
       }
-      dataflows {
-        #[skip_nc]
-        content.box_rect().size ~> this.content_size,
-        #[skip_nc]
-        view.box_rect().size ~> this.page
-      }
+
+      #[skip_nc]
+      on content.box_rect().size ~> this.content_size
+      #[skip_nc]
+      on view.box_rect().size ~> this.page
+
       animations {
         content.left_anchor: Animate {
           transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),

@@ -170,7 +170,7 @@ fn data_flow_macro() {
       SizedBox { id: a, size }
       SizedBox { id: b, size: a.size }
     }
-    dataflows { a.size + b.size ~> c.size }
+    on a.size + b.size ~> c.size
   };
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.draw_frame();

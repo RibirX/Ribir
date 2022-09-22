@@ -2,12 +2,22 @@ use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use std::collections::{BTreeMap, HashMap};
-use syn::{parse::Parse, spanned::Spanned, token, Ident, Path};
+use syn::{
+  parse::Parse,
+  spanned::Spanned,
+  token::{self, Pound},
+  visit_mut::VisitMut,
+  Expr, Ident, Path,
+};
 
 use super::{
-  animations::Animations, child_variable, dataflows::Dataflows,
-  declare_widget::assign_uninit_field, kw, track::Track, DeclareCtx, DeclareWidget, Id, IdType,
-  ObjectUsed, Result,
+  animations::Animations,
+  child_variable,
+  declare_widget::assign_uninit_field,
+  kw,
+  on_change::{ChangeFlow, OnChangeDo},
+  track::Track,
+  DeclareCtx, DeclareWidget, Id, IdType, ObjectUsed, Result, ScopeUsedInfo,
 };
 use crate::{
   error::{CircleUsedPath, DeclareError},
@@ -17,11 +27,17 @@ use crate::{
 pub const EXPR_WIDGET: &str = "ExprWidget";
 pub const EXPR_FIELD: &str = "expr";
 
+#[derive(Debug, Clone)]
+pub struct TrackExpr {
+  pub expr: Expr,
+  pub used_name_info: ScopeUsedInfo,
+}
+
 pub struct WidgetMacro {
   widget: DeclareWidget,
   track: Option<Track>,
-  dataflows: Option<Dataflows>,
   animations: Option<Animations>,
+  on_change_items: Vec<OnChangeDo>,
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -29,7 +45,7 @@ pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty
 impl Parse for WidgetMacro {
   fn parse(content: syn::parse::ParseStream) -> syn::Result<Self> {
     let mut widget: Option<DeclareWidget> = None;
-    let mut dataflows: Option<Dataflows> = None;
+    let mut items = vec![];
     let mut animations: Option<Animations> = None;
     let mut track: Option<Track> = None;
     loop {
@@ -37,9 +53,9 @@ impl Parse for WidgetMacro {
         break;
       }
       let lk = content.lookahead1();
-      if lk.peek(kw::dataflows) {
-        let d = content.parse()?;
-        assign_uninit_field!(dataflows, d, dataflows)?;
+      if lk.peek(kw::on) || lk.peek(Pound) {
+        let flow: ChangeFlow = content.parse()?;
+        items.push(flow.into_change_do());
       } else if lk.peek(kw::animations) {
         let a = content.parse()?;
         assign_uninit_field!(animations, a, animations)?;
@@ -70,10 +86,23 @@ impl Parse for WidgetMacro {
     let widget =
       widget.ok_or_else(|| syn::Error::new(content.span(), "must declare widget in `widget!`"))?;
 
-    Ok(Self { widget, dataflows, animations, track })
+    Ok(Self {
+      widget,
+      on_change_items: items,
+      animations,
+      track,
+    })
   }
 }
 
+impl Parse for TrackExpr {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    Ok(Self {
+      expr: input.parse()?,
+      used_name_info: <_>::default(),
+    })
+  }
+}
 impl WidgetMacro {
   pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream> {
     fn circle_stack_to_path(stack: &[ObjectUsedPath], ctx: &DeclareCtx) -> Box<[CircleUsedPath]> {
@@ -103,8 +132,11 @@ impl WidgetMacro {
       // data flow should not effect the named object init order, and we allow circle
       // follow with skip_nc attribute. So we add the data flow relationship and
       // individual check the circle follow error.
-      if let Some(dataflows) = self.dataflows.as_ref() {
-        dataflows.analyze_data_flow_follows(&mut follows);
+      if !self.on_change_items.is_empty() {
+        self
+          .on_change_items
+          .iter()
+          .for_each(|item| item.analyze_observe_depends(&mut follows));
         // circle dependencies check
         Self::circle_check(&follows, |stack| {
           let weak_depends = stack
@@ -131,7 +163,10 @@ impl WidgetMacro {
     }
 
     self.all_anonyms_widgets_tokens(ctx, &mut tokens);
-    self.dataflows.to_tokens(&mut tokens);
+    for item in self.on_change_items.iter() {
+      item.to_tokens(&mut tokens)
+    }
+
     if let Some(a) = self.animations.as_mut() {
       a.gen_tokens(ctx, &mut tokens);
     }
@@ -157,6 +192,7 @@ impl WidgetMacro {
     ctx
       .unused_id_warning()
       .chain(self.widget.warnings())
+      .chain(self.on_change_items.iter().filter_map(|i| i.warning()))
       .for_each(|w| w.emit_warning());
 
     Ok(tokens)
@@ -347,11 +383,39 @@ impl WidgetMacro {
 impl DeclareCtx {
   pub fn visit_widget_macro_mut(&mut self, d: &mut WidgetMacro) {
     self.visit_declare_widget_mut(&mut d.widget);
-    if let Some(dataflows) = d.dataflows.as_mut() {
-      self.visit_dataflows_mut(dataflows)
-    }
+    d.on_change_items
+      .iter_mut()
+      .for_each(|item| self.visit_on_change_do(item));
+
     if let Some(animations) = d.animations.as_mut() {
       self.visit_animations_mut(animations);
     }
   }
+
+  pub fn visit_track_expr(&mut self, expr: &mut TrackExpr) {
+    self.visit_expr_mut(&mut expr.expr);
+    expr.used_name_info = self.take_current_used_info();
+  }
+}
+
+impl TrackExpr {
+  pub fn upstream_tokens(&self) -> Option<TokenStream> {
+    self
+      .used_name_info
+      .directly_used_widgets()
+      .map(|directly_used| {
+        let upstream = directly_used.clone().map(|w| {
+          quote_spanned! { w.span() => #w.raw_change_stream() }
+        });
+        if directly_used.count() > 1 {
+          quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
+        } else {
+          quote! { #(#upstream)* }
+        }
+      })
+  }
+}
+
+impl ToTokens for TrackExpr {
+  fn to_tokens(&self, tokens: &mut TokenStream) { self.expr.to_tokens(tokens) }
 }

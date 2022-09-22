@@ -84,10 +84,15 @@ impl VisitMut for DeclareCtx {
         let mut overwrite_inner_used = UsedType::CAPTURE;
         if c.capture.is_some() {
           if self.current_used_info.refs_widgets().is_some() {
-            let body = self
-              .current_used_info
-              .expr_refs_wrap(c.body.to_token_stream());
-            c.body = parse_quote!(#body);
+            let mut body_tokens = quote! {};
+            self.current_used_info.value_expr_surround_refs(
+              &mut body_tokens,
+              c.body.span(),
+              |tokens| {
+                c.body.to_tokens(tokens);
+              },
+            );
+            c.body = parse_quote!(#body_tokens);
           }
 
           if let Some(all) = self.current_used_info.all_widgets() {

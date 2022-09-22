@@ -111,7 +111,8 @@ pub struct SilentRef<'a, W>(InnerRef<'a, W>);
 
 /// A reference of stateful widget, tracked the state change across if user
 /// mutable reference the `ShallowRef`. If mutable reference occur, state change
-/// only notify to the framework but no data change notify. And usually use it
+/// notify with `ChangeScope::Framework`, that means this modify only effect
+/// framework but not effect to data. And usually use it
 /// to temporary to modify the state.
 ///
 /// If you not very clear how `ShallowRef` work, use [`ShallowRef`]! instead of.

@@ -36,7 +36,7 @@ fn main() {
       id: a,
       size: Size::zero(),
     }
-    dataflows { a.size ~> a.size }
+    on a.size ~> a.size
   };
 
   let _data_flow_circular_field_skip_nc_pass = widget! {
@@ -49,9 +49,7 @@ fn main() {
         size: a.size,
       }
     }
-    dataflows {
-      a.size ~> b.size
-    }
+    on a.size ~> b.size
   };
 
   let _circular_follows_with_skip_nc_pass = widget! {
@@ -59,9 +57,7 @@ fn main() {
       id: a,
       size: Size::zero(),
     }
-    dataflows {
-      #[skip_nc]
-      a.size ~> a.size
-    }
+    #[skip_nc]
+    on a.size ~> a.size
   };
 }

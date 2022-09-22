@@ -19,7 +19,9 @@ use super::{
     assign_uninit_field, check_duplicate_field, is_listener, pick_fields_by, BuiltinFieldWidgets,
     WidgetGen, FIELD_WIDGET_TYPE,
   },
-  ribir_suffix_variable, ribir_variable, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
+  ribir_suffix_variable, ribir_variable,
+  widget_macro::TrackExpr,
+  DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
 };
 use super::{declare_widget::DeclareField, kw};
 
@@ -480,8 +482,10 @@ impl TransitionField {
         skip_nc: None,
         member: transition_token.clone(),
         colon_token: colon_token.clone(),
-        expr: expr.clone(),
-        used_name_info: used_name_info.clone(),
+        expr: TrackExpr {
+          expr: expr.clone(),
+          used_name_info: used_name_info.clone(),
+        },
       },
     }
   }

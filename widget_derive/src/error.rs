@@ -18,7 +18,6 @@ pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleInit(Box<[CircleUsedPath]>),
   CircleFollow(Box<[CircleUsedPath]>),
-  DataFlowNoDepends(Span),
   KeyDependsOnOther { key: Span, depends_on: Vec<Span> },
   ExprWidgetInvalidField(Vec<Span>),
 }
@@ -27,6 +26,7 @@ pub enum DeclareError {
 pub enum DeclareWarning<'a> {
   NeedlessSkipNc(Span),
   UnusedName(&'a Ident),
+  ObserveIsConst(Span),
 }
 
 pub type Result<T> = std::result::Result<T, DeclareError>;
@@ -71,12 +71,6 @@ impl DeclareError {
         or data_flow to skip the no change trigger of the field modify to ignore infinite state \
         change trigger.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
-      }
-
-      DeclareError::DataFlowNoDepends(span) => {
-        diagnostic.set_spans(span);
-        diagnostic.set_message("Declared a data flow but not depends on any others.");
-        diagnostic = diagnostic.help("Try to remove it.");
       }
       DeclareError::KeyDependsOnOther { key, mut depends_on } => {
         depends_on.push(key);
@@ -152,6 +146,11 @@ impl<'a> DeclareWarning<'a> {
         d.set_spans(name.span().unwrap());
         d.set_message(format!("`{name}` does not be used"));
         d = d.span_help(vec![name.span().unwrap()], "Remove this line.");
+      }
+      DeclareWarning::ObserveIsConst(span) => {
+        d.set_spans(*span);
+        d.set_message("Observe a expr but not depends on anything, this will do nothing.");
+        d = d.help("Try to remove it.");
       }
     };
     d.emit();

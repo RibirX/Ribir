@@ -28,10 +28,9 @@ impl ComposeSingleChild for HScrollBar {
           v_align: VAlign::Bottom,
         }
       }
-      dataflows {
-        #[skip_nc]
-        scrolling.pos.x ~> this.offset
-      }
+
+      #[skip_nc]
+      on scrolling.pos.x ~> this.offset
     }
   }
 }
@@ -64,10 +63,9 @@ impl ComposeSingleChild for VScrollBar {
           h_align: HAlign::Right
         }
       }
-      dataflows {
-        #[skip_nc]
-        scrolling.pos.y ~> this.offset
-      }
+
+      #[skip_nc]
+      on scrolling.pos.y ~> this.offset
     }
   }
 }
@@ -106,10 +104,8 @@ impl ComposeSingleChild for BothScrollbar {
           margin: EdgeInsets::only_bottom(this.style.track.thickness )
         }
       }
-      dataflows {
-        #[skip_nc]
-        scrolling.pos ~> this.offset
-      }
+      #[skip_nc]
+      on scrolling.pos ~> this.offset
     }
   }
 }
@@ -127,6 +123,7 @@ impl Compose for HRawScrollbar {
   fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
     let scrolling = this.raw_ref().scrolling.clone();
+
     widget! {
       track { scrolling, this }
       Stack {
