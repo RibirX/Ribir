@@ -127,68 +127,68 @@ macro_rules! impl_pointer_listener {
 #[derive(Declare)]
 pub struct PointerDownListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_pointer_down: PointerCallback,
+  pub pointer_down: PointerCallback,
 }
-impl_pointer_listener!(PointerDownListener, on_pointer_down);
+impl_pointer_listener!(PointerDownListener, pointer_down);
 
 #[derive(Declare)]
 pub struct PointerUpListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_pointer_up: PointerCallback,
+  pub pointer_up: PointerCallback,
 }
-impl_pointer_listener!(PointerUpListener, on_pointer_up);
+impl_pointer_listener!(PointerUpListener, pointer_up);
 
 #[derive(Declare)]
 pub struct PointerMoveListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_pointer_move: PointerCallback,
+  pub pointer_move: PointerCallback,
 }
-impl_pointer_listener!(PointerMoveListener, on_pointer_move);
+impl_pointer_listener!(PointerMoveListener, pointer_move);
 
 #[derive(Declare)]
 pub struct TapListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_tap: PointerCallback,
+  pub tap: PointerCallback,
 }
-impl_pointer_listener!(TapListener, on_tap);
+impl_pointer_listener!(TapListener, tap);
 
 #[derive(Declare)]
 pub struct PointerCancelListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_pointer_cancel: PointerCallback,
+  pub pointer_cancel: PointerCallback,
 }
-impl_pointer_listener!(PointerCancelListener, on_pointer_cancel);
+impl_pointer_listener!(PointerCancelListener, pointer_cancel);
 
 #[derive(Declare)]
 pub struct PointerEnterListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_pointer_enter: PointerCallback,
+  pub pointer_enter: PointerCallback,
 }
-impl_pointer_listener!(PointerEnterListener, on_pointer_enter);
+impl_pointer_listener!(PointerEnterListener, pointer_enter);
 
 #[derive(Declare)]
 pub struct PointerLeaveListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
-  pub on_pointer_leave: PointerCallback,
+  pub pointer_leave: PointerCallback,
 }
-impl_pointer_listener!(PointerLeaveListener, on_pointer_leave);
+impl_pointer_listener!(PointerLeaveListener, pointer_leave);
 
 #[derive(Declare)]
 pub struct XTimesTapListener {
   #[declare(convert=custom, builtin)]
-  pub on_x_times_tap: (u8, PointerCallback),
+  pub x_times_tap: (u8, PointerCallback),
 }
 
 #[derive(Declare)]
 pub struct DoubleTapListener {
   #[declare(convert=custom, builtin)]
-  pub on_double_tap: PointerCallback,
+  pub double_tap: PointerCallback,
 }
 
 #[derive(Declare)]
 pub struct TripleTapListener {
   #[declare(convert=custom, builtin)]
-  pub on_tripe_tap: PointerCallback,
+  pub tripe_tap: PointerCallback,
 }
 
 impl ComposeSingleChild for XTimesTapListener {
@@ -197,7 +197,7 @@ impl ComposeSingleChild for XTimesTapListener {
       try_track { this }
       ExprWidget {
         expr: child,
-        on_tap: {
+        tap: {
           const DUR: Duration = Duration::from_millis(250);
           #[derive(Clone)]
           struct TapInfo {
@@ -208,7 +208,7 @@ impl ComposeSingleChild for XTimesTapListener {
           }
           let mut tap_info: Option<TapInfo> = None;
           move |e| {
-            let (times, ref handler) = this.on_x_times_tap;
+            let (times, ref handler) = this.x_times_tap;
             match &mut tap_info {
               Some(info)
                 if info.pointer_type == e.point_type
@@ -245,7 +245,7 @@ impl ComposeSingleChild for DoubleTapListener {
     widget_try_track! {
       try_track { this }
       XTimesTapListener {
-        on_x_times_tap: (2, move |e| {(this.on_double_tap.borrow_mut())(e);} ),
+        x_times_tap: (2, move |e| {(this.double_tap.borrow_mut())(e);} ),
         ExprWidget { expr: child }
       }
     }
@@ -257,7 +257,7 @@ impl ComposeSingleChild for TripleTapListener {
     widget_try_track! {
       try_track { this }
       XTimesTapListener {
-        on_x_times_tap: (3, move |e| {(this.on_tripe_tap.borrow_mut())(e);} ),
+        x_times_tap: (3, move |e| {(this.tripe_tap.borrow_mut())(e);} ),
         ExprWidget { expr: child }
       }
     }
@@ -266,30 +266,27 @@ impl ComposeSingleChild for TripleTapListener {
 
 impl XTimesTapListenerBuilder {
   #[inline]
-  pub fn on_x_times_tap(
+  pub fn x_times_tap(
     mut self,
     f: (u8, impl for<'r> FnMut(&'r mut PointerEvent) + 'static),
   ) -> Self {
-    self.on_x_times_tap = Some((f.0, RefCell::new(Box::new(f.1))));
+    self.x_times_tap = Some((f.0, RefCell::new(Box::new(f.1))));
     self
   }
 }
 
 impl XTimesTapListener {
   #[inline]
-  pub fn set_declare_on_x_times_tap(
+  pub fn set_declare_x_times_tap(
     &mut self,
     f: (u8, impl for<'r> FnMut(&'r mut PointerEvent) + 'static),
   ) {
-    self.on_x_times_tap = (f.0, RefCell::new(Box::new(f.1)));
+    self.x_times_tap = (f.0, RefCell::new(Box::new(f.1)));
   }
 }
 
 impl TapListener {
-  pub fn on_tap_times(
-    times: u8,
-    handler: PointerCallback,
-  ) -> impl FnMut(&mut PointerEvent) + 'static {
+  pub fn tap_times(times: u8, handler: PointerCallback) -> impl FnMut(&mut PointerEvent) + 'static {
     const DUR: Duration = Duration::from_millis(250);
     #[derive(Clone)]
     struct TapInfo {
@@ -342,7 +339,7 @@ mod tests {
     let w = widget! {
       SizedBox {
         size,
-        on_x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
+        x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
       }
     };
     let mut wnd = Window::without_render(w, size);

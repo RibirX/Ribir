@@ -25,7 +25,7 @@ impl Compose for TodoMVP {
         Column {
           align_items: Align::Start,
           // when performed layout, means all task are mounted, we reset the mount count.
-          on_performed_layout: move |_| *mount_task_cnt = 0,
+          performed_layout: move |_| *mount_task_cnt = 0,
           ExprWidget {
             expr: this.tasks.iter().enumerate().map(|(idx, task)| {
               let checked = task.finished;
@@ -35,7 +35,7 @@ impl Compose for TodoMVP {
                 Row {
                   id: task,
                   margin: EdgeInsets::vertical(4.),
-                  on_mounted: move |_| {
+                  mounted: move |_| {
                     *mount_idx = *mount_task_cnt;
                     *mount_task_cnt +=1;
                   },
@@ -47,7 +47,7 @@ impl Compose for TodoMVP {
                 }
                 on checkbox.checked ~> this2.silent().tasks[idx].finished
                 animations {
-                  task.on_mounted: Animate  {
+                  task.mounted: Animate  {
                     from: State { task.transform: Transform::translation(-400., 0. )},
                     transition: Transition {
                       delay: (*mount_idx + 1) * Duration::from_millis(100) ,

@@ -353,10 +353,10 @@ mod tests {
     widget! {
       ExprWidget {
         expr: widget,
-        on_pointer_down : handler_ctor(),
-        on_pointer_move: handler_ctor(),
-        on_pointer_up: handler_ctor(),
-        on_pointer_cancel: handler_ctor(),
+        pointer_down : handler_ctor(),
+        pointer_move: handler_ctor(),
+        pointer_up: handler_ctor(),
+        pointer_cancel: handler_ctor(),
       }
     }
   }
@@ -532,11 +532,11 @@ mod tests {
           track { this: this.into_stateful() }
           SizedBox {
             size: INFINITY_SIZE,
-            on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
+            pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
             Text {
               text: "pointer event test",
               style: TextStyle::default(),
-              on_pointer_down: move |e| {
+              pointer_down: move |e| {
                 this.0.borrow_mut().push(e.clone());
                 e.stop_bubbling();
               }
@@ -576,13 +576,13 @@ mod tests {
           track { this: this.into_stateful() }
           SizedBox {
             size: INFINITY_SIZE,
-            on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
-            on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
+            pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
+            pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
             SizedBox {
               margin: EdgeInsets::all(4.),
               size: INFINITY_SIZE,
-              on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
-              on_pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
+              pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
+              pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
             }
           }
         }
@@ -644,13 +644,13 @@ mod tests {
           track { this: this.into_stateful() }
           Row {
             align_items: Align::Start,
-            on_tap: move |_| {
+            tap: move |_| {
               let mut res = this.0.borrow_mut();
               *res += 1;
             },
             SizedBox {
               size: Size::new(100., 100.),
-              on_tap: move |_| {
+              tap: move |_| {
                 let mut res = this.0.borrow_mut();
                 *res += 1;
               }

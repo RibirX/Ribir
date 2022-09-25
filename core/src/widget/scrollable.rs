@@ -32,7 +32,7 @@ impl ComposeSingleChild for ScrollableWidget {
       track { this: this.into_stateful() }
       LayoutBox {
         id: view,
-        on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+        wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
         UnconstrainedBox { LayoutBox {
           id: content,
           left_anchor: this.pos.x,
@@ -109,7 +109,7 @@ mod tests {
       SizedBox {
         size: Size::new(1000., 1000.),
         scrollable,
-        on_performed_layout: move|ctx| *global_pos = ctx.map_to_global(Point::zero())
+        performed_layout: move|ctx| *global_pos = ctx.map_to_global(Point::zero())
       }
     };
 

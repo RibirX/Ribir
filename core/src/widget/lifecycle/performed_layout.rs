@@ -8,6 +8,6 @@ use crate::{
 #[derive(Declare)]
 pub struct PerformedLayoutListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(LifeCycleCtx<'r>)))]
-  pub on_performed_layout: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>>,
+  pub performed_layout: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>>,
 }
-impl_lifecycle!(PerformedLayoutListener, on_performed_layout);
+impl_lifecycle!(PerformedLayoutListener, performed_layout);

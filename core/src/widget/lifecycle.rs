@@ -38,9 +38,9 @@ mod tests {
         expr: trigger.then(|| widget! {
           SizedBox {
             size: Size::zero(),
-            on_mounted: move |_| lifecycle.silent().push("mounted"),
-            on_performed_layout: move |_| lifecycle.silent().push("performed layout"),
-            on_disposed: move |_| lifecycle.silent().push("disposed")
+            mounted: move |_| lifecycle.silent().push("mounted"),
+            performed_layout: move |_| lifecycle.silent().push("performed layout"),
+            disposed: move |_| lifecycle.silent().push("disposed")
           }
         })
       }

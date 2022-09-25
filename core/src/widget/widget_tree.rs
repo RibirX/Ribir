@@ -143,7 +143,7 @@ impl WidgetTree {
       let (tree1, tree2) = unsafe { self.split_tree() };
       id.assert_get(tree1).query_all_type(
         |l: &PerformedLayoutListener| {
-          (l.on_performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
+          (l.performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
           true
         },
         QueryOrder::OutsideFirst,
@@ -380,7 +380,7 @@ impl WidgetId {
       let (tree1, tree2) = unsafe { tree.split_tree() };
       self.assert_get(tree1).query_all_type(
         |m: &MountedListener| {
-          (m.on_mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
+          (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
           true
         },
         QueryOrder::OutsideFirst,
@@ -394,7 +394,7 @@ impl WidgetId {
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self.assert_get(tree1).query_all_type(
       |d: &DisposedListener| {
-        (d.on_disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
+        (d.disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
         true
       },
       QueryOrder::OutsideFirst,

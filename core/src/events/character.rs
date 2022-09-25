@@ -9,7 +9,7 @@ use std::cell::RefCell;
 #[derive(Declare)]
 pub struct CharListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut CharEvent)))]
-  on_char: RefCell<Box<dyn for<'r> FnMut(&'r mut CharEvent)>>,
+  char: RefCell<Box<dyn for<'r> FnMut(&'r mut CharEvent)>>,
 }
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl std::ops::DerefMut for CharEvent {
 impl EventListener for CharListener {
   type Event = CharEvent;
   #[inline]
-  fn dispatch(&self, event: &mut CharEvent) { (self.on_char.borrow_mut())(event) }
+  fn dispatch(&self, event: &mut CharEvent) { (self.char.borrow_mut())(event) }
 }
 
 #[cfg(test)]
@@ -73,7 +73,7 @@ mod tests {
       SizedBox {
         size: ZERO_SIZE,
         auto_focus: true,
-        on_char: move |key| c_receive.borrow_mut().push(key.char)
+        char: move |key| c_receive.borrow_mut().push(key.char)
       }
     };
     let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));

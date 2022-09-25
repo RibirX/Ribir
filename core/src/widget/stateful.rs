@@ -38,12 +38,12 @@
 //! .into_stateful();
 //!
 //! let mut state_ref = unsafe { rect.state_ref() };
-//! rect.on_tap(move |_| { state_ref.color = Color::BLACK; });
+//! rect.tap(move |_| { state_ref.color = Color::BLACK; });
 //! ```
 //! In the above example, we implement a widget `Rectangle`, and use it to
 //! change its color when user tapped.
 //!
-//! How to do if the `on_tap` behavior should as a part of the rectangle
+//! How to do if the `tap` behavior should as a part of the rectangle
 //! itself, not need to user to listen. In this case we should skip to implement
 //! `CombinationWidget`, but directly implement `StatefulCombination`,
 
@@ -63,7 +63,7 @@
 //!       declare SizedBox {
 //!         size: this.size,
 //!         background: this.color.clone(),
-//!         on_tap: move |_| this_ref.color = Color::BLACK
+//!         tap: move |_| this_ref.color = Color::BLACK
 //!       }
 //!     }
 //!   }

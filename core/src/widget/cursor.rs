@@ -16,7 +16,7 @@ impl ComposeSingleChild for Cursor {
       try_track { this }
       ExprWidget {
         expr: child,
-        on_pointer_move: move |e: &mut PointerEvent| {
+        pointer_move: move |e: &mut PointerEvent| {
 
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()

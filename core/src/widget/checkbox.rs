@@ -29,8 +29,8 @@ impl Compose for Checkbox {
       Icon {
         size: this.size,
         cursor: CursorIcon::Hand,
-        on_tap: move |_| this.switch_check(),
-        on_key_up: move |k| {
+        tap: move |_| this.switch_check(),
+        key_up: move |k| {
           if k.key == VirtualKeyCode::Space {
             this.switch_check()
           }

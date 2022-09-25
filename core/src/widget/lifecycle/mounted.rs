@@ -9,6 +9,6 @@ use crate::{
 #[derive(Declare)]
 pub struct MountedListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(LifeCycleCtx<'r>)))]
-  pub on_mounted: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>>,
+  pub mounted: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>>,
 }
-impl_lifecycle!(MountedListener, on_mounted);
+impl_lifecycle!(MountedListener, mounted);

@@ -175,7 +175,12 @@ where
 }
 
 impl<W, M: ?Sized> SingleDyn<&M> for W where W: IntoWidget<M> {}
-impl<W, M: ?Sized> SingleDyn<dyn Iterator<Item = M>> for Option<W> where W: IntoWidget<M> + 'static {}
+impl<W, M> SingleDyn<dyn Iterator<Item = M>> for Option<W>
+where
+  M: ?Sized,
+  W: IntoWidget<M> + 'static,
+{
+}
 
 impl<E, R> ExprWidget<E>
 where

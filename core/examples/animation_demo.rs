@@ -12,7 +12,7 @@ fn main() {
       }
       Text {
         text:"click me to trigger animation",
-        on_tap: move |_| {
+        tap: move |_| {
           let s = sized_box.size;
           sized_box.radius = Some(Radius::all(sized_box.radius.unwrap().top_left * 2.));
           sized_box.size = Size::new(s.width * 2. , s.height * 2.);

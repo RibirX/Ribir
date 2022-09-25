@@ -25,7 +25,7 @@ fn main() {
       background: Color::RED,
     }
     animations {
-      id1.on_tap: Animate {
+      id1.tap: Animate {
         from: State { id1.background },
         transition: Transition { easing: easing::LINEAR }
       }

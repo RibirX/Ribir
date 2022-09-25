@@ -20,7 +20,7 @@ fn main() {
       SizedBox {
         id: a,
         size: Size::zero(),
-        on_tap: move |e| {}
+        tap: move |e| {}
       }
       SizedBox {
         id: b,
@@ -32,7 +32,7 @@ fn main() {
       }
     }
     on a {
-      on_tap: move |_| {},
+      tap: move |_| {},
       change: move |_| {}
     }
     on a.size { change: move |(before, after)| {} }
