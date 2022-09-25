@@ -6,10 +6,7 @@ use quote::quote_spanned;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{
-  error::DeclareError,
-  widget_attr_macro::{ribir_suffix_variable, DeclareCtx, IdType, ObjectUsed},
-};
+use crate::widget_attr_macro::{ribir_suffix_variable, DeclareCtx, IdType, ObjectUsed};
 
 use super::{widget_gen::WidgetGen, DeclareField};
 
@@ -40,21 +37,13 @@ pub struct BuiltinFieldWidgets {
 }
 
 #[derive(Debug, Default)]
-struct BuiltinWidgetInfo(SmallVec<[DeclareField; 1]>);
+pub struct BuiltinWidgetInfo(pub SmallVec<[DeclareField; 1]>);
 
 impl BuiltinFieldWidgets {
   pub fn as_builtin_widget(field_name: &Ident) -> Option<&String> {
     FIELD_WIDGET_TYPE
       .get(field_name.to_string().as_str())
       .and_then(|w| BUILTIN_WIDGET_SUFFIX.get(w))
-  }
-
-  pub fn visit_builtin_fields_mut(&mut self, ctx: &mut DeclareCtx) {
-    self
-      .widgets
-      .values_mut()
-      .flat_map(|info| info.0.iter_mut())
-      .for_each(|f| ctx.visit_declare_field_mut(f))
   }
 
   pub fn all_builtin_fields(&self) -> impl Iterator<Item = &DeclareField> {
@@ -73,22 +62,6 @@ impl BuiltinFieldWidgets {
         follows_info.insert(name, follows);
       }
     });
-  }
-
-  // todo: key should not as a builtin widget again.
-  pub fn key_follow_check(&self) -> crate::error::Result<()> {
-    if let Some((_, info)) = self.widgets.iter().find(|(name, _)| "KeyWidget" == **name) {
-      assert_eq!(info.0.len(), 1);
-      let DeclareField { member, expr, .. } = &info.0[0];
-      if let Some(follows) = expr.used_name_info.directly_used_widgets() {
-        return Err(DeclareError::KeyDependsOnOther {
-          key: member.span().unwrap(),
-          depends_on: follows.map(|w| w.span().unwrap()).collect(),
-        });
-      }
-    }
-
-    Ok(())
   }
 
   pub fn widget_tokens_iter<'a>(
@@ -118,16 +91,15 @@ impl BuiltinFieldWidgets {
         (var_name, tokens)
       })
   }
-  pub fn collect_names(&self, host: &Ident, ctx: &mut DeclareCtx) -> Result<(), DeclareError> {
+  pub fn collect_names(&self, host: &Ident, ctx: &mut DeclareCtx) {
     for builtin in WIDGETS.iter() {
       let ty_name = builtin.ty;
       if self.widgets.get(ty_name).is_some() {
         let suffix = BUILTIN_WIDGET_SUFFIX.get(ty_name).unwrap();
         let var_name = ribir_suffix_variable(host, suffix);
-        ctx.add_named_obj(var_name, IdType::DECLARE)?;
+        ctx.add_named_obj(var_name, IdType::DECLARE);
       }
     }
-    Ok(())
   }
 
   pub fn add_user_perspective_pairs(&self, host: &Ident, ctx: &mut DeclareCtx) {
@@ -166,7 +138,7 @@ impl BuiltinFieldWidgets {
     );
 
     let info = self.widgets.entry(widget_ty).or_default();
-    info.0.push(field);
+    info.push(field);
   }
 
   fn get_builtin_widget<'a>(
@@ -176,8 +148,7 @@ impl BuiltinFieldWidgets {
     builtin: &'a BuiltinWidget,
   ) -> Option<(Ident, &str, Option<&BuiltinWidgetInfo>)> {
     let ty_name = builtin.ty;
-    let suffix = BUILTIN_WIDGET_SUFFIX.get(ty_name).unwrap();
-    let var_name = ribir_suffix_variable(host_id, suffix);
+    let var_name = builtin_var_name(host_id, ty_name);
     if let Some(info) = self.widgets.get(ty_name) {
       Some((var_name, ty_name, Some(info)))
     } else if ctx.is_used(&var_name) || ctx.animate_listener_triggers.contains(&var_name) {
@@ -189,6 +160,8 @@ impl BuiltinFieldWidgets {
 }
 
 impl BuiltinWidgetInfo {
+  pub fn push(&mut self, f: DeclareField) { self.0.push(f) }
+
   fn span(&self) -> Span {
     self
       .0
@@ -202,4 +175,23 @@ impl BuiltinWidgetInfo {
       })
       .unwrap()
   }
+}
+
+impl DeclareCtx {
+  pub fn visit_builtin_fields_mut(&mut self, builtin: &mut BuiltinFieldWidgets) {
+    for w in builtin.widgets.values_mut() {
+      self.visit_builtin_widget_info_mut(w)
+    }
+  }
+
+  pub fn visit_builtin_widget_info_mut(&mut self, builtin_widget: &mut BuiltinWidgetInfo) {
+    for f in builtin_widget.0.iter_mut() {
+      self.visit_declare_field_mut(f)
+    }
+  }
+}
+
+pub fn builtin_var_name(host: &Ident, ty: &str) -> Ident {
+  let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).unwrap();
+  ribir_suffix_variable(host, suffix)
 }

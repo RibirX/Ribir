@@ -18,9 +18,9 @@ fn main() {
   let _flow_handler = widget! {
     Flex {
       SizedBox {
-        id: first,
+        id: a,
         size: Size::zero(),
-        tap: move |e| {}
+        on_tap: move |e| {}
       }
       SizedBox {
         id: b,
@@ -30,29 +30,15 @@ fn main() {
         id: c,
         size: Size::zero(),
       }
-
     }
-    on a.size + b.size: move |_, after| c.size = after
-
-
-
-    #3.3
     on a {
-      tap: move |_| animate1.run(),
-      press: move |e| menu.open(),
-      change: move |before, after| { }
+      on_tap: move |_| {},
+      change: move |_| {}
     }
-    on a.size { change: move |before, after| {} },
-    a.size ~> b.size
-
-    animations {
-      on a {
-        tap: Animate {}
-      }
-
-      on a.size {
-        change: ctx.theme().xxx_transition
-      }
+    on a.size { change: move |(before, after)| {} }
+    on a.size + b.size ~> c.size
+    on a.size + b.size {
+      change : move |(_, after)| c.size = after
     }
   };
 

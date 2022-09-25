@@ -1,5 +1,0 @@
-error: The `key` field is not allowed to depend on others.
-  --> tests/ui/declare/key_depends_forbidden_fail.rs:10:9
-   |
-10 |         key:  key1.key.clone(),
-   |         ^^^   ^^^^^^^^

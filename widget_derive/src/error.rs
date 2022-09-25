@@ -18,8 +18,9 @@ pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleInit(Box<[CircleUsedPath]>),
   CircleFollow(Box<[CircleUsedPath]>),
-  KeyDependsOnOther { key: Span, depends_on: Vec<Span> },
   ExprWidgetInvalidField(Vec<Span>),
+  OnInvalidTarget(Ident),
+  OnInvalidField(Ident),
 }
 
 #[derive(Debug)]
@@ -28,8 +29,6 @@ pub enum DeclareWarning<'a> {
   UnusedName(&'a Ident),
   ObserveIsConst(Span),
 }
-
-pub type Result<T> = std::result::Result<T, DeclareError>;
 
 impl DeclareError {
   pub fn into_compile_error(self) -> TokenStream {
@@ -72,14 +71,19 @@ impl DeclareError {
         change trigger.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
-      DeclareError::KeyDependsOnOther { key, mut depends_on } => {
-        depends_on.push(key);
-        diagnostic.set_spans(depends_on);
-        diagnostic.set_message("The `key` field is not allowed to depend on others.");
-      }
       DeclareError::ExprWidgetInvalidField(spans) => {
         diagnostic.set_spans(spans);
         diagnostic.set_message("`ExprWidget` only accept `expr` field.");
+      }
+      DeclareError::OnInvalidTarget(t) => {
+        diagnostic.set_spans(t.span().unwrap());
+        diagnostic.set_message(
+          "only the id of widget declared in `widget!` can used as the target of `on` group",
+        );
+      }
+      DeclareError::OnInvalidField(f) => {
+        diagnostic.set_spans(f.span().unwrap());
+        diagnostic.set_message("only listener work for `on` group.");
       }
     };
 

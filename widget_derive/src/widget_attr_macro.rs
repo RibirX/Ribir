@@ -7,7 +7,7 @@ use syn::{
   Ident,
 };
 
-use crate::{error::Result, widget_attr_macro::declare_widget::DeclareField};
+use crate::widget_attr_macro::declare_widget::DeclareField;
 mod declare_ctx;
 pub use declare_ctx::*;
 mod name_used_info;
@@ -19,6 +19,7 @@ pub use variable_names::*;
 pub mod animations;
 mod declare_widget;
 mod on_change;
+mod on_event_do;
 pub use declare_widget::RESERVE_IDENT;
 
 mod track;
@@ -37,6 +38,7 @@ pub mod kw {
   syn::custom_keyword!(on);
   syn::custom_keyword!(change);
 }
+pub const CHANGE: &str = "change";
 
 #[derive(Debug)]
 pub struct Id {

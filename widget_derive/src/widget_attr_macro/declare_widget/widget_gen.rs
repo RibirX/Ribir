@@ -55,6 +55,18 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
         let declare_set = declare_field_name(member);
         let mut used_name_info = ScopeUsedInfo::default();
         used_name_info.add_used((*name).clone(), UsedType::MOVE_CAPTURE);
+
+        let subscribe_do: syn::Expr = if skip_nc.is_some() {
+          parse_quote_spanned! { member.span() =>
+            move |(before, after)| if before != after {
+              #name.state_ref().#declare_set(after)
+            }
+          }
+        } else {
+          parse_quote_spanned! { member.span() =>
+            move |(_, after)| #name.state_ref().#declare_set(after)
+          }
+        };
         let on_change_flow = OnChangeDo {
           on_token: kw::on(expr_span),
           observe: expr.clone(),
@@ -62,14 +74,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
           skip_nc: skip_nc.clone(),
           change_token: kw::change(expr_span),
           colon_token: Colon(expr_span),
-          subscribe_do: TrackExpr {
-            expr: parse_quote_spanned! { member.span() =>
-              move |(_, after)| {
-                 #name.state_ref().#declare_set(after)
-              }
-            },
-            used_name_info,
-          },
+          subscribe_do: TrackExpr { expr: subscribe_do, used_name_info },
         };
         on_change_flow.to_tokens(&mut tokens)
       }

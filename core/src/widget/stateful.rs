@@ -485,10 +485,6 @@ impl StateChangeNotifier {
 
 #[cfg(test)]
 mod tests {
-  use lazy_static::__Deref;
-
-  use crate::prelude::widget_tree::WidgetTree;
-
   use super::*;
 
   #[test]
@@ -504,24 +500,6 @@ mod tests {
       stateful.state_ref().text = "World!".into();
     }
     assert_eq!(&*stateful.state_ref().text, "World!");
-  }
-
-  #[test]
-  fn stateful_id_check() {
-    let stateful = widget! {
-      Text {
-        text: "Hello",
-        style: TextStyle::default(),
-        key: 1,
-      }
-    };
-    let tree = WidgetTree::new(stateful, <_>::default());
-    let mut key = None;
-    tree
-      .root()
-      .assert_get(&tree)
-      .query_on_first_type(QueryOrder::InnerFirst, |k: &Key| key = Some(k.clone()));
-    assert!(key.is_some());
   }
 
   #[test]

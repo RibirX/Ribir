@@ -3,9 +3,10 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{
+  braced,
   parse::Parse,
   spanned::Spanned,
-  token::{self, Pound},
+  token::{self, Brace, Pound},
   visit_mut::VisitMut,
   Expr, Ident, Path,
 };
@@ -13,14 +14,15 @@ use syn::{
 use super::{
   animations::Animations,
   child_variable,
-  declare_widget::assign_uninit_field,
+  declare_widget::{assign_uninit_field, try_parse_skip_nc},
   kw,
   on_change::{ChangeFlow, OnChangeDo},
+  on_event_do::OnEventDo,
   track::Track,
-  DeclareCtx, DeclareWidget, Id, IdType, ObjectUsed, Result, ScopeUsedInfo,
+  DeclareCtx, DeclareWidget, Id, IdType, ObjectUsed, ScopeUsedInfo,
 };
 use crate::{
-  error::{CircleUsedPath, DeclareError},
+  error::{CircleUsedPath, DeclareError, DeclareWarning},
   widget_attr_macro::{ctx_ident, ribir_variable, ObjectUsedPath, UsedType},
 };
 
@@ -37,7 +39,12 @@ pub struct WidgetMacro {
   widget: DeclareWidget,
   track: Option<Track>,
   animations: Option<Animations>,
-  on_change_items: Vec<OnChangeDo>,
+  on_items: Vec<OnItem>,
+}
+
+pub enum OnItem {
+  OnEvent(OnEventDo),
+  OnChange(OnChangeDo),
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -53,9 +60,8 @@ impl Parse for WidgetMacro {
         break;
       }
       let lk = content.lookahead1();
-      if lk.peek(kw::on) || lk.peek(Pound) {
-        let flow: ChangeFlow = content.parse()?;
-        items.push(flow.into_change_do());
+      if lk.peek(Pound) || lk.peek(kw::on) {
+        items.push(content.parse()?);
       } else if lk.peek(kw::animations) {
         let a = content.parse()?;
         assign_uninit_field!(animations, a, animations)?;
@@ -88,7 +94,7 @@ impl Parse for WidgetMacro {
 
     Ok(Self {
       widget,
-      on_change_items: items,
+      on_items: items,
       animations,
       track,
     })
@@ -103,13 +109,53 @@ impl Parse for TrackExpr {
     })
   }
 }
+
+impl Parse for OnItem {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    if input.peek(Pound) {
+      let flow: ChangeFlow = input.parse()?;
+      Ok(OnItem::OnChange(flow.into_change_do()))
+    } else if input.peek2(Ident) && input.peek3(Brace) {
+      Ok(OnItem::OnEvent(input.parse::<OnEventDo>()?))
+    } else {
+      let on_token: kw::on = input.parse()?;
+      let expr: TrackExpr = input.parse()?;
+      let lk = input.lookahead1();
+      if lk.peek(kw::FlowArrow) {
+        let flow = ChangeFlow {
+          skip_nc: None,
+          on_token,
+          from: expr,
+          flow_arrow: input.parse()?,
+          to: input.parse()?,
+        };
+        Ok(OnItem::OnChange(flow.into_change_do()))
+      } else if lk.peek(Brace) {
+        let content;
+        let change_do = OnChangeDo {
+          on_token,
+          observe: expr,
+          brace: braced!( content in input),
+          skip_nc: try_parse_skip_nc(&content)?,
+          change_token: content.parse()?,
+          colon_token: content.parse()?,
+          subscribe_do: content.parse()?,
+        };
+        Ok(OnItem::OnChange(change_do))
+      } else {
+        Err(lk.error())
+      }
+    }
+  }
+}
+
 impl WidgetMacro {
-  pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> Result<TokenStream> {
+  pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx) -> TokenStream {
     fn circle_stack_to_path(stack: &[ObjectUsedPath], ctx: &DeclareCtx) -> Box<[CircleUsedPath]> {
       stack.iter().map(|c| c.to_used_path(ctx)).collect()
     }
 
-    self.id_collect(ctx)?;
+    self.id_collect(ctx);
     ctx.visit_widget_macro_mut(self);
 
     self.widget.traverses_widget().for_each(|w| {
@@ -118,7 +164,7 @@ impl WidgetMacro {
       }
     });
 
-    self.widget.before_generate_check()?;
+    self.on_items.iter().for_each(|item| item.error_check(ctx));
 
     let mut tokens = quote!();
     // named object define.
@@ -126,15 +172,17 @@ impl WidgetMacro {
       let mut follows = self.analyze_object_dependencies();
       // init circle check
       Self::circle_check(&follows, |stack| {
-        Err(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)))
-      })?;
+        ctx
+          .errors
+          .push(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)));
+      });
 
-      // data flow should not effect the named object init order, and we allow circle
-      // follow with skip_nc attribute. So we add the data flow relationship and
-      // individual check the circle follow error.
-      if !self.on_change_items.is_empty() {
+      // change flow should not effect the named object init order, and we allow
+      // circle follow with skip_nc attribute. So we add the data flow
+      // relationship and individual check the circle follow error.
+      if !self.on_items.is_empty() {
         self
-          .on_change_items
+          .on_items
           .iter()
           .for_each(|item| item.analyze_observe_depends(&mut follows));
         // circle dependencies check
@@ -143,12 +191,12 @@ impl WidgetMacro {
             .iter()
             .any(|s| !s.used_info.used_type.contains(UsedType::USED) || s.skip_nc_cfg);
 
-          if weak_depends {
-            Ok(())
-          } else {
-            Err(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
+          if !weak_depends {
+            ctx
+              .errors
+              .push(DeclareError::CircleFollow(circle_stack_to_path(stack, ctx)))
           }
-        })?;
+        });
       }
 
       let mut named_widgets_def = self.named_objects_def_tokens(ctx);
@@ -163,8 +211,8 @@ impl WidgetMacro {
     }
 
     self.all_anonyms_widgets_tokens(ctx, &mut tokens);
-    for item in self.on_change_items.iter() {
-      item.to_tokens(&mut tokens)
+    for item in self.on_items.iter() {
+      item.gen_tokens(&mut tokens, ctx)
     }
 
     if let Some(a) = self.animations.as_mut() {
@@ -189,30 +237,32 @@ impl WidgetMacro {
       }};
     }
 
-    ctx
-      .unused_id_warning()
-      .chain(self.widget.warnings())
-      .chain(self.on_change_items.iter().filter_map(|i| i.warning()))
-      .for_each(|w| w.emit_warning());
-
-    Ok(tokens)
+    if ctx.errors.is_empty() {
+      ctx
+        .unused_id_warning()
+        .chain(self.widget.warnings())
+        .chain(self.on_items.iter().filter_map(|i| i.warning()))
+        .for_each(|w| w.emit_warning());
+      tokens
+    } else {
+      let errs = ctx.errors.drain(..).map(|e| e.into_compile_error());
+      quote! {#(#errs)*}
+    }
   }
 
-  pub fn id_collect(&self, ctx: &mut DeclareCtx) -> super::Result<()> {
+  pub fn id_collect(&self, ctx: &mut DeclareCtx) {
     for w in self.widget.traverses_widget() {
       if let Some(Id { name, .. }) = w.named.as_ref() {
-        ctx.add_named_obj(name.clone(), IdType::DECLARE)?;
-        w.builtin.collect_names(name, ctx)?;
+        ctx.add_named_obj(name.clone(), IdType::DECLARE);
+        w.builtin.collect_names(name, ctx);
       }
     }
     for name in self.animations.iter().flat_map(|a| a.names()) {
-      ctx.add_named_obj(name.clone(), IdType::DECLARE)?;
+      ctx.add_named_obj(name.clone(), IdType::DECLARE);
     }
     for name in self.track.iter().flat_map(|t| t.track_names()) {
-      ctx.add_named_obj(name.clone(), IdType::USER_SPECIFY)?;
+      ctx.add_named_obj(name.clone(), IdType::USER_SPECIFY);
     }
-
-    Ok(())
   }
 
   /// return follow relationship of the named widgets,it is a key-value map,
@@ -309,10 +359,10 @@ impl WidgetMacro {
     }
   }
 
-  fn circle_check<F>(follow_infos: &BTreeMap<Ident, ObjectUsed>, err_detect: F) -> Result<()>
-  where
-    F: Fn(&[ObjectUsedPath]) -> Result<()>,
-  {
+  fn circle_check(
+    follow_infos: &BTreeMap<Ident, ObjectUsed>,
+    mut err_detect: impl FnMut(&[ObjectUsedPath]),
+  ) {
     #[derive(PartialEq, Eq, Debug)]
     enum CheckState {
       Checking,
@@ -323,43 +373,44 @@ impl WidgetMacro {
     let mut stack = vec![];
 
     // return if the widget follow contain circle.
-    fn widget_follow_circle_check<'a, F>(
+    fn widget_follow_circle_check<'a>(
       name: &'a Ident,
       follow_infos: &'a BTreeMap<Ident, ObjectUsed>,
       check_info: &mut HashMap<&'a Ident, CheckState, RandomState>,
       stack: &mut Vec<ObjectUsedPath<'a>>,
-      err_detect: &F,
-    ) -> Result<()>
-    where
-      F: Fn(&[ObjectUsedPath]) -> Result<()>,
-    {
+      err_detect: &mut impl FnMut(&[ObjectUsedPath]),
+    ) {
       match check_info.get(name) {
         None => {
           if let Some(follows) = follow_infos.get(name) {
-            follows.used_full_path_iter(name).try_for_each(|path| {
+            follows.used_full_path_iter(name).for_each(|path| {
               let next_obj = path.used_obj;
               check_info.insert(name, CheckState::Checking);
               stack.push(path);
-              widget_follow_circle_check(next_obj, follow_infos, check_info, stack, err_detect)?;
+              widget_follow_circle_check(next_obj, follow_infos, check_info, stack, err_detect);
               stack.pop();
-              Ok(())
-            })?;
+            });
             debug_assert_eq!(check_info.get(name), Some(&CheckState::Checking));
             check_info.insert(name, CheckState::Checked);
           };
         }
         Some(CheckState::Checking) => {
           let start = stack.iter().position(|v| v.obj == name).unwrap();
-          err_detect(&stack[start..])?;
+          err_detect(&stack[start..]);
         }
         Some(CheckState::Checked) => {}
       };
-      Ok(())
     }
 
-    follow_infos.keys().try_for_each(|name| {
-      widget_follow_circle_check(name, follow_infos, &mut check_info, &mut stack, &err_detect)
-    })
+    follow_infos.keys().for_each(|name| {
+      widget_follow_circle_check(
+        name,
+        follow_infos,
+        &mut check_info,
+        &mut stack,
+        &mut err_detect,
+      );
+    });
   }
 
   fn deep_used_iter<F: FnMut(&Ident)>(follows: &BTreeMap<Ident, ObjectUsed>, mut callback: F) {
@@ -383,9 +434,9 @@ impl WidgetMacro {
 impl DeclareCtx {
   pub fn visit_widget_macro_mut(&mut self, d: &mut WidgetMacro) {
     self.visit_declare_widget_mut(&mut d.widget);
-    d.on_change_items
+    d.on_items
       .iter_mut()
-      .for_each(|item| self.visit_on_change_do(item));
+      .for_each(|item| self.visit_on_item(item));
 
     if let Some(animations) = d.animations.as_mut() {
       self.visit_animations_mut(animations);
@@ -414,8 +465,54 @@ impl TrackExpr {
         }
       })
   }
+
+  pub fn used_nothing_warning(&self) -> Option<DeclareWarning> {
+    let Self { expr, used_name_info } = self;
+    used_name_info
+      .directly_used_widgets()
+      .is_none()
+      .then(|| DeclareWarning::ObserveIsConst(expr.span().unwrap()))
+  }
 }
 
 impl ToTokens for TrackExpr {
   fn to_tokens(&self, tokens: &mut TokenStream) { self.expr.to_tokens(tokens) }
+}
+
+impl OnItem {
+  fn warning(&self) -> Option<DeclareWarning> {
+    match self {
+      OnItem::OnEvent(e) => e.warning(),
+      OnItem::OnChange(c) => c.warning(),
+    }
+  }
+
+  pub fn error_check(&self, ctx: &mut DeclareCtx) {
+    if let OnItem::OnEvent(e) = self {
+      e.error_check(ctx);
+    }
+  }
+
+  fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &mut DeclareCtx) {
+    match self {
+      OnItem::OnEvent(e) => e.gen_tokens(tokens, ctx),
+      OnItem::OnChange(c) => c.to_tokens(tokens),
+    }
+  }
+
+  fn analyze_observe_depends<'a>(&'a self, depends: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
+    match self {
+      OnItem::OnEvent(e) => e.analyze_observe_depends(depends),
+      OnItem::OnChange(c) => c.analyze_observe_depends(depends),
+    }
+  }
+}
+
+impl DeclareCtx {
+  pub fn visit_on_item(&mut self, item: &mut OnItem) {
+    match item {
+      OnItem::OnEvent(e) => self.visit_on_event_do(e),
+      OnItem::OnChange(c) => self.visit_on_change_do(c),
+    }
+  }
 }

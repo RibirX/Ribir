@@ -20,7 +20,7 @@ pub use widget_gen::WidgetGen;
 use super::{
   kw,
   widget_macro::{is_expr_keyword, TrackExpr, EXPR_FIELD},
-  DeclareCtx, Id, ObjectUsed, Result, UsedPart,
+  DeclareCtx, Id, ObjectUsed, UsedPart,
 };
 
 #[derive(Debug)]
@@ -232,7 +232,7 @@ impl DeclareCtx {
         .for_each(|f| self.visit_declare_field_mut(f));
     }
 
-    self.visit_builtin_field_widgets(builtin);
+    self.visit_builtin_fields_mut(builtin);
 
     children
       .iter_mut()
@@ -242,10 +242,6 @@ impl DeclareCtx {
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
     self.visit_ident_mut(&mut f.member);
     self.visit_track_expr(&mut f.expr);
-  }
-
-  pub fn visit_builtin_field_widgets(&mut self, builtin: &mut BuiltinFieldWidgets) {
-    builtin.visit_builtin_fields_mut(self);
   }
 }
 
@@ -260,12 +256,6 @@ impl DeclareWidget {
     let host = gen.gen_widget_tokens(ctx);
     let builtin = self.builtin.widget_tokens_iter(name, ctx);
     std::iter::once((name.clone(), host)).chain(builtin)
-  }
-
-  pub fn before_generate_check(&self) -> Result<()> {
-    self
-      .traverses_widget()
-      .try_for_each(|w| w.builtin.key_follow_check())
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {

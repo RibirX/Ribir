@@ -169,14 +169,9 @@ builtin! {
     #[doc= "enumerate to describe which direction allow widget to scroll."]
     scrollable: Scrollable
   }
-  
+
   TransformWidget {
     #[doc="A widget that applies a transformation its child. Doesn't change size, only apply painting"]
     transform: Transform
-  }
-
-  KeyWidget {
-    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
-    key: Key
   }
 }

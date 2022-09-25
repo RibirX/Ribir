@@ -78,8 +78,6 @@
  	 - enumerate to describe which direction allow widget to scroll.
 - transform : [`Transform`] 
  	 - A widget that applies a transformation its child. Doesn't change size, only apply painting
-- key : [`Key`] 
- 	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
 [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
 
@@ -158,5 +156,3 @@
 [`Scrollable`]: prelude::Scrollable
 
 [`Transform`]: prelude::Transform
-
-[`Key`]: prelude::Key

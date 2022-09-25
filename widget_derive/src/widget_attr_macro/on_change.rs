@@ -55,10 +55,20 @@ impl Parse for ChangeFlow {
 
 impl Parse for OnChangeDo {
   fn parse(input: ParseStream) -> syn::Result<Self> {
+    let on_token = input.parse()?;
+    let observe = if input.peek(Ident) && input.peek2(Brace) {
+      TrackExpr {
+        expr: syn::Expr::Path(input.parse()?),
+        used_name_info: <_>::default(),
+      }
+    } else {
+      input.parse()?
+    };
+
     let content;
     Ok(Self {
-      on_token: input.parse()?,
-      observe: input.parse()?,
+      on_token,
+      observe,
       brace: braced! { content in input },
       skip_nc: try_parse_skip_nc(&content)?,
       change_token: content.parse()?,
@@ -147,9 +157,7 @@ impl ToTokens for OnChangeDo {
         if let Some(all) = subscribe_do.used_name_info.all_widgets() {
           Brace(brace.span).surround(tokens, |tokens| {
             // we convert a `expression` into move closure.
-            for c in all {
-              capture_widget(c).to_tokens(tokens);
-            }
+            all.for_each(|c| capture_widget(c).to_tokens(tokens));
             subscribe_tokens.to_tokens(tokens);
           });
         } else {
@@ -162,17 +170,8 @@ impl ToTokens for OnChangeDo {
 }
 
 impl OnChangeDo {
-  pub fn warning(&self) -> Option<DeclareWarning> {
-    let expr = &self.observe;
-    expr
-      .used_name_info
-      .directly_used_widgets()
-      .is_none()
-      .then(|| DeclareWarning::ObserveIsConst(expr.span().unwrap()))
-  }
-}
+  pub fn warning(&self) -> Option<DeclareWarning> { self.observe.used_nothing_warning() }
 
-impl OnChangeDo {
   pub fn analyze_observe_depends<'a>(&'a self, follows: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
     if let Some(widgets) = self.subscribe_do.used_name_info.all_widgets() {
       if let Some(part) = self.as_depend_part() {
@@ -191,7 +190,7 @@ impl OnChangeDo {
     }
   }
 
-  pub fn as_depend_part(&self) -> Option<UsedPart> {
+  fn as_depend_part(&self) -> Option<UsedPart> {
     self
       .observe
       .used_name_info

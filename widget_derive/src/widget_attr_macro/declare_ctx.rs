@@ -38,6 +38,7 @@ pub struct DeclareCtx {
   /// Some builtin widget (like margin, padding) implicit defined by user,
   /// shared the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident, ahash::RandomState>,
+  pub errors: Vec<DeclareError>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +56,7 @@ impl Default for DeclareCtx {
       analyze_stack: vec![vec![]],
       user_perspective_name: Default::default(),
       animate_listener_triggers: <_>::default(),
+      errors: vec![],
     }
   }
 }
@@ -278,12 +280,13 @@ impl DeclareCtx {
     self.user_perspective_name.get(name)
   }
 
-  pub fn add_named_obj(&mut self, name: Ident, used_type: IdType) -> Result<(), DeclareError> {
+  pub fn add_named_obj(&mut self, name: Ident, used_type: IdType) {
     if self.named_objects.contains_key(&name) {
-      Err(DeclareError::DuplicateID([name.clone(), name]))
+      self
+        .errors
+        .push(DeclareError::DuplicateID([name.clone(), name]));
     } else {
       self.named_objects.insert(name, used_type);
-      Ok(())
     }
   }
 
@@ -357,10 +360,7 @@ impl DeclareCtx {
       new_ctx.named_objects.insert(name.clone(), ty);
     });
 
-    let tokens = widget_macro
-      .gen_tokens(&mut new_ctx)
-      .unwrap_or_else(|err| err.into_compile_error());
-
+    let tokens = widget_macro.gen_tokens(&mut new_ctx);
     // inner `widget!` used means need be captured.
     new_ctx.used_widgets.iter().for_each(|name| {
       if self.named_objects.contains_key(name) || self.user_perspective_name.contains_key(name) {
