@@ -16,8 +16,8 @@ use crate::widget_attr_macro::Id;
 use super::{
   capture_widget,
   declare_widget::{
-    assign_uninit_field, check_duplicate_field, pick_fields_by, BuiltinFieldWidgets, WidgetGen,
-    FIELD_WIDGET_TYPE,
+    assign_uninit_field, check_duplicate_field, pick_fields_by, BuiltinFieldWidgets, WidgetExtend,
+    WidgetGen, FIELD_WIDGET_TYPE,
   },
   ribir_suffix_variable, ribir_variable, DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
 };
@@ -44,6 +44,7 @@ pub struct Transition {
   brace_token: token::Brace,
   id: Option<Id>,
   fields: Punctuated<DeclareField, token::Comma>,
+  extend: Option<WidgetExtend>,
 }
 
 #[derive(Debug)]
@@ -139,6 +140,7 @@ impl Parse for Transition {
       brace_token: braced!( content in input),
       id: None,
       fields: content.parse_terminated(DeclareField::parse)?,
+      extend: WidgetExtend::parse(input).ok(),
     };
 
     check_duplicate_field(&res.fields)?;
@@ -570,9 +572,10 @@ impl Transition {
 
     let ty = parse_quote_spanned! { transition_token.span => #transition_token <_>};
     let gen = WidgetGen::new(&ty, &name, fields.iter(), false);
-    let transition_tokens = gen.gen_widget_tokens(ctx);
-
-    tokens.extend(transition_tokens)
+    match &self.extend {
+      None => tokens.extend(gen.gen_widget_tokens(ctx)),
+      Some(extend) => tokens.extend(gen.gen_extended_tokens(ctx, extend)),
+    };
   }
 }
 
@@ -790,6 +793,10 @@ impl DeclareCtx {
       .fields
       .iter_mut()
       .for_each(|f| self.visit_declare_field_mut(f));
+    transition
+      .extend
+      .as_mut()
+      .map(|e| self.visit_widget_extend(e));
   }
 
   fn visit_trigger_mut(&mut self, trigger: &mut Trigger) {
@@ -814,6 +821,11 @@ impl DeclareCtx {
     path.on_real_widget_name(|w| {
       self.add_used_widget(w.clone(), UsedType::USED);
     })
+  }
+
+  fn visit_widget_extend(&mut self, extend: &mut WidgetExtend) {
+    self.visit_expr_mut(&mut extend.expr);
+    extend.expr_used = self.take_current_used_info();
   }
 }
 

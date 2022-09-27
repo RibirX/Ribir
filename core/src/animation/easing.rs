@@ -10,6 +10,7 @@ pub trait Easing {
 ///
 /// Construct `CubicBezierEasing` with two control pointer, the curve always
 /// start from (0., 0.) to (1., 1.).
+#[derive(Clone)]
 pub struct CubicBezierEasing(CubicBezierSegment<f32>);
 
 /// Animate at a Quadratic Bézier curve. Limit x value between [0., 1.], so
@@ -21,6 +22,7 @@ pub struct CubicBezierEasing(CubicBezierSegment<f32>);
 pub struct QuadraticBezierEasing(QuadraticBezierSegment<f32>);
 
 /// Animates at an even speed
+#[derive(Clone)]
 pub struct LinearEasing;
 
 // Some const easing cubic bezier provide.
@@ -95,6 +97,75 @@ impl Easing for CubicBezierEasing {
     assert!(0. <= time_rate && time_rate <= 1.);
     self.0.y(time_rate)
   }
+}
+
+pub enum StepsJump {
+  /// Denotes a left-continuous function, so that the first jump happens when
+  /// the animation begins;
+  JumpStart,
+
+  /// Denotes a right-continuous function, so that the last jump happens when
+  /// the animation ends;
+  JumpEnd,
+
+  /// There is no jump on either end. Instead, holding at both the 0% mark and
+  /// the 100% mark, each for 1/n of the duration.
+  JumpNone,
+
+  /// Includes pauses at both the 0% and 100% marks, effectively adding a step
+  /// during the animation iteration.
+  JumpBoth,
+}
+
+/// Displays an animation iteration along n stops along the transition,
+/// displaying each stop for equal lengths of time. For example, if n is 5,
+/// there are 5 steps. Whether the animation holds temporarily at 0%, 20%, 40%,
+/// 60% and 80%, on the 20%, 40%, 60%, 80% and 100%, or makes 5 stops between
+/// the 0% and 100% along the animation, or makes 5 stops including the 0% and
+/// 100% marks (on the 0%, 25%, 50%, 75%, and 100%) depends on which of the
+/// following jump terms is used
+pub fn steps(step_cnt: u32, jump: StepsJump) -> Steps {
+  let time_step = 1. / step_cnt as f32;
+  match jump {
+    StepsJump::JumpStart => Steps {
+      start: time_step,
+      step: time_step,
+      time_step,
+    },
+    StepsJump::JumpEnd => Steps {
+      start: 0.,
+      step: time_step,
+      time_step,
+    },
+    StepsJump::JumpBoth => Steps {
+      start: 1. / (step_cnt + 1) as f32,
+      step: 1. / (step_cnt + 1) as f32,
+      time_step,
+    },
+    StepsJump::JumpNone => Steps {
+      start: 0.,
+      step: 1. / (step_cnt - 1) as f32,
+      time_step,
+    },
+  }
+}
+#[derive(Clone)]
+pub struct Steps {
+  start: f32,
+  step: f32,
+  time_step: f32,
+}
+impl Easing for Steps {
+  #[inline]
+  fn easing(&self, time_rate: f32) -> f32 {
+    (self.start + (time_rate / self.time_step).floor() * self.step).min(1.)
+  }
+}
+
+pub struct StepEnd(pub f32);
+impl Easing for StepEnd {
+  #[inline]
+  fn easing(&self, time_rate: f32) -> f32 { ((time_rate / self.0).ceil() * self.0).min(1.) }
 }
 
 #[cfg(test)]

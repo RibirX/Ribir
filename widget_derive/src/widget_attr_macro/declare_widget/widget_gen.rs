@@ -1,14 +1,15 @@
 use crate::{
   declare_derive::declare_field_name,
   widget_attr_macro::{
-    capture_widget, ctx_ident, ribir_variable, DeclareCtx, ScopeUsedInfo, UsedType,
+    capture_widget, ctx_ident, ribir_suffix_variable, ribir_variable, DeclareCtx, ScopeUsedInfo,
+    UsedType,
   },
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, Ident, Path};
 
-use super::{upstream_tokens, DeclareField};
+use super::{upstream_tokens, DeclareField, WidgetExtend};
 
 pub struct WidgetGen<'a, F> {
   ty: &'a Path,
@@ -23,14 +24,81 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
   }
 
   pub fn gen_widget_tokens(&self, ctx: &DeclareCtx) -> TokenStream {
-    let Self { fields, ty, name, .. } = self;
+    let stateful = (self.is_stateful(ctx)).then(|| quote! { .into_stateful()});
+    self.gen_widget(self.name, stateful)
+  }
 
-    let stateful = self.is_stateful(ctx).then(|| quote! { .into_stateful()});
+  pub fn gen_extended_tokens(&self, ctx: &DeclareCtx, extends: &WidgetExtend) -> TokenStream {
+    let used_widgets = extends.expr_used.directly_used_widgets();
+    let is_stateful = self.is_stateful(ctx) || used_widgets.map_or(false, |_| true);
+    if is_stateful {
+      self.gen_stateful_extended(&extends)
+    } else {
+      self.gen_stateless_extended(&extends)
+    }
+  }
+
+  fn gen_stateless_extended(&self, extends: &WidgetExtend) -> TokenStream {
+    self.gen_widget(self.name, Some(extends.tokens()))
+  }
+
+  fn gen_stateful_extended(&self, extends: &WidgetExtend) -> TokenStream {
+    let Self { ty, name, .. } = self;
+    let inner_name = ribir_suffix_variable(name, "inner");
+    let inner_widget = self.gen_widget(&inner_name, Some(quote! { .into_stateful()}));
+    let extend_tokens = extends.tokens();
+    let declare_widget = {
+      let tokens = extends.expr_used.expr_refs_wrap(quote_spanned! {
+        ty.span() => #inner_name.raw_ref().clone()#extend_tokens.into_stateful()
+      });
+      quote_spanned! { ty.span() => let #name = #tokens; }
+    };
+
+    let rebuild_tokens = {
+      let extend_tokens = extend_tokens.clone();
+      extends.expr_used.expr_refs_wrap(
+        quote! { *(#name.state_ref()) = #inner_name.state_ref().clone()#extend_tokens; },
+      )
+    };
+    let used_widgets = extends
+      .expr_used
+      .directly_used_widgets()
+      .into_iter()
+      .flatten()
+      .chain(std::iter::once(&inner_name));
+
+    let capture_widgets = used_widgets
+      .clone()
+      .chain(std::iter::once(*name))
+      .map(capture_widget);
+
+    let follow = used_widgets.clone().map(move |widget| {
+      let upstream = upstream_tokens(std::iter::once(widget), quote! {clone().change_stream});
+      let rebuild_tokens = rebuild_tokens.clone();
+      let capture_widgets = capture_widgets.clone();
+      quote_spanned! { ty.span() => {
+          {
+            #(#capture_widgets)*
+            #upstream.subscribe(move |_| #rebuild_tokens );
+          }
+        }
+      }
+    });
+
+    quote! {
+      #inner_widget
+      #declare_widget
+      #(#follow)*
+    }
+  }
+
+  fn gen_widget(&self, name: &Ident, extends: Option<TokenStream>) -> TokenStream {
+    let Self { fields, ty, .. } = self;
 
     let build_ctx = ctx_ident(self.ty.span());
     let fields_tokens = self.fields.clone().map(|f| f.field_tokens());
     let mut build_widget = quote! {
-      <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#stateful
+      <#ty as Declare>::builder()#(#fields_tokens)*.build(#build_ctx)#extends
     };
     let used_info = self.whole_used_info();
     build_widget = used_info.expr_refs_wrap(build_widget);

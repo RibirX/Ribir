@@ -33,6 +33,10 @@ impl Lerp for f64 {
   fn lerp(&self, to: &Self, factor: f32) -> Self { (factor as f64).mul_add(to - self, *self) }
 }
 
+impl Lerp for bool {
+  fn lerp(&self, to: &Self, factor: f32) -> Self { if factor == 0. { *self } else { *to } }
+}
+
 impl<V: Lerp + Default> Lerp for Option<V> {
   fn lerp(&self, to: &Self, factor: f32) -> Self {
     match (self, to) {

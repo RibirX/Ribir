@@ -50,6 +50,28 @@ pub struct SkipNcAttr {
   skip_nc_meta: kw::skip_nc,
 }
 
+#[derive(Clone, Debug)]
+pub struct WidgetExtend {
+  dot: token::Dot,
+  pub expr: Expr,
+  pub expr_used: ScopeUsedInfo,
+}
+
+impl WidgetExtend {
+  pub fn parse(input: ParseStream) -> syn::Result<Self> {
+    Ok(WidgetExtend {
+      dot: input.parse()?,
+      expr: input.parse()?,
+      expr_used: ScopeUsedInfo::default(),
+    })
+  }
+  fn tokens(&self) -> TokenStream {
+    let value = &self.expr;
+    let dot = &self.dot;
+    quote! {#dot #value}
+  }
+}
+
 macro_rules! assign_uninit_field {
   ($self: ident.$name: ident, $field: ident) => {
     assign_uninit_field!($self.$name, $field, $name)

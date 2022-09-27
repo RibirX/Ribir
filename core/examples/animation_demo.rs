@@ -28,10 +28,9 @@ fn main() {
           sized_box.background: Some(Brush::Color(Color::RED)),
         },
         transition: Transition {
-          id: transition1,
           duration: Duration::from_secs(5),
           easing: easing::EASE_IN_OUT,
-        },
+        }.delay(Duration::from_secs(1)),
       }
     }
   };

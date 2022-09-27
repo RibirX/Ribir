@@ -182,15 +182,13 @@ where
     self.visual_lines.push(<_>::default());
     let Self { x_cursor, y_cursor, .. } = *self;
     if self.cfg.line_dir.is_horizontal() {
-      p.runs.for_each(|r| {
-        let cursor = VInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
-        self.consume_run_with_letter_space_cursor(r.borrow(), cursor)
-      });
+      let mut cursor = VInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
+      p.runs
+        .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
     } else {
-      p.runs.for_each(|r| {
-        let cursor = HInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
-        self.consume_run_with_letter_space_cursor(r.borrow(), cursor)
-      });
+      let mut cursor = HInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
+      p.runs
+        .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
     }
 
     if let Some(line_height) = self.cfg.line_height {
@@ -203,58 +201,65 @@ where
   fn consume_run_with_letter_space_cursor(
     &mut self,
     run: &Runs::Item,
-    inner_cursor: impl InlineCursor,
+    inner_cursor: &mut impl InlineCursor,
   ) {
     let letter_space = run
       .letter_space()
       .or(self.cfg.letter_space)
       .unwrap_or_else(Pixel::zero);
     if letter_space != Em::zero() {
-      let cursor = LetterSpaceCursor::new(inner_cursor, letter_space.into());
-      self.consume_run_with_bounds_cursor(run, cursor);
+      let mut cursor = LetterSpaceCursor::new(inner_cursor, letter_space.into());
+      self.consume_run_with_bounds_cursor(run, &mut cursor);
     } else {
       self.consume_run_with_bounds_cursor(run, inner_cursor);
     }
   }
 
-  fn consume_run_with_bounds_cursor(&mut self, run: &Runs::Item, inner_cursor: impl InlineCursor) {
+  fn consume_run_with_bounds_cursor(
+    &mut self,
+    run: &Runs::Item,
+    inner_cursor: &mut impl InlineCursor,
+  ) {
     if self.cfg.text_align != Some(TextAlign::Center) {
       let bounds = if self.cfg.line_dir.is_horizontal() {
         self.cfg.bounds.width
       } else {
         self.cfg.bounds.height
       };
-      let cursor = BoundsCursor {
+      let mut cursor = BoundsCursor {
         inner_cursor,
         bounds: Em::zero()..bounds,
       };
-      self.consume_run(run, cursor);
+      self.consume_run(run, &mut cursor);
     } else {
       self.consume_run(run, inner_cursor);
     }
   }
 
-  fn consume_run(&mut self, run: &Runs::Item, cursor: impl InlineCursor) {
+  fn consume_run(&mut self, run: &Runs::Item, cursor: &mut impl InlineCursor) {
     let font_size = run.font_size();
     let text = run.text();
     let glyphs = run.glyphs();
+    let base = run.range().start as u32;
 
     let line = self.visual_lines.last_mut().unwrap();
     line.line_height = line.line_height.max(run.line_height());
-    self.place_glyphs(cursor, font_size, text, glyphs.iter());
+    self.place_glyphs(cursor, font_size, text, glyphs.iter(), base);
   }
 
   fn place_glyphs<'b>(
     &mut self,
-    mut cursor: impl InlineCursor,
+    cursor: &mut impl InlineCursor,
     font_size: FontSize,
     text: &str,
     runs: impl Iterator<Item = &'b Glyph<Em>>,
+    base_cluster: u32,
   ) {
     for g in runs {
       let mut at = g.clone();
       at.scale(font_size.into_em().value());
       let over_boundary = cursor.advance_glyph(&mut at, text);
+      at.cluster = g.cluster + base_cluster;
       self.push_glyph(at);
       if over_boundary {
         self.over_bounds = true;
@@ -348,6 +353,7 @@ pub trait InputRun {
   fn font_size(&self) -> FontSize;
   fn line_height(&self) -> Em;
   fn letter_space(&self) -> Option<Pixel>;
+  fn range(&self) -> Range<usize>;
 }
 
 pub struct HInlineCursor {
@@ -360,18 +366,20 @@ pub struct VInlineCursor {
   pub y_pos: Em,
 }
 
-pub struct LetterSpaceCursor<I> {
-  inner_cursor: I,
+pub struct LetterSpaceCursor<'a, I> {
+  inner_cursor: &'a mut I,
   letter_space: Em,
 }
 
-struct BoundsCursor<Inner> {
-  inner_cursor: Inner,
+struct BoundsCursor<'a, Inner> {
+  inner_cursor: &'a mut Inner,
   bounds: Range<Em>,
 }
 
-impl<I> LetterSpaceCursor<I> {
-  pub fn new(inner_cursor: I, letter_space: Em) -> Self { Self { inner_cursor, letter_space } }
+impl<'a, I> LetterSpaceCursor<'a, I> {
+  pub fn new(inner_cursor: &'a mut I, letter_space: Em) -> Self {
+    Self { inner_cursor, letter_space }
+  }
 }
 
 impl InlineCursor for HInlineCursor {
@@ -412,7 +420,7 @@ impl InlineCursor for VInlineCursor {
   fn cursor(&self) -> (Em, Em) { (self.x_pos, self.y_pos) }
 }
 
-impl<I: InlineCursor> InlineCursor for LetterSpaceCursor<I> {
+impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
   fn advance_glyph(&mut self, g: &mut Glyph<Em>, origin_text: &str) -> bool {
     let cursor = &mut self.inner_cursor;
     let res = cursor.advance_glyph(g, origin_text);
@@ -432,7 +440,7 @@ impl<I: InlineCursor> InlineCursor for LetterSpaceCursor<I> {
   fn cursor(&self) -> (Em, Em) { self.inner_cursor.cursor() }
 }
 
-impl<I: InlineCursor> InlineCursor for BoundsCursor<I> {
+impl<'a, I: InlineCursor> InlineCursor for BoundsCursor<'a, I> {
   fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, origin_text: &str) -> bool {
     self.inner_cursor.advance_glyph(glyph, origin_text);
     !self.bounds.contains(&self.position())
