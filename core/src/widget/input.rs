@@ -176,9 +176,8 @@ impl Compose for Caret {
             caret.visible: !caret.visible,
           },
           transition: Transition {
-            id: transition1,
             duration: Duration::from_secs(1),
-            easing: easing::Throld(0.5),
+            easing: easing::steps(2, easing::StepsJump::JumpNone),
             repeat: Repeat::Infinite,
           },
         }
@@ -284,7 +283,9 @@ impl Compose for Input {
           }
         },
 
-        FilledBox {}
+        SizedBox {
+          size: INFINITY_SIZE,
+        }
         SelectedTextBackground {
           focus: *focus,
           rects: helper.select_rects(this.caret.select_range()),
