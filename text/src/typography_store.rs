@@ -258,7 +258,7 @@ impl VisualGlyphs {
         .iter()
         .enumerate()
         .rev()
-        .find(|(_, g)| g.x_offset <= x)
+        .find(|(_, g)| Em::zero() < g.x_advance && g.x_offset <= x)
         .map(|(i, g)| {
           if x - g.x_offset >= g.x_offset + g.x_advance - x {
             return i + 1;
@@ -344,35 +344,27 @@ impl VisualGlyphs {
 
   pub fn glyph_rect(&self, para: usize, offset: usize) -> (Rect<f32>, f32) {
     let visual_lines = &self.visual_info.visual_lines;
-    let idx = (offset).min(visual_lines[para].glyphs.len() - 1);
-    let glyph = &visual_lines[para].glyphs[idx];
-
-    if offset > idx {
-      (
-        Rect::new(
-          Point::new(
-            self.to_pixel_value(glyph.x_offset + glyph.x_advance),
-            self.to_pixel_value(glyph.y_offset),
+    visual_lines
+      .get(para)
+      .and_then(|line| {
+        let height = line.line_height;
+        line.glyphs.get(offset).map(move |g| (g, height))
+      })
+      .map_or((Rect::default(), 0.), |(glyph, height)| {
+        (
+          Rect::new(
+            Point::new(
+              self.to_pixel_value(glyph.x_offset),
+              self.to_pixel_value(glyph.y_offset),
+            ),
+            Size::new(
+              self.to_pixel_value(glyph.x_advance),
+              self.to_pixel_value(glyph.y_advance),
+            ),
           ),
-          Size::new(0., self.to_pixel_value(glyph.y_advance)),
-        ),
-        self.to_pixel_value(visual_lines[para].line_height),
-      )
-    } else {
-      (
-        Rect::new(
-          Point::new(
-            self.to_pixel_value(glyph.x_offset),
-            self.to_pixel_value(glyph.y_offset),
-          ),
-          Size::new(
-            self.to_pixel_value(glyph.x_advance),
-            self.to_pixel_value(glyph.y_advance),
-          ),
-        ),
-        self.to_pixel_value(visual_lines[para].line_height),
-      )
-    }
+          self.to_pixel_value(height),
+        )
+      })
   }
 
   pub fn select_range(&self, rg: Range<usize>) -> Vec<Rect<Pixel>> {

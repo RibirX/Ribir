@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 pub struct ControlChar;
 
 #[allow(dead_code)]
@@ -18,6 +20,8 @@ pub trait CharacterCursor {
   fn prev(&mut self, text: &str) -> bool;
 
   fn byte_offset(&self) -> usize;
+
+  fn reset(&mut self, byte_offset: usize);
 }
 
 pub struct TextWriter<'a> {
@@ -66,4 +70,21 @@ impl<'a> TextWriter<'a> {
   }
 
   pub fn is_at_last(&self) -> bool { self.text.len() <= self.cursor.byte_offset() }
+
+  pub fn insert_str(&mut self, text: &str) {
+    self.text.insert_str(self.cursor.byte_offset(), text);
+    self.cursor.reset(self.cursor.byte_offset() + text.len());
+  }
+
+  pub fn delete_range(&mut self, rg: &Range<usize>) {
+    self.text.drain(rg.clone());
+
+    let cursor = self.cursor.byte_offset();
+    let new_cursor = match cursor {
+      _ if rg.contains(&cursor) => rg.start,
+      _ if (rg.end <= cursor) => cursor - (rg.end - rg.start),
+      _ => cursor,
+    };
+    self.cursor.reset(new_cursor);
+  }
 }

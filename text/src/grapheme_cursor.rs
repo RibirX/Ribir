@@ -54,6 +54,10 @@ impl CharacterCursor for GraphemeCursor {
   }
 
   fn byte_offset(&self) -> usize { self.0 }
+
+  fn reset(&mut self, byte_offset: usize) {
+      self.0 = byte_offset;
+  }
 }
 
 #[cfg(test)]

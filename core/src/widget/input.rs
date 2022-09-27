@@ -239,9 +239,9 @@ impl Render for SelectedTextBackground {
     };
 
     let painter = ctx.painter();
+    painter.set_brush(Brush::Color(color));
     self.rects.iter().for_each(|rc| {
       painter.rect(&rc);
-      painter.set_brush(Brush::Color(color));
       painter.fill();
     })
   }
@@ -251,6 +251,7 @@ impl Render for SelectedTextBackground {
 
 impl Compose for Input {
   fn compose(this: StateWidget<Self>) -> Widget {
+    let placeholder = "\r";
     widget! {
       track { this: this.into_stateful(), helper: GlyphHelper::default().into_stateful(), focus: false.into_stateful()  }
       Stack {
@@ -291,7 +292,7 @@ impl Compose for Input {
         }
         Text {
           id: text,
-          text: this.text.clone(),
+          text: this.text.clone() + placeholder,
           style: this.style.clone(),
           on_performed_layout: move |ctx| {
             let app_ctx = ctx.widget_tree().app_ctx().borrow();
