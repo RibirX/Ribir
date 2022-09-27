@@ -45,24 +45,21 @@ impl ComposeSingleChild for ScrollableWidget {
       on content.box_rect().size ~> this.content_size
       #[skip_nc]
       on view.box_rect().size ~> this.page
-
-      animations {
-        content.left_anchor: Animate {
-          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
-          lerp_fn: move |from, to, rate| {
-            let from = from.abs_value(content.width());
-            let to = to.abs_value(content.width());
-            PositionUnit::Pixel(from.lerp(&to, rate))
-          }
-        },
-        content.top_anchor: Animate {
-          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
-          lerp_fn: move |from, to, rate| {
-            let from = from.abs_value(content.height());
-            let to = to.abs_value(content.height());
-            PositionUnit::Pixel(from.lerp(&to, rate))
-          }
-        },
+      on content.left_anchor Animate {
+        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(content.width());
+          let to = to.abs_value(content.width());
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
+      }
+      on content.top_anchor Animate {
+        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(content.height());
+          let to = to.abs_value(content.height());
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
       }
     }
   }

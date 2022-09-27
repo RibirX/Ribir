@@ -109,7 +109,6 @@ impl NameUsedInfo {
 }
 
 impl ScopeUsedInfo {
-  #[inline]
   pub fn take(&mut self) -> Self { Self(self.0.take()) }
 
   pub fn add_used(&mut self, name: Ident, used_type: UsedType) {
@@ -145,9 +144,36 @@ impl ScopeUsedInfo {
     self.filter_widget(|info| info.used_type != UsedType::MOVE_CAPTURE)
   }
 
+  /// create refs before expression and release borrow after it, then return its
+  /// value, to avoid change notify order problem.
+  ///
+  /// Surround only if refs more than one.
   pub fn refs_surround<'a>(&self, tokens: &mut TokenStream, f: impl FnOnce(&mut TokenStream)) {
     if let Some(refs) = self.refs_widgets() {
-      refs_surround(refs, tokens, f)
+      if refs.clone().count() > 1 {
+        refs.clone().for_each(|name| {
+          tokens.extend(quote_spanned! { name.span() =>
+            let mut #name = #name.state_ref();
+          });
+        });
+
+        f(tokens);
+
+        refs.for_each(|name| {
+          tokens.extend(quote_spanned! { name.span() =>
+            #name.release_current_borrow();
+          })
+        })
+      } else {
+        refs.for_each(|name| {
+          tokens.extend(quote_spanned! { name.span() =>
+            #[allow(unused_mut)]
+            let mut #name = #name.state_ref();
+          });
+        });
+
+        f(tokens);
+      }
     } else {
       f(tokens)
     }
@@ -164,13 +190,18 @@ impl ScopeUsedInfo {
       f(tokens);
     } else {
       Brace(span).surround(tokens, |tokens| {
-        let v = ribir_variable("v", span);
-        self.refs_surround(tokens, |tokens| {
-          tokens.extend(quote_spanned! {span => let #v = });
-          f(tokens);
-          Semi(span).to_tokens(tokens);
-        });
-        v.to_tokens(tokens);
+        let ref_cnt = self.refs_widgets().map_or(0, |refs| refs.count());
+        if ref_cnt > 1 {
+          let v = ribir_variable("v", span);
+          self.refs_surround(tokens, |tokens| {
+            tokens.extend(quote_spanned! {span => let #v = });
+            f(tokens);
+            Semi(span).to_tokens(tokens);
+          });
+          v.to_tokens(tokens);
+        } else {
+          self.refs_surround(tokens, |tokens| f(tokens))
+        }
       })
     }
   }
@@ -213,27 +244,6 @@ impl ScopeUsedInfo {
     filter: impl Fn(&NameUsedInfo) -> bool + Clone,
   ) -> Option<impl Iterator<Item = &Ident> + Clone> {
     self.filter_item(filter).map(|iter| iter.map(|(w, _)| w))
-  }
-}
-
-pub fn refs_surround<'a>(
-  names: impl Iterator<Item = &'a Ident> + Clone,
-  tokens: &mut TokenStream,
-  f: impl FnOnce(&mut TokenStream),
-) {
-  let names2 = names.clone();
-  for name in names {
-    tokens.extend(quote_spanned! { name.span() =>
-      let mut #name = #name.state_ref();
-    });
-  }
-
-  f(tokens);
-
-  for name in names2 {
-    tokens.extend(quote_spanned! { name.span() =>
-      #name.release_current_borrow();
-    });
   }
 }
 

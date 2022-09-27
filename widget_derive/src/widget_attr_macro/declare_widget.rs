@@ -246,16 +246,30 @@ impl DeclareCtx {
 }
 
 impl DeclareWidget {
-  pub fn host_and_builtin_widgets_tokens<'a>(
-    &'a self,
-    name: &'a Ident,
-    ctx: &'a DeclareCtx,
-  ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
-    let Self { path: ty, fields, .. } = self;
-    let gen = WidgetGen::new(ty, name, fields.iter(), false);
-    let host = gen.gen_widget_tokens(ctx);
-    let builtin = self.builtin.widget_tokens_iter(name, ctx);
-    std::iter::once((name.clone(), host)).chain(builtin)
+  pub fn collect_named_defs(&self, ctx: &mut DeclareCtx) {
+    if let Some(name) = self.name() {
+      let Self { path: ty, fields, .. } = self;
+      let tokens = WidgetGen::new(ty, name, fields.iter(), false).gen_widget_tokens(ctx);
+      ctx.named_obj_defs.insert(name.clone(), tokens);
+
+      let builtin = self
+        .builtin
+        .widget_tokens_iter(name, ctx)
+        .collect::<Vec<_>>();
+      ctx.named_obj_defs.extend(builtin);
+    }
+  }
+
+  pub fn gen_tokens(&self, name: &Ident, tokens: &mut TokenStream, ctx: &mut DeclareCtx) {
+    if self.name().is_none() {
+      let Self { path: ty, fields, .. } = self;
+      let gen = WidgetGen::new(ty, name, fields.iter(), false);
+      gen.gen_widget_tokens(ctx).to_tokens(tokens);
+      self
+        .builtin
+        .widget_tokens_iter(name, ctx)
+        .for_each(|(_, builtin)| builtin.to_tokens(tokens));
+    }
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {
@@ -282,21 +296,16 @@ impl DeclareWidget {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  pub fn analyze_object_dependencies(&self) -> BTreeMap<Ident, ObjectUsed> {
-    let mut follows: BTreeMap<Ident, ObjectUsed> = BTreeMap::new();
-    self.traverses_widget().for_each(|w| {
-      if let Some(name) = w.name() {
-        w.builtin.collect_builtin_widget_follows(name, &mut follows);
+  pub fn analyze_observe_depends<'a>(&'a self, follows: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
+    if let Some(name) = self.name() {
+      self.builtin.collect_builtin_widget_follows(name, follows);
 
-        let w_follows: ObjectUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
+      let w_follows: ObjectUsed = self.fields.iter().flat_map(|f| f.used_part()).collect();
 
-        if !w_follows.is_empty() {
-          follows.insert(name.clone(), w_follows);
-        }
+      if !w_follows.is_empty() {
+        follows.insert(name.clone(), w_follows);
       }
-    });
-
-    follows
+    }
   }
 
   pub fn traverses_widget(&self) -> impl Iterator<Item = &DeclareWidget> {

@@ -45,16 +45,18 @@ impl Compose for TodoMVP {
                     margin: EdgeInsets::vertical(4.)
                   }
                 }
-                on checkbox.checked ~> this2.silent().tasks[idx].finished
-                animations {
-                  task.mounted: Animate  {
-                    from: State { task.transform: Transform::translation(-400., 0. )},
-                    transition: Transition {
-                      delay: (*mount_idx + 1) * Duration::from_millis(100) ,
-                      duration: Duration::from_millis(150),
-                      easing: easing::EASE_IN,
-                    }
+                on checkbox.checked  ~> this2.silent().tasks[idx].finished
+                Animate  {
+                  id: mount_animate,
+                  from: State { task.transform: Transform::translation(-400., 0. )},
+                  transition: Transition {
+                    delay: (*mount_idx + 1) * Duration::from_millis(100) ,
+                    duration: Duration::from_millis(150),
+                    easing: easing::EASE_IN,
                   }
+                }
+                on task {
+                  mounted: move |_| mount_animate.run()
                 }
               }
             }).collect::<Vec<_>>()

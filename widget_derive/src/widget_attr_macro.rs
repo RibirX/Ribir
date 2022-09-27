@@ -22,11 +22,10 @@ mod on_change;
 mod on_event_do;
 pub use declare_widget::RESERVE_IDENT;
 
-mod track;
+pub mod track;
 mod widget_macro;
 pub mod kw {
   syn::custom_keyword!(widget);
-  syn::custom_keyword!(animations);
   syn::custom_keyword!(track);
   syn::custom_keyword!(ExprWidget);
   syn::custom_keyword!(id);
@@ -36,6 +35,7 @@ pub mod kw {
   syn::custom_keyword!(Transition);
   syn::custom_punctuation!(FlowArrow, ~>);
   syn::custom_keyword!(on);
+  syn::custom_keyword!(transition);
   syn::custom_keyword!(change);
 }
 pub const CHANGE: &str = "change";

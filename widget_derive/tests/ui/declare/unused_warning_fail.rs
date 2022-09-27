@@ -24,11 +24,13 @@ fn main() {
       size: Size::zero(),
       background: Color::RED,
     }
-    animations {
-      id1.tap: Animate {
-        from: State { id1.background },
-        transition: Transition { easing: easing::LINEAR }
-      }
+    Animate {
+      id: animate,
+      from: State { id1.background },
+      transition: Transition { easing: easing::LINEAR }
+    }
+    on id1 {
+      tap: move |_| animate.run()
     }
   };
 

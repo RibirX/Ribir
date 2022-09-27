@@ -20,7 +20,7 @@ fn main() {
       SizedBox {
         id: a,
         size: Size::zero(),
-        tap: move |e| {}
+        tap: move |_| {}
       }
       SizedBox {
         id: b,
@@ -31,15 +31,13 @@ fn main() {
         size: Size::zero(),
       }
     }
-    on a {
-      tap: move |_| {},
-      change: move |_| {}
-    }
-    on a.size { change: move |(before, after)| {} }
+
     on a.size + b.size ~> c.size
     on a.size + b.size {
       change : move |(_, after)| c.size = after
     }
+    on a { tap: move |_| {} }
+    on a.size { change: move |_| {} }
   };
 
   let _flow_embed = widget! {

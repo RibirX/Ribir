@@ -1,9 +1,6 @@
 use crate::{
   declare_derive::declare_field_name,
-  widget_attr_macro::{
-    ctx_ident, kw, on_change::OnChangeDo, widget_macro::TrackExpr, DeclareCtx, ScopeUsedInfo,
-    UsedType,
-  },
+  widget_attr_macro::{ctx_ident, kw, on_change::OnChangeDo, DeclareCtx, IdType, ScopeUsedInfo},
 };
 use proc_macro2::TokenStream;
 use quote::{quote_spanned, ToTokens};
@@ -28,7 +25,7 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
     Self { ty, name, fields, force_stateful }
   }
 
-  pub fn gen_widget_tokens(self, ctx: &DeclareCtx) -> TokenStream {
+  pub fn gen_widget_tokens(self, ctx: &mut DeclareCtx) -> TokenStream {
     let Self { fields, ty, name, .. } = &self;
     let used_info = self.whole_used_info();
     let span = ty.span();
@@ -53,30 +50,28 @@ impl<'a, F: Iterator<Item = &'a DeclareField> + Clone> WidgetGen<'a, F> {
       if f.expr.upstream_tokens().is_some() {
         let expr_span = expr.span();
         let declare_set = declare_field_name(member);
-        let mut used_name_info = ScopeUsedInfo::default();
-        used_name_info.add_used((*name).clone(), UsedType::MOVE_CAPTURE);
 
-        let subscribe_do: syn::Expr = if skip_nc.is_some() {
-          parse_quote_spanned! { member.span() =>
-            move |(before, after)| if before != after {
-              #name.state_ref().#declare_set(after)
-            }
-          }
-        } else {
-          parse_quote_spanned! { member.span() =>
-            move |(_, after)| #name.state_ref().#declare_set(after)
-          }
-        };
-        let on_change_flow = OnChangeDo {
+        let mut on_change_do = OnChangeDo {
           on_token: kw::on(expr_span),
           observe: expr.clone(),
           brace: Brace(expr_span),
           skip_nc: skip_nc.clone(),
           change_token: kw::change(expr_span),
           colon_token: Colon(expr_span),
-          subscribe_do: TrackExpr { expr: subscribe_do, used_name_info },
+          subscribe_do: parse_quote_spanned! { member.span() =>
+            move |(_, after)| #name.#declare_set(after)
+          },
         };
-        on_change_flow.to_tokens(&mut tokens)
+
+        if !ctx.named_objects.contains_key(&name) {
+          ctx.add_named_obj((*name).clone(), IdType::DECLARE);
+          ctx.visit_on_change_do_mut(&mut on_change_do);
+          ctx.named_objects.remove(name);
+        } else {
+          ctx.visit_on_change_do_mut(&mut on_change_do);
+        }
+
+        on_change_do.to_tokens(&mut tokens)
       }
     }
     tokens

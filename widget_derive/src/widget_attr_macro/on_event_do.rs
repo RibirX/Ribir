@@ -3,26 +3,34 @@ use std::collections::{BTreeMap, HashMap};
 use crate::error::{DeclareError, DeclareWarning};
 
 use super::{
+  animations::{Animate, MemberPath, Transition},
   declare_widget::{
     builtin_var_name, check_duplicate_field, is_listener, BuiltinWidgetInfo, DeclareField,
-    WidgetGen, FIELD_WIDGET_TYPE,
+    SkipNcAttr, WidgetGen, FIELD_WIDGET_TYPE,
   },
   kw,
   on_change::OnChangeDo,
-  DeclareCtx, IdType, ObjectUsed, UsedType, CHANGE,
+  ribir_suffix_variable, ribir_variable, DeclareCtx, IdType, ObjectUsed, UsedType, CHANGE,
 };
 
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   braced,
   parse::Parse,
-  parse_quote_spanned,
+  parse_quote, parse_quote_spanned,
   punctuated::Punctuated,
   spanned::Spanned,
   token::{Brace, Comma},
   Ident,
 };
 
+/// todo: The next step, we should support pipe for event as a rx stream
+///
+/// ```
+///     on sized_box {
+///         wheel pipe(xxx)
+///         | press pipe(): move || {}
+///     }
 #[derive(Debug)]
 pub struct OnEventDo {
   pub on_token: kw::on,
@@ -31,6 +39,38 @@ pub struct OnEventDo {
   pub listeners: HashMap<&'static str, BuiltinWidgetInfo, ahash::RandomState>,
   // change have itself logic to gen code.
   pub on_change_do: Option<OnChangeDo>,
+}
+
+#[derive(Debug)]
+pub struct OnTransitionSyntax {
+  pub skip_nc: Option<SkipNcAttr>,
+  pub on_token: kw::on,
+  pub observe: syn::Expr,
+  pub transition: Transition,
+}
+
+/// The syntax case `on id.member Animate {...}`,
+#[derive(Debug)]
+pub struct OnAnimateSyntax {
+  pub skip_nc: Option<SkipNcAttr>,
+  pub on_token: kw::on,
+  pub observe: syn::Expr,
+  pub animate: Animate,
+}
+
+#[derive(Debug)]
+pub struct OnAnimate {
+  env_variables: Option<InitVariables>,
+  pub animate: Animate,
+  pub on_change_do: OnChangeDo,
+}
+
+#[derive(Debug)]
+
+struct InitVariables {
+  name1: Ident,
+  name2: Ident,
+  value: MemberPath,
 }
 
 impl Parse for OnEventDo {
@@ -143,8 +183,13 @@ impl OnEventDo {
 }
 
 impl DeclareCtx {
-  pub fn visit_on_event_do(&mut self, on_event_do: &mut OnEventDo) {
-    let OnEventDo { target, listeners: events, .. } = on_event_do;
+  pub fn visit_on_event_do_mut(&mut self, on_event_do: &mut OnEventDo) {
+    let OnEventDo {
+      target,
+      listeners: events,
+      on_change_do,
+      ..
+    } = on_event_do;
     for (ty, builtin_widget) in events {
       let builtin_name = builtin_var_name(target, ty);
       // widget be used by on target.
@@ -153,5 +198,125 @@ impl DeclareCtx {
 
       self.visit_builtin_widget_info_mut(builtin_widget);
     }
+    if let Some(on_change_do) = on_change_do {
+      self.visit_on_change_do_mut(on_change_do)
+    }
+  }
+  pub fn visit_on_animate_mut(&mut self, on_animate: &mut OnAnimate) {
+    let OnAnimate { env_variables, animate, on_change_do } = on_animate;
+    if let Some(vars) = env_variables.as_mut() {
+      self.visit_vars_mut(vars);
+    }
+    self.visit_animate_mut(animate);
+    if animate.id.is_none() {
+      // animate not declare an id but also captured be the `on_change_do`.
+      let animate_name = animate.variable_name();
+      self.add_named_obj(animate_name.clone(), IdType::DECLARE);
+      self.visit_on_change_do_mut(on_change_do);
+      self.named_objects.remove(&animate_name);
+    } else {
+      self.visit_on_change_do_mut(on_change_do);
+    }
+  }
+
+  fn visit_vars_mut(&mut self, vars: &mut InitVariables) {
+    self.visit_member_path_mut(&mut vars.value);
+    self.take_current_used_info();
+  }
+}
+
+impl OnAnimate {
+  pub fn gen_tokens(&self, tokens: &mut proc_macro2::TokenStream, ctx: &mut DeclareCtx) {
+    let Self { env_variables, animate, on_change_do } = self;
+    if let Some(InitVariables { name1, name2, value }) = env_variables {
+      let MemberPath { widget, dot_token, member } = value;
+      tokens.extend(quote_spanned! { value.span() =>
+        let #name1 = std::rc::Rc::new(std::cell::RefCell::new(
+          #widget #dot_token raw_ref() #dot_token #member #dot_token clone()
+        ));
+        let #name2 = #name1.clone();
+      });
+    }
+    if animate.id.is_none() {
+      animate.gen_tokens(tokens, ctx);
+    }
+    on_change_do.to_tokens(tokens);
+  }
+}
+impl OnAnimateSyntax {
+  pub fn into_on_animate(self) -> OnAnimate {
+    let span = self.span();
+    let Self {
+      skip_nc,
+      on_token,
+      observe,
+      mut animate,
+    } = self;
+    let animate_name = animate.variable_name();
+    if animate.from.is_some() {
+      // todo: only subscribe change
+      OnAnimate {
+        env_variables: None,
+        animate,
+        on_change_do: parse_quote_spanned! { span =>
+          #on_token #observe { #skip_nc change: move |_| #animate_name.run() }
+        },
+      }
+    } else {
+      let path: MemberPath = parse_quote! { #observe };
+      let init = ribir_variable("init_state", path.member.span());
+      let init_2 = ribir_suffix_variable(&init, "2");
+
+      animate.from = Some(parse_quote_spanned! { path.span() =>
+        from: State { #path: #init.borrow().clone()}
+      });
+
+      let on_change_do = parse_quote_spanned! { span =>
+        on #observe { #skip_nc change: move |(before, _)| {
+          *#init_2.borrow_mut() = before.clone();
+          #animate_name.run()
+        }}
+      };
+      OnAnimate {
+        env_variables: Some(InitVariables {
+          name1: init,
+          name2: init_2,
+          value: path,
+        }),
+        animate,
+        on_change_do,
+      }
+    }
+  }
+}
+
+impl Spanned for OnAnimateSyntax {
+  fn span(&self) -> proc_macro2::Span {
+    let Self { skip_nc, on_token, animate, .. } = self;
+    if let Some(skip) = skip_nc {
+      skip.span().join(animate.span()).unwrap()
+    } else {
+      on_token.span().join(animate.span()).unwrap()
+    }
+  }
+}
+
+impl OnTransitionSyntax {
+  pub fn into_on_animate(self) -> OnAnimate {
+    let Self {
+      skip_nc,
+      on_token,
+      observe,
+      transition,
+    } = self;
+    OnAnimateSyntax {
+      on_token,
+      skip_nc,
+      observe,
+      animate: parse_quote_spanned! { transition.span() =>
+        Animate { transition: #transition }
+      },
+    }
+    .into_on_animate()
   }
 }

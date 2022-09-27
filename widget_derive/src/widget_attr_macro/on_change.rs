@@ -110,6 +110,7 @@ impl ToTokens for OnChangeDo {
       brace,
       skip_nc,
       subscribe_do,
+      change_token,
       ..
     } = self;
 
@@ -120,7 +121,7 @@ impl ToTokens for OnChangeDo {
       observe
         .used_name_info
         .value_expr_surround_refs(&mut expr_value, observe_span, |tokens| {
-          observe.to_tokens(tokens)
+          quote_spanned! { observe_span => #observe.clone() }.to_tokens(tokens);
         });
 
       let captures = observe
@@ -146,22 +147,17 @@ impl ToTokens for OnChangeDo {
           .filter(move |(before, after)| before != after)
         });
       }
-      quote_spanned! {brace.span => .subscribe}.to_tokens(tokens);
-      Paren(brace.span).surround(tokens, |tokens| {
-        let mut subscribe_tokens = quote! {};
-        subscribe_do
-          .used_name_info
-          .refs_surround(&mut subscribe_tokens, |tokens| {
-            subscribe_do.to_tokens(tokens);
-          });
-        if let Some(all) = subscribe_do.used_name_info.all_widgets() {
-          Brace(brace.span).surround(tokens, |tokens| {
-            // we convert a `expression` into move closure.
-            all.for_each(|c| capture_widget(c).to_tokens(tokens));
-            subscribe_tokens.to_tokens(tokens);
-          });
+      let subscribe_span = change_token.span.join(subscribe_do.span()).unwrap();
+      quote_spanned! {subscribe_span => .subscribe}.to_tokens(tokens);
+      Paren(subscribe_span).surround(tokens, |tokens| {
+        if subscribe_do.used_name_info.refs_widgets().is_some() {
+          Brace(subscribe_span).surround(tokens, |tokens| {
+            subscribe_do.used_name_info.refs_surround(tokens, |tokens| {
+              subscribe_do.to_tokens(tokens);
+            });
+          })
         } else {
-          subscribe_tokens.to_tokens(tokens);
+          subscribe_do.to_tokens(tokens);
         }
       });
       Semi(brace.span).to_tokens(tokens);
@@ -199,7 +195,7 @@ impl OnChangeDo {
 }
 
 impl DeclareCtx {
-  pub fn visit_on_change_do(&mut self, on_change_do: &mut OnChangeDo) {
+  pub fn visit_on_change_do_mut(&mut self, on_change_do: &mut OnChangeDo) {
     self.visit_track_expr(&mut on_change_do.observe);
     self.visit_track_expr(&mut on_change_do.subscribe_do);
   }

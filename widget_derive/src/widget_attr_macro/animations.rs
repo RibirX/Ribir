@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
@@ -11,25 +13,17 @@ use syn::{
   Error, Expr, Ident, Result,
 };
 
-use crate::widget_attr_macro::{Id, IdType};
+use crate::widget_attr_macro::Id;
 
 use super::{
   capture_widget,
-  declare_widget::{
-    assign_uninit_field, check_duplicate_field, is_listener, pick_fields_by, BuiltinFieldWidgets,
-    WidgetGen, FIELD_WIDGET_TYPE,
-  },
-  ribir_suffix_variable, ribir_variable,
+  declare_widget::{assign_uninit_field, check_duplicate_field, pick_fields_by, WidgetGen},
+  ribir_variable,
+  track::SimpleField,
   widget_macro::TrackExpr,
   DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
 };
 use super::{declare_widget::DeclareField, kw};
-
-pub struct Animations {
-  animations_token: kw::animations,
-  brace_token: token::Brace,
-  triggers: Punctuated<Trigger, token::Comma>,
-}
 
 #[derive(Debug)]
 pub struct State {
@@ -44,7 +38,7 @@ pub struct State {
 pub struct Transition {
   transition_token: kw::Transition,
   brace_token: token::Brace,
-  id: Option<Id>,
+  pub id: Option<Id>,
   fields: Punctuated<DeclareField, token::Comma>,
 }
 
@@ -52,11 +46,10 @@ pub struct Transition {
 pub struct Animate {
   animate_token: Ident,
   _brace_token: token::Brace,
-  id: Option<Id>,
-  from: FromStateField,
+  pub id: Option<Id>,
+  pub from: Option<FromStateField>,
   transition: TransitionField,
   lerp_fn: DeclareField,
-  directly_used: ScopeUsedInfo,
 }
 mod animate_kw {
   syn::custom_keyword!(from);
@@ -64,18 +57,8 @@ mod animate_kw {
   syn::custom_keyword!(animation);
   syn::custom_keyword!(lerp_fn);
 }
-
-struct AnimateParser {
-  animate_token: Ident,
-  _brace_token: token::Brace,
-  id: Option<Id>,
-  from: Option<FromStateField>,
-  transition: TransitionField,
-  lerp_fn: DeclareField,
-}
-
 #[derive(Debug)]
-struct FromStateField {
+pub struct FromStateField {
   from_token: Ident,
   colon_token: token::Colon,
   expr: State,
@@ -84,10 +67,7 @@ struct FromStateField {
 #[derive(Debug)]
 enum AnimateTransitionValue {
   Transition(Transition),
-  Expr {
-    expr: syn::Expr,
-    used_name_info: ScopeUsedInfo,
-  },
+  Expr(TrackExpr),
 }
 #[derive(Debug)]
 struct TransitionField {
@@ -96,27 +76,11 @@ struct TransitionField {
   value: AnimateTransitionValue,
 }
 
-struct Trigger {
-  path: MemberPath,
-  _colon_token: token::Colon,
-  expr: AnimateExpr,
-  env: Option<TokenStream>,
-  eval_before_trigger: Option<TokenStream>,
-}
-
-enum AnimateExpr {
-  /// a.on_click: Animate { ... }
-  Animate(Animate),
-  Expr {
-    expr: syn::Expr,
-    used_name_info: ScopeUsedInfo,
-  },
-}
 #[derive(Debug)]
-struct MemberPath {
-  widget: Ident,
-  dot_token: token::Dot,
-  member: Ident,
+pub struct MemberPath {
+  pub widget: Ident,
+  pub dot_token: token::Dot,
+  pub member: Ident,
 }
 
 #[derive(Debug)]
@@ -124,13 +88,6 @@ struct StateField {
   path: MemberPath,
   _colon_token: Option<token::Colon>,
   value: Expr,
-}
-
-#[derive(Debug)]
-pub struct SimpleField {
-  pub(crate) member: Ident,
-  pub(crate) colon_token: Option<token::Colon>,
-  pub(crate) expr: Expr,
 }
 
 impl Parse for Transition {
@@ -154,38 +111,6 @@ impl Parse for Transition {
     })?;
 
     Ok(res)
-  }
-}
-
-impl Parse for Animations {
-  fn parse(input: ParseStream) -> Result<Self> {
-    let content;
-    Ok(Animations {
-      animations_token: input.parse()?,
-      brace_token: braced!(content in input),
-      triggers: content.parse_terminated(Trigger::parse)?,
-    })
-  }
-}
-
-impl Spanned for Animations {
-  fn span(&self) -> proc_macro2::Span {
-    self
-      .animations_token
-      .span
-      .join(self.brace_token.span)
-      .unwrap()
-  }
-}
-
-impl MemberPath {
-  fn on_real_widget_name(&self, mut cb: impl FnMut(&Ident)) {
-    let Self { widget, member, .. } = self;
-    if let Some(suffix) = BuiltinFieldWidgets::as_builtin_widget(member) {
-      cb(&ribir_suffix_variable(widget, suffix))
-    } else {
-      cb(widget)
-    }
   }
 }
 
@@ -231,11 +156,11 @@ impl Parse for State {
   }
 }
 
-impl Parse for AnimateParser {
+impl Parse for Animate {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let animate_token = input.parse::<Ident>()?;
     let content;
-    let brace_token = braced!(content in input);
+    let _brace_token = braced!(content in input);
     #[derive(Default)]
     struct Fields {
       id: Option<Id>,
@@ -281,9 +206,9 @@ impl Parse for AnimateParser {
        lerp_fn: |from, to, rate| Lerp::lerp(from, to, rate)
       }
     });
-    Ok(AnimateParser {
+    Ok(Animate {
       animate_token,
-      _brace_token: brace_token,
+      _brace_token,
       id,
       from,
       transition,
@@ -337,10 +262,7 @@ impl Parse for AnimateTransitionValue {
     let expr = if input.peek(kw::Transition) {
       AnimateTransitionValue::Transition(input.parse()?)
     } else {
-      AnimateTransitionValue::Expr {
-        expr: input.parse()?,
-        used_name_info: <_>::default(),
-      }
+      AnimateTransitionValue::Expr(input.parse()?)
     };
     Ok(expr)
   }
@@ -370,49 +292,19 @@ impl Parse for StateField {
   }
 }
 
-impl Parse for Trigger {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    let path: MemberPath = input.parse()?;
-    let _colon_token = input.parse()?;
-    let mut eval_before_trigger = None;
-    let mut env = None;
-    let expr = if input.peek(kw::Animate) {
-      let a = input.parse::<AnimateParser>()?;
-      AnimateExpr::Animate(a.into_animate(&path, &mut env, &mut eval_before_trigger)?)
-    } else if input.peek(kw::Transition) {
-      let transition: Transition = input.parse()?;
-      let animate: AnimateParser = parse_quote! {
-        Animate { transition: #transition }
-      };
-      AnimateExpr::Animate(animate.into_animate(&path, &mut env, &mut eval_before_trigger)?)
-    } else {
-      AnimateExpr::Expr {
-        expr: input.parse()?,
-        used_name_info: <_>::default(),
-      }
-    };
-
-    Ok(Trigger {
-      path,
-      _colon_token,
-      expr,
-      eval_before_trigger,
-      env,
-    })
-  }
-}
-
-impl Animations {
-  pub fn gen_tokens(&mut self, ctx: &mut DeclareCtx, tokens: &mut TokenStream) {
-    self
-      .triggers
-      .iter_mut()
-      .for_each(|t| t.gen_tokens(tokens, ctx));
-  }
-}
-
 impl Animate {
-  fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &DeclareCtx) {
+  pub fn collect_named_defs(&self, ctx: &mut DeclareCtx) {
+    if let Some(Id { name, .. }) = self.id.as_ref() {
+      let mut tokens = quote! {};
+      self.gen_tokens(&mut tokens, ctx);
+      ctx.named_obj_defs.insert(name.clone(), tokens);
+      if let AnimateTransitionValue::Transition(t) = &self.transition.value {
+        t.collect_named_defs(ctx);
+      }
+    }
+  }
+
+  pub fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &mut DeclareCtx) {
     let Self {
       animate_token,
       from,
@@ -431,20 +323,22 @@ impl Animate {
     let animate_def = gen.gen_widget_tokens(ctx);
     animate_def.to_tokens(tokens);
   }
-}
 
-impl AnimateExpr {
-  fn variable_name(&self) -> Ident {
-    if let AnimateExpr::Animate(a) = &self {
-      a.variable_name()
-    } else {
-      Animate::anonymous_name(self.span())
+  pub fn collect_name(&self, ctx: &mut DeclareCtx) {
+    let Animate { id, transition, .. } = self;
+    ctx.id_collect(id);
+    if let TransitionField {
+      value: AnimateTransitionValue::Transition(t),
+      ..
+    } = transition
+    {
+      ctx.id_collect(&t.id)
     }
   }
 }
 
 impl Animate {
-  fn variable_name(&self) -> Ident {
+  pub fn variable_name(&self) -> Ident {
     self
       .id
       .as_ref()
@@ -463,14 +357,17 @@ impl ToTokens for FromStateField {
 }
 
 impl TransitionField {
-  fn to_declare_field(&self, ctx: &DeclareCtx) -> DeclareField {
+  fn to_declare_field(&self, ctx: &mut DeclareCtx) -> DeclareField {
     let TransitionField { transition_token, colon_token, value } = self;
 
     match value {
       AnimateTransitionValue::Transition(t) => {
         // named object is already define before
         if let Some(Id { name, .. }) = t.id.as_ref() {
-          parse_quote! { #transition_token #colon_token #name.clone() }
+          let mut f: DeclareField =
+            parse_quote! { #transition_token #colon_token #name.clone_stateful() };
+          f.expr.used_name_info.add_used(name.clone(), UsedType::USED);
+          f
         } else {
           let mut transition_tokens = quote! {};
           t.gen_tokens(&mut transition_tokens, ctx);
@@ -478,14 +375,11 @@ impl TransitionField {
           parse_quote! { #transition_token #colon_token { #transition_tokens } }
         }
       }
-      AnimateTransitionValue::Expr { expr, used_name_info } => DeclareField {
+      AnimateTransitionValue::Expr(expr) => DeclareField {
         skip_nc: None,
         member: transition_token.clone(),
         colon_token: colon_token.clone(),
-        expr: TrackExpr {
-          expr: expr.clone(),
-          used_name_info: used_name_info.clone(),
-        },
+        expr: expr.clone(),
       },
     }
   }
@@ -495,7 +389,7 @@ impl Spanned for TransitionField {
   fn span(&self) -> Span {
     match &self.value {
       AnimateTransitionValue::Transition(t) => t.span(),
-      AnimateTransitionValue::Expr { expr, .. } => expr.span(),
+      AnimateTransitionValue::Expr(expr) => expr.span(),
     }
   }
 }
@@ -539,10 +433,13 @@ impl ToTokens for State {
       .target_objs()
       .map(|name| quote_spanned! { name.span() =>  let mut #name = #name.shallow_ref(); });
     let target_value = self.maybe_tuple_value(|field| {
-      let value = field.path.to_real_widget_tokens();
-      quote! { #value.clone()}
+      let path = &field.path;
+      quote! { #path.clone()}
     });
-    let target_assign = self.maybe_tuple_value(|field| field.path.to_real_widget_tokens());
+    let target_assign = self.maybe_tuple_value(|field| {
+      let path = &field.path;
+      quote! { #path }
+    });
 
     let v = ribir_variable("v", state_span);
     tokens.extend(quote_spanned! { state_span =>
@@ -568,7 +465,7 @@ impl ToTokens for State {
 }
 
 impl Transition {
-  fn gen_tokens(&self, tokens: &mut proc_macro2::TokenStream, ctx: &DeclareCtx) {
+  pub fn gen_tokens(&self, tokens: &mut proc_macro2::TokenStream, ctx: &mut DeclareCtx) {
     let Self { transition_token, fields, .. } = self;
     let name = self.variable_name();
 
@@ -577,6 +474,14 @@ impl Transition {
     let transition_tokens = gen.gen_widget_tokens(ctx);
 
     tokens.extend(transition_tokens)
+  }
+
+  pub fn collect_named_defs(&self, ctx: &mut DeclareCtx) {
+    if let Some(Id { name, .. }) = self.id.as_ref() {
+      let mut tokens = quote! {};
+      self.gen_tokens(&mut tokens, ctx);
+      ctx.named_obj_defs.insert(name.clone(), tokens);
+    }
   }
 }
 
@@ -588,153 +493,6 @@ impl ToTokens for Transition {
       self.fields.to_tokens(tokens);
     });
   }
-}
-
-impl Trigger {
-  pub fn gen_tokens(&mut self, tokens: &mut TokenStream, ctx: &mut DeclareCtx) {
-    // define animation
-    let Self { expr, env, eval_before_trigger, .. } = self;
-    env.to_tokens(tokens);
-
-    let animate_name = expr.variable_name();
-    let trigger = match expr {
-      AnimateExpr::Animate(a) => {
-        if a.id.is_none() {
-          a.gen_tokens(tokens, ctx);
-        }
-        quote! {{
-          let #animate_name = #animate_name.clone_stateful();
-          move |change| {
-            #eval_before_trigger
-            #animate_name.run()
-          }
-        }}
-      }
-      AnimateExpr::Expr { expr, used_name_info } => {
-        let mut run_fn = quote! { move |change| {
-          #eval_before_trigger
-          (#expr).run()
-        }};
-        if let Some(captures) = used_name_info.all_widgets() {
-          let captures = captures.map(capture_widget);
-          run_fn = quote! {{
-            #(#captures)*
-            #run_fn
-          }}
-        }
-        run_fn
-      }
-    };
-
-    self.subscribe_to_trigger_animate(trigger, tokens, ctx);
-  }
-
-  fn subscribe_to_trigger_animate(
-    &self,
-    run_fn: TokenStream,
-    tokens: &mut TokenStream,
-    ctx: &DeclareCtx,
-  ) {
-    if let Some(listener) = self.listener_trigger_ty() {
-      self.path.on_real_widget_name(|name| {
-        let ty = Ident::new(listener, self.path.span()).into();
-        let member = &self.path.member;
-        let fields = [parse_quote! {#member: #run_fn}];
-        let gen = WidgetGen::new(&ty, name, fields.iter(), false);
-
-        if ctx
-          .named_objects
-          .get(name)
-          .map_or(false, |id_ty| id_ty.contains(IdType::DECLARE))
-        {
-          let listener = gen.gen_widget_tokens(ctx);
-          tokens.extend(quote! {
-            let #name: SingleChildWidget<_, _> = {
-              let tmp = #name;
-              #listener
-              #name.have_child(tmp)
-            };
-          });
-        } else {
-          tokens.extend(gen.gen_widget_tokens(ctx));
-        }
-      });
-    } else {
-      self.path.on_real_widget_name(|name| {
-        let MemberPath { dot_token, member, .. } = &self.path;
-        tokens.extend(quote_spanned! { self.span() =>
-          #name.clone_stateful()
-            .state_change(|w| w #dot_token #member #dot_token clone())
-            .filter(StateChange::not_same)
-            .subscribe(#run_fn);
-        })
-      });
-    }
-  }
-
-  fn listener_trigger_ty(&self) -> Option<&str> {
-    FIELD_WIDGET_TYPE
-      .get(self.path.member.to_string().as_str())
-      .filter(|name| name.ends_with("Listener"))
-      .cloned()
-  }
-}
-
-impl MemberPath {
-  fn to_real_widget_tokens(&self) -> TokenStream {
-    let mut tokens = quote! {};
-    self.on_real_widget_name(|w| w.to_tokens(&mut tokens));
-    self.dot_token.to_tokens(&mut tokens);
-    self.member.to_tokens(&mut tokens);
-    tokens
-  }
-
-  fn as_state(&self) -> Result<MemberPathAsState> {
-    if self.is_listener().is_some() {
-      return Err(syn::Error::new(
-        self.span(),
-        "A listener trigger, can not use as an implicit `State`.",
-      ));
-    }
-    let init = ribir_variable("init_state", self.member.span());
-    let init_2 = ribir_suffix_variable(&init, "2");
-
-    let MemberPath { dot_token, member, .. } = self;
-    let mut init_env = quote! {};
-    self.on_real_widget_name(|name| {
-      init_env = quote_spanned! { self.span() =>
-        let #init = std::rc::Rc::new(std::cell::RefCell::new(
-          #name #dot_token raw_ref() #dot_token #member #dot_token clone()
-        ));
-        let #init_2 = #init.clone();
-      };
-    });
-
-    let state = quote! {
-      State { #self: #init.borrow().clone()}
-    };
-    let animate_trigger_eval = quote! {
-      *#init_2.borrow_mut() = change.before.clone();
-    };
-    Ok(MemberPathAsState {
-      init_env,
-      state,
-      animate_trigger_eval,
-    })
-  }
-
-  fn is_listener(&self) -> Option<&str> {
-    FIELD_WIDGET_TYPE
-      .get(self.member.to_string().as_str())
-      .filter(|ty_name| is_listener(ty_name))
-      .cloned()
-  }
-}
-
-struct MemberPathAsState {
-  init_env: TokenStream,
-  state: TokenStream,
-  animate_trigger_eval: TokenStream,
 }
 
 impl ToTokens for MemberPath {
@@ -753,39 +511,22 @@ impl ToTokens for SimpleField {
   }
 }
 
-pub enum AnimationObject<'a> {
-  Animate(&'a Animate),
-  Transition(&'a Transition),
-}
-
 impl DeclareCtx {
-  pub fn visit_animations_mut(&mut self, animations: &mut Animations) {
-    let Animations { triggers, .. } = animations;
-    triggers.iter_mut().for_each(|t| self.visit_trigger_mut(t));
-  }
-
-  fn visit_animate_mut(&mut self, animate: &mut Animate) {
+  pub fn visit_animate_mut(&mut self, animate: &mut Animate) {
     let Animate { from, transition, lerp_fn, .. } = animate;
-    self.visit_state_mut(&mut from.expr);
+    if let Some(from) = from.as_mut() {
+      self.visit_state_mut(&mut from.expr);
+    }
     match &mut transition.value {
       AnimateTransitionValue::Transition(t) => {
         self.visit_transition_mut(t);
       }
-      AnimateTransitionValue::Expr { expr, used_name_info } => {
-        self.visit_expr_mut(expr);
-        *used_name_info = self.take_current_used_info();
-      }
+      AnimateTransitionValue::Expr(expr) => self.visit_track_expr(expr),
     }
     self.visit_declare_field_mut(lerp_fn);
-    if let AnimateTransitionValue::Transition(Transition { id: Some(Id { name, .. }), .. }) =
-      &transition.value
-    {
-      self.add_used_widget(name.clone(), UsedType::USED);
-    }
-    animate.directly_used = self.take_current_used_info();
   }
 
-  fn visit_state_mut(&mut self, state: &mut State) {
+  pub fn visit_state_mut(&mut self, state: &mut State) {
     state
       .fields
       .iter_mut()
@@ -796,161 +537,72 @@ impl DeclareCtx {
     state
       .fields
       .iter_mut()
-      .for_each(|p| self.visit_member_path(&mut p.path));
+      .for_each(|p| self.visit_member_path_mut(&mut p.path));
     state.target_used = self.take_current_used_info();
   }
 
-  fn visit_transition_mut(&mut self, transition: &mut Transition) {
+  pub fn visit_transition_mut(&mut self, transition: &mut Transition) {
     transition
       .fields
       .iter_mut()
       .for_each(|f| self.visit_declare_field_mut(f));
   }
 
-  fn visit_trigger_mut(&mut self, trigger: &mut Trigger) {
-    match &mut trigger.expr {
-      AnimateExpr::Animate(a) => {
-        self.visit_animate_mut(a);
-        // animate declare in trigger will used by trigger.
-        if let Some(id) = a.id.as_ref() {
-          self.add_used_widget(id.name.clone(), UsedType::USED)
-        }
-      }
-      AnimateExpr::Expr { expr, used_name_info } => {
-        self.visit_expr_mut(expr);
-        *used_name_info = self.take_current_used_info();
-      }
-    }
-    self.visit_member_path(&mut trigger.path);
-    self.take_current_used_info();
-  }
-
-  fn visit_member_path(&mut self, path: &mut MemberPath) {
+  pub fn visit_member_path_mut(&mut self, path: &mut MemberPath) {
     let MemberPath { widget, member, .. } = path;
     if let Some(builtin) = self.find_builtin_access(widget, member) {
-      // listener trigger is not be used and follow change, but gen be animate self,
-      // but need to tell builtin compose.
-      if path.is_listener().is_some() {
-        self.animate_listener_triggers.insert(builtin);
-      } else {
-        self.add_used_widget(builtin, UsedType::USED);
-      }
+      *widget = parse_quote! { #builtin };
+      self.add_used_widget(builtin, UsedType::USED);
     } else {
       self.add_used_widget(widget.clone(), UsedType::USED);
     }
   }
 }
 
-impl Animations {
-  pub fn names(&self) -> impl Iterator<Item = &Ident> {
-    self.named_objects_iter().map(|o| o.name())
-  }
-
-  // return the key-value map of the named widget define tokens.
-  pub fn named_objects_def_tokens_iter<'a>(
-    &'a self,
-    ctx: &'a DeclareCtx,
-  ) -> impl Iterator<Item = (Ident, TokenStream)> + 'a {
-    self.named_objects_iter().map(|o| {
-      let mut tokens = quote! {};
-      match o {
-        AnimationObject::Animate(a) => a.gen_tokens(&mut tokens, ctx),
-        AnimationObject::Transition(t) => t.gen_tokens(&mut tokens, ctx),
-      };
-      (o.name().clone(), tokens)
-    })
-  }
-
-  pub fn dependencies(&self) -> impl Iterator<Item = (Ident, ObjectUsed)> + '_ {
-    self
-      .named_objects_iter()
-      .filter_map(move |n| n.used_part().map(|d| (n.name().clone(), d)))
-  }
-
-  pub fn named_objects_iter(&self) -> impl Iterator<Item = AnimationObject> + '_ {
-    fn named_objects_in_animate<'a>(a: &'a Animate) -> impl Iterator<Item = AnimationObject> {
-      let Animate { id, transition, .. } = a;
-      id.as_ref()
-        .map(|_| AnimationObject::Animate(a))
-        .into_iter()
-        .chain(
-          if let TransitionField {
-            value: AnimateTransitionValue::Transition(t @ Transition { id: Some(_), .. }),
-            ..
-          } = transition
-          {
-            Some(AnimationObject::Transition(t))
-          } else {
-            None
-          }
-          .into_iter(),
-        )
-    }
-
-    self
-      .triggers
-      .iter()
-      .filter_map(|t| match &t.expr {
-        AnimateExpr::Animate(a) => Some(named_objects_in_animate(a)),
-        _ => None,
-      })
-      .flatten()
-  }
-}
-
-impl<'a> AnimationObject<'a> {
-  fn name(&self) -> &'a Ident {
-    let id = match self {
-      AnimationObject::Animate(a) => a.id.as_ref(),
-      AnimationObject::Transition(t) => t.id.as_ref(),
-    };
-    &id.expect("Try to get name from an anonymous object.").name
-  }
-
-  fn used_part(&self) -> Option<ObjectUsed<'a>> {
-    match self {
-      AnimationObject::Animate(a) => a.used_part(),
-      AnimationObject::Transition(t) => t.used_part(),
-    }
-  }
-}
-
 impl Animate {
-  fn used_part(&self) -> Option<ObjectUsed> {
-    let FromStateField { from_token, expr, .. } = &self.from;
-    let mut used_objs = [
-      self
-        .directly_used
-        .used_part(Some(&self.animate_token), false),
-      expr.expr_used.used_part(Some(from_token), false),
-      expr.target_used.used_part(Some(from_token), false),
-    ]
-    .into_iter()
-    .filter_map(|o| o)
-    .collect::<Vec<_>>();
+  pub fn analyze_observe_depends<'a>(&'a self, depends: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
+    if let Some(Id { name, .. }) = self.id.as_ref() {
+      let mut used_objs = vec![];
+      if let Some(FromStateField { from_token, expr, .. }) = &self.from {
+        if let Some(p) = expr.expr_used.used_part(Some(from_token), false) {
+          used_objs.push(p);
+        }
+        if let Some(p) = expr.target_used.used_part(Some(from_token), false) {
+          used_objs.push(p);
+        }
+      }
 
-    let TransitionField { transition_token, value, .. } = &self.transition;
-    match value {
-      AnimateTransitionValue::Transition(t) => {
-        if t.id.is_none() {
+      let TransitionField { transition_token, value, .. } = &self.transition;
+      match value {
+        AnimateTransitionValue::Transition(t) => {
+          t.analyze_observe_depends(depends);
           used_objs.extend(t.fields.iter().filter_map(|f| f.used_part()));
         }
-      }
-      AnimateTransitionValue::Expr { used_name_info, .. } => {
-        if let Some(o) = used_name_info.used_part(Some(&transition_token), false) {
-          used_objs.push(o);
+        AnimateTransitionValue::Expr(expr) => {
+          if let Some(o) = expr
+            .used_name_info
+            .used_part(Some(&transition_token), false)
+          {
+            used_objs.push(o);
+          }
         }
-      }
-    };
+      };
 
-    (!used_objs.is_empty()).then(|| ObjectUsed(used_objs.into_boxed_slice()))
+      if !used_objs.is_empty() {
+        depends.insert(name.clone(), ObjectUsed(used_objs.into_boxed_slice()));
+      }
+    }
   }
 }
 
 impl Transition {
-  pub fn used_part(&self) -> Option<ObjectUsed> {
-    let used = ObjectUsed::from_iter(self.fields.iter().filter_map(|f| f.used_part()));
-    (!used.is_empty()).then(|| used)
+  pub fn analyze_observe_depends<'a>(&'a self, depends: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
+    if let Some(Id { name, .. }) = self.id.as_ref() {
+      let used = ObjectUsed::from_iter(self.fields.iter().filter_map(|f| f.used_part()));
+      if !used.is_empty() {
+        depends.insert(name.clone(), used);
+      }
+    }
   }
 
   pub fn variable_name(&self) -> Ident {
@@ -958,16 +610,6 @@ impl Transition {
       name.clone()
     } else {
       ribir_variable("transition", self.span())
-    }
-  }
-}
-
-impl Spanned for AnimateExpr {
-  #[inline]
-  fn span(&self) -> proc_macro2::Span {
-    match self {
-      AnimateExpr::Animate(a) => a.span(),
-      AnimateExpr::Expr { expr, .. } => expr.span(),
     }
   }
 }
@@ -980,51 +622,5 @@ impl Spanned for Animate {
       .span()
       .join(self._brace_token.span)
       .unwrap()
-  }
-}
-
-impl Spanned for Trigger {
-  fn span(&self) -> Span { self.path.span().join(self.expr.span()).unwrap() }
-}
-
-impl AnimateParser {
-  fn into_animate(
-    self,
-    trigger_path: &MemberPath,
-    env: &mut Option<TokenStream>,
-    eval_before_trigger: &mut Option<TokenStream>,
-  ) -> Result<Animate> {
-    let Self {
-      animate_token,
-      _brace_token,
-      id,
-      from,
-      transition,
-      lerp_fn,
-    } = self;
-
-    let from = match from {
-      Some(f) => f,
-      None => {
-        let MemberPathAsState {
-          init_env,
-          state,
-          animate_trigger_eval,
-        } = trigger_path.as_state()?;
-        *env = Some(init_env);
-        *eval_before_trigger = Some(animate_trigger_eval);
-        parse_quote!(from: #state)
-      }
-    };
-
-    Ok(Animate {
-      animate_token,
-      _brace_token,
-      id,
-      from,
-      transition,
-      lerp_fn,
-      directly_used: <_>::default(),
-    })
   }
 }

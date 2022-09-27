@@ -4,7 +4,7 @@ use crate::{
 };
 
 use super::{
-  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, ScopeUsedInfo,
+  capture_widget, declare_widget::BuiltinFieldWidgets, ribir_suffix_variable, Id, ScopeUsedInfo,
   UsedType, WidgetMacro,
 };
 
@@ -31,7 +31,6 @@ pub struct DeclareCtx {
   /// All name we can use in macro and need to reactive to its change
   pub named_objects: HashMap<Ident, IdType, ahash::RandomState>,
   pub current_used_info: ScopeUsedInfo,
-  pub animate_listener_triggers: HashSet<Ident, ahash::RandomState>,
   /// name object has be used.
   used_widgets: HashSet<Ident, ahash::RandomState>,
   analyze_stack: Vec<Vec<LocalVariable>>,
@@ -39,6 +38,7 @@ pub struct DeclareCtx {
   /// shared the `id` with host widget in user perspective.
   user_perspective_name: HashMap<Ident, Ident, ahash::RandomState>,
   pub errors: Vec<DeclareError>,
+  pub named_obj_defs: HashMap<Ident, TokenStream, ahash::RandomState>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,8 +55,8 @@ impl Default for DeclareCtx {
       used_widgets: Default::default(),
       analyze_stack: vec![vec![]],
       user_perspective_name: Default::default(),
-      animate_listener_triggers: <_>::default(),
       errors: vec![],
+      named_obj_defs: <_>::default(),
     }
   }
 }
@@ -261,13 +261,18 @@ impl VisitMut for DeclareCtx {
 }
 
 impl DeclareCtx {
+  pub fn id_collect(&mut self, id: &Option<Id>) {
+    if let Some(Id { name, .. }) = id {
+      self.add_named_obj(name.clone(), IdType::DECLARE);
+    }
+  }
   pub fn find_builtin_access(&self, base: &Ident, member: &Ident) -> Option<Ident> {
     let mut name = self.find_named_widget(base).cloned()?;
     let suffix = BuiltinFieldWidgets::as_builtin_widget(member)?;
     self
       .named_objects
       .get(&name)
-      .filter(|t| t.contains(IdType::DECLARE))
+      .filter(|t| t.contains(IdType::DECLARE) && self.user_perspective_name(&name).is_none())
       .map(|_| {
         name.set_span(name.span().join(member.span()).unwrap());
         ribir_suffix_variable(&name, &suffix.to_string())
@@ -352,6 +357,7 @@ impl DeclareCtx {
     let mut widget_macro: WidgetMacro = syn::parse2(tokens)?;
     let mut new_ctx = DeclareCtx {
       analyze_stack: self.analyze_stack.clone(),
+      user_perspective_name: self.user_perspective_name.clone(),
       ..<_>::default()
     };
     // all named objects should as outside define for embed `widget!` macro.

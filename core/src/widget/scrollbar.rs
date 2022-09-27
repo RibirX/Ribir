@@ -151,15 +151,13 @@ impl Compose for HRawScrollbar {
           }
         }
       }
-      animations {
-        thumb.left_anchor: Animate {
-          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
-          lerp_fn: move |from, to, rate| {
-            let from = from.abs_value(thumb.size.width);
-            let to = to.abs_value(thumb.size.width);
-            PositionUnit::Pixel(from.lerp(&to, rate))
-          }
-        },
+      on thumb.left_anchor Animate {
+        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(thumb.size.width);
+          let to = to.abs_value(thumb.size.width);
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
       }
     }
   }
@@ -178,6 +176,7 @@ impl Compose for VRawScrollbar {
   fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
     let scrolling = this.raw_ref().scrolling.clone();
+    
     widget! {
       track { scrolling, this }
       Stack {
@@ -205,15 +204,13 @@ impl Compose for VRawScrollbar {
           }
         }
       }
-      animations {
-        thumb.top_anchor: Animate {
-          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
-          lerp_fn: move |from, to, rate| {
-            let from = from.abs_value(thumb.size.height);
-            let to = to.abs_value(thumb.size.height);
-            PositionUnit::Pixel(from.lerp(&to, rate))
-          }
-        },
+      on thumb.top_anchor Animate {
+        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(thumb.size.height);
+          let to = to.abs_value(thumb.size.height);
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
       }
     }
   }

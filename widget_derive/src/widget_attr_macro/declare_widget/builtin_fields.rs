@@ -67,18 +67,14 @@ impl BuiltinFieldWidgets {
   pub fn widget_tokens_iter<'a>(
     &'a self,
     host_id: &'a Ident,
-    ctx: &'a DeclareCtx,
+    ctx: &'a mut DeclareCtx,
   ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
-    WIDGETS
-      .iter()
-      .filter_map(|builtin| self.get_builtin_widget(host_id, ctx, builtin))
-      .filter(|(_, ty_name, info)| {
-        // we provide a default implementation for a builtin widget if it not declared,
-        // but used by others except it's a listener. We can't give a default handler
-        // for it, its implementation should depend on who used it.
-        !is_listener(ty_name) || info.is_some()
-      })
-      .map(|(var_name, ty_name, info)| {
+    WIDGETS.iter().filter_map(|builtin| {
+      let (var_name, ty_name, info) = self.get_builtin_widget(host_id, ctx, builtin)?;
+      // we provide a default implementation for a builtin widget if it not declared,
+      // but used by others except it's a listener. We can't give a default handler
+      // for it, its implementation should depend on who used it.
+      if !is_listener(ty_name) || info.is_some() {
         let tokens = if let Some(info) = info {
           let ty = Ident::new(ty_name, info.span()).into();
           let gen = WidgetGen::new(&ty, &var_name, info.0.iter(), false);
@@ -88,8 +84,11 @@ impl BuiltinFieldWidgets {
           let gen = WidgetGen::new(&ty, &var_name, [].into_iter(), false);
           gen.gen_widget_tokens(ctx)
         };
-        (var_name, tokens)
-      })
+        Some((var_name, tokens))
+      } else {
+        None
+      }
+    })
   }
   pub fn collect_names(&self, host: &Ident, ctx: &mut DeclareCtx) {
     for builtin in WIDGETS.iter() {
@@ -144,14 +143,14 @@ impl BuiltinFieldWidgets {
   fn get_builtin_widget<'a>(
     &'a self,
     host_id: &'a Ident,
-    ctx: &'a DeclareCtx,
+    ctx: &DeclareCtx,
     builtin: &'a BuiltinWidget,
   ) -> Option<(Ident, &str, Option<&BuiltinWidgetInfo>)> {
     let ty_name = builtin.ty;
     let var_name = builtin_var_name(host_id, ty_name);
     if let Some(info) = self.widgets.get(ty_name) {
       Some((var_name, ty_name, Some(info)))
-    } else if ctx.is_used(&var_name) || ctx.animate_listener_triggers.contains(&var_name) {
+    } else if ctx.is_used(&var_name) {
       Some((var_name, ty_name, None))
     } else {
       None

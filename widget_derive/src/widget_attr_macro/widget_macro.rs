@@ -12,12 +12,12 @@ use syn::{
 };
 
 use super::{
-  animations::Animations,
+  animations::{Animate, Transition},
   child_variable,
-  declare_widget::{assign_uninit_field, try_parse_skip_nc},
+  declare_widget::try_parse_skip_nc,
   kw,
   on_change::{ChangeFlow, OnChangeDo},
-  on_event_do::OnEventDo,
+  on_event_do::{OnAnimate, OnAnimateSyntax, OnEventDo, OnTransitionSyntax},
   track::Track,
   DeclareCtx, DeclareWidget, Id, IdType, ObjectUsed, ScopeUsedInfo,
 };
@@ -38,13 +38,18 @@ pub struct TrackExpr {
 pub struct WidgetMacro {
   widget: DeclareWidget,
   track: Option<Track>,
-  animations: Option<Animations>,
-  on_items: Vec<OnItem>,
+  items: Vec<Item>,
 }
 
 pub enum OnItem {
   OnEvent(OnEventDo),
   OnChange(OnChangeDo),
+  OnAnimate(OnAnimate),
+}
+pub enum Item {
+  On(OnItem),
+  Transition(Transition),
+  Animate(Animate),
 }
 
 pub fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
@@ -53,7 +58,6 @@ impl Parse for WidgetMacro {
   fn parse(content: syn::parse::ParseStream) -> syn::Result<Self> {
     let mut widget: Option<DeclareWidget> = None;
     let mut items = vec![];
-    let mut animations: Option<Animations> = None;
     let mut track: Option<Track> = None;
     loop {
       if content.is_empty() {
@@ -61,10 +65,11 @@ impl Parse for WidgetMacro {
       }
       let lk = content.lookahead1();
       if lk.peek(Pound) || lk.peek(kw::on) {
-        items.push(content.parse()?);
-      } else if lk.peek(kw::animations) {
-        let a = content.parse()?;
-        assign_uninit_field!(animations, a, animations)?;
+        items.push(Item::On(content.parse()?));
+      } else if lk.peek(kw::Animate) {
+        items.push(Item::Animate(content.parse()?));
+      } else if lk.peek(kw::Transition) {
+        items.push(Item::Transition(content.parse()?));
       } else if lk.peek(kw::track) {
         let mut t = content.parse::<Track>()?;
         if let Some(ot) = track.take() {
@@ -92,49 +97,58 @@ impl Parse for WidgetMacro {
     let widget =
       widget.ok_or_else(|| syn::Error::new(content.span(), "must declare widget in `widget!`"))?;
 
-    Ok(Self {
-      widget,
-      on_items: items,
-      animations,
-      track,
-    })
+    Ok(Self { widget, items, track })
   }
 }
 
 impl Parse for TrackExpr {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    Ok(Self {
-      expr: input.parse()?,
-      used_name_info: <_>::default(),
-    })
-  }
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> { Ok(Self::new(input.parse()?)) }
 }
 
 impl Parse for OnItem {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     if input.peek(Pound) {
       let flow: ChangeFlow = input.parse()?;
+      // todo OnTransition & OnAnimate syntax with skip_nc
       Ok(OnItem::OnChange(flow.into_change_do()))
     } else if input.peek2(Ident) && input.peek3(Brace) {
       Ok(OnItem::OnEvent(input.parse::<OnEventDo>()?))
     } else {
       let on_token: kw::on = input.parse()?;
-      let expr: TrackExpr = input.parse()?;
+      let expr: Expr = input.parse()?;
       let lk = input.lookahead1();
       if lk.peek(kw::FlowArrow) {
         let flow = ChangeFlow {
           skip_nc: None,
           on_token,
-          from: expr,
+          from: TrackExpr::new(expr),
           flow_arrow: input.parse()?,
           to: input.parse()?,
         };
         Ok(OnItem::OnChange(flow.into_change_do()))
+      } else if lk.peek(kw::Transition) {
+        let on_animate = OnTransitionSyntax {
+          skip_nc: None,
+          on_token,
+          observe: expr,
+          transition: input.parse()?,
+        }
+        .into_on_animate();
+        Ok(OnItem::OnAnimate(on_animate))
+      } else if lk.peek(kw::Animate) {
+        let on_animate = OnAnimateSyntax {
+          skip_nc: None,
+          on_token,
+          observe: expr,
+          animate: input.parse()?,
+        }
+        .into_on_animate();
+        Ok(OnItem::OnAnimate(on_animate))
       } else if lk.peek(Brace) {
         let content;
         let change_do = OnChangeDo {
           on_token,
-          observe: expr,
+          observe: TrackExpr::new(expr),
           brace: braced!( content in input),
           skip_nc: try_parse_skip_nc(&content)?,
           change_token: content.parse()?,
@@ -155,8 +169,7 @@ impl WidgetMacro {
       stack.iter().map(|c| c.to_used_path(ctx)).collect()
     }
 
-    self.id_collect(ctx);
-    ctx.visit_widget_macro_mut(self);
+    self.collet_names(ctx);
 
     self.widget.traverses_widget().for_each(|w| {
       if let Some(name) = w.name() {
@@ -164,12 +177,14 @@ impl WidgetMacro {
       }
     });
 
-    self.on_items.iter().for_each(|item| item.error_check(ctx));
+    ctx.visit_widget_macro_mut(self);
+
+    self.error_check(ctx);
 
     let mut tokens = quote!();
     // named object define.
     if !ctx.named_objects.is_empty() {
-      let mut follows = self.analyze_object_dependencies();
+      let mut follows = self.analyze_observe_depends_without_on_items();
       // init circle check
       Self::circle_check(&follows, |stack| {
         ctx
@@ -177,14 +192,16 @@ impl WidgetMacro {
           .push(DeclareError::CircleInit(circle_stack_to_path(stack, ctx)));
       });
 
-      // change flow should not effect the named object init order, and we allow
-      // circle follow with skip_nc attribute. So we add the data flow
-      // relationship and individual check the circle follow error.
-      if !self.on_items.is_empty() {
-        self
-          .on_items
-          .iter()
-          .for_each(|item| item.analyze_observe_depends(&mut follows));
+      // `on` item should not effect the named object init order, and we allow circle
+      // follow with skip_nc attribute. So we add the `on` relationship and individual
+      // check the circle follow error.
+      if !self.items.is_empty() {
+        for item in self.items.iter() {
+          if let Item::On(item) = item {
+            item.analyze_observe_depends_only_on_do(&mut follows)
+          }
+        }
+
         // circle dependencies check
         Self::circle_check(&follows, |stack| {
           let weak_depends = stack
@@ -199,25 +216,26 @@ impl WidgetMacro {
         });
       }
 
-      let mut named_widgets_def = self.named_objects_def_tokens(ctx);
+      self.collect_named_defs(ctx);
 
       Self::deep_used_iter(&follows, |name| {
-        tokens.extend(named_widgets_def.remove(name));
+        tokens.extend(ctx.named_obj_defs.remove(name));
       });
 
-      named_widgets_def
-        .into_values()
-        .for_each(|def_tokens| tokens.extend(def_tokens));
+      ctx
+        .named_obj_defs
+        .drain()
+        .for_each(|(_, def_tokens)| tokens.extend(def_tokens));
     }
 
     self.all_anonyms_widgets_tokens(ctx, &mut tokens);
-    for item in self.on_items.iter() {
-      item.gen_tokens(&mut tokens, ctx)
+    for item in self.items.iter() {
+      // Animate & Transition item as a named object defined before.
+      if let Item::On(on) = item {
+        on.gen_tokens(&mut tokens, ctx)
+      }
     }
 
-    if let Some(a) = self.animations.as_mut() {
-      a.gen_tokens(ctx, &mut tokens);
-    }
     self.compose_tokens(ctx, &mut tokens);
 
     let ctx_name = ctx_ident(Span::call_site());
@@ -241,7 +259,7 @@ impl WidgetMacro {
       ctx
         .unused_id_warning()
         .chain(self.widget.warnings())
-        .chain(self.on_items.iter().filter_map(|i| i.warning()))
+        .chain(self.items.iter().filter_map(|i| i.warning()))
         .for_each(|w| w.emit_warning());
       tokens
     } else {
@@ -250,19 +268,26 @@ impl WidgetMacro {
     }
   }
 
-  pub fn id_collect(&self, ctx: &mut DeclareCtx) {
+  // todo: directly collect the declare objects.
+  pub fn collet_names(&self, ctx: &mut DeclareCtx) {
     for w in self.widget.traverses_widget() {
       if let Some(Id { name, .. }) = w.named.as_ref() {
         ctx.add_named_obj(name.clone(), IdType::DECLARE);
         w.builtin.collect_names(name, ctx);
       }
     }
-    for name in self.animations.iter().flat_map(|a| a.names()) {
-      ctx.add_named_obj(name.clone(), IdType::DECLARE);
+
+    for item in self.items.iter() {
+      item.id_collect(ctx);
     }
+
     for name in self.track.iter().flat_map(|t| t.track_names()) {
       ctx.add_named_obj(name.clone(), IdType::USER_SPECIFY);
     }
+  }
+
+  pub fn error_check(&self, ctx: &mut DeclareCtx) {
+    self.items.iter().for_each(|item| item.error_check(ctx));
   }
 
   /// return follow relationship of the named widgets,it is a key-value map,
@@ -272,46 +297,50 @@ impl WidgetMacro {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  fn analyze_object_dependencies(&self) -> BTreeMap<Ident, ObjectUsed> {
-    let mut follows = self.widget.analyze_object_dependencies();
+  pub fn analyze_observe_depends_without_on_items(&self) -> BTreeMap<Ident, ObjectUsed> {
+    let mut depends: BTreeMap<Ident, ObjectUsed> = BTreeMap::new();
+    self.widget.traverses_widget().for_each(|w| {
+      w.analyze_observe_depends(&mut depends);
+    });
+    self.items.iter().for_each(|item| match item {
+      Item::Transition(t) => t.analyze_observe_depends(&mut depends),
+      Item::Animate(a) => a.analyze_observe_depends(&mut depends),
+      Item::On(on_item) => {
+        if let OnItem::OnAnimate(on_animate) = on_item {
+          on_animate.animate.analyze_observe_depends(&mut depends);
+        }
+      }
+    });
 
-    if let Some(animations) = self.animations.as_ref() {
-      follows.extend(animations.dependencies());
-    }
-    follows
+    depends
   }
 
   // return the key-value map of the named widget define tokens.
-  fn named_objects_def_tokens(&self, ctx: &DeclareCtx) -> HashMap<Ident, TokenStream, RandomState> {
+  fn collect_named_defs(&self, ctx: &mut DeclareCtx) {
     self
       .widget
       .traverses_widget()
-      .filter_map(|w| {
-        w.name()
-          .map(|name| w.host_and_builtin_widgets_tokens(name, ctx))
-      })
-      .flatten()
-      .chain(
-        self
-          .animations
-          .as_ref()
-          .map(|a| a.named_objects_def_tokens_iter(ctx))
-          .into_iter()
-          .flatten(),
-      )
-      .collect()
+      .for_each(|w| w.collect_named_defs(ctx));
+    self.items.iter().for_each(|item| match item {
+      Item::On(on_item) => {
+        if let OnItem::OnAnimate(on_animate) = on_item {
+          on_animate.animate.collect_named_defs(ctx)
+        }
+      }
+      Item::Transition(t) => t.collect_named_defs(ctx),
+      Item::Animate(a) => a.collect_named_defs(ctx),
+    });
   }
 
-  pub fn all_anonyms_widgets_tokens(&self, ctx: &DeclareCtx, tokens: &mut TokenStream) {
+  pub fn all_anonyms_widgets_tokens(&self, ctx: &mut DeclareCtx, tokens: &mut TokenStream) {
     fn anonyms_widgets_tokens(
       name: &Ident,
       w: &DeclareWidget,
-      ctx: &DeclareCtx,
+      ctx: &mut DeclareCtx,
       tokens: &mut TokenStream,
     ) {
       if w.name().is_none() {
-        w.host_and_builtin_widgets_tokens(name, ctx)
-          .for_each(|(_, widget)| tokens.extend(widget));
+        w.gen_tokens(name, tokens, ctx);
       }
 
       w.children.iter().enumerate().for_each(|(idx, c)| {
@@ -434,22 +463,36 @@ impl WidgetMacro {
 impl DeclareCtx {
   pub fn visit_widget_macro_mut(&mut self, d: &mut WidgetMacro) {
     self.visit_declare_widget_mut(&mut d.widget);
-    d.on_items
+    d.items
       .iter_mut()
-      .for_each(|item| self.visit_on_item(item));
-
-    if let Some(animations) = d.animations.as_mut() {
-      self.visit_animations_mut(animations);
-    }
+      .for_each(|item| self.visit_widget_item_mut(item));
   }
 
   pub fn visit_track_expr(&mut self, expr: &mut TrackExpr) {
     self.visit_expr_mut(&mut expr.expr);
     expr.used_name_info = self.take_current_used_info();
   }
+
+  pub fn visit_widget_item_mut(&mut self, item: &mut Item) {
+    match item {
+      Item::On(on_item) => self.visit_on_item_mut(on_item),
+      Item::Transition(t) => self.visit_transition_mut(t),
+      Item::Animate(a) => self.visit_animate_mut(a),
+    }
+  }
+
+  pub fn visit_on_item_mut(&mut self, item: &mut OnItem) {
+    match item {
+      OnItem::OnEvent(e) => self.visit_on_event_do_mut(e),
+      OnItem::OnChange(c) => self.visit_on_change_do_mut(c),
+      OnItem::OnAnimate(on_animate) => self.visit_on_animate_mut(on_animate),
+    }
+  }
 }
 
 impl TrackExpr {
+  pub fn new(expr: Expr) -> Self { Self { expr, used_name_info: <_>::default() } }
+
   pub fn upstream_tokens(&self) -> Option<TokenStream> {
     self
       .used_name_info
@@ -484,6 +527,7 @@ impl OnItem {
     match self {
       OnItem::OnEvent(e) => e.warning(),
       OnItem::OnChange(c) => c.warning(),
+      OnItem::OnAnimate(on_a) => on_a.on_change_do.warning(),
     }
   }
 
@@ -497,22 +541,54 @@ impl OnItem {
     match self {
       OnItem::OnEvent(e) => e.gen_tokens(tokens, ctx),
       OnItem::OnChange(c) => c.to_tokens(tokens),
+      OnItem::OnAnimate(on_animate) => on_animate.gen_tokens(tokens, ctx),
     }
   }
 
-  fn analyze_observe_depends<'a>(&'a self, depends: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
+  fn analyze_observe_depends_only_on_do<'a>(
+    &'a self,
+    depends: &mut BTreeMap<Ident, ObjectUsed<'a>>,
+  ) {
     match self {
       OnItem::OnEvent(e) => e.analyze_observe_depends(depends),
       OnItem::OnChange(c) => c.analyze_observe_depends(depends),
+      OnItem::OnAnimate(a) => a.on_change_do.analyze_observe_depends(depends),
+    }
+  }
+
+  fn collect_name(&self, ctx: &mut DeclareCtx) {
+    if let OnItem::OnAnimate(on_animate) = self {
+      on_animate.animate.collect_name(ctx);
     }
   }
 }
 
-impl DeclareCtx {
-  pub fn visit_on_item(&mut self, item: &mut OnItem) {
-    match item {
-      OnItem::OnEvent(e) => self.visit_on_event_do(e),
-      OnItem::OnChange(c) => self.visit_on_change_do(c),
+impl Item {
+  fn warning(&self) -> Option<DeclareWarning> {
+    match self {
+      Item::On(o) => o.warning(),
+      Item::Transition(t) => t
+        .id
+        .is_none()
+        .then(|| DeclareWarning::DefObjWithoutId(t.span().unwrap())),
+      Item::Animate(a) => a
+        .id
+        .is_none()
+        .then(|| DeclareWarning::DefObjWithoutId(a.span().unwrap())),
+    }
+  }
+
+  fn error_check(&self, ctx: &mut DeclareCtx) {
+    if let Item::On(on_item) = self {
+      on_item.error_check(ctx)
+    }
+  }
+
+  fn id_collect(&self, ctx: &mut DeclareCtx) {
+    match self {
+      Item::On(on) => on.collect_name(ctx),
+      Item::Transition(t) => ctx.id_collect(&t.id),
+      Item::Animate(a) => a.collect_name(ctx),
     }
   }
 }

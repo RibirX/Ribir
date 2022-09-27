@@ -96,28 +96,6 @@ pub trait IntoStateful {
     Self: Sized;
 }
 
-/// A reference of stateful widget, can use it to directly access and modify
-/// stateful widget. Tracked the state change across if user mutable deref the
-/// `StateRef`.
-pub struct StateRef<'a, W>(InnerRef<'a, W>);
-
-/// A reference of stateful widget, tracked the state change across if user
-/// mutable deref the `SilentRef`. If mutable reference occur, state change
-/// notify will trigger, but not effect to framework, relayout or paint not be
-/// effected.
-///
-/// If you not very clear how `SilentRef` work, use [`StateRef`]! instead of.
-pub struct SilentRef<'a, W>(InnerRef<'a, W>);
-
-/// A reference of stateful widget, tracked the state change across if user
-/// mutable reference the `ShallowRef`. If mutable reference occur, state change
-/// notify with `ChangeScope::Framework`, that means this modify only effect
-/// framework but not effect to data. And usually use it
-/// to temporary to modify the state.
-///
-/// If you not very clear how `ShallowRef` work, use [`ShallowRef`]! instead of.
-pub struct ShallowRef<'a, W>(InnerRef<'a, W>);
-
 /// The stateful widget generic implementation.
 pub struct Stateful<W> {
   pub(crate) widget: Rc<RefCell<W>>,
@@ -129,7 +107,10 @@ pub struct Stateful<W> {
 #[derive(Default, Clone)]
 pub(crate) struct StateChangeNotifier(LocalSubject<'static, ChangeScope, ()>);
 
-/// `InnerRef` help implicit borrow inner widget mutable or not by deref or
+/// A reference of `Stateful which tracked the state change across if user
+/// mutable deref this reference.
+///
+/// `StateRef` also help implicit borrow inner widget mutable or not by deref or
 /// deref_mut. And early drop the inner borrow if need, so the borrow lifetime
 /// not bind to struct lifetime. Useful to avoid borrow conflict. For example
 ///
@@ -142,10 +123,11 @@ pub(crate) struct StateChangeNotifier(LocalSubject<'static, ChangeScope, ()>);
 /// But in logic, first borrow needn't live as long as the statement. See
 /// relative rust issue https://github.com/rust-lang/rust/issues/37612
 
-struct InnerRef<'a, W> {
+pub struct StateRef<'a, W> {
   widget: &'a Stateful<W>,
   current_ref: UnsafeCell<Option<RefMut<'a, W>>>,
-  mut_accessed: bool,
+  mut_accessed: Option<ChangeScope>,
+  current_scope: ChangeScope,
 }
 
 bitflags! {
@@ -183,19 +165,27 @@ impl<W> Stateful<W> {
     }
   }
 
-  /// Return a `StateRef` of the stateful widget.
+  /// Return a reference of `Stateful`, modify across this reference will notify
+  /// data and framework.
   #[inline]
-  pub fn state_ref(&self) -> StateRef<W> { StateRef(InnerRef::new(self)) }
+  pub fn state_ref(&self) -> StateRef<W> { StateRef::new(self, ChangeScope::BOTH) }
 
-  /// Return a `SilentMut` of the stateful widget. Which tell the framework,
-  /// modify from here will not effect ui.
+  /// Return a reference of `Stateful`, modify across this reference will notify
+  /// data only, the relayout or paint depends on this object will not be skip.
+  ///
+  /// If you not very clear how `silent_ref` work, use [`Stateful::state_ref`]!
+  /// instead of.
   #[inline]
-  pub fn silent_ref(&self) -> SilentRef<W> { SilentRef(InnerRef::new(self)) }
+  pub fn silent_ref(&self) -> StateRef<W> { StateRef::new(self, ChangeScope::DATA) }
 
-  /// Return a shallow reference to the stateful widget which directly modify
-  /// the widget and not notify state change.
+  /// Return a reference of `Stateful`, modify across this reference will notify
+  /// framework only. That means this modify only effect framework but not
+  /// effect on data. And usually use it to temporary to modify the `Stateful`.
+  ///
+  /// If you not very clear how `shallow_ref` work, use [`Stateful::state_ref`]!
+  /// instead of.
   #[inline]
-  pub fn shallow_ref(&self) -> ShallowRef<W> { ShallowRef(InnerRef::new(self)) }
+  pub fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ChangeScope::FRAMEWORK) }
 
   /// Directly mutable borrow the inner widget and control on it, nothing will
   /// be know by framework, use it only if you know how the four kind of ref
@@ -249,112 +239,64 @@ impl<T: Clone + std::cmp::PartialEq> StateChange<T> {
   pub fn not_same(&self) -> bool { self.before != self.after }
 }
 
-impl<'a, W> StateRef<'a, W> {
-  /// Fork a silent reference
-  pub fn silent(&mut self) -> SilentRef<'a, W> {
-    self.0.release_current_borrow();
-    SilentRef(InnerRef::new(self.0.widget))
-  }
-
-  #[inline]
-  pub fn shallow(&mut self) -> ShallowRef<'a, W> {
-    self.0.release_current_borrow();
-    ShallowRef(InnerRef::new(self.0.widget))
-  }
-
-  /// Clone the stateful widget of which the reference point to. Require mutable
-  /// reference because we try to early release inner borrow when clone occur.
-  #[inline]
-  pub fn clone_stateful(&mut self) -> Stateful<W> {
-    self.0.release_current_borrow();
-    self.0.widget.clone()
-  }
-
-  #[inline]
-  pub fn into_inner(self) -> W
-  where
-    W: Copy,
-  {
-    *self
-  }
-
-  #[inline]
-  pub fn release_current_borrow(&mut self) { self.0.release_current_borrow(); }
-}
-
-impl<'a, W> std::ops::Deref for SilentRef<'a, W> {
-  type Target = W;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { self.0.deref() }
-}
-
-impl<'a, W> std::ops::DerefMut for SilentRef<'a, W> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { self.0.deref_mut() }
-}
-
 impl<'a, W> std::ops::Deref for StateRef<'a, W> {
-  type Target = W;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { self.0.deref() }
-}
-
-impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { self.0.deref_mut() }
-}
-
-impl<'a, W> std::ops::Deref for ShallowRef<'a, W> {
-  type Target = W;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { self.0.deref() }
-}
-
-impl<'a, W> std::ops::DerefMut for ShallowRef<'a, W> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { self.0.deref_mut() }
-}
-
-impl<'a, W> std::ops::Deref for InnerRef<'a, W> {
   type Target = W;
 
   fn deref(&self) -> &Self::Target {
     // SAFETY: `RefCell` guarantees unique access, and `InnerRef` not thread safe no
     // data race occur to fill the option value at same time.
     let inner = unsafe { &mut *self.current_ref.get() };
-    if inner.is_none() {
-      *inner = Some(self.widget.widget.borrow_mut())
-    }
-    inner.as_ref().unwrap().deref()
+    inner.get_or_insert_with(|| self.widget.widget.borrow_mut())
   }
 }
 
-impl<'a, W> std::ops::DerefMut for InnerRef<'a, W> {
+impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     // SAFETY: `RefCell` guarantees unique access.
     let inner = unsafe { &mut *self.current_ref.get() };
     if inner.is_none() {
       *inner = Some(self.widget.widget.borrow_mut())
     }
-    self.mut_accessed = true;
-    inner.as_mut().unwrap().deref_mut()
+    if let Some(mut_access) = self.mut_accessed {
+      self.mut_accessed = Some(mut_access | self.current_scope)
+    } else {
+      self.mut_accessed = Some(self.current_scope)
+    }
+    inner.get_or_insert_with(|| self.widget.widget.borrow_mut())
   }
 }
 
-impl<'a, W> InnerRef<'a, W> {
-  fn new(widget: &'a Stateful<W>) -> Self {
-    Self {
-      widget,
-      current_ref: UnsafeCell::new(None),
-      mut_accessed: false,
-    }
+impl<'a, W> StateRef<'a, W> {
+  /// Fork a silent reference
+  pub fn silent(&mut self) -> StateRef<'a, W> {
+    self.release_current_borrow();
+    StateRef::new(self.widget, ChangeScope::DATA)
   }
 
   #[inline]
-  fn release_current_borrow(&mut self) { self.current_ref.get_mut().take(); }
+  pub fn shallow(&mut self) -> StateRef<'a, W> {
+    self.release_current_borrow();
+    StateRef::new(self.widget, ChangeScope::FRAMEWORK)
+  }
+
+  fn new(widget: &'a Stateful<W>, scope: ChangeScope) -> Self {
+    Self {
+      widget,
+      current_ref: UnsafeCell::new(None),
+      mut_accessed: None,
+      current_scope: scope,
+    }
+  }
+  #[inline]
+  pub fn release_current_borrow(&mut self) { self.current_ref.get_mut().take(); }
+
+  /// Clone the stateful widget of which the reference point to. Require mutable
+  /// reference because we try to early release inner borrow when clone occur.
+  #[inline]
+  pub fn clone_stateful(&mut self) -> Stateful<W> {
+    self.release_current_borrow();
+    self.widget.clone()
+  }
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
@@ -406,31 +348,9 @@ impl<W: ComposeMultiChild> ComposeMultiChild for Stateful<W> {
 
 impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) {
-    if self.0.mut_accessed {
-      self.0.release_current_borrow();
-      self.0.widget.raw_change_stream().next(ChangeScope::BOTH)
-    }
-  }
-}
-
-impl<'a, W> Drop for SilentRef<'a, W> {
-  fn drop(&mut self) {
-    if self.0.mut_accessed {
-      self.0.release_current_borrow();
-      self.0.widget.raw_change_stream().next(ChangeScope::DATA)
-    }
-  }
-}
-
-impl<'a, W> Drop for ShallowRef<'a, W> {
-  fn drop(&mut self) {
-    if self.0.mut_accessed {
-      self.0.release_current_borrow();
-      self
-        .0
-        .widget
-        .raw_change_stream()
-        .next(ChangeScope::FRAMEWORK)
+    if let Some(scope) = self.mut_accessed {
+      self.release_current_borrow();
+      self.widget.raw_change_stream().next(scope)
     }
   }
 }

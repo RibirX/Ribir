@@ -28,6 +28,7 @@ pub enum DeclareWarning<'a> {
   NeedlessSkipNc(Span),
   UnusedName(&'a Ident),
   ObserveIsConst(Span),
+  DefObjWithoutId(Span),
 }
 
 impl DeclareError {
@@ -43,7 +44,7 @@ impl DeclareError {
         assert_eq!(id1, id2);
         diagnostic.set_spans(vec![id1.span().unwrap(), id2.span().unwrap()]);
         diagnostic.set_message(format!(
-          "Same id(`{}`) assign to multiple widgets, id must be unique.",
+          "Same `id: {}` assign to multiple objects, id must be unique.",
           id1
         ));
       }
@@ -155,6 +156,11 @@ impl<'a> DeclareWarning<'a> {
         d.set_spans(*span);
         d.set_message("Observe a expr but not depends on anything, this will do nothing.");
         d = d.help("Try to remove it.");
+      }
+      DeclareWarning::DefObjWithoutId(span) => {
+        d.set_spans(*span);
+        d.set_message("Def an object without id.");
+        d = d.help("Try to assign an `id` for it.");
       }
     };
     d.emit();
