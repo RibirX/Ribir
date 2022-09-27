@@ -178,8 +178,7 @@ impl Compose for Caret {
           transition: Transition {
             duration: Duration::from_secs(1),
             easing: easing::steps(2, easing::StepsJump::JumpNone),
-            repeat: Repeat::Infinite,
-          },
+          }.repeat(Repeat::Infinite),
         }
       }
     }
