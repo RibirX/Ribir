@@ -11,8 +11,8 @@ pub struct Text {
   pub style: TextStyle,
 }
 
-impl Render for Text {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+impl Text {
+  pub fn text_layout(&self, t_store: &TypographyStore, bound: BoxClamp) -> VisualGlyphs {
     let TextStyle {
       font_size,
       letter_space,
@@ -21,11 +21,10 @@ impl Render for Text {
       ..
     } = self.style;
 
-    let width: Em = Pixel(clamp.max.width.into()).into();
-    let height: Em = Pixel(clamp.max.width.into()).into();
+    let width: Em = Pixel(bound.max.width.into()).into();
+    let height: Em = Pixel(bound.max.width.into()).into();
 
-    let app_ctx = ctx.app_context();
-    let visual_info = app_ctx.borrow().typography_store.typography(
+    t_store.typography(
       self.text.substr(..),
       font_size,
       font_face,
@@ -37,8 +36,18 @@ impl Render for Text {
         line_dir: PlaceLineDirection::TopToBottom,
         overflow: Overflow::Clip,
       },
-    );
-    visual_info.visual_rect().size.cast_unit()
+    )
+  }
+}
+
+impl Render for Text {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let app_ctx = ctx.app_context();
+    self
+      .text_layout(&app_ctx.borrow().typography_store, clamp)
+      .visual_rect()
+      .size
+      .cast_unit()
   }
 
   #[inline]

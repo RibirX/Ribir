@@ -249,10 +249,20 @@ impl Dispatcher {
 
   fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
     fn down_coordinate(id: WidgetId, pos: Point, tree: &WidgetTree) -> Option<(WidgetId, Point)> {
-      tree
-        .layout_box_rect(id)
-        .filter(|rect| rect.contains(pos))
-        .map(|_| (id, tree.map_from_parent(id, pos)))
+      let r = id.assert_get(tree);
+      let ctx = TreeCtx::new(id, tree);
+      let hit_test = r.hit_test(&ctx, pos);
+
+      if hit_test.hit {
+        Some((id, tree.map_from_parent(id, pos)))
+      } else if hit_test.can_hit_child {
+        let pos = tree.map_from_parent(id, pos);
+        id
+          .reverse_children(tree)
+          .find_map(|c| down_coordinate(c, pos, tree))
+      } else {
+        None
+      }
     }
 
     let mut current = down_coordinate(tree.root(), self.info.cursor_pos, tree);

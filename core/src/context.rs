@@ -20,6 +20,9 @@ use text::{font_db::FontDB, TextReorder, TypographyStore};
 pub use widget_context::*;
 pub(crate) mod build_context;
 pub use build_context::BuildCtx;
+mod tree_context;
+pub use tree_context::*;
+
 
 pub struct AppContext {
   pub font_db: Arc<RwLock<FontDB>>,

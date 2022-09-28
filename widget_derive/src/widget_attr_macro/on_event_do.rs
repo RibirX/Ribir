@@ -259,7 +259,7 @@ impl OnAnimateSyntax {
         env_variables: None,
         animate,
         on_change_do: parse_quote_spanned! { span =>
-          #on_token #observe { #skip_nc change: move |_| #animate_name.run() }
+          #on_token #observe.clone() { #skip_nc change: move |_| #animate_name.run() }
         },
       }
     } else {
@@ -272,7 +272,7 @@ impl OnAnimateSyntax {
       });
 
       let on_change_do = parse_quote_spanned! { span =>
-        on #observe { #skip_nc change: move |(before, _)| {
+        on #observe.clone() { #skip_nc change: move |(before, _)| {
           *#init_2.borrow_mut() = before.clone();
           #animate_name.run()
         }}

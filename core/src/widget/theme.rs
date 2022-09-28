@@ -58,6 +58,12 @@ pub struct TextTheme {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct TextSelectedBackground {
+  pub focus: Color,
+  pub blur: Color,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScrollBoxDecorationStyle {
   pub background: Brush,
   /// The corners of this box are rounded by this `BorderRadius`. The round
@@ -106,6 +112,8 @@ pub struct Theme {
   pub default_font_family: Box<[FontFamily]>,
   pub scrollbar: ScrollBarTheme,
   pub icon_theme: IconTheme,
+  pub text_selected_background: TextSelectedBackground,
+  pub caret_color: Color,
 }
 
 #[derive(Debug, Clone)]
@@ -121,6 +129,11 @@ pub struct IconSize {
   pub medium: Size,
   pub large: Size,
   pub huge: Size,
+}
+
+impl TextSelectedBackground {
+  #[inline]
+  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().text_selected_background }
 }
 
 impl TypographyTheme {

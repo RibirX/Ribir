@@ -53,21 +53,33 @@ impl WidgetTree {
 
     let mut paint_ctx = PaintingCtx::new(self.root(), self, painter);
     while let Some(id) = w {
-      paint_ctx.id = id;
-      let rect = paint_ctx
-        .box_rect()
-        .expect("when paint node, it's mut be already layout.");
-      paint_ctx
-        .painter
-        .save()
-        .translate(rect.min_x(), rect.min_y());
-      let rw = id.assert_get(self);
-      rw.paint(&mut paint_ctx);
+
+      let mut need_paint: bool = true;
+
+      id.assert_get(self).query_all_type(
+        |r: &Offstage| {
+          need_paint = !r.offstage;
+          false
+        },
+        QueryOrder::OutsideFirst,
+      );
+
+      if need_paint {
+        paint_ctx.id = id;
+        let rect = paint_ctx
+          .box_rect()
+          .expect("when paint node, it's mut be already layout.");
+        paint_ctx
+          .painter
+          .save()
+          .translate(rect.min_x(), rect.min_y());
+        let rw = id.assert_get(self);
+        rw.paint(&mut paint_ctx);
+      }
 
       w = id
-        // deep first.
         .first_child(self)
-        // goto sibling or back to parent sibling
+        .filter(|_| need_paint)
         .or_else(|| {
           let mut node = w;
           while let Some(p) = node {

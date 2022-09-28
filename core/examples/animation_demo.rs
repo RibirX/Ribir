@@ -28,7 +28,8 @@ fn main() {
       transition: Transition {
         duration: Duration::from_secs(5),
         easing: easing::EASE_IN_OUT,
-      },
+      }
+      // .delay(Duration::from_secs(1)),
     }
   };
 

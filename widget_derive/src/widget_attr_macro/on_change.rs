@@ -121,7 +121,7 @@ impl ToTokens for OnChangeDo {
       observe
         .used_name_info
         .value_expr_surround_refs(&mut expr_value, observe_span, |tokens| {
-          quote_spanned! { observe_span => #observe.clone() }.to_tokens(tokens);
+          observe.to_tokens(tokens);
         });
 
       let captures = observe

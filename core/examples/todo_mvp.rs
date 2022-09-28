@@ -50,7 +50,7 @@ impl Compose for TodoMVP {
                   id: mount_animate,
                   from: State { task.transform: Transform::translation(-400., 0. )},
                   transition: Transition {
-                    delay: (*mount_idx + 1) * Duration::from_millis(100) ,
+                    delay: (*mount_idx + 1) * Duration::from_millis(100),
                     duration: Duration::from_millis(150),
                     easing: easing::EASE_IN,
                   }
