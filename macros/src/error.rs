@@ -1,4 +1,4 @@
-use crate::widget_attr_macro::NameUsedInfo;
+use crate::widget_macro::NameUsedInfo;
 use proc_macro::{Diagnostic, Level, Span};
 use proc_macro2::TokenStream;
 

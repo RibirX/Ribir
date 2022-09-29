@@ -17,11 +17,7 @@ mod builtin_fields;
 pub use builtin_fields::*;
 pub use widget_gen::WidgetGen;
 
-use super::{
-  kw,
-  widget_macro::{is_expr_keyword, TrackExpr, EXPR_FIELD},
-  DeclareCtx, Id, ObjectUsed, UsedPart,
-};
+use super::{is_expr_keyword, kw, DeclareCtx, Id, ObjectUsed, TrackExpr, UsedPart, EXPR_FIELD};
 
 #[derive(Debug)]
 pub struct DeclareWidget {

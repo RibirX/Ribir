@@ -4,14 +4,14 @@ extern crate proc_macro2;
 
 mod declare_derive;
 mod error;
-mod widget_attr_macro;
+mod widget_macro;
 
 mod lerp_derive;
 mod util;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-use widget_attr_macro::{DeclareCtx, WidgetMacro};
+use widget_macro::{DeclareCtx, WidgetMacro};
 use widget_try_track_macro::TryTrack;
 mod widget_try_track_macro;
 

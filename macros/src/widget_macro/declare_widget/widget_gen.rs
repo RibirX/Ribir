@@ -1,6 +1,6 @@
 use crate::{
   declare_derive::declare_field_name,
-  widget_attr_macro::{ctx_ident, kw, on_change::OnChangeDo, DeclareCtx, IdType, ScopeUsedInfo},
+  widget_macro::{ctx_ident, kw, on_change::OnChangeDo, DeclareCtx, IdType, ScopeUsedInfo},
 };
 use proc_macro2::TokenStream;
 use quote::{quote_spanned, ToTokens};

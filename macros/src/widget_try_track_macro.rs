@@ -9,7 +9,7 @@ use syn::{
   token::{Brace, Comma, Paren},
 };
 
-use crate::widget_attr_macro::track::SimpleField;
+use crate::widget_macro::track::SimpleField;
 
 syn::custom_keyword!(try_track);
 pub struct TryTrack {

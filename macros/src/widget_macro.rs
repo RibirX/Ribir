@@ -1,33 +1,102 @@
+use crate::error::{CircleUsedPath, DeclareError, DeclareWarning};
 use ahash::RandomState;
+use proc_macro2::TokenStream as TokenStream2;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{
   braced,
-  parse::Parse,
+  parse::{Parse, ParseStream},
   spanned::Spanned,
-  token::{self, Brace, Pound},
+  token::{self, Brace, Comma, Pound},
   visit_mut::VisitMut,
   Expr, Ident, Path,
 };
 
-use super::{
-  animations::{Animate, Transition},
-  child_variable,
-  declare_widget::try_parse_skip_nc,
-  kw,
-  on_change::{ChangeFlow, OnChangeDo},
-  on_event_do::{OnAnimate, OnAnimateSyntax, OnEventDo, OnTransitionSyntax},
-  track::Track,
-  DeclareCtx, DeclareWidget, Id, IdType, ObjectUsed, ScopeUsedInfo,
-};
-use crate::{
-  error::{CircleUsedPath, DeclareError, DeclareWarning},
-  widget_attr_macro::{ctx_ident, ribir_variable, ObjectUsedPath, UsedType},
-};
+mod declare_ctx;
+pub use declare_ctx::*;
+mod name_used_info;
+pub use name_used_info::*;
+mod variable_names;
+pub use variable_names::*;
+pub mod animations;
+mod declare_widget;
+pub use declare_widget::{DeclareField, DeclareWidget};
+mod on_change;
+mod on_event_do;
+pub use declare_widget::RESERVE_IDENT;
+pub mod track;
+
+use animations::{Animate, Transition};
+use track::Track;
+
+use declare_widget::try_parse_skip_nc;
+use on_change::{ChangeFlow, OnChangeDo};
+use on_event_do::{OnAnimate, OnAnimateSyntax, OnEventDo, OnTransitionSyntax};
 
 pub const EXPR_WIDGET: &str = "ExprWidget";
 pub const EXPR_FIELD: &str = "expr";
+
+pub mod kw {
+  syn::custom_keyword!(widget);
+  syn::custom_keyword!(track);
+  syn::custom_keyword!(ExprWidget);
+  syn::custom_keyword!(id);
+  syn::custom_keyword!(skip_nc);
+  syn::custom_keyword!(Animate);
+  syn::custom_keyword!(State);
+  syn::custom_keyword!(Transition);
+  syn::custom_punctuation!(FlowArrow, ~>);
+  syn::custom_keyword!(on);
+  syn::custom_keyword!(transition);
+  syn::custom_keyword!(change);
+}
+pub const CHANGE: &str = "change";
+
+#[derive(Debug)]
+pub struct Id {
+  pub id_token: kw::id,
+  pub colon_token: token::Colon,
+  pub name: Ident,
+  pub tail_comma: Option<token::Comma>,
+}
+
+impl Parse for Id {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    Ok(Self {
+      id_token: input.parse()?,
+      colon_token: input.parse()?,
+      name: input.parse()?,
+      tail_comma: input.parse()?,
+    })
+  }
+}
+
+impl ToTokens for Id {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    self.id_token.to_tokens(tokens);
+    self.colon_token.to_tokens(tokens);
+    self.name.to_tokens(tokens);
+  }
+}
+
+impl Id {
+  pub fn from_field_pair(p: syn::punctuated::Pair<DeclareField, Comma>) -> syn::Result<Id> {
+    let field = p.value();
+    if field.skip_nc.is_some() {
+      return Err(syn::Error::new(
+        field.skip_nc.span(),
+        "Attribute `#[skip_nc]` is not supported in `id`",
+      ));
+    }
+
+    Ok(syn::parse_quote! {#p})
+  }
+}
+
+fn capture_widget(widget: &Ident) -> TokenStream2 {
+  quote_spanned!(widget.span() => let #widget = #widget.clone_stateful();)
+}
 
 #[derive(Debug, Clone)]
 pub struct TrackExpr {

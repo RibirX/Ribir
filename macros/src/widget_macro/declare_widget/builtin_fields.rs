@@ -6,7 +6,7 @@ use quote::quote_spanned;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, HashMap};
 
-use crate::widget_attr_macro::{ribir_suffix_variable, DeclareCtx, IdType, ObjectUsed};
+use crate::widget_macro::{ribir_suffix_variable, DeclareCtx, IdType, ObjectUsed};
 
 use super::{widget_gen::WidgetGen, DeclareField};
 
