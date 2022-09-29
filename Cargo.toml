@@ -3,8 +3,8 @@ members = [
   "core",
   "gpu",
   "painter",
-  "widget_derive",
-  "widget_derive/builtin",
+  "macros",
+  "macros/builtin",
   "algo",
   "text",
 ]

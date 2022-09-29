@@ -1,4 +1,4 @@
-use widget_derive::include_svg;
+use ribir_macros::include_svg;
 
 #[test]
 fn ui() {
