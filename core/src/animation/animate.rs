@@ -35,7 +35,7 @@ pub struct AnimateInfo<S> {
   _tick_msg_guard: Option<SubscriptionGuard<MutRc<SingleSubscription>>>,
 }
 
-impl<T, I, F, W, R, L> Stateful<Animate<T, I, F, W, R, L>>
+impl<'a, T, I, F, W, R, L> StateRef<'a, Animate<T, I, F, W, R, L>>
 where
   I: Fn() -> R,
   F: Fn() -> R,
@@ -43,23 +43,19 @@ where
   T: Roc,
   R: Clone,
   L: FnMut(&R, &R, f32) -> R,
-  Self: 'static,
+  Animate<T, I, F, W, R, L>: 'static,
 {
-  pub fn run(&self) {
+  pub fn run(&mut self) {
+    let new_to = self.state.finial_value();
+    let Animate { lerp_fn, running_info, .. } = &mut **self;
     // if animate is running, animate start from current value.
-    let mut inner = self.raw_ref();
-
-    let new_to = inner.state.finial_value();
-    let Animate { lerp_fn, running_info, .. } = &mut *inner;
     if let Some(info) = running_info {
       let AnimateInfo { from, to, last_progress, .. } = info;
       *from = (lerp_fn)(from, to, last_progress.value());
       *to = new_to;
     } else {
-      drop(inner);
-      let animate = self.clone();
-      let mut inner = self.silent_ref();
-      let ticker = inner.frame_ticker.frame_tick_stream();
+      let animate = self.clone_stateful();
+      let ticker = self.frame_ticker.frame_tick_stream();
       let guard = ticker
         .subscribe(move |msg| match msg {
           FrameMsg::NewFrame(_) => {}
@@ -74,8 +70,8 @@ where
           FrameMsg::Finish(_) => animate.silent_ref().frame_finished(),
         })
         .unsubscribe_when_dropped();
-      let from = inner.state.init_value();
-      inner.running_info = Some(AnimateInfo {
+      let from = self.state.init_value();
+      self.running_info = Some(AnimateInfo {
         from,
         to: new_to,
         start_at: Instant::now(),
@@ -116,10 +112,16 @@ where
     let elapsed = now - *start_at;
     let progress = self.transition.rate_of_change(elapsed);
 
-    // the state may change during animate.
-    *to = self.state.finial_value();
-    let animate_state = (self.lerp_fn)(from, to, progress.value());
-    self.state.update(animate_state);
+    match progress {
+      AnimateProgress::Between(rate) => {
+        // the state may change during animate.
+        *to = self.state.finial_value();
+        let animate_state = (self.lerp_fn)(from, to, rate);
+        self.state.update(animate_state);
+      }
+      AnimateProgress::Dismissed => self.state.update(from.clone()),
+      AnimateProgress::Finish => {}
+    }
 
     *last_progress = progress;
     *already_lerp = true;

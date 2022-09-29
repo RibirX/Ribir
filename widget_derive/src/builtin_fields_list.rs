@@ -1,67 +1,67 @@
 builtin! {
   PerformedLayoutListener {
     #[doc="action perform after widget performed layout."]
-    on_performed_layout: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+    performed_layout: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
   }
 
   MountedListener {
     #[doc="action perform after widget be added to the widget tree."]
-    on_mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+    mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
   }
 
   DisposedListener {
     #[doc="action perform after widget remove from widget tree."]
-    on_disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+    disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
   }
 
   PointerDownListener {
     #[doc="specify the event handler for the pointer down event."]
-    on_pointer_down: impl FnMut(&mut PointerEvent),
+    pointer_down: impl FnMut(&mut PointerEvent),
   }
 
   PointerUpListener {
     #[doc="specify the event handler for the pointer up event."]
-    on_pointer_up: impl FnMut(&mut PointerEvent),
+    pointer_up: impl FnMut(&mut PointerEvent),
   }
 
   PointerMoveListener {
     #[doc="specify the event handler for the pointer move event."]
-    on_pointer_move: impl FnMut(&mut PointerEvent),
+    pointer_move: impl FnMut(&mut PointerEvent),
   }
 
   TapListener {
     #[doc="specify the event handler for the pointer tap event."]
-    on_tap: impl FnMut(&mut PointerEvent),
+    tap: impl FnMut(&mut PointerEvent),
   }
 
   DoubleTapListener {
     #[doc="specify the event handler for the pointer double tap event."]
-    on_double_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+    double_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
   }
 
   TripleTapListener {
     #[doc="specify the event handler for the pointer triple tap event."]
-    on_tripe_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+    tripe_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
   }
 
   XTimesTapListener {
     #[doc="specify the event handler for the pointer `x` times tap event."]
-    on_x_times_tap: (u8, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>),
+    x_times_tap: (u8, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>),
   }
 
   PointerCancelListener {
     #[doc="specify the event handler to process pointer cancel event."]
-    on_pointer_cancel: impl FnMut(&mut PointerEvent),
+    pointer_cancel: impl FnMut(&mut PointerEvent),
   }
 
   PointerEnterListener {
     #[doc="specify the event handler when pointer enter this widget."]
-    on_pointer_enter: impl FnMut(&mut PointerEvent),
+    pointer_enter: impl FnMut(&mut PointerEvent),
   }
 
   PointerLeaveListener {
     #[doc="specify the event handler when pointer leave this widget."]
-    on_pointer_leave: impl FnMut(&mut PointerEvent),
+    pointer_leave: impl FnMut(&mut PointerEvent),
   }
 
   FocusListener {
@@ -71,33 +71,33 @@ builtin! {
           sequential keyboard navigation (usually with the Tab key, hence the name."]
     tab_index: i16,
     #[doc="specify the event handler to process focus event."]
-    on_focus: impl FnMut(&mut FocusEvent),
+    focus: impl FnMut(&mut FocusEvent),
     #[doc="specify the event handler to process blur event."]
-    on_blur: impl FnMut(&mut FocusEvent),
+    blur: impl FnMut(&mut FocusEvent),
     #[doc="specify the event handler to process focusin event."]
-    on_focus_in: impl FnMut(&mut FocusEvent),
+    focus_in: impl FnMut(&mut FocusEvent),
     #[doc="specify the event handler to process focusout event."]
-    on_focus_out: impl FnMut(&mut FocusEvent),
+    focus_out: impl FnMut(&mut FocusEvent),
   }
 
   KeyDownListener {
     #[doc="specify the event handler when keyboard press down."]
-    on_key_down: impl FnMut(&mut KeyboardEvent),
+    key_down: impl FnMut(&mut KeyboardEvent),
   }
 
   KeyUpListener {
     #[doc="specify the event handler when a key is released."]
-    on_key_up: impl FnMut(&mut KeyboardEvent),
+    key_up: impl FnMut(&mut KeyboardEvent),
   }
 
   CharListener {
     #[doc="specify the event handler when received a unicode character."]
-    on_char: impl FnMut(&mut CharEvent)
+    char: impl FnMut(&mut CharEvent)
   }
 
   WheelListener {
     #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
-    on_wheel: impl FnMut(&mut WheelEvent),
+    wheel: impl FnMut(&mut WheelEvent),
   }
 
   Cursor {
@@ -169,7 +169,7 @@ builtin! {
     #[doc= "enumerate to describe which direction allow widget to scroll."]
     scrollable: Scrollable
   }
-  
+
   TransformWidget {
     #[doc="A widget that applies a transformation its child. Doesn't change size, only apply painting"]
     transform: Transform

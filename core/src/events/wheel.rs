@@ -18,7 +18,7 @@ pub struct WheelEvent {
 #[derive(Declare)]
 pub struct WheelListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut WheelEvent)))]
-  on_wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
+  wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
 }
 
 impl ComposeSingleChild for WheelListener {
@@ -54,7 +54,7 @@ impl std::ops::DerefMut for WheelEvent {
 impl EventListener for WheelListener {
   type Event = WheelEvent;
   #[inline]
-  fn dispatch(&self, event: &mut WheelEvent) { (self.on_wheel.borrow_mut())(event) }
+  fn dispatch(&self, event: &mut WheelEvent) { (self.wheel.borrow_mut())(event) }
 }
 
 #[cfg(test)]
@@ -72,7 +72,7 @@ mod tests {
       SizedBox {
         size: Size::new(100., 100.),
         auto_focus: true,
-        on_wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
+        wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
       }
     };
 

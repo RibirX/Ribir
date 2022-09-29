@@ -32,7 +32,7 @@ impl ComposeSingleChild for ScrollableWidget {
       track { this: this.into_stateful() }
       LayoutBox {
         id: view,
-        on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+        wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
         UnconstrainedBox { LayoutBox {
           id: content,
           left_anchor: this.pos.x,
@@ -40,29 +40,26 @@ impl ComposeSingleChild for ScrollableWidget {
           ExprWidget { expr: child }
         }}
       }
-      dataflows {
-        #[skip_nc]
-        content.box_rect().size ~> this.content_size,
-        #[skip_nc]
-        view.box_rect().size ~> this.page
+
+      #[skip_nc]
+      on content.box_rect().size ~> this.content_size
+      #[skip_nc]
+      on view.box_rect().size ~> this.page
+      on content.left_anchor Animate {
+        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(content.width());
+          let to = to.abs_value(content.width());
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
       }
-      animations {
-        content.left_anchor: Animate {
-          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
-          lerp_fn: move |from, to, rate| {
-            let from = from.abs_value(content.width());
-            let to = to.abs_value(content.width());
-            PositionUnit::Pixel(from.lerp(&to, rate))
-          }
-        },
-        content.top_anchor: Animate {
-          transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
-          lerp_fn: move |from, to, rate| {
-            let from = from.abs_value(content.height());
-            let to = to.abs_value(content.height());
-            PositionUnit::Pixel(from.lerp(&to, rate))
-          }
-        },
+      on content.top_anchor Animate {
+        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(content.height());
+          let to = to.abs_value(content.height());
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
       }
     }
   }
@@ -102,7 +99,6 @@ mod tests {
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
-  // todo: need disable animate to test.
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let global_pos = Stateful::new(Point::zero());
     let w = widget! {
@@ -110,7 +106,7 @@ mod tests {
       SizedBox {
         size: Size::new(1000., 1000.),
         scrollable,
-        on_performed_layout: move|ctx| *global_pos = ctx.map_to_global(Point::zero())
+        performed_layout: move|ctx| *global_pos = ctx.map_to_global(Point::zero())
       }
     };
 
@@ -125,7 +121,8 @@ mod tests {
       phase: TouchPhase::Started,
       modifiers: ModifiersState::default(),
     });
-    wnd.draw_frame();
+
+    wnd.layout_ready();
 
     assert_eq!(global_pos.raw_ref().x, expect_x);
     assert_eq!(global_pos.raw_ref().y, expect_y);

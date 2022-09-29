@@ -167,18 +167,17 @@ impl Compose for Caret {
         visible: true,
         rect: this.rect,
         color: this.color,
-        on_mounted: move |_| animate1.clone_stateful().run(),
+        mounted: move |_| animate1.run(),
       }
-      animations {
-        caret.visible: Animate {
-          id: animate1,
-          from: State {
-            caret.visible: !caret.visible,
-          },
-          transition: Transition {
-            duration: Duration::from_secs(1),
-            easing: easing::steps(2, easing::StepsJump::JumpNone),
-          }.repeat(Repeat::Infinite),
+      on caret.visible Animate {
+        id: animate1,
+        from: State {
+          caret.visible: !caret.visible,
+        },
+        transition: Transition {
+          duration: Duration::from_secs(1),
+          easing: easing::steps(2, easing::StepsJump::JumpNone),
+          repeat: f32::INFINITY
         }
       }
     }
@@ -189,7 +188,6 @@ impl Compose for Caret {
 // support
 #[derive(Declare)]
 struct CaretRender {
-  visible: bool,
   rect: Rect,
   color: Color,
 }
@@ -202,9 +200,6 @@ impl Render for CaretRender {
   fn perform_layout(&self, _: BoxClamp, _ctx: &mut LayoutCtx) -> Size { Size::zero() }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    if !self.visible {
-      return;
-    }
     let painter = ctx.painter();
     painter.rect(&self.rect);
     painter.set_brush(Brush::Color(self.color));
@@ -216,8 +211,8 @@ impl Render for CaretRender {
 
 #[derive(Declare)]
 struct SelectedTextBackground {
-  focus: bool,
-  
+  is_focusing: bool,
+
   #[declare(default = TextSelectedBackground::of(ctx).focus.clone())]
   focus_color: Color,
   #[declare(default = TextSelectedBackground::of(ctx).blur.clone())]
@@ -233,7 +228,7 @@ impl Render for SelectedTextBackground {
   fn perform_layout(&self, _: BoxClamp, _ctx: &mut LayoutCtx) -> Size { Size::zero() }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let color = match self.focus {
+    let color = match self.is_focusing {
       true => self.focus_color,
       false => self.blur_color,
     };
@@ -253,14 +248,18 @@ impl Compose for Input {
   fn compose(this: StateWidget<Self>) -> Widget {
     let placeholder = "\r";
     widget! {
-      track { this: this.into_stateful(), helper: GlyphHelper::default().into_stateful(), focus: false.into_stateful()  }
+      track {
+        this: this.into_stateful(),
+        helper: GlyphHelper::default().into_stateful(),
+        focus: false.into_stateful()
+      }
       Stack {
-        on_char: move |c| this.edit_handle(c.char),
-        on_key_down: move |key| this.key_handle(key),
-        on_focus: move |_| *focus = true,
-        on_blur: move |_| *focus = false,
+        char: move |c| this.edit_handle(c.char),
+        key_down: move |key| this.key_handle(key),
+        focus: move |_| *focus = true,
+        blur: move |_| *focus = false,
 
-        on_pointer_move: move |e| {
+        pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
             if e.point_type == PointerType::Mouse
                && e.mouse_buttons() == MouseButtons::PRIMARY {
@@ -269,11 +268,11 @@ impl Compose for Input {
             }
           }
         },
-        on_pointer_down: move |e| {
+        pointer_down: move |e| {
           let cluster = helper.cluster_from_pos(e.position().x, e.position().y);
           this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
         },
-        on_pointer_up: move |_e| {
+        pointer_up: move |_e| {
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
                 CaretState::Caret(begin as usize)              }
@@ -287,14 +286,14 @@ impl Compose for Input {
           size: INFINITY_SIZE,
         }
         SelectedTextBackground {
-          focus: *focus,
+          is_focusing: *focus,
           rects: helper.select_rects(this.caret.select_range()),
         }
         Text {
           id: text,
           text: this.text.clone() + placeholder,
           style: this.style.clone(),
-          on_performed_layout: move |ctx| {
+          performed_layout: move |ctx| {
             let app_ctx = ctx.widget_tree().app_ctx().borrow();
             helper.glyphs = Some(text.text_layout(&app_ctx.typography_store, BoxClamp::default()));
           },
@@ -306,7 +305,7 @@ impl Compose for Input {
               color: ctx.theme().caret_color,
             }
           })
-        }  
+        }
       }
 
     }

@@ -1,14 +1,11 @@
 use crate::prelude::*;
-use ahash::RandomState;
 use indextree::*;
-use smallvec::SmallVec;
 use std::{
   cell::RefCell,
   collections::{HashMap, HashSet},
   rc::Rc,
 };
 
-mod generator_store;
 mod layout_info;
 pub use layout_info::*;
 
@@ -24,7 +21,7 @@ pub(crate) struct WidgetTree {
   /// Store the render object's place relative to parent coordinate and the
   /// clamp passed from parent.
   layout_store: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
-  pub(crate) generator_store: generator_store::GeneratorStore,
+  pub(crate) needs_regen: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
 }
 
 impl WidgetTree {
@@ -43,7 +40,7 @@ impl WidgetTree {
       state_changed: <_>::default(),
       ctx,
       layout_store: <_>::default(),
-      generator_store: <_>::default(),
+      needs_regen: <_>::default(),
     };
 
     tree.set_root(root_widget);
@@ -101,17 +98,40 @@ impl WidgetTree {
     }
   }
 
+  // perform repair the tree and layout it until everything ready, and return if
+  // modify the tree struct.
+  pub(crate) fn tree_ready(&mut self, win_size: Size) -> bool {
+    let mut struct_modify = false;
+    while self.is_dirty() {
+      struct_modify |= self.any_struct_dirty();
+      self.tree_repair();
+      self.layout(win_size);
+    }
+    struct_modify
+  }
+
   /// Repair the gaps between widget tree represent and current data state after
   /// some user or device inputs has been processed.
   pub(crate) fn tree_repair(&mut self) {
-    while let Some(mut needs_regen) = self.take_needs_regen_generator() {
-      needs_regen
-        .sort_by_cached_key(|g| g.info.parent().map_or(0, |wid| wid.ancestors(self).count()));
-      needs_regen.iter_mut().for_each(|g| g.refresh(self));
+    loop {
+      if self.needs_regen.borrow().is_empty() {
+        break;
+      }
 
-      needs_regen
-        .into_iter()
-        .for_each(|g| self.generator_store.add_generator(g));
+      let mut needs_regen = self
+        .needs_regen
+        .borrow_mut()
+        .drain()
+        .filter(|g| !g.0.is_removed(&mut self.arena))
+        .collect::<Vec<_>>();
+
+      needs_regen.sort_by_cached_key(|g| g.ancestors(self).count());
+      for g in needs_regen.into_iter() {
+        // child expr widget may removed by parent ancestor expr widget refresh.
+        if !g.is_dropped(self) {
+          self.refresh_generator(g);
+        }
+      }
     }
   }
 
@@ -135,7 +155,7 @@ impl WidgetTree {
       let (tree1, tree2) = unsafe { self.split_tree() };
       id.assert_get(tree1).query_all_type(
         |l: &PerformedLayoutListener| {
-          (l.on_performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
+          (l.performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
           true
         },
         QueryOrder::OutsideFirst,
@@ -157,118 +177,17 @@ impl WidgetTree {
     self.root = Some(id);
   }
 
-  pub(crate) fn swap_node_data(&mut self, a: WidgetId, b: WidgetId) {
-    let a_node = std::mem::replace(a.assert_get_mut(self), Box::new(Void));
-    let b_node = std::mem::replace(b.assert_get_mut(self), a_node);
-    let _ = std::mem::replace(a.assert_get_mut(self), b_node);
-  }
-
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.state_changed.borrow_mut().insert(id); }
 
-  pub(crate) fn is_dirty(&self) -> bool {
-    self.any_state_modified() || self.generator_store.is_dirty()
-  }
+  pub(crate) fn is_dirty(&self) -> bool { self.any_state_modified() || self.any_struct_dirty() }
 
   pub(crate) fn any_state_modified(&self) -> bool { !self.state_changed.borrow().is_empty() }
 
-  pub(crate) fn any_struct_dirty(&self) -> bool { self.generator_store.is_dirty() }
+  pub(crate) fn any_struct_dirty(&self) -> bool { !self.needs_regen.borrow().is_empty() }
 
   pub(crate) fn count(&self) -> usize { self.root().descendants(&self).count() }
 
   pub(crate) fn app_ctx(&self) -> &Rc<RefCell<AppContext>> { &self.ctx }
-
-  /// #panic
-  /// dst should not be empty.
-  pub(crate) fn replace_children(
-    &mut self,
-    dst: &[WidgetId],
-    widgets: Vec<Widget>,
-  ) -> SmallVec<[WidgetId; 1]> {
-    fn collect_same_key_pairs(
-      old_widgets: impl Iterator<Item = WidgetId>,
-      new_widgets: impl Iterator<Item = WidgetId>,
-      tree: &WidgetTree,
-      same_key_pairs: &mut Vec<(WidgetId, WidgetId)>,
-    ) {
-      let new_keys = new_widgets
-        .filter_map(|n| n.key(tree).map(|k| (k, n)))
-        .collect::<HashMap<_, _, RandomState>>();
-
-      for o in old_widgets {
-        if let Some(n) = o.key(tree).and_then(|k| new_keys.get(&k)) {
-          same_key_pairs.push((o, *n));
-          collect_same_key_pairs(o.children(tree), n.children(tree), tree, same_key_pairs);
-        }
-      }
-    }
-
-    let mut sign = *dst.last().expect("replace target at least have one widget");
-    let parent = sign.parent(self);
-    let mut new_widgets = widgets
-      .into_iter()
-      .flat_map(|w| w.into_subtree(parent, self))
-      .collect::<SmallVec<[WidgetId; 1]>>();
-
-    if new_widgets.is_empty() {
-      // gen root at least have a void widget as road sign.
-      new_widgets.push(self.empty_node());
-    }
-
-    for w in new_widgets.iter().cloned() {
-      sign.insert_after(w, self);
-      sign = w;
-    }
-
-    let mut same_key_pairs = vec![];
-    collect_same_key_pairs(
-      dst.iter().cloned(),
-      new_widgets.iter().cloned(),
-      self,
-      &mut same_key_pairs,
-    );
-
-    if same_key_pairs.is_empty() {
-      dst.iter().for_each(|o| o.remove_subtree(self));
-      new_widgets
-        .iter()
-        .for_each(|n| n.on_mounted_subtree(self, true));
-    } else {
-      let mut swapped = HashMap::<_, _, RandomState>::default();
-      for &(o, n) in same_key_pairs.iter() {
-        n.swap(o, self);
-        self.swap_node_data(n, o);
-        swapped.insert(o, n);
-        swapped.insert(n, o);
-      }
-
-      let (tree1, tree2) = unsafe { self.split_tree() };
-      dst.iter().for_each(|o| {
-        let old = swapped.get(o).unwrap_or(o);
-        old.descendants(tree1).for_each(|o| {
-          if !swapped.contains_key(&o) {
-            o.on_disposed(tree2);
-          }
-        });
-        old.0.remove_subtree(&mut tree1.arena);
-      });
-
-      new_widgets
-        .iter_mut()
-        .flat_map(|n| {
-          if let Some(s) = swapped.get(n) {
-            *n = *s;
-          }
-          n.descendants(tree1)
-        })
-        .for_each(|n| n.on_mounted(tree2, !swapped.contains_key(&n)));
-    }
-
-    if self.root.is_none() {
-      assert_eq!(new_widgets.len(), 1, "must have one widget as root");
-      self.set_root_id(new_widgets[0]);
-    }
-    new_widgets
-  }
 
   pub(crate) unsafe fn split_tree(&mut self) -> (&mut WidgetTree, &mut WidgetTree) {
     let ptr = self as *mut WidgetTree;
@@ -380,6 +299,20 @@ impl WidgetId {
     self.0.descendants(&tree.arena).map(WidgetId)
   }
 
+  pub(crate) fn replace_data(
+    self,
+    other: Box<dyn Render>,
+    tree: &mut WidgetTree,
+  ) -> Box<dyn Render> {
+    std::mem::replace(self.assert_get_mut(tree), other)
+  }
+
+  pub(crate) fn swap_data(self, other: WidgetId, tree: &mut WidgetTree) {
+    // Safety: mut borrow two node not intersect.
+    let (tree1, tree2) = unsafe { tree.split_tree() };
+    std::mem::swap(self.assert_get_mut(tree1), other.assert_get_mut(tree2));
+  }
+
   pub(crate) fn swap(self, other: WidgetId, tree: &mut WidgetTree) {
     let first_child = self.first_child(tree);
     let mut cursor = first_child;
@@ -419,6 +352,10 @@ impl WidgetId {
     self.0.insert_after(next.0, &mut tree.arena);
   }
 
+  pub(crate) fn insert_before(self, before: WidgetId, tree: &mut WidgetTree) {
+    self.0.insert_before(before.0, &mut tree.arena);
+  }
+
   pub(crate) fn prepend(self, child: WidgetId, tree: &mut WidgetTree) {
     self.0.prepend(child.0, &mut tree.arena);
   }
@@ -455,7 +392,7 @@ impl WidgetId {
       let (tree1, tree2) = unsafe { tree.split_tree() };
       self.assert_get(tree1).query_all_type(
         |m: &MountedListener| {
-          (m.on_mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
+          (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
           true
         },
         QueryOrder::OutsideFirst,
@@ -469,7 +406,7 @@ impl WidgetId {
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self.assert_get(tree1).query_all_type(
       |d: &DisposedListener| {
-        (d.on_disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
+        (d.disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
         true
       },
       QueryOrder::OutsideFirst,
@@ -496,14 +433,6 @@ impl WidgetId {
 
   pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
-  }
-
-  pub(crate) fn key(self, tree: &WidgetTree) -> Option<Key> {
-    let mut key = None;
-    self
-      .assert_get(tree)
-      .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| key = Some(k.clone()));
-    key
   }
 }
 
@@ -551,11 +480,8 @@ impl Widget {
         }
         WidgetNode::Render(r) => (Some(tree.new_node(r)), children),
         WidgetNode::Dynamic(e) => {
-          let road_sign = tree.empty_node();
-          tree
-            .generator_store
-            .new_generator(e, parent, road_sign, !children.is_none());
-          (Some(road_sign), children)
+          let w = Generator::new_generator(e, !children.is_none(), tree);
+          (Some(w), children)
         }
       }
     } else {
@@ -585,6 +511,63 @@ mod tests {
   }
 
   #[test]
+  fn fix_dropped_child_expr_widget() {
+    let parent = Stateful::new(true);
+    let child = Stateful::new(true);
+    let w = widget! {
+      track { parent: parent.clone(), child: child.clone() }
+      ExprWidget {
+        expr: parent.then(|| {
+          widget!{
+            SizedBox {
+              size: Size::zero(),
+              ExprWidget { expr: child.then(|| Void )}
+            }
+          }
+        })
+      }
+    };
+
+    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    wnd.draw_frame();
+
+    {
+      *child.state_ref() = false;
+      *parent.state_ref() = false;
+    }
+
+    // fix crash here.
+    wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_child_expr_widget_same_root_as_parent() {
+    let trigger = Stateful::new(true);
+    let w = widget! {
+      track { trigger: trigger.clone() }
+      ExprWidget {
+        expr: trigger.then(|| {
+          widget!{ ExprWidget { expr: trigger.then(|| Void )}}
+        })
+      }
+    };
+
+    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    wnd.draw_frame();
+
+    {
+      *trigger.state_ref() = false;
+    }
+
+    // fix crash here
+    // crash because generator live as long as its parent, at here two expr widget's
+    // parent both none, all as root expr widget, parent expr widget can't remove
+    // child expr widget.
+    //
+    // generator lifetime should bind to its generator widget instead of parent.
+    wnd.draw_frame();
+  }
+  #[test]
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
     let ctx = Rc::new(RefCell::new(AppContext::default()));
@@ -595,7 +578,13 @@ mod tests {
     tree.mark_dirty(tree.root());
     tree.root().remove_subtree(&mut tree);
     assert_eq!(tree.layout_list(), None);
-    assert!(tree.take_needs_regen_generator().is_none());
+    assert!(
+      tree
+        .needs_regen
+        .borrow()
+        .iter()
+        .all(|g| g.is_dropped(&tree))
+    );
   }
 
   #[bench]
@@ -662,5 +651,30 @@ mod tests {
       tree.mark_dirty(tree.root());
       tree.tree_repair();
     })
+  }
+
+  #[test]
+  fn perf_silent_ref_should_not_dirty_expr_widget() {
+    let trigger = Stateful::new(1);
+    let widget = widget! {
+      track { trigger: trigger.clone() }
+      Row {
+        ExprWidget {
+          expr: (0..3).map(|_| if *trigger > 0 {
+            SizedBox { size: Size::new(1., 1.)}
+          } else {
+            SizedBox { size: Size::zero()}
+          }).collect::<Vec<_>>()
+        }
+      }
+    };
+
+    let mut tree = WidgetTree::new(widget, <_>::default());
+    tree.tree_repair();
+    tree.layout(Size::new(100., 100.));
+    {
+      *trigger.silent_ref() = 2;
+    }
+    assert!(tree.needs_regen.borrow().is_empty())
   }
 }

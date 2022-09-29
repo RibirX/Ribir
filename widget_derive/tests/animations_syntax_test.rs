@@ -27,21 +27,22 @@ fn listener_trigger_have_handler() {
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
-      on_wheel: move |_| h1.set(h1.get() + 1),
+      wheel: move |_| h1.set(h1.get() + 1),
     }
-    animations {
-      sized_box.on_wheel: Animate {
-        id: leak_animate,
-        from: State {
-          sized_box.size: Size::zero(),
-        },
-        transition: Transition {
-          easing: easing::LINEAR,
-          duration: Duration::from_millis(100)
-        }
+    Animate {
+      id: leak_animate,
+      from: State {
+        sized_box.size: Size::zero(),
+      },
+      transition: Transition {
+        easing: easing::LINEAR,
+        duration: Duration::from_millis(100)
       }
     }
-    dataflows { leak_animate.is_running() ~> *animate_state }
+    on sized_box {
+      wheel: move |_| leak_animate.run()
+    }
+    on leak_animate.is_running() ~> *animate_state
   };
 
   wheel_widget(w);
@@ -60,19 +61,20 @@ fn listener_trigger() {
       id: sized_box,
       size: Size::new(100., 100.),
     }
-    animations {
-      sized_box.on_wheel: Animate {
-        id: leak_animate,
-        from: State {
-          sized_box.size: Size::zero(),
-        },
-        transition: Transition {
-          easing: easing::LINEAR,
-          duration: Duration::from_millis(100)
-        }
+    Animate {
+      id: leak_animate,
+      from: State {
+        sized_box.size: Size::zero(),
+      },
+      transition: Transition {
+        easing: easing::LINEAR,
+        duration: Duration::from_millis(100)
       }
     }
-    dataflows { leak_animate.is_running() ~> *animate_state }
+    on sized_box {
+      wheel: move |_| leak_animate.run()
+    }
+    on leak_animate.is_running() ~> *animate_state
   };
 
   wheel_widget(w);

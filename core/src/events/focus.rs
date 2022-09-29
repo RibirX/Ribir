@@ -5,7 +5,7 @@ use crate::{
 use std::cell::RefCell;
 
 /// Focus attr attach to widget to support get ability to focus in.
-#[derive(Default, Declare, SingleChild)]
+#[derive(Default, Declare)]
 pub struct FocusListener {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -36,13 +36,13 @@ pub struct FocusListener {
   #[declare(default, builtin)]
   pub auto_focus: bool,
   #[declare(default, builtin, convert=custom)]
-  pub on_focus: Callback,
+  pub focus: Callback,
   #[declare(default, builtin, convert=custom)]
-  pub on_blur: Callback,
+  pub blur: Callback,
   #[declare(default, builtin, convert=custom)]
-  pub on_focus_in: Callback,
+  pub focus_in: Callback,
   #[declare(default, builtin, convert=custom)]
-  pub on_focus_out: Callback,
+  pub focus_out: Callback,
 }
 type Callback = RefCell<Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>>;
 
@@ -83,10 +83,10 @@ impl FocusListener {
   #[inline]
   pub fn dispatch_event(&self, event_type: FocusEventType, event: &mut FocusEvent) {
     let mut callback = match event_type {
-      FocusEventType::Focus => self.on_focus.borrow_mut(),
-      FocusEventType::Blur => self.on_blur.borrow_mut(),
-      FocusEventType::FocusIn => self.on_focus_in.borrow_mut(),
-      FocusEventType::FocusOut => self.on_focus_out.borrow_mut(),
+      FocusEventType::Focus => self.focus.borrow_mut(),
+      FocusEventType::Blur => self.blur.borrow_mut(),
+      FocusEventType::FocusIn => self.focus_in.borrow_mut(),
+      FocusEventType::FocusOut => self.focus_out.borrow_mut(),
     };
     if let Some(callback) = callback.as_mut() {
       callback(event)
@@ -96,26 +96,26 @@ impl FocusListener {
 
 impl FocusListenerBuilder {
   #[inline]
-  pub fn on_focus(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_focus = Some(into_callback(f));
+  pub fn focus(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.focus = Some(into_callback(f));
     self
   }
 
   #[inline]
-  pub fn on_blur(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_blur = Some(into_callback(f));
+  pub fn blur(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.blur = Some(into_callback(f));
     self
   }
 
   #[inline]
-  pub fn on_focus_in(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_focus_in = Some(into_callback(f));
+  pub fn focus_in(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.focus_in = Some(into_callback(f));
     self
   }
 
   #[inline]
-  pub fn on_focus_out(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.on_focus_out = Some(into_callback(f));
+  pub fn focus_out(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.focus_out = Some(into_callback(f));
     self
   }
 }
@@ -126,22 +126,22 @@ fn into_callback(f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Callbac
 
 impl FocusListener {
   #[inline]
-  pub fn set_declare_on_focus(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_focus = into_callback(f);
+  pub fn set_declare_focus(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.focus = into_callback(f);
   }
 
   #[inline]
-  pub fn set_declare_on_blur(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_blur = into_callback(f);
+  pub fn set_declare_blur(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.blur = into_callback(f);
   }
 
   #[inline]
-  pub fn set_declare_on_focus_in(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_focus_in = into_callback(f);
+  pub fn set_declare_focus_in(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.focus_in = into_callback(f);
   }
 
   #[inline]
-  pub fn set_declare_on_focus_out(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.on_focus_out = into_callback(f);
+  pub fn set_declare_focus_out(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
+    self.focus_out = into_callback(f);
   }
 }

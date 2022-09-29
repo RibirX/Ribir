@@ -18,25 +18,25 @@ type Callback = RefCell<Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>>;
 #[derive(Declare)]
 pub struct KeyDownListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut KeyboardEvent)))]
-  pub on_key_down: Callback,
+  pub key_down: Callback,
 }
 
 #[derive(Declare)]
 pub struct KeyUpListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut KeyboardEvent)))]
-  pub on_key_up: Callback,
+  pub key_up: Callback,
 }
 
 impl EventListener for KeyDownListener {
   type Event = KeyboardEvent;
   #[inline]
-  fn dispatch(&self, event: &mut KeyboardEvent) { (self.on_key_down.borrow_mut())(event) }
+  fn dispatch(&self, event: &mut KeyboardEvent) { (self.key_down.borrow_mut())(event) }
 }
 
 impl EventListener for KeyUpListener {
   type Event = KeyboardEvent;
   #[inline]
-  fn dispatch(&self, event: &mut KeyboardEvent) { (self.on_key_up.borrow_mut())(event) }
+  fn dispatch(&self, event: &mut KeyboardEvent) { (self.key_up.borrow_mut())(event) }
 }
 
 impl ComposeSingleChild for KeyDownListener {
@@ -115,12 +115,12 @@ mod tests {
           SizedBox {
             size: Size::zero(),
             auto_focus: true,
-            on_key_down: move |key| {
+            key_down: move |key| {
               this.0
                 .borrow_mut()
                 .push(format!("key down {:?}", key.key));
             },
-            on_key_up: move |key| {
+            key_up: move |key| {
               this.0.borrow_mut().push(format!("key up {:?}", key.key));
             }
           }

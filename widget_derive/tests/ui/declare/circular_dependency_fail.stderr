@@ -53,16 +53,16 @@ note: If the circular is your want and will finally not infinite change,you shou
    |         ^^^^^^
 
 error: Circle follow will cause infinite state change trigger: a ～> a
-  --> tests/ui/declare/circular_dependency_fail.rs:39:17
+  --> tests/ui/declare/circular_dependency_fail.rs:39:8
    |
-39 |     dataflows { a.size ~> a.size }
-   |                 ^         ^
+39 |     on a.size ~> a.size
+   |        ^         ^
    |
 note: If the circular is your want, use `#[skip_nc]` attribute before field or data_flow to skip the no change trigger of the field modify to ignore infinite state change trigger.
-  --> tests/ui/declare/circular_dependency_fail.rs:39:17
+  --> tests/ui/declare/circular_dependency_fail.rs:39:8
    |
-39 |     dataflows { a.size ~> a.size }
-   |                 ^^^^^^^^^^^
+39 |     on a.size ~> a.size
+   |        ^^^^^^^^^^^
 
 warning: unreachable statement
   --> tests/ui/declare/circular_dependency_fail.rs:21:3

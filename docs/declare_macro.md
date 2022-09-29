@@ -46,14 +46,14 @@ impl CombinationWidget for T {
       declare SizedBox {
         size: Size::new(100., 100.),
         background: Color::RED,
-        on_tap: |_| println!("Tapped!")
+        tap: |_| println!("Tapped!")
       }
     }
   }
 }
 ```
 
-Although, `SizedBox` not have field `background` and `on_tap`, but the code above is valid, because `widget!` macro provide built-in fields as sugar syntax to simplify use the commonly widgets or attributes.
+Although, `SizedBox` not have field `background` and `tap`, but the code above is valid, because `widget!` macro provide built-in fields as sugar syntax to simplify use the commonly widgets or attributes.
 
 ## `if` guard syntax for field.
 

@@ -1,4 +1,4 @@
-use super::{animations::SimpleField, kw};
+use super::kw;
 use proc_macro2::Ident;
 use quote::{quote_spanned, ToTokens};
 use syn::{
@@ -7,7 +7,15 @@ use syn::{
   punctuated::Punctuated,
   spanned::Spanned,
   token::{self, Comma},
+  Expr,
 };
+
+#[derive(Debug)]
+pub struct SimpleField {
+  pub(crate) member: Ident,
+  pub(crate) colon_token: Option<token::Colon>,
+  pub(crate) expr: Expr,
+}
 
 pub struct Track {
   _track_token: kw::track,

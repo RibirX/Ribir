@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, ToTokens};
 use std::collections::{BTreeMap, HashSet};
 use syn::{
   bracketed,
@@ -9,7 +9,7 @@ use syn::{
   spanned::Spanned,
   token::{self, Brace, Comma},
   visit_mut::VisitMut,
-  Expr, Ident, Path,
+  Ident, Path,
 };
 mod widget_gen;
 use crate::error::{DeclareError, DeclareWarning};
@@ -19,8 +19,8 @@ pub use widget_gen::WidgetGen;
 
 use super::{
   kw,
-  widget_macro::{is_expr_keyword, EXPR_FIELD, EXPR_WIDGET},
-  DeclareCtx, Id, ObjectUsed, Result, ScopeUsedInfo, UsedPart,
+  widget_macro::{is_expr_keyword, TrackExpr, EXPR_FIELD},
+  DeclareCtx, Id, ObjectUsed, UsedPart,
 };
 
 #[derive(Debug)]
@@ -39,8 +39,7 @@ pub struct DeclareField {
   pub skip_nc: Option<SkipNcAttr>,
   pub member: Ident,
   pub colon_token: Option<token::Colon>,
-  pub expr: Expr,
-  pub used_name_info: ScopeUsedInfo,
+  pub expr: TrackExpr,
 }
 
 #[derive(Clone, Debug)]
@@ -48,28 +47,6 @@ pub struct SkipNcAttr {
   pound_token: token::Pound,
   bracket_token: token::Bracket,
   skip_nc_meta: kw::skip_nc,
-}
-
-#[derive(Clone, Debug)]
-pub struct WidgetExtend {
-  dot: token::Dot,
-  pub expr: Expr,
-  pub expr_used: ScopeUsedInfo,
-}
-
-impl WidgetExtend {
-  pub fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(WidgetExtend {
-      dot: input.parse()?,
-      expr: input.parse()?,
-      expr_used: ScopeUsedInfo::default(),
-    })
-  }
-  fn tokens(&self) -> TokenStream {
-    let value = &self.expr;
-    let dot = &self.dot;
-    quote! {#dot #value}
-  }
 }
 
 macro_rules! assign_uninit_field {
@@ -186,26 +163,17 @@ impl Parse for DeclareField {
     let expr = if colon_token.is_some() {
       input.parse()?
     } else {
-      Expr::Path(syn::ExprPath {
-        attrs: Vec::new(),
-        qself: None,
-        path: Path::from(member.clone()),
-      })
+      parse_quote!(#member)
     };
 
-    Ok(DeclareField {
-      skip_nc,
-      member,
-      colon_token,
-      expr,
-      used_name_info: ScopeUsedInfo::default(),
-    })
+    Ok(DeclareField { skip_nc, member, colon_token, expr })
   }
 }
 
 impl DeclareField {
   pub fn used_part(&self) -> Option<UsedPart> {
     self
+      .expr
       .used_name_info
       .used_part(Some(&self.member), self.skip_nc.is_some())
   }
@@ -239,27 +207,23 @@ impl DeclareCtx {
         let origin_expr = expr_field.expr.clone();
         self.visit_declare_field_mut(expr_field);
 
-        let upstream = expr_field
-          .used_name_info
-          .all_widgets()
-          .map(|objs| upstream_tokens(objs, quote! {raw_change_stream}));
-        if let Some(upstream) = upstream {
+        if let Some(upstream) = expr_field.expr.upstream_tokens() {
           expr_field.expr = parse_quote_spanned! { origin_expr.span() =>
-            move |#[allow(unused)] ctx: &mut BuildCtx| #origin_expr.into_gen_result()
+            move |#[allow(unused)] ctx: &mut BuildCtx| #origin_expr
           };
-
           // we convert the field expr to a closure, revisit again.
-          expr_field.used_name_info.take();
-          self.visit_declare_field_mut(expr_field);
+          expr_field.expr.used_name_info.take();
+          self.visit_track_expr(&mut expr_field.expr);
 
           *path = parse_quote_spanned! { path.span() => #path::<_> };
           if !fields.trailing_punct() {
             fields.push_punct(Comma::default());
           }
-          fields.push(parse_quote! {upstream: #upstream});
+          fields.push(
+            parse_quote! {upstream: #upstream.filter(|e| e.contains(ChangeScope::FRAMEWORK)) },
+          );
         } else {
           *path = parse_quote_spanned! { path.span() => ConstExprWidget<_> };
-          assert!(expr_field.used_name_info.is_empty())
         }
       }
     } else {
@@ -268,7 +232,7 @@ impl DeclareCtx {
         .for_each(|f| self.visit_declare_field_mut(f));
     }
 
-    self.visit_builtin_field_widgets(builtin);
+    self.visit_builtin_fields_mut(builtin);
 
     children
       .iter_mut()
@@ -277,33 +241,35 @@ impl DeclareCtx {
 
   pub fn visit_declare_field_mut(&mut self, f: &mut DeclareField) {
     self.visit_ident_mut(&mut f.member);
-    self.visit_expr_mut(&mut f.expr);
-
-    f.used_name_info = self.take_current_used_info();
-  }
-
-  pub fn visit_builtin_field_widgets(&mut self, builtin: &mut BuiltinFieldWidgets) {
-    builtin.visit_builtin_fields_mut(self);
+    self.visit_track_expr(&mut f.expr);
   }
 }
 
 impl DeclareWidget {
-  pub fn host_and_builtin_widgets_tokens<'a>(
-    &'a self,
-    name: &'a Ident,
-    ctx: &'a DeclareCtx,
-  ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
-    let Self { path: ty, fields, .. } = self;
-    let gen = WidgetGen::new(ty, name, fields.iter(), false);
-    let host = gen.gen_widget_tokens(ctx);
-    let builtin = self.builtin.widget_tokens_iter(name, ctx);
-    std::iter::once((name.clone(), host)).chain(builtin)
+  pub fn collect_named_defs(&self, ctx: &mut DeclareCtx) {
+    if let Some(name) = self.name() {
+      let Self { path: ty, fields, .. } = self;
+      let tokens = WidgetGen::new(ty, name, fields.iter(), false).gen_widget_tokens(ctx);
+      ctx.named_obj_defs.insert(name.clone(), tokens);
+
+      let builtin = self
+        .builtin
+        .widget_tokens_iter(name, ctx)
+        .collect::<Vec<_>>();
+      ctx.named_obj_defs.extend(builtin);
+    }
   }
 
-  pub fn before_generate_check(&self) -> Result<()> {
-    self
-      .traverses_widget()
-      .try_for_each(|w| w.builtin.key_follow_check())
+  pub fn gen_tokens(&self, name: &Ident, tokens: &mut TokenStream, ctx: &mut DeclareCtx) {
+    if self.name().is_none() {
+      let Self { path: ty, fields, .. } = self;
+      let gen = WidgetGen::new(ty, name, fields.iter(), false);
+      gen.gen_widget_tokens(ctx).to_tokens(tokens);
+      self
+        .builtin
+        .widget_tokens_iter(name, ctx)
+        .for_each(|(_, builtin)| builtin.to_tokens(tokens));
+    }
   }
 
   pub fn warnings(&self) -> impl Iterator<Item = DeclareWarning> + '_ {
@@ -311,7 +277,7 @@ impl DeclareWidget {
       .fields
       .iter()
       .chain(self.builtin.all_builtin_fields())
-      .filter(|f| self.named.is_none() || f.used_name_info.all_widgets().is_none())
+      .filter(|f| self.named.is_none() || f.expr.used_name_info.all_widgets().is_none())
       .filter_map(|f| {
         f.skip_nc
           .as_ref()
@@ -330,29 +296,16 @@ impl DeclareWidget {
   ///   widget_name: [field, {depended_widget: [position]}]
   /// }
   /// ```
-  pub fn analyze_object_dependencies(&self) -> BTreeMap<Ident, ObjectUsed> {
-    let mut follows: BTreeMap<Ident, ObjectUsed> = BTreeMap::new();
-    self.traverses_widget().for_each(|w| {
-      if let Some(name) = w.name() {
-        w.builtin.collect_builtin_widget_follows(name, &mut follows);
+  pub fn analyze_observe_depends<'a>(&'a self, follows: &mut BTreeMap<Ident, ObjectUsed<'a>>) {
+    if let Some(name) = self.name() {
+      self.builtin.collect_builtin_widget_follows(name, follows);
 
-        let w_follows: ObjectUsed = w.fields.iter().flat_map(|f| f.used_part()).collect();
+      let w_follows: ObjectUsed = self.fields.iter().flat_map(|f| f.used_part()).collect();
 
-        if !w_follows.is_empty() {
-          follows.insert(name.clone(), w_follows);
-        }
+      if !w_follows.is_empty() {
+        follows.insert(name.clone(), w_follows);
       }
-    });
-
-    follows
-  }
-
-  pub(crate) fn is_expr_widget(&self) -> bool {
-    self
-      .path
-      .segments
-      .first()
-      .map_or(false, |s| s.ident == EXPR_WIDGET)
+    }
   }
 
   pub fn traverses_widget(&self) -> impl Iterator<Item = &DeclareWidget> {
@@ -363,20 +316,6 @@ impl DeclareWidget {
   }
 
   pub fn name(&self) -> Option<&Ident> { self.named.as_ref().map(|id| &id.name) }
-}
-
-pub fn upstream_tokens<'a>(
-  used_widgets: impl Iterator<Item = &'a Ident> + Clone,
-  stream_name: TokenStream,
-) -> TokenStream {
-  let upstream = used_widgets.clone().map(|w| {
-    quote_spanned! { w.span() =>  #w.#stream_name() }
-  });
-  if used_widgets.count() > 1 {
-    quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
-  } else {
-    quote! { #(#upstream)* }
-  }
 }
 
 pub fn check_duplicate_field(fields: &Punctuated<DeclareField, Comma>) -> syn::Result<()> {

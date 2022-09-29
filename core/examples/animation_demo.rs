@@ -12,26 +12,24 @@ fn main() {
       }
       Text {
         text:"click me to trigger animation",
-        on_tap: move |_| {
+        tap: move |_| {
           let s = sized_box.size;
           sized_box.radius = Some(Radius::all(sized_box.radius.unwrap().top_left * 2.));
           sized_box.size = Size::new(s.width * 2. , s.height * 2.);
         }
       }
     }
-    animations {
-      sized_box.size:  Animate {
-        id: animate1,
-        from: State {
-          sized_box.size: Size::new(10., 10.),
-          sized_box.radius: Some(Radius::all(0.)),
-          sized_box.background: Some(Brush::Color(Color::RED)),
-        },
-        transition: Transition {
-          duration: Duration::from_secs(5),
-          easing: easing::EASE_IN_OUT,
-        }.delay(Duration::from_secs(1)),
+    on sized_box.size  Animate {
+      from: State {
+        sized_box.size: Size::new(10., 10.),
+        sized_box.radius: Some(Radius::all(0.)),
+        sized_box.background: Some(Brush::Color(Color::RED)),
+      },
+      transition: Transition {
+        duration: Duration::from_secs(5),
+        easing: easing::EASE_IN_OUT,
       }
+      // .delay(Duration::from_secs(1)),
     }
   };
 

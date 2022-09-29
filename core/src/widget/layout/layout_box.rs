@@ -14,7 +14,7 @@ impl ComposeSingleChild for LayoutBox {
       track { this: this.into_stateful() }
       ExprWidget {
         expr: child,
-        on_performed_layout: move |ctx| this.silent().rect = ctx.box_rect().unwrap()
+        performed_layout: move |ctx| this.silent().rect = ctx.box_rect().unwrap()
       }
     }
   }

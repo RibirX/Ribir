@@ -5,7 +5,7 @@ fn main() {
     SizedBox {
       size: Size::zero(),
       SizedBox {
-        id: id1,
+        id: _id1,
         size: Size::zero(),
         SizedBox { size: Size::zero() }
       }

@@ -8,7 +8,7 @@ use crate::{
 #[derive(Declare)]
 pub struct DisposedListener {
   #[declare(builtin, convert=listener_callback(for<'r> FnMut(LifeCycleCtx<'r>)))]
-  pub on_disposed: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>>,
+  pub disposed: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>>,
 }
 
-impl_lifecycle!(DisposedListener, on_disposed);
+impl_lifecycle!(DisposedListener, disposed);

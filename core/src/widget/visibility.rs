@@ -3,7 +3,7 @@ use crate::prelude::*;
 #[derive(Declare, Default, Clone)]
 pub struct Visibility {
   #[declare(builtin)]
-  visible: bool,
+  pub visible: bool,
 }
 
 impl ComposeSingleChild for Visibility {
@@ -20,4 +20,3 @@ impl ComposeSingleChild for Visibility {
     }
   }
 }
-

@@ -6,10 +6,7 @@ use quote::quote_spanned;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{
-  error::DeclareError,
-  widget_attr_macro::{ribir_suffix_variable, DeclareCtx, ObjectUsed},
-};
+use crate::widget_attr_macro::{ribir_suffix_variable, DeclareCtx, IdType, ObjectUsed};
 
 use super::{widget_gen::WidgetGen, DeclareField};
 
@@ -32,27 +29,21 @@ lazy_static! {
     .collect();
 }
 
+pub fn is_listener(ty_name: &str) -> bool { ty_name.ends_with("Listener") }
+
 #[derive(Debug, Default)]
 pub struct BuiltinFieldWidgets {
   widgets: HashMap<&'static str, BuiltinWidgetInfo, ahash::RandomState>,
 }
 
 #[derive(Debug, Default)]
-struct BuiltinWidgetInfo(SmallVec<[DeclareField; 1]>);
+pub struct BuiltinWidgetInfo(pub SmallVec<[DeclareField; 1]>);
 
 impl BuiltinFieldWidgets {
   pub fn as_builtin_widget(field_name: &Ident) -> Option<&String> {
     FIELD_WIDGET_TYPE
       .get(field_name.to_string().as_str())
       .and_then(|w| BUILTIN_WIDGET_SUFFIX.get(w))
-  }
-
-  pub fn visit_builtin_fields_mut(&mut self, ctx: &mut DeclareCtx) {
-    self
-      .widgets
-      .values_mut()
-      .flat_map(|info| info.0.iter_mut())
-      .for_each(|f| ctx.visit_declare_field_mut(f))
   }
 
   pub fn all_builtin_fields(&self) -> impl Iterator<Item = &DeclareField> {
@@ -73,75 +64,62 @@ impl BuiltinFieldWidgets {
     });
   }
 
-  pub fn key_follow_check(&self) -> crate::error::Result<()> {
-    if let Some((_, info)) = self.widgets.iter().find(|(name, _)| "KeyWidget" == **name) {
-      assert_eq!(info.0.len(), 1);
-      let DeclareField { member, used_name_info, .. } = &info.0[0];
-      if let Some(follows) = used_name_info.directly_used_widgets() {
-        return Err(DeclareError::KeyDependsOnOther {
-          key: member.span().unwrap(),
-          depends_on: follows.map(|w| w.span().unwrap()).collect(),
-        });
-      }
-    }
-
-    Ok(())
-  }
-
   pub fn widget_tokens_iter<'a>(
     &'a self,
     host_id: &'a Ident,
-    ctx: &'a DeclareCtx,
+    ctx: &'a mut DeclareCtx,
   ) -> impl Iterator<Item = (Ident, TokenStream)> + '_ {
-    // builtin widgets compose in special order.
-    WIDGETS
-      .iter()
-      .filter_map(|builtin| self.widgets.get_key_value(builtin.ty))
-      .map(move |(ty_name, info)| {
+    WIDGETS.iter().filter_map(|builtin| {
+      let (var_name, ty_name, info) = self.get_builtin_widget(host_id, ctx, builtin)?;
+      // we provide a default implementation for a builtin widget if it not declared,
+      // but used by others except it's a listener. We can't give a default handler
+      // for it, its implementation should depend on who used it.
+      if !is_listener(ty_name) || info.is_some() {
+        let tokens = if let Some(info) = info {
+          let ty = Ident::new(ty_name, info.span()).into();
+          let gen = WidgetGen::new(&ty, &var_name, info.0.iter(), false);
+          gen.gen_widget_tokens(ctx)
+        } else {
+          let ty = Ident::new(ty_name, host_id.span()).into();
+          let gen = WidgetGen::new(&ty, &var_name, [].into_iter(), false);
+          gen.gen_widget_tokens(ctx)
+        };
+        Some((var_name, tokens))
+      } else {
+        None
+      }
+    })
+  }
+  pub fn collect_names(&self, host: &Ident, ctx: &mut DeclareCtx) {
+    for builtin in WIDGETS.iter() {
+      let ty_name = builtin.ty;
+      if self.widgets.get(ty_name).is_some() {
         let suffix = BUILTIN_WIDGET_SUFFIX.get(ty_name).unwrap();
-        let name = ribir_suffix_variable(host_id, suffix);
-
-        let span = info.span();
-        let ty = Ident::new(ty_name, span).into();
-
-        let fields = &info.0;
-        let gen = WidgetGen::new(&ty, &name, fields.iter(), false);
-        let tokens = gen.gen_widget_tokens(ctx);
-
-        (name, tokens)
-      })
+        let var_name = ribir_suffix_variable(host, suffix);
+        ctx.add_named_obj(var_name, IdType::DECLARE);
+      }
+    }
   }
 
-  pub fn builtin_widget_names<'a>(
-    &'a self,
-    host_name: &'a Ident,
-  ) -> impl Iterator<Item = Ident> + '_ {
-    self.widgets.keys().map(|w| {
-      let suffix = BUILTIN_WIDGET_SUFFIX.get(w).unwrap();
-      ribir_suffix_variable(host_name, suffix)
-    })
+  pub fn add_user_perspective_pairs(&self, host: &Ident, ctx: &mut DeclareCtx) {
+    for builtin in WIDGETS.iter() {
+      if let Some((builtin_name, _, _)) = self.get_builtin_widget(host, ctx, builtin) {
+        ctx.add_user_perspective_pair(builtin_name, host.clone())
+      }
+    }
   }
 
   /// return builtin fields composed tokens, and the upstream tokens if the
   /// finally widget as a expr widget.
-  pub fn compose_tokens(&self, name: &Ident, is_expr_host: bool, tokens: &mut TokenStream) {
+  pub fn compose_tokens(&self, name: &Ident, ctx: &DeclareCtx, tokens: &mut TokenStream) {
     WIDGETS
       .iter()
-      .filter_map(|builtin| self.widgets.get_key_value(builtin.ty))
-      .fold(is_expr_host, |is_expr_widget, (builtin_ty, info)| {
-        let suffix = BUILTIN_WIDGET_SUFFIX.get(builtin_ty).unwrap();
-        let builtin_name = ribir_suffix_variable(name, suffix);
-        let span = info.span();
-        if is_expr_widget {
-          tokens.extend(quote_spanned! { span =>
-             let #name = SingleChildWidget::from_expr_child(#builtin_name, #name);
-          });
-        } else {
-          tokens.extend(quote_spanned! { span =>
-            let #name = SingleChildWidget::new(#builtin_name, #name);
-          });
-        }
-        false
+      .filter_map(|builtin| self.get_builtin_widget(name, ctx, builtin))
+      .for_each(|(var_name, _, info)| {
+        let span = info.map_or_else(|| name.span(), |info| info.span());
+        tokens.extend(quote_spanned! { span =>
+          let #name: SingleChildWidget<_, _> = #var_name.have_child(#name);
+        });
       });
   }
 
@@ -159,11 +137,30 @@ impl BuiltinFieldWidgets {
     );
 
     let info = self.widgets.entry(widget_ty).or_default();
-    info.0.push(field);
+    info.push(field);
+  }
+
+  fn get_builtin_widget<'a>(
+    &'a self,
+    host_id: &'a Ident,
+    ctx: &DeclareCtx,
+    builtin: &'a BuiltinWidget,
+  ) -> Option<(Ident, &str, Option<&BuiltinWidgetInfo>)> {
+    let ty_name = builtin.ty;
+    let var_name = builtin_var_name(host_id, ty_name);
+    if let Some(info) = self.widgets.get(ty_name) {
+      Some((var_name, ty_name, Some(info)))
+    } else if ctx.is_used(&var_name) {
+      Some((var_name, ty_name, None))
+    } else {
+      None
+    }
   }
 }
 
 impl BuiltinWidgetInfo {
+  pub fn push(&mut self, f: DeclareField) { self.0.push(f) }
+
   fn span(&self) -> Span {
     self
       .0
@@ -177,4 +174,23 @@ impl BuiltinWidgetInfo {
       })
       .unwrap()
   }
+}
+
+impl DeclareCtx {
+  pub fn visit_builtin_fields_mut(&mut self, builtin: &mut BuiltinFieldWidgets) {
+    for w in builtin.widgets.values_mut() {
+      self.visit_builtin_widget_info_mut(w)
+    }
+  }
+
+  pub fn visit_builtin_widget_info_mut(&mut self, builtin_widget: &mut BuiltinWidgetInfo) {
+    for f in builtin_widget.0.iter_mut() {
+      self.visit_declare_field_mut(f)
+    }
+  }
+}
+
+pub fn builtin_var_name(host: &Ident, ty: &str) -> Ident {
+  let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).unwrap();
+  ribir_suffix_variable(host, suffix)
 }

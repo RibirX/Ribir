@@ -1,4 +1,4 @@
-error: Same id(`same_id`) assign to multiple widgets, id must be unique.
+error: Same `id: same_id` assign to multiple objects, id must be unique.
  --> tests/ui/declare/duplicate_id_fail.rs:9:13
   |
 9 |         id: same_id,

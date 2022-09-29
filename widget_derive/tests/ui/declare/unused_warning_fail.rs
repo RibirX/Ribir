@@ -17,4 +17,28 @@ fn main() {
       }
     }
   };
+
+  let _animate_used_builtin_no_warning = widget! {
+    SizedBox {
+      id: id1,
+      size: Size::zero(),
+      background: Color::RED,
+    }
+    Animate {
+      id: animate,
+      from: State { id1.background },
+      transition: Transition { easing: easing::LINEAR }
+    }
+    on id1 {
+      tap: move |_| animate.run()
+    }
+  };
+
+  let _fix_use_no_declared_builtin_no_warning = widget! {
+    SizedBox {
+      id: sized_box,
+      size: Size::zero(),
+      SizedBox { size: Size::zero(), background: sized_box.background }
+    }
+  };
 }

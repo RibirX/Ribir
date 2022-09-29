@@ -30,6 +30,8 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     },
     thumb_min_size: 12.,
     scroll_transition: Transition {
+      delay: None,
+      repeat: None,
       duration: Duration::from_millis(150),
       easing: easing::EASE_OUT,
     },

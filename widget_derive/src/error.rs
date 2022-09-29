@@ -18,18 +18,18 @@ pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleInit(Box<[CircleUsedPath]>),
   CircleFollow(Box<[CircleUsedPath]>),
-  DataFlowNoDepends(Span),
-  KeyDependsOnOther { key: Span, depends_on: Vec<Span> },
   ExprWidgetInvalidField(Vec<Span>),
+  OnInvalidTarget(Ident),
+  OnInvalidField(Ident),
 }
 
 #[derive(Debug)]
 pub enum DeclareWarning<'a> {
   NeedlessSkipNc(Span),
   UnusedName(&'a Ident),
+  ObserveIsConst(Span),
+  DefObjWithoutId(Span),
 }
-
-pub type Result<T> = std::result::Result<T, DeclareError>;
 
 impl DeclareError {
   pub fn into_compile_error(self) -> TokenStream {
@@ -44,7 +44,7 @@ impl DeclareError {
         assert_eq!(id1, id2);
         diagnostic.set_spans(vec![id1.span().unwrap(), id2.span().unwrap()]);
         diagnostic.set_message(format!(
-          "Same id(`{}`) assign to multiple widgets, id must be unique.",
+          "Same `id: {}` assign to multiple objects, id must be unique.",
           id1
         ));
       }
@@ -72,20 +72,19 @@ impl DeclareError {
         change trigger.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
-
-      DeclareError::DataFlowNoDepends(span) => {
-        diagnostic.set_spans(span);
-        diagnostic.set_message("Declared a data flow but not depends on any others.");
-        diagnostic = diagnostic.help("Try to remove it.");
-      }
-      DeclareError::KeyDependsOnOther { key, mut depends_on } => {
-        depends_on.push(key);
-        diagnostic.set_spans(depends_on);
-        diagnostic.set_message("The `key` field is not allowed to depend on others.");
-      }
       DeclareError::ExprWidgetInvalidField(spans) => {
         diagnostic.set_spans(spans);
         diagnostic.set_message("`ExprWidget` only accept `expr` field.");
+      }
+      DeclareError::OnInvalidTarget(t) => {
+        diagnostic.set_spans(t.span().unwrap());
+        diagnostic.set_message(
+          "only the id of widget declared in `widget!` can used as the target of `on` group",
+        );
+      }
+      DeclareError::OnInvalidField(f) => {
+        diagnostic.set_spans(f.span().unwrap());
+        diagnostic.set_message("only listener work for `on` group.");
       }
     };
 
@@ -152,6 +151,16 @@ impl<'a> DeclareWarning<'a> {
         d.set_spans(name.span().unwrap());
         d.set_message(format!("`{name}` does not be used"));
         d = d.span_help(vec![name.span().unwrap()], "Remove this line.");
+      }
+      DeclareWarning::ObserveIsConst(span) => {
+        d.set_spans(*span);
+        d.set_message("Observe a expr but not depends on anything, this will do nothing.");
+        d = d.help("Try to remove it.");
+      }
+      DeclareWarning::DefObjWithoutId(span) => {
+        d.set_spans(*span);
+        d.set_message("Def an object without id.");
+        d = d.help("Try to assign an `id` for it.");
       }
     };
     d.emit();

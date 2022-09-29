@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote_spanned, ToTokens};
 use syn::{
   parse::{Parse, ParseStream},
   spanned::Spanned,
@@ -7,7 +7,7 @@ use syn::{
   Ident,
 };
 
-use crate::{error::Result, widget_attr_macro::declare_widget::DeclareField};
+use crate::widget_attr_macro::declare_widget::DeclareField;
 mod declare_ctx;
 pub use declare_ctx::*;
 mod name_used_info;
@@ -17,16 +17,15 @@ mod variable_names;
 pub use self::{declare_widget::DeclareWidget, widget_macro::WidgetMacro};
 pub use variable_names::*;
 pub mod animations;
-mod dataflows;
 mod declare_widget;
+mod on_change;
+mod on_event_do;
 pub use declare_widget::RESERVE_IDENT;
 
-mod track;
+pub mod track;
 mod widget_macro;
 pub mod kw {
   syn::custom_keyword!(widget);
-  syn::custom_keyword!(dataflows);
-  syn::custom_keyword!(animations);
   syn::custom_keyword!(track);
   syn::custom_keyword!(ExprWidget);
   syn::custom_keyword!(id);
@@ -34,25 +33,12 @@ pub mod kw {
   syn::custom_keyword!(Animate);
   syn::custom_keyword!(State);
   syn::custom_keyword!(Transition);
+  syn::custom_punctuation!(FlowArrow, ~>);
+  syn::custom_keyword!(on);
+  syn::custom_keyword!(transition);
+  syn::custom_keyword!(change);
 }
-
-fn skip_nc_assign<L, R>(skip_nc: bool, left: &L, right: &R) -> TokenStream2
-where
-  L: ToTokens,
-  R: ToTokens,
-{
-  if skip_nc {
-    let v = ribir_variable("v", left.span());
-    quote! {
-      let #v = #right;
-      if #v != #left {
-        #left = #v;
-      }
-    }
-  } else {
-    quote! { #left = #right; }
-  }
-}
+pub const CHANGE: &str = "change";
 
 #[derive(Debug)]
 pub struct Id {
