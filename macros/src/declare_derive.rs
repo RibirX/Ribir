@@ -376,7 +376,7 @@ impl<'a> DeclareField<'a> {
 
   fn check_reserve(&mut self) {
     // reverse name check.
-    let reserve_ident = &crate::widget_attr_macro::RESERVE_IDENT;
+    let reserve_ident = &crate::widget_macro::RESERVE_IDENT;
 
     let not_builtin = self
       .attr

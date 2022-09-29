@@ -1,8 +1,6 @@
 use super::{
   declare_widget::{try_parse_skip_nc, SkipNcAttr},
-  kw,
-  widget_macro::TrackExpr,
-  DeclareCtx, ObjectUsed, UsedPart,
+  kw, DeclareCtx, ObjectUsed, TrackExpr, UsedPart,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
@@ -16,7 +14,7 @@ use syn::{
   Ident,
 };
 
-use crate::{error::DeclareWarning, widget_attr_macro::capture_widget};
+use crate::{error::DeclareWarning, widget_macro::capture_widget};
 
 #[derive(Debug)]
 pub struct OnChangeDo {

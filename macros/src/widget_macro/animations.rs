@@ -13,15 +13,14 @@ use syn::{
   Error, Expr, Ident, Result,
 };
 
-use crate::widget_attr_macro::Id;
+use crate::widget_macro::Id;
 
 use super::{
   capture_widget,
   declare_widget::{assign_uninit_field, check_duplicate_field, pick_fields_by, WidgetGen},
   ribir_variable,
   track::SimpleField,
-  widget_macro::TrackExpr,
-  DeclareCtx, ObjectUsed, ScopeUsedInfo, UsedType,
+  DeclareCtx, ObjectUsed, ScopeUsedInfo, TrackExpr, UsedType,
 };
 use super::{declare_widget::DeclareField, kw};
 
