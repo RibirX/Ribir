@@ -26,7 +26,7 @@ module.exports = {
   "scopes": [
     "core",
     "painter",
-    "compiler",
+    "macros",
     "gpu",
     "text",
     "algo",

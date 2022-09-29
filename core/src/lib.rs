@@ -3,7 +3,6 @@
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;
-extern crate widget_derive;
 
 pub mod animation;
 mod application;
@@ -43,14 +42,14 @@ pub mod prelude {
   pub use ::painter::*;
   #[doc(no_inline)]
   pub use algo::CowRc;
+  #[doc(no_inline)]
+  pub use ribir_macros::{
+    include_svg, widget, widget_try_track, Declare, Lerp, MultiChild, SingleChild,
+  };
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   #[doc(no_inline)]
   pub use widget::layout::{MultiChildWidget, SingleChildWidget};
-  #[doc(no_inline)]
-  pub use widget_derive::{
-    include_svg, widget, widget_try_track, Declare, Lerp, MultiChild, SingleChild,
-  };
 }
 
 pub mod test;
