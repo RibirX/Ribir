@@ -8,9 +8,7 @@ pub struct TreeCtx<'a> {
 }
 
 impl<'a> TreeCtx<'a> {
-  pub(crate) fn new(id: WidgetId, tree: &'a WidgetTree) -> Self {
-    Self { id, tree }
-  }
+  pub(crate) fn new(id: WidgetId, tree: &'a WidgetTree) -> Self { Self { id, tree } }
 }
 
 impl<'a> WidgetCtxImpl for TreeCtx<'a> {

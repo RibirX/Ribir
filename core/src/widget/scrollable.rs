@@ -40,12 +40,9 @@ impl ComposeSingleChild for ScrollableWidget {
           ExprWidget { expr: child }
         }}
       }
-
-      #[skip_nc]
-      on content.box_rect().size ~> this.content_size
-      #[skip_nc]
-      on view.box_rect().size ~> this.page
-      on content.left_anchor Animate {
+      change_on content.box_rect().size ~> this.content_size
+      change_on view.box_rect().size ~> this.page
+      change_on content.left_anchor Animate {
         transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(content.width());
@@ -53,7 +50,7 @@ impl ComposeSingleChild for ScrollableWidget {
           PositionUnit::Pixel(from.lerp(&to, rate))
         }
       }
-      on content.top_anchor Animate {
+      change_on content.top_anchor Animate {
         transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(content.height());

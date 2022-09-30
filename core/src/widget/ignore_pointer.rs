@@ -1,4 +1,4 @@
-use crate::{ prelude::*, impl_query_self_only };
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(Declare, SingleChild, Clone)]
 pub struct IgnorePointer {
@@ -7,9 +7,9 @@ pub struct IgnorePointer {
 
 impl Render for IgnorePointer {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      ctx.perform_child_layout(c, clamp)
-    })
+    ctx
+      .single_child()
+      .map_or_else(Size::zero, |c| ctx.perform_child_layout(c, clamp))
   }
 
   #[inline]

@@ -161,5 +161,4 @@ pub macro unit_test_describe($(run_unit_test($name: ident);)* ) {{
   if let Result::Err(err) = res {
     std::panic::resume_unwind(err);
   }
-
 }}

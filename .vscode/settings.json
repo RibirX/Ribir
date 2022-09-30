@@ -16,6 +16,7 @@
     "clippy",
     "cond",
     "dataflows",
+    "Desugared",
     "fontdb",
     "framebuffer",
     "guillotiere",

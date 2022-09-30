@@ -54,14 +54,11 @@ impl<W: AllowSingle<M>, C, M: ?Sized> HaveChild<(&dyn SingleChild, &M), C> for W
 }
 
 impl<W1, W2: HaveChild<M, C>, C, M: ?Sized> HaveChild<&M, C> for SingleChildWidget<W1, W2> {
-  type Target = SingleChildWidget<W1, SingleChildWidget<W2, C>>;
+  type Target = SingleChildWidget<W1, W2::Target>;
 
   fn have_child(self, child: C) -> Self::Target {
     let SingleChildWidget { widget, child: w2 } = self;
-    SingleChildWidget {
-      widget,
-      child: SingleChildWidget { widget: w2, child },
-    }
+    SingleChildWidget { widget, child: w2.have_child(child) }
   }
 }
 

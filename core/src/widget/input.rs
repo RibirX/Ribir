@@ -169,7 +169,7 @@ impl Compose for Caret {
         color: this.color,
         mounted: move |_| animate1.run(),
       }
-      on caret.visible Animate {
+      change_on caret.visible Animate {
         id: animate1,
         from: State {
           caret.visible: !caret.visible,

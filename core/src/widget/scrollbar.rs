@@ -28,9 +28,7 @@ impl ComposeSingleChild for HScrollBar {
           v_align: VAlign::Bottom,
         }
       }
-
-      #[skip_nc]
-      on scrolling.pos.x ~> this.offset
+      change_on scrolling.pos.x ~> this.offset
     }
   }
 }
@@ -64,8 +62,7 @@ impl ComposeSingleChild for VScrollBar {
         }
       }
 
-      #[skip_nc]
-      on scrolling.pos.y ~> this.offset
+      change_on scrolling.pos.y ~> this.offset
     }
   }
 }
@@ -104,8 +101,7 @@ impl ComposeSingleChild for BothScrollbar {
           margin: EdgeInsets::only_bottom(this.style.track.thickness )
         }
       }
-      #[skip_nc]
-      on scrolling.pos ~> this.offset
+      change_on scrolling.pos ~> this.offset
     }
   }
 }
@@ -151,7 +147,7 @@ impl Compose for HRawScrollbar {
           }
         }
       }
-      on thumb.left_anchor Animate {
+      change_on thumb.left_anchor Animate {
         transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(thumb.size.width);
@@ -176,7 +172,7 @@ impl Compose for VRawScrollbar {
   fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
     let scrolling = this.raw_ref().scrolling.clone();
-    
+
     widget! {
       track { scrolling, this }
       Stack {
@@ -204,7 +200,7 @@ impl Compose for VRawScrollbar {
           }
         }
       }
-      on thumb.top_anchor Animate {
+      change_on thumb.top_anchor Animate {
         transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(thumb.size.height);

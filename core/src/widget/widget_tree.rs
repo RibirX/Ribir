@@ -53,7 +53,6 @@ impl WidgetTree {
 
     let mut paint_ctx = PaintingCtx::new(self.root(), self, painter);
     while let Some(id) = w {
-
       let mut need_paint: bool = true;
 
       id.assert_get(self).query_all_type(
@@ -77,24 +76,21 @@ impl WidgetTree {
         rw.paint(&mut paint_ctx);
       }
 
-      w = id
-        .first_child(self)
-        .filter(|_| need_paint)
-        .or_else(|| {
-          let mut node = w;
-          while let Some(p) = node {
-            // self node sub-tree paint finished, goto sibling
-            paint_ctx.painter.restore();
-            node = p.next_sibling(self);
-            if node.is_some() {
-              break;
-            } else {
-              // if there is no more sibling, back to parent to find sibling.
-              node = p.parent(self);
-            }
+      w = id.first_child(self).filter(|_| need_paint).or_else(|| {
+        let mut node = w;
+        while let Some(p) = node {
+          // self node sub-tree paint finished, goto sibling
+          paint_ctx.painter.restore();
+          node = p.next_sibling(self);
+          if node.is_some() {
+            break;
+          } else {
+            // if there is no more sibling, back to parent to find sibling.
+            node = p.parent(self);
           }
-          node
-        });
+        }
+        node
+      });
     }
   }
 

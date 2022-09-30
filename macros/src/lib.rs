@@ -11,7 +11,7 @@ mod util;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-use widget_macro::{DeclareCtx, WidgetMacro};
+use widget_macro::gen_widget_macro;
 use widget_try_track_macro::TryTrack;
 mod widget_try_track_macro;
 
@@ -72,11 +72,7 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn widget(input: TokenStream) -> TokenStream {
-  let mut w = parse_macro_input! { input as WidgetMacro };
-  let mut ctx = DeclareCtx::default();
-  w.gen_tokens(&mut ctx).into()
-}
+pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None).into() }
 
 #[proc_macro]
 pub fn widget_try_track(input: TokenStream) -> TokenStream {

@@ -12,7 +12,7 @@ fn main() {
         size: Size::zero(),
       }
     }
-    on a.size ~> b.size
+    modify_on a.size ~> b.size
   };
 
   let _flow_handler = widget! {
@@ -32,7 +32,7 @@ fn main() {
       }
     }
 
-    on a.size + b.size ~> c.size
+    modify_on a.size + b.size ~> c.size
     on a.size + b.size {
       change : move |(_, after)| c.size = after
     }
@@ -57,12 +57,12 @@ fn main() {
               id: c,
               size: Size::zero(),
             }
-            on a.size + b.size ~> c.size
+            modify_on a.size + b.size ~> c.size
           }
         })
       }
     }
-    on a.size ~> b.size
+    modify_on a.size ~> b.size
   };
 
   let _fix_named_obj_moved_in_flow = widget! {
@@ -71,7 +71,7 @@ fn main() {
       SizedBox { id: b, size: Size::zero() }
       SizedBox { id: c, size: Size::zero() }
     }
-    on a.size ~> b.size
-    on a.size ~> c.size
+    modify_on a.size ~> b.size
+    modify_on a.size ~> c.size
   };
 }

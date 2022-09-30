@@ -170,7 +170,7 @@ fn data_flow_macro() {
       SizedBox { id: a, size }
       SizedBox { id: b, size: a.size }
     }
-    on a.size + b.size ~> c.size
+    change_on a.size + b.size ~> c.size
   };
   let mut wnd = Window::without_render(w, Size::new(400., 400.));
   wnd.draw_frame();
@@ -245,7 +245,6 @@ fn builtin_bind_to_self() {
     SizedBox {
       id: sized_box,
       size: Size::new(5., 5.),
-      #[skip_nc]
       cursor: {
         let icon = if sized_box.size.area() < 100. {
           CursorIcon::Hand

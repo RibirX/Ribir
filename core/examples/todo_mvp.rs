@@ -45,8 +45,8 @@ impl Compose for TodoMVP {
                     margin: EdgeInsets::vertical(4.)
                   }
                 }
-                on checkbox.checked  ~> this2.silent().tasks[idx].finished
-                Animate  {
+                change_on checkbox.checked ~> this2.silent().tasks[idx].finished
+                Animate {
                   id: mount_animate,
                   from: State { task.transform: Transform::translation(-400., 0. )},
                   transition: Transition {

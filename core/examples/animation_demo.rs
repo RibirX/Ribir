@@ -19,7 +19,7 @@ fn main() {
         }
       }
     }
-    on sized_box.size  Animate {
+    change_on sized_box.size Animate {
       from: State {
         sized_box.size: Size::new(10., 10.),
         sized_box.radius: Some(Radius::all(0.)),

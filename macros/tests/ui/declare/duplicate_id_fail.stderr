@@ -1,5 +1,8 @@
 error: Same `id: same_id` assign to multiple objects, id must be unique.
- --> tests/ui/declare/duplicate_id_fail.rs:9:13
+ --> tests/ui/declare/duplicate_id_fail.rs:6:11
   |
+6 |       id: same_id,
+  |           ^^^^^^^
+...
 9 |         id: same_id,
   |             ^^^^^^^
