@@ -7,7 +7,7 @@ fn main() {
       id: sized_box,
       size: Size::zero(),
     }
-    on sized_box.size Animate {
+    change_on sized_box.size Animate {
       id: size_animate,
       from: State {
         sized_box.size: Size::new(10., 10.),

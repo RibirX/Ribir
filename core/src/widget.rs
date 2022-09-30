@@ -107,17 +107,14 @@ pub trait Render: Query {
   /// Determines the set of render widgets located at the given position.
   fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
     let is_hit = hit_test_impl(ctx, pos);
-    HitTest {
-      hit: is_hit,
-      can_hit_child: is_hit,
-    }
+    HitTest { hit: is_hit, can_hit_child: is_hit }
   }
-
 }
 
 pub(crate) fn hit_test_impl(ctx: &TreeCtx, pos: Point) -> bool {
   let id = ctx.id();
-  ctx.widget_tree()
+  ctx
+    .widget_tree()
     .layout_box_rect(id)
     .map_or(false, |rect| rect.contains(pos))
 }

@@ -257,8 +257,7 @@ impl Dispatcher {
         Some((id, tree.map_from_parent(id, pos)))
       } else if hit_test.can_hit_child {
         let pos = tree.map_from_parent(id, pos);
-        id
-          .reverse_children(tree)
+        id.reverse_children(tree)
           .find_map(|c| down_coordinate(c, pos, tree))
       } else {
         None

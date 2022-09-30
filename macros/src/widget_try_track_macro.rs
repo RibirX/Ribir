@@ -9,13 +9,13 @@ use syn::{
   token::{Brace, Comma, Paren},
 };
 
-use crate::widget_macro::track::SimpleField;
+use crate::widget_macro::TrackField;
 
 syn::custom_keyword!(try_track);
 pub struct TryTrack {
   _try_track_token: try_track,
   _brace: Brace,
-  targets: Punctuated<SimpleField, Comma>,
+  targets: Punctuated<TrackField, Comma>,
   rest_tokens: TokenStream,
 }
 
@@ -36,7 +36,7 @@ impl ToTokens for TryTrack {
     let mut init = quote! {};
     self.targets.iter().for_each(|f| {
       if f.colon_token.is_some() {
-        let SimpleField { member, expr, .. } = f;
+        let TrackField { member, expr, .. } = f;
         init.extend(quote! { let #member = #expr; });
       }
     });

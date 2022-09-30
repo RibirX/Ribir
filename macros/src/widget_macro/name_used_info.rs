@@ -1,5 +1,5 @@
-use super::{ribir_variable, DeclareCtx};
-use crate::error::CircleUsedPath;
+use super::{desugar::NamedObjMap, ribir_variable};
+use crate::{error::CircleUsedPath, widget_macro::desugar::NamedObj};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote_spanned, ToTokens};
 use std::collections::HashMap;
@@ -27,7 +27,6 @@ bitflags::bitflags! {
 
 #[derive(Clone, Debug)]
 pub struct UsedPart<'a> {
-  pub skip_nc_cfg: bool,
   pub scope_label: Option<&'a Ident>,
   pub used_info: &'a HashMap<Ident, NameUsedInfo, ahash::RandomState>,
 }
@@ -49,16 +48,12 @@ where
 #[derive(Clone, Debug)]
 pub struct ObjectUsedPath<'a> {
   pub obj: &'a Ident,
-  pub skip_nc_cfg: bool,
   pub scope_label: Option<&'a Ident>,
   pub used_obj: &'a Ident,
   pub used_info: &'a NameUsedInfo,
 }
 
 impl<'a> ObjectUsed<'a> {
-  #[inline]
-  pub fn from_single_part(part: UsedPart<'a>) -> Self { Self(Box::new([part])) }
-
   // return the iterator of tuple, the tuple compose by a field and a widget name,
   // the widget name is what the field follow on
   pub fn used_full_path_iter<'r>(
@@ -66,21 +61,16 @@ impl<'a> ObjectUsed<'a> {
     self_name: &'r Ident,
   ) -> impl Iterator<Item = ObjectUsedPath<'r>> + 'r {
     self.iter().flat_map(move |p| {
-      let &UsedPart { skip_nc_cfg, scope_label, used_info } = p;
+      let &UsedPart { scope_label, used_info } = p;
       used_info
         .iter()
         .map(move |(used_obj, used_info)| ObjectUsedPath {
           obj: self_name,
-          skip_nc_cfg,
           scope_label,
           used_obj,
           used_info,
         })
     })
-  }
-
-  pub fn used_obj_iter(&self) -> impl Iterator<Item = &Ident> + '_ {
-    self.iter().flat_map(move |p| p.used_info.keys())
   }
 }
 
@@ -210,20 +200,16 @@ impl ScopeUsedInfo {
     self.0.iter_mut().flat_map(|m| m.iter_mut())
   }
 
-  pub fn all_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
+  pub fn all_used(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
     let used = self.0.as_ref()?;
     (!used.is_empty()).then(|| used.keys())
   }
 
-  pub fn used_part<'a>(
-    &'a self,
-    scope_label: Option<&'a Ident>,
-    skip_nc_cfg: bool,
-  ) -> Option<UsedPart> {
+  pub fn used_part<'a>(&'a self, scope_label: Option<&'a Ident>) -> Option<UsedPart> {
     self
       .0
       .as_ref()
-      .map(|used_info| UsedPart { scope_label, used_info, skip_nc_cfg })
+      .map(|used_info| UsedPart { scope_label, used_info })
   }
 
   pub fn filter_item(
@@ -248,25 +234,29 @@ impl ScopeUsedInfo {
 }
 
 impl<'a> ObjectUsedPath<'a> {
-  pub fn to_used_path(&self, ctx: &DeclareCtx) -> CircleUsedPath {
-    let obj = ctx
-      .user_perspective_name(self.obj)
+  pub fn to_used_path(&self, declare_objs: &NamedObjMap) -> CircleUsedPath {
+    fn src_name<'a>(name: &Ident, declare_objs: &'a NamedObjMap) -> Option<&'a Ident> {
+      declare_objs.get(name).map(|obj| match obj {
+        NamedObj::Host(obj) => &obj.name,
+        NamedObj::Builtin { src_name, .. } => src_name,
+      })
+    }
+    let obj = src_name(&self.obj, declare_objs)
       .unwrap_or_else(|| {
         if self.scope_label.is_none() {
           self.obj
         } else {
           // same id, but use the one which at the define place to provide more friendly
           // compile error.
-          ctx
-            .named_objects
-            .get_key_value(self.obj)
+          declare_objs
+            .get_name_obj(self.obj)
             .expect("Some named object not collect.")
             .0
         }
       })
       .clone();
 
-    let used_obj = ctx.user_perspective_name(self.used_obj).map_or_else(
+    let used_obj = src_name(self.used_obj, declare_objs).map_or_else(
       || self.used_obj.clone(),
       |user| Ident::new(&user.to_string(), self.used_obj.span()),
     );

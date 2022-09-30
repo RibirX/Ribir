@@ -1,5 +1,28 @@
+use ::builtin::builtin;
+use inflector::Inflector;
+use lazy_static::lazy_static;
 use proc_macro2::Span;
+use std::collections::HashMap;
 use syn::Ident;
+
+include!("../builtin_fields_list.rs");
+
+lazy_static! {
+  pub static ref RESERVE_IDENT: HashMap<&'static str, &'static str, ahash::RandomState> = WIDGETS
+    .iter()
+    .flat_map(|w| w.fields.iter())
+    .map(|f| (f.name, f.doc))
+    .collect();
+  pub static ref FIELD_WIDGET_TYPE: HashMap<&'static str, &'static str, ahash::RandomState> =
+    WIDGETS
+      .iter()
+      .flat_map(|w| w.fields.iter().map(|f| (f.name, w.ty)))
+      .collect();
+  pub static ref BUILTIN_WIDGET_SUFFIX: HashMap<&'static str, String, ahash::RandomState> = WIDGETS
+    .iter()
+    .map(|w| (w.ty, w.ty.to_snake_case()))
+    .collect();
+}
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
 
@@ -25,3 +48,12 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
 }
 
 pub fn ctx_ident(span: Span) -> Ident { Ident::new("ctx", span) }
+
+pub fn builtin_var_name(host: &Ident, ty: &str) -> Ident {
+  let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).expect(&format!(
+    "The suffix of {ty} not found, should use a builtin type to query suffix."
+  ));
+  ribir_suffix_variable(host, suffix)
+}
+
+pub fn is_listener(ty_name: &str) -> bool { ty_name.ends_with("Listener") }

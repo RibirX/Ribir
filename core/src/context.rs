@@ -23,7 +23,6 @@ pub use build_context::BuildCtx;
 mod tree_context;
 pub use tree_context::*;
 
-
 pub struct AppContext {
   pub font_db: Arc<RwLock<FontDB>>,
   pub shaper: TextShaper,

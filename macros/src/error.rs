@@ -2,7 +2,7 @@ use crate::widget_macro::NameUsedInfo;
 use proc_macro::{Diagnostic, Level, Span};
 use proc_macro2::TokenStream;
 
-use quote::quote;
+use quote::ToTokens;
 use syn::Ident;
 
 #[derive(Debug)]
@@ -16,28 +16,24 @@ pub struct CircleUsedPath {
 #[derive(Debug)]
 pub enum DeclareError {
   DuplicateID([Ident; 2]),
-  CircleInit(Box<[CircleUsedPath]>),
-  CircleFollow(Box<[CircleUsedPath]>),
+  CircleDepends(Box<[CircleUsedPath]>),
   ExprWidgetInvalidField(Vec<Span>),
-  OnInvalidTarget(Ident),
+  OnInvalidTarget(Span),
   OnInvalidField(Ident),
+  NoFromStateForAnimate(Span),
+  EventObserveOnUndeclared(Ident),
+  SynErr(syn::Error),
 }
 
 #[derive(Debug)]
-pub enum DeclareWarning<'a> {
-  NeedlessSkipNc(Span),
-  UnusedName(&'a Ident),
+pub enum DeclareWarning {
+  UnusedName(Span),
   ObserveIsConst(Span),
   DefObjWithoutId(Span),
 }
 
 impl DeclareError {
-  pub fn into_compile_error(self) -> TokenStream {
-    self.error_emit();
-    quote! { unreachable!() }
-  }
-
-  pub fn error_emit(self) {
+  pub fn into_compile_error(&self, tokens: &mut TokenStream) {
     let mut diagnostic = Diagnostic::new(Level::Error, "");
     match self {
       DeclareError::DuplicateID([id1, id2]) => {
@@ -48,44 +44,45 @@ impl DeclareError {
           id1
         ));
       }
-      DeclareError::CircleInit(path) => {
-        let (msg, spans, note_spans) = path_info(&path);
-        let msg = format!("Can't init widget because circle follow: {}", msg);
-        diagnostic.set_spans(spans);
-        diagnostic.set_message(msg);
-        let note_msg = "If the circular is your want and will finally not infinite change,\
-        you should break the init circle and declare some follow relationship in `data_flow`, \
-        and remember use `#[skip_nc]` attribute to skip the no change trigger of the field modify\
-        to ignore infinite state change trigger.";
-        diagnostic = diagnostic.span_note(note_spans, note_msg);
-      }
-      DeclareError::CircleFollow(path) => {
+      DeclareError::CircleDepends(path) => {
         let (msg, spans, note_spans) = path_info(&path);
         let msg = format!(
-          "Circle follow will cause infinite state change trigger: {}",
+          "There is a directly circle depends exist, this will cause infinite loop: {}",
           msg
         );
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);
-        let note_msg = "If the circular is your want, use `#[skip_nc]` attribute before field \
-        or data_flow to skip the no change trigger of the field modify to ignore infinite state \
-        change trigger.";
+        let note_msg = "You can use `change` event to break circle, which \
+          will trigger only if the value really changed by compare if the value \
+          equal before modify and after.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::ExprWidgetInvalidField(spans) => {
-        diagnostic.set_spans(spans);
+        diagnostic.set_spans(spans.clone());
         diagnostic.set_message("`ExprWidget` only accept `expr` field.");
       }
-      DeclareError::OnInvalidTarget(t) => {
-        diagnostic.set_spans(t.span().unwrap());
+      DeclareError::OnInvalidTarget(span) => {
+        diagnostic.set_spans(*span);
         diagnostic.set_message(
           "only the id of widget declared in `widget!` can used as the target of `on` group",
         );
       }
       DeclareError::OnInvalidField(f) => {
         diagnostic.set_spans(f.span().unwrap());
-        diagnostic.set_message("only listener work for `on` group.");
+        diagnostic.set_message(&format!(
+          "`{f}` is not allow use in `on` group, only listeners support.",
+        ));
       }
+      DeclareError::NoFromStateForAnimate(_) => todo!(),
+      DeclareError::EventObserveOnUndeclared(name) => {
+        diagnostic.set_spans(name.span().unwrap());
+        diagnostic.set_message(&format!(
+          "`{name}` is not declare in same `widget!` with `on` item, `on` item \
+          only allow to observe widget declared in the `widget!` macro which \
+          itself located in.",
+        ));
+      }
+      DeclareError::SynErr(err) => err.clone().into_compile_error().to_tokens(tokens),
     };
 
     diagnostic.emit();
@@ -99,9 +96,9 @@ fn path_info(path: &[CircleUsedPath]) -> (String, Vec<Span>, Vec<Span>) {
     .iter()
     .map(|info| {
       if let Some(m) = info.member.as_ref() {
-        format!("{}.{} ～> {} ", info.obj, m, info.used_widget)
+        format!("{}.{} ~> {} ", info.obj, m, info.used_widget)
       } else {
-        format!("{} ～> {} ", info.obj, info.used_widget)
+        format!("{} ~> {} ", info.obj, info.used_widget)
       }
     })
     .collect::<Vec<_>>()
@@ -138,19 +135,14 @@ fn path_info(path: &[CircleUsedPath]) -> (String, Vec<Span>, Vec<Span>) {
   (msg, spans, note_spans)
 }
 
-impl<'a> DeclareWarning<'a> {
+impl DeclareWarning {
   pub fn emit_warning(&self) {
     let mut d = Diagnostic::new(Level::Warning, "");
     match self {
-      DeclareWarning::NeedlessSkipNc(span) => {
+      DeclareWarning::UnusedName(span) => {
         d.set_spans(*span);
-        d.set_message("Unnecessary attribute, because not depends on any others");
-        d = d.help("Try to remove it.");
-      }
-      DeclareWarning::UnusedName(name) => {
-        d.set_spans(name.span().unwrap());
-        d.set_message(format!("`{name}` does not be used"));
-        d = d.span_help(vec![name.span().unwrap()], "Remove this line.");
+        d.set_message(format!("assigned id but not be used in anywhere."));
+        d = d.span_help(*span, "Remove this line.");
       }
       DeclareWarning::ObserveIsConst(span) => {
         d.set_spans(*span);

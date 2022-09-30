@@ -36,7 +36,7 @@ fn main() {
       id: a,
       size: Size::zero(),
     }
-    on a.size ~> a.size
+    modify_on a.size ~> a.size
   };
 
   let _data_flow_circular_field_skip_nc_pass = widget! {
@@ -45,11 +45,10 @@ fn main() {
       size: Size::zero(),
       SizedBox {
         id: b,
-        #[skip_nc]
         size: a.size,
       }
     }
-    on a.size ~> b.size
+    change_on a.size ~> b.size
   };
 
   let _circular_follows_with_skip_nc_pass = widget! {
@@ -57,7 +56,6 @@ fn main() {
       id: a,
       size: Size::zero(),
     }
-    #[skip_nc]
-    on a.size ~> a.size
+    change_on a.size ~> a.size
   };
 }
