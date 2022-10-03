@@ -19,12 +19,36 @@ impl Compose for TodoMVP {
         this: this.into_stateful(),
         this2: this.clone(),
         mount_task_cnt: Stateful::new(0),
-       }
+      }
       VScrollBar {
         Column {
           align_items: Align::Start,
           // when performed layout, means all task are mounted, we reset the mount count.
           performed_layout: move |_| *mount_task_cnt = 0,
+          Row {
+            SizedBox {
+              size: Size::new(300., 30.),
+              Input {
+                id: input,
+                text: String::from("\n"),
+              }
+            }
+            SizedBox {
+              size: Size::new(60., 30.),
+              radius: Radius::all(4.),
+              background: Brush::Color(Color::BLUEVIOLET),
+              tap: move |_| {
+                if input.text.len() > 0 {
+                  this.tasks.push(Task {
+                    label: input.text.to_string(),
+                    finished: false,
+                  });
+                  input.text = String::from("\n");
+                }
+              },
+              Text { text: "Add" }
+            }
+          }
           ExprWidget {
             expr: this.tasks.iter().enumerate().map(|(idx, task)| {
               let checked = task.finished;
