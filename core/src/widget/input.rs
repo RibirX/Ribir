@@ -249,11 +249,11 @@ impl Compose for Input {
           let cluster = helper.cluster_from_pos(e.position().x, e.position().y);
           this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
         },
-        pointer_up: move |_e| {
+        pointer_up: move |_| {
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
-                CaretState::Caret(begin as usize)              }
-              else {
+              CaretState::Caret(begin as usize)
+            } else {
               CaretState::Select(begin, end)
             };
           }

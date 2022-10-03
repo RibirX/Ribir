@@ -211,6 +211,26 @@ impl Border {
       bottom: side,
     }
   }
+
+  #[inline]
+  pub fn only_left(left: BorderSide) -> Self {
+    Self { left, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn only_right(right: BorderSide) -> Self {
+    Self { right, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn only_bottom(bottom: BorderSide) -> Self {
+    Self { bottom, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn only_top(top: BorderSide) -> Self {
+    Self { top, ..Default::default() }
+  }
 }
 #[cfg(test)]
 mod tests {
