@@ -162,11 +162,13 @@ impl Compose for Caret {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       track {this: this.into_stateful(),}
-      CaretRender {
+      SizedBox {
         id: caret,
         opacity: 1.,
-        rect: this.rect,
-        color: this.color,
+        size: this.rect.size,
+        top_anchor: this.rect.min_y(),
+        left_anchor: this.rect.min_x(),
+        background: this.color,
         mounted: move |_| animate1.run(),
       }
       Animate {
@@ -182,31 +184,6 @@ impl Compose for Caret {
       }
     }
   }
-}
-
-// todo: should be replace by sizedbox or rectangle widget after visible has
-// support
-#[derive(Declare)]
-struct CaretRender {
-  rect: Rect,
-  color: Color,
-}
-
-impl Query for CaretRender {
-  impl_query_self_only!();
-}
-
-impl Render for CaretRender {
-  fn perform_layout(&self, _: BoxClamp, _ctx: &mut LayoutCtx) -> Size { Size::zero() }
-
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    let painter = ctx.painter();
-    painter.rect(&self.rect);
-    painter.set_brush(Brush::Color(self.color));
-    painter.fill();
-  }
-
-  fn only_sized_by_parent(&self) -> bool { false }
 }
 
 #[derive(Declare)]
@@ -300,10 +277,10 @@ impl Compose for Input {
         }
         ExprWidget {
           expr: (*focus).then(|| {
-            Caret {
-              rect: helper.caret(this.caret.cursor().byte_offset()),
-              color: ctx.theme().caret_color,
-            }
+              Caret {
+                rect: helper.caret(this.caret.cursor().byte_offset()),
+                color: ctx.theme().caret_color,
+              }
           })
         }
       }
