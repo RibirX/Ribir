@@ -277,10 +277,12 @@ impl Compose for Input {
         }
         ExprWidget {
           expr: (*focus).then(|| {
+            widget!{
               Caret {
                 rect: helper.caret(this.caret.cursor().byte_offset()),
                 color: ctx.theme().caret_color,
               }
+            }
           })
         }
       }
