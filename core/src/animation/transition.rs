@@ -36,22 +36,16 @@ impl<E: Easing> Roc for Transition<E> {
       }
     }
 
-    if let Some(repeat) = self.repeat {
-      let rounds = run_dur.as_secs_f32() / self.duration.as_secs_f32();
-      if rounds > repeat {
-        return AnimateProgress::Dismissed;
-      } else {
-        run_dur = Duration::from_secs_f32(rounds.floor());
-      }
+    let repeat = self.repeat.unwrap_or(1.);
+
+    let rounds = run_dur.as_secs_f32() / self.duration.as_secs_f32();
+    if rounds > repeat {
+      return AnimateProgress::Finish;
     }
 
-    if run_dur > self.duration {
-      AnimateProgress::Finish
-    } else {
-      let time_rate = run_dur.as_secs_f32() / self.duration.as_secs_f32();
-      let p = self.easing.easing(time_rate);
-      AnimateProgress::Between(p)
-    }
+    let time_rate = (run_dur.as_secs_f32() - rounds.floor()) / self.duration.as_secs_f32();
+    let p = self.easing.easing(time_rate);
+    AnimateProgress::Between(p)
   }
 }
 
