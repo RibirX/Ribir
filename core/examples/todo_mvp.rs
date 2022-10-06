@@ -11,8 +11,8 @@ struct TodoMVP {
   tasks: Vec<Task>,
 }
 
-#[derive(PartialEq)]
-enum TabMode {
+#[derive(PartialEq, Debug)]
+enum TodoMode {
   All,
   Completed,
   Active,
@@ -26,7 +26,7 @@ impl Compose for TodoMVP {
         this: this.into_stateful(),
         this2: this.clone(),
         mount_task_cnt: Stateful::new(0),
-        tab_mode: Stateful::new(TabMode::All),
+        todo_mode: Stateful::new(TodoMode::All),
       }
       Column {
         margin: EdgeInsets::all(10.),
@@ -63,153 +63,180 @@ impl Compose for TodoMVP {
                 }
               }
               Text {
-                h_align: HAlign::Center,
-                v_align: VAlign::Center,
                 text: "Add",
                 style: TypographyTheme::of(ctx).button.text.clone(),
               }
             }
           }
         }
-        
-        SizedBox {
-          size: Size::new(512., 400.),
-          VScrollBar {
-            Column {
-              align_items: Align::Start,
-              // when performed layout, means all task are mounted, we reset the mount count.
-              performed_layout: move |_| *mount_task_cnt = 0,
-              ExprWidget {
-                expr: this.tasks.iter()
-                .filter(|task| {
-                  match *tab_mode {
-                    TabMode::All => true,
-                    TabMode::Active => !task.finished,
-                    TabMode::Completed => task.finished,
-                  }
-                })
-                .enumerate().map(|(idx, task)| {
-                  let checked = task.finished;
-                  let label = task.label.clone();
-                  widget! {
-                    track {
-                      mount_idx: Stateful::new(0),
-                      visible_delete: Stateful::new(false),
-                    }
-                    SizedBox {
-                      size: Size::new(400., 48.),
-                      Row {
-                        id: task,
-                        align_items: Align::Center,
-                        margin: EdgeInsets::vertical(4.),
-                        mounted: move |_| {
-                          *mount_idx = *mount_task_cnt;
-                          *mount_task_cnt +=1;
-                        },
-                        pointer_enter: move |_| { *visible_delete = true; },
-                        pointer_leave: move |_| { *visible_delete = false; },
-    
-                        Checkbox { id: checkbox, checked }
-                        Expanded {
-                          flex: 1.,
-                          Text {
-                            text: label,
-                            margin: EdgeInsets::vertical(4.)
-                          }
-                        }
-                        Icon {
-                          // visible: *visible_delete,
-                          tap: move |_| {
-                            this2.tasks.remove(idx);
-                          },
-                          ExprWidget {
-                            expr: {
-                              SvgIcons::of(ctx).close.clone()
-                            }
-                          }
-                        }
-                      }
-                    }
-                    on checkbox.checked  ~> this2.silent().tasks[idx].finished
-                    Animate  {
-                      id: mount_animate,
-                      from: State { task.transform: Transform::translation(-400., 0. )},
-                      transition: Transition {
-                        delay: (*mount_idx + 1) * Duration::from_millis(100),
-                        duration: Duration::from_millis(150),
-                        easing: easing::EASE_IN,
-                      }
-                    }
-                    on task {
-                      mounted: move |_| mount_animate.run()
-                    }
-                  }
-                }).collect::<Vec<_>>()
+
+        Row {
+          Expanded {
+            flex: 1.,
+            Text {
+              h_align: HAlign::Center,
+              padding: EdgeInsets::all(4.),
+              background: if *todo_mode == TodoMode::All {
+                Brush::Color(Color::BURLYWOOD)
+              } else {
+                Brush::Color(Color::WHITE)
+              },
+              border: if *todo_mode == TodoMode::All {
+                Border::only_bottom(BorderSide { width:1., color: Color::BURLYWOOD })
+              } else {
+                Border::only_bottom(BorderSide { width:1., color: Color::GRAY })
+              },
+              tap: move |_| {
+                if *todo_mode != TodoMode::All {
+                  *todo_mode = TodoMode::All;
+                }
+              },
+              text: "All",
+              style: TextStyle {
+                foreground: if *todo_mode == TodoMode::All {
+                  Brush::Color(Color::RED)
+                } else {
+                  Brush::Color(Color::BLACK)
+                },
+                ..Default::default()
+              }
+            }
+          }
+          Expanded {
+            flex: 1.,
+            Text {
+              h_align: HAlign::Center,
+              padding: EdgeInsets::all(4.),
+              background: if *todo_mode == TodoMode::Active {
+                Brush::Color(Color::BURLYWOOD)
+              } else {
+                Brush::Color(Color::WHITE)
+              },
+              border: if *todo_mode == TodoMode::Active {
+                Border::only_bottom(BorderSide { width:1., color: Color::BURLYWOOD })
+              } else {
+                Border::only_bottom(BorderSide { width:1., color: Color::GRAY })
+              },
+              tap: move |_| {
+                if *todo_mode != TodoMode::Active {
+                  *todo_mode = TodoMode::Active;
+                }
+              },
+              text: "Active",
+              style: TextStyle {
+                foreground: if *todo_mode == TodoMode::Active {
+                  Brush::Color(Color::RED)
+                } else {
+                  Brush::Color(Color::BLACK)
+                },
+                ..Default::default()
+              }
+            }
+          }
+          Expanded {
+            flex: 1.,
+            Text {
+              h_align: HAlign::Center,
+              padding: EdgeInsets::all(4.),
+              background: if *todo_mode == TodoMode::Completed {
+                Brush::Color(Color::BURLYWOOD)
+              } else {
+                Brush::Color(Color::WHITE)
+              },
+              border: if *todo_mode == TodoMode::Completed {
+                Border::only_bottom(BorderSide { width:1., color: Color::BURLYWOOD })
+              } else {
+                Border::only_bottom(BorderSide { width:1., color: Color::GRAY })
+              },
+              tap: move |_| {
+                if *todo_mode != TodoMode::Completed {
+                  *todo_mode = TodoMode::Completed;
+                }
+              },
+              text: "Completed",
+              style: TextStyle {
+                foreground: if *todo_mode == TodoMode::Completed {
+                  Brush::Color(Color::RED)
+                } else {
+                  Brush::Color(Color::BLACK)
+                },
+                ..Default::default()
               }
             }
           }
         }
 
-        Row {
+        VScrollBar {
           background: Brush::Color(Color::BURLYWOOD),
-          Expanded {
-            flex: 1.,
-            Text {
-              h_align: HAlign::Center,
-              tap: move |_| {
-                if *tab_mode != TabMode::All {
-                  *tab_mode = TabMode::All;
+
+          Column {
+            align_items: Align::Start,
+            padding: EdgeInsets::all(8.),
+            // when performed layout, means all task are mounted, we reset the mount count.
+            performed_layout: move |_| *mount_task_cnt = 0,
+            ExprWidget {
+              expr: this.tasks.iter()
+              .filter(|task| {
+                match *todo_mode {
+                  TodoMode::All => true,
+                  TodoMode::Active => !task.finished,
+                  TodoMode::Completed => task.finished,
                 }
-              },
-              text: "All",
-              style: TextStyle {
-                foreground: if *tab_mode == TabMode::All {
-                  Brush::Color(Color::RED)
-                } else {
-                  Brush::Color(Color::BLACK)
-                },
-                ..Default::default()
-              }
-            }
-          }
-          Expanded {
-            flex: 1.,
-            Text {
-              h_align: HAlign::Center,
-              tap: move |_| {
-                if *tab_mode != TabMode::Active {
-                  *tab_mode = TabMode::Active;
+              })
+              .enumerate().map(|(idx, task)| {
+                let checked = task.finished;
+                let label = task.label.clone();
+                widget! {
+                  track {
+                    mount_idx: Stateful::new(0),
+                    visible_delete: Stateful::new(false),
+                  }
+                  Row {
+                    id: task,
+                    align_items: Align::Center,
+                    margin: EdgeInsets::vertical(4.),
+                    mounted: move |_| {
+                      *mount_idx = *mount_task_cnt;
+                      *mount_task_cnt +=1;
+                    },
+                    pointer_enter: move |_| { *visible_delete = true; },
+                    pointer_leave: move |_| { *visible_delete = false; },
+
+                    Checkbox { id: checkbox, checked }
+                    Expanded {
+                      flex: 1.,
+                      Text {
+                        text: label,
+                        margin: EdgeInsets::vertical(4.)
+                      }
+                    }
+                    Icon {
+                      visible: *visible_delete,
+                      tap: move |_| {
+                        this2.tasks.remove(idx);
+                      },
+                      ExprWidget {
+                        expr: {
+                          SvgIcons::of(ctx).close.clone()
+                        }
+                      }
+                    }
+                  }
+                  on checkbox.checked  ~> this2.silent().tasks[idx].finished
+                  Animate  {
+                    id: mount_animate,
+                    from: State { task.transform: Transform::translation(-400., 0. )},
+                    transition: Transition {
+                      delay: (*mount_idx + 1) * Duration::from_millis(100),
+                      duration: Duration::from_millis(150),
+                      easing: easing::EASE_IN,
+                    }
+                  }
+                  on task {
+                    mounted: move |_| mount_animate.run()
+                  }
                 }
-              },
-              text: "Active",
-              style: TextStyle {
-                foreground: if *tab_mode == TabMode::Active {
-                  Brush::Color(Color::RED)
-                } else {
-                  Brush::Color(Color::BLACK)
-                },
-                ..Default::default()
-              }
-            }
-          }
-          Expanded {
-            flex: 1.,
-            Text {
-              h_align: HAlign::Center,
-              tap: move |_| {
-                if *tab_mode != TabMode::Completed {
-                  *tab_mode = TabMode::Completed;
-                }
-              },
-              text: "Completed",
-              style: TextStyle {
-                foreground: if *tab_mode == TabMode::Completed {
-                  Brush::Color(Color::RED)
-                } else {
-                  Brush::Color(Color::BLACK)
-                },
-                ..Default::default()
-              }
+              }).collect::<Vec<_>>()
             }
           }
         }
@@ -223,6 +250,18 @@ fn main() {
 
   let todo = TodoMVP {
     tasks: vec![
+      Task {
+        finished: true,
+        label: "Implement Checkbox".to_string(),
+      },
+      Task {
+        finished: true,
+        label: "Implement Checkbox".to_string(),
+      },
+      Task {
+        finished: true,
+        label: "Implement Checkbox".to_string(),
+      },
       Task {
         finished: true,
         label: "Implement Checkbox".to_string(),

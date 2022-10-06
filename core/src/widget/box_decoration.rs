@@ -231,6 +231,11 @@ impl Border {
   pub fn only_top(top: BorderSide) -> Self {
     Self { top, ..Default::default() }
   }
+
+  #[inline]
+  pub fn none() -> Self {
+    Self { ..Default::default() }
+  }
 }
 #[cfg(test)]
 mod tests {

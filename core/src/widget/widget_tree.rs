@@ -57,6 +57,26 @@ impl WidgetTree {
   pub(crate) fn draw(&self, painter: &mut Painter) {
     let mut w = Some(self.root());
 
+    fn back(
+      mut inspect: impl FnMut(),
+      mut back_parent_inspect: impl FnMut(),
+      mut node: Option<WidgetId>,
+      tree: &WidgetTree,
+    ) -> Option<WidgetId> {
+      while let Some(p) = node {
+        inspect();
+        node = p.next_sibling(tree);
+        if node.is_some() {
+          break;
+        } else {
+          back_parent_inspect();
+          // if there is no more sibling, back to parent to find sibling.
+          node = p.parent(tree);
+        }
+      }
+      node
+    }
+
     let mut paint_ctx = PaintingCtx::new(self.root(), self, painter);
     while let Some(id) = w {
       paint_ctx.id = id;
@@ -552,7 +572,10 @@ mod tests {
   use super::*;
   use crate::{
     prelude::{widget_tree::WidgetTree, IntoWidget},
-    test::{embed_post::EmbedPost, key_embed_post::EmbedPostWithKey, recursive_row::RecursiveRow},
+    test::{
+      embed_post::EmbedPost, expect_layout_result, key_embed_post::EmbedPostWithKey,
+      recursive_row::RecursiveRow, ExpectRect, LayoutTestItem,
+    },
   };
 
   fn test_sample_create(width: usize, depth: usize) -> WidgetTree {
@@ -734,5 +757,47 @@ mod tests {
       *trigger.silent_ref() = 2;
     }
     assert!(tree.needs_regen.borrow().is_empty())
+  }
+
+  // #[cfg(feature = "png")]
+  #[test]
+  fn need_paint_translate() {
+    let widget = widget! {
+      Column {
+        Row {
+          SizedBox { size: Size::new(20., 20.), background: Color::YELLOW }
+
+          SizedBox {
+            size: Size::new(30., 20.),
+            background: Color::YELLOW,
+            visible: false,
+          }
+        }
+        Row {
+          SizedBox { size: Size::new(20., 20.), background: Color::BLUE }
+
+          SizedBox {
+            size: Size::new(30., 20.),
+            background: Color::YELLOW,
+            visible: false,
+          }
+        }
+        Row {
+          SizedBox { size: Size::new(20., 20.), background: Color::RED }
+
+          SizedBox {
+            size: Size::new(30., 20.),
+            background: Color::YELLOW,
+            visible: false,
+          }
+        }
+      }
+    };
+    let mut window = Window::wgpu_headless(widget.into_widget(), DeviceSize::new(100, 100));
+    window.draw_frame();
+
+    // let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // expected.push("src/test_imgs/checkbox_indeterminate.png");
+    // window.write_as_png(expected.clone());
   }
 }
