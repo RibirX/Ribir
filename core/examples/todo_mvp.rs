@@ -18,33 +18,6 @@ enum TodoMode {
   Active,
 }
 
-#[derive(Default, Declare, MultiChild)]
-struct Tabs {
-  #[declare(default = 0)]
-  cur_idx: u32,
-}
-
-impl ComposeMultiChild for Tabs {
-  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
-    let len = children.len();
-    let mid = len / 2;
-    let (tabs, contents) = children.split_at(mid - 1);
-    widget_try_track! {
-      track { this }
-      Column {
-        Row {
-          ExprWidget {
-            expr: tabs,
-          }
-        }
-        ExprWidget {
-          expr: contents[this.cur_idx + mid]
-        }
-      } 
-    }
-  }
-}
-
 impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
@@ -64,7 +37,7 @@ impl Compose for TodoMVP {
             border: Border::only_bottom(BorderSide { width:1., color: Color::BLACK }),
             Input {
               id: input,
-              text: String::from("Add Task"),
+              placeholder: String::from("Add Task"),
             }
           }
           SizedBox {
@@ -73,13 +46,11 @@ impl Compose for TodoMVP {
             radius: Radius::all(4.),
             border: Border::all(BorderSide { width: 1., color: Color::BLACK }),
             tap: move |_| {
-              if input.text.len() > 0 {
-                this.tasks.push(Task {
-                  label: input.text.to_string(),
-                  finished: false,
-                });
-                input.text = String::from("Add Task");
-              }
+              this.tasks.push(Task {
+                label: input.text_in_show(),
+                finished: false,
+              });
+              input.text = String::default();
             },
             Row {
               Icon {
