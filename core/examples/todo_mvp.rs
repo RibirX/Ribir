@@ -18,6 +18,33 @@ enum TodoMode {
   Active,
 }
 
+#[derive(Default, Declare, MultiChild)]
+struct Tabs {
+  #[declare(default = 0)]
+  cur_idx: u32,
+}
+
+impl ComposeMultiChild for Tabs {
+  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
+    let len = children.len();
+    let mid = len / 2;
+    let (tabs, contents) = children.split_at(mid - 1);
+    widget_try_track! {
+      track { this }
+      Column {
+        Row {
+          ExprWidget {
+            expr: tabs,
+          }
+        }
+        ExprWidget {
+          expr: contents[this.cur_idx + mid]
+        }
+      } 
+    }
+  }
+}
+
 impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {

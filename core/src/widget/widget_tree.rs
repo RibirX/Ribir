@@ -57,26 +57,6 @@ impl WidgetTree {
   pub(crate) fn draw(&self, painter: &mut Painter) {
     let mut w = Some(self.root());
 
-    fn back(
-      mut inspect: impl FnMut(),
-      mut back_parent_inspect: impl FnMut(),
-      mut node: Option<WidgetId>,
-      tree: &WidgetTree,
-    ) -> Option<WidgetId> {
-      while let Some(p) = node {
-        inspect();
-        node = p.next_sibling(tree);
-        if node.is_some() {
-          break;
-        } else {
-          back_parent_inspect();
-          // if there is no more sibling, back to parent to find sibling.
-          node = p.parent(tree);
-        }
-      }
-      node
-    }
-
     let mut paint_ctx = PaintingCtx::new(self.root(), self, painter);
     while let Some(id) = w {
       paint_ctx.id = id;
