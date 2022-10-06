@@ -106,214 +106,94 @@ impl BoxDecoration {
   }
 }
 
-#[derive(Clone)]
-enum BorderPosition {
-  Top,
-  Left,
-  Bottom,
-  Right,
-}
 impl BoxDecoration {
   fn paint_border(&self, painter: &mut Painter, rect: &Rect) {
-    // return;
-    // todo: refactor border paint, we should only support radius for uniform border
-    // line.
-    let path_to_paint = self.continues_border();
-    if path_to_paint.is_empty() {
+    if self.border.is_none() {
       return;
     }
     let border = self.border.as_ref().unwrap();
-    // A continue rect round border.
-    if path_to_paint.len() == 1 && path_to_paint[0].len() == 4 {
-      let border_width = border.left.width;
-      painter
-        .set_line_width(border_width)
-        .set_brush(Brush::Color(border.left.color.clone()));
-
-      let half_border = border_width / 2.;
-      let rect = rect.inflate(half_border, half_border);
-      if let Some(ref radius) = self.radius {
-        painter.rect_round(&rect, radius);
-      } else {
-        painter.rect(&rect);
-      };
-      painter.stroke();
+    if let Some(radius) = &self.radius {
+      self.paint_round_border(painter, radius, border, rect);
     } else {
-      let w = rect.width();
-      let h = rect.height();
-      let mut tl = 0.;
-      let mut tr = 0.;
-      let mut bl = 0.;
-      let mut br = 0.;
-      if let Some(radius) = self.radius {
-        tl = radius.top_left.abs().min(w).min(h);
-        tr = radius.top_right.abs().min(w).min(h);
-        bl = radius.bottom_left.abs().min(w).min(h);
-        br = radius.bottom_right.abs().min(w).min(h);
-
-        if tl + tr > w {
-          let shrink = (tl + tr - w) / 2.;
-          tl -= shrink;
-          tr -= shrink;
-        }
-        if bl + br > w {
-          let shrink = (bl + br - w) / 2.;
-          bl -= shrink;
-          br -= shrink;
-        }
-        if tl + bl > h {
-          let shrink = (tl + bl - h) / 2.;
-          tl -= shrink;
-          bl -= shrink;
-        }
-        if tr + br > h {
-          let shrink = (tr + br - h) / 2.;
-          tr -= shrink;
-          br -= shrink;
-        }
-      }
-      let max = rect.max();
-      let half_left = border.left.width / 2.;
-      let half_right = border.right.width / 2.;
-      let half_top = border.top.width / 2.;
-      let half_bottom = border.bottom.width / 2.;
-      path_to_paint.iter().for_each(|path| {
-        path.iter().enumerate().for_each(|(index, pos)| {
-          let start = index == 0;
-          let end = index == path.len() - 1;
-          match pos {
-            BorderPosition::Top => {
-              let y = rect.min_y() - half_top;
-              if start {
-                painter
-                  .set_line_width(border.top.width)
-                  .set_brush(border.top.color.clone())
-                  .begin_path(Point::new(rect.min_x() - border.left.width, y));
-              }
-              if !end && tr > 0. && tr > 0. {
-                let center = Point::new(max.x - tr, rect.min_y() + tr);
-                painter.line_to(Point::new(max.x - tr, y)).ellipse_to(
-                  center,
-                  Vector::new(tr + half_right, tr + half_top),
-                  Angle::degrees(270.),
-                  Angle::degrees(360.),
-                );
-              } else {
-                painter.line_to(Point::new(max.x, y));
-              }
-            }
-            BorderPosition::Right => {
-              let x = max.x + half_right;
-              if start {
-                painter
-                  .set_line_width(border.right.width)
-                  .set_brush(border.right.color.clone())
-                  .begin_path(Point::new(x, rect.min_y() - border.top.width));
-              }
-              if !end && br > 0. && br > 0. {
-                let radius = Vector::new(br, br);
-                let center = max - radius;
-                painter.line_to(Point::new(x, max.y - br)).ellipse_to(
-                  center,
-                  radius + Vector::new(half_right, half_bottom),
-                  Angle::degrees(0.),
-                  Angle::degrees(90.),
-                );
-              } else {
-                painter.line_to(Point::new(x, max.y));
-              }
-            }
-            BorderPosition::Bottom => {
-              let y = max.y + half_bottom;
-              if start {
-                painter
-                  .set_line_width(border.bottom.width)
-                  .set_brush(border.bottom.color.clone())
-                  .begin_path(Point::new(max.x + border.right.width, y));
-              }
-              if !end && bl > 0. && bl > 0. {
-                painter
-                  .line_to(Point::new(rect.min_x() + bl, y))
-                  .ellipse_to(
-                    Point::new(rect.min_x() + bl, max.y - bl),
-                    Vector::new(bl + half_left, bl + half_bottom),
-                    Angle::degrees(90.),
-                    Angle::degrees(180.),
-                  );
-              } else {
-                painter.line_to(Point::new(rect.min_x(), y));
-              }
-            }
-            BorderPosition::Left => {
-              let x = rect.min_x() - half_left;
-              if start {
-                painter
-                  .set_line_width(border.left.width)
-                  .set_brush(border.left.color.clone())
-                  .begin_path(Point::new(x, max.y + border.bottom.width));
-              }
-
-              if !end && tl > 0. && tl > 0. {
-                let radius = Vector::new(tl, tl);
-                painter
-                  .line_to(Point::new(x, rect.min_y() + tl))
-                  .ellipse_to(
-                    rect.min() + radius,
-                    radius + Vector::new(half_left, half_top),
-                    Angle::degrees(180.),
-                    Angle::degrees(270.),
-                  );
-              } else {
-                painter.line_to(Point::new(x, rect.min_y()));
-              }
-            }
-          }
-        });
-        painter.close_path(true).stroke();
-      })
+      self.paint_rect_border(painter, border, rect);
     }
   }
 
-  fn continues_border(&self) -> Vec<Vec<BorderPosition>> {
-    let mut path_to_paint = vec![];
-    if let Some(border) = &self.border {
-      let mut continues_border = vec![];
+  fn is_border_uniform(&self) -> bool {
+    self.border.as_ref().map_or(true, |border| {
+      border.top == border.left && border.top == border.right && border.top == border.bottom
+    })
+  }
 
-      if border.top.is_visible() {
-        continues_border.push(BorderPosition::Top);
-      }
-      if border.right.is_visible() {
-        if border.right != border.top && !continues_border.is_empty() {
-          path_to_paint.push(continues_border.clone());
-          continues_border.clear();
+  fn paint_round_border(
+    &self,
+    painter: &mut Painter,
+    radius: &Radius,
+    border: &Border,
+    content_rect: &Rect,
+  ) {
+    assert!(
+      self.is_border_uniform(),
+      "radius can't be setted with different border"
+    );
+    let width_half = border.left.width / 2.;
+    let min_x = content_rect.min_x() - width_half;
+    let max_x = content_rect.max_x() + width_half;
+    let min_y = content_rect.min_y() - width_half;
+    let max_y = content_rect.max_y() + width_half;
+    let radius = Radius::new(
+      radius.top_left + width_half,
+      radius.top_right + width_half,
+      radius.bottom_left + width_half,
+      radius.bottom_right + width_half,
+    );
+
+    painter
+      .set_line_width(border.top.width)
+      .set_brush(Brush::Color(border.top.color.clone()));
+    painter.rect_round(
+      &Rect::new(
+        Point::new(min_x, min_y),
+        Size::new(max_x - min_x, max_y - min_y),
+      ),
+      &radius,
+    );
+    painter.stroke();
+  }
+
+  fn paint_rect_border(&self, painter: &mut Painter, border: &Border, content_rect: &Rect) {
+    let min_x = content_rect.min_x() - border.left.width;
+    let max_x = content_rect.max_x() + border.right.width;
+    let min_y = content_rect.min_y() - border.top.width;
+    let max_y = content_rect.max_y() + border.bottom.width;
+    let vertexs = [
+      Point::new(min_x, min_y), // lt
+      Point::new(max_x, min_y), // rt
+      Point::new(max_x, max_y), // rb
+      Point::new(min_x, max_y), // lb
+    ];
+    let edges = [(0, 1), (1, 2), (2, 3), (3, 0)];
+    let borders = [&border.top, &border.right, &border.bottom, &border.left];
+    let borders_offset = [
+      Size::new(0., border.top.width / 2.),
+      Size::new(-border.right.width / 2., 0.),
+      Size::new(0., -border.bottom.width / 2.),
+      Size::new(border.left.width / 2., 0.),
+    ];
+    edges
+      .iter()
+      .zip(borders.iter())
+      .zip(borders_offset.iter())
+      .for_each(|((edge, border), offset)| {
+        if border.is_visible() {
+          painter
+            .set_line_width(border.width)
+            .set_brush(Brush::Color(border.color.clone()));
+          painter.begin_path(vertexs[edge.0] + *offset);
+          painter.line_to(vertexs[edge.1] + *offset);
+          painter.close_path(false).stroke();
         }
-        continues_border.push(BorderPosition::Right);
-      }
-      if border.bottom.is_visible() {
-        if border.bottom != border.right && !continues_border.is_empty() {
-          path_to_paint.push(continues_border.clone());
-          continues_border.clear();
-        }
-        continues_border.push(BorderPosition::Bottom);
-      }
-      if border.left.is_visible() {
-        if border.left != border.bottom && !continues_border.is_empty() {
-          path_to_paint.push(continues_border.clone());
-          continues_border.clear();
-        }
-        continues_border.push(BorderPosition::Left);
-        if border.left == border.top {
-          if let Some(first) = path_to_paint.first_mut() {
-            continues_border.append(first);
-            std::mem::swap(first, &mut continues_border);
-          }
-        }
-      }
-      if !continues_border.is_empty() {
-        path_to_paint.push(continues_border);
-      }
-    }
-    path_to_paint
+      });
   }
 }
 
