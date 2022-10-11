@@ -28,7 +28,7 @@ pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
   let init_size = tex_init_size.unwrap_or(TEXTURE_INIT_SIZE);
   let max_size = tex_max_size.unwrap_or(TEXTURE_MAX_SIZE);
   let tessellator = Tessellator::new(init_size, max_size, shaper);
-  let gl = WgpuGl::from_wnd(window, size, AntiAliasing::Msaa4X).await;
+  let gl = WgpuGl::from_wnd(window, size, AntiAliasing::None).await;
 
   GpuBackend { tessellator, gl }
 }
@@ -203,10 +203,11 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     });
 
     {
-      let (view, resolve_target, store) = self.multisample_framebuffer.as_ref().map_or_else(
-        || (&view, None, true),
-        |multi_sample| (multi_sample, Some(&view), false),
-      );
+      // let (view, resolve_target, store) = self.multisample_framebuffer.as_ref().map_or_else(
+      //   || (&view, None, true),
+      //   |multi_sample| (multi_sample, Some(&view), false),
+      // );
+      let (view, resolve_target, store) =   (&view, None, true);
       let load = if self.empty_frame {
         wgpu::LoadOp::Clear(wgpu::Color::WHITE)
       } else {

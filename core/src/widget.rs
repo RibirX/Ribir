@@ -57,6 +57,8 @@ pub use data_widget::DataWidget;
 pub use scrollbar::*;
 mod clip;
 pub use clip::*;
+mod tabs;
+pub use tabs::*;
 
 mod void;
 use self::widget_tree::BoxClamp;
@@ -423,4 +425,21 @@ impl Render for Box<dyn Render> {
 
 impl Query for Box<dyn Render> {
   impl_proxy_query!(deref());
+}
+
+impl Query for Widget {
+  fn query_all(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    order: QueryOrder,
+  ) {
+    if let Some(ref node) = self.node {
+      match node {
+        WidgetNode::Compose(_) => todo!(),
+        WidgetNode::Render(r) => r.query_all(type_id, callback, order),
+        WidgetNode::Dynamic(_) => todo!(),
+      }
+    }
+  }
 }
