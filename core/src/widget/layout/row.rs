@@ -13,8 +13,9 @@ pub struct Row {
   pub justify_content: JustifyContent,
 }
 
-impl ComposeMultiChild for Row {
-  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
+impl ComposeChild for Row {
+  type Child = Vec<Widget>;
+  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
       Flex {
@@ -23,7 +24,7 @@ impl ComposeMultiChild for Row {
         direction: Direction::Horizontal,
         align_items: this.align_items,
         justify_content: this.justify_content,
-        ExprWidget { expr: children.into_iter() }
+        ExprWidget { expr: children }
       }
     }
   }

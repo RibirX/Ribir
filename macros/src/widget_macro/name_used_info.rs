@@ -32,7 +32,7 @@ pub struct UsedPart<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ObjectUsed<'a>(pub Box<[UsedPart<'a>]>);
+pub struct ObjectUsed<'a>(pub Vec<UsedPart<'a>>);
 
 #[derive(Debug, Default, Clone)]
 pub struct ScopeUsedInfo(Option<HashMap<Ident, NameUsedInfo, ahash::RandomState>>);
@@ -238,7 +238,9 @@ impl<'a> ObjectUsedPath<'a> {
     fn src_name<'a>(name: &Ident, declare_objs: &'a NamedObjMap) -> Option<&'a Ident> {
       declare_objs.get(name).map(|obj| match obj {
         NamedObj::Host(obj) => &obj.name,
-        NamedObj::Builtin { src_name, .. } => src_name,
+        NamedObj::Builtin { src_name, .. } | NamedObj::DuplicateListener { src_name, .. } => {
+          src_name
+        }
       })
     }
     let obj = src_name(&self.obj, declare_objs)

@@ -39,16 +39,18 @@ impl EventListener for KeyUpListener {
   fn dispatch(&self, event: &mut KeyboardEvent) { (self.key_up.borrow_mut())(event) }
 }
 
-impl ComposeSingleChild for KeyDownListener {
+impl ComposeChild for KeyDownListener {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }
 
-impl ComposeSingleChild for KeyUpListener {
+impl ComposeChild for KeyUpListener {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

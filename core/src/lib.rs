@@ -49,7 +49,7 @@ pub mod prelude {
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   #[doc(no_inline)]
-  pub use widget::layout::{MultiChildWidget, SingleChildWidget};
+  pub use widget::layout::WidgetWithChild;
 }
 
 pub mod test;

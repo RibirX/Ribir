@@ -18,9 +18,10 @@ pub struct CharEvent {
   pub common: EventCommon,
 }
 
-impl ComposeSingleChild for CharListener {
+impl ComposeChild for CharListener {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

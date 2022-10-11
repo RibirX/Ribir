@@ -20,9 +20,8 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
       match node {
         WidgetNode::Compose(c) => {
           assert!(children.is_none());
-          let composed =
-            { move |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget() };
-          composed.into_widget()
+          (move |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget())
+            .into_widget()
         }
         WidgetNode::Render(r) => {
           let node = WidgetNode::Render(Box::new(ComposedWidget { composed: r, by }));

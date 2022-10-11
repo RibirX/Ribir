@@ -8,8 +8,9 @@ pub use disposed::*;
 #[macro_export]
 macro_rules! impl_lifecycle {
   ($name: ident, $field: ident) => {
-    impl ComposeSingleChild for $name {
-      fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+    impl ComposeChild for $name {
+      type Child = Widget;
+      fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
         compose_child_as_data_widget(child, this)
       }
     }

@@ -154,6 +154,7 @@ pub trait IntoDynWidget<M: ?Sized> {
 
 // mark the expr of `ExprWidget` only generate at most one widget.
 pub trait SingleDyn<M: ?Sized>: IntoDynWidget<M> {}
+
 impl<W, M: ?Sized> IntoDynWidget<&M> for W
 where
   W: IntoWidget<M>,
@@ -182,22 +183,24 @@ where
 {
 }
 
+impl<E> ExprWidget<E> {
+  /// Only if `ExprWidget` generate at most one widget can as a normal widget,
+  /// otherwise it must been children of multi child widget.
+  #[inline]
+  pub fn into_widget<M: ?Sized, R>(self) -> Widget
+  where
+    E: FnMut(&mut BuildCtx) -> R + 'static,
+    R: SingleDyn<M>,
+  {
+    self.inner_into_widget()
+  }
+}
+
 impl<E, R> ExprWidget<E>
 where
   E: FnMut(&mut BuildCtx) -> R + 'static,
 {
-  /// Only if `ExprWidget` generate at most one widget can as a normal widget,
-  /// otherwise it must been children of multi child widget.
-  #[inline]
-  pub fn into_widget<M: ?Sized>(self) -> Widget
-  where
-    R: SingleDyn<M>,
-  {
-    self.into_child()
-  }
-
-  #[inline]
-  pub fn into_child<M: ?Sized>(self) -> Widget
+  pub(crate) fn inner_into_widget<M: ?Sized>(self) -> Widget
   where
     R: IntoDynWidget<M>,
   {

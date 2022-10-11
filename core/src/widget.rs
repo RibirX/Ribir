@@ -142,13 +142,6 @@ pub(crate) enum Children {
   Multi(Vec<Widget>),
 }
 
-#[marker]
-pub(crate) trait WidgetMarker {}
-impl<W: Compose> WidgetMarker for W {}
-impl<W: ComposeSingleChild> WidgetMarker for W {}
-impl<W: ComposeMultiChild> WidgetMarker for W {}
-impl<W: Render> WidgetMarker for W {}
-
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
 pub trait Query {
@@ -168,9 +161,6 @@ pub enum QueryOrder {
   InnerFirst,
   OutsideFirst,
 }
-
-pub(crate) type BoxedSingleChild = Box<SingleChildWidget<Box<dyn Render>, Widget>>;
-pub(crate) type BoxedMultiChild = MultiChildWidget<Box<dyn Render>>;
 
 /// Trait to detect if a type is match the `type_id`.
 pub trait QueryFiler {
@@ -218,14 +208,14 @@ impl<'a> dyn Render + 'a {
     );
   }
 
-  pub fn contain_type<T: Any>(&self, order: QueryOrder) -> bool {
+  pub fn contain_type<T: Any>(&self) -> bool {
     let mut hit = false;
     self.query_all_type(
       |_: &T| {
         hit = true;
         false
       },
-      order,
+      QueryOrder::OutsideFirst,
     );
     hit
   }
@@ -241,13 +231,9 @@ impl IntoWidget<Widget> for Widget {
 }
 
 impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C {
+  #[inline]
   fn into_widget(self) -> Widget {
-    Widget {
-      node: Some(WidgetNode::Compose(Box::new(|_| {
-        ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
-      }))),
-      children: Children::None,
-    }
+    ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
   }
 }
 

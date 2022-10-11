@@ -26,8 +26,9 @@ pub struct ScrollableWidget {
   content_size: Size,
 }
 
-impl ComposeSingleChild for ScrollableWidget {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for ScrollableWidget {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       LayoutBox {
