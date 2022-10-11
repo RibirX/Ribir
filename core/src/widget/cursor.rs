@@ -10,8 +10,9 @@ pub struct Cursor {
   pub cursor: Rc<Cell<CursorIcon>>,
 }
 
-impl ComposeSingleChild for Cursor {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for Cursor {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
       ExprWidget {

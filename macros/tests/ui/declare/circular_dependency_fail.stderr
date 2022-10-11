@@ -35,13 +35,13 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
    |           ^^^^^^
 24 |       size: Size::zero(),
 25 |       margin: child.margin.clone(),
-   |       ^^^^^^  ^^^^^
+   |       ^^^^^^  ^^^^^^^^^^^^
 26 |       SizedBox{
 27 |         id: child,
    |             ^^^^^
 28 |         size: Size::zero(),
 29 |         margin: parent.margin.clone(),
-   |         ^^^^^^  ^^^^^^
+   |         ^^^^^^  ^^^^^^^^^^^^^
    |
 note: You can use `change` event to break circle, which will trigger only if the value really changed by compare if the value equal before modify and after.
   --> tests/ui/declare/circular_dependency_fail.rs:25:7

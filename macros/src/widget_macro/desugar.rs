@@ -1,9 +1,8 @@
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
-use syn::{
-  parse_quote, parse_quote_spanned, spanned::Spanned, Expr, ExprField, ExprPath, Ident, Path,
-};
+use syn::{parse_quote, parse_quote_spanned, spanned::Spanned, Expr, ExprPath, Ident, Path};
 
 use super::{
   child_variable, is_listener,
@@ -28,7 +27,6 @@ pub struct Desugared {
   pub track: Option<Track>,
   pub named_objs: NamedObjMap,
   pub stmts: Vec<SubscribeItem>,
-  pub on_listeners: Vec<ExprField>,
   pub widget: Option<WidgetNode>,
   pub errors: Vec<DeclareError>,
   pub warnings: Vec<DeclareWarning>,
@@ -49,12 +47,13 @@ pub enum SubscribeItem {
     value: TrackExpr,
   },
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeclareObj {
   pub ty: Path,
   pub name: Ident,
   pub fields: SmallVec<[Field; 1]>,
   pub stateful: bool,
+  pub desugar_from_on_event: bool,
 }
 
 #[derive(Debug)]
@@ -68,17 +67,21 @@ pub enum NamedObj {
   Host(DeclareObj),
   Builtin {
     src_name: Ident,
-    objs: SmallVec<[DeclareObj; 1]>,
+    obj: DeclareObj,
+  },
+  DuplicateListener {
+    src_name: Ident,
+    objs: Vec<DeclareObj>,
   },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Field {
   pub member: Ident,
   pub value: FieldValue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FieldValue {
   Expr(TrackExpr),
   Obj(Box<DeclareObj>),
@@ -104,7 +107,6 @@ impl MacroSyntax {
       widget: None,
       errors: vec![],
       warnings: vec![],
-      on_listeners: <_>::default(),
     };
     let default_name = ribir_variable("ribir", widget.ty.span());
     let widget = widget.desugar(default_name, &mut desugared);
@@ -143,8 +145,9 @@ impl DeclareWidget {
 
     let parent = if let Some(name) = id {
       desugared.add_named_host_obj(DeclareObj::new(ty, name.clone(), fields));
-      builtin_widgets.into_iter().for_each(|(ty, info)| {
-        desugared.add_named_builtin_obj(&name, ty, info);
+      builtin_widgets.into_iter().for_each(|(ty, fields)| {
+        let obj = builtin_obj(&name, ty, fields);
+        desugared.add_named_builtin_obj(&name, obj);
       });
       ComposeItem::Id(name)
     } else {
@@ -153,9 +156,10 @@ impl DeclareWidget {
         .rev()
         .filter_map(|b_widget| builtin_widgets.remove_entry(b_widget.ty))
         .map(|(ty, fields)| {
-          let name = builtin_var_name(&default_name, ty);
+          let span = builtin_span(&default_name, &fields);
+          let name = builtin_var_name(&default_name, span, ty);
           let ty = Ident::new(ty, name.span()).into();
-          DeclareObj { ty, name, fields, stateful: false }
+          DeclareObj::new(ty, name, fields)
         })
         .collect::<SmallVec<_>>();
       assert!(builtin_widgets.is_empty());
@@ -179,7 +183,13 @@ impl DeclareWidget {
 
 impl DeclareObj {
   pub fn new(ty: Path, name: Ident, fields: SmallVec<[Field; 1]>) -> Self {
-    Self { ty, name, fields, stateful: false }
+    Self {
+      ty,
+      name,
+      fields,
+      stateful: false,
+      desugar_from_on_event: false,
+    }
   }
 }
 
@@ -290,7 +300,9 @@ impl Animate {
       DesugaredObj::Name(c_name)
     } else {
       let name = ribir_variable("animate", animate_token.span());
-      DesugaredObj::Obj(DeclareObj { ty, name, fields, stateful: true })
+      let mut obj = DeclareObj::new(ty, name, fields);
+      obj.stateful = true;
+      DesugaredObj::Obj(obj)
     }
   }
 }
@@ -405,13 +417,8 @@ impl Desugared {
     }
   }
 
-  pub fn add_named_builtin_obj(
-    &mut self,
-    src_name: &Ident,
-    ty: &str,
-    fields: SmallVec<[Field; 1]>,
-  ) {
-    self.named_objs.add_builtin_obj(src_name, ty, fields)
+  pub fn add_named_builtin_obj(&mut self, src_name: &Ident, obj: DeclareObj) {
+    self.named_objs.add_builtin_obj(src_name, obj)
   }
 }
 impl OnEventDo {
@@ -435,11 +442,6 @@ impl OnEventDo {
       } else {
         if let Some(ty) = FIELD_WIDGET_TYPE.get(member.to_string().as_str()) {
           if is_listener(ty) {
-            if observe_name.is_some() {
-              desugar
-                .on_listeners
-                .push(parse_quote!(#observe_name.#member));
-            }
             listeners.entry(ty).or_default().push(f.into());
             continue;
           }
@@ -456,8 +458,10 @@ impl OnEventDo {
       if !named_objs.contains(&name) {
         errors.push(DeclareError::EventObserveOnUndeclared(name.clone()));
       }
-      listeners.into_iter().for_each(|(ty, info)| {
-        desugar.add_named_builtin_obj(name, ty, info);
+      listeners.into_iter().for_each(|(ty, fields)| {
+        let mut obj = builtin_obj(name, ty, fields);
+        obj.desugar_from_on_event = true;
+        desugar.add_named_builtin_obj(name, obj);
       });
     } else {
       errors.push(DeclareError::OnInvalidTarget(observe.span().unwrap()));
@@ -535,6 +539,8 @@ impl NamedObjMap {
 
   pub fn names(&self) -> impl Iterator<Item = &Ident> { self.0.keys() }
 
+  pub fn objs(&self) -> impl Iterator<Item = &NamedObj> { self.0.values() }
+
   pub fn objs_mut(&mut self) -> impl Iterator<Item = &mut NamedObj> { self.0.values_mut() }
 
   pub fn iter(&self) -> impl Iterator<Item = (&Ident, &NamedObj)> { self.0.iter() }
@@ -553,26 +559,42 @@ impl NamedObjMap {
     }
   }
 
-  fn add_builtin_obj(&mut self, src_name: &Ident, ty: &str, fields: SmallVec<[Field; 1]>) {
-    let name = builtin_var_name(&src_name, ty);
-    let ty = Ident::new(ty, src_name.span()).into();
-    let obj = DeclareObj {
-      ty,
-      name: name.clone(),
-      fields,
-      stateful: false,
-    };
-
-    match self.get_mut(&name) {
+  fn add_builtin_obj(&mut self, src_name: &Ident, obj: DeclareObj) {
+    match self.0.get_mut(&obj.name) {
       Some(NamedObj::Host(_)) => unreachable!("named object conflict with listener name."),
-      Some(NamedObj::Builtin { objs, .. }) => objs.push(obj),
+      Some(NamedObj::Builtin { obj: o, src_name }) => {
+        let name = obj.name.clone();
+        let n = NamedObj::DuplicateListener {
+          src_name: src_name.clone(),
+          objs: vec![o.clone(), obj],
+        };
+        self.0.insert(name, n);
+      }
+      Some(NamedObj::DuplicateListener { objs, .. }) => objs.push(obj),
       None => {
         let src_name = src_name.clone();
-        self.0.insert(
-          obj.name.clone(),
-          NamedObj::Builtin { src_name, objs: smallvec![obj] },
-        );
+        self
+          .0
+          .insert(obj.name.clone(), NamedObj::Builtin { src_name, obj });
       }
     }
   }
+}
+
+fn builtin_span(host: &Ident, fields: &SmallVec<[Field; 1]>) -> Span {
+  if fields.is_empty() {
+    host.span()
+  } else {
+    let span = fields[0].member.span();
+    fields[1..]
+      .iter()
+      .fold(span, |span, f| span.join(f.member.span()).unwrap())
+  }
+}
+
+pub fn builtin_obj(src_name: &Ident, ty: &str, fields: SmallVec<[Field; 1]>) -> DeclareObj {
+  let span = builtin_span(src_name, &fields);
+  let name = builtin_var_name(&src_name, span, ty);
+  let ty = Ident::new(ty, src_name.span()).into();
+  DeclareObj::new(ty, name, fields)
 }

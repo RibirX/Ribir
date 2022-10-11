@@ -9,17 +9,15 @@ pub use palette::Palette;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
-  prelude::{
-    Any, BuildCtx, ComposeSingleChild, Declare, DeclareBuilder, Query, QueryFiler, QueryOrder,
-    TypeId, Widget,
-  },
+  prelude::{Any, BuildCtx, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
 };
 use algo::ShareResource;
 pub use painter::*;
 use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
 use super::{
-  data_widget::compose_child_as_data_widget, easing::QuadraticBezierEasing, StateWidget, Transition,
+  data_widget::compose_child_as_data_widget, easing::QuadraticBezierEasing, ComposeChild,
+  StateWidget, Transition,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -167,9 +165,10 @@ pub struct ThemeWidget {
   pub theme: Theme,
 }
 
-impl ComposeSingleChild for ThemeWidget {
+impl ComposeChild for ThemeWidget {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     // todo: theme can provide fonts to load.
     compose_child_as_data_widget(child, this)
   }

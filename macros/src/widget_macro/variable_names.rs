@@ -49,11 +49,14 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
 
 pub fn ctx_ident(span: Span) -> Ident { Ident::new("ctx", span) }
 
-pub fn builtin_var_name(host: &Ident, ty: &str) -> Ident {
+pub fn builtin_var_name(host: &Ident, span: Span, ty: &str) -> Ident {
   let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).expect(&format!(
     "The suffix of {ty} not found, should use a builtin type to query suffix."
   ));
-  ribir_suffix_variable(host, suffix)
+
+  let mut name = ribir_suffix_variable(host, suffix);
+  name.set_span(span);
+  name
 }
 
 pub fn is_listener(ty_name: &str) -> bool { ty_name.ends_with("Listener") }

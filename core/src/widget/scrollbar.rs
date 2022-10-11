@@ -11,8 +11,9 @@ pub struct HScrollBar {
   pub style: ScrollBarTheme,
 }
 
-impl ComposeSingleChild for HScrollBar {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for HScrollBar {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Stack {
@@ -44,8 +45,9 @@ pub struct VScrollBar {
   pub style: ScrollBarTheme,
 }
 
-impl ComposeSingleChild for VScrollBar {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for VScrollBar {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Stack {
@@ -77,8 +79,9 @@ pub struct BothScrollbar {
   pub style: ScrollBarTheme,
 }
 
-impl ComposeSingleChild for BothScrollbar {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for BothScrollbar {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       Stack {

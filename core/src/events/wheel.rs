@@ -21,8 +21,10 @@ pub struct WheelListener {
   wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
 }
 
-impl ComposeSingleChild for WheelListener {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for WheelListener {
+  type Child = Widget;
+  #[inline]
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

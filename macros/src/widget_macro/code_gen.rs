@@ -5,11 +5,12 @@ use crate::{
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
+use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
   parse_quote_spanned,
   spanned::Spanned,
-  token::{Brace, Dot, Paren, Semi},
+  token::{Brace, Comma, Dot, Paren, Semi},
   Ident,
 };
 
@@ -88,18 +89,19 @@ impl Desugared {
       })
     }
 
-    let mut depends = BTreeMap::new();
-    self.named_objs.iter().for_each(|(name, obj)| {
+    let mut depends = BTreeMap::default();
+    let Self { named_objs, stmts, errors, .. } = self;
+    named_objs.iter().for_each(|(name, obj)| {
       let obj_used: ObjectUsed = match obj {
-        NamedObj::Host(obj) => used_part_iter(obj).collect(),
-        NamedObj::Builtin { objs, .. } => objs.iter().flat_map(used_part_iter).collect(),
+        NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => used_part_iter(obj).collect(),
+        NamedObj::DuplicateListener { objs, .. } => objs.iter().flat_map(used_part_iter).collect(),
       };
       if !obj_used.is_empty() {
         depends.insert(name, obj_used);
       }
     });
 
-    self.stmts.iter().for_each(|item| match item {
+    stmts.iter().for_each(|item| match item {
       SubscribeItem::Obj(_) => {
         // embed object must be a antonymous object.
       }
@@ -107,9 +109,12 @@ impl Desugared {
         if let Some(observes) = observe.used_name_info.directly_used_widgets() {
           let used = subscribe_do.used_name_info.used_part(None);
           if let Some(used) = used {
-            let used = ObjectUsed(Box::new([used]));
+            let used = ObjectUsed(vec![used]);
             observes.for_each(|name| {
-              depends.insert(name, used.clone());
+              depends
+                .entry(name)
+                .and_modify(|obj| obj.0.extend(used.0.clone()))
+                .or_insert_with(|| used.clone());
             });
           }
         }
@@ -148,12 +153,17 @@ impl Desugared {
 
         if let Some(CheckState::Checking) = check_state {
           let mut circle = vec![edges.last().cloned().unwrap()];
-          // todo!("start from node");
-          edges.iter().rev().for_each(|edge| {
-            if circle.last().map_or(false, |p| p.obj != edge.obj) {
-              circle.push(edge.clone());
+          for edge in edges.iter().rev() {
+            let circle_last = circle.last().unwrap();
+            if circle_last.obj != edge.obj {
+              if edge.used_obj == circle_last.obj {
+                circle.push(edge.clone());
+              } else {
+                break;
+              }
             }
-          });
+          }
+
           circles.push(circle);
         }
 
@@ -178,13 +188,9 @@ impl Desugared {
     });
 
     circles.iter().for_each(|path| {
-      let circle = DeclareError::CircleDepends(
-        path
-          .iter()
-          .map(|c| c.to_used_path(&self.named_objs))
-          .collect(),
-      );
-      self.errors.push(circle);
+      let circle =
+        DeclareError::CircleDepends(path.iter().map(|c| c.to_used_path(named_objs)).collect());
+      errors.push(circle);
     });
   }
 
@@ -208,11 +214,11 @@ impl Desugared {
       visit_state.insert(name);
       if let Some(obj) = self.named_objs.get(name) {
         match obj {
-          NamedObj::Host(obj) => obj
+          NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => obj
             .fields
             .iter()
             .for_each(|f| self.deep_in_field(f, visit_state, orders)),
-          NamedObj::Builtin { objs, .. } => objs
+          NamedObj::DuplicateListener { objs, .. } => objs
             .iter()
             .flat_map(|obj| obj.fields.iter())
             .for_each(|f| self.deep_in_field(f, visit_state, orders)),
@@ -243,15 +249,27 @@ impl Desugared {
   }
 
   fn collect_unused_declare_obj(&mut self, ctx: &VisitCtx) {
+    let on_event_used = self
+      .named_objs
+      .objs()
+      .filter_map(|obj| match obj {
+        NamedObj::Host(_) => None,
+        NamedObj::Builtin { src_name, obj } => obj.desugar_from_on_event.then_some(src_name),
+        NamedObj::DuplicateListener { src_name, .. } => Some(src_name),
+      })
+      .collect::<HashSet<_, ahash::RandomState>>();
+
     self
       .named_objs
       .iter()
-      .filter_map(|(name, obj)| {
+      .filter(|(name, obj)| {
         // Needn't check builtin named widget, shared id with host in user side.
-        matches!(obj, NamedObj::Host(_)).then(|| name)
+        matches!(obj, NamedObj::Host(_))
+          && !ctx.used_objs.contains_key(name)
+          && !name.to_string().starts_with('_')
+          && !on_event_used.contains(name)
       })
-      .filter(|name| !ctx.used_widgets.contains_key(name) && !name.to_string().starts_with('_'))
-      .for_each(|name| {
+      .for_each(|(name, _)| {
         self
           .warnings
           .push(DeclareWarning::UnusedName(name.span().unwrap()));
@@ -273,20 +291,6 @@ impl Desugared {
   }
 }
 
-impl DeclareObj {
-  pub fn whole_used_info(&self) -> ScopeUsedInfo {
-    self
-      .fields
-      .iter()
-      .fold(ScopeUsedInfo::default(), |mut acc, f| {
-        if let FieldValue::Expr(e) = &f.value {
-          acc.merge(&e.used_name_info)
-        }
-        acc
-      })
-  }
-}
-
 impl ToTokens for FieldValue {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
@@ -301,26 +305,10 @@ impl ToTokens for FieldValue {
 
 impl ToTokens for DeclareObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
-    let DeclareObj { fields, ty, name, stateful, .. } = self;
-    let whole_used_info = self.whole_used_info();
+    let DeclareObj { fields, ty, name, .. } = self;
     let span = ty.span();
     quote_spanned! { span => let #name = }.to_tokens(tokens);
-    whole_used_info.value_expr_surround_refs(tokens, span, |tokens| {
-      tokens.extend(quote_spanned! { span => <#ty as Declare>::builder() });
-      fields.iter().for_each(|f| {
-        let Field { member, value, .. } = f;
-        Dot(value.span()).to_tokens(tokens);
-        member.to_tokens(tokens);
-        Paren(value.span()).surround(tokens, |tokens| value.to_tokens(tokens))
-      });
-      let build_ctx = ctx_ident(ty.span());
-      tokens.extend(quote_spanned! { span => .build(#build_ctx) });
-      let is_stateful = *stateful || whole_used_info.directly_used_widgets().is_some();
-      if is_stateful {
-        tokens.extend(quote_spanned! { span => .into_stateful() });
-      }
-    });
-
+    self.gen_build_tokens(tokens);
     Semi(span).to_tokens(tokens);
 
     fields
@@ -350,6 +338,59 @@ impl ToTokens for DeclareObj {
           // subscribe.
         }
       });
+  }
+}
+
+impl DeclareObj {
+  pub fn whole_used_info(&self) -> ScopeUsedInfo {
+    self
+      .fields
+      .iter()
+      .fold(ScopeUsedInfo::default(), |mut acc, f| {
+        if let FieldValue::Expr(e) = &f.value {
+          acc.merge(&e.used_name_info)
+        }
+        acc
+      })
+  }
+
+  pub fn depends_any_other(&self) -> bool {
+    self.fields.iter().any(|f| match &f.value {
+      FieldValue::Expr(e) => e.used_name_info.directly_used_widgets().is_some(),
+      FieldValue::Obj(_) => false,
+    })
+  }
+
+  fn gen_as_value(&self, tokens: &mut TokenStream) {
+    if self.depends_any_other() {
+      Brace(self.span()).surround(tokens, |tokens| {
+        self.to_tokens(tokens);
+        self.name.to_tokens(tokens)
+      })
+    } else {
+      self.gen_build_tokens(tokens);
+    }
+  }
+
+  fn gen_build_tokens(&self, tokens: &mut TokenStream) {
+    let DeclareObj { fields, ty, stateful, .. } = self;
+    let whole_used_info = self.whole_used_info();
+    let span = ty.span();
+    whole_used_info.value_expr_surround_refs(tokens, span, |tokens| {
+      tokens.extend(quote_spanned! { span => <#ty as Declare>::builder() });
+      fields.iter().for_each(|f| {
+        let Field { member, value, .. } = f;
+        Dot(value.span()).to_tokens(tokens);
+        member.to_tokens(tokens);
+        Paren(value.span()).surround(tokens, |tokens| value.to_tokens(tokens))
+      });
+      let build_ctx = ctx_ident(ty.span());
+      tokens.extend(quote_spanned! { span => .build(#build_ctx) });
+      let is_stateful = *stateful || whole_used_info.directly_used_widgets().is_some();
+      if is_stateful {
+        tokens.extend(quote_spanned! { span => .into_stateful() });
+      }
+    });
   }
 }
 
@@ -466,71 +507,86 @@ impl WidgetNode {
 
   fn gen_compose_node(&self, named_objs: &NamedObjMap, tokens: &mut TokenStream) {
     let WidgetNode { parent, children } = self;
-    parent.gen_compose_item(named_objs, tokens);
+    let mut compose_list = parent.node_compose_list(named_objs);
 
     if !children.is_empty() {
-      children.iter().for_each(|node| {
-        quote! {.have_child}.to_tokens(tokens);
-        Paren::default().surround(tokens, |tokens| {
-          node.gen_compose_node(named_objs, tokens);
-        });
+      let last = compose_list
+        .last_mut()
+        .expect("must at least have one obj to compose.");
+
+      let span = last.span();
+      quote_spanned! {span => .with_child}.to_tokens(last);
+      Paren(span).surround(last, |tokens| {
+        if children.len() > 1 {
+          Paren(span).surround(tokens, |tokens| {
+            children.iter().for_each(|node| {
+              node.gen_compose_node(named_objs, tokens);
+              Comma(span).to_tokens(tokens);
+            });
+          });
+        } else {
+          children[0].gen_compose_node(named_objs, tokens);
+        }
       });
     }
+    compose_list[0].to_tokens(tokens);
+    recursive_compose(compose_list.into_iter().skip(1), tokens);
+  }
+}
+
+fn recursive_compose(mut chain: impl Iterator<Item = TokenStream>, tokens: &mut TokenStream) {
+  if let Some(current) = chain.next() {
+    let span = current.span();
+    quote_spanned! {span => .with_child}.to_tokens(tokens);
+    Paren(span).surround(tokens, |tokens| {
+      current.to_tokens(tokens);
+      recursive_compose(chain, tokens);
+    });
   }
 }
 
 impl ComposeItem {
-  fn gen_compose_item(&self, named_objs: &NamedObjMap, tokens: &mut TokenStream) {
+  fn node_compose_list(&self, named_objs: &NamedObjMap) -> SmallVec<[TokenStream; 1]> {
+    let mut list = smallvec![];
     match self {
       ComposeItem::ChainObjs(objs) => {
         assert!(objs.len() > 0);
-        objs[0].name.to_tokens(tokens);
-        objs[1..].iter().for_each(|obj| {
-          let name = &obj.name;
-          quote! {.have_child(#name)}.to_tokens(tokens);
-        })
+        list.extend(objs.iter().map(|obj| obj.name.clone().into_token_stream()));
       }
       ComposeItem::Id(name) => {
-        let builtin = WIDGETS
+        WIDGETS
           .iter()
           .rev()
           .filter_map(|builtin| {
-            let var_name = builtin_var_name(name, &builtin.ty);
-            named_objs.contains(&var_name).then(|| var_name)
+            let var_name = builtin_var_name(name, name.span(), &builtin.ty);
+            named_objs.get_name_obj(&var_name)
           })
-          .collect::<Vec<_>>();
-        if !builtin.is_empty() {
-          let first = &builtin[0];
-          first.to_tokens(tokens);
-          builtin[1..]
-            .iter()
-            .for_each(|name| quote! { .have_child(#name)}.to_tokens(tokens));
-          quote! { .have_child(#name)}.to_tokens(tokens)
-        } else {
-          name.to_tokens(tokens);
-        }
+          .for_each(|(var_name, obj)| match obj {
+            NamedObj::DuplicateListener { objs, .. } => {
+              list.extend(objs.iter().map(|obj| {
+                let mut obj_tokens = quote! {};
+                obj.gen_as_value(&mut obj_tokens);
+                obj_tokens
+              }));
+            }
+            NamedObj::Builtin { .. } => list.push(quote! {#var_name}),
+            NamedObj::Host(..) => unreachable!("builtin object type not match."),
+          });
+
+        list.push(quote! {#name});
       }
-    }
+    };
+    list
   }
 }
 
 impl ToTokens for NamedObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
-      NamedObj::Host(obj) => obj.to_tokens(tokens),
-      NamedObj::Builtin { objs, .. } => {
-        let most_inner = objs.last().unwrap();
-        most_inner.to_tokens(tokens);
-        objs.iter().rev().skip(1).for_each(|obj| {
-          let name = &obj.name;
-          quote_spanned! {obj.span() =>  let #name = }.to_tokens(tokens);
-          Brace(obj.span()).surround(tokens, |tokens| {
-            quote_spanned! { obj.span() =>  let tmp = #name; }.to_tokens(tokens);
-            obj.to_tokens(tokens);
-            quote_spanned! {obj.span() => #name.have_child(tmp)}.to_tokens(tokens);
-          });
-          Semi(obj.span()).to_tokens(tokens);
-        });
+      NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => obj.to_tokens(tokens),
+      NamedObj::DuplicateListener { .. } => {
+        // duplicated listener should not allow by others, directly do recursive
+        // compose in later.
       }
     }
   }

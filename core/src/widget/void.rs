@@ -19,9 +19,10 @@ impl Render for Void {
   fn only_sized_by_parent(&self) -> bool { true }
 }
 
-impl crate::prelude::ComposeSingleChild for Void {
+impl ComposeChild for Void {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(_: StateWidget<Self>, child: Widget) -> Widget { child }
+  fn compose_child(_: StateWidget<Self>, child: Self::Child) -> Widget { child }
 }
 
 impl Query for Void {

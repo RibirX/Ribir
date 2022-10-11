@@ -14,6 +14,10 @@ pub use name_used_info::*;
 mod variable_names;
 pub use variable_names::*;
 
+use crate::error::DeclareError;
+
+use self::desugar::{builtin_obj, NamedObj};
+
 pub mod kw {
   syn::custom_keyword!(widget);
   syn::custom_keyword!(track);
@@ -63,26 +67,32 @@ pub fn gen_widget_macro(
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
   desugar.collect_warnings(&ctx);
-  let used_widgets = ctx.used_widgets;
-  used_widgets.iter().for_each(|(name, builtin)| {
-    // add default builtin widget, which used by others but but declared.
-    if let Some(builtin) = builtin {
-      if !desugar.named_objs.contains(name) && desugar.named_objs.contains(&builtin.src_name) {
-        let BuiltinUsed { src_name, builtin_ty } = builtin;
-        desugar.add_named_builtin_obj(src_name, builtin_ty, <_>::default());
-      }
-    }
-
-    if let Some(obj) = desugar.named_objs.get_mut(name) {
-      // named obj used by other should force be stateful
-      match obj {
-        desugar::NamedObj::Host(obj) => obj.stateful = true,
-        desugar::NamedObj::Builtin { objs, .. } => {
-          objs.iter_mut().for_each(|obj| obj.stateful = true);
+  let used_widgets = ctx.used_objs;
+  used_widgets
+    .iter()
+    .for_each(|(name, UsedInfo { builtin, spans })| {
+      // add default builtin widget, which used by others but but declared.
+      if let Some(builtin) = builtin {
+        if !desugar.named_objs.contains(name) && desugar.named_objs.contains(&builtin.src_name) {
+          let BuiltinUsed { src_name, builtin_ty } = builtin;
+          let obj = builtin_obj(src_name, builtin_ty, <_>::default());
+          desugar.add_named_builtin_obj(src_name, obj);
         }
       }
-    }
-  });
+
+      if let Some(obj) = desugar.named_objs.get_mut(name) {
+        // named obj used by other should force be stateful
+        match obj {
+          NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => obj.stateful = true,
+          NamedObj::DuplicateListener { objs, .. } => {
+            desugar.errors.push(DeclareError::DependsOnDupListener {
+              declare_at: objs.iter().map(|o| o.name.span().unwrap()).collect(),
+              used_at: spans.clone(),
+            })
+          }
+        }
+      }
+    });
 
   let mut tokens = desugar.gen_code();
   if let Some(outside_ctx) = outside_ctx {
@@ -102,8 +112,12 @@ pub fn gen_widget_macro(
         #tokens
       }};
     }
-    used_outsides.into_iter().for_each(|(name, built_used)| {
-      outside_ctx.add_used_widget(name.clone(), built_used.clone(), UsedType::MOVE_CAPTURE)
+    used_outsides.into_iter().for_each(|(name, used_info)| {
+      outside_ctx.add_used_widget(
+        name.clone(),
+        used_info.builtin.clone(),
+        UsedType::MOVE_CAPTURE,
+      )
     });
   }
 

@@ -478,11 +478,14 @@ mod tests {
   #[test]
   fn cross_align() {
     fn cross_align_check(align: Align, y_pos: [f32; 3]) {
-      let row = Row { align_items: align, ..<_>::default() }
-        .have_child(SizedBox { size: Size::new(100., 20.) }.into_widget())
-        .have_child(SizedBox { size: Size::new(100., 30.) }.into_widget())
-        .have_child(SizedBox { size: Size::new(100., 40.) }.into_widget())
-        .into_widget();
+      let row = widget! {
+        Row {
+          align_items: align,
+          SizedBox { size: Size::new(100., 20.) }
+          SizedBox { size: Size::new(100., 30.) }
+          SizedBox { size: Size::new(100., 40.) }
+        }
+      };
 
       let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
       assert_eq!(rect.size, Size::new(300., 40.));
@@ -508,14 +511,14 @@ mod tests {
     cross_align_check(Align::Center, [10., 5., 0.]);
     cross_align_check(Align::End, [20., 10., 0.]);
 
-    let row = Row {
-      align_items: Align::Stretch,
-      ..<_>::default()
-    }
-    .have_child(SizedBox { size: Size::new(100., 20.) }.into_widget())
-    .have_child(SizedBox { size: Size::new(100., 30.) }.into_widget())
-    .have_child(SizedBox { size: Size::new(100., 40.) }.into_widget())
-    .into_widget();
+    let row = widget! {
+      Row {
+        align_items: Align::Stretch,
+        SizedBox { size: Size::new(100., 20.) }
+        SizedBox { size: Size::new(100., 30.) }
+        SizedBox { size: Size::new(100., 40.) }
+      }
+    };
 
     let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
     assert_eq!(rect.size, Size::new(300., 40.));

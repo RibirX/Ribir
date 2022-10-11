@@ -22,6 +22,10 @@ pub enum DeclareError {
   OnInvalidField(Ident),
   NoFromStateForAnimate(Span),
   EventObserveOnUndeclared(Ident),
+  DependsOnDupListener {
+    declare_at: Vec<Span>,
+    used_at: Vec<Span>,
+  },
   SynErr(syn::Error),
 }
 
@@ -77,12 +81,19 @@ impl DeclareError {
       DeclareError::EventObserveOnUndeclared(name) => {
         diagnostic.set_spans(name.span().unwrap());
         diagnostic.set_message(&format!(
-          "`{name}` is not declare in same `widget!` with `on` item, `on` item \
-          only allow to observe widget declared in the `widget!` macro which \
+          "Not found `{name}` declare in the `widget!`, `on` item only \
+          allow to observe widget declared in the `widget!` macro which \
           itself located in.",
         ));
       }
       DeclareError::SynErr(err) => err.clone().into_compile_error().to_tokens(tokens),
+      DeclareError::DependsOnDupListener { declare_at, used_at } => {
+        diagnostic.set_spans(used_at.clone());
+        diagnostic.set_message(&format!(
+          "Object can't be depends which have many instance.",
+        ));
+        diagnostic = diagnostic.span_help(declare_at.clone(), "declare at here.");
+      }
     };
 
     diagnostic.emit();

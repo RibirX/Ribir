@@ -68,9 +68,10 @@ pub enum FocusEventType {
   FocusOut,
 }
 
-impl ComposeSingleChild for FocusListener {
+impl ComposeChild for FocusListener {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

@@ -179,9 +179,8 @@ impl Dispatcher {
     self.pointer_down_uid = event.as_ref().map(|e| e.target());
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
-        id.get(tree).map_or(false, |w| {
-          w.contain_type::<FocusListener>(QueryOrder::InnerFirst)
-        })
+        id.get(tree)
+          .map_or(false, |w| w.contain_type::<FocusListener>())
       })
     });
     if let Some(focus_id) = nearest_focus {
@@ -222,9 +221,8 @@ impl Dispatcher {
       hit_widget
         .ancestors(tree)
         .filter(|w| {
-          w.get(tree).map_or(false, |w| {
-            w.contain_type::<PointerEnterListener>(QueryOrder::OutsideFirst)
-          })
+          w.get(tree)
+            .map_or(false, |w| w.contain_type::<PointerEnterListener>())
         })
         .for_each(|w| self.entered_widgets.push(w));
 

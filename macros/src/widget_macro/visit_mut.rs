@@ -1,12 +1,12 @@
 use crate::{error::DeclareError, WIDGET_MACRO_NAME};
 
 use super::{
-  capture_widget,
+  builtin_var_name, capture_widget,
   desugar::{ComposeItem, DeclareObj, Field, FieldValue, NamedObj, SubscribeItem, WidgetNode},
-  gen_widget_macro, ribir_suffix_variable, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
-  BUILTIN_WIDGET_SUFFIX, FIELD_WIDGET_TYPE,
+  gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, FIELD_WIDGET_TYPE,
 };
 
+use proc_macro::Span;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::collections::{HashMap, HashSet};
@@ -32,7 +32,7 @@ pub struct VisitCtx {
   pub track_names: HashSet<Ident, ahash::RandomState>,
   pub current_used_info: ScopeUsedInfo,
   /// name object has be used and its source name.
-  pub used_widgets: HashMap<Ident, Option<BuiltinUsed>, ahash::RandomState>,
+  pub used_objs: HashMap<Ident, UsedInfo, ahash::RandomState>,
   pub analyze_stack: Vec<Vec<LocalVariable>>,
 }
 
@@ -40,6 +40,11 @@ pub struct VisitCtx {
 pub struct LocalVariable {
   name: Ident,
   alias_of_name: Option<Ident>,
+}
+
+pub struct UsedInfo {
+  pub builtin: Option<BuiltinUsed>,
+  pub spans: Vec<Span>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,7 +59,7 @@ impl Default for VisitCtx {
       declare_objs: <_>::default(),
       track_names: <_>::default(),
       current_used_info: Default::default(),
-      used_widgets: Default::default(),
+      used_objs: Default::default(),
       analyze_stack: vec![vec![]],
     }
   }
@@ -137,10 +142,7 @@ impl VisitMut for VisitCtx {
         .filter(|name| self.declare_objs.contains(&name))
       {
         if let Some(builtin_ty) = FIELD_WIDGET_TYPE.get(member.to_string().as_str()) {
-          let suffix = BUILTIN_WIDGET_SUFFIX
-            .get(builtin_ty)
-            .expect("builtin ty must have a suffix");
-          let builtin_name = ribir_suffix_variable(&name, &suffix.to_string());
+          let builtin_name = builtin_var_name(&name, f_expr.span(), builtin_ty);
           let src_name = name.clone();
           *f_expr.base = parse_quote! { #builtin_name };
           self.add_used_widget(
@@ -268,8 +270,10 @@ fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == 
 impl VisitCtx {
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
     desugar.named_objs.objs_mut().for_each(|obj| match obj {
-      NamedObj::Host(obj) => self.visit_declare_obj(obj),
-      NamedObj::Builtin { objs, .. } => objs.iter_mut().for_each(|obj| self.visit_declare_obj(obj)),
+      NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj(obj),
+      NamedObj::DuplicateListener { objs, .. } => {
+        objs.iter_mut().for_each(|obj| self.visit_declare_obj(obj))
+      }
     });
 
     desugar
@@ -277,9 +281,6 @@ impl VisitCtx {
       .iter_mut()
       .for_each(|item| self.visit_subscribe_item_mut(item));
 
-    desugar.on_listeners.iter_mut().for_each(|e| {
-      self.visit_expr_field_mut(e);
-    });
     self.take_current_used_info();
 
     self.visit_widget_node_mut(&mut desugar.widget.as_mut().unwrap());
@@ -425,10 +426,22 @@ impl VisitCtx {
     used_type: UsedType,
   ) {
     if let Some(builtin) = builtin.as_ref() {
-      self.used_widgets.insert(builtin.src_name.clone(), None);
+      self.inner_add_used_obj(builtin.src_name.clone(), None);
     }
-    self.used_widgets.insert(name.clone(), builtin);
+    self.inner_add_used_obj(name.clone(), builtin);
+
     self.current_used_info.add_used(name, used_type);
+  }
+
+  fn inner_add_used_obj(&mut self, name: Ident, builtin: Option<BuiltinUsed>) {
+    let span = name.span().unwrap();
+    self
+      .used_objs
+      .entry(name)
+      .and_modify(|info| {
+        info.spans.push(span);
+      })
+      .or_insert_with(|| UsedInfo { builtin, spans: vec![span] });
   }
 }
 

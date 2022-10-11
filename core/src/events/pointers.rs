@@ -106,8 +106,10 @@ impl std::ops::DerefMut for PointerEvent {
 type PointerCallback = RefCell<Box<dyn for<'r> FnMut(&'r mut PointerEvent)>>;
 macro_rules! impl_pointer_listener {
   ($name: ident, $field: ident) => {
-    impl ComposeSingleChild for $name {
-      fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+    impl ComposeChild for $name {
+      type Child = Widget;
+      #[inline]
+      fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
         compose_child_as_data_widget(child, this)
       }
     }
@@ -191,8 +193,9 @@ pub struct TripleTapListener {
   pub tripe_tap: PointerCallback,
 }
 
-impl ComposeSingleChild for XTimesTapListener {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for XTimesTapListener {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
       ExprWidget {
@@ -240,8 +243,9 @@ impl ComposeSingleChild for XTimesTapListener {
   }
 }
 
-impl ComposeSingleChild for DoubleTapListener {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for DoubleTapListener {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
       XTimesTapListener {
@@ -252,8 +256,9 @@ impl ComposeSingleChild for DoubleTapListener {
   }
 }
 
-impl ComposeSingleChild for TripleTapListener {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for TripleTapListener {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
       XTimesTapListener {

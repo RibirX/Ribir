@@ -11,9 +11,10 @@ pub struct Expanded {
   pub flex: f32,
 }
 
-impl ComposeSingleChild for Expanded {
+impl ComposeChild for Expanded {
+  type Child = Widget;
   #[inline]
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }
@@ -65,19 +66,21 @@ mod tests {
   #[test]
   fn wrap_expanded() {
     let size = Size::new(100., 50.);
-    let row = Row { wrap: true, ..<_>::default() }
-      .have_child(
-        Expanded { flex: 1. }
-          .have_child(SizedBox { size }.into_widget())
-          .into_widget(),
-      )
-      .have_child(SizedBox { size }.into_widget())
-      .have_child(SizedBox { size }.into_widget())
-      .have_child(
-        Expanded { flex: 2. }
-          .have_child(SizedBox { size }.into_widget())
-          .into_widget(),
-      );
+    let row = widget! {
+      Row {
+        wrap: true,
+        Expanded {
+          flex: 1. ,
+          SizedBox { size }
+        }
+        SizedBox { size }
+        SizedBox { size }
+        Expanded {
+          flex: 2.,
+          SizedBox { size }
+        }
+      }
+    };
 
     let (rect, children) =
       widget_and_its_children_box_rect(row.into_widget(), Size::new(350., 500.));

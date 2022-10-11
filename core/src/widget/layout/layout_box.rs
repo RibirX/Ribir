@@ -8,8 +8,9 @@ pub struct LayoutBox {
   rect: Rect,
 }
 
-impl ComposeSingleChild for LayoutBox {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for LayoutBox {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
       ExprWidget {

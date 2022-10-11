@@ -42,34 +42,21 @@ macro_rules! impl_enum_widget {
        }
     }
 
-    impl<$($var_ty: SingleChild),+> SingleChild for $name <$($var_ty),+> {}
-    impl<$($var_ty: MultiChild),+> MultiChild for $name <$($var_ty),+> {}
-    impl<$($var_ty: ComposeSingleChild),+> ComposeSingleChild for $name <$($var_ty),+> {
-      fn compose_single_child(this: StateWidget<Self>, child: Widget)
-         -> Widget {
-        let w = match this {
-         StateWidget::  Stateless(w) => w,
-         StateWidget:: Stateful(_) =>  {
-          unreachable!("Enum widgets only use to store widget, should never convert to stateful.");
-         }
-        };
-        match w {
-          $($name::$var_ty(w) => $var_ty::compose_single_child(w.into(), child)),+
-        }
-      }
+    impl<$($var_ty: SingleChild),+> SingleChild for $name <$($var_ty),+> {
+
     }
-
-    impl<$($var_ty: ComposeMultiChild),+> ComposeMultiChild for $name <$($var_ty),+> {
-      fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
+    impl<$($var_ty: MultiChild),+> MultiChild for $name <$($var_ty),+> {}
+    impl<Child, $($var_ty: ComposeChild<Child=Child>),+> ComposeChild for $name <$($var_ty),+> {
+      type Child = Child;
+      fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
         let w = match this {
          StateWidget::  Stateless(w) => w,
          StateWidget:: Stateful(_) =>  {
           unreachable!("Enum widgets only use to store widget, should never convert to stateful.");
          }
         };
-
         match w {
-          $($name::$var_ty(w) => $var_ty::compose_multi_child(w.into(), children, )),+
+          $($name::$var_ty(w) => $var_ty::compose_child(w.into(), child)),+
         }
       }
     }
