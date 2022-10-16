@@ -1,6 +1,6 @@
 use self::palette::LightnessCfg;
 pub use super::*;
-use crate::{prelude::include_svg, widget::easing};
+use crate::{fill_icon, prelude::include_svg, widget::easing};
 pub use painter::{Brush, Color};
 use std::time::Duration;
 
@@ -82,24 +82,21 @@ pub mod purple {
 }
 
 fn icon_theme() -> IconTheme {
-  macro_rules! include_icon {
-    ($path: literal) => {
-      ShareResource::new(include_svg!($path))
-    };
-  }
+  let icon_size = IconSize {
+    tiny: Size::new(18., 18.),
+    small: Size::new(24., 24.),
+    medium: Size::new(36., 36.),
+    large: Size::new(48., 48.),
+    huge: Size::new(64., 64.),
+  };
+  let miss_icon = ShareResource::new(include_svg!("./material/miss_icon.svg"));
+  let mut theme = IconTheme::new(icon_size, miss_icon);
 
-  IconTheme {
-    icon_size: IconSize {
-      tiny: Size::new(18., 18.),
-      small: Size::new(24., 24.),
-      medium: Size::new(36., 36.),
-      large: Size::new(48., 48.),
-      huge: Size::new(64., 64.),
-    },
-    builtin_icons: SvgIcons {
-      checked: include_icon!("./material/checked.svg"),
-      unchecked: include_icon!("./material/unchecked_box.svg"),
-      indeterminate: include_icon!("./material/indeterminate_check_box.svg"),
-    },
-  }
+  fill_icon! { theme,
+    icons::CHECKED: "./material/checked.svg",
+    icons::UNCHECKED: "./material/unchecked_box.svg",
+    icons::INDETERMINATE: "./material/indeterminate_check_box.svg"
+  };
+
+  theme
 }
