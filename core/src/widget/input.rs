@@ -164,7 +164,7 @@ impl Compose for Caret {
       track {this: this.into_stateful(),}
       CaretRender {
         id: caret,
-        visible: true,
+        opacity: 1.,
         rect: this.rect,
         color: this.color,
         mounted: move |_| animate1.run(),
@@ -172,7 +172,7 @@ impl Compose for Caret {
       change_on caret.visible Animate {
         id: animate1,
         from: State {
-          caret.visible: !caret.visible,
+          caret.opacity: 1. - caret.opacity,
         },
         transition: Transition {
           duration: Duration::from_secs(1),

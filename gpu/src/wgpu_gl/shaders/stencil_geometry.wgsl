@@ -7,10 +7,8 @@ struct Transform2d {
 };
 
 struct Primitive {
-  rgba: array<f32, 4>;
   transform: Transform2d;
-  opacity: f32;
-  dummy: f32;
+  dummy: array<u32, 6>;
 };
 
 struct Uniform {
@@ -28,7 +26,6 @@ var<storage> primitive_info: PrimitiveInfo;
 
 struct VertexOutput {
   [[builtin(position)]] clip_position: vec4<f32>;
-  [[location(0)]] f_color: vec4<f32>;
 };
 
 
@@ -40,15 +37,12 @@ fn vs_main([[location(0)]] pos: vec2<f32>, [[location(1)]] prim_id: u32) -> Vert
   let canvas_coord: vec2<f32> = transform * vec3<f32>(pos, 1.0);
 
   var out: VertexOutput;
-
   out.clip_position = coord_matrix.matrix * vec4<f32>(canvas_coord, 0.0, 1.0);
-  let rgba = prim.rgba;
-  out.f_color = vec4<f32>(rgba[0], rgba[1], rgba[2], rgba[3] * prim.opacity );
 
   return out;
 }
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-  return in.f_color;
+  return vec4<f32>(0.0, 0.0, 0.0, 0.0);
 }

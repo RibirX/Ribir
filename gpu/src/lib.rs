@@ -109,6 +109,10 @@ pub enum DrawTriangles {
     rg: std::ops::Range<u32>,
     texture_id: usize,
   },
+
+  PushStencil(std::ops::Range<u32>),
+
+  PopStencil(std::ops::Range<u32>),
 }
 
 /// The triangle lists data and the commands to describe how to draw it.
@@ -125,40 +129,92 @@ pub struct TriangleLists<'a> {
 }
 
 #[repr(C)]
-#[derive(AsBytes, PartialEq, Clone)]
-pub struct Primitive {
-  // Both color and texture primitive have 128 bit size, see [`ColorPrimitive`]!  and
-  // [`TexturePrimitive`]! to upstanding their struct.
-  pub data: [u32; 4],
-  /// the transform vertex to apply
-  pub(crate) transform: [[f32; 2]; 3],
-}
-
-#[repr(C)]
-#[derive(AsBytes, PartialEq, Clone)]
+#[derive(AsBytes, PartialEq, Clone, Copy)]
 pub struct ColorPrimitive {
-  /// Rgba color
-  pub(crate) color: [f32; 4],
+  /// brush's Rgba color
+  color: [f32; 4],
   /// the transform vertex to apply
-  pub(crate) transform: [[f32; 2]; 3],
+  transform: [[f32; 2]; 3],
+  /// extra alpha apply to current vertex
+  opacity: f32,
+
+  /// let the TexturePrimitive align to 16
+  /// the alignment of the struct must restrict to https://www.w3.org/TR/WGSL/#alignment
+  dummy: f32,
+}
+
+impl ColorPrimitive {
+  fn new(color: [f32; 4], transform: [[f32; 2]; 3], opacity: f32) -> Self {
+    Self {
+      color,
+      transform,
+      opacity,
+      dummy: 0.0,
+    }
+  }
 }
 
 #[repr(C)]
-#[derive(AsBytes, PartialEq, Clone)]
+#[derive(AsBytes, PartialEq, Clone, Copy)]
 pub struct TexturePrimitive {
   /// Texture rect(x, y ,width, height) in texture, maybe placed in a
   /// atlas.
-  pub(crate) tex_rect: [u16; 4],
+  tex_rect: [u16; 4],
   /// The factor use to calc the texture sampler position of vertex relative to
   /// the texture. Vertex calc its texture sampler pixel position across:
   /// vertex position multiplied by factor then modular texture size.
   ///
   /// - Repeat mode should be 1.
   /// - Cover mode should be  path.max / texture.size
-  pub(crate) factor: [f32; 2],
+  factor: [f32; 2],
 
   /// the transform vertex to apply
-  pub(crate) transform: [[f32; 2]; 3],
+  transform: [[f32; 2]; 3],
+  /// extra alpha apply to current vertex
+  opacity: f32,
+
+  /// let the TexturePrimitive align to 16
+  /// the alignment of the struct must restrict to https://www.w3.org/TR/WGSL/#alignment
+  dummy: f32,
+}
+
+impl TexturePrimitive {
+  fn new(tex_rect: [u16; 4], factor: [f32; 2], transform: [[f32; 2]; 3], opacity: f32) -> Self {
+    Self {
+      tex_rect,
+      factor,
+      transform,
+      opacity,
+      dummy: 0.,
+    }
+  }
+}
+
+#[repr(C)]
+#[derive(AsBytes, PartialEq, Clone, Copy)]
+pub struct StencilPrimitive {
+  /// the transform vertex to apply
+  transform: [[f32; 2]; 3],
+
+  /// let the StencilPrimitive algin to Primitive
+  dummy: [u32; 6],
+}
+
+impl StencilPrimitive {
+  fn new(transform: [[f32; 2]; 3]) -> Self {
+    StencilPrimitive {
+      transform: transform,
+      dummy: <[u32; 6]>::default(),
+    }
+  }
+}
+
+#[repr(C)]
+#[derive(AsBytes, Clone, Copy)]
+pub union Primitive {
+  color_primitive: ColorPrimitive,
+  texture_primitive: TexturePrimitive,
+  stencil_primitive: StencilPrimitive,
 }
 
 /// We use a texture atlas to shader vertices, even if a pure color path.
@@ -176,10 +232,24 @@ impl<'a> TriangleLists<'a> {
 
 impl From<ColorPrimitive> for Primitive {
   #[inline]
-  fn from(c: ColorPrimitive) -> Self { unsafe { std::mem::transmute(c) } }
+  fn from(c: ColorPrimitive) -> Self { Self { color_primitive: c } }
 }
 
 impl From<TexturePrimitive> for Primitive {
   #[inline]
-  fn from(t: TexturePrimitive) -> Self { unsafe { std::mem::transmute(t) } }
+  fn from(t: TexturePrimitive) -> Self { Self { texture_primitive: t } }
+}
+
+impl From<StencilPrimitive> for Primitive {
+  #[inline]
+  fn from(s: StencilPrimitive) -> Self { Self { stencil_primitive: s } }
+}
+
+impl PartialEq for Primitive {
+  fn eq(&self, other: &Self) -> bool {
+    const SIZE: usize = std::mem::size_of::<Primitive>();
+    let p1: &[u8; SIZE] = unsafe { std::mem::transmute(self) };
+    let p2: &[u8; SIZE] = unsafe { std::mem::transmute(other) };
+    return p1 == p2;
+  }
 }

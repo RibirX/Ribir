@@ -1,10 +1,12 @@
 use crate::{
-  ColorPrimitive, DrawTriangles, GlRender, Primitive, Texture, TexturePrimitive, TriangleLists,
-  Vertex,
+  ColorPrimitive, DrawTriangles, GlRender, Primitive, StencilPrimitive, Texture, TexturePrimitive,
+  TriangleLists, Vertex,
 };
 use algo::{FrameCache, Resource, ShareResource};
 use lyon_tessellation::{path::Path as LyonPath, *};
-use painter::{Brush, PaintCommand, PaintPath, Path, PathStyle, TileMode};
+use painter::{
+  Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path, PathStyle, TileMode, Transform,
+};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::{collections::VecDeque, hash::Hash};
 use text::{
@@ -46,7 +48,9 @@ pub struct Tessellator {
 #[derive(Clone, Copy)]
 enum PrimitiveType {
   Color,
-  Texture(usize),
+  Texture { id: usize },
+  PushStencil,
+  PopStencil,
 }
 struct CacheItem {
   prim_id: u32,
@@ -109,9 +113,11 @@ impl Tessellator {
       .get_or_insert_with(<_>::default)
       .as_uninit_map();
     let mut no_cache_paths = vec![];
+    let mut stencil_path = vec![];
     commands.iter().for_each(|cmd| {
       self.command_to_buffer(
         cmd,
+        &mut stencil_path,
         |key| uninit_vertices.get_or_delay_init(key),
         |tolerance, path| {
           let mut vc = Box::new(VertexCache::default());
@@ -155,17 +161,18 @@ impl Tessellator {
     self.atlas.end_frame();
   }
 
-  fn prim_from_command<R: GlRender>(
+  fn prim_from_paint<R: GlRender>(
     &mut self,
-    cmd: &PaintCommand,
+    cmd: &PaintInstruct,
     render: &mut R,
   ) -> (Primitive, PrimitiveType) {
     match &cmd.brush {
       Brush::Color(color) => {
-        let c = ColorPrimitive {
-          color: color.into_f32_components(),
-          transform: cmd.transform.clone().to_arrays(),
-        };
+        let c = ColorPrimitive::new(
+          color.into_f32_components(),
+          cmd.transform.clone().to_arrays(),
+          cmd.opacity,
+        );
         (c.into(), PrimitiveType::Color)
       }
       Brush::Image { img, tile_mode } => {
@@ -187,7 +194,10 @@ impl Tessellator {
         let (w, h) = rect.size.to_tuple();
         let mut factor = [1., 1.];
         if tile_mode.is_cover_mode() {
-          let box_rect = cmd.box_rect_without_transform();
+          let box_rect = match &cmd.path {
+            PaintPath::Path(path) => path.box_rect(),
+            PaintPath::Text { .. } => todo!(),
+          };
           if tile_mode.contains(TileMode::COVER_X) {
             factor[0] = w as f32 / box_rect.width();
           }
@@ -195,14 +205,32 @@ impl Tessellator {
             factor[1] = h as f32 / box_rect.height();
           }
         }
-        let t = TexturePrimitive {
-          tex_rect: [x, y, w, h],
-          factor,
-          transform: cmd.transform.to_arrays(),
-        };
-        (t.into(), PrimitiveType::Texture(id))
+        let t = TexturePrimitive::new([x, y, w, h], factor, cmd.transform.to_arrays(), cmd.opacity);
+        (t.into(), PrimitiveType::Texture { id })
       }
       Brush::Gradient => todo!(),
+    }
+  }
+
+  fn prim_from_command<'a, R: GlRender>(
+    &mut self,
+    cmd: &PaintCommand,
+    stencil_path: &Vec<&'a ClipInstruct>,
+    render: &mut R,
+  ) -> (Primitive, PrimitiveType) {
+    match cmd {
+      PaintCommand::Paint(paint) => self.prim_from_paint(paint, render),
+      PaintCommand::PushClip(clip) => (
+        StencilPrimitive::new(clip.transform.clone().to_arrays()).into(),
+        PrimitiveType::PushStencil,
+      ),
+      PaintCommand::PopClip => {
+        let transform = stencil_path.last().unwrap().transform.clone();
+        (
+          StencilPrimitive::new(transform.to_arrays()).into(),
+          PrimitiveType::PopStencil,
+        )
+      }
     }
   }
 
@@ -216,17 +244,43 @@ impl Tessellator {
   fn command_to_buffer<'a, F, F2, R>(
     &mut self,
     cmd: &'a PaintCommand,
-    mut cache: F,
-    mut not_cache: F2,
+    stencil_path: &mut Vec<&'a ClipInstruct>,
+    cache: F,
+    not_cache: F2,
     render: &mut R,
   ) where
     F: FnMut(VerticesKey) -> *mut VertexCache,
     F2: FnMut(f32, &'a Path) -> *mut VertexCache,
     R: GlRender,
   {
-    let (primitive, prim_type) = self.prim_from_command(cmd, render);
+    let (primitive, prim_type) = self.prim_from_command(cmd, stencil_path, render);
+    let (path, transform) = match cmd {
+      PaintCommand::Paint(p) => (&p.path, &p.transform),
+      PaintCommand::PushClip(clip) => {
+        stencil_path.push(clip);
+        (&clip.path, &clip.transform)
+      }
+      PaintCommand::PopClip => {
+        let clip = stencil_path.pop().unwrap();
+        (&clip.path, &clip.transform)
+      }
+    };
 
-    let PaintCommand { path, transform, .. } = cmd;
+    self.path_to_buffer(path, transform, cache, not_cache, primitive, prim_type)
+  }
+
+  fn path_to_buffer<'a, F, F2>(
+    &mut self,
+    path: &'a PaintPath,
+    transform: &Transform,
+    mut cache: F,
+    mut not_cache: F2,
+    primitive: Primitive,
+    prim_type: PrimitiveType,
+  ) where
+    F: FnMut(VerticesKey) -> *mut VertexCache,
+    F2: FnMut(f32, &'a Path) -> *mut VertexCache,
+  {
     let scale = transform.m11.max(transform.m22).max(f32::EPSILON);
     match path {
       PaintPath::Path(path) => {
@@ -266,7 +320,8 @@ impl Tessellator {
               .pre_scale(font_size_ems, font_size_ems);
 
             let mut p = primitive.clone();
-            p.transform = t.to_arrays();
+            let color_primitive = unsafe { &mut p.color_primitive };
+            color_primitive.transform = t.to_arrays();
 
             let prim_id = self.add_primitive(p);
             self
@@ -331,7 +386,7 @@ impl Tessellator {
         (Some(DrawTriangles::Color(rg)), PrimitiveType::Color) => {
           rg.end += indices_count;
         }
-        (Some(DrawTriangles::Texture { rg, texture_id }), PrimitiveType::Texture(id))
+        (Some(DrawTriangles::Texture { rg, texture_id }), PrimitiveType::Texture { id })
           if *texture_id == id =>
         {
           rg.end += indices_count;
@@ -339,15 +394,26 @@ impl Tessellator {
         (_, PrimitiveType::Color) => self.commands.push(DrawTriangles::Color(
           indices_start..indices_start + indices_count,
         )),
-        (_, PrimitiveType::Texture(texture_id)) => {
+        (_, PrimitiveType::Texture { id }) => {
           self.commands.push(DrawTriangles::Texture {
             rg: indices_start..indices_start + indices_count,
-            texture_id,
+            texture_id: id,
           });
+        }
+        (_, PrimitiveType::PushStencil) => {
+          self.commands.push(DrawTriangles::PushStencil(
+            indices_start..indices_start + indices_count,
+          ));
+        }
+        (_, PrimitiveType::PopStencil) => {
+          self.commands.push(DrawTriangles::PopStencil(
+            indices_start..indices_start + indices_count,
+          ));
         }
       }
 
-      use_atlas = use_atlas || matches!(prim_type, PrimitiveType::Texture(id) if id == ATLAS_ID);
+      use_atlas =
+        use_atlas || matches!(prim_type, PrimitiveType::Texture {id, .. } if id == ATLAS_ID);
       count += 1;
     }
 
@@ -580,6 +646,7 @@ mod tests {
       data.commands.iter().for_each(|cmd| match cmd {
         DrawTriangles::Color(_) => render_data.push(true),
         DrawTriangles::Texture { .. } => render_data.push(false),
+        _ => (),
       });
     });
 
@@ -596,6 +663,7 @@ mod tests {
       data.commands.iter().for_each(|cmd| match cmd {
         DrawTriangles::Color(_) => render_data.push(true),
         DrawTriangles::Texture { .. } => render_data.push(false),
+        _ => (),
       });
     });
 
@@ -617,6 +685,7 @@ mod tests {
       data.commands.iter().for_each(|cmd| match cmd {
         DrawTriangles::Color(_) => render_data.push(true),
         DrawTriangles::Texture { .. } => render_data.push(false),
+        _ => (),
       });
     });
 
@@ -646,6 +715,7 @@ mod tests {
       data.commands.iter().for_each(|cmd| match cmd {
         DrawTriangles::Color(_) => render_data.push(true),
         DrawTriangles::Texture { .. } => render_data.push(false),
+        _ => (),
       });
     });
 

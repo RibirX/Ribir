@@ -217,7 +217,7 @@ pub fn pipeline(
       entry_point: "fs_main",
       targets: &[wgpu::ColorTargetState {
         format,
-        blend: Some(wgpu::BlendState::REPLACE),
+        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
         write_mask: wgpu::ColorWrites::all(),
       }],
     }),
@@ -230,7 +230,32 @@ pub fn pipeline(
       polygon_mode: wgpu::PolygonMode::Fill,
       conservative: false,
     },
-    depth_stencil: None,
+    depth_stencil: Some(wgpu::DepthStencilState {
+      format: wgpu::TextureFormat::Depth24PlusStencil8,
+      depth_write_enabled: false,
+      depth_compare: wgpu::CompareFunction::Always,
+      stencil: wgpu::StencilState {
+        front: wgpu::StencilFaceState {
+          compare: wgpu::CompareFunction::Equal,
+          fail_op: wgpu::StencilOperation::Keep,
+          depth_fail_op: wgpu::StencilOperation::Keep,
+          pass_op: wgpu::StencilOperation::Keep,
+        },
+        back: wgpu::StencilFaceState {
+          compare: wgpu::CompareFunction::Equal,
+          fail_op: wgpu::StencilOperation::Keep,
+          depth_fail_op: wgpu::StencilOperation::Keep,
+          pass_op: wgpu::StencilOperation::Keep,
+        },
+        read_mask: 0x0000_0000_0000_FFFF,
+        write_mask: 0x0000_0000_0000_FFFF,
+      },
+      bias: wgpu::DepthBiasState {
+        constant: 0,
+        slope_scale: 0.,
+        clamp: 0.,
+      },
+    }),
     multisample: wgpu::MultisampleState {
       count: msaa_count,
       mask: !0,

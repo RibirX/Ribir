@@ -54,10 +54,24 @@ pub enum PaintPath {
 // todo: need a way to batch commands as a single resource. so we can cache
 // their vertexes as a whole. useful for svg, animation and paint layers.
 #[derive(Clone)]
-pub struct PaintCommand {
+pub struct PaintInstruct {
+  pub opacity: f32,
   pub path: PaintPath,
   pub transform: Transform,
   pub brush: Brush,
+}
+
+#[derive(Clone)]
+pub struct ClipInstruct {
+  pub path: PaintPath,
+  pub transform: Transform,
+}
+
+#[derive(Clone)]
+pub enum PaintCommand {
+  Paint(PaintInstruct),
+  PushClip(ClipInstruct),
+  PopClip,
 }
 
 #[derive(Clone)]
@@ -70,6 +84,8 @@ struct PainterState {
   font_face: FontFace,
   text_line_height: Option<Em>,
   transform: Transform,
+  opacity: f32,
+  clip_cnt: u32,
 }
 
 impl Painter {
@@ -111,7 +127,13 @@ impl Painter {
   /// the drawing state stack. If there is no saved state, this method does
   /// nothing.
   #[inline]
-  pub fn restore(&mut self) { self.state_stack.pop(); }
+  pub fn restore(&mut self) {
+    let clip_cnt = self.current_state().clip_cnt;
+    self.state_stack.pop();
+
+    (self.current_state().clip_cnt..clip_cnt)
+      .for_each(|_| self.commands.push(PaintCommand::PopClip));
+  }
 
   pub fn reset(&mut self, device_scale: Option<f32>) {
     if let Some(scale) = device_scale {
@@ -135,6 +157,13 @@ impl Painter {
     self.current_state_mut().brush = brush.into();
     self
   }
+
+  pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
+    self.current_state_mut().opacity *= alpha;
+    self
+  }
+
+  pub fn alpha(&self) -> f32 { self.current_state().opacity }
 
   /// Return the line width of the stroke pen.
   #[inline]
@@ -226,15 +255,27 @@ impl Painter {
     self
   }
 
+  pub fn clip<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
+    let transform = self.current_state().transform;
+    self.commands.push(PaintCommand::PushClip(ClipInstruct {
+      path: PaintPath::Path(path.into()),
+      transform,
+    }));
+    self.current_state_mut().clip_cnt += 1;
+    self
+  }
+
   /// Paint a path with its style.
   pub fn paint_path<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
     let transform = self.current_state().transform;
+    let alpha = self.alpha();
     let brush = self.current_state().brush.clone();
-    self.commands.push(PaintCommand {
+    self.commands.push(PaintCommand::Paint(PaintInstruct {
+      opacity: alpha,
       path: PaintPath::Path(path.into()),
       transform,
       brush,
-    });
+    }));
     self
   }
 
@@ -263,15 +304,16 @@ impl Painter {
   ) -> &mut Self {
     let transform = self.current_state().transform;
     let visual_glyphs = typography_with_text_style(&self.typography_store, text, style, bounds);
-    self.commands.push(PaintCommand {
+    self.commands.push(PaintCommand::Paint(PaintInstruct {
       path: PaintPath::Text {
         font_size: style.font_size,
         glyphs: visual_glyphs.pixel_glyphs().collect(),
         style: style.path_style,
       },
+      opacity: self.alpha(),
       brush: style.foreground.clone(),
       transform,
-    });
+    }));
 
     self
   }
@@ -309,7 +351,8 @@ impl Painter {
       bounds,
     );
 
-    let cmd = PaintCommand {
+    let cmd = PaintCommand::Paint(PaintInstruct {
+      opacity: self.alpha(),
       path: PaintPath::Text {
         font_size,
         glyphs: visual_glyphs.pixel_glyphs().collect(),
@@ -317,7 +360,7 @@ impl Painter {
       },
       transform,
       brush: brush.clone(),
-    };
+    });
     self.commands.push(cmd);
     self
   }
@@ -537,15 +580,8 @@ impl Default for PainterState {
       font_face: FontFace::default(),
       text_line_height: None,
       transform: Transform::new(1., 0., 0., 1., 0., 0.),
-    }
-  }
-}
-
-impl PaintCommand {
-  pub fn box_rect_without_transform(&self) -> Rect {
-    match &self.path {
-      PaintPath::Path(path) => path.box_rect(),
-      PaintPath::Text { .. } => todo!(),
+      clip_cnt: 0,
+      opacity: 1.,
     }
   }
 }
@@ -588,7 +624,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   )
 }
 
-impl PaintCommand {
+impl PaintInstruct {
   pub fn style(&self) -> PathStyle {
     match &self.path {
       PaintPath::Path(p) => p.style,
