@@ -6,6 +6,8 @@
 pub mod material;
 mod palette;
 pub use palette::Palette;
+mod icon_theme;
+pub use icon_theme::*;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
@@ -112,21 +114,9 @@ pub struct Theme {
   pub icon_theme: IconTheme,
   pub text_selected_background: TextSelectedBackground,
   pub caret_color: Color,
-}
-
-#[derive(Debug, Clone)]
-pub struct IconTheme {
-  pub icon_size: IconSize,
-  pub builtin_icons: SvgIcons,
-}
-
-#[derive(Debug, Clone)]
-pub struct IconSize {
-  pub tiny: Size,
-  pub small: Size,
-  pub medium: Size,
-  pub large: Size,
-  pub huge: Size,
+  // transitions  map.
+  // compose_styles map.
+  // custom config by type id.
 }
 
 impl TextSelectedBackground {
@@ -139,26 +129,11 @@ impl TypographyTheme {
   pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().typography_theme }
 }
 
-impl IconSize {
-  #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.icon_size }
-}
-
-impl SvgIcons {
-  #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.builtin_icons }
-}
-
 impl ScrollBarTheme {
   #[inline]
   pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().scrollbar }
 }
-#[derive(Debug, Clone)]
-pub struct SvgIcons {
-  pub checked: ShareResource<SvgRender>,
-  pub unchecked: ShareResource<SvgRender>,
-  pub indeterminate: ShareResource<SvgRender>,
-}
+
 #[derive(Declare)]
 pub struct ThemeWidget {
   #[declare(builtin)]

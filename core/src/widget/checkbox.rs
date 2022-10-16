@@ -37,16 +37,12 @@ impl Compose for Checkbox {
         },
         ExprWidget {
           expr: {
-            let icons = SvgIcons::of(ctx);
-            let checked = icons.checked.clone();
-            let unchecked = icons.unchecked.clone();
-            let indeterminate = icons.indeterminate.clone();
             if this.indeterminate {
-              indeterminate.clone()
+              icons::INDETERMINATE.get_from_or_miss(ctx)
             } else if this.checked {
-              checked.clone()
+              icons::CHECKED.get_from_or_miss(ctx)
             } else {
-              unchecked.clone()
+              icons::UNCHECKED.get_from_or_miss(ctx)
             }
         }}
       }
