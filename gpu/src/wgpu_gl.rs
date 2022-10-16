@@ -159,6 +159,7 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     let mut encoder = self.create_command_encoder();
     let prim_bind_group = self.create_primitives_bind_group(data.primitives);
 
+    let sample_count = self.multi_sample_count();
     let Self {
       device,
       coordinate_matrix,
@@ -195,7 +196,7 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       label: Some("stencil"),
       size: size_extend,
       mip_level_count: 1,
-      sample_count: 4,
+      sample_count,
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::Depth24PlusStencil8,
       usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -277,6 +278,7 @@ impl<S: Surface> GlRender for WgpuGl<S> {
   }
 
   fn resize(&mut self, size: DeviceSize) {
+    self.size = size;
     self.surface.resize(&self.device, &self.queue, size);
     self.coordinate_matrix = coordinate_matrix_buffer_2d(&self.device, size.width, size.height);
     self
@@ -285,6 +287,12 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     self
       .stencil_pass
       .resize(&self.coordinate_matrix, &self.device);
+    self.multisample_framebuffer = Self::multisample_framebuffer(
+      &self.device,
+      size,
+      self.surface.format(),
+      self.multi_sample_count(),
+    );
   }
 
   fn capture(&self, capture: painter::CaptureCallback) -> Result<(), Box<dyn Error>> {
@@ -450,6 +458,8 @@ impl<S: Surface> WgpuGl<S> {
       label: Some("Primitive buffer bind group"),
     })
   }
+
+  fn multi_sample_count(&self) -> u32 { self.anti_aliasing as u32 }
 
   fn write_vertex_buffer(&mut self, vertices: &[Vertex], indices: &[u32]) {
     let Self { device, vertex_buffers, .. } = self;

@@ -158,6 +158,7 @@ impl Window {
   }
 
   fn resize(&mut self, size: DeviceSize) {
+    self.painter.finish();
     self.widget_tree.mark_dirty(self.widget_tree.root());
     self.p_backend.resize(size);
     self.raw_window.request_redraw();
