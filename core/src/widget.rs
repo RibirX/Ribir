@@ -55,6 +55,8 @@ pub mod data_widget;
 mod scrollbar;
 pub use data_widget::DataWidget;
 pub use scrollbar::*;
+mod clip;
+pub use clip::*;
 
 mod void;
 use self::widget_tree::BoxClamp;
@@ -63,6 +65,8 @@ mod composed_widget;
 pub(crate) use composed_widget::ComposedWidget;
 mod lifecycle;
 pub use lifecycle::*;
+mod opacity;
+pub use opacity::*;
 
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.

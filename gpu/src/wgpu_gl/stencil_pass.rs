@@ -1,12 +1,13 @@
 use crate::Vertex;
 
-pub struct ColorPass {
+pub struct StencilPass {
   pub uniform_layout: wgpu::BindGroupLayout,
   pub uniform: wgpu::BindGroup,
-  pub pipeline: wgpu::RenderPipeline,
+  pub push_stencil_pipeline: wgpu::RenderPipeline,
+  pub pop_stencil_pipeline: wgpu::RenderPipeline,
 }
 
-impl ColorPass {
+impl StencilPass {
   pub fn new(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
@@ -29,15 +30,29 @@ impl ColorPass {
     });
 
     let uniform = uniform_bind_group(device, &uniform_layout, coordinate_matrix);
-    let pipeline = pipeline(
+    let push_stencil_pipeline = pipeline(
       device,
       format,
       &uniform_layout,
       primitive_layout,
+      false,
+      msaa_count,
+    );
+    let pop_stencil_pipeline = pipeline(
+      device,
+      format,
+      &uniform_layout,
+      primitive_layout,
+      true,
       msaa_count,
     );
 
-    Self { uniform_layout, uniform, pipeline }
+    Self {
+      uniform_layout,
+      uniform,
+      push_stencil_pipeline,
+      pop_stencil_pipeline,
+    }
   }
 
   pub fn set_anti_aliasing(
@@ -47,11 +62,20 @@ impl ColorPass {
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
   ) {
-    self.pipeline = pipeline(
+    self.push_stencil_pipeline = pipeline(
       device,
       format,
       &self.uniform_layout,
       primitive_layout,
+      false,
+      msaa_count,
+    );
+    self.pop_stencil_pipeline = pipeline(
+      device,
+      format,
+      &self.uniform_layout,
+      primitive_layout,
+      true,
       msaa_count,
     );
   }
@@ -72,7 +96,7 @@ fn uniform_bind_group(
       binding: 0,
       resource: coordinate_matrix.as_entire_binding(),
     }],
-    label: Some("Color uniforms bind group"),
+    label: Some("Stencil uniforms bind group"),
   })
 }
 
@@ -81,21 +105,38 @@ fn pipeline(
   format: wgpu::TextureFormat,
   uniform_layout: &wgpu::BindGroupLayout,
   primitive_layout: &wgpu::BindGroupLayout,
+  is_clear: bool,
   msaa_count: u32,
 ) -> wgpu::RenderPipeline {
   let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-    label: Some("Color geometry pipeline layout"),
+    label: Some("Stencil geometry pipeline layout"),
     bind_group_layouts: &[uniform_layout, primitive_layout],
     push_constant_ranges: &[],
   });
 
   let module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-    label: Some("Color geometry shader"),
-    source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/color_geometry.wgsl").into()),
+    label: Some("Stencil geometry shader"),
+    source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/stencil_geometry.wgsl").into()),
   });
 
+  let stencil_state = if is_clear {
+    wgpu::StencilFaceState {
+      compare: wgpu::CompareFunction::Equal,
+      fail_op: wgpu::StencilOperation::Keep,
+      depth_fail_op: wgpu::StencilOperation::Keep,
+      pass_op: wgpu::StencilOperation::DecrementClamp,
+    }
+  } else {
+    wgpu::StencilFaceState {
+      compare: wgpu::CompareFunction::Equal,
+      fail_op: wgpu::StencilOperation::Keep,
+      depth_fail_op: wgpu::StencilOperation::Keep,
+      pass_op: wgpu::StencilOperation::IncrementClamp,
+    }
+  };
+
   device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-    label: Some("Color geometry pipeline"),
+    label: Some("Stencil geometry pipeline"),
     layout: Some(&pipeline_layout),
     vertex: wgpu::VertexState {
       module: &module,
@@ -108,7 +149,7 @@ fn pipeline(
       targets: &[wgpu::ColorTargetState {
         format,
         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-        write_mask: wgpu::ColorWrites::all(),
+        write_mask: wgpu::ColorWrites::empty(),
       }],
     }),
     primitive: wgpu::PrimitiveState {
@@ -125,18 +166,8 @@ fn pipeline(
       depth_write_enabled: false,
       depth_compare: wgpu::CompareFunction::Always,
       stencil: wgpu::StencilState {
-        front: wgpu::StencilFaceState {
-          compare: wgpu::CompareFunction::Equal,
-          fail_op: wgpu::StencilOperation::Keep,
-          depth_fail_op: wgpu::StencilOperation::Keep,
-          pass_op: wgpu::StencilOperation::Keep,
-        },
-        back: wgpu::StencilFaceState {
-          compare: wgpu::CompareFunction::Equal,
-          fail_op: wgpu::StencilOperation::Keep,
-          depth_fail_op: wgpu::StencilOperation::Keep,
-          pass_op: wgpu::StencilOperation::Keep,
-        },
+        front: stencil_state,
+        back: stencil_state,
         read_mask: 0x0000_0000_0000_FFFF,
         write_mask: 0x0000_0000_0000_FFFF,
       },

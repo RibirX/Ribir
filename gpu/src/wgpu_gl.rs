@@ -4,6 +4,7 @@ use painter::DeviceSize;
 use std::{error::Error, iter};
 use text::shaper::TextShaper;
 mod color_pass;
+mod stencil_pass;
 pub mod surface;
 
 use surface::{Surface, TextureSurface, WindowSurface};
@@ -11,7 +12,7 @@ use wgpu::util::DeviceExt;
 
 use zerocopy::AsBytes;
 mod img_pass;
-use self::{color_pass::ColorPass, img_pass::ImagePass};
+use self::{color_pass::ColorPass, img_pass::ImagePass, stencil_pass::StencilPass};
 
 const TEXTURE_INIT_SIZE: (u16, u16) = (1024, 1024);
 const TEXTURE_MAX_SIZE: (u16, u16) = (4096, 4096);
@@ -61,13 +62,16 @@ pub struct WgpuGl<S: Surface = WindowSurface> {
   surface: S,
   color_pass: ColorPass,
   img_pass: ImagePass,
+  stencil_pass: StencilPass,
   coordinate_matrix: wgpu::Buffer,
   primitives_layout: wgpu::BindGroupLayout,
   vertex_buffers: Option<VertexBuffers>,
   anti_aliasing: AntiAliasing,
   multisample_framebuffer: Option<wgpu::TextureView>,
+  size: DeviceSize,
   /// if the frame already draw something.
   empty_frame: bool,
+  stencil_cnt: u32,
 }
 struct VertexBuffers {
   vertices: wgpu::Buffer,
@@ -155,11 +159,13 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     let mut encoder = self.create_command_encoder();
     let prim_bind_group = self.create_primitives_bind_group(data.primitives);
 
+    let sample_count = self.multi_sample_count();
     let Self {
       device,
       coordinate_matrix,
       color_pass,
       img_pass,
+      stencil_pass,
       ..
     } = self;
 
@@ -180,6 +186,22 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       .current_texture()
       .create_view(&wgpu::TextureViewDescriptor::default());
 
+    let size_extend = wgpu::Extent3d {
+      width: self.size.width,
+      height: self.size.height,
+      depth_or_array_layers: 1,
+    };
+
+    let stencil_texture = device.create_texture(&wgpu::TextureDescriptor {
+      label: Some("stencil"),
+      size: size_extend,
+      mip_level_count: 1,
+      sample_count,
+      dimension: wgpu::TextureDimension::D2,
+      format: wgpu::TextureFormat::Depth24PlusStencil8,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+    });
+
     {
       let (view, resolve_target, store) = self.multisample_framebuffer.as_ref().map_or_else(
         || (&view, None, true),
@@ -193,25 +215,53 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       let ops = wgpu::Operations { load, store };
       let rpass_color_attachment = wgpu::RenderPassColorAttachment { view, resolve_target, ops };
 
+      let load_stencil = if self.empty_frame {
+        wgpu::LoadOp::Clear(0)
+      } else {
+        wgpu::LoadOp::Load
+      };
+      let stencil_view = stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
       let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("Triangles render pass"),
         color_attachments: &[rpass_color_attachment],
-        depth_stencil_attachment: None,
+        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+          view: &stencil_view,
+          depth_ops: None,
+          stencil_ops: Some(wgpu::Operations { load: load_stencil, store: true }),
+        }),
       });
-
       render_pass.set_vertex_buffer(0, vertex_buffers.vertices.slice(..));
       render_pass.set_index_buffer(vertex_buffers.indices.slice(..), wgpu::IndexFormat::Uint32);
       render_pass.set_bind_group(1, &prim_bind_group, &[]);
-      data.commands.iter().for_each(|cmd| match cmd {
-        crate::DrawTriangles::Color(rg) => {
-          render_pass.set_pipeline(&color_pass.pipeline);
-          render_pass.set_bind_group(0, &color_pass.uniform, &[]);
-          render_pass.draw_indexed(rg.clone(), 0, 0..1);
-        }
-        crate::DrawTriangles::Texture { rg, texture_id } => {
-          render_pass.set_pipeline(&img_pass.pipeline);
-          render_pass.set_bind_group(0, uniforms.get(texture_id).unwrap(), &[]);
-          render_pass.draw_indexed(rg.clone(), 0, 0..1);
+      data.commands.iter().for_each(|cmd| {
+        let stencil_reference = self.stencil_cnt;
+        match cmd {
+          crate::DrawTriangles::Color(rg) => {
+            render_pass.set_pipeline(&color_pass.pipeline);
+            render_pass.set_bind_group(0, &color_pass.uniform, &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+          }
+          crate::DrawTriangles::Texture { rg, texture_id } => {
+            render_pass.set_pipeline(&img_pass.pipeline);
+            render_pass.set_bind_group(0, uniforms.get(texture_id).unwrap(), &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+          }
+          crate::DrawTriangles::PushStencil(rg) => {
+            render_pass.set_pipeline(&stencil_pass.push_stencil_pipeline);
+            render_pass.set_bind_group(0, &stencil_pass.uniform, &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+            self.stencil_cnt += 1;
+          }
+          crate::DrawTriangles::PopStencil(rg) => {
+            render_pass.set_pipeline(&stencil_pass.pop_stencil_pipeline);
+            render_pass.set_bind_group(0, &stencil_pass.uniform, &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+            self.stencil_cnt -= 1;
+          }
         }
       });
     }
@@ -228,11 +278,21 @@ impl<S: Surface> GlRender for WgpuGl<S> {
   }
 
   fn resize(&mut self, size: DeviceSize) {
+    self.size = size;
     self.surface.resize(&self.device, &self.queue, size);
     self.coordinate_matrix = coordinate_matrix_buffer_2d(&self.device, size.width, size.height);
     self
       .color_pass
-      .resize(&self.coordinate_matrix, &self.device)
+      .resize(&self.coordinate_matrix, &self.device);
+    self
+      .stencil_pass
+      .resize(&self.coordinate_matrix, &self.device);
+    self.multisample_framebuffer = Self::multisample_framebuffer(
+      &self.device,
+      size,
+      self.surface.format(),
+      self.multi_sample_count(),
+    );
   }
 
   fn capture(&self, capture: painter::CaptureCallback) -> Result<(), Box<dyn Error>> {
@@ -297,6 +357,13 @@ impl<S: Surface> WgpuGl<S> {
       msaa_count,
     );
     let texture_pass = ImagePass::new(&device, surface.format(), &primitive_layout, msaa_count);
+    let stencil_pass = StencilPass::new(
+      &device,
+      surface.format(),
+      &coordinate_matrix,
+      &primitive_layout,
+      msaa_count,
+    );
 
     let multisample_framebuffer =
       Self::multisample_framebuffer(&device, size, surface.format(), msaa_count);
@@ -304,14 +371,17 @@ impl<S: Surface> WgpuGl<S> {
       device,
       surface,
       queue,
+      size,
       color_pass,
       img_pass: texture_pass,
+      stencil_pass,
       coordinate_matrix,
       primitives_layout: primitive_layout,
       empty_frame: true,
       vertex_buffers: None,
       anti_aliasing,
       multisample_framebuffer,
+      stencil_cnt: 0,
     }
   }
 
@@ -324,6 +394,7 @@ impl<S: Surface> WgpuGl<S> {
         primitives_layout,
         surface,
         device,
+        stencil_pass,
         ..
       } = self;
       self.anti_aliasing = anti_aliasing;
@@ -331,6 +402,7 @@ impl<S: Surface> WgpuGl<S> {
       let format = surface.format();
       color_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
       img_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
+      stencil_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
     }
   }
 
@@ -386,6 +458,8 @@ impl<S: Surface> WgpuGl<S> {
       label: Some("Primitive buffer bind group"),
     })
   }
+
+  fn multi_sample_count(&self) -> u32 { self.anti_aliasing as u32 }
 
   fn write_vertex_buffer(&mut self, vertices: &[Vertex], indices: &[u32]) {
     let Self { device, vertex_buffers, .. } = self;

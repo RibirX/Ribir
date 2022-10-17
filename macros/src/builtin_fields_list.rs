@@ -184,4 +184,8 @@ builtin! {
     #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
     key: Key
   }
+  Opacity {
+    #[doc="Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency."]
+    opacity: f32
+  }
 }
