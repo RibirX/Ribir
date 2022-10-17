@@ -44,7 +44,7 @@ impl ComposeChild for ScrollableWidget {
       change_on content.box_rect().size ~> this.content_size
       change_on view.box_rect().size ~> this.page
       change_on content.left_anchor Animate {
-        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(content.width());
           let to = to.abs_value(content.width());
@@ -52,7 +52,7 @@ impl ComposeChild for ScrollableWidget {
         }
       }
       change_on content.top_anchor Animate {
-        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(content.height());
           let to = to.abs_value(content.height());

@@ -12,7 +12,7 @@ pub struct IconTheme {
   pub icon_size: IconSize,
   /// default icon if a icon not fill or miss in `icons`.
   miss_icon: ShareResource<SvgRender>,
-  /// a collection of icon.
+  /// a collection of icons.
   icons: HashMap<IconIdent, ShareResource<SvgRender>>,
 }
 
@@ -52,7 +52,7 @@ pub mod icons {
   pub const BEGIN: IconIdent = IconIdent::new(0);
   define_icon_ident!(BEGIN, CHECKED, UNCHECKED, INDETERMINATE, THEME_EXTEND);
   /// The user custom icon identify define start from.
-  pub const CUSTOM_START: IconIdent = IconIdent::new(1048576);
+  pub const CUSTOM_START: IconIdent = IconIdent::new(65536);
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
