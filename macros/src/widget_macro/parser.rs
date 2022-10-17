@@ -608,8 +608,10 @@ impl ToTokens for AnimateState {
     let target_value = self.maybe_tuple_value(|StateField { path, .. }| {
       quote! { #path.clone()}
     });
+
     let target_assign = self.maybe_tuple_value(|StateField { path, .. }| {
-      quote! { #path }
+      let MemberPath { widget, dot, member } = path;
+      quote! { #widget #dot shallow() #dot #member }
     });
 
     let v = ribir_variable("v", state_span);

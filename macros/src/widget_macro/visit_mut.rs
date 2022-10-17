@@ -12,7 +12,7 @@ use quote::{quote, ToTokens};
 use std::collections::{HashMap, HashSet};
 use syn::{
   parse_quote, parse_quote_spanned, spanned::Spanned, token::Brace, visit_mut, visit_mut::VisitMut,
-  Expr, Ident, ItemMacro, Member, Path, Stmt,
+  Expr, ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
 };
 
 bitflags::bitflags! {
@@ -134,26 +134,47 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
-    if let (Expr::Path(syn::ExprPath { path, .. }), Member::Named(member)) =
-      (&*f_expr.base, &f_expr.member)
-    {
+    let span = f_expr.span();
+    fn builtin_access(f_expr: &mut syn::ExprField) -> Option<(&mut Path, &'static str)> {
+      if let Member::Named(member) = &f_expr.member {
+        let builtin_ty = FIELD_WIDGET_TYPE.get(member.to_string().as_str())?;
+        let path = match &mut *f_expr.base {
+          Expr::Path(syn::ExprPath { path, .. }) => path,
+          Expr::MethodCall(ExprMethodCall { receiver, method, args, .. })
+            if args.is_empty() && (method == "shallow" || method == "silent") =>
+          {
+            if let Expr::Path(syn::ExprPath { path, .. }) = &mut **receiver {
+              path
+            } else {
+              return None;
+            }
+          }
+          _ => return None,
+        };
+
+        Some((path, builtin_ty))
+      } else {
+        None
+      }
+    }
+
+    if let Some((path, builtin_ty)) = builtin_access(f_expr) {
       if let Some(name) = path
         .get_ident()
         .filter(|name| self.declare_objs.contains(&name))
       {
-        if let Some(builtin_ty) = FIELD_WIDGET_TYPE.get(member.to_string().as_str()) {
-          let builtin_name = builtin_var_name(&name, f_expr.span(), builtin_ty);
-          let src_name = name.clone();
-          *f_expr.base = parse_quote! { #builtin_name };
-          self.add_used_widget(
-            builtin_name,
-            Some(BuiltinUsed { src_name, builtin_ty }),
-            UsedType::USED,
-          );
-          return;
-        }
+        let builtin_name = builtin_var_name(&name, span, builtin_ty);
+        let src_name = name.clone();
+        *path = parse_quote! { #builtin_name };
+        self.add_used_widget(
+          builtin_name,
+          Some(BuiltinUsed { src_name, builtin_ty }),
+          UsedType::USED,
+        );
+        return;
       }
     }
+
     visit_mut::visit_expr_field_mut(self, f_expr);
   }
 

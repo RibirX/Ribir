@@ -300,3 +300,17 @@ fn fix_builtin_field_can_declare_as_widget() {
   let wnd = Window::without_render(w, Size::zero());
   assert_eq!(wnd.widget_count(), 2);
 }
+
+#[test]
+fn fix_access_builtin_with_gap() {
+  widget! {
+    Void {
+      id: this,
+      cursor: CursorIcon::Hand,
+      tap: move |e| {
+        // this access cursor across `silent` or `shallow` should compile pass.
+        let _ = this.shallow().cursor == this.silent().cursor;
+      }
+    }
+  };
+}
