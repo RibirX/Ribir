@@ -1,4 +1,5 @@
 use painter::Brush;
+use text::FontFamily;
 
 use crate::prelude::BuildCtx;
 
@@ -7,6 +8,8 @@ use crate::prelude::BuildCtx;
 /// spec](https://material.io/design/typography/the-type-system.html#applying-the-type-scale)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypographyTheme {
+  /// Default text font families
+  pub default_font_family: Box<[FontFamily]>,
   pub headline1: TextTheme,
   pub headline2: TextTheme,
   pub headline3: TextTheme,

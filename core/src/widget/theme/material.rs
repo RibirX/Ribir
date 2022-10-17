@@ -37,12 +37,12 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     brightness,
     palette,
     typography_theme,
-    default_font_family: family,
     scrollbar,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
     text_selected_background,
     caret_color: Color::BLACK,
+    compose_styles: <_>::default(),
   }
 }
 pub mod purple {
@@ -124,11 +124,12 @@ pub fn typography_theme(
   medium_title_face.weight = FontWeight::MEDIUM;
 
   let body_face = FontFace {
-    families: body_family,
+    families: body_family.clone(),
     ..<_>::default()
   };
 
   TypographyTheme {
+    default_font_family: body_family,
     headline1: TextTheme {
       text: TextStyle {
         font_size: FontSize::Pixel(96.0.into()),

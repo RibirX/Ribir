@@ -9,7 +9,7 @@ pub struct BuildCtx<'a> {
   parent: Option<WidgetId>,
   // todo: use as store current theme?
   default_theme: Option<Rc<Theme>>,
-  pub(crate) tree: &'a mut WidgetTree,
+  pub(crate) tree: &'a WidgetTree,
 }
 
 impl<'a> BuildCtx<'a> {
@@ -68,7 +68,7 @@ mod tests {
     WidgetTree::new(w, <_>::default());
   }
 
-  #[derive(Debug, Declare)]
+  #[derive(Declare)]
   struct ThemeTrack {
     themes: Rc<RefCell<Vec<Theme>>>,
   }

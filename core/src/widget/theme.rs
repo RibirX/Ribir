@@ -13,6 +13,8 @@ mod typography_theme;
 pub use typography_theme::*;
 mod transition_theme;
 pub use transition_theme::*;
+mod compose_styles;
+pub use compose_styles::*;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
@@ -22,10 +24,7 @@ use algo::ShareResource;
 pub use painter::*;
 pub use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
-use super::{
-  data_widget::compose_child_as_data_widget, ComposeChild,
-  StateWidget, 
-};
+use super::{data_widget::compose_child_as_data_widget, ComposeChild, StateWidget};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -56,6 +55,7 @@ pub struct ScrollBarTheme {
   pub thumb_min_size: f32,
 }
 
+#[derive(Clone)]
 pub struct Theme {
   // Dark or light theme.
   pub brightness: Brightness,
@@ -63,12 +63,10 @@ pub struct Theme {
   pub typography_theme: TypographyTheme,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
-  /// Default text font families
-  pub default_font_family: Box<[FontFamily]>,
+  pub compose_styles: ComposeStyles,
   pub scrollbar: ScrollBarTheme,
   pub text_selected_background: TextSelectedBackground,
   pub caret_color: Color,
-  // compose_styles map.
   // custom config by type id.
 }
 

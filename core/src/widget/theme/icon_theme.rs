@@ -13,7 +13,7 @@ pub struct IconTheme {
   /// default icon if a icon not fill or miss in `icons`.
   miss_icon: ShareResource<SvgRender>,
   /// a collection of icons.
-  icons: HashMap<IconIdent, ShareResource<SvgRender>>,
+  icons: HashMap<IconIdent, ShareResource<SvgRender>, ahash::RandomState>,
 }
 
 /// A five level standard of the size of icon in application.
