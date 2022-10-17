@@ -8,7 +8,7 @@ use crate::{
 #[derive(Clone)]
 pub struct TransitionTheme {
   pub default: Rc<Box<dyn Roc>>,
-  pub transitions: HashMap<TransitionIdent, Rc<Box<dyn Roc>>>,
+  pub transitions: HashMap<TransitionIdent, Rc<Box<dyn Roc>>, ahash::RandomState>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

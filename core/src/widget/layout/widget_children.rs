@@ -89,39 +89,6 @@ where
   }
 }
 
-impl<W, C, M1: ?Sized, M2: ?Sized> IntoWidget<(Option<&M1>, &M2)> for WidgetWithChild<Option<W>, C>
-where
-  WidgetWithChild<W, C>: IntoWidget<M1>,
-  C: IntoWidget<M2>,
-{
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    if let Some(widget) = widget {
-      WidgetWithChild { widget, child }.into_widget()
-    } else {
-      child.into_widget()
-    }
-  }
-}
-
-impl<W, C, M1: ?Sized, M2: ?Sized, M3: ?Sized> IntoWidget<(&M3, Option<&M1>, Option<&M2>)>
-  for WidgetWithChild<Option<W>, Option<C>>
-where
-  W: IntoWidget<M1>,
-  C: IntoWidget<M2>,
-  WidgetWithChild<W, C>: IntoWidget<M3>,
-{
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    match (widget, child) {
-      (None, None) => Void.into_widget(),
-      (None, Some(child)) => child.into_widget(),
-      (Some(widget), None) => widget.into_widget(),
-      (Some(widget), Some(child)) => WidgetWithChild { widget, child }.into_widget(),
-    }
-  }
-}
-
 impl<W, E, R, M: ?Sized> IntoWidget<(ExprWidget<E>, &M)> for WidgetWithChild<ExprWidget<E>, W>
 where
   E: FnMut(&mut BuildCtx) -> R + 'static,
@@ -181,7 +148,6 @@ where
   }
 }
 
-// todo: impl have children for it and strip the exprWidget.
 impl<R: SingleChild, E> SingleChild for ExprWidget<E> where E: FnMut(&mut BuildCtx) -> R {}
 impl<R: MultiChild, E> MultiChild for ExprWidget<E> where E: FnMut(&mut BuildCtx) -> R {}
 
@@ -319,7 +285,8 @@ macro_rules! tuple_child_into {
   };
   ({ $($target: ident, $from: ident, $mark: ident,)+ })  => {
 
-    impl<$($target, $from, $mark: ?Sized),+> IntoChild<($(&$mark,)+), ($($target,)+)> for ($($from,)+)
+    impl<$($target, $from, $mark: ?Sized),+>
+      IntoChild<($(&$mark,)+), ($($target,)+)> for ($($from,)+)
     where
       $($from: IntoChild<$mark, $target>),+
     {
@@ -349,6 +316,7 @@ where
 {
   type Target = Widget;
 
+  #[inline]
   fn with_child(self, child: C) -> Self::Target {
     ComposeChild::compose_child(StateWidget::Stateless(self), child.into_child())
   }
@@ -385,8 +353,45 @@ impl<M: ?Sized, E: WithChild<M, C>, C> WithChild<M, C> for ConstExprWidget<E> {
   fn with_child(self, child: C) -> Self::Target { self.expr.with_child(child) }
 }
 
-// Option type only support have single child to replace self.
-impl<W: SingleChild> SingleChild for Option<W> {}
+impl<F, R, C, M: ?Sized> WithChild<dyn Fn(&M) -> R, C> for F
+where
+  F: Fn(Widget) -> R,
+  C: IntoWidget<M>,
+{
+  type Target = R;
+
+  #[inline]
+  fn with_child(self, child: C) -> Self::Target { self(child.into_widget()) }
+}
+
+impl<F, R, C, M: ?Sized> WithChild<dyn Fn(&M) -> R, C> for std::rc::Rc<F>
+where
+  F: Fn(Widget) -> R,
+  C: IntoWidget<M>,
+{
+  type Target = R;
+
+  #[inline]
+  fn with_child(self, child: C) -> Self::Target { self(child.into_widget()) }
+}
+
+impl<T, C, M1: ?Sized, M2: ?Sized, M3: ?Sized> WithChild<(&M1, &M2, &M3), C> for Option<T>
+where
+  T: WithChild<M1, C>,
+  T::Target: IntoWidget<M2>,
+  C: IntoWidget<M3>,
+{
+  type Target = Widget;
+
+  #[inline]
+  fn with_child(self, child: C) -> Self::Target {
+    if let Some(widget) = self {
+      widget.with_child(child).into_widget()
+    } else {
+      child.into_widget()
+    }
+  }
+}
 
 #[cfg(test)]
 mod tests {
