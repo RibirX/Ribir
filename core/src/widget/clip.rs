@@ -1,12 +1,17 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[derive(SingleChild, Clone, Declare)]
-pub struct Clip
-{
-  path: Path,
+#[derive(Clone)]
+pub enum ClipType {
+  Auto,
+  Path(Path),
 }
 
-impl Render for Clip  {
+#[derive(SingleChild, Clone, Declare)]
+pub struct Clip {
+  clip: ClipType,
+}
+
+impl Render for Clip {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
@@ -16,7 +21,23 @@ impl Render for Clip  {
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    ctx.painter().clip(self.path.clone());
+    let path = match &self.clip {
+      ClipType::Auto => {
+        let size = ctx
+          .box_rect()
+          .expect("impossible without size in painting stage");
+        let mut builder = Path::builder();
+        builder
+          .begin_path(Point::zero())
+          .line_to(Point::new(size.width(), 0.))
+          .line_to(Point::new(size.width(), size.height()))
+          .line_to(Point::new(0., size.height()))
+          .end_path(true);
+        builder.fill()
+      }
+      ClipType::Path(path) => path.clone(),
+    };
+    ctx.painter().clip(path.clone());
   }
 }
 
