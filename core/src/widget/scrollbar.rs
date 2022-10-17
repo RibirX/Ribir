@@ -151,7 +151,7 @@ impl Compose for HRawScrollbar {
         }
       }
       change_on thumb.left_anchor Animate {
-        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(thumb.size.width);
           let to = to.abs_value(thumb.size.width);
@@ -204,7 +204,7 @@ impl Compose for VRawScrollbar {
         }
       }
       change_on thumb.top_anchor Animate {
-        transition: ScrollBarTheme::of(ctx).scroll_transition.clone(),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(thumb.size.height);
           let to = to.abs_value(thumb.size.height);

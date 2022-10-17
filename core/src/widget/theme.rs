@@ -5,11 +5,14 @@
 //! windows.
 pub mod material;
 mod palette;
+
 pub use palette::Palette;
 mod icon_theme;
 pub use icon_theme::*;
 mod typography_theme;
 pub use typography_theme::*;
+mod transition_theme;
+pub use transition_theme::*;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
@@ -20,8 +23,8 @@ pub use painter::*;
 pub use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
 use super::{
-  data_widget::compose_child_as_data_widget, easing::QuadraticBezierEasing, ComposeChild,
-  StateWidget, Transition,
+  data_widget::compose_child_as_data_widget, ComposeChild,
+  StateWidget, 
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,22 +54,20 @@ pub struct ScrollBarTheme {
   pub thumb: ScrollBoxDecorationStyle,
   /// The min size of the thumb have.
   pub thumb_min_size: f32,
-  pub scroll_transition: Transition<QuadraticBezierEasing>,
 }
 
-#[derive(Clone, Debug)]
 pub struct Theme {
   // Dark or light theme.
   pub brightness: Brightness,
   pub palette: Palette,
   pub typography_theme: TypographyTheme,
   pub icon_theme: IconTheme,
+  pub transitions_theme: TransitionTheme,
   /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
   pub scrollbar: ScrollBarTheme,
   pub text_selected_background: TextSelectedBackground,
   pub caret_color: Color,
-  // transitions  map.
   // compose_styles map.
   // custom config by type id.
 }

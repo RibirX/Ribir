@@ -3,6 +3,7 @@ use crate::prelude::*;
 use crate::prelude::BuildCtx;
 
 use super::easing::Easing;
+use std::rc::Rc;
 use std::time::Duration;
 
 /// Transition describe how the state change form init to final smoothly.
@@ -54,4 +55,14 @@ impl<T: Roc> Roc for Stateful<T> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
     self.state_ref().rate_of_change(dur)
   }
+}
+
+impl Roc for Box<dyn Roc> {
+  #[inline]
+  fn rate_of_change(&self, dur: Duration) -> AnimateProgress { self.deref().rate_of_change(dur) }
+}
+
+impl<T: Roc> Roc for Rc<T> {
+  #[inline]
+  fn rate_of_change(&self, dur: Duration) -> AnimateProgress { self.deref().rate_of_change(dur) }
 }

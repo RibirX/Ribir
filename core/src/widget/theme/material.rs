@@ -1,8 +1,7 @@
 use self::palette::LightnessCfg;
 pub use super::*;
-use crate::{fill_icon, prelude::include_svg, widget::easing};
+use crate::{fill_icon, prelude::include_svg};
 pub use painter::{Brush, Color};
-use std::time::Duration;
 
 /// Crate a material theme with palette.
 pub fn new(brightness: Brightness, palette: Palette) -> Theme {
@@ -29,12 +28,6 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
       thickness: 12.,
     },
     thumb_min_size: 12.,
-    scroll_transition: Transition {
-      delay: None,
-      repeat: None,
-      duration: Duration::from_millis(150),
-      easing: easing::EASE_OUT,
-    },
   };
   let text_selected_background = TextSelectedBackground {
     focus: Color::from_rgb(50, 150, 255).with_alpha(0.9),
@@ -47,6 +40,7 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     default_font_family: family,
     scrollbar,
     icon_theme: icon_theme(),
+    transitions_theme: TransitionTheme::default(),
     text_selected_background,
     caret_color: Color::BLACK,
   }
