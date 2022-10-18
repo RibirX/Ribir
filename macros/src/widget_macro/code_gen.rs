@@ -19,7 +19,7 @@ use super::{
   desugar::{
     ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, WidgetNode,
   },
-  parser::{Track, TrackField},
+  parser::{Env, Track, TrackField},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
@@ -40,37 +40,46 @@ impl Desugared {
       return tokens;
     }
 
+    let Self {
+      env,
+      track,
+      named_objs,
+      stmts,
+      widget,
+      warnings,
+      ..
+    } = &self;
     let sorted_named_objs = self.order_named_objs();
     Paren::default().surround(&mut tokens, |tokens| {
       let ctx_name = ctx_ident(Span::call_site());
       quote! { move |#ctx_name: &mut BuildCtx| }.to_tokens(tokens);
       Brace::default().surround(tokens, |tokens| {
+        env.to_tokens(tokens);
         // deep first declare named obj by their dependencies
         // circular may exist widget attr follow widget self to init.
         sorted_named_objs.iter().for_each(|name| {
-          if let Some(obj) = self.named_objs.get(name) {
+          if let Some(obj) = named_objs.get(name) {
             obj.to_tokens(tokens)
           }
         });
 
-        self.stmts.iter().for_each(|item| item.to_tokens(tokens));
-        let w = self.widget.as_ref().unwrap();
+        stmts.iter().for_each(|item| item.to_tokens(tokens));
+        let w = widget.as_ref().unwrap();
         w.gen_node_objs(tokens);
-        w.gen_compose_node(&self.named_objs, tokens);
+        w.gen_compose_node(named_objs, tokens);
         quote! { .into_widget() }.to_tokens(tokens);
       })
     });
     quote! { .into_widget() }.to_tokens(&mut tokens);
 
-    let track = self.track.as_ref();
-    if track.map_or(false, Track::has_def_names) {
+    if track.as_ref().map_or(false, Track::has_def_names) {
       tokens = quote! {{
         #track
         #tokens
       }};
     }
 
-    self.warnings.iter().for_each(|w| w.emit_warning());
+    warnings.iter().for_each(|w| w.emit_warning());
 
     tokens
   }
@@ -412,6 +421,12 @@ impl ToTokens for Track {
       .iter()
       .filter(|f| f.colon_token.is_some())
       .for_each(|field| field.to_tokens(tokens));
+  }
+}
+
+impl ToTokens for Env {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    self.stmts.stmts.iter().for_each(|s| s.to_tokens(tokens));
   }
 }
 

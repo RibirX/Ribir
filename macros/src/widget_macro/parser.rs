@@ -10,7 +10,7 @@ use syn::{
   punctuated::Punctuated,
   spanned::Spanned,
   token::{Brace, Colon, Comma, Dot},
-  Expr, Ident, Path, Result,
+  Block, Expr, Ident, Path, Result,
 };
 
 use super::ribir_variable;
@@ -18,6 +18,7 @@ use super::ribir_variable;
 pub mod kw {
   syn::custom_keyword!(widget);
   syn::custom_keyword!(track);
+  syn::custom_keyword!(env);
   syn::custom_keyword!(ExprWidget);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);
@@ -40,6 +41,7 @@ mod animate_kw {
 }
 
 pub struct MacroSyntax {
+  pub env: Option<Env>,
   pub track: Option<Track>,
   pub widget: DeclareWidget,
   pub items: Vec<Item>,
@@ -49,6 +51,11 @@ pub struct Track {
   _track_token: kw::track,
   _brace: Brace,
   pub track_externs: Vec<TrackField>,
+}
+
+pub struct Env {
+  _env_token: kw::env,
+  pub stmts: Block,
 }
 
 #[derive(Debug)]
@@ -201,6 +208,7 @@ impl Parse for MacroSyntax {
   fn parse(input: ParseStream) -> Result<Self> {
     let mut widget: Option<DeclareWidget> = None;
     let mut items = vec![];
+    let mut env: Option<Env> = None;
     let mut track: Option<Track> = None;
     loop {
       if input.is_empty() {
@@ -223,6 +231,13 @@ impl Parse for MacroSyntax {
           t.track_externs.extend(ot.track_externs);
         }
         track = Some(t);
+      } else if lk.peek(kw::env) {
+        let e: Env = input.parse::<Env>()?;
+        if let Some(env) = env.as_mut() {
+          env.stmts.stmts.extend(e.stmts.stmts);
+        } else {
+          env = Some(e)
+        }
       } else if lk.peek(Ident) && input.peek2(Brace) {
         let w: DeclareWidget = input.parse()?;
         if let Some(first) = widget.as_ref() {
@@ -242,7 +257,7 @@ impl Parse for MacroSyntax {
     }
     let widget = widget
       .ok_or_else(|| syn::Error::new(input.span(), "must declare a root widget in `widget!`"))?;
-    Ok(Self { widget, items, track })
+    Ok(Self { widget, items, track, env })
   }
 }
 
@@ -262,6 +277,14 @@ impl Parse for Track {
   }
 }
 
+impl Parse for Env {
+  fn parse(input: ParseStream) -> Result<Self> {
+    Ok(Self {
+      _env_token: input.parse()?,
+      stmts: input.parse()?,
+    })
+  }
+}
 impl Parse for TrackField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let member = input.parse::<Ident>()?;
