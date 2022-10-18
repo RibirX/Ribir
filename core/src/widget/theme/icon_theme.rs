@@ -1,8 +1,7 @@
+use super::Theme;
 use algo::ShareResource;
 use painter::{Size, SvgRender};
 use std::collections::HashMap;
-
-use crate::prelude::BuildCtx;
 
 /// The theme of icon, which specify the icon size standard and provide a store
 /// of svg icons to use.
@@ -44,8 +43,8 @@ pub mod icons {
   /// macro use to specify icon of [`IconIdent`]! in [`IconTheme`]!.
   #[macro_export]
   macro_rules! fill_icon {
-    ($icons_theme: ident, $($name: path: $path: literal),+) => {
-      $($icons_theme.set_icon($name,  ShareResource::new(include_svg!($path)));)+
+    ($theme: ident, $($name: path: $path: literal),+) => {
+      $($theme.icon_theme.set_icon($name,  ShareResource::new(include_svg!($path)));)+
     };
   }
 
@@ -76,22 +75,11 @@ impl IconTheme {
   ) -> Option<ShareResource<SvgRender>> {
     self.icons.insert(name, icon)
   }
-
-  pub fn get_icon_or_miss(&self, name: IconIdent) -> ShareResource<SvgRender> {
-    self.get_icon(name).unwrap_or_else(|| {
-      log::info!("Icon({:?})  not init in theme.", name);
-      self.miss_icon.clone()
-    })
-  }
-
-  pub fn get_icon(&self, name: IconIdent) -> Option<ShareResource<SvgRender>> {
-    self.icons.get(&name).cloned()
-  }
 }
 
 impl IconSize {
   #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().icon_theme.icon_size }
+  pub fn of<'a>(theme: &'a Theme) -> &'a Self { &theme.icon_theme.icon_size }
 }
 
 impl IconIdent {
@@ -99,13 +87,16 @@ impl IconIdent {
 
   /// get the svg icon of the ident from the context if it have otherwise return
   /// a default icon.
-  pub fn get_from_or_miss(self, ctx: &mut BuildCtx) -> ShareResource<SvgRender> {
-    ctx.theme().icon_theme.get_icon_or_miss(self)
+  pub fn of_or_miss(self, theme: &Theme) -> ShareResource<SvgRender> {
+    self.of(theme).unwrap_or_else(|| {
+      log::info!("Icon({:?})  not init in theme.", self);
+      theme.icon_theme.miss_icon.clone()
+    })
   }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn get_from(self, ctx: &mut BuildCtx) -> Option<ShareResource<SvgRender>> {
-    ctx.theme().icon_theme.get_icon(self)
+  pub fn of(self, theme: &Theme) -> Option<ShareResource<SvgRender>> {
+    theme.icon_theme.icons.get(&self).cloned()
   }
 }
 

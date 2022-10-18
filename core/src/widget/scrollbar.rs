@@ -7,8 +7,22 @@ pub struct HScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
   pub offset: f32,
-  #[declare(default=ScrollBarTheme::of(ctx).clone())]
-  pub style: ScrollBarTheme,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScrollBarTheme {
+  /// The brush to fill the scrollbar thumb.
+  pub thumb_brush: Brush,
+  /// The brush to fill the scrollbar track.
+  pub track_brush: Brush,
+  /// The Radius of the scrollbar thumb's rounded rectangle corners.
+  pub radius: Option<Radius>,
+  /// The min size of the thumb have.
+  pub thumb_min_size: f32,
+  /// The thickness of scrollbar element.
+  pub thickness: f32,
+  /// The margin of scrollbar thumb at cross axis edge in logical pixels.
+  pub thumb_margin: f32,
 }
 
 impl ComposeChild for HScrollBar {
@@ -24,7 +38,6 @@ impl ComposeChild for HScrollBar {
           ExprWidget { expr: child}
         }
         HRawScrollbar {
-          style: this.style.clone(),
           scrolling: scrolling.clone_stateful(),
           v_align: VAlign::Bottom,
         }
@@ -41,8 +54,6 @@ pub struct VScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
   pub offset: f32,
-  #[declare(default=ScrollBarTheme::of(ctx).clone())]
-  pub style: ScrollBarTheme,
 }
 
 impl ComposeChild for VScrollBar {
@@ -58,7 +69,6 @@ impl ComposeChild for VScrollBar {
           ExprWidget { expr: child}
         }
         VRawScrollbar {
-          style: this.style.clone(),
           scrolling: scrolling.clone_stateful(),
           h_align: HAlign::Right
         }
@@ -75,8 +85,6 @@ pub struct BothScrollbar {
   /// Scrolled pixels of child content.
   #[declare(default)]
   pub offset: Point,
-  #[declare(default=ScrollBarTheme::of(ctx).clone())]
-  pub style: ScrollBarTheme,
 }
 
 impl ComposeChild for BothScrollbar {
@@ -84,6 +92,10 @@ impl ComposeChild for BothScrollbar {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
+      env {
+        let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
+        let margin = theme.track_thickness();
+      }
       Stack {
         ScrollableWidget {
           id: scrolling,
@@ -92,16 +104,14 @@ impl ComposeChild for BothScrollbar {
           ExprWidget { expr: child}
         }
         HRawScrollbar {
-          style: this.style.clone(),
           scrolling: scrolling.clone_stateful(),
           v_align: VAlign::Bottom,
-          margin: EdgeInsets::only_right(this.style.track.thickness )
+          margin: EdgeInsets::only_right(margin)
         }
         VRawScrollbar {
-          style: this.style.clone(),
           scrolling: scrolling.clone_stateful(),
           h_align: HAlign::Right,
-          margin: EdgeInsets::only_bottom(this.style.track.thickness )
+          margin: EdgeInsets::only_bottom(margin)
         }
       }
       change_on scrolling.pos ~> this.offset
@@ -113,8 +123,6 @@ impl ComposeChild for BothScrollbar {
 /// `scrolling` widget.
 #[derive(Declare)]
 pub struct HRawScrollbar {
-  #[declare(default=ScrollBarTheme::of(ctx).clone())]
-  pub style: ScrollBarTheme,
   scrolling: Stateful<ScrollableWidget>,
 }
 
@@ -125,13 +133,15 @@ impl Compose for HRawScrollbar {
 
     widget! {
       track { scrolling, this }
+      env {
+        let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
+      }
       Stack {
         LayoutBox {
           id: track_box,
           SizedBox {
-            size: Size::new(f32::MAX, this.style.track.thickness),
-            background: this.style.track.background.clone(),
-            radius: this.style.track.radius,
+            size: Size::new(f32::MAX, theme.track_thickness()),
+            background: theme.track_brush.clone(),
           }
         }
         SizedBox {
@@ -140,10 +150,10 @@ impl Compose for HRawScrollbar {
             let page_width = scrolling.page_size().width;
             let content_width = scrolling.content_size().width;
             let width = page_width / content_width * track_box.width();
-            Size::new(width.max(this.style.thumb_min_size), this.style.thumb.thickness)
+            Size::new(width.max(theme.thumb_min_size), theme.thickness)
           },
-          background: this.style.thumb.background.clone(),
-          radius: this.style.thumb.radius,
+          background: theme.track_brush.clone(),
+          radius: theme.radius,
           left_anchor: {
             let content_width = scrolling.content_size().width;
             -scrolling.pos.x * safe_recip(content_width) * track_box.width()
@@ -166,8 +176,6 @@ impl Compose for HRawScrollbar {
 /// `scrolling` widget.
 #[derive(Declare)]
 pub struct VRawScrollbar {
-  #[declare(default=ScrollBarTheme::of(ctx).clone())]
-  pub style: ScrollBarTheme,
   scrolling: Stateful<ScrollableWidget>,
 }
 
@@ -178,13 +186,15 @@ impl Compose for VRawScrollbar {
 
     widget! {
       track { scrolling, this }
+      env {
+        let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
+      }
       Stack {
         LayoutBox {
           id: track_box,
           SizedBox {
-            size: Size::new(this.style.track.thickness, f32::MAX),
-            background: this.style.track.background.clone(),
-            radius: this.style.track.radius,
+            size: Size::new(theme.track_thickness(), f32::MAX),
+            background: theme.track_brush.clone(),
           }
         }
         SizedBox {
@@ -193,10 +203,10 @@ impl Compose for VRawScrollbar {
             let page_height = scrolling.page_size().height;
             let content_height = scrolling.content_size().height;
             let height = page_height / content_height * track_box.height();
-            Size::new( this.style.thumb.thickness, height.max(this.style.thumb_min_size))
+            Size::new( theme.thickness, height.max(theme.thumb_min_size))
           },
-          background: this.style.thumb.background.clone(),
-          radius: this.style.thumb.radius,
+          background: theme.thumb_brush.clone(),
+          radius: theme.radius,
           top_anchor: {
             let content_height = scrolling.content_size().height;
             -scrolling.pos.y * safe_recip(content_height) * track_box.height()
@@ -218,4 +228,21 @@ impl Compose for VRawScrollbar {
 fn safe_recip(v: f32) -> f32 {
   let v = v.recip();
   if v.is_infinite() || v.is_nan() { 0. } else { v }
+}
+
+impl CustomTheme for ScrollBarTheme {
+  fn default_theme(theme: &Theme) -> Self {
+    Self {
+      thumb_brush: theme.palette.primary().into(),
+      track_brush: Color::TRANSPARENT.into(),
+      radius: Some(Radius::all(4.)),
+      thumb_min_size: 12.,
+      thickness: 8.,
+      thumb_margin: 2.,
+    }
+  }
+}
+
+impl ScrollBarTheme {
+  fn track_thickness(&self) -> f32 { self.thickness + self.thumb_margin * 2. }
 }

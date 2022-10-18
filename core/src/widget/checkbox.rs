@@ -7,7 +7,7 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default = IconSize::of(ctx).tiny)]
+  #[declare(default = IconSize::of(ctx.theme()).tiny)]
   pub size: Size,
 }
 
@@ -37,12 +37,13 @@ impl Compose for Checkbox {
         },
         ExprWidget {
           expr: {
+            let theme = ctx.theme();
             if this.indeterminate {
-              icons::INDETERMINATE.get_from_or_miss(ctx)
+              icons::INDETERMINATE.of_or_miss(theme)
             } else if this.checked {
-              icons::CHECKED.get_from_or_miss(ctx)
+              icons::CHECKED.of_or_miss(theme)
             } else {
-              icons::UNCHECKED.get_from_or_miss(ctx)
+              icons::UNCHECKED.of_or_miss(theme)
             }
         }}
       }

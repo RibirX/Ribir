@@ -15,6 +15,8 @@ mod transition_theme;
 pub use transition_theme::*;
 mod compose_styles;
 pub use compose_styles::*;
+mod custom_theme;
+pub use custom_theme::*;
 
 use crate::{
   impl_proxy_query, impl_query_self_only,
@@ -37,24 +39,6 @@ pub struct TextSelectedBackground {
   pub blur: Color,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScrollBoxDecorationStyle {
-  pub background: Brush,
-  /// The corners of this box are rounded by this `BorderRadius`. The round
-  /// corner only work if the two borders beside it are same style.]
-  pub radius: Option<Radius>,
-  /// The thickness of scrollbar element.
-  pub thickness: f32,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScrollBarTheme {
-  pub track: ScrollBoxDecorationStyle,
-  pub thumb: ScrollBoxDecorationStyle,
-  /// The min size of the thumb have.
-  pub thumb_min_size: f32,
-}
-
 #[derive(Clone)]
 pub struct Theme {
   // Dark or light theme.
@@ -64,20 +48,16 @@ pub struct Theme {
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
   pub compose_styles: ComposeStyles,
-  pub scrollbar: ScrollBarTheme,
+  pub custom_themes: CustomThemes,
+
+  // todo: refactor input theme style.
   pub text_selected_background: TextSelectedBackground,
   pub caret_color: Color,
-  // custom config by type id.
 }
 
 impl TextSelectedBackground {
   #[inline]
   pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().text_selected_background }
-}
-
-impl ScrollBarTheme {
-  #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &ctx.theme().scrollbar }
 }
 
 #[derive(Declare)]
