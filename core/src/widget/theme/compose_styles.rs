@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::prelude::{BuildCtx, Widget};
+use crate::prelude::{Theme, Widget};
 
 /// Compose style is a compose child widget to decoration its child.
 #[derive(Clone, Default)]
@@ -62,9 +62,8 @@ impl ComposeStyleIdent {
   pub const fn new(idx: usize) -> Self { Self(idx) }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn get_from<'a>(self, ctx: &'a mut BuildCtx) -> Option<&'a dyn Fn(Widget) -> Widget> {
-    ctx
-      .theme()
+  pub fn of<'a>(self, theme: &'a Theme) -> Option<&'a dyn Fn(Widget) -> Widget> {
+    theme
       .compose_styles
       .styles
       .get(&self)
@@ -110,7 +109,7 @@ mod tests {
     let w = widget! {
       ExprWidget {
         theme,
-        expr: SIZE_100.get_from(ctx),
+        expr: SIZE_100.of(ctx),
         SizedBox {
           size: Size::zero(),
         }

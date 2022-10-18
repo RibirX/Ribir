@@ -15,35 +15,30 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     Color::BLACK.with_alpha(0.87).into(),
   );
 
-  let scrollbar = ScrollBarTheme {
-    track: ScrollBoxDecorationStyle {
-      background: Color::SILVER.into(),
-      radius: None,
-      thickness: 12.,
-    },
-
-    thumb: ScrollBoxDecorationStyle {
-      background: Color::GRAY.into(),
-      radius: Some(Radius::all(4.)),
-      thickness: 12.,
-    },
-    thumb_min_size: 12.,
-  };
   let text_selected_background = TextSelectedBackground {
     focus: Color::from_rgb(50, 150, 255).with_alpha(0.9),
     blur: Color::GRAY.with_alpha(0.9),
   };
-  Theme {
+
+  let mut theme = Theme {
     brightness,
     palette,
     typography_theme,
-    scrollbar,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
     text_selected_background,
     caret_color: Color::BLACK,
     compose_styles: <_>::default(),
-  }
+    custom_themes: <_>::default(),
+  };
+
+  fill_icon! { theme,
+    icons::CHECKED: "./material/checked.svg",
+    icons::UNCHECKED: "./material/unchecked_box.svg",
+    icons::INDETERMINATE: "./material/indeterminate_check_box.svg"
+  };
+
+  theme
 }
 pub mod purple {
   use super::*;
@@ -84,15 +79,7 @@ fn icon_theme() -> IconTheme {
     huge: Size::new(64., 64.),
   };
   let miss_icon = ShareResource::new(include_svg!("./material/miss_icon.svg"));
-  let mut theme = IconTheme::new(icon_size, miss_icon);
-
-  fill_icon! { theme,
-    icons::CHECKED: "./material/checked.svg",
-    icons::UNCHECKED: "./material/unchecked_box.svg",
-    icons::INDETERMINATE: "./material/indeterminate_check_box.svg"
-  };
-
-  theme
+  IconTheme::new(icon_size, miss_icon)
 }
 
 /// Create a TypographyTheme which implement the typography styles base on the
