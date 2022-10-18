@@ -7,8 +7,9 @@ use syn::{parse_quote, parse_quote_spanned, spanned::Spanned, Expr, ExprPath, Id
 use super::{
   child_variable, is_listener,
   parser::{
-    Animate, AnimateTransitionValue, DataFlow, DeclareField, DeclareWidget, FromStateField, Id,
-    Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, Track, Transition, TransitionField,
+    Animate, AnimateTransitionValue, DataFlow, DeclareField, DeclareWidget, Env, FromStateField,
+    Id, Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, Track, Transition,
+    TransitionField,
   },
   ribir_suffix_variable, ribir_variable, TrackExpr, FIELD_WIDGET_TYPE, WIDGETS,
 };
@@ -24,6 +25,7 @@ pub const CHANGE: &str = "change";
 pub const MODIFY: &str = "modify";
 pub const ID: &str = "id";
 pub struct Desugared {
+  pub env: Option<Env>,
   pub track: Option<Track>,
   pub named_objs: NamedObjMap,
   pub stmts: Vec<SubscribeItem>,
@@ -99,8 +101,9 @@ pub enum ComposeItem {
 impl MacroSyntax {
   pub fn desugar(self) -> Desugared {
     let named_objs = NamedObjMap::default();
-    let MacroSyntax { track, widget, items } = self;
+    let MacroSyntax { env, track, widget, items } = self;
     let mut desugared = Desugared {
+      env,
       track,
       named_objs,
       stmts: vec![],
