@@ -167,7 +167,7 @@ impl Compose for Caret {
         opacity: 1.,
         rect: this.rect,
         color: this.color,
-        mounted: move |_| animate1.run(),
+        mounted: move |_, _| animate1.run(),
       }
       change_on caret.visible Animate {
         id: animate1,

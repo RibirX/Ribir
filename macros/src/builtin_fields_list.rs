@@ -1,4 +1,9 @@
 builtin! {
+  KeyWidget {
+    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
+    key: Key
+  }
+
   PerformedLayoutListener {
     #[doc="action perform after widget performed layout."]
     performed_layout: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
@@ -6,7 +11,7 @@ builtin! {
 
   MountedListener {
     #[doc="action perform after widget be added to the widget tree."]
-    mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
+    mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, MountedType)>,
   }
 
   DisposedListener {
@@ -180,10 +185,6 @@ builtin! {
     visible: bool
   }
 
-  KeyWidget {
-    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
-    key: Key
-  }
   Opacity {
     #[doc="Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency."]
     opacity: f32

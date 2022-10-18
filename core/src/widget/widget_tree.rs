@@ -164,7 +164,8 @@ impl WidgetTree {
 
     let root = widget.into_subtree(None, self).expect("must have a root");
     self.set_root_id(root);
-    root.on_mounted_subtree(self, true);
+    let keys = <_>::default();
+    root.on_mounted_subtree(self, &keys);
     self.mark_dirty(root);
   }
 
@@ -360,15 +361,24 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree, brand_new: bool) {
+  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree, keys: &HashSet<Key>) {
     let (tree1, tree2) = unsafe { tree.split_tree() };
 
-    self
-      .descendants(tree1)
-      .for_each(|w| w.on_mounted(tree2, brand_new));
+    self.descendants(tree1).for_each(|w| {
+      let mount = if keys.is_empty() {
+        MountedType::New
+      } else {
+        w.clone()
+          .key(tree2)
+          .and_then(|k| keys.get(&k))
+          .map_or(MountedType::New, |_| MountedType::Refresh)
+      };
+
+      w.on_mounted(tree2, mount);
+    });
   }
 
-  pub(crate) fn on_mounted(self, tree: &mut WidgetTree, brand_new: bool) {
+  pub(crate) fn on_mounted(self, tree: &mut WidgetTree, mounted_type: MountedType) {
     self.assert_get(tree).query_all_type(
       |notifier: &StateChangeNotifier| {
         let state_changed = tree.state_changed.clone();
@@ -383,17 +393,15 @@ impl WidgetId {
       QueryOrder::OutsideFirst,
     );
 
-    if brand_new {
-      // Safety: lifecycle context have no way to change tree struct.
-      let (tree1, tree2) = unsafe { tree.split_tree() };
-      self.assert_get(tree1).query_all_type(
-        |m: &MountedListener| {
-          (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
-          true
-        },
-        QueryOrder::OutsideFirst,
-      );
-    }
+    // Safety: lifecycle context have no way to change tree struct.
+    let (tree1, tree2) = unsafe { tree.split_tree() };
+    self.assert_get(tree1).query_all_type(
+      |m: &MountedListener| {
+        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 }, mounted_type);
+        true
+      },
+      QueryOrder::OutsideFirst,
+    );
   }
 
   pub(crate) fn on_disposed(self, tree: &mut WidgetTree) {
@@ -429,6 +437,16 @@ impl WidgetId {
 
   pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
+  }
+
+  pub(crate) fn key(self, tree: &WidgetTree) -> Option<Key> {
+    let mut key = None;
+    self
+      .assert_get(tree)
+      .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
+        key = Some(k.clone());
+      });
+    key
   }
 }
 

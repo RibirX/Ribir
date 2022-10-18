@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use crate::{
   impl_proxy_render,
@@ -311,11 +311,20 @@ fn refresh_single_with_child(
   sign.swap_data(new_gen_root, tree);
   sign.swap(new_gen_root, tree);
   // new is swap to old gen root.
+
+  let mut keys = HashSet::default();
+  collect_widget_keys(new_gen_root, tree, &mut keys);
   new_gen_root.remove_subtree(tree);
-  single_on_mounted(sign, new_depth, true, tree);
+  single_on_mounted(sign, new_depth, tree, keys);
 
   tree.mark_dirty(new_gen_root);
   depth
+}
+
+fn collect_widget_keys(root: WidgetId, tree: &WidgetTree, keys: &mut HashSet<Key>) {
+  root.descendants(tree).for_each(|node| {
+    node.key(tree).map(|k| keys.insert(k));
+  });
 }
 
 fn refresh_multi(
@@ -331,7 +340,11 @@ fn refresh_multi(
   gen_widgets[0] = tmp;
 
   let parent = sign.parent(tree);
-  gen_widgets.iter().for_each(|w| w.remove_subtree(tree));
+  let mut keys = HashSet::default();
+  gen_widgets.iter().for_each(|w| {
+    collect_widget_keys(*w, tree, &mut keys);
+    w.remove_subtree(tree);
+  });
   gen_widgets.clear();
 
   match widgets {
@@ -363,7 +376,7 @@ fn refresh_multi(
     gen_widgets[0] = sign;
 
     gen_widgets.iter().for_each(|n| {
-      n.on_mounted_subtree(tree, true);
+      n.on_mounted_subtree(tree, &keys);
       tree.mark_dirty(*n)
     });
   }
@@ -402,13 +415,19 @@ fn down_to_leaf(id: WidgetId, tree: &WidgetTree) -> (WidgetId, usize) {
 fn single_on_mounted(
   from: WidgetId,
   mut level: usize,
-  brand_new: bool,
   tree: &mut WidgetTree,
+  keys: HashSet<Key>,
 ) -> Option<WidgetId> {
   let mut next = Some(from);
   while level > 0 {
     let c = next.unwrap();
-    c.on_mounted(tree, brand_new);
+
+    let mount = c
+      .key(tree)
+      .and_then(|k| keys.get(&k))
+      .map_or(MountedType::New, |_| MountedType::Refresh);
+
+    c.on_mounted(tree, mount);
     next = c.single_child(tree);
 
     level -= 1;
@@ -420,6 +439,8 @@ fn single_on_mounted(
 mod tests {
   use crate::prelude::*;
   use crate::widget::{widget_tree::WidgetTree, IntoStateful};
+  use std::cell::RefCell;
+  use std::rc::Rc;
 
   #[test]
   fn expr_widget_as_root() {
@@ -471,5 +492,98 @@ mod tests {
 
     assert_eq!(ids[0], new_ids[0]);
     assert_eq!(ids[2], new_ids[2]);
+  }
+
+  #[test]
+  fn expr_widget_mounted_new() {
+    let v = vec![1, 2, 3].into_stateful();
+
+    let new_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let refresh_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let w = widget! {
+      track { v: v.clone(),
+              new_cnt: new_cnt.clone(),
+              refresh_cnt: refresh_cnt.clone() }
+      Row {
+        ExprWidget {
+          expr: {
+            v.iter().enumerate().map(move |(idx, _)| {
+              widget! {
+                SizedBox{
+                  size: Size::zero(),
+                  mounted: move |_, t| {
+                    match t {
+                      MountedType::New => *new_cnt.borrow_mut() += 1,
+                      MountedType::Refresh => *refresh_cnt.borrow_mut() += 1,
+                    };
+                  }
+                }
+              }
+            }).collect::<Vec<_>>()
+          }
+        }
+      }
+    };
+    let mut tree = WidgetTree::new(w, <_>::default());
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 3);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+
+    v.state_ref().push(4);
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 7);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+
+    v.state_ref().pop();
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 10);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+  }
+
+  #[test]
+  fn expr_widget_mounted_track() {
+    let v = vec![1, 2, 3].into_stateful();
+
+    let new_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let refresh_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let w = widget! {
+      track { v: v.clone(),
+              new_cnt: new_cnt.clone(),
+              refresh_cnt: refresh_cnt.clone() }
+      Row {
+        ExprWidget {
+          expr: {
+            v.iter().enumerate().map(move |(idx, _)| {
+            widget! {
+              SizedBox{
+                key: idx,
+                size: Size::zero(),
+                mounted: move |_, t| {
+                  match t {
+                    MountedType::New => *new_cnt.borrow_mut() += 1,
+                    MountedType::Refresh => *refresh_cnt.borrow_mut() += 1,
+                  };
+                }
+              }
+            }
+          }).collect::<Vec<_>>()
+          }
+        }
+      }
+    };
+    let mut tree = WidgetTree::new(w, <_>::default());
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 3);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+
+    v.state_ref().push(4);
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 4);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 3);
+
+    v.state_ref().pop();
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 4);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 6);
   }
 }
