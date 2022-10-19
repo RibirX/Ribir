@@ -557,3 +557,123 @@ impl Vertex {
     }
   }
 }
+
+#[cfg(test)]
+mod test {
+  use crate::wgpu_backend_headless;
+  use painter::{
+    Brush, CaptureCallback, ClipInstruct, Color, DeviceSize, PaintCommand, PaintInstruct,
+    PaintPath, PainterBackend, Path, Point, Transform, Vector,
+  };
+  use ribir::widget::AppContext;
+  use std::{cell::RefCell, rc::Rc};
+
+  fn compare_paint_result(
+    size: DeviceSize,
+    commands1: Vec<PaintCommand>,
+    commands2: Vec<PaintCommand>,
+  ) {
+    let ctx = Rc::new(RefCell::new(AppContext::default()));
+    let mut p_backend = futures::executor::block_on(wgpu_backend_headless(
+      size,
+      None,
+      None,
+      ctx.borrow().shaper.clone(),
+    ));
+
+    fn capture_buf() -> (Rc<RefCell<Vec<u8>>>, CaptureCallback<'static>) {
+      let v = Rc::new(RefCell::new(Vec::default()));
+      let data = v.clone();
+      let receiver: CaptureCallback<'static> = Box::new(move |size, rows| {
+        v.borrow_mut()
+          .reserve((4 * size.width * size.height) as usize);
+        rows.for_each(|r| v.borrow_mut().extend(r));
+      });
+      return (data, receiver);
+    }
+
+    let (buf1, receiver1) = capture_buf();
+    p_backend.commands_to_image(commands1, receiver1).unwrap();
+
+    let (buf2, receiver2) = capture_buf();
+    p_backend.commands_to_image(commands2, receiver2).unwrap();
+
+    assert_eq!(*buf1.borrow(), *buf2.borrow());
+  }
+
+  fn fill_path(path: &Path, transform: &Transform, color: painter::Color) -> PaintCommand {
+    PaintCommand::Paint(PaintInstruct {
+      path: PaintPath::Path(path.clone().into()),
+      opacity: 1.,
+      transform: transform.clone(),
+      brush: Brush::Color(color),
+    })
+  }
+
+  fn push_clip(path: &Path, transform: &Transform) -> PaintCommand {
+    PaintCommand::PushClip(ClipInstruct {
+      path: PaintPath::Path(path.clone().into()),
+      transform: transform.clone(),
+    })
+  }
+
+  fn pop_clip() -> PaintCommand { PaintCommand::PopClip }
+
+  fn full_rect(width: f32, height: f32) -> Path {
+    let mut builder = Path::builder();
+    builder
+      .begin_path(Point::zero())
+      .line_to(Point::new(width, 0.))
+      .line_to(Point::new(width, height))
+      .line_to(Point::new(0., height))
+      .end_path(true);
+    builder.fill()
+  }
+
+  #[test]
+  fn stencil_clip() {
+    let size = DeviceSize::new(100, 100);
+    let ident = Transform::default();
+    let full_path = full_rect(100., 100.);
+
+    // simple clip
+    let commands1 = vec![
+      push_clip(&full_path, &Transform::scale(0.5, 0.5)),
+      fill_path(&full_path, &ident, Color::BLUE),
+      pop_clip(),
+    ];
+    let commands2 = vec![fill_path(
+      &full_path,
+      &Transform::scale(0.5, 0.5),
+      Color::BLUE,
+    )];
+    compare_paint_result(size, commands1, commands2);
+
+    // clip embed
+    let commands3 = vec![
+      push_clip(&full_path, &Transform::scale(0.75, 0.75)),
+      push_clip(
+        &full_path,
+        &Transform::scale(0.75, 0.75).then_translate(Vector::new(25., 25.)),
+      ),
+      fill_path(&full_path, &ident, Color::BLUE),
+      pop_clip(),
+      fill_path(&full_path, &Transform::scale(1., 0.15), Color::YELLOW),
+      fill_path(
+        &full_path,
+        &Transform::scale(0.25, 0.25).then_translate(Vector::new(75., 75.)),
+        Color::RED,
+      ),
+      pop_clip(),
+    ];
+    let commands4 = vec![
+      fill_path(
+        &full_path,
+        &Transform::scale(0.5, 0.5).then_translate(Vector::new(25., 25.)),
+        Color::BLUE,
+      ),
+      fill_path(&full_path, &Transform::scale(0.75, 0.15), Color::YELLOW),
+    ];
+    compare_paint_result(size, commands3, commands4);
+  }
+}
