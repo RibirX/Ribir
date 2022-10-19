@@ -1,16 +1,13 @@
 use ribir::prelude::*;
 
-fn dummy_ctx() -> BuildCtx<'static> {
-  let ctx = std::mem::MaybeUninit::uninit();
-  unsafe { ctx.assume_init() }
-}
+fn dummy_ctx() -> &'static BuildCtx<'static> { unsafe { std::mem::transmute(&0) } }
+
 #[test]
 fn declare_builder_smoke() {
-  let mut ctx = dummy_ctx();
   // empty struct
   #[derive(Declare)]
   struct A;
-  let _: A = ABuilder {}.build(&mut ctx);
+  let _: A = ABuilder {}.build(dummy_ctx());
 
   #[derive(Declare)]
   struct B {
@@ -18,11 +15,9 @@ fn declare_builder_smoke() {
     b: i32,
   }
 
-  let b = <B as Declare>::builder().a(1.).b(1).build(&mut ctx);
+  let b = <B as Declare>::builder().a(1.).b(1).build(dummy_ctx());
   assert_eq!(b.a, 1.);
   assert_eq!(b.b, 1);
-
-  std::mem::forget(ctx);
 }
 
 #[test]
@@ -33,9 +28,7 @@ fn panic_if_miss_require_field() {
     _a: f32,
   }
 
-  let mut ctx = dummy_ctx();
-  let _ = <T as Declare>::builder().build(&mut ctx);
-  std::mem::forget(ctx);
+  let _ = <T as Declare>::builder().build(dummy_ctx());
 }
 
 #[test]
@@ -47,10 +40,8 @@ fn empty_default_field() {
     a: f32,
   }
 
-  let mut ctx = dummy_ctx();
-  let t = <T as Declare>::builder().build(&mut ctx);
+  let t = <T as Declare>::builder().build(dummy_ctx());
   assert_eq!(t.a, 0.);
-  std::mem::forget(ctx);
 }
 
 #[test]
@@ -62,9 +53,6 @@ fn string_default_field() {
     text: &'static str,
   }
 
-  let mut ctx = dummy_ctx();
-  let t = <T as Declare>::builder().build(&mut ctx);
+  let t = <T as Declare>::builder().build(dummy_ctx());
   assert_eq!(t.text, "hi!");
-
-  std::mem::forget(ctx);
 }

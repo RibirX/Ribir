@@ -77,7 +77,7 @@ mod tests {
         char: move |key| c_receive.borrow_mut().push(key.char)
       }
     };
-    let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget.into_widget(), None, None);
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();

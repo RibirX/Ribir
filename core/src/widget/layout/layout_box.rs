@@ -41,7 +41,6 @@ mod tests {
   #[test]
   fn smoke() {
     expect_layout_result(
-      Size::new(500., 500.),
       widget! {
         Row {
           LayoutBox {
@@ -51,32 +50,34 @@ mod tests {
           SizedBox { size: layout_box.rect.size }
         }
       },
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(200.),
-            ..<_>::default()
+      None,
+      None,
+        & [
+          LayoutTestItem {
+            path: &[0],
+            expect: ExpectRect {
+              width: Some(200.),
+              height: Some(200.),
+              ..<_>::default()
+            },
           },
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect {
-            width: Some(100.),
-            height: Some(200.),
-            ..<_>::default()
+          LayoutTestItem {
+            path: &[0, 0],
+            expect: ExpectRect {
+              width: Some(100.),
+              height: Some(200.),
+              ..<_>::default()
+            },
           },
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect {
-            width: Some(100.),
-            height: Some(200.),
-            ..<_>::default()
+          LayoutTestItem {
+            path: &[0, 1],
+            expect: ExpectRect {
+              width: Some(100.),
+              height: Some(200.),
+              ..<_>::default()
+            },
           },
-        },
-      ],
+        ],
     );
   }
 }

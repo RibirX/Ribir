@@ -126,7 +126,7 @@ mod tests {
         margin: EdgeInsets::all(2.),
       }
     };
-    let mut wnd = Window::without_render(w.into_widget(), Size::zero());
+    let mut wnd = Window::without_render(w.into_widget(), None, None);
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;

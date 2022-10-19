@@ -379,7 +379,7 @@ mod tests {
       event_record.clone(),
       widget! { Row { ExprWidget  { expr: record } } },
     );
-    let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.into_widget(), None, None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -416,7 +416,7 @@ mod tests {
       event_record.clone(),
       widget! { Text { text: "pointer event test" }},
     );
-    let mut wnd = Window::without_render(root, Size::new(100., 100.));
+    let mut wnd = Window::without_render(root, None, None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -474,7 +474,7 @@ mod tests {
       event_record.clone(),
       widget! { Text { text: "pointer event test"}},
     );
-    let mut wnd = Window::without_render(root, Size::new(100., 100.));
+    let mut wnd = Window::without_render(root, None, None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -556,7 +556,7 @@ mod tests {
     let root = EventRecord::default();
     let event_record = root.0.clone();
 
-    let mut wnd = Window::without_render(root.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(root.into_widget(), None, Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -600,7 +600,7 @@ mod tests {
     let enter_event = w.enter.clone();
     let leave_event = w.leave.clone();
 
-    let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(w.into_widget(), None, Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -674,7 +674,7 @@ mod tests {
     let click_path = cp.0.clone();
 
     // Stretch row
-    let mut wnd = Window::without_render(cp.into_widget(), Size::new(400., 400.));
+    let mut wnd = Window::without_render(cp.into_widget(), None, Some(Size::new(400., 400.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -746,7 +746,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    let mut wnd = Window::without_render(w, None, Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -790,7 +790,7 @@ mod tests {
   #[test]
   fn fix_hit_out_window() {
     let w = SizedBox { size: INFINITY_SIZE };
-    let mut wnd = Window::without_render(w.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(w.into_widget(), None, None);
     wnd.draw_frame();
     wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
     let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);

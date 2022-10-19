@@ -66,8 +66,11 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn checked_paint() {
+    use std::rc::Rc;
+
     let c = widget! { Checkbox { checked: true } };
-    let mut window = Window::wgpu_headless(c, DeviceSize::new(100, 100));
+    let theme = Rc::new(material::purple::light());
+    let mut window = Window::wgpu_headless(c, theme, DeviceSize::new(100, 100));
     window.draw_frame();
 
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -78,7 +81,11 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn unchecked_paint() {
-    let mut window = Window::wgpu_headless(widget! { Checkbox {} }, DeviceSize::new(100, 100));
+    use std::rc::Rc;
+
+    let theme = Rc::new(material::purple::light());
+    let mut window =
+      Window::wgpu_headless(widget! { Checkbox {} }, theme, DeviceSize::new(100, 100));
     window.draw_frame();
     let mut unchecked_expect = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     unchecked_expect.push("src/test_imgs/checkbox_uncheck.png");
@@ -88,13 +95,16 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn indeterminate_paint() {
+    use std::rc::Rc;
+
     let c = widget! {
       Checkbox {
         checked: true,
         indeterminate: true,
       }
     };
-    let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
+    let theme = Rc::new(material::purple::light());
+    let mut window = Window::wgpu_headless(c.into_widget(), theme, DeviceSize::new(100, 100));
     window.draw_frame();
 
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -107,7 +117,8 @@ mod tests {
         indeterminate: true,
       }
     };
-    let mut window = Window::wgpu_headless(c.into_widget(), DeviceSize::new(100, 100));
+    let theme = Rc::new(material::purple::light());
+    let mut window = Window::wgpu_headless(c.into_widget(), theme, DeviceSize::new(100, 100));
     window.draw_frame();
 
     assert!(window.same_as_png(expected));

@@ -2,7 +2,9 @@ use std::{cell::Cell, rc::Rc};
 
 use ribir::{
   prelude::*,
-  test::{root_and_children_rect, widget_and_its_children_box_rect},
+  test::{
+    expect_layout_result, layout_info_by_path, root_and_children_rect, ExpectRect, LayoutTestItem,
+  },
 };
 
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
@@ -34,7 +36,7 @@ fn simple_ref_bind_work() {
   };
 
   let flex_size = Size::new(1000., 500.);
-  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, None, Some(Size::new(2000., 2000.)));
   wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
@@ -61,7 +63,7 @@ fn event_attr_sugar_work() {
     }
   };
 
-  let mut wnd = Window::without_render(w.into_widget(), Size::new(400., 400.));
+  let mut wnd = Window::without_render(w.into_widget(), None, None);
   wnd.draw_frame();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, BEFORE_SIZE.into());
@@ -92,7 +94,7 @@ fn widget_wrap_bind_work() {
     }
   };
 
-  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, None, Some(Size::new(2000., 2000.)));
   wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
@@ -119,7 +121,7 @@ fn expression_for_children() {
     }
   };
 
-  let mut wnd = Window::without_render(embed_expr, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(embed_expr, None, None);
   wnd.draw_frame();
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -148,7 +150,7 @@ fn embed_widget_ref_outside() {
     }
   };
 
-  let mut wnd = Window::without_render(w, Size::new(2000., 2000.));
+  let mut wnd = Window::without_render(w, None, None);
   wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -172,16 +174,16 @@ fn data_flow_macro() {
     }
     change_on a.size + b.size ~> c.size
   };
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, None, None);
   wnd.draw_frame();
-  let (rect, _) = root_and_children_rect(&mut wnd);
+  let rect = layout_info_by_path(&wnd, &[0]);
   // data flow not affect on init.
   assert_eq!(rect.size, Size::new(3., 1.));
 
   tap_at(&mut wnd, (0, 0));
   wnd.draw_frame();
 
-  let (rect, _) = root_and_children_rect(&mut wnd);
+  let rect = layout_info_by_path(&mut wnd, &[0]);
   assert_eq!(rect.size, Size::new(8., 4.));
 }
 
@@ -203,9 +205,20 @@ fn local_var_not_bind() {
       }
     }
   };
-  let (rect, child_rect) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
-  assert_eq!(rect.size, EXPECT_SIZE * 2.);
-  assert_eq!(child_rect[0].size, EXPECT_SIZE * 2.);
+  let expect = ExpectRect {
+    width: Some(10.),
+    height: Some(10.),
+    ..<_>::default()
+  };
+  expect_layout_result(
+    w,
+    None,
+    None,
+    &[
+      LayoutTestItem { path: &[0], expect },
+      LayoutTestItem { path: &[0, 0], expect },
+    ],
+  );
 }
 
 #[test]
@@ -229,7 +242,7 @@ fn builtin_ref() {
     }
   };
 
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, None, None);
   wnd.draw_frame();
 
   tap_at(&mut wnd, (1, 1));
@@ -258,7 +271,7 @@ fn builtin_bind_to_self() {
     }
   };
 
-  let mut wnd = Window::without_render(w, Size::new(400., 400.));
+  let mut wnd = Window::without_render(w, None, None);
   wnd.draw_frame();
   tap_at(&mut wnd, (1, 1));
   wnd.draw_frame();
@@ -297,7 +310,7 @@ fn fix_builtin_field_can_declare_as_widget() {
     }
   };
 
-  let wnd = Window::without_render(w, Size::zero());
+  let wnd = Window::without_render(w, None, None);
   assert_eq!(wnd.widget_count(), 2);
 }
 

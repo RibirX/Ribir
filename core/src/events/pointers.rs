@@ -347,7 +347,7 @@ mod tests {
         x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
       }
     };
-    let mut wnd = Window::without_render(w, size);
+    let mut wnd = Window::without_render(w, None, Some(size));
     wnd.draw_frame();
 
     (wnd, count)

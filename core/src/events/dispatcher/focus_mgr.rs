@@ -196,7 +196,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget, None, None);
     let tree = &wnd.widget_tree;
 
     let id = tree.root().first_child(tree);
@@ -215,7 +215,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget, None, None);
     let tree = &wnd.widget_tree;
 
     let id = tree
@@ -239,7 +239,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget.into_widget(), None, None);
     let Window { dispatcher, widget_tree, .. } = &mut wnd;
     dispatcher.refresh_focus(widget_tree);
 
@@ -305,7 +305,7 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut wnd = Window::without_render(widget.into_widget(), Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget.into_widget(), None, None);
     let Window { dispatcher, widget_tree, .. } = &mut wnd;
 
     let parent = widget_tree.root();

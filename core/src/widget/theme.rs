@@ -6,10 +6,13 @@
 pub mod material;
 mod palette;
 
+use std::rc::Rc;
+
 pub use palette::Palette;
 mod icon_theme;
 pub use icon_theme::*;
 mod typography_theme;
+use ribir_macros::widget_try_track;
 pub use typography_theme::*;
 mod transition_theme;
 pub use transition_theme::*;
@@ -19,14 +22,17 @@ mod custom_theme;
 pub use custom_theme::*;
 
 use crate::{
-  impl_proxy_query, impl_query_self_only,
+  impl_query_self_only,
   prelude::{Any, BuildCtx, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
 };
 use algo::ShareResource;
 pub use painter::*;
 pub use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
-use super::{data_widget::compose_child_as_data_widget, ComposeChild, StateWidget};
+use super::{
+  data_widget::{expr_attach_data, widget_attach_data},
+  ComposeChild, StateWidget,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Brightness {
@@ -57,28 +63,35 @@ pub struct Theme {
 
 impl TextSelectedBackground {
   #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().text_selected_background }
+  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self { &&ctx.theme().text_selected_background }
 }
 
 #[derive(Declare)]
 pub struct ThemeWidget {
   #[declare(builtin)]
-  pub theme: Theme,
+  pub theme: Rc<Theme>,
 }
 
 impl ComposeChild for ThemeWidget {
   type Child = Widget;
   #[inline]
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    // todo: theme can provide fonts to load.
-    compose_child_as_data_widget(child, this)
+    use crate::prelude::*;
+
+    widget_try_track! {
+      try_track { this }
+      // use `ExprWidget` to refresh whole subtree when theme changed.
+      ExprWidget {
+        expr: move |ctx: &mut BuildCtx| {
+          let theme = this.theme.clone();
+          ctx.theme = theme.clone();
+          widget_attach_data(child, theme, expr_attach_data)
+        }
+      }
+    }
   }
 }
 
 impl Query for Theme {
   impl_query_self_only!();
-}
-
-impl Query for ThemeWidget {
-  impl_proxy_query!(theme);
 }

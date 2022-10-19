@@ -345,6 +345,14 @@ impl Children {
       Children::Multi(m) => m.into_iter().for_each(cb),
     }
   }
+
+  pub(crate) fn len(&self) -> usize {
+    match self {
+      Children::None => 0,
+      Children::Single(_) => 1,
+      Children::Multi(m) => m.len(),
+    }
+  }
 }
 
 #[macro_export]
@@ -371,12 +379,42 @@ impl<W: Query> Query for RefCell<W> {
   impl_proxy_query!(borrow());
 }
 
-impl<W: Render> Render for Rc<W> {
+impl<W: Render + 'static> Render for Rc<W> {
   impl_proxy_render!(deref());
 }
 
-impl<W: Query> Query for Rc<W> {
-  impl_proxy_query!(deref());
+impl<W: Query + 'static> Query for Rc<W> {
+  fn query_all(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    order: QueryOrder,
+  ) {
+    let mut query_more = true;
+    match order {
+      QueryOrder::InnerFirst => {
+        self.deref().query_all(
+          type_id,
+          &mut |any| {
+            query_more = callback(any);
+            query_more
+          },
+          order,
+        );
+        if let Some(a) = self.query_filter(type_id) {
+          callback(a);
+        }
+      }
+      QueryOrder::OutsideFirst => {
+        if let Some(a) = self.query_filter(type_id) {
+          query_more = callback(a);
+        }
+        if query_more {
+          self.deref().query_all(type_id, callback, order);
+        }
+      }
+    }
+  }
 }
 
 impl Render for Box<dyn Render> {

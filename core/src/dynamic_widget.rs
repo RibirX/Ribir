@@ -261,8 +261,22 @@ impl InnerGenerator {
     self.is_dirty = false;
 
     let sign = sign.unwrap_or_else(|| self.gen_dyn_widgets.first());
-    let parent = sign.parent(tree);
-    let mut ctx = BuildCtx::new(parent, tree);
+
+    let current_theme = sign
+      .parent(tree)
+      .and_then(|s| {
+        s.ancestors(tree).find_map(|id| {
+          let mut theme = None;
+          id.assert_get(tree)
+            .query_on_first_type(QueryOrder::InnerFirst, |t: &Rc<Theme>| {
+              theme = Some(t.clone());
+            });
+          theme
+        })
+      })
+      .unwrap_or_else(|| tree.app_theme.clone());
+
+    let mut ctx = BuildCtx::new(current_theme.clone(), tree);
     let new_gen = (self.expr)(&mut ctx);
 
     // Place the real render node in tree, effect lifecycle.
@@ -270,11 +284,11 @@ impl InnerGenerator {
     match (&mut self.gen_dyn_widgets, new_gen) {
       (DynamicWidgetInfo::SingleDynWithChild { depth, first }, DynamicWidget::Single(w)) => {
         *first = sign;
-        *depth = refresh_single_with_child(sign, w, *depth, tree)
+        *depth = refresh_single_with_child(sign, w, *depth, tree, current_theme)
       }
       (DynamicWidgetInfo::WholeSubtree(gen_widgets), new_widgets) => {
         gen_widgets[0] = sign;
-        refresh_multi(gen_widgets, new_widgets, tree)
+        refresh_multi(gen_widgets, new_widgets, tree, current_theme)
       }
       _ => unreachable!("generator not match its generate"),
     };
@@ -288,10 +302,11 @@ fn refresh_single_with_child(
   widget: Option<Widget>,
   depth: usize,
   tree: &mut WidgetTree,
+  current_theme: Rc<Theme>,
 ) -> usize {
   let p = sign.parent(tree);
   let new_gen_root = widget
-    .and_then(|w| w.into_subtree(p, tree))
+    .and_then(|w| w.into_subtree(p, tree, current_theme))
     // gen root at least have a void widget as road sign.
     .unwrap_or_else(|| tree.empty_node());
 
@@ -322,6 +337,7 @@ fn refresh_multi(
   gen_widgets: &mut SmallVec<[WidgetId; 1]>,
   widgets: DynamicWidget,
   tree: &mut WidgetTree,
+  current_theme: Rc<Theme>,
 ) {
   let tmp = tree.empty_node();
   let sign = gen_widgets[0];
@@ -336,7 +352,7 @@ fn refresh_multi(
 
   match widgets {
     DynamicWidget::Single(w) => {
-      if let Some(n) = w.and_then(|w| w.into_subtree(parent, tree)) {
+      if let Some(n) = w.and_then(|w| w.into_subtree(parent, tree, current_theme)) {
         sign.insert_after(n, tree);
         gen_widgets.push(n);
       }
@@ -344,7 +360,7 @@ fn refresh_multi(
     DynamicWidget::Multi(m) => {
       let mut cursor = sign;
       for w in m.into_iter() {
-        if let Some(n) = w.into_subtree(parent, tree) {
+        if let Some(n) = w.into_subtree(parent, tree, current_theme.clone()) {
           cursor.insert_after(n, tree);
           gen_widgets.push(n);
           cursor = n;
@@ -418,6 +434,8 @@ fn single_on_mounted(
 
 #[cfg(test)]
 mod tests {
+  use std::rc::Rc;
+
   use crate::prelude::*;
   use crate::widget::{widget_tree::WidgetTree, IntoStateful};
 
@@ -431,7 +449,8 @@ mod tests {
         Void {}
       }
     };
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(w, theme, <_>::default());
     tree.tree_repair();
     let ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
@@ -458,7 +477,8 @@ mod tests {
         }
       }
     };
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(w, theme, <_>::default());
     tree.tree_repair();
     let ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);

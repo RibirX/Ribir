@@ -78,7 +78,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(widget, Size::new(100., 100.));
+    let mut wnd = Window::without_render(widget, None, Some(Size::new(100., 100.)));
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };

@@ -2,16 +2,20 @@ pub mod embed_post;
 pub mod key_embed_post;
 pub mod recursive_row;
 
+use std::rc::Rc;
+
 use crate::prelude::*;
 
+#[deprecated]
 // return the flex box rect, and rect of its children.
 pub fn widget_and_its_children_box_rect(root: Widget, window_size: Size) -> (Rect, Vec<Rect>) {
-  let mut wnd = Window::without_render(root, window_size);
+  let mut wnd = Window::without_render(root, None, Some(window_size));
   wnd.draw_frame();
 
   root_and_children_rect(&mut wnd)
 }
 
+#[deprecated]
 pub fn root_and_children_rect(wnd: &Window) -> (Rect, Vec<Rect>) {
   let tree = &wnd.widget_tree;
   let root = tree.root();
@@ -24,7 +28,7 @@ pub fn root_and_children_rect(wnd: &Window) -> (Rect, Vec<Rect>) {
   (rect, children_box_rect)
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct ExpectRect {
   pub x: Option<f32>,
   pub y: Option<f32>,
@@ -36,8 +40,13 @@ pub struct LayoutTestItem<'a> {
   pub expect: ExpectRect,
 }
 
-pub fn expect_layout_result(wnd_size: Size, w: Widget, items: &[LayoutTestItem]) {
-  let mut wnd = Window::without_render(w, wnd_size);
+pub fn expect_layout_result(
+  w: Widget,
+  wnd_size: Option<Size>,
+  theme: Option<Rc<Theme>>,
+  items: &[LayoutTestItem],
+) {
+  let mut wnd = Window::without_render(w, theme, wnd_size);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     let res = layout_info_by_path(&wnd, path);

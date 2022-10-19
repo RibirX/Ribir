@@ -23,7 +23,9 @@ macro_rules! impl_lifecycle {
 
 #[cfg(test)]
 mod tests {
-  use crate::prelude::{widget_tree::WidgetTree, *};
+  use std::rc::Rc;
+
+use crate::prelude::{widget_tree::WidgetTree, *};
 
   #[test]
   fn full_lifecycle() {
@@ -47,7 +49,8 @@ mod tests {
       }
     };
 
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(w, theme, <_>::default());
     tree.tree_repair();
     assert_eq!(&**lifecycle.raw_ref(), ["mounted"]);
     tree.layout(Size::new(100., 100.));
