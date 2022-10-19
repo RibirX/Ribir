@@ -133,7 +133,6 @@ mod test {
   #[test]
   fn pixel_left_top() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -141,6 +140,8 @@ mod test {
           top_anchor: 1.,
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -157,7 +158,6 @@ mod test {
   #[test]
   fn pixel_left_bottom() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -165,6 +165,8 @@ mod test {
           bottom_anchor: 1.,
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -181,7 +183,6 @@ mod test {
   #[test]
   fn pixel_top_right() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -189,6 +190,8 @@ mod test {
           top_anchor: 1.,
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -205,7 +208,6 @@ mod test {
   #[test]
   fn pixel_bottom_right() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -213,6 +215,8 @@ mod test {
           bottom_anchor: 1.,
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -229,7 +233,6 @@ mod test {
   #[test]
   fn percent_left_top() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -237,6 +240,8 @@ mod test {
           top_anchor: Percent(10.),
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -253,7 +258,6 @@ mod test {
   #[test]
   fn percent_left_bottom() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -261,6 +265,8 @@ mod test {
           bottom_anchor: Percent( 10.),
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -277,7 +283,6 @@ mod test {
   #[test]
   fn percent_top_right() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -285,6 +290,8 @@ mod test {
           top_anchor: Percent(10.),
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -301,7 +308,6 @@ mod test {
   #[test]
   fn percent_bottom_right() {
     expect_layout_result(
-      WND_SIZE,
       widget! {
         SizedBox {
           size: CHILD_SIZE,
@@ -309,6 +315,8 @@ mod test {
           bottom_anchor: Percent(10.),
         }
       },
+      Some(WND_SIZE),
+      None,
       &[
         LayoutTestItem {
           path: &[0, 0],

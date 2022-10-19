@@ -60,6 +60,8 @@ impl Padding {
 
 #[cfg(test)]
 mod tests {
+  use crate::test::{expect_layout_result, ExpectRect, LayoutTestItem};
+
   use super::*;
 
   #[test]
@@ -72,27 +74,41 @@ mod tests {
         }
       }
     };
-
-    let mut wnd = Window::without_render(widget, Size::new(200., 200.));
-    wnd.draw_frame();
-
-    let tree = &wnd.widget_tree;
-    let padding_widget = tree.root();
-    assert_eq!(
-      tree.layout_box_rect(padding_widget).unwrap(),
-      Rect::from_size(Size::new(101., 100.))
-    );
-
-    let row_widget = padding_widget.single_child(tree).unwrap();
-    assert_eq!(
-      tree.layout_box_rect(row_widget).unwrap(),
-      Rect::from_size(Size::new(101., 100.))
-    );
-
-    let child_box = row_widget.single_child(tree).unwrap();
-    assert_eq!(
-      tree.layout_box_rect(child_box).unwrap(),
-      Rect::new(Point::new(1., 0.), Size::new(100., 100.))
+    expect_layout_result(
+      widget,
+      None,
+      None,
+      &[
+        // padding widget
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect {
+            width: Some(101.),
+            height: Some(100.),
+            ..Default::default()
+          },
+        },
+        // Row widget
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect {
+            width: Some(101.),
+            height: Some(100.),
+            ..Default::default()
+          },
+        },
+        // SizedBox
+        LayoutTestItem {
+          path: &[0, 0, 0],
+          expect: ExpectRect {
+            x: Some(1.),
+            y: Some(0.),
+            width: Some(100.),
+            height: Some(100.),
+            ..Default::default()
+          },
+        },
+      ],
     );
   }
 }

@@ -3,7 +3,7 @@ use std::{cell::Cell, rc::Rc, time::Duration};
 use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
 fn wheel_widget(w: Widget) -> Window {
-  let mut wnd = Window::without_render(w, Size::new(100., 100.));
+  let mut wnd = Window::without_render(w, None, None);
 
   wnd.draw_frame();
   let device_id = unsafe { DeviceId::dummy() };

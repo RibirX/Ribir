@@ -432,7 +432,7 @@ mod tests {
     });
 
     let state = sized_box.clone();
-    let mut wnd = Window::without_render(sized_box.into_widget(), Size::new(500., 500.));
+    let mut wnd = Window::without_render(sized_box.into_widget(), None, None);
     wnd.draw_frame();
 
     assert_eq!(*notified_count.borrow(), 0);
@@ -451,7 +451,8 @@ mod tests {
   fn fix_pin_widget_node() {
     let mut wnd = Window::without_render(
       widget! { SizedBox { size: Size::new(100., 100.) } },
-      Size::new(500., 500.),
+      None,
+      None,
     );
     wnd.draw_frame();
     let tree = &wnd.widget_tree;

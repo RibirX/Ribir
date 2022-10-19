@@ -16,6 +16,7 @@ pub struct WidgetId(NodeId);
 pub(crate) struct WidgetTree {
   arena: Arena<Box<dyn Render>>,
   root: Option<WidgetId>,
+  pub(crate) app_theme: Rc<Theme>,
   ctx: Rc<RefCell<AppContext>>,
   pub(crate) state_changed: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
   /// Store the render object's place relative to parent coordinate and the
@@ -33,10 +34,15 @@ impl WidgetTree {
 
   pub(crate) fn empty_node(&mut self) -> WidgetId { self.new_node(Box::new(Void)) }
 
-  pub(crate) fn new(root_widget: Widget, ctx: Rc<RefCell<AppContext>>) -> WidgetTree {
+  pub(crate) fn new(
+    root_widget: Widget,
+    app_theme: Rc<Theme>,
+    ctx: Rc<RefCell<AppContext>>,
+  ) -> WidgetTree {
     let mut tree = WidgetTree {
       arena: Arena::default(),
       root: None,
+      app_theme,
       state_changed: <_>::default(),
       ctx,
       layout_store: <_>::default(),
@@ -150,8 +156,10 @@ impl WidgetTree {
 
   pub(crate) fn set_root(&mut self, widget: Widget) {
     assert!(self.root.is_none());
-
-    let root = widget.into_subtree(None, self).expect("must have a root");
+    let theme = self.app_theme.clone();
+    let root = widget
+      .into_subtree(None, self, theme)
+      .expect("must have a root");
     self.set_root_id(root);
     root.on_mounted_subtree(self, true);
     self.mark_dirty(root);
@@ -436,56 +444,102 @@ impl Widget {
     self,
     parent: Option<WidgetId>,
     tree: &mut WidgetTree,
+    current_theme: Rc<Theme>,
   ) -> Option<WidgetId> {
-    let (id, children) = self.place_node_in_tree(parent, tree);
-    if let Some(id) = id {
-      let mut pairs = vec![];
-      children.for_each(|w| pairs.push((id, w)));
+    enum NodeInfo {
+      BackTheme(Rc<Theme>),
+      Parent(WidgetId),
+      Widget(Widget),
+    }
+    pub(crate) struct InflateHelper<'a> {
+      stack: Vec<NodeInfo>,
+      tree: &'a mut WidgetTree,
+      current_theme: Rc<Theme>,
+      parent: Option<WidgetId>,
+      root: Option<WidgetId>,
+    }
 
-      while let Some((parent, widget)) = pairs.pop() {
-        let (child, children) = widget.place_node_in_tree(Some(parent), tree);
-        if let Some(child) = child {
-          parent.prepend(child, tree);
+    impl<'a> InflateHelper<'a> {
+      pub(crate) fn inflate(mut self, widget: Widget) -> Option<WidgetId> {
+        self.place_node_in_tree(widget);
+        loop {
+          match self.stack.pop() {
+            Some(NodeInfo::BackTheme(theme)) => {
+              self.current_theme = theme;
+            }
+            Some(NodeInfo::Parent(p)) => self.parent = Some(p),
+            Some(NodeInfo::Widget(w)) => {
+              self.place_node_in_tree(w);
+            }
+            None => break,
+          }
         }
-        children.for_each(|w| pairs.push((child.unwrap_or(parent), w)));
+
+        self.root
       }
-      Some(id)
-    } else {
-      match children {
-        Children::None => None,
-        _ => unreachable!(),
+
+      fn place_node_in_tree(&mut self, widget: Widget) {
+        let Widget { node, children } = widget;
+        let children_size = children.len();
+        self.push_children(children);
+
+        if let Some(node) = node {
+          match node {
+            WidgetNode::Compose(c) => {
+              assert_eq!(children_size, 0, "compose widget shouldn't have child.");
+              let mut build_ctx = BuildCtx::new(self.current_theme.clone(), self.tree);
+              let c = c(&mut build_ctx);
+              self
+                .stack
+                .push(NodeInfo::BackTheme(self.current_theme.clone()));
+              self.current_theme = build_ctx.theme.clone();
+              self.stack.push(NodeInfo::Widget(c));
+            }
+            WidgetNode::Render(r) => {
+              let wid = self.tree.new_node(r);
+              self.perpend(wid, children_size > 0);
+            }
+            WidgetNode::Dynamic(e) => {
+              let w = Generator::new_generator(e, children_size > 0, self.tree);
+              self.perpend(w, children_size > 0);
+            }
+          }
+        } else {
+          assert!(
+            children_size <= 1,
+            "None parent with multi child is forbidden."
+          );
+        }
+      }
+
+      fn push_children(&mut self, children: Children) {
+        if let Some(p) = self.parent {
+          self.stack.push(NodeInfo::Parent(p));
+        }
+        children.for_each(|w| self.stack.push(NodeInfo::Widget(w)))
+      }
+
+      fn perpend(&mut self, child: WidgetId, has_child: bool) {
+        if let Some(o) = self.parent {
+          o.prepend(child, self.tree);
+        }
+        if has_child || self.parent.is_none() {
+          self.parent = Some(child)
+        }
+        if self.root.is_none() {
+          self.root = Some(child)
+        }
       }
     }
-  }
 
-  fn place_node_in_tree(
-    self,
-    parent: Option<WidgetId>,
-    tree: &mut WidgetTree,
-  ) -> (Option<WidgetId>, Children) {
-    let Self { node, children } = self;
-
-    if let Some(node) = node {
-      match node {
-        WidgetNode::Compose(c) => {
-          assert!(children.is_none(), "compose widget shouldn't have child.");
-          let mut build_ctx = BuildCtx::new(parent, tree);
-          let c = c(&mut build_ctx);
-          c.place_node_in_tree(parent, tree)
-        }
-        WidgetNode::Render(r) => (Some(tree.new_node(r)), children),
-        WidgetNode::Dynamic(e) => {
-          let w = Generator::new_generator(e, !children.is_none(), tree);
-          (Some(w), children)
-        }
-      }
-    } else {
-      match children {
-        Children::None => (None, Children::None),
-        Children::Single(s) => s.place_node_in_tree(parent, tree),
-        Children::Multi(_) => unreachable!("None parent with multi child is forbidden."),
-      }
-    }
+    let helper = InflateHelper {
+      stack: vec![],
+      tree,
+      current_theme,
+      parent,
+      root: None,
+    };
+    helper.inflate(self)
   }
 }
 #[cfg(test)]
@@ -502,7 +556,12 @@ mod tests {
   };
 
   fn test_sample_create(width: usize, depth: usize) -> WidgetTree {
-    WidgetTree::new(RecursiveRow { width, depth }.into_widget(), <_>::default())
+    let theme = Rc::new(material::purple::light());
+    WidgetTree::new(
+      RecursiveRow { width, depth }.into_widget(),
+      theme,
+      <_>::default(),
+    )
   }
 
   #[test]
@@ -523,7 +582,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    let mut wnd = Window::without_render(w, None, None);
     wnd.draw_frame();
 
     {
@@ -547,7 +606,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    let mut wnd = Window::without_render(w, None, None);
     wnd.draw_frame();
 
     {
@@ -566,7 +625,8 @@ mod tests {
   fn drop_info_clear() {
     let post = EmbedPost::new(3);
     let ctx = Rc::new(RefCell::new(AppContext::default()));
-    let mut tree = WidgetTree::new(post.into_widget(), ctx);
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(post.into_widget(), theme, ctx);
     tree.tree_repair();
     assert_eq!(tree.count(), 17);
 
@@ -584,9 +644,10 @@ mod tests {
 
   #[bench]
   fn inflate_5_x_1000(b: &mut Bencher) {
+    let theme = Rc::new(material::purple::light());
     b.iter(|| {
       let post = EmbedPost::new(1000);
-      WidgetTree::new(post.into_widget(), <_>::default());
+      WidgetTree::new(post.into_widget(), theme.clone(), <_>::default());
     });
   }
 
@@ -605,7 +666,8 @@ mod tests {
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
     let post = EmbedPostWithKey::new(1000);
-    let mut tree = WidgetTree::new(post.into_widget(), <_>::default());
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(post.into_widget(), theme, <_>::default());
     b.iter(|| {
       tree.mark_dirty(tree.root());
       tree.tree_repair()
@@ -664,7 +726,8 @@ mod tests {
       }
     };
 
-    let mut tree = WidgetTree::new(widget, <_>::default());
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(widget, theme, <_>::default());
     tree.tree_repair();
     tree.layout(Size::new(100., 100.));
     {

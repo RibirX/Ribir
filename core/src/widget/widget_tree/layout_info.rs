@@ -154,6 +154,8 @@ impl Default for BoxClamp {
 
 #[cfg(test)]
 mod tests {
+  use std::rc::Rc;
+
   use super::*;
   use crate::prelude::*;
 
@@ -175,7 +177,8 @@ mod tests {
         }
       }
     };
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let theme = Rc::new(material::purple::light());
+    let mut tree = WidgetTree::new(w, theme, <_>::default());
     tree.layout(Size::zero());
     {
       child_box.state_ref().size = Size::new(2., 2.);

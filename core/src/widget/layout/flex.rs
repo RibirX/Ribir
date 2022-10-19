@@ -558,7 +558,7 @@ mod tests {
         }
       };
 
-      let mut wnd = Window::without_render(root, Size::new(500., 500.));
+      let mut wnd = Window::without_render(root, None, Some(Size::new(500., 500.)));
       wnd.draw_frame();
       let tree = &wnd.widget_tree;
       let child = tree.root().first_child(tree).unwrap();

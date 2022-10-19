@@ -56,5 +56,5 @@ bitflags! {
 
 impl TypographyTheme {
   #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().typography_theme }
+  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self { &ctx.theme().typography_theme }
 }

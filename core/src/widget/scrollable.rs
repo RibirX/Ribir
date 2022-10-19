@@ -108,7 +108,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::without_render(w, Size::new(100., 100.));
+    let mut wnd = Window::without_render(w, None, Some(Size::new(100., 100.)));
 
     wnd.draw_frame();
 

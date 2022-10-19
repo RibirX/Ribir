@@ -134,12 +134,18 @@ impl Window {
 
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 
-  fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: Rc<RefCell<AppContext>>) -> Self
+  fn new<W, P>(
+    wnd: W,
+    p_backend: P,
+    root: Widget,
+    theme: Rc<Theme>,
+    context: Rc<RefCell<AppContext>>,
+  ) -> Self
   where
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let mut widget_tree = WidgetTree::new(root, context.clone());
+    let mut widget_tree = WidgetTree::new(root, theme, context.clone());
     let mut dispatcher = Dispatcher::default();
     dispatcher.refresh_focus(&mut widget_tree);
     if let Some(auto_focusing) = dispatcher.auto_focus(&widget_tree) {
@@ -168,6 +174,7 @@ impl Window {
   pub(crate) fn from_event_loop(
     root: Widget,
     event_loop: &winit::event_loop::EventLoop<()>,
+    app_theme: Rc<Theme>,
   ) -> Self {
     let native_window = winit::window::WindowBuilder::new()
       .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
@@ -182,7 +189,7 @@ impl Window {
       None,
       ctx.borrow().shaper.clone(),
     ));
-    Self::new(native_window, p_backend, root, ctx)
+    Self::new(native_window, p_backend, root, app_theme, ctx)
   }
 
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
@@ -290,7 +297,7 @@ impl RawWindow for MockRawWindow {
 
 impl Window {
   #[cfg(feature = "wgpu_gl")]
-  pub fn wgpu_headless(root: Widget, size: DeviceSize) -> Self {
+  pub fn wgpu_headless(root: Widget, theme: Rc<Theme>, size: DeviceSize) -> Self {
     let ctx = Rc::new(RefCell::new(AppContext::default()));
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
       size,
@@ -305,15 +312,19 @@ impl Window {
       },
       p_backend,
       root,
+      theme,
       ctx,
     )
   }
 
-  pub fn without_render(root: Widget, size: Size) -> Self {
+  pub fn without_render(root: Widget, theme: Option<Rc<Theme>>, size: Option<Size>) -> Self {
+    let theme = theme.unwrap_or_else(|| Rc::new(material::purple::light()));
+    let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
     Self::new(
       MockRawWindow { size, ..Default::default() },
       MockBackend,
       root,
+      theme,
       <_>::default(),
     )
   }

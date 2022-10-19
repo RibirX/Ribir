@@ -85,6 +85,8 @@ impl<F: Fn(Widget) -> Widget + Clone + 'static> ComposeStyle for F {
 }
 #[cfg(test)]
 mod tests {
+  use std::rc::Rc;
+
   use crate::{
     define_compose_style_ident, fill_compose_style,
     prelude::*,
@@ -108,16 +110,16 @@ mod tests {
 
     let w = widget! {
       ExprWidget {
-        theme,
-        expr: SIZE_100.of(ctx),
+        expr: SIZE_100.of(&theme),
         SizedBox {
           size: Size::zero(),
         }
       }
     };
     expect_layout_result(
-      Size::new(500., 500.),
       w,
+      None,
+      None,
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect {

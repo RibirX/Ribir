@@ -257,6 +257,8 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn paint() {
+    use std::rc::Rc;
+
     let radius_cases = vec![
       Radius::all(0.),
       Radius::all(10.),
@@ -298,7 +300,8 @@ mod tests {
         }
      }
     };
-    let mut window = Window::wgpu_headless(w, DeviceSize::new(400, 600));
+    let theme = Rc::new(material::purple::light());
+    let mut window = Window::wgpu_headless(w, theme, DeviceSize::new(400, 600));
     window.draw_frame();
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     expected.push("src/test_imgs/box_decoration.png");

@@ -280,7 +280,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       }
 
       impl #g_impl #builder #g_ty #g_where {
-        #vis fn build(mut self, ctx: &mut BuildCtx) -> #name #g_ty  {
+        #vis fn build(mut self, ctx: &BuildCtx) -> #name #g_ty  {
           #(#fill_default)*
           #name {
             #(#fields_ident : #builder_values),* }

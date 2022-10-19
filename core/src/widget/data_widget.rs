@@ -65,7 +65,7 @@ impl<W: Query, D: Query> Query for DataWidget<W, D> {
   }
 }
 
-fn expr_attach_data<D: Query + Clone + 'static>(
+pub(crate) fn expr_attach_data<D: Query + Clone + 'static>(
   expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> DynamicWidget>>,
   children: Children,
   data: D,
@@ -106,7 +106,7 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
   }
 }
 
-fn widget_attach_data<D: Query + 'static>(
+pub(crate) fn widget_attach_data<D: Query + 'static>(
   widget: Widget,
   data: D,
   attach_expr: impl FnOnce(
@@ -121,11 +121,7 @@ fn widget_attach_data<D: Query + 'static>(
     match node {
       WidgetNode::Compose(c) => {
         assert!(children.is_none());
-        (|ctx: &mut BuildCtx| {
-          // todo: merge theme if data is theme.
-          widget_attach_data(c(ctx), data, attach_expr)
-        })
-        .into_widget()
+        (|ctx: &mut BuildCtx| widget_attach_data(c(ctx), data, attach_expr)).into_widget()
       }
       WidgetNode::Render(r) => {
         let node = WidgetNode::Render(Box::new(DataWidget { widget: r, data }));
