@@ -1,6 +1,7 @@
 use self::palette::LightnessCfg;
 pub use super::*;
-use crate::{fill_icon, prelude::include_svg};
+use crate::prelude::*;
+use crate::{fill_compose_style, fill_icon, prelude::include_svg};
 pub use painter::{Brush, Color};
 
 /// Crate a material theme with palette.
@@ -36,6 +37,25 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     icons::CHECKED: "./material/checked.svg",
     icons::UNCHECKED: "./material/unchecked_box.svg",
     icons::INDETERMINATE: "./material/indeterminate_check_box.svg"
+  };
+  fill_compose_style! { theme,
+    cs::SCROLLBAR_TRACK: |child| {
+      widget!{
+        ExprWidget {
+          expr: child,
+          background: ctx.theme().palette.primary_container()
+        }
+      }
+    },
+    cs::SCROLLBAR_THUMB: |child| {
+      widget!{
+        ExprWidget {
+          expr: child,
+          radius: Radius::all(4.),
+          background: ctx.theme().palette.primary()
+        }
+      }
+    }
   };
 
   theme

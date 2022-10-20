@@ -1,6 +1,6 @@
+use crate::prelude::*;
+use smallvec::SmallVec;
 use std::collections::HashMap;
-
-use crate::prelude::{Theme, Widget};
 
 /// Compose style is a compose child widget to decoration its child.
 #[derive(Clone, Default)]
@@ -9,7 +9,7 @@ pub struct ComposeStyles {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct ComposeStyleIdent(usize);
+pub struct ComposeStyleIdent(pub usize);
 
 pub trait ComposeStyle: Fn(Widget) -> Widget {
   fn box_clone(&self) -> Box<dyn ComposeStyle>;
@@ -17,35 +17,34 @@ pub trait ComposeStyle: Fn(Widget) -> Widget {
   fn as_fn(&self) -> &dyn Fn(Widget) -> Widget;
 }
 
-pub mod styles {
-  use super::*;
+#[derive(Declare)]
+pub struct ComposeStylesWidget {
+  #[declare(builtin, convert=into)]
+  compose_styles: SmallVec<[ComposeStyleIdent; 1]>,
+}
 
-  /// macro use to define a identify of [`ComposeStyleIdent`]!.
-  #[macro_export]
-  macro_rules! define_compose_style_ident {
+/// macro use to define a identify of [`ComposeStyleIdent`]!.
+#[macro_export]
+macro_rules! define_compose_style_ident {
     ($from: expr, $define: ident, $($ident: ident),+) => {
       define_compose_style_ident!($from, $define);
-      define_compose_style_ident!($define, $($ident), +);
+      define_compose_style_ident!(ComposeStyleIdent($define.0 + 1), $($ident), +);
     };
     ($value: expr, $define: ident) => {
       pub const $define: ComposeStyleIdent = $value;
     }
   }
 
-  /// macro use to specify the compose style widget for the identify.
-  #[macro_export]
-  macro_rules! fill_compose_style {
-      ($styles: expr, $($name: path: $expr: expr),+) => {
-        $($styles.set_style($name,  Box::new($expr));)+
-      };
-    }
-
-  pub const BEGIN: ComposeStyleIdent = ComposeStyleIdent::new(0);
-  define_compose_style_ident!(BEGIN, THEME_EXTEND);
-
-  /// The user custom icon identify define start from.
-  pub const CUSTOM_START: ComposeStyleIdent = ComposeStyleIdent::new(65536);
+/// macro use to specify the compose style widget for the identify.
+#[macro_export]
+macro_rules! fill_compose_style {
+  ($theme: expr, $($name: path: $expr: expr),+) => {
+    $($theme.compose_styles.set_style($name, Box::new($expr));)+
+  };
 }
+
+/// The user custom icon identify define start from.
+pub const CUSTOM_START: ComposeStyleIdent = ComposeStyleIdent::new(65536);
 
 impl ComposeStyles {
   #[inline]
@@ -73,7 +72,7 @@ impl ComposeStyleIdent {
 
 impl Clone for Box<dyn ComposeStyle> {
   #[inline]
-  fn clone(&self) -> Self { self.box_clone() }
+  fn clone(&self) -> Self { self.deref().box_clone() }
 }
 
 impl<F: Fn(Widget) -> Widget + Clone + 'static> ComposeStyle for F {
@@ -83,10 +82,41 @@ impl<F: Fn(Widget) -> Widget + Clone + 'static> ComposeStyle for F {
   #[inline]
   fn as_fn(&self) -> &dyn Fn(Widget) -> Widget { self }
 }
+
+impl ComposeChild for ComposeStylesWidget {
+  type Child = Widget;
+
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    let this = match this {
+      StateWidget::Stateless(this) => this,
+      StateWidget::Stateful(_) => {
+        panic!(
+          "compose styles not support as a stateful widget, it's not support to \
+          reactive on the change. So not directly depends on any others as a \
+          builtin widget declare in `widget!`, or use `ExprWidget` to generate \
+          dynamic compose style instead of."
+        )
+      }
+    };
+
+    widget! {
+      ExprWidget {
+        expr: this.compose_styles.iter().filter_map(|compose_style| {
+          let style = compose_style.of(ctx.theme());
+          if style.is_none() {
+            log::warn!("use an compose style not init in theme.");
+          }
+          style
+        }).fold(child, | child, compose_style| {
+          compose_style(child)
+        })
+      }
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
-  use std::rc::Rc;
-
   use crate::{
     define_compose_style_ident, fill_compose_style,
     prelude::*,
@@ -97,8 +127,8 @@ mod tests {
   fn compose_style_smoke() {
     let mut theme = material::purple::light();
 
-    define_compose_style_ident!(styles::THEME_EXTEND, SIZE_100);
-    fill_compose_style!(theme.compose_styles,
+    define_compose_style_ident!(cs::THEME_EXTEND, SIZE_100);
+    fill_compose_style!(theme,
       SIZE_100: |child| {
       widget! {
         SizedBox {
@@ -109,17 +139,15 @@ mod tests {
     });
 
     let w = widget! {
-      ExprWidget {
-        expr: SIZE_100.of(&theme),
-        SizedBox {
-          size: Size::zero(),
-        }
+      SizedBox {
+        compose_styles: [SIZE_100],
+        size: Size::zero(),
       }
     };
     expect_layout_result(
       w,
       None,
-      None,
+      Some(theme.into()),
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect {

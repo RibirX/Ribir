@@ -46,10 +46,10 @@
  	 - specify the event handler when received a unicode character.
 - wheel : [`impl FnMut(& mut WheelEvent)`] 
  	 - specify the event handler when user moving a mouse wheel or similar input device.
+- compose_styles : [`SmallVec < [ComposeStyleIdent ; 1] >`] 
+ 	 - compose_styles specify one or more `compose style` to a widget, `compose style` is an identify of a function defined in `Theme` which support convert a widget to another, in normal do some thing decoration in it.
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.
-- theme : [`Theme`] 
- 	 - assign theme to the widget.
 - box_fit : [`BoxFit`] 
  	 -  set how its child should be resized to its box.
 - padding : [`EdgeInsets`] 
@@ -80,10 +80,12 @@
  	 - A widget that applies a transformation its child. Doesn't change size, only apply painting
 - visible : [`bool`] 
  	 - Whether to show or hide a child
-- key : [`Key`] 
- 	 - assign a key to widget, use for track if two widget is same widget in two frames.
 - opacity : [`f32`] 
  	 - Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency.
+- theme : [`Theme`] 
+ 	 - assign theme to the widget.
+- key : [`Key`] 
+ 	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
 [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
 
@@ -131,9 +133,9 @@
 
 [`impl FnMut(& mut WheelEvent)`]: prelude::impl FnMut(& mut WheelEvent)
 
-[`CursorIcon`]: prelude::CursorIcon
+[`SmallVec < [ComposeStyleIdent ; 1] >`]: prelude::SmallVec < [ComposeStyleIdent ; 1] >
 
-[`Theme`]: prelude::Theme
+[`CursorIcon`]: prelude::CursorIcon
 
 [`BoxFit`]: prelude::BoxFit
 
@@ -165,6 +167,8 @@
 
 [`bool`]: prelude::bool
 
-[`Key`]: prelude::Key
-
 [`f32`]: prelude::f32
+
+[`Theme`]: prelude::Theme
+
+[`Key`]: prelude::Key
