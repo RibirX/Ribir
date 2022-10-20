@@ -152,7 +152,7 @@ impl Compose for TodoMVP {
                           }
                         }
                       }
-                      on checkbox.checked  ~> this2.silent().tasks[idx].finished
+                      on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
                     }
                   }).collect::<Vec<_>>()
                 }
@@ -202,7 +202,7 @@ impl Compose for TodoMVP {
                           }
                         }
                       }
-                      on checkbox.checked  ~> this2.silent().tasks[idx].finished
+                      on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
                     }
                   }).collect::<Vec<_>>()
                 }
@@ -252,7 +252,7 @@ impl Compose for TodoMVP {
                           }
                         }
                       }
-                      on checkbox.checked  ~> this2.silent().tasks[idx].finished
+                      on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
                     }
                   }).collect::<Vec<_>>()
                 }

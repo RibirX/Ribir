@@ -1,12 +1,15 @@
-
-use crate::{prelude::*, impl_query_self_only};
 use crate::prelude::data_widget::compose_child_as_data_widget;
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(Declare)]
 pub struct Tab {}
 
-impl ComposeSingleChild for Tab {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for Tab {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget
+  where
+    Self: Sized,
+  {
     compose_child_as_data_widget(child, this)
   }
 }
@@ -18,8 +21,12 @@ impl Query for Tab {
 #[derive(Declare)]
 pub struct Pane {}
 
-impl ComposeSingleChild for Pane {
-  fn compose_single_child(this: StateWidget<Self>, child: Widget) -> Widget {
+impl ComposeChild for Pane {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget
+  where
+    Self: Sized,
+  {
     compose_child_as_data_widget(child, this)
   }
 }
@@ -34,9 +41,12 @@ pub struct Tabs {
   pub cur_idx: usize,
 }
 
-impl ComposeMultiChild for Tabs {
-  fn compose_multi_child(this: StateWidget<Self>, children: Vec<Widget>) -> Widget {
-
+impl ComposeChild for Tabs {
+  type Child = Vec<Widget>;
+  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget
+  where
+    Self: Sized,
+  {
     let mid = children.len();
     let mut tabs = vec![];
     let mut panes = vec![];
@@ -48,7 +58,7 @@ impl ComposeMultiChild for Tabs {
         panes.push(w);
       }
     }
-    
+
     widget! {
       track {
         this: this.into_stateful()
@@ -82,7 +92,7 @@ impl ComposeMultiChild for Tabs {
               }
             })
         }
-      } 
+      }
     }
   }
 }
