@@ -11,12 +11,6 @@ pub struct HScrollBar {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollBarTheme {
-  /// The brush to fill the scrollbar thumb.
-  pub thumb_brush: Brush,
-  /// The brush to fill the scrollbar track.
-  pub track_brush: Brush,
-  /// The Radius of the scrollbar thumb's rounded rectangle corners.
-  pub radius: Option<Radius>,
   /// The min size of the thumb have.
   pub thumb_min_size: f32,
   /// The thickness of scrollbar element.
@@ -136,27 +130,24 @@ impl Compose for HRawScrollbar {
       env {
         let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
       }
-      Stack {
-        LayoutBox {
-          id: track_box,
-          SizedBox {
-            size: Size::new(f32::MAX, theme.track_thickness()),
-            background: theme.track_brush.clone(),
-          }
-        }
+      LayoutBox {
+        id: track_box,
         SizedBox {
-          id: thumb,
-          size: {
-            let page_width = scrolling.page_size().width;
-            let content_width = scrolling.content_size().width;
-            let width = page_width / content_width * track_box.width();
-            Size::new(width.max(theme.thumb_min_size), theme.thickness)
-          },
-          background: theme.track_brush.clone(),
-          radius: theme.radius,
-          left_anchor: {
-            let content_width = scrolling.content_size().width;
-            -scrolling.pos.x * safe_recip(content_width) * track_box.width()
+          size: Size::new(f32::MAX, theme.track_thickness()),
+          compose_styles: [cs::SCROLLBAR_TRACK],
+          SizedBox {
+            id: thumb,
+            size: {
+              let page_width = scrolling.page_size().width;
+              let content_width = scrolling.content_size().width;
+              let width = page_width / content_width * track_box.width();
+              Size::new(width.max(theme.thumb_min_size), theme.thickness)
+            },
+            left_anchor: {
+              let content_width = scrolling.content_size().width;
+              -scrolling.pos.x * safe_recip(content_width) * track_box.width()
+            },
+            compose_styles: [cs::SCROLLBAR_THUMB],
           }
         }
       }
@@ -189,27 +180,24 @@ impl Compose for VRawScrollbar {
       env {
         let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
       }
-      Stack {
-        LayoutBox {
-          id: track_box,
-          SizedBox {
-            size: Size::new(theme.track_thickness(), f32::MAX),
-            background: theme.track_brush.clone(),
-          }
-        }
+      LayoutBox {
+        id: track_box,
         SizedBox {
-          id: thumb,
-          size: {
-            let page_height = scrolling.page_size().height;
-            let content_height = scrolling.content_size().height;
-            let height = page_height / content_height * track_box.height();
-            Size::new( theme.thickness, height.max(theme.thumb_min_size))
-          },
-          background: theme.thumb_brush.clone(),
-          radius: theme.radius,
-          top_anchor: {
-            let content_height = scrolling.content_size().height;
-            -scrolling.pos.y * safe_recip(content_height) * track_box.height()
+          size: Size::new(theme.track_thickness(), f32::MAX),
+          compose_styles: [cs::SCROLLBAR_TRACK],
+          SizedBox {
+            id: thumb,
+            size: {
+              let page_height = scrolling.page_size().height;
+              let content_height = scrolling.content_size().height;
+              let height = page_height / content_height * track_box.height();
+              Size::new( theme.thickness, height.max(theme.thumb_min_size))
+            },
+            top_anchor: {
+              let content_height = scrolling.content_size().height;
+              -scrolling.pos.y * safe_recip(content_height) * track_box.height()
+            },
+            compose_styles: [cs::SCROLLBAR_THUMB],
           }
         }
       }
@@ -230,12 +218,11 @@ fn safe_recip(v: f32) -> f32 {
   if v.is_infinite() || v.is_nan() { 0. } else { v }
 }
 
-impl CustomTheme for ScrollBarTheme {
-  fn default_theme(theme: &Theme) -> Self {
+impl CustomTheme for ScrollBarTheme {}
+
+impl Default for ScrollBarTheme {
+  fn default() -> Self {
     Self {
-      thumb_brush: theme.palette.primary().into(),
-      track_brush: Color::TRANSPARENT.into(),
-      radius: Some(Radius::all(4.)),
       thumb_min_size: 12.,
       thickness: 8.,
       thumb_margin: 2.,

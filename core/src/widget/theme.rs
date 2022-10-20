@@ -20,6 +20,8 @@ mod compose_styles;
 pub use compose_styles::*;
 mod custom_theme;
 pub use custom_theme::*;
+mod styles_sheet;
+pub use styles_sheet::*;
 
 use crate::{
   impl_query_self_only,

@@ -20,9 +20,7 @@ macro_rules! fill_custom_theme {
   };
 }
 
-pub trait CustomTheme: Clone {
-  fn default_theme(theme: &Theme) -> Self;
-
+pub trait CustomTheme: Clone + Default {
   #[inline]
   fn custom_theme_of(theme: &Theme) -> Self
   where
@@ -38,7 +36,7 @@ pub trait CustomTheme: Clone {
           "Not set {} in theme, use its default style",
           std::any::type_name::<Self>()
         );
-        Self::default_theme(theme)
+        <_>::default()
       })
   }
 }

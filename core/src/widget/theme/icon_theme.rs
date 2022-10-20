@@ -25,37 +25,31 @@ pub struct IconSize {
   pub huge: Size,
 }
 
-pub mod icons {
-  use super::*;
-
-  /// macro use to define a dozen of [`IconIdent`]! of icons.
-  #[macro_export]
-  macro_rules! define_icon_ident {
-    ($from: ident, $define: ident, $($ident: ident),+) => {
+/// macro use to define a dozen of [`IconIdent`]! of icons.
+#[macro_export]
+macro_rules! define_icon_ident {
+    ($from: expr, $define: ident, $($ident: ident),+) => {
       define_icon_ident!($from, $define);
-      define_icon_ident!($define, $($ident), +);
+      define_icon_ident!(IconIdent($define.0 + 1), $($ident), +);
     };
-    ($value: ident, $define: ident) => {
+    ($value: expr, $define: ident) => {
       pub const $define: IconIdent = $value;
     }
   }
 
-  /// macro use to specify icon of [`IconIdent`]! in [`IconTheme`]!.
-  #[macro_export]
-  macro_rules! fill_icon {
+/// macro use to specify icon of [`IconIdent`]! in [`IconTheme`]!.
+#[macro_export]
+macro_rules! fill_icon {
     ($theme: ident, $($name: path: $path: literal),+) => {
       $($theme.icon_theme.set_icon($name,  ShareResource::new(include_svg!($path)));)+
     };
   }
 
-  pub const BEGIN: IconIdent = IconIdent::new(0);
-  define_icon_ident!(BEGIN, CHECKED, UNCHECKED, INDETERMINATE, THEME_EXTEND);
-  /// The user custom icon identify define start from.
-  pub const CUSTOM_START: IconIdent = IconIdent::new(65536);
-}
+/// The user custom icon identify define start from.
+pub const CUSTOM_ICON_START: IconIdent = IconIdent::new(65536);
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct IconIdent(usize);
+pub struct IconIdent(pub usize);
 
 impl IconTheme {
   #[inline]
@@ -98,11 +92,4 @@ impl IconIdent {
   pub fn of(self, theme: &Theme) -> Option<ShareResource<SvgRender>> {
     theme.icon_theme.icons.get(&self).cloned()
   }
-}
-
-impl std::ops::Add<usize> for IconIdent {
-  type Output = IconIdent;
-
-  #[inline]
-  fn add(self, rhs: usize) -> Self::Output { Self(self.0 + rhs) }
 }

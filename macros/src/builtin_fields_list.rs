@@ -100,14 +100,17 @@ builtin! {
     wheel: impl FnMut(&mut WheelEvent),
   }
 
+  ComposeStylesWidget {
+    #[doc="compose_styles specify one or more `compose style` to a widget, \
+    `compose style` is an identify of a function defined in `Theme` which \
+    support convert a widget to another, in normal do some thing decoration \
+    in it."]
+    compose_styles: SmallVec<[ComposeStyleIdent; 1]>,
+  }
+
   Cursor {
     #[doc="assign cursor to the widget."]
     cursor: CursorIcon
-  }
-
-  ThemeWidget {
-    #[doc="assign theme to the widget."]
-    theme: Theme
   }
 
   FittedBox {
@@ -144,7 +147,6 @@ builtin! {
     v_align: VAlign,
   }
 
-
   LeftAnchor {
     #[doc="use to anchor child constraints with the left edge of parent widget."]
     left_anchor: PositionUnit,
@@ -180,12 +182,18 @@ builtin! {
     visible: bool
   }
 
-  KeyWidget {
-    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
-    key: Key
-  }
   Opacity {
     #[doc="Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency."]
     opacity: f32
+  }
+
+  ThemeWidget {
+    #[doc="assign theme to the widget."]
+    theme: Theme
+  }
+
+  KeyWidget {
+    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
+    key: Key
   }
 }
