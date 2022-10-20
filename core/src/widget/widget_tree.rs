@@ -53,27 +53,16 @@ impl WidgetTree {
 
     let mut paint_ctx = PaintingCtx::new(self.root(), self, painter);
     while let Some(id) = w {
-      let mut need_paint: bool = true;
+      paint_ctx.id = id;
+      paint_ctx.painter.save();
 
-      id.assert_get(self).query_all_type(
-        |r: &Offstage| {
-          need_paint = !r.offstage;
-          false
-        },
-        QueryOrder::OutsideFirst,
-      );
-
+      let need_paint: bool = !id.is_offstage(self);
       if need_paint {
-        paint_ctx.id = id;
         let rect = paint_ctx
           .box_rect()
           .expect("when paint node, it's mut be already layout.");
-        paint_ctx
-          .painter
-          .save()
-          .translate(rect.min_x(), rect.min_y());
-        let rw = id.assert_get(self);
-        rw.paint(&mut paint_ctx);
+        paint_ctx.painter.translate(rect.min_x(), rect.min_y());
+        id.assert_get(self).paint(&mut paint_ctx);
       }
 
       w = id.first_child(self).filter(|_| need_paint).or_else(|| {
@@ -429,6 +418,16 @@ impl WidgetId {
 
   pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
+  }
+
+  pub(crate) fn is_offstage(self, tree: &WidgetTree) -> bool {
+    let mut offstage = false;
+    self
+      .assert_get(tree)
+      .query_on_first_type(QueryOrder::OutsideFirst, |r: &Offstage| {
+        offstage = r.offstage
+      });
+    offstage
   }
 }
 
