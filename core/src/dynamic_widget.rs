@@ -17,12 +17,9 @@ pub struct ExprWidget<E> {
   pub(crate) upstream: LocalBoxOp<'static, ChangeScope, ()>,
 }
 
-/// ConstExprWidget is convert from uer declared  `ExprWidget` which but its
-/// expression not following anything.
-#[derive(Declare)]
-pub struct ConstExprWidget<W> {
-  pub(crate) expr: W,
-}
+/// ConstExprWidget is convert from uer declared `ExprWidget` if its expression
+/// not depends anything. And will stripe to its inner value when declare build.
+pub struct ConstExprWidget<E>(E);
 
 /// Generator is a virtual child construct from `ExprWidget` in a widget tree,
 /// which use to generate dynamic widgets and provide ability to keep them up to
@@ -45,7 +42,7 @@ struct InnerGenerator {
   self_render: Box<dyn Render>,
   is_dirty: bool,
   gen_dyn_widgets: DynamicWidgetInfo,
-  expr: Box<dyn FnMut(&mut BuildCtx) -> DynamicWidget>,
+  expr: Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>,
 }
 
 impl<R> ExprWidgetBuilder<R> {
@@ -60,7 +57,7 @@ impl<R> ExprWidgetBuilder<R> {
 
 impl Generator {
   pub(crate) fn new_generator(
-    expr: ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> DynamicWidget>>,
+    expr: ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> Vec<Widget>>>,
     has_child: bool,
     tree: &mut WidgetTree,
   ) -> WidgetId {
@@ -143,46 +140,7 @@ impl Render for Generator {
   impl_proxy_render!(0.borrow_mut().self_render);
 }
 
-pub enum DynamicWidget {
-  Single(Option<Widget>),
-  Multi(Box<dyn Iterator<Item = Widget>>),
-}
-
-pub trait IntoDynWidget<M: ?Sized> {
-  fn into_dyn_widget(self) -> DynamicWidget;
-}
-
 // mark the expr of `ExprWidget` only generate at most one widget.
-pub trait SingleDyn<M: ?Sized>: IntoDynWidget<M> {}
-
-impl<W, M: ?Sized> IntoDynWidget<&M> for W
-where
-  W: IntoWidget<M>,
-{
-  #[inline]
-  fn into_dyn_widget(self) -> DynamicWidget { DynamicWidget::Single(Some(self.into_widget())) }
-}
-
-impl<I, M> IntoDynWidget<dyn Iterator<Item = M>> for I
-where
-  M: ?Sized,
-  I: IntoIterator + 'static,
-  I::Item: IntoWidget<M>,
-{
-  #[inline]
-  fn into_dyn_widget(self) -> DynamicWidget {
-    DynamicWidget::Multi(Box::new(self.into_iter().map(|w| w.into_widget())))
-  }
-}
-
-impl<W, M: ?Sized> SingleDyn<&M> for W where W: IntoWidget<M> {}
-impl<W, M> SingleDyn<dyn Iterator<Item = M>> for Option<W>
-where
-  M: ?Sized,
-  W: IntoWidget<M> + 'static,
-{
-}
-
 impl<E> ExprWidget<E> {
   /// Only if `ExprWidget` generate at most one widget can as a normal widget,
   /// otherwise it must been children of multi child widget.
@@ -190,25 +148,20 @@ impl<E> ExprWidget<E> {
   pub fn into_widget<M: ?Sized, R>(self) -> Widget
   where
     E: FnMut(&mut BuildCtx) -> R + 'static,
-    R: SingleDyn<M>,
+    R: IntoChild<M, Option<Widget>>,
   {
-    self.inner_into_widget()
+    self.replace_expr_as_widget(|mut expr| move |ctx| expr(ctx).into_child().into_iter().collect())
   }
-}
 
-impl<E, R> ExprWidget<E>
-where
-  E: FnMut(&mut BuildCtx) -> R + 'static,
-{
-  pub(crate) fn inner_into_widget<M: ?Sized>(self) -> Widget
+  fn replace_expr_as_widget<F, R2>(self, mut f: F) -> Widget
   where
-    R: IntoDynWidget<M>,
+    F: FnMut(E) -> R2,
+    R2: FnMut(&mut BuildCtx) -> Vec<Widget> + 'static,
   {
-    let Self { mut expr, upstream } = self;
-
+    let Self { expr, upstream } = self;
     Widget {
       node: Some(WidgetNode::Dynamic(ExprWidget {
-        expr: Box::new(move |ctx| expr(ctx).into_dyn_widget()),
+        expr: Box::new(f(expr)),
         upstream,
       })),
       children: Children::None,
@@ -216,14 +169,35 @@ where
   }
 }
 
-impl<W> ConstExprWidget<W> {
+impl<E, R> ExprWidget<E>
+where
+  E: FnMut(&mut BuildCtx) -> R + 'static,
+{
   #[inline]
-  pub fn into_widget<M: ?Sized>(self) -> Widget
+  pub(crate) fn inner_into_widget<M: ?Sized>(self) -> Widget
   where
-    W: IntoWidget<M>,
+    R: IntoChild<M, Vec<Widget>>,
   {
-    self.expr.into_widget()
+    self.replace_expr_as_widget(|mut expr| move |ctx| expr(ctx).into_child())
   }
+}
+
+pub struct ConstExprWidgetBuilder<E>(Option<E>);
+
+impl<E> Declare for ConstExprWidget<E> {
+  type Builder = ConstExprWidgetBuilder<E>;
+
+  fn builder() -> Self::Builder { ConstExprWidgetBuilder(None) }
+}
+
+impl<E> ConstExprWidgetBuilder<E> {
+  #[inline]
+  pub fn expr(mut self, expr: E) -> Self {
+    self.0 = Some(expr);
+    self
+  }
+
+  pub fn build(self, _: &mut BuildCtx) -> E { self.0.expect("ConstExprWidget miss `expr` field.") }
 }
 
 impl WidgetTree {
@@ -277,20 +251,21 @@ impl InnerGenerator {
       .unwrap_or_else(|| tree.app_theme.clone());
 
     let mut ctx = BuildCtx::new(current_theme.clone(), tree);
-    let new_gen = (self.expr)(&mut ctx);
+    let mut new_gen = (self.expr)(&mut ctx);
 
     // Place the real render node in tree, effect lifecycle.
     std::mem::swap(&mut self.self_render, sign.assert_get_mut(tree));
-    match (&mut self.gen_dyn_widgets, new_gen) {
-      (DynamicWidgetInfo::SingleDynWithChild { depth, first }, DynamicWidget::Single(w)) => {
+    match &mut self.gen_dyn_widgets {
+      DynamicWidgetInfo::SingleDynWithChild { depth, first } => {
         *first = sign;
+        assert!(new_gen.len() <= 1);
+        let w = new_gen.pop();
         *depth = refresh_single_with_child(sign, w, *depth, tree, current_theme)
       }
-      (DynamicWidgetInfo::WholeSubtree(gen_widgets), new_widgets) => {
+      DynamicWidgetInfo::WholeSubtree(gen_widgets) => {
         gen_widgets[0] = sign;
-        refresh_multi(gen_widgets, new_widgets, tree, current_theme)
+        refresh_multi(gen_widgets, new_gen, tree, current_theme)
       }
-      _ => unreachable!("generator not match its generate"),
     };
 
     self.self_render = sign.replace_data(Box::new(Void), tree);
@@ -335,7 +310,7 @@ fn refresh_single_with_child(
 
 fn refresh_multi(
   gen_widgets: &mut SmallVec<[WidgetId; 1]>,
-  widgets: DynamicWidget,
+  widgets: Vec<Widget>,
   tree: &mut WidgetTree,
   current_theme: Rc<Theme>,
 ) {
@@ -350,24 +325,14 @@ fn refresh_multi(
   gen_widgets.iter().for_each(|w| w.remove_subtree(tree));
   gen_widgets.clear();
 
-  match widgets {
-    DynamicWidget::Single(w) => {
-      if let Some(n) = w.and_then(|w| w.into_subtree(parent, tree, current_theme)) {
-        sign.insert_after(n, tree);
-        gen_widgets.push(n);
-      }
+  let mut cursor = sign;
+  for w in widgets {
+    if let Some(n) = w.into_subtree(parent, tree, current_theme.clone()) {
+      cursor.insert_after(n, tree);
+      gen_widgets.push(n);
+      cursor = n;
     }
-    DynamicWidget::Multi(m) => {
-      let mut cursor = sign;
-      for w in m.into_iter() {
-        if let Some(n) = w.into_subtree(parent, tree, current_theme.clone()) {
-          cursor.insert_after(n, tree);
-          gen_widgets.push(n);
-          cursor = n;
-        }
-      }
-    }
-  };
+  }
 
   if gen_widgets.is_empty() {
     gen_widgets.push(sign)

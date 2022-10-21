@@ -66,23 +66,18 @@ impl<W: Query, D: Query> Query for DataWidget<W, D> {
 }
 
 pub(crate) fn expr_attach_data<D: Query + Clone + 'static>(
-  expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> DynamicWidget>>,
+  expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>>,
   children: Children,
   data: D,
 ) -> Widget {
   let ExprWidget { mut expr, upstream } = expr;
-  let new_expr = move |ctx: &mut BuildCtx| match expr(ctx) {
-    DynamicWidget::Single(w) => {
-      let w = w.map(|w| widget_attach_data(w, data.clone(), expr_attach_data));
-      DynamicWidget::Single(w)
-    }
-    DynamicWidget::Multi(m) => {
-      let data = data.clone();
-      let m = m.map(move |w| widget_attach_data(w, data.clone(), expr_attach_data));
-      DynamicWidget::Multi(Box::new(m))
-    }
+  let new_expr = move |ctx: &mut BuildCtx| {
+    let data = data.clone();
+    expr(ctx)
+      .into_iter()
+      .map(move |w| widget_attach_data(w, data.clone(), expr_attach_data))
+      .collect()
   };
-
   let node = WidgetNode::Dynamic(ExprWidget { expr: Box::new(new_expr), upstream });
   Widget { node: Some(node), children }
 }
@@ -95,7 +90,7 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
     StateWidget::Stateless(data) => widget_attach_data(
       child,
       data,
-      |expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> DynamicWidget>>,
+      |expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>>,
        children: Children,
        data: D| {
         let data = Stateful::new(data);
@@ -110,7 +105,7 @@ pub(crate) fn widget_attach_data<D: Query + 'static>(
   widget: Widget,
   data: D,
   attach_expr: impl FnOnce(
-    ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> DynamicWidget>>,
+    ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>>,
     Children,
     D,
   ) -> Widget
