@@ -137,7 +137,7 @@ pub struct Widget {
 pub(crate) enum WidgetNode {
   Compose(Box<dyn for<'r> FnOnce(&'r mut BuildCtx) -> Widget>),
   Render(Box<dyn Render>),
-  Dynamic(ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> DynamicWidget>>),
+  Dynamic(ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> Vec<Widget>>>),
 }
 
 pub(crate) enum Children {
@@ -229,9 +229,9 @@ pub trait IntoWidget<M: ?Sized> {
   fn into_widget(self) -> Widget;
 }
 
-impl IntoWidget<Widget> for Widget {
+impl Widget {
   #[inline]
-  fn into_widget(self) -> Widget { self }
+  pub fn into_widget(self) -> Widget { self }
 }
 
 impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C {

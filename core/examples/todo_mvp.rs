@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use ribir::prelude::*;
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {

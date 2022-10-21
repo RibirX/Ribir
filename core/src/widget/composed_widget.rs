@@ -28,14 +28,19 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
           Widget { node: Some(node), children }
         }
         WidgetNode::Dynamic(ExprWidget { mut expr, upstream }) => {
-          let new_expr = move |ctx: &mut BuildCtx| match expr(ctx) {
-            DynamicWidget::Single(w) => {
-              DynamicWidget::Single(w.map(|w| ComposedWidget { composed: w, by }.into_widget()))
+          let new_expr = move |ctx: &mut BuildCtx| {
+            let mut widgets = expr(ctx);
+            assert!(
+              widgets.len() <= 1,
+              "`ExprWidget` from compose widget, must be generate single child."
+            );
+
+            if let Some(w) = widgets.pop() {
+              widgets.push(ComposedWidget { composed: w, by }.into_widget());
             }
-            DynamicWidget::Multi(_) => {
-              unreachable!("`ExprWidget` from compose widget, must be generate single child.")
-            }
+            widgets
           };
+
           Widget {
             node: Some(WidgetNode::Dynamic(ExprWidget {
               expr: Box::new(new_expr),
