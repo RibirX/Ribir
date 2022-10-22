@@ -3,7 +3,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, ToTokens};
 use syn::{
   braced, bracketed, parse::Parse, parse_macro_input, punctuated::Punctuated, token, Ident,
-  MetaNameValue, Path,
+  MetaNameValue, Path, Signature,
 };
 
 mod kw {
@@ -11,32 +11,43 @@ mod kw {
   custom_keyword!(by);
 }
 
-struct Field {
-  doc_attr: MetaNameValue,
-  mem: Ident,
-  _colon: token::Colon,
-  ty: syn::Type,
+enum Item {
+  Field {
+    doc_attr: MetaNameValue,
+    mem: Ident,
+    _colon: token::Colon,
+    ty: syn::Type,
+  },
+  Method {
+    doc_attr: MetaNameValue,
+    sign: Signature,
+  },
 }
 struct BuiltinWidget {
   ty: Path,
   _brace_token: token::Brace,
-  fields: Punctuated<Field, token::Comma>,
+  items: Punctuated<Item, token::Comma>,
 }
 struct BuiltinWidgets {
   pub widgets: Vec<BuiltinWidget>,
 }
 
-impl Parse for Field {
+impl Parse for Item {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     input.parse::<token::Pound>()?;
-    let doc;
-    bracketed!(doc in input);
-    Ok(Field {
-      doc_attr: doc.parse()?,
-      mem: input.parse()?,
-      _colon: input.parse()?,
-      ty: input.parse()?,
-    })
+    let content;
+    bracketed!(content in input);
+    let doc_attr = content.parse()?;
+    if input.peek(token::Fn) {
+      Ok(Item::Method { doc_attr, sign: input.parse()? })
+    } else {
+      Ok(Item::Field {
+        doc_attr,
+        mem: input.parse()?,
+        _colon: input.parse()?,
+        ty: input.parse()?,
+      })
+    }
   }
 }
 
@@ -46,7 +57,7 @@ impl Parse for BuiltinWidget {
     Ok(BuiltinWidget {
       ty: input.parse()?,
       _brace_token: braced!(content in input),
-      fields: Punctuated::parse_terminated(&content)?,
+      items: Punctuated::parse_terminated(&content)?,
     })
   }
 }
@@ -64,33 +75,56 @@ impl Parse for BuiltinWidgets {
   }
 }
 
-impl ToTokens for Field {
+impl ToTokens for Item {
   fn to_tokens(&self, tokens: &mut TokenStream2) {
-    let Self { doc_attr, mem, ty, .. } = self;
-    let ty = quote! { #ty }.to_string();
-    let name = mem.to_string();
-    let doc = match &doc_attr.lit {
-      syn::Lit::Str(str) => str,
-      _ => unreachable!(),
-    };
-    tokens.extend(quote! {
-      BuiltinField {
-        name: #name,
-        ty: #ty,
-        doc: #doc,
+    match self {
+      Item::Field { doc_attr, mem, _colon, ty } => {
+        let ty = quote! { #ty }.to_string();
+        let name = mem.to_string();
+        let doc = match &doc_attr.lit {
+          syn::Lit::Str(str) => str,
+          _ => unreachable!(),
+        };
+        tokens.extend(quote! {
+          BuiltinField {
+            name: #name,
+            ty: #ty,
+            doc: #doc,
+          }
+        })
       }
-    })
+      Item::Method { doc_attr, sign } => {
+        let name = sign.ident.to_string();
+        let sign = sign.to_token_stream().to_string();
+        let doc = match &doc_attr.lit {
+          syn::Lit::Str(str) => str,
+          _ => unreachable!(),
+        };
+        tokens.extend(quote! {
+          BuiltinMethod {
+            name: #name,
+            sign: #sign,
+            doc: #doc,
+          }
+        })
+      }
+    }
   }
 }
 
 impl ToTokens for BuiltinWidget {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let ty = self.ty.to_token_stream().to_string();
-    let fields = &self.fields;
+    let Self { ty, _brace_token, items } = self;
+    let ty = ty.to_token_stream().to_string();
+    let (fields, methods): (Vec<_>, Vec<_>) = items
+      .iter()
+      .partition(|item| matches!(item, Item::Field { .. }));
+
     tokens.extend(quote! {
       BuiltinWidget {
         ty: #ty,
-        fields: &[#fields]
+        fields: &[#(#fields),*],
+        methods:&[#(#methods),*]
       }
     });
   }
@@ -104,6 +138,7 @@ impl ToTokens for BuiltinWidgets {
       pub struct BuiltinWidget {
         pub ty: &'static str,
         pub fields: &'static [BuiltinField],
+        pub methods: &'static [BuiltinMethod],
       }
 
       pub struct BuiltinField {
@@ -112,8 +147,14 @@ impl ToTokens for BuiltinWidgets {
         pub doc: &'static str,
       }
 
+      pub struct BuiltinMethod {
+        pub name: &'static str,
+        pub sign: &'static str,
+        pub doc: &'static str,
+      }
+
       pub static WIDGETS: [BuiltinWidget; #widget_size ] = [ #(#widgets), *];
-    })
+    });
   }
 }
 

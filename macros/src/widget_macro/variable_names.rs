@@ -13,7 +13,12 @@ lazy_static! {
     .flat_map(|w| w.fields.iter())
     .map(|f| (f.name, f.doc))
     .collect();
-  pub static ref FIELD_WIDGET_TYPE: HashMap<&'static str, &'static str, ahash::RandomState> =
+  pub static ref WIDGET_OF_BUILTIN_METHOD: HashMap<&'static str, &'static str, ahash::RandomState> =
+    WIDGETS
+      .iter()
+      .flat_map(|w| w.methods.iter().map(|m| (m.name, w.ty)))
+      .collect();
+  pub static ref WIDGET_OF_BUILTIN_FIELD: HashMap<&'static str, &'static str, ahash::RandomState> =
     WIDGETS
       .iter()
       .flat_map(|w| w.fields.iter().map(|f| (f.name, w.ty)))

@@ -28,7 +28,7 @@ impl ComposeChild for HScrollBar {
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::X,
-          pos: Point::new(this.offset, 0.),
+          scroll_pos: Point::new(this.offset, 0.),
           ExprWidget { expr: child}
         }
         HRawScrollbar {
@@ -36,7 +36,7 @@ impl ComposeChild for HScrollBar {
           v_align: VAlign::Bottom,
         }
       }
-      change_on scrolling.pos.x ~> this.offset
+      change_on scrolling.scroll_pos.x ~> this.offset
     }
   }
 }
@@ -59,7 +59,7 @@ impl ComposeChild for VScrollBar {
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::Y,
-          pos: Point::new(0., this.offset),
+          scroll_pos: Point::new(0., this.offset),
           ExprWidget { expr: child}
         }
         VRawScrollbar {
@@ -68,7 +68,7 @@ impl ComposeChild for VScrollBar {
         }
       }
 
-      change_on scrolling.pos.y ~> this.offset
+      change_on scrolling.scroll_pos.y ~> this.offset
     }
   }
 }
@@ -94,7 +94,7 @@ impl ComposeChild for BothScrollbar {
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::Both,
-          pos: this.offset,
+          scroll_pos: this.offset,
           ExprWidget { expr: child}
         }
         HRawScrollbar {
@@ -108,7 +108,7 @@ impl ComposeChild for BothScrollbar {
           margin: EdgeInsets::only_bottom(margin)
         }
       }
-      change_on scrolling.pos ~> this.offset
+      change_on scrolling.scroll_pos ~> this.offset
     }
   }
 }
@@ -140,12 +140,12 @@ impl Compose for HRawScrollbar {
             size: {
               let page_width = scrolling.page_size().width;
               let content_width = scrolling.content_size().width;
-              let width = page_width / content_width * track_box.width();
+              let width = page_width / content_width * track_box.layout_width();
               Size::new(width.max(theme.thumb_min_size), theme.thickness)
             },
             left_anchor: {
               let content_width = scrolling.content_size().width;
-              -scrolling.pos.x * safe_recip(content_width) * track_box.width()
+              -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
             },
             compose_styles: [cs::SCROLLBAR_THUMB],
           }
@@ -190,12 +190,12 @@ impl Compose for VRawScrollbar {
             size: {
               let page_height = scrolling.page_size().height;
               let content_height = scrolling.content_size().height;
-              let height = page_height / content_height * track_box.height();
+              let height = page_height / content_height * track_box.layout_height();
               Size::new( theme.thickness, height.max(theme.thumb_min_size))
             },
             top_anchor: {
               let content_height = scrolling.content_size().height;
-              -scrolling.pos.y * safe_recip(content_height) * track_box.height()
+              -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
             },
             compose_styles: [cs::SCROLLBAR_THUMB],
           }

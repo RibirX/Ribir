@@ -22,15 +22,33 @@ impl ComposeChild for LayoutBox {
 }
 
 impl LayoutBox {
+  /// return the rect after layout of the widget
   #[inline]
-  pub fn box_rect(&self) -> Rect { self.rect }
-}
+  pub fn layout_rect(&self) -> Rect { self.rect }
 
-impl std::ops::Deref for LayoutBox {
-  type Target = Rect;
-
+  /// return the position relative to parent after layout of the widget
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.rect }
+  pub fn layout_pos(&self) -> Point { self.rect.origin }
+
+  /// return the size after layout of the widget
+  #[inline]
+  pub fn layout_size(&self) -> Size { self.rect.size }
+
+  /// return the left position relative parent after layout of the widget
+  #[inline]
+  pub fn layout_left(&self) -> f32 { self.rect.min_x() }
+
+  /// return the top position relative parent after layout of the widget
+  #[inline]
+  pub fn layout_top(&self) -> f32 { self.rect.min_y() }
+
+  /// return the width after layout of the widget
+  #[inline]
+  pub fn layout_width(&self) -> f32 { self.rect.width() }
+
+  /// return the height after layout of the widget
+  #[inline]
+  pub fn layout_height(&self) -> f32 { self.rect.height() }
 }
 
 #[cfg(test)]
@@ -52,32 +70,32 @@ mod tests {
       },
       None,
       None,
-        & [
-          LayoutTestItem {
-            path: &[0],
-            expect: ExpectRect {
-              width: Some(200.),
-              height: Some(200.),
-              ..<_>::default()
-            },
+      &[
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect {
+            width: Some(200.),
+            height: Some(200.),
+            ..<_>::default()
           },
-          LayoutTestItem {
-            path: &[0, 0],
-            expect: ExpectRect {
-              width: Some(100.),
-              height: Some(200.),
-              ..<_>::default()
-            },
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect {
+            width: Some(100.),
+            height: Some(200.),
+            ..<_>::default()
           },
-          LayoutTestItem {
-            path: &[0, 1],
-            expect: ExpectRect {
-              width: Some(100.),
-              height: Some(200.),
-              ..<_>::default()
-            },
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect {
+            width: Some(100.),
+            height: Some(200.),
+            ..<_>::default()
           },
-        ],
+        },
+      ],
     );
   }
 }

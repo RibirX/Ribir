@@ -87,88 +87,23 @@
 - key : [`Key`] 
  	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
-[`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
+ - `fn layout_rect(& self) -> Rect`
+ 	- return the rect after layout of the widget
 
-[`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
+ - `fn layout_pos(& self) -> Point`
+ 	- return the position relative to parent after layout of the widget
 
-[`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`]: prelude::Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >
+ - `fn layout_size(& self) -> Size`
+ 	- return the size after layout of the widget
 
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
+ - `fn layout_left(& self) -> f32`
+ 	- return the left position relative parent after layout of the widget
 
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
+ - `fn layout_top(& self) -> f32`
+ 	- return the top position relative parent after layout of the widget
 
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
+ - `fn layout_width(& self) -> f32`
+ 	- return the width after layout of the widget
 
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
-
-[`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`]: prelude::Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >
-
-[`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`]: prelude::Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >
-
-[`(u8, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`]: prelude::(u8, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)
-
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
-
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
-
-[`impl FnMut(& mut PointerEvent)`]: prelude::impl FnMut(& mut PointerEvent)
-
-[`bool`]: prelude::bool
-
-[`i16`]: prelude::i16
-
-[`impl FnMut(& mut FocusEvent)`]: prelude::impl FnMut(& mut FocusEvent)
-
-[`impl FnMut(& mut FocusEvent)`]: prelude::impl FnMut(& mut FocusEvent)
-
-[`impl FnMut(& mut FocusEvent)`]: prelude::impl FnMut(& mut FocusEvent)
-
-[`impl FnMut(& mut FocusEvent)`]: prelude::impl FnMut(& mut FocusEvent)
-
-[`impl FnMut(& mut KeyboardEvent)`]: prelude::impl FnMut(& mut KeyboardEvent)
-
-[`impl FnMut(& mut KeyboardEvent)`]: prelude::impl FnMut(& mut KeyboardEvent)
-
-[`impl FnMut(& mut CharEvent)`]: prelude::impl FnMut(& mut CharEvent)
-
-[`impl FnMut(& mut WheelEvent)`]: prelude::impl FnMut(& mut WheelEvent)
-
-[`SmallVec < [ComposeStyleIdent ; 1] >`]: prelude::SmallVec < [ComposeStyleIdent ; 1] >
-
-[`CursorIcon`]: prelude::CursorIcon
-
-[`BoxFit`]: prelude::BoxFit
-
-[`EdgeInsets`]: prelude::EdgeInsets
-
-[`Brush`]: prelude::Brush
-
-[`Border`]: prelude::Border
-
-[`Radius`]: prelude::Radius
-
-[`impl EdgeInsets`]: prelude::impl EdgeInsets
-
-[`HAlign`]: prelude::HAlign
-
-[`VAlign`]: prelude::VAlign
-
-[`PositionUnit`]: prelude::PositionUnit
-
-[`PositionUnit`]: prelude::PositionUnit
-
-[`PositionUnit`]: prelude::PositionUnit
-
-[`PositionUnit`]: prelude::PositionUnit
-
-[`Scrollable`]: prelude::Scrollable
-
-[`Transform`]: prelude::Transform
-
-[`bool`]: prelude::bool
-
-[`f32`]: prelude::f32
-
-[`Theme`]: prelude::Theme
-
-[`Key`]: prelude::Key
+ - `fn layout_height(& self) -> f32`
+ 	- return the height after layout of the widget

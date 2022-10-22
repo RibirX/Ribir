@@ -19,7 +19,7 @@ pub struct ScrollableWidget {
   #[declare(builtin)]
   pub scrollable: Scrollable,
   #[declare(default)]
-  pub pos: Point,
+  pub scroll_pos: Point,
   #[declare(skip)]
   page: Size,
   #[declare(skip)]
@@ -31,31 +31,32 @@ impl ComposeChild for ScrollableWidget {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      LayoutBox {
+      UnconstrainedBox {
         id: view,
         wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
-        UnconstrainedBox { LayoutBox {
+        ExprWidget {
           id: content,
-          left_anchor: this.pos.x,
-          top_anchor: this.pos.y,
-          ExprWidget { expr: child }
-        }}
+          expr: child,
+          left_anchor: this.scroll_pos.x,
+          top_anchor: this.scroll_pos.y,
+        }
       }
-      change_on content.box_rect().size ~> this.content_size
-      change_on view.box_rect().size ~> this.page
+
+      change_on content.layout_size() ~> this.content_size
+      change_on view.layout_size() ~> this.page
       change_on content.left_anchor Animate {
         transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
-          let from = from.abs_value(content.width());
-          let to = to.abs_value(content.width());
+          let from = from.abs_value(content.layout_width());
+          let to = to.abs_value(content.layout_width());
           PositionUnit::Pixel(from.lerp(&to, rate))
         }
       }
       change_on content.top_anchor Animate {
         transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
-          let from = from.abs_value(content.height());
-          let to = to.abs_value(content.height());
+          let from = from.abs_value(content.layout_height());
+          let to = to.abs_value(content.layout_height());
           PositionUnit::Pixel(from.lerp(&to, rate))
         }
       }
@@ -80,7 +81,7 @@ impl ScrollableWidget {
   }
 
   fn validate_scroll(&mut self, delta: Point) {
-    let mut new = self.pos;
+    let mut new = self.scroll_pos;
     if self.scrollable != Scrollable::X {
       new.y += delta.y;
     }
@@ -88,7 +89,7 @@ impl ScrollableWidget {
       new.x += delta.x;
     }
     let min = self.page_size() - self.content_size();
-    self.pos = new.clamp(min.to_vector().to_point(), Point::zero());
+    self.scroll_pos = new.clamp(min.to_vector().to_point(), Point::zero());
   }
 }
 

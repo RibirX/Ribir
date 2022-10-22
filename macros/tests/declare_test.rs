@@ -302,6 +302,24 @@ fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
 }
 
 #[test]
+fn builtin_method_support() {
+  let layout_size = Stateful::new(Size::zero());
+  let w = widget! {
+    track { layout_size: layout_size.clone() }
+    SizedBox {
+      id: sized_box,
+      size: Size::new(100., 100.),
+    }
+    change_on sized_box.layout_size() ~> *layout_size
+  };
+
+  let mut wnd = Window::without_render(w, None, None);
+  wnd.draw_frame();
+
+  assert_eq!(&*layout_size.raw_ref(), &Size::new(100., 100.));
+}
+
+#[test]
 fn fix_builtin_field_can_declare_as_widget() {
   let w = widget! {
     Margin {

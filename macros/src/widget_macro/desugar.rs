@@ -11,7 +11,7 @@ use super::{
     Id, Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, Track, Transition,
     TransitionField,
   },
-  ribir_suffix_variable, ribir_variable, TrackExpr, FIELD_WIDGET_TYPE, WIDGETS,
+  ribir_suffix_variable, ribir_variable, TrackExpr, WIDGETS, WIDGET_OF_BUILTIN_FIELD,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -135,7 +135,7 @@ impl DeclareWidget {
         Err(DeclareField { member, expr, .. }) => {
           let value = FieldValue::Expr(expr.into());
           let field = Field { member, value };
-          if let Some(ty) = FIELD_WIDGET_TYPE
+          if let Some(ty) = WIDGET_OF_BUILTIN_FIELD
             .get(field.member.to_string().as_str())
             .filter(|builtin_ty| !ty.is_ident(builtin_ty))
           {
@@ -443,7 +443,7 @@ impl OnEventDo {
           subscribe_do: f.expr.into(),
         })
       } else {
-        if let Some(ty) = FIELD_WIDGET_TYPE.get(member.to_string().as_str()) {
+        if let Some(ty) = WIDGET_OF_BUILTIN_FIELD.get(member.to_string().as_str()) {
           if is_listener(ty) {
             listeners.entry(ty).or_default().push(f.into());
             continue;
