@@ -70,194 +70,200 @@ impl Compose for TodoMVP {
         Tabs {
           id: tabs,
           Tab {
-            TabText {
-              tab_text: String::from("All"),
-              is_active: *todo_mode == TodoMode::All,
-
-              tap: move |_| {
-                if *todo_mode != TodoMode::All {
-                  *todo_mode = TodoMode::All;
-                  tabs.cur_idx = 0;
+            TabHeader {
+              TabText {
+                tab_text: String::from("All"),
+                is_active: *todo_mode == TodoMode::All,
+  
+                tap: move |_| {
+                  if *todo_mode != TodoMode::All {
+                    *todo_mode = TodoMode::All;
+                    tabs.cur_idx = 0;
+                  }
+                },
+              }
+            }
+            TabPane {
+              VScrollBar {
+                background: Brush::Color(Color::BURLYWOOD),
+        
+                Column {
+                  align_items: Align::Start,
+                  padding: EdgeInsets::all(8.),
+                  ExprWidget {
+                    expr: this.tasks.iter()
+                    .filter(|_| { true })
+                    .enumerate().map(|(idx, task)| {
+                      let checked = task.finished;
+                      let label = task.label.clone();
+                      widget! {
+                        track {
+                          visible_delete: Stateful::new(false),
+                        }
+                        Row {
+                          align_items: Align::Center,
+                          margin: EdgeInsets::vertical(4.),
+                          pointer_enter: move |_| { *visible_delete = true; },
+                          pointer_leave: move |_| { *visible_delete = false; },
+        
+                          Checkbox { id: checkbox, checked }
+                          Expanded {
+                            flex: 1.,
+                            Text {
+                              text: label,
+                              margin: EdgeInsets::vertical(4.)
+                            }
+                          }
+                          Icon {
+                            visible: *visible_delete,
+                            tap: move |_| {
+                              this2.tasks.remove(idx);
+                            },
+                            ExprWidget {
+                              expr: {
+                                SvgIcons::of(ctx).close.clone()
+                              }
+                            }
+                          }
+                        }
+                        on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
+                      }
+                    }).collect::<Vec<_>>()
+                  }
                 }
-              },
+              }
             }
           }
           Tab {
-            TabText {
-              tab_text: String::from("Active"),
-              is_active: *todo_mode == TodoMode::Active,
-
-              tap: move |_| {
-                if *todo_mode != TodoMode::Active {
-                  *todo_mode = TodoMode::Active;
-                  tabs.cur_idx = 0;
+            TabHeader {
+              TabText {
+                tab_text: String::from("Active"),
+                is_active: *todo_mode == TodoMode::Active,
+  
+                tap: move |_| {
+                  if *todo_mode != TodoMode::Active {
+                    *todo_mode = TodoMode::Active;
+                    tabs.cur_idx = 0;
+                  }
+                },
+              }
+            }
+            TabPane {
+              VScrollBar {
+                background: Brush::Color(Color::BURLYWOOD),
+        
+                Column {
+                  align_items: Align::Start,
+                  padding: EdgeInsets::all(8.),
+                  ExprWidget {
+                    expr: this.tasks.iter()
+                    .filter(|task| { !task.finished })
+                    .enumerate().map(|(idx, task)| {
+                      let checked = task.finished;
+                      let label = task.label.clone();
+                      widget! {
+                        track {
+                          visible_delete: Stateful::new(false),
+                        }
+                        Row {
+                          align_items: Align::Center,
+                          margin: EdgeInsets::vertical(4.),
+                          pointer_enter: move |_| { *visible_delete = true; },
+                          pointer_leave: move |_| { *visible_delete = false; },
+        
+                          Checkbox { id: checkbox, checked }
+                          Expanded {
+                            flex: 1.,
+                            Text {
+                              text: label,
+                              margin: EdgeInsets::vertical(4.)
+                            }
+                          }
+                          Icon {
+                            visible: *visible_delete,
+                            tap: move |_| {
+                              this2.tasks.remove(idx);
+                            },
+                            ExprWidget {
+                              expr: {
+                                SvgIcons::of(ctx).close.clone()
+                              }
+                            }
+                          }
+                        }
+                        on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
+                      }
+                    }).collect::<Vec<_>>()
+                  }
                 }
-              },
+              }
             }
           }
           Tab {
-            TabText {
-              tab_text: String::from("Completed"),
-              is_active: *todo_mode == TodoMode::Completed,
+            TabHeader {
+              TabText {
+                tab_text: String::from("Completed"),
+                is_active: *todo_mode == TodoMode::Completed,
+  
+                tap: move |_| {
+                  if *todo_mode != TodoMode::Completed {
+                    *todo_mode = TodoMode::Completed;
+                    tabs.cur_idx = 0;
+                  }
+                },
+              }
+            }
+            TabPane {
+              VScrollBar {
+                background: Brush::Color(Color::BURLYWOOD),
+        
+                Column {
+                  align_items: Align::Start,
+                  padding: EdgeInsets::all(8.),
+                  ExprWidget {
+                    expr: this.tasks.iter()
+                    .filter(|task| { task.finished })
+                    .enumerate().map(|(idx, task)| {
+                      let checked = task.finished;
+                      let label = task.label.clone();
+                      widget! {
+                        track {
+                          visible_delete: Stateful::new(false),
+                        }
+                        Row {
+                          align_items: Align::Center,
+                          margin: EdgeInsets::vertical(4.),
+                          pointer_enter: move |_| { *visible_delete = true; },
+                          pointer_leave: move |_| { *visible_delete = false; },
+        
+                          Checkbox { id: checkbox, checked }
+                          Expanded {
+                            flex: 1.,
+                            Text {
+                              text: label,
+                              margin: EdgeInsets::vertical(4.)
+                            }
+                          }
+                          Icon {
+                            visible: *visible_delete,
+                            tap: move |_| {
+                              this2.tasks.remove(idx);
+                            },
+                            ExprWidget {
+                              expr: {
+                                SvgIcons::of(ctx).close.clone()
+                              }
+                            }
+                          }
+                        }
+                        on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
+                      }
+                    }).collect::<Vec<_>>()
+                  }
+                }
+              }
+            }
 
-              tap: move |_| {
-                if *todo_mode != TodoMode::Completed {
-                  *todo_mode = TodoMode::Completed;
-                  tabs.cur_idx = 0;
-                }
-              },
-            }
-          }
-    
-          Pane {
-            VScrollBar {
-              background: Brush::Color(Color::BURLYWOOD),
-      
-              Column {
-                align_items: Align::Start,
-                padding: EdgeInsets::all(8.),
-                ExprWidget {
-                  expr: this.tasks.iter()
-                  .filter(|_| { true })
-                  .enumerate().map(|(idx, task)| {
-                    let checked = task.finished;
-                    let label = task.label.clone();
-                    widget! {
-                      track {
-                        visible_delete: Stateful::new(false),
-                      }
-                      Row {
-                        align_items: Align::Center,
-                        margin: EdgeInsets::vertical(4.),
-                        pointer_enter: move |_| { *visible_delete = true; },
-                        pointer_leave: move |_| { *visible_delete = false; },
-      
-                        Checkbox { id: checkbox, checked }
-                        Expanded {
-                          flex: 1.,
-                          Text {
-                            text: label,
-                            margin: EdgeInsets::vertical(4.)
-                          }
-                        }
-                        Icon {
-                          visible: *visible_delete,
-                          tap: move |_| {
-                            this2.tasks.remove(idx);
-                          },
-                          ExprWidget {
-                            expr: {
-                              SvgIcons::of(ctx).close.clone()
-                            }
-                          }
-                        }
-                      }
-                      on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
-                    }
-                  }).collect::<Vec<_>>()
-                }
-              }
-            }
-          }
-          Pane {
-            VScrollBar {
-              background: Brush::Color(Color::BURLYWOOD),
-      
-              Column {
-                align_items: Align::Start,
-                padding: EdgeInsetArcStrs::all(8.),
-                ExprWidget {
-                  expr: this.tasks.iter()
-                  .filter(|task| { !task.finished })
-                  .enumerate().map(|(idx, task)| {
-                    let checked = task.finished;
-                    let label = task.label.clone();
-                    widget! {
-                      track {
-                        visible_delete: Stateful::new(false),
-                      }
-                      Row {
-                        align_items: Align::Center,
-                        margin: EdgeInsets::vertical(4.),
-                        pointer_enter: move |_| { *visible_delete = true; },
-                        pointer_leave: move |_| { *visible_delete = false; },
-      
-                        Checkbox { id: checkbox, checked }
-                        Expanded {
-                          flex: 1.,
-                          Text {
-                            text: label,
-                            margin: EdgeInsets::vertical(4.)
-                          }
-                        }
-                        Icon {
-                          visible: *visible_delete,
-                          tap: move |_| {
-                            this2.tasks.remove(idx);
-                          },
-                          ExprWidget {
-                            expr: {
-                              SvgIcons::of(ctx).close.clone()
-                            }
-                          }
-                        }
-                      }
-                      on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
-                    }
-                  }).collect::<Vec<_>>()
-                }
-              }
-            }
-          }
-          Pane {
-            VScrollBar {
-              background: Brush::Color(Color::BURLYWOOD),
-      
-              Column {
-                align_items: Align::Start,
-                padding: EdgeInsets::all(8.),
-                ExprWidget {
-                  expr: this.tasks.iter()
-                  .filter(|task| { task.finished })
-                  .enumerate().map(|(idx, task)| {
-                    let checked = task.finished;
-                    let label = task.label.clone();
-                    widget! {
-                      track {
-                        visible_delete: Stateful::new(false),
-                      }
-                      Row {
-                        align_items: Align::Center,
-                        margin: EdgeInsets::vertical(4.),
-                        pointer_enter: move |_| { *visible_delete = true; },
-                        pointer_leave: move |_| { *visible_delete = false; },
-      
-                        Checkbox { id: checkbox, checked }
-                        Expanded {
-                          flex: 1.,
-                          Text {
-                            text: label,
-                            margin: EdgeInsets::vertical(4.)
-                          }
-                        }
-                        Icon {
-                          visible: *visible_delete,
-                          tap: move |_| {
-                            this2.tasks.remove(idx);
-                          },
-                          ExprWidget {
-                            expr: {
-                              SvgIcons::of(ctx).close.clone()
-                            }
-                          }
-                        }
-                      }
-                      on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
-                    }
-                  }).collect::<Vec<_>>()
-                }
-              }
-            }
           }
         }
 

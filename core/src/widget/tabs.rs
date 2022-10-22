@@ -1,39 +1,13 @@
-use crate::prelude::data_widget::compose_child_as_data_widget;
-use crate::{impl_query_self_only, prelude::*};
+use crate::{prelude::*};
 
-#[derive(Declare)]
-pub struct Tab {}
+#[derive(Declare, SingleChild)]
+pub struct Tab;
 
-impl ComposeChild for Tab {
-  type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
-    compose_child_as_data_widget(child, this)
-  }
-}
+#[derive(Declare, SingleChild)]
+pub struct TabPane;
 
-impl Query for Tab {
-  impl_query_self_only!();
-}
-
-#[derive(Declare)]
-pub struct Pane {}
-
-impl ComposeChild for Pane {
-  type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
-    compose_child_as_data_widget(child, this)
-  }
-}
-
-impl Query for Pane {
-  impl_query_self_only!();
-}
+#[derive(Declare, SingleChild)]
+pub struct TabHeader;
 
 #[derive(Default, Declare)]
 pub struct Tabs {
@@ -42,21 +16,17 @@ pub struct Tabs {
 }
 
 impl ComposeChild for Tabs {
-  type Child = Vec<Widget>;
+  type Child = Vec<WidgetWithChild<Tab, (WidgetWithChild<TabHeader, Widget>, WidgetWithChild<TabPane, Widget>)>>;
   fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget
   where
     Self: Sized,
   {
-    let mid = children.len();
-    let mut tabs = vec![];
+    let mut headers = vec![];
     let mut panes = vec![];
 
-    for (i, w) in children.into_iter().enumerate() {
-      if i < mid {
-        tabs.push(w);
-      } else {
-        panes.push(w);
-      }
+    for w in children.into_iter() {
+      headers.push(w.child.0.child);
+      panes.push(w.child.1.child);
     }
 
     widget! {
@@ -67,13 +37,13 @@ impl ComposeChild for Tabs {
       Column {
         Row {
           ExprWidget {
-            expr: tabs.into_iter()
-              .map(|tab| {
+            expr: headers.into_iter()
+              .map(|header| {
                 widget! {
                   Expanded {
                     flex: 1.,
                     ExprWidget {
-                      expr: tab
+                      expr: header
                     }
                   }
                 }
@@ -94,5 +64,28 @@ impl ComposeChild for Tabs {
         }
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn compose_tabs() {
+
+    widget! {
+      Tabs {
+        Tab {
+          TabHeader {
+            Void {}
+          }
+          TabPane {
+            Void {}
+          }
+        }
+      }
+    };
+
   }
 }
