@@ -39,11 +39,11 @@ impl Compose for Checkbox {
           expr: {
             let theme = ctx.theme();
             if this.indeterminate {
-              icons::INDETERMINATE.of_or_miss(theme)
+              icons::INDETERMINATE_CHECK_BOX.of_or_miss(theme)
             } else if this.checked {
-              icons::CHECKED.of_or_miss(theme)
+              icons::CHECK_BOX.of_or_miss(theme)
             } else {
-              icons::UNCHECKED.of_or_miss(theme)
+              icons::CHECK_BOX_OUTLINE_BLANK.of_or_miss(theme)
             }
         }}
       }

@@ -1,5 +1,6 @@
 use ribir::prelude::*;
 use std::time::Duration;
+use ::text::ArcStr;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {
@@ -55,7 +56,7 @@ impl Compose for TodoMVP {
               Icon {
                 ExprWidget {
                   expr: {
-                    SvgIcons::of(ctx).add.clone()
+                    icons::ADD.of_or_miss(ctx.theme())
                   }
                 }
               }
@@ -121,7 +122,7 @@ impl Compose for TodoMVP {
                             },
                             ExprWidget {
                               expr: {
-                                SvgIcons::of(ctx).close.clone()
+                                icons::CLOSE.of_or_miss(ctx.theme())
                               }
                             }
                           }
@@ -186,7 +187,7 @@ impl Compose for TodoMVP {
                             },
                             ExprWidget {
                               expr: {
-                                SvgIcons::of(ctx).close.clone()
+                                icons::CLOSE.of_or_miss(ctx.theme())
                               }
                             }
                           }
@@ -251,7 +252,7 @@ impl Compose for TodoMVP {
                             },
                             ExprWidget {
                               expr: {
-                                SvgIcons::of(ctx).close.clone()
+                                icons::CLOSE.of_or_miss(ctx.theme())
                               }
                             }
                           }

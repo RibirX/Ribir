@@ -35,7 +35,7 @@ pub mod icons {
     SEARCH,
     SETTINGS,
     STAR,
-    THEME_EXTEND,
+    THEME_EXTEND
   );
 }
 

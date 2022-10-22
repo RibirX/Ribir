@@ -34,9 +34,6 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   };
 
   fill_icon! { theme,
-    icons::CHECKED: "./material/checked.svg",
-    icons::UNCHECKED: "./material/unchecked_box.svg",
-    icons::INDETERMINATE: "./material/indeterminate_check_box.svg",
     icons::ADD_CIRCLE: "./material/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
     icons::ADD: "./material/add_FILL0_wght400_GRAD0_opsz48.svg",
     icons::ARROW_BACK: "./material/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
@@ -64,7 +61,7 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     icons::REFRESH: "./material/refresh_FILL0_wght400_GRAD0_opsz48.svg",
     icons::SEARCH: "./material/search_FILL0_wght400_GRAD0_opsz48.svg",
     icons::SETTINGS: "./material/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::STAR: "./material/star_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::STAR: "./material/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
   fill_compose_style! { theme,
     cs::SCROLLBAR_TRACK: |child| {
