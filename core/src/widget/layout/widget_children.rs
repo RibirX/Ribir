@@ -175,12 +175,12 @@ where
   fn into_child(self) -> Widget { self.into_widget() }
 }
 
-impl<W, C, M: ?Sized> IntoChild<M, WidgetWithChild<W, Widget>> for WidgetWithChild<W, C>
+impl<W, C, C2, M: ?Sized> IntoChild<M, WidgetWithChild<W, C2>> for WidgetWithChild<W, C>
 where
-  C: IntoChild<M, Widget>,
+  C: IntoChild<M, C2>,
 {
   #[inline]
-  fn into_child(self) -> WidgetWithChild<W, Widget> {
+  fn into_child(self) -> WidgetWithChild<W, C2> {
     let Self { widget, child } = self;
     WidgetWithChild { widget, child: child.into_child() }
   }
@@ -280,6 +280,14 @@ where
   W: IntoWidget<M>,
 {
   fn fill(self, vec: &mut Vec<Widget>) { vec.push(self.into_widget()) }
+}
+
+impl<M: ?Sized, W, C, C2> FillVec<dyn IntoWidget<&M>, Vec<WidgetWithChild<W, C2>>>
+  for WidgetWithChild<W, C>
+where
+  C: IntoChild<M, C2>,
+{
+  fn fill(self, vec: &mut Vec<WidgetWithChild<W, C2>>) { vec.push(self.into_child()) }
 }
 
 impl<M: ?Sized, I, V> FillVec<dyn Iterator<Item = &M>, V> for I
