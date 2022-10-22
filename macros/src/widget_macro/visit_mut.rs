@@ -3,7 +3,8 @@ use crate::{error::DeclareError, WIDGET_MACRO_NAME};
 use super::{
   builtin_var_name, capture_widget,
   desugar::{ComposeItem, DeclareObj, Field, FieldValue, NamedObj, SubscribeItem, WidgetNode},
-  gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, FIELD_WIDGET_TYPE,
+  gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, WIDGET_OF_BUILTIN_FIELD,
+  WIDGET_OF_BUILTIN_METHOD,
 };
 
 use proc_macro::Span;
@@ -79,7 +80,7 @@ impl VisitMut for VisitCtx {
       Expr::Path(p) => {
         visit_mut::visit_expr_path_mut(self, p);
         if let Some(name) = p.path.get_ident() {
-          if let Some(name) = self.find_named_widget(name).cloned() {
+          if let Some(name) = self.find_named_obj(name).cloned() {
             self.add_used_widget(name, None, UsedType::USED)
           }
         }
@@ -134,48 +135,31 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
-    let span = f_expr.span();
-    fn builtin_access(f_expr: &mut syn::ExprField) -> Option<(&mut Path, &'static str)> {
-      if let Member::Named(member) = &f_expr.member {
-        let builtin_ty = FIELD_WIDGET_TYPE.get(member.to_string().as_str())?;
-        let path = match &mut *f_expr.base {
-          Expr::Path(syn::ExprPath { path, .. }) => path,
-          Expr::MethodCall(ExprMethodCall { receiver, method, args, .. })
-            if args.is_empty() && (method == "shallow" || method == "silent") =>
-          {
-            if let Expr::Path(syn::ExprPath { path, .. }) = &mut **receiver {
-              path
-            } else {
-              return None;
-            }
-          }
-          _ => return None,
-        };
-
-        Some((path, builtin_ty))
-      } else {
-        None
-      }
-    }
-
-    if let Some((path, builtin_ty)) = builtin_access(f_expr) {
-      if let Some(name) = path
-        .get_ident()
-        .filter(|name| self.declare_objs.contains(&name))
-      {
-        let builtin_name = builtin_var_name(&name, span, builtin_ty);
-        let src_name = name.clone();
-        *path = parse_quote! { #builtin_name };
-        self.add_used_widget(
-          builtin_name,
-          Some(BuiltinUsed { src_name, builtin_ty }),
-          UsedType::USED,
-        );
-        return;
+    if let Member::Named(member) = &f_expr.member {
+      if let Some(builtin_ty) = WIDGET_OF_BUILTIN_FIELD.get(member.to_string().as_str()) {
+        if self
+          .visit_builtin_member(&mut f_expr.base, builtin_ty)
+          .is_some()
+        {
+          return;
+        }
       }
     }
 
     visit_mut::visit_expr_field_mut(self, f_expr);
+  }
+
+  fn visit_expr_method_call_mut(&mut self, i: &mut ExprMethodCall) {
+    if let Some(builtin_ty) = WIDGET_OF_BUILTIN_METHOD.get(i.method.to_string().as_str()) {
+      if self
+        .visit_builtin_member(&mut i.receiver, builtin_ty)
+        .is_some()
+      {
+        return;
+      }
+    }
+
+    visit_mut::visit_expr_method_call_mut(self, i);
   }
 
   fn visit_expr_assign_mut(&mut self, assign: &mut syn::ExprAssign) {
@@ -417,7 +401,7 @@ impl VisitCtx {
   pub fn stack_push(&mut self) -> StackGuard<'_> { StackGuard::new(self) }
 
   // return the name of widget that `ident` point to if it's have.
-  pub fn find_named_widget<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
+  pub fn find_named_obj<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
     self
       .analyze_stack
       .iter()
@@ -432,9 +416,7 @@ impl VisitCtx {
 
   pub fn expr_find_name_widget<'a>(&'a self, expr: &'a Expr) -> Option<&'a Ident> {
     if let Expr::Path(syn::ExprPath { path, .. }) = expr {
-      path
-        .get_ident()
-        .and_then(|name| self.find_named_widget(name))
+      path.get_ident().and_then(|name| self.find_named_obj(name))
     } else {
       None
     }
@@ -463,6 +445,40 @@ impl VisitCtx {
         info.spans.push(span);
       })
       .or_insert_with(|| UsedInfo { builtin, spans: vec![span] });
+  }
+
+  fn visit_builtin_member(&mut self, expr: &mut syn::Expr, builtin_ty: &'static str) -> Option<()> {
+    let span = expr.span();
+    let path = match expr {
+      Expr::Path(syn::ExprPath { path, .. }) => path,
+      Expr::MethodCall(ExprMethodCall { receiver, method, args, .. })
+        if args.is_empty() && (method == "shallow" || method == "silent") =>
+      {
+        if let Expr::Path(syn::ExprPath { path, .. }) = &mut **receiver {
+          path
+        } else {
+          return None;
+        }
+      }
+      _ => return None,
+    };
+    let name = path.get_ident()?;
+    let name = self.find_named_obj(name)?;
+
+    if self.declare_objs.contains(&name) {
+      let builtin_name = builtin_var_name(&name, span, builtin_ty);
+      let src_name = name.clone();
+      *path = parse_quote! { #builtin_name };
+
+      self.add_used_widget(
+        builtin_name,
+        Some(BuiltinUsed { src_name, builtin_ty }),
+        UsedType::USED,
+      );
+      Some(())
+    } else {
+      None
+    }
   }
 }
 

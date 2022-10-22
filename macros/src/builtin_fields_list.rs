@@ -132,6 +132,23 @@ builtin! {
     radius: Radius,
   }
 
+  LayoutBox {
+    #[doc= "return the rect after layout of the widget"]
+    fn layout_rect(&self) -> Rect,
+    #[doc= "return the position relative to parent after layout of the widget"]
+    fn layout_pos(&self) -> Point,
+    #[doc= "return the size after layout of the widget"]
+    fn layout_size(&self) -> Size,
+    #[doc= "return the left position relative parent after layout of the widget"]
+    fn layout_left(&self) -> f32,
+    #[doc= "return the top position relative parent after layout of the widget"]
+    fn layout_top(&self) -> f32,
+    #[doc= "return the width after layout of the widget"]
+    fn layout_width(&self) -> f32,
+    #[doc= "return the height after layout of the widget"]
+    fn layout_height(&self) -> f32,
+  }
+
   Margin {
     #[doc="expand space around widget wrapped."]
     margin: impl EdgeInsets,

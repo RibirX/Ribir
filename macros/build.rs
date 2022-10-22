@@ -24,11 +24,9 @@ fn main() -> std::io::Result<()> {
       )?;
     }
   }
-
   for w in WIDGETS.iter() {
-    for field in w.fields.iter() {
-      let ty_name = field.ty;
-      f.write_all(format!("\n[`{ty_name}`]: prelude::{ty_name}\n",).as_bytes())?;
+    for m in w.methods.iter() {
+      f.write_all(format!("\n - `{}`\n \t- {}\n", m.sign, m.doc).as_bytes())?;
     }
   }
 
