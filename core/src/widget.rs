@@ -1,3 +1,8 @@
+pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
+use crate::{context::*, dynamic_widget::ExprWidget};
+use algo::ShareResource;
+use painter::*;
+
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
@@ -5,69 +10,6 @@ pub use std::{
   ops::Deref,
 };
 use std::{cell::RefCell, rc::Rc};
-pub mod key;
-pub mod layout;
-use algo::ShareResource;
-pub use layout::*;
-pub mod stateful;
-pub mod text;
-mod theme;
-pub use theme::*;
-pub(crate) mod widget_tree;
-pub use crate::dynamic_widget::*;
-pub use crate::widget::text::Text;
-pub use key::{Key, KeyWidget};
-pub use stateful::*;
-mod cursor;
-pub use cursor::Cursor;
-pub use winit::window::CursorIcon;
-mod margin;
-pub use margin::*;
-mod padding;
-pub use padding::*;
-mod icon;
-pub use icon::*;
-mod svg;
-pub use svg::*;
-mod box_decoration;
-pub use box_decoration::*;
-mod checkbox;
-pub use checkbox::*;
-mod scrollable;
-pub use scrollable::*;
-mod path;
-pub use path::*;
-mod grid_view;
-pub use grid_view::*;
-mod transform_widget;
-pub use transform_widget::*;
-mod transform_box;
-pub use transform_box::*;
-mod input;
-pub use input::*;
-mod visibility;
-pub use visibility::*;
-mod offstage;
-pub use offstage::*;
-mod ignore_pointer;
-pub use ignore_pointer::*;
-pub mod data_widget;
-mod scrollbar;
-pub use data_widget::DataWidget;
-pub use scrollbar::*;
-mod clip;
-pub use clip::*;
-
-mod void;
-use self::widget_tree::BoxClamp;
-pub use void::Void;
-mod composed_widget;
-pub(crate) use composed_widget::ComposedWidget;
-mod lifecycle;
-pub use lifecycle::*;
-mod opacity;
-pub use opacity::*;
-
 pub trait Compose {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.

@@ -9,7 +9,7 @@ fn ui() {
 
 #[test]
 fn include_svg() {
-  use painter::SvgRender;
-  let svg: SvgRender = include_svg!("./assets/test1.svg");
+  use painter::SvgPaths;
+  let svg: SvgPaths = include_svg!("./assets/test1.svg");
   assert_eq!(svg.paths.len(), 2);
 }

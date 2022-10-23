@@ -1,9 +1,6 @@
 use std::cell::RefCell;
 
-use crate::{
-  impl_query_self_only,
-  prelude::{data_widget::compose_child_as_data_widget, *},
-};
+use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -88,6 +85,7 @@ impl std::ops::DerefMut for KeyboardEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::*;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, KeyboardInput, WindowEvent};
 
@@ -114,7 +112,7 @@ mod tests {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
-          SizedBox {
+          MockBox {
             size: Size::zero(),
             auto_focus: true,
             key_down: move |key| {
@@ -133,7 +131,7 @@ mod tests {
     let w = Keys::default();
     let keys = w.0.clone();
 
-    let mut wnd = Window::without_render(w.into_widget(), None, None);
+    let mut wnd = Window::default_mock(w.into_widget(), None);
     wnd.draw_frame();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));

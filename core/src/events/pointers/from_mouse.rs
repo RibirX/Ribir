@@ -1,5 +1,8 @@
 use super::PointerId;
-use crate::prelude::{dispatcher::DispatchInfo, widget_tree::WidgetTree, *};
+use crate::{
+  prelude::{dispatcher::DispatchInfo, *},
+  widget_tree::WidgetTree,
+};
 use winit::event::MouseButton;
 
 impl PointerEvent {

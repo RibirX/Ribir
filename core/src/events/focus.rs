@@ -1,7 +1,4 @@
-use crate::{
-  impl_query_self_only,
-  prelude::{data_widget::compose_child_as_data_widget, *},
-};
+use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 use std::cell::RefCell;
 
 /// Focus attr attach to widget to support get ability to focus in.

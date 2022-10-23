@@ -1,9 +1,7 @@
-use std::{cell::RefCell, error::Error, rc::Rc};
+use std::error::Error;
 
 use crate::{
-  context::AppContext,
-  events::dispatcher::Dispatcher,
-  prelude::{widget_tree::WidgetTree, *},
+  context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
 };
 
 pub use winit::window::CursorIcon;
@@ -64,7 +62,7 @@ impl RawWindow for winit::window::Window {
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
-  pub(crate) context: Rc<RefCell<AppContext>>,
+  pub(crate) context: AppContext,
   pub(crate) painter: Painter,
   pub(crate) dispatcher: Dispatcher,
   pub(crate) widget_tree: WidgetTree,
@@ -107,13 +105,13 @@ impl Window {
         painter,
       } = self;
 
-      context.borrow_mut().begin_frame();
+      context.begin_frame();
 
       let mut struct_dirty = false;
       loop {
         struct_dirty |= widget_tree.tree_ready(raw_window.inner_size());
 
-        context.borrow_mut().layout_ready();
+        context.layout_ready();
         if !widget_tree.is_dirty() {
           break;
         }
@@ -126,7 +124,7 @@ impl Window {
       let commands = painter.finish();
       p_backend.submit(commands);
 
-      context.borrow_mut().end_frame();
+      context.end_frame();
     }
   }
 
@@ -134,24 +132,18 @@ impl Window {
 
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 
-  fn new<W, P>(
-    wnd: W,
-    p_backend: P,
-    root: Widget,
-    theme: Rc<Theme>,
-    context: Rc<RefCell<AppContext>>,
-  ) -> Self
+  fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: AppContext) -> Self
   where
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let mut widget_tree = WidgetTree::new(root, theme, context.clone());
+    let mut widget_tree = WidgetTree::new(root, context.clone());
     let mut dispatcher = Dispatcher::default();
     dispatcher.refresh_focus(&mut widget_tree);
     if let Some(auto_focusing) = dispatcher.auto_focus(&widget_tree) {
       dispatcher.focus(auto_focusing, &mut widget_tree)
     }
-    let typography = context.borrow().typography_store.clone();
+    let typography = context.typography_store.clone();
     let painter = Painter::new(wnd.scale_factor() as f32, typography);
     Self {
       dispatcher,
@@ -174,22 +166,21 @@ impl Window {
   pub(crate) fn from_event_loop(
     root: Widget,
     event_loop: &winit::event_loop::EventLoop<()>,
-    app_theme: Rc<Theme>,
+    ctx: AppContext,
   ) -> Self {
     let native_window = winit::window::WindowBuilder::new()
       .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
       .build(event_loop)
       .unwrap();
-    let ctx = Rc::new(RefCell::new(AppContext::default()));
     let size = native_window.inner_size();
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
       &native_window,
       DeviceSize::new(size.width, size.height),
       None,
       None,
-      ctx.borrow().shaper.clone(),
+      ctx.shaper.clone(),
     ));
-    Self::new(native_window, p_backend, root, app_theme, ctx)
+    Self::new(native_window, p_backend, root, ctx)
   }
 
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
@@ -297,13 +288,12 @@ impl RawWindow for MockRawWindow {
 
 impl Window {
   #[cfg(feature = "wgpu_gl")]
-  pub fn wgpu_headless(root: Widget, theme: Rc<Theme>, size: DeviceSize) -> Self {
-    let ctx = Rc::new(RefCell::new(AppContext::default()));
+  pub fn wgpu_headless(root: Widget, ctx: AppContext, size: DeviceSize) -> Self {
     let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
       size,
       None,
       None,
-      ctx.borrow().shaper.clone(),
+      ctx.shaper.clone(),
     ));
     Self::new(
       MockRawWindow {
@@ -312,20 +302,21 @@ impl Window {
       },
       p_backend,
       root,
-      theme,
       ctx,
     )
   }
 
-  pub fn without_render(root: Widget, theme: Option<Rc<Theme>>, size: Option<Size>) -> Self {
-    let theme = theme.unwrap_or_else(|| Rc::new(material::purple::light()));
+  pub fn default_mock(root: Widget, size: Option<Size>) -> Self {
     let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
+    Self::mock_render(root, size, <_>::default())
+  }
+
+  pub fn mock_render(root: Widget, size: Size, ctx: AppContext) -> Self {
     Self::new(
       MockRawWindow { size, ..Default::default() },
       MockBackend,
       root,
-      theme,
-      <_>::default(),
+      ctx,
     )
   }
 }

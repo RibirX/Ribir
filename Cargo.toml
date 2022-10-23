@@ -7,6 +7,8 @@ members = [
   "macros/builtin",
   "algo",
   "text",
+  "widgets",
+  "ribir",
 ]
 resolver = "2"
 

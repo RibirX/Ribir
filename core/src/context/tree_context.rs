@@ -1,4 +1,4 @@
-use crate::prelude::{widget_tree::WidgetTree, WidgetId};
+use crate::widget_tree::{WidgetId, WidgetTree};
 
 use super::WidgetCtxImpl;
 
@@ -14,5 +14,5 @@ impl<'a> TreeCtx<'a> {
 impl<'a> WidgetCtxImpl for TreeCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
-  fn widget_tree(&self) -> &crate::prelude::widget_tree::WidgetTree { &self.tree }
+  fn widget_tree(&self) -> &WidgetTree { &self.tree }
 }

@@ -1,16 +1,15 @@
-use crate::prelude::{widget_tree::WidgetTree, *};
-mod focus_mgr;
-pub(crate) use focus_mgr::FocusManager;
-
+use crate::{prelude::*, widget_tree::WidgetTree};
 use ::text::PIXELS_PER_EM;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
+use super::focus_mgr::FocusManager;
+
 #[derive(Default)]
 pub(crate) struct Dispatcher {
-  focus_mgr: FocusManager,
-  info: DispatchInfo,
-  entered_widgets: Vec<WidgetId>,
-  pointer_down_uid: Option<WidgetId>,
+  pub(crate) focus_mgr: FocusManager,
+  pub(crate) info: DispatchInfo,
+  pub(crate) entered_widgets: Vec<WidgetId>,
+  pub(crate) pointer_down_uid: Option<WidgetId>,
 }
 
 #[derive(Default)]
@@ -337,6 +336,7 @@ impl WidgetTree {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::*;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
@@ -373,13 +373,13 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      widget! { Text { text: "pointer event test" }},
+      widget! { MockBox { size: Size::new(100., 30.) } },
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { Row { ExprWidget  { expr: record } } },
+      widget! { MockMulti { ExprWidget  { expr: record } } },
     );
-    let mut wnd = Window::without_render(root.into_widget(), None, None);
+    let mut wnd = Window::default_mock(root.into_widget(), None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -414,9 +414,9 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { Text { text: "pointer event test" }},
+      widget! { MockBox { size: Size::new(100., 30.) } },
     );
-    let mut wnd = Window::without_render(root, None, None);
+    let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -472,9 +472,9 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { Text { text: "pointer event test"}},
+      widget! { MockBox { size: Size::new(100., 30.) } },
     );
-    let mut wnd = Window::without_render(root, None, None);
+    let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -537,12 +537,12 @@ mod tests {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
-          SizedBox {
+          MockBox {
             size: INFINITY_SIZE,
             pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
-            Text {
-              text: "pointer event test",
-              style: TextStyle::default(),
+
+            MockBox {
+              size: Size::new(100., 30.),
               pointer_down: move |e| {
                 this.0.borrow_mut().push(e.clone());
                 e.stop_bubbling();
@@ -556,7 +556,7 @@ mod tests {
     let root = EventRecord::default();
     let event_record = root.0.clone();
 
-    let mut wnd = Window::without_render(root.into_widget(), None, Some(Size::new(100., 100.)));
+    let mut wnd = Window::default_mock(root.into_widget(), Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -581,11 +581,11 @@ mod tests {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
-          SizedBox {
+          MockBox {
             size: INFINITY_SIZE,
             pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
             pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
-            SizedBox {
+            MockBox {
               margin: EdgeInsets::all(4.),
               size: INFINITY_SIZE,
               pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
@@ -600,7 +600,7 @@ mod tests {
     let enter_event = w.enter.clone();
     let leave_event = w.leave.clone();
 
-    let mut wnd = Window::without_render(w.into_widget(), None, Some(Size::new(100., 100.)));
+    let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -649,20 +649,19 @@ mod tests {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
-          Row {
-            align_items: Align::Start,
+          MockMulti {
             tap: move |_| {
               let mut res = this.0.borrow_mut();
               *res += 1;
             },
-            SizedBox {
+            MockBox {
               size: Size::new(100., 100.),
               tap: move |_| {
                 let mut res = this.0.borrow_mut();
                 *res += 1;
               }
             }
-            SizedBox {
+            MockBox {
               size: Size::new(100., 400.)
             }
           }
@@ -674,7 +673,7 @@ mod tests {
     let click_path = cp.0.clone();
 
     // Stretch row
-    let mut wnd = Window::without_render(cp.into_widget(), None, Some(Size::new(400., 400.)));
+    let mut wnd = Window::default_mock(cp.into_widget(), Some(Size::new(400., 400.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -736,17 +735,17 @@ mod tests {
   #[test]
   fn focus_change_by_event() {
     let w = widget! {
-      Row {
-        SizedBox {
+      MockMulti {
+        MockBox {
           size: Size::new(50., 50.),
           tab_index: 0
         }
-        SizedBox {
+        MockBox {
           size: Size::new(50., 50.)
         }
       }
     };
-    let mut wnd = Window::without_render(w, None, Some(Size::new(100., 100.)));
+    let mut wnd = Window::default_mock(w, Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -789,8 +788,8 @@ mod tests {
 
   #[test]
   fn fix_hit_out_window() {
-    let w = SizedBox { size: INFINITY_SIZE };
-    let mut wnd = Window::without_render(w.into_widget(), None, None);
+    let w = MockBox { size: INFINITY_SIZE };
+    let mut wnd = Window::default_mock(w.into_widget(), None);
     wnd.draw_frame();
     wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
     let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);

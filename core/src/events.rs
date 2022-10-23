@@ -1,4 +1,7 @@
-use crate::{context::EventCtx, prelude::widget_tree::WidgetTree, widget::widget_tree::WidgetId};
+use crate::{
+  context::EventCtx,
+  widget_tree::{WidgetId, WidgetTree},
+};
 use std::ptr::NonNull;
 
 pub(crate) mod dispatcher;
@@ -14,6 +17,7 @@ mod character;
 pub use character::*;
 mod wheel;
 pub use wheel::*;
+pub(crate) mod focus_mgr;
 
 use self::dispatcher::DispatchInfo;
 

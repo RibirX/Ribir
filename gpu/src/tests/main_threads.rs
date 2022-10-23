@@ -68,11 +68,11 @@ fn wnd_smoke() {
 fn main() {
   use colored::Colorize;
 
-  ribir::test::unit_test_describe! {
+  ribir::core::test::unit_test_describe! {
     run_unit_test(headless_smoke);
   }
 
   #[cfg(feature = "ui_window")]
   use winit::{event_loop::EventLoop, window::WindowBuilder};
-  ribir::test::unit_test_describe! {}
+  ribir::core::test::unit_test_describe! {}
 }

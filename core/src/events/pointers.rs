@@ -1,8 +1,5 @@
 use super::EventCommon;
-use crate::{
-  impl_query_self_only,
-  prelude::{data_widget::compose_child_as_data_widget, *},
-};
+use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 use std::{
   cell::RefCell,
   time::{Duration, Instant},
@@ -333,6 +330,7 @@ impl TapListener {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::MockBox;
   use futures::executor::LocalPool;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
@@ -342,12 +340,12 @@ mod tests {
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
     let w = widget! {
-      SizedBox {
+      MockBox {
         size,
         x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
       }
     };
-    let mut wnd = Window::without_render(w, None, Some(size));
+    let mut wnd = Window::default_mock(w, Some(size));
     wnd.draw_frame();
 
     (wnd, count)

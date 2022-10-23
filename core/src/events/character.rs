@@ -1,7 +1,4 @@
-use crate::{
-  impl_query_self_only,
-  prelude::{data_widget::compose_child_as_data_widget, *},
-};
+use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 use std::cell::RefCell;
 
 /// An attribute that sends a single Unicode codepoint. The character can be
@@ -61,6 +58,7 @@ impl EventListener for CharListener {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::*;
 
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
@@ -71,13 +69,13 @@ mod tests {
     let c_receive = receive.clone();
 
     let widget = widget! {
-      SizedBox {
+      MockBox {
         size: ZERO_SIZE,
         auto_focus: true,
         char: move |key| c_receive.borrow_mut().push(key.char)
       }
     };
-    let mut wnd = Window::without_render(widget.into_widget(), None, None);
+    let mut wnd = Window::default_mock(widget.into_widget(), None);
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();
