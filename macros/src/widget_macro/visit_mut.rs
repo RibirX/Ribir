@@ -428,11 +428,7 @@ impl VisitCtx {
     builtin: Option<BuiltinUsed>,
     used_type: UsedType,
   ) {
-    if let Some(builtin) = builtin.as_ref() {
-      self.inner_add_used_obj(builtin.src_name.clone(), None);
-    }
     self.inner_add_used_obj(name.clone(), builtin);
-
     self.current_used_info.add_used(name, used_type);
   }
 
