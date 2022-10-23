@@ -87,10 +87,10 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   let mut file = span.source_file().path();
   file.pop();
   file.push(w.value());
-  let encoded_bytes = painter::SvgRender::open(file).and_then(|reader| reader.serialize());
+  let encoded_bytes = painter::SvgPaths::open(file).and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
-      SvgRender::deserialize(#data).unwrap()
+      SvgPaths::deserialize(#data).unwrap()
     }
     .into(),
     Err(err) => {

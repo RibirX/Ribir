@@ -23,12 +23,12 @@ colored = "1.9.3"
 env_logger = "0.7.1"
 futures = "0.3.5"
 png = "0.17.5"
-ribir = {path = "../core"}
+ribir = {path = "../ribir"}
 winit = "0.26.1"
 
 [features]
-wgpu_gl = ["wgpu", "raw-window-handle", "futures"]
 ui_window = []
+wgpu_gl = ["wgpu", "raw-window-handle", "futures"]
 
 [[example]]
 name = "wgpu-hello"

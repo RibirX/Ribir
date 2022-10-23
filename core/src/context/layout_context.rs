@@ -1,7 +1,10 @@
 use painter::{Point, Size};
 
 use super::WidgetCtxImpl;
-use crate::prelude::{widget_tree::WidgetTree, BoxClamp, WidgetId};
+use crate::{
+  prelude::BoxClamp,
+  widget_tree::{WidgetId, WidgetTree},
+};
 
 /// A place to compute the render object's layout. Rather than holding children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx`

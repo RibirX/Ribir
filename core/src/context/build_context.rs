@@ -1,5 +1,5 @@
-use crate::prelude::{widget_tree::WidgetTree, *};
-use std::{cell::RefCell, rc::Rc};
+use crate::{prelude::*, widget_tree::WidgetTree};
+use std::rc::Rc;
 
 pub struct BuildCtx<'a> {
   pub(crate) theme: Rc<Theme>,
@@ -11,7 +11,7 @@ impl<'a> BuildCtx<'a> {
   pub fn theme(&self) -> &Theme { &self.theme }
 
   #[inline]
-  pub fn app_ctx(&self) -> &Rc<RefCell<AppContext>> { self.tree.app_ctx() }
+  pub fn app_ctx(&self) -> &AppContext { self.tree.app_ctx() }
 
   #[inline]
   pub(crate) fn new(theme: Rc<Theme>, tree: &'a WidgetTree) -> Self { Self { theme, tree } }
@@ -20,6 +20,7 @@ impl<'a> BuildCtx<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::*;
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
@@ -36,7 +37,7 @@ mod tests {
       }
     };
     // should panic when construct widget tree
-    Window::without_render(w, None, None);
+    Window::default_mock(w, None);
   }
 
   #[derive(Declare)]
@@ -73,10 +74,10 @@ mod tests {
 
         widget! {
           track { this: this.into_stateful() }
-          SizedBox {
+          MockBox {
             size: INFINITY_SIZE,
             theme: dark.clone(),
-            SizedBox {
+            MockBox {
               size: ZERO_SIZE,
               theme: light.clone(),
               ThemeTrack { themes: this.0.clone() }
@@ -88,13 +89,10 @@ mod tests {
 
     let dark_light = DarkLightThemes::default();
     let track_themes = dark_light.0.clone();
-    let mut wnd = Window::without_render(dark_light.into_widget(), None, None);
+    let mut wnd = Window::default_mock(dark_light.into_widget(), None);
     wnd.draw_frame();
     assert_eq!(track_themes.borrow().len(), 1);
-    assert_eq!(
-      track_themes.borrow()[0].brightness,
-      widget::Brightness::Light
-    );
+    assert_eq!(track_themes.borrow()[0].brightness, Brightness::Light);
 
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
@@ -106,10 +104,10 @@ mod tests {
 
         widget! {
           track { this: this.into_stateful() }
-          SizedBox {
+          MockBox {
             size: INFINITY_SIZE,
             theme: light,
-            SizedBox {
+            MockBox {
               size: ZERO_SIZE,
               theme: dark,
               ThemeTrack { themes: this.0.clone() }
@@ -121,12 +119,9 @@ mod tests {
 
     let light_dark = LightDarkThemes::default();
     let track_themes = light_dark.0.clone();
-    let mut wnd = Window::without_render(light_dark.into_widget(), None, None);
+    let mut wnd = Window::default_mock(light_dark.into_widget(), None);
     wnd.draw_frame();
     assert_eq!(track_themes.borrow().len(), 1);
-    assert_eq!(
-      track_themes.borrow()[0].brightness,
-      widget::Brightness::Dark
-    );
+    assert_eq!(track_themes.borrow()[0].brightness, Brightness::Dark);
   }
 }

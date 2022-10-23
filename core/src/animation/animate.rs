@@ -21,7 +21,7 @@ where
   lerp_fn: L,
   #[declare(skip)]
   running_info: Option<AnimateInfo<R>>,
-  #[declare(skip, default = ctx.app_ctx().borrow().frame_ticker.clone())]
+  #[declare(skip, default = ctx.app_ctx().frame_ticker.clone())]
   frame_ticker: FrameTicker,
 }
 

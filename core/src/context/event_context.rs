@@ -1,5 +1,8 @@
 use super::WidgetCtxImpl;
-use crate::prelude::{dispatcher::DispatchInfo, widget_tree::WidgetTree, WidgetId};
+use crate::{
+  events::dispatcher::DispatchInfo,
+  widget_tree::{WidgetId, WidgetTree},
+};
 use winit::{event::ModifiersState, window::CursorIcon};
 
 pub struct EventCtx<'a> {
@@ -27,5 +30,5 @@ impl<'a> EventCtx<'a> {
 impl<'a> WidgetCtxImpl for EventCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
-  fn widget_tree(&self) -> &crate::prelude::widget_tree::WidgetTree { self.tree }
+  fn widget_tree(&self) -> &WidgetTree { self.tree }
 }

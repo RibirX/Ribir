@@ -30,7 +30,8 @@ module.exports = {
     "gpu",
     "text",
     "algo",
-    "*"
+    "widgets",
+    "ribir"
   ],
   "types": {
     "chore": {

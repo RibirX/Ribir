@@ -565,7 +565,7 @@ mod test {
     Brush, CaptureCallback, ClipInstruct, Color, DeviceSize, PaintCommand, PaintInstruct,
     PaintPath, PainterBackend, Path, Point, Transform, Vector,
   };
-  use ribir::widget::AppContext;
+  use ribir::prelude::AppContext;
   use std::{cell::RefCell, rc::Rc};
 
   fn compare_paint_result(

@@ -1,9 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{
-  impl_proxy_render,
-  prelude::{widget_tree::WidgetTree, *},
-};
+use crate::{impl_proxy_render, prelude::*, widget_tree::WidgetTree};
 use rxrust::ops::box_it::LocalBoxOp;
 use smallvec::{smallvec, SmallVec};
 
@@ -248,7 +245,7 @@ impl InnerGenerator {
           theme
         })
       })
-      .unwrap_or_else(|| tree.app_theme.clone());
+      .unwrap_or_else(|| tree.app_ctx().app_theme.clone());
 
     let mut ctx = BuildCtx::new(current_theme.clone(), tree);
     let mut new_gen = (self.expr)(&mut ctx);
@@ -399,10 +396,7 @@ fn single_on_mounted(
 
 #[cfg(test)]
 mod tests {
-  use std::rc::Rc;
-
-  use crate::prelude::*;
-  use crate::widget::{widget_tree::WidgetTree, IntoStateful};
+  use crate::{prelude::*, test::*, widget_tree::WidgetTree};
 
   #[test]
   fn expr_widget_as_root() {
@@ -410,12 +404,11 @@ mod tests {
     let w = widget! {
       track { size: size.clone() }
       ExprWidget {
-        expr: SizedBox { size: size.clone() },
+        expr: MockBox { size: size.clone() },
         Void {}
       }
     };
-    let theme = Rc::new(material::purple::light());
-    let mut tree = WidgetTree::new(w, theme, <_>::default());
+    let mut tree = WidgetTree::new(w, <_>::default());
     tree.tree_repair();
     let ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
@@ -434,16 +427,15 @@ mod tests {
     let size = Size::zero().into_stateful();
     let w = widget! {
       track { size: size.clone() }
-      SizedBox {
+      MockBox {
         size: Size::zero(),
         ExprWidget {
-          expr: SizedBox { size: size.clone() },
+          expr: MockBox { size: size.clone() },
           Void {}
         }
       }
     };
-    let theme = Rc::new(material::purple::light());
-    let mut tree = WidgetTree::new(w, theme, <_>::default());
+    let mut tree = WidgetTree::new(w, <_>::default());
     tree.tree_repair();
     let ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);

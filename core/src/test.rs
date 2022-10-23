@@ -1,15 +1,9 @@
-pub mod embed_post;
-pub mod key_embed_post;
-pub mod recursive_row;
-
-use std::rc::Rc;
-
-use crate::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 #[deprecated]
 // return the flex box rect, and rect of its children.
 pub fn widget_and_its_children_box_rect(root: Widget, window_size: Size) -> (Rect, Vec<Rect>) {
-  let mut wnd = Window::without_render(root, None, Some(window_size));
+  let mut wnd = Window::default_mock(root, Some(window_size));
   wnd.draw_frame();
 
   root_and_children_rect(&mut wnd)
@@ -40,13 +34,8 @@ pub struct LayoutTestItem<'a> {
   pub expect: ExpectRect,
 }
 
-pub fn expect_layout_result(
-  w: Widget,
-  wnd_size: Option<Size>,
-  theme: Option<Rc<Theme>>,
-  items: &[LayoutTestItem],
-) {
-  let mut wnd = Window::without_render(w, theme, wnd_size);
+pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTestItem]) {
+  let mut wnd = Window::default_mock(w, wnd_size);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     let res = layout_info_by_path(&wnd, path);
@@ -81,6 +70,51 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
   }
 
   tree.layout_box_rect(node).unwrap()
+}
+
+#[derive(Declare, MultiChild)]
+pub(crate) struct MockMulti;
+
+#[derive(Declare, SingleChild)]
+pub(crate) struct MockBox {
+  pub size: Size,
+}
+
+impl Render for MockMulti {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let (ctx, children) = ctx.split_children();
+    children.fold(Size::zero(), |mut size, c| {
+      let child_size = ctx.perform_child_layout(c, clamp);
+      ctx.update_position(c, Point::new(size.width, 0.));
+      size.width += child_size.width;
+      size.height = size.height.max(child_size.height);
+      size
+    })
+  }
+
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Render for MockBox {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx
+      .single_child()
+      .map(|c| ctx.perform_child_layout(c, clamp));
+    self.size
+  }
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { true }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for MockMulti {
+  impl_query_self_only!();
+}
+
+impl Query for MockBox {
+  impl_query_self_only!();
 }
 
 impl Window {

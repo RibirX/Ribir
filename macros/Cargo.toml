@@ -21,7 +21,7 @@ quote = "1.0.16"
 smallvec = "1.8.0"
 
 [dev-dependencies]
-ribir = {path = "../core"}
+ribir = {path = "../ribir"}
 trybuild = "1.0.53"
 winit = "0.26.1"
 

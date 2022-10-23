@@ -1,10 +1,11 @@
 use std::{
+  rc::Rc,
   sync::{Arc, RwLock},
   time::Instant,
 };
 
-use crate::ticker::FrameMsg;
-use crate::ticker::FrameTicker;
+use crate::{builtin_widgets::material, ticker::FrameTicker};
+use crate::{builtin_widgets::Theme, ticker::FrameMsg};
 
 mod lifecycle_context;
 pub use lifecycle_context::LifeCycleCtx;
@@ -23,7 +24,9 @@ pub use build_context::BuildCtx;
 mod tree_context;
 pub use tree_context::*;
 
+#[derive(Clone)]
 pub struct AppContext {
+  pub app_theme: Rc<Theme>,
   pub font_db: Arc<RwLock<FontDB>>,
   pub shaper: TextShaper,
   pub reorder: TextReorder,
@@ -62,6 +65,7 @@ impl Default for AppContext {
 
     AppContext {
       font_db: <_>::default(),
+      app_theme: Rc::new(material::purple::light()),
       shaper,
       reorder,
       typography_store,

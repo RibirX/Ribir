@@ -1,7 +1,9 @@
 use super::AppContext;
-use crate::prelude::{widget_tree::WidgetTree, QueryOrder, WidgetId};
+use crate::{
+  prelude::QueryOrder,
+  widget_tree::{WidgetId, WidgetTree},
+};
 use painter::{Point, Rect};
-use std::{cell::RefCell, rc::Rc};
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -39,7 +41,7 @@ pub trait WidgetCtx {
   /// type `T`, or `None` if it isn't.
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
 
-  fn app_context(&self) -> &Rc<RefCell<AppContext>>;
+  fn app_ctx(&self) -> &AppContext;
 }
 
 pub(crate) trait WidgetCtxImpl {
@@ -104,13 +106,13 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   #[inline]
-  fn app_context(&self) -> &Rc<RefCell<AppContext>> { self.widget_tree().app_ctx() }
+  fn app_ctx(&self) -> &AppContext { self.widget_tree().app_ctx() }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::*;
+  use crate::{prelude::*, test::MockBox};
 
   #[test]
   fn map_self_eq_self() {
@@ -121,12 +123,12 @@ mod tests {
     }
 
     let w = widget! {
-      SizedBox {
+      MockBox {
         size: Size::zero(),
         margin: EdgeInsets::all(2.),
       }
     };
-    let mut wnd = Window::without_render(w.into_widget(), None, None);
+    let mut wnd = Window::default_mock(w.into_widget(), None);
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;

@@ -1,12 +1,5 @@
+use ribir::{core::test::*, prelude::*};
 use std::{cell::Cell, rc::Rc};
-
-use ribir::{
-  prelude::*,
-  test::{
-    expect_layout_result, layout_info_by_path, root_and_children_rect, ExpectRect, LayoutTestItem,
-  },
-};
-
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
@@ -36,7 +29,7 @@ fn simple_ref_bind_work() {
   };
 
   let flex_size = Size::new(1000., 500.);
-  let mut wnd = Window::without_render(w, None, Some(Size::new(2000., 2000.)));
+  let mut wnd = Window::default_mock(w, Some(Size::new(2000., 2000.)));
   wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect.size, flex_size);
@@ -63,7 +56,7 @@ fn event_attr_sugar_work() {
     }
   };
 
-  let mut wnd = Window::without_render(w.into_widget(), None, None);
+  let mut wnd = Window::default_mock(w.into_widget(), None);
   wnd.draw_frame();
   let (rect, child_rect) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, BEFORE_SIZE.into());
@@ -94,7 +87,7 @@ fn widget_wrap_bind_work() {
     }
   };
 
-  let mut wnd = Window::without_render(w, None, Some(Size::new(2000., 2000.)));
+  let mut wnd = Window::default_mock(w, Some(Size::new(2000., 2000.)));
   wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
 
@@ -121,7 +114,7 @@ fn expression_for_children() {
     }
   };
 
-  let mut wnd = Window::without_render(embed_expr, None, None);
+  let mut wnd = Window::default_mock(embed_expr, None);
   wnd.draw_frame();
   let (rect, children) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -150,7 +143,7 @@ fn embed_widget_ref_outside() {
     }
   };
 
-  let mut wnd = Window::without_render(w, None, None);
+  let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
   let (rect, _) = root_and_children_rect(&mut wnd);
   assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
@@ -174,7 +167,7 @@ fn data_flow_macro() {
     }
     change_on a.size + b.size ~> c.size
   };
-  let mut wnd = Window::without_render(w, None, None);
+  let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
   let rect = layout_info_by_path(&wnd, &[0]);
   // data flow not affect on init.
@@ -213,7 +206,6 @@ fn local_var_not_bind() {
   expect_layout_result(
     w,
     None,
-    None,
     &[
       LayoutTestItem { path: &[0], expect },
       LayoutTestItem { path: &[0, 0], expect },
@@ -242,7 +234,7 @@ fn builtin_ref() {
     }
   };
 
-  let mut wnd = Window::without_render(w, None, None);
+  let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
 
   tap_at(&mut wnd, (1, 1));
@@ -271,7 +263,7 @@ fn builtin_bind_to_self() {
     }
   };
 
-  let mut wnd = Window::without_render(w, None, None);
+  let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
   tap_at(&mut wnd, (1, 1));
   wnd.draw_frame();
@@ -313,7 +305,7 @@ fn builtin_method_support() {
     change_on sized_box.layout_size() ~> *layout_size
   };
 
-  let mut wnd = Window::without_render(w, None, None);
+  let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
 
   assert_eq!(&*layout_size.raw_ref(), &Size::new(100., 100.));
@@ -328,7 +320,7 @@ fn fix_builtin_field_can_declare_as_widget() {
     }
   };
 
-  let wnd = Window::without_render(w, None, None);
+  let wnd = Window::default_mock(w, None);
   assert_eq!(wnd.widget_count(), 2);
 }
 

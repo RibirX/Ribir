@@ -1,5 +1,5 @@
 use super::WidgetCtxImpl;
-use crate::prelude::{widget_tree::WidgetTree, WidgetId};
+use crate::widget_tree::{WidgetId, WidgetTree};
 
 pub struct LifeCycleCtx<'a> {
   pub(crate) id: WidgetId,

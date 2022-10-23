@@ -12,9 +12,10 @@ pub mod image;
 mod style;
 pub use image::{PixelImage, ShallowImage};
 pub use style::*;
-mod svg_render;
-pub use svg_render::SvgRender;
+mod svg_parser;
+pub use svg_parser::SvgPaths;
 pub use text;
+pub use text::{typography::Overflow, *};
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.

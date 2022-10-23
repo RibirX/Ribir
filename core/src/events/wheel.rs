@@ -1,9 +1,6 @@
 use std::cell::RefCell;
 
-use crate::{
-  impl_query_self_only,
-  prelude::{data_widget::compose_child_as_data_widget, *},
-};
+use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct WheelEvent {
@@ -62,6 +59,7 @@ impl EventListener for WheelListener {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::test::MockBox;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
@@ -71,14 +69,14 @@ mod tests {
     let c_receive = receive.clone();
 
     let widget = widget! {
-      SizedBox {
+      MockBox {
         size: Size::new(100., 100.),
         auto_focus: true,
         wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
       }
     };
 
-    let mut wnd = Window::without_render(widget, None, Some(Size::new(100., 100.)));
+    let mut wnd = Window::default_mock(widget, Some(Size::new(100., 100.)));
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
