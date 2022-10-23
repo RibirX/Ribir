@@ -1,9 +1,10 @@
 use crate::prelude::*;
 /// Enumerate to describe which direction allow widget to scroll.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash)]
 pub enum Scrollable {
   /// let child widget horizontal scrollable and the scroll view is as large as
   /// its parent allow.
+  #[default]
   X,
   /// Let child widget vertical scrollable and the scroll view is as large  as
   /// its parent allow.
@@ -16,9 +17,9 @@ pub enum Scrollable {
 /// Helper struct for builtin scrollable field.
 #[derive(Declare)]
 pub struct ScrollableWidget {
-  #[declare(builtin)]
+  #[declare(builtin, default)]
   pub scrollable: Scrollable,
-  #[declare(default)]
+  #[declare(builtin, default)]
   pub scroll_pos: Point,
   #[declare(skip)]
   page: Size,
@@ -66,17 +67,20 @@ impl ComposeChild for ScrollableWidget {
 
 impl ScrollableWidget {
   #[inline]
-  pub fn page_size(&self) -> Size { self.page }
+  pub fn scroll_view_size(&self) -> Size { self.page }
 
   #[inline]
-  pub fn content_size(&self) -> Size { self.content_size }
+  pub fn scroll_content_size(&self) -> Size { self.content_size }
 
   /// return if the content greater than the view.
   pub fn can_scroll(&self) -> bool {
     match self.scrollable {
-      Scrollable::X => self.content_size().width > self.page_size().width,
-      Scrollable::Y => self.content_size().height > self.page_size().height,
-      Scrollable::Both => self.content_size().greater_than(self.page_size()).any(),
+      Scrollable::X => self.scroll_content_size().width > self.scroll_view_size().width,
+      Scrollable::Y => self.scroll_content_size().height > self.scroll_view_size().height,
+      Scrollable::Both => self
+        .scroll_content_size()
+        .greater_than(self.scroll_view_size())
+        .any(),
     }
   }
 
@@ -88,7 +92,7 @@ impl ScrollableWidget {
     if self.scrollable != Scrollable::Y {
       new.x += delta.x;
     }
-    let min = self.page_size() - self.content_size();
+    let min = self.scroll_view_size() - self.scroll_content_size();
     self.scroll_pos = new.clamp(min.to_vector().to_point(), Point::zero());
   }
 }

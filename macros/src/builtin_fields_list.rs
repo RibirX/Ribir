@@ -186,7 +186,13 @@ builtin! {
 
   ScrollableWidget {
     #[doc= "enumerate to describe which direction allow widget to scroll."]
-    scrollable: Scrollable
+    scrollable: Scrollable,
+    #[doc= "specify the scroll position of this widget, also means that the host widget scrollable."]
+    scroll_pos: Point,
+    #[doc= "return the scroll view of the scrollable widget"]
+    fn scroll_view(&self) -> Size,
+    #[doc= "return the content widget size of the scrollable widget."]
+    fn scroll_content(&self) -> Size,
   }
 
   TransformWidget {
