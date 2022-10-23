@@ -138,13 +138,13 @@ impl Compose for HRawScrollbar {
           SizedBox {
             id: thumb,
             size: {
-              let page_width = scrolling.page_size().width;
-              let content_width = scrolling.content_size().width;
+              let page_width = scrolling.scroll_view_size().width;
+              let content_width = scrolling.scroll_content_size().width;
               let width = page_width / content_width * track_box.layout_width();
               Size::new(width.max(theme.thumb_min_size), theme.thickness)
             },
             left_anchor: {
-              let content_width = scrolling.content_size().width;
+              let content_width = scrolling.scroll_content_size().width;
               -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
             },
             compose_styles: [cs::SCROLLBAR_THUMB],
@@ -188,13 +188,13 @@ impl Compose for VRawScrollbar {
           SizedBox {
             id: thumb,
             size: {
-              let page_height = scrolling.page_size().height;
-              let content_height = scrolling.content_size().height;
+              let page_height = scrolling.scroll_view_size().height;
+              let content_height = scrolling.scroll_content_size().height;
               let height = page_height / content_height * track_box.layout_height();
               Size::new( theme.thickness, height.max(theme.thumb_min_size))
             },
             top_anchor: {
-              let content_height = scrolling.content_size().height;
+              let content_height = scrolling.scroll_content_size().height;
               -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
             },
             compose_styles: [cs::SCROLLBAR_THUMB],

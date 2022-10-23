@@ -76,6 +76,8 @@
  	 - use to anchor child constraints with the bottom edge of parent widget.
 - scrollable : [`Scrollable`] 
  	 - enumerate to describe which direction allow widget to scroll.
+- scroll_pos : [`Point`] 
+ 	 - specify the scroll position of this widget, also means that the host widget scrollable.
 - transform : [`Transform`] 
  	 - A widget that applies a transformation its child. Doesn't change size, only apply painting
 - visible : [`bool`] 
@@ -107,3 +109,9 @@
 
  - `fn layout_height(& self) -> f32`
  	- return the height after layout of the widget
+
+ - `fn scroll_view(& self) -> Size`
+ 	- return the scroll view of the scrollable widget
+
+ - `fn scroll_content(& self) -> Size`
+ 	- return the content widget size of the scrollable widget.
