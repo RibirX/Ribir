@@ -268,13 +268,24 @@ impl Desugared {
       })
       .collect::<HashSet<_, ahash::RandomState>>();
 
+    let used_ids = ctx
+      .used_objs
+      .iter()
+      .map(|(name, info)| {
+        if let Some(builtin) = info.builtin.as_ref() {
+          &builtin.src_name
+        } else {
+          name
+        }
+      })
+      .collect::<HashSet<_, ahash::RandomState>>();
     self
       .named_objs
       .iter()
       .filter(|(name, obj)| {
         // Needn't check builtin named widget, shared id with host in user side.
         matches!(obj, NamedObj::Host(_))
-          && !ctx.used_objs.contains_key(name)
+          && !used_ids.contains(name)
           && !name.to_string().starts_with('_')
           && !on_event_used.contains(name)
       })
