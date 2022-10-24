@@ -85,53 +85,8 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              VScrollBar {
-                background: Brush::Color(Color::BURLYWOOD),
-        
-                Column {
-                  align_items: Align::Start,
-                  padding: EdgeInsets::all(8.),
-                  ExprWidget {
-                    expr: this.tasks.iter()
-                    .filter(|_| { true })
-                    .enumerate().map(|(idx, task)| {
-                      let checked = task.finished;
-                      let label = task.label.clone();
-                      widget! {
-                        track {
-                          visible_delete: Stateful::new(false),
-                        }
-                        Row {
-                          align_items: Align::Center,
-                          margin: EdgeInsets::vertical(4.),
-                          pointer_enter: move |_| { *visible_delete = true; },
-                          pointer_leave: move |_| { *visible_delete = false; },
-        
-                          Checkbox { id: checkbox, checked }
-                          Expanded {
-                            flex: 1.,
-                            Text {
-                              text: label,
-                              margin: EdgeInsets::vertical(4.)
-                            }
-                          }
-                          Icon {
-                            visible: *visible_delete,
-                            tap: move |_| {
-                              this2.tasks.remove(idx);
-                            },
-                            ExprWidget {
-                              expr: {
-                                icons::CLOSE.of_or_miss(ctx.theme())
-                              }
-                            }
-                          }
-                        }
-                        on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
-                      }
-                    }).collect::<Vec<_>>()
-                  }
-                }
+              ExprWidget {
+                expr: TodoMVP::pane(this.clone_stateful(), |task| true)
               }
             }
           }
@@ -144,59 +99,14 @@ impl Compose for TodoMVP {
                 tap: move |_| {
                   if *todo_mode != TodoMode::Active {
                     *todo_mode = TodoMode::Active;
-                    tabs.cur_idx = 0;
+                    tabs.cur_idx = 1;
                   }
                 },
               }
             }
             TabPane {
-              VScrollBar {
-                background: Brush::Color(Color::BURLYWOOD),
-        
-                Column {
-                  align_items: Align::Start,
-                  padding: EdgeInsets::all(8.),
-                  ExprWidget {
-                    expr: this.tasks.iter()
-                    .filter(|task| { !task.finished })
-                    .enumerate().map(|(idx, task)| {
-                      let checked = task.finished;
-                      let label = task.label.clone();
-                      widget! {
-                        track {
-                          visible_delete: Stateful::new(false),
-                        }
-                        Row {
-                          align_items: Align::Center,
-                          margin: EdgeInsets::vertical(4.),
-                          pointer_enter: move |_| { *visible_delete = true; },
-                          pointer_leave: move |_| { *visible_delete = false; },
-        
-                          Checkbox { id: checkbox, checked }
-                          Expanded {
-                            flex: 1.,
-                            Text {
-                              text: label,
-                              margin: EdgeInsets::vertical(4.)
-                            }
-                          }
-                          Icon {
-                            visible: *visible_delete,
-                            tap: move |_| {
-                              this2.tasks.remove(idx);
-                            },
-                            ExprWidget {
-                              expr: {
-                                icons::CLOSE.of_or_miss(ctx.theme())
-                              }
-                            }
-                          }
-                        }
-                        on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
-                      }
-                    }).collect::<Vec<_>>()
-                  }
-                }
+              ExprWidget {
+                expr: TodoMVP::pane(this.clone_stateful(), |task| !task.finished)
               }
             }
           }
@@ -209,59 +119,14 @@ impl Compose for TodoMVP {
                 tap: move |_| {
                   if *todo_mode != TodoMode::Completed {
                     *todo_mode = TodoMode::Completed;
-                    tabs.cur_idx = 0;
+                    tabs.cur_idx = 2;
                   }
                 },
               }
             }
             TabPane {
-              VScrollBar {
-                background: Brush::Color(Color::BURLYWOOD),
-        
-                Column {
-                  align_items: Align::Start,
-                  padding: EdgeInsets::all(8.),
-                  ExprWidget {
-                    expr: this.tasks.iter()
-                    .filter(|task| { task.finished })
-                    .enumerate().map(|(idx, task)| {
-                      let checked = task.finished;
-                      let label = task.label.clone();
-                      widget! {
-                        track {
-                          visible_delete: Stateful::new(false),
-                        }
-                        Row {
-                          align_items: Align::Center,
-                          margin: EdgeInsets::vertical(4.),
-                          pointer_enter: move |_| { *visible_delete = true; },
-                          pointer_leave: move |_| { *visible_delete = false; },
-        
-                          Checkbox { id: checkbox, checked }
-                          Expanded {
-                            flex: 1.,
-                            Text {
-                              text: label,
-                              margin: EdgeInsets::vertical(4.)
-                            }
-                          }
-                          Icon {
-                            visible: *visible_delete,
-                            tap: move |_| {
-                              this2.tasks.remove(idx);
-                            },
-                            ExprWidget {
-                              expr: {
-                                icons::CLOSE.of_or_miss(ctx.theme())
-                              }
-                            }
-                          }
-                        }
-                        on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
-                      }
-                    }).collect::<Vec<_>>()
-                  }
-                }
+              ExprWidget {
+                expr: TodoMVP::pane(this.clone_stateful(), |task| task.finished)
               }
             }
 
@@ -274,6 +139,61 @@ impl Compose for TodoMVP {
   }
 }
 
+impl TodoMVP {
+  fn pane(this: Stateful<Self>, cond: impl Fn(&Task)-> bool + 'static) -> Widget{
+    widget!{
+      track { this, this2: this.clone() }
+      VScrollBar {
+        background: Brush::Color(Color::BURLYWOOD),
+
+        Column {
+          align_items: Align::Start,
+          padding: EdgeInsets::all(8.),
+          ExprWidget {
+            expr: this.tasks.iter()
+            .filter(|task| { cond(task) })
+            .enumerate().map(|(idx, task)| {
+              let checked = task.finished;
+              let label = task.label.clone();
+              widget! {
+                track {
+                  visible_delete: Stateful::new(false),
+                }
+                Row {
+                  align_items: Align::Center,
+                  margin: EdgeInsets::vertical(4.),
+                  pointer_enter: move |_| { *visible_delete = true; },
+                  pointer_leave: move |_| { *visible_delete = false; },
+
+                  Checkbox { id: checkbox, checked }
+                  Expanded {
+                    flex: 1.,
+                    Text {
+                      text: label,
+                      margin: EdgeInsets::vertical(4.)
+                    }
+                  }
+                  Icon {
+                    visible: *visible_delete,
+                    tap: move |_| {
+                      this2.tasks.remove(idx);
+                    },
+                    ExprWidget {
+                      expr: {
+                        icons::CLOSE.of_or_miss(ctx.theme())
+                      }
+                    }
+                  }
+                }
+                on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
+              }
+            }).collect::<Vec<_>>()
+          }
+        }
+      }
+    }
+  }
+}
 
 #[derive(Debug, Declare)]
 struct TabText {
