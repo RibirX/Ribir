@@ -27,10 +27,11 @@ impl Application {
   #[inline]
   pub fn context(&self) -> &AppContext { &self.ctx }
 
-  pub fn exec(mut self, w: Widget) {
-    let wnd_id = self.new_window(w);
+  pub fn exec(mut self, wnd_id: WindowId) {
     if let Some(wnd) = self.windows.get_mut(&wnd_id) {
       wnd.draw_frame();
+    } else {
+      panic!("application at least have one window");
     }
 
     let Self { mut windows, mut event_loop, .. } = self;
@@ -62,16 +63,18 @@ impl Application {
     );
   }
 
-  pub fn run(w: Widget) {
-    let app = Application::default();
-    app.exec(w)
-  }
+  pub fn new_window(
+    &mut self,
+    wnd_creator: impl FnOnce(winit::window::Window, AppContext) -> Window,
+  ) -> WindowId {
+    let native_wnd = winit::window::WindowBuilder::new()
+      .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
+      .build(&self.event_loop)
+      .unwrap();
+    let wnd = wnd_creator(native_wnd, self.ctx.clone());
 
-  pub(crate) fn new_window(&mut self, w: Widget) -> WindowId {
-    let window = Window::from_event_loop(w, &self.event_loop, self.ctx.clone());
-
-    let id = window.raw_window.id();
-    self.windows.insert(id, window);
+    let id = wnd.raw_window.id();
+    self.windows.insert(id, wnd);
 
     id
   }

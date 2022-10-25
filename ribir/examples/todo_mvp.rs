@@ -91,5 +91,5 @@ fn main() {
   }
   .into_stateful();
 
-  Application::run(todo.into_widget());
+  app::run(todo.into_widget());
 }

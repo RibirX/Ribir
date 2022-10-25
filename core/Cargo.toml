@@ -11,13 +11,11 @@ ahash = "0.7.6"
 algo = {path = "../algo"}
 bitflags = "1.2.1"
 futures = "0.3.5"
-gpu = {path = "../gpu", version = "*"}
 indextree = "4.3.1"
 lazy_static = "1.4.0"
 log = "0.4.8"
 lyon_geom = "0.17.7"
 painter = {path = "../painter", version = "*"}
-path-clean = "0.1.0"
 png = {version = "0.17.3", optional = true}
 ribir_macros = {path = "../macros"}
 rxrust = "1.0.0-alpha.2"
@@ -30,9 +28,10 @@ features = ["rayon"]
 version = "0.3.4"
 
 [features]
-default = ["wgpu_gl"]
 png = ["dep:png"]
-wgpu_gl = ["gpu/wgpu_gl"]
+thread-pool = [
+  "futures/thread-pool",
+]
 
 [dev-dependencies]
 colored = "2.0.0"

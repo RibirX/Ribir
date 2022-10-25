@@ -132,7 +132,7 @@ impl Window {
 
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 
-  fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: AppContext) -> Self
+  pub fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: AppContext) -> Self
   where
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
@@ -160,27 +160,6 @@ impl Window {
     self.widget_tree.mark_dirty(self.widget_tree.root());
     self.p_backend.resize(size);
     self.raw_window.request_redraw();
-  }
-
-  #[cfg(feature = "wgpu_gl")]
-  pub(crate) fn from_event_loop(
-    root: Widget,
-    event_loop: &winit::event_loop::EventLoop<()>,
-    ctx: AppContext,
-  ) -> Self {
-    let native_window = winit::window::WindowBuilder::new()
-      .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
-      .build(event_loop)
-      .unwrap();
-    let size = native_window.inner_size();
-    let p_backend = futures::executor::block_on(gpu::wgpu_backend_with_wnd(
-      &native_window,
-      DeviceSize::new(size.width, size.height),
-      None,
-      None,
-      ctx.shaper.clone(),
-    ));
-    Self::new(native_window, p_backend, root, ctx)
   }
 
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
@@ -287,25 +266,6 @@ impl RawWindow for MockRawWindow {
 }
 
 impl Window {
-  #[cfg(feature = "wgpu_gl")]
-  pub fn wgpu_headless(root: Widget, ctx: AppContext, size: DeviceSize) -> Self {
-    let p_backend = futures::executor::block_on(gpu::wgpu_backend_headless(
-      size,
-      None,
-      None,
-      ctx.shaper.clone(),
-    ));
-    Self::new(
-      MockRawWindow {
-        size: Size::from_untyped(size.to_f32().to_untyped()),
-        ..Default::default()
-      },
-      p_backend,
-      root,
-      ctx,
-    )
-  }
-
   pub fn default_mock(root: Widget, size: Option<Size>) -> Self {
     let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
     Self::mock_render(root, size, <_>::default())

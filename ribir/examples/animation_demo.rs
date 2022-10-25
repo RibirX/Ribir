@@ -32,5 +32,5 @@ fn main() {
     }
   };
 
-  Application::run(w);
+  app::run(w);
 }
