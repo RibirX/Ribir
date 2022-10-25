@@ -137,8 +137,9 @@ impl VisitMut for VisitCtx {
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
     if let Member::Named(member) = &f_expr.member {
       if let Some(builtin_ty) = WIDGET_OF_BUILTIN_FIELD.get(member.to_string().as_str()) {
+        let span = f_expr.span();
         if self
-          .visit_builtin_member(&mut f_expr.base, builtin_ty)
+          .visit_builtin_member(&mut f_expr.base, span, builtin_ty)
           .is_some()
         {
           return;
@@ -151,8 +152,9 @@ impl VisitMut for VisitCtx {
 
   fn visit_expr_method_call_mut(&mut self, i: &mut ExprMethodCall) {
     if let Some(builtin_ty) = WIDGET_OF_BUILTIN_METHOD.get(i.method.to_string().as_str()) {
+      let span = i.span();
       if self
-        .visit_builtin_member(&mut i.receiver, builtin_ty)
+        .visit_builtin_member(&mut i.receiver, span, builtin_ty)
         .is_some()
       {
         return;
@@ -443,8 +445,12 @@ impl VisitCtx {
       .or_insert_with(|| UsedInfo { builtin, spans: vec![span] });
   }
 
-  fn visit_builtin_member(&mut self, expr: &mut syn::Expr, builtin_ty: &'static str) -> Option<()> {
-    let span = expr.span();
+  fn visit_builtin_member(
+    &mut self,
+    expr: &mut syn::Expr,
+    span: proc_macro2::Span,
+    builtin_ty: &'static str,
+  ) -> Option<()> {
     let path = match expr {
       Expr::Path(syn::ExprPath { path, .. }) => path,
       Expr::MethodCall(ExprMethodCall { receiver, method, args, .. })
