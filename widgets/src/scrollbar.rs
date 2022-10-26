@@ -1,4 +1,4 @@
-use crate::layout::{SizedBox, Stack};
+use crate::layout::{Container, Stack};
 use crate::themes::cs;
 use ribir_core::prelude::*;
 
@@ -17,8 +17,6 @@ pub struct ScrollBarTheme {
   pub thumb_min_size: f32,
   /// The thickness of scrollbar element.
   pub thickness: f32,
-  /// The margin of scrollbar thumb at cross axis edge in logical pixels.
-  pub thumb_margin: f32,
 }
 
 impl ComposeChild for HScrollBar {
@@ -31,7 +29,9 @@ impl ComposeChild for HScrollBar {
           id: scrolling,
           scrollable: Scrollable::X,
           scroll_pos: Point::new(this.offset, 0.),
-          ExprWidget { expr: child}
+          v_align: VAlign::Stretch,
+          h_align: HAlign::Stretch,
+          ExprWidget { expr: child }
         }
         HRawScrollbar {
           scrolling: scrolling.clone_stateful(),
@@ -62,7 +62,9 @@ impl ComposeChild for VScrollBar {
           id: scrolling,
           scrollable: Scrollable::Y,
           scroll_pos: Point::new(0., this.offset),
-          ExprWidget { expr: child}
+          v_align: VAlign::Stretch,
+          h_align: HAlign::Stretch,
+          ExprWidget { expr: child }
         }
         VRawScrollbar {
           scrolling: scrolling.clone_stateful(),
@@ -88,26 +90,26 @@ impl ComposeChild for BothScrollbar {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      env {
-        let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
-        let margin = theme.track_thickness();
-      }
       Stack {
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::Both,
           scroll_pos: this.offset,
-          ExprWidget { expr: child}
+          v_align: VAlign::Stretch,
+          h_align: HAlign::Stretch,
+          ExprWidget { expr: child }
         }
         HRawScrollbar {
+          id: h_bar,
           scrolling: scrolling.clone_stateful(),
           v_align: VAlign::Bottom,
-          margin: EdgeInsets::only_right(margin)
+          margin: EdgeInsets::only_right(v_bar.layout_width())
         }
         VRawScrollbar {
+          id: v_bar,
           scrolling: scrolling.clone_stateful(),
           h_align: HAlign::Right,
-          margin: EdgeInsets::only_bottom(margin)
+          margin: EdgeInsets::only_bottom(h_bar.layout_height())
         }
       }
       change_on scrolling.scroll_pos ~> this.offset
@@ -132,12 +134,17 @@ impl Compose for HRawScrollbar {
       env {
         let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
       }
-      LayoutBox {
-        id: track_box,
-        SizedBox {
-          size: Size::new(f32::MAX, theme.track_thickness()),
-          compose_styles: [cs::SCROLLBAR_TRACK],
-          SizedBox {
+
+      Stack {
+        visible: scrolling.can_scroll(),
+        Container {
+          id: track_box,
+          size: Size::new(f32::MAX, thumb_outline.layout_height()),
+          compose_styles: [cs::H_SCROLLBAR_TRACK],
+        }
+        LayoutBox {
+          id: thumb_outline,
+          Container {
             id: thumb,
             size: {
               let page_width = scrolling.scroll_view_size().width;
@@ -149,10 +156,11 @@ impl Compose for HRawScrollbar {
               let content_width = scrolling.scroll_content_size().width;
               -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
             },
-            compose_styles: [cs::SCROLLBAR_THUMB],
+            compose_styles: [cs::H_SCROLLBAR_THUMB],
           }
         }
       }
+
       change_on thumb.left_anchor Animate {
         transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
@@ -207,10 +215,11 @@ impl Compose for VRawScrollbar {
               let content_height = scrolling.scroll_content_size().height;
               -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
             },
-            compose_styles: [cs::SCROLLBAR_THUMB],
+            compose_styles: [cs::V_SCROLLBAR_THUMB],
           }
         }
       }
+
       change_on thumb.top_anchor Animate {
         transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
@@ -285,8 +294,4 @@ mod test {
       ],
     );
   }
-}
-
-impl ScrollBarTheme {
-  fn track_thickness(&self) -> f32 { self.thickness + self.thumb_margin * 2. }
 }
