@@ -572,7 +572,6 @@ mod tests {
   };
 
   use super::*;
-  use std::rc::Rc;
   use test::Bencher;
 
   #[derive(Clone, Debug)]

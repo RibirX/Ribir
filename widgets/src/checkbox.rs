@@ -1,4 +1,4 @@
-use crate::icon::Icon;
+use crate::{icon::Icon, themes::icons};
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
@@ -54,14 +54,30 @@ impl Compose for Checkbox {
 
 #[cfg(test)]
 mod tests {
+  use crate::prelude::material;
+
   use super::*;
-  use ribir_core::test::widget_and_its_children_box_rect;
+  use ribir_core::test::{
+    expect_layout_result_with_theme, widget_and_its_children_box_rect, ExpectRect, LayoutTestItem,
+  };
 
   #[test]
   fn layout() {
     let w = widget! { Checkbox {} };
-    let (rect, _) = widget_and_its_children_box_rect(w.into_widget(), Size::new(200., 200.));
-    debug_assert_eq!(rect, Rect::new(Point::new(0., 0.), Size::new(18., 18.)));
+    expect_layout_result_with_theme(
+      w,
+      None,
+      material::purple::light(),
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(18.),
+          height: Some(18.),
+        },
+      }],
+    );
   }
 
   #[cfg(feature = "png")]

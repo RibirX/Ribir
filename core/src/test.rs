@@ -34,25 +34,46 @@ pub struct LayoutTestItem<'a> {
   pub expect: ExpectRect,
 }
 
+pub fn expect_layout_result_with_theme(
+  w: Widget,
+  wnd_size: Option<Size>,
+  theme: Theme,
+  items: &[LayoutTestItem],
+) {
+  let ctx = AppContext {
+    app_theme: std::rc::Rc::new(theme),
+    ..<_>::default()
+  };
+  let mut wnd = Window::mock_render(w, wnd_size.unwrap_or_else(|| Size::new(1024., 1024.)), ctx);
+  wnd.draw_frame();
+  items.iter().for_each(|LayoutTestItem { path, expect }| {
+    assert_layout_result(&wnd, path, expect);
+  });
+}
+
 pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTestItem]) {
   let mut wnd = Window::default_mock(w, wnd_size);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
-    let res = layout_info_by_path(&wnd, path);
-    if let Some(x) = expect.x {
-      assert_eq!(x, res.min_x());
-    }
-    if let Some(y) = expect.y {
-      assert_eq!(y, res.min_y());
-    }
-    if let Some(width) = expect.width {
-      assert_eq!(width, res.width())
-    }
-
-    if let Some(height) = expect.height {
-      assert_eq!(height, res.height())
-    }
+    assert_layout_result(&wnd, path, expect);
   });
+}
+
+pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
+  let res = layout_info_by_path(&wnd, path);
+  if let Some(x) = expect.x {
+    assert_eq!(x, res.min_x());
+  }
+  if let Some(y) = expect.y {
+    assert_eq!(y, res.min_y());
+  }
+  if let Some(width) = expect.width {
+    assert_eq!(width, res.width())
+  }
+
+  if let Some(height) = expect.height {
+    assert_eq!(height, res.height())
+  }
 }
 
 /// ues a index path to access widget tree and return the layout info,
@@ -138,7 +159,7 @@ macro count {
 /// # Example
 ///
 /// ```
-/// use ribir::test::unit_test_describe;
+/// use ribir_core::test::unit_test_describe;
 ///
 /// fn test_first() {}
 ///

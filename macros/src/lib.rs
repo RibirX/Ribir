@@ -83,7 +83,10 @@ pub fn widget_try_track(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn include_svg(input: TokenStream) -> TokenStream {
   let w = parse_macro_input! { input as syn::LitStr };
-  let span = proc_macro::Span::call_site();
+  let mut span = proc_macro::Span::call_site();
+  while let Some(p) = span.parent() {
+    span = p;
+  }
   let mut file = span.source_file().path();
   file.pop();
   file.push(w.value());

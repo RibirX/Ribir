@@ -69,8 +69,10 @@ mod tests {
 
     impl Compose for DarkLightThemes {
       fn compose(this: StateWidget<Self>) -> Widget {
-        let dark = Rc::new(material::purple::dark());
-        let light = Rc::new(material::purple::light());
+        let mut theme = Theme::default();
+        let light = Rc::new(theme.clone());
+        theme.brightness = Brightness::Dark;
+        let dark = Rc::new(theme.clone());
 
         widget! {
           track { this: this.into_stateful() }
@@ -99,8 +101,10 @@ mod tests {
 
     impl Compose for LightDarkThemes {
       fn compose(this: StateWidget<Self>) -> Widget {
-        let dark = Rc::new(material::purple::dark());
-        let light = Rc::new(material::purple::light());
+        let mut theme = Theme::default();
+        let light = Rc::new(theme.clone());
+        theme.brightness = Brightness::Dark;
+        let dark = Rc::new(theme);
 
         widget! {
           track { this: this.into_stateful() }
