@@ -41,8 +41,10 @@ impl Application {
     }
 
     let Self { mut windows, mut event_loop, .. } = self;
-    event_loop.run_return(
-      move |event, _event_loop, control: &mut ControlFlow| match event {
+    event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
+      *control = ControlFlow::Wait;
+
+      match event {
         Event::WindowEvent { event, window_id } => {
           if event == WindowEvent::CloseRequested {
             windows.remove(&window_id);
@@ -65,8 +67,8 @@ impl Application {
           }
         }
         _ => (),
-      },
-    );
+      }
+    });
   }
 
   pub fn new_window(
