@@ -34,6 +34,11 @@ impl ComposeChild for ScrollableWidget {
       track { this: this.into_stateful() }
       UnconstrainedBox {
         id: view,
+        dir: match this.scrollable {
+          Scrollable::X => UnconstrainedDir::X,
+          Scrollable::Y => UnconstrainedDir::Y,
+          Scrollable::Both => UnconstrainedDir::Both,
+        },
         wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
         ExprWidget {
           id: content,

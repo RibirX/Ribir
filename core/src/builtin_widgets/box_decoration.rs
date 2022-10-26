@@ -282,9 +282,7 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn paint() {
-    use std::rc::Rc;
-
-    use crate::test::MockMulti;
+    use ribir::prelude::*;
 
     let radius_cases = vec![
       Radius::all(0.),
@@ -297,9 +295,9 @@ mod tests {
     ];
 
     let w = widget! {
-      MockMulti {
+      Row {
         margin: EdgeInsets::all(2.),
-        MockBox {
+        SizedBox {
           size: Size::new(60., 40.),
           background: Color::PINK,
           border: Border {
@@ -314,7 +312,7 @@ mod tests {
             .into_iter()
             .map(|radius| {
               widget! {
-                MockBox {
+                SizedBox {
                   size: Size::new(60., 40.),
                   background: Color::RED,
                   radius,
@@ -326,8 +324,7 @@ mod tests {
         }
      }
     };
-    let theme = Rc::new(material::purple::light());
-    let mut window = Window::wgpu_headless(w, theme, DeviceSize::new(400, 600));
+    let mut window = ribir::wgpu_headless_wnd(w, <_>::default(), DeviceSize::new(400, 600));
     window.draw_frame();
     let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     expected.push("src/test_imgs/box_decoration.png");
