@@ -15,7 +15,7 @@ pub struct BoxDecoration {
   pub radius: Option<Radius>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Copy)]
 pub struct Border {
   pub left: BorderSide,
   pub right: BorderSide,
@@ -23,7 +23,7 @@ pub struct Border {
   pub bottom: BorderSide,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Lerp)]
+#[derive(Debug, Default, Clone, PartialEq, Lerp, Copy)]
 pub struct BorderSide {
   pub color: Color,
   pub width: f32,

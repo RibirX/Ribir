@@ -12,21 +12,12 @@ struct TodoMVP {
   tasks: Vec<Task>,
 }
 
-#[derive(PartialEq, Debug)]
-enum TodoMode {
-  All,
-  Completed,
-  Active,
-}
-
 impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       // split this to avoid mutable borrow conflict in `ExprWidget`.
       track {
         this: this.into_stateful(),
-        this2: this.clone(),
-        todo_mode: Stateful::new(TodoMode::All),
       }
       Column {
         margin: EdgeInsets::all(10.),
@@ -74,14 +65,7 @@ impl Compose for TodoMVP {
             TabHeader {
               TabText {
                 tab_text: String::from("All"),
-                is_active: *todo_mode == TodoMode::All,
-  
-                tap: move |_| {
-                  if *todo_mode != TodoMode::All {
-                    *todo_mode = TodoMode::All;
-                    tabs.cur_idx = 0;
-                  }
-                },
+                is_active: tabs.cur_idx == 0,
               }
             }
             TabPane {
@@ -94,14 +78,7 @@ impl Compose for TodoMVP {
             TabHeader {
               TabText {
                 tab_text: String::from("Active"),
-                is_active: *todo_mode == TodoMode::Active,
-  
-                tap: move |_| {
-                  if *todo_mode != TodoMode::Active {
-                    *todo_mode = TodoMode::Active;
-                    tabs.cur_idx = 1;
-                  }
-                },
+                is_active: tabs.cur_idx == 1,
               }
             }
             TabPane {
@@ -114,14 +91,7 @@ impl Compose for TodoMVP {
             TabHeader {
               TabText {
                 tab_text: String::from("Completed"),
-                is_active: *todo_mode == TodoMode::Completed,
-  
-                tap: move |_| {
-                  if *todo_mode != TodoMode::Completed {
-                    *todo_mode = TodoMode::Completed;
-                    tabs.cur_idx = 2;
-                  }
-                },
+                is_active: tabs.cur_idx == 2,
               }
             }
             TabPane {
@@ -203,18 +173,14 @@ struct TabText {
 
 impl Compose for TabText {
   fn compose(this: StateWidget<Self>) -> Widget {
-    let tab_bottom_border = Border::only_bottom(BorderSide { width:1., color: Color::BURLYWOOD });
-    let tab_bottom_default_border = Border::only_bottom(BorderSide { width:1., color: Color::GRAY });
     widget! {
       track {
         this: this.into_stateful()
       }
       Text {
-        h_align: HAlign::Center,
-        padding: EdgeInsets::all(4.),
-        background: if this.is_active { Color::BURLYWOOD } else { Color::WHITE },
-        border: if this.is_active { tab_bottom_border.clone() } else { tab_bottom_default_border.clone() },
         text: ArcStr::from(String::from(this.tab_text.as_str()).as_str()),
+        padding: EdgeInsets::all(4.),
+        h_align: HAlign::Center,
         style: TextStyle {
           foreground: if this.is_active { Brush::Color(Color::RED) } else { Brush::Color(Color::BLACK) },
           ..Default::default()

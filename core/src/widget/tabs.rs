@@ -36,20 +36,44 @@ impl ComposeChild for Tabs {
 
       Column {
         Row {
+          border: Border::only_bottom(BorderSide {
+            width: 1., color: ctx.theme().palette.primary
+          }),
+
           ExprWidget {
-            expr: headers.into_iter()
-              .map(|header| {
-                widget! {
-                  Expanded {
-                    flex: 1.,
-                    ExprWidget {
-                      expr: header
+            expr: {
+              let tab_bottom_active_border = Border::only_bottom(BorderSide {
+                width: 2., color: ctx.theme().palette.success
+              });
+              headers.into_iter()
+                .enumerate()
+                .map(move |(idx, header)| {
+                  widget! {
+                    Expanded {
+                      flex: 1.,
+                      tap: move |_| {
+                        if this.cur_idx != idx {
+                          this.cur_idx = idx;
+                        }
+                      },
+                      ExprWidget {
+                        border: if this.cur_idx == idx {
+                          Some(tab_bottom_active_border)
+                        } else {
+                          None
+                        },
+                        h_align: HAlign::Center,
+                        v_align: VAlign::Center,
+                        
+                        expr: header
+                      }
                     }
                   }
-                }
-              }),
+                })
+            }
           }
         }
+
         ExprWidget {
           expr: panes.into_iter()
             .enumerate()
