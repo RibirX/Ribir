@@ -20,6 +20,7 @@ pub struct Palette {
   /// such as filter chips, while expanding the opportunity for color
   /// expression.
   pub secondary: Color,
+  
   /// The tertiary key color is used to derive the roles of contrasting accents
   /// that can be used to balance primary and secondary colors or bring
   /// heightened attention to an element. The tertiary color role is left for
@@ -373,6 +374,22 @@ impl LightnessCfg {
       outline: LightnessTone(0.6),
       inverse_surface: LightnessTone(0.9),
       on_inverse_surface: LightnessTone(0.2),
+    }
+  }
+}
+
+impl Default for Palette {
+  fn default() -> Self {
+    Palette {
+      primary: Color::from_u32(0x6750A4FF),
+      secondary: Color::from_u32(0x625B71FF),
+      tertiary: Color::from_u32(0x7D5260FF),
+      neutral: Color::from_u32(0xFFFBFEFF),
+      neutral_variant: Color::from_u32(0xE7E0ECFF),
+      error: Color::from_u32(0xB3261EFF),
+      warning: Color::from_u32(0xffb74dFF),
+      success: Color::from_u32(0x81c784FF),
+      lightness_cfg: LightnessCfg::light_theme_default(),
     }
   }
 }

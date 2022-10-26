@@ -5,7 +5,7 @@ use std::{
   time::Instant,
 };
 
-use crate::{builtin_widgets::material, ticker::FrameTicker};
+use crate::ticker::FrameTicker;
 use crate::{builtin_widgets::Theme, ticker::FrameMsg};
 use ::text::shaper::TextShaper;
 pub use futures::task::SpawnError;
@@ -65,7 +65,7 @@ impl Default for AppContext {
 
     AppContext {
       font_db: <_>::default(),
-      app_theme: Rc::new(material::purple::light()),
+      app_theme: <_>::default(),
       shaper,
       reorder,
       typography_store,

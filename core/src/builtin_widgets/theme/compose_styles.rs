@@ -44,7 +44,7 @@ macro_rules! fill_compose_style {
 }
 
 /// The user custom icon identify define start from.
-pub const CUSTOM_START: ComposeStyleIdent = ComposeStyleIdent::new(65536);
+pub const CUSTOM_STYLE_START: ComposeStyleIdent = ComposeStyleIdent::new(65536);
 
 impl ComposeStyles {
   #[inline]
@@ -122,9 +122,9 @@ mod tests {
 
   #[test]
   fn compose_style_smoke() {
-    let mut theme = material::purple::light();
+    let mut theme = Theme::default();
 
-    define_compose_style_ident!(cs::THEME_EXTEND, SIZE_100);
+    define_compose_style_ident!(CUSTOM_STYLE_START, SIZE_100);
     fill_compose_style!(theme,
       SIZE_100: |child| {
       widget! {

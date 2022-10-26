@@ -1,8 +1,5 @@
-use self::palette::LightnessCfg;
 pub use super::*;
-use crate::prelude::*;
-use crate::{fill_compose_style, fill_icon, prelude::include_svg};
-pub use painter::{Brush, Color};
+use ribir_core::{fill_compose_style, fill_icon, prelude::*};
 
 /// Crate a material theme with palette.
 pub fn new(brightness: Brightness, palette: Palette) -> Theme {

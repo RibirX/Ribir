@@ -7,7 +7,8 @@ pub mod prelude {
 
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
-      let mut app = super::Application::default();
+      let mut app = super::Application::new(super::material::purple::light());
+
       let wnd = app.new_window(|native_wnd, ctx| {
         let size = native_wnd.inner_size();
         let p_backend = super::AppContext::wait_future(gpu::wgpu_backend_with_wnd(

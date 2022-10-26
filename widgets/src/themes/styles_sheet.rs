@@ -1,5 +1,5 @@
 pub mod icons {
-  use crate::{define_icon_ident, prelude::IconIdent};
+  use ribir_core::{define_icon_ident, prelude::IconIdent};
 
   pub const BEGIN: IconIdent = IconIdent::new(0);
   define_icon_ident!(
@@ -40,7 +40,7 @@ pub mod icons {
 }
 
 pub mod cs {
-  use crate::{define_compose_style_ident, prelude::ComposeStyleIdent};
+  use ribir_core::{define_compose_style_ident, prelude::ComposeStyleIdent};
   pub const BEGIN: ComposeStyleIdent = ComposeStyleIdent::new(0);
 
   define_compose_style_ident! {

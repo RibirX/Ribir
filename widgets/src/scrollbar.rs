@@ -1,4 +1,5 @@
 use crate::layout::{SizedBox, Stack};
+use crate::themes::cs;
 use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
@@ -179,14 +180,22 @@ impl Compose for VRawScrollbar {
     widget! {
       track { scrolling, this }
       env {
-        let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
+        let ScrollBarTheme {
+          thickness,
+          thumb_min_size
+        } = *ScrollBarTheme::of(ctx.theme());
       }
-      LayoutBox {
-        id: track_box,
-        SizedBox {
-          size: Size::new(theme.track_thickness(), f32::MAX),
-          compose_styles: [cs::SCROLLBAR_TRACK],
-          SizedBox {
+
+      Stack {
+        visible: scrolling.can_scroll(),
+        Container {
+          id: track_box,
+          size: Size::new(thumb_outline.layout_width() , f32::MAX),
+          compose_styles: [cs::V_SCROLLBAR_TRACK],
+        }
+        LayoutBox {
+          id: thumb_outline,
+          Container {
             id: thumb,
             size: {
               let page_height = scrolling.scroll_view_size().height;
@@ -221,13 +230,60 @@ fn safe_recip(v: f32) -> f32 {
 
 impl CustomTheme for ScrollBarTheme {}
 
-impl Default for ScrollBarTheme {
-  fn default() -> Self {
-    Self {
-      thumb_min_size: 12.,
-      thickness: 8.,
-      thumb_margin: 2.,
-    }
+#[cfg(test)]
+mod test {
+  use crate::prelude::material;
+
+  use super::*;
+  use ribir_core::test::*;
+
+  #[test]
+  fn content_expand_so_all_view_can_scroll() {
+    let w = widget! {
+      Stack {
+        HScrollBar {
+          Container { size: Size::new(100., 100.) }
+        }
+        VScrollBar {
+          Container { size: Size::new(100., 100.) }
+        }
+        BothScrollbar {
+          Container { size: Size::new(100., 100.) }
+        }
+      }
+    };
+
+    expect_layout_result_with_theme(
+      w,
+      Some(Size::new(200., 200.)),
+      material::purple::light(),
+      &[
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect {
+            width: Some(200.),
+            height: Some(200.),
+            ..<_>::default()
+          },
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect {
+            width: Some(200.),
+            height: Some(200.),
+            ..<_>::default()
+          },
+        },
+        LayoutTestItem {
+          path: &[0, 2],
+          expect: ExpectRect {
+            width: Some(200.),
+            height: Some(200.),
+            ..<_>::default()
+          },
+        },
+      ],
+    );
   }
 }
 
