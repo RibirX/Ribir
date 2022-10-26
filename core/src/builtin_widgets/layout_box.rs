@@ -15,7 +15,12 @@ impl ComposeChild for LayoutBox {
       track { this: this.into_stateful() }
       ExprWidget {
         expr: child,
-        performed_layout: move |ctx| this.silent().rect = ctx.box_rect().unwrap()
+        performed_layout: move |ctx| {
+          let new_rect = ctx.box_rect().unwrap();
+          if this.rect != new_rect {
+            this.silent().rect = new_rect;
+          }
+        }
       }
     }
   }

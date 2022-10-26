@@ -149,9 +149,38 @@ builtin! {
     fn layout_height(&self) -> f32,
   }
 
+  Cursor {
+    #[doc="assign cursor to the widget."]
+    cursor: CursorIcon
+  }
+
+  ComposeStylesWidget {
+    #[doc="compose_styles specify one or more `compose style` to a widget, \
+    `compose style` is an identify of a function defined in `Theme` which \
+    support convert a widget to another, in normal do some thing decoration \
+    in it."]
+    compose_styles: SmallVec<[ComposeStyleIdent; 1]>,
+  }
+
   Margin {
     #[doc="expand space around widget wrapped."]
     margin: impl EdgeInsets,
+  }
+
+  ScrollableWidget {
+    #[doc= "enumerate to describe which direction allow widget to scroll."]
+    scrollable: Scrollable,
+    #[doc= "specify the scroll position of this widget, also means that the host widget scrollable."]
+    scroll_pos: Point,
+    #[doc= "return the scroll view of the scrollable widget"]
+    fn scroll_view(&self) -> Size,
+    #[doc= "return the content widget size of the scrollable widget."]
+    fn scroll_content(&self) -> Size,
+  }
+
+  TransformWidget {
+    #[doc="A widget that applies a transformation its child. Doesn't change size, only apply painting"]
+    transform: Transform
   }
 
   HAlignWidget {
@@ -182,22 +211,6 @@ builtin! {
   BottomAnchor {
     #[doc="use to anchor child constraints with the bottom edge of parent widget."]
     bottom_anchor: PositionUnit,
-  }
-
-  ScrollableWidget {
-    #[doc= "enumerate to describe which direction allow widget to scroll."]
-    scrollable: Scrollable,
-    #[doc= "specify the scroll position of this widget, also means that the host widget scrollable."]
-    scroll_pos: Point,
-    #[doc= "return the scroll view of the scrollable widget"]
-    fn scroll_view(&self) -> Size,
-    #[doc= "return the content widget size of the scrollable widget."]
-    fn scroll_content(&self) -> Size,
-  }
-
-  TransformWidget {
-    #[doc="A widget that applies a transformation its child. Doesn't change size, only apply painting"]
-    transform: Transform
   }
 
   Visibility {

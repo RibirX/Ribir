@@ -85,6 +85,40 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
           background: ctx.theme().palette.primary()
         }
       }
+    },
+    cs::H_SCROLLBAR_TRACK: |child| {
+      widget!{
+        ExprWidget{
+          expr: child,
+          compose_styles: [cs::SCROLLBAR_TRACK]
+        }
+      }
+    },
+    cs::H_SCROLLBAR_THUMB: |child| {
+      widget!{
+        ExprWidget{
+          expr: child,
+          margin: EdgeInsets::vertical(1.),
+          compose_styles: [cs::SCROLLBAR_THUMB]
+        }
+      }
+    },
+    cs::V_SCROLLBAR_TRACK: |child| {
+      widget!{
+        ExprWidget{
+          expr: child,
+          compose_styles: [cs::SCROLLBAR_TRACK]
+        }
+      }
+    },
+    cs::V_SCROLLBAR_THUMB: |child| {
+      widget!{
+        ExprWidget{
+          expr: child,
+          margin: EdgeInsets::horizontal(1.),
+          compose_styles: [cs::SCROLLBAR_THUMB]
+        }
+      }
     }
   };
 

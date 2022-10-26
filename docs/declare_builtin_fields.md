@@ -56,8 +56,18 @@
  	 - specify the border of the widget which draw above the background
 - radius : [`Radius`] 
  	 - specify how rounded the corners have of the widget.
+- cursor : [`CursorIcon`] 
+ 	 - assign cursor to the widget.
+- compose_styles : [`SmallVec < [ComposeStyleIdent ; 1] >`] 
+ 	 - compose_styles specify one or more `compose style` to a widget, `compose style` is an identify of a function defined in `Theme` which support convert a widget to another, in normal do some thing decoration in it.
 - margin : [`impl EdgeInsets`] 
  	 - expand space around widget wrapped.
+- scrollable : [`Scrollable`] 
+ 	 - enumerate to describe which direction allow widget to scroll.
+- scroll_pos : [`Point`] 
+ 	 - specify the scroll position of this widget, also means that the host widget scrollable.
+- transform : [`Transform`] 
+ 	 - A widget that applies a transformation its child. Doesn't change size, only apply painting
 - h_align : [`HAlign`] 
  	 - describe how widget align to its box in x-axis.
 - v_align : [`VAlign`] 
@@ -70,12 +80,6 @@
  	 - use to anchor child constraints with the top edge of parent widget
 - bottom_anchor : [`PositionUnit`] 
  	 - use to anchor child constraints with the bottom edge of parent widget.
-- scrollable : [`Scrollable`] 
- 	 - enumerate to describe which direction allow widget to scroll.
-- scroll_pos : [`Point`] 
- 	 - specify the scroll position of this widget, also means that the host widget scrollable.
-- transform : [`Transform`] 
- 	 - A widget that applies a transformation its child. Doesn't change size, only apply painting
 - visible : [`bool`] 
  	 - Whether to show or hide a child
 - opacity : [`f32`] 
