@@ -32,7 +32,7 @@ impl ComposeChild for ScrollableWidget {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      UnconstrainedBox {
+      Clip { UnconstrainedBox {
         id: view,
         dir: match this.scrollable {
           Scrollable::X => UnconstrainedDir::X,
@@ -46,7 +46,7 @@ impl ComposeChild for ScrollableWidget {
           left_anchor: this.scroll_pos.x,
           top_anchor: this.scroll_pos.y,
         }
-      }
+      }}
 
       change_on content.layout_size() ~> this.content_size
       change_on view.layout_size() ~> this.page

@@ -1,5 +1,4 @@
 pub mod checkbox;
-pub mod clip;
 pub mod grid_view;
 pub mod icon;
 pub mod input;
@@ -12,7 +11,6 @@ pub mod themes;
 pub mod transform_box;
 pub mod prelude {
   pub use super::checkbox::*;
-  pub use super::clip::*;
   pub use super::grid_view::*;
   pub use super::icon::*;
   pub use super::input::*;

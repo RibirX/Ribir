@@ -43,3 +43,5 @@ pub mod has_focus;
 pub use has_focus::*;
 pub mod is_hover;
 pub use is_hover::*;
+pub mod clip;
+pub use clip::*;
