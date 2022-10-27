@@ -39,9 +39,9 @@ mod tests {
         expr: trigger.then(|| widget! {
           MockBox {
             size: Size::zero(),
-            mounted: move |_| lifecycle.silent().push("mounted"),
+            mounted: move |_, _| lifecycle.silent().push("mounted"),
             performed_layout: move |_| lifecycle.silent().push("performed layout"),
-            disposed: move |_| lifecycle.silent().push("disposed")
+            disposed: move |_, _| lifecycle.silent().push("disposed")
           }
         })
       }

@@ -167,7 +167,7 @@ impl Compose for Caret {
         top_anchor: this.rect.min_y(),
         left_anchor: this.rect.min_x(),
         background: this.color,
-        mounted: move |_| animate1.run(),
+        mounted: move |_, _| animate1.run(),
       }
       Animate {
         id: animate1,

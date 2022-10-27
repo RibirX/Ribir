@@ -34,7 +34,7 @@ impl Compose for TodoMVP {
                 Row {
                   id: task,
                   margin: EdgeInsets::vertical(4.),
-                  mounted: move |_| {
+                  mounted: move |_, _| {
                     *mount_idx = *mount_task_cnt;
                     *mount_task_cnt +=1;
                   },
@@ -55,7 +55,7 @@ impl Compose for TodoMVP {
                   }
                 }
                 on task {
-                  mounted: move |_| mount_animate.run()
+                  mounted: move |_, _| mount_animate.run()
                 }
               }
             }).collect::<Vec<_>>()

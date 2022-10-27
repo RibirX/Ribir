@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{impl_proxy_render, prelude::*, widget_tree::WidgetTree};
 use rxrust::ops::box_it::LocalBoxOp;
@@ -296,13 +296,48 @@ fn refresh_single_with_child(
 
   // we always keep the first dyn widget not change for `Generator`.
   sign.swap_data(new_gen_root, tree);
-  sign.swap(new_gen_root, tree);
+  sign.swap_children(new_gen_root, tree);
   // new is swap to old gen root.
-  new_gen_root.remove_subtree(tree);
-  single_on_mounted(sign, new_depth, true, tree);
+
+  let old_to_news = collect_refreshed_widgets(
+    &SmallVec::from_elem(new_gen_root, 1),
+    &SmallVec::from_elem(sign, 1),
+    tree,
+  );
+
+  new_gen_root.remove_subtree(tree, &old_to_news);
+  single_on_mounted(sign, new_depth, tree, &old_to_news);
 
   tree.mark_dirty(new_gen_root);
   depth
+}
+
+pub(crate) fn collect_refreshed_widgets(
+  olds: &SmallVec<[WidgetId; 1]>,
+  news: &SmallVec<[WidgetId; 1]>,
+  tree: &mut WidgetTree,
+) -> HashMap<WidgetId, WidgetId> {
+  let mut old_to_news: HashMap<WidgetId, WidgetId> = HashMap::default();
+
+  let mut old_keys: HashMap<Key, WidgetId> = HashMap::default();
+  olds.iter().for_each(|id| {
+    id.key(tree).map(|key| {
+      old_keys.insert(key, *id);
+    });
+  });
+
+  news
+    .iter()
+    .flat_map(|id| {
+      id.key(tree)
+        .and_then(|key| old_keys.get(&key))
+        .zip(Some(id))
+    })
+    .for_each(|(old, new)| {
+      old_to_news.insert(*old, *new);
+    });
+
+  old_to_news
 }
 
 fn refresh_multi(
@@ -314,12 +349,12 @@ fn refresh_multi(
   let tmp = tree.empty_node();
   let sign = gen_widgets[0];
   sign.insert_before(tmp, tree);
-  tmp.swap(sign, tree);
+  tmp.swap_children(sign, tree);
   tmp.swap_data(sign, tree);
   gen_widgets[0] = tmp;
 
   let parent = sign.parent(tree);
-  gen_widgets.iter().for_each(|w| w.remove_subtree(tree));
+  let olds = gen_widgets.clone();
   gen_widgets.clear();
 
   let mut cursor = sign;
@@ -335,16 +370,20 @@ fn refresh_multi(
     gen_widgets.push(sign)
   } else {
     let first = gen_widgets[0];
-    first.swap(sign, tree);
+    first.swap_children(sign, tree);
     first.swap_data(sign, tree);
-    first.remove_subtree(tree);
+    first.remove_subtree(tree, &HashMap::default());
     gen_widgets[0] = sign;
-
-    gen_widgets.iter().for_each(|n| {
-      n.on_mounted_subtree(tree, true);
-      tree.mark_dirty(*n)
-    });
   }
+
+  let old_to_news = collect_refreshed_widgets(&olds, &gen_widgets, tree);
+  olds.iter().for_each(|w| {
+    w.remove_subtree(tree, &old_to_news);
+  });
+  gen_widgets.iter().for_each(|n| {
+    n.on_mounted_subtree(tree, &old_to_news);
+    tree.mark_dirty(*n)
+  });
 }
 
 impl DynamicWidgetInfo {
@@ -380,13 +419,21 @@ fn down_to_leaf(id: WidgetId, tree: &WidgetTree) -> (WidgetId, usize) {
 fn single_on_mounted(
   from: WidgetId,
   mut level: usize,
-  brand_new: bool,
   tree: &mut WidgetTree,
+  old_to_news: &HashMap<WidgetId, WidgetId>,
 ) -> Option<WidgetId> {
   let mut next = Some(from);
+
+  let new_to_olds = old_to_news
+    .iter()
+    .map(|(old, new)| (*new, *old))
+    .collect::<HashMap<WidgetId, WidgetId>>();
   while level > 0 {
     let c = next.unwrap();
-    c.on_mounted(tree, brand_new);
+    let mount = new_to_olds
+      .get(&c)
+      .map_or(MountedType::New, |id| MountedType::Replace(*id));
+    c.on_mounted(tree, mount);
     next = c.single_child(tree);
 
     level -= 1;
@@ -397,6 +444,8 @@ fn single_on_mounted(
 #[cfg(test)]
 mod tests {
   use crate::{prelude::*, test::*, widget_tree::WidgetTree};
+  use std::cell::RefCell;
+  use std::rc::Rc;
 
   #[test]
   fn expr_widget_as_root() {
@@ -448,5 +497,132 @@ mod tests {
 
     assert_eq!(ids[0], new_ids[0]);
     assert_eq!(ids[2], new_ids[2]);
+  }
+  #[test]
+  fn expr_widget_mounted_new() {
+    let v = vec![1, 2, 3].into_stateful();
+
+    let new_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let refresh_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let drop_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let replaced_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let w = widget! {
+      track { v: v.clone(),
+              new_cnt: new_cnt.clone(),
+              refresh_cnt: refresh_cnt.clone(),
+              drop_cnt: drop_cnt.clone(),
+              replaced_cnt: replaced_cnt.clone(), }
+
+        ExprWidget {
+          expr: widget! { MockMulti {
+        ExprWidget {
+          expr: {
+            v.iter().map(move |_| {
+              widget! {
+                MockBox{
+                  size: Size::zero(),
+                  mounted: move |_, t| {
+                    match t {
+                      MountedType::New => *new_cnt.borrow_mut() += 1,
+                      MountedType::Replace(_) => *refresh_cnt.borrow_mut() += 1,
+                    };
+                  },
+                  disposed: move |_, t| {
+                    match t {
+                    DisposedType::Drop => *drop_cnt.borrow_mut() += 1,
+                    DisposedType::Replaced(_) => *replaced_cnt.borrow_mut() += 1,
+                    }
+
+                  }
+                }
+              }
+            }).collect::<Vec<_>>()
+          }
+        }
+      }
+      }}
+    };
+    let mut tree = WidgetTree::new(w, <_>::default());
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 3);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*drop_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*replaced_cnt.raw_ref().borrow(), 0);
+
+    v.state_ref().push(4);
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 7);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*drop_cnt.raw_ref().borrow(), 3);
+    assert_eq!(*replaced_cnt.raw_ref().borrow(), 0);
+
+    v.state_ref().pop();
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 10);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*drop_cnt.raw_ref().borrow(), 7);
+    assert_eq!(*replaced_cnt.raw_ref().borrow(), 0);
+  }
+
+  #[test]
+  fn expr_widget_mounted_track() {
+    let v = vec![1, 2, 3].into_stateful();
+    let new_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let refresh_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let drop_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let replaced_cnt = Rc::new(RefCell::new(0)).into_stateful();
+    let w = widget! {
+      track { v: v.clone(),
+              new_cnt: new_cnt.clone(),
+              refresh_cnt: refresh_cnt.clone(),
+              drop_cnt: drop_cnt.clone(),
+              replaced_cnt: replaced_cnt.clone() }
+      MockMulti {
+        ExprWidget {
+          expr: {
+            v.iter().enumerate().map(move |(idx, _)| {
+            widget! {
+              MockBox{
+                key: idx,
+                size: Size::zero(),
+                mounted: move |_, t| {
+                  match t {
+                    MountedType::New => *new_cnt.borrow_mut() += 1,
+                    MountedType::Replace(_) => *refresh_cnt.borrow_mut() += 1,
+                  };
+                },
+                disposed: move |_, t| {
+                  match t {
+                    DisposedType::Drop => *drop_cnt.borrow_mut() += 1,
+                    DisposedType::Replaced(_) => *replaced_cnt.borrow_mut() += 1,
+                  };
+                }
+              }
+            }
+          }).collect::<Vec<_>>()
+          }
+        }
+      }
+    };
+    let mut tree = WidgetTree::new(w, <_>::default());
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 3);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*replaced_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*drop_cnt.raw_ref().borrow(), 0);
+
+    v.state_ref().push(4);
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 4);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 3);
+    assert_eq!(*drop_cnt.raw_ref().borrow(), 0);
+    assert_eq!(*replaced_cnt.raw_ref().borrow(), 3);
+
+    v.state_ref().pop();
+    tree.tree_repair();
+    assert_eq!(*new_cnt.raw_ref().borrow(), 4);
+    assert_eq!(*refresh_cnt.raw_ref().borrow(), 6);
+    assert_eq!(*drop_cnt.raw_ref().borrow(), 1);
+    assert_eq!(*replaced_cnt.raw_ref().borrow(), 6);
   }
 }

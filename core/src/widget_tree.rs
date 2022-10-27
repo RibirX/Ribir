@@ -154,8 +154,8 @@ impl WidgetTree {
       .into_subtree(None, self, theme)
       .expect("must have a root");
     self.set_root_id(root);
-    root.on_mounted_subtree(self, true);
     self.mark_dirty(root);
+    root.on_mounted_subtree(self, &HashMap::default());
   }
 
   pub(crate) fn set_root_id(&mut self, id: WidgetId) {
@@ -299,7 +299,7 @@ impl WidgetId {
     std::mem::swap(self.assert_get_mut(tree1), other.assert_get_mut(tree2));
   }
 
-  pub(crate) fn swap(self, other: WidgetId, tree: &mut WidgetTree) {
+  pub(crate) fn swap_children(self, other: WidgetId, tree: &mut WidgetTree) {
     let first_child = self.first_child(tree);
     let mut cursor = first_child;
     while let Some(c) = cursor {
@@ -320,14 +320,23 @@ impl WidgetId {
     guard.0.remove(&mut tree.arena);
   }
 
-  pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
+  pub(crate) fn remove_subtree(
+    self,
+    tree: &mut WidgetTree,
+    old_to_news: &HashMap<WidgetId, WidgetId>,
+  ) {
     // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self
       .0
       .descendants(&tree1.arena)
       .map(WidgetId)
-      .for_each(|id| id.on_disposed(tree2));
+      .for_each(|id| {
+        let disposed_type = old_to_news
+          .get(&id)
+          .map_or(DisposedType::Drop, |id| DisposedType::Replaced(*id));
+        id.on_disposed(tree2, disposed_type);
+      });
     self.0.remove_subtree(&mut tree1.arena);
     if tree1.root() == self {
       tree1.root.take();
@@ -350,15 +359,25 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree, brand_new: bool) {
+  pub(crate) fn on_mounted_subtree(
+    self,
+    tree: &mut WidgetTree,
+    old_to_news: &HashMap<WidgetId, WidgetId>,
+  ) {
     let (tree1, tree2) = unsafe { tree.split_tree() };
-
-    self
-      .descendants(tree1)
-      .for_each(|w| w.on_mounted(tree2, brand_new));
+    let new_to_olds = old_to_news
+      .iter()
+      .map(|(old, new)| (*new, *old))
+      .collect::<HashMap<WidgetId, WidgetId>>();
+    self.descendants(tree1).for_each(|w| {
+      let mount = new_to_olds
+        .get(&w)
+        .map_or(MountedType::New, |id| MountedType::Replace(*id));
+      w.on_mounted(tree2, mount);
+    });
   }
 
-  pub(crate) fn on_mounted(self, tree: &mut WidgetTree, brand_new: bool) {
+  pub(crate) fn on_mounted(self, tree: &mut WidgetTree, mounted_type: MountedType) {
     self.assert_get(tree).query_all_type(
       |notifier: &StateChangeNotifier| {
         let state_changed = tree.state_changed.clone();
@@ -373,26 +392,24 @@ impl WidgetId {
       QueryOrder::OutsideFirst,
     );
 
-    if brand_new {
-      // Safety: lifecycle context have no way to change tree struct.
-      let (tree1, tree2) = unsafe { tree.split_tree() };
-      self.assert_get(tree1).query_all_type(
-        |m: &MountedListener| {
-          (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
-          true
-        },
-        QueryOrder::OutsideFirst,
-      );
-    }
+    // Safety: lifecycle context have no way to change tree struct.
+    let (tree1, tree2) = unsafe { tree.split_tree() };
+    self.assert_get(tree1).query_all_type(
+      |m: &MountedListener| {
+        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 }, mounted_type);
+        true
+      },
+      QueryOrder::OutsideFirst,
+    );
   }
 
-  pub(crate) fn on_disposed(self, tree: &mut WidgetTree) {
+  pub(crate) fn on_disposed(self, tree: &mut WidgetTree, disposed_type: DisposedType) {
     tree.layout_store.remove(&self);
     // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self.assert_get(tree1).query_all_type(
       |d: &DisposedListener| {
-        (d.disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
+        (d.disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 }, disposed_type);
         true
       },
       QueryOrder::OutsideFirst,
@@ -429,6 +446,16 @@ impl WidgetId {
         offstage = r.offstage
       });
     offstage
+  }
+
+  pub(crate) fn key(self, tree: &WidgetTree) -> Option<Key> {
+    let mut key = None;
+    self
+      .assert_get(tree)
+      .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
+        key = Some(k.clone());
+      });
+    key
   }
 }
 
@@ -691,7 +718,7 @@ mod tests {
     assert_eq!(tree.count(), 16);
 
     tree.mark_dirty(tree.root());
-    tree.root().remove_subtree(&mut tree);
+    tree.root().remove_subtree(&mut tree, &HashMap::default());
     assert_eq!(tree.layout_list(), None);
     assert!(
       tree

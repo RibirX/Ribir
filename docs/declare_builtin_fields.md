@@ -2,10 +2,6 @@
 
 - performed_layout : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
  	 - action perform after widget performed layout.
-- mounted : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
- 	 - action perform after widget be added to the widget tree.
-- disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
- 	 - action perform after widget remove from widget tree.
 - pointer_down : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer down event.
 - pointer_up : [`impl FnMut(& mut PointerEvent)`] 
@@ -86,6 +82,10 @@
  	 - Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency.
 - theme : [`Theme`] 
  	 - assign theme to the widget.
+- mounted : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, MountedType) >`] 
+ 	 - action perform after widget be added to the widget tree.
+- disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, DisposedType) >`] 
+ 	 - action perform after widget remove from widget tree.
 - key : [`Key`] 
  	 - assign a key to widget, use for track if two widget is same widget in two frames.
 

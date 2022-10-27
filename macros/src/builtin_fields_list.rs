@@ -4,16 +4,6 @@ builtin! {
     performed_layout: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
   }
 
-  MountedListener {
-    #[doc="action perform after widget be added to the widget tree."]
-    mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
-  }
-
-  DisposedListener {
-    #[doc="action perform after widget remove from widget tree."]
-    disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
-  }
-
   PointerDownListener {
     #[doc="specify the event handler for the pointer down event."]
     pointer_down: impl FnMut(&mut PointerEvent),
@@ -213,6 +203,16 @@ builtin! {
   ThemeWidget {
     #[doc="assign theme to the widget."]
     theme: Theme
+  }
+
+  MountedListener {
+    #[doc="action perform after widget be added to the widget tree."]
+    mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, MountedType)>,
+  }
+
+  DisposedListener {
+    #[doc="action perform after widget remove from widget tree."]
+    disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, DisposedType)>,
   }
 
   KeyWidget {
