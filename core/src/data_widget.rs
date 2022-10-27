@@ -66,8 +66,8 @@ impl<W: Query, D: Query> Query for DataWidget<W, D> {
 }
 
 pub(crate) fn expr_attach_data<D: Query + Clone + 'static>(
-  expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>>,
-  children: Children,
+  expr: BoxedExprWidget,
+  children: ChildVec<Widget>,
   data: D,
 ) -> Widget {
   let ExprWidget { mut expr, upstream } = expr;
@@ -87,16 +87,12 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
   data: StateWidget<D>,
 ) -> Widget {
   match data {
-    StateWidget::Stateless(data) => widget_attach_data(
-      child,
-      data,
-      |expr: ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>>,
-       children: Children,
-       data: D| {
+    StateWidget::Stateless(data) => {
+      widget_attach_data(child, data, |expr, children: ChildVec<Widget>, data: D| {
         let data = Stateful::new(data);
         expr_attach_data(expr, children, data)
-      },
-    ),
+      })
+    }
     StateWidget::Stateful(data) => widget_attach_data(child, data, expr_attach_data),
   }
 }
@@ -104,18 +100,13 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
 pub(crate) fn widget_attach_data<D: Query + 'static>(
   widget: Widget,
   data: D,
-  attach_expr: impl FnOnce(
-    ExprWidget<Box<dyn FnMut(&mut BuildCtx) -> Vec<Widget>>>,
-    Children,
-    D,
-  ) -> Widget
-  + 'static,
+  attach_expr: impl FnOnce(BoxedExprWidget, ChildVec<Widget>, D) -> Widget + 'static,
 ) -> Widget {
-  let Widget { node, children } = widget;
+  let Widget { node, mut children } = widget;
   if let Some(node) = node {
     match node {
       WidgetNode::Compose(c) => {
-        assert!(children.is_none());
+        assert!(children.is_empty());
         (|ctx: &mut BuildCtx| widget_attach_data(c(ctx), data, attach_expr)).into_widget()
       }
       WidgetNode::Render(r) => {
@@ -125,10 +116,10 @@ pub(crate) fn widget_attach_data<D: Query + 'static>(
       WidgetNode::Dynamic(expr) => attach_expr(expr, children, data),
     }
   } else {
-    match children {
-      Children::None => Widget { node: None, children: Children::None },
-      Children::Single(s) => widget_attach_data(*s, data, attach_expr),
-      Children::Multi(_) => unreachable!("Compiler should not allow attach data to many widget."),
+    match children.len() {
+      0 => Widget { node: None, children },
+      1 => widget_attach_data(children.pop().unwrap(), data, attach_expr),
+      _ => unreachable!("Compiler should not allow attach data to many widget."),
     }
   }
 }

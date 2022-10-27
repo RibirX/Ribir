@@ -54,7 +54,7 @@ impl<R> ExprWidgetBuilder<R> {
 
 impl Generator {
   pub(crate) fn new_generator(
-    expr: ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> Vec<Widget>>>,
+    expr: BoxedExprWidget,
     has_child: bool,
     tree: &mut WidgetTree,
   ) -> WidgetId {
@@ -161,7 +161,7 @@ impl<E> ExprWidget<E> {
         expr: Box::new(f(expr)),
         upstream,
       })),
-      children: Children::None,
+      children: <_>::default(),
     }
   }
 }
@@ -173,9 +173,9 @@ where
   #[inline]
   pub(crate) fn inner_into_widget<M: ?Sized>(self) -> Widget
   where
-    R: IntoChild<M, Vec<Widget>>,
+    R: IntoChild<M, ChildVec<Widget>>,
   {
-    self.replace_expr_as_widget(|mut expr| move |ctx| expr(ctx).into_child())
+    self.replace_expr_as_widget(|mut expr| move |ctx| expr(ctx).into_child().into_inner())
   }
 }
 

@@ -24,6 +24,29 @@ pub struct WidgetWithChild<W, C> {
   pub child: C,
 }
 
+pub struct ChildVec<W>(Vec<W>);
+
+impl<W> ChildVec<W> {
+  #[inline]
+  pub fn into_inner(self) -> Vec<W> { self.0 }
+}
+
+impl<W> std::ops::Deref for ChildVec<W> {
+  type Target = Vec<W>;
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl<W> std::ops::DerefMut for ChildVec<W> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
+impl<W> Default for ChildVec<W> {
+  #[inline]
+  fn default() -> Self { Self(Default::default()) }
+}
+
 // implementation of IntoWidget
 
 impl<W> IntoWidget<(&dyn Render, Widget)> for WidgetWithChild<W, Widget>
@@ -33,7 +56,7 @@ where
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
     let node = WidgetNode::Render(Box::new(widget));
-    let children = Children::Single(Box::new(child));
+    let children = ChildVec(vec![child]);
     Widget { node: Some(node), children }
   }
 }
@@ -87,7 +110,7 @@ where
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
     let mut widget = widget.into_widget();
-    widget.children = Children::Single(Box::new(child.into_widget()));
+    widget.children = ChildVec(vec![child.into_widget()]);
 
     widget
   }
@@ -120,15 +143,14 @@ where
   }
 }
 
-impl<W> IntoWidget<dyn Render> for WidgetWithChild<W, Vec<Widget>>
+impl<W> IntoWidget<dyn Render> for WidgetWithChild<W, ChildVec<Widget>>
 where
   W: MultiChild + Render + 'static,
 {
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
     let node = WidgetNode::Render(Box::new(widget));
-    let children = Children::Multi(child);
-    Widget { node: Some(node), children }
+    Widget { node: Some(node), children: child }
   }
 }
 
@@ -145,9 +167,9 @@ impl<W: IntoWidget<M>, M: ?Sized> IntoChild<dyn IntoWidget<M>, Widget> for W {
   fn into_child(self) -> Widget { self.into_widget() }
 }
 
-impl IntoChild<Widget, Widget> for Widget {
+impl<W> IntoChild<W, W> for W {
   #[inline]
-  fn into_child(self) -> Widget { self }
+  fn into_child(self) -> W { self }
 }
 
 impl<T, M: ?Sized, C> IntoChild<dyn IntoChild<M, C>, Option<C>> for T
@@ -158,21 +180,21 @@ where
   fn into_child(self) -> Option<C> { Some(self.into_child()) }
 }
 
-impl<T, M: ?Sized, C> IntoChild<Option<&dyn IntoChild<M, C>>, Option<C>> for Option<T>
+impl<T, M: ?Sized> IntoChild<Option<&dyn IntoChild<M, Widget>>, Option<Widget>> for Option<T>
 where
-  T: IntoChild<M, C>,
+  T: IntoWidget<M>,
 {
   #[inline]
-  fn into_child(self) -> Option<C> { self.map(IntoChild::into_child) }
+  fn into_child(self) -> Option<Widget> { self.map(IntoWidget::into_widget) }
 }
 
 impl<E, R, M: ?Sized> IntoChild<dyn IntoChild<M, Widget>, Widget> for ExprWidget<E>
 where
   E: FnMut(&mut BuildCtx) -> R + 'static,
-  R: IntoChild<M, Option<Widget>>,
+  R: IntoChild<M, ChildVec<Widget>>,
 {
   #[inline]
-  fn into_child(self) -> Widget { self.into_widget() }
+  fn into_child(self) -> Widget { self.inner_into_widget() }
 }
 
 impl<W, C, C2, M: ?Sized> IntoChild<&M, WidgetWithChild<W, C2>> for WidgetWithChild<W, C>
@@ -202,15 +224,15 @@ macro_rules! tuple_merge_into_vec {
       );
   };
   ({ $($ty: ident, $mark: ident,)+})  => {
-    impl<W, $($ty, $mark: ?Sized),+> IntoChild<&($(&$mark,)+), Vec<W>>
+    impl<W, $($ty, $mark: ?Sized),+> IntoChild<&($(&$mark,)+), ChildVec<W>>
       for ($($ty,)+)
     where
-      $($ty: FillVec<$mark, Vec<W>>),+
+      $($ty: FillChildVec<$mark, W>),+
     {
       #[allow(non_snake_case)]
-      fn into_child(self) -> Vec<W> {
+      fn into_child(self) -> ChildVec<W> {
         let ($($ty,)+) = self;
-        let mut children = vec![];
+        let mut children = ChildVec(<_>::default());
         $($ty.fill(&mut children);)+
         children
       }
@@ -268,53 +290,33 @@ tuple_child_into!(
   F28, M28, T29, F29, M29, T30, F30, M30, T31, F31, M31, T32, F32, M32,
 );
 
-trait FillVec<M: ?Sized, V> {
-  fn fill(self, vec: &mut V);
+trait FillChildVec<M: ?Sized, C> {
+  fn fill(self, vec: &mut ChildVec<C>);
 }
 
-impl<W> FillVec<W, Vec<W>> for W {
-  fn fill(self, vec: &mut Vec<W>) { vec.push(self) }
-}
-
-impl<M: ?Sized, W> FillVec<dyn IntoWidget<&M>, Vec<Widget>> for W
+impl<M: ?Sized, W, C> FillChildVec<dyn IntoWidget<&M>, C> for W
 where
-  W: IntoWidget<M>,
+  W: IntoChild<M, C>,
 {
-  fn fill(self, vec: &mut Vec<Widget>) { vec.push(self.into_widget()) }
+  fn fill(self, vec: &mut ChildVec<C>) { vec.0.push(self.into_child()) }
 }
 
-impl<M: ?Sized, W, C, C2> FillVec<dyn IntoWidget<&M>, Vec<WidgetWithChild<W, C2>>>
-  for WidgetWithChild<W, C>
-where
-  C: IntoChild<M, C2>,
-{
-  fn fill(self, vec: &mut Vec<WidgetWithChild<W, C2>>) { vec.push(self.into_child()) }
-}
-
-impl<M: ?Sized, I, V> FillVec<dyn Iterator<Item = &M>, V> for I
+impl<M: ?Sized, I, C> FillChildVec<dyn Iterator<Item = &M>, C> for I
 where
   I: IntoIterator,
-  I::Item: FillVec<M, V>,
+  I::Item: FillChildVec<M, C>,
 {
   #[inline]
-  fn fill(self, vec: &mut V) { self.into_iter().for_each(|w| w.fill(vec)); }
+  fn fill(self, vec: &mut ChildVec<C>) { self.into_iter().for_each(|w| w.fill(vec)); }
 }
 
-impl<E, R, M: ?Sized> FillVec<ExprWidget<&M>, Vec<Widget>> for ExprWidget<E>
-where
-  E: FnMut(&mut BuildCtx) -> R + 'static,
-  R: IntoChild<M, Vec<Widget>>,
-{
-  fn fill(self, vec: &mut Vec<Widget>) { vec.push(self.inner_into_widget()) }
-}
-
-impl<W, M, T> IntoChild<Vec<&dyn IntoChild<M, W>>, Vec<W>> for T
+impl<C, M, T> IntoChild<ChildVec<&dyn IntoChild<M, C>>, ChildVec<C>> for T
 where
   M: ?Sized,
-  T: FillVec<M, Vec<W>>,
+  T: FillChildVec<M, C>,
 {
-  fn into_child(self) -> Vec<W> {
-    let mut vec = vec![];
+  fn into_child(self) -> ChildVec<C> {
+    let mut vec = ChildVec::default();
     self.fill(&mut vec);
     vec
   }
@@ -347,9 +349,9 @@ where
 impl<W, C, M: ?Sized> WithChild<(&dyn MultiChild, &M), C> for W
 where
   W: MultiChild,
-  C: IntoChild<M, Vec<Widget>>,
+  C: IntoChild<M, ChildVec<Widget>>,
 {
-  type Target = WidgetWithChild<Self, Vec<Widget>>;
+  type Target = WidgetWithChild<Self, ChildVec<Widget>>;
   #[inline]
   fn with_child(self, child: C) -> Self::Target {
     WidgetWithChild {
@@ -466,7 +468,7 @@ mod tests {
     struct B;
 
     impl ComposeChild for A {
-      type Child = Vec<B>;
+      type Child = ChildVec<B>;
 
       fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");

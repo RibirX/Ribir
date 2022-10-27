@@ -1,5 +1,9 @@
 pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
-use crate::{context::*, dynamic_widget::ExprWidget, prelude::ComposeChild};
+use crate::{
+  context::*,
+  dynamic_widget::ExprWidget,
+  prelude::{ChildVec, ComposeChild},
+};
 use algo::ShareResource;
 use painter::*;
 
@@ -73,19 +77,15 @@ pub enum StateWidget<W> {
 
 pub struct Widget {
   pub(crate) node: Option<WidgetNode>,
-  pub(crate) children: Children,
+  pub(crate) children: ChildVec<Widget>,
 }
 
+pub(crate) type BoxedExprWidget =
+  ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> Vec<Widget>>>;
 pub(crate) enum WidgetNode {
   Compose(Box<dyn for<'r> FnOnce(&'r mut BuildCtx) -> Widget>),
   Render(Box<dyn Render>),
-  Dynamic(ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> Vec<Widget>>>),
-}
-
-pub(crate) enum Children {
-  None,
-  Single(Box<Widget>),
-  Multi(Vec<Widget>),
+  Dynamic(BoxedExprWidget),
 }
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
@@ -196,7 +196,7 @@ impl<R: Render + 'static> IntoWidget<dyn Render> for R {
   fn into_widget(self) -> Widget {
     Widget {
       node: Some(WidgetNode::Render(Box::new(self))),
-      children: Children::None,
+      children: ChildVec::default(),
     }
   }
 }
@@ -206,7 +206,7 @@ impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
   fn into_widget(self) -> Widget {
     Widget {
       node: Some(WidgetNode::Compose(Box::new(self))),
-      children: Children::None,
+      children: ChildVec::default(),
     }
   }
 }
@@ -281,26 +281,6 @@ impl<W: IntoStateful> StateWidget<W> {
     match self {
       StateWidget::Stateless(w) => w.into_stateful(),
       StateWidget::Stateful(w) => w,
-    }
-  }
-}
-
-impl Children {
-  pub(crate) fn is_none(&self) -> bool { matches!(self, Children::None) }
-
-  pub(crate) fn for_each(self, mut cb: impl FnMut(Widget)) {
-    match self {
-      Children::None => {}
-      Children::Single(w) => cb(*w),
-      Children::Multi(m) => m.into_iter().for_each(cb),
-    }
-  }
-
-  pub(crate) fn len(&self) -> usize {
-    match self {
-      Children::None => 0,
-      Children::Single(_) => 1,
-      Children::Multi(m) => m.len(),
     }
   }
 }
