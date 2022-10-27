@@ -100,19 +100,6 @@ builtin! {
     fn is_hover(&self) -> bool,
   }
 
-  ComposeStylesWidget {
-    #[doc="compose_styles specify one or more `compose style` to a widget, \
-    `compose style` is an identify of a function defined in `Theme` which \
-    support convert a widget to another, in normal do some thing decoration \
-    in it."]
-    compose_styles: SmallVec<[ComposeStyleIdent; 1]>,
-  }
-
-  Cursor {
-    #[doc="assign cursor to the widget."]
-    cursor: CursorIcon
-  }
-
   FittedBox {
     #[doc=" set how its child should be resized to its box."]
     box_fit: BoxFit,
