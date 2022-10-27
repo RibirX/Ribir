@@ -1,13 +1,15 @@
-use ribir_core::{impl_query_self_only, prelude::*};
+use crate::{impl_query_self_only, prelude::*};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ClipType {
+  #[default]
   Auto,
   Path(Path),
 }
 
 #[derive(SingleChild, Clone, Declare)]
 pub struct Clip {
+  #[declare(default)]
   clip: ClipType,
 }
 
