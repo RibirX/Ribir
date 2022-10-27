@@ -1,4 +1,4 @@
-use crate::{icon::Icon, themes::icons};
+use crate::prelude::{icons, Icon, Label, Position, Row, Text};
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
@@ -8,8 +8,14 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default = IconSize::of(ctx.theme()).tiny)]
+}
+
+#[derive(Clone)]
+pub struct CheckBoxTheme {
+  /// The size of the checkbox icon.
   pub size: Size,
+  /// The text style of the checkbox label.
+  pub label_style: TextStyle,
 }
 
 impl Checkbox {
@@ -23,19 +29,16 @@ impl Checkbox {
   }
 }
 
-impl Compose for Checkbox {
-  fn compose(this: StateWidget<Self>) -> Widget {
-    widget! {
-      track { this: this.into_stateful() }
+impl ComposeChild for Checkbox {
+  type Child = Option<Label>;
+
+  fn compose_child(this: StateWidget<Self>, label: Self::Child) -> Widget {
+    let this = this.into_stateful();
+    let mut checkbox = widget! {
+      track { this: this.clone() }
+      env { let theme = CheckBoxTheme::of(ctx.theme()); }
       Icon {
-        size: this.size,
-        cursor: CursorIcon::Hand,
-        tap: move |_| this.switch_check(),
-        key_up: move |k| {
-          if k.key == VirtualKeyCode::Space {
-            this.switch_check()
-          }
-        },
+        size: theme.size,
         ExprWidget {
           expr: {
             let theme = ctx.theme();
@@ -48,10 +51,39 @@ impl Compose for Checkbox {
             }
         }}
       }
+    };
+    if let Some(Label { desc, position }) = label {
+      let label = widget! {
+        env { let theme = CheckBoxTheme::of(ctx.theme()); }
+        Text { text: desc, style: theme.label_style.clone() }
+      };
+      checkbox = match position {
+        Position::Before => {
+          widget! { Row { ExprWidget { expr: [label, checkbox] } } }
+        }
+        Position::After => {
+          widget! { Row { ExprWidget { expr: [checkbox, label] } } }
+        }
+      };
+    }
+
+    widget! {
+      track { this }
+      ExprWidget {
+        cursor: CursorIcon::Hand,
+        tap: move |_| this.switch_check(),
+        key_up: move |k| {
+          if k.key == VirtualKeyCode::Space {
+            this.switch_check()
+          }
+        },
+        expr: checkbox
+      }
     }
   }
 }
 
+impl CustomTheme for CheckBoxTheme {}
 #[cfg(test)]
 mod tests {
   use crate::prelude::material;

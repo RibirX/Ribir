@@ -20,9 +20,9 @@ macro_rules! fill_custom_theme {
   };
 }
 
-pub trait CustomTheme: Clone + Default {
+pub trait CustomTheme {
   #[inline]
-  fn custom_theme_of(theme: &Theme) -> Self
+  fn of(theme: &Theme) -> &Self
   where
     Self: Sized + 'static,
   {
@@ -30,14 +30,11 @@ pub trait CustomTheme: Clone + Default {
       .custom_themes
       .themes
       .get(&TypeId::of::<Self>())
-      .map(|c| c.as_any().downcast_ref::<Self>().unwrap().clone())
-      .unwrap_or_else(|| {
-        log::warn!(
-          "Not set {} in theme, use its default style",
-          std::any::type_name::<Self>()
-        );
-        <_>::default()
-      })
+      .and_then(|c| c.as_any().downcast_ref::<Self>())
+      .expect(&format!(
+        "The custom theme({}) is not init in theme, use it after init.",
+        std::any::type_name::<Self>()
+      ))
   }
 }
 
@@ -47,10 +44,10 @@ trait ExtendCustomTheme: Any {
   fn as_any(&self) -> &dyn Any;
 }
 
-impl CustomThemes {
+impl Theme {
   #[inline]
   pub fn set_custom_theme<T: Clone + CustomTheme + 'static>(&mut self, v: T) {
-    self.themes.insert(v.type_id(), Box::new(v));
+    self.custom_themes.themes.insert(v.type_id(), Box::new(v));
   }
 }
 

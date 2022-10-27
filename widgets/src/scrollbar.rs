@@ -132,7 +132,10 @@ impl Compose for HRawScrollbar {
     widget! {
       track { scrolling, this }
       env {
-        let theme = ScrollBarTheme::custom_theme_of(ctx.theme());
+        let ScrollBarTheme {
+          thickness,
+          thumb_min_size
+        } = *ScrollBarTheme::of(ctx.theme());
       }
 
       Stack {
@@ -150,7 +153,7 @@ impl Compose for HRawScrollbar {
               let page_width = scrolling.scroll_view_size().width;
               let content_width = scrolling.scroll_content_size().width;
               let width = page_width / content_width * track_box.layout_width();
-              Size::new(width.max(theme.thumb_min_size), theme.thickness)
+              Size::new(width.max(thumb_min_size), thickness)
             },
             left_anchor: {
               let content_width = scrolling.scroll_content_size().width;
@@ -209,7 +212,7 @@ impl Compose for VRawScrollbar {
               let page_height = scrolling.scroll_view_size().height;
               let content_height = scrolling.scroll_content_size().height;
               let height = page_height / content_height * track_box.layout_height();
-              Size::new( theme.thickness, height.max(theme.thumb_min_size))
+              Size::new(thickness, height.max(thumb_min_size))
             },
             top_anchor: {
               let content_height = scrolling.scroll_content_size().height;

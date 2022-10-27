@@ -158,7 +158,7 @@ where
   fn into_child(self) -> Option<C> { Some(self.into_child()) }
 }
 
-impl<T, M: ?Sized, C> IntoChild<Option<&M>, Option<C>> for Option<T>
+impl<T, M: ?Sized, C> IntoChild<Option<&dyn IntoChild<M, C>>, Option<C>> for Option<T>
 where
   T: IntoChild<M, C>,
 {
@@ -175,7 +175,7 @@ where
   fn into_child(self) -> Widget { self.into_widget() }
 }
 
-impl<W, C, C2, M: ?Sized> IntoChild<M, WidgetWithChild<W, C2>> for WidgetWithChild<W, C>
+impl<W, C, C2, M: ?Sized> IntoChild<&M, WidgetWithChild<W, C2>> for WidgetWithChild<W, C>
 where
   C: IntoChild<M, C2>,
 {
@@ -245,7 +245,8 @@ macro_rules! tuple_child_into {
   };
   ({ $($target: ident, $from: ident, $mark: ident,)+ })  => {
 
-    impl<$($target, $from, $mark: ?Sized),+> IntoChild<($(&$mark,)+), ($($target,)+)>
+    impl<$($target, $from, $mark: ?Sized),+>
+      IntoChild<($(&dyn IntoChild<&$mark, $target>,)+), ($($target,)+)>
       for ($($from,)+)
     where
       $($from: IntoChild<$mark, $target>),+
@@ -307,7 +308,7 @@ where
   fn fill(self, vec: &mut Vec<Widget>) { vec.push(self.inner_into_widget()) }
 }
 
-impl<W, M, T> IntoChild<Vec<&M>, Vec<W>> for T
+impl<W, M, T> IntoChild<Vec<&dyn IntoChild<M, W>>, Vec<W>> for T
 where
   M: ?Sized,
   T: FillVec<M, Vec<W>>,

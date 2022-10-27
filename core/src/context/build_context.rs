@@ -2,6 +2,7 @@ use crate::{prelude::*, widget_tree::WidgetTree};
 use std::rc::Rc;
 
 pub struct BuildCtx<'a> {
+  // todo: query theme across stack, not merge, so user can overwrite them in a more cheap way.
   pub(crate) theme: Rc<Theme>,
   pub(crate) tree: &'a WidgetTree,
 }

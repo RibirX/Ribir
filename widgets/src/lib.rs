@@ -2,6 +2,7 @@ pub mod checkbox;
 pub mod grid_view;
 pub mod icon;
 pub mod input;
+pub mod label;
 pub mod layout;
 pub mod path;
 pub mod scrollbar;
@@ -14,6 +15,7 @@ pub mod prelude {
   pub use super::grid_view::*;
   pub use super::icon::*;
   pub use super::input::*;
+  pub use super::label::*;
   pub use super::layout::*;
   pub use super::path::*;
   pub use super::scrollbar::*;

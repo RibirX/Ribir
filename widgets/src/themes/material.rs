@@ -1,3 +1,5 @@
+use crate::prelude::{CheckBoxTheme, ScrollBarTheme};
+
 pub use super::*;
 use ribir_core::{fill_compose_style, fill_icon, prelude::*};
 
@@ -121,8 +123,16 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
       }
     }
   };
-
+  init_custom_theme(&mut theme);
   theme
+}
+
+fn init_custom_theme(theme: &mut Theme) {
+  theme.set_custom_theme(ScrollBarTheme { thumb_min_size: 12., thickness: 8. });
+  theme.set_custom_theme(CheckBoxTheme {
+    size: IconSize::of(theme).tiny,
+    label_style: TypographyTheme::of(theme).body1.text.clone(),
+  });
 }
 pub mod purple {
   use super::*;
