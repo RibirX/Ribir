@@ -100,6 +100,16 @@ builtin! {
     wheel: impl FnMut(&mut WheelEvent),
   }
 
+  HasFocus {
+    #[doc="specify the element is focus now"]
+    fn has_focus(&self) -> bool,
+  }
+
+  IsHover {
+    #[doc="specify the element is mouse hover now"]
+    fn is_hover(&self) -> bool,
+  }
+
   ComposeStylesWidget {
     #[doc="compose_styles specify one or more `compose style` to a widget, \
     `compose style` is an identify of a function defined in `Theme` which \
