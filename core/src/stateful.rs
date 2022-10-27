@@ -303,18 +303,6 @@ impl<W: SingleChild> SingleChild for Stateful<W> {}
 
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
-impl<M: ?Sized, W, C> WithChild<dyn ComposeChild<Child = &M>, C> for Stateful<W>
-where
-  W: ComposeChild,
-  C: IntoChild<M, W::Child>,
-{
-  type Target = Widget;
-
-  fn with_child(self, child: C) -> Self::Target {
-    ComposeChild::compose_child(StateWidget::Stateful(self), child.into_child())
-  }
-}
-
 impl<W: Render + 'static> Render for Stateful<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -335,6 +323,18 @@ impl<W: Compose> Compose for Stateful<W> {
       StateWidget::Stateful(s) => s.widget.borrow().clone(),
     };
     Compose::compose(StateWidget::Stateful(w))
+  }
+}
+
+impl<W: ComposeChild> ComposeChild for Stateful<W> {
+  type Child = W::Child;
+
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    let w = match this {
+      StateWidget::Stateless(s) => s,
+      StateWidget::Stateful(s) => s.widget.borrow().clone(),
+    };
+    ComposeChild::compose_child(StateWidget::Stateful(w), child)
   }
 }
 

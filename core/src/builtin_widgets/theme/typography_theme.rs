@@ -1,7 +1,6 @@
+use super::Theme;
 use painter::Brush;
 use text::FontFamily;
-
-use crate::prelude::BuildCtx;
 
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
@@ -56,5 +55,5 @@ bitflags! {
 
 impl TypographyTheme {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self { &ctx.theme().typography_theme }
+  pub fn of<'a>(theme: &'a Theme) -> &'a Self { &theme.typography_theme }
 }

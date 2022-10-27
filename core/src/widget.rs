@@ -1,5 +1,5 @@
 pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
-use crate::{context::*, dynamic_widget::ExprWidget};
+use crate::{context::*, dynamic_widget::ExprWidget, prelude::ComposeChild};
 use algo::ShareResource;
 use painter::*;
 
@@ -181,6 +181,14 @@ impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C 
   fn into_widget(self) -> Widget {
     ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
   }
+}
+
+impl<W, C> IntoWidget<dyn ComposeChild<Child = Option<C>>> for W
+where
+  W: ComposeChild<Child = Option<C>> + Into<StateWidget<W>> + 'static,
+{
+  #[inline]
+  fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
 }
 
 impl<R: Render + 'static> IntoWidget<dyn Render> for R {

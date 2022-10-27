@@ -92,7 +92,7 @@ impl GlyphHelper {
 pub struct Input {
   #[declare(default)]
   pub text: String,
-  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
+  #[declare(default = TypographyTheme::of(ctx.theme()).body1.text.clone())]
   pub style: TextStyle,
   #[declare(default)]
   pub caret: CaretState,
