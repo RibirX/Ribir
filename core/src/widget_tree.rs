@@ -6,7 +6,6 @@ use std::{
 };
 
 mod layout_info;
-use crate::prelude::Children;
 use crate::prelude::*;
 pub use layout_info::*;
 
@@ -532,11 +531,13 @@ impl Widget {
         }
       }
 
-      fn push_children(&mut self, children: Children) {
+      fn push_children(&mut self, children: ChildVec<Widget>) {
         if let Some(p) = self.parent {
           self.stack.push(NodeInfo::Parent(p));
         }
-        children.for_each(|w| self.stack.push(NodeInfo::Widget(w)))
+        self
+          .stack
+          .extend(children.into_inner().into_iter().map(NodeInfo::Widget));
       }
 
       fn perpend(&mut self, child: WidgetId, has_child: bool) {

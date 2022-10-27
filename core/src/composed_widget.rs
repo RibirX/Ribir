@@ -14,12 +14,12 @@ impl<B> ComposedWidget<Widget, B> {
 
 impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
   fn into_widget(self) -> Widget {
-    let Widget { node, children } = self.composed;
+    let Widget { node, mut children } = self.composed;
     let by = self.by;
     if let Some(node) = node {
       match node {
         WidgetNode::Compose(c) => {
-          assert!(children.is_none());
+          assert!(children.is_empty());
           (move |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget())
             .into_widget()
         }
@@ -51,10 +51,14 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
         }
       }
     } else {
-      match children {
-        Children::None => Widget { node: None, children: Children::None },
-        Children::Single(s) => Self { composed: *s, by }.into_widget(),
-        Children::Multi(_) => unreachable!("Compose return multi widget, should compile failed."),
+      match children.len() {
+        0 => Widget { node: None, children },
+        1 => Self {
+          composed: children.pop().unwrap(),
+          by,
+        }
+        .into_widget(),
+        _ => unreachable!("Compose return multi widget, should compile failed."),
       }
     }
   }
