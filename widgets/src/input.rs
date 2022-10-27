@@ -186,7 +186,7 @@ impl Compose for Caret {
 
 #[derive(Declare)]
 struct SelectedTextBackground {
-  is_focusing: bool,
+  is_focused: bool,
 
   #[declare(default = TextSelectedBackground::of(ctx).focus.clone())]
   focus_color: Color,
@@ -203,7 +203,7 @@ impl Render for SelectedTextBackground {
   fn perform_layout(&self, _: BoxClamp, _ctx: &mut LayoutCtx) -> Size { Size::zero() }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let color = match self.is_focusing {
+    let color = match self.is_focused {
       true => self.focus_color,
       false => self.blur_color,
     };
@@ -226,13 +226,11 @@ impl Compose for Input {
       track {
         this: this.into_stateful(),
         helper: GlyphHelper::default().into_stateful(),
-        focus: false.into_stateful()
       }
       Stack {
+        id: container,
         char: move |c| this.edit_handle(c.char),
         key_down: move |key| this.key_handle(key),
-        focus: move |_| *focus = true,
-        blur: move |_| *focus = false,
 
         pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
@@ -261,7 +259,7 @@ impl Compose for Input {
           size: INFINITY_SIZE,
         }
         SelectedTextBackground {
-          is_focusing: *focus,
+          is_focused: container.has_focus(),
           rects: helper.select_rects(this.caret.select_range()),
         }
         Text {
@@ -273,7 +271,7 @@ impl Compose for Input {
           },
         }
         ExprWidget {
-          expr: (*focus).then(|| {
+          expr: (container.has_focus()).then(|| {
             widget!{
               Caret {
                 rect: helper.caret(this.caret.cursor().byte_offset()),
