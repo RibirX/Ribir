@@ -34,9 +34,34 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   };
 
   fill_icon! { theme,
-    icons::CHECKED: "./material/checked.svg",
-    icons::UNCHECKED: "./material/unchecked_box.svg",
-    icons::INDETERMINATE: "./material/indeterminate_check_box.svg"
+    icons::ADD_CIRCLE: "./material/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ADD: "./material/add_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ARROW_BACK: "./material/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ARROW_DROP_DOWN: "./material/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ARROW_FORWARD: "./material/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CANCEL: "./material/cancel_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK_BOX: "./material/check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK_BOX_OUTLINE_BLANK: "./material/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK_CIRCLE: "./material/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK: "./material/check_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHEVRON_RIGHT: "./material/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CLOSE: "./material/close_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::DELETE: "./material/delete_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::DONE: "./material/done_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::EXPAND_MORE: "./material/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::FAVORITE: "./material/favorite_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::FILE_DOWNLOAD: "./material/file_download_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::GRADE: "./material/grade_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::HOME: "./material/home_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::INDETERMINATE_CHECK_BOX: "./material/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::LOGIN: "./material/login_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::LOGOUT: "./material/logout_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::MENU: "./material/menu_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::MORE_VERT: "./material/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::REFRESH: "./material/refresh_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::SEARCH: "./material/search_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::SETTINGS: "./material/settings_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::STAR: "./material/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
   fill_compose_style! { theme,
     cs::SCROLLBAR_TRACK: |child| {
@@ -52,6 +77,14 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
         ExprWidget {
           expr: child,
           radius: Radius::all(4.),
+          background: ctx.theme().palette.primary()
+        }
+      }
+    },
+    cs::INK_BAR: |child| {
+      widget! {
+        ExprWidget {
+          expr: child,
           background: ctx.theme().palette.primary()
         }
       }

@@ -20,8 +20,8 @@ pub trait WithChild<M: ?Sized, C> {
 }
 
 pub struct WidgetWithChild<W, C> {
-  pub(crate) widget: W,
-  pub(crate) child: C,
+  pub widget: W,
+  pub child: C,
 }
 
 // implementation of IntoWidget

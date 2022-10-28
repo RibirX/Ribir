@@ -90,11 +90,30 @@ impl GlyphHelper {
 
 #[derive(Declare)]
 pub struct Input {
+  #[declare(default)]
   pub text: String,
   #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
   #[declare(default)]
   pub caret: CaretState,
+
+  #[declare(default, convert=strip_option)]
+  pub placeholder: Option<String>,
+  #[declare(default, convert=strip_option)]
+  pub placeholder_style: Option<TextStyle>,
+}
+
+impl Input {
+  pub fn text_in_show(&self) -> String {
+    if self.text.is_empty() {
+      self
+        .placeholder
+        .as_ref()
+        .map_or(String::default(), |s| s.clone())
+    } else {
+      self.text.clone()
+    }
+  }
 }
 
 impl Input {
@@ -245,10 +264,11 @@ impl Compose for Input {
           let cluster = helper.cluster_from_pos(e.position().x, e.position().y);
           this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
         },
-        pointer_up: move |_e| {
+        pointer_up: move |_| {
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
-                CaretState::Caret(begin as usize)              }
+                CaretState::Caret(begin as usize)
+              }
               else {
               CaretState::Select(begin, end)
             };
@@ -279,6 +299,17 @@ impl Compose for Input {
               }
             }
           })
+        }
+        ExprWidget {
+          expr: (this.text.is_empty() && this.placeholder.is_some()).then(|| {
+            widget! {
+              Text {
+                text: this.placeholder.as_ref().unwrap().clone(),
+                style: this.placeholder_style.as_ref().unwrap_or(&this.style).clone()
+              }
+            }
+          })
+
         }
       }
 
