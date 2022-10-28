@@ -126,7 +126,10 @@ impl WidgetTree {
     loop {
       if let Some(needs_layout) = self.layout_list() {
         needs_layout.iter().for_each(|wid| {
-          let clamp = BoxClamp { min: Size::zero(), max: win_size };
+          let clamp = self
+            .layout_info(*wid)
+            .map(|info| info.clamp)
+            .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
           wid.perform_layout(clamp, self, &mut performed);
         });
       } else {
@@ -655,6 +658,32 @@ mod tests {
       }
       tree.tree_repair();
     });
+  }
+
+  #[test]
+  fn fix_relayout_incorrect_clamp() {
+    let expect_size = Size::new(20., 20.);
+    let no_boundary_size = INFINITY_SIZE.into_stateful();
+    let w = widget! {
+      track { size: no_boundary_size.clone() }
+      MockBox {
+        size: expect_size,
+        MockBox { size: *size }
+      }
+    };
+    let mut wnd = Window::default_mock(w, Some(Size::new(200., 200.)));
+    wnd.draw_frame();
+    let rect = layout_info_by_path(&wnd, &[0, 0]);
+    assert_eq!(rect.size, expect_size);
+
+    // when relayout the inner `MockBox`, its clamp should same with its previous
+    // layout, and clamp its size.
+    {
+      *no_boundary_size.state_ref() = INFINITY_SIZE;
+    }
+    wnd.draw_frame();
+    let rect = layout_info_by_path(&wnd, &[0, 0]);
+    assert_eq!(rect.size, expect_size);
   }
 
   #[test]
