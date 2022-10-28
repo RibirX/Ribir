@@ -56,7 +56,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use ::painter::*;
   #[doc(no_inline)]
-  pub use algo::CowRc;
+  pub use algo::CowArc;
   pub use log;
   #[doc(no_inline)]
   pub use ribir_macros::{

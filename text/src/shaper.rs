@@ -8,9 +8,8 @@ use crate::{
   font_db::{Face, FontDB, ID},
   Em, Glyph, TextDirection,
 };
-use algo::FrameCache;
+use algo::{FrameCache, Substr};
 
-use arcstr::Substr;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 pub use ttf_parser::GlyphId;
 
@@ -268,17 +267,17 @@ impl PartialEq for dyn ShapeKeySlice + '_ {
 
 impl Eq for dyn ShapeKeySlice + '_ {}
 
-impl ToOwned for dyn ShapeKeySlice + '_ {
-  type Owned = ShapeKey;
+// impl ToOwned for dyn ShapeKeySlice + '_ {
+//   type Owned = ShapeKey;
 
-  fn to_owned(&self) -> Self::Owned {
-    ShapeKey {
-      face_ids: self.face_ids().into(),
-      text: self.text().to_owned().into(),
-      direction: self.direction(),
-    }
-  }
-}
+//   fn to_owned(&self) -> Self::Owned {
+//     ShapeKey {
+//       face_ids: self.face_ids().into(),
+//       text: self.text().to_owned().into(),
+//       direction: self.direction(),
+//     }
+//   }
+// }
 
 impl ShapeKeySlice for ShapeKey {
   fn face_ids(&self) -> &[ID] { &self.face_ids }
@@ -363,7 +362,7 @@ mod tests {
     let mut shaper = TextShaper::new(<_>::default());
     shaper.font_db_mut().load_system_fonts();
 
-    let text = arcstr::literal!(concat!["א", "ב", "ג", "a", "b", "c",]).substr(..);
+    let text: Substr = concat!["א", "ב", "ג", "a", "b", "c",].into();
     let ids = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
       ..<_>::default()
@@ -423,7 +422,7 @@ mod tests {
     let shaper = TextShaper::new(font_db.clone());
     font_db.write().unwrap().load_system_fonts();
 
-    let text = arcstr::literal!("⚛∩∗∔⋅⋖⊵⊶⊇≺∹⊈⋫⋷⋝⊿⋌⊷⋖⊐≑⊢⊷⋧");
+    let text: Substr = "⚛∩∗∔⋅⋖⊵⊶⊇≺∹⊈⋫⋷⋝⊿⋌⊷⋖⊐≑⊢⊷⋧".into();
     let ids = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
       ..<_>::default()
@@ -446,7 +445,7 @@ mod tests {
 
     bencher.iter(|| {
       shaper.shape_cache.write().unwrap().clear();
-      let str = arcstr::literal_substr!(include_str!("../../LICENSE"));
+      let str = include_str!("../../LICENSE").into();
       shaper.shape_text(&str, &ids, TextDirection::LeftToRight)
     })
   }

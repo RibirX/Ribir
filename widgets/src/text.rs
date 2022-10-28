@@ -9,8 +9,7 @@ use ribir_core::{
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
   #[declare(convert=into)]
-  // todo: use CowRc<str>,
-  pub text: ArcStr,
+  pub text: CowArc<str>,
   #[declare(default = TypographyTheme::of(ctx.theme()).body1.text.clone())]
   pub style: TextStyle,
 }

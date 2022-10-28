@@ -3,8 +3,7 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use algo::FrameCache;
-use arcstr::Substr;
+use algo::{FrameCache, Substr};
 use lyon_path::geom::{euclid::num::Zero, Point, Rect, Size};
 
 use crate::{
@@ -469,7 +468,6 @@ impl VisualGlyphs {
 
 #[cfg(test)]
 mod tests {
-  use arcstr::{literal_substr, Substr};
 
   use super::*;
   use crate::{shaper::*, FontFace, FontFamily};
@@ -496,13 +494,12 @@ mod tests {
 
   #[test]
   fn simple_text_bounds() {
-    let text = literal_substr!(
-      "Hello
+    let text = "Hello
     
     
     
     world!"
-    );
+      .into();
 
     let visual = typography_text(
       text,
@@ -523,7 +520,7 @@ mod tests {
   #[test]
   fn simple_typography_text() {
     fn glyphs(cfg: TypographyCfg) -> Vec<(f32, f32)> {
-      let text = literal_substr!("Hello--------\nworld!");
+      let text = "Hello--------\nworld!".into();
       let info = typography_text(text, FontSize::Pixel(10.0.into()), cfg);
       info
         .pixel_glyphs()
@@ -670,7 +667,7 @@ mod tests {
       line_dir: PlaceLineDirection::TopToBottom,
       overflow: Overflow::Clip,
     };
-    let text = literal_substr!("hi!");
+    let text: Substr = "hi!".into();
     let font_size = FontSize::Em(Em::absolute(1.));
     assert!(
       store
@@ -709,9 +706,8 @@ mod tests {
       line_dir: PlaceLineDirection::TopToBottom,
       overflow: Overflow::Clip,
     };
-    let text = literal_substr!(
-      "abcd \u{202e} right_to_left_1 \u{202d} embed \u{202c} right_to_left_2 \u{202c} end"
-    );
+    let text =
+      "abcd \u{202e} right_to_left_1 \u{202d} embed \u{202c} right_to_left_2 \u{202c} end".into();
     let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg);
     assert!((0, 4) == graphys.position_by_cluster(4));
     assert!((0, 35) == graphys.position_by_cluster(22));

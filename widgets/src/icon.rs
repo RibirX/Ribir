@@ -1,4 +1,4 @@
-use crate::layout::SizedBox;
+use crate::layout::Container;
 use ribir_core::prelude::*;
 
 /// Widget that let child paint as a icon with special size. Unlike icon in
@@ -16,7 +16,7 @@ impl ComposeChild for Icon {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
-      SizedBox {
+      Container {
         size: this.size,
         ExprWidget {
           expr: child,

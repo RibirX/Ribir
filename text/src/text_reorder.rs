@@ -1,5 +1,4 @@
-use algo::FrameCache;
-use arcstr::Substr;
+use algo::{FrameCache, Substr};
 use std::{
   ops::Range,
   sync::{Arc, RwLock},
@@ -59,7 +58,7 @@ mod tests {
   #[test]
   fn smoke() {
     let mut reorder = TextReorder::default();
-    let text = crate::literal_substr!(concat!["א", "ב", "ג", "a", "b", "c",]).substr(..);
+    let text: Substr = concat!["א", "ב", "ג", "a", "b", "c",].into();
     // No cache exists
     assert!(reorder.get_from_cache(&text).is_none());
 

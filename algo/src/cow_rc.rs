@@ -1,16 +1,81 @@
-use std::{borrow::Borrow, fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+  borrow::Borrow,
+  fmt::Debug,
+  hash::Hash,
+  ops::{Bound, Range},
+  ops::{Deref, RangeBounds},
+  sync::Arc,
+};
 
 #[derive(Eq)]
 
 ///! A copy on write smart pointer shared value without deep clone .
-pub enum CowRc<B: ToOwned + ?Sized + 'static> {
+pub enum CowArc<B: ToOwned + ?Sized + 'static> {
   /// Borrowed  data
   Borrowed(&'static B),
   /// Owned data
   Owned(Arc<B::Owned>),
 }
 
-impl<B: ?Sized + ToOwned> std::ops::Deref for CowRc<B>
+#[derive(Debug, Clone, Eq)]
+pub struct Substr {
+  str: CowArc<str>,
+  rg: Range<usize>,
+}
+
+impl CowArc<str> {
+  pub fn substr(&self, rg: impl RangeBounds<usize>) -> Substr {
+    let start = match rg.start_bound() {
+      Bound::Included(&n) => n,
+      Bound::Excluded(&n) => n + 1,
+      Bound::Unbounded => 0,
+    };
+
+    let end = match rg.end_bound() {
+      Bound::Included(&n) => n + 1,
+      Bound::Excluded(&n) => n,
+      Bound::Unbounded => self.len(),
+    };
+    Substr {
+      str: self.clone(),
+      rg: Range { start, end },
+    }
+  }
+}
+
+impl Substr {
+  pub fn substr(&self, rg: impl RangeBounds<usize>) -> Substr {
+    let offset = self.rg.start;
+    let mut start = match rg.start_bound() {
+      Bound::Included(&n) => n,
+      Bound::Excluded(&n) => n + 1,
+      Bound::Unbounded => 0,
+    };
+
+    let mut end = match rg.end_bound() {
+      Bound::Included(&n) => n + 1,
+      Bound::Excluded(&n) => n,
+      Bound::Unbounded => self.len(),
+    };
+    start += offset;
+    end = self.rg.end.min(end + offset);
+
+    Substr {
+      str: self.str.clone(),
+      rg: start..end,
+    }
+  }
+}
+impl std::ops::Deref for Substr {
+  type Target = str;
+
+  fn deref(&self) -> &str {
+    let Self { str, rg } = self;
+    &str[rg.clone()]
+  }
+}
+
+impl<B: ?Sized + ToOwned> std::ops::Deref for CowArc<B>
 where
   B::Owned: std::borrow::Borrow<B>,
 {
@@ -18,58 +83,58 @@ where
 
   fn deref(&self) -> &B {
     match self {
-      CowRc::Borrowed(borrowed) => borrowed,
-      CowRc::Owned(ref owned) => (&**owned).borrow(),
+      CowArc::Borrowed(borrowed) => borrowed,
+      CowArc::Owned(ref owned) => (&**owned).borrow(),
     }
   }
 }
 
-impl<T: ToOwned + ?Sized + 'static> Clone for CowRc<T> {
+impl<T: ToOwned + ?Sized + 'static> Clone for CowArc<T> {
   #[inline]
   fn clone(&self) -> Self {
     match self {
-      CowRc::Borrowed(borrowed) => CowRc::Borrowed(borrowed),
-      CowRc::Owned(owned) => CowRc::Owned(owned.clone()),
+      CowArc::Borrowed(borrowed) => CowArc::Borrowed(borrowed),
+      CowArc::Owned(owned) => CowArc::Owned(owned.clone()),
     }
   }
 }
 
-impl<B: ?Sized> Debug for CowRc<B>
+impl<B: ?Sized> Debug for CowArc<B>
 where
   B: Debug + ToOwned,
   B::Owned: Debug,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match *self {
-      CowRc::Borrowed(ref b) => Debug::fmt(b, f),
-      CowRc::Owned(ref o) => Debug::fmt(o, f),
+      CowArc::Borrowed(ref b) => Debug::fmt(b, f),
+      CowArc::Owned(ref o) => Debug::fmt(o, f),
     }
   }
 }
 
-impl<T: ToOwned + ?Sized> CowRc<T> {
+impl<T: ToOwned + ?Sized> CowArc<T> {
   #[inline]
-  pub fn borrowed(v: &'static T) -> Self { CowRc::Borrowed(v) }
+  pub fn borrowed(v: &'static T) -> Self { CowArc::Borrowed(v) }
 
   #[inline]
-  pub fn owned(v: T::Owned) -> Self { CowRc::Owned(Arc::new(v)) }
+  pub fn owned(v: T::Owned) -> Self { CowArc::Owned(Arc::new(v)) }
 
   /// Return if two `CowRc` pointer to same allocation.
   pub fn ptr_eq(&self, other: &Self) -> bool {
     match (self, other) {
-      (CowRc::Borrowed(a), CowRc::Borrowed(b)) => std::ptr::eq(a, b),
-      (CowRc::Owned(a), CowRc::Owned(b)) => Arc::ptr_eq(a, b),
+      (CowArc::Borrowed(a), CowArc::Borrowed(b)) => std::ptr::eq(a, b),
+      (CowArc::Owned(a), CowArc::Owned(b)) => Arc::ptr_eq(a, b),
       _ => false,
     }
   }
 
   /// Return true if the data is borrowed
   #[inline]
-  pub fn is_borrowed(&self) -> bool { matches!(self, CowRc::Borrowed(_)) }
+  pub fn is_borrowed(&self) -> bool { matches!(self, CowArc::Borrowed(_)) }
 
   ///  Return  true if the data is owned
   #[inline]
-  pub fn is_owned(&self) -> bool { matches!(self, CowRc::Owned(_)) }
+  pub fn is_owned(&self) -> bool { matches!(self, CowArc::Owned(_)) }
 
   /// Acquires a mutable reference to the owned form of the data.
   /// Clones the data if it is not already owned or other pointer to the same
@@ -78,14 +143,14 @@ impl<T: ToOwned + ?Sized> CowRc<T> {
   where
     T::Owned: Clone,
   {
-    if let CowRc::Borrowed(borrowed) = self {
+    if let CowArc::Borrowed(borrowed) = self {
       let a = Arc::new(borrowed.to_owned());
-      *self = CowRc::Owned(a);
+      *self = CowArc::Owned(a);
     }
 
     let arc = match self {
-      CowRc::Borrowed(_) => unreachable!(),
-      CowRc::Owned(owned) => owned,
+      CowArc::Borrowed(_) => unreachable!(),
+      CowArc::Owned(owned) => owned,
     };
     // Safety:  `Arc::get_mut` and `Arc::make_mut` cannot borrow both in logic.
     let split_lf: &mut _ = unsafe { &mut *(arc as *mut Arc<_>) };
@@ -93,29 +158,29 @@ impl<T: ToOwned + ?Sized> CowRc<T> {
   }
 }
 
-impl<T: ToOwned + ?Sized> From<&'static T> for CowRc<T> {
-  fn from(borrowed: &'static T) -> Self { CowRc::borrowed(borrowed) }
+impl<T: ToOwned + ?Sized> From<&'static T> for CowArc<T> {
+  fn from(borrowed: &'static T) -> Self { CowArc::borrowed(borrowed) }
 }
 
-impl<T: ToOwned<Owned = T>> From<T> for CowRc<T> {
-  fn from(owned: T) -> Self { CowRc::owned(owned) }
+impl<T: ToOwned<Owned = T>> From<T> for CowArc<T> {
+  fn from(owned: T) -> Self { CowArc::owned(owned) }
 }
 
-impl From<String> for CowRc<str> {
+impl From<String> for CowArc<str> {
   #[inline]
-  fn from(str: String) -> Self { CowRc::owned(str) }
+  fn from(str: String) -> Self { CowArc::owned(str) }
 }
 
-impl<B: ?Sized + ToOwned> Borrow<B> for CowRc<B> {
+impl<B: ?Sized + ToOwned> Borrow<B> for CowArc<B> {
   fn borrow(&self) -> &B {
     match self {
-      CowRc::Borrowed(b) => *b,
-      CowRc::Owned(o) => (&**o).borrow(),
+      CowArc::Borrowed(b) => *b,
+      CowArc::Owned(o) => (&**o).borrow(),
     }
   }
 }
 
-impl<B: ?Sized + ToOwned + PartialEq> PartialEq for CowRc<B> {
+impl<B: ?Sized + ToOwned + PartialEq> PartialEq for CowArc<B> {
   fn eq(&self, other: &Self) -> bool {
     let a: &B = self.borrow();
     let b = other.borrow();
@@ -123,10 +188,41 @@ impl<B: ?Sized + ToOwned + PartialEq> PartialEq for CowRc<B> {
   }
 }
 
-impl<B: ?Sized + ToOwned + Hash> Hash for CowRc<B> {
+impl<B: ?Sized + ToOwned + Hash> Hash for CowArc<B> {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
     let borrow: &B = self.borrow();
     borrow.hash(state);
+  }
+}
+
+impl<T: std::ops::Index<Idx> + Clone, Idx> std::ops::Index<Idx> for CowArc<T> {
+  type Output = T::Output;
+
+  #[inline]
+  fn index(&self, index: Idx) -> &Self::Output { &(self.deref())[index] }
+}
+
+impl std::ops::Index<Range<usize>> for Substr {
+  type Output = str;
+
+  #[inline]
+  fn index(&self, rg: Range<usize>) -> &Self::Output { &(self.deref())[rg] }
+}
+
+impl PartialEq for Substr {
+  #[inline]
+  fn eq(&self, other: &Self) -> bool { self.deref() == other.deref() }
+}
+
+impl Hash for Substr {
+  #[inline]
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.deref().hash(state) }
+}
+
+impl<T: Into<CowArc<str>>> From<T> for Substr {
+  fn from(v: T) -> Self {
+    let str = v.into();
+    str.substr(..)
   }
 }
 
@@ -134,7 +230,7 @@ impl<B: ?Sized + ToOwned + Hash> Hash for CowRc<B> {
 fn smoke() {
   static V: i32 = 1;
 
-  let mut cow = CowRc::borrowed(&V);
+  let mut cow = CowArc::borrowed(&V);
   let c_cow = cow.clone();
 
   assert_eq!(cow, c_cow);
