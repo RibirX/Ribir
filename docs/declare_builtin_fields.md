@@ -89,6 +89,12 @@
 - key : [`Key`] 
  	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
+ - `fn has_focus(& self) -> bool`
+ 	- specify the element is focus now
+
+ - `fn is_hover(& self) -> bool`
+ 	- specify the element is mouse hover now
+
  - `fn layout_rect(& self) -> Rect`
  	- return the rect after layout of the widget
 

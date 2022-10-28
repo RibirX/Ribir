@@ -90,11 +90,30 @@ impl GlyphHelper {
 
 #[derive(Declare)]
 pub struct Input {
+  #[declare(default)]
   pub text: String,
   #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
   #[declare(default)]
   pub caret: CaretState,
+
+  #[declare(default, convert=strip_option)]
+  pub placeholder: Option<String>,
+  #[declare(default, convert=strip_option)]
+  pub placeholder_style: Option<TextStyle>,
+}
+
+impl Input {
+  pub fn text_in_show(&self) -> String {
+    if self.text.is_empty() {
+      self
+        .placeholder
+        .as_ref()
+        .map_or(String::default(), |s| s.clone())
+    } else {
+      self.text.clone()
+    }
+  }
 }
 
 impl Input {
@@ -186,7 +205,7 @@ impl Compose for Caret {
 
 #[derive(Declare)]
 struct SelectedTextBackground {
-  is_focusing: bool,
+  is_focused: bool,
 
   #[declare(default = TextSelectedBackground::of(ctx).focus.clone())]
   focus_color: Color,
@@ -203,7 +222,7 @@ impl Render for SelectedTextBackground {
   fn perform_layout(&self, _: BoxClamp, _ctx: &mut LayoutCtx) -> Size { Size::zero() }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let color = match self.is_focusing {
+    let color = match self.is_focused {
       true => self.focus_color,
       false => self.blur_color,
     };
@@ -226,13 +245,11 @@ impl Compose for Input {
       track {
         this: this.into_stateful(),
         helper: GlyphHelper::default().into_stateful(),
-        focus: false.into_stateful()
       }
       Stack {
+        id: container,
         char: move |c| this.edit_handle(c.char),
         key_down: move |key| this.key_handle(key),
-        focus: move |_| *focus = true,
-        blur: move |_| *focus = false,
 
         pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
@@ -247,10 +264,11 @@ impl Compose for Input {
           let cluster = helper.cluster_from_pos(e.position().x, e.position().y);
           this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
         },
-        pointer_up: move |_e| {
+        pointer_up: move |_| {
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
-                CaretState::Caret(begin as usize)              }
+                CaretState::Caret(begin as usize)
+              }
               else {
               CaretState::Select(begin, end)
             };
@@ -261,7 +279,7 @@ impl Compose for Input {
           size: INFINITY_SIZE,
         }
         SelectedTextBackground {
-          is_focusing: *focus,
+          is_focused: container.has_focus(),
           rects: helper.select_rects(this.caret.select_range()),
         }
         Text {
@@ -273,7 +291,7 @@ impl Compose for Input {
           },
         }
         ExprWidget {
-          expr: (*focus).then(|| {
+          expr: (container.has_focus()).then(|| {
             widget!{
               Caret {
                 rect: helper.caret(this.caret.cursor().byte_offset()),
@@ -281,6 +299,17 @@ impl Compose for Input {
               }
             }
           })
+        }
+        ExprWidget {
+          expr: (this.text.is_empty() && this.placeholder.is_some()).then(|| {
+            widget! {
+              Text {
+                text: this.placeholder.as_ref().unwrap().clone(),
+                style: this.placeholder_style.as_ref().unwrap_or(&this.style).clone()
+              }
+            }
+          })
+
         }
       }
 
