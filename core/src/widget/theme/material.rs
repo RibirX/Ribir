@@ -80,6 +80,14 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
           background: ctx.theme().palette.primary()
         }
       }
+    },
+    cs::INK_BAR: |child| {
+      widget! {
+        ExprWidget {
+          expr: child,
+          background: ctx.theme().palette.primary()
+        }
+      }
     }
   };
 

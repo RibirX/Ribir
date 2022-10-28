@@ -47,6 +47,7 @@ pub mod cs {
     BEGIN,
     SCROLLBAR_TRACK,
     SCROLLBAR_THUMB,
+    INK_BAR,
     THEME_EXTEND
   }
 }

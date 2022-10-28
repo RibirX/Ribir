@@ -29,47 +29,53 @@ impl ComposeChild for Tabs {
       panes.push(w.child.1.child);
     }
 
+    let tab_size = panes.len();
+
     widget! {
       track {
         this: this.into_stateful()
       }
 
       Column {
-        Row {
-          border: Border::only_bottom(BorderSide {
-            width: 1., color: ctx.theme().palette.primary
-          }),
-
-          ExprWidget {
-            expr: {
-              let tab_bottom_active_border = Border::only_bottom(BorderSide {
-                width: 2., color: ctx.theme().palette.success
-              });
-              headers.into_iter()
-                .enumerate()
-                .map(move |(idx, header)| {
-                  widget! {
-                    Expanded {
-                      flex: 1.,
-                      tap: move |_| {
-                        if this.cur_idx != idx {
-                          this.cur_idx = idx;
+        LayoutBox {
+          id: stack,
+          Stack {
+            Row {
+              border: Border::only_bottom(BorderSide {
+                width: 1., color: ctx.theme().palette.primary()
+              }),
+              ExprWidget {
+                expr: {
+                  headers.into_iter()
+                    .enumerate()
+                    .map(move |(idx, header)| {
+                      widget! {
+                        Expanded {
+                          flex: 1.,
+                          tap: move |_| {
+                            if this.cur_idx != idx {
+                              this.cur_idx = idx;
+                            }
+                          },
+                          ExprWidget {
+                            h_align: HAlign::Center,
+                            v_align: VAlign::Center,
+    
+                            expr: header
+                          }
                         }
-                      },
-                      ExprWidget {
-                        border: if this.cur_idx == idx {
-                          Some(tab_bottom_active_border)
-                        } else {
-                          None
-                        },
-                        h_align: HAlign::Center,
-                        v_align: VAlign::Center,
-                        
-                        expr: header
                       }
-                    }
-                  }
-                })
+                    })
+                }
+              }
+            }
+            Container {
+              id: ink_bar,
+              width: 0.,
+              height: 0.,
+              left_anchor: 0.,
+              top_anchor: 0.,
+              compose_styles: [cs::INK_BAR],
             }
           }
         }
@@ -85,6 +91,37 @@ impl ComposeChild for Tabs {
                 }
               }
             })
+        }
+
+      }
+      
+      on this.cur_idx {
+        change: move |(_, after)| {
+          let Size { width, height, .. } = stack.box_rect().size;
+          let pos = (after as f32) * width / (tab_size as f32);
+          ink_bar.left_anchor = PositionUnit::Pixel(pos);
+          ink_bar.top_anchor = PositionUnit::Pixel(height - 2.);
+        }
+      }
+
+      on stack.box_rect().size {
+        change: move |(_, after)| {
+          ink_bar.width = after.width / (tab_size as f32);
+          ink_bar.height = 2.;
+
+          let Size { width, height, .. } = stack.box_rect().size;
+          let pos = (this.cur_idx as f32) * width / (tab_size as f32);
+          ink_bar.left_anchor = PositionUnit::Pixel(pos);
+          ink_bar.top_anchor = PositionUnit::Pixel(height - 2.);
+        }
+      }
+
+      change_on ink_bar.left_anchor Animate {
+        transition: transitions::EASE_IN.get_from_or_default(ctx),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(0.);
+          let to = to.abs_value(0.);
+          PositionUnit::Pixel(from.lerp(&to, rate))
         }
       }
     }
