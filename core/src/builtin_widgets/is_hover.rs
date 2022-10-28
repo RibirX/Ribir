@@ -19,8 +19,7 @@ impl ComposeChild for IsHover {
     let this = this.into_stateful();
 
     widget! {
-    track {this}
-
+      track {this}
       ExprWidget {
         expr: child,
         pointer_enter: move |_| this.hover = true,

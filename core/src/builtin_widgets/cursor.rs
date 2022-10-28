@@ -15,19 +15,22 @@ impl ComposeChild for Cursor {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
+      track { save_cursor: None.into_stateful() }
       ExprWidget {
         expr: child,
-        pointer_move: move |e: &mut PointerEvent| {
-
+        pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()
           {
             let mut ctx = e.context();
-            if ctx.stage_cursor_icon().is_none () {
-              ctx.set_cursor_icon(this.cursor.get());
-            }
+            *save_cursor = ctx.stage_cursor_icon();
+            ctx.set_cursor_icon(this.cursor.get());
           }
         },
+        pointer_leave: move |e: &mut PointerEvent| {
+          let cursor = save_cursor.unwrap_or_default();
+          e.context().set_cursor_icon(cursor);
+        }
       }
     }
   }
@@ -98,11 +101,9 @@ mod tests {
           MockBox {
             size: Size::new(200., 200.),
             cursor: CursorIcon::Hand,
-            MockMulti {
-              MockBox {
-                size:  Size::new(100., 100.),
-                cursor: CursorIcon::Help,
-              }
+            MockBox {
+              size:  Size::new(100., 100.),
+              cursor: CursorIcon::Help,
             }
           }
         }
