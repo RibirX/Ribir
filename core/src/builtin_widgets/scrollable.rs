@@ -104,19 +104,16 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::MockBox;
+  use crate::test::{layout_info_by_path, MockBox};
 
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
-    let global_pos = Stateful::new(Point::zero());
     let w = widget! {
-      track { global_pos: global_pos.clone() }
       MockBox {
         size: Size::new(1000., 1000.),
         scrollable,
-        performed_layout: move|ctx| *global_pos = ctx.map_to_global(Point::zero())
       }
     };
 
@@ -133,9 +130,10 @@ mod tests {
     });
 
     wnd.layout_ready();
-
-    assert_eq!(global_pos.raw_ref().x, expect_x);
-    assert_eq!(global_pos.raw_ref().y, expect_y);
+    let rect = layout_info_by_path(&wnd, &[0, 0, 0, 0]);
+    assert_eq!(rect.origin.y, expect_y);
+    let rect = layout_info_by_path(&wnd, &[0, 0, 0, 0, 0]);
+    assert_eq!(rect.origin.x, expect_x);
   }
 
   #[test]

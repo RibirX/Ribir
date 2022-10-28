@@ -91,7 +91,10 @@ impl WidgetTree {
       }
 
       let mut relayout_root = *id;
-      self.layout_store.remove(id);
+      if let Some(info) = self.layout_store.get_mut(id) {
+        info.rect.take();
+      }
+
       // All ancestors of this render widget should relayout until the one which only
       // sized by parent.
       for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
@@ -103,7 +106,10 @@ impl WidgetTree {
           break;
         }
 
-        self.layout_store.remove(&p);
+        if let Some(info) = self.layout_store.get_mut(&p) {
+          info.rect.take();
+        }
+
         relayout_root = p
       }
       needs_layout.push(relayout_root);

@@ -117,7 +117,8 @@ impl Render for MockMulti {
 }
 
 impl Render for MockBox {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    clamp.max = clamp.max.min(self.size);
     ctx
       .single_child()
       .map(|c| ctx.perform_child_layout(c, clamp));
