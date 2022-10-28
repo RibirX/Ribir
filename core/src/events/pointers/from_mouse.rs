@@ -6,7 +6,7 @@ use crate::{
 use winit::event::MouseButton;
 
 impl PointerEvent {
-  pub(crate) fn from_mouse(target: WidgetId, tree: &WidgetTree, info: &mut DispatchInfo) -> Self {
+  pub(crate) fn from_mouse(target: WidgetId, tree: &WidgetTree, info: &DispatchInfo) -> Self {
     PointerEvent {
       // todo: how to generate pointer id ?
       id: PointerId(0),

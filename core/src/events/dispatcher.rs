@@ -195,52 +195,70 @@ impl Dispatcher {
   fn pointer_enter_leave_dispatch(&mut self, tree: &mut WidgetTree) {
     let new_hit = self.hit_widget(tree);
 
-    let mut already_entered = vec![];
+    let already_entered_start = new_hit
+      .and_then(|new_hit| {
+        self
+          .entered_widgets
+          .iter()
+          .rev()
+          .position(|e| !e.ancestors_of(new_hit, tree))
+      })
+      .map_or_else(
+        || self.entered_widgets.len(),
+        |idx| self.entered_widgets.len() - idx,
+      );
 
-    for w in self.entered_widgets.drain(..) {
-      if w.is_dropped(tree) {
-        continue;
+    let mut already_entered = vec![];
+    self.entered_widgets[already_entered_start..].clone_into(&mut already_entered);
+
+    // fire leave
+    self.entered_widgets[..already_entered_start]
+      .iter()
+      .filter(|w| !w.is_dropped(tree))
+      .for_each(|l| {
+        let mut event = PointerEvent::from_mouse(*l, tree, &self.info);
+        l.assert_get(tree).query_all_type(
+          |pointer: &PointerLeaveListener| {
+            pointer.dispatch(&mut event);
+            !event.bubbling_canceled()
+          },
+          QueryOrder::InnerFirst,
+        );
+      });
+
+    let new_enter_end = self.entered_widgets.get(already_entered_start).cloned();
+    self.entered_widgets.clear();
+
+    // fire new entered
+    if let Some(hit_widget) = new_hit {
+      // collect new entered
+      for w in hit_widget.ancestors(tree) {
+        if Some(w) != new_enter_end {
+          let obj = w.assert_get(tree);
+          if obj.contain_type::<PointerEnterListener>()
+            || obj.contain_type::<PointerLeaveListener>()
+          {
+            self.entered_widgets.push(w);
+          }
+        } else {
+          break;
+        }
       }
-      match new_hit {
-        Some(new_hit) if w.ancestors_of(new_hit, tree) => already_entered.push(w),
-        _ => {
-          let mut event = PointerEvent::from_mouse(w, tree, &mut self.info);
-          w.assert_get(tree).query_all_type(
-            |pointer: &PointerLeaveListener| {
+
+      self.entered_widgets.iter().rev().for_each(|w| {
+        let obj = w.assert_get(tree);
+        if obj.contain_type::<PointerEnterListener>() {
+          let mut event = PointerEvent::from_mouse(*w, tree, &mut self.info);
+          obj.query_all_type(
+            |pointer: &PointerEnterListener| {
               pointer.dispatch(&mut event);
               !event.bubbling_canceled()
             },
             QueryOrder::InnerFirst,
           );
         }
-      };
-    }
-
-    if let Some(hit_widget) = new_hit {
-      hit_widget
-        .ancestors(tree)
-        .filter(|w| {
-          w.get(tree)
-            .map_or(false, |w| w.contain_type::<PointerEnterListener>())
-        })
-        .for_each(|w| self.entered_widgets.push(w));
-
-      self
-        .entered_widgets
-        .iter()
-        .rev()
-        .filter(|w| !already_entered.iter().any(|e| e != *w))
-        .for_each(|&w| {
-          let mut event = PointerEvent::from_mouse(w, tree, &mut self.info);
-
-          w.assert_get(tree).query_all_type(
-            |pointer: &PointerEnterListener| {
-              pointer.dispatch(&mut event);
-              !event.bubbling_canceled()
-            },
-            QueryOrder::OutsideFirst,
-          );
-        });
+      });
+      self.entered_widgets.extend(already_entered);
     }
   }
 
