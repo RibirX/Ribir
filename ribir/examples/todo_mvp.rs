@@ -132,6 +132,11 @@ impl TodoMVP {
                 Row {
                   align_items: Align::Center,
                   margin: EdgeInsets::vertical(4.),
+
+                  mounted: move |_, _| {
+                    *mount_idx = *mount_task_cnt;
+                    *mount_task_cnt +=1;
+                  },
                   pointer_enter: move |_| { *visible_delete = true; },
                   pointer_leave: move |_| { *visible_delete = false; },
                   Checkbox { id: checkbox, checked }
@@ -153,6 +158,9 @@ impl TodoMVP {
                       }
                     }
                   }
+                }
+                on task {
+                  mounted: move |_, _| mount_animate.run()
                 }
                 on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
               }
