@@ -10,7 +10,7 @@ use ribir_core::prelude::*;
 #[derive(Declare)]
 pub struct Label {
   #[declare(convert=into)]
-  pub desc: ArcStr,
+  pub desc: CowArc<str>,
   /// the position to place the label.
   #[declare(default)]
   pub position: Position,

@@ -583,7 +583,7 @@ mod tests {
   use crate::TriangleLists;
   use painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
 
-  use text::{font_db::FontDB, literal_substr, shaper::TextShaper, TypographyStore};
+  use text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
   extern crate test;
   use test::Bencher;
 
@@ -817,8 +817,7 @@ mod tests {
   text_bench!(
     chinese_2500,
     chinese_2500_with_cache,
-    literal_substr!(
-      "一乙二十丁厂七卜人入八九几儿了力乃刀又三于干亏士工土才寸下大丈与万
+    "一乙二十丁厂七卜人入八九几儿了力乃刀又三于干亏士工土才寸下大丈与万
     上小口巾山千乞川亿个勺久凡及夕丸么广亡门义之尸弓己已子卫也女飞刃习叉马乡丰王井开夫天无元专
     云扎艺木五支厅不太犬区历尤友匹车巨牙屯比互切瓦止少日中冈贝内水见午牛手毛气升长仁什片仆化仇
     币仍仅斤爪反介父从今凶分乏公仓月氏勿欠风丹匀乌凤勾文六方火为斗忆订计户认心尺引丑巴孔队办以
@@ -867,7 +866,6 @@ mod tests {
     蔬横槽樱橡飘醋醉震霉瞒题暴瞎影踢踏踩踪蝶蝴嘱墨镇靠稻黎稿稼箱箭篇僵躺僻德艘膝膛熟摩颜毅糊遵
     潜潮懂额慰劈操燕薯薪薄颠橘整融醒餐嘴蹄器赠默镜赞篮邀衡膨雕磨凝辨辩糖糕燃澡激懒壁避缴戴擦鞠
     藏霜霞瞧蹈螺穗繁辫赢糟糠燥臂翼骤鞭覆蹦镰翻鹰警攀蹲颤瓣爆疆壤耀躁嚼嚷籍魔灌蠢霸露囊罐"
-    )
   );
 
   fn default_painter() -> Painter {

@@ -5,14 +5,13 @@
 #![feature(test)]
 pub mod font_db;
 pub mod shaper;
-use std::hash::Hash;
-
+pub use algo::Substr;
 use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+use std::hash::Hash;
 pub mod text_reorder;
 pub mod typography;
-pub use arcstr::{literal, literal_substr, ArcStr, Substr};
 use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
 use ttf_parser::GlyphId;
