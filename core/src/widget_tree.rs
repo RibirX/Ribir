@@ -538,7 +538,11 @@ impl Widget {
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::test::{MockBox, MockMulti};
+  use crate::test::{
+    MockBox, MockMulti,
+    embed_post::EmbedPost, expect_layout_result, key_embed_post::EmbedPostWithKey,
+    recursive_row::RecursiveRow, ExpectRect, LayoutTestItem,
+  };
 
   use super::*;
   use std::rc::Rc;
@@ -772,5 +776,47 @@ mod tests {
       *trigger.silent_ref() = 2;
     }
     assert!(tree.needs_regen.borrow().is_empty())
+  }
+
+  // #[cfg(feature = "png")]
+  #[test]
+  fn need_paint_translate() {
+    let widget = widget! {
+      Column {
+        Row {
+          SizedBox { size: Size::new(20., 20.), background: Color::YELLOW }
+
+          SizedBox {
+            size: Size::new(30., 20.),
+            background: Color::YELLOW,
+            visible: false,
+          }
+        }
+        Row {
+          SizedBox { size: Size::new(20., 20.), background: Color::BLUE }
+
+          SizedBox {
+            size: Size::new(30., 20.),
+            background: Color::YELLOW,
+            visible: false,
+          }
+        }
+        Row {
+          SizedBox { size: Size::new(20., 20.), background: Color::RED }
+
+          SizedBox {
+            size: Size::new(30., 20.),
+            background: Color::YELLOW,
+            visible: false,
+          }
+        }
+      }
+    };
+    let mut window = Window::wgpu_headless(widget.into_widget(), DeviceSize::new(100, 100));
+    window.draw_frame();
+
+    // let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // expected.push("src/test_imgs/checkbox_indeterminate.png");
+    // window.write_as_png(expected.clone());
   }
 }

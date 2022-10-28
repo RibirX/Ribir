@@ -15,7 +15,7 @@ pub struct BoxDecoration {
   pub radius: Option<Radius>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Copy)]
 pub struct Border {
   pub left: BorderSide,
   pub right: BorderSide,
@@ -23,7 +23,7 @@ pub struct Border {
   pub bottom: BorderSide,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Lerp)]
+#[derive(Debug, Default, Clone, PartialEq, Lerp, Copy)]
 pub struct BorderSide {
   pub color: Color,
   pub width: f32,
@@ -210,6 +210,31 @@ impl Border {
       top: side.clone(),
       bottom: side,
     }
+  }
+
+  #[inline]
+  pub fn only_left(left: BorderSide) -> Self {
+    Self { left, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn only_right(right: BorderSide) -> Self {
+    Self { right, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn only_bottom(bottom: BorderSide) -> Self {
+    Self { bottom, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn only_top(top: BorderSide) -> Self {
+    Self { top, ..Default::default() }
+  }
+
+  #[inline]
+  pub fn none() -> Self {
+    Self { ..Default::default() }
   }
 }
 #[cfg(test)]
