@@ -601,3 +601,21 @@ pub fn builtin_obj(src_name: &Ident, ty: &str, fields: SmallVec<[Field; 1]>) -> 
   let ty = Ident::new(ty, src_name.span()).into();
   DeclareObj::new(ty, name, fields)
 }
+
+impl NamedObj {
+  pub fn name(&self) -> &Ident {
+    match self {
+      NamedObj::Host(obj) => &obj.name,
+      NamedObj::Builtin { obj, .. } => &obj.name,
+      NamedObj::DuplicateListener { objs, .. } => &objs.first().unwrap().name,
+    }
+  }
+
+  pub fn ty(&self) -> &Path {
+    match self {
+      NamedObj::Host(obj) => &obj.ty,
+      NamedObj::Builtin { obj, .. } => &obj.ty,
+      NamedObj::DuplicateListener { objs, .. } => &objs.first().unwrap().ty,
+    }
+  }
+}

@@ -10,7 +10,10 @@ use super::{
 use proc_macro::Span;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use std::collections::{HashMap, HashSet};
+use std::{
+  collections::{HashMap, HashSet},
+  hash::Hash,
+};
 use syn::{
   parse_quote, parse_quote_spanned, spanned::Spanned, token::Brace, visit_mut, visit_mut::VisitMut,
   Expr, ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
@@ -29,7 +32,7 @@ bitflags::bitflags! {
 
 pub struct VisitCtx {
   /// All declared object.
-  pub declare_objs: HashSet<Ident, ahash::RandomState>,
+  pub declare_objs: HashMap<Ident, Path, ahash::RandomState>,
   pub track_names: HashSet<Ident, ahash::RandomState>,
   pub current_used_info: ScopeUsedInfo,
   /// name object has be used and its source name.
@@ -412,7 +415,7 @@ impl VisitCtx {
       .find(|v| &v.name == ident)
       .and_then(|v| v.alias_of_name.as_ref())
       .or_else(|| {
-        (self.declare_objs.contains(ident) || self.track_names.contains(ident)).then(|| ident)
+        (self.declare_objs.contains_key(ident) || self.track_names.contains(ident)).then(|| ident)
       })
   }
 
@@ -467,7 +470,11 @@ impl VisitCtx {
     let name = path.get_ident()?;
     let name = self.find_named_obj(name)?;
 
-    if self.declare_objs.contains(&name) {
+    if self
+      .declare_objs
+      .get(&name)
+      .map_or(false, |ty| !ty.is_ident(builtin_ty))
+    {
       let builtin_name = builtin_var_name(&name, span, builtin_ty);
       let src_name = name.clone();
       *path = parse_quote! { #builtin_name };
