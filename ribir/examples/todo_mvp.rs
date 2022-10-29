@@ -1,6 +1,4 @@
 use ribir::prelude::*;
-use std::time::Duration;
-use self::text::ArcStr;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {
@@ -53,7 +51,7 @@ impl Compose for TodoMVP {
               }
               Text {
                 text: "Add",
-                style: TypographyTheme::of(ctx).button.text.clone(),
+                style: TypographyTheme::of(ctx.theme()).button.text.clone(),
               }
             }
           }
@@ -99,23 +97,19 @@ impl Compose for TodoMVP {
                 expr: TodoMVP::pane(this.clone_stateful(), |task| task.finished)
               }
             }
-
           }
         }
-
-        
       }
     }
   }
 }
 
 impl TodoMVP {
-  fn pane(this: Stateful<Self>, cond: impl Fn(&Task)-> bool + 'static) -> Widget{
-    widget!{
+  fn pane(this: Stateful<Self>, cond: impl Fn(&Task) -> bool + 'static) -> Widget {
+    widget! {
       track { this, this2: this.clone() }
       VScrollBar {
         background: Brush::Color(Color::BURLYWOOD),
-
         Column {
           align_items: Align::Start,
           padding: EdgeInsets::all(8.),
@@ -132,11 +126,6 @@ impl TodoMVP {
                 Row {
                   align_items: Align::Center,
                   margin: EdgeInsets::vertical(4.),
-
-                  mounted: move |_, _| {
-                    *mount_idx = *mount_task_cnt;
-                    *mount_task_cnt +=1;
-                  },
                   pointer_enter: move |_| { *visible_delete = true; },
                   pointer_leave: move |_| { *visible_delete = false; },
                   Checkbox { id: checkbox, checked }
@@ -158,9 +147,6 @@ impl TodoMVP {
                       }
                     }
                   }
-                }
-                on task {
-                  mounted: move |_, _| mount_animate.run()
                 }
                 on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
               }
@@ -185,7 +171,7 @@ impl Compose for TabText {
         this: this.into_stateful()
       }
       Text {
-        text: ArcStr::from(String::from(this.tab_text.as_str()).as_str()),
+        text: this.tab_text.clone(),
         padding: EdgeInsets::all(4.),
         h_align: HAlign::Center,
         style: TextStyle {
