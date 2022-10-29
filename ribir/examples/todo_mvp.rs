@@ -120,31 +120,23 @@ impl TodoMVP {
               let checked = task.finished;
               let label = task.label.clone();
               widget! {
-                track {
-                  visible_delete: Stateful::new(false),
-                }
-                Row {
-                  align_items: Align::Center,
-                  margin: EdgeInsets::vertical(4.),
-                  pointer_enter: move |_| { *visible_delete = true; },
-                  pointer_leave: move |_| { *visible_delete = false; },
-                  Checkbox { id: checkbox, checked }
-                  Expanded {
-                    flex: 1.,
-                    Text {
-                      text: label,
-                      margin: EdgeInsets::vertical(4.)
-                    }
+                Stack {
+                  id: item, 
+                  Checkbox { 
+                    id: checkbox, 
+                    checked,
+                    margin: EdgeInsets::vertical(4.),
+                    h_align: HAlign::Stretch,
+                    Label { desc: label }
                   }
                   Icon {
-                    visible: *visible_delete,
+                    visible: item.is_hover(),
+                    h_align: HAlign::Right,
                     tap: move |_| {
-                      this2.tasks.remove(idx);
+                       this2.tasks.remove(idx);
                     },
                     ExprWidget {
-                      expr: {
-                        icons::CLOSE.of_or_miss(ctx.theme())
-                      }
+                      expr: icons::CLOSE.of_or_miss(ctx.theme())
                     }
                   }
                 }
