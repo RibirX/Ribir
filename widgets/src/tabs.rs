@@ -1,5 +1,5 @@
-use ribir_core::prelude::*;
 use crate::prelude::*;
+use ribir_core::prelude::*;
 
 #[derive(Declare, SingleChild)]
 pub struct Tab;
@@ -17,7 +17,7 @@ pub struct Tabs {
 }
 
 impl ComposeChild for Tabs {
-  type Child = Vec<
+  type Child = ChildVec<
     WidgetWithChild<
       Tab,
       (
@@ -33,7 +33,7 @@ impl ComposeChild for Tabs {
     let mut headers = vec![];
     let mut panes = vec![];
 
-    for w in children.into_iter() {
+    for w in children.into_inner().into_iter() {
       headers.push(w.child.0.child);
       panes.push(w.child.1.child);
     }
@@ -112,13 +112,13 @@ impl ComposeChild for Tabs {
           ink_bar.top_anchor = PositionUnit::Pixel(height - 2.);
         }
       }
-      
+
       on stack.layout_width() {
         change: move |(_, after)| {
           let width = after / (tab_size as f32);
           let height = 2.;
           ink_bar.size = Size::new(width, height);
-          
+
           let pos = (this.cur_idx as f32) * width / (tab_size as f32);
           ink_bar.left_anchor = PositionUnit::Pixel(pos);
         }
