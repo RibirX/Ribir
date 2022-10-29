@@ -325,6 +325,23 @@ fn fix_builtin_field_can_declare_as_widget() {
 }
 
 #[test]
+fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
+  let w = widget! {
+    Margin {
+      id: margin,
+      margin: EdgeInsets::all(1.),
+      Void {}
+    }
+    on margin.margin.clone() {
+      change: |(_, _)| {}
+    }
+  };
+
+  let wnd = Window::default_mock(w, None);
+  assert_eq!(wnd.widget_count(), 2);
+}
+
+#[test]
 fn fix_access_builtin_with_gap() {
   widget! {
     Void {

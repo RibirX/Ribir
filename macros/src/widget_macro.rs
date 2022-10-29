@@ -51,7 +51,11 @@ pub fn gen_widget_macro(
   let mut desugar = macro_syntax.desugar();
 
   let mut ctx = VisitCtx {
-    declare_objs: desugar.named_objs.names().cloned().collect(),
+    declare_objs: desugar
+      .named_objs
+      .objs()
+      .map(|obj| (obj.name().clone(), obj.ty().clone()))
+      .collect(),
     track_names: desugar
       .track
       .iter()
