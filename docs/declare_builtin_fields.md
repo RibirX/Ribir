@@ -54,8 +54,6 @@
  	 - specify how rounded the corners have of the widget.
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.
-- compose_styles : [`SmallVec < [ComposeStyleIdent ; 1] >`] 
- 	 - compose_styles specify one or more `compose style` to a widget, `compose style` is an identify of a function defined in `Theme` which support convert a widget to another, in normal do some thing decoration in it.
 - margin : [`impl EdgeInsets`] 
  	 - expand space around widget wrapped.
 - scrollable : [`Scrollable`] 

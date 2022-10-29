@@ -16,6 +16,15 @@ pub struct Tabs {
   pub cur_idx: usize,
 }
 
+#[derive(Declare, Debug)]
+pub struct InkBarStyle;
+
+impl ComposeStyle for InkBarStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: StateWidget<Self>, host: Widget) -> Widget { host }
+}
+
 impl ComposeChild for Tabs {
   type Child = ChildVec<
     WidgetWithChild<
@@ -78,12 +87,14 @@ impl ComposeChild for Tabs {
                 }
               }
             }
-            Container {
+            InkBarStyle {
               id: ink_bar,
-              size: Size::new(0., 0.),
               left_anchor: 0.,
               top_anchor: 0.,
-              compose_styles: [cs::INK_BAR],
+              Container {
+                id: ink_box,
+                size: Size::new(0., 0.),
+              }
             }
           }
         }
@@ -117,7 +128,7 @@ impl ComposeChild for Tabs {
         change: move |(_, after)| {
           let width = after / (tab_size as f32);
           let height = 2.;
-          ink_bar.size = Size::new(width, height);
+          ink_box.size = Size::new(width, height);
 
           let pos = (this.cur_idx as f32) * width / (tab_size as f32);
           ink_bar.left_anchor = PositionUnit::Pixel(pos);

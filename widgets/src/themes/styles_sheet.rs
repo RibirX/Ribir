@@ -38,20 +38,3 @@ pub mod icons {
     THEME_EXTEND
   );
 }
-
-pub mod cs {
-  use ribir_core::{define_compose_style_ident, prelude::ComposeStyleIdent};
-  pub const BEGIN: ComposeStyleIdent = ComposeStyleIdent::new(0);
-
-  define_compose_style_ident! {
-    BEGIN,
-    SCROLLBAR_TRACK,
-    SCROLLBAR_THUMB,
-    H_SCROLLBAR_TRACK,
-    H_SCROLLBAR_THUMB,
-    V_SCROLLBAR_TRACK,
-    V_SCROLLBAR_THUMB,
-    INK_BAR,
-    THEME_EXTEND
-  }
-}

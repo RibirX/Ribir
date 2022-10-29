@@ -1,145 +1,113 @@
 use crate::prelude::*;
-use smallvec::SmallVec;
-use std::collections::HashMap;
+use std::{any::type_name, collections::HashMap};
 
 /// Compose style is a compose child widget to decoration its child.
-#[derive(Clone, Default)]
+#[derive(Default, Clone)]
 pub struct ComposeStyles {
-  styles: HashMap<ComposeStyleIdent, Box<dyn ComposeStyle>, ahash::RandomState>,
+  styles: HashMap<TypeId, Box<dyn ComposeStyleOverride>, ahash::RandomState>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct ComposeStyleIdent(pub usize);
-
-pub trait ComposeStyle: Fn(Widget) -> Widget {
-  fn box_clone(&self) -> Box<dyn ComposeStyle>;
-
-  fn as_fn(&self) -> &dyn Fn(Widget) -> Widget;
+/// `ComposeStyle` is a trait let you can convert your host widget to another,
+/// it has same signature of `ComposeChild`, but it can be overwrote in `Theme`
+/// by a function. The trait implementation only as a default logic if no
+/// overwrite function in `Theme`.
+pub trait ComposeStyle {
+  type Host;
+  fn compose_style(this: StateWidget<Self>, style: Self::Host) -> Widget
+  where
+    Self: Sized;
 }
 
-#[derive(Declare)]
-pub struct ComposeStylesWidget {
-  #[declare(builtin, convert=into)]
-  compose_styles: SmallVec<[ComposeStyleIdent; 1]>,
-}
+impl<W: ComposeStyle + 'static> ComposeChild for W {
+  type Child = W::Host;
 
-/// macro use to define a identify of [`ComposeStyleIdent`]!.
-#[macro_export]
-macro_rules! define_compose_style_ident {
-    ($from: expr, $define: ident, $($ident: ident),+) => {
-      define_compose_style_ident!($from, $define);
-      define_compose_style_ident!(ComposeStyleIdent($define.0 + 1), $($ident), +);
-    };
-    ($value: expr, $define: ident) => {
-      pub const $define: ComposeStyleIdent = $value;
-    }
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    let widget = (move |ctx: &mut BuildCtx| {
+      let style = ctx.theme().compose_styles.styles.get(&TypeId::of::<Self>());
+      if let Some(style) = style {
+        (style.override_fn())(Box::new(this), Box::new(child))
+      } else {
+        ComposeStyle::compose_style(this, child)
+      }
+    })
+    .into_widget();
+    ComposedWidget::<Widget, W>::new(widget).into_widget()
   }
-
-/// macro use to specify the compose style widget for the identify.
-#[macro_export]
-macro_rules! fill_compose_style {
-  ($theme: expr, $($name: path: $expr: expr),+) => {
-    $($theme.compose_styles.set_style($name, Box::new($expr));)+
-  };
 }
 
-/// The user custom icon identify define start from.
-pub const CUSTOM_STYLE_START: ComposeStyleIdent = ComposeStyleIdent::new(65536);
-
-impl ComposeStyles {
+impl Theme {
   #[inline]
-  pub fn set_style(
+  pub fn overwrite_compose_style<W: ComposeStyle + 'static>(
     &mut self,
-    ident: ComposeStyleIdent,
-    style: Box<dyn ComposeStyle>,
-  ) -> Option<Box<dyn ComposeStyle>> {
-    self.styles.insert(ident, style)
+    compose_style: impl Fn(StateWidget<W>, W::Host) -> Widget + Clone + 'static,
+  ) {
+    self.compose_styles.styles.insert(
+      TypeId::of::<W>(),
+      Box::new(move |this: Box<dyn Any>, host: Box<dyn Any>| {
+        let this = this.downcast().expect(&format!(
+          "Caller should guarantee the boxed type is StateWidget<{}>.",
+          type_name::<W>(),
+        ));
+        let host = host.downcast().expect(&format!(
+          "Caller should guarantee the boxed type is {}.",
+          type_name::<W::Host>(),
+        ));
+        compose_style(*this, *host)
+      }),
+    );
   }
 }
 
-impl ComposeStyleIdent {
-  pub const fn new(idx: usize) -> Self { Self(idx) }
+trait ComposeStyleOverride {
+  fn box_clone(&self) -> Box<dyn ComposeStyleOverride>;
 
-  /// get the svg icon of the ident from the context if it have.
-  pub fn of<'a>(self, theme: &'a Theme) -> Option<&'a dyn Fn(Widget) -> Widget> {
-    theme
-      .compose_styles
-      .styles
-      .get(&self)
-      .map(ComposeStyle::as_fn)
-  }
+  fn override_fn(&self) -> &dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget;
 }
 
-impl Clone for Box<dyn ComposeStyle> {
+impl Clone for Box<dyn ComposeStyleOverride> {
   #[inline]
   fn clone(&self) -> Self { self.deref().box_clone() }
 }
 
-impl<F: Fn(Widget) -> Widget + Clone + 'static> ComposeStyle for F {
+impl<F> ComposeStyleOverride for F
+where
+  F: Fn(Box<dyn Any>, Box<dyn Any>) -> Widget + Clone + 'static,
+{
   #[inline]
-  fn box_clone(&self) -> Box<dyn ComposeStyle> { Box::new(self.clone()) }
-
+  fn box_clone(&self) -> Box<dyn ComposeStyleOverride> { Box::new(self.clone()) }
   #[inline]
-  fn as_fn(&self) -> &dyn Fn(Widget) -> Widget { self }
-}
-
-impl ComposeChild for ComposeStylesWidget {
-  type Child = Widget;
-
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    let this = match this {
-      StateWidget::Stateless(this) => this,
-      StateWidget::Stateful(_) => {
-        panic!(
-          "compose styles not support as a stateful widget, it's not support to \
-          reactive on the change. So not directly depends on any others as a \
-          builtin widget declare in `widget!`, or use `ExprWidget` to generate \
-          dynamic compose style instead of."
-        )
-      }
-    };
-
-    widget! {
-      ExprWidget {
-        expr: this.compose_styles.iter().filter_map(|compose_style| {
-          let style = compose_style.of(ctx.theme());
-          if style.is_none() {
-            log::warn!("use an compose style not init in theme.");
-          }
-          style
-        }).fold(child, | child, compose_style| {
-          compose_style(child)
-        })
-      }
-    }
-  }
+  fn override_fn(&self) -> &dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget { self }
 }
 
 #[cfg(test)]
 mod tests {
-  use crate::{define_compose_style_ident, fill_compose_style, prelude::*, test::*};
+  use crate::{prelude::*, test::*};
   use std::rc::Rc;
 
   #[test]
   fn compose_style_smoke() {
     let mut theme = Theme::default();
 
-    define_compose_style_ident!(CUSTOM_STYLE_START, SIZE_100);
-    fill_compose_style!(theme,
-      SIZE_100: |child| {
+    #[derive(Declare)]
+    struct Size100Style;
+
+    impl ComposeStyle for Size100Style {
+      type Host = Widget;
+      fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
+    }
+    theme.overwrite_compose_style::<Size100Style>(|_, host| {
       widget! {
         MockBox {
           size: Size::new(100., 100.),
-          ExprWidget { expr: child }
+          ExprWidget { expr: host }
         }
       }
     });
 
     let w = widget! {
-      MockBox {
-        compose_styles: [SIZE_100],
+      Size100Style { MockBox {
         size: Size::zero(),
-      }
+      }}
     };
 
     let ctx = AppContext {
