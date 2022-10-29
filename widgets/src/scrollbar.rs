@@ -1,5 +1,4 @@
 use crate::layout::{Container, Stack};
-use crate::themes::cs;
 use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
@@ -17,6 +16,70 @@ pub struct ScrollBarTheme {
   pub thumb_min_size: f32,
   /// The thickness of scrollbar element.
   pub thickness: f32,
+}
+
+/// Compose style that use to decoration the track of horizontal scrollbar,
+/// overwrite it when init theme.
+#[derive(Debug, Declare)]
+pub struct HScrollBarTrackStyle;
+
+impl ComposeStyle for HScrollBarTrackStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: StateWidget<Self>, host: Widget) -> Widget { host }
+}
+
+/// Compose style that use to decoration the track of vertical scrollbar,
+/// overwrite it when init theme.
+#[derive(Debug, Declare)]
+pub struct VScrollBarTrackStyle;
+
+impl ComposeStyle for VScrollBarTrackStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: StateWidget<Self>, host: Widget) -> Widget { host }
+}
+
+/// Compose style that use to decoration the thumb of horizontal scrollbar,
+/// overwrite it when init theme.
+#[derive(Debug, Declare)]
+pub struct HScrollBarThumbStyle {
+  pub offset: f32,
+}
+
+impl ComposeStyle for HScrollBarThumbStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(this: StateWidget<Self>, host: Widget) -> Widget {
+    widget! {
+      track { this: this.into_stateful() }
+      ExprWidget {
+        left_anchor: this.offset,
+        expr: host
+      }
+    }
+  }
+}
+
+/// Compose style that use to decoration the thumb of vertical scrollbar,
+/// overwrite it when init theme.
+#[derive(Debug, Declare)]
+pub struct VScrollBarThumbStyle {
+  pub offset: f32,
+}
+
+impl ComposeStyle for VScrollBarThumbStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(this: StateWidget<Self>, host: Widget) -> Widget {
+    widget! {
+      track { this: this.into_stateful() }
+      ExprWidget {
+        top_anchor: this.offset,
+        expr: host
+      }
+    }
+  }
 }
 
 impl ComposeChild for HScrollBar {
@@ -140,36 +203,26 @@ impl Compose for HRawScrollbar {
 
       Stack {
         visible: scrolling.can_scroll(),
-        Container {
+        HScrollBarTrackStyle { Container {
           id: track_box,
           size: Size::new(f32::MAX, thumb_outline.layout_height()),
-          compose_styles: [cs::H_SCROLLBAR_TRACK],
-        }
+        }}
         LayoutBox {
           id: thumb_outline,
-          Container {
-            id: thumb,
-            size: {
-              let page_width = scrolling.scroll_view_size().width;
-              let content_width = scrolling.scroll_content_size().width;
-              let width = page_width / content_width * track_box.layout_width();
-              Size::new(width.max(thumb_min_size), thickness)
-            },
-            left_anchor: {
+          HScrollBarThumbStyle{
+            offset: {
               let content_width = scrolling.scroll_content_size().width;
               -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
             },
-            compose_styles: [cs::H_SCROLLBAR_THUMB],
-          }
-        }
-      }
-
-      change_on thumb.left_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
-        lerp_fn: move |from, to, rate| {
-          let from = from.abs_value(thumb.size.width);
-          let to = to.abs_value(thumb.size.width);
-          PositionUnit::Pixel(from.lerp(&to, rate))
+            Container {
+              size: {
+                let page_width = scrolling.scroll_view_size().width;
+                let content_width = scrolling.scroll_content_size().width;
+                let width = page_width / content_width * track_box.layout_width();
+                Size::new(width.max(thumb_min_size), thickness)
+              },
+            }
+         }
         }
       }
     }
@@ -199,36 +252,26 @@ impl Compose for VRawScrollbar {
 
       Stack {
         visible: scrolling.can_scroll(),
-        Container {
+        VScrollBarTrackStyle { Container {
           id: track_box,
           size: Size::new(thumb_outline.layout_width() , f32::MAX),
-          compose_styles: [cs::V_SCROLLBAR_TRACK],
-        }
+        }}
         LayoutBox {
           id: thumb_outline,
-          Container {
-            id: thumb,
-            size: {
-              let page_height = scrolling.scroll_view_size().height;
-              let content_height = scrolling.scroll_content_size().height;
-              let height = page_height / content_height * track_box.layout_height();
-              Size::new(thickness, height.max(thumb_min_size))
-            },
-            top_anchor: {
+          VScrollBarThumbStyle {
+            offset: {
               let content_height = scrolling.scroll_content_size().height;
               -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
             },
-            compose_styles: [cs::V_SCROLLBAR_THUMB],
+            Container {
+              size: {
+                let page_height = scrolling.scroll_view_size().height;
+                let content_height = scrolling.scroll_content_size().height;
+                let height = page_height / content_height * track_box.layout_height();
+                Size::new(thickness, height.max(thumb_min_size))
+              },
+            }
           }
-        }
-      }
-
-      change_on thumb.top_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
-        lerp_fn: move |from, to, rate| {
-          let from = from.abs_value(thumb.size.height);
-          let to = to.abs_value(thumb.size.height);
-          PositionUnit::Pixel(from.lerp(&to, rate))
         }
       }
     }

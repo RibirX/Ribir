@@ -141,14 +141,6 @@ builtin! {
     cursor: CursorIcon
   }
 
-  ComposeStylesWidget {
-    #[doc="compose_styles specify one or more `compose style` to a widget, \
-    `compose style` is an identify of a function defined in `Theme` which \
-    support convert a widget to another, in normal do some thing decoration \
-    in it."]
-    compose_styles: SmallVec<[ComposeStyleIdent; 1]>,
-  }
-
   Margin {
     #[doc="expand space around widget wrapped."]
     margin: impl EdgeInsets,

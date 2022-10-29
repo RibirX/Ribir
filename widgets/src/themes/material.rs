@@ -1,7 +1,6 @@
-use crate::prelude::{CheckBoxTheme, ScrollBarTheme};
-
 pub use super::*;
-use ribir_core::{fill_compose_style, fill_icon, prelude::*};
+use crate::prelude::*;
+use ribir_core::{fill_icon, prelude::*};
 
 /// Crate a material theme with palette.
 pub fn new(brightness: Brightness, palette: Palette) -> Theme {
@@ -62,69 +61,76 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     icons::SETTINGS: "./material/settings_FILL0_wght400_GRAD0_opsz48.svg",
     icons::STAR: "./material/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
-  fill_compose_style! { theme,
-    cs::SCROLLBAR_TRACK: |child| {
-      widget!{
-        ExprWidget {
-          expr: child,
-          background: ctx.theme().palette.primary_container()
-        }
-      }
-    },
-    cs::SCROLLBAR_THUMB: |child| {
-      widget!{
-        ExprWidget {
-          expr: child,
-          radius: Radius::all(4.),
-          background: ctx.theme().palette.primary()
-        }
-      }
-    },
-    cs::INK_BAR: |child| {
-      widget! {
-        ExprWidget {
-          expr: child,
-          background: ctx.theme().palette.primary()
-        }
-      }
-    },
-    cs::H_SCROLLBAR_TRACK: |child| {
-      widget!{
-        ExprWidget{
-          expr: child,
-          compose_styles: [cs::SCROLLBAR_TRACK]
-        }
-      }
-    },
-    cs::H_SCROLLBAR_THUMB: |child| {
-      widget!{
-        ExprWidget{
-          expr: child,
-          margin: EdgeInsets::vertical(1.),
-          compose_styles: [cs::SCROLLBAR_THUMB]
-        }
-      }
-    },
-    cs::V_SCROLLBAR_TRACK: |child| {
-      widget!{
-        ExprWidget{
-          expr: child,
-          compose_styles: [cs::SCROLLBAR_TRACK]
-        }
-      }
-    },
-    cs::V_SCROLLBAR_THUMB: |child| {
-      widget!{
-        ExprWidget{
-          expr: child,
-          margin: EdgeInsets::horizontal(1.),
-          compose_styles: [cs::SCROLLBAR_THUMB]
-        }
-      }
-    }
-  };
+
+  overwrite_compose_styles(&mut theme);
   init_custom_theme(&mut theme);
   theme
+}
+
+fn overwrite_compose_styles(theme: &mut Theme) {
+  fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
+    widget! {
+      ExprWidget {
+        expr: host,
+        margin,
+        radius: Radius::all(4.),
+        background: ctx.theme().palette.primary()
+      }
+    }
+  }
+  fn scrollbar_track(host: Widget) -> Widget {
+    widget! {
+      ExprWidget {
+        expr: host,
+        background: ctx.theme().palette.primary_container()
+      }
+    }
+  }
+  fn lerp_position(from: &PositionUnit, to: &PositionUnit, rate: f32, size: f32) -> PositionUnit {
+    let from = from.abs_value(size);
+    let to = to.abs_value(size);
+    PositionUnit::Pixel(from.lerp(&to, rate))
+  }
+  theme.overwrite_compose_style::<HScrollBarThumbStyle>(|this, host| {
+    widget! {
+      track { this: this.into_stateful() }
+      ExprWidget {
+        id: thumb,
+        left_anchor: this.offset,
+        expr: scrollbar_thumb(host, EdgeInsets::vertical(1.))
+      }
+
+      change_on thumb.left_anchor Animate {
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
+        lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_width()),
+      }
+    }
+  });
+  theme.overwrite_compose_style::<VScrollBarThumbStyle>(|this, host| {
+    widget! {
+      track { this: this.into_stateful() }
+      ExprWidget {
+        id: thumb,
+        top_anchor: this.offset,
+        expr: scrollbar_thumb(host, EdgeInsets::vertical(1.))
+      }
+
+      change_on thumb.top_anchor Animate {
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
+        lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_height()),
+      }
+    }
+  });
+  theme.overwrite_compose_style::<HScrollBarTrackStyle>(|_, host| scrollbar_track(host));
+  theme.overwrite_compose_style::<VScrollBarTrackStyle>(|_, host| scrollbar_track(host));
+  theme.overwrite_compose_style::<InkBarStyle>(|_, host| {
+    widget! {
+      ExprWidget {
+        expr: host,
+        background: ctx.theme().palette.primary()
+      }
+    }
+  });
 }
 
 fn init_custom_theme(theme: &mut Theme) {
@@ -134,6 +140,7 @@ fn init_custom_theme(theme: &mut Theme) {
     label_style: TypographyTheme::of(theme).body1.text.clone(),
   });
 }
+
 pub mod purple {
   use super::*;
 
