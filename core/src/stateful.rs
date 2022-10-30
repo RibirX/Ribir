@@ -314,6 +314,11 @@ impl<W: Render + 'static> Render for Stateful<W> {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { self.widget.borrow().paint(ctx) }
+
+  #[inline]
+  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+    self.widget.borrow().hit_test(ctx, pos)
+  }
 }
 
 impl<W: Compose> Compose for Stateful<W> {

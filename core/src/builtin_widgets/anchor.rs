@@ -65,6 +65,10 @@ impl Render for LeftAnchor {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 impl Render for RightAnchor {
@@ -79,6 +83,10 @@ impl Render for RightAnchor {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 impl Render for TopAnchor {
@@ -92,6 +100,10 @@ impl Render for TopAnchor {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 impl Render for BottomAnchor {
@@ -106,6 +118,10 @@ impl Render for BottomAnchor {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 impl From<f32> for PositionUnit {

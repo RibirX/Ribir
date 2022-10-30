@@ -17,7 +17,7 @@ impl Render for IgnorePointer {
 
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest {
-      hit: !self.ignore,
+      hit: false,
       can_hit_child: !self.ignore,
     }
   }

@@ -21,7 +21,7 @@ impl Render for Offstage {
 
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest {
-      hit: !self.offstage,
+      hit: false,
       can_hit_child: !self.offstage,
     }
   }

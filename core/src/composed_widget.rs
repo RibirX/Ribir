@@ -71,10 +71,13 @@ impl<B: 'static> Render for ComposedWidget<Box<dyn Render>, B> {
   }
 
   #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
+
+  #[inline]
   fn only_sized_by_parent(&self) -> bool { self.composed.only_sized_by_parent() }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.composed.paint(ctx) }
+  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.composed.hit_test(ctx, pos) }
 }
 
 impl<W: SingleChild, B> SingleChild for ComposedWidget<W, B> {}
