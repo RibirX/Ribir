@@ -83,6 +83,11 @@ impl Render for HAlignWidget {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  #[inline]
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 impl Query for HAlignWidget {
@@ -105,6 +110,11 @@ impl Render for VAlignWidget {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  #[inline]
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 impl Query for VAlignWidget {

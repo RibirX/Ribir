@@ -200,13 +200,9 @@ impl Dispatcher {
         self
           .entered_widgets
           .iter()
-          .rev()
-          .position(|e| !e.ancestors_of(new_hit, tree))
+          .position(|e| e.ancestors_of(new_hit, tree))
       })
-      .map_or_else(
-        || self.entered_widgets.len(),
-        |idx| self.entered_widgets.len() - idx,
-      );
+      .unwrap_or_else(|| self.entered_widgets.len());
 
     let mut already_entered = vec![];
     self.entered_widgets[already_entered_start..].clone_into(&mut already_entered);
@@ -636,6 +632,16 @@ mod tests {
       position: (99, 99).into(),
       modifiers: ModifiersState::default(),
     });
+    assert_eq!(&*leave_event.borrow(), &[1]);
+
+    // move in same widget,
+    // check if duplicate event fired.
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (99, 99).into(),
+      modifiers: ModifiersState::default(),
+    });
+    assert_eq!(&*enter_event.borrow(), &[2, 1]);
     assert_eq!(&*leave_event.borrow(), &[1]);
 
     // leave all
