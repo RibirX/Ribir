@@ -49,17 +49,31 @@ impl WidgetTree {
   pub(crate) fn draw(&self, painter: &mut Painter) {
     let mut w = Some(self.root());
 
+    fn paint_rect_interset(painter: &mut Painter, rc: &Rect) -> bool {
+      let paint_rect = painter.get_transform().outer_transformed_rect(rc);
+      painter
+        .visiual_rect()
+        .and_then(|rc| rc.intersection(&paint_rect))
+        .is_some()
+    }
+
     let mut paint_ctx = PaintingCtx::new(self.root(), self, painter);
     while let Some(id) = w {
       paint_ctx.id = id;
       paint_ctx.painter.save();
 
-      let need_paint: bool = !id.is_offstage(self);
+      let layout_box = paint_ctx
+        .box_rect()
+        .expect("when paint node, it's mut be already layout.");
+
+      let need_paint: bool = paint_ctx.painter.alpha() != 0.
+        && paint_rect_interset(paint_ctx.painter, &layout_box)
+        && !id.is_offstage(self);
+
       if need_paint {
-        let rect = paint_ctx
-          .box_rect()
-          .expect("when paint node, it's mut be already layout.");
-        paint_ctx.painter.translate(rect.min_x(), rect.min_y());
+        paint_ctx
+          .painter
+          .translate(layout_box.min_x(), layout_box.min_y());
         id.assert_get(self).paint(&mut paint_ctx);
       }
 
@@ -574,6 +588,8 @@ mod tests {
   };
 
   use super::*;
+  use painter::{font_db::FontDB, shaper::TextShaper};
+  use std::{sync::Arc, sync::RwLock};
   use test::Bencher;
 
   #[derive(Clone, Debug)]
@@ -830,5 +846,50 @@ mod tests {
       *trigger.silent_ref() = 2;
     }
     assert!(tree.needs_regen.borrow().is_empty())
+  }
+
+  #[test]
+  fn draw_clip() {
+    let mut font_db = FontDB::default();
+    font_db.load_system_fonts();
+    let font_db = Arc::new(RwLock::new(font_db));
+    let shaper = TextShaper::new(font_db.clone());
+    let store = TypographyStore::new(<_>::default(), font_db.clone(), shaper);
+    let win_size = Size::new(150., 50.);
+    let mut painter = Painter::new(2., store, win_size);
+
+    let w1 = widget! {
+       MockMulti {
+        ExprWidget {
+          expr: (0..100).map(|_|
+            widget! {MockBox {
+             size: Size::new(150., 50.),
+             background: Color::BLUE,
+          }}).collect::<Vec<_>>()
+        }
+    }};
+    let mut tree1 = WidgetTree::new(w1, <_>::default());
+    tree1.tree_repair();
+    tree1.tree_ready(win_size);
+    tree1.draw(&mut painter);
+
+    let len_100_widget = painter.finish().len();
+
+    let w2 = widget! {
+       MockMulti {
+        ExprWidget {
+          expr: (0..1).map(|_|
+            widget! {MockBox {
+             size: Size::new(150., 50.),
+             background: Color::BLUE,
+          }}).collect::<Vec<_>>()
+        }
+    }};
+    let mut tree2 = WidgetTree::new(w2, <_>::default());
+    tree2.tree_repair();
+    tree2.tree_ready(win_size);
+    tree2.draw(&mut painter);
+    let len_1_widget = painter.finish().len();
+    assert_eq!(len_1_widget, len_100_widget);
   }
 }

@@ -9,7 +9,7 @@ use gpu::wgpu_backend_headless;
 fn red_img_test<B: PainterBackend>(mut backend: B) {
   let font_db = Arc::new(RwLock::new(FontDB::default()));
   let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
-  let mut painter = Painter::new(1., store);
+  let mut painter = Painter::new(1., store, Size::new(512., 512.));
   painter
     .set_brush(Color::RED)
     .rect(&Rect::from_size(Size::new(100., 100.)))

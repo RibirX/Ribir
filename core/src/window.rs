@@ -144,7 +144,7 @@ impl Window {
       dispatcher.focus(auto_focusing, &mut widget_tree)
     }
     let typography = context.typography_store.clone();
-    let painter = Painter::new(wnd.scale_factor() as f32, typography);
+    let painter = Painter::new(wnd.scale_factor() as f32, typography, wnd.inner_size());
     Self {
       dispatcher,
       raw_window: Box::new(wnd),
@@ -159,6 +159,7 @@ impl Window {
     self.painter.finish();
     self.widget_tree.mark_dirty(self.widget_tree.root());
     self.p_backend.resize(size);
+    self.painter.resize(self.raw_window.inner_size());
     self.raw_window.request_redraw();
   }
 
