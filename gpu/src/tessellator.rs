@@ -872,6 +872,6 @@ mod tests {
     let font_db = Arc::new(RwLock::new(FontDB::default()));
     font_db.write().unwrap().load_system_fonts();
     let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
-    Painter::new(1., store)
+    Painter::new(1., store, Size::new(4096., 1024.))
   }
 }

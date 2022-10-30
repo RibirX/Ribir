@@ -17,6 +17,7 @@ use text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
 /// bottom edge of the canvas.
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
+  size: Size,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: Builder,
@@ -86,20 +87,49 @@ struct PainterState {
   transform: Transform,
   opacity: f32,
   clip_cnt: u32,
+  visiual_rect: Option<Rect>,
+}
+
+impl PainterState {
+  fn new(size: Size) -> PainterState {
+    PainterState {
+      visiual_rect: Some(Rect::new(Point::zero(), size)),
+      stroke_options: <_>::default(),
+      font_size: FontSize::Pixel(14.0.into()),
+      letter_space: None,
+      brush: Color::BLACK.into(),
+      font_face: FontFace::default(),
+      text_line_height: None,
+      transform: Transform::new(1., 0., 0., 1., 0., 0.),
+      clip_cnt: 0,
+      opacity: 1.,
+    }
+  }
 }
 
 impl Painter {
-  pub fn new(device_scale: f32, typography_store: TypographyStore) -> Self {
+  pub fn new(device_scale: f32, typography_store: TypographyStore, size: Size) -> Self {
+    let size = Size::new(size.width * device_scale, size.height * device_scale);
     let mut p = Self {
       device_scale,
-      state_stack: vec![PainterState::default()],
+      state_stack: vec![PainterState::new(size)],
       commands: vec![],
       path_builder: Path::builder(),
       typography_store,
+      size,
     };
     p.scale(device_scale, device_scale);
     p
   }
+
+  pub fn resize(&mut self, logic_size: Size) {
+    self.size = Size::new(
+      logic_size.width * self.device_scale,
+      logic_size.height * self.device_scale,
+    );
+  }
+
+  pub fn visiual_rect(&mut self) -> Option<Rect> { self.current_state().visiual_rect }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
@@ -140,7 +170,7 @@ impl Painter {
       self.device_scale = scale;
     }
     self.state_stack.clear();
-    self.state_stack.push(PainterState::default());
+    self.state_stack.push(PainterState::new(self.size));
     self.scale(self.device_scale, self.device_scale);
   }
 
@@ -257,10 +287,17 @@ impl Painter {
 
   pub fn clip<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
     let transform = self.current_state().transform;
+    let path: Resource<Path> = path.into();
+    let path_rect = transform.outer_transformed_rect(&path.box_rect());
+    self.current_state_mut().visiual_rect = self
+      .current_state()
+      .visiual_rect
+      .and_then(|rc| rc.intersection(&path_rect));
     self.commands.push(PaintCommand::PushClip(ClipInstruct {
-      path: PaintPath::Path(path.into()),
+      path: PaintPath::Path(path),
       transform,
     }));
+
     self.current_state_mut().clip_cnt += 1;
     self
   }
@@ -569,23 +606,6 @@ impl<'a> DerefMut for PainterGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }
 
-impl Default for PainterState {
-  #[inline]
-  fn default() -> Self {
-    Self {
-      stroke_options: <_>::default(),
-      font_size: FontSize::Pixel(14.0.into()),
-      letter_space: None,
-      brush: Color::BLACK.into(),
-      font_face: FontFace::default(),
-      text_line_height: None,
-      transform: Transform::new(1., 0., 0., 1., 0., 0.),
-      clip_cnt: 0,
-      opacity: 1.,
-    }
-  }
-}
-
 pub fn typography_with_text_style<T: Into<Substr>>(
   store: &TypographyStore,
   text: T,
@@ -648,6 +668,7 @@ mod test {
         <_>::default(),
         TextShaper::new(<_>::default()),
       ),
+      Size::new(512., 512.),
     );
     {
       let mut paint = layer.save_guard();

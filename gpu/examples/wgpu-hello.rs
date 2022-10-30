@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use gpu::wgpu_backend_with_wnd;
 use painter::{
   image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, ShallowImage,
-  TileMode,
+  Size, TileMode,
 };
 use text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
 use winit::{
@@ -88,7 +88,7 @@ fn main() {
       }
       let font_db = Arc::new(RwLock::new(FontDB::default()));
       let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
-      let mut painter = Painter::new(2., store);
+      let mut painter = Painter::new(2., store, Size::new(512., 512.));
       let red_brush = Brush::from(Color::RED);
       let img_brush = Brush::Image {
         img: img.clone(),
