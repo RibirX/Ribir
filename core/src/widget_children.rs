@@ -100,22 +100,6 @@ where
   }
 }
 
-impl<W, E, R, M: ?Sized> IntoWidget<(ExprWidget<E>, &M)> for WidgetWithChild<ExprWidget<E>, W>
-where
-  E: FnMut(&mut BuildCtx) -> R + 'static,
-  R: SingleChild + Render + 'static,
-  W: IntoWidget<M>,
-{
-  #[inline]
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    let mut widget = widget.into_widget();
-    widget.children = ChildVec(vec![child.into_widget()]);
-
-    widget
-  }
-}
-
 impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, ExprWidget<&M2>)>
   for WidgetWithChild<W, ExprWidget<E>>
 where
@@ -154,8 +138,21 @@ where
   }
 }
 
-impl<R: SingleChild, E> SingleChild for ExprWidget<E> where E: FnMut(&mut BuildCtx) -> R {}
-impl<R: MultiChild, E> MultiChild for ExprWidget<E> where E: FnMut(&mut BuildCtx) -> R {}
+impl<R, E, C, M1: ?Sized, M2: ?Sized, M3: ?Sized> WithChild<(&M1, &M2, &M3), C> for ExprWidget<E>
+where
+  E: FnMut(&mut BuildCtx) -> R + 'static,
+  R: WithChild<M2, C> + IntoChild<M3, Option<Widget>>,
+  C: IntoChild<M1, ChildVec<Widget>>,
+{
+  type Target = Widget;
+
+  fn with_child(self, child: C) -> Self::Target {
+    let mut widget = self.into_widget();
+    assert!(widget.children.is_empty());
+    widget.children = child.into_child();
+    widget
+  }
+}
 
 pub trait IntoChild<M: ?Sized, C> {
   fn into_child(self) -> C;
@@ -403,6 +400,8 @@ where
 
 #[cfg(test)]
 mod tests {
+  use crate::test::{MockBox, MockMulti};
+
   use super::*;
 
   #[test]
@@ -478,6 +477,41 @@ mod tests {
       A {
         B {}
         B {}
+      }
+    };
+  }
+
+  #[test]
+  fn expr_with_child() {
+    let size = Size::zero().into_stateful();
+    // with single child
+    let _e = widget! {
+      track { size: size.clone() }
+      ExprWidget {
+        expr: if size.area() > 0. {
+           MockBox { size: *size }
+        } else {
+          MockBox { size: Size::new(1., 1.) }
+        },
+        MockBox { size: *size }
+      }
+    };
+    // with multi child
+    let _e = widget! {
+      track { size: size.clone() }
+      ExprWidget {
+        expr: if size.area() > 0. { MockMulti {} } else { MockMulti {} },
+        MockBox { size: Size::zero() }
+        MockBox { size: Size::zero() }
+        MockBox { size: Size::zero() }
+      }
+    };
+    // option with single child
+    let _e = widget! {
+      track { size: size.clone() }
+      ExprWidget {
+        expr: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
+        MockBox { size: Size::zero() }
       }
     };
   }
