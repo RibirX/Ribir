@@ -91,13 +91,18 @@ builtin! {
   }
 
   HasFocus {
-    #[doc="specify the element is focus now"]
+    #[doc="return if the widget has focus."]
     fn has_focus(&self) -> bool,
   }
 
-  IsHover {
-    #[doc="specify the element is mouse hover now"]
-    fn is_hover(&self) -> bool,
+  MouseHover {
+    #[doc="return if the pointer is hover on the widget"]
+    fn mouse_hover(&self) -> bool,
+  }
+
+  PointerPressed {
+    #[doc="return if the widget is pressed"]
+    fn pointer_pressed(&self) -> bool,
   }
 
   FittedBox {
