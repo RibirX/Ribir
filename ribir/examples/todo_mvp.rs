@@ -130,7 +130,7 @@ impl TodoMVP {
                     Label { desc: label }
                   }
                   Icon {
-                    visible: item.is_hover(),
+                    visible: item.mouse_hover(),
                     h_align: HAlign::Right,
                     tap: move |_| {
                        this2.tasks.remove(idx);
