@@ -18,7 +18,7 @@ pub enum MountedType {
 /// Listener perform when its child widget add to the widget tree.
 #[derive(Declare)]
 pub struct MountedListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(LifeCycleCtx<'r>, MountedType)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(LifeCycleCtx<'r>, MountedType), wrap_fn=RefCell::new))]
   pub mounted: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, MountedType)>>,
 }
 

@@ -5,22 +5,17 @@ use crate::{
 use std::time::Instant;
 
 #[derive(Declare)]
-pub struct Animate<T, I, F, W, R, L>
-where
-  I: Fn() -> R,
-  F: Fn() -> R,
-  W: FnMut(R) + 'static,
-  L: FnMut(&R, &R, f32) -> R,
-{
+pub struct Animate<T, S> {
   pub transition: T,
   #[declare(rename = from)]
-  state: AnimateState<I, F, W>,
+  state: AnimateState<S>,
   /// function calc the linearly lerp value by rate, three arguments are
   /// `from` `to` and `rate`, specify `lerp_fn` when the animate state not
   /// implement `Lerp` trait or you want to specify a custom lerp function.
-  lerp_fn: L,
+  #[declare(convert=box_trait(Fn(&S, &S, f32)-> S))]
+  lerp_fn: Box<dyn Fn(&S, &S, f32) -> S>,
   #[declare(skip)]
-  running_info: Option<AnimateInfo<R>>,
+  running_info: Option<AnimateInfo<S>>,
   #[declare(skip, default = ctx.app_ctx().frame_ticker.clone())]
   frame_ticker: FrameTicker,
 }
@@ -35,15 +30,9 @@ pub struct AnimateInfo<S> {
   _tick_msg_guard: Option<SubscriptionGuard<MutRc<SingleSubscription>>>,
 }
 
-impl<'a, T, I, F, W, R, L> StateRef<'a, Animate<T, I, F, W, R, L>>
+impl<'a, T: Roc, S: Clone> StateRef<'a, Animate<T, S>>
 where
-  I: Fn() -> R,
-  F: Fn() -> R,
-  W: FnMut(R),
-  T: Roc,
-  R: Clone,
-  L: FnMut(&R, &R, f32) -> R,
-  Animate<T, I, F, W, R, L>: 'static,
+  Animate<T, S>: 'static,
 {
   pub fn run(&mut self) {
     let new_to = self.state.finial_value();
@@ -83,15 +72,7 @@ where
   }
 }
 
-impl<T, I, F, W, R, L> Animate<T, I, F, W, R, L>
-where
-  I: Fn() -> R,
-  F: Fn() -> R,
-  W: FnMut(R),
-  T: Roc,
-  R: Clone,
-  L: FnMut(&R, &R, f32) -> R,
-{
+impl<T: Roc, S: Clone> Animate<T, S> {
   fn lerp(&mut self, now: Instant) -> AnimateProgress {
     let AnimateInfo {
       from,

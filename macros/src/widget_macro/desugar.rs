@@ -296,7 +296,7 @@ impl Animate {
       fields.push(field);
     }
 
-    let ty = parse_quote! {#animate_token<_, _, _, _, _, _>};
+    let ty = parse_quote! {#animate_token<_, _>};
     if let Some(Id { name, .. }) = id {
       let c_name = name.clone();
       desugared.add_named_host_obj(DeclareObj::new(ty, name, fields));

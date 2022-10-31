@@ -5,7 +5,7 @@ use std::cell::RefCell;
 /// pushed to the end of a string.
 #[derive(Declare)]
 pub struct CharListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut CharEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut CharEvent), wrap_fn = RefCell::new))]
   char: RefCell<Box<dyn for<'r> FnMut(&'r mut CharEvent)>>,
 }
 

@@ -651,9 +651,9 @@ impl ToTokens for AnimateState {
 
     quote_spanned! { state_span =>
       AnimateState::new(
-        move ||  #init_value,
-        move || #target_value,
-        move |#v| #target_assign = #v
+        Box::new(move ||  #init_value),
+        Box::new(move || #target_value),
+        Box::new(move |#v| #target_assign = #v)
       )
     }
     .to_tokens(tokens);

@@ -1,22 +1,23 @@
-pub struct AnimateState<I, F, W> {
-  init_fn: I,
-  final_fn: F,
-  write_fn: W,
+pub struct AnimateState<S> {
+  init_fn: Box<dyn Fn() -> S>,
+  final_fn: Box<dyn Fn() -> S>,
+  write_fn: Box<dyn Fn(S)>,
 }
 
-impl<I, F, W, R> AnimateState<I, F, W>
-where
-  I: Fn() -> R,
-  F: Fn() -> R,
-  W: FnMut(R) + 'static,
-{
+impl<S> AnimateState<S> {
   #[inline]
-  pub fn new(init_fn: I, final_fn: F, write_fn: W) -> Self { Self { init_fn, final_fn, write_fn } }
+  pub fn new(
+    init_fn: Box<dyn Fn() -> S>,
+    final_fn: Box<dyn Fn() -> S>,
+    write_fn: Box<dyn Fn(S)>,
+  ) -> Self {
+    Self { init_fn, final_fn, write_fn }
+  }
 
   #[inline]
-  pub fn init_value(&self) -> R { (self.init_fn)() }
+  pub fn init_value(&self) -> S { (self.init_fn)() }
   #[inline]
-  pub fn finial_value(&self) -> R { (self.final_fn)() }
+  pub fn finial_value(&self) -> S { (self.final_fn)() }
   #[inline]
-  pub fn update(&mut self, v: R) { (self.write_fn)(v) }
+  pub fn update(&mut self, v: S) { (self.write_fn)(v) }
 }
