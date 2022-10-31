@@ -51,6 +51,14 @@ impl Color {
     self
   }
 
+  /// return an new color after the color applied alpha.
+  #[inline]
+  pub fn apply_alpha(mut self, alpha: f32) -> Self {
+    let base: f32 = self.0.alpha.into_component();
+    self.0.alpha = (base * alpha).into_component();
+    self
+  }
+
   /// `l` is the lightness of the color. 0.0 gives absolute black and 1.0
   /// give the brightest white.
   #[inline]
