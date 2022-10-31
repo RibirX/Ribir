@@ -10,7 +10,8 @@ module.exports = {
     "style",
     "ci",
     "release",
-    "perf"
+    "perf",
+    "ce"
   ],
   "maxMessageLength": 96,
   "minMessageLength": 3,
@@ -83,6 +84,12 @@ module.exports = {
       "description": "Adding missing tests",
       "emoji": "💍",
       "value": "test"
+    },
+    "ce": {
+      "description": "improve the compile error of macros",
+      "emoji": "🔧",
+      "value": "ce"
     }
+
   }
 };

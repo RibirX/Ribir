@@ -302,7 +302,10 @@ impl Parse for Observe {
     if input.peek(Ident) && input.peek2(Brace) {
       Ok(Observe::Name(input.parse()?))
     } else {
-      let expr: Expr = input.parse()?;
+      let mut expr: Expr = input.parse()?;
+      if let Expr::Paren(p) = expr {
+        expr = *p.expr;
+      }
       if let Expr::Path(p) = expr {
         if let Some(name) = p.path.get_ident() {
           Ok(Observe::Name(name.clone()))
@@ -319,12 +322,19 @@ impl Parse for OnEventDo {
   fn parse(input: ParseStream) -> Result<Self> {
     let content;
     let on_token = input.parse()?;
-    let observe = if input.peek(Ident) && input.peek2(Brace) {
+    let observe: Observe = if input.peek(Ident) && input.peek2(Brace) {
       let target: Ident = input.parse()?;
       parse_quote!(#target)
     } else {
       input.parse()?
     };
+    if input.is_empty() || !input.peek(Brace) {
+      return Err(syn::Error::new(
+        observe.span(),
+        "No block found for `on` item, maybe ambiguity observe \
+          expressions, try to parenthesis the expression you observe on.",
+      ));
+    }
     let on_event = Self {
       on_token,
       observe,
