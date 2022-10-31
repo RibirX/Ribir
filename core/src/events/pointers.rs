@@ -125,49 +125,49 @@ macro_rules! impl_pointer_listener {
 
 #[derive(Declare)]
 pub struct PointerDownListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub pointer_down: PointerCallback,
 }
 impl_pointer_listener!(PointerDownListener, pointer_down);
 
 #[derive(Declare)]
 pub struct PointerUpListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub pointer_up: PointerCallback,
 }
 impl_pointer_listener!(PointerUpListener, pointer_up);
 
 #[derive(Declare)]
 pub struct PointerMoveListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub pointer_move: PointerCallback,
 }
 impl_pointer_listener!(PointerMoveListener, pointer_move);
 
 #[derive(Declare)]
 pub struct TapListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub tap: PointerCallback,
 }
 impl_pointer_listener!(TapListener, tap);
 
 #[derive(Declare)]
 pub struct PointerCancelListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub pointer_cancel: PointerCallback,
 }
 impl_pointer_listener!(PointerCancelListener, pointer_cancel);
 
 #[derive(Declare)]
 pub struct PointerEnterListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub pointer_enter: PointerCallback,
 }
 impl_pointer_listener!(PointerEnterListener, pointer_enter);
 
 #[derive(Declare)]
 pub struct PointerLeaveListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut PointerEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut PointerEvent), wrap_fn = RefCell::new))]
   pub pointer_leave: PointerCallback,
 }
 impl_pointer_listener!(PointerLeaveListener, pointer_leave);
