@@ -4,7 +4,7 @@
 pub mod color;
 mod painter;
 pub mod path;
-pub use crate::color::Color;
+pub use crate::color::{Color, LightnessTone};
 
 pub use crate::painter::*;
 pub use path::*;
