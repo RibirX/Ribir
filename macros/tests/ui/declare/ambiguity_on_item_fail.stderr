@@ -1,0 +1,14 @@
+error: No block found for `on` item, maybe ambiguity observe expressions, try to parenthesis the expression you observe on.
+ --> tests/ui/declare/ambiguity_on_item_fail.rs:8:8
+  |
+8 |     on container.size
+  |        ^^^^^^^^^^^^^^
+
+error: No block found for `on` item, maybe ambiguity observe expressions, try to parenthesis the expression you observe on.
+  --> tests/ui/declare/ambiguity_on_item_fail.rs:16:8
+   |
+16 |       on *flag {
+   |  ________^
+17 | |       change: |_, _| {}
+18 | |     }
+   | |_____^
