@@ -1,16 +1,16 @@
+use crate::{Angle, PathStyle, Point, Rect, Vector};
+use lyon_tessellation::path::Path as LyonPath;
 pub use lyon_tessellation::{
   path::{
     builder::BorderRadii,
     geom::{Arc, LineSegment},
     path::Builder as LyonBuilder,
     traits::PathBuilder,
-    Path as LyonPath, Winding,
+    Winding,
   },
   StrokeOptions,
 };
 use serde::{Deserialize, Serialize};
-
-use crate::{Angle, PathStyle, Point, Rect, Vector};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone, Serialize, Deserialize)]
