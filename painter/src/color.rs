@@ -7,6 +7,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Color(palette::Srgba<u8>);
 
+/// Describe the light tone of a color, should between [0, 1.0], 0.0 gives
+/// absolute black and 1.0 give the brightest white.
+#[derive(Clone, Debug, Copy)]
+pub struct LightnessTone(f32);
+
+impl LightnessTone {
+  #[inline]
+  pub fn new(tone: f32) -> Self { Self(tone.clamp(0., 1.0)) }
+}
+
 impl Color {
   #[inline]
   pub const fn new(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
@@ -62,10 +72,10 @@ impl Color {
   /// `l` is the lightness of the color. 0.0 gives absolute black and 1.0
   /// give the brightest white.
   #[inline]
-  pub fn with_lightness(self, l: f32) -> Self {
+  pub fn with_lightness(self, l: LightnessTone) -> Self {
     let color: Srgba = self.0.into_format();
     let mut lab: Lab = color.into_color();
-    lab.l = (l * 100.).clamp(0., 100.);
+    lab.l = (l.0 * 100.).clamp(0., 100.);
     let rgba: Srgba = lab.into_color();
     Color(rgba.into_format())
   }
