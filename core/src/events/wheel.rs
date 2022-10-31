@@ -14,7 +14,7 @@ pub struct WheelEvent {
 
 #[derive(Declare)]
 pub struct WheelListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(&'r mut WheelEvent)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent), wrap_fn = RefCell::new))]
   wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
 }
 

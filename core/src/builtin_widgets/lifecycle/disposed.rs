@@ -17,7 +17,7 @@ pub enum DisposedType {
 
 #[derive(Declare)]
 pub struct DisposedListener {
-  #[declare(builtin, convert=listener_callback(for<'r> FnMut(LifeCycleCtx<'r>, DisposedType)))]
+  #[declare(builtin, convert=box_trait(for<'r> FnMut(LifeCycleCtx<'r>, DisposedType), wrap_fn = RefCell::new))]
   pub disposed: RefCell<Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, DisposedType)>>,
 }
 
