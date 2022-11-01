@@ -35,6 +35,37 @@ impl Path {
     // todo: path_style effect box rect
     lyon_algorithms::aabb::bounding_rect(self.path.iter()).cast_unit()
   }
+
+  /// create a rect path.
+  pub fn rect(rect: &Rect, style: PathStyle) -> Self {
+    let mut builder = Path::builder();
+    builder.rect(rect);
+    match style {
+      PathStyle::Fill => builder.fill(),
+      PathStyle::Stroke(o) => builder.stroke(o),
+    }
+  }
+
+  /// Creates a path for a rectangle by `rect` with `radius`.
+  /// #[inline]
+  pub fn rect_round(rect: &Rect, radius: &Radius, style: PathStyle) -> Self {
+    let mut builder = Path::builder();
+    builder.rect_round(rect, radius);
+    match style {
+      PathStyle::Fill => builder.fill(),
+      PathStyle::Stroke(o) => builder.stroke(o),
+    }
+  }
+
+  /// create a circle path.
+  pub fn circle(center: Point, radius: f32, style: PathStyle) -> Self {
+    let mut builder = Path::builder();
+    builder.circle(center, radius);
+    match style {
+      PathStyle::Fill => builder.fill(),
+      PathStyle::Stroke(o) => builder.stroke(o),
+    }
+  }
 }
 
 impl Builder {

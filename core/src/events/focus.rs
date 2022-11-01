@@ -1,6 +1,7 @@
 use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 use std::cell::RefCell;
 
+// todo: split focus listener, and auto add focus node when listen on key/char.
 /// Focus attr attach to widget to support get ability to focus in.
 #[derive(Default, Declare)]
 pub struct FocusListener {

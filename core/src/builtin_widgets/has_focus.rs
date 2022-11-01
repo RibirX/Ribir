@@ -11,15 +11,9 @@ impl HasFocus {
 
 impl ComposeChild for HasFocus {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
-    let this = this.into_stateful();
-
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-    track {this}
-
+      track {this: this.into_stateful()}
       ExprWidget {
         expr: child,
         focus: move|_| this.focused = true,
