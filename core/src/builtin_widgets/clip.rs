@@ -10,7 +10,7 @@ pub enum ClipType {
 #[derive(SingleChild, Clone, Declare)]
 pub struct Clip {
   #[declare(default)]
-  clip: ClipType,
+  pub clip: ClipType,
 }
 
 impl Render for Clip {
@@ -25,17 +25,10 @@ impl Render for Clip {
   fn paint(&self, ctx: &mut PaintingCtx) {
     let path = match &self.clip {
       ClipType::Auto => {
-        let size = ctx
+        let rect = ctx
           .box_rect()
           .expect("impossible without size in painting stage");
-        let mut builder = Path::builder();
-        builder
-          .begin_path(Point::zero())
-          .line_to(Point::new(size.width(), 0.))
-          .line_to(Point::new(size.width(), size.height()))
-          .line_to(Point::new(0., size.height()))
-          .end_path(true);
-        builder.fill()
+        Path::rect(&rect, PathStyle::Fill)
       }
       ClipType::Path(path) => path.clone(),
     };

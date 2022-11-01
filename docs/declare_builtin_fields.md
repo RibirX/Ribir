@@ -50,7 +50,7 @@
  	 - specify the background of the widget box.
 - border : [`Border`] 
  	 - specify the border of the widget which draw above the background
-- radius : [`Radius`] 
+- border_radius : [`Radius`] 
  	 - specify how rounded the corners have of the widget.
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.

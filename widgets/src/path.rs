@@ -1,10 +1,11 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
 /// Widget just use as a paint kit for a path and not care about its size.
-/// Use `[HitTesPath]!` instead of.
+/// Use `[PathWidget]!` instead of.
 #[derive(Declare)]
 pub struct PathPaintKit {
   pub path: Path,
+  #[declare(convert=into)]
   pub brush: Brush,
 }
 
@@ -33,11 +34,10 @@ impl Query for PathPaintKit {
 /// the path self, not its size cover area.
 pub struct PathWidget {
   pub path: Path,
+  #[declare(convert=into)]
   pub brush: Brush,
 }
 
-/// Path widget just use as a paint kit for a path and not care about its size.
-/// Use `[HitTesPath]!` instead of.
 // fixme: hit test directly used path box rect, no path hit test do.
 impl Render for PathWidget {
   #[inline]

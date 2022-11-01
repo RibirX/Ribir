@@ -49,10 +49,9 @@ where
         .subscribe(move |msg| match msg {
           FrameMsg::NewFrame(_) => {}
           FrameMsg::LayoutReady(time) => {
-            let mut inner = animate.raw_ref();
-            let p = inner.lerp(time);
+            let p = animate.raw_ref().lerp(time);
             if matches!(p, AnimateProgress::Finish) {
-              inner.stop();
+              animate.silent_ref().stop();
             }
           }
           // use silent_ref because the state of animate change, bu no need to effect the framework.

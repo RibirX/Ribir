@@ -32,7 +32,7 @@ impl Compose for TodoMVP {
           SizedBox {
             size: Size::new(60., 30.),
             margin: EdgeInsets::only_left(20.),
-            radius: Radius::all(4.),
+            border_radius: Radius::all(4.),
             border: Border::all(BorderSide { width: 1., color: Color::BLACK }),
             tap: move |_| {
               this.tasks.push(Task {
@@ -68,7 +68,7 @@ impl Compose for TodoMVP {
             }
             TabPane {
               ExprWidget {
-                expr: TodoMVP::pane(this.clone_stateful(), |task| true)
+                expr: TodoMVP::pane(this.clone_stateful(), |_| true)
               }
             }
           }
@@ -121,9 +121,9 @@ impl TodoMVP {
               let label = task.label.clone();
               widget! {
                 Stack {
-                  id: item, 
-                  Checkbox { 
-                    id: checkbox, 
+                  id: item,
+                  Checkbox {
+                    id: checkbox,
                     checked,
                     margin: EdgeInsets::vertical(4.),
                     h_align: HAlign::Stretch,
