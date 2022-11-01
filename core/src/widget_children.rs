@@ -383,17 +383,17 @@ where
 impl<T, C, M1: ?Sized, M2: ?Sized, M3: ?Sized> WithChild<(&M1, &M2, &M3), C> for Option<T>
 where
   T: WithChild<M1, C>,
-  T::Target: IntoWidget<M2>,
-  C: IntoWidget<M3>,
+  T::Target: IntoChild<M2, Widget>,
+  C: IntoChild<M3, Widget>,
 {
   type Target = Widget;
 
   #[inline]
   fn with_child(self, child: C) -> Self::Target {
     if let Some(widget) = self {
-      widget.with_child(child).into_widget()
+      widget.with_child(child).into_child()
     } else {
-      child.into_widget()
+      child.into_child()
     }
   }
 }
@@ -506,12 +506,22 @@ mod tests {
         MockBox { size: Size::zero() }
       }
     };
+
     // option with single child
     let _e = widget! {
       track { size: size.clone() }
       ExprWidget {
         expr: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
         MockBox { size: Size::zero() }
+      }
+    };
+
+    // option with `Widget`
+    let _e = widget! {
+      track { size: size.clone() }
+      ExprWidget {
+        expr: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
+        ExprWidget { expr: Void.into_widget() }
       }
     };
   }
