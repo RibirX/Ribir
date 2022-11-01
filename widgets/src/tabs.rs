@@ -142,7 +142,7 @@ impl ComposeChild for Tabs {
       }
 
       change_on ink_bar.left_anchor Animate {
-        transition: transitions::EASE_IN.get_from_or_default(ctx),
+        transition: transitions::EASE_IN.get_from_or_default(ctx.theme()),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(0.);
           let to = to.abs_value(0.);

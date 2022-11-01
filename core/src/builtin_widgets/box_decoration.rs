@@ -12,7 +12,7 @@ pub struct BoxDecoration {
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
   #[declare(builtin, default, convert=strip_option)]
-  pub radius: Option<Radius>,
+  pub border_radius: Option<Radius>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Copy)]
@@ -61,7 +61,7 @@ impl Render for BoxDecoration {
       let painter = ctx.painter();
       if let Some(ref background) = self.background {
         painter.set_brush(background.clone());
-        if let Some(radius) = &self.radius {
+        if let Some(radius) = &self.border_radius {
           painter.rect_round(&content_rect, radius);
         } else {
           painter.rect(&content_rect);
@@ -112,7 +112,7 @@ impl BoxDecoration {
       return;
     }
     let border = self.border.as_ref().unwrap();
-    if let Some(radius) = &self.radius {
+    if let Some(radius) = &self.border_radius {
       self.paint_round_border(painter, radius, border, rect);
     } else {
       self.paint_rect_border(painter, border, rect);
@@ -213,29 +213,19 @@ impl Border {
   }
 
   #[inline]
-  pub fn only_left(left: BorderSide) -> Self {
-    Self { left, ..Default::default() }
-  }
+  pub fn only_left(left: BorderSide) -> Self { Self { left, ..Default::default() } }
 
   #[inline]
-  pub fn only_right(right: BorderSide) -> Self {
-    Self { right, ..Default::default() }
-  }
+  pub fn only_right(right: BorderSide) -> Self { Self { right, ..Default::default() } }
 
   #[inline]
-  pub fn only_bottom(bottom: BorderSide) -> Self {
-    Self { bottom, ..Default::default() }
-  }
+  pub fn only_bottom(bottom: BorderSide) -> Self { Self { bottom, ..Default::default() } }
 
   #[inline]
-  pub fn only_top(top: BorderSide) -> Self {
-    Self { top, ..Default::default() }
-  }
+  pub fn only_top(top: BorderSide) -> Self { Self { top, ..Default::default() } }
 
   #[inline]
-  pub fn none() -> Self {
-    Self { ..Default::default() }
-  }
+  pub fn none() -> Self { Self { ..Default::default() } }
 }
 #[cfg(test)]
 mod tests {
@@ -250,7 +240,7 @@ mod tests {
     let w = BoxDecoration::builder().build(&mut ctx);
 
     assert_eq!(w.border, None);
-    assert_eq!(w.radius, None);
+    assert_eq!(w.border_radius, None);
     assert_eq!(w.background, None);
 
     std::mem::forget(ctx);
@@ -310,12 +300,12 @@ mod tests {
         ExprWidget {
           expr: radius_cases
             .into_iter()
-            .map(|radius| {
+            .map(|border_radius| {
               widget! {
                 SizedBox {
                   size: Size::new(60., 40.),
                   background: Color::RED,
-                  radius,
+                  border_radius,
                   border: Border::all(BorderSide { width: 5., color: Color::BLACK }),
                   margin: EdgeInsets::all(2.)
                 }

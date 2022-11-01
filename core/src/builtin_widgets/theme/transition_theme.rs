@@ -5,6 +5,8 @@ use crate::{
   prelude::{easing, Roc, Transition},
 };
 
+use super::Theme;
+
 #[derive(Clone)]
 pub struct TransitionTheme {
   pub default: Rc<Box<dyn Roc>>,
@@ -69,18 +71,13 @@ impl TransitionIdent {
 
   /// get the svg icon of the ident from the context if it have otherwise return
   /// a default icon.
-  pub fn get_from_or_default(self, ctx: &mut BuildCtx) -> Rc<Box<dyn Roc>> {
-    self.get_from(ctx).unwrap_or_else(|| todo!())
+  pub fn get_from_or_default(self, theme: &Theme) -> Rc<Box<dyn Roc>> {
+    self.get_from(theme).unwrap_or_else(|| todo!())
   }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn get_from(self, ctx: &mut BuildCtx) -> Option<Rc<Box<dyn Roc>>> {
-    ctx
-      .theme()
-      .transitions_theme
-      .transitions
-      .get(&self)
-      .cloned()
+  pub fn get_from(self, theme: &Theme) -> Option<Rc<Box<dyn Roc>>> {
+    theme.transitions_theme.transitions.get(&self).cloned()
   }
 }
 

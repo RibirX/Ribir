@@ -121,7 +121,7 @@ builtin! {
     #[doc="specify the border of the widget which draw above the background"]
     border: Border,
     #[doc= "specify how rounded the corners have of the widget."]
-    radius: Radius,
+    border_radius: Radius,
   }
 
   LayoutBox {

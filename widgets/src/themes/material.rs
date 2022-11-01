@@ -1,6 +1,7 @@
 pub use super::*;
 use crate::prelude::*;
 use ribir_core::{fill_icon, prelude::*};
+pub mod ripple;
 pub mod state_layer;
 
 /// Crate a material theme with palette.
@@ -33,34 +34,34 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   };
 
   fill_icon! { theme,
-    icons::ADD_CIRCLE: "./material/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ADD: "./material/add_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ARROW_BACK: "./material/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ARROW_DROP_DOWN: "./material/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ARROW_FORWARD: "./material/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CANCEL: "./material/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK_BOX: "./material/check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK_BOX_OUTLINE_BLANK: "./material/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK_CIRCLE: "./material/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK: "./material/check_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHEVRON_RIGHT: "./material/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CLOSE: "./material/close_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::DELETE: "./material/delete_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::DONE: "./material/done_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::EXPAND_MORE: "./material/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::FAVORITE: "./material/favorite_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::FILE_DOWNLOAD: "./material/file_download_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::GRADE: "./material/grade_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::HOME: "./material/home_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::INDETERMINATE_CHECK_BOX: "./material/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::LOGIN: "./material/login_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::LOGOUT: "./material/logout_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::MENU: "./material/menu_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::MORE_VERT: "./material/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::REFRESH: "./material/refresh_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::SEARCH: "./material/search_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::SETTINGS: "./material/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::STAR: "./material/star_FILL0_wght400_GRAD0_opsz48.svg"
+    icons::ADD_CIRCLE: "./material/icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ADD: "./material/icons/add_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ARROW_BACK: "./material/icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ARROW_DROP_DOWN: "./material/icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::ARROW_FORWARD: "./material/icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CANCEL: "./material/icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK_BOX: "./material/icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK_BOX_OUTLINE_BLANK: "./material/icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK_CIRCLE: "./material/icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHECK: "./material/icons/check_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CHEVRON_RIGHT: "./material/icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::CLOSE: "./material/icons/close_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::DELETE: "./material/icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::DONE: "./material/icons/done_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::EXPAND_MORE: "./material/icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::FAVORITE: "./material/icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::FILE_DOWNLOAD: "./material/icons/file_download_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::GRADE: "./material/icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::HOME: "./material/icons/home_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::INDETERMINATE_CHECK_BOX: "./material/icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::LOGIN: "./material/icons/login_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::LOGOUT: "./material/icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::MENU: "./material/icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::MORE_VERT: "./material/icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::REFRESH: "./material/icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::SEARCH: "./material/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::SETTINGS: "./material/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
+    icons::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
 
   overwrite_compose_styles(&mut theme);
@@ -74,7 +75,7 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       ExprWidget {
         expr: host,
         margin,
-        radius: Radius::all(4.),
+        border_radius: Radius::all(4.),
         background: ctx.theme().palette.primary()
       }
     }
@@ -102,7 +103,7 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
 
       change_on thumb.left_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx.theme()),
         lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_width()),
       }
     }
@@ -117,7 +118,7 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
 
       change_on thumb.top_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx.theme()),
         lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_height()),
       }
     }
@@ -180,7 +181,7 @@ fn icon_theme() -> IconTheme {
     large: Size::new(48., 48.),
     huge: Size::new(64., 64.),
   };
-  let miss_icon = ShareResource::new(SvgRender(include_svg!("./material/miss_icon.svg")));
+  let miss_icon = ShareResource::new(SvgRender(include_svg!("./material/icons/miss_icon.svg")));
   IconTheme::new(icon_size, miss_icon)
 }
 
