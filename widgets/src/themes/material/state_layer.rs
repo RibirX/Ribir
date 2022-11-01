@@ -1,11 +1,24 @@
-use crate::path::PathPaintKit;
+use crate::{layout::Stack, path::PathPaintKit};
 use ribir_core::prelude::*;
 
+/// Widget that as an visual indicator of material design used to present the
+/// interactive status of its child.
 #[derive(Declare)]
 pub struct StateLayer {
   pub color: Color,
   pub path: Path,
   pub role: StateRole,
+}
+/// Widget that as visual indicator of material design used to communicate the
+/// status of interactive widget, its visual state will reactive to its child
+/// interactive state.
+#[derive(Declare)]
+pub struct InteractiveLayer {
+  /// the color of the state layer, will apply a fixed opacity in different
+  /// state.
+  pub color: Color,
+  /// The border radii
+  pub border_radii: Radius,
 }
 
 impl Compose for StateLayer {
@@ -14,13 +27,36 @@ impl Compose for StateLayer {
       try_track { this }
       PathPaintKit {
         path: this.path.clone(),
-        brush: {
-          let color = this.color;
-          let alpha = this.role.value();
-          color.apply_alpha(alpha)
-        }
+        brush: this.role.calc_color(this.color),
       }
     )
+  }
+}
+
+impl ComposeChild for InteractiveLayer {
+  type Child = Widget;
+
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    widget! {
+      track { this: this.into_stateful() }
+      Stack {
+        ExprWidget { id: host, expr: child }
+        StateLayer {
+          color: this.color,
+          path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
+          role: if host.pointer_pressed() {
+            StateRole::pressed()
+          } else if host.has_focus() {
+            StateRole::focus()
+          } else if host.mouse_hover() {
+            StateRole::hover()
+          } else {
+            // todo: not support drag & drop now
+            StateRole::custom(0.)
+          }
+        }
+      }
+    }
   }
 }
 
@@ -36,9 +72,8 @@ impl StateRole {
 
   pub const fn dragged() -> Self { Self(0.16) }
 
-  #[inline]
   pub const fn custom(opacity: f32) -> Self { Self(opacity) }
 
   #[inline]
-  pub const fn value(self) -> f32 { self.0 }
+  pub fn calc_color(self, color: Color) -> Color { color.apply_alpha(self.0) }
 }
