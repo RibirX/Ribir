@@ -13,7 +13,7 @@ pub struct ComposeStyles {
 /// overwrite function in `Theme`.
 pub trait ComposeStyle {
   type Host;
-  fn compose_style(this: StateWidget<Self>, style: Self::Host) -> Widget
+  fn compose_style(this: StateWidget<Self>, host: Self::Host) -> Widget
   where
     Self: Sized;
 }
@@ -37,7 +37,7 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
 
 impl Theme {
   #[inline]
-  pub fn overwrite_compose_style<W: ComposeStyle + 'static>(
+  pub fn override_compose_style<W: ComposeStyle + 'static>(
     &mut self,
     compose_style: impl Fn(StateWidget<W>, W::Host) -> Widget + Clone + 'static,
   ) {
@@ -95,7 +95,7 @@ mod tests {
       type Host = Widget;
       fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
     }
-    theme.overwrite_compose_style::<Size100Style>(|_, host| {
+    theme.override_compose_style::<Size100Style>(|_, host| {
       widget! {
         MockBox {
           size: Size::new(100., 100.),

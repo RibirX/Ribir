@@ -10,14 +10,6 @@ pub struct HScrollBar {
   pub offset: f32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScrollBarTheme {
-  /// The min size of the thumb have.
-  pub thumb_min_size: f32,
-  /// The thickness of scrollbar element.
-  pub thickness: f32,
-}
-
 /// Compose style that use to decoration the track of horizontal scrollbar,
 /// overwrite it when init theme.
 #[derive(Debug, Declare)]
@@ -45,6 +37,12 @@ impl ComposeStyle for VScrollBarTrackStyle {
 #[derive(Debug, Declare)]
 pub struct HScrollBarThumbStyle {
   pub offset: f32,
+  /// The min size of the thumb have.
+  #[declare(default = 24.)]
+  pub thumb_min_size: f32,
+  /// The thickness of scrollbar element.
+  #[declare(default = 6.)]
+  pub thickness: f32,
 }
 
 impl ComposeStyle for HScrollBarThumbStyle {
@@ -53,10 +51,7 @@ impl ComposeStyle for HScrollBarThumbStyle {
   fn compose_style(this: StateWidget<Self>, host: Widget) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      ExprWidget {
-        left_anchor: this.offset,
-        expr: host
-      }
+      ExprWidget { left_anchor: this.offset, expr: host }
     }
   }
 }
@@ -66,6 +61,12 @@ impl ComposeStyle for HScrollBarThumbStyle {
 #[derive(Debug, Declare)]
 pub struct VScrollBarThumbStyle {
   pub offset: f32,
+  /// The min size of the thumb have.
+  #[declare(default = 24.)]
+  pub thumb_min_size: f32,
+  /// The thickness of scrollbar element.
+  #[declare(default = 6.)]
+  pub thickness: f32,
 }
 
 impl ComposeStyle for VScrollBarThumbStyle {
@@ -194,13 +195,6 @@ impl Compose for HRawScrollbar {
 
     widget! {
       track { scrolling, this }
-      env {
-        let ScrollBarTheme {
-          thickness,
-          thumb_min_size
-        } = *ScrollBarTheme::of(ctx.theme());
-      }
-
       Stack {
         visible: scrolling.can_scroll(),
         HScrollBarTrackStyle { Container {
@@ -209,7 +203,8 @@ impl Compose for HRawScrollbar {
         }}
         LayoutBox {
           id: thumb_outline,
-          HScrollBarThumbStyle{
+          HScrollBarThumbStyle {
+            id: thumb_style,
             offset: {
               let content_width = scrolling.scroll_content_size().width;
               -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
@@ -219,7 +214,7 @@ impl Compose for HRawScrollbar {
                 let page_width = scrolling.scroll_view_size().width;
                 let content_width = scrolling.scroll_content_size().width;
                 let width = page_width / content_width * track_box.layout_width();
-                Size::new(width.max(thumb_min_size), thickness)
+                Size::new(width.max(thumb_style.thumb_min_size), thumb_style.thickness)
               },
             }
          }
@@ -243,12 +238,6 @@ impl Compose for VRawScrollbar {
 
     widget! {
       track { scrolling, this }
-      env {
-        let ScrollBarTheme {
-          thickness,
-          thumb_min_size
-        } = *ScrollBarTheme::of(ctx.theme());
-      }
 
       Stack {
         visible: scrolling.can_scroll(),
@@ -259,6 +248,7 @@ impl Compose for VRawScrollbar {
         LayoutBox {
           id: thumb_outline,
           VScrollBarThumbStyle {
+            id: thumb_style,
             offset: {
               let content_height = scrolling.scroll_content_size().height;
               -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
@@ -268,7 +258,7 @@ impl Compose for VRawScrollbar {
                 let page_height = scrolling.scroll_view_size().height;
                 let content_height = scrolling.scroll_content_size().height;
                 let height = page_height / content_height * track_box.layout_height();
-                Size::new(thickness, height.max(thumb_min_size))
+                Size::new(thumb_style.thickness, height.max(thumb_style.thumb_min_size))
               },
             }
           }
@@ -282,8 +272,6 @@ fn safe_recip(v: f32) -> f32 {
   let v = v.recip();
   if v.is_infinite() || v.is_nan() { 0. } else { v }
 }
-
-impl CustomTheme for ScrollBarTheme {}
 
 #[cfg(test)]
 mod test {

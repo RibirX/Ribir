@@ -18,8 +18,6 @@ mod transition_theme;
 pub use transition_theme::*;
 mod compose_styles;
 pub use compose_styles::*;
-mod custom_theme;
-pub use custom_theme::*;
 
 use crate::{
   impl_query_self_only,
@@ -54,7 +52,6 @@ pub struct Theme {
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
   pub compose_styles: ComposeStyles,
-  pub custom_themes: CustomThemes,
 
   // todo: refactor input theme style.
   pub text_selected_background: TextSelectedBackground,
@@ -130,7 +127,6 @@ impl Default for Theme {
       icon_theme: IconTheme::new(icon_size, miss_icon),
       transitions_theme: Default::default(),
       compose_styles: Default::default(),
-      custom_themes: Default::default(),
       text_selected_background,
       caret_color: Default::default(),
     }

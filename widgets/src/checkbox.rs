@@ -10,12 +10,31 @@ pub struct Checkbox {
   pub indeterminate: bool,
 }
 
-#[derive(Clone)]
-pub struct CheckBoxTheme {
+#[derive(Clone, Declare)]
+pub struct CheckBoxStyle {
+  #[declare(default= IconSize::of(ctx.theme()).tiny)]
   /// The size of the checkbox icon.
   pub size: Size,
+}
+
+#[derive(Clone, Declare)]
+
+pub struct CheckBoxLabelStyle {
   /// The text style of the checkbox label.
+  #[declare(default = TypographyTheme::of(ctx.theme()).body1.text.clone() )]
   pub label_style: TextStyle,
+}
+
+impl ComposeStyle for CheckBoxStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
+}
+
+impl ComposeStyle for CheckBoxLabelStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
 }
 
 impl Checkbox {
@@ -34,27 +53,33 @@ impl ComposeChild for Checkbox {
 
   fn compose_child(this: StateWidget<Self>, label: Self::Child) -> Widget {
     let this = this.into_stateful();
+
     let mut checkbox = widget! {
       track { this: this.clone() }
-      env { let theme = CheckBoxTheme::of(ctx.theme()); }
-      Icon {
-        size: theme.size,
-        ExprWidget {
-          expr: {
-            if this.indeterminate {
-              icons::INDETERMINATE_CHECK_BOX
-            } else if this.checked {
-              icons::CHECK_BOX
-            } else {
-              icons::CHECK_BOX_OUTLINE_BLANK
+      CheckBoxStyle {
+        id: style,
+        Icon {
+          size: style.size,
+          ExprWidget {
+            expr: {
+              if this.indeterminate {
+                icons::INDETERMINATE_CHECK_BOX
+              } else if this.checked {
+                icons::CHECK_BOX
+              } else {
+                icons::CHECK_BOX_OUTLINE_BLANK
+              }
             }
-        }}
-      }
-    };
+          }
+        }
+    }};
+
     if let Some(Label { desc, position }) = label {
       let label = widget! {
-        env { let theme = CheckBoxTheme::of(ctx.theme()); }
-        Text { text: desc, style: theme.label_style.clone() }
+        CheckBoxLabelStyle {
+          id: style,
+          Text { text: desc, style: style.label_style.clone() }
+        }
       };
       checkbox = match position {
         Position::Before => {
@@ -82,7 +107,6 @@ impl ComposeChild for Checkbox {
   }
 }
 
-impl CustomTheme for CheckBoxTheme {}
 #[cfg(test)]
 mod tests {
   use crate::prelude::material;

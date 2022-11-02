@@ -30,7 +30,6 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     text_selected_background,
     caret_color: Color::BLACK,
     compose_styles: <_>::default(),
-    custom_themes: <_>::default(),
   };
 
   fill_icon! { theme,
@@ -64,12 +63,11 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     icons::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
 
-  overwrite_compose_styles(&mut theme);
-  init_custom_theme(&mut theme);
+  override_compose_styles(&mut theme);
   theme
 }
 
-fn overwrite_compose_styles(theme: &mut Theme) {
+fn override_compose_styles(theme: &mut Theme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
       ExprWidget {
@@ -93,9 +91,15 @@ fn overwrite_compose_styles(theme: &mut Theme) {
     let to = to.abs_value(size);
     PositionUnit::Pixel(from.lerp(&to, rate))
   }
-  theme.overwrite_compose_style::<HScrollBarThumbStyle>(|this, host| {
+  theme.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
+    let this = this.into_stateful();
+    {
+      let mut this_ref = this.state_ref();
+      this_ref.thumb_min_size = 12.;
+      this_ref.thickness = 6.;
+    }
     widget! {
-      track { this: this.into_stateful() }
+      track { this }
       ExprWidget {
         id: thumb,
         left_anchor: this.offset,
@@ -108,9 +112,16 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
     }
   });
-  theme.overwrite_compose_style::<VScrollBarThumbStyle>(|this, host| {
+  theme.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
+    let this = this.into_stateful();
+    {
+      let mut this_ref = this.state_ref();
+      this_ref.thumb_min_size = 12.;
+      this_ref.thickness = 6.;
+    }
+
     widget! {
-      track { this: this.into_stateful() }
+      track { this }
       ExprWidget {
         id: thumb,
         top_anchor: this.offset,
@@ -123,9 +134,9 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
     }
   });
-  theme.overwrite_compose_style::<HScrollBarTrackStyle>(|_, host| scrollbar_track(host));
-  theme.overwrite_compose_style::<VScrollBarTrackStyle>(|_, host| scrollbar_track(host));
-  theme.overwrite_compose_style::<InkBarStyle>(|_, host| {
+  theme.override_compose_style::<HScrollBarTrackStyle>(|_, host| scrollbar_track(host));
+  theme.override_compose_style::<VScrollBarTrackStyle>(|_, host| scrollbar_track(host));
+  theme.override_compose_style::<InkBarStyle>(|_, host| {
     widget! {
       ExprWidget {
         expr: host,
@@ -133,14 +144,20 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
     }
   });
-}
-
-fn init_custom_theme(theme: &mut Theme) {
-  theme.set_custom_theme(ScrollBarTheme { thumb_min_size: 12., thickness: 8. });
-  theme.set_custom_theme(CheckBoxTheme {
-    size: IconSize::of(theme).tiny,
-    label_style: TypographyTheme::of(theme).body1.text.clone(),
+  theme.override_compose_style::<CheckBoxStyle>(move |style, host| {
+    widget! {
+      track { style: style.into_stateful() }
+      env { style.state_ref().size =  IconSize::of(ctx.theme()).tiny; }
+      ExprWidget { expr: host }
+    }
   });
+  theme.override_compose_style::<CheckBoxLabelStyle>(move |style, host| {
+    widget! {
+      track { style: style.into_stateful() }
+      env { style.state_ref().label_style = TypographyTheme::of(ctx.theme()).body1.text.clone(); }
+      ExprWidget { expr: host }
+    }
+  })
 }
 
 pub mod purple {
