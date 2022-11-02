@@ -26,9 +26,10 @@ impl<W: Render, D: Query> Render for DataWidget<W, D> {
   fn only_sized_by_parent(&self) -> bool { self.widget.only_sized_by_parent() }
 
   #[inline]
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
-    self.widget.hit_test(ctx, pos)
-  }
+  fn can_overflow(&self) -> bool { self.widget.can_overflow() }
+
+  #[inline]
+  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.widget.hit_test(ctx, pos) }
 }
 
 impl<W: Query, D: Query> Query for DataWidget<W, D> {

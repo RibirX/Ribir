@@ -15,6 +15,8 @@ impl Render for IgnorePointer {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 
+  fn can_overflow(&self) -> bool { false }
+
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest {
       hit: false,
