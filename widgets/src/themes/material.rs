@@ -3,6 +3,8 @@ use crate::prelude::*;
 use ribir_core::{fill_icon, prelude::*};
 pub mod ripple;
 pub mod state_layer;
+pub use ripple::*;
+pub use state_layer::*;
 
 /// Crate a material theme with palette.
 pub fn new(brightness: Brightness, palette: Palette) -> Theme {
@@ -143,10 +145,19 @@ fn override_compose_styles(theme: &mut Theme) {
     }
   });
   theme.override_compose_style::<CheckBoxStyle>(move |style, host| {
+    style.state_ref().size = Size::new(18., 18.);
     widget! {
       track { style }
-      env { style.state_ref().size =  IconSize::of(ctx.theme()).tiny; }
-      ExprWidget { expr: host }
+      Ripple {
+        center: true,
+        color: style.color,
+        radius: 20.,
+        bounded: RippleBound::Unbounded,
+        InteractiveLayer {
+          color: style.color, border_radii: Radius::all(20.),
+          ExprWidget { expr: host, margin: EdgeInsets::all(12.) }
+        }
+      }
     }
   });
   theme.override_compose_style::<CheckBoxLabelStyle>(move |style, host| {

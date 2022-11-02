@@ -75,5 +75,5 @@ impl StateRole {
   pub const fn custom(opacity: f32) -> Self { Self(opacity) }
 
   #[inline]
-  pub fn calc_color(self, color: Color) -> Color { color.apply_alpha(self.0) }
+  pub fn calc_color(self, color: Color) -> Color { color.with_alpha(self.0) }
 }

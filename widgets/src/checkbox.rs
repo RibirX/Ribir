@@ -15,6 +15,8 @@ pub struct CheckBoxStyle {
   #[declare(default= IconSize::of(ctx.theme()).tiny)]
   /// The size of the checkbox icon.
   pub size: Size,
+  #[declare(default= Palette::of(ctx).primary())]
+  pub color: Color,
 }
 
 #[derive(Clone, Declare)]

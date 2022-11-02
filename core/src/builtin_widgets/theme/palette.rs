@@ -91,7 +91,7 @@ pub struct LightnessCfg {
 
 impl Palette {
   #[inline]
-  pub fn of<'a>(ctx: &'a mut BuildCtx) -> &'a Self { &&ctx.theme().palette }
+  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self { &&ctx.theme().palette }
 
   #[inline]
   pub fn primary(&self) -> Color { self.base_of(self.primary) }
