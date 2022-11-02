@@ -41,13 +41,12 @@ impl ComposeChild for Checkbox {
         size: theme.size,
         ExprWidget {
           expr: {
-            let theme = ctx.theme();
             if this.indeterminate {
-              icons::INDETERMINATE_CHECK_BOX.of_or_miss(theme)
+              icons::INDETERMINATE_CHECK_BOX
             } else if this.checked {
-              icons::CHECK_BOX.of_or_miss(theme)
+              icons::CHECK_BOX
             } else {
-              icons::CHECK_BOX_OUTLINE_BLANK.of_or_miss(theme)
+              icons::CHECK_BOX_OUTLINE_BLANK
             }
         }}
       }
