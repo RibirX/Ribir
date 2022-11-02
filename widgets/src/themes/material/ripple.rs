@@ -11,7 +11,7 @@ pub struct Ripple {
   /// The radius in pixels of foreground ripples when fully expanded. The
   /// default radius will be the distance from the center of the ripple to the
   /// furthest corner of the host bounding rectangle.
-  #[declare(default)]
+  #[declare(default, convert=strip_option)]
   pub radius: Option<f32>,
   /// Whether the ripple always originates from the center of the host bound.
   #[declare(default)]
