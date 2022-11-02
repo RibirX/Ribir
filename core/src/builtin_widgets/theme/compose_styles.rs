@@ -13,7 +13,7 @@ pub struct ComposeStyles {
 /// overwrite function in `Theme`.
 pub trait ComposeStyle {
   type Host;
-  fn compose_style(this: StateWidget<Self>, style: Self::Host) -> Widget
+  fn compose_style(this: Stateful<Self>, host: Self::Host) -> Widget
   where
     Self: Sized;
 }
@@ -25,9 +25,9 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
     let widget = (move |ctx: &mut BuildCtx| {
       let style = ctx.theme().compose_styles.styles.get(&TypeId::of::<Self>());
       if let Some(style) = style {
-        (style.override_fn())(Box::new(this), Box::new(child))
+        (style.override_fn())(Box::new(this.into_stateful()), Box::new(child))
       } else {
-        ComposeStyle::compose_style(this, child)
+        ComposeStyle::compose_style(this.into_stateful(), child)
       }
     })
     .into_widget();
@@ -39,13 +39,13 @@ impl Theme {
   #[inline]
   pub fn overwrite_compose_style<W: ComposeStyle + 'static>(
     &mut self,
-    compose_style: impl Fn(StateWidget<W>, W::Host) -> Widget + Clone + 'static,
+    compose_style: impl Fn(Stateful<W>, W::Host) -> Widget + Clone + 'static,
   ) {
     self.compose_styles.styles.insert(
       TypeId::of::<W>(),
       Box::new(move |this: Box<dyn Any>, host: Box<dyn Any>| {
         let this = this.downcast().expect(&format!(
-          "Caller should guarantee the boxed type is StateWidget<{}>.",
+          "Caller should guarantee the boxed type is Stateful<{}>.",
           type_name::<W>(),
         ));
         let host = host.downcast().expect(&format!(
@@ -93,7 +93,7 @@ mod tests {
 
     impl ComposeStyle for Size100Style {
       type Host = Widget;
-      fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
+      fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
     }
     theme.overwrite_compose_style::<Size100Style>(|_, host| {
       widget! {

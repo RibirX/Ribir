@@ -26,7 +26,7 @@ pub struct HScrollBarTrackStyle;
 impl ComposeStyle for HScrollBarTrackStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(_: StateWidget<Self>, host: Widget) -> Widget { host }
+  fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
 }
 
 /// Compose style that use to decoration the track of vertical scrollbar,
@@ -37,7 +37,7 @@ pub struct VScrollBarTrackStyle;
 impl ComposeStyle for VScrollBarTrackStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(_: StateWidget<Self>, host: Widget) -> Widget { host }
+  fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
 }
 
 /// Compose style that use to decoration the thumb of horizontal scrollbar,
@@ -50,13 +50,10 @@ pub struct HScrollBarThumbStyle {
 impl ComposeStyle for HScrollBarThumbStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(this: StateWidget<Self>, host: Widget) -> Widget {
+  fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
-      ExprWidget {
-        left_anchor: this.offset,
-        expr: host
-      }
+      track { this }
+      ExprWidget { left_anchor: this.offset, expr: host }
     }
   }
 }
@@ -71,9 +68,9 @@ pub struct VScrollBarThumbStyle {
 impl ComposeStyle for VScrollBarThumbStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(this: StateWidget<Self>, host: Widget) -> Widget {
+  fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      track { this }
       ExprWidget {
         top_anchor: this.offset,
         expr: host
