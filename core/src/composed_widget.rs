@@ -77,6 +77,9 @@ impl<B: 'static> Render for ComposedWidget<Box<dyn Render>, B> {
   fn only_sized_by_parent(&self) -> bool { self.composed.only_sized_by_parent() }
 
   #[inline]
+  fn can_overflow(&self) -> bool { self.composed.can_overflow() }
+
+  #[inline]
   fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.composed.hit_test(ctx, pos) }
 }
 

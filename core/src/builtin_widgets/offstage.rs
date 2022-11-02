@@ -17,7 +17,13 @@ impl Render for Offstage {
   }
 
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    if self.offstage {
+      ctx.painter().apply_alpha(0.);
+    }
+  }
+
+  fn can_overflow(&self) -> bool { false }
 
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest {

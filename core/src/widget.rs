@@ -54,6 +54,8 @@ pub trait Render: Query {
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
+  fn can_overflow(&self) -> bool { false }
+
   /// Determines the set of render widgets located at the given position.
   fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
     let is_hit = hit_test_impl(ctx, pos);

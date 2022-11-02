@@ -316,6 +316,9 @@ impl<W: Render + 'static> Render for Stateful<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.widget.borrow().paint(ctx) }
 
   #[inline]
+  fn can_overflow(&self) -> bool { self.widget.borrow().can_overflow() }
+
+  #[inline]
   fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
     self.widget.borrow().hit_test(ctx, pos)
   }

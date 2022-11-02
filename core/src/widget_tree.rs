@@ -65,18 +65,17 @@ impl WidgetTree {
       let layout_box = paint_ctx
         .box_rect()
         .expect("when paint node, it's mut be already layout.");
+      let render = id.assert_get(self);
 
-      let need_paint: bool = paint_ctx.painter.alpha() != 0.
-        && paint_rect_interset(paint_ctx.painter, &layout_box)
-        && !id.is_offstage(self);
+      let need_paint = paint_ctx.painter.alpha() != 0.
+        && (paint_rect_interset(paint_ctx.painter, &layout_box) || render.can_overflow());
 
       if need_paint {
         paint_ctx
           .painter
           .translate(layout_box.min_x(), layout_box.min_y());
-        id.assert_get(self).paint(&mut paint_ctx);
+        render.paint(&mut paint_ctx);
       }
-
       w = id.first_child(self).filter(|_| need_paint).or_else(|| {
         let mut node = w;
         while let Some(p) = node {
@@ -452,16 +451,6 @@ impl WidgetId {
 
   pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
-  }
-
-  pub(crate) fn is_offstage(self, tree: &WidgetTree) -> bool {
-    let mut offstage = false;
-    self
-      .assert_get(tree)
-      .query_on_first_type(QueryOrder::OutsideFirst, |r: &Offstage| {
-        offstage = r.offstage
-      });
-    offstage
   }
 
   pub(crate) fn key(self, tree: &WidgetTree) -> Option<Key> {

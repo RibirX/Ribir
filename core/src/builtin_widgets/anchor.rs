@@ -66,6 +66,8 @@ impl Render for LeftAnchor {
 
   fn paint(&self, _: &mut PaintingCtx) {}
 
+  fn can_overflow(&self) -> bool { true }
+
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
   }
@@ -84,6 +86,8 @@ impl Render for RightAnchor {
 
   fn paint(&self, _: &mut PaintingCtx) {}
 
+  fn can_overflow(&self) -> bool { true }
+
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
   }
@@ -100,6 +104,8 @@ impl Render for TopAnchor {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  fn can_overflow(&self) -> bool { true }
 
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
@@ -118,6 +124,8 @@ impl Render for BottomAnchor {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
+
+  fn can_overflow(&self) -> bool { true }
 
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
