@@ -1,6 +1,7 @@
 use super::Theme;
-use crate::prelude::{Size, SvgRender};
+use crate::{prelude::*, widget::Compose};
 use algo::ShareResource;
+use ribir_macros::widget_try_track;
 use std::collections::HashMap;
 
 /// The theme of icon, which specify the icon size standard and provide a store
@@ -54,6 +55,14 @@ pub const CUSTOM_ICON_START: IconIdent = IconIdent::new(65536);
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct IconIdent(pub usize);
 
+impl Compose for IconIdent {
+  fn compose(this: crate::widget::StateWidget<Self>) -> crate::widget::Widget {
+    widget_try_track! {
+      try_track { this }
+      ExprWidget { expr: this.of_or_miss(ctx.theme()) }
+    }
+  }
+}
 impl IconTheme {
   #[inline]
   pub fn new(icon_size: IconSize, miss_icon: ShareResource<SvgRender>) -> Self {
