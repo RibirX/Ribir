@@ -92,7 +92,6 @@ fn override_compose_styles(theme: &mut Theme) {
     PositionUnit::Pixel(from.lerp(&to, rate))
   }
   theme.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
-    let this = this.into_stateful();
     {
       let mut this_ref = this.state_ref();
       this_ref.thumb_min_size = 12.;
@@ -113,7 +112,6 @@ fn override_compose_styles(theme: &mut Theme) {
     }
   });
   theme.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
-    let this = this.into_stateful();
     {
       let mut this_ref = this.state_ref();
       this_ref.thumb_min_size = 12.;
@@ -146,14 +144,14 @@ fn override_compose_styles(theme: &mut Theme) {
   });
   theme.override_compose_style::<CheckBoxStyle>(move |style, host| {
     widget! {
-      track { style: style.into_stateful() }
+      track { style }
       env { style.state_ref().size =  IconSize::of(ctx.theme()).tiny; }
       ExprWidget { expr: host }
     }
   });
   theme.override_compose_style::<CheckBoxLabelStyle>(move |style, host| {
     widget! {
-      track { style: style.into_stateful() }
+      track { style }
       env { style.state_ref().label_style = TypographyTheme::of(ctx.theme()).body1.text.clone(); }
       ExprWidget { expr: host }
     }

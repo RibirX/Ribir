@@ -28,13 +28,13 @@ pub struct CheckBoxLabelStyle {
 impl ComposeStyle for CheckBoxStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
+  fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
 }
 
 impl ComposeStyle for CheckBoxLabelStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(_: StateWidget<Self>, style: Self::Host) -> Widget { style }
+  fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
 }
 
 impl Checkbox {

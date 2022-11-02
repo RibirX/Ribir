@@ -22,7 +22,7 @@ pub struct InkBarStyle;
 impl ComposeStyle for InkBarStyle {
   type Host = Widget;
   #[inline]
-  fn compose_style(_: StateWidget<Self>, host: Widget) -> Widget { host }
+  fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
 }
 
 impl ComposeChild for Tabs {
