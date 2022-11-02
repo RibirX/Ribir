@@ -17,8 +17,6 @@ mod transform_widget;
 pub use transform_widget::*;
 mod visibility;
 pub use visibility::*;
-mod offstage;
-pub use offstage::*;
 mod ignore_pointer;
 pub use ignore_pointer::*;
 mod void;
