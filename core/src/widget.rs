@@ -6,6 +6,7 @@ use crate::{
 };
 use algo::ShareResource;
 use painter::*;
+use rxrust::subscription::{SubscriptionGuard, SubscriptionLike};
 
 #[doc(hidden)]
 pub use std::{
@@ -368,4 +369,8 @@ impl Render for Box<dyn Render> {
 
 impl Query for Box<dyn Render> {
   impl_proxy_query!(deref());
+}
+
+impl Query for Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> {
+  impl_query_self_only!();
 }

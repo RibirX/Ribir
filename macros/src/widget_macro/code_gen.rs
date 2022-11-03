@@ -19,17 +19,16 @@ use super::{
   desugar::{
     ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, WidgetNode,
   },
+  guard_ident, guard_vec_ident,
   parser::{Env, Track, TrackField},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
 
-impl Desugared {
-  pub fn gen_code(&mut self) -> TokenStream {
-    self.circle_detect();
-    let mut tokens = quote! {};
+impl ToTokens for Desugared {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
     if !self.errors.is_empty() {
-      Brace::default().surround(&mut tokens, |tokens| {
+      Brace::default().surround(tokens, |tokens| {
         self
           .errors
           .iter()
@@ -37,23 +36,35 @@ impl Desugared {
         quote! { Void }.to_tokens(tokens);
       });
 
-      return tokens;
+      return;
+    }
+    let Self { track, warnings, .. } = &*self;
+    if track.as_ref().map_or(false, Track::has_def_names) {
+      Brace::default().surround(tokens, |tokens| {
+        track.to_tokens(tokens);
+        self.inner_tokens(tokens);
+      })
+    } else {
+      self.inner_tokens(tokens);
     }
 
-    let Self {
-      env,
-      track,
-      named_objs,
-      stmts,
-      widget,
-      warnings,
-      ..
-    } = &self;
+    warnings.iter().for_each(|w| w.emit_warning());
+  }
+}
+
+impl Desugared {
+  fn inner_tokens(&self, tokens: &mut TokenStream) {
+    let Self { env, named_objs, stmts, widget, .. } = &self;
     let sorted_named_objs = self.order_named_objs();
-    Paren::default().surround(&mut tokens, |tokens| {
+    Paren::default().surround(tokens, |tokens| {
       let ctx_name = ctx_ident(Span::call_site());
       quote! { move |#ctx_name: &mut BuildCtx| }.to_tokens(tokens);
       Brace::default().surround(tokens, |tokens| {
+        let guards_vec = guard_vec_ident();
+        quote! {
+         let mut #guards_vec: Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> = vec![];
+        }
+        .to_tokens(tokens);
         env.to_tokens(tokens);
         // deep first declare named obj by their dependencies
         // circular may exist widget attr follow widget self to init.
@@ -66,22 +77,20 @@ impl Desugared {
         stmts.iter().for_each(|item| item.to_tokens(tokens));
         let w = widget.as_ref().unwrap();
         w.gen_node_objs(tokens);
+        let name = w.parent.name();
+        quote! { let mut #name = }.to_tokens(tokens);
         w.gen_compose_node(named_objs, tokens);
-        quote! { .into_widget() }.to_tokens(tokens);
+        quote! {
+          .into_widget();
+          if !#guards_vec.is_empty() {
+            #name = compose_child_as_data_widget(#name, StateWidget::Stateless(#guards_vec));
+          }
+          #name
+        }
+        .to_tokens(tokens);
       })
     });
-    quote! { .into_widget() }.to_tokens(&mut tokens);
-
-    if track.as_ref().map_or(false, Track::has_def_names) {
-      tokens = quote! {{
-        #track
-        #tokens
-      }};
-    }
-
-    warnings.iter().for_each(|w| w.emit_warning());
-
-    tokens
+    quote! { .into_widget() }.to_tokens(tokens);
   }
 
   pub fn collect_warnings(&mut self, ctx: &VisitCtx) {
@@ -471,6 +480,10 @@ fn subscribe_modify(
   tokens: &mut TokenStream,
 ) {
   if let Some(upstream) = observe.upstream_tokens() {
+    let guard = guard_ident();
+    let subscribe_span = subscribe_do.span();
+    quote_spanned! { subscribe_span => let #guard =  }.to_tokens(tokens);
+
     let observe_span = observe.span();
     upstream.to_tokens(tokens);
     let mut expr_value = quote! {};
@@ -504,7 +517,6 @@ fn subscribe_modify(
       .to_tokens(tokens);
     }
 
-    let subscribe_span = subscribe_do.span();
     quote_spanned! {subscribe_span => .subscribe}.to_tokens(tokens);
     Paren(subscribe_span).surround(tokens, |tokens| {
       if subscribe_do.used_name_info.refs_widgets().is_some() {
@@ -518,6 +530,13 @@ fn subscribe_modify(
       }
     });
     Semi(subscribe_span).to_tokens(tokens);
+
+    let guard_vec = guard_vec_ident();
+    quote_spanned! { subscribe_span =>
+      let #guard: Box<dyn SubscriptionLike> = Box::new(#guard.into_inner());
+      #guard_vec.push(SubscriptionGuard::new(#guard));
+    }
+    .to_tokens(tokens);
   }
 }
 
