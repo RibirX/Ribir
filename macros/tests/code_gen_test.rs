@@ -21,10 +21,7 @@ fn simple_ref_bind_work() {
        size: size2.size,
        tap: move |_| size2.size *= 2.,
      }
-     SizedBox {
-      id: size2,
-      size,
-    }
+     SizedBox { id: size2, size, }
    }
   };
 
@@ -353,4 +350,42 @@ fn fix_access_builtin_with_gap() {
       }
     }
   };
+}
+
+#[test]
+fn fix_subscribe_cancel_after_widget_drop() {
+  let notify_cnt = 0.into_stateful();
+  let trigger = true.into_stateful();
+  let w = widget! {
+    track { cnt: notify_cnt.clone(), trigger: trigger.clone() }
+    SizedBox {
+      size: Size::zero(),
+      ExprWidget  {
+        expr: trigger.then(|| {
+          widget! {
+            SizedBox { size: Size::zero() }
+            on (*trigger) { modify: move |(_, _)| { *cnt += 1; } }
+          }
+        })
+      }
+    }
+  };
+
+  let mut wnd = Window::default_mock(w, None);
+  wnd.draw_frame();
+  {
+    *trigger.state_ref() = true
+  }
+  wnd.draw_frame();
+  assert_eq!(*notify_cnt.raw_ref(), 1);
+  {
+    *trigger.state_ref() = true
+  }
+  wnd.draw_frame();
+  assert_eq!(*notify_cnt.raw_ref(), 2);
+  {
+    *trigger.state_ref() = true
+  }
+  wnd.draw_frame();
+  assert_eq!(*notify_cnt.raw_ref(), 3);
 }

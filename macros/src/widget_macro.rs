@@ -98,7 +98,10 @@ pub fn gen_widget_macro(
       }
     });
 
-  let mut tokens = desugar.gen_code();
+  let mut tokens = quote! {};
+  desugar.circle_detect();
+  desugar.to_tokens(&mut tokens);
+
   if let Some(outside_ctx) = outside_ctx {
     let used_outsides = used_widgets
       .iter()
