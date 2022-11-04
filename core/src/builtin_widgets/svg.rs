@@ -11,12 +11,13 @@ impl Compose for Svg {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget_try_track! {
       try_track { this }
-      ExprWidget {
-        expr: match SvgRender::parse_from_bytes(&this.bytes) {
+      env { let theme = ctx.theme().clone(); }
+      DynWidget {
+        dyns: match SvgRender::parse_from_bytes(&this.bytes) {
           Ok(reader) => reader.into_widget(),
           Err(err) =>  {
             log::warn!("Parse svg failed: {err}");
-            IconTheme::of(ctx.theme()).miss_icon.clone().into_widget()
+            IconTheme::of(&theme).miss_icon.clone().into_widget()
           }
         }
       }

@@ -102,8 +102,8 @@ mod tests {
       let fit = FittedBox { box_fit, scale_cache: <_>::default() }.into_stateful();
       let c_fit = fit.clone();
       let w = widget! {
-        ExprWidget {
-          expr: fit,
+        DynWidget {
+          dyns: fit,
           MockBox { size }
         }
       };

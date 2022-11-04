@@ -40,7 +40,7 @@ impl ComposeChild for InteractiveLayer {
     widget! {
       track { this: this.into_stateful() }
       Stack {
-        ExprWidget { id: host, expr: child }
+        DynWidget { id: host, dyns: child }
         StateLayer {
           color: this.color,
           path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),

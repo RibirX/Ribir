@@ -16,8 +16,8 @@ impl ComposeChild for Cursor {
     widget_try_track! {
       try_track { this }
       track { save_cursor: None.into_stateful() }
-      ExprWidget {
-        expr: child,
+      DynWidget {
+        dyns: child,
         pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()

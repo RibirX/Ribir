@@ -19,7 +19,6 @@ pub(crate) struct WidgetTree {
   /// Store the render object's place relative to parent coordinate and the
   /// clamp passed from parent.
   layout_store: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
-  pub(crate) needs_regen: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
 }
 
 impl WidgetTree {
@@ -38,7 +37,6 @@ impl WidgetTree {
       state_changed: <_>::default(),
       ctx,
       layout_store: <_>::default(),
-      needs_regen: <_>::default(),
     };
 
     tree.set_root(root_widget);
@@ -96,38 +94,9 @@ impl WidgetTree {
 
   // perform repair the tree and layout it until everything ready, and return if
   // modify the tree struct.
-  pub(crate) fn tree_ready(&mut self, win_size: Size) -> bool {
-    let mut struct_modify = false;
+  pub(crate) fn tree_ready(&mut self, win_size: Size) {
     while self.is_dirty() {
-      struct_modify |= self.any_struct_dirty();
-      self.tree_repair();
       self.layout(win_size);
-    }
-    struct_modify
-  }
-
-  /// Repair the gaps between widget tree represent and current data state after
-  /// some user or device inputs has been processed.
-  pub(crate) fn tree_repair(&mut self) {
-    loop {
-      if self.needs_regen.borrow().is_empty() {
-        break;
-      }
-
-      let mut needs_regen = self
-        .needs_regen
-        .borrow_mut()
-        .drain()
-        .filter(|g| !g.0.is_removed(&mut self.arena))
-        .collect::<Vec<_>>();
-
-      needs_regen.sort_by_cached_key(|g| g.ancestors(self).count());
-      for g in needs_regen.into_iter() {
-        // child expr widget may removed by parent ancestor expr widget refresh.
-        if !g.is_dropped(self) {
-          self.refresh_generator(g);
-        }
-      }
     }
   }
 
@@ -170,7 +139,7 @@ impl WidgetTree {
       .expect("must have a root");
     self.set_root_id(root);
     self.mark_dirty(root);
-    root.on_mounted_subtree(self, &HashMap::default());
+    root.on_mounted_subtree(self);
   }
 
   pub(crate) fn set_root_id(&mut self, id: WidgetId) {
@@ -180,11 +149,7 @@ impl WidgetTree {
 
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.state_changed.borrow_mut().insert(id); }
 
-  pub(crate) fn is_dirty(&self) -> bool { self.any_state_modified() || self.any_struct_dirty() }
-
-  pub(crate) fn any_state_modified(&self) -> bool { !self.state_changed.borrow().is_empty() }
-
-  pub(crate) fn any_struct_dirty(&self) -> bool { !self.needs_regen.borrow().is_empty() }
+  pub(crate) fn is_dirty(&self) -> bool { !self.state_changed.borrow().is_empty() }
 
   pub(crate) fn count(&self) -> usize { self.root().descendants(&self).count() }
 
@@ -301,24 +266,45 @@ impl WidgetId {
     w.ancestors(tree).any(|a| a == self)
   }
 
-  pub(crate) fn children(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
-    self.0.children(&tree.arena).map(WidgetId)
+  pub(crate) fn children(self, tree: &WidgetTree) -> ChildrenIter<'_> {
+    ChildrenIter {
+      tree,
+      parent: Some(self),
+      current: None,
+    }
   }
 
-  pub(crate) fn reverse_children(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
-    self.0.reverse_children(&tree.arena).map(WidgetId)
+  pub(crate) fn reverse_children(self, tree: &WidgetTree) -> RevChildrenIter {
+    RevChildrenIter {
+      tree,
+      parent: Some(self),
+      current: None,
+    }
   }
 
   pub(crate) fn descendants(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.descendants(&tree.arena).map(WidgetId)
   }
 
-  pub(crate) fn replace_data(
-    self,
-    other: Box<dyn Render>,
-    tree: &mut WidgetTree,
-  ) -> Box<dyn Render> {
-    std::mem::replace(self.assert_get_mut(tree), other)
+  pub(crate) fn swap_id(self, other: WidgetId, tree: &mut WidgetTree) {
+    self.swap_data(other, tree);
+
+    let guard = tree.empty_node();
+    self.transplant(guard, tree);
+    other.transplant(self, tree);
+    guard.transplant(other, tree);
+    guard.0.remove(&mut tree.arena);
+  }
+
+  pub(crate) fn transplant(self, other: WidgetId, tree: &mut WidgetTree) {
+    self.insert_after(other, tree);
+    let first_child = self.first_child(tree);
+    let mut cursor = first_child;
+    while let Some(c) = cursor {
+      cursor = c.next_sibling(tree);
+      other.append(c, tree);
+    }
+    self.detach(tree);
   }
 
   pub(crate) fn swap_data(self, other: WidgetId, tree: &mut WidgetTree) {
@@ -327,32 +313,9 @@ impl WidgetId {
     std::mem::swap(self.assert_get_mut(tree1), other.assert_get_mut(tree2));
   }
 
-  pub(crate) fn swap_children(self, other: WidgetId, tree: &mut WidgetTree) {
-    let first_child = self.first_child(tree);
-    let mut cursor = first_child;
-    while let Some(c) = cursor {
-      cursor = c.next_sibling(tree);
-      other.append(c, tree);
-    }
-    let mut other_child = other.first_child(tree);
-    while other_child.is_some() && other_child != first_child {
-      let o_c = other_child.unwrap();
-      other_child = o_c.next_sibling(tree);
-      self.append(o_c, tree);
-    }
+  pub(crate) fn detach(self, tree: &mut WidgetTree) { self.0.detach(&mut tree.arena) }
 
-    let guard = tree.empty_node();
-    self.insert_after(guard, tree);
-    other.insert_after(self, tree);
-    guard.insert_after(other, tree);
-    guard.0.remove(&mut tree.arena);
-  }
-
-  pub(crate) fn remove_subtree(
-    self,
-    tree: &mut WidgetTree,
-    old_to_news: &HashMap<WidgetId, WidgetId>,
-  ) {
+  pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
     // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self
@@ -360,10 +323,7 @@ impl WidgetId {
       .descendants(&tree1.arena)
       .map(WidgetId)
       .for_each(|id| {
-        let disposed_type = old_to_news
-          .get(&id)
-          .map_or(DisposedType::Drop, |id| DisposedType::Replaced(*id));
-        id.on_disposed(tree2, disposed_type);
+        id.on_disposed(tree2);
       });
     self.0.remove_subtree(&mut tree1.arena);
     if tree1.root() == self {
@@ -387,25 +347,14 @@ impl WidgetId {
     self.0.append(child.0, &mut tree.arena);
   }
 
-  pub(crate) fn on_mounted_subtree(
-    self,
-    tree: &mut WidgetTree,
-    old_to_news: &HashMap<WidgetId, WidgetId>,
-  ) {
+  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree) {
     let (tree1, tree2) = unsafe { tree.split_tree() };
-    let new_to_olds = old_to_news
-      .iter()
-      .map(|(old, new)| (*new, *old))
-      .collect::<HashMap<WidgetId, WidgetId>>();
     self.descendants(tree1).for_each(|w| {
-      let mount = new_to_olds
-        .get(&w)
-        .map_or(MountedType::New, |id| MountedType::Replace(*id));
-      w.on_mounted(tree2, mount);
+      w.on_mounted(tree2);
     });
   }
 
-  pub(crate) fn on_mounted(self, tree: &mut WidgetTree, mounted_type: MountedType) {
+  pub(crate) fn on_mounted(self, tree: &mut WidgetTree) {
     self.assert_get(tree).query_all_type(
       |notifier: &StateChangeNotifier| {
         let state_changed = tree.state_changed.clone();
@@ -424,20 +373,20 @@ impl WidgetId {
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self.assert_get(tree1).query_all_type(
       |m: &MountedListener| {
-        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 }, mounted_type);
+        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
         true
       },
       QueryOrder::OutsideFirst,
     );
   }
 
-  pub(crate) fn on_disposed(self, tree: &mut WidgetTree, disposed_type: DisposedType) {
+  pub(crate) fn on_disposed(self, tree: &mut WidgetTree) {
     tree.layout_store.remove(&self);
     // Safety: tmp code, remove after deprecated `query_all_type_mut`.
     let (tree1, tree2) = unsafe { tree.split_tree() };
     self.assert_get(tree1).query_all_type(
       |d: &DisposedListener| {
-        (d.disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 }, disposed_type);
+        (d.disposed.borrow_mut())(LifeCycleCtx { id: self, tree: tree2 });
         true
       },
       QueryOrder::OutsideFirst,
@@ -464,16 +413,6 @@ impl WidgetId {
 
   pub(crate) fn assert_get_mut(self, tree: &mut WidgetTree) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
-  }
-
-  pub(crate) fn key(self, tree: &WidgetTree) -> Option<Key> {
-    let mut key = None;
-    self
-      .assert_get(tree)
-      .query_on_first_type(QueryOrder::OutsideFirst, |k: &Key| {
-        key = Some(k.clone());
-      });
-    key
   }
 }
 
@@ -537,10 +476,6 @@ impl Widget {
               let wid = self.tree.new_node(r);
               self.perpend(wid, children_size > 0);
             }
-            WidgetNode::Dynamic(e) => {
-              let w = Generator::new_generator(e, children_size > 0, self.tree);
-              self.perpend(w, children_size > 0);
-            }
           }
         } else {
           assert!(
@@ -582,6 +517,49 @@ impl Widget {
     helper.inflate(self)
   }
 }
+
+pub struct ChildrenIter<'a> {
+  tree: &'a WidgetTree,
+  parent: Option<WidgetId>,
+  current: Option<WidgetId>,
+}
+
+impl<'a> Iterator for ChildrenIter<'a> {
+  type Item = WidgetId;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let Self { tree, parent, current } = self;
+    if let Some(c) = current {
+      *current = c.next_sibling(tree);
+    } else if let Some(p) = parent {
+      *current = p.first_child(tree);
+      parent.take();
+    }
+    self.current
+  }
+}
+
+pub struct RevChildrenIter<'a> {
+  tree: &'a WidgetTree,
+  parent: Option<WidgetId>,
+  current: Option<WidgetId>,
+}
+
+impl<'a> Iterator for RevChildrenIter<'a> {
+  type Item = WidgetId;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let Self { tree, parent, current } = self;
+    if let Some(c) = current {
+      *current = c.next_sibling(tree);
+    } else if let Some(p) = parent {
+      *current = p.first_child(tree);
+      parent.take();
+    }
+    self.current
+  }
+}
+
 #[cfg(test)]
 mod tests {
   extern crate test;
@@ -605,8 +583,8 @@ mod tests {
       widget! {
         track { this: this.into_stateful() }
         MockMulti {
-          ExprWidget {
-            expr: (0..this.width)
+          DynWidget {
+            dyns: (0..this.width)
               .map(move |_| {
                 if this.depth > 1 {
                   Recursive {
@@ -617,6 +595,7 @@ mod tests {
                   MockBox { size: Size::new(10., 10.)}.into_widget()
                 }
               })
+              .collect::<Vec<_>>()
           }
         }
       }
@@ -634,14 +613,14 @@ mod tests {
       widget! {
         track { this: this.into_stateful()}
         MockMulti {
-          ExprWidget {
-            expr: (0..this.width - 1)
+          DynWidget {
+            dyns: (0..this.width - 1)
               .map(move |_| {
                 MockBox { size: Size::new(10., 10.)}
-              })
+              }).collect::<Vec<_>>()
           }
-          ExprWidget {
-            expr: if this.depth > 1{
+          DynWidget {
+            dyns: if this.depth > 1{
               Embed {
                 width: this.width,
                 depth: this.depth - 1,
@@ -659,7 +638,7 @@ mod tests {
     let ctx: AppContext = <_>::default();
     b.iter(move || {
       let mut tree = WidgetTree::new(Recursive { width, depth }.into_widget(), ctx.clone());
-      tree.tree_repair();
+      tree.tree_ready(Size::new(512., 512.));
     });
   }
 
@@ -672,7 +651,7 @@ mod tests {
         let mut v = trigger.state_ref();
         v.width = v.width;
       }
-      tree.tree_repair();
+      tree.tree_ready(Size::new(512., 512.));
     });
   }
 
@@ -708,12 +687,12 @@ mod tests {
     let child = Stateful::new(true);
     let w = widget! {
       track { parent: parent.clone(), child: child.clone() }
-      ExprWidget {
-        expr: parent.then(|| {
+      DynWidget {
+        dyns: parent.then(|| {
           widget!{
             MockBox {
               size: Size::zero(),
-              ExprWidget { expr: child.then(|| Void )}
+              DynWidget { dyns: child.then(|| Void )}
             }
           }
         })
@@ -737,9 +716,9 @@ mod tests {
     let trigger = Stateful::new(true);
     let w = widget! {
       track { trigger: trigger.clone() }
-      ExprWidget {
-        expr: trigger.then(|| {
-          widget!{ ExprWidget { expr: trigger.then(|| Void )}}
+      DynWidget {
+        dyns: trigger.then(|| {
+          widget!{ DynWidget { dyns: trigger.then(|| Void )}}
         })
       }
     };
@@ -763,11 +742,11 @@ mod tests {
   fn drop_info_clear() {
     let post = Embed { width: 5, depth: 3 };
     let mut tree = WidgetTree::new(post.into_widget(), <_>::default());
-    tree.tree_repair();
+    tree.tree_ready(Size::new(512., 512.));
     assert_eq!(tree.count(), 16);
 
     tree.mark_dirty(tree.root());
-    tree.root().remove_subtree(&mut tree, &HashMap::default());
+    tree.root().remove_subtree(&mut tree);
     assert_eq!(tree.layout_list(), None);
     assert!(
       tree
@@ -809,7 +788,7 @@ mod tests {
         let mut v = trigger.state_ref();
         v.width = v.width;
       }
-      tree.tree_repair();
+      tree.tree_ready(Size::new(512., 512.));
     });
   }
 
@@ -831,8 +810,8 @@ mod tests {
     let widget = widget! {
       track { trigger: trigger.clone() }
       MockMulti {
-        ExprWidget {
-          expr: (0..3).map(|_| if *trigger > 0 {
+        DynWidget {
+          dyns: (0..3).map(|_| if *trigger > 0 {
             MockBox { size: Size::new(1., 1.)}
           } else {
             MockBox { size: Size::zero()}
@@ -842,7 +821,6 @@ mod tests {
     };
 
     let mut tree = WidgetTree::new(widget, <_>::default());
-    tree.tree_repair();
     tree.layout(Size::new(100., 100.));
     {
       *trigger.silent_ref() = 2;
@@ -862,8 +840,8 @@ mod tests {
 
     let w1 = widget! {
        MockMulti {
-        ExprWidget {
-          expr: (0..100).map(|_|
+        DynWidget {
+          dyns: (0..100).map(|_|
             widget! {MockBox {
              size: Size::new(150., 50.),
              background: Color::BLUE,
@@ -871,7 +849,6 @@ mod tests {
         }
     }};
     let mut tree1 = WidgetTree::new(w1, <_>::default());
-    tree1.tree_repair();
     tree1.tree_ready(win_size);
     tree1.draw(&mut painter);
 
@@ -879,16 +856,15 @@ mod tests {
 
     let w2 = widget! {
        MockMulti {
-        ExprWidget {
-          expr: (0..1).map(|_|
-            widget! {MockBox {
+        DynWidget {
+          dyns: (0..1).map(|_|
+            widget! { MockBox {
              size: Size::new(150., 50.),
              background: Color::BLUE,
           }}).collect::<Vec<_>>()
         }
     }};
     let mut tree2 = WidgetTree::new(w2, <_>::default());
-    tree2.tree_repair();
     tree2.tree_ready(win_size);
     tree2.draw(&mut painter);
     let len_1_widget = painter.finish().len();

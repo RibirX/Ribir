@@ -80,7 +80,7 @@ impl CombinationWidget for T {
 }
 
 ```
-## Use `ExprWidget` to dynamic generate widget.
+## Use `DynWidget` to dynamic generate widget.
 
 At before we use struct literal to declare children, we also can pass any rust expression as children.
 

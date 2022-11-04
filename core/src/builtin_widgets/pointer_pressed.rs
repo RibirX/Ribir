@@ -19,8 +19,8 @@ impl ComposeChild for PointerPressed {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful()}
-      ExprWidget {
-        expr: child,
+      DynWidget {
+        dyns: child,
         pointer_down: move|_| this.pointer_pressed = true,
         pointer_up: move |_| this.pointer_pressed = false,
       }

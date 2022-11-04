@@ -303,7 +303,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
 
   let tokens = quote! {
 
-      #vis struct #builder #g_ty #g_where {
+      #vis struct #builder #g_impl #g_where {
         #(#def_fields)*
       }
 

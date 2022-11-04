@@ -46,7 +46,7 @@ impl ComposeChild for KeyWidget {
 }
 
 impl Query for KeyWidget {
-  impl_proxy_query!(key);
+  impl_proxy_query!(self.key);
 }
 
 impl Query for Key {

@@ -376,8 +376,8 @@ mod tests {
   fn horizontal_line() {
     let row = widget! {
       Flex {
-        ExprWidget {
-          expr: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
+        DynWidget {
+          dyns: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
       }
     };
@@ -402,8 +402,8 @@ mod tests {
     let col = widget! {
       Flex {
         direction: Direction::Vertical,
-        ExprWidget  {
-         expr: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
+        DynWidget  {
+         dyns: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
       }
     };
@@ -429,8 +429,8 @@ mod tests {
     let row = widget! {
       Flex {
         wrap: true,
-        ExprWidget {
-          expr: (0..3).map(|_| SizedBox { size })
+        DynWidget {
+          dyns: (0..3).map(|_| SizedBox { size })
         }
       }
     };
@@ -488,8 +488,8 @@ mod tests {
       Flex {
         wrap: true,
         reverse: true,
-        ExprWidget {
-          expr: (0..3).map(|_| SizedBox { size })
+        DynWidget {
+          dyns: (0..3).map(|_| SizedBox { size })
         }
       }
     };

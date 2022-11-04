@@ -40,9 +40,9 @@ impl ComposeChild for ScrollableWidget {
           Scrollable::Both => UnconstrainedDir::Both,
         },
         wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
-        ExprWidget {
+        DynWidget {
           id: content,
-          expr: child,
+          dyns: child,
           left_anchor: this.scroll_pos.x,
           top_anchor: this.scroll_pos.y,
         }

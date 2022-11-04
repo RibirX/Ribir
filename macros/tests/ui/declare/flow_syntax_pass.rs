@@ -50,8 +50,8 @@ fn main() {
         id: b,
         size: Size::zero(),
       }
-      ExprWidget {
-        expr: true.then(||{
+      DynWidget {
+        dyns: true.then(||{
           widget!{
             SizedBox {
               id: c,

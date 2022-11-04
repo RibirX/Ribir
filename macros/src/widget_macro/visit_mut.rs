@@ -1,4 +1,4 @@
-use crate::{error::DeclareError, WIDGET_MACRO_NAME};
+use crate::WIDGET_MACRO_NAME;
 
 use super::{
   builtin_var_name, capture_widget,
@@ -15,8 +15,8 @@ use std::{
   hash::Hash,
 };
 use syn::{
-  parse_quote, parse_quote_spanned, spanned::Spanned, token::Brace, visit_mut, visit_mut::VisitMut,
-  Expr, ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
+  parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr,
+  ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
 };
 
 bitflags::bitflags! {
@@ -273,9 +273,8 @@ impl VisitMut for VisitCtx {
   }
 }
 
-pub const EXPR_WIDGET: &str = "ExprWidget";
-pub const EXPR_FIELD: &str = "expr";
-fn is_expr_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == EXPR_WIDGET) }
+pub const DYN_WIDGET: &str = "DynWidget";
+fn is_dyn_widget_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == DYN_WIDGET) }
 
 impl VisitCtx {
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
@@ -296,68 +295,12 @@ impl VisitCtx {
     self.visit_widget_node_mut(&mut desugar.widget.as_mut().unwrap());
   }
   pub fn visit_declare_obj(&mut self, obj: &mut DeclareObj) {
-    let obj_span = obj.span();
     let DeclareObj { ty, fields, .. } = obj;
     self.visit_path_mut(ty);
-    if is_expr_keyword(ty) {
-      if fields.len() != 1 || fields[0].member != EXPR_FIELD {
-        let spans = fields.iter().map(|f| f.member.span().unwrap()).collect();
-        let mut error = quote! {};
-        DeclareError::ExprWidgetInvalidField(spans).into_compile_error(&mut error);
-        fields.clear();
-        fields.push(Field {
-          member: Ident::new(EXPR_FIELD, obj_span),
-          value: FieldValue::Expr(TrackExpr::new(parse_quote! {#error})),
-        });
-      } else {
-        let mut expr_field = fields.first_mut().unwrap();
-        self.visit_field(expr_field);
-        let origin_expr = match &expr_field.value {
-          FieldValue::Expr(e) => e,
-          FieldValue::Obj(_) => unreachable!(),
-        };
-
-        if let Some(upstream) = origin_expr.upstream_tokens() {
-          let mut expr_tokens = quote! {};
-          let span = origin_expr.span();
-          Brace(span).surround(&mut expr_tokens, |tokens| {
-            origin_expr
-              .used_name_info
-              .all_used()
-              .unwrap()
-              .for_each(|name| capture_widget(name).to_tokens(tokens));
-            quote! {move |#[allow(unused)] ctx: &mut BuildCtx|}.to_tokens(tokens);
-            Brace(span).surround(tokens, |tokens| {
-              origin_expr
-                .used_name_info
-                .value_expr_surround_refs(tokens, span, |tokens| origin_expr.to_tokens(tokens))
-            })
-          });
-          let mut used_name_info = origin_expr.used_name_info.clone();
-          used_name_info
-            .iter_mut()
-            .for_each(|(_, info)| info.used_type = UsedType::MOVE_CAPTURE);
-          let value = FieldValue::Expr(TrackExpr {
-            expr: Expr::Verbatim(expr_tokens),
-            used_name_info,
-          });
-
-          expr_field.value = value;
-
-          *ty = parse_quote_spanned! { ty.span() => #ty::<_> };
-          fields.push(Field {
-            member: Ident::new("upstream", obj_span),
-            value: FieldValue::Expr(TrackExpr::new(
-              parse_quote! { #upstream.filter(|e|e.contains(ChangeScope::FRAMEWORK)) },
-            )),
-          });
-        } else {
-          *ty = parse_quote_spanned! { ty.span() => ConstExprWidget<_> };
-        }
-      }
-    } else {
-      fields.iter_mut().for_each(|f| self.visit_field(f));
+    if is_dyn_widget_keyword(ty) {
+      *ty = parse_quote_spanned! { ty.span() => #ty::<_> };
     }
+    fields.iter_mut().for_each(|f| self.visit_field(f));
   }
 
   pub fn visit_subscribe_item_mut(&mut self, item: &mut SubscribeItem) {

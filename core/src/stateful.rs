@@ -80,8 +80,7 @@
 //! Notice, the first argument of `build` method is `Stateful<Self>` let you can
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
-use crate::prelude::*;
-use lazy_static::__Deref;
+use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
 use rxrust::{ops::box_it::LocalCloneBoxOp, prelude::*};
 use std::{
   cell::{RefCell, RefMut, UnsafeCell},
@@ -361,42 +360,12 @@ impl<W> IntoStateful for W {
   fn into_stateful(self) -> Stateful<W> { Stateful::new(self) }
 }
 
-impl<W: Query> Query for Stateful<W> {
-  fn query_all(
-    &self,
-    type_id: std::any::TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
-    order: QueryOrder,
-  ) {
-    let w = self.widget.borrow();
-    let widget = w.deref();
-    let mut continue_query = true;
-    match order {
-      QueryOrder::InnerFirst => {
-        widget.query_all(
-          type_id,
-          &mut |t| {
-            continue_query = callback(t);
-            continue_query
-          },
-          order,
-        );
-        if continue_query {
-          if let Some(a) = self.change_notifier.query_filter(type_id) {
-            callback(a);
-          }
-        }
-      }
-      QueryOrder::OutsideFirst => {
-        if let Some(a) = self.change_notifier.query_filter(type_id) {
-          continue_query = callback(a);
-        }
-        if continue_query {
-          widget.query_all(type_id, callback, order);
-        }
-      }
-    }
-  }
+impl<W: Query + 'static> Query for Stateful<W> {
+  impl_proxy_query!(self.change_notifier, self.widget);
+}
+
+impl Query for StateChangeNotifier {
+  impl_query_self_only!();
 }
 
 impl StateChangeNotifier {
@@ -439,16 +408,16 @@ mod tests {
     let state = sized_box.clone();
     let mut wnd = Window::default_mock(sized_box.into_widget(), None);
     wnd.draw_frame();
-
     assert_eq!(*notified_count.borrow(), 0);
     assert_eq!(wnd.widget_tree.any_state_modified(), false);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
+
     {
       state.state_ref().size = Size::new(1., 1.);
     }
-    wnd.widget_tree.tree_repair();
-    assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(wnd.widget_tree.any_state_modified(), true);
+    wnd.draw_frame();
+    assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
   }
 

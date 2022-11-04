@@ -36,21 +36,24 @@ impl ComposeChild for Checkbox {
     let this = this.into_stateful();
     let mut checkbox = widget! {
       track { this: this.clone() }
-      env { let theme = CheckBoxTheme::of(ctx.theme()); }
-      Icon {
-        size: theme.size,
-        ExprWidget {
-          expr: {
-            if this.indeterminate {
-              icons::INDETERMINATE_CHECK_BOX
-            } else if this.checked {
-              icons::CHECK_BOX
-            } else {
-              icons::CHECK_BOX_OUTLINE_BLANK
+      CheckBoxStyle {
+        id: style,
+        Icon {
+          size: style.size,
+          DynWidget {
+            dyns: {
+              if this.indeterminate {
+                icons::INDETERMINATE_CHECK_BOX
+              } else if this.checked {
+                icons::CHECK_BOX
+              } else {
+                icons::CHECK_BOX_OUTLINE_BLANK
+              }
             }
-        }}
-      }
-    };
+          }
+        }
+    }};
+
     if let Some(Label { desc, position }) = label {
       let label = widget! {
         env { let theme = CheckBoxTheme::of(ctx.theme()); }
@@ -58,17 +61,17 @@ impl ComposeChild for Checkbox {
       };
       checkbox = match position {
         Position::Before => {
-          widget! { Row { ExprWidget { expr: [label, checkbox] } } }
+          widget! { Row { DynWidget { dyns: [label, checkbox] } } }
         }
         Position::After => {
-          widget! { Row { ExprWidget { expr: [checkbox, label] } } }
+          widget! { Row { DynWidget { dyns: [checkbox, label] } } }
         }
       };
     }
 
     widget! {
       track { this }
-      ExprWidget {
+      DynWidget {
         cursor: CursorIcon::Hand,
         tap: move |_| this.switch_check(),
         key_up: move |k| {
@@ -76,7 +79,7 @@ impl ComposeChild for Checkbox {
             this.switch_check()
           }
         },
-        expr: checkbox
+        dyns: checkbox
       }
     }
   }

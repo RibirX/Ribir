@@ -372,8 +372,8 @@ mod tests {
       }
     };
     widget! {
-      ExprWidget {
-        expr: widget,
+      DynWidget {
+        dyns: widget,
         pointer_down : handler_ctor(),
         pointer_move: handler_ctor(),
         pointer_up: handler_ctor(),
@@ -391,7 +391,7 @@ mod tests {
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockMulti { ExprWidget  { expr: record } } },
+      widget! { MockMulti { DynWidget  { dyns: record } } },
     );
     let mut wnd = Window::default_mock(root.into_widget(), None);
     wnd.draw_frame();

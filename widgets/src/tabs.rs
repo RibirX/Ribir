@@ -62,8 +62,8 @@ impl ComposeChild for Tabs {
               border: Border::only_bottom(BorderSide {
                 width: 1., color: ctx.theme().palette.primary()
               }),
-              ExprWidget {
-                expr: {
+              DynWidget {
+                dyns: {
                   headers.into_iter()
                     .enumerate()
                     .map(move |(idx, header)| {
@@ -75,11 +75,11 @@ impl ComposeChild for Tabs {
                               this.cur_idx = idx;
                             }
                           },
-                          ExprWidget {
+                          DynWidget {
                             h_align: HAlign::Center,
                             v_align: VAlign::Center,
 
-                            expr: header
+                            dyns: header
                           }
                         }
                       }
@@ -99,14 +99,14 @@ impl ComposeChild for Tabs {
           }
         }
 
-        ExprWidget {
-          expr: panes.into_iter()
+        DynWidget {
+          dyns: panes.into_iter()
             .enumerate()
             .map(move |(idx, pane)| {
               widget! {
-                ExprWidget {
+                DynWidget {
                   visible: this.cur_idx == idx,
-                  expr: pane
+                  dyns: pane
                 }
               }
             })

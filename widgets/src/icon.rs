@@ -18,8 +18,8 @@ impl ComposeChild for Icon {
       try_track { this }
       Container {
         size: this.size,
-        ExprWidget {
-          expr: child,
+        DynWidget {
+          dyns: child,
           box_fit: BoxFit::Contain,
           h_align: HAlign::Center,
           v_align: VAlign::Center,

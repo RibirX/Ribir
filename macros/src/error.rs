@@ -17,7 +17,6 @@ pub struct CircleUsedPath {
 pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleDepends(Box<[CircleUsedPath]>),
-  ExprWidgetInvalidField(Vec<Span>),
   OnInvalidTarget(Span),
   OnInvalidField(Ident),
   NoFromStateForAnimate(Span),
@@ -60,10 +59,6 @@ impl DeclareError {
           will trigger only if the value really changed by compare if the value \
           equal before modify and after.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
-      }
-      DeclareError::ExprWidgetInvalidField(spans) => {
-        diagnostic.set_spans(spans.clone());
-        diagnostic.set_message("`ExprWidget` only accept `expr` field.");
       }
       DeclareError::OnInvalidTarget(span) => {
         diagnostic.set_spans(*span);

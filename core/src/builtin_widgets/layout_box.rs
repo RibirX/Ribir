@@ -13,8 +13,8 @@ impl ComposeChild for LayoutBox {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track { this: this.into_stateful() }
-      ExprWidget {
-        expr: child,
+      DynWidget {
+        dyns: child,
         performed_layout: move |ctx| {
           let new_rect = ctx.box_rect().unwrap();
           if this.rect != new_rect {

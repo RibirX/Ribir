@@ -107,9 +107,8 @@ impl Window {
 
       context.begin_frame();
 
-      let mut struct_dirty = false;
       loop {
-        struct_dirty |= widget_tree.tree_ready(raw_window.inner_size());
+        widget_tree.tree_ready(raw_window.inner_size());
 
         context.layout_ready();
         if !widget_tree.is_dirty() {
@@ -117,9 +116,9 @@ impl Window {
         }
       }
 
-      if struct_dirty {
-        dispatcher.refresh_focus(widget_tree);
-      }
+      // todo: refresh focus only necessary and in a more cheap way.
+      dispatcher.refresh_focus(widget_tree);
+
       widget_tree.draw(painter);
       let commands = painter.finish();
       p_backend.submit(commands);

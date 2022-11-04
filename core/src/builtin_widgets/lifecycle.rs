@@ -35,30 +35,49 @@ mod tests {
         trigger: trigger.clone(),
         lifecycle: lifecycle.clone()
       }
-      ExprWidget {
-        expr: trigger.then(|| widget! {
-          MockBox {
-            size: Size::zero(),
-            mounted: move |_, _| lifecycle.silent().push("mounted"),
-            performed_layout: move |_| lifecycle.silent().push("performed layout"),
-            disposed: move |_, _| lifecycle.silent().push("disposed")
-          }
-        })
+      MockBox {
+        size: Size::zero(),
+        mounted: move |_| lifecycle.silent().push("static mounted"),
+        performed_layout: move |_| lifecycle.silent().push("static performed layout"),
+        disposed: move |_| lifecycle.silent().push("static disposed"),
+        DynWidget {
+          dyns: trigger.then(|| widget! {
+            MockBox {
+              size: Size::zero(),
+              mounted: move |_| lifecycle.silent().push("dyn mounted"),
+              performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
+              disposed: move |_| lifecycle.silent().push("dyn disposed")
+            }
+          })
+        }
       }
     };
 
     let mut tree = WidgetTree::new(w, <_>::default());
-    tree.tree_repair();
-    assert_eq!(&**lifecycle.raw_ref(), ["mounted"]);
+    assert_eq!(&**lifecycle.raw_ref(), ["static mounted"]);
     tree.layout(Size::new(100., 100.));
-    assert_eq!(&**lifecycle.raw_ref(), ["mounted", "performed layout"]);
+    assert_eq!(
+      &**lifecycle.raw_ref(),
+      [
+        "static mounted",
+        "dyn mounted",
+        "dyn performed layout",
+        "static performed layout",
+      ]
+    );
     {
       *trigger.state_ref() = false;
     }
-    tree.tree_repair();
+    tree.tree_ready(Size::zero());
     assert_eq!(
       &**lifecycle.raw_ref(),
-      ["mounted", "performed layout", "disposed"]
+      [
+        "static mounted",
+        "dyn mounted",
+        "dyn performed layout",
+        "static performed layout",
+        "dyn disposed",
+      ]
     );
   }
 }

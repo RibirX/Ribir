@@ -74,8 +74,8 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
 fn overwrite_compose_styles(theme: &mut Theme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
-      ExprWidget {
-        expr: host,
+      DynWidget {
+        dyns: host,
         margin,
         border_radius: Radius::all(4.),
         background: ctx.theme().palette.primary()
@@ -84,8 +84,8 @@ fn overwrite_compose_styles(theme: &mut Theme) {
   }
   fn scrollbar_track(host: Widget) -> Widget {
     widget! {
-      ExprWidget {
-        expr: host,
+      DynWidget {
+        dyns: host,
         background: ctx.theme().palette.primary_container()
       }
     }
@@ -97,11 +97,11 @@ fn overwrite_compose_styles(theme: &mut Theme) {
   }
   theme.overwrite_compose_style::<HScrollBarThumbStyle>(|this, host| {
     widget! {
-      track { this: this.into_stateful() }
-      ExprWidget {
+      track { this }
+      DynWidget {
         id: thumb,
         left_anchor: this.offset,
-        expr: scrollbar_thumb(host, EdgeInsets::vertical(1.))
+        dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
       }
 
       change_on thumb.left_anchor Animate {
@@ -112,11 +112,11 @@ fn overwrite_compose_styles(theme: &mut Theme) {
   });
   theme.overwrite_compose_style::<VScrollBarThumbStyle>(|this, host| {
     widget! {
-      track { this: this.into_stateful() }
-      ExprWidget {
+      track { this }
+      DynWidget {
         id: thumb,
         top_anchor: this.offset,
-        expr: scrollbar_thumb(host, EdgeInsets::vertical(1.))
+        dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
       }
 
       change_on thumb.top_anchor Animate {
@@ -129,8 +129,8 @@ fn overwrite_compose_styles(theme: &mut Theme) {
   theme.overwrite_compose_style::<VScrollBarTrackStyle>(|_, host| scrollbar_track(host));
   theme.overwrite_compose_style::<InkBarStyle>(|_, host| {
     widget! {
-      ExprWidget {
-        expr: host,
+      DynWidget {
+        dyns: host,
         background: ctx.theme().palette.primary()
       }
     }

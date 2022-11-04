@@ -103,10 +103,10 @@ fn expression_for_children() {
     Flex {
       tap: move |_| sized_box.size = Size::new(5., 5.),
       SizedBox { id: sized_box, size: Size::new(1., 1.) }
-      // todo: how should we hint user, he/she need wrap inner widget of `ExprWidget` to track named widget change.
-      ExprWidget { expr: (0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }) }
-      ExprWidget {
-         expr: (sized_box.size.area() > 2.).then(|| widget!{ SizedBox { size: sized_box.size } })
+      // todo: how should we hint user, he/she need wrap inner widget of `DynWidget` to track named widget change.
+      DynWidget { dyns: (0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }) }
+      DynWidget {
+         dyns: (sized_box.size.area() > 2.).then(|| widget!{ SizedBox { size: sized_box.size } })
       }
     }
   };
@@ -134,8 +134,8 @@ fn embed_widget_ref_outside() {
         size: Size::new(1., 1.),
         tap: move |_| first.size = Size::new(2., 2.)
       }
-      ExprWidget {
-        expr: (0..3).map(move |_| widget!{ SizedBox { size: first.size } } )
+      DynWidget {
+        dyns: (0..3).map(move |_| widget!{ SizedBox { size: first.size } } )
       }
     }
   };
@@ -360,11 +360,11 @@ fn fix_subscribe_cancel_after_widget_drop() {
     track { cnt: notify_cnt.clone(), trigger: trigger.clone() }
     SizedBox {
       size: Size::zero(),
-      ExprWidget  {
-        expr: trigger.then(|| {
+      DynWidget  {
+        dyns: trigger.then(|| {
           widget! {
             SizedBox { size: Size::zero() }
-            on (*trigger) { modify: move |(_, _)| { *cnt += 1; } }
+            on (*trigger) { modify: move |_| { *cnt += 1; } }
           }
         })
       }

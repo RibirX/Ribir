@@ -19,7 +19,7 @@ pub mod kw {
   syn::custom_keyword!(widget);
   syn::custom_keyword!(track);
   syn::custom_keyword!(env);
-  syn::custom_keyword!(ExprWidget);
+  syn::custom_keyword!(DynWidget);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);
   syn::custom_keyword!(Animate);

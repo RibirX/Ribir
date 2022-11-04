@@ -39,6 +39,8 @@ impl<'a> LayoutCtx<'a> {
     child.perform_layout(clamp, self.tree, self.performed)
   }
 
+  pub fn has_child(&self) -> bool { self.id.first_child(&self.tree).is_some() }
+
   /// Return a tuple of [`LayoutCtx`]! and an iterator of `id`'s children.
   pub fn split_children_for(
     &mut self,
