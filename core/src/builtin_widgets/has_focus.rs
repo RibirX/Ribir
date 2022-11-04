@@ -14,8 +14,8 @@ impl ComposeChild for HasFocus {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       track {this: this.into_stateful()}
-      ExprWidget {
-        expr: child,
+      DynWidget {
+        dyns: child,
         focus: move|_| this.focused = true,
         blur: move |_| this.focused = false,
       }

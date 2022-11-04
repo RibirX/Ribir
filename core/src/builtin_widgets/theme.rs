@@ -30,7 +30,7 @@ use crate::{
 pub use painter::*;
 pub use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
-use crate::data_widget::{expr_attach_data, widget_attach_data};
+use crate::data_widget::widget_attach_data;
 
 use super::SvgRender;
 
@@ -77,15 +77,13 @@ impl ComposeChild for ThemeWidget {
   #[inline]
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
-
     widget_try_track! {
       try_track { this }
-      // use `ExprWidget` to refresh whole subtree when theme changed.
-      ExprWidget {
-        expr: move |ctx: &mut BuildCtx| {
-          let theme = this.theme.clone();
-          ctx.theme = theme.clone();
-          widget_attach_data(child, theme, expr_attach_data)
+      // use `DynWidget` to refresh whole subtree when theme changed.
+      DynWidget {
+        dyns: move |_: &BuildCtx| {
+          // todo: override theme.
+          widget_attach_data(child, this.theme.clone())
         }
       }
     }

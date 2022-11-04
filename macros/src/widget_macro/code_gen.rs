@@ -58,7 +58,7 @@ impl Desugared {
     let sorted_named_objs = self.order_named_objs();
     Paren::default().surround(tokens, |tokens| {
       let ctx_name = ctx_ident(Span::call_site());
-      quote! { move |#ctx_name: &mut BuildCtx| }.to_tokens(tokens);
+      quote! { move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
       Brace::default().surround(tokens, |tokens| {
         let guards_vec = guard_vec_ident();
         quote! {
@@ -354,7 +354,7 @@ impl ToTokens for DeclareObj {
               subscribe_do: TrackExpr {
                 expr: parse_quote_spanned! { member.span() => {
                   let #name = #name.clone_stateful();
-                  move |(_, after)| #name.state_ref().#declare_set(after)
+                  move |v| #name.state_ref().#declare_set(v)
                 }},
                 used_name_info,
               },
@@ -493,26 +493,35 @@ fn subscribe_modify(
         observe.to_tokens(tokens)
       });
 
+    quote_spanned! { observe.span() =>
+      .filter(|s| s.contains(ChangeScope::DATA))
+    }
+    .to_tokens(tokens);
     let captures = observe
       .used_name_info
       .all_used()
       .expect("if upstream is not none, must used some widget")
       .map(capture_widget);
-
-    quote_spanned! { observe.span() =>
-      .filter(|s| s.contains(ChangeScope::DATA))
-      .scan_initial({
-          let v = #expr_value;
-          (v.clone(), v)
-        }, {
-          #(#captures)*
-          move |(_, after), _| { (after, #expr_value)}
-      })
-    }
-    .to_tokens(tokens);
     if change_only {
       quote_spanned! { observe.span() =>
+        .scan_initial(
+          (#expr_value, #expr_value),
+          {
+            #(#captures)*
+            move |(_, after), _| { (after, #expr_value)}
+          }
+        )
         .filter(|(before, after)| before != after)
+      }
+      .to_tokens(tokens);
+    } else {
+      quote_spanned! { observe.span() =>
+        .map(
+          {
+            #(#captures)*
+            move |_| #expr_value
+          }
+        )
       }
       .to_tokens(tokens);
     }

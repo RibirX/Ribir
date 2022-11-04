@@ -186,7 +186,7 @@ impl Compose for Caret {
         top_anchor: this.rect.min_y(),
         left_anchor: this.rect.min_x(),
         background: this.color,
-        mounted: move |_, _| animate1.run(),
+        mounted: move |_| animate1.run(),
       }
       Animate {
         id: animate1,
@@ -290,8 +290,8 @@ impl Compose for Input {
             helper.glyphs = Some(text.text_layout(&ctx.app_ctx().typography_store, BoxClamp::default()));
           },
         }
-        ExprWidget {
-          expr: (container.has_focus()).then(|| {
+        DynWidget {
+          dyns: (container.has_focus()).then(|| {
             widget!{
               Caret {
                 rect: helper.caret(this.caret.cursor().byte_offset()),
@@ -300,8 +300,8 @@ impl Compose for Input {
             }
           })
         }
-        ExprWidget {
-          expr: (this.text.is_empty() && this.placeholder.is_some()).then(|| {
+        DynWidget {
+          dyns: (this.text.is_empty() && this.placeholder.is_some()).then(|| {
             widget! {
               Text {
                 text: this.placeholder.as_ref().unwrap().clone(),

@@ -22,7 +22,7 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
   type Child = W::Host;
 
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    let widget = (move |ctx: &mut BuildCtx| {
+    let widget = (move |ctx: &BuildCtx| {
       let style = ctx.theme().compose_styles.styles.get(&TypeId::of::<Self>());
       if let Some(style) = style {
         (style.override_fn())(Box::new(this.into_stateful()), Box::new(child))
@@ -99,7 +99,7 @@ mod tests {
       widget! {
         MockBox {
           size: Size::new(100., 100.),
-          ExprWidget { expr: host }
+          DynWidget { dyns: host }
         }
       }
     });

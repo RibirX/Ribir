@@ -53,7 +53,7 @@ impl ComposeStyle for HScrollBarThumbStyle {
   fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
       track { this }
-      ExprWidget { left_anchor: this.offset, expr: host }
+      DynWidget { left_anchor: this.offset, dyns: host }
     }
   }
 }
@@ -71,9 +71,9 @@ impl ComposeStyle for VScrollBarThumbStyle {
   fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
       track { this }
-      ExprWidget {
+      DynWidget {
         top_anchor: this.offset,
-        expr: host
+        dyns: host
       }
     }
   }
@@ -91,7 +91,7 @@ impl ComposeChild for HScrollBar {
           scroll_pos: Point::new(this.offset, 0.),
           v_align: VAlign::Stretch,
           h_align: HAlign::Stretch,
-          ExprWidget { expr: child }
+          DynWidget { dyns: child }
         }
         HRawScrollbar {
           scrolling: scrolling.clone_stateful(),
@@ -124,7 +124,7 @@ impl ComposeChild for VScrollBar {
           scroll_pos: Point::new(0., this.offset),
           v_align: VAlign::Stretch,
           h_align: HAlign::Stretch,
-          ExprWidget { expr: child }
+          DynWidget { dyns: child }
         }
         VRawScrollbar {
           scrolling: scrolling.clone_stateful(),
@@ -157,7 +157,7 @@ impl ComposeChild for BothScrollbar {
           scroll_pos: this.offset,
           v_align: VAlign::Stretch,
           h_align: HAlign::Stretch,
-          ExprWidget { expr: child }
+          DynWidget { dyns: child }
         }
         HRawScrollbar {
           id: h_bar,

@@ -195,8 +195,8 @@ impl ComposeChild for XTimesTapListener {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }
-      ExprWidget {
-        expr: child,
+      DynWidget {
+        dyns: child,
         tap: {
           const DUR: Duration = Duration::from_millis(250);
           #[derive(Clone)]
@@ -247,7 +247,7 @@ impl ComposeChild for DoubleTapListener {
       try_track { this }
       XTimesTapListener {
         x_times_tap: (2, move |e| {(this.double_tap.borrow_mut())(e);} ),
-        ExprWidget { expr: child }
+        DynWidget { dyns: child }
       }
     }
   }
@@ -260,7 +260,7 @@ impl ComposeChild for TripleTapListener {
       try_track { this }
       XTimesTapListener {
         x_times_tap: (3, move |e| {(this.tripe_tap.borrow_mut())(e);} ),
-        ExprWidget { expr: child }
+        DynWidget { dyns: child }
       }
     }
   }

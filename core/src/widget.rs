@@ -1,7 +1,6 @@
 pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
 use crate::{
   context::*,
-  dynamic_widget::ExprWidget,
   prelude::{ChildVec, ComposeChild},
 };
 use algo::ShareResource;
@@ -83,12 +82,9 @@ pub struct Widget {
   pub(crate) children: ChildVec<Widget>,
 }
 
-pub(crate) type BoxedExprWidget =
-  ExprWidget<Box<dyn for<'r> FnMut(&'r mut BuildCtx) -> Vec<Widget>>>;
 pub(crate) enum WidgetNode {
-  Compose(Box<dyn for<'r> FnOnce(&'r mut BuildCtx) -> Widget>),
+  Compose(Box<dyn for<'r> FnOnce(&'r BuildCtx) -> Widget>),
   Render(Box<dyn Render>),
-  Dynamic(BoxedExprWidget),
 }
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
@@ -204,7 +200,7 @@ impl<R: Render + 'static> IntoWidget<dyn Render> for R {
   }
 }
 
-impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
+impl<F: FnOnce(&BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget {
@@ -216,7 +212,13 @@ impl<F: FnOnce(&mut BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
 
 #[macro_export]
 macro_rules! impl_proxy_query {
-  ($($field: tt)*) => {
+  (reverse [$first: expr $(, $rest: expr)*] $($reversed: expr)*) => {
+    impl_proxy_query!(reverse [$($rest),*] $first $($reversed)*);
+  };
+  (reverse [] $($reversed: expr)*) => { $($reversed)* };
+  (
+    $($self: ident .$name: ident $(($($args: ident),*))?),+
+  ) => {
     #[inline]
     fn query_all(
       &self,
@@ -224,7 +226,49 @@ macro_rules! impl_proxy_query {
       callback: &mut dyn FnMut(&dyn Any) -> bool,
       order: QueryOrder,
     ) {
-      self.$($field)*.query_all(type_id, callback, order)
+      let mut query_more = true;
+      match order {
+        QueryOrder::InnerFirst => {
+          impl_proxy_query!(reverse
+            [$(
+              if query_more {
+                self.$name $(($($args),*))?
+                  .query_all(
+                    type_id,
+                    &mut |any| {
+                      query_more = callback(any);
+                      query_more
+                    },
+                    order,
+                  );
+              }
+            ),+]
+          );
+          if let Some(a) = self.query_filter(type_id) {
+            callback(a);
+          }
+        }
+        QueryOrder::OutsideFirst => {
+          if let Some(a) = self.query_filter(type_id) {
+            query_more = callback(a);
+          }
+          if query_more {
+            $(
+              if query_more {
+                self.$name $(($($args),*))?
+                  .query_all(
+                    type_id,
+                    &mut |any| {
+                      query_more = callback(any);
+                      query_more
+                    },
+                    order,
+                  );
+              }
+            )+
+          }
+        }
+      }
     }
   };
 }
@@ -298,13 +342,13 @@ impl<W: IntoStateful> StateWidget<W> {
 #[macro_export]
 macro_rules! impl_proxy_render {
   ($($proxy: tt)*) => {
-      #[inline]
-      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-        self.$($proxy)*.perform_layout(clamp, ctx)
-      }
+    #[inline]
+    fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+      self.$($proxy)*.perform_layout(clamp, ctx)
+    }
 
-      #[inline]
-      fn paint(&self, ctx: &mut PaintingCtx) { self.$($proxy)*.paint(ctx) }
+    #[inline]
+    fn paint(&self, ctx: &mut PaintingCtx) { self.$($proxy)*.paint(ctx) }
 
       #[inline]
       fn only_sized_by_parent(&self) -> bool { self.$($proxy)*.only_sized_by_parent() }
@@ -317,12 +361,12 @@ macro_rules! impl_proxy_render {
   };
 }
 
-impl<W: Render> Render for RefCell<W> {
+impl<W: Render + 'static> Render for RefCell<W> {
   impl_proxy_render!(borrow());
 }
 
-impl<W: Query> Query for RefCell<W> {
-  impl_proxy_query!(borrow());
+impl<W: Query + 'static> Query for RefCell<W> {
+  impl_proxy_query!(self.borrow());
 }
 
 impl<W: Render + 'static> Render for Rc<W> {
@@ -330,37 +374,7 @@ impl<W: Render + 'static> Render for Rc<W> {
 }
 
 impl<W: Query + 'static> Query for Rc<W> {
-  fn query_all(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
-    order: QueryOrder,
-  ) {
-    let mut query_more = true;
-    match order {
-      QueryOrder::InnerFirst => {
-        self.deref().query_all(
-          type_id,
-          &mut |any| {
-            query_more = callback(any);
-            query_more
-          },
-          order,
-        );
-        if let Some(a) = self.query_filter(type_id) {
-          callback(a);
-        }
-      }
-      QueryOrder::OutsideFirst => {
-        if let Some(a) = self.query_filter(type_id) {
-          query_more = callback(a);
-        }
-        if query_more {
-          self.deref().query_all(type_id, callback, order);
-        }
-      }
-    }
-  }
+  impl_proxy_query!(self.deref());
 }
 
 impl Render for Box<dyn Render> {
@@ -368,7 +382,7 @@ impl Render for Box<dyn Render> {
 }
 
 impl Query for Box<dyn Render> {
-  impl_proxy_query!(deref());
+  impl_proxy_query!(self.deref());
 }
 
 impl Query for Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> {

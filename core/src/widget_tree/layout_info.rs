@@ -174,14 +174,19 @@ mod tests {
   #[test]
   fn fix_incorrect_relayout_root() {
     // Can't use layout info of dirty widget to detect if the ancestors path have
-    // in relayout list. Because new widget insert by `ExprWidget` not have layout
+    // in relayout list. Because new widget insert by `DynWidget` not have layout
     // info, but its parent have.
     let child_box = MockBox { size: Size::zero() }.into_stateful();
+    let root_layout_cnt = 0.into_stateful();
     let w = widget! {
-      track { child_box: child_box.clone() }
+      track {
+        child_box: child_box.clone(),
+        root_layout_cnt: root_layout_cnt.clone(),
+      }
       MockMulti {
-        ExprWidget {
-          expr: if child_box.size.is_empty() {
+        performed_layout: move |_| *root_layout_cnt += 1,
+        DynWidget {
+          dyns: if child_box.size.is_empty() {
             MockBox { size: Size::new(1., 1.) }.into_widget()
           } else {
             child_box.clone_stateful().into_widget()
@@ -192,10 +197,11 @@ mod tests {
 
     let mut tree = WidgetTree::new(w, <_>::default());
     tree.layout(Size::zero());
+    assert_eq!(*root_layout_cnt.raw_ref(), 1);
     {
       child_box.state_ref().size = Size::new(2., 2.);
     }
-    tree.tree_repair();
-    assert_eq!(tree.layout_list().unwrap().first(), Some(&tree.root()));
+    tree.tree_ready(Size::zero());
+    assert_eq!(*root_layout_cnt.raw_ref(), 2);
   }
 }

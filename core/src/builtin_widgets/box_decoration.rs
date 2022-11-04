@@ -297,8 +297,8 @@ mod tests {
             bottom: BorderSide { width: 4., color: Color::YELLOW },
           },
         }
-        ExprWidget {
-          expr: radius_cases
+        DynWidget {
+          dyns: radius_cases
             .into_iter()
             .map(|border_radius| {
               widget! {

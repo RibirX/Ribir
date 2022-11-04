@@ -48,109 +48,32 @@ impl<W> Default for ChildVec<W> {
 }
 
 // implementation of IntoWidget
-
-impl<W> IntoWidget<(&dyn Render, Widget)> for WidgetWithChild<W, Widget>
+impl<W, C, M: ?Sized> IntoWidget<(&dyn Render, dyn IntoWidget<M>)> for WidgetWithChild<W, C>
 where
   W: SingleChild + Render + 'static,
+  C: IntoChild<M, Option<Widget>>,
 {
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    let node = WidgetNode::Render(Box::new(widget));
-    let children = ChildVec(vec![child]);
-    Widget { node: Some(node), children }
-  }
-}
-
-impl<W, C> IntoWidget<(&dyn Render, dyn Render)> for WidgetWithChild<W, C>
-where
-  W: SingleChild + Render + 'static,
-  C: Render + 'static,
-{
-  #[inline]
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    WidgetWithChild { widget, child: child.into_widget() }.into_widget()
-  }
-}
-
-impl<W, C> IntoWidget<(&dyn Render, dyn Compose)> for WidgetWithChild<W, C>
-where
-  W: Render + SingleChild + 'static,
-  C: Compose + 'static,
-{
-  #[inline]
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    WidgetWithChild { widget, child: child.into_widget() }.into_widget()
-  }
-}
-
-impl<W, C, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, Option<&M2>)> for WidgetWithChild<W, Option<C>>
-where
-  W: IntoWidget<M1>,
-  WidgetWithChild<W, C>: IntoWidget<M2>,
-{
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    if let Some(child) = child {
-      WidgetWithChild { widget, child }.into_widget()
-    } else {
-      widget.into_widget()
+    Widget {
+      node: Some(WidgetNode::Render(Box::new(widget))),
+      children: ChildVec(child.into_child().into_iter().collect()),
     }
   }
 }
 
-impl<W, E, R, M1: ?Sized, M2: ?Sized> IntoWidget<(&M1, ExprWidget<&M2>)>
-  for WidgetWithChild<W, ExprWidget<E>>
-where
-  WidgetWithChild<W, Widget>: IntoWidget<M1>,
-  E: FnMut(&mut BuildCtx) -> R + 'static,
-  R: IntoChild<M2, Option<Widget>>,
-{
-  #[inline]
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    WidgetWithChild { widget, child: child.into_widget() }.into_widget()
-  }
-}
-
-impl<W1, W2, C, M2: ?Sized> IntoWidget<(&dyn Render, &M2)>
-  for WidgetWithChild<W1, WidgetWithChild<W2, C>>
-where
-  W1: Render + SingleChild + 'static,
-  WidgetWithChild<W2, C>: IntoWidget<M2>,
-{
-  #[inline]
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    WidgetWithChild { widget, child: child.into_widget() }.into_widget()
-  }
-}
-
-impl<W> IntoWidget<dyn Render> for WidgetWithChild<W, ChildVec<Widget>>
+impl<W, C, M: ?Sized> IntoWidget<(&dyn MultiChild, dyn IntoWidget<M>)> for WidgetWithChild<W, C>
 where
   W: MultiChild + Render + 'static,
+  C: IntoChild<M, ChildVec<Widget>>,
 {
+  #[inline]
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    let node = WidgetNode::Render(Box::new(widget));
-    Widget { node: Some(node), children: child }
-  }
-}
-
-impl<R, E, C, M1: ?Sized, M2: ?Sized, M3: ?Sized> WithChild<(&M1, &M2, &M3), C> for ExprWidget<E>
-where
-  E: FnMut(&mut BuildCtx) -> R + 'static,
-  R: WithChild<M2, C> + IntoChild<M3, Option<Widget>>,
-  C: IntoChild<M1, ChildVec<Widget>>,
-{
-  type Target = Widget;
-
-  fn with_child(self, child: C) -> Self::Target {
-    let mut widget = self.into_widget();
-    assert!(widget.children.is_empty());
-    widget.children = child.into_child();
-    widget
+    Widget {
+      node: Some(WidgetNode::Render(Box::new(widget))),
+      children: child.into_child(),
+    }
   }
 }
 
@@ -169,29 +92,25 @@ impl<W> IntoChild<W, W> for W {
   fn into_child(self) -> W { self }
 }
 
-impl<T, M: ?Sized, C> IntoChild<dyn IntoChild<M, C>, Option<C>> for T
-where
-  T: IntoChild<M, C>,
-{
+impl<W> IntoChild<W, Option<W>> for W {
   #[inline]
-  fn into_child(self) -> Option<C> { Some(self.into_child()) }
+  fn into_child(self) -> Option<W> { Some(self) }
 }
 
-impl<T, M: ?Sized> IntoChild<Option<&dyn IntoChild<M, Widget>>, Option<Widget>> for Option<T>
+impl<W, M: ?Sized> IntoChild<dyn IntoChild<M, Widget>, Option<Widget>> for W
 where
-  T: IntoWidget<M>,
+  W: IntoWidget<M>,
 {
   #[inline]
-  fn into_child(self) -> Option<Widget> { self.map(IntoWidget::into_widget) }
+  fn into_child(self) -> Option<Widget> { Some(self.into_widget()) }
 }
 
-impl<E, R, M: ?Sized> IntoChild<dyn IntoChild<M, Widget>, Widget> for ExprWidget<E>
+impl<D, C, M: ?Sized> IntoChild<&M, C> for DynWidget<D>
 where
-  E: FnMut(&mut BuildCtx) -> R + 'static,
-  R: IntoChild<M, ChildVec<Widget>>,
+  D: IntoChild<M, C>,
 {
   #[inline]
-  fn into_child(self) -> Widget { self.inner_into_widget() }
+  fn into_child(self) -> C { self.into_inner().into_child() }
 }
 
 impl<W, C, C2, M: ?Sized> IntoChild<&M, WidgetWithChild<W, C2>> for WidgetWithChild<W, C>
@@ -203,6 +122,14 @@ where
     let Self { widget, child } = self;
     WidgetWithChild { widget, child: child.into_child() }
   }
+}
+
+impl<M: ?Sized, D> IntoChild<DynWidget<&M>, Widget> for Stateful<DynWidget<D>>
+where
+  D: IntoChild<M, ChildVec<Widget>> + 'static,
+{
+  #[inline]
+  fn into_child(self) -> Widget { DynRender::new(self).into_widget() }
 }
 
 macro_rules! tuple_merge_into_vec {
@@ -307,6 +234,14 @@ where
   fn fill(self, vec: &mut ChildVec<C>) { self.into_iter().for_each(|w| w.fill(vec)); }
 }
 
+impl<M: ?Sized, D, C> FillChildVec<DynWidget<&M>, C> for DynWidget<D>
+where
+  D: FillChildVec<M, C>,
+{
+  #[inline]
+  fn fill(self, vec: &mut ChildVec<C>) { self.into_inner().fill(vec) }
+}
+
 impl<C, M, T> IntoChild<ChildVec<&dyn IntoChild<M, C>>, ChildVec<C>> for T
 where
   M: ?Sized,
@@ -380,21 +315,36 @@ where
   fn with_child(self, child: C) -> Self::Target { self(child.into_widget()) }
 }
 
-impl<T, C, M1: ?Sized, M2: ?Sized, M3: ?Sized> WithChild<(&M1, &M2, &M3), C> for Option<T>
+impl<D, C, M: ?Sized> WithChild<(&dyn SingleChild, &M), C> for Stateful<DynWidget<D>>
 where
-  T: WithChild<M1, C>,
-  T::Target: IntoChild<M2, Widget>,
-  C: IntoChild<M3, Widget>,
+  D: SingleChild + Render + 'static,
+  C: IntoChild<M, Option<Widget>>,
 {
   type Target = Widget;
-
-  #[inline]
   fn with_child(self, child: C) -> Self::Target {
-    if let Some(widget) = self {
-      widget.with_child(child).into_child()
-    } else {
-      child.into_child()
-    }
+    WidgetWithChild { widget: DynRender::new(self), child }.into_widget()
+  }
+}
+
+impl<D, C, M: ?Sized> WithChild<(&dyn SingleChild, &M), C> for Stateful<DynWidget<Option<D>>>
+where
+  D: SingleChild + Render + 'static,
+  C: IntoChild<M, Option<Widget>>,
+{
+  type Target = Widget;
+  fn with_child(self, child: C) -> Self::Target {
+    WidgetWithChild { widget: DynRender::new(self), child }.into_widget()
+  }
+}
+
+impl<D, C, M: ?Sized> WithChild<(&dyn MultiChild, &M), C> for Stateful<DynWidget<D>>
+where
+  D: MultiChild + Render + 'static,
+  C: IntoChild<M, ChildVec<Widget>>,
+{
+  type Target = Widget;
+  fn with_child(self, child: C) -> Self::Target {
+    WidgetWithChild { widget: DynRender::new(self), child }.into_widget()
   }
 }
 
@@ -487,8 +437,8 @@ mod tests {
     // with single child
     let _e = widget! {
       track { size: size.clone() }
-      ExprWidget {
-        expr: if size.area() > 0. {
+      DynWidget {
+        dyns: if size.area() > 0. {
            MockBox { size: *size }
         } else {
           MockBox { size: Size::new(1., 1.) }
@@ -499,8 +449,8 @@ mod tests {
     // with multi child
     let _e = widget! {
       track { size: size.clone() }
-      ExprWidget {
-        expr: if size.area() > 0. { MockMulti {} } else { MockMulti {} },
+      DynWidget {
+        dyns: if size.area() > 0. { MockMulti {} } else { MockMulti {} },
         MockBox { size: Size::zero() }
         MockBox { size: Size::zero() }
         MockBox { size: Size::zero() }
@@ -510,8 +460,8 @@ mod tests {
     // option with single child
     let _e = widget! {
       track { size: size.clone() }
-      ExprWidget {
-        expr: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
+      DynWidget {
+        dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
         MockBox { size: Size::zero() }
       }
     };
@@ -519,9 +469,9 @@ mod tests {
     // option with `Widget`
     let _e = widget! {
       track { size: size.clone() }
-      ExprWidget {
-        expr: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
-        ExprWidget { expr: Void.into_widget() }
+      DynWidget {
+        dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
+        DynWidget { dyns: Void.into_widget() }
       }
     };
   }

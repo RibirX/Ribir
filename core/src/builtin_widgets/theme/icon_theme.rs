@@ -59,7 +59,8 @@ impl Compose for IconIdent {
   fn compose(this: crate::widget::StateWidget<Self>) -> crate::widget::Widget {
     widget_try_track! {
       try_track { this }
-      ExprWidget { expr: this.of_or_miss(ctx.theme()) }
+      env { let theme = ctx.theme().clone(); }
+      DynWidget { dyns: this.of_or_miss(&theme) }
     }
   }
 }

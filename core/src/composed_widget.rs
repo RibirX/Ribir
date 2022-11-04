@@ -20,34 +20,12 @@ impl<B: 'static> IntoWidget<Widget> for ComposedWidget<Widget, B> {
       match node {
         WidgetNode::Compose(c) => {
           assert!(children.is_empty());
-          (move |ctx: &mut BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget())
+          (move |ctx: &BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget())
             .into_widget()
         }
         WidgetNode::Render(r) => {
           let node = WidgetNode::Render(Box::new(ComposedWidget { composed: r, by }));
           Widget { node: Some(node), children }
-        }
-        WidgetNode::Dynamic(ExprWidget { mut expr, upstream }) => {
-          let new_expr = move |ctx: &mut BuildCtx| {
-            let mut widgets = expr(ctx);
-            assert!(
-              widgets.len() <= 1,
-              "`ExprWidget` from compose widget, must be generate single child."
-            );
-
-            if let Some(w) = widgets.pop() {
-              widgets.push(ComposedWidget { composed: w, by }.into_widget());
-            }
-            widgets
-          };
-
-          Widget {
-            node: Some(WidgetNode::Dynamic(ExprWidget {
-              expr: Box::new(new_expr),
-              upstream,
-            })),
-            children,
-          }
         }
       }
     } else {
@@ -91,7 +69,7 @@ impl<B: 'static> Query for ComposedWidget<Box<dyn Render>, B>
 where
   Self: Render + 'static,
 {
-  impl_proxy_query!(composed);
+  impl_proxy_query!(self.composed);
 }
 
 #[cfg(test)]
@@ -108,9 +86,9 @@ mod tests {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
           track { this: this.into_stateful() }
-          ExprWidget {
-            expr: {
-               // explicit capture `this` to avoid `ExprWidget` to be optimized`.
+          DynWidget {
+            dyns: {
+               // explicit capture `this` to avoid `DynWidget` to be optimized`.
               let x = &*this;
               println!("{:?}", x);
               Void

@@ -9,7 +9,7 @@ pub struct BuildCtx<'a> {
 
 impl<'a> BuildCtx<'a> {
   /// The data from the closest Theme instance that encloses this context.
-  pub fn theme(&self) -> &Theme { &self.theme }
+  pub fn theme(&self) -> &Rc<Theme> { &self.theme }
 
   #[inline]
   pub fn app_ctx(&self) -> &AppContext { self.tree.app_ctx() }
@@ -28,8 +28,8 @@ mod tests {
   #[should_panic(expected = "Get a default theme from context")]
   fn always_have_default_theme() {
     let w = widget! {
-      ExprWidget {
-        expr: {
+      DynWidget {
+        dyns: {
           let _ = ctx.theme();
           panic!("Get a default theme from context");
           #[allow(unreachable_code)]
@@ -50,12 +50,13 @@ mod tests {
     fn compose(this: StateWidget<Self>) -> Widget {
       widget_try_track! {
         try_track { this }
-        ExprWidget {
-          expr: {
+        env { let theme = ctx.theme().clone(); }
+        DynWidget {
+          dyns: {
             this
             .themes
             .borrow_mut()
-            .push(ctx.theme().clone());
+            .push(theme.deref().clone());
             Void
           }
         }

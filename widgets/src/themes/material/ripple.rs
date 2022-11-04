@@ -42,9 +42,9 @@ impl ComposeChild for Ripple {
     widget! {
       track { this: this.into_stateful() }
       Stack {
-        ExprWidget { id: host, expr: child }
-        ExprWidget {
-          expr: {
+        DynWidget { id: host, dyns: child }
+        DynWidget {
+          dyns: {
             this.launch_pos.clone().map(|launch_at| {
               let radius = this.radius.unwrap_or_else(|| {
                 let rect = host.layout_rect();
@@ -53,8 +53,8 @@ impl ComposeChild for Ripple {
                 (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
               });
               widget!{
-                ExprWidget {
-                  expr: (this.bounded != RippleBound::Unbounded).then(|| {
+                DynWidget {
+                  dyns: (this.bounded != RippleBound::Unbounded).then(|| {
                     let rect = host.layout_rect();
                     let path = match this.bounded {
                       RippleBound::Unbounded => unreachable!(),
@@ -95,7 +95,7 @@ impl ComposeChild for Ripple {
                 //   transition: transitions::EASE_OUT.get_from_or_default(ctx.theme()),
                 // }
                 on ripple_path {
-                  mounted: move |_, _| { ripper_enter.run(); }
+                  mounted: move |_| { ripper_enter.run(); }
                 }
               }
             })

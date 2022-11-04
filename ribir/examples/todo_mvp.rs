@@ -13,7 +13,7 @@ struct TodoMVP {
 impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
-      // split this to avoid mutable borrow conflict in `ExprWidget`.
+      // split this to avoid mutable borrow conflict in `DynWidget`.
       track {
         this: this.into_stateful(),
       }
@@ -43,8 +43,8 @@ impl Compose for TodoMVP {
             },
             Row {
               Icon {
-                ExprWidget {
-                  expr: {
+                DynWidget {
+                  dyns: {
                     icons::ADD.of_or_miss(ctx.theme())
                   }
                 }
@@ -67,8 +67,8 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              ExprWidget {
-                expr: TodoMVP::pane(this.clone_stateful(), |_| true)
+              DynWidget {
+                dyns: TodoMVP::pane(this.clone_stateful(), |_| true)
               }
             }
           }
@@ -80,8 +80,8 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              ExprWidget {
-                expr: TodoMVP::pane(this.clone_stateful(), |task| !task.finished)
+              DynWidget {
+                dyns: TodoMVP::pane(this.clone_stateful(), |task| !task.finished)
               }
             }
           }
@@ -93,8 +93,8 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              ExprWidget {
-                expr: TodoMVP::pane(this.clone_stateful(), |task| task.finished)
+              DynWidget {
+                dyns: TodoMVP::pane(this.clone_stateful(), |task| task.finished)
               }
             }
           }
@@ -113,8 +113,8 @@ impl TodoMVP {
         Column {
           align_items: Align::Start,
           padding: EdgeInsets::all(8.),
-          ExprWidget {
-            expr: this.tasks.iter()
+          DynWidget {
+            dyns: this.tasks.iter()
               .filter(|task| { cond(task) })
               .enumerate().map(|(idx, task)| {
               let checked = task.finished;
@@ -135,8 +135,8 @@ impl TodoMVP {
                     tap: move |_| {
                        this2.tasks.remove(idx);
                     },
-                    ExprWidget {
-                      expr: icons::CLOSE.of_or_miss(ctx.theme())
+                    DynWidget {
+                      dyns: icons::CLOSE.of_or_miss(ctx.theme())
                     }
                   }
                 }
