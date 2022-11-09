@@ -39,7 +39,19 @@ macro_rules! impl_enum_widget {
         match self {
           $($name::$var_ty(w) => w.only_sized_by_parent()),+
         }
-       }
+      }
+
+      fn can_overflow(&self) -> bool {
+        match self {
+          $($name::$var_ty(w) => w.can_overflow()),+
+        }
+      }
+
+      fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+        match self {
+          $($name::$var_ty(w) => w.hit_test(ctx, pos)),+
+        }
+      }
     }
 
     impl<$($var_ty: SingleChild),+> SingleChild for $name <$($var_ty),+> {
