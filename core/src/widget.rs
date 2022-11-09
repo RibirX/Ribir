@@ -1,8 +1,5 @@
 pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
-use crate::{
-  context::*,
-  prelude::{ChildVec, ComposeChild},
-};
+use crate::{context::*, prelude::ComposeChild};
 use algo::ShareResource;
 use painter::*;
 use rxrust::subscription::{SubscriptionGuard, SubscriptionLike};
@@ -79,7 +76,7 @@ pub enum StateWidget<W> {
 
 pub struct Widget {
   pub(crate) node: Option<WidgetNode>,
-  pub(crate) children: ChildVec<Widget>,
+  pub(crate) children: Vec<Widget>,
 }
 
 pub(crate) enum WidgetNode {
@@ -166,23 +163,41 @@ impl<'a> dyn Render + 'a {
   }
 }
 
-pub trait IntoWidget<M: ?Sized> {
+pub trait WidgetMarker {}
+
+pub struct FromSelf;
+pub struct FromOther<M>(PhantomData<fn(M)>);
+
+impl WidgetMarker for FromSelf {}
+impl<M> WidgetMarker for FromOther<M> {}
+
+pub trait IntoWidget<M: WidgetMarker> {
   fn into_widget(self) -> Widget;
 }
 
-impl Widget {
+impl IntoWidget<FromSelf> for Widget {
   #[inline]
-  pub fn into_widget(self) -> Widget { self }
+  fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<dyn Compose> for C {
+impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<FromOther<&dyn Compose>> for C {
   #[inline]
   fn into_widget(self) -> Widget {
     ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
   }
 }
 
-impl<W, C> IntoWidget<dyn ComposeChild<Child = Option<C>>> for W
+impl<R: Render + 'static> IntoWidget<FromOther<&dyn Render>> for R {
+  #[inline]
+  fn into_widget(self) -> Widget {
+    Widget {
+      node: Some(WidgetNode::Render(Box::new(self))),
+      children: Vec::default(),
+    }
+  }
+}
+
+impl<W, C> IntoWidget<FromOther<&dyn ComposeChild<Child = Option<C>>>> for W
 where
   W: ComposeChild<Child = Option<C>> + Into<StateWidget<W>> + 'static,
 {
@@ -190,22 +205,15 @@ where
   fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
 }
 
-impl<R: Render + 'static> IntoWidget<dyn Render> for R {
-  #[inline]
-  fn into_widget(self) -> Widget {
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(self))),
-      children: ChildVec::default(),
-    }
-  }
-}
-
-impl<F: FnOnce(&BuildCtx) -> Widget + 'static> IntoWidget<F> for F {
+impl<F> IntoWidget<FromOther<&dyn FnOnce(&BuildCtx) -> Widget>> for F
+where
+  F: FnOnce(&BuildCtx) -> Widget + 'static,
+{
   #[inline]
   fn into_widget(self) -> Widget {
     Widget {
       node: Some(WidgetNode::Compose(Box::new(self))),
-      children: ChildVec::default(),
+      children: Vec::default(),
     }
   }
 }

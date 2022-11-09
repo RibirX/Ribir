@@ -485,13 +485,13 @@ impl Widget {
         }
       }
 
-      fn push_children(&mut self, children: ChildVec<Widget>) {
+      fn push_children(&mut self, children: Vec<Widget>) {
         if let Some(p) = self.parent {
           self.stack.push(NodeInfo::Parent(p));
         }
         self
           .stack
-          .extend(children.into_inner().into_iter().map(NodeInfo::Widget));
+          .extend(children.into_iter().map(NodeInfo::Widget));
       }
 
       fn perpend(&mut self, child: WidgetId, has_child: bool) {

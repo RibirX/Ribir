@@ -19,37 +19,20 @@ pub trait WithChild<M: ?Sized, C> {
   fn with_child(self, child: C) -> Self::Target;
 }
 
-pub struct WidgetWithChild<W, C> {
+/// A node of widget with not compose its child.
+pub struct WidgetPair<W, C> {
   pub widget: W,
   pub child: C,
 }
 
-pub struct ChildVec<W>(Vec<W>);
-
-impl<W> ChildVec<W> {
-  #[inline]
-  pub fn into_inner(self) -> Vec<W> { self.0 }
-}
-
-impl<W> std::ops::Deref for ChildVec<W> {
-  type Target = Vec<W>;
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl<W> std::ops::DerefMut for ChildVec<W> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-impl<W> Default for ChildVec<W> {
-  #[inline]
-  fn default() -> Self { Self(Default::default()) }
-}
+/// A alias of `WidgetPair<W, Widget>`, means `Widget` is the child of the
+/// generic type.
+pub type WidgetOf<W> = WidgetPair<W, Widget>;
 
 // implementation of IntoWidget
-impl<W, C, M: ?Sized> IntoWidget<(&dyn Render, dyn IntoWidget<M>)> for WidgetWithChild<W, C>
+impl<W, C, M> IntoWidget<FromOther<M>> for WidgetPair<W, C>
 where
+  M: ChildMarker,
   W: SingleChild + Render + 'static,
   C: IntoChild<M, Option<Widget>>,
 {
@@ -57,15 +40,16 @@ where
     let Self { widget, child } = self;
     Widget {
       node: Some(WidgetNode::Render(Box::new(widget))),
-      children: ChildVec(child.into_child().into_iter().collect()),
+      children: child.into_child().map_or_else(Vec::default, |c| vec![c]),
     }
   }
 }
 
-impl<W, C, M: ?Sized> IntoWidget<(&dyn MultiChild, dyn IntoWidget<M>)> for WidgetWithChild<W, C>
+impl<W, C, M> IntoWidget<FromOther<Vec<M>>> for WidgetPair<W, C>
 where
+  M: ChildMarker,
   W: MultiChild + Render + 'static,
-  C: IntoChild<M, ChildVec<Widget>>,
+  C: IntoChild<M, Vec<Widget>>,
 {
   #[inline]
   fn into_widget(self) -> Widget {
@@ -77,136 +61,146 @@ where
   }
 }
 
-pub trait IntoChild<M: ?Sized, C> {
+pub trait IntoChild<M: ChildMarker, C> {
   fn into_child(self) -> C;
 }
 
-// `IntoChild` implementations
-impl<W: IntoWidget<M>, M: ?Sized> IntoChild<dyn IntoWidget<M>, Widget> for W {
-  #[inline]
-  fn into_child(self) -> Widget { self.into_widget() }
-}
+/// A middle type use to help to convert children to tuple.
+pub struct TupleChild<W>(pub W);
+pub trait ChildMarker {}
+impl ChildMarker for FromSelf {}
+impl<M> ChildMarker for FromOther<M> {}
 
-impl<W> IntoChild<W, W> for W {
+// `IntoChild` implementations
+// W -> W
+impl<W> IntoChild<FromSelf, W> for W {
   #[inline]
   fn into_child(self) -> W { self }
 }
 
-impl<W> IntoChild<W, Option<W>> for W {
+// W -> Widget  W != Widget
+impl<W: IntoWidget<FromOther<M>>, M> IntoChild<FromOther<M>, Widget> for W {
   #[inline]
-  fn into_child(self) -> Option<W> { Some(self) }
+  fn into_child(self) -> Widget { self.into_widget() }
 }
 
-impl<W, M: ?Sized> IntoChild<dyn IntoChild<M, Widget>, Option<Widget>> for W
+// W -> Option<C>
+impl<W, M: ChildMarker, C> IntoChild<FromOther<M>, Option<C>> for W
 where
-  W: IntoWidget<M>,
+  W: IntoChild<M, C>,
 {
   #[inline]
-  fn into_child(self) -> Option<Widget> { Some(self.into_widget()) }
+  fn into_child(self) -> Option<C> { Some(self.into_child()) }
 }
 
-impl<D, C, M: ?Sized> IntoChild<&M, C> for DynWidget<D>
+// Option<W> -> Option<C>  W != C
+impl<W, M, C> IntoChild<FromOther<Option<M>>, Option<C>> for Option<W>
 where
-  D: IntoChild<M, C>,
+  M: ChildMarker,
+  W: IntoChild<FromOther<M>, C>,
 {
   #[inline]
-  fn into_child(self) -> C { self.into_inner().into_child() }
+  fn into_child(self) -> Option<C> { self.map(IntoChild::into_child) }
 }
 
-impl<W, C, C2, M: ?Sized> IntoChild<&M, WidgetWithChild<W, C2>> for WidgetWithChild<W, C>
+// WidgetWithChild<W, C> -> WidgetWithChild<W, C2>
+impl<W, C, C2, M: ChildMarker> IntoChild<FromOther<M>, WidgetPair<W, C2>> for WidgetPair<W, C>
 where
   C: IntoChild<M, C2>,
 {
   #[inline]
-  fn into_child(self) -> WidgetWithChild<W, C2> {
+  fn into_child(self) -> WidgetPair<W, C2> {
     let Self { widget, child } = self;
-    WidgetWithChild { widget, child: child.into_child() }
+    WidgetPair { widget, child: child.into_child() }
   }
 }
 
-impl<M: ?Sized, D> IntoChild<DynWidget<&M>, Widget> for Stateful<DynWidget<D>>
+// impl IntoChild<Vec<_>>
+
+// trait help to implement Vec<Child>.
+
+pub trait FillChildVec<M: ?Sized, C> {
+  fn fill(self, vec: &mut Vec<C>);
+}
+
+impl<W, M, C> IntoChild<FromOther<M>, Vec<C>> for W
 where
-  D: IntoChild<M, ChildVec<Widget>> + 'static,
+  W: FillChildVec<M, C>,
+{
+  fn into_child(self) -> Vec<C> {
+    let mut vec = vec![];
+    self.fill(&mut vec);
+    vec
+  }
+}
+
+// W -> Vec<C>
+impl<M, W, C> FillChildVec<M, C> for W
+where
+  M: ChildMarker,
+  W: IntoChild<M, C>,
 {
   #[inline]
-  fn into_child(self) -> Widget { DynRender::new(self).into_widget() }
+  fn fill(self, vec: &mut Vec<C>) { vec.push(self.into_child()) }
 }
 
-macro_rules! tuple_merge_into_vec {
-  ($ty: ident, $mark: ident, $($other_ty: ident, $other_mark: ident,)+) => {
-    tuple_merge_into_vec!({$ty, $mark, } $($other_ty, $other_mark,)+);
-  };
-  (
-    {$($ty: ident, $mark: ident,)+}
-    $next_ty: ident, $next_mark: ident,
-    $($other_ty: ident, $other_mark: ident,)*
-  ) => {
-      tuple_merge_into_vec!({$($ty, $mark,)+});
-      tuple_merge_into_vec!(
-        {$($ty, $mark,)+ $next_ty, $next_mark, }
-        $($other_ty, $other_mark,)*
-      );
-  };
-  ({ $($ty: ident, $mark: ident,)+})  => {
-    impl<W, $($ty, $mark: ?Sized),+> IntoChild<&($(&$mark,)+), ChildVec<W>>
-      for ($($ty,)+)
-    where
-      $($ty: FillChildVec<$mark, W>),+
-    {
-      #[allow(non_snake_case)]
-      fn into_child(self) -> ChildVec<W> {
-        let ($($ty,)+) = self;
-        let mut children = ChildVec(<_>::default());
-        $($ty.fill(&mut children);)+
-        children
-      }
-    }
-  }
-}
-
-tuple_merge_into_vec!(
-  T1, M1, T2, M2, T3, M3, T4, M4, T5, M5, T6, M6, T7, M7, T8, M8, T9, M9, T10, M10, T11, M11, T12,
-  M12, T13, M13, T14, M14, T15, M15, T16, M16, T17, M17, T18, M18, T19, M19, T20, M20, T21, M21,
-  T22, M22, T23, M23, T24, M24, T25, M25, T26, M26, T27, M27, T28, M28, T29, M29, T30, M30, T31,
-  M31, T32, M32,
-);
-
-macro_rules! tuple_child_into {
+macro_rules! tuple_into_child {
   (
     $target: ident, $from: ident, $mark: ident,
     $($other_target: ident, $other_from: ident, $other_mark: ident,)+
   ) => {
-    tuple_child_into!({$target, $from, $mark, } $($other_target, $other_from, $other_mark,)+);
+    tuple_into_child!(
+      {$target, $from, $mark, }
+      $($other_target, $other_from, $other_mark,)+);
   };
   (
     {$($target: ident, $from: ident, $mark: ident,)+}
     $next_target: ident, $next_from: ident, $next_mark: ident,
     $($other_target: ident, $other_from: ident, $other_mark: ident,)*
   ) => {
-      tuple_child_into!({ $($target, $from, $mark,)+ });
-      tuple_child_into!(
+      tuple_into_child!({ $($target, $from, $mark,)+ });
+      tuple_into_child!(
         {$($target, $from, $mark,)+ $next_target, $next_from, $next_mark, }
         $($other_target, $other_from, $other_mark,)*
       );
   };
-  ({ $($target: ident, $from: ident, $mark: ident,)+ })  => {
+  ({ $($target: ident $comma:tt $from: ident, $mark: ident,)+ })  => {
 
-    impl<$($target, $from, $mark: ?Sized),+>
-      IntoChild<($(&dyn IntoChild<&$mark, $target>,)+), ($($target,)+)>
-      for ($($from,)+)
+    // tuple convert.
+    // impl (W, W, ..) -> (W1, W2, ..)
+    impl<$($target, $from, $mark),+>
+      IntoChild<FromOther<($(&dyn IntoChild<&$mark, $target>,)+)>, ($($target,)+)>
+      for TupleChild<($($from,)+)>
     where
-      $($from: IntoChild<$mark, $target>),+
+      $(
+        $mark: ChildMarker,
+        $from: IntoChild<$mark, $target>
+      ),+
     {
       #[allow(non_snake_case)]
       fn into_child(self) -> ($($target,)+) {
-        let ($($from,)+) = self;
+        let TupleChild(($($from,)+)) = self;
         ($($from.into_child(),)+)
+      }
+    }
+
+    // impl (W, w, ..) -> Vec<C>
+    impl<W, $($from, $mark),+> FillChildVec<($(&$mark,)+), W> for TupleChild<($($from,)+)>
+    where
+      $(
+        $from: FillChildVec<$mark, W>
+      ),+
+    {
+      #[allow(non_snake_case)]
+      fn fill(self, vec: &mut Vec<W>) {
+        let TupleChild(($($from,)+)) = self;
+        $($from.fill(vec);)+
       }
     }
   }
 }
 
-tuple_child_into!(
+tuple_into_child!(
   T1, F1, M1, T2, F2, M2, T3, F3, M3, T4, F4, M4, T5, F5, M5, T6, F6, M6, T7, F7, M7, T8, F8, M8,
   T9, F9, M9, T10, F10, M10, T11, F11, M11, T12, F12, M12, T13, F13, M13, T14, F14, M14, T15, F15,
   M15, T16, F16, M16, T17, F17, M17, T18, F18, M18, T19, F19, M19, T20, F20, M20, T21, F21, M21,
@@ -214,50 +208,11 @@ tuple_child_into!(
   F28, M28, T29, F29, M29, T30, F30, M30, T31, F31, M31, T32, F32, M32,
 );
 
-trait FillChildVec<M: ?Sized, C> {
-  fn fill(self, vec: &mut ChildVec<C>);
-}
-
-impl<M: ?Sized, W, C> FillChildVec<dyn IntoWidget<&M>, C> for W
-where
-  W: IntoChild<M, C>,
-{
-  fn fill(self, vec: &mut ChildVec<C>) { vec.0.push(self.into_child()) }
-}
-
-impl<M: ?Sized, I, C> FillChildVec<dyn Iterator<Item = &M>, C> for I
-where
-  I: IntoIterator,
-  I::Item: FillChildVec<M, C>,
-{
-  #[inline]
-  fn fill(self, vec: &mut ChildVec<C>) { self.into_iter().for_each(|w| w.fill(vec)); }
-}
-
-impl<M: ?Sized, D, C> FillChildVec<DynWidget<&M>, C> for DynWidget<D>
-where
-  D: FillChildVec<M, C>,
-{
-  #[inline]
-  fn fill(self, vec: &mut ChildVec<C>) { self.into_inner().fill(vec) }
-}
-
-impl<C, M, T> IntoChild<ChildVec<&dyn IntoChild<M, C>>, ChildVec<C>> for T
-where
-  M: ?Sized,
-  T: FillChildVec<M, C>,
-{
-  fn into_child(self) -> ChildVec<C> {
-    let mut vec = ChildVec::default();
-    self.fill(&mut vec);
-    vec
-  }
-}
-
 // implementations of `WithChild`
 
-impl<M: ?Sized, W, C> WithChild<dyn ComposeChild<Child = &M>, C> for W
+impl<M, W, C> WithChild<dyn ComposeChild<Child = &M>, C> for W
 where
+  M: ChildMarker,
   W: ComposeChild,
   C: IntoChild<M, W::Child>,
 {
@@ -273,78 +228,24 @@ impl<W, C> WithChild<dyn SingleChild, C> for W
 where
   W: SingleChild,
 {
-  type Target = WidgetWithChild<Self, C>;
+  type Target = WidgetPair<Self, C>;
   #[inline]
-  fn with_child(self, child: C) -> Self::Target { WidgetWithChild { widget: self, child } }
+  fn with_child(self, child: C) -> Self::Target { WidgetPair { widget: self, child } }
 }
 
-impl<W, C, M: ?Sized> WithChild<(&dyn MultiChild, &M), C> for W
+impl<W, C, M> WithChild<(&dyn MultiChild, &M), C> for W
 where
+  M: ChildMarker,
   W: MultiChild,
-  C: IntoChild<M, ChildVec<Widget>>,
+  C: IntoChild<M, Vec<Widget>>,
 {
-  type Target = WidgetWithChild<Self, ChildVec<Widget>>;
+  type Target = WidgetPair<Self, Vec<Widget>>;
   #[inline]
   fn with_child(self, child: C) -> Self::Target {
-    WidgetWithChild {
+    WidgetPair {
       widget: self,
       child: child.into_child(),
     }
-  }
-}
-
-impl<F, R, C, M: ?Sized> WithChild<dyn Fn(&M) -> R, C> for F
-where
-  F: Fn(Widget) -> R,
-  C: IntoWidget<M>,
-{
-  type Target = R;
-
-  #[inline]
-  fn with_child(self, child: C) -> Self::Target { self(child.into_widget()) }
-}
-
-impl<F, R, C, M: ?Sized> WithChild<dyn Fn(&M) -> R, C> for std::rc::Rc<F>
-where
-  F: Fn(Widget) -> R,
-  C: IntoWidget<M>,
-{
-  type Target = R;
-
-  #[inline]
-  fn with_child(self, child: C) -> Self::Target { self(child.into_widget()) }
-}
-
-impl<D, C, M: ?Sized> WithChild<(&dyn SingleChild, &M), C> for Stateful<DynWidget<D>>
-where
-  D: SingleChild + Render + 'static,
-  C: IntoChild<M, Option<Widget>>,
-{
-  type Target = Widget;
-  fn with_child(self, child: C) -> Self::Target {
-    WidgetWithChild { widget: DynRender::new(self), child }.into_widget()
-  }
-}
-
-impl<D, C, M: ?Sized> WithChild<(&dyn SingleChild, &M), C> for Stateful<DynWidget<Option<D>>>
-where
-  D: SingleChild + Render + 'static,
-  C: IntoChild<M, Option<Widget>>,
-{
-  type Target = Widget;
-  fn with_child(self, child: C) -> Self::Target {
-    WidgetWithChild { widget: DynRender::new(self), child }.into_widget()
-  }
-}
-
-impl<D, C, M: ?Sized> WithChild<(&dyn MultiChild, &M), C> for Stateful<DynWidget<D>>
-where
-  D: MultiChild + Render + 'static,
-  C: IntoChild<M, ChildVec<Widget>>,
-{
-  type Target = Widget;
-  fn with_child(self, child: C) -> Self::Target {
-    WidgetWithChild { widget: DynRender::new(self), child }.into_widget()
   }
 }
 
@@ -367,9 +268,9 @@ mod tests {
 
     impl ComposeChild for Page {
       type Child = (
-        WidgetWithChild<Header, Widget>,
-        WidgetWithChild<Content, Widget>,
-        WidgetWithChild<Footer, Widget>,
+        WidgetPair<Header, Widget>,
+        WidgetPair<Content, Widget>,
+        WidgetPair<Footer, Widget>,
       );
 
       fn compose_child(_: StateWidget<Self>, child: Self::Child) -> Widget {
@@ -395,7 +296,7 @@ mod tests {
     struct Child;
 
     impl ComposeChild for Parent {
-      type Child = Option<WidgetWithChild<Child, Widget>>;
+      type Child = Option<WidgetPair<Child, Widget>>;
 
       fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
@@ -417,7 +318,7 @@ mod tests {
     struct B;
 
     impl ComposeChild for A {
-      type Child = ChildVec<B>;
+      type Child = Vec<B>;
 
       fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
@@ -474,5 +375,18 @@ mod tests {
         DynWidget { dyns: Void.into_widget() }
       }
     };
+  }
+
+  #[test]
+  fn compose_const_dyn_option_widget() {
+    MockBox { size: Size::zero() }.with_child(DynWidget {
+      dyns: Some(MockBox { size: Size::zero() }),
+    });
+  }
+
+  #[test]
+  fn tuple_into_child_self_hint() {
+    let x: (i32, i32) = (0, 0);
+    let _: (i32, i32) = x.into_child();
   }
 }
