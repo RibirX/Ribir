@@ -20,4 +20,6 @@ impl Render for Opacity {
   fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_alpha(self.opacity); }
 
   fn only_sized_by_parent(&self) -> bool { false }
+
+  fn can_overflow(&self) -> bool { self.opacity > 0. }
 }

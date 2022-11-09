@@ -254,7 +254,14 @@ impl<T: Render> Render for algo::ShareResource<T> {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { T::paint(self, ctx) }
 
+  #[inline]
   fn only_sized_by_parent(&self) -> bool { T::only_sized_by_parent(self) }
+
+  #[inline]
+  fn can_overflow(&self) -> bool { T::can_overflow(self) }
+
+  #[inline]
+  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
 }
 
 impl<T: Query> Query for ShareResource<T> {
@@ -300,6 +307,12 @@ macro_rules! impl_proxy_render {
 
       #[inline]
       fn only_sized_by_parent(&self) -> bool { self.$($proxy)*.only_sized_by_parent() }
+
+      #[inline]
+      fn can_overflow(&self) -> bool { self.$($proxy)*.can_overflow() }
+    
+      #[inline]
+      fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
   };
 }
 
