@@ -7,6 +7,7 @@ pub mod prelude {
 
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
+      use ribir_core::widget::IntoWidget;
       let mut app = super::Application::new(super::material::purple::light());
 
       let wnd = app.new_window(|native_wnd, ctx| {

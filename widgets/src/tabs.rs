@@ -25,16 +25,10 @@ impl ComposeStyle for InkBarStyle {
   fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
 }
 
+type TabTemplate = WidgetPair<Tab, (WidgetOf<TabHeader>, WidgetOf<TabPane>)>;
 impl ComposeChild for Tabs {
-  type Child = ChildVec<
-    WidgetWithChild<
-      Tab,
-      (
-        WidgetWithChild<TabHeader, Widget>,
-        WidgetWithChild<TabPane, Widget>,
-      ),
-    >,
-  >;
+  type Child = Vec<TabTemplate>;
+
   fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget
   where
     Self: Sized,
@@ -42,7 +36,7 @@ impl ComposeChild for Tabs {
     let mut headers = vec![];
     let mut panes = vec![];
 
-    for w in children.into_inner().into_iter() {
+    for w in children.into_iter() {
       headers.push(w.child.0.child);
       panes.push(w.child.1.child);
     }

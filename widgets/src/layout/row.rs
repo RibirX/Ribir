@@ -14,7 +14,7 @@ pub struct Row {
 }
 
 impl ComposeChild for Row {
-  type Child = ChildVec<Widget>;
+  type Child = Vec<Widget>;
   fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget {
     widget_try_track! {
       try_track { this }

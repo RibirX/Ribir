@@ -572,10 +572,13 @@ impl WidgetNode {
       quote_spanned! {span => .with_child}.to_tokens(last);
       Paren(span).surround(last, |tokens| {
         if children.len() > 1 {
+          quote_spanned!(span => TupleChild).to_tokens(tokens);
           Paren(span).surround(tokens, |tokens| {
-            children.iter().for_each(|node| {
-              node.gen_compose_node(named_objs, tokens);
-              Comma(span).to_tokens(tokens);
+            Paren(span).surround(tokens, |tokens| {
+              children.iter().for_each(|node| {
+                node.gen_compose_node(named_objs, tokens);
+                Comma(span).to_tokens(tokens);
+              });
             });
           });
         } else {
