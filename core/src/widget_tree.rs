@@ -106,29 +106,30 @@ impl WidgetTree {
     let mut performed = vec![];
 
     loop {
-      if let Some(needs_layout) = self.layout_list() {
-        needs_layout.iter().for_each(|wid| {
-          let clamp = self
-            .layout_info(*wid)
-            .map(|info| info.clamp)
-            .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
-          wid.perform_layout(clamp, self, &mut performed);
+      let Some(mut needs_layout) = self.layout_list() else {break;};
+      while let Some(wid) = needs_layout.pop() {
+        if wid.is_dropped(self) {
+          continue;
+        }
+
+        let clamp = self
+          .layout_info(wid)
+          .map(|info| info.clamp)
+          .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
+
+        wid.perform_layout(clamp, self, &mut performed);
+        performed.drain(..).for_each(|id| {
+          let (tree1, tree2) = unsafe { self.split_tree() };
+          id.assert_get(tree1).query_all_type(
+            |l: &PerformedLayoutListener| {
+              (l.performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
+              true
+            },
+            QueryOrder::OutsideFirst,
+          );
         });
-      } else {
-        break;
       }
     }
-
-    performed.drain(..).for_each(|id| {
-      let (tree1, tree2) = unsafe { self.split_tree() };
-      id.assert_get(tree1).query_all_type(
-        |l: &PerformedLayoutListener| {
-          (l.performed_layout.borrow_mut())(LifeCycleCtx { id, tree: tree2 });
-          true
-        },
-        QueryOrder::OutsideFirst,
-      );
-    });
   }
 
   pub(crate) fn set_root(&mut self, widget: Widget) {
@@ -158,6 +159,34 @@ impl WidgetTree {
   pub(crate) unsafe fn split_tree(&mut self) -> (&mut WidgetTree, &mut WidgetTree) {
     let ptr = self as *mut WidgetTree;
     (&mut *ptr, &mut *ptr)
+  }
+
+  #[allow(unused)]
+  pub fn display_tree(&self, sub_tree: WidgetId) -> String {
+    fn display_node(mut prefix: String, id: WidgetId, tree: &WidgetTree, display: &mut String) {
+      display.push_str(&format!("{prefix}{:?}\n", id.0));
+
+      prefix.pop();
+      match prefix.pop() {
+        Some('├') => prefix.push_str("│ "),
+        Some(_) => prefix.push_str("  "),
+        _ => {}
+      }
+
+      id.children(tree).for_each(|c| {
+        let mut prefix = prefix.clone();
+        let suffix = if Some(c) == id.last_child(tree) {
+          "└─"
+        } else {
+          "├─"
+        };
+        prefix.push_str(suffix);
+        display_node(prefix, c, tree, display)
+      });
+    }
+    let mut display = String::new();
+    display_node("".to_string(), sub_tree, self, &mut display);
+    display
   }
 }
 
@@ -748,13 +777,7 @@ mod tests {
     tree.mark_dirty(tree.root());
     tree.root().remove_subtree(&mut tree);
     assert_eq!(tree.layout_list(), None);
-    assert!(
-      tree
-        .needs_regen
-        .borrow()
-        .iter()
-        .all(|g| g.is_dropped(&tree))
-    );
+    assert_eq!(tree.is_dirty(), false);
   }
 
   #[bench]
@@ -825,7 +848,7 @@ mod tests {
     {
       *trigger.silent_ref() = 2;
     }
-    assert!(tree.needs_regen.borrow().is_empty())
+    assert_eq!(tree.is_dirty(), false)
   }
 
   #[test]

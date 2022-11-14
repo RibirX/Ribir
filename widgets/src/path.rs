@@ -23,6 +23,14 @@ impl Render for PathPaintKit {
       .set_brush(self.brush.clone())
       .paint_path(self.path.clone());
   }
+
+  #[inline]
+  fn can_overflow(&self) -> bool { true }
+
+  #[inline]
+  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: false }
+  }
 }
 
 impl Query for PathPaintKit {

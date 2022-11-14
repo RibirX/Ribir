@@ -291,6 +291,7 @@ impl<'a, W> StateRef<'a, W> {
 
   /// Clone the stateful widget of which the reference point to. Require mutable
   /// reference because we try to early release inner borrow when clone occur.
+  // todo: clone stateful mutable access across a modify event is incorrect.
   #[inline]
   pub fn clone_stateful(&mut self) -> Stateful<W> {
     self.release_current_borrow();
@@ -409,13 +410,13 @@ mod tests {
     let mut wnd = Window::default_mock(sized_box.into_widget(), None);
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
-    assert_eq!(wnd.widget_tree.any_state_modified(), false);
+    assert_eq!(wnd.widget_tree.is_dirty(), false);
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
 
     {
       state.state_ref().size = Size::new(1., 1.);
     }
-    assert_eq!(wnd.widget_tree.any_state_modified(), true);
+    assert_eq!(wnd.widget_tree.is_dirty(), true);
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));

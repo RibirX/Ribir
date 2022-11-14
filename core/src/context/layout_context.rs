@@ -33,6 +33,9 @@ impl<'a> LayoutCtx<'a> {
     self.tree.layout_box_rect_mut(child).size = size;
   }
 
+  // todo: ensure user can access next child after previous child performed
+  // layout.
+
   /// Do the work of computing the layout for render child, and return its size
   /// it should have. Should called from parent.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
