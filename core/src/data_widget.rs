@@ -1,7 +1,7 @@
 //! Data widget help attach data to a widget and get a new widget witch behavior
 //! is same as origin widget.
 
-use crate::{impl_proxy_query, prelude::*};
+use crate::{impl_proxy_query, impl_proxy_render, prelude::*};
 
 pub struct DataWidget<W, D> {
   widget: W,
@@ -14,22 +14,7 @@ impl<W, D> DataWidget<W, D> {
 }
 
 impl<W: Render + 'static, D: Query + 'static> Render for DataWidget<W, D> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.widget.perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.widget.paint(ctx) }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.widget.only_sized_by_parent() }
-
-  #[inline]
-  fn can_overflow(&self) -> bool { self.widget.can_overflow() }
-
-  #[inline]
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.widget.hit_test(ctx, pos) }
+  impl_proxy_render!(widget);
 }
 
 impl<W: Query + 'static, D: Query + 'static> Query for DataWidget<W, D> {

@@ -204,4 +204,37 @@ mod tests {
     tree.tree_ready(Size::zero());
     assert_eq!(*root_layout_cnt.raw_ref(), 2);
   }
+
+  #[test]
+  fn layout_list_from_root_to_leaf() {
+    let layout_order = vec![].into_stateful();
+    let trigger = Size::zero().into_stateful();
+    let w = widget! {
+      track {
+        layout_order: layout_order.clone(),
+        trigger: trigger.clone()
+      }
+      MockBox {
+        size: *trigger,
+        performed_layout: move |_| layout_order.push(1),
+        MockBox {
+          size: *trigger,
+          performed_layout: move |_| layout_order.push(2),
+          MockBox {
+            size: *trigger,
+            performed_layout: move |_| layout_order.push(3),
+          }
+        }
+      }
+    };
+
+    let mut wnd = Window::default_mock(w, None);
+    wnd.draw_frame();
+    assert_eq!([3, 2, 1], &**layout_order.raw_ref());
+    {
+      *trigger.state_ref() = Size::new(1., 1.);
+    }
+    wnd.draw_frame();
+    assert_eq!([3, 2, 1, 3, 2, 1], &**layout_order.raw_ref());
+  }
 }

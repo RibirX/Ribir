@@ -18,6 +18,12 @@ pub struct CheckBoxTheme {
   pub label_style: TextStyle,
 }
 
+#[derive(Clone, Declare)]
+pub struct CheckBoxStyle {
+  #[declare(default=Palette::of(ctx).primary())]
+  pub color: Color,
+}
+
 impl Checkbox {
   pub fn switch_check(&mut self) {
     if self.indeterminate {
@@ -29,6 +35,12 @@ impl Checkbox {
   }
 }
 
+impl ComposeStyle for CheckBoxStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
+}
+
 impl ComposeChild for Checkbox {
   type Child = Option<Label>;
 
@@ -36,22 +48,21 @@ impl ComposeChild for Checkbox {
     let this = this.into_stateful();
     let mut checkbox = widget! {
       track { this: this.clone() }
-      CheckBoxStyle {
-        id: style,
-        Icon {
-          size: style.size,
-          DynWidget {
-            dyns: {
-              if this.indeterminate {
-                icons::INDETERMINATE_CHECK_BOX
-              } else if this.checked {
-                icons::CHECK_BOX
-              } else {
-                icons::CHECK_BOX_OUTLINE_BLANK
-              }
+      env { let theme = CheckBoxTheme::of(ctx.theme()); }
+      CheckBoxStyle { Icon {
+        size: theme.size,
+        DynWidget {
+          dyns: {
+            if this.indeterminate {
+              icons::INDETERMINATE_CHECK_BOX
+            } else if this.checked {
+              icons::CHECK_BOX
+            } else {
+              icons::CHECK_BOX_OUTLINE_BLANK
             }
           }
         }
+      }
     }};
 
     if let Some(Label { desc, position }) = label {

@@ -20,8 +20,8 @@ pub trait Compose {
 }
 
 pub struct HitTest {
-  pub(crate) hit: bool,
-  pub(crate) can_hit_child: bool,
+  pub hit: bool,
+  pub can_hit_child: bool,
 }
 
 /// RenderWidget is a widget which want to paint something or do a layout to
@@ -51,6 +51,7 @@ pub trait Render: Query {
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
+  /// Hint if a render maybe paint over its layout boundary.
   fn can_overflow(&self) -> bool { false }
 
   /// Determines the set of render widgets located at the given position.
@@ -358,14 +359,14 @@ macro_rules! impl_proxy_render {
     #[inline]
     fn paint(&self, ctx: &mut PaintingCtx) { self.$($proxy)*.paint(ctx) }
 
-      #[inline]
-      fn only_sized_by_parent(&self) -> bool { self.$($proxy)*.only_sized_by_parent() }
+    #[inline]
+    fn only_sized_by_parent(&self) -> bool { self.$($proxy)*.only_sized_by_parent() }
 
-      #[inline]
-      fn can_overflow(&self) -> bool { self.$($proxy)*.can_overflow() }
-    
-      #[inline]
-      fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
+    #[inline]
+    fn can_overflow(&self) -> bool { self.$($proxy)*.can_overflow() }
+
+    #[inline]
+    fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
   };
 }
 

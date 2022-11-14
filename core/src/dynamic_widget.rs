@@ -60,6 +60,8 @@ impl<D: 'static> Render for DynRender<D> {
   fn only_sized_by_parent(&self) -> bool { self.self_render.only_sized_by_parent() }
 
   fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.self_render.hit_test(ctx, pos) }
+
+  fn can_overflow(&self) -> bool { self.self_render.can_overflow() }
 }
 
 impl<D> DynRender<D> {
@@ -158,9 +160,9 @@ impl<D> DynRender<D> {
     );
 
     // swap the new sign and old, so we can always keep the sign id not change.
+    sign.swap_id(new_widgets[0], tree);
     let old_sign = new_widgets[0];
     new_widgets[0] = sign;
-    sign.swap_id(old_sign, tree);
 
     match &mut gen_info {
       DynWidgetGenInfo::DynDepth(depth) => {

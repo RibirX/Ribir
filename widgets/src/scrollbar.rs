@@ -16,28 +16,8 @@ pub struct ScrollBarTheme {
   pub thumb_min_size: f32,
   /// The thickness of scrollbar element.
   pub thickness: f32,
-}
-
-/// Compose style that use to decoration the track of horizontal scrollbar,
-/// overwrite it when init theme.
-#[derive(Debug, Declare)]
-pub struct HScrollBarTrackStyle;
-
-impl ComposeStyle for HScrollBarTrackStyle {
-  type Host = Widget;
-  #[inline]
-  fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
-}
-
-/// Compose style that use to decoration the track of vertical scrollbar,
-/// overwrite it when init theme.
-#[derive(Debug, Declare)]
-pub struct VScrollBarTrackStyle;
-
-impl ComposeStyle for VScrollBarTrackStyle {
-  type Host = Widget;
-  #[inline]
-  fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
+  /// The brush of the scrollbar track.
+  pub track_brush: Brush,
 }
 
 /// Compose style that use to decoration the thumb of horizontal scrollbar,
@@ -194,16 +174,18 @@ impl Compose for HRawScrollbar {
       env {
         let ScrollBarTheme {
           thickness,
-          thumb_min_size
+          thumb_min_size,
+          ref track_brush,
         } = *ScrollBarTheme::of(ctx.theme());
       }
 
       Stack {
         visible: scrolling.can_scroll(),
-        HScrollBarTrackStyle { Container {
+        Container {
           id: track_box,
           size: Size::new(f32::MAX, thumb_outline.layout_height()),
-        }}
+          background: track_brush.clone()
+        }
         LayoutBox {
           id: thumb_outline,
           HScrollBarThumbStyle{
@@ -243,16 +225,18 @@ impl Compose for VRawScrollbar {
       env {
         let ScrollBarTheme {
           thickness,
-          thumb_min_size
+          thumb_min_size,
+          ref track_brush
         } = *ScrollBarTheme::of(ctx.theme());
       }
 
       Stack {
         visible: scrolling.can_scroll(),
-        VScrollBarTrackStyle { Container {
+        Container {
           id: track_box,
           size: Size::new(thumb_outline.layout_width() , f32::MAX),
-        }}
+          background: track_brush.clone(),
+        }
         LayoutBox {
           id: thumb_outline,
           VScrollBarThumbStyle {

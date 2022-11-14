@@ -66,12 +66,24 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     icons::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
 
-  overwrite_compose_styles(&mut theme);
+  override_compose_style(&mut theme);
   init_custom_theme(&mut theme);
   theme
 }
 
-fn overwrite_compose_styles(theme: &mut Theme) {
+fn init_custom_theme(theme: &mut Theme) {
+  theme.set_custom_theme(ScrollBarTheme {
+    thumb_min_size: 12.,
+    thickness: 8.,
+    track_brush: theme.palette.primary_container().into(),
+  });
+  theme.set_custom_theme(CheckBoxTheme {
+    size: IconSize::of(theme).tiny,
+    label_style: TypographyTheme::of(theme).body1.text.clone(),
+  });
+}
+
+fn override_compose_style(theme: &mut Theme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
       DynWidget {
@@ -82,20 +94,12 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
     }
   }
-  fn scrollbar_track(host: Widget) -> Widget {
-    widget! {
-      DynWidget {
-        dyns: host,
-        background: ctx.theme().palette.primary_container()
-      }
-    }
-  }
   fn lerp_position(from: &PositionUnit, to: &PositionUnit, rate: f32, size: f32) -> PositionUnit {
     let from = from.abs_value(size);
     let to = to.abs_value(size);
     PositionUnit::Pixel(from.lerp(&to, rate))
   }
-  theme.overwrite_compose_style::<HScrollBarThumbStyle>(|this, host| {
+  theme.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
     widget! {
       track { this }
       DynWidget {
@@ -110,7 +114,7 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
     }
   });
-  theme.overwrite_compose_style::<VScrollBarThumbStyle>(|this, host| {
+  theme.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
     widget! {
       track { this }
       DynWidget {
@@ -125,9 +129,7 @@ fn overwrite_compose_styles(theme: &mut Theme) {
       }
     }
   });
-  theme.overwrite_compose_style::<HScrollBarTrackStyle>(|_, host| scrollbar_track(host));
-  theme.overwrite_compose_style::<VScrollBarTrackStyle>(|_, host| scrollbar_track(host));
-  theme.overwrite_compose_style::<InkBarStyle>(|_, host| {
+  theme.override_compose_style::<InkBarStyle>(|_, host| {
     widget! {
       DynWidget {
         dyns: host,
@@ -136,7 +138,6 @@ fn overwrite_compose_styles(theme: &mut Theme) {
     }
   });
   theme.override_compose_style::<CheckBoxStyle>(move |style, host| {
-    style.state_ref().size = Size::new(18., 18.);
     widget! {
       track { style }
       Ripple {
@@ -146,7 +147,7 @@ fn overwrite_compose_styles(theme: &mut Theme) {
         bounded: RippleBound::Unbounded,
         InteractiveLayer {
           color: style.color, border_radii: Radius::all(20.),
-          ExprWidget { expr: host, margin: EdgeInsets::all(12.) }
+          DynWidget { dyns: host, margin: EdgeInsets::all(12.) }
         }
       }
     }
