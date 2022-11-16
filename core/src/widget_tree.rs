@@ -247,20 +247,33 @@ impl WidgetId {
   pub(crate) fn is_dropped(self, tree: &WidgetTree) -> bool { self.0.is_removed(&tree.arena) }
 
   #[allow(clippy::needless_collect)]
-  pub(crate) fn common_ancestor_of(self, other: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
-    if self.is_dropped(tree) || other.is_dropped(tree) {
-      return None;
+  pub(crate) fn lowest_common_ancestor(
+    self,
+    other: WidgetId,
+    tree: &WidgetTree,
+  ) -> Option<WidgetId> {
+    self.common_ancestors(other, tree).last()
+  }
+
+  #[allow(clippy::needless_collect)]
+  // return ancestors from root to lowest common ancestor
+  pub(crate) fn common_ancestors(
+    self,
+    other: WidgetId,
+    tree: &WidgetTree,
+  ) -> impl Iterator<Item = WidgetId> + '_ {
+    let mut p0 = vec![];
+    let mut p1 = vec![];
+    if !self.is_dropped(tree) && !other.is_dropped(tree) {
+      p0 = other.ancestors(tree).collect::<Vec<_>>();
+      p1 = self.ancestors(tree).collect::<Vec<_>>();
     }
 
-    let p0 = other.ancestors(tree).collect::<Vec<_>>();
-    let p1 = self.ancestors(tree).collect::<Vec<_>>();
-
-    p0.iter()
+    p0.into_iter()
       .rev()
-      .zip(p1.iter().rev())
-      .filter(|(a, b)| a == b)
-      .last()
-      .map(|(p, _)| p.clone())
+      .zip(p1.into_iter().rev())
+      .take_while(|(a, b)| a == b)
+      .map(|(a, _)| a)
   }
 
   pub(crate) fn parent(self, tree: &WidgetTree) -> Option<WidgetId> {

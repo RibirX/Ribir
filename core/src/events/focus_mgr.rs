@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{prelude::*, widget_tree::WidgetTree};
 
 use super::dispatcher::Dispatcher;
@@ -141,6 +143,13 @@ impl Dispatcher {
     let old = focus_mgr.focusing.take();
     focus_mgr.focusing = node;
 
+    let mut common_ancestors = HashSet::new();
+    old
+      .as_ref()
+      .zip(focus_mgr.focusing.as_ref())
+      .map(|((old, _), (new, _))| old.wid.common_ancestors(new.wid, tree))
+      .map(|v| common_ancestors.extend(v));
+
     if let Some((blur, _)) = old {
       let mut focus_event = FocusEvent::new(blur.wid, tree, info);
       // dispatch blur event
@@ -152,9 +161,14 @@ impl Dispatcher {
         });
 
       let mut focus_event = FocusEvent::new(blur.wid, tree, info);
+
       // bubble focus out
       tree.bubble_event_with(&mut focus_event, |focus: &FocusListener, event| {
-        focus.dispatch_event(FocusEventType::FocusOut, event)
+        if common_ancestors.contains(&event.current_target()) {
+          event.stop_bubbling();
+        } else {
+          focus.dispatch_event(FocusEventType::FocusOut, event);
+        }
       });
     }
 
@@ -172,7 +186,11 @@ impl Dispatcher {
 
       // bubble focus in
       tree.bubble_event_with(&mut focus_event, |focus: &FocusListener, event| {
-        focus.dispatch_event(FocusEventType::FocusIn, event)
+        if common_ancestors.contains(&event.current_target()) {
+          event.stop_bubbling();
+        } else {
+          focus.dispatch_event(FocusEventType::FocusIn, event)
+        }
       });
     }
 
@@ -324,13 +342,7 @@ mod tests {
     dispatcher.focus(parent, widget_tree);
     assert_eq!(
       &*log.borrow(),
-      &[
-        "blur child",
-        "focusout child",
-        "focusout parent",
-        "focus parent",
-        "focusin parent"
-      ]
+      &["blur child", "focusout child", "focus parent",]
     );
     log.borrow_mut().clear();
 
