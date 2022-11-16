@@ -25,7 +25,7 @@ impl Text {
     } = self.style;
 
     let width: Em = Pixel(bound.max.width.into()).into();
-    let height: Em = Pixel(bound.max.width.into()).into();
+    let height: Em = Pixel(bound.max.height.into()).into();
 
     t_store.typography(
       self.text.substr(..),
