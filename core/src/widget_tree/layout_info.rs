@@ -1,3 +1,5 @@
+use painter::ZERO_SIZE;
+
 use super::{WidgetId, WidgetTree};
 use crate::prelude::{Point, Rect, Size, INFINITY_SIZE};
 use std::cmp::Reverse;
@@ -29,6 +31,12 @@ impl BoxClamp {
   #[inline]
   pub fn expand(mut self) -> Self {
     self.max = INFINITY_SIZE;
+    self
+  }
+
+  #[inline]
+  pub fn loose(mut self) -> Self {
+    self.min = ZERO_SIZE;
     self
   }
 }
