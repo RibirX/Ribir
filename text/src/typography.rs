@@ -222,9 +222,9 @@ where
   ) {
     if self.cfg.text_align != Some(TextAlign::Center) {
       let bounds = if self.cfg.line_dir.is_horizontal() {
-        self.cfg.bounds.width
-      } else {
         self.cfg.bounds.height
+      } else {
+        self.cfg.bounds.width
       };
       let mut cursor = BoundsCursor {
         inner_cursor,
@@ -335,9 +335,9 @@ where
 
   fn is_line_over(&self) -> bool {
     if self.cfg.line_dir.is_horizontal() {
-      self.cfg.bounds.width > self.x_cursor
-    } else {
       self.cfg.bounds.height > self.y_cursor
+    } else {
+      self.cfg.bounds.width > self.x_cursor
     }
   }
 }
