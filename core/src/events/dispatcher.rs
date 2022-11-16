@@ -136,7 +136,7 @@ impl Dispatcher {
             let tap_on = self
               .pointer_down_uid
               .take()?
-              .common_ancestor_of(release_event.target(), tree)?;
+              .lowest_common_ancestor(release_event.target(), tree)?;
             let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &mut self.info);
 
             tree.bubble_event::<TapListener>(&mut tap_event);
