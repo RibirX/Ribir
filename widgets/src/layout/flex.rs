@@ -1,5 +1,8 @@
 use super::{Direction, Expanded};
-use ribir_core::{impl_query_self_only, prelude::*};
+use ribir_core::{
+  impl_query_self_only,
+  prelude::{log::warn, *},
+};
 
 /// How the children should be placed along the main axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
@@ -51,10 +54,18 @@ pub struct Flex {
 
 impl Render for Flex {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    if Align::Stretch == self.align_items && self.wrap {
+      warn!("stretch align and wrap property is conflict");
+    }
     let direction = self.direction;
+    let max_size = FlexSize::from_size(clamp.max, direction);
+    let mut min_size = FlexSize::from_size(clamp.min, direction);
+    if Align::Stretch == self.align_items {
+      min_size.cross = max_size.cross;
+    }
     let mut layouter = FlexLayouter {
-      max_size: FlexSize::from_size(clamp.max, direction),
-      min_size: FlexSize::from_size(clamp.min, direction),
+      max_size,
+      min_size,
       direction,
       reverse: self.reverse,
       wrap: self.wrap,
@@ -101,10 +112,6 @@ impl FlexSize {
 
   fn to_point(self, dir: Direction) -> Point { self.to_size(dir).to_vector().to_point() }
 
-  fn from_point(pos: Point, dir: Direction) -> Self {
-    FlexSize::from_size(Size::new(pos.x, pos.y), dir)
-  }
-
   fn clamp(self, min: FlexSize, max: FlexSize) -> FlexSize {
     FlexSize {
       main: self.main.min(max.main).max(min.main),
@@ -144,7 +151,7 @@ impl FlexLayouter {
         let (ctx, iter) = ctx.$method();
         self.children_perform(ctx, iter);
         let (ctx, iter) = ctx.$method();
-        self.relayout_if_need(ctx, iter);
+        self.layout_flex_children(ctx, iter);
         let size = self.box_size();
         let (ctx, iter) = ctx.$method();
         self.line_inner_align(ctx, iter, size);
@@ -163,60 +170,49 @@ impl FlexLayouter {
     ctx: &mut LayoutCtx,
     children: impl Iterator<Item = WidgetId>,
   ) {
-    let clamp = BoxClamp {
-      max: self.max_size.to_size(self.direction),
-      min: Size::zero(),
-    };
-
     children.for_each(|child| {
-      let size = ctx.perform_child_layout(child, clamp);
-      let flex_size = FlexSize::from_size(size, self.direction);
-      if self.wrap
-        && !self.current_line.is_empty()
-        && self.current_line.main_width + flex_size.main > self.max_size.main
-      {
-        self.place_line();
-      }
-      ctx.update_position(
-        child,
-        FlexSize {
-          main: self.current_line.main_width,
-          cross: self.current_line.cross_pos,
-        }
-        .to_point(self.direction),
-      );
-      self.place_widget(flex_size, child, ctx);
+      self.place_widget(child, ctx);
     });
     self.place_line();
   }
 
-  fn relayout_if_need<'a>(
+  fn layout_flex_children<'a>(
     &mut self,
     ctx: &mut LayoutCtx,
     mut children: impl Iterator<Item = WidgetId>,
   ) {
     let Self {
       lines_info,
-      direction,
-      align_items,
       max_size,
+      direction,
       main_max,
       ..
     } = self;
+    let mut line_cross = 0.;
     lines_info.iter_mut().for_each(|line| {
-      (0..line.child_count)
-        .map(|_| children.next().unwrap())
-        .fold(0.0f32, |main_offset, child| {
-          Self::obj_real_rect_with_main_start(
-            ctx,
-            child,
-            line,
-            main_offset,
-            *direction,
-            *align_items,
-            *max_size,
-          )
-        });
+      line.cross_pos = line_cross;
+      if line.flex_sum == 0. {
+        children.advance_by(line.child_count).unwrap();
+      } else {
+        let flex_unit = (max_size.main - line.main_width) / line.flex_sum;
+        (0..line.child_count)
+          .map(|_| children.next().unwrap())
+          .for_each(|wid| {
+            if let Some(flex) = Self::child_flex(ctx, wid) {
+              Self::layout_flex_child(
+                ctx,
+                wid,
+                flex,
+                flex_unit,
+                *max_size,
+                FlexSize { main: 0., cross: 0. },
+                *direction,
+                line,
+              );
+            }
+          });
+      }
+      line_cross += line.cross_line_height;
       *main_max = main_max.max(line.main_width);
     });
   }
@@ -255,33 +251,50 @@ impl FlexLayouter {
         }
       };
 
+      let cross_pos = line.cross_pos;
       (0..line.child_count)
         .map(|_| children.next().unwrap())
         .fold(offset, |main_offset: f32, child| {
           let rect = ctx
             .widget_box_rect(child)
             .expect("relayout a expanded widget which not prepare layout");
-          let mut origin = FlexSize::from_point(rect.origin, *direction);
+          let mut origin = FlexSize::default();
           let child_size = FlexSize::from_size(rect.size, *direction);
-
           let line_cross_offset = cross_align.align_value(child_size.cross, line.cross_line_height);
           origin.main += main_offset;
-          origin.cross += container_cross_offset + line_cross_offset;
+          origin.cross += container_cross_offset + line_cross_offset + cross_pos;
           ctx.update_position(child, origin.to_point(*direction));
-          main_offset + step
+          main_offset + step + child_size.main
         });
     });
   }
 
-  fn place_widget(&mut self, size: FlexSize, child: WidgetId, ctx: &mut LayoutCtx) {
-    let mut line = &mut self.current_line;
-    line.main_width += size.main;
-    line.cross_line_height = line.cross_line_height.max(size.cross);
-    line.child_count += 1;
+  fn place_widget(&mut self, child: WidgetId, ctx: &mut LayoutCtx) {
+    let mut flex_size = FlexSize { main: 0., cross: 0. };
+
+    let mut min_size = self.min_size;
+    min_size.main = 0.;
+    let clamp = BoxClamp {
+      max: self.max_size.to_size(self.direction),
+      min: min_size.to_size(self.direction),
+    };
+
     if let Some(flex) = Self::child_flex(ctx, child) {
-      line.flex_sum += flex;
-      line.flex_main_width += size.main;
+      self.current_line.flex_sum += flex;
+    } else {
+      let size = ctx.perform_child_layout(child, clamp);
+      flex_size = FlexSize::from_size(size, self.direction);
     }
+    if self.wrap
+      && !self.current_line.is_empty()
+      && self.current_line.main_width + flex_size.main > self.max_size.main
+    {
+      self.place_line();
+    }
+    let mut line = &mut self.current_line;
+    line.child_count += 1;
+    line.main_width += flex_size.main;
+    line.cross_line_height = line.cross_line_height.max(flex_size.cross);
   }
 
   fn place_line(&mut self) {
@@ -297,66 +310,27 @@ impl FlexLayouter {
     }
   }
 
-  // relayout child to get the real size, and return the new offset in main axis
-  // for next siblings.
-  fn obj_real_rect_with_main_start(
+  fn layout_flex_child(
     ctx: &mut LayoutCtx,
     child: WidgetId,
-    line: &mut MainLineInfo,
-    main_offset: f32,
+    flex: f32,
+    flex_unit: f32,
+    mut max_size: FlexSize,
+    mut min_size: FlexSize,
     dir: Direction,
-    cross_align: Align,
-    max_size: FlexSize,
-  ) -> f32 {
-    let pre_layout_rect = ctx
-      .widget_box_rect(child)
-      .expect("relayout a expanded widget which not prepare layout");
-
-    let pre_size = FlexSize::from_size(pre_layout_rect.size, dir);
-    let mut prefer_main = pre_size.main;
-    if let Some(flex) = Self::child_flex(ctx, child) {
-      let remain_space = max_size.main - line.main_width + line.flex_main_width;
-      prefer_main = remain_space * (flex / line.flex_sum);
-      line.flex_sum -= flex;
-      line.flex_main_width -= pre_size.main;
-    }
-    prefer_main = prefer_main.max(pre_size.main);
-
-    let clamp_max = FlexSize {
-      main: prefer_main,
-      cross: line.cross_line_height,
+    line: &mut MainLineInfo,
+  ) {
+    let max_main = flex_unit * flex;
+    max_size.main = max_size.main.min(max_main);
+    min_size.main = 0.;
+    let clamp = BoxClamp {
+      max: max_size.to_size(dir),
+      min: min_size.to_size(dir),
     };
-    let mut clamp_min = FlexSize { main: prefer_main, cross: 0. };
-    if Align::Stretch == cross_align {
-      clamp_min.cross = line.cross_line_height;
-    }
-
-    let real_size = if prefer_main > pre_size.main || clamp_min.cross > pre_size.cross {
-      // Relayout only if the child object size may change.
-      let new_size = ctx.perform_child_layout(
-        child,
-        BoxClamp {
-          max: clamp_max.to_size(dir),
-          min: clamp_min.to_size(dir),
-        },
-      );
-      FlexSize::from_size(new_size, dir)
-    } else {
-      pre_size
-    };
-
-    let main_diff = real_size.main - pre_size.main;
-    line.main_width += main_diff;
-
-    let mut new_pos = FlexSize::from_point(pre_layout_rect.origin, dir);
-    new_pos.main += main_offset;
-    let new_pos = new_pos.to_point(dir);
-
-    if pre_layout_rect.origin != new_pos {
-      ctx.update_position(child, new_pos);
-    }
-
-    main_offset + main_diff
+    let new_size = ctx.perform_child_layout(child, clamp);
+    let flex_size = FlexSize::from_size(new_size, dir);
+    line.main_width += flex_size.main;
+    line.cross_line_height = line.cross_line_height.max(flex_size.cross);
   }
 
   fn best_size(&self) -> FlexSize {
@@ -383,12 +357,11 @@ struct MainLineInfo {
   cross_pos: f32,
   main_width: f32,
   flex_sum: f32,
-  flex_main_width: f32,
   cross_line_height: f32,
 }
 
 impl MainLineInfo {
-  fn is_empty(&self) -> bool { self.child_count == 0 || self.main_width == 0. }
+  fn is_empty(&self) -> bool { self.child_count == 0 }
 
   fn cross_bottom(&self) -> f32 { self.cross_pos + self.cross_line_height }
 }
@@ -408,8 +381,20 @@ mod tests {
         }
       }
     };
-    let (rect, _) = widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
-    assert_eq!(rect.size, Size::new(100., 20.));
+    expect_layout_result_with_theme(
+      row,
+      Some(Size::new(500., 500.)),
+      material::purple::light(),
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(100.),
+          height: Some(20.),
+        },
+      }],
+    );
   }
 
   #[test]
@@ -422,8 +407,20 @@ mod tests {
         }
       }
     };
-    let (rect, _) = widget_and_its_children_box_rect(col.into_widget(), Size::new(500., 500.));
-    assert_eq!(rect.size, Size::new(10., 200.));
+    expect_layout_result_with_theme(
+      col,
+      Some(Size::new(500., 500.)),
+      material::purple::light(),
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(10.),
+          height: Some(200.),
+        },
+      }],
+    );
   }
 
   #[test]
@@ -438,16 +435,49 @@ mod tests {
       }
     };
 
-    let (rect, children) =
-      widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
-    assert_eq!(rect.size, Size::new(400., 40.));
-    assert_eq!(
-      children,
-      vec![
-        Rect::from_size(size),
-        Rect { origin: Point::new(200., 0.), size },
-        Rect { origin: Point::new(0., 20.), size },
-      ]
+    let layouts = [
+      LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(400.),
+          height: Some(40.),
+        },
+      },
+      LayoutTestItem {
+        path: &[0, 0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(200.),
+          height: Some(20.),
+        },
+      },
+      LayoutTestItem {
+        path: &[0, 1],
+        expect: ExpectRect {
+          x: Some(200.),
+          y: Some(0.),
+          width: Some(200.),
+          height: Some(20.),
+        },
+      },
+      LayoutTestItem {
+        path: &[0, 2],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(20.),
+          width: Some(200.),
+          height: Some(20.),
+        },
+      },
+    ];
+    expect_layout_result_with_theme(
+      row,
+      Some(Size::new(500., 500.)),
+      material::purple::light(),
+      &layouts,
     );
   }
 
@@ -464,16 +494,49 @@ mod tests {
       }
     };
 
-    let (rect, children) =
-      widget_and_its_children_box_rect(row.into_widget(), Size::new(500., 500.));
-    assert_eq!(rect.size, Size::new(400., 40.));
-    assert_eq!(
-      children,
-      vec![
-        Rect { origin: Point::new(0., 20.), size },
-        Rect { origin: Point::new(200., 0.), size },
-        Rect::from_size(size),
-      ]
+    let layouts = [
+      LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(400.),
+          height: Some(40.),
+        },
+      },
+      LayoutTestItem {
+        path: &[0, 0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(20.),
+          width: Some(200.),
+          height: Some(20.),
+        },
+      },
+      LayoutTestItem {
+        path: &[0, 1],
+        expect: ExpectRect {
+          x: Some(200.),
+          y: Some(0.),
+          width: Some(200.),
+          height: Some(20.),
+        },
+      },
+      LayoutTestItem {
+        path: &[0, 2],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(200.),
+          height: Some(20.),
+        },
+      },
+    ];
+    expect_layout_result_with_theme(
+      row,
+      Some(Size::new(500., 500.)),
+      material::purple::light(),
+      &layouts,
     );
   }
 
@@ -489,24 +552,49 @@ mod tests {
         }
       };
 
-      let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
-      assert_eq!(rect.size, Size::new(300., 40.));
-      assert_eq!(
-        children,
-        vec![
-          Rect {
-            origin: Point::new(0., y_pos[0]),
-            size: Size::new(100., 20.)
+      let layouts = [
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect {
+            x: Some(0.),
+            y: Some(0.),
+            width: Some(300.),
+            height: Some(40.),
           },
-          Rect {
-            origin: Point::new(100., y_pos[1]),
-            size: Size::new(100., 30.)
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect {
+            x: Some(0.),
+            y: Some(y_pos[0]),
+            width: Some(100.),
+            height: Some(20.),
           },
-          Rect {
-            origin: Point::new(200., y_pos[2]),
-            size: Size::new(100., 40.)
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect {
+            x: Some(100.),
+            y: Some(y_pos[1]),
+            width: Some(100.),
+            height: Some(30.),
           },
-        ]
+        },
+        LayoutTestItem {
+          path: &[0, 2],
+          expect: ExpectRect {
+            x: Some(200.),
+            y: Some(y_pos[2]),
+            width: Some(100.),
+            height: Some(40.),
+          },
+        },
+      ];
+      expect_layout_result_with_theme(
+        row,
+        Some(Size::new(500., 500.)),
+        material::purple::light(),
+        &layouts,
       );
     }
     cross_align_check(Align::Start, [0., 0., 0.]);
@@ -522,24 +610,49 @@ mod tests {
       }
     };
 
-    let (rect, children) = widget_and_its_children_box_rect(row, Size::new(500., 500.));
-    assert_eq!(rect.size, Size::new(300., 40.));
-    assert_eq!(
-      children,
-      vec![
-        Rect {
-          origin: Point::new(0., 0.),
-          size: Size::new(100., 40.)
+    let layouts = [
+      LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(300.),
+          height: Some(40.),
         },
-        Rect {
-          origin: Point::new(100., 0.),
-          size: Size::new(100., 40.)
+      },
+      LayoutTestItem {
+        path: &[0, 0],
+        expect: ExpectRect {
+          x: Some(0.),
+          y: Some(0.),
+          width: Some(100.),
+          height: Some(40.),
         },
-        Rect {
-          origin: Point::new(200., 0.),
-          size: Size::new(100., 40.)
+      },
+      LayoutTestItem {
+        path: &[0, 1],
+        expect: ExpectRect {
+          x: Some(100.),
+          y: Some(0.),
+          width: Some(100.),
+          height: Some(40.),
         },
-      ]
+      },
+      LayoutTestItem {
+        path: &[0, 2],
+        expect: ExpectRect {
+          x: Some(200.),
+          y: Some(0.),
+          width: Some(100.),
+          height: Some(40.),
+        },
+      },
+    ];
+    expect_layout_result_with_theme(
+      row,
+      Some(Size::new(500., 40.)),
+      material::purple::light(),
+      &layouts,
     );
   }
 
@@ -619,6 +732,66 @@ mod tests {
     main_align_check(
       JustifyContent::SpaceEvenly,
       [(50., 0.), (200., 0.), (350., 0.)],
+    );
+  }
+
+  #[test]
+  fn flex_expand() {
+    let row = widget! {
+      SizedBox {
+        size: Size::new(500., 25.),
+        Flex {
+          direction: Direction::Horizontal,
+          Expanded {
+            flex: 1.,
+            SizedBox {
+              size: INFINITY_SIZE,
+            }
+          }
+          SizedBox { size: Size::new(100., 20.) }
+          Expanded {
+            flex: 3.,
+            SizedBox {
+              size: INFINITY_SIZE,
+            }
+          }
+        }
+      }
+
+    };
+    expect_layout_result_with_theme(
+      row,
+      Some(Size::new(500., 500.)),
+      material::purple::light(),
+      &[
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect {
+            x: Some(0.),
+            y: Some(0.),
+            width: Some(500.),
+            height: Some(25.),
+          },
+        },
+        LayoutTestItem {
+          path: &[0, 0, 0],
+          expect: ExpectRect {
+            x: Some(0.),
+            y: Some(0.),
+            width: Some(100.),
+            height: Some(25.),
+          },
+        },
+        LayoutTestItem {
+          path: &[0, 0, 2],
+          expect: ExpectRect {
+            x: Some(200.),
+            y: Some(0.),
+            width: Some(300.),
+            height: Some(25.),
+          },
+        },
+      ],
     );
   }
 }
