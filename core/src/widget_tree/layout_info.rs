@@ -78,24 +78,24 @@ impl LayoutStore {
     self.data.entry(id).or_insert_with(LayoutInfo::default)
   }
 
-  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
-    // todo: should effect by transform widget.
-    self
-      .layout_box_rect(id)
-      .map_or(pos, |rect| pos + rect.min().to_vector())
+  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
+    self.layout_box_rect(id).map_or(pos, |rect| {
+      let pos = id.assert_get(arena).map_to_parent_transform(pos);
+      pos + rect.min().to_vector()
+    })
   }
 
-  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point) -> Point {
-    self
-      .layout_box_rect(id)
-      .map_or(pos, |rect| pos - rect.min().to_vector())
-    // todo: should effect by transform widget.
+  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
+    self.layout_box_rect(id).map_or(pos, |rect| {
+      let pos = pos - rect.min().to_vector();
+      id.assert_get(arena).map_from_parent_transform(pos)
+    })
   }
 
   pub(crate) fn map_to_global(&self, pos: Point, widget: WidgetId, arena: &TreeArena) -> Point {
     widget
       .ancestors(arena)
-      .fold(pos, |pos, p| self.map_to_parent(p, pos))
+      .fold(pos, |pos, p| self.map_to_parent(p, pos, arena))
   }
 
   pub(crate) fn map_from_global(&self, pos: Point, widget: WidgetId, arena: &TreeArena) -> Point {
@@ -103,7 +103,7 @@ impl LayoutStore {
     stack
       .iter()
       .rev()
-      .fold(pos, |pos, p| self.map_from_parent(*p, pos))
+      .fold(pos, |pos, p| self.map_from_parent(*p, pos, arena))
   }
 
   pub(crate) fn take_performed(&mut self) -> Vec<WidgetId> {

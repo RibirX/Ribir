@@ -57,6 +57,10 @@ pub trait Render: Query {
     let is_hit = hit_test_impl(ctx, pos);
     HitTest { hit: is_hit, can_hit_child: is_hit }
   }
+
+  fn map_to_parent_transform(&self, pos: Point) -> Point { pos }
+
+  fn map_from_parent_transform(&self, pos: Point) -> Point { pos }
 }
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {

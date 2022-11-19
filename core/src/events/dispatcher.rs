@@ -268,9 +268,9 @@ impl Dispatcher {
       let hit_test = r.hit_test(&ctx, pos);
 
       if hit_test.hit {
-        Some((id, store.map_from_parent(id, pos)))
+        Some((id, store.map_from_parent(id, pos, arena)))
       } else if hit_test.can_hit_child {
-        let pos = store.map_from_parent(id, pos);
+        let pos = store.map_from_parent(id, pos, arena);
         id.reverse_children(arena)
           .find_map(|c| down_coordinate(c, pos, tree))
       } else {

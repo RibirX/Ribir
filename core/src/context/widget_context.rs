@@ -98,11 +98,13 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
   }
 
   #[inline]
-  fn map_to_parent(&self, pos: Point) -> Point { self.layout_store().map_to_parent(self.id(), pos) }
+  fn map_to_parent(&self, pos: Point) -> Point {
+    self.layout_store().map_to_parent(self.id(), pos, self.tree_arena())
+  }
 
   #[inline]
   fn map_from_parent(&self, pos: Point) -> Point {
-    self.layout_store().map_from_parent(self.id(), pos)
+    self.layout_store().map_from_parent(self.id(), pos, self.tree_arena())
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
