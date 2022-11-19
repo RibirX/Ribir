@@ -68,7 +68,7 @@ mod tests {
     {
       *trigger.state_ref() = false;
     }
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     assert_eq!(
       &**lifecycle.raw_ref(),
       [

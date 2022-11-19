@@ -92,14 +92,6 @@ impl WidgetTree {
     }
   }
 
-  // perform repair the tree and layout it until everything ready, and return if
-  // modify the tree struct.
-  pub(crate) fn tree_ready(&mut self, win_size: Size) {
-    while self.is_dirty() {
-      self.layout(win_size);
-    }
-  }
-
   /// Do the work of computing the layout for all node which need, Return if any
   /// node has really computing the layout.
   pub(crate) fn layout(&mut self, win_size: Size) {
@@ -667,7 +659,7 @@ mod tests {
     let ctx: AppContext = <_>::default();
     b.iter(move || {
       let mut tree = WidgetTree::new(Recursive { width, depth }.into_widget(), ctx.clone());
-      tree.tree_ready(Size::new(512., 512.));
+      tree.layout(Size::new(512., 512.));
     });
   }
 
@@ -680,7 +672,7 @@ mod tests {
         let mut v = trigger.state_ref();
         v.width = v.width;
       }
-      tree.tree_ready(Size::new(512., 512.));
+      tree.layout(Size::new(512., 512.));
     });
   }
 
@@ -771,7 +763,7 @@ mod tests {
   fn drop_info_clear() {
     let post = Embed { width: 5, depth: 3 };
     let mut tree = WidgetTree::new(post.into_widget(), <_>::default());
-    tree.tree_ready(Size::new(512., 512.));
+    tree.layout(Size::new(512., 512.));
     assert_eq!(tree.count(), 16);
 
     tree.mark_dirty(tree.root());
@@ -811,7 +803,7 @@ mod tests {
         let mut v = trigger.state_ref();
         v.width = v.width;
       }
-      tree.tree_ready(Size::new(512., 512.));
+      tree.layout(Size::new(512., 512.));
     });
   }
 
@@ -872,7 +864,7 @@ mod tests {
         }
     }};
     let mut tree1 = WidgetTree::new(w1, <_>::default());
-    tree1.tree_ready(win_size);
+    tree1.layout(win_size);
     tree1.draw(&mut painter);
 
     let len_100_widget = painter.finish().len();
@@ -888,7 +880,7 @@ mod tests {
         }
     }};
     let mut tree2 = WidgetTree::new(w2, <_>::default());
-    tree2.tree_ready(win_size);
+    tree2.layout(win_size);
     tree2.draw(&mut painter);
     let len_1_widget = painter.finish().len();
     assert_eq!(len_1_widget, len_100_widget);

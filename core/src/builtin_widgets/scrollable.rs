@@ -129,7 +129,7 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
-    wnd.layout_ready();
+    wnd.layout();
     let rect = layout_info_by_path(&wnd, &[0, 0, 0, 0]);
     assert_eq!(rect.origin.y, expect_y);
     let rect = layout_info_by_path(&wnd, &[0, 0, 0, 0, 0]);

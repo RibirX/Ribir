@@ -96,38 +96,31 @@ impl Window {
   /// Draw an image what current render tree represent.
   pub fn draw_frame(&mut self) {
     if self.need_draw() {
-      let Self {
-        raw_window,
-        context,
-        dispatcher,
-        widget_tree,
-        p_backend,
-        painter,
-      } = self;
-
-      context.begin_frame();
+      self.context.begin_frame();
 
       loop {
-        widget_tree.tree_ready(raw_window.inner_size());
+        self.layout();
 
-        context.layout_ready();
-        if !widget_tree.is_dirty() {
+        if !self.need_draw() {
           break;
         }
       }
 
       // todo: refresh focus only necessary and in a more cheap way.
-      dispatcher.refresh_focus(widget_tree);
+      self.dispatcher.refresh_focus(&mut self.widget_tree);
 
-      widget_tree.draw(painter);
-      let commands = painter.finish();
-      p_backend.submit(commands);
+      self.widget_tree.draw(&mut self.painter);
+      let commands = self.painter.finish();
+      self.p_backend.submit(commands);
 
-      context.end_frame();
+      self.context.end_frame();
     }
   }
 
-  pub fn layout_ready(&mut self) { self.widget_tree.tree_ready(self.raw_window.inner_size()); }
+  pub fn layout(&mut self) {
+    self.widget_tree.layout(self.raw_window.inner_size());
+    self.context.layout_ready();
+  }
 
   pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
 

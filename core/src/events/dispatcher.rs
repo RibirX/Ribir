@@ -318,7 +318,7 @@ impl WidgetTree {
     self.bubble_event_with(event, |listener: &Ty, event| listener.dispatch(event));
   }
 
-  pub(crate) fn bubble_event_with<Ty, D, E>(&mut self, event: &mut E, mut dispatcher: D)
+  pub(crate) fn bubble_event_with<Ty, D, E>(&self, event: &mut E, mut dispatcher: D)
   where
     D: FnMut(&Ty, &mut E),
     E: std::borrow::BorrowMut<EventCommon>,

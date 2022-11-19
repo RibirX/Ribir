@@ -382,13 +382,13 @@ mod tests {
       }
     };
     let mut tree = WidgetTree::new(w, <_>::default());
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
     {
       *size.state_ref() = Size::new(1., 1.);
     }
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     let new_ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 2);
 
@@ -409,13 +409,13 @@ mod tests {
       }
     };
     let mut tree = WidgetTree::new(w, <_>::default());
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
     {
       *size.state_ref() = Size::new(1., 1.);
     }
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     let new_ids = tree.root().descendants(&tree).collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 3);
 
@@ -451,17 +451,17 @@ mod tests {
       }}
     };
     let mut tree = WidgetTree::new(w, <_>::default());
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     assert_eq!(*new_cnt.raw_ref(), 3);
     assert_eq!(*drop_cnt.raw_ref(), 0);
 
     v.state_ref().push(4);
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     assert_eq!(*new_cnt.raw_ref(), 7);
     assert_eq!(*drop_cnt.raw_ref(), 3);
 
     v.state_ref().pop();
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     assert_eq!(*new_cnt.raw_ref(), 10);
     assert_eq!(*drop_cnt.raw_ref(), 7);
   }

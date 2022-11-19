@@ -201,7 +201,7 @@ mod tests {
     {
       child_box.state_ref().size = Size::new(2., 2.);
     }
-    tree.tree_ready(Size::zero());
+    tree.layout(Size::zero());
     assert_eq!(*root_layout_cnt.raw_ref(), 2);
   }
 

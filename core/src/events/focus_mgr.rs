@@ -89,7 +89,7 @@ impl Dispatcher {
     })
   }
 
-  pub fn refresh_focus(&mut self, tree: &mut WidgetTree) {
+  pub fn refresh_focus(&mut self, tree: &WidgetTree) {
     let focus_mgr = &mut self.focus_mgr;
     focus_mgr.tab_orders.clear();
 
@@ -137,7 +137,7 @@ impl Dispatcher {
   fn change_focusing_to(
     &mut self,
     node: Option<(FocusNode, usize)>,
-    tree: &mut WidgetTree,
+    tree: &WidgetTree,
   ) -> Option<(FocusNode, usize)> {
     let Self { focus_mgr, info, .. } = self;
     let old = focus_mgr.focusing.take();
