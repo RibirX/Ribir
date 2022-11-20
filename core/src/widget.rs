@@ -206,14 +206,18 @@ where
   fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
 }
 
-impl<F> IntoWidget<FromOther<&dyn FnOnce(&BuildCtx) -> Widget>> for F
+impl<F, R, M> IntoWidget<FromOther<&dyn FnOnce(M) -> Widget>> for F
 where
-  F: FnOnce(&BuildCtx) -> Widget + 'static,
+  M: WidgetMarker,
+  F: FnOnce(&BuildCtx) -> R + 'static,
+  R: IntoWidget<M>,
 {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget {
-      node: Some(WidgetNode::Compose(Box::new(self))),
+      node: Some(WidgetNode::Compose(Box::new(move |ctx| {
+        self(ctx).into_widget()
+      }))),
       children: Vec::default(),
     }
   }

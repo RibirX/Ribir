@@ -63,7 +63,7 @@ impl Compose for NamedSvg {
     widget_try_track! {
       try_track { this }
       DynWidget {
-        dyns: move |ctx: &BuildCtx| this.of_or_miss(ctx).into_widget()
+        dyns: move |ctx: &BuildCtx| this.of_or_miss(ctx)
       }
     }
   }
