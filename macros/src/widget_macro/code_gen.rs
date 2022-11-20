@@ -60,6 +60,7 @@ impl Desugared {
       let ctx_name = ctx_ident(Span::call_site());
       quote! { move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
       Brace::default().surround(tokens, |tokens| {
+        // todo: gen guards vec only if need.
         let guards_vec = guard_vec_ident();
         quote! {
          let mut #guards_vec: Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> = vec![];
@@ -83,7 +84,7 @@ impl Desugared {
         quote! {
           .into_widget();
           if !#guards_vec.is_empty() {
-            #name = compose_child_as_data_widget(#name, StateWidget::Stateless(#guards_vec));
+            #name = compose_child_as_data_widget(#name.into_widget(), StateWidget::Stateless(#guards_vec));
           }
           #name
         }
