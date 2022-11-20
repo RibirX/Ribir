@@ -1,4 +1,4 @@
-use crate::prelude::{icons, Icon, Label, Position, Row, Text};
+use crate::prelude::{svgs, Icon, Label, Position, Row, Text};
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
@@ -48,17 +48,17 @@ impl ComposeChild for Checkbox {
     let this = this.into_stateful();
     let mut checkbox = widget! {
       track { this: this.clone() }
-      env { let theme = CheckBoxTheme::of(ctx.theme()); }
+      env { let theme = CheckBoxTheme::of(ctx); }
       CheckBoxStyle { Icon {
         size: theme.size,
         DynWidget {
           dyns: {
             if this.indeterminate {
-              icons::INDETERMINATE_CHECK_BOX
+              svgs::INDETERMINATE_CHECK_BOX
             } else if this.checked {
-              icons::CHECK_BOX
+              svgs::CHECK_BOX
             } else {
-              icons::CHECK_BOX_OUTLINE_BLANK
+              svgs::CHECK_BOX_OUTLINE_BLANK
             }
           }
         }
@@ -67,7 +67,7 @@ impl ComposeChild for Checkbox {
 
     if let Some(Label { desc, position }) = label {
       let label = widget! {
-        env { let theme = CheckBoxTheme::of(ctx.theme()); }
+        env { let theme = CheckBoxTheme::of(ctx); }
         Text { text: desc, style: theme.label_style.clone() }
       };
       checkbox = match position {

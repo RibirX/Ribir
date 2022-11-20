@@ -92,7 +92,7 @@ impl GlyphHelper {
 pub struct Input {
   #[declare(default)]
   pub text: String,
-  #[declare(default = TypographyTheme::of(ctx.theme()).body1.text.clone())]
+  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
   #[declare(default)]
   pub caret: CaretState,
@@ -207,9 +207,9 @@ impl Compose for Caret {
 struct SelectedTextBackground {
   is_focused: bool,
 
-  #[declare(default = TextSelectedBackground::of(ctx).focus.clone())]
+  #[declare(default = Color::BLACK)]
   focus_color: Color,
-  #[declare(default = TextSelectedBackground::of(ctx).blur.clone())]
+  #[declare(default = Color::BLACK)]
   blur_color: Color,
   rects: Vec<Rect>,
 }
@@ -295,7 +295,7 @@ impl Compose for Input {
             widget!{
               Caret {
                 rect: helper.caret(this.caret.cursor().byte_offset()),
-                color: ctx.theme().caret_color,
+                color: Color::BLACK,
               }
             }
           })

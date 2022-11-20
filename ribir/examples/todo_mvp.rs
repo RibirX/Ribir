@@ -43,15 +43,11 @@ impl Compose for TodoMVP {
             },
             Row {
               Icon {
-                DynWidget {
-                  dyns: {
-                    icons::ADD.of_or_miss(ctx.theme())
-                  }
-                }
+                DynWidget { dyns: svgs::ADD}
               }
               Text {
                 text: "Add",
-                style: TypographyTheme::of(ctx.theme()).button.text.clone(),
+                style: TypographyTheme::of(ctx).button.text.clone(),
               }
             }
           }
@@ -135,9 +131,7 @@ impl TodoMVP {
                     tap: move |_| {
                        this2.tasks.remove(idx);
                     },
-                    DynWidget {
-                      dyns: icons::CLOSE.of_or_miss(ctx.theme())
-                    }
+                    DynWidget { dyns: svgs::CLOSE }
                   }
                 }
                 on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }

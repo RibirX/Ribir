@@ -176,7 +176,7 @@ impl Compose for HRawScrollbar {
           thickness,
           thumb_min_size,
           ref track_brush,
-        } = *ScrollBarTheme::of(ctx.theme());
+        } = *ScrollBarTheme::of(ctx);
       }
 
       Stack {
@@ -227,7 +227,7 @@ impl Compose for VRawScrollbar {
           thickness,
           thumb_min_size,
           ref track_brush
-        } = *ScrollBarTheme::of(ctx.theme());
+        } = *ScrollBarTheme::of(ctx);
       }
 
       Stack {

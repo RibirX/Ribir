@@ -76,7 +76,7 @@ impl ComposeChild for Ripple {
                   from: State {
                     ripple_path.path: Path::circle(Point::zero(), 0., PathStyle::Fill)
                   },
-                  transition: transitions::LINEAR.get_from_or_default(ctx.theme()),
+                  transition: transitions::LINEAR.get_from_or_default(ctx),
                   lerp_fn: move |_, _, rate| {
                     let radius = Lerp::lerp(&0., &radius, rate);
                     let center = this.launch_pos.clone().unwrap();

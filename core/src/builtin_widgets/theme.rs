@@ -1,10 +1,7 @@
-//! To share colors and font styles throughout an app or sub widget tree, use
-//! themes. Theme data can be used as an attribute to attach to a widget, query
-//! theme data from `BuildCtx`. Use `Theme` widgets to specify part of
-//! application's theme. Application theme is use `Theme` widget as root of all
-//! windows.
+//! Theme use to share visual config or style compose logic. It can be defined
+//! to app-wide or particular part of the application.
 
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 pub use algo::ShareResource;
 mod palette;
@@ -12,7 +9,7 @@ pub use palette::*;
 mod icon_theme;
 pub use icon_theme::*;
 mod typography_theme;
-use ribir_macros::{include_svg, widget_try_track};
+use ribir_macros::widget_try_track;
 pub use typography_theme::*;
 mod transition_theme;
 pub use transition_theme::*;
@@ -34,7 +31,7 @@ use crate::data_widget::widget_attach_data;
 
 use super::SvgRender;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
   Dark,
   Light,
@@ -45,8 +42,10 @@ pub struct TextSelectedBackground {
   pub blur: Color,
 }
 
-#[derive(Clone)]
-pub struct Theme {
+/// A full theme means all config have be defined in it. Everything of parent
+/// theme are overriding here, if anything that you can't find means it be
+/// override as undefine, should not continue find in parent theme.
+pub struct FullTheme {
   // Dark or light theme.
   pub brightness: Brightness,
   pub palette: Palette,
@@ -55,20 +54,34 @@ pub struct Theme {
   pub transitions_theme: TransitionTheme,
   pub compose_styles: ComposeStyles,
   pub custom_themes: CustomThemes,
-
   // todo: refactor input theme style.
   pub text_selected_background: TextSelectedBackground,
   pub caret_color: Color,
 }
 
-impl TextSelectedBackground {
-  #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self { &&ctx.theme().text_selected_background }
+/// Inherit theme override part of parent theme, if anything not found in here,
+/// should query in parent theme until meet a `FullTheme`.
+#[derive(Default)]
+pub struct InheritTheme {
+  pub brightness: Option<Brightness>,
+  pub palette: Option<Palette>,
+  pub typography_theme: Option<TypographyTheme>,
+  /// icon size standard
+  pub icon_size: Option<IconSize>,
+  /// a collection of icons.
+  pub icons: Option<HashMap<NamedSvg, ShareResource<SvgRender>, ahash::RandomState>>,
+  pub transitions_theme: Option<TransitionTheme>,
+  pub compose_styles: Option<ComposeStyles>,
+  pub custom_themes: Option<CustomThemes>,
+}
+
+pub enum Theme {
+  Full(FullTheme),
+  Inherit(InheritTheme),
 }
 
 #[derive(Declare)]
 pub struct ThemeWidget {
-  #[declare(builtin)]
   pub theme: Rc<Theme>,
 }
 
@@ -81,8 +94,8 @@ impl ComposeChild for ThemeWidget {
       try_track { this }
       // use `DynWidget` to refresh whole subtree when theme changed.
       DynWidget {
-        dyns: move |_: &BuildCtx| {
-          // todo: override theme.
+        dyns: move |ctx: &BuildCtx| {
+          ctx.push_theme(this.theme.clone());
           widget_attach_data(child, this.theme.clone())
         }
       }
@@ -95,6 +108,9 @@ impl Query for Theme {
 }
 
 impl Default for Theme {
+  fn default() -> Self { Theme::Full(<_>::default()) }
+}
+impl Default for FullTheme {
   fn default() -> Self {
     let palette = Palette::default();
     let icon_size = IconSize {
@@ -104,7 +120,6 @@ impl Default for Theme {
       large: Size::new(48., 48.),
       huge: Size::new(64., 64.),
     };
-    let miss_icon = ShareResource::new(SvgRender(include_svg!("./theme/miss_icon.svg")));
 
     let text_selected_background = TextSelectedBackground {
       focus: palette.primary_container(),
@@ -121,17 +136,18 @@ impl Default for Theme {
       Color::BLACK.with_alpha(0.87).into(),
     );
 
-    Self {
+    FullTheme {
       brightness: Brightness::Light,
       palette: Default::default(),
       typography_theme,
-      icon_theme: IconTheme::new(icon_size, miss_icon),
+      icon_theme: IconTheme::new(icon_size),
       transitions_theme: Default::default(),
       compose_styles: Default::default(),
       custom_themes: Default::default(),
       text_selected_background,
       caret_color: Default::default(),
     }
+    .into()
   }
 }
 
@@ -314,4 +330,14 @@ fn typography_theme(
       decoration,
     },
   }
+}
+
+impl From<FullTheme> for Theme {
+  #[inline]
+  fn from(value: FullTheme) -> Self { Theme::Full(value) }
+}
+
+impl From<InheritTheme> for Theme {
+  #[inline]
+  fn from(value: InheritTheme) -> Self { Theme::Inherit(value) }
 }

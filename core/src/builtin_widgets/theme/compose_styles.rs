@@ -2,9 +2,9 @@ use crate::prelude::*;
 use std::{any::type_name, collections::HashMap};
 
 /// Compose style is a compose child widget to decoration its child.
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct ComposeStyles {
-  styles: HashMap<TypeId, Box<dyn ComposeStyleOverride>, ahash::RandomState>,
+  styles: HashMap<TypeId, Box<dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget>, ahash::RandomState>,
 }
 
 /// `ComposeStyle` is a trait let you can convert your host widget to another,
@@ -23,9 +23,14 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
 
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     let widget = (move |ctx: &BuildCtx| {
-      let style = ctx.theme().compose_styles.styles.get(&TypeId::of::<Self>());
+      let tid = TypeId::of::<W>();
+      let style = ctx.find_cfg(|t| match t {
+        Theme::Full(t) => t.compose_styles.styles.get(&tid),
+        Theme::Inherit(i) => i.compose_styles.as_ref().and_then(|s| s.styles.get(&tid)),
+      });
+
       if let Some(style) = style {
-        (style.override_fn())(Box::new(this.into_stateful()), Box::new(child))
+        style(Box::new(this.into_stateful()), Box::new(child))
       } else {
         ComposeStyle::compose_style(this.into_stateful(), child)
       }
@@ -35,13 +40,13 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
   }
 }
 
-impl Theme {
+impl ComposeStyles {
   #[inline]
   pub fn override_compose_style<W: ComposeStyle + 'static>(
     &mut self,
     compose_style: impl Fn(Stateful<W>, W::Host) -> Widget + Clone + 'static,
   ) {
-    self.compose_styles.styles.insert(
+    self.styles.insert(
       TypeId::of::<W>(),
       Box::new(move |this: Box<dyn Any>, host: Box<dyn Any>| {
         let this = this.downcast().expect(&format!(
@@ -58,27 +63,6 @@ impl Theme {
   }
 }
 
-trait ComposeStyleOverride {
-  fn box_clone(&self) -> Box<dyn ComposeStyleOverride>;
-
-  fn override_fn(&self) -> &dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget;
-}
-
-impl Clone for Box<dyn ComposeStyleOverride> {
-  #[inline]
-  fn clone(&self) -> Self { self.deref().box_clone() }
-}
-
-impl<F> ComposeStyleOverride for F
-where
-  F: Fn(Box<dyn Any>, Box<dyn Any>) -> Widget + Clone + 'static,
-{
-  #[inline]
-  fn box_clone(&self) -> Box<dyn ComposeStyleOverride> { Box::new(self.clone()) }
-  #[inline]
-  fn override_fn(&self) -> &dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget { self }
-}
-
 #[cfg(test)]
 mod tests {
   use crate::{prelude::*, test::*};
@@ -86,7 +70,7 @@ mod tests {
 
   #[test]
   fn compose_style_smoke() {
-    let mut theme = Theme::default();
+    let mut theme = FullTheme::default();
 
     #[derive(Declare)]
     struct Size100Style;
@@ -95,14 +79,16 @@ mod tests {
       type Host = Widget;
       fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
     }
-    theme.override_compose_style::<Size100Style>(|_, host| {
-      widget! {
-        MockBox {
-          size: Size::new(100., 100.),
-          DynWidget { dyns: host }
+    theme
+      .compose_styles
+      .override_compose_style::<Size100Style>(|_, host| {
+        widget! {
+          MockBox {
+            size: Size::new(100., 100.),
+            DynWidget { dyns: host }
+          }
         }
-      }
-    });
+      });
 
     let w = widget! {
       Size100Style { MockBox {
@@ -111,7 +97,7 @@ mod tests {
     };
 
     let ctx = AppContext {
-      app_theme: Rc::new(theme),
+      app_theme: Rc::new(Theme::Full(theme)),
       ..Default::default()
     };
     let mut wnd = Window::mock_render(w, Size::new(500., 500.), ctx);

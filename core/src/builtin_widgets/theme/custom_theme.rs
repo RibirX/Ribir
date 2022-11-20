@@ -1,15 +1,18 @@
 use std::{
   any::{Any, TypeId},
+  cell::Ref,
   collections::HashMap,
 };
+
+use crate::context::BuildCtx;
 
 use super::Theme;
 
 /// A map can store any type of config, useful for widget which the common
 /// information of theme mod not enough and need have itself theme.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct CustomThemes {
-  themes: HashMap<TypeId, Box<dyn ExtendCustomTheme>, ahash::RandomState>,
+  themes: HashMap<TypeId, Box<dyn Any>, ahash::RandomState>,
 }
 
 /// macro use to batch set custom theme.
@@ -22,15 +25,16 @@ macro_rules! fill_custom_theme {
 
 pub trait CustomTheme {
   #[inline]
-  fn of(theme: &Theme) -> &Self
+  fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self>
   where
     Self: Sized + 'static,
   {
-    theme
-      .custom_themes
-      .themes
-      .get(&TypeId::of::<Self>())
-      .and_then(|c| c.as_any().downcast_ref::<Self>())
+    let tid = TypeId::of::<Self>();
+    let c = ctx.find_cfg(|t| match t {
+      Theme::Full(t) => t.custom_themes.themes.get(&tid),
+      Theme::Inherit(i) => i.custom_themes.as_ref().and_then(|c| c.themes.get(&tid)),
+    });
+    c.and_then(|c| Ref::filter_map(c, |c| c.downcast_ref::<Self>()).ok())
       .expect(&format!(
         "The custom theme({}) is not init in theme, use it after init.",
         std::any::type_name::<Self>()
@@ -38,28 +42,9 @@ pub trait CustomTheme {
   }
 }
 
-trait ExtendCustomTheme: Any {
-  fn box_clone(&self) -> Box<dyn ExtendCustomTheme>;
-
-  fn as_any(&self) -> &dyn Any;
-}
-
-impl Theme {
+impl CustomThemes {
   #[inline]
   pub fn set_custom_theme<T: Clone + CustomTheme + 'static>(&mut self, v: T) {
-    self.custom_themes.themes.insert(v.type_id(), Box::new(v));
+    self.themes.insert(v.type_id(), Box::new(v));
   }
-}
-
-impl Clone for Box<dyn ExtendCustomTheme> {
-  #[inline]
-  fn clone(&self) -> Self { self.box_clone() }
-}
-
-impl<T: Clone + CustomTheme + 'static> ExtendCustomTheme for T {
-  #[inline]
-  fn box_clone(&self) -> Box<dyn ExtendCustomTheme> { Box::new(self.clone()) }
-
-  #[inline]
-  fn as_any(&self) -> &dyn Any { self }
 }

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, rc::Rc, time::Duration};
 
 use crate::{
+  context::BuildCtx,
   fill_transition,
   prelude::{easing, Roc, Transition},
 };
@@ -71,13 +72,21 @@ impl TransitionIdent {
 
   /// get the svg icon of the ident from the context if it have otherwise return
   /// a default icon.
-  pub fn get_from_or_default(self, theme: &Theme) -> Rc<Box<dyn Roc>> {
-    self.get_from(theme).unwrap_or_else(|| todo!())
+  pub fn get_from_or_default(self, ctx: &BuildCtx) -> Rc<Box<dyn Roc>> {
+    self.get_from(ctx).unwrap_or_else(|| todo!())
   }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn get_from(self, theme: &Theme) -> Option<Rc<Box<dyn Roc>>> {
-    theme.transitions_theme.transitions.get(&self).cloned()
+  pub fn get_from(self, ctx: &BuildCtx) -> Option<Rc<Box<dyn Roc>>> {
+    ctx
+      .find_cfg(|t| match t {
+        Theme::Full(t) => t.transitions_theme.transitions.get(&self),
+        Theme::Inherit(i) => i
+          .transitions_theme
+          .as_ref()
+          .and_then(|t| t.transitions.get(&self)),
+      })
+      .map(|t| t.clone())
   }
 }
 
