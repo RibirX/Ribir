@@ -75,7 +75,6 @@ where
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::widget_and_its_children_box_rect;
 
   #[test]
   fn fix_compose_expr_crash() {
@@ -98,6 +97,7 @@ mod tests {
       }
     }
 
-    let _ = widget_and_its_children_box_rect(T.into_widget(), Size::zero());
+    let mut wnd = Window::default_mock(T.into_widget(), None);
+    wnd.draw_frame();
   }
 }

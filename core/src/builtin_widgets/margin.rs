@@ -136,13 +136,19 @@ mod tests {
       }
     };
 
-    let (rect, children) =
-      widget_and_its_children_box_rect(widget.into_widget(), Size::new(200., 200.));
-
-    assert_eq!(rect, Rect::from_size(Size::new(102., 102.)));
-    assert_eq!(
-      &children,
-      &[Rect::new(Point::new(1., 1.0), Size::new(100., 100.))]
+    expect_layout_result(
+      widget,
+      Some(Size::new(200., 200.)),
+      &[
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect::from_size(Size::new(102., 102.)),
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::new(1., 1.0, 100., 100.),
+        },
+      ],
     );
   }
 }

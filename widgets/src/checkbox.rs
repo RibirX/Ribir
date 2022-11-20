@@ -102,9 +102,7 @@ mod tests {
   use crate::prelude::material;
 
   use super::*;
-  use ribir_core::test::{
-    expect_layout_result_with_theme, widget_and_its_children_box_rect, ExpectRect, LayoutTestItem,
-  };
+  use ribir_core::test::{expect_layout_result_with_theme, ExpectRect, LayoutTestItem};
 
   #[test]
   fn layout() {

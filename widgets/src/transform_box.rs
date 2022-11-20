@@ -38,24 +38,27 @@ impl TransformBox {
 
 #[cfg(test)]
 mod tests {
+  use ribir_core::test::{expect_layout_result, ExpectRect, LayoutTestItem};
+
   use super::*;
   use crate::prelude::*;
-  use ribir_core::test::widget_and_its_children_box_rect;
 
   #[test]
   fn smoke() {
     let widget = widget! {
       TransformBox {
         matrix: Transform::new(2., 0., 0., 2., 0., 0.),
-
-        SizedBox {
-          size: Size::new(100., 100.)
-        }
+        SizedBox { size: Size::new(100., 100.) }
       }
     };
 
-    let (rect, _) = widget_and_its_children_box_rect(widget.into_widget(), Size::new(800., 800.));
-
-    assert_eq!(rect, Rect::from_size(Size::new(200., 200.)));
+    expect_layout_result(
+      widget,
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(Size::new(200., 200.)),
+      }],
+    );
   }
 }

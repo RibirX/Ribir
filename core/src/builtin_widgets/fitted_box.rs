@@ -108,8 +108,14 @@ mod tests {
         }
       };
 
-      let (fitted_size, _) = widget_and_its_children_box_rect(w, WND_SIZE);
-      assert_eq!(fitted_size, Rect::from_size(expect));
+      expect_layout_result(
+        w,
+        Some(WND_SIZE),
+        &[LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect::from_size(expect),
+        }],
+      );
       assert_eq!(c_fit.shallow_ref().scale_cache.get(), expected_scale);
     }
   }
@@ -170,7 +176,13 @@ mod tests {
     };
 
     let wnd_size = Size::new(400., 400.);
-    let (rect, _) = widget_and_its_children_box_rect(w, wnd_size);
-    assert_eq!(rect, Rect::from_size(wnd_size));
+    expect_layout_result(
+      w,
+      Some(wnd_size),
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(wnd_size),
+      }],
+    );
   }
 }

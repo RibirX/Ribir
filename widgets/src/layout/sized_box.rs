@@ -32,7 +32,7 @@ impl Query for SizedBox {
 mod tests {
   use super::*;
   use crate::prelude::*;
-  use ribir_core::test::widget_and_its_children_box_rect;
+  use ribir_core::test::*;
 
   #[test]
   fn fix_size() {
@@ -44,9 +44,14 @@ mod tests {
       }
     };
 
-    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
-    assert_eq!(rect.size, size);
-    assert_eq!(child, vec![Rect::from_size(size)]);
+    expect_layout_result(
+      w,
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(size),
+      }],
+    );
   }
 
   #[test]
@@ -57,10 +62,21 @@ mod tests {
         Text { text: "" }
       }
     };
-    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
 
-    assert_eq!(rect.size, Size::zero());
-    assert_eq!(child, vec![Rect::zero()]);
+    expect_layout_result(
+      w,
+      None,
+      &[
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect::from_size(ZERO_SIZE),
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::from_size(ZERO_SIZE),
+        },
+      ],
+    );
   }
 
   #[test]
@@ -72,19 +88,33 @@ mod tests {
         Text { text: "" }
       }
     };
-    let (rect, child) = widget_and_its_children_box_rect(expand_box, Size::new(500., 500.));
 
-    assert_eq!(rect.size, wnd_size);
-    assert_eq!(child, vec![Rect::from_size(wnd_size)]);
+    expect_layout_result(
+      expand_box,
+      Some(wnd_size),
+      &[
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect::from_size(wnd_size),
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::from_size(wnd_size),
+        },
+      ],
+    );
   }
 
   #[test]
   fn empty_box() {
     let size = Size::new(10., 10.);
-    let empty_box = SizedBox { size };
-    let (rect, child) =
-      widget_and_its_children_box_rect(empty_box.into_widget(), Size::new(500., 500.));
-    assert_eq!(rect.size, size);
-    assert_eq!(child, vec![]);
+    expect_layout_result(
+      SizedBox { size }.into_widget(),
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(size),
+      }],
+    );
   }
 }

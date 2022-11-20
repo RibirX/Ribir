@@ -54,8 +54,13 @@ mod tests {
       }
     };
 
-    let (rect, _) = widget_and_its_children_box_rect(widget.into_widget(), Size::new(800., 800.));
-
-    assert_eq!(rect, Rect::from_size(Size::new(100., 100.)));
+    expect_layout_result(
+      widget,
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(Size::new(100., 100.)),
+      }],
+    );
   }
 }

@@ -31,13 +31,19 @@ impl Query for Container {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use ribir_core::test::widget_and_its_children_box_rect;
+  use ribir_core::test::*;
 
   #[test]
   fn smoke() {
     let size = Size::new(100., 100.);
-    let w = widget! { Container { size }};
-    let (rect, _) = widget_and_its_children_box_rect(w, Size::new(200., 200.));
-    assert_eq!(rect, Rect::from_size(size));
+
+    expect_layout_result(
+      widget! { Container { size }},
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(size),
+      }],
+    );
   }
 }
