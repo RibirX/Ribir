@@ -1,3 +1,7 @@
+use std::cell::Ref;
+
+use crate::context::BuildCtx;
+
 use super::Theme;
 use painter::Brush;
 use text::FontFamily;
@@ -55,5 +59,12 @@ bitflags! {
 
 impl TypographyTheme {
   #[inline]
-  pub fn of<'a>(theme: &'a Theme) -> &'a Self { &theme.typography_theme }
+  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
+    ctx
+      .find_cfg(|t| match t {
+        Theme::Full(t) => Some(&t.typography_theme),
+        Theme::Inherit(i) => i.typography_theme.as_ref(),
+      })
+      .unwrap()
+  }
 }

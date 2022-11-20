@@ -1,6 +1,10 @@
+use std::cell::Ref;
+
 use painter::{Color, LightnessTone};
 
 use crate::prelude::BuildCtx;
+
+use super::Theme;
 
 /// The palette enables you to modify the color of your application to suit
 /// your brand. `Palette` provide colors base on the 8 key colors with different
@@ -91,7 +95,14 @@ pub struct LightnessCfg {
 
 impl Palette {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self { &&ctx.theme().palette }
+  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
+    ctx
+      .find_cfg(|t| match t {
+        Theme::Full(f) => Some(&f.palette),
+        Theme::Inherit(i) => i.palette.as_ref(),
+      })
+      .unwrap()
+  }
 
   #[inline]
   pub fn primary(&self) -> Color { self.base_of(self.primary) }

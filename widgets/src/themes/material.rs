@@ -1,6 +1,6 @@
 pub use super::*;
 use crate::prelude::*;
-use ribir_core::{fill_icon, prelude::*};
+use ribir_core::{fill_svgs, prelude::*};
 pub mod ripple;
 pub mod state_layer;
 pub use ripple::*;
@@ -23,7 +23,7 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     blur: Color::GRAY.with_alpha(0.9),
   };
 
-  let mut theme = Theme {
+  let mut theme = FullTheme {
     brightness,
     palette,
     typography_theme,
@@ -35,62 +35,62 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     custom_themes: <_>::default(),
   };
 
-  fill_icon! { theme,
-    icons::ADD_CIRCLE: "./material/icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ADD: "./material/icons/add_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ARROW_BACK: "./material/icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ARROW_DROP_DOWN: "./material/icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::ARROW_FORWARD: "./material/icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CANCEL: "./material/icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK_BOX: "./material/icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK_BOX_OUTLINE_BLANK: "./material/icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK_CIRCLE: "./material/icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHECK: "./material/icons/check_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CHEVRON_RIGHT: "./material/icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::CLOSE: "./material/icons/close_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::DELETE: "./material/icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::DONE: "./material/icons/done_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::EXPAND_MORE: "./material/icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::FAVORITE: "./material/icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::FILE_DOWNLOAD: "./material/icons/file_download_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::GRADE: "./material/icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::HOME: "./material/icons/home_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::INDETERMINATE_CHECK_BOX: "./material/icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::LOGIN: "./material/icons/login_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::LOGOUT: "./material/icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::MENU: "./material/icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::MORE_VERT: "./material/icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::REFRESH: "./material/icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::SEARCH: "./material/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::SETTINGS: "./material/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    icons::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg"
+  fill_svgs! { theme.icon_theme,
+    svgs::ADD_CIRCLE: "./material/icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ADD: "./material/icons/add_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ARROW_BACK: "./material/icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ARROW_DROP_DOWN: "./material/icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ARROW_FORWARD: "./material/icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CANCEL: "./material/icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHECK_BOX: "./material/icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHECK_BOX_OUTLINE_BLANK: "./material/icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHECK_CIRCLE: "./material/icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHECK: "./material/icons/check_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHEVRON_RIGHT: "./material/icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CLOSE: "./material/icons/close_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::DELETE: "./material/icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::DONE: "./material/icons/done_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::EXPAND_MORE: "./material/icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::FAVORITE: "./material/icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::FILE_DOWNLOAD: "./material/icons/file_download_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::GRADE: "./material/icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::HOME: "./material/icons/home_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::INDETERMINATE_CHECK_BOX: "./material/icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::LOGIN: "./material/icons/login_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::LOGOUT: "./material/icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::MENU: "./material/icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::MORE_VERT: "./material/icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::REFRESH: "./material/icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::SEARCH: "./material/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::SETTINGS: "./material/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg"
   };
 
   override_compose_style(&mut theme);
   init_custom_theme(&mut theme);
-  theme
+  Theme::Full(theme)
 }
 
-fn init_custom_theme(theme: &mut Theme) {
-  theme.set_custom_theme(ScrollBarTheme {
+fn init_custom_theme(theme: &mut FullTheme) {
+  theme.custom_themes.set_custom_theme(ScrollBarTheme {
     thumb_min_size: 12.,
     thickness: 8.,
     track_brush: theme.palette.primary_container().into(),
   });
-  theme.set_custom_theme(CheckBoxTheme {
-    size: IconSize::of(theme).tiny,
-    label_style: TypographyTheme::of(theme).body1.text.clone(),
+  theme.custom_themes.set_custom_theme(CheckBoxTheme {
+    size: theme.icon_theme.icon_size.tiny,
+    label_style: theme.typography_theme.body1.text.clone(),
   });
 }
 
-fn override_compose_style(theme: &mut Theme) {
+fn override_compose_style(theme: &mut FullTheme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
       DynWidget {
         dyns: host,
         margin,
         border_radius: Radius::all(4.),
-        background: ctx.theme().palette.primary()
+        background: Palette::of(ctx).primary()
       }
     }
   }
@@ -99,7 +99,8 @@ fn override_compose_style(theme: &mut Theme) {
     let to = to.abs_value(size);
     PositionUnit::Pixel(from.lerp(&to, rate))
   }
-  theme.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
+  let styles = &mut theme.compose_styles;
+  styles.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
     widget! {
       track { this }
       DynWidget {
@@ -109,12 +110,12 @@ fn override_compose_style(theme: &mut Theme) {
       }
 
       change_on thumb.left_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx.theme()),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_width()),
       }
     }
   });
-  theme.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
+  styles.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
     widget! {
       track { this }
       DynWidget {
@@ -124,20 +125,20 @@ fn override_compose_style(theme: &mut Theme) {
       }
 
       change_on thumb.top_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx.theme()),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_height()),
       }
     }
   });
-  theme.override_compose_style::<InkBarStyle>(|_, host| {
+  styles.override_compose_style::<InkBarStyle>(|_, host| {
     widget! {
       DynWidget {
         dyns: host,
-        background: ctx.theme().palette.primary()
+        background: Palette::of(ctx).primary()
       }
     }
   });
-  theme.override_compose_style::<CheckBoxStyle>(move |style, host| {
+  styles.override_compose_style::<CheckBoxStyle>(move |style, host| {
     widget! {
       track { style }
       Ripple {
@@ -192,8 +193,7 @@ fn icon_theme() -> IconTheme {
     large: Size::new(48., 48.),
     huge: Size::new(64., 64.),
   };
-  let miss_icon = ShareResource::new(SvgRender(include_svg!("./material/icons/miss_icon.svg")));
-  IconTheme::new(icon_size, miss_icon)
+  IconTheme::new(icon_size)
 }
 
 /// Create a TypographyTheme which implement the typography styles base on the

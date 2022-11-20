@@ -207,11 +207,6 @@ builtin! {
     opacity: f32
   }
 
-  ThemeWidget {
-    #[doc="assign theme to the widget."]
-    theme: Theme
-  }
-
   MountedListener {
     #[doc="action perform after widget be added to the widget tree."]
     mounted: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, MountedType)>,

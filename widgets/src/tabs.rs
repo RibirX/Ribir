@@ -54,7 +54,7 @@ impl ComposeChild for Tabs {
           Stack {
             Row {
               border: Border::only_bottom(BorderSide {
-                width: 1., color: ctx.theme().palette.primary()
+                width: 1., color: Palette::of(ctx).primary()
               }),
               DynWidget {
                 dyns: {
@@ -136,7 +136,7 @@ impl ComposeChild for Tabs {
       }
 
       change_on ink_bar.left_anchor Animate {
-        transition: transitions::EASE_IN.get_from_or_default(ctx.theme()),
+        transition: transitions::EASE_IN.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(0.);
           let to = to.abs_value(0.);

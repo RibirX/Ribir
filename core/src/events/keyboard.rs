@@ -14,13 +14,21 @@ type Callback = RefCell<Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>>;
 /// Widget fire event whenever press or release a key.
 #[derive(Declare)]
 pub struct KeyDownListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent), wrap_fn = RefCell::new))]
+  #[declare(
+    builtin,
+    convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent),
+    wrap_fn = RefCell::new)
+  )]
   pub key_down: Callback,
 }
 
 #[derive(Declare)]
 pub struct KeyUpListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent), wrap_fn = RefCell::new))]
+  #[declare(
+    builtin,
+    convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent),
+    wrap_fn = RefCell::new)
+  )]
   pub key_up: Callback,
 }
 

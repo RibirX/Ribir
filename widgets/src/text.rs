@@ -10,7 +10,7 @@ use ribir_core::{
 pub struct Text {
   #[declare(convert=into)]
   pub text: CowArc<str>,
-  #[declare(default = TypographyTheme::of(ctx.theme()).body1.text.clone())]
+  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
 }
 

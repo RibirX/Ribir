@@ -51,7 +51,7 @@ impl ComposeChild for ScrollableWidget {
       change_on content.layout_size() ~> this.content_size
       change_on view.layout_size() ~> this.page
       change_on content.left_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx.theme()),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(content.layout_width());
           let to = to.abs_value(content.layout_width());
@@ -59,7 +59,7 @@ impl ComposeChild for ScrollableWidget {
         }
       }
       change_on content.top_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx.theme()),
+        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
         lerp_fn: move |from, to, rate| {
           let from = from.abs_value(content.layout_height());
           let to = to.abs_value(content.layout_height());

@@ -126,10 +126,7 @@ impl WidgetTree {
 
   pub(crate) fn set_root(&mut self, widget: Widget) {
     assert!(self.root.is_none());
-    let theme = self.ctx.app_theme.clone();
-    let root = widget
-      .into_subtree(None, self, theme)
-      .expect("must have a root");
+    let root = widget.into_subtree(None, self).expect("must have a root");
     self.set_root_id(root);
     self.mark_dirty(root);
     root.on_mounted_subtree(self);
@@ -442,17 +439,34 @@ impl Widget {
     self,
     parent: Option<WidgetId>,
     tree: &mut WidgetTree,
-    current_theme: Rc<Theme>,
   ) -> Option<WidgetId> {
     enum NodeInfo {
-      BackTheme(Rc<Theme>),
+      BackTheme,
       Parent(WidgetId),
       Widget(Widget),
     }
+
+    let mut themes = vec![];
+    let full = parent.map_or(false, |p| {
+      p.ancestors(tree).any(|p| {
+        p.assert_get(tree).query_all_type(
+          |t: &Rc<Theme>| {
+            themes.push(t.clone());
+            matches!(t.deref(), Theme::Inherit(_))
+          },
+          QueryOrder::InnerFirst,
+        );
+        matches!(themes.last().map(Rc::deref), Some(Theme::Full(_)))
+      })
+    });
+    if !full {
+      themes.push(tree.app_ctx().app_theme.clone());
+    }
+
     pub(crate) struct InflateHelper<'a> {
       stack: Vec<NodeInfo>,
       tree: &'a mut WidgetTree,
-      current_theme: Rc<Theme>,
+      themes: RefCell<Vec<Rc<Theme>>>,
       parent: Option<WidgetId>,
       root: Option<WidgetId>,
     }
@@ -461,15 +475,15 @@ impl Widget {
       pub(crate) fn inflate(mut self, widget: Widget) -> Option<WidgetId> {
         self.place_node_in_tree(widget);
         loop {
-          match self.stack.pop() {
-            Some(NodeInfo::BackTheme(theme)) => {
-              self.current_theme = theme;
+          let Some(node) = self.stack.pop() else{ break};
+          match node {
+            NodeInfo::BackTheme => {
+              self.themes.borrow_mut().pop();
             }
-            Some(NodeInfo::Parent(p)) => self.parent = Some(p),
-            Some(NodeInfo::Widget(w)) => {
+            NodeInfo::Parent(p) => self.parent = Some(p),
+            NodeInfo::Widget(w) => {
               self.place_node_in_tree(w);
             }
-            None => break,
           }
         }
 
@@ -485,12 +499,12 @@ impl Widget {
           match node {
             WidgetNode::Compose(c) => {
               assert_eq!(children_size, 0, "compose widget shouldn't have child.");
-              let mut build_ctx = BuildCtx::new(self.current_theme.clone(), self.tree);
+              let theme_cnt = self.themes.borrow().len();
+              let mut build_ctx = BuildCtx::new(&self.themes, self.tree);
               let c = c(&mut build_ctx);
-              self
-                .stack
-                .push(NodeInfo::BackTheme(self.current_theme.clone()));
-              self.current_theme = build_ctx.theme.clone();
+              if theme_cnt < self.themes.borrow().len() {
+                self.stack.push(NodeInfo::BackTheme);
+              }
               self.stack.push(NodeInfo::Widget(c));
             }
             WidgetNode::Render(r) => {
@@ -531,7 +545,7 @@ impl Widget {
     let helper = InflateHelper {
       stack: vec![],
       tree,
-      current_theme,
+      themes: RefCell::new(themes),
       parent,
       root: None,
     };
@@ -584,9 +598,7 @@ impl<'a> Iterator for RevChildrenIter<'a> {
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::test::{
-    expect_layout_result, layout_info_by_path, ExpectRect, LayoutTestItem, MockBox, MockMulti,
-  };
+  use crate::test::{layout_info_by_path, MockBox, MockMulti};
 
   use super::*;
   use painter::{font_db::FontDB, shaper::TextShaper};

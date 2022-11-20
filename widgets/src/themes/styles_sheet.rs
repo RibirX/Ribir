@@ -1,8 +1,10 @@
-pub mod icons {
-  use ribir_core::{define_icon_ident, prelude::IconIdent};
+pub mod svgs {
+  use ribir_core::{
+    define_named_svg,
+    prelude::{NamedSvg, BEGIN},
+  };
 
-  pub const BEGIN: IconIdent = IconIdent::new(0);
-  define_icon_ident!(
+  define_named_svg!(
     BEGIN,
     CHECKED,
     UNCHECKED,

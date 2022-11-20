@@ -24,9 +24,7 @@ impl Render for Visibility {
     }
   }
 
-  fn can_overflow(&self) -> bool {
-    self.visible
-  }
+  fn can_overflow(&self) -> bool { self.visible }
 
   fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
     HitTest {

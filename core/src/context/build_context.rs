@@ -1,27 +1,47 @@
 use crate::{prelude::*, widget_tree::WidgetTree};
-use std::rc::Rc;
+use std::{
+  cell::{Ref, RefCell},
+  rc::Rc,
+};
 
+#[derive(Clone)]
 pub struct BuildCtx<'a> {
-  // todo: stack theme to query, and cheap way to override theme.
-  pub(crate) theme: Rc<Theme>,
+  themes: &'a RefCell<Vec<Rc<Theme>>>,
   pub(crate) tree: &'a WidgetTree,
 }
 
 impl<'a> BuildCtx<'a> {
-  /// The data from the closest Theme instance that encloses this context.
-  pub fn theme(&self) -> &Rc<Theme> { &self.theme }
-
   #[inline]
   pub fn app_ctx(&self) -> &AppContext { self.tree.app_ctx() }
 
   #[inline]
-  pub(crate) fn new(theme: Rc<Theme>, tree: &'a WidgetTree) -> Self { Self { theme, tree } }
+  pub(crate) fn new(themes: &'a RefCell<Vec<Rc<Theme>>>, tree: &'a WidgetTree) -> Self {
+    Self { themes, tree }
+  }
+
+  pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<Ref<'_, T>> {
+    let themes = self.themes.borrow();
+    Ref::filter_map(themes, |themes| {
+      let mut v = None;
+      for t in themes.iter().rev() {
+        v = f(t);
+        if v.is_some() || matches!(t.deref(), Theme::Full(_)) {
+          break;
+        }
+      }
+      v
+    })
+    .ok()
+  }
+
+  pub(crate) fn push_theme(&self, theme: Rc<Theme>) { self.themes.borrow_mut().push(theme); }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::test::*;
+  use std::borrow::Borrow;
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
@@ -29,8 +49,8 @@ mod tests {
   fn always_have_default_theme() {
     let w = widget! {
       DynWidget {
-        dyns: {
-          let _ = ctx.theme();
+        dyns: move |ctx: &BuildCtx| {
+          assert!(ctx.themes.borrow().len() > 0);
           panic!("Get a default theme from context");
           #[allow(unreachable_code)]
           Void {}
@@ -41,93 +61,52 @@ mod tests {
     Window::default_mock(w, None);
   }
 
-  #[derive(Declare)]
-  struct ThemeTrack {
-    themes: Rc<RefCell<Vec<Theme>>>,
-  }
-
-  impl Compose for ThemeTrack {
-    fn compose(this: StateWidget<Self>) -> Widget {
-      widget_try_track! {
-        try_track { this }
-        env { let theme = ctx.theme().clone(); }
-        DynWidget {
-          dyns: {
-            this
-            .themes
-            .borrow_mut()
-            .push(theme.deref().clone());
-            Void
-          }
-        }
-      }
-    }
-  }
-
   #[test]
-  fn nearest_theme() {
-    #[derive(Default, Clone)]
-    struct DarkLightThemes(Rc<RefCell<Vec<Theme>>>);
-
-    impl Compose for DarkLightThemes {
-      fn compose(this: StateWidget<Self>) -> Widget {
-        let mut theme = Theme::default();
-        let light = Rc::new(theme.clone());
-        theme.brightness = Brightness::Dark;
-        let dark = Rc::new(theme.clone());
-
-        widget! {
-          track { this: this.into_stateful() }
-          MockBox {
-            size: INFINITY_SIZE,
-            theme: dark.clone(),
-            MockBox {
-              size: ZERO_SIZE,
-              theme: light.clone(),
-              ThemeTrack { themes: this.0.clone() }
-            }
-          }
-        }
-      }
-    }
-
-    let dark_light = DarkLightThemes::default();
-    let track_themes = dark_light.0.clone();
-    let mut wnd = Window::default_mock(dark_light.into_widget(), None);
-    wnd.draw_frame();
-    assert_eq!(track_themes.borrow().len(), 1);
-    assert_eq!(track_themes.borrow()[0].brightness, Brightness::Light);
-
+  fn themes() {
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
-    impl Compose for LightDarkThemes {
-      fn compose(this: StateWidget<Self>) -> Widget {
-        let mut theme = Theme::default();
-        let light = Rc::new(theme.clone());
-        theme.brightness = Brightness::Dark;
-        let dark = Rc::new(theme);
+    let themes: Stateful<Vec<Rc<Theme>>> = vec![].into_stateful();
+    let light_dark = widget! {
+      track { themes: themes.clone() }
+      ThemeWidget {
+        theme: Rc::new(Theme::Inherit(InheritTheme {
+          brightness: Some(Brightness::Light),
+          ..<_>::default()
 
-        widget! {
-          track { this: this.into_stateful() }
-          MockBox {
-            size: INFINITY_SIZE,
-            theme: light,
+        })),
+        MockBox {
+          size: INFINITY_SIZE,
+          ThemeWidget {
+            theme: Rc::new(Theme::Inherit(InheritTheme {
+              brightness: Some(Brightness::Dark),
+              ..<_>::default()
+            })),
             MockBox {
               size: ZERO_SIZE,
-              theme: dark,
-              ThemeTrack { themes: this.0.clone() }
+              DynWidget {
+                dyns: move |ctx: &BuildCtx| {
+                  *themes = ctx.themes.borrow().clone();
+                  Void
+                }
+              }
             }
           }
         }
       }
-    }
+    };
 
-    let light_dark = LightDarkThemes::default();
-    let track_themes = light_dark.0.clone();
-    let mut wnd = Window::default_mock(light_dark.into_widget(), None);
-    wnd.draw_frame();
-    assert_eq!(track_themes.borrow().len(), 1);
-    assert_eq!(track_themes.borrow()[0].brightness, Brightness::Dark);
+    let mut wnd = Window::default_mock(light_dark, None);
+    wnd.layout();
+    let themes = themes.state_ref();
+    assert_eq!(themes.borrow().len(), 3);
+    let mut iter = themes.borrow().iter().filter_map(|t| match t.deref() {
+      Theme::Full(t) => Some(t.brightness),
+      Theme::Inherit(i) => i.brightness,
+    });
+
+    assert_eq!(iter.next(), Some(Brightness::Light));
+    assert_eq!(iter.next(), Some(Brightness::Light));
+    assert_eq!(iter.next(), Some(Brightness::Dark));
   }
 }

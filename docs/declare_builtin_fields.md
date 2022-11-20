@@ -78,8 +78,6 @@
  	 - Whether to show or hide a child
 - opacity : [`f32`] 
  	 - Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency.
-- theme : [`Theme`] 
- 	 - assign theme to the widget.
 - mounted : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, MountedType) >`] 
  	 - action perform after widget be added to the widget tree.
 - disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, DisposedType) >`] 
