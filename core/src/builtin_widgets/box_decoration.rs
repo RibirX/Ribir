@@ -230,7 +230,7 @@ impl Border {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::{widget_and_its_children_box_rect, MockBox};
+  use crate::test::*;
 
   #[test]
   fn default_value_is_none() {
@@ -261,11 +261,19 @@ mod tests {
       }
     };
 
-    let (rect, child) = widget_and_its_children_box_rect(w, Size::new(500., 500.));
-    assert_eq!(rect, Rect::from_size(Size::new(103., 107.)));
-    assert_eq!(
-      child,
-      vec![Rect::new(Point::new(1., 3.), Size::new(100., 100.))]
+    expect_layout_result(
+      w,
+      None,
+      &[
+        LayoutTestItem {
+          path: &[0],
+          expect: ExpectRect::from_size(Size::new(103., 107.)),
+        },
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::new(1., 3., 100., 100.),
+        },
+      ],
     );
   }
 

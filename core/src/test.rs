@@ -1,27 +1,5 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[deprecated]
-// return the flex box rect, and rect of its children.
-pub fn widget_and_its_children_box_rect(root: Widget, window_size: Size) -> (Rect, Vec<Rect>) {
-  let mut wnd = Window::default_mock(root, Some(window_size));
-  wnd.draw_frame();
-
-  root_and_children_rect(&mut wnd)
-}
-
-#[deprecated]
-pub fn root_and_children_rect(wnd: &Window) -> (Rect, Vec<Rect>) {
-  let tree = &wnd.widget_tree;
-  let root = tree.root();
-  let rect = tree.layout_box_rect(root).unwrap();
-  let children_box_rect = root
-    .children(tree)
-    .map(|c| tree.layout_box_rect(c).unwrap())
-    .collect();
-
-  (rect, children_box_rect)
-}
-
 #[derive(Default, Clone, Copy)]
 pub struct ExpectRect {
   pub x: Option<f32>,
@@ -148,6 +126,34 @@ impl Window {
 macro count {
   () => (0usize),
   ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*))
+}
+
+impl ExpectRect {
+  pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
+    Self {
+      x: Some(x),
+      y: Some(y),
+      width: Some(width),
+      height: Some(height),
+    }
+  }
+
+  pub fn from_size(size: Size) -> Self {
+    Self {
+      width: Some(size.width),
+      height: Some(size.height),
+      ..Default::default()
+    }
+  }
+
+  pub fn from_rect(rect: Rect) -> Self {
+    Self {
+      x: Some(rect.min_x()),
+      y: Some(rect.min_y()),
+      width: Some(rect.width()),
+      height: Some(rect.height()),
+    }
+  }
 }
 
 /// A unit test help macro to describe the test flow. This macro provide ability

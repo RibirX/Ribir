@@ -69,7 +69,7 @@ impl Query for Stack {
 #[cfg(test)]
 mod tests {
   use crate::prelude::*;
-  use ribir_core::test::widget_and_its_children_box_rect;
+  use ribir_core::test::*;
 
   use super::*;
   #[test]
@@ -82,7 +82,14 @@ mod tests {
         SizedBox { size: five}
       }
     };
-    let (rect, _) = widget_and_its_children_box_rect(w, Size::new(100., 100.));
-    assert_eq!(rect.size, five)
+
+    expect_layout_result(
+      w,
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(five),
+      }],
+    );
   }
 }

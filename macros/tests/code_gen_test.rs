@@ -27,15 +27,13 @@ fn simple_ref_bind_work() {
 
   let flex_size = Size::new(1000., 500.);
   let mut wnd = Window::default_mock(w, Some(Size::new(2000., 2000.)));
-  wnd.draw_frame();
-  let (rect, _) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect.size, flex_size);
+  wnd.layout();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size));
 
   tap_at(&mut wnd, (1, 1));
 
-  wnd.draw_frame();
-  let (rect, _) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect.size, flex_size * 2.);
+  wnd.layout();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size * 2.));
 }
 
 #[test]
@@ -55,16 +53,15 @@ fn event_attr_sugar_work() {
 
   let mut wnd = Window::default_mock(w.into_widget(), None);
   wnd.draw_frame();
-  let (rect, child_rect) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, BEFORE_SIZE.into());
-  assert_eq!(child_rect[0], BEFORE_SIZE.into());
+
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(BEFORE_SIZE));
+  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(BEFORE_SIZE));
 
   tap_at(&mut wnd, (25, 25));
 
   wnd.draw_frame();
-  let (rect, child_rect) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, AFTER_TAP_SIZE.into());
-  assert_eq!(child_rect[0], AFTER_TAP_SIZE.into());
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(AFTER_TAP_SIZE));
+  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(AFTER_TAP_SIZE));
 }
 
 #[test]
@@ -86,23 +83,22 @@ fn widget_wrap_bind_work() {
 
   let mut wnd = Window::default_mock(w, Some(Size::new(2000., 2000.)));
   wnd.draw_frame();
-  let (rect, _) = root_and_children_rect(&mut wnd);
-
-  assert_eq!(rect.size, Size::new(104., 52.));
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(104., 52.)));
 
   tap_at(&mut wnd, (60, 1));
 
   wnd.draw_frame();
-  let (rect, _) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect.size, Size::new(70., 60.));
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(70., 60.)));
 }
 
 #[test]
 fn expression_for_children() {
+  let size_one = Size::new(1., 1.);
+  let size_five = Size::new(5., 5.);
   let embed_expr = widget! {
     Flex {
-      tap: move |_| sized_box.size = Size::new(5., 5.),
-      SizedBox { id: sized_box, size: Size::new(1., 1.) }
+      tap: move |_| sized_box.size = size_five,
+      SizedBox { id: sized_box, size: size_one }
       // todo: how should we hint user, he/she need wrap inner widget of `DynWidget` to track named widget change.
       DynWidget { dyns: (0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }) }
       DynWidget {
@@ -112,17 +108,22 @@ fn expression_for_children() {
   };
 
   let mut wnd = Window::default_mock(embed_expr, None);
-  wnd.draw_frame();
-  let (rect, children) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
-  assert_eq!(children.len(), 5);
+  wnd.layout();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
+  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(size_one));
+  assert_layout_result(&wnd, &[0, 1], &ExpectRect::from_size(size_one));
+  assert_layout_result(&wnd, &[0, 2], &ExpectRect::from_size(size_one));
+  assert_layout_result(&wnd, &[0, 3], &ExpectRect::from_size(size_one));
+  assert_layout_result(&wnd, &[0, 4], &ExpectRect::from_size(ZERO_SIZE));
 
   tap_at(&mut wnd, (0, 0));
-  wnd.draw_frame();
-
-  let (rect, children) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, Rect::new(Point::zero(), Size::new(25., 5.)));
-  assert_eq!(children.len(), 5);
+  wnd.layout();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(25., 5.)));
+  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(size_five));
+  assert_layout_result(&wnd, &[0, 1], &ExpectRect::from_size(size_five));
+  assert_layout_result(&wnd, &[0, 2], &ExpectRect::from_size(size_five));
+  assert_layout_result(&wnd, &[0, 3], &ExpectRect::from_size(size_five));
+  assert_layout_result(&wnd, &[0, 4], &ExpectRect::from_size(size_five));
 }
 
 #[test]
@@ -141,15 +142,13 @@ fn embed_widget_ref_outside() {
   };
 
   let mut wnd = Window::default_mock(w, None);
-  wnd.draw_frame();
-  let (rect, _) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, Rect::new(Point::zero(), Size::new(4., 1.)));
+  wnd.layout();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
 
   tap_at(&mut wnd, (0, 0));
-  wnd.draw_frame();
+  wnd.layout();
 
-  let (rect, _) = root_and_children_rect(&mut wnd);
-  assert_eq!(rect, Rect::new(Point::zero(), Size::new(8., 2.)));
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(8., 2.)));
 }
 
 #[test]

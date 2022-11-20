@@ -161,7 +161,7 @@ impl From<VAlign> for Align {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::{widget_and_its_children_box_rect, MockBox};
+  use crate::test::*;
 
   use super::*;
   const CHILD_SIZE: Size = Size::new(10., 10.);
@@ -177,9 +177,20 @@ mod tests {
         }
       };
 
-      let (rect, child) = widget_and_its_children_box_rect(w, WND_SIZE);
-      assert_eq!(rect, Rect::new(Point::zero(), expect.size));
-      assert_eq!(child[0], expect);
+      expect_layout_result(
+        w,
+        Some(WND_SIZE),
+        &[
+          LayoutTestItem {
+            path: &[0],
+            expect: ExpectRect::from_size(expect.size),
+          },
+          LayoutTestItem {
+            path: &[0, 0],
+            expect: ExpectRect::from_rect(expect),
+          },
+        ],
+      );
     }
 
     test_case(HAlign::Left, Rect::new(Point::zero(), CHILD_SIZE));
@@ -201,9 +212,20 @@ mod tests {
         }
       };
 
-      let (rect, child) = widget_and_its_children_box_rect(w, WND_SIZE);
-      assert_eq!(rect, Rect::new(Point::zero(), expect.size));
-      assert_eq!(child[0], expect);
+      expect_layout_result(
+        w,
+        Some(WND_SIZE),
+        &[
+          LayoutTestItem {
+            path: &[0],
+            expect: ExpectRect::from_size(expect.size),
+          },
+          LayoutTestItem {
+            path: &[0, 0],
+            expect: ExpectRect::from_rect(expect),
+          },
+        ],
+      );
     }
 
     test_case(VAlign::Top, Rect::new(Point::zero(), CHILD_SIZE));
