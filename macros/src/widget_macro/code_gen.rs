@@ -84,7 +84,10 @@ impl Desugared {
         quote! {
           .into_widget();
           if !#guards_vec.is_empty() {
-            #name = compose_child_as_data_widget(#name.into_widget(), StateWidget::Stateless(#guards_vec));
+            #name = compose_child_as_data_widget(
+              #name.into_widget(),
+              StateWidget::Stateless(#guards_vec)
+            );
           }
           #name
         }
