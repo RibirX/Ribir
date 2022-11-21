@@ -136,12 +136,8 @@ impl ComposeChild for Tabs {
       }
 
       change_on ink_bar.left_anchor Animate {
-        transition: transitions::EASE_IN.get_from_or_default(ctx),
-        lerp_fn: move |from, to, rate| {
-          let from = from.abs_value(0.);
-          let to = to.abs_value(0.);
-          PositionUnit::Pixel(from.lerp(&to, rate))
-        }
+        transition: transitions::EASE_IN.of(ctx),
+        lerp_fn: PositionUnit::lerp_fn(ink_bar.layout_width()),
       }
     }
   }
