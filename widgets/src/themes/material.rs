@@ -94,11 +94,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   }
-  fn lerp_position(from: &PositionUnit, to: &PositionUnit, rate: f32, size: f32) -> PositionUnit {
-    let from = from.abs_value(size);
-    let to = to.abs_value(size);
-    PositionUnit::Pixel(from.lerp(&to, rate))
-  }
+
   let styles = &mut theme.compose_styles;
   styles.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
     widget! {
@@ -110,8 +106,8 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
 
       change_on thumb.left_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
-        lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_width()),
+        transition: transitions::SMOOTH_SCROLL.of(ctx),
+        lerp_fn: PositionUnit::lerp_fn(thumb.layout_width())
       }
     }
   });
@@ -125,8 +121,8 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
 
       change_on thumb.top_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.get_from_or_default(ctx),
-        lerp_fn: move |from, to, rate| lerp_position(from, to, rate, thumb.layout_height()),
+        transition: transitions::SMOOTH_SCROLL.of(ctx),
+        lerp_fn: PositionUnit::lerp_fn(thumb.layout_height())
       }
     }
   });

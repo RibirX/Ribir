@@ -8,12 +8,12 @@ use std::time::Instant;
 pub struct Animate<T, S> {
   pub transition: T,
   #[declare(rename = from)]
-  state: AnimateState<S>,
+  pub state: AnimateState<S>,
   /// function calc the linearly lerp value by rate, three arguments are
   /// `from` `to` and `rate`, specify `lerp_fn` when the animate state not
   /// implement `Lerp` trait or you want to specify a custom lerp function.
   #[declare(convert=box_trait(Fn(&S, &S, f32)-> S))]
-  lerp_fn: Box<dyn Fn(&S, &S, f32) -> S>,
+  pub lerp_fn: Box<dyn Fn(&S, &S, f32) -> S>,
   #[declare(skip)]
   running_info: Option<AnimateInfo<S>>,
   #[declare(skip, default = ctx.app_ctx().frame_ticker.clone())]

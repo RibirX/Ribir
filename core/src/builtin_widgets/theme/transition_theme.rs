@@ -10,7 +10,6 @@ use super::Theme;
 
 #[derive(Clone)]
 pub struct TransitionTheme {
-  pub default: Rc<Box<dyn Roc>>,
   pub transitions: HashMap<TransitionIdent, Rc<Box<dyn Roc>>, ahash::RandomState>,
 }
 
@@ -70,37 +69,31 @@ impl TransitionTheme {
 impl TransitionIdent {
   pub const fn new(idx: usize) -> Self { Self(idx) }
 
-  /// get the svg icon of the ident from the context if it have otherwise return
-  /// a default icon.
-  pub fn get_from_or_default(self, ctx: &BuildCtx) -> Rc<Box<dyn Roc>> {
-    self.get_from(ctx).unwrap_or_else(|| todo!())
-  }
-
-  /// get the svg icon of the ident from the context if it have.
-  pub fn get_from(self, ctx: &BuildCtx) -> Option<Rc<Box<dyn Roc>>> {
+  /// get transition of the transition identify from the context if it have or
+  /// return linear transition.
+  pub fn of(self, ctx: &BuildCtx) -> Rc<Box<dyn Roc>> {
     ctx
       .find_cfg(|t| match t {
-        Theme::Full(t) => t.transitions_theme.transitions.get(&self),
+        Theme::Full(t) => {
+          let transitions = &t.transitions_theme.transitions;
+          transitions.get(&self).or_else(|| {
+            log::info!("Transition({:?}) not init in theme.", self);
+            transitions.get(&transitions::LINEAR)
+          })
+        }
         Theme::Inherit(i) => i
           .transitions_theme
           .as_ref()
           .and_then(|t| t.transitions.get(&self)),
       })
-      .map(|t| t.clone())
+      .unwrap()
+      .clone()
   }
 }
 
 impl Default for TransitionTheme {
   fn default() -> Self {
-    let mut theme = Self {
-      default: Rc::new(Box::new(Transition {
-        delay: None,
-        duration: Duration::from_millis(200),
-        easing: easing::EASE,
-        repeat: None,
-      })),
-      transitions: Default::default(),
-    };
+    let mut theme = Self { transitions: Default::default() };
     fill_transition! { theme,
       transitions::EASE: Transition {
         delay: None,

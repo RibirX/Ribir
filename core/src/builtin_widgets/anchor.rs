@@ -144,6 +144,14 @@ impl PositionUnit {
       PositionUnit::Percent(factor) => self_size * factor / 100.,
     }
   }
+
+  pub fn lerp_fn(self_size: f32) -> impl Fn(&Self, &Self, f32) -> Self {
+    move |from, to, rate| {
+      let from = from.abs_value(self_size);
+      let to = to.abs_value(self_size);
+      PositionUnit::Pixel(from.lerp(&to, rate))
+    }
+  }
 }
 
 #[cfg(test)]
