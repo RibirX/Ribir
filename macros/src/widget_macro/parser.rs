@@ -5,11 +5,11 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   braced,
-  parse::{Parse, ParseStream},
+  parse::{discouraged::Speculative, Parse, ParseStream},
   parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Brace, Colon, Comma, Dot},
+  token::{Brace, Colon, Colon2, Comma, Dot, Paren},
   Block, Expr, Ident, Path, Result,
 };
 
@@ -66,13 +66,27 @@ pub struct TrackField {
 }
 
 #[derive(Debug)]
-pub struct DeclareWidget {
-  pub ty: Path,
-  pub brace: Brace,
-  pub fields: Punctuated<DeclareField, Comma>,
-  pub children: Vec<DeclareWidget>,
+pub enum DeclareWidget {
+  /// Declare widget as struct literal.
+  Literal {
+    ty: Path,
+    brace: Brace,
+    fields: Punctuated<DeclareField, Comma>,
+    children: Vec<DeclareWidget>,
+  },
+  /// Declare a widget use a path.
+  Path(Path),
+  /// Declare a widget across widget construct call, only as a leaf declare.
+  /// `X::new(...)`
+  Call(ConstructCall),
 }
 
+#[derive(Debug)]
+pub struct ConstructCall {
+  path: Path,
+  paren: Paren,
+  args: Punctuated<Expr, Comma>,
+}
 #[derive(Debug)]
 pub struct Id {
   pub id: kw::id,
@@ -238,14 +252,14 @@ impl Parse for MacroSyntax {
         } else {
           env = Some(e)
         }
-      } else if lk.peek(Ident) && input.peek2(Brace) {
+      } else if (lk.peek(Ident) || lk.peek(Colon2)) && (input.peek2(Brace) || input.peek2(Colon2)) {
         let w: DeclareWidget = input.parse()?;
         if let Some(first) = widget.as_ref() {
           let err = syn::Error::new(
             w.span(),
             &format!(
               "Only one root widget can declare, but `{}` already declared.",
-              first.ty.to_token_stream()
+              first.ty_path().to_token_stream()
             ),
           );
           return Err(err);
@@ -404,37 +418,49 @@ impl Parse for Id {
 
 impl Parse for DeclareWidget {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    let content;
-    let mut widget = DeclareWidget {
-      ty: input.parse()?,
-      brace: syn::braced!(content in input),
-      fields: Punctuated::default(),
-      children: vec![],
-    };
-    loop {
-      if content.is_empty() {
-        break;
-      }
+    let path: Path = input.parse()?;
+    if input.peek(Brace) {
+      let content;
+      let brace = syn::braced!(content in input);
+      let mut fields = Punctuated::default();
+      let mut children = vec![];
 
-      if content.peek(Ident) && content.peek2(Brace) {
-        widget.children.push(content.parse()?);
-      } else {
-        let f: DeclareField = content.parse()?;
-        if !widget.children.is_empty() {
-          return Err(syn::Error::new(
-            f.span(),
-            "Field should always declare before children.",
-          ));
+      loop {
+        if content.is_empty() {
+          break;
         }
-        widget.fields.push(f);
-        if !content.is_empty() {
-          content.parse::<Comma>()?;
+
+        let fork = content.fork();
+        if let Ok(w) = fork.parse::<DeclareWidget>() {
+          content.advance_to(&fork);
+          children.push(w);
+        } else {
+          let f: DeclareField = content.parse()?;
+          if !children.is_empty() {
+            return Err(syn::Error::new(
+              f.span(),
+              "Field should always declare before children.",
+            ));
+          }
+          fields.push(f);
+          if !content.is_empty() {
+            content.parse::<Comma>()?;
+          }
         }
       }
+      check_duplicate_field(&fields)?;
+
+      Ok(DeclareWidget::Literal { ty: path, brace, fields, children })
+    } else if input.is_empty() && path.get_ident().is_none() {
+      Ok(DeclareWidget::Path(path))
+    } else {
+      let content;
+      Ok(DeclareWidget::Call(ConstructCall {
+        path,
+        paren: syn::parenthesized!(content in input),
+        args: content.parse_terminated(Expr::parse)?,
+      }))
     }
-    check_duplicate_field(&widget.fields)?;
-
-    Ok(widget)
   }
 }
 
@@ -603,7 +629,25 @@ impl ToTokens for MemberPath {
 }
 
 impl Spanned for DeclareWidget {
-  fn span(&self) -> proc_macro2::Span { self.ty.span().join(self.brace.span).unwrap() }
+  fn span(&self) -> proc_macro2::Span {
+    match self {
+      DeclareWidget::Literal { ty, brace, .. } => ty.span().join(brace.span).unwrap(),
+      DeclareWidget::Path(path) => path.span(),
+      DeclareWidget::Call(ConstructCall { path: ty, paren, .. }) => {
+        ty.span().join(paren.span).unwrap()
+      }
+    }
+  }
+}
+
+impl DeclareWidget {
+  pub(crate) fn ty_path(&self) -> &Path {
+    match self {
+      DeclareWidget::Literal { ty, .. } => ty,
+      DeclareWidget::Call(call) => &call.path,
+      DeclareWidget::Path(path) => path,
+    }
+  }
 }
 
 impl ToTokens for DeclareField {
@@ -613,6 +657,14 @@ impl ToTokens for DeclareField {
       self.colon.to_tokens(tokens);
       self.expr.to_tokens(tokens);
     }
+  }
+}
+
+impl ToTokens for ConstructCall {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    let Self { path, paren, args } = self;
+    path.to_tokens(tokens);
+    paren.surround(tokens, |tokens| args.to_tokens(tokens));
   }
 }
 

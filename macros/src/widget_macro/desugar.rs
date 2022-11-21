@@ -111,7 +111,7 @@ impl MacroSyntax {
       errors: vec![],
       warnings: vec![],
     };
-    let default_name = ribir_variable("ribir", widget.ty.span());
+    let default_name = ribir_variable("ribir", widget.ty_path().span());
     let widget = widget.desugar(default_name, &mut desugared);
     desugared.widget = Some(widget);
 
@@ -124,66 +124,92 @@ impl MacroSyntax {
 
 impl DeclareWidget {
   fn desugar(self, default_name: Ident, desugared: &mut Desugared) -> WidgetNode {
-    let Self { ty, fields: declare_fields, .. } = self;
-    let mut id = None;
-    let mut fields = smallvec![];
-    let mut builtin_widgets: HashMap<_, SmallVec<[Field; 1]>, ahash::RandomState> = <_>::default();
-    declare_fields
-      .into_iter()
-      .for_each(|f| match pick_id(f, &mut desugared.errors) {
-        Ok(name) => id = Some(name),
-        Err(DeclareField { member, expr, .. }) => {
-          let value = FieldValue::Expr(expr.into());
-          let field = Field { member, value };
-          if let Some(ty) = WIDGET_OF_BUILTIN_FIELD
-            .get(field.member.to_string().as_str())
-            .filter(|builtin_ty| !ty.is_ident(builtin_ty))
-          {
-            builtin_widgets.entry(*ty).or_default().push(field);
-          } else {
-            fields.push(field)
-          }
-        }
-      });
+    match self {
+      DeclareWidget::Literal {
+        ty, fields: declare_fields, children, ..
+      } => {
+        let mut id = None;
+        let mut fields = smallvec![];
+        let mut builtin_widgets: HashMap<_, SmallVec<[Field; 1]>, ahash::RandomState> =
+          <_>::default();
+        declare_fields
+          .into_iter()
+          .for_each(|f| match pick_id(f, &mut desugared.errors) {
+            Ok(name) => id = Some(name),
+            Err(DeclareField { member, expr, .. }) => {
+              let value = FieldValue::Expr(expr.into());
+              let field = Field { member, value };
+              if let Some(ty) = WIDGET_OF_BUILTIN_FIELD
+                .get(field.member.to_string().as_str())
+                .filter(|builtin_ty| !ty.is_ident(builtin_ty))
+              {
+                builtin_widgets.entry(*ty).or_default().push(field);
+              } else {
+                fields.push(field)
+              }
+            }
+          });
 
-    let parent = if let Some(name) = id {
-      desugared.add_named_host_obj(DeclareObj::new(ty, name.clone(), fields));
-      builtin_widgets.into_iter().for_each(|(ty, fields)| {
-        let obj = builtin_obj(&name, ty, fields);
-        desugared.add_named_builtin_obj(&name, obj);
-      });
-      ComposeItem::Id(name)
-    } else {
-      let mut objs = WIDGETS
-        .iter()
-        .rev()
-        .filter_map(|b_widget| builtin_widgets.remove_entry(b_widget.ty))
-        .map(|(ty, fields)| {
-          let span = builtin_span(&default_name, &fields);
-          let name = builtin_var_name(&default_name, span, ty);
-          let ty = Ident::new(ty, name.span()).into();
-          DeclareObj::new(ty, name, fields)
-        })
-        .collect::<SmallVec<_>>();
-      assert!(builtin_widgets.is_empty());
-      objs.push(DeclareObj::new(ty, default_name, fields));
-      ComposeItem::ChainObjs(objs)
-    };
+        let parent = if let Some(name) = id {
+          desugared.add_named_host_obj(DeclareObj::new(ty, name.clone(), fields));
+          builtin_widgets.into_iter().for_each(|(ty, fields)| {
+            let obj = builtin_obj(&name, ty, fields);
+            desugared.add_named_builtin_obj(&name, obj);
+          });
+          ComposeItem::Id(name)
+        } else {
+          let mut objs = WIDGETS
+            .iter()
+            .rev()
+            .filter_map(|b_widget| builtin_widgets.remove_entry(b_widget.ty))
+            .map(|(ty, fields)| {
+              let span = builtin_span(&default_name, &fields);
+              let name = builtin_var_name(&default_name, span, ty);
+              let ty = Ident::new(ty, name.span()).into();
+              DeclareObj::new(ty, name, fields)
+            })
+            .collect::<SmallVec<_>>();
+          assert!(builtin_widgets.is_empty());
+          objs.push(DeclareObj::new(ty, default_name, fields));
+          ComposeItem::ChainObjs(objs)
+        };
 
-    let children = self
-      .children
-      .into_iter()
-      .enumerate()
-      .map(|(idx, w)| {
-        let name = child_variable(parent.name(), idx);
-        w.desugar(name, desugared)
-      })
-      .collect();
+        let children = children
+          .into_iter()
+          .enumerate()
+          .map(|(idx, w)| {
+            let mut name = child_variable(parent.name(), idx);
+            name.set_span(w.ty_path().span());
+            w.desugar(name, desugared)
+          })
+          .collect();
 
-    WidgetNode { parent, children }
+        WidgetNode { parent, children }
+      }
+      DeclareWidget::Call(call) => {
+        let expr: Expr = parse_quote!(#call);
+        expr_as_widget_node(expr, default_name)
+      }
+      DeclareWidget::Path(path) => {
+        let expr: Expr = parse_quote!(#path);
+        expr_as_widget_node(expr, default_name)
+      }
+    }
   }
 }
 
+fn expr_as_widget_node(expr: Expr, default_name: Ident) -> WidgetNode {
+  let ty = parse_quote_spanned!(expr.span() => DynWidget);
+  let field = Field {
+    member: parse_quote_spanned!(expr.span() => dyns),
+    value: FieldValue::Expr(expr.into()),
+  };
+  let obj = DeclareObj::new(ty, default_name, smallvec![field]);
+  WidgetNode {
+    parent: ComposeItem::ChainObjs(smallvec![obj]),
+    children: vec![],
+  }
+}
 impl DeclareObj {
   pub fn new(ty: Path, name: Ident, fields: SmallVec<[Field; 1]>) -> Self {
     Self {
