@@ -294,7 +294,7 @@ impl ComposeChild for TripleTapListener {
   }
 }
 
-impl XTimesTapListenerBuilder {
+impl XTimesTapListenerDeclarer {
   #[inline]
   pub fn x_times_tap(
     mut self,

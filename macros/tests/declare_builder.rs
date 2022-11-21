@@ -7,7 +7,7 @@ fn declare_builder_smoke() {
   // empty struct
   #[derive(Declare)]
   struct A;
-  let _: A = ABuilder {}.build(dummy_ctx());
+  let _: A = ADeclarer {}.build(dummy_ctx());
 
   #[derive(Declare)]
   struct B {
@@ -15,7 +15,10 @@ fn declare_builder_smoke() {
     b: i32,
   }
 
-  let b = <B as Declare>::builder().a(1.).b(1).build(dummy_ctx());
+  let b = <B as Declare>::declare_builder()
+    .a(1.)
+    .b(1)
+    .build(dummy_ctx());
   assert_eq!(b.a, 1.);
   assert_eq!(b.b, 1);
 }
@@ -28,7 +31,7 @@ fn panic_if_miss_require_field() {
     _a: f32,
   }
 
-  let _ = <T as Declare>::builder().build(dummy_ctx());
+  let _ = <T as Declare>::declare_builder().build(dummy_ctx());
 }
 
 #[test]
@@ -40,7 +43,7 @@ fn empty_default_field() {
     a: f32,
   }
 
-  let t = <T as Declare>::builder().build(dummy_ctx());
+  let t = <T as Declare>::declare_builder().build(dummy_ctx());
   assert_eq!(t.a, 0.);
 }
 
@@ -53,6 +56,6 @@ fn string_default_field() {
     text: &'static str,
   }
 
-  let t = <T as Declare>::builder().build(dummy_ctx());
+  let t = <T as Declare>::declare_builder().build(dummy_ctx());
   assert_eq!(t.text, "hi!");
 }

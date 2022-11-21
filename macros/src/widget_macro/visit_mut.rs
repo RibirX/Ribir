@@ -273,9 +273,6 @@ impl VisitMut for VisitCtx {
   }
 }
 
-pub const DYN_WIDGET: &str = "DynWidget";
-fn is_dyn_widget_keyword(ty: &Path) -> bool { ty.get_ident().map_or(false, |ty| ty == DYN_WIDGET) }
-
 impl VisitCtx {
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
     desugar.named_objs.objs_mut().for_each(|obj| match obj {
@@ -297,9 +294,6 @@ impl VisitCtx {
   pub fn visit_declare_obj(&mut self, obj: &mut DeclareObj) {
     let DeclareObj { ty, fields, .. } = obj;
     self.visit_path_mut(ty);
-    if is_dyn_widget_keyword(ty) {
-      *ty = parse_quote_spanned! { ty.span() => #ty::<_> };
-    }
     fields.iter_mut().for_each(|f| self.visit_field(f));
   }
 

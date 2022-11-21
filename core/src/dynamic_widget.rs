@@ -21,7 +21,7 @@ pub struct DynWidget<D> {
   pub(crate) dyns: Option<D>,
 }
 
-impl<D> DynWidgetBuilder<D> {
+impl<D> DynWidgetDeclarer<D> {
   pub fn dyns(mut self, d: D) -> Self {
     self.dyns = Some(Some(d));
     self
@@ -29,6 +29,9 @@ impl<D> DynWidgetBuilder<D> {
 }
 
 impl<D> DynWidget<D> {
+  #[inline]
+  pub const fn new(dyns: D) -> D { dyns }
+
   pub fn set_declare_dyns(&mut self, dyns: D) { self.dyns = Some(dyns); }
 
   pub(crate) fn into_inner(mut self) -> D {

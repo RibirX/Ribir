@@ -50,7 +50,7 @@ impl IntoCursorIcon for CursorIcon {
   fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>> { Rc::new(Cell::new(self)) }
 }
 
-impl CursorBuilder {
+impl CursorDeclarer {
   #[inline]
   pub fn cursor<C: IntoCursorIcon>(mut self, icon: C) -> Self {
     self.cursor = Some(icon.into_cursor_icon());

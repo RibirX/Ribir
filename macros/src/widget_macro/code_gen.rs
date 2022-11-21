@@ -410,7 +410,7 @@ impl DeclareObj {
     let whole_used_info = self.whole_used_info();
     let span = ty.span();
     whole_used_info.value_expr_surround_refs(tokens, span, |tokens| {
-      tokens.extend(quote_spanned! { span => <#ty as Declare>::builder() });
+      tokens.extend(quote_spanned! { span => #ty::declare_builder() });
       fields.iter().for_each(|f| {
         let Field { member, value, .. } = f;
         Dot(value.span()).to_tokens(tokens);

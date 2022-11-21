@@ -93,7 +93,7 @@ impl FocusListener {
   }
 }
 
-impl FocusListenerBuilder {
+impl FocusListenerDeclarer {
   #[inline]
   pub fn focus(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
     self.focus = Some(into_callback(f));
