@@ -164,7 +164,7 @@
 /// to use it.
 pub trait Declare {
   type Builder;
-  fn builder() -> Self::Builder;
+  fn declare_builder() -> Self::Builder;
 }
 
 #[derive(Debug, PartialEq, Hash)]

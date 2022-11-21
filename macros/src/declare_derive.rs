@@ -11,7 +11,7 @@ use syn::{
 };
 
 const DECLARE: &str = "Declare";
-const BUILDER: &str = "Builder";
+const BUILDER: &str = "Declarer";
 const DECLARE_ATTR: &str = "declare";
 
 struct DefaultMeta {
@@ -310,7 +310,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       impl #g_impl Declare for #name #g_ty #g_where {
         type Builder = #builder #g_ty;
 
-        fn builder() -> Self::Builder {
+        fn declare_builder() -> Self::Builder {
           #builder { #(#builder_fields_ident : None ),*}
         }
       }

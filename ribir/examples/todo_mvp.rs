@@ -42,9 +42,7 @@ impl Compose for TodoMVP {
               input.text = String::default();
             },
             Row {
-              Icon {
-                DynWidget { dyns: svgs::ADD}
-              }
+              Icon { svgs::ADD }
               Text {
                 text: "Add",
                 style: TypographyTheme::of(ctx).button.text.clone(),

@@ -91,7 +91,7 @@ impl IntoBackground<Option<Brush>> for Option<Brush> {
   fn into_background(self) -> Option<Brush> { self }
 }
 
-impl BoxDecorationBuilder {
+impl BoxDecorationDeclarer {
   #[inline]
   pub fn background<M>(mut self, b: impl IntoBackground<M>) -> Self {
     self.background = Some(b.into_background());
@@ -237,7 +237,7 @@ mod tests {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
     let mut ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
-    let w = BoxDecoration::builder().build(&mut ctx);
+    let w = BoxDecoration::declare_builder().build(&mut ctx);
 
     assert_eq!(w.border, None);
     assert_eq!(w.border_radius, None);

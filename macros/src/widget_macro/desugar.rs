@@ -264,7 +264,7 @@ enum DesugaredObj {
 impl Transition {
   fn desugar(self, desugared: &mut Desugared) -> DesugaredObj {
     let Self { transition, fields, .. } = self;
-    let ty = parse_quote_spanned! { transition.span => #transition <_>};
+    let ty = parse_quote! { #transition };
     let mut id = None;
     let fields = fields
       .into_iter()
@@ -322,7 +322,7 @@ impl Animate {
       fields.push(field);
     }
 
-    let ty = parse_quote! {#animate_token<_, _>};
+    let ty = parse_quote! {#animate_token };
     if let Some(Id { name, .. }) = id {
       let c_name = name.clone();
       desugared.add_named_host_obj(DeclareObj::new(ty, name, fields));
