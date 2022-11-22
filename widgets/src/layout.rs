@@ -21,3 +21,5 @@ pub use container::Container;
 pub use expanded::Expanded;
 mod stack;
 pub use stack::*;
+mod expand_box;
+pub use expand_box::*;
