@@ -322,7 +322,7 @@ impl FlexLayouter {
   ) {
     let max_main = flex_unit * flex;
     max_size.main = max_size.main.min(max_main);
-    min_size.main = 0.;
+    min_size.main = max_size.main;
     let clamp = BoxClamp {
       max: max_size.to_size(dir),
       min: min_size.to_size(dir),
