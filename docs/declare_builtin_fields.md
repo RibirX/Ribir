@@ -115,8 +115,11 @@
  - `fn layout_height(& self) -> f32`
  	- return the height after layout of the widget
 
- - `fn scroll_view(& self) -> Size`
+ - `fn scroll_view_size(& self) -> Size`
  	- return the scroll view of the scrollable widget
 
- - `fn scroll_content(& self) -> Size`
+ - `fn scroll_content_size(& self) -> Size`
  	- return the content widget size of the scrollable widget.
+
+ - `fn jump_to(& mut self, left_top : Point)`
+ 	- jump to the special position.

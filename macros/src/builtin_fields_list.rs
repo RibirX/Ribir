@@ -171,9 +171,11 @@ builtin! {
     #[doc= "specify the scroll position of this widget, also means that the host widget scrollable."]
     scroll_pos: Point,
     #[doc= "return the scroll view of the scrollable widget"]
-    fn scroll_view(&self) -> Size,
+    fn scroll_view_size(&self) -> Size,
     #[doc= "return the content widget size of the scrollable widget."]
-    fn scroll_content(&self) -> Size,
+    fn scroll_content_size(&self) -> Size,
+    #[doc= "jump to the special position."]
+    fn jump_to(&mut self, left_top: Point)
   }
 
   TransformWidget {
