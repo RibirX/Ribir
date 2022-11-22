@@ -15,20 +15,25 @@ pub struct Text {
 }
 
 impl Text {
-  pub fn text_layout(&self, t_store: &TypographyStore, bound: BoxClamp) -> VisualGlyphs {
+  pub fn text_layout(
+    text: &CowArc<str>,
+    style: &TextStyle,
+    t_store: &TypographyStore,
+    bound: BoxClamp,
+  ) -> VisualGlyphs {
     let TextStyle {
       font_size,
       letter_space,
       line_height,
       ref font_face,
       ..
-    } = self.style;
+    } = *style;
 
     let width: Em = Pixel(bound.max.width.into()).into();
     let height: Em = Pixel(bound.max.height.into()).into();
 
     t_store.typography(
-      self.text.substr(..),
+      text.substr(..),
       font_size,
       font_face,
       TypographyCfg {
@@ -46,8 +51,7 @@ impl Text {
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let app_ctx = ctx.app_ctx();
-    self
-      .text_layout(&app_ctx.typography_store, clamp)
+    Text::text_layout(&self.text, &self.style, &app_ctx.typography_store, clamp)
       .visual_rect()
       .size
       .cast_unit()

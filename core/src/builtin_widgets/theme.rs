@@ -52,9 +52,6 @@ pub struct FullTheme {
   pub transitions_theme: TransitionTheme,
   pub compose_styles: ComposeStyles,
   pub custom_themes: CustomThemes,
-  // todo: refactor input theme style.
-  pub text_selected_background: TextSelectedBackground,
-  pub caret_color: Color,
 }
 
 /// Inherit theme override part of parent theme, if anything not found in here,
@@ -119,11 +116,6 @@ impl Default for FullTheme {
       huge: Size::new(64., 64.),
     };
 
-    let text_selected_background = TextSelectedBackground {
-      focus: palette.primary_container(),
-      blur: palette.surface_variant(),
-    };
-
     let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))]);
     let typography_theme = typography_theme(
       family.clone(),
@@ -142,8 +134,6 @@ impl Default for FullTheme {
       transitions_theme: Default::default(),
       compose_styles: Default::default(),
       custom_themes: Default::default(),
-      text_selected_background,
-      caret_color: Default::default(),
     }
     .into()
   }
