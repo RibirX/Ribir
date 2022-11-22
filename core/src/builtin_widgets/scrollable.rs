@@ -71,6 +71,11 @@ impl ComposeChild for ScrollableWidget {
 
 impl ScrollableWidget {
   #[inline]
+  pub fn jump_to(&mut self, top_left: Point) {
+    let min = self.scroll_view_size() - self.scroll_content_size();
+    self.scroll_pos = top_left.clamp(min.to_vector().to_point(), Point::zero());
+  }
+  #[inline]
   pub fn scroll_view_size(&self) -> Size { self.page }
 
   #[inline]
@@ -96,8 +101,7 @@ impl ScrollableWidget {
     if self.scrollable != Scrollable::Y {
       new.x += delta.x;
     }
-    let min = self.scroll_view_size() - self.scroll_content_size();
-    self.scroll_pos = new.clamp(min.to_vector().to_point(), Point::zero());
+    self.jump_to(new);
   }
 }
 
