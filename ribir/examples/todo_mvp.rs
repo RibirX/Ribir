@@ -34,8 +34,13 @@ impl Compose for TodoMVP {
           Button {
             margin: EdgeInsets::only_left(20.),
             tap: move |_| {
+              let label = if input.text.is_empty() {
+                String::from("Todo")
+              } else {
+                input.text.clone()
+              };
               this.tasks.push(Task {
-                label: input.text_in_show(),
+                label,
                 finished: false,
               });
               input.text = String::default();

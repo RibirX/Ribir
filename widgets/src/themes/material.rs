@@ -18,19 +18,12 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     Color::BLACK.with_alpha(0.87).into(),
   );
 
-  let text_selected_background = TextSelectedBackground {
-    focus: Color::from_rgb(50, 150, 255).with_alpha(0.9),
-    blur: Color::GRAY.with_alpha(0.9),
-  };
-
   let mut theme = FullTheme {
     brightness,
     palette,
     typography_theme,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
-    text_selected_background,
-    caret_color: Color::BLACK,
     compose_styles: <_>::default(),
     custom_themes: <_>::default(),
   };
@@ -176,18 +169,8 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<TabStyle>(move |style, host| {
-    widget! {
-      states { style }
-      Ripple {
-        color: style.color,
-        InteractiveLayer {
-          color: style.color, border_radii: Radius::all(20.),
-          DynWidget { dyns: host }
-        }
-      }
-    }
-  });
+  let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
+  theme.custom_themes.set_custom_theme(textfield);
 }
 
 pub mod purple {

@@ -11,6 +11,7 @@ pub mod path;
 pub mod scrollbar;
 pub mod tabs;
 pub mod text;
+pub mod text_field;
 pub mod themes;
 pub mod transform_box;
 pub mod prelude {
@@ -27,6 +28,7 @@ pub mod prelude {
   pub use super::scrollbar::*;
   pub use super::tabs::*;
   pub use super::text::*;
+  pub use super::text_field::*;
   pub use super::themes::*;
   pub use super::transform_box::*;
 }
