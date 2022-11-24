@@ -164,31 +164,33 @@ impl<'a> dyn Render + 'a {
   }
 }
 
-pub trait WidgetMarker {}
+pub trait ImplMarker {}
+/// implement marker means this converter not hope to convert continue.
+pub struct Concrete<M>(PhantomData<fn(M)>);
+/// implement marker means this converter can use as a generic bounds to convert
+/// continue.
+pub struct Generic<M>(PhantomData<fn(M)>);
 
-pub struct FromSelf;
-pub struct FromOther<M>(PhantomData<fn(M)>);
+impl<M> ImplMarker for Concrete<M> {}
+impl<M> ImplMarker for Generic<M> {}
 
-impl WidgetMarker for FromSelf {}
-impl<M> WidgetMarker for FromOther<M> {}
-
-pub trait IntoWidget<M: WidgetMarker> {
+pub trait IntoWidget<M: ImplMarker> {
   fn into_widget(self) -> Widget;
 }
 
-impl IntoWidget<FromSelf> for Widget {
+impl IntoWidget<Concrete<Widget>> for Widget {
   #[inline]
   fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<FromOther<&dyn Compose>> for C {
+impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<Generic<&dyn Compose>> for C {
   #[inline]
   fn into_widget(self) -> Widget {
     ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
   }
 }
 
-impl<R: Render + 'static> IntoWidget<FromOther<&dyn Render>> for R {
+impl<R: Render + 'static> IntoWidget<Generic<&dyn Render>> for R {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget {
@@ -198,7 +200,7 @@ impl<R: Render + 'static> IntoWidget<FromOther<&dyn Render>> for R {
   }
 }
 
-impl<W, C> IntoWidget<FromOther<&dyn ComposeChild<Child = Option<C>>>> for W
+impl<W, C> IntoWidget<Generic<Option<C>>> for W
 where
   W: ComposeChild<Child = Option<C>> + Into<StateWidget<W>> + 'static,
 {
@@ -206,9 +208,9 @@ where
   fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
 }
 
-impl<F, R, M> IntoWidget<FromOther<&dyn FnOnce(M) -> Widget>> for F
+impl<F, R, M> IntoWidget<Generic<&dyn FnOnce(M) -> Widget>> for F
 where
-  M: WidgetMarker,
+  M: ImplMarker,
   F: FnOnce(&BuildCtx) -> R + 'static,
   R: IntoWidget<M>,
 {

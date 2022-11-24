@@ -1,4 +1,4 @@
-use crate::util::struct_unwrap;
+use crate::util::data_struct_unwrap;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
@@ -6,7 +6,7 @@ use syn::spanned::Spanned;
 pub(crate) fn lerp_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
   let syn::DeriveInput { ident: name, generics, data, .. } = input;
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
-  let stt = struct_unwrap(data, "Lerp")?;
+  let stt = data_struct_unwrap(data, "Lerp")?;
 
   let tokens = match &stt.fields {
     syn::Fields::Named(n) => {

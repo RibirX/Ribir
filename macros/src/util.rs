@@ -1,6 +1,6 @@
 use syn::{spanned::Spanned, Data};
 
-pub fn struct_unwrap<'a>(
+pub fn data_struct_unwrap<'a>(
   data: &'a mut syn::Data,
   derive_trait: &'static str,
 ) -> syn::Result<&'a mut syn::DataStruct> {

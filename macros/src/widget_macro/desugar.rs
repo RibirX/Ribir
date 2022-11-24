@@ -89,7 +89,7 @@ pub enum FieldValue {
   Obj(Box<DeclareObj>),
 }
 pub struct WidgetNode {
-  pub parent: ComposeItem,
+  pub node: ComposeItem,
   pub children: Vec<WidgetNode>,
 }
 
@@ -184,7 +184,7 @@ impl DeclareWidget {
           })
           .collect();
 
-        WidgetNode { parent, children }
+        WidgetNode { node: parent, children }
       }
       DeclareWidget::Call(call) => {
         let expr: Expr = parse_quote!(#call);
@@ -206,7 +206,7 @@ fn expr_as_widget_node(expr: Expr, default_name: Ident) -> WidgetNode {
   };
   let obj = DeclareObj::new(ty, default_name, smallvec![field]);
   WidgetNode {
-    parent: ComposeItem::ChainObjs(smallvec![obj]),
+    node: ComposeItem::ChainObjs(smallvec![obj]),
     children: vec![],
   }
 }

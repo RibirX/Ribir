@@ -1,4 +1,4 @@
-use crate::util::struct_unwrap;
+use crate::util::data_struct_unwrap;
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
@@ -11,7 +11,7 @@ use syn::{
 };
 
 const DECLARE: &str = "Declare";
-const BUILDER: &str = "Declarer";
+pub const DECLARER: &str = "Declarer";
 const DECLARE_ATTR: &str = "declare";
 
 struct DefaultMeta {
@@ -213,7 +213,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let syn::DeriveInput { vis, ident: name, generics, data, .. } = input;
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
 
-  let stt = struct_unwrap(data, DECLARE)?;
+  let stt = data_struct_unwrap(data, DECLARE)?;
   let mut builder_fields = collect_filed_and_attrs(stt)?;
 
   // reverse name check.
@@ -221,7 +221,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     .iter_mut()
     .for_each(DeclareField::check_reserve);
 
-  let builder = Ident::new(&format!("{}{}", name, BUILDER), name.span());
+  let declarer = Ident::new(&format!("{}{}", name, DECLARER), name.span());
 
   let mut builder_methods = quote! {};
   let mut methods = quote! {};
@@ -302,16 +302,15 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   });
 
   let tokens = quote! {
-
-      #vis struct #builder #g_impl #g_where {
+      #vis struct #declarer #g_impl #g_where {
         #(#def_fields)*
       }
 
       impl #g_impl Declare for #name #g_ty #g_where {
-        type Builder = #builder #g_ty;
+        type Builder = #declarer #g_ty;
 
         fn declare_builder() -> Self::Builder {
-          #builder { #(#builder_fields_ident : None ),*}
+          #declarer { #(#builder_fields_ident : None ),*}
         }
       }
 
@@ -320,7 +319,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         #methods
       }
 
-      impl #g_impl #builder #g_ty #g_where {
+      impl #g_impl #declarer #g_ty #g_where {
         #vis fn build(mut self, ctx: &BuildCtx) -> #name #g_ty  {
           #(#fill_default)*
           #name {

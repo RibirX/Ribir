@@ -13,6 +13,7 @@ use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 use widget_macro::gen_widget_macro;
 use widget_try_track_macro::TryTrack;
+mod child_template;
 mod widget_try_track_macro;
 
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
@@ -67,6 +68,14 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
   declare_derive::declare_derive(&mut input)
+    .unwrap_or_else(|e| e.into_compile_error())
+    .into()
+}
+
+#[proc_macro_derive(Template, attributes(declare))]
+pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
+  let mut input = parse_macro_input!(input as DeriveInput);
+  child_template::derive_child_template(&mut input)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }

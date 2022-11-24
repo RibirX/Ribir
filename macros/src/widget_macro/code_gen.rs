@@ -1,6 +1,7 @@
 use crate::{
   declare_derive::declare_field_name,
   error::{DeclareError, DeclareWarning},
+  widget_macro::ribir_suffix_variable,
 };
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
@@ -10,7 +11,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
   parse_quote_spanned,
   spanned::Spanned,
-  token::{Brace, Comma, Dot, Paren, Semi},
+  token::{Brace, Dot, Paren, Semi},
   Ident,
 };
 
@@ -78,7 +79,7 @@ impl Desugared {
         stmts.iter().for_each(|item| item.to_tokens(tokens));
         let w = widget.as_ref().unwrap();
         w.gen_node_objs(tokens);
-        let name = w.parent.name();
+        let name = w.node.name();
         quote! { let mut #name = }.to_tokens(tokens);
         w.gen_compose_node(named_objs, tokens);
         quote! {
@@ -555,7 +556,7 @@ fn subscribe_modify(
 
 impl WidgetNode {
   fn gen_node_objs(&self, tokens: &mut TokenStream) {
-    let WidgetNode { parent, children } = self;
+    let WidgetNode { node: parent, children } = self;
     if let ComposeItem::ChainObjs(objs) = parent {
       objs.iter().for_each(|obj| obj.to_tokens(tokens));
     }
@@ -564,55 +565,80 @@ impl WidgetNode {
   }
 
   fn gen_compose_node(&self, named_objs: &NamedObjMap, tokens: &mut TokenStream) {
-    let WidgetNode { parent, children } = self;
-    let mut compose_list = parent.node_compose_list(named_objs);
+    fn recursive_compose(
+      nodes: &[ComposeNode],
+      children: &[WidgetNode],
+      named_objs: &NamedObjMap,
+      tokens: &mut TokenStream,
+    ) {
+      let node = &nodes[0];
 
-    if !children.is_empty() {
-      let last = compose_list
-        .last_mut()
-        .expect("must at least have one obj to compose.");
-
-      let span = last.span();
-      quote_spanned! {span => .with_child}.to_tokens(last);
-      Paren(span).surround(last, |tokens| {
-        if children.len() > 1 {
-          quote_spanned!(span => TupleChild).to_tokens(tokens);
-          Paren(span).surround(tokens, |tokens| {
+      if nodes.len() > 1 || !children.is_empty() {
+        let name = node.name();
+        let span = name.span();
+        Brace(name.span()).surround(tokens, |tokens| {
+          if let ComposeNode::Obj(obj) = node {
+            obj.to_tokens(tokens);
+          }
+          let child_tml = ribir_suffix_variable(name, "tml");
+          quote_spanned! { span =>
+            let #child_tml = #name.child_template()
+          }
+          .to_tokens(tokens);
+          if nodes.len() > 1 {
+            quote_spanned! { span => .fill}.to_tokens(tokens);
             Paren(span).surround(tokens, |tokens| {
-              children.iter().for_each(|node| {
-                node.gen_compose_node(named_objs, tokens);
-                Comma(span).to_tokens(tokens);
-              });
+              recursive_compose(&nodes[1..], children, named_objs, tokens);
             });
-          });
-        } else {
-          children[0].gen_compose_node(named_objs, tokens);
+          } else {
+            children.iter().for_each(|c| {
+              quote_spanned! {span => .fill}.to_tokens(tokens);
+              Paren(span).surround(tokens, |tokens| c.gen_compose_node(named_objs, tokens));
+            });
+          }
+          quote_spanned! {
+            span => .build();
+            #name.with_child(#child_tml)
+          }
+          .to_tokens(tokens);
+        });
+      } else {
+        match node {
+          ComposeNode::Name(name) => name.to_tokens(tokens),
+          ComposeNode::Obj(obj) => obj.gen_as_value(tokens),
         }
-      });
+      }
     }
-    compose_list[0].to_tokens(tokens);
-    recursive_compose(compose_list.into_iter().skip(1), tokens);
+
+    let WidgetNode { node, children } = self;
+    let nodes = node.node_compose_list(named_objs);
+    recursive_compose(&nodes, &children, named_objs, tokens);
   }
 }
 
-fn recursive_compose(mut chain: impl Iterator<Item = TokenStream>, tokens: &mut TokenStream) {
-  if let Some(current) = chain.next() {
-    let span = current.span();
-    quote_spanned! {span => .with_child}.to_tokens(tokens);
-    Paren(span).surround(tokens, |tokens| {
-      current.to_tokens(tokens);
-      recursive_compose(chain, tokens);
-    });
+enum ComposeNode<'a> {
+  /// object is already defined, directly compose the name.
+  Name(&'a Ident),
+  /// object not define before.
+  Obj(&'a DeclareObj),
+}
+
+impl<'a> ComposeNode<'a> {
+  fn name(&self) -> &Ident {
+    match self {
+      ComposeNode::Name(name) => name,
+      ComposeNode::Obj(obj) => &obj.name,
+    }
   }
 }
 
 impl ComposeItem {
-  fn node_compose_list(&self, named_objs: &NamedObjMap) -> SmallVec<[TokenStream; 1]> {
+  fn node_compose_list<'a>(&'a self, named_objs: &'a NamedObjMap) -> SmallVec<[ComposeNode; 1]> {
     let mut list = smallvec![];
     match self {
       ComposeItem::ChainObjs(objs) => {
         assert!(objs.len() > 0);
-        list.extend(objs.iter().map(|obj| obj.name.clone().into_token_stream()));
+        list.extend(objs.iter().map(|obj| ComposeNode::Name(&obj.name)));
       }
       ComposeItem::Id(name) => {
         WIDGETS
@@ -624,17 +650,13 @@ impl ComposeItem {
           })
           .for_each(|(var_name, obj)| match obj {
             NamedObj::DuplicateListener { objs, .. } => {
-              list.extend(objs.iter().map(|obj| {
-                let mut obj_tokens = quote! {};
-                obj.gen_as_value(&mut obj_tokens);
-                obj_tokens
-              }));
+              list.extend(objs.iter().map(|obj| ComposeNode::Obj(obj)));
             }
-            NamedObj::Builtin { .. } => list.push(quote! {#var_name}),
+            NamedObj::Builtin { .. } => list.push(ComposeNode::Name(var_name)),
             NamedObj::Host(..) => unreachable!("builtin object type not match."),
           });
 
-        list.push(quote! {#name});
+        list.push(ComposeNode::Name(name));
       }
     };
     list
