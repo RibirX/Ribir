@@ -84,9 +84,15 @@ mod tests {
         }
         SizedBox { size }
         SizedBox { size }
+        SizedBox { size }
+        SizedBox { size }
         Expanded {
-          flex: 2.,
-          SizedBox { size }
+          flex: 1. ,
+          SizedBox { size, }
+        }
+        Expanded {
+          flex: 4.,
+          SizedBox { size, }
         }
       }
     };
@@ -101,19 +107,31 @@ mod tests {
         },
         LayoutTestItem {
           path: &[0, 0],
-          expect: ExpectRect::new(0., 0., 150., 50.),
+          expect: ExpectRect::new(0., 0., 50., 50.),
         },
         LayoutTestItem {
           path: &[0, 1],
-          expect: ExpectRect::new(150., 0., size.width, size.height),
+          expect: ExpectRect::new(50., 0., size.width, size.height),
         },
         LayoutTestItem {
           path: &[0, 2],
-          expect: ExpectRect::new(250., 0., size.width, size.height),
+          expect: ExpectRect::new(150., 0., size.width, size.height),
         },
         LayoutTestItem {
           path: &[0, 3],
-          expect: ExpectRect::new(0., 50., 350., 50.),
+          expect: ExpectRect::new(250., 0., size.width, size.height),
+        },
+        LayoutTestItem {
+          path: &[0, 4],
+          expect: ExpectRect::new(0., 50., size.width, size.height),
+        },
+        LayoutTestItem {
+          path: &[0, 5],
+          expect: ExpectRect::new(100., 50., 50., 50.),
+        },
+        LayoutTestItem {
+          path: &[0, 6],
+          expect: ExpectRect::new(150., 50., 200., 50.),
         },
       ],
     );
