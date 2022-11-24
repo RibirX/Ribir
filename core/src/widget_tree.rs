@@ -275,6 +275,10 @@ impl WidgetId {
     self.node_feature(tree, |node| node.next_sibling())
   }
 
+  pub(crate) fn previous_sibling(self, tree: &WidgetTree) -> Option<WidgetId> {
+    self.node_feature(tree, |node| node.previous_sibling())
+  }
+
   pub(crate) fn ancestors(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(&tree.arena).map(WidgetId)
   }
@@ -586,9 +590,9 @@ impl<'a> Iterator for RevChildrenIter<'a> {
   fn next(&mut self) -> Option<Self::Item> {
     let Self { tree, parent, current } = self;
     if let Some(c) = current {
-      *current = c.next_sibling(tree);
+      *current = c.previous_sibling(tree);
     } else if let Some(p) = parent {
-      *current = p.first_child(tree);
+      *current = p.last_child(tree);
       parent.take();
     }
     self.current
