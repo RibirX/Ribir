@@ -60,7 +60,7 @@ pub mod prelude {
   pub use log;
   #[doc(no_inline)]
   pub use ribir_macros::{
-    include_svg, widget, widget_try_track, Declare, Lerp, MultiChild, SingleChild,
+    include_svg, widget, widget_try_track, Declare, Lerp, MultiChild, SingleChild, Template,
   };
   #[doc(hidden)]
   pub use rxrust::prelude::*;

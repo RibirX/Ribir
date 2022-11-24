@@ -12,7 +12,7 @@ impl<B> ComposedWidget<Widget, B> {
   pub fn new(composed: Widget) -> Self { ComposedWidget { composed, by: PhantomData } }
 }
 
-impl<B: 'static> IntoWidget<FromOther<Widget>> for ComposedWidget<Widget, B> {
+impl<B: 'static> IntoWidget<Generic<Widget>> for ComposedWidget<Widget, B> {
   fn into_widget(self) -> Widget {
     let Widget { node, mut children } = self.composed;
     let by = self.by;

@@ -419,7 +419,9 @@ impl Parse for Id {
 impl Parse for DeclareWidget {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let path: Path = input.parse()?;
-    if input.peek(Brace) {
+
+    // we not allow an ident as a widget, ambiguous with shorthand field init.
+    if path.get_ident().is_some() || input.peek(Brace) {
       let content;
       let brace = syn::braced!(content in input);
       let mut fields = Punctuated::default();
@@ -451,15 +453,15 @@ impl Parse for DeclareWidget {
       check_duplicate_field(&fields)?;
 
       Ok(DeclareWidget::Literal { ty: path, brace, fields, children })
-    } else if input.is_empty() && path.get_ident().is_none() {
-      Ok(DeclareWidget::Path(path))
-    } else {
+    } else if input.peek(Paren) {
       let content;
       Ok(DeclareWidget::Call(ConstructCall {
         path,
         paren: syn::parenthesized!(content in input),
         args: content.parse_terminated(Expr::parse)?,
       }))
+    } else {
+      Ok(DeclareWidget::Path(path))
     }
   }
 }

@@ -300,7 +300,6 @@ impl<'a, W> StateRef<'a, W> {
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
-
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
 impl<W: Render + 'static> Render for Stateful<W> {

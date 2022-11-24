@@ -12,7 +12,7 @@ pub struct ComposeStyles {
 /// by a function. The trait implementation only as a default logic if no
 /// overwrite function in `Theme`.
 pub trait ComposeStyle {
-  type Host;
+  type Host: AssociatedTemplate;
   fn compose_style(this: Stateful<Self>, host: Self::Host) -> Widget
   where
     Self: Sized;

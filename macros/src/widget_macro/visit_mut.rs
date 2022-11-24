@@ -315,7 +315,7 @@ impl VisitCtx {
   }
 
   pub fn visit_widget_node_mut(&mut self, widget: &mut WidgetNode) {
-    let WidgetNode { parent, children } = widget;
+    let WidgetNode { node: parent, children } = widget;
     self.visit_compose_item_mut(parent);
     children
       .iter_mut()

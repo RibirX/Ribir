@@ -1,15 +1,6 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
 
-#[derive(Declare, SingleChild)]
-pub struct Tab;
-
-#[derive(Declare, SingleChild)]
-pub struct TabPane;
-
-#[derive(Declare, SingleChild)]
-pub struct TabHeader;
-
 #[derive(Default, Declare)]
 pub struct Tabs {
   #[declare(default = 0)]
@@ -25,20 +16,29 @@ impl ComposeStyle for InkBarStyle {
   fn compose_style(_: Stateful<Self>, host: Widget) -> Widget { host }
 }
 
-type TabTemplate = WidgetPair<Tab, (WidgetOf<TabHeader>, WidgetOf<TabPane>)>;
-impl ComposeChild for Tabs {
-  type Child = Vec<TabTemplate>;
+#[derive(Template)]
+pub struct Tab {
+  header: WidgetOf<TabHeader>,
+  pane: WidgetOf<TabPane>,
+}
 
-  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
+#[derive(Declare, SingleChild)]
+pub struct TabPane;
+
+#[derive(Declare, SingleChild)]
+pub struct TabHeader;
+
+impl ComposeChild for Tabs {
+  type Child = Vec<Tab>;
+
+  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget {
     let mut headers = vec![];
     let mut panes = vec![];
 
-    for w in children.into_iter() {
-      headers.push(w.child.0.child);
-      panes.push(w.child.1.child);
+    for tab in children.into_iter() {
+      let Tab { header, pane } = tab;
+      headers.push(header.child);
+      panes.push(pane.child);
     }
 
     let tab_size = panes.len();

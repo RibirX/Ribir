@@ -51,6 +51,10 @@ pub(crate) struct DynRender<D> {
   cast_to_vec: fn(D) -> Vec<Widget>,
 }
 
+pub(crate) trait IntoDynRender<M, D> {
+  fn into_dyn_render(self) -> DynRender<D>;
+}
+
 // A dynamic widget must be stateful, depends others.
 impl<D: 'static> Render for DynRender<D> {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -76,35 +80,25 @@ impl<D> DynRender<D> {
       cast_to_vec,
     }
   }
-
-  fn from_single<M>(dyns: Stateful<DynWidget<D>>) -> Self
-  where
-    M: WidgetMarker,
-    D: IntoWidget<M>,
-  {
-    DynRender::new(dyns, |d| vec![d.into_widget()])
-  }
-
-  fn from_multi<M>(dyns: Stateful<DynWidget<D>>) -> Self
-  where
-    M: WidgetMarker,
-    D: IntoIterator,
-    D::Item: IntoWidget<M>,
-  {
-    DynRender::new(dyns, |d| {
-      d.into_iter().map(IntoWidget::into_widget).collect()
-    })
-  }
 }
 
-impl<D> DynRender<Option<D>> {
-  pub(crate) fn from_option_single<M>(dyns: Stateful<DynWidget<Option<D>>>) -> Self
-  where
-    M: WidgetMarker,
-    D: IntoWidget<M>,
-  {
-    DynRender::new(dyns, |d| {
-      d.map_or_else(Vec::default, |d| vec![d.into_widget()])
+impl<D, M> IntoDynRender<M, D> for Stateful<DynWidget<D>>
+where
+  M: ImplMarker,
+  D: IntoWidget<M> + 'static,
+{
+  fn into_dyn_render(self) -> DynRender<D> { DynRender::new(self, |d| vec![d.into_widget()]) }
+}
+
+impl<D, M> IntoDynRender<&dyn Iterator<Item = M>, D> for Stateful<DynWidget<D>>
+where
+  M: ImplMarker,
+  D: IntoIterator,
+  D::Item: IntoWidget<M> + 'static,
+{
+  fn into_dyn_render(self) -> DynRender<D> {
+    DynRender::new(self, |d| {
+      d.into_iter().map(IntoWidget::into_widget).collect()
     })
   }
 }
@@ -112,6 +106,7 @@ impl<D> DynRender<Option<D>> {
 impl<D: 'static> Query for DynRender<D> {
   impl_proxy_query!(self.self_render, self.dyn_widgets);
 }
+
 impl<D: 'static> Query for DynWidget<D> {
   impl_query_self_only!();
 }
@@ -238,123 +233,32 @@ fn single_on_mounted(from: WidgetId, mut level: usize, tree: &mut WidgetTree) ->
 
 // impl IntoWidget
 
-// only `DynWidget` gen single widget can as a widget.
-impl<D, M> IntoWidget<FromOther<M>> for Stateful<DynWidget<D>>
+// only `DynWidget` gen single widget can as a parent widget
+impl<M, D> IntoWidget<Concrete<M>> for Stateful<DynWidget<D>>
 where
-  M: WidgetMarker,
+  M: ImplMarker,
   D: IntoWidget<M> + 'static,
 {
   #[inline]
-  fn into_widget(self) -> Widget { DynRender::from_single(self).into_widget() }
+  fn into_widget(self) -> Widget { self.into_dyn_render().into_widget() }
 }
 
-impl<D> Stateful<DynWidget<Option<D>>> {
-  #[inline]
-  pub fn into_widget<M>(self) -> Widget
-  where
-    M: WidgetMarker,
-    D: IntoWidget<M> + 'static,
-  {
-    DynRender::from_option_single(self).into_widget()
-  }
-}
-
-impl<D, M> IntoWidget<FromOther<M>> for DynWidget<D>
+impl<M, D> IntoWidget<Concrete<Option<M>>> for Stateful<DynWidget<Option<D>>>
 where
-  M: WidgetMarker,
+  M: ImplMarker,
+  D: IntoWidget<M> + 'static,
+{
+  #[inline]
+  fn into_widget(self) -> Widget { self.into_dyn_render().into_widget() }
+}
+
+impl<D, M> IntoWidget<M> for DynWidget<D>
+where
+  M: ImplMarker,
   D: IntoWidget<M> + 'static,
 {
   #[inline]
   fn into_widget(self) -> Widget { self.into_inner().into_widget() }
-}
-
-// impl IntoChild
-impl<D, M> IntoChild<FromOther<DynWidget<M>>, Widget> for Stateful<DynWidget<D>>
-where
-  M: WidgetMarker,
-  D: IntoIterator + 'static,
-  D::Item: IntoWidget<M>,
-{
-  #[inline]
-  fn into_child(self) -> Widget { DynRender::from_multi(self).into_widget() }
-}
-
-// // Iterator -> Vec<C>
-// // Iterator can only provide across DynWidget.
-impl<Iter, C, M> FillChildVec<DynWidget<M>, C> for DynWidget<Iter>
-where
-  Iter: IntoIterator,
-  M: ChildMarker,
-  Iter::Item: IntoChild<M, C>,
-{
-  #[inline]
-  fn fill(self, vec: &mut Vec<C>) {
-    vec.extend(self.into_inner().into_iter().map(IntoChild::into_child))
-  }
-}
-
-// // impl WithChild
-
-impl<D, C, M1, M2> WithChild<(&dyn SingleChild, &M1, &M2), C> for Stateful<DynWidget<D>>
-where
-  D: SingleChild + IntoWidget<M1> + 'static,
-  C: IntoChild<M2, Option<Widget>>,
-  M1: WidgetMarker,
-  M2: ChildMarker,
-{
-  type Target = Widget;
-  fn with_child(self, child: C) -> Self::Target {
-    let render = DynRender::from_single(self);
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(render))),
-      children: child.into_child().into_iter().collect(),
-    }
-  }
-}
-
-impl<D, C, M1, M2> WithChild<(&dyn SingleChild, &M1, &M2), C> for Stateful<DynWidget<Option<D>>>
-where
-  D: SingleChild + IntoWidget<M1> + 'static,
-  C: IntoChild<M2, Option<Widget>>,
-  M1: WidgetMarker,
-  M2: ChildMarker,
-{
-  type Target = Widget;
-  fn with_child(self, child: C) -> Self::Target {
-    let render = DynRender::from_option_single(self);
-
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(render))),
-      children: child.into_child().into_iter().collect(),
-    }
-  }
-}
-
-impl<D, C, M1, M2> WithChild<(&dyn MultiChild, &M1, &M2), C> for Stateful<DynWidget<D>>
-where
-  D: MultiChild + IntoWidget<M1> + 'static,
-  C: IntoChild<M2, Vec<Widget>>,
-  M1: WidgetMarker,
-  M2: ChildMarker,
-{
-  type Target = Widget;
-  fn with_child(self, child: C) -> Self::Target {
-    let render = DynRender::from_single(self);
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(render))),
-      children: child.into_child(),
-    }
-  }
-}
-
-impl<C, D, M: ?Sized> WithChild<M, C> for DynWidget<D>
-where
-  D: WithChild<M, C>,
-{
-  type Target = D::Target;
-
-  #[inline]
-  fn with_child(self, child: C) -> Self::Target { self.into_inner().with_child(child) }
 }
 
 #[cfg(test)]
