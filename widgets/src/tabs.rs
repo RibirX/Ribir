@@ -21,6 +21,18 @@ impl ComposeStyle for InkBarStyle {
   }
 }
 
+#[derive(Clone, Declare)]
+pub struct TabStyle {
+  #[declare(default=Palette::of(ctx).primary())]
+  pub color: Color,
+}
+
+impl ComposeStyle for TabStyle {
+  type Host = Widget;
+  #[inline]
+  fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
+}
+
 #[derive(Template)]
 pub struct Tab {
   header: WidgetOf<TabHeader>,
@@ -56,7 +68,7 @@ impl ComposeChild for Tabs {
         Stack {
           Row {
             border: Border::only_bottom(BorderSide {
-              width: 1., color: Palette::of(ctx).primary()
+              width: 1., color: Palette::of(ctx).surface_variant()
             }),
             DynWidget {
               dyns: {
@@ -73,11 +85,10 @@ impl ComposeChild for Tabs {
                             *active_header_rect = tab_header.layout_rect();
                           }
                         },
-                        DynWidget {
-                          h_align: HAlign::Center,
-                          // v_align: VAlign::Center,
-
-                          dyns: header
+                        TabStyle {
+                          DynWidget {
+                            dyns: header
+                          }
                         }
                       }
 

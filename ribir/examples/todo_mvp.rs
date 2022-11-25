@@ -1,4 +1,4 @@
-use ribir::prelude::*;
+use ribir::prelude::{*, svgs};
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {
@@ -21,12 +21,13 @@ impl Compose for TodoMVP {
         margin: EdgeInsets::all(10.),
         Row {
           margin: EdgeInsets::only_bottom(10.),
-          SizedBox {
+
+          Container {
             size: Size::new(240., 30.),
-            border: Border::only_bottom(BorderSide { width:1., color: Color::BLACK }),
+            border: Border::only_bottom(BorderSide { width:1., color: Palette::of(ctx).surface_variant() }),
             Input {
               id: input,
-              placeholder: String::from("Add Task"),
+              placeholder: String::from("Todo"),
             }
           }
           Button {
@@ -48,6 +49,7 @@ impl Compose for TodoMVP {
 
         Tabs {
           id: tabs,
+          margin: EdgeInsets::only_top(20.),
           Tab {
             TabHeader {
               TabText {
@@ -98,9 +100,8 @@ impl TodoMVP {
     widget! {
       track { this, this2: this.clone() }
       VScrollBar {
-        Column {
-          align_items: Align::Start,
-          padding: EdgeInsets::all(8.),
+        Lists {
+          padding: EdgeInsets::vertical(8.),
           DynWidget {
             dyns: this.tasks.iter()
               .enumerate()
@@ -109,22 +110,24 @@ impl TodoMVP {
               let checked = task.finished;
               let label = task.label.clone();
               widget! {
-                Stack {
+                ListItem {
                   id: item,
-                  Checkbox {
-                    id: checkbox,
-                    checked,
-                    margin: EdgeInsets::vertical(4.),
-                    h_align: HAlign::Stretch,
-                    Label { desc: label }
+                  HeadlineText(label)
+                  Leading {
+                    Checkbox {
+                      id: checkbox,
+                      checked,
+                      margin: EdgeInsets::vertical(4.),
+                    }
                   }
-                  Icon {
-                    visible: item.mouse_hover(),
-                    h_align: HAlign::Right,
-                    tap: move |_| {
-                       this2.tasks.remove(idx);
-                    },
-                    DynWidget { dyns: svgs::CLOSE }
+                  Trailing {
+                    Icon {
+                      visible: item.mouse_hover(),
+                      tap: move |_| {
+                          this2.tasks.remove(idx);
+                      },
+                      svgs::CLOSE
+                    }
                   }
                 }
                 on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
@@ -149,13 +152,18 @@ impl Compose for TabText {
       track {
         this: this.into_stateful()
       }
+      env {
+        let primary = Palette::of(ctx).primary();
+        let on_surface_variant = Palette::of(ctx).on_surface_variant();
+        let text_style = TypographyTheme::of(ctx).body1.text.clone();
+      }
       Text {
         text: this.tab_text.clone(),
-        padding: EdgeInsets::all(4.),
+        padding: EdgeInsets::vertical(6.),
         h_align: HAlign::Center,
         style: TextStyle {
-          foreground: if this.is_active { Brush::Color(Color::RED) } else { Brush::Color(Color::BLACK) },
-          ..Default::default()
+          foreground: if this.is_active { Brush::Color(primary) } else { Brush::Color(on_surface_variant) },
+          ..text_style.clone()
         },
       }
     }

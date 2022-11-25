@@ -133,7 +133,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<InkBarStyle>(|style, host| {
+  styles.override_compose_style::<InkBarStyle>(|style, _host| {
     widget! {
       track { style }
       env { let palette = Palette::of(ctx); }
@@ -166,6 +166,18 @@ fn override_compose_style(theme: &mut FullTheme) {
         InteractiveLayer {
           color: style.color, border_radii: Radius::all(20.),
           DynWidget { dyns: host, margin: EdgeInsets::all(12.) }
+        }
+      }
+    }
+  });
+  styles.override_compose_style::<TabStyle>(move |style, host| {
+    widget! {
+      track { style }
+      Ripple {
+        color: style.color,
+        InteractiveLayer {
+          color: style.color, border_radii: Radius::all(20.),
+          DynWidget { dyns: host }
         }
       }
     }
