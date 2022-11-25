@@ -14,30 +14,16 @@ impl<B> ComposedWidget<Widget, B> {
 
 impl<B: 'static> IntoWidget<Generic<Widget>> for ComposedWidget<Widget, B> {
   fn into_widget(self) -> Widget {
-    let Widget { node, mut children } = self.composed;
     let by = self.by;
-    if let Some(node) = node {
-      match node {
-        WidgetNode::Compose(c) => {
-          assert!(children.is_empty());
-          (move |ctx: &BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget())
-            .into_widget()
-        }
-        WidgetNode::Render(r) => {
-          let node = WidgetNode::Render(Box::new(ComposedWidget { composed: r, by }));
-          Widget { node: Some(node), children }
-        }
+
+    match self.composed {
+      Widget::Compose(c) => {
+        (move |ctx: &BuildCtx| ComposedWidget { composed: c(ctx), by }.into_widget()).into_widget()
       }
-    } else {
-      match children.len() {
-        0 => Widget { node: None, children },
-        1 => Self {
-          composed: children.pop().unwrap(),
-          by,
-        }
-        .into_widget(),
-        _ => unreachable!("Compose return multi widget, should compile failed."),
-      }
+      Widget::Render { render, children } => Widget::Render {
+        render: Box::new(ComposedWidget { composed: render, by }),
+        children,
+      },
     }
   }
 }
