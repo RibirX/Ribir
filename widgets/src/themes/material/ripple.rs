@@ -42,12 +42,13 @@ impl ComposeChild for Ripple {
     widget! {
       track { this: this.into_stateful() }
       Stack {
-        DynWidget { id: host, dyns: child }
+        id: container,
+        DynWidget { dyns: child }
         DynWidget {
           dyns: {
             this.launch_pos.clone().map(|launch_at| {
               let radius = this.radius.unwrap_or_else(|| {
-                let rect = host.layout_rect();
+                let rect = container.layout_rect();
                 let distance_x = f32::max( launch_at.x - rect.min_x(), rect.max_x() - launch_at.x);
                 let distance_y = f32::max(launch_at.y - rect.min_y(), rect.max_y() - launch_at.y);
                 (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
@@ -55,7 +56,7 @@ impl ComposeChild for Ripple {
               widget!{
                 DynWidget {
                   dyns: (this.bounded != RippleBound::Unbounded).then(|| {
-                    let rect = host.layout_rect();
+                    let rect = container.layout_rect();
                     let path = match this.bounded {
                       RippleBound::Unbounded => unreachable!(),
                       RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
@@ -83,7 +84,7 @@ impl ComposeChild for Ripple {
                     Path::circle(center, radius, PathStyle::Fill)
                   }
                 }
-                on host.pointer_pressed() || ripper_enter.is_running() {
+                on container.pointer_pressed() || ripper_enter.is_running() {
                   change: move |(before, after)| if (before, after) == (true, false) {
                     this.launch_pos.take();
                   }
@@ -102,9 +103,9 @@ impl ComposeChild for Ripple {
           }
         }
       }
-      on host {
+      on container {
         pointer_down: move |e| this.launch_pos = if this.center {
-          Some(host.layout_rect().center())
+          Some(container.layout_rect().center())
         } else {
           Some(e.position())
         }

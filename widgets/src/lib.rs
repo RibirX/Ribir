@@ -6,6 +6,7 @@ pub mod icon;
 pub mod input;
 pub mod label;
 pub mod layout;
+pub mod lists;
 pub mod path;
 pub mod scrollbar;
 pub mod tabs;
@@ -20,6 +21,7 @@ pub mod prelude {
   pub use super::input::*;
   pub use super::label::*;
   pub use super::layout::*;
+  pub use super::lists::*;
   pub use super::path::*;
   pub use super::scrollbar::*;
   pub use super::tabs::*;
