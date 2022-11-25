@@ -58,7 +58,7 @@ macro_rules! impl_enum_widget {
 
     }
     impl<$($var_ty: MultiChild),+> MultiChild for $name <$($var_ty),+> {}
-    impl<Child: AssociatedTemplate, $($var_ty: ComposeChild<Child=Child>),+> ComposeChild 
+    impl<Child: AssociatedTemplate, $($var_ty: ComposeChild<Child=Child>),+> ComposeChild
       for $name <$($var_ty),+> {
       type Child = Child;
       fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {

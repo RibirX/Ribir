@@ -1,9 +1,5 @@
 use indextree::*;
-use std::{
-  cell::RefCell,
-  collections::{HashMap, HashSet},
-  rc::Rc,
-};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 pub mod widget_id;
 pub(crate) use widget_id::TreeArena;
@@ -13,13 +9,11 @@ use crate::prelude::*;
 pub use layout_info::*;
 
 pub(crate) struct WidgetTree {
-  arena: Arena<Box<dyn Render>>,
+  arena: TreeArena,
   root: Option<WidgetId>,
   ctx: AppContext,
-  pub(crate) state_changed: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
-  /// Store the render object's place relative to parent coordinate and the
-  /// clamp passed from parent.
-  layout_store: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
+  state_changed: Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>,
+  layout_store: LayoutStore,
 }
 
 impl WidgetTree {
@@ -176,7 +170,11 @@ impl WidgetTree {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.state_changed.borrow().is_empty() }
 
-  pub(crate) fn count(&self) -> usize { self.root().descendants(&self).count() }
+  pub(crate) fn count(&self) -> usize { self.root().descendants(&self.arena).count() }
+
+  pub(crate) fn arena(&self) -> &TreeArena { &self.arena() }
+
+  pub(crate) fn layout_store(&self) -> &LayoutStore { &self.layout_store }
 
   pub(crate) fn app_ctx(&self) -> &AppContext { &self.ctx }
 
