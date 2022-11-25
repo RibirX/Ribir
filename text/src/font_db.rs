@@ -339,8 +339,10 @@ impl OutlineBuilder for GlyphOutlineBuilder {
   }
 
   fn close(&mut self) {
-    self.closed = true;
-    self.builder.close()
+    if !self.closed {
+      self.closed = true;
+      self.builder.close()
+    }
   }
 }
 
