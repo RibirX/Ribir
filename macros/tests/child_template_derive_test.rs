@@ -29,7 +29,7 @@ fn syntax_pass() {
       self::ChildB
     }
   };
-  let _emit_option = widget! {
+  let _omit_option = widget! {
     P {
       self::ChildA
     }

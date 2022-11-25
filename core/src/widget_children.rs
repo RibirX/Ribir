@@ -103,8 +103,8 @@ where
 {
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(widget))),
+    Widget::Render {
+      render: Box::new(widget),
       children: vec![child.into_widget()],
     }
   }
@@ -117,8 +117,8 @@ where
   #[inline]
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(widget))),
+    Widget::Render {
+      render: Box::new(widget),
       children: child,
     }
   }
@@ -268,9 +268,9 @@ where
   }
 }
 
-impl<M, D, W> FillTemplate<Concrete<&M>, DynWidget<D>> for W
+impl<M, D, T> FillTemplate<Concrete<&M>, DynWidget<D>> for T
 where
-  W: FillTemplate<Generic<M>, D>,
+  T: FillTemplate<Generic<M>, D>,
 {
   #[inline]
   fn fill(self, c: DynWidget<D>) -> Self { self.fill(c.into_inner()) }

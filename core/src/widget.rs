@@ -75,14 +75,12 @@ pub enum StateWidget<W> {
   Stateful(Stateful<W>),
 }
 
-pub struct Widget {
-  pub(crate) node: Option<WidgetNode>,
-  pub(crate) children: Vec<Widget>,
-}
-
-pub(crate) enum WidgetNode {
+pub enum Widget {
   Compose(Box<dyn for<'r> FnOnce(&'r BuildCtx) -> Widget>),
-  Render(Box<dyn Render>),
+  Render {
+    render: Box<dyn Render>,
+    children: Vec<Widget>,
+  },
 }
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
@@ -193,8 +191,8 @@ impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<Generic<&dyn Compos
 impl<R: Render + 'static> IntoWidget<Generic<&dyn Render>> for R {
   #[inline]
   fn into_widget(self) -> Widget {
-    Widget {
-      node: Some(WidgetNode::Render(Box::new(self))),
+    Widget::Render {
+      render: Box::new(self),
       children: Vec::default(),
     }
   }
@@ -215,14 +213,7 @@ where
   R: IntoWidget<M>,
 {
   #[inline]
-  fn into_widget(self) -> Widget {
-    Widget {
-      node: Some(WidgetNode::Compose(Box::new(move |ctx| {
-        self(ctx).into_widget()
-      }))),
-      children: Vec::default(),
-    }
-  }
+  fn into_widget(self) -> Widget { Widget::Compose(Box::new(move |ctx| self(ctx).into_widget())) }
 }
 
 #[macro_export]

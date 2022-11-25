@@ -32,23 +32,11 @@ pub fn compose_child_as_data_widget<D: Query + 'static>(
 }
 
 pub fn widget_attach_data<D: Query + 'static>(widget: Widget, data: D) -> Widget {
-  let Widget { node, mut children } = widget;
-  if let Some(node) = node {
-    match node {
-      WidgetNode::Compose(c) => {
-        assert!(children.is_empty());
-        (|ctx: &BuildCtx| widget_attach_data(c(ctx), data)).into_widget()
-      }
-      WidgetNode::Render(r) => {
-        let node = WidgetNode::Render(Box::new(DataWidget { widget: r, data }));
-        Widget { node: Some(node), children }
-      }
-    }
-  } else {
-    match children.len() {
-      0 => Widget { node: None, children },
-      1 => widget_attach_data(children.pop().unwrap(), data),
-      _ => unreachable!("Compiler should not allow attach data to many widget."),
-    }
+  match widget {
+    Widget::Compose(c) => (|ctx: &BuildCtx| widget_attach_data(c(ctx), data)).into_widget(),
+    Widget::Render { render, children } => Widget::Render {
+      render: Box::new(DataWidget { widget: render, data }),
+      children,
+    },
   }
 }

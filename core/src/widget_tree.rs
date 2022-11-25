@@ -495,32 +495,22 @@ impl Widget {
       }
 
       fn place_node_in_tree(&mut self, widget: Widget) {
-        let Widget { node, children } = widget;
-        let children_size = children.len();
-        self.push_children(children);
-
-        if let Some(node) = node {
-          match node {
-            WidgetNode::Compose(c) => {
-              assert_eq!(children_size, 0, "compose widget shouldn't have child.");
-              let theme_cnt = self.themes.borrow().len();
-              let mut build_ctx = BuildCtx::new(&self.themes, self.tree);
-              let c = c(&mut build_ctx);
-              if theme_cnt < self.themes.borrow().len() {
-                self.stack.push(NodeInfo::BackTheme);
-              }
-              self.stack.push(NodeInfo::Widget(c));
+        match widget {
+          Widget::Compose(c) => {
+            let theme_cnt = self.themes.borrow().len();
+            let mut build_ctx = BuildCtx::new(&self.themes, self.tree);
+            let c = c(&mut build_ctx);
+            if theme_cnt < self.themes.borrow().len() {
+              self.stack.push(NodeInfo::BackTheme);
             }
-            WidgetNode::Render(r) => {
-              let wid = self.tree.new_node(r);
-              self.perpend(wid, children_size > 0);
-            }
+            self.stack.push(NodeInfo::Widget(c));
           }
-        } else {
-          assert!(
-            children_size <= 1,
-            "None parent with multi child is forbidden."
-          );
+          Widget::Render { render, children } => {
+            let wid = self.tree.new_node(render);
+            let children_size = children.len();
+            self.push_children(children);
+            self.perpend(wid, children_size > 0);
+          }
         }
       }
 
