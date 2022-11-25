@@ -1,8 +1,11 @@
 use painter::ZERO_SIZE;
 
 use super::{WidgetId, WidgetTree};
-use crate::prelude::{Point, Rect, Size, INFINITY_SIZE};
-use std::cmp::Reverse;
+use crate::{
+  prelude::{Point, Rect, Size, INFINITY_SIZE},
+  widget::TreeArena,
+};
+use std::{cmp::Reverse, collections::HashMap};
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -24,6 +27,71 @@ pub struct BoxLayout {
   pub rect: Option<Rect>,
 }
 
+/// Store the render object's place relative to parent coordinate and the
+/// clamp passed from parent.
+pub(crate) struct LayoutStore {
+  data: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
+}
+
+impl LayoutStore {
+  /// Remove the layout info of the `wid`
+  pub(crate) fn force_layout(&mut self, id: WidgetId) -> Option<BoxLayout> { self.data.remove(&id) }
+
+  /// Return the box rect of layout result of render widget, if it's a
+  /// combination widget return None.
+  pub(crate) fn layout_box_rect(&self, id: WidgetId) -> Option<Rect> {
+    self.layout_info(id).and_then(|info| info.rect)
+  }
+
+  pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&BoxLayout> { self.data.get(&id) }
+
+  /// Return the mut reference of box rect of the layout widget(create if not
+  /// have), notice
+  ///
+  /// Caller should guarantee `id` is a layout widget.
+  pub(crate) fn layout_box_rect_mut(&mut self, id: WidgetId) -> &mut Rect {
+    self
+      .layout_info_or_default(id)
+      .rect
+      .get_or_insert_with(Rect::zero)
+  }
+
+  // pub(crate) fn need_layout(&self) -> bool { !self.needs_layout.is_empty() }
+
+  /// return a mutable reference of the layout info  of `id`, if it's not exist
+  /// insert a default value before return
+  pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut BoxLayout {
+    self.data.entry(id).or_insert_with(BoxLayout::default)
+  }
+
+  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
+    // todo: should effect by transform widget.
+    self
+      .layout_box_rect(id)
+      .map_or(pos, |rect| pos + rect.min().to_vector())
+  }
+
+  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point) -> Point {
+    self
+      .layout_box_rect(id)
+      .map_or(pos, |rect| pos - rect.min().to_vector())
+    // todo: should effect by transform widget.
+  }
+
+  pub(crate) fn map_to_global(&self, id: WidgetId, pos: Point, tree_arena: &TreeArena) -> Point {
+    id.ancestors(tree_arena)
+      .fold(pos, |pos, p| self.map_to_parent(p, pos))
+  }
+
+  pub(crate) fn map_from_global(&self, id: WidgetId, pos: Point, tree_arena: &TreeArena) -> Point {
+    let stack = id.ancestors(tree_arena).collect::<Vec<_>>();
+    stack
+      .iter()
+      .rev()
+      .fold(pos, |pos, p| self.map_from_parent(*p, pos))
+  }
+}
+
 impl BoxClamp {
   #[inline]
   pub fn clamp(self, size: Size) -> Size { size.clamp(self.min, self.max) }
@@ -42,43 +110,6 @@ impl BoxClamp {
 }
 
 impl WidgetTree {
-  /// Remove the layout info of the `wid`
-  pub(crate) fn force_layout(&mut self, id: WidgetId) -> Option<BoxLayout> {
-    self.layout_store.remove(&id)
-  }
-
-  /// Return the box rect of layout result of render widget, if it's a
-  /// combination widget return None.
-  pub(crate) fn layout_box_rect(&self, id: WidgetId) -> Option<Rect> {
-    self.layout_info(id).and_then(|info| info.rect)
-  }
-
-  pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&BoxLayout> {
-    self.layout_store.get(&id)
-  }
-
-  /// Return the mut reference of box rect of the layout widget(create if not
-  /// have), notice
-  ///
-  /// Caller should guarantee `id` is a layout widget.
-  pub(crate) fn layout_box_rect_mut(&mut self, id: WidgetId) -> &mut Rect {
-    self
-      .layout_info_or_default(id)
-      .rect
-      .get_or_insert_with(Rect::zero)
-  }
-
-  // pub(crate) fn need_layout(&self) -> bool { !self.needs_layout.is_empty() }
-
-  /// return a mutable reference of the layout info  of `id`, if it's not exist
-  /// insert a default value before return
-  pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut BoxLayout {
-    self
-      .layout_store
-      .entry(id)
-      .or_insert_with(BoxLayout::default)
-  }
-
   pub(crate) fn layout_list(&mut self) -> Option<Vec<WidgetId>> {
     if self.state_changed.borrow().is_empty() {
       return None;
@@ -94,19 +125,19 @@ impl WidgetTree {
     };
 
     for id in dirty_widgets.iter() {
-      if id.is_dropped(self) {
+      if id.is_dropped(&self.arena) {
         continue;
       }
 
       let mut relayout_root = *id;
-      if let Some(info) = self.layout_store.get_mut(id) {
+      if let Some(info) = self.layout_store.data.get_mut(id) {
         info.rect.take();
       }
 
       // All ancestors of this render widget should relayout until the one which only
       // sized by parent.
       for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
-        if self.layout_box_rect(p).is_none() {
+        if self.layout_store.layout_box_rect(p).is_none() {
           break;
         }
         let r = self.arena.get(p.0).unwrap().get();
@@ -114,7 +145,7 @@ impl WidgetTree {
           break;
         }
 
-        if let Some(info) = self.layout_store.get_mut(&p) {
+        if let Some(info) = self.layout_store.data.get_mut(&p) {
           info.rect.take();
         }
 
@@ -127,33 +158,6 @@ impl WidgetTree {
       needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
       needs_layout
     })
-  }
-
-  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
-    // todo: should effect by transform widget.
-    self
-      .layout_box_rect(id)
-      .map_or(pos, |rect| pos + rect.min().to_vector())
-  }
-
-  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point) -> Point {
-    self
-      .layout_box_rect(id)
-      .map_or(pos, |rect| pos - rect.min().to_vector())
-    // todo: should effect by transform widget.
-  }
-
-  pub(crate) fn map_to_global(&self, id: WidgetId, pos: Point) -> Point {
-    id.ancestors(self)
-      .fold(pos, |pos, p| self.map_to_parent(p, pos))
-  }
-
-  pub(crate) fn map_from_global(&self, id: WidgetId, pos: Point) -> Point {
-    let stack = id.ancestors(self).collect::<Vec<_>>();
-    stack
-      .iter()
-      .rev()
-      .fold(pos, |pos, p| self.map_from_parent(*p, pos))
   }
 }
 

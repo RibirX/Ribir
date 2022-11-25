@@ -1,7 +1,7 @@
-use super::AppContext;
 use crate::{
   prelude::QueryOrder,
-  widget_tree::{WidgetId, WidgetTree},
+  widget::{LayoutStore, TreeArena},
+  widget_tree::WidgetId,
 };
 use painter::{Point, Rect};
 
@@ -40,25 +40,23 @@ pub trait WidgetCtx {
   /// Returns some reference to the inner value if the widget back of `id` is
   /// type `T`, or `None` if it isn't.
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
-
-  fn app_ctx(&self) -> &AppContext;
 }
 
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
-
-  fn widget_tree(&self) -> &WidgetTree;
+  fn tree_arena(&self) -> &TreeArena;
+  fn layout_store(&self) -> &LayoutStore;
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
   #[inline]
-  fn parent(&self) -> Option<WidgetId> { self.id().parent(self.widget_tree()) }
+  fn parent(&self) -> Option<WidgetId> { self.id().parent(self.tree_arena()) }
 
   #[inline]
-  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { w.parent(self.widget_tree()) }
+  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { w.parent(self.tree_arena()) }
 
   #[inline]
-  fn single_child(&self) -> Option<WidgetId> { self.id().single_child(self.widget_tree()) }
+  fn single_child(&self) -> Option<WidgetId> { self.id().single_child(self.tree_arena()) }
 
   #[inline]
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
@@ -70,43 +68,48 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
 
   #[inline]
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
-    self.widget_tree().layout_box_rect(wid)
+    self.layout_store().layout_box_rect(wid)
   }
 
   #[inline]
-  fn map_to_global(&self, pos: Point) -> Point { self.widget_tree().map_to_global(self.id(), pos) }
+  fn map_to_global(&self, pos: Point) -> Point {
+    self
+      .layout_store()
+      .map_to_global(self.id(), pos, self.tree_arena())
+  }
 
   #[inline]
   fn map_from_global(&self, pos: Point) -> Point {
-    self.widget_tree().map_from_global(self.id(), pos)
+    self
+      .layout_store()
+      .map_from_global(self.id(), pos, self.tree_arena())
   }
 
   #[inline]
-  fn map_to_parent(&self, pos: Point) -> Point { self.widget_tree().map_to_parent(self.id(), pos) }
+  fn map_to_parent(&self, pos: Point) -> Point { self.layout_store().map_to_parent(self.id(), pos) }
 
   #[inline]
   fn map_from_parent(&self, pos: Point) -> Point {
-    self.widget_tree().map_from_parent(self.id(), pos)
+    self.layout_store().map_from_parent(self.id(), pos)
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
     let global = self.map_to_global(pos);
-    self.widget_tree().map_from_global(w, global)
+    self
+      .layout_store()
+      .map_from_global(w, global, self.tree_arena())
   }
 
   fn map_from(&self, pos: Point, w: WidgetId) -> Point {
-    let global = self.widget_tree().map_to_global(w, pos);
+    let global = self.layout_store().map_to_global(w, pos, self.tree_arena());
     self.map_from_global(global)
   }
 
   #[inline]
   fn query_widget_type<W: 'static>(&self, id: WidgetId, callback: impl FnOnce(&W)) {
-    id.assert_get(self.widget_tree())
+    id.assert_get(self.tree_arena())
       .query_on_first_type(QueryOrder::OutsideFirst, callback);
   }
-
-  #[inline]
-  fn app_ctx(&self) -> &AppContext { self.widget_tree().app_ctx() }
 }
 
 #[cfg(test)]

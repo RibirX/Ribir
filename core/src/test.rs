@@ -63,12 +63,16 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
   let tree = &wnd.widget_tree;
   let mut node = tree.root();
   for (level, idx) in path[1..].into_iter().enumerate() {
-    node = node.children(tree).skip(*idx).next().unwrap_or_else(|| {
-      panic!("node no exist: {:?}", &path[0..level]);
-    });
+    node = node
+      .children(tree.arena())
+      .skip(*idx)
+      .next()
+      .unwrap_or_else(|| {
+        panic!("node no exist: {:?}", &path[0..level]);
+      });
   }
 
-  tree.layout_box_rect(node).unwrap()
+  tree.layout_store().layout_box_rect(node).unwrap()
 }
 
 #[derive(Declare, MultiChild)]
