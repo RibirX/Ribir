@@ -47,10 +47,10 @@ impl WidgetTree {
   pub(crate) fn draw(&self, painter: &mut Painter) {
     let mut w = Some(self.root());
 
-    fn paint_rect_interset(painter: &mut Painter, rc: &Rect) -> bool {
+    fn paint_rect_intersect(painter: &mut Painter, rc: &Rect) -> bool {
       let paint_rect = painter.get_transform().outer_transformed_rect(rc);
       painter
-        .visiual_rect()
+        .visual_rect()
         .and_then(|rc| rc.intersection(&paint_rect))
         .is_some()
     }
@@ -66,7 +66,7 @@ impl WidgetTree {
       let render = id.assert_get(self);
 
       let need_paint = paint_ctx.painter.alpha() != 0.
-        && (paint_rect_interset(paint_ctx.painter, &layout_box) || render.can_overflow());
+        && (paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow());
 
       if need_paint {
         paint_ctx
