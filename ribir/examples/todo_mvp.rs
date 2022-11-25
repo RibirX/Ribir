@@ -103,14 +103,14 @@ impl TodoMVP {
     widget! {
       track { this, this2: this.clone() }
       VScrollBar {
-        background: Brush::Color(Color::BURLYWOOD),
         Column {
           align_items: Align::Start,
           padding: EdgeInsets::all(8.),
           DynWidget {
             dyns: this.tasks.iter()
-              .filter(|task| { cond(task) })
-              .enumerate().map(|(idx, task)| {
+              .enumerate()
+              .filter(|(_, task)| { cond(task) })
+              .map(|(idx, task)| {
               let checked = task.finished;
               let label = task.label.clone();
               widget! {

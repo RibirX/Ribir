@@ -126,11 +126,25 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<InkBarStyle>(|_, host| {
+  styles.override_compose_style::<InkBarStyle>(|style, host| {
     widget! {
-      DynWidget {
-        dyns: host,
-        background: Palette::of(ctx).primary()
+      track { style }
+      env { let palette = Palette::of(ctx); }
+      Container {
+        id: ink_bar,
+        size: Size::new(style.ink_bar_rect.size.width, 2.),
+        left_anchor: style.ink_bar_rect.origin.x,
+        top_anchor: style.ink_bar_rect.size.height - 2.,
+        background: palette.primary(),
+      }
+
+      change_on ink_bar.left_anchor Animate {
+        transition: transitions::EASE_IN.of(ctx),
+        lerp_fn: move |from, to, rate| {
+          let from = from.abs_value(0.);
+          let to = to.abs_value(0.);
+          PositionUnit::Pixel(from.lerp(&to, rate))
+        }
       }
     }
   });
