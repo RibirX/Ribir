@@ -296,7 +296,7 @@ mod tests {
   use super::*;
 
   #[test]
-  fn compose_tuple_child() {
+  fn compose_template_child() {
     #[derive(Declare)]
     struct Page;
     #[derive(Declare, SingleChild)]
@@ -316,7 +316,7 @@ mod tests {
     impl ComposeChild for Page {
       type Child = PageTml;
 
-      fn compose_child(_: StateWidget<Self>, child: Self::Child) -> Widget {
+      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
     }

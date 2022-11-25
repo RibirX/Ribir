@@ -129,7 +129,7 @@ impl Painter {
     );
   }
 
-  pub fn visiual_rect(&mut self) -> Option<Rect> { self.current_state().visiual_rect }
+  pub fn visual_rect(&mut self) -> Option<Rect> { self.current_state().visiual_rect }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
