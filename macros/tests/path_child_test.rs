@@ -26,7 +26,8 @@ impl AB {
   fn b() -> Self { AB::B }
 }
 
-fn main() {
+#[test]
+fn path_widget() {
   expect_layout_result(
     widget! { AB::A },
     None,
@@ -60,6 +61,29 @@ fn main() {
     &[LayoutTestItem {
       path: &[0],
       expect: ExpectRect::from_size(SIZE_ONE),
+    }],
+  );
+}
+
+#[test]
+fn tuple_widget() {
+  struct TupleBox(Size);
+  impl Compose for TupleBox {
+    fn compose(this: StateWidget<Self>) -> Widget {
+      widget_try_track! {
+        try_track { this }
+        SizedBox { size: this.0 }
+      }
+    }
+  }
+
+  let size = Size::new(1., 1.);
+  expect_layout_result(
+    widget! { TupleBox(size) },
+    None,
+    &[LayoutTestItem {
+      path: &[0],
+      expect: ExpectRect::from_size(size),
     }],
   );
 }
