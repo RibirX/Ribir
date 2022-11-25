@@ -110,6 +110,23 @@ where
   }
 }
 
+impl<W, C, M1, M2> IntoWidget<Generic<(M1, M2)>> for WidgetPair<W, DynWidget<Option<C>>>
+where
+  M1: ImplMarker,
+  M2: ImplMarker,
+  W: IntoWidget<M1>,
+  WidgetPair<W, C>: IntoWidget<M2>,
+{
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    if let Some(child) = child.into_inner() {
+      WidgetPair { widget, child }.into_widget()
+    } else {
+      widget.into_widget()
+    }
+  }
+}
+
 impl<W> IntoWidget<Generic<Self>> for WidgetPair<W, Vec<Widget>>
 where
   W: Render + 'static,
@@ -421,8 +438,11 @@ mod tests {
 
   #[test]
   fn compose_const_dyn_option_widget() {
-    MockBox { size: Size::zero() }.with_child(DynWidget {
-      dyns: Some(MockBox { size: Size::zero() }),
-    });
+    let _ = widget! {
+      MockBox {
+        size: ZERO_SIZE,
+        Option::Some(MockBox { size: Size::zero() })
+      }
+    };
   }
 }
