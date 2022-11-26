@@ -55,18 +55,14 @@ pub trait Render: Query {
   fn can_overflow(&self) -> bool { false }
 
   /// Determines the set of render widgets located at the given position.
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     let is_hit = hit_test_impl(ctx, pos);
     HitTest { hit: is_hit, can_hit_child: is_hit }
   }
 }
 
-pub(crate) fn hit_test_impl(ctx: &TreeCtx, pos: Point) -> bool {
-  let id = ctx.id();
-  ctx
-    .widget_tree()
-    .layout_box_rect(id)
-    .map_or(false, |rect| rect.contains(pos))
+pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
+  ctx.box_rect().map_or(false, |rect| rect.contains(pos))
 }
 
 /// Enum to store both stateless and stateful widget.
@@ -312,7 +308,7 @@ impl<T: Render> Render for algo::ShareResource<T> {
   fn can_overflow(&self) -> bool { T::can_overflow(self) }
 
   #[inline]
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
 }
 
 impl<T: Query> Query for ShareResource<T> {
@@ -363,7 +359,7 @@ macro_rules! impl_proxy_render {
     fn can_overflow(&self) -> bool { self.$($proxy)*.can_overflow() }
 
     #[inline]
-    fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
+    fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
   };
 }
 

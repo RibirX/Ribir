@@ -20,7 +20,7 @@ impl Render for TransformWidget {
   fn can_overflow(&self) -> bool { true }
 
   #[inline]
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     let is_hit = self.transform.inverse().map_or(false, |transform| {
       hit_test_impl(ctx, transform.transform_point(pos))
     });

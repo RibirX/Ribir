@@ -87,7 +87,7 @@ impl Render for HAlignWidget {
   fn can_overflow(&self) -> bool { true }
 
   #[inline]
-  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
   }
 }
@@ -116,7 +116,7 @@ impl Render for VAlignWidget {
   fn can_overflow(&self) -> bool { true }
 
   #[inline]
-  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
   }
 }

@@ -1,6 +1,13 @@
 use indextree::{Arena, Node, NodeId};
+use rxrust::prelude::*;
 
-use crate::{builtin_widgets::Void, widget::Render};
+use crate::{
+  builtin_widgets::{DisposedListener, MountedListener, Void},
+  context::{AppContext, LifeCycleCtx},
+  widget::{ChangeScope, QueryOrder, Render, StateChangeNotifier},
+};
+
+use super::{DirtySet, LayoutStore};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 
@@ -134,6 +141,69 @@ impl WidgetId {
 
   pub(crate) fn detach(self, tree: &mut TreeArena) { self.0.detach(tree) }
 
+  pub(crate) fn remove_subtree(
+    self,
+    arena: &mut TreeArena,
+    store: &mut LayoutStore,
+    app_ctx: &AppContext,
+  ) {
+    self.descendants(arena).for_each(|id| {
+      store.remove(id);
+
+      id.assert_get(arena).query_all_type(
+        |d: &DisposedListener| {
+          (d.disposed.borrow_mut())(LifeCycleCtx { id: self, arena, store, app_ctx });
+          true
+        },
+        QueryOrder::OutsideFirst,
+      )
+    });
+
+    self.0.remove_subtree(arena)
+  }
+
+  pub(crate) fn on_mounted_subtree(
+    self,
+    arena: &TreeArena,
+    store: &LayoutStore,
+    app_ctx: &AppContext,
+    dirty_set: &DirtySet,
+  ) {
+    self
+      .descendants(arena)
+      .for_each(|w| w.on_mounted(arena, store, app_ctx, dirty_set));
+  }
+
+  pub(crate) fn on_mounted(
+    self,
+    arena: &TreeArena,
+    store: &LayoutStore,
+    app_ctx: &AppContext,
+    dirty_sets: &DirtySet,
+  ) {
+    self.assert_get(arena).query_all_type(
+      |notifier: &StateChangeNotifier| {
+        let state_changed = dirty_sets.clone();
+        notifier
+          .change_stream()
+          .filter(|b| b.contains(ChangeScope::FRAMEWORK))
+          .subscribe(move |_| {
+            state_changed.borrow_mut().insert(self);
+          });
+        true
+      },
+      QueryOrder::OutsideFirst,
+    );
+
+    self.assert_get(arena).query_all_type(
+      |m: &MountedListener| {
+        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, arena, store, app_ctx });
+        true
+      },
+      QueryOrder::OutsideFirst,
+    );
+  }
+
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut TreeArena) {
     self.0.insert_after(next.0, tree);
   }
@@ -177,6 +247,12 @@ pub(crate) unsafe fn split_arena(tree: &mut TreeArena) -> (&mut TreeArena, &mut 
   let ptr = tree as *mut TreeArena;
   (&mut *ptr, &mut *ptr)
 }
+
+pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
+  WidgetId(arena.new_node(node))
+}
+
+pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
 
 pub struct ChildrenIter<'a> {
   tree: &'a TreeArena,

@@ -47,7 +47,7 @@ macro_rules! impl_enum_widget {
         }
       }
 
-      fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+      fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
         match self {
           $($name::$var_ty(w) => w.hit_test(ctx, pos)),+
         }

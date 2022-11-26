@@ -318,7 +318,7 @@ impl<W: Render + 'static> Render for Stateful<W> {
   fn can_overflow(&self) -> bool { self.widget.borrow().can_overflow() }
 
   #[inline]
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     self.widget.borrow().hit_test(ctx, pos)
   }
 }
@@ -426,7 +426,7 @@ mod tests {
     let mut wnd = Window::default_mock(widget! { MockBox { size: Size::new(100., 100.) } }, None);
     wnd.draw_frame();
     let tree = &wnd.widget_tree;
-    assert_eq!(tree.root().descendants(tree).count(), 1);
+    assert_eq!(tree.root().descendants(&tree.arena).count(), 1);
   }
 
   #[test]

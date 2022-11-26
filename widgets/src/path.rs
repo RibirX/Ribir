@@ -31,7 +31,7 @@ impl Render for PathPaintKit {
   #[inline]
   fn can_overflow(&self) -> bool { true }
 
-  fn hit_test(&self, _ctx: &TreeCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, _ctx: &HitTestCtx, pos: Point) -> HitTest {
     let pt = point(pos.x, pos.y);
     // todo: support fillrule
     let is_hit = hit_test_path(
@@ -93,7 +93,7 @@ impl Render for PathsPaintKit {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { self.paths.iter().for_each(|p| p.paint(ctx)); }
 
-  fn hit_test(&self, _ctx: &TreeCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, _ctx: &HitTestCtx, pos: Point) -> HitTest {
     let pt = point(pos.x, pos.y);
     let is_hit = self.paths.iter().any(|path| {
       hit_test_path(

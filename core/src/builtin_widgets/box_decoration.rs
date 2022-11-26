@@ -34,7 +34,7 @@ impl BorderSide {
   pub fn new(width: f32, color: Color) -> Self { Self { width, color } }
 }
 
-fn single_child<C: WidgetCtx>(ctx: &C) -> WidgetId {
+fn single_child<C: WidgetContext>(ctx: &C) -> WidgetId {
   ctx
     .single_child()
     .expect("BoxDecoration must have one child.")

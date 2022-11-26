@@ -1,4 +1,4 @@
-use crate::{prelude::*, widget_tree::WidgetTree};
+use crate::prelude::*;
 use std::{
   cell::{Ref, RefCell},
   rc::Rc,
@@ -7,16 +7,16 @@ use std::{
 #[derive(Clone)]
 pub struct BuildCtx<'a> {
   themes: &'a RefCell<Vec<Rc<Theme>>>,
-  pub(crate) tree: &'a WidgetTree,
+  app_ctx: &'a AppContext,
 }
 
 impl<'a> BuildCtx<'a> {
   #[inline]
-  pub fn app_ctx(&self) -> &AppContext { self.tree.app_ctx() }
+  pub fn app_ctx(&self) -> &AppContext { self.app_ctx }
 
   #[inline]
-  pub(crate) fn new(themes: &'a RefCell<Vec<Rc<Theme>>>, tree: &'a WidgetTree) -> Self {
-    Self { themes, tree }
+  pub(crate) fn new(themes: &'a RefCell<Vec<Rc<Theme>>>, app_ctx: &'a AppContext) -> Self {
+    Self { themes, app_ctx }
   }
 
   pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<Ref<'_, T>> {
