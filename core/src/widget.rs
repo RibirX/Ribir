@@ -11,12 +11,10 @@ pub use std::{
   ops::Deref,
 };
 use std::{cell::RefCell, rc::Rc};
-pub trait Compose {
+pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: StateWidget<Self>) -> Widget
-  where
-    Self: Sized;
+  fn compose(this: StateWidget<Self>) -> Widget;
 }
 
 pub struct HitTest {
@@ -177,7 +175,7 @@ impl IntoWidget<Concrete<Widget>> for Widget {
   fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<Generic<&dyn Compose>> for C {
+impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<Generic<C>> for C {
   #[inline]
   fn into_widget(self) -> Widget {
     ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()

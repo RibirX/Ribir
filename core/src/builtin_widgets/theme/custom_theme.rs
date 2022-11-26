@@ -23,12 +23,9 @@ macro_rules! fill_custom_theme {
   };
 }
 
-pub trait CustomTheme {
+pub trait CustomTheme: Sized + 'static {
   #[inline]
-  fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self>
-  where
-    Self: Sized + 'static,
-  {
+  fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
     let tid = TypeId::of::<Self>();
     let c = ctx.find_cfg(|t| match t {
       Theme::Full(t) => t.custom_themes.themes.get(&tid),

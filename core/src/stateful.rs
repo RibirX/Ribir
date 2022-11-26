@@ -89,10 +89,8 @@ use std::{
 
 /// Convert a stateless widget to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
-pub trait IntoStateful {
-  fn into_stateful(self) -> Stateful<Self>
-  where
-    Self: Sized;
+pub trait IntoStateful: Sized {
+  fn into_stateful(self) -> Stateful<Self>;
 }
 
 /// The stateful widget generic implementation.
