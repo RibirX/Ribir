@@ -44,7 +44,7 @@ impl<B: 'static> Render for ComposedWidget<Box<dyn Render>, B> {
   fn can_overflow(&self) -> bool { self.composed.can_overflow() }
 
   #[inline]
-  fn hit_test(&self, ctx: &TreeCtx, pos: Point) -> HitTest { self.composed.hit_test(ctx, pos) }
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.composed.hit_test(ctx, pos) }
 }
 
 impl<W: SingleChild, B> SingleChild for ComposedWidget<W, B> {}

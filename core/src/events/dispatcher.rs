@@ -136,7 +136,7 @@ impl Dispatcher {
             let tap_on = self
               .pointer_down_uid
               .take()?
-              .lowest_common_ancestor(release_event.target(), tree)?;
+              .lowest_common_ancestor(release_event.target(), &tree.arena)?;
             let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &mut self.info);
 
             tree.bubble_event::<TapListener>(&mut tap_event);
@@ -177,8 +177,8 @@ impl Dispatcher {
     let event = self.pointer_event_for_hit_widget(tree);
     self.pointer_down_uid = event.as_ref().map(|e| e.target());
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
-      wid.ancestors(tree).find(|id| {
-        id.get(tree)
+      wid.ancestors(&tree.arena).find(|id| {
+        id.get(&tree.arena)
           .map_or(false, |w| w.contain_type::<FocusListener>())
       })
     });
@@ -195,12 +195,13 @@ impl Dispatcher {
   fn pointer_enter_leave_dispatch(&mut self, tree: &mut WidgetTree) {
     let new_hit = self.hit_widget(tree);
 
+    let arena = &tree.arena;
     let already_entered_start = new_hit
       .and_then(|new_hit| {
         self
           .entered_widgets
           .iter()
-          .position(|e| e.ancestors_of(new_hit, tree))
+          .position(|e| e.ancestors_of(new_hit, arena))
       })
       .unwrap_or_else(|| self.entered_widgets.len());
 
@@ -210,10 +211,10 @@ impl Dispatcher {
     // fire leave
     self.entered_widgets[..already_entered_start]
       .iter()
-      .filter(|w| !w.is_dropped(tree))
+      .filter(|w| !w.is_dropped(arena))
       .for_each(|l| {
         let mut event = PointerEvent::from_mouse(*l, tree, &self.info);
-        l.assert_get(tree).query_all_type(
+        l.assert_get(arena).query_all_type(
           |pointer: &PointerLeaveListener| {
             pointer.dispatch(&mut event);
             !event.bubbling_canceled()
@@ -228,9 +229,9 @@ impl Dispatcher {
     // fire new entered
     if let Some(hit_widget) = new_hit {
       // collect new entered
-      for w in hit_widget.ancestors(tree) {
+      for w in hit_widget.ancestors(arena) {
         if Some(w) != new_enter_end {
-          let obj = w.assert_get(tree);
+          let obj = w.assert_get(arena);
           if obj.contain_type::<PointerEnterListener>()
             || obj.contain_type::<PointerLeaveListener>()
           {
@@ -242,7 +243,7 @@ impl Dispatcher {
       }
 
       self.entered_widgets.iter().rev().for_each(|w| {
-        let obj = w.assert_get(tree);
+        let obj = w.assert_get(arena);
         if obj.contain_type::<PointerEnterListener>() {
           let mut event = PointerEvent::from_mouse(*w, tree, &mut self.info);
           obj.query_all_type(
@@ -260,15 +261,17 @@ impl Dispatcher {
 
   fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
     fn down_coordinate(id: WidgetId, pos: Point, tree: &WidgetTree) -> Option<(WidgetId, Point)> {
-      let r = id.assert_get(tree);
-      let ctx = TreeCtx::new(id, tree);
+      let WidgetTree { arena, store, app_ctx, .. } = tree;
+
+      let r = id.assert_get(arena);
+      let ctx = HitTestCtx { id, arena, store, app_ctx };
       let hit_test = r.hit_test(&ctx, pos);
 
       if hit_test.hit {
-        Some((id, tree.map_from_parent(id, pos)))
+        Some((id, store.map_from_parent(id, pos)))
       } else if hit_test.can_hit_child {
-        let pos = tree.map_from_parent(id, pos);
-        id.reverse_children(tree)
+        let pos = store.map_from_parent(id, pos);
+        id.reverse_children(arena)
           .find_map(|c| down_coordinate(c, pos, tree))
       } else {
         None
@@ -280,7 +283,7 @@ impl Dispatcher {
     while let Some((id, pos)) = current {
       hit = current;
       current = id
-        .reverse_children(tree)
+        .reverse_children(&tree.arena)
         .find_map(|c| down_coordinate(c, pos, tree));
     }
     hit.map(|(w, _)| w)
@@ -326,7 +329,7 @@ impl WidgetTree {
   {
     loop {
       let current_target = event.borrow().current_target;
-      current_target.assert_get(self).query_all_type(
+      current_target.assert_get(&self.arena).query_all_type(
         |listener: &Ty| {
           dispatcher(listener, event);
           !event.borrow_mut().bubbling_canceled()
@@ -338,7 +341,7 @@ impl WidgetTree {
         break;
       }
 
-      if let Some(p) = current_target.parent(self) {
+      if let Some(p) = current_target.parent(&self.arena) {
         event.borrow_mut().current_target = p;
       } else {
         break;

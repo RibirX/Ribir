@@ -17,7 +17,7 @@ impl Render for IgnorePointer {
 
   fn can_overflow(&self) -> bool { true }
 
-  fn hit_test(&self, _: &TreeCtx, _: Point) -> HitTest {
+  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
     HitTest {
       hit: false,
       can_hit_child: !self.ignore,

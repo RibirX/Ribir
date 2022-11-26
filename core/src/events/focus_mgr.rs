@@ -79,27 +79,30 @@ impl Dispatcher {
 
   /// return the auto focus widget of the tree.
   pub fn auto_focus(&mut self, tree: &WidgetTree) -> Option<WidgetId> {
-    tree.root().descendants(tree).find(|id| {
+    tree.root().descendants(&tree.arena).find(|id| {
       let mut auto_focus = false;
-      id.assert_get(tree)
-        .query_on_first_type(QueryOrder::OutsideFirst, |focus: &FocusListener| {
+      id.assert_get(&tree.arena).query_on_first_type(
+        QueryOrder::OutsideFirst,
+        |focus: &FocusListener| {
           auto_focus = focus.auto_focus;
-        });
+        },
+      );
       auto_focus
     })
   }
 
   pub fn refresh_focus(&mut self, tree: &WidgetTree) {
+    let arena = &tree.arena;
     let focus_mgr = &mut self.focus_mgr;
     focus_mgr.tab_orders.clear();
 
     let mut zeros = vec![];
     tree
       .root()
-      .descendants(tree)
+      .descendants(arena)
       .filter_map(|id| {
         let mut node = None;
-        id.get(tree).map(|w| {
+        id.get(arena).map(|w| {
           w.query_on_first_type(QueryOrder::OutsideFirst, |focus: &FocusListener| {
             node = Some(FocusNode { tab_index: focus.tab_index, wid: id });
           })
@@ -118,7 +121,7 @@ impl Dispatcher {
 
     // if current focusing widget is dropped, find the next focus replace it.
     if let Some((focusing, _)) = focus_mgr.focusing {
-      if focusing.wid.is_dropped(tree) {
+      if focusing.wid.is_dropped(arena) {
         // remove the dropped focusing.
         focus_mgr.focusing = None;
 
@@ -147,7 +150,7 @@ impl Dispatcher {
     old
       .as_ref()
       .zip(focus_mgr.focusing.as_ref())
-      .map(|((old, _), (new, _))| old.wid.common_ancestors(new.wid, tree))
+      .map(|((old, _), (new, _))| old.wid.common_ancestors(new.wid, &tree.arena))
       .map(|v| common_ancestors.extend(v));
 
     if let Some((blur, _)) = old {
@@ -155,7 +158,7 @@ impl Dispatcher {
       // dispatch blur event
       blur
         .wid
-        .assert_get(tree)
+        .assert_get(&tree.arena)
         .query_on_first_type(QueryOrder::InnerFirst, |focus: &FocusListener| {
           focus.dispatch_event(FocusEventType::Blur, &mut focus_event)
         });
@@ -175,7 +178,7 @@ impl Dispatcher {
     if let Some((focus, _)) = focus_mgr.focusing {
       let mut focus_event = FocusEvent::new(focus.wid, tree, info);
 
-      focus.wid.assert_get(tree).query_on_first_type(
+      focus.wid.assert_get(&tree.arena).query_on_first_type(
         QueryOrder::InnerFirst,
         |focus_listener: &FocusListener| {
           focus_listener.dispatch_event(FocusEventType::Focus, &mut focus_event)
@@ -218,7 +221,7 @@ mod tests {
     let mut wnd = Window::default_mock(widget, None);
     let tree = &wnd.widget_tree;
 
-    let id = tree.root().first_child(tree);
+    let id = tree.root().first_child(&tree.arena);
     assert!(id.is_some());
     assert_eq!(wnd.dispatcher.auto_focus(tree), id);
   }
@@ -239,8 +242,8 @@ mod tests {
 
     let id = tree
       .root()
-      .first_child(tree)
-      .and_then(|p| p.next_sibling(tree));
+      .first_child(&tree.arena)
+      .and_then(|p| p.next_sibling(&tree.arena));
     assert!(id.is_some());
     assert_eq!(wnd.dispatcher.auto_focus(tree), id);
   }
@@ -262,11 +265,12 @@ mod tests {
     let Window { dispatcher, widget_tree, .. } = &mut wnd;
     dispatcher.refresh_focus(widget_tree);
 
-    let negative = widget_tree.root().first_child(widget_tree).unwrap();
-    let id0 = negative.next_sibling(widget_tree).unwrap();
-    let id1 = id0.next_sibling(widget_tree).unwrap();
-    let id2 = id1.next_sibling(widget_tree).unwrap();
-    let id3 = id2.next_sibling(widget_tree).unwrap();
+    let arena = &widget_tree.arena;
+    let negative = widget_tree.root().first_child(arena).unwrap();
+    let id0 = negative.next_sibling(arena).unwrap();
+    let id1 = id0.next_sibling(arena).unwrap();
+    let id2 = id1.next_sibling(arena).unwrap();
+    let id3 = id2.next_sibling(arena).unwrap();
 
     {
       // next focus sequential
@@ -325,13 +329,13 @@ mod tests {
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
     let mut wnd = Window::default_mock(widget.into_widget(), None);
-    let Window { dispatcher, widget_tree, .. } = &mut wnd;
+    let Window { dispatcher, widget_tree: tree, .. } = &mut wnd;
 
-    let parent = widget_tree.root();
-    let child = parent.first_child(widget_tree).unwrap();
+    let parent = tree.root();
+    let child = parent.first_child(&tree.arena).unwrap();
 
-    dispatcher.refresh_focus(widget_tree);
-    dispatcher.focus(child, widget_tree);
+    dispatcher.refresh_focus(tree);
+    dispatcher.focus(child, tree);
 
     assert_eq!(
       &*log.borrow(),
@@ -339,14 +343,14 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    dispatcher.focus(parent, widget_tree);
+    dispatcher.focus(parent, tree);
     assert_eq!(
       &*log.borrow(),
       &["blur child", "focusout child", "focus parent",]
     );
     log.borrow_mut().clear();
 
-    dispatcher.blur(widget_tree);
+    dispatcher.blur(tree);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
 }

@@ -68,7 +68,9 @@ impl EventCommon {
   #[inline]
   pub fn position(&self) -> Point {
     let tree = unsafe { self.tree.as_ref() };
-    tree.map_from_global(self.current_target, self.global_pos())
+    tree
+      .store
+      .map_from_global(self.global_pos(), self.current_target, &tree.arena)
   }
 
   /// The buttons being depressed (if any) in current state.
@@ -84,11 +86,14 @@ impl EventCommon {
   pub fn context<'a>(&'a mut self) -> EventCtx<'a> {
     // Safety: framework promise event context only live in event dispatch and
     // there is no others to share `Context`.
-    EventCtx::new(
-      self.current_target(),
-      unsafe { self.tree.as_ref() },
-      self.dispatch_info_mut(),
-    )
+    let WidgetTree { arena, store, app_ctx, .. } = unsafe { self.tree.as_ref() };
+    EventCtx {
+      id: self.current_target(),
+      arena,
+      store,
+      app_ctx,
+      info: self.dispatch_info_mut(),
+    }
   }
 
   fn dispatch_info_mut(&mut self) -> &mut DispatchInfo {

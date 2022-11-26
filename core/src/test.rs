@@ -64,7 +64,7 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
   let mut node = tree.root();
   for (level, idx) in path[1..].into_iter().enumerate() {
     node = node
-      .children(tree.arena())
+      .children(&tree.arena)
       .skip(*idx)
       .next()
       .unwrap_or_else(|| {
@@ -72,7 +72,7 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
       });
   }
 
-  tree.layout_store().layout_box_rect(node).unwrap()
+  tree.store.layout_box_rect(node).unwrap()
 }
 
 #[derive(Declare, MultiChild)]
