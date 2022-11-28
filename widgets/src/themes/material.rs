@@ -81,6 +81,13 @@ fn init_custom_theme(theme: &mut FullTheme) {
     size: theme.icon_theme.icon_size.tiny,
     label_style: theme.typography_theme.body1.text.clone(),
   });
+  theme.custom_themes.set_custom_theme(ButtonTheme {
+    padding: 4.,
+    radius: 4.,
+    border_color: theme.palette.primary(),
+    background: theme.palette.primary(),
+    foreground: theme.palette.surface(),
+  });
 }
 
 fn override_compose_style(theme: &mut FullTheme) {
