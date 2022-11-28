@@ -29,11 +29,8 @@ impl Compose for TodoMVP {
               placeholder: String::from("Add Task"),
             }
           }
-          SizedBox {
-            size: Size::new(60., 30.),
+          Button {
             margin: EdgeInsets::only_left(20.),
-            border_radius: Radius::all(4.),
-            border: Border::all(BorderSide { width: 1., color: Color::BLACK }),
             tap: move |_| {
               this.tasks.push(Task {
                 label: input.text_in_show(),
@@ -41,13 +38,11 @@ impl Compose for TodoMVP {
               });
               input.text = String::default();
             },
-            Row {
-              Icon { svgs::ADD }
-              Text {
-                text: "Add",
-                style: TypographyTheme::of(ctx).button.text.clone(),
-              }
-            }
+            // todo: Icon color ugligy
+            // LeadingIcon {
+            //   Icon { svgs::ADD }
+            // }
+            ButtonText::new("ADD")
           }
         }
 
