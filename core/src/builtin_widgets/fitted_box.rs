@@ -30,12 +30,9 @@ pub struct FittedBox {
 
 impl Render for FittedBox {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx
-      .single_child()
-      .expect("Should always have a single child");
     let container_size = clamp.max;
     clamp.max = INFINITY_SIZE;
-    let child_size = ctx.perform_child_layout(child, clamp);
+    let child_size = ctx.assert_perform_single_child_layout(clamp);
 
     if child_size.is_empty() {
       self.scale_cache.set(Vector::zero());

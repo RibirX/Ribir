@@ -7,14 +7,9 @@ pub struct Visibility {
 }
 
 impl Render for Visibility {
+  #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if self.visible {
-      ctx
-        .single_child()
-        .map_or_else(Size::zero, |c| ctx.perform_child_layout(c, clamp))
-    } else {
-      Size::zero()
-    }
+    ctx.assert_perform_single_child_layout(clamp)
   }
 
   #[inline]

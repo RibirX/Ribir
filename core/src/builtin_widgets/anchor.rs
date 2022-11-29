@@ -56,12 +56,11 @@ impl Query for BottomAnchor {
 
 impl Render for LeftAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      let left = self.left_anchor.abs_value(child_size.width);
-      ctx.update_position(c, Point::new(left, 0.));
-      child_size
-    })
+    let mut layouter = ctx.assert_single_child_layouter();
+    let child_size = layouter.perform_widget_layout(clamp);
+    let left = self.left_anchor.abs_value(child_size.width);
+    layouter.update_position(Point::new(left, 0.));
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -75,13 +74,12 @@ impl Render for LeftAnchor {
 
 impl Render for RightAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      let right = self.right_anchor.abs_value(child_size.width);
-      let x = clamp.max.width - child_size.width - right;
-      ctx.update_position(c, Point::new(x, 0.));
-      child_size
-    })
+    let mut layouter = ctx.assert_single_child_layouter();
+    let child_size = layouter.perform_widget_layout(clamp);
+    let right = self.right_anchor.abs_value(child_size.width);
+    let x = clamp.max.width - child_size.width - right;
+    layouter.update_position(Point::new(x, 0.));
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -95,12 +93,11 @@ impl Render for RightAnchor {
 
 impl Render for TopAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      let top = self.top_anchor.abs_value(child_size.height);
-      ctx.update_position(c, Point::new(0., top));
-      child_size
-    })
+    let mut layouter = ctx.assert_single_child_layouter();
+    let child_size = layouter.perform_widget_layout(clamp);
+    let top = self.top_anchor.abs_value(child_size.height);
+    layouter.update_position(Point::new(0., top));
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -114,13 +111,12 @@ impl Render for TopAnchor {
 
 impl Render for BottomAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      let bottom = self.bottom_anchor.abs_value(child_size.height);
-      let y = clamp.max.height - child_size.height - bottom;
-      ctx.update_position(c, Point::new(0., y));
-      child_size
-    })
+    let mut layouter = ctx.assert_single_child_layouter();
+    let child_size = layouter.perform_widget_layout(clamp);
+    let bottom = self.bottom_anchor.abs_value(child_size.height);
+    let y = clamp.max.height - child_size.height - bottom;
+    layouter.update_position(Point::new(0., y));
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}

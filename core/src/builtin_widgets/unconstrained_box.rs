@@ -27,9 +27,7 @@ impl Render for UnconstrainedBox {
       UnconstrainedDir::Y => clamp.max.height = f32::INFINITY,
       UnconstrainedDir::Both => clamp = clamp.expand(),
     };
-    ctx
-      .single_child()
-      .map_or_else(Size::zero, |c| ctx.perform_child_layout(c, clamp))
+    ctx.assert_perform_single_child_layout(clamp)
   }
 
   #[inline]

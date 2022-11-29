@@ -35,4 +35,3 @@ thread-pool = [
 
 [dev-dependencies]
 colored = "2.0.0"
-ribir = {path = "../ribir", version = "*"}

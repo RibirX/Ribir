@@ -669,38 +669,21 @@ mod tests {
 
   #[test]
   fn click() {
-    #[derive(Default)]
-    struct ClickPath(Rc<RefCell<i32>>);
-
-    impl Compose for ClickPath {
-      fn compose(this: StateWidget<Self>) -> Widget {
-        widget! {
-          track { this: this.into_stateful() }
-          MockMulti {
-            tap: move |_| {
-              let mut res = this.0.borrow_mut();
-              *res += 1;
-            },
-            MockBox {
-              size: Size::new(100., 100.),
-              tap: move |_| {
-                let mut res = this.0.borrow_mut();
-                *res += 1;
-              }
-            }
-            MockBox {
-              size: Size::new(100., 400.)
-            }
-          }
+    let click_path = 0.into_stateful();
+    let w = widget! {
+      track { click_path: click_path.clone() }
+      MockMulti {
+        tap: move |_| *click_path += 1,
+        MockBox {
+          size: Size::new(100., 100.),
+          tap: move |_| *click_path += 1,
         }
+        MockBox { size: Size::new(100., 400.) }
       }
-    }
-
-    let cp = ClickPath::default();
-    let click_path = cp.0.clone();
+    };
 
     // Stretch row
-    let mut wnd = Window::default_mock(cp.into_widget(), Some(Size::new(400., 400.)));
+    let mut wnd = Window::default_mock(w, Some(Size::new(400., 400.)));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -725,7 +708,7 @@ mod tests {
     });
 
     {
-      let mut clicked = click_path.borrow_mut();
+      let mut clicked = click_path.raw_ref();
       assert_eq!(*clicked, 2);
       *clicked = 0;
     }
@@ -754,7 +737,7 @@ mod tests {
     });
 
     {
-      let clicked = click_path.borrow_mut();
+      let clicked = click_path.raw_ref();
       assert_eq!(*clicked, 1);
     }
   }

@@ -50,11 +50,14 @@ impl Render for Stack {
       StackFit::Passthrough => clamp,
     };
 
-    let (ctx, children) = ctx.split_children();
-    children.fold(Size::zero(), |size, c| {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      size.max(child_size)
-    })
+    let mut size = ZERO_SIZE;
+    let mut layouter = ctx.first_child_layouter();
+    while let Some(mut l) = layouter {
+      let child_size = l.perform_widget_layout(clamp);
+      size = size.max(child_size);
+      layouter = l.into_next_sibling();
+    }
+    size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {

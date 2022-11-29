@@ -12,9 +12,9 @@ impl Query for Opacity {
 }
 
 impl Render for Opacity {
+  #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.single_child().expect("Opacity must have one child");
-    ctx.perform_child_layout(child, clamp)
+    ctx.assert_perform_single_child_layout(clamp)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_alpha(self.opacity); }

@@ -79,10 +79,6 @@ impl WidgetId {
     self.node_feature(tree, |node| node.next_sibling())
   }
 
-  pub(crate) fn previous_sibling(self, tree: &TreeArena) -> Option<WidgetId> {
-    self.node_feature(tree, |node| node.previous_sibling())
-  }
-
   pub(crate) fn ancestors(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(tree).map(WidgetId)
   }
@@ -92,20 +88,13 @@ impl WidgetId {
     w.ancestors(tree).any(|a| a == self)
   }
 
-  pub(crate) fn children(self, tree: &TreeArena) -> ChildrenIter<'_> {
-    ChildrenIter {
-      tree,
-      parent: Some(self),
-      current: None,
-    }
+  #[inline]
+  pub(crate) fn children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
+    self.0.children(arena).map(WidgetId)
   }
 
-  pub(crate) fn reverse_children(self, tree: &TreeArena) -> RevChildrenIter {
-    RevChildrenIter {
-      tree,
-      parent: Some(self),
-      current: None,
-    }
+  pub(crate) fn reverse_children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
+    self.0.reverse_children(arena).map(WidgetId)
   }
 
   pub(crate) fn descendants(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
@@ -222,7 +211,11 @@ impl WidgetId {
 
   /// Return the single child of `widget`, panic if have more than once child.
   pub(crate) fn single_child(&self, tree: &TreeArena) -> Option<WidgetId> {
-    assert_eq!(self.first_child(tree), self.last_child(tree));
+    assert_eq!(
+      self.first_child(tree),
+      self.last_child(tree),
+      "Have more than one child."
+    );
     self.first_child(tree)
   }
 
@@ -253,45 +246,3 @@ pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId
 }
 
 pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
-
-pub struct ChildrenIter<'a> {
-  tree: &'a TreeArena,
-  parent: Option<WidgetId>,
-  current: Option<WidgetId>,
-}
-
-impl<'a> Iterator for ChildrenIter<'a> {
-  type Item = WidgetId;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    let Self { tree, parent, current } = self;
-    if let Some(c) = current {
-      *current = c.next_sibling(tree);
-    } else if let Some(p) = parent {
-      *current = p.first_child(tree);
-      parent.take();
-    }
-    self.current
-  }
-}
-
-pub struct RevChildrenIter<'a> {
-  tree: &'a TreeArena,
-  parent: Option<WidgetId>,
-  current: Option<WidgetId>,
-}
-
-impl<'a> Iterator for RevChildrenIter<'a> {
-  type Item = WidgetId;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    let Self { tree, parent, current } = self;
-    if let Some(c) = current {
-      *current = c.previous_sibling(tree);
-    } else if let Some(p) = parent {
-      *current = p.last_child(tree);
-      parent.take();
-    }
-    self.current
-  }
-}

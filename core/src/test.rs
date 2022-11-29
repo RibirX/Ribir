@@ -85,14 +85,17 @@ pub(crate) struct MockBox {
 
 impl Render for MockMulti {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let (ctx, children) = ctx.split_children();
-    children.fold(Size::zero(), |mut size, c| {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      ctx.update_position(c, Point::new(size.width, 0.));
+    let mut layouter = ctx.first_child_layouter();
+    let mut size = ZERO_SIZE;
+    while let Some(mut l) = layouter {
+      let child_size = l.perform_widget_layout(clamp);
+      l.update_position(Point::new(size.width, 0.));
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
-      size
-    })
+      layouter = l.into_next_sibling();
+    }
+
+    size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -101,9 +104,8 @@ impl Render for MockMulti {
 impl Render for MockBox {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     clamp.max = clamp.max.min(self.size);
-    ctx
-      .single_child()
-      .map(|c| ctx.perform_child_layout(c, clamp));
+    ctx.perform_single_child_layout(clamp);
+
     self.size
   }
   #[inline]
@@ -146,6 +148,14 @@ impl ExpectRect {
     Self {
       width: Some(size.width),
       height: Some(size.height),
+      ..Default::default()
+    }
+  }
+
+  pub fn from_point(pos: Point) -> Self {
+    Self {
+      x: Some(pos.x),
+      y: Some(pos.y),
       ..Default::default()
     }
   }

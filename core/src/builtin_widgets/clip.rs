@@ -17,8 +17,7 @@ impl Render for Clip {
   fn only_sized_by_parent(&self) -> bool { false }
 
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.single_child().expect("Clip must have one child.");
-    let child_size = ctx.perform_child_layout(child, clamp);
+    let child_size = ctx.assert_perform_single_child_layout(clamp);
     match self.clip {
       ClipType::Auto => child_size,
       ClipType::Path(ref path) => path.box_rect().max().to_tuple().into(),

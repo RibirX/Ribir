@@ -19,7 +19,7 @@ pub struct BoxClamp {
 /// render object's layout box, the information about layout, including box
 /// size, box position, and the clamp of render object layout.
 #[derive(Debug, Default)]
-pub struct BoxLayout {
+pub struct LayoutInfo {
   /// Box bound is the bound of the layout can be place. it will be set after
   /// render object computing its layout. It's passed by render object's parent.
   pub clamp: BoxClamp,
@@ -33,15 +33,23 @@ pub struct BoxLayout {
 /// clamp passed from parent.
 #[derive(Default)]
 pub(crate) struct LayoutStore {
-  data: HashMap<WidgetId, BoxLayout, ahash::RandomState>,
+  data: HashMap<WidgetId, LayoutInfo, ahash::RandomState>,
   performed: Vec<WidgetId>,
+}
+
+pub struct Layouter<'a> {
+  pub(crate) wid: WidgetId,
+  pub(crate) arena: &'a mut TreeArena,
+  pub(crate) store: &'a mut LayoutStore,
+  pub(crate) app_ctx: &'a AppContext,
+  pub(crate) dirty_set: &'a DirtySet,
 }
 
 impl LayoutStore {
   /// Remove the layout info of the `wid`
-  pub(crate) fn force_layout(&mut self, id: WidgetId) -> Option<BoxLayout> { self.remove(id) }
+  pub(crate) fn force_layout(&mut self, id: WidgetId) -> Option<LayoutInfo> { self.remove(id) }
 
-  pub(crate) fn remove(&mut self, id: WidgetId) -> Option<BoxLayout> { self.data.remove(&id) }
+  pub(crate) fn remove(&mut self, id: WidgetId) -> Option<LayoutInfo> { self.data.remove(&id) }
 
   /// Return the box rect of layout result of render widget, if it's a
   /// combination widget return None.
@@ -49,7 +57,7 @@ impl LayoutStore {
     self.layout_info(id).and_then(|info| info.rect)
   }
 
-  pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&BoxLayout> { self.data.get(&id) }
+  pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&LayoutInfo> { self.data.get(&id) }
 
   /// Return the mut reference of box rect of the layout widget(create if not
   /// have), notice
@@ -66,8 +74,8 @@ impl LayoutStore {
 
   /// return a mutable reference of the layout info  of `id`, if it's not exist
   /// insert a default value before return
-  pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut BoxLayout {
-    self.data.entry(id).or_insert_with(BoxLayout::default)
+  pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut LayoutInfo {
+    self.data.entry(id).or_insert_with(LayoutInfo::default)
   }
 
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
@@ -98,51 +106,6 @@ impl LayoutStore {
       .fold(pos, |pos, p| self.map_from_parent(*p, pos))
   }
 
-  /// Compute layout of the render widget `id`, and store its result in the
-  /// store.
-  pub(crate) fn perform_widget_layout(
-    &mut self,
-    id: WidgetId,
-    out_clamp: BoxClamp,
-    arena: &mut TreeArena,
-    app_ctx: &AppContext,
-    dirty_set: &DirtySet,
-  ) -> Size {
-    self
-      .layout_info(id)
-      .and_then(|BoxLayout { clamp, rect }| {
-        rect.and_then(|r| (&out_clamp == clamp).then(|| r.size))
-      })
-      .unwrap_or_else(|| {
-        // Safety: `LayoutCtx` will never mutable access widget tree, so split a node is
-        // safe.
-        let (arena1, arena2) = unsafe { split_arena(arena) };
-
-        let layout = id.assert_get(arena1);
-        let mut ctx = LayoutCtx {
-          id,
-          arena: arena2,
-          store: self,
-          app_ctx,
-          dirty_set,
-        };
-        let size = layout.perform_layout(out_clamp, &mut ctx);
-        let size = out_clamp.clamp(size);
-        let info = self.layout_info_or_default(id);
-        info.clamp = out_clamp;
-        info.rect.get_or_insert_with(Rect::zero).size = size;
-
-        id.assert_get(arena).query_all_type(
-          |_: &PerformedLayoutListener| {
-            self.performed.push(id);
-            false
-          },
-          QueryOrder::OutsideFirst,
-        );
-        size
-      })
-  }
-
   pub(crate) fn take_performed(&mut self) -> Vec<WidgetId> {
     let performed = self.performed.clone();
     self.performed.clear();
@@ -163,6 +126,106 @@ impl BoxClamp {
   #[inline]
   pub fn loose(mut self) -> Self {
     self.min = ZERO_SIZE;
+    self
+  }
+}
+
+impl<'a> Layouter<'a> {
+  /// perform layout of the widget this `ChildLayouter` represent, return the
+  /// size result after layout
+  pub fn perform_widget_layout(&mut self, clamp: BoxClamp) -> Size {
+    let Self {
+      wid: child,
+      arena,
+      store,
+      app_ctx,
+      dirty_set,
+    } = self;
+
+    store
+      .layout_info(*child)
+      .filter(|info| clamp == info.clamp)
+      .and_then(|info| info.rect.map(|r| r.size))
+      .unwrap_or_else(|| {
+        // Safety: `arena1` and `arena2` access different part of `arena`;
+        let (arena1, arena2) = unsafe { split_arena(arena) };
+
+        let layout = child.assert_get(arena1);
+        let mut ctx = LayoutCtx {
+          id: *child,
+          arena: arena2,
+          store,
+          app_ctx,
+          dirty_set,
+        };
+        let size = layout.perform_layout(clamp, &mut ctx);
+        let size = clamp.clamp(size);
+        let info = store.layout_info_or_default(*child);
+        info.clamp = clamp;
+        info.rect.get_or_insert_with(Rect::zero).size = size;
+
+        layout.query_all_type(
+          |_: &PerformedLayoutListener| {
+            store.performed.push(*child);
+            false
+          },
+          QueryOrder::OutsideFirst,
+        );
+        size
+      })
+  }
+
+  /// Get layouter of the next sibling of this layouter, panic if self is not
+  /// performed layout.
+  pub fn into_next_sibling(self) -> Option<Self> {
+    assert!(
+      self.store.layout_box_rect(self.wid).is_some(),
+      "Before try to layout next sibling, self must performed layout."
+    );
+    self
+      .wid
+      .next_sibling(&self.arena)
+      .map(move |sibling| self.into_new_layouter(sibling))
+  }
+
+  /// Return layouter of the first child of this widget.
+  pub fn into_first_child_layouter(self) -> Option<Self> {
+    self
+      .wid
+      .first_child(&self.arena)
+      .map(move |wid| self.into_new_layouter(wid))
+  }
+
+  /// Return the rect of this layouter if it had performed layout.
+  #[inline]
+  pub fn layout_rect(&self) -> Option<Rect> { self.store.layout_box_rect(self.wid) }
+
+  /// Update the position of the child render object should place. Relative to
+  /// parent.
+  #[inline]
+  pub fn update_position(&mut self, pos: Point) {
+    self.store.layout_box_rect_mut(self.wid).origin = pos;
+  }
+
+  /// Update the size of layout widget. Use this method to directly change the
+  /// size of a widget, in most cast you needn't call this method, use clamp to
+  /// limit the child size is enough. Use this method only it you know what you
+  /// are doing.
+  #[inline]
+  pub fn update_size(&mut self, child: WidgetId, size: Size) {
+    self.store.layout_box_rect_mut(child).size = size;
+  }
+
+  #[inline]
+  pub fn query_widget_type<W: 'static>(&self, callback: impl FnOnce(&W)) {
+    self
+      .wid
+      .assert_get(&self.arena)
+      .query_on_first_type(QueryOrder::OutsideFirst, callback);
+  }
+
+  fn into_new_layouter(mut self, wid: WidgetId) -> Self {
+    self.wid = wid;
     self
   }
 }

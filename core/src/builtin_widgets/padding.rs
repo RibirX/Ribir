@@ -21,23 +21,26 @@ impl Render for Padding {
     // Shrink the clamp of child.
     let child_clamp = BoxClamp { min, max };
     ctx.force_child_relayout(child);
-    let size = ctx.perform_child_layout(child, child_clamp);
+    let mut child_layouter = ctx.assert_single_child_layouter();
+    let size = child_layouter.perform_widget_layout(child_clamp);
 
     // Expand the size, so the child have padding.
     let size = clamp.clamp(size + thickness);
-    ctx.update_size(child, size);
+    child_layouter.update_size(child, size);
 
     // Update child's children position, let they have a correct position after
     // expanded with padding. padding.
-    let (ctx, grandson_iter) = ctx.split_children_for(child);
-    grandson_iter.for_each(|c| {
-      let pos = ctx
-        .widget_box_rect(c)
+    let mut layouter = child_layouter.into_first_child_layouter();
+    while let Some(mut l) = layouter {
+      let pos = l
+        .layout_rect()
         .expect("The grandson render widget must performed layout")
         .origin
         + Vector::new(self.padding.left, self.padding.top);
-      ctx.update_position(c, pos);
-    });
+      l.update_position(pos);
+
+      layouter = l.into_next_sibling()
+    }
 
     size
   }
