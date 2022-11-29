@@ -112,7 +112,14 @@ impl WidgetTree {
           .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
         let Self { arena, store, app_ctx, dirty_set, .. } = self;
-        store.perform_widget_layout(wid, clamp, arena, app_ctx, dirty_set);
+        let mut layouter = Layouter {
+          wid,
+          arena,
+          store,
+          app_ctx,
+          dirty_set,
+        };
+        layouter.perform_widget_layout(clamp);
 
         store.take_performed().into_iter().for_each(|id| {
           id.assert_get(arena).query_all_type(
@@ -550,10 +557,10 @@ mod tests {
        MockMulti {
         DynWidget {
           dyns: (0..100).map(|_|
-            widget! {MockBox {
+            widget! { MockBox {
              size: Size::new(150., 50.),
              background: Color::BLUE,
-          }}).collect::<Vec<_>>()
+          }})
         }
     }};
     let mut tree1 = WidgetTree::new(w1, <_>::default());
@@ -569,7 +576,7 @@ mod tests {
             widget! { MockBox {
              size: Size::new(150., 50.),
              background: Color::BLUE,
-          }}).collect::<Vec<_>>()
+          }})
         }
     }};
     let mut tree2 = WidgetTree::new(w2, <_>::default());

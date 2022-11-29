@@ -7,19 +7,19 @@ pub struct TransformBox {
 
 impl Render for TransformBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      self.matrix.inverse().map_or_else(Size::zero, |t| {
-        let min_box = t.outer_transformed_box(&Box2D::from_size(clamp.min));
-        let min = min_box.size();
+    self.matrix.inverse().map_or_else(Size::zero, |t| {
+      let min_box = t.outer_transformed_box(&Box2D::from_size(clamp.min));
+      let min = min_box.size();
 
-        let max_box = t.outer_transformed_box(&Box2D::from_size(clamp.max));
-        let max = max_box.size();
+      let max_box = t.outer_transformed_box(&Box2D::from_size(clamp.max));
+      let max = max_box.size();
 
-        let child_clamp = BoxClamp { min, max };
-        let size = ctx.perform_child_layout(c, child_clamp);
-        let rect = self.matrix.outer_transformed_rect(&Rect::from_size(size));
-        rect.size
-      })
+      let child_clamp = BoxClamp { min, max };
+
+      let mut layouter = ctx.assert_single_child_layouter();
+      let size = layouter.perform_widget_layout(child_clamp);
+      let rect = self.matrix.outer_transformed_rect(&Rect::from_size(size));
+      rect.size
     })
   }
 

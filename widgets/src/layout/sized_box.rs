@@ -10,11 +10,10 @@ pub struct SizedBox {
 }
 
 impl Render for SizedBox {
+  #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if let Some(child) = ctx.single_child() {
-      let size = clamp.clamp(self.size);
-      ctx.perform_child_layout(child, BoxClamp { min: size, max: size });
-    }
+    let size = clamp.clamp(self.size);
+    ctx.perform_single_child_layout(BoxClamp { min: size, max: size });
     self.size
   }
   #[inline]

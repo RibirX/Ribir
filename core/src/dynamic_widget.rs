@@ -68,7 +68,12 @@ impl<D: 'static> Render for DynRender<D> {
 
   fn paint(&self, ctx: &mut PaintingCtx) { self.self_render.paint(ctx) }
 
-  fn only_sized_by_parent(&self) -> bool { self.self_render.only_sized_by_parent() }
+  fn only_sized_by_parent(&self) -> bool {
+    // Dyn widget effect the children of its parent. Even if its self render is only
+    // sized by parent, but itself effect siblings, sibling effect parent, means
+    // itself not only sized by parent but also its sibling.
+    false
+  }
 
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     self.self_render.hit_test(ctx, pos)

@@ -1,10 +1,9 @@
-use super::{AppContext, WidgetCtxImpl};
+use super::{AppContext, WidgetContext, WidgetCtxImpl};
 use crate::{
-  prelude::BoxClamp,
-  widget::{DirtySet, LayoutStore, TreeArena},
+  widget::{BoxClamp, DirtySet, LayoutStore, Layouter, TreeArena},
   widget_tree::WidgetId,
 };
-use painter::{Point, Size};
+use painter::Size;
 
 /// A place to compute the render object's layout. Rather than holding children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx`
@@ -19,69 +18,48 @@ pub struct LayoutCtx<'a> {
 }
 
 impl<'a> LayoutCtx<'a> {
-  /// Update the position of the child render object should place. Relative to
-  /// parent.
+  /// Return if there is child of this widget.
   #[inline]
-  pub fn update_position(&mut self, child: WidgetId, pos: Point) {
-    self.store_mut().layout_box_rect_mut(child).origin = pos;
-  }
-
-  /// Update the size of layout widget. Use this method to directly change the
-  /// size of a widget, in most cast you needn't call this method, use clamp to
-  /// limit the child size is enough. Use this method only it you know what you
-  /// are doing.
-  #[inline]
-  pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    self.store_mut().layout_box_rect_mut(child).size = size;
-  }
-
-  // todo: ensure user can access next child after previous child performed
-  // layout.
-
-  /// Do the work of computing the layout for render child, and return its size
-  /// it should have. Should called from parent.
-  pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    let Self { arena, store, app_ctx, dirty_set, .. } = self;
-    store.perform_widget_layout(child, clamp, arena, app_ctx, dirty_set)
-  }
-
   pub fn has_child(&self) -> bool { self.id.first_child(self.tree_arena()).is_some() }
 
-  /// Return a tuple of [`LayoutCtx`]! and an iterator of `id`'s children.
-  pub fn split_children_for(
-    &mut self,
-    id: WidgetId,
-  ) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    let arena = self.arena_mut() as *mut TreeArena;
-    // Safety: layout context will never mutable access the inner tree. So the
-    // iterator is safe.
-    let children = id.children(unsafe { &mut *arena });
-    (self, children)
+  /// Quick method to do the work of computing the layout for the single child,
+  /// and return its size it should have.
+  ///
+  /// # Panic
+  /// panic if there are more than one child it have.
+  pub fn perform_single_child_layout(&mut self, clamp: BoxClamp) -> Option<Size> {
+    self
+      .single_child_layouter()
+      .map(|mut l| l.perform_widget_layout(clamp))
   }
 
-  /// Return a tuple of [`LayoutCtx`]! and an reverse iterator of `id`'s
-  /// children.
-  pub fn split_rev_children_for(
-    &mut self,
-    id: WidgetId,
-  ) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    let arena = self.arena_mut() as *mut TreeArena;
-    // Safety: layout context will never mutable access the inner tree. So the
-    // iterator is safe.
-    let children = id.reverse_children(unsafe { &mut *arena });
-    (self, children)
+  /// Quick method to do the work of computing the layout for the single child,
+  /// and return its size.
+  ///
+  /// # Panic
+  /// panic if there is not only one child it have.
+  pub fn assert_perform_single_child_layout(&mut self, clamp: BoxClamp) -> Size {
+    self
+      .assert_single_child_layouter()
+      .perform_widget_layout(clamp)
   }
 
-  /// Return a tuple of [`LayoutCtx`]! and  an reverse iterator of children, so
-  /// you can avoid the lifetime problem when precess on child.
-  pub fn split_rev_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    self.split_rev_children_for(self.id)
+  /// Return the layouter of the first child.
+  pub fn first_child_layouter(&mut self) -> Option<Layouter> {
+    self.first_child().map(|wid| self.new_layouter(wid))
   }
 
-  /// Return a tuple of [`LayoutCtx`]! and  an iterator of children, so
-  /// you can avoid the lifetime problem when precess on child.
-  pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
-    self.split_children_for(self.id)
+  /// Return the layouter of the first child.
+  pub fn single_child_layouter(&mut self) -> Option<Layouter> {
+    self.single_child().map(|wid| self.new_layouter(wid))
+  }
+
+  /// Return the layouter of the first child.
+  /// # Panic
+  /// panic if there is not only one child it have.
+  pub fn assert_single_child_layouter(&mut self) -> Layouter {
+    let wid = self.assert_single_child();
+    self.new_layouter(wid)
   }
 
   /// Clear the child layout information, so the `child` will be force layout
@@ -89,13 +67,20 @@ impl<'a> LayoutCtx<'a> {
   /// information with same input.
   #[inline]
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
-    assert_eq!(child.parent(self.tree_arena()), Some(self.id));
-    self.store_mut().force_layout(child).is_some()
+    assert_eq!(child.parent(&self.arena), Some(self.id));
+    self.store.force_layout(child).is_some()
   }
 
-  fn store_mut(&mut self) -> &mut LayoutStore { &mut self.store }
-
-  fn arena_mut(&mut self) -> &mut TreeArena { &mut self.arena }
+  fn new_layouter(&mut self, wid: WidgetId) -> Layouter {
+    let Self { arena, store, app_ctx, dirty_set, .. } = self;
+    Layouter {
+      wid,
+      arena,
+      store,
+      app_ctx,
+      dirty_set,
+    }
+  }
 }
 
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {

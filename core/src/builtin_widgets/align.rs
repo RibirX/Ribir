@@ -69,17 +69,16 @@ pub struct VAlignWidget {
 
 impl Render for HAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      let align: Align = self.h_align.into();
-      if align == Align::Stretch {
-        clamp.min.width = clamp.max.width;
-      }
-      let box_width = clamp.max.width;
-      let child_size = ctx.perform_child_layout(c, clamp);
-      let x = align.align_value(child_size.width, box_width);
-      ctx.update_position(c, Point::new(x, 0.));
-      child_size
-    })
+    let align: Align = self.h_align.into();
+    if align == Align::Stretch {
+      clamp.min.width = clamp.max.width;
+    }
+    let box_width = clamp.max.width;
+    let mut layouter = ctx.assert_single_child_layouter();
+    let child_size = layouter.perform_widget_layout(clamp);
+    let x = align.align_value(child_size.width, box_width);
+    layouter.update_position(Point::new(x, 0.));
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -98,17 +97,16 @@ impl Query for HAlignWidget {
 
 impl Render for VAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child().map_or_else(Size::zero, |c| {
-      let align: Align = self.v_align.into();
-      if align == Align::Stretch {
-        clamp.min.height = clamp.max.height;
-      }
-      let box_height = clamp.max.height;
-      let child_size = ctx.perform_child_layout(c, clamp);
-      let y = align.align_value(child_size.height, box_height);
-      ctx.update_position(c, Point::new(0., y));
-      child_size
-    })
+    let mut layouter = ctx.assert_single_child_layouter();
+    let align: Align = self.v_align.into();
+    if align == Align::Stretch {
+      clamp.min.height = clamp.max.height;
+    }
+    let box_height = clamp.max.height;
+    let child_size = layouter.perform_widget_layout(clamp);
+    let y = align.align_value(child_size.height, box_height);
+    layouter.update_position(Point::new(0., y));
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}

@@ -34,29 +34,20 @@ impl BorderSide {
   pub fn new(width: f32, color: Color) -> Self { Self { width, color } }
 }
 
-fn single_child<C: WidgetContext>(ctx: &C) -> WidgetId {
-  ctx
-    .single_child()
-    .expect("BoxDecoration must have one child.")
-}
-
 impl Render for BoxDecoration {
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = single_child(ctx);
-    let mut size = ctx.perform_child_layout(child, clamp);
+    let mut layouter = ctx.assert_single_child_layouter();
+    let mut size = layouter.perform_widget_layout(clamp);
     if let Some(ref border) = self.border {
       size.width += border.left.width + border.right.width;
       size.height += border.top.width + border.bottom.width;
-      ctx.update_position(child, Point::new(border.left.width, border.top.width));
+      layouter.update_position(Point::new(border.left.width, border.top.width));
     }
     size
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let child = single_child(ctx);
+    let child = ctx.assert_single_child();
     if let Some(content_rect) = ctx.widget_box_rect(child) {
       let painter = ctx.painter();
       if let Some(ref background) = self.background {
@@ -280,8 +271,6 @@ mod tests {
   #[cfg(feature = "png")]
   #[test]
   fn paint() {
-    use ribir::prelude::*;
-
     let radius_cases = vec![
       Radius::all(0.),
       Radius::all(10.),
@@ -293,9 +282,9 @@ mod tests {
     ];
 
     let w = widget! {
-      Row {
+      MockMulti {
         margin: EdgeInsets::all(2.),
-        SizedBox {
+        MockBox {
           size: Size::new(60., 40.),
           background: Color::PINK,
           border: Border {

@@ -15,9 +15,14 @@ pub trait WidgetContext {
   /// Return parent of widget `w`.
   fn widget_parent(&self, w: WidgetId) -> Option<WidgetId>;
   /// Return the single child of `widget`.
+  fn single_child(&self) -> Option<WidgetId>;
+  /// Return the single child of `widget`.
   /// # Panic
   /// panic if widget have multi child.
-  fn single_child(&self) -> Option<WidgetId>;
+  #[inline]
+  fn assert_single_child(&self) -> WidgetId { self.single_child().expect("Must have one child.") }
+  /// Return the first child of widget.
+  fn first_child(&self) -> Option<WidgetId>;
   /// Return the box rect of the single child of widget.
   /// # Panic
   /// panic if widget have multi child.
@@ -63,6 +68,9 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
 
   #[inline]
   fn single_child(&self) -> Option<WidgetId> { self.id().single_child(self.tree_arena()) }
+
+  #[inline]
+  fn first_child(&self) -> Option<WidgetId> { self.id().first_child(self.tree_arena()) }
 
   #[inline]
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
