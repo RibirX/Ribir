@@ -52,6 +52,12 @@ macro_rules! impl_enum_widget {
           $($name::$var_ty(w) => w.hit_test(ctx, pos)),+
         }
       }
+
+      fn get_transform(&self) -> Option<Transform> {
+        match self {
+          $($name::$var_ty(w) => w.get_transform()),+
+        }
+      }
     }
 
     impl<$($var_ty: SingleChild),+> SingleChild for $name <$($var_ty),+> {

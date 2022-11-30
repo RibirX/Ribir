@@ -27,13 +27,7 @@ impl Render for TransformWidget {
     HitTest { hit: is_hit, can_hit_child: is_hit }
   }
 
-  fn map_from_parent_transform(&self, pos: Point) -> Point {
-    self.transform.inverse().map_or(pos, |t| t.transform_point(pos))
-  }
-
-  fn map_to_parent_transform(&self, pos: Point) -> Point {
-    self.transform.transform_point(pos)
-  }
+  fn get_transform(&self) -> Option<Transform> { Some(self.transform.clone()) }
 }
 
 impl Query for TransformWidget {

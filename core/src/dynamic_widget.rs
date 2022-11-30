@@ -80,6 +80,8 @@ impl<D: 'static> Render for DynRender<D> {
   }
 
   fn can_overflow(&self) -> bool { self.self_render.can_overflow() }
+
+  fn get_transform(&self) -> Option<Transform> { self.self_render.get_transform() }
 }
 
 impl<D> DynRender<D> {

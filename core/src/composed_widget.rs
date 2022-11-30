@@ -45,6 +45,9 @@ impl<B: 'static> Render for ComposedWidget<Box<dyn Render>, B> {
 
   #[inline]
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.composed.hit_test(ctx, pos) }
+
+  #[inline]
+  fn get_transform(&self) -> Option<Transform> { self.composed.get_transform() }
 }
 
 impl<W: SingleChild, B> SingleChild for ComposedWidget<W, B> {}

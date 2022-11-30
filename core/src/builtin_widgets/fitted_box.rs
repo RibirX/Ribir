@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::cell::Cell;
 
 pub enum BoxFit {
   /// Widget will not be scale.
@@ -25,7 +26,7 @@ pub struct FittedBox {
   // fixme: provide a method to transform widget, not only transform when painting
   // also transform hit test.
   #[declare(default)]
-  scale_cache: std::cell::Cell<Vector>,
+  scale_cache: Cell<Transform>,
 }
 
 impl Render for FittedBox {
@@ -35,39 +36,44 @@ impl Render for FittedBox {
     let child_size = ctx.assert_perform_single_child_layout(clamp);
 
     if child_size.is_empty() {
-      self.scale_cache.set(Vector::zero());
+      self.scale_cache.set(Transform::default());
     }
     let scale_x = container_size.width / child_size.width;
     let scale_y = container_size.height / child_size.height;
     match self.box_fit {
-      BoxFit::None => self.scale_cache.set(Vector::new(1., 1.)),
-      BoxFit::Fill => self.scale_cache.set(Vector::new(scale_x, scale_y)),
+      BoxFit::None => self.scale_cache.set(Transform::scale(1., 1.)),
+      BoxFit::Fill => self.scale_cache.set(Transform::scale(scale_x, scale_y)),
       BoxFit::Contain => {
         let scale = scale_x.min(scale_y);
-        self.scale_cache.set(Vector::new(scale, scale));
+        self.scale_cache.set(Transform::scale(scale, scale));
       }
       BoxFit::Cover => {
         let scale = scale_x.max(scale_y);
-        self.scale_cache.set(Vector::new(scale, scale));
+        self.scale_cache.set(Transform::scale(scale, scale));
       }
     }
-    let Vector { x, y, .. } = self.scale_cache.get();
+    let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
     Size::new(child_size.width * x, child_size.height * y)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let size = ctx.box_rect().unwrap().size;
+    let rect = ctx.box_rect().unwrap();
+    let size = rect.size;
     let child_size = ctx
       .single_child_box()
       .expect("Should always have a single child")
       .size;
+
     if child_size.greater_than(size).any() {
-      // todo: cover clip if need
+      let path = Path::rect(&rect, PathStyle::Fill);
+      ctx.painter().clip(path.clone());
     }
 
-    let scale = self.scale_cache.get();
-    ctx.painter().scale(scale.x, scale.y);
+    let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
+    ctx.painter().scale(x, y);
   }
+
+  fn get_transform(&self) -> Option<Transform> { Some(self.scale_cache.get().clone()) }
 }
 
 impl Query for FittedBox {
@@ -85,7 +91,7 @@ mod tests {
     box_fit: BoxFit,
     size: Size,
     expect: Size,
-    expected_scale: Vector,
+    expected_scale: Transform,
   }
 
   impl FitTestCase {
@@ -125,7 +131,7 @@ mod tests {
       box_fit: BoxFit::None,
       size: small_size,
       expect: small_size,
-      expected_scale: Vector::new(1., 1.),
+      expected_scale: Transform::scale(1., 1.),
     }
     .test();
 
@@ -133,7 +139,7 @@ mod tests {
       box_fit: BoxFit::Fill,
       size: small_size,
       expect: WND_SIZE,
-      expected_scale: Vector::new(3., 2.),
+      expected_scale: Transform::scale(3., 2.),
     }
     .test();
 
@@ -141,7 +147,7 @@ mod tests {
       box_fit: BoxFit::Cover,
       size: small_size,
       expect: WND_SIZE,
-      expected_scale: Vector::new(3., 3.),
+      expected_scale: Transform::scale(3., 3.),
     }
     .test();
 
@@ -150,7 +156,7 @@ mod tests {
       box_fit: BoxFit::Cover,
       size: big_size_clip,
       expect: WND_SIZE,
-      expected_scale: Vector::new(0.5, 0.5),
+      expected_scale: Transform::scale(0.5, 0.5),
     }
     .test();
 
@@ -158,7 +164,7 @@ mod tests {
       box_fit: BoxFit::Contain,
       size: small_size,
       expect: Size::new(200., 300.),
-      expected_scale: Vector::new(2., 2.),
+      expected_scale: Transform::scale(2., 2.),
     }
     .test();
   }
