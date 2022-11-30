@@ -291,11 +291,27 @@ where
   fn fill(self, c: Stateful<DynWidget<D>>) -> Self { self.fill(c.into_dyn_render().into_widget()) }
 }
 
-impl<M, W, C, T> FillTemplate<Concrete<WidgetPair<W, M>>, WidgetPair<W, C>> for T
+impl<M, T, W, D> FillTemplate<Concrete<WidgetOf<M>>, WidgetPair<W, Stateful<DynWidget<D>>>> for T
 where
   T: FillTemplate<Generic<WidgetPair<W, Widget>>, WidgetPair<W, Widget>>,
-  M: ImplMarker,
-  C: IntoWidget<M>,
+  Stateful<DynWidget<D>>: IntoDynRender<M, D>,
+  D: 'static,
+{
+  #[inline]
+  fn fill(self, c: WidgetPair<W, Stateful<DynWidget<D>>>) -> Self {
+    let WidgetPair { widget, child } = c;
+
+    self.fill(WidgetPair {
+      widget,
+      child: child.into_dyn_render().into_widget(),
+    })
+  }
+}
+
+impl<M, W, C, T> FillTemplate<Concrete<WidgetPair<W, M>>, WidgetPair<W, C>> for T
+where
+  T: FillTemplate<Generic<WidgetOf<W>>, WidgetOf<W>>,
+  C: IntoWidget<Generic<M>>,
 {
   #[inline]
   fn fill(self, c: WidgetPair<W, C>) -> Self {
@@ -476,7 +492,14 @@ mod tests {
     }
 
     let _ = widget! {
-      P { MockBox {Void {} } }
+      P { MockBox { Void {} } }
     };
+  }
+
+  #[test]
+  fn fix_multi_fill_for_pair() {
+    let tml = WidgetPairTml::<MockBox, Widget>::empty();
+    let child = MockBox { size: ZERO_SIZE }.with_child(Void.into_widget());
+    tml.fill(child);
   }
 }
