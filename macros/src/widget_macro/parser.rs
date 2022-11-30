@@ -19,6 +19,7 @@ pub mod kw {
   syn::custom_keyword!(widget);
   syn::custom_keyword!(states);
   syn::custom_keyword!(init);
+  syn::custom_keyword!(finally);
   syn::custom_keyword!(DynWidget);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);
@@ -45,6 +46,7 @@ pub struct MacroSyntax {
   pub states: Option<States>,
   pub widget: DeclareWidget,
   pub items: Vec<Item>,
+  pub finally: Option<Finally>,
 }
 
 pub struct States {
@@ -55,7 +57,12 @@ pub struct States {
 
 pub struct Init {
   _init_token: kw::init,
-  pub stmts: Block,
+  pub block: Block,
+}
+
+pub struct Finally {
+  _init_token: kw::finally,
+  pub block: Block,
 }
 
 #[derive(Debug)]
@@ -223,6 +230,7 @@ impl Parse for MacroSyntax {
     let mut widget: Option<DeclareWidget> = None;
     let mut items = vec![];
     let mut init: Option<Init> = None;
+    let mut finally: Option<Finally> = None;
     let mut states: Option<States> = None;
     loop {
       if input.is_empty() {
@@ -248,9 +256,16 @@ impl Parse for MacroSyntax {
       } else if lk.peek(kw::init) {
         let e: Init = input.parse::<Init>()?;
         if let Some(init) = init.as_mut() {
-          init.stmts.stmts.extend(e.stmts.stmts);
+          init.block.stmts.extend(e.block.stmts);
         } else {
           init = Some(e)
+        }
+      } else if lk.peek(kw::finally) {
+        let e: Finally = input.parse::<Finally>()?;
+        if let Some(finally) = init.as_mut() {
+          finally.block.stmts.extend(e.block.stmts);
+        } else {
+          finally = Some(e)
         }
       } else if (lk.peek(Ident) || lk.peek(Colon2))
         && (input.peek2(Brace) || input.peek2(Colon2) || input.peek2(Paren))
@@ -273,7 +288,7 @@ impl Parse for MacroSyntax {
     }
     let widget = widget
       .ok_or_else(|| syn::Error::new(input.span(), "must declare a root widget in `widget!`"))?;
-    Ok(Self { widget, items, states, init })
+    Ok(Self { init, widget, items, states, finally })
   }
 }
 
@@ -297,10 +312,20 @@ impl Parse for Init {
   fn parse(input: ParseStream) -> Result<Self> {
     Ok(Self {
       _init_token: input.parse()?,
-      stmts: input.parse()?,
+      block: input.parse()?,
     })
   }
 }
+
+impl Parse for Finally {
+  fn parse(input: ParseStream) -> Result<Self> {
+    Ok(Self {
+      _init_token: input.parse()?,
+      block: input.parse()?,
+    })
+  }
+}
+
 impl Parse for StateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let member = input.parse::<Ident>()?;

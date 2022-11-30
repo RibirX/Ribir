@@ -126,6 +126,7 @@ impl ScopeUsedInfo {
     }
   }
 
+  // todo: instead of `refs_widgets`
   pub fn directly_used_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
     self.filter_widget(|info| info.used_type.contains(UsedType::USED))
   }
