@@ -12,7 +12,10 @@ fn main() {
         size: Size::zero(),
       }
     }
-    modify_on a.size ~> b.size
+    finally {
+      watch!(a.size)
+        .subscribe(move |v| b.size = v );
+    }
   };
 
   let _flow_handler = widget! {
@@ -31,8 +34,10 @@ fn main() {
         size: Size::zero(),
       }
     }
-
-    modify_on a.size + b.size ~> c.size
+    finally {
+      watch!(a.size + b.size)
+        .subscribe(move |v| c.size = v);
+    }
     on a.size + b.size {
       change : move |(_, after)| c.size = after
     }
@@ -57,12 +62,18 @@ fn main() {
               id: c,
               size: Size::zero(),
             }
-            modify_on a.size + b.size ~> c.size
+            finally {
+              watch!(a.size + b.size)
+                .subscribe(move |v| c.size = v);
+            }
           }
         })
       }
     }
-    modify_on a.size ~> b.size
+    finally {
+      watch!(a.size)
+        .subscribe(move |v| b.size = v);
+    }
   };
 
   let _fix_named_obj_moved_in_flow = widget! {
@@ -71,7 +82,12 @@ fn main() {
       SizedBox { id: b, size: Size::zero() }
       SizedBox { id: c, size: Size::zero() }
     }
-    modify_on a.size ~> b.size
-    modify_on a.size ~> c.size
+    finally {
+      watch!(a.size)
+        .subscribe(move |v| {
+          b.size = v;
+          c.size = v;
+        });
+    }
   };
 }

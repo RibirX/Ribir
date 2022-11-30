@@ -1,10 +1,10 @@
-use crate::WIDGET_MACRO_NAME;
+use crate::{WATCH_MACRO_NAME, WIDGET_MACRO_NAME};
 
 use super::{
   builtin_var_name, capture_widget,
   desugar::{ComposeItem, DeclareObj, Field, FieldValue, NamedObj, SubscribeItem, WidgetNode},
-  gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, WIDGET_OF_BUILTIN_FIELD,
-  WIDGET_OF_BUILTIN_METHOD,
+  gen_watch_macro, gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
+  WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
 };
 
 use proc_macro::Span;
@@ -76,6 +76,8 @@ impl VisitMut for VisitCtx {
         let mac = &m.mac;
         if mac.path.is_ident(WIDGET_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_widget_macro(mac.tokens.clone().into(), Some(self)).into());
+        } else if mac.path.is_ident(WATCH_MACRO_NAME) {
+          *expr = Expr::Verbatim(gen_watch_macro(mac.tokens.clone().into(), self).into());
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -131,10 +133,15 @@ impl VisitMut for VisitCtx {
       if mac.path.is_ident(WIDGET_MACRO_NAME) {
         let expr: TokenStream = gen_widget_macro(mac.tokens.clone().into(), Some(self)).into();
         *i = Stmt::Expr(Expr::Verbatim(expr));
-        return;
+      } else if mac.path.is_ident(WATCH_MACRO_NAME) {
+        let t = gen_watch_macro(mac.tokens.clone().into(), self);
+        *i = Stmt::Expr(Expr::Verbatim(t.into()).into());
+      } else {
+        visit_mut::visit_stmt_mut(self, i);
       }
+    } else {
+      visit_mut::visit_stmt_mut(self, i);
     }
-    visit_mut::visit_stmt_mut(self, i);
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
