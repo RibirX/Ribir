@@ -48,7 +48,7 @@ impl ComposeChild for Checkbox {
     let this = this.into_stateful();
     let mut checkbox = widget! {
       states { this: this.clone() }
-      env { let theme = CheckBoxTheme::of(ctx); }
+      init { let theme = CheckBoxTheme::of(ctx); }
       CheckBoxStyle { Icon {
         size: theme.size,
         DynWidget {
@@ -67,7 +67,7 @@ impl ComposeChild for Checkbox {
 
     if let Some(Label { desc, position }) = label {
       let label = widget! {
-        env { let theme = CheckBoxTheme::of(ctx); }
+        init { let theme = CheckBoxTheme::of(ctx); }
         Text { text: desc, style: theme.label_style.clone() }
       };
       checkbox = match position {
