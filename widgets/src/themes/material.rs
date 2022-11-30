@@ -136,7 +136,7 @@ fn override_compose_style(theme: &mut FullTheme) {
   styles.override_compose_style::<InkBarStyle>(|style, _| {
     widget! {
       states { style }
-      env { let palette = Palette::of(ctx); }
+      init { let palette = Palette::of(ctx); }
       Container {
         id: ink_bar,
         size: Size::new(style.ink_bar_rect.size.width, 2.),

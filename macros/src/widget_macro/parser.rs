@@ -18,7 +18,7 @@ use super::ribir_variable;
 pub mod kw {
   syn::custom_keyword!(widget);
   syn::custom_keyword!(states);
-  syn::custom_keyword!(env);
+  syn::custom_keyword!(init);
   syn::custom_keyword!(DynWidget);
   syn::custom_keyword!(id);
   syn::custom_keyword!(skip_nc);
@@ -41,7 +41,7 @@ mod animate_kw {
 }
 
 pub struct MacroSyntax {
-  pub env: Option<Env>,
+  pub init: Option<Init>,
   pub states: Option<States>,
   pub widget: DeclareWidget,
   pub items: Vec<Item>,
@@ -53,8 +53,8 @@ pub struct States {
   pub states: Vec<StateField>,
 }
 
-pub struct Env {
-  _env_token: kw::env,
+pub struct Init {
+  _init_token: kw::init,
   pub stmts: Block,
 }
 
@@ -222,7 +222,7 @@ impl Parse for MacroSyntax {
   fn parse(input: ParseStream) -> Result<Self> {
     let mut widget: Option<DeclareWidget> = None;
     let mut items = vec![];
-    let mut env: Option<Env> = None;
+    let mut init: Option<Init> = None;
     let mut states: Option<States> = None;
     loop {
       if input.is_empty() {
@@ -245,12 +245,12 @@ impl Parse for MacroSyntax {
           t.states.extend(ot.states);
         }
         states = Some(t);
-      } else if lk.peek(kw::env) {
-        let e: Env = input.parse::<Env>()?;
-        if let Some(env) = env.as_mut() {
-          env.stmts.stmts.extend(e.stmts.stmts);
+      } else if lk.peek(kw::init) {
+        let e: Init = input.parse::<Init>()?;
+        if let Some(init) = init.as_mut() {
+          init.stmts.stmts.extend(e.stmts.stmts);
         } else {
-          env = Some(e)
+          init = Some(e)
         }
       } else if (lk.peek(Ident) || lk.peek(Colon2))
         && (input.peek2(Brace) || input.peek2(Colon2) || input.peek2(Paren))
@@ -273,7 +273,7 @@ impl Parse for MacroSyntax {
     }
     let widget = widget
       .ok_or_else(|| syn::Error::new(input.span(), "must declare a root widget in `widget!`"))?;
-    Ok(Self { widget, items, states, env })
+    Ok(Self { widget, items, states, init })
   }
 }
 
@@ -293,10 +293,10 @@ impl Parse for States {
   }
 }
 
-impl Parse for Env {
+impl Parse for Init {
   fn parse(input: ParseStream) -> Result<Self> {
     Ok(Self {
-      _env_token: input.parse()?,
+      _init_token: input.parse()?,
       stmts: input.parse()?,
     })
   }

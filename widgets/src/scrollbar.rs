@@ -171,7 +171,7 @@ impl Compose for HRawScrollbar {
 
     widget! {
       states { scrolling, this }
-      env {
+      init {
         let ScrollBarTheme {
           thickness,
           thumb_min_size,
@@ -222,7 +222,7 @@ impl Compose for VRawScrollbar {
 
     widget! {
       states { scrolling, this }
-      env {
+      init {
         let ScrollBarTheme {
           thickness,
           thumb_min_size,

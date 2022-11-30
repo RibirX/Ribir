@@ -21,7 +21,7 @@ use super::{
     ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, WidgetNode,
   },
   guard_ident, guard_vec_ident,
-  parser::{Env, StateField, States},
+  parser::{Init, StateField, States},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
@@ -55,7 +55,9 @@ impl ToTokens for Desugared {
 
 impl Desugared {
   fn inner_tokens(&self, tokens: &mut TokenStream) {
-    let Self { env, named_objs, stmts, widget, .. } = &self;
+    let Self {
+      init: env, named_objs, stmts, widget, ..
+    } = &self;
     let sorted_named_objs = self.order_named_objs();
     Paren::default().surround(tokens, |tokens| {
       let ctx_name = ctx_ident(Span::call_site());
@@ -449,7 +451,7 @@ impl ToTokens for States {
   }
 }
 
-impl ToTokens for Env {
+impl ToTokens for Init {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     self.stmts.stmts.iter().for_each(|s| s.to_tokens(tokens));
   }
