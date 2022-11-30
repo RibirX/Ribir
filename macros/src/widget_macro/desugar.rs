@@ -8,7 +8,7 @@ use super::{
   child_variable, is_listener,
   parser::{
     Animate, AnimateTransitionValue, DataFlow, DeclareField, DeclareWidget, Env, FromStateField,
-    Id, Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, Track, Transition,
+    Id, Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, States, Transition,
     TransitionField,
   },
   ribir_suffix_variable, ribir_variable, TrackExpr, WIDGETS, WIDGET_OF_BUILTIN_FIELD,
@@ -26,7 +26,7 @@ pub const MODIFY: &str = "modify";
 pub const ID: &str = "id";
 pub struct Desugared {
   pub env: Option<Env>,
-  pub track: Option<Track>,
+  pub states: Option<States>,
   pub named_objs: NamedObjMap,
   pub stmts: Vec<SubscribeItem>,
   pub widget: Option<WidgetNode>,
@@ -101,10 +101,10 @@ pub enum ComposeItem {
 impl MacroSyntax {
   pub fn desugar(self) -> Desugared {
     let named_objs = NamedObjMap::default();
-    let MacroSyntax { env, track, widget, items } = self;
+    let MacroSyntax { init: env, states, widget, items } = self;
     let mut desugared = Desugared {
       env,
-      track,
+      states,
       named_objs,
       stmts: vec![],
       widget: None,

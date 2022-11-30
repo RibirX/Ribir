@@ -17,7 +17,7 @@ use super::ribir_variable;
 
 pub mod kw {
   syn::custom_keyword!(widget);
-  syn::custom_keyword!(track);
+  syn::custom_keyword!(states);
   syn::custom_keyword!(env);
   syn::custom_keyword!(DynWidget);
   syn::custom_keyword!(id);
@@ -42,15 +42,15 @@ mod animate_kw {
 
 pub struct MacroSyntax {
   pub env: Option<Env>,
-  pub track: Option<Track>,
+  pub states: Option<States>,
   pub widget: DeclareWidget,
   pub items: Vec<Item>,
 }
 
-pub struct Track {
-  _track_token: kw::track,
+pub struct States {
+  _states_token: kw::states,
   _brace: Brace,
-  pub track_externs: Vec<TrackField>,
+  pub states: Vec<StateField>,
 }
 
 pub struct Env {
@@ -59,7 +59,7 @@ pub struct Env {
 }
 
 #[derive(Debug)]
-pub struct TrackField {
+pub struct StateField {
   pub(crate) member: Ident,
   pub(crate) colon_token: Option<Colon>,
   pub(crate) expr: Expr,
@@ -148,11 +148,11 @@ pub enum Item {
 pub struct AnimateState {
   pub state: kw::State,
   pub brace: Brace,
-  pub fields: Punctuated<StateField, Comma>,
+  pub fields: Punctuated<AnimateStateField, Comma>,
 }
 
 #[derive(Debug)]
-pub struct StateField {
+pub struct AnimateStateField {
   path: MemberPath,
   _colon: Option<Colon>,
   value: Expr,
@@ -223,7 +223,7 @@ impl Parse for MacroSyntax {
     let mut widget: Option<DeclareWidget> = None;
     let mut items = vec![];
     let mut env: Option<Env> = None;
-    let mut track: Option<Track> = None;
+    let mut states: Option<States> = None;
     loop {
       if input.is_empty() {
         break;
@@ -239,12 +239,12 @@ impl Parse for MacroSyntax {
         items.push(Item::Animate(input.parse()?));
       } else if lk.peek(kw::Transition) {
         items.push(Item::Transition(input.parse()?));
-      } else if lk.peek(kw::track) {
-        let mut t = input.parse::<Track>()?;
-        if let Some(ot) = track.take() {
-          t.track_externs.extend(ot.track_externs);
+      } else if lk.peek(kw::states) {
+        let mut t = input.parse::<States>()?;
+        if let Some(ot) = states.take() {
+          t.states.extend(ot.states);
         }
-        track = Some(t);
+        states = Some(t);
       } else if lk.peek(kw::env) {
         let e: Env = input.parse::<Env>()?;
         if let Some(env) = env.as_mut() {
@@ -273,23 +273,23 @@ impl Parse for MacroSyntax {
     }
     let widget = widget
       .ok_or_else(|| syn::Error::new(input.span(), "must declare a root widget in `widget!`"))?;
-    Ok(Self { widget, items, track, env })
+    Ok(Self { widget, items, states, env })
   }
 }
 
-impl Parse for Track {
+impl Parse for States {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
 
-    let track = Track {
-      _track_token: input.parse()?,
+    let states = States {
+      _states_token: input.parse()?,
       _brace: braced!(content in input),
-      track_externs: {
-        let fields: Punctuated<TrackField, Comma> = content.parse_terminated(TrackField::parse)?;
+      states: {
+        let fields: Punctuated<StateField, Comma> = content.parse_terminated(StateField::parse)?;
         fields.into_iter().collect()
       },
     };
-    Ok(track)
+    Ok(states)
   }
 }
 
@@ -301,7 +301,7 @@ impl Parse for Env {
     })
   }
 }
-impl Parse for TrackField {
+impl Parse for StateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let member = input.parse::<Ident>()?;
     let (colon_token, expr) = if input.peek(Colon) {
@@ -309,7 +309,7 @@ impl Parse for TrackField {
     } else {
       (None, parse_quote!(#member))
     };
-    Ok(TrackField { member, colon_token, expr })
+    Ok(StateField { member, colon_token, expr })
   }
 }
 
@@ -609,7 +609,7 @@ impl Parse for MemberPath {
   }
 }
 
-impl Parse for StateField {
+impl Parse for AnimateStateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let path = input.parse()?;
     let _colon_token: Option<_> = input.parse()?;
@@ -693,12 +693,12 @@ impl ToTokens for AnimateState {
     let Self { state: state_token, brace, .. } = self;
     let state_span = state_token.span.join(brace.span).unwrap();
 
-    let init_value = self.maybe_tuple_value(|StateField { value: expr, .. }| quote! {#expr});
-    let target_value = self.maybe_tuple_value(|StateField { path, .. }| {
+    let init_value = self.maybe_tuple_value(|AnimateStateField { value: expr, .. }| quote! {#expr});
+    let target_value = self.maybe_tuple_value(|AnimateStateField { path, .. }| {
       quote! { #path.clone()}
     });
 
-    let target_assign = self.maybe_tuple_value(|StateField { path, .. }| {
+    let target_assign = self.maybe_tuple_value(|AnimateStateField { path, .. }| {
       let MemberPath { widget, dot, member } = path;
       quote! { #widget #dot shallow() #dot #member }
     });
@@ -746,7 +746,10 @@ impl Spanned for Animate {
 }
 
 impl AnimateState {
-  fn maybe_tuple_value(&self, value_by_field: impl Fn(&StateField) -> TokenStream) -> TokenStream {
+  fn maybe_tuple_value(
+    &self,
+    value_by_field: impl Fn(&AnimateStateField) -> TokenStream,
+  ) -> TokenStream {
     let value_tokens = self.fields.iter().map(|s| value_by_field(s));
     if self.fields.len() > 1 {
       quote! { (#(#value_tokens), *)}

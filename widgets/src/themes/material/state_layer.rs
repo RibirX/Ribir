@@ -23,8 +23,8 @@ pub struct InteractiveLayer {
 
 impl Compose for StateLayer {
   fn compose(this: StateWidget<Self>) -> Widget {
-    widget_try_track!(
-      try_track { this }
+    widget_maybe_states!(
+      maybe_states { this }
       PathPaintKit {
         path: this.path.clone(),
         brush: this.role.calc_color(this.color),
@@ -38,7 +38,7 @@ impl ComposeChild for InteractiveLayer {
 
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       Stack {
         DynWidget { id: host, dyns: child }
         StateLayer {

@@ -21,7 +21,7 @@ use super::{
     ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, WidgetNode,
   },
   guard_ident, guard_vec_ident,
-  parser::{Env, Track, TrackField},
+  parser::{Env, StateField, States},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
@@ -39,8 +39,8 @@ impl ToTokens for Desugared {
 
       return;
     }
-    let Self { track, warnings, .. } = &*self;
-    if track.as_ref().map_or(false, Track::has_def_names) {
+    let Self { states: track, warnings, .. } = &*self;
+    if track.as_ref().map_or(false, States::has_def_names) {
       Brace::default().surround(tokens, |tokens| {
         track.to_tokens(tokens);
         self.inner_tokens(tokens);
@@ -428,9 +428,9 @@ impl DeclareObj {
   }
 }
 
-impl ToTokens for TrackField {
+impl ToTokens for StateField {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    let TrackField { member, expr, .. } = self;
+    let StateField { member, expr, .. } = self;
     syn::token::Let(member.span()).to_tokens(tokens);
     member.to_tokens(tokens);
     quote_spanned!(member.span() => : Stateful<_> =  ).to_tokens(tokens);
@@ -439,10 +439,10 @@ impl ToTokens for TrackField {
   }
 }
 
-impl ToTokens for Track {
+impl ToTokens for States {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     self
-      .track_externs
+      .states
       .iter()
       .filter(|f| f.colon_token.is_some())
       .for_each(|field| field.to_tokens(tokens));
@@ -675,10 +675,10 @@ impl ToTokens for NamedObj {
   }
 }
 
-impl Track {
-  pub fn has_def_names(&self) -> bool { self.track_externs.iter().any(|f| f.colon_token.is_some()) }
+impl States {
+  pub fn has_def_names(&self) -> bool { self.states.iter().any(|f| f.colon_token.is_some()) }
 
   pub fn track_names(&self) -> impl Iterator<Item = &Ident> {
-    self.track_externs.iter().map(|f| &f.member)
+    self.states.iter().map(|f| &f.member)
   }
 }

@@ -12,7 +12,7 @@ impl ComposeChild for LayoutBox {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       DynWidget {
         dyns: child,
         performed_layout: move |ctx| {

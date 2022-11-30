@@ -68,7 +68,7 @@ mod tests {
 
     let themes: Stateful<Vec<Rc<Theme>>> = vec![].into_stateful();
     let light_dark = widget! {
-      track { themes: themes.clone() }
+      states { themes: themes.clone() }
       ThemeWidget {
         theme: Rc::new(Theme::Inherit(InheritTheme {
           brightness: Some(Brightness::Light),

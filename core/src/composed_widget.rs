@@ -73,7 +73,7 @@ mod tests {
     impl Compose for T {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
-          track { this: this.into_stateful() }
+          states { this: this.into_stateful() }
           DynWidget {
             dyns: {
                // explicit capture `this` to avoid `DynWidget` to be optimized`.

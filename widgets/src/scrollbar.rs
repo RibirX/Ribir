@@ -32,7 +32,7 @@ impl ComposeStyle for HScrollBarThumbStyle {
   #[inline]
   fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
-      track { this }
+      states { this }
       DynWidget { left_anchor: this.offset, dyns: host }
     }
   }
@@ -50,7 +50,7 @@ impl ComposeStyle for VScrollBarThumbStyle {
   #[inline]
   fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
-      track { this }
+      states { this }
       DynWidget {
         top_anchor: this.offset,
         dyns: host
@@ -63,7 +63,7 @@ impl ComposeChild for HScrollBar {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       Stack {
         ScrollableWidget {
           id: scrolling,
@@ -96,7 +96,7 @@ impl ComposeChild for VScrollBar {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       Stack {
         ScrollableWidget {
           id: scrolling,
@@ -129,7 +129,7 @@ impl ComposeChild for BothScrollbar {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       Stack {
         ScrollableWidget {
           id: scrolling,
@@ -170,7 +170,7 @@ impl Compose for HRawScrollbar {
     let scrolling = this.raw_ref().scrolling.clone();
 
     widget! {
-      track { scrolling, this }
+      states { scrolling, this }
       env {
         let ScrollBarTheme {
           thickness,
@@ -221,7 +221,7 @@ impl Compose for VRawScrollbar {
     let scrolling = this.raw_ref().scrolling.clone();
 
     widget! {
-      track { scrolling, this }
+      states { scrolling, this }
       env {
         let ScrollBarTheme {
           thickness,

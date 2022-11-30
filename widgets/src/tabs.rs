@@ -15,9 +15,9 @@ pub struct InkBarStyle {
 impl ComposeStyle for InkBarStyle {
   type Host = Option<Widget>;
   #[inline]
-  fn compose_style(_: Stateful<Self>, host: Option<Widget>) -> Widget { 
+  fn compose_style(_: Stateful<Self>, host: Option<Widget>) -> Widget {
     assert!(host.is_none());
-    Void.into_widget()  
+    Void.into_widget()
   }
 }
 
@@ -59,7 +59,7 @@ impl ComposeChild for Tabs {
     }
 
     widget! {
-      track {
+      states {
         this: this.into_stateful(),
         active_header_rect: Rect::zero().into_stateful()
       }

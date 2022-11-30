@@ -105,7 +105,7 @@ fn override_compose_style(theme: &mut FullTheme) {
   let styles = &mut theme.compose_styles;
   styles.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
     widget! {
-      track { this }
+      states { this }
       DynWidget {
         id: thumb,
         left_anchor: this.offset,
@@ -120,7 +120,7 @@ fn override_compose_style(theme: &mut FullTheme) {
   });
   styles.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
     widget! {
-      track { this }
+      states { this }
       DynWidget {
         id: thumb,
         top_anchor: this.offset,
@@ -133,9 +133,9 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<InkBarStyle>(|style, _host| {
+  styles.override_compose_style::<InkBarStyle>(|style, _| {
     widget! {
-      track { style }
+      states { style }
       env { let palette = Palette::of(ctx); }
       Container {
         id: ink_bar,
@@ -157,7 +157,7 @@ fn override_compose_style(theme: &mut FullTheme) {
   });
   styles.override_compose_style::<CheckBoxStyle>(move |style, host| {
     widget! {
-      track { style }
+      states { style }
       Ripple {
         center: true,
         color: style.color,

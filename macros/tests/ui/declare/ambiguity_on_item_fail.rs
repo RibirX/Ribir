@@ -9,7 +9,7 @@ fn main() {
   };
 
   let ambiguity = widget! {
-    track { flag: true.into_stateful() }
+    states { flag: true.into_stateful() }
     Container {
       size: Size::zero()
     }

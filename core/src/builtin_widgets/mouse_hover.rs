@@ -14,7 +14,7 @@ impl ComposeChild for MouseHover {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track {this: this.into_stateful()}
+      states {this: this.into_stateful()}
       DynWidget {
         dyns: child,
         pointer_enter: move |_| this.hover = true,

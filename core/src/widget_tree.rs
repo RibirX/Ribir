@@ -300,7 +300,7 @@ mod tests {
   impl Compose for Recursive {
     fn compose(this: StateWidget<Self>) -> Widget {
       widget! {
-        track { this: this.into_stateful() }
+        states { this: this.into_stateful() }
         MockMulti {
           DynWidget {
             dyns: (0..this.width)
@@ -330,7 +330,7 @@ mod tests {
   impl Compose for Embed {
     fn compose(this: StateWidget<Self>) -> Widget {
       widget! {
-        track { this: this.into_stateful()}
+        states { this: this.into_stateful()}
         MockMulti {
           DynWidget {
             dyns: (0..this.width - 1)
@@ -379,7 +379,7 @@ mod tests {
     let expect_size = Size::new(20., 20.);
     let no_boundary_size = INFINITY_SIZE.into_stateful();
     let w = widget! {
-      track { size: no_boundary_size.clone() }
+      states { size: no_boundary_size.clone() }
       MockBox {
         size: expect_size,
         MockBox { size: *size }
@@ -405,7 +405,7 @@ mod tests {
     let parent = Stateful::new(true);
     let child = Stateful::new(true);
     let w = widget! {
-      track { parent: parent.clone(), child: child.clone() }
+      states { parent: parent.clone(), child: child.clone() }
       DynWidget {
         dyns: parent.then(|| {
           widget!{
@@ -434,7 +434,7 @@ mod tests {
   fn fix_child_expr_widget_same_root_as_parent() {
     let trigger = Stateful::new(true);
     let w = widget! {
-      track { trigger: trigger.clone() }
+      states { trigger: trigger.clone() }
       DynWidget {
         dyns: trigger.then(|| {
           widget!{ DynWidget { dyns: trigger.then(|| Void )}}
@@ -523,7 +523,7 @@ mod tests {
   fn perf_silent_ref_should_not_dirty_expr_widget() {
     let trigger = Stateful::new(1);
     let widget = widget! {
-      track { trigger: trigger.clone() }
+      states { trigger: trigger.clone() }
       MockMulti {
         DynWidget {
           dyns: (0..3).map(|_| if *trigger > 0 {

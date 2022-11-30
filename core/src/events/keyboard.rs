@@ -119,7 +119,7 @@ mod tests {
     impl Compose for Keys {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
-          track { this: this.into_stateful() }
+          states { this: this.into_stateful() }
           MockBox {
             size: Size::zero(),
             auto_focus: true,

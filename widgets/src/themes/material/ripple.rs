@@ -40,7 +40,7 @@ impl ComposeChild for Ripple {
 
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       Stack {
         id: container,
         DynWidget { dyns: child }
