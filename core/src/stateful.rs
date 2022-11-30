@@ -319,6 +319,11 @@ impl<W: Render + 'static> Render for Stateful<W> {
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     self.widget.borrow().hit_test(ctx, pos)
   }
+
+  #[inline]
+  fn get_transform(&self) -> Option<Transform> {
+    self.widget.borrow().get_transform()
+  }
 }
 
 impl<W: Compose> Compose for Stateful<W> {

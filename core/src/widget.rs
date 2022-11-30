@@ -58,9 +58,7 @@ pub trait Render: Query {
     HitTest { hit: is_hit, can_hit_child: is_hit }
   }
 
-  fn map_to_parent_transform(&self, pos: Point) -> Point { pos }
-
-  fn map_from_parent_transform(&self, pos: Point) -> Point { pos }
+  fn get_transform(&self) -> Option<Transform> { None }
 }
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
@@ -311,6 +309,11 @@ impl<T: Render> Render for algo::ShareResource<T> {
 
   #[inline]
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
+
+  #[inline]
+  fn get_transform(&self) -> Option<Transform> {
+    T::get_transform(self)
+  }
 }
 
 impl<T: Query> Query for ShareResource<T> {
@@ -362,6 +365,11 @@ macro_rules! impl_proxy_render {
 
     #[inline]
     fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
+
+    #[inline]
+    fn get_transform(&self) -> Option<Transform> {
+      self.$($proxy)*.get_transform()
+    }
   };
 }
 

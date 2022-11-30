@@ -99,12 +99,16 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
 
   #[inline]
   fn map_to_parent(&self, pos: Point) -> Point {
-    self.layout_store().map_to_parent(self.id(), pos, self.tree_arena())
+    self
+      .layout_store()
+      .map_to_parent(self.id(), pos, self.tree_arena())
   }
 
   #[inline]
   fn map_from_parent(&self, pos: Point) -> Point {
-    self.layout_store().map_from_parent(self.id(), pos, self.tree_arena())
+    self
+      .layout_store()
+      .map_from_parent(self.id(), pos, self.tree_arena())
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
@@ -185,4 +189,42 @@ mod tests {
     assert_eq!(w_ctx.map_from(pos, child), pos);
     assert_eq!(w_ctx.map_to(pos, child), pos);
   }
+
+  #[test]
+  fn map_transform_test() {
+    let w = widget! {
+      MockBox {
+        size: Size::new(100., 100.),
+        MockBox {
+          transform: Transform::scale(0.5, 0.5),
+          left_anchor: 30.,
+          top_anchor: 30.,
+          size: Size::new(40., 40.)
+        }
+      }
+    };
+
+    let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(100., 100.)));
+    wnd.draw_frame();
+
+    let tree = &wnd.widget_tree;
+    let root = tree.root();
+    let child = get_single_child_by_depth(root, &tree.arena, 4);
+    let WidgetTree { arena, store, app_ctx , .. } = tree;
+    let w_ctx = TestCtx { id: root, arena, store, app_ctx };
+    let from_pos = Point::new(30., 30.);
+    assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
+    let to_pos = Point::new(50., 50.);
+    assert_eq!(w_ctx.map_to(to_pos, child), Point::new(40., 40.));
+  }
+
+  fn get_single_child_by_depth(id: WidgetId, tree: &TreeArena, mut depth: u32) -> WidgetId {
+    let mut child = id;
+    while depth > 0 {
+      child = child.single_child(tree).unwrap();
+      depth -= 1;
+    }
+    child
+  }
+
 }

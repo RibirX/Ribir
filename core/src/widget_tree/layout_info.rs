@@ -80,7 +80,10 @@ impl LayoutStore {
 
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
     self.layout_box_rect(id).map_or(pos, |rect| {
-      let pos = id.assert_get(arena).map_to_parent_transform(pos);
+      let pos = id
+        .assert_get(arena)
+        .get_transform()
+        .map_or(pos, |t| t.transform_point(pos));
       pos + rect.min().to_vector()
     })
   }
@@ -88,7 +91,9 @@ impl LayoutStore {
   pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
     self.layout_box_rect(id).map_or(pos, |rect| {
       let pos = pos - rect.min().to_vector();
-      id.assert_get(arena).map_from_parent_transform(pos)
+      id.assert_get(arena)
+        .get_transform()
+        .map_or(pos, |t| t.inverse().map_or(pos, |t| t.transform_point(pos)))
     })
   }
 
