@@ -2,7 +2,9 @@ use crate::{WATCH_MACRO_NAME, WIDGET_MACRO_NAME};
 
 use super::{
   builtin_var_name, capture_widget,
-  desugar::{ComposeItem, DeclareObj, Field, FieldValue, NamedObj, SubscribeItem, WidgetNode},
+  desugar::{
+    ComposeItem, DeclareObj, Field, FieldValue, NamedObj, SubscribeItem, TrackBlock, WidgetNode,
+  },
   gen_watch_macro, gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
   WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
 };
@@ -297,7 +299,20 @@ impl VisitCtx {
     self.take_current_used_info();
 
     self.visit_widget_node_mut(&mut desugar.widget.as_mut().unwrap());
+    if let Some(finally) = desugar.finally.as_mut() {
+      self.visit_track_block_mut(finally);
+    }
   }
+
+  pub fn visit_track_block_mut(&mut self, block: &mut TrackBlock) {
+    block
+      .block
+      .stmts
+      .iter_mut()
+      .for_each(|stmt| self.visit_stmt_mut(stmt));
+    block.used_name_info = self.take_current_used_info();
+  }
+
   pub fn visit_declare_obj(&mut self, obj: &mut DeclareObj) {
     let DeclareObj { ty, fields, .. } = obj;
     self.visit_path_mut(ty);

@@ -2,16 +2,17 @@ use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
-use syn::{parse_quote, parse_quote_spanned, spanned::Spanned, Expr, ExprPath, Ident, Path};
+use syn::{parse_quote, parse_quote_spanned, spanned::Spanned, Block, Expr, ExprPath, Ident, Path};
 
 use super::{
   child_variable, is_listener,
   parser::{
     Animate, AnimateTransitionValue, DataFlow, DeclareField, DeclareWidget, FromStateField, Id,
-    Init, Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, States, Transition,
+    Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, States, Transition,
     TransitionField,
   },
-  ribir_suffix_variable, ribir_variable, TrackExpr, WIDGETS, WIDGET_OF_BUILTIN_FIELD,
+  ribir_suffix_variable, ribir_variable, ScopeUsedInfo, TrackExpr, WIDGETS,
+  WIDGET_OF_BUILTIN_FIELD,
 };
 use crate::{
   error::{DeclareError, DeclareWarning},
@@ -25,13 +26,19 @@ pub const CHANGE: &str = "change";
 pub const MODIFY: &str = "modify";
 pub const ID: &str = "id";
 pub struct Desugared {
-  pub init: Option<Init>,
+  pub init: Option<TrackBlock>,
   pub states: Option<States>,
   pub named_objs: NamedObjMap,
   pub stmts: Vec<SubscribeItem>,
   pub widget: Option<WidgetNode>,
+  pub finally: Option<TrackBlock>,
   pub errors: Vec<DeclareError>,
   pub warnings: Vec<DeclareWarning>,
+}
+
+pub struct TrackBlock {
+  pub block: Block,
+  pub used_name_info: ScopeUsedInfo,
 }
 
 pub enum SubscribeItem {
@@ -101,13 +108,21 @@ pub enum ComposeItem {
 impl MacroSyntax {
   pub fn desugar(self) -> Desugared {
     let named_objs = NamedObjMap::default();
-    let MacroSyntax { init, states, widget, items } = self;
+    let MacroSyntax { init, states, widget, items, finally } = self;
+
     let mut desugared = Desugared {
-      init,
+      init: init.map(|init| TrackBlock {
+        block: init.block,
+        used_name_info: <_>::default(),
+      }),
       states,
       named_objs,
       stmts: vec![],
       widget: None,
+      finally: finally.map(|f| TrackBlock {
+        block: f.block,
+        used_name_info: <_>::default(),
+      }),
       errors: vec![],
       warnings: vec![],
     };

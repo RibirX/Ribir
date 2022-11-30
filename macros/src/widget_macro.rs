@@ -51,11 +51,6 @@ pub fn gen_widget_macro(
   let mut desugar = macro_syntax.desugar();
 
   let mut ctx = VisitCtx {
-    declare_objs: desugar
-      .named_objs
-      .objs()
-      .map(|obj| (obj.name().clone(), obj.ty().clone()))
-      .collect(),
     track_names: desugar
       .states
       .iter()
@@ -63,11 +58,24 @@ pub fn gen_widget_macro(
       .collect(),
     ..<_>::default()
   };
+
   if let Some(ref outside_ctx) = outside_ctx {
     ctx.declare_objs.extend(outside_ctx.declare_objs.clone());
     ctx.track_names.extend(outside_ctx.track_names.clone());
     ctx.analyze_stack = outside_ctx.analyze_stack.clone();
   };
+
+  // visit init without named objects.
+  if let Some(init) = desugar.init.as_mut() {
+    ctx.visit_track_block_mut(init);
+  }
+
+  ctx.declare_objs.extend(
+    desugar
+      .named_objs
+      .objs()
+      .map(|obj| (obj.name().clone(), obj.ty().clone())),
+  );
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
   desugar.collect_warnings(&ctx);
@@ -151,6 +159,7 @@ pub(crate) fn gen_watch_macro(
       |tokens| watch_expr.to_tokens(tokens),
     );
 
+    // todo: unsubscribe guard
     quote_spanned! { watch_expr.span() =>
       #upstream
         .filter(|s| s.contains(ChangeScope::DATA))

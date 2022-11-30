@@ -5,7 +5,7 @@ use crate::{
 };
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
@@ -18,10 +18,11 @@ use syn::{
 use super::{
   builtin_var_name, capture_widget, ctx_ident,
   desugar::{
-    ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, WidgetNode,
+    ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, TrackBlock,
+    WidgetNode,
   },
   guard_ident, guard_vec_ident,
-  parser::{Init, StateField, States},
+  parser::{StateField, States},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
@@ -56,7 +57,12 @@ impl ToTokens for Desugared {
 impl Desugared {
   fn inner_tokens(&self, tokens: &mut TokenStream) {
     let Self {
-      init: env, named_objs, stmts, widget, ..
+      init,
+      named_objs,
+      stmts,
+      widget,
+      finally,
+      ..
     } = &self;
     let sorted_named_objs = self.order_named_objs();
     Paren::default().surround(tokens, |tokens| {
@@ -69,7 +75,10 @@ impl Desugared {
          let mut #guards_vec: Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> = vec![];
         }
         .to_tokens(tokens);
-        env.to_tokens(tokens);
+        if let Some(init) = init {
+          init.to_strip_brace_tokens(tokens)
+        }
+
         // deep first declare named obj by their dependencies
         // circular may exist widget attr follow widget self to init.
         sorted_named_objs.iter().for_each(|name| {
@@ -81,6 +90,8 @@ impl Desugared {
         stmts.iter().for_each(|item| item.to_tokens(tokens));
         let w = widget.as_ref().unwrap();
         w.gen_node_objs(tokens);
+        finally.to_tokens(tokens);
+
         let name = w.node.name();
         quote! { let mut #name = }.to_tokens(tokens);
         w.gen_compose_node(named_objs, tokens);
@@ -451,12 +462,6 @@ impl ToTokens for States {
   }
 }
 
-impl ToTokens for Init {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
-    self.stmts.stmts.iter().for_each(|s| s.to_tokens(tokens));
-  }
-}
-
 impl ToTokens for SubscribeItem {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
@@ -682,5 +687,29 @@ impl States {
 
   pub fn track_names(&self) -> impl Iterator<Item = &Ident> {
     self.states.iter().map(|f| &f.member)
+  }
+}
+
+impl ToTokens for TrackBlock {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    self
+      .block
+      .brace_token
+      .surround(tokens, |tokens| self.to_strip_brace_tokens(tokens))
+  }
+}
+
+impl TrackBlock {
+  fn to_strip_brace_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    if let Some(refs) = self.used_name_info.refs_widgets() {
+      let refs = refs.map(|name| {
+        quote_spanned! { name.span() =>
+          #[allow(unused_mut)]
+          let mut #name = #name.state_ref();
+        }
+      });
+      tokens.append_all(refs);
+    }
+    tokens.append_all(&self.block.stmts)
   }
 }
