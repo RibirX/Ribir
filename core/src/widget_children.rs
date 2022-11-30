@@ -157,8 +157,9 @@ pub trait FillTemplate<M: ImplMarker, W>: Template {
 
 pub struct ConcreteTml<W>(Option<W>);
 pub struct WidgetTml(Option<Widget>);
+pub struct WidgetPairTml<W, C>(Option<WidgetPair<W, C>>);
 
-macro_rules! impl_concrete_tml {
+macro_rules! assert_impl_tml {
   () => {
     #[inline]
     fn empty() -> Self { Self(None) }
@@ -168,7 +169,7 @@ macro_rules! impl_concrete_tml {
   };
 }
 
-macro_rules! assert_concrete_fill {
+macro_rules! assert_assign_once {
   ($e: expr) => {
     assert!(
       $e.is_none(),
@@ -180,12 +181,12 @@ macro_rules! assert_concrete_fill {
 // impl concrete template
 impl<W> Template for ConcreteTml<W> {
   type Target = W;
-  impl_concrete_tml!();
+  assert_impl_tml!();
 }
 
 impl<W> FillTemplate<Concrete<W>, W> for ConcreteTml<W> {
   fn fill(mut self, c: W) -> Self {
-    assert_concrete_fill!(self.0);
+    assert_assign_once!(self.0);
     self.0 = Some(c);
     self
   }
@@ -198,12 +199,12 @@ impl AssociatedTemplate for Widget {
 
 impl Template for WidgetTml {
   type Target = Widget;
-  impl_concrete_tml!();
+  assert_impl_tml!();
 }
 
 impl FillTemplate<Generic<Widget>, Widget> for WidgetTml {
   fn fill(mut self, w: Widget) -> Self {
-    assert_concrete_fill!(self.0);
+    assert_assign_once!(self.0);
     self.0 = Some(w);
     self
   }
@@ -225,8 +226,26 @@ impl<W> Template for Option<W> {
 
 impl<W> FillTemplate<Generic<W>, W> for Option<W> {
   fn fill(mut self, c: W) -> Self {
-    assert_concrete_fill!(self);
+    assert_assign_once!(self);
     self = Some(c);
+    self
+  }
+}
+
+// WidgetPair template
+impl<W, C> AssociatedTemplate for WidgetPair<W, C> {
+  type T = WidgetPairTml<W, C>;
+}
+
+impl<W, C> Template for WidgetPairTml<W, C> {
+  type Target = WidgetPair<W, C>;
+  assert_impl_tml!();
+}
+
+impl<W, C> FillTemplate<Generic<WidgetPair<W, C>>, WidgetPair<W, C>> for WidgetPairTml<W, C> {
+  fn fill(mut self, c: WidgetPair<W, C>) -> Self {
+    assert_assign_once!(self.0);
+    self.0 = Some(c);
     self
   }
 }
@@ -443,6 +462,21 @@ mod tests {
         size: ZERO_SIZE,
         Option::Some(MockBox { size: Size::zero() })
       }
+    };
+  }
+
+  #[test]
+  fn pair_to_pair() {
+    #[derive(Declare)]
+    struct P;
+
+    impl ComposeChild for P {
+      type Child = WidgetOf<MockBox>;
+      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget { unreachable!() }
+    }
+
+    let _ = widget! {
+      P { MockBox {Void {} } }
     };
   }
 }
