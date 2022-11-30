@@ -13,9 +13,9 @@ pub struct Cursor {
 impl ComposeChild for Cursor {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    widget_try_track! {
-      try_track { this }
-      track { save_cursor: None.into_stateful() }
+    widget_maybe_states! {
+      maybe_states { this }
+      states { save_cursor: None.into_stateful() }
       DynWidget {
         dyns: child,
         pointer_enter: move |e: &mut PointerEvent| {

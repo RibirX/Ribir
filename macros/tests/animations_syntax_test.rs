@@ -23,7 +23,7 @@ fn listener_trigger_have_handler() {
   let animate_state = false.into_stateful();
 
   let w = widget! {
-    track { animate_state:  animate_state.clone() }
+    states { animate_state:  animate_state.clone() }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
@@ -56,7 +56,7 @@ fn listener_trigger() {
   let animate_state = false.into_stateful();
 
   let w = widget! {
-    track { animate_state:  animate_state.clone() }
+    states { animate_state:  animate_state.clone() }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),

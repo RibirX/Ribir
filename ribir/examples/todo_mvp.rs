@@ -14,7 +14,7 @@ impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       // split this to avoid mutable borrow conflict in `DynWidget`.
-      track {
+      states {
         this: this.into_stateful(),
       }
       Column {
@@ -95,7 +95,7 @@ impl Compose for TodoMVP {
 impl TodoMVP {
   fn pane(this: Stateful<Self>, cond: impl Fn(&Task) -> bool + 'static) -> Widget {
     widget! {
-      track { this, this2: this.clone() }
+      states { this, this2: this.clone() }
       VScrollBar {
         Lists {
           padding: EdgeInsets::vertical(8.),
@@ -146,7 +146,7 @@ struct TabText {
 impl Compose for TabText {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
-      track {
+      states {
         this: this.into_stateful()
       }
       env {

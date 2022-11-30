@@ -293,7 +293,7 @@ fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
 fn builtin_method_support() {
   let layout_size = Stateful::new(Size::zero());
   let w = widget! {
-    track { layout_size: layout_size.clone() }
+    states { layout_size: layout_size.clone() }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
@@ -356,7 +356,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
   let notify_cnt = 0.into_stateful();
   let trigger = true.into_stateful();
   let w = widget! {
-    track { cnt: notify_cnt.clone(), trigger: trigger.clone() }
+    states { cnt: notify_cnt.clone(), trigger: trigger.clone() }
     SizedBox {
       size: Size::zero(),
       DynWidget  {

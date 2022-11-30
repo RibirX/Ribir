@@ -283,7 +283,7 @@ mod tests {
   fn expr_widget_as_root() {
     let size = Size::zero().into_stateful();
     let w = widget! {
-      track { size: size.clone() }
+      states { size: size.clone() }
       DynWidget {
         dyns: MockBox { size: size.clone() },
         Void {}
@@ -307,7 +307,7 @@ mod tests {
   fn expr_widget_with_declare_child() {
     let size = Size::zero().into_stateful();
     let w = widget! {
-      track { size: size.clone() }
+      states { size: size.clone() }
       MockBox {
         size: Size::zero(),
         DynWidget {
@@ -338,7 +338,7 @@ mod tests {
     let new_cnt = 0.into_stateful();
     let drop_cnt = 0.into_stateful();
     let w = widget! {
-      track {
+      states {
         v: v.clone(),
         new_cnt: new_cnt.clone(),
         drop_cnt: drop_cnt.clone(),

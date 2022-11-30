@@ -12,9 +12,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 use widget_macro::gen_widget_macro;
-use widget_try_track_macro::TryTrack;
+use widget_maybe_state_macro::MaybeStates;
 mod child_template;
-mod widget_try_track_macro;
+mod widget_maybe_state_macro;
 
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 
@@ -84,8 +84,8 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None).into() }
 
 #[proc_macro]
-pub fn widget_try_track(input: TokenStream) -> TokenStream {
-  let try_track = parse_macro_input! { input as TryTrack };
+pub fn widget_maybe_states(input: TokenStream) -> TokenStream {
+  let try_track = parse_macro_input! { input as MaybeStates };
   quote! { #try_track}.into()
 }
 

@@ -60,8 +60,8 @@ pub struct NamedSvg(pub usize);
 
 impl Compose for NamedSvg {
   fn compose(this: StateWidget<Self>) -> Widget {
-    widget_try_track! {
-      try_track { this }
+    widget_maybe_states! {
+      maybe_states { this }
       DynWidget {
         dyns: move |ctx: &BuildCtx| this.of_or_miss(ctx)
       }

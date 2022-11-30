@@ -31,7 +31,7 @@ impl ComposeChild for ScrollableWidget {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
-      track { this: this.into_stateful() }
+      states { this: this.into_stateful() }
       Clip { UnconstrainedBox {
         id: view,
         dir: match this.scrollable {

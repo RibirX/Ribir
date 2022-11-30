@@ -6,7 +6,7 @@ mod code_gen;
 mod desugar;
 mod parser;
 pub use desugar::Desugared;
-pub use parser::{MacroSyntax, TrackField};
+pub use parser::{MacroSyntax, StateField};
 mod visit_mut;
 pub use visit_mut::*;
 mod name_used_info;
@@ -57,9 +57,9 @@ pub fn gen_widget_macro(
       .map(|obj| (obj.name().clone(), obj.ty().clone()))
       .collect(),
     track_names: desugar
-      .track
+      .states
       .iter()
-      .flat_map(|t| t.track_externs.iter().map(|sf| sf.member.clone()))
+      .flat_map(|t| t.states.iter().map(|sf| sf.member.clone()))
       .collect(),
     ..<_>::default()
   };
@@ -107,7 +107,7 @@ pub fn gen_widget_macro(
       .iter()
       .filter(|(name, _)| {
         !desugar.named_objs.contains(name)
-          && desugar.track.as_ref().map_or(true, |track| {
+          && desugar.states.as_ref().map_or(true, |track| {
             track.track_names().find(|n| n == name).is_none()
           })
       })

@@ -431,7 +431,7 @@ mod tests {
     let size = Size::zero().into_stateful();
     // with single child
     let _e = widget! {
-      track { size: size.clone() }
+      states { size: size.clone() }
       DynWidget {
         dyns: if size.area() > 0. {
            MockBox { size: *size }
@@ -443,7 +443,7 @@ mod tests {
     };
     // with multi child
     let _e = widget! {
-      track { size: size.clone() }
+      states { size: size.clone() }
       DynWidget {
         dyns: if size.area() > 0. { MockMulti {} } else { MockMulti {} },
         MockBox { size: Size::zero() }
@@ -454,7 +454,7 @@ mod tests {
 
     // option with single child
     let _e = widget! {
-      track { size: size.clone() }
+      states { size: size.clone() }
       DynWidget {
         dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
         MockBox { size: Size::zero() }
@@ -463,7 +463,7 @@ mod tests {
 
     // option with `Widget`
     let _e = widget! {
-      track { size: size.clone() }
+      states { size: size.clone() }
       DynWidget {
         dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
         DynWidget { dyns: Void.into_widget() }

@@ -47,7 +47,7 @@ impl ComposeChild for Checkbox {
   fn compose_child(this: StateWidget<Self>, label: Self::Child) -> Widget {
     let this = this.into_stateful();
     let mut checkbox = widget! {
-      track { this: this.clone() }
+      states { this: this.clone() }
       env { let theme = CheckBoxTheme::of(ctx); }
       CheckBoxStyle { Icon {
         size: theme.size,
@@ -81,7 +81,7 @@ impl ComposeChild for Checkbox {
     }
 
     widget! {
-      track { this }
+      states { this }
       DynWidget {
         cursor: CursorIcon::Hand,
         tap: move |_| this.switch_check(),

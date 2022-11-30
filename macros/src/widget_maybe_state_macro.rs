@@ -9,20 +9,20 @@ use syn::{
   token::{Brace, Comma, Paren},
 };
 
-use crate::widget_macro::TrackField;
+use crate::widget_macro::StateField;
 
-syn::custom_keyword!(try_track);
-pub struct TryTrack {
-  _try_track_token: try_track,
+syn::custom_keyword!(maybe_states);
+pub struct MaybeStates {
+  _try_track_token: maybe_states,
   _brace: Brace,
-  targets: Punctuated<TrackField, Comma>,
+  targets: Punctuated<StateField, Comma>,
   rest_tokens: TokenStream,
 }
 
-impl Parse for TryTrack {
+impl Parse for MaybeStates {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
-    Ok(TryTrack {
+    Ok(MaybeStates {
       _try_track_token: input.parse()?,
       _brace: braced!(content in input),
       targets: Punctuated::parse_separated_nonempty(&content)?,
@@ -31,12 +31,12 @@ impl Parse for TryTrack {
   }
 }
 
-impl ToTokens for TryTrack {
+impl ToTokens for MaybeStates {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let mut init = quote! {};
     self.targets.iter().for_each(|f| {
       if f.colon_token.is_some() {
-        let TrackField { member, expr, .. } = f;
+        let StateField { member, expr, .. } = f;
         init.extend(quote! { let #member = #expr; });
       }
     });
@@ -51,7 +51,7 @@ impl ToTokens for TryTrack {
   }
 }
 
-impl TryTrack {
+impl MaybeStates {
   fn gen_widget_macro(&self, tokens: &mut TokenStream) {
     let Self { targets, rest_tokens, .. } = self;
     if targets.len() == 1 {
@@ -59,7 +59,7 @@ impl TryTrack {
       tokens.extend(quote! {
         match #name {
           StateWidget::Stateful(#name) => widget!{
-            track { #name }
+            states { #name }
             #rest_tokens
           },
           StateWidget::Stateless(#name) => widget!{ #rest_tokens }
@@ -96,7 +96,7 @@ impl TryTrack {
         },});
       } else {
         tokens.extend(quote! { => widget! {
-          track { #(#stateful_names),* }
+          states { #(#stateful_names),* }
           #rest_tokens
         },});
       }

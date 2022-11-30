@@ -178,7 +178,7 @@ impl Query for Caret {
 impl Compose for Caret {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
-      track {this: this.into_stateful(),}
+      states {this: this.into_stateful(),}
       SizedBox {
         id: caret,
         opacity: 1.,
@@ -242,7 +242,7 @@ impl Compose for Input {
   fn compose(this: StateWidget<Self>) -> Widget {
     let placeholder = "\r";
     widget! {
-      track {
+      states {
         this: this.into_stateful(),
         helper: GlyphHelper::default().into_stateful(),
       }

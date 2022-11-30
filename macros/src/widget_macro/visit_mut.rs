@@ -23,7 +23,7 @@ bitflags::bitflags! {
   pub struct IdType: u16 {
     /// Declared by `id: name`,
     const DECLARE = 0x001;
-    /// name provide in `track { ... }`
+    /// name provide in `states { ... }`
     const USER_SPECIFY = 0x010;
       /// name pass by outside `widget!` macro.
     const FROM_ANCESTOR = 0x100;

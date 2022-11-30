@@ -309,7 +309,7 @@ mod tests {
     let child_box = MockBox { size: Size::zero() }.into_stateful();
     let root_layout_cnt = 0.into_stateful();
     let w = widget! {
-      track {
+      states {
         child_box: child_box.clone(),
         root_layout_cnt: root_layout_cnt.clone(),
       }
@@ -340,7 +340,7 @@ mod tests {
     let layout_order = vec![].into_stateful();
     let trigger = Size::zero().into_stateful();
     let w = widget! {
-      track {
+      states {
         layout_order: layout_order.clone(),
         trigger: trigger.clone()
       }

@@ -553,7 +553,7 @@ mod tests {
     impl Compose for EventRecord {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
-          track { this: this.into_stateful() }
+          states { this: this.into_stateful() }
           MockBox {
             size: INFINITY_SIZE,
             pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
@@ -597,7 +597,7 @@ mod tests {
     impl Compose for EnterLeave {
       fn compose(this: StateWidget<Self>) -> Widget {
         widget! {
-          track { this: this.into_stateful() }
+          states { this: this.into_stateful() }
           MockBox {
             size: INFINITY_SIZE,
             pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
@@ -671,7 +671,7 @@ mod tests {
   fn click() {
     let click_path = 0.into_stateful();
     let w = widget! {
-      track { click_path: click_path.clone() }
+      states { click_path: click_path.clone() }
       MockMulti {
         tap: move |_| *click_path += 1,
         MockBox {

@@ -31,7 +31,7 @@ mod tests {
     let lifecycle = Stateful::new(vec![]);
 
     let w = widget! {
-      track {
+      states {
         trigger: trigger.clone(),
         lifecycle: lifecycle.clone()
       }
