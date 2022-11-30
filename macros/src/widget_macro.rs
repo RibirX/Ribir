@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, Expr, Ident};
+use syn::{parse_macro_input, spanned::Spanned, Expr, Ident};
 
 mod code_gen;
 mod desugar;
@@ -14,7 +14,7 @@ pub use name_used_info::*;
 mod variable_names;
 pub use variable_names::*;
 
-use crate::error::DeclareError;
+use crate::error::{DeclareError, DeclareWarning};
 
 use self::desugar::{builtin_obj, NamedObj};
 
@@ -129,6 +129,41 @@ pub fn gen_widget_macro(
   }
 
   tokens.into()
+}
+
+pub(crate) fn gen_watch_macro(
+  input: proc_macro::TokenStream,
+  ctx: &mut VisitCtx,
+) -> proc_macro::TokenStream {
+  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
+  ctx.visit_track_expr(&mut watch_expr);
+  if let Some(upstream) = watch_expr.upstream_tokens() {
+    let captures = watch_expr
+      .used_name_info
+      .all_used()
+      .expect("if upstream is not none, must used some widget")
+      .map(capture_widget);
+
+    let mut expr_value = quote! {};
+    watch_expr.used_name_info.value_expr_surround_refs(
+      &mut expr_value,
+      watch_expr.span(),
+      |tokens| watch_expr.to_tokens(tokens),
+    );
+
+    quote_spanned! { watch_expr.span() =>
+      #upstream
+        .filter(|s| s.contains(ChangeScope::DATA))
+        .map({
+          #(#captures)*
+          move |_| #expr_value
+        })
+    }
+    .into()
+  } else {
+    DeclareWarning::ObserveIsConst(watch_expr.span().unwrap()).emit_warning();
+    watch_expr.to_token_stream().into()
+  }
 }
 
 impl TrackExpr {
