@@ -81,7 +81,7 @@
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
 use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
-use rxrust::{ops::box_it::LocalCloneBoxOp, prelude::*};
+use rxrust::{ops::box_it::LocalBoxOp, prelude::*};
 use std::{
   cell::{RefCell, RefMut, UnsafeCell},
   rc::Rc,
@@ -193,7 +193,7 @@ impl<W> Stateful<W> {
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn change_stream(&self) -> LocalCloneBoxOp<'static, (), ()> {
+  pub fn change_stream(&self) -> LocalBoxOp<'static, (), ()> {
     self
       .raw_change_stream()
       .filter_map(|s: ChangeScope| s.contains(ChangeScope::DATA).then(|| ()))

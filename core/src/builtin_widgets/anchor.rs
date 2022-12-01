@@ -141,7 +141,7 @@ impl PositionUnit {
     }
   }
 
-  pub fn lerp_fn(self_size: f32) -> impl Fn(&Self, &Self, f32) -> Self {
+  pub fn lerp_fn(self_size: f32) -> impl Fn(&Self, &Self, f32) -> Self + Clone {
     move |from, to, rate| {
       let from = from.abs_value(self_size);
       let to = to.abs_value(self_size);

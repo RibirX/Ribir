@@ -2,13 +2,16 @@ use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
-use syn::{parse_quote, parse_quote_spanned, spanned::Spanned, Block, Expr, ExprPath, Ident, Path};
+use syn::{
+  parse_quote, parse_quote_spanned, spanned::Spanned, token::Brace, Block, Expr, ExprPath, Ident,
+  Path, Stmt,
+};
 
 use super::{
   child_variable, is_listener,
   parser::{
     Animate, AnimateTransitionValue, DataFlow, DeclareField, DeclareWidget, FromStateField, Id,
-    Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, States, Transition,
+    Item, MacroSyntax, MemberPath, Observe, OnEventDo, QuickDo, States, TransProps, Transition,
     TransitionField,
   },
   ribir_suffix_variable, ribir_variable, ScopeUsedInfo, TrackExpr, WIDGETS,
@@ -26,19 +29,31 @@ pub const CHANGE: &str = "change";
 pub const MODIFY: &str = "modify";
 pub const ID: &str = "id";
 pub struct Desugared {
-  pub init: Option<TrackBlock>,
+  pub init: Option<InitStmts>,
   pub states: Option<States>,
   pub named_objs: NamedObjMap,
   pub stmts: Vec<SubscribeItem>,
   pub widget: Option<WidgetNode>,
-  pub finally: Option<TrackBlock>,
+  pub finally: Option<FinallyBlock>,
   pub errors: Vec<DeclareError>,
   pub warnings: Vec<DeclareWarning>,
 }
 
-pub struct TrackBlock {
-  pub block: Block,
+pub struct InitStmts {
+  pub stmts: Vec<Stmt>,
   pub used_name_info: ScopeUsedInfo,
+}
+
+#[derive(Default)]
+pub struct FinallyBlock {
+  pub brace_token: Brace,
+  pub stmts: Vec<FinallyStmt>,
+  pub used_name_info: ScopeUsedInfo,
+}
+
+pub enum FinallyStmt {
+  Stmt(Stmt),
+  Obj(DeclareObj),
 }
 
 pub enum SubscribeItem {
@@ -111,17 +126,21 @@ impl MacroSyntax {
     let MacroSyntax { init, states, widget, items, finally } = self;
 
     let mut desugared = Desugared {
-      init: init.map(|init| TrackBlock {
-        block: init.block,
+      init: init.map(|init| InitStmts {
+        stmts: init.block.stmts,
         used_name_info: <_>::default(),
       }),
       states,
       named_objs,
       stmts: vec![],
       widget: None,
-      finally: finally.map(|f| TrackBlock {
-        block: f.block,
-        used_name_info: <_>::default(),
+      finally: finally.map(|f| {
+        let Block { brace_token, stmts } = f.block;
+        FinallyBlock {
+          brace_token,
+          stmts: stmts.into_iter().map(|s| FinallyStmt::Stmt(s)).collect(),
+          used_name_info: <_>::default(),
+        }
       }),
       errors: vec![],
       warnings: vec![],
@@ -240,6 +259,82 @@ impl DeclareObj {
 impl Item {
   fn desugar(self, desugared: &mut Desugared) {
     match self {
+      Item::TransProps(TransProps { transition, props, fields, .. }) => {
+        let by = fields.iter().enumerate().find(|(_, f)| f.member == "by");
+        let transition = if let Some(by) = by {
+          if fields.len() > 1 {
+            desugared
+              .errors
+              .push(DeclareError::TransitionByConflict(by.1.span().unwrap()));
+            return;
+          }
+          FieldValue::Expr(by.1.expr.clone().into())
+        } else {
+          let fields = fields
+            .iter()
+            .map(|f| Field {
+              member: f.member.clone(),
+              value: FieldValue::Expr(f.expr.clone().into()),
+            })
+            .collect();
+          let name = ribir_variable("transition", transition.span());
+          let mut obj = DeclareObj::new(parse_quote!("Transition"), name, fields);
+          obj.stateful = true;
+          FieldValue::Obj(Box::new(obj))
+        };
+
+        let stmts = &mut desugared
+          .finally
+          .get_or_insert_with(FinallyBlock::default)
+          .stmts;
+
+        props.into_iter().for_each(|p| {
+          let span = p.span();
+          let prop = ribir_variable("prop", span);
+          stmts.push(FinallyStmt::Stmt(
+            parse_quote_spanned! { span => let #prop = #p;},
+          ));
+          let prop_changes = ribir_variable("prop_changes", span);
+          stmts.push(FinallyStmt::Stmt(
+            parse_quote_spanned! { span => let #prop_changes = #prop.changes();},
+          ));
+          let from = ribir_variable("from", span);
+          stmts.push(FinallyStmt::Stmt(
+            parse_quote_spanned! { span => let #from = #prop.get();},
+          ));
+          let name = ribir_variable("animate", transition.span());
+          let transition = Field {
+            member: Ident::new("transition", span),
+            value: transition.clone(),
+          };
+          let from_value: Expr = parse_quote!(#from);
+          let from = Field {
+            member: Ident::new("from", span),
+            value: FieldValue::Expr(from_value.into()),
+          };
+          let prop_value: Expr = parse_quote!(#prop);
+          let prop = Field {
+            member: Ident::new("prop", span),
+            value: FieldValue::Expr(prop_value.into()),
+          };
+
+          let mut obj = DeclareObj::new(
+            parse_quote_spanned!(span => Animate),
+            name.clone(),
+            smallvec![transition, prop, from],
+          );
+
+          obj.stateful = true;
+          stmts.push(FinallyStmt::Obj(obj));
+          stmts.push(FinallyStmt::Stmt(parse_quote_spanned! { span =>
+            // todo: subscribe guard.
+            #prop_changes.subscribe(move |(old, _)| {
+              #name.state_ref().from = old;
+              #name.state_ref().run();
+            });
+          }));
+        });
+      }
       Item::Transition(t) => {
         if let DesugaredObj::Obj(obj) = t.desugar(desugared) {
           let warning = DeclareWarning::DefObjWithoutId(obj.span().unwrap());

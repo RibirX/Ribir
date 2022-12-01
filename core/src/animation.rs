@@ -13,3 +13,5 @@ mod lerp;
 pub use lerp::Lerp;
 mod repeat;
 pub use repeat::*;
+mod property;
+pub use property::{LerpProp, Prop, Property};

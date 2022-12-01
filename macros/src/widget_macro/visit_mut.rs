@@ -1,9 +1,11 @@
-use crate::{WATCH_MACRO_NAME, WIDGET_MACRO_NAME};
+use crate::{PROP_MACRO_NAME, WATCH_MACRO_NAME, WIDGET_MACRO_NAME};
 
 use super::{
   builtin_var_name, capture_widget,
+  code_gen::gen_prop_macro,
   desugar::{
-    ComposeItem, DeclareObj, Field, FieldValue, NamedObj, SubscribeItem, TrackBlock, WidgetNode,
+    ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
+    SubscribeItem, WidgetNode,
   },
   gen_watch_macro, gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
   WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
@@ -80,6 +82,8 @@ impl VisitMut for VisitCtx {
           *expr = Expr::Verbatim(gen_widget_macro(mac.tokens.clone().into(), Some(self)).into());
         } else if mac.path.is_ident(WATCH_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_watch_macro(mac.tokens.clone().into(), self).into());
+        } else if mac.path.is_ident(PROP_MACRO_NAME) {
+          *expr = Expr::Verbatim(gen_prop_macro(mac.tokens.clone().into(), self).into());
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -138,6 +142,10 @@ impl VisitMut for VisitCtx {
       } else if mac.path.is_ident(WATCH_MACRO_NAME) {
         let t = gen_watch_macro(mac.tokens.clone().into(), self);
         *i = Stmt::Expr(Expr::Verbatim(t.into()).into());
+      } else if mac.path.is_ident(PROP_MACRO_NAME) {
+        *i = Stmt::Expr(Expr::Verbatim(
+          gen_prop_macro(mac.tokens.clone().into(), self).into(),
+        ));
       } else {
         visit_mut::visit_stmt_mut(self, i);
       }
@@ -150,10 +158,7 @@ impl VisitMut for VisitCtx {
     if let Member::Named(member) = &f_expr.member {
       if let Some(builtin_ty) = WIDGET_OF_BUILTIN_FIELD.get(member.to_string().as_str()) {
         let span = f_expr.span();
-        if self
-          .visit_builtin_member(&mut f_expr.base, span, builtin_ty)
-          .is_some()
-        {
+        if self.visit_builtin_in_expr(&mut f_expr.base, span, builtin_ty) {
           return;
         }
       }
@@ -165,10 +170,7 @@ impl VisitMut for VisitCtx {
   fn visit_expr_method_call_mut(&mut self, i: &mut ExprMethodCall) {
     if let Some(builtin_ty) = WIDGET_OF_BUILTIN_METHOD.get(i.method.to_string().as_str()) {
       let span = i.span();
-      if self
-        .visit_builtin_member(&mut i.receiver, span, builtin_ty)
-        .is_some()
-      {
+      if self.visit_builtin_in_expr(&mut i.receiver, span, builtin_ty) {
         return;
       }
     }
@@ -285,10 +287,10 @@ impl VisitMut for VisitCtx {
 impl VisitCtx {
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
     desugar.named_objs.objs_mut().for_each(|obj| match obj {
-      NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj(obj),
-      NamedObj::DuplicateListener { objs, .. } => {
-        objs.iter_mut().for_each(|obj| self.visit_declare_obj(obj))
-      }
+      NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj_mut(obj),
+      NamedObj::DuplicateListener { objs, .. } => objs
+        .iter_mut()
+        .for_each(|obj| self.visit_declare_obj_mut(obj)),
     });
 
     desugar
@@ -300,20 +302,27 @@ impl VisitCtx {
 
     self.visit_widget_node_mut(&mut desugar.widget.as_mut().unwrap());
     if let Some(finally) = desugar.finally.as_mut() {
-      self.visit_track_block_mut(finally);
+      self.visit_finally_mut(finally);
     }
   }
 
-  pub fn visit_track_block_mut(&mut self, block: &mut TrackBlock) {
-    block
-      .block
+  pub fn visit_init_stmts_mut(&mut self, init: &mut InitStmts) {
+    init
       .stmts
       .iter_mut()
       .for_each(|stmt| self.visit_stmt_mut(stmt));
-    block.used_name_info = self.take_current_used_info();
+    init.used_name_info = self.take_current_used_info();
   }
 
-  pub fn visit_declare_obj(&mut self, obj: &mut DeclareObj) {
+  pub fn visit_finally_mut(&mut self, finally: &mut FinallyBlock) {
+    finally.stmts.iter_mut().for_each(|stmt| match stmt {
+      FinallyStmt::Stmt(s) => self.visit_stmt_mut(s),
+      FinallyStmt::Obj(o) => self.visit_declare_obj_mut(o),
+    });
+    finally.used_name_info = self.take_current_used_info();
+  }
+
+  pub fn visit_declare_obj_mut(&mut self, obj: &mut DeclareObj) {
     let DeclareObj { ty, fields, .. } = obj;
     self.visit_path_mut(ty);
     fields.iter_mut().for_each(|f| self.visit_field(f));
@@ -321,17 +330,17 @@ impl VisitCtx {
 
   pub fn visit_subscribe_item_mut(&mut self, item: &mut SubscribeItem) {
     match item {
-      SubscribeItem::Obj(obj) => self.visit_declare_obj(obj),
+      SubscribeItem::Obj(obj) => self.visit_declare_obj_mut(obj),
       SubscribeItem::ObserveModifyDo { observe, subscribe_do, .. }
       | SubscribeItem::ObserveChangeDo { observe, subscribe_do, .. } => {
-        self.visit_track_expr(observe);
-        self.visit_track_expr(subscribe_do);
+        self.visit_track_expr_mut(observe);
+        self.visit_track_expr_mut(subscribe_do);
       }
-      SubscribeItem::LetVar { value, .. } => self.visit_track_expr(value),
+      SubscribeItem::LetVar { value, .. } => self.visit_track_expr_mut(value),
     }
   }
 
-  pub fn visit_track_expr(&mut self, expr: &mut TrackExpr) {
+  pub fn visit_track_expr_mut(&mut self, expr: &mut TrackExpr) {
     self.visit_expr_mut(&mut expr.expr);
     expr.used_name_info = self.take_current_used_info();
   }
@@ -346,7 +355,9 @@ impl VisitCtx {
 
   pub fn visit_compose_item_mut(&mut self, widget: &mut ComposeItem) {
     match widget {
-      ComposeItem::ChainObjs(objs) => objs.iter_mut().for_each(|obj| self.visit_declare_obj(obj)),
+      ComposeItem::ChainObjs(objs) => objs
+        .iter_mut()
+        .for_each(|obj| self.visit_declare_obj_mut(obj)),
       ComposeItem::Id(_) => {}
     }
   }
@@ -355,8 +366,8 @@ impl VisitCtx {
 
   pub fn visit_field_value(&mut self, value: &mut FieldValue) {
     match value {
-      FieldValue::Expr(e) => self.visit_track_expr(e),
-      FieldValue::Obj(obj) => self.visit_declare_obj(obj),
+      FieldValue::Expr(e) => self.visit_track_expr_mut(e),
+      FieldValue::Obj(obj) => self.visit_declare_obj_mut(obj),
     }
   }
 
@@ -407,12 +418,12 @@ impl VisitCtx {
       .or_insert_with(|| UsedInfo { builtin, spans: vec![span] });
   }
 
-  fn visit_builtin_member(
+  pub fn visit_builtin_in_expr(
     &mut self,
     expr: &mut syn::Expr,
     span: proc_macro2::Span,
     builtin_ty: &'static str,
-  ) -> Option<()> {
+  ) -> bool {
     let path = match expr {
       Expr::Path(syn::ExprPath { path, .. }) => path,
       Expr::MethodCall(ExprMethodCall { receiver, method, args, .. })
@@ -421,29 +432,40 @@ impl VisitCtx {
         if let Expr::Path(syn::ExprPath { path, .. }) = &mut **receiver {
           path
         } else {
-          return None;
+          return false;
         }
       }
-      _ => return None,
+      _ => return true,
     };
-    let name = path.get_ident()?;
-    let name = self.find_named_obj(name)?;
+    let Some(name) = path.get_ident() else { return false };
 
-    if self
-      .declare_objs
-      .get(&name)
-      .map_or(false, |ty| !ty.is_ident(builtin_ty))
-    {
+    if let Some(builtin_name) = self.visit_builtin_name_mut(name, span, builtin_ty) {
+      *path = parse_quote! { #builtin_name };
+      true
+    } else {
+      false
+    }
+  }
+
+  pub fn visit_builtin_name_mut(
+    &mut self,
+    host: &Ident,
+    span: proc_macro2::Span,
+    builtin_ty: &'static str,
+  ) -> Option<Ident> {
+    let name = self.find_named_obj(host)?;
+
+    let ty = self.declare_objs.get(&name)?;
+
+    if !ty.is_ident(builtin_ty) {
       let builtin_name = builtin_var_name(&name, span, builtin_ty);
       let src_name = name.clone();
-      *path = parse_quote! { #builtin_name };
-
       self.add_used_widget(
-        builtin_name,
+        builtin_name.clone(),
         Some(BuiltinUsed { src_name, builtin_ty }),
         UsedType::USED,
       );
-      Some(())
+      Some(builtin_name)
     } else {
       None
     }

@@ -112,9 +112,8 @@ fn override_compose_style(theme: &mut FullTheme) {
         dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
       }
 
-      change_on thumb.left_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.of(ctx),
-        lerp_fn: PositionUnit::lerp_fn(thumb.layout_width())
+      transition prop!(thumb.left_anchor, PositionUnit::lerp_fn(thumb.layout_width())) {
+        by: transitions::SMOOTH_SCROLL.of(ctx),
       }
     }
   });
@@ -127,9 +126,8 @@ fn override_compose_style(theme: &mut FullTheme) {
         dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
       }
 
-      change_on thumb.top_anchor Animate {
-        transition: transitions::SMOOTH_SCROLL.of(ctx),
-        lerp_fn: PositionUnit::lerp_fn(thumb.layout_height())
+      transition prop!(thumb.left_anchor,PositionUnit::lerp_fn(thumb.layout_height())) {
+        by: transitions::SMOOTH_SCROLL.of(ctx),
       }
     }
   });

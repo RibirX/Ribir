@@ -74,15 +74,13 @@ impl ComposeChild for Ripple {
                 }
                 Animate {
                   id: ripper_enter,
-                  from: State {
-                    ripple_path.path: Path::circle(Point::zero(), 0., PathStyle::Fill)
-                  },
                   transition: transitions::LINEAR.of(ctx),
-                  lerp_fn: move |_, _, rate| {
+                  prop: prop!(ripple_path.path, move |_, _, rate| {
                     let radius = Lerp::lerp(&0., &radius, rate);
                     let center = this.launch_pos.clone().unwrap();
                     Path::circle(center, radius, PathStyle::Fill)
-                  }
+                  }),
+                  from: Path::circle(Point::zero(), 0., PathStyle::Fill)
                 }
                 on container.pointer_pressed() || ripper_enter.is_running() {
                   change: move |(before, after)| if (before, after) == (true, false) {
