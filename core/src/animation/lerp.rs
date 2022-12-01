@@ -51,8 +51,22 @@ impl<V: Lerp + Default> Lerp for Option<V> {
 }
 
 macro_rules! impl_lerp_for_tuple {
-  ($({$param: ident, $index: tt},)*) => {
-    impl <$($param: Lerp,)*> Lerp for ($($param),*,) {
+  ($ty: ident, $idx: tt $(,$other_ty: ident, $other_idx: tt)*) => {
+    impl_lerp_for_tuple!({$ty, $idx} $($other_ty, $other_idx),*);
+  };
+  (
+    {$($ty: ident, $idx: tt),+}
+    $next_ty: ident, $next_idx: tt
+    $(,$other_ty: ident, $other_idx: tt)*
+  ) => {
+      impl_lerp_for_tuple!({$($ty, $idx),+});
+      impl_lerp_for_tuple!(
+        {$($ty, $idx,)+ $next_ty, $next_idx }
+        $($other_ty, $other_idx),*
+      );
+  };
+  ({$($ty: ident, $index: tt),*}) => {
+    impl <$($ty: Lerp,)*> Lerp for ($($ty),*,) {
       fn lerp(&self, to: &Self, factor: f32) -> Self {
         ($( self.$index.lerp(&to.$index, factor),)*)
       }
@@ -60,18 +74,11 @@ macro_rules! impl_lerp_for_tuple {
   }
 }
 
-impl_lerp_for_tuple!({T0, 0},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8}, {T9, 9},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8}, {T9, 9}, {T10, 10},);
-impl_lerp_for_tuple!({T0, 0}, {T1, 1}, {T2, 2}, {T3, 3}, {T4, 4}, {T5, 5}, {T6, 6}, {T7, 7}, {T8, 8}, {T9, 9}, {T10, 10}, {T11, 11},);
+impl_lerp_for_tuple! {T0, 0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7, 7,T8, 8, T9, 9,
+  T10, 10, T11, 11, T12, 12, T13, 13, T14, 14, T15, 15, T16, 16, T17, 17,T18, 18, T19, 19,
+  T20, 20, T21, 21, T22, 22, T23, 23, T24, 24, T25, 25, T26, 26, T27, 27,T28, 28, T29, 29,
+  T30, 30, T31, 31
+}
 
 macro_rules! impl_lerp_for_copy_geom {
   ($($ty: ident), *) => {

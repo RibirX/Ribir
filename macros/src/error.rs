@@ -26,6 +26,7 @@ pub enum DeclareError {
     used_at: Vec<Span>,
   },
   SynErr(syn::Error),
+  TransitionByConflict(Span),
 }
 
 #[derive(Debug)]
@@ -88,6 +89,18 @@ impl DeclareError {
           "Object can't be depends which have many instance.",
         ));
         diagnostic = diagnostic.span_help(declare_at.clone(), "declare at here.");
+      }
+      DeclareError::TransitionByConflict(span) => {
+        diagnostic.set_spans(span.clone());
+        diagnostic.set_message(&format!(
+          "field conflict with `by`, To config transition property.",
+        ));
+
+        diagnostic = diagnostic.span_help(
+          span.clone(),
+          "When you use `by` field provide a whole `Transition`\
+          obj, you can not config other field of `Transition`",
+        );
       }
     };
 

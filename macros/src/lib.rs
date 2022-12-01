@@ -18,6 +18,7 @@ mod widget_maybe_state_macro;
 
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 pub(crate) const WATCH_MACRO_NAME: &str = "watch";
+pub(crate) const PROP_MACRO_NAME: &str = "prop";
 
 #[proc_macro_derive(SingleChild)]
 pub fn single_marco_derive(input: TokenStream) -> TokenStream {

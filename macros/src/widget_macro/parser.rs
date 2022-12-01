@@ -1,10 +1,10 @@
 //! mod parse the `widget!` macro.
-use std::collections::HashSet;
-
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
+use smallvec::{smallvec, SmallVec};
+use std::collections::HashSet;
 use syn::{
-  braced,
+  braced, parenthesized,
   parse::{discouraged::Speculative, Parse, ParseStream},
   parse_quote,
   punctuated::Punctuated,
@@ -13,7 +13,7 @@ use syn::{
   Block, Expr, Ident, Path, Result,
 };
 
-use super::ribir_variable;
+use super::{ribir_variable, TrackExpr};
 
 pub mod kw {
   syn::custom_keyword!(widget);
@@ -144,11 +144,19 @@ pub enum Observe {
   Expr(Expr),
 }
 pub enum Item {
+  TransProps(TransProps),
   Transition(Transition),
   Animate(Animate),
   OnEvent(OnEventDo),
   ModifyOn(ModifyOnItem),
   ChangeOn(ChangeOnItem),
+}
+
+pub struct TransProps {
+  pub transition: kw::transition,
+  pub props: SmallVec<[Expr; 1]>,
+  pub brace: Brace,
+  pub fields: Punctuated<DeclareField, Comma>,
 }
 
 #[derive(Debug)]
@@ -208,6 +216,16 @@ pub struct TransitionField {
   pub value: AnimateTransitionValue,
 }
 
+pub enum Property {
+  Name(Ident),
+  MemberPath(MemberPath),
+}
+pub struct PropMacro {
+  pub prop: Property,
+  pub comma: Option<Comma>,
+  pub lerp_fn: Option<TrackExpr>,
+}
+
 macro_rules! assign_uninit_field {
   ($self: ident.$name: ident, $field: ident) => {
     assign_uninit_field!($self.$name, $field, $name)
@@ -223,6 +241,23 @@ macro_rules! assign_uninit_field {
       ))
     }
   };
+}
+
+impl Parse for PropMacro {
+  fn parse(input: ParseStream) -> Result<Self> {
+    let prop = if input.peek2(Dot) {
+      Property::MemberPath(input.parse()?)
+    } else {
+      Property::Name(input.parse()?)
+    };
+    let comma = input.parse()?;
+    let lerp_fn = if input.is_empty() {
+      None
+    } else {
+      Some(input.parse::<Expr>()?.into())
+    };
+    Ok(Self { prop, comma, lerp_fn })
+  }
 }
 
 impl Parse for MacroSyntax {
@@ -247,6 +282,8 @@ impl Parse for MacroSyntax {
         items.push(Item::Animate(input.parse()?));
       } else if lk.peek(kw::Transition) {
         items.push(Item::Transition(input.parse()?));
+      } else if lk.peek(kw::transition) {
+        items.push(Item::TransProps(input.parse()?));
       } else if lk.peek(kw::states) {
         let mut t = input.parse::<States>()?;
         if let Some(ot) = states.take() {
@@ -504,6 +541,26 @@ impl Parse for DeclareField {
     };
 
     Ok(DeclareField { member, colon: colon_token, expr })
+  }
+}
+
+impl Parse for TransProps {
+  fn parse(input: ParseStream) -> Result<Self> {
+    let transition = input.parse()?;
+    let props = if input.peek(Paren) {
+      let content;
+      parenthesized!(content in input );
+      content
+        .parse_terminated::<_, Comma>(Expr::parse)?
+        .into_iter()
+        .collect()
+    } else {
+      smallvec![input.parse()?]
+    };
+    let content;
+    let brace = braced!(content in input);
+    let fields = content.parse_terminated(DeclareField::parse)?;
+    Ok(Self { transition, props, brace, fields })
   }
 }
 

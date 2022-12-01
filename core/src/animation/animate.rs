@@ -2,27 +2,24 @@ use crate::{
   prelude::*,
   ticker::{FrameMsg, FrameTicker},
 };
-use std::time::Instant;
+use std::{ops::DerefMut, time::Instant};
+
+use super::property::AnimateProperty;
 
 #[derive(Declare)]
-pub struct Animate<T, S> {
+pub struct Animate<T, P: AnimateProperty> {
   pub transition: T,
-  #[declare(rename = from)]
-  pub state: AnimateState<S>,
-  /// function calc the linearly lerp value by rate, three arguments are
-  /// `from` `to` and `rate`, specify `lerp_fn` when the animate state not
-  /// implement `Lerp` trait or you want to specify a custom lerp function.
-  #[declare(convert=box_trait(Fn(&S, &S, f32)-> S))]
-  pub lerp_fn: Box<dyn Fn(&S, &S, f32) -> S>,
+  pub prop: P,
+  pub from: P::Value,
   #[declare(skip)]
-  running_info: Option<AnimateInfo<S>>,
+  running_info: Option<AnimateInfo<P::Value>>,
   #[declare(skip, default = ctx.app_ctx().frame_ticker.clone())]
   frame_ticker: FrameTicker,
 }
 
-pub struct AnimateInfo<S> {
-  from: S,
-  to: S,
+pub struct AnimateInfo<V> {
+  from: V,
+  to: V,
   start_at: Instant,
   last_progress: AnimateProgress,
   // Determines if lerp value in current frame.
@@ -30,17 +27,16 @@ pub struct AnimateInfo<S> {
   _tick_msg_guard: Option<SubscriptionGuard<MutRc<SingleSubscription>>>,
 }
 
-impl<'a, T: Roc, S: Clone> StateRef<'a, Animate<T, S>>
+impl<'a, T: Roc, P: AnimateProperty> StateRef<'a, Animate<T, P>>
 where
-  Animate<T, S>: 'static,
+  Animate<T, P>: 'static,
 {
   pub fn run(&mut self) {
-    let new_to = self.state.finial_value();
-    let Animate { lerp_fn, running_info, .. } = &mut **self;
+    let new_to = self.prop.get();
     // if animate is running, animate start from current value.
-    if let Some(info) = running_info {
-      let AnimateInfo { from, to, last_progress, .. } = info;
-      *from = (lerp_fn)(from, to, last_progress.value());
+    let Animate { prop, running_info, .. } = self.deref_mut();
+    if let Some(AnimateInfo { from, to, last_progress, .. }) = running_info {
+      *from = prop.calc_lerp_value(from, to, last_progress.value());
       *to = new_to;
     } else {
       let animate = self.clone_stateful();
@@ -58,9 +54,9 @@ where
           FrameMsg::Finish(_) => animate.silent_ref().frame_finished(),
         })
         .unsubscribe_when_dropped();
-      let from = self.state.init_value();
+
       self.running_info = Some(AnimateInfo {
-        from,
+        from: self.from.clone(),
         to: new_to,
         start_at: Instant::now(),
         last_progress: AnimateProgress::Dismissed,
@@ -71,7 +67,7 @@ where
   }
 }
 
-impl<T: Roc, S: Clone> Animate<T, S> {
+impl<T: Roc, P: AnimateProperty> Animate<T, P> {
   fn lerp(&mut self, now: Instant) -> AnimateProgress {
     let AnimateInfo {
       from,
@@ -92,14 +88,15 @@ impl<T: Roc, S: Clone> Animate<T, S> {
     let elapsed = now - *start_at;
     let progress = self.transition.rate_of_change(elapsed);
 
+    let prop = &mut self.prop;
     match progress {
       AnimateProgress::Between(rate) => {
         // the state may change during animate.
-        *to = self.state.finial_value();
-        let animate_state = (self.lerp_fn)(from, to, rate);
-        self.state.update(animate_state);
+        *to = prop.get();
+        let value = prop.calc_lerp_value(from, to, rate);
+        prop.set(value);
       }
-      AnimateProgress::Dismissed => self.state.update(from.clone()),
+      AnimateProgress::Dismissed => prop.set(from.clone()),
       AnimateProgress::Finish => {}
     }
 
@@ -116,7 +113,7 @@ impl<T: Roc, S: Clone> Animate<T, S> {
       .expect("This animation is not running.");
 
     if !matches!(info.last_progress, AnimateProgress::Finish) {
-      self.state.update(info.to.clone())
+      self.prop.set(info.to.clone())
     }
     info.already_lerp = false;
   }

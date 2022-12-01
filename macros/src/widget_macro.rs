@@ -67,7 +67,7 @@ pub fn gen_widget_macro(
 
   // visit init without named objects.
   if let Some(init) = desugar.init.as_mut() {
-    ctx.visit_track_block_mut(init);
+    ctx.visit_init_stmts_mut(init);
   }
 
   ctx.declare_objs.extend(
@@ -144,7 +144,7 @@ pub(crate) fn gen_watch_macro(
   ctx: &mut VisitCtx,
 ) -> proc_macro::TokenStream {
   let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
-  ctx.visit_track_expr(&mut watch_expr);
+  ctx.visit_track_expr_mut(&mut watch_expr);
   if let Some(upstream) = watch_expr.upstream_tokens() {
     let captures = watch_expr
       .used_name_info

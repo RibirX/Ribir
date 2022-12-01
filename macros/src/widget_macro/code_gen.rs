@@ -1,7 +1,7 @@
 use crate::{
   declare_derive::declare_field_name,
   error::{DeclareError, DeclareWarning},
-  widget_macro::ribir_suffix_variable,
+  widget_macro::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD},
 };
 use ahash::RandomState;
 use proc_macro2::{Span, TokenStream};
@@ -9,23 +9,52 @@ use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
-  parse_quote_spanned,
+  parse_macro_input, parse_quote_spanned,
   spanned::Spanned,
-  token::{Brace, Dot, Paren, Semi},
+  token::{Brace, Comma, Dot, Paren, Semi},
   Ident,
 };
 
 use super::{
   builtin_var_name, capture_widget, ctx_ident,
   desugar::{
-    ComposeItem, DeclareObj, Field, FieldValue, NamedObj, NamedObjMap, SubscribeItem, TrackBlock,
-    WidgetNode,
+    ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
+    NamedObjMap, SubscribeItem, WidgetNode,
   },
   guard_ident, guard_vec_ident,
-  parser::{StateField, States},
+  parser::{MemberPath, PropMacro, Property, StateField, States},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
+
+pub(crate) fn gen_prop_macro(
+  input: proc_macro::TokenStream,
+  ctx: &mut VisitCtx,
+) -> proc_macro::TokenStream {
+  let mut prop_macro = parse_macro_input! { input as PropMacro };
+  let PropMacro { prop, lerp_fn, .. } = &mut prop_macro;
+  match prop {
+    Property::Name(name) => {
+      if let Some(name) = ctx.find_named_obj(name).cloned() {
+        ctx.add_used_widget(name, None, UsedType::USED)
+      }
+    }
+    Property::MemberPath(path) => {
+      if let Some(builtin_ty) = WIDGET_OF_BUILTIN_FIELD.get(path.member.to_string().as_str()) {
+        if let Some(name) = ctx.visit_builtin_name_mut(&path.widget, path.span(), builtin_ty) {
+          path.widget = name;
+        }
+      } else if let Some(name) = ctx.find_named_obj(&path.widget).cloned() {
+        ctx.add_used_widget(name, None, UsedType::USED)
+      }
+    }
+  }
+  if let Some(lerp_fn) = lerp_fn {
+    ctx.visit_track_expr_mut(lerp_fn);
+  }
+
+  prop_macro.to_token_stream().into()
+}
 
 impl ToTokens for Desugared {
   fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -75,9 +104,7 @@ impl Desugared {
          let mut #guards_vec: Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> = vec![];
         }
         .to_tokens(tokens);
-        if let Some(init) = init {
-          init.to_strip_brace_tokens(tokens)
-        }
+        init.to_tokens(tokens);
 
         // deep first declare named obj by their dependencies
         // circular may exist widget attr follow widget self to init.
@@ -690,17 +717,8 @@ impl States {
   }
 }
 
-impl ToTokens for TrackBlock {
+impl ToTokens for InitStmts {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    self
-      .block
-      .brace_token
-      .surround(tokens, |tokens| self.to_strip_brace_tokens(tokens))
-  }
-}
-
-impl TrackBlock {
-  fn to_strip_brace_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     if let Some(refs) = self.used_name_info.refs_widgets() {
       let refs = refs.map(|name| {
         quote_spanned! { name.span() =>
@@ -710,6 +728,72 @@ impl TrackBlock {
       });
       tokens.append_all(refs);
     }
-    tokens.append_all(&self.block.stmts)
+    tokens.append_all(&self.stmts)
+  }
+}
+
+impl ToTokens for FinallyBlock {
+  fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    if let Some(refs) = self.used_name_info.refs_widgets() {
+      let refs = refs.map(|name| {
+        quote_spanned! { name.span() =>
+          #[allow(unused_mut)]
+          let mut #name = #name.state_ref();
+        }
+      });
+      tokens.append_all(refs);
+    }
+    tokens.append_all(&self.stmts)
+  }
+}
+impl ToTokens for FinallyStmt {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    match self {
+      FinallyStmt::Stmt(stmt) => stmt.to_tokens(tokens),
+      FinallyStmt::Obj(obj) => obj.to_tokens(tokens),
+    }
+  }
+}
+
+impl ToTokens for PropMacro {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    let Self { prop, lerp_fn, .. } = self;
+    if let Some(lerp_fn) = lerp_fn {
+      let span = lerp_fn.span();
+      quote_spanned!(span => LerpProp::new).to_tokens(tokens);
+      Paren(span).surround(tokens, |tokens| {
+        prop.to_tokens(tokens);
+        Comma(span).to_tokens(tokens);
+        lerp_fn
+          .used_name_info
+          .value_expr_surround_refs(tokens, span, |tokens: &mut TokenStream| {
+            lerp_fn.to_tokens(tokens)
+          })
+      });
+    } else {
+      prop.to_tokens(tokens)
+    }
+  }
+}
+
+impl ToTokens for Property {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    match self {
+      Property::Name(name) => quote_spanned! {name.span() =>
+        Prop::new(#name.clone_stateful(), |v| v.clone(), |this, v| *this = v)
+      }
+      .to_tokens(tokens),
+      Property::MemberPath(path) => {
+        let MemberPath { widget, dot, member } = path;
+        quote_spanned! {path.span() =>
+          Prop::new(
+            #widget.clone_stateful(),
+            |this| this #dot #member.clone(),
+            |this, v| this #dot #member = v
+          )
+        }
+        .to_tokens(tokens)
+      }
+    }
   }
 }
