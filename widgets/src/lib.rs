@@ -1,6 +1,7 @@
 #![feature(iter_advance_by)]
 pub mod button;
 pub mod checkbox;
+pub mod common_widget;
 pub mod grid_view;
 pub mod icon;
 pub mod input;
@@ -16,6 +17,7 @@ pub mod transform_box;
 pub mod prelude {
   pub use super::button::*;
   pub use super::checkbox::*;
+  pub use super::common_widget::*;
   pub use super::grid_view::*;
   pub use super::icon::*;
   pub use super::input::*;

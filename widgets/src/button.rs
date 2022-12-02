@@ -18,9 +18,6 @@ pub struct ButtonTheme {
   pub foreground: Color,
 }
 
-#[derive(Default, Declare, SingleChild)]
-pub struct LeadingIcon;
-
 pub struct ButtonText(pub CowArc<str>);
 
 impl ButtonText {
@@ -30,7 +27,7 @@ impl ButtonText {
 #[derive(Template)]
 pub struct ButtonTemplate {
   button_text: ButtonText,
-  icon: Option<WidgetOf<LeadingIcon>>,
+  icon: Option<WidgetOf<Leading>>,
 }
 
 impl ComposeChild for Button {

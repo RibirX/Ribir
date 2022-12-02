@@ -39,10 +39,7 @@ impl Compose for TodoMVP {
               });
               input.text = String::default();
             },
-            // todo: Icon color ugligy
-            // LeadingIcon {
-            //   Icon { svgs::ADD }
-            // }
+            Leading { Icon { svgs::ADD } }
             ButtonText::new("ADD")
           }
         }
@@ -112,7 +109,7 @@ impl TodoMVP {
               widget! {
                 ListItem {
                   id: item,
-                  HeadlineText(label)
+                  HeadlineText::new(label)
                   Leading {
                     Checkbox {
                       id: checkbox,
