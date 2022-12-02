@@ -7,12 +7,6 @@ pub struct Lists {
   divider: bool,
 }
 
-#[derive(Default, Declare, SingleChild)]
-pub struct Leading;
-
-#[derive(Default, Declare, SingleChild)]
-pub struct Trailing;
-
 #[derive(Clone, PartialEq)]
 pub enum EdgePosition {
   Frist,
@@ -38,8 +32,17 @@ impl ComposeStyle for ListItemStyle {
   }
 }
 
-pub struct HeadlineText(pub String);
-pub struct SupportingText(pub String);
+pub struct HeadlineText(pub CowArc<str>);
+
+impl HeadlineText {
+  pub fn new(v: impl Into<CowArc<str>>) -> Self { HeadlineText(v.into()) }
+}
+
+pub struct SupportingText(pub CowArc<str>);
+
+impl SupportingText {
+  pub fn new(v: impl Into<CowArc<str>>) -> Self { SupportingText(v.into()) }
+}
 
 #[derive(Default, Declare)]
 pub struct ListItem;
