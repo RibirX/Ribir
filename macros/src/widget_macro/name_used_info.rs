@@ -1,7 +1,7 @@
 use super::{desugar::NamedObjMap, ribir_variable};
 use crate::{error::CircleUsedPath, widget_macro::desugar::NamedObj};
 use proc_macro2::{Span, TokenStream};
-use quote::{quote_spanned, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use std::collections::HashMap;
 use syn::{
   token::{Brace, Semi},
@@ -16,12 +16,14 @@ pub struct NameUsedInfo {
 
 bitflags::bitflags! {
  pub struct UsedType: u16 {
-    /// named object used but not in closure
-    const USED = 0x0001;
-    /// named object used in ordinary closure.
-    const CAPTURE = 0x0010;
-    /// named object used in move closure.
-    const MOVE_CAPTURE = 0x0100;
+    /// subscribe the named object modifies.
+    const SUBSCRIBE = 0x0001;
+    /// directly use it.
+    const REF = 0x0010;
+    /// named object be used and subscribe, the default behavior.
+    const USED = Self::SUBSCRIBE.bits() | Self::REF.bits();
+    /// named object used in inner scope with needn't provide `state_ref` by outside.
+    const SCOPE_CAPTURE = 0x1000;
   }
 }
 
@@ -126,13 +128,25 @@ impl ScopeUsedInfo {
     }
   }
 
-  // todo: instead of `refs_widgets`
-  pub fn directly_used_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
-    self.filter_widget(|info| info.used_type.contains(UsedType::USED))
+  pub fn upstream_tokens(&self) -> Option<TokenStream> {
+    self.subscribe_widget().map(|directly_used| {
+      let upstream = directly_used.clone().map(|w| {
+        quote_spanned! { w.span() => #w.modifies() }
+      });
+      if directly_used.count() > 1 {
+        quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
+      } else {
+        quote! { #(#upstream)* }
+      }
+    })
   }
 
-  pub fn refs_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
-    self.filter_widget(|info| info.used_type != UsedType::MOVE_CAPTURE)
+  pub fn subscribe_widget(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
+    self.filter_widget(|info| info.used_type.contains(UsedType::SUBSCRIBE))
+  }
+
+  pub fn ref_widgets(&self) -> Option<impl Iterator<Item = &Ident> + Clone + '_> {
+    self.filter_widget(|info| info.used_type.contains(UsedType::REF))
   }
 
   /// create refs before expression and release borrow after it, then return its
@@ -140,7 +154,7 @@ impl ScopeUsedInfo {
   ///
   /// Surround only if refs more than one.
   pub fn refs_surround<'a>(&self, tokens: &mut TokenStream, f: impl FnOnce(&mut TokenStream)) {
-    if let Some(refs) = self.refs_widgets() {
+    if let Some(refs) = self.ref_widgets() {
       if refs.clone().count() > 1 {
         refs.clone().for_each(|name| {
           tokens.extend(quote_spanned! { name.span() =>
@@ -177,11 +191,11 @@ impl ScopeUsedInfo {
     // add value expression tokens.
     f: impl FnOnce(&mut TokenStream),
   ) {
-    if self.refs_widgets().is_none() {
+    if self.ref_widgets().is_none() {
       f(tokens);
     } else {
       Brace(span).surround(tokens, |tokens| {
-        let ref_cnt = self.refs_widgets().map_or(0, |refs| refs.count());
+        let ref_cnt = self.ref_widgets().map_or(0, |refs| refs.count());
         if ref_cnt > 1 {
           let v = ribir_variable("v", span);
           self.refs_surround(tokens, |tokens| {
@@ -239,9 +253,7 @@ impl<'a> ObjectUsedPath<'a> {
     fn src_name<'a>(name: &Ident, declare_objs: &'a NamedObjMap) -> Option<&'a Ident> {
       declare_objs.get(name).map(|obj| match obj {
         NamedObj::Host(obj) => &obj.name,
-        NamedObj::Builtin { src_name, .. } | NamedObj::DuplicateListener { src_name, .. } => {
-          src_name
-        }
+        NamedObj::Builtin { src_name, .. } => src_name,
       })
     }
     let obj = src_name(&self.obj, declare_objs)

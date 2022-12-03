@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, spanned::Spanned, Expr, Ident};
+use syn::{parse_macro_input, Expr, Ident};
 
 mod code_gen;
 mod desugar;
@@ -14,24 +14,7 @@ pub use name_used_info::*;
 mod variable_names;
 pub use variable_names::*;
 
-use crate::error::{DeclareError, DeclareWarning};
-
 use self::desugar::{builtin_obj, NamedObj};
-
-pub mod kw {
-  syn::custom_keyword!(widget);
-  syn::custom_keyword!(track);
-  syn::custom_keyword!(DynWidget);
-  syn::custom_keyword!(id);
-  syn::custom_keyword!(skip_nc);
-  syn::custom_keyword!(Animate);
-  syn::custom_keyword!(State);
-  syn::custom_keyword!(Transition);
-  syn::custom_punctuation!(FlowArrow, ~>);
-  syn::custom_keyword!(on);
-  syn::custom_keyword!(transition);
-  syn::custom_keyword!(change);
-}
 
 fn capture_widget(widget: &Ident) -> TokenStream {
   quote_spanned!(widget.span() => let #widget = #widget.clone_stateful();)
@@ -82,13 +65,13 @@ pub fn gen_widget_macro(
   let used_widgets = ctx.used_objs;
   used_widgets
     .iter()
-    .for_each(|(name, UsedInfo { builtin, spans })| {
+    .for_each(|(name, UsedInfo { builtin, .. })| {
       // add default builtin widget, which used by others but but declared.
       if let Some(builtin) = builtin {
         if !desugar.named_objs.contains(name) && desugar.named_objs.contains(&builtin.src_name) {
           let BuiltinUsed { src_name, builtin_ty } = builtin;
           let obj = builtin_obj(src_name, builtin_ty, <_>::default());
-          desugar.add_named_builtin_obj(src_name, obj);
+          desugar.add_named_builtin_obj(src_name.clone(), obj);
         }
       }
 
@@ -96,12 +79,6 @@ pub fn gen_widget_macro(
         // named obj used by other should force be stateful
         match obj {
           NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => obj.stateful = true,
-          NamedObj::DuplicateListener { objs, .. } => {
-            desugar.errors.push(DeclareError::DependsOnDupListener {
-              declare_at: objs.iter().map(|o| o.name.span().unwrap()).collect(),
-              used_at: spans.clone(),
-            })
-          }
         }
       }
     });
@@ -131,7 +108,7 @@ pub fn gen_widget_macro(
       outside_ctx.add_used_widget(
         name.clone(),
         used_info.builtin.clone(),
-        UsedType::MOVE_CAPTURE,
+        UsedType::SCOPE_CAPTURE,
       )
     });
   }
@@ -139,60 +116,8 @@ pub fn gen_widget_macro(
   tokens.into()
 }
 
-pub(crate) fn gen_watch_macro(
-  input: proc_macro::TokenStream,
-  ctx: &mut VisitCtx,
-) -> proc_macro::TokenStream {
-  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
-  ctx.visit_track_expr_mut(&mut watch_expr);
-  if let Some(upstream) = watch_expr.upstream_tokens() {
-    let captures = watch_expr
-      .used_name_info
-      .all_used()
-      .expect("if upstream is not none, must used some widget")
-      .map(capture_widget);
-
-    let mut expr_value = quote! {};
-    watch_expr.used_name_info.value_expr_surround_refs(
-      &mut expr_value,
-      watch_expr.span(),
-      |tokens| watch_expr.to_tokens(tokens),
-    );
-
-    // todo: unsubscribe guard
-    quote_spanned! { watch_expr.span() =>
-      #upstream
-        .filter(|s| s.contains(ChangeScope::DATA))
-        .map({
-          #(#captures)*
-          move |_| #expr_value
-        })
-    }
-    .into()
-  } else {
-    DeclareWarning::ObserveIsConst(watch_expr.span().unwrap()).emit_warning();
-    watch_expr.to_token_stream().into()
-  }
-}
-
 impl TrackExpr {
   pub fn new(expr: Expr) -> Self { Self { expr, used_name_info: <_>::default() } }
-
-  pub fn upstream_tokens(&self) -> Option<TokenStream> {
-    self
-      .used_name_info
-      .directly_used_widgets()
-      .map(|directly_used| {
-        let upstream = directly_used.clone().map(|w| {
-          quote_spanned! { w.span() => #w.raw_change_stream() }
-        });
-        if directly_used.count() > 1 {
-          quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
-        } else {
-          quote! { #(#upstream)* }
-        }
-      })
-  }
 }
 
 impl ToTokens for TrackExpr {

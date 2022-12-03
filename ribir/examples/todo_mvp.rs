@@ -127,7 +127,10 @@ impl TodoMVP {
                     }
                   }
                 }
-                on checkbox.checked { change: move |(_, after)| this2.silent().tasks[idx].finished = after }
+                finally {
+                  watch!(checkbox.checked)
+                    .subscribe(move |v| this2.silent().tasks[idx].finished = v);
+                }
               }
             }).collect::<Vec<_>>()
           }

@@ -19,16 +19,13 @@ fn main() {
         }
       }
     }
-    change_on sized_box.size Animate {
-      from: State {
-        sized_box.size: Size::new(10., 10.),
-        sized_box.border_radius: Some(Radius::all(0.)),
-        sized_box.background: Some(Brush::Color(Color::RED)),
-      },
-      transition: Transition {
-        duration: Duration::from_secs(5),
-        easing: easing::EASE_IN_OUT,
-      }
+    transition (
+      prop!(sized_box.size),
+      prop!(sized_box.border_radius),
+      prop!(sized_box.background)
+    ) {
+      easing: easing::EASE_IN_OUT,
+      duration: Duration::from_secs(5)
     }
   };
 

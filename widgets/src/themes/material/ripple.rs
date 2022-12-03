@@ -43,6 +43,11 @@ impl ComposeChild for Ripple {
       states { this: this.into_stateful() }
       Stack {
         id: container,
+        pointer_down: move |e| this.launch_pos = if this.center {
+          Some(container.layout_rect().center())
+        } else {
+          Some(e.position())
+        }
         DynWidget { dyns: child }
         DynWidget {
           dyns: {
@@ -70,6 +75,7 @@ impl ComposeChild for Ripple {
                     id: ripple_path,
                     brush: StateRole::pressed().calc_color(this.color),
                     path: Path::circle(launch_at, radius, PathStyle::Fill),
+                    mounted: move |_| { ripper_enter.run(); }
                   }
                 }
                 Animate {
@@ -82,10 +88,12 @@ impl ComposeChild for Ripple {
                   }),
                   from: Path::circle(Point::zero(), 0., PathStyle::Fill)
                 }
-                on container.pointer_pressed() || ripper_enter.is_running() {
-                  change: move |(before, after)| if (before, after) == (true, false) {
-                    this.launch_pos.take();
-                  }
+                finally {
+                  watch!(container.pointer_pressed() || ripper_enter.is_running())
+                    .filter(|b| !b)
+                    .subscribe(move |_| {
+                      this.launch_pos.take();
+                    });
                 }
                 // todo: support disposed animate
                 // Animate {
@@ -93,19 +101,9 @@ impl ComposeChild for Ripple {
                 //   from: State { ripple_path.opacity: 1.},
                 //   transition: transitions::EASE_OUT.get_from_or_default(ctx.theme()),
                 // }
-                on ripple_path {
-                  mounted: move |_| { ripper_enter.run(); }
-                }
               }
             })
           }
-        }
-      }
-      on container {
-        pointer_down: move |e| this.launch_pos = if this.center {
-          Some(container.layout_rect().center())
-        } else {
-          Some(e.position())
         }
       }
     }

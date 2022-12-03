@@ -78,7 +78,10 @@ impl ComposeChild for HScrollBar {
           v_align: VAlign::Bottom,
         }
       }
-      change_on scrolling.scroll_pos.x ~> this.offset
+      finally {
+        watch!(scrolling.scroll_pos.x)
+          .subscribe(move |v| this.offset = v);
+      }
     }
   }
 }
@@ -111,8 +114,10 @@ impl ComposeChild for VScrollBar {
           h_align: HAlign::Right
         }
       }
-
-      change_on scrolling.scroll_pos.y ~> this.offset
+      finally {
+        watch!(scrolling.scroll_pos.y)
+          .subscribe(move |v| this.offset = v);
+      }
     }
   }
 }
@@ -152,7 +157,10 @@ impl ComposeChild for BothScrollbar {
           margin: EdgeInsets::only_bottom(h_bar.layout_height())
         }
       }
-      change_on scrolling.scroll_pos ~> this.offset
+      finally {
+        watch!(scrolling.scroll_pos)
+          .subscribe(move |v| this.offset = v);
+      }
     }
   }
 }

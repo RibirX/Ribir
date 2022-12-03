@@ -27,22 +27,24 @@ fn listener_trigger_have_handler() {
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
-      wheel: move |_| h1.set(h1.get() + 1),
+      wheel: move |_| {
+        h1.set(h1.get() + 1);
+        leak_animate.run();
+      },
     }
     Animate {
       id: leak_animate,
-      from: State {
-        sized_box.size: Size::zero(),
-      },
-      transition: Transition {
-        easing: easing::LINEAR,
-        duration: Duration::from_millis(100)
-      }
+      transition: Transition::declare_builder()
+        .easing(easing::LINEAR)
+        .duration(Duration::from_millis(100))
+        .build(ctx),
+      prop: prop!(sized_box.size),
+      from: ZERO_SIZE,
     }
-    on sized_box {
-      wheel: move |_| leak_animate.run()
+    finally {
+      watch!(leak_animate.is_running())
+        .subscribe(move |v| *animate_state = v);
     }
-    change_on leak_animate.is_running() ~> *animate_state
   };
 
   wheel_widget(w);
@@ -60,21 +62,21 @@ fn listener_trigger() {
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
+      wheel: move |_| leak_animate.run()
     }
     Animate {
       id: leak_animate,
-      from: State {
-        sized_box.size: Size::zero(),
-      },
-      transition: Transition {
-        easing: easing::LINEAR,
-        duration: Duration::from_millis(100)
-      }
+      prop: prop!(sized_box.size),
+      from: ZERO_SIZE,
+      transition: Transition::declare_builder()
+        .easing(easing::LINEAR)
+        .duration(Duration::from_millis(100))
+        .build(ctx),
     }
-    on sized_box {
-      wheel: move |_| leak_animate.run()
+    finally {
+      watch!(leak_animate.is_running())
+        .subscribe(move |v| *animate_state = v);
     }
-    change_on leak_animate.is_running() ~> *animate_state
   };
 
   wheel_widget(w);

@@ -9,51 +9,87 @@ use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
-  parse_macro_input, parse_quote_spanned,
+  parse_macro_input, parse_quote,
   spanned::Spanned,
-  token::{Brace, Comma, Dot, Paren, Semi},
+  token::{Brace, Dot, Paren, Semi},
   Ident,
 };
 
 use super::{
-  builtin_var_name, capture_widget, ctx_ident,
+  builtin_var_name, closure_surround_refs, ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
-    NamedObjMap, SubscribeItem, WidgetNode,
+    NamedObjMap, WidgetNode,
   },
   guard_ident, guard_vec_ident,
-  parser::{MemberPath, PropMacro, Property, StateField, States},
+  parser::{PropMacro, Property, StateField, States},
   Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
   WIDGETS,
 };
+
+pub(crate) fn watch_expr_to_tokens(watch_expr: &TrackExpr) -> TokenStream {
+  if let Some(upstream) = watch_expr.used_name_info.upstream_tokens() {
+    let map_closure = closure_surround_refs(
+      &watch_expr.used_name_info,
+      &mut parse_quote!( move |_| #watch_expr),
+    )
+    .unwrap();
+
+    quote_spanned! { watch_expr.span() =>
+      // todo: unsubscribe guard
+      #upstream.map(#map_closure)
+    }
+  } else {
+    let mut tokens = quote! {};
+    DeclareError::WatchNothing(watch_expr.span().unwrap()).into_compile_error(&mut tokens);
+    tokens
+  }
+}
 
 pub(crate) fn gen_prop_macro(
   input: proc_macro::TokenStream,
   ctx: &mut VisitCtx,
 ) -> proc_macro::TokenStream {
+  // todo: use declare object to generate prop macro.
   let mut prop_macro = parse_macro_input! { input as PropMacro };
   let PropMacro { prop, lerp_fn, .. } = &mut prop_macro;
-  match prop {
-    Property::Name(name) => {
-      if let Some(name) = ctx.find_named_obj(name).cloned() {
-        ctx.add_used_widget(name, None, UsedType::USED)
-      }
-    }
-    Property::MemberPath(path) => {
-      if let Some(builtin_ty) = WIDGET_OF_BUILTIN_FIELD.get(path.member.to_string().as_str()) {
-        if let Some(name) = ctx.visit_builtin_name_mut(&path.widget, path.span(), builtin_ty) {
-          path.widget = name;
+
+  ctx.new_capture_scope_visit(
+    |ctx| match prop {
+      Property::Name(name) => {
+        if let Some(name) = ctx.find_named_obj(name).cloned() {
+          ctx.add_used_widget(name, None, UsedType::USED)
         }
-      } else if let Some(name) = ctx.find_named_obj(&path.widget).cloned() {
-        ctx.add_used_widget(name, None, UsedType::USED)
       }
-    }
-  }
+      Property::Member { target, member, .. } => {
+        if let Some(builtin_ty) = WIDGET_OF_BUILTIN_FIELD.get(member.to_string().as_str()) {
+          let span = target.span().join(member.span()).unwrap();
+          if let Some(name) = ctx.visit_builtin_name_mut(target, span, builtin_ty) {
+            *target = name;
+          }
+        } else if let Some(name) = ctx.find_named_obj(target).cloned() {
+          ctx.add_used_widget(name, None, UsedType::USED)
+        }
+      }
+    },
+    |t| t.remove(UsedType::SUBSCRIBE),
+  );
   if let Some(lerp_fn) = lerp_fn {
     ctx.visit_track_expr_mut(lerp_fn);
   }
 
-  prop_macro.to_token_stream().into()
+  let name = match &prop {
+    Property::Name(name) => name,
+    Property::Member { target, .. } => target,
+  };
+
+  if ctx.find_named_obj(name).is_none() {
+    let mut tokens = quote!();
+    DeclareError::PropInvalidTarget(name.span().unwrap()).into_compile_error(&mut tokens);
+    tokens.into()
+  } else {
+    prop_macro.to_token_stream().into()
+  }
 }
 
 impl ToTokens for Desugared {
@@ -86,12 +122,7 @@ impl ToTokens for Desugared {
 impl Desugared {
   fn inner_tokens(&self, tokens: &mut TokenStream) {
     let Self {
-      init,
-      named_objs,
-      stmts,
-      widget,
-      finally,
-      ..
+      init, named_objs, widget, finally, ..
     } = &self;
     let sorted_named_objs = self.order_named_objs();
     Paren::default().surround(tokens, |tokens| {
@@ -114,7 +145,6 @@ impl Desugared {
           }
         });
 
-        stmts.iter().for_each(|item| item.to_tokens(tokens));
         let w = widget.as_ref().unwrap();
         w.gen_node_objs(tokens);
         finally.to_tokens(tokens);
@@ -138,10 +168,7 @@ impl Desugared {
     quote! { .into_widget() }.to_tokens(tokens);
   }
 
-  pub fn collect_warnings(&mut self, ctx: &VisitCtx) {
-    self.collect_unused_declare_obj(ctx);
-    self.collect_observe_nothing();
-  }
+  pub fn collect_warnings(&mut self, ctx: &VisitCtx) { self.collect_unused_declare_obj(ctx); }
 
   pub fn circle_detect(&mut self) {
     fn used_part_iter(obj: &DeclareObj) -> impl Iterator<Item = UsedPart> + '_ {
@@ -153,39 +180,14 @@ impl Desugared {
     }
 
     let mut depends = BTreeMap::default();
-    let Self { named_objs, stmts, errors, .. } = self;
+    let Self { named_objs, errors, .. } = self;
     named_objs.iter().for_each(|(name, obj)| {
       let obj_used: ObjectUsed = match obj {
         NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => used_part_iter(obj).collect(),
-        NamedObj::DuplicateListener { objs, .. } => objs.iter().flat_map(used_part_iter).collect(),
       };
       if !obj_used.is_empty() {
         depends.insert(name, obj_used);
       }
-    });
-
-    stmts.iter().for_each(|item| match item {
-      SubscribeItem::Obj(_) => {
-        // embed object must be a antonymous object.
-      }
-      SubscribeItem::ObserveModifyDo { observe, subscribe_do } => {
-        if let Some(observes) = observe.used_name_info.directly_used_widgets() {
-          let used = subscribe_do.used_name_info.used_part(None);
-          if let Some(used) = used {
-            let used = ObjectUsed(vec![used]);
-            observes.for_each(|name| {
-              depends
-                .entry(name)
-                .and_modify(|obj| obj.0.extend(used.0.clone()))
-                .or_insert_with(|| used.clone());
-            });
-          }
-        }
-      }
-      SubscribeItem::ObserveChangeDo { .. } => {
-        // change event will compare the value use to break depends.
-      }
-      SubscribeItem::LetVar { .. } => {}
     });
 
     #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -281,10 +283,6 @@ impl Desugared {
             .fields
             .iter()
             .for_each(|f| self.deep_in_field(f, visit_state, orders)),
-          NamedObj::DuplicateListener { objs, .. } => objs
-            .iter()
-            .flat_map(|obj| obj.fields.iter())
-            .for_each(|f| self.deep_in_field(f, visit_state, orders)),
         }
 
         orders.push(name.clone());
@@ -312,16 +310,6 @@ impl Desugared {
   }
 
   fn collect_unused_declare_obj(&mut self, ctx: &VisitCtx) {
-    let on_event_used = self
-      .named_objs
-      .objs()
-      .filter_map(|obj| match obj {
-        NamedObj::Host(_) => None,
-        NamedObj::Builtin { src_name, obj } => obj.desugar_from_on_event.then_some(src_name),
-        NamedObj::DuplicateListener { src_name, .. } => Some(src_name),
-      })
-      .collect::<HashSet<_, ahash::RandomState>>();
-
     let used_ids = ctx
       .used_objs
       .iter()
@@ -341,27 +329,12 @@ impl Desugared {
         matches!(obj, NamedObj::Host(_))
           && !used_ids.contains(name)
           && !name.to_string().starts_with('_')
-          && !on_event_used.contains(name)
       })
       .for_each(|(name, _)| {
         self
           .warnings
           .push(DeclareWarning::UnusedName(name.span().unwrap()));
       });
-  }
-
-  pub fn collect_observe_nothing(&mut self) {
-    self.stmts.iter().for_each(|stmt| match stmt {
-      SubscribeItem::ObserveModifyDo { observe, .. }
-      | SubscribeItem::ObserveChangeDo { observe, .. } => {
-        if observe.used_name_info.directly_used_widgets().is_none() {
-          self
-            .warnings
-            .push(DeclareWarning::ObserveIsConst(observe.span().unwrap()));
-        }
-      }
-      _ => {}
-    });
   }
 }
 
@@ -389,22 +362,16 @@ impl ToTokens for DeclareObj {
       .iter()
       .for_each(|Field { member, value }| match value {
         FieldValue::Expr(expr) => {
-          if expr.used_name_info.directly_used_widgets().is_some() {
+          if expr.used_name_info.subscribe_widget().is_some() {
+            watch_expr_to_tokens(expr).to_tokens(tokens);
             let declare_set = declare_field_name(member);
-
-            let mut used_name_info = ScopeUsedInfo::default();
-            used_name_info.add_used(name.clone(), UsedType::MOVE_CAPTURE);
-            let on_change_do = SubscribeItem::ObserveModifyDo {
-              observe: expr.clone(),
-              subscribe_do: TrackExpr {
-                expr: parse_quote_spanned! { member.span() => {
-                  let #name = #name.clone_stateful();
-                  move |v| #name.state_ref().#declare_set(v)
-                }},
-                used_name_info,
-              },
-            };
-            on_change_do.to_tokens(tokens);
+            quote_spanned! { expr.span() =>
+              .subscribe({
+                let #name = #name.clone_stateful();
+                move |v| #name.state_ref().#declare_set(v)
+              });
+            }
+            .to_tokens(tokens);
           }
         }
         FieldValue::Obj(_) => {
@@ -428,24 +395,6 @@ impl DeclareObj {
       })
   }
 
-  pub fn depends_any_other(&self) -> bool {
-    self.fields.iter().any(|f| match &f.value {
-      FieldValue::Expr(e) => e.used_name_info.directly_used_widgets().is_some(),
-      FieldValue::Obj(_) => false,
-    })
-  }
-
-  fn gen_as_value(&self, tokens: &mut TokenStream) {
-    if self.depends_any_other() {
-      Brace(self.span()).surround(tokens, |tokens| {
-        self.to_tokens(tokens);
-        self.name.to_tokens(tokens)
-      })
-    } else {
-      self.gen_build_tokens(tokens);
-    }
-  }
-
   fn gen_build_tokens(&self, tokens: &mut TokenStream) {
     let DeclareObj { fields, ty, stateful, .. } = self;
     let whole_used_info = self.whole_used_info();
@@ -460,7 +409,7 @@ impl DeclareObj {
       });
       let build_ctx = ctx_ident(ty.span());
       tokens.extend(quote_spanned! { span => .build(#build_ctx) });
-      let is_stateful = *stateful || whole_used_info.directly_used_widgets().is_some();
+      let is_stateful = *stateful || whole_used_info.ref_widgets().is_some();
       if is_stateful {
         tokens.extend(quote_spanned! { span => .into_stateful() });
       }
@@ -489,105 +438,6 @@ impl ToTokens for States {
   }
 }
 
-impl ToTokens for SubscribeItem {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
-    match self {
-      SubscribeItem::Obj(obj) => obj.to_tokens(tokens),
-      SubscribeItem::ObserveModifyDo { observe, subscribe_do } => {
-        subscribe_modify(observe, subscribe_do, false, tokens)
-      }
-      SubscribeItem::ObserveChangeDo { observe, subscribe_do } => {
-        subscribe_modify(observe, subscribe_do, true, tokens)
-      }
-      SubscribeItem::LetVar { name, value } => {
-        quote_spanned! {name.span() => let #name = }.to_tokens(tokens);
-        value
-          .used_name_info
-          .value_expr_surround_refs(tokens, value.span(), |tokens| {
-            value.to_tokens(tokens);
-          });
-        Semi(name.span()).to_tokens(tokens);
-      }
-    }
-  }
-}
-
-fn subscribe_modify(
-  observe: &TrackExpr,
-  subscribe_do: &TrackExpr,
-  change_only: bool,
-  tokens: &mut TokenStream,
-) {
-  if let Some(upstream) = observe.upstream_tokens() {
-    let guard = guard_ident();
-    let subscribe_span = subscribe_do.span();
-    quote_spanned! { subscribe_span => let #guard =  }.to_tokens(tokens);
-
-    let observe_span = observe.span();
-    upstream.to_tokens(tokens);
-    let mut expr_value = quote! {};
-    observe
-      .used_name_info
-      .value_expr_surround_refs(&mut expr_value, observe_span, |tokens| {
-        observe.to_tokens(tokens)
-      });
-
-    quote_spanned! { observe.span() =>
-      .filter(|s| s.contains(ChangeScope::DATA))
-    }
-    .to_tokens(tokens);
-    let captures = observe
-      .used_name_info
-      .all_used()
-      .expect("if upstream is not none, must used some widget")
-      .map(capture_widget);
-    if change_only {
-      quote_spanned! { observe.span() =>
-        .scan_initial(
-          (#expr_value, #expr_value),
-          {
-            #(#captures)*
-            move |(_, after), _| { (after, #expr_value)}
-          }
-        )
-        .filter(|(before, after)| before != after)
-      }
-      .to_tokens(tokens);
-    } else {
-      quote_spanned! { observe.span() =>
-        .map(
-          {
-            #(#captures)*
-            move |_| #expr_value
-          }
-        )
-      }
-      .to_tokens(tokens);
-    }
-
-    quote_spanned! {subscribe_span => .subscribe}.to_tokens(tokens);
-    Paren(subscribe_span).surround(tokens, |tokens| {
-      if subscribe_do.used_name_info.refs_widgets().is_some() {
-        Brace(subscribe_span).surround(tokens, |tokens| {
-          subscribe_do.used_name_info.refs_surround(tokens, |tokens| {
-            subscribe_do.to_tokens(tokens);
-          });
-        })
-      } else {
-        subscribe_do.to_tokens(tokens);
-      }
-    });
-    Semi(subscribe_span).to_tokens(tokens);
-
-    let guard_vec = guard_vec_ident();
-    quote_spanned! { subscribe_span =>
-      let #guard: Box<dyn SubscriptionLike> = Box::new(#guard.into_inner());
-      #guard_vec.push(SubscriptionGuard::new(#guard));
-    }
-    .to_tokens(tokens);
-  }
-}
-
 impl WidgetNode {
   fn gen_node_objs(&self, tokens: &mut TokenStream) {
     let WidgetNode { node: parent, children } = self;
@@ -600,23 +450,19 @@ impl WidgetNode {
 
   fn gen_compose_node(&self, named_objs: &NamedObjMap, tokens: &mut TokenStream) {
     fn recursive_compose(
-      nodes: &[ComposeNode],
+      nodes: &[&Ident],
       children: &[WidgetNode],
       named_objs: &NamedObjMap,
       tokens: &mut TokenStream,
     ) {
-      let node = &nodes[0];
+      let first = &nodes[0];
 
       if nodes.len() > 1 || !children.is_empty() {
-        let name = node.name();
-        let span = name.span();
-        Brace(name.span()).surround(tokens, |tokens| {
-          if let ComposeNode::Obj(obj) = node {
-            obj.to_tokens(tokens);
-          }
-          let child_tml = ribir_suffix_variable(name, "tml");
+        let span = first.span();
+        Brace(first.span()).surround(tokens, |tokens| {
+          let child_tml = ribir_suffix_variable(first, "tml");
           quote_spanned! { span =>
-            let #child_tml = #name.child_template()
+            let #child_tml = #first.child_template()
           }
           .to_tokens(tokens);
           if nodes.len() > 1 {
@@ -632,15 +478,12 @@ impl WidgetNode {
           }
           quote_spanned! {
             span => .build();
-            #name.with_child(#child_tml)
+            #first.with_child(#child_tml)
           }
           .to_tokens(tokens);
         });
       } else {
-        match node {
-          ComposeNode::Name(name) => name.to_tokens(tokens),
-          ComposeNode::Obj(obj) => obj.gen_as_value(tokens),
-        }
+        first.to_tokens(tokens)
       }
     }
 
@@ -650,29 +493,13 @@ impl WidgetNode {
   }
 }
 
-enum ComposeNode<'a> {
-  /// object is already defined, directly compose the name.
-  Name(&'a Ident),
-  /// object not define before.
-  Obj(&'a DeclareObj),
-}
-
-impl<'a> ComposeNode<'a> {
-  fn name(&self) -> &Ident {
-    match self {
-      ComposeNode::Name(name) => name,
-      ComposeNode::Obj(obj) => &obj.name,
-    }
-  }
-}
-
 impl ComposeItem {
-  fn node_compose_list<'a>(&'a self, named_objs: &'a NamedObjMap) -> SmallVec<[ComposeNode; 1]> {
+  fn node_compose_list<'a>(&'a self, named_objs: &'a NamedObjMap) -> SmallVec<[&'a Ident; 1]> {
     let mut list = smallvec![];
     match self {
       ComposeItem::ChainObjs(objs) => {
         assert!(objs.len() > 0);
-        list.extend(objs.iter().map(|obj| ComposeNode::Name(&obj.name)));
+        list.extend(objs.iter().map(|obj| &obj.name));
       }
       ComposeItem::Id(name) => {
         WIDGETS
@@ -683,14 +510,11 @@ impl ComposeItem {
             named_objs.get_name_obj(&var_name)
           })
           .for_each(|(var_name, obj)| match obj {
-            NamedObj::DuplicateListener { objs, .. } => {
-              list.extend(objs.iter().map(|obj| ComposeNode::Obj(obj)));
-            }
-            NamedObj::Builtin { .. } => list.push(ComposeNode::Name(var_name)),
+            NamedObj::Builtin { .. } => list.push(var_name),
             NamedObj::Host(..) => unreachable!("builtin object type not match."),
           });
 
-        list.push(ComposeNode::Name(name));
+        list.push(name);
       }
     };
     list
@@ -701,10 +525,6 @@ impl ToTokens for NamedObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
       NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => obj.to_tokens(tokens),
-      NamedObj::DuplicateListener { .. } => {
-        // duplicated listener should not allow by others, directly do recursive
-        // compose in later.
-      }
     }
   }
 }
@@ -719,7 +539,7 @@ impl States {
 
 impl ToTokens for InitStmts {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    if let Some(refs) = self.used_name_info.refs_widgets() {
+    if let Some(refs) = self.used_name_info.ref_widgets() {
       let refs = refs.map(|name| {
         quote_spanned! { name.span() =>
           #[allow(unused_mut)]
@@ -734,16 +554,11 @@ impl ToTokens for InitStmts {
 
 impl ToTokens for FinallyBlock {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    if let Some(refs) = self.used_name_info.refs_widgets() {
-      let refs = refs.map(|name| {
-        quote_spanned! { name.span() =>
-          #[allow(unused_mut)]
-          let mut #name = #name.state_ref();
-        }
-      });
-      tokens.append_all(refs);
-    }
-    tokens.append_all(&self.stmts)
+    self.brace_token.surround(tokens, |tokens| {
+      self
+        .used_name_info
+        .refs_surround(tokens, |tokens| tokens.append_all(&self.stmts));
+    })
   }
 }
 impl ToTokens for FinallyStmt {
@@ -760,16 +575,7 @@ impl ToTokens for PropMacro {
     let Self { prop, lerp_fn, .. } = self;
     if let Some(lerp_fn) = lerp_fn {
       let span = lerp_fn.span();
-      quote_spanned!(span => LerpProp::new).to_tokens(tokens);
-      Paren(span).surround(tokens, |tokens| {
-        prop.to_tokens(tokens);
-        Comma(span).to_tokens(tokens);
-        lerp_fn
-          .used_name_info
-          .value_expr_surround_refs(tokens, span, |tokens: &mut TokenStream| {
-            lerp_fn.to_tokens(tokens)
-          })
-      });
+      quote_spanned!(span => LerpProp::new (#prop, #lerp_fn)).to_tokens(tokens);
     } else {
       prop.to_tokens(tokens)
     }
@@ -783,17 +589,15 @@ impl ToTokens for Property {
         Prop::new(#name.clone_stateful(), |v| v.clone(), |this, v| *this = v)
       }
       .to_tokens(tokens),
-      Property::MemberPath(path) => {
-        let MemberPath { widget, dot, member } = path;
-        quote_spanned! {path.span() =>
-          Prop::new(
-            #widget.clone_stateful(),
-            |this| this #dot #member.clone(),
-            |this, v| this #dot #member = v
-          )
-        }
-        .to_tokens(tokens)
+      Property::Member { target, dot, member } => quote_spanned! {
+        target.span().join(member.span()).unwrap() =>
+        Prop::new(
+          #target.clone_stateful(),
+          |this| this #dot #member.clone(),
+          |this, v| this #dot #member = v
+        )
       }
+      .to_tokens(tokens),
     }
   }
 }
