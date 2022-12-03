@@ -161,7 +161,10 @@ fn data_flow_macro() {
       SizedBox { id: a, size }
       SizedBox { id: b, size: a.size }
     }
-    change_on a.size + b.size ~> c.size
+    finally {
+      watch!(a.size + b.size)
+        .subscribe(move |v| c.size = v);
+    }
   };
   let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
@@ -298,7 +301,10 @@ fn builtin_method_support() {
       id: sized_box,
       size: Size::new(100., 100.),
     }
-    change_on sized_box.layout_size() ~> *layout_size
+    finally{
+      watch!(sized_box.layout_size())
+        .subscribe(move |v| *layout_size = v);
+    }
   };
 
   let mut wnd = Window::default_mock(w, None);
@@ -328,8 +334,8 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
       margin: EdgeInsets::all(1.),
       Void {}
     }
-    on margin.margin.clone() {
-      change: |(_, _)| {}
+    finally {
+      watch!(margin.margin.clone()).subscribe(|_| {});
     }
   };
 
@@ -363,7 +369,9 @@ fn fix_subscribe_cancel_after_widget_drop() {
         dyns: trigger.then(|| {
           widget! {
             SizedBox { size: Size::zero() }
-            on (*trigger) { modify: move |_| { *cnt += 1; } }
+            finally {
+              watch!(trigger.deref().clone()).subscribe(move |_| *cnt +=1 );
+            }
           }
         })
       }

@@ -94,7 +94,7 @@ impl<T: Roc, P: AnimateProperty> Animate<T, P> {
         // the state may change during animate.
         *to = prop.get();
         let value = prop.calc_lerp_value(from, to, rate);
-        prop.set(value);
+        prop.shallow_set(value);
       }
       AnimateProgress::Dismissed => prop.set(from.clone()),
       AnimateProgress::Finish => {}

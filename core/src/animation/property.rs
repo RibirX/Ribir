@@ -7,6 +7,7 @@ pub trait Property: Clone {
   type Value: Clone;
   fn get(&self) -> Self::Value;
   fn set(&mut self, v: Self::Value);
+  fn shallow_set(&mut self, v: Self::Value);
   fn modifies(&self) -> LocalBoxOp<'static, (), ()>;
 }
 
@@ -64,7 +65,10 @@ where
   fn set(&mut self, v: V) { (self.setter)(&mut *self.target.state_ref(), v); }
 
   #[inline]
-  fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.target.change_stream() }
+  fn shallow_set(&mut self, v: Self::Value) { (self.setter)(&mut *self.target.shallow_ref(), v); }
+
+  #[inline]
+  fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.target.modifies() }
 }
 
 impl<T, G, S> AnimateProperty for Prop<T, G, S>
@@ -110,6 +114,9 @@ where
 
   #[inline]
   fn set(&mut self, v: Self::Value) { self.prop.set(v) }
+
+  #[inline]
+  fn shallow_set(&mut self, v: Self::Value) { self.prop.shallow_set(v) }
 
   #[inline]
   fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.prop.modifies() }
@@ -168,6 +175,10 @@ macro_rules! impl_tuple_property {
         $(self.$idx.set(v.$idx);)+
       }
 
+      #[inline]
+      fn shallow_set(&mut self, v: Self::Value) {
+        $(self.$idx.shallow_set(v.$idx);)+
+       }
 
       #[inline]
       fn modifies(&self) -> LocalBoxOp<'static, (), ()> {

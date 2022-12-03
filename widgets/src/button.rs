@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use ribir_core::{prelude::*};
+use ribir_core::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct Button;
@@ -37,7 +37,7 @@ impl ComposeChild for Button {
     let ButtonTemplate { icon, button_text } = child;
 
     widget! {
-      env {
+      init {
         let ButtonTheme {
           padding,
           radius,

@@ -91,13 +91,11 @@ impl ComposeChild for Tabs {
                           }
                         }
                       }
-
-                      on tab_header.layout_rect() {
-                        change: move |(_, after)| {
-                          if this.cur_idx == idx {
-                            *active_header_rect = after;
-                          }
-                        }
+                      finally {
+                        watch!(tab_header.layout_rect())
+                          .subscribe(move |v| if this.cur_idx == idx {
+                              *active_header_rect = v;
+                          });
                       }
                     }
                   })

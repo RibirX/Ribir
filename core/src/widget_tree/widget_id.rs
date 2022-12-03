@@ -174,7 +174,7 @@ impl WidgetId {
       |notifier: &StateChangeNotifier| {
         let state_changed = dirty_sets.clone();
         notifier
-          .change_stream()
+          .raw_modifies()
           .filter(|b| b.contains(ChangeScope::FRAMEWORK))
           .subscribe(move |_| {
             state_changed.borrow_mut().insert(self);

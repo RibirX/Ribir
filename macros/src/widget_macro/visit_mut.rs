@@ -2,13 +2,13 @@ use crate::{PROP_MACRO_NAME, WATCH_MACRO_NAME, WIDGET_MACRO_NAME};
 
 use super::{
   builtin_var_name, capture_widget,
-  code_gen::gen_prop_macro,
+  code_gen::{gen_prop_macro, watch_expr_to_tokens},
   desugar::{
     ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
-    SubscribeItem, WidgetNode,
+    WidgetNode,
   },
-  gen_watch_macro, gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
-  WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
+  gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, WIDGET_OF_BUILTIN_FIELD,
+  WIDGET_OF_BUILTIN_METHOD,
 };
 
 use proc_macro::Span;
@@ -19,8 +19,8 @@ use std::{
   hash::Hash,
 };
 use syn::{
-  parse_quote, parse_quote_spanned, spanned::Spanned, visit_mut, visit_mut::VisitMut, Expr,
-  ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
+  parse_macro_input, parse_quote, spanned::Spanned, token::Brace, visit_mut, visit_mut::VisitMut,
+  Expr, ExprClosure, ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
 };
 
 bitflags::bitflags! {
@@ -97,36 +97,25 @@ impl VisitMut for VisitCtx {
         }
       }
       Expr::Closure(c) => {
-        let mut outside_used = self.current_used_info.take();
-        visit_mut::visit_expr_closure_mut(self, c);
-        let mut overwrite_inner_used = UsedType::CAPTURE;
-        if c.capture.is_some() {
-          if self.current_used_info.refs_widgets().is_some() {
-            let mut body_tokens = quote! {};
-            self.current_used_info.value_expr_surround_refs(
-              &mut body_tokens,
-              c.body.span(),
-              |tokens| c.body.to_tokens(tokens),
-            );
-            c.body = parse_quote!(#body_tokens);
-          }
-
-          if let Some(all) = self.current_used_info.all_used() {
-            let captures = all.map(capture_widget);
-            *expr = parse_quote_spanned! {c.span() => {
-              #(#captures)*
-              #c
-            }}
-          }
-          overwrite_inner_used = UsedType::MOVE_CAPTURE;
+        let mut new_closure = None;
+        let is_capture = c.capture.is_some();
+        self.new_capture_scope_visit(
+          |ctx| {
+            visit_mut::visit_expr_closure_mut(ctx, c);
+            new_closure = closure_surround_refs(&ctx.current_used_info, c);
+          },
+          |t| {
+            if is_capture {
+              *t = UsedType::SCOPE_CAPTURE
+            } else {
+              *t |= UsedType::SCOPE_CAPTURE;
+              t.remove(UsedType::SUBSCRIBE);
+            }
+          },
+        );
+        if let Some(new) = new_closure {
+          *expr = parse_quote!(#new);
         }
-
-        self.current_used_info.iter_mut().for_each(|(_, info)| {
-          info.used_type = overwrite_inner_used;
-        });
-
-        outside_used.merge(&self.current_used_info);
-        self.current_used_info = outside_used;
       }
       _ => {
         visit_mut::visit_expr_mut(self, expr);
@@ -288,15 +277,7 @@ impl VisitCtx {
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
     desugar.named_objs.objs_mut().for_each(|obj| match obj {
       NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj_mut(obj),
-      NamedObj::DuplicateListener { objs, .. } => objs
-        .iter_mut()
-        .for_each(|obj| self.visit_declare_obj_mut(obj)),
     });
-
-    desugar
-      .stmts
-      .iter_mut()
-      .for_each(|item| self.visit_subscribe_item_mut(item));
 
     self.take_current_used_info();
 
@@ -328,21 +309,14 @@ impl VisitCtx {
     fields.iter_mut().for_each(|f| self.visit_field(f));
   }
 
-  pub fn visit_subscribe_item_mut(&mut self, item: &mut SubscribeItem) {
-    match item {
-      SubscribeItem::Obj(obj) => self.visit_declare_obj_mut(obj),
-      SubscribeItem::ObserveModifyDo { observe, subscribe_do, .. }
-      | SubscribeItem::ObserveChangeDo { observe, subscribe_do, .. } => {
-        self.visit_track_expr_mut(observe);
-        self.visit_track_expr_mut(subscribe_do);
-      }
-      SubscribeItem::LetVar { value, .. } => self.visit_track_expr_mut(value),
-    }
-  }
-
   pub fn visit_track_expr_mut(&mut self, expr: &mut TrackExpr) {
-    self.visit_expr_mut(&mut expr.expr);
-    expr.used_name_info = self.take_current_used_info();
+    self.new_capture_scope_visit(
+      |ctx| {
+        ctx.visit_expr_mut(&mut expr.expr);
+        expr.used_name_info = ctx.current_used_info.clone();
+      },
+      |_| {},
+    );
   }
 
   pub fn visit_widget_node_mut(&mut self, widget: &mut WidgetNode) {
@@ -470,8 +444,42 @@ impl VisitCtx {
       None
     }
   }
+
+  pub(crate) fn new_capture_scope_visit(
+    &mut self,
+    visiter: impl FnOnce(&mut Self),
+    used_type_writer: impl Fn(&mut UsedType),
+  ) {
+    let mut outside_used = self.current_used_info.take();
+    visiter(self);
+    self.current_used_info.iter_mut().for_each(|(_, info)| {
+      used_type_writer(&mut info.used_type);
+    });
+    outside_used.merge(&self.current_used_info);
+    self.current_used_info = outside_used;
+  }
 }
 
+#[must_use]
+pub(crate) fn closure_surround_refs(
+  body_used: &ScopeUsedInfo,
+  c: &mut ExprClosure,
+) -> Option<TokenStream> {
+  c.capture?;
+  let all_capture = body_used.all_used()?;
+
+  let mut tokens = quote!();
+  Brace(c.span()).surround(&mut tokens, |tokens| {
+    all_capture.for_each(|obj| capture_widget(obj).to_tokens(tokens));
+    let mut body_tokens = quote! {};
+    body_used.value_expr_surround_refs(&mut body_tokens, c.body.span(), |tokens| {
+      c.body.to_tokens(tokens)
+    });
+    c.body = parse_quote!(#body_tokens);
+    c.to_tokens(tokens);
+  });
+  Some(tokens)
+}
 pub struct StackGuard<'a> {
   ctx: &'a mut VisitCtx,
 }
@@ -509,4 +517,19 @@ impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
 
 impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
+}
+
+pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {
+  let input = input.into();
+  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
+
+  ctx.new_capture_scope_visit(
+    |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
+    |t| {
+      *t |= UsedType::SCOPE_CAPTURE;
+      t.remove(UsedType::SUBSCRIBE);
+    },
+  );
+
+  watch_expr_to_tokens(&watch_expr).into()
 }

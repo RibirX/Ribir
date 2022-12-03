@@ -17,22 +17,15 @@ pub struct CircleUsedPath {
 pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleDepends(Box<[CircleUsedPath]>),
-  OnInvalidTarget(Span),
-  OnInvalidField(Ident),
-  NoFromStateForAnimate(Span),
-  EventObserveOnUndeclared(Ident),
-  DependsOnDupListener {
-    declare_at: Vec<Span>,
-    used_at: Vec<Span>,
-  },
-  SynErr(syn::Error),
+  WatchNothing(Span),
+  PropInvalidTarget(Span),
   TransitionByConflict(Span),
+  SynErr(syn::Error),
 }
 
 #[derive(Debug)]
 pub enum DeclareWarning {
   UnusedName(Span),
-  ObserveIsConst(Span),
   DefObjWithoutId(Span),
 }
 
@@ -61,35 +54,6 @@ impl DeclareError {
           equal before modify and after.";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
-      DeclareError::OnInvalidTarget(span) => {
-        diagnostic.set_spans(*span);
-        diagnostic.set_message(
-          "only the id of widget declared in `widget!` can used as the target of `on` group",
-        );
-      }
-      DeclareError::OnInvalidField(f) => {
-        diagnostic.set_spans(f.span().unwrap());
-        diagnostic.set_message(&format!(
-          "`{f}` is not allow use in `on` group, only listeners support.",
-        ));
-      }
-      DeclareError::NoFromStateForAnimate(_) => todo!(),
-      DeclareError::EventObserveOnUndeclared(name) => {
-        diagnostic.set_spans(name.span().unwrap());
-        diagnostic.set_message(&format!(
-          "Not found `{name}` declare in the `widget!`, `on` item only \
-          allow to observe widget declared in the `widget!` macro which \
-          itself located in.",
-        ));
-      }
-      DeclareError::SynErr(err) => err.clone().into_compile_error().to_tokens(tokens),
-      DeclareError::DependsOnDupListener { declare_at, used_at } => {
-        diagnostic.set_spans(used_at.clone());
-        diagnostic.set_message(&format!(
-          "Object can't be depends which have many instance.",
-        ));
-        diagnostic = diagnostic.span_help(declare_at.clone(), "declare at here.");
-      }
       DeclareError::TransitionByConflict(span) => {
         diagnostic.set_spans(span.clone());
         diagnostic.set_message(&format!(
@@ -102,6 +66,15 @@ impl DeclareError {
           obj, you can not config other field of `Transition`",
         );
       }
+      DeclareError::WatchNothing(span) => {
+        diagnostic.set_spans(*span);
+        diagnostic.set_message("try to watch a expression without any stateful target.");
+      }
+      DeclareError::PropInvalidTarget(span) => {
+        diagnostic.set_spans(*span);
+        diagnostic.set_message("is not a stateful target.");
+      }
+      DeclareError::SynErr(err) => err.clone().into_compile_error().to_tokens(tokens),
     };
 
     diagnostic.emit();
@@ -163,14 +136,9 @@ impl DeclareWarning {
         d.set_message(format!("assigned id but not be used in anywhere."));
         d = d.span_help(*span, "Remove this line.");
       }
-      DeclareWarning::ObserveIsConst(span) => {
-        d.set_spans(*span);
-        d.set_message("Observe a expr but not depends on anything, this will do nothing.");
-        d = d.help("Try to remove it.");
-      }
       DeclareWarning::DefObjWithoutId(span) => {
         d.set_spans(*span);
-        d.set_message("Def an object without id.");
+        d.set_message("Define an object without id.");
         d = d.help("Try to assign an `id` for it.");
       }
     };

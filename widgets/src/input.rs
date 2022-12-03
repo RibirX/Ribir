@@ -190,14 +190,13 @@ impl Compose for Caret {
       }
       Animate {
         id: animate1,
-        from: State {
-          caret.opacity: 1. - caret.opacity,
-        },
-        transition: Transition {
-          duration: Duration::from_secs(1),
-          easing: easing::steps(2, easing::StepsJump::JumpNone),
-          repeat: f32::INFINITY
-        }
+        transition: Transition::declare_builder()
+          .duration(Duration::from_secs(1))
+          .easing(easing::steps(2, easing::StepsJump::JumpNone))
+          .repeat(f32::INFINITY)
+          .build(ctx),
+        prop: prop!(caret.opacity),
+        from: 1. - caret.opacity,
       }
     }
   }

@@ -126,7 +126,7 @@ fn override_compose_style(theme: &mut FullTheme) {
         dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
       }
 
-      transition prop!(thumb.left_anchor,PositionUnit::lerp_fn(thumb.layout_height())) {
+      transition prop!(thumb.top_anchor, PositionUnit::lerp_fn(thumb.layout_height())) {
         by: transitions::SMOOTH_SCROLL.of(ctx),
       }
     }
@@ -143,13 +143,11 @@ fn override_compose_style(theme: &mut FullTheme) {
         background: palette.primary(),
       }
 
-      change_on ink_bar.left_anchor Animate {
-        transition: transitions::EASE_IN.of(ctx),
-        lerp_fn: move |from, to, rate| {
-          let from = from.abs_value(0.);
-          let to = to.abs_value(0.);
-          PositionUnit::Pixel(from.lerp(&to, rate))
-        }
+      transition prop!(
+        ink_bar.left_anchor,
+        PositionUnit::lerp_fn(style.ink_bar_rect.size.width)
+      ) {
+        by: transitions::EASE_IN.of(ctx)
       }
     }
   });

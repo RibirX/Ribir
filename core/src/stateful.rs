@@ -138,12 +138,6 @@ bitflags! {
   }
 }
 
-#[derive(Clone)]
-pub struct StateChange<T: Clone> {
-  pub before: T,
-  pub after: T,
-}
-
 impl<W> Clone for Stateful<W> {
   #[inline]
   fn clone(&self) -> Self {
@@ -190,50 +184,24 @@ impl<W> Stateful<W> {
   #[inline]
   pub fn raw_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
 
+  pub fn raw_modifies(&self) -> LocalSubject<'static, ChangeScope, ()> {
+    self.change_notifier.raw_modifies()
+  }
+
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn change_stream(&self) -> LocalBoxOp<'static, (), ()> {
+  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> {
     self
-      .raw_change_stream()
+      .raw_modifies()
       .filter_map(|s: ChangeScope| s.contains(ChangeScope::DATA).then(|| ()))
       .box_it()
-  }
-
-  /// Pick field change stream from the widget change
-  pub fn state_change<T: Clone + 'static>(
-    &self,
-    pick: impl Fn(&W) -> T + 'static,
-  ) -> impl LocalObservable<'static, Item = StateChange<T>, Err = ()>
-  where
-    Self: 'static,
-  {
-    let v = pick(&self.state_ref());
-    let init = StateChange { before: v.clone(), after: v };
-    let stateful = self.clone();
-    self.change_stream().scan_initial(init, move |mut init, _| {
-      init.before = init.after;
-      init.after = pick(&stateful.state_ref());
-      init
-    })
-  }
-
-  pub fn raw_change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> {
-    self.change_notifier.0.clone()
   }
 
   /// Clone the stateful widget of which the reference point to. Require mutable
   /// reference because we try to early release inner borrow when clone occur.
   #[inline]
   pub fn clone_stateful(&self) -> Stateful<W> { self.clone() }
-}
-
-impl<T: Clone + std::cmp::PartialEq> StateChange<T> {
-  #[inline]
-  pub fn is_same(&self) -> bool { self.after == self.before }
-
-  #[inline]
-  pub fn not_same(&self) -> bool { self.before != self.after }
 }
 
 impl<'a, W> std::ops::Deref for StateRef<'a, W> {
@@ -275,6 +243,14 @@ impl<'a, W> StateRef<'a, W> {
     self.release_current_borrow();
     StateRef::new(self.widget, ChangeScope::FRAMEWORK)
   }
+
+  #[inline]
+  pub fn raw_modifies(&self) -> LocalSubject<'static, ChangeScope, ()> {
+    self.widget.raw_modifies()
+  }
+
+  #[inline]
+  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.widget.modifies() }
 
   fn new(widget: &'a Stateful<W>, scope: ChangeScope) -> Self {
     Self {
@@ -321,9 +297,7 @@ impl<W: Render + 'static> Render for Stateful<W> {
   }
 
   #[inline]
-  fn get_transform(&self) -> Option<Transform> {
-    self.widget.borrow().get_transform()
-  }
+  fn get_transform(&self) -> Option<Transform> { self.widget.borrow().get_transform() }
 }
 
 impl<W: Compose> Compose for Stateful<W> {
@@ -352,7 +326,7 @@ impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) {
     if let Some(scope) = self.mut_accessed {
       self.release_current_borrow();
-      self.widget.raw_change_stream().next(scope)
+      self.widget.raw_modifies().next(scope)
     }
   }
 }
@@ -372,7 +346,7 @@ impl Query for StateChangeNotifier {
 }
 
 impl StateChangeNotifier {
-  pub(crate) fn change_stream(&self) -> LocalSubject<'static, ChangeScope, ()> { self.0.clone() }
+  pub(crate) fn raw_modifies(&self) -> LocalSubject<'static, ChangeScope, ()> { self.0.clone() }
 }
 
 #[cfg(test)]
@@ -399,13 +373,14 @@ mod tests {
 
     let sized_box = MockBox { size: Size::new(100., 100.) }.into_stateful();
     sized_box
-      .change_stream()
+      .modifies()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
 
     let changed_size = Rc::new(RefCell::new(Size::zero()));
     let c_changed_size = changed_size.clone();
-    sized_box.state_change(|w| w.size).subscribe(move |size| {
-      *c_changed_size.borrow_mut() = size.after;
+    let c_box = sized_box.clone();
+    sized_box.modifies().subscribe(move |_| {
+      *c_changed_size.borrow_mut() = c_box.raw_ref().size;
     });
 
     let state = sized_box.clone();
@@ -437,7 +412,7 @@ mod tests {
     let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
     let w = MockBox { size: Size::zero() }.into_stateful();
-    w.raw_change_stream()
+    w.raw_modifies()
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 
     {

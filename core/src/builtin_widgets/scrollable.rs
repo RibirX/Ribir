@@ -47,14 +47,21 @@ impl ComposeChild for ScrollableWidget {
           top_anchor: this.scroll_pos.y,
         }
       }}
-      change_on content.layout_size() ~> this.content_size
-      change_on view.layout_size() ~> this.page
+
       transition (
         prop!(content.left_anchor, PositionUnit::lerp_fn(content.layout_width())),
         prop!(content.top_anchor, PositionUnit::lerp_fn(content.layout_height()))
       ) {
         by: transitions::SMOOTH_SCROLL.of(ctx),
       }
+
+      finally {
+        watch!(content.layout_size())
+          .subscribe(move |v| this.content_size = v);
+        watch!(view.layout_size())
+          .subscribe(move |v| this.page = v);
+      }
+
     }
   }
 }

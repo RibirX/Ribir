@@ -64,7 +64,5 @@ pub fn builtin_var_name(host: &Ident, span: Span, ty: &str) -> Ident {
   name
 }
 
-pub fn is_listener(ty_name: &str) -> bool { ty_name.ends_with("Listener") }
-
 pub fn guard_vec_ident() -> Ident { ribir_variable("guard_vec", Span::call_site()) }
 pub fn guard_ident() -> Ident { ribir_variable("guard", Span::call_site()) }
