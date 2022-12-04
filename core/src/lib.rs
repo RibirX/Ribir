@@ -33,7 +33,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::context::*;
   #[doc(no_inline)]
-  pub use crate::data_widget::{compose_child_as_data_widget, DataWidget};
+  pub use crate::data_widget::{compose_child_as_data_widget, AnonymousData, DataWidget};
   #[doc(no_inline)]
   pub use crate::declare::*;
   #[doc(no_inline)]

@@ -7,7 +7,7 @@ use syn::{
 };
 
 use super::{
-  child_variable,
+  child_variable, guard_ident,
   parser::{DeclareField, DeclareSingle, DeclareWidget, Item, MacroSyntax, States, TransProps},
   ribir_variable, ScopeUsedInfo, TrackExpr, WIDGETS, WIDGET_OF_BUILTIN_FIELD,
 };
@@ -53,6 +53,7 @@ pub struct DeclareObj {
   pub name: Ident,
   pub fields: SmallVec<[Field; 1]>,
   pub stateful: bool,
+  pub watch_stmts: SmallVec<[Stmt; 1]>,
 }
 
 #[derive(Debug)]
@@ -213,7 +214,13 @@ fn expr_as_widget_node(expr: Expr, default_name: Ident) -> WidgetNode {
 }
 impl DeclareObj {
   pub fn new(ty: Path, name: Ident, fields: SmallVec<[Field; 1]>) -> Self {
-    Self { ty, name, fields, stateful: false }
+    Self {
+      ty,
+      name,
+      fields,
+      stateful: false,
+      watch_stmts: <_>::default(),
+    }
   }
 }
 
@@ -255,6 +262,7 @@ impl Item {
           stmts.push(FinallyStmt::Stmt(
             parse_quote_spanned! { span => let #prop = #p;},
           ));
+
           let prop_changes = ribir_variable("prop_changes", span);
           stmts.push(FinallyStmt::Stmt(
             parse_quote_spanned! { span => let #prop_changes = #prop.changes();},
@@ -287,13 +295,17 @@ impl Item {
 
           obj.stateful = true;
           stmts.push(FinallyStmt::Obj(obj));
+          let guard = guard_ident(span);
           stmts.push(FinallyStmt::Stmt(parse_quote_spanned! { span =>
-            // todo: subscribe guard.
-            #prop_changes.subscribe(move |(old, _)| {
+            let #guard = #prop_changes.subscribe(move |(old, _)| {
               #name.state_ref().from = old;
               #name.state_ref().run();
-            });
+            })
+            .unsubscribe_when_dropped();
           }));
+          stmts.push(FinallyStmt::Stmt(
+            parse_quote_spanned! { span => move_to_widget!(#guard); },
+          ));
         });
       }
       Item::Transition(d) | Item::Animate(d) => {

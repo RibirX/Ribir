@@ -370,7 +370,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
           widget! {
             SizedBox { size: Size::zero() }
             finally {
-              watch!(trigger.deref().clone()).subscribe(move |_| *cnt +=1 );
+              let_watch!(trigger.deref().clone()).subscribe(move |_| *cnt +=1 );
             }
           }
         })

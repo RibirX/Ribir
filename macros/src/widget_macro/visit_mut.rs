@@ -1,11 +1,14 @@
-use crate::{PROP_MACRO_NAME, WATCH_MACRO_NAME, WIDGET_MACRO_NAME};
+use crate::{
+  declare_derive::declare_field_name, error::DeclareError, widget_macro::guard_ident,
+  LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, PROP_MACRO_NAME, WATCH_MACRO_NAME,
+  WIDGET_MACRO_NAME,
+};
 
 use super::{
   builtin_var_name, capture_widget,
-  code_gen::{gen_prop_macro, watch_expr_to_tokens},
+  code_gen::{gen_move_to_widget_macro, gen_prop_macro},
   desugar::{
-    ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
-    WidgetNode,
+    ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
   },
   gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, WIDGET_OF_BUILTIN_FIELD,
   WIDGET_OF_BUILTIN_METHOD,
@@ -13,13 +16,17 @@ use super::{
 
 use proc_macro::Span;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use std::{
   collections::{HashMap, HashSet},
   hash::Hash,
 };
 use syn::{
-  parse_macro_input, parse_quote, spanned::Spanned, token::Brace, visit_mut, visit_mut::VisitMut,
+  parse_macro_input, parse_quote, parse_quote_spanned,
+  spanned::Spanned,
+  token::{Brace, Semi},
+  visit_mut,
+  visit_mut::VisitMut,
   Expr, ExprClosure, ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
 };
 
@@ -42,12 +49,17 @@ pub struct VisitCtx {
   /// name object has be used and its source name.
   pub used_objs: HashMap<Ident, UsedInfo, ahash::RandomState>,
   pub analyze_stack: Vec<Vec<LocalVariable>>,
+  pub has_guards_data: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct LocalVariable {
   name: Ident,
   alias_of_name: Option<Ident>,
+}
+
+impl LocalVariable {
+  pub fn local(name: Ident) -> Self { Self { name, alias_of_name: None } }
 }
 
 pub struct UsedInfo {
@@ -69,6 +81,7 @@ impl Default for VisitCtx {
       current_used_info: Default::default(),
       used_objs: Default::default(),
       analyze_stack: vec![vec![]],
+      has_guards_data: false,
     }
   }
 }
@@ -84,6 +97,8 @@ impl VisitMut for VisitCtx {
           *expr = Expr::Verbatim(gen_watch_macro(mac.tokens.clone().into(), self).into());
         } else if mac.path.is_ident(PROP_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_prop_macro(mac.tokens.clone().into(), self).into());
+        } else if mac.path.is_ident(MOVE_TO_WIDGET_MACRO_NAME) {
+          *expr = Expr::Verbatim(gen_move_to_widget_macro(&mac.tokens, self));
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -99,7 +114,8 @@ impl VisitMut for VisitCtx {
       Expr::Closure(c) => {
         let mut new_closure = None;
         let is_capture = c.capture.is_some();
-        self.new_capture_scope_visit(
+        let mut ctx = self.stack_push();
+        ctx.new_capture_scope_visit(
           |ctx| {
             visit_mut::visit_expr_closure_mut(ctx, c);
             new_closure = closure_surround_refs(&ctx.current_used_info, c);
@@ -123,24 +139,61 @@ impl VisitMut for VisitCtx {
     }
   }
 
-  fn visit_stmt_mut(&mut self, i: &mut Stmt) {
-    if let syn::Stmt::Item(syn::Item::Macro(ItemMacro { ident: None, mac, .. })) = i {
-      if mac.path.is_ident(WIDGET_MACRO_NAME) {
-        let expr: TokenStream = gen_widget_macro(mac.tokens.clone().into(), Some(self)).into();
-        *i = Stmt::Expr(Expr::Verbatim(expr));
-      } else if mac.path.is_ident(WATCH_MACRO_NAME) {
-        let t = gen_watch_macro(mac.tokens.clone().into(), self);
-        *i = Stmt::Expr(Expr::Verbatim(t.into()).into());
-      } else if mac.path.is_ident(PROP_MACRO_NAME) {
-        *i = Stmt::Expr(Expr::Verbatim(
-          gen_prop_macro(mac.tokens.clone().into(), self).into(),
-        ));
-      } else {
-        visit_mut::visit_stmt_mut(self, i);
+  fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
+    fn let_watch_as_watch(expr: &mut Expr, semi: Option<Semi>) -> Option<Stmt> {
+      let Expr::MethodCall(method_call) = expr else { None? };
+      let Expr::Macro(mac) = &mut *method_call.receiver else { None? };
+      let path = &mut mac.mac.path;
+      if !path.is_ident(LET_WATCH_MACRO_NAME) {
+        None?
       }
-    } else {
-      visit_mut::visit_stmt_mut(self, i);
+
+      let path_span = path.span();
+
+      let watch = Ident::new(WATCH_MACRO_NAME, path_span);
+      *path = watch.into();
+      let guard = guard_ident(path_span);
+
+      let move_to_widget = Ident::new(MOVE_TO_WIDGET_MACRO_NAME, expr.span());
+      Some(parse_quote_spanned! { expr.span() =>{
+        let #guard = #expr #semi
+        #move_to_widget!(#guard.unsubscribe_when_dropped());
+      }})
     }
+
+    match stmt {
+      Stmt::Item(syn::Item::Macro(ItemMacro { ident: None, mac, .. })) => {
+        if mac.path.is_ident(WIDGET_MACRO_NAME) {
+          let expr: TokenStream = gen_widget_macro(mac.tokens.clone().into(), Some(self)).into();
+          *stmt = Stmt::Expr(Expr::Verbatim(expr));
+        } else if mac.path.is_ident(WATCH_MACRO_NAME) {
+          let t = gen_watch_macro(mac.tokens.clone().into(), self);
+          *stmt = Stmt::Expr(Expr::Verbatim(t.into()).into());
+        } else if mac.path.is_ident(PROP_MACRO_NAME) {
+          *stmt = Stmt::Expr(Expr::Verbatim(
+            gen_prop_macro(mac.tokens.clone().into(), self).into(),
+          ));
+        } else if mac.path.is_ident(MOVE_TO_WIDGET_MACRO_NAME) {
+          *stmt = Stmt::Expr(Expr::Verbatim(gen_move_to_widget_macro(&mac.tokens, self)));
+        } else if mac.path.is_ident(LET_WATCH_MACRO_NAME) {
+          let mut tokens = quote! {};
+          DeclareError::LetWatchWrongPlace(mac.span().unwrap()).into_compile_error(&mut tokens);
+          *stmt = Stmt::Expr(Expr::Verbatim(tokens));
+        }
+      }
+      Stmt::Expr(expr) => {
+        if let Some(new_stmt) = let_watch_as_watch(expr, None) {
+          *stmt = new_stmt;
+        }
+      }
+      Stmt::Semi(expr, semi) => {
+        if let Some(new_stmt) = let_watch_as_watch(expr, Some(*semi)) {
+          *stmt = new_stmt;
+        }
+      }
+      _ => {}
+    }
+    visit_mut::visit_stmt_mut(self, stmt);
   }
 
   fn visit_expr_field_mut(&mut self, f_expr: &mut syn::ExprField) {
@@ -170,6 +223,7 @@ impl VisitMut for VisitCtx {
   fn visit_expr_assign_mut(&mut self, assign: &mut syn::ExprAssign) {
     visit_mut::visit_expr_assign_mut(self, assign);
 
+    // todo: pat alias
     let local_alias = self.expr_find_name_widget(&assign.left).and_then(|local| {
       self
         .expr_find_name_widget(&assign.right)
@@ -205,6 +259,7 @@ impl VisitMut for VisitCtx {
   fn visit_local_mut(&mut self, local: &mut syn::Local) {
     visit_mut::visit_local_mut(self, local);
 
+    // todo: pat alias
     if let Some((_, init)) = &local.init {
       let right_name = self.expr_find_name_widget(init).cloned();
       let var_name = self.analyze_stack.last_mut().unwrap().last_mut();
@@ -266,10 +321,7 @@ impl VisitMut for VisitCtx {
           column!()
         )
       })
-      .push(LocalVariable {
-        name: i.ident.clone(),
-        alias_of_name: None,
-      });
+      .push(LocalVariable::local(i.ident.clone()));
   }
 }
 
@@ -304,9 +356,32 @@ impl VisitCtx {
   }
 
   pub fn visit_declare_obj_mut(&mut self, obj: &mut DeclareObj) {
-    let DeclareObj { ty, fields, .. } = obj;
+    let DeclareObj { ty, name, fields, watch_stmts, .. } = obj;
     self.visit_path_mut(ty);
-    fields.iter_mut().for_each(|f| self.visit_field(f));
+    fields.iter_mut().for_each(|f| match &mut f.value {
+      FieldValue::Expr(expr) => {
+        let origin = expr.expr.clone();
+        self.visit_track_expr_mut(expr);
+        if expr.used_name_info.subscribe_widget().is_some() {
+          let declare_set = declare_field_name(&f.member);
+          let subscribe_do = if self.declare_objs.contains_key(name) {
+            quote! { move |v| #name.#declare_set(v) }
+          } else {
+            quote! {{
+              let #name = #name.clone_stateful();
+              move |v| #name.state_ref().#declare_set(v)
+            }}
+          };
+          watch_stmts.push(parse_quote_spanned! { expr.span() =>
+            let_watch!(#origin).subscribe( #subscribe_do );
+          });
+        }
+      }
+      FieldValue::Obj(obj) => {
+        self.visit_declare_obj_mut(obj);
+      }
+    });
+    watch_stmts.iter_mut().for_each(|s| self.visit_stmt_mut(s));
   }
 
   pub fn visit_track_expr_mut(&mut self, expr: &mut TrackExpr) {
@@ -336,15 +411,6 @@ impl VisitCtx {
     }
   }
 
-  pub fn visit_field(&mut self, field: &mut Field) { self.visit_field_value(&mut field.value) }
-
-  pub fn visit_field_value(&mut self, value: &mut FieldValue) {
-    match value {
-      FieldValue::Expr(e) => self.visit_track_expr_mut(e),
-      FieldValue::Obj(obj) => self.visit_declare_obj_mut(obj),
-    }
-  }
-
   pub fn take_current_used_info(&mut self) -> ScopeUsedInfo { self.current_used_info.take() }
 
   pub fn stack_push(&mut self) -> StackGuard<'_> { StackGuard::new(self) }
@@ -357,8 +423,8 @@ impl VisitCtx {
       .rev()
       .flat_map(|local| local.iter().rev())
       .find(|v| &v.name == ident)
-      .and_then(|v| v.alias_of_name.as_ref())
-      .or_else(|| {
+      .map(|v| v.alias_of_name.as_ref())
+      .unwrap_or_else(|| {
         (self.declare_objs.contains_key(ident) || self.track_names.contains(ident)).then(|| ident)
       })
   }
@@ -530,6 +596,31 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
       t.remove(UsedType::SUBSCRIBE);
     },
   );
+  if let Some(upstream) = watch_expr.used_name_info.upstream_tokens() {
+    let map_closure = closure_surround_refs(
+      &watch_expr.used_name_info,
+      &mut parse_quote!( move |_| #watch_expr),
+    )
+    .unwrap();
 
-  watch_expr_to_tokens(&watch_expr).into()
+    quote_spanned! { watch_expr.span() => #upstream.map(#map_closure) }.into()
+  } else {
+    let mut tokens = quote! {};
+    DeclareError::WatchNothing(watch_expr.span().unwrap()).into_compile_error(&mut tokens);
+    tokens.into()
+  }
+}
+
+#[test]
+fn local_var() {
+  let mut ctx = VisitCtx::default();
+  let v = Ident::new("v", proc_macro2::Span::call_site());
+  ctx
+    .analyze_stack
+    .last_mut()
+    .unwrap()
+    .push(LocalVariable::local(v.clone()));
+  ctx.declare_objs.insert(v.clone(), v.clone().into());
+
+  assert!(ctx.find_named_obj(&v).is_none());
 }
