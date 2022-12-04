@@ -1,7 +1,7 @@
 //! Data widget help attach data to a widget and get a new widget witch behavior
 //! is same as origin widget.
 
-use crate::{impl_proxy_query, impl_proxy_render, prelude::*};
+use crate::{impl_proxy_query, impl_proxy_render, impl_query_self_only, prelude::*};
 
 pub struct DataWidget<W, D> {
   widget: W,
@@ -39,4 +39,20 @@ pub fn widget_attach_data<D: Query + 'static>(widget: Widget, data: D) -> Widget
       children,
     },
   }
+}
+
+/// Data attach widget that we don't care about its type.
+pub struct AnonymousData(Box<dyn Any>);
+
+impl AnonymousData {
+  #[inline]
+  pub fn new(data: Box<dyn Any>) -> Self { Self(data) }
+}
+
+impl Query for AnonymousData {
+  impl_query_self_only!();
+}
+
+impl Query for Vec<AnonymousData> {
+  impl_query_self_only!();
 }

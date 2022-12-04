@@ -20,6 +20,7 @@ pub enum DeclareError {
   WatchNothing(Span),
   PropInvalidTarget(Span),
   TransitionByConflict(Span),
+  LetWatchWrongPlace(Span),
   SynErr(syn::Error),
 }
 
@@ -73,6 +74,13 @@ impl DeclareError {
       DeclareError::PropInvalidTarget(span) => {
         diagnostic.set_spans(*span);
         diagnostic.set_message("is not a stateful target.");
+      }
+      DeclareError::LetWatchWrongPlace(span) => {
+        diagnostic.set_spans(*span);
+        diagnostic.set_message(
+          "`let_watch` only allow start as a statement to help auto\
+          unsubscribe a subscribed stream when the root of `widget!` dropped.",
+        );
       }
       DeclareError::SynErr(err) => err.clone().into_compile_error().to_tokens(tokens),
     };

@@ -62,8 +62,8 @@ pub fn gen_widget_macro(
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
   desugar.collect_warnings(&ctx);
-  let used_widgets = ctx.used_objs;
-  used_widgets
+  ctx
+    .used_objs
     .iter()
     .for_each(|(name, UsedInfo { builtin, .. })| {
       // add default builtin widget, which used by others but but declared.
@@ -85,10 +85,11 @@ pub fn gen_widget_macro(
 
   let mut tokens = quote! {};
   desugar.circle_detect();
-  desugar.to_tokens(&mut tokens);
+  desugar.gen_tokens(&mut tokens, &ctx);
 
   if let Some(outside_ctx) = outside_ctx {
-    let used_outsides = used_widgets
+    let used_outsides = ctx
+      .used_objs
       .iter()
       .filter(|(name, _)| {
         !desugar.named_objs.contains(name)

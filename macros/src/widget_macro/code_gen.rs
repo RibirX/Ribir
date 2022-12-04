@@ -1,5 +1,4 @@
 use crate::{
-  declare_derive::declare_field_name,
   error::{DeclareError, DeclareWarning},
   widget_macro::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD},
 };
@@ -9,48 +8,27 @@ use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
-  parse_macro_input, parse_quote,
+  parse_macro_input,
   spanned::Spanned,
   token::{Brace, Dot, Paren, Semi},
   Ident,
 };
 
 use super::{
-  builtin_var_name, closure_surround_refs, ctx_ident,
+  builtin_var_name, ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
     NamedObjMap, WidgetNode,
   },
-  guard_ident, guard_vec_ident,
+  guard_vec_ident,
   parser::{PropMacro, Property, StateField, States},
-  Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, TrackExpr, UsedPart, UsedType, VisitCtx,
-  WIDGETS,
+  Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, UsedPart, UsedType, VisitCtx, WIDGETS,
 };
-
-pub(crate) fn watch_expr_to_tokens(watch_expr: &TrackExpr) -> TokenStream {
-  if let Some(upstream) = watch_expr.used_name_info.upstream_tokens() {
-    let map_closure = closure_surround_refs(
-      &watch_expr.used_name_info,
-      &mut parse_quote!( move |_| #watch_expr),
-    )
-    .unwrap();
-
-    quote_spanned! { watch_expr.span() =>
-      // todo: unsubscribe guard
-      #upstream.map(#map_closure)
-    }
-  } else {
-    let mut tokens = quote! {};
-    DeclareError::WatchNothing(watch_expr.span().unwrap()).into_compile_error(&mut tokens);
-    tokens
-  }
-}
 
 pub(crate) fn gen_prop_macro(
   input: proc_macro::TokenStream,
   ctx: &mut VisitCtx,
 ) -> proc_macro::TokenStream {
-  // todo: use declare object to generate prop macro.
   let mut prop_macro = parse_macro_input! { input as PropMacro };
   let PropMacro { prop, lerp_fn, .. } = &mut prop_macro;
 
@@ -92,8 +70,14 @@ pub(crate) fn gen_prop_macro(
   }
 }
 
-impl ToTokens for Desugared {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
+pub(crate) fn gen_move_to_widget_macro(input: &TokenStream, ctx: &mut VisitCtx) -> TokenStream {
+  let guards = guard_vec_ident();
+  ctx.has_guards_data = true;
+  quote_spanned!(input.span() => #guards.push(AnonymousData::new(Box::new(#input))))
+}
+
+impl Desugared {
+  pub fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &VisitCtx) {
     if !self.errors.is_empty() {
       Brace::default().surround(tokens, |tokens| {
         self
@@ -109,18 +93,16 @@ impl ToTokens for Desugared {
     if track.as_ref().map_or(false, States::has_def_names) {
       Brace::default().surround(tokens, |tokens| {
         track.to_tokens(tokens);
-        self.inner_tokens(tokens);
+        self.inner_tokens(tokens, ctx);
       })
     } else {
-      self.inner_tokens(tokens);
+      self.inner_tokens(tokens, ctx);
     }
 
     warnings.iter().for_each(|w| w.emit_warning());
   }
-}
 
-impl Desugared {
-  fn inner_tokens(&self, tokens: &mut TokenStream) {
+  fn inner_tokens(&self, tokens: &mut TokenStream, ctx: &VisitCtx) {
     let Self {
       init, named_objs, widget, finally, ..
     } = &self;
@@ -129,12 +111,10 @@ impl Desugared {
       let ctx_name = ctx_ident(Span::call_site());
       quote! { move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
       Brace::default().surround(tokens, |tokens| {
-        // todo: gen guards vec only if need.
-        let guards_vec = guard_vec_ident();
-        quote! {
-         let mut #guards_vec: Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> = vec![];
+        if ctx.has_guards_data {
+          let guards_vec = guard_vec_ident();
+          quote! { let mut #guards_vec: Vec<AnonymousData> = vec![]; }.to_tokens(tokens);
         }
-        .to_tokens(tokens);
         init.to_tokens(tokens);
 
         // deep first declare named obj by their dependencies
@@ -149,20 +129,16 @@ impl Desugared {
         w.gen_node_objs(tokens);
         finally.to_tokens(tokens);
 
-        let name = w.node.name();
-        quote! { let mut #name = }.to_tokens(tokens);
-        w.gen_compose_node(named_objs, tokens);
-        quote! {
-          .into_widget();
-          if !#guards_vec.is_empty() {
-            #name = compose_child_as_data_widget(
-              #name.into_widget(),
-              StateWidget::Stateless(#guards_vec)
-            );
-          }
-          #name
+        if ctx.has_guards_data {
+          quote! { compose_child_as_data_widget }.to_tokens(tokens);
+          Paren::default().surround(tokens, |tokens| {
+            w.gen_compose_node(named_objs, tokens);
+            let guards_vec = guard_vec_ident();
+            quote! { .into_widget(), StateWidget::Stateless(#guards_vec) }.to_tokens(tokens)
+          });
+        } else {
+          w.gen_compose_node(named_objs, tokens)
         }
-        .to_tokens(tokens);
       })
     });
     quote! { .into_widget() }.to_tokens(tokens);
@@ -352,51 +328,15 @@ impl ToTokens for FieldValue {
 
 impl ToTokens for DeclareObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
-    let DeclareObj { fields, ty, name, .. } = self;
+    let DeclareObj {
+      fields,
+      ty,
+      name,
+      watch_stmts,
+      stateful,
+    } = self;
     let span = ty.span();
     quote_spanned! { span => let #name = }.to_tokens(tokens);
-    self.gen_build_tokens(tokens);
-    Semi(span).to_tokens(tokens);
-
-    fields
-      .iter()
-      .for_each(|Field { member, value }| match value {
-        FieldValue::Expr(expr) => {
-          if expr.used_name_info.subscribe_widget().is_some() {
-            watch_expr_to_tokens(expr).to_tokens(tokens);
-            let declare_set = declare_field_name(member);
-            quote_spanned! { expr.span() =>
-              .subscribe({
-                let #name = #name.clone_stateful();
-                move |v| #name.state_ref().#declare_set(v)
-              });
-            }
-            .to_tokens(tokens);
-          }
-        }
-        FieldValue::Obj(_) => {
-          // directly obj needn't subscribe anything, its fields directly
-          // subscribe.
-        }
-      });
-  }
-}
-
-impl DeclareObj {
-  pub fn whole_used_info(&self) -> ScopeUsedInfo {
-    self
-      .fields
-      .iter()
-      .fold(ScopeUsedInfo::default(), |mut acc, f| {
-        if let FieldValue::Expr(e) = &f.value {
-          acc.merge(&e.used_name_info)
-        }
-        acc
-      })
-  }
-
-  fn gen_build_tokens(&self, tokens: &mut TokenStream) {
-    let DeclareObj { fields, ty, stateful, .. } = self;
     let whole_used_info = self.whole_used_info();
     let span = ty.span();
     whole_used_info.value_expr_surround_refs(tokens, span, |tokens| {
@@ -411,9 +351,26 @@ impl DeclareObj {
       tokens.extend(quote_spanned! { span => .build(#build_ctx) });
       let is_stateful = *stateful || whole_used_info.ref_widgets().is_some();
       if is_stateful {
-        tokens.extend(quote_spanned! { span => .into_stateful() });
+        quote_spanned! { span => .into_stateful() }.to_tokens(tokens);
       }
     });
+    Semi(span).to_tokens(tokens);
+
+    watch_stmts.iter().for_each(|s| s.to_tokens(tokens));
+  }
+}
+
+impl DeclareObj {
+  pub fn whole_used_info(&self) -> ScopeUsedInfo {
+    self
+      .fields
+      .iter()
+      .fold(ScopeUsedInfo::default(), |mut acc, f| {
+        if let FieldValue::Expr(e) = &f.value {
+          acc.merge(&e.used_name_info)
+        }
+        acc
+      })
   }
 }
 
