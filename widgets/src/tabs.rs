@@ -92,7 +92,7 @@ impl ComposeChild for Tabs {
                         }
                       }
                       finally {
-                        watch!(tab_header.layout_rect())
+                        let_watch!(tab_header.layout_rect())
                           .subscribe(move |v| if this.cur_idx == idx {
                               *active_header_rect = v;
                           });
