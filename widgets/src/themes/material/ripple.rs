@@ -44,7 +44,8 @@ impl ComposeChild for Ripple {
       Stack {
         id: container,
         pointer_down: move |e| this.launch_pos = if this.center {
-          Some(container.layout_rect().center())
+          let center = container.layout_size() / 2.;
+          Some(Point::new(center.width, center.height))
         } else {
           Some(e.position())
         },
@@ -53,15 +54,15 @@ impl ComposeChild for Ripple {
           dyns: {
             this.launch_pos.clone().map(|launch_at| {
               let radius = this.radius.unwrap_or_else(|| {
-                let rect = container.layout_rect();
-                let distance_x = f32::max( launch_at.x - rect.min_x(), rect.max_x() - launch_at.x);
-                let distance_y = f32::max(launch_at.y - rect.min_y(), rect.max_y() - launch_at.y);
+                let size = container.layout_size();
+                let distance_x = f32::max(launch_at.x , size.width - launch_at.x);
+                let distance_y = f32::max(launch_at.y, size.height - launch_at.y);
                 (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
               });
               widget!{
                 DynWidget {
                   dyns: (this.bounded != RippleBound::Unbounded).then(|| {
-                    let rect = container.layout_rect();
+                    let rect = Rect::from_size(container.layout_size());
                     let path = match this.bounded {
                       RippleBound::Unbounded => unreachable!(),
                       RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
@@ -89,8 +90,8 @@ impl ComposeChild for Ripple {
                   from: Path::circle(Point::zero(), 0., PathStyle::Fill)
                 }
                 finally {
-                  let_watch!(container.pointer_pressed() || ripper_enter.is_running())
-                    .filter(|b| !b)
+                  let_watch!(!container.pointer_pressed() && !ripper_enter.is_running())
+                    .filter(|b| *b)
                     .subscribe(move |_| {
                       this.launch_pos.take();
                     });
