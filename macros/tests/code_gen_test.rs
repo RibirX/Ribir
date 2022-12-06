@@ -396,3 +396,30 @@ fn fix_subscribe_cancel_after_widget_drop() {
   wnd.draw_frame();
   assert_eq!(*notify_cnt.raw_ref(), 3);
 }
+
+#[test]
+fn fix_local_assign_tuple() {
+  let w = widget! {
+    Row {
+      SizedBox {
+        id: _sized,
+        size: Size::new(1., 1.,),
+      }
+      SizedBox {
+        size: {
+          let (x, _) = (_sized, 2);
+          x.size
+        }
+      }
+    }
+  };
+
+  expect_layout_result(
+    w,
+    None,
+    &[LayoutTestItem {
+      path: &[0],
+      expect: ExpectRect::new(0., 0., 2., 1.),
+    }],
+  );
+}
