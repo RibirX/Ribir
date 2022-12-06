@@ -230,9 +230,4 @@ builtin! {
     #[doc="action perform after widget remove from widget tree."]
     disposed: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>, DisposedType)>,
   }
-
-  KeyWidget {
-    #[doc="assign a key to widget, use for track if two widget is same widget in two frames."]
-    key: Key
-  }
 }

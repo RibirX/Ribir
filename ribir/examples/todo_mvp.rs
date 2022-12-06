@@ -1,4 +1,5 @@
 use ribir::prelude::{svgs, *};
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {
@@ -90,9 +91,11 @@ impl TodoMVP {
   fn pane(this: StateRef<Self>, cond: fn(&Task) -> bool) -> Widget {
     let this = this.clone_stateful();
     widget! {
-      states { this }
+      states { this, mount_task_cnt: Stateful::new(0) }
       VScrollBar {
         Lists {
+          // when performed layout, means all task are mounted, we reset the mount count.
+          performed_layout: move |_| *mount_task_cnt = 0,
           padding: EdgeInsets::vertical(8.),
           DynWidget {
             dyns: {
@@ -103,23 +106,48 @@ impl TodoMVP {
                 .filter(move |(_, task)| { cond(task) })
                 .map(move |(idx, task)| {
                   widget! {
-                    ListItem {
-                      id: item,
-                      HeadlineText::new(task.label.clone())
-                      Leading {
-                        Checkbox {
-                          id: checkbox,
-                          checked: task.finished,
-                          margin: EdgeInsets::vertical(4.),
+                    states { mount_idx: Stateful::new(0) }
+                    KeyWidget {
+                      id: key,
+                      key: Key::from(idx),
+                      value: Some(task.label.clone()),
+                      ListItem {
+                        id: item,
+                        transform: Transform::default(),
+                        mounted: move |_| {
+                          if key.is_enter() {
+                            *mount_idx = *mount_task_cnt;
+                            *mount_task_cnt += 1;
+                            mount_animate.run();
+                          }
+                        },
+                        HeadlineText::new(task.label.clone())
+                        Leading {
+                          Checkbox {
+                            id: checkbox,
+                            checked: task.finished,
+                            margin: EdgeInsets::vertical(4.),
+                          }
+                        }
+                        Trailing {
+                          Icon {
+                            visible: item.mouse_hover(),
+                            tap: move |_| { this.tasks.remove(idx); },
+                            svgs::CLOSE
+                          }
                         }
                       }
-                      Trailing {
-                        Icon {
-                          visible: item.mouse_hover(),
-                          tap: move |_| { this.tasks.remove(idx); },
-                          svgs::CLOSE
-                        }
-                      }
+                    }
+                    Animate {
+                      id: mount_animate,
+                      transition: Transition {
+                        delay: Some(Duration::from_millis(100).mul_f32((*mount_idx + 1) as f32)),
+                        duration: Duration::from_millis(150),
+                        easing: easing::EASE_IN,
+                        repeat: None,
+                      },
+                      prop: prop!(item.transform),
+                      from: Transform::translation(-400., 0. ),
                     }
                     finally {
                       let_watch!(checkbox.checked)

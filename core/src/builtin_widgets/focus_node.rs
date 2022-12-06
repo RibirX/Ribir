@@ -1,5 +1,7 @@
-use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*, events::focus_mgr::FocusType};
-
+use crate::{
+  data_widget::compose_child_as_data_widget, events::focus_mgr::FocusType, impl_query_self_only,
+  prelude::*,
+};
 
 #[derive(Default, Declare)]
 pub struct FocusNode {
@@ -40,13 +42,13 @@ impl ComposeChild for FocusNode {
   type Child = Widget;
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     let this = this.into_stateful();
-      
+
     let w = widget! {
       states { this: this.clone() }
       DynWidget {
         mounted: move |ctx| {
           WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, this.auto_focus, FocusType::NODE, ctx.tree_arena());
-            this.clone_stateful().raw_ref().wid = Some(ctx.id);
+            this.clone_stateful().state_ref().wid = Some(ctx.id);
           },
           disposed: move|ctx| {
             WidgetCtxImpl::app_ctx(&ctx).remove_focus_node(ctx.id, FocusType::NODE);
@@ -57,7 +59,7 @@ impl ComposeChild for FocusNode {
     compose_child_as_data_widget(w, StateWidget::Stateful(this))
   }
 }
-impl  FocusNode {
+impl FocusNode {
   pub fn request_focus(&self, ctx: &AppContext) {
     self
       .wid
@@ -67,7 +69,7 @@ impl  FocusNode {
 }
 
 impl Query for FocusNode {
-    impl_query_self_only!();
+  impl_query_self_only!();
 }
 
 fn has_focus(r: &dyn Render) -> bool {
@@ -76,25 +78,24 @@ fn has_focus(r: &dyn Render) -> bool {
   focused
 }
 
-
 pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
-    match widget {
-      Widget::Compose(c) => (|ctx: &BuildCtx| dynamic_compose_focus_node(c(ctx))).into_widget(),
-      Widget::Render { ref render,  children: _ } => {
-        if has_focus(render) {
-          widget
-        } else {
-          widget! {
-            DynWidget {
-              tab_index: 0,
-              dyns: widget,
-            }
+  match widget {
+    Widget::Compose(c) => (|ctx: &BuildCtx| dynamic_compose_focus_node(c(ctx))).into_widget(),
+    Widget::Render { ref render, children: _ } => {
+      if has_focus(render) {
+        widget
+      } else {
+        widget! {
+          DynWidget {
+            tab_index: 0,
+            dyns: widget,
           }
         }
       }
     }
+  }
 }
-  
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -102,15 +103,13 @@ mod tests {
 
   #[test]
   fn dynamic_focus_node() {
-
     #[derive(Declare)]
-    struct AutoFockNode {
-    }
+    struct AutoFockNode {}
 
     impl ComposeChild for AutoFockNode {
       type Child = Widget;
       #[inline]
-      fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+      fn compose_child(_this: StateWidget<Self>, child: Self::Child) -> Widget {
         dynamic_compose_focus_node(child)
       }
     }
@@ -118,7 +117,7 @@ mod tests {
       AutoFockNode{
         AutoFockNode{
           AutoFockNode {
-            MockBox { 
+            MockBox {
               size: Size::default(),
             }
           }
@@ -131,10 +130,13 @@ mod tests {
     let id = tree.root();
     let node = id.get(&tree.arena).unwrap();
     let mut cnt = 0;
-    node.query_all_type(|_: &FocusNode| {
-      cnt += 1;
-      true
-    }, QueryOrder::InnerFirst);
+    node.query_all_type(
+      |_: &FocusNode| {
+        cnt += 1;
+        true
+      },
+      QueryOrder::InnerFirst,
+    );
 
     assert!(cnt == 1);
   }

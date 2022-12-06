@@ -1,6 +1,4 @@
-use crate::{
-  data_widget::compose_child_as_data_widget, impl_proxy_query, impl_query_self_only, prelude::*,
-};
+use crate::{data_widget::widget_attach_data, impl_query_self_only, prelude::*};
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -31,22 +29,152 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-#[derive(Declare)]
-pub struct KeyWidget {
-  #[declare(builtin, convert=into)]
-  pub key: Key,
+/// The KeyStatus is the status of the Key, not the status of the KeyWidget.
+/// The change of Key status is determined by its associated KeyWidget state
+/// and its own state.
+///
+/// The KeyStatus has four status:
+/// The first status: The KeyWidget associated with the Key was constructed, the
+/// Key didn't exist in DynWidget Key List, the key status is `KeyStatus::Init`.
+///
+/// The second status: The KeyWidget associated with the Key was mounted, and
+/// now its status is `KeyStatus::Init`, the key status will be changed
+/// `KeyStatus::Mounted`.
+///
+/// The third status: The KeyWidget associated with the Key was disposed, and
+/// the same key has anther associated KeyWidget was mounted, the key status
+/// will be changed `KeyStatus::Updated`.
+///
+/// The last status: The KeyWidget associated with the Key was disposed, the
+/// same key don't has anther associated KeyWidget, the key status will be
+/// changed `KeyStatus::Disposed`.
+#[derive(PartialEq, Debug)]
+pub enum KeyStatus {
+  Init,
+  Mounted,
+  Updated,
+  Disposed,
 }
 
-impl ComposeChild for KeyWidget {
+impl Default for KeyStatus {
+  fn default() -> Self { Self::Init }
+}
+
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub struct KeyChange<V>(pub Option<V>, pub Option<V>);
+
+impl<V> Default for KeyChange<V> {
+  fn default() -> Self { KeyChange(None, None) }
+}
+#[derive(Declare)]
+pub struct KeyWidget<V = ()> {
+  #[declare(convert=into)]
+  pub key: Key,
+  pub value: Option<V>,
+  #[declare(default)]
+  before_value: Option<V>,
+  #[declare(default)]
+  status: KeyStatus,
+}
+
+pub(crate) trait AnyKey: Any {
+  fn key(&self) -> Key;
+  fn record_before_value(&self, key: &dyn AnyKey);
+  fn disposed(&self);
+  fn mounted(&self);
+  fn as_any(&self) -> &dyn Any;
+}
+
+impl<V> AnyKey for StateWidget<KeyWidget<V>>
+where
+  V: Clone + PartialEq,
+  Self: Any,
+{
+  fn key(&self) -> Key {
+    match self {
+      StateWidget::Stateless(this) => this.key.clone(),
+      StateWidget::Stateful(this) => this.state_ref().key.clone(),
+    }
+  }
+
+  fn record_before_value(&self, key: &dyn AnyKey) {
+    assert_eq!(self.key(), key.key());
+    let Some(key) = key.as_any().downcast_ref::<Self>() else {
+      log::warn!("Different value type for same key.");
+      return;
+    };
+    match self {
+      // stateless key widget needn't record before value.
+      StateWidget::Stateless(_) => {}
+      StateWidget::Stateful(this) => match key {
+        StateWidget::Stateless(key) => this.state_ref().record_before_value(key.value.clone()),
+        StateWidget::Stateful(key) => this
+          .state_ref()
+          .record_before_value(key.state_ref().value.clone()),
+      },
+    }
+  }
+
+  fn disposed(&self) {
+    match self {
+      StateWidget::Stateless(_) => {}
+      StateWidget::Stateful(this) => {
+        this.state_ref().status = KeyStatus::Disposed;
+      }
+    }
+  }
+
+  fn mounted(&self) {
+    match self {
+      StateWidget::Stateless(_) => {}
+      StateWidget::Stateful(this) => {
+        this.state_ref().status = KeyStatus::Mounted;
+      }
+    }
+  }
+
+  fn as_any(&self) -> &dyn Any { self }
+}
+
+impl<V: 'static + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   type Child = Widget;
   #[inline]
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    compose_child_as_data_widget(child, this)
+    let data: Box<dyn AnyKey> = Box::new(this);
+    widget_attach_data(child, data)
   }
 }
 
-impl Query for KeyWidget {
-  impl_proxy_query!(self.key);
+impl Query for Box<dyn AnyKey> {
+  impl_query_self_only!();
+}
+
+impl<V> KeyWidget<V>
+where
+  V: Clone + PartialEq,
+{
+  fn record_before_value(&mut self, value: Option<V>) {
+    self.status = KeyStatus::Updated;
+    self.before_value = value;
+  }
+
+  pub fn is_enter(&self) -> bool {
+    self.status == KeyStatus::Mounted
+  }
+
+  pub fn is_modified(&self) -> bool {
+    self.status == KeyStatus::Updated
+  }
+
+  pub fn is_changed(&self) -> bool { self.is_modified() && self.before_value != self.value }
+
+  pub fn is_disposed(&self) -> bool {
+    self.status == KeyStatus::Disposed
+  }
+
+  pub fn get_change(&self) -> KeyChange<V> {
+    KeyChange(self.before_value.clone(), self.value.clone())
+  }
 }
 
 impl Query for Key {
