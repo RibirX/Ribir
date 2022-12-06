@@ -22,11 +22,11 @@ pub mod transitions {
   /// macro use to define a dozen of [`TransitionIdent`]! of icons.
   #[macro_export]
   macro_rules! define_transition_ident {
-    ($from: ident, $define: ident, $($ident: ident),+) => {
+    ($from: expr, $define: ident, $($ident: ident),+) => {
       define_transition_ident!($from, $define);
-      define_transition_ident!($define, $($ident), +);
+      define_transition_ident!(TransitionIdent($define.0 + 1), $($ident), +);
     };
-    ($value: ident, $define: ident) => {
+    ($value: expr, $define: ident) => {
       pub const $define: TransitionIdent = $value;
     }
   }
