@@ -27,8 +27,6 @@ use crate::{
 pub use painter::*;
 pub use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
-use crate::data_widget::widget_attach_data;
-
 use super::SvgRender;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

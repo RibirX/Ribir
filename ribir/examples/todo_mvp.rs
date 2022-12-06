@@ -13,7 +13,6 @@ struct TodoMVP {
 impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
-      // split this to avoid mutable borrow conflict in `DynWidget`.
       states {
         this: this.into_stateful(),
       }
@@ -55,9 +54,7 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              DynWidget {
-                dyns: TodoMVP::pane(this.clone_stateful(), |_| true)
-              }
+              Self::pane(this.clone_stateful(), |_| true)
             }
           }
           Tab {
@@ -68,9 +65,7 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              DynWidget {
-                dyns: TodoMVP::pane(this.clone_stateful(), |task| !task.finished)
-              }
+              Self::pane(this.clone_stateful(), |task| !task.finished)
             }
           }
           Tab {
@@ -81,9 +76,7 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              DynWidget {
-                dyns: TodoMVP::pane(this.clone_stateful(), |task| task.finished)
-              }
+              Self::pane(this.clone_stateful(), |task| task.finished)
             }
           }
         }
@@ -128,7 +121,7 @@ impl TodoMVP {
                   }
                 }
                 finally {
-                  watch!(checkbox.checked)
+                  let_watch!(checkbox.checked)
                     .subscribe(move |v| this2.silent().tasks[idx].finished = v);
                 }
               }
@@ -152,7 +145,7 @@ impl Compose for TabText {
       states {
         this: this.into_stateful()
       }
-      env {
+      init {
         let primary = Palette::of(ctx).primary();
         let on_surface_variant = Palette::of(ctx).on_surface_variant();
         let text_style = TypographyTheme::of(ctx).body1.text.clone();

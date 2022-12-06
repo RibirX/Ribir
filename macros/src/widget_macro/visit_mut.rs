@@ -99,6 +99,10 @@ impl VisitMut for VisitCtx {
           *expr = Expr::Verbatim(gen_prop_macro(mac.tokens.clone().into(), self).into());
         } else if mac.path.is_ident(MOVE_TO_WIDGET_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_move_to_widget_macro(&mac.tokens, self));
+        } else if mac.path.is_ident(LET_WATCH_MACRO_NAME) {
+          let mut tokens = quote! {};
+          DeclareError::LetWatchWrongPlace(mac.span().unwrap()).into_compile_error(&mut tokens);
+          *expr = Expr::Verbatim(tokens);
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -140,25 +144,37 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
-    fn let_watch_as_watch(expr: &mut Expr, semi: Option<Semi>) -> Option<Stmt> {
-      let Expr::MethodCall(method_call) = expr else { None? };
-      let Expr::Macro(mac) = &mut *method_call.receiver else { None? };
-      let path = &mut mac.mac.path;
-      if !path.is_ident(LET_WATCH_MACRO_NAME) {
-        None?
+    if stmt
+      .to_token_stream()
+      .to_string()
+      .contains("let_watch! (sized_box.size)")
+    {
+      println!("statement contain `let_watch` \n {:?}", stmt);
+    }
+
+    fn let_watch_as_watch(expr: &mut Expr) -> bool {
+      let Expr::MethodCall(method_call) = expr else {return false;};
+      if let Expr::Macro(mac) = &mut *method_call.receiver {
+        let path = &mut mac.mac.path;
+        if path.is_ident(LET_WATCH_MACRO_NAME) {
+          let watch = Ident::new(WATCH_MACRO_NAME, path.span());
+          *path = watch.into();
+          return true;
+        }
       }
+      return let_watch_as_watch(&mut method_call.receiver);
+    }
 
-      let path_span = path.span();
+    fn let_watch_desugar(expr: &mut Expr, semi: Option<Semi>) -> Option<Stmt> {
+      let_watch_as_watch(expr).then(|| {
+        let guard = guard_ident(expr.span());
 
-      let watch = Ident::new(WATCH_MACRO_NAME, path_span);
-      *path = watch.into();
-      let guard = guard_ident(path_span);
-
-      let move_to_widget = Ident::new(MOVE_TO_WIDGET_MACRO_NAME, expr.span());
-      Some(parse_quote_spanned! { expr.span() =>{
-        let #guard = #expr #semi
-        #move_to_widget!(#guard.unsubscribe_when_dropped());
-      }})
+        let move_to_widget = Ident::new(MOVE_TO_WIDGET_MACRO_NAME, expr.span());
+        parse_quote_spanned! { expr.span() =>{
+          let #guard = #expr #semi
+          #move_to_widget!(#guard.unsubscribe_when_dropped());
+        }}
+      })
     }
 
     match stmt {
@@ -182,12 +198,12 @@ impl VisitMut for VisitCtx {
         }
       }
       Stmt::Expr(expr) => {
-        if let Some(new_stmt) = let_watch_as_watch(expr, None) {
+        if let Some(new_stmt) = let_watch_desugar(expr, None) {
           *stmt = new_stmt;
         }
       }
       Stmt::Semi(expr, semi) => {
-        if let Some(new_stmt) = let_watch_as_watch(expr, Some(*semi)) {
+        if let Some(new_stmt) = let_watch_desugar(expr, Some(*semi)) {
           *stmt = new_stmt;
         }
       }

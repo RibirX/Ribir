@@ -35,14 +35,10 @@ fn main() {
       }
     }
     finally {
-      watch!(a.size + b.size)
+      let_watch!(a.size + b.size)
         .subscribe(move |v| c.size = v);
     }
-    on a.size + b.size {
-      change : move |(_, after)| c.size = after
-    }
-    on a { tap: move |_| {} }
-    on a.size { change: move |_| {} }
+
   };
 
   let _flow_embed = widget! {

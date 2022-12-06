@@ -50,9 +50,10 @@ impl DeclareError {
         );
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);
-        let note_msg = "You can use `change` event to break circle, which \
-          will trigger only if the value really changed by compare if the value \
-          equal before modify and after.";
+        let note_msg = "You should manual watch to break circle, subscribe \
+          only if the value really changed.\n \
+          `let_watch!(...).distinct_until_changed().subscribe(...)`
+          ";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::TransitionByConflict(span) => {

@@ -4,6 +4,196 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug unit tests in library 'ribir_core'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=ribir_core"
+        ],
+        "filter": {
+          "name": "ribir_core",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'algo'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=algo"
+        ],
+        "filter": {
+          "name": "algo",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'painter'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=painter"
+        ],
+        "filter": {
+          "name": "painter",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'text'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=text"
+        ],
+        "filter": {
+          "name": "text",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=test",
+          "--package=ribir_macros"
+        ],
+        "filter": {
+          "name": "test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'declare_builder'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=declare_builder",
+          "--package=ribir_macros"
+        ],
+        "filter": {
+          "name": "declare_builder",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'child_template_derive_test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=child_template_derive_test",
+          "--package=ribir_macros"
+        ],
+        "filter": {
+          "name": "child_template_derive_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'path_child_test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=path_child_test",
+          "--package=ribir_macros"
+        ],
+        "filter": {
+          "name": "path_child_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'animations_syntax_test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=animations_syntax_test",
+          "--package=ribir_macros"
+        ],
+        "filter": {
+          "name": "animations_syntax_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'code_gen_test'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=code_gen_test",
+          "--package=ribir_macros"
+        ],
+        "filter": {
+          "name": "code_gen_test",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug unit tests in library 'ribir'",
       "cargo": {
         "args": [
@@ -97,25 +287,6 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'algo'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--lib",
-          "--package=algo"
-        ],
-        "filter": {
-          "name": "algo",
-          "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
       "name": "Debug unit tests in library 'gpu'",
       "cargo": {
         "args": [
@@ -191,112 +362,17 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'painter'",
+      "name": "Debug unit tests in library 'ribir_widgets'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
           "--lib",
-          "--package=painter"
+          "--package=ribir_widgets"
         ],
         "filter": {
-          "name": "painter",
+          "name": "ribir_widgets",
           "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in library 'text'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--lib",
-          "--package=text"
-        ],
-        "filter": {
-          "name": "text",
-          "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug integration test 'declare_builder'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--test=declare_builder",
-          "--package=widget_derive"
-        ],
-        "filter": {
-          "name": "declare_builder",
-          "kind": "test"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug integration test 'test'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--test=test",
-          "--package=widget_derive"
-        ],
-        "filter": {
-          "name": "test",
-          "kind": "test"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug integration test 'animations_syntax_test'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--test=animations_syntax_test",
-          "--package=widget_derive"
-        ],
-        "filter": {
-          "name": "animations_syntax_test",
-          "kind": "test"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug integration test 'declare_test'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--test=declare_test",
-          "--package=widget_derive"
-        ],
-        "filter": {
-          "name": "declare_test",
-          "kind": "test"
         }
       },
       "args": [],
