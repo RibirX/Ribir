@@ -9,6 +9,7 @@ use winit::{event::WindowEvent, window::WindowId};
 
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
+  fn set_inner_size(&mut self, size: Size);
   fn outer_size(&self) -> Size;
   fn inner_position(&self) -> Point;
   fn outer_position(&self) -> Point;
@@ -24,6 +25,11 @@ impl RawWindow for winit::window::Window {
   fn inner_size(&self) -> Size {
     let size = self.inner_size().to_logical(self.scale_factor());
     Size::new(size.width, size.height)
+  }
+
+  fn set_inner_size(&mut self, size: Size) {
+    let size = winit::dpi::LogicalSize::new(size.width, size.height);
+    winit::window::Window::set_inner_size(self, size)
   }
 
   fn outer_size(&self) -> Size {
@@ -75,10 +81,10 @@ impl Window {
   pub fn processes_native_event(&mut self, event: WindowEvent) {
     match event {
       WindowEvent::Resized(size) => {
-        self.resize(DeviceSize::new(size.width, size.height));
+        self.on_resize(DeviceSize::new(size.width, size.height));
       }
       WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
-        self.resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
+        self.on_resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
         let factor = scale_factor as f32;
         self.painter.reset(Some(factor));
       }
@@ -143,9 +149,10 @@ impl Window {
     }
   }
 
-  fn resize(&mut self, size: DeviceSize) {
+  fn on_resize(&mut self, size: DeviceSize) {
     self.painter.finish();
     self.widget_tree.mark_dirty(self.widget_tree.root());
+    self.widget_tree.store.remove(self.widget_tree.root());
     self.p_backend.resize(size);
     self.painter.resize(self.raw_window.inner_size());
     self.raw_window.request_redraw();
@@ -245,6 +252,7 @@ impl PainterBackend for MockBackend {
 
 impl RawWindow for MockRawWindow {
   fn inner_size(&self) -> Size { self.size }
+  fn set_inner_size(&mut self, size: Size) { self.size = size; }
   fn outer_size(&self) -> Size { self.size }
   fn inner_position(&self) -> Point { Point::zero() }
   fn outer_position(&self) -> Point { Point::zero() }
@@ -267,5 +275,31 @@ impl Window {
       root,
       ctx,
     )
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test::*;
+
+  #[test]
+  fn layout_after_wnd_resize() {
+    let w = widget! {
+       MockBox { size: INFINITY_SIZE }
+    };
+    let mut wnd = Window::mock_render(w, Size::new(100., 100.), <_>::default());
+    wnd.draw_frame();
+    assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(100., 100.)));
+
+    let new_size = DeviceSize::new(200, 200);
+    wnd.raw_window.set_inner_size(new_size.to_f32().cast_unit());
+    wnd.on_resize(new_size);
+    wnd.draw_frame();
+    assert_layout_result(
+      &wnd,
+      &[0],
+      &ExpectRect::from_size(new_size.to_f32().cast_unit()),
+    );
   }
 }
