@@ -27,7 +27,7 @@ use syn::{
   token::{Brace, Semi},
   visit_mut,
   visit_mut::VisitMut,
-  Expr, ExprClosure, ExprMethodCall, Ident, ItemMacro, Member, Path, Stmt,
+  Expr, ExprClosure, ExprMethodCall, ExprPath, Ident, ItemMacro, Member, Path, Stmt,
 };
 
 bitflags::bitflags! {
@@ -221,25 +221,7 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_expr_assign_mut(&mut self, assign: &mut syn::ExprAssign) {
-    visit_mut::visit_expr_assign_mut(self, assign);
-
-    // todo: pat alias
-    let local_alias = self.expr_find_name_widget(&assign.left).and_then(|local| {
-      self
-        .expr_find_name_widget(&assign.right)
-        .map(|named| (local.clone(), named.clone()))
-    });
-    if let Some((local, named)) = local_alias {
-      let local_var = self
-        .analyze_stack
-        .iter_mut()
-        .rev()
-        .flat_map(|locals| locals.iter_mut().rev())
-        .find(|v| v.name == local);
-      if let Some(local_var) = local_var {
-        local_var.alias_of_name = Some(named);
-      }
-    }
+    self.recursive_visit_assign_mut(&mut *assign.left, &mut assign.right);
   }
 
   fn visit_block_mut(&mut self, i: &mut syn::Block) {
@@ -257,18 +239,10 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_local_mut(&mut self, local: &mut syn::Local) {
-    visit_mut::visit_local_mut(self, local);
-
-    // todo: pat alias
-    if let Some((_, init)) = &local.init {
-      let right_name = self.expr_find_name_widget(init).cloned();
-      let var_name = self.analyze_stack.last_mut().unwrap().last_mut();
-      // var_name maybe none if
-      // `let _ = xxx`
-      if let Some(var) = var_name {
-        var.alias_of_name = right_name;
-      }
-    }
+    self.recursive_visit_local_mut(
+      &mut local.pat,
+      local.init.as_mut().map(|(_, init)| &mut **init),
+    );
   }
 
   fn visit_expr_block_mut(&mut self, i: &mut syn::ExprBlock) {
@@ -429,11 +403,66 @@ impl VisitCtx {
       })
   }
 
-  pub fn expr_find_name_widget<'a>(&'a self, expr: &'a Expr) -> Option<&'a Ident> {
-    if let Expr::Path(syn::ExprPath { path, .. }) = expr {
-      path.get_ident().and_then(|name| self.find_named_obj(name))
-    } else {
-      None
+  fn path_as_named_obj(&self, expr: &ExprPath) -> Option<Ident> {
+    expr
+      .path
+      .get_ident()
+      .and_then(|name| self.find_named_obj(name))
+      .cloned()
+  }
+
+  fn recursive_visit_assign_mut(&mut self, left: &mut Expr, right: &mut Expr) {
+    match (left, right) {
+      (Expr::Path(l), Expr::Path(r)) => {
+        if let (Some(l), Some(r)) = (self.path_as_named_obj(l), r.path.get_ident()) {
+          let local_var = self
+            .analyze_stack
+            .iter_mut()
+            .rev()
+            .flat_map(|locals| locals.iter_mut().rev())
+            .find(|v| v.name == l);
+          if let Some(local_var) = local_var {
+            local_var.alias_of_name = Some(r.clone());
+          }
+        }
+      }
+      (Expr::Tuple(l), Expr::Tuple(r)) => {
+        l.elems
+          .iter_mut()
+          .zip(r.elems.iter_mut())
+          .for_each(|(l, r)| self.recursive_visit_assign_mut(l, r));
+      }
+      (left, right) => {
+        self.visit_expr_mut(left);
+        self.visit_expr_mut(right);
+      }
+    }
+  }
+
+  fn recursive_visit_local_mut(&mut self, left: &mut syn::Pat, right: Option<&mut Expr>) {
+    match (left, right) {
+      (syn::Pat::Ident(i), Some(Expr::Path(path))) => {
+        let name = i.ident.clone();
+        let var = if let Some(right) = self.path_as_named_obj(path) {
+          LocalVariable { name, alias_of_name: Some(right) }
+        } else {
+          LocalVariable::local(name)
+        };
+        self.analyze_stack.last_mut().unwrap().push(var);
+      }
+      (syn::Pat::Tuple(left), Some(Expr::Tuple(right))) => {
+        left
+          .elems
+          .iter_mut()
+          .zip(right.elems.iter_mut())
+          .for_each(|(l, r)| self.recursive_visit_local_mut(l, Some(r)));
+      }
+      (left, right) => {
+        self.visit_pat_mut(left);
+        if let Some(right) = right {
+          self.visit_expr_mut(right);
+        }
+      }
     }
   }
 
