@@ -84,8 +84,6 @@
  	 - action perform after widget be added to the widget tree.
 - disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, DisposedType) >`] 
  	 - action perform after widget remove from widget tree.
-- key : [`Key`] 
- 	 - assign a key to widget, use for track if two widget is same widget in two frames.
 
  - `fn has_focus(& self) -> bool`
  	- return if the widget has focus.

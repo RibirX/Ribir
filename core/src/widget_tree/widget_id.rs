@@ -16,7 +16,7 @@ pub struct WidgetId(pub(crate) NodeId);
 pub(crate) type TreeArena = Arena<Box<dyn Render>>;
 
 impl WidgetId {
-  pub(crate) fn new_noe(tree: &mut TreeArena) -> WidgetId {
+  pub(crate) fn new_node(tree: &mut TreeArena) -> WidgetId {
     WidgetId(tree.new_node(Box::new(Void)))
   }
 
@@ -104,7 +104,7 @@ impl WidgetId {
   pub(crate) fn swap_id(self, other: WidgetId, tree: &mut TreeArena) {
     self.swap_data(other, tree);
 
-    let guard = WidgetId::new_noe(tree);
+    let guard = WidgetId::new_node(tree);
     self.transplant(guard, tree);
     other.transplant(self, tree);
     guard.transplant(other, tree);
