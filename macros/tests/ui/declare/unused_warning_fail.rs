@@ -24,13 +24,8 @@ fn main() {
       size: Size::zero(),
       background: Color::RED,
     }
-    Animate {
-      id: animate,
-      from: State { id1.background },
-      transition: Transition { easing: easing::LINEAR }
-    }
-    on id1 {
-      tap: move |_| animate.run()
+    transition prop!(id1.background) {
+      easing: easing::LINEAR
     }
   };
 

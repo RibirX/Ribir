@@ -79,7 +79,8 @@ impl ComposeChild for HScrollBar {
         }
       }
       finally {
-        watch!(scrolling.scroll_pos.x)
+        let_watch!(scrolling.scroll_pos.x)
+          .distinct_until_changed()
           .subscribe(move |v| this.offset = v);
       }
     }
@@ -115,7 +116,7 @@ impl ComposeChild for VScrollBar {
         }
       }
       finally {
-        watch!(scrolling.scroll_pos.y)
+        let_watch!(scrolling.scroll_pos.y)
           .distinct_until_changed()
           .subscribe(move |v| this.offset = v);
       }
@@ -159,8 +160,7 @@ impl ComposeChild for BothScrollbar {
         }
       }
       finally {
-        // todo: watch should be warning if not process handle.
-        watch!(scrolling.scroll_pos)
+        let_watch!(scrolling.scroll_pos)
           .distinct_until_changed()
           .subscribe(move |v| this.offset = v);
       }

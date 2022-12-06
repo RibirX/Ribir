@@ -16,7 +16,9 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
 16 |         size: id1.size,
    |         ^^^^  ^^^
    |
-note: You can use `change` event to break circle, which will trigger only if the value really changed by compare if the value equal before modify and after.
+note: You should manual watch to break circle, subscribe only if the value really changed.
+       `let_watch!(...).distinct_until_changed().subscribe(...)`
+
   --> tests/ui/declare/circular_dependency_fail.rs:8:9
    |
 8  |         size: id2.size,
@@ -43,7 +45,9 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
 29 |         margin: parent.margin.clone(),
    |         ^^^^^^  ^^^^^^^^^^^^^
    |
-note: You can use `change` event to break circle, which will trigger only if the value really changed by compare if the value equal before modify and after.
+note: You should manual watch to break circle, subscribe only if the value really changed.
+       `let_watch!(...).distinct_until_changed().subscribe(...)`
+
   --> tests/ui/declare/circular_dependency_fail.rs:25:7
    |
 25 |       margin: child.margin.clone(),
@@ -51,22 +55,3 @@ note: You can use `change` event to break circle, which will trigger only if the
 ...
 29 |         margin: parent.margin.clone(),
    |         ^^^^^^
-
-error: There is a directly circle depends exist, this will cause infinite loop: a ~> a
-  --> tests/ui/declare/circular_dependency_fail.rs:36:11
-   |
-36 |       id: a,
-   |           ^
-...
-39 |     modify_on a.size ~> a.size
-   |                         ^
-   |
-note: You can use `change` event to break circle, which will trigger only if the value really changed by compare if the value equal before modify and after.
-  --> tests/ui/declare/circular_dependency_fail.rs:36:11
-   |
-36 |         id: a,
-   |  ___________^
-37 | |       size: Size::zero(),
-38 | |     }
-39 | |     modify_on a.size ~> a.size
-   | |_________________________^

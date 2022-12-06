@@ -47,7 +47,7 @@ impl ComposeChild for Ripple {
           Some(container.layout_rect().center())
         } else {
           Some(e.position())
-        }
+        },
         DynWidget { dyns: child }
         DynWidget {
           dyns: {
@@ -89,7 +89,7 @@ impl ComposeChild for Ripple {
                   from: Path::circle(Point::zero(), 0., PathStyle::Fill)
                 }
                 finally {
-                  watch!(container.pointer_pressed() || ripper_enter.is_running())
+                  let_watch!(container.pointer_pressed() || ripper_enter.is_running())
                     .filter(|b| !b)
                     .subscribe(move |_| {
                       this.launch_pos.take();

@@ -130,11 +130,11 @@ impl Desugared {
         finally.to_tokens(tokens);
 
         if ctx.has_guards_data {
-          quote! { compose_child_as_data_widget }.to_tokens(tokens);
+          quote! { widget_attach_data }.to_tokens(tokens);
           Paren::default().surround(tokens, |tokens| {
             w.gen_compose_node(named_objs, tokens);
             let guards_vec = guard_vec_ident();
-            quote! { .into_widget(), StateWidget::Stateless(#guards_vec) }.to_tokens(tokens)
+            quote! { .into_widget(),#guards_vec }.to_tokens(tokens)
           });
         } else {
           w.gen_compose_node(named_objs, tokens)

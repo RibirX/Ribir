@@ -30,32 +30,4 @@ fn main() {
       }
     }
   };
-
-  let _data_flow_circular_err = widget! {
-    SizedBox {
-      id: a,
-      size: Size::zero(),
-    }
-    modify_on a.size ~> a.size
-  };
-
-  let _data_flow_circular_field_skip_nc_pass = widget! {
-    SizedBox {
-      id: a,
-      size: Size::zero(),
-      SizedBox {
-        id: b,
-        size: a.size,
-      }
-    }
-    change_on a.size ~> b.size
-  };
-
-  let _circular_follows_with_skip_nc_pass = widget! {
-    SizedBox {
-      id: a,
-      size: Size::zero(),
-    }
-    change_on a.size ~> a.size
-  };
 }

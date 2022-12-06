@@ -13,7 +13,9 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
 29 |         cursor: a.cursor
    |         ^^^^^^  ^^^^^^^^
    |
-note: You can use `change` event to break circle, which will trigger only if the value really changed by compare if the value equal before modify and after.
+note: You should manual watch to break circle, subscribe only if the value really changed.
+       `let_watch!(...).distinct_until_changed().subscribe(...)`
+
   --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:25:7
    |
 25 |       cursor: b.cursor,

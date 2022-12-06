@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use ribir_core::{prelude::*};
+use ribir_core::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct Lists {
@@ -73,7 +73,6 @@ impl ComposeChild for ListItem {
         }
         Expanded {
           flex: 1.,
-          
           Column {
             DynWidget {
               dyns: widget! {
@@ -103,7 +102,6 @@ impl ComposeChild for ListItem {
       }
     }
   }
-
 }
 
 impl ComposeChild for Lists {
@@ -113,7 +111,7 @@ impl ComposeChild for Lists {
     let last_idx = children.len() - 1;
 
     widget! {
-      track {
+      states {
         this: this.into_stateful()
       }
       Column {
