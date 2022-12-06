@@ -68,7 +68,7 @@ where
   fn shallow_set(&mut self, v: Self::Value) { (self.setter)(&mut *self.target.shallow_ref(), v); }
 
   #[inline]
-  fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.target.modifies() }
+  fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.target.modifies().box_it() }
 }
 
 impl<T, G, S> AnimateProperty for Prop<T, G, S>
@@ -88,7 +88,7 @@ where
   Self: Property<Value = V> + 'static,
   V: 'static,
 {
-  pub fn changes(&self) -> LocalBoxOp<'static, (V, V), ()>
+  pub fn changes(&self) -> LocalBoxOp<'static, V, ()>
   where
     V: PartialEq + Clone,
   {
@@ -96,8 +96,7 @@ where
     self
       .modifies()
       .map(move |_| prop.get())
-      .pairwise()
-      .filter(|(before, after)| before != after)
+      .distinct_until_changed()
       .box_it()
   }
 }
@@ -139,7 +138,7 @@ where
   V: PartialEq + Clone + 'static,
 {
   #[inline]
-  pub fn changes(&self) -> LocalBoxOp<'static, (V, V), ()> { self.prop.changes() }
+  pub fn changes(&self) -> LocalBoxOp<'static, V, ()> { self.prop.changes() }
 }
 
 macro_rules! impl_tuple_property {
