@@ -297,7 +297,7 @@ impl Item {
           stmts.push(FinallyStmt::Obj(obj));
           let guard = guard_ident(span);
           stmts.push(FinallyStmt::Stmt(parse_quote_spanned! { span =>
-            let #guard = #prop_changes.subscribe(move |(old, _)| {
+            let #guard = #prop_changes.pairwise().subscribe(move |(old, _)| {
               #name.state_ref().from = old;
               #name.state_ref().run();
             })

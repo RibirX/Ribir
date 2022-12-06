@@ -18,7 +18,7 @@ lyon_geom = "0.17.7"
 painter = {path = "../painter", version = "*"}
 png = {version = "0.17.3", optional = true}
 ribir_macros = {path = "../macros"}
-rxrust = "1.0.0-alpha.4"
+rxrust = "1.0.0-alpha.5"
 smallvec = "1.8.0"
 text = {path = "../text"}
 winit = "0.26.1"
