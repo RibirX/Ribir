@@ -1,17 +1,30 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{prelude::*, widget_tree::WidgetTree};
 use ::text::PIXELS_PER_EM;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 use super::focus_mgr::FocusManager;
 
-#[derive(Default)]
 pub(crate) struct Dispatcher {
-  pub(crate) focus_mgr: FocusManager,
+  pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
+  pub(crate) focus_widgets: Vec<WidgetId>,
   pub(crate) info: DispatchInfo,
   pub(crate) entered_widgets: Vec<WidgetId>,
   pub(crate) pointer_down_uid: Option<WidgetId>,
 }
 
+impl Dispatcher {
+  pub fn new(focus_mgr: Rc<RefCell<FocusManager>>) -> Self {
+    Self {
+      focus_mgr,
+      focus_widgets: vec![],
+      info: <_>::default(),
+      entered_widgets: vec![],
+      pointer_down_uid: None,
+    }
+  }
+}
 #[derive(Default)]
 pub(crate) struct DispatchInfo {
   /// The current state of mouse button press state.

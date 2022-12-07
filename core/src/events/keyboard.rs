@@ -48,7 +48,8 @@ impl ComposeChild for KeyDownListener {
   type Child = Widget;
   #[inline]
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    compose_child_as_data_widget(child, this)
+    let widget = compose_child_as_data_widget(child, this);
+    dynamic_compose_focus(widget)
   }
 }
 

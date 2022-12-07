@@ -130,7 +130,7 @@ impl Window {
     P: PainterBackend + 'static,
   {
     let mut widget_tree = WidgetTree::new(root, context.clone());
-    let mut dispatcher = Dispatcher::default();
+    let mut dispatcher = Dispatcher::new(context.focus_mgr.clone());
     dispatcher.refresh_focus(&mut widget_tree);
     if let Some(auto_focusing) = dispatcher.auto_focus(&widget_tree) {
       dispatcher.focus(auto_focusing, &mut widget_tree)

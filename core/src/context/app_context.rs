@@ -5,8 +5,13 @@ use std::{
   time::Instant,
 };
 
-use crate::ticker::FrameTicker;
-use crate::{builtin_widgets::Theme, ticker::FrameMsg};
+use crate::{
+  builtin_widgets::Theme,
+  events::focus_mgr::{FocusManager, FocusType},
+  ticker::FrameMsg,
+  widget::TreeArena,
+};
+use crate::{ticker::FrameTicker, widget::WidgetId};
 use ::text::shaper::TextShaper;
 pub use futures::task::SpawnError;
 use futures::{
@@ -25,6 +30,7 @@ pub struct AppContext {
   pub typography_store: TypographyStore,
   pub frame_ticker: FrameTicker,
   pub executor: Executor,
+  pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
 }
 
 #[derive(Clone)]
@@ -51,6 +57,28 @@ impl AppContext {
 
     self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
   }
+
+  pub(crate) fn next_focus(&self, arena: &TreeArena) {
+    self.focus_mgr.borrow_mut().next_focus(arena);
+  }
+
+  pub(crate) fn prev_focus(&self, arena: &TreeArena) {
+    self.focus_mgr.borrow_mut().prev_focus(arena);
+  }
+
+  pub(crate) fn add_focus_node(&self, wid: WidgetId, focus_tyep: FocusType, arena: &TreeArena) {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .add_focus_node(wid, focus_tyep, arena);
+  }
+
+  pub(crate) fn remove_focus_node(&self, wid: WidgetId, focus_tyep: FocusType) {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .remove_focus_node(wid, focus_tyep);
+  }
 }
 
 impl Default for AppContext {
@@ -71,6 +99,7 @@ impl Default for AppContext {
       typography_store,
       frame_ticker,
       executor: <_>::default(),
+      focus_mgr: <_>::default(),
     }
   }
 }

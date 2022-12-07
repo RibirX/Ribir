@@ -64,10 +64,19 @@ builtin! {
     focus: impl FnMut(&mut FocusEvent),
     #[doc="specify the event handler to process blur event."]
     blur: impl FnMut(&mut FocusEvent),
+  }
+
+  FocusInOutListener {
     #[doc="specify the event handler to process focusin event."]
     focus_in: impl FnMut(&mut FocusEvent),
     #[doc="specify the event handler to process focusout event."]
     focus_out: impl FnMut(&mut FocusEvent),
+  }
+
+
+  HasFocus {
+    #[doc="return if the widget has focus."]
+    fn has_focus(&self) -> bool,
   }
 
   KeyDownListener {
@@ -89,12 +98,6 @@ builtin! {
     #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
     wheel: impl FnMut(&mut WheelEvent),
   }
-
-  HasFocus {
-    #[doc="return if the widget has focus."]
-    fn has_focus(&self) -> bool,
-  }
-
   MouseHover {
     #[doc="return if the pointer is hover on the widget"]
     fn mouse_hover(&self) -> bool,

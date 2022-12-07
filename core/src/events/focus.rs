@@ -1,6 +1,8 @@
 use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 use std::cell::RefCell;
 
+use super::focus_mgr::FocusType;
+
 // todo: split focus listener, and auto add focus node when listen on key/char.
 /// Focus attr attach to widget to support get ability to focus in.
 #[derive(Default, Declare)]
@@ -37,11 +39,28 @@ pub struct FocusListener {
   pub focus: Callback,
   #[declare(default, builtin, convert=custom)]
   pub blur: Callback,
+
+  #[declare(default)]
+  wid: Option<WidgetId>,
+}
+
+
+#[derive(Declare)]
+pub struct FocusInOutListener {
+  /// The focusin event fires when an widget is about to receive focus. The main
+  /// difference between this event and focus is that focusin bubbles while
+  /// focus does not.
   #[declare(default, builtin, convert=custom)]
   pub focus_in: Callback,
+
+  /// The focusout event fires when an widget is about to lose focus. The main
+  /// difference between this event and blur is that focusout bubbles while blur
+  /// does not.
   #[declare(default, builtin, convert=custom)]
   pub focus_out: Callback,
 }
+
+
 type Callback = RefCell<Option<Box<dyn for<'r> FnMut(&'r mut FocusEvent)>>>;
 
 pub type FocusEvent = EventCommon;
@@ -56,21 +75,50 @@ pub enum FocusEventType {
   /// between this event and focusout is that focusout bubbles while blur does
   /// not.
   Blur,
-  /// The focusin event fires when an widget is about to receive focus. The main
-  /// difference between this event and focus is that focusin bubbles while
-  /// focus does not.
-  FocusIn,
-  /// The focusout event fires when an widget is about to lose focus. The main
-  /// difference between this event and blur is that focusout bubbles while blur
-  /// does not.
-  FocusOut,
+}
+
+fn has_focus(r: &dyn Render) -> bool {
+  let mut focused = false;
+  r.query_on_first_type(QueryOrder::OutsideFirst, |_: &FocusListener| focused = true);
+  focused
+}
+
+pub(crate) fn dynamic_compose_focus(widget: Widget) -> Widget {
+  match widget {
+    Widget::Compose(c) => (|ctx: &BuildCtx| dynamic_compose_focus(c(ctx))).into_widget(),
+    Widget::Render { ref render,  children: _ } => {
+      if has_focus(render) {
+        widget
+      } else {
+        widget! {
+          DynWidget {
+            tab_index: 0,
+            dyns: widget,
+          }
+        }
+      }
+    }
+  }
 }
 
 impl ComposeChild for FocusListener {
   type Child = Widget;
-  #[inline]
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-    compose_child_as_data_widget(child, this)
+    let this = this.into_stateful();
+    let w = widget! {
+        track { this: this.clone() }
+        DynWidget {
+          mounted: move |ctx| {
+            this.wid = Some(ctx.id);
+            WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, FocusType::NODE, ctx.tree_arena());
+          },
+          disposed: move|ctx| {
+            WidgetCtxImpl::app_ctx(&ctx).remove_focus_node(ctx.id, FocusType::NODE);
+          },
+        dyns: child
+      }
+    };
+    compose_child_as_data_widget(w, StateWidget::Stateful(this))
   }
 }
 
@@ -78,18 +126,30 @@ impl Query for FocusListener {
   impl_query_self_only!();
 }
 
+macro_rules! dispatch_event {
+  ($callback: expr, $event: ident) => {
+    let mut callback = $callback.borrow_mut();
+    if let Some(callback) = callback.as_mut() {
+      callback($event)
+    }
+  };
+}
+
 impl FocusListener {
   #[inline]
-  pub fn dispatch_event(&self, event_type: FocusEventType, event: &mut FocusEvent) {
-    let mut callback = match event_type {
-      FocusEventType::Focus => self.focus.borrow_mut(),
-      FocusEventType::Blur => self.blur.borrow_mut(),
-      FocusEventType::FocusIn => self.focus_in.borrow_mut(),
-      FocusEventType::FocusOut => self.focus_out.borrow_mut(),
-    };
-    if let Some(callback) = callback.as_mut() {
-      callback(event)
-    }
+  pub fn dispatch_focus(&self, event: &mut FocusEvent) {
+    dispatch_event!(self.focus, event);
+  }
+
+  pub fn dispatch_blur(&self, event: &mut FocusEvent) {
+    dispatch_event!(self.blur, event);
+  }
+
+  pub fn request_focus(&self, ctx: &AppContext) {
+    self
+      .wid
+      .as_ref()
+      .map(|wid| ctx.focus_mgr.borrow_mut().focus_to(Some(*wid)));
   }
 }
 
@@ -103,18 +163,6 @@ impl FocusListenerDeclarer {
   #[inline]
   pub fn blur(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
     self.blur = Some(into_callback(f));
-    self
-  }
-
-  #[inline]
-  pub fn focus_in(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.focus_in = Some(into_callback(f));
-    self
-  }
-
-  #[inline]
-  pub fn focus_out(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
-    self.focus_out = Some(into_callback(f));
     self
   }
 }
@@ -133,14 +181,68 @@ impl FocusListener {
   pub fn set_declare_blur(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
     self.blur = into_callback(f);
   }
+}
 
+impl Query for FocusInOutListener {
+  impl_query_self_only!();
+}
+
+impl ComposeChild for FocusInOutListener {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    compose_child_as_data_widget(child, this)
+  }
+}
+
+impl FocusInOutListener {
   #[inline]
-  pub fn set_declare_focus_in(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.focus_in = into_callback(f);
+  pub fn dispatch_focus_in(&self, event: &mut FocusEvent) {
+    dispatch_event!(self.focus_in, event);
+  }
+
+  pub fn dispatch_focus_out(&self, event: &mut FocusEvent) {
+    dispatch_event!(self.focus_out, event);
+  }
+}
+
+impl FocusInOutListenerDeclarer {
+  #[inline]
+  pub fn focus_in(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.focus_in = Some(into_callback(f));
+    self
   }
 
   #[inline]
-  pub fn set_declare_focus_out(&mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) {
-    self.focus_out = into_callback(f);
+  pub fn focus_out(mut self, f: impl for<'r> FnMut(&'r mut FocusEvent) + 'static) -> Self {
+    self.focus_out = Some(into_callback(f));
+    self
   }
+}
+
+#[derive(Declare, Clone)]
+pub struct FocusScope {
+  pub ignore: bool,
+}
+
+impl ComposeChild for FocusScope {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    let this = this.into_stateful();
+    let w = widget! {
+        DynWidget {
+          mounted: move |ctx| {
+            WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, FocusType::SCOPE, ctx.tree_arena());
+          },
+          disposed: move|ctx| {
+            WidgetCtxImpl::app_ctx(&ctx).remove_focus_node(ctx.id, FocusType::SCOPE);
+          },
+        dyns: child
+      }
+    };
+    compose_child_as_data_widget(w, StateWidget::Stateful(this))
+  }
+}
+
+impl Query for FocusScope {
+  impl_query_self_only!();
 }
