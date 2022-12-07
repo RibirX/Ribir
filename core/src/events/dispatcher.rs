@@ -1,17 +1,30 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{prelude::*, widget_tree::WidgetTree};
 use ::text::PIXELS_PER_EM;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 use super::focus_mgr::FocusManager;
 
-#[derive(Default)]
 pub(crate) struct Dispatcher {
-  pub(crate) focus_mgr: FocusManager,
+  pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
+  pub(crate) focus_widgets: Vec<WidgetId>,
   pub(crate) info: DispatchInfo,
   pub(crate) entered_widgets: Vec<WidgetId>,
   pub(crate) pointer_down_uid: Option<WidgetId>,
 }
 
+impl Dispatcher {
+  pub fn new(focus_mgr: Rc<RefCell<FocusManager>>) -> Self {
+    Self {
+      focus_mgr,
+      focus_widgets: vec![],
+      info: <_>::default(),
+      entered_widgets: vec![],
+      pointer_down_uid: None,
+    }
+  }
+}
 #[derive(Default)]
 pub(crate) struct DispatchInfo {
   /// The current state of mouse button press state.
@@ -70,7 +83,7 @@ impl Dispatcher {
         false
       };
       if !prevented {
-        self.shortcut_process(key, tree);
+        self.shortcut_process(key, input.state, tree);
       }
     }
   }
@@ -85,8 +98,13 @@ impl Dispatcher {
     }
   }
 
-  pub fn shortcut_process(&mut self, key: VirtualKeyCode, tree: &mut WidgetTree) {
-    if key == VirtualKeyCode::Tab {
+  pub fn shortcut_process(
+    &mut self,
+    key: VirtualKeyCode,
+    state: ElementState,
+    tree: &mut WidgetTree,
+  ) {
+    if key == VirtualKeyCode::Tab && ElementState::Pressed == state {
       if self.info.modifiers.contains(ModifiersState::SHIFT) {
         self.prev_focus_widget(tree);
       } else {
@@ -179,7 +197,7 @@ impl Dispatcher {
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(&tree.arena).find(|id| {
         id.get(&tree.arena)
-          .map_or(false, |w| w.contain_type::<FocusListener>())
+          .map_or(false, |w| w.contain_type::<FocusNode>())
       })
     });
     if let Some(focus_id) = nearest_focus {

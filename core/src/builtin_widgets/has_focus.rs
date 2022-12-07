@@ -16,8 +16,8 @@ impl ComposeChild for HasFocus {
       states {this: this.into_stateful()}
       DynWidget {
         dyns: child,
-        focus: move|_| this.focused = true,
-        blur: move |_| this.focused = false,
+        focus_in: move|_| this.focused = true,
+        focus_out: move |_| this.focused = false,
       }
     }
   }

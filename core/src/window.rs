@@ -129,12 +129,8 @@ impl Window {
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let mut widget_tree = WidgetTree::new(root, context.clone());
-    let mut dispatcher = Dispatcher::default();
-    dispatcher.refresh_focus(&mut widget_tree);
-    if let Some(auto_focusing) = dispatcher.auto_focus(&widget_tree) {
-      dispatcher.focus(auto_focusing, &mut widget_tree)
-    }
+    let widget_tree = WidgetTree::new(root, context.clone());
+    let dispatcher = Dispatcher::new(context.focus_mgr.clone());
     let typography = context.typography_store.clone();
     let painter = Painter::new(wnd.scale_factor() as f32, typography, wnd.inner_size());
     Self {

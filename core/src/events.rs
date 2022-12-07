@@ -96,6 +96,16 @@ impl EventCommon {
     }
   }
 
+  pub fn next_focus(&self) {
+    let tree = unsafe { self.tree.as_ref() };
+    tree.app_ctx.next_focus(&tree.arena);
+  }
+
+  pub fn prev_focus(&self) {
+    let tree = unsafe { self.tree.as_ref() };
+    tree.app_ctx.prev_focus(&tree.arena);
+  }
+
   fn dispatch_info_mut(&mut self) -> &mut DispatchInfo {
     // Safety: framework promise `info` only live in event dispatch and
     // there is no others borrow `info`.
