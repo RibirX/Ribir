@@ -60,23 +60,25 @@ impl ComposeChild for Ripple {
                 (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
               });
               widget!{
-                DynWidget {
-                  dyns: (this.bounded != RippleBound::Unbounded).then(|| {
-                    let rect = Rect::from_size(container.layout_size());
-                    let path = match this.bounded {
-                      RippleBound::Unbounded => unreachable!(),
-                      RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
-                      RippleBound::Radius(radius) => {
-                        Path::rect_round(&rect, &radius, PathStyle::Fill)
-                      }
-                    };
-                    Clip { clip: ClipType::Path(path) }
-                  }),
-                  PathPaintKit {
-                    id: ripple_path,
-                    brush: StateRole::pressed().calc_color(this.color),
-                    path: Path::circle(launch_at, radius, PathStyle::Fill),
-                    mounted: move |_| { ripper_enter.run(); }
+                IgnorePointer {
+                  DynWidget {
+                    dyns: (this.bounded != RippleBound::Unbounded).then(|| {
+                      let rect = Rect::from_size(container.layout_size());
+                      let path = match this.bounded {
+                        RippleBound::Unbounded => unreachable!(),
+                        RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
+                        RippleBound::Radius(radius) => {
+                          Path::rect_round(&rect, &radius, PathStyle::Fill)
+                        }
+                      };
+                      Clip { clip: ClipType::Path(path) }
+                    }),
+                    PathPaintKit {
+                      id: ripple_path,
+                      brush: StateRole::pressed().calc_color(this.color),
+                      path: Path::circle(launch_at, radius, PathStyle::Fill),
+                      mounted: move |_| { ripper_enter.run(); }
+                    }
                   }
                 }
                 Animate {
