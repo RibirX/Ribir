@@ -56,10 +56,10 @@ impl ComposeChild for ScrollableWidget {
       }
 
       finally {
-        watch!(content.layout_size())
+        let_watch!(content.layout_size())
           .distinct_until_changed()
           .subscribe(move |v| this.content_size = v);
-        watch!(view.layout_size())
+        let_watch!(view.layout_size())
           .distinct_until_changed()
           .subscribe(move |v| this.page = v);
       }

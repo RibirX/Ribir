@@ -199,7 +199,7 @@ impl<W> Stateful<W> {
   /// If you not very clear how `shallow_ref` work, use [`Stateful::state_ref`]!
   /// instead of.
   #[inline]
-  pub fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::FRAMEWORK) }
+  pub(crate) fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::FRAMEWORK) }
 
   pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> {
     self.modify_notifier.raw_modifies()
@@ -311,12 +311,6 @@ impl<'a, W> StateRef<'a, W> {
   pub fn silent(&self) -> StateRef<'a, W> {
     self.release_current_borrow();
     StateRef::new(self.value, ModifyScope::DATA)
-  }
-
-  #[inline]
-  pub fn shallow(&self) -> StateRef<'a, W> {
-    self.release_current_borrow();
-    StateRef::new(self.value, ModifyScope::FRAMEWORK)
   }
 
   #[inline]

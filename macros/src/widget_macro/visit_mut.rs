@@ -1,5 +1,7 @@
 use crate::{
-  declare_derive::declare_field_name, error::DeclareError, widget_macro::guard_ident,
+  declare_derive::declare_field_name,
+  error::DeclareError,
+  widget_macro::{desugar::WatchField, guard_ident},
   LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, PROP_MACRO_NAME, WATCH_MACRO_NAME,
   WIDGET_MACRO_NAME,
 };
@@ -10,8 +12,8 @@ use super::{
   desugar::{
     ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
   },
-  gen_widget_macro, Desugared, ScopeUsedInfo, TrackExpr, UsedType, WIDGET_OF_BUILTIN_FIELD,
-  WIDGET_OF_BUILTIN_METHOD,
+  gen_widget_macro, ribir_suffix_variable, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
+  WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
 };
 
 use proc_macro::Span;
@@ -119,18 +121,20 @@ impl VisitMut for VisitCtx {
         let mut new_closure = None;
         let is_capture = c.capture.is_some();
         let mut ctx = self.stack_push();
-        ctx.new_capture_scope_visit(
+        ctx.new_scope_visit(
           |ctx| {
             visit_mut::visit_expr_closure_mut(ctx, c);
             new_closure = closure_surround_refs(&ctx.current_used_info, c);
           },
-          |t| {
-            if is_capture {
-              *t = UsedType::SCOPE_CAPTURE
-            } else {
-              *t |= UsedType::SCOPE_CAPTURE;
-              t.remove(UsedType::SUBSCRIBE);
-            }
+          |scope| {
+            scope.iter_mut().for_each(|(_, info)| {
+              if is_capture {
+                info.used_type = UsedType::SCOPE_CAPTURE
+              } else {
+                info.used_type |= UsedType::SCOPE_CAPTURE;
+                info.used_type.remove(UsedType::SUBSCRIBE);
+              }
+            });
           },
         );
         if let Some(new) = new_closure {
@@ -318,7 +322,7 @@ impl VisitMut for VisitCtx {
 impl VisitCtx {
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
     desugar.named_objs.objs_mut().for_each(|obj| match obj {
-      NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj_mut(obj),
+      NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj_mut(obj, false),
     });
 
     self.take_current_used_info();
@@ -340,42 +344,84 @@ impl VisitCtx {
   pub fn visit_finally_mut(&mut self, finally: &mut FinallyBlock) {
     finally.stmts.iter_mut().for_each(|stmt| match stmt {
       FinallyStmt::Stmt(s) => self.visit_stmt_mut(s),
-      FinallyStmt::Obj(o) => self.visit_declare_obj_mut(o),
+      FinallyStmt::Obj(o) => self.visit_declare_obj_mut(o, false),
     });
     finally.used_name_info = self.take_current_used_info();
   }
 
-  pub fn visit_declare_obj_mut(&mut self, obj: &mut DeclareObj) {
+  pub fn visit_declare_obj_mut(&mut self, obj: &mut DeclareObj, value_obj: bool) {
     let DeclareObj { ty, name, fields, watch_stmts, .. } = obj;
-    self.visit_path_mut(ty);
-    fields.iter_mut().for_each(|f| match &mut f.value {
-      FieldValue::Expr(expr) => {
-        let origin = expr.expr.clone();
-        self.visit_track_expr_mut(expr);
-        if expr.used_name_info.subscribe_widget().is_some() {
-          let declare_set = declare_field_name(&f.member);
-          let subscribe_do = if self.declare_objs.contains_key(name) {
-            quote! { move |v| #name.#declare_set(v) }
-          } else {
-            quote! {{
-              let #name = #name.clone_stateful();
-              move |v| #name.state_ref().#declare_set(v)
-            }}
-          };
-          watch_stmts.push(parse_quote_spanned! { expr.span() =>
-            let_watch!(#origin).subscribe( #subscribe_do );
-          });
+    self.new_scope_visit(
+      |ctx| {
+        ctx.visit_path_mut(ty);
+        fields.iter_mut().for_each(|f| {
+          ctx.new_scope_visit(
+            |ctx| match &mut f.value {
+              FieldValue::Expr(expr) => {
+                let origin = expr.expr.clone();
+                ctx.visit_track_expr_mut(expr);
+                if expr.used_name_info.subscribe_widget().is_some() {
+                  let field_fn_name = ribir_suffix_variable(&f.member, "fn");
+                  let field_fn = parse_quote_spanned! { expr.span() =>
+                    let #field_fn_name = move ||  #origin ;
+                  };
+                  let declare_set = declare_field_name(&f.member);
+                  let subscribe_do = if ctx.declare_objs.contains_key(name) {
+                    quote! { move |v| #name.#declare_set(v) }
+                  } else {
+                    quote! {{
+                      let #name = #name.clone_stateful();
+                      move |v| #name.state_ref().#declare_set(v)
+                    }}
+                  };
+                  expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name()};
+                  let upstream = expr.used_name_info.upstream_tokens();
+                  let watch_update = parse_quote_spanned! { expr.span() =>
+                    move_to_widget!(
+                      #upstream.map(move |_| #field_fn_name()).subscribe( #subscribe_do )
+                    );
+                  };
+                  watch_stmts.push(WatchField { field_fn, watch_update });
+                }
+              }
+              FieldValue::Obj(obj) => {
+                ctx.visit_declare_obj_mut(obj, true);
+              }
+            },
+            |scope| {
+              if scope.subscribe_widget().is_some() {
+                scope
+                  .iter_mut()
+                  .for_each(|(_, info)| info.used_type = UsedType::SCOPE_CAPTURE)
+              }
+            },
+          )
+        });
+
+        ctx.new_scope_visit(
+          |ctx| {
+            watch_stmts.iter_mut().for_each(|f| {
+              ctx.visit_stmt_mut(&mut f.field_fn);
+              ctx.visit_stmt_mut(&mut f.watch_update);
+            });
+          },
+          |scope| {
+            scope
+              .iter_mut()
+              .for_each(|(_, info)| info.used_type = UsedType::SCOPE_CAPTURE)
+          },
+        );
+
+        if !value_obj {
+          obj.used_name_info = ctx.take_current_used_info();
         }
-      }
-      FieldValue::Obj(obj) => {
-        self.visit_declare_obj_mut(obj);
-      }
-    });
-    watch_stmts.iter_mut().for_each(|s| self.visit_stmt_mut(s));
+      },
+      |_| {},
+    );
   }
 
   pub fn visit_track_expr_mut(&mut self, expr: &mut TrackExpr) {
-    self.new_capture_scope_visit(
+    self.new_scope_visit(
       |ctx| {
         ctx.visit_expr_mut(&mut expr.expr);
         expr.used_name_info = ctx.current_used_info.clone();
@@ -396,7 +442,7 @@ impl VisitCtx {
     match widget {
       ComposeItem::ChainObjs(objs) => objs
         .iter_mut()
-        .for_each(|obj| self.visit_declare_obj_mut(obj)),
+        .for_each(|obj| self.visit_declare_obj_mut(obj, false)),
       ComposeItem::Id(_) => {}
     }
   }
@@ -556,16 +602,14 @@ impl VisitCtx {
     }
   }
 
-  pub(crate) fn new_capture_scope_visit(
+  pub(crate) fn new_scope_visit(
     &mut self,
     visiter: impl FnOnce(&mut Self),
-    used_type_writer: impl Fn(&mut UsedType),
+    update_used_type: impl Fn(&mut ScopeUsedInfo),
   ) {
     let mut outside_used = self.current_used_info.take();
     visiter(self);
-    self.current_used_info.iter_mut().for_each(|(_, info)| {
-      used_type_writer(&mut info.used_type);
-    });
+    update_used_type(&mut self.current_used_info);
     outside_used.merge(&self.current_used_info);
     self.current_used_info = outside_used;
   }
@@ -634,11 +678,13 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
   let input = input.into();
   let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
 
-  ctx.new_capture_scope_visit(
+  ctx.new_scope_visit(
     |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
-    |t| {
-      *t |= UsedType::SCOPE_CAPTURE;
-      t.remove(UsedType::SUBSCRIBE);
+    |scope| {
+      scope.iter_mut().for_each(|(_, info)| {
+        info.used_type.remove(UsedType::SUBSCRIBE);
+        info.used_type |= UsedType::SCOPE_CAPTURE
+      });
     },
   );
   if let Some(upstream) = watch_expr.used_name_info.upstream_tokens() {

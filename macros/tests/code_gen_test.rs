@@ -350,8 +350,8 @@ fn fix_access_builtin_with_gap() {
       id: this,
       cursor: CursorIcon::Hand,
       tap: move |_| {
-        // this access cursor across `silent` or `shallow` should compile pass.
-        let _ = this.shallow().cursor == this.silent().cursor;
+        // this access cursor across `silent` should compile pass.
+        let _ = this.silent().cursor;
       }
     }
   };
