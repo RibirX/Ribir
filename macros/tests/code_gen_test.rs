@@ -310,7 +310,7 @@ fn builtin_method_support() {
   let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
 
-  assert_eq!(&*layout_size.raw_ref(), &Size::new(100., 100.));
+  assert_eq!(&*layout_size.state_ref(), &Size::new(100., 100.));
 }
 
 #[test]
@@ -384,17 +384,17 @@ fn fix_subscribe_cancel_after_widget_drop() {
     *trigger.state_ref() = true
   }
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.raw_ref(), 1);
+  assert_eq!(*notify_cnt.state_ref(), 1);
   {
     *trigger.state_ref() = true
   }
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.raw_ref(), 2);
+  assert_eq!(*notify_cnt.state_ref(), 2);
   {
     *trigger.state_ref() = true
   }
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.raw_ref(), 3);
+  assert_eq!(*notify_cnt.state_ref(), 3);
 }
 
 #[test]

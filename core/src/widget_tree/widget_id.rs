@@ -4,7 +4,7 @@ use rxrust::prelude::*;
 use crate::{
   builtin_widgets::{DisposedListener, MountedListener, Void},
   context::{AppContext, LifeCycleCtx},
-  widget::{ChangeScope, QueryOrder, Render, StateChangeNotifier},
+  widget::{ModifyScope, QueryOrder, Render, StateChangeNotifier},
 };
 
 use super::{DirtySet, LayoutStore};
@@ -175,7 +175,7 @@ impl WidgetId {
         let state_changed = dirty_sets.clone();
         notifier
           .raw_modifies()
-          .filter(|b| b.contains(ChangeScope::FRAMEWORK))
+          .filter(|b| b.contains(ModifyScope::FRAMEWORK))
           .subscribe(move |_| {
             state_changed.borrow_mut().insert(self);
           });

@@ -54,10 +54,10 @@ mod tests {
     };
 
     let mut tree = WidgetTree::new(w, <_>::default());
-    assert_eq!(&**lifecycle.raw_ref(), ["static mounted"]);
+    assert_eq!(&**lifecycle.state_ref(), ["static mounted"]);
     tree.layout(Size::new(100., 100.));
     assert_eq!(
-      &**lifecycle.raw_ref(),
+      &**lifecycle.state_ref(),
       [
         "static mounted",
         "dyn mounted",
@@ -70,7 +70,7 @@ mod tests {
     }
     tree.layout(Size::zero());
     assert_eq!(
-      &**lifecycle.raw_ref(),
+      &**lifecycle.state_ref(),
       [
         "static mounted",
         "dyn mounted",

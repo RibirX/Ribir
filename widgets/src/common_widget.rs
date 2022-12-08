@@ -1,4 +1,4 @@
-use ribir_core::{prelude::*};
+use ribir_core::prelude::*;
 
 #[derive(Default, Declare, SingleChild)]
 pub struct Leading;

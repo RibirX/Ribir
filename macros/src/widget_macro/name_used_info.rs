@@ -158,6 +158,7 @@ impl ScopeUsedInfo {
       if refs.clone().count() > 1 {
         refs.clone().for_each(|name| {
           tokens.extend(quote_spanned! { name.span() =>
+            #[allow(unused_mut)]
             let mut #name = #name.state_ref();
           });
         });

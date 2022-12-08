@@ -83,7 +83,8 @@
 use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
 use rxrust::{ops::box_it::LocalBoxOp, prelude::*};
 use std::{
-  cell::{RefCell, RefMut, UnsafeCell},
+  cell::{Cell, UnsafeCell},
+  ops::DerefMut,
   rc::Rc,
 };
 
@@ -95,14 +96,14 @@ pub trait IntoStateful: Sized {
 
 /// The stateful widget generic implementation.
 pub struct Stateful<W> {
-  pub(crate) widget: Rc<RefCell<W>>,
-  pub(crate) change_notifier: StateChangeNotifier,
+  inner: Rc<InnerStateful<W>>,
+  modify_notifier: StateChangeNotifier,
 }
 
 /// notify downstream when widget state changed, the value mean if the change it
 /// as silent or not.
 #[derive(Default, Clone)]
-pub(crate) struct StateChangeNotifier(LocalSubject<'static, ChangeScope, ()>);
+pub(crate) struct StateChangeNotifier(LocalSubject<'static, ModifyScope, ()>);
 
 /// A reference of `Stateful which tracked the state change across if user
 /// mutable deref this reference.
@@ -121,14 +122,16 @@ pub(crate) struct StateChangeNotifier(LocalSubject<'static, ChangeScope, ()>);
 /// relative rust issue https://github.com/rust-lang/rust/issues/37612
 
 pub struct StateRef<'a, W> {
-  widget: &'a Stateful<W>,
-  current_ref: UnsafeCell<Option<RefMut<'a, W>>>,
-  mut_accessed: Option<ChangeScope>,
-  current_scope: ChangeScope,
+  /// - None, Not used the value
+  /// - Some(false), borrow used the value
+  /// - Some(true), mutable borrow used the value
+  mut_accessed_flag: Cell<Option<bool>>,
+  modify_scope: ModifyScope,
+  value: &'a Stateful<W>,
 }
 
 bitflags! {
-  pub struct ChangeScope: u8 {
+  pub struct ModifyScope: u8 {
     /// state change only effect the data, transparent to ribir framework.
     const DATA  = 0x001;
     /// state change only effect to framework, transparent to widget data.
@@ -138,28 +141,48 @@ bitflags! {
   }
 }
 
+type BorrowFlag = isize;
+const UNUSED: BorrowFlag = 0;
+
+#[inline(always)]
+fn is_reading(x: BorrowFlag) -> bool { x > UNUSED }
+
+struct InnerStateful<W> {
+  borrow_flag: Cell<BorrowFlag>,
+  modify_scope: Cell<Option<ModifyScope>>,
+  #[cfg(debug_assertions)]
+  borrowed_at: Cell<Option<&'static std::panic::Location<'static>>>,
+  data: UnsafeCell<W>,
+}
+
 impl<W> Clone for Stateful<W> {
   #[inline]
   fn clone(&self) -> Self {
     Self {
-      widget: self.widget.clone(),
-      change_notifier: self.change_notifier.clone(),
+      inner: self.inner.clone(),
+      modify_notifier: self.modify_notifier.clone(),
     }
   }
 }
 
 impl<W> Stateful<W> {
-  pub fn new(widget: W) -> Self {
+  pub fn new(data: W) -> Self {
     Stateful {
-      widget: Rc::new(RefCell::new(widget)),
-      change_notifier: <_>::default(),
+      inner: Rc::new(InnerStateful {
+        data: UnsafeCell::new(data),
+        borrow_flag: Cell::new(0),
+        modify_scope: Cell::new(None),
+        #[cfg(debug_assertions)]
+        borrowed_at: Cell::new(None),
+      }),
+      modify_notifier: <_>::default(),
     }
   }
 
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// data and framework.
   #[inline]
-  pub fn state_ref(&self) -> StateRef<W> { StateRef::new(self, ChangeScope::BOTH) }
+  pub fn state_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::BOTH) }
 
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// data only, the relayout or paint depends on this object will not be skip.
@@ -167,7 +190,7 @@ impl<W> Stateful<W> {
   /// If you not very clear how `silent_ref` work, use [`Stateful::state_ref`]!
   /// instead of.
   #[inline]
-  pub fn silent_ref(&self) -> StateRef<W> { StateRef::new(self, ChangeScope::DATA) }
+  pub fn silent_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::DATA) }
 
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// framework only. That means this modify only effect framework but not
@@ -176,16 +199,10 @@ impl<W> Stateful<W> {
   /// If you not very clear how `shallow_ref` work, use [`Stateful::state_ref`]!
   /// instead of.
   #[inline]
-  pub fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ChangeScope::FRAMEWORK) }
+  pub fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::FRAMEWORK) }
 
-  /// Directly mutable borrow the inner widget and control on it, nothing will
-  /// be know by framework, use it only if you know how the four kind of ref
-  /// (state, silent, shallow, raw) of stateful widget work.
-  #[inline]
-  pub fn raw_ref(&self) -> RefMut<W> { self.widget.borrow_mut() }
-
-  pub fn raw_modifies(&self) -> LocalSubject<'static, ChangeScope, ()> {
-    self.change_notifier.raw_modifies()
+  pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> {
+    self.modify_notifier.raw_modifies()
   }
 
   /// Notify when this widget be mutable accessed, no mather if the widget
@@ -194,7 +211,7 @@ impl<W> Stateful<W> {
   pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> {
     self
       .raw_modifies()
-      .filter_map(|s: ChangeScope| s.contains(ChangeScope::DATA).then(|| ()))
+      .filter_map(|s: ModifyScope| s.contains(ModifyScope::DATA).then(|| ()))
       .box_it()
   }
 
@@ -204,72 +221,142 @@ impl<W> Stateful<W> {
   pub fn clone_stateful(&self) -> Stateful<W> { self.clone() }
 }
 
-impl<'a, W> std::ops::Deref for StateRef<'a, W> {
+macro_rules! debug_borrow_location {
+  ($this: ident) => {
+    #[cfg(debug_assertions)]
+    $this
+      .value
+      .inner
+      .borrowed_at
+      .set(Some(std::panic::Location::caller()))
+  };
+}
+
+macro_rules! already_borrow_panic {
+  ($this: ident) => {
+    #[cfg(debug_assertions)]
+    {
+      let location = $this.value.inner.borrowed_at.get().unwrap();
+      panic!("already borrowed at {}", location);
+    }
+    #[cfg(not(debug_assertions))]
+    panic!("already borrowed");
+  };
+}
+
+impl<'a, W> Deref for StateRef<'a, W> {
   type Target = W;
 
+  #[track_caller]
   fn deref(&self) -> &Self::Target {
-    // SAFETY: `RefCell` guarantees unique access, and `InnerRef` not thread safe no
-    // data race occur to fill the option value at same time.
-    let inner = unsafe { &mut *self.current_ref.get() };
-    inner.get_or_insert_with(|| self.widget.widget.borrow_mut())
+    if self.mut_accessed_flag.get().is_none() {
+      self.mut_accessed_flag.set(Some(false));
+      let b = &self.value.inner.borrow_flag;
+      b.set(b.get() + 1);
+
+      match b.get() {
+        1 => {
+          debug_borrow_location!(self);
+        }
+        flag if !is_reading(flag) => {
+          already_borrow_panic!(self);
+        }
+        _ => {}
+      }
+      if !is_reading(b.get()) {}
+    }
+
+    // SAFETY: `BorrowFlag` guarantees unique access.
+    let ptr = self.value.inner.data.get();
+    unsafe { &*ptr }
   }
 }
 
-impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
+impl<'a, W> DerefMut for StateRef<'a, W> {
+  #[track_caller]
   fn deref_mut(&mut self) -> &mut Self::Target {
-    // SAFETY: `RefCell` guarantees unique access.
-    let inner = unsafe { &mut *self.current_ref.get() };
-    if inner.is_none() {
-      *inner = Some(self.widget.widget.borrow_mut())
+    let b = &self.value.inner.borrow_flag;
+    match self.mut_accessed_flag.get() {
+      None => {
+        debug_borrow_location!(self);
+
+        b.set(b.get() - 1);
+        self.mut_accessed_flag.set(Some(true))
+      }
+      Some(false) => {
+        debug_borrow_location!(self);
+
+        // current ref is borrowed value, we release the borrow and mutably
+        // borrow the value.
+        b.set(b.get() - 2);
+        self.mut_accessed_flag.set(Some(true))
+      }
+      Some(true) => {
+        // Already mutably the value, directly return.
+      }
     }
-    if let Some(mut_access) = self.mut_accessed {
-      self.mut_accessed = Some(mut_access | self.current_scope)
-    } else {
-      self.mut_accessed = Some(self.current_scope)
+
+    if b.get() != -1 {
+      already_borrow_panic!(self);
     }
-    inner.get_or_insert_with(|| self.widget.widget.borrow_mut())
+
+    // SAFETY: `BorrowFlag` guarantees unique access.
+    let ptr = self.value.inner.data.get();
+    unsafe { &mut *ptr }
   }
 }
 
 impl<'a, W> StateRef<'a, W> {
   /// Fork a silent reference
-  pub fn silent(&mut self) -> StateRef<'a, W> {
+  pub fn silent(&self) -> StateRef<'a, W> {
     self.release_current_borrow();
-    StateRef::new(self.widget, ChangeScope::DATA)
+    StateRef::new(self.value, ModifyScope::DATA)
   }
 
   #[inline]
-  pub fn shallow(&mut self) -> StateRef<'a, W> {
+  pub fn shallow(&self) -> StateRef<'a, W> {
     self.release_current_borrow();
-    StateRef::new(self.widget, ChangeScope::FRAMEWORK)
+    StateRef::new(self.value, ModifyScope::FRAMEWORK)
   }
 
   #[inline]
-  pub fn raw_modifies(&self) -> LocalSubject<'static, ChangeScope, ()> {
-    self.widget.raw_modifies()
-  }
+  pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> { self.value.raw_modifies() }
 
   #[inline]
-  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.widget.modifies() }
+  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.value.modifies() }
 
-  fn new(widget: &'a Stateful<W>, scope: ChangeScope) -> Self {
+  fn new(value: &'a Stateful<W>, modify_scope: ModifyScope) -> Self {
     Self {
-      widget,
-      current_ref: UnsafeCell::new(None),
-      mut_accessed: None,
-      current_scope: scope,
+      mut_accessed_flag: Cell::new(None),
+      modify_scope,
+      value,
     }
   }
   #[inline]
-  pub fn release_current_borrow(&mut self) { self.current_ref.get_mut().take(); }
+  pub fn release_current_borrow(&self) {
+    let b = &self.value.inner.borrow_flag;
+    match self.mut_accessed_flag.get() {
+      Some(false) => b.set(b.get() - 1),
+      Some(true) => {
+        b.set(b.get() + 1);
+        let scope = &self.value.inner.modify_scope;
+        let union_scope = scope
+          .get()
+          .map_or(self.modify_scope, |s| s.union(self.modify_scope));
+        scope.set(Some(union_scope));
+      }
+      None => {}
+    }
+    self.mut_accessed_flag.set(None);
+  }
 
   /// Clone the stateful widget of which the reference point to. Require mutable
   /// reference because we try to early release inner borrow when clone occur.
-  // todo: clone stateful mutable access across a modify event is incorrect.
+
   #[inline]
-  pub fn clone_stateful(&mut self) -> Stateful<W> {
+  pub fn clone_stateful(&self) -> Stateful<W> {
     self.release_current_borrow();
-    self.widget.clone()
+    self.value.clone()
   }
 }
 
@@ -279,32 +366,32 @@ impl<W: MultiChild> MultiChild for Stateful<W> {}
 impl<W: Render + 'static> Render for Stateful<W> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.widget.borrow().perform_layout(clamp, ctx)
+    self.state_ref().perform_layout(clamp, ctx)
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.widget.borrow().only_sized_by_parent() }
+  fn only_sized_by_parent(&self) -> bool { self.state_ref().only_sized_by_parent() }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.widget.borrow().paint(ctx) }
+  fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
 
   #[inline]
-  fn can_overflow(&self) -> bool { self.widget.borrow().can_overflow() }
+  fn can_overflow(&self) -> bool { self.state_ref().can_overflow() }
 
   #[inline]
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-    self.widget.borrow().hit_test(ctx, pos)
+    self.state_ref().hit_test(ctx, pos)
   }
 
   #[inline]
-  fn get_transform(&self) -> Option<Transform> { self.widget.borrow().get_transform() }
+  fn get_transform(&self) -> Option<Transform> { self.state_ref().get_transform() }
 }
 
 impl<W: Compose> Compose for Stateful<W> {
   fn compose(this: StateWidget<Self>) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => s,
-      StateWidget::Stateful(s) => s.widget.borrow().clone(),
+      StateWidget::Stateful(s) => s.state_ref().clone(),
     };
     Compose::compose(StateWidget::Stateful(w))
   }
@@ -316,7 +403,7 @@ impl<W: ComposeChild> ComposeChild for Stateful<W> {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     let w = match this {
       StateWidget::Stateless(s) => s,
-      StateWidget::Stateful(s) => s.widget.borrow().clone(),
+      StateWidget::Stateful(s) => s.state_ref().clone(),
     };
     ComposeChild::compose_child(StateWidget::Stateful(w), child)
   }
@@ -324,9 +411,13 @@ impl<W: ComposeChild> ComposeChild for Stateful<W> {
 
 impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) {
-    if let Some(scope) = self.mut_accessed {
-      self.release_current_borrow();
-      self.widget.raw_modifies().next(scope)
+    self.release_current_borrow();
+    let inner = &self.value.inner;
+    if UNUSED == inner.borrow_flag.get() {
+      let scope = inner.modify_scope.take();
+      if let Some(scope) = scope {
+        self.value.raw_modifies().next(scope);
+      }
     }
   }
 }
@@ -338,7 +429,7 @@ impl<W> IntoStateful for W {
 }
 
 impl<W: Query + 'static> Query for Stateful<W> {
-  impl_proxy_query!(self.change_notifier, self.widget);
+  impl_proxy_query!(self.modify_notifier, self.state_ref());
 }
 
 impl Query for StateChangeNotifier {
@@ -346,11 +437,13 @@ impl Query for StateChangeNotifier {
 }
 
 impl StateChangeNotifier {
-  pub(crate) fn raw_modifies(&self) -> LocalSubject<'static, ChangeScope, ()> { self.0.clone() }
+  pub(crate) fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> { self.0.clone() }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::cell::RefCell;
+
   use super::*;
   use crate::test::*;
 
@@ -380,7 +473,7 @@ mod tests {
     let c_changed_size = changed_size.clone();
     let c_box = sized_box.clone();
     sized_box.modifies().subscribe(move |_| {
-      *c_changed_size.borrow_mut() = c_box.raw_ref().size;
+      *c_changed_size.borrow_mut() = c_box.state_ref().size;
     });
 
     let state = sized_box.clone();
@@ -418,14 +511,14 @@ mod tests {
     {
       let _ = &mut w.state_ref().size;
     }
-    assert_eq!(notified.borrow().deref(), &[ChangeScope::BOTH]);
+    assert_eq!(notified.borrow().deref(), &[ModifyScope::BOTH]);
 
     {
       let _ = &mut w.silent_ref().size;
     }
     assert_eq!(
       notified.borrow().deref(),
-      &[ChangeScope::BOTH, ChangeScope::DATA]
+      &[ModifyScope::BOTH, ModifyScope::DATA]
     );
 
     {
@@ -438,7 +531,7 @@ mod tests {
     }
     assert_eq!(
       notified.borrow().deref(),
-      &[ChangeScope::BOTH, ChangeScope::DATA]
+      &[ModifyScope::BOTH, ModifyScope::DATA]
     );
   }
 }

@@ -45,7 +45,7 @@ where
         .subscribe(move |msg| match msg {
           FrameMsg::NewFrame(_) => {}
           FrameMsg::LayoutReady(time) => {
-            let p = animate.raw_ref().lerp(time);
+            let p = animate.shallow_ref().lerp(time);
             if matches!(p, AnimateProgress::Finish) {
               animate.silent_ref().stop();
             }
