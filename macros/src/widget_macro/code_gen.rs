@@ -85,70 +85,70 @@ pub(crate) fn gen_move_to_widget_macro(input: &TokenStream, ctx: &mut VisitCtx) 
 
 impl Desugared {
   pub fn gen_tokens(&self, tokens: &mut TokenStream, ctx: &VisitCtx) {
-    if !self.errors.is_empty() {
+    let Self {
+      init,
+      named_objs,
+      widget,
+      states,
+      finally,
+      errors,
+      warnings,
+      ..
+    } = &self;
+
+    if !errors.is_empty() {
       Brace::default().surround(tokens, |tokens| {
-        self
-          .errors
-          .iter()
-          .for_each(|err| err.into_compile_error(tokens));
+        errors.iter().for_each(|err| err.into_compile_error(tokens));
         quote! { Void }.to_tokens(tokens);
       });
 
       return;
     }
-    let Self { states: track, warnings, .. } = &*self;
-    if track.as_ref().map_or(false, States::has_def_names) {
-      Brace::default().surround(tokens, |tokens| {
-        track.to_tokens(tokens);
-        self.inner_tokens(tokens, ctx);
-      })
-    } else {
-      self.inner_tokens(tokens, ctx);
-    }
 
-    warnings.iter().for_each(|w| w.emit_warning());
-  }
-
-  fn inner_tokens(&self, tokens: &mut TokenStream, ctx: &VisitCtx) {
-    let Self {
-      init, named_objs, widget, finally, ..
-    } = &self;
     let sorted_named_objs = self.order_named_objs();
-    Paren::default().surround(tokens, |tokens| {
-      let ctx_name = ctx_ident(Span::call_site());
-      quote! { move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
+    Brace::default().surround(tokens, |tokens| {
       Brace::default().surround(tokens, |tokens| {
-        if ctx.has_guards_data {
-          let guards_vec = guard_vec_ident();
-          quote! { let mut #guards_vec: Vec<AnonymousData> = vec![]; }.to_tokens(tokens);
-        }
-        init.to_tokens(tokens);
+        quote!(#![allow(unused_mut)]).to_tokens(tokens);
 
-        // deep first declare named obj by their dependencies
-        // circular may exist widget attr follow widget self to init.
-        sorted_named_objs.iter().for_each(|name| {
-          if let Some(obj) = named_objs.get(name) {
-            obj.to_tokens(tokens)
+        states.to_tokens(tokens);
+        let ctx_name = ctx_ident(Span::call_site());
+        let name = widget.as_ref().unwrap().node.name();
+        quote! { let #name = move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
+        Brace::default().surround(tokens, |tokens| {
+          if ctx.has_guards_data {
+            let guards_vec = guard_vec_ident();
+            quote! { let mut #guards_vec: Vec<AnonymousData> = vec![]; }.to_tokens(tokens);
+          }
+          init.to_tokens(tokens);
+
+          // deep first declare named obj by their dependencies
+          // circular may exist widget attr follow widget self to init.
+          sorted_named_objs.iter().for_each(|name| {
+            if let Some(obj) = named_objs.get(name) {
+              obj.to_tokens(tokens)
+            }
+          });
+
+          let w = widget.as_ref().unwrap();
+          w.gen_node_objs(tokens);
+          finally.to_tokens(tokens);
+
+          if ctx.has_guards_data {
+            quote! { widget_attach_data }.to_tokens(tokens);
+            Paren::default().surround(tokens, |tokens| {
+              w.gen_compose_node(named_objs, tokens);
+              let guards_vec = guard_vec_ident();
+              quote! { .into_widget(),#guards_vec }.to_tokens(tokens)
+            });
+          } else {
+            w.gen_compose_node(named_objs, tokens)
           }
         });
-
-        let w = widget.as_ref().unwrap();
-        w.gen_node_objs(tokens);
-        finally.to_tokens(tokens);
-
-        if ctx.has_guards_data {
-          quote! { widget_attach_data }.to_tokens(tokens);
-          Paren::default().surround(tokens, |tokens| {
-            w.gen_compose_node(named_objs, tokens);
-            let guards_vec = guard_vec_ident();
-            quote! { .into_widget(),#guards_vec }.to_tokens(tokens)
-          });
-        } else {
-          w.gen_compose_node(named_objs, tokens)
-        }
-      })
+        quote! { ; #name.into_widget() }.to_tokens(tokens);
+      });
     });
-    quote! { .into_widget() }.to_tokens(tokens);
+
+    warnings.iter().for_each(|w| w.emit_warning());
   }
 
   pub fn collect_warnings(&mut self, ctx: &VisitCtx) { self.collect_unused_declare_obj(ctx); }
@@ -509,8 +509,6 @@ impl ToTokens for NamedObj {
 }
 
 impl States {
-  pub fn has_def_names(&self) -> bool { self.states.iter().any(|f| f.colon_token.is_some()) }
-
   pub fn track_names(&self) -> impl Iterator<Item = &Ident> {
     self.states.iter().map(|f| &f.member)
   }

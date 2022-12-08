@@ -149,13 +149,11 @@ impl ScopeUsedInfo {
   pub fn prepend_bundle_refs<'a>(&self, tokens: &mut TokenStream) {
     if let Some(names) = self.ref_widgets() {
       let c_names = names.clone();
-      quote! {let _guard = (#(#names.modify_guard(),)*);}.to_tokens(tokens);
+      if names.clone().nth(1).is_some() {
+        quote! {let _guard = (#(#names.modify_guard(),)*);}.to_tokens(tokens);
+      }
       c_names.clone().for_each(|n| {
-        quote_spanned! {n.span() =>
-          #[allow(unused_mut)]
-          let mut #n = #n.state_ref();
-        }
-        .to_tokens(tokens);
+        quote_spanned! {n.span() => let mut #n = #n.state_ref();}.to_tokens(tokens);
       });
     }
   }

@@ -367,19 +367,17 @@ impl VisitCtx {
                   };
                   let declare_set = declare_field_name(&f.member);
                   let subscribe_do = if ctx.declare_objs.contains_key(name) {
-                    quote! { move |v| #name.#declare_set(v) }
+                    quote! { move |_| #name.#declare_set(#field_fn_name()) }
                   } else {
                     quote! {{
                       let #name = #name.clone_stateful();
-                      move |v| #name.state_ref().#declare_set(v)
+                      move |_| #name.state_ref().#declare_set(#field_fn_name())
                     }}
                   };
                   expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name()};
                   let upstream = expr.used_name_info.upstream_tokens();
                   let watch_update = parse_quote_spanned! { expr.span() =>
-                    move_to_widget!(
-                      #upstream.map(move |_| #field_fn_name()).subscribe( #subscribe_do )
-                    );
+                    move_to_widget!(#upstream.subscribe( #subscribe_do ).unsubscribe_when_dropped() );
                   };
                   watch_stmts.push(WatchField { field_fn, watch_update });
                 }
@@ -629,8 +627,15 @@ pub(crate) fn closure_surround_refs(
     if body_used.ref_widgets().is_some() {
       let mut refs = quote! {};
       body_used.prepend_bundle_refs(&mut refs);
-      let body = &c.body;
-      c.body = parse_quote_spanned!(c.body.span() => { #refs #body });
+      let body = &mut *c.body;
+      if let Expr::Block(block) = body {
+        block
+          .block
+          .stmts
+          .insert(0, Stmt::Expr(Expr::Verbatim(refs)));
+      } else {
+        *body = parse_quote_spanned!(body.span() => { #refs #body });
+      }
     }
     c.to_tokens(tokens);
   });
