@@ -626,11 +626,12 @@ pub(crate) fn closure_surround_refs(
   let mut tokens = quote!();
   Brace(c.span()).surround(&mut tokens, |tokens| {
     all_capture.for_each(|obj| capture_widget(obj).to_tokens(tokens));
-    let mut body_tokens = quote! {};
-    body_used.value_expr_surround_refs(&mut body_tokens, c.body.span(), |tokens| {
-      c.body.to_tokens(tokens)
-    });
-    c.body = parse_quote!(#body_tokens);
+    if body_used.ref_widgets().is_some() {
+      let mut refs = quote! {};
+      body_used.prepend_bundle_refs(&mut refs);
+      let body = &c.body;
+      c.body = parse_quote_spanned!(c.body.span() => { #refs #body });
+    }
     c.to_tokens(tokens);
   });
   Some(tokens)

@@ -1,12 +1,9 @@
-use super::{desugar::NamedObjMap, ribir_variable};
+use super::desugar::NamedObjMap;
 use crate::{error::CircleUsedPath, widget_macro::desugar::NamedObj};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use std::collections::HashMap;
-use syn::{
-  token::{Brace, Semi},
-  Ident,
-};
+use syn::Ident;
 
 #[derive(Clone, Debug)]
 pub struct NameUsedInfo {
@@ -149,66 +146,17 @@ impl ScopeUsedInfo {
     self.filter_widget(|info| info.used_type.contains(UsedType::REF))
   }
 
-  /// create refs before expression and release borrow after it, then return its
-  /// value, to avoid change notify order problem.
-  ///
-  /// Surround only if refs more than one.
-  pub fn refs_surround<'a>(&self, tokens: &mut TokenStream, f: impl FnOnce(&mut TokenStream)) {
-    if let Some(refs) = self.ref_widgets() {
-      if refs.clone().count() > 1 {
-        refs.clone().for_each(|name| {
-          tokens.extend(quote_spanned! { name.span() =>
-            #[allow(unused_mut)]
-            let mut #name = #name.state_ref();
-          });
-        });
-
-        f(tokens);
-
-        refs.for_each(|name| {
-          tokens.extend(quote_spanned! { name.span() =>
-            #name.release_current_borrow();
-          })
-        })
-      } else {
-        refs.for_each(|name| {
-          tokens.extend(quote_spanned! { name.span() =>
-            #[allow(unused_mut)]
-            let mut #name = #name.state_ref();
-          });
-        });
-
-        f(tokens);
-      }
-    } else {
-      f(tokens)
-    }
-  }
-
-  pub fn value_expr_surround_refs(
-    &self,
-    tokens: &mut TokenStream,
-    span: Span,
-    // add value expression tokens.
-    f: impl FnOnce(&mut TokenStream),
-  ) {
-    if self.ref_widgets().is_none() {
-      f(tokens);
-    } else {
-      Brace(span).surround(tokens, |tokens| {
-        let ref_cnt = self.ref_widgets().map_or(0, |refs| refs.count());
-        if ref_cnt > 1 {
-          let v = ribir_variable("v", span);
-          self.refs_surround(tokens, |tokens| {
-            tokens.extend(quote_spanned! {span => let #v = });
-            f(tokens);
-            Semi(span).to_tokens(tokens);
-          });
-          v.to_tokens(tokens);
-        } else {
-          self.refs_surround(tokens, |tokens| f(tokens))
+  pub fn prepend_bundle_refs<'a>(&self, tokens: &mut TokenStream) {
+    if let Some(names) = self.ref_widgets() {
+      let c_names = names.clone();
+      quote! {let _guard = (#(#names.modify_guard(),)*);}.to_tokens(tokens);
+      c_names.clone().for_each(|n| {
+        quote_spanned! {n.span() =>
+          #[allow(unused_mut)]
+          let mut #n = #n.state_ref();
         }
-      })
+        .to_tokens(tokens);
+      });
     }
   }
 
