@@ -53,7 +53,14 @@ pub struct DeclareObj {
   pub name: Ident,
   pub fields: SmallVec<[Field; 1]>,
   pub stateful: bool,
-  pub watch_stmts: SmallVec<[Stmt; 1]>,
+  pub watch_stmts: SmallVec<[WatchField; 1]>,
+  pub used_name_info: ScopeUsedInfo,
+}
+
+#[derive(Debug, Clone)]
+pub struct WatchField {
+  pub field_fn: Stmt,
+  pub watch_update: Stmt,
 }
 
 #[derive(Debug)]
@@ -220,6 +227,7 @@ impl DeclareObj {
       fields,
       stateful: false,
       watch_stmts: <_>::default(),
+      used_name_info: <_>::default(),
     }
   }
 }

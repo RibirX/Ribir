@@ -8,10 +8,11 @@ use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
-  parse_macro_input,
+  parse_macro_input, parse_quote,
   spanned::Spanned,
   token::{Brace, Dot, Paren, Semi},
-  Ident,
+  visit_mut::VisitMut,
+  Expr, Ident,
 };
 
 use super::{
@@ -22,7 +23,7 @@ use super::{
   },
   guard_vec_ident,
   parser::{PropMacro, Property, StateField, States},
-  Desugared, ObjectUsed, ObjectUsedPath, ScopeUsedInfo, UsedPart, UsedType, VisitCtx, WIDGETS,
+  Desugared, ObjectUsed, ObjectUsedPath, UsedPart, UsedType, VisitCtx, WIDGETS,
 };
 
 pub(crate) fn gen_prop_macro(
@@ -32,7 +33,7 @@ pub(crate) fn gen_prop_macro(
   let mut prop_macro = parse_macro_input! { input as PropMacro };
   let PropMacro { prop, lerp_fn, .. } = &mut prop_macro;
 
-  ctx.new_capture_scope_visit(
+  ctx.new_scope_visit(
     |ctx| match prop {
       Property::Name(name) => {
         if let Some(name) = ctx.find_named_obj(name).cloned() {
@@ -50,7 +51,11 @@ pub(crate) fn gen_prop_macro(
         }
       }
     },
-    |t| t.remove(UsedType::SUBSCRIBE),
+    |scope| {
+      scope
+        .iter_mut()
+        .for_each(|(_, info)| info.used_type.remove(UsedType::SUBSCRIBE))
+    },
   );
   if let Some(lerp_fn) = lerp_fn {
     ctx.visit_track_expr_mut(lerp_fn);
@@ -73,7 +78,9 @@ pub(crate) fn gen_prop_macro(
 pub(crate) fn gen_move_to_widget_macro(input: &TokenStream, ctx: &mut VisitCtx) -> TokenStream {
   let guards = guard_vec_ident();
   ctx.has_guards_data = true;
-  quote_spanned!(input.span() => #guards.push(AnonymousData::new(Box::new(#input))))
+  let mut expr: Expr = parse_quote!(#input);
+  ctx.visit_expr_mut(&mut expr);
+  quote_spanned!(input.span() => #guards.push(AnonymousData::new(Box::new(#expr))))
 }
 
 impl Desugared {
@@ -328,19 +335,41 @@ impl ToTokens for FieldValue {
 
 impl ToTokens for DeclareObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
+    let DeclareObj { ty, name, watch_stmts, .. } = self;
+    let span = ty.span();
+    if watch_stmts.is_empty() {
+      self.build_tokens(tokens);
+    } else {
+      quote_spanned! { span => let #name = }.to_tokens(tokens);
+      Brace(ty.span()).surround(tokens, |tokens| {
+        watch_stmts.iter().for_each(|f| {
+          f.field_fn.to_tokens(tokens);
+        });
+        self.build_tokens(tokens);
+        watch_stmts.iter().for_each(|f| {
+          f.watch_update.to_tokens(tokens);
+        });
+        name.to_tokens(tokens);
+      });
+      Semi(span).to_tokens(tokens);
+    }
+  }
+}
+
+impl DeclareObj {
+  fn build_tokens(&self, tokens: &mut TokenStream) {
     let DeclareObj {
       fields,
       ty,
       name,
       watch_stmts,
       stateful,
+      used_name_info,
     } = self;
     let span = ty.span();
     quote_spanned! { span => let #name = }.to_tokens(tokens);
-    let whole_used_info = self.whole_used_info();
-    let span = ty.span();
-    whole_used_info.value_expr_surround_refs(tokens, span, |tokens| {
-      tokens.extend(quote_spanned! { span => #ty::declare_builder() });
+    used_name_info.value_expr_surround_refs(tokens, span, |tokens| {
+      quote_spanned! { span => #ty::declare_builder() }.to_tokens(tokens);
       fields.iter().for_each(|f| {
         let Field { member, value, .. } = f;
         Dot(value.span()).to_tokens(tokens);
@@ -349,28 +378,12 @@ impl ToTokens for DeclareObj {
       });
       let build_ctx = ctx_ident(ty.span());
       tokens.extend(quote_spanned! { span => .build(#build_ctx) });
-      let is_stateful = *stateful || whole_used_info.ref_widgets().is_some();
+      let is_stateful = *stateful || !watch_stmts.is_empty();
       if is_stateful {
         quote_spanned! { span => .into_stateful() }.to_tokens(tokens);
       }
     });
     Semi(span).to_tokens(tokens);
-
-    watch_stmts.iter().for_each(|s| s.to_tokens(tokens));
-  }
-}
-
-impl DeclareObj {
-  pub fn whole_used_info(&self) -> ScopeUsedInfo {
-    self
-      .fields
-      .iter()
-      .fold(ScopeUsedInfo::default(), |mut acc, f| {
-        if let FieldValue::Expr(e) = &f.value {
-          acc.merge(&e.used_name_info)
-        }
-        acc
-      })
   }
 }
 
