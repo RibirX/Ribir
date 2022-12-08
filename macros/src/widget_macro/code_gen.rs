@@ -368,7 +368,7 @@ impl DeclareObj {
     } = self;
     let span = ty.span();
     quote_spanned! { span => let #name = }.to_tokens(tokens);
-    used_name_info.value_expr_surround_refs(tokens, span, |tokens| {
+    let builder = |tokens: &mut TokenStream| {
       quote_spanned! { span => #ty::declare_builder() }.to_tokens(tokens);
       fields.iter().for_each(|f| {
         let Field { member, value, .. } = f;
@@ -382,7 +382,16 @@ impl DeclareObj {
       if is_stateful {
         quote_spanned! { span => .into_stateful() }.to_tokens(tokens);
       }
-    });
+    };
+    if used_name_info.ref_widgets().is_some() {
+      Brace(span).surround(tokens, |tokens| {
+        used_name_info.prepend_bundle_refs(tokens);
+        builder(tokens);
+      })
+    } else {
+      builder(tokens);
+    }
+
     Semi(span).to_tokens(tokens);
   }
 }
@@ -525,9 +534,8 @@ impl ToTokens for InitStmts {
 impl ToTokens for FinallyBlock {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     self.brace_token.surround(tokens, |tokens| {
-      self
-        .used_name_info
-        .refs_surround(tokens, |tokens| tokens.append_all(&self.stmts));
+      self.used_name_info.prepend_bundle_refs(tokens);
+      tokens.append_all(&self.stmts)
     })
   }
 }

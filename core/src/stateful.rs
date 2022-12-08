@@ -81,6 +81,7 @@
 //! access self `sate_ref`, that the only different with `CombinationWidget`.
 
 use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
+pub use guards::ModifyGuard;
 use rxrust::{ops::box_it::LocalBoxOp, prelude::*};
 use std::{
   cell::{Cell, UnsafeCell},
@@ -127,7 +128,7 @@ pub struct StateRef<'a, W> {
   /// - Some(true), mutable borrow used the value
   mut_accessed_flag: Cell<Option<bool>>,
   modify_scope: ModifyScope,
-  value: &'a Stateful<W>,
+  value: ModifyGuard<'a, W>,
 }
 
 bitflags! {
@@ -138,6 +139,44 @@ bitflags! {
     const FRAMEWORK = 0x010;
     /// state change effect both widget data and framework.
     const BOTH = Self::DATA.bits | Self::FRAMEWORK.bits;
+  }
+}
+
+mod guards {
+  use super::*;
+  pub struct ModifyGuard<'a, W>(&'a Stateful<W>);
+
+  impl<'a, W> ModifyGuard<'a, W> {
+    pub(crate) fn new(data: &'a Stateful<W>) -> Self {
+      let guards = &data.inner.guard_cnt;
+      guards.set(guards.get() + 1);
+      Self(data)
+    }
+
+    pub(crate) fn inner_ref(&self) -> &'a Stateful<W> { self.0 }
+  }
+
+  impl<'a, W> Drop for ModifyGuard<'a, W> {
+    fn drop(&mut self) {
+      let guards = &self.0.inner.guard_cnt;
+      guards.set(guards.get() - 1);
+
+      if guards.get() == 0 {
+        let inner = &self.0.inner;
+        assert_eq!(UNUSED, inner.borrow_flag.get());
+        let scope = inner.modify_scope.take();
+        if let Some(scope) = scope {
+          self.0.raw_modifies().next(scope);
+        }
+      }
+    }
+  }
+
+  impl<'a, W> std::ops::Deref for ModifyGuard<'a, W> {
+    type Target = Stateful<W>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target { self.0 }
   }
 }
 
@@ -152,6 +191,7 @@ struct InnerStateful<W> {
   modify_scope: Cell<Option<ModifyScope>>,
   #[cfg(debug_assertions)]
   borrowed_at: Cell<Option<&'static std::panic::Location<'static>>>,
+  guard_cnt: Cell<usize>,
   data: UnsafeCell<W>,
 }
 
@@ -174,10 +214,15 @@ impl<W> Stateful<W> {
         modify_scope: Cell::new(None),
         #[cfg(debug_assertions)]
         borrowed_at: Cell::new(None),
+        guard_cnt: Cell::new(0),
       }),
       modify_notifier: <_>::default(),
     }
   }
+
+  /// Return a guard that batch the modify event.
+  #[inline]
+  pub fn modify_guard(&self) -> ModifyGuard<W> { ModifyGuard::new(self) }
 
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// data and framework.
@@ -309,8 +354,8 @@ impl<'a, W> DerefMut for StateRef<'a, W> {
 impl<'a, W> StateRef<'a, W> {
   /// Fork a silent reference
   pub fn silent(&self) -> StateRef<'a, W> {
-    self.release_current_borrow();
-    StateRef::new(self.value, ModifyScope::DATA)
+    self.release_borrow();
+    StateRef::new(self.value.inner_ref(), ModifyScope::DATA)
   }
 
   #[inline]
@@ -323,11 +368,12 @@ impl<'a, W> StateRef<'a, W> {
     Self {
       mut_accessed_flag: Cell::new(None),
       modify_scope,
-      value,
+      value: ModifyGuard::new(value),
     }
   }
+
   #[inline]
-  pub fn release_current_borrow(&self) {
+  fn release_borrow(&self) {
     let b = &self.value.inner.borrow_flag;
     match self.mut_accessed_flag.get() {
       Some(false) => b.set(b.get() - 1),
@@ -349,7 +395,7 @@ impl<'a, W> StateRef<'a, W> {
 
   #[inline]
   pub fn clone_stateful(&self) -> Stateful<W> {
-    self.release_current_borrow();
+    self.release_borrow();
     self.value.clone()
   }
 }
@@ -404,16 +450,7 @@ impl<W: ComposeChild> ComposeChild for Stateful<W> {
 }
 
 impl<'a, W> Drop for StateRef<'a, W> {
-  fn drop(&mut self) {
-    self.release_current_borrow();
-    let inner = &self.value.inner;
-    if UNUSED == inner.borrow_flag.get() {
-      let scope = inner.modify_scope.take();
-      if let Some(scope) = scope {
-        self.value.raw_modifies().next(scope);
-      }
-    }
-  }
+  fn drop(&mut self) { self.release_borrow(); }
 }
 
 // Implement IntoStateful for all widget
