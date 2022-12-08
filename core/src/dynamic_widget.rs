@@ -360,17 +360,17 @@ mod tests {
     };
     let mut tree = WidgetTree::new(w, <_>::default());
     tree.layout(Size::zero());
-    assert_eq!(*new_cnt.raw_ref(), 3);
-    assert_eq!(*drop_cnt.raw_ref(), 0);
+    assert_eq!(*new_cnt.state_ref(), 3);
+    assert_eq!(*drop_cnt.state_ref(), 0);
 
     v.state_ref().push(4);
     tree.layout(Size::zero());
-    assert_eq!(*new_cnt.raw_ref(), 7);
-    assert_eq!(*drop_cnt.raw_ref(), 3);
+    assert_eq!(*new_cnt.state_ref(), 7);
+    assert_eq!(*drop_cnt.state_ref(), 3);
 
     v.state_ref().pop();
     tree.layout(Size::zero());
-    assert_eq!(*new_cnt.raw_ref(), 10);
-    assert_eq!(*drop_cnt.raw_ref(), 7);
+    assert_eq!(*new_cnt.state_ref(), 10);
+    assert_eq!(*drop_cnt.state_ref(), 7);
   }
 }

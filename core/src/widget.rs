@@ -311,9 +311,7 @@ impl<T: Render> Render for algo::ShareResource<T> {
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
 
   #[inline]
-  fn get_transform(&self) -> Option<Transform> {
-    T::get_transform(self)
-  }
+  fn get_transform(&self) -> Option<Transform> { T::get_transform(self) }
 }
 
 impl<T: Query> Query for ShareResource<T> {

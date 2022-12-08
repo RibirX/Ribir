@@ -1,4 +1,4 @@
-use ribir::prelude::{*, svgs};
+use ribir::prelude::{svgs, *};
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {

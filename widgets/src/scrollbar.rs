@@ -178,7 +178,7 @@ pub struct HRawScrollbar {
 impl Compose for HRawScrollbar {
   fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
-    let scrolling = this.raw_ref().scrolling.clone();
+    let scrolling = this.state_ref().scrolling.clone();
 
     widget! {
       states { scrolling, this }
@@ -229,7 +229,7 @@ pub struct VRawScrollbar {
 impl Compose for VRawScrollbar {
   fn compose(this: StateWidget<Self>) -> Widget {
     let this = this.into_stateful();
-    let scrolling = this.raw_ref().scrolling.clone();
+    let scrolling = this.state_ref().scrolling.clone();
 
     widget! {
       states { scrolling, this }

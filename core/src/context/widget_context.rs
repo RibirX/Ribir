@@ -210,7 +210,7 @@ mod tests {
     let tree = &wnd.widget_tree;
     let root = tree.root();
     let child = get_single_child_by_depth(root, &tree.arena, 4);
-    let WidgetTree { arena, store, app_ctx , .. } = tree;
+    let WidgetTree { arena, store, app_ctx, .. } = tree;
     let w_ctx = TestCtx { id: root, arena, store, app_ctx };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
@@ -226,5 +226,4 @@ mod tests {
     }
     child
   }
-
 }

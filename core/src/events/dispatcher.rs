@@ -708,7 +708,7 @@ mod tests {
     });
 
     {
-      let mut clicked = click_path.raw_ref();
+      let mut clicked = click_path.state_ref();
       assert_eq!(*clicked, 2);
       *clicked = 0;
     }
@@ -737,7 +737,7 @@ mod tests {
     });
 
     {
-      let clicked = click_path.raw_ref();
+      let clicked = click_path.state_ref();
       assert_eq!(*clicked, 1);
     }
   }

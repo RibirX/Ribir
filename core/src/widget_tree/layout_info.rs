@@ -327,12 +327,12 @@ mod tests {
 
     let mut tree = WidgetTree::new(w, <_>::default());
     tree.layout(Size::zero());
-    assert_eq!(*root_layout_cnt.raw_ref(), 1);
+    assert_eq!(*root_layout_cnt.state_ref(), 1);
     {
       child_box.state_ref().size = Size::new(2., 2.);
     }
     tree.layout(Size::zero());
-    assert_eq!(*root_layout_cnt.raw_ref(), 2);
+    assert_eq!(*root_layout_cnt.state_ref(), 2);
   }
 
   #[test]
@@ -360,11 +360,11 @@ mod tests {
 
     let mut wnd = Window::default_mock(w, None);
     wnd.draw_frame();
-    assert_eq!([3, 2, 1], &**layout_order.raw_ref());
+    assert_eq!([3, 2, 1], &**layout_order.state_ref());
     {
       *trigger.state_ref() = Size::new(1., 1.);
     }
     wnd.draw_frame();
-    assert_eq!([3, 2, 1, 3, 2, 1], &**layout_order.raw_ref());
+    assert_eq!([3, 2, 1, 3, 2, 1], &**layout_order.state_ref());
   }
 }
