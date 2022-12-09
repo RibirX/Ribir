@@ -61,7 +61,7 @@ pub fn gen_widget_macro(
   );
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
-  desugar.collect_warnings(&ctx);
+
   ctx
     .used_objs
     .iter()
@@ -83,6 +83,7 @@ pub fn gen_widget_macro(
       }
     });
 
+  desugar.collect_warnings(&ctx);
   let mut tokens = quote! {};
   desugar.circle_detect();
   desugar.gen_tokens(&mut tokens, &ctx);
