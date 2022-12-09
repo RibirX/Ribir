@@ -125,10 +125,15 @@ impl ScopeUsedInfo {
     }
   }
 
-  pub fn upstream_tokens(&self) -> Option<TokenStream> {
+  pub fn upstream_modifies_tokens(&self, raw: bool) -> Option<TokenStream> {
     self.subscribe_widget().map(|directly_used| {
+      let modifies = if raw {
+        quote! { raw_modifies }
+      } else {
+        quote! {modifies}
+      };
       let upstream = directly_used.clone().map(|w| {
-        quote_spanned! { w.span() => #w.modifies() }
+        quote_spanned! { w.span() => #w.#modifies() }
       });
       if directly_used.count() > 1 {
         quote! {  observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
