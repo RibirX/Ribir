@@ -1,7 +1,7 @@
 use crate::{
   declare_derive::declare_field_name,
   error::DeclareError,
-  widget_macro::{desugar::WatchField, guard_ident},
+  widget_macro::{desugar::WatchField, guard_ident, guard_vec_ident},
   LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, PROP_MACRO_NAME, WATCH_MACRO_NAME,
   WIDGET_MACRO_NAME,
 };
@@ -364,22 +364,29 @@ impl VisitCtx {
                 ctx.visit_track_expr_mut(expr);
                 if expr.used_name_info.subscribe_widget().is_some() {
                   let field_fn_name = ribir_suffix_variable(&f.member, "fn");
-                  let field_fn = parse_quote_spanned! { expr.span() =>
+                  let mut field_fn = parse_quote_spanned! { expr.span() =>
                     let #field_fn_name = move ||  #origin ;
                   };
-                  let declare_set = declare_field_name(&f.member);
-                  let subscribe_do = if ctx.declare_objs.contains_key(name) {
-                    quote! { move |_| #name.#declare_set(#field_fn_name()) }
-                  } else {
-                    quote! {{
-                      let #name = #name.clone_stateful();
-                      move |_| #name.state_ref().#declare_set(#field_fn_name())
-                    }}
-                  };
+                  ctx.visit_stmt_mut(&mut field_fn);
+
                   expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name()};
                   let upstream = expr.used_name_info.upstream_tokens();
+
+                  let declare_set = declare_field_name(&f.member);
+                  let subscribe_do: Expr = parse_quote_spanned! { expr.span() => {
+                    let #name = #name.clone_stateful();
+                    move |_| #name.state_ref().#declare_set(#field_fn_name())
+                  }};
+
+                  ctx.has_guards_data = true;
+                  let guards = guard_vec_ident();
+
                   let watch_update = parse_quote_spanned! { expr.span() =>
-                    move_to_widget!(#upstream.subscribe( #subscribe_do ).unsubscribe_when_dropped() );
+                    #guards.push(AnonymousData::new(Box::new(
+                      #upstream
+                      .subscribe( #subscribe_do )
+                      .unsubscribe_when_dropped()
+                    )));
                   };
                   watch_stmts.push(WatchField { field_fn, watch_update });
                 }
@@ -397,20 +404,6 @@ impl VisitCtx {
             },
           )
         });
-
-        ctx.new_scope_visit(
-          |ctx| {
-            watch_stmts.iter_mut().for_each(|f| {
-              ctx.visit_stmt_mut(&mut f.field_fn);
-              ctx.visit_stmt_mut(&mut f.watch_update);
-            });
-          },
-          |scope| {
-            scope
-              .iter_mut()
-              .for_each(|(_, info)| info.used_type = UsedType::SCOPE_CAPTURE)
-          },
-        );
 
         if !value_obj {
           obj.used_name_info = ctx.take_current_used_info();

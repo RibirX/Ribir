@@ -76,11 +76,11 @@ pub(crate) fn gen_prop_macro(
 }
 
 pub(crate) fn gen_move_to_widget_macro(input: &TokenStream, ctx: &mut VisitCtx) -> TokenStream {
-  let guards = guard_vec_ident();
-  ctx.has_guards_data = true;
   let mut expr: Expr = parse_quote!(#input);
   ctx.visit_expr_mut(&mut expr);
-  quote_spanned!(input.span() => #guards.push(AnonymousData::new(Box::new(#expr))))
+  ctx.has_guards_data = true;
+  let guards = guard_vec_ident();
+  quote_spanned!(expr.span() => #guards.push(AnonymousData::new(Box::new(#expr))))
 }
 
 impl Desugared {
