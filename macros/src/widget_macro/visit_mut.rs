@@ -370,7 +370,7 @@ impl VisitCtx {
                   ctx.visit_stmt_mut(&mut field_fn);
 
                   expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name()};
-                  let upstream = expr.used_name_info.upstream_tokens();
+                  
 
                   let declare_set = declare_field_name(&f.member);
                   let subscribe_do: Expr = parse_quote_spanned! { expr.span() => {
@@ -381,6 +381,15 @@ impl VisitCtx {
                   ctx.has_guards_data = true;
                   let guards = guard_vec_ident();
 
+                  // DynWidget is a special object, it's both require data and framework change to update its children. 
+                  // When user call `.silent()` means no need relayout and redraw the widget. `DynWidget` as the directly subscriber also needn't to change.
+                  let upstream = if ty.is_ident("DynWidget") && f.member == "dyns" {
+                    let mut upstream = expr.used_name_info.upstream_modifies_tokens(true).unwrap();
+                    upstream.extend(quote_spanned! { f.member.span() => .filter(|s| s.contains(ModifyScope::FRAMEWORK)) });
+                    upstream
+                  } else {
+                    expr.used_name_info.upstream_modifies_tokens(false).unwrap()
+                  };
                   let watch_update = parse_quote_spanned! { expr.span() =>
                     #guards.push(AnonymousData::new(Box::new(
                       #upstream
@@ -688,7 +697,7 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
       });
     },
   );
-  if let Some(upstream) = watch_expr.used_name_info.upstream_tokens() {
+  if let Some(upstream) = watch_expr.used_name_info.upstream_modifies_tokens(false) {
     let map_closure = closure_surround_refs(
       &watch_expr.used_name_info,
       &mut parse_quote!( move |_| #watch_expr),

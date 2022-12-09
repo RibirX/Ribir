@@ -423,3 +423,28 @@ fn fix_local_assign_tuple() {
     }],
   );
 }
+
+#[test]
+fn fix_silent_not_relayout_dyn_widget() {
+  let trigger_size = Stateful::new(ZERO_SIZE);
+  let w = widget! {
+    states { trigger_size: trigger_size.clone() }
+    DynWidget {
+      dyns: if trigger_size.area() > 0. {
+        SizedBox { size: trigger_size.clone() }
+      } else {
+        SizedBox { size: ZERO_SIZE }
+      }
+    }
+  };
+
+  let mut wnd = Window::default_mock(w, None);
+  wnd.draw_frame();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+  {
+    *trigger_size.state_ref().silent() = Size::new(100., 100.);
+  }
+  // after silent modified, dyn widget not rebuild.
+  wnd.draw_frame();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+}
