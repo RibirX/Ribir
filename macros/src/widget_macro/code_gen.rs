@@ -104,6 +104,9 @@ impl Desugared {
 
       return;
     }
+    if !ctx.visit_error_occur {
+      warnings.iter().for_each(|w| w.emit_warning());
+    }
 
     let sorted_named_objs = self.order_named_objs();
     Brace::default().surround(tokens, |tokens| {
@@ -147,8 +150,6 @@ impl Desugared {
         quote! { ; #name.into_widget() }.to_tokens(tokens);
       });
     });
-
-    warnings.iter().for_each(|w| w.emit_warning());
   }
 
   pub fn collect_warnings(&mut self, ctx: &VisitCtx) { self.collect_unused_declare_obj(ctx); }
