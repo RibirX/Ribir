@@ -61,7 +61,6 @@ impl ComposeChild for Tabs {
     widget! {
       states {
         this: this.into_stateful(),
-        active_header_rect: Rect::zero().into_stateful()
       }
 
       Column {
@@ -71,39 +70,36 @@ impl ComposeChild for Tabs {
               width: 1., color: Palette::of(ctx).surface_variant()
             }),
             DynWidget {
-              dyns: {
-                headers.into_iter()
-                  .enumerate()
-                  .map(move |(idx, header)| {
-                    widget! {
-                      Expanded {
-                        id: tab_header,
-                        flex: 1.,
-                        tap: move |_| {
-                          if this.cur_idx != idx {
-                            this.cur_idx = idx;
-                            *active_header_rect = tab_header.layout_rect();
-                          }
-                        },
-                        TabStyle {
-                          DynWidget {
-                            dyns: header
-                          }
+              dyns: headers.into_iter()
+                .enumerate()
+                .map(move |(idx, header)| {
+                  widget! {
+                    Expanded {
+                      id: tab_header,
+                      flex: 1.,
+                      tap: move |_| {
+                        if this.cur_idx != idx {
+                          this.cur_idx = idx;
+                        }
+                      },
+                      TabStyle {
+                        DynWidget {
+                          dyns: header
                         }
                       }
-                      finally {
-                        let_watch!(tab_header.layout_rect())
-                          .subscribe(move |v| if this.cur_idx == idx {
-                              *active_header_rect = v;
-                          });
-                      }
                     }
-                  })
-              }
+                    finally {
+                      let_watch!((this.cur_idx == idx, tab_header.layout_rect()))
+                        .filter_map(|(active, rect): (bool, Rect)| active.then(|| rect))
+                        .subscribe(move |v| { ink_bar.ink_bar_rect = v });
+                    }
+                  }
+                })
             }
           }
           InkBarStyle {
-            ink_bar_rect: active_header_rect.clone(),
+            id: ink_bar,
+            ink_bar_rect: Rect::zero()
           }
         }
 

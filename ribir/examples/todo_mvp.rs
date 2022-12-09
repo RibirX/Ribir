@@ -54,7 +54,7 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              Self::pane(this.clone_stateful(), |_| true)
+              Self::pane(this, |_| true, tabs.cur_idx == 0)
             }
           }
           Tab {
@@ -65,7 +65,7 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              Self::pane(this.clone_stateful(), |task| !task.finished)
+              Self::pane(this, |task| !task.finished, tabs.cur_idx == 1)
             }
           }
           Tab {
@@ -76,7 +76,7 @@ impl Compose for TodoMVP {
               }
             }
             TabPane {
-              Self::pane(this.clone_stateful(), |task| task.finished)
+              Self::pane(this, |task| task.finished, tabs.cur_idx == 2)
             }
           }
         }
@@ -86,50 +86,63 @@ impl Compose for TodoMVP {
 }
 
 impl TodoMVP {
-  fn pane(this: Stateful<Self>, cond: impl Fn(&Task) -> bool + 'static) -> Widget {
-    widget! {
-      states { this, this2: this.clone() }
+  fn pane(
+    this: StateRef<'_, Self>,
+    cond: impl Fn(&Task) -> bool + 'static,
+    is_active: bool,
+  ) -> Option<Widget> {
+    if !is_active {
+      return None;
+    }
+
+    let this = this.clone_stateful();
+   
+    let w = widget! {
+      states { this }
       VScrollBar {
         Lists {
           padding: EdgeInsets::vertical(8.),
           DynWidget {
-            dyns: this.tasks.iter()
-              .enumerate()
-              .filter(|(_, task)| { cond(task) })
-              .map(|(idx, task)| {
-              let checked = task.finished;
-              let label = task.label.clone();
-              widget! {
-                ListItem {
-                  id: item,
-                  HeadlineText::new(label)
-                  Leading {
-                    Checkbox {
-                      id: checkbox,
-                      checked,
-                      margin: EdgeInsets::vertical(4.),
+            dyns: {
+              this
+                .tasks
+                .iter()
+                .enumerate()
+                .filter(|(_, task)| { cond(task) })
+                .map(move |(idx, task)| {
+                  let task = task.clone();
+                  widget! { 
+                    ListItem {
+                      id: item,
+                      HeadlineText::new(task.label.clone())
+                      Leading {
+                        Checkbox {
+                          id: checkbox,
+                          checked: task.finished,
+                          margin: EdgeInsets::vertical(4.),
+                        }
+                      }
+                      Trailing {
+                        Icon {
+                          visible: item.mouse_hover(),
+                          tap: move |_| { this.tasks.remove(idx); },
+                          svgs::CLOSE
+                        }
+                      }
+                    }
+                    finally {
+                      let_watch!(checkbox.checked)
+                        .subscribe(move |v| this.silent().tasks[idx].finished = v);
                     }
                   }
-                  Trailing {
-                    Icon {
-                      visible: item.mouse_hover(),
-                      tap: move |_| {
-                          this2.tasks.remove(idx);
-                      },
-                      svgs::CLOSE
-                    }
-                  }
-                }
-                finally {
-                  let_watch!(checkbox.checked)
-                    .subscribe(move |v| this2.silent().tasks[idx].finished = v);
-                }
-              }
-            }).collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+            }
           }
         }
       }
-    }
+    };
+    Some(w)
   }
 }
 
