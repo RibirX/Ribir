@@ -52,6 +52,7 @@ pub struct VisitCtx {
   pub used_objs: HashMap<Ident, UsedInfo, ahash::RandomState>,
   pub analyze_stack: Vec<Vec<LocalVariable>>,
   pub has_guards_data: bool,
+  pub visit_error_occur: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +85,7 @@ impl Default for VisitCtx {
       used_objs: Default::default(),
       analyze_stack: vec![vec![]],
       has_guards_data: false,
+      visit_error_occur: false,
     }
   }
 }
@@ -105,6 +107,7 @@ impl VisitMut for VisitCtx {
           let mut tokens = quote! {};
           DeclareError::LetWatchWrongPlace(mac.span().unwrap()).into_compile_error(&mut tokens);
           *expr = Expr::Verbatim(tokens);
+          self.visit_error_occur = true;
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -148,39 +151,6 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_stmt_mut(&mut self, stmt: &mut Stmt) {
-    if stmt
-      .to_token_stream()
-      .to_string()
-      .contains("let_watch! (sized_box.size)")
-    {
-      println!("statement contain `let_watch` \n {:?}", stmt);
-    }
-
-    fn let_watch_as_watch(expr: &mut Expr) -> bool {
-      let Expr::MethodCall(method_call) = expr else {return false;};
-      if let Expr::Macro(mac) = &mut *method_call.receiver {
-        let path = &mut mac.mac.path;
-        if path.is_ident(LET_WATCH_MACRO_NAME) {
-          let watch = Ident::new(WATCH_MACRO_NAME, path.span());
-          *path = watch.into();
-          return true;
-        }
-      }
-      return let_watch_as_watch(&mut method_call.receiver);
-    }
-
-    fn let_watch_desugar(expr: &mut Expr, semi: Option<Semi>) -> Option<Stmt> {
-      let_watch_as_watch(expr).then(|| {
-        let guard = guard_ident(expr.span());
-
-        let move_to_widget = Ident::new(MOVE_TO_WIDGET_MACRO_NAME, expr.span());
-        parse_quote_spanned! { expr.span() =>{
-          let #guard = #expr #semi
-          #move_to_widget!(#guard.unsubscribe_when_dropped());
-        }}
-      })
-    }
-
     match stmt {
       Stmt::Item(syn::Item::Macro(ItemMacro { ident: None, mac, .. })) => {
         if mac.path.is_ident(WIDGET_MACRO_NAME) {
@@ -198,16 +168,17 @@ impl VisitMut for VisitCtx {
         } else if mac.path.is_ident(LET_WATCH_MACRO_NAME) {
           let mut tokens = quote! {};
           DeclareError::LetWatchWrongPlace(mac.span().unwrap()).into_compile_error(&mut tokens);
+          self.visit_error_occur = true;
           *stmt = Stmt::Expr(Expr::Verbatim(tokens));
         }
       }
       Stmt::Expr(expr) => {
-        if let Some(new_stmt) = let_watch_desugar(expr, None) {
+        if let Some(new_stmt) = self.let_watch_desugar(expr, None) {
           *stmt = new_stmt;
         }
       }
       Stmt::Semi(expr, semi) => {
-        if let Some(new_stmt) = let_watch_desugar(expr, Some(*semi)) {
+        if let Some(new_stmt) = self.let_watch_desugar(expr, Some(*semi)) {
           *stmt = new_stmt;
         }
       }
@@ -320,6 +291,37 @@ impl VisitMut for VisitCtx {
 }
 
 impl VisitCtx {
+  fn let_watch_desugar(&mut self, expr: &mut Expr, semi: Option<Semi>) -> Option<Stmt> {
+    fn let_watch_as_watch(expr: &mut Expr) -> bool {
+      let Expr::MethodCall(method_call) = expr else {return false;};
+      if let Expr::Macro(mac) = &mut *method_call.receiver {
+        let path = &mut mac.mac.path;
+        if path.is_ident(LET_WATCH_MACRO_NAME) {
+          let watch = Ident::new(WATCH_MACRO_NAME, path.span());
+          *path = watch.into();
+          return true;
+        }
+      }
+      return let_watch_as_watch(&mut method_call.receiver);
+    }
+
+    let_watch_as_watch(expr).then(|| {
+      let guard = guard_ident(expr.span());
+
+      let move_to_widget = Ident::new(MOVE_TO_WIDGET_MACRO_NAME, expr.span());
+      let res = syn::parse2::<Stmt>(quote_spanned! { expr.span() =>{
+        let #guard = #expr #semi
+        #move_to_widget!(#guard.unsubscribe_when_dropped());
+      }});
+
+      res.unwrap_or_else(|err| {
+        self.visit_error_occur = true;
+        let tokens = err.into_compile_error();
+        Stmt::Expr(Expr::Verbatim(tokens))
+      })
+    })
+  }
+
   pub fn visit_desugared_syntax_mut(&mut self, desugar: &mut Desugared) {
     desugar.named_objs.objs_mut().for_each(|obj| match obj {
       NamedObj::Host(obj) | NamedObj::Builtin { obj, .. } => self.visit_declare_obj_mut(obj, false),
@@ -704,6 +706,7 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
   } else {
     let mut tokens = quote! {};
     DeclareError::WatchNothing(watch_expr.span().unwrap()).into_compile_error(&mut tokens);
+    ctx.visit_error_occur = true;
     tokens.into()
   }
 }
