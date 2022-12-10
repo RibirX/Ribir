@@ -41,6 +41,9 @@ impl ComposeChild for Ripple {
   fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
     widget! {
       states { this: this.into_stateful() }
+      init ctx => {
+        let linear_transition = transitions::LINEAR.of(ctx);
+      }
       Stack {
         id: container,
         pointer_down: move |e| this.launch_pos = if this.center {
@@ -59,6 +62,7 @@ impl ComposeChild for Ripple {
                 let distance_y = f32::max(launch_at.y, size.height - launch_at.y);
                 (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
               });
+              let linear_transition = linear_transition.clone();
               widget!{
                 IgnorePointer {
                   DynWidget {
@@ -83,7 +87,7 @@ impl ComposeChild for Ripple {
                 }
                 Animate {
                   id: ripper_enter,
-                  transition: transitions::LINEAR.of(ctx),
+                  transition: linear_transition,
                   prop: prop!(ripple_path.path, move |_, _, rate| {
                     let radius = Lerp::lerp(&0., &radius, rate);
                     let center = this.launch_pos.clone().unwrap();

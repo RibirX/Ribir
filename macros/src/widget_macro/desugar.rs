@@ -31,6 +31,7 @@ pub struct Desugared {
 }
 
 pub struct InitStmts {
+  pub ctx_name: Option<Ident>,
   pub stmts: Vec<Stmt>,
   pub used_name_info: ScopeUsedInfo,
 }
@@ -103,6 +104,7 @@ impl MacroSyntax {
 
     let mut desugared = Desugared {
       init: init.map(|init| InitStmts {
+        ctx_name: init.ctx_name,
         stmts: init.block.stmts,
         used_name_info: <_>::default(),
       }),

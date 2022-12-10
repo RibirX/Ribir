@@ -14,6 +14,8 @@ pub use name_used_info::*;
 mod variable_names;
 pub use variable_names::*;
 
+use crate::error::DeclareError;
+
 use self::desugar::{builtin_obj, NamedObj};
 
 fn capture_widget(widget: &Ident) -> TokenStream {
@@ -51,6 +53,9 @@ pub fn gen_widget_macro(
   // visit init without named objects.
   if let Some(init) = desugar.init.as_mut() {
     ctx.visit_init_stmts_mut(init);
+    if let Some(ctx_name) = init.ctx_name.clone() {
+      ctx.track_names.insert(ctx_name);
+    }
   }
 
   ctx.declare_objs.extend(
@@ -61,6 +66,14 @@ pub fn gen_widget_macro(
   );
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
+  if let Some(ctx_name) = desugar.init.as_ref().and_then(|i| i.ctx_name.as_ref()) {
+    if let Some(used_info) = ctx.used_objs.get(ctx_name) {
+      desugar.errors.push(DeclareError::CtxOnlyAllowInInit {
+        name: ctx_name.to_string(),
+        spans: used_info.spans.clone(),
+      })
+    }
+  }
 
   ctx
     .used_objs

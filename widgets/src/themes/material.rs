@@ -93,11 +93,14 @@ fn init_custom_theme(theme: &mut FullTheme) {
 fn override_compose_style(theme: &mut FullTheme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
+      init ctx => {
+        let background = Palette::of(ctx).primary();
+      }
       DynWidget {
         dyns: host,
         margin,
         border_radius: Radius::all(4.),
-        background: Palette::of(ctx).primary()
+        background
       }
     }
   }
@@ -106,6 +109,9 @@ fn override_compose_style(theme: &mut FullTheme) {
   styles.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
     widget! {
       states { this }
+      init ctx => {
+        let  smooth_scroll = transitions::SMOOTH_SCROLL.of(ctx);
+      }
       DynWidget {
         id: thumb,
         left_anchor: this.offset,
@@ -113,13 +119,16 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
 
       transition prop!(thumb.left_anchor, PositionUnit::lerp_fn(thumb.layout_width())) {
-        by: transitions::SMOOTH_SCROLL.of(ctx),
+        by: smooth_scroll,
       }
     }
   });
   styles.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
     widget! {
       states { this }
+      init ctx => {
+        let smooth_scroll = transitions::SMOOTH_SCROLL.of(ctx);
+      }
       DynWidget {
         id: thumb,
         top_anchor: this.offset,
@@ -127,14 +136,17 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
 
       transition prop!(thumb.top_anchor, PositionUnit::lerp_fn(thumb.layout_height())) {
-        by: transitions::SMOOTH_SCROLL.of(ctx),
+        by: smooth_scroll
       }
     }
   });
   styles.override_compose_style::<InkBarStyle>(|style, _| {
     widget! {
       states { style }
-      init { let palette = Palette::of(ctx); }
+      init ctx => {
+        let palette = Palette::of(ctx);
+        let ease_in = transitions::EASE_IN.of(ctx);
+      }
       Container {
         id: ink_bar,
         size: Size::new(style.ink_bar_rect.size.width, 2.),
@@ -146,9 +158,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       transition prop!(
         ink_bar.left_anchor,
         PositionUnit::lerp_fn(style.ink_bar_rect.size.width)
-      ) {
-        by: transitions::EASE_IN.of(ctx)
-      }
+      ) { by: ease_in }
     }
   });
   styles.override_compose_style::<CheckBoxStyle>(move |style, host| {

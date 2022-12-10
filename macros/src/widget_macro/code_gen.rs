@@ -3,7 +3,7 @@ use crate::{
   widget_macro::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD},
 };
 use ahash::RandomState;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use smallvec::{smallvec, SmallVec};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -99,7 +99,7 @@ impl Desugared {
     if !errors.is_empty() {
       Brace::default().surround(tokens, |tokens| {
         errors.iter().for_each(|err| err.into_compile_error(tokens));
-        quote! { Void }.to_tokens(tokens);
+        quote! { Void.into_widget() }.to_tokens(tokens);
       });
 
       return;
@@ -114,9 +114,15 @@ impl Desugared {
         quote!(#![allow(unused_mut)]).to_tokens(tokens);
 
         states.to_tokens(tokens);
-        let ctx_name = ctx_ident(Span::call_site());
         let name = widget.as_ref().unwrap().node.name();
-        quote! { let #name = move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
+        quote! { let #name = move | }.to_tokens(tokens);
+        if let Some(ctx_name) = init.as_ref().and_then(|i| i.ctx_name.as_ref()) {
+          ctx_name.to_tokens(tokens);
+        } else {
+          ctx_ident().to_tokens(tokens)
+        };
+        quote! { : &BuildCtx|}.to_tokens(tokens);
+
         Brace::default().surround(tokens, |tokens| {
           if ctx.has_guards_data {
             let guards_vec = guard_vec_ident();
@@ -377,7 +383,7 @@ impl DeclareObj {
         member.to_tokens(tokens);
         Paren(value.span()).surround(tokens, |tokens| value.to_tokens(tokens))
       });
-      let build_ctx = ctx_ident(ty.span());
+      let build_ctx = ctx_ident();
       tokens.extend(quote_spanned! { span => .build(#build_ctx) });
       let is_stateful = *stateful || !watch_stmts.is_empty();
       if is_stateful {
@@ -526,7 +532,11 @@ impl ToTokens for InitStmts {
       });
       tokens.append_all(refs);
     }
-    tokens.append_all(&self.stmts)
+    tokens.append_all(&self.stmts);
+    if let Some(name) = self.ctx_name.as_ref() {
+      let inner_name = ctx_ident();
+      quote! { let #inner_name = #name; }.to_tokens(tokens);
+    }
   }
 }
 

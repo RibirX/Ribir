@@ -13,8 +13,9 @@ struct TodoMVP {
 impl Compose for TodoMVP {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
-      states {
-        this: this.into_stateful(),
+      states { this: this.into_stateful() }
+      init ctx => {
+        let surface_variant = Palette::of(ctx).surface_variant();
       }
       Column {
         margin: EdgeInsets::all(10.),
@@ -23,7 +24,7 @@ impl Compose for TodoMVP {
 
           Container {
             size: Size::new(240., 30.),
-            border: Border::only_bottom(BorderSide { width:1., color: Palette::of(ctx).surface_variant() }),
+            border: Border::only_bottom(BorderSide { width:1., color: surface_variant }),
             Input {
               id: input,
               placeholder: String::from("Todo"),
@@ -53,9 +54,9 @@ impl Compose for TodoMVP {
                 is_active: tabs.cur_idx == 0,
               }
             }
-            TabPane {
-              Self::pane(this, |_| true, tabs.cur_idx == 0)
-            }
+            TabPane { DynWidget {
+              dyns: (tabs.cur_idx == 0).then(|| Self::pane(this, |_| true))
+            }}
           }
           Tab {
             TabHeader {
@@ -64,9 +65,9 @@ impl Compose for TodoMVP {
                 is_active: tabs.cur_idx == 1,
               }
             }
-            TabPane {
-              Self::pane(this, |task| !task.finished, tabs.cur_idx == 1)
-            }
+            TabPane { DynWidget {
+              dyns: (tabs.cur_idx == 1).then(|| Self::pane(this, |task| !task.finished))
+            }}
           }
           Tab {
             TabHeader {
@@ -75,9 +76,9 @@ impl Compose for TodoMVP {
                 is_active: tabs.cur_idx == 2,
               }
             }
-            TabPane {
-              Self::pane(this, |task| task.finished, tabs.cur_idx == 2)
-            }
+            TabPane { DynWidget {
+              dyns: (tabs.cur_idx == 2).then(|| Self::pane(this, |task| task.finished))
+            }}
           }
         }
       }
@@ -86,32 +87,22 @@ impl Compose for TodoMVP {
 }
 
 impl TodoMVP {
-  fn pane(
-    this: StateRef<'_, Self>,
-    cond: impl Fn(&Task) -> bool + 'static,
-    is_active: bool,
-  ) -> Option<Widget> {
-    if !is_active {
-      return None;
-    }
-
+  fn pane(this: StateRef<Self>, cond: fn(&Task) -> bool) -> Widget {
     let this = this.clone_stateful();
-   
-    let w = widget! {
+    widget! {
       states { this }
       VScrollBar {
         Lists {
           padding: EdgeInsets::vertical(8.),
           DynWidget {
             dyns: {
-              this
-                .tasks
-                .iter()
+              let tasks = this.tasks.clone();
+              tasks
+                .into_iter()
                 .enumerate()
-                .filter(|(_, task)| { cond(task) })
+                .filter(move |(_, task)| { cond(task) })
                 .map(move |(idx, task)| {
-                  let task = task.clone();
-                  widget! { 
+                  widget! {
                     ListItem {
                       id: item,
                       HeadlineText::new(task.label.clone())
@@ -136,13 +127,11 @@ impl TodoMVP {
                     }
                   }
                 })
-                .collect::<Vec<_>>()
             }
           }
         }
       }
-    };
-    Some(w)
+    }
   }
 }
 
@@ -158,7 +147,7 @@ impl Compose for TabText {
       states {
         this: this.into_stateful()
       }
-      init {
+      init ctx => {
         let primary = Palette::of(ctx).primary();
         let on_surface_variant = Palette::of(ctx).on_surface_variant();
         let text_style = TypographyTheme::of(ctx).body1.text.clone();

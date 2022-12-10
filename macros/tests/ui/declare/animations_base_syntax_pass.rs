@@ -2,6 +2,11 @@ use ribir::prelude::*;
 
 fn main() {
   let _def_ref = widget! {
+    init ctx => {
+      let linear = Transition::declare_builder()
+        .easing(easing::LINEAR)
+        .build(ctx);
+    }
     SizedBox {
       id: sized_box,
       size: Size::zero()
@@ -9,9 +14,7 @@ fn main() {
 
     Animate {
       id: animate1,
-      transition: Transition::declare_builder()
-        .easing(easing::LINEAR)
-        .build(ctx),
+      transition: linear,
       prop: prop!(sized_box.size),
       from: Size::new(10., 10.),
     }
@@ -36,13 +39,14 @@ fn main() {
   };
 
   let _transition_by = widget! {
+    init ctx => {
+      let linear = transitions::LINEAR.of(ctx);
+    }
     SizedBox {
       id: sized_box,
       size: Size::zero()
     }
-    transition prop!(sized_box.size) {
-      by: transitions::LINEAR.of(ctx)
-    }
+    transition prop!(sized_box.size) { by: linear }
   };
 
   let _fix_shorthand_with_builtin_field = widget! {

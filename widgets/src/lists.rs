@@ -67,6 +67,10 @@ impl ComposeChild for ListItem {
     } = child;
 
     widget! {
+      init ctx => {
+        let surface_variant = Brush::Color(Palette::of(ctx).on_surface_variant());
+        let body_text_style = TypographyTheme::of(ctx).body1.text.clone();
+      }
       Row {
         DynWidget {
           dyns: leading.map(|w| w.child)
@@ -79,8 +83,8 @@ impl ComposeChild for ListItem {
                 Text {
                   text: headline_text.0,
                   style: TextStyle {
-                    foreground: Brush::Color(Palette::of(ctx).on_surface_variant()),
-                    ..TypographyTheme::of(ctx).body1.text.clone()
+                    foreground: surface_variant,
+                    ..body_text_style
                   }
                 }
               }

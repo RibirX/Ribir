@@ -52,7 +52,7 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
   Ident::new(&name, from.span())
 }
 
-pub fn ctx_ident(span: Span) -> Ident { Ident::new("ctx", span) }
+pub fn ctx_ident() -> Ident { ribir_variable("ctx", Span::call_site()) }
 
 pub fn builtin_var_name(host: &Ident, span: Span, ty: &str) -> Ident {
   let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).expect(&format!(

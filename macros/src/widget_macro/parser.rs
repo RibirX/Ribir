@@ -9,7 +9,7 @@ use syn::{
   parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Brace, Colon, Colon2, Comma, Dot, Paren},
+  token::{Brace, Colon, Colon2, Comma, Dot, FatArrow, Paren},
   Block, Expr, Ident, Path, Result,
 };
 
@@ -42,6 +42,8 @@ pub struct States {
 
 pub struct Init {
   _init_token: kw::init,
+  pub ctx_name: Option<Ident>,
+  _fat_arrow: Option<FatArrow>,
   pub block: Block,
 }
 
@@ -180,7 +182,7 @@ impl Parse for MacroSyntax {
         }
       } else if lk.peek(kw::finally) {
         let e: Finally = input.parse::<Finally>()?;
-        if let Some(finally) = init.as_mut() {
+        if let Some(finally) = finally.as_mut() {
           finally.block.stmts.extend(e.block.stmts);
         } else {
           finally = Some(e)
@@ -228,8 +230,18 @@ impl Parse for States {
 
 impl Parse for Init {
   fn parse(input: ParseStream) -> Result<Self> {
+    let _init_token = input.parse()?;
+    let ctx_name: Option<Ident> = input.parse()?;
+    let _fat_arrow = if ctx_name.is_some() {
+      input.parse()?
+    } else {
+      None
+    };
+
     Ok(Self {
-      _init_token: input.parse()?,
+      _init_token,
+      ctx_name,
+      _fat_arrow,
       block: input.parse()?,
     })
   }
