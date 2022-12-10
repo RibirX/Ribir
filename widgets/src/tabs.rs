@@ -59,15 +59,15 @@ impl ComposeChild for Tabs {
     }
 
     widget! {
-      states {
-        this: this.into_stateful(),
+      states { this: this.into_stateful() }
+      init ctx => {
+        let  border_color = Palette::of(ctx).surface_variant();
       }
-
       Column {
         Stack {
           Row {
             border: Border::only_bottom(BorderSide {
-              width: 1., color: Palette::of(ctx).surface_variant()
+              width: 1., color: border_color
             }),
             DynWidget {
               dyns: headers.into_iter()

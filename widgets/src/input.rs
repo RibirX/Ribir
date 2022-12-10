@@ -179,6 +179,13 @@ impl Compose for Caret {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       states {this: this.into_stateful(),}
+      init ctx => {
+        let caret_transition = Transition::declare_builder()
+        .duration(Duration::from_secs(1))
+        .easing(easing::steps(2, easing::StepsJump::JumpNone))
+        .repeat(f32::INFINITY)
+        .build(ctx);
+      }
       SizedBox {
         id: caret,
         opacity: 1.,
@@ -190,11 +197,7 @@ impl Compose for Caret {
       }
       Animate {
         id: animate1,
-        transition: Transition::declare_builder()
-          .duration(Duration::from_secs(1))
-          .easing(easing::steps(2, easing::StepsJump::JumpNone))
-          .repeat(f32::INFINITY)
-          .build(ctx),
+        transition: caret_transition,
         prop: prop!(caret.opacity),
         from: 1. - caret.opacity,
       }

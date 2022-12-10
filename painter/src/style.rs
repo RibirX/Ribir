@@ -8,6 +8,7 @@ use text::{Em, FontFace, FontSize, Pixel};
 pub struct TextStyle {
   /// The size of glyphs (in logical pixels) to use when painting the text.
   pub font_size: FontSize,
+  // todo: needn't a color in style?
   /// The style drawn as a foreground for the text.
   pub foreground: Brush,
   /// The font face to use when painting the text.

@@ -65,6 +65,7 @@ impl LocalVariable {
   pub fn local(name: Ident) -> Self { Self { name, alias_of_name: None } }
 }
 
+#[derive(Debug, Clone)]
 pub struct UsedInfo {
   pub builtin: Option<BuiltinUsed>,
   pub spans: Vec<Span>,
@@ -368,9 +369,7 @@ impl VisitCtx {
                     let #field_fn_name = move ||  #origin ;
                   };
                   ctx.visit_stmt_mut(&mut field_fn);
-
                   expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name()};
-                  
 
                   let declare_set = declare_field_name(&f.member);
                   let subscribe_do: Expr = parse_quote_spanned! { expr.span() => {
@@ -381,11 +380,15 @@ impl VisitCtx {
                   ctx.has_guards_data = true;
                   let guards = guard_vec_ident();
 
-                  // DynWidget is a special object, it's both require data and framework change to update its children. 
-                  // When user call `.silent()` means no need relayout and redraw the widget. `DynWidget` as the directly subscriber also needn't to change.
+                  // DynWidget is a special object, it's both require data and framework change to
+                  // update its children. When user call `.silent()` means no
+                  // need relayout and redraw the widget. `DynWidget` as the directly subscriber
+                  // also needn't to change.
                   let upstream = if ty.is_ident("DynWidget") && f.member == "dyns" {
                     let mut upstream = expr.used_name_info.upstream_modifies_tokens(true).unwrap();
-                    upstream.extend(quote_spanned! { f.member.span() => .filter(|s| s.contains(ModifyScope::FRAMEWORK)) });
+                    upstream.extend(quote_spanned! {
+                      f.member.span() => .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+                    });
                     upstream
                   } else {
                     expr.used_name_info.upstream_modifies_tokens(false).unwrap()

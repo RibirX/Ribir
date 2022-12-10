@@ -22,6 +22,7 @@ pub enum DeclareError {
   TransitionByConflict(Span),
   LetWatchWrongPlace(Span),
   SynErr(syn::Error),
+  CtxOnlyAllowInInit { name: String, spans: Vec<Span> },
 }
 
 #[derive(Debug)]
@@ -82,6 +83,10 @@ impl DeclareError {
           "`let_watch` only allow start as a statement to help auto\
           unsubscribe a subscribed stream when the root of `widget!` dropped.",
         );
+      }
+      DeclareError::CtxOnlyAllowInInit { name, spans } => {
+        diagnostic.set_spans(spans.clone());
+        diagnostic.set_message(format!("`{name}` only allow use in `init` phase"));
       }
       DeclareError::SynErr(err) => err.clone().into_compile_error().to_tokens(tokens),
     };

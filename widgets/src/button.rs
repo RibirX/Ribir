@@ -37,7 +37,7 @@ impl ComposeChild for Button {
     let ButtonTemplate { icon, button_text } = child;
 
     widget! {
-      init {
+      init ctx => {
         let ButtonTheme {
           padding,
           radius,
@@ -45,6 +45,10 @@ impl ComposeChild for Button {
           background,
           foreground,
         } = *ButtonTheme::of(ctx);
+        let text_style = TextStyle {
+          foreground: Brush::Color(foreground),
+          ..TypographyTheme::of(ctx).button.text.clone()
+        };
       }
       Row {
         padding: EdgeInsets::all(padding),
@@ -58,10 +62,7 @@ impl ComposeChild for Button {
         }
         Text {
           text: button_text.0,
-          style: TextStyle {
-            foreground: Brush::Color(foreground),
-            ..TypographyTheme::of(ctx).button.text.clone()
-          }
+          style: text_style,
         }
       }
     }

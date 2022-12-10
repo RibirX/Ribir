@@ -24,6 +24,9 @@ fn listener_trigger_have_handler() {
 
   let w = widget! {
     states { animate_state:  animate_state.clone() }
+    init ctx => {
+      let linear_transition = transitions::LINEAR.of(ctx);
+    }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
@@ -34,10 +37,7 @@ fn listener_trigger_have_handler() {
     }
     Animate {
       id: leak_animate,
-      transition: Transition::declare_builder()
-        .easing(easing::LINEAR)
-        .duration(Duration::from_millis(100))
-        .build(ctx),
+      transition: linear_transition,
       prop: prop!(sized_box.size),
       from: ZERO_SIZE,
     }
@@ -59,6 +59,12 @@ fn listener_trigger() {
 
   let w = widget! {
     states { animate_state:  animate_state.clone() }
+    init ctx => {
+      let linear_transition = Transition::declare_builder()
+      .easing(easing::LINEAR)
+      .duration(Duration::from_millis(100))
+      .build(ctx);
+    }
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
@@ -68,10 +74,7 @@ fn listener_trigger() {
       id: leak_animate,
       prop: prop!(sized_box.size),
       from: ZERO_SIZE,
-      transition: Transition::declare_builder()
-        .easing(easing::LINEAR)
-        .duration(Duration::from_millis(100))
-        .build(ctx),
+      transition: linear_transition,
     }
     finally {
       watch!(leak_animate.is_running())
