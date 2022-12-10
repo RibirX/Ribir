@@ -68,17 +68,22 @@ builtin! {
   FocusListener {
     #[doc="specify the event handler to process focus event."]
     focus: impl FnMut(&mut FocusEvent),
+  }
+
+  BlurListener {
     #[doc="specify the event handler to process blur event."]
     blur: impl FnMut(&mut FocusEvent),
   }
 
-  FocusInOutListener {
+  FocusInListener {
     #[doc="specify the event handler to process focusin event."]
     focus_in: impl FnMut(&mut FocusEvent),
+  }
+
+  FocusOutListener{
     #[doc="specify the event handler to process focusout event."]
     focus_out: impl FnMut(&mut FocusEvent),
   }
-
 
   HasFocus {
     #[doc="return if the widget has focus."]

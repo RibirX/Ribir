@@ -447,8 +447,8 @@ impl Dispatcher {
       let mut focus_event = FocusEvent::new(wid, tree, info);
       wid
         .assert_get(&tree.arena)
-        .query_on_first_type(QueryOrder::InnerFirst, |focus: &FocusListener| {
-          focus.dispatch_blur(&mut focus_event)
+        .query_on_first_type(QueryOrder::InnerFirst, |blur: &BlurListener| {
+          blur.dispatch(&mut focus_event)
         })
     });
 
@@ -460,11 +460,11 @@ impl Dispatcher {
       .next()
       .map(|wid| {
         let mut focus_event = FocusEvent::new(*wid, tree, info);
-        tree.bubble_event_with(&mut focus_event, |focus: &FocusInOutListener, event| {
+        tree.bubble_event_with(&mut focus_event, |focus_out: &FocusOutListener, event| {
           if common_ancestors.contains(&event.current_target()) {
             event.stop_bubbling();
           } else {
-            focus.dispatch_focus_out(event);
+            focus_out.dispatch(event);
           }
         });
       });
@@ -474,18 +474,18 @@ impl Dispatcher {
 
       wid
         .assert_get(&tree.arena)
-        .query_on_first_type(QueryOrder::InnerFirst, |focus_listener: &FocusListener| {
-          focus_listener.dispatch_focus(&mut focus_event)
+        .query_on_first_type(QueryOrder::InnerFirst, |focus: &FocusListener| {
+          focus.dispatch(&mut focus_event)
         });
 
       let mut focus_event = FocusEvent::new(wid, tree, info);
 
       // bubble focus in
-      tree.bubble_event_with(&mut focus_event, |focus: &FocusInOutListener, event| {
+      tree.bubble_event_with(&mut focus_event, |focus_in: &FocusInListener, event| {
         if common_ancestors.contains(&event.current_target()) {
           event.stop_bubbling();
         } else {
-          focus.dispatch_focus_in(event);
+          focus_in.dispatch(event);
         }
       });
     }

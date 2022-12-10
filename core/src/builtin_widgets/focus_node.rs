@@ -77,9 +77,9 @@ fn has_focus(r: &dyn Render) -> bool {
 }
 
 
-pub(crate) fn dynamic_compose_focus(widget: Widget) -> Widget {
+pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
     match widget {
-      Widget::Compose(c) => (|ctx: &BuildCtx| dynamic_compose_focus(c(ctx))).into_widget(),
+      Widget::Compose(c) => (|ctx: &BuildCtx| dynamic_compose_focus_node(c(ctx))).into_widget(),
       Widget::Render { ref render,  children: _ } => {
         if has_focus(render) {
           widget
@@ -111,7 +111,7 @@ mod tests {
       type Child = Widget;
       #[inline]
       fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
-        dynamic_compose_focus(child)
+        dynamic_compose_focus_node(child)
       }
     }
     let widget = widget! {
