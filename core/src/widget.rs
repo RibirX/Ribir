@@ -75,7 +75,7 @@ pub enum Widget {
   Compose(Box<dyn for<'r> FnOnce(&'r BuildCtx) -> Widget>),
   Render {
     render: Box<dyn Render>,
-    children: Vec<Widget>,
+    children: Option<Vec<Widget>>,
   },
 }
 
@@ -189,7 +189,7 @@ impl<R: Render + 'static> IntoWidget<Generic<&dyn Render>> for R {
   fn into_widget(self) -> Widget {
     Widget::Render {
       render: Box::new(self),
-      children: Vec::default(),
+      children: None,
     }
   }
 }

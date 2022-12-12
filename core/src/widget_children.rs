@@ -14,37 +14,49 @@ pub trait ComposeChild: Sized {
 
 /// Trait specify what child a widget can have, and the target type after widget
 /// compose its child.
-pub trait WithChild<M, T: Template> {
+pub trait WithChild<M, C> {
   type Target;
-  fn with_child(self, child: T::Target) -> Self::Target;
-
-  #[inline]
-  fn child_template(&self) -> T { Template::empty() }
+  fn with_child(self, child: C) -> Self::Target;
 }
 
-impl<W, T> WithChild<W, T> for W
+pub trait ChildTemplate<M> {
+  type T: Template;
+  #[inline]
+  fn child_template(&self) -> Self::T { Self::T::empty() }
+}
+
+impl<W, C> WithChild<W, C> for W
 where
-  W: ComposeChild,
-  W::Child: AssociatedTemplate<T = T>,
-  T: Template<Target = W::Child>,
+  W: ComposeChild<Child = C>,
 {
   type Target = Widget;
   #[inline]
-  fn with_child(self, child: T::Target) -> Self::Target {
+  fn with_child(self, child: C) -> Self::Target {
     ComposeChild::compose_child(StateWidget::Stateless(self), child)
   }
 }
 
-impl<W, C> WithChild<&dyn SingleChild, ConcreteTml<C>> for W
+impl<W> ChildTemplate<W> for W
+where
+  W: ComposeChild,
+{
+  type T = <W::Child as AssociatedTemplate>::T;
+}
+
+impl<W, C> WithChild<&dyn SingleChild, C> for W
 where
   W: SingleChild,
 {
   type Target = WidgetPair<Self, C>;
   #[inline]
   fn with_child(self, child: C) -> Self::Target { WidgetPair { widget: self, child } }
+}
 
-  #[inline]
-  fn child_template(&self) -> ConcreteTml<C> { Template::empty() }
+impl<W, C> ChildTemplate<(&dyn SingleChild, C)> for W
+where
+  W: SingleChild,
+{
+  type T = ConcreteTml<C>;
 }
 
 impl<W: MultiChild> WithChild<&dyn MultiChild, Vec<Widget>> for W {
@@ -53,33 +65,8 @@ impl<W: MultiChild> WithChild<&dyn MultiChild, Vec<Widget>> for W {
   fn with_child(self, child: Vec<Widget>) -> Self::Target { WidgetPair { widget: self, child } }
 }
 
-impl<M, D, T> WithChild<DynWidget<M>, T> for DynWidget<D>
-where
-  D: WithChild<M, T>,
-  T: Template,
-{
-  type Target = D::Target;
-
-  fn with_child(self, child: T::Target) -> Self::Target { self.into_inner().with_child(child) }
-}
-
-impl<M1, M2, M3, D, T> WithChild<DynWidget<(M1, M2, M3)>, T> for Stateful<DynWidget<D>>
-where
-  D: WithChild<M1, T>,
-  T: Template,
-  Self: IntoDynRender<M2, D>,
-  M3: ImplMarker,
-  WidgetPair<DynRender<D>, T::Target>: IntoWidget<M3>,
-{
-  type Target = Widget;
-
-  fn with_child(self, child: T::Target) -> Self::Target {
-    WidgetPair {
-      widget: self.into_dyn_render(),
-      child,
-    }
-    .into_widget()
-  }
+impl<W: MultiChild> ChildTemplate<&dyn MultiChild> for W {
+  type T = Vec<Widget>;
 }
 
 impl<D: SingleChild> SingleChild for Option<D> {}
@@ -105,12 +92,23 @@ where
     let Self { widget, child } = self;
     Widget::Render {
       render: Box::new(widget),
-      children: vec![child.into_widget()],
+      children: Some(vec![child.into_widget()]),
     }
   }
 }
 
-impl<W, C, M1, M2> IntoWidget<Generic<(M1, M2)>> for WidgetPair<W, DynWidget<Option<C>>>
+impl<W, C, M> IntoWidget<Concrete<Option<M>>> for WidgetPair<W, DynWidget<Option<C>>>
+where
+  M: ImplMarker,
+  WidgetPair<W, Option<C>>: IntoWidget<M>,
+{
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    WidgetPair { widget, child: child.into_inner() }.into_widget()
+  }
+}
+
+impl<W, C, M1, M2> IntoWidget<Concrete<Option<(M1, M2)>>> for WidgetPair<W, Option<C>>
 where
   M1: ImplMarker,
   M2: ImplMarker,
@@ -119,7 +117,7 @@ where
 {
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    if let Some(child) = child.into_inner() {
+    if let Some(child) = child {
       WidgetPair { widget, child }.into_widget()
     } else {
       widget.into_widget()
@@ -136,8 +134,36 @@ where
     let Self { widget, child } = self;
     Widget::Render {
       render: Box::new(widget),
-      children: child,
+      children: Some(child),
     }
+  }
+}
+
+// implementation of IntoWidget
+impl<D, M1, M2, C> IntoWidget<Generic<(M1, M2)>> for WidgetPair<Stateful<DynWidget<D>>, C>
+where
+  M1: ImplMarker,
+  WidgetPair<DynRender<D>, C>: IntoWidget<M1>,
+  Stateful<DynWidget<D>>: IntoDynRender<M2, D>,
+{
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    WidgetPair {
+      widget: widget.into_dyn_render(),
+      child,
+    }
+    .into_widget()
+  }
+}
+
+impl<D, C, M> IntoWidget<Concrete<M>> for WidgetPair<DynWidget<D>, C>
+where
+  WidgetPair<D, C>: IntoWidget<Generic<M>>,
+{
+  #[inline]
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    WidgetPair { widget: widget.into_inner(), child }.into_widget()
   }
 }
 

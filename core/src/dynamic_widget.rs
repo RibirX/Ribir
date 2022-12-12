@@ -339,6 +339,11 @@ where
   fn into_widget(self) -> Widget { self.into_inner().into_widget() }
 }
 
+impl<D: SingleChild> SingleChild for DynWidget<D> {}
+impl<D: MultiChild> MultiChild for DynWidget<D> {}
+impl<D: SingleChild> SingleChild for DynRender<D> {}
+impl<D: MultiChild> MultiChild for DynRender<D> {}
+
 #[cfg(test)]
 mod tests {
   use std::collections::HashMap;

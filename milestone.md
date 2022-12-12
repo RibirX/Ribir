@@ -15,7 +15,7 @@
   - [ ] benchmark comparison [#2](https://github.com/M-Adoo/Ribir/issues/2)
   - [x] merge framework branch to master.
   - [ ] (lavapipe?) gpu environment support [Test](./doc/develope.md#Test)
-- [ ] perform layout on render tree (2 weeks)
+- [x] perform layout on render tree (2 weeks)
   - [x] layout flow
   - [x] base layout widget
     - [x] Row
@@ -69,7 +69,7 @@
 
 - [x] osx
 - [x] linux, already add a test in ci.
-- [ ] windows
+- [x] windows
 - [ ] android
 - [ ] ios
 - [ ] web / WebAssembly

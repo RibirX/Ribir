@@ -240,9 +240,13 @@ impl Widget {
           }
           Widget::Render { render, children } => {
             let wid = new_node(self.arena, render);
-            let children_size = children.len();
-            self.push_children(children);
-            self.perpend(wid, children_size > 0);
+            if let Some(children) = children {
+              let children_size = children.len();
+              self.push_children(children);
+              self.perpend(wid, children_size > 0);
+            } else {
+              self.perpend(wid, false);
+            }
           }
         }
       }
