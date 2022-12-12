@@ -412,6 +412,8 @@ fn pick_id(f: DeclareField, errors: &mut Vec<DeclareError>) -> Result<Ident, Dec
 }
 
 impl NamedObjMap {
+  pub fn is_empty(&self) -> bool { self.0.is_empty() }
+
   pub fn get(&self, name: &Ident) -> Option<&NamedObj> { self.0.get(name) }
 
   pub fn contains(&self, name: &Ident) -> bool { self.0.contains_key(name) }

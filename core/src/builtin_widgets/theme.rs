@@ -77,7 +77,7 @@ pub enum Theme {
 
 #[derive(Declare)]
 pub struct ThemeWidget {
-  pub theme: Rc<Theme>,
+  pub(crate) theme: Rc<Theme>,
 }
 
 impl ComposeChild for ThemeWidget {
@@ -87,7 +87,6 @@ impl ComposeChild for ThemeWidget {
     use crate::prelude::*;
     widget_maybe_states! {
       maybe_states { this }
-      // use `DynWidget` to refresh whole subtree when theme changed.
       DynWidget {
         dyns: move |ctx: &BuildCtx| {
           ctx.push_theme(this.theme.clone());

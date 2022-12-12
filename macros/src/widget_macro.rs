@@ -14,9 +14,8 @@ pub use name_used_info::*;
 mod variable_names;
 pub use variable_names::*;
 
-use crate::error::DeclareError;
-
 use self::desugar::{builtin_obj, NamedObj};
+use crate::error::DeclareError;
 
 fn capture_widget(widget: &Ident) -> TokenStream {
   quote_spanned!(widget.span() => let #widget = #widget.clone_stateful();)
@@ -36,7 +35,7 @@ pub fn gen_widget_macro(
   let mut desugar = macro_syntax.desugar();
 
   let mut ctx = VisitCtx {
-    track_names: desugar
+    states: desugar
       .states
       .iter()
       .flat_map(|t| t.states.iter().map(|sf| sf.member.clone()))
@@ -44,26 +43,60 @@ pub fn gen_widget_macro(
     ..<_>::default()
   };
 
+  use DeclareError::DuplicateID;
+  let errors = &mut desugar.errors;
   if let Some(ref outside_ctx) = outside_ctx {
     ctx.declare_objs.extend(outside_ctx.declare_objs.clone());
-    ctx.track_names.extend(outside_ctx.track_names.clone());
+
+    if !outside_ctx.states.is_empty() {
+      if !ctx.states.is_empty() {
+        ctx.states.iter().for_each(|name| {
+          if let Some(other) = outside_ctx.states.get(name) {
+            errors.push(DuplicateID([name.clone(), other.clone()]))
+          }
+        })
+      }
+      ctx.states.extend(outside_ctx.states.clone());
+    }
+
     ctx.analyze_stack = outside_ctx.analyze_stack.clone();
-  };
+  }
 
   // visit init without named objects.
   if let Some(init) = desugar.init.as_mut() {
     ctx.visit_init_stmts_mut(init);
     if let Some(ctx_name) = init.ctx_name.clone() {
-      ctx.track_names.insert(ctx_name);
+      if let Some(other) = ctx.states.get(&ctx_name) {
+        errors.push(DuplicateID([ctx_name.clone(), other.clone()]))
+      } else {
+        ctx.states.insert(ctx_name);
+      }
     }
   }
 
-  ctx.declare_objs.extend(
+  if !desugar.named_objs.is_empty() {
     desugar
       .named_objs
       .objs()
-      .map(|obj| (obj.name().clone(), obj.ty().clone())),
-  );
+      .map(|obj| (obj.name().clone(), obj.ty().clone()))
+      .for_each(|(name, path)| {
+        if let Some((other, _)) = ctx.declare_objs.get_key_value(&name) {
+          errors.push(DuplicateID([name.clone(), other.clone()]))
+        }
+        if let Some(other) = ctx.states.get(&name) {
+          errors.push(DuplicateID([name.clone(), other.clone()]))
+        }
+        ctx.declare_objs.insert(name, path);
+      });
+  };
+
+  if !ctx.declare_objs.is_empty() && !ctx.states.is_empty() {
+    ctx.states.iter().for_each(|name| {
+      if let Some((other, _)) = ctx.declare_objs.get_key_value(name) {
+        errors.push(DuplicateID([name.clone(), other.clone()]))
+      }
+    })
+  }
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
   if let Some(ctx_name) = desugar.init.as_ref().and_then(|i| i.ctx_name.as_ref()) {
@@ -102,6 +135,7 @@ pub fn gen_widget_macro(
   desugar.gen_tokens(&mut tokens, &ctx);
 
   if let Some(outside_ctx) = outside_ctx {
+    outside_ctx.visit_error_occur |= ctx.visit_error_occur || !desugar.errors.is_empty();
     let used_outsides = ctx
       .used_objs
       .iter()
