@@ -1,4 +1,4 @@
-#![feature(test, decl_macro, drain_filter)]
+#![feature(test, decl_macro)]
 
 #[macro_use]
 extern crate bitflags;

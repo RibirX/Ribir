@@ -96,10 +96,14 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       #vis fn build(self, _: &BuildCtx) -> Self { self }
     }
 
-    impl #g_impl WithChild<#name #g_ty, #tml #g_ty> for #declarer #g_where {
+    impl #g_impl WithChild<#name #g_ty, #name #g_ty> for #declarer #g_where {
       type Target = #name #g_ty;
       #[inline]
       fn with_child(self, child: #name #g_ty) -> Self::Target { child }
+    }
+
+    impl #g_impl ChildTemplate<Self> for #declarer #g_where {
+      type T = #tml #g_ty;
     }
 
     #fill_child_impl
