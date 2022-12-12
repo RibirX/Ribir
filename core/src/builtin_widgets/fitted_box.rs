@@ -23,8 +23,6 @@ pub enum BoxFit {
 pub struct FittedBox {
   #[declare(builtin)]
   pub box_fit: BoxFit,
-  // fixme: provide a method to transform widget, not only transform when painting
-  // also transform hit test.
   #[declare(default)]
   scale_cache: Cell<Transform>,
 }

@@ -46,7 +46,7 @@ bitflags::bitflags! {
 pub struct VisitCtx {
   /// All declared object.
   pub declare_objs: HashMap<Ident, Path, ahash::RandomState>,
-  pub track_names: HashSet<Ident, ahash::RandomState>,
+  pub states: HashSet<Ident, ahash::RandomState>,
   pub current_used_info: ScopeUsedInfo,
   /// name object has be used and its source name.
   pub used_objs: HashMap<Ident, UsedInfo, ahash::RandomState>,
@@ -81,7 +81,7 @@ impl Default for VisitCtx {
   fn default() -> Self {
     Self {
       declare_objs: <_>::default(),
-      track_names: <_>::default(),
+      states: <_>::default(),
       current_used_info: Default::default(),
       used_objs: Default::default(),
       analyze_stack: vec![vec![]],
@@ -466,7 +466,7 @@ impl VisitCtx {
       .find(|v| &v.name == ident)
       .map(|v| v.alias_of_name.as_ref())
       .unwrap_or_else(|| {
-        (self.declare_objs.contains_key(ident) || self.track_names.contains(ident)).then(|| ident)
+        (self.declare_objs.contains_key(ident) || self.states.contains(ident)).then(|| ident)
       })
   }
 
