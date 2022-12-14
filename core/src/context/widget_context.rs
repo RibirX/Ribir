@@ -1,6 +1,6 @@
 use crate::{
   prelude::QueryOrder,
-  widget::{LayoutStore, TreeArena},
+  widget::{LayoutInfo, LayoutStore, TreeArena},
   widget_tree::WidgetId,
 };
 
@@ -161,6 +161,12 @@ pub(crate) use define_widget_context;
 
 define_widget_context!(HitTestCtx);
 define_widget_context!(LifeCycleCtx);
+
+impl<'a> LifeCycleCtx<'a> {
+  pub fn layout_info(&self) -> Option<&LayoutInfo> { self.layout_store().layout_info(self.id()) }
+
+  pub fn app_ctx(&self) -> &AppContext { WidgetCtxImpl::app_ctx(self) }
+}
 
 #[cfg(test)]
 mod tests {
