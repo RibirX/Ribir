@@ -26,8 +26,6 @@
  	 - Indicates whether the widget should automatically get focus when the window loads.
 - tab_index : [`i16`] 
  	 - indicates that widget can be focused, and where it participates in sequential keyboard navigation (usually with the Tab key, hence the name.
-- request_focus : [`impl Fn(& AppContext)`] 
- 	 - request the FocusNode to be focused.
 - focus : [`impl FnMut(& mut FocusEvent)`] 
  	 - specify the event handler to process focus event.
 - blur : [`impl FnMut(& mut FocusEvent)`] 
@@ -84,6 +82,12 @@
  	 - action perform after widget be added to the widget tree.
 - disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, DisposedType) >`] 
  	 - action perform after widget remove from widget tree.
+
+ - `fn request_focus(& self)`
+ 	- request the this node to be focused.
+
+ - `fn unfocus(& self)`
+ 	- removes the focus from this node.
 
  - `fn has_focus(& self) -> bool`
  	- return if the widget has focus.

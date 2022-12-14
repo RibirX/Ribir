@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
   builtin_widgets::Theme,
-  events::focus_mgr::{FocusManager, FocusType},
+  events::focus_mgr::{FocusManager, FocusType, FocustHandle},
   ticker::FrameMsg,
   widget::TreeArena,
 };
@@ -75,6 +75,10 @@ impl AppContext {
 
   pub(crate) fn prev_focus(&self, arena: &TreeArena) {
     self.focus_mgr.borrow_mut().prev_focus(arena);
+  }
+
+  pub(crate) fn focus_handle(&self, wid: WidgetId) -> FocustHandle {
+    FocusManager::focus_handle(&self.focus_mgr, wid)
   }
 
   pub(crate) fn add_focus_node(

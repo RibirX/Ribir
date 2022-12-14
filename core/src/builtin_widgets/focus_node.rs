@@ -1,7 +1,5 @@
-use crate::{
-  data_widget::compose_child_as_data_widget, events::focus_mgr::FocusType, impl_query_self_only,
-  prelude::*,
-};
+use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*, events::focus_mgr::{FocusType, FocustHandle}};
+
 
 #[derive(Default, Declare)]
 pub struct FocusNode {
@@ -33,9 +31,6 @@ pub struct FocusNode {
   /// focus.
   #[declare(default, builtin)]
   pub auto_focus: bool,
-
-  #[declare(default)]
-  wid: Option<WidgetId>,
 }
 
 impl ComposeChild for FocusNode {
@@ -47,8 +42,7 @@ impl ComposeChild for FocusNode {
       states { this: this.clone() }
       DynWidget {
         mounted: move |ctx| {
-          WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, this.auto_focus, FocusType::NODE, ctx.tree_arena());
-            this.clone_stateful().state_ref().wid = Some(ctx.id);
+            WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, this.auto_focus, FocusType::NODE, ctx.tree_arena());
           },
           disposed: move|ctx| {
             WidgetCtxImpl::app_ctx(&ctx).remove_focus_node(ctx.id, FocusType::NODE);
@@ -57,14 +51,6 @@ impl ComposeChild for FocusNode {
       }
     };
     compose_child_as_data_widget(w, StateWidget::Stateful(this))
-  }
-}
-impl FocusNode {
-  pub fn request_focus(&self, ctx: &AppContext) {
-    self
-      .wid
-      .as_ref()
-      .map(|wid| ctx.focus_mgr.borrow_mut().focus_to(Some(*wid)));
   }
 }
 
@@ -95,6 +81,50 @@ pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
     }
   }
 }
+#[derive(Declare)]
+pub struct RequestFocus {
+  #[declare(default)]
+  handle: Option<FocustHandle>,
+}
+  
+impl ComposeChild for RequestFocus {
+  type Child = Widget;
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    let this = this.into_stateful();
+    let w = widget! {
+      states { this: this.clone() }
+      DynWidget {
+        mounted: move |ctx| {
+          this.silent().handle = Some(ctx.app_ctx().focus_handle(ctx.id));
+        },
+        dyns: child
+      }
+    };
+    let widget = compose_child_as_data_widget(w, StateWidget::Stateful(this));
+    dynamic_compose_focus_node(widget)
+  }
+}
+impl  RequestFocus {
+  pub fn request_focus(& self) {
+    self
+      .handle
+      .as_ref()
+      .map(|h| h.request_focus());
+  }
+
+  pub fn unfocus(& self) {
+    self
+      .handle
+      .as_ref()
+      .map(|h| h.unfocus());
+  }
+}
+
+
+impl Query for RequestFocus {
+  impl_query_self_only!();
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -104,9 +134,10 @@ mod tests {
   #[test]
   fn dynamic_focus_node() {
     #[derive(Declare)]
-    struct AutoFockNode {}
+    struct AutoFocusNode {
+    }
 
-    impl ComposeChild for AutoFockNode {
+    impl ComposeChild for AutoFocusNode {
       type Child = Widget;
       #[inline]
       fn compose_child(_this: StateWidget<Self>, child: Self::Child) -> Widget {
@@ -114,10 +145,10 @@ mod tests {
       }
     }
     let widget = widget! {
-      AutoFockNode{
-        AutoFockNode{
-          AutoFockNode {
-            MockBox {
+      AutoFocusNode{
+        AutoFocusNode{
+          AutoFocusNode {
+            MockBox { 
               size: Size::default(),
             }
           }

@@ -60,9 +60,13 @@ builtin! {
     #[doc="indicates that widget can be focused, and where it participates in \
           sequential keyboard navigation (usually with the Tab key, hence the name."]
     tab_index: i16,
+  }
 
-    #[doc="request the FocusNode to be focused."]
-    request_focus: impl Fn(&AppContext),
+  RequestFocus{
+    #[doc="request the this node to be focused."]
+    fn request_focus(&self),
+    #[doc="removes the focus from this node."]
+    fn unfocus(&self),
   }
 
   FocusListener {
