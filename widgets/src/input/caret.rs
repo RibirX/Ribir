@@ -71,7 +71,10 @@ impl Compose for Caret {
             caret.left_anchor = PositionUnit::Pixel(offset.x);
             icon.size = Size::new(1., height);
           });
-        }
+
+        // emit the first elem to caret stream after mounted
+        this.caret = this.caret;
+      }
     }
   }
 }
