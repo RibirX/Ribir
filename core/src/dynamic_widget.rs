@@ -49,19 +49,19 @@ impl<D> DynWidget<D> {
 
 /// Widget help to limit which `DynWidget` can be a parent widget and which can
 /// be a child.
-pub(crate) struct DynRender<D> {
+pub(crate) struct DynRender<D, M> {
   dyn_widgets: Stateful<DynWidget<D>>,
   self_render: RefCell<Box<dyn Render>>,
   gen_info: RefCell<Option<DynWidgetGenInfo>>,
-  cast_to_vec: fn(D) -> Vec<Widget>,
+  marker: PhantomData<fn(M)>,
 }
 
-pub(crate) trait IntoDynRender<M, D> {
-  fn into_dyn_render(self) -> DynRender<D>;
+pub(crate) trait DynsIntoWidget<M> {
+  fn dyns_into_widget(self) -> Vec<Widget>;
 }
 
 // A dynamic widget must be stateful, depends others.
-impl<D: 'static> Render for DynRender<D> {
+impl<D: DynsIntoWidget<M> + 'static, M: 'static> Render for DynRender<D, M> {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.regen_if_need(ctx);
     self.self_render.perform_layout(clamp, ctx)
@@ -85,47 +85,16 @@ impl<D: 'static> Render for DynRender<D> {
   fn get_transform(&self) -> Option<Transform> { self.self_render.get_transform() }
 }
 
-impl<D> DynRender<D> {
-  fn new(dyns: Stateful<DynWidget<D>>, cast_to_vec: fn(D) -> Vec<Widget>) -> Self {
+impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
+  pub(crate) fn new(dyns: Stateful<DynWidget<D>>) -> Self {
     Self {
       dyn_widgets: dyns,
       self_render: RefCell::new(Box::new(Void)),
       gen_info: <_>::default(),
-      cast_to_vec,
+      marker: PhantomData,
     }
   }
-}
 
-impl<D, M> IntoDynRender<M, D> for Stateful<DynWidget<D>>
-where
-  M: ImplMarker,
-  D: IntoWidget<M> + 'static,
-{
-  fn into_dyn_render(self) -> DynRender<D> { DynRender::new(self, |d| vec![d.into_widget()]) }
-}
-
-impl<D, M> IntoDynRender<&dyn Iterator<Item = M>, D> for Stateful<DynWidget<D>>
-where
-  M: ImplMarker,
-  D: IntoIterator,
-  D::Item: IntoWidget<M> + 'static,
-{
-  fn into_dyn_render(self) -> DynRender<D> {
-    DynRender::new(self, |d| {
-      d.into_iter().map(IntoWidget::into_widget).collect()
-    })
-  }
-}
-
-impl<D: 'static> Query for DynRender<D> {
-  impl_proxy_query!(self.self_render, self.dyn_widgets);
-}
-
-impl<D: 'static> Query for DynWidget<D> {
-  impl_query_self_only!();
-}
-
-impl<D> DynRender<D> {
   fn regen_if_need(&self, ctx: &mut LayoutCtx) {
     let mut dyn_widget = self.dyn_widgets.silent_ref();
     let Some(new_widgets) = dyn_widget.dyns.take() else {
@@ -149,7 +118,8 @@ impl<D> DynRender<D> {
       dirty_set,
     } = ctx;
 
-    let mut new_widgets = (self.cast_to_vec)(new_widgets)
+    let mut new_widgets = new_widgets
+      .dyns_into_widget()
       .into_iter()
       .filter_map(|w| w.into_subtree(None, arena, wnd_ctx))
       .collect::<Vec<_>>();
@@ -281,6 +251,49 @@ impl<D> DynRender<D> {
   }
 }
 
+pub(crate) struct SingleDyn<M>(M);
+
+impl<D, M> DynsIntoWidget<SingleDyn<M>> for D
+where
+  M: ImplMarker,
+  D: IntoWidget<M> + 'static,
+{
+  fn dyns_into_widget(self) -> Vec<Widget> { vec![self.into_widget()] }
+}
+
+impl<D, M> DynsIntoWidget<SingleDyn<Option<M>>> for Option<D>
+where
+  M: ImplMarker,
+  D: IntoWidget<M> + 'static,
+{
+  fn dyns_into_widget(self) -> Vec<Widget> {
+    if let Some(w) = self {
+      vec![w.into_widget()]
+    } else {
+      vec![]
+    }
+  }
+}
+
+impl<D, M> DynsIntoWidget<&dyn Iterator<Item = M>> for D
+where
+  M: ImplMarker,
+  D: IntoIterator,
+  D::Item: IntoWidget<M> + 'static,
+{
+  fn dyns_into_widget(self) -> Vec<Widget> {
+    self.into_iter().map(IntoWidget::into_widget).collect()
+  }
+}
+
+impl<D: 'static, M: 'static> Query for DynRender<D, M> {
+  impl_proxy_query!(self.self_render, self.dyn_widgets);
+}
+
+impl<D: 'static> Query for DynWidget<D> {
+  impl_query_self_only!();
+}
+
 fn inspect_key(id: &WidgetId, tree: &TreeArena, mut cb: impl FnMut(&Box<dyn AnyKey>)) {
   id.assert_get(tree).query_on_first_type(
     QueryOrder::OutsideFirst,
@@ -312,22 +325,22 @@ fn down_to_leaf(id: WidgetId, arena: &TreeArena) -> (WidgetId, usize) {
 // impl IntoWidget
 
 // only `DynWidget` gen single widget can as a parent widget
-impl<M, D> IntoWidget<Concrete<M>> for Stateful<DynWidget<D>>
+impl<M, D> IntoWidget<Generic<M>> for Stateful<DynWidget<D>>
 where
-  M: ImplMarker,
+  M: ImplMarker + 'static,
   D: IntoWidget<M> + 'static,
 {
   #[inline]
-  fn into_widget(self) -> Widget { self.into_dyn_render().into_widget() }
+  fn into_widget(self) -> Widget { DynRender::new(self).into_widget() }
 }
 
-impl<M, D> IntoWidget<Concrete<Option<M>>> for Stateful<DynWidget<Option<D>>>
+impl<M, D> IntoWidget<Generic<Option<M>>> for Stateful<DynWidget<Option<D>>>
 where
-  M: ImplMarker,
+  M: ImplMarker + 'static,
   D: IntoWidget<M> + 'static,
 {
   #[inline]
-  fn into_widget(self) -> Widget { self.into_dyn_render().into_widget() }
+  fn into_widget(self) -> Widget { DynRender::<_, SingleDyn<_>>::new(self).into_widget() }
 }
 
 impl<D, M> IntoWidget<M> for DynWidget<D>
@@ -341,8 +354,30 @@ where
 
 impl<D: SingleChild> SingleChild for DynWidget<D> {}
 impl<D: MultiChild> MultiChild for DynWidget<D> {}
-impl<D: SingleChild> SingleChild for DynRender<D> {}
-impl<D: MultiChild> MultiChild for DynRender<D> {}
+
+impl<D> ComposeChild for Stateful<DynWidget<D>>
+where
+  D: ComposeChild + 'static,
+  D::Child: Clone,
+{
+  type Child = D::Child;
+
+  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+    let dyns = match this {
+      StateWidget::Stateless(dyns) => dyns,
+      StateWidget::Stateful(dyns) => dyns.silent_ref().clone(),
+    };
+
+    widget! {
+      states { dyns }
+      DynWidget {
+        dyns: dyns.silent().dyns.take().map(|d| {
+          ComposeChild::compose_child(d.into(), child.clone())
+        }),
+      }
+    }
+  }
+}
 
 #[cfg(test)]
 mod tests {
@@ -418,7 +453,7 @@ mod tests {
 
       MockMulti { DynWidget {
         dyns: {
-          v.iter().map(move |_| {
+          v.clone().into_iter().map(move |_| {
             widget! {
               MockBox{
                 size: Size::zero(),
@@ -426,7 +461,7 @@ mod tests {
                 disposed: move |_| *drop_cnt += 1
               }
             }
-          }).collect::<Vec<_>>()
+          })
         }
       }}
     };
@@ -492,7 +527,7 @@ mod tests {
                   }
                 }
               }
-            }).collect::<Vec<_>>()
+            })
           }
         }
       }

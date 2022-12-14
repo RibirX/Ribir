@@ -318,7 +318,6 @@ mod tests {
                   MockBox { size: Size::new(10., 10.)}.into_widget()
                 }
               })
-              .collect::<Vec<_>>()
           }
         }
       }
@@ -340,7 +339,7 @@ mod tests {
             dyns: (0..this.width - 1)
               .map(move |_| {
                 MockBox { size: Size::new(10., 10.)}
-              }).collect::<Vec<_>>()
+              })
           }
           DynWidget {
             dyns: if this.depth > 1{
@@ -534,11 +533,11 @@ mod tests {
       states { trigger: trigger.clone() }
       MockMulti {
         DynWidget {
-          dyns: (0..3).map(|_| if *trigger > 0 {
+          dyns: (0..3).map(move |_| if *trigger > 0 {
             MockBox { size: Size::new(1., 1.)}
           } else {
             MockBox { size: Size::zero()}
-          }).collect::<Vec<_>>()
+          })
         }
       }
     };

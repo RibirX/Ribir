@@ -52,6 +52,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
       fill_child_impl.extend(quote! {
         impl #g_impl FillTemplate<Generic<#ty>, #ty> for #tml #g_ty #g_where  {
+          type New = Self;
           fn fill(mut self, c: #ty) -> Self {
             assert!(self.#field_name.is_none(), "Try to fill same type twice.");
             self.#field_name = Some(c);
@@ -71,17 +72,14 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       #builder_fields
     }
 
-    impl #g_impl AssociatedTemplate for #name #g_ty #g_where {
-      type T = #tml #g_ty;
+    impl #g_impl Template for #name #g_ty #g_where {
+      type Builder = #tml #g_ty;
     }
 
-    impl #g_impl Template for #tml #g_ty #g_where {
+    impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
       type Target = #name #g_ty;
       #[inline]
-      fn empty() -> Self { <_>::default() }
-      fn build(self) -> Self::Target {
-        #name { #init_values }
-      }
+      fn build(self) -> Self::Target {#name { #init_values }}
     }
 
     #vis struct #declarer;
@@ -98,12 +96,11 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
     impl #g_impl WithChild<#name #g_ty, #name #g_ty> for #declarer #g_where {
       type Target = #name #g_ty;
+      type Builder = #tml #g_ty;
       #[inline]
       fn with_child(self, child: #name #g_ty) -> Self::Target { child }
-    }
-
-    impl #g_impl ChildTemplate<Self> for #declarer #g_where {
-      type T = #tml #g_ty;
+      #[inline]
+      fn child_builder(&self) -> Self::Builder { <_>::default() }
     }
 
     #fill_child_impl

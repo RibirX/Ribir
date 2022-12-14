@@ -448,7 +448,7 @@ impl WidgetNode {
         Brace(first.span()).surround(tokens, |tokens| {
           let child_tml = ribir_suffix_variable(first, "tml");
           quote_spanned! { span =>
-            let #child_tml = #first.child_template()
+            let #child_tml = #first.child_builder()
           }
           .to_tokens(tokens);
           if nodes.len() > 1 {
