@@ -2,8 +2,10 @@ use crate::{prelude::*, widget_tree::TreeArena};
 
 use indextree::{Arena, NodeId};
 use std::{
+  cell::RefCell,
   cmp::Ordering,
   collections::{HashMap, HashSet},
+  rc::Rc,
 };
 
 use super::dispatcher::Dispatcher;
@@ -15,6 +17,21 @@ pub(crate) struct FocusManager {
   node_ids: HashMap<WidgetId, NodeId>,
   arena: Arena<FocusNodeInfo>,
   root: NodeId,
+}
+
+pub struct FocustHandle {
+  wid: WidgetId,
+  mgr: Rc<RefCell<FocusManager>>,
+}
+
+impl FocustHandle {
+  pub(crate) fn request_focus(&self) { self.mgr.borrow_mut().focus_to(Some(self.wid)); }
+
+  pub(crate) fn unfocus(&self) {
+    if self.mgr.borrow().focusing == Some(self.wid) {
+      self.mgr.borrow_mut().focus_to(None);
+    }
+  }
 }
 
 impl Default for FocusManager {
@@ -75,6 +92,10 @@ impl FocusManager {
     if focus_type == FocusType::NODE && self.focusing.is_none() && auto_focus {
       self.focusing = Some(wid);
     }
+  }
+
+  pub(crate) fn focus_handle(this: &Rc<RefCell<Self>>, wid: WidgetId) -> FocustHandle {
+    FocustHandle { mgr: this.clone(), wid }
   }
 
   pub(crate) fn remove_focus_node(&mut self, wid: WidgetId, focus_type: FocusType) {

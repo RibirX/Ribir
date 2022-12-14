@@ -399,6 +399,13 @@ fn build_input_area(
         .subscribe(move |val| {
           this.silent().text = val.clone();
         });
+      let_watch!(theme.state)
+        .distinct_until_changed()
+        .subscribe(move |state| {
+          if state == TextFieldState::Focused {
+            input.request_focus();
+          }
+        });
     }
   }
 }
