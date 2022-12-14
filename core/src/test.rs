@@ -78,7 +78,7 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
 #[derive(Declare, MultiChild)]
 pub(crate) struct MockMulti;
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare, Clone, SingleChild)]
 pub(crate) struct MockBox {
   pub size: Size,
 }

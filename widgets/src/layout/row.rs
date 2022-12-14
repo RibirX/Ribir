@@ -24,7 +24,7 @@ impl ComposeChild for Row {
         direction: Direction::Horizontal,
         align_items: this.align_items,
         justify_content: this.justify_content,
-        DynWidget { dyns: children }
+        DynWidget { dyns: children.into_iter() }
       }
     }
   }

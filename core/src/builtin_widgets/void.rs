@@ -16,8 +16,6 @@ impl Render for Void {
 
   fn paint(&self, _: &mut PaintingCtx) {}
 
-  fn only_sized_by_parent(&self) -> bool { false }
-
   fn can_overflow(&self) -> bool { true }
 
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
