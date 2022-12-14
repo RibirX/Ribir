@@ -233,6 +233,18 @@ impl<'a> Layouter<'a> {
     self.wid = wid;
     self
   }
+
+  /// reset the child layout position to Point::zero()
+  pub fn reset_children_position(&mut self) {
+    let Self { wid, arena, store, .. } = self;
+    wid.children(arena).for_each(move |id| {
+      store
+        .layout_info_or_default(id)
+        .rect
+        .as_mut()
+        .map(|rc| rc.origin = Point::zero());
+    });
+  }
 }
 
 impl WidgetTree {
