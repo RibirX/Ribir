@@ -158,19 +158,13 @@ where
     self.before_value = value;
   }
 
-  pub fn is_enter(&self) -> bool {
-    self.status == KeyStatus::Mounted
-  }
+  pub fn is_enter(&self) -> bool { self.status == KeyStatus::Mounted }
 
-  pub fn is_modified(&self) -> bool {
-    self.status == KeyStatus::Updated
-  }
+  pub fn is_modified(&self) -> bool { self.status == KeyStatus::Updated }
 
   pub fn is_changed(&self) -> bool { self.is_modified() && self.before_value != self.value }
 
-  pub fn is_disposed(&self) -> bool {
-    self.status == KeyStatus::Disposed
-  }
+  pub fn is_disposed(&self) -> bool { self.status == KeyStatus::Disposed }
 
   pub fn get_change(&self) -> KeyChange<V> {
     KeyChange(self.before_value.clone(), self.value.clone())

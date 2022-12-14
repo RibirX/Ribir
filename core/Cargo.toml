@@ -14,7 +14,7 @@ futures = "0.3.5"
 indextree = "4.5.0"
 lazy_static = "1.4.0"
 log = "0.4.8"
-lyon_geom = "0.17.7"
+lyon_geom = "1.0.1"
 painter = {path = "../painter", version = "*"}
 png = {version = "0.17.3", optional = true}
 ribir_macros = {path = "../macros"}

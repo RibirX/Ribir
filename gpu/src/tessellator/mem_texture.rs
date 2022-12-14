@@ -1,6 +1,6 @@
+use lyon_tessellation::geom::euclid::UnknownUnit;
 use zerocopy::AsBytes;
-
-pub type Rect = lyon_tessellation::geom::Rect<u16>;
+pub type Rect = lyon_tessellation::geom::euclid::Rect<u16, UnknownUnit>;
 pub type Size = lyon_tessellation::geom::Size<u16>;
 pub struct MemTexture<const N: usize> {
   max_size: Size,

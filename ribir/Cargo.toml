@@ -10,6 +10,8 @@ version = "0.1.0"
 gpu = {path = "../gpu", version = "*"}
 ribir_core = {path = "../core"}
 ribir_widgets = {path = "../widgets"}
+lyon_algorithms = "1.0.1"
+lyon_path = "1.0.1"
 
 [dev-dependencies]
 env_logger = "0.7.1"

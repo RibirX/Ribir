@@ -7,5 +7,5 @@ version = "0.1.0"
 
 [dependencies]
 ribir_core = {path = "../core"}
-lyon_algorithms = "0.17.7"
-lyon_path = "0.17.7"
+lyon_algorithms = "1.0.1"
+lyon_path = "1.0.1"
