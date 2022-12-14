@@ -44,7 +44,7 @@ impl<E: Easing> Roc for Transition<E> {
       return AnimateProgress::Finish;
     }
 
-    let time_rate = (run_dur.as_secs_f32() - rounds.floor()) / self.duration.as_secs_f32();
+    let time_rate = run_dur.as_secs_f32() / self.duration.as_secs_f32() - rounds.floor();
     let p = self.easing.easing(time_rate);
     AnimateProgress::Between(p)
   }
