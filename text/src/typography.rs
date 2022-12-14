@@ -1,6 +1,8 @@
 use std::{borrow::Borrow, ops::Range};
 
-use lyon_path::geom::{euclid::num::Zero, Rect, Size};
+use lyon_path::geom::{euclid::num::Zero, euclid::UnknownUnit, Size};
+pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
+
 use unicode_script::{Script, UnicodeScript};
 
 use crate::{Em, FontSize, Glyph, Pixel, TextAlign};

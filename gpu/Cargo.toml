@@ -10,7 +10,7 @@ version = "0.1.0"
 algo = {path = "../algo"}
 futures = {version = "0.3.21", optional = true}
 guillotiere = "0.6.0"
-lyon_tessellation = "0.17.10"
+lyon_tessellation = "1.0.1"
 painter = {path = "../painter"}
 raw-window-handle = {version = "0.4.2", optional = true}
 rayon = "1.5.1"

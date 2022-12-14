@@ -10,7 +10,7 @@ algo = {path = "../algo"}
 derive_more = "0.99.17"
 fontdb = "0.7.0"
 log = "0.4.14"
-lyon_path = "0.17.7"
+lyon_path = "1.0.1"
 ordered-float = "2.10.0"
 rustybuzz = "0.5.0"
 ttf-parser = "0.15.0"

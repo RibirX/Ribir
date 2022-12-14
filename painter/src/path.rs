@@ -33,7 +33,9 @@ impl Path {
   #[inline]
   pub fn box_rect(&self) -> Rect {
     // todo: path_style effect box rect
-    lyon_algorithms::aabb::bounding_rect(self.path.iter()).cast_unit()
+    lyon_algorithms::aabb::bounding_box(self.path.iter())
+      .to_rect()
+      .cast_unit()
   }
 
   /// create a rect path.
@@ -179,7 +181,9 @@ impl Builder {
   /// No sub-path is in progress after the method is called.
   #[inline]
   pub fn rect(&mut self, rect: &Rect) -> &mut Self {
-    self.0.add_rectangle(&rect.to_untyped(), Winding::Positive);
+    self
+      .0
+      .add_rectangle(&rect.to_box2d().to_untyped(), Winding::Positive);
     self
   }
 
