@@ -19,8 +19,8 @@ pub struct ExpandBox {
 impl Render for ExpandBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let mut size = Size::zero();
-    if let Some(child) = ctx.single_child() {
-      size = ctx.perform_child_layout(child, clamp);
+    if ctx.has_child() {
+      size = ctx.assert_perform_single_child_layout(clamp);
     }
     match self.dir {
       ExpandDir::X => size.width = clamp.max.width,

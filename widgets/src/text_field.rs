@@ -1,6 +1,6 @@
 use crate::{
   layout::{Column, Container},
-  prelude::{ExpandBox, ExpandDir, Expanded, Icon, Input, Row, Stack, Text},
+  prelude::{ExpandBox, ExpandDir, Expanded, Icon, Input, Row, Stack, Text}, common_widget::{Leading, Trailing, LabelText, TrailingText, LeadingText},
 };
 use ribir_core::prelude::*;
 use std::hash::Hash;
@@ -13,35 +13,29 @@ pub struct TextField {
   text: String,
 }
 
-/// Label text is used to inform users as to what information is requested for a text field.
-pub struct LabelStr(pub String);
+pub struct Placeholder(pub CowArc<str>);
 
-/// The placeholder text is displayed in the input field before the user enters a value.
-pub struct PlaceholderStr(pub String);
+#[derive(Template, Default)]
+pub struct TextFieldTml {
+  /// Label text is used to inform users as to what information is requested for a text field.
+  label: Option<LabelText>,
 
-/// Use prefix text before the editable text to show symbols or abbreviations that help users 
-/// enter the right type of information in a form’s text input
-pub struct PrefixStr(pub String);
+  /// The placeholder text is displayed in the input field before the user enters a value.
+  placeholder: Option<Placeholder>,
 
-/// Use suffix text after the editable text to show symbols or abbreviations that help users 
-/// enter the right type of information in a form’s text input
-pub struct SubfixStr(pub String);
+  /// Use prefix text before the editable text to show symbols or abbreviations that help users 
+  /// enter the right type of information in a form’s text input
+  prefix: Option<LeadingText>,
+  
+  /// Use suffix text after the editable text to show symbols or abbreviations that help users 
+  /// enter the right type of information in a form’s text input
+  subfix: Option<TrailingText>,
+  
+  /// An icon that appears before the editable part of the text field
+  leading_icon: Option<WidgetOf<Leading>>,
 
-/// An icon that appears before the editable part of the text field
-
-pub struct LeadingIcon(pub Widget);
-
-/// An icon that appears after the editable part of the text field
-pub struct TrailingIcon(pub Widget);
-
-#[derive(Template)]
-pub struct TextFieldConfig {
-  label: Option<LabelStr>,
-  placeholder: Option<PlaceholderStr>,
-  prefix: Option<PrefixStr>,
-  subfix: Option<SubfixStr>,
-  leading_icon: Option<LeadingIcon>,
-  trailing_icon: Option<TrailingIcon>,
+  /// An icon that appears after the editable part of the text field
+  trailing_icon: Option<WidgetOf<Trailing>>,
 }
 
 #[derive(Clone)]
@@ -74,7 +68,6 @@ pub struct TextFieldTheme {
   /// edit area's padding when expand
   pub input_expand_padding: EdgeInsets,
 }
-
 
 #[derive(Clone)]
 pub struct ThemeSuit<S, T>
@@ -109,12 +102,12 @@ impl ComposeChild for TextFieldThemeProxy {
     Self: Sized,
   {
     widget! {
-      track {this: this.into_stateful()}
+      states {this: this.into_stateful()}
       DynWidget {
         dyns: {
           child
         },
-        focus_in: move |_| {
+        tap: move |_| {
           match this.state {
             TextFieldState::Enabled => this.state = TextFieldState::Focused,
             TextFieldState::Hovered => this.state = TextFieldState::Focused,
@@ -292,16 +285,17 @@ macro_rules! take_option_field {
 }
 
 impl ComposeChild for TextField {
-  type Child = TextFieldConfig;
-  fn compose_child(this: StateWidget<Self>, mut config: Self::Child) -> Widget
+  type Child = Option<TextFieldTml>;
+  fn compose_child(this: StateWidget<Self>, config: Self::Child) -> Widget
   where
     Self: Sized,
   {
+    let mut config = config.unwrap_or(TextFieldTml::default());
     widget! {
-      track{
-        this: this.into_stateful()
+      states {
+        this: this.into_stateful(),
       }
-      env {
+      init {
         take_option_field!({leading_icon, trailing_icon}, config);
       }
 
@@ -319,7 +313,7 @@ impl ComposeChild for TextField {
                 dir: ExpandDir::Y,
                 DynWidget {
                   v_align: VAlign::Center,
-                  dyns: build_icon(leading_icon.map(|l| l.0))
+                  dyns: build_icon(leading_icon.map(|l| l.child))
                 }
               }
               Expanded {
@@ -332,7 +326,7 @@ impl ComposeChild for TextField {
                 dir: ExpandDir::Y,
                 DynWidget {
                   v_align: VAlign::Center,
-                  dyns: build_icon(trailing_icon.map(|t| t.0))
+                  dyns: build_icon(trailing_icon.map(|t| t.child))
                 }
               }
             }
@@ -352,19 +346,19 @@ impl ComposeChild for TextField {
 fn build_input_area(
   this: &mut StateRef<TextField>,
   theme: &mut StateRef<TextFieldThemeProxy>,
-  prefix: Option<PrefixStr>,
-  subfix: Option<SubfixStr>,
-  placeholder: Option<PlaceholderStr>,
+  prefix: Option<LeadingText>,
+  subfix: Option<TrailingText>,
+  placeholder: Option<Placeholder>,
 ) -> Widget {
   widget! {
-    track { this: this.clone_stateful(), theme: theme.clone_stateful(), }
+    states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
     Row {
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
       DynWidget {
         dyns: prefix.map(|text| {
           Text {
-            text: text.0.clone().into(),
+            text: text.child.clone().into(),
             style: theme.text.clone(),
           }
         })
@@ -376,34 +370,35 @@ fn build_input_area(
           id: input,
           text:  this.text.clone(),
           style: theme.text.clone(),
-          placeholder: placeholder.map(|p| p.0.clone()) ,
+
+          Text {
+            text: placeholder.map(|p| p.0).unwrap_or("".into()),
+            style: theme.text.clone(),
+          }
         }
       }
       DynWidget {
         dyns: subfix.map(|text| {
           Text {
-            text: text.0.clone().into(),
+            text: text.child.clone().into(),
             style: theme.text.clone(),
           }
         })
       }
     }
-    change_on input_area.visible Animate {
-      id: input_animate,
-      from: State {
-        input_area.visible: false,
-      },
-      transition: Transition {
+    transition prop!(input_area.visible) {
         duration: Duration::from_millis(1),
         easing: easing::steps(1, easing::StepsJump::JumpStart),
-        delay: Duration::from_millis(400),
-      }
+        delay: Some(Duration::from_millis(400)),
+        repeat: None
     }
 
-    on input.text.clone() {
-      change: move |(_, val)| {
-        this.silent().text = val;
-      }
+    finally {
+      let_watch!(input.text.clone()) 
+        .distinct_until_changed()
+        .subscribe(move |val| {
+          this.silent().text = val.clone();
+        });
     }
   }
 }
@@ -419,8 +414,8 @@ impl Compose for TextFieldLabel {
   where
     Self: Sized,
   {
-    widget_try_track! {
-      try_track { this }
+    widget_maybe_states! {
+      maybe_states { this }
       Text {
         id: label,
         v_align: VAlign::Top,
@@ -428,19 +423,20 @@ impl Compose for TextFieldLabel {
         style: this.style.clone(),
       }
 
-      change_on label.style Animate {
-        transition: Transition {
-          easing: easing::LINEAR,
-          duration: Duration::from_millis(500)
-        },
-        lerp_fn: move |from, to, rate| {
-          let from_size = from.font_size.into_pixel();
-          let to_size = to.font_size.into_pixel();
+      // todo: prop with inner field's property
+      // transition prop!(label.style.font_size) {
+      //   by: transitions::LINEAR.of(ctx)
+      // }
+      transition prop!(label.style, move |from, to, rate| {
+        let from_size = from.font_size.into_pixel();
+        let to_size = to.font_size.into_pixel();
 
-          let mut res = to.clone();
-          res.font_size = FontSize::Pixel(Pixel(from_size.0.lerp(&to_size.0, rate).into()));
-          res
-        }
+        let mut res = to.clone();
+        res.font_size = FontSize::Pixel(Pixel(from_size.0.lerp(&to_size.0, rate).into()));
+        res
+      }) {
+          easing: easing::LINEAR,
+          duration: Duration::from_millis(500),
       }
     }
   }
@@ -450,11 +446,11 @@ impl Compose for TextFieldLabel {
 fn build_content_area(
   this: &mut StateRef<TextField>,
   theme: &mut StateRef<TextFieldThemeProxy>,
-  mut config: TextFieldConfig,
+  mut config: TextFieldTml,
 ) -> Widget {
   widget! {
-    track { this: this.clone_stateful(), theme: theme.clone_stateful(), }
-    env {
+    states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
+    init {
       take_option_field!({label, prefix, subfix, placeholder}, config);
     }
     Column {
@@ -480,9 +476,8 @@ fn build_content_area(
       }
     }
 
-    change_on content_area.padding Transition {
-      duration: Duration::from_millis(500),
-      easing: easing::LINEAR,
+    transition prop!(content_area.padding) {
+      by: transitions::LINEAR.of(ctx)
     }
   }
 }

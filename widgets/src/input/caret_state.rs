@@ -1,6 +1,6 @@
 use ribir_core::prelude::GraphemeCursor;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaretState {
   Caret(usize),
   Select(usize, usize),
