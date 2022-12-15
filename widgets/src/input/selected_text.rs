@@ -33,10 +33,14 @@ pub(crate) struct SelectedText {
 impl Compose for SelectedText {
   fn compose(this: StateWidget<Self>) -> Widget {
     let rects = vec![];
+    
     widget! {
       states {
         this: this.into_stateful(),
         rects: rects.into_stateful(),
+      }
+      init ctx => {
+        let tick_of_layout_ready = ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
       }
       Stack {
         DynWidget {
@@ -59,7 +63,7 @@ impl Compose for SelectedText {
       finally {
         let_watch!(this.caret.clone())
           .distinct_until_changed()
-          .sample(ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_))))
+          .sample(tick_of_layout_ready)
           .subscribe(move |caret| {
             *rects =   this.glyphs_helper.borrow().selection(caret.select_range());
           });

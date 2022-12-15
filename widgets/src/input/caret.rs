@@ -50,6 +50,9 @@ impl Compose for Caret {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       states {this: this.into_stateful()}
+      init ctx => {
+        let tick_of_layout_ready = ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+      }
       CaretStyle{
         id: caret,
         font: this.font.clone(),
@@ -64,7 +67,7 @@ impl Compose for Caret {
       finally {
         let_watch!(this.caret)
           .distinct_until_changed()
-          .sample(ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_))))
+          .sample(tick_of_layout_ready)
           .subscribe(move |_| {
             let (offset, height) = this.glyphs_helper.borrow().cursor(this.caret.offset());
             caret.top_anchor = PositionUnit::Pixel(offset.y);
