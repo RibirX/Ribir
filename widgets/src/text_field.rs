@@ -295,13 +295,16 @@ impl ComposeChild for TextField {
       states {
         this: this.into_stateful(),
       }
+      init ctx => {
+        let theme_suit = TextFieldThemeSuit::of(ctx).clone();
+      }
       init {
         take_option_field!({leading_icon, trailing_icon}, config);
       }
 
       TextFieldThemeProxy {
         id: theme,
-        suit: TextFieldThemeSuit::of(ctx).clone(),
+        suit: theme_suit,
         state: TextFieldState::default(),
 
         Container {
@@ -352,6 +355,9 @@ fn build_input_area(
 ) -> Widget {
   widget! {
     states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
+    init ctx => {
+      let linear = transitions::LINEAR.of(ctx);
+    }
     Row {
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
@@ -386,11 +392,8 @@ fn build_input_area(
         })
       }
     }
-    transition prop!(input_area.visible) {
-        duration: Duration::from_millis(1),
-        easing: easing::steps(1, easing::StepsJump::JumpStart),
-        delay: Some(Duration::from_millis(400)),
-        repeat: None
+    transition prop!(input_area.visible, move |_from, to, rate| *to && rate >= 1.) {
+        by: linear,
     }
 
     finally {
@@ -412,7 +415,7 @@ fn build_input_area(
 
 #[derive(Declare)]
 struct TextFieldLabel {
-  text: String,
+  text: CowArc<str>,
   style: TextStyle,
 }
 
@@ -423,6 +426,9 @@ impl Compose for TextFieldLabel {
   {
     widget_maybe_states! {
       maybe_states { this }
+      init ctx => {
+        let linear = transitions::LINEAR.of(ctx);
+      }
       Text {
         id: label,
         v_align: VAlign::Top,
@@ -442,8 +448,7 @@ impl Compose for TextFieldLabel {
         res.font_size = FontSize::Pixel(Pixel(from_size.0.lerp(&to_size.0, rate).into()));
         res
       }) {
-          easing: easing::LINEAR,
-          duration: Duration::from_millis(500),
+        by: linear,
       }
     }
   }
@@ -457,6 +462,9 @@ fn build_content_area(
 ) -> Widget {
   widget! {
     states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
+    init ctx => {
+      let linear = transitions::LINEAR.of(ctx);
+    }
     init {
       take_option_field!({label, prefix, subfix, placeholder}, config);
     }
@@ -483,17 +491,19 @@ fn build_content_area(
       }
     }
 
-    transition prop!(content_area.padding) {
-      by: transitions::LINEAR.of(ctx)
-    }
+    transition prop!(content_area.padding) { by: linear }
   }
 }
 
 fn build_icon(icon: Option<Widget>) -> Widget {
   if icon.is_some() {
+    
     widget! {
+      init ctx => {
+        let icon_size = IconSize::of(ctx).small;
+      }
       Icon {
-        size: IconSize::of(ctx).small,
+        size: icon_size,
         DynWidget {
           dyns: icon.unwrap()
         }
