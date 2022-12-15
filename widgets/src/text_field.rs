@@ -1,6 +1,6 @@
 use crate::{
-  layout::{Column, Container},
-  prelude::{ExpandBox, ExpandDir, Expanded, Icon, Input, Row, Stack, Text}, common_widget::{Leading, Trailing, LabelText, TrailingText, LeadingText},
+  layout::{Column, Container, ConstrainedBox, constrained_box::EXPAND_Y},
+  prelude::{ Expanded, Icon, Input, Row, Stack, Text}, common_widget::{Leading, Trailing, LabelText, TrailingText, LeadingText},
 };
 use ribir_core::prelude::*;
 use std::hash::Hash;
@@ -309,8 +309,8 @@ impl ComposeChild for TextField {
           background: theme.container_color.clone(),
           Stack {
             Row {
-              ExpandBox {
-                dir: ExpandDir::Y,
+              ConstrainedBox {
+                clamp: EXPAND_Y,
                 DynWidget {
                   v_align: VAlign::Center,
                   dyns: build_icon(leading_icon.map(|l| l.child))
@@ -322,8 +322,8 @@ impl ComposeChild for TextField {
                   dyns: move |_: &BuildCtx| build_content_area(&mut this, &mut theme, config)
                 }
               }
-              ExpandBox {
-                dir: ExpandDir::Y,
+              ConstrainedBox {
+                clamp: EXPAND_Y,
                 DynWidget {
                   v_align: VAlign::Center,
                   dyns: build_icon(trailing_icon.map(|t| t.child))

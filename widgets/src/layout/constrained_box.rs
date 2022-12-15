@@ -1,34 +1,36 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
-/// Enum to describe which axis will expand of constraints on its child, use by
-/// `ExpandBox`.
-#[derive(Default, Clone, Copy)]
-pub enum ExpandDir {
-  X,
-  Y,
-  #[default]
-  Both,
-}
-
-/// A box that will expand the specify axis to the parent's max clamp size
+/// a widget that imposes additional constraints clamp on its child.
 #[derive(SingleChild, Declare, Clone)]
-pub struct ExpandBox {
-  dir: ExpandDir,
+pub struct ConstrainedBox {
+  clamp: BoxClamp,
 }
 
-impl Render for ExpandBox {
+/// clamp use to expand the width to max
+pub const EXPAND_X: BoxClamp = BoxClamp {
+  min: Size::new(f32::INFINITY, 0.),
+  max: Size::new(f32::INFINITY, f32::INFINITY),
+};
+
+/// clamp use to expand the height to max
+pub const EXPAND_Y: BoxClamp = BoxClamp {
+  min: Size::new(0., f32::INFINITY),
+  max: Size::new(f32::INFINITY, f32::INFINITY),
+};
+
+/// clamp use to expand the size to max
+pub const EXPAND_BOTH: BoxClamp = BoxClamp {
+  min: Size::new(f32::INFINITY, f32::INFINITY),
+  max: Size::new(f32::INFINITY, f32::INFINITY),
+};
+
+impl Render for ConstrainedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut size = Size::zero();
-    if ctx.has_child() {
-      size = ctx.assert_perform_single_child_layout(clamp);
-    }
-    match self.dir {
-      ExpandDir::X => size.width = clamp.max.width,
-      ExpandDir::Y => size.height = clamp.max.height,
-      ExpandDir::Both => size = clamp.max,
-    }
-    size
+    let max = clamp.max.min(self.clamp.max);
+    let min = clamp.min.max(self.clamp.min).min(max);
+    ctx.assert_perform_single_child_layout(BoxClamp { min, max })
   }
+
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 
@@ -36,7 +38,7 @@ impl Render for ExpandBox {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for ExpandBox {
+impl Query for ConstrainedBox {
   impl_query_self_only!();
 }
 
@@ -51,8 +53,8 @@ mod tests {
     let w = widget! {
       Container {
         size: Size::new(256., 50.),
-        ExpandBox {
-          dir: ExpandDir::X,
+        ConstrainedBox {
+          clamp: EXPAND_X,
           Container {
             size: Size::new(128., 20.),
           }
@@ -80,8 +82,8 @@ mod tests {
     let w = widget! {
       Container {
         size: Size::new(256., 50.),
-        ExpandBox {
-          dir: ExpandDir::Both,
+        ConstrainedBox {
+          clamp: EXPAND_BOTH,
           Container {
             size: Size::new(128., 20.),
           }

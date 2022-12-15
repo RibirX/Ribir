@@ -7,7 +7,7 @@ pub use caret::CaretStyle;
 pub use caret_state::CaretState;
 pub use selected_text::SelectedTextStyle;
 
-use crate::layout::{ExpandBox, ExpandDir, Stack};
+use crate::layout::{constrained_box::EXPAND_X, ConstrainedBox, Stack};
 use ribir_core::prelude::*;
 
 use self::{caret::Caret, input_text::InputText, selected_text::SelectedText};
@@ -33,9 +33,9 @@ impl ComposeChild for Input {
       states {
         this: this.into_stateful(),
       }
-      ExpandBox {
+      ConstrainedBox {
         id: outbox,
-        dir: ExpandDir::X,
+        clamp: EXPAND_X,
         auto_focus: true,
         char: move |c| this.edit_handle(c.char),
         key_down: move |key| this.key_handle(key),
