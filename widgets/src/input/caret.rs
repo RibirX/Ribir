@@ -1,4 +1,4 @@
-use ribir_core::prelude::*;
+use ribir_core::{prelude::*, ticker::FrameMsg};
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use crate::layout::Container;
@@ -64,7 +64,7 @@ impl Compose for Caret {
       finally {
         let_watch!(this.caret)
           .distinct_until_changed()
-          .sample(ctx.app_ctx().tick_of_layout_ready())
+          .sample(ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_))))
           .subscribe(move |_| {
             let (offset, height) = this.glyphs_helper.borrow().cursor(this.caret.offset());
             caret.top_anchor = PositionUnit::Pixel(offset.y);

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use ribir_core::prelude::*;
+use ribir_core::{prelude::*, ticker::FrameMsg};
 
 use crate::layout::{Container, Stack};
 
@@ -59,7 +59,7 @@ impl Compose for SelectedText {
       finally {
         let_watch!(this.caret.clone())
           .distinct_until_changed()
-          .sample(ctx.app_ctx().tick_of_layout_ready())
+          .sample(ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_))))
           .subscribe(move |caret| {
             *rects =   this.glyphs_helper.borrow().selection(caret.select_range());
           });
