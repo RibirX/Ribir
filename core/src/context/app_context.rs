@@ -59,14 +59,8 @@ impl AppContext {
     self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
   }
 
-  pub fn tick_of_layout_ready(&self) -> impl LocalObservable<'static, Item = (), Err = ()> {
-    self.frame_ticker.frame_tick_stream().filter_map(|msg| {
-      if matches!(msg, FrameMsg::LayoutReady(_)) {
-        Some(())
-      } else {
-        None
-      }
-    })
+  pub fn frame_tick_stream(&self) -> impl LocalObservable<'static, Item = FrameMsg, Err = ()> {
+    self.frame_ticker.frame_tick_stream()
   }
 
   pub(crate) fn next_focus(&self, arena: &TreeArena) {
