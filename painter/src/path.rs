@@ -24,7 +24,7 @@ pub struct Path {
 pub struct Radius(BorderRadii);
 
 #[derive(Default)]
-pub struct Builder(LyonBuilder);
+pub struct Builder(pub LyonBuilder);
 
 impl Path {
   #[inline]

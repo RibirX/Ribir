@@ -1,33 +1,39 @@
-use ribir::prelude::*;
 use std::time::Duration;
+use ribir::prelude::*;
 
 fn main() {
+  let style = PathStyle::Stroke(StrokeOptions::default());
+  let lyon_path = include_svg!("./ribir-logo.svg");
+  let path = lyon_path.paths.get(2).unwrap().path.clone();
+  // let path3 = Path::circle(Point::new(100., 100.), 50., style);
+  // let path4 = path3.clone();
   let w = widget! {
-    Row {
-      SizedBox {
-        id: sized_box,
-        background: Brush::Color(Color::BLUE),
-        border_radius: Radius::all(20.),
-        size: Size::new(20., 20.),
+    Stack {
+      Button {
+        left_anchor: 10.,
+        top_anchor: 10.,
+        mounted: move |_| {
+          circle_animate.run();
+        },
+        ButtonText::new("START 2")
       }
-      Text {
-        text:"click me to trigger animation",
-        tap: move |_| {
-          let s = sized_box.size;
-          sized_box.border_radius = Some(Radius::all(sized_box.border_radius.unwrap().top_left * 2.));
-          sized_box.size = Size::new(s.width * 2. , s.height * 2.);
-        }
+      PathWidget {
+        id: path_widget,
+        path,
+        brush: Color::BLACK,
       }
     }
-    transition (
-      prop!(sized_box.size),
-      prop!(sized_box.border_radius),
-      prop!(sized_box.background)
-    ) {
-      easing: easing::EASE_IN_OUT,
-      duration: Duration::from_secs(5)
+    Animate {
+      id: circle_animate,
+      transition: Transition {
+        delay: None,
+        duration: Duration::from_millis(2000),
+        easing: easing::LINEAR,
+        repeat: Some(f32::MAX),
+      },
+      prop: prop!(path_widget.path, PathPaintKit::path_lerp_fn(prop!(path_widget.path), style)),
+      from: Path::circle(Point::new(100., 100.), 0., style)
     }
   };
-
   app::run(w);
 }
