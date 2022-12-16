@@ -1,6 +1,10 @@
 use std::rc::Rc;
 
-use lyon_algorithms::{hit_test::hit_test_path, math::point, measure::{PathMeasurements, SampleType}};
+use lyon_algorithms::{
+  hit_test::hit_test_path,
+  math::point,
+  measure::{PathMeasurements, SampleType},
+};
 use lyon_path::FillRule;
 use ribir_core::{impl_query_self_only, prelude::*};
 
@@ -8,7 +12,7 @@ const TOLERANCE: f32 = 0.1;
 
 /// Widget just use as a paint kit for a path and not care about its size.
 /// Use `[PathWidget]!` instead of.
-#[derive(Declare)]
+#[derive(Declare, Clone)]
 pub struct PathPaintKit {
   pub path: Path,
   #[declare(convert=into)]
@@ -16,7 +20,9 @@ pub struct PathPaintKit {
 }
 
 impl PathPaintKit {
-  pub fn path_lerp_fn<'a>(prop: impl Property<Value = Path>, style: PathStyle) -> impl Fn(&'a Path, &'a Path, f32) -> Path + Clone {
+  pub fn path_lerp_fn(
+    prop: impl Property<Value = Path>,
+  ) -> impl Fn(&Path, &Path, f32) -> Path + Clone {
     let path = prop.get();
     let measurements = Rc::new(PathMeasurements::from_path(&path.path, 1e-3));
     move |_, _, rate| {
@@ -25,19 +31,79 @@ impl PathPaintKit {
       sampler.split_range(0.0..rate, &mut path_builder.0);
       Path {
         path: path_builder.0.build(),
-        style,
+        style: path.style,
       }
     }
   }
-  
-  pub fn sample_lerp_fn(prop: impl Property<Value = Path>) -> impl FnMut(&Path, &Path, f32) -> Point {
-    let mut measurements: Option<PathMeasurements> = None;
-    let path = prop.get();
+
+  pub fn paths_lerp_fn(
+    prop: impl Property<Value = Vec<PathPaintKit>> + Clone,
+  ) -> impl Fn(&Vec<PathPaintKit>, &Vec<PathPaintKit>, f32) -> Vec<PathPaintKit> + Clone {
+    let paths = prop.get();
+    let mut measurements_list = vec![];
+    paths.iter().for_each(|path_paint_kit| {
+      let measurements = PathMeasurements::from_path(&path_paint_kit.path.path, 1e-3);
+      measurements_list.push(measurements);
+    });
+    let measurements_list = Rc::new(measurements_list);
+
     move |_, _, rate| {
-      let mut sampler = measurements
-        .get_or_insert_with(|| PathMeasurements::from_path(&path.path, 1e-3))
-        .create_sampler(&path.path, SampleType::Normalized);
-      let sample  = sampler.sample(rate);
+      let mut total_len = 0.;
+      let mut len_list = vec![];
+      measurements_list.iter().enumerate().for_each(|(i, m)| {
+        let sampler = m.create_sampler(&(paths[i].path.path), SampleType::Normalized);
+        let len = sampler.length();
+        len_list.push(len);
+        total_len += len;
+      });
+      let real_len = total_len * rate;
+      let mut rest_len = real_len;
+      let mut rate = 0.;
+      // find current rate at which path index
+      let mut idx: usize = 0;
+      for (i, len) in len_list.into_iter().enumerate() {
+        if rest_len < len {
+          rate = rest_len / len;
+          idx = i;
+          break;
+        } else {
+          rest_len -= len;
+        }
+      }
+      let mut path_list = vec![];
+      // before index path push path-list result
+      for (i, path) in paths.iter().enumerate() {
+        if i < idx {
+          path_list.push(path.clone());
+        } else {
+          break;
+        }
+      }
+      // generate rate rest path
+      let path = paths[idx].clone();
+      let measurements = PathMeasurements::from_path(&path.path.path, 1e-3);
+      let mut sampler = measurements.create_sampler(&path.path.path, SampleType::Normalized);
+      let mut path_builder = Path::builder();
+      sampler.split_range(0.0..rate, &mut path_builder.0);
+      path_list.push(PathPaintKit {
+        path: Path {
+          path: path_builder.0.build(),
+          style: paths.get(idx).unwrap().path.style,
+        },
+        brush: path.brush,
+      });
+      path_list
+    }
+  }
+
+  pub fn sample_lerp_fn(
+    prop: impl Property<Value = Path>,
+  ) -> impl FnMut(&Path, &Path, f32) -> Point + Clone {
+    let path = prop.get();
+    let measurements = Rc::new(PathMeasurements::from_path(&path.path, 1e-3));
+    move |_, _, rate| {
+      let mut sampler = measurements.create_sampler(&path.path, SampleType::Normalized);
+      let sample = sampler.sample(rate);
       let pos = sample.position();
       Point::new(pos.x, pos.y)
     }
@@ -137,6 +203,8 @@ impl Render for PathsPaintKit {
 
     HitTest { hit: is_hit, can_hit_child: false }
   }
+
+  fn can_overflow(&self) -> bool { true }
 }
 
 impl Query for PathsPaintKit {

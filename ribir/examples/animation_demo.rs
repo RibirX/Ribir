@@ -1,38 +1,42 @@
-use std::time::Duration;
 use ribir::prelude::*;
+use std::time::Duration;
 
 fn main() {
   let style = PathStyle::Stroke(StrokeOptions::default());
-  let lyon_path = include_svg!("./ribir-logo.svg");
-  let path = lyon_path.paths.get(2).unwrap().path.clone();
-  // let path3 = Path::circle(Point::new(100., 100.), 50., style);
-  // let path4 = path3.clone();
+  let lyon_path = include_svg!("./Logo.svg");
+  let mut paths = vec![];
+  lyon_path.paths.into_iter().for_each(|render_path| {
+    paths.push(PathPaintKit {
+      path: render_path.path,
+      brush: render_path.brush.map_or(Brush::Color(Color::BLACK), |b| b),
+    });
+  });
   let w = widget! {
-    Stack {
-      Button {
-        left_anchor: 10.,
-        top_anchor: 10.,
-        mounted: move |_| {
-          circle_animate.run();
-        },
-        ButtonText::new("START 2")
-      }
-      PathWidget {
-        id: path_widget,
-        path,
-        brush: Color::BLACK,
-      }
+    PathsPaintKit {
+      top_anchor: 100.,
+      left_anchor: 100.,
+      transform: Transform::scale(0.5, 0.5),
+      id: path_widget,
+      paths,
+      mounted: move |_| {
+        circle_animate.run();
+      },
     }
     Animate {
       id: circle_animate,
       transition: Transition {
         delay: None,
-        duration: Duration::from_millis(2000),
+        duration: Duration::from_millis(5000),
         easing: easing::LINEAR,
         repeat: Some(f32::MAX),
       },
-      prop: prop!(path_widget.path, PathPaintKit::path_lerp_fn(prop!(path_widget.path), style)),
-      from: Path::circle(Point::new(100., 100.), 0., style)
+      prop: prop!(path_widget.paths, PathPaintKit::paths_lerp_fn(prop!(path_widget.paths))),
+      from: vec![
+        PathPaintKit {
+          path: Path::rect(&Rect::zero(), style),
+          brush: Brush::Color(Color::WHITE),
+        }
+      ]
     }
   };
   app::run(w);
