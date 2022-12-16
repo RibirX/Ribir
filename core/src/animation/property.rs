@@ -3,7 +3,7 @@ use crate::widget::Stateful;
 use rxrust::{observable, ops::box_it::LocalBoxOp, prelude::Observable};
 
 /// Property is a value with can be accessed and watch its changes.
-pub trait Property: Clone {
+pub trait Property {
   type Value: Clone;
   fn get(&self) -> Self::Value;
   fn set(&mut self, v: Self::Value);
@@ -53,8 +53,7 @@ impl<T, G, S, V> Property for Prop<T, G, S>
 where
   G: Fn(&T) -> V,
   S: FnMut(&mut T, V),
-  V: Clone + 'static,
-  Self: Clone + 'static,
+  V: Clone,
 {
   type Value = V;
 
@@ -85,17 +84,17 @@ where
 
 impl<T, G, S, V> Prop<T, G, S>
 where
-  Self: Property<Value = V> + 'static,
-  V: 'static,
+  Self: Property<Value = V>,
+  G: Fn(&T) -> V + Clone + 'static,
+  V: PartialEq + Clone + 'static,
+  T: 'static,
 {
-  pub fn changes(&self) -> LocalBoxOp<'static, V, ()>
-  where
-    V: PartialEq + Clone,
-  {
-    let prop = self.clone();
+  pub fn changes(&self) -> LocalBoxOp<'static, V, ()> {
+    let target = self.target.clone();
+    let getter = self.getter.clone();
     self
       .modifies()
-      .map(move |_| prop.get())
+      .map(move |_| getter(&*target.state_ref()).clone())
       .distinct_until_changed()
       .box_it()
   }
@@ -104,7 +103,6 @@ where
 impl<P, F> Property for LerpProp<P, F>
 where
   P: Property,
-  Self: Clone,
 {
   type Value = P::Value;
 
@@ -123,7 +121,7 @@ where
 
 impl<P, F> AnimateProperty for LerpProp<P, F>
 where
-  P: Property + Clone,
+  P: Property,
   F: Fn(&P::Value, &P::Value, f32) -> P::Value + Clone,
 {
   #[inline]
@@ -134,8 +132,10 @@ where
 
 impl<T, G, S, F, V> LerpProp<Prop<T, G, S>, F>
 where
-  Prop<T, G, S>: Property<Value = V> + Clone + 'static,
+  Prop<T, G, S>: Property<Value = V>,
   V: PartialEq + Clone + 'static,
+  G: Fn(&T) -> V + Clone + 'static,
+  T: 'static,
 {
   #[inline]
   pub fn changes(&self) -> LocalBoxOp<'static, V, ()> { self.prop.changes() }
