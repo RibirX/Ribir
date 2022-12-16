@@ -1,4 +1,6 @@
-use lyon_algorithms::{hit_test::hit_test_path, math::point};
+use std::rc::Rc;
+
+use lyon_algorithms::{hit_test::hit_test_path, math::point, measure::{PathMeasurements, SampleType}};
 use lyon_path::FillRule;
 use ribir_core::{impl_query_self_only, prelude::*};
 
@@ -11,6 +13,35 @@ pub struct PathPaintKit {
   pub path: Path,
   #[declare(convert=into)]
   pub brush: Brush,
+}
+
+impl PathPaintKit {
+  pub fn path_lerp_fn<'a>(prop: impl Property<Value = Path>, style: PathStyle) -> impl Fn(&'a Path, &'a Path, f32) -> Path + Clone {
+    let path = prop.get();
+    let measurements = Rc::new(PathMeasurements::from_path(&path.path, 1e-3));
+    move |_, _, rate| {
+      let mut sampler = measurements.create_sampler(&path.path, SampleType::Normalized);
+      let mut path_builder = Path::builder();
+      sampler.split_range(0.0..rate, &mut path_builder.0);
+      Path {
+        path: path_builder.0.build(),
+        style,
+      }
+    }
+  }
+  
+  pub fn sample_lerp_fn(prop: impl Property<Value = Path>) -> impl FnMut(&Path, &Path, f32) -> Point {
+    let mut measurements: Option<PathMeasurements> = None;
+    let path = prop.get();
+    move |_, _, rate| {
+      let mut sampler = measurements
+        .get_or_insert_with(|| PathMeasurements::from_path(&path.path, 1e-3))
+        .create_sampler(&path.path, SampleType::Normalized);
+      let sample  = sampler.sample(rate);
+      let pos = sample.position();
+      Point::new(pos.x, pos.y)
+    }
+  }
 }
 
 impl Render for PathPaintKit {
