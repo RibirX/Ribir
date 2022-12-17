@@ -3,7 +3,7 @@ use painter::ZERO_SIZE;
 use super::{widget_id::split_arena, DirtySet, WidgetId, WidgetTree};
 use crate::{
   builtin_widgets::PerformedLayoutListener,
-  context::{AppContext, LayoutCtx},
+  context::{LayoutCtx, WindowCtx},
   prelude::{Point, Rect, Size, INFINITY_SIZE},
   widget::{QueryOrder, TreeArena},
 };
@@ -41,7 +41,7 @@ pub struct Layouter<'a> {
   pub(crate) wid: WidgetId,
   pub(crate) arena: &'a mut TreeArena,
   pub(crate) store: &'a mut LayoutStore,
-  pub(crate) app_ctx: &'a AppContext,
+  pub(crate) wnd_ctx: &'a WindowCtx,
   pub(crate) dirty_set: &'a DirtySet,
 }
 
@@ -143,7 +143,7 @@ impl<'a> Layouter<'a> {
       wid: child,
       arena,
       store,
-      app_ctx,
+      wnd_ctx,
       dirty_set,
     } = self;
 
@@ -160,7 +160,7 @@ impl<'a> Layouter<'a> {
           id: *child,
           arena: arena2,
           store,
-          app_ctx,
+          wnd_ctx: wnd_ctx,
           dirty_set,
         };
         let size = layout.perform_layout(clamp, &mut ctx);
@@ -337,7 +337,8 @@ mod tests {
       }
     };
 
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let app_ctx = <_>::default();
+    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx));
     tree.layout(Size::zero());
     assert_eq!(*root_layout_cnt.state_ref(), 1);
     {

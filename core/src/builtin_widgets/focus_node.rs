@@ -42,10 +42,10 @@ impl ComposeChild for FocusNode {
       states { this: this.clone() }
       DynWidget {
         mounted: move |ctx| {
-            WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, this.auto_focus, FocusType::NODE, ctx.tree_arena());
+            WidgetCtxImpl::wnd_ctx(&ctx).add_focus_node(ctx.id, this.auto_focus, FocusType::NODE, ctx.tree_arena());
           },
           disposed: move|ctx| {
-            WidgetCtxImpl::app_ctx(&ctx).remove_focus_node(ctx.id, FocusType::NODE);
+            WidgetCtxImpl::wnd_ctx(&ctx).remove_focus_node(ctx.id, FocusType::NODE);
           },
         dyns: child
       }
@@ -95,7 +95,7 @@ impl ComposeChild for RequestFocus {
       states { this: this.clone() }
       DynWidget {
         mounted: move |ctx| {
-          this.silent().handle = Some(ctx.app_ctx().focus_handle(ctx.id));
+          this.silent().handle = Some(ctx.wnd_ctx().focus_handle(ctx.id));
         },
         dyns: child
       }

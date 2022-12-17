@@ -3,7 +3,7 @@ use rxrust::prelude::*;
 
 use crate::{
   builtin_widgets::{DisposedListener, MountedListener, Void},
-  context::{AppContext, LifeCycleCtx},
+  context::{LifeCycleCtx, WindowCtx},
   widget::{ModifyScope, QueryOrder, Render, StateChangeNotifier},
 };
 
@@ -134,14 +134,14 @@ impl WidgetId {
     self,
     arena: &mut TreeArena,
     store: &mut LayoutStore,
-    app_ctx: &AppContext,
+    wnd_ctx: &WindowCtx,
   ) {
     self.descendants(arena).for_each(|id| {
       store.remove(id);
 
       id.assert_get(arena).query_all_type(
         |d: &DisposedListener| {
-          (d.disposed.borrow_mut())(LifeCycleCtx { id: self, arena, store, app_ctx });
+          (d.disposed.borrow_mut())(LifeCycleCtx { id: self, arena, store, wnd_ctx });
           true
         },
         QueryOrder::OutsideFirst,
@@ -155,19 +155,19 @@ impl WidgetId {
     self,
     arena: &TreeArena,
     store: &LayoutStore,
-    app_ctx: &AppContext,
+    wnd_ctx: &WindowCtx,
     dirty_set: &DirtySet,
   ) {
     self
       .descendants(arena)
-      .for_each(|w| w.on_mounted(arena, store, app_ctx, dirty_set));
+      .for_each(|w| w.on_mounted(arena, store, wnd_ctx, dirty_set));
   }
 
   pub(crate) fn on_mounted(
     self,
     arena: &TreeArena,
     store: &LayoutStore,
-    app_ctx: &AppContext,
+    wnd_ctx: &WindowCtx,
     dirty_sets: &DirtySet,
   ) {
     self.assert_get(arena).query_all_type(
@@ -186,7 +186,7 @@ impl WidgetId {
 
     self.assert_get(arena).query_all_type(
       |m: &MountedListener| {
-        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, arena, store, app_ctx });
+        (m.mounted.borrow_mut())(LifeCycleCtx { id: self, arena, store, wnd_ctx });
         true
       },
       QueryOrder::OutsideFirst,

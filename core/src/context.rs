@@ -10,3 +10,5 @@ pub(crate) mod build_context;
 pub use build_context::BuildCtx;
 pub mod app_context;
 pub use app_context::*;
+pub mod window_context;
+pub use window_context::*;

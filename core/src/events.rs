@@ -86,24 +86,24 @@ impl EventCommon {
   pub fn context<'a>(&'a mut self) -> EventCtx<'a> {
     // Safety: framework promise event context only live in event dispatch and
     // there is no others to share `Context`.
-    let WidgetTree { arena, store, app_ctx, .. } = unsafe { self.tree.as_ref() };
+    let WidgetTree { arena, store, wnd_ctx, .. } = unsafe { self.tree.as_ref() };
     EventCtx {
       id: self.current_target(),
       arena,
       store,
-      app_ctx,
+      wnd_ctx,
       info: self.dispatch_info_mut(),
     }
   }
 
   pub fn next_focus(&self) {
     let tree = unsafe { self.tree.as_ref() };
-    tree.app_ctx.next_focus(&tree.arena);
+    tree.wnd_ctx.next_focus(&tree.arena);
   }
 
   pub fn prev_focus(&self) {
     let tree = unsafe { self.tree.as_ref() };
-    tree.app_ctx.prev_focus(&tree.arena);
+    tree.wnd_ctx.prev_focus(&tree.arena);
   }
 
   fn dispatch_info_mut(&mut self) -> &mut DispatchInfo {

@@ -4,7 +4,7 @@ use crate::{
 };
 use ribir_core::prelude::*;
 use std::hash::Hash;
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap};
 
 #[derive(Declare, Default)]
 pub struct TextField {

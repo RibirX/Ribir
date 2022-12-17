@@ -50,8 +50,8 @@ impl Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let app_ctx = ctx.app_ctx();
-    Text::text_layout(&self.text, &self.style, &app_ctx.typography_store, clamp)
+    let wnd_ctx = ctx.wnd_ctx();
+    Text::text_layout(&self.text, &self.style, wnd_ctx.typography_store(), clamp)
       .visual_rect()
       .size
       .cast_unit()

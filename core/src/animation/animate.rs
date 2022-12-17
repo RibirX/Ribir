@@ -13,7 +13,7 @@ pub struct Animate<T, P: AnimateProperty> {
   pub from: P::Value,
   #[declare(skip)]
   running_info: Option<AnimateInfo<P::Value>>,
-  #[declare(skip, default = ctx.app_ctx().frame_ticker.clone())]
+  #[declare(skip, default = ctx.wnd_ctx().frame_ticker.clone())]
   frame_ticker: FrameTicker,
 }
 

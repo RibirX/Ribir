@@ -6,7 +6,7 @@ use crate::{
 
 use painter::{Point, Rect};
 
-use super::AppContext;
+use super::WindowCtx;
 
 /// common action for all context of widget.
 pub trait WidgetContext {
@@ -49,14 +49,14 @@ pub trait WidgetContext {
   /// type `T`, or `None` if it isn't.
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
 
-  fn app_ctx(&self) -> &AppContext;
+  fn wnd_ctx(&self) -> &WindowCtx;
 }
 
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
   fn tree_arena(&self) -> &TreeArena;
   fn layout_store(&self) -> &LayoutStore;
-  fn app_ctx(&self) -> &AppContext;
+  fn wnd_ctx(&self) -> &WindowCtx;
 }
 
 impl<T: WidgetCtxImpl> WidgetContext for T {
@@ -129,7 +129,7 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
       .query_on_first_type(QueryOrder::OutsideFirst, callback);
   }
 
-  fn app_ctx(&self) -> &AppContext { WidgetCtxImpl::app_ctx(self) }
+  fn wnd_ctx(&self) -> &WindowCtx { WidgetCtxImpl::wnd_ctx(self) }
 }
 
 macro_rules! define_widget_context {
@@ -138,7 +138,7 @@ macro_rules! define_widget_context {
       pub(crate) id: WidgetId,
       pub(crate) arena: &'a TreeArena,
       pub(crate) store: &'a LayoutStore,
-      pub(crate) app_ctx: &'a AppContext,
+      pub(crate) wnd_ctx: &'a WindowCtx,
       $(pub(crate) $extra_name: $extra_ty,)*
     }
 
@@ -153,7 +153,7 @@ macro_rules! define_widget_context {
       fn layout_store(&self) -> &LayoutStore { self.store }
 
       #[inline]
-      fn app_ctx(&self) -> &AppContext { self.app_ctx }
+      fn wnd_ctx(&self) -> &WindowCtx { self.wnd_ctx }
     }
   };
 }
@@ -165,7 +165,7 @@ define_widget_context!(LifeCycleCtx);
 impl<'a> LifeCycleCtx<'a> {
   pub fn layout_info(&self) -> Option<&LayoutInfo> { self.layout_store().layout_info(self.id()) }
 
-  pub fn app_ctx(&self) -> &AppContext { WidgetCtxImpl::app_ctx(self) }
+  pub fn wnd_ctx(&self) -> &WindowCtx { WidgetCtxImpl::wnd_ctx(self) }
 }
 
 #[cfg(test)]
@@ -190,8 +190,8 @@ mod tests {
     let root = tree.root();
     let pos = Point::zero();
     let child = root.single_child(&tree.arena).unwrap();
-    let WidgetTree { arena, store, app_ctx, .. } = tree;
-    let w_ctx = TestCtx { id: child, arena, store, app_ctx };
+    let WidgetTree { arena, store, wnd_ctx, .. } = tree;
+    let w_ctx = TestCtx { id: child, arena, store, wnd_ctx };
     assert_eq!(w_ctx.map_from(pos, child), pos);
     assert_eq!(w_ctx.map_to(pos, child), pos);
   }
@@ -216,8 +216,8 @@ mod tests {
     let tree = &wnd.widget_tree;
     let root = tree.root();
     let child = get_single_child_by_depth(root, &tree.arena, 4);
-    let WidgetTree { arena, store, app_ctx, .. } = tree;
-    let w_ctx = TestCtx { id: root, arena, store, app_ctx };
+    let WidgetTree { arena, store, wnd_ctx, .. } = tree;
+    let w_ctx = TestCtx { id: root, arena, store, wnd_ctx };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
     let to_pos = Point::new(50., 50.);

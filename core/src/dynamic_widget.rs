@@ -145,13 +145,13 @@ impl<D> DynRender<D> {
       id: sign,
       arena,
       store,
-      app_ctx,
+      wnd_ctx,
       dirty_set,
     } = ctx;
 
     let mut new_widgets = (self.cast_to_vec)(new_widgets)
       .into_iter()
-      .filter_map(|w| w.into_subtree(None, arena, app_ctx))
+      .filter_map(|w| w.into_subtree(None, arena, wnd_ctx))
       .collect::<Vec<_>>();
     if new_widgets.is_empty() {
       new_widgets.push(empty_node(arena));
@@ -190,7 +190,7 @@ impl<D> DynRender<D> {
         });
 
         old_sign.insert_after(*sign, arena);
-        old_sign.remove_subtree(arena, store, app_ctx);
+        old_sign.remove_subtree(arena, store, wnd_ctx);
 
         let w = *sign;
 
@@ -210,7 +210,7 @@ impl<D> DynRender<D> {
         }
 
         loop {
-          w.on_mounted(arena, store, app_ctx, dirty_set);
+          w.on_mounted(arena, store, wnd_ctx, dirty_set);
           if w == new_leaf {
             break;
           }
@@ -264,12 +264,12 @@ impl<D> DynRender<D> {
         (0..*siblings).for_each(|_| {
           let o = remove.unwrap();
           remove = o.next_sibling(arena);
-          o.remove_subtree(arena, store, app_ctx);
+          o.remove_subtree(arena, store, wnd_ctx);
         });
 
         new_widgets
           .iter()
-          .for_each(|n| n.on_mounted_subtree(arena, store, app_ctx, dirty_set));
+          .for_each(|n| n.on_mounted_subtree(arena, store, wnd_ctx, dirty_set));
         *siblings = new_widgets.len();
       }
     };
@@ -355,7 +355,7 @@ mod tests {
         Void {}
       }
     };
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default()));
     tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
@@ -382,7 +382,8 @@ mod tests {
         }
       }
     };
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let app_ctx = <_>::default();
+    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx));
     tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
@@ -424,7 +425,7 @@ mod tests {
         }
       }}
     };
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default()));
     tree.layout(Size::zero());
     assert_eq!(*new_cnt.state_ref(), 3);
     assert_eq!(*drop_cnt.state_ref(), 0);
@@ -493,7 +494,8 @@ mod tests {
     };
 
     // 1. 3 item enter
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let app_ctx = <_>::default();
+    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx));
     tree.layout(Size::zero());
     let expect_vec = vec!['1', '2', '3'];
     assert_eq!((*enter_list.state_ref()).len(), 3);

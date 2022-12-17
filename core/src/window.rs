@@ -68,7 +68,7 @@ impl RawWindow for winit::window::Window {
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
-  pub(crate) context: AppContext,
+  pub(crate) context: WindowCtx,
   pub(crate) painter: Painter,
   pub(crate) dispatcher: Dispatcher,
   pub(crate) widget_tree: WidgetTree,
@@ -112,7 +112,6 @@ impl Window {
         }
       }
 
-      // todo: refresh focus only necessary and in a more cheap way.
       self.dispatcher.refresh_focus(&mut self.widget_tree);
 
       self.widget_tree.draw(&mut self.painter);
@@ -135,14 +134,15 @@ impl Window {
     W: RawWindow + 'static,
     P: PainterBackend + 'static,
   {
-    let widget_tree = WidgetTree::new(root, context.clone());
-    let dispatcher = Dispatcher::new(context.focus_mgr.clone());
     let typography = context.typography_store.clone();
+    let wnd_ctx = WindowCtx::new(context);
+    let widget_tree = WidgetTree::new(root, wnd_ctx.clone());
+    let dispatcher = Dispatcher::new(wnd_ctx.focus_mgr.clone());
     let painter = Painter::new(wnd.scale_factor() as f32, typography, wnd.inner_size());
     Self {
       dispatcher,
       raw_window: Box::new(wnd),
-      context,
+      context: wnd_ctx,
       widget_tree,
       p_backend: Box::new(p_backend),
       painter,

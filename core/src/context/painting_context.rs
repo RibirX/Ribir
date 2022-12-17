@@ -3,7 +3,7 @@ use crate::{
   widget::{LayoutStore, TreeArena},
 };
 
-use super::{define_widget_context, AppContext, WidgetCtxImpl};
+use super::{define_widget_context, WidgetCtxImpl, WindowCtx};
 
 define_widget_context!(PaintingCtx, painter: &'a mut Painter);
 
