@@ -1,4 +1,4 @@
-use super::{define_widget_context, AppContext, WidgetCtxImpl};
+use super::{define_widget_context, WidgetCtxImpl, WindowCtx};
 use crate::{
   events::dispatcher::DispatchInfo,
   widget::{LayoutStore, TreeArena},

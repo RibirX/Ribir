@@ -40,7 +40,7 @@ impl Compose for SelectedText {
         rects: rects.into_stateful(),
       }
       init ctx => {
-        let tick_of_layout_ready = ctx.app_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+        let tick_of_layout_ready = ctx.wnd_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
       }
       Stack {
         DynWidget {

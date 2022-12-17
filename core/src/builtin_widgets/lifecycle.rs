@@ -53,7 +53,7 @@ mod tests {
       }
     };
 
-    let mut tree = WidgetTree::new(w, <_>::default());
+    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default()));
     assert_eq!(&**lifecycle.state_ref(), ["static mounted"]);
     tree.layout(Size::new(100., 100.));
     assert_eq!(

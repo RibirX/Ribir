@@ -35,7 +35,7 @@ impl Compose for InputText {
               glyphs: Some(Text::text_layout(
               &text.text,
               &text.style,
-              &ctx.app_ctx().typography_store,
+              ctx.wnd_ctx().typography_store(),
               bound,
             ))};
           }

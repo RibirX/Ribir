@@ -21,10 +21,10 @@ impl ComposeChild for FocusScope {
     let w = widget! {
       FocusScopeRender {
         mounted: move |ctx| {
-          WidgetCtxImpl::app_ctx(&ctx).add_focus_node(ctx.id, false, FocusType::SCOPE, ctx.tree_arena());
+          WidgetCtxImpl::wnd_ctx(&ctx).add_focus_node(ctx.id, false, FocusType::SCOPE, ctx.tree_arena());
         },
         disposed: move|ctx| {
-          WidgetCtxImpl::app_ctx(&ctx).remove_focus_node(ctx.id, FocusType::SCOPE);
+          WidgetCtxImpl::wnd_ctx(&ctx).remove_focus_node(ctx.id, FocusType::SCOPE);
         },
         DynWidget { dyns: child }
       }

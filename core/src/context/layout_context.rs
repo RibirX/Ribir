@@ -1,4 +1,4 @@
-use super::{AppContext, WidgetContext, WidgetCtxImpl};
+use super::{WidgetContext, WidgetCtxImpl, WindowCtx};
 use crate::{
   widget::{BoxClamp, DirtySet, LayoutStore, Layouter, TreeArena},
   widget_tree::WidgetId,
@@ -13,7 +13,7 @@ pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
   pub(crate) arena: &'a mut TreeArena,
   pub(crate) store: &'a mut LayoutStore,
-  pub(crate) app_ctx: &'a AppContext,
+  pub(crate) wnd_ctx: &'a WindowCtx,
   pub(crate) dirty_set: &'a DirtySet,
 }
 
@@ -72,12 +72,12 @@ impl<'a> LayoutCtx<'a> {
   }
 
   fn new_layouter(&mut self, wid: WidgetId) -> Layouter {
-    let Self { arena, store, app_ctx, dirty_set, .. } = self;
+    let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
     Layouter {
       wid,
       arena,
       store,
-      app_ctx,
+      wnd_ctx,
       dirty_set,
     }
   }
@@ -90,5 +90,5 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
 
   fn layout_store(&self) -> &LayoutStore { self.store }
 
-  fn app_ctx(&self) -> &AppContext { self.app_ctx }
+  fn wnd_ctx(&self) -> &WindowCtx { self.wnd_ctx }
 }

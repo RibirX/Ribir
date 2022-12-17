@@ -279,10 +279,10 @@ impl Dispatcher {
 
   fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
     fn down_coordinate(id: WidgetId, pos: Point, tree: &WidgetTree) -> Option<(WidgetId, Point)> {
-      let WidgetTree { arena, store, app_ctx, .. } = tree;
+      let WidgetTree { arena, store, wnd_ctx, .. } = tree;
 
       let r = id.assert_get(arena);
-      let ctx = HitTestCtx { id, arena, store, app_ctx };
+      let ctx = HitTestCtx { id, arena, store, wnd_ctx };
       let hit_test = r.hit_test(&ctx, pos);
 
       if hit_test.hit {

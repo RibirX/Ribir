@@ -13,23 +13,23 @@ pub(crate) struct WidgetTree {
   root: WidgetId,
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
-  pub(crate) app_ctx: AppContext,
+  pub(crate) wnd_ctx: WindowCtx,
   dirty_set: DirtySet,
 }
 
 impl WidgetTree {
-  pub(crate) fn new(root: Widget, app_ctx: AppContext) -> WidgetTree {
+  pub(crate) fn new(root: Widget, wnd_ctx: WindowCtx) -> WidgetTree {
     let mut arena = Arena::default();
     let root = root
-      .into_subtree(None, &mut arena, &app_ctx)
+      .into_subtree(None, &mut arena, &wnd_ctx)
       .expect("must have a root");
     let store = LayoutStore::default();
     let dirty_set = DirtySet::default();
-    root.on_mounted_subtree(&arena, &store, &app_ctx, &dirty_set);
+    root.on_mounted_subtree(&arena, &store, &wnd_ctx, &dirty_set);
     let tree = Self {
       root,
       arena,
-      app_ctx,
+      wnd_ctx,
       store,
       dirty_set,
     };
@@ -49,14 +49,14 @@ impl WidgetTree {
         .is_some()
     }
 
-    let Self { root, arena, store, app_ctx, .. } = self;
+    let Self { root, arena, store, wnd_ctx, .. } = self;
     let mut w = Some(*root);
 
     let mut paint_ctx = PaintingCtx {
       id: *root,
       arena,
       store,
-      app_ctx,
+      wnd_ctx,
       painter,
     };
     while let Some(id) = w {
@@ -111,12 +111,12 @@ impl WidgetTree {
           .map(|info| info.clamp)
           .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-        let Self { arena, store, app_ctx, dirty_set, .. } = self;
+        let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
         let mut layouter = Layouter {
           wid,
           arena,
           store,
-          app_ctx,
+          wnd_ctx: wnd_ctx,
           dirty_set,
         };
         layouter.perform_widget_layout(clamp);
@@ -124,7 +124,7 @@ impl WidgetTree {
         store.take_performed().into_iter().for_each(|id| {
           id.assert_get(arena).query_all_type(
             |l: &PerformedLayoutListener| {
-              (l.performed_layout.borrow_mut())(LifeCycleCtx { id, arena, store, app_ctx });
+              (l.performed_layout.borrow_mut())(LifeCycleCtx { id, arena, store, wnd_ctx });
               true
             },
             QueryOrder::OutsideFirst,
@@ -174,7 +174,7 @@ impl Widget {
     self,
     parent: Option<WidgetId>,
     arena: &mut TreeArena,
-    app_ctx: &AppContext,
+    wnd_ctx: &WindowCtx,
   ) -> Option<WidgetId> {
     enum NodeInfo {
       BackTheme,
@@ -196,13 +196,13 @@ impl Widget {
       })
     });
     if !full {
-      themes.push(app_ctx.app_theme.clone());
+      themes.push(wnd_ctx.app_theme());
     }
 
     pub(crate) struct InflateHelper<'a> {
       stack: Vec<NodeInfo>,
       arena: &'a mut TreeArena,
-      app_ctx: &'a AppContext,
+      wnd_ctx: &'a WindowCtx,
       themes: RefCell<Vec<Rc<Theme>>>,
       parent: Option<WidgetId>,
       root: Option<WidgetId>,
@@ -231,7 +231,7 @@ impl Widget {
         match widget {
           Widget::Compose(c) => {
             let theme_cnt = self.themes.borrow().len();
-            let mut build_ctx = BuildCtx::new(&self.themes, self.app_ctx);
+            let mut build_ctx = BuildCtx::new(&self.themes, self.wnd_ctx);
             let c = c(&mut build_ctx);
             if theme_cnt < self.themes.borrow().len() {
               self.stack.push(NodeInfo::BackTheme);
@@ -272,7 +272,7 @@ impl Widget {
     let helper = InflateHelper {
       stack: vec![],
       arena,
-      app_ctx,
+      wnd_ctx,
       themes: RefCell::new(themes),
       parent,
       root: None,
@@ -356,7 +356,10 @@ mod tests {
   fn bench_recursive_inflate(width: usize, depth: usize, b: &mut Bencher) {
     let ctx: AppContext = <_>::default();
     b.iter(move || {
-      let mut tree = WidgetTree::new(Recursive { width, depth }.into_widget(), ctx.clone());
+      let mut tree = WidgetTree::new(
+        Recursive { width, depth }.into_widget(),
+        WindowCtx::new(ctx.clone()),
+      );
       tree.layout(Size::new(512., 512.));
     });
   }
@@ -364,7 +367,8 @@ mod tests {
   fn bench_recursive_repair(width: usize, depth: usize, b: &mut Bencher) {
     let w = Recursive { width, depth }.into_stateful();
     let trigger = w.clone();
-    let mut tree = WidgetTree::new(w.into_widget(), <_>::default());
+    let app_ctx = <_>::default();
+    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx));
     b.iter(|| {
       {
         let mut v = trigger.state_ref();
@@ -460,13 +464,13 @@ mod tests {
   #[test]
   fn drop_info_clear() {
     let post = Embed { width: 5, depth: 3 };
-    let mut tree = WidgetTree::new(post.into_widget(), <_>::default());
+    let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(AppContext::default()));
     tree.layout(Size::new(512., 512.));
     assert_eq!(tree.count(), 16);
 
     tree.mark_dirty(tree.root());
-    let WidgetTree { root, arena, store, app_ctx, .. } = &mut tree;
-    root.remove_subtree(arena, store, app_ctx);
+    let WidgetTree { root, arena, store, wnd_ctx, .. } = &mut tree;
+    root.remove_subtree(arena, store, wnd_ctx);
 
     assert_eq!(tree.layout_list(), None);
     assert_eq!(tree.is_dirty(), false);
@@ -477,7 +481,7 @@ mod tests {
     let ctx: AppContext = <_>::default();
     b.iter(move || {
       let post = Embed { width: 5, depth: 1000 };
-      WidgetTree::new(post.into_widget(), ctx.clone());
+      WidgetTree::new(post.into_widget(), WindowCtx::new(ctx.clone()));
     });
   }
 
@@ -497,7 +501,7 @@ mod tests {
   fn repair_5_x_1000(b: &mut Bencher) {
     let post = Embed { width: 5, depth: 1000 }.into_stateful();
     let trigger = post.clone();
-    let mut tree = WidgetTree::new(post.into_widget(), <_>::default());
+    let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(AppContext::default()));
     b.iter(|| {
       {
         let mut v = trigger.state_ref();
@@ -535,7 +539,7 @@ mod tests {
       }
     };
 
-    let mut tree = WidgetTree::new(widget, <_>::default());
+    let mut tree = WidgetTree::new(widget, WindowCtx::new(AppContext::default()));
     tree.layout(Size::new(100., 100.));
     {
       *trigger.silent_ref() = 2;
@@ -563,7 +567,8 @@ mod tests {
           }})
         }
     }};
-    let mut tree1 = WidgetTree::new(w1, <_>::default());
+    let app_ctx = <_>::default();
+    let mut tree1 = WidgetTree::new(w1, WindowCtx::new(app_ctx));
     tree1.layout(win_size);
     tree1.draw(&mut painter);
 
@@ -579,7 +584,7 @@ mod tests {
           }})
         }
     }};
-    let mut tree2 = WidgetTree::new(w2, <_>::default());
+    let mut tree2 = WidgetTree::new(w2, WindowCtx::new(AppContext::default()));
     tree2.layout(win_size);
     tree2.draw(&mut painter);
     let len_1_widget = painter.finish().len();

@@ -7,16 +7,16 @@ use std::{
 #[derive(Clone)]
 pub struct BuildCtx<'a> {
   themes: &'a RefCell<Vec<Rc<Theme>>>,
-  app_ctx: &'a AppContext,
+  wnd_ctx: &'a WindowCtx,
 }
 
 impl<'a> BuildCtx<'a> {
   #[inline]
-  pub fn app_ctx(&self) -> &AppContext { self.app_ctx }
+  pub fn wnd_ctx(&self) -> &WindowCtx { self.wnd_ctx }
 
   #[inline]
-  pub(crate) fn new(themes: &'a RefCell<Vec<Rc<Theme>>>, app_ctx: &'a AppContext) -> Self {
-    Self { themes, app_ctx }
+  pub(crate) fn new(themes: &'a RefCell<Vec<Rc<Theme>>>, wnd_ctx: &'a WindowCtx) -> Self {
+    Self { themes, wnd_ctx }
   }
 
   pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<Ref<'_, T>> {
