@@ -9,11 +9,10 @@ pub use selected_text::SelectedTextStyle;
 
 use crate::layout::{constrained_box::EXPAND_X, ConstrainedBox, Stack, Container};
 use crate::prelude::Text;
-
 use ribir_core::{prelude::*, ticker::FrameMsg};
-
-
 use self::{glyphs_helper::GlyphsHelper, selected_text::SelectedText};
+
+pub struct Placeholder(CowArc<str>);
 
 #[derive(Declare)]
 pub struct Input {
@@ -42,11 +41,8 @@ impl Input {
 }
 
 impl ComposeChild for Input {
-  type Child = Option<Widget>;
-  fn compose_child(this: StateWidget<Self>, placeholder: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
+  type Child = Option<Placeholder>;
+  fn compose_child(this: StateWidget<Self>, placeholder: Self::Child) -> Widget {
     let end_char = "\r";
     widget! {
       states {
@@ -116,8 +112,14 @@ impl ComposeChild for Input {
             }
 
             DynWidget {
-              visible: this.text.is_empty(),
-              dyns: placeholder.unwrap_or(Void {}.into_widget()),
+              dyns: placeholder.map(|holder| {
+                widget! {
+                  Text {
+                    visible: this.text.is_empty(),
+                    text: holder.0,
+                  }
+                }
+              })
             }
 
             CaretStyle{
@@ -155,6 +157,11 @@ impl ComposeChild for Input {
       }
     }
   }
+}
+
+impl Placeholder {
+  #[inline]
+  pub fn new(str: impl Into<CowArc<str>>) -> Self { Self(str.into()) }
 }
 
 fn auto_x_scroll_pos(container: &ScrollableWidget, before: f32, after: f32) -> f32 {

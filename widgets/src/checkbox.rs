@@ -72,10 +72,10 @@ impl ComposeChild for Checkbox {
       };
       checkbox = match position {
         Position::Before => {
-          widget! { Row { DynWidget { dyns: [label, checkbox].into_iter() } } }
+          widget! { Row { DynWidget { dyns: [label, checkbox] } } }
         }
         Position::After => {
-          widget! { Row { DynWidget { dyns: [checkbox, label].into_iter() } } }
+          widget! { Row { DynWidget { dyns: [checkbox, label] } } }
         }
       };
     }

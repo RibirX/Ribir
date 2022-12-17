@@ -28,9 +28,7 @@ impl Compose for TodoMVP {
             border: Border::only_bottom(BorderSide { width:1., color: surface_variant }),
             Input {
               id: input,
-              Text {
-                text: "todo",
-              }
+              Placeholder::new("Todo")
             }
           }
           Button {

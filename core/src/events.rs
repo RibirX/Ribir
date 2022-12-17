@@ -29,7 +29,6 @@ pub struct EventCommon {
   pub(crate) current_target: WidgetId,
   pub(crate) cancel_bubble: bool,
   pub(crate) prevent_default: bool,
-  // todo: we need to support lifetime in event.
   tree: NonNull<WidgetTree>,
   info: NonNull<DispatchInfo>,
 }

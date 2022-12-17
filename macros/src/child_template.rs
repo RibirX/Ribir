@@ -5,7 +5,7 @@ use syn::{
   GenericArgument, PathArguments, PathSegment,
 };
 
-use crate::{declare_derive::DECLARER, util::data_struct_unwrap};
+use crate::util::data_struct_unwrap;
 const TML: &str = "Tml";
 const ASSOCIATED_TEMPLATE: &str = "AssociatedTemplate";
 
@@ -15,7 +15,6 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
   let stt = data_struct_unwrap(data, ASSOCIATED_TEMPLATE)?;
   let tml = Ident::new(&format!("{}{}", name, TML), name.span());
-  let declarer = Ident::new(&format!("{}{}", name, DECLARER), name.span());
 
   let fields = match stt.fields {
     Fields::Named(ref named) => &named.named,
@@ -51,7 +50,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       init_values.extend(quote! { #field_name: #value #punct});
 
       fill_child_impl.extend(quote! {
-        impl #g_impl FillTemplate<Generic<#ty>, #ty> for #tml #g_ty #g_where  {
+        impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
           type New = Self;
           fn fill(mut self, c: #ty) -> Self {
             assert!(self.#field_name.is_none(), "Try to fill same type twice.");
@@ -74,37 +73,32 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
     impl #g_impl Template for #name #g_ty #g_where {
       type Builder = #tml #g_ty;
+
+      #[inline]
+      fn builder() -> Self::Builder {  <_>::default() }
     }
 
     impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
       type Target = #name #g_ty;
       #[inline]
-      fn build(self) -> Self::Target {#name { #init_values }}
+      fn build_tml(self) -> Self::Target {#name { #init_values }}
     }
 
-    #vis struct #declarer;
+
     impl #g_impl Declare for #name #g_ty #g_where {
-      type Builder = #declarer;
+      type Builder = #tml #g_ty;
       #[inline]
-      fn declare_builder() -> Self::Builder { #declarer }
+      fn declare_builder() -> Self::Builder { #name::builder() }
     }
 
-    impl #declarer {
+    impl #g_impl #tml #g_ty {
       #[inline]
       #vis fn build(self, _: &BuildCtx) -> Self { self }
     }
 
-    impl #g_impl WithChild<#name #g_ty, #name #g_ty> for #declarer #g_where {
-      type Target = #name #g_ty;
-      type Builder = #tml #g_ty;
-      #[inline]
-      fn with_child(self, child: #name #g_ty) -> Self::Target { child }
-      #[inline]
-      fn child_builder(&self) -> Self::Builder { <_>::default() }
-    }
-
     #fill_child_impl
   };
+
   Ok(tokens)
 }
 

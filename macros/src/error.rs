@@ -18,7 +18,7 @@ pub enum DeclareError {
   DuplicateID([Ident; 2]),
   CircleDepends(Box<[CircleUsedPath]>),
   WatchNothing(Span),
-  PropInvalidTarget(Span),
+  PropInvalidTarget(proc_macro2::Span),
   TransitionByConflict(Span),
   LetWatchWrongPlace(Span),
   SynErr(syn::Error),
@@ -74,8 +74,7 @@ impl DeclareError {
         diagnostic.set_message("try to watch a expression without any stateful target.");
       }
       DeclareError::PropInvalidTarget(span) => {
-        diagnostic.set_spans(*span);
-        diagnostic.set_message("is not a stateful target.");
+        *tokens = syn::Error::new(*span, "is not a stateful target.").into_compile_error();
       }
       DeclareError::LetWatchWrongPlace(span) => {
         diagnostic.set_spans(*span);

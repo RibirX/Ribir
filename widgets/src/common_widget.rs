@@ -11,3 +11,8 @@ pub struct LabelText(pub CowArc<str>);
 pub type TrailingText = WidgetPair<Trailing, CowArc<str>>;
 
 pub type LeadingText = WidgetPair<Leading, CowArc<str>>;
+
+impl LabelText {
+  #[inline]
+  pub fn new(str: impl Into<CowArc<str>>) -> Self { LabelText(str.into()) }
+}

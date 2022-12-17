@@ -525,10 +525,10 @@ impl VisitCtx {
           .for_each(|(l, r)| self.recursive_visit_local_mut(l, Some(r)));
       }
       (left, right) => {
-        self.visit_pat_mut(left);
         if let Some(right) = right {
           self.visit_expr_mut(right);
         }
+        self.visit_pat_mut(left);
       }
     }
   }

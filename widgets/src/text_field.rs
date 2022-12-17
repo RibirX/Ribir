@@ -1,6 +1,6 @@
 use crate::{
   layout::{Column, Container, ConstrainedBox, constrained_box::EXPAND_Y},
-  prelude::{ Expanded, Icon, Input, Row, Stack, Text}, common_widget::{Leading, Trailing, LabelText, TrailingText, LeadingText},
+  prelude::{ Expanded, Icon, Input, Row, Stack, Text}, common_widget::{Leading, Trailing, LabelText, TrailingText, LeadingText}, input::Placeholder,
 };
 use ribir_core::prelude::*;
 use std::hash::Hash;
@@ -22,7 +22,6 @@ impl TextField {
   }
 }
 
-pub struct Placeholder(pub CowArc<str>);
 
 #[derive(Template, Default)]
 pub struct TextFieldTml {
@@ -383,10 +382,7 @@ fn build_input_area(
         Input {
           id: input,
           style: theme.text.clone(),
-          Text {
-            text: placeholder.map(|p| p.0).unwrap_or("".into()),
-            style: theme.text.clone(),
-          }
+          DynWidget::new(placeholder)
         }
       }
       DynWidget {
