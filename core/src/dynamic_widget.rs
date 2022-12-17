@@ -15,7 +15,7 @@ pub(crate) enum DynWidgetGenInfo {
   /// `DynWidget` without static children, and the whole subtree of generated
   /// widget are dynamic widgets. The value record how many dynamic siblings
   /// have.
-  WholeSubtree(usize),
+  WholeSubtree { width: usize, directly_spread: bool },
 }
 
 /// Widget that as a container of dynamic widgets
@@ -63,8 +63,25 @@ pub(crate) trait DynsIntoWidget<M> {
 // A dynamic widget must be stateful, depends others.
 impl<D: DynsIntoWidget<M> + 'static, M: 'static> Render for DynRender<D, M> {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.regen_if_need(ctx);
-    self.self_render.perform_layout(clamp, ctx)
+    if let Some(width) = self.take_spread_cnt() {
+      let size = self.self_render.perform_layout(clamp, ctx);
+
+      let arena = &ctx.arena;
+      let mut sibling = Some(ctx.id);
+      (0..width).for_each(|_| {
+        let w = sibling.unwrap();
+        inspect_key(&w, arena, |key: &Box<dyn AnyKey>| {
+          key.mounted();
+        });
+        w.on_mounted(arena, &ctx.store, ctx.wnd_ctx, ctx.dirty_set);
+        sibling = w.next_sibling(arena);
+      });
+
+      size
+    } else {
+      self.regen_if_need(ctx);
+      self.self_render.perform_layout(clamp, ctx)
+    }
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) { self.self_render.paint(ctx) }
@@ -95,6 +112,34 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
     }
   }
 
+  pub(crate) fn spread(dyns: Stateful<DynWidget<D>>) -> Vec<Widget>
+  where
+    M: 'static,
+    D: 'static,
+  {
+    let mut widgets = dyns.silent_ref().dyns.take().unwrap().dyns_into_widget();
+
+    if widgets.is_empty() {
+      widgets.push(Void.into_widget());
+    }
+
+    let first = std::mem::replace(&mut widgets[0], Void.into_widget());
+    let first = DynRender::new(DynWidget { dyns: Some(first) }.into_stateful());
+    let first = Self {
+      dyn_widgets: dyns,
+      self_render: RefCell::new(Box::new(first)),
+      gen_info: RefCell::new(Some(DynWidgetGenInfo::WholeSubtree {
+        width: widgets.len(),
+        directly_spread: true,
+      })),
+      marker: PhantomData,
+    };
+
+    widgets[0] = first.into_widget();
+
+    widgets
+  }
+
   fn regen_if_need(&self, ctx: &mut LayoutCtx) {
     let mut dyn_widget = self.dyn_widgets.silent_ref();
     let Some(new_widgets) = dyn_widget.dyns.take() else {
@@ -106,7 +151,7 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
       if ctx.has_child() {
         DynWidgetGenInfo::DynDepth(1)
       } else {
-        DynWidgetGenInfo::WholeSubtree(1)
+        DynWidgetGenInfo::WholeSubtree { width: 1, directly_spread: false }
       }
     });
 
@@ -190,7 +235,7 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
         *depth = new_depth;
       }
 
-      DynWidgetGenInfo::WholeSubtree(siblings) => {
+      DynWidgetGenInfo::WholeSubtree { width: siblings, .. } => {
         let mut cursor = old_sign;
         new_widgets.iter().rev().for_each(|n| {
           cursor.insert_before(*n, arena);
@@ -248,6 +293,18 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
       &mut *self.self_render.borrow_mut(),
       sign.assert_get_mut(arena),
     );
+  }
+
+  fn take_spread_cnt(&self) -> Option<usize> {
+    if let Some(DynWidgetGenInfo::WholeSubtree { directly_spread, width }) =
+      &mut *self.gen_info.borrow_mut()
+    {
+      if *directly_spread {
+        *directly_spread = false;
+        return Some(*width);
+      }
+    }
+    None
   }
 }
 
@@ -325,7 +382,7 @@ fn down_to_leaf(id: WidgetId, arena: &TreeArena) -> (WidgetId, usize) {
 // impl IntoWidget
 
 // only `DynWidget` gen single widget can as a parent widget
-impl<M, D> IntoWidget<Generic<M>> for Stateful<DynWidget<D>>
+impl<M, D> IntoWidget<NotSelf<M>> for Stateful<DynWidget<D>>
 where
   M: ImplMarker + 'static,
   D: IntoWidget<M> + 'static,
@@ -334,7 +391,14 @@ where
   fn into_widget(self) -> Widget { DynRender::new(self).into_widget() }
 }
 
-impl<M, D> IntoWidget<Generic<Option<M>>> for Stateful<DynWidget<Option<D>>>
+/// only use to avoid conflict implement for `IntoIterator`.
+/// `Stateful<DynWidget<Option<W: IntoWidget>>>` both satisfied `IntoWidget` as
+/// a single child and `Stateful<DynWidget<impl IntoIterator<Item= impl
+/// IntoWidget>>>` as multi child.
+pub struct OptionDyn<M>(PhantomData<fn(M)>);
+impl<M> ImplMarker for OptionDyn<M> {}
+
+impl<M, D> IntoWidget<OptionDyn<M>> for Stateful<DynWidget<Option<D>>>
 where
   M: ImplMarker + 'static,
   D: IntoWidget<M> + 'static,

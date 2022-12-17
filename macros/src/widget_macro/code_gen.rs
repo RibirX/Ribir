@@ -1,6 +1,6 @@
 use crate::{
   error::{DeclareError, DeclareWarning},
-  widget_macro::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD},
+  widget_macro::WIDGET_OF_BUILTIN_FIELD,
 };
 use ahash::RandomState;
 use proc_macro2::TokenStream;
@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
   parse_macro_input, parse_quote,
   spanned::Spanned,
-  token::{Brace, Dot, Paren, Semi},
+  token::{Brace, Comma, Dot, Paren, Semi},
   visit_mut::VisitMut,
   Expr, Ident,
 };
@@ -32,6 +32,17 @@ pub(crate) fn gen_prop_macro(
 ) -> proc_macro::TokenStream {
   let mut prop_macro = parse_macro_input! { input as PropMacro };
   let PropMacro { prop, lerp_fn, .. } = &mut prop_macro;
+
+  let name = match &prop {
+    Property::Name(name) => name,
+    Property::Member { target, .. } => target,
+  };
+
+  if ctx.find_named_obj(name).is_none() {
+    let mut tokens = quote!();
+    DeclareError::PropInvalidTarget(name.span()).into_compile_error(&mut tokens);
+    return tokens.into();
+  };
 
   ctx.new_scope_visit(
     |ctx| match prop {
@@ -61,18 +72,7 @@ pub(crate) fn gen_prop_macro(
     ctx.visit_track_expr_mut(lerp_fn);
   }
 
-  let name = match &prop {
-    Property::Name(name) => name,
-    Property::Member { target, .. } => target,
-  };
-
-  if ctx.find_named_obj(name).is_none() {
-    let mut tokens = quote!();
-    DeclareError::PropInvalidTarget(name.span().unwrap()).into_compile_error(&mut tokens);
-    tokens.into()
-  } else {
-    prop_macro.to_token_stream().into()
-  }
+  prop_macro.to_token_stream().into()
 }
 
 pub(crate) fn gen_move_to_widget_macro(input: &TokenStream, ctx: &mut VisitCtx) -> TokenStream {
@@ -445,28 +445,26 @@ impl WidgetNode {
 
       if nodes.len() > 1 || !children.is_empty() {
         let span = first.span();
-        Brace(first.span()).surround(tokens, |tokens| {
-          let child_tml = ribir_suffix_variable(first, "tml");
-          quote_spanned! { span =>
-            let #child_tml = #first.child_builder()
-          }
-          .to_tokens(tokens);
+        quote_spanned! { span => #first.with_child}.to_tokens(tokens);
+        Paren(span).surround(tokens, |tokens| {
           if nodes.len() > 1 {
-            quote_spanned! { span => .fill}.to_tokens(tokens);
-            Paren(span).surround(tokens, |tokens| {
-              recursive_compose(&nodes[1..], children, named_objs, tokens);
-            });
+            recursive_compose(&nodes[1..], children, named_objs, tokens);
           } else {
-            children.iter().for_each(|c| {
-              quote_spanned! {span => .fill}.to_tokens(tokens);
-              Paren(span).surround(tokens, |tokens| c.gen_compose_node(named_objs, tokens));
-            });
+            if children.len() > 1 {
+              quote_spanned!(span =>  ChildLink::new).to_tokens(tokens);
+              Paren(span).surround(tokens, |tokens| {
+                children[0].gen_compose_node(named_objs, tokens);
+                Comma(span).to_tokens(tokens);
+                children[1].gen_compose_node(named_objs, tokens);
+              });
+              children[2..].iter().for_each(|c| {
+                quote_spanned!(span => .append).to_tokens(tokens);
+                Paren(span).surround(tokens, |tokens| c.gen_compose_node(named_objs, tokens))
+              });
+            } else {
+              children[0].gen_compose_node(named_objs, tokens);
+            }
           }
-          quote_spanned! {
-            span => .build();
-            #first.with_child(#child_tml)
-          }
-          .to_tokens(tokens);
         });
       } else {
         first.to_tokens(tokens)

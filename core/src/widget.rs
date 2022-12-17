@@ -160,31 +160,31 @@ impl<'a> dyn Render + 'a {
 
 pub trait ImplMarker {}
 /// implement marker means this converter not hope to convert continue.
-pub struct Concrete<M>(PhantomData<fn(M)>);
+pub struct SelfImpl;
 /// implement marker means this converter can use as a generic bounds to convert
 /// continue.
-pub struct Generic<M>(PhantomData<fn(M)>);
+pub struct NotSelf<M>(PhantomData<fn(M)>);
 
-impl<M> ImplMarker for Concrete<M> {}
-impl<M> ImplMarker for Generic<M> {}
+impl ImplMarker for SelfImpl {}
+impl<M> ImplMarker for NotSelf<M> {}
 
 pub trait IntoWidget<M: ImplMarker> {
   fn into_widget(self) -> Widget;
 }
 
-impl IntoWidget<Concrete<Widget>> for Widget {
+impl IntoWidget<SelfImpl> for Widget {
   #[inline]
   fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<Generic<C>> for C {
+impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<NotSelf<()>> for C {
   #[inline]
   fn into_widget(self) -> Widget {
     ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
   }
 }
 
-impl<R: Render + 'static> IntoWidget<Generic<&dyn Render>> for R {
+impl<R: Render + 'static> IntoWidget<NotSelf<&()>> for R {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget::Render {
@@ -194,7 +194,7 @@ impl<R: Render + 'static> IntoWidget<Generic<&dyn Render>> for R {
   }
 }
 
-impl<W, C> IntoWidget<Generic<Option<C>>> for W
+impl<W, C> IntoWidget<NotSelf<[(); 0]>> for W
 where
   W: ComposeChild<Child = Option<C>> + Into<StateWidget<W>> + 'static,
 {
@@ -202,7 +202,7 @@ where
   fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
 }
 
-impl<F, R, M> IntoWidget<Generic<&dyn FnOnce(M) -> Widget>> for F
+impl<F, R, M> IntoWidget<NotSelf<M>> for F
 where
   M: ImplMarker,
   F: FnOnce(&BuildCtx) -> R + 'static,
