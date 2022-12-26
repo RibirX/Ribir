@@ -63,20 +63,20 @@ impl WidgetTree {
       paint_ctx.id = id;
       paint_ctx.painter.save();
 
-      let layout_box = paint_ctx
-        .box_rect()
-        .expect("when paint node, it's mut be already layout.");
-      let render = id.assert_get(arena);
-
-      let need_paint = paint_ctx.painter.alpha() != 0.
-        && (paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow());
-
-      if need_paint {
-        paint_ctx
-          .painter
-          .translate(layout_box.min_x(), layout_box.min_y());
-        render.paint(&mut paint_ctx);
+      let mut need_paint = false;
+      if paint_ctx.painter.alpha() != 0. {
+        paint_ctx.box_rect().map(|layout_box| {
+          let render = id.assert_get(arena);
+          if paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow() {
+            paint_ctx
+              .painter
+              .translate(layout_box.min_x(), layout_box.min_y());
+            render.paint(&mut paint_ctx);
+            need_paint = true;
+          }
+        });
       }
+
       w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
         let mut node = w;
         while let Some(p) = node {
