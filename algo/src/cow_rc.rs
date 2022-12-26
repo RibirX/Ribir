@@ -171,6 +171,10 @@ impl From<String> for CowArc<str> {
   fn from(str: String) -> Self { CowArc::owned(str) }
 }
 
+impl Default for CowArc<str> {
+  fn default() -> Self { Self::from(String::default()) }
+}
+
 impl<B: ?Sized + ToOwned> Borrow<B> for CowArc<B> {
   fn borrow(&self) -> &B {
     match self {

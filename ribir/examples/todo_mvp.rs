@@ -28,22 +28,24 @@ impl Compose for TodoMVP {
             border: Border::only_bottom(BorderSide { width:1., color: surface_variant }),
             Input {
               id: input,
-              placeholder: String::from("Todo"),
+              Text {
+                text: "todo",
+              }
             }
           }
           Button {
             margin: EdgeInsets::only_left(20.),
             tap: move |_| {
-              let label = if input.text.is_empty() {
+              let label = if input.text().is_empty() {
                 String::from("Todo")
               } else {
-                input.text.clone()
+                input.text().to_string()
               };
               this.tasks.push(Task {
                 label,
                 finished: false,
               });
-              input.text = String::default();
+              input.set_text(String::default().into());
             },
             Leading { Icon { svgs::ADD } }
             ButtonText::new("ADD")
