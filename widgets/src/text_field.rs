@@ -10,7 +10,16 @@ use std::{collections::HashMap};
 pub struct TextField {
   /// textfield's input value
   #[declare(default)]
-  text: String,
+  text: CowArc<str>,
+}
+
+impl TextField {
+  pub fn text(&self) -> CowArc<str> {
+    self.text.clone()
+  }
+  pub fn set_text(&mut self, text: CowArc<str>) {
+    self.text = text;
+  }
 }
 
 pub struct Placeholder(pub CowArc<str>);
@@ -180,7 +189,6 @@ pub enum TextFieldState {
   Hovered,
   // Disabled,
 }
-
 
 impl CustomTheme for TextFieldThemeSuit {}
 
@@ -374,9 +382,7 @@ fn build_input_area(
         flex: 1.,
         Input {
           id: input,
-          text:  this.text.clone(),
           style: theme.text.clone(),
-
           Text {
             text: placeholder.map(|p| p.0).unwrap_or("".into()),
             style: theme.text.clone(),
@@ -397,10 +403,18 @@ fn build_input_area(
     }
 
     finally {
-      let_watch!(input.text.clone()) 
+      input.set_text(this.text.clone());
+      let_watch!(input.text().clone()) 
         .distinct_until_changed()
         .subscribe(move |val| {
-          this.silent().text = val.clone();
+          this.silent().text = val;
+        });
+      let_watch!(this.text.clone())
+        .distinct_until_changed()
+        .subscribe(move |val| {
+          if input.text() != val {
+            input.set_text(val);
+          }
         });
       let_watch!(theme.state)
         .distinct_until_changed()

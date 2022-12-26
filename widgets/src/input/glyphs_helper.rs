@@ -1,47 +1,10 @@
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::ops::Range;
 
 use ribir_core::prelude::*;
 
-use crate::prelude::Text;
-
-#[derive(Declare)]
-pub(crate) struct InputText {
-  #[declare(convert=into)]
-  pub(crate) text: CowArc<str>,
-  pub(crate) style: TextStyle,
-
-  #[declare(default)]
-  pub(crate) glyphs_helper: Rc<RefCell<GlyphsHelper>>,
-}
-
 #[derive(Default)]
 pub(crate) struct GlyphsHelper {
-  glyphs: Option<VisualGlyphs>,
-}
-
-impl Compose for InputText {
-  fn compose(this: StateWidget<Self>) -> Widget {
-    let placeholder = "\r";
-    widget! {
-        states {this: this.into_stateful()}
-        Text {
-          id: text,
-          text: this.text.to_string() + placeholder,
-          style: this.style.clone(),
-
-          performed_layout: move |ctx| {
-            let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
-            *this.glyphs_helper.borrow_mut() = GlyphsHelper {
-              glyphs: Some(Text::text_layout(
-              &text.text,
-              &text.style,
-              ctx.wnd_ctx().typography_store(),
-              bound,
-            ))};
-          }
-      }
-    }
-  }
+  pub(crate) glyphs: Option<VisualGlyphs>,
 }
 
 impl GlyphsHelper {

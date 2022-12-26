@@ -1,26 +1,44 @@
 mod caret;
 mod caret_state;
 mod handle;
-mod input_text;
+mod glyphs_helper;
 mod selected_text;
 pub use caret::CaretStyle;
 pub use caret_state::CaretState;
 pub use selected_text::SelectedTextStyle;
 
-use crate::layout::{constrained_box::EXPAND_X, ConstrainedBox, Stack};
-use ribir_core::prelude::*;
+use crate::layout::{constrained_box::EXPAND_X, ConstrainedBox, Stack, Container};
+use crate::prelude::Text;
 
-use self::{caret::Caret, input_text::InputText, selected_text::SelectedText};
+use ribir_core::{prelude::*, ticker::FrameMsg};
+
+
+use self::{glyphs_helper::GlyphsHelper, selected_text::SelectedText};
 
 #[derive(Declare)]
 pub struct Input {
-  #[declare(default)]
-  pub text: String,
   #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
+  #[declare(default, skip)]
+  text: CowArc<str>,
+  #[declare(default, skip)]
+  caret: CaretState,
+}
 
-  #[declare(default)]
-  pub caret: CaretState,
+impl Input {
+  pub fn text(&self) -> CowArc<str> { self.text.clone() }
+
+  pub fn caret(&self) -> &CaretState { &self.caret }
+
+  pub fn set_text(&mut self, text: CowArc<str>) {
+    self.text = text;
+    self.caret.valid(self.text.len());
+  }
+
+  pub fn set_caret(&mut self, caret: CaretState) {
+    self.caret = caret;
+    self.caret.valid(self.text.len());
+  }
 }
 
 impl ComposeChild for Input {
@@ -29,10 +47,16 @@ impl ComposeChild for Input {
   where
     Self: Sized,
   {
+    let end_char = "\r";
     widget! {
       states {
         this: this.into_stateful(),
+        helper: GlyphsHelper::default().into_stateful(),
       }
+      init ctx => {
+        let tick_of_layout_ready = ctx.wnd_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+      }
+
       ConstrainedBox {
         id: outbox,
         clamp: EXPAND_X,
@@ -44,14 +68,14 @@ impl ComposeChild for Input {
             if e.point_type == PointerType::Mouse
               && e.mouse_buttons() == MouseButtons::PRIMARY {
               let position = to_content_pos(&container, &e.position());
-              let cluster = text.glyphs_helper.borrow().cluster_from_pos(position.x, position.y);
+              let cluster = helper.cluster_from_pos(position.x, position.y);
               this.caret = CaretState::Selecting(begin, cluster as usize);
             }
           }
         },
         pointer_down: move |e| {
           let position = to_content_pos(&container, &e.position());
-          let cluster = text.glyphs_helper.borrow().cluster_from_pos(position.x, position.y);
+          let cluster = helper.cluster_from_pos(position.x, position.y);
           this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
         },
         pointer_up: move |_| {
@@ -67,48 +91,68 @@ impl ComposeChild for Input {
         ScrollableWidget {
           id: container,
           scrollable: Scrollable::X,
-
+          padding: EdgeInsets::horizontal(1.),
           Stack {
-            padding: EdgeInsets::horizontal(1.),
+            
             SelectedText {
-              caret: this.caret,
-              glyphs_helper: text.glyphs_helper.clone(),
+              id: selected,
+              rects: vec![],
             }
-            InputText {
+            
+            Text {
               id: text,
-              text: this.text.clone(),
+              text: this.text.to_string() + end_char,
               style: this.style.clone(),
+    
+              performed_layout: move |ctx| {
+                let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
+                helper.glyphs = Some(Text::text_layout(
+                  &text.text,
+                  &text.style,
+                  ctx.wnd_ctx().typography_store(),
+                  bound,
+                ));
+              }
             }
 
             DynWidget {
               visible: this.text.is_empty(),
-              dyns: placeholder,
+              dyns: placeholder.unwrap_or(Void {}.into_widget()),
             }
 
-            DynWidget {
-              dyns: (outbox.has_focus()).then(move || widget! {
-                Caret {
-                  id: caret,
-                  caret: this.caret,
-                  font: this.style.clone(),
-                  glyphs_helper: text.glyphs_helper.clone(),
-                }
-
-                finally {
-                  let_watch!(caret.layout_pos())
-                    .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
-                    .distinct_until_changed()
-                    .subscribe(move |(before, after)| {
-                      let pos = auto_x_scroll_pos(&container, before.x, after.x);
-                      container.silent().jump_to(Point::new(pos, 0.));
-                    });
-                }
-              })
+            CaretStyle{
+              id: caret,
+              visible: outbox.has_focus(),
+              font: this.style.clone(),
+              top_anchor: 0.,
+              left_anchor: 0.,
+              Container {
+                id: icon,
+                size: Size::new(1., 0.),
+              }
             }
           }
         }
       }
-
+      finally {
+        let_watch!(this.caret)
+          .distinct_until_changed()
+          .sample(tick_of_layout_ready)
+          .subscribe(move |cursor| {
+            selected.rects = helper.selection(cursor.select_range());
+            let (offset, height) = helper.cursor(cursor.offset());
+            caret.top_anchor = PositionUnit::Pixel(offset.y);
+            caret.left_anchor = PositionUnit::Pixel(offset.x);
+            icon.size = Size::new(1., height);
+          });
+        let_watch!(caret.left_anchor.abs_value(1.))
+          .scan_initial((0., 0.), |pair, v| (pair.1, v))
+          .distinct_until_changed()
+          .subscribe(move |(before, after)| {
+            let pos = auto_x_scroll_pos(&container, before, after);
+            container.silent().jump_to(Point::new(pos, 0.));
+          });
+      }
     }
   }
 }

@@ -1,10 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
-
-use ribir_core::{prelude::*, ticker::FrameMsg};
+use ribir_core::prelude::*;
 
 use crate::layout::{Container, Stack};
-
-use super::{input_text::GlyphsHelper, CaretState};
 
 #[derive(Declare)]
 pub struct SelectedTextStyle {}
@@ -26,26 +22,17 @@ impl ComposeStyle for SelectedTextStyle {
 
 #[derive(Declare)]
 pub(crate) struct SelectedText {
-  pub(crate) caret: CaretState,
-  pub(crate) glyphs_helper: Rc<RefCell<GlyphsHelper>>,
+  pub(crate) rects: Vec<Rect>,
 }
 
 impl Compose for SelectedText {
   fn compose(this: StateWidget<Self>) -> Widget {
-    let rects = vec![];
-    
     widget! {
-      states {
-        this: this.into_stateful(),
-        rects: rects.into_stateful(),
-      }
-      init ctx => {
-        let tick_of_layout_ready = ctx.wnd_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
-      }
+      states { this: this.into_stateful() }
       Stack {
         DynWidget {
           dyns: {
-            rects.iter().map(move |rc: &Rect| rc.clone())
+            this.rects.iter().map(move |rc: &Rect| rc.clone())
             .map(|rc| {
             widget! {
               SelectedTextStyle {
@@ -59,15 +46,6 @@ impl Compose for SelectedText {
           }).collect::<Vec<_>>()}
         }
       }
-
-      finally {
-        let_watch!(this.caret.clone())
-          .distinct_until_changed()
-          .sample(tick_of_layout_ready)
-          .subscribe(move |caret| {
-            *rects =   this.glyphs_helper.borrow().selection(caret.select_range());
-          });
-        }
     }
   }
 }

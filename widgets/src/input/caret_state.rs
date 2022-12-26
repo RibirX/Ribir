@@ -1,5 +1,3 @@
-use ribir_core::prelude::GraphemeCursor;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaretState {
   Caret(usize),
@@ -28,13 +26,27 @@ impl CaretState {
     }
   }
 
-  pub fn cursor(&self) -> GraphemeCursor { GraphemeCursor(self.offset()) }
-
   pub fn offset(&self) -> usize {
     match *self {
       CaretState::Caret(cursor) => cursor,
       CaretState::Select(_, end) => end,
       CaretState::Selecting(_, end) => end,
     }
+  }
+
+  pub fn valid(&mut self, len: usize) {
+    *self = match *self {
+      CaretState::Caret(cursor) => CaretState::Caret(cursor.min(len)),
+      CaretState::Select(begin, end) => {
+        let begin = begin.min(len);
+        let end = end.min(len);
+        if begin == end {
+          CaretState::Caret(begin)
+        } else {
+          CaretState::Select(begin, end)
+        }
+      }
+      CaretState::Selecting(begin, end) => CaretState::Selecting(begin.min(len), end.min(len)),
+    };
   }
 }

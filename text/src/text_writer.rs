@@ -24,19 +24,27 @@ pub trait CharacterCursor {
   fn reset(&mut self, byte_offset: usize);
 }
 
-pub struct TextWriter<'a> {
-  text: &'a mut String,
-  cursor: &'a mut dyn CharacterCursor,
+pub struct TextWriter<T>
+where
+  T: CharacterCursor,
+{
+  text: String,
+  cursor: T,
 }
 
-impl<'a> TextWriter<'a> {
-  pub fn new(text: &'a mut String, cursor: &'a mut dyn CharacterCursor) -> Self {
-    Self { text, cursor }
-  }
+impl<T> TextWriter<T>
+where
+  T: CharacterCursor,
+{
+  pub fn new(text: String, cursor: T) -> Self { Self { text, cursor } }
+
+  pub fn text(&self) -> &String { &self.text }
+
+  pub fn byte_offset(&self) -> usize { self.cursor.byte_offset() }
 
   pub fn insert_char(&mut self, c: char) {
     self.text.insert(self.cursor.byte_offset(), c);
-    self.cursor.next(self.text);
+    self.cursor.next(&self.text);
   }
 
   pub fn del_char(&mut self) {
@@ -44,8 +52,9 @@ impl<'a> TextWriter<'a> {
       return;
     }
     let idx = self.cursor.byte_offset();
-    let len = self.cursor.measure_bytes(self.text, idx, 1);
-    self.text.drain(idx..(idx + len));
+    let len = self.cursor.measure_bytes(&self.text, idx, 1);
+
+    self.delete_byte_range(&Range { start: idx, end: idx + len })
   }
 
   pub fn back_space(&mut self) {
@@ -59,7 +68,7 @@ impl<'a> TextWriter<'a> {
       return false;
     }
 
-    self.cursor.next(self.text)
+    self.cursor.next(&self.text)
   }
 
   pub fn move_to_prev(&mut self) -> bool {
@@ -76,7 +85,7 @@ impl<'a> TextWriter<'a> {
     self.cursor.reset(self.cursor.byte_offset() + text.len());
   }
 
-  pub fn delete_range(&mut self, rg: &Range<usize>) {
+  pub fn delete_byte_range(&mut self, rg: &Range<usize>) {
     self.text.drain(rg.clone());
 
     let cursor = self.cursor.byte_offset();
