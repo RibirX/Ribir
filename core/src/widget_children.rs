@@ -311,6 +311,15 @@ where
   fn as_compose_child(self) -> T { T::builder().fill(self).build_tml() }
 }
 
+impl<T, C, M> AsComposeChild<(M,), Option<T>> for C
+where
+  T: Template,
+  T::Builder: FillTml<M, C>,
+  <T::Builder as FillTml<M, C>>::New: TemplateBuilder<Target = T>,
+{
+  fn as_compose_child(self) -> Option<T> { Some(T::builder().fill(self).build_tml()) }
+}
+
 pub trait CommonChildConvert<M, T> {
   fn common_convert(self) -> T;
 }
@@ -541,9 +550,8 @@ impl<P, L> ChildLink<P, L> {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::*;
-
   use super::*;
+  use crate::test::*;
 
   #[test]
   fn compose_template_child() {
@@ -760,6 +768,37 @@ mod tests {
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect::from_size(size),
+      }],
+    );
+  }
+
+  #[test]
+  fn fix_option_template() {
+    struct Field(String);
+
+    #[derive(Template, Default)]
+    pub struct ConfigTml {
+      _field: Option<Field>,
+    }
+    #[derive(Declare)]
+    struct Host {}
+
+    const EXPECT_SIZE: Size = Size::new(100., 200.);
+    impl ComposeChild for Host {
+      type Child = Option<ConfigTml>;
+      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
+        widget! { MockBox { size: EXPECT_SIZE } }
+      }
+    }
+
+    expect_layout_result(
+      widget! {
+        Host { Field("test".into()) }
+      },
+      None,
+      &[LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::from_size(EXPECT_SIZE),
       }],
     );
   }
