@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
   parse_macro_input, parse_quote,
   spanned::Spanned,
-  token::{Brace, Comma, Dot, Paren, Semi},
+  token::{Brace, Dot, Paren, Semi},
   visit_mut::VisitMut,
   Expr, Ident,
 };
@@ -442,32 +442,19 @@ impl WidgetNode {
       tokens: &mut TokenStream,
     ) {
       let first = &nodes[0];
+      first.to_tokens(tokens);
+      let span = first.span();
 
-      if nodes.len() > 1 || !children.is_empty() {
-        let span = first.span();
-        quote_spanned! { span => #first.with_child}.to_tokens(tokens);
+      if nodes.len() > 1 {
+        quote_spanned! { span => .with_child}.to_tokens(tokens);
         Paren(span).surround(tokens, |tokens| {
-          if nodes.len() > 1 {
-            recursive_compose(&nodes[1..], children, named_objs, tokens);
-          } else {
-            if children.len() > 1 {
-              quote_spanned!(span =>  ChildLink::new).to_tokens(tokens);
-              Paren(span).surround(tokens, |tokens| {
-                children[0].gen_compose_node(named_objs, tokens);
-                Comma(span).to_tokens(tokens);
-                children[1].gen_compose_node(named_objs, tokens);
-              });
-              children[2..].iter().for_each(|c| {
-                quote_spanned!(span => .append).to_tokens(tokens);
-                Paren(span).surround(tokens, |tokens| c.gen_compose_node(named_objs, tokens))
-              });
-            } else {
-              children[0].gen_compose_node(named_objs, tokens);
-            }
-          }
+          recursive_compose(&nodes[1..], children, named_objs, tokens);
         });
       } else {
-        first.to_tokens(tokens)
+        children.iter().for_each(|c| {
+          quote_spanned!(span => .with_child).to_tokens(tokens);
+          Paren(span).surround(tokens, |tokens| c.gen_compose_node(named_objs, tokens))
+        });
       }
     }
 

@@ -118,6 +118,47 @@ where
   }
 }
 
+impl<W, C> IntoWidget<NotSelf<[(); 1]>> for WidgetPair<W, C>
+where
+  W: ComposeChild<Child = C>,
+{
+  #[inline]
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    ComposeChild::compose_child(StateWidget::Stateless(widget), child)
+  }
+}
+
+impl<W, M, T> IntoWidget<NotSelf<[M; 2]>> for WidgetPair<W, T>
+where
+  M: ImplMarker,
+  T: TemplateBuilder,
+  WidgetPair<W, T::Target>: IntoWidget<M>,
+{
+  #[inline]
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    WidgetPair { widget, child: child.build_tml() }.into_widget()
+  }
+}
+
+impl<W, M, T> IntoWidget<NotSelf<[M; 3]>> for WidgetPair<W, T>
+where
+  M: ImplMarker,
+  T: TemplateBuilder,
+  WidgetPair<W, Option<T::Target>>: IntoWidget<M>,
+{
+  #[inline]
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    WidgetPair {
+      widget,
+      child: Some(child.build_tml()),
+    }
+    .into_widget()
+  }
+}
+
 impl<D, M1, M2, C> IntoWidget<NotSelf<(M1, M2)>> for WidgetPair<Stateful<DynWidget<D>>, C>
 where
   D: DynsIntoWidget<SingleDyn<M1>>,
@@ -177,35 +218,131 @@ where
   }
 }
 
-impl<W, C, M> WithChild<[M; 1], C> for W
+impl<W, C, M> WithChild<[M; 0], C> for W
+where
+  W: ComposeChild,
+  C: CommonChildConvert<M, W::Child>,
+{
+  type Target = WidgetPair<W, W::Child>;
+
+  #[inline]
+  fn with_child(self, child: C) -> Self::Target {
+    WidgetPair {
+      widget: self,
+      child: child.common_convert(),
+    }
+  }
+}
+
+impl<W, C, Item, M> WithChild<[M; 1], Item> for W
+where
+  W: ComposeChild<Child = Vec<C>>,
+  Vec<C>: FillVec<M, Item>,
+{
+  type Target = WidgetPair<W, W::Child>;
+
+  #[inline]
+  fn with_child(self, child: Item) -> Self::Target {
+    let mut vec: Vec<C> = vec![];
+    vec.fill_vec(child);
+    WidgetPair { widget: self, child: vec }
+  }
+}
+
+impl<W, C, Item, M> WithChild<[M; 1], Item> for WidgetPair<W, Vec<C>>
+where
+  Vec<C>: FillVec<M, Item>,
+{
+  type Target = Self;
+
+  #[inline]
+  fn with_child(mut self, child: Item) -> Self::Target {
+    self.child.fill_vec(child);
+    self
+  }
+}
+
+impl<W, M1, M2, C> WithChild<[(M1, M2); 2], C> for W
+where
+  W: ComposeChild + WithChild<M1, Widget>,
+  C: IntoWidget<OptionDyn<M2>>,
+{
+  type Target = W::Target;
+
+  fn with_child(self, child: C) -> Self::Target { self.with_child(child.into_widget()) }
+}
+
+impl<W, C, M, Builder> WithChild<[M; 3], C> for W
+where
+  W: ComposeChild,
+  W::Child: Template<Builder = Builder>,
+  Builder: FillTml<M, C>,
+{
+  type Target = WidgetPair<W, Builder::New>;
+
+  #[inline]
+  fn with_child(self, c: C) -> Self::Target {
+    let child = W::Child::builder().fill(c);
+    WidgetPair { widget: self, child }
+  }
+}
+
+impl<W, C, T, M> WithChild<[M; 4], C> for W
+where
+  W: ComposeChild<Child = Option<T>>,
+  T: Template,
+  T::Builder: FillTml<M, C>,
+{
+  type Target = WidgetPair<W, <T::Builder as FillTml<M, C>>::New>;
+
+  #[inline]
+  fn with_child(self, c: C) -> Self::Target {
+    let child = T::builder().fill(c);
+    WidgetPair { widget: self, child }
+  }
+}
+
+impl<W, T, C, M> WithChild<[M; 5], C> for WidgetPair<W, T>
+where
+  T: FillTml<M, C>,
+{
+  type Target = WidgetPair<W, T::New>;
+
+  #[inline]
+  fn with_child(self, c: C) -> Self::Target {
+    let Self { widget, child } = self;
+    WidgetPair { widget, child: child.fill(c) }
+  }
+}
+
+impl<W, C, M> WithChild<[M; 6], C> for W
 where
   W: TemplateBuilder + FillTml<M, C>,
   W::New: TemplateBuilder,
 {
-  type Target = <W::New as TemplateBuilder>::Target;
+  type Target = W::New;
 
   #[inline]
-  fn with_child(self, c: C) -> Self::Target { self.fill(c).build_tml() }
+  fn with_child(self, c: C) -> Self::Target { self.fill(c) }
 }
 
-impl<W, C, M> WithChild<fn(M), C> for W
+impl<W, C, M> WithChild<[M; 7], C> for WidgetPair<W, Vec<Widget>>
 where
-  W: ComposeChild,
-  C: AsComposeChild<M, W::Child>,
+  C: IntoWidget<OptionDyn<M>>,
 {
-  type Target = Widget;
+  type Target = Self;
 
   #[inline]
-  fn with_child(self, child: C) -> Self::Target {
-    let c: W::Child = child.as_compose_child();
-    ComposeChild::compose_child(StateWidget::Stateless(self), c)
+  fn with_child(mut self, c: C) -> Self::Target {
+    self.child.push(c.into_widget());
+    self
   }
 }
 
-impl<W, D, C, M1, M2> WithChild<[(M1, M2); 0], Stateful<DynWidget<D>>> for W
+impl<W, D, C, M1, M2> WithChild<[(M1, M2); 8], Stateful<DynWidget<D>>> for W
 where
   W: ComposeChild<Child = Vec<C>> + 'static,
-  D: AsComposeChild<M2, W::Child> + 'static,
+  D: CommonChildConvert<M2, W::Child> + 'static,
   C: NotWidget<M1>,
 {
   type Target = Widget;
@@ -217,7 +354,7 @@ where
       states { child }
       DynWidget {
         dyns: {
-          let child = child.silent().dyns.take().unwrap().as_compose_child();
+          let child = child.silent().dyns.take().unwrap().common_convert();
           ComposeChild::compose_child(StateWidget::Stateful(this.clone()), child)
         }
       }
@@ -225,10 +362,10 @@ where
   }
 }
 
-impl<W, D, M1> WithChild<[M1; 2], Stateful<DynWidget<D>>> for W
+impl<W, D, M> WithChild<[M; 9], Stateful<DynWidget<D>>> for W
 where
   W: ComposeChild<Child = D> + 'static,
-  D: NotWidget<M1> + 'static,
+  D: NotWidget<M> + 'static,
 {
   type Target = Widget;
 
@@ -247,7 +384,7 @@ where
   }
 }
 
-impl<W, D, M> WithChild<[M; 3], Stateful<DynWidget<D>>> for W
+impl<W, D, M> WithChild<[M; 10], Stateful<DynWidget<D>>> for W
 where
   W: ComposeChild<Child = Vec<Widget>> + 'static,
   D: IntoIterator + 'static,
@@ -271,55 +408,16 @@ where
   }
 }
 
-trait AsComposeChild<M, T> {
-  fn as_compose_child(self) -> T;
-}
-
-impl<M, C, T> AsComposeChild<[M; 0], C> for T
+impl<W, M, T> WithChild<[M; 11], T> for W
 where
-  T: CommonChildConvert<M, C>,
+  W: WithChild<M, T::Target>,
+  T: TemplateBuilder,
 {
+  type Target = W::Target;
+
   #[inline]
-  fn as_compose_child(self) -> C { self.common_convert() }
+  fn with_child(self, child: T) -> Self::Target { self.with_child(child.build_tml()) }
 }
-
-impl<M, T> AsComposeChild<[M; 2], Widget> for T
-where
-  T: IntoWidget<OptionDyn<M>>,
-{
-  #[inline]
-  fn as_compose_child(self) -> Widget { self.into_widget() }
-}
-
-impl<M, W, Item> AsComposeChild<[M; 3], Vec<W>> for Item
-where
-  Vec<W>: FillComposeVec<M, Item>,
-{
-  fn as_compose_child(self) -> Vec<W> {
-    let mut c: Vec<W> = vec![];
-    c.fill_compose_vec(self);
-    c
-  }
-}
-
-impl<T, C, M> AsComposeChild<(M,), T> for C
-where
-  T: Template,
-  T::Builder: FillTml<M, C>,
-  <T::Builder as FillTml<M, C>>::New: TemplateBuilder<Target = T>,
-{
-  fn as_compose_child(self) -> T { T::builder().fill(self).build_tml() }
-}
-
-impl<T, C, M> AsComposeChild<(M,), Option<T>> for C
-where
-  T: Template,
-  T::Builder: FillTml<M, C>,
-  <T::Builder as FillTml<M, C>>::New: TemplateBuilder<Target = T>,
-{
-  fn as_compose_child(self) -> Option<T> { Some(T::builder().fill(self).build_tml()) }
-}
-
 pub trait CommonChildConvert<M, T> {
   fn common_convert(self) -> T;
 }
@@ -367,38 +465,6 @@ where
     WidgetPair { widget, child: child.into_widget() }
   }
 }
-
-trait FillComposeVec<M, Item> {
-  fn fill_compose_vec(&mut self, item: Item);
-}
-
-impl<M, Item1, Item2> FillComposeVec<[M; 0], Item2> for Vec<Item1>
-where
-  Vec<Item1>: FillVec<M, Item2>,
-{
-  #[inline]
-  fn fill_compose_vec(&mut self, item: Item2) { self.fill_vec(item) }
-}
-
-impl<M, Item> FillComposeVec<[M; 1], Item> for Vec<Widget>
-where
-  Item: IntoWidget<OptionDyn<M>>,
-{
-  #[inline]
-  fn fill_compose_vec(&mut self, item: Item) { self.push(item.into_widget()) }
-}
-
-impl<Item, P, L, M1, M2> FillComposeVec<(M1, M2), ChildLink<P, L>> for Vec<Item>
-where
-  Self: FillComposeVec<M1, P>,
-  Self: FillComposeVec<M2, L>,
-{
-  fn fill_compose_vec(&mut self, item: ChildLink<P, L>) {
-    self.fill_compose_vec(item.prev);
-    self.fill_compose_vec(item.last);
-  }
-}
-
 /// trait mark the expected `ComposeChild::Child` is not `Widget` or
 /// `Option<Widget>`, so when it meet a dynamic widget, it need to convert the
 /// result to a dynamic widget.
@@ -458,17 +524,6 @@ where
   fn fill_multi(&mut self, item: Item) { self.fill_vec(item) }
 }
 
-impl<P, L, M1, M2> FillMultiChild<(M1, M2), ChildLink<P, L>> for Vec<Widget>
-where
-  Vec<Widget>: FillMultiChild<M1, P>,
-  Vec<Widget>: FillMultiChild<M2, L>,
-{
-  fn fill_multi(&mut self, item: ChildLink<P, L>) {
-    self.fill_multi(item.prev);
-    self.fill_multi(item.last);
-  }
-}
-
 impl<D: SingleChild> SingleChild for Option<D> {}
 
 // Template use to construct child of a widget.
@@ -520,32 +575,6 @@ where
   type New = T::New;
   #[inline]
   fn fill(self, c: DynWidget<D>) -> Self::New { self.fill(c.into_inner()) }
-}
-
-impl<T, P, L, M1, M2> FillTml<(M1, M2), ChildLink<P, L>> for T
-where
-  T: FillTml<M1, P>,
-  T::New: FillTml<M2, L>,
-{
-  type New = <T::New as FillTml<M2, L>>::New;
-
-  fn fill(self, c: ChildLink<P, L>) -> Self::New { self.fill(c.prev).fill(c.last) }
-}
-
-pub struct ChildLink<Prev, Last> {
-  prev: Prev,
-  last: Last,
-}
-
-impl<P, L> ChildLink<P, L> {
-  #[inline]
-  pub fn new(prev: P, last: L) -> Self { ChildLink { prev, last } }
-
-  #[inline]
-  pub fn append<N>(self, next: N) -> ChildLink<P, ChildLink<L, N>> {
-    let Self { prev, last } = self;
-    ChildLink::new(prev, ChildLink::new(last, next))
-  }
 }
 
 #[cfg(test)]
