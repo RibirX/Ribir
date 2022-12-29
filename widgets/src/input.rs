@@ -19,9 +19,9 @@ use self::{glyphs_helper::GlyphsHelper, selected_text::SelectedText};
 pub struct Input {
   #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
   pub style: TextStyle,
-  #[declare(default, skip)]
+  #[declare(skip)]
   text: CowArc<str>,
-  #[declare(default, skip)]
+  #[declare(skip)]
   caret: CaretState,
 }
 
