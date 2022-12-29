@@ -9,7 +9,7 @@ use std::{collections::HashMap};
 #[derive(Declare, Default)]
 pub struct TextField {
   /// textfield's input value
-  #[declare(default)]
+  #[declare(skip)]
   text: CowArc<str>,
 }
 
