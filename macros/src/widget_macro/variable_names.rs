@@ -1,4 +1,4 @@
-use ::builtin::builtin;
+use ::ribir_builtin::builtin;
 use inflector::Inflector;
 use lazy_static::lazy_static;
 use proc_macro2::Span;

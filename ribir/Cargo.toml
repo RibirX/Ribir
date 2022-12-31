@@ -7,7 +7,7 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gpu = {path = "../gpu", version = "*"}
+ribir_gpu = {path = "../gpu", version = "*"}
 ribir_core = {path = "../core"}
 ribir_widgets = {path = "../widgets"}
 lyon_algorithms = "1.0.1"
@@ -18,4 +18,4 @@ env_logger = "0.7.1"
 
 [features]
 default = ["wgpu_gl"]
-wgpu_gl = ["gpu/wgpu_gl"]
+wgpu_gl = ["ribir_gpu/wgpu_gl"]

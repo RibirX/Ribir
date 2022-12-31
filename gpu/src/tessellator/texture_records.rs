@@ -1,5 +1,5 @@
-use algo::FrameCache;
-use painter::ShallowImage;
+use ribir_algo::FrameCache;
+use ribir_painter::ShallowImage;
 
 pub struct TextureRecords {
   id_from: usize,

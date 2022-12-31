@@ -1,8 +1,8 @@
 use crate::{tessellator::Tessellator, GlRender, GpuBackend, TriangleLists, Vertex};
 use futures::executor::block_on;
-use painter::DeviceSize;
+use ribir_painter::DeviceSize;
 use std::{error::Error, iter};
-use text::shaper::TextShaper;
+use ribir_text::shaper::TextShaper;
 mod color_pass;
 mod stencil_pass;
 pub mod surface;
@@ -295,7 +295,7 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     );
   }
 
-  fn capture(&self, capture: painter::CaptureCallback) -> Result<(), Box<dyn Error>> {
+  fn capture(&self, capture: ribir_painter::CaptureCallback) -> Result<(), Box<dyn Error>> {
     let mut encoder = self.create_command_encoder();
     let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut encoder);
     self.queue.submit(iter::once(encoder.finish()));
@@ -561,7 +561,7 @@ impl Vertex {
 #[cfg(test)]
 mod test {
   use crate::wgpu_backend_headless;
-  use painter::{
+  use ribir_painter::{
     Brush, CaptureCallback, ClipInstruct, Color, DeviceSize, PaintCommand, PaintInstruct,
     PaintPath, PainterBackend, Path, Point, Transform, Vector,
   };
@@ -601,7 +601,7 @@ mod test {
     assert_eq!(*buf1.borrow(), *buf2.borrow());
   }
 
-  fn fill_path(path: &Path, transform: &Transform, color: painter::Color) -> PaintCommand {
+  fn fill_path(path: &Path, transform: &Transform, color: ribir_painter::Color) -> PaintCommand {
     PaintCommand::Paint(PaintInstruct {
       path: PaintPath::Path(path.clone().into()),
       opacity: 1.,

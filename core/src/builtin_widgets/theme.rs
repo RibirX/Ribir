@@ -3,7 +3,7 @@
 
 use std::{collections::HashMap, rc::Rc};
 
-pub use algo::ShareResource;
+pub use ribir_algo::ShareResource;
 mod palette;
 pub use palette::*;
 mod icon_theme;
@@ -24,8 +24,8 @@ use crate::{
   widget::StateWidget,
 };
 
-pub use painter::*;
-pub use text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
+pub use ribir_painter::*;
+pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
 use super::SvgRender;
 

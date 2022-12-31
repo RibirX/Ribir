@@ -1,10 +1,10 @@
-use painter::{
-  text::{font_db::FontDB, shaper::TextShaper, TypographyStore},
+use ribir_painter::{
+  ribir_text::{font_db::FontDB, shaper::TextShaper, TypographyStore},
   Color, DeviceSize, Painter, PainterBackend, Rect, Size,
 };
 use std::sync::{Arc, RwLock};
 
-use gpu::wgpu_backend_headless;
+use ribir_gpu::wgpu_backend_headless;
 
 fn red_img_test<B: PainterBackend>(mut backend: B) {
   let font_db = Arc::new(RwLock::new(FontDB::default()));

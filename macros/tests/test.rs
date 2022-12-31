@@ -9,7 +9,7 @@ fn ui() {
 
 #[test]
 fn include_svg() {
-  use painter::SvgPaths;
+  use ribir_painter::SvgPaths;
   let svg: SvgPaths = include_svg!("./assets/test1.svg");
   assert_eq!(svg.paths.len(), 2);
 }

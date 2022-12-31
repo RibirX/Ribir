@@ -3,8 +3,8 @@ use std::cell::Ref;
 use crate::context::BuildCtx;
 
 use super::Theme;
-use painter::Brush;
-use text::FontFamily;
+use ribir_painter::Brush;
+use ribir_text::FontFamily;
 
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
@@ -30,7 +30,7 @@ pub struct TypographyTheme {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextTheme {
-  pub text: painter::TextStyle,
+  pub text: ribir_painter::TextStyle,
   pub decoration: TextDecorationStyle,
 }
 

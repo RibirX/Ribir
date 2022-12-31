@@ -8,7 +8,7 @@ use crate::{
   font_db::{Face, FontDB, ID},
   Em, Glyph, TextDirection,
 };
-use algo::{FrameCache, Substr};
+use ribir_algo::{FrameCache, Substr};
 
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 pub use ttf_parser::GlyphId;

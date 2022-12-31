@@ -1,6 +1,6 @@
 use std::cell::Ref;
 
-use painter::{Color, LightnessTone};
+use ribir_painter::{Color, LightnessTone};
 
 use crate::prelude::BuildCtx;
 

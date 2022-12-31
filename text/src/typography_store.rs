@@ -3,7 +3,7 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use algo::{FrameCache, Substr};
+use ribir_algo::{FrameCache, Substr};
 use lyon_path::geom::euclid::UnknownUnit;
 use lyon_path::geom::{euclid::num::Zero, Point, Size};
 pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;

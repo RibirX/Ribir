@@ -1,4 +1,4 @@
-use algo::{FrameCache, Substr};
+use ribir_algo::{FrameCache, Substr};
 use std::{
   ops::Range,
   sync::{Arc, RwLock},

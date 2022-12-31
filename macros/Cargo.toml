@@ -13,9 +13,9 @@ proc-macro = true
 Inflector = "0.11.4"
 ahash = "0.7.6"
 bitflags = "1.3.2"
-builtin = {path = "./builtin"}
+ribir_builtin = {path = "./builtin"}
 lazy_static = "1.4.0"
-painter = {path = "../painter"}
+ribir_painter = {path = "../painter"}
 proc-macro2 = "1.0.36"
 quote = "1.0.16"
 smallvec = "1.8.0"
@@ -26,7 +26,7 @@ trybuild = "1.0.53"
 winit = "0.26.1"
 
 [build-dependencies]
-builtin = {path = "./builtin"}
+ribir_builtin = {path = "./builtin"}
 
 [dependencies.syn]
 features = ["visit-mut", "full", "extra-traits"]

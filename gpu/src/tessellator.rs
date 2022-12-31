@@ -2,14 +2,14 @@ use crate::{
   ColorPrimitive, DrawTriangles, GlRender, Primitive, StencilPrimitive, Texture, TexturePrimitive,
   TriangleLists, Vertex,
 };
-use algo::{FrameCache, Resource, ShareResource};
+use ribir_algo::{FrameCache, Resource, ShareResource};
 use lyon_tessellation::{path::Path as LyonPath, *};
-use painter::{
+use ribir_painter::{
   Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path, PathStyle, TileMode, Transform,
 };
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::{collections::VecDeque, hash::Hash};
-use text::{
+use ribir_text::{
   font_db::ID,
   shaper::{GlyphId, TextShaper},
   Glyph,
@@ -474,8 +474,8 @@ impl Tessellator {
 
 fn tesselate_path(path: &LyonPath, style: PathStyle, tolerance: f32) -> VertexCache {
   match style {
-    painter::PathStyle::Fill => fill_tess(path, tolerance),
-    painter::PathStyle::Stroke(mut options) => {
+    ribir_painter::PathStyle::Fill => fill_tess(path, tolerance),
+    ribir_painter::PathStyle::Stroke(mut options) => {
       options.tolerance = tolerance;
       stroke_tess(path, &options)
     }
@@ -581,9 +581,9 @@ mod tests {
   };
 
   use crate::TriangleLists;
-  use painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
+  use ribir_painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
 
-  use text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
+  use ribir_text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
   extern crate test;
   use test::Bencher;
 
@@ -722,7 +722,7 @@ mod tests {
     assert_eq!(&render_data, &[false, false, false]);
   }
 
-  fn bench_rect_round() -> painter::Builder {
+  fn bench_rect_round() -> ribir_painter::Builder {
     let mut builder = Path::builder();
     builder.rect_round(
       &Rect::new(Point::zero(), Size::new(100., 100.)),

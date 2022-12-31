@@ -12,7 +12,7 @@ pub mod prelude {
 
       let wnd = app.new_window(|native_wnd, ctx| {
         let size = native_wnd.inner_size();
-        let p_backend = super::AppContext::wait_future(gpu::wgpu_backend_with_wnd(
+        let p_backend = super::AppContext::wait_future(ribir_gpu::wgpu_backend_with_wnd(
           &native_wnd,
           super::DeviceSize::new(size.width, size.height),
           None,
@@ -29,7 +29,7 @@ pub mod prelude {
 use prelude::*;
 #[cfg(feature = "wgpu_gl")]
 pub fn wgpu_headless_wnd(root: Widget, ctx: AppContext, size: DeviceSize) -> Window {
-  let p_backend = AppContext::wait_future(gpu::wgpu_backend_headless(
+  let p_backend = AppContext::wait_future(ribir_gpu::wgpu_backend_headless(
     size,
     None,
     None,
