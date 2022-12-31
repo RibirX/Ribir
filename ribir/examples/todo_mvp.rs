@@ -17,9 +17,15 @@ impl Compose for TodoMVP {
       states { this: this.into_writable() }
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
+        let headline1_style = TypographyTheme::of(ctx).headline1.text.clone();
       }
       Column {
         margin: EdgeInsets::all(10.),
+        Text {
+          margin: EdgeInsets::only_bottom(10.),
+          text: "Todo",
+          style: headline1_style,
+        }
         Row {
           margin: EdgeInsets::only_bottom(10.),
 
@@ -28,7 +34,7 @@ impl Compose for TodoMVP {
             border: Border::only_bottom(BorderSide { width:1., color: surface_variant }),
             Input {
               id: input,
-              Placeholder::new("Todo")
+              Placeholder::new("What do you want to do?")
             }
           }
           Button {
@@ -52,11 +58,11 @@ impl Compose for TodoMVP {
 
         Tabs {
           id: tabs,
-          margin: EdgeInsets::only_top(20.),
+          margin: EdgeInsets::only_top(10.),
           Tab {
             TabHeader {
               TabText {
-                tab_text: String::from("All"),
+                tab_text: String::from("ALL"),
                 is_active: tabs.cur_idx == 0,
               }
             }
@@ -67,7 +73,7 @@ impl Compose for TodoMVP {
           Tab {
             TabHeader {
               TabText {
-                tab_text: String::from("Active"),
+                tab_text: String::from("ACTIVE"),
                 is_active: tabs.cur_idx == 1,
               }
             }
@@ -78,7 +84,7 @@ impl Compose for TodoMVP {
           Tab {
             TabHeader {
               TabText {
-                tab_text: String::from("Completed"),
+                tab_text: String::from("DONE"),
                 is_active: tabs.cur_idx == 2,
               }
             }
@@ -110,59 +116,65 @@ impl TodoMVP {
                 .enumerate()
                 .filter(move |(_, task)| { cond(task) })
                 .map(move |(idx, task)| {
-                  widget! {
-                    states { mount_idx: Stateful::new(0) }
-                    KeyWidget {
-                      id: key,
-                      key: Key::from(idx),
-                      value: Some(task.label.clone()),
-                      ListItem {
-                        id: item,
-                        transform: Transform::default(),
-                        mounted: move |_| {
-                          if key.is_enter() {
-                            *mount_idx = *mount_task_cnt;
-                            *mount_task_cnt += 1;
-                            mount_animate.run();
-                          }
-                        },
-                        HeadlineText::new(task.label.clone())
-                        Leading {
-                          Checkbox {
-                            id: checkbox,
-                            checked: task.finished,
-                            margin: EdgeInsets::vertical(4.),
-                          }
-                        }
-                        Trailing {
-                          Icon {
-                            visible: item.mouse_hover(),
-                            tap: move |_| { this.tasks.remove(idx); },
-                            svgs::CLOSE
-                          }
-                        }
-                      }
-                    }
-                    Animate {
-                      id: mount_animate,
-                      transition: Transition {
-                        delay: Some(Duration::from_millis(100).mul_f32((*mount_idx + 1) as f32)),
-                        duration: Duration::from_millis(150),
-                        easing: easing::EASE_IN,
-                        repeat: None,
-                      },
-                      prop: prop!(item.transform),
-                      from: Transform::translation(-400., 0. ),
-                    }
-                    finally {
-                      let_watch!(checkbox.checked)
-                        .subscribe(move |v| this.silent().tasks[idx].finished = v);
-                    }
-                  }
+                  Self::task(this, task, idx, mount_task_cnt)
                 })
             }
           }
         }
+      }
+    }
+  }
+
+  fn task<'a>(this: StateRef<Self>, task: Task, idx: usize, mount_task_cnt: StateRef<i32>) -> Widget {
+    let this = this.clone_stateful();
+    let mount_task_cnt = mount_task_cnt.clone_stateful();
+    widget! {
+      states { this, mount_task_cnt, mount_idx: Stateful::new(0) }
+      KeyWidget {
+        id: key,
+        key: Key::from(idx),
+        value: Some(task.label.clone()),
+        ListItem {
+          id: item,
+          transform: Transform::default(),
+          mounted: move |_| {
+            if key.is_enter() {
+              *mount_idx = *mount_task_cnt;
+              *mount_task_cnt += 1;
+              mount_animate.run();
+            }
+          },
+          HeadlineText::new(task.label.clone())
+          Leading {
+            Checkbox {
+              id: checkbox,
+              checked: task.finished,
+              margin: EdgeInsets::vertical(4.),
+            }
+          }
+          Trailing {
+            Icon {
+              visible: item.mouse_hover(),
+              tap: move |_| { this.tasks.remove(idx); },
+              svgs::CLOSE
+            }
+          }
+        }
+      }
+      Animate {
+        id: mount_animate,
+        transition: Transition {
+          delay: Some(Duration::from_millis(100).mul_f32((*mount_idx + 1) as f32)),
+          duration: Duration::from_millis(150),
+          easing: easing::EASE_IN,
+          repeat: None,
+        },
+        prop: prop!(item.transform),
+        from: Transform::translation(-400., 0. ),
+      }
+      finally {
+        let_watch!(checkbox.checked)
+          .subscribe(move |v| this.silent().tasks[idx].finished = v);
       }
     }
   }
@@ -220,8 +232,7 @@ fn main() {
         label: "Support data bind".to_string(),
       },
     ],
-  }
-  .into_stateful();
+  };
 
   app::run(todo.into_widget());
 }
