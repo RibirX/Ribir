@@ -41,9 +41,10 @@ impl ComposeChild for Button {
         let ButtonTheme {
           padding,
           radius,
-          border_color,
           background,
           foreground,
+          // border_color,
+          ..
         } = *ButtonTheme::of(ctx);
         let text_style = TextStyle {
           foreground: Brush::Color(foreground),
@@ -53,7 +54,8 @@ impl ComposeChild for Button {
       Row {
         padding: EdgeInsets::all(padding),
         border_radius: Radius::all(radius),
-        border: Border::all(BorderSide { width: 1., color: border_color }),
+        // todo: border and background render has little gap?
+        // border: Border::all(BorderSide { width: 1., color: border_color }),
         background,
         justify_content: JustifyContent::Center,
 
