@@ -1,4 +1,4 @@
-use algo::FrameCache;
+use ribir_algo::FrameCache;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::{Point, Transform};

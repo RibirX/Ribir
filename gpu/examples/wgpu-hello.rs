@@ -1,11 +1,11 @@
 use std::sync::{Arc, RwLock};
 
-use gpu::wgpu_backend_with_wnd;
-use painter::{
+use ribir_gpu::wgpu_backend_with_wnd;
+use ribir_painter::{
   image::ColorFormat, Brush, Color, DeviceSize, Painter, PainterBackend, PixelImage, ShallowImage,
   Size, TileMode,
 };
-use text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
+use ribir_text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
 use winit::{
   event::*,
   event_loop::{ControlFlow, EventLoop},

@@ -1,4 +1,4 @@
-use algo::FrameCache;
+use ribir_algo::FrameCache;
 
 use crate::Vertex;
 
@@ -56,7 +56,7 @@ impl ImagePass {
 
     self.resources.get_or_insert_with(&mem_texture.id, || {
       let format = match mem_texture.format {
-        painter::image::ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8UnormSrgb,
+        ribir_painter::image::ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8UnormSrgb,
       };
       let (width, height) = mem_texture.size;
       let size = wgpu::Extent3d {

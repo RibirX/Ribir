@@ -4,7 +4,7 @@ use crate::{
   widget_tree::WidgetId,
 };
 
-use painter::{Point, Rect};
+use ribir_painter::{Point, Rect};
 
 use super::WindowCtx;
 

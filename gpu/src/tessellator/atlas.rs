@@ -2,9 +2,9 @@ use crate::{error::Error, ColorFormat};
 
 use super::mem_texture::{MemTexture, Rect, Size};
 
-use algo::FrameCache;
+use ribir_algo::FrameCache;
 use guillotiere::{Allocation, AtlasAllocator, ChangeList};
-use painter::{PixelImage, ShallowImage};
+use ribir_painter::{PixelImage, ShallowImage};
 use std::collections::HashMap;
 
 pub(crate) struct TextureAtlas {
@@ -155,7 +155,7 @@ impl TextureAtlas {
 #[cfg(test)]
 pub mod tests {
   use super::*;
-  use painter::Color;
+  use ribir_painter::Color;
   use std::borrow::Cow;
 
   const MAX_SIZE: Size = Size::new(1024, 1024);

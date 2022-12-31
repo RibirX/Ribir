@@ -1,7 +1,7 @@
 pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
 use crate::{context::*, prelude::ComposeChild};
-use algo::ShareResource;
-use painter::*;
+use ribir_algo::ShareResource;
+use ribir_painter::*;
 use rxrust::subscription::{SubscriptionGuard, SubscriptionLike};
 
 #[doc(hidden)]
@@ -292,7 +292,7 @@ macro_rules! impl_query_self_only {
   };
 }
 
-impl<T: Render> Render for algo::ShareResource<T> {
+impl<T: Render> Render for ribir_algo::ShareResource<T> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     T::perform_layout(self, clamp, ctx)

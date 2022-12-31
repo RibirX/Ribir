@@ -56,9 +56,9 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::window::Window;
   #[doc(no_inline)]
-  pub use ::painter::*;
+  pub use ::ribir_painter::*;
   #[doc(no_inline)]
-  pub use algo::CowArc;
+  pub use ribir_algo::CowArc;
   pub use log;
   #[doc(no_inline)]
   pub use ribir_macros::{

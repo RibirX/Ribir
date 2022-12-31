@@ -8,7 +8,7 @@ version = "0.1.0"
 
 [dependencies]
 ahash = "0.7.6"
-algo = {path = "../algo"}
+ribir_algo = {path = "../algo"}
 bitflags = "1.2.1"
 futures = "0.3.5"
 indextree = "4.5.0"
@@ -16,12 +16,12 @@ lazy_static = "1.4.0"
 log = "0.4.8"
 lyon_geom = "1.0.1"
 lyon_algorithms = "1.0.1"
-painter = {path = "../painter", version = "*"}
+ribir_painter = {path = "../painter", version = "*"}
 png = {version = "0.17.3", optional = true}
 ribir_macros = {path = "../macros"}
 rxrust = "1.0.0-alpha.5"
 smallvec = "1.8.0"
-text = {path = "../text"}
+ribir_text = {path = "../text"}
 winit = "0.26.1"
 
 [dependencies.blake3]

@@ -1,7 +1,7 @@
 use crate::{Color, ShallowImage};
 use lyon_tessellation::StrokeOptions;
 use serde::{Deserialize, Serialize};
-use text::{Em, FontFace, FontSize, Pixel};
+use ribir_text::{Em, FontFace, FontSize, Pixel};
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, Debug, PartialEq)]

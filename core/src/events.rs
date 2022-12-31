@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 
 pub(crate) mod dispatcher;
 mod pointers;
-use painter::Point;
+use ribir_painter::Point;
 pub use pointers::*;
 pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;

@@ -8,9 +8,9 @@ use std::error::Error;
 
 use tessellator::Tessellator;
 pub mod tessellator;
-use painter::{CaptureCallback, DeviceSize, PainterBackend};
+use ribir_painter::{CaptureCallback, DeviceSize, PainterBackend};
 
-use painter::image::ColorFormat;
+use ribir_painter::image::ColorFormat;
 use zerocopy::AsBytes;
 
 #[cfg(feature = "wgpu_gl")]
@@ -25,7 +25,7 @@ pub struct GpuBackend<R: GlRender> {
 }
 
 impl<R: GlRender> PainterBackend for GpuBackend<R> {
-  fn submit<'a>(&mut self, commands: Vec<painter::PaintCommand>) {
+  fn submit<'a>(&mut self, commands: Vec<ribir_painter::PaintCommand>) {
     self.gl.begin_frame();
     self.tessellator.tessellate(&commands, &mut self.gl);
     self.gl.end_frame(false);
@@ -36,7 +36,7 @@ impl<R: GlRender> PainterBackend for GpuBackend<R> {
 
   fn commands_to_image(
     &mut self,
-    commands: Vec<painter::PaintCommand>,
+    commands: Vec<ribir_painter::PaintCommand>,
     capture: CaptureCallback,
   ) -> Result<(), Box<dyn Error>> {
     self.gl.begin_frame();

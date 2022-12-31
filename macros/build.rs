@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-use builtin::builtin;
+use ribir_builtin::builtin;
 
 include!("./src/builtin_fields_list.rs");
 

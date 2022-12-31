@@ -291,7 +291,7 @@ mod tests {
   use crate::test::{layout_info_by_path, MockBox, MockMulti};
 
   use super::*;
-  use painter::{font_db::FontDB, shaper::TextShaper};
+  use ribir_painter::{font_db::FontDB, shaper::TextShaper};
   use std::{sync::Arc, sync::RwLock};
   use test::Bencher;
 

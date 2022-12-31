@@ -6,14 +6,14 @@ use std::{
 
 use crate::builtin_widgets::Theme;
 
-use ::text::shaper::TextShaper;
+use ::ribir_text::shaper::TextShaper;
 pub use futures::task::SpawnError;
 use futures::{
   executor::{block_on, LocalPool},
   task::LocalSpawnExt,
   Future,
 };
-use text::{font_db::FontDB, TextReorder, TypographyStore};
+use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
 
 #[derive(Clone)]
 pub struct AppContext {

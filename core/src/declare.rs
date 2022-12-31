@@ -188,7 +188,7 @@ impl<V> DeclareStripOption<Option<V>> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use painter::{Brush, Color};
+  use ribir_painter::{Brush, Color};
 
   #[test]
   fn inner_value_into() {

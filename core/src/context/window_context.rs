@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, time::Instant};
 
-use painter::TypographyStore;
+use ribir_painter::TypographyStore;
 use rxrust::prelude::LocalObservable;
 
 use super::AppContext;

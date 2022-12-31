@@ -1,6 +1,6 @@
 use super::Theme;
 use crate::prelude::*;
-use algo::ShareResource;
+use ribir_algo::ShareResource;
 use std::{cell::Ref, collections::HashMap};
 
 /// The theme of icon, which specify the icon size standard and provide a store

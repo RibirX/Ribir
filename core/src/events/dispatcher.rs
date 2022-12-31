@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{prelude::*, widget_tree::WidgetTree};
-use ::text::PIXELS_PER_EM;
+use ::ribir_text::PIXELS_PER_EM;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 use super::focus_mgr::FocusManager;

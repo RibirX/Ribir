@@ -1,4 +1,4 @@
-use painter::Transform;
+use ribir_painter::Transform;
 
 use crate::prelude::{
   Angle, Box2D, Brush, Color, DevicePoint, DeviceRect, DeviceSize, DeviceVector, Point, Radius,

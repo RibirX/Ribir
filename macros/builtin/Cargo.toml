@@ -1,5 +1,5 @@
 [package]
-name = "builtin"
+name = "ribir_builtin"
 version = "0.1.0"
 edition = "2021"
 
