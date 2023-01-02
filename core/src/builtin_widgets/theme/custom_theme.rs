@@ -32,10 +32,12 @@ pub trait CustomTheme: Sized + 'static {
       Theme::Inherit(i) => i.custom_themes.as_ref().and_then(|c| c.themes.get(&tid)),
     });
     c.and_then(|c| Ref::filter_map(c, |c| c.downcast_ref::<Self>()).ok())
-      .expect(&format!(
-        "The custom theme({}) is not init in theme, use it after init.",
-        std::any::type_name::<Self>()
-      ))
+      .unwrap_or_else(|| {
+        panic!(
+          "The custom theme({}) is not init in theme, use it after init.",
+          std::any::type_name::<Self>()
+        )
+      })
   }
 }
 

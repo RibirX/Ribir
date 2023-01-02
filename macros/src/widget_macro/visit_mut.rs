@@ -99,14 +99,14 @@ impl VisitMut for VisitCtx {
         if mac.path.is_ident(WIDGET_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_widget_macro(mac.tokens.clone().into(), Some(self)).into());
         } else if mac.path.is_ident(WATCH_MACRO_NAME) {
-          *expr = Expr::Verbatim(gen_watch_macro(mac.tokens.clone().into(), self).into());
+          *expr = Expr::Verbatim(gen_watch_macro(mac.tokens.clone(), self).into());
         } else if mac.path.is_ident(PROP_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_prop_macro(mac.tokens.clone().into(), self).into());
         } else if mac.path.is_ident(MOVE_TO_WIDGET_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_move_to_widget_macro(&mac.tokens, self));
         } else if mac.path.is_ident(LET_WATCH_MACRO_NAME) {
           let mut tokens = quote! {};
-          DeclareError::LetWatchWrongPlace(mac.span().unwrap()).into_compile_error(&mut tokens);
+          DeclareError::LetWatchWrongPlace(mac.span().unwrap()).to_compile_error(&mut tokens);
           *expr = Expr::Verbatim(tokens);
           self.visit_error_occur = true;
         } else {
@@ -158,8 +158,8 @@ impl VisitMut for VisitCtx {
           let expr: TokenStream = gen_widget_macro(mac.tokens.clone().into(), Some(self)).into();
           *stmt = Stmt::Expr(Expr::Verbatim(expr));
         } else if mac.path.is_ident(WATCH_MACRO_NAME) {
-          let t = gen_watch_macro(mac.tokens.clone().into(), self);
-          *stmt = Stmt::Expr(Expr::Verbatim(t.into()).into());
+          let t = gen_watch_macro(mac.tokens.clone(), self);
+          *stmt = Stmt::Expr(Expr::Verbatim(t.into()));
         } else if mac.path.is_ident(PROP_MACRO_NAME) {
           *stmt = Stmt::Expr(Expr::Verbatim(
             gen_prop_macro(mac.tokens.clone().into(), self).into(),
@@ -168,7 +168,7 @@ impl VisitMut for VisitCtx {
           *stmt = Stmt::Expr(Expr::Verbatim(gen_move_to_widget_macro(&mac.tokens, self)));
         } else if mac.path.is_ident(LET_WATCH_MACRO_NAME) {
           let mut tokens = quote! {};
-          DeclareError::LetWatchWrongPlace(mac.span().unwrap()).into_compile_error(&mut tokens);
+          DeclareError::LetWatchWrongPlace(mac.span().unwrap()).to_compile_error(&mut tokens);
           self.visit_error_occur = true;
           *stmt = Stmt::Expr(Expr::Verbatim(tokens));
         }
@@ -213,7 +213,7 @@ impl VisitMut for VisitCtx {
   }
 
   fn visit_expr_assign_mut(&mut self, assign: &mut syn::ExprAssign) {
-    self.recursive_visit_assign_mut(&mut *assign.left, &mut assign.right);
+    self.recursive_visit_assign_mut(&mut assign.left, &mut assign.right);
   }
 
   fn visit_block_mut(&mut self, i: &mut syn::Block) {
@@ -303,7 +303,7 @@ impl VisitCtx {
           return true;
         }
       }
-      return let_watch_as_watch(&mut method_call.receiver);
+      let_watch_as_watch(&mut method_call.receiver)
     }
 
     let_watch_as_watch(expr).then(|| {
@@ -330,7 +330,7 @@ impl VisitCtx {
 
     self.take_current_used_info();
 
-    self.visit_widget_node_mut(&mut desugar.widget.as_mut().unwrap());
+    self.visit_widget_node_mut(desugar.widget.as_mut().unwrap());
     if let Some(finally) = desugar.finally.as_mut() {
       self.visit_finally_mut(finally);
     }
@@ -466,7 +466,7 @@ impl VisitCtx {
       .find(|v| &v.name == ident)
       .map(|v| v.alias_of_name.as_ref())
       .unwrap_or_else(|| {
-        (self.declare_objs.contains_key(ident) || self.states.contains(ident)).then(|| ident)
+        (self.declare_objs.contains_key(ident) || self.states.contains(ident)).then_some(ident)
       })
   }
 
@@ -591,10 +591,10 @@ impl VisitCtx {
   ) -> Option<Ident> {
     let name = self.find_named_obj(host)?;
 
-    let ty = self.declare_objs.get(&name)?;
+    let ty = self.declare_objs.get(name)?;
 
     if !ty.is_ident(builtin_ty) {
-      let builtin_name = builtin_var_name(&name, span, builtin_ty);
+      let builtin_name = builtin_var_name(name, span, builtin_ty);
       let src_name = name.clone();
       self.add_used_widget(
         builtin_name.clone(),
@@ -710,7 +710,7 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
     quote_spanned! { watch_expr.span() => #upstream.map(#map_closure) }.into()
   } else {
     let mut tokens = quote! {};
-    DeclareError::WatchNothing(watch_expr.span().unwrap()).into_compile_error(&mut tokens);
+    DeclareError::WatchNothing(watch_expr.span().unwrap()).to_compile_error(&mut tokens);
     ctx.visit_error_occur = true;
     tokens.into()
   }

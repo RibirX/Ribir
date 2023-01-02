@@ -74,6 +74,6 @@ impl Input {
       return false;
     }
     InputWriter::new(self).delete_byte_range(&Range { start, end });
-    return true;
+    true
   }
 }

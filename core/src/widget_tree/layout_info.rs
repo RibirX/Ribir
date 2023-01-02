@@ -160,7 +160,7 @@ impl<'a> Layouter<'a> {
           id: *child,
           arena: arena2,
           store,
-          wnd_ctx: wnd_ctx,
+          wnd_ctx,
           dirty_set,
         };
         let size = layout.perform_layout(clamp, &mut ctx);
@@ -189,7 +189,7 @@ impl<'a> Layouter<'a> {
     );
     self
       .wid
-      .next_sibling(&self.arena)
+      .next_sibling(self.arena)
       .map(move |sibling| self.into_new_layouter(sibling))
   }
 
@@ -197,7 +197,7 @@ impl<'a> Layouter<'a> {
   pub fn into_first_child_layouter(self) -> Option<Self> {
     self
       .wid
-      .first_child(&self.arena)
+      .first_child(self.arena)
       .map(move |wid| self.into_new_layouter(wid))
   }
 
@@ -225,7 +225,7 @@ impl<'a> Layouter<'a> {
   pub fn query_widget_type<W: 'static>(&self, callback: impl FnOnce(&W)) {
     self
       .wid
-      .assert_get(&self.arena)
+      .assert_get(self.arena)
       .query_on_first_type(QueryOrder::OutsideFirst, callback);
   }
 
@@ -238,11 +238,9 @@ impl<'a> Layouter<'a> {
   pub fn reset_children_position(&mut self) {
     let Self { wid, arena, store, .. } = self;
     wid.children(arena).for_each(move |id| {
-      store
-        .layout_info_or_default(id)
-        .rect
-        .as_mut()
-        .map(|rc| rc.origin = Point::zero());
+      if let Some(rc) = store.layout_info_or_default(id).rect.as_mut() {
+        rc.origin = Point::zero()
+      };
     });
   }
 }

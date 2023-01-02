@@ -115,7 +115,7 @@ impl MacroSyntax {
         let Block { brace_token, stmts } = f.block;
         FinallyBlock {
           brace_token,
-          stmts: stmts.into_iter().map(|s| FinallyStmt::Stmt(s)).collect(),
+          stmts: stmts.into_iter().map(FinallyStmt::Stmt).collect(),
           used_name_info: <_>::default(),
         }
       }),
@@ -390,12 +390,7 @@ impl From<DeclareField> for Field {
 }
 
 impl From<Expr> for TrackExpr {
-  fn from(expr: Expr) -> Self {
-    TrackExpr {
-      expr: expr,
-      used_name_info: <_>::default(),
-    }
-  }
+  fn from(expr: Expr) -> Self { TrackExpr { expr, used_name_info: <_>::default() } }
 }
 
 fn pick_id(f: DeclareField, errors: &mut Vec<DeclareError>) -> Result<Ident, DeclareField> {
@@ -464,7 +459,7 @@ fn builtin_span(host: &Ident, fields: &SmallVec<[Field; 1]>) -> Span {
 
 pub fn builtin_obj(src_name: &Ident, ty: &str, fields: SmallVec<[Field; 1]>) -> DeclareObj {
   let span = builtin_span(src_name, &fields);
-  let name = builtin_var_name(&src_name, span, ty);
+  let name = builtin_var_name(src_name, span, ty);
   let ty = Ident::new(ty, src_name.span()).into();
   DeclareObj::new(ty, name, fields)
 }

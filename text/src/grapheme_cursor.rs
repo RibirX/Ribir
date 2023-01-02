@@ -13,7 +13,7 @@ impl CharacterCursor for GraphemeCursor {
         break;
       }
     }
-    return legacy.cur_cursor() - byte_from;
+    legacy.cur_cursor() - byte_from
   }
 
   fn move_by_char(&mut self, text: &str, mut offset: isize) {

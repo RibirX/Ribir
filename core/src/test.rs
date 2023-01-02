@@ -38,7 +38,7 @@ pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTe
 }
 
 pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
-  let res = layout_info_by_path(&wnd, path);
+  let res = layout_info_by_path(wnd, path);
   if let Some(x) = expect.x {
     assert_eq!(x, res.min_x(), "path: {:?}", path);
   }
@@ -62,14 +62,10 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
   assert_eq!(path[0], 0);
   let tree = &wnd.widget_tree;
   let mut node = tree.root();
-  for (level, idx) in path[1..].into_iter().enumerate() {
-    node = node
-      .children(&tree.arena)
-      .skip(*idx)
-      .next()
-      .unwrap_or_else(|| {
-        panic!("node no exist: {:?}", &path[0..level]);
-      });
+  for (level, idx) in path[1..].iter().enumerate() {
+    node = node.children(&tree.arena).nth(*idx).unwrap_or_else(|| {
+      panic!("node no exist: {:?}", &path[0..level]);
+    });
   }
 
   tree.store.layout_box_rect(node).unwrap()

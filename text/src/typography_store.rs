@@ -262,16 +262,16 @@ impl VisualGlyphs {
         .find(|(_, g)| Em::zero() < g.x_advance && g.x_offset <= x)
         .map(|(i, g)| {
           if x - g.x_offset >= g.x_offset + g.x_advance - x {
-            return i + 1;
+            i + 1
           } else {
-            return i;
+            i
           }
         })
         .unwrap_or(0);
       return (row, idx);
     }
 
-    return (0, 0);
+    (0, 0)
   }
 
   pub fn position_by_cluster(&self, cluster: u32) -> (usize, usize) {
@@ -322,11 +322,11 @@ impl VisualGlyphs {
             return glyph.cluster > cluster;
           }
         }
-        return glyph_run < dst_run;
+        glyph_run < dst_run
       });
-      return (para, offset);
+      (para, offset)
     } else {
-      return (para, order_info.range.end);
+      (para, order_info.range.end)
     }
   }
 
@@ -386,7 +386,7 @@ impl VisualGlyphs {
         if let Some(rc) = &mut self.cur {
           rc.size.width = next.max_x() - rc.min_x();
         } else {
-          self.cur = Some(next.clone());
+          self.cur = Some(next);
         }
       }
       fn new_rect(&mut self) {
@@ -402,7 +402,7 @@ impl VisualGlyphs {
       let height = (line.line_height * self.scale).into();
       for glyph in &line.glyphs {
         if rg.contains(&(glyph.cluster as usize)) {
-          let glyph = self.scale_to_pixel_glyph(&glyph);
+          let glyph = self.scale_to_pixel_glyph(glyph);
           let rc = Rect::new(
             Point::new(glyph.x_offset, glyph.y_offset),
             Size::new(glyph.x_advance, height),

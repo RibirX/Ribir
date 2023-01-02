@@ -70,7 +70,7 @@ pub trait GlRender {
   /// Draw frame finished and the render data commit finished and should ensure
   /// draw every of this frame into device. Cancel current frame if `cancel` is
   /// true.
-  fn end_frame<'a>(&mut self, cancel: bool);
+  fn end_frame(&mut self, cancel: bool);
 
   /// Window or surface size changed, need do a redraw.
   fn resize(&mut self, size: DeviceSize);
@@ -203,7 +203,7 @@ pub struct StencilPrimitive {
 impl StencilPrimitive {
   fn new(transform: [[f32; 2]; 3]) -> Self {
     StencilPrimitive {
-      transform: transform,
+      transform,
       dummy: <[u32; 6]>::default(),
     }
   }
@@ -250,6 +250,6 @@ impl PartialEq for Primitive {
     const SIZE: usize = std::mem::size_of::<Primitive>();
     let p1: &[u8; SIZE] = unsafe { std::mem::transmute(self) };
     let p2: &[u8; SIZE] = unsafe { std::mem::transmute(other) };
-    return p1 == p2;
+    p1 == p2
   }
 }

@@ -40,7 +40,7 @@ pub(crate) fn gen_prop_macro(
 
   if ctx.find_named_obj(name).is_none() {
     let mut tokens = quote!();
-    DeclareError::PropInvalidTarget(name.span()).into_compile_error(&mut tokens);
+    DeclareError::PropInvalidTarget(name.span()).to_compile_error(&mut tokens);
     return tokens.into();
   };
 
@@ -98,7 +98,7 @@ impl Desugared {
 
     if !errors.is_empty() {
       Brace::default().surround(tokens, |tokens| {
-        errors.iter().for_each(|err| err.into_compile_error(tokens));
+        errors.iter().for_each(|err| err.to_compile_error(tokens));
         quote! { Void.into_widget() }.to_tokens(tokens);
       });
 
@@ -191,7 +191,7 @@ impl Desugared {
     let mut edges: Vec<ObjectUsedPath> = vec![];
     depends.keys().for_each(|name| {
       loop {
-        let node = edges.last().map_or(*name, |e| &e.used_obj);
+        let node = edges.last().map_or(*name, |e| e.used_obj);
         let check_state = check_info.get(node).copied();
         if check_state.is_none() {
           let edge_size = edges.len();
@@ -460,7 +460,7 @@ impl WidgetNode {
 
     let WidgetNode { node, children } = self;
     let nodes = node.node_compose_list(named_objs);
-    recursive_compose(&nodes, &children, named_objs, tokens);
+    recursive_compose(&nodes, children, named_objs, tokens);
   }
 }
 
@@ -469,7 +469,7 @@ impl ComposeItem {
     let mut list = smallvec![];
     match self {
       ComposeItem::ChainObjs(objs) => {
-        assert!(objs.len() > 0);
+        assert!(!objs.is_empty());
         list.extend(objs.iter().map(|obj| &obj.name));
       }
       ComposeItem::Id(name) => {
@@ -477,7 +477,7 @@ impl ComposeItem {
           .iter()
           .rev()
           .filter_map(|builtin| {
-            let var_name = builtin_var_name(name, name.span(), &builtin.ty);
+            let var_name = builtin_var_name(name, name.span(), builtin.ty);
             named_objs.get_name_obj(&var_name)
           })
           .for_each(|(var_name, obj)| match obj {

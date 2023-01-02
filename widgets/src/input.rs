@@ -77,7 +77,7 @@ impl ComposeChild for Input {
         pointer_up: move |_| {
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
-             CaretState::Caret(begin as usize)
+             CaretState::Caret(begin)
             } else {
               CaretState::Select(begin, end)
             };

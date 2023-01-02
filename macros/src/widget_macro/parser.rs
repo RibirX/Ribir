@@ -194,7 +194,7 @@ impl Parse for MacroSyntax {
         if let Some(first) = widget.as_ref() {
           let err = syn::Error::new(
             w.span(),
-            &format!(
+            format!(
               "Only one root widget can declare, but `{}` already declared.",
               first.ty_path().to_token_stream()
             ),
@@ -430,7 +430,7 @@ pub fn check_duplicate_field(fields: &Punctuated<DeclareField, Comma>) -> syn::R
     if !sets.insert(&f.member) {
       return Err(syn::Error::new(
         f.member.span(),
-        format!("`{}` declare more than once", f.member.to_string()).as_str(),
+        format!("`{}` declare more than once", f.member).as_str(),
       ));
     }
   }

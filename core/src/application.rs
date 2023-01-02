@@ -49,7 +49,7 @@ impl Application {
           if event == WindowEvent::CloseRequested {
             windows.remove(&window_id);
           } else if event == WindowEvent::Destroyed {
-            if windows.len() == 0 {
+            if windows.is_empty() {
               *control = ControlFlow::Exit;
             }
           } else if let Some(wnd) = windows.get_mut(&window_id) {
@@ -88,7 +88,7 @@ impl Application {
   }
 }
 
-impl<'a> Default for Application {
+impl Default for Application {
   fn default() -> Self {
     Self {
       windows: Default::default(),

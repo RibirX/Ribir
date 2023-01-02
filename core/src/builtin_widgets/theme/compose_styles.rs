@@ -47,14 +47,18 @@ impl ComposeStyles {
     self.styles.insert(
       TypeId::of::<W>(),
       Box::new(move |this: Box<dyn Any>, host: Box<dyn Any>| {
-        let this = this.downcast().expect(&format!(
-          "Caller should guarantee the boxed type is Stateful<{}>.",
-          type_name::<W>(),
-        ));
-        let host = host.downcast().expect(&format!(
-          "Caller should guarantee the boxed type is {}.",
-          type_name::<W::Host>(),
-        ));
+        let this = this.downcast().unwrap_or_else(|_| {
+          panic!(
+            "Caller should guarantee the boxed type is Stateful<{}>.",
+            type_name::<W>()
+          )
+        });
+        let host = host.downcast().unwrap_or_else(|_| {
+          panic!(
+            "Caller should guarantee the boxed type is {}.",
+            type_name::<W::Host>(),
+          )
+        });
         compose_style(*this, *host)
       }),
     );

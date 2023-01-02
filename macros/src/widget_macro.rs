@@ -141,9 +141,12 @@ pub fn gen_widget_macro(
       .iter()
       .filter(|(name, _)| {
         !desugar.named_objs.contains(name)
-          && desugar.states.as_ref().map_or(true, |track| {
-            track.track_names().find(|n| n == name).is_none()
-          })
+          && desugar
+            .states
+            .as_ref()
+            .map_or(true, |track| {
+              !track.track_names().any(|n| &n == name)
+            })
       })
       .collect::<Vec<_>>();
     if !used_outsides.is_empty() {

@@ -94,7 +94,7 @@ impl Easing for QuadraticBezierEasing {
 impl Easing for CubicBezierEasing {
   #[inline]
   fn easing(&self, time_rate: f32) -> f32 {
-    assert!(0. <= time_rate && time_rate <= 1.);
+    assert!((0. ..=1.).contains(&time_rate));
     self.0.y(time_rate)
   }
 }

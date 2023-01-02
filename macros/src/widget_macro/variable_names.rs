@@ -55,9 +55,9 @@ pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
 pub fn ctx_ident() -> Ident { ribir_variable("ctx", Span::call_site()) }
 
 pub fn builtin_var_name(host: &Ident, span: Span, ty: &str) -> Ident {
-  let suffix = BUILTIN_WIDGET_SUFFIX.get(ty).expect(&format!(
-    "The suffix of {ty} not found, should use a builtin type to query suffix."
-  ));
+  let suffix = BUILTIN_WIDGET_SUFFIX
+    .get(ty)
+    .expect("The suffix of {ty} not found, should use a builtin type to query suffix.");
 
   let mut name = ribir_suffix_variable(host, suffix);
   name.set_span(span);

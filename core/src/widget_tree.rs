@@ -65,7 +65,7 @@ impl WidgetTree {
 
       let mut need_paint = false;
       if paint_ctx.painter.alpha() != 0. {
-        paint_ctx.box_rect().map(|layout_box| {
+        if let Some(layout_box) = paint_ctx.box_rect() {
           let render = id.assert_get(arena);
           if paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow() {
             paint_ctx
@@ -74,7 +74,7 @@ impl WidgetTree {
             render.paint(&mut paint_ctx);
             need_paint = true;
           }
-        });
+        };
       }
 
       w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
@@ -116,7 +116,7 @@ impl WidgetTree {
           wid,
           arena,
           store,
-          wnd_ctx: wnd_ctx,
+          wnd_ctx,
           dirty_set,
         };
         layouter.perform_widget_layout(clamp);
@@ -262,7 +262,7 @@ impl Widget {
 
       fn perpend(&mut self, child: WidgetId, has_child: bool) {
         if let Some(o) = self.parent {
-          o.prepend(child, &mut self.arena);
+          o.prepend(child, self.arena);
         }
         if has_child || self.parent.is_none() {
           self.parent = Some(child)

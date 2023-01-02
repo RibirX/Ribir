@@ -58,7 +58,7 @@ where
   type Value = V;
 
   #[inline]
-  fn get(&self) -> V { (self.getter)(&*self.target.state_ref()).clone() }
+  fn get(&self) -> V { (self.getter)(&*self.target.state_ref()) }
 
   #[inline]
   fn set(&mut self, v: V) { (self.setter)(&mut *self.target.state_ref(), v); }
@@ -94,7 +94,7 @@ where
     let getter = self.getter.clone();
     self
       .modifies()
-      .map(move |_| getter(&*target.state_ref()).clone())
+      .map(move |_| getter(&*target.state_ref()))
       .distinct_until_changed()
       .box_it()
   }

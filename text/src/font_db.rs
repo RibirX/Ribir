@@ -225,10 +225,7 @@ impl FontDB {
     init_data.iter().for_each(|(families, set_fn)| {
       let name = self
         .data_base
-        .query(&Query {
-          families: *families,
-          ..<_>::default()
-        })
+        .query(&Query { families, ..<_>::default() })
         .and_then(|id| self.data_base.face(id))
         .map(|f| f.family.clone());
       if let Some(name) = name {
@@ -350,7 +347,7 @@ impl std::ops::Deref for Face {
   type Target = ttf_parser::Face<'static>;
 
   #[inline]
-  fn deref(&self) -> &Self::Target { &*self.rb_face }
+  fn deref(&self) -> &Self::Target { &self.rb_face }
 }
 
 #[cfg(test)]

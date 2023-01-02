@@ -90,7 +90,7 @@ impl ComposeChild for Tabs {
                     }
                     finally {
                       let_watch!((this.cur_idx == idx, tab_header.layout_rect()))
-                        .filter_map(|(active, rect): (bool, Rect)| active.then(|| rect))
+                        .filter_map(|(active, rect): (bool, Rect)| active.then_some(rect))
                         .subscribe(move |v| { ink_bar.ink_bar_rect = v });
                     }
                   }

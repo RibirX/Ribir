@@ -311,8 +311,8 @@ impl Default for Palette {
       neutral: Color::from_u32(0xFFFBFEFF),
       neutral_variant: Color::from_u32(0xE7E0ECFF),
       error: Color::from_u32(0xB3261EFF),
-      warning: Color::from_u32(0xffb74dFF),
-      success: Color::from_u32(0x81c784FF),
+      warning: Color::from_u32(0xFFB74DFF),
+      success: Color::from_u32(0x81C784FF),
       lightness_cfg: LightnessCfg::light_theme_default(),
     }
   }

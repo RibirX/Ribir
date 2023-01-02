@@ -11,7 +11,7 @@ impl GlyphsHelper {
   pub(crate) fn cluster_from_pos(&self, x: f32, y: f32) -> u32 {
     let glyphs = self.glyphs.as_ref().unwrap();
     let (para, offset) = glyphs.nearest_glyph(x, y);
-    return glyphs.position_to_cluster(para, offset);
+    glyphs.position_to_cluster(para, offset)
   }
 
   pub(crate) fn cursor(&self, cursor: usize) -> (Point, f32) {

@@ -71,7 +71,7 @@ impl Dispatcher {
         let mut event = KeyboardEvent {
           key,
           scan_code: input.scancode,
-          common: EventCommon::new(focus, tree, &mut self.info),
+          common: EventCommon::new(focus, tree, &self.info),
         };
         match input.state {
           ElementState::Pressed => tree.bubble_event::<KeyDownListener>(&mut event),
@@ -92,7 +92,7 @@ impl Dispatcher {
     if let Some(focus) = self.focusing() {
       let mut char_event = CharEvent {
         char: c,
-        common: EventCommon::new(focus, tree, &mut self.info),
+        common: EventCommon::new(focus, tree, &self.info),
       };
       tree.bubble_event::<CharListener>(&mut char_event);
     }
@@ -155,7 +155,7 @@ impl Dispatcher {
               .pointer_down_uid
               .take()?
               .lowest_common_ancestor(release_event.target(), &tree.arena)?;
-            let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &mut self.info);
+            let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &self.info);
 
             tree.bubble_event::<TapListener>(&mut tap_event);
           }
@@ -183,7 +183,7 @@ impl Dispatcher {
       let mut wheel_event = WheelEvent {
         delta_x,
         delta_y,
-        common: EventCommon::new(wid, tree, &mut self.info),
+        common: EventCommon::new(wid, tree, &self.info),
       };
       tree.bubble_event::<WheelListener>(&mut wheel_event);
     }
@@ -221,7 +221,7 @@ impl Dispatcher {
           .iter()
           .position(|e| e.ancestors_of(new_hit, arena))
       })
-      .unwrap_or_else(|| self.entered_widgets.len());
+      .unwrap_or(self.entered_widgets.len());
 
     let mut already_entered = vec![];
     self.entered_widgets[already_entered_start..].clone_into(&mut already_entered);
@@ -263,7 +263,7 @@ impl Dispatcher {
       self.entered_widgets.iter().rev().for_each(|w| {
         let obj = w.assert_get(arena);
         if obj.contain_type::<PointerEnterListener>() {
-          let mut event = PointerEvent::from_mouse(*w, tree, &mut self.info);
+          let mut event = PointerEvent::from_mouse(*w, tree, &self.info);
           obj.query_all_type(
             |pointer: &PointerEnterListener| {
               pointer.dispatch(&mut event);
@@ -310,7 +310,7 @@ impl Dispatcher {
   fn pointer_event_for_hit_widget(&mut self, tree: &WidgetTree) -> Option<PointerEvent> {
     self
       .hit_widget(tree)
-      .map(|target| PointerEvent::from_mouse(target, tree, &mut self.info))
+      .map(|target| PointerEvent::from_mouse(target, tree, &self.info))
   }
 }
 

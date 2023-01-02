@@ -76,11 +76,11 @@ impl<'a> ObjectUsed<'a> {
 impl<'a> std::ops::Deref for ObjectUsed<'a> {
   type Target = [UsedPart<'a>];
 
-  fn deref(&self) -> &Self::Target { &*self.0 }
+  fn deref(&self) -> &Self::Target { &self.0 }
 }
 
 impl<'a> std::ops::DerefMut for ObjectUsed<'a> {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut *self.0 }
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
 impl<'a> FromIterator<UsedPart<'a>> for ObjectUsed<'a> {
@@ -151,7 +151,7 @@ impl ScopeUsedInfo {
     self.filter_widget(|info| info.used_type.contains(UsedType::REF))
   }
 
-  pub fn prepend_bundle_refs<'a>(&self, tokens: &mut TokenStream) {
+  pub fn prepend_bundle_refs(&self, tokens: &mut TokenStream) {
     if let Some(names) = self.ref_widgets() {
       let c_names = names.clone();
       if names.clone().nth(1).is_some() {
@@ -189,7 +189,7 @@ impl ScopeUsedInfo {
       .iter()
       .filter(move |(_, info)| filter(info));
 
-    widgets.clone().next().is_some().then(move || widgets)
+    widgets.clone().next().is_some().then_some(widgets)
   }
 
   fn filter_widget(
@@ -208,7 +208,7 @@ impl<'a> ObjectUsedPath<'a> {
         NamedObj::Builtin { src_name, .. } => src_name,
       })
     }
-    let obj = src_name(&self.obj, declare_objs)
+    let obj = src_name(self.obj, declare_objs)
       .unwrap_or_else(|| {
         if self.scope_label.is_none() {
           self.obj
