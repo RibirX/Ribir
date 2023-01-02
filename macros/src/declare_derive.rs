@@ -74,7 +74,7 @@ mod kw {
 
 #[inline]
 pub fn declare_field_name(field_name: &Ident) -> Ident {
-  let name = if field_name.to_string().starts_with("_") {
+  let name = if field_name.to_string().starts_with('_') {
     format!("set_declare{field_name}",)
   } else {
     format!("set_declare_{field_name}",)
@@ -355,7 +355,7 @@ fn collect_filed_and_attrs(stt: &mut DataStruct) -> Result<Punctuated<DeclareFie
 
           builder_fields.push(DeclareField { attr: builder_attr, field });
           if let Some(c) = comma {
-            builder_fields.push_punct(c.clone());
+            builder_fields.push_punct(*c);
           }
 
           Ok(())

@@ -32,7 +32,7 @@ pub enum DeclareWarning {
 }
 
 impl DeclareError {
-  pub fn into_compile_error(&self, tokens: &mut TokenStream) {
+  pub fn to_compile_error(&self, tokens: &mut TokenStream) {
     let mut diagnostic = Diagnostic::new(Level::Error, "");
     match self {
       DeclareError::DuplicateID([id1, id2]) => {
@@ -44,7 +44,7 @@ impl DeclareError {
         ));
       }
       DeclareError::CircleDepends(path) => {
-        let (msg, spans, note_spans) = path_info(&path);
+        let (msg, spans, note_spans) = path_info(path);
         let msg = format!(
           "There is a directly circle depends exist, this will cause infinite loop: {}",
           msg
@@ -58,13 +58,11 @@ impl DeclareError {
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::TransitionByConflict(span) => {
-        diagnostic.set_spans(span.clone());
-        diagnostic.set_message(&format!(
-          "field conflict with `by`, To config transition property.",
-        ));
+        diagnostic.set_spans(*span);
+        diagnostic.set_message("field conflict with `by`, To config transition property.");
 
         diagnostic = diagnostic.span_help(
-          span.clone(),
+          *span,
           "When you use `by` field provide a whole `Transition`\
           obj, you can not config other field of `Transition`",
         );
@@ -146,7 +144,7 @@ impl DeclareWarning {
     match self {
       DeclareWarning::UnusedName(span) => {
         d.set_spans(*span);
-        d.set_message(format!("assigned id but not be used in anywhere."));
+        d.set_message("assigned id but not be used in anywhere.");
         d = d.span_help(*span, "Remove this line.");
       }
       DeclareWarning::DefObjWithoutId(span) => {

@@ -256,7 +256,7 @@ impl<W> Stateful<W> {
   pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> {
     self
       .raw_modifies()
-      .filter_map(|s: ModifyScope| s.contains(ModifyScope::DATA).then(|| ()))
+      .filter_map(|s: ModifyScope| s.contains(ModifyScope::DATA).then_some(()))
       .box_it()
   }
 

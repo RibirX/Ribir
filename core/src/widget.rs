@@ -112,12 +112,12 @@ pub trait QueryFiler {
 impl<W: 'static> QueryFiler for W {
   #[inline]
   fn query_filter(&self, type_id: TypeId) -> Option<&dyn Any> {
-    (self.type_id() == type_id).then(|| self as &dyn Any)
+    (self.type_id() == type_id).then_some(self as &dyn Any)
   }
 
   #[inline]
   fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
-    ((&*self).type_id() == type_id).then(|| self as &mut dyn Any)
+    ((*self).type_id() == type_id).then_some(self as &mut dyn Any)
   }
 }
 
@@ -126,7 +126,7 @@ impl<'a> dyn Render + 'a {
   pub fn query_all_type<T: Any>(&self, mut callback: impl FnMut(&T) -> bool, order: QueryOrder) {
     self.query_all(
       TypeId::of::<T>(),
-      &mut |a: &dyn Any| a.downcast_ref().map_or(true, |t| callback(t)),
+      &mut |a: &dyn Any| a.downcast_ref().map_or(true, &mut callback),
       order,
     )
   }
@@ -321,7 +321,7 @@ impl<T: Query> Query for ShareResource<T> {
     callback: &mut dyn FnMut(&dyn Any) -> bool,
     order: QueryOrder,
   ) {
-    (&**self).query_all(type_id, callback, order)
+    (**self).query_all(type_id, callback, order)
   }
 }
 

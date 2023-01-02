@@ -84,7 +84,7 @@ where
   fn deref(&self) -> &B {
     match self {
       CowArc::Borrowed(borrowed) => borrowed,
-      CowArc::Owned(ref owned) => (&**owned).borrow(),
+      CowArc::Owned(ref owned) => (**owned).borrow(),
     }
   }
 }
@@ -178,8 +178,8 @@ impl Default for CowArc<str> {
 impl<B: ?Sized + ToOwned> Borrow<B> for CowArc<B> {
   fn borrow(&self) -> &B {
     match self {
-      CowArc::Borrowed(b) => *b,
-      CowArc::Owned(o) => (&**o).borrow(),
+      CowArc::Borrowed(b) => b,
+      CowArc::Owned(o) => (**o).borrow(),
     }
   }
 }

@@ -27,7 +27,7 @@ impl Render for TransformWidget {
     HitTest { hit: is_hit, can_hit_child: is_hit }
   }
 
-  fn get_transform(&self) -> Option<Transform> { Some(self.transform.clone()) }
+  fn get_transform(&self) -> Option<Transform> { Some(self.transform) }
 }
 
 impl Query for TransformWidget {

@@ -8,11 +8,11 @@ pub struct Container {
 
 impl Render for Container {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.single_child_layouter().map(|mut l| {
+    if let Some(mut l) = ctx.single_child_layouter() {
       clamp.max = clamp.max.min(self.size);
       clamp.min = clamp.max.min(clamp.min);
       l.perform_widget_layout(clamp);
-    });
+    };
     self.size
   }
 

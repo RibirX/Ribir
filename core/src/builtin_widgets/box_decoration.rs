@@ -141,7 +141,7 @@ impl BoxDecoration {
 
     painter
       .set_line_width(border.top.width)
-      .set_brush(Brush::Color(border.top.color.clone()));
+      .set_brush(Brush::Color(border.top.color));
     painter.rect_round(
       &Rect::new(
         Point::new(min_x, min_y),
@@ -179,7 +179,7 @@ impl BoxDecoration {
         if border.is_visible() {
           painter
             .set_line_width(border.width)
-            .set_brush(Brush::Color(border.color.clone()));
+            .set_brush(Brush::Color(border.color));
           painter.begin_path(vertexs[edge.0] + *offset);
           painter.line_to(vertexs[edge.1] + *offset);
           painter.close_path(false).stroke();
@@ -196,9 +196,9 @@ impl Border {
   #[inline]
   pub fn all(side: BorderSide) -> Self {
     Self {
-      left: side.clone(),
-      right: side.clone(),
-      top: side.clone(),
+      left: side,
+      right: side,
+      top: side,
       bottom: side,
     }
   }

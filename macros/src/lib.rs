@@ -85,7 +85,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None).into() }
+pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None) }
 
 #[proc_macro]
 pub fn widget_maybe_states(input: TokenStream) -> TokenStream {

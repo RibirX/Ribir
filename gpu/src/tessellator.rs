@@ -120,7 +120,7 @@ impl Tessellator {
         &mut stencil_path,
         |key| uninit_vertices.get_or_delay_init(key),
         |tolerance, path| {
-          let mut vc = Box::new(VertexCache::default());
+          let mut vc = Box::<VertexCache>::default();
           let ptr = &mut *vc as *mut VertexCache;
           no_cache_paths.push((tolerance, path, vc));
           ptr
@@ -215,7 +215,7 @@ impl Tessellator {
   fn prim_from_command<'a, R: GlRender>(
     &mut self,
     cmd: &PaintCommand,
-    stencil_path: &Vec<&'a ClipInstruct>,
+    stencil_path: &[&'a ClipInstruct],
     render: &mut R,
   ) -> (Primitive, PrimitiveType) {
     match cmd {
@@ -225,7 +225,7 @@ impl Tessellator {
         PrimitiveType::PushStencil,
       ),
       PaintCommand::PopClip => {
-        let transform = stencil_path.last().unwrap().transform.clone();
+        let transform = stencil_path.last().unwrap().transform;
         (
           StencilPrimitive::new(transform.to_arrays()).into(),
           PrimitiveType::PopStencil,
@@ -319,7 +319,7 @@ impl Tessellator {
               .pre_translate((x_offset.value(), y_offset.value()).into())
               .pre_scale(font_size_ems, font_size_ems);
 
-            let mut p = primitive.clone();
+            let mut p = primitive;
             let color_primitive = unsafe { &mut p.color_primitive };
             color_primitive.transform = t.to_arrays();
 

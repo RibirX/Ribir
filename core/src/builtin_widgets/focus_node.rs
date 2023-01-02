@@ -1,6 +1,5 @@
 use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*, events::focus_mgr::{FocusType, FocustHandle}};
 
-
 #[derive(Default, Declare)]
 pub struct FocusNode {
   /// Indicates that `widget` can be focused, and where it participates in
@@ -106,17 +105,15 @@ impl ComposeChild for RequestFocus {
 }
 impl  RequestFocus {
   pub fn request_focus(& self) {
-    self
-      .handle
-      .as_ref()
-      .map(|h| h.request_focus());
+    if let Some(h) = self.handle.as_ref() {
+      h.request_focus();
+    }
   }
 
   pub fn unfocus(& self) {
-    self
-      .handle
-      .as_ref()
-      .map(|h| h.unfocus());
+    if let Some(h) = self.handle.as_ref() { 
+      h.unfocus();
+    }
   }
 }
 

@@ -10,15 +10,15 @@ const TAG_FOUR_B: u8 = 0b1111_0000;
 pub fn next_char_len(text: &str, byte_idx: usize) -> usize {
   let b: u8 = text.as_bytes()[byte_idx];
   if b == 0 {
-    return 0;
+    0
   } else if b < TAG_TWO_B {
-    return 1;
+    1
   } else if b < TAG_THREE_B {
-    return 2;
+    2
   } else if b < TAG_FOUR_B {
-    return 3;
+    3
   } else {
-    return 4;
+    4
   }
 }
 
@@ -29,7 +29,7 @@ pub fn prev_char_len(text: &str, byte_idx: usize) -> usize {
   while byte_idx > len {
     len += 1;
     let c = bytes[byte_idx - len];
-    if c < TAG_CONT || TAG_TWO_B <= c {
+    if !(TAG_CONT..TAG_TWO_B).contains(&c) {
       return len;
     }
   }

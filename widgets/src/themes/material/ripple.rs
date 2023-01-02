@@ -55,7 +55,7 @@ impl ComposeChild for Ripple {
         DynWidget { dyns: child }
         DynWidget {
           dyns: {
-            this.launch_pos.clone().map(|launch_at| {
+            this.launch_pos.map(|launch_at| {
               let radius = this.radius.unwrap_or_else(|| {
                 let size = container.layout_size();
                 let distance_x = f32::max(launch_at.x , size.width - launch_at.x);

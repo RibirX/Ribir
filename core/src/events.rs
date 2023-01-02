@@ -82,7 +82,7 @@ impl EventCommon {
   pub fn button_num(&self) -> u32 { self.mouse_buttons().bits().count_ones() }
 
   #[inline]
-  pub fn context<'a>(&'a mut self) -> EventCtx<'a> {
+  pub fn context(&mut self) -> EventCtx {
     // Safety: framework promise event context only live in event dispatch and
     // there is no others to share `Context`.
     let WidgetTree { arena, store, wnd_ctx, .. } = unsafe { self.tree.as_ref() };

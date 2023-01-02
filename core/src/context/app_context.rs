@@ -49,7 +49,7 @@ impl Default for AppContext {
     let font_db = Arc::new(RwLock::new(font_db));
     let shaper = TextShaper::new(font_db.clone());
     let reorder = TextReorder::default();
-    let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
+    let typography_store = TypographyStore::new(reorder.clone(), font_db, shaper.clone());
 
     AppContext {
       font_db: <_>::default(),

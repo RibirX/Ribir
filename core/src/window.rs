@@ -112,7 +112,7 @@ impl Window {
         }
       }
 
-      self.dispatcher.refresh_focus(&mut self.widget_tree);
+      self.dispatcher.refresh_focus(&self.widget_tree);
 
       self.widget_tree.draw(&mut self.painter);
       let commands = self.painter.finish();

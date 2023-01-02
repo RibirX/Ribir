@@ -31,18 +31,20 @@ impl Compose for SelectedText {
       states { this: this.into_stateful() }
       Stack {
         DynWidget {
-          dyns: this.rects.clone().into_iter()
+          dyns: {
+            this.rects.iter().copied()
             .map(|rc| {
               widget! {
                 SelectedTextStyle {
                   top_anchor: rc.origin.y,
                   left_anchor: rc.origin.x,
                   Container {
-                    size: rc.size.clone(),
+                    size: rc.size,
                   }
                 }
               }
-            })
+            }).collect::<Vec<_>>()
+          }
         }
       }
     }

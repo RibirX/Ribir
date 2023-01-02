@@ -11,7 +11,7 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))]);
   let typography_theme = typography_theme(
     family.clone(),
-    family.clone(),
+    family,
     palette.on_background().into(),
     palette.on_surface_variant().into(),
     TextDecoration::NONE,
@@ -184,8 +184,8 @@ pub mod purple {
       neutral: Color::from_u32(0xFFFBFEFF),
       neutral_variant: Color::from_u32(0xE7E0ECFF),
       error: Color::from_u32(0xB3261EFF),
-      warning: Color::from_u32(0xffb74dFF),
-      success: Color::from_u32(0x81c784FF),
+      warning: Color::from_u32(0xFFB74DFF),
+      success: Color::from_u32(0x81C784FF),
       lightness_cfg,
     }
   }
@@ -286,7 +286,7 @@ pub fn typography_theme(
     headline4: TextTheme {
       text: TextStyle {
         font_size: FontSize::Pixel(34.0.into()),
-        foreground: display_style.clone(),
+        foreground: display_style,
         letter_space: Some(Pixel(0.25.into())),
         font_face: normal_title_face.clone(),
         path_style: PathStyle::Fill,
@@ -322,7 +322,7 @@ pub fn typography_theme(
         font_size: FontSize::Pixel(16.0.into()),
         letter_space: Some(Pixel(0.15.into())),
         foreground: body_style.clone(),
-        font_face: normal_title_face.clone(),
+        font_face: normal_title_face,
         path_style: PathStyle::Fill,
         line_height: None,
       },
@@ -333,7 +333,7 @@ pub fn typography_theme(
         font_size: FontSize::Pixel(14.0.into()),
         letter_space: Some(Pixel(0.1.into())),
         foreground: body_style.clone(),
-        font_face: medium_title_face.clone(),
+        font_face: medium_title_face,
         path_style: PathStyle::Fill,
         line_height: None,
       },

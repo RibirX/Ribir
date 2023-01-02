@@ -70,7 +70,7 @@ impl<D: DynsIntoWidget<M> + 'static, M: 'static> Render for DynRender<D, M> {
       let mut sibling = Some(ctx.id);
       (0..width).for_each(|_| {
         let w = sibling.unwrap();
-        inspect_key(&w, arena, |key: &Box<dyn AnyKey>| {
+        inspect_key(&w, arena, |key: &dyn AnyKey| {
           key.mounted();
         });
         w.on_mounted(arena, &ctx.store, ctx.wnd_ctx, ctx.dirty_set);
@@ -200,8 +200,8 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
         }
 
         let mut old_key = None;
-        inspect_key(&old_sign, arena, |key: &Box<dyn AnyKey>| {
-          old_key = Some((key.key().clone(), old_sign));
+        inspect_key(&old_sign, arena, |key: &dyn AnyKey| {
+          old_key = Some((key.key(), old_sign));
         });
 
         old_sign.insert_after(*sign, arena);
@@ -210,13 +210,13 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
         let w = *sign;
 
         if let Some(old) = &old_key {
-          inspect_key(&w, arena, |key: &Box<dyn AnyKey>| {
+          inspect_key(&w, arena, |key: &dyn AnyKey| {
             if old.0 == key.key() {
-              inspect_key(&old.1, arena, |old_key_widget: &Box<dyn AnyKey>| {
-                key.record_before_value(&**old_key_widget)
+              inspect_key(&old.1, arena, |old_key_widget: &dyn AnyKey| {
+                key.record_before_value(old_key_widget)
               });
             } else {
-              inspect_key(&old.1, arena, |old_key_widget: &Box<dyn AnyKey>| {
+              inspect_key(&old.1, arena, |old_key_widget: &dyn AnyKey| {
                 old_key_widget.disposed()
               });
               key.mounted();
@@ -248,21 +248,21 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
         (0..*siblings).for_each(|_| {
           let o = remove.unwrap();
 
-          inspect_key(&o, arena, |old_key_widget: &Box<dyn AnyKey>| {
-            old_key_list.insert(old_key_widget.key().clone(), o);
+          inspect_key(&o, arena, |old_key_widget: &dyn AnyKey| {
+            old_key_list.insert(old_key_widget.key(), o);
           });
 
           remove = o.next_sibling(arena);
         });
 
         new_widgets.iter().for_each(|n| {
-          inspect_key(&n, arena, |new_key_widget: &Box<dyn AnyKey>| {
+          inspect_key(n, arena, |new_key_widget: &dyn AnyKey| {
             let key = &new_key_widget.key();
-            if let Some(old_key_widget) = old_key_list.get(&key) {
-              inspect_key(old_key_widget, arena, |old_key_widget: &Box<dyn AnyKey>| {
-                new_key_widget.record_before_value(&**old_key_widget);
+            if let Some(old_key_widget) = old_key_list.get(key) {
+              inspect_key(old_key_widget, arena, |old_key_widget: &dyn AnyKey| {
+                new_key_widget.record_before_value(old_key_widget);
               });
-              old_key_list.remove(&key);
+              old_key_list.remove(key);
             } else {
               new_key_widget.mounted();
             }
@@ -351,11 +351,11 @@ impl<D: 'static> Query for DynWidget<D> {
   impl_query_self_only!();
 }
 
-fn inspect_key(id: &WidgetId, tree: &TreeArena, mut cb: impl FnMut(&Box<dyn AnyKey>)) {
+fn inspect_key(id: &WidgetId, tree: &TreeArena, mut cb: impl FnMut(&dyn AnyKey)) {
   id.assert_get(tree).query_on_first_type(
     QueryOrder::OutsideFirst,
     |key_widget: &Box<dyn AnyKey>| {
-      cb(key_widget);
+      cb(&**key_widget);
     },
   );
 }

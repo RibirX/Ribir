@@ -67,7 +67,7 @@ impl Render for GridView {
       layouter = l.into_next_sibling();
     }
 
-    return self.bound_size(idx);
+    self.bound_size(idx)
   }
 
   #[inline]

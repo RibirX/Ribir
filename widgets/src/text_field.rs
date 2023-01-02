@@ -124,23 +124,14 @@ impl ComposeChild for TextFieldThemeProxy {
         },
 
         pointer_move: move |_| {
-          match this.state {
-            TextFieldState::Enabled => this.state = TextFieldState::Hovered,
-            _ => (),
-          };
+          if this.state == TextFieldState::Enabled { this.state = TextFieldState::Hovered }
         },
 
         pointer_leave: move |_| {
-          match this.state {
-            TextFieldState::Hovered => this.state = TextFieldState::Enabled,
-            _ => (),
-          };
+          if this.state == TextFieldState::Hovered { this.state = TextFieldState::Enabled }
         },
         focus_out: move |_| {
-          match this.state {
-            TextFieldState::Focused => this.state = TextFieldState::Enabled,
-            _ => (),
-          };
+          if this.state == TextFieldState::Focused { this.state = TextFieldState::Enabled }
         },
       }
     }
@@ -250,17 +241,17 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Hovered,
       TextFieldTheme {
-        text: body.clone(),
+        text: body,
         container_color: palette.surface_variant(),
         indicator: palette.on_surface(),
         indicator_height: 2.,
         label_color: palette.on_surface(),
 
         container_height: 56.,
-        label_collapse: caption.clone(),
-        label_expand: header.clone(),
-        input_collapse_padding: input_collapse_padding.clone(),
-        input_expand_padding: input_expand_padding.clone(),
+        label_collapse: caption,
+        label_expand: header,
+        input_collapse_padding,
+        input_expand_padding,
       },
     );
 
@@ -297,7 +288,7 @@ impl ComposeChild for TextField {
   where
     Self: Sized,
   {
-    let mut config = config.unwrap_or(TextFieldTml::default());
+    let mut config = config.unwrap_or_default();
     widget! {
       states {
         this: this.into_stateful(),
@@ -316,7 +307,7 @@ impl ComposeChild for TextField {
 
         Container {
           size: Size::new(f32::MAX, theme.container_height),
-          background: theme.container_color.clone(),
+          background: theme.container_color,
           Stack {
             Row {
               ConstrainedBox {
@@ -344,7 +335,7 @@ impl ComposeChild for TextField {
             Container {
               v_align: VAlign::Bottom,
               size: Size::new(f32::MAX, theme.indicator_height),
-              background: theme.indicator.clone(),
+              background: theme.indicator,
             }
           }
         }
@@ -371,7 +362,7 @@ fn build_input_area(
       DynWidget {
         dyns: prefix.map(|text| {
           Text {
-            text: text.child.clone().into(),
+            text: text.child,
             style: theme.text.clone(),
           }
         })
@@ -388,7 +379,7 @@ fn build_input_area(
       DynWidget {
         dyns: subfix.map(|text| {
           Text {
-            text: text.child.clone().into(),
+            text: text.child,
             style: theme.text.clone(),
           }
         })
@@ -400,7 +391,7 @@ fn build_input_area(
 
     finally {
       input.set_text(this.text.clone());
-      let_watch!(input.text().clone()) 
+      let_watch!(input.text()) 
         .distinct_until_changed()
         .subscribe(move |val| {
           this.silent().text = val;

@@ -31,7 +31,7 @@ impl WidgetId {
   }
 
   /// detect if the widget of this id point to is dropped.
-  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(&tree) }
+  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
 
   #[allow(clippy::needless_collect)]
   pub(crate) fn lowest_common_ancestor(
@@ -224,7 +224,7 @@ impl WidgetId {
     tree: &TreeArena,
     method: F,
   ) -> Option<WidgetId> {
-    tree.get(self.0).map(method).flatten().map(WidgetId)
+    tree.get(self.0).and_then(method).map(WidgetId)
   }
 
   pub(crate) fn assert_get(self, tree: &TreeArena) -> &dyn Render {

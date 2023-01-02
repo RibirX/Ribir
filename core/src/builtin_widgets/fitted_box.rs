@@ -64,14 +64,14 @@ impl Render for FittedBox {
 
     if child_size.greater_than(size).any() {
       let path = Path::rect(&rect, PathStyle::Fill);
-      ctx.painter().clip(path.clone());
+      ctx.painter().clip(path);
     }
 
     let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
     ctx.painter().scale(x, y);
   }
 
-  fn get_transform(&self) -> Option<Transform> { Some(self.scale_cache.get().clone()) }
+  fn get_transform(&self) -> Option<Transform> { Some(self.scale_cache.get()) }
 }
 
 impl Query for FittedBox {

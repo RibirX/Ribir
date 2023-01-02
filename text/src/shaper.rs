@@ -143,7 +143,7 @@ impl TextShaper {
     }
     let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
 
-    let mut font_fallback = FallBackFaceHelper::new(face_ids, &*self.font_db);
+    let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
 
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text);

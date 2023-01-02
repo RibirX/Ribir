@@ -197,7 +197,7 @@ impl FlexLayouter {
     self.place_line();
   }
 
-  fn flex_children_layout<'a>(&mut self, ctx: &mut LayoutCtx) {
+  fn flex_children_layout(&mut self, ctx: &mut LayoutCtx) {
     let mut layouter = ctx.first_child_layouter();
     self.lines.iter_mut().for_each(|line| {
       let flex_unit = (self.max.main - line.main_width) / line.flex_sum;
@@ -270,9 +270,7 @@ impl FlexLayouter {
 
   fn place_line(&mut self) {
     if !self.current_line.is_empty() {
-      self
-        .lines
-        .push(std::mem::replace(&mut self.current_line, <_>::default()));
+      self.lines.push(std::mem::take(&mut self.current_line));
     }
   }
 }

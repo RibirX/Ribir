@@ -129,7 +129,7 @@ impl FocusManager {
       wid = self.focus_step(wid, backward, arena);
     }
     self.focusing = wid;
-    return wid;
+    wid
   }
 
   fn focus_step(
@@ -138,14 +138,10 @@ impl FocusManager {
     backward: bool,
     arena: &TreeArena,
   ) -> Option<WidgetId> {
-    let mut node_id = focusing.and_then(|id| self.node_ids.get(&id)).map(|id| *id);
-    let mut scope_id = node_id
-      .and_then(|id| self.scope_id(id))
-      .or_else(|| Some(self.root));
+    let mut node_id = focusing.and_then(|id| self.node_ids.get(&id)).copied();
+    let mut scope_id = node_id.and_then(|id| self.scope_id(id)).or(Some(self.root));
     loop {
-      if scope_id.is_none() {
-        return None;
-      }
+      scope_id?;
       let next = self.focus_step_in_scope(scope_id.unwrap(), node_id, backward, arena);
       if let Some(id) = next {
         return self.get(id).and_then(|n| n.wid);
@@ -198,7 +194,7 @@ impl FocusManager {
           *level -= 1;
         }
       }
-      return None;
+      None
     };
     let mut tab_indexs = vec![];
     let mut node = self.arena[scope_id].first_child();
@@ -265,7 +261,7 @@ impl FocusManager {
         return next;
       }
     }
-    return None;
+    None
   }
 
   fn scope_id(&self, node_id: NodeId) -> Option<NodeId> { self.scope_list(node_id).next() }
@@ -280,23 +276,20 @@ impl FocusManager {
   fn ignore_scope_id(&self, wid: WidgetId, arena: &TreeArena) -> Option<NodeId> {
     let node_id = wid
       .ancestors(arena)
-      .filter_map(|wid| self.node_ids.get(&wid).map(|n| *n))
+      .filter_map(|wid| self.node_ids.get(&wid).copied())
       .next();
     node_id.and_then(|node_id| {
-      self
-        .scope_list(node_id)
-        .skip_while(|id| {
-          let mut ignore = false;
-          self.get(*id).and_then(|n| n.wid).map(|wid| {
-            wid.get(arena).map(|r| {
-              r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| {
-                ignore = s.skip_descendants;
-              })
+      self.scope_list(node_id).find(|id| {
+        let mut has_ignore = false;
+        self.get(*id).and_then(|n| n.wid).map(|wid| {
+          wid.get(arena).map(|r| {
+            r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| {
+              has_ignore = s.skip_descendants;
             })
-          });
-          !ignore
-        })
-        .next()
+          })
+        });
+        has_ignore
+      })
     })
   }
 
@@ -311,7 +304,7 @@ impl FocusManager {
           node
         })
       })
-      .unwrap_or(FocusScope::default())
+      .unwrap_or_default()
   }
 
   fn tab_index(&self, node_id: NodeId, arena: &TreeArena) -> i16 {
@@ -336,7 +329,11 @@ impl FocusManager {
       AfterSibling,
     }
 
-    fn locat_posiont(dst: &Vec<WidgetId>, base: &Vec<WidgetId>, arena: &TreeArena) -> TreePosition {
+    fn locate_position(
+      dst: &Vec<WidgetId>,
+      base: &Vec<WidgetId>,
+      arena: &TreeArena,
+    ) -> TreePosition {
       assert!(dst.len() > 1 && base.len() > 1);
       let cnt = dst
         .iter()
@@ -360,7 +357,7 @@ impl FocusManager {
           return TreePosition::AfterSibling;
         }
       }
-      return TreePosition::AfterSibling;
+      TreePosition::AfterSibling
     }
 
     fn collect_sub_ancestors(
@@ -387,7 +384,7 @@ impl FocusManager {
       let wid = self.arena.get(id).and_then(|node| node.get().wid).unwrap();
       let path2 = collect_sub_ancestors(wid, pwid, arena);
 
-      match locat_posiont(&path, &path2, &arena) {
+      match locate_position(&path, &path2, arena) {
         TreePosition::BeforeSibling => before_sibling = Some(id),
         TreePosition::SubTree => children.push(id),
         TreePosition::AfterSibling => afrer_sibling = Some(id),
@@ -461,34 +458,33 @@ impl Dispatcher {
     let old = old_widgets
       .get(0)
       .filter(|wid| !(*wid).is_dropped(&tree.arena))
-      .map(|n| *n);
+      .copied();
 
     // dispatch blur event
-    old.map(|wid| {
+    if let Some(wid) = old {
       let mut focus_event = FocusEvent::new(wid, tree, info);
       wid
         .assert_get(&tree.arena)
         .query_on_first_type(QueryOrder::InnerFirst, |blur: &BlurListener| {
           blur.dispatch(&mut focus_event)
         })
-    });
+    };
 
-    let common_ancestors = common_ancestors(&new_widgets, &old_widgets);
+    let common_ancestors = common_ancestors(&new_widgets, old_widgets);
     // bubble focus out
-    old_widgets
+    if let Some(wid) = old_widgets
       .iter()
-      .filter(|wid| !(*wid).is_dropped(&tree.arena))
-      .next()
-      .map(|wid| {
-        let mut focus_event = FocusEvent::new(*wid, tree, info);
-        tree.bubble_event_with(&mut focus_event, |focus_out: &FocusOutListener, event| {
-          if common_ancestors.contains(&event.current_target()) {
-            event.stop_bubbling();
-          } else {
-            focus_out.dispatch(event);
-          }
-        });
+      .find(|wid| !(*wid).is_dropped(&tree.arena))
+    {
+      let mut focus_event = FocusEvent::new(*wid, tree, info);
+      tree.bubble_event_with(&mut focus_event, |focus_out: &FocusOutListener, event| {
+        if common_ancestors.contains(&event.current_target()) {
+          event.stop_bubbling();
+        } else {
+          focus_out.dispatch(event);
+        }
       });
+    };
 
     if let Some(wid) = node {
       let mut focus_event = FocusEvent::new(wid, tree, info);
@@ -517,7 +513,7 @@ impl Dispatcher {
   }
 }
 
-fn common_ancestors(path: &Vec<WidgetId>, path2: &Vec<WidgetId>) -> HashSet<WidgetId> {
+fn common_ancestors(path: &[WidgetId], path2: &[WidgetId]) -> HashSet<WidgetId> {
   let it = path
     .iter()
     .rev()
