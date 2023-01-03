@@ -43,7 +43,7 @@ impl Compose for TodoMVP {
                 label,
                 finished: false,
               });
-              input.set_text(String::default().into());
+              input.set_text("");
             },
             Leading { Icon { svgs::ADD } }
             ButtonText::new("ADD")

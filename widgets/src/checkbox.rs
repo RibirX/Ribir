@@ -116,8 +116,8 @@ mod tests {
         expect: ExpectRect {
           x: Some(0.),
           y: Some(0.),
-          width: Some(18.),
-          height: Some(18.),
+          width: Some(42.),
+          height: Some(42.),
         },
       }],
     );
