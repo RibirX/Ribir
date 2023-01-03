@@ -13,9 +13,6 @@ pub mod data_widget;
 mod stateful;
 pub(crate) mod widget_tree;
 
-// todo: reorganize document
-#[doc = include_str!("../../docs/declare_macro.md")]
-#[doc = include_str!("../../docs/declare_builtin_fields.md")]
 pub mod declare;
 pub mod dynamic_widget;
 pub mod enum_widget;

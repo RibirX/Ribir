@@ -37,8 +37,8 @@ impl Input {
 
   pub fn caret(&self) -> &CaretState { &self.caret }
 
-  pub fn set_text(&mut self, text: CowArc<str>) {
-    self.text = text;
+  pub fn set_text(&mut self, text: impl Into<CowArc<str>>) {
+    self.text = text.into();
     self.caret.valid(self.text.len());
   }
 
