@@ -1,8 +1,12 @@
 use std::{borrow::Borrow, ops::Range};
 
-use lyon_path::geom::{euclid::num::Zero, euclid::UnknownUnit, Size};
+use lyon_path::geom::{
+  euclid::num::Zero,
+  euclid::{Point2D, UnknownUnit},
+  Size,
+};
 pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
-
+pub type Point<T> = lyon_path::geom::euclid::Point2D<T, UnknownUnit>;
 use unicode_script::{Script, UnicodeScript};
 
 use crate::{Em, FontSize, Glyph, Pixel, TextAlign};
@@ -53,10 +57,20 @@ pub trait InlineCursor {
   fn cursor(&self) -> (Em, Em);
 }
 
-#[derive(Default)]
 pub struct VisualLine {
+  pub base_position: Point<Em>,
   pub line_height: Em,
   pub glyphs: Vec<Glyph<Em>>,
+}
+
+impl Default for VisualLine {
+  fn default() -> Self {
+    Self {
+      base_position: Point2D::zero(),
+      line_height: Em::default(),
+      glyphs: vec![],
+    }
+  }
 }
 
 pub struct VisualInfos {
@@ -114,6 +128,7 @@ where
       lines.iter_mut().for_each(|l| {
         if let Some(g) = l.glyphs.last() {
           let offset = f(g);
+          l.base_position.y += offset;
           l.glyphs.iter_mut().for_each(|g| g.y_offset += offset);
         }
       });
@@ -123,6 +138,7 @@ where
       lines.iter_mut().for_each(|l| {
         if let Some(g) = l.glyphs.last() {
           let offset = f(g);
+          l.base_position.x += offset;
           l.glyphs.iter_mut().for_each(|g| g.x_offset += offset);
         }
       });
@@ -184,10 +200,12 @@ where
     self.visual_lines.push(<_>::default());
     let Self { x_cursor, y_cursor, .. } = *self;
     if self.cfg.line_dir.is_horizontal() {
+      self.visual_lines.last_mut().unwrap().base_position.x = x_cursor;
       let mut cursor = VInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
       p.runs
         .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
     } else {
+      self.visual_lines.last_mut().unwrap().base_position.y = y_cursor;
       let mut cursor = HInlineCursor { x_pos: x_cursor, y_pos: y_cursor };
       p.runs
         .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));

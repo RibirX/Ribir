@@ -17,8 +17,8 @@ impl GlyphsHelper {
   pub(crate) fn cursor(&self, cursor: usize) -> (Point, f32) {
     let glyphs = self.glyphs.as_ref().unwrap();
     let (para, offset) = glyphs.position_by_cluster(cursor as u32);
-    let (glphy, line_height) = glyphs.glyph_rect(para, offset);
-
+    let glphy = glyphs.glyph_rect(para, offset);
+    let line_height = glyphs.line_height(para);
     (Point::new(glphy.min_x(), glphy.max_y()), line_height)
   }
 

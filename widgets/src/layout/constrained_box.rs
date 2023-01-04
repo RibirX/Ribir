@@ -32,7 +32,7 @@ impl Render for ConstrainedBox {
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn only_sized_by_parent(&self) -> bool { false }
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
