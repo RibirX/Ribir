@@ -43,7 +43,6 @@ impl Input {
 impl ComposeChild for Input {
   type Child = Option<Placeholder>;
   fn compose_child(this: StateWidget<Self>, placeholder: Self::Child) -> Widget {
-    let end_char = "\r";
     widget! {
       states {
         this: this.into_stateful(),
@@ -89,15 +88,13 @@ impl ComposeChild for Input {
           scrollable: Scrollable::X,
           padding: EdgeInsets::horizontal(1.),
           Stack {
-            
             SelectedText {
               id: selected,
               rects: vec![],
             }
-            
             Text {
               id: text,
-              text: this.text.to_string() + end_char,
+              text: this.text.clone(),
               style: this.style.clone(),
     
               performed_layout: move |ctx| {

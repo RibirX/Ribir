@@ -107,7 +107,7 @@ impl TypographyStore {
     let ids = self.font_db.read().unwrap().select_all_match(face);
     let inputs = info.paras.iter().map(|p| {
       let runs = p.runs.iter().map(|r| {
-        let dir = if p.levels[r.start].is_ltr() {
+        let dir = if r.is_empty() || p.levels[r.start].is_ltr() {
           TextDirection::LeftToRight
         } else {
           TextDirection::RightToLeft
@@ -127,6 +127,7 @@ impl TypographyStore {
 
       InputParagraph { text_align: input.text_align, runs }
     });
+
     let t_cfg = TypographyCfg {
       line_height: input.line_height,
       letter_space: input.letter_space,
@@ -306,7 +307,11 @@ impl VisualGlyphs {
     }
 
     let visual_lines = &self.visual_info.visual_lines;
-    let para = self.get_para(cluster);
+    let para = self
+      .order_info
+      .paras
+      .partition_point(|p| p.range.end <= cluster as usize)
+      .min(self.order_info.paras.len() - 1);
     let order_info = &self.order_info.paras[para];
     let line = &visual_lines[para];
     let locator = RangeLocator::from_unorder_ranges(order_info.runs.iter());
@@ -343,29 +348,68 @@ impl VisualGlyphs {
     }
   }
 
-  pub fn glyph_rect(&self, para: usize, offset: usize) -> (Rect<f32>, f32) {
+  pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect<f32> {
     let visual_lines = &self.visual_info.visual_lines;
-    visual_lines
-      .get(para)
-      .and_then(|line| {
-        let height = line.line_height;
-        line.glyphs.get(offset).map(move |g| (g, height))
-      })
-      .map_or((Rect::default(), 0.), |(glyph, height)| {
-        (
-          Rect::new(
-            Point::new(
-              self.to_pixel_value(glyph.x_offset),
-              self.to_pixel_value(glyph.y_offset),
-            ),
-            Size::new(
-              self.to_pixel_value(glyph.x_advance),
-              self.to_pixel_value(glyph.y_advance),
-            ),
-          ),
-          self.to_pixel_value(height),
+    let line_dir = self.visual_info.line_dir;
+    if visual_lines.is_empty() {
+      return Rect::zero();
+    }
+    if para >= visual_lines.len() {
+      para = visual_lines.len() - 1;
+      offset = visual_lines[para].glyphs.len();
+    }
+
+    let line = &visual_lines[para];
+    let mut is_end = false;
+    let glyph = if offset >= line.glyphs.len() {
+      is_end = true;
+      line.glyphs.last()
+    } else {
+      line.glyphs.get(offset)
+    };
+
+    glyph.map_or_else(
+      move || {
+        let base = line.base_position;
+        Rect::new(
+          Point::new(self.to_pixel_value(base.x), self.to_pixel_value(base.y)),
+          Size::zero(),
         )
-      })
+      },
+      move |glyph| {
+        let mut rc = Rect::new(
+          Point::new(
+            self.to_pixel_value(glyph.x_offset),
+            self.to_pixel_value(glyph.y_offset),
+          ),
+          Size::new(
+            self.to_pixel_value(glyph.x_advance),
+            self.to_pixel_value(glyph.y_advance),
+          ),
+        );
+        if is_end {
+          match line_dir.is_horizontal() {
+            true => {
+              rc.origin.y += rc.height();
+              rc.size.height = 0.;
+            }
+            false => {
+              rc.origin.x += rc.width();
+              rc.size.width = 0.;
+            }
+          }
+        }
+        rc
+      },
+    )
+  }
+
+  pub fn line_height(&self, para: usize) -> f32 {
+    self
+      .visual_info
+      .visual_lines
+      .get(para)
+      .map_or(0., |line| self.to_pixel_value(line.line_height))
   }
 
   pub fn select_range(&self, rg: Range<usize>) -> Vec<Rect<Pixel>> {
@@ -458,14 +502,6 @@ impl VisualGlyphs {
       cluster,
     }
   }
-
-  fn get_para(&self, cluster: u32) -> usize {
-    self
-      .order_info
-      .paras
-      .partition_point(|p| p.range.end <= cluster as usize)
-      .min(self.order_info.paras.len() - 1)
-  }
 }
 
 #[cfg(test)]
@@ -517,6 +553,49 @@ mod tests {
     );
 
     assert_eq!(visual.visual_rect().size, Size::new(61.960938, 81.484375));
+  }
+
+  #[test]
+  fn empty_text_bounds() {
+    let text = "".into();
+
+    let visual = typography_text(
+      text,
+      FontSize::Pixel(14.0.into()),
+      TypographyCfg {
+        letter_space: None,
+        text_align: None,
+        line_height: None,
+        bounds: (Em::MAX, Em::MAX).into(),
+        line_dir: PlaceLineDirection::TopToBottom,
+        overflow: Overflow::Clip,
+      },
+    );
+
+    assert_eq!(visual.visual_rect().size, Size::new(0., 16.296875));
+  }
+
+  #[test]
+  fn new_line_bounds() {
+    let text = "123\n".into();
+
+    let visual = typography_text(
+      text,
+      FontSize::Pixel(14.0.into()),
+      TypographyCfg {
+        letter_space: None,
+        text_align: None,
+        line_height: None,
+        bounds: (Em::MAX, Em::MAX).into(),
+        line_dir: PlaceLineDirection::TopToBottom,
+        overflow: Overflow::Clip,
+      },
+    );
+
+    assert_eq!(
+      visual.visual_rect().size,
+      Size::new(35.123047, 16.296875 * 2.)
+    );
   }
 
   #[test]

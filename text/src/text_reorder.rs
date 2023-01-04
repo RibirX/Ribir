@@ -29,7 +29,7 @@ impl TextReorder {
   pub fn reorder_text(&self, text: &Substr) -> Arc<ReorderResult> {
     self.get_from_cache(text).unwrap_or_else(|| {
       let info = BidiInfo::new(text, None);
-      let paras = info
+      let mut paras: Vec<Paragraph> = info
         .paragraphs
         .iter()
         .map(|p| {
@@ -37,6 +37,14 @@ impl TextReorder {
           Paragraph { levels, runs, range: p.range.clone() }
         })
         .collect();
+
+      if paras.is_empty() || text.ends_with('\r') || text.ends_with('\n') {
+        paras.push(Paragraph {
+          levels: vec![],
+          runs: vec![Range { start: text.len(), end: text.len() }],
+          range: Range { start: text.len(), end: text.len() },
+        })
+      }
 
       let result = Arc::new(ReorderResult {
         original_classes: info.original_classes,
