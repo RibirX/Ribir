@@ -9,6 +9,7 @@ use crate::{
 use super::{
   builtin_var_name, capture_widget,
   code_gen::{gen_move_to_widget_macro, gen_prop_macro},
+  ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
   },
@@ -53,6 +54,7 @@ pub struct VisitCtx {
   pub analyze_stack: Vec<Vec<LocalVariable>>,
   pub has_guards_data: bool,
   pub visit_error_occur: bool,
+  pub replace_ident: Option<(Ident, Ident)>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +89,7 @@ impl Default for VisitCtx {
       analyze_stack: vec![vec![]],
       has_guards_data: false,
       visit_error_occur: false,
+      replace_ident: None,
     }
   }
 }
@@ -118,6 +121,12 @@ impl VisitMut for VisitCtx {
         if let Some(name) = p.path.get_ident() {
           if let Some(name) = self.find_named_obj(name).cloned() {
             self.add_used_widget(name, None, UsedType::USED)
+          } else if let Some((from, to)) = self.replace_ident.as_ref() {
+            if name == from && self.get_local_var(name).is_none() {
+              let mut instead = to.clone();
+              instead.set_span(name.span());
+              p.path = instead.into();
+            }
           }
         }
       }
@@ -337,11 +346,15 @@ impl VisitCtx {
   }
 
   pub fn visit_init_stmts_mut(&mut self, init: &mut InitStmts) {
+    if let Some(ctx_name) = init.ctx_name.as_ref() {
+      self.replace_ident = Some((ctx_name.clone(), ctx_ident()));
+    }
     init
       .stmts
       .iter_mut()
       .for_each(|stmt| self.visit_stmt_mut(stmt));
     init.used_name_info = self.take_current_used_info();
+    self.replace_ident.take();
   }
 
   pub fn visit_finally_mut(&mut self, finally: &mut FinallyBlock) {
@@ -459,15 +472,20 @@ impl VisitCtx {
   // return the name of widget that `ident` point to if it's have.
   pub fn find_named_obj<'a>(&'a self, ident: &'a Ident) -> Option<&'a Ident> {
     self
-      .analyze_stack
-      .iter()
-      .rev()
-      .flat_map(|local| local.iter().rev())
-      .find(|v| &v.name == ident)
+      .get_local_var(ident)
       .map(|v| v.alias_of_name.as_ref())
       .unwrap_or_else(|| {
         (self.declare_objs.contains_key(ident) || self.states.contains(ident)).then_some(ident)
       })
+  }
+
+  fn get_local_var(&self, name: &Ident) -> Option<&LocalVariable> {
+    self
+      .analyze_stack
+      .iter()
+      .rev()
+      .flat_map(|local| local.iter().rev())
+      .find(|v| &v.name == name)
   }
 
   fn path_as_named_obj(&self, expr: &ExprPath) -> Option<Ident> {

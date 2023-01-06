@@ -115,13 +115,8 @@ impl Desugared {
 
         states.to_tokens(tokens);
         let name = widget.as_ref().unwrap().node.name();
-        quote! { let #name = move | }.to_tokens(tokens);
-        if let Some(ctx_name) = init.as_ref().and_then(|i| i.ctx_name.as_ref()) {
-          ctx_name.to_tokens(tokens);
-        } else {
-          ctx_ident().to_tokens(tokens)
-        };
-        quote! { : &BuildCtx|}.to_tokens(tokens);
+        let ctx_name = ctx_ident();
+        quote! { let #name = move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
 
         Brace::default().surround(tokens, |tokens| {
           if ctx.has_guards_data {
@@ -518,10 +513,6 @@ impl ToTokens for InitStmts {
       tokens.append_all(refs);
     }
     tokens.append_all(&self.stmts);
-    if let Some(name) = self.ctx_name.as_ref() {
-      let inner_name = ctx_ident();
-      quote! { let #inner_name = #name; }.to_tokens(tokens);
-    }
   }
 }
 

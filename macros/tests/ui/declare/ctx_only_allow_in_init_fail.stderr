@@ -1,5 +1,5 @@
-error: `ctx` only allow use in `init` phase
-  --> tests/ui/declare/ctx_only_allow_in_init_fail.rs:14:48
+error[E0425]: cannot find value `ctx` in this scope
+  --> tests/ui/declare/ctx_only_allow_in_init_fail.rs:24:48
    |
-14 |       size: ZERO_SIZE, background: Palette::of(ctx).primary()
-   |                                                ^^^
+24 |       size: ZERO_SIZE, background: Palette::of(ctx).primary()
+   |                                                ^^^ not found in this scope
