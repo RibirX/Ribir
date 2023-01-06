@@ -8,6 +8,16 @@ fn main() {
     SizedBox { size: ZERO_SIZE, background: primary }
   };
 
+  let _no_ctx_conflict_pass = widget! {
+    init ctx => {}
+    DynWidget {
+      dyns: widget!{
+        init ctx => {}
+        Void {}
+      }
+    }
+  };
+
   let _ctx_not_allow_in_other_phase = widget! {
     init ctx => {}
     SizedBox {

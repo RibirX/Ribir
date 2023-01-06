@@ -68,8 +68,6 @@ pub fn gen_widget_macro(
     if let Some(ctx_name) = init.ctx_name.clone() {
       if let Some(other) = ctx.states.get(&ctx_name) {
         errors.push(DuplicateID([ctx_name.clone(), other.clone()]))
-      } else {
-        ctx.states.insert(ctx_name);
       }
     }
   }
@@ -99,14 +97,6 @@ pub fn gen_widget_macro(
   }
 
   ctx.visit_desugared_syntax_mut(&mut desugar);
-  if let Some(ctx_name) = desugar.init.as_ref().and_then(|i| i.ctx_name.as_ref()) {
-    if let Some(used_info) = ctx.used_objs.get(ctx_name) {
-      desugar.errors.push(DeclareError::CtxOnlyAllowInInit {
-        name: ctx_name.to_string(),
-        spans: used_info.spans.clone(),
-      })
-    }
-  }
 
   ctx
     .used_objs
