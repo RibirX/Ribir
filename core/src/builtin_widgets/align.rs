@@ -78,12 +78,10 @@ impl Render for HAlignWidget {
     let child_size = layouter.perform_widget_layout(clamp);
     let x = align.align_value(child_size.width, box_width);
     layouter.update_position(Point::new(x, 0.));
-    child_size
+    Size::new((child_size.width + x).max(0.), child_size.height)
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
-
-  fn can_overflow(&self) -> bool { true }
 
   #[inline]
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
@@ -106,12 +104,10 @@ impl Render for VAlignWidget {
     let child_size = layouter.perform_widget_layout(clamp);
     let y = align.align_value(child_size.height, box_height);
     layouter.update_position(Point::new(0., y));
-    child_size
+    Size::new(child_size.width, (child_size.height + y).max(0.))
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
-
-  fn can_overflow(&self) -> bool { true }
 
   #[inline]
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
@@ -181,7 +177,7 @@ mod tests {
         &[
           LayoutTestItem {
             path: &[0],
-            expect: ExpectRect::from_size(expect.size),
+            expect: ExpectRect::from_size(Size::new(expect.max_x(), expect.max_y())),
           },
           LayoutTestItem {
             path: &[0, 0],
@@ -216,7 +212,7 @@ mod tests {
         &[
           LayoutTestItem {
             path: &[0],
-            expect: ExpectRect::from_size(expect.size),
+            expect: ExpectRect::from_size(Size::new(expect.max_x(), expect.max_y())),
           },
           LayoutTestItem {
             path: &[0, 0],
