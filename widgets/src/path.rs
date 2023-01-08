@@ -1,14 +1,7 @@
 use std::rc::Rc;
 
-use lyon_algorithms::{
-  hit_test::hit_test_path,
-  math::point,
-  measure::{PathMeasurements, SampleType},
-};
-use lyon_path::FillRule;
+use lyon_algorithms::measure::{PathMeasurements, SampleType};
 use ribir_core::{impl_query_self_only, prelude::*};
-
-const TOLERANCE: f32 = 0.1;
 
 /// Widget just use as a paint kit for a path and not care about its size.
 /// Use `[PathWidget]!` instead of.
@@ -112,32 +105,27 @@ impl PathPaintKit {
 
 impl Render for PathPaintKit {
   #[inline]
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { Size::zero() }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+    let rc = self.path.box_rect();
+    clamp.clamp(Size::new(rc.max_x(), rc.max_y()))
+  }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
+    let size = ctx.box_rect().expect("must have layout").size;
+    let path = Path::rect(&Rect::from_size(size), PathStyle::Fill);
+    ctx.painter().clip(path);
     ctx
       .painter()
       .set_brush(self.brush.clone())
       .paint_path(self.path.clone());
   }
 
-  #[inline]
-  fn can_overflow(&self) -> bool { true }
-
-  fn hit_test(&self, _ctx: &HitTestCtx, pos: Point) -> HitTest {
-    let pt = point(pos.x, pos.y);
-    // todo: support fillrule
-    let is_hit = hit_test_path(
-      &pt,
-      self.path.path.into_iter(),
-      FillRule::EvenOdd,
-      TOLERANCE,
-    );
-    HitTest { hit: is_hit, can_hit_child: is_hit }
+  fn hit_test(&self, _ctx: &HitTestCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: false }
   }
 }
 
@@ -158,10 +146,13 @@ pub struct PathWidget {
 /// Use `[HitTesPath]!` instead of.
 impl Render for PathWidget {
   #[inline]
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { self.path.box_rect().size }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { self.path.box_rect().size }
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
+    let size = ctx.box_rect().expect("must have layout").size;
+    let path = Path::rect(&Rect::from_size(size), PathStyle::Fill);
+    ctx.painter().clip(path);
     ctx
       .painter()
       .set_brush(self.brush.clone())
@@ -182,7 +173,11 @@ pub struct PathsPaintKit {
 
 impl Render for PathsPaintKit {
   #[inline]
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { Size::zero() }
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.paths.iter().fold(Size::zero(), |size, path| {
+      size.max(path.perform_layout(clamp, ctx))
+    })
+  }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
@@ -190,21 +185,9 @@ impl Render for PathsPaintKit {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { self.paths.iter().for_each(|p| p.paint(ctx)); }
 
-  fn hit_test(&self, _ctx: &HitTestCtx, pos: Point) -> HitTest {
-    let pt = point(pos.x, pos.y);
-    let is_hit = self.paths.iter().any(|path| {
-      hit_test_path(
-        &pt,
-        path.path.path.into_iter(),
-        FillRule::EvenOdd,
-        TOLERANCE,
-      )
-    });
-
-    HitTest { hit: is_hit, can_hit_child: false }
+  fn hit_test(&self, _ctx: &HitTestCtx, _: Point) -> HitTest {
+    HitTest { hit: false, can_hit_child: false }
   }
-
-  fn can_overflow(&self) -> bool { true }
 }
 
 impl Query for PathsPaintKit {
