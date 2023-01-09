@@ -374,24 +374,31 @@ impl VisitCtx {
           ctx.new_scope_visit(
             |ctx| match &mut f.value {
               FieldValue::Expr(expr) => {
-                let origin = expr.expr.clone();
                 ctx.visit_track_expr_mut(expr);
                 if expr.used_name_info.subscribe_widget().is_some() {
+                  ctx.take_current_used_info();
+
                   let field_fn_name = ribir_suffix_variable(&f.member, "fn");
-                  let mut field_fn = parse_quote_spanned! { expr.span() =>
-                    let #field_fn_name = move ||  #origin ;
+                  let mut field_fn: ExprClosure =
+                    parse_quote_spanned! { expr.span() => move || #expr};
+                  let body_used = expr.used_name_info.clone();
+                  let field_fn = closure_surround_refs(&body_used, &mut field_fn);
+                  let field_fn = quote_spanned! { expr.span() =>
+                    let #field_fn_name = #field_fn;
                   };
-                  ctx.visit_stmt_mut(&mut field_fn);
-                  expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name()};
+
+                  expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name.clone()()};
 
                   let declare_set = declare_field_name(&f.member);
                   let subscribe_do: Expr = parse_quote_spanned! { expr.span() => {
                     let #name = #name.clone_stateful();
-                    move |_| #name.state_ref().#declare_set(#field_fn_name())
+                    move |_| {
+                      let #field_fn_name = #field_fn_name.clone()();
+                      #name.state_ref().#declare_set(#field_fn_name)
+                    }
                   }};
 
                   ctx.has_guards_data = true;
-                  let guards = guard_vec_ident();
 
                   // DynWidget is a special object, it's both require data and framework change to
                   // update its children. When user call `.silent()` means no
@@ -406,6 +413,7 @@ impl VisitCtx {
                   } else {
                     expr.used_name_info.upstream_modifies_tokens(false).unwrap()
                   };
+                  let guards = guard_vec_ident();
                   let watch_update = parse_quote_spanned! { expr.span() =>
                     #guards.push(AnonymousData::new(Box::new(
                       #upstream
@@ -420,13 +428,7 @@ impl VisitCtx {
                 ctx.visit_declare_obj_mut(obj, true);
               }
             },
-            |scope| {
-              if scope.subscribe_widget().is_some() {
-                scope
-                  .iter_mut()
-                  .for_each(|(_, info)| info.used_type = UsedType::SCOPE_CAPTURE)
-              }
-            },
+            |_| {},
           )
         });
 

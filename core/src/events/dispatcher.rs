@@ -569,9 +569,9 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      fn compose(this: StateWidget<Self>) -> Widget {
+      fn compose(this: State<Self>) -> Widget {
         widget! {
-          states { this: this.into_stateful() }
+          states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
             pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
@@ -613,9 +613,9 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: StateWidget<Self>) -> Widget {
+      fn compose(this: State<Self>) -> Widget {
         widget! {
-          states { this: this.into_stateful() }
+          states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
             pointer_enter: move |_| { this.enter.borrow_mut().push(2); },

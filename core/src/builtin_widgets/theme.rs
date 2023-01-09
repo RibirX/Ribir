@@ -21,7 +21,7 @@ pub use custom_theme::*;
 use crate::{
   impl_query_self_only,
   prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
-  widget::StateWidget,
+  state::State,
 };
 
 pub use ribir_painter::*;
@@ -83,7 +83,7 @@ pub struct ThemeWidget {
 impl ComposeChild for ThemeWidget {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     widget_maybe_states! {
       maybe_states { this }

@@ -21,13 +21,10 @@ impl<W: Query + 'static, D: Query + 'static> Query for DataWidget<W, D> {
   impl_proxy_query!(self.data, self.widget);
 }
 
-pub fn compose_child_as_data_widget<D: Query + 'static>(
-  child: Widget,
-  data: StateWidget<D>,
-) -> Widget {
+pub fn compose_child_as_data_widget<D: Query + 'static>(child: Widget, data: State<D>) -> Widget {
   match data {
-    StateWidget::Stateless(data) => widget_attach_data(child, data),
-    StateWidget::Stateful(data) => widget_attach_data(child, data),
+    State::Stateless(data) => widget_attach_data(child, data),
+    State::Stateful(data) => widget_attach_data(child, data),
   }
 }
 

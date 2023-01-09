@@ -40,7 +40,7 @@ pub trait MultiChild {}
 /// and its child.
 pub trait ComposeChild: Sized {
   type Child;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget;
 }
 
 /// Trait specify what child a widget can have, and the target type after widget
@@ -125,7 +125,7 @@ where
   #[inline]
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    ComposeChild::compose_child(StateWidget::Stateless(widget), child)
+    ComposeChild::compose_child(State::Stateless(widget), child)
   }
 }
 
@@ -355,7 +355,7 @@ where
       DynWidget {
         dyns: {
           let child = child.silent().dyns.take().unwrap().common_convert();
-          ComposeChild::compose_child(StateWidget::Stateful(this.clone()), child)
+          ComposeChild::compose_child(State::Stateful(this.clone()), child)
         }
       }
     }
@@ -377,7 +377,7 @@ where
       DynWidget {
         dyns: {
           let child = child.silent().dyns.take().unwrap();
-          ComposeChild::compose_child(StateWidget::Stateful(this.clone()), child)
+          ComposeChild::compose_child(State::Stateful(this.clone()), child)
         }
       }
     }
@@ -401,7 +401,7 @@ where
       DynWidget {
         dyns: {
           let widgets = DynRender::spread(child.clone_stateful());
-          ComposeChild::compose_child(StateWidget::Stateful(this.clone()), widgets)
+          ComposeChild::compose_child(State::Stateful(this.clone()), widgets)
         }
       }
     }
@@ -418,6 +418,29 @@ where
   #[inline]
   fn with_child(self, child: T) -> Self::Target { self.with_child(child.build_tml()) }
 }
+
+impl<W, C, M> WithChild<[M; 12], C> for W
+where
+  W: ComposeChild<Child = State<C>>,
+{
+  type Target = Widget;
+
+  #[inline]
+  fn with_child(self, c: C) -> Self::Target { ComposeChild::compose_child(self.into(), c.into()) }
+}
+
+impl<W, C: 'static, M> WithChild<[M; 13], Stateful<DynWidget<C>>> for W
+where
+  W: ComposeChild<Child = State<C>>,
+{
+  type Target = Widget;
+
+  #[inline]
+  fn with_child(self, c: Stateful<DynWidget<C>>) -> Self::Target {
+    ComposeChild::compose_child(self.into(), c.into())
+  }
+}
+
 pub trait CommonChildConvert<M, T> {
   fn common_convert(self) -> T;
 }
@@ -577,6 +600,24 @@ where
   fn fill(self, c: DynWidget<D>) -> Self::New { self.fill(c.into_inner()) }
 }
 
+impl<C, T> FillTml<State<C>, C> for T
+where
+  T: FillTml<SelfImpl, State<C>>,
+{
+  type New = T::New;
+  #[inline]
+  fn fill(self, c: C) -> Self::New { self.fill(c.into()) }
+}
+
+impl<C: 'static, T> FillTml<State<C>, Stateful<DynWidget<C>>> for T
+where
+  T: FillTml<SelfImpl, State<C>>,
+{
+  type New = T::New;
+  #[inline]
+  fn fill(self, c: Stateful<DynWidget<C>>) -> Self::New { self.fill(c.into()) }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -603,7 +644,7 @@ mod tests {
     impl ComposeChild for Page {
       type Child = PageTml;
 
-      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
     }
@@ -627,7 +668,7 @@ mod tests {
     impl ComposeChild for Parent {
       type Child = Option<WidgetPair<Child, Widget>>;
 
-      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
     }
@@ -649,7 +690,7 @@ mod tests {
     impl ComposeChild for A {
       type Child = Vec<B>;
 
-      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
     }
@@ -723,7 +764,7 @@ mod tests {
 
     impl ComposeChild for P {
       type Child = WidgetOf<MockBox>;
-      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget { unreachable!() }
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { unreachable!() }
     }
 
     let _ = widget! {
@@ -736,7 +777,7 @@ mod tests {
     struct X;
     impl ComposeChild for X {
       type Child = WidgetOf<MockBox>;
-      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
     }
 
     let child = MockBox { size: ZERO_SIZE }.with_child(Void.into_widget());
@@ -750,13 +791,13 @@ mod tests {
 
     impl ComposeChild for X {
       type Child = MockBox;
-      fn compose_child(_: StateWidget<Self>, child: Self::Child) -> Widget { child.into_widget() }
+      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
     let dyns = DynWidget { dyns: Some(X) }.into_stateful();
     let size = Size::new(100., 200.);
 
-    let w = ComposeChild::compose_child(StateWidget::Stateless(dyns), MockBox { size });
+    let w = ComposeChild::compose_child(State::Stateless(dyns), MockBox { size });
     expect_layout_result(
       w,
       None,
@@ -774,7 +815,7 @@ mod tests {
 
     impl ComposeChild for X {
       type Child = MockBox;
-      fn compose_child(_: StateWidget<Self>, child: Self::Child) -> Widget { child.into_widget() }
+      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
     let trigger = Stateful::new(true);
@@ -815,7 +856,7 @@ mod tests {
     const EXPECT_SIZE: Size = Size::new(100., 200.);
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
-      fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget {
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         widget! { MockBox { size: EXPECT_SIZE } }
       }
     }

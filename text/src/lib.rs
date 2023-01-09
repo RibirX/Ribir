@@ -5,10 +5,10 @@
 #![feature(test)]
 pub mod font_db;
 pub mod shaper;
-pub use ribir_algo::Substr;
 use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+pub use ribir_algo::Substr;
 use std::hash::Hash;
 pub mod text_reorder;
 pub mod typography;

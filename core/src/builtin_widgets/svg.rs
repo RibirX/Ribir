@@ -8,7 +8,7 @@ pub struct Svg {
 }
 
 impl Compose for Svg {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     widget_maybe_states! {
       maybe_states { this }
       DynWidget {

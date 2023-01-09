@@ -58,11 +58,11 @@ impl MaybeStates {
       let name = &targets[0].member;
       tokens.extend(quote! {
         match #name {
-          StateWidget::Stateful(#name) => widget!{
+          State::Stateful(#name) => widget!{
             states { #name }
             #rest_tokens
           },
-          StateWidget::Stateless(#name) => widget!{ #rest_tokens }
+          State::Stateless(#name) => widget!{ #rest_tokens }
         }
       });
     } else {

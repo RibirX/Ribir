@@ -1,4 +1,4 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ pub struct DeclareObj {
 
 #[derive(Debug, Clone)]
 pub struct WatchField {
-  pub field_fn: Stmt,
+  pub field_fn: TokenStream,
   pub watch_update: Stmt,
 }
 

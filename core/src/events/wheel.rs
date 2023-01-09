@@ -21,7 +21,7 @@ pub struct WheelListener {
 impl ComposeChild for WheelListener {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

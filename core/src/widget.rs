@@ -1,5 +1,5 @@
-pub(crate) use crate::{composed_widget::ComposedWidget, stateful::*, widget_tree::*};
-use crate::{context::*, prelude::ComposeChild};
+pub(crate) use crate::{composed_widget::ComposedWidget, widget_tree::*};
+use crate::{context::*, prelude::ComposeChild, state::State};
 use ribir_algo::ShareResource;
 use ribir_painter::*;
 use rxrust::subscription::{SubscriptionGuard, SubscriptionLike};
@@ -14,7 +14,7 @@ use std::{cell::RefCell, rc::Rc};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: StateWidget<Self>) -> Widget;
+  fn compose(this: State<Self>) -> Widget;
 }
 
 pub struct HitTest {
@@ -63,12 +63,6 @@ pub trait Render: Query {
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx.box_rect().map_or(false, |rect| rect.contains(pos))
-}
-
-/// Enum to store both stateless and stateful widget.
-pub enum StateWidget<W> {
-  Stateless(W),
-  Stateful(Stateful<W>),
 }
 
 pub enum Widget {
@@ -177,7 +171,7 @@ impl IntoWidget<SelfImpl> for Widget {
   fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + Into<StateWidget<C>> + 'static> IntoWidget<NotSelf<()>> for C {
+impl<C: Compose + Into<State<C>> + 'static> IntoWidget<NotSelf<()>> for C {
   #[inline]
   fn into_widget(self) -> Widget {
     ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
@@ -196,7 +190,7 @@ impl<R: Render + 'static> IntoWidget<NotSelf<&()>> for R {
 
 impl<W, C> IntoWidget<NotSelf<[(); 0]>> for W
 where
-  W: ComposeChild<Child = Option<C>> + Into<StateWidget<W>> + 'static,
+  W: ComposeChild<Child = Option<C>> + Into<State<W>> + 'static,
 {
   #[inline]
   fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
@@ -322,25 +316,6 @@ impl<T: Query> Query for ShareResource<T> {
     order: QueryOrder,
   ) {
     (**self).query_all(type_id, callback, order)
-  }
-}
-
-impl<W> From<W> for StateWidget<W> {
-  #[inline]
-  fn from(w: W) -> Self { StateWidget::Stateless(w) }
-}
-
-impl<W> From<Stateful<W>> for StateWidget<W> {
-  #[inline]
-  fn from(w: Stateful<W>) -> Self { StateWidget::Stateful(w) }
-}
-
-impl<W: IntoStateful> StateWidget<W> {
-  pub fn into_stateful(self) -> Stateful<W> {
-    match self {
-      StateWidget::Stateless(w) => w.into_stateful(),
-      StateWidget::Stateful(w) => w,
-    }
   }
 }
 

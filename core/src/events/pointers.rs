@@ -106,7 +106,7 @@ macro_rules! impl_pointer_listener {
     impl ComposeChild for $name {
       type Child = Widget;
       #[inline]
-      fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
         compose_child_as_data_widget(child, this)
       }
     }
@@ -220,7 +220,7 @@ pub struct TripleTapListener {
 
 impl ComposeChild for XTimesTapListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget_maybe_states! {
       maybe_states { this }
       DynWidget {
@@ -270,7 +270,7 @@ impl ComposeChild for XTimesTapListener {
 
 impl ComposeChild for DoubleTapListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget_maybe_states! {
       maybe_states { this }
       XTimesTapListener {
@@ -283,7 +283,7 @@ impl ComposeChild for DoubleTapListener {
 
 impl ComposeChild for TripleTapListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget_maybe_states! {
       maybe_states { this }
       XTimesTapListener {

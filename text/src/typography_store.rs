@@ -3,9 +3,9 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use ribir_algo::{FrameCache, Substr};
 use lyon_path::geom::euclid::UnknownUnit;
 use lyon_path::geom::{euclid::num::Zero, Point, Size};
+use ribir_algo::{FrameCache, Substr};
 pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
 
 use crate::{

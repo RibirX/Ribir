@@ -44,8 +44,8 @@ impl ComposeStyle for CheckBoxStyle {
 impl ComposeChild for Checkbox {
   type Child = Option<Label>;
 
-  fn compose_child(this: StateWidget<Self>, label: Self::Child) -> Widget {
-    let this = this.into_stateful();
+  fn compose_child(this: State<Self>, label: Self::Child) -> Widget {
+    let this = this.into_writable();
     let mut checkbox = widget! {
       states { this: this.clone() }
       init ctx => { let theme = CheckBoxTheme::of(ctx); }

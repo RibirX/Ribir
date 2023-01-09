@@ -1,8 +1,8 @@
 use crate::{tessellator::Tessellator, GlRender, GpuBackend, TriangleLists, Vertex};
 use futures::executor::block_on;
 use ribir_painter::DeviceSize;
-use std::{error::Error, iter};
 use ribir_text::shaper::TextShaper;
+use std::{error::Error, iter};
 mod color_pass;
 mod stencil_pass;
 pub mod surface;
@@ -561,11 +561,11 @@ impl Vertex {
 #[cfg(test)]
 mod test {
   use crate::wgpu_backend_headless;
+  use ribir::prelude::AppContext;
   use ribir_painter::{
     Brush, CaptureCallback, ClipInstruct, Color, DeviceSize, PaintCommand, PaintInstruct,
     PaintPath, PainterBackend, Path, Point, Transform, Vector,
   };
-  use ribir::prelude::AppContext;
   use std::{cell::RefCell, rc::Rc};
 
   fn compare_paint_result(

@@ -302,9 +302,9 @@ mod tests {
   }
 
   impl Compose for Recursive {
-    fn compose(this: StateWidget<Self>) -> Widget {
+    fn compose(this: State<Self>) -> Widget {
       widget! {
-        states { this: this.into_stateful() }
+        states { this: this.into_writable() }
         MockMulti {
           DynWidget {
             dyns: (0..this.width)
@@ -331,9 +331,9 @@ mod tests {
   }
 
   impl Compose for Embed {
-    fn compose(this: StateWidget<Self>) -> Widget {
+    fn compose(this: State<Self>) -> Widget {
       widget! {
-        states { this: this.into_stateful()}
+        states { this: this.into_writable()}
         MockMulti {
           DynWidget {
             dyns: (0..this.width - 1)

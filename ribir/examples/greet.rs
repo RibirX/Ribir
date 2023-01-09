@@ -43,12 +43,12 @@ fn main() {
               from: Transform::translation(0., greet.layout_height() * 2.)
             }
             finally {
-              let_watch!(counter)
+              let_watch!(*counter)
                 .subscribe(move |_| {
                   greet.text = input.text();
                   input.set_text("");
                 });
-              let_watch!(greet.text)
+              let_watch!(greet.text.clone())
                 .subscribe(move |_| greet_new.run());
             }
           }

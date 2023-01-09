@@ -11,9 +11,9 @@ impl HasFocus {
 
 impl ComposeChild for HasFocus {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
-      states {this: this.into_stateful()}
+      states {this: this.into_writable()}
       DynWidget {
         dyns: child,
         focus_in: move|_| this.focused = true,

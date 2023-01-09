@@ -18,7 +18,7 @@ pub struct CharEvent {
 impl ComposeChild for CharListener {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let widget = dynamic_compose_focus_node(child);
     compose_child_as_data_widget(widget, this)
   }

@@ -17,7 +17,7 @@ struct ChildTemplateOfP {
 impl ComposeChild for P {
   type Child = ChildTemplateOfP;
 
-  fn compose_child(_: StateWidget<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
 }
 
 #[test]

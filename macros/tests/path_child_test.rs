@@ -7,9 +7,9 @@ enum AB {
 
 const SIZE_ONE: Size = Size::new(1., 1.);
 impl Compose for AB {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     widget! {
-      states { this: this.into_stateful() }
+      states { this: this.into_writable() }
       SizedBox {
         size: match *this {
           AB::A => ZERO_SIZE,
@@ -69,7 +69,7 @@ fn path_widget() {
 fn tuple_widget() {
   struct TupleBox(Size);
   impl Compose for TupleBox {
-    fn compose(this: StateWidget<Self>) -> Widget {
+    fn compose(this: State<Self>) -> Widget {
       widget_maybe_states! {
         maybe_states { this }
         SizedBox { size: this.0 }

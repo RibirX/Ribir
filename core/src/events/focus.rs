@@ -42,7 +42,7 @@ pub struct FocusOutListener {
 
 impl ComposeChild for FocusListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let widget = dynamic_compose_focus_node(child);
     compose_child_as_data_widget(widget, this)
   }
@@ -50,7 +50,7 @@ impl ComposeChild for FocusListener {
 
 impl ComposeChild for BlurListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let widget = dynamic_compose_focus_node(child);
     compose_child_as_data_widget(widget, this)
   }
@@ -58,14 +58,14 @@ impl ComposeChild for BlurListener {
 
 impl ComposeChild for FocusInListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }
 
 impl ComposeChild for FocusOutListener {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     compose_child_as_data_widget(child, this)
   }
 }

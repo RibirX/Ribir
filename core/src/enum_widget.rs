@@ -67,12 +67,12 @@ macro_rules! impl_enum_widget {
     impl<Child, $($var_ty: ComposeChild<Child=Child>),+> ComposeChild
       for $name <$($var_ty),+> {
       type Child = Child;
-      fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
         let w = match this {
-         StateWidget::  Stateless(w) => w,
-         StateWidget:: Stateful(_) =>  {
-          unreachable!("Enum widgets only use to store widget, should never convert to stateful.");
-         }
+          State::Stateless(w) => w,
+          State::Stateful(_) =>  {
+            unreachable!("Enum widgets only use to store widget, should never convert to stateful.");
+          }
         };
         match w {
           $($name::$var_ty(w) => $var_ty::compose_child(w.into(), child)),+

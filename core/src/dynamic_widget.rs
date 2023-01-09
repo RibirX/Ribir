@@ -426,10 +426,10 @@ where
 {
   type Child = D::Child;
 
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let dyns = match this {
-      StateWidget::Stateless(dyns) => dyns,
-      StateWidget::Stateful(dyns) => dyns.silent_ref().clone(),
+      State::Stateless(dyns) => dyns,
+      State::Stateful(dyns) => dyns.silent_ref().clone(),
     };
 
     widget! {

@@ -12,9 +12,9 @@ struct TodoMVP {
 }
 
 impl Compose for TodoMVP {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     widget! {
-      states { this: this.into_stateful() }
+      states { this: this.into_writable() }
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
       }
@@ -175,10 +175,10 @@ struct TabText {
 }
 
 impl Compose for TabText {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     widget! {
       states {
-        this: this.into_stateful()
+        this: this.into_writable()
       }
       init ctx => {
         let primary = Palette::of(ctx).primary();

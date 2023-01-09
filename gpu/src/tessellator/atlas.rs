@@ -2,8 +2,8 @@ use crate::{error::Error, ColorFormat};
 
 use super::mem_texture::{MemTexture, Rect, Size};
 
-use ribir_algo::FrameCache;
 use guillotiere::{Allocation, AtlasAllocator, ChangeList};
+use ribir_algo::FrameCache;
 use ribir_painter::{PixelImage, ShallowImage};
 use std::collections::HashMap;
 

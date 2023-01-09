@@ -26,14 +26,14 @@ impl ButtonText {
 
 #[derive(Template)]
 pub struct ButtonTemplate {
-  button_text: ButtonText,
+  button_text: State<ButtonText>,
   icon: Option<WidgetOf<Leading>>,
 }
 
 impl ComposeChild for Button {
   type Child = ButtonTemplate;
 
-  fn compose_child(_: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
     let ButtonTemplate { icon, button_text } = child;
 
     widget! {
@@ -50,6 +50,10 @@ impl ComposeChild for Button {
           ..TypographyTheme::of(ctx).button.text.clone()
         };
       }
+
+      states {
+        button_text: button_text.into_readonly(),
+      }
       Row {
         padding: EdgeInsets::all(padding),
         border_radius: Radius::all(radius),
@@ -61,7 +65,7 @@ impl ComposeChild for Button {
           dyns: icon.map(|w| w.child)
         }
         Text {
-          text: button_text.0,
+          text: button_text.0.clone(),
           style: text_style,
         }
       }

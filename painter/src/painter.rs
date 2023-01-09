@@ -2,14 +2,14 @@ use crate::{
   path::*, Angle, Brush, Color, DeviceSize, PathStyle, Point, Rect, Size, TextStyle, Transform,
   Vector,
 };
-use ribir_algo::{CowArc, Resource, Substr};
 use euclid::Size2D;
 pub use lyon_tessellation::{LineCap, LineJoin};
-use std::error::Error;
-use std::ops::{Deref, DerefMut};
+use ribir_algo::{CowArc, Resource, Substr};
 use ribir_text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
 use ribir_text::FontSize;
 use ribir_text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
+use std::error::Error;
+use std::ops::{Deref, DerefMut};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards

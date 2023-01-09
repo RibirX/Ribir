@@ -1,85 +1,3 @@
-//! ## Stateless and Stateful
-//! As default, In Ribir, every widget is stateless, just present like what you
-//! declare and no interactive. That mean you can't modify the data of the
-//! widget, the presentation of this widget is static.
-
-//! But Ribir provide a stateful implementation version widget for every widget,
-//! convert widget across [`IntoStateful`]!. So, in most cases you implement
-//! your widget without stateful, and a stateful version will provide by Ribir.
-//!
-//! # Example
-//! This example implement a rectangle widget which support change its size and
-//! fill color.
-//! ```
-//! # use ribir::prelude::*;
-//!
-//! struct Rectangle {
-//!   size: Size,
-//!   color: Color,
-//! }
-//!
-//! impl CombinationWidget for Rectangle {
-//!   #[widget]
-//!   fn build(&self, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     widget!{
-//!       declare MockBox {
-//!         size: self.size,
-//!         background: self.color.clone()
-//!       }
-//!     }
-//!   }
-//! }
-//!
-//! let rect = Rectangle {
-//!   size: Size::new(100., 100.),
-//!   color: Color::RED,
-//! }
-//! // Rectangle support convert to stateful now.
-//! .into_stateful();
-//!
-//! let mut state_ref = unsafe { rect.state_ref() };
-//! rect.tap(move |_| { state_ref.color = Color::BLACK; });
-//! ```
-//! In the above example, we implement a widget `Rectangle`, and use it to
-//! change its color when user tapped.
-//!
-//! How to do if the `tap` behavior should as a part of the rectangle
-//! itself, not need to user to listen. In this case we should skip to implement
-//! `CombinationWidget`, but directly implement `StatefulCombination`,
-
-//! ```
-//! # use ribir::prelude::*;
-//!
-//! struct Rectangle {
-//!   size: Size,
-//!   color: Color,
-//! }
-//!
-//! impl StatefulCombination for Rectangle {
-//!   #[widget]
-//!   fn build(this: &Stateful<Self>, ctx: &mut BuildCtx) -> BoxedWidget {
-//!     let mut this_ref = unsafe { this.state_ref() };
-//!     widget!{
-//!       declare MockBox {
-//!         size: this.size,
-//!         background: this.color.clone(),
-//!         tap: move |_| this_ref.color = Color::BLACK
-//!       }
-//!     }
-//!   }
-//! }
-//!
-//! // Remember call the 'into_stateful', the `Rectangle` is not a widget but
-//! // its stateful version is.
-//! let rect = Rectangle {
-//!   size: Size::new(100., 100.),
-//!   color: Color::RED,
-//! }.into_stateful();
-//! ```
-//!
-//! Notice, the first argument of `build` method is `Stateful<Self>` let you can
-//! access self `sate_ref`, that the only different with `CombinationWidget`.
-
 use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
 pub use guards::ModifyGuard;
 use rxrust::{ops::box_it::LocalBoxOp, prelude::*};
@@ -89,13 +7,13 @@ use std::{
   rc::Rc,
 };
 
-/// Convert a stateless widget to stateful which can provide a `StateRefCell`
+/// Convert a stateless objet to stateful which can provide a `StateRefCell`
 /// to use to modify the states of the widget.
 pub trait IntoStateful: Sized {
   fn into_stateful(self) -> Stateful<Self>;
 }
 
-/// The stateful widget generic implementation.
+/// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
   inner: Rc<InnerStateful<W>>,
   modify_notifier: StateChangeNotifier,
@@ -264,6 +182,15 @@ impl<W> Stateful<W> {
   /// reference because we try to early release inner borrow when clone occur.
   #[inline]
   pub fn clone_stateful(&self) -> Stateful<W> { self.clone() }
+
+  pub(crate) fn try_into_inner(self) -> Result<W, Self> {
+    if Rc::strong_count(&self.inner) == 1 {
+      let inner = Rc::try_unwrap(self.inner).unwrap_or_else(|_| unreachable!());
+      Ok(inner.data.into_inner())
+    } else {
+      Err(self)
+    }
+  }
 }
 
 macro_rules! debug_borrow_location {
@@ -428,24 +355,24 @@ impl<W: Render + 'static> Render for Stateful<W> {
 }
 
 impl<W: Compose> Compose for Stateful<W> {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     let w = match this {
-      StateWidget::Stateless(s) => s,
-      StateWidget::Stateful(s) => s.state_ref().clone(),
+      State::Stateless(s) => s,
+      State::Stateful(s) => s.state_ref().clone(),
     };
-    Compose::compose(StateWidget::Stateful(w))
+    Compose::compose(State::Stateful(w))
   }
 }
 
 impl<W: ComposeChild> ComposeChild for Stateful<W> {
   type Child = W::Child;
 
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let w = match this {
-      StateWidget::Stateless(s) => s,
-      StateWidget::Stateful(s) => s.state_ref().clone(),
+      State::Stateless(s) => s,
+      State::Stateful(s) => s.state_ref().clone(),
     };
-    ComposeChild::compose_child(StateWidget::Stateful(w), child)
+    ComposeChild::compose_child(State::Stateful(w), child)
   }
 }
 
