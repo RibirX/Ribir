@@ -7,7 +7,7 @@
 There are some awesome library we use to generate triangles.
 
 - use `ttf-parser` to parse font
-- use `harfbuzz` to shape text.
+- use `rustybuzz` to shape text.
 - use `lyon` to generate triangles for path.
 ## Replace graphics library
 

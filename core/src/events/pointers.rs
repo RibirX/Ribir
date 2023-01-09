@@ -221,8 +221,8 @@ pub struct TripleTapListener {
 impl ComposeChild for XTimesTapListener {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       DynWidget {
         dyns: child,
         tap: {
@@ -271,8 +271,8 @@ impl ComposeChild for XTimesTapListener {
 impl ComposeChild for DoubleTapListener {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       XTimesTapListener {
         x_times_tap: (2, move |e| {(this.double_tap.borrow_mut())(e);} ),
         DynWidget { dyns: child }
@@ -284,8 +284,8 @@ impl ComposeChild for DoubleTapListener {
 impl ComposeChild for TripleTapListener {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       XTimesTapListener {
         x_times_tap: (3, move |e| {(this.tripe_tap.borrow_mut())(e);} ),
         DynWidget { dyns: child }

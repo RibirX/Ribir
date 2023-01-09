@@ -58,9 +58,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use ribir_algo::CowArc;
   #[doc(no_inline)]
-  pub use ribir_macros::{
-    include_svg, widget, widget_maybe_states, Declare, Lerp, MultiChild, SingleChild, Template,
-  };
+  pub use ribir_macros::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild, Template};
   #[doc(hidden)]
   pub use rxrust::prelude::*;
 }

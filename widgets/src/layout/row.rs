@@ -16,8 +16,8 @@ pub struct Row {
 impl ComposeChild for Row {
   type Child = Vec<Widget>;
   fn compose_child(this: State<Self>, children: Self::Child) -> Widget {
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       Flex {
         reverse: this.reverse,
         wrap: this.wrap,

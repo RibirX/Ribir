@@ -9,8 +9,8 @@ pub struct Svg {
 
 impl Compose for Svg {
   fn compose(this: State<Self>) -> Widget {
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       DynWidget {
         dyns: match SvgRender::parse_from_bytes(&this.bytes) {
           Ok(reader) => reader.into_widget(),
