@@ -66,6 +66,11 @@ impl TextShaper {
           .shape_text_with_fallback(text, direction, face_ids)
           .unwrap_or_else(|| {
             log::warn!("There is no font can shape the text: \"{}\"", &**text);
+
+            if text.is_empty() {
+              return Vec::new();
+            }
+
             // if no font can shape the text use the first font shape it with miss glyph.
             let face = {
               let mut font_db = self.font_db_mut();
@@ -88,25 +93,36 @@ impl TextShaper {
           });
 
         let line_height = {
-          let font_db = self.font_db.read().unwrap();
-          let font_line_height = |id: &ID| {
-            font_db.try_get_face_data(*id).map(|face| {
+          let mut font_db = self.font_db.write().unwrap();
+          let mut line_height = None;
+          let mut face_idx = 0;
+          let face_len = face_ids.len();
+          let font_db_len = font_db.faces().len();
+
+          while face_idx < face_len + font_db_len {
+            let id = if face_idx < face_len {
+              face_ids[face_idx]
+            } else {
+              font_db.faces()[face_idx].id
+            };
+
+            line_height = font_db.face_data_or_insert(id).map(|face| {
               let height = if direction.is_horizontal() {
                 face.vertical_height().unwrap_or_else(|| face.height())
               } else {
                 face.height()
               };
               Em::absolute(height as f32 / face.units_per_em() as f32)
-            })
-          };
-          face_ids
-            .iter()
-            .find_map(font_line_height)
-            .or_else(|| {
-              log::warn!("Not provide an available font, use another font to instead of.");
-              font_db.faces().iter().find_map(|f| font_line_height(&f.id))
-            })
-            .expect("Fonts are not available.")
+            });
+
+            if line_height.is_some() {
+              break;
+            }
+
+            face_idx += 1;
+          }
+
+          line_height.expect("Fonts are not available.")
         };
 
         let glyphs = Arc::new(ShapeResult {
@@ -331,6 +347,10 @@ impl<'a> FallBackFaceHelper<'a> {
   fn new(ids: &'a [ID], font_db: &'a RwLock<FontDB>) -> Self { Self { ids, font_db, face_idx: 0 } }
 
   fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
+    if text.is_empty() {
+      return None;
+    }
+
     let Self { ids, font_db, face_idx } = self;
     let mut font_db = font_db.write().unwrap();
     while *face_idx < ids.len() + font_db.faces().len() {
