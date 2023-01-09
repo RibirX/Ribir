@@ -9,7 +9,6 @@ pub use palette::*;
 mod icon_theme;
 pub use icon_theme::*;
 mod typography_theme;
-use ribir_macros::widget_maybe_states;
 pub use typography_theme::*;
 mod transition_theme;
 pub use transition_theme::*;
@@ -85,8 +84,8 @@ impl ComposeChild for ThemeWidget {
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       DynWidget {
         dyns: move |ctx: &BuildCtx| {
           ctx.push_theme(this.theme.clone());

@@ -23,8 +23,8 @@ pub struct InteractiveLayer {
 
 impl Compose for StateLayer {
   fn compose(this: State<Self>) -> Widget {
-    widget_maybe_states!(
-      maybe_states { this }
+    widget!(
+      states { this: this.into_readonly() }
       PathPaintKit {
         path: this.path.clone(),
         brush: this.role.calc_color(this.color),

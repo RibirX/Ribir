@@ -70,8 +70,8 @@ fn tuple_widget() {
   struct TupleBox(Size);
   impl Compose for TupleBox {
     fn compose(this: State<Self>) -> Widget {
-      widget_maybe_states! {
-        maybe_states { this }
+      widget! {
+        states { this: this.into_readonly() }
         SizedBox { size: this.0 }
       }
     }

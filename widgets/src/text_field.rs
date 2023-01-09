@@ -421,12 +421,9 @@ struct TextFieldLabel {
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(this: State<Self>) -> Widget
-  where
-    Self: Sized,
-  {
-    widget_maybe_states! {
-      maybe_states { this }
+  fn compose(this: State<Self>) -> Widget {
+    widget! {
+      states { this: this.into_readonly() }
       init ctx => {
         let linear = transitions::LINEAR.of(ctx);
       }

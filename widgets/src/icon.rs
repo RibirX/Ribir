@@ -14,8 +14,8 @@ pub struct Icon {
 impl ComposeChild for Icon {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget_maybe_states! {
-      maybe_states { this }
+    widget! {
+      states { this: this.into_readonly() }
       Container {
         size: this.size,
         DynWidget {
