@@ -50,10 +50,10 @@ impl Input {
 
 impl ComposeChild for Input {
   type Child = Option<Placeholder>;
-  fn compose_child(this: StateWidget<Self>, placeholder: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
       states {
-        this: this.into_stateful(),
+        this: this.into_writable(),
         helper: GlyphsHelper::default().into_stateful(),
       }
       init ctx => {

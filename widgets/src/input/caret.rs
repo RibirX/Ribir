@@ -10,9 +10,9 @@ pub struct Caret {
 }
 
 impl Compose for Caret {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     widget! {
-      states { this: this.into_stateful() }
+      states { this: this.into_readonly() }
       Container {
         id: caret,
         opacity: 1.,

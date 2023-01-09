@@ -85,15 +85,15 @@ pub(crate) trait AnyKey: Any {
   fn as_any(&self) -> &dyn Any;
 }
 
-impl<V> AnyKey for StateWidget<KeyWidget<V>>
+impl<V> AnyKey for State<KeyWidget<V>>
 where
   V: Clone + PartialEq,
   Self: Any,
 {
   fn key(&self) -> Key {
     match self {
-      StateWidget::Stateless(this) => this.key.clone(),
-      StateWidget::Stateful(this) => this.state_ref().key.clone(),
+      State::Stateless(this) => this.key.clone(),
+      State::Stateful(this) => this.state_ref().key.clone(),
     }
   }
 
@@ -105,10 +105,10 @@ where
     };
     match self {
       // stateless key widget needn't record before value.
-      StateWidget::Stateless(_) => {}
-      StateWidget::Stateful(this) => match key {
-        StateWidget::Stateless(key) => this.state_ref().record_before_value(key.value.clone()),
-        StateWidget::Stateful(key) => this
+      State::Stateless(_) => {}
+      State::Stateful(this) => match key {
+        State::Stateless(key) => this.state_ref().record_before_value(key.value.clone()),
+        State::Stateful(key) => this
           .state_ref()
           .record_before_value(key.state_ref().value.clone()),
       },
@@ -117,8 +117,8 @@ where
 
   fn disposed(&self) {
     match self {
-      StateWidget::Stateless(_) => {}
-      StateWidget::Stateful(this) => {
+      State::Stateless(_) => {}
+      State::Stateful(this) => {
         this.state_ref().status = KeyStatus::Disposed;
       }
     }
@@ -126,8 +126,8 @@ where
 
   fn mounted(&self) {
     match self {
-      StateWidget::Stateless(_) => {}
-      StateWidget::Stateful(this) => {
+      State::Stateless(_) => {}
+      State::Stateful(this) => {
         this.state_ref().status = KeyStatus::Mounted;
       }
     }
@@ -139,7 +139,7 @@ where
 impl<V: 'static + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let data: Box<dyn AnyKey> = Box::new(this);
     widget_attach_data(child, data)
   }

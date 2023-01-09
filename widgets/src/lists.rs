@@ -58,7 +58,7 @@ pub struct ListItemTemplate {
 impl ComposeChild for ListItem {
   type Child = ListItemTemplate;
 
-  fn compose_child(_this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(_this: State<Self>, child: Self::Child) -> Widget {
     let ListItemTemplate {
       headline_text,
       supporting_text,
@@ -111,12 +111,12 @@ impl ComposeChild for ListItem {
 impl ComposeChild for Lists {
   type Child = Vec<Widget>;
 
-  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, children: Self::Child) -> Widget {
     let last_idx = children.len() - 1;
 
     widget! {
       states {
-        this: this.into_stateful()
+        this: this.into_writable()
       }
       Column {
         DynWidget {

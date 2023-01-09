@@ -1,5 +1,6 @@
+use crate::state::Stateful;
+
 use super::Lerp;
-use crate::widget::Stateful;
 use rxrust::{observable, ops::box_it::LocalBoxOp, prelude::Observable};
 
 /// Property is a value with can be accessed and watch its changes.

@@ -13,9 +13,9 @@ mod style;
 pub use image::{PixelImage, ShallowImage};
 pub use style::*;
 mod svg_parser;
-pub use svg_parser::SvgPaths;
 pub use ribir_text;
 pub use ribir_text::{typography::Overflow, *};
+pub use svg_parser::SvgPaths;
 
 /// The tag for device unit system to prevent mixing values from different
 /// system.

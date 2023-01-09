@@ -38,9 +38,9 @@ pub enum RippleBound {
 impl ComposeChild for Ripple {
   type Child = Widget;
 
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
-      states { this: this.into_stateful() }
+      states { this: this.into_writable() }
       init ctx => {
         let linear_transition = transitions::LINEAR.of(ctx);
       }

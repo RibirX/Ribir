@@ -17,7 +17,7 @@ pub struct FocusScope {
 
 impl ComposeChild for FocusScope {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let w = widget! {
       FocusScopeRender {
         mounted: move |ctx| {

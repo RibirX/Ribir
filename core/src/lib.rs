@@ -10,7 +10,7 @@ pub mod builtin_widgets;
 pub(crate) mod composed_widget;
 mod context;
 pub mod data_widget;
-mod stateful;
+mod state;
 pub(crate) mod widget_tree;
 
 pub mod declare;
@@ -41,7 +41,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
-  pub use crate::stateful::*;
+  pub use crate::state::*;
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
@@ -54,9 +54,9 @@ pub mod prelude {
   pub use crate::window::Window;
   #[doc(no_inline)]
   pub use ::ribir_painter::*;
+  pub use log;
   #[doc(no_inline)]
   pub use ribir_algo::CowArc;
-  pub use log;
   #[doc(no_inline)]
   pub use ribir_macros::{
     include_svg, widget, widget_maybe_states, Declare, Lerp, MultiChild, SingleChild, Template,

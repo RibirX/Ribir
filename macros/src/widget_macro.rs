@@ -134,9 +134,7 @@ pub fn gen_widget_macro(
           && desugar
             .states
             .as_ref()
-            .map_or(true, |track| {
-              !track.track_names().any(|n| &n == name)
-            })
+            .map_or(true, |track| !track.track_names().any(|n| &n == name))
       })
       .collect::<Vec<_>>();
     if !used_outsides.is_empty() {

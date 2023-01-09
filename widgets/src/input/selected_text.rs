@@ -10,9 +10,9 @@ pub(crate) struct SelectedText {
 }
 
 impl Compose for SelectedText {
-  fn compose(this: StateWidget<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     widget! {
-      states { this: this.into_stateful() }
+      states { this: this.into_readonly() }
       init ctx => {
         let color = InputTheme::of(ctx).select_background.clone();
       }

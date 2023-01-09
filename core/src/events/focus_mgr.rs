@@ -638,9 +638,9 @@ mod tests {
     }
 
     impl Compose for EmbedFocus {
-      fn compose(this: StateWidget<Self>) -> Widget {
+      fn compose(this: State<Self>) -> Widget {
         widget! {
-          states { this: this.into_stateful() }
+          states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
             focus: move |_| { this.log.borrow_mut().push("focus parent"); },

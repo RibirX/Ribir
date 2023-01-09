@@ -4,7 +4,8 @@ use rxrust::prelude::*;
 use crate::{
   builtin_widgets::{DisposedListener, MountedListener, Void},
   context::{LifeCycleCtx, WindowCtx},
-  widget::{ModifyScope, QueryOrder, Render, StateChangeNotifier},
+  state::{ModifyScope, StateChangeNotifier},
+  widget::{QueryOrder, Render},
 };
 
 use super::{DirtySet, LayoutStore};

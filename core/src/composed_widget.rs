@@ -71,9 +71,9 @@ mod tests {
     struct T;
 
     impl Compose for T {
-      fn compose(this: StateWidget<Self>) -> Widget {
+      fn compose(this: State<Self>) -> Widget {
         widget! {
-          states { this: this.into_stateful() }
+          states { this: this.into_writable() }
           DynWidget {
             dyns: {
                // explicit capture `this` to avoid `DynWidget` to be optimized`.

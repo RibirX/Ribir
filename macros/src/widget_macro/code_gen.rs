@@ -142,7 +142,7 @@ impl Desugared {
             Paren::default().surround(tokens, |tokens| {
               w.gen_compose_node(named_objs, tokens);
               let guards_vec = guard_vec_ident();
-              quote! { .into_widget(),#guards_vec }.to_tokens(tokens)
+              quote! { .into_widget(), #guards_vec }.to_tokens(tokens)
             });
           } else {
             w.gen_compose_node(named_objs, tokens)
@@ -348,9 +348,9 @@ impl ToTokens for DeclareObj {
           f.field_fn.to_tokens(tokens);
         });
         self.build_tokens(tokens);
-        watch_stmts.iter().for_each(|f| {
-          f.watch_update.to_tokens(tokens);
-        });
+        watch_stmts
+          .iter()
+          .for_each(|f| f.watch_update.to_tokens(tokens));
         name.to_tokens(tokens);
       });
       Semi(span).to_tokens(tokens);
@@ -403,7 +403,7 @@ impl ToTokens for StateField {
     let StateField { member, expr, .. } = self;
     syn::token::Let(member.span()).to_tokens(tokens);
     member.to_tokens(tokens);
-    quote_spanned!(member.span() => : Stateful<_> =  ).to_tokens(tokens);
+    syn::token::Eq(member.span()).to_tokens(tokens);
     expr.to_tokens(tokens);
     Semi(member.span()).to_tokens(tokens);
   }

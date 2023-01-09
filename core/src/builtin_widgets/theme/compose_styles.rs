@@ -19,7 +19,7 @@ pub trait ComposeStyle: Sized {
 impl<W: ComposeStyle + 'static> ComposeChild for W {
   type Child = W::Host;
 
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let widget = (move |ctx: &BuildCtx| {
       let tid = TypeId::of::<W>();
       let style = ctx.find_cfg(|t| match t {
@@ -28,9 +28,9 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
       });
 
       if let Some(style) = style {
-        style(Box::new(this.into_stateful()), Box::new(child))
+        style(Box::new(this.into_writable()), Box::new(child))
       } else {
-        ComposeStyle::compose_style(this.into_stateful(), child)
+        ComposeStyle::compose_style(this.into_writable(), child)
       }
     })
     .into_widget();

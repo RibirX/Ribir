@@ -2,18 +2,18 @@ use crate::{
   ColorPrimitive, DrawTriangles, GlRender, Primitive, StencilPrimitive, Texture, TexturePrimitive,
   TriangleLists, Vertex,
 };
-use ribir_algo::{FrameCache, Resource, ShareResource};
 use lyon_tessellation::{path::Path as LyonPath, *};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use ribir_algo::{FrameCache, Resource, ShareResource};
 use ribir_painter::{
   Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path, PathStyle, TileMode, Transform,
 };
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
-use std::{collections::VecDeque, hash::Hash};
 use ribir_text::{
   font_db::ID,
   shaper::{GlyphId, TextShaper},
   Glyph,
 };
+use std::{collections::VecDeque, hash::Hash};
 mod atlas;
 use atlas::TextureAtlas;
 

@@ -1,7 +1,7 @@
-use ribir_algo::FrameCache;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::{Point, Transform};
+use ribir_algo::FrameCache;
 use std::sync::Arc;
 use ttf_parser::{GlyphId, OutlineBuilder};
 

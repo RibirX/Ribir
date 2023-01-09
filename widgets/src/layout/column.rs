@@ -15,7 +15,7 @@ pub struct Column {
 
 impl ComposeChild for Column {
   type Child = Vec<Widget>;
-  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, children: Self::Child) -> Widget {
     widget_maybe_states! {
       maybe_states { this }
       Flex {

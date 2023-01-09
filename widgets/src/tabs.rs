@@ -48,7 +48,7 @@ pub struct TabHeader;
 impl ComposeChild for Tabs {
   type Child = Vec<Tab>;
 
-  fn compose_child(this: StateWidget<Self>, children: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, children: Self::Child) -> Widget {
     let mut headers = vec![];
     let mut panes = vec![];
 
@@ -59,7 +59,7 @@ impl ComposeChild for Tabs {
     }
 
     widget! {
-      states { this: this.into_stateful() }
+      states { this: this.into_writable() }
       init ctx => {
         let  border_color = Palette::of(ctx).surface_variant();
       }

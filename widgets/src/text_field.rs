@@ -105,12 +105,12 @@ type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
 impl ComposeChild for TextFieldThemeProxy {
   type Child = Widget;
-  fn compose_child(this: StateWidget<Self>, child: Self::Child) -> Widget
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget
   where
     Self: Sized,
   {
     widget! {
-      states {this: this.into_stateful()}
+      states {this: this.into_writable()}
       DynWidget {
         dyns: {
           child
@@ -284,14 +284,14 @@ macro_rules! take_option_field {
 
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
-  fn compose_child(this: StateWidget<Self>, config: Self::Child) -> Widget
+  fn compose_child(this: State<Self>, config: Self::Child) -> Widget
   where
     Self: Sized,
   {
     let mut config = config.unwrap_or_default();
     widget! {
       states {
-        this: this.into_stateful(),
+        this: this.into_writable(),
       }
       init ctx => {
         let theme_suit = TextFieldThemeSuit::of(ctx).clone();
@@ -421,7 +421,7 @@ struct TextFieldLabel {
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(this: StateWidget<Self>) -> Widget
+  fn compose(this: State<Self>) -> Widget
   where
     Self: Sized,
   {
