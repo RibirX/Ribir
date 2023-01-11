@@ -68,17 +68,18 @@ impl Dispatcher {
   ) {
     if let Some(key) = input.virtual_keycode {
       let prevented = if let Some(focus) = self.focusing() {
-        let mut event = KeyboardEvent {
+        let event = Rc::new(RefCell::new(KeyboardEvent {
           key,
           scan_code: input.scancode,
           common: EventCommon::new(focus, tree, &self.info),
-        };
+        }));
         match input.state {
-          ElementState::Pressed => tree.bubble_event::<KeyDownListener>(&mut event),
-          ElementState::Released => tree.bubble_event::<KeyUpListener>(&mut event),
+          ElementState::Pressed => tree.bubble_event::<KeyDownListener>(event.clone()),
+          ElementState::Released => tree.bubble_event::<KeyUpListener>(event.clone()),
         };
 
-        event.common.prevent_default
+        let is_prevent = event.borrow().common.prevent_default;
+        is_prevent
       } else {
         false
       };
@@ -90,11 +91,11 @@ impl Dispatcher {
 
   pub fn dispatch_received_char(&mut self, c: char, tree: &mut WidgetTree) {
     if let Some(focus) = self.focusing() {
-      let mut char_event = CharEvent {
+      let char_event = CharEvent {
         char: c,
         common: EventCommon::new(focus, tree, &self.info),
       };
-      tree.bubble_event::<CharListener>(&mut char_event);
+      tree.bubble_event::<CharListener>(Rc::new(RefCell::new(char_event)));
     }
   }
 
@@ -116,8 +117,8 @@ impl Dispatcher {
   pub fn cursor_move_to(&mut self, position: Point, tree: &mut WidgetTree) {
     self.info.cursor_pos = position;
     self.pointer_enter_leave_dispatch(tree);
-    if let Some(mut event) = self.pointer_event_for_hit_widget(tree) {
-      tree.bubble_event::<PointerMoveListener>(&mut event);
+    if let Some(event) = self.pointer_event_for_hit_widget(tree) {
+      tree.bubble_event::<PointerMoveListener>(Rc::new(RefCell::new(event)));
     }
   }
 
@@ -148,16 +149,17 @@ impl Dispatcher {
           // only the last button release emit event.
           if self.info.mouse_button.1.is_empty() {
             self.info.mouse_button.0 = None;
-            let mut release_event = self.pointer_event_for_hit_widget(tree)?;
-            tree.bubble_event::<PointerUpListener>(&mut release_event);
+            let release_event = Rc::new(RefCell::new(self.pointer_event_for_hit_widget(tree)?));
+            tree.bubble_event::<PointerUpListener>(release_event.clone());
 
+            let target = release_event.borrow().target();
             let tap_on = self
               .pointer_down_uid
               .take()?
-              .lowest_common_ancestor(release_event.target(), &tree.arena)?;
-            let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &self.info);
+              .lowest_common_ancestor(target, &tree.arena)?;
+            let tap_event = PointerEvent::from_mouse(tap_on, tree, &self.info);
 
-            tree.bubble_event::<TapListener>(&mut tap_event);
+            tree.bubble_event::<TapListener>(Rc::new(RefCell::new(tap_event)));
           }
         }
       };
@@ -180,12 +182,12 @@ impl Dispatcher {
         }
       };
 
-      let mut wheel_event = WheelEvent {
+      let wheel_event = WheelEvent {
         delta_x,
         delta_y,
         common: EventCommon::new(wid, tree, &self.info),
       };
-      tree.bubble_event::<WheelListener>(&mut wheel_event);
+      tree.bubble_event::<WheelListener>(Rc::new(RefCell::new(wheel_event)));
     }
   }
 
@@ -205,8 +207,8 @@ impl Dispatcher {
     } else {
       self.blur(tree);
     }
-    if let Some(mut event) = event {
-      tree.bubble_event::<PointerDownListener>(&mut event);
+    if let Some(event) = event {
+      tree.bubble_event::<PointerDownListener>(Rc::new(RefCell::new(event)));
     }
   }
 
@@ -231,11 +233,11 @@ impl Dispatcher {
       .iter()
       .filter(|w| !w.is_dropped(arena))
       .for_each(|l| {
-        let mut event = PointerEvent::from_mouse(*l, tree, &self.info);
+        let event = Rc::new(RefCell::new(PointerEvent::from_mouse(*l, tree, &self.info)));
         l.assert_get(arena).query_all_type(
           |pointer: &PointerLeaveListener| {
-            pointer.dispatch(&mut event);
-            !event.bubbling_canceled()
+            pointer.dispatch(event.clone());
+            !event.borrow().bubbling_canceled()
           },
           QueryOrder::InnerFirst,
         );
@@ -263,11 +265,11 @@ impl Dispatcher {
       self.entered_widgets.iter().rev().for_each(|w| {
         let obj = w.assert_get(arena);
         if obj.contain_type::<PointerEnterListener>() {
-          let mut event = PointerEvent::from_mouse(*w, tree, &self.info);
+          let event = Rc::new(RefCell::new(PointerEvent::from_mouse(*w, tree, &self.info)));
           obj.query_all_type(
             |pointer: &PointerEnterListener| {
-              pointer.dispatch(&mut event);
-              !event.bubbling_canceled()
+              pointer.dispatch(event.clone());
+              !event.borrow_mut().bubbling_canceled()
             },
             QueryOrder::InnerFirst,
           );
@@ -332,35 +334,35 @@ impl DispatchInfo {
 }
 
 impl WidgetTree {
-  pub(crate) fn bubble_event<Ty>(&mut self, event: &mut Ty::Event)
+  pub(crate) fn bubble_event<Ty>(&mut self, event: Rc<RefCell<Ty::Event>>)
   where
     Ty: EventListener + 'static,
   {
     self.bubble_event_with(event, |listener: &Ty, event| listener.dispatch(event));
   }
 
-  pub(crate) fn bubble_event_with<Ty, D, E>(&self, event: &mut E, mut dispatcher: D)
+  pub(crate) fn bubble_event_with<Ty, D, E>(&self, event: Rc<RefCell<E>>, mut dispatcher: D)
   where
-    D: FnMut(&Ty, &mut E),
+    D: FnMut(&Ty, Rc<RefCell<E>>),
     E: std::borrow::BorrowMut<EventCommon>,
     Ty: 'static,
   {
     loop {
-      let current_target = event.borrow().current_target;
+      let current_target = event.borrow().borrow().current_target;
       current_target.assert_get(&self.arena).query_all_type(
         |listener: &Ty| {
-          dispatcher(listener, event);
-          !event.borrow_mut().bubbling_canceled()
+          dispatcher(listener, event.clone());
+          !event.borrow_mut().borrow_mut().bubbling_canceled()
         },
         QueryOrder::InnerFirst,
       );
 
-      if event.borrow().bubbling_canceled() {
+      if event.borrow().borrow().bubbling_canceled() {
         break;
       }
 
       if let Some(p) = current_target.parent(&self.arena) {
-        event.borrow_mut().current_target = p;
+        event.borrow_mut().borrow_mut().current_target = p;
       } else {
         break;
       }

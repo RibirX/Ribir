@@ -462,11 +462,11 @@ impl Dispatcher {
 
     // dispatch blur event
     if let Some(wid) = old {
-      let mut focus_event = FocusEvent::new(wid, tree, info);
+      let focus_event = Rc::new(RefCell::new(FocusEvent::new(wid, tree, info)));
       wid
         .assert_get(&tree.arena)
         .query_on_first_type(QueryOrder::InnerFirst, |blur: &BlurListener| {
-          blur.dispatch(&mut focus_event)
+          blur.dispatch(focus_event)
         })
     };
 
@@ -476,35 +476,41 @@ impl Dispatcher {
       .iter()
       .find(|wid| !(*wid).is_dropped(&tree.arena))
     {
-      let mut focus_event = FocusEvent::new(*wid, tree, info);
-      tree.bubble_event_with(&mut focus_event, |focus_out: &FocusOutListener, event| {
-        if common_ancestors.contains(&event.current_target()) {
-          event.stop_bubbling();
-        } else {
-          focus_out.dispatch(event);
-        }
-      });
+      let focus_event = Rc::new(RefCell::new(FocusEvent::new(*wid, tree, info)));
+      tree.bubble_event_with(
+        focus_event,
+        |focus_out: &FocusOutListener, event: Rc<RefCell<FocusEvent>>| {
+          if common_ancestors.contains(&event.borrow().current_target()) {
+            event.borrow_mut().stop_bubbling();
+          } else {
+            focus_out.dispatch(event);
+          }
+        },
+      );
     };
 
     if let Some(wid) = node {
-      let mut focus_event = FocusEvent::new(wid, tree, info);
+      let focus_event = Rc::new(RefCell::new(FocusEvent::new(wid, tree, info)));
 
       wid
         .assert_get(&tree.arena)
         .query_on_first_type(QueryOrder::InnerFirst, |focus: &FocusListener| {
-          focus.dispatch(&mut focus_event)
+          focus.dispatch(focus_event)
         });
 
-      let mut focus_event = FocusEvent::new(wid, tree, info);
+      let focus_event = Rc::new(RefCell::new(FocusEvent::new(wid, tree, info)));
 
       // bubble focus in
-      tree.bubble_event_with(&mut focus_event, |focus_in: &FocusInListener, event| {
-        if common_ancestors.contains(&event.current_target()) {
-          event.stop_bubbling();
-        } else {
-          focus_in.dispatch(event);
-        }
-      });
+      tree.bubble_event_with(
+        focus_event,
+        |focus_in: &FocusInListener, event: Rc<RefCell<FocusEvent>>| {
+          if common_ancestors.contains(&event.borrow().current_target()) {
+            event.borrow_mut().stop_bubbling();
+          } else {
+            focus_in.dispatch(event);
+          }
+        },
+      );
     }
 
     self.focus_widgets = new_widgets;

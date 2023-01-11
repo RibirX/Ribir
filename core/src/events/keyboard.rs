@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 
@@ -35,13 +35,17 @@ pub struct KeyUpListener {
 impl EventListener for KeyDownListener {
   type Event = KeyboardEvent;
   #[inline]
-  fn dispatch(&self, event: &mut KeyboardEvent) { (self.key_down.borrow_mut())(event) }
+  fn dispatch(&self, event: Rc<RefCell<KeyboardEvent>>) {
+    (self.key_down.borrow_mut())(&mut event.borrow_mut())
+  }
 }
 
 impl EventListener for KeyUpListener {
   type Event = KeyboardEvent;
   #[inline]
-  fn dispatch(&self, event: &mut KeyboardEvent) { (self.key_up.borrow_mut())(event) }
+  fn dispatch(&self, event: Rc<RefCell<KeyboardEvent>>) {
+    (self.key_up.borrow_mut())(&mut event.borrow_mut())
+  }
 }
 
 impl ComposeChild for KeyDownListener {

@@ -2,12 +2,14 @@ use crate::{
   context::EventCtx,
   widget_tree::{WidgetId, WidgetTree},
 };
-use std::ptr::NonNull;
 
+use std::{cell::RefCell, ptr::NonNull, rc::Rc};
 pub(crate) mod dispatcher;
+#[macro_use]
+mod event_stream_macros;
 mod pointers;
-use ribir_painter::Point;
 pub use pointers::*;
+use ribir_painter::Point;
 pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;
 pub use focus::*;
@@ -120,7 +122,7 @@ impl EventCommon {
 
 pub trait EventListener {
   type Event: std::borrow::BorrowMut<EventCommon>;
-  fn dispatch(&self, event: &mut Self::Event);
+  fn dispatch(&self, event: Rc<RefCell<Self::Event>>);
 }
 
 impl std::fmt::Debug for EventCommon {

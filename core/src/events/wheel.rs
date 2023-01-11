@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 
@@ -11,12 +11,17 @@ pub struct WheelEvent {
 
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
-
 #[derive(Declare)]
 pub struct WheelListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent), wrap_fn = RefCell::new))]
-  wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
+  #[declare(builtin, convert=custom)]
+  wheel: Rc<RefCell<Box<dyn FnMut(&mut WheelEvent)>>>,
+  #[declare(skip)]
+  pub wheel_stream: LocalSubject<'static, Rc<RefCell<WheelEvent>>, ()>,
 }
+
+impl_set_declare_event_field!(WheelListener, wheel, WheelEvent);
+impl_declare_listen_event!(WheelListener, wheel, WheelEvent);
+impl_event_stream_dispatch!(WheelListener, wheel, WheelEvent);
 
 impl ComposeChild for WheelListener {
   type Child = Widget;
@@ -48,12 +53,6 @@ impl std::ops::Deref for WheelEvent {
 
 impl std::ops::DerefMut for WheelEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
-}
-
-impl EventListener for WheelListener {
-  type Event = WheelEvent;
-  #[inline]
-  fn dispatch(&self, event: &mut WheelEvent) { (self.wheel.borrow_mut())(event) }
 }
 
 #[cfg(test)]
