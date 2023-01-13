@@ -81,6 +81,11 @@ fn init_custom_theme(theme: &mut FullTheme) {
     background: theme.palette.primary(),
     foreground: theme.palette.surface(),
   });
+  theme.custom_themes.set_custom_theme(InputTheme {
+    min_length: 20.,
+    select_background: Color::from_rgb(181, 215, 254).into(),
+    caret_color: theme.typography_theme.body1.text.foreground.clone(),
+  });
 }
 
 fn override_compose_style(theme: &mut FullTheme) {

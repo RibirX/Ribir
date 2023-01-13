@@ -2,23 +2,7 @@ use ribir_core::prelude::*;
 
 use crate::layout::{Container, Stack};
 
-#[derive(Declare)]
-pub struct SelectedTextStyle {}
-
-impl ComposeStyle for SelectedTextStyle {
-  type Host = Widget;
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget
-  where
-    Self: Sized,
-  {
-    widget! {
-      DynWidget {
-        background: Color::from_rgb(181, 215, 254), // todo: follow application active state
-        dyns: host,
-      }
-    }
-  }
-}
+use super::InputTheme;
 
 #[derive(Declare)]
 pub(crate) struct SelectedText {
@@ -29,19 +13,22 @@ impl Compose for SelectedText {
   fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
       states { this: this.into_stateful() }
+      init ctx => {
+        let color = InputTheme::of(ctx).select_background.clone();
+      }
       Stack {
         DynWidget {
           dyns: {
             this.rects.iter().copied()
             .map(|rc| {
+              let color = color.clone();
               widget! {
-                SelectedTextStyle {
-                  top_anchor: rc.origin.y,
-                  left_anchor: rc.origin.x,
                   Container {
+                    background: color,
+                    top_anchor: rc.origin.y,
+                    left_anchor: rc.origin.x,
                     size: rc.size,
                   }
-                }
               }
             }).collect::<Vec<_>>()
           }

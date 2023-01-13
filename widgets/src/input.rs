@@ -3,16 +3,22 @@ mod caret_state;
 mod handle;
 mod glyphs_helper;
 mod selected_text;
-pub use caret::CaretStyle;
 pub use caret_state::CaretState;
-pub use selected_text::SelectedTextStyle;
 
-use crate::layout::{constrained_box::EXPAND_X, ConstrainedBox, Stack, Container};
+use crate::layout::{ConstrainedBox, Stack};
 use crate::prelude::Text;
 use ribir_core::{prelude::*, ticker::FrameMsg};
-use self::{glyphs_helper::GlyphsHelper, selected_text::SelectedText};
+use self::{glyphs_helper::GlyphsHelper, selected_text::SelectedText, caret::Caret};
 
 pub struct Placeholder(CowArc<str>);
+
+#[derive(Clone, PartialEq)]
+pub struct InputTheme {
+  pub min_length: f32,
+  pub select_background: Brush,
+  pub caret_color: Brush,
+}
+impl CustomTheme for InputTheme {}
 
 #[derive(Declare)]
 pub struct Input {
@@ -22,6 +28,8 @@ pub struct Input {
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
+  #[declare(default = InputTheme::of(ctx).min_length)]
+  min_length: f32,
 }
 
 impl Input {
@@ -54,7 +62,10 @@ impl ComposeChild for Input {
 
       ConstrainedBox {
         id: outbox,
-        clamp: EXPAND_X,
+        clamp: BoxClamp { 
+          min: Size::new(input_width(this.style.font_size, this.min_length), 0.), 
+          max: Size::new(input_width(this.style.font_size, this.min_length), f32::INFINITY)
+        },
         auto_focus: true,
         char: move |c| this.edit_handle(c.char),
         key_down: move |key| this.key_handle(key),
@@ -119,16 +130,12 @@ impl ComposeChild for Input {
               })
             }
 
-            CaretStyle{
+            Caret{
               id: caret,
-              visible: outbox.has_focus(),
-              font: this.style.clone(),
               top_anchor: 0.,
               left_anchor: 0.,
-              Container {
-                id: icon,
-                size: Size::new(1., 0.),
-              }
+              visible: outbox.has_focus(),
+              size: Size::new(1., 0.),
             }
           }
         }
@@ -142,7 +149,7 @@ impl ComposeChild for Input {
             let (offset, height) = helper.cursor(cursor.offset());
             caret.top_anchor = PositionUnit::Pixel(offset.y);
             caret.left_anchor = PositionUnit::Pixel(offset.x);
-            icon.size = Size::new(1., height);
+            caret.size = Size::new(1., height);
           });
         let_watch!(caret.left_anchor.abs_value(1.))
           .scan_initial((0., 0.), |pair, v| (pair.1, v))
@@ -159,6 +166,10 @@ impl ComposeChild for Input {
 impl Placeholder {
   #[inline]
   pub fn new(str: impl Into<CowArc<str>>) -> Self { Self(str.into()) }
+}
+
+fn input_width(font_size: FontSize, length: f32) -> f32 {
+  FontSize::Em(Em::relative_to(length, font_size)).into_pixel().value()
 }
 
 fn auto_x_scroll_pos(container: &ScrollableWidget, before: f32, after: f32) -> f32 {
