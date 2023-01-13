@@ -1,24 +1,24 @@
+use super::InputTheme;
+use crate::layout::Container;
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]
-pub struct CaretStyle {
-  pub font: TextStyle,
+pub struct Caret {
+  #[declare(default = InputTheme::of(ctx).caret_color.clone())]
+  pub color: Brush,
+  pub size: Size,
 }
 
-impl ComposeStyle for CaretStyle {
-  type Host = Widget;
-  fn compose_style(this: Stateful<Self>, host: Self::Host) -> Widget
-  where
-    Self: Sized,
-  {
+impl Compose for Caret {
+  fn compose(this: StateWidget<Self>) -> Widget {
     widget! {
-      states { this }
-      DynWidget {
+      states { this: this.into_stateful() }
+      Container {
         id: caret,
         opacity: 1.,
-        background: this.font.foreground.clone(),
+        background: this.color.clone(),
         mounted: move |_| animate1.run(),
-        dyns: host,
+        size: this.size,
       }
       Animate {
         id: animate1,

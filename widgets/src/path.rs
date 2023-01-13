@@ -146,7 +146,7 @@ pub struct PathWidget {
 /// Use `[HitTesPath]!` instead of.
 impl Render for PathWidget {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { self.path.box_rect().size }
+  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { self.path.box_rect().size }
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {

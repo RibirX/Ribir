@@ -3,7 +3,7 @@ use ribir_core::{impl_query_self_only, prelude::*};
 /// a widget that imposes additional constraints clamp on its child.
 #[derive(SingleChild, Declare, Clone)]
 pub struct ConstrainedBox {
-  clamp: BoxClamp,
+  pub clamp: BoxClamp,
 }
 
 /// clamp use to expand the width to max
