@@ -116,7 +116,7 @@ where
 
     while let Some(p) = self.inputs.next() {
       self.consume_paragraph(p);
-      if !self.is_line_over() {
+      if self.is_next_line_over() {
         self.over_bounds = true;
         break;
       }
@@ -353,11 +353,11 @@ where
     }
   }
 
-  fn is_line_over(&self) -> bool {
+  fn is_next_line_over(&self) -> bool {
     if self.cfg.line_dir.is_horizontal() {
-      self.cfg.bounds.height > self.y_cursor
+      self.cfg.bounds.width < self.x_cursor
     } else {
-      self.cfg.bounds.width > self.x_cursor
+      self.cfg.bounds.height < self.y_cursor
     }
   }
 }
