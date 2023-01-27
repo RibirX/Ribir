@@ -100,7 +100,7 @@ mod tests {
         expect,
         expected_scale,
       } = self;
-      let fit = FittedBox { box_fit, scale_cache: <_>::default() }.into_stateful();
+      let fit = Stateful::new(FittedBox { box_fit, scale_cache: <_>::default() });
       let c_fit = fit.clone();
       let w = widget! {
         DynWidget {

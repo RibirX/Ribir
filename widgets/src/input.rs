@@ -54,7 +54,7 @@ impl ComposeChild for Input {
     widget! {
       states {
         this: this.into_writable(),
-        helper: GlyphsHelper::default().into_stateful(),
+        helper: Stateful::new(GlyphsHelper::default()),
       }
       init ctx => {
         let tick_of_layout_ready = ctx.wnd_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));

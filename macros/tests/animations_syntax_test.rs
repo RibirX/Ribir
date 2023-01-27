@@ -20,7 +20,7 @@ fn wheel_widget(w: Widget) -> Window {
 fn listener_trigger_have_handler() {
   let handler_call_times = Rc::new(Cell::new(0));
   let h1 = handler_call_times.clone();
-  let animate_state = false.into_stateful();
+  let animate_state = Stateful::new(false);
 
   let w = widget! {
     states { animate_state:  animate_state.clone() }
@@ -55,7 +55,7 @@ fn listener_trigger_have_handler() {
 
 #[test]
 fn listener_trigger() {
-  let animate_state = false.into_stateful();
+  let animate_state = Stateful::new(false);
 
   let w = widget! {
     states { animate_state:  animate_state.clone() }

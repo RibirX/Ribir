@@ -7,12 +7,6 @@ use std::{
   rc::Rc,
 };
 
-/// Convert a stateless objet to stateful which can provide a `StateRefCell`
-/// to use to modify the states of the widget.
-pub trait IntoStateful: Sized {
-  fn into_stateful(self) -> Stateful<Self>;
-}
-
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
   inner: Rc<InnerStateful<W>>,
@@ -380,12 +374,6 @@ impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) { self.release_borrow(); }
 }
 
-// Implement IntoStateful for all widget
-impl<W> IntoStateful for W {
-  #[inline]
-  fn into_stateful(self) -> Stateful<W> { Stateful::new(self) }
-}
-
 impl<W: Query + 'static> Query for Stateful<W> {
   impl_proxy_query!(self.modify_notifier, self.state_ref());
 }
@@ -409,7 +397,7 @@ mod tests {
   fn smoke() {
     // Simulate `MockBox` widget need modify its size in event callback. Can use the
     // `cell_ref` in closure.
-    let stateful = MockBox { size: Size::zero() }.into_stateful();
+    let stateful = Stateful::new(MockBox { size: Size::zero() });
     {
       stateful.state_ref().size = Size::new(100., 100.)
     }
@@ -422,7 +410,7 @@ mod tests {
     let notified_count = Rc::new(RefCell::new(0));
     let cnc = notified_count.clone();
 
-    let sized_box = MockBox { size: Size::new(100., 100.) }.into_stateful();
+    let sized_box = Stateful::new(MockBox { size: Size::new(100., 100.) });
     sized_box
       .modifies()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -462,7 +450,7 @@ mod tests {
   fn change_notify() {
     let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
-    let w = MockBox { size: Size::zero() }.into_stateful();
+    let w = Stateful::new(MockBox { size: Size::zero() });
     w.raw_modifies()
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 

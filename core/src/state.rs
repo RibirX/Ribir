@@ -24,10 +24,10 @@ impl<W> From<Stateful<W>> for State<W> {
   fn from(w: Stateful<W>) -> Self { State::Stateful(w) }
 }
 
-impl<W: IntoStateful> State<W> {
+impl<W> State<W> {
   pub fn into_writable(self) -> Stateful<W> {
     match self {
-      State::Stateless(w) => w.into_stateful(),
+      State::Stateless(w) => Stateful::new(w),
       State::Stateful(w) => w,
     }
   }
@@ -47,7 +47,7 @@ impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
   fn from(value: Stateful<DynWidget<D>>) -> Self {
     let c_value = value.clone();
     let v = value.silent_ref().dyns.take().unwrap();
-    let v = v.into_stateful();
+    let v = Stateful::new(v);
     let c_v = v.clone();
     value.modifies().subscribe(move |_| {
       if let Some(v) = c_value.silent_ref().dyns.take() {

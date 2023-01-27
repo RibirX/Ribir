@@ -15,7 +15,7 @@ impl ComposeChild for Cursor {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
       states {
-        save_cursor: None.into_stateful(),
+        save_cursor: Stateful::new(None),
         this: this.into_readonly()
       }
       DynWidget {
