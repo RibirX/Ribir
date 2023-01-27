@@ -370,7 +370,7 @@ impl DeclareObj {
     } = self;
     let span = ty.span();
     quote_spanned! { span => let #name = }.to_tokens(tokens);
-    let builder = |tokens: &mut TokenStream| {
+    let build_widget = |tokens: &mut TokenStream| {
       quote_spanned! { span => #ty::declare_builder() }.to_tokens(tokens);
       fields.iter().for_each(|f| {
         let Field { member, value, .. } = f;
@@ -380,11 +380,18 @@ impl DeclareObj {
       });
       let build_ctx = ctx_ident();
       tokens.extend(quote_spanned! { span => .build(#build_ctx) });
+    };
+    let builder = |tokens: &mut TokenStream| {
       let is_stateful = *stateful || !watch_stmts.is_empty();
       if is_stateful {
-        quote_spanned! { span => .into_stateful() }.to_tokens(tokens);
+        let mut stream = TokenStream::new();
+        build_widget(&mut stream);
+        quote_spanned! { span => Stateful::new(#stream) }.to_tokens(tokens);
+      } else {
+        build_widget(tokens);
       }
     };
+
     if used_name_info.ref_widgets().is_some() {
       Brace(span).surround(tokens, |tokens| {
         used_name_info.prepend_bundle_refs(tokens);

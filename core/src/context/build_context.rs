@@ -66,7 +66,7 @@ mod tests {
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
-    let themes: Stateful<Vec<Rc<Theme>>> = vec![].into_stateful();
+    let themes: Stateful<Vec<Rc<Theme>>> = Stateful::new(vec![]);
     let light_dark = widget! {
       states { themes: themes.clone() }
       ThemeWidget {

@@ -349,7 +349,7 @@ where
 
   #[inline]
   fn with_child(self, child: Stateful<DynWidget<D>>) -> Self::Target {
-    let this = self.into_stateful();
+    let this = Stateful::new(self);
     widget! {
       states { child }
       DynWidget {
@@ -371,7 +371,7 @@ where
 
   #[inline]
   fn with_child(self, child: Stateful<DynWidget<D>>) -> Self::Target {
-    let this = self.into_stateful();
+    let this = Stateful::new(self);
     widget! {
       states { child }
       DynWidget {
@@ -395,7 +395,7 @@ where
 
   #[inline]
   fn with_child(self, child: Stateful<DynWidget<D>>) -> Self::Target {
-    let this = self.into_stateful();
+    let this = Stateful::new(self);
     widget! {
       states { child }
       DynWidget {
@@ -704,7 +704,7 @@ mod tests {
 
   #[test]
   fn expr_with_child() {
-    let size = Size::zero().into_stateful();
+    let size = Stateful::new(Size::zero());
     // with single child
     let _e = widget! {
       states { size: size.clone() }
@@ -794,7 +794,7 @@ mod tests {
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
-    let dyns = DynWidget { dyns: Some(X) }.into_stateful();
+    let dyns = Stateful::new(DynWidget { dyns: Some(X) });
     let size = Size::new(100., 200.);
 
     let w = ComposeChild::compose_child(State::Stateless(dyns), MockBox { size });

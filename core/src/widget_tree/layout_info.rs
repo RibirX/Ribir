@@ -316,8 +316,8 @@ mod tests {
     // Can't use layout info of dirty widget to detect if the ancestors path have
     // in relayout list. Because new widget insert by `DynWidget` not have layout
     // info, but its parent have.
-    let child_box = MockBox { size: Size::zero() }.into_stateful();
-    let root_layout_cnt = 0.into_stateful();
+    let child_box = Stateful::new(MockBox { size: Size::zero() });
+    let root_layout_cnt = Stateful::new(0);
     let w = widget! {
       states {
         child_box: child_box.clone(),
@@ -348,8 +348,8 @@ mod tests {
 
   #[test]
   fn layout_list_from_root_to_leaf() {
-    let layout_order = vec![].into_stateful();
-    let trigger = Size::zero().into_stateful();
+    let layout_order = Stateful::new(vec![]);
+    let trigger = Stateful::new(Size::zero());
     let w = widget! {
       states {
         layout_order: layout_order.clone(),

@@ -359,8 +359,8 @@ fn fix_access_builtin_with_gap() {
 
 #[test]
 fn fix_subscribe_cancel_after_widget_drop() {
-  let notify_cnt = 0.into_stateful();
-  let trigger = true.into_stateful();
+  let notify_cnt = Stateful::new(0);
+  let trigger = Stateful::new(true);
   let w = widget! {
     states { cnt: notify_cnt.clone(), trigger: trigger.clone() }
     SizedBox {

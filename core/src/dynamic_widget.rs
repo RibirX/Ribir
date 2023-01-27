@@ -124,7 +124,7 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
     }
 
     let first = std::mem::replace(&mut widgets[0], Void.into_widget());
-    let first = DynRender::new(DynWidget { dyns: Some(first) }.into_stateful());
+    let first = DynRender::new(Stateful::new(DynWidget { dyns: Some(first) }));
     let first = Self {
       dyn_widgets: dyns,
       self_render: RefCell::new(Box::new(first)),
@@ -451,7 +451,7 @@ mod tests {
 
   #[test]
   fn expr_widget_as_root() {
-    let size = Size::zero().into_stateful();
+    let size = Stateful::new(Size::zero());
     let w = widget! {
       states { size: size.clone() }
       DynWidget {
@@ -475,7 +475,7 @@ mod tests {
 
   #[test]
   fn expr_widget_with_declare_child() {
-    let size = Size::zero().into_stateful();
+    let size = Stateful::new(Size::zero());
     let w = widget! {
       states { size: size.clone() }
       MockBox {
@@ -504,10 +504,10 @@ mod tests {
 
   #[test]
   fn expr_widget_mounted_new() {
-    let v = vec![1, 2, 3].into_stateful();
+    let v = Stateful::new(vec![1, 2, 3]);
 
-    let new_cnt = 0.into_stateful();
-    let drop_cnt = 0.into_stateful();
+    let new_cnt = Stateful::new(0);
+    let drop_cnt = Stateful::new(0);
     let w = widget! {
       states {
         v: v.clone(),
@@ -547,11 +547,11 @@ mod tests {
 
   #[test]
   fn dyn_widgets_with_key() {
-    let v = HashMap::from([(1, '1'), (2, '2'), (3, '3')]).into_stateful();
-    let enter_list: Stateful<Vec<char>> = vec![].into_stateful();
-    let update_list: Stateful<Vec<char>> = vec![].into_stateful();
-    let leave_list: Stateful<Vec<char>> = vec![].into_stateful();
-    let key_change: Stateful<KeyChange<char>> = (KeyChange::default()).into_stateful();
+    let v = Stateful::new(HashMap::from([(1, '1'), (2, '2'), (3, '3')]));
+    let enter_list: Stateful<Vec<char>> = Stateful::new(vec![]);
+    let update_list: Stateful<Vec<char>> = Stateful::new(vec![]);
+    let leave_list: Stateful<Vec<char>> = Stateful::new(vec![]);
+    let key_change: Stateful<KeyChange<char>> = Stateful::new(KeyChange::default());
     let w = widget! {
       states {
         v: v.clone(),

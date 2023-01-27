@@ -368,7 +368,7 @@ mod tests {
   }
 
   fn bench_recursive_repair(width: usize, depth: usize, b: &mut Bencher) {
-    let w = Recursive { width, depth }.into_stateful();
+    let w = Stateful::new(Recursive { width, depth });
     let trigger = w.clone();
     let app_ctx = <_>::default();
     let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx));
@@ -384,7 +384,7 @@ mod tests {
   #[test]
   fn fix_relayout_incorrect_clamp() {
     let expect_size = Size::new(20., 20.);
-    let no_boundary_size = INFINITY_SIZE.into_stateful();
+    let no_boundary_size = Stateful::new(INFINITY_SIZE);
     let w = widget! {
       states { size: no_boundary_size.clone() }
       MockBox {
@@ -502,7 +502,7 @@ mod tests {
 
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
-    let post = Embed { width: 5, depth: 1000 }.into_stateful();
+    let post = Stateful::new(Embed { width: 5, depth: 1000 });
     let trigger = post.clone();
     let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(AppContext::default()));
     b.iter(|| {

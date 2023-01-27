@@ -234,5 +234,5 @@ fn main() {
     ],
   };
 
-  app::run(todo.into_widget());
+  app::run(Stateful::new(todo).into_widget());
 }

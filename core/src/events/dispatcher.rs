@@ -687,7 +687,7 @@ mod tests {
 
   #[test]
   fn click() {
-    let click_path = 0.into_stateful();
+    let click_path = Stateful::new(0);
     let w = widget! {
       states { click_path: click_path.clone() }
       MockMulti {

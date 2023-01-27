@@ -5,8 +5,8 @@ fn main() {
   let y = 1.;
 
   let _multi_track = widget! {
-    states { x: x.into_stateful() }
-    states { y: y.into_stateful() }
+    states { x: Stateful::new(x) }
+    states { y: Stateful::new(y) }
     Void {
       left_anchor: x.clone(),
       top_anchor: y.clone(),
