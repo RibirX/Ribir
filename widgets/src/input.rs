@@ -134,13 +134,14 @@ impl ComposeChild for Input {
               id: caret,
               top_anchor: 0.,
               left_anchor: 0.,
-              visible: outbox.has_focus(),
+              focused: outbox.has_focus(),
               size: Size::new(1., 0.),
             }
           }
         }
       }
       finally {
+        this.caret = this.caret;
         let_watch!(this.caret)
           .distinct_until_changed()
           .sample(tick_of_layout_ready)
