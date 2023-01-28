@@ -105,10 +105,7 @@ impl PathPaintKit {
 
 impl Render for PathPaintKit {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    let rc = self.path.box_rect();
-    clamp.clamp(Size::new(rc.max_x(), rc.max_y()))
-  }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.max }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
@@ -173,11 +170,7 @@ pub struct PathsPaintKit {
 
 impl Render for PathsPaintKit {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.paths.iter().fold(Size::zero(), |size, path| {
-      size.max(path.perform_layout(clamp, ctx))
-    })
-  }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.max }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
