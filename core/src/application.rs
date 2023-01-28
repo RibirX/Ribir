@@ -66,6 +66,11 @@ impl Application {
             wnd.draw_frame();
           }
         }
+        Event::RedrawEventsCleared => {
+          if windows.iter_mut().any(|(_, wnd)| wnd.need_draw()) {
+            *control = ControlFlow::Poll;
+          }
+        }
         _ => (),
       }
     });
