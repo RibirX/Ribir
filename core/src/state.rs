@@ -50,8 +50,8 @@ impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
     let v = v.into_stateful();
     let c_v = v.clone();
     value.modifies().subscribe(move |_| {
-      if let Some(v) = c_value.silent_ref().dyns.take() {
-        *c_v.state_ref() = v;
+      if c_value.silent_ref().dyns.is_some() {
+        *c_v.state_ref() = c_value.silent_ref().dyns.take().unwrap();
       }
     });
     v.into()
