@@ -1,8 +1,12 @@
+---
+sidebar_position: 1
+---
+
 # How to build a Todo Application with Ribir
 
 In this tutorial, We'll start learning how to build a Todo application using Ribir. By following this tutorial in its entirety, you will be able to complete a Todo application like this by yourself:
 
-<img src="../getting_started/assets/todo_example.png" alt="todo example" width="300" />
+![todo example](./img/todo_example.png)
 
 This will be an exciting journey. Let's go!
 
