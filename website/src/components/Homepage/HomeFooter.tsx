@@ -21,18 +21,18 @@ export default function HomeFooter() {
           <img src={`/logo/${colorMode}.svg`} alt="Logo" className="h-10" />
         </div>
         <div className="flex items-center gap-3">
-          <Link href="https://community.dyte.io">
+          <Link href="#">
             <DiscordLogoIcon className="h-6 w-6 text-zinc-400 hover:text-primary" />
           </Link>
-          <Link href="https://twitter.com/dyte_io">
+          <Link href="#">
             <TwitterLogoIcon className="h-6 w-6 text-zinc-400 hover:text-primary" />
           </Link>
-          <Link href="https://linkedin.com/company/dyteio">
+          <Link href="#">
             <LinkedInLogoIcon className="h-6 w-6 text-zinc-400 hover:text-primary" />
           </Link>
         </div>
         <div className="flex-1 text-zinc-400 lg:text-right">
-          Copyright &copy; Dyte since 2020. All rights reserved.
+          Copyright &copy; Ribir since 2023. All rights reserved.
         </div>
       </div>
     </footer>

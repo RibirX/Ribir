@@ -344,8 +344,8 @@ The next statement `move_to_widget!(guard);` is very simple. `move_to_widget!` m
 
 > **Tips**
 >
-> - ReactiveX is an API for asynchronous programming with observable streams. [See More](reactivex.io)
-> - rxRust is the implementation of ReactiveX Ribir used. [See More](github.com/rxRust/rxRust)
+> - ReactiveX is an API for asynchronous programming with observable streams. [See More](https://reactivex.io)
+> - rxRust is the implementation of ReactiveX Ribir used. [See More](https://github.com/rxRust/rxRust)
 
 ### use `watch` and `let_watch!` to watch expression.
 

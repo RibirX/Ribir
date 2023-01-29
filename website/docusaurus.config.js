@@ -8,8 +8,8 @@ const tailwindPlugin = require('./plugins/tailwind-plugin.cjs');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'My Site',
-  tagline: 'Dinosaurs are cool',
+  title: 'Ribir Official Website',
+  tagline: 'Using the Ribir to build everything',
   url: 'https://ribir.org',
   baseUrl: '/',
   onBrokenLinks: 'warn',
@@ -57,10 +57,9 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'Ribir',
         logo: {
           alt: 'Ribir logo',
-          src: 'img/ribir-short-logo.svg',
+          src: 'img/ribir-long-logo.svg',
         },
         items: [
           // todo: multiple version config
@@ -72,10 +71,10 @@ const config = {
           {
             type: 'doc',
             docId: 'introduction',
-            position: 'right',
+            position: 'left',
             label: 'Tutorial',
           },
-          {to: '/blog', label: 'Blog', position: 'right'},
+          {to: '/blog', label: 'Blog', position: 'left'},
           {
             href: 'https://github.com/RibirX/Ribir',
             label: 'GitHub',
@@ -129,11 +128,12 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Ribir, Inc. Built with RibirX.`,
       },
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
+        additionalLanguages: ['rust']
       },
     }),
 };

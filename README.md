@@ -1,8 +1,10 @@
 <div align="center">
 
-<img src="website/static/img/ribir-long-logo.svg" width="480px" />
+<img src="website/static/img/logo-animation.gif" width="480px" />
 
 # Ribir
+
+[![License](https://img.shields.io/badge/license-MIT-informational)](https://github.com/RibirX/ribir/blob/master/LICENSE)
 
 A declarative, purely composed GUI library for building cross-platform applications. It's lightweight and powerful.
 

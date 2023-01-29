@@ -23,7 +23,7 @@ export default function HelpSection({ className = '' }) {
               you.
             </p>
             <Link
-              href="https://dyte.io/contact"
+              href="#"
               className="text-primary dark:text-primary-100"
             >
               Schedule a Call &rarr;
@@ -34,11 +34,11 @@ export default function HelpSection({ className = '' }) {
             <img src="/static/landing-page/customer.svg" alt="Book a demo" />
             <h4 className="my-3">Support</h4>
             <p className="text-zinc-600 dark:text-zinc-400">
-              Dyte&apos;s expert support team is excited to help. Connect for
+              Ribir expert support team is excited to help. Connect for
               dedicated 1:1 support!
             </p>
             <Link
-              href="https://dyte.io/contact"
+              href="#"
               className="text-primary dark:text-primary-100"
             >
               Contact Us &rarr;
