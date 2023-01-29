@@ -1,5 +1,6 @@
 use crate::{layout::Stack, path::PathPaintKit};
 use ribir_core::prelude::*;
+use crate::prelude::Container;
 
 /// Widget that as an visual indicator of material design used to present the
 /// interactive status of its child.
@@ -38,21 +39,24 @@ impl ComposeChild for InteractiveLayer {
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
-      states { this: this.into_writable() }
+      states { this: this.into_readonly() }
       Stack {
         DynWidget { id: host, dyns: child }
-        StateLayer {
-          color: this.color,
-          path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
-          role: if host.pointer_pressed() {
-            StateRole::pressed()
-          } else if host.has_focus() {
-            StateRole::focus()
-          } else if host.mouse_hover() {
-            StateRole::hover()
-          } else {
-            // todo: not support drag & drop now
-            StateRole::custom(0.)
+        Container {
+          size: host.layout_size(),
+          StateLayer {
+            color: this.color,
+            path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
+            role: if host.pointer_pressed() {
+              StateRole::pressed()
+            } else if host.has_focus() {
+              StateRole::focus()
+            } else if host.mouse_hover() {
+              StateRole::hover()
+            } else {
+              // todo: not support drag & drop now
+              StateRole::custom(0.)
+            }
           }
         }
       }
