@@ -78,7 +78,7 @@ mod tests {
             dyns: {
                // explicit capture `this` to avoid `DynWidget` to be optimized`.
               let x = &*this;
-              println!("{:?}", x);
+              println!("{x:?}");
               Void
             },
           }

@@ -212,10 +212,10 @@ impl Tessellator {
     }
   }
 
-  fn prim_from_command<'a, R: GlRender>(
+  fn prim_from_command<R: GlRender>(
     &mut self,
     cmd: &PaintCommand,
-    stencil_path: &[&'a ClipInstruct],
+    stencil_path: &[&ClipInstruct],
     render: &mut R,
   ) -> (Primitive, PrimitiveType) {
     match cmd {
@@ -622,7 +622,7 @@ mod tests {
   }
 
   fn two_img_paint(painter: &mut Painter) {
-    let img = color_image(Color::YELLOW.into(), 100, 100);
+    let img = color_image(Color::YELLOW, 100, 100);
     painter
       .set_brush(Brush::Image {
         img,
@@ -806,6 +806,7 @@ mod tests {
   text_bench!(
     latin,
     latin_with_cache,
+    #[allow(clippy::invisible_characters)]
     r#"!"\#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUV
     WXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œž¡¢£¤¥¦§¨
     ©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóô

@@ -175,7 +175,7 @@ fn data_flow_macro() {
   tap_at(&mut wnd, (0, 0));
   wnd.draw_frame();
 
-  let rect = layout_info_by_path(&mut wnd, &[0]);
+  let rect = layout_info_by_path(&wnd, &[0]);
   assert_eq!(rect.size, Size::new(8., 4.));
 }
 
@@ -370,7 +370,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
           widget! {
             SizedBox { size: Size::zero() }
             finally {
-              let_watch!(trigger.deref().clone()).subscribe(move |_| *cnt +=1 );
+              let_watch!(*trigger.deref()).subscribe(move |_| *cnt +=1 );
             }
           }
         })
@@ -431,7 +431,7 @@ fn fix_silent_not_relayout_dyn_widget() {
     states { trigger_size: trigger_size.clone() }
     DynWidget {
       dyns: if trigger_size.area() > 0. {
-        SizedBox { size: trigger_size.clone() }
+        SizedBox { size: *trigger_size }
       } else {
         SizedBox { size: ZERO_SIZE }
       }

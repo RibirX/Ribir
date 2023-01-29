@@ -33,10 +33,10 @@ impl<D> DynWidgetDeclarer<D> {
   }
 }
 
-impl<D> DynWidget<D> {
-  #[inline]
-  pub const fn new(dyns: D) -> D { dyns }
+#[inline]
+pub const fn identify<V>(v: V) -> V { v }
 
+impl<D> DynWidget<D> {
   pub fn set_declare_dyns(&mut self, dyns: D) { self.dyns = Some(dyns); }
 
   pub(crate) fn into_inner(mut self) -> D {
@@ -73,7 +73,7 @@ impl<D: DynsIntoWidget<M> + 'static, M: 'static> Render for DynRender<D, M> {
         inspect_key(&w, arena, |key: &dyn AnyKey| {
           key.mounted();
         });
-        w.on_mounted(arena, &ctx.store, ctx.wnd_ctx, ctx.dirty_set);
+        w.on_mounted(arena, ctx.store, ctx.wnd_ctx, ctx.dirty_set);
         sibling = w.next_sibling(arena);
       });
 
@@ -352,6 +352,7 @@ impl<D: 'static> Query for DynWidget<D> {
 }
 
 fn inspect_key(id: &WidgetId, tree: &TreeArena, mut cb: impl FnMut(&dyn AnyKey)) {
+  #[allow(clippy::borrowed_box)]
   id.assert_get(tree).query_on_first_type(
     QueryOrder::OutsideFirst,
     |key_widget: &Box<dyn AnyKey>| {
@@ -455,7 +456,7 @@ mod tests {
     let w = widget! {
       states { size: size.clone() }
       DynWidget {
-        dyns: MockBox { size: size.clone() },
+        dyns: MockBox { size: *size },
         Void {}
       }
     };
@@ -481,7 +482,7 @@ mod tests {
       MockBox {
         size: Size::zero(),
         DynWidget {
-          dyns: MockBox { size: size.clone() },
+          dyns: MockBox { size: *size },
           Void {}
         }
       }

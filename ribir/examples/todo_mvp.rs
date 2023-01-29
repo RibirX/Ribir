@@ -125,7 +125,7 @@ impl TodoMVP {
     }
   }
 
-  fn task<'a>(this: StateRef<Self>, task: Task, idx: usize, mount_task_cnt: StateRef<i32>) -> Widget {
+  fn task(this: StateRef<Self>, task: Task, idx: usize, mount_task_cnt: StateRef<i32>) -> Widget {
     let this = this.clone_stateful();
     let mount_task_cnt = mount_task_cnt.clone_stateful();
     widget! {

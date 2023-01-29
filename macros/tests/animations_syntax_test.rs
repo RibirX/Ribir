@@ -49,7 +49,7 @@ fn listener_trigger_have_handler() {
 
   wheel_widget(w);
 
-  assert_eq!(true, *animate_state.state_ref());
+  assert!(*animate_state.state_ref());
   assert_eq!(handler_call_times.get(), 1);
 }
 
@@ -84,5 +84,5 @@ fn listener_trigger() {
 
   wheel_widget(w);
 
-  assert_eq!(true, *animate_state.state_ref());
+  assert!(*animate_state.state_ref());
 }

@@ -719,9 +719,8 @@ mod tests {
     };
     // with multi child
     let _e = widget! {
-      states { size: size.clone() }
       DynWidget {
-        dyns: if size.area() > 0. { MockMulti {} } else { MockMulti {} },
+        dyns: MockMulti {},
         MockBox { size: Size::zero() }
         MockBox { size: Size::zero() }
         MockBox { size: Size::zero() }
@@ -739,7 +738,7 @@ mod tests {
 
     // option with `Widget`
     let _e = widget! {
-      states { size: size.clone() }
+      states { size: size }
       DynWidget {
         dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
         DynWidget { dyns: Void.into_widget() }
@@ -821,7 +820,7 @@ mod tests {
     let trigger = Stateful::new(true);
     let size = Size::new(100., 200.);
     let w = widget! {
-      states { trigger: trigger.clone() }
+      states { trigger: trigger }
       X {
         DynWidget {
           dyns: if *trigger {

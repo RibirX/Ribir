@@ -589,7 +589,7 @@ mod test {
           .reserve((4 * size.width * size.height) as usize);
         rows.for_each(|r| v.borrow_mut().extend(r));
       });
-      return (data, receiver);
+      (data, receiver)
     }
 
     let (buf1, receiver1) = capture_buf();
@@ -605,7 +605,7 @@ mod test {
     PaintCommand::Paint(PaintInstruct {
       path: PaintPath::Path(path.clone().into()),
       opacity: 1.,
-      transform: transform.clone(),
+      transform: *transform,
       brush: Brush::Color(color),
     })
   }
@@ -613,7 +613,7 @@ mod test {
   fn push_clip(path: &Path, transform: &Transform) -> PaintCommand {
     PaintCommand::PushClip(ClipInstruct {
       path: PaintPath::Path(path.clone().into()),
-      transform: transform.clone(),
+      transform: *transform,
     })
   }
 

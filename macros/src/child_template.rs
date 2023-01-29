@@ -14,15 +14,12 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
 
   let stt = data_struct_unwrap(data, ASSOCIATED_TEMPLATE)?;
-  let tml = Ident::new(&format!("{}{}", name, TML), name.span());
+  let tml = Ident::new(&format!("{name}{TML}"), name.span());
 
   let fields = match stt.fields {
     Fields::Named(ref named) => &named.named,
     Fields::Unit => {
-      let err_str = format!(
-        "Can't derive `{}` for a empty template.",
-        ASSOCIATED_TEMPLATE
-      );
+      let err_str = format!("Can't derive `{ASSOCIATED_TEMPLATE}` for a empty template.",);
       return Err(syn::Error::new(Span::call_site(), err_str));
     }
     Fields::Unnamed(_) => unreachable!(),

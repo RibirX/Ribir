@@ -66,28 +66,28 @@ mod tests {
   fn test_compose_emoj() {
     let text = "👨‍👩‍👦‍👦";
     let mut cursor = GraphemeCursor(0);
-    assert!(25 == cursor.measure_bytes(&text, 0, 1));
-    cursor.next(&text);
+    assert!(25 == cursor.measure_bytes(text, 0, 1));
+    cursor.next(text);
     assert!(25 == cursor.byte_offset());
-    cursor.prev(&text);
+    cursor.prev(text);
     assert!(0 == cursor.byte_offset());
   }
   #[test]
   fn test_char_with_combine() {
     let text = "ee\u{0301}e\u{0301}\u{0301}";
     let mut cursor = GraphemeCursor(0);
-    cursor.next(&text);
+    cursor.next(text);
     assert!(1 == cursor.byte_offset());
-    cursor.next(&text);
+    cursor.next(text);
     assert!(4 == cursor.byte_offset());
-    cursor.next(&text);
+    cursor.next(text);
     assert!(9 == cursor.byte_offset());
 
-    cursor.prev(&text);
+    cursor.prev(text);
     assert!(4 == cursor.byte_offset());
-    cursor.prev(&text);
+    cursor.prev(text);
     assert!(1 == cursor.byte_offset());
-    cursor.prev(&text);
+    cursor.prev(text);
     assert!(0 == cursor.byte_offset());
   }
 }

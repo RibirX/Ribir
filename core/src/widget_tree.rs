@@ -374,8 +374,7 @@ mod tests {
     let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx));
     b.iter(|| {
       {
-        let mut v = trigger.state_ref();
-        v.width = v.width;
+        let _: &mut Recursive = &mut trigger.state_ref();
       }
       tree.layout(Size::new(512., 512.));
     });
@@ -476,7 +475,7 @@ mod tests {
     root.remove_subtree(arena, store, wnd_ctx);
 
     assert_eq!(tree.layout_list(), None);
-    assert_eq!(tree.is_dirty(), false);
+    assert!(!tree.is_dirty());
   }
 
   #[bench]
@@ -507,8 +506,7 @@ mod tests {
     let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(AppContext::default()));
     b.iter(|| {
       {
-        let mut v = trigger.state_ref();
-        v.width = v.width;
+        let _: &mut Embed = &mut trigger.state_ref();
       }
       tree.layout(Size::new(512., 512.));
     });
@@ -547,7 +545,7 @@ mod tests {
     {
       *trigger.silent_ref() = 2;
     }
-    assert_eq!(tree.is_dirty(), false)
+    assert!(!tree.is_dirty())
   }
 
   #[test]
@@ -556,7 +554,7 @@ mod tests {
     font_db.load_system_fonts();
     let font_db = Arc::new(RwLock::new(font_db));
     let shaper = TextShaper::new(font_db.clone());
-    let store = TypographyStore::new(<_>::default(), font_db.clone(), shaper);
+    let store = TypographyStore::new(<_>::default(), font_db, shaper);
     let win_size = Size::new(150., 50.);
     let mut painter = Painter::new(2., store, win_size);
 

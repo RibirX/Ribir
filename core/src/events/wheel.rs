@@ -9,13 +9,13 @@ pub struct WheelEvent {
   pub common: EventCommon,
 }
 
+type WhellCallback = dyn for<'r> FnMut(&'r mut WheelEvent);
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
-
 #[derive(Declare)]
 pub struct WheelListener {
   #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent), wrap_fn = RefCell::new))]
-  wheel: RefCell<Box<dyn for<'r> FnMut(&'r mut WheelEvent)>>,
+  wheel: RefCell<Box<WhellCallback>>,
 }
 
 impl ComposeChild for WheelListener {

@@ -309,15 +309,15 @@ impl FocusManager {
 
   fn tab_index(&self, node_id: NodeId, arena: &TreeArena) -> i16 {
     let mut index = 0;
-    self
+    if let Some(r) = self
       .get(node_id)
       .and_then(|n| n.wid)
       .and_then(|wid| wid.get(arena))
-      .map(|r| {
-        r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusNode| {
-          index = s.tab_index;
-        });
+    {
+      r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusNode| {
+        index = s.tab_index;
       });
+    };
 
     index
   }

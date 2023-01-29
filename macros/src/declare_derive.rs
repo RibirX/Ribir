@@ -221,7 +221,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     .iter_mut()
     .for_each(DeclareField::check_reserve);
 
-  let declarer = Ident::new(&format!("{}{}", name, DECLARER), name.span());
+  let declarer = Ident::new(&format!("{name}{DECLARER}"), name.span());
 
   let mut builder_methods = quote! {};
   let mut methods = quote! {};
@@ -365,7 +365,7 @@ fn collect_filed_and_attrs(stt: &mut DataStruct) -> Result<Punctuated<DeclareFie
     Fields::Unnamed(unnamed) => {
       let err = syn::Error::new(
         unnamed.span(),
-        format!("`{}` not be supported to derive for tuple struct", DECLARE),
+        format!("`{DECLARE}` not be supported to derive for tuple struct"),
       );
       return Err(err);
     }
