@@ -77,11 +77,14 @@ impl ComposeChild for Ripple {
                       };
                       Clip { clip: ClipType::Path(path) }
                     }),
-                    PathPaintKit {
-                      id: ripple_path,
-                      brush: StateRole::pressed().calc_color(this.color),
-                      path: Path::circle(launch_at, radius, PathStyle::Fill),
-                      mounted: move |_| { ripper_enter.run(); }
+                    Container {
+                      size: container.layout_size(),
+                      PathPaintKit {
+                        id: ripple_path,
+                        brush: StateRole::pressed().calc_color(this.color),
+                        path: Path::circle(launch_at, radius, PathStyle::Fill),
+                        mounted: move |_| { ripper_enter.run(); }
+                      }
                     }
                   }
                 }
