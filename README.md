@@ -10,11 +10,11 @@ A declarative, purely composed GUI library for building cross-platform applicati
 
 ## Principle
 
-**Only pay for what you need**: The Ribir don't have base object, everything is purely composed, such as `Margin`, if your application don't need `Margin`, you don't pay for `Margin` overhead.
+**Only pay for what you need**: Ribir does not have the base object. Everything is purely composed, such as `Margin`. If your application doesn't need `Margin`, you don't pay for `Margin` overhead.
 
-**Only describe your data structure**:  In Ribir the interface is just the presentation around the data structure, not interfering with the data structure.
+**Only describe your data structure**: In Ribir, the interface is a presentation around the data structure, not interfering with the data structure.
 
-**Auto reactive to data notify**: The Ribir can automatically respond to changes reactive when the data relationships are established.
+**Auto reactive to data notifies**: Ribir can automatically respond to change reactive when the data relationships are established.
 
 ## Features
 
@@ -31,16 +31,16 @@ counter demo
 
 |Platform|Support situation|
 |---|---|
-|linux|✅|
-|windows|✅|
+|Linux|✅|
+|Windows|✅|
 |macOS|✅|
-|iOS|not yet|
-|android|not yet|
-|web|not yet|
+|iOS|🚧 Not yet|
+|Android|🚧 Not yet|
+|Web|🚧 Not yet|
 
 ## Contributing/Feedback
 
-We are grateful to the community for contributing bugfixes and improvements. Read below to learn how you can take part in improving Ribir.
+We are grateful to the community for contributing bug fixes and improvements. Read below to learn how you can take part in improving Ribir.
 
 ### [Contributing Guide](./CONTRIBUTING.md)
 
