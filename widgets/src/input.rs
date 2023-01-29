@@ -141,7 +141,6 @@ impl ComposeChild for Input {
         }
       }
       finally {
-        this.caret = this.caret;
         let_watch!(this.caret)
           .distinct_until_changed()
           .sample(tick_of_layout_ready)
@@ -159,6 +158,10 @@ impl ComposeChild for Input {
             let pos = auto_x_scroll_pos(&container, before, after);
             container.silent().jump_to(Point::new(pos, 0.));
           });
+
+        // let_watch!(this.caret).distinct_until_changed() will only be triggered after modify
+        // borrow mut from state_ref to manual triggered after init.
+        let _:&mut Input = &mut this;
       }
     }
   }

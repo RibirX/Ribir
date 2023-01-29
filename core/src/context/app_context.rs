@@ -25,7 +25,7 @@ pub struct AppContext {
   pub executor: Executor,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Executor {
   #[cfg(feature = "thread-pool")]
   pub thread_pool: futures::executor::ThreadPool,
@@ -58,16 +58,6 @@ impl Default for AppContext {
       reorder,
       typography_store,
       executor: <_>::default(),
-    }
-  }
-}
-
-impl Default for Executor {
-  fn default() -> Self {
-    Self {
-      #[cfg(feature = "thread-pool")]
-      thread_pool: futures::executor::ThreadPool::new().unwrap(),
-      local: Default::default(),
     }
   }
 }

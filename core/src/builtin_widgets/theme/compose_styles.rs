@@ -1,10 +1,11 @@
 use crate::prelude::*;
 use std::{any::type_name, collections::HashMap};
 
+type ComposeStyleFn = dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget;
 /// Compose style is a compose child widget to decoration its child.
 #[derive(Default)]
 pub struct ComposeStyles {
-  styles: HashMap<TypeId, Box<dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget>, ahash::RandomState>,
+  styles: HashMap<TypeId, Box<ComposeStyleFn>, ahash::RandomState>,
 }
 
 /// `ComposeStyle` is a trait let you can convert your host widget to another,

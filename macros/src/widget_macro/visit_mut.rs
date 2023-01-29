@@ -393,6 +393,7 @@ impl VisitCtx {
                   let subscribe_do: Expr = parse_quote_spanned! { expr.span() => {
                     let #name = #name.clone_stateful();
                     move |_| {
+                      #[allow(clippy::redundant_clone, clippy::clone_on_copy)]
                       let #field_fn_name = #field_fn_name.clone()();
                       #name.state_ref().#declare_set(#field_fn_name)
                     }

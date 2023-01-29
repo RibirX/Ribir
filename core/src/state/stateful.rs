@@ -426,13 +426,13 @@ mod tests {
     let mut wnd = Window::default_mock(sized_box.into_widget(), None);
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
-    assert_eq!(wnd.widget_tree.is_dirty(), false);
+    assert!(!wnd.widget_tree.is_dirty());
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
 
     {
       state.state_ref().size = Size::new(1., 1.);
     }
-    assert_eq!(wnd.widget_tree.is_dirty(), true);
+    assert!(wnd.widget_tree.is_dirty());
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));

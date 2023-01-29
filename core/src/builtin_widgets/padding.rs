@@ -107,7 +107,6 @@ mod tests {
             y: Some(0.),
             width: Some(100.),
             height: Some(100.),
-            ..Default::default()
           },
         },
       ],

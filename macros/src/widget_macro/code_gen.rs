@@ -369,7 +369,11 @@ impl DeclareObj {
       used_name_info,
     } = self;
     let span = ty.span();
-    quote_spanned! { span => let #name = }.to_tokens(tokens);
+    quote_spanned! { span =>
+      #[allow(clippy::redundant_clone, clippy::clone_on_copy)]
+      let #name =
+    }
+    .to_tokens(tokens);
     let build_widget = |tokens: &mut TokenStream| {
       quote_spanned! { span => #ty::declare_builder() }.to_tokens(tokens);
       fields.iter().for_each(|f| {
@@ -561,6 +565,7 @@ impl ToTokens for Property {
       .to_tokens(tokens),
       Property::Member { target, dot, member } => quote_spanned! {
         target.span().join(member.span()).unwrap() =>
+        #[allow(clippy::clone_on_copy)]
         Prop::new(
           #target.clone_stateful(),
           |this| this #dot #member.clone(),

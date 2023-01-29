@@ -227,14 +227,12 @@ mod tests {
   fn default_value_is_none() {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
-    let mut ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
-    let w = BoxDecoration::declare_builder().build(&mut ctx);
+    let ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
+    let w = BoxDecoration::declare_builder().build(&ctx);
 
     assert_eq!(w.border, None);
     assert_eq!(w.border_radius, None);
     assert_eq!(w.background, None);
-
-    std::mem::forget(ctx);
   }
 
   #[test]
@@ -244,10 +242,10 @@ mod tests {
       MockBox {
         size: SIZE,
         border: Border {
-          left: BorderSide::new(1., Color::BLACK.into()),
-          right: BorderSide::new(2., Color::BLACK.into()),
-          top: BorderSide::new(3., Color::BLACK.into()),
-          bottom: BorderSide::new(4., Color::BLACK.into()),
+          left: BorderSide::new(1., Color::BLACK),
+          right: BorderSide::new(2., Color::BLACK),
+          top: BorderSide::new(3., Color::BLACK),
+          bottom: BorderSide::new(4., Color::BLACK),
         },
       }
     };

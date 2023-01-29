@@ -58,7 +58,7 @@ impl<W> Readonly<W> {
 
 impl<'a, W> ReadRef<'a, W> {
   #[inline]
-  pub fn silent(&self) -> &W { &**self }
+  pub fn silent(&self) -> &W { self }
 
   #[inline]
   pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> {

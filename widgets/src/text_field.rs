@@ -373,7 +373,7 @@ fn build_input_area(
         Input {
           id: input,
           style: theme.text.clone(),
-          DynWidget::new(placeholder)
+          identify(placeholder)
         }
       }
       DynWidget {

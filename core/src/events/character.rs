@@ -1,12 +1,13 @@
 use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 use std::cell::RefCell;
 
+type CharCallback = dyn for<'r> FnMut(&'r mut CharEvent);
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
 #[derive(Declare)]
 pub struct CharListener {
   #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut CharEvent), wrap_fn = RefCell::new))]
-  char: RefCell<Box<dyn for<'r> FnMut(&'r mut CharEvent)>>,
+  char: RefCell<Box<CharCallback>>,
 }
 
 #[derive(Debug)]

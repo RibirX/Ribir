@@ -38,15 +38,13 @@ impl DeclareError {
         assert_eq!(id1, id2);
         diagnostic.set_spans(vec![id1.span().unwrap(), id2.span().unwrap()]);
         diagnostic.set_message(format!(
-          "Same `id: {}` assign to multiple objects, id must be unique.",
-          id1
+          "Same `id: {id1}` assign to multiple objects, id must be unique.",
         ));
       }
       DeclareError::CircleDepends(path) => {
         let (msg, spans, note_spans) = path_info(path);
         let msg = format!(
-          "There is a directly circle depends exist, this will cause infinite loop: {}",
-          msg
+          "There is a directly circle depends exist, this will cause infinite loop: {msg}",
         );
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);

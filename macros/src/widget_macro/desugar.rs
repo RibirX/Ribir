@@ -270,7 +270,7 @@ impl Item {
           let span = p.span();
           let prop = ribir_variable("prop", span);
           stmts.push(FinallyStmt::Stmt(
-            parse_quote_spanned! { span => let #prop = #p;},
+            parse_quote_spanned! { span => let #prop = { #p };},
           ));
 
           let prop_changes = ribir_variable("prop_changes", span);
