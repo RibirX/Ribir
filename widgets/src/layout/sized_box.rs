@@ -11,16 +11,19 @@ pub struct SizedBox {
 
 impl Render for SizedBox {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let size = clamp.clamp(self.size);
-    ctx.perform_single_child_layout(BoxClamp { min: size, max: size });
+  fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    ctx.perform_single_child_layout(BoxClamp { min: self.size, max: self.size });
     self.size
   }
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let rect = Rect::from_size(ctx.box_rect().unwrap().size);
+    let path = Path::rect(&rect, PathStyle::Fill);
+    ctx.painter().clip(path);
+  }
 }
 
 impl Query for SizedBox {
