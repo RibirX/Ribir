@@ -2,7 +2,7 @@ use crate::{
   prelude::*,
   ticker::{FrameMsg, FrameTicker},
 };
-use std::{ops::DerefMut, time::Instant};
+use std::{cell::RefCell, ops::DerefMut, rc::Rc, time::Instant};
 
 use super::property::AnimateProperty;
 
@@ -15,6 +15,8 @@ pub struct Animate<T, P: AnimateProperty> {
   running_info: Option<AnimateInfo<P::Value>>,
   #[declare(skip, default = ctx.wnd_ctx().frame_ticker.clone())]
   frame_ticker: FrameTicker,
+  #[declare(skip, default = ctx.wnd_ctx().animate_track())]
+  animate_track: AnimateTrack,
 }
 
 pub struct AnimateInfo<V> {
@@ -63,6 +65,7 @@ where
         _tick_msg_guard: Some(guard),
         already_lerp: false,
       });
+      self.animate_track.set_actived(true);
     }
   }
 }
@@ -118,8 +121,38 @@ impl<T: Roc, P: AnimateProperty> Animate<T, P> {
     info.already_lerp = false;
   }
 
-  pub fn stop(&mut self) { self.running_info.take(); }
+  pub fn stop(&mut self) {
+    self.animate_track.set_actived(false);
+    self.running_info.take();
+  }
 
   #[inline]
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
+}
+
+pub struct AnimateTrack {
+  pub(crate) actived: bool,
+  pub(crate) actived_cnt: Rc<RefCell<u32>>,
+}
+
+impl Drop for AnimateTrack {
+  fn drop(&mut self) {
+    if self.actived {
+      *self.actived_cnt.borrow_mut() -= 1;
+    }
+    self.actived = false;
+  }
+}
+
+impl AnimateTrack {
+  fn set_actived(&mut self, actived: bool) {
+    if self.actived == actived {
+      return;
+    }
+    self.actived = actived;
+    match actived {
+      true => *self.actived_cnt.borrow_mut() += 1,
+      false => *self.actived_cnt.borrow_mut() -= 1,
+    };
+  }
 }

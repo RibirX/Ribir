@@ -107,7 +107,7 @@ impl Window {
       loop {
         self.layout();
 
-        if !self.need_draw() {
+        if !self.widget_tree.is_dirty() {
           break;
         }
       }
@@ -127,7 +127,9 @@ impl Window {
     self.context.layout_ready();
   }
 
-  pub(crate) fn need_draw(&self) -> bool { self.widget_tree.is_dirty() }
+  pub(crate) fn need_draw(&self) -> bool {
+    self.widget_tree.is_dirty() || self.context.has_actived_animate()
+  }
 
   pub fn new<W, P>(wnd: W, p_backend: P, root: Widget, context: AppContext) -> Self
   where

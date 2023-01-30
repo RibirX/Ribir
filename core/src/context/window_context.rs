@@ -5,6 +5,7 @@ use rxrust::prelude::LocalObservable;
 
 use super::AppContext;
 use crate::{
+  animation::AnimateTrack,
   builtin_widgets::Theme,
   events::focus_mgr::{FocusManager, FocusType, FocustHandle},
   ticker::{FrameMsg, FrameTicker},
@@ -16,6 +17,7 @@ pub struct WindowCtx {
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
   pub(crate) app_ctx: AppContext,
+  pub(crate) actived_animates: Rc<RefCell<u32>>,
 }
 
 impl WindowCtx {
@@ -26,6 +28,7 @@ impl WindowCtx {
       app_ctx,
       focus_mgr: Rc::new(RefCell::new(FocusManager::default())),
       frame_ticker: FrameTicker::default(),
+      actived_animates: Rc::new(RefCell::new(0)),
     }
   }
 
@@ -79,5 +82,14 @@ impl WindowCtx {
       .focus_mgr
       .borrow_mut()
       .remove_focus_node(wid, focus_tyep);
+  }
+
+  pub(crate) fn has_actived_animate(&self) -> bool { *self.actived_animates.borrow() > 0 }
+
+  pub fn animate_track(&self) -> AnimateTrack {
+    AnimateTrack {
+      actived: false,
+      actived_cnt: self.actived_animates.clone(),
+    }
   }
 }
