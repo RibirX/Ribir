@@ -27,9 +27,12 @@ impl Render for Clip {
   fn paint(&self, ctx: &mut PaintingCtx) {
     let path = match &self.clip {
       ClipType::Auto => {
-        let rect = ctx
-          .box_rect()
-          .expect("impossible without size in painting stage");
+        let rect = Rect::from_size(
+          ctx
+            .box_rect()
+            .expect("impossible without size in painting stage")
+            .size,
+        );
         Path::rect(&rect, PathStyle::Fill)
       }
       ClipType::Path(path) => path.clone(),
