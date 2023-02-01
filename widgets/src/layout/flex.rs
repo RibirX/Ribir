@@ -543,7 +543,7 @@ mod tests {
       let item_size = Size::new(100., 20.);
       let root = widget! {
         SizedBox {
-          size: INFINITY_SIZE,
+          size: Size::new(500., 500.),
           Row {
             justify_content,
             align_items: Align::Start,
