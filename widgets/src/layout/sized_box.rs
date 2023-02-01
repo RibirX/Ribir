@@ -101,7 +101,7 @@ mod tests {
         },
         LayoutTestItem {
           path: &[0, 0],
-          expect: ExpectRect::from_size(wnd_size),
+          expect: ExpectRect::from_size(INFINITY_SIZE),
         },
       ],
     );
