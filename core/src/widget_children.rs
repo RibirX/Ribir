@@ -397,7 +397,6 @@ where
   fn with_child(self, child: Stateful<DynWidget<D>>) -> Self::Target {
     let this = Stateful::new(self);
     widget! {
-      states { child }
       DynWidget {
         dyns: {
           let widgets = DynRender::spread(child.clone_stateful());
