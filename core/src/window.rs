@@ -194,7 +194,7 @@ impl Window {
         .unwrap();
 
       rows.for_each(|data| {
-        stream_writer.write(data).unwrap();
+        stream_writer.write_all(data).unwrap();
       });
       stream_writer.finish().unwrap();
     })
