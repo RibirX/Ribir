@@ -25,11 +25,21 @@ pub struct AppContext {
   pub executor: Executor,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Executor {
   #[cfg(feature = "thread-pool")]
   pub thread_pool: futures::executor::ThreadPool,
   pub local: Rc<RefCell<LocalPool>>,
+}
+
+impl Default for Executor {
+  fn default() -> Self {
+    Self {
+      #[cfg(feature = "thread-pool")]
+      thread_pool: futures::executor::ThreadPool::new().unwrap(),
+      local: Rc::new(RefCell::new(LocalPool::default())),
+    }
+  }
 }
 
 impl AppContext {
