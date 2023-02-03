@@ -45,7 +45,7 @@ struct TypographyResult {
 #[derive(Clone)]
 pub struct TypographyStore {
   reorder: TextReorder,
-  shaper: TextShaper,
+  pub shaper: TextShaper,
   font_db: Arc<RwLock<FontDB>>,
   cache: Arc<RwLock<FrameCache<TypographyKey, TypographyResult>>>,
 }

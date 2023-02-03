@@ -12,6 +12,7 @@ ribir_core = {path = "../core"}
 ribir_widgets = {path = "../widgets"}
 lyon_algorithms = "1.0.1"
 lyon_path = "1.0.1"
+euclid = "0.22.6"
 
 [dev-dependencies]
 env_logger = "0.7.1"
