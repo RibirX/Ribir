@@ -22,7 +22,7 @@ pub fn expect_layout_result_with_theme(
     app_theme: std::rc::Rc::new(theme),
     ..<_>::default()
   };
-  let mut wnd = Window::mock_render(w, wnd_size.unwrap_or_else(|| Size::new(1024., 1024.)), ctx);
+  let mut wnd = Window::mock_window(w, wnd_size.unwrap_or_else(|| Size::new(1024., 1024.)), ctx);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     assert_layout_result(&wnd, path, expect);

@@ -9,6 +9,7 @@ version = "0.1.0"
 [dependencies]
 ahash = "0.7.6"
 ribir_algo = {path = "../algo"}
+ribir_gpu = {path = "../gpu"}
 bitflags = "1.2.1"
 futures = "0.3.5"
 indextree = "4.5.0"

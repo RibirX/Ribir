@@ -51,7 +51,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
-  pub use crate::window::Window;
+  pub use crate::window::{Window, WindowBuilder};
   #[doc(no_inline)]
   pub use ::ribir_painter::*;
   pub use log;
