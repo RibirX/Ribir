@@ -320,13 +320,16 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       }
 
       impl #g_impl #declarer #g_ty #g_where {
-        #vis fn build(mut self, ctx: &BuildCtx) -> #name #g_ty  {
+        #builder_methods
+      }
+
+      impl #g_impl DeclareBuilder for #declarer #g_ty #g_where {
+        type Target = #name #g_ty;
+        fn build(mut self, ctx: &BuildCtx) -> #name #g_ty  {
           #(#fill_default)*
           #name {
             #(#fields_ident : #builder_values),* }
         }
-
-        #builder_methods
       }
   };
   Ok(tokens)

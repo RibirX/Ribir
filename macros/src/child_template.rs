@@ -88,9 +88,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       fn declare_builder() -> Self::Builder { #name::builder() }
     }
 
-    impl #g_impl #tml #g_ty {
+    impl #g_impl DeclareBuilder for #tml #g_ty {
+      type Target = Self;
       #[inline]
-      #vis fn build(self, _: &BuildCtx) -> Self { self }
+      fn build(self, _: &BuildCtx) -> Self { self }
     }
 
     #fill_child_impl
