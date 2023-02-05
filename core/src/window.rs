@@ -65,6 +65,117 @@ impl RawWindow for winit::window::Window {
   fn scale_factor(&self) -> f64 { winit::window::Window::scale_factor(self) }
 }
 
+pub struct WindowBuilder {
+  inner_builder: winit::window::WindowBuilder,
+  root: Widget,
+}
+
+impl WindowBuilder {
+  #[inline]
+  pub fn build(self, app: &Application) -> Window {
+    let native_wnd = self.inner_builder.build(app.event_loop()).unwrap();
+    let size = native_wnd.inner_size();
+    let ctx = app.context().clone();
+    let p_backend = AppContext::wait_future(ribir_gpu::wgpu_backend_with_wnd(
+      &native_wnd,
+      DeviceSize::new(size.width, size.height),
+      None,
+      None,
+      ctx.shaper.clone(),
+    ));
+    Window::new(native_wnd, p_backend, self.root, ctx)
+  }
+
+  /// Requests the window to be of specific dimensions.
+  #[inline]
+  pub fn with_inner_size(mut self, size: Size) -> Self {
+    let size = winit::dpi::LogicalSize::new(size.width, size.height);
+    self.inner_builder = self.inner_builder.with_inner_size(size);
+    self
+  }
+
+  /// Sets a minimum dimension size for the window.
+  #[inline]
+  pub fn with_min_inner_size(mut self, min_size: Size) -> Self {
+    let size = winit::dpi::LogicalSize::new(min_size.width, min_size.height);
+    self.inner_builder = self.inner_builder.with_min_inner_size(size);
+    self
+  }
+
+  /// Sets a maximum dimension size for the window.
+  #[inline]
+  pub fn with_max_inner_size(mut self, max_size: Size) -> Self {
+    let size = winit::dpi::LogicalSize::new(max_size.width, max_size.height);
+    self.inner_builder = self.inner_builder.with_max_inner_size(size);
+    self
+  }
+
+  /// Sets a desired initial position for the window.
+  #[inline]
+  pub fn with_position(mut self, position: Point) -> Self {
+    let position = winit::dpi::LogicalPosition::new(position.x, position.y);
+    self.inner_builder = self.inner_builder.with_position(position);
+    self
+  }
+
+  /// Sets whether the window is resizable or not.
+  #[inline]
+  pub fn with_resizable(mut self, resizable: bool) -> Self {
+    self.inner_builder = self.inner_builder.with_resizable(resizable);
+    self
+  }
+
+  /// Requests a specific title for the window.
+  #[inline]
+  pub fn with_title<T: Into<String>>(mut self, title: T) -> Self {
+    self.inner_builder = self.inner_builder.with_title(title);
+    self
+  }
+
+  /// Requests maximized mode.
+  #[inline]
+  pub fn with_maximized(mut self, maximized: bool) -> Self {
+    self.inner_builder = self.inner_builder.with_maximized(maximized);
+    self
+  }
+
+  /// Sets whether the window will be initially hidden or visible.
+  #[inline]
+  pub fn with_visible(mut self, visible: bool) -> Self {
+    self.inner_builder = self.inner_builder.with_visible(visible);
+    self
+  }
+
+  /// Sets whether the background of the window should be transparent.
+  #[inline]
+  pub fn with_transparent(mut self, transparent: bool) -> Self {
+    self.inner_builder = self.inner_builder.with_transparent(transparent);
+    self
+  }
+
+  /// Sets whether the window should have a border, a title bar, etc.
+  #[inline]
+  pub fn with_decorations(mut self, decorations: bool) -> Self {
+    self.inner_builder = self.inner_builder.with_decorations(decorations);
+    self
+  }
+
+  /// Sets whether or not the window will always be on top of other windows.
+  #[inline]
+  pub fn with_always_on_top(mut self, always_on_top: bool) -> Self {
+    self.inner_builder = self.inner_builder.with_always_on_top(always_on_top);
+    self
+  }
+
+  // /// Sets the window icon.
+  // #[inline]
+  // pub fn with_window_icon(mut self, window_icon: Option<winit::window::Icon>)
+  // -> Self {   self.inner_builder =
+  // self.inner_builder.with_window_icon(window_icon);   self
+  // }
+
+}
+
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
@@ -76,6 +187,14 @@ pub struct Window {
 }
 
 impl Window {
+  #[inline]
+  pub fn builder(root: Widget) -> WindowBuilder {
+    WindowBuilder {
+        root,
+        inner_builder: winit::window::WindowBuilder::default(),
+    }
+  }
+
   /// processes native events from this native window
   #[inline]
   pub fn processes_native_event(&mut self, event: WindowEvent) {
@@ -267,10 +386,10 @@ impl RawWindow for MockRawWindow {
 impl Window {
   pub fn default_mock(root: Widget, size: Option<Size>) -> Self {
     let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
-    Self::mock_render(root, size, <_>::default())
+    Self::mock_window(root, size, <_>::default())
   }
 
-  pub fn mock_render(root: Widget, size: Size, ctx: AppContext) -> Self {
+  pub fn mock_window(root: Widget, size: Size, ctx: AppContext) -> Self {
     Self::new(
       MockRawWindow { size, ..Default::default() },
       MockBackend,
@@ -290,7 +409,7 @@ mod tests {
     let w = widget! {
        MockBox { size: INFINITY_SIZE }
     };
-    let mut wnd = Window::mock_render(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = Window::mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
     assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(100., 100.)));
 

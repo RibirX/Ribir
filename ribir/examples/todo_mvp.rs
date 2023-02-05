@@ -234,5 +234,8 @@ fn main() {
     ],
   };
 
-  app::run(Stateful::new(todo).into_widget());
+
+  let app = Application::new(material::purple::light());
+  let wnd = Window::builder(todo.into_widget()).with_inner_size(Size::new(400., 640.)).build(&app);
+  app::run_with_window(app, wnd);
 }

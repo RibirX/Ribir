@@ -103,7 +103,7 @@ mod tests {
       app_theme: Rc::new(Theme::Full(theme)),
       ..Default::default()
     };
-    let mut wnd = Window::mock_render(w, Size::new(500., 500.), ctx);
+    let mut wnd = Window::mock_window(w, Size::new(500., 500.), ctx);
     wnd.draw_frame();
 
     let rect = layout_info_by_path(&wnd, &[0]);

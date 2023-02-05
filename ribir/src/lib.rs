@@ -4,24 +4,19 @@ pub mod prelude {
   pub use ribir_core::prelude::*;
   pub use ribir_widgets::prelude::*;
   pub mod app {
+    use ribir_core::window::Window;
 
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
-      use ribir_core::widget::IntoWidget;
-      let mut app = super::Application::new(super::material::purple::light());
+      let app = super::Application::new(super::material::purple::light());
+      let wnd = Window::builder(root).build(&app);
+      run_with_window(app, wnd);
+    }
 
-      let wnd = app.new_window(|native_wnd, ctx| {
-        let size = native_wnd.inner_size();
-        let p_backend = super::AppContext::wait_future(ribir_gpu::wgpu_backend_with_wnd(
-          &native_wnd,
-          super::DeviceSize::new(size.width, size.height),
-          None,
-          None,
-          ctx.shaper.clone(),
-        ));
-        super::Window::new(native_wnd, p_backend, root.into_widget(), ctx)
-      });
-      app.exec(wnd);
+    #[cfg(feature = "wgpu_gl")]
+    pub fn run_with_window(mut app: super::Application, wnd: Window) {
+      let wnd_id = app.add_window(wnd);
+      app.exec(wnd_id);
     }
   }
 }

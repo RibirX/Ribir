@@ -33,6 +33,8 @@ impl Application {
   #[inline]
   pub fn context(&self) -> &AppContext { &self.ctx }
 
+  pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
+
   pub fn exec(mut self, wnd_id: WindowId) {
     if let Some(wnd) = self.windows.get_mut(&wnd_id) {
       wnd.draw_frame();
@@ -76,16 +78,7 @@ impl Application {
     });
   }
 
-  pub fn new_window(
-    &mut self,
-    wnd_creator: impl FnOnce(winit::window::Window, AppContext) -> Window,
-  ) -> WindowId {
-    let native_wnd = winit::window::WindowBuilder::new()
-      .with_inner_size(winit::dpi::LogicalSize::new(512., 512.))
-      .build(&self.event_loop)
-      .unwrap();
-    let wnd = wnd_creator(native_wnd, self.ctx.clone());
-
+  pub fn add_window(&mut self, wnd: Window) -> WindowId {
     let id = wnd.raw_window.id();
     self.windows.insert(id, wnd);
 
