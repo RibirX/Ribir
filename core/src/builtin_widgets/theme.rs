@@ -18,6 +18,7 @@ mod custom_theme;
 pub use custom_theme::*;
 
 use crate::{
+  declare::DeclareBuilder,
   impl_query_self_only,
   prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
   state::State,

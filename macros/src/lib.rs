@@ -61,8 +61,8 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 ///   `declare！` to build the `XXX` widget.
 /// - for every field of `XXXBuilder`
 ///   - implement an associate method `into_xxx`   use to convert a value to the
-///     `xxx` field type, which effect by the   `convert` meta. `widget!` will
-///     use it to convert the field value
+///     `xxx` field type, which effect by the `convert` meta. `widget!` will use
+///     it to convert the field value
 ///   - implement method with same name of the field and use to init the field.
 ///
 ///  [declare]: ../ribir/declare/index.html
