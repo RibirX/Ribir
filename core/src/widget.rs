@@ -2,7 +2,7 @@ pub(crate) use crate::{composed_widget::ComposedWidget, widget_tree::*};
 use crate::{context::*, prelude::ComposeChild, state::State};
 use ribir_algo::ShareResource;
 use ribir_painter::*;
-use rxrust::subscription::{SubscriptionGuard, SubscriptionLike};
+use rxrust::subscription::{SubscriptionGuard, BoxSubscription};
 
 #[doc(hidden)]
 pub use std::{
@@ -370,6 +370,6 @@ impl Query for Box<dyn Render> {
   impl_proxy_query!(self.deref());
 }
 
-impl Query for Vec<SubscriptionGuard<Box<dyn SubscriptionLike>>> {
+impl Query for Vec<SubscriptionGuard<BoxSubscription<'static>>> {
   impl_query_self_only!();
 }

@@ -13,9 +13,14 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
 29 |         cursor: a.cursor
    |         ^^^^^^  ^^^^^^^^
    |
-note: You should manual watch to break circle, subscribe only if the value really changed.
-       `let_watch!(...).distinct_until_changed().subscribe(...)`
+note: You should manual watch expression and add operator to break the circular, then delay subscribe it avoid to mut borrow panic. For example
 
+      ```
+        let_watch!(...)
+          .distinct_until_changed()
+          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .subscribe(...)
+      ```
   --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:25:7
    |
 25 |       cursor: b.cursor,

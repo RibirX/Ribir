@@ -336,7 +336,8 @@ mod tests {
     };
 
     let app_ctx = <_>::default();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx));
+    let scheduler = FuturesLocalSchedulerPool::default().spawner();
+    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx, scheduler));
     tree.layout(Size::zero());
     assert_eq!(*root_layout_cnt.state_ref(), 1);
     {

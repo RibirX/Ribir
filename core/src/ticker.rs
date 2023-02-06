@@ -1,11 +1,11 @@
 use std::time::Instant;
 
-use rxrust::prelude::{LocalSubject, Observer};
+use rxrust::prelude::{Observer, Subject};
 
 /// Frame ticker emit message when new frame need to draw.
 #[derive(Default, Clone)]
 pub struct FrameTicker {
-  subject: LocalSubject<'static, FrameMsg, ()>,
+  subject: Subject<'static, FrameMsg, ()>,
 }
 
 /// Message emitted at different status of a frame.
@@ -30,5 +30,5 @@ impl FrameTicker {
   pub(crate) fn emit(&mut self, msg: FrameMsg) { self.subject.next(msg) }
 
   #[inline]
-  pub fn frame_tick_stream(&self) -> LocalSubject<'static, FrameMsg, ()> { self.subject.clone() }
+  pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, ()> { self.subject.clone() }
 }

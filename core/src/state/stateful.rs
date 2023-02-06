@@ -1,6 +1,6 @@
 use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
 pub use guards::ModifyGuard;
-use rxrust::{ops::box_it::LocalBoxOp, prelude::*};
+use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
   cell::{Cell, UnsafeCell},
   ops::DerefMut,
@@ -16,7 +16,7 @@ pub struct Stateful<W> {
 /// notify downstream when widget state changed, the value mean if the change it
 /// as silent or not.
 #[derive(Default, Clone)]
-pub(crate) struct StateChangeNotifier(LocalSubject<'static, ModifyScope, ()>);
+pub(crate) struct StateChangeNotifier(Subject<'static, ModifyScope, ()>);
 
 /// A reference of `Stateful which tracked the state change across if user
 /// mutable deref this reference.
@@ -158,14 +158,14 @@ impl<W> Stateful<W> {
   #[inline]
   pub(crate) fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::FRAMEWORK) }
 
-  pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> {
+  pub fn raw_modifies(&self) -> Subject<'static, ModifyScope, ()> {
     self.modify_notifier.raw_modifies()
   }
 
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> {
+  pub fn modifies(&self) -> BoxOp<'static, (), ()> {
     self
       .raw_modifies()
       .filter_map(|s: ModifyScope| s.contains(ModifyScope::DATA).then_some(()))
@@ -280,10 +280,10 @@ impl<'a, W> StateRef<'a, W> {
   }
 
   #[inline]
-  pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> { self.value.raw_modifies() }
+  pub fn raw_modifies(&self) -> Subject<'static, ModifyScope, ()> { self.value.raw_modifies() }
 
   #[inline]
-  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> { self.value.modifies() }
+  pub fn modifies(&self) -> BoxOp<'static, (), ()> { self.value.modifies() }
 
   fn new(value: &'a Stateful<W>, modify_scope: ModifyScope) -> Self {
     Self {
@@ -383,7 +383,7 @@ impl Query for StateChangeNotifier {
 }
 
 impl StateChangeNotifier {
-  pub(crate) fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> { self.0.clone() }
+  pub(crate) fn raw_modifies(&self) -> Subject<'static, ModifyScope, ()> { self.0.clone() }
 }
 
 #[cfg(test)]

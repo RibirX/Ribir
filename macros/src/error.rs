@@ -48,10 +48,15 @@ impl DeclareError {
         );
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);
-        let note_msg = "You should manual watch to break circle, subscribe \
-          only if the value really changed.\n \
-          `let_watch!(...).distinct_until_changed().subscribe(...)`
-          ";
+        let note_msg = "You should manual watch expression and add operator \
+         to break the circular, then delay subscribe it avoid to mut borrow panic. \
+        For example \n
+```
+  let_watch!(...)
+    .distinct_until_changed()
+    .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+    .subscribe(...)
+```";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
       }
       DeclareError::TransitionByConflict(span) => {

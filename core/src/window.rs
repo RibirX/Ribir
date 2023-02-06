@@ -173,9 +173,11 @@ impl WindowBuilder {
   // -> Self {   self.inner_builder =
   // self.inner_builder.with_window_icon(window_icon);   self
   // }
-
 }
 
+/// A rx scheduler pool that block until all task finished before every frame
+/// end.
+struct FramePool(FuturesLocalSchedulerPool);
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
@@ -184,14 +186,17 @@ pub struct Window {
   pub(crate) dispatcher: Dispatcher,
   pub(crate) widget_tree: WidgetTree,
   p_backend: Box<dyn PainterBackend>,
+  /// A task pool use to process `Future` or `rxRust` task, and will block until
+  /// all task finished before current frame end.
+  frame_pool: FramePool,
 }
 
 impl Window {
   #[inline]
   pub fn builder(root: Widget) -> WindowBuilder {
     WindowBuilder {
-        root,
-        inner_builder: winit::window::WindowBuilder::default(),
+      root,
+      inner_builder: winit::window::WindowBuilder::default(),
     }
   }
 
@@ -226,6 +231,9 @@ impl Window {
       loop {
         self.layout();
 
+        // wait all frame task finished.
+        self.frame_pool.0.run();
+
         if !self.widget_tree.is_dirty() {
           break;
         }
@@ -256,7 +264,8 @@ impl Window {
     P: PainterBackend + 'static,
   {
     let typography = context.typography_store.clone();
-    let wnd_ctx = WindowCtx::new(context);
+    let frame_pool = FramePool(FuturesLocalSchedulerPool::new());
+    let wnd_ctx = WindowCtx::new(context, frame_pool.0.spawner());
     let widget_tree = WidgetTree::new(root, wnd_ctx.clone());
     let dispatcher = Dispatcher::new(wnd_ctx.focus_mgr.clone());
     let painter = Painter::new(wnd.scale_factor() as f32, typography, wnd.inner_size());
@@ -267,6 +276,7 @@ impl Window {
       widget_tree,
       p_backend: Box::new(p_backend),
       painter,
+      frame_pool,
     }
   }
 
