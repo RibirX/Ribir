@@ -48,7 +48,9 @@ pub struct Init {
 }
 
 pub struct Finally {
-  _init_token: kw::finally,
+  _finally_token: kw::finally,
+  pub ctx_name: Option<Ident>,
+  _fat_arrow: Option<FatArrow>,
   pub block: Block,
 }
 
@@ -228,30 +230,34 @@ impl Parse for States {
   }
 }
 
+fn ctx_block_parse<Kw: Parse>(
+  input: ParseStream,
+) -> Result<(Kw, Option<Ident>, Option<FatArrow>, Block)> {
+  let kw = input.parse::<Kw>()?;
+  let ctx: Option<Ident> = input.parse()?;
+  let fat_arrow: Option<FatArrow> = if ctx.is_some() { input.parse()? } else { None };
+
+  Ok((kw, ctx, fat_arrow, input.parse()?))
+}
+
 impl Parse for Init {
   fn parse(input: ParseStream) -> Result<Self> {
-    let _init_token = input.parse()?;
-    let ctx_name: Option<Ident> = input.parse()?;
-    let _fat_arrow = if ctx_name.is_some() {
-      input.parse()?
-    } else {
-      None
-    };
-
-    Ok(Self {
+    ctx_block_parse(input).map(|(_init_token, ctx_name, _fat_arrow, block)| Self {
       _init_token,
       ctx_name,
       _fat_arrow,
-      block: input.parse()?,
+      block,
     })
   }
 }
 
 impl Parse for Finally {
   fn parse(input: ParseStream) -> Result<Self> {
-    Ok(Self {
-      _init_token: input.parse()?,
-      block: input.parse()?,
+    ctx_block_parse(input).map(|(_finally_token, ctx_name, _fat_arrow, block)| Self {
+      _finally_token,
+      ctx_name,
+      _fat_arrow,
+      block,
     })
   }
 }

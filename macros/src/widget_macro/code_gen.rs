@@ -530,6 +530,12 @@ impl ToTokens for InitStmts {
 impl ToTokens for FinallyBlock {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     self.brace_token.surround(tokens, |tokens| {
+      // finally block can directly define a variable but `init` can't, because
+      // `finally` not leak its variable outside.
+      if let Some(ctx) = self.ctx_name.as_ref() {
+        let real_ctx = ctx_ident();
+        quote_spanned! { ctx.span() => let #ctx = #real_ctx; }.to_tokens(tokens);
+      }
       self.used_name_info.prepend_bundle_refs(tokens);
       tokens.append_all(&self.stmts)
     })
