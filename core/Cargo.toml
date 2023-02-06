@@ -9,7 +9,7 @@ version = "0.1.0"
 [dependencies]
 ahash = "0.7.6"
 bitflags = "1.2.1"
-futures = "0.3.5"
+futures = "0.3.26"
 indextree = "4.5.0"
 lazy_static = "1.4.0"
 log = "0.4.8"
@@ -21,7 +21,8 @@ ribir_gpu = {path = "../gpu"}
 ribir_macros = {path = "../macros"}
 ribir_painter = {path = "../painter", version = "*"}
 ribir_text = {path = "../text"}
-rxrust = "1.0.0-alpha.5"
+rxrust = {git = "https://github.com/rxRust/rxRust.git", branch = "refactor-traits"}
+
 smallvec = "1.8.0"
 winit = "0.26.1"
 

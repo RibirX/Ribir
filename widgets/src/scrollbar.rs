@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::layout::{Container, Stack};
 use ribir_core::prelude::*;
 
@@ -78,9 +80,10 @@ impl ComposeChild for HScrollBar {
           v_align: VAlign::Bottom,
         }
       }
-      finally {
+      finally ctx => {
         let_watch!(scrolling.scroll_pos.x)
           .distinct_until_changed()
+          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
       }
     }
@@ -115,9 +118,10 @@ impl ComposeChild for VScrollBar {
           h_align: HAlign::Right
         }
       }
-      finally {
+      finally ctx => {
         let_watch!(scrolling.scroll_pos.y)
           .distinct_until_changed()
+          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
       }
     }
@@ -159,9 +163,10 @@ impl ComposeChild for BothScrollbar {
           margin: EdgeInsets::only_bottom(h_bar.layout_height())
         }
       }
-      finally {
+      finally ctx => {
         let_watch!(scrolling.scroll_pos)
           .distinct_until_changed()
+          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
       }
     }

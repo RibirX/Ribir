@@ -53,7 +53,8 @@ mod tests {
       }
     };
 
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default()));
+    let scheduler = FuturesLocalSchedulerPool::default().spawner();
+    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
     assert_eq!(&**lifecycle.state_ref(), ["static mounted"]);
     tree.layout(Size::new(100., 100.));
     assert_eq!(

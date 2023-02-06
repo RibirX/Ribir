@@ -1,8 +1,6 @@
-use std::rc::Rc;
-
-use rxrust::{observable, ops::box_it::LocalBoxOp, prelude::Observable, subject::LocalSubject};
-
 use super::{ModifyScope, StateRef, Stateful};
+use rxrust::{observable, ops::box_it::BoxOp, prelude::BoxIt, subject::Subject};
+use std::rc::Rc;
 
 pub enum Readonly<W> {
   Stateful(Stateful<W>),
@@ -33,17 +31,17 @@ impl<W> Readonly<W> {
     self.state_ref()
   }
 
-  pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> {
+  pub fn raw_modifies(&self) -> Subject<'static, ModifyScope, ()> {
     match self {
       Readonly::Stateful(s) => s.raw_modifies(),
-      Readonly::Stateless(_) => LocalSubject::default(),
+      Readonly::Stateless(_) => Subject::default(),
     }
   }
 
   /// Notify when this widget be mutable accessed, no mather if the widget
   /// really be modified, the value is hint if it's only access by silent ref.
   #[inline]
-  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> {
+  pub fn modifies(&self) -> BoxOp<'static, (), ()> {
     match self {
       Readonly::Stateful(s) => s.modifies(),
       Readonly::Stateless(_) => observable::create(|_| {}).box_it(),
@@ -61,15 +59,15 @@ impl<'a, W> ReadRef<'a, W> {
   pub fn silent(&self) -> &W { self }
 
   #[inline]
-  pub fn raw_modifies(&self) -> LocalSubject<'static, ModifyScope, ()> {
+  pub fn raw_modifies(&self) -> Subject<'static, ModifyScope, ()> {
     match self {
       ReadRef::Stateful(s) => s.raw_modifies(),
-      ReadRef::Stateless(_) => LocalSubject::default(),
+      ReadRef::Stateless(_) => Subject::default(),
     }
   }
 
   #[inline]
-  pub fn modifies(&self) -> LocalBoxOp<'static, (), ()> {
+  pub fn modifies(&self) -> BoxOp<'static, (), ()> {
     match self {
       ReadRef::Stateful(s) => s.modifies(),
       ReadRef::Stateless(_) => observable::create(|_| {}).box_it(),

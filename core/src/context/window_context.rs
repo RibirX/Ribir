@@ -1,7 +1,10 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
-
+use futures::{
+  task::{LocalSpawnExt, SpawnError},
+  Future,
+};
 use ribir_painter::TypographyStore;
-use rxrust::prelude::LocalObservable;
+use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 use super::AppContext;
 use crate::{
@@ -18,23 +21,36 @@ pub struct WindowCtx {
   pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
   pub(crate) app_ctx: AppContext,
   pub(crate) actived_animates: Rc<RefCell<u32>>,
+  pub(crate) frame_scheduler: FuturesLocalScheduler,
 }
 
 impl WindowCtx {
   pub fn app_theme(&self) -> Rc<Theme> { self.app_ctx.app_theme.clone() }
 
-  pub fn new(app_ctx: AppContext) -> Self {
+  pub fn new(app_ctx: AppContext, frame_scheduler: FuturesLocalScheduler) -> Self {
     Self {
       app_ctx,
       focus_mgr: Rc::new(RefCell::new(FocusManager::default())),
       frame_ticker: FrameTicker::default(),
       actived_animates: Rc::new(RefCell::new(0)),
+      frame_scheduler,
     }
+  }
+
+  /// Return an `rxRust` Scheduler, which will guarantee all task add to the
+  /// scheduler will finished before current frame finished.
+  #[inline]
+  pub fn frame_scheduler(&self) -> FuturesLocalScheduler { self.frame_scheduler.clone() }
+
+  /// Spawns a task that polls the given future with output `()` to completion.
+  /// And guarantee wait this task will finished in current frame.
+  pub fn frame_spawn(&self, f: impl Future<Output = ()> + 'static) -> Result<(), SpawnError> {
+    self.frame_scheduler.spawn_local(f)
   }
 
   pub fn typography_store(&self) -> &TypographyStore { &self.app_ctx.typography_store }
 
-  pub fn frame_tick_stream(&self) -> impl LocalObservable<'static, Item = FrameMsg, Err = ()> {
+  pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, ()> {
     self.frame_ticker.frame_tick_stream()
   }
 

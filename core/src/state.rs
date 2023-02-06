@@ -3,7 +3,7 @@ mod stateful;
 use std::rc::Rc;
 
 pub use readonly::*;
-use rxrust::prelude::SubscribeNext;
+use rxrust::prelude::ObservableItem;
 pub use stateful::*;
 
 use crate::dynamic_widget::DynWidget;

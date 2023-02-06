@@ -26,7 +26,7 @@ pub struct AnimateInfo<V> {
   last_progress: AnimateProgress,
   // Determines if lerp value in current frame.
   already_lerp: bool,
-  _tick_msg_guard: Option<SubscriptionGuard<MutRc<SingleSubscription>>>,
+  _tick_msg_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
 }
 
 impl<'a, T: Roc, P: AnimateProperty> StateRef<'a, Animate<T, P>>
@@ -43,20 +43,18 @@ where
     } else {
       let animate = self.clone_stateful();
       let ticker = self.frame_ticker.frame_tick_stream();
-      let guard = ticker
-        .subscribe(move |msg| match msg {
-          FrameMsg::NewFrame(_) => {}
-          FrameMsg::LayoutReady(time) => {
-            let p = animate.shallow_ref().lerp(time);
-            if matches!(p, AnimateProgress::Finish) {
-              animate.silent_ref().stop();
-            }
+      let unsub = ticker.subscribe(move |msg| match msg {
+        FrameMsg::NewFrame(_) => {}
+        FrameMsg::LayoutReady(time) => {
+          let p = animate.shallow_ref().lerp(time);
+          if matches!(p, AnimateProgress::Finish) {
+            animate.silent_ref().stop();
           }
-          // use silent_ref because the state of animate change, bu no need to effect the framework.
-          FrameMsg::Finish(_) => animate.silent_ref().frame_finished(),
-        })
-        .unsubscribe_when_dropped();
-
+        }
+        // use silent_ref because the state of animate change, bu no need to effect the framework.
+        FrameMsg::Finish(_) => animate.silent_ref().frame_finished(),
+      });
+      let guard = BoxSubscription::new(unsub).unsubscribe_when_dropped();
       self.running_info = Some(AnimateInfo {
         from: self.from.clone(),
         to: new_to,
