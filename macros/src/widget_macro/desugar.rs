@@ -38,6 +38,7 @@ pub struct InitStmts {
 
 #[derive(Default)]
 pub struct FinallyBlock {
+  pub ctx_name: Option<Ident>,
   pub brace_token: Brace,
   pub stmts: Vec<FinallyStmt>,
   pub used_name_info: ScopeUsedInfo,
@@ -114,6 +115,7 @@ impl MacroSyntax {
       finally: finally.map(|f| {
         let Block { brace_token, stmts } = f.block;
         FinallyBlock {
+          ctx_name: f.ctx_name,
           brace_token,
           stmts: stmts.into_iter().map(FinallyStmt::Stmt).collect(),
           used_name_info: <_>::default(),

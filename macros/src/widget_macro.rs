@@ -62,7 +62,6 @@ pub fn gen_widget_macro(
     ctx.analyze_stack = outside_ctx.analyze_stack.clone();
   }
 
-  // visit init without named objects.
   if let Some(init) = desugar.init.as_mut() {
     ctx.visit_init_stmts_mut(init);
     if let Some(ctx_name) = init.ctx_name.clone() {
