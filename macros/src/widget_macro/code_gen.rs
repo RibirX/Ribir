@@ -16,15 +16,45 @@ use syn::{
 };
 
 use super::{
-  builtin_var_name, ctx_ident,
+  builtin_var_name, closure_surround_refs, ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
     NamedObjMap, WidgetNode,
   },
   guard_vec_ident,
   parser::{PropMacro, Property, StateField, States},
-  Desugared, ObjectUsed, ObjectUsedPath, UsedPart, UsedType, VisitCtx, WIDGETS,
+  Desugared, ObjectUsed, ObjectUsedPath, TrackExpr, UsedPart, UsedType, VisitCtx, WIDGETS,
 };
+
+pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {
+  let input = input.into();
+  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
+
+  ctx.new_scope_visit(
+    |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
+    |scope| {
+      scope.iter_mut().for_each(|(_, info)| {
+        info.used_type.remove(UsedType::SUBSCRIBE);
+        info.used_type |= UsedType::SCOPE_CAPTURE
+      });
+    },
+  );
+
+  if let Some(upstream) = watch_expr.used_name_info.upstream_modifies_tokens(false) {
+    let map_closure = closure_surround_refs(
+      &watch_expr.used_name_info,
+      &mut parse_quote!( move |_| #watch_expr),
+    )
+    .unwrap();
+
+    quote_spanned! { watch_expr.span() => #upstream.map(#map_closure) }.into()
+  } else {
+    let mut tokens = quote! {};
+    DeclareError::WatchNothing(watch_expr.span().unwrap()).to_compile_error(&mut tokens);
+    ctx.visit_error_occur = true;
+    tokens.into()
+  }
+}
 
 pub(crate) fn gen_prop_macro(
   input: proc_macro::TokenStream,
