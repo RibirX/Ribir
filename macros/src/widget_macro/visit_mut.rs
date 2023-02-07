@@ -8,7 +8,7 @@ use crate::{
 
 use super::{
   builtin_var_name, capture_widget,
-  code_gen::{gen_move_to_widget_macro, gen_prop_macro},
+  code_gen::{gen_move_to_widget_macro, gen_prop_macro, gen_watch_macro},
   ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
@@ -25,7 +25,7 @@ use std::{
   hash::Hash,
 };
 use syn::{
-  parse_macro_input, parse_quote, parse_quote_spanned,
+  parse_quote, parse_quote_spanned,
   spanned::Spanned,
   token::{Brace, Semi},
   visit_mut,
@@ -380,7 +380,7 @@ impl VisitCtx {
 
                   let field_fn_name = ribir_suffix_variable(&f.member, "fn");
                   let mut field_fn: ExprClosure =
-                    parse_quote_spanned! { expr.span() => move || #expr};
+                    parse_quote_spanned! { expr.span() => move || #expr };
                   let body_used = expr.used_name_info.clone();
                   let field_fn = closure_surround_refs(&body_used, &mut field_fn);
                   let field_fn = quote_spanned! { expr.span() =>
@@ -706,35 +706,6 @@ impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
 
 impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
-}
-
-pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {
-  let input = input.into();
-  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
-
-  ctx.new_scope_visit(
-    |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
-    |scope| {
-      scope.iter_mut().for_each(|(_, info)| {
-        info.used_type.remove(UsedType::SUBSCRIBE);
-        info.used_type |= UsedType::SCOPE_CAPTURE
-      });
-    },
-  );
-  if let Some(upstream) = watch_expr.used_name_info.upstream_modifies_tokens(false) {
-    let map_closure = closure_surround_refs(
-      &watch_expr.used_name_info,
-      &mut parse_quote!( move |_| #watch_expr),
-    )
-    .unwrap();
-
-    quote_spanned! { watch_expr.span() => #upstream.map(#map_closure) }.into()
-  } else {
-    let mut tokens = quote! {};
-    DeclareError::WatchNothing(watch_expr.span().unwrap()).to_compile_error(&mut tokens);
-    ctx.visit_error_occur = true;
-    tokens.into()
-  }
 }
 
 #[test]

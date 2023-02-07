@@ -17,6 +17,7 @@ pub mod declare;
 pub mod dynamic_widget;
 pub mod enum_widget;
 pub mod events;
+pub mod assign_observable;
 pub mod ticker;
 pub mod widget;
 pub mod widget_children;
