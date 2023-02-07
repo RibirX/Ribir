@@ -2,13 +2,13 @@ use crate::{
   declare_derive::declare_field_name,
   error::DeclareError,
   widget_macro::{desugar::WatchField, guard_ident, guard_vec_ident},
-  LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, PROP_MACRO_NAME, WATCH_MACRO_NAME,
+  ASSIGN_WATCH, LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, PROP_MACRO_NAME, WATCH_MACRO_NAME,
   WIDGET_MACRO_NAME,
 };
 
 use super::{
   builtin_var_name, capture_widget,
-  code_gen::{gen_move_to_widget_macro, gen_prop_macro, gen_watch_macro},
+  code_gen::{gen_assign_watch, gen_move_to_widget_macro, gen_prop_macro, gen_watch_macro},
   ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
@@ -112,6 +112,8 @@ impl VisitMut for VisitCtx {
           DeclareError::LetWatchWrongPlace(mac.span().unwrap()).to_compile_error(&mut tokens);
           *expr = Expr::Verbatim(tokens);
           self.visit_error_occur = true;
+        } else if mac.path.is_ident(ASSIGN_WATCH) {
+          *expr = Expr::Verbatim(gen_assign_watch(mac.tokens.clone(), self).into());
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -180,6 +182,10 @@ impl VisitMut for VisitCtx {
           DeclareError::LetWatchWrongPlace(mac.span().unwrap()).to_compile_error(&mut tokens);
           self.visit_error_occur = true;
           *stmt = Stmt::Expr(Expr::Verbatim(tokens));
+        } else if mac.path.is_ident(ASSIGN_WATCH) {
+          *stmt = Stmt::Expr(Expr::Verbatim(
+            gen_assign_watch(mac.tokens.clone(), self).into(),
+          ));
         }
       }
       Stmt::Expr(expr) => {
@@ -383,24 +389,12 @@ impl VisitCtx {
                     parse_quote_spanned! { expr.span() => move || #expr };
                   let body_used = expr.used_name_info.clone();
                   let field_fn = closure_surround_refs(&body_used, &mut field_fn);
-                  let field_fn = quote_spanned! { expr.span() =>
+                  let pre_def = quote_spanned! { expr.span() =>
                     let #field_fn_name = #field_fn;
                   };
 
                   expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name.clone()()};
-
-                  let declare_set = declare_field_name(&f.member);
-                  let subscribe_do: Expr = parse_quote_spanned! { expr.span() => {
-                    let #name = #name.clone_stateful();
-                    move |_| {
-                      #[allow(clippy::redundant_clone, clippy::clone_on_copy)]
-                      let #field_fn_name = #field_fn_name.clone()();
-                      #name.state_ref().#declare_set(#field_fn_name)
-                    }
-                  }};
-
                   ctx.has_guards_data = true;
-
                   // DynWidget is a special object, it's both require data and framework change to
                   // update its children. When user call `.silent()` means no
                   // need relayout and redraw the widget. `DynWidget` as the directly subscriber
@@ -415,15 +409,47 @@ impl VisitCtx {
                     expr.used_name_info.upstream_modifies_tokens(false).unwrap()
                   };
                   let guards = guard_vec_ident();
+                  let declare_set = declare_field_name(&f.member);
                   let watch_update = parse_quote_spanned! { expr.span() =>
                     #guards.push(AnonymousData::new(Box::new(
                       #upstream
-                      .subscribe( #subscribe_do )
+                      .subscribe({
+                        let #name = #name.clone_stateful();
+                        move |_| {
+                          let #field_fn_name = #field_fn_name.clone()();
+                          #name.state_ref().#declare_set(#field_fn_name)
+                        }
+                      })
                       .unsubscribe_when_dropped()
                     )));
                   };
-                  watch_stmts.push(WatchField { field_fn, watch_update });
+                  watch_stmts.push(WatchField { pre_def, watch_update });
                 }
+              }
+              FieldValue::Observable(expr) => {
+                ctx.visit_track_expr_mut(expr);
+                ctx.take_current_used_info();
+
+                let field_subject = ribir_suffix_variable(&f.member, "subject");
+                let field_value = ribir_suffix_variable(&f.member, "init");
+                let pre_def = quote_spanned! { expr.span() =>
+                  let (#field_value, #field_subject) = AssignObservable::unzip(#expr);
+                };
+                expr.expr = parse_quote_spanned! { expr.span() => #field_value };
+                let guards = guard_vec_ident();
+                let declare_set = declare_field_name(&f.member);
+                let watch_update = parse_quote_spanned! { expr.span() =>
+                  #guards.push(AnonymousData::new(Box::new(
+                    #field_subject
+                    .subscribe({
+                      let #name = #name.clone_stateful();
+                      move |v| #name.state_ref().#declare_set(v)
+                    })
+                    .unsubscribe_when_dropped()
+                  )));
+                };
+                watch_stmts.push(WatchField { pre_def, watch_update });
+                ctx.has_guards_data = true;
               }
               FieldValue::Obj(obj) => {
                 ctx.visit_declare_obj_mut(obj, true);
@@ -654,7 +680,7 @@ pub(crate) fn closure_surround_refs(
     all_capture.for_each(|obj| capture_widget(obj).to_tokens(tokens));
     if body_used.ref_widgets().is_some() {
       let mut refs = quote! {};
-      body_used.prepend_bundle_refs(&mut refs);
+      body_used.state_refs_tokens(&mut refs);
       let body = &mut *c.body;
       if let Expr::Block(block) = body {
         block

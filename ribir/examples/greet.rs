@@ -22,36 +22,41 @@ fn main() {
         }
       }
       DynWidget {
-        dyns: (*counter > 0).then(|| {
-          widget! {
-            init ctx => {
-              let ease_in = transitions::EASE_IN.of(ctx);
-            }
-            Row {
-              Text { text: "Hello ", style: style.clone() }
-              Text {
-                id: greet,
-                text: "World",
-                style: style.clone()
+        dyns := assign_watch!(*counter > 0)
+          .stream_map(|o| o.distinct_until_changed())
+          .map(move |not_empty| {
+            let style = style.clone();
+            not_empty.then(move || {
+              widget! {
+                init ctx => {
+                  let ease_in = transitions::EASE_IN.of(ctx);
+                }
+                Row {
+                  Text { text: "Hello ", style: style.clone() }
+                  Text {
+                    id: greet,
+                    text: "World",
+                    style: style.clone()
+                  }
+                  Text { text: "!" , style }
+                }
+                Animate {
+                  id: greet_new,
+                  transition: ease_in,
+                  prop: prop!(greet.transform),
+                  from: Transform::translation(0., greet.layout_height() * 2.)
+                }
+                finally {
+                  let_watch!(*counter)
+                    .subscribe(move |_| {
+                      greet.text = input.text();
+                      input.set_text("");
+                    });
+                  let_watch!(greet.text.clone())
+                    .subscribe(move |_| greet_new.run());
+                }
               }
-              Text { text: "!" , style }
-            }
-            Animate {
-              id: greet_new,
-              transition: ease_in,
-              prop: prop!(greet.transform),
-              from: Transform::translation(0., greet.layout_height() * 2.)
-            }
-            finally {
-              let_watch!(*counter)
-                .subscribe(move |_| {
-                  greet.text = input.text();
-                  input.set_text("");
-                });
-              let_watch!(greet.text.clone())
-                .subscribe(move |_| greet_new.run());
-            }
-          }
+            })
         })
       }
     }
