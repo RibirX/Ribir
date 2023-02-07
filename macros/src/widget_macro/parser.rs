@@ -5,7 +5,7 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::HashSet;
 use syn::{
   braced, parenthesized,
-  parse::{discouraged::Speculative, Parse, ParseStream},
+  parse::{Parse, ParseStream},
   parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
@@ -24,6 +24,7 @@ pub mod kw {
   syn::custom_keyword!(Animate);
   syn::custom_keyword!(Transition);
   syn::custom_keyword!(transition);
+  syn::custom_punctuation!(AssignColon, :=);
 }
 
 pub struct MacroSyntax {
@@ -54,6 +55,11 @@ pub struct Finally {
   pub block: Block,
 }
 
+#[derive(Clone, Debug)]
+pub enum FieldColon {
+  Colon(Colon),
+  AssignColon(kw::AssignColon),
+}
 #[derive(Debug)]
 pub struct StateField {
   pub(crate) member: Ident,
@@ -94,7 +100,7 @@ pub struct Id {
 #[derive(Clone, Debug)]
 pub struct DeclareField {
   pub member: Ident,
-  pub colon: Option<Colon>,
+  pub colon: Option<FieldColon>,
   pub expr: Expr,
 }
 
@@ -189,9 +195,7 @@ impl Parse for MacroSyntax {
         } else {
           finally = Some(e)
         }
-      } else if (lk.peek(Ident) || lk.peek(Colon2))
-        && (input.peek2(Brace) || input.peek2(Colon2) || input.peek2(Paren))
-      {
+      } else if peek_widget(&input) {
         let w: DeclareWidget = input.parse()?;
         if let Some(first) = widget.as_ref() {
           let err = syn::Error::new(
@@ -262,6 +266,16 @@ impl Parse for Finally {
   }
 }
 
+impl Parse for FieldColon {
+  fn parse(input: ParseStream) -> Result<Self> {
+    if input.peek(kw::AssignColon) {
+      Ok(FieldColon::AssignColon(input.parse()?))
+    } else {
+      Ok(FieldColon::Colon(input.parse::<Colon>()?))
+    }
+  }
+}
+
 impl Parse for StateField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let member = input.parse::<Ident>()?;
@@ -297,7 +311,7 @@ impl Parse for DeclareWidget {
         paren: syn::parenthesized!(content in input),
         args: content.parse_terminated(Expr::parse)?,
       }))
-    } else if path.get_ident().is_some() || input.peek(Brace) {
+    } else if input.peek(Brace) {
       let content;
       let brace = syn::braced!(content in input);
       let mut fields = Punctuated::default();
@@ -308,10 +322,8 @@ impl Parse for DeclareWidget {
           break;
         }
 
-        let fork = content.fork();
-        if let Ok(w) = fork.parse::<DeclareWidget>() {
-          content.advance_to(&fork);
-          children.push(w);
+        if peek_widget(&content) {
+          children.push(content.parse()?);
         } else {
           let f: DeclareField = content.parse()?;
           if !children.is_empty() {
@@ -335,10 +347,19 @@ impl Parse for DeclareWidget {
   }
 }
 
+fn peek_widget(input: ParseStream) -> bool {
+  (input.peek(Ident) && (input.peek2(Brace) || input.peek2(Colon2) || input.peek2(Paren)))
+    || input.peek(Colon2)
+    || input.peek2(Colon2)
+}
+
 impl Parse for DeclareField {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let member: Ident = input.parse()?;
-    let colon_token: Option<_> = input.parse()?;
+    let mut colon_token = None;
+    if input.peek(Colon) {
+      colon_token = Some(input.parse()?);
+    }
     let expr = if colon_token.is_some() {
       input.parse()?
     } else {
@@ -400,6 +421,15 @@ impl DeclareWidget {
       DeclareWidget::Literal { ty, .. } => ty,
       DeclareWidget::Call(call) => &call.path,
       DeclareWidget::Path(path) => path,
+    }
+  }
+}
+
+impl ToTokens for FieldColon {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    match self {
+      FieldColon::Colon(c) => c.to_tokens(tokens),
+      FieldColon::AssignColon(a) => a.to_tokens(tokens),
     }
   }
 }

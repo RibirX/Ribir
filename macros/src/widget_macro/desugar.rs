@@ -8,7 +8,9 @@ use syn::{
 
 use super::{
   child_variable, guard_ident,
-  parser::{DeclareField, DeclareSingle, DeclareWidget, Item, MacroSyntax, States, TransProps},
+  parser::{
+    DeclareField, DeclareSingle, DeclareWidget, FieldColon, Item, MacroSyntax, States, TransProps,
+  },
   ribir_variable, ScopeUsedInfo, TrackExpr, WIDGETS, WIDGET_OF_BUILTIN_FIELD,
 };
 use crate::{
@@ -61,7 +63,7 @@ pub struct DeclareObj {
 
 #[derive(Debug, Clone)]
 pub struct WatchField {
-  pub field_fn: TokenStream,
+  pub pre_def: TokenStream,
   pub watch_update: Stmt,
 }
 
@@ -85,6 +87,7 @@ pub struct Field {
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
+  Observable(TrackExpr),
   Expr(TrackExpr),
   Obj(Box<DeclareObj>),
 }
@@ -149,9 +152,8 @@ impl DeclareWidget {
           .into_iter()
           .for_each(|f| match pick_id(f, &mut desugared.errors) {
             Ok(name) => id = Some(name),
-            Err(DeclareField { member, expr, .. }) => {
-              let value = FieldValue::Expr(expr.into());
-              let field = Field { member, value };
+            Err(f) => {
+              let field = f.desugar();
               if let Some(ty) = WIDGET_OF_BUILTIN_FIELD
                 .get(field.member.to_string().as_str())
                 .filter(|builtin_ty| !ty.is_ident(builtin_ty))
@@ -250,13 +252,7 @@ impl Item {
           }
           FieldValue::Expr(by.1.expr.clone().into())
         } else {
-          let fields = fields
-            .iter()
-            .map(|f| Field {
-              member: f.member.clone(),
-              value: FieldValue::Expr(f.expr.clone().into()),
-            })
-            .collect();
+          let fields = fields.iter().map(|f| f.clone().desugar()).collect();
           let name = ribir_variable("transition", transition.span());
           let mut obj = DeclareObj::new(parse_quote!(Transition), name, fields);
           obj.stateful = true;
@@ -343,10 +339,11 @@ impl DeclareSingle {
       .into_iter()
       .filter_map(|f| match pick_id(f, &mut desugared.errors) {
         Ok(name) => {
+          assert!(id.is_none(), "only once `id` allow.");
           id = Some(name);
           None
         }
-        Err(f) => Some(f.into()),
+        Err(f) => Some(f.desugar()),
       })
       .collect();
 
@@ -382,12 +379,15 @@ impl Desugared {
   }
 }
 
-impl From<DeclareField> for Field {
-  fn from(f: DeclareField) -> Self {
-    Self {
-      member: f.member,
-      value: FieldValue::Expr(f.expr.into()),
-    }
+impl DeclareField {
+  fn desugar(self) -> Field {
+    let Self { member, colon, expr } = self;
+    let value = if let Some(FieldColon::AssignColon(_)) = colon {
+      FieldValue::Observable(expr.into())
+    } else {
+      FieldValue::Expr(expr.into())
+    };
+    Field { member, value }
   }
 }
 

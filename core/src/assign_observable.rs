@@ -1,4 +1,4 @@
-use rxrust::prelude::ObservableExt;
+use rxrust::{ops::map::MapOp, prelude::ObservableExt};
 
 /// Is a struct contain a initialize value and an observable that should be
 /// subscribed to update the value.
@@ -14,8 +14,9 @@ where
   #[inline]
   pub fn new(init: V, observable: S) -> Self { Self { value: init, observable } }
 
-  /// map the inner observable to another observable.
-  pub fn map_stream<R>(self, f: impl FnOnce(S) -> R) -> AssignObservable<V, R>
+  /// map the inner observable stream to another observable that emit same type
+  /// value.
+  pub fn stream_map<R>(self, f: impl FnOnce(S) -> R) -> AssignObservable<V, R>
   where
     R: ObservableExt<V, ()>,
   {
@@ -24,15 +25,17 @@ where
     AssignObservable { value, observable }
   }
 
-  ///  map the init value and observable to another and construct to a new
-  /// InitObservable
-  pub fn map<V2, S2>(self, f: impl FnOnce(V, S) -> (V2, S2)) -> AssignObservable<V2, S2>
+  /// Creates a new `AssignObservable` which calls a closure on each element and
+  /// uses its return as the value.
+  pub fn map<R, F>(self, mut f: F) -> AssignObservable<R, MapOp<S, F, V>>
   where
-    S2: ObservableExt<V2, ()>,
+    F: FnMut(V) -> R,
   {
-    let Self { value: init, observable } = self;
-    let (init, observable) = f(init, observable);
-    AssignObservable { value: init, observable }
+    let Self { value, observable } = self;
+    AssignObservable {
+      value: f(value),
+      observable: observable.map(f),
+    }
   }
 
   #[inline]

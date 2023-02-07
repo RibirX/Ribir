@@ -13,11 +13,11 @@ pub mod data_widget;
 mod state;
 pub(crate) mod widget_tree;
 
+pub mod assign_observable;
 pub mod declare;
 pub mod dynamic_widget;
 pub mod enum_widget;
 pub mod events;
-pub mod assign_observable;
 pub mod ticker;
 pub mod widget;
 pub mod widget_children;
@@ -26,6 +26,7 @@ pub mod prelude {
   pub use crate::animation::*;
   #[doc(no_inline)]
   pub use crate::application::Application;
+  pub use crate::assign_observable::AssignObservable;
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
   #[doc(no_inline)]

@@ -151,7 +151,7 @@ impl ScopeUsedInfo {
     self.filter_widget(|info| info.used_type.contains(UsedType::REF))
   }
 
-  pub fn prepend_bundle_refs(&self, tokens: &mut TokenStream) {
+  pub fn state_refs_tokens(&self, tokens: &mut TokenStream) {
     if let Some(names) = self.ref_widgets() {
       let c_names = names.clone();
       if names.clone().nth(1).is_some() {

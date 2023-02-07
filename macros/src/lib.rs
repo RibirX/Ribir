@@ -17,6 +17,7 @@ mod child_template;
 pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
 pub(crate) const MOVE_TO_WIDGET_MACRO_NAME: &str = "move_to_widget";
 pub(crate) const WATCH_MACRO_NAME: &str = "watch";
+pub(crate) const ASSIGN_WATCH: &str = "assign_watch";
 pub(crate) const LET_WATCH_MACRO_NAME: &str = "let_watch";
 pub(crate) const PROP_MACRO_NAME: &str = "prop";
 

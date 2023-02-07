@@ -26,10 +26,10 @@ use super::{
   Desugared, ObjectUsed, ObjectUsedPath, TrackExpr, UsedPart, UsedType, VisitCtx, WIDGETS,
 };
 
-pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {
-  let input = input.into();
-  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
-
+fn visit_watch_expr_as_observable(
+  mut watch_expr: &mut TrackExpr,
+  ctx: &mut VisitCtx,
+) -> TokenStream {
   ctx.new_scope_visit(
     |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
     |scope| {
@@ -47,13 +47,31 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
     )
     .unwrap();
 
-    quote_spanned! { watch_expr.span() => #upstream.map(#map_closure) }.into()
+    quote_spanned! { watch_expr.span() => #upstream.map(#map_closure) }
   } else {
     let mut tokens = quote! {};
     DeclareError::WatchNothing(watch_expr.span().unwrap()).to_compile_error(&mut tokens);
     ctx.visit_error_occur = true;
-    tokens.into()
+    tokens
   }
+}
+
+pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {
+  let input = input.into();
+  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
+  visit_watch_expr_as_observable(&mut watch_expr, ctx).into()
+}
+
+pub(crate) fn gen_assign_watch(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {
+  let input = input.into();
+  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
+  let tokens = visit_watch_expr_as_observable(&mut watch_expr, ctx);
+  let mut value = quote! {};
+  Brace(watch_expr.span()).surround(&mut value, |tokens| {
+    watch_expr.used_name_info.state_refs_tokens(tokens);
+    watch_expr.to_tokens(tokens);
+  });
+  quote_spanned!(watch_expr.span() => AssignObservable::new(#value, #tokens)).into()
 }
 
 pub(crate) fn gen_prop_macro(
@@ -141,7 +159,8 @@ impl Desugared {
     let sorted_named_objs = self.order_named_objs();
     Brace::default().surround(tokens, |tokens| {
       Brace::default().surround(tokens, |tokens| {
-        quote!(#![allow(unused_mut)]).to_tokens(tokens);
+        quote!(#![allow(unused_mut, clippy::redundant_clone, clippy::clone_on_copy)])
+          .to_tokens(tokens);
 
         states.to_tokens(tokens);
         let name = widget.as_ref().unwrap().node.name();
@@ -188,7 +207,9 @@ impl Desugared {
   pub fn circle_detect(&mut self) {
     fn used_part_iter(obj: &DeclareObj) -> impl Iterator<Item = UsedPart> + '_ {
       obj.fields.iter().flat_map(|f| match &f.value {
-        FieldValue::Expr(e) => e.used_name_info.used_part(Some(&f.member)),
+        FieldValue::Expr(e) | FieldValue::Observable(e) => {
+          e.used_name_info.used_part(Some(&f.member))
+        }
         // embed object must be an anonymous object never construct a circle.
         FieldValue::Obj(_) => None,
       })
@@ -312,7 +333,7 @@ impl Desugared {
     orders: &mut Vec<Ident>,
   ) {
     match &f.value {
-      FieldValue::Expr(e) => {
+      FieldValue::Expr(e) | FieldValue::Observable(e) => {
         if let Some(all) = e.used_name_info.all_used() {
           all.for_each(|name| self.obj_deep_first(name, visit_state, orders))
         }
@@ -356,7 +377,7 @@ impl Desugared {
 impl ToTokens for FieldValue {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
-      FieldValue::Expr(e) => e.to_tokens(tokens),
+      FieldValue::Expr(e) | FieldValue::Observable(e) => e.to_tokens(tokens),
       FieldValue::Obj(obj) => Brace(obj.span()).surround(tokens, |tokens| {
         obj.to_tokens(tokens);
         obj.name.to_tokens(tokens)
@@ -375,7 +396,7 @@ impl ToTokens for DeclareObj {
       quote_spanned! { span => let #name = }.to_tokens(tokens);
       Brace(ty.span()).surround(tokens, |tokens| {
         watch_stmts.iter().for_each(|f| {
-          f.field_fn.to_tokens(tokens);
+          f.pre_def.to_tokens(tokens);
         });
         self.build_tokens(tokens);
         watch_stmts
@@ -400,7 +421,6 @@ impl DeclareObj {
     } = self;
     let span = ty.span();
     quote_spanned! { span =>
-      #[allow(clippy::redundant_clone, clippy::clone_on_copy)]
       let #name =
     }
     .to_tokens(tokens);
@@ -428,7 +448,7 @@ impl DeclareObj {
 
     if used_name_info.ref_widgets().is_some() {
       Brace(span).surround(tokens, |tokens| {
-        used_name_info.prepend_bundle_refs(tokens);
+        used_name_info.state_refs_tokens(tokens);
         builder(tokens);
       })
     } else {
@@ -547,7 +567,6 @@ impl ToTokens for InitStmts {
     if let Some(refs) = self.used_name_info.ref_widgets() {
       let refs = refs.map(|name| {
         quote_spanned! { name.span() =>
-          #[allow(unused_mut)]
           let mut #name = #name.state_ref();
         }
       });
@@ -566,7 +585,7 @@ impl ToTokens for FinallyBlock {
         let real_ctx = ctx_ident();
         quote_spanned! { ctx.span() => let #ctx = #real_ctx; }.to_tokens(tokens);
       }
-      self.used_name_info.prepend_bundle_refs(tokens);
+      self.used_name_info.state_refs_tokens(tokens);
       tokens.append_all(&self.stmts)
     })
   }
@@ -601,7 +620,6 @@ impl ToTokens for Property {
       .to_tokens(tokens),
       Property::Member { target, dot, member } => quote_spanned! {
         target.span().join(member.span()).unwrap() =>
-        #[allow(clippy::clone_on_copy)]
         Prop::new(
           #target.clone_stateful(),
           |this| this #dot #member.clone(),
