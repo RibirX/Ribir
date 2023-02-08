@@ -559,7 +559,7 @@ impl Vertex {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
   use crate::wgpu_backend_headless;
   use ribir::prelude::AppContext;
   use ribir_painter::{
@@ -630,6 +630,7 @@ mod test {
     builder.fill()
   }
 
+  #[cfg(feature = "wgpu_gl")]
   #[test]
   fn stencil_clip() {
     let size = DeviceSize::new(100, 100);
