@@ -149,64 +149,20 @@ impl TextShaper {
     dir: TextDirection,
     face_ids: &[ID],
   ) -> Option<Vec<Glyph<Em>>> {
-    macro_rules! unwrap_or_break {
-      ($option: expr) => {
-        match $option {
-          Some(o) => o,
-          None => break,
-        }
-      };
-    }
-    let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
-
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
-
+    let face = font_fallback.next_fallback_face(text)?;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text);
-    let hb_direction = dir.into();
-    buffer.set_direction(hb_direction);
+    buffer.set_direction(dir.into());
 
-    let face = font_fallback.next_fallback_face(text)?;
     let GlyphsWithoutFallback { mut glyphs, mut buffer } = Self::directly_shape(buffer, &face);
-
-    let mut miss_part_stack = vec![(0, None, font_fallback)];
-
-    while let Some((mut miss_start, miss_end, mut fallback)) = miss_part_stack.pop() {
-      let skip = glyphs[miss_start..].iter().position(Glyph::is_miss);
-      miss_start += unwrap_or_break!(skip);
-      if miss_end.is_some() && Some(miss_start) >= miss_end {
-        continue;
+    let mut new_part = vec![(0, glyphs.len(), font_fallback.clone())];
+    loop {
+      if new_part.is_empty() {
+        break;
       }
-
-      let miss_size = glyphs[miss_start..].iter().position(Glyph::is_not_miss);
-      let miss_part_end = miss_size.map(|size| miss_start + size);
-      if miss_part_end != miss_end {
-        miss_part_stack.push((miss_part_end.unwrap(), miss_end, fallback.clone()));
-      }
-
-      let start_byte = glyphs[miss_start].cluster as usize;
-      let miss_range = match (miss_part_end, is_rtl) {
-        (None, true) => 0..start_byte,
-        (None, false) => start_byte..text.len(),
-        (Some(end), true) => glyphs[end].cluster as usize..start_byte,
-        (Some(end), false) => start_byte..glyphs[end].cluster as usize,
-      };
-      let miss_text = &text[miss_range.clone()];
-      let fallback_face = unwrap_or_break!(fallback.next_fallback_face(miss_text));
-      buffer.push_str(miss_text);
-      buffer.set_direction(hb_direction);
-      let mut res = Self::directly_shape(buffer, &fallback_face);
-      buffer = res.buffer;
-      for g in res.glyphs.iter_mut() {
-        g.cluster += miss_range.start as u32;
-      }
-
-      // todo: we need align baseline.
-      match miss_part_end {
-        Some(part_end) => glyphs.splice(miss_start..part_end, res.glyphs),
-        None => glyphs.splice(miss_start.., res.glyphs),
-      };
-      miss_part_stack.push((miss_start, miss_part_end, fallback));
+      let miss_part = collect_miss_part(&glyphs, &new_part);
+      (buffer, new_part) = regen_miss_part(text, dir, &mut glyphs, miss_part, buffer) ;
     }
 
     Some(glyphs)
@@ -253,6 +209,72 @@ impl TextShaper {
   pub fn font_db(&self) -> RwLockReadGuard<'_, FontDB> { self.font_db.read().unwrap() }
 
   pub fn font_db_mut(&self) -> RwLockWriteGuard<FontDB> { self.font_db.write().unwrap() }
+}
+
+
+fn collect_miss_part<'a> (glyphs: &[Glyph<Em>], new_part:&[(usize, usize, FallBackFaceHelper<'a>)]) ->  Vec<(usize, usize, FallBackFaceHelper<'a>)>{
+  let mut miss_parts = vec![];
+  for (start, end, helper) in new_part {
+    let mut miss_start = None;
+    glyphs[*start..*end].iter()
+      .enumerate()
+      .map(|(idx, glyph)| (idx + *start, glyph))
+      .for_each(|(idx, glyph)| {
+      if glyph.is_miss() {
+        if miss_start.is_none() {
+          miss_start = Some(idx);
+        }
+      } else if miss_start.is_some() {
+          miss_parts.push((miss_start.take().unwrap(), idx, helper.clone()));
+      }
+    });
+    if miss_start.is_some() {
+      miss_parts.push((miss_start.take().unwrap(), *end, helper.clone()));
+    }
+  }
+  miss_parts
+}
+
+fn regen_miss_part<'a>(text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph<Em>>, miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>, mut buffer: UnicodeBuffer) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) { 
+  let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
+  let hb_direction = dir.into();
+
+  let cluster_to_range_byte = |glyphs: &Vec<Glyph<Em>>, idx: usize| -> usize{
+    let is_end = (is_rtl && 0 == idx) || (!is_rtl && idx == glyphs.len());
+    match (is_end, is_rtl) {
+      (true, _) => text.len(),
+      (false, true) => glyphs[idx-1].cluster as usize,
+      (false, false) => glyphs[idx].cluster as usize,
+    }
+  };
+
+  let mut offset = 0_i32;
+  let mut new_part = vec![];
+  for (mut miss_start, mut miss_end, mut helper) in miss_part.into_iter() {
+    miss_start = ((miss_start as i32) + offset) as usize;
+    miss_end = ((miss_end as i32) + offset) as usize;
+    let start_byte = cluster_to_range_byte(glyphs, miss_start);
+    let end_byte = cluster_to_range_byte(glyphs, miss_end);
+    let miss_range = match is_rtl {
+      true => end_byte..start_byte,
+      false => start_byte..end_byte,
+    };
+    let miss_text = &text[miss_range.clone()];
+    if let Some(face) = helper.next_fallback_face(miss_text) {
+      buffer.push_str(miss_text);
+      buffer.set_direction(hb_direction);
+      let mut res = TextShaper::directly_shape(buffer, &face);
+      buffer = res.buffer;
+      for g in res.glyphs.iter_mut() {
+        g.cluster += miss_range.start as u32;
+      }
+      
+      offset += (res.glyphs.len() as i32) - ((miss_end - miss_start) as i32);
+      new_part.push((miss_start, miss_start + res.glyphs.len(), helper));
+      glyphs.splice(miss_start..miss_end, res.glyphs);
+    }
+  };
+  (buffer, new_part)
 }
 
 trait ShapeKeySlice {
@@ -316,6 +338,7 @@ fn is_miss_glyph_id(id: u16) -> bool { id == 0 }
 impl<U: std::ops::MulAssign<f32>> Glyph<U> {
   fn is_miss(&self) -> bool { is_miss_glyph_id(self.glyph_id.0) }
 
+  #[allow(unused)]
   fn is_not_miss(&self) -> bool { !self.is_miss() }
 
   pub fn scale(&mut self, scale: f32) {
@@ -451,6 +474,34 @@ mod tests {
     shaper.shape_cache.write().unwrap().clear();
     let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
     assert_eq!(res.glyphs.len(), 24);
+  }
+
+  
+  #[test]
+  fn unicode_with_fallback() {
+    let font_db = Arc::new(RwLock::new(FontDB::default()));
+    font_db.write().unwrap().load_system_fonts();
+    let shaper = TextShaper::new(font_db.clone());
+    let text: Substr = "ӌҳӟЭӨӅЊҾѮПҢћҽѷӧѹѩѾир҈Ӂ҂ӢҷҕѧщӍАѪрдҺњЭѧХѩӆҒЏқжҡӯӐқДЪТЧѦк҇ЖчѯЫСЮъҏӍѴЏӕћЕ҈Є".into();
+    
+    let ids = shaper.font_db().select_all_match(&FontFace {
+      families: Box::new([FontFamily::Serif]),
+      ..<_>::default()
+    });
+
+    shaper.shape_cache.write().unwrap().clear();
+    let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
+    assert!(!res.glyphs.iter().any(|glyph| glyph.is_miss()));
+
+    shaper.shape_cache.write().unwrap().clear();
+    let mut font_fallback = FallBackFaceHelper::new(&ids, &font_db);
+    let hb_direction = TextDirection::LeftToRight.into();
+    let face = font_fallback.next_fallback_face(&text).unwrap();
+    let mut buffer = UnicodeBuffer::new();
+    buffer.push_str(&text);
+    buffer.set_direction(hb_direction);
+    let GlyphsWithoutFallback { glyphs, .. } = TextShaper::directly_shape(buffer, &face);
+    assert!(glyphs.iter().any(|glyph| glyph.is_miss()));
   }
 
   #[bench]
