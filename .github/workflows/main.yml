@@ -43,6 +43,8 @@ jobs:
           override: true
 
       - name: Run cargo test
+        env:
+          RUST_BACKTRACE: 1
         uses: actions-rs/cargo@v1
         with:
           command: test
