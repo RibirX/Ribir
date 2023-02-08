@@ -1,14 +1,14 @@
 # Custom widget declare in macro.
 
-Any widget implement `Declare` trait can be declared in `widget!`. And Ribir provide a derive macro make implement `Declare` trait super easy.
+You can declare any widget in `widget!` that implements the `Declare` trait. And Ribir provides a derive macro that makes implementing the `Declare` trait super easy.
 
-> Tips
+> Some tips
 > 
-> Almost all widget provide by `Ribir` implement `Declare` across derive it. If we have no special reason，we shouldn't implement by self, just derive it directly. To implement by self, see the [derive macro document](declare_derive) to know how it work.
+> Almost all widgets provided by `Ribir` implement `Declare` via derive. We shouldn't implement it ourselves unless we have a special reason. You can derive it directly. If you want to implement it yourself, read the [derive macro document](declare_derive) to see how it works.
 
-In this chapter, we'll learn how to use the meta of `#[declare(...)]` attribute on the field. And it help us improve the declaration user experience about our widget.
+In this chapter, we'll learn how to use the meta of the `#[declare(...)]` attribute on the field. And it will help us improve the declaration user experience on our widget.
 
-Let's build a hero card widget which contain name, email and telephone. And the name is required, email and telephone are optional.
+Let's create a hero card widget. It contains a name, email, and phone. And the name is required, email and phone are optional.
 
  ```rust
 #[derive(Declare)]
@@ -35,17 +35,17 @@ fn main() {
   };
 }
 ```
-After `HeroCard` derived `Declare`, it can be declared in `widget!` and builtin fields can be used in it. Looks good but not enough, the declaration of  `HeroCard` is too verbose.
+After `HeroCard` derives `Declare`, it can be declared in `widget!` and the built-in fields can be used in it. Looks good, but not enough. The declaration of `HeroCard` is too lengthy.
 
-- Does we can initialize `name` by `&str` directly ? Because `&str` can convert to `String`.
-- `tel` is initialized by None, does we can omit it?
--  can we strip the `Some` of `email` ? If we use a value to initialize a option type, it's implicitly contain the mean that it's a `Some-Value`.
+- Can we initialise `name` directly with `&str`? Because `&str` can be converted to `String`.
+- `tel` is initialised with None. Can we omit it?
+- Can we remove the `Some` from `email`? When we use a value to initialise an option type, it implicitly implies that it's a `Some-value`.
 
-Of course we can, just use meta of `#[declare(...)]`, let's introduce one by one.
+Of course we can use the meta of `#[declare(...)]`. Let's introduce them one by one.
 
-## use `convert` meta to convert value from another type.
+## Use `convert` meta to convert value from one type to another.
 
-Let's answer the problems of `name` accept `&str` and `tel` stripe the `Some` wrap first. Both they are type convert problem.
+Let's start with the problems of `name` accepting `&str` and `tel` removing the `Some` wrap. Both are type conversion problems.
 
 ```rust
 #[derive(Declare)]
@@ -58,11 +58,11 @@ struct HeroCard {
   email: Option<String>,
 }
 ```
-We just add `#[declare(convert=into)]` or `#[declare(convert=strip_option)]` for the fields, that all. Except `into` and `strip_option` there are two other value can be used in `#[declare(convert=...)]`. Let's introduce one by one.
+We just add `#[declare(convert=into)]` or `#[declare(convert=strip_option)]` for the fields. That is all. Besides `into` and `strip_option` there are two other values that can be used in `#[declare(convert=...)]`. Let's look at them one by one.
 
-- `#[declare(convert=into)]`, use `std::convert::Into` convert the value before initialize the field. With this meta, any type implemented `Into` trait to the field type can be used to initialize the field. 
-- `#[declare(convert=strip_option)]`, wrap `V` to `Some(V)` before initialize `Option<V>`, of course `Option<V>` also be accepted.
-- `#[declare(convert=box_trait(...))]`, convert the value to a box dyn type, also provide an optional `wrap_fn` argument to warp the box dyn type as finally result. For example, the `debug` filed accept any type that implemented `Debug` trait and auto wrap with `Box` and `RefCell`.
+- `#[declare(convert=into)]`, use `std::convert::Into` to convert the value before initialising the field. With this meta, any type that implements an `Into` trait on the field type can be used to initialise the field. 
+- `#[declare(convert=strip_option)]`, wrap `V` to `Some(V)` before initialising `Option<V>`, of course `Option<V>` is also accepted.
+- `#[declare(convert=box_trait(...))]`, which converts the value to a box dyn type, also provides an optional `wrap_fn` argument to warp the box dyn type as a final result. For example, the `debug` file will accept any type that implements the `debug` trait and auto-wrap with `Box` and `RefCell`.
   ```rust
   #[Derive(Declare)]
   struct Printer {
@@ -70,7 +70,7 @@ We just add `#[declare(convert=into)]` or `#[declare(convert=strip_option)]` for
     debug: RefCell<Box<dyn Debug>>
   }
   ```
-- `#[declare(convert=custom)]`, implement the filed build by self, implement the same name method for its declarer to accept the initialize type. Then implement a `set_declare_xxx` method  for its host type, so it can be updated by the type you want.  For example
+- `#[declare(convert=custom)]`, implement the filed build by itself, implement the same name method for its declarer to accept the initialize type. Then implement a `set_declare_xxx` method for its host type so that it can be updated with the type you want.  For example:
   ```rust
   #[Derive(Declare)]
   struct Printer {
@@ -92,11 +92,11 @@ We just add `#[declare(convert=into)]` or `#[declare(convert=strip_option)]` for
   }
   ```
 
-## use `default` meta provide a default value for field when declare it.
+## Use the `default` meta to provide a default value for a field when you declare it.
 
-we can use `#[declare(default)]` to mark the field can be initialized by [`std::default::Default`]! if user not initialized it.
+We can use `#[declare(default)]` to indicate that the field can be initialised by [`std::default::Default`]! if the user does not initialise it.
 
-So update our code
+Let's update our code
 
  ```rust
 #[derive(Declare)]
@@ -122,16 +122,16 @@ let _ = widget!{
 };
 ```
 
-> Tips
+> Some tips
 >
-> `#[declare(default)]` also support accept an expression as the init value instead of directly use `Default::default`. Three are two identify you can use in your expression.
+> `#[declare(default)]` also supports accepting an expression as an init value instead of using `Default::Default` directly. There are two identifiers you can use in your expression.
 > - `self` is the declarer, 
-> - and `ctx` is build context of the widget,about build context see [`BuildCtx`]!.
+> - and `ctx` is the build context of the widget. For the build context see [`BuildCtx`]!.
 
-There're two other `meta` we not used in `HeroCard` but need to know.
+There are two other `meta` that we don't use in `HeroCard`, but need to know about.
 
-- #[declare(skip)] can use to skip the field that you don't want user to declare it. The field type must implemented `Default` trait or provide default expression by `default` meta.
-- #[declare(rename=...)] use another name to declare field. It's useful when your field name conflict with the builtin fields. See [all builtin fields](builtin_fields).
+- We can use #[declare(skip)] to skip the field that we don't want the user to declare. The field type must implement the `Default` trait or provide a default expression through the `default` meta.
+- We can use #[declare(rename=...)] to rename a field. It's useful if our field name conflicts with the built-in fields. See [all built-in fields](builtin_fields).
 
  [declare_derive]: ../ribir/widget_derive/Declare.html
  [builtin_fields]: ../ribir/widget_derive/declare_builtin_fields.html
