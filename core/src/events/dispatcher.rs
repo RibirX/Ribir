@@ -395,10 +395,10 @@ mod tests {
     widget! {
       DynWidget {
         dyns: widget,
-        pointer_down : handler_ctor(),
-        pointer_move: handler_ctor(),
-        pointer_up: handler_ctor(),
-        pointer_cancel: handler_ctor(),
+        on_pointer_down : handler_ctor(),
+        on_pointer_move: handler_ctor(),
+        on_pointer_up: handler_ctor(),
+        on_pointer_cancel: handler_ctor(),
       }
     }
   }
@@ -574,11 +574,11 @@ mod tests {
           states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
-            pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
+            on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
 
             MockBox {
               size: Size::new(100., 30.),
-              pointer_down: move |e| {
+              on_pointer_down: move |e| {
                 this.0.borrow_mut().push(e.clone());
                 e.stop_bubbling();
               }
@@ -618,13 +618,13 @@ mod tests {
           states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
-            pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
-            pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
+            on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
+            on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
             MockBox {
               margin: EdgeInsets::all(4.),
               size: INFINITY_SIZE,
-              pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
-              pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
+              on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
+              on_pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
             }
           }
         }
@@ -691,10 +691,10 @@ mod tests {
     let w = widget! {
       states { click_path: click_path.clone() }
       MockMulti {
-        tap: move |_| *click_path += 1,
+        on_tap: move |_| *click_path += 1,
         MockBox {
           size: Size::new(100., 100.),
-          tap: move |_| *click_path += 1,
+          on_tap: move |_| *click_path += 1,
         }
         MockBox { size: Size::new(100., 400.) }
       }

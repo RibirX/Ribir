@@ -19,7 +19,7 @@ fn simple_ref_bind_work() {
     Flex {
      SizedBox {
        size: size2.size,
-       tap: move |_| size2.size *= 2.,
+       on_tap: move |_| size2.size *= 2.,
      }
      SizedBox { id: size2, size, }
    }
@@ -46,7 +46,7 @@ fn event_attr_sugar_work() {
       size: BEFORE_SIZE,
       SizedBox {
         size: sized_box.size,
-        tap: move |_| sized_box.size = AFTER_TAP_SIZE,
+        on_tap: move |_| sized_box.size = AFTER_TAP_SIZE,
       }
     }
   };
@@ -76,7 +76,7 @@ fn widget_wrap_bind_work() {
       SizedBox {
         margin: sibling.margin.clone(),
         size: if sibling.margin.left > 1. { Size::zero() } else { sibling.size },
-        tap: move |_| sibling.margin = EdgeInsets::all(5.),
+        on_tap: move |_| sibling.margin = EdgeInsets::all(5.),
       }
     }
   };
@@ -97,7 +97,7 @@ fn expression_for_children() {
   let size_five = Size::new(5., 5.);
   let embed_expr = widget! {
     Flex {
-      tap: move |_| sized_box.size = size_five,
+      on_tap: move |_| sized_box.size = size_five,
       SizedBox { id: sized_box, size: size_one }
       // todo: how should we hint user, he/she need wrap inner widget of `DynWidget` to track named widget change.
       DynWidget { dyns: (0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }) }
@@ -133,7 +133,7 @@ fn embed_widget_ref_outside() {
       SizedBox {
         id: first,
         size: Size::new(1., 1.),
-        tap: move |_| first.size = Size::new(2., 2.)
+        on_tap: move |_| first.size = Size::new(2., 2.)
       }
       DynWidget {
         dyns: (0..3).map(move |_| widget!{ SizedBox { size: first.size } } )
@@ -156,7 +156,7 @@ fn data_flow_macro() {
   let size = Size::new(1., 1.);
   let w = widget! {
     Flex {
-      tap: move |_| a.size *= 2.,
+      on_tap: move |_| a.size *= 2.,
       SizedBox { id: c, size }
       SizedBox { id: a, size }
       SizedBox { id: b, size: a.size }
@@ -225,7 +225,7 @@ fn builtin_ref() {
         id: tap_box,
         size: Size::new(5., 5.),
         cursor: CursorIcon::Hand,
-        tap: move |_| {
+        on_tap: move |_| {
           tap_box.cursor.set(CursorIcon::AllScroll);
           c_icon_track.set(tap_box.cursor.get());
         }
@@ -258,7 +258,7 @@ fn builtin_bind_to_self() {
         c_icon_track.set(icon);
         icon
       },
-      tap: move |_|  sized_box.size = Size::new(20.,20.),
+      on_tap: move |_|  sized_box.size = Size::new(20.,20.),
     }
   };
 
@@ -349,7 +349,7 @@ fn fix_access_builtin_with_gap() {
     Void {
       id: this,
       cursor: CursorIcon::Hand,
-      tap: move |_| {
+      on_tap: move |_| {
         // this access cursor across `silent` should compile pass.
         let _ = this.silent().cursor;
       }

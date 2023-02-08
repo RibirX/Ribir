@@ -8,6 +8,6 @@ type LayouCallback = dyn for<'r> FnMut(LifeCycleCtx<'r>);
 #[derive(Declare)]
 pub struct PerformedLayoutListener {
   #[declare(builtin, convert=box_trait(for<'r> FnMut(LifeCycleCtx<'r>), wrap_fn = RefCell::new))]
-  pub performed_layout: RefCell<Box<LayouCallback>>,
+  pub on_performed_layout: RefCell<Box<LayouCallback>>,
 }
-impl_lifecycle!(PerformedLayoutListener, performed_layout);
+impl_lifecycle!(PerformedLayoutListener, on_performed_layout);

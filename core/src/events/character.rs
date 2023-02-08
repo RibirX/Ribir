@@ -7,7 +7,7 @@ type CharCallback = dyn for<'r> FnMut(&'r mut CharEvent);
 #[derive(Declare)]
 pub struct CharListener {
   #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut CharEvent), wrap_fn = RefCell::new))]
-  char: RefCell<Box<CharCallback>>,
+  on_char: RefCell<Box<CharCallback>>,
 }
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl std::ops::DerefMut for CharEvent {
 impl EventListener for CharListener {
   type Event = CharEvent;
   #[inline]
-  fn dispatch(&self, event: &mut CharEvent) { (self.char.borrow_mut())(event) }
+  fn dispatch(&self, event: &mut CharEvent) { (self.on_char.borrow_mut())(event) }
 }
 
 #[cfg(test)]
@@ -74,7 +74,7 @@ mod tests {
       MockBox {
         size: ZERO_SIZE,
         auto_focus: true,
-        char: move |key| c_receive.borrow_mut().push(key.char)
+        on_char: move |key| c_receive.borrow_mut().push(key.char)
       }
     };
     let mut wnd = Window::default_mock(widget.into_widget(), None);

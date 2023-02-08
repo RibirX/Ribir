@@ -39,7 +39,7 @@ impl Compose for TodoMVP {
           }
           Button {
             margin: EdgeInsets::only_left(20.),
-            tap: move |_| {
+            on_tap: move |_| {
               let label = if input.text().is_empty() {
                 String::from("Todo")
               } else {
@@ -106,7 +106,7 @@ impl TodoMVP {
       VScrollBar {
         Lists {
           // when performed layout, means all task are mounted, we reset the mount count.
-          performed_layout: move |_| *mount_task_cnt = 0,
+          on_performed_layout: move |_| *mount_task_cnt = 0,
           padding: EdgeInsets::vertical(8.),
           DynWidget {
             dyns: {
@@ -137,7 +137,7 @@ impl TodoMVP {
         ListItem {
           id: item,
           transform: Transform::default(),
-          mounted: move |_| {
+          on_mounted: move |_| {
             if key.is_enter() {
               *mount_idx = *mount_task_cnt;
               *mount_task_cnt += 1;
@@ -155,7 +155,7 @@ impl TodoMVP {
           Trailing {
             Icon {
               visible: item.mouse_hover(),
-              tap: move |_| { this.tasks.remove(idx); },
+              on_tap: move |_| { this.tasks.remove(idx); },
               svgs::CLOSE
             }
           }

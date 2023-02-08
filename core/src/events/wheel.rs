@@ -15,7 +15,7 @@ type WhellCallback = dyn for<'r> FnMut(&'r mut WheelEvent);
 #[derive(Declare)]
 pub struct WheelListener {
   #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent), wrap_fn = RefCell::new))]
-  wheel: RefCell<Box<WhellCallback>>,
+  on_wheel: RefCell<Box<WhellCallback>>,
 }
 
 impl ComposeChild for WheelListener {
@@ -53,7 +53,7 @@ impl std::ops::DerefMut for WheelEvent {
 impl EventListener for WheelListener {
   type Event = WheelEvent;
   #[inline]
-  fn dispatch(&self, event: &mut WheelEvent) { (self.wheel.borrow_mut())(event) }
+  fn dispatch(&self, event: &mut WheelEvent) { (self.on_wheel.borrow_mut())(event) }
 }
 
 #[cfg(test)]
@@ -72,7 +72,7 @@ mod tests {
       MockBox {
         size: Size::new(100., 100.),
         auto_focus: true,
-        wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
+        on_wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
       }
     };
 

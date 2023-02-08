@@ -46,7 +46,7 @@ impl ComposeChild for Ripple {
       }
       Stack {
         id: container,
-        pointer_down: move |e| this.launch_pos = if this.center {
+        on_pointer_down: move |e| this.launch_pos = if this.center {
           let center = container.layout_size() / 2.;
           Some(Point::new(center.width, center.height))
         } else {
@@ -83,7 +83,7 @@ impl ComposeChild for Ripple {
                         id: ripple_path,
                         brush: StateRole::pressed().calc_color(this.color),
                         path: Path::circle(launch_at, radius, PathStyle::Fill),
-                        mounted: move |_| { ripper_enter.run(); }
+                        on_mounted: move |_| { ripper_enter.run(); }
                       }
                     }
                   }

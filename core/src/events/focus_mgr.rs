@@ -643,16 +643,16 @@ mod tests {
           states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
-            focus: move |_| { this.log.borrow_mut().push("focus parent"); },
-            blur: move |_| { this.log.borrow_mut().push("blur parent"); },
-            focus_in: move |_| { this.log.borrow_mut().push("focusin parent"); },
-            focus_out: move |_| { this.log.borrow_mut().push("focusout parent"); },
+            on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },
+            on_blur: move |_| { this.log.borrow_mut().push("blur parent"); },
+            on_focus_in: move |_| { this.log.borrow_mut().push("focusin parent"); },
+            on_focus_out: move |_| { this.log.borrow_mut().push("focusout parent"); },
             MockBox {
               size: Size::zero(),
-              focus: move |_| { this.log.borrow_mut().push("focus child"); },
-              blur: move |_| { this.log.borrow_mut().push("blur child"); },
-              focus_in: move |_| { this.log.borrow_mut().push("focusin child"); },
-              focus_out: move |_| { this.log.borrow_mut().push("focusout child"); },
+              on_focus: move |_| { this.log.borrow_mut().push("focus child"); },
+              on_blur: move |_| { this.log.borrow_mut().push("blur child"); },
+              on_focus_in: move |_| { this.log.borrow_mut().push("focusin child"); },
+              on_focus_out: move |_| { this.log.borrow_mut().push("focusout child"); },
             }
           }
         }

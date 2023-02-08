@@ -16,8 +16,8 @@ impl ComposeChild for HasFocus {
       states {this: this.into_writable()}
       DynWidget {
         dyns: child,
-        focus_in: move|_| this.focused = true,
-        focus_out: move |_| this.focused = false,
+        on_focus_in: move|_| this.focused = true,
+        on_focus_out: move |_| this.focused = false,
       }
     }
   }

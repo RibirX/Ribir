@@ -20,7 +20,7 @@ impl ComposeChild for Cursor {
       }
       DynWidget {
         dyns: child,
-        pointer_enter: move |e: &mut PointerEvent| {
+        on_pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()
           {
@@ -29,7 +29,7 @@ impl ComposeChild for Cursor {
             ctx.set_cursor_icon(this.cursor.get());
           }
         },
-        pointer_leave: move |e: &mut PointerEvent| {
+        on_pointer_leave: move |e: &mut PointerEvent| {
           let cursor = save_cursor.unwrap_or_default();
           e.context().set_cursor_icon(cursor);
         }

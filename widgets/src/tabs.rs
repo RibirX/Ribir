@@ -77,7 +77,7 @@ impl ComposeChild for Tabs {
                     Expanded {
                       id: tab_header,
                       flex: 1.,
-                      tap: move |_| {
+                      on_tap: move |_| {
                         if this.cur_idx != idx {
                           this.cur_idx = idx;
                         }

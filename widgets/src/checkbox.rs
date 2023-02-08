@@ -84,8 +84,8 @@ impl ComposeChild for Checkbox {
       states { this }
       DynWidget {
         cursor: CursorIcon::Hand,
-        tap: move |_| this.switch_check(),
-        key_up: move |k| {
+        on_tap: move |_| this.switch_check(),
+        on_key_up: move |k| {
           if k.key == VirtualKeyCode::Space {
             this.switch_check()
           }

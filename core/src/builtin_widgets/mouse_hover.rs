@@ -17,8 +17,8 @@ impl ComposeChild for MouseHover {
       states {this: this.into_writable()}
       DynWidget {
         dyns: child,
-        pointer_enter: move |_| this.hover = true,
-        pointer_leave: move |_| this.hover = false,
+        on_pointer_enter: move |_| this.hover = true,
+        on_pointer_leave: move |_| this.hover = false,
       }
     }
   }

@@ -30,7 +30,7 @@ fn listener_trigger_have_handler() {
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
-      wheel: move |_| {
+      on_wheel: move |_| {
         h1.set(h1.get() + 1);
         leak_animate.run();
       },
@@ -68,7 +68,7 @@ fn listener_trigger() {
     SizedBox {
       id: sized_box,
       size: Size::new(100., 100.),
-      wheel: move |_| leak_animate.run()
+      on_wheel: move |_| leak_animate.run()
     }
     Animate {
       id: leak_animate,
