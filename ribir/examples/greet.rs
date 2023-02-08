@@ -14,7 +14,7 @@ fn main() {
           Placeholder::new("Enter the name you want to greet.")
         }
         Button {
-          tap: move |_| *counter += 1,
+          on_tap: move |_| *counter += 1,
           ButtonText::new({
             let counter = counter.to_string();
             format!("Greet!({counter})")

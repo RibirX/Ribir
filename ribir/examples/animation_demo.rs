@@ -18,7 +18,7 @@ fn main() {
       transform: Transform::scale(0.5, 0.5),
       id: path_widget,
       paths,
-      mounted: move |_| {
+      on_mounted: move |_| {
         circle_animate.run();
       },
     }

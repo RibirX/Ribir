@@ -115,7 +115,7 @@ impl ComposeChild for TextFieldThemeProxy {
         dyns: {
           child
         },
-        tap: move |_| {
+        on_tap: move |_| {
           match this.state {
             TextFieldState::Enabled => this.state = TextFieldState::Focused,
             TextFieldState::Hovered => this.state = TextFieldState::Focused,
@@ -123,14 +123,14 @@ impl ComposeChild for TextFieldThemeProxy {
           };
         },
 
-        pointer_move: move |_| {
+        on_pointer_move: move |_| {
           if this.state == TextFieldState::Enabled { this.state = TextFieldState::Hovered }
         },
 
-        pointer_leave: move |_| {
+        on_pointer_leave: move |_| {
           if this.state == TextFieldState::Hovered { this.state = TextFieldState::Enabled }
         },
-        focus_out: move |_| {
+        on_focus_out: move |_| {
           if this.state == TextFieldState::Focused { this.state = TextFieldState::Enabled }
         },
       }

@@ -42,7 +42,7 @@ impl ComposeChild for ScrollableWidget {
           Scrollable::Y => UnconstrainedDir::Y,
           Scrollable::Both => UnconstrainedDir::Both,
         },
-        wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+        on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
         DynWidget {
           id: content,
           dyns: child,

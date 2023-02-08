@@ -23,7 +23,7 @@ fn main() {
       SizedBox {
         id: a,
         size: Size::zero(),
-        tap: move |_| {}
+        on_tap: move |_| {}
       }
       SizedBox {
         id: b,

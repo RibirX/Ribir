@@ -524,8 +524,8 @@ mod tests {
             widget! {
               MockBox{
                 size: Size::zero(),
-                mounted: move |_| *new_cnt += 1,
-                disposed: move |_| *drop_cnt += 1
+                on_mounted: move |_| *new_cnt += 1,
+                on_disposed: move |_| *drop_cnt += 1
               }
             }
           })
@@ -577,7 +577,7 @@ mod tests {
 
                   MockBox {
                     size: Size::zero(),
-                    mounted: move |_| {
+                    on_mounted: move |_| {
                       if key.is_enter() {
                         (*enter_list).push(key.value.unwrap());
                       }
@@ -587,7 +587,7 @@ mod tests {
                         *key_change = key.get_change();
                       }
                     },
-                    disposed: move |_| {
+                    on_disposed: move |_| {
                       if key.is_disposed() {
                         (*leave_list).push(key.value.unwrap());
                       }

@@ -21,8 +21,8 @@ impl ComposeChild for PointerPressed {
       states { this: this.into_writable()}
       DynWidget {
         dyns: child,
-        pointer_down: move|_| this.pointer_pressed = true,
-        pointer_up: move |_| this.pointer_pressed = false,
+        on_pointer_down: move|_| this.pointer_pressed = true,
+        on_pointer_up: move |_| this.pointer_pressed = false,
       }
     }
   }

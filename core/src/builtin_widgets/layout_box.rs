@@ -15,7 +15,7 @@ impl ComposeChild for LayoutBox {
       states { this: this.into_writable() }
       DynWidget {
         dyns: child,
-        performed_layout: move |ctx| {
+        on_performed_layout: move |ctx| {
           let new_rect = ctx.box_rect().unwrap();
           if this.rect != new_rect {
             this.silent().rect = new_rect;

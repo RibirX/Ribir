@@ -1,7 +1,7 @@
-mod mounted;
-pub use mounted::*;
-mod performed_layout;
-pub use performed_layout::*;
+mod on_mounted;
+pub use on_mounted::*;
+mod on_performed_layout;
+pub use on_performed_layout::*;
 mod disposed;
 pub use disposed::*;
 
@@ -37,16 +37,16 @@ mod tests {
       }
       MockBox {
         size: Size::zero(),
-        mounted: move |_| lifecycle.silent().push("static mounted"),
-        performed_layout: move |_| lifecycle.silent().push("static performed layout"),
-        disposed: move |_| lifecycle.silent().push("static disposed"),
+        on_mounted: move |_| lifecycle.silent().push("static mounted"),
+        on_performed_layout: move |_| lifecycle.silent().push("static performed layout"),
+        on_disposed: move |_| lifecycle.silent().push("static disposed"),
         DynWidget {
           dyns: trigger.then(|| widget! {
             MockBox {
               size: Size::zero(),
-              mounted: move |_| lifecycle.silent().push("dyn mounted"),
-              performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
-              disposed: move |_| lifecycle.silent().push("dyn disposed")
+              on_mounted: move |_| lifecycle.silent().push("dyn mounted"),
+              on_performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
+              on_disposed: move |_| lifecycle.silent().push("dyn disposed")
             }
           })
         }

@@ -67,9 +67,9 @@ impl ComposeChild for Input {
           max: Size::new(input_width(this.style.font_size, this.min_length), f32::INFINITY)
         },
         auto_focus: true,
-        char: move |c| this.edit_handle(c.char),
-        key_down: move |key| this.key_handle(key),
-        pointer_move: move |e| {
+        on_char: move |c| this.edit_handle(c.char),
+        on_key_down: move |key| this.key_handle(key),
+        on_pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
             if e.point_type == PointerType::Mouse
               && e.mouse_buttons() == MouseButtons::PRIMARY {
@@ -79,12 +79,12 @@ impl ComposeChild for Input {
             }
           }
         },
-        pointer_down: move |e| {
+        on_pointer_down: move |e| {
           let position = to_content_pos(&container, &e.position());
           let cluster = helper.cluster_from_pos(position.x, position.y);
           this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
         },
-        pointer_up: move |_| {
+        on_pointer_up: move |_| {
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
              CaretState::Caret(begin)
@@ -108,7 +108,7 @@ impl ComposeChild for Input {
               text: this.text.clone(),
               style: this.style.clone(),
     
-              performed_layout: move |ctx| {
+              on_performed_layout: move |ctx| {
                 let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
                 helper.glyphs = Some(Text::text_layout(
                   &text.text,

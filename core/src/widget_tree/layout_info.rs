@@ -324,7 +324,7 @@ mod tests {
         root_layout_cnt: root_layout_cnt.clone(),
       }
       MockMulti {
-        performed_layout: move |_| *root_layout_cnt += 1,
+        on_performed_layout: move |_| *root_layout_cnt += 1,
         DynWidget {
           dyns: if child_box.size.is_empty() {
             MockBox { size: Size::new(1., 1.) }.into_widget()
@@ -358,13 +358,13 @@ mod tests {
       }
       MockBox {
         size: *trigger,
-        performed_layout: move |_| layout_order.push(1),
+        on_performed_layout: move |_| layout_order.push(1),
         MockBox {
           size: *trigger,
-          performed_layout: move |_| layout_order.push(2),
+          on_performed_layout: move |_| layout_order.push(2),
           MockBox {
             size: *trigger,
-            performed_layout: move |_| layout_order.push(3),
+            on_performed_layout: move |_| layout_order.push(3),
           }
         }
       }

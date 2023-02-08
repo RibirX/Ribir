@@ -8,7 +8,7 @@ type DisposedCallback = dyn for<'r> FnMut(LifeCycleCtx<'r>);
 #[derive(Declare)]
 pub struct DisposedListener {
   #[declare(builtin, convert=box_trait(for<'r> FnMut(LifeCycleCtx<'r>), wrap_fn = RefCell::new))]
-  pub disposed: RefCell<Box<DisposedCallback>>,
+  pub on_disposed: RefCell<Box<DisposedCallback>>,
 }
 
-impl_lifecycle!(DisposedListener, disposed);
+impl_lifecycle!(DisposedListener, on_disposed);
