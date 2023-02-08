@@ -24,9 +24,9 @@ fn main() {
       DynWidget {
         dyns := assign_watch!(*counter > 0)
           .stream_map(|o| o.distinct_until_changed())
-          .map(move |not_empty| {
+          .map(move |need_greet| {
             let style = style.clone();
-            not_empty.then(move || {
+            need_greet.then(move || {
               widget! {
                 init ctx => {
                   let ease_in = transitions::EASE_IN.of(ctx);
