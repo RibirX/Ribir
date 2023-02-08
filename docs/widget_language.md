@@ -177,11 +177,39 @@ DynWidget {
 }
 ``` 
 
-This `DynWidget` generates an optional widget to detect if the `counter` is greater than zero. 
+This `DynWidget` generates an optional widget as detected by if the `counter` is greater than zero. One thing that could be improved is to the `greet` not always regenerate after the `counter` modified. Indeed the `greet` widget can regenerate only if the result `*counter > 0` changed. Let's go further:
+
+```rust
+DynWidget {
+  dyns := assign_watch!(*counter > 0)               // edit!
+    .stream_map(|o| o.distinct_until_changed())     // new!
+    .map(move |need_greet| {                        // new!
+      need_greet.then(|| {
+          widget! {
+            Text { 
+              id: greet,
+              text: "Hello world!",
+              h_align: HAlign::Center,
+              v_align: VAlign::Center,
+            }
+          }
+        })
+    })
+}
+```
+
+We add three lines of code. 
+
+The first line is `dyns := assign_watch!(*counter > 0)`, we use operator `:=` instead of `:` to initialize the `dyns`. Not like `:`, `:=` accept an `AssignObservable` as its initialization value and explicit subscribe it to update the field. `AssignObservable` is a type contain the initialization value and an observable stream of that value. `assign_watch!` macro use to convert a expression to an `AssignObservable`. 
+
+In the second line, we use `stream_map` to chain `distinct_until_changed` on the stream observable.  So we accept the modifies only when the result of `*counter > 0` changed.
+
+The third line `.map(move |need_greet| {...}) ` map a `bool` to `Option<Widget>` what `dyns` want.
+
 
 > **Tips**
 >
-> `DynWidget` also supports accepting children depending on the type of `dyns` allow.  Its children are static. The dynamic part only limits in `dyns` field.
+> `DynWidget` also supports accepting children depending on the type of `dyns` allow. Its children are static. The dynamic part only limits in `dyns` field.
 >```rust
 >Column {
 >  DynWidget {
@@ -553,37 +581,41 @@ Let's review all the code of the widget.
         }
       }
       DynWidget {
-        dyns: (*counter > 0).then(|| {
-          widget! {
-            init ctx => {
-              let ease_in = transitions::EASE_IN.of(ctx);
-            }
-            Row {
-              Text { text: "Hello ", style: style.clone() }
-              Text {
-                id: greet,
-                text: "World",
-                style: style.clone()
+        dyns: := assign_watch!(*counter > 0)
+          .stream_map(|o| o.distinct_until_changed())
+          .map(move |need_greet| {
+            need_greet.then(|| {
+              widget! {
+                init ctx => {
+                  let ease_in = transitions::EASE_IN.of(ctx);
+                }
+                Row {
+                  Text { text: "Hello ", style: style.clone() }
+                  Text {
+                    id: greet,
+                    text: "World",
+                    style: style.clone()
+                  }
+                  Text { text: "!" , style }
+                }
+                Animate {
+                  id: greet_new,
+                  transition: ease_in,
+                  prop: prop!(greet.transform),
+                  from: Transform::translation(0., greet.layout_height() * 2.)
+                }
+                finally {
+                  let_watch!(counter)
+                    .subscribe(move |_| {
+                      greet.text = input.text();
+                      input.set_text("");
+                    });
+                  let_watch!(greet.text)
+                    .subscribe(move |_| greet_new.run());
+                }
               }
-              Text { text: "!" , style }
-            }
-            Animate {
-              id: greet_new,
-              transition: ease_in,
-              prop: prop!(greet.transform),
-              from: Transform::translation(0., greet.layout_height() * 2.)
-            }
-            finally {
-              let_watch!(counter)
-                .subscribe(move |_| {
-                  greet.text = input.text();
-                  input.set_text("");
-                });
-              let_watch!(greet.text)
-                .subscribe(move |_| greet_new.run());
-            }
-          }
-        })
+            })
+          })
       }
     }
   };
