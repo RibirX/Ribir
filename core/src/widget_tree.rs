@@ -124,7 +124,7 @@ impl WidgetTree {
         store.take_performed().into_iter().for_each(|id| {
           id.assert_get(arena).query_all_type(
             |l: &PerformedLayoutListener| {
-              (l.on_performed_layout.borrow_mut())(LifeCycleCtx { id, arena, store, wnd_ctx });
+              l.dispatch(LifeCycleCtx { id, arena, store, wnd_ctx });
               true
             },
             QueryOrder::OutsideFirst,

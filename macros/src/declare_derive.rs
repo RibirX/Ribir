@@ -7,7 +7,7 @@ use syn::{
   parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token, DataStruct, Fields, Ident, Path, Result,
+  token, DataStruct, Fields, Ident, Result,
 };
 
 const DECLARE: &str = "Declare";
@@ -20,21 +20,8 @@ struct DefaultMeta {
   value: Option<syn::Expr>,
 }
 
-struct WrapFn {
-  pub _wrap_fn_kw: kw::wrap_fn,
-  pub _eq_token: token::Eq,
-  pub method_path: Path,
-}
-struct BoxTrait {
-  _box_trait: kw::box_trait,
-  _paren: token::Paren,
-  trait_bound: syn::TraitBound,
-  wrap_fn: Option<WrapFn>,
-}
-
 enum ConvertValue {
   Into(kw::into),
-  BoxTrait(BoxTrait),
   Custom(kw::custom),
   Stipe(kw::strip_option),
 }
@@ -65,8 +52,6 @@ mod kw {
   custom_keyword!(default);
   custom_keyword!(convert);
   custom_keyword!(into);
-  custom_keyword!(box_trait);
-  custom_keyword!(wrap_fn);
   custom_keyword!(custom);
   custom_keyword!(skip);
   custom_keyword!(strip_option);
@@ -116,57 +101,11 @@ impl Parse for ConvertValue {
       input.parse().map(ConvertValue::Into)
     } else if lk.peek(kw::custom) {
       input.parse().map(ConvertValue::Custom)
-    } else if lk.peek(kw::box_trait) {
-      input.parse().map(ConvertValue::BoxTrait)
     } else if lk.peek(kw::strip_option) {
       input.parse().map(ConvertValue::Stipe)
     } else {
       Err(lk.error())
     }
-  }
-}
-impl Parse for WrapFn {
-  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
-    Ok(Self {
-      _wrap_fn_kw: input.parse()?,
-      _eq_token: input.parse()?,
-      method_path: input.parse()?,
-    })
-  }
-}
-
-impl ToTokens for WrapFn {
-  fn to_tokens(&self, tokens: &mut TokenStream) { self.method_path.to_tokens(tokens) }
-}
-
-impl Parse for BoxTrait {
-  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
-    let _box_trait = input.parse()?;
-    let content;
-    let _paren = syn::parenthesized!(content in input);
-    let trait_bound;
-    let wrap_meta;
-    if content.peek(kw::wrap_fn) {
-      wrap_meta = Some(content.parse()?);
-      content.parse::<token::Comma>()?;
-      trait_bound = content.parse()?;
-    } else {
-      trait_bound = content.parse()?;
-      if !content.is_empty() {
-        content.parse::<token::Comma>()?;
-      }
-      if content.is_empty() {
-        wrap_meta = None;
-      } else {
-        wrap_meta = Some(content.parse()?);
-      }
-    }
-    Ok(Self {
-      _box_trait,
-      _paren,
-      trait_bound,
-      wrap_fn: wrap_meta,
-    })
   }
 }
 
@@ -403,14 +342,6 @@ impl<'a> DeclareField<'a> {
       Some(ConvertValue::Stipe(_)) => Some((
         quote! { v: impl std::convert::Into<DeclareStripOption<#ty>> },
         quote! { v.into().into_option_value() },
-      )),
-      Some(ConvertValue::BoxTrait(BoxTrait { trait_bound, wrap_fn, .. })) => Some((
-        quote! { v: impl #trait_bound + 'static },
-        if let Some(wrap_fn) = wrap_fn {
-          quote! { #wrap_fn(Box::new(v)) }
-        } else {
-          quote! { Box::new(v) }
-        },
       )),
       // custom
       Some(ConvertValue::Custom(_)) => None,

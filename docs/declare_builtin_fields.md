@@ -2,6 +2,8 @@
 
 - on_performed_layout : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
  	 - action perform after widget performed layout.
+- performed_layout_stream : [`LifecycleSubject`] 
+ 	 - return an observable stream of the performed layout event
 - on_pointer_down : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer down event.
 - on_pointer_up : [`impl FnMut(& mut PointerEvent)`] 
@@ -14,7 +16,7 @@
  	 - specify the event handler for the pointer double tap event.
 - on_tripe_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
  	 - specify the event handler for the pointer triple tap event.
-- on_x_times_tap : [`(u8, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
+- on_x_times_tap : [`(usize, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
  	 - specify the event handler for the pointer `x` times tap event.
 - on_pointer_cancel : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler to process pointer cancel event.
@@ -80,8 +82,55 @@
  	 - Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency.
 - on_mounted : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, MountedType) >`] 
  	 - action perform after widget be added to the widget tree.
+- mounted_stream : [`LifecycleSubject`] 
+ 	 - return an observable stream of the widget mounted event
 - on_disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, DisposedType) >`] 
  	 - action perform after widget remove from widget tree.
+- disposed_stream : [`LifecycleSubject`] 
+ 	 - return an observable stream of the widget disposed event
+
+ - `fn pointer_down_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
+() >`
+ 	- return an observable stream of the pointer down event
+
+ - `fn pointer_up_stream(& self) -> MutRefItemSubject < 'static, PointerEvent, ()
+>`
+ 	- return an observable stream of the pointer up event
+
+ - `fn pointer_move_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
+() >`
+ 	- return an observable stream of the pointer move event
+
+ - `fn tap_stream(& self) -> MutRefItemSubject < 'static, PointerEvent, () >`
+ 	- return an observable stream of the pointer tap event
+
+ - `fn double_tap_stream(& self,) -> FilterMapOp < MutRefItemSubject < 'static,
+PointerEvent, () >, impl FnMut(& mut PointerEvent) -> Option < & mut
+PointerEvent >, & mut PointerEvent, >`
+ 	-  Return an observable stream of double tap event
+
+ - `fn triple_tap_stream(& self,) -> FilterMapOp < MutRefItemSubject < 'static,
+PointerEvent, () >, impl FnMut(& mut PointerEvent) -> Option < & mut
+PointerEvent >, & mut PointerEvent, >`
+ 	- Return an observable stream of tripe tap event
+
+ - `fn x_times_tap_stream(& self, x : usize, dur : Duration,) -> FilterMapOp <
+MutRefItemSubject < 'static, PointerEvent, () >, impl
+FnMut(& mut PointerEvent) -> Option < & mut PointerEvent >, & mut
+PointerEvent, >`
+ 	-  Return an observable stream of x-tap event that user tapped 'x' times in the specify duration `dur`.
+
+ - `fn pointer_cancel_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
+() >`
+ 	- return an observable stream of the pointer cancel event
+
+ - `fn pointer_enter_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
+() >`
+ 	- return an observable stream of the pointer enter event
+
+ - `fn pointer_leave_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
+() >`
+ 	- return an observable stream of the pointer leave event
 
  - `fn request_focus(& self)`
  	- request the this node to be focused.
@@ -89,8 +138,32 @@
  - `fn unfocus(& self)`
  	- removes the focus from this node.
 
+ - `fn focus_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
+ 	- return an observable stream of the pointer focus event
+
+ - `fn blur_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
+ 	- return an observable stream of the pointer blur event
+
+ - `fn focus_in_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
+ 	- return an observable stream of the pointer focus-in event
+
+ - `fn focus_out_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
+ 	- return an observable stream of the pointer focus-out event
+
  - `fn has_focus(& self) -> bool`
  	- return if the widget has focus.
+
+ - `fn key_down_stream(& self) -> MutRefItemSubject < 'static, KeyboardEvent, () >`
+ 	- return an observable stream of the key down event
+
+ - `fn key_up_stream(& self) -> MutRefItemSubject < 'static, KeyboardEvent, () >`
+ 	- return an observable stream of the key up event
+
+ - `fn char_stream(& self) -> MutRefItemSubject < 'static, CharEvent, () >`
+ 	- return an observable stream of the char event
+
+ - `fn key_down_stream(& self) -> MutRefItemSubject < 'static, WheelEvent, () >`
+ 	- return an observable stream of the wheel event
 
  - `fn mouse_hover(& self) -> bool`
  	- return if the pointer is hover on the widget

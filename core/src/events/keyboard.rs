@@ -1,6 +1,7 @@
-use std::cell::RefCell;
-
-use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
+use crate::{
+  data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
+  impl_listener, impl_query_self_only, prelude::*,
+};
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -9,65 +10,39 @@ pub struct KeyboardEvent {
   pub common: EventCommon,
 }
 
-type Callback = RefCell<Box<dyn for<'r> FnMut(&'r mut KeyboardEvent)>>;
-
-/// Widget fire event whenever press or release a key.
 #[derive(Declare)]
 pub struct KeyDownListener {
-  #[declare(
-    builtin,
-    convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent),
-    wrap_fn = RefCell::new)
-  )]
-  pub on_key_down: Callback,
+  #[declare(builtin, default, convert=custom)]
+  on_key_down: MutRefItemSubject<'static, KeyboardEvent, ()>,
 }
 
 #[derive(Declare)]
 pub struct KeyUpListener {
   #[declare(
     builtin,
-    convert=box_trait(for<'r> FnMut(&'r mut KeyboardEvent),
-    wrap_fn = RefCell::new)
+    convert=custom
   )]
-  pub on_key_up: Callback,
+  pub on_key_up: MutRefItemSubject<'static, KeyboardEvent, ()>,
 }
 
-impl EventListener for KeyDownListener {
-  type Event = KeyboardEvent;
-  #[inline]
-  fn dispatch(&self, event: &mut KeyboardEvent) { (self.on_key_down.borrow_mut())(event) }
-}
+impl_listener!(
+  KeyDownListener,
+  KeyDownListenerDeclarer,
+  on_key_down,
+  KeyboardEvent,
+  key_down_stream
+);
+impl_compose_child_with_focus_for_listener!(KeyDownListener);
 
-impl EventListener for KeyUpListener {
-  type Event = KeyboardEvent;
-  #[inline]
-  fn dispatch(&self, event: &mut KeyboardEvent) { (self.on_key_up.borrow_mut())(event) }
-}
+impl_listener!(
+  KeyUpListener,
+  KeyUpListenerDeclarer,
+  on_key_up,
+  KeyboardEvent,
+  key_up_stream
+);
 
-impl ComposeChild for KeyDownListener {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let widget = dynamic_compose_focus_node(child);
-    compose_child_as_data_widget(widget, this)
-  }
-}
-
-impl ComposeChild for KeyUpListener {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    compose_child_as_data_widget(child, this)
-  }
-}
-
-impl Query for KeyDownListener {
-  impl_query_self_only!();
-}
-
-impl Query for KeyUpListener {
-  impl_query_self_only!();
-}
+impl_compose_child_with_focus_for_listener!(KeyUpListener);
 
 impl std::borrow::Borrow<EventCommon> for KeyboardEvent {
   #[inline]

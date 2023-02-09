@@ -1,6 +1,6 @@
+use crate::prelude::Container;
 use crate::{layout::Stack, path::PathPaintKit};
 use ribir_core::prelude::*;
-use crate::prelude::Container;
 
 /// Widget that as an visual indicator of material design used to present the
 /// interactive status of its child.

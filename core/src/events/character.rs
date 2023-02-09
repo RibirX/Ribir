@@ -1,13 +1,14 @@
-use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
-use std::cell::RefCell;
+use crate::{
+  data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
+  impl_listener, impl_query_self_only, prelude::*,
+};
 
-type CharCallback = dyn for<'r> FnMut(&'r mut CharEvent);
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
 #[derive(Declare)]
 pub struct CharListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut CharEvent), wrap_fn = RefCell::new))]
-  on_char: RefCell<Box<CharCallback>>,
+  #[declare(builtin, convert=custom)]
+  on_char: MutRefItemSubject<'static, CharEvent, ()>,
 }
 
 #[derive(Debug)]
@@ -16,18 +17,14 @@ pub struct CharEvent {
   pub common: EventCommon,
 }
 
-impl ComposeChild for CharListener {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let widget = dynamic_compose_focus_node(child);
-    compose_child_as_data_widget(widget, this)
-  }
-}
-
-impl Query for CharListener {
-  impl_query_self_only!();
-}
+impl_listener!(
+  CharListener,
+  CharListenerDeclarer,
+  on_char,
+  CharEvent,
+  char_stream
+);
+impl_compose_child_with_focus_for_listener!(CharListener);
 
 impl std::borrow::Borrow<EventCommon> for CharEvent {
   #[inline]
@@ -49,12 +46,6 @@ impl std::ops::Deref for CharEvent {
 impl std::ops::DerefMut for CharEvent {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
-}
-
-impl EventListener for CharListener {
-  type Event = CharEvent;
-  #[inline]
-  fn dispatch(&self, event: &mut CharEvent) { (self.on_char.borrow_mut())(event) }
 }
 
 #[cfg(test)]
