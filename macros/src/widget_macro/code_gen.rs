@@ -26,12 +26,9 @@ use super::{
   Desugared, ObjectUsed, ObjectUsedPath, TrackExpr, UsedPart, UsedType, VisitCtx, WIDGETS,
 };
 
-fn visit_watch_expr_as_observable(
-  mut watch_expr: &mut TrackExpr,
-  ctx: &mut VisitCtx,
-) -> TokenStream {
+fn visit_watch_expr_as_observable(watch_expr: &mut TrackExpr, ctx: &mut VisitCtx) -> TokenStream {
   ctx.new_scope_visit(
-    |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
+    |ctx| ctx.visit_track_expr_mut(watch_expr),
     |scope| {
       scope.iter_mut().for_each(|(_, info)| {
         info.used_type.remove(UsedType::SUBSCRIBE);

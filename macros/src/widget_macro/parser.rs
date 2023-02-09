@@ -195,7 +195,7 @@ impl Parse for MacroSyntax {
         } else {
           finally = Some(e)
         }
-      } else if peek_widget(&input) {
+      } else if peek_widget(input) {
         let w: DeclareWidget = input.parse()?;
         if let Some(first) = widget.as_ref() {
           let err = syn::Error::new(

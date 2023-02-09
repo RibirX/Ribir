@@ -1,14 +1,14 @@
 mod caret;
 mod caret_state;
-mod handle;
 mod glyphs_helper;
+mod handle;
 mod selected_text;
 pub use caret_state::CaretState;
 
+use self::{caret::Caret, glyphs_helper::GlyphsHelper, selected_text::SelectedText};
 use crate::layout::{ConstrainedBox, Stack};
 use crate::prelude::Text;
 use ribir_core::{prelude::*, ticker::FrameMsg};
-use self::{glyphs_helper::GlyphsHelper, selected_text::SelectedText, caret::Caret};
 
 pub struct Placeholder(CowArc<str>);
 
@@ -62,8 +62,8 @@ impl ComposeChild for Input {
 
       ConstrainedBox {
         id: outbox,
-        clamp: BoxClamp { 
-          min: Size::new(input_width(this.style.font_size, this.min_length), 0.), 
+        clamp: BoxClamp {
+          min: Size::new(input_width(this.style.font_size, this.min_length), 0.),
           max: Size::new(input_width(this.style.font_size, this.min_length), f32::INFINITY)
         },
         auto_focus: true,
@@ -107,7 +107,7 @@ impl ComposeChild for Input {
               id: text,
               text: this.text.clone(),
               style: this.style.clone(),
-    
+
               on_performed_layout: move |ctx| {
                 let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
                 helper.glyphs = Some(Text::text_layout(
@@ -173,7 +173,9 @@ impl Placeholder {
 }
 
 fn input_width(font_size: FontSize, length: f32) -> f32 {
-  FontSize::Em(Em::relative_to(length, font_size)).into_pixel().value()
+  FontSize::Em(Em::relative_to(length, font_size))
+    .into_pixel()
+    .value()
 }
 
 fn auto_x_scroll_pos(container: &ScrollableWidget, before: f32, after: f32) -> f32 {

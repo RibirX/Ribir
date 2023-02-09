@@ -21,7 +21,7 @@ ribir_gpu = {path = "../gpu"}
 ribir_macros = {path = "../macros"}
 ribir_painter = {path = "../painter", version = "*"}
 ribir_text = {path = "../text"}
-rxrust = {git = "https://github.com/rxRust/rxRust.git", branch = "refactor-traits"}
+rxrust = {path = "../../rxRust"}
 
 smallvec = "1.8.0"
 winit = "0.26.1"

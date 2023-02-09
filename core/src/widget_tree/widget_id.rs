@@ -142,7 +142,7 @@ impl WidgetId {
 
       id.assert_get(arena).query_all_type(
         |d: &DisposedListener| {
-          (d.on_disposed.borrow_mut())(LifeCycleCtx { id: self, arena, store, wnd_ctx });
+          d.dispatch(LifeCycleCtx { id: self, arena, store, wnd_ctx });
           true
         },
         QueryOrder::OutsideFirst,
@@ -187,7 +187,7 @@ impl WidgetId {
 
     self.assert_get(arena).query_all_type(
       |m: &MountedListener| {
-        (m.on_mounted.borrow_mut())(LifeCycleCtx { id: self, arena, store, wnd_ctx });
+        m.dispatch(LifeCycleCtx { id: self, arena, store, wnd_ctx });
         true
       },
       QueryOrder::OutsideFirst,

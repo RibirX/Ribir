@@ -1,6 +1,6 @@
 use palette::{
   rgb::{channels::Rgba, Rgb},
-  Alpha, IntoColor, IntoComponent, Lab, Srgba, LinSrgba,
+  Alpha, IntoColor, IntoComponent, Lab, LinSrgba, Srgba,
 };
 use serde::{Deserialize, Serialize};
 

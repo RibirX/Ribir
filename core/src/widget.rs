@@ -2,7 +2,7 @@ pub(crate) use crate::{composed_widget::ComposedWidget, widget_tree::*};
 use crate::{context::*, prelude::ComposeChild, state::State};
 use ribir_algo::ShareResource;
 use ribir_painter::*;
-use rxrust::subscription::{SubscriptionGuard, BoxSubscription};
+use rxrust::subscription::{BoxSubscription, SubscriptionGuard};
 
 #[doc(hidden)]
 pub use std::{

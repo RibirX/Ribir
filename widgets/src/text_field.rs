@@ -1,10 +1,12 @@
 use crate::{
-  layout::{Column, Container, ConstrainedBox, constrained_box::EXPAND_Y},
-  prelude::{ Expanded, Icon, Input, Row, Stack, Text}, common_widget::{Leading, Trailing, LabelText, TrailingText, LeadingText}, input::{Placeholder},
+  common_widget::{LabelText, Leading, LeadingText, Trailing, TrailingText},
+  input::Placeholder,
+  layout::{constrained_box::EXPAND_Y, Column, ConstrainedBox, Container},
+  prelude::{Expanded, Icon, Input, Row, Stack, Text},
 };
 use ribir_core::prelude::*;
+use std::collections::HashMap;
 use std::hash::Hash;
-use std::{collections::HashMap};
 
 #[derive(Declare, Default)]
 pub struct TextField {
@@ -14,31 +16,30 @@ pub struct TextField {
 }
 
 impl TextField {
-  pub fn text(&self) -> CowArc<str> {
-    self.text.clone()
-  }
-  pub fn set_text(&mut self, text: CowArc<str>) {
-    self.text = text;
-  }
+  pub fn text(&self) -> CowArc<str> { self.text.clone() }
+  pub fn set_text(&mut self, text: CowArc<str>) { self.text = text; }
 }
-
 
 #[derive(Template, Default)]
 pub struct TextFieldTml {
-  /// Label text is used to inform users as to what information is requested for a text field.
+  /// Label text is used to inform users as to what information is requested for
+  /// a text field.
   label: Option<LabelText>,
 
-  /// The placeholder text is displayed in the input field before the user enters a value.
+  /// The placeholder text is displayed in the input field before the user
+  /// enters a value.
   placeholder: Option<Placeholder>,
 
-  /// Use prefix text before the editable text to show symbols or abbreviations that help users 
-  /// enter the right type of information in a form’s text input
+  /// Use prefix text before the editable text to show symbols or abbreviations
+  /// that help users enter the right type of information in a form’s text
+  /// input
   prefix: Option<LeadingText>,
-  
-  /// Use suffix text after the editable text to show symbols or abbreviations that help users 
-  /// enter the right type of information in a form’s text input
+
+  /// Use suffix text after the editable text to show symbols or abbreviations
+  /// that help users enter the right type of information in a form’s text
+  /// input
   subfix: Option<TrailingText>,
-  
+
   /// An icon that appears before the editable part of the text field
   leading_icon: Option<WidgetOf<Leading>>,
 
@@ -72,7 +73,7 @@ pub struct TextFieldTheme {
 
   /// edit area's padding when collapse
   pub input_collapse_padding: EdgeInsets,
-  
+
   /// edit area's padding when expand
   pub input_expand_padding: EdgeInsets,
 }
@@ -143,10 +144,10 @@ impl TextFieldThemeProxy {
 
   fn label_style(&self, is_text_empty: bool) -> TextStyle {
     let mut font = if self.is_collapse(is_text_empty) {
-        self.label_collapse.clone()
-      } else {
-        self.label_expand.clone()
-      };
+      self.label_collapse.clone()
+    } else {
+      self.label_expand.clone()
+    };
     font.foreground = Brush::Color(self.label_color);
     font
   }
@@ -275,7 +276,6 @@ impl TextFieldThemeSuit {
   }
 }
 
-
 macro_rules! take_option_field {
   ({$($f: ident),+}, $c: ident) => {
     $(let $f = $c.$f.take();)+
@@ -304,7 +304,7 @@ impl ComposeChild for TextField {
         id: theme,
         suit: theme_suit,
         state: TextFieldState::default(),
-          
+
           Stack {
             Container {
               size: Size::new(0., theme.container_height),
@@ -391,7 +391,7 @@ fn build_input_area(
 
     finally {
       input.set_text(this.text.clone());
-      let_watch!(input.text()) 
+      let_watch!(input.text())
         .distinct_until_changed()
         .subscribe(move |val| {
           this.silent().text = val;
@@ -452,7 +452,6 @@ impl Compose for TextFieldLabel {
   }
 }
 
-
 fn build_content_area(
   this: &mut StateRef<TextField>,
   theme: &mut StateRef<TextFieldThemeProxy>,
@@ -495,7 +494,6 @@ fn build_content_area(
 
 fn build_icon(icon: Option<Widget>) -> Widget {
   if icon.is_some() {
-    
     widget! {
       init ctx => {
         let icon_size = IconSize::of(ctx).small;

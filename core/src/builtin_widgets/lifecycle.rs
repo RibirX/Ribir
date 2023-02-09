@@ -1,26 +1,182 @@
-mod on_mounted;
-pub use on_mounted::*;
-mod on_performed_layout;
-pub use on_performed_layout::*;
-mod disposed;
-pub use disposed::*;
+use crate::{impl_query_self_only, prelude::*};
+use rxrust::{
+  prelude::*,
+  rc::{MutRc, RcDeref, RcDerefMut},
+  subscriber::{Publisher, Subscriber},
+};
+use smallvec::SmallVec;
+
+use crate::context::LifeCycleCtx;
+
+/// Listener perform when its child widget add to the widget tree.
+#[derive(Declare)]
+pub struct MountedListener {
+  #[declare(builtin, convert=custom)]
+  pub on_mounted: LifecycleSubject,
+}
+
+#[derive(Declare)]
+pub struct PerformedLayoutListener {
+  #[declare(builtin, convert=custom)]
+  pub on_performed_layout: LifecycleSubject,
+}
+
+#[derive(Declare)]
+pub struct DisposedListener {
+  #[declare(builtin, convert=custom)]
+  pub on_disposed: LifecycleSubject,
+}
+
+type LifecyclePublisher =
+  MutRc<Option<SmallVec<[Box<dyn for<'r> Publisher<LifeCycleCtx<'r>, ()>>; 1]>>>;
+
+#[derive(Clone)]
+pub struct LifecycleSubject {
+  observers: LifecyclePublisher,
+  chamber: LifecyclePublisher,
+}
+
+impl<'a, O> Observable<LifeCycleCtx<'a>, (), O> for LifecycleSubject
+where
+  O: for<'r> Observer<LifeCycleCtx<'r>, ()> + 'static,
+{
+  type Unsub = Subscriber<O>;
+
+  fn actual_subscribe(self, observer: O) -> Self::Unsub {
+    if let Some(chamber) = self.chamber.rc_deref_mut().as_mut() {
+      self
+        .observers
+        .rc_deref_mut()
+        .as_mut()
+        .unwrap()
+        .retain(|p| !p.p_is_closed());
+
+      let subscriber = Subscriber::new(Some(observer));
+      chamber.push(Box::new(subscriber.clone()));
+      subscriber
+    } else {
+      Subscriber::new(None)
+    }
+  }
+}
+impl<'a> ObservableExt<LifeCycleCtx<'a>, ()> for LifecycleSubject {}
+
+impl<'b> Observer<LifeCycleCtx<'b>, ()> for LifecycleSubject {
+  fn next(&mut self, value: LifeCycleCtx<'b>) {
+    self.load();
+    if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
+      for p in observers.iter_mut() {
+        p.p_next(value.clone());
+      }
+    }
+  }
+
+  fn error(mut self, err: ()) {
+    self.load();
+    if let Some(observers) = self.observers.rc_deref_mut().take() {
+      observers
+        .into_iter()
+        .filter(|o| !o.p_is_closed())
+        .for_each(|o| o.p_error(err));
+    }
+  }
+
+  fn complete(mut self) {
+    self.load();
+    if let Some(observers) = self.observers.rc_deref_mut().take() {
+      observers
+        .into_iter()
+        .filter(|o| !o.p_is_closed())
+        .for_each(|subscriber| subscriber.p_complete());
+    }
+  }
+
+  #[inline]
+  fn is_finished(&self) -> bool { self.observers.rc_deref().is_none() }
+}
+
+impl LifecycleSubject {
+  fn load(&mut self) {
+    if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
+      observers.append(self.chamber.rc_deref_mut().as_mut().unwrap());
+    }
+  }
+}
 
 #[macro_export]
 macro_rules! impl_lifecycle {
-  ($name: ident, $field: ident) => {
-    impl ComposeChild for $name {
+  ($listener: ident, $declarer:ident, $field: ident, $stream_name: ident) => {
+    impl ComposeChild for $listener {
       type Child = Widget;
       fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
         compose_child_as_data_widget(child, this)
       }
     }
 
-    impl Query for $name {
+    impl $listener {
+      #[inline]
+      pub fn $stream_name(&self) -> LifecycleSubject { self.$field.clone() }
+
+      #[inline]
+      pub(crate) fn dispatch<'r>(&self, event: LifeCycleCtx<'r>) { self.$field.clone().next(event) }
+    }
+
+    impl $declarer {
+      pub fn $field(mut self, handler: impl for<'r> FnMut(LifeCycleCtx<'r>) + 'static) -> Self {
+        assert!(self.$field.is_none());
+        let subject = LifecycleSubject::default();
+        subject.clone().subscribe(handler);
+        self.$field = Some(subject);
+        self
+      }
+    }
+
+    impl Query for $listener {
       impl_query_self_only!();
     }
   };
 }
 
+impl_lifecycle!(
+  MountedListener,
+  MountedListenerDeclarer,
+  on_mounted,
+  mounted_stream
+);
+
+impl_lifecycle!(
+  PerformedLayoutListener,
+  PerformedLayoutListenerDeclarer,
+  on_performed_layout,
+  performed_layout_stream
+);
+
+impl_lifecycle!(
+  DisposedListener,
+  DisposedListenerDeclarer,
+  on_disposed,
+  disposed_stream
+);
+
+impl<'a> Clone for LifeCycleCtx<'a> {
+  fn clone(&self) -> Self {
+    Self {
+      id: self.id.clone(),
+      arena: self.arena,
+      store: self.store,
+      wnd_ctx: self.wnd_ctx,
+    }
+  }
+}
+
+impl Default for LifecycleSubject {
+  fn default() -> Self {
+    Self {
+      observers: MutRc::own(Some(<_>::default())),
+      chamber: MutRc::own(Some(<_>::default())),
+    }
+  }
+}
 #[cfg(test)]
 mod tests {
   use crate::{prelude::*, test::MockBox, widget_tree::WidgetTree};

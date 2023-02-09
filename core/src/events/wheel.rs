@@ -1,6 +1,7 @@
-use std::cell::RefCell;
-
-use crate::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
+use crate::{
+  data_widget::compose_child_as_data_widget, impl_compose_child_for_listener, impl_listener,
+  impl_query_self_only, prelude::*,
+};
 
 #[derive(Debug, Clone)]
 pub struct WheelEvent {
@@ -9,26 +10,23 @@ pub struct WheelEvent {
   pub common: EventCommon,
 }
 
-type WhellCallback = dyn for<'r> FnMut(&'r mut WheelEvent);
 /// Firing the wheel event when the user rotates a wheel button on a pointing
 /// device (typically a mouse).
 #[derive(Declare)]
 pub struct WheelListener {
-  #[declare(builtin, convert=box_trait(for<'r> FnMut(&'r mut WheelEvent), wrap_fn = RefCell::new))]
-  on_wheel: RefCell<Box<WhellCallback>>,
+  #[declare(builtin, convert=custom)]
+  on_wheel: MutRefItemSubject<'static, WheelEvent, ()>,
 }
 
-impl ComposeChild for WheelListener {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    compose_child_as_data_widget(child, this)
-  }
-}
+impl_listener!(
+  WheelListener,
+  WheelListenerDeclarer,
+  on_wheel,
+  WheelEvent,
+  wheel_stream
+);
 
-impl Query for WheelListener {
-  impl_query_self_only!();
-}
+impl_compose_child_for_listener!(WheelListener);
 
 impl std::borrow::Borrow<EventCommon> for WheelEvent {
   #[inline]
@@ -48,12 +46,6 @@ impl std::ops::Deref for WheelEvent {
 
 impl std::ops::DerefMut for WheelEvent {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
-}
-
-impl EventListener for WheelListener {
-  type Event = WheelEvent;
-  #[inline]
-  fn dispatch(&self, event: &mut WheelEvent) { (self.on_wheel.borrow_mut())(event) }
 }
 
 #[cfg(test)]
