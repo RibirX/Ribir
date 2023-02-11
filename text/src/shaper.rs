@@ -232,6 +232,15 @@ fn collect_miss_part<'a> (glyphs: &[Glyph<Em>], new_part:&[(usize, usize, FallBa
       miss_parts.push((miss_start.take().unwrap(), *end, helper.clone()));
     }
   }
+
+  miss_parts.iter_mut().for_each(|(start, end, _)| {
+    while 0 < *start && glyphs[*start - 1].cluster == glyphs[*start].cluster {
+      *start -= 1;
+    }
+    while *end < glyphs.len() && glyphs[*end - 1].cluster == glyphs[*end].cluster {
+      *end += 1;
+    }
+  });
   miss_parts
 }
 
@@ -373,7 +382,6 @@ impl<'a> FallBackFaceHelper<'a> {
     if text.is_empty() {
       return None;
     }
-
     let Self { ids, font_db, face_idx } = self;
     let mut font_db = font_db.write().unwrap();
     while *face_idx < ids.len() + font_db.faces().len() {
@@ -478,30 +486,42 @@ mod tests {
 
   
   #[test]
-  fn unicode_with_fallback() {
+  fn partiall_glyphs() {
     let font_db = Arc::new(RwLock::new(FontDB::default()));
-    font_db.write().unwrap().load_system_fonts();
+    let _ = font_db.write().unwrap().load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/GaramondNo8-Reg.ttf");
+    let _ = font_db.write().unwrap().load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/Nunito-VariableFont_wght.ttf"); 
     let shaper = TextShaper::new(font_db.clone());
-    let text: Substr = "ӌҳӟЭӨӅЊҾѮПҢћҽѷӧѹѩѾир҈Ӂ҂ӢҷҕѧщӍАѪрдҺњЭѧХѩӆҒЏқжҡӯӐқДЪТЧѦк҇ЖчѯЫСЮъҏӍѴЏӕћЕ҈Є".into();
+
+    let text: Substr = "р҈р҈р҈р҈".into();
     
-    let ids = shaper.font_db().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Serif]),
-      ..<_>::default()
-    });
-
-    shaper.shape_cache.write().unwrap().clear();
-    let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
-    assert!(!res.glyphs.iter().any(|glyph| glyph.is_miss()));
-
-    shaper.shape_cache.write().unwrap().clear();
-    let mut font_fallback = FallBackFaceHelper::new(&ids, &font_db);
-    let hb_direction = TextDirection::LeftToRight.into();
-    let face = font_fallback.next_fallback_face(&text).unwrap();
-    let mut buffer = UnicodeBuffer::new();
-    buffer.push_str(&text);
-    buffer.set_direction(hb_direction);
-    let GlyphsWithoutFallback { glyphs, .. } = TextShaper::directly_shape(buffer, &face);
-    assert!(glyphs.iter().any(|glyph| glyph.is_miss()));
+    {
+      let ids = shaper.font_db().select_all_match(&FontFace {
+        families: Box::new([FontFamily::Name("GaramondNo8".into()), FontFamily::Name("Nunito ExtraLight".into())]),
+        ..<_>::default()
+      });
+      let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
+      assert!(res.glyphs.len() == 8);
+      assert!(
+        res.glyphs.iter().enumerate().all(|(idx, glyph)| 
+        if idx % 2 == 0 {
+          glyph.is_not_miss()
+        } else {
+          glyph.is_miss()
+        })
+      );
+    }
+    
+    {
+      let _ = font_db.write().unwrap().load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf");
+      let ids = shaper.font_db().select_all_match(&FontFace {
+        families: Box::new([FontFamily::Name("GaramondNo8".into()), FontFamily::Name("Nunito ExtraLight".into()), FontFamily::Name("DejaVu Sans".into())]),
+        ..<_>::default()
+      });
+      shaper.shape_cache.write().unwrap().clear();
+      let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
+      assert!(res.glyphs.len() == 8);
+      assert!(res.glyphs.iter().all(|glyph| glyph.is_not_miss()));
+    }
   }
 
   #[bench]
