@@ -191,11 +191,10 @@ impl<W> Stateful<W> {
 macro_rules! debug_borrow_location {
   ($this: ident) => {
     #[cfg(debug_assertions)]
-    $this
-      .value
-      .inner
-      .borrowed_at
-      .set(Some(std::panic::Location::caller()))
+    {
+      let caller = std::panic::Location::caller();
+      $this.value.inner.borrowed_at.set(Some(caller));
+    }
   };
 }
 
@@ -243,10 +242,14 @@ impl<'a, W> DerefMut for StateRef<'a, W> {
   #[track_caller]
   fn deref_mut(&mut self) -> &mut Self::Target {
     let b = &self.value.inner.borrow_flag;
+    if log::log_enabled!(log::Level::Debug) {
+      let caller = std::panic::Location::caller();
+      log::debug!("state modified at {caller}");
+    }
+
     match self.mut_accessed_flag.get() {
       None => {
         debug_borrow_location!(self);
-
         b.set(b.get() - 1);
         self.mut_accessed_flag.set(Some(true))
       }
