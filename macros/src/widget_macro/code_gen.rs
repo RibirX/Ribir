@@ -31,6 +31,7 @@ fn visit_watch_expr_as_observable(watch_expr: &mut TrackExpr, ctx: &mut VisitCtx
     |ctx| ctx.visit_track_expr_mut(watch_expr),
     |scope| {
       scope.iter_mut().for_each(|(_, info)| {
+        // watch will manually subscribe the expression.
         info.used_type.remove(UsedType::SUBSCRIBE);
         info.used_type |= UsedType::SCOPE_CAPTURE
       });
@@ -57,6 +58,23 @@ pub(crate) fn gen_watch_macro(input: TokenStream, ctx: &mut VisitCtx) -> proc_ma
   let input = input.into();
   let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
   visit_watch_expr_as_observable(&mut watch_expr, ctx).into()
+}
+
+pub(crate) fn gen_no_watch_macro(
+  input: TokenStream,
+  ctx: &mut VisitCtx,
+) -> proc_macro::TokenStream {
+  let input = input.into();
+  let mut watch_expr = TrackExpr::new(parse_macro_input! { input as Expr });
+  ctx.new_scope_visit(
+    |ctx| ctx.visit_track_expr_mut(&mut watch_expr),
+    |scope| {
+      scope.iter_mut().for_each(|(_, info)| {
+        info.used_type.remove(UsedType::SUBSCRIBE);
+      });
+    },
+  );
+  watch_expr.into_token_stream().into()
 }
 
 pub(crate) fn gen_assign_watch(input: TokenStream, ctx: &mut VisitCtx) -> proc_macro::TokenStream {

@@ -448,3 +448,22 @@ fn fix_silent_not_relayout_dyn_widget() {
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
 }
+
+#[test]
+fn no_watch() {
+  let size = Stateful::new(ZERO_SIZE);
+  let w = widget! {
+    states { size: size.clone() }
+    SizedBox { size: no_watch!(*size) }
+  };
+
+  let mut wnd = Window::default_mock(w, None);
+  wnd.draw_frame();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+
+  {
+    *size.state_ref() = Size::new(100., 100.)
+  }
+  wnd.draw_frame();
+  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+}

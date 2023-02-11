@@ -2,13 +2,15 @@ use crate::{
   declare_derive::declare_field_name,
   error::DeclareError,
   widget_macro::{desugar::WatchField, guard_ident, guard_vec_ident},
-  ASSIGN_WATCH, LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, PROP_MACRO_NAME, WATCH_MACRO_NAME,
-  WIDGET_MACRO_NAME,
+  ASSIGN_WATCH_MACRO_NAME, LET_WATCH_MACRO_NAME, MOVE_TO_WIDGET_MACRO_NAME, NO_WATCH_MACRO_NAME,
+  PROP_MACRO_NAME, WATCH_MACRO_NAME, WIDGET_MACRO_NAME,
 };
 
 use super::{
   builtin_var_name, capture_widget,
-  code_gen::{gen_assign_watch, gen_move_to_widget_macro, gen_prop_macro, gen_watch_macro},
+  code_gen::{
+    gen_assign_watch, gen_move_to_widget_macro, gen_no_watch_macro, gen_prop_macro, gen_watch_macro,
+  },
   ctx_ident,
   desugar::{
     ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
@@ -112,8 +114,10 @@ impl VisitMut for VisitCtx {
           DeclareError::LetWatchWrongPlace(mac.span().unwrap()).to_compile_error(&mut tokens);
           *expr = Expr::Verbatim(tokens);
           self.visit_error_occur = true;
-        } else if mac.path.is_ident(ASSIGN_WATCH) {
+        } else if mac.path.is_ident(ASSIGN_WATCH_MACRO_NAME) {
           *expr = Expr::Verbatim(gen_assign_watch(mac.tokens.clone(), self).into());
+        } else if mac.path.is_ident(NO_WATCH_MACRO_NAME) {
+          *expr = Expr::Verbatim(gen_no_watch_macro(mac.tokens.clone(), self).into());
         } else {
           visit_mut::visit_expr_macro_mut(self, m);
         }
@@ -182,9 +186,13 @@ impl VisitMut for VisitCtx {
           DeclareError::LetWatchWrongPlace(mac.span().unwrap()).to_compile_error(&mut tokens);
           self.visit_error_occur = true;
           *stmt = Stmt::Expr(Expr::Verbatim(tokens));
-        } else if mac.path.is_ident(ASSIGN_WATCH) {
+        } else if mac.path.is_ident(ASSIGN_WATCH_MACRO_NAME) {
           *stmt = Stmt::Expr(Expr::Verbatim(
             gen_assign_watch(mac.tokens.clone(), self).into(),
+          ));
+        } else if mac.path.is_ident(NO_WATCH_MACRO_NAME) {
+          *stmt = Stmt::Expr(Expr::Verbatim(
+            gen_no_watch_macro(mac.tokens.clone(), self).into(),
           ));
         }
       }
