@@ -147,11 +147,10 @@ impl VisitMut for VisitCtx {
           },
           |scope| {
             scope.iter_mut().for_each(|(_, info)| {
+              info.used_type |= UsedType::SCOPE_CAPTURE;
+              // move capture closure will generate state reference by itself.
               if is_capture {
-                info.used_type = UsedType::SCOPE_CAPTURE
-              } else {
-                info.used_type |= UsedType::SCOPE_CAPTURE;
-                info.used_type.remove(UsedType::SUBSCRIBE);
+                info.used_type.remove(UsedType::REF);
               }
             });
           },
@@ -388,20 +387,31 @@ impl VisitCtx {
           ctx.new_scope_visit(
             |ctx| match &mut f.value {
               FieldValue::Expr(expr) => {
+                let closure_as_value = is_pure_closure(&expr.expr);
                 ctx.visit_track_expr_mut(expr);
+                if closure_as_value {
+                  // when a closure directly as a field value, needn't subscribe it, because no
+                  // matter how many states the closure body used, they are only effects the logic
+                  // of the closure.
+                  expr
+                    .used_name_info
+                    .iter_mut()
+                    .for_each(|(_, info)| info.used_type.remove(UsedType::SUBSCRIBE));
+                }
+
                 if expr.used_name_info.subscribe_widget().is_some() {
                   ctx.take_current_used_info();
 
-                  let field_fn_name = ribir_suffix_variable(&f.member, "fn");
+                  let field_value = ribir_suffix_variable(&f.member, "value");
                   let mut field_fn: ExprClosure =
                     parse_quote_spanned! { expr.span() => move || #expr };
                   let body_used = expr.used_name_info.clone();
                   let field_fn = closure_surround_refs(&body_used, &mut field_fn);
                   let pre_def = quote_spanned! { expr.span() =>
-                    let #field_fn_name = #field_fn;
+                    let mut #field_value = DeclareFieldValue::new(#field_fn);
                   };
 
-                  expr.expr = parse_quote_spanned! {expr.span() => #field_fn_name.clone()()};
+                  expr.expr = parse_quote_spanned! {expr.span() => #field_value.value()};
                   ctx.has_guards_data = true;
                   // DynWidget is a special object, it's both require data and framework change to
                   // update its children. When user call `.silent()` means no
@@ -423,10 +433,7 @@ impl VisitCtx {
                       #upstream
                       .subscribe({
                         let #name = #name.clone_stateful();
-                        move |_| {
-                          let #field_fn_name = #field_fn_name.clone()();
-                          #name.state_ref().#declare_set(#field_fn_name)
-                        }
+                        move |_| #name.state_ref().#declare_set(#field_value.value())
                       })
                       .unsubscribe_when_dropped()
                     )));
@@ -740,6 +747,17 @@ impl<'a> std::ops::Deref for CaptureScopeGuard<'a> {
 
 impl<'a> std::ops::DerefMut for CaptureScopeGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
+}
+
+fn is_pure_closure(expr: &Expr) -> bool {
+  match expr {
+    Expr::Closure(_) => true,
+    Expr::Block(b) if b.block.stmts.len() == 1 => {
+      let stmt = &b.block.stmts[0];
+      matches!(stmt, Stmt::Expr(expr) if is_pure_closure(expr))
+    }
+    _ => false,
+  }
 }
 
 #[test]
