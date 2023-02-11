@@ -60,9 +60,9 @@ struct HeroCard {
 ```
 We just add `#[declare(convert=into)]` or `#[declare(convert=strip_option)]` for the fields. That is all. Besides `into` and `strip_option` there are two other values that can be used in `#[declare(convert=...)]`. Let's look at them one by one.
 
-- `#[declare(convert=into)]`, use `std::convert::Into` convert the value before initialize the field. With this meta, any type implemented `Into` trait to the field type can be used to initialize the field. 
-- `#[declare(convert=strip_option)]`, wrap `V` to `Some(V)` before initialize `Option<V>`, of course `Option<V>` also be accepted.
-- `#[declare(convert=custom)]`, implement the filed build by self, implement the same name method for its declarer to accept the initialize type. Then implement a `set_declare_xxx` method  for its host type, so it can be updated by the type you want.  For example:
+- `#[declare(convert=into)]`, use `std::convert::Into` to convert the value before initialising the field. With this meta, any type that implements an `Into` trait on the field type can be used to initialise the field. 
+- `#[declare(convert=strip_option)]`, wrap `V` to `Some(V)` before initialising `Option<V>`, of course `Option<V>` is also accepted.
+- `#[declare(convert=custom)]`, implement the filed build by itself, implement the same name method for its declarer to accept the initialize type. Then implement a `set_declare_xxx` method for its host type so that it can be updated with the type you want.  For example:
   ```rust
   #[Derive(Declare)]
   struct Printer {
