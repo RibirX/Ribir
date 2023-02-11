@@ -54,11 +54,11 @@ mod tests {
 
 /// struct help the generate code have better type hint.
 #[derive(Clone)]
-pub struct DeclareFieldValue<F: Clone>(F);
+pub struct DeclareFieldValue<F>(F);
 
-impl<R, F: Clone> DeclareFieldValue<F>
+impl<R, F> DeclareFieldValue<F>
 where
-  F: Clone + FnMut() -> R,
+  F: FnMut() -> R,
 {
   #[inline]
   pub fn new(f: F) -> Self { Self(f) }

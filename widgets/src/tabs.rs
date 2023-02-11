@@ -102,17 +102,12 @@ impl ComposeChild for Tabs {
                           padding: EdgeInsets::vertical(6.),
                           h_align: HAlign::Center,
                           dyns: {
-                            if this.cur_idx == idx {
-                              Text {
-                                text: text.0.clone(),
-                                style: active_text_style,
-                              }
+                            let style =  if this.cur_idx == idx {
+                              active_text_style.clone()
                             } else {
-                              Text {
-                                text: text.0.clone(),
-                                style: normal_text_style,
-                              }
-                            }
+                              normal_text_style.clone()
+                            };
+                            Text { text: text.0.clone(), style }
                           }
                         }
                       }

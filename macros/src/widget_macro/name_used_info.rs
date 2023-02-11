@@ -157,7 +157,7 @@ impl ScopeUsedInfo {
       if names.clone().nth(1).is_some() {
         quote! {let _guard = (#(#names.modify_guard(),)*);}.to_tokens(tokens);
       }
-      c_names.clone().for_each(|n| {
+      c_names.for_each(|n| {
         quote_spanned! {n.span() => let mut #n = #n.state_ref();}.to_tokens(tokens);
       });
     }
