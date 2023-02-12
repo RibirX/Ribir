@@ -1,5 +1,9 @@
 pub(crate) use crate::widget_tree::*;
-use crate::{context::*, prelude::ComposeChild, state::State};
+use crate::{
+  context::*,
+  prelude::ComposeChild,
+  state::{State, Stateful},
+};
 use ribir_algo::ShareResource;
 use ribir_painter::*;
 use rxrust::subscription::{BoxSubscription, SubscriptionGuard};
@@ -103,6 +107,11 @@ pub trait QueryFiler {
   fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
 }
 
+/// Convert a widget to `Widget`
+pub trait IntoWidget<M: ImplMarker> {
+  fn into_widget(self) -> Widget;
+}
+
 impl<W: 'static> QueryFiler for W {
   #[inline]
   fn query_filter(&self, type_id: TypeId) -> Option<&dyn Any> {
@@ -162,21 +171,27 @@ pub struct NotSelf<M>(PhantomData<fn(M)>);
 impl ImplMarker for SelfImpl {}
 impl<M> ImplMarker for NotSelf<M> {}
 
-pub trait IntoWidget<M: ImplMarker> {
-  fn into_widget(self) -> Widget;
-}
-
 impl IntoWidget<SelfImpl> for Widget {
   #[inline]
   fn into_widget(self) -> Widget { self }
 }
 
-impl<C: Compose + Into<State<C>> + 'static> IntoWidget<NotSelf<()>> for C {
-  #[inline]
-  fn into_widget(self) -> Widget { Compose::compose(self.into()) }
+macro_rules! impl_compose_into_widget {
+  ($ty: ty) => {
+    impl<C: Compose> IntoWidget<NotSelf<[(); 0]>> for $ty {
+      #[inline]
+      fn into_widget(self) -> Widget { Compose::compose(State::<C>::from(self)) }
+    }
+  };
 }
 
-impl<R: Render + 'static> IntoWidget<NotSelf<&()>> for R {
+impl_compose_into_widget!(State<C>);
+impl_compose_into_widget!(C);
+impl_compose_into_widget!(Stateful<C>);
+// `Stateful<DynWidget<C>>` has its own implementation.
+// impl_compose_into_widget!(Stateful<DynWidget<C>>);
+
+impl<R: Render + 'static> IntoWidget<NotSelf<[(); 1]>> for R {
   #[inline]
   fn into_widget(self) -> Widget {
     Widget::Render {
@@ -186,19 +201,43 @@ impl<R: Render + 'static> IntoWidget<NotSelf<&()>> for R {
   }
 }
 
-impl<W, C> IntoWidget<NotSelf<[(); 0]>> for W
+impl<M1, M2, W> IntoWidget<NotSelf<(M1, M2)>> for State<W>
 where
-  W: ComposeChild<Child = Option<C>> + Into<State<W>> + 'static,
+  W: IntoWidget<M1>,
+  Stateful<W>: IntoWidget<M2>,
+  M1: ImplMarker,
+  M2: ImplMarker,
 {
-  #[inline]
-  fn into_widget(self) -> Widget { ComposeChild::compose_child(self.into(), None) }
+  fn into_widget(self) -> crate::widget::Widget {
+    match self {
+      State::Stateless(w) => w.into_widget(),
+      State::Stateful(s) => s.into_widget(),
+    }
+  }
 }
 
-impl<F, R, M> IntoWidget<NotSelf<M>> for F
+macro_rules! impl_compose_option_child_into_widget {
+  ($ty: ty) => {
+    impl<T, C> IntoWidget<NotSelf<[(); 2]>> for $ty
+    where
+      T: ComposeChild<Child = Option<C>> + 'static,
+    {
+      #[inline]
+      fn into_widget(self) -> Widget { ComposeChild::compose_child(State::<T>::from(self), None) }
+    }
+  };
+}
+
+impl_compose_option_child_into_widget!(Stateful<T>);
+impl_compose_option_child_into_widget!(T);
+// `Stateful<DynWidget<T>>` has its own implementation.
+// impl_compose_option_child_into_widget!(Stateful<DynWidget<T>>);
+
+impl<F, R, M> IntoWidget<NotSelf<[M; 3]>> for F
 where
-  M: ImplMarker,
   F: FnOnce(&BuildCtx) -> R + 'static,
   R: IntoWidget<M>,
+  M: ImplMarker,
 {
   #[inline]
   fn into_widget(self) -> Widget { Widget::Compose(Box::new(move |ctx| self(ctx).into_widget())) }

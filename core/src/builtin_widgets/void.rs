@@ -23,12 +23,6 @@ impl Render for Void {
   }
 }
 
-impl ComposeChild for Void {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child }
-}
-
 impl Query for Void {
   impl_query_self_only!();
 }

@@ -162,9 +162,7 @@ mod tests {
           TabHeader {
             Label::new("test")
           }
-          TabPane {
-            Void {}
-          }
+          TabPane { Void {} }
         }
       }
     };

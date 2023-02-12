@@ -509,6 +509,6 @@ fn build_icon(icon: Option<Widget>) -> Widget {
       }
     }
   } else {
-    Void {}.into_widget()
+    Void.into_widget()
   }
 }

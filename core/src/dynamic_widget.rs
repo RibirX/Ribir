@@ -39,7 +39,7 @@ pub const fn identify<V>(v: V) -> V { v }
 impl<D> DynWidget<D> {
   pub fn set_declare_dyns(&mut self, dyns: D) { self.dyns = Some(dyns); }
 
-  pub(crate) fn into_inner(mut self) -> D {
+  pub fn into_inner(mut self) -> D {
     self
       .dyns
       .take()
@@ -49,19 +49,19 @@ impl<D> DynWidget<D> {
 
 /// Widget help to limit which `DynWidget` can be a parent widget and which can
 /// be a child.
-pub(crate) struct DynRender<D, M> {
+pub(crate) struct DynRender<D> {
   dyn_widgets: Stateful<DynWidget<D>>,
   self_render: RefCell<Box<dyn Render>>,
   gen_info: RefCell<Option<DynWidgetGenInfo>>,
-  marker: PhantomData<fn(M)>,
+  dyns_to_widgets: fn(D) -> Vec<Widget>,
 }
 
-pub(crate) trait DynsIntoWidget<M> {
-  fn dyns_into_widget(self) -> Vec<Widget>;
+pub(crate) trait IntoDyns<M> {
+  fn into_dyns(self) -> Vec<Widget>;
 }
 
 // A dynamic widget must be stateful, depends others.
-impl<D: DynsIntoWidget<M> + 'static, M: 'static> Render for DynRender<D, M> {
+impl<D: 'static> Render for DynRender<D> {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     if let Some(width) = self.take_spread_cnt() {
       let size = self.self_render.perform_layout(clamp, ctx);
@@ -102,22 +102,24 @@ impl<D: DynsIntoWidget<M> + 'static, M: 'static> Render for DynRender<D, M> {
   fn get_transform(&self) -> Option<Transform> { self.self_render.get_transform() }
 }
 
-impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
-  pub(crate) fn new(dyns: Stateful<DynWidget<D>>) -> Self {
+impl<D> DynRender<D> {
+  pub(crate) fn new<M>(dyns: Stateful<DynWidget<D>>) -> Self
+  where
+    D: IntoDyns<M>,
+  {
     Self {
       dyn_widgets: dyns,
       self_render: RefCell::new(Box::new(Void)),
       gen_info: <_>::default(),
-      marker: PhantomData,
+      dyns_to_widgets: D::into_dyns,
     }
   }
 
-  pub(crate) fn spread(dyns: &mut StateRef<DynWidget<D>>) -> Vec<Widget>
+  pub(crate) fn spread<M>(dyns: &mut StateRef<DynWidget<D>>) -> Vec<Widget>
   where
-    M: 'static,
-    D: 'static,
+    D: IntoDyns<M> + 'static,
   {
-    let mut widgets = dyns.dyns.take().unwrap().dyns_into_widget();
+    let mut widgets = dyns.dyns.take().unwrap().into_dyns();
 
     if widgets.is_empty() {
       widgets.push(Void.into_widget());
@@ -132,7 +134,7 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
         width: widgets.len(),
         directly_spread: true,
       })),
-      marker: PhantomData,
+      dyns_to_widgets: D::into_dyns,
     };
 
     widgets[0] = first.into_widget();
@@ -163,8 +165,7 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
       dirty_set,
     } = ctx;
 
-    let mut new_widgets = new_widgets
-      .dyns_into_widget()
+    let mut new_widgets = (self.dyns_to_widgets)(new_widgets)
       .into_iter()
       .filter_map(|w| w.into_subtree(None, arena, wnd_ctx))
       .collect::<Vec<_>>();
@@ -308,42 +309,21 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
   }
 }
 
-pub(crate) struct SingleDyn<M>(M);
-
-impl<D, M> DynsIntoWidget<SingleDyn<M>> for D
-where
-  M: ImplMarker,
-  D: IntoWidget<M> + 'static,
-{
-  fn dyns_into_widget(self) -> Vec<Widget> { vec![self.into_widget()] }
+impl<D: IntoWidget<M>, M: ImplMarker> IntoDyns<[M; 0]> for D {
+  #[inline]
+  fn into_dyns(self) -> Vec<Widget> { vec![self.into_widget()] }
 }
 
-impl<D, M> DynsIntoWidget<SingleDyn<Option<M>>> for Option<D>
+impl<D, M> IntoDyns<[M; 1]> for D
 where
-  M: ImplMarker,
-  D: IntoWidget<M> + 'static,
-{
-  fn dyns_into_widget(self) -> Vec<Widget> {
-    if let Some(w) = self {
-      vec![w.into_widget()]
-    } else {
-      vec![]
-    }
-  }
-}
-
-impl<D, M> DynsIntoWidget<&dyn Iterator<Item = M>> for D
-where
-  M: ImplMarker,
   D: IntoIterator,
-  D::Item: IntoWidget<M> + 'static,
+  D::Item: IntoWidget<M>,
+  M: ImplMarker,
 {
-  fn dyns_into_widget(self) -> Vec<Widget> {
-    self.into_iter().map(IntoWidget::into_widget).collect()
-  }
+  fn into_dyns(self) -> Vec<Widget> { self.into_iter().map(IntoWidget::into_widget).collect() }
 }
 
-impl<D: 'static, M: 'static> Query for DynRender<D, M> {
+impl<D: 'static> Query for DynRender<D> {
   impl_proxy_query!(self.self_render, self.dyn_widgets);
 }
 
@@ -385,7 +365,7 @@ fn down_to_leaf(id: WidgetId, arena: &TreeArena) -> (WidgetId, usize) {
 // only `DynWidget` gen single widget can as a parent widget
 impl<M, D> IntoWidget<NotSelf<M>> for Stateful<DynWidget<D>>
 where
-  M: ImplMarker + 'static,
+  M: ImplMarker,
   D: IntoWidget<M> + 'static,
 {
   #[inline]
@@ -401,48 +381,14 @@ impl<M> ImplMarker for OptionDyn<M> {}
 
 impl<M, D> IntoWidget<OptionDyn<M>> for Stateful<DynWidget<Option<D>>>
 where
-  M: ImplMarker + 'static,
-  D: IntoWidget<M> + 'static,
-{
-  #[inline]
-  fn into_widget(self) -> Widget { DynRender::<_, SingleDyn<_>>::new(self).into_widget() }
-}
-
-impl<D, M> IntoWidget<M> for DynWidget<D>
-where
   M: ImplMarker,
   D: IntoWidget<M> + 'static,
 {
   #[inline]
-  fn into_widget(self) -> Widget { self.into_inner().into_widget() }
+  fn into_widget(self) -> Widget { DynRender::new(self).into_widget() }
 }
 
-impl<D: SingleChild> SingleChild for DynWidget<D> {}
-impl<D: MultiChild> MultiChild for DynWidget<D> {}
-
-impl<D> ComposeChild for Stateful<DynWidget<D>>
-where
-  D: ComposeChild + 'static,
-  D::Child: Clone,
-{
-  type Child = D::Child;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let dyns = match this {
-      State::Stateless(dyns) => dyns,
-      State::Stateful(dyns) => dyns.silent_ref().clone(),
-    };
-
-    widget! {
-      states { dyns }
-      DynWidget {
-        dyns: dyns.silent().dyns.take().map(|d| {
-          ComposeChild::compose_child(d.into(), child.clone())
-        }),
-      }
-    }
-  }
-}
+impl<W: SingleChild> SingleChild for DynWidget<W> {}
 
 #[cfg(test)]
 mod tests {

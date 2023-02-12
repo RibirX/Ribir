@@ -414,7 +414,7 @@ mod tests {
       event_record.clone(),
       widget! { MockMulti { DynWidget  { dyns: record } } },
     );
-    let mut wnd = Window::default_mock(root.into_widget(), None);
+    let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };

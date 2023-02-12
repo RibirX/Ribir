@@ -15,8 +15,8 @@ use super::{
   desugar::{
     ComposeItem, DeclareObj, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj, WidgetNode,
   },
-  gen_widget_macro, ribir_suffix_variable, Desugared, ScopeUsedInfo, TrackExpr, UsedType,
-  WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
+  gen_widget_macro, is_dyn_widget, ribir_suffix_variable, Desugared, ScopeUsedInfo, TrackExpr,
+  UsedType, WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD,
 };
 
 use proc_macro::Span;
@@ -407,7 +407,7 @@ impl VisitCtx {
                   // update its children. When user call `.silent()` means no
                   // need relayout and redraw the widget. `DynWidget` as the directly subscriber
                   // also needn't to change.
-                  let upstream = if ty.is_ident("DynWidget") && f.member == "dyns" {
+                  let upstream = if is_dyn_widget(ty) && f.member == "dyns" {
                     let mut upstream = expr.used_name_info.upstream_modifies_tokens(true).unwrap();
                     upstream.extend(quote_spanned! {
                       f.member.span() => .filter(|s| s.contains(ModifyScope::FRAMEWORK))

@@ -242,7 +242,7 @@ impl TapListener {
   pub fn double_tap_stream(
     &self,
   ) -> FilterMapOp<
-    MutRefItemSubject<'static, PointerEvent, ()>,
+    MutRefItemSubject<'static, PointerEvent, Infallible>,
     impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
     &mut PointerEvent,
   > {
