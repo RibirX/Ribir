@@ -40,17 +40,44 @@ counter demo
 |Android|🚧 Not yet|
 |Web|🚧 Not yet|
 
-## Contributing/Feedback
+## Contributing
 
-We are grateful to the community for contributing bug fixes and improvements. Read below to learn how you can take part in improving Ribir.
+We are grateful to the community for contributing bug fixes and improvements. 
 
-### [Contributing Guide](./CONTRIBUTING.md)
+**😎 New to Ribir?** 
 
-### [Writing a Good Issue](https://developers.google.com/blockly/guides/contribute/get-started/write_a_good_issue)
+Start learning about the framework by helping us improve our [documentation](https://ribir.org/docs/introduction). We are also very welcome:
+* Point out to us where our document has misunderstandings
+* Pull requests which improve test coverage
+* Add undocumented code (e.g. built-in widget)
+* Report typo 
+
+For more information please read：
+* [Contributing Guide](./CONTRIBUTING.md)
+* [Writing a Good Issue](https://developers.google.com/blockly/guides/contribute/get-started/write_a_good_issue)
+
+**🤔 Confused about something?**
+
+Feel free to open a [new "Question" issue]() to get help from contributors. Often questions lead to improvements to the ergonomics of the framework, better documentation, and even new features!
+
+**😱 Found a bug?**
+
+Please [report all bugs]()! We are happy to help support developers fix the bugs they find if they are interested and have the time.
+
 
 ## Thanks
+This project exists thanks to all the people who contribute:
 
-Inspired by Flutter, QML.
+<a href="https://github.com/RibirX/Ribir/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=RibirX/Ribir" height="50px">
+</a>
+
+<br/>
+We also found a lot of inspiration from the following frameworks:
+<div style="margin-top:10px">
+    <img src="https://avatars.githubusercontent.com/u/14101776?s=280&v=4" height="60px"/>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Qt_logo_2016.svg/1200px-Qt_logo_2016.svg.png" height="60px" width="70px"/>
+</div>
 
 ## License
 
