@@ -1,12 +1,5 @@
 import React from 'react';
-import Link from '@docusaurus/Link';
 import { useColorMode } from '@docusaurus/theme-common';
-
-import {
-  DiscordLogoIcon,
-  LinkedInLogoIcon,
-  TwitterLogoIcon,
-} from '@radix-ui/react-icons';
 import clsx from 'clsx';
 
 export default function HomeFooter() {
@@ -17,22 +10,12 @@ export default function HomeFooter() {
       <div
         className={clsx('mx-auto flex max-w-7xl flex-col gap-4 px-10 py-8 lg:flex-row lg:items-center lg:gap-8')}
       >
-        <div>
-          <img src={`/logo/${colorMode}.svg`} alt="Logo" className="h-10" />
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="#">
-            <DiscordLogoIcon className="h-6 w-6 text-zinc-400 hover:text-primary" />
-          </Link>
-          <Link href="#">
-            <TwitterLogoIcon className="h-6 w-6 text-zinc-400 hover:text-primary" />
-          </Link>
-          <Link href="#">
-            <LinkedInLogoIcon className="h-6 w-6 text-zinc-400 hover:text-primary" />
-          </Link>
-        </div>
-        <div className="flex-1 text-zinc-400 lg:text-right">
-          Copyright &copy; Ribir since 2023. All rights reserved.
+        <div className="flex-1 text-zinc-400 lg:text-center">
+          <p>
+            The official website uses <a target={"_blank"} href={"https://docs.dyte.io/"}>dyte.io</a> theme, thanks for dyte.io.
+            <br/>
+            Build with RibirX and <span className="emoji">❤️</span>
+          </p>
         </div>
       </div>
     </footer>

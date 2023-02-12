@@ -82,54 +82,6 @@ const config = {
           },
         ],
       },
-      footer: {
-        style: 'dark',
-        links: [
-          {
-            title: 'Docs',
-            items: [
-              {
-                label: 'Tutorial',
-                to: '/docs/introduction',
-              },
-            ],
-          },
-          {
-            title: 'Community',
-            items: [
-              {
-                label: 'Stack Overflow',
-                // todo
-                href: 'https://stackoverflow.com/questions/tagged/',
-              },
-              {
-                label: 'Discord',
-                // todo
-                href: 'https://discordapp.com/invite/',
-              },
-              {
-                label: 'Twitter',
-                // todo
-                href: 'https://twitter.com/',
-              },
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: 'Blog',
-                to: '/blog',
-              },
-              {
-                label: 'GitHub',
-                href: 'https://github.com/RibirX/Ribir',
-              },
-            ],
-          },
-        ],
-        copyright: `Copyright © ${new Date().getFullYear()} Ribir, Inc. Built with RibirX.`,
-      },
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,

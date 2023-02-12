@@ -3,9 +3,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 
 import HeroSection from '../components/homepage/HeroSection';
-import CommunitySection from '../components/homepage/CommunitySection';
 import HomeFooter from '../components/homepage/HomeFooter';
-import HelpSection from '../components/homepage/HelpSection';
 import PrincipleSection from '../components/Homepage/Principlesection';
 
 export default function Home(): JSX.Element {
@@ -22,12 +20,6 @@ export default function Home(): JSX.Element {
       </div>
 
       <PrincipleSection />
-
-      {/* <div className="z-0 bg-secondary-800 dark:bg-secondary-900">
-        <HelpSection className="-mb-48" />
-      </div>
-
-      <CommunitySection /> */}
 
       <HomeFooter />
     </Layout>

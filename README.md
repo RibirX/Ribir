@@ -42,9 +42,9 @@ counter demo
 
 ## Contributing
 
-We are grateful to the community for contributing bug fixes and improvements. 
+We are grateful to the community for contributing bug fixes and improvements.
 
-**😎 New to Ribir?** 
+**😎 New to Ribir?**
 
 Start learning about the framework by helping us improve our [documentation](https://ribir.org/docs/introduction). Feel free to open a [new "Documentation" issue](https://github.com/RibirX/Ribir/issues/new/choose). We are also very welcome:
 * Point out to us where our document has misunderstandings
@@ -66,12 +66,14 @@ Please [report all bugs](https://github.com/RibirX/Ribir/issues/new/choose)! We 
 
 
 ## Thanks
+
 This project exists thanks to all the people who contribute:
 
 <a href="https://github.com/RibirX/Ribir/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=RibirX/Ribir" height="50px">
 </a>
 
+<br/>
 <br/>
 
 We also found inspiration from the following frameworks:
