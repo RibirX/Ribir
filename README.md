@@ -46,7 +46,7 @@ We are grateful to the community for contributing bug fixes and improvements.
 
 **😎 New to Ribir?** 
 
-Start learning about the framework by helping us improve our [documentation](https://ribir.org/docs/introduction). We are also very welcome:
+Start learning about the framework by helping us improve our [documentation](https://ribir.org/docs/introduction). Feel free to open a [new "Documentation" issue](https://github.com/RibirX/Ribir/issues/new/choose). We are also very welcome:
 * Point out to us where our document has misunderstandings
 * Pull requests which improve test coverage
 * Add undocumented code (e.g. built-in widget)
