@@ -35,15 +35,18 @@ impl ComposeStyle for TabStyle {
 
 #[derive(Template)]
 pub struct Tab {
-  header: WidgetOf<TabHeader>,
+  header: TabHeader,
   pane: WidgetOf<TabPane>,
 }
 
 #[derive(Declare, SingleChild)]
 pub struct TabPane;
 
-#[derive(Declare, SingleChild)]
-pub struct TabHeader;
+#[derive(Template)]
+pub struct TabHeader {
+  header_text: Label,
+  icon: Option<WidgetOf<Leading>>,
+}
 
 impl ComposeChild for Tabs {
   type Child = Vec<Tab>;
@@ -54,14 +57,24 @@ impl ComposeChild for Tabs {
 
     for tab in children.into_iter() {
       let Tab { header, pane } = tab;
-      headers.push(header.child);
+      headers.push((header.icon, header.header_text));
       panes.push(pane.child);
     }
 
     widget! {
       states { this: this.into_writable() }
       init ctx => {
-        let  border_color = Palette::of(ctx).surface_variant();
+        let border_color = Palette::of(ctx).surface_variant();
+        let primary = Palette::of(ctx).primary();
+        let on_surface_variant = Palette::of(ctx).on_surface_variant();
+        let normal_text_style = TextStyle {
+          foreground: Brush::Color(on_surface_variant),
+          ..TypographyTheme::of(ctx).body1.text.clone()
+        };
+        let active_text_style = TextStyle {
+          foreground: Brush::Color(primary),
+          ..TypographyTheme::of(ctx).body1.text.clone()
+        };
       }
       Column {
         Stack {
@@ -72,7 +85,9 @@ impl ComposeChild for Tabs {
             DynWidget {
               dyns: headers.into_iter()
                 .enumerate()
-                .map(move |(idx, header)| {
+                .map(move |(idx, (_, text))| {
+                  let normal_text_style = normal_text_style.clone();
+                  let active_text_style = active_text_style.clone();
                   widget! {
                     Expanded {
                       id: tab_header,
@@ -84,7 +99,21 @@ impl ComposeChild for Tabs {
                       },
                       TabStyle {
                         DynWidget {
-                          dyns: header
+                          padding: EdgeInsets::vertical(6.),
+                          h_align: HAlign::Center,
+                          dyns: {
+                            if this.cur_idx == idx {
+                              Text {
+                                text: text.0.clone(),
+                                style: active_text_style,
+                              }
+                            } else {
+                              Text {
+                                text: text.0.clone(),
+                                style: normal_text_style,
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -131,7 +160,7 @@ mod tests {
       Tabs {
         Tab {
           TabHeader {
-            Void {}
+            Label::new("test")
           }
           TabPane {
             Void {}

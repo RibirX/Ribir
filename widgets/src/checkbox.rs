@@ -1,4 +1,4 @@
-use crate::prelude::{svgs, Icon, Label, Position, Row, Text};
+use crate::prelude::{svgs, Icon, Row, Text};
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
@@ -35,6 +35,20 @@ impl Checkbox {
   }
 }
 
+/// Describe label position before or after purpose widget.`
+#[derive(Default)]
+pub enum Position {
+  Before,
+  #[default]
+  After,
+}
+
+#[derive(Declare)]
+pub struct CheckboxLabel {
+  pub desc: CowArc<str>,
+  pub position: Position,
+}
+
 impl ComposeStyle for CheckBoxStyle {
   type Host = Widget;
   #[inline]
@@ -42,7 +56,7 @@ impl ComposeStyle for CheckBoxStyle {
 }
 
 impl ComposeChild for Checkbox {
-  type Child = Option<Label>;
+  type Child = Option<CheckboxLabel>;
 
   fn compose_child(this: State<Self>, label: Self::Child) -> Widget {
     let this = this.into_writable();
@@ -65,7 +79,7 @@ impl ComposeChild for Checkbox {
       }
     }};
 
-    if let Some(Label { desc, position }) = label {
+    if let Some(CheckboxLabel { desc, position }) = label {
       let label = widget! {
         init ctx => { let theme = CheckBoxTheme::of(ctx); }
         Text { text: desc, style: theme.label_style.clone() }
