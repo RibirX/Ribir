@@ -174,8 +174,15 @@ impl Desugared {
     let sorted_named_objs = self.order_named_objs();
     Brace::default().surround(tokens, |tokens| {
       Brace::default().surround(tokens, |tokens| {
-        quote!(#![allow(unused_mut, clippy::redundant_clone, clippy::clone_on_copy)])
-          .to_tokens(tokens);
+        quote! {
+          #![allow(
+            unused_mut,
+            clippy::redundant_clone,
+            clippy::clone_on_copy,
+            clippy::let_and_return
+          )]
+        }
+        .to_tokens(tokens);
 
         states.to_tokens(tokens);
         let name = widget.as_ref().unwrap().node.name();

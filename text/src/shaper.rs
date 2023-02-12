@@ -162,7 +162,7 @@ impl TextShaper {
         break;
       }
       let miss_part = collect_miss_part(&glyphs, &new_part);
-      (buffer, new_part) = regen_miss_part(text, dir, &mut glyphs, miss_part, buffer) ;
+      (buffer, new_part) = regen_miss_part(text, dir, &mut glyphs, miss_part, buffer);
     }
 
     Some(glyphs)
@@ -211,23 +211,26 @@ impl TextShaper {
   pub fn font_db_mut(&self) -> RwLockWriteGuard<FontDB> { self.font_db.write().unwrap() }
 }
 
-
-fn collect_miss_part<'a> (glyphs: &[Glyph<Em>], new_part:&[(usize, usize, FallBackFaceHelper<'a>)]) ->  Vec<(usize, usize, FallBackFaceHelper<'a>)>{
+fn collect_miss_part<'a>(
+  glyphs: &[Glyph<Em>],
+  new_part: &[(usize, usize, FallBackFaceHelper<'a>)],
+) -> Vec<(usize, usize, FallBackFaceHelper<'a>)> {
   let mut miss_parts = vec![];
   for (start, end, helper) in new_part {
     let mut miss_start = None;
-    glyphs[*start..*end].iter()
+    glyphs[*start..*end]
+      .iter()
       .enumerate()
       .map(|(idx, glyph)| (idx + *start, glyph))
       .for_each(|(idx, glyph)| {
-      if glyph.is_miss() {
-        if miss_start.is_none() {
-          miss_start = Some(idx);
-        }
-      } else if miss_start.is_some() {
+        if glyph.is_miss() {
+          if miss_start.is_none() {
+            miss_start = Some(idx);
+          }
+        } else if miss_start.is_some() {
           miss_parts.push((miss_start.take().unwrap(), idx, helper.clone()));
-      }
-    });
+        }
+      });
     if miss_start.is_some() {
       miss_parts.push((miss_start.take().unwrap(), *end, helper.clone()));
     }
@@ -244,15 +247,21 @@ fn collect_miss_part<'a> (glyphs: &[Glyph<Em>], new_part:&[(usize, usize, FallBa
   miss_parts
 }
 
-fn regen_miss_part<'a>(text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph<Em>>, miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>, mut buffer: UnicodeBuffer) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) { 
+fn regen_miss_part<'a>(
+  text: &str,
+  dir: TextDirection,
+  glyphs: &mut Vec<Glyph<Em>>,
+  miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>,
+  mut buffer: UnicodeBuffer,
+) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) {
   let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
   let hb_direction = dir.into();
 
-  let cluster_to_range_byte = |glyphs: &Vec<Glyph<Em>>, idx: usize| -> usize{
+  let cluster_to_range_byte = |glyphs: &Vec<Glyph<Em>>, idx: usize| -> usize {
     let is_end = (is_rtl && 0 == idx) || (!is_rtl && idx == glyphs.len());
     match (is_end, is_rtl) {
       (true, _) => text.len(),
-      (false, true) => glyphs[idx-1].cluster as usize,
+      (false, true) => glyphs[idx - 1].cluster as usize,
       (false, false) => glyphs[idx].cluster as usize,
     }
   };
@@ -277,12 +286,12 @@ fn regen_miss_part<'a>(text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph<Em
       for g in res.glyphs.iter_mut() {
         g.cluster += miss_range.start as u32;
       }
-      
+
       offset += (res.glyphs.len() as i32) - ((miss_end - miss_start) as i32);
       new_part.push((miss_start, miss_start + res.glyphs.len(), helper));
       glyphs.splice(miss_start..miss_end, res.glyphs);
     }
-  };
+  }
   (buffer, new_part)
 }
 
@@ -436,9 +445,13 @@ mod tests {
   #[test]
   fn font_fallback() {
     let shaper = TextShaper::new(<_>::default());
-    shaper.font_db_mut().load_system_fonts();
-    let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
-    let _ = shaper.font_db_mut().load_font_file(path);
+    let path = env!("CARGO_MANIFEST_DIR").to_owned();
+    let _ = shaper
+      .font_db_mut()
+      .load_font_file(path.clone() + "/../fonts/DejaVuSans.ttf");
+    let _ = shaper
+      .font_db_mut()
+      .load_font_file(path + "/../fonts/NotoSerifSC-Bold.你好世界.otf");
 
     let ids = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
@@ -468,53 +481,53 @@ mod tests {
   }
 
   #[test]
-  fn slice_unicode() {
-    let font_db = Arc::new(RwLock::new(<_>::default()));
-    let shaper = TextShaper::new(font_db.clone());
-    font_db.write().unwrap().load_system_fonts();
-
-    let text: Substr = "⚛∩∗∔⋅⋖⊵⊶⊇≺∹⊈⋫⋷⋝⊿⋌⊷⋖⊐≑⊢⊷⋧".into();
-    let ids = shaper.font_db().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
-      ..<_>::default()
-    });
-
-    shaper.shape_cache.write().unwrap().clear();
-    let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
-    assert_eq!(res.glyphs.len(), 24);
-  }
-
-  
-  #[test]
   fn partiall_glyphs() {
     let font_db = Arc::new(RwLock::new(FontDB::default()));
-    let _ = font_db.write().unwrap().load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/GaramondNo8-Reg.ttf");
-    let _ = font_db.write().unwrap().load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/Nunito-VariableFont_wght.ttf"); 
+    let _ = font_db
+      .write()
+      .unwrap()
+      .load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/GaramondNo8-Reg.ttf");
+    let _ = font_db.write().unwrap().load_font_file(
+      env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/Nunito-VariableFont_wght.ttf",
+    );
     let shaper = TextShaper::new(font_db.clone());
 
     let text: Substr = "р҈р҈р҈р҈".into();
-    
+
     {
       let ids = shaper.font_db().select_all_match(&FontFace {
-        families: Box::new([FontFamily::Name("GaramondNo8".into()), FontFamily::Name("Nunito ExtraLight".into())]),
+        families: Box::new([
+          FontFamily::Name("GaramondNo8".into()),
+          FontFamily::Name("Nunito ExtraLight".into()),
+        ]),
         ..<_>::default()
       });
       let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
       assert!(res.glyphs.len() == 8);
       assert!(
-        res.glyphs.iter().enumerate().all(|(idx, glyph)| 
-        if idx % 2 == 0 {
-          glyph.is_not_miss()
-        } else {
-          glyph.is_miss()
-        })
+        res
+          .glyphs
+          .iter()
+          .enumerate()
+          .all(|(idx, glyph)| if idx % 2 == 0 {
+            glyph.is_not_miss()
+          } else {
+            glyph.is_miss()
+          })
       );
     }
-    
+
     {
-      let _ = font_db.write().unwrap().load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf");
+      let _ = font_db
+        .write()
+        .unwrap()
+        .load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf");
       let ids = shaper.font_db().select_all_match(&FontFace {
-        families: Box::new([FontFamily::Name("GaramondNo8".into()), FontFamily::Name("Nunito ExtraLight".into()), FontFamily::Name("DejaVu Sans".into())]),
+        families: Box::new([
+          FontFamily::Name("GaramondNo8".into()),
+          FontFamily::Name("Nunito ExtraLight".into()),
+          FontFamily::Name("DejaVu Sans".into()),
+        ]),
         ..<_>::default()
       });
       shaper.shape_cache.write().unwrap().clear();

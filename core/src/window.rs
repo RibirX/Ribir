@@ -173,7 +173,6 @@ impl WindowBuilder {
   // -> Self {   self.inner_builder =
   // self.inner_builder.with_window_icon(window_icon);   self
   // }
-
 }
 
 /// A rx scheduler pool that block until all task finished before every frame
@@ -196,8 +195,8 @@ impl Window {
   #[inline]
   pub fn builder(root: Widget) -> WindowBuilder {
     WindowBuilder {
-        root,
-        inner_builder: winit::window::WindowBuilder::default(),
+      root,
+      inner_builder: winit::window::WindowBuilder::default(),
     }
   }
 

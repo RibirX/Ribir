@@ -57,7 +57,9 @@ impl ComposeChild for Input {
         helper: Stateful::new(GlyphsHelper::default()),
       }
       init ctx => {
-        let tick_of_layout_ready = ctx.wnd_ctx().frame_tick_stream().filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+        let tick_of_layout_ready = ctx.wnd_ctx()
+          .frame_tick_stream()
+          .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
       }
 
       ConstrainedBox {

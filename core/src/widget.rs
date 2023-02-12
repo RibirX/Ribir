@@ -331,13 +331,17 @@ macro_rules! impl_proxy_render {
     fn paint(&self, ctx: &mut PaintingCtx) { self.$($proxy)*.paint(ctx) }
 
     #[inline]
-    fn only_sized_by_parent(&self) -> bool { self.$($proxy)*.only_sized_by_parent() }
+    fn only_sized_by_parent(&self) -> bool {
+      self.$($proxy)*.only_sized_by_parent()
+    }
 
     #[inline]
     fn can_overflow(&self) -> bool { self.$($proxy)*.can_overflow() }
 
     #[inline]
-    fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.$($proxy)*.hit_test(ctx, pos) }
+    fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+      self.$($proxy)*.hit_test(ctx, pos)
+    }
 
     #[inline]
     fn get_transform(&self) -> Option<Transform> {

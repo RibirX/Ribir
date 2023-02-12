@@ -38,7 +38,7 @@ pub struct TextFieldTml {
   /// Use suffix text after the editable text to show symbols or abbreviations
   /// that help users enter the right type of information in a form’s text
   /// input
-  subfix: Option<TrailingText>,
+  suffix: Option<TrailingText>,
 
   /// An icon that appears before the editable part of the text field
   leading_icon: Option<WidgetOf<Leading>>,
@@ -463,7 +463,7 @@ fn build_content_area(
       let linear = transitions::LINEAR.of(ctx);
     }
     init {
-      take_option_field!({label, prefix, subfix, placeholder}, config);
+      take_option_field!({label, prefix, suffix, placeholder}, config);
     }
     Column {
       id: content_area,
@@ -482,10 +482,13 @@ fn build_content_area(
           }
         })
       }
-
-      DynWidget {
-        dyns: move |_: &BuildCtx| build_input_area(&mut this, &mut theme, prefix, subfix, placeholder)
-      }
+      build_input_area(
+        no_watch!(&mut this),
+        no_watch!(&mut theme),
+        prefix,
+        suffix,
+        placeholder
+      )
     }
 
     transition prop!(content_area.padding) { by: linear }
