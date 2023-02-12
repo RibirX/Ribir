@@ -76,8 +76,8 @@ This project exists thanks to all the people who contribute:
 
 We also found inspiration from the following frameworks:
 
-* Flutter
-* Qt QML
+* [Flutter](https://flutter.dev/)
+* [Qt QML](https://doc.qt.io/qt-6/qtqml-index.html)
 
 ## License
 
