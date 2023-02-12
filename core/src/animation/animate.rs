@@ -2,7 +2,12 @@ use crate::{
   prelude::*,
   ticker::{FrameMsg, FrameTicker},
 };
-use std::{cell::RefCell, ops::DerefMut, rc::Rc, time::Instant};
+use std::{
+  cell::RefCell,
+  ops::DerefMut,
+  rc::Rc,
+  time::{Duration, Instant},
+};
 
 use super::property::AnimateProperty;
 
@@ -17,6 +22,8 @@ pub struct Animate<T, P: AnimateProperty> {
   frame_ticker: FrameTicker,
   #[declare(skip, default = ctx.wnd_ctx().animate_track())]
   animate_track: AnimateTrack,
+  #[declare(skip, default = ctx.wnd_ctx().frame_scheduler())]
+  frame_scheduler: FuturesLocalScheduler,
 }
 
 pub struct AnimateInfo<V> {
@@ -48,7 +55,13 @@ where
         FrameMsg::LayoutReady(time) => {
           let p = animate.shallow_ref().lerp(time);
           if matches!(p, AnimateProgress::Finish) {
-            animate.silent_ref().stop();
+            let scheduler = animate.silent_ref().frame_scheduler.clone();
+            let animate = animate.clone();
+            observable::of_fn(move || {
+              animate.silent_ref().stop();
+            })
+            .delay(Duration::ZERO, scheduler)
+            .subscribe(|()| {});
           }
         }
         // use silent_ref because the state of animate change, bu no need to effect the framework.

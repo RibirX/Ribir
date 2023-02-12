@@ -1,8 +1,8 @@
 use crate::{
-  common_widget::{LabelText, Leading, LeadingText, Trailing, TrailingText},
+  common_widget::{Leading, LeadingText, Trailing, TrailingText},
   input::Placeholder,
   layout::{constrained_box::EXPAND_Y, Column, ConstrainedBox, Container},
-  prelude::{Expanded, Icon, Input, Row, Stack, Text},
+  prelude::{Expanded, Icon, Input, Label, Row, Stack, Text},
 };
 use ribir_core::prelude::*;
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ impl TextField {
 pub struct TextFieldTml {
   /// Label text is used to inform users as to what information is requested for
   /// a text field.
-  label: Option<LabelText>,
+  label: Option<Label>,
 
   /// The placeholder text is displayed in the input field before the user
   /// enters a value.
