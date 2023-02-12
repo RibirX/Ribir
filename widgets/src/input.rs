@@ -69,7 +69,7 @@ impl ComposeChild for Input {
           max: Size::new(input_width(this.style.font_size, this.min_length), f32::INFINITY)
         },
         auto_focus: true,
-        on_char: move |c| this.edit_handle(c.char),
+        on_char: move |char_event| this.edit_handle(char_event),
         on_key_down: move |key| this.key_handle(key),
         on_pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
@@ -147,7 +147,7 @@ impl ComposeChild for Input {
           .distinct_until_changed()
           .sample(tick_of_layout_ready)
           .subscribe(move |cursor| {
-            selected.rects = helper.selection(cursor.select_range());
+            selected.rects = helper.selection(&cursor.select_range());
             let (offset, height) = helper.cursor(cursor.offset());
             caret.top_anchor = PositionUnit::Pixel(offset.y);
             caret.left_anchor = PositionUnit::Pixel(offset.x);

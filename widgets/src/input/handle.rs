@@ -1,6 +1,6 @@
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::{Deref, DerefMut};
 
-use ribir_core::prelude::{ControlChar, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
+use ribir_core::prelude::{CharEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
 
 struct InputWriter<'a> {
   input: &'a mut Input,
@@ -37,23 +37,13 @@ impl<'a> DerefMut for InputWriter<'a> {
 
 use super::Input;
 impl Input {
-  pub(crate) fn edit_handle(&mut self, c: char) {
-    let has_deleted = self.del_selected();
-
-    let mut writer = InputWriter::new(self);
-    match c {
-      ControlChar::DEL => {
-        if !has_deleted {
-          writer.del_char()
-        }
-      }
-      ControlChar::BACKSPACE => {
-        if !has_deleted {
-          writer.back_space()
-        }
-      }
-      _ => writer.insert_char(c),
-    };
+  pub(crate) fn edit_handle(&mut self, event: &mut CharEvent) {
+    if !event.char.is_ascii_control() {
+      let rg = self.caret.select_range();
+      let mut writer = InputWriter::new(self);
+      writer.delete_byte_range(&rg);
+      writer.insert_char(event.char);
+    }
   }
 
   pub(crate) fn key_handle(&mut self, key: &mut KeyboardEvent) {
@@ -64,16 +54,23 @@ impl Input {
       VirtualKeyCode::Right => {
         InputWriter::new(self).move_to_next();
       }
+      VirtualKeyCode::Back => {
+        let rg = self.caret.select_range();
+        if rg.is_empty() {
+          InputWriter::new(self).back_space();
+        } else {
+          InputWriter::new(self).delete_byte_range(&rg);
+        }
+      }
+      VirtualKeyCode::Delete => {
+        let rg = self.caret.select_range();
+        if rg.is_empty() {
+          InputWriter::new(self).del_char();
+        } else {
+          InputWriter::new(self).delete_byte_range(&rg);
+        }
+      }
       _ => (),
     };
-  }
-
-  pub(crate) fn del_selected(&mut self) -> bool {
-    let (start, end) = self.caret.select_range();
-    if start == end {
-      return false;
-    }
-    InputWriter::new(self).delete_byte_range(&Range { start, end });
-    true
   }
 }

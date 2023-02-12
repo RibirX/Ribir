@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaretState {
   Caret(usize),
@@ -18,11 +20,17 @@ impl Default for CaretState {
 }
 
 impl CaretState {
-  pub fn select_range(&self) -> (usize, usize) {
+  pub fn select_range(&self) -> Range<usize> {
     match *self {
-      CaretState::Caret(cursor) => (cursor, cursor),
-      CaretState::Select(begin, end) => (begin.min(end), begin.max(end)),
-      CaretState::Selecting(begin, end) => (begin.min(end), begin.max(end)),
+      CaretState::Caret(cursor) => Range { start: cursor, end: cursor },
+      CaretState::Select(begin, end) => Range {
+        start: begin.min(end),
+        end: begin.max(end),
+      },
+      CaretState::Selecting(begin, end) => Range {
+        start: begin.min(end),
+        end: begin.max(end),
+      },
     }
   }
 

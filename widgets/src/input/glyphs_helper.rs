@@ -22,15 +22,15 @@ impl GlyphsHelper {
     (Point::new(glphy.min_x(), glphy.max_y()), line_height)
   }
 
-  pub(crate) fn selection(&self, (start, end): (usize, usize)) -> Vec<Rect> {
-    if start == end {
+  pub(crate) fn selection(&self, rg: &Range<usize>) -> Vec<Rect> {
+    if rg.is_empty() {
       return vec![];
     }
     self
       .glyphs
       .as_ref()
       .unwrap()
-      .select_range(Range { start, end })
+      .select_range(rg)
       .iter()
       .map(|r| {
         Rect::new(
