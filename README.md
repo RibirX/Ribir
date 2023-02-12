@@ -58,11 +58,11 @@ For more information please read：
 
 **🤔 Confused about something?**
 
-Feel free to open a [new "Question" issue]() to get help from contributors. Often questions lead to improvements to the ergonomics of the framework, better documentation, and even new features!
+Feel free to open a [new "Question" issue](https://github.com/RibirX/Ribir/issues/new/choose) to get help from contributors. Often questions lead to improvements to the ergonomics of the framework, better documentation, and even new features!
 
 **😱 Found a bug?**
 
-Please [report all bugs]()! We are happy to help support developers fix the bugs they find if they are interested and have the time.
+Please [report all bugs](https://github.com/RibirX/Ribir/issues/new/choose)! We are happy to help support developers fix the bugs they find if they are interested and have the time.
 
 
 ## Thanks
