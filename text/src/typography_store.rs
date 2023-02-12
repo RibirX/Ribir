@@ -412,7 +412,7 @@ impl VisualGlyphs {
       .map_or(0., |line| self.to_pixel_value(line.line_height))
   }
 
-  pub fn select_range(&self, rg: Range<usize>) -> Vec<Rect<Pixel>> {
+  pub fn select_range(&self, rg: &Range<usize>) -> Vec<Rect<Pixel>> {
     struct TypoRectJointer<T>
     where
       T: Add<T, Output = T> + Sub<T, Output = T> + Copy + PartialEq,
