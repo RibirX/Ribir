@@ -58,7 +58,7 @@ For more information please read：
 
 **🤔 Confused about something?**
 
-Feel free to open a [new "Question" issue](https://github.com/RibirX/Ribir/issues/new/choose) to get help from contributors. Often questions lead to improvements to the ergonomics of the framework, better documentation, and even new features!
+Feel free to go to Discussions and open a [new "Q&A"](https://github.com/RibirX/Ribir/discussions/new/choose) to get help from contributors. Often questions lead to improvements to the ergonomics of the framework, better documentation, and even new features!
 
 **😱 Found a bug?**
 
@@ -73,11 +73,10 @@ This project exists thanks to all the people who contribute:
 </a>
 
 <br/>
-We also found a lot of inspiration from the following frameworks:
-<div style="margin-top:10px">
-    <img src="https://avatars.githubusercontent.com/u/14101776?s=280&v=4" height="60px"/>
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Qt_logo_2016.svg/1200px-Qt_logo_2016.svg.png" height="60px" width="70px"/>
-</div>
+We also found inspiration from the following frameworks:
+
+* Flutter
+* Qt QML
 
 ## License
 
