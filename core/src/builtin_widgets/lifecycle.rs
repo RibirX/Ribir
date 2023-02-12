@@ -161,7 +161,7 @@ impl_lifecycle!(
 impl<'a> Clone for LifeCycleCtx<'a> {
   fn clone(&self) -> Self {
     Self {
-      id: self.id.clone(),
+      id: self.id,
       arena: self.arena,
       store: self.store,
       wnd_ctx: self.wnd_ctx,

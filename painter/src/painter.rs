@@ -4,7 +4,7 @@ use crate::{
 };
 use euclid::Size2D;
 pub use lyon_tessellation::{LineCap, LineJoin};
-use ribir_algo::{CowArc, Resource, Substr};
+use ribir_algo::{Resource, Substr};
 use ribir_text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
 use ribir_text::FontSize;
 use ribir_text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
@@ -259,7 +259,7 @@ impl Painter {
   pub fn get_font(&self) -> &FontFace { &self.current_state().font_face }
 
   #[inline]
-  pub fn set_font<F: Into<CowArc<FontFace>>>(&mut self, font: FontFace) -> &mut Self {
+  pub fn set_font(&mut self, font: FontFace) -> &mut Self {
     self.current_state_mut().font_face = font;
     self
   }

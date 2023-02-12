@@ -190,7 +190,7 @@ impl Compose for TabText {
   fn compose(this: State<Self>) -> Widget {
     widget! {
       states {
-        this: this.into_writable()
+        this: this.into_readonly()
       }
       init ctx => {
         let primary = Palette::of(ctx).primary();
@@ -202,7 +202,11 @@ impl Compose for TabText {
         padding: EdgeInsets::vertical(6.),
         h_align: HAlign::Center,
         style: TextStyle {
-          foreground: if this.is_active { Brush::Color(primary) } else { Brush::Color(on_surface_variant) },
+          foreground: if this.is_active {
+            Brush::Color(primary)
+          } else {
+            Brush::Color(on_surface_variant)
+          },
           ..text_style.clone()
         },
       }
@@ -234,8 +238,9 @@ fn main() {
     ],
   };
 
-
   let app = Application::new(material::purple::light());
-  let wnd = Window::builder(todo.into_widget()).with_inner_size(Size::new(400., 640.)).build(&app);
+  let wnd = Window::builder(todo.into_widget())
+    .with_inner_size(Size::new(400., 640.))
+    .build(&app);
   app::run_with_window(app, wnd);
 }

@@ -20,12 +20,10 @@ impl ComposeChild for FocusScope {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let w = widget! {
       FocusScopeRender {
-        on_mounted: move |ctx| {
-          WidgetCtxImpl::wnd_ctx(&ctx).add_focus_node(ctx.id, false, FocusType::SCOPE, ctx.tree_arena());
-        },
-        on_disposed: move|ctx| {
-          WidgetCtxImpl::wnd_ctx(&ctx).remove_focus_node(ctx.id, FocusType::SCOPE);
-        },
+        on_mounted: move |ctx| WidgetCtxImpl::wnd_ctx(&ctx)
+          .add_focus_node(ctx.id, false, FocusType::SCOPE, ctx.tree_arena()),
+        on_disposed: move|ctx| WidgetCtxImpl::wnd_ctx(&ctx)
+          .remove_focus_node(ctx.id, FocusType::SCOPE),
         DynWidget { dyns: child }
       }
     };

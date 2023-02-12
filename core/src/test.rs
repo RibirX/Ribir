@@ -192,7 +192,7 @@ impl ExpectRect {
 /// }
 /// ```
 
-pub macro unit_test_describe($(run_unit_test($name: ident);)* ) {{
+pub macro unit_test_describe($(run_unit_test($name: path);)* ) {{
   let panic_infos: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
 
   // hook panic to format message

@@ -4,21 +4,21 @@ on:
     branches:
       - master
 
-name: base check
+name: CI
 jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
-
+        uses: actions/checkout@v3
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly-2023-02-01
           override: true
+      - uses: Swatinem/rust-cache@v2
       - name: Run cargo check
         uses: actions-rs/cargo@v1
         with:
@@ -29,38 +29,63 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        # ubuntu will test individual and be used for 'codecov'
+        os: [macos-latest, windows-latest]
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly-2023-02-01
           override: true
-
+      - uses: Swatinem/rust-cache@v2
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-
+  ubuntu-test:
+    name: Test Suite(ubuntu-latest)
+    runs-on: macos-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2023-02-01
+          override: true
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+      - name: run llvm-cov test
+        # should test with --all-features if gpu support.
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info
+          fail_ci_if_error: true
+ 
   rustfmt:
     name: rust code format style check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly-2023-02-01
           override: true
           components: rustfmt
-
+      - uses: Swatinem/rust-cache@v2
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
@@ -70,43 +95,15 @@ jobs:
   clippy_check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: nightly-2023-02-01
             components: clippy
             override: true
+      - uses: Swatinem/rust-cache@v2
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets --all-features -- -D warnings 
-  codecov:
-      name: code coverage analysis
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v2
-
-        - name: Install nightly toolchain
-          uses: actions-rs/toolchain@v1
-          with:
-            toolchain: nightly
-            override: true
-
-        - name: Run cargo-tarpaulin
-          uses: actions-rs/tarpaulin@v0.1
-          with:
-            version: '0.9.0'
-            args: '-- --test-threads 1'
-
-        - name: Upload to codecov.io
-          uses: codecov/codecov-action@v1.0.2
-          with:
-            token: ${{secrets.CODECOV_TOKEN}}
-            fail_ci_if_error: true
-
-        - name: Archive code coverage results
-          uses: actions/upload-artifact@v1
-          with:
-            name: code-coverage-report
-            path: cobertura.xml
+          args: --all-targets --all-features -- -D warnings
+  
