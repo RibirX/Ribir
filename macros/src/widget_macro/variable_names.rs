@@ -66,3 +66,13 @@ pub fn builtin_var_name(host: &Ident, span: Span, ty: &str) -> Ident {
 
 pub fn guard_vec_ident() -> Ident { ribir_variable("guard_vec", Span::call_site()) }
 pub fn guard_ident(span: Span) -> Ident { ribir_variable("guard", span) }
+
+// We only check `DynWidget` and `DynWidget<_>`.
+pub fn is_dyn_widget(path: &syn::Path) -> bool {
+  if path.leading_colon.is_some() || path.segments.len() != 1 {
+    return false;
+  }
+
+  let seg = &path.segments[0];
+  seg.ident == "DynWidget"
+}

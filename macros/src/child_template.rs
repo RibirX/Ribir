@@ -48,11 +48,9 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
       fill_child_impl.extend(quote! {
         impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
-          type New = Self;
-          fn fill(mut self, c: #ty) -> Self {
+          fn fill(&mut self, c: #ty) {
             assert!(self.#field_name.is_none(), "Try to fill same type twice.");
             self.#field_name = Some(c);
-            self
           }
         }
       });

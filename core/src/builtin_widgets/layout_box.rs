@@ -65,7 +65,7 @@ mod tests {
   fn smoke() {
     expect_layout_result(
       widget! {
-        MockMulti {
+         MockMulti {
           LayoutBox {
             id: layout_box,
             MockBox { size: Size::new(100., 200.) }

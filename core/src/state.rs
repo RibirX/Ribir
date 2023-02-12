@@ -14,16 +14,6 @@ pub enum State<W> {
   Stateful(Stateful<W>),
 }
 
-impl<W> From<W> for State<W> {
-  #[inline]
-  fn from(w: W) -> Self { State::Stateless(w) }
-}
-
-impl<W> From<Stateful<W>> for State<W> {
-  #[inline]
-  fn from(w: Stateful<W>) -> Self { State::Stateful(w) }
-}
-
 impl<W> State<W> {
   pub fn into_writable(self) -> Stateful<W> {
     match self {
@@ -43,6 +33,16 @@ impl<W> State<W> {
   }
 }
 
+impl<W> From<W> for State<W> {
+  #[inline]
+  fn from(w: W) -> Self { State::Stateless(w) }
+}
+
+impl<W> From<Stateful<W>> for State<W> {
+  #[inline]
+  fn from(w: Stateful<W>) -> Self { State::Stateful(w) }
+}
+
 impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
   fn from(value: Stateful<DynWidget<D>>) -> Self {
     let c_value = value.clone();
@@ -56,9 +56,4 @@ impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
     });
     v.into()
   }
-}
-
-impl<D: 'static> From<DynWidget<D>> for State<D> {
-  #[inline]
-  fn from(value: DynWidget<D>) -> Self { State::Stateless(value.into_inner()) }
 }

@@ -21,7 +21,7 @@ use super::{
     ComposeItem, DeclareObj, Field, FieldValue, FinallyBlock, FinallyStmt, InitStmts, NamedObj,
     NamedObjMap, WidgetNode,
   },
-  guard_vec_ident,
+  guard_vec_ident, is_dyn_widget,
   parser::{PropMacro, Property, StateField, States},
   Desugared, ObjectUsed, ObjectUsedPath, TrackExpr, UsedPart, UsedType, VisitCtx, WIDGETS,
 };
@@ -465,6 +465,10 @@ impl DeclareObj {
         quote_spanned! { span => Stateful::new(#stream) }.to_tokens(tokens);
       } else {
         build_widget(tokens);
+        // we stripe the `DynWidget` if it stateless.
+        if is_dyn_widget(ty) {
+          quote_spanned! { span => .into_inner() }.to_tokens(tokens);
+        }
       }
     };
 

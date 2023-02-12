@@ -3,7 +3,7 @@ pub use guards::ModifyGuard;
 use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
   cell::{Cell, UnsafeCell},
-  ops::DerefMut,
+  ops::{Deref, DerefMut},
   rc::Rc,
 };
 
@@ -356,28 +356,6 @@ impl<W: Render + 'static> Render for Stateful<W> {
 
   #[inline]
   fn get_transform(&self) -> Option<Transform> { self.state_ref().get_transform() }
-}
-
-impl<W: Compose> Compose for Stateful<W> {
-  fn compose(this: State<Self>) -> Widget {
-    let w = match this {
-      State::Stateless(s) => s,
-      State::Stateful(s) => s.state_ref().clone(),
-    };
-    Compose::compose(State::Stateful(w))
-  }
-}
-
-impl<W: ComposeChild> ComposeChild for Stateful<W> {
-  type Child = W::Child;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let w = match this {
-      State::Stateless(s) => s,
-      State::Stateful(s) => s.state_ref().clone(),
-    };
-    ComposeChild::compose_child(State::Stateful(w), child)
-  }
 }
 
 impl<'a, W> Drop for StateRef<'a, W> {

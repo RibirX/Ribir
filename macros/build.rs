@@ -9,7 +9,7 @@ include!("./src/builtin_fields_list.rs");
 
 fn main() -> std::io::Result<()> {
   let out_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
-  let dest_path = Path::new(&out_dir).join("../docs/declare_builtin_fields.md");
+  let dest_path = Path::new(&out_dir).join("../docs/builtin_widget/declare_builtin_fields.md");
   let mut f = fs::File::create(dest_path)?;
   f.write_all(b"# Full builtin fields list \n\n")?;
 
