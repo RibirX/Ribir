@@ -73,6 +73,7 @@ This project exists thanks to all the people who contribute:
 </a>
 
 <br/>
+
 We also found inspiration from the following frameworks:
 
 * Flutter
