@@ -1,4 +1,4 @@
-#![feature(decl_macro, test)]
+#![feature(test)]
 pub mod error;
 
 #[cfg(feature = "wgpu_gl")]

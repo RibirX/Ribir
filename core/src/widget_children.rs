@@ -399,8 +399,17 @@ where
     widget! {
       states { child }
       DynWidget {
-        dyns: {
-          let widgets = DynRender::spread(child.clone_stateful());
+        dyns:{
+          let widgets = DynRender::spread(&mut child);
+
+          // In this widget, we subscribed the `child` modifies, then spread it.
+          // When we spread it, we modifies it, a circular occur. So we forget
+          // the modify of take its children to break the circular.
+          //
+          // In other side, `child` is a stateful dynamic widget and use as
+          // child here, and all its content all a black box, so others
+          // should not depends on it.
+          child.forget_modifies();
           ComposeChild::compose_child(State::Stateful(this.clone()), widgets)
         }
       }
@@ -620,6 +629,8 @@ where
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
   use super::*;
   use crate::test::*;
 
@@ -870,5 +881,29 @@ mod tests {
         expect: ExpectRect::from_size(EXPECT_SIZE),
       }],
     );
+  }
+
+  #[test]
+  fn compose_dyn_multi_child() {
+    struct A;
+
+    impl ComposeChild for A {
+      type Child = Vec<Widget>;
+
+      fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
+        MockMulti.with_child(child).into_widget()
+      }
+    }
+
+    let child = DynWidget { dyns: Some([Void]) };
+    let child = Stateful::new(child);
+    let cnt = Rc::new(RefCell::new(0));
+    let c_cnt = cnt.clone();
+    child
+      .modifies()
+      .subscribe(move |_| *c_cnt.borrow_mut() += 1);
+
+    let _ = Window::default_mock(A.with_child(child), None);
+    assert_eq!(*cnt.borrow(), 0);
   }
 }

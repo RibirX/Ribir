@@ -112,12 +112,12 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
     }
   }
 
-  pub(crate) fn spread(dyns: Stateful<DynWidget<D>>) -> Vec<Widget>
+  pub(crate) fn spread(dyns: &mut StateRef<DynWidget<D>>) -> Vec<Widget>
   where
     M: 'static,
     D: 'static,
   {
-    let mut widgets = dyns.silent_ref().dyns.take().unwrap().dyns_into_widget();
+    let mut widgets = dyns.dyns.take().unwrap().dyns_into_widget();
 
     if widgets.is_empty() {
       widgets.push(Void.into_widget());
@@ -126,7 +126,7 @@ impl<D: DynsIntoWidget<M>, M> DynRender<D, M> {
     let first = std::mem::replace(&mut widgets[0], Void.into_widget());
     let first = DynRender::new(Stateful::new(DynWidget { dyns: Some(first) }));
     let first = Self {
-      dyn_widgets: dyns,
+      dyn_widgets: dyns.clone_stateful(),
       self_render: RefCell::new(Box::new(first)),
       gen_info: RefCell::new(Some(DynWidgetGenInfo::WholeSubtree {
         width: widgets.len(),
