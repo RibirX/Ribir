@@ -279,6 +279,19 @@ impl<'a, W> StateRef<'a, W> {
     StateRef::new(self.value.inner_ref(), ModifyScope::DATA)
   }
 
+  /// Forget all modifies record in this reference. So the downstream will no
+  /// know the inner value be modified if this reference not be mut accessed
+  /// anymore.
+  pub fn forget_modifies(&self) {
+    let b = &self.value.inner.borrow_flag;
+    match self.mut_accessed_flag.get() {
+      Some(false) => b.set(b.get() - 1),
+      Some(true) => b.set(b.get() + 1),
+      None => {}
+    }
+    self.mut_accessed_flag.set(None);
+  }
+
   #[inline]
   pub fn raw_modifies(&self) -> Subject<'static, ModifyScope, ()> { self.value.raw_modifies() }
 
@@ -315,10 +328,7 @@ impl<'a, W> StateRef<'a, W> {
   /// reference because we try to early release inner borrow when clone occur.
 
   #[inline]
-  pub fn clone_stateful(&self) -> Stateful<W> {
-    self.release_borrow();
-    self.value.clone()
-  }
+  pub fn clone_stateful(&self) -> Stateful<W> { self.value.clone() }
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
