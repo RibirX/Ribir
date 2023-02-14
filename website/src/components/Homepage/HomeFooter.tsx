@@ -31,7 +31,7 @@ export default function HomeFooter() {
           The official website uses <a target={"_blank"} href={"https://docs.dyte.io/"}>dyte.io</a> theme, thanks for dyte.io.
         </div>
         <div className="flex-1 text-zinc-400 lg:text-right">
-            Build with RibirX and <span className="emoji">❤️</span>
+          Build with RibirX and <span className="emoji">❤️</span>
         </div>
       </div>
     </footer>
