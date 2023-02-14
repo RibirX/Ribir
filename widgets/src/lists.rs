@@ -116,7 +116,7 @@ impl ComposeChild for Lists {
 
     widget! {
       states {
-        this: this.into_writable()
+        this: this.into_readonly()
       }
       Column {
         DynWidget {
