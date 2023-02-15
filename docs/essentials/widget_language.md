@@ -1,6 +1,10 @@
+---
+sidebar_position: 1
+---
+
 # The `widget!` macro
 
-`widget!` macro is a declarative language to help you to build your declare and reactive UI  quickly and expressively. It allows user interfaces to be described in terms of their visual struct, and almost all its syntaxes are expanded from the syntax of Rusts. So don't worry about the learning curve of this DSL language. 
+`widget!` macro is a declarative language to help you to build your declare and reactive UI  quickly and expressively. It allows user interfaces to be described in terms of their visual struct, and almost all its syntaxes are expanded from the syntax of Rusts. So don't worry about the learning curve of this DSL language.
 
 `widget!` is a macro that returns a widget, so you can use it as an expression anywhere you want.
 
@@ -28,7 +32,7 @@ At first, we import `ribir::prelude::*`, which is the list of essential things t
 
 > Tips
 >
-> Any struct can support declare in `widget!` if it is derived `Declare` trait. `Declare` provide the default value for the `style` of `Text`. See more in [How `Declare` trait work [wip] ?]().
+> Any struct can support declare in `widget!` if it is derived `Declare` trait. `Declare` provide the default value for the `style` of `Text`. See more in [How `Declare` trait work [wip] ?](./).
 
 The next step, let it support saying hi to anyone. User enters what the `Text` display hello to what. So we need a `Input` to accept user enter.
 
@@ -340,8 +344,8 @@ The next statement `move_to_widget!(guard);` is very simple. `move_to_widget!` m
 
 > **Tips**
 >
-> - ReactiveX is an API for asynchronous programming with observable streams. [See More](reactivex.io)
-> - rxRust is the implementation of ReactiveX Ribir used. [See More](github.com/rxRust/rxRust)
+> - ReactiveX is an API for asynchronous programming with observable streams. [See More](https://reactivex.io)
+> - rxRust is the implementation of ReactiveX Ribir used. [See More](https://github.com/rxRust/rxRust)
 
 ### use `watch` and `let_watch!` to watch expression.
 

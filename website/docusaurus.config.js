@@ -1,0 +1,93 @@
+// @ts-check
+// Note: type annotations allow type checking and IDEs autocompletion
+
+const lightCodeTheme = require('prism-react-renderer/themes/github');
+const darkCodeTheme = require('prism-react-renderer/themes/dracula');
+
+const tailwindPlugin = require('./plugins/tailwind-plugin.cjs');
+
+/** @type {import('@docusaurus/types').Config} */
+const config = {
+  title: 'Ribir Official Website',
+  tagline: 'Using the Ribir to build everything',
+  url: 'https://ribir.org',
+  baseUrl: '/',
+  onBrokenLinks: 'warn',
+  onBrokenMarkdownLinks: 'warn',
+  favicon: 'img/favicon.ico',
+  organizationName: 'RibirX',
+  projectName: 'Ribir',
+
+  // Even if you don't use internalization, you can use this field to set useful
+  // metadata like html lang. For example, if your site is Chinese, you may want
+  // to replace "en" with "zh-Hans".
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en'],
+  },
+
+  presets: [
+    [
+      'classic',
+      /** @type {import('@docusaurus/preset-classic').Options} */
+      ({
+        docs: {
+          showLastUpdateAuthor: true,
+          showLastUpdateTime: true,
+          sidebarPath: require.resolve('./sidebars.js'),
+          editUrl: 'https://github.com/RibirX/Ribir/tree/master/website/',
+          path: '../docs',
+        },
+        blog: {
+          showReadingTime: true,
+          editUrl: 'https://github.com/RibirX/Ribir/tree/master/website/',
+        },
+        theme: {
+          customCss: require.resolve('./src/css/custom.css'),
+        },
+      }),
+    ],
+  ],
+
+  plugins: [
+    tailwindPlugin,
+  ],
+
+  themeConfig:
+    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    ({
+      navbar: {
+        logo: {
+          alt: 'Ribir logo',
+          src: 'img/ribir-long-logo.svg',
+        },
+        items: [
+          // todo: multiple version config
+          // {
+          //   type: 'docsVersionDropdown',
+          //   position: 'left',
+          //   dropdownActiveClassDisabled: true,
+          // },
+          {
+            type: 'doc',
+            docId: 'introduction',
+            position: 'left',
+            label: 'Tutorial',
+          },
+          {to: '/blog', label: 'Blog', position: 'left'},
+          {
+            href: 'https://github.com/RibirX/Ribir',
+            label: 'GitHub',
+            position: 'right',
+          },
+        ],
+      },
+      prism: {
+        theme: lightCodeTheme,
+        darkTheme: darkCodeTheme,
+        additionalLanguages: ['rust']
+      },
+    }),
+};
+
+module.exports = config;
