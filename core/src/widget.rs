@@ -1,4 +1,4 @@
-pub(crate) use crate::{composed_widget::ComposedWidget, widget_tree::*};
+pub(crate) use crate::widget_tree::*;
 use crate::{context::*, prelude::ComposeChild, state::State};
 use ribir_algo::ShareResource;
 use ribir_painter::*;
@@ -173,9 +173,7 @@ impl IntoWidget<SelfImpl> for Widget {
 
 impl<C: Compose + Into<State<C>> + 'static> IntoWidget<NotSelf<()>> for C {
   #[inline]
-  fn into_widget(self) -> Widget {
-    ComposedWidget::<Widget, C>::new(Compose::compose(self.into())).into_widget()
-  }
+  fn into_widget(self) -> Widget { Compose::compose(self.into()) }
 }
 
 impl<R: Render + 'static> IntoWidget<NotSelf<&()>> for R {
