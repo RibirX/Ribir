@@ -21,7 +21,7 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
   type Child = W::Host;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let widget = (move |ctx: &BuildCtx| {
+    (move |ctx: &BuildCtx| {
       let tid = TypeId::of::<W>();
       let style = ctx.find_cfg(|t| match t {
         Theme::Full(t) => t.compose_styles.styles.get(&tid),
@@ -34,8 +34,7 @@ impl<W: ComposeStyle + 'static> ComposeChild for W {
         ComposeStyle::compose_style(this.into_writable(), child)
       }
     })
-    .into_widget();
-    ComposedWidget::<Widget, W>::new(widget).into_widget()
+    .into_widget()
   }
 }
 

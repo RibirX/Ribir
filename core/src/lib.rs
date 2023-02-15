@@ -7,7 +7,6 @@ extern crate lazy_static;
 pub mod animation;
 mod application;
 pub mod builtin_widgets;
-pub(crate) mod composed_widget;
 mod context;
 pub mod data_widget;
 mod state;
