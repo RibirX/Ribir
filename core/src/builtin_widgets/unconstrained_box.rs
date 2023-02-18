@@ -23,9 +23,15 @@ impl Render for UnconstrainedBox {
   #[inline]
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     match self.dir {
-      UnconstrainedDir::X => clamp.max.width = f32::INFINITY,
-      UnconstrainedDir::Y => clamp.max.height = f32::INFINITY,
-      UnconstrainedDir::Both => clamp = clamp.expand(),
+      UnconstrainedDir::X => {
+        clamp.min.width = 0.;
+        clamp.max.width = f32::INFINITY;
+      }
+      UnconstrainedDir::Y => {
+        clamp.min.height = 0.;
+        clamp.max.height = f32::INFINITY;
+      }
+      UnconstrainedDir::Both => clamp = clamp.expand().loose(),
     };
     ctx.assert_perform_single_child_layout(clamp)
   }
