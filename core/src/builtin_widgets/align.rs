@@ -72,6 +72,8 @@ impl Render for HAlignWidget {
     let align: Align = self.h_align.into();
     if align == Align::Stretch {
       clamp.min.width = clamp.max.width;
+    } else {
+      clamp.min.width = 0.;
     }
     let box_width = clamp.max.width;
     let mut layouter = ctx.assert_single_child_layouter();
@@ -99,6 +101,8 @@ impl Render for VAlignWidget {
     let align: Align = self.v_align.into();
     if align == Align::Stretch {
       clamp.min.height = clamp.max.height;
+    } else {
+      clamp.min.height = 0.;
     }
     let box_height = clamp.max.height;
     let child_size = layouter.perform_widget_layout(clamp);
