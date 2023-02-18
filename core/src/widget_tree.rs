@@ -288,7 +288,10 @@ impl Widget {
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::test::{layout_info_by_path, MockBox, MockMulti};
+  use crate::{
+    test::{layout_info_by_path, MockBox, MockMulti},
+    widget::widget_id::dispose_nodes,
+  };
 
   use super::*;
   use ribir_painter::{font_db::FontDB, shaper::TextShaper};
@@ -478,7 +481,9 @@ mod tests {
 
     tree.mark_dirty(tree.root());
     let WidgetTree { root, arena, store, wnd_ctx, .. } = &mut tree;
-    root.remove_subtree(arena, store, wnd_ctx);
+
+    dispose_nodes(root.descendants(arena), arena, store, wnd_ctx);
+    root.remove_subtree(arena);
 
     assert_eq!(tree.layout_list(), None);
     assert!(!tree.is_dirty());

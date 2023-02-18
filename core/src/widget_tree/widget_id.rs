@@ -131,26 +131,7 @@ impl WidgetId {
 
   pub(crate) fn detach(self, tree: &mut TreeArena) { self.0.detach(tree) }
 
-  pub(crate) fn remove_subtree(
-    self,
-    arena: &mut TreeArena,
-    store: &mut LayoutStore,
-    wnd_ctx: &WindowCtx,
-  ) {
-    self.descendants(arena).for_each(|id| {
-      store.remove(id);
-
-      id.assert_get(arena).query_all_type(
-        |d: &DisposedListener| {
-          d.dispatch(LifeCycleCtx { id: self, arena, store, wnd_ctx });
-          true
-        },
-        QueryOrder::OutsideFirst,
-      )
-    });
-
-    self.0.remove_subtree(arena)
-  }
+  pub(crate) fn remove_subtree(self, arena: &mut TreeArena) { self.0.remove_subtree(arena) }
 
   pub(crate) fn on_mounted_subtree(
     self,
@@ -247,3 +228,22 @@ pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId
 }
 
 pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
+
+pub(crate) fn dispose_nodes<T: Iterator<Item = WidgetId>>(
+  it: T,
+  arena: &TreeArena,
+  store: &mut LayoutStore,
+  wnd_ctx: &WindowCtx,
+) {
+  it.for_each(|id| {
+    store.remove(id);
+
+    id.assert_get(arena).query_all_type(
+      |d: &DisposedListener| {
+        d.dispatch(LifeCycleCtx { id, arena, store, wnd_ctx });
+        true
+      },
+      QueryOrder::OutsideFirst,
+    )
+  });
+}

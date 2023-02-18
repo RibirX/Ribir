@@ -2,7 +2,7 @@ use crate::{
   builtin_widgets::key::AnyKey,
   impl_proxy_query, impl_query_self_only,
   prelude::*,
-  widget::widget_id::{empty_node, split_arena},
+  widget::widget_id::{dispose_nodes, empty_node, split_arena},
 };
 use std::{cell::RefCell, collections::HashMap};
 
@@ -99,8 +99,7 @@ impl<D> DynRender<D> {
   }
 
   fn regen_if_need(&self, ctx: &mut LayoutCtx) {
-    let mut dyn_widget = self.dyn_widgets.silent_ref();
-    let Some(new_widgets) = dyn_widget.dyns.take() else {
+    let Some(new_widgets) = self.dyn_widgets.silent_ref().dyns.take() else {
       return
     };
 
@@ -129,6 +128,7 @@ impl<D> DynRender<D> {
       new_widgets.push(empty_node(arena));
     }
 
+    self.update_key_state(*sign, gen_info, &new_widgets, arena);
     // Place the real old render in node, the dyn render in node keep.
     std::mem::swap(
       &mut *self.self_render.borrow_mut(),
@@ -136,14 +136,24 @@ impl<D> DynRender<D> {
     );
 
     // swap the new sign and old, so we can always keep the sign id not change.
-    sign.swap_id(new_widgets[0], arena);
-    let old_sign = new_widgets[0];
-    new_widgets[0] = *sign;
+    fn refresh_sign_id(sign: WidgetId, ids: &mut [WidgetId], arena: &mut TreeArena) -> WidgetId {
+      sign.swap_id(ids[0], arena);
+      let old_sign = ids[0];
+      ids[0] = sign;
+      old_sign
+    }
 
     match &mut gen_info {
       DynWidgetGenInfo::DynDepth(depth) => {
         assert_eq!(new_widgets.len(), 1);
 
+        dispose_nodes(
+          iter_single_child(*sign, arena, *depth),
+          arena,
+          store,
+          wnd_ctx,
+        );
+        let old_sign = refresh_sign_id(*sign, &mut new_widgets, arena);
         let declare_child_parent = single_down(old_sign, arena, *depth as isize - 1);
         let (new_leaf, down_level) = down_to_leaf(*sign, arena);
 
@@ -156,93 +166,45 @@ impl<D> DynRender<D> {
             .for_each(|c| new_leaf.append(c, arena2));
         }
 
-        let mut old_key = None;
-        inspect_key(&old_sign, arena, |key: &dyn AnyKey| {
-          old_key = Some((key.key(), old_sign));
-        });
-
         old_sign.insert_after(*sign, arena);
-        old_sign.remove_subtree(arena, store, wnd_ctx);
+        old_sign.remove_subtree(arena);
 
-        let w = *sign;
-
-        if let Some(old) = &old_key {
-          inspect_key(&w, arena, |key: &dyn AnyKey| {
-            if old.0 == key.key() {
-              inspect_key(&old.1, arena, |old_key_widget: &dyn AnyKey| {
-                key.record_before_value(old_key_widget)
-              });
-            } else {
-              inspect_key(&old.1, arena, |old_key_widget: &dyn AnyKey| {
-                old_key_widget.disposed()
-              });
-              key.mounted();
-            }
-          });
-        }
-
+        let mut w = *sign;
         loop {
           w.on_mounted(arena, store, wnd_ctx, dirty_set);
           if w == new_leaf {
             break;
           }
-          w.single_child(arena).unwrap();
+          w = w.single_child(arena).unwrap();
         }
 
         *depth = new_depth;
       }
 
       DynWidgetGenInfo::WholeSubtree(siblings) => {
+        let mut remove = Some(*sign);
+        (0..*siblings).for_each(|_| {
+          let o = remove.unwrap();
+          remove = o.next_sibling(arena);
+          dispose_nodes(o.descendants(arena), arena, store, wnd_ctx);
+          if o != *sign {
+            o.remove_subtree(arena);
+          }
+        });
+
+        let old_sign = refresh_sign_id(*sign, &mut new_widgets, arena);
         let mut cursor = old_sign;
         new_widgets.iter().rev().for_each(|n| {
           cursor.insert_before(*n, arena);
           cursor = *n;
         });
 
-        let mut old_key_list = HashMap::new();
-        let mut remove = Some(old_sign);
-
-        (0..*siblings).for_each(|_| {
-          let o = remove.unwrap();
-
-          inspect_key(&o, arena, |old_key_widget: &dyn AnyKey| {
-            old_key_list.insert(old_key_widget.key(), o);
-          });
-
-          remove = o.next_sibling(arena);
-        });
-
-        new_widgets.iter().for_each(|n| {
-          inspect_key(n, arena, |new_key_widget: &dyn AnyKey| {
-            let key = &new_key_widget.key();
-            if let Some(old_key_widget) = old_key_list.get(key) {
-              inspect_key(old_key_widget, arena, |old_key_widget: &dyn AnyKey| {
-                new_key_widget.record_before_value(old_key_widget);
-              });
-              old_key_list.remove(key);
-            } else {
-              new_key_widget.mounted();
-            }
-          });
-        });
-
-        if !old_key_list.is_empty() {
-          old_key_list.iter().for_each(|old_key| {
-            inspect_key(old_key.1, arena, |old_key_widget| old_key_widget.disposed())
-          });
-        }
-
-        let mut remove = Some(old_sign);
-        (0..*siblings).for_each(|_| {
-          let o = remove.unwrap();
-          remove = o.next_sibling(arena);
-          o.remove_subtree(arena, store, wnd_ctx);
-        });
-
         new_widgets
           .iter()
           .for_each(|n| n.on_mounted_subtree(arena, store, wnd_ctx, dirty_set));
         *siblings = new_widgets.len();
+
+        old_sign.remove_subtree(arena);
       }
     };
     // Place the dynRender back in node.
@@ -251,10 +213,53 @@ impl<D> DynRender<D> {
       sign.assert_get_mut(arena),
     );
   }
+
+  fn update_key_state(
+    &self,
+    sign_id: WidgetId,
+    gen_info: &DynWidgetGenInfo,
+    new_widgets: &[WidgetId],
+    arena: &TreeArena,
+  ) {
+    let mut old_key_list = HashMap::new();
+    let siblings = match gen_info {
+      DynWidgetGenInfo::DynDepth(_) => 1,
+      DynWidgetGenInfo::WholeSubtree(width) => *width,
+    };
+    let mut remove = Some(sign_id);
+
+    (0..siblings).for_each(|_| {
+      let o = remove.unwrap();
+      inspect_key(&o, arena, |old_key_widget: &dyn AnyKey| {
+        old_key_list.insert(old_key_widget.key(), o);
+      });
+
+      remove = o.next_sibling(arena);
+    });
+
+    new_widgets.iter().for_each(|n| {
+      inspect_key(n, arena, |new_key_widget: &dyn AnyKey| {
+        let key = &new_key_widget.key();
+        if let Some(old_key_widget) = old_key_list.get(key) {
+          inspect_key(old_key_widget, arena, |old_key_widget: &dyn AnyKey| {
+            new_key_widget.record_before_value(old_key_widget);
+          });
+          old_key_list.remove(key);
+        } else {
+          new_key_widget.mounted();
+        }
+      });
+    });
+
+    if !old_key_list.is_empty() {
+      old_key_list.iter().for_each(|old_key| {
+        inspect_key(old_key.1, arena, |old_key_widget| old_key_widget.disposed())
+      });
+    }
+  }
 }
 
 impl<D: IntoWidget<M>, M: ImplMarker> IntoDyns<[M; 0]> for D {
-  #[inline]
   fn into_dyns(self) -> Vec<Widget> { vec![self.into_widget()] }
 }
 
@@ -292,6 +297,19 @@ fn single_down(id: WidgetId, arena: &TreeArena, mut down_level: isize) -> Option
     res = res.unwrap().single_child(arena);
   }
   res
+}
+
+fn iter_single_child(
+  id: WidgetId,
+  arena: &TreeArena,
+  depth: usize,
+) -> impl Iterator<Item = WidgetId> + '_ {
+  (0..depth).scan(id, |id, idx| {
+    if idx != 0 {
+      *id = id.single_child(arena).unwrap();
+    }
+    Some(*id)
+  })
 }
 
 fn down_to_leaf(id: WidgetId, arena: &TreeArena) -> (WidgetId, usize) {

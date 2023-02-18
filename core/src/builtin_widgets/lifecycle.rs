@@ -173,7 +173,13 @@ impl Default for LifecycleSubject {
 }
 #[cfg(test)]
 mod tests {
-  use crate::{prelude::*, test::MockBox, widget_tree::WidgetTree};
+  use std::collections::HashSet;
+
+  use crate::{
+    prelude::*,
+    test::{MockBox, MockMulti},
+    widget_tree::WidgetTree,
+  };
 
   #[test]
   fn full_lifecycle() {
@@ -230,5 +236,46 @@ mod tests {
         "dyn disposed",
       ]
     );
+  }
+
+  #[test]
+  fn track_lifecycle() {
+    let cnt = Stateful::new(3);
+    let mounted: Stateful<HashSet<WidgetId>> = Stateful::new(HashSet::default());
+    let disposed: Stateful<HashSet<WidgetId>> = Stateful::new(HashSet::default());
+    let w = widget! {
+      states {
+        cnt: cnt.clone(),
+        mounted: mounted.clone(),
+        disposed: disposed.clone(),
+      }
+      MockMulti {
+        DynWidget {
+          dyns: (0..*cnt).map(move |_| widget! {
+            MockBox {
+              size: Size::zero(),
+              on_mounted: move |ctx| {
+                mounted.insert(ctx.id);
+              },
+              on_disposed: move |ctx| {
+                disposed.insert(ctx.id);
+              },
+            }
+          })
+        }
+      }
+    };
+
+    let scheduler = FuturesLocalSchedulerPool::default().spawner();
+    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    tree.layout(Size::new(100., 100.));
+    let mounted_ids = (*mounted.state_ref()).clone();
+
+    *cnt.state_ref() = 5;
+    tree.layout(Size::zero());
+
+    let disposed_ids = (*disposed.state_ref()).clone();
+    assert_eq!(mounted_ids.len(), 3);
+    assert_eq!(mounted_ids, disposed_ids);
   }
 }
