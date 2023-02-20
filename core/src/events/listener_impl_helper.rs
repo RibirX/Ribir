@@ -17,7 +17,7 @@ macro_rules! impl_listener {
 
     impl $listener {
       /// Convert a observable stream of this event.
-      pub fn $stream_name(&self) -> MutRefItemSubject<'static, $event_ty, ()> {
+      pub fn $stream_name(&self) -> MutRefItemSubject<'static, $event_ty, Infallible> {
         self.$field.clone()
       }
     }

@@ -4,7 +4,7 @@ use futures::{
 };
 use ribir_painter::TypographyStore;
 use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{cell::RefCell, convert::Infallible, rc::Rc, time::Instant};
 
 use super::AppContext;
 use crate::{
@@ -50,7 +50,7 @@ impl WindowCtx {
 
   pub fn typography_store(&self) -> &TypographyStore { &self.app_ctx.typography_store }
 
-  pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, ()> {
+  pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
     self.frame_ticker.frame_tick_stream()
   }
 

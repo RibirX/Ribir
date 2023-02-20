@@ -1,15 +1,17 @@
+use std::convert::Infallible;
+
 use rxrust::{ops::map::MapOp, prelude::ObservableExt};
 
 /// Is a struct contain a initialize value and an observable that should be
 /// subscribed to update the value.
-pub struct AssignObservable<V, S: ObservableExt<V, ()>> {
+pub struct AssignObservable<V, S: ObservableExt<V, Infallible>> {
   value: V,
   observable: S,
 }
 
 impl<V, S> AssignObservable<V, S>
 where
-  S: ObservableExt<V, ()>,
+  S: ObservableExt<V, Infallible>,
 {
   #[inline]
   pub fn new(init: V, observable: S) -> Self { Self { value: init, observable } }
@@ -18,7 +20,7 @@ where
   /// value.
   pub fn stream_map<R>(self, f: impl FnOnce(S) -> R) -> AssignObservable<V, R>
   where
-    R: ObservableExt<V, ()>,
+    R: ObservableExt<V, Infallible>,
   {
     let Self { value, observable } = self;
     let observable = f(observable);

@@ -1,4 +1,5 @@
 use crate::state::Stateful;
+use std::convert::Infallible;
 
 use super::Lerp;
 use rxrust::{
@@ -13,7 +14,7 @@ pub trait Property {
   fn get(&self) -> Self::Value;
   fn set(&mut self, v: Self::Value);
   fn shallow_set(&mut self, v: Self::Value);
-  fn modifies(&self) -> BoxOp<'static, (), ()>;
+  fn modifies(&self) -> BoxOp<'static, (), Infallible>;
 }
 
 pub trait AnimateProperty: Property {
@@ -72,7 +73,7 @@ where
   fn shallow_set(&mut self, v: Self::Value) { (self.setter)(&mut *self.target.shallow_ref(), v); }
 
   #[inline]
-  fn modifies(&self) -> BoxOp<'static, (), ()> { self.target.modifies().box_it() }
+  fn modifies(&self) -> BoxOp<'static, (), Infallible> { self.target.modifies().box_it() }
 }
 
 impl<T, G, S> AnimateProperty for Prop<T, G, S>
@@ -94,7 +95,7 @@ where
   V: PartialEq + Clone + 'static,
   T: 'static,
 {
-  pub fn changes(&self) -> BoxOp<'static, V, ()> {
+  pub fn changes(&self) -> BoxOp<'static, V, Infallible> {
     let target = self.target.clone();
     let getter = self.getter.clone();
     self
@@ -121,7 +122,7 @@ where
   fn shallow_set(&mut self, v: Self::Value) { self.prop.shallow_set(v) }
 
   #[inline]
-  fn modifies(&self) -> BoxOp<'static, (), ()> { self.prop.modifies() }
+  fn modifies(&self) -> BoxOp<'static, (), Infallible> { self.prop.modifies() }
 }
 
 impl<P, F> AnimateProperty for LerpProp<P, F>
@@ -143,7 +144,7 @@ where
   T: 'static,
 {
   #[inline]
-  pub fn changes(&self) -> BoxOp<'static, V, ()> { self.prop.changes() }
+  pub fn changes(&self) -> BoxOp<'static, V, Infallible> { self.prop.changes() }
 }
 
 macro_rules! impl_tuple_property {
@@ -185,7 +186,7 @@ macro_rules! impl_tuple_property {
        }
 
       #[inline]
-      fn modifies(&self) -> BoxOp<'static, (), ()> {
+      fn modifies(&self) -> BoxOp<'static, (), Infallible> {
         observable::from_iter([$(self.$idx.modifies()),+])
           .merge_all(usize::MAX)
           .box_it()

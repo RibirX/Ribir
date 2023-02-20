@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
   impl_listener, impl_query_self_only, prelude::*,
@@ -8,7 +10,7 @@ use crate::{
 #[derive(Declare)]
 pub struct CharListener {
   #[declare(builtin, convert=custom)]
-  on_char: MutRefItemSubject<'static, CharEvent, ()>,
+  on_char: MutRefItemSubject<'static, CharEvent, Infallible>,
 }
 
 #[derive(Debug)]

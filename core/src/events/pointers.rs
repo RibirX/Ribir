@@ -5,7 +5,10 @@ use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_for_listener, impl_listener,
   impl_query_self_only, prelude::*,
 };
-use std::time::{Duration, Instant};
+use std::{
+  convert::Infallible,
+  time::{Duration, Instant},
+};
 
 mod from_mouse;
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
@@ -106,42 +109,42 @@ impl std::ops::DerefMut for PointerEvent {
 #[derive(Declare)]
 pub struct PointerDownListener {
   #[declare(builtin, convert=custom)]
-  on_pointer_down: MutRefItemSubject<'static, PointerEvent, ()>,
+  on_pointer_down: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 
 #[derive(Declare)]
 pub struct PointerUpListener {
   #[declare(builtin, convert=custom)]
-  on_pointer_up: MutRefItemSubject<'static, PointerEvent, ()>,
+  on_pointer_up: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 
 #[derive(Declare)]
 pub struct PointerMoveListener {
   #[declare(builtin, convert=custom)]
-  on_pointer_move: MutRefItemSubject<'static, PointerEvent, ()>,
+  on_pointer_move: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 
 #[derive(Declare)]
 pub struct TapListener {
   #[declare(builtin, convert=custom)]
-  on_tap: MutRefItemSubject<'static, PointerEvent, ()>,
+  on_tap: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 
 #[derive(Declare)]
 pub struct PointerCancelListener {
   #[declare(builtin, convert=custom)]
-  pub on_pointer_cancel: MutRefItemSubject<'static, PointerEvent, ()>,
+  pub on_pointer_cancel: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 #[derive(Declare)]
 pub struct PointerEnterListener {
   #[declare(builtin, convert=custom)]
-  on_pointer_enter: MutRefItemSubject<'static, PointerEvent, ()>,
+  on_pointer_enter: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 
 #[derive(Declare)]
 pub struct PointerLeaveListener {
   #[declare(builtin, convert=custom)]
-  pub on_pointer_leave: MutRefItemSubject<'static, PointerEvent, ()>,
+  pub on_pointer_leave: MutRefItemSubject<'static, PointerEvent, Infallible>,
 }
 
 macro_rules! impl_pointer_listener {
@@ -224,7 +227,7 @@ impl TapListenerDeclarer {
     self.on_x_times_tap((3, handler))
   }
 
-  fn tap_subject(&mut self) -> MutRefItemSubject<'static, PointerEvent, ()> {
+  fn tap_subject(&mut self) -> MutRefItemSubject<'static, PointerEvent, Infallible> {
     self.on_tap.get_or_insert_with(Default::default).clone()
   }
 }
@@ -235,7 +238,9 @@ impl Query for TapListener {
 
 impl TapListener {
   /// Return an observable stream of this event.
-  pub fn tap_steam(&self) -> MutRefItemSubject<'static, PointerEvent, ()> { self.on_tap.clone() }
+  pub fn tap_steam(&self) -> MutRefItemSubject<'static, PointerEvent, Infallible> {
+    self.on_tap.clone()
+  }
 
   /// Return an observable stream of double tap event
   #[inline]
@@ -254,7 +259,7 @@ impl TapListener {
   pub fn triple_tap_stream(
     &self,
   ) -> FilterMapOp<
-    MutRefItemSubject<'static, PointerEvent, ()>,
+    MutRefItemSubject<'static, PointerEvent, Infallible>,
     impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
     &mut PointerEvent,
   > {
@@ -268,7 +273,7 @@ impl TapListener {
     x: usize,
     dur: Duration,
   ) -> FilterMapOp<
-    MutRefItemSubject<'static, PointerEvent, ()>,
+    MutRefItemSubject<'static, PointerEvent, Infallible>,
     impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
     &mut PointerEvent,
   > {

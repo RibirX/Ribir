@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crate::{impl_query_self_only, prelude::*};
 use rxrust::{
   prelude::*,
@@ -28,7 +30,7 @@ pub struct DisposedListener {
 }
 
 type LifecyclePublisher =
-  MutRc<Option<SmallVec<[Box<dyn for<'r> Publisher<LifeCycleCtx<'r>, ()>>; 1]>>>;
+  MutRc<Option<SmallVec<[Box<dyn for<'r> Publisher<LifeCycleCtx<'r>, Infallible>>; 1]>>>;
 
 #[derive(Clone)]
 pub struct LifecycleSubject {
@@ -36,9 +38,9 @@ pub struct LifecycleSubject {
   chamber: LifecyclePublisher,
 }
 
-impl<'a, O> Observable<LifeCycleCtx<'a>, (), O> for LifecycleSubject
+impl<'a, O> Observable<LifeCycleCtx<'a>, Infallible, O> for LifecycleSubject
 where
-  O: for<'r> Observer<LifeCycleCtx<'r>, ()> + 'static,
+  O: for<'r> Observer<LifeCycleCtx<'r>, Infallible> + 'static,
 {
   type Unsub = Subscriber<O>;
 
@@ -61,7 +63,7 @@ where
 }
 impl<'a> ObservableExt<LifeCycleCtx<'a>, ()> for LifecycleSubject {}
 
-impl<'b> Observer<LifeCycleCtx<'b>, ()> for LifecycleSubject {
+impl<'b> Observer<LifeCycleCtx<'b>, Infallible> for LifecycleSubject {
   fn next(&mut self, value: LifeCycleCtx<'b>) {
     self.load();
     if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
@@ -71,15 +73,7 @@ impl<'b> Observer<LifeCycleCtx<'b>, ()> for LifecycleSubject {
     }
   }
 
-  fn error(mut self, err: ()) {
-    self.load();
-    if let Some(observers) = self.observers.rc_deref_mut().take() {
-      observers
-        .into_iter()
-        .filter(|o| !o.p_is_closed())
-        .for_each(|o| o.p_error(err));
-    }
-  }
+  fn error(self, _: Infallible) {}
 
   fn complete(mut self) {
     self.load();
