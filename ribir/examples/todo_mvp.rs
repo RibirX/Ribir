@@ -57,16 +57,15 @@ impl Compose for TodoMVP {
           margin: EdgeInsets::only_top(10.),
           Tab {
             TabHeader { Label::new("ALL") }
-            // todo: this need no_watch!()
-            TabPane { Self::pane(this, |_| true) }
+            TabPane { Self::pane(no_watch!(this), |_| true) }
           }
           Tab {
             TabHeader { Label::new("ACTIVE") }
-            TabPane { Self::pane(this, |task| !task.finished) }
+            TabPane { Self::pane(no_watch!(this), |task| !task.finished) }
           }
           Tab {
             TabHeader { Label::new("DONE") }
-            TabPane { Self::pane(this, |task| task.finished) }
+            TabPane { Self::pane(no_watch!(this), |task| task.finished) }
           }
         }
       }
