@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
   impl_listener, impl_query_self_only, prelude::*,
@@ -13,7 +15,7 @@ pub struct KeyboardEvent {
 #[derive(Declare)]
 pub struct KeyDownListener {
   #[declare(builtin, default, convert=custom)]
-  on_key_down: MutRefItemSubject<'static, KeyboardEvent, ()>,
+  on_key_down: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
 }
 
 #[derive(Declare)]
@@ -22,7 +24,7 @@ pub struct KeyUpListener {
     builtin,
     convert=custom
   )]
-  pub on_key_up: MutRefItemSubject<'static, KeyboardEvent, ()>,
+  on_key_up: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
 }
 
 impl_listener!(

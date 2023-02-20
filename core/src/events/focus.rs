@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
   impl_listener, impl_query_self_only, prelude::*,
@@ -11,7 +13,7 @@ pub struct FocusListener {
   /// difference between this event and focusin is that focusin bubbles while
   /// focus does not.
   #[declare(builtin, convert=custom)]
-  on_focus: MutRefItemSubject<'static, FocusEvent, ()>,
+  on_focus: MutRefItemSubject<'static, FocusEvent, Infallible>,
 }
 
 #[derive(Declare)]
@@ -20,7 +22,7 @@ pub struct BlurListener {
   /// between this event and focusout is that focusout bubbles while blur does
   /// not.
   #[declare(builtin, convert=custom)]
-  on_blur: MutRefItemSubject<'static, FocusEvent, ()>,
+  on_blur: MutRefItemSubject<'static, FocusEvent, Infallible>,
 }
 
 #[derive(Declare)]
@@ -29,7 +31,7 @@ pub struct FocusInListener {
   /// difference between this event and focus is that focusin bubbles while
   /// focus does not.
   #[declare(builtin, convert=custom)]
-  on_focus_in: MutRefItemSubject<'static, FocusEvent, ()>,
+  on_focus_in: MutRefItemSubject<'static, FocusEvent, Infallible>,
 }
 
 #[derive(Declare)]
@@ -38,7 +40,7 @@ pub struct FocusOutListener {
   /// difference between this event and blur is that focusout bubbles while blur
   /// does not.
   #[declare(builtin, convert=custom)]
-  on_focus_out: MutRefItemSubject<'static, FocusEvent, ()>,
+  on_focus_out: MutRefItemSubject<'static, FocusEvent, Infallible>,
 }
 
 impl_listener!(

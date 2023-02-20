@@ -20,7 +20,7 @@
   - [x] base layout widget
     - [x] Row
     - [x] Column
-    - [ ] Center
+    - [x] Center
     - [x] Flex
 
 ## TodoMVP

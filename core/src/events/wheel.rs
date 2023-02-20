@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_for_listener, impl_listener,
   impl_query_self_only, prelude::*,
@@ -15,7 +17,7 @@ pub struct WheelEvent {
 #[derive(Declare)]
 pub struct WheelListener {
   #[declare(builtin, convert=custom)]
-  on_wheel: MutRefItemSubject<'static, WheelEvent, ()>,
+  on_wheel: MutRefItemSubject<'static, WheelEvent, Infallible>,
 }
 
 impl_listener!(

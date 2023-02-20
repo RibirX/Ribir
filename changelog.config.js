@@ -4,11 +4,10 @@ module.exports = {
     "test",
     "feat",
     "fix",
-    "chore",
+    "build",
+    "ci",
     "docs",
     "refactor",
-    "style",
-    "ci",
     "release",
     "perf",
     "ce"
@@ -45,6 +44,11 @@ module.exports = {
       "emoji": "🎡",
       "value": "ci"
     },
+    "build": {
+      "description": "Changes that affect the build system or external dependencies",
+      "emoji": "🎡",
+      "value": "build"
+    },
     "docs": {
       "description": "Documentation only changes",
       "emoji": "✏️",
@@ -74,11 +78,6 @@ module.exports = {
       "description": "Create a release commit",
       "emoji": "🏹",
       "value": "release"
-    },
-    "style": {
-      "description": "Markup, white-space, formatting, missing semi-colons...",
-      "emoji": "💄",
-      "value": "style"
     },
     "test": {
       "description": "Adding missing tests",
