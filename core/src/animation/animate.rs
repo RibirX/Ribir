@@ -57,11 +57,11 @@ where
           if matches!(p, AnimateProgress::Finish) {
             let scheduler = animate.silent_ref().frame_scheduler.clone();
             let animate = animate.clone();
-            observable::of_fn(move || {
-              animate.silent_ref().stop();
-            })
-            .delay(Duration::ZERO, scheduler)
-            .subscribe(|()| {});
+            observable::of(())
+              .delay(Duration::ZERO, scheduler)
+              .subscribe(move |_| {
+                animate.silent_ref().stop();
+              });
           }
         }
         // use silent_ref because the state of animate change, bu no need to effect the framework.
@@ -165,5 +165,45 @@ impl AnimateTrack {
       true => *self.actived_cnt.borrow_mut() += 1,
       false => *self.actived_cnt.borrow_mut() -= 1,
     };
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{
+    animation::{easing, Prop},
+    declare::Declare,
+    state::Stateful,
+  };
+
+  #[test]
+  fn fix_animate_circular_mut_borrow() {
+    let themes = RefCell::new(vec![]);
+    let pool = FuturesLocalSchedulerPool::default();
+    let scheduler = pool.spawner();
+    let mut wnd_ctx = WindowCtx::new(<_>::default(), scheduler);
+    let ctx = BuildCtx::new(&themes, &wnd_ctx);
+    let animate = Animate::declare_builder()
+      .transition(
+        Transition::declare_builder()
+          .easing(easing::LINEAR)
+          .duration(Duration::ZERO)
+          .build(&ctx),
+      )
+      .prop(Prop::new(
+        Stateful::new(1.),
+        |v| *v,
+        |_: &mut f32, _: f32| {},
+      ))
+      .from(0.)
+      .build(&ctx);
+
+    let animate = Stateful::new(animate);
+    animate.state_ref().run();
+
+    wnd_ctx
+      .frame_ticker
+      .emit(FrameMsg::LayoutReady(Instant::now()));
   }
 }
