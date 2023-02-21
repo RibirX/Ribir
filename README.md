@@ -1,35 +1,48 @@
 <div align="center">
-
 <img src="website/static/img/logo-animation.gif" width="480px" />
 
-# Ribir
+<!-- # Ribir -->
 
+Ribir is a framework for building modern native/wasm cross-platform user interface application.
+
+![CI](https://github.com/RibirX/Ribir/actions/workflows/main.yml/badge.svg
+)
+[![codecov](https://codecov.io/gh/RibirX/Ribir/branch/master/graph/badge.svg)](https://codecov.io/gh/RibirX/ribir)
 [![License](https://img.shields.io/badge/license-MIT-informational)](https://github.com/RibirX/ribir/blob/master/LICENSE)
 
-A declarative, purely composed GUI library for building cross-platform applications. It's lightweight and powerful.
+[Documents] | [Examples]
 
 </div>
 
+
 ## Principle
 
-**Only pay for what you need**: Ribir does not have the base object. Everything is purely composed, such as `Margin`. If your application doesn't need `Margin`, you don't pay for `Margin` overhead.
+**Non-injection Non-invasive**: Ribir directly interact with the APIs of your data struct, does not require you to do any pre-design for the user interface. The developer can focus on to design the data struct, logic and APIs, Ribir will neither breaks your existing logic nor requires injecting any of its own objects.
 
-**Only describe your data structure**: In Ribir, the interface is a presentation around the data structure, not interfering with the data structure.
+**Declarative**: user interface is the description of data，the description will auto reactive to the data modifies. Once you described your data, the description is always describe your data.
 
-**Auto reactive to data notifies**: Ribir can automatically respond to change reactive when the data relationships are established.
+**Purely Composed**: Ribir create UI across widget. There is not a base object exist, even if the builtin fields is provided in a compose way. For example only if you use `margin` field, the `Margin` widget will be composed, if you not use it, you don't pay any overhead for `Margin`. "Only pay for what you need" is an important guideline for Ribir.
 
-## Features
 
-- Declarative GUI
-- Reactive programming
-- Multiple built-in widgets
-- Custom widget support
+## At first glance
 
-## Example
+[todo] counter demo 
 
-counter demo
 
-## Support platform
+More [Examples]
+
+
+## Key Features
+
+- **Write once run anywhere**: Compile native code to desktop and mobile(not yet), and WASM for Web(not yet). Because Ribir has very few dependencies on platforms, it's not hard to provide more platform by yourself.
+- **Declarative language expanded from Rust syntax**: The declarative language is base on rust, so it interaction with Rust becomes natural and easy.
+- **Easy custom widget**: Ribir support implement custom `Compose`, `Render` and `ComposeChild` widget, only need to implement the corresponding trait. Even, you can specify the template of the children of `ComposeChild`, just across derive the `Template` trait.
+- **Powerful custom theme**: specify the theme for whole application or partial subtree. In the theme you can config the palette, icons, animate transitions, widget custom theme, the interactive behavior of widget and even compose more decoration widget on it.
+- **Rich available official widgets**: a `ribir_widgets` library exist，contains common desktop and mobile widgets.
+- **No side effect animations**: animations in Ribir is only an visual effect, and not effect data. Animate support for any render widget.
+- **Alternative rendering backends**: the render backend is replaceable, you can implement your own render to output picture, html, svg or any other stuff. Ribir provide a gpu backend base on [wgpu] and maybe a soft(cpu) render in future.
+
+## Support platform 
 
 |Platform|Support situation|
 |---|---|
@@ -78,9 +91,15 @@ This project exists thanks to all the people who contribute:
 
 We also found inspiration from the following frameworks:
 
-* [Flutter](https://flutter.dev/)
-* [Qt QML](https://doc.qt.io/qt-6/qtqml-index.html)
+* [Flutter]
+* [QML]
 
 ## License
 
 Ribir is [MIT licensed](./LICENSE)
+
+[Flutter]: https://flutter.dev/
+[QML]: https://doc.qt.io/qt-6/qtqml-index.html
+[Examples]: ./ribir/examples/
+[Documents]: https://ribir.org/docs/introduction
+[Wgpu]: https://github.com/gfx-rs/wgpu
