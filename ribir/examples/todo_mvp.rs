@@ -3,6 +3,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Task {
+  id: usize,
   finished: bool,
   label: String,
 }
@@ -14,17 +15,17 @@ struct TodoMVP {
 impl Compose for TodoMVP {
   fn compose(this: State<Self>) -> Widget {
     widget! {
-      states { this: this.into_writable() }
+      states { this: this.into_writable(), id_gen: Stateful::new(this.state_ref().tasks.len()) }
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
-        let headline1_style = TypographyTheme::of(ctx).headline1.text.clone();
+        let headline2_style = TypographyTheme::of(ctx).headline2.text.clone();
       }
       Column {
         margin: EdgeInsets::all(10.),
         Text {
           margin: EdgeInsets::only_bottom(10.),
           text: "Todo",
-          style: headline1_style,
+          style: headline2_style,
         }
         Row {
           margin: EdgeInsets::only_bottom(10.),
@@ -42,13 +43,14 @@ impl Compose for TodoMVP {
               if !input.text().is_empty() {
                 let label = input.text().to_string();
                 this.tasks.push(Task {
+                  id: *id_gen,
                   label,
                   finished: false,
                 });
+                *id_gen += 1;
                 input.set_text("");
               }
             },
-            Leading { Icon { svgs::ADD } }
             ButtonText::new("ADD")
           }
         }
@@ -107,7 +109,7 @@ impl TodoMVP {
       states { this, mount_task_cnt, mount_idx: Stateful::new(0) }
       KeyWidget {
         id: key,
-        key: Key::from(idx),
+        key: Key::from(task.id),
         value: Some(task.label.clone()),
         ListItem {
           id: item,
@@ -149,7 +151,7 @@ impl TodoMVP {
       }
       finally {
         let_watch!(checkbox.checked)
-          .subscribe(move |v| this.silent().tasks[idx].finished = v);
+          .subscribe(move |v| this.tasks[idx].finished = v);
       }
     }
   }
@@ -161,20 +163,19 @@ fn main() {
   let todo = TodoMVP {
     tasks: vec![
       Task {
+        id: 0,
         finished: true,
         label: "Implement Checkbox".to_string(),
       },
       Task {
+        id: 1,
         finished: true,
         label: "Support Scroll".to_string(),
       },
       Task {
+        id: 2,
         finished: false,
         label: "Support Virtual Scroll".to_string(),
-      },
-      Task {
-        finished: false,
-        label: "Support data bind".to_string(),
       },
     ],
   };
@@ -182,6 +183,7 @@ fn main() {
   let app = Application::new(material::purple::light());
   let wnd = Window::builder(todo.into_widget())
     .with_inner_size(Size::new(400., 640.))
+    .with_title("todo")
     .build(&app);
   app::run_with_window(app, wnd);
 }
