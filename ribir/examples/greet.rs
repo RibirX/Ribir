@@ -1,3 +1,6 @@
+//! This is just a `widget!` syntax teaching demo No consideration to its
+//! completeness and reasonableness.
+
 use ribir::prelude::*;
 
 fn main() {
@@ -35,7 +38,7 @@ fn main() {
                   Text { text: "Hello ", style: style.clone() }
                   Text {
                     id: greet,
-                    text: "World",
+                    text: no_watch!(input.text()),
                     style: style.clone()
                   }
                   Text { text: "!" , style }

@@ -647,5 +647,5 @@ Let's review all the code of the widget.
 >}
 >```
 
-That's all, we've covered all the syntax of `widget!`.
+That's all, we've covered all the syntax of `widget!`. You can find the code in [github](https://github.com/RibirX/Ribir/blob/master/ribir/examples/greet.rs). And this's just a `widget!` syntax teaching demo, no consideration to its completeness and reasonableness. In practices, use a `visible` to control `greet` show or hide is a easier and better way.
 
