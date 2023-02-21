@@ -51,9 +51,34 @@ impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
     let c_v = v.clone();
     value.modifies().subscribe(move |_| {
       if c_value.silent_ref().dyns.is_some() {
-        *c_v.state_ref() = c_value.silent_ref().dyns.take().unwrap();
+        let mut c_value = c_value.silent_ref();
+        *c_v.state_ref() = c_value.dyns.take().unwrap();
+
+        // In this widget, we subscribed the `child` modifies, then spread it.
+        // When we spread it, we modifies it, a circular occur. So we forget
+        // the modify of take its children to break the circular.
+        //
+        // In other side, `child` is a stateful dynamic widget and use as
+        // child here, and all its content all a black box, so others
+        // should not depends on it.
+        c_value.forget_modifies();
       }
     });
     v.into()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn fix_dyn_widget_to_state_circular_mut_borrow_panic() {
+    let dyn_widget = Stateful::new(DynWidget { dyns: Some(1) });
+    let c_dyns = dyn_widget.clone();
+    let state: State<i32> = dyn_widget.into();
+    {
+      c_dyns.state_ref().dyns = Some(2);
+    }
   }
 }
