@@ -1,5 +1,7 @@
 use ribir_core::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
 
+use super::ConstrainedBox;
+
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
@@ -12,7 +14,18 @@ impl ComposeChild for Expanded {
   type Child = Widget;
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    compose_child_as_data_widget(child, this)
+    let w = widget! {
+      ConstrainedBox {
+        clamp: BoxClamp {
+          min: Size::new(0., 0.),
+          max: Size::new(f32::INFINITY, f32::INFINITY)
+        },
+        DynWidget {
+          dyns: child
+        }
+      }
+    };
+    compose_child_as_data_widget(w, this)
   }
 }
 
