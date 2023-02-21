@@ -76,7 +76,7 @@ mod tests {
   fn fix_dyn_widget_to_state_circular_mut_borrow_panic() {
     let dyn_widget = Stateful::new(DynWidget { dyns: Some(1) });
     let c_dyns = dyn_widget.clone();
-    let state: State<i32> = dyn_widget.into();
+    let _: State<i32> = dyn_widget.into();
     {
       c_dyns.state_ref().dyns = Some(2);
     }
