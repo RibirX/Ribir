@@ -10,7 +10,7 @@ version = "0.1.0"
 futures = {version = "0.3.21", optional = true}
 guillotiere = "0.6.0"
 lyon_tessellation = "1.0.1"
-raw-window-handle = {version = "0.4.2", optional = true}
+raw-window-handle = {version = "0.5.0", optional = true}
 rayon = "1.5.1"
 ribir_algo = {path = "../algo"}
 ribir_painter = {path = "../painter"}
