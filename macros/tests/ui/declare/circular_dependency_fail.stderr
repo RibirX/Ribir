@@ -16,12 +16,12 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
 16 |         size: id1.size,
    |         ^^^^  ^^^
    |
-note: You should manual watch expression and add operator to break the circular, then delay subscribe it avoid to mut borrow panic. For example
+note: You should manual watch expression and add operator to break the circular, then debounce subscribe it avoid to mut borrow panic. For example
 
       ```
         let_watch!(...)
           .distinct_until_changed()
-          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(...)
       ```
   --> tests/ui/declare/circular_dependency_fail.rs:8:9
@@ -50,12 +50,12 @@ error: There is a directly circle depends exist, this will cause infinite loop: 
 29 |         margin: parent.margin.clone(),
    |         ^^^^^^  ^^^^^^^^^^^^^
    |
-note: You should manual watch expression and add operator to break the circular, then delay subscribe it avoid to mut borrow panic. For example
+note: You should manual watch expression and add operator to break the circular, then debounce subscribe it avoid to mut borrow panic. For example
 
       ```
         let_watch!(...)
           .distinct_until_changed()
-          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(...)
       ```
   --> tests/ui/declare/circular_dependency_fail.rs:25:7

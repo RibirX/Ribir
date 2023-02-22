@@ -83,7 +83,7 @@ impl ComposeChild for HScrollBar {
       finally ctx => {
         let_watch!(scrolling.scroll_pos.x)
           .distinct_until_changed()
-          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
       }
     }
@@ -121,7 +121,7 @@ impl ComposeChild for VScrollBar {
       finally ctx => {
         let_watch!(scrolling.scroll_pos.y)
           .distinct_until_changed()
-          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
       }
     }
@@ -166,7 +166,7 @@ impl ComposeChild for BothScrollbar {
       finally ctx => {
         let_watch!(scrolling.scroll_pos)
           .distinct_until_changed()
-          .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
       }
     }
@@ -284,7 +284,7 @@ impl CustomTheme for ScrollBarTheme {}
 
 #[cfg(test)]
 mod test {
-  use crate::prelude::material;
+  use crate::{layout::Column, prelude::material};
 
   use super::*;
   use ribir_core::test::*;
@@ -336,5 +336,63 @@ mod test {
         },
       ],
     );
+  }
+
+  #[test]
+  fn scrollable() {
+    let offset = Stateful::new(Point::zero());
+    let v_offset = Stateful::new(0.);
+    let h_offset = Stateful::new(0.);
+    let w = widget! {
+      states { offset: offset.clone(), v_offset: v_offset.clone(), h_offset: h_offset.clone() }
+      Column {
+        Container {
+          size: Size::new(30., 30.),
+          BothScrollbar {
+            id: both_bar,
+            offset: *offset,
+            Container { size: Size::new(100., 100.) }
+          }
+        }
+        Container {
+          size: Size::new(30., 30.),
+          HScrollBar {
+            id: h_bar,
+            offset: both_bar.offset.x,
+            Container { size: Size::new(100., 100.) }
+          }
+        }
+        Container {
+          size: Size::new(30., 30.),
+          VScrollBar {
+            id: v_bar,
+            offset: both_bar.offset.y,
+            Container { size: Size::new(100., 100.) }
+          }
+        }
+      }
+
+      finally {
+        let_watch!(v_bar.offset)
+          .subscribe(move|v| *v_offset = v);
+        let_watch!(h_bar.offset)
+          .subscribe(move|v| *h_offset = v);
+      }
+    };
+
+    let ctx = AppContext {
+      app_theme: std::rc::Rc::new(material::purple::light()),
+      ..<_>::default()
+    };
+    let mut wnd = Window::mock_window(w, Size::new(1024., 1024.), ctx);
+    {
+      *offset.state_ref() = Point::new(10., 10.);
+    }
+    {
+      *offset.state_ref() = Point::new(20., 20.);
+    }
+    wnd.draw_frame();
+    assert!(*v_offset.state_ref() == offset.state_ref().y);
+    assert!(*h_offset.state_ref() == offset.state_ref().x);
   }
 }
