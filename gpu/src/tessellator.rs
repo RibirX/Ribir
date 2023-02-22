@@ -3,7 +3,8 @@ use crate::{
   TriangleLists, Vertex,
 };
 use lyon_tessellation::{path::Path as LyonPath, *};
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::ParallelIterator;
+use rayon::prelude::ParallelSliceMut;
 use ribir_algo::{FrameCache, Resource, ShareResource};
 use ribir_painter::{
   Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path, PathStyle, TileMode, Transform,
@@ -25,7 +26,7 @@ const ATLAS_ID: usize = 0;
 const TOLERANCE: f32 = 0.01;
 const MAX_VERTEX_CAN_BATCH: usize = 256 * 1024;
 const TEXTURE_ID_FROM: usize = 1;
-
+const PAR_CHUNKS_SIZE: usize = 128;
 /// `Tessellator` use to generate triangles from
 pub struct Tessellator {
   // todo: only a 4 bytes pixel atlas provide, should we add a 3 bytes atlas (useful for rgb) ?
@@ -128,12 +129,18 @@ impl Tessellator {
         render,
       )
     });
-    uninit_vertices.par_init_with(|key| Self::gen_triangles(&self.shaper, &key));
+
+    uninit_vertices.par_init_with(
+      |key| Self::gen_triangles(&self.shaper, key),
+      PAR_CHUNKS_SIZE,
+    );
     no_cache_paths
-      .par_iter_mut()
-      .for_each(|(tolerance, path, cache)| {
-        let valid = tesselate_path(&path.path, path.style, *tolerance);
-        **cache = valid;
+      .par_chunks_mut(PAR_CHUNKS_SIZE)
+      .for_each(|slice| {
+        for (tolerance, path, cache) in slice {
+          let valid = tesselate_path(&path.path, path.style, *tolerance);
+          **cache = valid;
+        }
       });
     self.vertices_cache = vertices_cache;
 
