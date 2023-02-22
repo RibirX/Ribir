@@ -49,12 +49,12 @@ impl DeclareError {
         diagnostic.set_spans(spans);
         diagnostic.set_message(msg);
         let note_msg = "You should manual watch expression and add operator \
-         to break the circular, then delay subscribe it avoid to mut borrow panic. \
+         to break the circular, then debounce subscribe it avoid to mut borrow panic. \
         For example \n
 ```
   let_watch!(...)
     .distinct_until_changed()
-    .delay(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+    .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
     .subscribe(...)
 ```";
         diagnostic = diagnostic.span_note(note_spans, note_msg);
