@@ -28,7 +28,7 @@ winit = "0.26.1"
 
 [dependencies.blake3]
 features = ["rayon"]
-version = "0.3.4"
+version = "1.3.3"
 
 [features]
 png = ["dep:png"]
