@@ -6,7 +6,8 @@ use std::{
 };
 
 use ahash::RandomState;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::ParallelIterator;
+use rayon::prelude::ParallelSliceMut;
 
 /// A hashmap frame cache, which only keep the hit cached in the last frame.
 /// Call [`frame_end`] when a frame finish.
@@ -220,18 +221,20 @@ where
 
   /// Parallel init the uninit values, after this method called the pointer
   /// return by `get_or_delay_init` valid to use.
-  pub fn par_init_with<F>(mut self, default: F)
+  pub fn par_init_with<F>(mut self, default: F, chunks_size: usize)
   where
-    F: Fn(A) -> V::Target + Send + Sync,
+    F: Fn(&A) -> V::Target + Send + Sync,
     A: Send,
   {
-    let to_init = std::mem::take(&mut self.uninit);
+    let mut to_init = std::mem::take(&mut self.uninit);
 
-    to_init
-      .into_par_iter()
-      .for_each(|UninitRecord { mut uninit_ptr, key: init_arg }| unsafe {
-        *uninit_ptr.as_mut() = default(init_arg);
-      });
+    to_init.par_chunks_mut(chunks_size).for_each(|slice| {
+      for UninitRecord { mut uninit_ptr, key: init_arg } in slice {
+        unsafe {
+          *uninit_ptr.as_mut() = default(init_arg);
+        }
+      }
+    });
   }
 }
 
