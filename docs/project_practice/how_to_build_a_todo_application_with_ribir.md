@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # How to build a Todo Application with Ribir
 
-In this tutorial, We'll start learning how to build a Todo application using Ribir. By following this tutorial in its entirety, you will be able to complete a Todo application like this by yourself:
+In this tutorial, we will learn how to build a Todo application using Ribir. By following this tutorial in its entirety, you will be able to complete a Todo application like this by yourself:
 
 ![todo example](./img/todo_example.png)
 
@@ -12,9 +12,9 @@ This will be an exciting journey. Let's go!
 
 ## Define the Application data structure
 
-The data structure is the core of the application. In Ribir the interface is just the presentation around the data structure, not interfering with the data structure. So we need to define Todo data structure first.
+The data structure is the core of the application. In Ribir the interface is just the presentation around the data structure, but not interfering with the data structure. So we need to define the Todo data structure first.
 
-Now let's define the simplest Todo application data structure. I call this structure `TodoMVP`. And as a simplest Todo application has a list of what it use to save the collection of todo task at least. In Rust, we can use `Vec` structure to describe a list. And then, the list must have many task. A single task needs two fields, `done` and `description`. The `done` field use type `bool` to describe task whether or not to complete, and the `description` field use type `String` to describe task specific information.
+Now let's define the simplest Todo application data structure. I call this structure `TodoMVP`. As a simplest Todo application it has a list of what it uses to save the collection of todo tasks at least. In Rust, we can use the `Vec` structure to describe a list, and then, the list must be able hold many task. A single task needs two fields, `done` and `description`. The `done` field is of type `bool` to describe whether or not the task is completed and the `description` field is of type `String` to describe task specific information.
 
 We can try to do it in `main.rs`.
 
@@ -38,13 +38,13 @@ fn main() {
 }
 ```
 
-At this point, our basic data structure is built.
+At this point our basic data structure is built.
 
 ## Build the base view using Ribir
 
-We had a base data structure. Now we try to use Ribir to build the part of Todo interface view. The base Todo application needs to have two features, input and display. In the input part, we can use an `Input` widget to describe it what can be used to submit task. And the display part, we can use a `List` widget to describe it, what it can be used to browse the task list. We defined a rough idea of what put `Input` in the upper of the whole and put `List` in the lower. Like these upper and lower parts, here we can use a `Column` widget layout, which is a base vertical arrangement layout widget.
+We have a base data structure. Now we use Ribir to build the user interface part of the Todo app. The basic Todo application needs to have two features, input and display. In the input part we can use an `Input` widget to enter a description for a new task. For the display part we can use a `List` widget to render the task list. We start with adding `Input` at the top and the `List` below the input. To accomplish that we use a `Column` widget, which is a basic vertical arrangement layout widget.
 
-We call Todo to interface it `todo_widget`.
+**We call Todo to interface it `todo_widget`.**(I don't understand this part)
 
 ```rust
 use ribir::prelude::*;
@@ -67,13 +67,13 @@ fn main() {
 }
 ```
 
-You can execute it by `cargo run`, you will see a window what it show `Input` and `Lists`.
+Executing `cargo run` launches the app and shows a window with the `Input` and the `Lists`.
 
 ## Combine data and view
 
-Now we have Todo data and view. How we combine these both? Actually, our data is core, view is just the presentation of data. So we need to modify the view code.
+Now we have Todo data and view. How do we combine them? Actually, our data is the core, the view is just the presentation of the data. So we need to modify the view code.
 
-Here we need to use `Compose` trait to combine data and view. Let's try use `Compose` to modify the above code case.
+We use the `Compose` trait to combine data and view.
 
 ```rust
 // ...
@@ -108,7 +108,7 @@ fn main() {
 }
 ```
 
-And task data is not static. We need to render it dynamically. Here, we need `DynWidget` to represent dynamic widgets.
+The tasks list data is not static. We need to render it dynamically. We can use `DynWidget` to represent dynamic widgets.
 
 ```rust
 use ribir::prelude::*;
@@ -167,11 +167,11 @@ fn main() {
 }
 ```
 
-Now we are finished combining the data and views.
+Data and views are now connected.
 
 ## Add and delete task
 
-As a Todo application, it needs to have two base abilities: adding and deleting tasks. Let's complete these two ability. We already have `Input` but don't submit, so we add a button. `Input` and `Button` use `Row` to layout horizontally. How to submit input content? We need to add submit an event. Usually, we choose `tap` event to trigger submit action.
+As mentioned the core features are adding and deleting tasks. We already have `Input` but can not yet submit a new task. For that we add a button. For `Input` and `Button` we use `Row` to layout them horizontally. We need an event to act upon to invoke the submit functionality. We choose the `tap` event to trigger it.
 
 ```rust
 widget! {
@@ -200,7 +200,7 @@ widget! {
 }
 ```
 
-And now we can add task to our application. We need to complete the ability to delete tasks. We should have an `Icon` to respond delete events. We will put the icon in `ListItem`. `ListItem` has `Trailing` to put `Widget` in the trail of list items.
+Now we can add new task to our list. Next we want to delete tasks. We should have an `Icon` to dispatch delete events. We will wrap the icon in a `ListItem`. `ListItem` has `Trailing` to put `Widget` in the trail of list items.
 
 ```rust
 // ...
@@ -236,7 +236,7 @@ impl TodoMVP {
 
 ## Use `Tab` to categorize tasks
 
-Suppose we want to archive task to distinguishing task whether or not done clearly. We can divide three tabs, all, activity, and done. In Ribir, `Tab` widget can help us complete this operation.
+Suppose we want to archive a task to distinguish from it being actually completed or it just becoming obsolete. Ribir provides tabs that we can use to easily distiguish between "all", "activity", and "done".
 
 ```rust
 // ...
@@ -308,7 +308,7 @@ Tabs {
 // ...
 ```
 
-Yeah, we've done it, but there has a problem -- too lengthy. In `TabPane`, most of the logic is repeated. Let's optimize it. We can abstract and create panel logic.
+Yeah, we've done it. But we have a problem - too verbose code. In `TabPane` most of the logic is repeated. Let's improve that. We can abstract and create shared panel logic.
 
 ```rust
 // ...
@@ -364,11 +364,11 @@ Tabs {
 // ...
 ```
 
-Now, this code looks much simpler.
+Now, this code looks much more concise.
 
 ## Use `Scrollbar` to support scrollable
 
-If we have many tasks in the view, the out of view contents we can't show it, we need a scrollable view to show all tasks. In Ribir, we have a built-in widget `Scrollbar`. Scrollbar has direction, horizontal or vertical. In our case, we need scroll in a vertical direction, so we should use `VScrollbar`.
+If the tasks list grows, there might not be enough room to show all tasks at once. We need a scrollable view to show let the user  decide what to show. Ribir has a built-in widget `Scrollbar`. A scrollbar can have horizontal or vertical direction. We want scroll in a vertical direction, so we use `VScrollbar`.
 
 It's straightforward like this:
 
@@ -404,7 +404,7 @@ impl TodoMVP {
 
 ## Adding transition animation
 
-The Ribir is a moden GUI library. Let's add some animation to show. We add a task moving show when it is mounted.
+Ribir is a moden GUI library. Let's add some animation to demonstrate that. We add a task show animation when it is mounted.
 
 ```rust
 impl TodoMVP {
