@@ -1,6 +1,6 @@
 use palette::{
   rgb::{channels::Rgba, Rgb},
-  Alpha, IntoColor, IntoComponent, Lab, LinSrgba, Srgba,
+  Alpha, IntoColor, IntoComponent, Lab, Srgba,
 };
 use serde::{Deserialize, Serialize};
 
@@ -85,10 +85,8 @@ impl Color {
     let (r, g, b, a) = self.0.into_components();
     [r, g, b, a]
   }
-
-  // Non-linear sRGB, Srgb-color [0, 255] converted to/from float [0, 1]
   #[inline]
-  pub fn into_non_linear_f32_components(self) -> [f32; 4] {
+  pub fn into_f32_components(self) -> [f32; 4] {
     let (r, g, b, a) = self.0.into_components();
     [
       r.into_component(),
@@ -96,15 +94,6 @@ impl Color {
       b.into_component(),
       a.into_component(),
     ]
-  }
-
-  // Linear sRGB, Srgb-color [0, 255] converted to/from linear-color float [0, 1]
-  #[inline]
-  pub fn into_linear_f32_components(self) -> [f32; 4] {
-    let [r, g, b, a] = self.into_non_linear_f32_components();
-    let color = palette::Srgba::new(r, g, b, a);
-    let (r, g, b, a) = LinSrgba::from(color).into_components();
-    [r, g, b, a]
   }
 }
 
