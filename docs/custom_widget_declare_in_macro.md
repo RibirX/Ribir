@@ -122,8 +122,8 @@ let _ = widget!{
 
 There are two other `meta` that we don't use in `HeroCard`, but need to know about.
 
-- We can use `#[declare(skip)]` to skip the field that we don't want the user to declare. The field type must implement the `Default` trait or provide a default expression through the `default` meta.
-- We can use `#[declare(rename=...)]` to rename a field. It's useful if our field name conflicts with the built-in fields. See [all built-in fields](builtin_fields).
+- We can use #[declare(skip)] to skip the field that we don't want the user to declare. The field type must implement the `Default` trait or provide a default expression through the `default` meta.
+- We can use #[declare(rename=...)] to rename a field. It's useful if our field name conflicts with the built-in fields. See [builtin fields].
 
- [declare_derive]: ../ribir/widget_derive/Declare.html
- [builtin_fields]: ../ribir/widget_derive/declare_builtin_fields.html
+ [declare_derive]: ./Declare.html
+ [builtin fields]: builtin_widget/declare_builtin_fields.md
