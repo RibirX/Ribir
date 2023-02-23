@@ -23,7 +23,7 @@ smallvec = "1.8.0"
 [dev-dependencies]
 ribir = {path = "../ribir"}
 trybuild = "1.0.77"
-winit = "0.26.1"
+winit = "0.28.1"
 
 [build-dependencies]
 ribir_builtin = {path = "./builtin"}

@@ -160,13 +160,6 @@ impl WindowBuilder {
     self
   }
 
-  /// Sets whether or not the window will always be on top of other windows.
-  #[inline]
-  pub fn with_always_on_top(mut self, always_on_top: bool) -> Self {
-    self.inner_builder = self.inner_builder.with_always_on_top(always_on_top);
-    self
-  }
-
   // /// Sets the window icon.
   // #[inline]
   // pub fn with_window_icon(mut self, window_icon: Option<winit::window::Icon>)

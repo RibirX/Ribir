@@ -72,6 +72,7 @@ impl ImagePass {
         usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
         mip_level_count: 1,
         sample_count: 1,
+        view_formats: &[],
       };
       let texture = device.create_texture(texture_descriptor);
 
@@ -199,7 +200,7 @@ pub fn pipeline(
     push_constant_ranges: &[],
   });
 
-  let module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+  let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
     label: Some("Image Shader"),
     source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/img_geometry.wgsl").into()),
   });
@@ -215,11 +216,11 @@ pub fn pipeline(
     fragment: Some(wgpu::FragmentState {
       module: &module,
       entry_point: "fs_main",
-      targets: &[wgpu::ColorTargetState {
+      targets: &[Some(wgpu::ColorTargetState {
         format,
         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
         write_mask: wgpu::ColorWrites::all(),
-      }],
+      })],
     }),
     primitive: wgpu::PrimitiveState {
       topology: wgpu::PrimitiveTopology::TriangleList,

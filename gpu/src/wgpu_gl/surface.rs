@@ -77,7 +77,7 @@ impl Surface for WindowSurface {
       label: None,
     });
 
-    let cs_module = device.create_shader_module(&wgpu::include_wgsl!("./shaders/bgra_2_rgba.wgsl"));
+    let cs_module = device.create_shader_module(wgpu::include_wgsl!("./shaders/bgra_2_rgba.wgsl"));
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       bind_group_layouts: &[&group_layout],
@@ -123,7 +123,7 @@ impl Surface for WindowSurface {
         });
         c_pass.set_pipeline(&pipeline);
         c_pass.set_bind_group(0, &bind_group, &[]);
-        c_pass.dispatch(size, 1, 1);
+        c_pass.dispatch_workgroups(size, 1, 1);
 
         offset += max_group;
       }
@@ -268,6 +268,8 @@ impl WindowSurface {
       width: size.width,
       height: size.height,
       present_mode: wgpu::PresentMode::Fifo,
+      alpha_mode: wgpu::CompositeAlphaMode::Auto,
+      view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
     };
 
     surface.configure(device, &s_config);
@@ -313,6 +315,7 @@ impl TextureSurface {
       usage,
       mip_level_count: 1,
       sample_count: 1,
+      view_formats: &[],
     })
   }
 }

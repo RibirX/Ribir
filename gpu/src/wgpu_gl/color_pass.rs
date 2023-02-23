@@ -89,7 +89,7 @@ fn pipeline(
     push_constant_ranges: &[],
   });
 
-  let module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+  let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
     label: Some("Color geometry shader"),
     source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/color_geometry.wgsl").into()),
   });
@@ -105,11 +105,11 @@ fn pipeline(
     fragment: Some(wgpu::FragmentState {
       module: &module,
       entry_point: "fs_main",
-      targets: &[wgpu::ColorTargetState {
+      targets: &[Some(wgpu::ColorTargetState {
         format,
         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
         write_mask: wgpu::ColorWrites::all(),
-      }],
+      })],
     }),
     primitive: wgpu::PrimitiveState {
       topology: wgpu::PrimitiveTopology::TriangleList,
