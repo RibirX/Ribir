@@ -176,7 +176,7 @@ impl Tessellator {
     match &cmd.brush {
       Brush::Color(color) => {
         let c = ColorPrimitive::new(
-          color.into_linear_f32_components(),
+          color.into_f32_components(),
           cmd.transform.clone().to_arrays(),
           cmd.opacity,
         );

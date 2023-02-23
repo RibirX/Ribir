@@ -264,12 +264,12 @@ impl WindowSurface {
   pub(crate) fn new(surface: wgpu::Surface, device: &wgpu::Device, size: DeviceSize) -> Self {
     let s_config = wgpu::SurfaceConfiguration {
       usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      format: wgpu::TextureFormat::Bgra8UnormSrgb,
+      format: wgpu::TextureFormat::Bgra8Unorm,
       width: size.width,
       height: size.height,
       present_mode: wgpu::PresentMode::Fifo,
       alpha_mode: wgpu::CompositeAlphaMode::Auto,
-      view_formats: vec![wgpu::TextureFormat::Bgra8UnormSrgb],
+      view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
     };
 
     surface.configure(device, &s_config);
