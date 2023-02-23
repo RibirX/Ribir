@@ -1,5 +1,5 @@
 use crate::{tessellator::Tessellator, GlRender, GpuBackend, TriangleLists, Vertex};
-use futures::executor::block_on;
+use futures::{channel::oneshot, executor::block_on};
 use ribir_painter::DeviceSize;
 use ribir_text::shaper::TextShaper;
 use std::{error::Error, iter};
@@ -18,7 +18,9 @@ const TEXTURE_INIT_SIZE: (u16, u16) = (1024, 1024);
 const TEXTURE_MAX_SIZE: (u16, u16) = (4096, 4096);
 
 /// create wgpu backend with window
-pub async fn wgpu_backend_with_wnd<W: raw_window_handle::HasRawWindowHandle>(
+pub async fn wgpu_backend_with_wnd<
+  W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+>(
   window: &W,
   size: DeviceSize,
   tex_init_size: Option<(u16, u16)>,
@@ -84,14 +86,16 @@ impl WgpuGl<WindowSurface> {
   /// Create a canvas and bind to a native window, its size is `width` and
   /// `height`. If you want to create a headless window, use
   /// [`headless_render`](WgpuRender::headless_render).
-  pub async fn from_wnd<W: raw_window_handle::HasRawWindowHandle>(
+  pub async fn from_wnd<
+    W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+  >(
     window: &W,
     size: DeviceSize,
     anti_aliasing: AntiAliasing,
   ) -> Self {
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    let instance = wgpu::Instance::new(<_>::default());
 
-    let w_surface = unsafe { instance.create_surface(window) };
+    let w_surface = unsafe { instance.create_surface(window) }.unwrap();
 
     let adapter = instance
       .request_adapter(&wgpu::RequestAdapterOptions {
@@ -116,7 +120,7 @@ impl WgpuGl<TextureSurface> {
   /// Create a headless wgpu render, if you want to bind to a window, use
   /// [`wnd_render`](WgpuRender::wnd_render).
   pub async fn headless(size: DeviceSize) -> Self {
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    let instance = wgpu::Instance::new(<_>::default());
 
     let adapter = instance
       .request_adapter(&wgpu::RequestAdapterOptions {
@@ -200,6 +204,7 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::Depth24PlusStencil8,
       usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+      view_formats: &[],
     });
 
     {
@@ -223,7 +228,7 @@ impl<S: Surface> GlRender for WgpuGl<S> {
       let stencil_view = stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
       let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("Triangles render pass"),
-        color_attachments: &[rpass_color_attachment],
+        color_attachments: &[Some(rpass_color_attachment)],
         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
           view: &stencil_view,
           depth_ops: None,
@@ -301,11 +306,15 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     self.queue.submit(iter::once(encoder.finish()));
 
     let buffer_slice = buffer.slice(..);
-    let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
+
+    let (sender, receiver) = oneshot::channel::<()>();
+    buffer_slice.map_async(wgpu::MapMode::Read, |_| {
+      sender.send(()).unwrap();
+    });
 
     // Poll the device in a blocking manner so that our future resolves.
     self.device.poll(wgpu::Maintain::Wait);
-    block_on(buffer_future)?;
+    block_on(receiver)?;
 
     let size = self.surface.view_size();
     let slice = buffer_slice.get_mapped_range();
@@ -433,6 +442,7 @@ impl<S: Surface> WgpuGl<S> {
         format,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         label: None,
+        view_formats: &[],
       };
 
       device

@@ -1,39 +1,39 @@
 /// Vertex Shader
 
 struct Transform2d {
-  r1: vec2<f32>;
-  r2: vec2<f32>;
-  r3: vec2<f32>;
+  r1: vec2<f32>,
+  r2: vec2<f32>,
+  r3: vec2<f32>,
 };
 
 struct Primitive {
-  rgba: array<f32, 4>;
-  transform: Transform2d;
-  opacity: f32;
-  dummy: f32;
+  rgba: array<f32, 4>,
+  transform: Transform2d,
+  opacity: f32,
+  dummy: f32,
 };
 
 struct Uniform {
-  matrix: mat4x4<f32>;
+  matrix: mat4x4<f32>,
 };
 
-[[group(0), binding(0)]]
+@group(0) @binding(0)
 var<uniform> coord_matrix: Uniform;
 
 struct PrimitiveInfo {
-  primitives: array<Primitive>;
+  primitives: array<Primitive>,
 };
-[[group(1), binding(0)]]
+@group(1) @binding(0)
 var<storage> primitive_info: PrimitiveInfo;
 
 struct VertexOutput {
-  [[builtin(position)]] clip_position: vec4<f32>;
-  [[location(0)]] f_color: vec4<f32>;
+  @builtin(position) clip_position: vec4<f32>,
+  @location(0) f_color: vec4<f32>,
 };
 
 
-[[stage(vertex)]]
-fn vs_main([[location(0)]] pos: vec2<f32>, [[location(1)]] prim_id: u32) -> VertexOutput {
+@vertex
+fn vs_main(@location(0) pos: vec2<f32>, @location(1) prim_id: u32) -> VertexOutput {
   let prim: Primitive = primitive_info.primitives[prim_id];
   let t: Transform2d = prim.transform;
   let transform: mat3x2<f32> = mat3x2<f32>(t.r1, t.r2, t.r3);
@@ -48,7 +48,7 @@ fn vs_main([[location(0)]] pos: vec2<f32>, [[location(1)]] prim_id: u32) -> Vert
   return out;
 }
 
-[[stage(fragment)]]
-fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   return in.f_color;
 }
