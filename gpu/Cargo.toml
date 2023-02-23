@@ -24,7 +24,7 @@ env_logger = "0.7.1"
 futures = "0.3.5"
 png = "0.17.5"
 ribir = {path = "../ribir"}
-winit = "0.26.1"
+winit = "0.28.1"
 
 [features]
 test_gpu = []
