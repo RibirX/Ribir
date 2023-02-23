@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # The `widget!` macro
 
-`widget!` macro is a declarative language to help you to build your declare and reactive UI  quickly and expressively. It allows user interfaces to be described in terms of their visual struct, and almost all its syntaxes are expanded from the syntax of Rusts. So don't worry about the learning curve of this DSL language.
+The `widget!` macro is a declarative language to help you to build and declare your reactive UI quickly and expressively. It allows user interfaces to be described in terms of their visual structure, and almost all its syntaxes are expanded to the syntax of Rusts. So don't worry about the learning curve of this DSL language.
 
 `widget!` is a macro that returns a widget, so you can use it as an expression anywhere you want.
 
@@ -12,7 +12,7 @@ Let's learn its syntax by building a greeting application.
 
 ## Nested struct literal syntax to describe widget hierarchy
 
-`widget!` macro describe widget use rust struct literal syntax.
+The `widget!` macro describes a widget by using the Rust struct literal syntax.
 
 ```rust ignore
 use ribir::prelude::*;
@@ -28,13 +28,13 @@ fn main() {
 
 At first, we import `ribir::prelude::*`, which is the list of essential things that a `Ribir` application needs to use. In the `main` function, we declare a `hi` widget and use it as a root widget to run an application. If you run `cargo run`, a window with text `Hello world!` will launch.
 
-`Text` is a widget provided by Ribir, which displays simple text. It has two fields: the `text` used to specify what text to display, and the `style` specify the style of the text. At here we only use `text`, and `style` will be a default value.
+`Text` is a widget provided by Ribir, which displays simple text. It has two fields: the `text` used to specify what text to display, and the `style` specify the style of the text. Here we only use `text` and `style` will be a default value.
 
 > Tips
 >
 > Any struct can support declare in `widget!` if it is derived `Declare` trait. `Declare` provide the default value for the `style` of `Text`. See more in [How `Declare` trait work [wip] ?](./).
 
-The next step, let it support saying hi to anyone. User enters what the `Text` display hello to what. So we need a `Input` to accept user enter.
+In the next step we want it to say hi to anyone, by entering the name to say hi to. So we need an `Input` widget to accept user input.
 
 ```rust 
   let hi = widget! {
@@ -47,15 +47,15 @@ The next step, let it support saying hi to anyone. User enters what the `Text` d
   };
 ```
 
-In `widget!` user interfaces to be described in terms of their visual hierarchy. The above code declares a `Column` widget has two child `Input` and `Text`. And `PlaceHolder` is the child of `Input`. The child always nested declared in the parent. Except for struct literal syntax, we allow describing leaf widgets across tuple struct or function call, like `PlaceHolder` in here.
+With `widget!` user interfaces are described in terms of their visual hierarchy. The above code declares a `Column` widget that has two children `Input` and `Text` and a `PlaceHolder` that is the child of the `Input` widget. The child is always declared nested in the parent widget. With the exception of struct literal syntax, we allow describing leaf widgets across tuple struct or function call, like `PlaceHolder` in here.
 
-For now, we have a `Input` to accept user enter and use a `Column` to place the `Input` and `Text` vertically. But the text of `Text` still does not change following user entry.
+For now, we have an `Input` to accept user input and use a `Column` to place the `Input` and `Text` widgets vertically. But the rendered text of the `Text` widget still does not update when the user input changes.
 
 ## Use id to access and directly react to the widget modifier.
 
-Every object is declared in `widget!` can be named by `id` field, and it must be unique in the whole `widget!` scope. After a widget is named with `id`, its `id` can be directly accessed like a smart pointer in `widget!` or embed `widget!`. 
+Every object declared in `widget!` can be named using the `id` field. The `id` must be unique in the whole `widget!` scope. After a widget is named with an `id`, its `id` can be directly accessed like a smart pointer in `widget!` or embed `widget!`. 
 
-`id` implicitly describes the relationship between objects. For example, if a field of object initializes with an expression containing `id`, that means the field value will react to the modifies of `id` to update.
+`id` implicitly describes the relationship between objects. For example, if a field of an object initializes with an expression referencing `id`, it means the field value will react to changes of `id` to update.
 
 ```rust 
 let hi = widget! {
@@ -74,14 +74,15 @@ let hi = widget! {
 };
 ```
 
-We named the `Input` with `input`, and used its text to format a new text for `Text`. Now, the `Text` will react to user input.
+We named the `Input` with `input`, and used its text to format content for `Text`. Now, the `Text` widget will react to user input.
 
 > **Tips**
 >
-> We did not directly format the text in one line like `format!("Hello {}!", input.text())`, that because Ribir will not deep in external macro to analyze, so if we write `input.text()` in a macro, the expression result will not reactive to the modifies of `input`.
+> We did not directly format the text in one line like `format!("Hello {}!", input.text())`, because `Ribir will not go deep into the external macro to analyze. So if we write `input.text()` in a macro, the expression result will not react to the changes of `input`.
+
 ## Built-in abilities compose to any widget.
 
-After these codes work as we expected, let's try to beautify our style.
+After this works as we expected, let's try to beautify our style.
 
 ```rust 
 let hi = widget! {
@@ -103,17 +104,17 @@ let hi = widget! {
 };
 ```
 
-Now, we center `Input` horizontally and center the `Text` both horizontally and vertically by using the `h_align` and `v_algin`.
+Now, we center `Input` horizontally and center the `Text` both horizontally and vertically by using `h_align` and `v_algin` properties.
 
-But wait, where are the `h_align` and `v_align` come from? Both `Input` and `Text` did not have these fields. That is because Ribir provides dozens of built-in widgets. The fields and methods of the built-in widgets can directly use like itself fields of any widgets which declare in the `widget!`, like `padding` `margin` `background` and so on. [See the full list of built-in fields][builtin] to know what you can use.
+But wait, where do `h_align` and `v_align` come from? Both `Input` and `Text` did not declare these fields. That is because `Input` and `Text` are widgets provided by Ribir. There are dozens more of these built-in widgets. The fields and methods of the built-in widgets can directly be used like fields declared manually using the `widget!` macro. See the [full list of built-in fields][builtin] to for an overview what is available.
 
 > **Tips**
 >
->Ribir provides some built-in fields to extend the struct literal syntax. But remember **widget fields and built-in fields do not belong to the same widget**. In essence, they work together in a composed way, which means if the user use a built-in field in a widget, the built-in widget composes the widget into a new widget. In this way, any widget gets many abilities from built-in widgets and pays the memory overhead only if the user use it. 
+>Ribir provides some built-in fields to extend the struct literal syntax. But remember **widget fields and built-in fields do not belong to the same widget**. In essence, they work together in a composed way, which means if the user uses a built-in field in a widget, the built-in widget composes the widget into a new widget. In this way, any widget gets many abilities from built-in widgets and pays the memory overhead only if the user use it. 
 
 ## Use states to declare more stateful objects.
 
-This app immediately change the greet text after user entered every char, even if the name is not entered completely. In this section, we'll add a button to let the user manually submit the name after entering finished and count how many people we have already greeted.
+This app immediately updates the greet text after the user enters a char, even if the name is not entered completely yet. In this section, we'll add a button to let the user explicitely submit the name after completing it and also count how many people we have already greeted.
 
 ```rust 
 let hi = widget! {
@@ -148,21 +149,21 @@ let hi = widget! {
 };
 ```
 
-The most important change is we add `states { counter: Stateful::new(0) }` before all. We call it `states` block. It starts with a keyword `states` and declare a stateful object in a `key: value` mode. When the stateful object is declared in this block modifier, it'll also be react by others that used it in the `widget` macro, have same behavior like an object named by `id`.
+The most important change is that we add `states { counter: Stateful::new(0) }` at the top. We call it `states` block. It starts with a keyword `states` and declares a stateful object in a `key: value` mode. When the stateful object is declared in this block modifier, it'll also be reacted to by others that refer to it in the `widget` macro, and behaves like with an object referred to by `id`.
 
-The other change is we add `Button` after the `Input`, and update the `Input`, `Text` , and `counter` when the user tapped it.
+The other change is that we add the `Button` after the `Input`, and update the `Input`, `Text` and `counter` when the user taps it.
 
-`states` block it is very useful to tell `widget!` macro we have other stateful objects that need to be reactive. Here, we defined a stateful object `counter`and used it as a part text of `Button`. We declare the counter as stateful, so when we modified the `counter` after the user tapped the button, the button text will auto-update.
+The `states` block it is very useful to tell the `widget!` macro that we have other stateful objects that need to be reactive. Here, we defined a stateful object `counter` and used it as a part of the `Button` text. We declare the counter as stateful, so that when the `counter` changes, after the user tapped the button, the button text will auto-update.
 
 ## Use `DynWidget` to declare a dynamic widget hierarchy.
 
-You may have found that our application has static widget tree, and even if user not enter anything, a "Hello world!" was displayed. In this section, we'll introduce a special widget `DynWidget` and use it to generate the `greet` widget conditionally.
+You may have found that our application has a static widget tree, and even if the user not enter anything, a "Hello world!" was displayed. In this section, we'll introduce a special widget `DynWidget` and use it to generate the `greet` widget conditionally.
 
-`DynWidget` has a `dyns` field to accept dynamic widgets, `dyns` value will replace `DynWidget` self as its parent children. When `dyns` was modified, the widgets were updated. The `dyns` value type is limited by `DynWidget`'s parent, usually it can be three kinds:
+`DynWidget` has a `dyns` field to accept dynamic widgets. The `dyns` value will replace `DynWidget` itself as its parent child or children. When `dyns` is modified, the widgets are updated. The `dyns` value type is limited by `DynWidget`'s parent. Usually it can be one of three kinds:
 
-- The child type of `DynWidget`'s parent want. 
-- An `Option` of `C`, if `DynWidget`'s parent accepts one or multi `C` as its child.
-- A type that implemented `IntoIterator` and its iterate item is `C`, if `DynWidget`'s parent accepts  multi `C` as its children.
+- The child type the `DynWidget`'s parent requires. 
+- An `Option` of `C`, if `DynWidget`'s parent accepts one or multiple `C` as its child.
+- A type that implements `IntoIterator` and its iterate item is `C`, if `DynWidget`'s parent accepts  multiple `C` as its children.
 
 Now, we use `DynWidget` to control if we need a greet `Text`:
 
@@ -181,7 +182,7 @@ DynWidget {
 }
 ``` 
 
-This `DynWidget` generates an optional widget as detected by if the `counter` is greater than zero. One thing that could be improved is to the `greet` not always regenerate after the `counter` modified. Indeed the `greet` widget can regenerate only if the result `*counter > 0` changed. Let's go further:
+This `DynWidget` generates an optional widget when it detects that the `counter` is greater than zero. One thing that could be improved is to not always regenerate `greet` after the `counter` changes. Indeed the `greet` widget should regenerate only after the result `*counter > 0` changed the first time. Let's go further:
 
 ```rust
 DynWidget {
@@ -202,13 +203,13 @@ DynWidget {
 }
 ```
 
-We add three lines of code. 
+We added three lines of code. 
 
-The first line is `dyns := assign_watch!(*counter > 0)`, we use operator `:=` instead of `:` to initialize the `dyns`. Not like `:`, `:=` accept an `AssignObservable` as its initialization value and explicit subscribe it to update the field. `AssignObservable` is a type contain the initialization value and an observable stream of that value. `assign_watch!` macro use to convert a expression to an `AssignObservable`. 
+The first line is `dyns := assign_watch!(*counter > 0)`, we use operator `:=` instead of `:` to initialize the `dyns`. Unlike `:`, `:=` accepts an `AssignObservable` as its initialization value and explicitly subscribes to it to update the field. `AssignObservable` is a type that contain the initialization value and an observable stream of that value. The `assign_watch!` macro is used to convert a expression to an `AssignObservable`. 
 
-In the second line, we use `stream_map` to chain `distinct_until_changed` on the stream observable.  So we accept the modifies only when the result of `*counter > 0` changed.
+In the second line we use `stream_map` to chain `distinct_until_changed` on the stream observable. So we accept the changes only when the result of `*counter > 0` changed the first time.
 
-The third line `.map(move |need_greet| {...}) ` map a `bool` to `Option<Widget>` what `dyns` want.
+The third line `.map(move |need_greet| {...}) ` maps a `bool` to `Option<Widget>` what `dyns` want.
 
 
 > **Tips**
@@ -277,7 +278,7 @@ fn main() {
 }
 ```
 
-When we compiled, the compiler complained not find `greet`:
+When we compile, the compiler complaines about not finding `greet`:
 
 ```
 error[E0425]: cannot find value `greet` in this scope
@@ -287,9 +288,9 @@ error[E0425]: cannot find value `greet` in this scope
    |  ^^^^^ not found in this scope
 ```
 
-That is because the `tap` callback of `Button` is trying to access `greet`, but `greet` declare in an embed `widget!` in `DynWidget`. `widget!` can access any `id` in the same `widget!` scope or outside `widget!`, but not allow the embed `widget!`. In this case, when we think deeply, we'll find `greet` does not always exists for the outside `widget!` scope.
+This is because the `tap` callback of `Button` is trying to access `greet`, but `greet` is declared in an embedded `widget!`, in `DynWidget`. `widget!` can access any `id` in the same `widget!` scope or outside `widget!`, but not in an embedded `widget!`. In this case, when we think deeply, we'll find that `greet` does not always exists for the outside `widget!` scope.
 
-In the next section, we'll resolve it across thet access `Button` and `input` in the embed `widget!` instead of access `greet` text in the outside `widget!`.
+In the next section, we'll resolve it across that access `Button` and `input` in the embed `widget!` instead of access `greet` text in the outside `widget!`.
 
 ## `init` and `finally` block
 
@@ -649,3 +650,4 @@ Let's review all the code of the widget.
 
 That's all, we've covered all the syntax of `widget!`. You can find the code in [github](https://github.com/RibirX/Ribir/blob/master/ribir/examples/greet.rs). And this's just a `widget!` syntax teaching demo, no consideration to its completeness and reasonableness. In practices, use a `visible` to control `greet` show or hide is a easier and better way.
 
+[builtin]: ../builtin_widget/declare_builtin_fields.md
