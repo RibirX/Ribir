@@ -14,7 +14,11 @@ This will be an exciting journey. Let's go!
 
 The data structure is the core of the application. In Ribir the interface is just the presentation around the data structure, but not interfering with the data structure. So we need to define the Todo data structure first.
 
-Now let's define the simplest Todo application data structure. I call this structure `TodoMVP`. As a simplest Todo application it has a list of what it uses to save the collection of todo tasks at least. In Rust, we can use the `Vec` structure to describe a list, and then, the list must be able hold many task. A single task needs two fields, `done` and `description`. The `done` field is of type `bool` to describe whether or not the task is completed and the `description` field is of type `String` to describe task specific information.
+Now let's define the simplest Todo application data structure. I call
+this structure `TodoMVP`. As a simplest Todo application it has a list
+of what it uses to save the collection of todo tasks at least. In
+Rust, we can use the `Vec` structure to describe a list, and then, the
+list must be able to hold many tasks. A single task needs two fields, `done` and `description`. The `done` field is of type `bool` to describe whether or not the task is completed and the `description` field is of type `String` to describe task specific information.
 
 We can try to do it in `main.rs`.
 
@@ -44,7 +48,7 @@ At this point our basic data structure is built.
 
 We have a base data structure. Now we use Ribir to build the user interface part of the Todo app. The basic Todo application needs to have two features, input and display. In the input part we can use an `Input` widget to enter a description for a new task. For the display part we can use a `List` widget to render the task list. We start with adding `Input` at the top and the `List` below the input. To accomplish that we use a `Column` widget, which is a basic vertical arrangement layout widget.
 
-**We call Todo to interface it `todo_widget`.**(I don't understand this part)
+We call the user interface of Todo `todo_widget`.
 
 ```rust
 use ribir::prelude::*;
@@ -404,7 +408,7 @@ impl TodoMVP {
 
 ## Adding transition animation
 
-Ribir is a moden GUI library. Let's add some animation to demonstrate that. We add a task show animation when it is mounted.
+Ribir is a modern GUI library. Let's add some animation to demonstrate that. We add a task show animation when it is mounted.
 
 ```rust
 impl TodoMVP {
