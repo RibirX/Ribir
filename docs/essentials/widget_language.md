@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # The `widget!` macro
 
-The `widget!` macro is a declarative language to help you to build and declare your reactive UI quickly and expressively. It allows user interfaces to be described in terms of their visual structure, and almost all its syntaxes are expanded to the syntax of Rusts. So don't worry about the learning curve of this DSL language.
+The `widget!` macro is a declarative language to help you to build and declare your reactive UI quickly and expressively. It allows user interfaces to be described in terms of their visual structure, and almost all its syntax is expanded to the syntax of Rusts. So don't worry about the learning curve of this DSL language.
 
 `widget!` is a macro that returns a widget, so you can use it as an expression anywhere you want.
 
@@ -106,7 +106,11 @@ let hi = widget! {
 
 Now, we center `Input` horizontally and center the `Text` both horizontally and vertically by using `h_align` and `v_algin` properties.
 
-But wait, where do `h_align` and `v_align` come from? Both `Input` and `Text` did not declare these fields. That is because `Input` and `Text` are widgets provided by Ribir. There are dozens more of these built-in widgets. The fields and methods of the built-in widgets can directly be used like fields declared manually using the `widget!` macro. See the [full list of built-in fields][builtin] to for an overview what is available.
+But wait, where do `h_align` and `v_align` come from? Both `Input` and
+`Text` did not declare these fields. That is because `Input` and
+`Text` are widgets provided by Ribir. There are dozens more of these
+built-in widgets. The fields and methods of the built-in widgets can
+directly be used like fields declared in a `widget!` macro. See the [full list of built-in fields][builtin] to for an overview what is available.
 
 > **Tips**
 >
@@ -182,7 +186,11 @@ DynWidget {
 }
 ``` 
 
-This `DynWidget` generates an optional widget when it detects that the `counter` is greater than zero. One thing that could be improved is to not always regenerate `greet` after the `counter` changes. Indeed the `greet` widget should regenerate only after the result `*counter > 0` changed the first time. Let's go further:
+This `DynWidget` generates an optional widget when it detects that the
+`counter` is greater than zero. One thing that could be improved is to
+not always regenerate `greet` after the `counter` changes. Indeed the
+`greet` widget can only be regenerated if the result of the whole
+`*counter > 0` has changed, not just the `counter` change. Let's go further:
 
 ```rust
 DynWidget {
@@ -207,7 +215,7 @@ We added three lines of code.
 
 The first line is `dyns := assign_watch!(*counter > 0)`, we use operator `:=` instead of `:` to initialize the `dyns`. Unlike `:`, `:=` accepts an `AssignObservable` as its initialization value and explicitly subscribes to it to update the field. `AssignObservable` is a type that contain the initialization value and an observable stream of that value. The `assign_watch!` macro is used to convert a expression to an `AssignObservable`. 
 
-In the second line we use `stream_map` to chain `distinct_until_changed` on the stream observable. So we accept the changes only when the result of `*counter > 0` changed the first time.
+In the second line we use `stream_map` to chain `distinct_until_changed` on the stream observable. So we accept the changes only when the result of `*counter > 0` changed.
 
 The third line `.map(move |need_greet| {...}) ` maps a `bool` to `Option<Widget>` what `dyns` want.
 
