@@ -10,8 +10,8 @@ use crate::{
 };
 use ribir_algo::{FrameCache, Substr};
 
+pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
-pub use ttf_parser::GlyphId;
 
 /// Shaper to shape the `text` using provided font faces, and will do BIDI
 /// reordering before to shape text.
