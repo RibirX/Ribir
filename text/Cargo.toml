@@ -1,17 +1,25 @@
 [package]
+categories = ["gui"]
+description = "Ribir is a framework for building modern native/wasm cross-platform user interface applications."
+documentation = "https://ribir.org/docs"
 edition = "2021"
+homepage = "https://ribir.org"
+keywords = ["gui", "ui", "declarative", "compose-ui"]
+license = "MIT"
 name = "ribir_text"
-version = "0.1.0"
+readme = "README.md"
+repository = "https://github.com/RibirX/Ribir/algo"
+version = "0.0.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ribir_algo = {path = "../algo"}
 derive_more = "0.99.17"
 fontdb = "0.7.0"
 log = "0.4.14"
 lyon_path = "1.0.1"
 ordered-float = "2.10.0"
+ribir_algo = {path = "../algo", version = "0.0.0"}
 rustybuzz = "0.5.0"
 ttf-parser = "0.15.0"
 unicode-bidi = "0.3.7"
