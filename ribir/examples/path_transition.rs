@@ -1,3 +1,4 @@
+use euclid::default::Box2D;
 use lyon_algorithms::{
   aabb::bounding_box,
   geom::{CubicBezierSegment, QuadraticBezierSegment},
@@ -28,17 +29,28 @@ fn main() {
     font_size: FontSize::Pixel(240.0.into()),
     ..Default::default()
   };
-  let init_path = get_text_paths(&typography_store, "1", &text_style);
-  let finally_path = get_text_paths(&typography_store, "7", &text_style);
+  let init_path = get_text_paths(&typography_store, "2", &text_style)
+    .into_iter()
+    .map(|path| PathPaintKit {
+      path,
+      brush: Brush::Color(Color::BLACK),
+    })
+    .collect::<Vec<_>>();
+  let finally_path = get_text_paths(&typography_store, "1", &text_style)
+    .into_iter()
+    .map(|path| PathPaintKit {
+      path,
+      brush: Brush::Color(Color::BLACK),
+    })
+    .collect::<Vec<_>>();
 
   let w = widget! {
     Column {
       Container {
         size: Size::new(300., 300.),
-        PathPaintKit {
+        PathsPaintKit {
           id: path_kit,
-          path: finally_path.get(0).unwrap().clone(),
-          brush: Color::BLACK,
+          paths: finally_path,
         }
       }
       Button {
@@ -53,56 +65,155 @@ fn main() {
       id: animate,
       transition: Transition {
         delay: Some(Duration::from_millis(200)),
-        duration: Duration::from_millis(500),
+        duration: Duration::from_millis(10000),
         easing: easing::LINEAR,
         repeat: None,
       },
-      prop: prop!(path_kit.path, text_path_lerp_fn()),
-      from: init_path.get(0).unwrap().clone(),
+      prop: prop!(path_kit.paths, char_path_lerp_fn()),
+      from: init_path,
     }
   };
 
   app::run(w);
 }
 
-fn text_path_lerp_fn() -> impl Fn(&Path, &Path, f32) -> Path + Clone {
+/// char convert to path lerp
+fn char_path_lerp_fn()
+-> impl Fn(&Vec<PathPaintKit>, &Vec<PathPaintKit>, f32) -> Vec<PathPaintKit> + Clone {
   move |from, to, rate| {
-    let init_path_0 = &from.path;
-    let finally_path_0 = &to.path;
+    let mut result = vec![];
+    let init_path = &from[0].path.path;
+    let finally_path = &to[0].path.path;
 
-    let init_path_points = get_points_from_path(init_path_0);
-    let finally_path_points = get_points_from_path(finally_path_0);
+    let center_point = get_paths_center_point(vec![init_path, finally_path]);
 
-    let center_point = find_path_center_point(init_path_0, finally_path_0);
-    let (s_path_points, t_path_points) =
-      fit_nearest_path_points(&init_path_points[0], &finally_path_points[0], center_point);
+    let init_path_points = get_points_from_path(init_path);
+    let finally_path_points = get_points_from_path(finally_path);
 
-    let last_idx = s_path_points.0.len() - 1;
-    let mut result_path = lyon_path::Path::builder();
-    for (idx, scp) in s_path_points.0.iter().enumerate() {
-      let tcp = &t_path_points.0[idx];
-      if idx == 0 {
-        result_path.begin(scp.end_point + (tcp.end_point - scp.end_point) * rate);
-      } else {
-        let to = scp.end_point + (tcp.end_point - scp.end_point) * rate;
-        let ctrl1 = scp.ctrl1 + (tcp.ctrl1 - scp.ctrl1) * rate;
-        let ctrl2 = scp.ctrl2 + (tcp.ctrl2 - scp.ctrl2) * rate;
+    // let path_pair = find_nearest_path_pair(&init_path_points,
+    // &finally_path_points);
+    let path_pair = vec![
+      (Some(0), Some(0)),
+    ];
 
-        result_path.cubic_bezier_to(ctrl1, ctrl2, to);
+    for (op1, op2) in path_pair {
+      if op1.is_some() && op2.is_some() {
+        let s_idx = op1.unwrap();
+        let t_idx = op2.unwrap();
+        let (s_path_points, t_path_points) = fit_nearest_path_points(
+          &init_path_points[s_idx],
+          &finally_path_points[t_idx],
+          center_point,
+        );
+        let last_idx = s_path_points.0.len() - 1;
+        let mut result_path = lyon_path::Path::builder();
+        for (idx, scp) in s_path_points.0.iter().enumerate() {
+          let tcp = &t_path_points.0[idx];
+          if idx == 0 {
+            result_path.begin(scp.end_point + (tcp.end_point - scp.end_point) * rate);
+          } else {
+            let to = scp.end_point + (tcp.end_point - scp.end_point) * rate;
+            let ctrl1 = scp.ctrl1 + (tcp.ctrl1 - scp.ctrl1) * rate;
+            let ctrl2 = scp.ctrl2 + (tcp.ctrl2 - scp.ctrl2) * rate;
 
-        if idx == last_idx {
-          result_path.close();
+            result_path.cubic_bezier_to(ctrl1, ctrl2, to);
+
+            if idx == last_idx {
+              result_path.close();
+            }
+          }
         }
+
+        let path = result_path.build();
+
+        result.push(PathPaintKit {
+          path: Path {
+            path,
+            // style: PathStyle::Fill,
+            style: PathStyle::Stroke(StrokeOptions::default()),
+          },
+          brush: Brush::Color(Color::BLACK),
+        });
+      } else if op1.is_some() {
+        let s_idx = op1.unwrap();
+        let s_path_points = &init_path_points[s_idx];
+        let t_point = CubicPoint {
+          end_point: center_point,
+          ctrl1: center_point,
+          ctrl2: center_point,
+        };
+        let last_idx = s_path_points.0.len() - 1;
+        let mut result_path = lyon_path::Path::builder();
+        for (idx, scp) in s_path_points.0.iter().enumerate() {
+          let tcp = &t_point;
+          if idx == 0 {
+            result_path.begin(scp.end_point + (tcp.end_point - scp.end_point) * rate);
+          } else {
+            let to = scp.end_point + (tcp.end_point - scp.end_point) * rate;
+            let ctrl1 = scp.ctrl1 + (tcp.ctrl1 - scp.ctrl1) * rate;
+            let ctrl2 = scp.ctrl2 + (tcp.ctrl2 - scp.ctrl2) * rate;
+
+            result_path.cubic_bezier_to(ctrl1, ctrl2, to);
+
+            if idx == last_idx {
+              result_path.close();
+            }
+          }
+        }
+
+        let path = result_path.build();
+
+        result.push(PathPaintKit {
+          path: Path {
+            path,
+            // style: PathStyle::Fill,
+            style: PathStyle::Stroke(StrokeOptions::default()),
+          },
+          brush: Brush::Color(Color::BLACK),
+        });
+      } else if op2.is_some() {
+        let t_idx = op2.unwrap();
+        let t_path_points = &finally_path_points[t_idx];
+        let last_idx = t_path_points.0.len() - 1;
+        let mut result_path = lyon_path::Path::builder();
+        let s_point = CubicPoint {
+          end_point: center_point,
+          ctrl1: center_point,
+          ctrl2: center_point,
+        };
+
+        for (idx, tcp) in t_path_points.0.iter().enumerate() {
+          let scp = &s_point;
+          if idx == 0 {
+            result_path.begin(scp.end_point + (tcp.end_point - scp.end_point) * rate);
+          } else {
+            let to = scp.end_point + (tcp.end_point - scp.end_point) * rate;
+            let ctrl1 = scp.ctrl1 + (tcp.ctrl1 - scp.ctrl1) * rate;
+            let ctrl2 = scp.ctrl2 + (tcp.ctrl2 - scp.ctrl2) * rate;
+
+            result_path.cubic_bezier_to(ctrl1, ctrl2, to);
+
+            if idx == last_idx {
+              result_path.close();
+            }
+          }
+        }
+
+        let path = result_path.build();
+
+        result.push(PathPaintKit {
+          path: Path {
+            path,
+            // style: PathStyle::Fill,
+            style: PathStyle::Stroke(StrokeOptions::default()),
+          },
+          brush: Brush::Color(Color::BLACK),
+        });
+      } else {
+        unreachable!("It is impossible that all paths cannot match");
       }
     }
-
-    let path = result_path.build();
-
-    Path {
-      path,
-      style: PathStyle::Fill,
-      // style: PathStyle::Stroke(StrokeOptions::default()),
-    }
+    result
   }
 }
 
@@ -164,10 +275,13 @@ fn get_points_from_path(path: &lyon_path::Path) -> Vec<PathPoints> {
   multi_paths
 }
 
-/// Get path center point
-fn find_path_center_point(path1: &lyon_path::Path, path2: &lyon_path::Path) -> Point {
-  bounding_box(path1.iter())
-    .union(&bounding_box(path2.iter()))
+/// Get two path center point
+fn get_paths_center_point(paths: Vec<&lyon_path::Path>) -> Point {
+  paths
+    .iter()
+    .fold(Box2D::default(), |box_2d, path| {
+      box_2d.union(&bounding_box(path.iter()))
+    })
     .center()
 }
 
@@ -188,11 +302,9 @@ fn get_point_by_quadrant(
   let mut quadrants: [Vec<_>; QUADRANT_COUNT] = {
     let mut data: [MaybeUninit<Vec<QuadrantPoint>>; QUADRANT_COUNT] =
       unsafe { MaybeUninit::uninit().assume_init() };
-
     for elem in &mut data[..] {
       elem.write(vec![]);
     }
-
     unsafe { std::mem::transmute::<_, [Vec<QuadrantPoint>; QUADRANT_COUNT]>(data) }
   };
 
@@ -205,12 +317,12 @@ fn get_point_by_quadrant(
   let unit_pi = 2. * PI / (QUADRANT_COUNT as f32);
 
   for (idx, cp) in path_points.0.iter().enumerate() {
-    let vc = cp.end_point - center_point;
+    let pt = cp.end_point;
+    let vc = pt - center_point;
     let Angle { mut radians } = vc.angle_from_x_axis();
     radians += PI;
-    let offset_percent =
-      (cp.end_point.distance_to(center_point) - avg_distance).abs() / avg_distance;
-    let u = (radians / unit_pi).floor() as usize;
+    let offset_percent = (pt.distance_to(center_point) - avg_distance).abs() / avg_distance;
+    let i = (radians / unit_pi).floor() as usize;
     // let mut insert_idx = (&quadrants[u]).len();
     // for (i, elem) in (&quadrants[u]).iter().enumerate() {
     //   if offset_percent >= elem.offset_percent {
@@ -218,14 +330,9 @@ fn get_point_by_quadrant(
     //     break;
     //   }
     // }
-    // quadrants[u].insert(insert_idx, QuadrantPoint { pt: cp.end_point, vc, idx,
+    // quadrants[u].insert(insert_idx, QuadrantPoint { pt: pt, vc, idx,
     // offset_percent });
-    quadrants[u].push(QuadrantPoint {
-      pt: cp.end_point,
-      vc,
-      idx,
-      offset_percent,
-    });
+    quadrants[i].push(QuadrantPoint { pt, vc, idx, offset_percent });
   }
 
   quadrants
@@ -262,14 +369,14 @@ fn get_text_paths<T: Into<Substr>>(
         .pre_scale(font_size_ems, font_size_ems);
       Path {
         path: face.outline_glyph(glyph_id).unwrap().transformed(&t),
-        // style: PathStyle::Stroke(StrokeOptions::default()),
-        style: PathStyle::Fill,
+        style: PathStyle::Stroke(StrokeOptions::default()),
+        // style: PathStyle::Fill,
       }
     })
     .collect::<Vec<_>>()
 }
 
-fn find_pair_path_key_points(
+fn match_pair_path_key_points(
   source: &PathPoints,
   target: &PathPoints,
   center_point: Point,
@@ -280,6 +387,9 @@ fn find_pair_path_key_points(
   let mut source_first_idx = None;
   let mut target_first_idx = None;
   let mut pair_result = vec![];
+
+  let mut infos = [0; QUADRANT_COUNT];
+
   // Iterate the collected points by quadrant
   for i in 0..QUADRANT_COUNT {
     if (&source_quadrants[i]).len() != 0 && (&target_quadrants[i]).len() != 0 {
@@ -303,14 +413,29 @@ fn find_pair_path_key_points(
             };
 
             let mut has_cross = false;
+            let mut remove_idxs = vec![];
             for (idx, (old_sq, old_tq)) in pair_result.iter().enumerate() {
               if (old_sq > &sq_idx && old_tq < &tq_idx) || (old_sq < &sq_idx && old_tq > &tq_idx) {
-                has_cross = true;
-                break;
+                if infos[i] > 1 {
+                  has_cross = true;
+                  break;
+                } else {
+                  remove_idxs.push(idx);
+                }
               }
 
               if old_sq > &sq_idx {
                 insert_idx = idx - 1;
+              }
+            }
+
+            if remove_idxs.len() > 0 {
+              remove_idxs.reverse();
+              for idx in remove_idxs {
+                if idx <= insert_idx {
+                  insert_idx -= 1;
+                }
+                pair_result.remove(idx);
               }
             }
 
@@ -383,7 +508,9 @@ fn fit_nearest_path_points(
 ) -> (PathPoints, PathPoints) {
   let mut pair = (PathPoints(vec![]), PathPoints(vec![]));
 
-  let pair_idx = find_pair_path_key_points(source, target, center_point);
+  let pair_idx = match_pair_path_key_points(source, target, center_point);
+  let source_len = source.0.len();
+  let target_len = target.0.len();
 
   let first_pair_idx_from_source = pair_idx[0].0;
   let first_pair_idx_from_target = pair_idx[0].1;
@@ -394,18 +521,19 @@ fn fit_nearest_path_points(
   for i in 1..pair_idx.len() {
     let (source_idx, target_idx) = pair_idx[i];
 
-    let source_range = generate_range(prev_pair_idx_from_source, source_idx, source.0.len());
-    let target_range = generate_range(prev_pair_idx_from_target, target_idx, target.0.len());
+    let source_range = generate_range(prev_pair_idx_from_source, source_idx, source_len);
+    let target_range = generate_range(prev_pair_idx_from_target, target_idx, target_len);
 
     prev_pair_idx_from_source = source_idx;
     prev_pair_idx_from_target = target_idx;
 
     fill_lerp_pair(source, target, &mut pair, &source_range, &target_range);
 
-    // last do more
+    // last item must end to end.
     if i == pair_last_idx {
-      let source_range = generate_range(source_idx, first_pair_idx_from_source, source.0.len());
-      let target_range = generate_range(target_idx, first_pair_idx_from_target, target.0.len());
+      let source_range = generate_range(source_idx, first_pair_idx_from_source, source_len);
+      let target_range = generate_range(target_idx, first_pair_idx_from_target, target_len);
+
       fill_lerp_pair(source, target, &mut pair, &source_range, &target_range);
     }
   }
