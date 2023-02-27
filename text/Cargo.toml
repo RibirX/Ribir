@@ -18,7 +18,7 @@ derive_more = "0.99.17"
 fontdb = "0.7.0"
 log = "0.4.14"
 lyon_path = "1.0.1"
-ordered-float = "2.10.0"
+ordered-float = "3.4.0"
 ribir_algo = {path = "../algo", version = "0.0.0"}
 rustybuzz = "0.7.0"
 unicode-bidi = "0.3.7"
