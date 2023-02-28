@@ -29,14 +29,14 @@ fn main() {
     font_size: FontSize::Pixel(240.0.into()),
     ..Default::default()
   };
-  let init_path = get_text_paths(&typography_store, "2", &text_style)
+  let init_path = get_text_paths(&typography_store, "1", &text_style)
     .into_iter()
     .map(|path| PathPaintKit {
       path,
       brush: Brush::Color(Color::BLACK),
     })
     .collect::<Vec<_>>();
-  let finally_path = get_text_paths(&typography_store, "1", &text_style)
+  let finally_path = get_text_paths(&typography_store, "7", &text_style)
     .into_iter()
     .map(|path| PathPaintKit {
       path,
@@ -65,7 +65,7 @@ fn main() {
       id: animate,
       transition: Transition {
         delay: Some(Duration::from_millis(200)),
-        duration: Duration::from_millis(10000),
+        duration: Duration::from_millis(500),
         easing: easing::LINEAR,
         repeat: None,
       },
@@ -92,9 +92,7 @@ fn char_path_lerp_fn()
 
     // let path_pair = find_nearest_path_pair(&init_path_points,
     // &finally_path_points);
-    let path_pair = vec![
-      (Some(0), Some(0)),
-    ];
+    let path_pair = vec![(Some(0), Some(0))];
 
     for (op1, op2) in path_pair {
       if op1.is_some() && op2.is_some() {
@@ -129,8 +127,8 @@ fn char_path_lerp_fn()
         result.push(PathPaintKit {
           path: Path {
             path,
-            // style: PathStyle::Fill,
-            style: PathStyle::Stroke(StrokeOptions::default()),
+            style: PathStyle::Fill,
+            // style: PathStyle::Stroke(StrokeOptions::default()),
           },
           brush: Brush::Color(Color::BLACK),
         });
@@ -369,8 +367,8 @@ fn get_text_paths<T: Into<Substr>>(
         .pre_scale(font_size_ems, font_size_ems);
       Path {
         path: face.outline_glyph(glyph_id).unwrap().transformed(&t),
-        style: PathStyle::Stroke(StrokeOptions::default()),
-        // style: PathStyle::Fill,
+        // style: PathStyle::Stroke(StrokeOptions::default()),
+        style: PathStyle::Fill,
       }
     })
     .collect::<Vec<_>>()
@@ -432,7 +430,7 @@ fn match_pair_path_key_points(
             if remove_idxs.len() > 0 {
               remove_idxs.reverse();
               for idx in remove_idxs {
-                if idx <= insert_idx {
+                if idx < insert_idx {
                   insert_idx -= 1;
                 }
                 pair_result.remove(idx);
