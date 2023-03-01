@@ -11,12 +11,33 @@ use lyon_path::{
 };
 use ribir::prelude::{font_db::FontDB, shaper::TextShaper, *};
 use std::{
+  collections::HashSet,
   f32::consts::PI,
   mem::MaybeUninit,
   ops::RangeInclusive,
   sync::{Arc, RwLock},
   time::Duration,
 };
+
+/// Path convert to path with transition.
+///
+/// a. convert path to Third-order Bezier curve, record a end point `end_point`
+/// and two
+/// control point `ctrl1` and `ctrl2`.
+///
+/// b. calculate two path aabb bounding box union size, to get two path center
+/// point.
+///
+/// c. for each path end point, relative to the center point to get offset
+/// distance and offset angle. Define angle range to average match point.
+///
+/// d. for each two path end point by angle range, to find match point. Two path
+/// end point index can't cross.
+///
+/// e. Use linear interpolation to fill lose point in two path end point.
+
+const FONT_SIZE: f32 = 240.0;
+const QUADRANT_COUNT: usize = 8;
 
 fn main() {
   let mut font_db = FontDB::default();
@@ -26,17 +47,17 @@ fn main() {
   let reorder = TextReorder::default();
   let typography_store = TypographyStore::new(reorder.clone(), font_db, shaper.clone());
   let text_style = TextStyle {
-    font_size: FontSize::Pixel(240.0.into()),
+    font_size: FontSize::Pixel(FONT_SIZE.into()),
     ..Default::default()
   };
-  let init_path = get_text_paths(&typography_store, "1", &text_style)
+  let init_path = get_char_paths(&typography_store, "1", &text_style)
     .into_iter()
     .map(|path| PathPaintKit {
       path,
       brush: Brush::Color(Color::BLACK),
     })
     .collect::<Vec<_>>();
-  let finally_path = get_text_paths(&typography_store, "7", &text_style)
+  let finally_path = get_char_paths(&typography_store, "8", &text_style)
     .into_iter()
     .map(|path| PathPaintKit {
       path,
@@ -47,7 +68,7 @@ fn main() {
   let w = widget! {
     Column {
       Container {
-        size: Size::new(300., 300.),
+        size: Size::new(FONT_SIZE, FONT_SIZE),
         PathsPaintKit {
           id: path_kit,
           paths: finally_path,
@@ -81,7 +102,7 @@ fn main() {
 fn char_path_lerp_fn()
 -> impl Fn(&Vec<PathPaintKit>, &Vec<PathPaintKit>, f32) -> Vec<PathPaintKit> + Clone {
   move |from, to, rate| {
-    let mut result = vec![];
+    let mut path_paint_kits = vec![];
     let init_path = &from[0].path.path;
     let finally_path = &to[0].path.path;
 
@@ -90,9 +111,7 @@ fn char_path_lerp_fn()
     let init_path_points = get_points_from_path(init_path);
     let finally_path_points = get_points_from_path(finally_path);
 
-    // let path_pair = find_nearest_path_pair(&init_path_points,
-    // &finally_path_points);
-    let path_pair = vec![(Some(0), Some(0))];
+    let path_pair = find_nearest_path_pair(&init_path_points, &finally_path_points, center_point);
 
     for (op1, op2) in path_pair {
       if op1.is_some() && op2.is_some() {
@@ -124,7 +143,7 @@ fn char_path_lerp_fn()
 
         let path = result_path.build();
 
-        result.push(PathPaintKit {
+        path_paint_kits.push(PathPaintKit {
           path: Path {
             path,
             style: PathStyle::Fill,
@@ -161,7 +180,7 @@ fn char_path_lerp_fn()
 
         let path = result_path.build();
 
-        result.push(PathPaintKit {
+        path_paint_kits.push(PathPaintKit {
           path: Path {
             path,
             // style: PathStyle::Fill,
@@ -199,7 +218,7 @@ fn char_path_lerp_fn()
 
         let path = result_path.build();
 
-        result.push(PathPaintKit {
+        path_paint_kits.push(PathPaintKit {
           path: Path {
             path,
             // style: PathStyle::Fill,
@@ -211,7 +230,7 @@ fn char_path_lerp_fn()
         unreachable!("It is impossible that all paths cannot match");
       }
     }
-    result
+    path_paint_kits
   }
 }
 
@@ -291,8 +310,6 @@ struct QuadrantPoint {
   offset_percent: f32,
 }
 
-const QUADRANT_COUNT: usize = 4;
-
 fn get_point_by_quadrant(
   path_points: &PathPoints,
   center_point: Point,
@@ -337,7 +354,7 @@ fn get_point_by_quadrant(
 }
 
 /// Get the character path through text and text_style
-fn get_text_paths<T: Into<Substr>>(
+fn get_char_paths<T: Into<Substr>>(
   typography_store: &TypographyStore,
   text: T,
   style: &TextStyle,
@@ -740,8 +757,69 @@ fn get_path_percent_by_points_range(
 fn find_nearest_path_pair(
   source: &Vec<PathPoints>,
   target: &Vec<PathPoints>,
+  center_point: Point,
 ) -> Vec<(Option<usize>, Option<usize>)> {
-  todo!()
+  let mut source_offset_list = source
+    .iter()
+    .enumerate()
+    .map(|(idx, path_points)| {
+      let distances = get_point_by_quadrant(path_points, center_point)
+        .to_vec()
+        .iter()
+        .fold(0., |acc, qp_list| {
+          acc + qp_list.iter().fold(0., |c, q| c + q.vc.length())
+        });
+      PointLenIdx {
+        idx,
+        len: distances / path_points.0.len() as f32,
+      }
+    })
+    .collect::<Vec<_>>();
+
+  source_offset_list.sort_by(|a, b| a.len.partial_cmp(&b.len).unwrap());
+
+  let mut target_offset_list = target
+    .iter()
+    .enumerate()
+    .map(|(idx, path_points)| {
+      let distances = get_point_by_quadrant(path_points, center_point)
+        .to_vec()
+        .iter()
+        .fold(0., |acc, qp_list| {
+          acc + qp_list.iter().fold(0., |c, q| c + q.vc.length())
+        });
+
+      PointLenIdx {
+        idx,
+        len: distances / path_points.0.len() as f32,
+      }
+    })
+    .collect::<Vec<_>>();
+
+  target_offset_list.sort_by(|a, b| b.len.partial_cmp(&a.len).unwrap());
+
+  let mut match_result = vec![];
+
+  while source_offset_list.first().is_some() && target_offset_list.first().is_some() {
+    match_result.push((
+      Some(source_offset_list.first().unwrap().idx),
+      Some(target_offset_list.first().unwrap().idx),
+    ));
+    source_offset_list.remove(0);
+    target_offset_list.remove(0);
+  }
+
+  while source_offset_list.first().is_some() {
+    match_result.push((Some(source_offset_list.first().unwrap().idx), None));
+    source_offset_list.remove(0);
+  }
+
+  while target_offset_list.first().is_some() {
+    match_result.push((None, Some(target_offset_list.first().unwrap().idx)));
+    target_offset_list.remove(0);
+  }
+
+  match_result
 }
 
 #[cfg(test)]
