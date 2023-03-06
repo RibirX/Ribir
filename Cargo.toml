@@ -8,6 +8,7 @@ members = [
   "algo",
   "text",
   "widgets",
+  "app_winit",
   "ribir",
 ]
 resolver = "2"

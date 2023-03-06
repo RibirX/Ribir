@@ -1,10 +1,10 @@
-pub use ribir_core as core;
+pub use ribir_app_winit as app;
 pub use ribir_widgets as widgets;
 pub mod prelude {
-  pub use ribir_core::prelude::*;
+  pub use ribir_app_winit::prelude::*;
   pub use ribir_widgets::prelude::*;
   pub mod app {
-    use ribir_core::window::Window;
+    use ribir_app_winit::window::Window;
 
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
@@ -31,7 +31,7 @@ pub fn wgpu_headless_wnd(root: Widget, ctx: AppContext, size: DeviceSize) -> Win
     ctx.shaper.clone(),
   ));
   Window::new(
-    ribir_core::window::MockRawWindow {
+    app::window::MockRawWindow {
       size: Size::from_untyped(size.to_f32().to_untyped()),
       ..Default::default()
     },

@@ -32,7 +32,7 @@ pub struct LayoutInfo {
 /// Store the render object's place relative to parent coordinate and the
 /// clamp passed from parent.
 #[derive(Default)]
-pub(crate) struct LayoutStore {
+pub struct LayoutStore {
   data: HashMap<WidgetId, LayoutInfo, ahash::RandomState>,
   performed: Vec<WidgetId>,
 }
@@ -49,7 +49,7 @@ impl LayoutStore {
   /// Remove the layout info of the `wid`
   pub(crate) fn force_layout(&mut self, id: WidgetId) -> Option<LayoutInfo> { self.remove(id) }
 
-  pub(crate) fn remove(&mut self, id: WidgetId) -> Option<LayoutInfo> { self.data.remove(&id) }
+  pub fn remove(&mut self, id: WidgetId) -> Option<LayoutInfo> { self.data.remove(&id) }
 
   /// Return the box rect of layout result of render widget, if it's a
   /// combination widget return None.
@@ -88,7 +88,7 @@ impl LayoutStore {
     })
   }
 
-  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
+  pub fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
     self.layout_box_rect(id).map_or(pos, |rect| {
       let pos = pos - rect.min().to_vector();
       id.assert_get(arena)

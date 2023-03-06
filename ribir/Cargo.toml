@@ -8,7 +8,8 @@ version = "0.1.0"
 
 [dependencies]
 ribir_gpu = {path = "../gpu", version = "*"}
-ribir_core = {path = "../core"}
+# ribir_core = {path = "../core"}
+ribir_app_winit = {path = "../app_winit"}
 ribir_widgets = {path = "../widgets"}
 lyon_algorithms = "1.0.1"
 lyon_path = "1.0.1"
@@ -18,4 +19,4 @@ env_logger = "0.7.1"
 
 [features]
 default = ["wgpu_gl"]
-wgpu_gl = ["ribir_gpu/wgpu_gl"]
+wgpu_gl = ["ribir_gpu/wgpu_gl", "ribir_app_winit/wgpu_gl"]

@@ -17,14 +17,11 @@ lyon_algorithms = "1.0.1"
 lyon_geom = "1.0.1"
 png = {version = "0.17.3", optional = true}
 ribir_algo = {path = "../algo"}
-ribir_gpu = {path = "../gpu"}
 ribir_macros = {path = "../macros"}
 ribir_painter = {path = "../painter", version = "*"}
 ribir_text = {path = "../text"}
 rxrust = "1.0.0-beta.1"
-
 smallvec = "1.8.0"
-winit = "0.28.1"
 
 [dependencies.blake3]
 features = ["rayon"]
@@ -32,9 +29,10 @@ version = "1.3.3"
 
 [features]
 png = ["dep:png"]
-thread-pool = [
-  "futures/thread-pool",
-]
+thread-pool = ["futures/thread-pool"]
+test-utils = []
 
 [dev-dependencies]
 colored = "2.0.0"
+ribir_app_winit = { path = "../app_winit" }
+winit = "0.28.1"

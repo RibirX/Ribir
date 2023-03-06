@@ -1,16 +1,16 @@
 #![feature(test, decl_macro)]
+#![allow(clippy::deprecated_semver)]
 
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;
 
 pub mod animation;
-mod application;
 pub mod builtin_widgets;
 mod context;
 pub mod data_widget;
 mod state;
-pub(crate) mod widget_tree;
+pub mod widget_tree;
 
 pub mod assign_observable;
 pub mod declare;
@@ -23,8 +23,6 @@ pub mod widget_children;
 pub mod window;
 pub mod prelude {
   pub use crate::animation::*;
-  #[doc(no_inline)]
-  pub use crate::application::Application;
   pub use crate::assign_observable::AssignObservable;
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
@@ -52,7 +50,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
-  pub use crate::window::{Window, WindowBuilder};
+  pub use crate::window::{CursorIcon,Window};
   #[doc(no_inline)]
   pub use ::ribir_painter::*;
   pub use log;
@@ -64,4 +62,6 @@ pub mod prelude {
   pub use rxrust::prelude::*;
 }
 
+#[cfg(test)]
+#[cfg(feature = "test-utils")]
 pub mod test;

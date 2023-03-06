@@ -22,7 +22,7 @@ impl WidgetId {
   }
 
   /// Returns a reference to the node data.
-  pub(crate) fn get(self, tree: &TreeArena) -> Option<&dyn Render> {
+  pub fn get(self, tree: &TreeArena) -> Option<&dyn Render> {
     tree.get(self.0).map(|node| node.get().as_ref())
   }
 
@@ -32,20 +32,16 @@ impl WidgetId {
   }
 
   /// detect if the widget of this id point to is dropped.
-  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
+  pub fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
 
   #[allow(clippy::needless_collect)]
-  pub(crate) fn lowest_common_ancestor(
-    self,
-    other: WidgetId,
-    tree: &TreeArena,
-  ) -> Option<WidgetId> {
+  pub fn lowest_common_ancestor(self, other: WidgetId, tree: &TreeArena) -> Option<WidgetId> {
     self.common_ancestors(other, tree).last()
   }
 
   #[allow(clippy::needless_collect)]
   // return ancestors from root to lowest common ancestor
-  pub(crate) fn common_ancestors(
+  pub fn common_ancestors(
     self,
     other: WidgetId,
     tree: &TreeArena,
@@ -80,21 +76,21 @@ impl WidgetId {
     self.node_feature(tree, |node| node.next_sibling())
   }
 
-  pub(crate) fn ancestors(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
+  pub fn ancestors(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(tree).map(WidgetId)
   }
 
   /// Detect if this widget is the ancestors of `w`
-  pub(crate) fn ancestors_of(self, w: WidgetId, tree: &TreeArena) -> bool {
+  pub fn ancestors_of(self, w: WidgetId, tree: &TreeArena) -> bool {
     w.ancestors(tree).any(|a| a == self)
   }
 
   #[inline]
-  pub(crate) fn children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
+  pub fn children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.children(arena).map(WidgetId)
   }
 
-  pub(crate) fn reverse_children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
+  pub fn reverse_children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.reverse_children(arena).map(WidgetId)
   }
 
@@ -209,7 +205,7 @@ impl WidgetId {
     tree.get(self.0).and_then(method).map(WidgetId)
   }
 
-  pub(crate) fn assert_get(self, tree: &TreeArena) -> &dyn Render {
+  pub fn assert_get(self, tree: &TreeArena) -> &dyn Render {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 

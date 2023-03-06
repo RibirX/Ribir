@@ -8,12 +8,12 @@ use std::{
   rc::Rc,
 };
 
-use super::dispatcher::Dispatcher;
+// use super::dispatcher::Dispatcher;
 
 #[derive(Debug)]
-pub(crate) struct FocusManager {
+pub struct FocusManager {
   /// store current focusing node, and its position in tab_orders.
-  focusing: Option<WidgetId>,
+  pub focusing: Option<WidgetId>,
   node_ids: HashMap<WidgetId, NodeId>,
   arena: Arena<FocusNodeInfo>,
   root: NodeId,
@@ -114,11 +114,11 @@ impl FocusManager {
 
   pub fn focus_to(&mut self, wid: Option<WidgetId>) { self.focusing = wid; }
 
-  pub(crate) fn next_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
+  pub fn next_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
     self.focus_move_circle(false, arena)
   }
 
-  pub(crate) fn prev_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
+  pub fn prev_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
     self.focus_move_circle(true, arena)
   }
 
@@ -273,7 +273,7 @@ impl FocusManager {
       .take_while(|n| self.assert_get(*n).focus_type.intersects(FocusType::SCOPE))
   }
 
-  fn ignore_scope_id(&self, wid: WidgetId, arena: &TreeArena) -> Option<NodeId> {
+  pub fn ignore_scope_id(&self, wid: WidgetId, arena: &TreeArena) -> Option<NodeId> {
     let node_id = wid
       .ancestors(arena)
       .filter_map(|wid| self.node_ids.get(&wid).copied())
@@ -416,104 +416,7 @@ impl FocusManager {
   }
 }
 
-impl Dispatcher {
-  pub fn next_focus_widget(&mut self, tree: &WidgetTree) {
-    self.focus_mgr.borrow_mut().next_focus(&tree.arena);
-  }
-
-  pub fn prev_focus_widget(&mut self, tree: &WidgetTree) {
-    self.focus_mgr.borrow_mut().prev_focus(&tree.arena);
-  }
-
-  /// Removes keyboard focus from the current focusing widget and return its id.
-  pub fn blur(&mut self, tree: &mut WidgetTree) -> Option<WidgetId> {
-    self.change_focusing_to(None, tree)
-  }
-
-  /// return the focusing widget.
-  pub fn focusing(&self) -> Option<WidgetId> { self.focus_mgr.borrow_mut().focusing }
-
-  pub fn refresh_focus(&mut self, tree: &WidgetTree) {
-    let focusing = self.focus_mgr.borrow().focusing.filter(|node_id| {
-      self
-        .focus_mgr
-        .borrow()
-        .ignore_scope_id(*node_id, &tree.arena)
-        .is_none()
-    });
-    if self.focus_widgets.get(0) != focusing.as_ref() {
-      self.change_focusing_to(focusing, tree);
-    }
-  }
-
-  pub fn focus(&mut self, wid: WidgetId, tree: &WidgetTree) {
-    self.change_focusing_to(Some(wid), tree);
-  }
-
-  fn change_focusing_to(&mut self, node: Option<WidgetId>, tree: &WidgetTree) -> Option<WidgetId> {
-    let Self { focus_mgr, info, .. } = self;
-    let old_widgets = &self.focus_widgets;
-    let new_widgets = node.map_or(vec![], |wid| wid.ancestors(&tree.arena).collect::<Vec<_>>());
-
-    let old = old_widgets
-      .get(0)
-      .filter(|wid| !(*wid).is_dropped(&tree.arena))
-      .copied();
-
-    // dispatch blur event
-    if let Some(wid) = old {
-      let mut focus_event = FocusEvent::new(wid, tree, info);
-      wid
-        .assert_get(&tree.arena)
-        .query_on_first_type(QueryOrder::InnerFirst, |blur: &BlurListener| {
-          blur.dispatch(&mut focus_event)
-        })
-    };
-
-    let common_ancestors = common_ancestors(&new_widgets, old_widgets);
-    // bubble focus out
-    if let Some(wid) = old_widgets
-      .iter()
-      .find(|wid| !(*wid).is_dropped(&tree.arena))
-    {
-      let mut focus_event = FocusEvent::new(*wid, tree, info);
-      tree.bubble_event_with(&mut focus_event, |focus_out: &FocusOutListener, event| {
-        if common_ancestors.contains(&event.current_target()) {
-          event.stop_bubbling();
-        } else {
-          focus_out.dispatch(event);
-        }
-      });
-    };
-
-    if let Some(wid) = node {
-      let mut focus_event = FocusEvent::new(wid, tree, info);
-
-      wid
-        .assert_get(&tree.arena)
-        .query_on_first_type(QueryOrder::InnerFirst, |focus: &FocusListener| {
-          focus.dispatch(&mut focus_event)
-        });
-
-      let mut focus_event = FocusEvent::new(wid, tree, info);
-
-      // bubble focus in
-      tree.bubble_event_with(&mut focus_event, |focus_in: &FocusInListener, event| {
-        if common_ancestors.contains(&event.current_target()) {
-          event.stop_bubbling();
-        } else {
-          focus_in.dispatch(event);
-        }
-      });
-    }
-
-    self.focus_widgets = new_widgets;
-    focus_mgr.borrow_mut().focusing = node;
-    old
-  }
-}
-
-fn common_ancestors(path: &[WidgetId], path2: &[WidgetId]) -> HashSet<WidgetId> {
+pub fn common_ancestors(path: &[WidgetId], path2: &[WidgetId]) -> HashSet<WidgetId> {
   let it = path
     .iter()
     .rev()
@@ -524,6 +427,7 @@ fn common_ancestors(path: &[WidgetId], path2: &[WidgetId]) -> HashSet<WidgetId> 
   set.extend(it);
   set
 }
+
 #[cfg(test)]
 mod tests {
   use super::*;

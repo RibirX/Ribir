@@ -135,11 +135,11 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
 macro_rules! define_widget_context {
   ($name: ident $(, $extra_name: ident: $extra_ty: ty)*) => {
     pub struct $name<'a> {
-      pub(crate) id: WidgetId,
-      pub(crate) arena: &'a TreeArena,
-      pub(crate) store: &'a LayoutStore,
-      pub(crate) wnd_ctx: &'a WindowCtx,
-      $(pub(crate) $extra_name: $extra_ty,)*
+      pub id: WidgetId,
+      pub arena: &'a TreeArena,
+      pub store: &'a LayoutStore,
+      pub wnd_ctx: &'a WindowCtx,
+      $(pub $extra_name: $extra_ty,)*
     }
 
     impl<'a> WidgetCtxImpl for $name<'a> {

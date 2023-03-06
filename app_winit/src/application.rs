@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use std::{collections::HashMap, rc::Rc};
+use ribir_core::prelude::{AppContext, Theme};
 pub use winit::window::WindowId;
 use winit::{
   event::{Event, WindowEvent},

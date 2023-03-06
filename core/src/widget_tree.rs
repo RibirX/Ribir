@@ -9,16 +9,16 @@ use crate::{prelude::*, widget::widget_id::new_node};
 pub use layout_info::*;
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
-pub(crate) struct WidgetTree {
+pub struct WidgetTree {
   root: WidgetId,
-  pub(crate) arena: TreeArena,
-  pub(crate) store: LayoutStore,
-  pub(crate) wnd_ctx: WindowCtx,
+  pub arena: TreeArena,
+  pub store: LayoutStore,
+  pub wnd_ctx: WindowCtx,
   dirty_set: DirtySet,
 }
 
 impl WidgetTree {
-  pub(crate) fn new(root: Widget, wnd_ctx: WindowCtx) -> WidgetTree {
+  pub fn new(root: Widget, wnd_ctx: WindowCtx) -> WidgetTree {
     let mut arena = Arena::default();
     let root = root
       .into_subtree(None, &mut arena, &wnd_ctx)
@@ -37,10 +37,10 @@ impl WidgetTree {
     tree
   }
 
-  pub(crate) fn root(&self) -> WidgetId { self.root }
+  pub fn root(&self) -> WidgetId { self.root }
 
   /// Draw current tree by painter.
-  pub(crate) fn draw(&self, painter: &mut Painter) {
+  pub fn draw(&self, painter: &mut Painter) {
     fn paint_rect_intersect(painter: &mut Painter, rc: &Rect) -> bool {
       let paint_rect = painter.get_transform().outer_transformed_rect(rc);
       painter
@@ -97,7 +97,7 @@ impl WidgetTree {
 
   /// Do the work of computing the layout for all node which need, Return if any
   /// node has really computing the layout.
-  pub(crate) fn layout(&mut self, win_size: Size) {
+  pub fn layout(&mut self, win_size: Size) {
     loop {
       let Some(mut needs_layout) = self.layout_list() else {break;};
       while let Some(wid) = needs_layout.pop() {
@@ -134,11 +134,11 @@ impl WidgetTree {
     }
   }
 
-  pub(crate) fn mark_dirty(&self, id: WidgetId) { self.dirty_set.borrow_mut().insert(id); }
+  pub fn mark_dirty(&self, id: WidgetId) { self.dirty_set.borrow_mut().insert(id); }
 
-  pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
+  pub fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
 
-  pub(crate) fn count(&self) -> usize { self.root.descendants(&self.arena).count() }
+  pub fn count(&self) -> usize { self.root.descendants(&self.arena).count() }
 
   #[allow(unused)]
   pub fn display_tree(&self, sub_tree: WidgetId) -> String {

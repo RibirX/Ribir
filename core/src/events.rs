@@ -2,13 +2,13 @@ use crate::{
   context::EventCtx,
   widget_tree::{WidgetId, WidgetTree},
 };
-use std::ptr::NonNull;
+use std::{cell::RefCell, ptr::NonNull, rc::Rc};
 
-pub(crate) mod dispatcher;
+pub mod dispatcher;
 mod pointers;
 pub use pointers::*;
 use ribir_painter::Point;
-pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
+// pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;
 pub use focus::*;
 mod keyboard;
@@ -17,7 +17,7 @@ mod character;
 pub use character::*;
 mod wheel;
 pub use wheel::*;
-pub(crate) mod focus_mgr;
+pub mod focus_mgr;
 mod listener_impl_helper;
 use self::dispatcher::DispatchInfo;
 
@@ -28,9 +28,9 @@ pub struct EventCommon {
   pub(crate) target: WidgetId,
   pub(crate) current_target: WidgetId,
   pub(crate) cancel_bubble: bool,
-  pub(crate) prevent_default: bool,
+  pub prevent_default: bool,
   tree: NonNull<WidgetTree>,
-  info: NonNull<DispatchInfo>,
+  info: Rc<RefCell<dyn DispatchInfo>>,
 }
 
 impl EventCommon {
@@ -57,11 +57,11 @@ impl EventCommon {
   pub fn prevent_default(&mut self) { self.prevent_default = true; }
   /// Represents the current state of the keyboard modifiers
   #[inline]
-  pub fn modifiers(&self) -> ModifiersState { self.dispatch_info().modifiers() }
+  pub fn modifiers(&self) -> ModifiersState { self.dispatch_info().borrow().modifiers() }
 
   /// The X, Y coordinate of the mouse pointer in global (window) coordinates.
   #[inline]
-  pub fn global_pos(&self) -> Point { self.dispatch_info().global_pos() }
+  pub fn global_pos(&self) -> Point { self.dispatch_info().borrow().global_pos() }
 
   /// The X, Y coordinate of the pointer in current target widget.
   #[inline]
@@ -74,7 +74,7 @@ impl EventCommon {
 
   /// The buttons being depressed (if any) in current state.
   #[inline]
-  pub fn mouse_buttons(&self) -> MouseButtons { self.dispatch_info().mouse_buttons() }
+  pub fn mouse_buttons(&self) -> MouseButtons { self.dispatch_info().borrow().mouse_button() }
 
   /// The button number that was pressed (if applicable) when the mouse event
   /// was fired.
@@ -91,7 +91,7 @@ impl EventCommon {
       arena,
       store,
       wnd_ctx,
-      info: self.dispatch_info_mut(),
+      info: self.dispatch_info/*_mut*/(),
     }
   }
 
@@ -105,16 +105,19 @@ impl EventCommon {
     tree.wnd_ctx.prev_focus(&tree.arena);
   }
 
-  fn dispatch_info_mut(&mut self) -> &mut DispatchInfo {
-    // Safety: framework promise `info` only live in event dispatch and
-    // there is no others borrow `info`.
-    unsafe { self.info.as_mut() }
-  }
+  // fn dispatch_info_mut(&mut self) -> Rc<RefCell<dyn DispatchInfo>> {
+  //   // Safety: framework promise `info` only live in event dispatch and
+  //   // there is no others borrow `info`.
+  //   // unsafe { self.info.as_mut() }
+  //   self.info.as_mut()
+  // }
 
-  fn dispatch_info(&self) -> &DispatchInfo {
+  fn dispatch_info(&self) -> Rc<RefCell<dyn DispatchInfo>> {
     // Safety: framework promise `info` only live in event dispatch and
     // there is no others mutable borrow `info`.
-    unsafe { self.info.as_ref() }
+    // unsafe {
+    self.info.clone() /*.as_ref()*/
+    // }
   }
 }
 
@@ -134,14 +137,14 @@ impl std::fmt::Debug for EventCommon {
 }
 
 impl EventCommon {
-  pub(crate) fn new(target: WidgetId, tree: &WidgetTree, info: &DispatchInfo) -> Self {
+  pub fn new(target: WidgetId, tree: &WidgetTree, info: Rc<RefCell<dyn DispatchInfo>>) -> Self {
     Self {
       target,
       current_target: target,
       cancel_bubble: <_>::default(),
       prevent_default: <_>::default(),
       tree: NonNull::from(tree),
-      info: NonNull::from(info),
+      info, //: NonNull::from(info),
     }
   }
 }

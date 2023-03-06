@@ -11,6 +11,7 @@ use std::{
 };
 
 mod from_mouse;
+pub use from_mouse::*;
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PointerId(usize);
@@ -73,6 +74,17 @@ bitflags! {
     /// 5th button (typically the "Browser Forward" button)
     const FIFTH = 0b0001_0000;
   }
+}
+
+pub trait DeviceId  {
+    fn as_any(&self) -> &dyn Any;
+    fn eq(&self, other: &dyn DeviceId) -> bool;
+}
+
+#[derive(Default)]
+pub struct DeviceMouseButtons {
+  pub device_id: Option<Box<dyn DeviceId>>,
+  pub buttons: MouseButtons,
 }
 
 #[derive(Debug, Clone, PartialEq)]

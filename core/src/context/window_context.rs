@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone)]
 pub struct WindowCtx {
   pub(crate) frame_ticker: FrameTicker,
-  pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
+  pub focus_mgr: Rc<RefCell<FocusManager>>,
   pub(crate) app_ctx: AppContext,
   pub(crate) actived_animates: Rc<RefCell<u32>>,
   pub(crate) frame_scheduler: FuturesLocalScheduler,
@@ -54,16 +54,14 @@ impl WindowCtx {
     self.frame_ticker.frame_tick_stream()
   }
 
-  pub(crate) fn begin_frame(&mut self) {
-    self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
-  }
-  pub(crate) fn layout_ready(&mut self) {
+  pub fn begin_frame(&mut self) { self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now())); }
+  pub fn layout_ready(&mut self) {
     self
       .frame_ticker
       .emit(FrameMsg::LayoutReady(Instant::now()));
   }
 
-  pub(crate) fn end_frame(&mut self) {
+  pub fn end_frame(&mut self) {
     self.app_ctx.end_frame();
     self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
   }
@@ -100,7 +98,7 @@ impl WindowCtx {
       .remove_focus_node(wid, focus_tyep);
   }
 
-  pub(crate) fn has_actived_animate(&self) -> bool { *self.actived_animates.borrow() > 0 }
+  pub fn has_actived_animate(&self) -> bool { *self.actived_animates.borrow() > 0 }
 
   pub fn animate_track(&self) -> AnimateTrack {
     AnimateTrack {

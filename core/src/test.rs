@@ -37,7 +37,7 @@ pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTe
   });
 }
 
-pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
+pub fn assert_layout_result(wnd: &impl Window, path: &[usize], expect: &ExpectRect) {
   let res = layout_info_by_path(wnd, path);
   if let Some(x) = expect.x {
     assert_eq!(x, res.min_x(), "path: {path:?}");
@@ -58,7 +58,7 @@ pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
 /// [0, 1] means use the second child of the root.
 /// [0, 1, 2] the first node at the root level (must be 0), then down to its
 /// second child, then down to third child.
-pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
+pub fn layout_info_by_path(wnd: &impl Window, path: &[usize]) -> Rect {
   assert_eq!(path[0], 0);
   let tree = &wnd.widget_tree;
   let mut node = tree.root();
@@ -117,11 +117,6 @@ impl Query for MockMulti {
 
 impl Query for MockBox {
   impl_query_self_only!();
-}
-
-impl Window {
-  #[inline]
-  pub fn widget_count(&self) -> usize { self.widget_tree.count() }
 }
 
 #[allow(unused)]

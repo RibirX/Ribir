@@ -4,7 +4,6 @@ mod theme;
 pub use theme::*;
 mod cursor;
 pub use cursor::Cursor;
-pub use winit::window::CursorIcon;
 mod margin;
 pub use margin::*;
 mod padding;

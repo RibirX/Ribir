@@ -1,9 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, window::CursorIcon};
 use std::{cell::Cell, rc::Rc};
-use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
-
 #[derive(Declare, Debug)]
 pub struct Cursor {
   #[declare(convert=custom, builtin, default)]
