@@ -17,7 +17,7 @@ version = "0.0.0"
 [dependencies]
 lyon_algorithms = "1.0.1"
 lyon_path = "1.0.1"
-ribir_app_winit = {path = "../app_winit, version = "0.0.0"}
+ribir_app_winit = {path = "../app_winit", version = "0.0.0"}
 ribir_gpu = {path = "../gpu", version = "0.0.0"}
 ribir_widgets = {path = "../widgets", version = "0.0.0"}
 
