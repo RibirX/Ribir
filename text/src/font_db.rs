@@ -2,8 +2,8 @@ use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::{Point, Transform};
 use ribir_algo::FrameCache;
+use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 use std::sync::Arc;
-use ttf_parser::{GlyphId, OutlineBuilder};
 
 use crate::{FontFace, FontFamily};
 
@@ -344,7 +344,7 @@ impl OutlineBuilder for GlyphOutlineBuilder {
 }
 
 impl std::ops::Deref for Face {
-  type Target = ttf_parser::Face<'static>;
+  type Target = rustybuzz::ttf_parser::Face<'static>;
 
   #[inline]
   fn deref(&self) -> &Self::Target { &self.rb_face }

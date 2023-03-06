@@ -1,18 +1,25 @@
 [package]
 authors = ["adoo <Adoo@outlook.com>"]
+categories = ["gui"]
+description = "Ribir is a framework for building modern native/wasm cross-platform user interface applications."
+documentation = "https://ribir.org/docs"
 edition = "2021"
+homepage = "https://ribir.org"
+keywords = ["gui", "ui", "declarative", "compose-ui"]
+license = "MIT"
 name = "ribir"
-version = "0.1.0"
+readme = "README.md"
+repository = "https://github.com/RibirX/Ribir/algo"
+version = "0.0.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ribir_gpu = {path = "../gpu", version = "*"}
-# ribir_core = {path = "../core"}
-ribir_app_winit = {path = "../app_winit"}
-ribir_widgets = {path = "../widgets"}
 lyon_algorithms = "1.0.1"
 lyon_path = "1.0.1"
+ribir_app_winit = {path = "../app_winit, version = "0.0.0"}
+ribir_gpu = {path = "../gpu", version = "0.0.0"}
+ribir_widgets = {path = "../widgets", version = "0.0.0"}
 
 [dev-dependencies]
 env_logger = "0.7.1"

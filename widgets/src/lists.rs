@@ -72,37 +72,21 @@ impl ComposeChild for ListItem {
         let body_text_style = TypographyTheme::of(ctx).body1.text.clone();
       }
       Row {
-        DynWidget {
-          dyns: leading.map(|w| w.child)
-        }
+        Option::map(leading, |w| w.child)
         Expanded {
           flex: 1.,
           Column {
-            DynWidget {
-              dyns: widget! {
-                Text {
-                  text: headline_text.0,
-                  style: TextStyle {
-                    foreground: surface_variant,
-                    ..body_text_style
-                  }
-                }
+            Text {
+              text: headline_text.0,
+              style: TextStyle {
+                foreground: surface_variant,
+                ..body_text_style
               }
             }
-            DynWidget {
-              dyns: supporting_text.map(|text| {
-                widget! {
-                  Text {
-                    text: text.0
-                  }
-                }
-              })
-            }
+            Option::map(supporting_text, |text | widget! { Text { text: text.0 } })
           }
         }
-        DynWidget {
-          dyns: trailing.map(|w| w.child)
-        }
+        Option::map(trailing, |w| w.child)
       }
     }
   }
@@ -133,10 +117,7 @@ impl ComposeChild for Lists {
               ListItemStyle {
                 divider: this.divider,
                 edge,
-
-                DynWidget {
-                  dyns: w
-                }
+                identify(w)
               }
             }
           })

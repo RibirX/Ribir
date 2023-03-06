@@ -93,7 +93,7 @@ impl TodoMVP {
                 .enumerate()
                 .filter(move |(_, task)| { cond(task) })
                 .map(move |(idx, task)| {
-                  Self::task(this, task, idx, mount_task_cnt)
+                  no_watch!(Self::task(this, task, idx, mount_task_cnt))
                 })
             }
           }

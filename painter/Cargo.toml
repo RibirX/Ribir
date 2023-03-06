@@ -1,19 +1,27 @@
 [package]
+categories = ["gui"]
+description = "Ribir is a framework for building modern native/wasm cross-platform user interface applications."
+documentation = "https://ribir.org/docs"
 edition = "2021"
+homepage = "https://ribir.org"
+keywords = ["gui", "ui", "declarative", "compose-ui"]
+license = "MIT"
 name = "ribir_painter"
-version = "0.1.0"
+readme = "README.md"
+repository = "https://github.com/RibirX/Ribir/algo"
+version = "0.0.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ribir_algo = {path = "../algo"}
 bitflags = "1.3.2"
 euclid = "0.22.6"
 log = "0.4.17"
 lyon_algorithms = "1.0.1"
 lyon_tessellation = {version = "1.0.1", features = ["serialization"]}
 palette = {version = "0.6.1", features = ["serializing"]}
+ribir_algo = {path = "../algo", version = "0.0.0"}
+ribir_text = {path = "../text", version = "0.0.0"}
 serde = {version = "1.0", features = ["rc"]}
 serde_json = "1.0.82"
-ribir_text = {path = "../text"}
 usvg = {version = "0.23.0", features = ["text"]}

@@ -348,26 +348,22 @@ fn build_input_area(
   this: &mut StateRef<TextField>,
   theme: &mut StateRef<TextFieldThemeProxy>,
   prefix: Option<LeadingText>,
-  subfix: Option<TrailingText>,
+  suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
 ) -> Widget {
   widget! {
     states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
     init ctx => {
       let linear = transitions::LINEAR.of(ctx);
+      let prefix = prefix.map(move |p| p.child);
+      let suffix = suffix.map(move|s| s.child);
     }
     Row {
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
-      DynWidget {
-        dyns: prefix.map(|text| {
-          Text {
-            text: text.child,
-            style: theme.text.clone(),
-          }
-        })
-      }
-
+      Option::map(prefix.clone(), move |text| {
+        Text { text, style: theme.text.clone() }
+      })
       Expanded {
         flex: 1.,
         Input {
@@ -376,14 +372,10 @@ fn build_input_area(
           identify(placeholder)
         }
       }
-      DynWidget {
-        dyns: subfix.map(|text| {
-          Text {
-            text: text.child,
-            style: theme.text.clone(),
-          }
-        })
-      }
+      Option::map(suffix.clone(),  move |text| {
+        Text { text, style: theme.text.clone()}
+      })
+
     }
     transition prop!(input_area.visible, move |_from, to, rate| *to && rate >= 1.) {
         by: linear,
@@ -398,11 +390,7 @@ fn build_input_area(
         });
       let_watch!(this.text.clone())
         .distinct_until_changed()
-        .subscribe(move |val| {
-          if input.text() != val {
-            input.set_text(val);
-          }
-        });
+        .subscribe(move |val| input.set_text(val));
       let_watch!(theme.state)
         .distinct_until_changed()
         .subscribe(move |state| {

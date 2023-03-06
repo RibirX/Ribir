@@ -52,69 +52,65 @@ impl ComposeChild for Ripple {
         } else {
           Some(e.position())
         },
-        DynWidget { dyns: child }
-        DynWidget {
-          dyns: {
-            this.launch_pos.map(|launch_at| {
-              let radius = this.radius.unwrap_or_else(|| {
-                let size = container.layout_size();
-                let distance_x = f32::max(launch_at.x , size.width - launch_at.x);
-                let distance_y = f32::max(launch_at.y, size.height - launch_at.y);
-                (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
-              });
-              let linear_transition = linear_transition.clone();
-              widget!{
-                IgnorePointer {
-                  DynWidget {
-                    dyns: (this.bounded != RippleBound::Unbounded).then(|| {
-                      let rect = Rect::from_size(container.layout_size());
-                      let path = match this.bounded {
-                        RippleBound::Unbounded => unreachable!(),
-                        RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
-                        RippleBound::Radius(radius) => {
-                          Path::rect_round(&rect, &radius, PathStyle::Fill)
-                        }
-                      };
-                      Clip { clip: ClipType::Path(path) }
-                    }),
-                    Container {
-                      size: container.layout_size(),
-                      PathPaintKit {
-                        id: ripple_path,
-                        brush: StateRole::pressed().calc_color(this.color),
-                        path: Path::circle(launch_at, radius, PathStyle::Fill),
-                        on_mounted: move |_| { ripper_enter.run(); }
-                      }
+        identify(child)
+        Option::map(this.launch_pos, |launch_at| {
+          let radius = this.radius.unwrap_or_else(|| {
+            let size = container.layout_size();
+            let distance_x = f32::max(launch_at.x , size.width - launch_at.x);
+            let distance_y = f32::max(launch_at.y, size.height - launch_at.y);
+            (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
+          });
+          let linear_transition = linear_transition.clone();
+          widget!{
+            IgnorePointer {
+              DynWidget {
+                dyns: (this.bounded != RippleBound::Unbounded).then(|| {
+                  let rect = Rect::from_size(container.layout_size());
+                  let path = match this.bounded {
+                    RippleBound::Unbounded => unreachable!(),
+                    RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
+                    RippleBound::Radius(radius) => {
+                      Path::rect_round(&rect, &radius, PathStyle::Fill)
                     }
+                  };
+                  Clip { clip: ClipType::Path(path) }
+                }),
+                Container {
+                  size: container.layout_size(),
+                  PathPaintKit {
+                    id: ripple_path,
+                    brush: StateRole::pressed().calc_color(this.color),
+                    path: Path::circle(launch_at, radius, PathStyle::Fill),
+                    on_mounted: move |_| { ripper_enter.run(); }
                   }
                 }
-                Animate {
-                  id: ripper_enter,
-                  transition: linear_transition,
-                  prop: prop!(ripple_path.path, move |_, _, rate| {
-                    let radius = Lerp::lerp(&0., &radius, rate);
-                    let center = this.launch_pos.clone().unwrap();
-                    Path::circle(center, radius, PathStyle::Fill)
-                  }),
-                  from: Path::circle(Point::zero(), 0., PathStyle::Fill)
-                }
-                finally {
-                  let_watch!(!container.pointer_pressed() && !ripper_enter.is_running())
-                    .filter(|b| *b)
-                    .subscribe(move |_| {
-                      this.launch_pos.take();
-                    });
-                }
-                // todo: support disposed animate
-                // Animate {
-                //   id: ripper_fade_out,
-                //   from: State { ripple_path.opacity: 1.},
-                //   transition: transitions::EASE_OUT.get_from_or_default(ctx.theme()),
-                // }
               }
-            })
+            }
+            Animate {
+              id: ripper_enter,
+              transition: linear_transition,
+              prop: prop!(ripple_path.path, move |_, _, rate| {
+                let radius = Lerp::lerp(&0., &radius, rate);
+                let center = this.launch_pos.clone().unwrap();
+                Path::circle(center, radius, PathStyle::Fill)
+              }),
+              from: Path::circle(Point::zero(), 0., PathStyle::Fill)
+            }
+            finally {
+              let_watch!(!container.pointer_pressed() && !ripper_enter.is_running())
+                .filter(|b| *b)
+                .subscribe(move |_| {
+                  this.launch_pos.take();
+                });
+            }
+            // todo: support disposed animate
+            // Animate {
+            //   id: ripper_fade_out,
+            //   from: State { ripple_path.opacity: 1.},
+            //   transition: transitions::EASE_OUT.get_from_or_default(ctx.theme()),
+            // }
           }
-        }
+        })
       }
     }
   }
