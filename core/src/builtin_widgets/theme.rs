@@ -47,7 +47,7 @@ pub struct TextSelectedBackground {
 pub struct FullTheme {
   // Dark or light theme.
   pub brightness: Brightness,
-  pub palette: Palette,
+  pub palette: Rc<Palette>,
   pub typography_theme: TypographyTheme,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
@@ -60,7 +60,7 @@ pub struct FullTheme {
 #[derive(Default)]
 pub struct InheritTheme {
   pub brightness: Option<Brightness>,
-  pub palette: Option<Palette>,
+  pub palette: Option<Rc<Palette>>,
   pub typography_theme: Option<TypographyTheme>,
   /// icon size standard
   pub icon_size: Option<IconSize>,

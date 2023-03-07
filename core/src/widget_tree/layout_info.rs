@@ -16,6 +16,42 @@ pub struct BoxClamp {
   pub max: Size,
 }
 
+impl BoxClamp {
+  /// clamp use to expand the width to max
+  pub const EXPAND_X: BoxClamp = BoxClamp {
+    min: Size::new(f32::INFINITY, 0.),
+    max: Size::new(f32::INFINITY, f32::INFINITY),
+  };
+
+  /// clamp use to expand the height to max
+  pub const EXPAND_Y: BoxClamp = BoxClamp {
+    min: Size::new(0., f32::INFINITY),
+    max: Size::new(f32::INFINITY, f32::INFINITY),
+  };
+
+  /// clamp use to expand the size to max
+  pub const EXPAND_BOTH: BoxClamp = BoxClamp {
+    min: Size::new(f32::INFINITY, f32::INFINITY),
+    max: Size::new(f32::INFINITY, f32::INFINITY),
+  };
+
+  /// clamp use fixed width and unfixed height
+  pub fn fixed_width(width: f32) -> Self {
+    BoxClamp {
+      min: Size::new(width, 0.),
+      max: Size::new(width, f32::INFINITY),
+    }
+  }
+
+  /// clamp use fixed height and unfixed width
+  pub fn fixed_height(height: f32) -> Self {
+    BoxClamp {
+      min: Size::new(0., height),
+      max: Size::new(f32::INFINITY, height),
+    }
+  }
+}
+
 /// render object's layout box, the information about layout, including box
 /// size, box position, and the clamp of render object layout.
 #[derive(Debug, Default)]

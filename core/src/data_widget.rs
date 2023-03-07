@@ -1,4 +1,4 @@
-//! Data widget help attach data to a widget and get a new widget witch behavior
+//! Data widget help attach data to a widget and get a new widget which behavior
 //! is same as origin widget.
 
 use crate::{impl_proxy_query, impl_proxy_render, impl_query_self_only, prelude::*};

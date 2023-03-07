@@ -53,6 +53,15 @@ pub enum Brush {
   Gradient, // todo,
 }
 
+impl Brush {
+  pub fn only_convert_color(&self, f: impl FnOnce(&Color) -> Color) -> Brush {
+    match self {
+      Brush::Color(color) => f(color).into(),
+      _ => self.clone(),
+    }
+  }
+}
+
 /// The style to paint path, maybe fill or stroke.
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub enum PathStyle {

@@ -52,7 +52,7 @@ impl ComposeChild for Ripple {
         } else {
           Some(e.position())
         },
-        identify(child)
+        DynWidget::from(child)
         Option::map(this.launch_pos, |launch_at| {
           let radius = this.radius.unwrap_or_else(|| {
             let size = container.layout_size();

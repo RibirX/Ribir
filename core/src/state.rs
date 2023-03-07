@@ -9,6 +9,7 @@ pub use stateful::*;
 use crate::dynamic_widget::DynWidget;
 
 /// Enum to store both stateless and stateful object.
+#[derive(Clone)]
 pub enum State<W> {
   Stateless(W),
   Stateful(Stateful<W>),

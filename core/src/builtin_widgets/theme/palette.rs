@@ -1,4 +1,4 @@
-use std::cell::Ref;
+use std::{cell::Ref, rc::Rc};
 
 use ribir_painter::{Color, LightnessTone};
 
@@ -95,7 +95,7 @@ pub struct LightnessCfg {
 
 impl Palette {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
+  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Rc<Self>> {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(f) => Some(&f.palette),
@@ -105,76 +105,76 @@ impl Palette {
   }
 
   #[inline]
-  pub fn primary(&self) -> Color { self.base_of(self.primary) }
+  pub fn primary(&self) -> Color { self.base_of(&self.primary) }
 
   #[inline]
-  pub fn on_primary(&self) -> Color { self.on_of(self.primary) }
+  pub fn on_primary(&self) -> Color { self.on_of(&self.primary) }
 
   #[inline]
-  pub fn primary_container(&self) -> Color { self.container_of(self.primary) }
+  pub fn primary_container(&self) -> Color { self.container_of(&self.primary) }
 
   #[inline]
-  pub fn on_primary_container(&self) -> Color { self.on_container_of(self.primary) }
+  pub fn on_primary_container(&self) -> Color { self.on_container_of(&self.primary) }
 
   #[inline]
-  pub fn secondary(&self) -> Color { self.base_of(self.secondary) }
+  pub fn secondary(&self) -> Color { self.base_of(&self.secondary) }
 
   #[inline]
-  pub fn on_secondary(&self) -> Color { self.on_of(self.secondary) }
+  pub fn on_secondary(&self) -> Color { self.on_of(&self.secondary) }
 
   #[inline]
-  pub fn secondary_container(&self) -> Color { self.container_of(self.secondary) }
+  pub fn secondary_container(&self) -> Color { self.container_of(&self.secondary) }
 
   #[inline]
-  pub fn on_secondary_container(&self) -> Color { self.on_container_of(self.secondary) }
+  pub fn on_secondary_container(&self) -> Color { self.on_container_of(&self.secondary) }
 
   #[inline]
-  pub fn tertiary(&self) -> Color { self.base_of(self.tertiary) }
+  pub fn tertiary(&self) -> Color { self.base_of(&self.tertiary) }
 
   #[inline]
-  pub fn on_tertiary(&self) -> Color { self.on_of(self.tertiary) }
+  pub fn on_tertiary(&self) -> Color { self.on_of(&self.tertiary) }
 
   #[inline]
-  pub fn tertiary_container(&self) -> Color { self.container_of(self.tertiary) }
+  pub fn tertiary_container(&self) -> Color { self.container_of(&self.tertiary) }
 
   #[inline]
-  pub fn on_tertiary_container(&self) -> Color { self.on_container_of(self.tertiary) }
+  pub fn on_tertiary_container(&self) -> Color { self.on_container_of(&self.tertiary) }
 
   #[inline]
-  pub fn success(&self) -> Color { self.base_of(self.success) }
+  pub fn success(&self) -> Color { self.base_of(&self.success) }
 
   #[inline]
-  pub fn on_success(&self) -> Color { self.on_of(self.success) }
+  pub fn on_success(&self) -> Color { self.on_of(&self.success) }
 
   #[inline]
-  pub fn success_container(&self) -> Color { self.container_of(self.success) }
+  pub fn success_container(&self) -> Color { self.container_of(&self.success) }
 
   #[inline]
-  pub fn on_success_container(&self) -> Color { self.on_container_of(self.success) }
+  pub fn on_success_container(&self) -> Color { self.on_container_of(&self.success) }
 
   #[inline]
-  pub fn warning(&self) -> Color { self.base_of(self.warning) }
+  pub fn warning(&self) -> Color { self.base_of(&self.warning) }
 
   #[inline]
-  pub fn on_warning(&self) -> Color { self.on_of(self.warning) }
+  pub fn on_warning(&self) -> Color { self.on_of(&self.warning) }
 
   #[inline]
-  pub fn warning_container(&self) -> Color { self.container_of(self.warning) }
+  pub fn warning_container(&self) -> Color { self.container_of(&self.warning) }
 
   #[inline]
-  pub fn on_warning_container(&self) -> Color { self.on_container_of(self.warning) }
+  pub fn on_warning_container(&self) -> Color { self.on_container_of(&self.warning) }
 
   #[inline]
-  pub fn error(&self) -> Color { self.base_of(self.error) }
+  pub fn error(&self) -> Color { self.base_of(&self.error) }
 
   #[inline]
-  pub fn on_error(&self) -> Color { self.on_of(self.error) }
+  pub fn on_error(&self) -> Color { self.on_of(&self.error) }
 
   #[inline]
-  pub fn error_container(&self) -> Color { self.container_of(self.error) }
+  pub fn error_container(&self) -> Color { self.container_of(&self.error) }
 
   #[inline]
-  pub fn on_error_container(&self) -> Color { self.on_container_of(self.error) }
+  pub fn on_error_container(&self) -> Color { self.on_container_of(&self.error) }
 
   #[inline]
   pub fn background(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.neutral) }
@@ -227,25 +227,25 @@ impl Palette {
 
   /// change color to the `base` light tone of the palette.
   #[inline]
-  pub fn base_of(&self, color: Color) -> Color {
+  pub fn base_of(&self, color: &Color) -> Color {
     color.with_lightness(self.lightness_cfg.color_group.base)
   }
 
   /// change color to the `container` light tone of the palette.
   #[inline]
-  pub fn container_of(&self, color: Color) -> Color {
+  pub fn container_of(&self, color: &Color) -> Color {
     color.with_lightness(self.lightness_cfg.color_group.container)
   }
 
   /// change color to the `on`  light tone of the palette.
   #[inline]
-  pub fn on_of(&self, color: Color) -> Color {
+  pub fn on_of(&self, color: &Color) -> Color {
     color.with_lightness(self.lightness_cfg.color_group.on)
   }
 
   /// change color to the `on`  light tone of the palette.
   #[inline]
-  pub fn on_container_of(&self, color: Color) -> Color {
+  pub fn on_container_of(&self, color: &Color) -> Color {
     color.with_lightness(self.lightness_cfg.color_group.on_container)
   }
 }
