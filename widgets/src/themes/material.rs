@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 pub use super::*;
 use crate::prelude::*;
 use ribir_core::{fill_svgs, prelude::*};
@@ -24,7 +26,7 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
 
   let mut theme = FullTheme {
     brightness,
-    palette,
+    palette: Rc::new(palette),
     typography_theme,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
@@ -68,6 +70,11 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   Theme::Full(theme)
 }
 
+const FAB_RADIUS: f32 = 16.;
+const LABEL_GAP: f32 = 8.;
+const BUTTON_RADIUS: f32 = 20.;
+const BUTTON_PADDING: f32 = 16.;
+
 fn init_custom_theme(theme: &mut FullTheme) {
   theme.custom_themes.set_custom_theme(ScrollBarTheme {
     thumb_min_size: 12.,
@@ -78,17 +85,46 @@ fn init_custom_theme(theme: &mut FullTheme) {
     size: theme.icon_theme.icon_size.tiny,
     label_style: theme.typography_theme.body_large.text.clone(),
   });
-  theme.custom_themes.set_custom_theme(ButtonTheme {
-    padding: 4.,
-    radius: 4.,
-    border_color: theme.palette.primary(),
-    background: theme.palette.primary(),
-    foreground: theme.palette.surface(),
-  });
   theme.custom_themes.set_custom_theme(InputTheme {
     min_length: 20.,
     select_background: Color::from_rgb(181, 215, 254).into(),
     caret_color: Brush::Color(theme.palette.on_surface()),
+  });
+  theme.custom_themes.set_custom_theme(FilledButtonStyle {
+    height: 40.,
+    icon_size: theme.icon_theme.icon_size.tiny,
+    label_gap: LABEL_GAP,
+    icon_pos: IconPosition::Before,
+    label_style: theme.typography_theme.label_large.text.clone(),
+    radius: BUTTON_RADIUS,
+    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
+  });
+  theme.custom_themes.set_custom_theme(OutlinedButtonStyle {
+    height: 40.,
+    icon_size: theme.icon_theme.icon_size.tiny,
+    label_gap: LABEL_GAP,
+    icon_pos: IconPosition::Before,
+    label_style: theme.typography_theme.label_large.text.clone(),
+    radius: BUTTON_RADIUS,
+    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
+    border_width: 1.,
+  });
+  theme.custom_themes.set_custom_theme(RawButtonStyle {
+    height: 40.,
+    icon_size: theme.icon_theme.icon_size.tiny,
+    label_gap: LABEL_GAP,
+    icon_pos: IconPosition::Before,
+    label_style: theme.typography_theme.label_large.text.clone(),
+    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
+  });
+  theme.custom_themes.set_custom_theme(FabButtonStyle {
+    height: 56.,
+    icon_size: theme.icon_theme.icon_size.small,
+    label_gap: LABEL_GAP,
+    icon_pos: IconPosition::Before,
+    label_style: theme.typography_theme.label_large.text.clone(),
+    radius: FAB_RADIUS,
+    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
 }
 

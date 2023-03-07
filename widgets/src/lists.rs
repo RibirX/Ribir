@@ -115,7 +115,7 @@ impl ComposeChild for Lists {
               ListItemStyle {
                 divider: this.divider,
                 edge,
-                identify(w)
+                DynWidget::from(w)
               }
             }
           })

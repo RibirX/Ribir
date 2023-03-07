@@ -6,24 +6,6 @@ pub struct ConstrainedBox {
   pub clamp: BoxClamp,
 }
 
-/// clamp use to expand the width to max
-pub const EXPAND_X: BoxClamp = BoxClamp {
-  min: Size::new(f32::INFINITY, 0.),
-  max: Size::new(f32::INFINITY, f32::INFINITY),
-};
-
-/// clamp use to expand the height to max
-pub const EXPAND_Y: BoxClamp = BoxClamp {
-  min: Size::new(0., f32::INFINITY),
-  max: Size::new(f32::INFINITY, f32::INFINITY),
-};
-
-/// clamp use to expand the size to max
-pub const EXPAND_BOTH: BoxClamp = BoxClamp {
-  min: Size::new(f32::INFINITY, f32::INFINITY),
-  max: Size::new(f32::INFINITY, f32::INFINITY),
-};
-
 impl Render for ConstrainedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let max = clamp.max.min(self.clamp.max);
@@ -54,7 +36,7 @@ mod tests {
       Container {
         size: Size::new(256., 50.),
         ConstrainedBox {
-          clamp: EXPAND_X,
+          clamp: BoxClamp::EXPAND_X,
           Container {
             size: Size::new(128., 20.),
           }
@@ -83,7 +65,7 @@ mod tests {
       Container {
         size: Size::new(256., 50.),
         ConstrainedBox {
-          clamp: EXPAND_BOTH,
+          clamp: BoxClamp::EXPAND_BOTH,
           Container {
             size: Size::new(128., 20.),
           }

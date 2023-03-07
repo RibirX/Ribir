@@ -12,15 +12,15 @@ fn main() {
     Column {
       Row {
         margin: EdgeInsets::all(2.),
-        Button {
+        FilledButton {
           on_tap: move |_| *cnt += 1,
           margin: EdgeInsets::only_right(2.),
-          ButtonText::new("Add")
+          Label::new("Add")
         }
-        Button {
+        FilledButton {
           on_tap: move |_| *cnt -= 1,
           margin: EdgeInsets::only_right(2.),
-          ButtonText::new("Sub")
+          Label::new("Sub")
         }
       }
       Row {

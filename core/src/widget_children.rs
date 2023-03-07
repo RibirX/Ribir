@@ -119,6 +119,18 @@ mod tests {
   }
 
   #[test]
+  fn compose_option_dyn_parent() {
+    widget! {
+      DynWidget {
+        dyns: true.then(|| {
+          MockBox { size: Size::zero() }
+        }),
+        Void {}
+      }
+    };
+  }
+
+  #[test]
   fn tuple_as_vec() {
     #[derive(Declare)]
     struct A;

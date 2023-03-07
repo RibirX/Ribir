@@ -33,10 +33,10 @@ impl<D> DynWidgetDeclarer<D> {
   }
 }
 
-#[inline]
-pub const fn identify<V>(v: V) -> V { v }
-
 impl<D> DynWidget<D> {
+  #[inline]
+  pub const fn from(v: D) -> D { v }
+
   pub fn set_declare_dyns(&mut self, dyns: D) { self.dyns = Some(dyns); }
 
   pub fn into_inner(mut self) -> D {

@@ -16,9 +16,9 @@ fn main() {
           id: input,
           Placeholder::new("Enter the name you want to greet.")
         }
-        Button {
+        FilledButton {
           on_tap: move |_| *counter += 1,
-          ButtonText::new({
+          Label::new({
             let counter = counter.to_string();
             format!("Greet!({counter})")
           })

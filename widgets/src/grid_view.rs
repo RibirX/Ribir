@@ -1,5 +1,6 @@
 use crate::layout::Direction;
 use ribir_core::{impl_query_self_only, prelude::*};
+
 #[derive(Declare, MultiChild)]
 pub struct GridView {
   axis_dir: Direction,

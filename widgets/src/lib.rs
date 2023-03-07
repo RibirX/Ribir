@@ -1,4 +1,4 @@
-pub mod button;
+pub mod buttons;
 pub mod checkbox;
 pub mod common_widget;
 pub mod grid_view;
@@ -15,7 +15,7 @@ pub mod text_field;
 pub mod themes;
 pub mod transform_box;
 pub mod prelude {
-  pub use super::button::*;
+  pub use super::buttons::*;
   pub use super::checkbox::*;
   pub use super::common_widget::*;
   pub use super::grid_view::*;

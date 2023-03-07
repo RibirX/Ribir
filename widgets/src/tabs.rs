@@ -64,7 +64,7 @@ impl ComposeChild for Tabs {
     widget! {
       states { this: this.into_writable() }
       init ctx => {
-        let border_color = Palette::of(ctx).surface_variant();
+        let border_color = Palette::of(ctx).surface_variant().into();
         let normal_text_style = &TypographyTheme::of(ctx).title_small.text;
         let active_text_style = &TypographyTheme::of(ctx).title_small.text;
         let normal_foreground: Brush = Palette::of(ctx).on_surface_variant().into();
