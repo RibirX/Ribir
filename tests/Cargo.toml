@@ -1,0 +1,34 @@
+[package]
+edition = "2021"
+name = "tests"
+publish = false
+version = "0.1.0"
+
+[dev-dependencies]
+ribir = {path = "../ribir"}
+trybuild = "1.0.77"
+winit = "0.28.1"
+
+[[test]]
+name = "compile_message"
+path = "compile_message.rs"
+
+[[test]]
+name = "code_gen_logic"
+path = "code_gen_test.rs"
+
+[[test]]
+name = "animations_syntax"
+path = "animations_syntax_test.rs"
+
+[[test]]
+name = "child_template_derive"
+path = "child_template_derive_test.rs"
+
+[[test]]
+name = "declare_builder"
+path = "declare_builder_test.rs"
+
+[[test]]
+name = "path_child"
+path = "path_child_test.rs"

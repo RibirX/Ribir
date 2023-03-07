@@ -9,6 +9,7 @@ members = [
   "text",
   "widgets",
   "ribir",
+  "tests",
 ]
 resolver = "2"
 
