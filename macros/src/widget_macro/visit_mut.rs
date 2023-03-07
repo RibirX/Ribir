@@ -66,6 +66,7 @@ pub struct LocalVariable {
 }
 
 impl LocalVariable {
+  pub fn new(name: Ident, alias: Ident) -> Self { Self { name, alias_of_name: Some(alias) } }
   pub fn local(name: Ident) -> Self { Self { name, alias_of_name: None } }
 }
 
