@@ -5,6 +5,12 @@ on:
     branches:
       - master
 
+env:
+  CARGO_INCREMENTAL: false
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+  RUSTDOCFLAGS: -Dwarnings
+
 name: CI
 jobs:
   check:
