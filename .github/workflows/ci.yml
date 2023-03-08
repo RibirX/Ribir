@@ -25,38 +25,16 @@ jobs:
         with:
           command: check
 
-
-  gpu-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Windows
-          - name: Windows x86_64
-            os: windows-2022
-            backends: dx12
-
-          # Linux
-          - name: Linux x86_64
-            os: ubuntu-22.04
-            backends: vulkan gl
-
-    name: Test ${{ matrix.name }}
+  test:
+    name: Test Suite
     runs-on: ${{ matrix.os }}
-
+    strategy:
+      matrix:
+        # ubuntu will test individual and be used for 'codecov'
+        os: [macos-latest, ubuntu-22.04, windows-2022]
     steps:
-      - name: checkout repo
+      - name: Checkout sources
         uses: actions/checkout@v3
-
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2023-02-01
-          override: true
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
       - name: install swiftshader
         if: matrix.os == 'ubuntu-22.04'
         shell: bash
@@ -76,60 +54,24 @@ jobs:
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
           sudo apt-get update
           sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev vulkan-sdk
-      - name: caching
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: test-${{ matrix.os }}-${{ env.CACHE_SUFFIX }}
-      - name: run wgpu-info
-        shell: bash
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
-  test:
-    name: Test Suite
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        # ubuntu will test individual and be used for 'codecov'
-        os: [macos-latest, windows-latest]
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
+            - name: Install cargo-nextest and cargo-llvm-cov
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: nightly-2023-02-01
           override: true
-      - uses: Swatinem/rust-cache@v2
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
+      - uses: taiki-e/install-action@v2
         with:
-          command: test
-  ubuntu-test:
-    name: Test Suite(ubuntu-latest)
-    runs-on: macos-latest
-    env:
-      CARGO_TERM_COLOR: always
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2023-02-01
-          override: true
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+          tool: cargo-nextest, cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
       - name: run llvm-cov test
         # should test with --all-features if gpu support.
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+        run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: lcov.info
-          fail_ci_if_error: true
- 
   rustfmt:
     name: rust code format style check
     runs-on: ubuntu-latest
