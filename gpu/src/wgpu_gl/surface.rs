@@ -1,7 +1,4 @@
-use std::{
-  cell::{Ref, RefCell},
-  num::{NonZeroU32, NonZeroU64},
-};
+use std::num::{NonZeroU32, NonZeroU64};
 
 use super::DeviceSize;
 /// `Surface` is a thing presentable canvas visual display.
@@ -12,7 +9,7 @@ pub trait Surface {
 
   fn format(&self) -> wgpu::TextureFormat;
 
-  fn current_texture(&self) -> SurfaceTexture;
+  fn current_texture(&mut self) -> &wgpu::Texture;
 
   fn copy_as_rgba_buffer(
     &self,
@@ -27,7 +24,7 @@ pub trait Surface {
 pub struct WindowSurface {
   surface: wgpu::Surface,
   s_config: wgpu::SurfaceConfiguration,
-  current_texture: RefCell<Option<wgpu::SurfaceTexture>>,
+  current_texture: Option<wgpu::SurfaceTexture>,
 }
 
 impl Surface for WindowSurface {
@@ -41,16 +38,16 @@ impl Surface for WindowSurface {
 
   fn format(&self) -> wgpu::TextureFormat { self.s_config.format }
 
-  fn current_texture(&self) -> SurfaceTexture {
-    self.current_texture.borrow_mut().get_or_insert_with(|| {
-      self
-        .surface
-        .get_current_texture()
-        .expect("Timeout getting texture")
-    });
-    SurfaceTexture::RefCell(Ref::map(self.current_texture.borrow(), |t| {
-      &t.as_ref().unwrap().texture
-    }))
+  fn current_texture(&mut self) -> &wgpu::Texture {
+    &self
+      .current_texture
+      .get_or_insert_with(|| {
+        self
+          .surface
+          .get_current_texture()
+          .expect("Timeout getting texture")
+      })
+      .texture
   }
 
   fn copy_as_rgba_buffer(
@@ -58,8 +55,11 @@ impl Surface for WindowSurface {
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
   ) -> wgpu::Buffer {
-    let texture = self.current_texture.borrow();
-    let texture = &texture.as_ref().expect("should always have").texture;
+    let texture = &self
+      .current_texture
+      .as_ref()
+      .expect("should always have")
+      .texture;
     let wgpu::SurfaceConfiguration { width, height, .. } = self.s_config;
     let buffer = texture_to_buffer_4_bytes_per_pixel(device, encoder, texture, width, height);
 
@@ -139,22 +139,6 @@ impl Surface for WindowSurface {
   }
 }
 
-pub enum SurfaceTexture<'a> {
-  RefCell(Ref<'a, wgpu::Texture>),
-  Ref(&'a wgpu::Texture),
-}
-
-impl<'a> std::ops::Deref for SurfaceTexture<'a> {
-  type Target = wgpu::Texture;
-
-  fn deref(&self) -> &Self::Target {
-    match self {
-      SurfaceTexture::RefCell(t) => t,
-      SurfaceTexture::Ref(t) => t,
-    }
-  }
-}
-
 impl Surface for TextureSurface {
   fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: DeviceSize) {
     let new_texture = Self::new_texture(device, size, self.usage);
@@ -192,7 +176,7 @@ impl Surface for TextureSurface {
 
   fn format(&self) -> wgpu::TextureFormat { TextureSurface::FORMAT }
 
-  fn current_texture(&self) -> SurfaceTexture { SurfaceTexture::Ref(&self.raw_texture) }
+  fn current_texture(&mut self) -> &wgpu::Texture { &self.raw_texture }
 
   fn copy_as_rgba_buffer(
     &self,
@@ -277,7 +261,7 @@ impl WindowSurface {
     Self {
       surface,
       s_config,
-      current_texture: RefCell::new(None),
+      current_texture: None,
     }
   }
 }

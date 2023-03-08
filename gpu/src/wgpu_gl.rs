@@ -8,7 +8,7 @@ mod stencil_pass;
 pub mod surface;
 
 use surface::{Surface, TextureSurface, WindowSurface};
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, TextureView};
 
 use zerocopy::AsBytes;
 mod img_pass;
@@ -157,122 +157,12 @@ impl<S: Surface> GlRender for WgpuGl<S> {
   }
 
   fn draw_triangles(&mut self, data: TriangleLists) {
-    self.write_vertex_buffer(data.vertices, data.indices);
-    let vertex_buffers = self.vertex_buffers.as_ref().unwrap();
-
-    let mut encoder = self.create_command_encoder();
-    let prim_bind_group = self.create_primitives_bind_group(data.primitives);
-
-    let sample_count = self.multi_sample_count();
-    let Self {
-      device,
-      coordinate_matrix,
-      color_pass,
-      img_pass,
-      stencil_pass,
-      ..
-    } = self;
-
-    let uniforms = data
-      .commands
-      .iter()
-      .filter_map(|cmd| match cmd {
-        crate::DrawTriangles::Texture { texture_id, .. } => {
-          let uniform = img_pass.create_texture_uniform(device, *texture_id, coordinate_matrix);
-          Some((texture_id, uniform))
-        }
-        _ => None,
-      })
-      .collect::<std::collections::HashMap<_, _>>();
-
     let view = self
       .surface
       .current_texture()
       .create_view(&wgpu::TextureViewDescriptor::default());
 
-    let size_extend = wgpu::Extent3d {
-      width: self.size.width,
-      height: self.size.height,
-      depth_or_array_layers: 1,
-    };
-
-    let stencil_texture = device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("stencil"),
-      size: size_extend,
-      mip_level_count: 1,
-      sample_count,
-      dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Depth24PlusStencil8,
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      view_formats: &[],
-    });
-
-    {
-      let (view, resolve_target, store) = self.multisample_framebuffer.as_ref().map_or_else(
-        || (&view, None, true),
-        |multi_sample| (multi_sample, Some(&view), false),
-      );
-      let load = if self.empty_frame {
-        wgpu::LoadOp::Clear(wgpu::Color::WHITE)
-      } else {
-        wgpu::LoadOp::Load
-      };
-      let ops = wgpu::Operations { load, store };
-      let rpass_color_attachment = wgpu::RenderPassColorAttachment { view, resolve_target, ops };
-
-      let load_stencil = if self.empty_frame {
-        wgpu::LoadOp::Clear(0)
-      } else {
-        wgpu::LoadOp::Load
-      };
-      let stencil_view = stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
-      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("Triangles render pass"),
-        color_attachments: &[Some(rpass_color_attachment)],
-        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-          view: &stencil_view,
-          depth_ops: None,
-          stencil_ops: Some(wgpu::Operations { load: load_stencil, store: true }),
-        }),
-      });
-      render_pass.set_vertex_buffer(0, vertex_buffers.vertices.slice(..));
-      render_pass.set_index_buffer(vertex_buffers.indices.slice(..), wgpu::IndexFormat::Uint32);
-      render_pass.set_bind_group(1, &prim_bind_group, &[]);
-      data.commands.iter().for_each(|cmd| {
-        let stencil_reference = self.stencil_cnt;
-        match cmd {
-          crate::DrawTriangles::Color(rg) => {
-            render_pass.set_pipeline(&color_pass.pipeline);
-            render_pass.set_bind_group(0, &color_pass.uniform, &[]);
-            render_pass.set_stencil_reference(stencil_reference);
-            render_pass.draw_indexed(rg.clone(), 0, 0..1);
-          }
-          crate::DrawTriangles::Texture { rg, texture_id } => {
-            render_pass.set_pipeline(&img_pass.pipeline);
-            render_pass.set_bind_group(0, uniforms.get(texture_id).unwrap(), &[]);
-            render_pass.set_stencil_reference(stencil_reference);
-            render_pass.draw_indexed(rg.clone(), 0, 0..1);
-          }
-          crate::DrawTriangles::PushStencil(rg) => {
-            render_pass.set_pipeline(&stencil_pass.push_stencil_pipeline);
-            render_pass.set_bind_group(0, &stencil_pass.uniform, &[]);
-            render_pass.set_stencil_reference(stencil_reference);
-            render_pass.draw_indexed(rg.clone(), 0, 0..1);
-            self.stencil_cnt += 1;
-          }
-          crate::DrawTriangles::PopStencil(rg) => {
-            render_pass.set_pipeline(&stencil_pass.pop_stencil_pipeline);
-            render_pass.set_bind_group(0, &stencil_pass.uniform, &[]);
-            render_pass.set_stencil_reference(stencil_reference);
-            render_pass.draw_indexed(rg.clone(), 0, 0..1);
-            self.stencil_cnt -= 1;
-          }
-        }
-      });
-    }
-    self.empty_frame = false;
-
-    self.queue.submit(iter::once(encoder.finish()));
+    self.draw_triangles_into_view(data, view);
   }
 
   fn end_frame<'a>(&mut self, cancel: bool) {
@@ -513,6 +403,120 @@ impl<S: Surface> WgpuGl<S> {
         index_size: indices.len(),
       });
     }
+  }
+
+  fn draw_triangles_into_view(&mut self, data: TriangleLists, view: TextureView) {
+    self.write_vertex_buffer(data.vertices, data.indices);
+    let vertex_buffers = self.vertex_buffers.as_ref().unwrap();
+
+    let mut encoder = self.create_command_encoder();
+    let prim_bind_group = self.create_primitives_bind_group(data.primitives);
+
+    let sample_count = self.multi_sample_count();
+    let Self {
+      device,
+      coordinate_matrix,
+      color_pass,
+      img_pass,
+      stencil_pass,
+      ..
+    } = self;
+
+    let uniforms = data
+      .commands
+      .iter()
+      .filter_map(|cmd| match cmd {
+        crate::DrawTriangles::Texture { texture_id, .. } => {
+          let uniform = img_pass.create_texture_uniform(device, *texture_id, coordinate_matrix);
+          Some((texture_id, uniform))
+        }
+        _ => None,
+      })
+      .collect::<std::collections::HashMap<_, _>>();
+
+    let size_extend = wgpu::Extent3d {
+      width: self.size.width,
+      height: self.size.height,
+      depth_or_array_layers: 1,
+    };
+
+    let stencil_texture = device.create_texture(&wgpu::TextureDescriptor {
+      label: Some("stencil"),
+      size: size_extend,
+      mip_level_count: 1,
+      sample_count,
+      dimension: wgpu::TextureDimension::D2,
+      format: wgpu::TextureFormat::Depth24PlusStencil8,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+      view_formats: &[],
+    });
+
+    {
+      let (view, resolve_target, store) = self.multisample_framebuffer.as_ref().map_or_else(
+        || (&view, None, true),
+        |multi_sample| (multi_sample, Some(&view), false),
+      );
+      let load = if self.empty_frame {
+        wgpu::LoadOp::Clear(wgpu::Color::WHITE)
+      } else {
+        wgpu::LoadOp::Load
+      };
+      let ops = wgpu::Operations { load, store };
+      let rpass_color_attachment = wgpu::RenderPassColorAttachment { view, resolve_target, ops };
+
+      let load_stencil = if self.empty_frame {
+        wgpu::LoadOp::Clear(0)
+      } else {
+        wgpu::LoadOp::Load
+      };
+      let stencil_view = stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
+      let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("Triangles render pass"),
+        color_attachments: &[Some(rpass_color_attachment)],
+        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+          view: &stencil_view,
+          depth_ops: None,
+          stencil_ops: Some(wgpu::Operations { load: load_stencil, store: true }),
+        }),
+      });
+      render_pass.set_vertex_buffer(0, vertex_buffers.vertices.slice(..));
+      render_pass.set_index_buffer(vertex_buffers.indices.slice(..), wgpu::IndexFormat::Uint32);
+      render_pass.set_bind_group(1, &prim_bind_group, &[]);
+      data.commands.iter().for_each(|cmd| {
+        let stencil_reference = self.stencil_cnt;
+        match cmd {
+          crate::DrawTriangles::Color(rg) => {
+            render_pass.set_pipeline(&color_pass.pipeline);
+            render_pass.set_bind_group(0, &color_pass.uniform, &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+          }
+          crate::DrawTriangles::Texture { rg, texture_id } => {
+            render_pass.set_pipeline(&img_pass.pipeline);
+            render_pass.set_bind_group(0, uniforms.get(texture_id).unwrap(), &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+          }
+          crate::DrawTriangles::PushStencil(rg) => {
+            render_pass.set_pipeline(&stencil_pass.push_stencil_pipeline);
+            render_pass.set_bind_group(0, &stencil_pass.uniform, &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+            self.stencil_cnt += 1;
+          }
+          crate::DrawTriangles::PopStencil(rg) => {
+            render_pass.set_pipeline(&stencil_pass.pop_stencil_pipeline);
+            render_pass.set_bind_group(0, &stencil_pass.uniform, &[]);
+            render_pass.set_stencil_reference(stencil_reference);
+            render_pass.draw_indexed(rg.clone(), 0, 0..1);
+            self.stencil_cnt -= 1;
+          }
+        }
+      });
+    }
+    self.empty_frame = false;
+
+    self.queue.submit(iter::once(encoder.finish()));
   }
 }
 
