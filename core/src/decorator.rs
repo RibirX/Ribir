@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::{
   prelude::{BuildCtx, ComposeChild, Declare, DeclareBuilder},
   state::State,
@@ -21,18 +23,20 @@ use crate::{
 ///
 /// // We can apply `decorate_widget` in `Void` in a declared way.
 /// let _w = widget! {
-///   Decorator::<_> {
-///     decorate_fn: &decorate_widget,
+///   Decorator {
+///     decorate_fn: decorate_widget,
 ///     Void {}
 ///   }
 /// };
 /// ```
 #[derive(Declare)]
-pub struct Decorator<'a, Host> {
-  decorate_fn: &'a dyn Fn(Host) -> Widget,
+pub struct Decorator<Host, F: Fn(Host) -> Widget> {
+  decorate_fn: F,
+  #[declare(skip)]
+  _marker: PhantomData<*const Host>,
 }
 
-impl<'a, Host> ComposeChild for Decorator<'a, Host> {
+impl<Host, F: Fn(Host) -> Widget> ComposeChild for Decorator<Host, F> {
   type Child = Host;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
