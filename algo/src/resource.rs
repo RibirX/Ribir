@@ -22,11 +22,14 @@ pub enum Resource<T> {
 /// # Notice
 /// Compare two `ShareResource` just compare if it come form same resource not
 /// compare its content.
-#[derive(Debug, Eq, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ShareResource<T>(Rc<T>);
 
 impl<T> ShareResource<T> {
+  #[inline]
   pub fn new(v: T) -> Self { ShareResource(Rc::new(v)) }
+  #[inline]
+  pub fn as_ptr(this: &Self) -> *const () { Rc::as_ptr(&this.0) as *const () }
 }
 
 impl<T> Clone for ShareResource<T> {
@@ -65,6 +68,8 @@ impl<T> PartialEq for ShareResource<T> {
   #[inline]
   fn eq(&self, other: &Self) -> bool { Rc::ptr_eq(&self.0, &other.0) }
 }
+
+impl<T> Eq for ShareResource<T> {}
 
 impl<T> Hash for ShareResource<T> {
   #[inline]

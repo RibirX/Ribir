@@ -233,7 +233,7 @@ impl WidgetId {
     fn paint_rect_intersect(painter: &mut Painter, rc: &Rect) -> bool {
       let paint_rect = painter.get_transform().outer_transformed_rect(rc);
       painter
-        .visual_rect()
+        .paint_bounds()
         .and_then(|rc| rc.intersection(&paint_rect))
         .is_some()
     }

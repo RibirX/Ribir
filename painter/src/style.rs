@@ -1,4 +1,4 @@
-use crate::{Color, PixelImage};
+use crate::{Color, PixelImage, Transform};
 use ribir_algo::ShareResource;
 use ribir_text::{Em, FontFace, FontSize, Pixel};
 use serde::{Deserialize, Serialize};
@@ -62,10 +62,12 @@ impl TileMode {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum Brush {
   Color(Color),
+  /// Image brush always use a repeat mode to brush the path.
   Image {
     img: ShareResource<PixelImage>,
-    tile_mode: TileMode,
-    opacify: f32,
+    opacity: f32,
+    /// Transform applied to the image before brush the path.
+    transform: Transform,
   },
   Gradient, // todo,
 }
@@ -81,7 +83,7 @@ impl Brush {
   pub fn apply_opacify(&mut self, alpha: f32) {
     match self {
       Brush::Color(c) => *c = c.apply_alpha(alpha),
-      Brush::Image { opacify, .. } => *opacify *= alpha,
+      Brush::Image { opacity, .. } => *opacity *= alpha,
       Brush::Gradient => todo!(),
     }
   }
@@ -101,6 +103,22 @@ impl Default for TextStyle {
 impl From<Color> for Brush {
   #[inline]
   fn from(c: Color) -> Self { Brush::Color(c) }
+}
+
+impl From<ShareResource<PixelImage>> for Brush {
+  #[inline]
+  fn from(img: ShareResource<PixelImage>) -> Self {
+    Brush::Image {
+      img,
+      opacity: 1.,
+      transform: Transform::identity(),
+    }
+  }
+}
+
+impl From<PixelImage> for Brush {
+  #[inline]
+  fn from(img: PixelImage) -> Self { ShareResource::new(img).into() }
 }
 
 impl Default for Brush {

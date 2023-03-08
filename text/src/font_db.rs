@@ -381,7 +381,7 @@ fn get_or_insert_face<'a>(
   data_base: &'a Database,
   id: ID,
 ) -> &'a Option<Face> {
-  cache.get_or_insert_with(&id, || {
+  cache.get_or_insert_with(id, || {
     data_base.face_source(id).and_then(|(src, face_index)| {
       let source_data = match src {
         fontdb::Source::Binary(data) => Some(data),

@@ -25,5 +25,6 @@ image.workspace = true
 ribir_material = {path = "../themes/material", version = "0.0.0"}
 
 [features]
-default = ["wgpu_gl"]
-wgpu_gl = ["ribir_gpu/wgpu_gl"]
+default = ["wgpu"]
+png = ["ribir_core/png"]
+wgpu = ["ribir_gpu/wgpu"]

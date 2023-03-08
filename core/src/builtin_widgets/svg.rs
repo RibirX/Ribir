@@ -18,6 +18,6 @@ impl Render for Svg {
   }
 }
 
-impl Query for SvgRender {
+impl Query for Svg {
   impl_query_self_only!();
 }

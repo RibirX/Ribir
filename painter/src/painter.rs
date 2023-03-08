@@ -1,16 +1,20 @@
+use crate::image::ColorFormat;
 use crate::{
   path::*, path_builder::PathBuilder, Angle, Brush, Color, DeviceRect, DeviceSize, Point, Rect,
   Size, TextStyle, Transform, Vector,
 };
+use crate::{DevicePoint, PixelImage};
 use euclid::{num::Zero, Size2D};
-use ribir_algo::{ShareResource, Substr};
+use ribir_algo::Substr;
 use ribir_text::{
   typography::{Overflow, PlaceLineDirection, TypographyCfg},
   Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
 };
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 use std::{
   error::Error,
+  future::Future,
   ops::{Deref, DerefMut},
 };
 
@@ -20,7 +24,7 @@ use std::{
 /// bottom edge of the canvas.
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
-  size: Size,
+  bounds: DeviceRect,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: PathBuilder,
@@ -28,28 +32,67 @@ pub struct Painter {
   typography_store: TypographyStore,
 }
 
-pub type CaptureCallback<'a> =
-  Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>;
-/// `PainterBackend` use to draw the picture what the `commands` described  to
-/// the target device. Usually is implemented by graphic library.
+/// `PainterBackend` use to draw textures for every frame, All `draw_commands`
+/// will called between `begin_frame` and `end_frame`
+///
+/// -- begin_frame()
+///  +--> draw_commands --+
+///  ^                    V
+///  +----------<---------+
+///  |
+///  V
+/// -+ end_frame()
+pub type ImageFuture =
+  Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>>;
 pub trait PainterBackend {
-  /// Submit the paint commands to draw
-  fn submit(&mut self, commands: Vec<PaintCommand>);
+  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing);
 
-  fn commands_to_image(
+  /// A frame start.
+  fn begin_frame(&mut self);
+
+  /// Paint `commands` and return a `SubTexture` store the image. This may be
+  /// called more than once to get multi sub-images.
+  fn draw_commands(&mut self, view_port: DeviceRect, commands: Vec<PaintCommand>) -> ImageFuture;
+
+  /// A frame end.
+  fn end_frame(&mut self);
+}
+
+/// Texture use to display.
+pub trait Texture {
+  type Host;
+
+  /// write data to the texture.
+  fn write_data(&mut self, dist: &DeviceRect, data: &[u8], host: &mut Self::Host);
+
+  fn copy_from_texture(
     &mut self,
-    commands: Vec<PaintCommand>,
-    capture: CaptureCallback,
-  ) -> Result<(), Box<dyn Error>>;
+    copy_to: DevicePoint,
+    from_texture: &Self,
+    from_rect: DeviceRect,
+    host: &mut Self::Host,
+  );
 
-  fn resize(&mut self, size: DeviceSize);
+  fn copy_as_image(&self, rect: &DeviceRect, host: &mut Self::Host) -> ImageFuture;
+
+  fn format(&self) -> ColorFormat;
+
+  fn size(&self) -> DeviceSize;
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AntiAliasing {
+  None = 1,
+  Msaa2X = 2,
+  Msaa4X = 4,
+  Msaa8X = 8,
+  Msaa16X = 16,
 }
 
 /// A path and its geometry information are friendly to paint and cache.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PaintPath {
-  /// The path to painting, and it's moved to `(0, 0)`, use bounds to move the
-  /// path to the rightful place.
+  /// The path to painting, and its axis is relative to the `bounds`.
   pub path: Path,
   /// The device bounds of drawing this path are required.
   pub bounds: DeviceRect,
@@ -57,20 +100,8 @@ pub struct PaintPath {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
-  Fill {
-    paint_path: PaintPath,
-    brush: Brush,
-  },
+  Fill { paint_path: PaintPath, brush: Brush },
   Clip(PaintPath),
-  Bundle {
-    /// The commands to painting, and it's moved to `(0, 0)`, use `transform`
-    /// move it to the rightful place.
-    commands: ShareResource<Box<[PaintCommand]>>,
-    /// A transform need to apply after all bundles commands are painted.
-    transform: Transform,
-    /// The device bounds of drawing this path are required.
-    bounds: DeviceRect,
-  },
   PopClip,
 }
 
@@ -86,14 +117,13 @@ struct PainterState {
   transform: Transform,
   opacity: f32,
   clip_cnt: u32,
-  visual_rect: DeviceRect,
+  bounds: DeviceRect,
 }
 
 impl PainterState {
-  fn new(size: Size, device_scale: f32) -> PainterState {
-    let visual_size = (size * device_scale).round().to_i32().cast_unit();
+  fn new(device_scale: f32, bounds: DeviceRect) -> PainterState {
     PainterState {
-      visual_rect: DeviceRect::from_size(visual_size),
+      bounds,
       stroke_options: <_>::default(),
       font_size: FontSize::Pixel(14.0.into()),
       letter_space: None,
@@ -108,28 +138,25 @@ impl PainterState {
 }
 
 impl Painter {
-  pub fn new(device_scale: f32, typography_store: TypographyStore, size: Size) -> Self {
-    let size = Size::new(size.width * device_scale, size.height * device_scale);
+  pub fn new(device_scale: f32, typography_store: TypographyStore) -> Self {
+    let bounds = DeviceRect::from_size(DeviceSize::new(i32::MAX, i32::MAX));
     let mut p = Self {
       device_scale,
-      state_stack: vec![PainterState::new(size, device_scale)],
+      state_stack: vec![PainterState::new(device_scale, bounds)],
       commands: vec![],
       path_builder: Path::builder(),
       typography_store,
-      size,
+      bounds,
     };
     p.scale(device_scale, device_scale);
     p
   }
 
-  pub fn resize(&mut self, logic_size: Size) {
-    self.size = Size::new(
-      logic_size.width * self.device_scale,
-      logic_size.height * self.device_scale,
-    );
-  }
+  /// Change the bounds of the painter can draw.But it won't take effect until
+  /// the next time you call [`Painter::reset`]!.
+  pub fn set_bounds(&mut self, bounds: DeviceRect) { self.bounds = bounds; }
 
-  pub fn visual_rect(&self) -> &DeviceRect { &self.current_state().visual_rect }
+  pub fn paint_bounds(&self) -> &DeviceRect { &self.current_state().bounds }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
@@ -161,8 +188,13 @@ impl Painter {
     let clip_cnt = self.current_state().clip_cnt;
     self.state_stack.pop();
 
-    (self.current_state().clip_cnt..clip_cnt)
-      .for_each(|_| self.commands.push(PaintCommand::PopClip));
+    (self.current_state().clip_cnt..clip_cnt).for_each(|_| {
+      if matches!(self.commands.last(), Some(PaintCommand::Clip(_))) {
+        self.commands.pop();
+      } else {
+        self.commands.push(PaintCommand::PopClip)
+      }
+    });
   }
 
   pub fn reset(&mut self, device_scale: Option<f32>) {
@@ -172,7 +204,7 @@ impl Painter {
     self.state_stack.clear();
     self
       .state_stack
-      .push(PainterState::new(self.size, self.device_scale));
+      .push(PainterState::new(self.device_scale, self.bounds));
     self.scale(self.device_scale, self.device_scale);
   }
 
@@ -299,9 +331,9 @@ impl Painter {
   pub fn clip(&mut self, path: Path) -> &mut Self {
     let paint_path = PaintPath::new(path, self.get_transform());
 
-    self.current_state_mut().visual_rect = self
+    self.current_state_mut().bounds = self
       .current_state()
-      .visual_rect
+      .bounds
       .intersection(&paint_path.bounds)
       .unwrap_or(DeviceRect::zero());
 
@@ -310,37 +342,15 @@ impl Painter {
     self
   }
 
-  /// Directly paint a bundle of commands.
-  pub fn paint_bundle(&mut self, commands: ShareResource<Box<[PaintCommand]>>) -> &mut Self {
-    let bounds = commands
-      .iter()
-      .fold(DeviceRect::zero(), |rect, cmd| match cmd {
-        PaintCommand::Fill { paint_path: p, .. } | PaintCommand::Clip(p) => rect.union(&p.bounds),
-        PaintCommand::Bundle { bounds, .. } => rect.union(bounds),
-        PaintCommand::PopClip => rect,
-      });
-
-    let transform = self.get_transform().clone();
-    let bounds = transform.outer_transformed_rect(&bounds.to_f32().cast_unit());
-    let bounds = bounds.cast_unit().to_i32();
-    if bounds.intersects(self.visual_rect()) {
-      self
-        .commands
-        .push(PaintCommand::Bundle { commands, transform, bounds });
-    }
-
-    self
-  }
-
   /// Fill a path with its style.
   pub fn fill_path(&mut self, path: Path) -> &mut Self {
-    let paint_path = PaintPath::new(path, self.get_transform());
-    if paint_path.bounds.intersects(self.visual_rect()) {
-      let alpha = self.alpha();
-      let mut brush = self.current_state().brush.clone();
-      brush.apply_opacify(alpha);
-
-      self.commands.push(PaintCommand::Fill { paint_path, brush });
+    let alpha = self.alpha();
+    let mut brush = self.current_state().brush.clone();
+    brush.apply_opacify(alpha);
+    let cmd = PaintCommand::fill(path, self.get_transform(), brush);
+    let PaintCommand::Fill { paint_path,.. } = &cmd else { unreachable!(); };
+    if paint_path.bounds.intersects(self.paint_bounds()) {
+      self.commands.push(cmd);
     }
     self
   }
@@ -631,7 +641,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
 
 impl PaintPath {
   pub fn new(mut path: Path, ts: &Transform) -> Self {
-    if ts.m11 != 1.0 || ts.m12 != 0. || ts.m21 != 0. || ts.m22 != 1. {
+    if ts != &Transform::identity() {
       path = path.transform(ts);
     }
     let bounds = lyon_algorithms::aabb::bounding_box(&path.0)
@@ -651,6 +661,22 @@ impl PaintPath {
   }
 }
 
+impl PaintCommand {
+  pub fn fill(path: Path, ts: &Transform, mut brush: Brush) -> Self {
+    let paint_path = PaintPath::new(path, &ts);
+    if let Brush::Image { transform, .. } = &mut brush {
+      let mut ts = ts.clone();
+      ts.m31 = 0.;
+      ts.m32 = 0.;
+      if let Some(ts) = ts.inverse() {
+        *transform = ts.then(&transform);
+      }
+    }
+
+    PaintCommand::Fill { paint_path, brush }
+  }
+}
+
 #[cfg(test)]
 mod test {
   use ribir_text::shaper::TextShaper;
@@ -666,7 +692,6 @@ mod test {
         <_>::default(),
         TextShaper::new(<_>::default()),
       ),
-      Size::new(512., 512.),
     );
     {
       let mut paint = layer.save_guard();

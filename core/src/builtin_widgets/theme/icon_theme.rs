@@ -10,7 +10,7 @@ pub struct IconTheme {
   /// icon size standard
   pub icon_size: IconSize,
   /// a collection of icons.
-  svgs: HashMap<NamedSvg, ShareResource<SvgRender>, ahash::RandomState>,
+  svgs: HashMap<NamedSvg, ShareResource<Svg>, ahash::RandomState>,
 }
 
 /// A five level standard of the size of icon in application.
@@ -71,7 +71,7 @@ impl Compose for NamedSvg {
 
 impl IconTheme {
   pub fn new(icon_size: IconSize) -> Self {
-    let miss_icon = ShareResource::new(SvgRender(include_svg!("./miss_icon.svg")));
+    let miss_icon = ShareResource::new(include_svg!("./miss_icon.svg"));
     let mut icons = HashMap::<_, _, ahash::RandomState>::default();
     icons.insert(MISS_ICON, miss_icon);
 
@@ -82,8 +82,8 @@ impl IconTheme {
   pub fn set_svg(
     &mut self,
     name: NamedSvg,
-    icon: ShareResource<SvgRender>,
-  ) -> Option<ShareResource<SvgRender>> {
+    icon: ShareResource<Svg>,
+  ) -> Option<ShareResource<Svg>> {
     self.svgs.insert(name, icon)
   }
 
@@ -108,7 +108,7 @@ impl NamedSvg {
 
   /// get the svg icon of the ident from the context if it have otherwise return
   /// a default icon.
-  pub fn of_or_miss(self, ctx: &BuildCtx) -> ShareResource<SvgRender> {
+  pub fn of_or_miss(self, ctx: &BuildCtx) -> ShareResource<Svg> {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => t.icon_theme.svgs.get(&self).or_else(|| {
@@ -122,7 +122,7 @@ impl NamedSvg {
   }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn of(self, ctx: &BuildCtx) -> Option<ShareResource<SvgRender>> {
+  pub fn of(self, ctx: &BuildCtx) -> Option<ShareResource<Svg>> {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => t.icon_theme.svgs.get(&self),

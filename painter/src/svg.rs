@@ -1,10 +1,6 @@
-use crate::{
-  Brush, Color, LineCap, LineJoin, PaintCommand, PaintPath, Path, Point, Size, StrokeOptions,
-  Transform,
-};
+use crate::{Brush, Color, LineCap, LineJoin, Path, Point, Size, StrokeOptions, Transform};
 use euclid::approxeq::ApproxEq;
 use palette::FromComponent;
-use ribir_algo::ShareResource;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
@@ -12,7 +8,14 @@ use usvg::{Options, Tree};
 #[derive(Serialize, Deserialize)]
 pub struct Svg {
   pub size: Size,
-  pub paths: ShareResource<Box<[PaintCommand]>>,
+  pub paths: Box<[SvgPath]>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SvgPath {
+  path: Path,
+  brush: Brush,
+  transform: Transform,
 }
 
 // todo: we need to support currentColor to change svg color.
@@ -39,11 +42,14 @@ impl Svg {
           NodeKind::Path(p) => {
             t_stack.push(matrix_convert(p.transform));
             let path = usvg_path_to_path(p);
-
+            let transform = t_stack.current_transform().clone();
             if let Some(ref fill) = p.fill {
-              let paint_path = PaintPath::new(path.clone(), t_stack.current_transform());
               let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
-              paths.push(PaintCommand::Fill { paint_path, brush });
+              paths.push(SvgPath {
+                path: path.clone(),
+                brush,
+                transform: transform.clone(),
+              });
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -67,8 +73,7 @@ impl Svg {
               let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity);
               let ts = t_stack.current_transform();
               if let Some(path) = path.stroke(&options, Some(ts)).map(|p| p.transform(ts)) {
-                let paint_path = PaintPath::new(path, t_stack.current_transform());
-                paths.push(PaintCommand::Fill { paint_path, brush });
+                paths.push(SvgPath { path, brush, transform });
               }
             };
           }
@@ -104,7 +109,7 @@ impl Svg {
 
     Ok(Svg {
       size: Size::new(size.width() as f32, size.height() as f32),
-      paths: ShareResource::new(paths.into_boxed_slice()),
+      paths: paths.into_boxed_slice(),
     })
   }
 

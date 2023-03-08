@@ -179,17 +179,10 @@ pub(crate) fn stroke_path(
 
   path.iter().for_each(|e| match e {
     Event::Begin { at } => builder.move_to(at.x, at.y),
-    Event::Line { from, to } => {
-      builder.move_to(from.x, from.y);
-      builder.line_to(to.x, to.y);
-    }
-    Event::Quadratic { from, ctrl, to } => {
-      builder.move_to(from.x, from.y);
-      builder.quad_to(ctrl.x, ctrl.y, to.x, to.y);
-    }
-    Event::Cubic { from, ctrl1, ctrl2, to } => {
-      builder.move_to(from.x, from.y);
-      builder.cubic_to(ctrl1.x, ctrl1.y, ctrl2.x, ctrl2.y, to.x, to.y);
+    Event::Line { to, .. } => builder.line_to(to.x, to.y),
+    Event::Quadratic { ctrl, to, .. } => builder.quad_to(ctrl.x, ctrl.y, to.x, to.y),
+    Event::Cubic { ctrl1, ctrl2, to, .. } => {
+      builder.cubic_to(ctrl1.x, ctrl1.y, ctrl2.x, ctrl2.y, to.x, to.y)
     }
     Event::End { close, .. } => {
       if close {

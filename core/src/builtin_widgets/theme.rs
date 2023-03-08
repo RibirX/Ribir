@@ -28,8 +28,6 @@ use crate::{
 pub use ribir_painter::*;
 pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
-use super::SvgRender;
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
   Dark,
@@ -59,7 +57,7 @@ pub struct InheritTheme {
   /// icon size standard
   pub icon_size: Option<IconSize>,
   /// a collection of icons.
-  pub icons: Option<HashMap<NamedSvg, ShareResource<SvgRender>, ahash::RandomState>>,
+  pub icons: Option<HashMap<NamedSvg, ShareResource<Svg>, ahash::RandomState>>,
   pub transitions_theme: Option<TransitionTheme>,
   pub compose_decorators: Option<ComposeDecorators>,
   pub custom_styles: Option<CustomStyles>,

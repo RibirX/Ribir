@@ -48,25 +48,18 @@ where
     })
   }
 
-  pub fn get_or_insert_with<Q, F>(&mut self, key: &Q, default: F) -> &mut V
+  pub fn get_or_insert_with<F>(&mut self, key: K, f: F) -> &mut V
   where
-    K: Borrow<Q>,
-    Q: Hash + ToOwned + Eq + ?Sized,
-    Q::Owned: Into<K>,
     F: FnOnce() -> V,
   {
-    if !self.contains_key(key) {
-      let value = default();
-      let key = key.to_owned().into();
-      self.cache.insert(
-        key,
-        CacheValue {
-          value,
-          last_frame_used: AtomicBool::new(true),
-        },
-      );
-    }
-    self.get_mut(key).unwrap()
+    &mut self
+      .cache
+      .entry(key)
+      .or_insert_with(|| CacheValue {
+        value: f(),
+        last_frame_used: AtomicBool::new(true),
+      })
+      .value
   }
 
   pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
@@ -120,6 +113,7 @@ where
   where
     F: FnMut(bool, &mut V),
   {
+    // todo: use link list to avoid iterate all elements.
     let mut hit = 0;
     let count = self.cache.len();
     self.cache.retain(|_, v| {
@@ -208,7 +202,9 @@ where
     if let Some(v) = self.cache.get_mut(key.borrow()) {
       v.heap_mut_ptr()
     } else {
-      let v = self.cache.get_or_insert_with(key.borrow(), V::default);
+      let v = self
+        .cache
+        .get_or_insert_with(key.borrow().to_owned().into(), V::default);
 
       let v_ptr = v.heap_mut_ptr();
       let v_mut_ptr = SendMutPtr(v_ptr);

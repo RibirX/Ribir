@@ -178,7 +178,7 @@ pub struct Window {
   pub(crate) painter: Painter,
   pub(crate) dispatcher: Dispatcher,
   pub(crate) widget_tree: WidgetTree,
-  p_backend: Box<dyn PainterBackend>,
+  p_backend: Box<dyn PainterBackend<Texture = MockTexture>>,
   /// A task pool use to process `Future` or `rxRust` task, and will block until
   /// all task finished before current frame end.
   frame_pool: FramePool,
@@ -288,50 +288,6 @@ impl Window {
   /// after all OS events have been processed by the event loop.
   #[inline]
   pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
-
-  pub fn capture_image<F>(&mut self, image_data_callback: F) -> Result<(), Box<dyn Error>>
-  where
-    F: for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>),
-  {
-    self.widget_tree.draw(&mut self.painter);
-    let commands = self.painter.finish();
-    self
-      .p_backend
-      .commands_to_image(commands, Box::new(image_data_callback))
-  }
-
-  #[cfg(feature = "png")]
-  pub fn write_as_png<P>(&mut self, path: P) -> Result<(), Box<dyn Error>>
-  where
-    P: std::convert::AsRef<std::path::Path>,
-  {
-    let writer = std::fs::File::create(path.as_ref()).map_err(|e| e.to_string())?;
-    self.capture_image(move |size, rows| {
-      let png_encoder = ::image::codecs::png::PngEncoder::new(writer);
-      let data = rows.flat_map(|c| c.iter()).copied().collect::<Vec<_>>();
-      #[allow(deprecated)]
-      png_encoder
-        .encode(&data, size.width, size.height, ::image::ColorType::Rgba8)
-        .unwrap();
-    })
-  }
-
-  #[cfg(feature = "png")]
-  pub fn same_as_png<P>(&mut self, path: P) -> bool
-  where
-    P: std::convert::AsRef<std::path::Path>,
-  {
-    let im = ::image::open(path).unwrap();
-    let mut same = false;
-    self
-      .capture_image(|size, rows| {
-        if size.width == im.width() && size.height == im.height() {
-          let data = rows.flat_map(|c| c.iter()).copied().collect::<Vec<_>>();
-          same = im.as_bytes() == data;
-        }
-      })
-      .map_or(false, |_| same)
-  }
 }
 
 pub struct MockBackend;
@@ -342,18 +298,18 @@ pub struct MockRawWindow {
   pub cursor: Option<CursorIcon>,
 }
 
+pub struct MockTexture;
+
 impl PainterBackend for MockBackend {
-  fn submit<'a>(&mut self, _: Vec<PaintCommand>) {}
+  type Texture = MockTexture;
 
-  fn resize(&mut self, _: DeviceSize) {}
+  fn begin_frame(&mut self) { todo!() }
 
-  fn commands_to_image(
-    &mut self,
-    _: Vec<PaintCommand>,
-    _: CaptureCallback,
-  ) -> Result<(), Box<dyn Error>> {
-    Ok(())
+  fn draw_commands(&mut self, view_port: DeviceRect, commands: Vec<PaintCommand>) -> Self::Texture {
+    MockTexture
   }
+
+  fn end_frame(self) { todo!() }
 }
 
 impl RawWindow for MockRawWindow {

@@ -90,8 +90,11 @@ pub struct Radius {
 }
 
 #[cfg(feature = "tessellation")]
-#[repr(C)]
+pub type VertexBuffers<V> = lyon_tessellation::VertexBuffers<Vertex<V>, u32>;
+
+#[cfg(feature = "tessellation")]
 #[derive(Copy, Clone, Debug, zerocopy::AsBytes, Default)]
+#[repr(packed)]
 pub struct Vertex<Attr> {
   pub pos: [f32; 2],
   pub attr: Attr,
@@ -140,24 +143,24 @@ impl Path {
   }
 
   #[cfg(feature = "tessellation")]
-  pub fn tessellate<Attr>(self, tolerance: f32, attr: Attr) -> (Vec<Vertex<Attr>, Vec<u32>>,) {
-    use lyon_tessellation::{
-      BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers,
-    };
+  pub fn tessellate<Attr>(
+    &self,
+    tolerance: f32,
+    buffer: &mut VertexBuffers<Attr>,
+    vertex_ctor: impl Fn(Point) -> Vertex<Attr>,
+  ) {
+    use lyon_tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex};
 
-    let mut buffers = VertexBuffers::new();
     let mut fill_tess = FillTessellator::default();
     fill_tess
       .tessellate_path(
-        self.0,
-        &FillOptions::tolerance(tolerance),
-        &mut BuffersBuilder::new(&mut buffers, move |v: FillVertex| Vertex {
-          pos: v.position().to_array(),
-          attr,
+        &self.0,
+        &FillOptions::non_zero().with_tolerance(tolerance),
+        &mut BuffersBuilder::new(buffer, move |v: FillVertex| {
+          vertex_ctor(v.position().cast_unit())
         }),
       )
       .unwrap();
-    (buffers.vertices, buffers.indices)
   }
 }
 
@@ -220,4 +223,10 @@ impl Default for StrokeOptions {
       line_join: LineJoin::default(),
     }
   }
+}
+
+#[cfg(feature = "tessellation")]
+impl<Attr> Vertex<Attr> {
+  #[inline]
+  pub fn new(pos: [f32; 2], attr: Attr) -> Self { Self { attr, pos } }
 }
