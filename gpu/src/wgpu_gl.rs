@@ -567,7 +567,7 @@ impl Vertex {
     }
   }
 }
-#[cfg(feature = "test_gpu")]
+
 #[cfg(test)]
 mod test {
   use crate::wgpu_backend_headless;
