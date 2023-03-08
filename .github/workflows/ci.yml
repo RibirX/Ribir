@@ -29,9 +29,19 @@ jobs:
     name: Test Suite
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        # ubuntu will test individual and be used for 'codecov'
-        os: [macos-latest, ubuntu-22.04, windows-2022]
+        include:
+          # Windows
+          - name: Windows x86_64
+            os: windows-2022
+            backends: dx12
+          # Linux
+          - name: Linux x86_64
+            os: ubuntu-22.04
+            backends: vulkan gl
+          - name: Macos x86
+            os: macos-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -54,16 +64,16 @@ jobs:
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
           sudo apt-get update
           sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev vulkan-sdk
-            - name: Install cargo-nextest and cargo-llvm-cov
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: nightly-2023-02-01
           override: true
-      - uses: taiki-e/install-action@v2
+      - name: Install cargo-nextest and cargo-llvm-cov
+        uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest, cargo-llvm-cov
+          tool: cargo-nextest,cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
       - name: run llvm-cov test
         # should test with --all-features if gpu support.
