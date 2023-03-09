@@ -57,14 +57,11 @@ mod with_target_child {
     C: IntoTargetChild<M, W::Child>,
     M: ImplMarker,
   {
-    type Target = ComposePair<State<W>, W::Child>;
+    type Target = Widget;
 
     #[inline]
     fn with_child(self, child: C) -> Self::Target {
-      ComposePair {
-        widget: self,
-        child: child.into_target_child(),
-      }
+      ComposeChild::compose_child(self, child.into_target_child())
     }
   }
 
