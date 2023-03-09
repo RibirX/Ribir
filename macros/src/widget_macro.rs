@@ -1,7 +1,7 @@
 use ahash::HashSet;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, Expr, Ident};
+use syn::{parse_macro_input, token::Brace, Expr, Ident};
 
 mod code_gen;
 mod desugar;
@@ -130,7 +130,22 @@ pub fn gen_widget_macro(
   desugar.collect_warnings(&ctx);
   let mut tokens = quote! {};
   desugar.circle_detect();
-  desugar.gen_tokens(&mut tokens, &ctx);
+  Brace::default().surround(&mut tokens, |tokens| {
+    Brace::default().surround(tokens, |tokens| {
+      if outside_ctx.is_none() {
+        quote! {
+          #![allow(
+            unused_mut,
+            clippy::redundant_clone,
+            clippy::clone_on_copy,
+            clippy::let_and_return
+          )]
+        }
+        .to_tokens(tokens);
+      }
+      desugar.gen_tokens(tokens, &ctx);
+    });
+  });
 
   if let Some(outside_ctx) = outside_ctx {
     outside_ctx.visit_error_occur |= ctx.visit_error_occur || !desugar.errors.is_empty();
