@@ -68,6 +68,7 @@ pub struct WgpuGl<S: Surface = WindowSurface> {
   coordinate_matrix: wgpu::Buffer,
   primitives_layout: wgpu::BindGroupLayout,
   vertex_buffers: Option<VertexBuffers>,
+  command_encoder: Option<wgpu::CommandEncoder>,
   anti_aliasing: AntiAliasing,
   multisample_framebuffer: Option<wgpu::TextureView>,
   size: DeviceSize,
@@ -148,7 +149,17 @@ impl WgpuGl<TextureSurface> {
 }
 
 impl<S: Surface> GlRender for WgpuGl<S> {
-  fn begin_frame(&mut self) { self.empty_frame = true; }
+  fn begin_frame(&mut self) {
+    self.empty_frame = true;
+    let encoder = self
+      .device
+      .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Create Encoder") });
+    assert!(
+      self.command_encoder.is_none(),
+      "Try to start a new frame, but current frame not end."
+    );
+    self.command_encoder = Some(encoder);
+  }
 
   fn add_texture(&mut self, texture: crate::Texture) {
     self
@@ -165,7 +176,9 @@ impl<S: Surface> GlRender for WgpuGl<S> {
     self.draw_triangles_into_view(data, view);
   }
 
-  fn end_frame<'a>(&mut self, cancel: bool) {
+  fn end_frame(&mut self, cancel: bool) {
+    let encoder = self.command_encoder.take().unwrap();
+    self.queue.submit(iter::once(encoder.finish()));
     if !cancel {
       self.surface.present();
     }
@@ -191,32 +204,33 @@ impl<S: Surface> GlRender for WgpuGl<S> {
   }
 
   fn capture(&self, capture: ribir_painter::CaptureCallback) -> Result<(), Box<dyn Error>> {
-    let mut encoder = self.create_command_encoder();
-    let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut encoder);
-    self.queue.submit(iter::once(encoder.finish()));
+    todo!();
+    // let mut encoder = self.command_encoder.as_ref().unwrap();
+    // let buffer = self.surface.copy_as_rgba_buffer(&self.device, &mut
+    // encoder);
 
-    let buffer_slice = buffer.slice(..);
+    // let buffer_slice = buffer.slice(..);
 
-    let (sender, receiver) = oneshot::channel::<()>();
-    buffer_slice.map_async(wgpu::MapMode::Read, |_| {
-      sender.send(()).unwrap();
-    });
+    // let (sender, receiver) = oneshot::channel::<()>();
+    // buffer_slice.map_async(wgpu::MapMode::Read, |_| {
+    //   sender.send(()).unwrap();
+    // });
 
-    // Poll the device in a blocking manner so that our future resolves.
-    self.device.poll(wgpu::Maintain::Wait);
-    block_on(receiver)?;
+    // // Poll the device in a blocking manner so that our future resolves.
+    // self.device.poll(wgpu::Maintain::Wait);
+    // block_on(receiver)?;
 
-    let size = self.surface.view_size();
-    let slice = buffer_slice.get_mapped_range();
-    let buffer_bytes_per_row = slice.len() as u32 / size.height;
-    let img_bytes_pre_row = (size.width * 4) as usize;
-    let rows = (0..size.height).map(|i| {
-      let offset = (i * buffer_bytes_per_row) as usize;
-      &slice.as_ref()[offset..offset + img_bytes_pre_row]
-    });
+    // let size = self.surface.view_size();
+    // let slice = buffer_slice.get_mapped_range();
+    // let buffer_bytes_per_row = slice.len() as u32 / size.height;
+    // let img_bytes_pre_row = (size.width * 4) as usize;
+    // let rows = (0..size.height).map(|i| {
+    //   let offset = (i * buffer_bytes_per_row) as usize;
+    //   &slice.as_ref()[offset..offset + img_bytes_pre_row]
+    // });
 
-    capture(size, Box::new(rows));
-    Ok(())
+    // capture(size, Box::new(rows));
+    // Ok(())
   }
 }
 
@@ -268,18 +282,19 @@ impl<S: Surface> WgpuGl<S> {
       Self::multisample_framebuffer(&device, size, surface.format(), msaa_count);
     WgpuGl {
       device,
-      surface,
       queue,
-      size,
+      surface,
       color_pass,
       img_pass: texture_pass,
       stencil_pass,
       coordinate_matrix,
       primitives_layout: primitive_layout,
-      empty_frame: true,
       vertex_buffers: None,
+      command_encoder: None,
       anti_aliasing,
       multisample_framebuffer,
+      size,
+      empty_frame: true,
       stencil_cnt: 0,
     }
   }
@@ -303,12 +318,6 @@ impl<S: Surface> WgpuGl<S> {
       img_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
       stencil_pass.set_anti_aliasing(msaa_count, primitives_layout, device, format);
     }
-  }
-
-  fn create_command_encoder(&self) -> wgpu::CommandEncoder {
-    self
-      .device
-      .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Create Encoder") })
   }
 
   fn multisample_framebuffer(
@@ -409,10 +418,9 @@ impl<S: Surface> WgpuGl<S> {
     self.write_vertex_buffer(data.vertices, data.indices);
     let vertex_buffers = self.vertex_buffers.as_ref().unwrap();
 
-    let mut encoder = self.create_command_encoder();
     let prim_bind_group = self.create_primitives_bind_group(data.primitives);
-
     let sample_count = self.multi_sample_count();
+    let encoder = self.command_encoder.as_mut().unwrap();
     let Self {
       device,
       coordinate_matrix,
@@ -515,8 +523,6 @@ impl<S: Surface> WgpuGl<S> {
       });
     }
     self.empty_frame = false;
-
-    self.queue.submit(iter::once(encoder.finish()));
   }
 }
 

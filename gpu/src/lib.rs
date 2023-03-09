@@ -1,22 +1,17 @@
-#![feature(test)]
 pub mod error;
-
 #[cfg(feature = "wgpu_gl")]
 pub mod wgpu_gl;
-
 use std::error::Error;
-
 use tessellator::Tessellator;
-pub mod tessellator;
-use ribir_painter::{CaptureCallback, DeviceSize, PainterBackend};
-
-use ribir_painter::image::ColorFormat;
-use zerocopy::AsBytes;
-
 #[cfg(feature = "wgpu_gl")]
 pub use wgpu_gl::wgpu_backend_headless;
 #[cfg(feature = "wgpu_gl")]
 pub use wgpu_gl::wgpu_backend_with_wnd;
+pub mod tessellator;
+use ribir_painter::image::ColorFormat;
+use ribir_painter::{CaptureCallback, DeviceSize, PainterBackend};
+use zerocopy::AsBytes;
+
 /// A painter backend which convert `PaintCommands` to triangles and texture,
 /// then submit to the gl.
 pub struct GpuBackend<R: GlRender> {
