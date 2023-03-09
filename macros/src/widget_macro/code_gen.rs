@@ -172,56 +172,43 @@ impl Desugared {
     }
 
     let sorted_named_objs = self.order_named_objs();
+
+    states.to_tokens(tokens);
+    let name = widget.as_ref().unwrap().node.name();
+    let ctx_name = ctx_ident();
+    quote! { let #name = move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
+
     Brace::default().surround(tokens, |tokens| {
-      Brace::default().surround(tokens, |tokens| {
-        quote! {
-          #![allow(
-            unused_mut,
-            clippy::redundant_clone,
-            clippy::clone_on_copy,
-            clippy::let_and_return
-          )]
+      if ctx.has_guards_data {
+        let guards_vec = guard_vec_ident();
+        quote! { let mut #guards_vec: Vec<AnonymousData> = vec![]; }.to_tokens(tokens);
+      }
+      init.to_tokens(tokens);
+
+      // deep first declare named obj by their dependencies
+      // circular may exist widget attr follow widget self to init.
+      sorted_named_objs.iter().for_each(|name| {
+        if let Some(obj) = named_objs.get(name) {
+          obj.to_tokens(tokens)
         }
-        .to_tokens(tokens);
-
-        states.to_tokens(tokens);
-        let name = widget.as_ref().unwrap().node.name();
-        let ctx_name = ctx_ident();
-        quote! { let #name = move |#ctx_name: &BuildCtx| }.to_tokens(tokens);
-
-        Brace::default().surround(tokens, |tokens| {
-          if ctx.has_guards_data {
-            let guards_vec = guard_vec_ident();
-            quote! { let mut #guards_vec: Vec<AnonymousData> = vec![]; }.to_tokens(tokens);
-          }
-          init.to_tokens(tokens);
-
-          // deep first declare named obj by their dependencies
-          // circular may exist widget attr follow widget self to init.
-          sorted_named_objs.iter().for_each(|name| {
-            if let Some(obj) = named_objs.get(name) {
-              obj.to_tokens(tokens)
-            }
-          });
-
-          let w = widget.as_ref().unwrap();
-          w.gen_node_objs(tokens);
-          finally.to_tokens(tokens);
-
-          if ctx.has_guards_data {
-            quote! { widget_attach_data }.to_tokens(tokens);
-            Paren::default().surround(tokens, |tokens| {
-              w.gen_compose_node(named_objs, tokens);
-              let guards_vec = guard_vec_ident();
-              quote! { .into_widget(), #guards_vec }.to_tokens(tokens)
-            });
-          } else {
-            w.gen_compose_node(named_objs, tokens)
-          }
-        });
-        quote! { ; #name.into_widget() }.to_tokens(tokens);
       });
+
+      let w = widget.as_ref().unwrap();
+      w.gen_node_objs(tokens);
+      finally.to_tokens(tokens);
+
+      if ctx.has_guards_data {
+        quote! { widget_attach_data }.to_tokens(tokens);
+        Paren::default().surround(tokens, |tokens| {
+          w.gen_compose_node(named_objs, tokens);
+          let guards_vec = guard_vec_ident();
+          quote! { .into_widget(), #guards_vec }.to_tokens(tokens)
+        });
+      } else {
+        w.gen_compose_node(named_objs, tokens)
+      }
     });
+    quote! { ; #name.into_widget() }.to_tokens(tokens);
   }
 
   pub fn collect_warnings(&mut self, ctx: &VisitCtx) { self.collect_unused_declare_obj(ctx); }
