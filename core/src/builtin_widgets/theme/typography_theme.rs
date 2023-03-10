@@ -3,34 +3,37 @@ use std::cell::Ref;
 use crate::context::BuildCtx;
 
 use super::Theme;
+use ribir_algo::CowArc;
 use ribir_painter::Brush;
 use ribir_text::FontFamily;
 
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
-/// spec](https://material.io/design/typography/the-type-system.html#applying-the-type-scale)
+/// spec](https://m3.material.io/styles/typography/type-scale-tokens)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypographyTheme {
   /// Default text font families
   pub default_font_family: Box<[FontFamily]>,
-  pub headline1: TextTheme,
-  pub headline2: TextTheme,
-  pub headline3: TextTheme,
-  pub headline4: TextTheme,
-  pub headline5: TextTheme,
-  pub headline6: TextTheme,
-  pub subtitle1: TextTheme,
-  pub subtitle2: TextTheme,
-  pub body1: TextTheme,
-  pub body2: TextTheme,
-  pub button: TextTheme,
-  pub caption: TextTheme,
-  pub overline: TextTheme,
+  pub display_large: TextTheme,
+  pub display_medium: TextTheme,
+  pub display_small: TextTheme,
+  pub headline_large: TextTheme,
+  pub headline_medium: TextTheme,
+  pub headline_small: TextTheme,
+  pub title_large: TextTheme,
+  pub title_medium: TextTheme,
+  pub title_small: TextTheme,
+  pub label_large: TextTheme,
+  pub label_medium: TextTheme,
+  pub label_small: TextTheme,
+  pub body_large: TextTheme,
+  pub body_medium: TextTheme,
+  pub body_small: TextTheme,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextTheme {
-  pub text: ribir_painter::TextStyle,
+  pub text: CowArc<ribir_painter::TextStyle>,
   pub decoration: TextDecorationStyle,
 }
 

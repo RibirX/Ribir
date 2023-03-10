@@ -46,10 +46,7 @@ impl ComposeChild for Button {
           // border_color,
           ..
         } = *ButtonTheme::of(ctx);
-        let text_style = TextStyle {
-          foreground: Brush::Color(foreground),
-          ..TypographyTheme::of(ctx).button.text.clone()
-        };
+        let style = &TypographyTheme::of(ctx).label_large.text;
       }
 
       states {
@@ -68,7 +65,8 @@ impl ComposeChild for Button {
         }
         Text {
           text: button_text.0.clone(),
-          style: text_style,
+          foreground: foreground.into(),
+          style: style.clone(),
         }
       }
     }

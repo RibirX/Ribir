@@ -22,8 +22,8 @@ impl CustomTheme for InputTheme {}
 
 #[derive(Declare)]
 pub struct Input {
-  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
-  pub style: TextStyle,
+  #[declare(default = TypographyTheme::of(ctx).body_large.text.clone())]
+  pub style: CowArc<TextStyle>,
   #[declare(skip)]
   text: CowArc<str>,
   #[declare(skip)]
