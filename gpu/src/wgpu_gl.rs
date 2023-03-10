@@ -1,4 +1,4 @@
-use crate::{tessellator::Tessellator, GlRender, GpuBackend, TriangleLists, Vertex};
+use crate::{tessellator::Tessellator, TriangleLists, Vertex};
 use futures::{channel::oneshot, executor::block_on};
 use ribir_painter::DeviceSize;
 use ribir_text::shaper::TextShaper;
@@ -47,15 +47,6 @@ pub async fn wgpu_backend_headless(
   let tessellator = Tessellator::new(init_size, max_size, shaper);
   let gl = WgpuGl::headless(size).await;
   GpuBackend { tessellator, gl }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum AntiAliasing {
-  None = 1,
-  Msaa2X = 2,
-  Msaa4X = 4,
-  Msaa8X = 8,
-  Msaa16X = 16,
 }
 
 pub struct WgpuGl<S: Surface = WindowSurface> {

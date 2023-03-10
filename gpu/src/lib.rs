@@ -1,74 +1,58 @@
 pub mod error;
-#[cfg(feature = "wgpu_gl")]
-pub mod wgpu_gl;
+// #[cfg(feature = "wgpu_gl")]
+// pub mod wgpu_gl;
+// #[cfg(feature = "wgpu_gl")]
+// pub use wgpu_gl::wgpu_backend_headless;
+// #[cfg(feature = "wgpu_gl")]
+// pub use wgpu_gl::wgpu_backend_with_wnd;
+use guillotiere::Size;
+use ribir_painter::DeviceRect;
+use ribir_painter::TextureCfg;
+use ribir_painter::TextureX;
 use std::error::Error;
-use tessellator::Tessellator;
-#[cfg(feature = "wgpu_gl")]
-pub use wgpu_gl::wgpu_backend_headless;
-#[cfg(feature = "wgpu_gl")]
-pub use wgpu_gl::wgpu_backend_with_wnd;
+pub use tessellator::Tessellator;
 pub mod tessellator;
 use ribir_painter::image::ColorFormat;
-use ribir_painter::{CaptureCallback, DeviceSize, PainterBackend};
+use ribir_painter::DeviceSize;
 use zerocopy::AsBytes;
 
-/// A painter backend which convert `PaintCommands` to triangles and texture,
-/// then submit to the gl.
-pub struct GpuBackend<R: GlRender> {
-  gl: R,
-  tessellator: Tessellator,
-}
+// todo: use window size or monitor size to detect the cache size;
+const ATLAS_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
+const CANVAS_SIZE: DeviceSize = DeviceSize::new(512, 512);
 
-impl<R: GlRender> PainterBackend for GpuBackend<R> {
-  fn submit<'a>(&mut self, commands: Vec<ribir_painter::PaintCommand>) {
-    self.gl.begin_frame();
-    self.tessellator.tessellate(&commands, &mut self.gl);
-    self.gl.end_frame(false);
-  }
+#[derive(Hash, Clone, Copy, PartialEq, Eq)]
+pub struct TextureId(pub usize);
 
-  #[inline]
-  fn resize(&mut self, size: DeviceSize) { self.gl.resize(size) }
+pub trait GpuTessellatorHelper {
+  type Texture: TextureX;
 
-  fn commands_to_image(
+  /// The major texture used to display the final picture.
+  fn main_texture(&mut self) -> &mut Self::Texture;
+
+  /// Create a new texture, backend need to record the id will be used in
+  /// primitive.
+  fn new_texture(&mut self, id: TextureId, cfg: TextureCfg) -> Self::Texture;
+
+  /// Set a clip rectangle and all triangles after this method called should
+  /// clip by this rectangle.
+  fn push_clip_rect(&mut self, rect: DeviceRect);
+
+  /// Draw triangles to the texture,caller will try to batch as much as
+  /// possible, but also possibly call multi times in a frame.
+  fn draw_triangles(&mut self, texture: &mut Texture, data: TriangleLists);
+
+  /// Draw triangles only alpha channel with 1.0. Caller guarantee the texture
+  /// format is `ColorFormat::Alpha8`, caller will try to batch as much as
+  /// possible, but also possibly call multi times in a frame.
+  fn draw_alpha_triangles(
     &mut self,
-    commands: Vec<ribir_painter::PaintCommand>,
-    capture: CaptureCallback,
-  ) -> Result<(), Box<dyn Error>> {
-    self.gl.begin_frame();
-    self.tessellator.tessellate(&commands, &mut self.gl);
-    self.gl.capture(capture)?;
-    self.gl.end_frame(true);
-    Ok(())
-  }
-}
+    vertices: &[AlphaVertex],
+    indices: &[u32],
+    texture: &mut Texture,
+  );
 
-/// GlRender support draw triangles to the devices.
-pub trait GlRender {
-  /// A new frame begin.
-  fn begin_frame(&mut self);
-
-  /// Add a texture which this frame will use.
-  fn add_texture(&mut self, texture: Texture);
-
-  /// Commit the render data to gl, caller will try to as possible as batch all
-  /// render data, but also possible call `commit_render_data` multi time pre
-  /// frame.
-  fn draw_triangles(&mut self, data: TriangleLists);
-
-  /// Capture the current frame image data, the `capture` callback will be
-  /// called to pass the frame image data with rgba(u8 x 4) format.
-  /// # Note
-  /// Only capture stuff of the frame not ended, so should always call this
-  /// method after `draw_triangles` and before `end_frame`.
-  fn capture(&self, capture: CaptureCallback) -> Result<(), Box<dyn Error>>;
-
-  /// Draw frame finished and the render data commit finished and should ensure
-  /// draw every of this frame into device. Cancel current frame if `cancel` is
-  /// true.
-  fn end_frame(&mut self, cancel: bool);
-
-  /// Window or surface size changed, need do a redraw.
-  fn resize(&mut self, size: DeviceSize);
+  /// cancel the last clip rectangle.
+  fn pop_clip_rect(&mut self);
 }
 
 /// A texture for the vertexes sampler color. Every texture have identify to
@@ -97,17 +81,15 @@ pub struct Texture<'a> {
 }
 
 pub enum DrawTriangles {
-  /// indices range witch use pure color to draw.
+  /// indices range witch use pure color to draw. The primitive is
+  /// `ColorPrimitive`
   Color(std::ops::Range<u32>),
-  /// indices range witch use texture to draw.
+  /// indices range witch use texture to draw. The primitive is
+  /// `TexturePrimitive`
   Texture {
     rg: std::ops::Range<u32>,
     texture_id: usize,
   },
-
-  PushStencil(std::ops::Range<u32>),
-
-  PopStencil(std::ops::Range<u32>),
 }
 
 /// The triangle lists data and the commands to describe how to draw it.
@@ -120,7 +102,6 @@ pub struct TriangleLists<'a> {
   pub primitives: &'a [Primitive],
   /// commands describe how to draw the indices.
   pub commands: &'a [DrawTriangles],
-  // field to support clip and gradient
 }
 
 #[repr(C)]
@@ -132,7 +113,6 @@ pub struct ColorPrimitive {
   transform: [[f32; 2]; 3],
   /// extra alpha apply to current vertex
   opacity: f32,
-
   /// let the TexturePrimitive align to 16
   /// the alignment of the struct must restrict to https://www.w3.org/TR/WGSL/#alignment
   dummy: f32,
@@ -167,7 +147,6 @@ pub struct TexturePrimitive {
   transform: [[f32; 2]; 3],
   /// extra alpha apply to current vertex
   opacity: f32,
-
   /// let the TexturePrimitive align to 16
   /// the alignment of the struct must restrict to https://www.w3.org/TR/WGSL/#alignment
   dummy: f32,
@@ -219,6 +198,11 @@ pub struct Vertex {
   pub pixel_coords: [f32; 2],
   pub prim_id: u32,
 }
+
+// We use a texture atlas to shader vertices, even if a pure color path.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, AsBytes, Default)]
+pub struct AlphaVertex(f32, f32);
 
 impl<'a> TriangleLists<'a> {
   #[inline]

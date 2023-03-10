@@ -1,37 +1,52 @@
 use crate::{
-  ColorPrimitive, DrawTriangles, GlRender, Primitive, StencilPrimitive, Texture, TexturePrimitive,
-  TriangleLists, Vertex,
+  ColorPrimitive, DrawTriangles, GpuTessellatorHelper, Primitive, StencilPrimitive, Texture,
+  TextureId, TexturePrimitive, TriangleLists, Vertex, ATLAS_SIZE, CANVAS_SIZE,
 };
 use lyon_tessellation::{path::Path as LyonPath, *};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
 use ribir_algo::{FrameCache, Resource, ShareResource};
 use ribir_painter::{
-  Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path, PathStyle, TileMode, Transform,
+  font_db::FontDB, AntiAliasing, Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path,
+  PathStyle, Rect, ShallowImage, TextureX, TileMode, Transform,
 };
 use ribir_text::{
   font_db::ID,
   shaper::{GlyphId, TextShaper},
   Glyph,
 };
-use std::{collections::VecDeque, hash::Hash};
-mod atlas;
-use atlas::TextureAtlas;
-
+use std::{
+  collections::VecDeque,
+  hash::Hash,
+  sync::{Arc, RwLock},
+};
+mod img_atlas;
+use img_atlas::ImgAtlas;
+mod alpha_atlas;
 mod mem_texture;
 mod texture_records;
+mod utils;
+use self::alpha_atlas::AlphaAtlas;
 use texture_records::TextureRecords;
-
+mod atlas;
 const ATLAS_ID: usize = 0;
-const TOLERANCE: f32 = 0.01;
 const MAX_VERTEX_CAN_BATCH: usize = 256 * 1024;
 const TEXTURE_ID_FROM: usize = 1;
+
+const TOLERANCE: f32 = 0.01;
 const PAR_CHUNKS_SIZE: usize = 128;
+const ATLAS_ITEM_MAX_SIZE: usize = 256;
+const PATH_ATLAS_ID: TextureId = TextureId(0);
+const PATH_CANVAS_ID: TextureId = TextureId(1);
+const IMG_ATLAS_ID: TextureId = TextureId(2);
+const TEXTURE_CUSTOM_START: TextureId = TextureId(3);
+
 /// `Tessellator` use to generate triangles from
-pub struct Tessellator {
+pub struct Tessellator<T: TextureX> {
   // todo: only a 4 bytes pixel atlas provide, should we add a 3 bytes atlas (useful for rgb) ?
   // texture atlas for pure color and image to draw.
-  atlas: TextureAtlas,
+  img_atlas: ImgAtlas<T>,
+  alpha_atlas: AlphaAtlas<T>,
   texture_records: TextureRecords,
   vertices_cache: Option<FrameCache<VerticesKey, Box<VertexCache>>>,
   vertices: Vec<Vertex>,
@@ -43,7 +58,31 @@ pub struct Tessellator {
   /// it's less than the count of vertex generate by one paint command, default
   /// value is [`MAX_VERTEX_CAN_BATCH`]!
   vertex_batch_limit: usize,
-  shaper: TextShaper,
+  font_db: Arc<RwLock<FontDB>>,
+  anti_aliasing: AntiAliasing,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum AlphaItem {
+  Image(ShallowImage),
+  Path(AlphaPath),
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub(crate) struct AlphaPath {
+  pub path: LyonPath,
+  pub stroke_width: f32,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd)]
+struct PathId;
+
+/// This struct guarantees that if the same id is the same, the path is the
+/// same.
+pub(crate) struct IdPath {
+  id: PathId,
+  path: Path,
+  box_rect: Rect,
 }
 
 #[derive(Clone, Copy)]
@@ -80,15 +119,20 @@ struct VertexCache {
   indices: Box<[u32]>,
 }
 
-impl Tessellator {
+impl<T: TextureX> Tessellator<T> {
   /// Create a `Tessellator` with the init texture size and the maximum texture
   /// size. `threshold` is the scale difference of a path need to retessellate.
   #[inline]
-  pub fn new(tex_init_size: (u16, u16), tex_max_size: (u16, u16), shaper: TextShaper) -> Self {
+  pub fn new(
+    font_db: Arc<RwLock<FontDB>>,
+    anti_aliasing: AntiAliasing,
+    helper: &mut impl GpuTessellatorHelper,
+  ) -> Self {
     Self {
-      atlas: TextureAtlas::new(tex_init_size.into(), tex_max_size.into()),
+      img_atlas: ImgAtlas::new(ATLAS_SIZE, helper),
+      alpha_atlas: AlphaAtlas::new(CANVAS_SIZE, ATLAS_SIZE, helper),
       vertex_batch_limit: MAX_VERTEX_CAN_BATCH,
-      shaper,
+      font_db,
       vertices_cache: None,
       texture_records: TextureRecords::new(TEXTURE_ID_FROM),
       vertices: vec![],
@@ -96,14 +140,11 @@ impl Tessellator {
       primitives: vec![],
       commands: vec![],
       buffer_list: <_>::default(),
+      anti_aliasing,
     }
   }
 
-  /// The vertex count to trigger a gpu submit. It's not a strict number, may
-  /// exceed this limit by one paint command
-  pub fn set_vertex_batch_limit(&mut self, count: usize) { self.vertex_batch_limit = count; }
-
-  pub fn tessellate<R: GlRender>(&mut self, commands: &[PaintCommand], render: &mut R) {
+  pub fn tessellate(&mut self, commands: &[PaintCommand], helper: &mut impl GpuTessellatorHelper) {
     if commands.is_empty() {
       return;
     }
@@ -114,7 +155,7 @@ impl Tessellator {
       .get_or_insert_with(<_>::default)
       .as_uninit_map();
     let mut no_cache_paths = vec![];
-    let mut stencil_path = vec![];
+
     commands.iter().for_each(|cmd| {
       self.command_to_buffer(
         cmd,
@@ -126,7 +167,7 @@ impl Tessellator {
           no_cache_paths.push((tolerance, path, vc));
           ptr
         },
-        render,
+        helper,
       )
     });
 
@@ -144,17 +185,6 @@ impl Tessellator {
       });
     self.vertices_cache = vertices_cache;
 
-    while !self.buffer_list.is_empty() {
-      let used_atlas = unsafe { self.fill_vertices() };
-      if used_atlas {
-        render.add_texture(self.atlas_texture());
-        self.atlas.data_synced();
-      }
-
-      render.draw_triangles(self.get_triangle_list());
-      self.clear_buffer();
-    }
-
     self.end_frame()
   }
 
@@ -162,17 +192,15 @@ impl Tessellator {
     assert!(self.buffer_list.is_empty());
     // end frame to clear miss cache, atlas and vertexes clear before by itself.
     self.texture_records.end_frame();
+    self.img_atlas.end_frame();
+    self.alpha_atlas.end_frame();
+
     if let Some(vertices_cache) = self.vertices_cache.as_mut() {
       vertices_cache.end_frame("Vertices");
     }
-    self.atlas.end_frame();
   }
 
-  fn prim_from_paint<R: GlRender>(
-    &mut self,
-    cmd: &PaintInstruct,
-    render: &mut R,
-  ) -> (Primitive, PrimitiveType) {
+  fn prim_from_paint(&mut self, cmd: &PaintInstruct) -> (Primitive, PrimitiveType) {
     match &cmd.brush {
       Brush::Color(color) => {
         let c = ColorPrimitive::new(
@@ -184,7 +212,7 @@ impl Tessellator {
       }
       Brush::Image { img, tile_mode } => {
         let mut id = ATLAS_ID;
-        let rect = self.atlas.store_image(img).unwrap_or_else(|_| {
+        let rect = self.img_atlas.store_image(img).unwrap_or_else(|_| {
           let size = img.size();
 
           let format = img.color_format();
@@ -219,12 +247,7 @@ impl Tessellator {
     }
   }
 
-  fn prim_from_command<R: GlRender>(
-    &mut self,
-    cmd: &PaintCommand,
-    stencil_path: &[&ClipInstruct],
-    render: &mut R,
-  ) -> (Primitive, PrimitiveType) {
+  fn prim_from_command(&mut self, cmd: &PaintCommand) -> (Primitive, PrimitiveType) {
     match cmd {
       PaintCommand::Paint(paint) => self.prim_from_paint(paint, render),
       PaintCommand::PushClip(clip) => (
@@ -248,17 +271,16 @@ impl Tessellator {
     self.primitives.len() as u32 - 1
   }
 
-  fn command_to_buffer<'a, F, F2, R>(
+  fn command_to_buffer<'a, F, F2>(
     &mut self,
     cmd: &'a PaintCommand,
     stencil_path: &mut Vec<&'a ClipInstruct>,
     cache: F,
     not_cache: F2,
-    render: &mut R,
+    helper: &mut impl GpuTessellatorHelper,
   ) where
     F: FnMut(VerticesKey) -> *mut VertexCache,
     F2: FnMut(f32, &'a Path) -> *mut VertexCache,
-    R: GlRender,
   {
     let (primitive, prim_type) = self.prim_from_command(cmd, stencil_path, render);
     let (path, transform) = match cmd {
@@ -468,13 +490,13 @@ impl Tessellator {
   }
 
   fn atlas_texture(&self) -> Texture {
-    let tex = self.atlas.texture();
-    let data = self.atlas.is_updated().then(|| tex.as_bytes());
+    let tex = self.img_atlas.texture();
+    let data = self.img_atlas.is_updated().then(|| tex.as_bytes());
     Texture {
       id: ATLAS_ID,
       size: tex.size().into(),
       data,
-      format: TextureAtlas::FORMAT,
+      format: ImgAtlas::FORMAT,
     }
   }
 }
@@ -594,7 +616,7 @@ mod tests {
   extern crate test;
   use test::Bencher;
 
-  use super::{atlas::tests::color_image, *};
+  use super::{img_atlas::tests::color_image, *};
 
   impl<F: FnMut(TriangleLists)> GlRender for F {
     fn begin_frame(&mut self) {}

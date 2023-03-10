@@ -1,6 +1,7 @@
+use crate::image::ColorFormat;
 use crate::{
-  path::*, Angle, Brush, Color, DeviceSize, PathStyle, Point, Rect, Size, TextStyle, Transform,
-  Vector,
+  path::*, Angle, Brush, Color, DeviceRect, DeviceSize, PathStyle, Point, Rect, Size, TextStyle,
+  Transform, Vector,
 };
 use euclid::Size2D;
 pub use lyon_tessellation::{LineCap, LineJoin};
@@ -8,7 +9,6 @@ use ribir_algo::{Resource, Substr};
 use ribir_text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
 use ribir_text::FontSize;
 use ribir_text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
-use std::error::Error;
 use std::ops::{Deref, DerefMut};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
@@ -25,25 +25,47 @@ pub struct Painter {
   typography_store: TypographyStore,
 }
 
-pub type CaptureCallback<'a> =
-  Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>;
-/// `PainterBackend` use to draw the picture what the `commands` described  to
+/// `PainterBackend` use to draw the picture what the `commands` described to
 /// the target device. Usually is implemented by graphic library.
 pub trait PainterBackend {
-  /// Submit the paint commands to draw
-  fn submit(&mut self, commands: Vec<PaintCommand>);
+  type Texture: TextureX;
+  /// Start record the paint commands.
+  fn begin_pass(&mut self);
+  /// Create a new texture to draw paint commands.
+  fn new_texture(&mut self, size: DeviceSize) -> Self::Texture;
+  /// paint `commands` into this frame.
+  fn draw_commands(&mut self, commands: Vec<PaintCommand>, target: &mut Self::Texture);
+  /// Stop recording commands and submit all paint commands to the device.
+  fn submit(self);
+}
 
-  fn commands_to_image(
-    &mut self,
-    commands: Vec<PaintCommand>,
-    capture: CaptureCallback,
-  ) -> Result<(), Box<dyn Error>>;
+/// Texture use to display.
+pub trait TextureX {
+  /// write data to the texture.
+  fn write_data_to(&mut self, dist: DeviceRect, data: &[u8]);
+  fn copy_as_bit_map(&mut self, data: &mut [u8]);
+  fn format(&self) -> ColorFormat;
+  fn size(&self) -> DeviceSize;
+}
 
-  fn resize(&mut self, size: DeviceSize);
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AntiAliasing {
+  None = 1,
+  Msaa2X = 2,
+  Msaa4X = 4,
+  Msaa8X = 8,
+  Msaa16X = 16,
+}
+
+pub struct TextureCfg {
+  pub format: ColorFormat,
+  pub size: DeviceSize,
+  pub anti_aliasing: AntiAliasing,
 }
 
 #[derive(Clone)]
 pub enum PaintPath {
+  // todo: unnecessary resource.  
   Path(Resource<Path>),
   Text {
     font_size: FontSize,

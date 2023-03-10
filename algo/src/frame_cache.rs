@@ -120,6 +120,7 @@ where
   where
     F: FnMut(bool, &mut V),
   {
+    // todo: use link list to avoid iterate all elements.
     let mut hit = 0;
     let count = self.cache.len();
     self.cache.retain(|_, v| {

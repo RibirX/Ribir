@@ -2,9 +2,10 @@ use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum ColorFormat {
   Rgba8,
+  Alpha8,
 }
 
 impl ColorFormat {
@@ -12,6 +13,7 @@ impl ColorFormat {
   pub const fn pixel_per_bytes(&self) -> u8 {
     match self {
       ColorFormat::Rgba8 => 4,
+      ColorFormat::Alpha8 => 1,
     }
   }
 }
