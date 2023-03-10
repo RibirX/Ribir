@@ -10,14 +10,16 @@ use ribir_core::{
 pub struct Text {
   #[declare(convert=into)]
   pub text: CowArc<str>,
-  #[declare(default = TypographyTheme::of(ctx).body1.text.clone())]
-  pub style: TextStyle,
+  #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()))]
+  pub foreground: Brush,
+  #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
+  pub style: CowArc<TextStyle>,
 }
 
 impl Text {
   pub fn text_layout(
     text: &CowArc<str>,
-    style: &TextStyle,
+    style: &CowArc<TextStyle>,
     t_store: &TypographyStore,
     bound: BoxClamp,
   ) -> VisualGlyphs {
@@ -27,7 +29,7 @@ impl Text {
       line_height,
       ref font_face,
       ..
-    } = *style;
+    } = **style;
 
     let width: Em = Pixel(bound.max.width.into()).into();
     let height: Em = Pixel(bound.max.height.into()).into();
@@ -63,9 +65,12 @@ impl Render for Text {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let rect = ctx.box_rect().unwrap();
-    ctx
-      .painter()
-      .paint_text_with_style(self.text.substr(..), &self.style, Some(rect.size));
+    ctx.painter().paint_text_with_style(
+      self.text.substr(..),
+      &self.style,
+      self.foreground.clone(),
+      Some(rect.size),
+    );
   }
 }
 

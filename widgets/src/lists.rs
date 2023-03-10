@@ -69,7 +69,7 @@ impl ComposeChild for ListItem {
     widget! {
       init ctx => {
         let surface_variant = Brush::Color(Palette::of(ctx).on_surface_variant());
-        let body_text_style = TypographyTheme::of(ctx).body1.text.clone();
+        let body_text_style = &TypographyTheme::of(ctx).body_large.text;
       }
       Row {
         Option::map(leading, |w| w.child)
@@ -78,10 +78,8 @@ impl ComposeChild for ListItem {
           Column {
             Text {
               text: headline_text.0,
-              style: TextStyle {
-                foreground: surface_variant,
-                ..body_text_style
-              }
+              foreground: surface_variant,
+              style: body_text_style.clone(),
             }
             Option::map(supporting_text, |text | widget! { Text { text: text.0 } })
           }

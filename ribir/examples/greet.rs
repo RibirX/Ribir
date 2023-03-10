@@ -7,7 +7,7 @@ fn main() {
   let hi = widget! {
     states { counter: Stateful::new(0) }
     init ctx => {
-      let style = TypographyTheme::of(ctx).headline1.text.clone();
+      let style = TypographyTheme::of(ctx).display_large.text.clone();
     }
     Column {
       Row {

@@ -18,14 +18,14 @@ impl Compose for TodoMVP {
       states { this: this.into_writable(), id_gen: Stateful::new(this.state_ref().tasks.len()) }
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
-        let headline2_style = TypographyTheme::of(ctx).headline2.text.clone();
+        let style = TypographyTheme::of(ctx).display_large.text.clone();
       }
       Column {
         margin: EdgeInsets::all(10.),
         Text {
           margin: EdgeInsets::only_bottom(10.),
           text: "Todo",
-          style: headline2_style,
+          style,
         }
         Row {
           margin: EdgeInsets::only_bottom(10.),
