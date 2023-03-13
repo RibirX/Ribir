@@ -1,14 +1,17 @@
 [workspace]
 members = [
+  "algo",
+  "app",
   "core",
+  "geometry",
   "gpu",
-  "painter",
   "macros",
   "macros/builtin",
-  "algo",
+  "painter",
+  "ribir",
   "text",
   "widgets",
-  "ribir",
+  "winit",
 ]
 resolver = "2"
 

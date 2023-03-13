@@ -7,13 +7,40 @@ use crate::{
 };
 use std::{
   convert::Infallible,
+  fmt::Debug,
   time::{Duration, Instant},
 };
 
-mod from_mouse;
+mod pointer_event;
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PointerId(usize);
+
+pub trait PointerId: Debug {
+  fn as_any(&self) -> &dyn Any;
+  fn eq(&self, other: &dyn PointerId) -> bool;
+  fn box_clone(&self) -> Box<dyn PointerId>;
+  // fn debug(&self) -> String;
+}
+
+impl Clone for Box<dyn PointerId> {
+  fn clone(&self) -> Self { self.box_clone() }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct DummyPointerId(usize);
+
+impl DummyPointerId {
+  pub fn dummy() -> DummyPointerId { DummyPointerId(0) }
+}
+
+impl PointerId for DummyPointerId {
+  fn as_any(&self) -> &dyn Any { &self.0 }
+
+  fn eq(&self, other: &dyn PointerId) -> bool {
+    self.0 == other.as_any().downcast_ref::<DummyPointerId>().unwrap().0
+  }
+
+  fn box_clone(&self) -> Box<dyn PointerId> { Box::new(*self) }
+}
 
 /// The pointer is a hardware-agnostic device that can target a specific set of
 /// screen coordinates. Having a single event model for pointers can simplify
@@ -25,7 +52,7 @@ pub struct PointerId(usize);
 #[derive(Debug, Clone)]
 pub struct PointerEvent {
   /// A unique identifier for the pointer causing the event.
-  pub id: PointerId,
+  pub id: Box<dyn PointerId>,
   /// The width (magnitude on the X axis), in pixels, of the contact geometry of
   /// the pointer.
   pub width: f32,
@@ -287,7 +314,7 @@ fn x_times_tap_map_filter(
 ) -> impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent> {
   assert!(x > 0);
   struct TapInfo {
-    pointer_id: PointerId,
+    pointer_id: Box<dyn PointerId>,
     stamps: Vec<Instant>,
   }
 
@@ -295,7 +322,7 @@ fn x_times_tap_map_filter(
   move |e: &mut PointerEvent| {
     let now = Instant::now();
     match &mut type_info {
-      Some(info) if info.pointer_id == e.id => {
+      Some(info) if info.pointer_id.eq(&*e.id) => {
         if info.stamps.len() + 1 == x {
           if now.duration_since(info.stamps[0]) <= dur {
             // emit x-tap event and reset the tap info
@@ -313,7 +340,10 @@ fn x_times_tap_map_filter(
         }
       }
       _ => {
-        type_info = Some(TapInfo { pointer_id: e.id, stamps: vec![now] });
+        type_info = Some(TapInfo {
+          pointer_id: e.id.clone(),
+          stamps: vec![now],
+        });
         None
       }
     }
@@ -340,7 +370,8 @@ mod tests {
   use crate::test::MockBox;
   use futures::executor::LocalPool;
   use std::{cell::RefCell, rc::Rc};
-  use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
+  // use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton,
+  // WindowEvent};
 
   fn env(times: usize) -> (Window, Rc<RefCell<usize>>) {
     let size = Size::new(400., 400.);
@@ -363,7 +394,7 @@ mod tests {
     let (mut wnd, count) = env(2);
 
     let mut local_pool = LocalPool::new();
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = Box::new(DummyPointerId::dummy());
     observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(8)
       .subscribe(move |i| {
@@ -374,8 +405,7 @@ mod tests {
           } else {
             ElementState::Released
           },
-          button: MouseButton::Left,
-          modifiers: ModifiersState::default(),
+          button: MouseButtons::Left,
         });
       });
 
@@ -394,8 +424,7 @@ mod tests {
           } else {
             ElementState::Released
           },
-          button: MouseButton::Left,
-          modifiers: ModifiersState::default(),
+          button: MouseButtons::Left,
         });
       });
 
@@ -408,7 +437,7 @@ mod tests {
     let (mut wnd, count) = env(3);
 
     let mut local_pool = LocalPool::new();
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(12)
       .subscribe(move |i| {
@@ -419,8 +448,7 @@ mod tests {
           } else {
             ElementState::Released
           },
-          button: MouseButton::Left,
-          modifiers: ModifiersState::default(),
+          button: MouseButtons::Left,
         });
       });
 

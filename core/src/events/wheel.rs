@@ -55,7 +55,8 @@ mod tests {
   use super::*;
   use crate::test::MockBox;
   use std::{cell::RefCell, rc::Rc};
-  use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
+  // use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase,
+  // WindowEvent};
 
   #[test]
   fn smoke() {
@@ -73,12 +74,11 @@ mod tests {
     let mut wnd = Window::default_mock(widget, Some(Size::new(100., 100.)));
 
     wnd.draw_frame();
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = Box::new(DummyPointerId::dummy());
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
       delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),
       phase: TouchPhase::Started,
-      modifiers: ModifiersState::default(),
     });
 
     assert_eq!(*receive.borrow(), (1., 1.));

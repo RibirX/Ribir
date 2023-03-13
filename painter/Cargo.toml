@@ -15,5 +15,6 @@ lyon_tessellation = {version = "1.0.1", features = ["serialization"]}
 palette = {version = "0.6.1", features = ["serializing"]}
 serde = {version = "1.0", features = ["rc"]}
 serde_json = "1.0.82"
+ribir_geometry = {path = "../geometry"}
 ribir_text = {path = "../text"}
 usvg = {version = "0.23.0", features = ["text"]}

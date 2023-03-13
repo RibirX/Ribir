@@ -1,4 +1,6 @@
-use crate::prelude::*;
+use ribir_core::prelude::*;
+use ribir_app::shell_window::ShellWindow;
+
 use std::{collections::HashMap, rc::Rc};
 pub use winit::window::WindowId;
 use winit::{

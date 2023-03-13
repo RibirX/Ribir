@@ -1,9 +1,7 @@
 use crate::prelude::*;
 use std::{cell::Cell, rc::Rc};
-use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
-
 #[derive(Declare, Debug)]
 pub struct Cursor {
   #[declare(convert=custom, builtin, default)]
@@ -91,7 +89,7 @@ impl Default for Cursor {
 mod tests {
   use super::*;
   use crate::test::*;
-  use winit::event::{DeviceId, WindowEvent};
+  // use winit::event::{DeviceId, WindowEvent};
 
   #[test]
   fn tree_down_up() {
@@ -117,7 +115,7 @@ mod tests {
     wnd.draw_frame();
     let tree = &mut wnd.widget_tree;
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     let dispatcher = &mut wnd.dispatcher;
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
@@ -130,7 +128,7 @@ mod tests {
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
@@ -142,7 +140,7 @@ mod tests {
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
@@ -154,7 +152,7 @@ mod tests {
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::AllScroll));
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
@@ -166,7 +164,7 @@ mod tests {
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,

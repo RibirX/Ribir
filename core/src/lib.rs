@@ -1,11 +1,11 @@
-#![feature(test, decl_macro)]
+#![feature(test, decl_macro, box_into_inner)]
 
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;
 
 pub mod animation;
-mod application;
+// mod application;
 pub mod builtin_widgets;
 mod context;
 pub mod data_widget;
@@ -13,6 +13,7 @@ mod state;
 pub(crate) mod widget_tree;
 
 pub mod assign_observable;
+pub mod cursor_icon;
 pub mod declare;
 pub mod dynamic_widget;
 pub mod enum_widget;
@@ -23,13 +24,15 @@ pub mod widget_children;
 pub mod window;
 pub mod prelude {
   pub use crate::animation::*;
-  #[doc(no_inline)]
-  pub use crate::application::Application;
+  // #[doc(no_inline)]
+  // pub use crate::application::Application;
   pub use crate::assign_observable::AssignObservable;
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
   #[doc(no_inline)]
   pub use crate::context::*;
+  #[doc(no_inline)]
+  pub use crate::cursor_icon::*;
   #[doc(no_inline)]
   pub use crate::data_widget::{
     compose_child_as_data_widget, widget_attach_data, AnonymousData, DataWidget,
@@ -52,7 +55,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
-  pub use crate::window::{Window, WindowBuilder};
+  pub use crate::window::Window;
   #[doc(no_inline)]
   pub use ::ribir_painter::*;
   pub use log;

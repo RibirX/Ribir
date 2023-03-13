@@ -110,7 +110,8 @@ mod tests {
   use crate::test::{layout_info_by_path, MockBox};
 
   use super::*;
-  use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
+  // use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase,
+  // WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let w = widget! {
@@ -124,7 +125,7 @@ mod tests {
 
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DummyPointerId::dummy();
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
       delta: MouseScrollDelta::PixelDelta((delta_x, delta_y).into()),

@@ -4,8 +4,18 @@ use crate::{
   context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
 };
 
-pub use winit::window::CursorIcon;
-use winit::{event::WindowEvent, window::WindowId};
+pub trait WindowId {
+  fn as_any(&self) -> &dyn Any;
+  fn eq(&self, other: &dyn WindowId) -> bool;
+  fn box_clone(&self) -> Box<dyn WindowId>;
+}
+
+impl Clone for Box<dyn WindowId> {
+  fn clone(&self) -> Self { self.box_clone() }
+}
+
+// pub use winit::window::CursorIcon;
+// use winit::{event::WindowEvent, window::WindowId};
 
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
@@ -13,164 +23,167 @@ pub trait RawWindow {
   fn outer_size(&self) -> Size;
   fn inner_position(&self) -> Point;
   fn outer_position(&self) -> Point;
-  fn id(&self) -> WindowId;
+  fn id(&self) -> Box<dyn WindowId>;
 
   fn request_redraw(&self);
   /// Modify the native window if cursor modified.
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn scale_factor(&self) -> f64;
+  fn as_any(&self) -> &dyn Any;
 }
 
-impl RawWindow for winit::window::Window {
-  fn inner_size(&self) -> Size {
-    let size = self.inner_size().to_logical(self.scale_factor());
-    Size::new(size.width, size.height)
-  }
+// impl RawWindow for winit::window::Window {
+//   fn inner_size(&self) -> Size {
+//     let size = self.inner_size().to_logical(self.scale_factor());
+//     Size::new(size.width, size.height)
+//   }
 
-  fn set_inner_size(&mut self, size: Size) {
-    let size = winit::dpi::LogicalSize::new(size.width, size.height);
-    winit::window::Window::set_inner_size(self, size)
-  }
+//   fn set_inner_size(&mut self, size: Size) {
+//     let size = winit::dpi::LogicalSize::new(size.width, size.height);
+//     winit::window::Window::set_inner_size(self, size)
+//   }
 
-  fn outer_size(&self) -> Size {
-    let size = self.outer_size().to_logical(self.scale_factor());
-    Size::new(size.width, size.height)
-  }
+//   fn outer_size(&self) -> Size {
+//     let size = self.outer_size().to_logical(self.scale_factor());
+//     Size::new(size.width, size.height)
+//   }
 
-  fn inner_position(&self) -> Point {
-    let pos = self
-      .inner_position()
-      .expect(" Can only be called on the main thread")
-      .to_logical(self.scale_factor());
+//   fn inner_position(&self) -> Point {
+//     let pos = self
+//       .inner_position()
+//       .expect(" Can only be called on the main thread")
+//       .to_logical(self.scale_factor());
 
-    Point::new(pos.x, pos.y)
-  }
-  #[inline]
-  fn id(&self) -> WindowId { self.id() }
+//     Point::new(pos.x, pos.y)
+//   }
+//   #[inline]
+//   fn id(&self) -> WindowId { self.id() }
 
-  fn outer_position(&self) -> Point {
-    let pos = self
-      .outer_position()
-      .expect(" Can only be called on the main thread")
-      .to_logical(self.scale_factor());
-    Point::new(pos.x, pos.y)
-  }
+//   fn outer_position(&self) -> Point {
+//     let pos = self
+//       .outer_position()
+//       .expect(" Can only be called on the main thread")
+//       .to_logical(self.scale_factor());
+//     Point::new(pos.x, pos.y)
+//   }
 
-  #[inline]
-  fn request_redraw(&self) { winit::window::Window::request_redraw(self) }
+//   #[inline]
+//   fn request_redraw(&self) { winit::window::Window::request_redraw(self) }
 
-  fn set_cursor(&mut self, cursor: CursorIcon) { self.set_cursor_icon(cursor) }
+//   fn set_cursor(&mut self, cursor: CursorIcon) { self.set_cursor_icon(cursor)
+// }
 
-  #[inline]
-  fn scale_factor(&self) -> f64 { winit::window::Window::scale_factor(self) }
-}
+//   #[inline]
+//   fn scale_factor(&self) -> f64 { winit::window::Window::scale_factor(self) }
+// }
 
-pub struct WindowBuilder {
-  inner_builder: winit::window::WindowBuilder,
-  root: Widget,
-}
+// pub struct WindowBuilder {
+//   inner_builder: winit::window::WindowBuilder,
+//   root: Widget,
+// }
 
-impl WindowBuilder {
-  #[inline]
-  pub fn build(self, app: &Application) -> Window {
-    let native_wnd = self.inner_builder.build(app.event_loop()).unwrap();
-    let size = native_wnd.inner_size();
-    let ctx = app.context().clone();
-    let p_backend = AppContext::wait_future(ribir_gpu::wgpu_backend_with_wnd(
-      &native_wnd,
-      DeviceSize::new(size.width, size.height),
-      None,
-      None,
-      ctx.shaper.clone(),
-    ));
-    Window::new(native_wnd, p_backend, self.root, ctx)
-  }
+// impl WindowBuilder {
+//   #[inline]
+//   pub fn build(self, app: &Application) -> Window {
+//     let native_wnd = self.inner_builder.build(app.event_loop()).unwrap();
+//     let size = native_wnd.inner_size();
+//     let ctx = app.context().clone();
+//     let p_backend = AppContext::wait_future(ribir_gpu::wgpu_backend_with_wnd(
+//       &native_wnd,
+//       DeviceSize::new(size.width, size.height),
+//       None,
+//       None,
+//       ctx.shaper.clone(),
+//     ));
+//     Window::new(native_wnd, p_backend, self.root, ctx)
+//   }
 
-  /// Requests the window to be of specific dimensions.
-  #[inline]
-  pub fn with_inner_size(mut self, size: Size) -> Self {
-    let size = winit::dpi::LogicalSize::new(size.width, size.height);
-    self.inner_builder = self.inner_builder.with_inner_size(size);
-    self
-  }
+//   /// Requests the window to be of specific dimensions.
+//   #[inline]
+//   pub fn with_inner_size(mut self, size: Size) -> Self {
+//     let size = winit::dpi::LogicalSize::new(size.width, size.height);
+//     self.inner_builder = self.inner_builder.with_inner_size(size);
+//     self
+//   }
 
-  /// Sets a minimum dimension size for the window.
-  #[inline]
-  pub fn with_min_inner_size(mut self, min_size: Size) -> Self {
-    let size = winit::dpi::LogicalSize::new(min_size.width, min_size.height);
-    self.inner_builder = self.inner_builder.with_min_inner_size(size);
-    self
-  }
+//   /// Sets a minimum dimension size for the window.
+//   #[inline]
+//   pub fn with_min_inner_size(mut self, min_size: Size) -> Self {
+//     let size = winit::dpi::LogicalSize::new(min_size.width, min_size.height);
+//     self.inner_builder = self.inner_builder.with_min_inner_size(size);
+//     self
+//   }
 
-  /// Sets a maximum dimension size for the window.
-  #[inline]
-  pub fn with_max_inner_size(mut self, max_size: Size) -> Self {
-    let size = winit::dpi::LogicalSize::new(max_size.width, max_size.height);
-    self.inner_builder = self.inner_builder.with_max_inner_size(size);
-    self
-  }
+//   /// Sets a maximum dimension size for the window.
+//   #[inline]
+//   pub fn with_max_inner_size(mut self, max_size: Size) -> Self {
+//     let size = winit::dpi::LogicalSize::new(max_size.width, max_size.height);
+//     self.inner_builder = self.inner_builder.with_max_inner_size(size);
+//     self
+//   }
 
-  /// Sets a desired initial position for the window.
-  #[inline]
-  pub fn with_position(mut self, position: Point) -> Self {
-    let position = winit::dpi::LogicalPosition::new(position.x, position.y);
-    self.inner_builder = self.inner_builder.with_position(position);
-    self
-  }
+//   /// Sets a desired initial position for the window.
+//   #[inline]
+//   pub fn with_position(mut self, position: Point) -> Self {
+//     let position = winit::dpi::LogicalPosition::new(position.x, position.y);
+//     self.inner_builder = self.inner_builder.with_position(position);
+//     self
+//   }
 
-  /// Sets whether the window is resizable or not.
-  #[inline]
-  pub fn with_resizable(mut self, resizable: bool) -> Self {
-    self.inner_builder = self.inner_builder.with_resizable(resizable);
-    self
-  }
+//   /// Sets whether the window is resizable or not.
+//   #[inline]
+//   pub fn with_resizable(mut self, resizable: bool) -> Self {
+//     self.inner_builder = self.inner_builder.with_resizable(resizable);
+//     self
+//   }
 
-  /// Requests a specific title for the window.
-  #[inline]
-  pub fn with_title<T: Into<String>>(mut self, title: T) -> Self {
-    self.inner_builder = self.inner_builder.with_title(title);
-    self
-  }
+//   /// Requests a specific title for the window.
+//   #[inline]
+//   pub fn with_title<T: Into<String>>(mut self, title: T) -> Self {
+//     self.inner_builder = self.inner_builder.with_title(title);
+//     self
+//   }
 
-  /// Requests maximized mode.
-  #[inline]
-  pub fn with_maximized(mut self, maximized: bool) -> Self {
-    self.inner_builder = self.inner_builder.with_maximized(maximized);
-    self
-  }
+//   /// Requests maximized mode.
+//   #[inline]
+//   pub fn with_maximized(mut self, maximized: bool) -> Self {
+//     self.inner_builder = self.inner_builder.with_maximized(maximized);
+//     self
+//   }
 
-  /// Sets whether the window will be initially hidden or visible.
-  #[inline]
-  pub fn with_visible(mut self, visible: bool) -> Self {
-    self.inner_builder = self.inner_builder.with_visible(visible);
-    self
-  }
+//   /// Sets whether the window will be initially hidden or visible.
+//   #[inline]
+//   pub fn with_visible(mut self, visible: bool) -> Self {
+//     self.inner_builder = self.inner_builder.with_visible(visible);
+//     self
+//   }
 
-  /// Sets whether the background of the window should be transparent.
-  #[inline]
-  pub fn with_transparent(mut self, transparent: bool) -> Self {
-    self.inner_builder = self.inner_builder.with_transparent(transparent);
-    self
-  }
+//   /// Sets whether the background of the window should be transparent.
+//   #[inline]
+//   pub fn with_transparent(mut self, transparent: bool) -> Self {
+//     self.inner_builder = self.inner_builder.with_transparent(transparent);
+//     self
+//   }
 
-  /// Sets whether the window should have a border, a title bar, etc.
-  #[inline]
-  pub fn with_decorations(mut self, decorations: bool) -> Self {
-    self.inner_builder = self.inner_builder.with_decorations(decorations);
-    self
-  }
+//   /// Sets whether the window should have a border, a title bar, etc.
+//   #[inline]
+//   pub fn with_decorations(mut self, decorations: bool) -> Self {
+//     self.inner_builder = self.inner_builder.with_decorations(decorations);
+//     self
+//   }
 
-  // /// Sets the window icon.
-  // #[inline]
-  // pub fn with_window_icon(mut self, window_icon: Option<winit::window::Icon>)
-  // -> Self {   self.inner_builder =
-  // self.inner_builder.with_window_icon(window_icon);   self
-  // }
-}
+//   // /// Sets the window icon.
+//   // #[inline]
+//   // pub fn with_window_icon(mut self, window_icon:
+// Option<winit::window::Icon>)   // -> Self {   self.inner_builder =
+//   // self.inner_builder.with_window_icon(window_icon);   self
+//   // }
+// }
 
 /// A rx scheduler pool that block until all task finished before every frame
 /// end.
 struct FramePool(FuturesLocalSchedulerPool);
+
 /// Window is the root to represent.
 pub struct Window {
   pub raw_window: Box<dyn RawWindow>,
@@ -185,13 +198,13 @@ pub struct Window {
 }
 
 impl Window {
-  #[inline]
-  pub fn builder(root: Widget) -> WindowBuilder {
-    WindowBuilder {
-      root,
-      inner_builder: winit::window::WindowBuilder::default(),
-    }
-  }
+  // #[inline]
+  // pub fn builder(root: Widget) -> WindowBuilder {
+  //   WindowBuilder {
+  //     root,
+  //     inner_builder: winit::window::WindowBuilder::default(),
+  //   }
+  // }
 
   /// processes native events from this native window
   #[inline]
@@ -201,7 +214,7 @@ impl Window {
         self.on_resize(DeviceSize::new(size.width, size.height));
       }
       WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
-        self.on_resize(DeviceSize::new(new_inner_size.width, new_inner_size.height));
+        self.on_resize(new_inner_size.value());
         let factor = scale_factor as f32;
         self.painter.reset(Some(factor));
       }
@@ -374,16 +387,34 @@ impl PainterBackend for MockBackend {
   }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct MockWindowId(usize);
+
+impl MockWindowId {
+  fn dummy() -> MockWindowId { MockWindowId(0) }
+}
+
+impl WindowId for MockWindowId {
+  fn as_any(&self) -> &dyn Any { &self.0 }
+
+  fn eq(&self, other: &dyn WindowId) -> bool {
+    self.0 == other.as_any().downcast_ref::<MockWindowId>().unwrap().0
+  }
+
+  fn box_clone(&self) -> Box<dyn WindowId> { Box::new(*self) }
+}
+
 impl RawWindow for MockRawWindow {
   fn inner_size(&self) -> Size { self.size }
   fn set_inner_size(&mut self, size: Size) { self.size = size; }
   fn outer_size(&self) -> Size { self.size }
   fn inner_position(&self) -> Point { Point::zero() }
   fn outer_position(&self) -> Point { Point::zero() }
-  fn id(&self) -> WindowId { unsafe { WindowId::dummy() } }
+  fn id(&self) -> Box<dyn WindowId> { Box::new(MockWindowId::dummy()) }
   fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
   fn request_redraw(&self) {}
   fn scale_factor(&self) -> f64 { 1. }
+  fn as_any(&self) -> &dyn Any { self }
 }
 
 impl Window {
