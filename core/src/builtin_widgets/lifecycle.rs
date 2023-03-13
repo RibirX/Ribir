@@ -112,7 +112,7 @@ macro_rules! impl_lifecycle {
       pub fn $stream_name(&self) -> LifecycleSubject { self.$field.clone() }
 
       #[inline]
-      pub(crate) fn dispatch<'r>(&self, event: LifeCycleCtx<'r>) { self.$field.clone().next(event) }
+      pub(crate) fn dispatch(&self, event: LifeCycleCtx<'_>) { self.$field.clone().next(event) }
     }
 
     impl $declarer {
