@@ -214,7 +214,7 @@ impl Window {
         self.on_resize(DeviceSize::new(size.width, size.height));
       }
       WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
-        self.on_resize(new_inner_size.value());
+        self.on_resize(new_inner_size);
         let factor = scale_factor as f32;
         self.painter.reset(Some(factor));
       }

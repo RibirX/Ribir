@@ -1,4 +1,3 @@
-use std::any::Any;
 
 use crate::{
   from_device_id::WrappedPointerId,
@@ -8,7 +7,7 @@ use crate::{
   from_mouse::WrappedMouseButton,
   from_size::{WrappedPhysicalPosition, WrappedPhysicalSize},
   from_touch_phase::WrappedTouchPhase,
-  prelude::{WrappedMouseScrollDelta, WrappedMutPhysicalSize},
+  prelude::WrappedMouseScrollDelta,
 };
 use ribir_core::prelude::WindowEvent as RibirWindowEvent;
 use winit::event::{ModifiersState as WinitModifiersState, WindowEvent as WinitWindowEvent};
@@ -72,12 +71,12 @@ impl<'a> From<WrappedWindowEvent<'a>> for RibirWindowEvent {
         state: WrappedElementState::from(state).into(),
         button: WrappedMouseButton::from(button).into(),
       },
-      WinitWindowEvent::ScaleFactorChanged { scale_factor, new_inner_size } => {
-        RibirWindowEvent::ScaleFactorChanged {
-          scale_factor,
-          new_inner_size: Box::new(WrappedMutPhysicalSize::<u32>::from(new_inner_size)),
-        }
-      }
+      // WinitWindowEvent::ScaleFactorChanged { scale_factor, new_inner_size } => {
+      //   RibirWindowEvent::ScaleFactorChanged {
+      //     scale_factor,
+      //     new_inner_size: WrappedPhysicalSize::<u32>::from(new_inner_size).into(),
+      //   }
+      // }
       _ => RibirWindowEvent::Unsupported,
     }
   }
@@ -123,20 +122,12 @@ impl<'a> From<RibirWindowEvent> for WrappedWindowEvent<'a> {
         button: WrappedMouseButton::from(button).into(),
         modifiers: WinitModifiersState::default(),
       },
-      RibirWindowEvent::ScaleFactorChanged { scale_factor, new_inner_size } => {
-        let new_inner_size: Box<dyn Any> = new_inner_size.as_any();
-        let new_inner_size = new_inner_size
-          .downcast::<WrappedMutPhysicalSize<u32>>()
-          .unwrap();
-        // let new_inner_size = new_inner_size.as_ref()
-        //   .to_boxed_any()
-        //   .downcast::<WrappedMutPhysicalSize<'static, u32>>()
-        //   .unwrap();
-
-        WinitWindowEvent::ScaleFactorChanged {
-          scale_factor,
-          new_inner_size: Box::into_inner(new_inner_size).into(),
-        }
+      RibirWindowEvent::ScaleFactorChanged { scale_factor:_, new_inner_size:_ } => {
+        // WinitWindowEvent::ScaleFactorChanged {
+        //   scale_factor,
+        //   new_inner_size: WrappedPhysicalSize::<u32>::from(new_inner_size).into(),
+        // }
+        panic!("Unimplemented: \"{value:?}\" can not be converted to winit enum.");
       }
       other => {
         panic!("Unimplemented: \"{other:?}\"");

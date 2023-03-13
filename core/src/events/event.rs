@@ -1,5 +1,5 @@
 use ribir_painter::{DevicePoint, DeviceSize};
-use std::{any::Any, fmt::Debug};
+use std::fmt::Debug;
 
 use super::{ModifiersState, MouseButtons, PointerId, ScanCode, VirtualKeyCode};
 
@@ -78,14 +78,8 @@ pub enum WindowEvent {
   /// module.
   ScaleFactorChanged {
     scale_factor: f64,
-    new_inner_size: Box<dyn MutDeviceSize>,
+    new_inner_size: DeviceSize
   },
-}
-
-pub trait MutDeviceSize: Debug {
-  fn value(&self) -> DeviceSize;
-  fn set_value(&mut self, size: DeviceSize);
-  fn as_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 impl PartialEq for WindowEvent {
@@ -157,7 +151,7 @@ impl PartialEq for WindowEvent {
           scale_factor: r_scale_factor,
           new_inner_size: r_new_inner_size,
         },
-      ) => l_scale_factor == r_scale_factor && l_new_inner_size.value() == r_new_inner_size.value(),
+      ) => l_scale_factor == r_scale_factor && l_new_inner_size == r_new_inner_size,
       _ => false,
     }
   }

@@ -3,8 +3,6 @@ use ribir_geometry::{
   Point as RibirLogicalPosition, Size as RibirLogicalSize,
 };
 
-use std::any::Any;
-use std::borrow::Borrow;
 use std::fmt::Debug;
 use winit::dpi::Pixel;
 
@@ -12,8 +10,6 @@ pub use winit::dpi::LogicalPosition as WinitLogicalPosition;
 pub use winit::dpi::LogicalSize as WinitLogicalSize;
 pub use winit::dpi::PhysicalPosition as WinitPhysicalPosition;
 pub use winit::dpi::PhysicalSize as WinitPhysicalSize;
-
-use ribir_core::prelude::MutDeviceSize;
 
 #[derive(Debug)]
 pub struct WrappedPhysicalSize<T: Pixel>(WinitPhysicalSize<T>);
@@ -39,33 +35,6 @@ impl<T: Pixel> From<RibirPhysicalSize> for WrappedPhysicalSize<T> {
       value.height.cast(),
     ))
   }
-}
-
-#[derive(Debug)]
-pub struct WrappedMutPhysicalSize<'a, T: Pixel>(&'a mut WinitPhysicalSize<T>);
-
-impl<'a: 'static, T: Pixel + Debug> MutDeviceSize for WrappedMutPhysicalSize<'a, T> {
-  fn value(&self) -> RibirPhysicalSize { WrappedPhysicalSize::from(*(self.0)).into() }
-
-  fn set_value(&mut self, size: RibirPhysicalSize) {
-    let val: WinitPhysicalSize<T> = WrappedPhysicalSize::<T>::from(size).into();
-    self.0.width = val.width;
-    self.0.height = val.height;
-  }
-
-  fn as_any(self: Box<Self>) -> Box<dyn Any> { self }
-}
-
-impl<'a, T: Pixel> From<&'a mut WinitPhysicalSize<T>> for WrappedMutPhysicalSize<'a, T> {
-  fn from(value: &'a mut WinitPhysicalSize<T>) -> Self { WrappedMutPhysicalSize(value) }
-}
-
-impl<'a, T: Pixel> From<WrappedMutPhysicalSize<'a, T>> for &'a mut WinitPhysicalSize<T> {
-  fn from(value: WrappedMutPhysicalSize<'a, T>) -> Self { value.0 }
-}
-
-impl<'a, T: Pixel> From<WrappedMutPhysicalSize<'a, T>> for WinitPhysicalSize<T> {
-  fn from(value: WrappedMutPhysicalSize<T>) -> Self { *value.0.borrow() }
 }
 
 // impl<'a, T: Pixel> From<&'a mut WinitPhysicalSize<T>> for
