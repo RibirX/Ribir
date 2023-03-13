@@ -50,9 +50,7 @@ impl Render for SvgRender {
       if let Some(b) = c.brush.as_ref() {
         painter.set_brush(b.clone());
       }
-      painter
-        .apply_transform(&c.transform)
-        .paint_path(c.path.clone());
+      painter.paint_path(c.path.clone());
     });
   }
 }

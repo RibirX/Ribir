@@ -15,17 +15,11 @@ pub struct Text {
   pub foreground: Brush,
   #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
   pub style: CowArc<TextStyle>,
+  #[declare(default)]
+  pub path_paint_style: PathPaintStyle,
 }
 
 impl Text {
-  pub fn new(str: impl Into<CowArc<str>>, foreground: &Brush, style: CowArc<TextStyle>) -> Self {
-    Text {
-      text: str.into(),
-      foreground: foreground.clone(),
-      style,
-    }
-  }
-
   pub fn text_layout(
     text: &CowArc<str>,
     style: &CowArc<TextStyle>,
@@ -74,12 +68,33 @@ impl Render for Text {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let rect = ctx.box_rect().unwrap();
-    ctx.painter().paint_text_with_style(
-      self.text.substr(..),
-      &self.style,
-      self.foreground.clone(),
-      Some(rect.size),
-    );
+    let painter = ctx.painter();
+    let TextStyle {
+      font_size,
+      font_face,
+      letter_space,
+      line_height,
+    } = &*self.style;
+    painter
+      .set_font(font_face.clone())
+      .set_font_size(*font_size);
+    if let Some(letter_space) = letter_space {
+      painter.set_letter_space(*letter_space);
+    }
+    if let Some(line_height) = line_height {
+      painter.set_text_line_height(*line_height);
+    }
+
+    let text = self.text.substr(..);
+    let bounds = Some(rect.size);
+    match self.path_paint_style {
+      PathPaintStyle::Fill => {
+        painter.fill_text(text, bounds);
+      }
+      PathPaintStyle::Stroke(stroke) => {
+        painter.stroke_text(text, bounds);
+      }
+    }
   }
 }
 

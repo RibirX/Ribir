@@ -1,5 +1,4 @@
 use crate::{Color, ShallowImage};
-use lyon_tessellation::StrokeOptions;
 use ribir_text::{Em, FontFace, FontSize, Pixel};
 use serde::{Deserialize, Serialize};
 
@@ -13,8 +12,6 @@ pub struct TextStyle {
   pub font_face: FontFace,
   /// Not support now.
   pub letter_space: Option<Pixel>,
-  /// The path style(fill or stroke) to use when painting.
-  pub path_style: PathStyle,
   /// The factor use to multiplied by the font size to specify the text line
   /// height.
   pub line_height: Option<Em>,
@@ -80,22 +77,12 @@ impl Brush {
   }
 }
 
-/// The style to paint path, maybe fill or stroke.
-#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
-pub enum PathStyle {
-  /// Fill the path.
-  Fill,
-  /// Stroke path with line width.
-  Stroke(StrokeOptions),
-}
-
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
       font_size: FontSize::Pixel(14.0.into()),
       font_face: Default::default(),
       letter_space: None,
-      path_style: PathStyle::Fill,
       line_height: None,
     }
   }

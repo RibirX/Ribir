@@ -4,8 +4,8 @@
 pub mod color;
 mod painter;
 pub mod path;
+pub mod path_builder;
 pub use crate::color::{Color, LightnessTone};
-
 pub use crate::painter::*;
 pub use path::*;
 pub mod image;
@@ -39,10 +39,6 @@ pub type DeviceRect = euclid::Rect<u32, PhysicUnit>;
 pub type DevicePoint = euclid::Point2D<u32, PhysicUnit>;
 pub type DeviceSize = euclid::Size2D<u32, PhysicUnit>;
 pub type DeviceVector = euclid::Vector2D<u32, PhysicUnit>;
-
 pub use euclid::Transform2D;
-
-pub use lyon_tessellation::{LineCap, LineJoin, StrokeOptions};
-
 pub const INFINITY_SIZE: Size = Size::new(f32::INFINITY, f32::INFINITY);
 pub const ZERO_SIZE: Size = Size::new(0., 0.);

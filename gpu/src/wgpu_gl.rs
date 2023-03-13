@@ -574,7 +574,7 @@ mod test {
   use ribir::prelude::AppContext;
   use ribir_painter::{
     Brush, CaptureCallback, ClipInstruct, Color, DeviceSize, PaintCommand, PaintInstruct,
-    PaintPath, PainterBackend, Path, Point, Transform, Vector,
+    PaintPath, PaintPath, PainterBackend, Point, Transform, Vector,
   };
   use std::{cell::RefCell, rc::Rc};
 
@@ -611,7 +611,11 @@ mod test {
     assert_eq!(*buf1.borrow(), *buf2.borrow());
   }
 
-  fn fill_path(path: &Path, transform: &Transform, color: ribir_painter::Color) -> PaintCommand {
+  fn fill_path(
+    path: &PaintPath,
+    transform: &Transform,
+    color: ribir_painter::Color,
+  ) -> PaintCommand {
     PaintCommand::Paint(PaintInstruct {
       path: PaintPath::Path(path.clone().into()),
       opacity: 1.,
@@ -620,7 +624,7 @@ mod test {
     })
   }
 
-  fn push_clip(path: &Path, transform: &Transform) -> PaintCommand {
+  fn push_clip(path: &PaintPath, transform: &Transform) -> PaintCommand {
     PaintCommand::PushClip(ClipInstruct {
       path: PaintPath::Path(path.clone().into()),
       transform: *transform,
@@ -629,15 +633,15 @@ mod test {
 
   fn pop_clip() -> PaintCommand { PaintCommand::PopClip }
 
-  fn full_rect(width: f32, height: f32) -> Path {
-    let mut builder = Path::builder();
+  fn full_rect(width: f32, height: f32) -> PaintPath {
+    let mut builder = PaintPath::builder();
     builder
       .begin_path(Point::zero())
       .line_to(Point::new(width, 0.))
       .line_to(Point::new(width, height))
       .line_to(Point::new(0., height))
       .end_path(true);
-    builder.fill()
+    builder.build()
   }
 
   #[test]

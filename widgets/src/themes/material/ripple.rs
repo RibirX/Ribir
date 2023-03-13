@@ -68,9 +68,9 @@ impl ComposeChild for Ripple {
                   let rect = Rect::from_size(container.layout_size());
                   let path = match this.bounded {
                     RippleBound::Unbounded => unreachable!(),
-                    RippleBound::Bounded => Path::rect(&rect, PathStyle::Fill),
+                    RippleBound::Bounded => PaintPath::rect(&rect),
                     RippleBound::Radius(radius) => {
-                      Path::rect_round(&rect, &radius, PathStyle::Fill)
+                      PaintPath::rect_round(&rect, &radius)
                     }
                   };
                   Clip { clip: ClipType::Path(path) }
@@ -80,7 +80,7 @@ impl ComposeChild for Ripple {
                   PathPaintKit {
                     id: ripple_path,
                     brush: StateRole::pressed().calc_color(this.color),
-                    path: Path::circle(launch_at, radius, PathStyle::Fill),
+                    path: PaintPath::circle(launch_at, radius),
                     on_mounted: move |_| { ripper_enter.run(); }
                   }
                 }
@@ -92,9 +92,9 @@ impl ComposeChild for Ripple {
               prop: prop!(ripple_path.path, move |_, _, rate| {
                 let radius = Lerp::lerp(&0., &radius, rate);
                 let center = this.launch_pos.clone().unwrap();
-                Path::circle(center, radius, PathStyle::Fill)
+                PaintPath::circle(center, radius)
               }),
-              from: Path::circle(Point::zero(), 0., PathStyle::Fill)
+              from: PaintPath::circle(Point::zero(), 0.)
             }
             finally {
               let_watch!(!container.pointer_pressed() && !ripper_enter.is_running())

@@ -106,7 +106,8 @@ impl ComposeChild for Tabs {
                             Text {
                               text: text.0.clone(),
                               foreground,
-                              style
+                              style,
+                              path_paint_style: PathPaintStyle::Fill,
                             }
                           }
                         }

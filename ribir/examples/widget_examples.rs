@@ -5,14 +5,14 @@ const WINDOW_SIZE: f32 = 800.;
 fn main() {
   let widgets = widget! {
     init ctx => {
-      let title_style = TypographyTheme::of(ctx).display_large.text.clone();
+      let label_style = TypographyTheme::of(ctx).display_large.text.clone();
       let foreground = Palette::of(ctx).on_surface_variant().into();
     }
     Column {
       margin: EdgeInsets::horizontal(20.),
       Column {
         margin: EdgeInsets::only_top(20.),
-        Text::new("Button", &foreground, title_style.clone())
+        Text { text: "Button", foreground, label_style }
         Row {
           margin: EdgeInsets::only_top(20.),
           FilledButton { svgs::ADD }

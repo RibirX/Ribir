@@ -7,7 +7,7 @@ use ribir_core::prelude::*;
 #[derive(Declare)]
 pub struct StateLayer {
   pub color: Color,
-  pub path: Path,
+  pub path: PaintPath,
   pub role: StateRole,
 }
 /// Widget that as visual indicator of material design used to communicate the
@@ -46,7 +46,7 @@ impl ComposeChild for InteractiveLayer {
           size: host.layout_size(),
           StateLayer {
             color: this.color,
-            path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
+            path: PaintPath::rect_round(&host.layout_rect(), &this.border_radii),
             role: if host.pointer_pressed() {
               StateRole::pressed()
             } else if host.has_focus() {

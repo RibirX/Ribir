@@ -33,7 +33,7 @@ fn main() {
       prop: prop!(path_widget.paths, PathPaintKit::paths_lerp_fn(prop!(path_widget.paths))),
       from: vec![
         PathPaintKit {
-          path: Path::rect(&Rect::zero(), style),
+          path: PaintPath::rect(&Rect::zero(), style),
           brush: Brush::Color(Color::WHITE),
         }
       ]

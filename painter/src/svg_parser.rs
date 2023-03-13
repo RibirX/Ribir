@@ -1,24 +1,25 @@
-use crate::{Brush, Color, LineCap, LineJoin, Path, PathStyle, Point, Size, Transform};
+use crate::{
+  Brush, Color, LineCap, LineJoin, PaintPath_, Path, Point, Size, StrokeOptions, Transform,
+};
 use euclid::approxeq::ApproxEq;
-use lyon_tessellation::{math::Point as LyonPoint, path::Path as LyonPath, StrokeOptions};
 use palette::FromComponent;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SvgPaths {
   pub size: Size,
   pub paths: Vec<SvgRenderPath>,
 }
 
-// todo: we need to support currentColor to change svg color.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SvgRenderPath {
-  pub path: Path,
-  pub transform: Transform,
+  pub path: PaintPath_,
   pub brush: Option<Brush>,
 }
 
+// todo: we need to support currentColor to change svg color.
 impl SvgPaths {
   pub fn parse_from_bytes(svg_data: &[u8]) -> Result<Self, Box<dyn Error>> {
     let opt = Options { ..<_>::default() };
@@ -41,15 +42,12 @@ impl SvgPaths {
         match &*node.borrow() {
           NodeKind::Path(p) => {
             t_stack.push(matrix_convert(p.transform));
+            let path = usvg_path_to_path(p);
+
             if let Some(ref fill) = p.fill {
               let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
-              let lyon_path = usvg_path_to_lyon_path(p);
-              let transform = t_stack.current_transform();
-              let path = Path {
-                path: lyon_path,
-                style: PathStyle::Fill,
-              };
-              paths.push(SvgRenderPath { path, transform, brush });
+              let path = path.clone().transform(t_stack.current_transform());
+              paths.push(SvgRenderPath { path: PaintPath_::new(path), brush });
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -63,19 +61,20 @@ impl SvgPaths {
                 usvg::LineJoin::Bevel => LineJoin::Bevel,
                 usvg::LineJoin::Round => LineJoin::Round,
               };
-              let options = StrokeOptions::default()
-                .with_line_width(stroke.width.get() as f32)
-                .with_line_join(join)
-                .with_line_cap(cap);
-              let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity);
-              let lyon_path = usvg_path_to_lyon_path(p);
-              let path = Path {
-                path: lyon_path,
-                style: PathStyle::Stroke(options),
+              let options = StrokeOptions {
+                width: stroke.width.get() as f32,
+                line_cap: cap,
+                line_join: join,
+                miter_limit: stroke.miterlimit.get() as f32,
               };
-              let transform = t_stack.current_transform();
-              paths.push(SvgRenderPath { path, transform, brush });
-            }
+
+              let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity);
+              let ts = t_stack.current_transform();
+              let path = path.stroke(&options, Some(ts)).map(|p| p.transform(ts));
+              if let Some(path) = path {
+                paths.push(SvgRenderPath { path: PaintPath_::new(path), brush });
+              }
+            };
           }
           NodeKind::Image(_) => {
             // todo;
@@ -128,8 +127,8 @@ impl SvgPaths {
   pub fn deserialize(str: &str) -> Result<Self, Box<dyn Error>> { Ok(serde_json::from_str(str)?) }
 }
 
-fn usvg_path_to_lyon_path(path: &usvg::Path) -> LyonPath {
-  let mut builder = LyonPath::svg_builder();
+fn usvg_path_to_path(path: &usvg::Path) -> Path {
+  let mut builder = lyon_algorithms::path::Path::svg_builder();
   path.data.segments().for_each(|seg| match seg {
     usvg::PathSegment::MoveTo { x, y } => {
       builder.move_to(point(x, y));
@@ -143,10 +142,12 @@ fn usvg_path_to_lyon_path(path: &usvg::Path) -> LyonPath {
     usvg::PathSegment::ClosePath => builder.close(),
   });
 
-  builder.build()
+  Path(builder.build())
 }
 
-fn point(x: f64, y: f64) -> LyonPoint { Point::new(x as f32, y as f32).to_untyped() }
+fn point(x: f64, y: f64) -> lyon_algorithms::math::Point {
+  Point::new(x as f32, y as f32).to_untyped()
+}
 
 fn matrix_convert(t: usvg::Transform) -> Transform {
   let usvg::Transform { a, b, c, d, e, f } = t;
@@ -183,5 +184,5 @@ impl TransformStack {
 
   fn pop(&mut self) -> Option<Transform> { self.stack.pop() }
 
-  fn current_transform(&self) -> Transform { self.stack.last().cloned().unwrap() }
+  fn current_transform(&self) -> &Transform { self.stack.last().unwrap() }
 }

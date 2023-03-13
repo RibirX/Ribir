@@ -182,7 +182,7 @@ impl BoxDecoration {
             .set_brush(border.color.clone());
           painter.begin_path(vertexs[edge.0] + *offset);
           painter.line_to(vertexs[edge.1] + *offset);
-          painter.close_path(false).stroke();
+          painter.end_path(false).stroke();
         }
       });
   }
