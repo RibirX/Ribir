@@ -1,8 +1,10 @@
 use std::{
   hash::{Hash, Hasher},
   ops::Deref,
-  sync::Arc,
+  rc::Rc,
 };
+
+use serde::{Deserialize, Serialize};
 
 /// Enum to store both share and local resource. Share resources can have many
 /// copy, and every copy as the same one. Local resources means is individual
@@ -20,11 +22,11 @@ pub enum Resource<T> {
 /// # Notice
 /// Compare two `ShareResource` just compare if it come form same resource not
 /// compare its content.
-#[derive(Debug, Eq)]
-pub struct ShareResource<T>(Arc<T>);
+#[derive(Debug, Eq, Serialize, Deserialize)]
+pub struct ShareResource<T>(Rc<T>);
 
 impl<T> ShareResource<T> {
-  pub fn new(v: T) -> Self { ShareResource(Arc::new(v)) }
+  pub fn new(v: T) -> Self { ShareResource(Rc::new(v)) }
 }
 
 impl<T> Clone for ShareResource<T> {
@@ -61,12 +63,12 @@ impl<T> Deref for ShareResource<T> {
 
 impl<T> PartialEq for ShareResource<T> {
   #[inline]
-  fn eq(&self, other: &Self) -> bool { Arc::ptr_eq(&self.0, &other.0) }
+  fn eq(&self, other: &Self) -> bool { Rc::ptr_eq(&self.0, &other.0) }
 }
 
 impl<T> Hash for ShareResource<T> {
   #[inline]
-  fn hash<H: Hasher>(&self, state: &mut H) { Arc::as_ptr(&self.0).hash(state); }
+  fn hash<H: Hasher>(&self, state: &mut H) { Rc::as_ptr(&self.0).hash(state); }
 }
 
 impl<T> From<T> for Resource<T> {

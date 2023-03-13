@@ -13,21 +13,23 @@ repository = "https://github.com/RibirX/Ribir/painter"
 version.workspace = true
 
 [dependencies]
-bitflags.workspace = true
-bitflags-serde-legacy.workspace = true
-euclid.workspace = true
-log.workspace = true
-lyon_algorithms.workspace = true
-lyon_tessellation = {workspace = true, features = ["serialization"]}
-palette = {workspace = true, features = ["serializing"]}
-rctree.workspace = true
+bitflags = "2.0.1"
+bitflags-serde-legacy = "0.1.0"
+euclid = {version = "0.22.6", features = ["serde"]}
+image = {workspace = true, optional = true, default-features = false}
+log = "0.4.17"
+lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
+lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
+material-color-utilities-rs = {workspace = true}
+palette = {version = "0.6.1", features = ["serializing"]}
+rctree = "0.5.0"
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
-serde = {workspace = true, features = ["rc"]}
-serde_json.workspace = true
-usvg.workspace = true
-image = {workspace = true, optional = true, default-features = false}
-material-color-utilities-rs = {workspace = true}
+serde = {version = "1.0", features = ["rc", "derive"]}
+serde_json = "1.0.82"
+tiny-skia-path = "0.8.3"
+usvg = {version = "0.29.0"}
+zerocopy = "0.6.1"
 
 [features]
-png = ["image",  "image/png"]
+tessellation = ["lyon_tessellation"]

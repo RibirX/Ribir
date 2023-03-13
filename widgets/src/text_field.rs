@@ -353,6 +353,12 @@ fn build_input_area(
   suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
 ) -> Widget {
+  let input_label = |text| Text {
+    text,
+    foreground: theme.foreground.clone(),
+    style: theme.text.clone(),
+    path_paint_style: PathPaintStyle::Fill,
+  };
   widget! {
     states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
     init ctx => {
@@ -363,9 +369,7 @@ fn build_input_area(
     Row {
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
-      Option::map(prefix.clone(), move |text| {
-        Text { text, foreground: theme.foreground.clone(), style: theme.text.clone() }
-      })
+      Option::map(prefix.clone(), input_label)
       Expanded {
         flex: 1.,
         Input {
@@ -374,13 +378,11 @@ fn build_input_area(
           widget::from(placeholder)
         }
       }
-      Option::map(suffix.clone(),  move |text| {
-        Text { text, foreground: theme.foreground.clone(), style: theme.text.clone()}
-      })
+      Option::map(suffix.clone(),  input_label)
 
     }
     transition prop!(input_area.visible, move |_from, to, rate| *to && rate >= 1.) {
-        by: linear,
+      by: linear,
     }
 
     finally {

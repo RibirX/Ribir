@@ -1,5 +1,5 @@
-use crate::{Color, ShallowImage};
-use lyon_tessellation::StrokeOptions;
+use crate::{Color, PixelImage};
+use ribir_algo::ShareResource;
 use ribir_text::{Em, FontFace, FontSize, Pixel};
 use serde::{Deserialize, Serialize};
 
@@ -13,8 +13,6 @@ pub struct TextStyle {
   pub font_face: FontFace,
   /// Not support now.
   pub letter_space: Option<Pixel>,
-  /// The path style(fill or stroke) to use when painting.
-  pub path_style: PathStyle,
   /// The factor use to multiplied by the font size to specify the text line
   /// height.
   pub line_height: Option<Em>,
@@ -61,12 +59,13 @@ impl TileMode {
   pub fn is_cover_mode(&self) -> bool { self.bits() & (TileMode::COVER_BOTH.bits()) > 0 }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum Brush {
   Color(Color),
   Image {
-    img: ShallowImage,
+    img: ShareResource<PixelImage>,
     tile_mode: TileMode,
+    opacify: f32,
   },
   Gradient, // todo,
 }
@@ -75,25 +74,17 @@ impl Brush {
   pub fn only_convert_color(&self, f: impl FnOnce(&Color) -> Color) -> Brush {
     match self {
       Brush::Color(color) => f(color).into(),
-      _ => self.clone(),
-    }
-  }
-
-  pub fn only_convert_to_color(&self, f: impl FnOnce(&Color) -> Color) -> Color {
-    match self {
-      Brush::Color(color) => f(color),
       _ => panic!("Need Color!"),
     }
   }
-}
 
-/// The style to paint path, maybe fill or stroke.
-#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
-pub enum PathStyle {
-  /// Fill the path.
-  Fill,
-  /// Stroke path with line width.
-  Stroke(StrokeOptions),
+  pub fn apply_opacify(&mut self, alpha: f32) {
+    match self {
+      Brush::Color(c) => *c = c.apply_alpha(alpha),
+      Brush::Image { opacify, .. } => *opacify *= alpha,
+      Brush::Gradient => todo!(),
+    }
+  }
 }
 
 impl Default for TextStyle {
@@ -102,7 +93,6 @@ impl Default for TextStyle {
       font_size: FontSize::Pixel(14.0.into()),
       font_face: Default::default(),
       letter_space: None,
-      path_style: PathStyle::Fill,
       line_height: None,
     }
   }

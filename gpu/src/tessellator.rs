@@ -6,9 +6,7 @@ use lyon_tessellation::{path::Path as LyonPath, *};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
 use ribir_algo::{FrameCache, Resource, ShareResource};
-use ribir_painter::{
-  Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, Path, PathStyle, TileMode, Transform,
-};
+use ribir_painter::{Brush, PaintCommand, TileMode, Transform};
 use ribir_text::{
   font_db::ID,
   shaper::{GlyphId, TextShaper},
@@ -67,12 +65,8 @@ struct VerticesKey {
 
 #[derive(Debug, Clone)]
 enum PathKey {
-  Path(ShareResource<Path>),
-  Glyph {
-    glyph_id: GlyphId,
-    face_id: ID,
-    style: PathStyle,
-  },
+  Path(ShareResource<PaintPath>),
+  Glyph { glyph_id: GlyphId, face_id: ID },
 }
 #[derive(Default)]
 struct VertexCache {
@@ -138,7 +132,7 @@ impl Tessellator {
       .par_chunks_mut(PAR_CHUNKS_SIZE)
       .for_each(|slice| {
         for (tolerance, path, cache) in slice {
-          let valid = tesselate_path(&path.path, path.style, *tolerance);
+          let valid = tessellate(path.inner_path(), *tolerance);
           **cache = valid;
         }
       });
@@ -202,7 +196,7 @@ impl Tessellator {
         let mut factor = [1., 1.];
         if tile_mode.is_cover_mode() {
           let box_rect = match &cmd.path {
-            PaintPath::Path(path) => path.box_rect(),
+            PaintPath::Path(path) => path.bounds(),
             PaintPath::Text { .. } => todo!(),
           };
           if tile_mode.contains(TileMode::COVER_X) {
@@ -257,7 +251,7 @@ impl Tessellator {
     render: &mut R,
   ) where
     F: FnMut(VerticesKey) -> *mut VertexCache,
-    F2: FnMut(f32, &'a Path) -> *mut VertexCache,
+    F2: FnMut(f32, &'a PaintPath) -> *mut VertexCache,
     R: GlRender,
   {
     let (primitive, prim_type) = self.prim_from_command(cmd, stencil_path, render);
@@ -286,7 +280,7 @@ impl Tessellator {
     prim_type: PrimitiveType,
   ) where
     F: FnMut(VerticesKey) -> *mut VertexCache,
-    F2: FnMut(f32, &'a Path) -> *mut VertexCache,
+    F2: FnMut(f32, &'a PaintPath) -> *mut VertexCache,
   {
     let scale = transform.m11.max(transform.m22).max(f32::EPSILON);
     match path {
@@ -306,7 +300,7 @@ impl Tessellator {
           .buffer_list
           .push_back(CacheItem { prim_id, cache_ptr, prim_type });
       }
-      PaintPath::Text { font_size, glyphs, style } => {
+      PaintPath::Text { font_size, glyphs } => {
         let tolerance = TOLERANCE / (font_size.into_pixel().value() * scale);
         let font_size_ems = font_size.into_pixel().value();
         glyphs.iter().for_each(
@@ -317,7 +311,7 @@ impl Tessellator {
              glyph_id,
              ..
            }| {
-            let path = PathKey::Glyph { face_id, glyph_id, style: *style };
+            let path = PathKey::Glyph { face_id, glyph_id };
             let key = VerticesKey { tolerance, path };
             let cache_ptr = cache(key);
 
@@ -431,8 +425,8 @@ impl Tessellator {
   fn gen_triangles(shaper: &TextShaper, key: &VerticesKey) -> VertexCache {
     let &VerticesKey { tolerance, ref path, .. } = key;
     match path {
-      PathKey::Path(path) => tesselate_path(&path.path, path.style, tolerance),
-      &PathKey::Glyph { glyph_id, face_id, style } => {
+      PathKey::Path(path) => tessellate(path.inner_path(), tolerance),
+      &PathKey::Glyph { glyph_id, face_id } => {
         let face = {
           let mut font_db = shaper.font_db_mut();
           font_db
@@ -442,7 +436,7 @@ impl Tessellator {
         };
 
         if let Some(path) = face.outline_glyph(glyph_id) {
-          tesselate_path(&path, style, tolerance)
+          tessellate(&path, tolerance)
         } else {
           //todo, image or svg fallback?
           VertexCache::default()
@@ -479,37 +473,7 @@ impl Tessellator {
   }
 }
 
-fn tesselate_path(path: &LyonPath, style: PathStyle, tolerance: f32) -> VertexCache {
-  match style {
-    ribir_painter::PathStyle::Fill => fill_tess(path, tolerance),
-    ribir_painter::PathStyle::Stroke(mut options) => {
-      options.tolerance = tolerance;
-      stroke_tess(path, &options)
-    }
-  }
-}
-
-fn stroke_tess(path: &LyonPath, options: &StrokeOptions) -> VertexCache {
-  let mut buffers = VertexBuffers::new();
-  let mut stroke_tess = StrokeTessellator::default();
-  stroke_tess
-    .tessellate_path(
-      path,
-      options,
-      &mut BuffersBuilder::new(&mut buffers, move |v: StrokeVertex| Vertex {
-        pixel_coords: v.position().to_array(),
-        prim_id: u32::MAX,
-      }),
-    )
-    .unwrap();
-
-  VertexCache {
-    vertices: buffers.vertices.into_boxed_slice(),
-    indices: buffers.indices.into_boxed_slice(),
-  }
-}
-
-fn fill_tess(path: &LyonPath, tolerance: f32) -> VertexCache {
+fn tessellate(path: &LyonPath, tolerance: f32) -> VertexCache {
   let mut buffers = VertexBuffers::new();
   let mut fill_tess = FillTessellator::default();
   fill_tess
@@ -535,14 +499,9 @@ impl Hash for VerticesKey {
     core::mem::discriminant(&self.path).hash(state);
     match &self.path {
       PathKey::Path(p) => p.hash(state),
-      PathKey::Glyph { glyph_id, face_id, style } => {
+      PathKey::Glyph { glyph_id, face_id } => {
         glyph_id.hash(state);
         face_id.hash(state);
-        core::mem::discriminant(style).hash(state);
-        match style {
-          PathStyle::Fill => {}
-          PathStyle::Stroke(options) => stroke_options_hash(options, state),
-        }
       }
     }
   }
@@ -554,31 +513,15 @@ impl PartialEq for VerticesKey {
       && match (&self.path, &other.path) {
         (PathKey::Path(l_p), PathKey::Path(r_p)) => l_p == r_p,
         (
-          PathKey::Glyph {
-            glyph_id: l_id,
-            face_id: l_face,
-            style: l_style,
-          },
-          PathKey::Glyph {
-            glyph_id: r_id,
-            face_id: r_face,
-            style: r_style,
-          },
-        ) => l_id == r_id && l_face == r_face && l_style == r_style,
+          PathKey::Glyph { glyph_id: l_id, face_id: l_face },
+          PathKey::Glyph { glyph_id: r_id, face_id: r_face },
+        ) => l_id == r_id && l_face == r_face,
         _ => false,
       }
   }
 }
 
 impl Eq for VerticesKey {}
-
-fn stroke_options_hash<H: std::hash::Hasher>(options: &StrokeOptions, state: &mut H) {
-  options.line_width.to_bits().hash(state);
-  core::mem::discriminant(&options.start_cap).hash(state);
-  core::mem::discriminant(&options.end_cap).hash(state);
-  core::mem::discriminant(&options.line_join).hash(state);
-  options.miter_limit.to_bits().hash(state);
-}
 
 #[cfg(test)]
 mod tests {
@@ -711,7 +654,7 @@ mod tests {
       tile_mode: TileMode::REPEAT_BOTH,
     });
     #[derive(Debug, Clone)]
-    struct PathHash(Path);
+    struct PathHash(PaintPath);
 
     painter.rect(&Rect::new(Point::new(0., 0.), Size::new(512., 512.)));
     painter.fill();
@@ -730,7 +673,7 @@ mod tests {
   }
 
   fn bench_rect_round() -> ribir_painter::Builder {
-    let mut builder = Path::builder();
+    let mut builder = PaintPath::builder();
     builder.rect_round(
       &Rect::new(Point::zero(), Size::new(100., 100.)),
       &Radius::all(2.),
@@ -744,7 +687,7 @@ mod tests {
     painter.set_brush(Color::RED);
     let fill_path = bench_rect_round().fill();
     let stroke_path = bench_rect_round().stroke(StrokeOptions::default().with_line_width(2.));
-    painter.paint_path(fill_path).paint_path(stroke_path);
+    painter.fill_path(fill_path).fill_path(stroke_path);
     let commands = painter.finish();
     let mut tess = tessellator();
     let commands = commands
@@ -767,7 +710,7 @@ mod tests {
     let stroke_path = bench_rect_round().stroke(StrokeOptions::default().with_line_width(2.));
     let fill_path = ShareResource::new(fill_path);
     let stroke_path = ShareResource::new(stroke_path);
-    painter.paint_path(fill_path).paint_path(stroke_path);
+    painter.fill_path(fill_path).fill_path(stroke_path);
     let commands = painter.finish();
     let mut tess = tessellator();
     let commands = commands

@@ -53,7 +53,7 @@ pub trait Render: Query {
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
-  /// deprecated, todo: auto filter unnecessary paint in lower layer.
+  /// todo: remove it, only use clip to control overflow.
   /// Hint if a render maybe paint over its layout boundary.
   fn can_overflow(&self) -> bool { false }
 

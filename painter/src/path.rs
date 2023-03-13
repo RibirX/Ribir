@@ -1,256 +1,175 @@
-use crate::{Angle, PathStyle, Point, Rect, Vector};
-use lyon_tessellation::path::Path as LyonPath;
-pub use lyon_tessellation::{
-  path::{
-    builder::BorderRadii,
-    geom::{Arc, LineSegment},
-    path::Builder as LyonBuilder,
-    traits::PathBuilder,
-    Winding,
-  },
-  StrokeOptions,
+use crate::{
+  path_builder::{stroke_path, PathBuilder},
+  Point, Rect, Transform,
 };
+use lyon_algorithms::path::Path as LyonPath;
 use serde::{Deserialize, Serialize};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Path {
-  pub path: LyonPath,
-  pub style: PathStyle,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Path(pub(crate) LyonPath);
+
+/// Describe how to paint path, fill or stroke.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
+pub enum PathPaintStyle {
+  /// Fill the path.
+  #[default]
+  Fill,
+  /// Stroke path with line width.
+  Stroke(StrokeOptions),
+}
+
+/// Stroke properties.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+pub struct StrokeOptions {
+  /// A stroke thickness.
+  ///
+  /// Must be >= 0.
+  ///
+  /// When set to 0, a hairline stroking will be used.
+  ///
+  /// Default: 1.0
+  pub width: f32,
+
+  /// The limit at which a sharp corner is drawn beveled.
+  ///
+  /// Default: 4.0
+  pub miter_limit: f32,
+
+  /// A stroke line cap.
+  ///
+  /// Default: Butt
+  pub line_cap: LineCap,
+
+  /// A stroke line join.
+  ///
+  /// Default: Miter
+  pub line_join: LineJoin,
+}
+
+/// Draws at the beginning and end of an open path contour.
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
+pub enum LineCap {
+  /// No stroke extension.
+  #[default]
+  Butt,
+  /// Adds circle.
+  Round,
+  /// Adds square.
+  Square,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
+pub enum LineJoin {
+  /// Extends to miter limit.
+  #[default]
+  Miter,
+  /// Adds circle.
+  Round,
+  /// Connects outside edges.
+  Bevel,
+}
+
+/// A path segment.
+#[derive(Copy, Clone, PartialEq, Deserialize, Serialize, Debug)]
+pub enum PathSegment {
+  MoveTo(Point),
+  LineTo(Point),
+  QuadTo(Point, Point),
+  CubicTo(Point, Point, Point),
+  Close,
 }
 
 /// The radius of each corner of a rounded rectangle.
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Default)]
-pub struct Radius(BorderRadii);
+pub struct Radius {
+  pub top_left: f32,
+  pub top_right: f32,
+  pub bottom_left: f32,
+  pub bottom_right: f32,
+}
 
-#[derive(Default)]
-pub struct Builder(pub LyonBuilder);
+#[cfg(feature = "tessellation")]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, zerocopy::AsBytes, Default)]
+pub struct Vertex<Attr> {
+  pub pos: [f32; 2],
+  pub attr: Attr,
+}
 
 impl Path {
   #[inline]
-  pub fn builder() -> Builder { Builder::default() }
-
-  #[inline]
-  pub fn box_rect(&self) -> Rect {
-    // todo: path_style effect box rect
-    lyon_algorithms::aabb::bounding_box(self.path.iter())
-      .to_rect()
-      .cast_unit()
-  }
+  pub fn builder() -> PathBuilder { PathBuilder::default() }
 
   /// create a rect path.
-  pub fn rect(rect: &Rect, style: PathStyle) -> Self {
+  pub fn rect(rect: &Rect) -> Self {
     let mut builder = Path::builder();
     builder.rect(rect);
-    match style {
-      PathStyle::Fill => builder.fill(),
-      PathStyle::Stroke(o) => builder.stroke(o),
-    }
+    builder.build()
   }
 
   /// Creates a path for a rectangle by `rect` with `radius`.
   /// #[inline]
-  pub fn rect_round(rect: &Rect, radius: &Radius, style: PathStyle) -> Self {
+  pub fn rect_round(rect: &Rect, radius: &Radius) -> Self {
     let mut builder = Path::builder();
     builder.rect_round(rect, radius);
-    match style {
-      PathStyle::Fill => builder.fill(),
-      PathStyle::Stroke(o) => builder.stroke(o),
-    }
+    builder.build()
   }
 
   /// create a circle path.
-  pub fn circle(center: Point, radius: f32, style: PathStyle) -> Self {
+  pub fn circle(center: Point, radius: f32) -> Self {
     let mut builder = Path::builder();
     builder.circle(center, radius);
-    match style {
-      PathStyle::Fill => builder.fill(),
-      PathStyle::Stroke(o) => builder.stroke(o),
-    }
-  }
-}
-
-impl Builder {
-  /// Starts a new path by emptying the list of sub-paths.
-  /// Call this method when you want to create a new path.
-  #[inline]
-  pub fn begin_path(&mut self, at: Point) -> &mut Self {
-    self.0.begin(at.to_untyped());
-    self
+    builder.build()
   }
 
-  /// Tell the builder the sub-path is finished.
-  /// if `close` is true,  causes the point of the pen to move back to the start
-  /// of the current sub-path. It tries to draw a straight line from the
-  /// current point to the start. If the shape has already been closed or has
-  /// only one point, nothing to do.
-  #[inline]
-  pub fn end_path(&mut self, close: bool) { self.0.end(close); }
-
-  /// Connects the last point in the current sub-path to the specified (x, y)
-  /// coordinates with a straight line.
-  #[inline]
-  pub fn line_to(&mut self, to: Point) -> &mut Self {
-    self.0.line_to(to.to_untyped());
-    self
+  /// Convert this path to a stroked path
+  ///
+  /// `ts` is the current transform of the path pre applied. Provide it have a
+  /// more precise convert.
+  pub fn stroke(&self, options: &StrokeOptions, ts: Option<&Transform>) -> Option<Path> {
+    stroke_path(&self.0, options, ts).map(Path)
   }
 
-  /// Adds a cubic Bezier curve to the current path.
-  #[inline]
-  pub fn bezier_curve_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) {
-    self
-      .0
-      .cubic_bezier_to(ctrl1.to_untyped(), ctrl2.to_untyped(), to.to_untyped());
+  /// Returns a transformed path in place.
+  ///
+  /// Some points may become NaN/inf therefore this method can fail.
+  pub fn transform(self, ts: &Transform) -> Self {
+    let ts: &lyon_algorithms::geom::Transform<f32> = unsafe { std::mem::transmute(ts) };
+    Self(self.0.transformed(ts))
   }
 
-  /// Adds a quadratic Bézier curve to the current path.
-  #[inline]
-  pub fn quadratic_curve_to(&mut self, ctrl: Point, to: Point) {
-    self
-      .0
-      .quadratic_bezier_to(ctrl.to_untyped(), to.to_untyped());
-  }
-
-  /// adds a circular arc to the current sub-path, using the given control
-  /// points and radius. The arc is automatically connected to the path's latest
-  /// point with a straight line, if necessary for the specified
-  pub fn arc_to(&mut self, center: Point, radius: f32, start_angle: Angle, end_angle: Angle) {
-    let sweep_angle = end_angle - start_angle;
-    let arc = Arc {
-      start_angle,
-      sweep_angle,
-      radii: (radius, radius).into(),
-      center: center.to_untyped(),
-      x_rotation: Angle::zero(),
+  #[cfg(feature = "tessellation")]
+  pub fn tessellate<Attr>(self, tolerance: f32, attr: Attr) -> (Vec<Vertex<Attr>, Vec<u32>>,) {
+    use lyon_tessellation::{
+      BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers,
     };
-    arc.for_each_quadratic_bezier(&mut |curve| {
-      self.0.quadratic_bezier_to(curve.ctrl, curve.to);
-    });
+
+    let mut buffers = VertexBuffers::new();
+    let mut fill_tess = FillTessellator::default();
+    fill_tess
+      .tessellate_path(
+        self.0,
+        &FillOptions::tolerance(tolerance),
+        &mut BuffersBuilder::new(&mut buffers, move |v: FillVertex| Vertex {
+          pos: v.position().to_array(),
+          attr,
+        }),
+      )
+      .unwrap();
+    (buffers.vertices, buffers.indices)
   }
-
-  /// The ellipse_to() method creates an elliptical arc centered at `center`
-  /// with the `radius`. The path starts at startAngle and ends at endAngle, and
-  /// travels in the direction given by anticlockwise (defaulting to
-  /// clockwise).
-  pub fn ellipse_to(
-    &mut self,
-    center: Point,
-    radius: Vector,
-    start_angle: Angle,
-    end_angle: Angle,
-  ) {
-    let sweep_angle = end_angle - start_angle;
-    let arc = Arc {
-      start_angle,
-      sweep_angle,
-      radii: radius.to_untyped(),
-      center: center.to_untyped(),
-      x_rotation: Angle::zero(),
-    };
-    arc.for_each_quadratic_bezier(&mut |curve| {
-      self.0.quadratic_bezier_to(curve.ctrl, curve.to);
-    });
-  }
-
-  #[inline]
-  pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
-    self.0.add_line_segment(&LineSegment {
-      from: from.to_untyped(),
-      to: to.to_untyped(),
-    });
-    self
-  }
-
-  /// Adds a sub-path containing an ellipse.
-  ///
-  /// There must be no sub-path in progress when this method is called.
-  /// No sub-path is in progress after the method is called.
-  #[inline]
-  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32) {
-    self.0.add_ellipse(
-      center.to_untyped(),
-      radius.to_untyped(),
-      Angle::radians(rotation),
-      Winding::Positive,
-    );
-  }
-
-  /// Adds a sub-path containing a rectangle.
-  ///
-  /// There must be no sub-path in progress when this method is called.
-  /// No sub-path is in progress after the method is called.
-  #[inline]
-  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
-    self
-      .0
-      .add_rectangle(&rect.to_box2d().to_untyped(), Winding::Positive);
-    self
-  }
-
-  /// Adds a sub-path containing a circle.
-  ///
-  /// There must be no sub-path in progress when this method is called.
-  /// No sub-path is in progress after the method is called.
-  #[inline]
-  pub fn circle(&mut self, center: Point, radius: f32) -> &mut Self {
-    self
-      .0
-      .add_circle(center.to_untyped(), radius, Winding::Positive);
-    self
-  }
-
-  /// Creates a path for a rectangle by `rect` with `radius`.
-  /// #[inline]
-  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
-    // Safety, just a unit type convert, it's same type.
-    let rect = unsafe { std::mem::transmute(rect) };
-    self
-      .0
-      .add_rounded_rectangle(rect, radius, Winding::Positive);
-    self
-  }
-
-  /// Build a stroke path with `width` size, and `style`.
-  #[inline]
-  pub fn stroke(self, options: StrokeOptions) -> Path {
-    Path {
-      path: self.0.build(),
-      style: PathStyle::Stroke(options),
-    }
-  }
-
-  /// Build a fill path, witch should fill with `style`
-  #[inline]
-  pub fn fill(self) -> Path {
-    Path {
-      path: self.0.build(),
-      style: PathStyle::Fill,
-    }
-  }
-}
-
-impl std::ops::Deref for Radius {
-  type Target = BorderRadii;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl std::ops::DerefMut for Radius {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
 impl Radius {
   #[inline]
   pub fn new(top_left: f32, top_right: f32, bottom_left: f32, bottom_right: f32) -> Radius {
-    BorderRadii {
+    Radius {
       top_left,
       top_right,
       bottom_left,
       bottom_right,
     }
-    .into()
   }
 
   /// Creates a radius where all radii are radius.
@@ -280,28 +199,25 @@ impl Radius {
   pub fn vertical(top: f32, bottom: f32) -> Radius { Self::new(top, top, bottom, bottom) }
 
   #[inline]
-  pub fn top_left(top_left: f32) -> Self { Radius(BorderRadii { top_left, ..<_>::default() }) }
+  pub fn top_left(top_left: f32) -> Self { Radius { top_left, ..<_>::default() } }
 
   #[inline]
-  pub fn top_right(top_right: f32) -> Self { Radius(BorderRadii { top_right, ..<_>::default() }) }
+  pub fn top_right(top_right: f32) -> Self { Radius { top_right, ..<_>::default() } }
 
   #[inline]
-  pub fn bottom_left(bottom_left: f32) -> Self {
-    Radius(BorderRadii { bottom_left, ..<_>::default() })
-  }
+  pub fn bottom_left(bottom_left: f32) -> Self { Radius { bottom_left, ..<_>::default() } }
 
   #[inline]
-  pub fn bottom_right(bottom_right: f32) -> Self {
-    Radius(BorderRadii { bottom_right, ..<_>::default() })
-  }
+  pub fn bottom_right(bottom_right: f32) -> Self { Radius { bottom_right, ..<_>::default() } }
 }
 
-impl From<Radius> for BorderRadii {
-  #[inline]
-  fn from(radius: Radius) -> Self { radius.0 }
-}
-
-impl From<BorderRadii> for Radius {
-  #[inline]
-  fn from(radii: BorderRadii) -> Self { Self(radii) }
+impl Default for StrokeOptions {
+  fn default() -> Self {
+    StrokeOptions {
+      width: 1.0,
+      miter_limit: 4.0,
+      line_cap: LineCap::default(),
+      line_join: LineJoin::default(),
+    }
+  }
 }

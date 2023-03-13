@@ -73,7 +73,7 @@ fn main() {
           .line_to((100.0, 200.0).into())
           .line_to((100.0, 130.0).into())
           .line_to((0.0, 130.0).into())
-          .close_path(true);
+          .end_path(true);
       }
       let font_db = Arc::new(RwLock::new(FontDB::default()));
       let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));

@@ -75,7 +75,11 @@ impl ComposeChild for ButtonImpl {
                 states { text: label.into_readonly() }
                 Margin {
                   margin: EdgeInsets::horizontal(this.label_gap),
-                  Text::new(text.0.clone(), &this.foreground_color, this.label_style.clone())
+                  Text {
+                    text: text.0.clone(),
+                    foreground: this.foreground_color.clone(),
+                    style: this.label_style.clone()
+                  }
                 }
               })
             }

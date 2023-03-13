@@ -151,6 +151,10 @@ impl TypographyStore {
     }
   }
 
+  pub fn font_db(&mut self) -> &FontDB { todo!() }
+
+  pub fn font_db_mut(&mut self) -> &mut FontDB { todo!() }
+
   fn get_from_cache(
     &self,
     text: Substr,

@@ -7,7 +7,7 @@ use ribir_widgets::{layout::Stack, path::PathPaintKit};
 #[derive(Declare)]
 pub struct StateLayer {
   pub color: Color,
-  pub path: Path,
+  pub path: PaintPath,
   pub role: StateRole,
 }
 /// Widget that as visual indicator of material design used to communicate the
@@ -43,22 +43,20 @@ impl ComposeChild for InteractiveLayer {
       Stack {
         fit: StackFit::Passthrough,
         DynWidget { id: host, dyns: child }
-        IgnorePointer {
-          Container {
-            size: host.layout_size(),
-            StateLayer {
-              color: this.color,
-              path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
-              role: if host.pointer_pressed() {
-                StateRole::pressed()
-              } else if host.has_focus() {
-                StateRole::focus()
-              } else if host.mouse_hover() {
-                StateRole::hover()
-              } else {
-                // todo: not support drag & drop now
-                StateRole::custom(0.)
-              }
+        Container {
+          size: host.layout_size(),
+          StateLayer {
+            color: this.color,
+            path: PaintPath::rect_round(&host.layout_rect(), &this.border_radii),
+            role: if host.pointer_pressed() {
+              StateRole::pressed()
+            } else if host.has_focus() {
+              StateRole::focus()
+            } else if host.mouse_hover() {
+              StateRole::hover()
+            } else {
+              // todo: not support drag & drop now
+              StateRole::custom(0.)
             }
           }
         }
