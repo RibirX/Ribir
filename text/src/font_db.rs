@@ -6,9 +6,9 @@ use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 use std::sync::Arc;
 
 use crate::{FontFace, FontFamily};
-
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
+  default_font: ID,
   data_base: fontdb::Database,
   cache: FrameCache<ID, Option<Face>>,
 }
@@ -22,35 +22,16 @@ pub struct Face {
 }
 
 impl FontDB {
+  pub fn set_default_font(&mut self, face_id: ID) { self.default_font = face_id; }
+
+  pub fn default_font(&self) -> ID { self.default_font }
+
   pub fn try_get_face_data(&self, face_id: ID) -> Option<&Face> {
     self.cache.get(&face_id)?.as_ref()
   }
 
   pub fn face_data_or_insert(&mut self, face_id: ID) -> Option<&Face> {
-    self
-      .cache
-      .get_or_insert_with(&face_id, || {
-        self
-          .data_base
-          .face_source(face_id)
-          .and_then(|(src, face_index)| {
-            let source_data = match src {
-              fontdb::Source::Binary(data) => Some(data),
-              fontdb::Source::File(_) => {
-                let mut source_data = None;
-                self.data_base.with_face_data(face_id, |data, index| {
-                  assert_eq!(face_index, index);
-                  let data: Arc<dyn AsRef<[u8]> + Sync + Send> = Arc::new(data.to_owned());
-                  source_data = Some(data);
-                });
-                source_data
-              }
-              fontdb::Source::SharedFile(_, data) => Some(data),
-            }?;
-            Face::from_data(face_id, source_data, face_index)
-          })
-      })
-      .as_ref()
+    get_or_insert_face(&mut self.cache, &self.data_base, face_id).as_ref()
   }
 
   /// Selects a `FaceInfo` by `id`.
@@ -64,7 +45,15 @@ impl FontDB {
   ///
   /// This can be used for manual font matching.
   #[inline]
-  pub fn faces(&self) -> &[FaceInfo] { self.data_base.faces() }
+  pub fn faces_info_iter(&self) -> impl Iterator<Item = &FaceInfo> + '_ { self.data_base.faces() }
+
+  pub fn faces_data_iter(&mut self) -> impl Iterator<Item = Face> + '_ {
+    FaceIter {
+      face_id_iter: self.data_base.faces(),
+      data_base: &self.data_base,
+      cache: &mut self.cache,
+    }
+  }
 
   #[inline]
   pub fn load_from_bytes(&mut self, data: Vec<u8>) { self.data_base.load_font_data(data); }
@@ -223,11 +212,17 @@ impl FontDB {
     ];
 
     init_data.iter().for_each(|(families, set_fn)| {
-      let name = self
-        .data_base
-        .query(&Query { families, ..<_>::default() })
-        .and_then(|id| self.data_base.face(id))
-        .map(|f| f.family.clone());
+      let name = families
+        .iter()
+        .filter(|f| {
+          self
+            .data_base
+            .query(&Query { families: &[**f], ..<_>::default() })
+            .is_some()
+        })
+        .map(|f| self.data_base.family_name(f).to_string())
+        .next();
+
       if let Some(name) = name {
         set_fn(&mut self.data_base, name);
       }
@@ -237,8 +232,12 @@ impl FontDB {
 
 impl Default for FontDB {
   fn default() -> FontDB {
+    let mut data_base = fontdb::Database::new();
+    data_base.load_font_data(include_bytes!("../../fonts/Lato-Regular.ttf").to_vec());
+    let default_font = data_base.faces().next().map(|f| f.id).unwrap();
     FontDB {
-      data_base: fontdb::Database::new(),
+      default_font,
+      data_base,
       cache: <_>::default(),
     }
   }
@@ -350,6 +349,58 @@ impl std::ops::Deref for Face {
   fn deref(&self) -> &Self::Target { &self.rb_face }
 }
 
+pub struct FaceIter<'a, T>
+where
+  T: Iterator<Item = &'a FaceInfo>,
+{
+  face_id_iter: T,
+  data_base: &'a Database,
+  cache: &'a mut FrameCache<ID, Option<Face>>,
+}
+
+impl<'a, T> Iterator for FaceIter<'a, T>
+where
+  T: Iterator<Item = &'a FaceInfo>,
+{
+  type Item = Face;
+  fn next(&mut self) -> Option<Self::Item> {
+    loop {
+      let info = self.face_id_iter.next()?;
+      let face = get_or_insert_face(self.cache, self.data_base, info.id)
+        .as_ref()
+        .cloned();
+      if face.is_some() {
+        return face;
+      }
+    }
+  }
+}
+
+fn get_or_insert_face<'a>(
+  cache: &'a mut FrameCache<ID, Option<Face>>,
+  data_base: &'a Database,
+  id: ID,
+) -> &'a Option<Face> {
+  cache.get_or_insert_with(&id, || {
+    data_base.face_source(id).and_then(|(src, face_index)| {
+      let source_data = match src {
+        fontdb::Source::Binary(data) => Some(data),
+        fontdb::Source::File(_) => {
+          let mut source_data = None;
+          data_base.with_face_data(id, |data, index| {
+            assert_eq!(face_index, index);
+            let data: Arc<dyn AsRef<[u8]> + Sync + Send> = Arc::new(data.to_owned());
+            source_data = Some(data);
+          });
+          source_data
+        }
+        fontdb::Source::SharedFile(_, data) => Some(data),
+      }?;
+      Face::from_data(id, source_data, face_index)
+    })
+  })
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -368,7 +419,8 @@ mod tests {
 
     let info = db.face_info(face_id.unwrap()).unwrap();
 
-    assert_eq!(info.family, "DejaVu Sans");
+    assert_eq!(info.families.len(), 1);
+    assert_eq!(info.families[0].0, "DejaVu Sans");
   }
 
   #[test]
@@ -388,7 +440,7 @@ mod tests {
   fn load_sys_fonts() {
     let mut db = FontDB::default();
     db.load_system_fonts();
-    assert!(!db.faces().is_empty())
+    assert!(matches!(db.faces_info_iter().next(), Some(_)))
   }
 
   #[test]
@@ -410,7 +462,8 @@ mod tests {
     // match custom load fonts.
     let id = fonts.select_best_match(&face).unwrap();
     let info = fonts.face_info(id).unwrap();
-    assert_eq!(info.family, "DejaVu Sans");
+    assert_eq!(info.families.len(), 1);
+    assert_eq!(info.families[0].0, "DejaVu Sans");
     fonts.data_base.remove_face(id);
 
     face.weight = FontWeight::BOLD;

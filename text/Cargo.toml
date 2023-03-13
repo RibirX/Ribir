@@ -15,7 +15,7 @@ version = "0.0.0"
 
 [dependencies]
 derive_more = "0.99.17"
-fontdb = "0.7.0"
+fontdb = "0.13.0"
 log = "0.4.14"
 lyon_path = "1.0.1"
 ordered-float = "3.4.0"
