@@ -24,4 +24,5 @@ ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
 serde = {version = "1.0", features = ["rc"]}
 serde_json = "1.0.82"
-usvg = {version = "0.23.0", features = ["text"]}
+usvg = {version = "0.29.0"}
+rctree ="0.5.0"
