@@ -289,7 +289,7 @@ impl Widget {
 mod tests {
   extern crate test;
   use crate::{
-    test::{layout_info_by_path, MockBox, MockMulti},
+    test::{layout_size_by_path, MockBox, MockMulti},
     widget::widget_id::dispose_nodes,
   };
 
@@ -398,8 +398,8 @@ mod tests {
     };
     let mut wnd = Window::default_mock(w, Some(Size::new(200., 200.)));
     wnd.draw_frame();
-    let rect = layout_info_by_path(&wnd, &[0, 0]);
-    assert_eq!(rect.size, expect_size);
+    let size = layout_size_by_path(&wnd, &[0, 0]);
+    assert_eq!(size, expect_size);
 
     // when relayout the inner `MockBox`, its clamp should same with its previous
     // layout, and clamp its size.
@@ -407,8 +407,8 @@ mod tests {
       *no_boundary_size.state_ref() = INFINITY_SIZE;
     }
     wnd.draw_frame();
-    let rect = layout_info_by_path(&wnd, &[0, 0]);
-    assert_eq!(rect.size, expect_size);
+    let size = layout_size_by_path(&wnd, &[0, 0]);
+    assert_eq!(size, expect_size);
   }
 
   #[test]

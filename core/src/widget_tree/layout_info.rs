@@ -23,10 +23,11 @@ pub struct LayoutInfo {
   /// Box bound is the bound of the layout can be place. it will be set after
   /// render object computing its layout. It's passed by render object's parent.
   pub clamp: BoxClamp,
-  /// The position and size render object to place, relative to its parent
-  /// coordinate. Some value after the relative render object has been layout,
-  /// otherwise is none value.
-  pub rect: Option<Rect>,
+  /// object's layout size, Some value after the render
+  /// object has been layout, otherwise is none value.
+  pub size: Option<Size>,
+  /// The position render object to place, default is zero
+  pub pos: Point,
 }
 
 /// Store the render object's place relative to parent coordinate and the
@@ -51,24 +52,15 @@ impl LayoutStore {
 
   pub(crate) fn remove(&mut self, id: WidgetId) -> Option<LayoutInfo> { self.data.remove(&id) }
 
-  /// Return the box rect of layout result of render widget, if it's a
-  /// combination widget return None.
-  pub(crate) fn layout_box_rect(&self, id: WidgetId) -> Option<Rect> {
-    self.layout_info(id).and_then(|info| info.rect)
+  pub(crate) fn layout_box_size(&self, id: WidgetId) -> Option<Size> {
+    self.layout_info(id).and_then(|info| info.size)
+  }
+
+  pub(crate) fn layout_box_position(&self, id: WidgetId) -> Option<Point> {
+    self.layout_info(id).map(|info| info.pos)
   }
 
   pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&LayoutInfo> { self.data.get(&id) }
-
-  /// Return the mut reference of box rect of the layout widget(create if not
-  /// have), notice
-  ///
-  /// Caller should guarantee `id` is a layout widget.
-  pub(crate) fn layout_box_rect_mut(&mut self, id: WidgetId) -> &mut Rect {
-    self
-      .layout_info_or_default(id)
-      .rect
-      .get_or_insert_with(Rect::zero)
-  }
 
   // pub(crate) fn need_layout(&self) -> bool { !self.needs_layout.is_empty() }
 
@@ -79,18 +71,18 @@ impl LayoutStore {
   }
 
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
-    self.layout_box_rect(id).map_or(pos, |rect| {
+    self.layout_box_position(id).map_or(pos, |offset| {
       let pos = id
         .assert_get(arena)
         .get_transform()
         .map_or(pos, |t| t.transform_point(pos));
-      pos + rect.min().to_vector()
+      pos + offset.to_vector()
     })
   }
 
   pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
-    self.layout_box_rect(id).map_or(pos, |rect| {
-      let pos = pos - rect.min().to_vector();
+    self.layout_box_position(id).map_or(pos, |offset| {
+      let pos = pos - offset.to_vector();
       id.assert_get(arena)
         .get_transform()
         .map_or(pos, |t| t.inverse().map_or(pos, |t| t.transform_point(pos)))
@@ -150,7 +142,7 @@ impl<'a> Layouter<'a> {
     store
       .layout_info(*child)
       .filter(|info| clamp == info.clamp)
-      .and_then(|info| info.rect.map(|r| r.size))
+      .and_then(|info| info.size)
       .unwrap_or_else(|| {
         // Safety: `arena1` and `arena2` access different part of `arena`;
         let (arena1, arena2) = unsafe { split_arena(arena) };
@@ -167,7 +159,7 @@ impl<'a> Layouter<'a> {
         let size = clamp.clamp(size);
         let info = store.layout_info_or_default(*child);
         info.clamp = clamp;
-        info.rect.get_or_insert_with(Rect::zero).size = size;
+        info.size = Some(size);
 
         layout.query_all_type(
           |_: &PerformedLayoutListener| {
@@ -184,7 +176,7 @@ impl<'a> Layouter<'a> {
   /// performed layout.
   pub fn into_next_sibling(self) -> Option<Self> {
     assert!(
-      self.store.layout_box_rect(self.wid).is_some(),
+      self.layout_rect().is_some(),
       "Before try to layout next sibling, self must performed layout."
     );
     self
@@ -203,13 +195,18 @@ impl<'a> Layouter<'a> {
 
   /// Return the rect of this layouter if it had performed layout.
   #[inline]
-  pub fn layout_rect(&self) -> Option<Rect> { self.store.layout_box_rect(self.wid) }
+  pub fn layout_rect(&self) -> Option<Rect> {
+    self
+      .store
+      .layout_info(self.wid)
+      .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
+  }
 
   /// Update the position of the child render object should place. Relative to
   /// parent.
   #[inline]
   pub fn update_position(&mut self, pos: Point) {
-    self.store.layout_box_rect_mut(self.wid).origin = pos;
+    self.store.layout_info_or_default(self.wid).pos = pos;
   }
 
   /// Update the size of layout widget. Use this method to directly change the
@@ -218,7 +215,7 @@ impl<'a> Layouter<'a> {
   /// are doing.
   #[inline]
   pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    self.store.layout_box_rect_mut(child).size = size;
+    self.store.layout_info_or_default(child).size = Some(size);
   }
 
   #[inline]
@@ -238,9 +235,7 @@ impl<'a> Layouter<'a> {
   pub fn reset_children_position(&mut self) {
     let Self { wid, arena, store, .. } = self;
     wid.children(arena).for_each(move |id| {
-      if let Some(rc) = store.layout_info_or_default(id).rect.as_mut() {
-        rc.origin = Point::zero()
-      };
+      store.layout_info_or_default(id).pos = Point::zero();
     });
   }
 }
@@ -267,25 +262,25 @@ impl WidgetTree {
 
       let mut relayout_root = *id;
       if let Some(info) = self.store.data.get_mut(id) {
-        info.rect.take();
+        info.size.take();
       }
 
       // All ancestors of this render widget should relayout until the one which only
       // sized by parent.
       for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
-        if self.store.layout_box_rect(p).is_none() {
+        if self.store.layout_box_size(p).is_none() {
           break;
         }
+
+        relayout_root = p;
+        if let Some(info) = self.store.data.get_mut(&p) {
+          info.size.take();
+        }
+
         let r = self.arena.get(p.0).unwrap().get();
         if r.only_sized_by_parent() {
           break;
         }
-
-        if let Some(info) = self.store.data.get_mut(&p) {
-          info.rect.take();
-        }
-
-        relayout_root = p
       }
       needs_layout.push(relayout_root);
     }
@@ -308,9 +303,35 @@ impl Default for BoxClamp {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::{prelude::*, test::*};
+  use std::{cell::RefCell, rc::Rc};
 
+  use super::*;
+  use crate::{impl_query_self_only, prelude::*, test::*};
+
+  #[derive(Declare, Clone, SingleChild)]
+  struct OffsetBox {
+    pub offset: Point,
+    pub size: Size,
+  }
+
+  impl Render for OffsetBox {
+    fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+      clamp.max = clamp.max.min(self.size);
+      let mut layouter = ctx.assert_single_child_layouter();
+      layouter.perform_widget_layout(clamp);
+      layouter.update_position(self.offset);
+      self.size
+    }
+    #[inline]
+    fn only_sized_by_parent(&self) -> bool { true }
+
+    #[inline]
+    fn paint(&self, _: &mut PaintingCtx) {}
+  }
+
+  impl Query for OffsetBox {
+    impl_query_self_only!();
+  }
   #[test]
   fn fix_incorrect_relayout_root() {
     // Can't use layout info of dirty widget to detect if the ancestors path have
@@ -378,5 +399,64 @@ mod tests {
     }
     wnd.draw_frame();
     assert_eq!([3, 2, 1, 3, 2, 1], &**layout_order.state_ref());
+  }
+
+  #[test]
+  fn relayout_size() {
+    let trigger = Stateful::new(Size::zero());
+    let w = widget! {
+      states {trigger: trigger.clone()}
+      OffsetBox {
+        size: Size::new(100., 100.),
+        offset: Point::new(50., 50.),
+        MockBox {
+          size: Size::new(50., 50.),
+          MockBox {
+            size: *trigger,
+          }
+        }
+      }
+    };
+
+    let mut wnd = Window::default_mock(w, None);
+    wnd.draw_frame();
+    assert_layout_result(&wnd, &[0, 0], &ExpectRect::new(50., 50., 50., 50.));
+    assert_layout_result(&wnd, &[0, 0, 0], &ExpectRect::new(0., 0., 0., 0.));
+
+    {
+      *trigger.state_ref() = Size::new(10., 10.);
+    }
+
+    wnd.draw_frame();
+    assert_layout_result(&wnd, &[0, 0], &ExpectRect::new(50., 50., 50., 50.));
+    assert_layout_result(&wnd, &[0, 0, 0], &ExpectRect::new(0., 0., 10., 10.));
+  }
+
+  #[test]
+  fn relayout_from_parent() {
+    let trigger = Stateful::new(Size::zero());
+    let cnt = Rc::new(RefCell::new(0));
+    let cnt2 = cnt.clone();
+    let w = widget! {
+      states {trigger: trigger.clone()}
+      init { let cnt = cnt2; }
+      MockBox {
+        size: Size::new(50., 50.),
+        on_performed_layout: move |_| *cnt.borrow_mut() += 1,
+        MockBox {
+          size: *trigger,
+        }
+      }
+    };
+
+    let mut wnd = Window::default_mock(w, None);
+    wnd.draw_frame();
+    assert_eq!(*cnt.borrow(), 1);
+
+    {
+      *trigger.state_ref() = Size::new(10., 10.);
+    }
+    wnd.draw_frame();
+    assert_eq!(*cnt.borrow(), 2);
   }
 }
