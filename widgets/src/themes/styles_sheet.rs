@@ -37,6 +37,7 @@ pub mod svgs {
     SEARCH,
     SETTINGS,
     STAR,
+    TEXT_CARET,
     THEME_EXTEND
   );
 }
