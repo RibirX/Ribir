@@ -62,7 +62,8 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     svgs::REFRESH: "./material/icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::SEARCH: "./material/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::SETTINGS: "./material/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg"
+    svgs::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::TEXT_CARET: "./material/icons/text_caret.svg"
   };
 
   override_compose_style(&mut theme);
