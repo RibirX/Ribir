@@ -27,7 +27,6 @@ pub struct TextShaper {
 pub struct ShapeResult {
   pub text: Substr,
   pub glyphs: Vec<Glyph<Em>>,
-  pub line_height: Em,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -62,15 +61,11 @@ impl TextShaper {
     self
       .get_from_cache(text, face_ids, direction)
       .unwrap_or_else(|| {
-        let (glyphs, line_height) = self
+        let glyphs = self
           .shape_text_with_fallback(text, direction, face_ids)
-          .unwrap_or((vec![], Em::default()));
+          .unwrap_or(vec![]);
 
-        let glyphs = Arc::new(ShapeResult {
-          text: text.clone(),
-          glyphs,
-          line_height,
-        });
+        let glyphs = Arc::new(ShapeResult { text: text.clone(), glyphs });
         self.shape_cache.write().unwrap().insert(
           ShapeKey {
             face_ids: face_ids.into(),
@@ -89,7 +84,7 @@ impl TextShaper {
     text: &str,
     dir: TextDirection,
     face_ids: &[ID],
-  ) -> Option<(Vec<Glyph<Em>>, Em)> {
+  ) -> Option<Vec<Glyph<Em>>> {
     let default_font = {
       let mut font_db = self.font_db.write().unwrap();
       let font_id = font_db.default_font();
@@ -111,14 +106,7 @@ impl TextShaper {
       (buffer, new_part) = regen_miss_part(text, dir, &mut glyphs, miss_part, buffer);
     }
 
-    let height = if dir.is_horizontal() {
-      face.vertical_height().unwrap_or_else(|| face.height())
-    } else {
-      face.height()
-    };
-    let line_height = Em::absolute(height as f32 / face.units_per_em() as f32);
-
-    Some((glyphs, line_height))
+    Some(glyphs)
   }
 
   fn directly_shape(text: UnicodeBuffer, face: &Face) -> GlyphsWithoutFallback {
