@@ -15,6 +15,7 @@ pub(crate) mod widget_tree;
 pub mod assign_observable;
 pub mod cursor_icon;
 pub mod declare;
+mod decorator;
 pub mod dynamic_widget;
 pub mod enum_widget;
 pub mod events;
@@ -39,6 +40,7 @@ pub mod prelude {
   };
   #[doc(no_inline)]
   pub use crate::declare::*;
+  pub use crate::decorator::Decorator;
   #[doc(no_inline)]
   pub use crate::dynamic_widget::*;
   pub use crate::enum_widget::*;

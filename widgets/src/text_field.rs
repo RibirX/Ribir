@@ -49,8 +49,10 @@ pub struct TextFieldTml {
 
 #[derive(Clone)]
 pub struct TextFieldTheme {
+  /// text foreground.
+  pub foreground: Brush,
   /// textfield input's text style
-  pub text: TextStyle,
+  pub text: CowArc<TextStyle>,
 
   /// textfield's background color
   pub container_color: Color,
@@ -66,10 +68,10 @@ pub struct TextFieldTheme {
   pub label_color: Color,
 
   /// label's text style when collapse
-  pub label_collapse: TextStyle,
+  pub label_collapse: CowArc<TextStyle>,
 
   /// label's text style when expand
-  pub label_expand: TextStyle,
+  pub label_expand: CowArc<TextStyle>,
 
   /// edit area's padding when collapse
   pub input_collapse_padding: EdgeInsets,
@@ -142,14 +144,12 @@ impl ComposeChild for TextFieldThemeProxy {
 impl TextFieldThemeProxy {
   fn theme(&self) -> Option<&TextFieldTheme> { self.suit.get(self.state) }
 
-  fn label_style(&self, is_text_empty: bool) -> TextStyle {
-    let mut font = if self.is_collapse(is_text_empty) {
+  fn label_style(&self, is_text_empty: bool) -> CowArc<TextStyle> {
+    if self.is_collapse(is_text_empty) {
       self.label_collapse.clone()
     } else {
       self.label_expand.clone()
-    };
-    font.foreground = Brush::Color(self.label_color);
-    font
+    }
   }
 
   fn input_padding(&self, is_text_empty: bool) -> EdgeInsets {
@@ -185,9 +185,9 @@ impl CustomTheme for TextFieldThemeSuit {}
 
 impl TextFieldThemeSuit {
   pub fn from_theme(palette: &Palette, typo_theme: &TypographyTheme) -> Self {
-    let body = typo_theme.body1.text.clone();
-    let header = typo_theme.headline6.text.clone();
-    let caption = typo_theme.caption.text.clone();
+    let body = &typo_theme.body_large.text;
+    let header = &typo_theme.title_large.text;
+    let caption = &typo_theme.label_small.text;
 
     let mut themes = HashMap::new();
 
@@ -208,6 +208,7 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Enabled,
       TextFieldTheme {
+        foreground: palette.on_surface().into(),
         text: body.clone(),
         container_color: palette.surface_variant(),
         indicator: palette.on_surface_variant(),
@@ -225,6 +226,7 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Focused,
       TextFieldTheme {
+        foreground: palette.on_surface().into(),
         text: body.clone(),
         container_color: palette.surface_variant(),
         indicator: palette.primary(),
@@ -242,15 +244,16 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Hovered,
       TextFieldTheme {
-        text: body,
+        foreground: palette.on_surface().into(),
+        text: body.clone(),
         container_color: palette.surface_variant(),
         indicator: palette.on_surface(),
         indicator_height: 2.,
         label_color: palette.on_surface(),
 
         container_height: 56.,
-        label_collapse: caption,
-        label_expand: header,
+        label_collapse: caption.clone(),
+        label_expand: header.clone(),
         input_collapse_padding,
         input_expand_padding,
       },
@@ -348,26 +351,22 @@ fn build_input_area(
   this: &mut StateRef<TextField>,
   theme: &mut StateRef<TextFieldThemeProxy>,
   prefix: Option<LeadingText>,
-  subfix: Option<TrailingText>,
+  suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
 ) -> Widget {
   widget! {
     states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
     init ctx => {
       let linear = transitions::LINEAR.of(ctx);
+      let prefix = prefix.map(move |p| p.child);
+      let suffix = suffix.map(move|s| s.child);
     }
     Row {
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
-      DynWidget {
-        dyns: prefix.map(|text| {
-          Text {
-            text: text.child,
-            style: theme.text.clone(),
-          }
-        })
-      }
-
+      Option::map(prefix.clone(), move |text| {
+        Text { text, foreground: theme.foreground.clone(), style: theme.text.clone() }
+      })
       Expanded {
         flex: 1.,
         Input {
@@ -376,14 +375,10 @@ fn build_input_area(
           identify(placeholder)
         }
       }
-      DynWidget {
-        dyns: subfix.map(|text| {
-          Text {
-            text: text.child,
-            style: theme.text.clone(),
-          }
-        })
-      }
+      Option::map(suffix.clone(),  move |text| {
+        Text { text, foreground: theme.foreground.clone(), style: theme.text.clone()}
+      })
+
     }
     transition prop!(input_area.visible, move |_from, to, rate| *to && rate >= 1.) {
         by: linear,
@@ -398,11 +393,7 @@ fn build_input_area(
         });
       let_watch!(this.text.clone())
         .distinct_until_changed()
-        .subscribe(move |val| {
-          if input.text() != val {
-            input.set_text(val);
-          }
-        });
+        .subscribe(move |val| input.set_text(val));
       let_watch!(theme.state)
         .distinct_until_changed()
         .subscribe(move |state| {
@@ -417,7 +408,7 @@ fn build_input_area(
 #[derive(Declare)]
 struct TextFieldLabel {
   text: CowArc<str>,
-  style: TextStyle,
+  style: CowArc<TextStyle>,
 }
 
 impl Compose for TextFieldLabel {
@@ -443,7 +434,7 @@ impl Compose for TextFieldLabel {
         let to_size = to.font_size.into_pixel();
 
         let mut res = to.clone();
-        res.font_size = FontSize::Pixel(Pixel(from_size.0.lerp(&to_size.0, rate).into()));
+        res.to_mut().font_size = FontSize::Pixel(Pixel(from_size.0.lerp(&to_size.0, rate).into()));
         res
       }) {
         by: linear,

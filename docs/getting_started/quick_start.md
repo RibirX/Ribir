@@ -6,13 +6,12 @@ sidebar_position: 1
 
 ## Prerequisites
 
-The first step is to install Rust, and others system dependencies.
-
-You can reference [official documentation](https://www.rust-lang.org/tools/install).
+The first step is to install Rust, and others system dependencies.  
+You can reference the [official documentation](https://www.rust-lang.org/tools/install).
 
 ## Setting up Ribir
 
-The first you need create a new Rust Application.
+Then create a new Rust Application:
 
 ```shell
 cargo new ribir-hello-world
@@ -21,18 +20,20 @@ cd ribir-hello-world
 
 > Tips
 > 
-> Ribir only support rust nightly version now. You can use `rustup override set nightly` to switch channel. If you don't install nightly version, you can reference this [documentation](https://rust-lang.github.io/rustup/concepts/channels.html).
+> Currently Ribir only support Rust nightly version. You can use `rustup override set nightly` to switch to the nightly channel. If you do not have the nightly channel installed yet, the [rustup Channels documentation](https://rust-lang.github.io/rustup/concepts/channels.html) explains how to get it.
 
-And next, edit the `Cargo.toml` file and add Ribir dependencies:
+Next, edit the `Cargo.toml` file and add Ribir as dependency:
 
 ```toml
 [dependencies]
 ribir = "0.0.1"
 ```
+or just run `cargo add --git "https://github.com/RibirX/Ribir" ribir` to let Cargo do it for you.
+
 
 ## Starting with `main.rs`
 
-Open `main.rs` file by your editor and modify it like this:
+Open the `src/main.rs` file in your editor and change it to:
 
 ```rust
 // main.rs
@@ -56,3 +57,21 @@ cargo run
 [todo: hello world demo show placeholder]
 
 Congratulations! You finish the first Ribir project.
+
+## Run Examples
+
+To run the examples included with Ribir check out the Git repository
+
+```sh
+git clone git@github.com:RibirX/Ribir.git
+cd Ribir/ribir
+```
+
+and run the examples with
+
+```rust
+cargo run --example animation_demo                   
+cargo run --example counter                          
+cargo run --example greet                            
+cargo run --example todo_mvp                
+```

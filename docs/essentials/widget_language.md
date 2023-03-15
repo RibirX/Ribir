@@ -302,17 +302,17 @@ In the next section, we'll resolve it across that access `Button` and `input` in
 
 ## `init` and `finally` block
 
-As before, we introduced `states` block to declare more stateful objects. There are two other blocks we can use in `widget!`, that `init` and `finally` block.
+As before, we introduced the `states` block to declare more stateful objects. There are two more blocks we can use in `widget!`, the `init` and `finally` block.
 
-`init` and `finally` are blocks only accept statements and run these statements in `widget!`.
+The `init` and `finally` blocks only accept statements and run these statements in `widget!`.
 
-`init` run statements after the `states` block and before any others in `widget!`, and the variable in `init` block can be accessed in the whole `widget!` scope except for `states`.
+`init` runs its statements after the `states` block and before any others in `widget!`. The variable in the `init` block can be accessed from everywhere inside the whole `widget!` scope except from `states`.
 
-`finally` run statements after everything declare in `widget!` scope but before `widget!` compose the final widget to return.
+`finally` runs statements after everything declared in the `widget!` scope, but before the final widget composed by `widget!` is returned.
 
 ### Subscribe `tap` event in `finally` block
 
-Back to our greet app, first, we update the `tap` callback and only use it to update the `counter` and give a name `submit` to `Button`, so we can access it in the embed `widget!`.
+Back to our greet app. First we update the `tap` callback and only use it to update the `counter` and assign the name `submit` to the  `Button`, so we can access it even when it is inside the embedded `widget!`.
 
 ```rust
 Button {
@@ -325,7 +325,7 @@ Button {
 }
 ```
 
-Then we add `finally` block in the embed `widget!`, and subscribe to the tap stream of `submit` to update the `greet` text and reset the `input`.
+Then we add the `finally` block to the embeded `widget!`, and subscribe to the `tap` stream of `submit` to update the `greet` text and reset the `input`.
 
 ```rust
 finally {
@@ -343,28 +343,28 @@ finally {
 
 Let’s review this `finally` block in detail.
 
-`finally` is the keyword of the block, all statements wrapped by `{}` it as part of the block.
+`finally` is the keyword of the block, all statements wrapped by `{}` are part of the block.  
+In this block, there are two statements. Let's look deeper in them one by one.
 
-In this block, there are two statements. Let deep in one by one.
+The first statement `submit.tap_stream()`, returns the `tap` event as a ReactiveX `Observable` stream. Then we subscribe to it to update `greet`s text and then we reset `input`. The name of `unsubscribe_when_dropped` should be self-describing. It converts the handle to a variable that will result in auto-`unsubscribe` when it is dropped. So the whole statement subscribes to `submit`s`tap` and creates a variable to manage the subscriptions lifetime.
 
-In the first statement, `submit.tap_stream()` return the tap event as a ReactiveX `Observable` stream, then we subscribe it to update `greet` text and reset `input`. The name of `unsubscribe_when_dropped` is self-described, it converts the handle to a variable that will make auto `unsubscribe` when it dropped. So the whole statement subscribes to the tap event of `submit` and create a variable to manage the subscribe lifetime.
-
-The next statement `move_to_widget!(guard);` is very simple. `move_to_widget!` move `guard` to `widget!`, in other words, transfer the ownership of the `guard`. So the `guard` will live as long as `widget!`, at here it's the `greet`.
+The next statement `move_to_widget!(guard);` is very simple. It
+transfers the ownership of `guard` to `greet`, then  `guard` will live as long as `greet`.
 
 > **Tips**
 >
-> - ReactiveX is an API for asynchronous programming with observable streams. [See More](https://reactivex.io)
-> - rxRust is the implementation of ReactiveX Ribir used. [See More](https://github.com/rxRust/rxRust)
+> - ReactiveX is an API for asynchronous programming with observable streams. [ReactiveX Homepage](https://reactivex.io)
+> - rxRust is the implementation of ReactiveX Ribir uses. [rxRust Repository](https://github.com/rxRust/rxRust)
 
 ### use `watch` and `let_watch!` to watch expression.
 
-In `finally` block, we subscribe to the `tap` event stream. Here we provide another way to do the same thing. And we will introduce `watch!` and `let_watch!` macro. They're very useful macros that let we can subscribe to the modifications of an expression result.
+In the `finally` block, we subscribed to the `tap` event stream. Now we provide an alternative way of doing the same thing and we will introduce the `watch!` and `let_watch!` macros. They are very useful macros to subscribe to the changes of an expression result.
 
-We already have a stateful object `counter`, and it increments itself after every tap of `submit` button. So we can update the `greet` text after the `counter` modifies. We'll use `watch!` macro to do it. `watch!` helps us to convert an expression to a value stream.
+We already have a stateful object `counter` and it increments itself after every tap on the `submit` button. So we can update the `greet` text after the `counter` changes. We will now use the `watch!` macro to convert an expression to a value stream.
 
 > Tips
 >
-> `watch!` macro subscribe all stateful objects in the expression and recalculates it when any stateful object modifies. 
+> The `watch!` macro subscribes to all stateful objects in the expression and recalculates them when any stateful object changes. 
 
 We use `watch!(counter)` instead of `submit.tap_stream()` now.
 
@@ -381,28 +381,24 @@ finally {
 }
 ```
 
-`let_watch!` is a more convenient macro if you want to subscribe an expression. Like `watch!`, it converts an expression to a value stream, but also auto unsubscribe this when the root of `widget!` over. We use `let_watch!` instead of `watch!`, `.unsubscribe_when_dropped()` and `move_to_widget!(guard)` not necessary anymore.
+`let_watch!` is a more convenient macro if you want to subscribe to an expression. It converts an expression to a value stream and automatically releases the subscription when the root of `widget!` is over its lifetime. The `let_watch!(...).subscribe(...);` generates:
 
 ```rust
-finally {
-  let_watch!(counter)
-    .subscribe(move |_| {
-      let name = &*input.text();
-      greet.text = format!("Hello {name}!").into();
-      input.set_text("");
-    });
-}
+  let guard = watch!(...)
+    .subscribe(move |_| { ... })
+    .unsubscribe_when_dropped();
+  move_to_widget!(guard);
 ```
 
 > Tips
 >
-> In most cases, `let_watch!` is a more convenient, but `watch!` is more flexible in some complex situations.
+> In most cases `let_watch!` is more convenient. `watch!` is more flexible in some complex situations.
 
 ### Access `BuildCtx` in `init` block
 
-Our `greet` text with a default style. In this section, we'll use larger letters to highlight it. Instead of hard code for greet `style`, we'll use the `Theme` to init it. 
+So far, our `greet` text was rendered with the default style. In this section we'll use larger letters to emphasize the text. Instead of hard coding `style` for `greet`, we will use a theme to customize it. 
 
-First, let's add an `init` block after `states`
+First, we add an `init` block after the `states` block.
 
 ```rust
 init ctx => {
@@ -410,11 +406,11 @@ init ctx => {
 }
 
 ```
-`init` block has the same syntax as `finally`, but the above code has a little more stuff (`ctx =>`) than what the `finally` block we used before.
+The `init` block has the same syntax as the `finally` block, but the above code has some more stuff (`ctx =>`) than the `finally` block we used before.
 
-`ctx =>` is a syntax we use to name `BuildCtx`. Here, `ctx` is the name of `BuildCtx`. Because the `finally` block not use `BuildCtx`, so it be omitted. Let deep into the body, we create a style variable, and init it by the predefined theme.
+`ctx =>` is syntax to name `BuildCtx`. Here, `ctx` is the name assigned to `BuildCtx`. Because the `finally` block does not use `BuildCtx` it is omitted. Let's now look deep into the body. We created a style variable, and initialized it with the predefined theme.
 
-Second, we use `style` to init the `greet` text.
+Second, we use the `style` field to assign the themes style to the `greet` text.
 
 ``` rust
 Text { 
@@ -429,15 +425,15 @@ Text {
 > **Tips**
 >
 > - `TypographyTheme` configures the text style used in the application as a part of `Theme`. Click [`Introduction to Theme[wip]`] to learn more.
-> - `BuildCtx` provides many contexts for the application of the `widget!`.
+> - `BuildCtx` construct when adding a widget to the widget tree can be used to find the theme information and access the `WindowCtx`. The theme information consists of all themes from the widget parent to the root of the widget tree, and the window context is about the widget's host window. `BuildCtx` will provide additional contexts for the application of the `widget!` in the future.
 
 ## Animations
 
-We build a greet application, but the greet text transition without animation looks blunt. In this section, we will add animations to transition the greet text and cover the basic knowledge of Ribir animations.
+We built a greet application so far, but the greeting texts transition without animation looks blunt. In this section, we will add animation to transition the greeting text and cover the basics of Ribir animations.
 
-At first, we need to split `greet` as three `Text`, because the `Hello` and `!` part will never change. Our animation only works on the name part.
+At first, we need to split `greet` into three `Text` widgets, because the `Hello` and `!` part will never change. Our animation is only applied to the name part.
 
-We change the single `Text`
+We change the single `Text` to a `Row` widget with three `Text`s 
 
 ``` rust
 Text { 
@@ -449,7 +445,7 @@ Text {
 }
 ```
 
-To a `Row` widget with three `Text`, and apply `h_align` and `v_align` to `Row`.
+and apply `h_align` and `v_align` to `Row`,
 
 ``` rust
 Row {
@@ -465,7 +461,7 @@ Row {
 }
 ```
 
-Then, we can directly update the `greet` text by the text of `input`.
+then we can directly update the `greet` text with the text of `input`.
 
 ```rust
 finally {
@@ -477,7 +473,7 @@ finally {
 }
 ```
 
-After the widgets are ready, we will add a "ease in" animation to transition `greet` text change. Ribir does animate all across the `Animate` object. Let's declare an `Animate` object after the `Row` widget.
+After the widgets are ready, we will add an "ease in" animation to transition `greet` text changes. Ribir does animation using the `Animate` object. Let's insert an `Animate` object after the `Row` widget.
 
 ```rust
 Animate {
@@ -493,12 +489,13 @@ Animate {
 }
 ```
 
-We have already introduced `id` before. Here, we use it to name the object `greet_new`. `Animate` has three public fields `transition`, `prop` and `from`. These three fields described how an animation runs. 
+We have already introduced the `id` property before. Here, we use it to assign the id `greet_new`. `Animate` has three public fields `transition`, `prop` and `from`. These three fields define how an animation runs. 
 
-- `transition` field accepts a type that implemented `Roc` (Rate of change) trait, Ribir provides `Transition` as the standard implementation. We use `Transition` to describe how property animates smoothly from another value to the current value over time. 
+- The `transition` field accepts a type that implements the `Roc` (Rate of change) trait. Ribir provides `Transition` as the standard implementation. We use `Transition` to describe how a property animates smoothly from some previous value to the new value over time. 
 > **Tips**
 >
-> `Transition` also supports declaring individual, `Animate` can use it across its `id`.
+> `Transition` also can be declared individually. For example, `Animate` can access it via its `id.
+
 >```rust
 >Transition {
 >   id: ease_in,
@@ -513,12 +510,13 @@ We have already introduced `id` before. Here, we use it to name the object `gree
 >}
 >```
 
-- `prop` field accepts the animate property need transition, the animate property is a type that implemented `AnimateProperty`. Here we want to do animate for `transform` of `greet`. `prop!(greet.transform)` help us to construct an animate property by a chaining path of field, and the path must start with a stateful object.
+- The `prop` field refers to the property of the widget that is supposed to be transitioned. The property has to be of a type that implements `AnimateProperty`. Here we want to do animate the `transform` property of `greet`. `prop!(greet.transform)` helps us to construct an animate property by chaining the path of the field. The path must start with the id of a stateful object.
 
 > **Tips**
 >
 > - `transform` is a built-in field, so we can directly use it even if it's not a field of `Text`.
-> - In fact, `prop!` also has a second argument called lerp function. Lerp function requires to implement `Fn(&P, &P, f32) -> P`, it used to interpolate between two property value linearly. If we provide a lerp function argument, that means this property should use this function to calculate interpolate value. Otherwise, the type of property must implement `Lerp`. So we can write the property as
+> - In fact, `prop!` also has a second argument called Lerp function (`lerp_fn`). The Lerp function is required to implement `Fn(&P, &P, f32) -> P`. It is used to interpolate between two property values linearly. Providing a Lerp function argument means that this property should use the function to calculate intermediate values. Otherwise the type of property must implement `Lerp`. So we can write the property as
+
 > ```rust
 >// Do same thing as `prop!(greet.transform)`.
 >prop!(greet.transform, |from, to, rate| from.lerp(to, rate))
@@ -536,30 +534,32 @@ We have already introduced `id` before. Here, we use it to name the object `gree
 >
 >```
 
-- `from` field accept a value of a property which the animate start from.
+- The `from` field accepts a value of a property where the animation should start with.
 
-Someone may need clarification, we have a `from` field describe animate come from, but why not have a `to` field describe where to go. In Ribir, animations are only visual effects and should not affect any application data. Ribir animate always finished at the value of the animate property, that's where the animation goes.
+Why do we have a `from` field to describe where to start the animation from, but not a `to` field to define where to end the?  
+In Ribir animations are only visual effects and should not affect any application data. Ribir animations always finish at the current value of the animation property. That's where the animation goes.
 
 > Tips
 >
-> Because animations are only visual effects, the animate property must be a field of `Render` widget.
+> Because animations are only visual effects, the animate property must be a field of the `Render` widget.
 
 We have learned how to declare an `Animate` object. The next step is to trigger it. We need to trigger it when the `greet` text is modified, so add this statement to `finally` block.
+
 ```rust
 let_watch!(greet.text)
   .subscribe(move |_| greet_enter.run());
 ```
 
-The animation work as we expected now. In practice, we use the predefined `Transition` in theme. We polish over animate code.
+The animation now works as we expected. In practice we use the predefined `Transition` from the theme.
 
-Add a `init` block, before `Row` widget.
+We add a `init` block before the `Row` widget
 
 ```
 init ctx => {
   let ease_in = transitions::EASE_IN.of(ctx);
 }
 ```
-Then use `ease_in` to initialize the `Animate`.
+then we use `ease_in` to configure `Animate`.
 
 ```
 Animate {
@@ -636,7 +636,7 @@ Let's review all the code of the widget.
 
 > **Tips** 
 > 
->In addition to a "standard" trigger animation that declares an `Animate` and then manually triggers it, there is a syntax sugar to quick transition property change. It starts with a keyword  `transition`. It gives an animate effect when its value changes.
+>In addition to a "standard" trigger animation that declares an `Animate` object and then manually triggers it, there is syntactic sugar to easily define property change transitions. It starts with the keyword `transition` and creates an animation effect whenever its value changes.
 >
 >```rust ignore
 >transition prop!(greet.background) {
@@ -647,7 +647,7 @@ Let's review all the code of the widget.
 >
 >The animate property follows the `transition` keyword, and the next block declares a `Transition` object.
 >
->Instead of declaring a new `Transition` object, we also can use `by` field to provide a `Transition` object by an expression.
+>Instead of declaring a new `Transition` object, we also can use the `by` field to provide a `Transition` object using an expression.
 >
 >```rust ignore
 >transition prop!(greet.background) {
@@ -656,6 +656,6 @@ Let's review all the code of the widget.
 >}
 >```
 
-That's all, we've covered all the syntax of `widget!`. You can find the code in [github](https://github.com/RibirX/Ribir/blob/master/ribir/examples/greet.rs). And this's just a `widget!` syntax teaching demo, no consideration to its completeness and reasonableness. In practices, use a `visible` to control `greet` show or hide is a easier and better way.
+That's it. We've covered all the syntax of the `widget!` macro. You can find the code in [Greet example source code](https://github.com/RibirX/Ribir/blob/master/ribir/examples/greet.rs). And this is just a `widget!` syntax learning demo, not a consideration about its completeness and reasonableness. In practice, use a `visible` to control `greet` show or hide is a easier and better way.
 
 [builtin]: ../builtin_widget/declare_builtin_fields.md

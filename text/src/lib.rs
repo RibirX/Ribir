@@ -9,12 +9,12 @@ use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use ribir_algo::Substr;
+use rustybuzz::ttf_parser::GlyphId;
 use std::hash::Hash;
 pub mod text_reorder;
 pub mod typography;
 use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
-use ttf_parser::GlyphId;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
 

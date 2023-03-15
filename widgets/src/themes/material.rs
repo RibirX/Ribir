@@ -8,12 +8,16 @@ pub use state_layer::*;
 
 /// Crate a material theme with palette.
 pub fn new(brightness: Brightness, palette: Palette) -> Theme {
-  let family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Roboto"))]);
+  let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
+    "Roboto Regular",
+  ))]);
+  let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
+    "Roboto Medium",
+  ))]);
+
   let typography_theme = typography_theme(
-    family.clone(),
-    family,
-    palette.on_background().into(),
-    palette.on_surface_variant().into(),
+    regular_family,
+    medium_family,
     TextDecoration::NONE,
     Color::BLACK.with_alpha(0.87).into(),
   );
@@ -72,7 +76,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   });
   theme.custom_themes.set_custom_theme(CheckBoxTheme {
     size: theme.icon_theme.icon_size.tiny,
-    label_style: theme.typography_theme.body1.text.clone(),
+    label_style: theme.typography_theme.body_large.text.clone(),
   });
   theme.custom_themes.set_custom_theme(ButtonTheme {
     padding: 4.,
@@ -84,7 +88,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   theme.custom_themes.set_custom_theme(InputTheme {
     min_length: 20.,
     select_background: Color::from_rgb(181, 215, 254).into(),
-    caret_color: theme.typography_theme.body1.text.foreground.clone(),
+    caret_color: Brush::Color(theme.palette.on_surface()),
   });
 }
 
@@ -227,181 +231,173 @@ fn icon_theme() -> IconTheme {
 /// headline4, headline3, headline2, headline1, and caption. The
 /// `body_style` is applied to the remaining text styles.
 pub fn typography_theme(
-  titles_family: Box<[FontFamily]>,
-  body_family: Box<[FontFamily]>,
-  display_style: Brush,
-  body_style: Brush,
+  regular_family: Box<[FontFamily]>,
+  medium_family: Box<[FontFamily]>,
   decoration: TextDecoration,
   decoration_color: Brush,
 ) -> TypographyTheme {
   let decoration = TextDecorationStyle { decoration, decoration_color };
-  let light_title_face = FontFace {
-    families: titles_family,
-    weight: FontWeight::LIGHT,
+  let regular_face = FontFace {
+    families: regular_family.clone(),
+    weight: FontWeight::NORMAL,
     ..<_>::default()
   };
-
-  let mut normal_title_face = light_title_face.clone();
-  normal_title_face.weight = FontWeight::NORMAL;
-
-  let mut medium_title_face = light_title_face.clone();
-  medium_title_face.weight = FontWeight::MEDIUM;
-
-  let body_face = FontFace {
-    families: body_family.clone(),
+  let medium_face = FontFace {
+    families: medium_family,
+    weight: FontWeight::MEDIUM,
     ..<_>::default()
   };
 
   TypographyTheme {
-    default_font_family: body_family,
-    headline1: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(96.0.into()),
-        letter_space: Some(Pixel::from(-1.5)),
-        foreground: display_style.clone(),
-        font_face: light_title_face.clone(),
-        path_style: PathStyle::Fill,
-        line_height: None,
-      },
-      decoration: decoration.clone(),
-    },
-    headline2: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(60.0.into()),
-        letter_space: Some(Pixel::from(-0.5)),
-        foreground: display_style.clone(),
-        font_face: light_title_face,
-        path_style: PathStyle::Fill,
-        line_height: None,
-      },
-      decoration: decoration.clone(),
-    },
-    headline3: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(48.0.into()),
-        foreground: display_style.clone(),
+    default_font_family: regular_family,
+    display_large: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(64.0.into()).into()),
+        font_size: FontSize::Pixel(57.0.into()),
         letter_space: Some(Pixel(0.0.into())),
-        font_face: normal_title_face.clone(),
+        font_face: regular_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-
-    headline4: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(34.0.into()),
-        foreground: display_style,
-        letter_space: Some(Pixel(0.25.into())),
-        font_face: normal_title_face.clone(),
+    display_medium: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(52.0.into()).into()),
+        font_size: FontSize::Pixel(45.0.into()),
+        letter_space: Some(Pixel(0.0.into())),
+        font_face: regular_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-    headline5: TextTheme {
-      text: TextStyle {
+    display_small: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(44.0.into()).into()),
+        font_size: FontSize::Pixel(36.0.into()),
+        letter_space: Some(Pixel(0.0.into())),
+        font_face: regular_face.clone(),
+        path_style: PathStyle::Fill,
+      }),
+      decoration: decoration.clone(),
+    },
+    headline_large: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(40.0.into()).into()),
+        font_size: FontSize::Pixel(32.0.into()),
+        letter_space: Some(Pixel(0.0.into())),
+        font_face: regular_face.clone(),
+        path_style: PathStyle::Fill,
+      }),
+      decoration: decoration.clone(),
+    },
+    headline_medium: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(36.0.into()).into()),
+        font_size: FontSize::Pixel(28.0.into()),
+        letter_space: Some(Pixel(0.0.into())),
+        font_face: regular_face.clone(),
+        path_style: PathStyle::Fill,
+      }),
+      decoration: decoration.clone(),
+    },
+    headline_small: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(32.0.into()).into()),
         font_size: FontSize::Pixel(24.0.into()),
         letter_space: Some(Pixel(0.0.into())),
-        foreground: body_style.clone(),
-        font_face: normal_title_face.clone(),
+        font_face: regular_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-    headline6: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(20.0.into()),
-        letter_space: Some(Pixel(0.15.into())),
-        foreground: body_style.clone(),
-        font_face: medium_title_face.clone(),
+    title_large: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(28.0.into()).into()),
+        font_size: FontSize::Pixel(22.0.into()),
+        letter_space: Some(Pixel(0.0.into())),
+        font_face: medium_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-
-    subtitle1: TextTheme {
-      text: TextStyle {
+    title_medium: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(24.0.into()).into()),
         font_size: FontSize::Pixel(16.0.into()),
         letter_space: Some(Pixel(0.15.into())),
-        foreground: body_style.clone(),
-        font_face: normal_title_face,
+        font_face: medium_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-    subtitle2: TextTheme {
-      text: TextStyle {
+    title_small: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(20.0.into()).into()),
         font_size: FontSize::Pixel(14.0.into()),
         letter_space: Some(Pixel(0.1.into())),
-        foreground: body_style.clone(),
-        font_face: medium_title_face,
+        font_face: medium_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-    body1: TextTheme {
-      text: TextStyle {
+    label_large: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(20.0.into()).into()),
+        font_size: FontSize::Pixel(14.0.into()),
+        letter_space: Some(Pixel(0.1.into())),
+        font_face: medium_face.clone(),
+        path_style: PathStyle::Fill,
+      }),
+      decoration: decoration.clone(),
+    },
+    label_medium: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(16.0.into()).into()),
+        font_size: FontSize::Pixel(12.0.into()),
+        letter_space: Some(Pixel(0.5.into())),
+        font_face: medium_face.clone(),
+        path_style: PathStyle::Fill,
+      }),
+      decoration: decoration.clone(),
+    },
+    label_small: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(16.0.into()).into()),
+        font_size: FontSize::Pixel(11.0.into()),
+        letter_space: Some(Pixel(0.5.into())),
+        font_face: medium_face,
+        path_style: PathStyle::Fill,
+      }),
+      decoration: decoration.clone(),
+    },
+    body_large: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(24.0.into()).into()),
         font_size: FontSize::Pixel(16.0.into()),
         letter_space: Some(Pixel(0.5.into())),
-        foreground: body_style.clone(),
-        font_face: body_face.clone(),
+        font_face: regular_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-
-    body2: TextTheme {
-      text: TextStyle {
+    body_medium: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(20.0.into()).into()),
         font_size: FontSize::Pixel(14.0.into()),
         letter_space: Some(Pixel(0.25.into())),
-        foreground: body_style.clone(),
-        font_face: body_face.clone(),
+        font_face: regular_face.clone(),
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration: decoration.clone(),
     },
-    button: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(14.0.into()),
-        letter_space: Some(Pixel(1.25.into())),
-        foreground: body_style.clone(),
-        font_face: {
-          let mut face = body_face.clone();
-          face.weight = FontWeight::MEDIUM;
-          face
-        },
-        path_style: PathStyle::Fill,
-        line_height: None,
-      },
-      decoration: decoration.clone(),
-    },
-    caption: TextTheme {
-      text: TextStyle {
+    body_small: TextTheme {
+      text: CowArc::owned(TextStyle {
+        line_height: Some(Pixel(16.0.into()).into()),
         font_size: FontSize::Pixel(12.0.into()),
         letter_space: Some(Pixel(0.4.into())),
-        foreground: body_style.clone(),
-        font_face: body_face.clone(),
+        font_face: regular_face,
         path_style: PathStyle::Fill,
-        line_height: None,
-      },
-      decoration: decoration.clone(),
-    },
-    overline: TextTheme {
-      text: TextStyle {
-        font_size: FontSize::Pixel(10.0.into()),
-        letter_space: Some(Pixel(1.5.into())),
-        foreground: body_style,
-        font_face: body_face,
-        path_style: PathStyle::Fill,
-        line_height: None,
-      },
+      }),
       decoration,
     },
   }

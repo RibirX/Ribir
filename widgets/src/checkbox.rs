@@ -15,7 +15,7 @@ pub struct CheckBoxTheme {
   /// The size of the checkbox icon.
   pub size: Size,
   /// The text style of the checkbox label.
-  pub label_style: TextStyle,
+  pub label_style: CowArc<TextStyle>,
 }
 
 #[derive(Clone, Declare)]

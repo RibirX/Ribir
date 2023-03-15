@@ -337,6 +337,7 @@ impl Painter {
     &mut self,
     text: T,
     style: &TextStyle,
+    foreground: Brush,
     bounds: Option<Size>,
   ) -> &mut Self {
     let transform = self.current_state().transform;
@@ -348,7 +349,7 @@ impl Painter {
         style: style.path_style,
       },
       opacity: self.alpha(),
-      brush: style.foreground.clone(),
+      brush: foreground,
       transform,
     }));
 
@@ -379,7 +380,6 @@ impl Painter {
       text,
       &TextStyle {
         font_size,
-        foreground: brush.clone(),
         font_face: font_face.clone(),
         letter_space,
         path_style,

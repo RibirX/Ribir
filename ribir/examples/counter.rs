@@ -4,7 +4,7 @@ fn main() {
   let w = widget! {
     init ctx => {
       let ease_in = transitions::EASE_IN.of(ctx);
-      let headline3_style = TypographyTheme::of(ctx).headline3.text.clone();
+      let style = TypographyTheme::of(ctx).display_medium.text.clone();
     }
     states {
       cnt: Stateful::new(0_i32),
@@ -31,7 +31,7 @@ fn main() {
             let cnt = *cnt;
             format!("{cnt}")
           },
-          style: headline3_style,
+          style,
         }
       }
     }

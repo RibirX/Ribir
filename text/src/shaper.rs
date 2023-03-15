@@ -10,8 +10,8 @@ use crate::{
 };
 use ribir_algo::{FrameCache, Substr};
 
+pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
-pub use ttf_parser::GlyphId;
 
 /// Shaper to shape the `text` using provided font faces, and will do BIDI
 /// reordering before to shape text.
@@ -62,68 +62,9 @@ impl TextShaper {
     self
       .get_from_cache(text, face_ids, direction)
       .unwrap_or_else(|| {
-        let glyphs = self
+        let (glyphs, line_height) = self
           .shape_text_with_fallback(text, direction, face_ids)
-          .unwrap_or_else(|| {
-            log::warn!("There is no font can shape the text: \"{}\"", &**text);
-
-            if text.is_empty() {
-              return Vec::new();
-            }
-
-            // if no font can shape the text use the first font shape it with miss glyph.
-            let face = {
-              let mut font_db = self.font_db_mut();
-              face_ids
-                .iter()
-                .find_map(|id| font_db.face_data_or_insert(*id).cloned())
-                .unwrap_or_else(|| {
-                  font_db
-                    .faces()
-                    .iter()
-                    .find_map(|info| font_db.try_get_face_data(info.id))
-                    .expect("No font can use.")
-                    .clone()
-                })
-            };
-            let mut buffer = UnicodeBuffer::new();
-            buffer.push_str(text);
-            buffer.set_direction(direction.into());
-            Self::directly_shape(buffer, &face).glyphs
-          });
-
-        let line_height = {
-          let mut font_db = self.font_db.write().unwrap();
-          let mut line_height = None;
-          let mut face_idx = 0;
-          let face_len = face_ids.len();
-          let font_db_len = font_db.faces().len();
-
-          while face_idx < face_len + font_db_len {
-            let id = if face_idx < face_len {
-              face_ids[face_idx]
-            } else {
-              font_db.faces()[face_idx].id
-            };
-
-            line_height = font_db.face_data_or_insert(id).map(|face| {
-              let height = if direction.is_horizontal() {
-                face.vertical_height().unwrap_or_else(|| face.height())
-              } else {
-                face.height()
-              };
-              Em::absolute(height as f32 / face.units_per_em() as f32)
-            });
-
-            if line_height.is_some() {
-              break;
-            }
-
-            face_idx += 1;
-          }
-
-          line_height.expect("Fonts are not available.")
-        };
+          .unwrap_or((vec![], Em::default()));
 
         let glyphs = Arc::new(ShapeResult {
           text: text.clone(),
@@ -148,9 +89,14 @@ impl TextShaper {
     text: &str,
     dir: TextDirection,
     face_ids: &[ID],
-  ) -> Option<Vec<Glyph<Em>>> {
+  ) -> Option<(Vec<Glyph<Em>>, Em)> {
+    let default_font = {
+      let mut font_db = self.font_db.write().unwrap();
+      let font_id = font_db.default_font();
+      font_db.face_data_or_insert(font_id).cloned()
+    };
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
-    let face = font_fallback.next_fallback_face(text)?;
+    let face = font_fallback.next_fallback_face(text).or(default_font)?;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text);
     buffer.set_direction(dir.into());
@@ -165,7 +111,14 @@ impl TextShaper {
       (buffer, new_part) = regen_miss_part(text, dir, &mut glyphs, miss_part, buffer);
     }
 
-    Some(glyphs)
+    let height = if dir.is_horizontal() {
+      face.vertical_height().unwrap_or_else(|| face.height())
+    } else {
+      face.height()
+    };
+    let line_height = Em::absolute(height as f32 / face.units_per_em() as f32);
+
+    Some((glyphs, line_height))
   }
 
   fn directly_shape(text: UnicodeBuffer, face: &Face) -> GlyphsWithoutFallback {
@@ -388,24 +341,21 @@ impl<'a> FallBackFaceHelper<'a> {
   fn new(ids: &'a [ID], font_db: &'a RwLock<FontDB>) -> Self { Self { ids, font_db, face_idx: 0 } }
 
   fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
-    if text.is_empty() {
-      return None;
-    }
-    let Self { ids, font_db, face_idx } = self;
-    let mut font_db = font_db.write().unwrap();
-    while *face_idx < ids.len() + font_db.faces().len() {
-      let id = if *face_idx < ids.len() {
-        ids[*face_idx]
-      } else {
-        font_db.faces()[*face_idx - ids.len()].id
-      };
-      *face_idx += 1;
-      let face = font_db.face_data_or_insert(id);
-      if face.map_or(false, |f| text.chars().any(|c| f.has_char(c))) {
-        return face.cloned();
+    let mut font_db = self.font_db.write().unwrap();
+    loop {
+      let id = self.ids.get(self.face_idx)?;
+      self.face_idx += 1;
+      let face = font_db
+        .face_data_or_insert(*id)
+        .filter(|f| match text.is_empty() {
+          true => true,
+          false => text.chars().any(|c| f.has_char(c)),
+        })
+        .cloned();
+      if face.is_some() {
+        return face;
       }
     }
-    None
   }
 }
 
@@ -453,27 +403,48 @@ mod tests {
       .font_db_mut()
       .load_font_file(path + "/../fonts/NotoSerifSC-Bold.你好世界.otf");
 
-    let ids = shaper.font_db().select_all_match(&FontFace {
+    let ids_latin = shaper.font_db().select_all_match(&FontFace {
       families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
       ..<_>::default()
     });
 
+    let ids_all = shaper.font_db().select_all_match(&FontFace {
+      families: Box::new([
+        FontFamily::Name("DejaVu Sans".into()),
+        FontFamily::Name("Noto Serif SC".into()),
+      ]),
+      ..<_>::default()
+    });
+
     let dir = TextDirection::LeftToRight;
-    let latin1 = shaper.shape_text(&"hello world!".into(), &ids, dir);
-    assert_eq!(latin1.glyphs.len(), 12);
-    let fallback_chinese = shaper.shape_text(&"hello world! 你好，世界".into(), &ids, dir);
-    let latin2 = &fallback_chinese.glyphs[..latin1.glyphs.len()];
-    assert_eq!(fallback_chinese.glyphs.len(), 18);
-    assert!(Iterator::eq(
-      latin1.glyphs.iter().map(|g| { (g.glyph_id, g.x_advance) }),
-      latin2.iter().map(|g| { (g.glyph_id, g.x_advance) })
-    ));
-    assert!(fallback_chinese.glyphs.iter().all(|g| g.is_not_miss()));
+    let latin1 = shaper.shape_text(&"hello world! 你好，世界".into(), &ids_latin, dir);
+    assert_eq!(
+      latin1
+        .glyphs
+        .iter()
+        .fold((0_u32, 0_u32), |(mut latin, mut chinese), g| {
+          if g.is_not_miss() {
+            latin += 1;
+          } else {
+            chinese += 1
+          }
+          (latin, chinese)
+        }),
+      (13, 5)
+    );
+
+    let fallback_chinese = shaper.shape_text(&"hello world! 你好，世界".into(), &ids_all, dir);
     let clusters = fallback_chinese
       .glyphs
       .iter()
       .map(|g| g.cluster)
       .collect::<Vec<_>>();
+    assert!(
+      fallback_chinese
+        .glyphs
+        .iter()
+        .all(|glyph| glyph.is_not_miss())
+    );
     assert_eq!(
       &clusters,
       &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 19, 22, 25]
@@ -498,12 +469,12 @@ mod tests {
       let ids = shaper.font_db().select_all_match(&FontFace {
         families: Box::new([
           FontFamily::Name("GaramondNo8".into()),
-          FontFamily::Name("Nunito ExtraLight".into()),
+          FontFamily::Name("Nunito".into()),
         ]),
         ..<_>::default()
       });
       let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
-      assert!(res.glyphs.len() == 8);
+      assert_eq!(res.glyphs.len(), 8);
       assert!(
         res
           .glyphs
@@ -525,7 +496,7 @@ mod tests {
       let ids = shaper.font_db().select_all_match(&FontFace {
         families: Box::new([
           FontFamily::Name("GaramondNo8".into()),
-          FontFamily::Name("Nunito ExtraLight".into()),
+          FontFamily::Name("Nunito".into()),
           FontFamily::Name("DejaVu Sans".into()),
         ]),
         ..<_>::default()

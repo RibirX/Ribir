@@ -65,16 +65,10 @@ impl ComposeChild for Tabs {
       states { this: this.into_writable() }
       init ctx => {
         let border_color = Palette::of(ctx).surface_variant();
-        let primary = Palette::of(ctx).primary();
-        let on_surface_variant = Palette::of(ctx).on_surface_variant();
-        let normal_text_style = TextStyle {
-          foreground: Brush::Color(on_surface_variant),
-          ..TypographyTheme::of(ctx).body1.text.clone()
-        };
-        let active_text_style = TextStyle {
-          foreground: Brush::Color(primary),
-          ..TypographyTheme::of(ctx).body1.text.clone()
-        };
+        let normal_text_style = &TypographyTheme::of(ctx).title_small.text;
+        let active_text_style = &TypographyTheme::of(ctx).title_small.text;
+        let normal_foreground: Brush = Palette::of(ctx).on_surface_variant().into();
+        let active_foreground: Brush = Palette::of(ctx).primary().into();
       }
       Column {
         Stack {
@@ -88,6 +82,8 @@ impl ComposeChild for Tabs {
                 .map(move |(idx, (_, text))| {
                   let normal_text_style = normal_text_style.clone();
                   let active_text_style = active_text_style.clone();
+                  let normal_foreground = normal_foreground.clone();
+                  let active_foreground = active_foreground.clone();
                   widget! {
                     Expanded {
                       id: tab_header,
@@ -102,16 +98,15 @@ impl ComposeChild for Tabs {
                           padding: EdgeInsets::vertical(6.),
                           h_align: HAlign::Center,
                           dyns: {
-                            if this.cur_idx == idx {
-                              Text {
-                                text: text.0.clone(),
-                                style: active_text_style,
-                              }
+                            let (foreground, style) =  if this.cur_idx == idx {
+                              (active_foreground.clone(), active_text_style.clone())
                             } else {
-                              Text {
-                                text: text.0.clone(),
-                                style: normal_text_style,
-                              }
+                              (normal_foreground.clone(), normal_text_style.clone())
+                            };
+                            Text {
+                              text: text.0.clone(),
+                              foreground,
+                              style
                             }
                           }
                         }
@@ -143,7 +138,7 @@ impl ComposeChild for Tabs {
                 }
               }
             })
-        }
+          }
 
       }
     }
