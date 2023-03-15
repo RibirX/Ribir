@@ -105,7 +105,7 @@ mod tests {
     let mut wnd = Window::mock_window(w, Size::new(500., 500.), ctx);
     wnd.draw_frame();
 
-    let rect = layout_info_by_path(&wnd, &[0]);
-    assert_eq!(rect.size, Size::new(100., 100.));
+    let size = layout_size_by_path(&wnd, &[0]);
+    assert_eq!(size, Size::new(100., 100.));
   }
 }

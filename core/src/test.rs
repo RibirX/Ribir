@@ -38,19 +38,19 @@ pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTe
 }
 
 pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
-  let res = layout_info_by_path(wnd, path);
+  let rect = layout_rect_by_path(wnd, path);
   if let Some(x) = expect.x {
-    assert_eq!(x, res.min_x(), "path: {path:?}");
+    assert_eq!(x, rect.min_x(), "path: {path:?}");
   }
   if let Some(y) = expect.y {
-    assert_eq!(y, res.min_y(), "path: {path:?}");
+    assert_eq!(y, rect.min_y(), "path: {path:?}");
   }
   if let Some(width) = expect.width {
-    assert_eq!(width, res.width(), "path: {path:?}")
+    assert_eq!(width, rect.width(), "path: {path:?}")
   }
 
   if let Some(height) = expect.height {
-    assert_eq!(height, res.height(), "path: {path:?}")
+    assert_eq!(height, rect.height(), "path: {path:?}")
   }
 }
 
@@ -58,7 +58,22 @@ pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
 /// [0, 1] means use the second child of the root.
 /// [0, 1, 2] the first node at the root level (must be 0), then down to its
 /// second child, then down to third child.
-pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
+pub fn layout_rect_by_path(wnd: &Window, path: &[usize]) -> Rect {
+  let info = layout_info_by_path(wnd, path).unwrap();
+  Rect::new(info.pos, info.size.unwrap())
+}
+
+pub fn layout_size_by_path(wnd: &Window, path: &[usize]) -> Size {
+  let info = layout_info_by_path(wnd, path).unwrap();
+  info.size.unwrap()
+}
+
+pub fn layout_position_by_path(wnd: &Window, path: &[usize]) -> Point {
+  let info = layout_info_by_path(wnd, path).unwrap();
+  info.pos
+}
+
+pub fn layout_info_by_path<'a>(wnd: &'a Window, path: &[usize]) -> Option<&'a LayoutInfo> {
   assert_eq!(path[0], 0);
   let tree = &wnd.widget_tree;
   let mut node = tree.root();
@@ -68,7 +83,7 @@ pub fn layout_info_by_path(wnd: &Window, path: &[usize]) -> Rect {
     });
   }
 
-  tree.store.layout_box_rect(node).unwrap()
+  tree.store.layout_info(node)
 }
 
 #[derive(Declare, MultiChild)]

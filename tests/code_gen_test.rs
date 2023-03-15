@@ -168,15 +168,15 @@ fn data_flow_macro() {
   };
   let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
-  let rect = layout_info_by_path(&wnd, &[0]);
+  let size = layout_size_by_path(&wnd, &[0]);
   // data flow not affect on init.
-  assert_eq!(rect.size, Size::new(3., 1.));
+  assert_eq!(size, Size::new(3., 1.));
 
   tap_at(&mut wnd, (0, 0));
   wnd.draw_frame();
 
-  let rect = layout_info_by_path(&wnd, &[0]);
-  assert_eq!(rect.size, Size::new(8., 4.));
+  let size = layout_size_by_path(&wnd, &[0]);
+  assert_eq!(size, Size::new(8., 4.));
 }
 
 #[test]

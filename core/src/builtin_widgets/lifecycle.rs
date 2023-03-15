@@ -234,6 +234,7 @@ mod tests {
         "dyn performed layout",
         "static performed layout",
         "dyn disposed",
+        "static performed layout",
       ]
     );
   }

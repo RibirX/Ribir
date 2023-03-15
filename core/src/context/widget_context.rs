@@ -82,7 +82,10 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
 
   #[inline]
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
-    self.layout_store().layout_box_rect(wid)
+    self
+      .layout_store()
+      .layout_info(wid)
+      .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
   }
 
   fn map_to_global(&self, pos: Point) -> Point {
