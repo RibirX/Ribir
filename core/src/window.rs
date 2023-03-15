@@ -4,9 +4,10 @@ use crate::{
   context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
 };
 
-pub trait WindowId {
-  fn as_any(&self) -> &dyn Any;
-  fn eq(&self, other: &dyn WindowId) -> bool;
+pub trait WindowId: std::fmt::Debug {
+  // fn as_any(&self) -> &dyn Any;
+  fn into_any(self: Box<Self>) -> Box<dyn Any>;
+  fn equals(&self, other: &Box<dyn WindowId>) -> bool;
   fn box_clone(&self) -> Box<dyn WindowId>;
 }
 
@@ -260,7 +261,7 @@ impl Window {
     self.context.layout_ready();
   }
 
-  pub(crate) fn need_draw(&self) -> bool {
+  pub fn need_draw(&self) -> bool {
     self.widget_tree.is_dirty() || self.context.has_actived_animate()
   }
 
@@ -298,7 +299,7 @@ impl Window {
   /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop
   /// after all OS events have been processed by the event loop.
   #[inline]
-  pub(crate) fn request_redraw(&self) { self.raw_window.request_redraw(); }
+  pub fn request_redraw(&self) { self.raw_window.request_redraw(); }
 
   pub fn capture_image<F>(&mut self, image_data_callback: F) -> Result<(), Box<dyn Error>>
   where
@@ -395,10 +396,16 @@ impl MockWindowId {
 }
 
 impl WindowId for MockWindowId {
-  fn as_any(&self) -> &dyn Any { &self.0 }
-
-  fn eq(&self, other: &dyn WindowId) -> bool {
-    self.0 == other.as_any().downcast_ref::<MockWindowId>().unwrap().0
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+  // fn as_boxed_any(self: Box<Self>) -> Box<dyn Any> { self }
+  fn equals(&self, other: &Box<dyn WindowId>) -> bool {
+    self.0
+      == other
+        .box_clone()
+        .into_any()
+        .downcast_ref::<MockWindowId>()
+        .unwrap()
+        .0
   }
 
   fn box_clone(&self) -> Box<dyn WindowId> { Box::new(*self) }

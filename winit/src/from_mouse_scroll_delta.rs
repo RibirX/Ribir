@@ -33,7 +33,7 @@ impl From<RibirMouseScrollDelta> for WrappedMouseScrollDelta {
         WinitMouseScrollDelta::LineDelta(right, down)
       }
       RibirMouseScrollDelta::PixelDelta(pos) => {
-        WinitMouseScrollDelta::PixelDelta(WrappedPhysicalPosition::from(pos).into())
+        WinitMouseScrollDelta::PixelDelta(WrappedPhysicalPosition::from(pos.cast()).into())
       }
     };
     es.into()

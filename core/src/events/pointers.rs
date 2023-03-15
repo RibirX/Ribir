@@ -15,8 +15,8 @@ mod pointer_event;
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
 pub trait PointerId: Debug {
-  fn as_any(&self) -> &dyn Any;
-  fn eq(&self, other: &dyn PointerId) -> bool;
+  fn into_any(self: Box<Self>) -> Box<dyn Any>;
+  fn eq(&self, other: &Box<dyn PointerId>) -> bool;
   fn box_clone(&self) -> Box<dyn PointerId>;
   // fn debug(&self) -> String;
 }
@@ -25,18 +25,25 @@ impl Clone for Box<dyn PointerId> {
   fn clone(&self) -> Self { self.box_clone() }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct DummyPointerId(usize);
+#[derive(Default, Debug, Copy, Clone)]
+pub struct MockPointerId(usize);
 
-impl DummyPointerId {
-  pub fn dummy() -> DummyPointerId { DummyPointerId(0) }
+impl MockPointerId {
+  pub fn new(value: usize) -> Box<MockPointerId> { Box::new(MockPointerId(value)) }
+  pub fn zero() -> Box<MockPointerId> { MockPointerId::new(0) }
 }
 
-impl PointerId for DummyPointerId {
-  fn as_any(&self) -> &dyn Any { &self.0 }
+impl PointerId for MockPointerId {
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
 
-  fn eq(&self, other: &dyn PointerId) -> bool {
-    self.0 == other.as_any().downcast_ref::<DummyPointerId>().unwrap().0
+  fn eq(&self, other: &Box<dyn PointerId>) -> bool {
+    self.0
+      == other
+        .box_clone()
+        .into_any()
+        .downcast::<MockPointerId>()
+        .unwrap()
+        .0
   }
 
   fn box_clone(&self) -> Box<dyn PointerId> { Box::new(*self) }
@@ -322,7 +329,7 @@ fn x_times_tap_map_filter(
   move |e: &mut PointerEvent| {
     let now = Instant::now();
     match &mut type_info {
-      Some(info) if info.pointer_id.eq(&*e.id) => {
+      Some(info) if info.pointer_id.eq(&e.id) => {
         if info.stamps.len() + 1 == x {
           if now.duration_since(info.stamps[0]) <= dur {
             // emit x-tap event and reset the tap info
@@ -394,18 +401,18 @@ mod tests {
     let (mut wnd, count) = env(2);
 
     let mut local_pool = LocalPool::new();
-    let device_id = Box::new(DummyPointerId::dummy());
+
     observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(8)
       .subscribe(move |i| {
         wnd.processes_native_event(WindowEvent::MouseInput {
-          device_id,
+          device_id: MockPointerId::zero(),
           state: if i % 2 == 0 {
             ElementState::Pressed
           } else {
             ElementState::Released
           },
-          button: MouseButtons::Left,
+          button: MouseButtons::PRIMARY,
         });
       });
 
@@ -418,13 +425,13 @@ mod tests {
       .take(8)
       .subscribe(move |i| {
         wnd.processes_native_event(WindowEvent::MouseInput {
-          device_id,
+          device_id: MockPointerId::zero(),
           state: if i % 2 == 0 {
             ElementState::Pressed
           } else {
             ElementState::Released
           },
-          button: MouseButtons::Left,
+          button: MouseButtons::PRIMARY,
         });
       });
 
@@ -437,18 +444,18 @@ mod tests {
     let (mut wnd, count) = env(3);
 
     let mut local_pool = LocalPool::new();
-    let device_id = DummyPointerId::dummy();
+    // let device_id = MockPointerId::zero();
     observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(12)
       .subscribe(move |i| {
         wnd.processes_native_event(WindowEvent::MouseInput {
-          device_id,
+          device_id: MockPointerId::zero(),
           state: if i % 2 == 0 {
             ElementState::Pressed
           } else {
             ElementState::Released
           },
-          button: MouseButtons::Left,
+          button: MouseButtons::PRIMARY,
         });
       });
 

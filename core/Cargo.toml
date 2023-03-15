@@ -17,7 +17,7 @@ lyon_algorithms = "1.0.1"
 lyon_geom = "1.0.1"
 png = {version = "0.17.3", optional = true}
 ribir_algo = {path = "../algo"}
-ribir_gpu = {path = "../gpu"}
+# ribir_gpu = {path = "../gpu"}
 ribir_macros = {path = "../macros"}
 ribir_painter = {path = "../painter", version = "*"}
 ribir_text = {path = "../text"}

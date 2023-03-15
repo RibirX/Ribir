@@ -1,17 +1,17 @@
 use ribir::prelude::*;
 use std::{cell::Cell, rc::Rc, time::Duration};
-use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
+// use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
 fn wheel_widget(w: Widget) -> Window {
   let mut wnd = Window::default_mock(w, None);
 
   wnd.draw_frame();
-  let device_id = unsafe { DeviceId::dummy() };
+  let device_id = MockPointerId::zero() ;
   wnd.processes_native_event(WindowEvent::MouseWheel {
     device_id,
     delta: MouseScrollDelta::LineDelta(1.0, 1.0),
     phase: TouchPhase::Started,
-    modifiers: ModifiersState::default(),
+    // modifiers: ModifiersState::default(),
   });
   wnd
 }

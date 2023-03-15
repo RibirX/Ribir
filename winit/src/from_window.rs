@@ -2,7 +2,7 @@ use std::any::Any;
 
 use ribir_core::{
   prelude::{CursorIcon, Point, Size},
-  window::{RawWindow as CoreWindow, WindowId},
+  window::{RawWindow as RibirRawWindow, WindowId},
 };
 use winit::{dpi::Pixel, window::Window as WinitWindow};
 
@@ -15,7 +15,7 @@ use crate::{
 // #[derive(PartialEq, Eq)]
 pub struct WrappedWindow(WinitWindow);
 
-impl CoreWindow for WrappedWindow {
+impl RibirRawWindow for WrappedWindow {
   fn inner_size(&self) -> Size {
     WrappedLogicalSize::<u32>::from(self.0.inner_size().to_logical(self.scale_factor())).into()
   }

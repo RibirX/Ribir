@@ -7,8 +7,10 @@ use winit::event::DeviceId as WinitDeviceId;
 pub struct WrappedPointerId(WinitDeviceId);
 
 impl RibirPointerId for WrappedPointerId {
-  fn as_any(&self) -> &dyn Any { self }
-  fn eq(&self, other: &dyn RibirPointerId) -> bool { self.0 == WrappedPointerId::from(other).0 }
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+  fn eq(&self, other: &Box<dyn RibirPointerId>) -> bool {
+    self.0 == WrappedPointerId::from(other).0
+  }
   fn box_clone(&self) -> Box<dyn RibirPointerId> { Box::new(self.clone()) }
 }
 
@@ -22,35 +24,31 @@ impl From<WrappedPointerId> for WinitDeviceId {
 
 impl From<Box<dyn RibirPointerId>> for WrappedPointerId {
   fn from(value: Box<dyn RibirPointerId>) -> Self {
-    let x = value
-      .as_ref()
-      .as_any()
-      .downcast_ref::<WinitDeviceId>()
-      .map(|v| v.to_owned())
-      .unwrap();
-    x.into()
+    *value
+      .box_clone()
+      .into_any()
+      .downcast::<WrappedPointerId>()
+      .unwrap()
   }
 }
 
 impl From<&Box<dyn RibirPointerId>> for WrappedPointerId {
   fn from(value: &Box<dyn RibirPointerId>) -> Self {
-    let x = value
-      .as_ref()
-      .as_any()
-      .downcast_ref::<WinitDeviceId>()
-      .map(|v| v.to_owned())
-      .unwrap();
-    x.into()
+    *(value
+      .box_clone()
+      .into_any()
+      .downcast::<WrappedPointerId>()
+      .unwrap())
   }
 }
 
-impl From<&dyn RibirPointerId> for WrappedPointerId {
-  fn from(value: &dyn RibirPointerId) -> Self {
-    let x = value
-      .as_any()
-      .downcast_ref::<WinitDeviceId>()
-      .map(|v| v.to_owned())
-      .unwrap();
-    x.into()
-  }
-}
+// impl From<&dyn RibirPointerId> for WrappedPointerId {
+//   fn from(value: &dyn RibirPointerId) -> Self {
+//     let x = value
+//       .as_any()
+//       .downcast_ref::<WinitDeviceId>()
+//       .map(|v| v.to_owned())
+//       .unwrap();
+//     x.into()
+//   }
+// }

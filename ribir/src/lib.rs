@@ -1,4 +1,7 @@
-pub use ribir_core as core;
+// pub use ribir_core as core;
+pub use ribir_app::prelude::*;
+pub use ribir_winit::prelude::*;
+
 pub use ribir_widgets as widgets;
 pub mod prelude {
   pub use ribir_core::prelude::*;
@@ -8,14 +11,18 @@ pub mod prelude {
 
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
-      let app = super::Application::new(super::material::purple::light());
-      let wnd = Window::builder(root).build(&app);
+      use ribir_winit::prelude::{WindowBuilder, WinitApplication};
+
+      let app = WinitApplication::new(super::material::purple::light());
+      let wnd = WindowBuilder::new(root).build(&app);
       run_with_window(app, wnd);
     }
 
     #[cfg(feature = "wgpu_gl")]
-    pub fn run_with_window(mut app: super::Application, wnd: Window) {
+    pub fn run_with_window(mut app: ribir_winit::prelude::WinitApplication, wnd: Window) {
+      println!("WindowId: {:?}", wnd.raw_window.id());
       let wnd_id = app.add_window(wnd);
+      println!("WindowId: {wnd_id:?}");
       app.exec(wnd_id);
     }
   }

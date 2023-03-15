@@ -1,4 +1,4 @@
-use ribir::core::test::*;
+use ribir_core::test::*;
 use ribir::prelude::*;
 enum AB {
   A,

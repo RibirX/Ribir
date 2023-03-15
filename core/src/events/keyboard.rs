@@ -320,7 +320,7 @@ mod tests {
   fn new_key_event(key: VirtualKeyCode, state: ElementState) -> WindowEvent /*<'static>*/ {
     #[allow(deprecated)]
     WindowEvent::KeyboardInput {
-      device_id: Box::new(DummyPointerId::dummy()),
+      device_id: MockPointerId::zero(),
       input: KeyboardInput {
         scancode: 0,
         virtual_keycode: Some(key),

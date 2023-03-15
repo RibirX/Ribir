@@ -1,4 +1,7 @@
-use ribir::prelude::{svgs, *};
+use ribir::{
+  prelude::{svgs, *},
+  WindowBuilder, WinitApplication,
+};
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -180,8 +183,8 @@ fn main() {
     ],
   };
 
-  let app = Application::new(material::purple::light());
-  let wnd = Window::builder(todo.into_widget())
+  let app = WinitApplication::new(material::purple::light());
+  let wnd = WindowBuilder::new(todo.into_widget())
     .with_inner_size(Size::new(400., 640.))
     .with_title("todo")
     .build(&app);

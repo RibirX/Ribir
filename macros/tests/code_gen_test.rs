@@ -1,6 +1,7 @@
-use ribir::{core::test::*, prelude::*};
+use ribir::prelude::*;
+use ribir_core::test::*;
 use std::{cell::Cell, rc::Rc};
-use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+// use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
 fn declare_smoke() {
@@ -269,26 +270,20 @@ fn builtin_bind_to_self() {
   assert_eq!(icon_track.get(), CursorIcon::Help);
 }
 
-fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
-  let device_id = unsafe { DeviceId::dummy() };
-  let modifiers = ModifiersState::default();
-
+fn tap_at(wnd: &mut Window, pos: (u32, u32)) {
   wnd.processes_native_event(WindowEvent::CursorMoved {
-    device_id,
-    position: pos.into(),
-    modifiers,
+    device_id: MockPointerId::zero(),
+    position: DevicePoint::new(pos.0, pos.1),
   });
   wnd.processes_native_event(WindowEvent::MouseInput {
-    device_id,
+    device_id: MockPointerId::zero(),
     state: ElementState::Pressed,
-    button: MouseButton::Left,
-    modifiers,
+    button: MouseButtons::PRIMARY,
   });
   wnd.processes_native_event(WindowEvent::MouseInput {
-    device_id,
+    device_id: MockPointerId::zero(),
     state: ElementState::Released,
-    button: MouseButton::Left,
-    modifiers,
+    button: MouseButtons::PRIMARY,
   });
 }
 

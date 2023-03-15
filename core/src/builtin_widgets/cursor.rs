@@ -115,61 +115,56 @@ mod tests {
     wnd.draw_frame();
     let tree = &mut wnd.widget_tree;
 
-    let device_id = DummyPointerId::dummy();
+    let device_id = MockPointerId::zero();
     let dispatcher = &mut wnd.dispatcher;
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: (1f64, 1.).into(),
-        modifiers: ModifiersState::default(),
+        position: DevicePoint::new(1, 1),
       },
       tree,
       1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
 
-    let device_id = DummyPointerId::dummy();
+    let device_id = MockPointerId::zero();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: (101f64, 1.).into(),
-        modifiers: ModifiersState::default(),
+        position: DevicePoint::new(101, 1),
       },
       tree,
       1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
-    let device_id = DummyPointerId::dummy();
+    let device_id = MockPointerId::zero();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: (201f64, 1.).into(),
-        modifiers: ModifiersState::default(),
+        position: DevicePoint::new(201, 1),
       },
       tree,
       1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::AllScroll));
 
-    let device_id = DummyPointerId::dummy();
+    let device_id = MockPointerId::zero();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: (101f64, 1.).into(),
-        modifiers: ModifiersState::default(),
+        position: DevicePoint::new(101, 1),
       },
       tree,
       1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
-    let device_id = DummyPointerId::dummy();
+    let device_id = MockPointerId::zero();
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: (1f64, 1.).into(),
-        modifiers: ModifiersState::default(),
+        position: DevicePoint::new(1, 1),
       },
       tree,
       1.,

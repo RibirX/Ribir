@@ -10,4 +10,10 @@ log = "0.4.8"
 ribir_app = { path = "../app" }
 ribir_core = { path = "../core" }
 ribir_geometry = { path = "../geometry" }
+ribir_gpu = {path = "../gpu"}
+ribir_text = {path = "../text"}
 winit = "0.28.1"
+
+[features]
+default = ["wgpu_gl"]
+wgpu_gl = ["ribir_gpu/wgpu_gl"]

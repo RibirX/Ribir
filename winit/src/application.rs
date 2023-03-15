@@ -1,5 +1,4 @@
 use ribir_core::prelude::*;
-use ribir_app::shell_window::ShellWindow;
 
 use std::{collections::HashMap, rc::Rc};
 pub use winit::window::WindowId;
@@ -9,15 +8,18 @@ use winit::{
   platform::run_return::EventLoopExtRunReturn,
 };
 
-pub struct Application {
+use crate::{from_event::WrappedWindowEvent, prelude::WrappedWindowId};
+use ribir_core::window::WindowId as RibirWindowId;
+
+pub struct WinitApplication {
   windows: HashMap<WindowId, Window>,
   ctx: AppContext,
   event_loop: EventLoop<()>,
 }
 
-impl Application {
+impl WinitApplication {
   #[inline]
-  pub fn new(theme: Theme) -> Application {
+  pub fn new(theme: Theme) -> Self {
     // todo: theme can provide fonts to load.
     let ctx = AppContext {
       app_theme: Rc::new(theme),
@@ -27,7 +29,7 @@ impl Application {
   }
 
   #[inline]
-  pub fn with_theme(mut self, theme: Theme) -> Application {
+  pub fn with_theme(mut self, theme: Theme) -> Self {
     self.ctx.app_theme = Rc::new(theme);
     self
   }
@@ -37,8 +39,8 @@ impl Application {
 
   pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
 
-  pub fn exec(mut self, wnd_id: WindowId) {
-    if let Some(wnd) = self.windows.get_mut(&wnd_id) {
+  pub fn exec(mut self, wnd_id: Box<dyn RibirWindowId>) {
+    if let Some(wnd) = self.windows.get_mut(&WrappedWindowId::from(wnd_id).into()) {
       wnd.draw_frame();
     } else {
       panic!("application at least have one window");
@@ -57,7 +59,7 @@ impl Application {
               *control = ControlFlow::Exit;
             }
           } else if let Some(wnd) = windows.get_mut(&window_id) {
-            wnd.processes_native_event(event);
+            wnd.processes_native_event(WrappedWindowEvent::from(event).into());
           }
         }
         Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
@@ -80,15 +82,17 @@ impl Application {
     });
   }
 
-  pub fn add_window(&mut self, wnd: Window) -> WindowId {
+  pub fn add_window(&mut self, wnd: Window) -> Box<dyn RibirWindowId> {
     let id = wnd.raw_window.id();
-    self.windows.insert(id, wnd);
+    self
+      .windows
+      .insert(WrappedWindowId::from(id.clone()).into(), wnd);
 
     id
   }
 }
 
-impl Default for Application {
+impl Default for WinitApplication {
   fn default() -> Self {
     Self {
       windows: Default::default(),
@@ -97,3 +101,5 @@ impl Default for Application {
     }
   }
 }
+
+// impl Application for WinitApplication {}

@@ -141,7 +141,7 @@ impl Dispatcher {
       .mouse_button
       .0
       .get_or_insert(device_id.clone())
-      .eq(device_id.as_ref())
+      .eq(&device_id)
     {
       match state {
         ElementState::Pressed => {
@@ -164,7 +164,7 @@ impl Dispatcher {
               .take()?
               .lowest_common_ancestor(release_event.target(), &tree.arena)?;
             let mut tap_event =
-              PointerEvent::from_mouse(Box::new(DummyPointerId::dummy()), tap_on, tree, &self.info);
+              PointerEvent::from_mouse(MockPointerId::zero(), tap_on, tree, &self.info);
 
             tree.bubble_event::<TapListener>(&mut tap_event);
           }
@@ -240,8 +240,7 @@ impl Dispatcher {
       .iter()
       .filter(|w| !w.is_dropped(arena))
       .for_each(|l| {
-        let mut event =
-          PointerEvent::from_mouse(Box::new(DummyPointerId::dummy()), *l, tree, &self.info);
+        let mut event = PointerEvent::from_mouse(MockPointerId::zero(), *l, tree, &self.info);
         l.assert_get(arena).query_all_type(
           |pointer: &PointerLeaveListener| {
             pointer.dispatch(&mut event);
@@ -273,8 +272,7 @@ impl Dispatcher {
       self.entered_widgets.iter().rev().for_each(|w| {
         let obj = w.assert_get(arena);
         if obj.contain_type::<PointerEnterListener>() {
-          let mut event =
-            PointerEvent::from_mouse(Box::new(DummyPointerId::dummy()), *w, tree, &self.info);
+          let mut event = PointerEvent::from_mouse(MockPointerId::zero(), *w, tree, &self.info);
           obj.query_all_type(
             |pointer: &PointerEnterListener| {
               pointer.dispatch(&mut event);
@@ -319,9 +317,9 @@ impl Dispatcher {
   }
 
   fn pointer_event_for_hit_widget(&mut self, tree: &WidgetTree) -> Option<PointerEvent> {
-    self.hit_widget(tree).map(|target| {
-      PointerEvent::from_mouse(Box::new(DummyPointerId::dummy()), target, tree, &self.info)
-    })
+    self
+      .hit_widget(tree)
+      .map(|target| PointerEvent::from_mouse(MockPointerId::zero(), target, tree, &self.info))
   }
 }
 
@@ -428,8 +426,10 @@ mod tests {
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
 
-    let device_id = unsafe { PointerId::dummy() };
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1., 1.).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: MockPointerId::zero(),
+      position: DevicePoint::new(1, 1),
+    });
 
     {
       let mut records = event_record.borrow_mut();
@@ -439,9 +439,9 @@ mod tests {
     }
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     let mut records = event_record.borrow_mut();
@@ -460,31 +460,33 @@ mod tests {
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
 
-    let device_id = unsafe { PointerId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Right,
+      button: MouseButtons::SECONDARY,
     });
 
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1, 1).into() });
-
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButtons::Left,
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: MockPointerId::zero(),
+      position: (1, 1).into(),
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Released,
-      button: MouseButtons::Right,
+      button: MouseButtons::PRIMARY,
+    });
+
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id: MockPointerId::zero(),
+      state: ElementState::Released,
+      button: MouseButtons::SECONDARY,
     });
 
     let records = event_record.borrow();
@@ -510,31 +512,26 @@ mod tests {
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
 
-    let device_id = unsafe { PointerId::dummy() };
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     assert_eq!(event_record.borrow().len(), 1);
 
     // A mouse press/release emit during another mouse's press will be ignored.
-    let device_id_2 = unsafe {
-      let mut id = PointerId::dummy();
-      (&mut id as *mut PointerId).write_bytes(1, 1);
-      id
-    };
+    let device_id_2 = MockPointerId::new(1);
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: device_id_2,
+      device_id: device_id_2.clone(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: device_id_2,
+      device_id: device_id_2.clone(),
       state: ElementState::Released,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
     assert_eq!(event_record.borrow().len(), 1);
 
@@ -549,9 +546,9 @@ mod tests {
     assert_eq!(event_record.borrow()[1].btns, MouseButtons::PRIMARY);
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Released,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     assert_eq!(event_record.borrow().len(), 3);
@@ -588,9 +585,9 @@ mod tests {
     wnd.draw_frame();
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { PointerId::dummy() },
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     assert_eq!(event_record.borrow().len(), 1);
@@ -630,24 +627,31 @@ mod tests {
     let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
-    let device_id = unsafe { PointerId::dummy() };
-
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: MockPointerId::zero(),
+      position: (10, 10).into(),
+    });
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
 
     // leave to parent
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (99, 99).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: MockPointerId::zero(),
+      position: (99, 99).into(),
+    });
     assert_eq!(&*leave_event.borrow(), &[1]);
 
     // move in same widget,
     // check if duplicate event fired.
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (99, 99).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: MockPointerId::zero(),
+      position: (99, 99).into(),
+    });
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
     assert_eq!(&*leave_event.borrow(), &[1]);
 
     // leave all
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: MockPointerId::zero(),
       position: (999, 999).into(),
     });
 
@@ -655,8 +659,11 @@ mod tests {
 
     // leave event trigger by window left.
     leave_event.borrow_mut().clear();
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
-    wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: MockPointerId::zero(),
+      position: (10, 10).into(),
+    });
+    wnd.processes_native_event(WindowEvent::CursorLeft { device_id: MockPointerId::zero() });
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
   }
 
@@ -679,22 +686,19 @@ mod tests {
     let mut wnd = Window::default_mock(w, Some(Size::new(400., 400.)));
     wnd.draw_frame();
 
-    let device_id = unsafe { PointerId::dummy() };
-    let modifiers = ModifiersState::default();
-
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (50f64, 50f64).into(),
+      device_id: MockPointerId::zero(),
+      position: DevicePoint::new(50, 50),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Released,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     {
@@ -704,22 +708,22 @@ mod tests {
     }
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (50f64, 50f64).into(),
+      device_id: MockPointerId::zero(),
+      position: DevicePoint::new(50, 50),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (50f64, 150f64).into(),
+      device_id: MockPointerId::zero(),
+      position: DevicePoint::new(50, 150),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: MockPointerId::zero(),
       state: ElementState::Released,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     {
@@ -744,34 +748,33 @@ mod tests {
     let mut wnd = Window::default_mock(w, Some(Size::new(100., 100.)));
     wnd.draw_frame();
 
-    let device_id = unsafe { PointerId::dummy() };
-    let modifiers = ModifiersState::default();
+    let device_id = MockPointerId::zero();
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (45f64, 45f64).into(),
+      device_id: device_id.clone(),
+      position: DevicePoint::new(45, 45),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: device_id.clone(),
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     // point down on a focus widget
     assert!(wnd.dispatcher.focusing().is_some());
 
     wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
+      device_id: device_id.clone(),
       state: ElementState::Released,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (80f64, 80f64).into(),
+      device_id: device_id.clone(),
+      position: DevicePoint::new(80, 80),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
-      button: MouseButtons::Left,
+      button: MouseButtons::PRIMARY,
     });
 
     assert!(wnd.dispatcher.focusing().is_none());

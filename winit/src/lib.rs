@@ -1,5 +1,6 @@
 #![feature(test, decl_macro, box_into_inner)]
 
+mod application;
 mod from_cursor_icon;
 mod from_device_id;
 mod from_element_state;
@@ -13,8 +14,11 @@ mod from_touch_phase;
 mod from_virtual_key_code;
 mod from_window;
 mod from_window_id;
+mod window_builder;
 
 pub mod prelude {
+  #[doc(no_inline)]
+  pub use crate::application::*;
   #[doc(no_inline)]
   pub use crate::from_cursor_icon::*;
   #[doc(no_inline)]
@@ -41,4 +45,6 @@ pub mod prelude {
   pub use crate::from_window::*;
   #[doc(no_inline)]
   pub use crate::from_window_id::*;
+  #[doc(no_inline)]
+  pub use crate::window_builder::*;
 }

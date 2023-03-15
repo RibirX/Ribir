@@ -1,4 +1,3 @@
-
 use crate::{
   from_device_id::WrappedPointerId,
   from_element_state::WrappedElementState,
@@ -122,7 +121,7 @@ impl<'a> From<RibirWindowEvent> for WrappedWindowEvent<'a> {
         button: WrappedMouseButton::from(button).into(),
         modifiers: WinitModifiersState::default(),
       },
-      RibirWindowEvent::ScaleFactorChanged { scale_factor:_, new_inner_size:_ } => {
+      RibirWindowEvent::ScaleFactorChanged { scale_factor: _, new_inner_size: _ } => {
         // WinitWindowEvent::ScaleFactorChanged {
         //   scale_factor,
         //   new_inner_size: WrappedPhysicalSize::<u32>::from(new_inner_size).into(),

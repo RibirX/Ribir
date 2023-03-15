@@ -74,10 +74,10 @@ mod tests {
     let mut wnd = Window::default_mock(widget, Some(Size::new(100., 100.)));
 
     wnd.draw_frame();
-    let device_id = Box::new(DummyPointerId::dummy());
+    let device_id = MockPointerId::zero();
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
-      delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),
+      delta: MouseScrollDelta::PixelDelta(DeviceOffset::new(1, 1).into()),
       phase: TouchPhase::Started,
     });
 

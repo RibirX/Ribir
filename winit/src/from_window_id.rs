@@ -7,8 +7,18 @@ use winit::window::WindowId as WinitWindowId;
 pub struct WrappedWindowId(WinitWindowId);
 
 impl RibirWindowId for WrappedWindowId {
-  fn as_any(&self) -> &dyn Any { self }
-  fn eq(&self, other: &dyn RibirWindowId) -> bool { self.0 == WrappedWindowId::from(other).0 }
+  // fn as_any(&self) -> &dyn Any { self }
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+
+  fn equals(&self, other: &Box<dyn RibirWindowId>) -> bool {
+    self.0
+      == other
+        .box_clone()
+        .into_any()
+        .downcast::<WrappedWindowId>()
+        .unwrap()
+        .0
+  }
   fn box_clone(&self) -> Box<dyn RibirWindowId> { Box::new(self.clone()) }
 }
 
@@ -22,35 +32,43 @@ impl From<WrappedWindowId> for WinitWindowId {
 
 impl From<Box<dyn RibirWindowId>> for WrappedWindowId {
   fn from(value: Box<dyn RibirWindowId>) -> Self {
-    let x = value
-      .as_ref()
-      .as_any()
-      .downcast_ref::<WinitWindowId>()
-      .map(|v| v.to_owned())
-      .unwrap();
-    x.into()
+    *value.into_any().downcast::<WrappedWindowId>().unwrap()
   }
 }
 
-impl From<&Box<dyn RibirWindowId>> for WrappedWindowId {
-  fn from(value: &Box<dyn RibirWindowId>) -> Self {
-    let x = value
-      .as_ref()
-      .as_any()
-      .downcast_ref::<WinitWindowId>()
-      .map(|v| v.to_owned())
-      .unwrap();
-    x.into()
-  }
+impl From<WrappedWindowId> for Box<dyn RibirWindowId> {
+  fn from(value: WrappedWindowId) -> Self { Box::new(value) }
 }
 
-impl From<&dyn RibirWindowId> for WrappedWindowId {
-  fn from(value: &dyn RibirWindowId) -> Self {
-    let x = value
-      .as_any()
-      .downcast_ref::<WinitWindowId>()
-      .map(|v| v.to_owned())
-      .unwrap();
-    x.into()
+// impl From<&Box<dyn RibirWindowId>> for WrappedWindowId {
+//     fn from(value: &Box<dyn RibirWindowId>) -> Self {
+//         // let x = *value;
+//     value.as_boxed_any().downcast_ref::<WrappedWindowId>().unwrap()
+//   }
+// }
+
+// impl From<Box<dyn RibirWindowId>> for WrappedWindowId {
+//   fn from(value: Box<dyn RibirWindowId>) -> Self {
+//     value
+//       .into_any()
+//       .downcast::<WrappedWindowId>()
+//       .unwrap()
+//   }
+// }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_ribir_window_id_into_wrapped() {
+    let d1: WinitWindowId = 3_u64.into();
+    let d2: WinitWindowId = 3_u64.into();
+    assert_eq!(d1, d2);
+    let winit_window_id = unsafe { WinitWindowId::dummy() };
+    let wrapped = WrappedWindowId::from(winit_window_id);
+    let boxed_ribir_window_id: Box<dyn RibirWindowId> = Box::new(wrapped.clone());
+    let wrapped2: WrappedWindowId = boxed_ribir_window_id.into();
+    assert!(wrapped2.equals(&wrapped.into()));
   }
 }
