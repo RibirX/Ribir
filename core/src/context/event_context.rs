@@ -5,7 +5,6 @@ use crate::{
   widget::{LayoutStore, TreeArena},
   widget_tree::WidgetId,
 };
-// use winit::{event::ModifiersState, window::CursorIcon};
 
 define_widget_context!(EventCtx, info: &'a mut DispatchInfo);
 

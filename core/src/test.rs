@@ -257,4 +257,29 @@ pub macro unit_test_describe($(run_unit_test($name: path);)* ) {{
   if let Result::Err(err) = res {
     std::panic::resume_unwind(err);
   }
-}}
+}
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+pub struct MockPointerId(usize);
+
+impl MockPointerId {
+  pub fn new(value: usize) -> Box<MockPointerId> { Box::new(MockPointerId(value)) }
+  pub fn zero() -> Box<MockPointerId> { MockPointerId::new(0) }
+}
+
+impl PointerId for MockPointerId {
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+
+  fn equals(&self, other: &Box<dyn PointerId>) -> bool {
+    self.0
+      == other
+        .box_clone()
+        .into_any()
+        .downcast::<MockPointerId>()
+        .unwrap()
+        .0
+  }
+
+  fn box_clone(&self) -> Box<dyn PointerId> { Box::new(*self) }
+}

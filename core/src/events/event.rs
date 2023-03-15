@@ -98,7 +98,7 @@ impl PartialEq for WindowEvent {
           input: r_input,
           is_synthetic: r_is_synthetic,
         },
-      ) => l_device_id.eq(r_device_id) && l_input == r_input && l_is_synthetic == r_is_synthetic,
+      ) => l_device_id == r_device_id && l_input == r_input && l_is_synthetic == r_is_synthetic,
       (Self::ModifiersChanged(l0), Self::ModifiersChanged(r0)) => l0 == r0,
       (
         Self::CursorMoved {
@@ -109,11 +109,11 @@ impl PartialEq for WindowEvent {
           device_id: r_device_id,
           position: r_position,
         },
-      ) => l_device_id.eq(r_device_id) && l_position == r_position,
+      ) => l_device_id == r_device_id && l_position == r_position,
       (
         Self::CursorLeft { device_id: l_device_id },
         Self::CursorLeft { device_id: r_device_id },
-      ) => l_device_id.eq(r_device_id),
+      ) => l_device_id == r_device_id,
       (
         Self::MouseWheel {
           device_id: l_device_id,
@@ -125,7 +125,7 @@ impl PartialEq for WindowEvent {
           delta: r_delta,
           phase: r_phase,
         },
-      ) => l_device_id.eq(r_device_id) && l_delta == r_delta && l_phase == r_phase,
+      ) => l_device_id == r_device_id && l_delta == r_delta && l_phase == r_phase,
       (
         Self::MouseInput {
           device_id: l_device_id,
@@ -137,7 +137,7 @@ impl PartialEq for WindowEvent {
           state: r_state,
           button: r_button,
         },
-      ) => l_device_id.eq(r_device_id) && l_state == r_state && l_button == r_button,
+      ) => l_device_id == r_device_id && l_state == r_state && l_button == r_button,
       (
         Self::ScaleFactorChanged {
           scale_factor: l_scale_factor,

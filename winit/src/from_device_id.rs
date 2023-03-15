@@ -8,7 +8,7 @@ pub struct WrappedPointerId(WinitDeviceId);
 
 impl RibirPointerId for WrappedPointerId {
   fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
-  fn eq(&self, other: &Box<dyn RibirPointerId>) -> bool {
+  fn equals(&self, other: &Box<dyn RibirPointerId>) -> bool {
     self.0 == WrappedPointerId::from(other).0
   }
   fn box_clone(&self) -> Box<dyn RibirPointerId> { Box::new(self.clone()) }

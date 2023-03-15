@@ -16,37 +16,16 @@ const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
 pub trait PointerId: Debug {
   fn into_any(self: Box<Self>) -> Box<dyn Any>;
-  fn eq(&self, other: &Box<dyn PointerId>) -> bool;
+  fn equals(&self, other: &Box<dyn PointerId>) -> bool;
   fn box_clone(&self) -> Box<dyn PointerId>;
-  // fn debug(&self) -> String;
 }
 
 impl Clone for Box<dyn PointerId> {
   fn clone(&self) -> Self { self.box_clone() }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
-pub struct MockPointerId(usize);
-
-impl MockPointerId {
-  pub fn new(value: usize) -> Box<MockPointerId> { Box::new(MockPointerId(value)) }
-  pub fn zero() -> Box<MockPointerId> { MockPointerId::new(0) }
-}
-
-impl PointerId for MockPointerId {
-  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
-
-  fn eq(&self, other: &Box<dyn PointerId>) -> bool {
-    self.0
-      == other
-        .box_clone()
-        .into_any()
-        .downcast::<MockPointerId>()
-        .unwrap()
-        .0
-  }
-
-  fn box_clone(&self) -> Box<dyn PointerId> { Box::new(*self) }
+impl PartialEq for Box<dyn PointerId> {
+  fn eq(&self, other: &Self) -> bool { self.equals(other) }
 }
 
 /// The pointer is a hardware-agnostic device that can target a specific set of
@@ -329,7 +308,7 @@ fn x_times_tap_map_filter(
   move |e: &mut PointerEvent| {
     let now = Instant::now();
     match &mut type_info {
-      Some(info) if info.pointer_id.eq(&e.id) => {
+      Some(info) if info.pointer_id == e.id.clone() => {
         if info.stamps.len() + 1 == x {
           if now.duration_since(info.stamps[0]) <= dur {
             // emit x-tap event and reset the tap info
@@ -374,11 +353,9 @@ impl ComposeChild for TapListener {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::MockBox;
+  use crate::test::{MockBox, MockPointerId};
   use futures::executor::LocalPool;
   use std::{cell::RefCell, rc::Rc};
-  // use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton,
-  // WindowEvent};
 
   fn env(times: usize) -> (Window, Rc<RefCell<usize>>) {
     let size = Size::new(400., 400.);

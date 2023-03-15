@@ -56,7 +56,6 @@ mod tests {
   use crate::test::*;
 
   use std::{cell::RefCell, rc::Rc};
-  // use winit::event::WindowEvent;
 
   #[test]
   fn smoke() {

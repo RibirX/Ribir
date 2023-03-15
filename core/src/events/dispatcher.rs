@@ -1,9 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{prelude::*, widget_tree::WidgetTree};
+use crate::{prelude::*, test::MockPointerId, widget_tree::WidgetTree};
 use ribir_text::PIXELS_PER_EM;
-// use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta,
-// WindowEvent};
 
 use super::focus_mgr::FocusManager;
 
@@ -136,13 +134,7 @@ impl Dispatcher {
     tree: &mut WidgetTree,
   ) -> Option<()> {
     // A mouse press/release emit during another mouse's press will ignored.
-    if self
-      .info
-      .mouse_button
-      .0
-      .get_or_insert(device_id.clone())
-      .eq(&device_id)
-    {
+    if self.info.mouse_button.0.get_or_insert(device_id.clone()) == &device_id {
       match state {
         ElementState::Pressed => {
           self.info.mouse_button.1 |= button;

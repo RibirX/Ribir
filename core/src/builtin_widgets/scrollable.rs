@@ -107,11 +107,9 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::{layout_position_by_path, MockBox};
+  use crate::test::{layout_position_by_path, MockBox, MockPointerId};
 
   use super::*;
-  // use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase,
-  // WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: i32, delta_y: i32, expect_x: i32, expect_y: i32) {
     let w = widget! {

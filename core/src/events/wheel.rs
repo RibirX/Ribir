@@ -53,7 +53,7 @@ impl std::ops::DerefMut for WheelEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::MockBox;
+  use crate::test::{MockBox, MockPointerId};
   use std::{cell::RefCell, rc::Rc};
   // use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase,
   // WindowEvent};

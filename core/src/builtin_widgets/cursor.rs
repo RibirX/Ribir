@@ -89,7 +89,6 @@ impl Default for Cursor {
 mod tests {
   use super::*;
   use crate::test::*;
-  // use winit::event::{DeviceId, WindowEvent};
 
   #[test]
   fn tree_down_up() {

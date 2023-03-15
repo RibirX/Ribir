@@ -10,7 +10,6 @@ pub use event::*;
 mod pointers;
 pub use pointers::*;
 use ribir_painter::Point;
-// pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;
 pub use focus::*;
 mod keyboard;

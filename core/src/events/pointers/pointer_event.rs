@@ -3,7 +3,6 @@ use crate::{
   prelude::{dispatcher::DispatchInfo, *},
   widget_tree::WidgetTree,
 };
-// use winit::event::MouseButton;
 
 impl PointerEvent {
   pub(crate) fn from_mouse(
@@ -13,8 +12,7 @@ impl PointerEvent {
     info: &DispatchInfo,
   ) -> Self {
     PointerEvent {
-      // todo: how to generate pointer id ?
-      id: pointer_id, /* PointerId(0) */
+      id: pointer_id,
       width: 1.0,
       height: 1.0,
       pressure: if info.mouse_buttons().is_empty() {
