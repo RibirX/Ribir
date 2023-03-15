@@ -1,3 +1,4 @@
+use ribir_app::prelude::Application;
 use ribir_core::prelude::*;
 
 use std::{collections::HashMap, rc::Rc};
@@ -19,7 +20,7 @@ pub struct WinitApplication {
 
 impl WinitApplication {
   #[inline]
-  pub fn new(theme: Theme) -> Self {
+  fn new(theme: Theme) -> Self {
     // todo: theme can provide fonts to load.
     let ctx = AppContext {
       app_theme: Rc::new(theme),
@@ -27,19 +28,20 @@ impl WinitApplication {
     };
     Self { ctx, ..Default::default() }
   }
-
+}
+impl Application for WinitApplication {
   #[inline]
-  pub fn with_theme(mut self, theme: Theme) -> Self {
+  fn with_theme(mut self, theme: Theme) -> Self {
     self.ctx.app_theme = Rc::new(theme);
     self
   }
 
   #[inline]
-  pub fn context(&self) -> &AppContext { &self.ctx }
+  fn context(&self) -> &AppContext { &self.ctx }
 
-  pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
+  fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
 
-  pub fn exec(mut self, wnd_id: Box<dyn RibirWindowId>) {
+  fn exec(mut self, wnd_id: Box<dyn RibirWindowId>) {
     if let Some(wnd) = self.windows.get_mut(&WrappedWindowId::from(wnd_id).into()) {
       wnd.draw_frame();
     } else {
@@ -82,7 +84,7 @@ impl WinitApplication {
     });
   }
 
-  pub fn add_window(&mut self, wnd: Window) -> Box<dyn RibirWindowId> {
+  fn add_window(&mut self, wnd: Window) -> Box<dyn RibirWindowId> {
     let id = wnd.raw_window.id();
     self
       .windows

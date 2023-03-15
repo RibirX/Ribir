@@ -6,12 +6,12 @@ use crate::{
   prelude::{WrappedPhysicalSize, WrappedWindow},
 };
 
-pub struct WindowBuilder {
+pub struct WinitWindowBuilder {
   inner_builder: winit::window::WindowBuilder,
   root: Widget,
 }
 
-impl WindowBuilder {
+impl WinitWindowBuilder {
   #[inline]
   pub fn new(root: Widget) -> WindowBuilder {
     WindowBuilder {
@@ -19,9 +19,11 @@ impl WindowBuilder {
       inner_builder: winit::window::WindowBuilder::default(),
     }
   }
+}
 
+impl WindowBuilder for WinitWindowBuilder {
   #[inline]
-  pub fn build(self, app: &WinitApplication) -> RibirWindow {
+  fn build(self, app: &WinitApplication) -> RibirWindow {
     let native_wnd = self.inner_builder.build(app.event_loop()).unwrap();
     let size: DeviceSize = WrappedPhysicalSize::<u32>::from(native_wnd.inner_size()).into();
     let ctx = app.context().clone();
@@ -37,7 +39,7 @@ impl WindowBuilder {
 
   /// Requests the window to be of specific dimensions.
   #[inline]
-  pub fn with_inner_size(mut self, size: Size) -> Self {
+  fn with_inner_size(mut self, size: Size) -> Self {
     let size = winit::dpi::LogicalSize::new(size.width, size.height);
     self.inner_builder = self.inner_builder.with_inner_size(size);
     self
@@ -45,7 +47,7 @@ impl WindowBuilder {
 
   /// Sets a minimum dimension size for the window.
   #[inline]
-  pub fn with_min_inner_size(mut self, min_size: Size) -> Self {
+  fn with_min_inner_size(mut self, min_size: Size) -> Self {
     let size = winit::dpi::LogicalSize::new(min_size.width, min_size.height);
     self.inner_builder = self.inner_builder.with_min_inner_size(size);
     self
@@ -53,7 +55,7 @@ impl WindowBuilder {
 
   /// Sets a maximum dimension size for the window.
   #[inline]
-  pub fn with_max_inner_size(mut self, max_size: Size) -> Self {
+  fn with_max_inner_size(mut self, max_size: Size) -> Self {
     let size = winit::dpi::LogicalSize::new(max_size.width, max_size.height);
     self.inner_builder = self.inner_builder.with_max_inner_size(size);
     self
@@ -61,7 +63,7 @@ impl WindowBuilder {
 
   /// Sets a desired initial position for the window.
   #[inline]
-  pub fn with_position(mut self, position: Point) -> Self {
+  fn with_position(mut self, position: Point) -> Self {
     let position = winit::dpi::LogicalPosition::new(position.x, position.y);
     self.inner_builder = self.inner_builder.with_position(position);
     self
@@ -69,42 +71,42 @@ impl WindowBuilder {
 
   /// Sets whether the window is resizable or not.
   #[inline]
-  pub fn with_resizable(mut self, resizable: bool) -> Self {
+  fn with_resizable(mut self, resizable: bool) -> Self {
     self.inner_builder = self.inner_builder.with_resizable(resizable);
     self
   }
 
   /// Requests a specific title for the window.
   #[inline]
-  pub fn with_title<T: Into<String>>(mut self, title: T) -> Self {
+  fn with_title<T: Into<String>>(mut self, title: T) -> Self {
     self.inner_builder = self.inner_builder.with_title(title);
     self
   }
 
   /// Requests maximized mode.
   #[inline]
-  pub fn with_maximized(mut self, maximized: bool) -> Self {
+  fn with_maximized(mut self, maximized: bool) -> Self {
     self.inner_builder = self.inner_builder.with_maximized(maximized);
     self
   }
 
   /// Sets whether the window will be initially hidden or visible.
   #[inline]
-  pub fn with_visible(mut self, visible: bool) -> Self {
+  fn with_visible(mut self, visible: bool) -> Self {
     self.inner_builder = self.inner_builder.with_visible(visible);
     self
   }
 
   /// Sets whether the background of the window should be transparent.
   #[inline]
-  pub fn with_transparent(mut self, transparent: bool) -> Self {
+  fn with_transparent(mut self, transparent: bool) -> Self {
     self.inner_builder = self.inner_builder.with_transparent(transparent);
     self
   }
 
   /// Sets whether the window should have a border, a title bar, etc.
   #[inline]
-  pub fn with_decorations(mut self, decorations: bool) -> Self {
+  fn with_decorations(mut self, decorations: bool) -> Self {
     self.inner_builder = self.inner_builder.with_decorations(decorations);
     self
   }
