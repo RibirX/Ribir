@@ -1,5 +1,5 @@
-use ribir_core::test::*;
 use ribir::prelude::*;
+use ribir_core::test::*;
 enum AB {
   A,
   B,

@@ -12,7 +12,7 @@ pub type Rect = euclid::Rect<f32, LogicUnit>;
 pub type Point = euclid::Point2D<f32, LogicUnit>;
 pub type Size = euclid::Size2D<f32, LogicUnit>;
 pub type Transform = euclid::Transform2D<f32, LogicUnit, LogicUnit>;
-pub type ScaleToPhysic = euclid::Scale<u32, LogicUnit, PhysicUnit>;
+pub type ScaleToPhysic = euclid::Scale<f32, LogicUnit, PhysicUnit>;
 pub type ScaleToLogic = euclid::Scale<f32, PhysicUnit, LogicUnit>;
 
 pub type Vector = euclid::Vector2D<f32, LogicUnit>;
@@ -35,12 +35,21 @@ pub const ZERO_SIZE: Size = Size::new(0., 0.);
 mod tests {
   use super::*;
   #[test]
-  fn test() {
-    let logic_rect = Rect::new(Point::new(1., 1.), Size::new(3., 4.));
-    let physic_rect = ScaleToPhysic::new(1).transform_rect(&logic_rect.cast());
-    assert_eq!(logic_rect.origin.x as u32, physic_rect.origin.x);
-    assert_eq!(logic_rect.origin.y as u32, physic_rect.origin.y);
-    assert_eq!(logic_rect.width() as u32, physic_rect.width());
-    assert_eq!(logic_rect.height() as u32, physic_rect.height());
+  fn scale_from_physics_rect_to_logic_rect_and_back() {
+    let physic_rect = DeviceRect::new(DevicePoint::new(1, 1), DeviceSize::new(3, 4));
+    let factor = 1.3;
+    let logic_rect: Rect = ScaleToLogic::new(factor)
+      .transform_rect(&physic_rect.cast())
+      .cast();
+
+    assert!((logic_rect.origin.x - 1.3).abs() < f32::EPSILON);
+    assert!((logic_rect.origin.y - 1.3).abs() < f32::EPSILON);
+    assert!((logic_rect.width() - 3.8999999).abs() < f32::EPSILON);
+    assert!((logic_rect.height() - 5.2).abs() < f32::EPSILON);
+
+    let physic_rect2: DeviceRect = ScaleToPhysic::new(1.0 / factor)
+      .transform_rect(&logic_rect.cast())
+      .cast();
+    assert_eq!(physic_rect, physic_rect2)
   }
 }

@@ -44,9 +44,9 @@ impl Dispatcher {
     match event {
       WindowEvent::ModifiersChanged(s) => self.info.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
-        let logical_pos = ScaleToLogic::new(wnd_factor as f32).transform_point(position.cast());
-
-        self.cursor_move_to(Point::new(logical_pos.x, logical_pos.y), tree)
+        let logical_pos =
+          ScaleToLogic::new(1.0 / wnd_factor as f32).transform_point(position.cast());
+        self.cursor_move_to(logical_pos, tree)
       }
       WindowEvent::CursorLeft { .. } => self.on_cursor_left(tree),
       WindowEvent::MouseInput { state, button, device_id, .. } => {
@@ -59,7 +59,7 @@ impl Dispatcher {
         self.dispatch_received_char(c, tree);
       }
       WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, tree, wnd_factor),
-      _ => log::info!("not processed event {:?}", event),
+      _ => log::info!("Not processed event {:?}", event),
     }
   }
 
@@ -184,7 +184,8 @@ impl Dispatcher {
       let (delta_x, delta_y) = match delta {
         MouseScrollDelta::LineDelta(x, y) => (x * PIXELS_PER_EM, y * PIXELS_PER_EM),
         MouseScrollDelta::PixelDelta(delta) => {
-          let logical_delta = ScaleToLogic::new(wnd_factor as f32).transform_point(delta.cast());
+          let logical_delta =
+            ScaleToLogic::new(1.0 / wnd_factor as f32).transform_point(delta.cast());
           (logical_delta.x, logical_delta.y)
         }
       };

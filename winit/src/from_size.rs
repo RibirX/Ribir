@@ -1,7 +1,6 @@
 use ribir_geometry::{
-  DevicePoint as RibirPhysicalPosition, DeviceSize as RibirPhysicalSize,
-    Point as RibirLogicalPosition, Size as RibirLogicalSize,
-    DeviceOffset as RibirPhysicalOffset
+  DeviceOffset as RibirPhysicalOffset, DevicePoint as RibirPhysicalPosition,
+  DeviceSize as RibirPhysicalSize, Point as RibirLogicalPosition, Size as RibirLogicalSize,
 };
 
 use std::fmt::Debug;
@@ -103,7 +102,6 @@ impl<T: Pixel> From<RibirPhysicalPosition> for WrappedPhysicalPosition<T> {
     .into()
   }
 }
-
 
 pub struct WrappedLogicalPosition<T: Pixel>(WinitLogicalPosition<T>);
 

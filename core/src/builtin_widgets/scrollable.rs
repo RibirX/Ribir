@@ -128,7 +128,7 @@ mod tests {
     let device_id = MockPointerId::zero();
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
-      delta: MouseScrollDelta::PixelDelta(DeviceOffset::new(delta_x, delta_y).into()),
+      delta: MouseScrollDelta::PixelDelta(DeviceOffset::new(delta_x, delta_y)),
       phase: TouchPhase::Started,
     });
 
