@@ -1,7 +1,6 @@
 use ribir::prelude::*;
 use ribir_core::test::*;
 use std::{cell::Cell, rc::Rc};
-// use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
 fn declare_smoke() {

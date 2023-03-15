@@ -1,7 +1,6 @@
 use ribir::prelude::*;
 use ribir_core::test::MockPointerId;
 use std::{cell::Cell, rc::Rc, time::Duration};
-// use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
 fn wheel_widget(w: Widget) -> Window {
   let mut wnd = Window::default_mock(w, None);
@@ -12,7 +11,6 @@ fn wheel_widget(w: Widget) -> Window {
     device_id,
     delta: MouseScrollDelta::LineDelta(1.0, 1.0),
     phase: TouchPhase::Started,
-    // modifiers: ModifiersState::default(),
   });
   wnd
 }

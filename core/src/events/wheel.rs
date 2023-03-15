@@ -55,8 +55,6 @@ mod tests {
   use super::*;
   use crate::test::{MockBox, MockPointerId};
   use std::{cell::RefCell, rc::Rc};
-  // use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase,
-  // WindowEvent};
 
   #[test]
   fn smoke() {

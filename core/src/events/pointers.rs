@@ -421,7 +421,6 @@ mod tests {
     let (mut wnd, count) = env(3);
 
     let mut local_pool = LocalPool::new();
-    // let device_id = MockPointerId::zero();
     observable::interval(Duration::from_millis(10), local_pool.spawner())
       .take(12)
       .subscribe(move |i| {

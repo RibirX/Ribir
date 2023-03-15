@@ -18,9 +18,6 @@ impl PartialEq for Box<dyn WindowId> {
   fn eq(&self, other: &Self) -> bool { self.equals(other) }
 }
 
-// pub use winit::window::CursorIcon;
-// use winit::{event::WindowEvent, window::WindowId};
-
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
   fn set_inner_size(&mut self, size: Size);
