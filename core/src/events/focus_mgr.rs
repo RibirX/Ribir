@@ -51,6 +51,7 @@ impl Default for FocusManager {
 }
 
 bitflags! {
+  #[derive(PartialEq, Eq, Clone, Copy, Debug)]
   pub(crate) struct FocusType: u8 {
     const SCOPE = 0x01;
     const NODE = 0x02;

@@ -60,7 +60,7 @@ pub struct PointerEvent {
 }
 
 bitflags! {
-  #[derive(Default)]
+  #[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
   pub struct MouseButtons: u8 {
     /// Primary button (usually the left button)
     const PRIMARY = 0b0000_0001;
