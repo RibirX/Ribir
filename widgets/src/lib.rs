@@ -1,6 +1,7 @@
 pub mod buttons;
 pub mod checkbox;
 pub mod common_widget;
+pub mod divider;
 pub mod grid_view;
 pub mod icon;
 pub mod input;
@@ -18,6 +19,7 @@ pub mod prelude {
   pub use super::buttons::*;
   pub use super::checkbox::*;
   pub use super::common_widget::*;
+  pub use super::divider::*;
   pub use super::grid_view::*;
   pub use super::icon::*;
   pub use super::input::*;

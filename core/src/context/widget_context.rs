@@ -4,7 +4,7 @@ use crate::{
   widget_tree::WidgetId,
 };
 
-use ribir_painter::{Point, Rect};
+use ribir_painter::{Point, Rect, Size};
 
 use super::WindowCtx;
 
@@ -29,6 +29,10 @@ pub trait WidgetContext {
   fn single_child_box(&self) -> Option<Rect>;
   /// Return the widget box rect of the widget of the context.
   fn box_rect(&self) -> Option<Rect>;
+  /// Return the widget box size of the widget of the context.
+  fn box_size(&self) -> Option<Size>;
+  /// Return the box size of the widget `wid`.
+  fn widget_box_size(&self, wid: WidgetId) -> Option<Size>;
   /// Return the box rect of the widget `wid` point to.
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect>;
   /// Translates the global window coordinate pos to widget coordinates.
@@ -76,8 +80,19 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
 
   #[inline]
+  fn box_size(&self) -> Option<Size> { self.widget_box_size(self.id()) }
+
+  #[inline]
   fn single_child_box(&self) -> Option<Rect> {
     self.single_child().and_then(|c| self.widget_box_rect(c))
+  }
+
+  #[inline]
+  fn widget_box_size(&self, wid: WidgetId) -> Option<Size> {
+    self
+      .layout_store()
+      .layout_info(wid)
+      .and_then(|info| info.size)
   }
 
   #[inline]
