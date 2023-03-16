@@ -7,6 +7,12 @@ pub enum Direction {
   Vertical,
 }
 
+impl Direction {
+  pub fn is_horizontal(&self) -> bool { matches!(self, Direction::Horizontal) }
+
+  pub fn is_vertical(&self) -> bool { matches!(self, Direction::Vertical) }
+}
+
 mod column;
 pub mod container;
 pub mod flex;
