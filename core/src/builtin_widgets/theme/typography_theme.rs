@@ -48,7 +48,7 @@ pub struct TextDecorationStyle {
 
 bitflags! {
   /// A linear decoration to draw near the text.
-  #[derive(Default)]
+  #[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
   pub struct  TextDecoration: u8 {
     const NONE = 0b0001;
     /// Draw a line underneath each line of text

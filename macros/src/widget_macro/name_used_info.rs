@@ -12,7 +12,8 @@ pub struct NameUsedInfo {
 }
 
 bitflags::bitflags! {
- pub struct UsedType: u16 {
+  #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+  pub struct UsedType: u16 {
     /// subscribe the named object modifies.
     const SUBSCRIBE = 0x0001;
     /// directly use it.
