@@ -91,6 +91,8 @@ pub struct LightnessCfg {
   pub on_variant_neutral: LightnessTone,
   /// The light tone of outline
   pub outline: LightnessTone,
+  /// The light tone of outline variant
+  pub outline_variant: LightnessTone,
 }
 
 impl Palette {
@@ -211,6 +213,12 @@ impl Palette {
       .with_lightness(self.lightness_cfg.outline)
   }
 
+  pub fn outline_variant(&self) -> Color {
+    self
+      .neutral_variant
+      .with_lightness(self.lightness_cfg.outline_variant)
+  }
+
   #[inline]
   pub fn inverse_surface(&self) -> Color {
     self
@@ -282,6 +290,7 @@ impl LightnessCfg {
       variant_neutral: LightnessTone::new(0.9),
       on_variant_neutral: LightnessTone::new(0.3),
       outline: LightnessTone::new(0.5),
+      outline_variant: LightnessTone::new(0.8),
       inverse_surface: LightnessTone::new(0.2),
       on_inverse_surface: LightnessTone::new(0.95),
     }
@@ -296,6 +305,7 @@ impl LightnessCfg {
       variant_neutral: LightnessTone::new(0.3),
       on_variant_neutral: LightnessTone::new(0.8),
       outline: LightnessTone::new(0.6),
+      outline_variant: LightnessTone::new(0.3),
       inverse_surface: LightnessTone::new(0.9),
       on_inverse_surface: LightnessTone::new(0.2),
     }
