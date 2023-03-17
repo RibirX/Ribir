@@ -31,9 +31,7 @@ fn main() {
             Label::new("Filled button")
           }
         }
-        Divider {
-          margin: EdgeInsets::vertical(10.),
-        }
+        Divider { extent: 30., end_indent: 150. }
         Row {
           OutlinedButton { svgs::ADD }
           SizedBox { size: Size::new(20., 0.) }
@@ -51,9 +49,7 @@ fn main() {
             Label::new("Outlined button")
           }
         }
-        Divider {
-          margin: EdgeInsets::vertical(10.),
-        }
+        Divider { extent: 30., end_indent: 150. }
         Row {
           Button { svgs::ADD }
           SizedBox { size: Size::new(20., 0.) }
@@ -69,9 +65,7 @@ fn main() {
             Label::new("Raw button")
           }
         }
-        Divider {
-          margin: EdgeInsets::vertical(10.),
-        }
+        Divider { extent: 30., end_indent: 150. }
         Row {
           FabButton { svgs::ADD }
           SizedBox { size: Size::new(20., 0.) }
