@@ -103,7 +103,11 @@ impl Render for MockMulti {
       l.update_position(Point::new(size.width, 0.));
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
-      layouter = l.into_next_sibling();
+      if let Ok(layout) = l.into_next_sibling() {
+        layouter = layout;
+      } else {
+        break;
+      }
     }
 
     size

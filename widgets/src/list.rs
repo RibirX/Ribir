@@ -107,14 +107,9 @@ impl ComposeChild for ListItem {
           headline_style,
           supporting_style,
         } = ListItemStyle::of(ctx).clone();
-        let on_surface: Brush = Palette::of(ctx)
-          .on_surface()
-          .clone()
-          .into();
-        let on_surface_variant: Brush = Palette::of(ctx)
-          .on_surface_variant()
-          .clone()
-          .into();
+        let palette = Palette::of(ctx);
+        let on_surface: Brush = palette.on_surface().clone().into();
+        let on_surface_variant: Brush = palette.on_surface_variant().clone().into();
       }
 
       ConstrainedBox {
@@ -129,21 +124,21 @@ impl ComposeChild for ListItem {
               }
             })
             Expanded {
-              padding: label_gap,
               flex: 1.,
               Column {
-                Text::new(
-                  headline.0.0.clone(),
-                  &on_surface,
-                  headline_style.clone()
-                )
+                padding: label_gap,
+                Text {
+                  text: headline.0.0.clone(),
+                  foreground: on_surface,
+                  style: headline_style.clone(),
+                }
                 Option::map(supporting, |supporting| widget! {
                   states { supporting: supporting.into_readonly() }
-                  Text::new(
-                    supporting.0.0.clone(),
-                    &on_surface_variant,
-                    supporting_style.clone(),
-                  )
+                  Text {
+                    text: supporting.0.0.clone(),
+                    foreground: on_surface_variant,
+                    style: supporting_style.clone(),
+                  }
                 })
               }
             }

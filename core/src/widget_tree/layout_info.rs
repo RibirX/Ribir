@@ -210,15 +210,17 @@ impl<'a> Layouter<'a> {
 
   /// Get layouter of the next sibling of this layouter, panic if self is not
   /// performed layout.
-  pub fn into_next_sibling(self) -> Option<Self> {
-    assert!(
-      self.layout_rect().is_some(),
-      "Before try to layout next sibling, self must performed layout."
-    );
-    self
-      .wid
-      .next_sibling(self.arena)
-      .map(move |sibling| self.into_new_layouter(sibling))
+  pub fn into_next_sibling(self) -> Result<Option<Self>, &'static str> {
+    if self.layout_rect().is_some() {
+      Ok(
+        self
+          .wid
+          .next_sibling(self.arena)
+          .map(move |sibling| self.into_new_layouter(sibling)),
+      )
+    } else {
+      Err("Before try to layout next sibling, self must performed layout.")
+    }
   }
 
   /// Return layouter of the first child of this widget.
@@ -241,19 +243,13 @@ impl<'a> Layouter<'a> {
   /// Return the position of this layouter if it had performed layout.
   #[inline]
   pub fn layout_pos(&self) -> Option<Point> {
-    self
-      .store
-      .layout_info(self.wid)
-      .map(|info| info.pos)
+    self.store.layout_info(self.wid).map(|info| info.pos)
   }
 
   /// Return the size of this layouter if it had performed layout.
   #[inline]
   pub fn layout_size(&self) -> Option<Size> {
-    self
-      .store
-      .layout_info(self.wid)
-      .and_then(|info| info.size)
+    self.store.layout_info(self.wid).and_then(|info| info.size)
   }
 
   /// Update the position of the child render object should place. Relative to
