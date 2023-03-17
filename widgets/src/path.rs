@@ -117,7 +117,7 @@ impl Render for PathPaintKit {
     ctx
       .painter()
       .set_brush(self.brush.clone())
-      .paint_path(self.path.clone());
+      .fill_path(self.path.clone());
   }
 
   fn hit_test(&self, _ctx: &HitTestCtx, _: Point) -> HitTest {
@@ -152,7 +152,7 @@ impl Render for PathWidget {
     ctx
       .painter()
       .set_brush(self.brush.clone())
-      .paint_path(self.path.clone());
+      .fill_path(self.path.clone());
   }
 }
 

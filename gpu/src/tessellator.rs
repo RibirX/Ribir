@@ -689,7 +689,7 @@ mod tests {
     painter.set_brush(Color::RED);
     let fill_path = bench_rect_round().fill();
     let stroke_path = bench_rect_round().stroke(StrokeOptions::default().with_line_width(2.));
-    painter.paint_path(fill_path).paint_path(stroke_path);
+    painter.fill_path(fill_path).fill_path(stroke_path);
     let commands = painter.finish();
     let mut tess = tessellator();
     let commands = commands
@@ -712,7 +712,7 @@ mod tests {
     let stroke_path = bench_rect_round().stroke(StrokeOptions::default().with_line_width(2.));
     let fill_path = ShareResource::new(fill_path);
     let stroke_path = ShareResource::new(stroke_path);
-    painter.paint_path(fill_path).paint_path(stroke_path);
+    painter.fill_path(fill_path).fill_path(stroke_path);
     let commands = painter.finish();
     let mut tess = tessellator();
     let commands = commands

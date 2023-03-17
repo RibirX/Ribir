@@ -44,35 +44,22 @@ pub trait PainterBackend {
   fn resize(&mut self, size: DeviceSize);
 }
 
-#[derive(Clone)]
-pub enum PaintPath {
-  Path(PaintPath_),
-  Text {
-    font_size: FontSize,
-    glyphs: Vec<Glyph<Pixel>>,
-  },
-}
-
 // todo: need a way to batch commands as a single resource. so we can cache
 // their vertexes as a whole. useful for svg, animation and paint layers.
-#[derive(Clone)]
-pub struct PaintInstruct {
-  pub opacity: f32,
-  pub path: PaintPath,
-  pub transform: Transform,
-  pub brush: Brush,
-}
 
-#[derive(Clone)]
-pub struct ClipInstruct {
-  pub path: PaintPath_,
-  pub transform: Transform,
-}
-
+/// The bounds of a path in command all start from zero.
 #[derive(Clone)]
 pub enum PaintCommand {
-  Paint(PaintInstruct),
-  PushClip(ClipInstruct),
+  PaintPath {
+    path: Path,
+    bounds: Size,
+    brush: Brush,
+    transform: Transform,
+  },
+  Clip {
+    path: Path,
+    transform: Transform,
+  },
   PopClip,
 }
 
@@ -297,49 +284,56 @@ impl Painter {
 
   pub fn clip(&mut self, path: Path) -> &mut Self {
     let transform = self.current_state().transform;
-    let path = PaintPath_::new(path);
-    let path_rect = transform.outer_transformed_rect(&path.bounds);
+    let bounds = lyon_algorithms::aabb::bounding_box(&path.0);
+    let path_rect = transform.outer_transformed_rect(&bounds.to_rect().cast_unit());
     self.current_state_mut().visiual_rect = self
       .current_state()
       .visiual_rect
       .and_then(|rc| rc.intersection(&path_rect));
-    self
-      .commands
-      .push(PaintCommand::PushClip(ClipInstruct { path, transform }));
+    self.commands.push(PaintCommand::Clip { path, transform });
 
     self.current_state_mut().clip_cnt += 1;
     self
   }
 
-  /// Paint a path with its style.
-  pub fn paint_path(&mut self, path: PaintPath_) -> &mut Self {
-    let transform = self.current_state().transform;
+  /// Fill a path with its style.
+  pub fn fill_path(&mut self, mut path: Path) -> &mut Self {
+    let mut transform = self.current_state().transform;
     let alpha = self.alpha();
-    let brush = self.current_state().brush.clone();
-    self.commands.push(PaintCommand::Paint(PaintInstruct {
-      opacity: alpha,
-      path: PaintPath::Path(path),
-      transform,
-      brush,
-    }));
+    let mut brush = self.current_state().brush.clone();
+    brush.apply_opacify(alpha);
+    let bounds = lyon_algorithms::aabb::bounding_box(&path.0);
+    let offset = bounds.min;
+    if offset != Point::zero().cast_unit() {
+      path = path.transform(&Transform::translation(-offset.x, -offset.y));
+      transform = transform.then_translate(offset.to_vector().cast_unit());
+    }
+
+    let bounds = Size::new(bounds.max.x, bounds.max.y);
+    self
+      .commands
+      .push(PaintCommand::PaintPath { path, bounds, brush, transform });
+    self
+  }
+
+  /// Fill a path with its style.
+  pub fn stroke_path(&mut self, path: Path) -> &mut Self {
+    if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.get_transform())) {
+      self.fill_path(stroke_path);
+    }
     self
   }
 
   /// Strokes (outlines) the current path with the current brush and line width.
   pub fn stroke(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let stroke_path = builder.stroke(self.stroke_options(), Some(self.get_transform()));
-    if let Some(stroke_path) = stroke_path {
-      self.paint_path(PaintPath_::new(stroke_path));
-    }
-    self
+    self.stroke_path(builder.build())
   }
 
   /// Fill the current path with current brush.
   pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    self.paint_path(PaintPath_::new(builder.build()));
-    self
+    self.fill_path(builder.build())
   }
 
   /// Stroke `text` from left to right, start at let top position, use
@@ -349,9 +343,7 @@ impl Painter {
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
   pub fn stroke_text<T: Into<Substr>>(&mut self, text: T, bounds: Option<Size>) -> &mut Self {
-    let cmd = self.paint_text_command(text, bounds);
-    // todo: convert fill path to stroke.
-    self.commands.push(PaintCommand::Paint(cmd));
+    self.paint_text_command(text, true, bounds);
     self
   }
 
@@ -362,8 +354,7 @@ impl Painter {
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
   pub fn fill_text<T: Into<Substr>>(&mut self, text: T, bounds: Option<Size>) -> &mut Self {
-    let cmd = self.paint_text_command(text, bounds);
-    self.commands.push(PaintCommand::Paint(cmd));
+    self.paint_text_command(text, false, bounds);
     self
   }
 
@@ -505,18 +496,12 @@ impl Painter {
 
   fn stroke_options(&self) -> &StrokeOptions { &self.current_state().stroke_options }
 
-  fn paint_text_command<T: Into<Substr>>(
-    &mut self,
-    text: T,
-    bounds: Option<Size>,
-  ) -> PaintInstruct {
+  fn paint_text_command<T: Into<Substr>>(&mut self, text: T, stroke: bool, bounds: Option<Size>) {
     let &PainterState {
       font_size,
       letter_space,
-      ref brush,
       ref font_face,
       text_line_height,
-      transform,
       ..
     } = self.current_state();
     let visual_glyphs = typography_with_text_style(
@@ -531,15 +516,24 @@ impl Painter {
       bounds,
     );
 
-    PaintInstruct {
-      opacity: self.alpha(),
-      path: PaintPath::Text {
-        font_size,
-        glyphs: visual_glyphs.pixel_glyphs().collect(),
-      },
-      transform,
-      brush: brush.clone(),
-    }
+    visual_glyphs.pixel_glyphs().for_each(|g| {
+      let face = self
+        .typography_store
+        .font_db_mut()
+        .face_data_or_insert(g.face_id)
+        .expect("Font face not exist!");
+
+      if let Some(path) = face.outline_glyph(g.glyph_id).map(Path) {
+        // todo: mark glyph
+        if stroke {
+          self.stroke_path(path);
+        } else {
+          self.fill_path(path);
+        }
+      } else {
+        todo!("image or svg fallback");
+      }
+    });
   }
 }
 

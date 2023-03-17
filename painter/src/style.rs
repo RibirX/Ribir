@@ -64,6 +64,7 @@ pub enum Brush {
   Image {
     img: ShallowImage,
     tile_mode: TileMode,
+    opacify: f32,
   },
   Gradient, // todo,
 }
@@ -73,6 +74,14 @@ impl Brush {
     match self {
       Brush::Color(color) => f(color).into(),
       _ => self.clone(),
+    }
+  }
+
+  pub fn apply_opacify(&mut self, alpha: f32) {
+    match self {
+      Brush::Color(c) => *c = c.apply_alpha(alpha),
+      Brush::Image { opacify, .. } => *opacify *= alpha,
+      Brush::Gradient => todo!(),
     }
   }
 }

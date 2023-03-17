@@ -5,6 +5,7 @@ use crate::{
 use lyon_algorithms::path::Path as LyonPath;
 use serde::{Deserialize, Serialize};
 
+// todo: remove it.
 /// Paint path use another path to describe how to fill the path.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PaintPath_ {
@@ -145,8 +146,6 @@ impl Path {
     let ts: &lyon_algorithms::geom::Transform<f32> = unsafe { std::mem::transmute(ts) };
     Self(self.0.transformed(ts))
   }
-
-  
 
   #[cfg(feature = "tessellation")]
   pub fn tessellate<Attr>(self, tolerance: f32, attr: Attr) -> (Vec<Vertex<Attr>, Vec<u32>>,) {
