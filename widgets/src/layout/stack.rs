@@ -55,7 +55,11 @@ impl Render for Stack {
     while let Some(mut l) = layouter {
       let child_size = l.perform_widget_layout(clamp);
       size = size.max(child_size);
-      layouter = l.into_next_sibling();
+      if let Ok(layout) = l.into_next_sibling() {
+        layouter = layout;
+      } else {
+        break;
+      }
     }
     size
   }

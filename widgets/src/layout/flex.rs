@@ -192,7 +192,11 @@ impl FlexLayouter {
         .current_line
         .items_info
         .push(FlexLayoutInfo { size, flex, pos: <_>::default() });
-      layouter = l.into_next_sibling();
+      if let Ok(layout) = l.into_next_sibling() {
+        layouter = layout;
+      } else {
+        break;
+      }
     }
     self.place_line();
   }
@@ -218,7 +222,9 @@ impl FlexLayouter {
           line.cross_line_height = line.cross_line_height.max(info.size.cross);
         }
 
-        layouter = l.into_next_sibling();
+        if let Ok(layout) = l.into_next_sibling() {
+          layouter = layout;
+        }
       });
     });
   }
@@ -263,7 +269,10 @@ impl FlexLayouter {
       line.items_info.iter_mut().for_each(|info| {
         let mut l = layouter.take().unwrap();
         l.update_position(info.pos.to_size(*dir).to_vector().to_point());
-        layouter = l.into_next_sibling();
+        // layouter = l.into_next_sibling();
+        if let Ok(layout) = l.into_next_sibling() {
+          layouter = layout;
+        }
       })
     });
   }
