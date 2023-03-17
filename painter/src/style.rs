@@ -1,4 +1,5 @@
-use crate::{Color, ShallowImage};
+use crate::{Color, PixelImage};
+use ribir_algo::{Resource, ShareResource};
 use ribir_text::{Em, FontFace, FontSize, Pixel};
 use serde::{Deserialize, Serialize};
 
@@ -58,11 +59,11 @@ impl TileMode {
   pub fn is_cover_mode(&self) -> bool { self.bits() & (TileMode::COVER_BOTH.bits()) > 0 }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum Brush {
   Color(Color),
   Image {
-    img: ShallowImage,
+    img: ShareResource<PixelImage>,
     tile_mode: TileMode,
     opacify: f32,
   },

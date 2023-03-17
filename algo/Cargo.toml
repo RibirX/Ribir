@@ -17,3 +17,4 @@ version = "0.0.0"
 ahash = "0.8.3"
 log = "0.4.14"
 rayon = "1.5.1"
+serde = {version = "1.0.156", features = ["derive"]}

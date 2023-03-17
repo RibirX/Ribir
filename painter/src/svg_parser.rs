@@ -7,13 +7,13 @@ use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct SvgPaths {
   pub size: Size,
   pub paths: Vec<SvgRenderPath>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct SvgRenderPath {
   pub path: PaintPath_,
   pub brush: Option<Brush>,

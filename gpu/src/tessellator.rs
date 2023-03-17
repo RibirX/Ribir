@@ -6,9 +6,7 @@ use lyon_tessellation::{path::Path as LyonPath, *};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
 use ribir_algo::{FrameCache, Resource, ShareResource};
-use ribir_painter::{
-  Brush, ClipInstruct, PaintCommand, PaintInstruct, PaintPath, TileMode, Transform,
-};
+use ribir_painter::{Brush, PaintCommand, TileMode, Transform};
 use ribir_text::{
   font_db::ID,
   shaper::{GlyphId, TextShaper},
