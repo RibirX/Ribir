@@ -238,6 +238,24 @@ impl<'a> Layouter<'a> {
       .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
   }
 
+  /// Return the position of this layouter if it had performed layout.
+  #[inline]
+  pub fn layout_pos(&self) -> Option<Point> {
+    self
+      .store
+      .layout_info(self.wid)
+      .map(|info| info.pos)
+  }
+
+  /// Return the size of this layouter if it had performed layout.
+  #[inline]
+  pub fn layout_size(&self) -> Option<Size> {
+    self
+      .store
+      .layout_info(self.wid)
+      .and_then(|info| info.size)
+  }
+
   /// Update the position of the child render object should place. Relative to
   /// parent.
   #[inline]

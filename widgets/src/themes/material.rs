@@ -127,6 +127,18 @@ fn init_custom_theme(theme: &mut FullTheme) {
     radius: FAB_RADIUS,
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
+  theme
+    .custom_themes
+    .set_custom_theme(ListsStyle { padding: EdgeInsets::vertical(8.) });
+  theme.custom_themes.set_custom_theme(ListItemStyle {
+    height: 56.,
+    padding: EdgeInsets::horizontal(16.),
+    label_gap: EdgeInsets::horizontal(16.),
+    leading_gap: EdgeInsets::all(0.),
+    trailing_gap: EdgeInsets::only_right(8.),
+    headline_style: theme.typography_theme.body_large.text.clone(),
+    supporting_style: theme.typography_theme.body_medium.text.clone(),
+  });
 }
 
 fn override_compose_style(theme: &mut FullTheme) {
