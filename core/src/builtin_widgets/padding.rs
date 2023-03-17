@@ -33,12 +33,10 @@ impl Render for Padding {
     // expanded with padding. padding.
     let mut layouter = child_layouter.into_first_child_layouter();
     while let Some(mut l) = layouter {
-      let pos = l
-        .layout_rect()
-        .expect("The grandson render widget must performed layout")
-        .origin
-        + Vector::new(self.padding.left, self.padding.top);
-      l.update_position(pos);
+      if let Some(pos) = l.layout_pos() {
+        let pos = pos + Vector::new(self.padding.left, self.padding.top);
+        l.update_position(pos);
+      }
 
       layouter = l.into_next_sibling()
     }

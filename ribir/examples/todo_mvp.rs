@@ -19,9 +19,11 @@ impl Compose for TodoMVP {
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
         let style = TypographyTheme::of(ctx).display_large.text.clone();
+        let surface: Brush = Palette::of(ctx).surface().clone().into();
       }
       Column {
-        margin: EdgeInsets::all(10.),
+        padding: EdgeInsets::all(10.),
+        background: surface.clone(),
         Text {
           margin: EdgeInsets::only_bottom(10.),
           text: "Todo",
@@ -120,7 +122,7 @@ impl TodoMVP {
               mount_animate.run();
             }
           },
-          HeadlineText::new(task.label.clone())
+          HeadlineText(Label::new(task.label.clone()))
           Leading {
             Checkbox {
               id: checkbox,

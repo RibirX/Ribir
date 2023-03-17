@@ -142,6 +142,19 @@ fn init_custom_theme(theme: &mut FullTheme) {
       measure: Some(INDICATOR_SIZE),
     },
   });
+  theme
+    .custom_themes
+    .set_custom_theme(ListsStyle { padding: EdgeInsets::vertical(8.) });
+  theme.custom_themes.set_custom_theme(ListItemStyle {
+    padding_style: EdgeInsets {
+      left: 16.,
+      right: 8.,
+      bottom: 8.,
+      top: 8.,
+    },
+    trailing_gap: EdgeInsets::only_right(16.),
+    label_gap: EdgeInsets::horizontal(16.),
+  });
 }
 
 fn override_compose_style(theme: &mut FullTheme) {
