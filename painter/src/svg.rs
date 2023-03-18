@@ -1,26 +1,22 @@
 use crate::{
-  Brush, Color, LineCap, LineJoin, PaintPath_, Path, Point, Size, StrokeOptions, Transform,
+  Brush, Color, LineCap, LineJoin, PaintCommand, PaintPath, Path, Point, Size, StrokeOptions,
+  Transform,
 };
 use euclid::approxeq::ApproxEq;
 use palette::FromComponent;
+use ribir_algo::ShareResource;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree};
 
 #[derive(Serialize, Deserialize)]
-pub struct SvgPaths {
+pub struct Svg {
   pub size: Size,
-  pub paths: Vec<SvgRenderPath>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SvgRenderPath {
-  pub path: PaintPath_,
-  pub brush: Option<Brush>,
+  pub paths: ShareResource<Box<[PaintCommand]>>,
 }
 
 // todo: we need to support currentColor to change svg color.
-impl SvgPaths {
+impl Svg {
   pub fn parse_from_bytes(svg_data: &[u8]) -> Result<Self, Box<dyn Error>> {
     let opt = Options { ..<_>::default() };
     let tree = Tree::from_data(svg_data, &opt).unwrap();
@@ -45,9 +41,9 @@ impl SvgPaths {
             let path = usvg_path_to_path(p);
 
             if let Some(ref fill) = p.fill {
+              let paint_path = PaintPath::new(path.clone(), t_stack.current_transform());
               let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
-              let path = path.clone().transform(t_stack.current_transform());
-              paths.push(SvgRenderPath { path: PaintPath_::new(path), brush });
+              paths.push(PaintCommand::Fill { paint_path, brush });
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -70,9 +66,9 @@ impl SvgPaths {
 
               let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity);
               let ts = t_stack.current_transform();
-              let path = path.stroke(&options, Some(ts)).map(|p| p.transform(ts));
-              if let Some(path) = path {
-                paths.push(SvgRenderPath { path: PaintPath_::new(path), brush });
+              if let Some(path) = path.stroke(&options, Some(ts)).map(|p| p.transform(ts)) {
+                let paint_path = PaintPath::new(path, t_stack.current_transform());
+                paths.push(PaintCommand::Fill { paint_path, brush });
               }
             };
           }
@@ -106,9 +102,9 @@ impl SvgPaths {
       }
     });
 
-    Ok(SvgPaths {
+    Ok(Svg {
       size: Size::new(size.width() as f32, size.height() as f32),
-      paths,
+      paths: ShareResource::new(paths.into_boxed_slice()),
     })
   }
 
@@ -154,16 +150,15 @@ fn matrix_convert(t: usvg::Transform) -> Transform {
   Transform::new(a as f32, b as f32, c as f32, d as f32, e as f32, f as f32)
 }
 
-fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<Brush> {
+fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> Brush {
   match paint {
     usvg::Paint::Color(usvg::Color { red, green, blue }) => {
       let alpha = u8::from_component(opacity.get());
-      let color = Color::new(*red, *green, *blue, alpha);
-      Some(Brush::Color(color))
+      Color::new(*red, *green, *blue, alpha).into()
     }
     paint => {
-      log::warn!("[painter]: not support `{paint:?}` in svg, ignored!");
-      None
+      log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
+      Color::BLACK.into()
     }
   }
 }

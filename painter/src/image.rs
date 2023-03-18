@@ -1,7 +1,5 @@
-use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
-
-use ribir_algo::Resource;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 pub enum ColorFormat {

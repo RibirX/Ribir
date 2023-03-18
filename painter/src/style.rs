@@ -1,5 +1,5 @@
 use crate::{Color, PixelImage};
-use ribir_algo::{Resource, ShareResource};
+use ribir_algo::ShareResource;
 use ribir_text::{Em, FontFace, FontSize, Pixel};
 use serde::{Deserialize, Serialize};
 

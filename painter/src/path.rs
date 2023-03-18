@@ -5,14 +5,6 @@ use crate::{
 use lyon_algorithms::path::Path as LyonPath;
 use serde::{Deserialize, Serialize};
 
-// todo: remove it.
-/// Paint path use another path to describe how to fill the path.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PaintPath_ {
-  pub(crate) lyon_path: LyonPath,
-  pub(crate) bounds: Rect,
-}
-
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Path(pub(crate) LyonPath);
@@ -166,16 +158,6 @@ impl Path {
       )
       .unwrap();
     (buffers.vertices, buffers.indices)
-  }
-}
-
-impl PaintPath_ {
-  pub fn new(path: Path) -> Self {
-    let bounds = lyon_algorithms::aabb::bounding_box(&path.0);
-    Self {
-      lyon_path: path.0,
-      bounds: bounds.to_rect().cast_unit(),
-    }
   }
 }
 

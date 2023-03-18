@@ -1,13 +1,14 @@
 use crate::{
-  path::*, path_builder::PathBuilder, Angle, Brush, Color, DeviceSize, Point, Rect, Size,
-  TextStyle, Transform, Vector,
+  path::*, path_builder::PathBuilder, Angle, Brush, Color, DeviceRect, DeviceSize, Point, Rect,
+  Size, TextStyle, Transform, Vector,
 };
 use euclid::{num::Zero, Size2D};
-use ribir_algo::Substr;
+use ribir_algo::{ShareResource, Substr};
 use ribir_text::{
   typography::{Overflow, PlaceLineDirection, TypographyCfg},
-  Em, FontFace, FontSize, Glyph, Pixel, TypographyStore, VisualGlyphs,
+  Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
 };
+use serde::{Deserialize, Serialize};
 use std::{
   error::Error,
   ops::{Deref, DerefMut},
@@ -44,21 +45,31 @@ pub trait PainterBackend {
   fn resize(&mut self, size: DeviceSize);
 }
 
-// todo: need a way to batch commands as a single resource. so we can cache
-// their vertexes as a whole. useful for svg, animation and paint layers.
+/// A path and its geometry information are friendly to paint and cache.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct PaintPath {
+  /// The path to painting, and it's moved to `(0, 0)`, use bounds to move the
+  /// path to the rightful place.
+  pub path: Path,
+  /// The device bounds of drawing this path are required.
+  pub bounds: DeviceRect,
+}
 
-/// The bounds of a path in command all start from zero.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
-  PaintPath {
-    path: Path,
-    bounds: Size,
+  Fill {
+    paint_path: PaintPath,
     brush: Brush,
-    transform: Transform,
   },
-  Clip {
-    path: Path,
+  Clip(PaintPath),
+  Bundle {
+    /// The commands to painting, and it's moved to `(0, 0)`, use `transform`
+    /// move it to the rightful place.
+    commands: ShareResource<Box<[PaintCommand]>>,
+    /// A transform need to apply after all bundles commands are painted.
     transform: Transform,
+    /// The device bounds of drawing this path are required.
+    bounds: DeviceRect,
   },
   PopClip,
 }
@@ -75,20 +86,21 @@ struct PainterState {
   transform: Transform,
   opacity: f32,
   clip_cnt: u32,
-  visiual_rect: Option<Rect>,
+  visual_rect: DeviceRect,
 }
 
 impl PainterState {
-  fn new(size: Size) -> PainterState {
+  fn new(size: Size, device_scale: f32) -> PainterState {
+    let visual_size = (size * device_scale).round().to_i32().cast_unit();
     PainterState {
-      visiual_rect: Some(Rect::new(Point::zero(), size)),
+      visual_rect: DeviceRect::from_size(visual_size),
       stroke_options: <_>::default(),
       font_size: FontSize::Pixel(14.0.into()),
       letter_space: None,
       brush: Color::BLACK.into(),
       font_face: FontFace::default(),
       text_line_height: None,
-      transform: Transform::new(1., 0., 0., 1., 0., 0.),
+      transform: Transform::new(device_scale, 0., 0., device_scale, 0., 0.),
       clip_cnt: 0,
       opacity: 1.,
     }
@@ -100,7 +112,7 @@ impl Painter {
     let size = Size::new(size.width * device_scale, size.height * device_scale);
     let mut p = Self {
       device_scale,
-      state_stack: vec![PainterState::new(size)],
+      state_stack: vec![PainterState::new(size, device_scale)],
       commands: vec![],
       path_builder: Path::builder(),
       typography_store,
@@ -117,7 +129,7 @@ impl Painter {
     );
   }
 
-  pub fn visual_rect(&mut self) -> Option<Rect> { self.current_state().visiual_rect }
+  pub fn visual_rect(&self) -> &DeviceRect { &self.current_state().visual_rect }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
@@ -158,7 +170,9 @@ impl Painter {
       self.device_scale = scale;
     }
     self.state_stack.clear();
-    self.state_stack.push(PainterState::new(self.size));
+    self
+      .state_stack
+      .push(PainterState::new(self.size, self.device_scale));
     self.scale(self.device_scale, self.device_scale);
   }
 
@@ -283,36 +297,51 @@ impl Painter {
   }
 
   pub fn clip(&mut self, path: Path) -> &mut Self {
-    let transform = self.current_state().transform;
-    let bounds = lyon_algorithms::aabb::bounding_box(&path.0);
-    let path_rect = transform.outer_transformed_rect(&bounds.to_rect().cast_unit());
-    self.current_state_mut().visiual_rect = self
-      .current_state()
-      .visiual_rect
-      .and_then(|rc| rc.intersection(&path_rect));
-    self.commands.push(PaintCommand::Clip { path, transform });
+    let paint_path = PaintPath::new(path, self.get_transform());
 
+    self.current_state_mut().visual_rect = self
+      .current_state()
+      .visual_rect
+      .intersection(&paint_path.bounds)
+      .unwrap_or(DeviceRect::zero());
+
+    self.commands.push(PaintCommand::Clip(paint_path));
     self.current_state_mut().clip_cnt += 1;
     self
   }
 
-  /// Fill a path with its style.
-  pub fn fill_path(&mut self, mut path: Path) -> &mut Self {
-    let mut transform = self.current_state().transform;
-    let alpha = self.alpha();
-    let mut brush = self.current_state().brush.clone();
-    brush.apply_opacify(alpha);
-    let bounds = lyon_algorithms::aabb::bounding_box(&path.0);
-    let offset = bounds.min;
-    if offset != Point::zero().cast_unit() {
-      path = path.transform(&Transform::translation(-offset.x, -offset.y));
-      transform = transform.then_translate(offset.to_vector().cast_unit());
+  /// Directly paint a bundle of commands.
+  pub fn paint_bundle(&mut self, commands: ShareResource<Box<[PaintCommand]>>) -> &mut Self {
+    let bounds = commands
+      .iter()
+      .fold(DeviceRect::zero(), |rect, cmd| match cmd {
+        PaintCommand::Fill { paint_path: p, .. } | PaintCommand::Clip(p) => rect.union(&p.bounds),
+        PaintCommand::Bundle { bounds, .. } => rect.union(bounds),
+        PaintCommand::PopClip => rect,
+      });
+
+    let transform = self.get_transform().clone();
+    let bounds = transform.outer_transformed_rect(&bounds.to_f32().cast_unit());
+    let bounds = bounds.cast_unit().to_i32();
+    if bounds.intersects(self.visual_rect()) {
+      self
+        .commands
+        .push(PaintCommand::Bundle { commands, transform, bounds });
     }
 
-    let bounds = Size::new(bounds.max.x, bounds.max.y);
     self
-      .commands
-      .push(PaintCommand::PaintPath { path, bounds, brush, transform });
+  }
+
+  /// Fill a path with its style.
+  pub fn fill_path(&mut self, path: Path) -> &mut Self {
+    let paint_path = PaintPath::new(path, self.get_transform());
+    if paint_path.bounds.intersects(self.visual_rect()) {
+      let alpha = self.alpha();
+      let mut brush = self.current_state().brush.clone();
+      brush.apply_opacify(alpha);
+
+      self.commands.push(PaintCommand::Fill { paint_path, brush });
+    }
     self
   }
 
@@ -598,6 +627,28 @@ pub fn typography_with_text_style<T: Into<Substr>>(
       overflow: Overflow::Clip,
     },
   )
+}
+
+impl PaintPath {
+  pub fn new(mut path: Path, ts: &Transform) -> Self {
+    if ts.m11 != 1.0 || ts.m12 != 0. || ts.m21 != 0. || ts.m22 != 1. {
+      path = path.transform(ts);
+    }
+    let bounds = lyon_algorithms::aabb::bounding_box(&path.0)
+      .round()
+      .to_rect()
+      .to_i32()
+      .cast_unit();
+
+    if bounds.min() != (0, 0).into() {
+      path = path.transform(&Transform::translation(
+        -bounds.origin.x as f32,
+        -bounds.origin.y as f32,
+      ));
+    }
+
+    PaintPath { path, bounds }
+  }
 }
 
 #[cfg(test)]
