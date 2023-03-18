@@ -131,13 +131,14 @@ fn init_custom_theme(theme: &mut FullTheme) {
     .custom_themes
     .set_custom_theme(ListsStyle { padding: EdgeInsets::vertical(8.) });
   theme.custom_themes.set_custom_theme(ListItemStyle {
-    height: 56.,
-    padding: EdgeInsets::horizontal(16.),
+    padding_style: EdgeInsets {
+      left: 16.,
+      right: 8.,
+      bottom: 8.,
+      top: 8.,
+    },
+    trailing_gap: EdgeInsets::only_right(16.),
     label_gap: EdgeInsets::horizontal(16.),
-    leading_gap: EdgeInsets::all(0.),
-    trailing_gap: EdgeInsets::only_right(8.),
-    headline_style: theme.typography_theme.body_large.text.clone(),
-    supporting_style: theme.typography_theme.body_medium.text.clone(),
   });
 }
 
