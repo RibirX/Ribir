@@ -38,6 +38,7 @@ use ribir_core::{impl_query_self_only, prelude::*};
 /// ```
 #[derive(Default, Declare)]
 pub struct Divider {
+  #[declare(default = 1.)]
   // Extent of divider
   extent: f32,
   // Color of divider
@@ -72,12 +73,12 @@ impl Render for Divider {
       size.width -= self.indent + self.end_indent;
       size.height = self.thickness;
       let y = (self.extent - self.thickness) / 2.;
-      (Point::new(0., y), size)
+      (Point::new(self.indent, y), size)
     } else {
       size.width = self.thickness;
       size.height -= self.indent + self.end_indent;
       let x = (self.extent - self.thickness) / 2.;
-      (Point::new(x, 0.), size)
+      (Point::new(x, self.indent), size)
     };
     let painter = ctx.painter();
     painter.set_brush(self.color.clone());
