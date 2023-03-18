@@ -30,7 +30,7 @@ impl ComposeStyle for RawButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{Button, Label, svgs};
+/// # use ribir_widgets::prelude::*;
 ///
 /// // only icon
 /// let raw_icon_button = widget! {

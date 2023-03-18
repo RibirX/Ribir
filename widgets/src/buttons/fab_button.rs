@@ -31,7 +31,7 @@ impl ComposeStyle for FabButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{FabButton, Label, svgs};
+/// # use ribir_widgets::prelude::*;
 ///
 /// // only icon
 /// let fab_icon_button = widget! {

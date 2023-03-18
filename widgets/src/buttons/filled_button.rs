@@ -31,7 +31,7 @@ impl ComposeStyle for FilledButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{FilledButton, Label, svgs};
+/// # use ribir_widgets::prelude::*;
 ///
 /// // only icon
 /// let filled_icon_button = widget! {
