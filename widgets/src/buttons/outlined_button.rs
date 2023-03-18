@@ -32,7 +32,7 @@ impl ComposeStyle for OutlinedButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{OutlinedButton, Label, svgs};
+/// # use ribir_widgets::prelude::*;
 ///
 /// // only icon
 /// let outlined_icon_button = widget! {
