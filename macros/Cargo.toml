@@ -33,4 +33,4 @@ ribir_builtin = {path = "./builtin", version = "0.0.0"}
 
 [dependencies.syn]
 features = ["visit-mut", "full", "extra-traits"]
-version = "1.0.109"
+version = "2.0.2"

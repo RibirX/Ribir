@@ -23,4 +23,4 @@ smallvec = "1.8.0"
 
 [dependencies.syn]
 features = ["full"]
-version = "1.0.109"
+version = "2.0.2"
