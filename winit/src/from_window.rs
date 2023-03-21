@@ -65,7 +65,7 @@ impl RibirRawWindow for WrappedWindow {
 
   fn scale_factor(&self) -> f64 { self.0.scale_factor() }
 
-  fn as_any(&self) -> &dyn Any { self }
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
 }
 
 impl From<WinitWindow> for WrappedWindow {

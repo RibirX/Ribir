@@ -1,4 +1,10 @@
-use crate::{impl_query_self_only, prelude::*};
+use std::error::Error;
+
+use crate::{
+  impl_query_self_only,
+  prelude::*,
+  window::{RawWindow, WindowId},
+};
 
 #[derive(Default, Clone, Copy)]
 pub struct ExpectRect {
@@ -282,4 +288,77 @@ impl PointerId for MockPointerId {
   }
 
   fn box_clone(&self) -> Box<dyn PointerId> { Box::new(*self) }
+}
+
+pub struct MockBackend;
+
+#[derive(Default)]
+pub struct MockRawWindow {
+  pub size: Size,
+  pub cursor: Option<CursorIcon>,
+}
+
+impl PainterBackend for MockBackend {
+  fn submit<'a>(&mut self, _: Vec<PaintCommand>) {}
+
+  fn resize(&mut self, _: DeviceSize) {}
+
+  fn commands_to_image(
+    &mut self,
+    _: Vec<PaintCommand>,
+    _: CaptureCallback,
+  ) -> Result<(), Box<dyn Error>> {
+    Ok(())
+  }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct MockWindowId(usize);
+
+impl MockWindowId {
+  fn dummy() -> MockWindowId { MockWindowId(0) }
+}
+
+impl WindowId for MockWindowId {
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+  fn equals(&self, other: &Box<dyn WindowId>) -> bool {
+    self.0
+      == other
+        .box_clone()
+        .into_any()
+        .downcast::<MockWindowId>()
+        .unwrap()
+        .0
+  }
+
+  fn box_clone(&self) -> Box<dyn WindowId> { Box::new(*self) }
+}
+
+impl RawWindow for MockRawWindow {
+  fn inner_size(&self) -> Size { self.size }
+  fn set_inner_size(&mut self, size: Size) { self.size = size; }
+  fn outer_size(&self) -> Size { self.size }
+  fn inner_position(&self) -> Point { Point::zero() }
+  fn outer_position(&self) -> Point { Point::zero() }
+  fn id(&self) -> Box<dyn WindowId> { Box::new(MockWindowId::dummy()) }
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
+  fn request_redraw(&self) {}
+  fn scale_factor(&self) -> f64 { 1. }
+  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
+}
+
+impl Window {
+  pub fn default_mock(root: Widget, size: Option<Size>) -> Self {
+    let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
+    Self::mock_window(root, size, <_>::default())
+  }
+
+  pub fn mock_window(root: Widget, size: Size, ctx: AppContext) -> Self {
+    Self::new(
+      MockRawWindow { size, ..Default::default() },
+      MockBackend,
+      root,
+      ctx,
+    )
+  }
 }

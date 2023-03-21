@@ -16,6 +16,7 @@ const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
 pub trait PointerId: Debug {
   fn into_any(self: Box<Self>) -> Box<dyn Any>;
+  #[allow(clippy::borrowed_box)] // to make downcast work
   fn equals(&self, other: &Box<dyn PointerId>) -> bool;
   fn box_clone(&self) -> Box<dyn PointerId>;
 }

@@ -125,7 +125,7 @@ impl BoxDecoration {
   ) {
     assert!(
       self.is_border_uniform(),
-      "radius can't be setted with different border"
+      "radius can't be used with with different borders"
     );
     let width_half = border.left.width / 2.;
     let min_x = content_rect.min_x() - width_half;

@@ -1,13 +1,12 @@
 [package]
 name = "ribir_winit"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 log = "0.4.8"
-ribir_app = { path = "../app" }
 ribir_core = { path = "../core" }
 ribir_geometry = { path = "../geometry" }
 ribir_gpu = {path = "../gpu"}

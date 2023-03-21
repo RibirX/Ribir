@@ -4,8 +4,56 @@ use crate::{
   context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
 };
 
+pub trait ShellWindow {
+  fn set_theme(self, theme: Theme);
+
+  fn context(&self) -> &AppContext;
+
+  // fn event_loop(&self) -> &EventLoop<()>;
+
+  fn exec(self, wnd_id: Box<dyn WindowId>);
+
+  fn add_window(&mut self, wnd: Window) -> Box<dyn WindowId>;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WindowConfig {
+  // Requests the window to be of specific dimensions.
+  pub inner_size: Option<Size>,
+
+  /// Sets a minimum dimension size for the window.
+  pub min_inner_size: Option<Size>,
+
+  /// Sets a maximum dimension size for the window.
+  pub max_inner_size: Option<Size>,
+
+  /// Sets a desired initial position for the window.
+  pub position: Option<Point>,
+
+  /// Sets whether the window is resizable or not.
+  pub resizable: Option<bool>,
+
+  /// Requests a specific title for the window.
+  pub title: Option<String>,
+
+  /// Requests maximized mode.
+  pub maximized: Option<bool>,
+
+  /// Sets whether the window will be initially hidden or visible.
+  pub visible: Option<bool>,
+
+  /// Sets whether the background of the window should be transparent.
+  pub transparent: Option<bool>,
+
+  /// Sets whether the window should have a border, a title bar, etc.
+  pub decorations: Option<bool>,
+  // /// Sets the window icon.
+  // pub window_icon:Option<winit::window::Icon>,
+}
+
 pub trait WindowId: std::fmt::Debug {
   fn into_any(self: Box<Self>) -> Box<dyn Any>;
+  #[allow(clippy::borrowed_box)] // to make downcast work
   fn equals(&self, other: &Box<dyn WindowId>) -> bool;
   fn box_clone(&self) -> Box<dyn WindowId>;
 }
@@ -30,7 +78,8 @@ pub trait RawWindow {
   /// Modify the native window if cursor modified.
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn scale_factor(&self) -> f64;
-  fn as_any(&self) -> &dyn Any;
+  // fn as_any(&self) -> &dyn Any;
+  fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 /// A rx scheduler pool that block until all task finished before every frame
@@ -51,14 +100,6 @@ pub struct Window {
 }
 
 impl Window {
-  // #[inline]
-  // pub fn builder(root: Widget) -> WindowBuilder {
-  //   WindowBuilder {
-  //     root,
-  //     inner_builder: winit::window::WindowBuilder::default(),
-  //   }
-  // }
-
   /// processes native events from this native window
   #[inline]
   pub fn processes_native_event(&mut self, event: WindowEvent) {
@@ -215,80 +256,6 @@ impl Window {
           .map_or(Ok(false), |_| Ok(same))
       })
       .unwrap_or(false)
-  }
-}
-
-pub struct MockBackend;
-
-#[derive(Default)]
-pub struct MockRawWindow {
-  pub size: Size,
-  pub cursor: Option<CursorIcon>,
-}
-
-impl PainterBackend for MockBackend {
-  fn submit<'a>(&mut self, _: Vec<PaintCommand>) {}
-
-  fn resize(&mut self, _: DeviceSize) {}
-
-  fn commands_to_image(
-    &mut self,
-    _: Vec<PaintCommand>,
-    _: CaptureCallback,
-  ) -> Result<(), Box<dyn Error>> {
-    Ok(())
-  }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct MockWindowId(usize);
-
-impl MockWindowId {
-  fn dummy() -> MockWindowId { MockWindowId(0) }
-}
-
-impl WindowId for MockWindowId {
-  fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
-  // fn as_boxed_any(self: Box<Self>) -> Box<dyn Any> { self }
-  fn equals(&self, other: &Box<dyn WindowId>) -> bool {
-    self.0
-      == other
-        .box_clone()
-        .into_any()
-        .downcast_ref::<MockWindowId>()
-        .unwrap()
-        .0
-  }
-
-  fn box_clone(&self) -> Box<dyn WindowId> { Box::new(*self) }
-}
-
-impl RawWindow for MockRawWindow {
-  fn inner_size(&self) -> Size { self.size }
-  fn set_inner_size(&mut self, size: Size) { self.size = size; }
-  fn outer_size(&self) -> Size { self.size }
-  fn inner_position(&self) -> Point { Point::zero() }
-  fn outer_position(&self) -> Point { Point::zero() }
-  fn id(&self) -> Box<dyn WindowId> { Box::new(MockWindowId::dummy()) }
-  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
-  fn request_redraw(&self) {}
-  fn scale_factor(&self) -> f64 { 1. }
-  fn as_any(&self) -> &dyn Any { self }
-}
-
-impl Window {
-  pub fn default_mock(root: Widget, size: Option<Size>) -> Self {
-    let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
-    Self::mock_window(root, size, <_>::default())
-  }
-
-  pub fn mock_window(root: Widget, size: Size, ctx: AppContext) -> Self {
-    Self::new(
-      MockRawWindow { size, ..Default::default() },
-      MockBackend,
-      root,
-      ctx,
-    )
   }
 }
 

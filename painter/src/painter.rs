@@ -42,7 +42,7 @@ pub trait PainterBackend {
   fn resize(&mut self, size: DeviceSize);
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum PaintPath {
   Path(Resource<Path>),
   Text {
@@ -54,7 +54,7 @@ pub enum PaintPath {
 
 // todo: need a way to batch commands as a single resource. so we can cache
 // their vertexes as a whole. useful for svg, animation and paint layers.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PaintInstruct {
   pub opacity: f32,
   pub path: PaintPath,
@@ -62,13 +62,13 @@ pub struct PaintInstruct {
   pub brush: Brush,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ClipInstruct {
   pub path: PaintPath,
   pub transform: Transform,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum PaintCommand {
   Paint(PaintInstruct),
   PushClip(ClipInstruct),

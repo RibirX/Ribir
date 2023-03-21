@@ -1,4 +1,3 @@
-// use ribir_app::prelude::*;
 use ribir_core::prelude::*;
 
 use std::{collections::HashMap, rc::Rc};
@@ -12,13 +11,13 @@ use winit::{
 use crate::{from_event::WrappedWindowEvent, prelude::WrappedWindowId};
 use ribir_core::window::WindowId as RibirWindowId;
 
-pub struct WinitApplication {
+pub struct PlatformShellWindow {
   windows: HashMap<WindowId, Window>,
   ctx: AppContext,
   event_loop: EventLoop<()>,
 }
 
-impl WinitApplication {
+impl PlatformShellWindow {
   #[inline]
   pub fn new(theme: Theme) -> Self {
     // todo: theme can provide fonts to load.
@@ -29,18 +28,17 @@ impl WinitApplication {
     Self { ctx, ..Default::default() }
   }
 
-  #[inline]
-  pub fn with_theme(mut self, theme: Theme) -> Self {
-    self.ctx.app_theme = Rc::new(theme);
-    self
-  }
-
-  #[inline]
-  pub fn context(&self) -> &AppContext { &self.ctx }
-
   pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
+}
 
-  pub fn exec(mut self, wnd_id: Box<dyn RibirWindowId>) {
+impl ShellWindow for PlatformShellWindow {
+  #[inline]
+  fn set_theme(mut self, theme: Theme) { self.ctx.app_theme = Rc::new(theme); }
+
+  #[inline]
+  fn context(&self) -> &AppContext { &self.ctx }
+
+  fn exec(mut self, wnd_id: Box<dyn RibirWindowId>) {
     if let Some(wnd) = self.windows.get_mut(&WrappedWindowId::from(wnd_id).into()) {
       wnd.draw_frame();
     } else {
@@ -83,7 +81,7 @@ impl WinitApplication {
     });
   }
 
-  pub fn add_window(&mut self, wnd: Window) -> Box<dyn RibirWindowId> {
+  fn add_window(&mut self, wnd: Window) -> Box<dyn RibirWindowId> {
     let id = wnd.raw_window.id();
     self
       .windows
@@ -93,7 +91,7 @@ impl WinitApplication {
   }
 }
 
-impl Default for WinitApplication {
+impl Default for PlatformShellWindow {
   fn default() -> Self {
     Self {
       windows: Default::default(),
@@ -103,4 +101,10 @@ impl Default for WinitApplication {
   }
 }
 
-// impl Application for WinitApplication {}
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn test() {
+    // let x = WinitApplication::new();
+  }
+}

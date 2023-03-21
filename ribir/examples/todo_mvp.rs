@@ -1,7 +1,4 @@
-use ribir::{
-  prelude::{svgs, *},
-  WindowBuilder, WinitApplication,
-};
+use ribir::prelude::{svgs, *};
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -160,7 +157,11 @@ impl TodoMVP {
   }
 }
 
+#[cfg(any(feature = "crossterm", feature = "winit"))]
 fn main() {
+  use ribir::Application;
+  use ribir_core::window::WindowConfig;
+
   env_logger::init();
 
   let todo = TodoMVP {
@@ -183,10 +184,24 @@ fn main() {
     ],
   };
 
-  let app = WinitApplication::new(material::purple::light());
-  let wnd = WindowBuilder::new(todo.into_widget())
-    .with_inner_size(Size::new(400., 640.))
-    .with_title("todo")
-    .build(&app);
-  app::run_with_window(app, wnd);
+  let mut app = Application::new(material::purple::light());
+
+  let window_builder = app.window_builder(
+    todo.into_widget(),
+    WindowConfig {
+      inner_size: Some(Size::new(400., 640.)),
+      title: Some("todo".to_owned()),
+      ..Default::default()
+    },
+  );
+
+  let window_id = app.build_window(window_builder);
+  app.exec(window_id);
+}
+
+#[cfg(all(not(feature = "crossterm"), not(feature = "winit")))]
+fn main() {
+  println!(
+    "The todo_mvp example is currently only implemented for the Winit and Crossterm platform"
+  );
 }

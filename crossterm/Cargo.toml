@@ -1,0 +1,21 @@
+[package]
+name = "ribir_crossterm"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.26.1"
+log = "0.4.8"
+ribir_core = { path = "../core" }
+ribir_geometry = { path = "../geometry" }
+ribir_painter = {path = "../painter"}
+ribir_text = {path = "../text"}
+
+# [dev-dpendencies]
+env_logger = "0.7.1"
+ribir_widgets = {path = "../widgets"}
+
+[features]
+default = ["bracketed-paste"]
+bracketed-paste = ["crossterm/bracketed-paste"]
+

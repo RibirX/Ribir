@@ -41,14 +41,3 @@ impl From<&Box<dyn RibirPointerId>> for WrappedPointerId {
       .unwrap())
   }
 }
-
-// impl From<&dyn RibirPointerId> for WrappedPointerId {
-//   fn from(value: &dyn RibirPointerId) -> Self {
-//     let x = value
-//       .as_any()
-//       .downcast_ref::<WinitDeviceId>()
-//       .map(|v| v.to_owned())
-//       .unwrap();
-//     x.into()
-//   }
-// }

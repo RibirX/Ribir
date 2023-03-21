@@ -5,7 +5,6 @@ extern crate bitflags;
 extern crate lazy_static;
 
 pub mod animation;
-// mod application;
 pub mod builtin_widgets;
 mod context;
 pub mod data_widget;
@@ -25,8 +24,6 @@ pub mod widget_children;
 pub mod window;
 pub mod prelude {
   pub use crate::animation::*;
-  // #[doc(no_inline)]
-  // pub use crate::application::Application;
   pub use crate::assign_observable::AssignObservable;
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
@@ -57,7 +54,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
-  pub use crate::window::Window;
+  pub use crate::window::{ShellWindow, Window};
   #[doc(no_inline)]
   pub use ::ribir_painter::*;
   pub use log;

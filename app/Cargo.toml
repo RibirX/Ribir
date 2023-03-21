@@ -1,9 +1,16 @@
 [package]
 name = "ribir_app"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 ribir_core = { path = "../core" }
+ribir_winit = { path = "../winit", optional = true }
+ribir_crossterm = { path = "../crossterm", optional = true }
+
+[features]
+wgpu_gl = ["ribir_winit/wgpu_gl"]
+winit = ["ribir_winit"]
+crossterm = ["ribir_crossterm"]

@@ -27,5 +27,7 @@ ribir_winit = {path = "../winit", version = "*"}
 env_logger = "0.7.1"
 
 [features]
-default = ["wgpu_gl"]
+# default = ["winit", "wgpu_gl"]
 wgpu_gl = ["ribir_gpu/wgpu_gl"]
+winit = ["ribir_app/winit"]
+crossterm = ["ribir_app/crossterm"]
