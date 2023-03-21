@@ -210,17 +210,15 @@ impl<'a> Layouter<'a> {
 
   /// Get layouter of the next sibling of this layouter, panic if self is not
   /// performed layout.
-  pub fn into_next_sibling(self) -> Result<Option<Self>, &'static str> {
-    if self.layout_rect().is_some() {
-      Ok(
-        self
-          .wid
-          .next_sibling(self.arena)
-          .map(move |sibling| self.into_new_layouter(sibling)),
-      )
-    } else {
-      Err("Before try to layout next sibling, self must performed layout.")
-    }
+  pub fn into_next_sibling(self) -> Option<Self> {
+    assert!(
+      self.layout_rect().is_some(),
+      "Before try to layout next sibling, self must performed layout."
+    );
+    self
+      .wid
+      .next_sibling(self.arena)
+      .map(move |sibling| self.into_new_layouter(sibling))
   }
 
   /// Return layouter of the first child of this widget.

@@ -34,17 +34,12 @@ impl Render for Padding {
     // expanded with padding. padding.
     let mut layouter = child_layouter.into_first_child_layouter();
     while let Some(mut l) = layouter {
-      if let Some(rect) = l.layout_rect() {
-        let pos = rect.origin + Vector::new(self.padding.left, self.padding.top);
+      if let Some(pos) = l.layout_pos() {
+        let pos = pos + Vector::new(self.padding.left, self.padding.top);
         l.update_position(pos);
-        if let Ok(layout) = l.into_next_sibling() {
-          layouter = layout;
-        } else {
-          break;
-        }
-      } else {
-        break;
       }
+
+      layouter = l.into_next_sibling()
     }
 
     size

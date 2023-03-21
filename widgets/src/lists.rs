@@ -135,38 +135,36 @@ impl ComposeChild for ListItemImpl {
           dyns: this.height.map(|height| ConstrainedBox {
             clamp: BoxClamp::fixed_height(height)
           }),
-          Padding {
+          Column {
             padding: this.padding_style,
-            Column {
-              Row {
-                align_items: this.item_align,
-                Option::map(leading, |w| w.child)
-                Expanded {
-                  flex: 1.,
-                  Column {
-                    padding: this.label_gap,
+            Row {
+              align_items: this.item_align,
+              Option::map(leading, |w| w.child)
+              Expanded {
+                flex: 1.,
+                Column {
+                  padding: this.label_gap,
+                  Text {
+                    text: headline.0.0.clone(),
+                    foreground: on_surface,
+                    style: this.headline_style.clone(),
+                  }
+                  Option::map(supporting, |supporting| widget! {
+                    states { supporting: supporting.into_readonly() }
                     Text {
-                      text: headline.0.0.clone(),
-                      foreground: on_surface,
-                      style: this.headline_style.clone(),
+                      text: supporting.0.0.clone(),
+                      foreground: on_surface_variant,
+                      style: this.supporting_style.clone(),
                     }
-                    Option::map(supporting, |supporting| widget! {
-                      states { supporting: supporting.into_readonly() }
-                      Text {
-                        text: supporting.0.0.clone(),
-                        foreground: on_surface_variant,
-                        style: this.supporting_style.clone(),
-                      }
-                    })
-                  }
+                  })
                 }
-                Option::map(trailing, |w| widget! {
-                  DynWidget {
-                    padding: this.trailing_gap,
-                    dyns: w.child
-                  }
-                })
               }
+              Option::map(trailing, |w| widget! {
+                DynWidget {
+                  padding: this.trailing_gap,
+                  dyns: w.child
+                }
+              })
             }
           }
         }

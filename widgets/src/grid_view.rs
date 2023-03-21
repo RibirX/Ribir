@@ -65,11 +65,7 @@ impl Render for GridView {
       });
       l.update_position(self.calc_child_pos(idx));
       idx += 1;
-      if let Ok(layout) = l.into_next_sibling() {
-        layouter = layout;
-      } else {
-        break;
-      }
+      layouter = l.into_next_sibling();
     }
 
     self.bound_size(idx)
