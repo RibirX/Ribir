@@ -40,17 +40,17 @@ pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTe
 pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
   let rect = layout_rect_by_path(wnd, path);
   if let Some(x) = expect.x {
-    assert_eq!(x, rect.min_x(), "path: {path:?}");
+    assert_eq!(rect.min_x(), x, "path: {path:?}");
   }
   if let Some(y) = expect.y {
-    assert_eq!(y, rect.min_y(), "path: {path:?}");
+    assert_eq!(rect.min_y(), y, "path: {path:?}");
   }
   if let Some(width) = expect.width {
-    assert_eq!(width, rect.width(), "path: {path:?}")
+    assert_eq!(rect.width(), width, "path: {path:?}")
   }
 
   if let Some(height) = expect.height {
-    assert_eq!(height, rect.height(), "path: {path:?}")
+    assert_eq!(rect.height(), height, "path: {path:?}")
   }
 }
 

@@ -75,6 +75,7 @@ const FAB_RADIUS: f32 = 16.;
 const LABEL_GAP: f32 = 8.;
 const BUTTON_RADIUS: f32 = 20.;
 const BUTTON_PADDING: f32 = 16.;
+const INDICATOR_SIZE: f32 = 60.;
 
 fn init_custom_theme(theme: &mut FullTheme) {
   theme.custom_themes.set_custom_theme(ScrollBarTheme {
@@ -126,6 +127,25 @@ fn init_custom_theme(theme: &mut FullTheme) {
     label_style: theme.typography_theme.label_large.text.clone(),
     radius: FAB_RADIUS,
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
+  });
+  theme.custom_themes.set_custom_theme(TabsStyle {
+    extent: 64.,
+    direction: Direction::Horizontal,
+    icon_size: theme.icon_theme.icon_size.small,
+    icon_pos: Position::Top,
+    active_color: theme.palette.primary().into(),
+    normal_color: theme.palette.on_surface_variant().into(),
+    label_style: theme.typography_theme.title_small.text.clone(),
+    indicator: IndicatorConfig {
+      extent: 3.,
+      measure: Some(INDICATOR_SIZE),
+      radius: Some(Radius::from(BorderRadii {
+        top_left: 3.,
+        top_right: 3.,
+        bottom_left: 0.,
+        bottom_right: 0.,
+      })),
+    },
   });
 }
 
@@ -179,24 +199,20 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<InkBarStyle>(|style, _| {
+  styles.override_compose_style::<IndicatorStyle>(|style, host| {
     widget! {
       states { style }
       init ctx => {
-        let palette = Palette::of(ctx);
         let ease_in = transitions::EASE_IN.of(ctx);
       }
-      Container {
-        id: ink_bar,
-        size: Size::new(style.ink_bar_rect.size.width, 2.),
-        left_anchor: style.ink_bar_rect.origin.x,
-        top_anchor: style.ink_bar_rect.size.height - 2.,
-        background: palette.primary(),
+      DynWidget {
+        id: indicator,
+        left_anchor: style.rect.origin.x + (style.rect.size.width - INDICATOR_SIZE) / 2.,
+        dyns: host,
       }
-
       transition prop!(
-        ink_bar.left_anchor,
-        PositionUnit::lerp_fn(style.ink_bar_rect.size.width)
+        indicator.left_anchor,
+        PositionUnit::lerp_fn(style.rect.size.width)
       ) { by: ease_in }
     }
   });

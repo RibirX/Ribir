@@ -7,6 +7,14 @@ pub enum Direction {
   Vertical,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Position {
+  Top,
+  Bottom,
+  Left,
+  Right,
+}
+
 impl Direction {
   pub fn is_horizontal(&self) -> bool { matches!(self, Direction::Horizontal) }
 

@@ -1,4 +1,7 @@
-use crate::prelude::{svgs, Icon, Row, Text};
+use crate::{
+  layout::Position,
+  prelude::{svgs, Icon, Row, Text},
+};
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
@@ -33,14 +36,6 @@ impl Checkbox {
       self.checked = !self.checked;
     }
   }
-}
-
-/// Describe label position before or after purpose widget.`
-#[derive(Default)]
-pub enum Position {
-  Before,
-  #[default]
-  After,
 }
 
 #[derive(Declare)]
@@ -85,12 +80,13 @@ impl ComposeChild for Checkbox {
         Text { text: desc, style: theme.label_style.clone() }
       };
       checkbox = match position {
-        Position::Before => {
+        Position::Left => {
           widget! { Row { DynWidget { dyns: [label, checkbox] } } }
         }
-        Position::After => {
+        Position::Right => {
           widget! { Row { DynWidget { dyns: [checkbox, label] } } }
         }
+        _ => unreachable!("don't have vertical checkbox"),
       };
     }
 
