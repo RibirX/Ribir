@@ -43,7 +43,7 @@ pub trait CustomTheme: Sized + 'static {
 
 impl CustomThemes {
   #[inline]
-  pub fn set_custom_theme<T: Clone + CustomTheme + 'static>(&mut self, v: T) {
+  pub fn set_custom_theme<T: CustomTheme + 'static>(&mut self, v: T) {
     self.themes.insert(v.type_id(), Box::new(v));
   }
 }

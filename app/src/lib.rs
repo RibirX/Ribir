@@ -11,5 +11,6 @@ pub mod application;
 pub mod prelude {
   pub use crate::application::*;
   pub use ribir_core::prelude::*;
+  #[cfg(any(feature = "crossterm", feature = "winit"))]
   pub use ribir_platform::prelude::*;
 }

@@ -5,6 +5,7 @@ use ribir_core::{
     *,
   },
 };
+
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
@@ -17,6 +18,14 @@ pub struct Text {
 }
 
 impl Text {
+  pub fn new(str: impl Into<CowArc<str>>, foreground: &Brush, style: CowArc<TextStyle>) -> Self {
+    Text {
+      text: str.into(),
+      foreground: foreground.clone(),
+      style,
+    }
+  }
+
   pub fn text_layout(
     text: &CowArc<str>,
     style: &CowArc<TextStyle>,

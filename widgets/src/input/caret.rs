@@ -1,5 +1,5 @@
 use super::InputTheme;
-use crate::layout::Container;
+use crate::{layout::SizedBox, themes::svgs};
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]
@@ -7,18 +7,24 @@ pub struct Caret {
   #[declare(default = InputTheme::of(ctx).caret_color.clone())]
   pub color: Brush,
   pub focused: bool,
-  pub size: Size,
+  pub height: f32,
+  #[declare(default = svgs::TEXT_CARET)]
+  pub icon: NamedSvg,
 }
 
 impl Compose for Caret {
   fn compose(this: State<Self>) -> Widget {
     widget! {
       states { this: this.into_readonly() }
-      Container {
-        id: caret,
-        visible: false,
-        background: this.color.clone(),
-        size: this.size,
+      SizedBox {
+        left_anchor: -this.height / 2.,
+        size: Size::new(this.height, this.height),
+        DynWidget {
+          id: caret,
+          visible: false,
+          dyns: this.icon,
+          box_fit: BoxFit::Fill,
+        }
       }
       Animate {
         id: animate1,

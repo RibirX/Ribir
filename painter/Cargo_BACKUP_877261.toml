@@ -1,5 +1,4 @@
 [package]
-authors = ["adoo <Adoo@outlook.com>"]
 categories = ["gui"]
 description = "Ribir is a framework for building modern native/wasm cross-platform user interface applications."
 documentation = "https://ribir.org/docs"
@@ -7,7 +6,7 @@ edition = "2021"
 homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
-name = "ribir_core"
+name = "ribir_painter"
 readme = "README.md"
 repository = "https://github.com/RibirX/Ribir/algo"
 version = "0.0.0"
@@ -15,34 +14,20 @@ version = "0.0.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ahash = "0.8.3"
 bitflags = "2.0.0"
-futures = "0.3.26"
-indextree = "4.5.0"
-lazy_static = "1.4.0"
-log = "0.4.8"
+euclid = "0.22.6"
+log = "0.4.17"
 lyon_algorithms = "1.0.1"
-lyon_geom = "1.0.1"
-png = {version = "0.17.3", optional = true}
+lyon_tessellation = {version = "1.0.1", features = ["serialization"]}
+palette = {version = "0.6.1", features = ["serializing"]}
 ribir_algo = {path = "../algo", version = "0.0.0"}
-#ribir_gpu = {path = "../gpu", version = "0.0.0", features = ["wgpu_gl"]}
-ribir_macros = {path = "../macros", version = "0.0.0"}
-ribir_painter = {path = "../painter", version = "0.0.0"}
+ribir_geometry = {path = "../geometry"}
 ribir_text = {path = "../text", version = "0.0.0"}
-rxrust = "1.0.0-beta.1"
-
-smallvec = "1.8.0"
-# winit = "0.28.1"
-
-[dependencies.blake3]
-features = ["rayon"]
-version = "1.3.3"
-
-[features]
-png = ["dep:png"]
-thread-pool = [
-  "futures/thread-pool",
-]
-
-[dev-dependencies]
-colored = "2.0.0"
+serde = {version = "1.0", features = ["rc"]}
+serde_json = "1.0.82"
+usvg = {version = "0.29.0"}
+rctree ="0.5.0"
+<<<<<<< HEAD
+=======
+bitflags-serde-legacy = "0.1.0"
+>>>>>>> a0665d2f38fb666548d265846d0b59384ea22772

@@ -15,7 +15,7 @@ pub struct BoxDecoration {
   pub border_radius: Option<Radius>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Copy)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Border {
   pub left: BorderSide,
   pub right: BorderSide,
@@ -23,15 +23,15 @@ pub struct Border {
   pub bottom: BorderSide,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Lerp, Copy)]
+#[derive(Debug, Default, Clone, PartialEq, Lerp)]
 pub struct BorderSide {
-  pub color: Color,
+  pub color: Brush,
   pub width: f32,
 }
 
 impl BorderSide {
   #[inline]
-  pub fn new(width: f32, color: Color) -> Self { Self { width, color } }
+  pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
 }
 
 impl Render for BoxDecoration {
@@ -141,7 +141,7 @@ impl BoxDecoration {
 
     painter
       .set_line_width(border.top.width)
-      .set_brush(Brush::Color(border.top.color));
+      .set_brush(border.top.color.clone());
     painter.rect_round(
       &Rect::new(
         Point::new(min_x, min_y),
@@ -179,7 +179,7 @@ impl BoxDecoration {
         if border.is_visible() {
           painter
             .set_line_width(border.width)
-            .set_brush(Brush::Color(border.color));
+            .set_brush(border.color.clone());
           painter.begin_path(vertexs[edge.0] + *offset);
           painter.line_to(vertexs[edge.1] + *offset);
           painter.close_path(false).stroke();
@@ -189,16 +189,21 @@ impl BoxDecoration {
 }
 
 impl BorderSide {
-  fn is_visible(&self) -> bool { self.width > 0. && self.color.alpha > 0 }
+  fn is_visible(&self) -> bool {
+    match self.color {
+      Brush::Color(color) => color.alpha > 0 && self.width > 0.,
+      _ => true,
+    }
+  }
 }
 
 impl Border {
   #[inline]
   pub fn all(side: BorderSide) -> Self {
     Self {
-      left: side,
-      right: side,
-      top: side,
+      left: side.clone(),
+      right: side.clone(),
+      top: side.clone(),
       bottom: side,
     }
   }
@@ -242,10 +247,10 @@ mod tests {
       MockBox {
         size: SIZE,
         border: Border {
-          left: BorderSide::new(1., Color::BLACK),
-          right: BorderSide::new(2., Color::BLACK),
-          top: BorderSide::new(3., Color::BLACK),
-          bottom: BorderSide::new(4., Color::BLACK),
+          left: BorderSide::new(1., Color::BLACK.into()),
+          right: BorderSide::new(2., Color::BLACK.into()),
+          top: BorderSide::new(3., Color::BLACK.into()),
+          bottom: BorderSide::new(4., Color::BLACK.into()),
         },
       }
     };

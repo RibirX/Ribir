@@ -1,9 +1,11 @@
+#[allow(unused_imports)]
 use ribir_core::{
   prelude::{ShellWindow, Theme},
   widget::Widget,
-  window::{WindowConfig, WindowId},
+  window::{WindowConfig, WindowId, Window},
 };
 
+#[cfg(any(feature = "crossterm", feature = "winit"))]
 use ribir_platform::prelude::{PlatformShellWindow, WindowBuilder};
 
 pub struct Application<T: ShellWindow> {

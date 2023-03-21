@@ -36,6 +36,23 @@ where
   }
 }
 
+impl<W, C, M1, M2> IntoWidget<NotSelf<(M1, M2)>> for WidgetPair<Option<W>, C>
+where
+  WidgetPair<W, C>: IntoWidget<M1>,
+  C: IntoWidget<M2>,
+  M1: ImplMarker,
+  M2: ImplMarker,
+{
+  fn into_widget(self) -> Widget {
+    let Self { widget, child } = self;
+    if let Some(widget) = widget {
+      WidgetPair { widget, child }.into_widget()
+    } else {
+      child.into_widget()
+    }
+  }
+}
+
 trait IntoSingleParent {
   fn into_single_parent(self) -> Box<dyn Render>;
 }

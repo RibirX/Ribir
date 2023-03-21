@@ -4,6 +4,7 @@ use ribir_core::prelude::*;
 /// individual widget and user can specify its style, but `Label` only can used
 /// with its purpose widget, and its style is detected by its purpose widget not
 /// user.
+#[derive(Clone)]
 pub struct Label(pub CowArc<str>);
 
 impl Label {

@@ -1,7 +1,7 @@
 use crate::{
   common_widget::{Leading, LeadingText, Trailing, TrailingText},
   input::Placeholder,
-  layout::{constrained_box::EXPAND_Y, Column, ConstrainedBox, Container},
+  layout::{Column, ConstrainedBox, Container},
   prelude::{Expanded, Icon, Input, Label, Row, Stack, Text},
 };
 use ribir_core::prelude::*;
@@ -154,9 +154,9 @@ impl TextFieldThemeProxy {
 
   fn input_padding(&self, is_text_empty: bool) -> EdgeInsets {
     if self.is_collapse(is_text_empty) {
-      self.input_collapse_padding.clone()
+      self.input_collapse_padding
     } else {
-      self.input_expand_padding.clone()
+      self.input_expand_padding
     }
   }
 
@@ -218,8 +218,8 @@ impl TextFieldThemeSuit {
         container_height: 56.,
         label_collapse: caption.clone(),
         label_expand: header.clone(),
-        input_collapse_padding: input_collapse_padding.clone(),
-        input_expand_padding: input_expand_padding.clone(),
+        input_collapse_padding,
+        input_expand_padding,
       },
     );
 
@@ -236,8 +236,8 @@ impl TextFieldThemeSuit {
         container_height: 56.,
         label_collapse: caption.clone(),
         label_expand: header.clone(),
-        input_collapse_padding: input_collapse_padding.clone(),
-        input_expand_padding: input_expand_padding.clone(),
+        input_collapse_padding,
+        input_expand_padding,
       },
     );
 
@@ -315,7 +315,7 @@ impl ComposeChild for TextField {
             }
             Row {
               ConstrainedBox {
-                clamp: EXPAND_Y,
+                clamp: BoxClamp::EXPAND_Y,
                 DynWidget {
                   v_align: VAlign::Center,
                   dyns: build_icon(leading_icon.map(|l| l.child))
@@ -328,7 +328,7 @@ impl ComposeChild for TextField {
                 }
               }
               ConstrainedBox {
-                clamp: EXPAND_Y,
+                clamp: BoxClamp::EXPAND_Y,
                 DynWidget {
                   v_align: VAlign::Center,
                   dyns: build_icon(trailing_icon.map(|t| t.child))
@@ -372,7 +372,7 @@ fn build_input_area(
         Input {
           id: input,
           style: theme.text.clone(),
-          identify(placeholder)
+          DynWidget::from(placeholder)
         }
       }
       Option::map(suffix.clone(),  move |text| {

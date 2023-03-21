@@ -132,12 +132,12 @@ impl ComposeChild for Input {
               })
             }
 
-            Caret{
+            Caret {
               id: caret,
               top_anchor: 0.,
               left_anchor: 0.,
               focused: outbox.has_focus(),
-              size: Size::new(1., 0.),
+              height: 0.,
             }
           }
         }
@@ -151,7 +151,7 @@ impl ComposeChild for Input {
             let (offset, height) = helper.cursor(cursor.offset());
             caret.top_anchor = PositionUnit::Pixel(offset.y);
             caret.left_anchor = PositionUnit::Pixel(offset.x);
-            caret.size = Size::new(1., height);
+            caret.height = height;
           });
         let_watch!(caret.left_anchor.abs_value(1.))
           .scan_initial((0., 0.), |pair, v| (pair.1, v))

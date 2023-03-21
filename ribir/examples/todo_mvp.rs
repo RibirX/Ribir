@@ -31,13 +31,13 @@ impl Compose for TodoMVP {
           margin: EdgeInsets::only_bottom(10.),
           Container {
             size: Size::new(240., 30.),
-            border: Border::only_bottom(BorderSide { width:1., color: surface_variant }),
+            border: Border::only_bottom(BorderSide { width:1., color: surface_variant.into() }),
             Input {
               id: input,
               Placeholder::new("What do you want to do ?")
             }
           }
-          Button {
+          FilledButton {
             margin: EdgeInsets::only_left(20.),
             on_tap: move |_| {
               if !input.text().is_empty() {
@@ -51,7 +51,7 @@ impl Compose for TodoMVP {
                 input.set_text("");
               }
             },
-            ButtonText::new("ADD")
+            Label::new("ADD")
           }
         }
 

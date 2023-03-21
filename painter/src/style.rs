@@ -25,22 +25,40 @@ bitflags::bitflags! {
   /// than the path, image will be clipped.
   /// - Cover mode resize the image to cover the entire path, even if it has to
   /// stretch the image or cut a little bit off one of the edges
-  #[derive(Serialize, Deserialize)]
+  #[derive(PartialEq, Debug, Clone, Copy)]
   pub struct TileMode: u8 {
     const REPEAT_X = 0b00000001;
     const REPEAT_Y = 0b00000010;
-    const REPEAT_BOTH = Self::REPEAT_X.bits | Self::REPEAT_Y.bits;
+    const REPEAT_BOTH = Self::REPEAT_X.bits() | Self::REPEAT_Y.bits();
     const COVER_X = 0b00000100;
     const COVER_Y = 0b00001000;
-    const COVER_BOTH = Self::COVER_X.bits | Self::COVER_Y.bits;
-    const REPEAT_X_COVER_Y = Self::REPEAT_X.bits | Self::COVER_Y.bits;
-    const COVER_X_REPEAT_Y = Self::COVER_X.bits | Self::REPEAT_Y.bits;
+    const COVER_BOTH = Self::COVER_X.bits() | Self::COVER_Y.bits();
+    const REPEAT_X_COVER_Y = Self::REPEAT_X.bits() | Self::COVER_Y.bits();
+    const COVER_X_REPEAT_Y = Self::COVER_X.bits() | Self::REPEAT_Y.bits();
   }
 }
 
+macro_rules! impl_bitflags_serde {
+  ($ty: ident, $name: expr) => {
+    impl serde::Serialize for $ty {
+      fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        bitflags_serde_legacy::serialize(self, $name, serializer)
+      }
+    }
+
+    impl<'de> serde::Deserialize<'de> for $ty {
+      fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        bitflags_serde_legacy::deserialize($name, deserializer)
+      }
+    }
+  };
+}
+
+impl_bitflags_serde!(TileMode, "TileMode");
+
 impl TileMode {
   #[inline]
-  pub fn is_cover_mode(&self) -> bool { self.bits & (TileMode::COVER_BOTH.bits) > 0 }
+  pub fn is_cover_mode(&self) -> bool { self.bits() & (TileMode::COVER_BOTH.bits()) > 0 }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -51,6 +69,15 @@ pub enum Brush {
     tile_mode: TileMode,
   },
   Gradient, // todo,
+}
+
+impl Brush {
+  pub fn only_convert_color(&self, f: impl FnOnce(&Color) -> Color) -> Brush {
+    match self {
+      Brush::Color(color) => f(color).into(),
+      _ => self.clone(),
+    }
+  }
 }
 
 /// The style to paint path, maybe fill or stroke.

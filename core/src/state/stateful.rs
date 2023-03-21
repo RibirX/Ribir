@@ -45,13 +45,14 @@ pub struct StateRef<'a, W> {
 }
 
 bitflags! {
+  #[derive(Clone, Copy, PartialEq, Eq, Debug)]
   pub struct ModifyScope: u8 {
     /// state change only effect the data, transparent to ribir framework.
     const DATA  = 0x001;
     /// state change only effect to framework, transparent to widget data.
     const FRAMEWORK = 0x010;
     /// state change effect both widget data and framework.
-    const BOTH = Self::DATA.bits | Self::FRAMEWORK.bits;
+    const BOTH = Self::DATA.bits() | Self::FRAMEWORK.bits();
   }
 }
 

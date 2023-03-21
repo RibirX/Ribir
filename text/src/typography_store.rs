@@ -212,25 +212,22 @@ impl InputRun for ShapeRun {
   fn letter_space(&self) -> Option<Pixel> { self.letter_space }
 
   #[inline]
-  fn line_height(&self) -> Em { self.shape_result.line_height }
-
-  #[inline]
   fn range(&self) -> Range<usize> { self.range.clone() }
 }
 
 impl VisualGlyphs {
   /// return a visual rect to place the text in pixel.
   pub fn visual_rect(&self) -> Rect<f32> {
-    let em_rect = self.visual_info.box_rect;
+    let info = &self.visual_info;
 
     Rect::new(
       Point::new(
-        self.to_pixel_value(em_rect.min_x()),
-        self.to_pixel_value(em_rect.min_y()),
+        self.to_pixel_value(info.visual_x),
+        self.to_pixel_value(info.visual_y),
       ),
       Size::new(
-        self.to_pixel_value(em_rect.width()),
-        self.to_pixel_value(em_rect.height()),
+        self.to_pixel_value(info.visual_width),
+        self.to_pixel_value(info.visual_height),
       ),
     )
   }
@@ -250,7 +247,7 @@ impl VisualGlyphs {
       .enumerate()
       .rev()
       .skip_while(move |(_, line)| {
-        bottom = bottom.max(line.line_height) - line.line_height;
+        bottom = bottom.max(line.height) - line.height;
         y < bottom
       });
 
@@ -370,9 +367,8 @@ impl VisualGlyphs {
 
     glyph.map_or_else(
       move || {
-        let base = line.base_position;
         Rect::new(
-          Point::new(self.to_pixel_value(base.x), self.to_pixel_value(base.y)),
+          Point::new(self.to_pixel_value(line.x), self.to_pixel_value(line.y)),
           Size::zero(),
         )
       },
@@ -409,7 +405,7 @@ impl VisualGlyphs {
       .visual_info
       .visual_lines
       .get(para)
-      .map_or(0., |line| self.to_pixel_value(line.line_height))
+      .map_or(0., |line| self.to_pixel_value(line.height))
   }
 
   pub fn select_range(&self, rg: &Range<usize>) -> Vec<Rect<Pixel>> {
@@ -443,7 +439,7 @@ impl VisualGlyphs {
     }
     let mut jointer = TypoRectJointer::new();
     for line in &self.visual_info.visual_lines {
-      let height = (line.line_height * self.scale).into();
+      let height = (line.height * self.scale).into();
       for glyph in &line.glyphs {
         if rg.contains(&(glyph.cluster as usize)) {
           let glyph = self.scale_to_pixel_glyph(glyph);
@@ -471,14 +467,21 @@ impl VisualGlyphs {
       .visual_info
       .visual_lines
       .iter()
-      .flat_map(move |l| l.glyphs.iter())
+      .flat_map(move |l| {
+        l.glyphs.iter().map(|g| {
+          let mut g = g.clone();
+          g.x_offset += l.x;
+          g.y_offset += l.y;
+          g
+        })
+      })
       .filter(|g| {
         Em::zero() <= g.x_offset + g.x_advance
           && g.x_offset < self.bounds.width
           && Em::zero() <= g.y_offset + g.y_advance
           && g.y_offset < self.bounds.height
       })
-      .map(move |g| self.scale_to_pixel_glyph(g))
+      .map(move |g| self.scale_to_pixel_glyph(&g))
   }
 
   fn scale_to_pixel_glyph(&self, g: &Glyph<Em>) -> Glyph<Pixel> {
@@ -552,7 +555,7 @@ mod tests {
       },
     );
 
-    assert_eq!(visual.visual_rect().size, Size::new(61.960938, 81.484375));
+    assert_eq!(visual.visual_rect().size, Size::new(61.960938, 70.));
   }
 
   #[test]
@@ -572,7 +575,7 @@ mod tests {
       },
     );
 
-    assert_eq!(visual.visual_rect().size, Size::new(0., 16.296875));
+    assert_eq!(visual.visual_rect().size, Size::new(0., 14.0));
   }
 
   #[test]
@@ -592,10 +595,7 @@ mod tests {
       },
     );
 
-    assert_eq!(
-      visual.visual_rect().size,
-      Size::new(35.123047, 16.296875 * 2.)
-    );
+    assert_eq!(visual.visual_rect().size, Size::new(35.123047, 28.));
   }
 
   #[test]
@@ -637,12 +637,12 @@ mod tests {
         (52.29101, 0.0),
         (56.024406, 0.0),
         // second line
-        (0.0, 11.640625),
-        (8.303711, 11.640625),
-        (14.546876, 11.640625),
-        (18.783205, 11.640625),
-        (21.686525, 11.640625),
-        (28.159182, 11.640625)
+        (0.0, 10.),
+        (8.303711, 10.),
+        (14.546876, 10.),
+        (18.783205, 10.),
+        (21.686525, 10.),
+        (28.159182, 10.)
       ]
     );
 
@@ -652,27 +652,27 @@ mod tests {
     assert_eq!(
       &r_align,
       &[
-        (37.974617, 0.0),
-        (45.619144, 0.0),
-        (51.896492, 0.0),
-        (54.799812, 0.0),
-        (57.703133, 0.0),
-        (64.13184, 0.0),
-        (67.86524, 0.0),
-        (71.59865, 0.0),
-        (75.33204, 0.0),
-        (79.06544, 0.0),
-        (82.798836, 0.0),
-        (86.53223, 0.0),
-        (90.265625, 0.0),
-        (93.99902, 0.0),
+        (37.849617, 0.0),
+        (45.49415, 0.0),
+        (51.771492, 0.0),
+        (54.674816, 0.0),
+        (57.578133, 0.0),
+        (64.00684, 0.0),
+        (67.74024, 0.0),
+        (71.47365, 0.0),
+        (75.20705, 0.0),
+        (78.94044, 0.0),
+        (82.673836, 0.0),
+        (86.407234, 0.0),
+        (90.140625, 0.0),
+        (93.87402, 0.0),
         // second line
-        (67.83203, 11.640625),
-        (76.13574, 11.640625),
-        (82.37891, 11.640625),
-        (86.615234, 11.640625),
-        (89.518555, 11.640625),
-        (95.99121, 11.640625)
+        (67.70703, 10.0),
+        (76.010735, 10.0),
+        (82.25391, 10.0),
+        (86.490234, 10.0),
+        (89.393555, 10.0),
+        (95.86621, 10.0)
       ],
     );
 
@@ -685,27 +685,27 @@ mod tests {
       &bottom,
       &[
         // first line
-        (0.0, 76.71875),
-        (8.303711, 76.71875),
-        (14.546876, 76.71875),
-        (18.783205, 76.71875),
-        (21.686525, 76.71875),
-        (28.159182, 76.71875),
+        (0.0, 80.),
+        (8.303711, 80.),
+        (14.546876, 80.),
+        (18.783205, 80.),
+        (21.686525, 80.),
+        (28.159182, 80.),
         // second line
-        (0.0, 88.359375),
-        (7.6445313, 88.359375),
-        (13.921876, 88.359375),
-        (16.825197, 88.359375),
-        (19.728518, 88.359375),
-        (26.157228, 88.359375),
-        (29.890629, 88.359375),
-        (33.624027, 88.359375),
-        (37.357426, 88.359375),
-        (41.09082, 88.359375),
-        (44.82422, 88.359375),
-        (48.557617, 88.359375),
-        (52.29101, 88.359375),
-        (56.024406, 88.359375)
+        (0.0, 90.),
+        (7.6445313, 90.),
+        (13.921876, 90.),
+        (16.825197, 90.),
+        (19.728518, 90.),
+        (26.157228, 90.),
+        (29.890629, 90.),
+        (33.624027, 90.),
+        (37.357426, 90.),
+        (41.09082, 90.),
+        (44.82422, 90.),
+        (48.557617, 90.),
+        (52.29101, 90.),
+        (56.024406, 90.)
       ],
     );
 
@@ -716,23 +716,23 @@ mod tests {
     assert_eq!(
       &center_clip,
       &[
-        (-3.3681612, 0.0),
-        (2.9091835, 0.0),
-        (5.8125043, 0.0),
-        (8.715825, 0.0),
-        (15.144537, 0.0),
-        (18.877935, 0.0),
-        (22.611334, 0.0),
-        (26.344734, 0.0),
-        (30.078129, 0.0),
-        (33.811527, 0.0),
-        (37.54492, 0.0),
-        (3.9160144, 11.640625),
-        (12.219725, 11.640625),
-        (18.46289, 11.640625),
-        (22.699219, 11.640625),
-        (25.602541, 11.640625),
-        (32.075195, 11.640625)
+        (-3.4306602, 0.0),
+        (2.8466845, 0.0),
+        (5.7500052, 0.0),
+        (8.653326, 0.0),
+        (15.082037, 0.0),
+        (18.815437, 0.0),
+        (22.548836, 0.0),
+        (26.282234, 0.0),
+        (30.01563, 0.0),
+        (33.749027, 0.0),
+        (37.48242, 0.0),
+        (3.8535142, 10.0),
+        (12.157226, 10.0),
+        (18.40039, 10.0),
+        (22.636719, 10.0),
+        (25.54004, 10.0),
+        (32.012695, 10.0)
       ],
     );
   }
