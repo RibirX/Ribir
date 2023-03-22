@@ -1,7 +1,9 @@
-use ribir::prelude::*;
-use std::time::Duration;
-
+#[cfg(any(feature = "crossterm", feature = "winit"))]
 fn main() {
+  use ribir::prelude::*;
+  use ribir::Application;
+  use std::time::Duration;
+
   let style = PathStyle::Stroke(StrokeOptions::default());
   let lyon_path = include_svg!("./Logo.svg");
   let mut paths = vec![];
@@ -39,5 +41,17 @@ fn main() {
       ]
     }
   };
-  app::run(w);
+
+  let mut app = Application::new(material::purple::light());
+  let window_builder = app.window_builder(w, Default::default());
+
+  let window_id = app.build_window(window_builder);
+  app.exec(window_id);
+}
+
+#[cfg(not(any(feature = "crossterm", feature = "winit")))]
+fn main() {
+  println!("Chose a platform to run:");
+  println!("  cargo run --example animation_demo -F winit,wgpu_gl");
+  println!("  cargo run --example animation_demo -F crossterm");
 }

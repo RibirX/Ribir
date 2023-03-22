@@ -9,10 +9,6 @@ impl From<CrosstermKeyModifiers> for WrappedModifiersState {
   fn from(value: CrosstermKeyModifiers) -> Self { WrappedModifiersState(value) }
 }
 
-impl From<WrappedModifiersState> for CrosstermKeyModifiers {
-  fn from(val: WrappedModifiersState) -> Self { val.0 }
-}
-
 impl From<WrappedModifiersState> for RibirModifiersState {
   fn from(val: WrappedModifiersState) -> Self {
     let shift = if val.0.contains(CrosstermKeyModifiers::SHIFT) {

@@ -1,7 +1,5 @@
 use ribir_core::prelude::KeyboardInput as RibirKeyboardInput;
-use winit::{
-  event::KeyboardInput as WinitKeyboardInput, event::ModifiersState as WinitModifiersState,
-};
+use winit::event::KeyboardInput as WinitKeyboardInput;
 
 use crate::prelude::{WrappedElementState, WrappedVirtualKeyCode};
 
@@ -10,10 +8,6 @@ pub struct WrappedKeyboardInput(WinitKeyboardInput);
 
 impl From<WinitKeyboardInput> for WrappedKeyboardInput {
   fn from(value: WinitKeyboardInput) -> Self { WrappedKeyboardInput(value) }
-}
-
-impl From<WrappedKeyboardInput> for WinitKeyboardInput {
-  fn from(val: WrappedKeyboardInput) -> Self { val.0 }
 }
 
 impl From<WrappedKeyboardInput> for RibirKeyboardInput {
@@ -29,26 +23,12 @@ impl From<WrappedKeyboardInput> for RibirKeyboardInput {
   }
 }
 
-impl From<RibirKeyboardInput> for WrappedKeyboardInput {
-  #[allow(deprecated)]
-  fn from(value: RibirKeyboardInput) -> WrappedKeyboardInput {
-    WrappedKeyboardInput::from(WinitKeyboardInput {
-      scancode: value.scancode,
-      state: WrappedElementState::from(value.state).into(),
-      virtual_keycode: value
-        .virtual_keycode
-        .map(|v| WrappedVirtualKeyCode::from(v).into()),
-      modifiers: WinitModifiersState::default(),
-    })
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
   use winit::{
     event::ElementState as WinitElementState, event::KeyboardInput as WinitKeyboardInput,
-    event::VirtualKeyCode as WinitVirtualKeyCode,
+    event::ModifiersState as WinitModifiersState, event::VirtualKeyCode as WinitVirtualKeyCode,
   };
 
   #[test]

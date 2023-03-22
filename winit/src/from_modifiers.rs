@@ -7,10 +7,6 @@ impl From<WinitModifiersState> for WrappedModifiersState {
   fn from(value: WinitModifiersState) -> Self { WrappedModifiersState(value) }
 }
 
-impl From<WrappedModifiersState> for WinitModifiersState {
-  fn from(val: WrappedModifiersState) -> Self { val.0 }
-}
-
 impl From<WrappedModifiersState> for RibirModifiersState {
   fn from(val: WrappedModifiersState) -> Self {
     let shift = if val.0.shift() {
@@ -38,35 +34,5 @@ impl From<WrappedModifiersState> for RibirModifiersState {
     };
 
     shift | ctrl | alt | logo
-  }
-}
-
-impl From<RibirModifiersState> for WrappedModifiersState {
-  fn from(value: RibirModifiersState) -> WrappedModifiersState {
-    let shift: WinitModifiersState = if value.shift() {
-      WinitModifiersState::SHIFT
-    } else {
-      WinitModifiersState::empty()
-    };
-
-    let ctrl: WinitModifiersState = if value.ctrl() {
-      WinitModifiersState::CTRL
-    } else {
-      WinitModifiersState::empty()
-    };
-
-    let alt: WinitModifiersState = if value.alt() {
-      WinitModifiersState::ALT
-    } else {
-      WinitModifiersState::empty()
-    };
-
-    let logo: WinitModifiersState = if value.logo() {
-      WinitModifiersState::LOGO
-    } else {
-      WinitModifiersState::empty()
-    };
-
-    (shift | ctrl | alt | logo).into()
   }
 }

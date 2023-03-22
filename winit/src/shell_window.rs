@@ -58,7 +58,9 @@ impl ShellWindow for PlatformShellWindow {
               *control = ControlFlow::Exit;
             }
           } else if let Some(wnd) = windows.get_mut(&window_id) {
-            wnd.processes_native_event(WrappedWindowEvent::from(event).into());
+            wnd.processes_native_event(
+              WrappedWindowEvent::from((event, wnd.raw_window.scale_factor())).into(),
+            );
           }
         }
         Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {

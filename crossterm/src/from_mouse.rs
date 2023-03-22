@@ -7,10 +7,6 @@ impl From<CrosstermMouseButton> for WrappedMouseButton {
   fn from(value: CrosstermMouseButton) -> Self { WrappedMouseButton(value) }
 }
 
-// impl From<WrappedMouseButton> for CrosstermMouseButton {
-//   fn from(val: WrappedMouseButton) -> Self { val.0 }
-// }
-
 impl From<WrappedMouseButton> for RibirMouseButton {
   fn from(val: WrappedMouseButton) -> Self {
     match val.0 {

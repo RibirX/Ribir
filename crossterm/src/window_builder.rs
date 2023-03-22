@@ -94,4 +94,8 @@ impl WindowBuilder {
     let p_backend = CrosstermBackend::new(Box::new(stdout()));
     RibirWindow::new(native_wnd, p_backend, self.root, ctx)
   }
+
+  pub fn build_headless(self, _shell_window: &PlatformShellWindow) -> RibirWindow {
+    todo!("Not supported");
+  }
 }

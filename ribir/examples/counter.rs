@@ -1,6 +1,7 @@
-use ribir::prelude::*;
-
+#[cfg(any(feature = "crossterm", feature = "winit"))]
 fn main() {
+  use ribir::prelude::*;
+
   let w = widget! {
     init ctx => {
       let ease_in = transitions::EASE_IN.of(ctx);
@@ -46,5 +47,17 @@ fn main() {
         .subscribe(move |_| animate.run());
     }
   };
-  app::run(w);
+
+  let mut app = Application::new(material::purple::light());
+  let window_builder = app.window_builder(w, Default::default());
+
+  let window_id = app.build_window(window_builder);
+  app.exec(window_id);
+}
+
+#[cfg(not(any(feature = "crossterm", feature = "winit")))]
+fn main() {
+  println!("Chose a platform to run:");
+  println!("  cargo run --example counter -F winit,wgpu_gl");
+  println!("  cargo run --example counter -F crossterm");
 }

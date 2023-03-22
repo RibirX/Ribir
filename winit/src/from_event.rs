@@ -4,28 +4,27 @@ use crate::{
   from_keyboard_input::WrappedKeyboardInput,
   from_modifiers::WrappedModifiersState,
   from_mouse::WrappedMouseButton,
-  from_size::{WrappedPhysicalPosition, WrappedPhysicalSize},
   from_touch_phase::WrappedTouchPhase,
-  prelude::WrappedMouseScrollDelta,
+  prelude::{WrappedLogicalPosition, WrappedLogicalSize, WrappedMouseScrollDelta},
 };
 use ribir_core::prelude::WindowEvent as RibirWindowEvent;
-use winit::event::{ModifiersState as WinitModifiersState, WindowEvent as WinitWindowEvent};
+use winit::event::WindowEvent as WinitWindowEvent;
 
-pub struct WrappedWindowEvent<'a>(WinitWindowEvent<'a>);
+pub type ScaleToLogicalFactor = f64;
 
-impl<'a> From<WinitWindowEvent<'a>> for WrappedWindowEvent<'a> {
-  fn from(value: WinitWindowEvent<'a>) -> Self { WrappedWindowEvent(value) }
-}
+pub struct WrappedWindowEvent<'a>(WinitWindowEvent<'a>, ScaleToLogicalFactor);
 
-impl<'a> From<WrappedWindowEvent<'a>> for WinitWindowEvent<'a> {
-  fn from(val: WrappedWindowEvent<'a>) -> Self { val.0 }
+impl<'a> From<(WinitWindowEvent<'a>, ScaleToLogicalFactor)> for WrappedWindowEvent<'a> {
+  fn from(value: (WinitWindowEvent<'a>, ScaleToLogicalFactor)) -> Self {
+    WrappedWindowEvent(value.0, value.1)
+  }
 }
 
 impl<'a> From<WrappedWindowEvent<'a>> for RibirWindowEvent {
   fn from(val: WrappedWindowEvent<'a>) -> Self {
     match val.0 {
       WinitWindowEvent::Resized(size) => {
-        RibirWindowEvent::Resized(WrappedPhysicalSize::from(size).into())
+        RibirWindowEvent::Resized(WrappedLogicalSize::<f64>::from(size.to_logical(val.1)).into())
       }
       WinitWindowEvent::ReceivedCharacter(char) => RibirWindowEvent::ReceivedCharacter(char),
       WinitWindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
@@ -42,7 +41,7 @@ impl<'a> From<WrappedWindowEvent<'a>> for RibirWindowEvent {
       WinitWindowEvent::CursorMoved { device_id, position, modifiers: _ } => {
         RibirWindowEvent::CursorMoved {
           device_id: Box::new(WrappedPointerId::from(device_id)),
-          position: WrappedPhysicalPosition::<f64>::from(position).into(),
+          position: WrappedLogicalPosition::<f64>::from(position.to_logical(val.1)).into(),
         }
       }
       WinitWindowEvent::CursorLeft { device_id } => RibirWindowEvent::CursorLeft {
@@ -56,7 +55,7 @@ impl<'a> From<WrappedWindowEvent<'a>> for RibirWindowEvent {
         modifiers: _,
       } => RibirWindowEvent::MouseWheel {
         device_id: Box::new(WrappedPointerId::from(device_id)),
-        delta: WrappedMouseScrollDelta::from(delta).into(),
+        delta: WrappedMouseScrollDelta::from((delta, val.1)).into(),
         phase: WrappedTouchPhase::from(phase).into(),
       },
       #[allow(deprecated)]
@@ -70,6 +69,7 @@ impl<'a> From<WrappedWindowEvent<'a>> for RibirWindowEvent {
         state: WrappedElementState::from(state).into(),
         button: WrappedMouseButton::from(button).into(),
       },
+      // TODO(zoech)
       // WinitWindowEvent::ScaleFactorChanged { scale_factor, new_inner_size } => {
       //   RibirWindowEvent::ScaleFactorChanged {
       //     scale_factor,
@@ -81,67 +81,13 @@ impl<'a> From<WrappedWindowEvent<'a>> for RibirWindowEvent {
   }
 }
 
-impl<'a> From<RibirWindowEvent> for WrappedWindowEvent<'a> {
-  fn from(value: RibirWindowEvent) -> WrappedWindowEvent<'a> {
-    let w_event = match value {
-      RibirWindowEvent::Resized(size) => {
-        WinitWindowEvent::Resized(WrappedPhysicalSize::from(size).into())
-      }
-      RibirWindowEvent::ReceivedCharacter(char) => WinitWindowEvent::ReceivedCharacter(char),
-      RibirWindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
-        WinitWindowEvent::KeyboardInput {
-          device_id: WrappedPointerId::from(device_id).into(),
-          input: WrappedKeyboardInput::from(input).into(),
-          is_synthetic,
-        }
-      }
-      RibirWindowEvent::ModifiersChanged(modifiers) => {
-        WinitWindowEvent::ModifiersChanged(WrappedModifiersState::from(modifiers).into())
-      }
-
-      RibirWindowEvent::CursorMoved { device_id, position } => WinitWindowEvent::CursorMoved {
-        device_id: WrappedPointerId::from(device_id).into(),
-        position: WrappedPhysicalPosition::<f64>::from(position).into(),
-        modifiers: WinitModifiersState::default(),
-      },
-      RibirWindowEvent::CursorLeft { device_id } => WinitWindowEvent::CursorLeft {
-        device_id: WrappedPointerId::from(device_id).into(),
-      },
-
-      RibirWindowEvent::MouseWheel { device_id, delta, phase } => WinitWindowEvent::MouseWheel {
-        device_id: WrappedPointerId::from(device_id).into(),
-        delta: WrappedMouseScrollDelta::from(delta).into(),
-        phase: WrappedTouchPhase::from(phase).into(),
-        modifiers: WinitModifiersState::default(),
-      },
-
-      RibirWindowEvent::MouseInput { device_id, state, button } => WinitWindowEvent::MouseInput {
-        device_id: WrappedPointerId::from(device_id).into(),
-        state: WrappedElementState::from(state).into(),
-        button: WrappedMouseButton::from(button).into(),
-        modifiers: WinitModifiersState::default(),
-      },
-      RibirWindowEvent::ScaleFactorChanged { scale_factor: _, new_inner_size: _ } => {
-        // WinitWindowEvent::ScaleFactorChanged {
-        //   scale_factor,
-        //   new_inner_size: WrappedPhysicalSize::<u32>::from(new_inner_size).into(),
-        // }
-        panic!("Unimplemented: \"{value:?}\" can not be converted to winit enum.");
-      }
-      other => {
-        panic!("Unimplemented: \"{other:?}\"");
-      }
-    };
-    w_event.into()
-  }
-}
-
 #[cfg(test)]
 mod tests {
 
-  use super::*;
-  use crate::from_size::WinitPhysicalSize;
+  // use super::*;
+  // use crate::from_size::WinitPhysicalSize;
 
-  #[test]
-  fn from_winit() { WinitWindowEvent::Resized(WinitPhysicalSize::<u32> { width: 5, height: 3 }); }
+  // #[test]
+  // fn from_winit() { WinitWindowEvent::Resized(WinitPhysicalSize::<u32> {
+  // width: 5, height: 3 }); }
 }

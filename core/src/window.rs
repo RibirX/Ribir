@@ -105,18 +105,22 @@ impl Window {
   pub fn processes_native_event(&mut self, event: WindowEvent) {
     match event {
       WindowEvent::Resized(size) => {
-        self.on_resize(DeviceSize::new(size.width, size.height));
+        self.on_resize(
+          ScaleToPhysic::new(self.raw_window.scale_factor() as f32)
+            .transform_size(size)
+            .cast(),
+        );
       }
       WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
-        self.on_resize(new_inner_size);
+        self.on_resize(
+          ScaleToPhysic::new(self.raw_window.scale_factor() as f32)
+            .transform_size(new_inner_size)
+            .cast(),
+        );
         let factor = scale_factor as f32;
         self.painter.reset(Some(factor));
       }
-      event => {
-        self
-          .dispatcher
-          .dispatch(event, &mut self.widget_tree, self.raw_window.scale_factor())
-      }
+      event => self.dispatcher.dispatch(event, &mut self.widget_tree),
     };
     if let Some(icon) = self.dispatcher.take_cursor_icon() {
       self.raw_window.set_cursor(icon);

@@ -7,7 +7,6 @@ use winit::window::WindowId as WinitWindowId;
 pub struct WrappedWindowId(WinitWindowId);
 
 impl RibirWindowId for WrappedWindowId {
-  // fn as_any(&self) -> &dyn Any { self }
   fn into_any(self: Box<Self>) -> Box<dyn Any> { self }
 
   fn equals(&self, other: &Box<dyn RibirWindowId>) -> bool {
@@ -39,22 +38,6 @@ impl From<Box<dyn RibirWindowId>> for WrappedWindowId {
 impl From<WrappedWindowId> for Box<dyn RibirWindowId> {
   fn from(value: WrappedWindowId) -> Self { Box::new(value) }
 }
-
-// impl From<&Box<dyn RibirWindowId>> for WrappedWindowId {
-//     fn from(value: &Box<dyn RibirWindowId>) -> Self {
-//         // let x = *value;
-//     value.as_boxed_any().downcast_ref::<WrappedWindowId>().unwrap()
-//   }
-// }
-
-// impl From<Box<dyn RibirWindowId>> for WrappedWindowId {
-//   fn from(value: Box<dyn RibirWindowId>) -> Self {
-//     value
-//       .into_any()
-//       .downcast::<WrappedWindowId>()
-//       .unwrap()
-//   }
-// }
 
 #[cfg(test)]
 mod tests {

@@ -62,14 +62,11 @@ impl ShellWindow for PlatformShellWindow {
       // `poll()` waits for an `Event` for a given time period
       match poll(Duration::from_millis(100)) {
         Ok(true) => {
-          // println!("poll");
           // It's guaranteed that the `read()` won't block when the `poll()`
           // function returns `true`
           if let Ok(event) = read() {
             let evt = CrosstermWindowId::from(wnd_id.clone());
-            // println!("Event {evt:?}");
             if let Some(wnd) = windows.get_mut(&evt) {
-              // println!("=== process event {event:?} ===");
               wnd.processes_native_event(WrappedWindowEvent::from(event).into());
               wnd.draw_frame();
             } else {
@@ -86,40 +83,6 @@ impl ShellWindow for PlatformShellWindow {
         _ => {}
       }
     }
-
-    // event_loop.run_return(move |event, _event_loop, control: &mut
-    // ControlFlow| { *control = ControlFlow::Wait;
-
-    // match event {
-    //   Event::WindowEvent { event, window_id } => {
-    //     if event == WindowEvent::CloseRequested {
-    //       windows.remove(&window_id);
-    //     } else if event == WindowEvent::Destroyed {
-    //       if windows.is_empty() {
-    //         *control = ControlFlow::Exit;
-    //       }
-    //     } else if let Some(wnd) = windows.get_mut(&window_id) {
-    //       wnd.processes_native_event(WrappedWindowEvent::from(event).
-    // into());     }
-    //   }
-    //   Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
-    //     if wnd.need_draw() {
-    //       wnd.request_redraw();
-    //     }
-    //   }),
-    //   Event::RedrawRequested(id) => {
-    //     if let Some(wnd) = windows.get_mut(&id) {
-    //       wnd.draw_frame();
-    //     }
-    //   }
-    //   Event::RedrawEventsCleared => {
-    //     if windows.iter_mut().any(|(_, wnd)| wnd.need_draw()) {
-    //       *control = ControlFlow::Poll;
-    //     }
-    //   }
-    //   _ => (),
-    // }
-    // });
   }
 
   fn add_window(&mut self, wnd: Window) -> Box<dyn RibirWindowId> {

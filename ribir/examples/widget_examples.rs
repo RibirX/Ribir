@@ -1,8 +1,12 @@
-use ribir::prelude::{svgs, *};
-
-const WINDOW_SIZE: f32 = 800.;
-
+#[cfg(any(feature = "crossterm", feature = "winit"))]
 fn main() {
+  use ribir::Application;
+  use ribir_core::window::WindowConfig;
+
+  use ribir::prelude::{svgs, *};
+
+  const WINDOW_SIZE: f32 = 800.;
+
   let widgets = widget! {
     init ctx => {
       let title_style = TypographyTheme::of(ctx).display_large.text.clone();
@@ -86,10 +90,25 @@ fn main() {
       }
     }
   };
-  let app = Application::new(material::purple::light());
-  let wnd = Window::builder(widgets)
-    .with_inner_size(Size::new(WINDOW_SIZE, WINDOW_SIZE))
-    .with_title("StoryBook")
-    .build(&app);
-  app::run_with_window(app, wnd);
+
+  let mut app = Application::new(material::purple::light());
+
+  let window_builder = app.window_builder(
+    widgets,
+    WindowConfig {
+      inner_size: Some((WINDOW_SIZE, WINDOW_SIZE).into()),
+      title: Some("StoryBook".to_owned()),
+      ..Default::default()
+    },
+  );
+
+  let window_id = app.build_window(window_builder);
+  app.exec(window_id);
+}
+
+#[cfg(not(any(feature = "crossterm", feature = "winit")))]
+fn main() {
+  println!("Chose a platform to run:");
+  println!("  cargo run --example widget_examples -F winit,wgpu_gl");
+  println!("  cargo run --example widget_examples -F crossterm");
 }

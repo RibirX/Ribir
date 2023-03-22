@@ -96,11 +96,11 @@ impl From<RibirCursorIcon> for WrappedCursorIcon {
   }
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-  use super::*;
+//   use super::*;
 
-  #[test]
-  fn from_winit() { let x = WinitCursorIcon::Alias; }
-}
+//   #[test]
+//   fn from_winit() { let x = WinitCursorIcon::Alias; }
+// }

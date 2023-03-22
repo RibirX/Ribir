@@ -117,12 +117,8 @@ mod tests {
     let device_id = MockPointerId::zero();
     let dispatcher = &mut wnd.dispatcher;
     dispatcher.dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: DevicePoint::new(1, 1),
-      },
+      WindowEvent::CursorMoved { device_id, position: (1., 1.).into() },
       tree,
-      1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
 
@@ -130,10 +126,9 @@ mod tests {
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: DevicePoint::new(101, 1),
+        position: (101., 1.).into(),
       },
       tree,
-      1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
@@ -141,10 +136,9 @@ mod tests {
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: DevicePoint::new(201, 1),
+        position: (201., 1.).into(),
       },
       tree,
-      1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::AllScroll));
 
@@ -152,21 +146,16 @@ mod tests {
     dispatcher.dispatch(
       WindowEvent::CursorMoved {
         device_id,
-        position: DevicePoint::new(101, 1),
+        position: (101., 1.).into(),
       },
       tree,
-      1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
 
     let device_id = MockPointerId::zero();
     dispatcher.dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: DevicePoint::new(1, 1),
-      },
+      WindowEvent::CursorMoved { device_id, position: (1., 1.).into() },
       tree,
-      1.,
     );
     assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
   }

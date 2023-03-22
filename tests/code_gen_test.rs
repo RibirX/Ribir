@@ -30,7 +30,7 @@ fn simple_ref_bind_work() {
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size));
 
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&mut wnd, (1., 1.));
 
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size * 2.));
@@ -57,7 +57,7 @@ fn event_attr_sugar_work() {
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(BEFORE_SIZE));
   assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(BEFORE_SIZE));
 
-  tap_at(&mut wnd, (25, 25));
+  tap_at(&mut wnd, (25., 25.));
 
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(AFTER_TAP_SIZE));
@@ -85,7 +85,7 @@ fn widget_wrap_bind_work() {
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(104., 52.)));
 
-  tap_at(&mut wnd, (60, 1));
+  tap_at(&mut wnd, (60., 1.));
 
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(70., 60.)));
@@ -116,7 +116,7 @@ fn expression_for_children() {
   assert_layout_result(&wnd, &[0, 3], &ExpectRect::from_size(size_one));
   assert_layout_result(&wnd, &[0, 4], &ExpectRect::from_size(ZERO_SIZE));
 
-  tap_at(&mut wnd, (0, 0));
+  tap_at(&mut wnd, (0., 0.));
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(25., 5.)));
   assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(size_five));
@@ -145,7 +145,7 @@ fn embed_widget_ref_outside() {
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
 
-  tap_at(&mut wnd, (0, 0));
+  tap_at(&mut wnd, (0., 0.));
   wnd.layout();
 
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(8., 2.)));
@@ -172,7 +172,7 @@ fn data_flow_macro() {
   // data flow not affect on init.
   assert_eq!(size, Size::new(3., 1.));
 
-  tap_at(&mut wnd, (0, 0));
+  tap_at(&mut wnd, (0., 0.));
   wnd.draw_frame();
 
   let size = layout_size_by_path(&wnd, &[0]);
@@ -236,7 +236,7 @@ fn builtin_ref() {
   let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
 
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&mut wnd, (1., 1.));
   wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::AllScroll);
 }
@@ -264,15 +264,15 @@ fn builtin_bind_to_self() {
 
   let mut wnd = Window::default_mock(w, None);
   wnd.draw_frame();
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&mut wnd, (1., 1.));
   wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::Help);
 }
 
-fn tap_at(wnd: &mut Window, pos: (u32, u32)) {
+fn tap_at(wnd: &mut Window, pos: (f32, f32)) {
   wnd.processes_native_event(WindowEvent::CursorMoved {
     device_id: MockPointerId::zero(),
-    position: DevicePoint::new(pos.0, pos.1),
+    position: (pos.0, pos.1).into(),
   });
   wnd.processes_native_event(WindowEvent::MouseInput {
     device_id: MockPointerId::zero(),

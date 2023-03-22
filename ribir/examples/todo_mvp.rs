@@ -199,9 +199,9 @@ fn main() {
   app.exec(window_id);
 }
 
-#[cfg(all(not(feature = "crossterm"), not(feature = "winit")))]
+#[cfg(not(any(feature = "crossterm", feature = "winit")))]
 fn main() {
-  println!(
-    "The todo_mvp example is currently only implemented for the Winit and Crossterm platform"
-  );
+  println!("Chose a platform to run:");
+  println!("  cargo run --example todo_mvp -F winit,wgpu_gl");
+  println!("  cargo run --example todo_mvp -F crossterm");
 }

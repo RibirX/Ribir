@@ -14,6 +14,7 @@ use crate::{
 pub struct WindowBuilder {
   inner_builder: winit::window::WindowBuilder,
   root: Widget,
+  config: WindowConfig,
 }
 
 impl WindowBuilder {
@@ -46,7 +47,7 @@ impl WindowBuilder {
       inner_builder = inner_builder.with_resizable(resizable);
     }
 
-    if let Some(title) = config.title {
+    if let Some(title) = &config.title {
       inner_builder = inner_builder.with_title(title);
     }
 
@@ -70,7 +71,11 @@ impl WindowBuilder {
     //   inner_builder = inner_builder.with_window_icon(window_icon);
     // }
 
-    WindowBuilder { root: root_widget, inner_builder }
+    WindowBuilder {
+      root: root_widget,
+      inner_builder,
+      config,
+    }
   }
 
   pub fn build(self, shell_window: &PlatformShellWindow) -> RibirWindow {
@@ -89,7 +94,12 @@ impl WindowBuilder {
 
   #[cfg(feature = "wgpu_gl")]
   #[inline]
-  pub fn build_headless(self, shell_window: &PlatformShellWindow, size: DeviceSize) -> RibirWindow {
+  pub fn build_headless(self, shell_window: &PlatformShellWindow) -> RibirWindow {
+    use ribir_geometry::{ScaleToPhysic, Size};
+
+    let size = self.config.inner_size.unwrap_or(Size::new(1024., 768.));
+    let size: DeviceSize = ScaleToPhysic::new(1.).transform_size(size).cast();
+
     let native_wnd = self.inner_builder.build(shell_window.event_loop()).unwrap();
     let ctx = shell_window.context().clone();
     let p_backend = AppContext::wait_future(ribir_gpu::wgpu_backend_with_wnd(

@@ -24,20 +24,6 @@ impl From<WrappedKeyboardInput> for RibirKeyboardInput {
   }
 }
 
-// impl From<RibirKeyboardInput> for WrappedKeyboardInput {
-//   #[allow(deprecated)]
-//   fn from(value: RibirKeyboardInput) -> WrappedKeyboardInput {
-//     WrappedKeyboardInput::from(CrosstermKeyboardInput {
-//       scancode: value.scancode,
-//       state: WrappedElementState::from(value.state).into(),
-//       virtual_keycode: value
-//         .virtual_keycode
-//         .map(|v| WrappedVirtualKeyCode::from(v).into()),
-//       modifiers: CrosstermModifiersState::default(),
-//     })
-//   }
-// }
-
 #[cfg(test)]
 mod tests {
   // use super::*;

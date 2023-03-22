@@ -2,7 +2,7 @@
 use ribir_core::{
   prelude::{ShellWindow, Theme},
   widget::Widget,
-  window::{WindowConfig, WindowId, Window},
+  window::{Window, WindowConfig, WindowId},
 };
 
 #[cfg(any(feature = "crossterm", feature = "winit"))]
@@ -26,6 +26,13 @@ impl Application<PlatformShellWindow> {
 
   pub fn build_window(&mut self, window_builder: WindowBuilder) -> Box<dyn WindowId> {
     let window = window_builder.build(&self.shell_window);
+    let window_id = window.raw_window.id().box_clone();
+    self.shell_window.add_window(window);
+    window_id
+  }
+
+  pub fn build_headless_window(&mut self, window_builder: WindowBuilder) -> Box<dyn WindowId> {
+    let window = window_builder.build_headless(&self.shell_window);
     let window_id = window.raw_window.id().box_clone();
     self.shell_window.add_window(window);
     window_id

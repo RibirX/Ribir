@@ -37,14 +37,14 @@ pub(crate) struct DispatchInfo {
 }
 
 impl Dispatcher {
-  pub fn dispatch(&mut self, event: WindowEvent, tree: &mut WidgetTree, wnd_factor: f64) {
+  pub fn dispatch(&mut self, event: WindowEvent, tree: &mut WidgetTree) {
     log::info!("Dispatch winit event {:?}", event);
     match event {
       WindowEvent::ModifiersChanged(s) => self.info.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
-        let logical_pos =
-          ScaleToLogic::new(1.0 / wnd_factor as f32).transform_point(position.cast());
-        self.cursor_move_to(logical_pos, tree)
+        // let logical_pos =
+        //   ScaleToLogic::new(1.0 / wnd_factor as f32).transform_point(position);
+        self.cursor_move_to(position, tree)
       }
       WindowEvent::CursorLeft { .. } => self.on_cursor_left(tree),
       WindowEvent::MouseInput { state, button, device_id, .. } => {
@@ -56,7 +56,7 @@ impl Dispatcher {
       WindowEvent::ReceivedCharacter(c) => {
         self.dispatch_received_char(c, tree);
       }
-      WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, tree, wnd_factor),
+      WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, tree),
       _ => log::info!("Not processed event {:?}", event),
     }
   }
@@ -166,19 +166,14 @@ impl Dispatcher {
     Some(())
   }
 
-  pub fn dispatch_wheel(
-    &mut self,
-    delta: MouseScrollDelta,
-    tree: &mut WidgetTree,
-    wnd_factor: f64,
-  ) {
+  pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, tree: &mut WidgetTree) {
     if let Some(wid) = self.hit_widget(tree) {
       let (delta_x, delta_y) = match delta {
         MouseScrollDelta::LineDelta(x, y) => (x * PIXELS_PER_EM, y * PIXELS_PER_EM),
         MouseScrollDelta::PixelDelta(delta) => {
-          let logical_delta =
-            ScaleToLogic::new(1.0 / wnd_factor as f32).transform_point(delta.cast());
-          (logical_delta.x, logical_delta.y)
+          // let logical_delta =
+          // ScaleToLogic::new(1.0 / wnd_factor as f32).transform_point(delta.cast());
+          (delta.x, delta.y)
         }
       };
 
@@ -421,7 +416,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: DevicePoint::new(1, 1),
+      position: (1., 1.).into(),
     });
 
     {
@@ -467,7 +462,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: (1, 1).into(),
+      position: (1., 1.).into(),
     });
 
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -530,7 +525,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: device_id_2,
-      position: (1, 1).into(),
+      position: (1., 1.).into(),
     });
 
     // but cursor move processed.
@@ -622,14 +617,14 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: (10, 10).into(),
+      position: (10., 10.).into(),
     });
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
 
     // leave to parent
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: (99, 99).into(),
+      position: (99., 99.).into(),
     });
     assert_eq!(&*leave_event.borrow(), &[1]);
 
@@ -637,7 +632,7 @@ mod tests {
     // check if duplicate event fired.
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: (99, 99).into(),
+      position: (99., 99.).into(),
     });
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
     assert_eq!(&*leave_event.borrow(), &[1]);
@@ -645,7 +640,7 @@ mod tests {
     // leave all
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: (999, 999).into(),
+      position: (999., 999.).into(),
     });
 
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
@@ -654,7 +649,7 @@ mod tests {
     leave_event.borrow_mut().clear();
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: (10, 10).into(),
+      position: (10., 10.).into(),
     });
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id: MockPointerId::zero() });
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
@@ -681,7 +676,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: DevicePoint::new(50, 50),
+      position: (50., 50.).into(),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: MockPointerId::zero(),
@@ -702,7 +697,7 @@ mod tests {
 
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: DevicePoint::new(50, 50),
+      position: (50., 50.).into(),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: MockPointerId::zero(),
@@ -711,7 +706,7 @@ mod tests {
     });
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: MockPointerId::zero(),
-      position: DevicePoint::new(50, 150),
+      position: (50., 150.).into(),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: MockPointerId::zero(),
@@ -744,7 +739,7 @@ mod tests {
     let device_id = MockPointerId::zero();
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: device_id.clone(),
-      position: DevicePoint::new(45, 45),
+      position: (45., 45.).into(),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: device_id.clone(),
@@ -762,7 +757,7 @@ mod tests {
     });
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: device_id.clone(),
-      position: DevicePoint::new(80, 80),
+      position: (80., 80.).into(),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,

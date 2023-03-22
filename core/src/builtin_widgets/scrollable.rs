@@ -111,7 +111,7 @@ mod tests {
 
   use super::*;
 
-  fn test_assert(scrollable: Scrollable, delta_x: i32, delta_y: i32, expect_x: i32, expect_y: i32) {
+  fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: i32, expect_y: i32) {
     let w = widget! {
       MockBox {
         size: Size::new(1000., 1000.),
@@ -126,7 +126,7 @@ mod tests {
     let device_id = MockPointerId::zero();
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
-      delta: MouseScrollDelta::PixelDelta(DeviceOffset::new(delta_x, delta_y)),
+      delta: MouseScrollDelta::PixelDelta((delta_x, delta_y).into()),
       phase: TouchPhase::Started,
     });
 
@@ -145,22 +145,22 @@ mod tests {
 
   #[test]
   fn x_scroll() {
-    test_assert(Scrollable::X, -10, -10, -10, 0);
-    test_assert(Scrollable::X, -10000, -10, -900, 0);
-    test_assert(Scrollable::X, 100, -10, 0, 0);
+    test_assert(Scrollable::X, -10., -10., -10, 0);
+    test_assert(Scrollable::X, -10000., -10., -900, 0);
+    test_assert(Scrollable::X, 100., -10., 0, 0);
   }
 
   #[test]
   fn y_scroll() {
-    test_assert(Scrollable::Y, -10, -10, 0, -10);
-    test_assert(Scrollable::Y, -10, -10000, 0, -900);
-    test_assert(Scrollable::Y, 10, 100, 0, 0);
+    test_assert(Scrollable::Y, -10., -10., 0, -10);
+    test_assert(Scrollable::Y, -10., -10000., 0, -900);
+    test_assert(Scrollable::Y, 10., 100., 0, 0);
   }
 
   #[test]
   fn both_scroll() {
-    test_assert(Scrollable::Both, -10, -10, -10, -10);
-    test_assert(Scrollable::Both, -10000, -10000, -900, -900);
-    test_assert(Scrollable::Both, 100, 100, 0, 0);
+    test_assert(Scrollable::Both, -10., -10., -10, -10);
+    test_assert(Scrollable::Both, -10000., -10000., -900, -900);
+    test_assert(Scrollable::Both, 100., 100., 0, 0);
   }
 }

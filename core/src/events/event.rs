@@ -1,12 +1,13 @@
-use ribir_painter::{DeviceOffset, DevicePoint, DeviceSize};
 use std::fmt::Debug;
+
+use ribir_geometry::{Offset, Point, Size};
 
 use super::{ModifiersState, MouseButtons, PointerId, ScanCode, VirtualKeyCode};
 
 #[derive(Debug)]
 pub enum WindowEvent {
   Unsupported,
-  Resized(DeviceSize),
+  Resized(Size),
 
   /// The window received a unicode character.
   ///
@@ -39,7 +40,7 @@ pub enum WindowEvent {
     /// may have been transformed by the OS to implement effects such as cursor
     /// acceleration, it should not be used to implement non-cursor-like
     /// interactions such as 3D camera control.
-    position: DevicePoint,
+    position: Point,
   },
 
   /// The cursor has left the window.
@@ -78,7 +79,7 @@ pub enum WindowEvent {
   /// module.
   ScaleFactorChanged {
     scale_factor: f64,
-    new_inner_size: DeviceSize,
+    new_inner_size: Size,
   },
 }
 
@@ -182,7 +183,7 @@ pub enum MouseScrollDelta {
   /// For a 'natural scrolling' touch pad (that acts like a touch screen)
   /// this means moving your fingers right and down should give positive values,
   /// and move the content right and down (to reveal more things left and up).
-  PixelDelta(DeviceOffset),
+  PixelDelta(Offset),
 }
 
 /// Describes touch-screen input state.
