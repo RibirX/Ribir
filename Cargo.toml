@@ -18,3 +18,15 @@ debug = true
 
 [profile.release]
 debug = true
+
+[workspace.package]
+authors = ["adoo <Adoo@outlook.com>"]
+categories = ["gui"]
+description = "Ribir is a framework for building modern native/wasm cross-platform user interface applications."
+documentation = "https://ribir.org/docs"
+edition = "2021"
+homepage = "https://ribir.org"
+keywords = ["gui", "ui", "declarative", "compose-ui"]
+license = "MIT"
+readme = "README.md"
+version = "0.0.0"
