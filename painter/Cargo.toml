@@ -13,16 +13,16 @@ repository = "https://github.com/RibirX/Ribir/painter"
 version.workspace = true
 
 [dependencies]
-bitflags = "2.0.0"
-euclid = "0.22.6"
-log = "0.4.17"
-lyon_algorithms = "1.0.1"
-lyon_tessellation = {version = "1.0.1", features = ["serialization"]}
-palette = {version = "0.6.1", features = ["serializing"]}
+bitflags.workspace = true
+bitflags-serde-legacy.workspace = true
+euclid.workspace = true
+log.workspace = true
+lyon_algorithms.workspace = true
+lyon_tessellation = {workspace = true, features = ["serialization"]}
+palette = {workspace = true, features = ["serializing"]}
+rctree.workspace = true
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
-serde = {version = "1.0", features = ["rc"]}
-serde_json = "1.0.82"
-usvg = {version = "0.29.0"}
-rctree ="0.5.0"
-bitflags-serde-legacy = "0.1.0"
+serde = {workspace = true, features = ["rc"]}
+serde_json.workspace = true
+usvg.workspace = true

@@ -13,6 +13,6 @@ repository = "https://github.com/RibirX/Ribir/algo"
 version.workspace = true
 
 [dependencies]
-ahash = "0.8.3"
-log = "0.4.14"
-rayon = "1.5.1"
+ahash.workspace = true
+log.workspace = true
+rayon.workspace = true

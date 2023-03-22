@@ -13,28 +13,25 @@ repository = "https://github.com/RibirX/Ribir/core"
 version.workspace = true
 
 [dependencies]
-ahash = "0.8.3"
-bitflags = "2.0.0"
-futures = "0.3.26"
-indextree = "4.5.0"
-lazy_static = "1.4.0"
-log = "0.4.8"
-lyon_algorithms = "1.0.1"
-lyon_geom = "1.0.1"
-png = {version = "0.17.3", optional = true}
+ahash.workspace = true
+bitflags.workspace = true
+blake3 = {workspace = true, features = ["rayon"]}
+futures.workspace = true
+indextree.workspace = true
+lazy_static.workspace = true
+log.workspace = true
+lyon_algorithms.workspace = true
+lyon_geom.workspace = true
+png = {workspace = true, optional = true}
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_gpu = {path = "../gpu", version = "0.0.0", features = ["wgpu_gl"]}
 ribir_macros = {path = "../macros", version = "0.0.0"}
 ribir_painter = {path = "../painter", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
-rxrust = "1.0.0-beta.1"
+rxrust.workspace = true
+smallvec.workspace = true
+winit.workspace = true
 
-smallvec = "1.8.0"
-winit = "0.28.1"
-
-[dependencies.blake3]
-features = ["rayon"]
-version = "1.3.3"
 
 [features]
 png = ["dep:png"]
@@ -43,4 +40,4 @@ thread-pool = [
 ]
 
 [dev-dependencies]
-colored = "2.0.0"
+colored.workspace = true
