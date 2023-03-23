@@ -10,7 +10,7 @@ use super::AppContext;
 use crate::{
   animation::AnimateTrack,
   builtin_widgets::Theme,
-  events::focus_mgr::{FocusManager, FocusType, FocustHandle},
+  events::focus_mgr::{FocusHandle, FocusManager, FocusType},
   ticker::{FrameMsg, FrameTicker},
   widget::{TreeArena, WidgetId},
 };
@@ -76,7 +76,7 @@ impl WindowCtx {
     self.focus_mgr.borrow_mut().prev_focus(arena);
   }
 
-  pub(crate) fn focus_handle(&self, wid: WidgetId) -> FocustHandle {
+  pub(crate) fn focus_handle(&self, wid: WidgetId) -> FocusHandle {
     FocusManager::focus_handle(&self.focus_mgr, wid)
   }
 
@@ -84,13 +84,13 @@ impl WindowCtx {
     &self,
     wid: WidgetId,
     auto_focus: bool,
-    focus_tyep: FocusType,
+    focus_type: FocusType,
     arena: &TreeArena,
   ) {
     self
       .focus_mgr
       .borrow_mut()
-      .add_focus_node(wid, auto_focus, focus_tyep, arena);
+      .add_focus_node(wid, auto_focus, focus_type, arena);
   }
 
   pub(crate) fn remove_focus_node(&self, wid: WidgetId, focus_tyep: FocusType) {
