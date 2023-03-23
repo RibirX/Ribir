@@ -1,6 +1,6 @@
 use crate::{
   data_widget::compose_child_as_data_widget,
-  events::focus_mgr::{FocusType, FocustHandle},
+  events::focus_mgr::{FocusHandle, FocusType},
   impl_query_self_only,
   prelude::*,
 };
@@ -86,7 +86,7 @@ pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
 #[derive(Declare)]
 pub struct RequestFocus {
   #[declare(default)]
-  handle: Option<FocustHandle>,
+  handle: Option<FocusHandle>,
 }
 
 impl ComposeChild for RequestFocus {

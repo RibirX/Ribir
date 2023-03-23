@@ -19,12 +19,12 @@ pub(crate) struct FocusManager {
   root: NodeId,
 }
 
-pub struct FocustHandle {
+pub struct FocusHandle {
   wid: WidgetId,
   mgr: Rc<RefCell<FocusManager>>,
 }
 
-impl FocustHandle {
+impl FocusHandle {
   pub(crate) fn request_focus(&self) { self.mgr.borrow_mut().focus_to(Some(self.wid)); }
 
   pub(crate) fn unfocus(&self) {
@@ -95,8 +95,8 @@ impl FocusManager {
     }
   }
 
-  pub(crate) fn focus_handle(this: &Rc<RefCell<Self>>, wid: WidgetId) -> FocustHandle {
-    FocustHandle { mgr: this.clone(), wid }
+  pub(crate) fn focus_handle(this: &Rc<RefCell<Self>>, wid: WidgetId) -> FocusHandle {
+    FocusHandle { mgr: this.clone(), wid }
   }
 
   pub(crate) fn remove_focus_node(&mut self, wid: WidgetId, focus_type: FocusType) {
@@ -688,7 +688,7 @@ mod tests {
     dispatcher.blur(tree);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
-  
+
   #[test]
   fn dynamic_focus() {
     let visible = Stateful::new(Some(()));
