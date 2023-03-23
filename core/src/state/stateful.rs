@@ -2,7 +2,7 @@ use crate::{impl_proxy_query, impl_query_self_only, prelude::*};
 pub use guards::ModifyGuard;
 use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
-  cell::{Cell, UnsafeCell},
+  cell::{Cell, RefCell, UnsafeCell},
   convert::Infallible,
   ops::{Deref, DerefMut},
   rc::Rc,
@@ -17,7 +17,7 @@ pub struct Stateful<W> {
 /// notify downstream when widget state changed, the value mean if the change it
 /// as silent or not.
 #[derive(Default, Clone)]
-pub(crate) struct StateChangeNotifier(Subject<'static, ModifyScope, Infallible>);
+pub(crate) struct StateChangeNotifier(Rc<RefCell<Subject<'static, ModifyScope, Infallible>>>);
 
 /// A reference of `Stateful which tracked the state change across if user
 /// mutable deref this reference.
@@ -378,7 +378,11 @@ impl Query for StateChangeNotifier {
 }
 
 impl StateChangeNotifier {
-  pub(crate) fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.clone() }
+  pub(crate) fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
+    self.0.borrow().clone()
+  }
+
+  pub(crate) fn reset(&self) { *self.0.borrow_mut() = <_>::default(); }
 }
 
 #[cfg(test)]

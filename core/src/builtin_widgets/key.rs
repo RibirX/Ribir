@@ -48,7 +48,7 @@ pub enum Key {
 /// The last status: The KeyWidget associated with the Key was disposed, the
 /// same key don't has anther associated KeyWidget, the key status will be
 /// changed `KeyStatus::Disposed`.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum KeyStatus {
   Init,
   Mounted,
@@ -71,6 +71,7 @@ pub struct KeyWidget<V = ()> {
   #[declare(convert=into)]
   pub key: Key,
   pub value: Option<V>,
+
   #[declare(default)]
   before_value: Option<V>,
   #[declare(default)]
@@ -117,7 +118,7 @@ where
 
   fn disposed(&self) {
     match self {
-      State::Stateless(_) => {}
+      State::Stateless(_) => (),
       State::Stateful(this) => {
         this.state_ref().status = KeyStatus::Disposed;
       }

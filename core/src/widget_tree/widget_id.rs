@@ -1,14 +1,14 @@
 use indextree::{Arena, Node, NodeId};
+use ribir_painter::{Painter, Rect};
 use rxrust::prelude::*;
 
+use super::{DirtySet, LayoutStore};
 use crate::{
   builtin_widgets::{DisposedListener, MountedListener, Void},
-  context::{LifeCycleCtx, WindowCtx},
+  context::{LifeCycleCtx, PaintingCtx, WidgetContext, WindowCtx},
   state::{ModifyScope, StateChangeNotifier},
   widget::{QueryOrder, Render},
 };
-
-use super::{DirtySet, LayoutStore};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 
@@ -102,8 +102,9 @@ impl WidgetId {
     self.0.descendants(tree).map(WidgetId)
   }
 
-  pub(crate) fn swap_id(self, other: WidgetId, tree: &mut TreeArena) {
+  pub(crate) fn swap_id(self, other: WidgetId, tree: &mut TreeArena, store: &mut LayoutStore) {
     self.swap_data(other, tree);
+    store.swap(self, other);
 
     let guard = WidgetId::new_node(tree);
     self.transplant(guard, tree);
@@ -131,7 +132,12 @@ impl WidgetId {
 
   pub(crate) fn detach(self, tree: &mut TreeArena) { self.0.detach(tree) }
 
-  pub(crate) fn remove_subtree(self, arena: &mut TreeArena) { self.0.remove_subtree(arena) }
+  pub(crate) fn remove_subtree(self, arena: &mut TreeArena, store: &mut LayoutStore) {
+    self.descendants(arena).for_each(|id| {
+      store.remove(id);
+    });
+    self.0.remove_subtree(arena);
+  }
 
   pub(crate) fn on_mounted_subtree(
     self,
@@ -216,6 +222,68 @@ impl WidgetId {
   pub(crate) fn assert_get_mut(self, tree: &mut TreeArena) -> &mut Box<dyn Render> {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
+
+  pub(crate) fn paint_subtree(
+    self,
+    arena: &TreeArena,
+    store: &LayoutStore,
+    wnd_ctx: &WindowCtx,
+    painter: &mut Painter,
+  ) {
+    fn paint_rect_intersect(painter: &mut Painter, rc: &Rect) -> bool {
+      let paint_rect = painter.get_transform().outer_transformed_rect(rc);
+      painter
+        .visual_rect()
+        .and_then(|rc| rc.intersection(&paint_rect))
+        .is_some()
+    }
+
+    let mut paint_ctx = PaintingCtx {
+      id: self,
+      arena,
+      store,
+      wnd_ctx,
+      painter,
+    };
+    let mut w = Some(self);
+    while let Some(id) = w {
+      paint_ctx.id = id;
+      paint_ctx.painter.save();
+
+      let mut need_paint = false;
+      if paint_ctx.painter.alpha() != 0. {
+        if let Some(layout_box) = paint_ctx.box_rect() {
+          let render = id.assert_get(arena);
+          if paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow() {
+            paint_ctx
+              .painter
+              .translate(layout_box.min_x(), layout_box.min_y());
+            render.paint(&mut paint_ctx);
+            need_paint = true;
+          }
+        };
+      }
+
+      w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
+        let mut node = w;
+        while let Some(p) = node {
+          // self node sub-tree paint finished, goto sibling
+          paint_ctx.painter.restore();
+          node = match p == self {
+            true => None,
+            false => p.next_sibling(arena),
+          };
+          if node.is_some() {
+            break;
+          } else {
+            // if there is no more sibling, back to parent to find sibling.
+            node = p.parent(arena);
+          }
+        }
+        node
+      });
+    }
+  }
 }
 
 pub(crate) unsafe fn split_arena(tree: &mut TreeArena) -> (&mut TreeArena, &mut TreeArena) {
@@ -232,12 +300,10 @@ pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Bo
 pub(crate) fn dispose_nodes<T: Iterator<Item = WidgetId>>(
   it: T,
   arena: &TreeArena,
-  store: &mut LayoutStore,
+  store: &LayoutStore,
   wnd_ctx: &WindowCtx,
 ) {
   it.for_each(|id| {
-    store.remove(id);
-
     id.assert_get(arena).query_all_type(
       |d: &DisposedListener| {
         d.dispatch(LifeCycleCtx { id, arena, store, wnd_ctx });
