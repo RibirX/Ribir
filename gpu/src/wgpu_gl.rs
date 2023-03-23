@@ -147,6 +147,33 @@ impl WgpuGl<TextureSurface> {
   }
 }
 
+impl<S: Surface> WgpuGl<S> {
+  fn draw_empty_frame(&mut self) {
+    let mut encoder = self.create_command_encoder();
+    let view = self
+      .surface
+      .current_texture()
+      .create_view(&wgpu::TextureViewDescriptor::default());
+
+    let load = wgpu::LoadOp::Clear(wgpu::Color::WHITE);
+    let ops = wgpu::Operations { load, store: false };
+    let rpass_color_attachment = wgpu::RenderPassColorAttachment {
+      view: &view,
+      resolve_target: None,
+      ops,
+    };
+
+    {
+      let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("emptyu render pass"),
+        color_attachments: &[Some(rpass_color_attachment)],
+        depth_stencil_attachment: None,
+      });
+    }
+    self.queue.submit(iter::once(encoder.finish()));
+  }
+}
+
 impl<S: Surface> GlRender for WgpuGl<S> {
   fn begin_frame(&mut self) { self.empty_frame = true; }
 
@@ -157,6 +184,10 @@ impl<S: Surface> GlRender for WgpuGl<S> {
   }
 
   fn draw_triangles(&mut self, data: TriangleLists) {
+    if data.commands.is_empty() {
+      return self.draw_empty_frame();
+    }
+
     self.write_vertex_buffer(data.vertices, data.indices);
     let vertex_buffers = self.vertex_buffers.as_ref().unwrap();
 
