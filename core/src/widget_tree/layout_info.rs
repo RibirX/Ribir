@@ -54,7 +54,7 @@ impl BoxClamp {
 
 /// render object's layout box, the information about layout, including box
 /// size, box position, and the clamp of render object layout.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LayoutInfo {
   /// Box bound is the bound of the layout can be place. it will be set after
   /// render object computing its layout. It's passed by render object's parent.
@@ -98,7 +98,21 @@ impl LayoutStore {
 
   pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&LayoutInfo> { self.data.get(&id) }
 
-  // pub(crate) fn need_layout(&self) -> bool { !self.needs_layout.is_empty() }
+  pub(crate) fn swap(&mut self, id1: WidgetId, id2: WidgetId) {
+    let info1 = self.layout_info(id1).cloned();
+    let info2 = self.layout_info(id2).cloned();
+
+    let mut reset = |id, v| {
+      if let Some(info) = v {
+        self.data.insert(id, info);
+      } else {
+        self.data.remove(&id);
+      }
+    };
+
+    reset(id1, info2);
+    reset(id2, info1);
+  }
 
   /// return a mutable reference of the layout info  of `id`, if it's not exist
   /// insert a default value before return

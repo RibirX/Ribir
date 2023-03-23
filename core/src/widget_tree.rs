@@ -41,58 +41,9 @@ impl WidgetTree {
 
   /// Draw current tree by painter.
   pub(crate) fn draw(&self, painter: &mut Painter) {
-    fn paint_rect_intersect(painter: &mut Painter, rc: &Rect) -> bool {
-      let paint_rect = painter.get_transform().outer_transformed_rect(rc);
-      painter
-        .visual_rect()
-        .and_then(|rc| rc.intersection(&paint_rect))
-        .is_some()
-    }
-
-    let Self { root, arena, store, wnd_ctx, .. } = self;
-    let mut w = Some(*root);
-
-    let mut paint_ctx = PaintingCtx {
-      id: *root,
-      arena,
-      store,
-      wnd_ctx,
-      painter,
-    };
-    while let Some(id) = w {
-      paint_ctx.id = id;
-      paint_ctx.painter.save();
-
-      let mut need_paint = false;
-      if paint_ctx.painter.alpha() != 0. {
-        if let Some(layout_box) = paint_ctx.box_rect() {
-          let render = id.assert_get(arena);
-          if paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow() {
-            paint_ctx
-              .painter
-              .translate(layout_box.min_x(), layout_box.min_y());
-            render.paint(&mut paint_ctx);
-            need_paint = true;
-          }
-        };
-      }
-
-      w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
-        let mut node = w;
-        while let Some(p) = node {
-          // self node sub-tree paint finished, goto sibling
-          paint_ctx.painter.restore();
-          node = p.next_sibling(arena);
-          if node.is_some() {
-            break;
-          } else {
-            // if there is no more sibling, back to parent to find sibling.
-            node = p.parent(arena);
-          }
-        }
-        node
-      });
-    }
+    self
+      .root
+      .paint_subtree(&self.arena, &self.store, &self.wnd_ctx, painter);
   }
 
   /// Do the work of computing the layout for all node which need, Return if any
@@ -483,7 +434,7 @@ mod tests {
     let WidgetTree { root, arena, store, wnd_ctx, .. } = &mut tree;
 
     dispose_nodes(root.descendants(arena), arena, store, wnd_ctx);
-    root.remove_subtree(arena);
+    root.remove_subtree(arena, store);
 
     assert_eq!(tree.layout_list(), None);
     assert!(!tree.is_dirty());

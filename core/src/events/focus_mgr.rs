@@ -102,12 +102,13 @@ impl FocusManager {
     if Some(wid) == self.focusing && focus_type.intersects(FocusType::NODE) {
       self.focusing = None;
     }
-    if let Some(id) = self.node_ids.get(&wid) {
-      let node = self.arena[*id].get_mut();
+    if let Some(id) = self.node_ids.get(&wid).cloned() {
+      let node = self.arena[id].get_mut();
       assert!(node.focus_type.intersects(focus_type));
       node.focus_type.remove(focus_type);
       if node.focus_type.is_empty() {
         id.remove(&mut self.arena);
+        self.node_ids.remove(&wid);
       }
     }
   }

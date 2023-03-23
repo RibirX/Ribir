@@ -88,6 +88,8 @@
  	 - action perform after widget remove from widget tree.
 - disposed_stream : [`LifecycleSubject`] 
  	 - return an observable stream of the widget disposed event
+- delay_drop_until : [`bool`] 
+ 	 - The widget delay the drop of its child until the field delay_drop_until is false, but not affect its dispose event emit time. It's useful to ensure the disappear-animate display fully.
 
  - `fn pointer_down_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
 () >`
