@@ -109,6 +109,7 @@ impl FocusManager {
       node.focus_type.remove(focus_type);
       if node.focus_type.is_empty() {
         id.remove(&mut self.arena);
+        self.node_ids.remove(&wid);
       }
     }
   }
@@ -686,5 +687,34 @@ mod tests {
 
     dispatcher.blur(tree);
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
+  }
+  
+  #[test]
+  fn dynamic_focus() {
+    let visible = Stateful::new(Some(()));
+    let w = widget! {
+      states { visible: visible.clone_stateful() }
+      MockMulti{
+        Option::map(*visible, |_| widget!{
+          MockBox {
+            size: Size::default(),
+            on_tap: move |_| {},
+          }
+        })
+      }
+    };
+
+    let mut wnd = Window::default_mock(w, None);
+    let focus_id = wnd.dispatcher.focusing();
+
+    wnd.draw_frame();
+
+    *visible.state_ref() = None;
+    wnd.draw_frame();
+
+    *visible.state_ref() = Some(());
+    wnd.draw_frame();
+
+    assert_eq!(wnd.dispatcher.focusing(), focus_id);
   }
 }
