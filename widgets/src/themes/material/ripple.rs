@@ -43,6 +43,7 @@ impl ComposeChild for Ripple {
       states { this: this.into_writable() }
       init ctx => {
         let linear_transition = transitions::LINEAR.of(ctx);
+        let ease_out = transitions::EASE_OUT.of(ctx);
       }
       Stack {
         id: container,
@@ -61,8 +62,14 @@ impl ComposeChild for Ripple {
             (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
           });
           let linear_transition = linear_transition.clone();
+          let ease_out = ease_out.clone();
+
           widget!{
             IgnorePointer {
+              id: ripple,
+              opacity: 1.,
+              delay_drop_until: !ripper_fade_out.is_running(),
+              on_disposed: move |_| ripper_fade_out.run(),
               DynWidget {
                 dyns: (this.bounded != RippleBound::Unbounded).then(|| {
                   let rect = Rect::from_size(container.layout_size());
@@ -91,24 +98,23 @@ impl ComposeChild for Ripple {
               transition: linear_transition,
               prop: prop!(ripple_path.path, move |_, _, rate| {
                 let radius = Lerp::lerp(&0., &radius, rate);
-                let center = this.launch_pos.clone().unwrap();
-                Path::circle(center, radius, PathStyle::Fill)
+                Path::circle(launch_at, radius, PathStyle::Fill)
               }),
               from: Path::circle(Point::zero(), 0., PathStyle::Fill)
             }
+            Animate {
+              id: ripper_fade_out,
+              from: 0.,
+              prop: prop!(ripple.opacity, |from, to, rate| to.lerp(from,rate)),
+              transition: ease_out,
+            }
             finally {
               let_watch!(!container.pointer_pressed() && !ripper_enter.is_running())
-                .filter(|b| *b)
-                .subscribe(move |_| {
-                  this.launch_pos.take();
-                });
+              .filter(|b| *b)
+              .subscribe(move |_| {
+                this.launch_pos.take();
+              });
             }
-            // todo: support disposed animate
-            // Animate {
-            //   id: ripper_fade_out,
-            //   from: State { ripple_path.opacity: 1.},
-            //   transition: transitions::EASE_OUT.get_from_or_default(ctx.theme()),
-            // }
           }
         })
       }
