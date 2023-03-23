@@ -105,7 +105,7 @@ impl Tessellator {
 
   pub fn tessellate<R: GlRender>(&mut self, commands: &[PaintCommand], render: &mut R) {
     if commands.is_empty() {
-      return;
+      return render.draw_triangles(self.get_triangle_list());
     }
 
     // parallel generate triangles
