@@ -1,11 +1,11 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-  parse_quote, punctuated::Pair, token::Comma, AngleBracketedGenericArguments, Field, Fields,
-  FieldsNamed, FieldsUnnamed, GenericArgument, Index, PathArguments, PathSegment,
+  parse_quote, punctuated::Pair, spanned::Spanned, token::Comma, AngleBracketedGenericArguments,
+  DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed, GenericArgument, Index, PathArguments,
+  PathSegment,
 };
 
-use crate::util::data_struct_unwrap;
 const TML: &str = "Tml";
 const ASSOCIATED_TEMPLATE: &str = "AssociatedTemplate";
 
@@ -45,69 +45,108 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       }
     });
   };
+  match data {
+    syn::Data::Struct(stt) => match &stt.fields {
+      Fields::Named(FieldsNamed { named: fields, .. }) => {
+        let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
+        tokens.extend(quote! {
+          #[derive(Default)]
+          #vis struct #tml #g_ty #g_where {
+            #(#builder_fields)*
+          }
+        });
 
-  let stt = data_struct_unwrap(data, ASSOCIATED_TEMPLATE)?;
-  match &stt.fields {
-    Fields::Named(FieldsNamed { named: fields, .. }) => {
-      let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
+        let init_values = fields.iter().map(|field| {
+          let field_name = field.ident.as_ref().unwrap();
+          let ty = &field.ty;
+          let value = gen_init_value_tokens(quote!(#field_name), ty);
+          quote! {#field_name: #value}
+        });
+
+        tokens.extend(quote! {
+          impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
+            type Target = #name #g_ty;
+            #[inline]
+            fn build_tml(self) -> Self::Target {#name { #(#init_values),* }}
+          }
+        });
+        fields.iter().for_each(|f| {
+          let f_name = f.ident.as_ref().unwrap();
+          let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
+          fill_tml_impl(quote! {#f_name}, ty, &mut tokens)
+        });
+      }
+      Fields::Unnamed(FieldsUnnamed { unnamed: fields, .. }) => {
+        let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
+        tokens.extend(quote! {
+          #[derive(Default)]
+          #vis struct #tml #g_ty #g_where(#(#builder_fields)*);
+        });
+
+        let init_values = fields.iter().enumerate().map(|(idx, field)| {
+          let idx = Index::from(idx);
+          gen_init_value_tokens(quote!(#idx), &field.ty)
+        });
+
+        tokens.extend(quote! {
+          impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
+            type Target = #name #g_ty;
+            #[inline]
+            fn build_tml(self) -> Self::Target {#name(#(#init_values),* ) }
+          }
+        });
+
+        fields.iter().enumerate().for_each(|(idx, f)| {
+          let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
+          let idx = Index::from(idx);
+          fill_tml_impl(quote! {#idx}, ty, &mut tokens)
+        });
+      }
+      Fields::Unit => {
+        let err_str = format!("Can't derive `{ASSOCIATED_TEMPLATE}` for a empty template.",);
+        return Err(syn::Error::new(Span::call_site(), err_str));
+      }
+    },
+    syn::Data::Enum(DataEnum { variants, .. }) => {
+      let err_str = format!("Child `{}` not specify.", quote! { #name });
       tokens.extend(quote! {
         #[derive(Default)]
-        #vis struct #tml #g_ty #g_where {
-          #(#builder_fields)*
-        }
-      });
+        #vis struct #tml #g_ty #g_where(Option<#name>);
 
-      let init_values = fields.iter().map(|field| {
-        let field_name = field.ident.as_ref().unwrap();
-        let ty = &field.ty;
-        let value = gen_init_value_tokens(quote!(#field_name), ty);
-        quote! {#field_name: #value}
-      });
-
-      tokens.extend(quote! {
         impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
           type Target = #name #g_ty;
           #[inline]
-          fn build_tml(self) -> Self::Target {#name { #(#init_values),* }}
-        }
-      });
-      fields.iter().for_each(|f| {
-        let f_name = f.ident.as_ref().unwrap();
-        let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
-        fill_tml_impl(quote! {#f_name}, ty, &mut tokens)
-      });
-    }
-    Fields::Unnamed(FieldsUnnamed { unnamed: fields, .. }) => {
-      let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
-      tokens.extend(quote! {
-        #[derive(Default)]
-        #vis struct #tml #g_ty #g_where(#(#builder_fields)*);
-      });
-
-      let init_values = fields.iter().enumerate().map(|(idx, field)| {
-        let idx = Index::from(idx);
-        gen_init_value_tokens(quote!(#idx), &field.ty)
-      });
-
-      tokens.extend(quote! {
-        impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
-          type Target = #name #g_ty;
-          #[inline]
-          fn build_tml(self) -> Self::Target {#name(#(#init_values),* ) }
+          fn build_tml(self) -> Self::Target {
+            self.0.expect(&#err_str)
+          }
         }
       });
 
-      fields.iter().enumerate().for_each(|(idx, f)| {
-        let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
-        let idx = Index::from(idx);
-        fill_tml_impl(quote! {#idx}, ty, &mut tokens)
+      variants.iter().for_each(|v| {
+        if let Fields::Unnamed(FieldsUnnamed { unnamed, .. }) = &v.fields {
+          // only the enum variant has a single type need to implement fill convert.
+          if unnamed.len() == 1 {
+            let f = unnamed.first().unwrap();
+            let ty = &f.ty;
+            let v_name = &v.ident;
+            tokens.extend(quote! {
+              impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
+                fn fill(&mut self, c: #ty) {
+                  assert!(self.0.is_none(), "Try to fill enum template with two variant.");
+                  self.0 = Some(#name::#v_name(c));
+                }
+              }
+            });
+          }
+        }
       });
     }
-    Fields::Unit => {
-      let err_str = format!("Can't derive `{ASSOCIATED_TEMPLATE}` for a empty template.",);
-      return Err(syn::Error::new(Span::call_site(), err_str));
+    syn::Data::Union(u) => {
+      let err_str = format!("`{ASSOCIATED_TEMPLATE}` not support for Union");
+      return Err(syn::Error::new(u.union_token.span(), err_str));
     }
-  };
+  }
+
   Ok(tokens)
 }
 
