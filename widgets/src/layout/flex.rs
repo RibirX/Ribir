@@ -105,6 +105,8 @@ impl FlexSize {
       Direction::Vertical => Self { cross: size.width, main: size.height },
     }
   }
+
+  fn zero() -> Self { Self { main: 0., cross: 0. } }
 }
 
 impl std::ops::Sub for FlexSize {
@@ -157,7 +159,11 @@ impl FlexLayouter {
     // All children perform layout.
     let mut layouter = ctx.first_child_layouter();
     let &mut Self { max, min, wrap, dir, .. } = self;
-    let min = FlexSize { main: 0., cross: min.cross };
+    let min = if self.align_items == Align::Stretch {
+      FlexSize { main: 0., cross: min.cross }
+    } else {
+      FlexSize::zero()
+    };
     while let Some(mut l) = layouter {
       let mut max = max;
       if !wrap {
@@ -178,7 +184,10 @@ impl FlexLayouter {
       // layout.
       let line = &mut self.current_line;
       if let Some(flex) = flex {
-        line.flex_sum += flex;
+        // expanded child size is zero, it don't need calculate
+        if size.main > 0. {
+          line.flex_sum += flex;
+        }
       } else {
         if wrap && !line.is_empty() && line.main_width + size.main > max.main {
           self.place_line();
@@ -203,19 +212,21 @@ impl FlexLayouter {
       let flex_unit = (self.max.main - line.main_width) / line.flex_sum;
       line.items_info.iter_mut().for_each(|info| {
         let mut l = layouter.take().unwrap();
-        if let Some(flex) = info.flex {
-          let &mut Self { mut max, mut min, dir, .. } = self;
-          let main = flex_unit * flex;
-          max.main = main;
-          min.main = main;
-          let clamp = BoxClamp {
-            max: max.to_size(dir),
-            min: min.to_size(dir),
-          };
-          let size = l.perform_widget_layout(clamp);
-          info.size = FlexSize::from_size(size, dir);
-          line.main_width += info.size.main;
-          line.cross_line_height = line.cross_line_height.max(info.size.cross);
+        if info.size.main > 0. {
+          if let Some(flex) = info.flex {
+            let &mut Self { mut max, mut min, dir, .. } = self;
+            let main = flex_unit * flex;
+            max.main = main;
+            min.main = main;
+            let clamp = BoxClamp {
+              max: max.to_size(dir),
+              min: min.to_size(dir),
+            };
+            let size = l.perform_widget_layout(clamp);
+            info.size = FlexSize::from_size(size, dir);
+            line.main_width += info.size.main;
+            line.cross_line_height = line.cross_line_height.max(info.size.cross);
+          }
         }
 
         layouter = l.into_next_sibling();
