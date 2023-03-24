@@ -40,6 +40,40 @@ mod tests {
   use ribir_core::test::*;
 
   #[test]
+  fn expaned_child_size_zero() {
+    let size = Size::new(100., 50.);
+
+    let widget = widget! {
+      Row {
+        Expanded {
+          flex: 1.,
+          SizedBox { size }
+        }
+        SizedBox { size }
+        Expanded {
+          flex: 2.,
+          SizedBox { size: Size::new(0., 50.) }
+        }
+      }
+    };
+
+    expect_layout_result(
+      widget,
+      Some(Size::new(500., 500.)),
+      &[
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::from_size(Size::new(400., 50.)),
+        },
+        LayoutTestItem {
+          path: &[0, 2],
+          expect: ExpectRect::from_size(Size::new(0., 50.)),
+        },
+      ],
+    );
+  }
+
+  #[test]
   fn one_line_expanded() {
     let size = Size::new(100., 50.);
     let widget = widget! {
