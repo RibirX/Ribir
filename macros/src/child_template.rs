@@ -1,13 +1,25 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-  parse_quote, punctuated::Pair, spanned::Spanned, token::Comma, AngleBracketedGenericArguments,
-  DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed, GenericArgument, Index, PathArguments,
-  PathSegment,
+  parse::Parse, parse_quote, punctuated::Pair, spanned::Spanned, token::Comma,
+  AngleBracketedGenericArguments, DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed,
+  GenericArgument, Index, PathArguments, PathSegment,
 };
 
 const TML: &str = "Tml";
 const ASSOCIATED_TEMPLATE: &str = "AssociatedTemplate";
+const TEMPLATE_ATTR: &str = "template";
+
+#[derive(Default)]
+struct TemplateAttr {
+  /// `flat_fill` let a template type support init by its template fill item.
+  _flat_fill: kw::flat_fill,
+}
+
+mod kw {
+  use syn::custom_keyword;
+  custom_keyword!(flat_fill);
+}
 
 pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
   let syn::DeriveInput { vis, ident: name, generics, data, .. } = input;
@@ -35,19 +47,55 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     }
   };
 
-  let fill_tml_impl = |field_name: TokenStream, ty: &syn::Type, tokens: &mut TokenStream| {
+  let fill_tml_impl = |field_name: TokenStream, f: &mut Field, tokens: &mut TokenStream| {
+    let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
     tokens.extend(quote! {
       impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
-        fn fill(&mut self, c: #ty) {
+        fn fill_tml(&mut self, c: #ty) {
           assert!(self.#field_name.is_none(), "Try to fill same type twice.");
           self.#field_name = Some(c);
         }
       }
     });
+    let idx = f
+      .attrs
+      .iter()
+      .position(|attr| attr.path.is_ident(TEMPLATE_ATTR));
+    let tml_attr = idx.map(|idx| f.attrs.remove(idx));
+    if let Some(tml_attr) = tml_attr {
+      let _: TemplateAttr = tml_attr
+        .parse_args()
+        .expect("Only #[template(flat_fill) support");
+      let mut flat_fill_gen = generics.clone();
+      flat_fill_gen.params.push(parse_quote!(Child));
+      let predicates = &mut flat_fill_gen
+        .where_clause
+        .get_or_insert_with(|| parse_quote! { where})
+        .predicates;
+      predicates.push(parse_quote! { #ty: Template});
+      predicates.push(parse_quote! {
+        <#ty as Template>::Builder: TemplateBuilder<Target = #ty> + FillTml<SelfImpl, Child>
+      });
+
+      let (g_impl, _, g_where) = flat_fill_gen.split_for_impl();
+      tokens.extend(quote! {
+        impl #g_impl FillTml<NotSelf<#ty>, Child> for #tml #g_ty #g_where {
+          fn fill_tml(&mut self, c: Child) {
+            let mut builder = #ty::builder();
+            builder.fill_tml(c);
+            self.fill_tml(builder.build_tml());
+          }
+        }
+      });
+    }
   };
   match data {
-    syn::Data::Struct(stt) => match &stt.fields {
+    syn::Data::Struct(stt) => match &mut stt.fields {
       Fields::Named(FieldsNamed { named: fields, .. }) => {
+        fields.iter_mut().for_each(|f| {
+          let f_name = f.ident.as_ref().unwrap();
+          fill_tml_impl(quote! {#f_name}, f, &mut tokens)
+        });
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
           #[derive(Default)]
@@ -70,13 +118,12 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             fn build_tml(self) -> Self::Target {#name { #(#init_values),* }}
           }
         });
-        fields.iter().for_each(|f| {
-          let f_name = f.ident.as_ref().unwrap();
-          let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
-          fill_tml_impl(quote! {#f_name}, ty, &mut tokens)
-        });
       }
       Fields::Unnamed(FieldsUnnamed { unnamed: fields, .. }) => {
+        fields.iter_mut().enumerate().for_each(|(idx, f)| {
+          let idx = Index::from(idx);
+          fill_tml_impl(quote! {#idx}, f, &mut tokens)
+        });
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
           #[derive(Default)]
@@ -94,12 +141,6 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             #[inline]
             fn build_tml(self) -> Self::Target {#name(#(#init_values),* ) }
           }
-        });
-
-        fields.iter().enumerate().for_each(|(idx, f)| {
-          let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
-          let idx = Index::from(idx);
-          fill_tml_impl(quote! {#idx}, ty, &mut tokens)
         });
       }
       Fields::Unit => {
@@ -131,7 +172,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             let v_name = &v.ident;
             tokens.extend(quote! {
               impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
-                fn fill(&mut self, c: #ty) {
+                fn fill_tml(&mut self, c: #ty) {
                   assert!(self.0.is_none(), "Try to fill enum template with two variant.");
                   self.0 = Some(#name::#v_name(c));
                 }
@@ -197,4 +238,10 @@ fn gen_init_value_tokens(field_name: TokenStream, ty: &syn::Type) -> TokenStream
     value.extend(quote! { .expect(#err)});
   };
   value
+}
+
+impl Parse for TemplateAttr {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    Ok(Self { _flat_fill: input.parse()? })
+  }
 }

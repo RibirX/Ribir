@@ -31,7 +31,7 @@ pub trait TemplateBuilder: Sized {
 }
 
 pub trait FillTml<M: ImplMarker, C> {
-  fn fill(&mut self, c: C);
+  fn fill_tml(&mut self, c: C);
 }
 
 use helper_impl::IntoComposeChildState;
@@ -301,7 +301,7 @@ mod with_child_template {
 
         fn with_child(self, c: C) -> Self::Target {
           let mut builder = Child::builder();
-          builder.fill(c);
+          builder.fill_tml(c);
           ComposePair { widget: self, child: builder }
         }
       }
@@ -320,7 +320,7 @@ mod with_child_template {
     type Target = ComposePair<State<W>, Builder>;
 
     fn with_child(mut self, c: C) -> Self::Target {
-      self.child.fill(c);
+      self.child.fill_tml(c);
       self
     }
   }
@@ -334,7 +334,7 @@ mod with_child_template {
 
     #[inline]
     fn with_child(mut self, child: C) -> Self::Target {
-      self.fill(child);
+      self.fill_tml(child);
       self
     }
   }
@@ -347,7 +347,7 @@ mod with_child_template {
         T: FillTml<SelfImpl, Widget>,
       {
         #[inline]
-        fn fill(&mut self, c: $child)  { self.fill(c.into_widget()) }
+        fn fill_tml(&mut self, c: $child)  { self.fill_tml(c.into_widget()) }
       }
     };
   }
@@ -362,7 +362,7 @@ mod with_child_template {
         T: FillTml<SelfImpl, State<C>>,
       {
         #[inline]
-        fn fill(&mut self, c: $name) { self.fill(State::<C>::from(c)) }
+        fn fill_tml(&mut self, c: $name) { self.fill_tml(State::<C>::from(c)) }
       }
     };
   }
@@ -379,9 +379,9 @@ mod with_child_template {
         $(C: $static)?
       {
         #[inline]
-        fn fill(&mut self, c: WidgetPair<W, $ty>){
+        fn fill_tml(&mut self, c: WidgetPair<W, $ty>){
           let WidgetPair { widget, child } = c;
-          self.fill( WidgetPair {
+          self.fill_tml( WidgetPair {
             widget,
             child: State::<C>::from(child),
           })
@@ -402,9 +402,9 @@ mod with_child_template {
         $(W: $static)?
       {
         #[inline]
-        fn fill(&mut self, c: WidgetPair<$ty, C>){
+        fn fill_tml(&mut self, c: WidgetPair<$ty, C>){
           let WidgetPair { widget, child } = c;
-          self.fill( WidgetPair {
+          self.fill_tml( WidgetPair {
             widget: State::<W>::from(widget),
             child,
           });
@@ -425,9 +425,9 @@ mod with_child_template {
         C: IntoWidget<NotSelf<M>>  $(+$static)?,
       {
         #[inline]
-        fn fill(&mut self, c: WidgetPair<W, $child>){
+        fn fill_tml(&mut self, c: WidgetPair<W, $child>){
           let WidgetPair { widget, child } = c;
-          self.fill(WidgetPair { widget, child: child.into_widget() });
+          self.fill_tml(WidgetPair { widget, child: child.into_widget() });
         }
       }
     };
@@ -440,7 +440,7 @@ mod with_child_template {
     T: FillTml<SelfImpl, Vec<C>>,
   {
     #[inline]
-    fn fill(&mut self, c: C) { self.fill(vec![c]) }
+    fn fill_tml(&mut self, c: C) { self.fill_tml(vec![c]) }
   }
 
   impl<T, C, M> FillTml<NotSelf<[M; 14]>, C> for T
@@ -449,7 +449,7 @@ mod with_child_template {
     C: IntoWidget<NotSelf<M>>,
   {
     #[inline]
-    fn fill(&mut self, c: C) { self.fill(vec![c.into_widget()]) }
+    fn fill_tml(&mut self, c: C) { self.fill_tml(vec![c.into_widget()]) }
   }
 
   impl<T, D, M> FillTml<NotSelf<[M; 15]>, Stateful<DynWidget<D>>> for T
@@ -460,8 +460,8 @@ mod with_child_template {
     M: ImplMarker,
   {
     #[inline]
-    fn fill(&mut self, c: Stateful<DynWidget<D>>) {
-      self.fill(vec![DynRender::new(c).into_widget()])
+    fn fill_tml(&mut self, c: Stateful<DynWidget<D>>) {
+      self.fill_tml(vec![DynRender::new(c).into_widget()])
     }
   }
 
@@ -473,7 +473,7 @@ mod with_child_template {
         $(C: $static)?
       {
         #[inline]
-        fn fill(&mut self, c: $ty) { self.fill(vec![State::<C>::from(c)]) }
+        fn fill_tml(&mut self, c: $ty) { self.fill_tml(vec![State::<C>::from(c)]) }
       }
     };
   }
@@ -490,9 +490,9 @@ mod with_child_template {
         $ty: IntoIterator::<Item = $ty>,
         $(C: $static)?
       {
-        fn fill(&mut self, c: $ty) {
+        fn fill_tml(&mut self, c: $ty) {
           let  vec = c.into_iter().map(State::<C>::from).collect();
-          self.fill(vec)
+          self.fill_tml(vec)
         }
       }
     };
@@ -508,7 +508,7 @@ mod with_child_template {
     C: TemplateBuilder,
   {
     #[inline]
-    fn fill(&mut self, c: C) { self.fill(c.build_tml()) }
+    fn fill_tml(&mut self, c: C) { self.fill_tml(c.build_tml()) }
   }
 
   impl<W, T> IntoWidget<NotSelf<[(); 1]>> for ComposePair<State<W>, T>
@@ -567,4 +567,31 @@ mod helper_impl {
   impl_compose_child_state!(C);
   impl_compose_child_state!(Stateful<C>);
   impl_compose_child_state!(Stateful<DynWidget<C>>, 'static);
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::prelude::*;
+
+  #[derive(Template)]
+  struct PTml {
+    #[template(flat_fill)]
+    _child: CTml,
+  }
+
+  #[derive(Template)]
+  enum CTml {
+    Void(Void),
+  }
+
+  struct P;
+
+  impl ComposeChild for P {
+    type Child = PTml;
+    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+  }
+
+  #[test]
+  fn template_fill_template() { let _ = P.with_child(Void).into_widget(); }
 }

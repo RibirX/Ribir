@@ -76,7 +76,7 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[proc_macro_derive(Template, attributes(declare))]
+#[proc_macro_derive(Template, attributes(template))]
 pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
   child_template::derive_child_template(&mut input)
