@@ -47,6 +47,18 @@ where
   }
 }
 
+impl<M, W, C1, C2> ComposeWithChild<[M; 0], C2> for WidgetPair<W, C1>
+where
+  C1: ComposeWithChild<M, C2>,
+{
+  type Target = WidgetPair<W, C1::Target>;
+
+  fn with_child(self, c: C2) -> Self::Target {
+    let WidgetPair { widget, child } = self;
+    WidgetPair { widget, child: child.with_child(c) }
+  }
+}
+
 mod with_target_child {
   use super::*;
   use crate::widget::SelfImpl;
@@ -572,8 +584,7 @@ mod helper_impl {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::*;
-
+  use crate::{prelude::*, test::MockBox};
   #[derive(Template)]
   struct PTml {
     #[template(flat_fill)]
@@ -592,6 +603,37 @@ mod tests {
     fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
   }
 
+  #[derive(Declare)]
+  struct X;
+
+  impl ComposeChild for X {
+    type Child = Widget;
+
+    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+  }
+
   #[test]
   fn template_fill_template() { let _ = P.with_child(Void).into_widget(); }
+
+  #[test]
+  fn pair_compose_child() {
+    let _ = MockBox { size: ZERO_SIZE }
+      .with_child(X)
+      .with_child(Void {})
+      .into_widget();
+  }
+
+  #[test]
+  fn enum_widget_compose_child() {
+    let flag = true;
+    let _ = widget! {
+      DynWidget {
+        dyns: match flag {
+          true => WidgetE2::A(MockBox{ size: ZERO_SIZE }.with_child(X)),
+          false => WidgetE2::B(X),
+        },
+        X { Void {} }
+      }
+    };
+  }
 }
