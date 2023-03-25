@@ -22,6 +22,15 @@ impl<W: SingleChild, C> SingleWithChild<W, C> for W {
   fn with_child(self, child: C) -> Self::Target { WidgetPair { widget: self, child } }
 }
 
+impl<W, C1: SingleChild, C2> SingleWithChild<W, C2> for WidgetPair<W, C1> {
+  type Target = WidgetPair<W, WidgetPair<C1, C2>>;
+
+  fn with_child(self, c: C2) -> Self::Target {
+    let WidgetPair { widget, child } = self;
+    WidgetPair { widget, child: child.with_child(c) }
+  }
+}
+
 impl<W, C, M> IntoWidget<NotSelf<M>> for WidgetPair<W, C>
 where
   W: IntoSingleParent,
@@ -85,4 +94,21 @@ impl<W: IntoWidget<M>, M: ImplMarker> IntoSingleChild<[M; 0]> for W {
 
 impl<W: IntoWidget<M>, M: ImplMarker> IntoSingleChild<[M; 1]> for Option<W> {
   fn into_single_child(self) -> Option<Vec<Widget>> { self.map(|c| vec![c.into_widget()]) }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::test::MockBox;
+
+  use super::*;
+
+  #[test]
+  fn pair_with_child() {
+    let mock_box = MockBox { size: ZERO_SIZE };
+    let _ = mock_box
+      .clone()
+      .with_child(mock_box.clone())
+      .with_child(mock_box)
+      .into_widget();
+  }
 }
