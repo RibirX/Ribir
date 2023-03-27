@@ -94,63 +94,40 @@ fn main() {
           Lists {
             margin: EdgeInsets::only_top(20.),
             ListItem {
-              Leading {
-                Icon {
-                  size: Size::new(24., 24.),
-                  svgs::ADD_CIRCLE
-                }
-              }
+              line_number: 1,
+              Leading { svgs::CHECK_BOX_OUTLINE_BLANK }
               HeadlineText(Label::new("One line list item"))
               SupportingText(Label::new("One line supporting text"))
-              Trailing {
-                Icon {
-                  size: Size::new(24., 24.),
-                  svgs::CHECK_BOX_OUTLINE_BLANK
-                }
-              }
             }
             Divider { indent: 16. }
             ListItem {
-              Leading {
-                Container {
-                  size: Size::new(40., 40.),
-                  background: primary.clone(),
-                  border_radius: Radius::all(20.),
-                  Text {
-                    h_align: HAlign::Center,
-                    v_align: VAlign::Center,
-                    text: "A",
-                    foreground: on_primary.clone(),
-                  }
-                }
-              }
-              HeadlineText(Label::new("Two line list item"))
-              SupportingText(Label::new("Two line supporting text \r two line support text"))
-              Trailing {
-                Text { text: "100+" }
-              }
+              Leading { svgs::MENU }
+              HeadlineText(Label::new("One line list item"))
+              Trailing { Label::new("100+") }
             }
             Divider { indent: 16. }
             ListItem {
-              item_align: Align::Start,
+              line_number: 2,
               Leading {
-                Container {
-                  size: Size::new(40., 40.),
-                  background: primary.clone(),
-                  border_radius: Radius::all(20.),
-                  Text {
-                    h_align: HAlign::Center,
-                    v_align: VAlign::Center,
-                    text: "A",
-                    foreground: on_primary.clone(),
+                IntoWidget::into_widget(
+                  widget! {
+                    Container {
+                      size: Size::splat(40.),
+                      background: primary.clone(),
+                      border_radius: Radius::all(20.),
+                      Text {
+                        h_align: HAlign::Center,
+                        v_align: VAlign::Center,
+                        foreground: on_primary.clone(),
+                        text: "A",
+                      }
+                    }
                   }
-                }
+                )
               }
-              HeadlineText(Label::new("More line list item"))
-              SupportingText(Label::new("More line supporting text \r more lines supporting text \r more lines supporting text"))
-              Trailing {
-                Text { text: "100+" }
-              }
+              HeadlineText(Label::new("Two lines list item"))
+              SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text"))
+              Trailing { Label::new("100+") }
             }
           }
         }
