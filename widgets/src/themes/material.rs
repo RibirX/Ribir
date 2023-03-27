@@ -76,6 +76,14 @@ const LABEL_GAP: f32 = 8.;
 const BUTTON_RADIUS: f32 = 20.;
 const BUTTON_PADDING: f32 = 16.;
 const INDICATOR_SIZE: f32 = 60.;
+const LIST_ITEM_GAP: f32 = 16.;
+const LIST_ITEM_SIZE: f32 = 40.;
+
+const ICON_TINY: Size = Size::new(18., 18.);
+const ICON_SMALL: Size = Size::new(24., 24.);
+const ICON_MEDIUM: Size = Size::new(36., 36.);
+const ICON_LARGE: Size = Size::new(48., 48.);
+const ICON_HUGE: Size = Size::new(64., 64.);
 
 fn init_custom_theme(theme: &mut FullTheme) {
   theme.custom_themes.set_custom_theme(ScrollBarTheme {
@@ -84,7 +92,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
     track_brush: theme.palette.primary_container().into(),
   });
   theme.custom_themes.set_custom_theme(CheckBoxTheme {
-    size: theme.icon_theme.icon_size.tiny,
+    size: ICON_TINY,
     label_style: theme.typography_theme.body_large.text.clone(),
   });
   theme.custom_themes.set_custom_theme(InputTheme {
@@ -94,7 +102,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   });
   theme.custom_themes.set_custom_theme(FilledButtonStyle {
     height: 40.,
-    icon_size: theme.icon_theme.icon_size.tiny,
+    icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
     icon_pos: IconPosition::Before,
     label_style: theme.typography_theme.label_large.text.clone(),
@@ -103,7 +111,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   });
   theme.custom_themes.set_custom_theme(OutlinedButtonStyle {
     height: 40.,
-    icon_size: theme.icon_theme.icon_size.tiny,
+    icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
     icon_pos: IconPosition::Before,
     label_style: theme.typography_theme.label_large.text.clone(),
@@ -113,7 +121,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   });
   theme.custom_themes.set_custom_theme(RawButtonStyle {
     height: 40.,
-    icon_size: theme.icon_theme.icon_size.tiny,
+    icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
     icon_pos: IconPosition::Before,
     label_style: theme.typography_theme.label_large.text.clone(),
@@ -121,7 +129,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   });
   theme.custom_themes.set_custom_theme(FabButtonStyle {
     height: 56.,
-    icon_size: theme.icon_theme.icon_size.small,
+    icon_size: ICON_SMALL,
     label_gap: LABEL_GAP,
     icon_pos: IconPosition::Before,
     label_style: theme.typography_theme.label_large.text.clone(),
@@ -142,18 +150,57 @@ fn init_custom_theme(theme: &mut FullTheme) {
       measure: Some(INDICATOR_SIZE),
     },
   });
-  theme
-    .custom_themes
-    .set_custom_theme(ListsStyle { padding: EdgeInsets::vertical(8.) });
+  theme.custom_themes.set_custom_theme(ListsStyle {
+    padding: EdgeInsets::vertical(8.),
+    background: theme.palette.surface().into(),
+  });
   theme.custom_themes.set_custom_theme(ListItemStyle {
-    padding_style: EdgeInsets {
-      left: 16.,
-      right: 8.,
+    padding_style: Some(EdgeInsets {
+      left: 0.,
+      right: 24.,
       bottom: 8.,
       top: 8.,
+    }),
+    item_align: |num| {
+      if num >= 2 {
+        Align::Start
+      } else {
+        Align::Center
+      }
     },
-    trailing_gap: EdgeInsets::only_right(16.),
-    label_gap: EdgeInsets::horizontal(16.),
+    label_gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+    headline_style: theme.typography_theme.body_large.text.clone(),
+    supporting_style: theme.typography_theme.body_medium.text.clone(),
+    leading_config: ListItemConfig {
+      icon: ItemInfo {
+        size: ICON_SMALL,
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      text: TextItemInfo {
+        style: theme.typography_theme.label_small.text.clone(),
+        foreground: theme.palette.on_surface_variant().into(),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      custom: ItemInfo {
+        size: Size::splat(LIST_ITEM_SIZE),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+    },
+    trailing_config: ListItemConfig {
+      icon: ItemInfo {
+        size: ICON_SMALL,
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      text: TextItemInfo {
+        style: theme.typography_theme.label_small.text.clone(),
+        foreground: theme.palette.on_surface_variant().into(),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      custom: ItemInfo {
+        size: Size::splat(LIST_ITEM_SIZE),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+    },
   });
 }
 
@@ -290,11 +337,11 @@ pub mod purple {
 
 fn icon_theme() -> IconTheme {
   let icon_size = IconSize {
-    tiny: Size::new(18., 18.),
-    small: Size::new(24., 24.),
-    medium: Size::new(36., 36.),
-    large: Size::new(48., 48.),
-    huge: Size::new(64., 64.),
+    tiny: ICON_TINY,
+    small: ICON_SMALL,
+    medium: ICON_MEDIUM,
+    large: ICON_LARGE,
+    huge: ICON_HUGE,
   };
   IconTheme::new(icon_size)
 }

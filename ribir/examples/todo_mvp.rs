@@ -124,18 +124,30 @@ impl TodoMVP {
           },
           HeadlineText(Label::new(task.label.clone()))
           Leading {
-            Checkbox {
-              id: checkbox,
-              checked: task.finished,
-              margin: EdgeInsets::vertical(4.),
-            }
+            IntoWidget::into_widget(
+              widget! {
+                Checkbox {
+                  id: checkbox,
+                  checked: task.finished,
+                  margin: EdgeInsets::vertical(4.),
+                }
+                finally {
+                  let_watch!(checkbox.checked)
+                    .subscribe(move |v| this.tasks[idx].finished = v);
+                }
+              }
+            )
           }
           Trailing {
-            Icon {
-              visible: item.mouse_hover(),
-              on_tap: move |_| { this.tasks.remove(idx); },
-              svgs::CLOSE
-            }
+            IntoWidget::into_widget(
+              widget! {
+                Icon {
+                  visible: item.mouse_hover(),
+                  on_tap: move |_| { this.tasks.remove(idx); },
+                  svgs::CLOSE
+                }
+              }
+            )
           }
         }
       }
@@ -149,10 +161,6 @@ impl TodoMVP {
         },
         prop: prop!(item.transform),
         from: Transform::translation(-400., 0. ),
-      }
-      finally {
-        let_watch!(checkbox.checked)
-          .subscribe(move |v| this.tasks[idx].finished = v);
       }
     }
   }

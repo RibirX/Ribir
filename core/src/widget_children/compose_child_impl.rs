@@ -1,7 +1,7 @@
 use crate::{
   dynamic_widget::DynWidget,
   state::{State, Stateful},
-  widget::{ImplMarker, IntoWidget, NotSelf, Widget, FlatFill},
+  widget::{FlatFill, ImplMarker, IntoWidget, NotSelf, Widget},
 };
 
 use super::{ComposeChild, WidgetPair};
@@ -377,7 +377,8 @@ mod with_child_template {
         fn fill_tml(&mut self, c: $name) { self.fill_tml(State::<C>::from(c)) }
       }
 
-      impl<T, const IDX: usize, C $(: $static)?> FillTml<NotSelf<[FlatFill<IDX>; $idx]>, $name> for T
+      impl<T, const IDX: usize, C $(: $static)?>
+        FillTml<NotSelf<[FlatFill<IDX>; $idx]>, $name> for T
       where
         T: FillTml<NotSelf<FlatFill<IDX>>, State<C>>,
       {
@@ -408,7 +409,8 @@ mod with_child_template {
         }
       }
 
-      impl<W, C, T, const IDX: usize,> FillTml<NotSelf<[FlatFill<IDX>; $idx]>, WidgetPair<W, $ty>> for T
+      impl<W, C, T, const IDX: usize,>
+        FillTml<NotSelf<[FlatFill<IDX>; $idx]>, WidgetPair<W, $ty>> for T
       where
         T: FillTml<NotSelf<FlatFill<IDX>>, WidgetPair<W, State<C>>>,
         $(C: $static)?
