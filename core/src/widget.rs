@@ -164,12 +164,15 @@ impl<'a> dyn Render + 'a {
 pub trait ImplMarker {}
 /// implement marker means this converter not hope to convert continue.
 pub struct SelfImpl;
+/// mark for template FlatFill embed template
+pub struct FlatFill<const IDX: usize>;
 /// implement marker means this converter can use as a generic bounds to convert
 /// continue.
 pub struct NotSelf<M>(PhantomData<fn(M)>);
 
 impl ImplMarker for SelfImpl {}
 impl<M> ImplMarker for NotSelf<M> {}
+impl<const IDX: usize> ImplMarker for FlatFill<IDX> {}
 
 impl IntoWidget<SelfImpl> for Widget {
   #[inline]
