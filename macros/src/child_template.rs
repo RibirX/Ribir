@@ -47,7 +47,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     }
   };
 
-  let fill_tml_impl = |field_name: TokenStream, f: &mut Field, tokens: &mut TokenStream| {
+  let fill_tml_impl = |field_name: TokenStream, f: &mut Field, tokens: &mut TokenStream, field_idx: usize| {
     let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
     tokens.extend(quote! {
       impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
@@ -79,7 +79,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
       let (g_impl, _, g_where) = flat_fill_gen.split_for_impl();
       tokens.extend(quote! {
-        impl #g_impl FillTml<NotSelf<#ty>, Child> for #tml #g_ty #g_where {
+        impl #g_impl FillTml<NotSelf<FlatFill<#field_idx>>, Child> for #tml #g_ty #g_where {
           fn fill_tml(&mut self, c: Child) {
             let mut builder = #ty::builder();
             builder.fill_tml(c);
@@ -92,9 +92,9 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
   match data {
     syn::Data::Struct(stt) => match &mut stt.fields {
       Fields::Named(FieldsNamed { named: fields, .. }) => {
-        fields.iter_mut().for_each(|f| {
+        fields.iter_mut().enumerate().for_each(|(idx, f)| {
           let f_name = f.ident.as_ref().unwrap();
-          fill_tml_impl(quote! {#f_name}, f, &mut tokens)
+          fill_tml_impl(quote! {#f_name}, f, &mut tokens, idx)
         });
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
@@ -121,8 +121,8 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       }
       Fields::Unnamed(FieldsUnnamed { unnamed: fields, .. }) => {
         fields.iter_mut().enumerate().for_each(|(idx, f)| {
-          let idx = Index::from(idx);
-          fill_tml_impl(quote! {#idx}, f, &mut tokens)
+          let idx_tokens = Index::from(idx);
+          fill_tml_impl(quote! {#idx_tokens}, f, &mut tokens, idx)
         });
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {

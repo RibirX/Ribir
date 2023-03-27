@@ -1,7 +1,7 @@
 use crate::{
   dynamic_widget::DynWidget,
   state::{State, Stateful},
-  widget::{ImplMarker, IntoWidget, NotSelf, Widget},
+  widget::{ImplMarker, IntoWidget, NotSelf, Widget, FlatFill},
 };
 
 use super::{ComposeChild, WidgetPair};
@@ -376,6 +376,14 @@ mod with_child_template {
         #[inline]
         fn fill_tml(&mut self, c: $name) { self.fill_tml(State::<C>::from(c)) }
       }
+
+      impl<T, const IDX: usize, C $(: $static)?> FillTml<NotSelf<[FlatFill<IDX>; $idx]>, $name> for T
+      where
+        T: FillTml<NotSelf<FlatFill<IDX>>, State<C>>,
+      {
+        #[inline]
+        fn fill_tml(&mut self, c: $name) { self.fill_tml(State::<C>::from(c)) }
+      }
     };
   }
 
@@ -385,9 +393,24 @@ mod with_child_template {
 
   macro_rules! impl_fill_pair_state_child {
     ($ty: ty, $idx: tt$(,$static:lifetime)?) => {
-      impl<W, C, M, T> FillTml<NotSelf<[M; $idx]>, WidgetPair<W, $ty>> for T
+      impl<W, C, T> FillTml<NotSelf<[SelfImpl; $idx]>, WidgetPair<W, $ty>> for T
       where
         T: FillTml<SelfImpl, WidgetPair<W, State<C>>>,
+        $(C: $static)?
+      {
+        #[inline]
+        fn fill_tml(&mut self, c: WidgetPair<W, $ty>){
+          let WidgetPair { widget, child } = c;
+          self.fill_tml( WidgetPair {
+            widget,
+            child: State::<C>::from(child),
+          })
+        }
+      }
+
+      impl<W, C, T, const IDX: usize,> FillTml<NotSelf<[FlatFill<IDX>; $idx]>, WidgetPair<W, $ty>> for T
+      where
+        T: FillTml<NotSelf<FlatFill<IDX>>, WidgetPair<W, State<C>>>,
         $(C: $static)?
       {
         #[inline]
