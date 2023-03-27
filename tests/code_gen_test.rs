@@ -1,5 +1,5 @@
 use ribir::{core::test::*, prelude::*};
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, rc::Rc, time::Duration};
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
@@ -479,4 +479,49 @@ fn embed_shadow_states() {
       SizedBox { size: *_a }
     })
   };
+}
+
+#[test]
+fn untrack_prop_with_pure_lambda() {
+  let trigger = Stateful::new(0_u32);
+  let counter = Stateful::new(0_u32);
+  let w = widget! {
+    states {
+      trigger: trigger.clone(),
+      counter: counter.clone()
+    }
+    SizedBox {
+      id: host,
+      size: Size::new(50., 50.),
+    }
+    Animate {
+      id: animate,
+      transition: Transition {
+        delay:  None,
+        duration: Duration::from_millis(150),
+        easing: easing::EASE_IN,
+        repeat: None,
+      },
+      prop: prop!(host.size, move |from, to, rate| {
+        let _ = *trigger;
+        to.lerp(from, rate)
+      }),
+      from: Size::zero(),
+    }
+    finally {
+      let_watch!(animate.from)
+        .subscribe(move |_| {
+          *counter += 1;
+        });
+    }
+  };
+
+  let mut wnd = Window::default_mock(w, None);
+  wnd.draw_frame();
+
+  assert_eq!(*counter.state_ref(), 0);
+  *trigger.state_ref() += 1;
+  wnd.draw_frame();
+
+  assert_eq!(*counter.state_ref(), 0);
 }
