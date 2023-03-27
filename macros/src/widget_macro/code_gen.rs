@@ -132,7 +132,7 @@ pub(crate) fn gen_prop_macro(
     },
   );
   if let Some(lerp_fn) = lerp_fn {
-    ctx.visit_track_expr_mut(lerp_fn);
+    ctx.visit_expr_as_value_mut(lerp_fn);
   }
 
   prop_macro.to_token_stream().into()

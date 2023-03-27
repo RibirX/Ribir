@@ -388,17 +388,7 @@ impl VisitCtx {
           ctx.new_scope_visit(
             |ctx| match &mut f.value {
               FieldValue::Expr(expr) => {
-                let closure_as_value = is_pure_closure(&expr.expr);
-                ctx.visit_track_expr_mut(expr);
-                if closure_as_value {
-                  // when a closure directly as a field value, needn't subscribe it, because no
-                  // matter how many states the closure body used, they are only effects the logic
-                  // of the closure.
-                  expr
-                    .used_name_info
-                    .iter_mut()
-                    .for_each(|(_, info)| info.used_type.remove(UsedType::SUBSCRIBE));
-                }
+                ctx.visit_expr_as_value_mut(expr);
 
                 if expr.used_name_info.subscribe_widget().is_some() {
                   ctx.take_current_used_info();
@@ -491,6 +481,29 @@ impl VisitCtx {
       },
       |_| {},
     );
+  }
+
+  pub fn visit_expr_as_value_mut(&mut self, expr: &mut TrackExpr) {
+    let closure_as_value = is_pure_closure(&expr.expr);
+    if closure_as_value {
+      self.new_scope_visit(
+        |ctx| {
+          ctx.visit_expr_mut(&mut expr.expr);
+          // when a closure directly as value, needn't subscribe it, because no
+          // matter how many states the closure body used, they are only effects the logic
+          // of the closure.
+          ctx
+            .current_used_info
+            .iter_mut()
+            .for_each(|(_, info)| info.used_type.remove(UsedType::SUBSCRIBE));
+
+          expr.used_name_info = ctx.current_used_info.clone();
+        },
+        |_| {},
+      );
+    } else {
+      self.visit_track_expr_mut(expr);
+    }
   }
 
   pub fn visit_widget_node_mut(&mut self, widget: &mut WidgetNode) {
