@@ -1,3 +1,4 @@
+pub mod avatar;
 pub mod buttons;
 pub mod checkbox;
 pub mod common_widget;
@@ -16,6 +17,7 @@ pub mod text_field;
 pub mod themes;
 pub mod transform_box;
 pub mod prelude {
+  pub use super::avatar::*;
   pub use super::buttons::*;
   pub use super::checkbox::*;
   pub use super::common_widget::*;
