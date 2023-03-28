@@ -75,11 +75,16 @@ impl<D: 'static> Render for DynRender<D> {
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    self.self_render.paint(ctx);
-    ctx.painter.restore(); // set the painter back to parent.
+    if !self.drop_until_widgets.is_empty() {
+      ctx.painter.save();
+      // set the position back to parent.
+      let rc = ctx.box_rect().unwrap();
+      ctx.painter.translate(-rc.min_x(), -rc.min_y());
+      self.drop_until_widgets.paint(ctx);
+      ctx.painter.restore();
+    }
 
-    self.drop_until_widgets.paint(ctx);
-    ctx.painter.save(); // outter framework will restore again,
+    self.self_render.paint(ctx);
   }
 
   fn only_sized_by_parent(&self) -> bool {
