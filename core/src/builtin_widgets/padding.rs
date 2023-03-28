@@ -23,7 +23,6 @@ impl Render for Padding {
     ctx.force_child_relayout(child);
     let mut child_layouter = ctx.assert_single_child_layouter();
 
-    child_layouter.reset_children_position();
     let size = child_layouter.perform_widget_layout(child_clamp);
 
     // Expand the size, so the child have padding.

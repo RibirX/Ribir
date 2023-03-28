@@ -80,6 +80,7 @@ pub struct Layouter<'a> {
   pub(crate) store: &'a mut LayoutStore,
   pub(crate) wnd_ctx: &'a WindowCtx,
   pub(crate) dirty_set: &'a DirtySet,
+  pub(crate) is_layout_root: bool,
 }
 
 impl LayoutStore {
@@ -178,28 +179,30 @@ impl BoxClamp {
 }
 
 impl<'a> Layouter<'a> {
-  /// perform layout of the widget this `ChildLayouter` represent, return the
+  /// perform layout of the widget this `ChildLayouter` represent,
+  /// reset the widget position back to (0, 0) relative to parent, return the
   /// size result after layout
   pub fn perform_widget_layout(&mut self, clamp: BoxClamp) -> Size {
     let Self {
-      wid: child,
+      wid,
       arena,
       store,
       wnd_ctx,
       dirty_set,
+      is_layout_root,
     } = self;
 
-    store
-      .layout_info(*child)
+    let size = store
+      .layout_info(*wid)
       .filter(|info| clamp == info.clamp)
       .and_then(|info| info.size)
       .unwrap_or_else(|| {
         // Safety: `arena1` and `arena2` access different part of `arena`;
         let (arena1, arena2) = unsafe { split_arena(arena) };
 
-        let layout = child.assert_get(arena1);
+        let layout = wid.assert_get(arena1);
         let mut ctx = LayoutCtx {
-          id: *child,
+          id: *wid,
           arena: arena2,
           store,
           wnd_ctx,
@@ -207,19 +210,23 @@ impl<'a> Layouter<'a> {
         };
         let size = layout.perform_layout(clamp, &mut ctx);
         let size = clamp.clamp(size);
-        let info = store.layout_info_or_default(*child);
+        let info = store.layout_info_or_default(*wid);
         info.clamp = clamp;
         info.size = Some(size);
 
         layout.query_all_type(
           |_: &PerformedLayoutListener| {
-            store.performed.push(*child);
+            store.performed.push(*wid);
             false
           },
           QueryOrder::OutsideFirst,
         );
         size
-      })
+      });
+    if !*is_layout_root {
+      store.layout_info_or_default(*wid).pos = Point::zero();
+    }
+    size
   }
 
   /// Get layouter of the next sibling of this layouter, panic if self is not
@@ -229,18 +236,42 @@ impl<'a> Layouter<'a> {
       self.layout_rect().is_some(),
       "Before try to layout next sibling, self must performed layout."
     );
-    self
-      .wid
-      .next_sibling(self.arena)
-      .map(move |sibling| self.into_new_layouter(sibling))
+    let Self {
+      arena,
+      store,
+      wnd_ctx,
+      dirty_set,
+      wid,
+      ..
+    } = self;
+    wid.next_sibling(arena).map(move |sibling| Layouter {
+      wid: sibling,
+      arena,
+      store,
+      wnd_ctx,
+      dirty_set,
+      is_layout_root: false,
+    })
   }
 
   /// Return layouter of the first child of this widget.
   pub fn into_first_child_layouter(self) -> Option<Self> {
-    self
-      .wid
-      .first_child(self.arena)
-      .map(move |wid| self.into_new_layouter(wid))
+    let Self {
+      arena,
+      store,
+      wnd_ctx,
+      dirty_set,
+      wid,
+      ..
+    } = self;
+    wid.first_child(arena).map(move |wid| Layouter {
+      wid,
+      arena,
+      store,
+      wnd_ctx,
+      dirty_set,
+      is_layout_root: false,
+    })
   }
 
   /// Return the rect of this layouter if it had performed layout.
@@ -274,11 +305,6 @@ impl<'a> Layouter<'a> {
       .wid
       .assert_get(self.arena)
       .query_on_first_type(QueryOrder::OutsideFirst, callback);
-  }
-
-  fn into_new_layouter(mut self, wid: WidgetId) -> Self {
-    self.wid = wid;
-    self
   }
 
   /// reset the child layout position to Point::zero()
@@ -508,5 +534,62 @@ mod tests {
     }
     wnd.draw_frame();
     assert_eq!(*cnt.borrow(), 2);
+  }
+
+  #[test]
+  fn layout_visit_prev_position() {
+    #[derive(Declare)]
+    struct MockWidget {
+      pos: RefCell<Point>,
+      size: Size,
+    }
+
+    impl Render for MockWidget {
+      fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+        *self.pos.borrow_mut() = ctx
+          .layout_store()
+          .layout_box_position(ctx.id)
+          .unwrap_or_default();
+        self.size
+      }
+      #[inline]
+      fn only_sized_by_parent(&self) -> bool { true }
+
+      #[inline]
+      fn paint(&self, _: &mut PaintingCtx) {}
+    }
+
+    impl Query for MockWidget {
+      impl_query_self_only!();
+    }
+
+    let pos = Rc::new(RefCell::new(Point::zero()));
+    let pos2 = pos.clone();
+    let trigger = Stateful::new(Size::zero());
+    let w = widget! {
+      states {trigger: trigger.clone()}
+      init {
+        let pos = pos2.clone();
+      }
+      MockMulti {
+        MockBox{
+          size: Size::new(50., 50.),
+        }
+        MockWidget {
+          id: w,
+          size: *trigger,
+          pos: RefCell::new(Point::zero()),
+          on_performed_layout: move |_| {
+            *pos.borrow_mut() = *w.pos.borrow();
+          }
+        }
+      }
+    };
+    let mut wnd = Window::default_mock(w, None);
+    wnd.draw_frame();
+
+    *trigger.state_ref() = Size::new(1., 1.);
+    wnd.draw_frame();
+    assert_eq!(*pos.borrow(), Point::new(50., 0.));
   }
 }
