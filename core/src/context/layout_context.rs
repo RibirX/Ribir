@@ -46,12 +46,12 @@ impl<'a> LayoutCtx<'a> {
 
   /// Return the layouter of the first child.
   pub fn first_child_layouter(&mut self) -> Option<Layouter> {
-    self.first_child().map(|wid| self.new_layouter(wid))
+    self.first_child().map(|wid| self.new_layouter(wid, false))
   }
 
   /// Return the layouter of the first child.
   pub fn single_child_layouter(&mut self) -> Option<Layouter> {
-    self.single_child().map(|wid| self.new_layouter(wid))
+    self.single_child().map(|wid| self.new_layouter(wid, false))
   }
 
   /// Return the layouter of the first child.
@@ -59,7 +59,7 @@ impl<'a> LayoutCtx<'a> {
   /// panic if there is not only one child it have.
   pub fn assert_single_child_layouter(&mut self) -> Layouter {
     let wid = self.assert_single_child();
-    self.new_layouter(wid)
+    self.new_layouter(wid, false)
   }
 
   /// Clear the child layout information, so the `child` will be force layout
@@ -71,7 +71,7 @@ impl<'a> LayoutCtx<'a> {
     self.store.force_layout(child).is_some()
   }
 
-  fn new_layouter(&mut self, wid: WidgetId) -> Layouter {
+  fn new_layouter(&mut self, wid: WidgetId, is_layout_root: bool) -> Layouter {
     let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
     Layouter {
       wid,
@@ -79,6 +79,7 @@ impl<'a> LayoutCtx<'a> {
       store,
       wnd_ctx,
       dirty_set,
+      is_layout_root,
     }
   }
 }

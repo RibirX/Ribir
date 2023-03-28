@@ -69,6 +69,7 @@ impl WidgetTree {
           store,
           wnd_ctx,
           dirty_set,
+          is_layout_root: true,
         };
         layouter.perform_widget_layout(clamp);
 
