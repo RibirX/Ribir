@@ -28,6 +28,27 @@ impl PixelImage {
   pub fn new(data: Cow<'static, [u8]>, width: u16, height: u16, format: ColorFormat) -> Self {
     PixelImage { data, size: (width, height), format }
   }
+
+  #[cfg(feature = "png")]
+  pub fn from_png(bytes: &[u8]) -> Self {
+    let decoder = png::Decoder::new(bytes);
+    let mut reader = decoder.read_info().unwrap();
+
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).unwrap();
+
+    let data = if info.buffer_size() != buf.len() {
+      buf[..info.buffer_size()].to_owned()
+    } else {
+      buf
+    };
+    PixelImage::new(
+      std::borrow::Cow::Owned(data),
+      info.width as u16,
+      info.height as u16,
+      ColorFormat::Rgba8,
+    )
+  }
   #[inline]
   pub fn color_format(&self) -> ColorFormat { self.format }
   #[inline]
@@ -67,6 +88,10 @@ impl Debug for ShallowImage {
 impl ShallowImage {
   #[inline]
   pub fn new(img: PixelImage) -> Self { Self(Rc::new(img)) }
+
+  #[inline]
+  #[cfg(feature = "png")]
+  pub fn from_png(bytes: &[u8]) -> Self { ShallowImage::new(PixelImage::from_png(bytes)) }
 }
 
 impl std::ops::Deref for ShallowImage {

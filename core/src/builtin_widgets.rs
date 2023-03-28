@@ -1,5 +1,7 @@
 pub mod key;
 pub use key::{Key, KeyWidget};
+pub mod image_widget;
+pub use image_widget::*;
 pub mod delay_drop_widget;
 pub use delay_drop_widget::DelayDropWidget;
 mod theme;
