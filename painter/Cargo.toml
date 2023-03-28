@@ -26,3 +26,7 @@ ribir_text = {path = "../text", version = "0.0.0"}
 serde = {workspace = true, features = ["rc"]}
 serde_json.workspace = true
 usvg.workspace = true
+png = {workspace = true, optional=true}
+
+[features]
+png = ["dep:png"]

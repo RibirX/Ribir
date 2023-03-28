@@ -63,7 +63,7 @@ impl TextShaper {
       .unwrap_or_else(|| {
         let glyphs = self
           .shape_text_with_fallback(text, direction, face_ids)
-          .unwrap_or(vec![]);
+          .unwrap_or_default();
 
         let glyphs = Arc::new(ShapeResult { text: text.clone(), glyphs });
         self.shape_cache.write().unwrap().insert(

@@ -34,7 +34,7 @@ winit.workspace = true
 
 
 [features]
-png = ["dep:png"]
+png = ["dep:png", "ribir_painter/png"]
 thread-pool = [
   "futures/thread-pool",
 ]
