@@ -414,6 +414,20 @@ where
   fn into_dyns(self) -> Vec<Widget> { self.into_iter().map(IntoWidget::into_widget).collect() }
 }
 
+impl<D, M, Item> IntoDyns<[M; 2]> for D
+where
+  D: IntoIterator<Item = Option<Item>>,
+  Item: IntoWidget<M>,
+  M: ImplMarker,
+{
+  fn into_dyns(self) -> Vec<Widget> {
+    self
+      .into_iter()
+      .filter_map(|w| w.map(IntoWidget::into_widget))
+      .collect()
+  }
+}
+
 impl<D: 'static> Query for DynRender<D> {
   impl_proxy_query!(self.self_render, self.dyn_widgets, self.drop_until_widgets);
 }
