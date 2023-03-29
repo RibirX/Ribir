@@ -129,22 +129,17 @@ fn init_custom_theme(theme: &mut FullTheme) {
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
   theme.custom_themes.set_custom_theme(TabsStyle {
-    extent: 64.,
-    direction: Direction::Horizontal,
+    extent_with_both: 64.,
+    extent_only_label: 48.,
+    extent_only_icon: 48.,
     icon_size: theme.icon_theme.icon_size.small,
     icon_pos: Position::Top,
     active_color: theme.palette.primary().into(),
-    normal_color: theme.palette.on_surface_variant().into(),
+    foreground: theme.palette.on_surface_variant().into(),
     label_style: theme.typography_theme.title_small.text.clone(),
-    indicator: IndicatorConfig {
+    indicator: IndicatorStyle {
       extent: 3.,
       measure: Some(INDICATOR_SIZE),
-      radius: Some(Radius::from(BorderRadii {
-        top_left: 3.,
-        top_right: 3.,
-        bottom_left: 0.,
-        bottom_right: 0.,
-      })),
     },
   });
 }
@@ -199,7 +194,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<IndicatorStyle>(|style, host| {
+  styles.override_compose_style::<IndicatorDecorator>(|style, host| {
     widget! {
       states { style }
       init ctx => {
@@ -207,12 +202,27 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
       DynWidget {
         id: indicator,
-        left_anchor: style.rect.origin.x + (style.rect.size.width - INDICATOR_SIZE) / 2.,
+        left_anchor: match style.pos {
+          Position::Top | Position::Bottom => style.rect.origin.x
+            + (style.rect.size.width - INDICATOR_SIZE) / 2.,
+          Position::Left => style.rect.size.width - style.extent,
+          Position::Right => 0.,
+        },
+        top_anchor: match style.pos {
+          Position::Left | Position::Right => style.rect.origin.y
+            + (style.rect.size.height - INDICATOR_SIZE) / 2.,
+          Position::Top => style.rect.size.height - style.extent,
+          Position::Bottom => 0.,
+        },
         dyns: host,
       }
       transition prop!(
         indicator.left_anchor,
         PositionUnit::lerp_fn(style.rect.size.width)
+      ) { by: ease_in.clone() }
+      transition prop!(
+        indicator.top_anchor,
+        PositionUnit::lerp_fn(style.rect.size.height)
       ) { by: ease_in }
     }
   });

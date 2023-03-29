@@ -1,29 +1,86 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
 
+/// Tabs usage
+///
+/// # Example
+/// ```
+/// # use ribir_core::prelude::*;
+/// # use ribir_widgets::prelude::*;
+///
+/// let tabs = widget! {
+///   Tabs {
+///     Tab {
+///       TabItem {
+///         svgs::HOME
+///         Label::new("Home")
+///       }
+///       TabPane {
+///         Text { text: "content" }
+///       }
+///     }
+///     Tab {
+///       TabItem {
+///         svgs::HOME
+///         Label::new("Home")
+///       }
+///       TabPane {
+///         Text { text: "content" }
+///       }
+///     }
+///   }
+/// };
+///
+/// // bottom tabs
+/// let bottom_tabs = widget! {
+///   Tabs {
+///     pos: Position::Bottom,
+///     Tab {
+///       TabItem {
+///         svgs::HOME
+///         Label::new("Home")
+///       }
+///       TabPane {
+///         Text { text: "content" }
+///       }
+///     }
+///     Tab {
+///       TabItem {
+///         svgs::HOME
+///         Label::new("Home")
+///       }
+///       TabPane {
+///         Text { text: "content" }
+///       }
+///     }
+///   }
+/// };
+/// ```
 #[derive(Declare, Clone)]
 pub struct Tabs {
+  #[declare(default = Position::Top)]
+  pub pos: Position,
   #[declare(default = 0)]
   pub cur_idx: usize,
 }
 
 #[derive(Clone)]
-pub struct IndicatorConfig {
+pub struct IndicatorStyle {
   pub measure: Option<f32>,
   pub extent: f32,
-  pub radius: Option<Radius>,
 }
 
 #[derive(Clone)]
 pub struct TabsStyle {
-  pub extent: f32,
-  pub direction: Direction,
+  pub extent_only_label: f32,
+  pub extent_only_icon: f32,
+  pub extent_with_both: f32,
   pub icon_size: Size,
   pub icon_pos: Position,
   pub active_color: Brush,
-  pub normal_color: Brush,
+  pub foreground: Brush,
   pub label_style: CowArc<TextStyle>,
-  pub indicator: IndicatorConfig,
+  pub indicator: IndicatorStyle,
 }
 
 impl CustomTheme for TabsStyle {}
@@ -62,11 +119,13 @@ impl ComposeStyle for TabDecorator {
 }
 
 #[derive(Declare)]
-pub struct IndicatorStyle {
+pub struct IndicatorDecorator {
+  pub pos: Position,
   pub rect: Rect,
+  pub extent: f32,
 }
 
-impl ComposeStyle for IndicatorStyle {
+impl ComposeStyle for IndicatorDecorator {
   type Host = Widget;
 
   #[inline]
@@ -75,16 +134,16 @@ impl ComposeStyle for IndicatorStyle {
 
 impl Tabs {
   fn tab_header(
-    headers: &Vec<(Option<NamedSvg>, Option<State<Label>>)>,
+    headers: Vec<(Option<NamedSvg>, Option<State<Label>>)>,
     tabs_style: TabsStyle,
     tabs: Stateful<Tabs>,
-    indicator: Stateful<IndicatorStyle>,
-  ) -> Vec<Widget> {
+    indicator: Stateful<IndicatorDecorator>,
+  ) -> impl Iterator<Item = Widget> {
     let TabsStyle {
-      icon_size,
+      icon_size: size,
       icon_pos,
       active_color,
-      normal_color,
+      foreground,
       label_style,
       ..
     } = tabs_style;
@@ -92,91 +151,60 @@ impl Tabs {
       .into_iter()
       .enumerate()
       .map(move |(idx, (icon, label))| {
-        let icon_widget = Option::map(icon.clone(), |icon| {
+        let icon_widget = icon.map(|icon| {
           widget! {
-            Icon {
-              size: icon_size,
-              DynWidget::from(icon)
-            }
+            Icon { size, DynWidget::from(icon) }
           }
         });
+
         let active_color = active_color.clone();
-        let normal_color = normal_color.clone();
+        let foreground = foreground.clone();
         let label_style = label_style.clone();
-        let label_widget = Option::map(label.clone(), |label| {
-          let tabs = tabs.clone();
+        let label_widget = label.map(|label| {
           widget! {
             states {
-              tabs,
+              tabs: tabs.clone(),
               text: label.into_readonly(),
             }
             Text {
               text: text.0.clone(),
               foreground: match tabs.cur_idx == idx {
                 true => active_color.clone(),
-                false => normal_color.clone(),
+                false => foreground.clone(),
               },
-              style: label_style.clone(),
+              style: label_style,
             }
           }
         });
         let indicator = indicator.clone();
-        let tabs = tabs.clone();
         widget! {
-          states { tabs }
+          states { tabs: tabs.clone() }
           Expanded {
             id: tab_header,
             flex: 1.,
-            on_tap: move |_| {
-              if tabs.cur_idx != idx {
-                tabs.cur_idx = idx;
-              }
+            on_tap: move |_| if tabs.cur_idx != idx {
+              tabs.cur_idx = idx;
             },
-            DynWidget {
-              dyns: match icon_pos {
-                Position::Top | Position::Bottom => {
-                  widget! {
-                    Column {
-                      align_items: Align::Center,
-                      justify_content: JustifyContent::Center,
-                      DynWidget {
-                        dyns: match icon_pos {
-                          Position::Top => [ icon_widget, label_widget ],
-                          Position::Bottom => [ label_widget, icon_widget ],
-                          _ => unreachable!(""),
-                        }
-                      }
-                    }
-                  }
-                }
-                Position::Left | Position::Right => {
-                  widget! {
-                    Row {
-                      align_items: Align::Center,
-                      justify_content: JustifyContent::Center,
-                      DynWidget {
-                        dyns: match icon_pos {
-                          Position::Left => [ icon_widget, label_widget ],
-                          Position::Right => [ label_widget, icon_widget ],
-                          _ => unreachable!(""),
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+            Flex {
+              align_items: Align::Center,
+              justify_content: JustifyContent::Center,
+              direction: match icon_pos {
+                Position::Left | Position::Right => Direction::Horizontal,
+                Position::Top | Position::Bottom => Direction::Vertical,
+              },
+              reverse: matches!(icon_pos, Position::Right | Position::Bottom),
+              DynWidget::from(icon_widget)
+              // todo: insert `Spacer`
+              DynWidget::from(label_widget)
             }
           }
           finally {
             let_watch!((tabs.cur_idx == idx, tab_header.layout_rect()))
-              .filter_map(|(active, rect): (bool, Rect)| active.then_some(rect))
-              .subscribe(move |v| {
-                indicator.silent_ref().rect = v
-              });
+              .filter_map(|(active, rect)| active.then_some(rect))
+              .subscribe(move |v| indicator.silent_ref().rect = v);
           }
         }
       })
-      .collect::<Vec<_>>()
   }
 }
 
@@ -184,7 +212,6 @@ impl ComposeChild for Tabs {
   type Child = Vec<Tab>;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this = this.into_writable();
     let mut headers = vec![];
     let mut panes = vec![];
 
@@ -195,117 +222,104 @@ impl ComposeChild for Tabs {
     }
 
     widget! {
-      states { this }
+      states { this: this.into_writable() }
       init ctx => {
         let tabs_style = TabsStyle::of(ctx);
         let TabsStyle {
-          extent,
-          direction,
+          extent_only_icon,
+          extent_only_label,
+          extent_with_both,
           active_color,
           indicator,
           ..
         } = tabs_style.clone();
         let tabs_style = tabs_style.clone();
-      }
-      TabsDecorator {
-        DynWidget {
-          dyns: {
-            match direction {
-              Direction::Horizontal => {
-                widget! {
-                  Column {
-                    DynWidget::from(panes.into_iter()
-                      .enumerate()
-                      .map(move |(idx, pane)| {
-                        widget! {
-                          Expanded {
-                            flex: 1.,
-                            DynWidget {
-                              visible: this.cur_idx == idx,
-                              dyns: pane,
-                            }
-                          }
-                        }
-                      }))
-                      Stack {
-                        ConstrainedBox {
-                          clamp: BoxClamp::fixed_height(extent),
-                          Row {
-                            id: row,
-                            Tabs::tab_header(
-                              &headers, tabs_style.clone(), this.clone_stateful(), indicator_style.clone_stateful(),
-                            )
-                          }
-                        }
-                        Divider {
-                          top_anchor: row.layout_size().height - 1.,
-                          direction: Direction::Horizontal,
-                        }
-                        IndicatorStyle {
-                          id: indicator_style,
-                          rect: Rect::zero(),
-                          BoxDecoration {
-                            top_anchor: row.layout_size().height - indicator.extent,
-                            background: active_color.clone(),
-                            border_radius: indicator.radius,
-                            Container {
-                              size: indicator.measure.map_or(
-                                Size::new(indicator_style.rect.width(), indicator.extent),
-                                |measure| Size::new(measure, indicator.extent)
-                              ),
-                            }
-                          }
-                        }
-                      }
-                  }
-                }
-              }
-              Direction::Vertical => {
-                widget! {
-                  Row {
-                    ConstrainedBox {
-                      clamp: BoxClamp::fixed_width(extent),
-                      Stack {
-                        Column {
-                          id: column,
-                          Tabs::tab_header(
-                            &headers, tabs_style.clone(), this.clone_stateful(), indicator_style.clone_stateful(),
-                          )
-                        }
-                        Divider {
-                          left_anchor: column.layout_size().width - 1.,
-                          direction: Direction::Vertical,
-                        }
-                        IndicatorStyle {
-                          id: indicator_style,
-                          rect: Rect::zero(),
-                          Container {
-                            left_anchor: column.layout_size().width - indicator.extent,
-                            size: indicator.measure.map_or(
-                              Size::new(indicator.extent, indicator_style.rect.height()),
-                              |measure| Size::new(indicator.extent, measure)
-                            ),
-                            background: active_color.clone(),
-                          }
-                        }
-                      }
-                    }
-                    DynWidget::from(panes.into_iter()
-                      .enumerate()
-                      .map(move |(idx, pane)| {
-                        widget! {
-                          Expanded {
-                            visible: this.cur_idx == idx,
-                            flex: 1.,
-                            DynWidget::from(pane)
-                          }
-                        }
-                      }))
-                  }
+        let has_icon = headers.iter().any(|item| item.0.is_some());
+        let has_label = headers.iter().any(|item| item.1.is_some());
+        let extent = match (has_icon, has_label) {
+          (true, true) => extent_with_both,
+          (false, true) => extent_only_label,
+          (true, false) => extent_only_icon,
+          (false, false) => 0.
+        };
+        let mut panes = panes.into_iter()
+          .enumerate()
+          .map(move |(idx, pane)| {
+            widget! {
+              Expanded {
+                flex: 1.,
+                DynWidget {
+                  visible: this.cur_idx == idx,
+                  dyns: pane,
                 }
               }
             }
+          });
+        let mut header = widget! {
+          Stack {
+            ConstrainedBox {
+              clamp: match this.pos {
+                Position::Top | Position::Bottom => BoxClamp::fixed_height(extent),
+                Position::Left | Position::Right => BoxClamp::fixed_width(extent),
+              },
+              Flex {
+                id: flex,
+                direction: match this.pos {
+                  Position::Top | Position::Bottom => Direction::Horizontal,
+                  Position::Left | Position::Right => Direction::Vertical,
+                },
+                Tabs::tab_header(
+                  headers, tabs_style.clone(),
+                  no_watch!(this.clone_stateful()),
+                  no_watch!(indicator_decorator.clone_stateful()),
+                )
+              }
+            }
+            Divider {
+              direction: match this.pos {
+                Position::Top | Position::Bottom => Direction::Horizontal,
+                Position::Left | Position::Right => Direction::Vertical,
+              },
+              left_anchor: match this.pos {
+                Position::Left => flex.layout_size().width - 1.,
+                Position::Top | Position::Right | Position::Bottom => 0.,
+              },
+              top_anchor: match this.pos {
+                Position::Top => flex.layout_size().height - 1.,
+                Position::Bottom | Position::Right | Position::Left => 0.,
+              },
+            }
+            IndicatorDecorator {
+              id: indicator_decorator,
+              pos: this.pos,
+              extent: indicator.extent,
+              rect: Rect::zero(),
+              Container {
+                background: active_color.clone(),
+                size: match this.pos {
+                  Position::Top | Position::Bottom => indicator.measure.map_or(
+                    Size::new(indicator_decorator.rect.width(), indicator.extent),
+                    |measure| Size::new(measure, indicator.extent)
+                  ),
+                  Position::Left | Position::Right => indicator.measure.map_or(
+                    Size::new(indicator.extent, indicator_decorator.rect.height()),
+                    |measure| Size::new(indicator.extent, measure)
+                  ),
+                }
+              }
+            }
+          }
+        };
+      }
+      TabsDecorator {
+        Flex {
+          direction: match this.pos {
+            Position::Left | Position::Right => Direction::Horizontal,
+            Position::Top | Position::Bottom => Direction::Vertical,
           },
+          reverse: matches!(this.silent_ref().pos, Position::Right | Position::Bottom),
+          DynWidget::from(header)
+          DynWidget::from(panes)
         }
       }
     }
