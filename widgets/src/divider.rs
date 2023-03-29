@@ -40,22 +40,22 @@ use ribir_core::{impl_query_self_only, prelude::*};
 pub struct Divider {
   #[declare(default = 1.)]
   // Extent of divider
-  extent: f32,
+  pub extent: f32,
   // Color of divider
   #[declare(default=Palette::of(ctx).outline_variant(), convert=into)]
-  color: Brush,
+  pub color: Brush,
   // Direction of divider
   #[declare(default=Direction::Horizontal)]
-  direction: Direction,
+  pub direction: Direction,
   // Thickness of line
   #[declare(default = 1.)]
-  thickness: f32,
+  pub thickness: f32,
   // front indentation distance
   #[declare(default = 0.)]
-  indent: f32,
+  pub indent: f32,
   // behind indentation distance
   #[declare(default = 0.)]
-  end_indent: f32,
+  pub end_indent: f32,
 }
 
 impl Render for Divider {

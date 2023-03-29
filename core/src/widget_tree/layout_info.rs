@@ -50,6 +50,9 @@ impl BoxClamp {
       max: Size::new(f32::INFINITY, height),
     }
   }
+
+  /// clamp use fixed size
+  pub fn fixed_size(size: Size) -> Self { BoxClamp { min: size, max: size } }
 }
 
 /// render object's layout box, the information about layout, including box

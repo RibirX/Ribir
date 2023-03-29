@@ -11,8 +11,9 @@ fn main() {
       let tertiary: Brush = Palette::of(ctx).tertiary().into();
     }
     ConstrainedBox {
-      clamp: BoxClamp { min: Size::new(WINDOW_SIZE, WINDOW_SIZE), max: Size::new(WINDOW_SIZE, WINDOW_SIZE) },
+      clamp: BoxClamp::fixed_size(Size::splat(WINDOW_SIZE)),
       Tabs {
+        pos: Position::Bottom,
         Tab {
           TabItem {
             svgs::HOME

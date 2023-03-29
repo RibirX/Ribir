@@ -28,7 +28,6 @@ impl Compose for TodoMVP {
           style,
         }
         Row {
-          margin: EdgeInsets::only_bottom(10.),
           Container {
             size: Size::new(240., 30.),
             border: Border::only_bottom(BorderSide { width:1., color: surface_variant.into() }),
@@ -56,7 +55,7 @@ impl Compose for TodoMVP {
         }
 
         Tabs {
-          margin: EdgeInsets::only_top(10.),
+          pos: Position::Top,
           Tab {
             TabItem { Label::new("ALL") }
             TabPane { Self::pane(no_watch!(this), |_| true) }
