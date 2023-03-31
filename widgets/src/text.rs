@@ -86,3 +86,36 @@ impl Render for Text {
 impl Query for Text {
   impl_query_self_only!();
 }
+
+macro_rules! define_text_with_theme_style {
+  ($name: ident, $style: ident) => {
+    #[derive(Declare)]
+    pub struct $name {
+      #[declare(convert=into)]
+      pub text: CowArc<str>,
+      #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()))]
+      pub foreground: Brush,
+    }
+
+    impl Compose for $name {
+      fn compose(this: State<Self>) -> Widget {
+        widget! {
+          init ctx => { let style = TypographyTheme::of(ctx).$style.text.clone(); }
+          states { this: this.into_readonly() }
+          Text {
+            text: this.text.clone(),
+            foreground: this.foreground.clone(),
+            style: style,
+          }
+        }
+      }
+    }
+  };
+}
+
+define_text_with_theme_style!(H1, headline_large);
+define_text_with_theme_style!(H2, headline_medium);
+define_text_with_theme_style!(H3, headline_small);
+define_text_with_theme_style!(H4, title_large);
+define_text_with_theme_style!(H5, title_medium);
+define_text_with_theme_style!(H6, title_small);
