@@ -9,7 +9,7 @@ pub mod prelude {
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
       let app = super::Application::new(super::material::purple::light());
-      let wnd = Window::builder(root).build(&app);
+      let wnd = Window::builder(root).with_title("ribir app").build(&app);
       run_with_window(app, wnd);
     }
 
