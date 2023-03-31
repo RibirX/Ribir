@@ -22,19 +22,17 @@ fn main() {
           TabPane {
             Column {
               margin: EdgeInsets::all(20.),
+              item_gap: 20.,
               Text::new("Button", &foreground, title_style.clone())
               Row {
-                margin: EdgeInsets::only_top(20.),
+                item_gap: 20.,
                 FilledButton { svgs::ADD }
-                SizedBox { size: Size::new(20., 0.) }
                 FilledButton { Label::new("Filled button") }
-                SizedBox { size: Size::new(20., 0.) }
                 FilledButton {
                   color: secondary.clone(),
                   svgs::ADD
                   Label::new("Filled button")
                 }
-                SizedBox { size: Size::new(20., 0.) }
                 FilledButton {
                   color: tertiary.clone(),
                   svgs::ADD
@@ -42,17 +40,14 @@ fn main() {
                 }
               }
               Row {
-                margin: EdgeInsets::only_top(20.),
+                item_gap: 20.,
                 OutlinedButton { svgs::ADD }
-                SizedBox { size: Size::new(20., 0.) }
                 OutlinedButton { Label::new("Outlined button") }
-                SizedBox { size: Size::new(20., 0.) }
                 OutlinedButton {
                   color: secondary.clone(),
                   svgs::ADD
                   Label::new("Outlined button")
                 }
-                SizedBox { size: Size::new(20., 0.) }
                 OutlinedButton {
                   color: tertiary.clone(),
                   svgs::ADD
@@ -60,33 +55,27 @@ fn main() {
                 }
               }
               Row {
-                margin: EdgeInsets::only_top(20.),
+                item_gap: 20.,
                 Button { svgs::ADD }
-                SizedBox { size: Size::new(20., 0.) }
                 Button { Label::new("Raw button") }
-                SizedBox { size: Size::new(20., 0.) }
                 Button {
                   color: secondary.clone(),
                   Label::new("Raw button")
                 }
-                SizedBox { size: Size::new(20., 0.) }
                 Button {
                   color: tertiary.clone(),
                   Label::new("Raw button")
                 }
               }
               Row {
-                margin: EdgeInsets::only_top(20.),
+                item_gap: 20.,
                 FabButton { svgs::ADD }
-                SizedBox { size: Size::new(20., 0.) }
                 FabButton { Label::new("Fab button") }
-                SizedBox { size: Size::new(20., 0.) }
                 FabButton {
                   color: secondary,
                   svgs::ADD
                   Label::new("Fab button")
                 }
-                SizedBox { size: Size::new(20., 0.) }
                 FabButton {
                   color: tertiary,
                   svgs::ADD

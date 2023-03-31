@@ -50,6 +50,12 @@ pub struct Flex {
   /// How the children should be placed along the main axis in a flex layout.
   #[declare(default)]
   pub justify_content: JustifyContent,
+  /// Define item between gap in main axis
+  #[declare(default)]
+  pub main_axis_gap: f32,
+  /// Define item between gap in cross axis
+  #[declare(default)]
+  pub cross_axis_gap: f32,
 }
 
 impl Render for Flex {
@@ -71,6 +77,8 @@ impl Render for Flex {
       align_items: self.align_items,
       justify_content: self.justify_content,
       wrap: self.wrap,
+      main_axis_gap: self.main_axis_gap,
+      cross_axis_gap: self.cross_axis_gap,
       current_line: <_>::default(),
       lines: vec![],
     };
@@ -129,6 +137,8 @@ struct FlexLayouter {
   wrap: bool,
   current_line: MainLineInfo,
   lines: Vec<MainLineInfo>,
+  main_axis_gap: f32,
+  cross_axis_gap: f32,
 }
 
 impl FlexLayouter {
@@ -136,10 +146,10 @@ impl FlexLayouter {
     self.perform_children_layout(ctx);
     self.flex_children_layout(ctx);
 
-    let cross = self
-      .lines
-      .iter()
-      .fold(0., |sum, l| sum + l.cross_line_height);
+    // cross direction need calculate cross_axis_gap but last line don't need.
+    let cross = self.lines.iter().fold(-self.cross_axis_gap, |sum, l| {
+      sum + l.cross_line_height + self.cross_axis_gap
+    });
     let main = match self.justify_content {
       JustifyContent::Start | JustifyContent::Center | JustifyContent::End => {
         self.lines.iter().fold(0f32, |max, l| max.max(l.main_width))
@@ -164,6 +174,7 @@ impl FlexLayouter {
     } else {
       FlexSize::zero()
     };
+    let mut gap = 0.;
     while let Some(mut l) = layouter {
       let mut max = max;
       if !wrap {
@@ -177,10 +188,11 @@ impl FlexLayouter {
 
       let size = l.perform_widget_layout(clamp);
       let size = FlexSize::from_size(size, dir);
+
       let mut flex = None;
       l.query_widget_type(|expanded: &Expanded| flex = Some(expanded.flex));
 
-      // flex-item need use empty space  to resize after all fixed widget performed
+      // flex-item need use empty space to resize after all fixed widget performed
       // layout.
       let line = &mut self.current_line;
       if let Some(flex) = flex {
@@ -188,22 +200,39 @@ impl FlexLayouter {
         if size.main > 0. {
           line.flex_sum += flex;
         }
+        line.main_width += gap;
       } else {
         if wrap && !line.is_empty() && line.main_width + size.main > max.main {
           self.place_line();
+        } else {
+          line.main_width += gap;
         }
 
         let mut line = &mut self.current_line;
         line.main_width += size.main;
         line.cross_line_height = line.cross_line_height.max(size.cross);
       }
+
       self
         .current_line
         .items_info
         .push(FlexLayoutInfo { size, flex, pos: <_>::default() });
+
       layouter = l.into_next_sibling();
+      if layouter.is_some() && !FlexLayouter::is_space_layout(self.justify_content) {
+        gap = self.main_axis_gap;
+      } else {
+        gap = 0.;
+      }
     }
     self.place_line();
+  }
+
+  fn is_space_layout(justify_content: JustifyContent) -> bool {
+    matches!(
+      justify_content,
+      JustifyContent::SpaceAround | JustifyContent::SpaceBetween | JustifyContent::SpaceEvenly
+    )
   }
 
   fn flex_children_layout(&mut self, ctx: &mut LayoutCtx) {
@@ -250,16 +279,22 @@ impl FlexLayouter {
     macro_rules! update_position {
       ($($rev: ident)?) => {
         let mut cross = cross_offset;
-        lines.iter_mut()$(.$rev())?.for_each(|line| {
-          let (mut main, step) = line.place_args(bound.main, *justify_content);
+        let last_line_idx = lines.len() - 1;
+        let mut cross_step = 0.;
+        lines.iter_mut()$(.$rev())?.enumerate().for_each(|(line_idx, line)| {
+          let (mut main, step) = line.place_args(bound.main, *justify_content, self.main_axis_gap);
           line.items_info.iter_mut()$(.$rev())?.for_each(|item| {
             let item_cross_offset =
               align_items.align_value(item.size.cross, line.cross_line_height);
-            item.pos.cross = cross + item_cross_offset;
+
+            item.pos.cross = cross + item_cross_offset + cross_step;
             item.pos.main = main;
             main = main + item.size.main + step;
           });
           cross += line.cross_line_height;
+          if line_idx != last_line_idx {
+            cross_step += self.cross_axis_gap;
+          }
         });
       };
     }
@@ -303,16 +338,16 @@ struct FlexLayoutInfo {
 impl MainLineInfo {
   fn is_empty(&self) -> bool { self.items_info.is_empty() }
 
-  fn place_args(&self, main_max: f32, justify_content: JustifyContent) -> (f32, f32) {
+  fn place_args(&self, main_max: f32, justify_content: JustifyContent, gap: f32) -> (f32, f32) {
     if self.items_info.is_empty() {
       return (0., 0.);
     }
 
     let item_cnt = self.items_info.len() as f32;
     match justify_content {
-      JustifyContent::Start => (0., 0.),
-      JustifyContent::Center => ((main_max - self.main_width) / 2., 0.),
-      JustifyContent::End => (main_max - self.main_width, 0.),
+      JustifyContent::Start => (0., gap),
+      JustifyContent::Center => ((main_max - self.main_width) / 2., gap),
+      JustifyContent::End => (main_max - self.main_width, gap),
       JustifyContent::SpaceAround => {
         let step = (main_max - self.main_width) / item_cnt;
         (step / 2., step)
@@ -473,6 +508,148 @@ mod tests {
           expect: ExpectRect::new(0., 0., 200., 20.),
         },
       ],
+    );
+  }
+
+  #[test]
+  fn main_axis_gap() {
+    expect_layout_result_with_theme(
+      widget! {
+        Row {
+          item_gap: 15.,
+          SizedBox { size: Size::new(120., 20.) }
+          SizedBox { size: Size::new(80., 20.) }
+          SizedBox { size: Size::new(30., 20.) }
+        }
+      },
+      Some(Size::new(500., 40.)),
+      material::purple::light(),
+      &[
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::new(0., 0., 120., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect::new(135., 0., 80., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 2],
+          expect: ExpectRect::new(230., 0., 30., 20.),
+        },
+      ],
+    );
+
+    // reverse
+    expect_layout_result_with_theme(
+      widget! {
+        Row {
+          item_gap: 15.,
+          reverse: true,
+          SizedBox { size: Size::new(120., 20.) }
+          SizedBox { size: Size::new(80., 20.) }
+          SizedBox { size: Size::new(30., 20.) }
+        }
+      },
+      Some(Size::new(500., 40.)),
+      material::purple::light(),
+      &[
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::new(140., 0., 120., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect::new(45., 0., 80., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 2],
+          expect: ExpectRect::new(0., 0., 30., 20.),
+        },
+      ],
+    );
+
+    // with expand
+    expect_layout_result_with_theme(
+      widget! {
+        Row {
+          item_gap: 15.,
+          SizedBox { size: Size::new(120., 20.) }
+          Expanded {
+            flex: 1.,
+            SizedBox { size: Size::new(10., 20.) }
+          }
+          SizedBox { size: Size::new(80., 20.) }
+          Expanded {
+            flex: 2.,
+            SizedBox { size: Size::new(10., 20.) }
+          }
+          SizedBox { size: Size::new(30., 20.) }
+        }
+      },
+      Some(Size::new(500., 40.)),
+      material::purple::light(),
+      &[
+        LayoutTestItem {
+          path: &[0, 0],
+          expect: ExpectRect::new(0., 0., 120., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 1],
+          expect: ExpectRect::new(135., 0., 70., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 2],
+          expect: ExpectRect::new(220., 0., 80., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 3],
+          expect: ExpectRect::new(315., 0., 140., 20.),
+        },
+        LayoutTestItem {
+          path: &[0, 4],
+          expect: ExpectRect::new(470., 0., 30., 20.),
+        },
+      ],
+    );
+  }
+
+  #[test]
+  fn cross_axis_gap() {
+    let size = Size::new(200., 20.);
+    let row = widget! {
+      Flex {
+        wrap: true,
+        cross_axis_gap: 10.,
+        DynWidget {
+          dyns: (0..3).map(|_| SizedBox { size })
+        }
+      }
+    };
+
+    let layouts = [
+      LayoutTestItem {
+        path: &[0],
+        expect: ExpectRect::new(0., 0., 400., 50.),
+      },
+      LayoutTestItem {
+        path: &[0, 0],
+        expect: ExpectRect::new(0., 0., 200., 20.),
+      },
+      LayoutTestItem {
+        path: &[0, 1],
+        expect: ExpectRect::new(200., 0., 200., 20.),
+      },
+      LayoutTestItem {
+        path: &[0, 2],
+        expect: ExpectRect::new(0., 30., 200., 20.),
+      },
+    ];
+    expect_layout_result_with_theme(
+      row,
+      Some(Size::new(500., 500.)),
+      material::purple::light(),
+      &layouts,
     );
   }
 

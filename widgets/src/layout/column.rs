@@ -11,6 +11,10 @@ pub struct Column {
   pub align_items: Align,
   #[declare(default)]
   pub justify_content: JustifyContent,
+  #[declare(default)]
+  pub item_gap: f32,
+  #[declare(default)]
+  pub line_gap: f32,
 }
 
 impl ComposeChild for Column {
@@ -24,6 +28,8 @@ impl ComposeChild for Column {
         direction: Direction::Vertical,
         align_items: this.align_items,
         justify_content: this.justify_content,
+        main_axis_gap: this.item_gap,
+        cross_axis_gap: this.line_gap,
         DynWidget { dyns: children }
       }
     }
