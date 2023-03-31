@@ -9,8 +9,8 @@ use syn::{
   parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Brace, Colon, Colon2, Comma, Dot, FatArrow, Paren},
-  Block, Expr, Ident, Path, Result,
+  token::{Bang, Brace, Colon, Colon2, Comma, Dot, FatArrow, Paren},
+  Block, Expr, ExprMacro, Ident, Path, Result,
 };
 
 use super::TrackExpr;
@@ -25,6 +25,7 @@ pub mod kw {
   syn::custom_keyword!(Transition);
   syn::custom_keyword!(transition);
   syn::custom_punctuation!(AssignColon, :=);
+  syn::custom_keyword!(widget);
 }
 
 pub struct MacroSyntax {
@@ -81,6 +82,8 @@ pub enum DeclareWidget {
   /// Declare a widget across widget construct call, only as a leaf declare.
   /// `X::new(...)`
   Call(ConstructCall),
+  /// Declare a child widget across widget! macro
+  EmbedWidget(ExprMacro),
 }
 
 #[derive(Debug)]
@@ -316,13 +319,13 @@ impl Parse for DeclareWidget {
       let brace = syn::braced!(content in input);
       let mut fields = Punctuated::default();
       let mut children = vec![];
-
       loop {
         if content.is_empty() {
           break;
         }
-
-        if peek_widget(&content) {
+        if content.peek(kw::widget) && content.peek2(Bang) {
+          children.push(DeclareWidget::EmbedWidget(content.parse()?));
+        } else if peek_widget(&content) {
           children.push(content.parse()?);
         } else {
           let f: DeclareField = content.parse()?;
@@ -411,6 +414,7 @@ impl Spanned for DeclareWidget {
       DeclareWidget::Call(ConstructCall { path: ty, paren, .. }) => {
         ty.span().join(paren.span).unwrap()
       }
+      DeclareWidget::EmbedWidget(expr) => expr.mac.path.span(),
     }
   }
 }
@@ -421,6 +425,7 @@ impl DeclareWidget {
       DeclareWidget::Literal { ty, .. } => ty,
       DeclareWidget::Call(call) => &call.path,
       DeclareWidget::Path(path) => path,
+      DeclareWidget::EmbedWidget(expr) => &expr.mac.path,
     }
   }
 }
