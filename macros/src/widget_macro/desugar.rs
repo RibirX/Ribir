@@ -209,6 +209,10 @@ impl DeclareWidget {
         let expr: Expr = parse_quote!(#path);
         expr_as_widget_node(expr, default_name)
       }
+      DeclareWidget::EmbedWidget(expr) => {
+        let expr: Expr = Expr::Macro(expr);
+        expr_as_widget_node(expr, default_name)
+      }
     }
   }
 }

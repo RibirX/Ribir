@@ -525,3 +525,55 @@ fn untrack_prop_with_pure_lambda() {
 
   assert_eq!(*counter.state_ref(), 0);
 }
+
+#[test]
+fn embed_widget() {
+  let _ = widget! {
+    Column {
+      widget! { // simple case & as first child
+        Container {
+          size: Size::new(10., 10.),
+        }
+      }
+      Container {
+        size: Size::zero(),
+      }
+      widget! { // all feature & as middle child
+        init ctx => {
+          let linear_transition = transitions::LINEAR.of(ctx);
+        }
+        Row {
+          SizedBox {
+            id: sized_box,
+            size: Size::new(100., 100.),
+            on_tap: move |_| {
+              leak_animate.run();
+            },
+          }
+        }
+        Animate {
+          id: leak_animate,
+          transition: linear_transition,
+          prop: prop!(sized_box.size),
+          from: ZERO_SIZE,
+        }
+        finally {
+          watch!(leak_animate.is_running())
+            .subscribe(move |v| println!("{v}"));
+        }
+      }
+      Container {
+        size: Size::zero(),
+      }
+      widget! {  // embed multi widget! & as last child
+        Row {
+          widget! {
+            Container {
+              size: Size::zero(),
+            }
+          }
+        }
+      }
+    }
+  };
+}
