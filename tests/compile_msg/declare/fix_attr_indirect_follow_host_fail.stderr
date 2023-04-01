@@ -1,5 +1,5 @@
 error: There is a directly circle depends exist, this will cause infinite loop: b.cursor ~> a , a.cursor ~> b
-  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:23:11
+  --> compile_msg/declare/fix_attr_indirect_follow_host_fail.rs:23:11
    |
 23 |       id: a,
    |           ^
@@ -21,7 +21,7 @@ note: You should manual watch expression and add operator to break the circular,
           .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(...)
       ```
-  --> tests/ui/declare/fix_attr_indirect_follow_host_fail.rs:25:7
+  --> compile_msg/declare/fix_attr_indirect_follow_host_fail.rs:25:7
    |
 25 |       cursor: b.cursor,
    |       ^^^^^^

@@ -1,5 +1,5 @@
 error: Same `id: same_id` assign to multiple objects, id must be unique.
- --> tests/ui/declare/duplicate_id_fail.rs:6:11
+ --> compile_msg/declare/duplicate_id_fail.rs:6:11
   |
 6 |       id: same_id,
   |           ^^^^^^^
@@ -8,7 +8,7 @@ error: Same `id: same_id` assign to multiple objects, id must be unique.
   |             ^^^^^^^
 
 error: Same `id: same_id` assign to multiple objects, id must be unique.
-  --> tests/ui/declare/duplicate_id_fail.rs:16:14
+  --> compile_msg/declare/duplicate_id_fail.rs:16:14
    |
 16 |     states { same_id: Stateful::new(0) }
    |              ^^^^^^^
@@ -17,7 +17,7 @@ error: Same `id: same_id` assign to multiple objects, id must be unique.
    |           ^^^^^^^
 
 error: Same `id: same_id` assign to multiple objects, id must be unique.
-  --> tests/ui/declare/duplicate_id_fail.rs:25:11
+  --> compile_msg/declare/duplicate_id_fail.rs:25:11
    |
 25 |       id: same_id,
    |           ^^^^^^^
@@ -26,7 +26,7 @@ error: Same `id: same_id` assign to multiple objects, id must be unique.
    |                          ^^^^^^^
 
 error: Same `id: same_id` assign to multiple objects, id must be unique.
-  --> tests/ui/declare/duplicate_id_fail.rs:36:14
+  --> compile_msg/declare/duplicate_id_fail.rs:36:14
    |
 36 |     states { same_id: Stateful::new(0),}
    |              ^^^^^^^
@@ -35,7 +35,7 @@ error: Same `id: same_id` assign to multiple objects, id must be unique.
    |                        ^^^^^^^
 
 error: Same `id: same_id` assign to multiple objects, id must be unique.
-  --> tests/ui/declare/duplicate_id_fail.rs:45:14
+  --> compile_msg/declare/duplicate_id_fail.rs:45:14
    |
 45 |     states { same_id: Stateful::new(0),}
    |              ^^^^^^^
@@ -44,7 +44,7 @@ error: Same `id: same_id` assign to multiple objects, id must be unique.
    |                  ^^^^^^^
 
 error: Same `id: same_id` assign to multiple objects, id must be unique.
-  --> tests/ui/declare/duplicate_id_fail.rs:56:11
+  --> compile_msg/declare/duplicate_id_fail.rs:56:11
    |
 56 |       id: same_id,
    |           ^^^^^^^

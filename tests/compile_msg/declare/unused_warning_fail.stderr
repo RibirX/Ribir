@@ -1,17 +1,17 @@
 error: Test for declare syntax warning.
- --> tests/ui/declare/unused_warning_fail.rs:4:3
+ --> compile_msg/declare/unused_warning_fail.rs:4:3
   |
 4 |   compile_error!("Test for declare syntax warning.");
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: assigned id but not be used in anywhere.
- --> tests/ui/declare/unused_warning_fail.rs:7:11
+ --> compile_msg/declare/unused_warning_fail.rs:7:11
   |
 7 |       id: test_id,
   |           ^^^^^^^
   |
 help: Remove this line.
- --> tests/ui/declare/unused_warning_fail.rs:7:11
+ --> compile_msg/declare/unused_warning_fail.rs:7:11
   |
 7 |       id: test_id,
   |           ^^^^^^^
