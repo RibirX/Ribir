@@ -1,5 +1,5 @@
 error: the identify `margin` is reserved to expand space around widget wrapped.
- --> tests/ui/declare_builder_fail.rs:5:3
+ --> compile_msg/declare_builder_fail.rs:5:3
   |
 5 |   margin: i32,
   |   ^^^^^^
