@@ -1,10 +1,6 @@
-use crate::prelude::*;
-
-use crate::prelude::BuildCtx;
-
 use super::easing::Easing;
-use std::rc::Rc;
-use std::time::Duration;
+use crate::prelude::{BuildCtx, *};
+use std::{ops::Deref, rc::Rc, time::Duration};
 
 /// Transition describe how the state change form init to final smoothly.
 #[derive(Declare, Clone, Debug, PartialEq)]

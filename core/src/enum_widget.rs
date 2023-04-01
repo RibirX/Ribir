@@ -1,7 +1,7 @@
 //! Implements a dozen of enums to store different widget, and implement the
 //! common trait if all enum variable implement it.
 
-use crate::prelude::*;
+use crate::prelude::{widget::ImplMarker, *};
 
 macro_rules! impl_enum_widget {
   ($name: ident, $($var_ty: ident, $mark_ty: ident) ,+ ) => {

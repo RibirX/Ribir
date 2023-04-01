@@ -1,6 +1,7 @@
-use crate::events::focus_mgr::FocusType;
-use crate::{context::LayoutCtx, widget::BoxClamp};
-use crate::{impl_query_self_only, prelude::*};
+use crate::{
+  context::LayoutCtx, events::focus_mgr::FocusType, impl_query_self_only, prelude::*,
+  widget::BoxClamp,
+};
 
 #[derive(Declare, Clone, Default)]
 pub struct FocusScope {

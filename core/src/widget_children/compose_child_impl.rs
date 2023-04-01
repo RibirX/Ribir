@@ -94,15 +94,6 @@ mod with_target_child {
     fn into_target_child(self) -> Widget { self.into_widget() }
   }
 
-  impl<D, M> IntoTargetChild<NotSelf<[M; 1]>, Widget> for Stateful<DynWidget<Option<D>>>
-  where
-    D: IntoWidget<M> + 'static,
-    M: ImplMarker,
-  {
-    #[inline]
-    fn into_target_child(self) -> Widget { self.into_widget() }
-  }
-
   impl<T, C> IntoTargetChild<NotSelf<[(); 2]>, State<C>> for T
   where
     T: Into<State<C>>,
@@ -365,7 +356,6 @@ mod with_child_template {
   }
 
   impl_fill_widget!(C, 0);
-  impl_fill_widget!(Stateful<DynWidget<Option<C>>>, 1, 'static);
 
   macro_rules! impl_fill_tml_for_state {
     ($name: ty, $idx:tt $(,$static:lifetime)?) => {
@@ -445,7 +435,6 @@ mod with_child_template {
     };
   }
   impl_fill_pair_widget!(C, 11);
-  impl_fill_pair_widget!(Stateful<DynWidget<Option<C>>>, 12, 'static);
 
   impl<T, C> FillTml<NotSelf<[(); 13]>, C> for T
   where

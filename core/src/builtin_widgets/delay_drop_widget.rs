@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{impl_query_self_only, prelude::*, widget::TreeArena};
 
 #[derive(Declare)]
 pub struct DelayDropWidget {

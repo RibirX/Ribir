@@ -5,8 +5,7 @@ use crate::{
   prelude::{Expanded, Icon, Input, Label, Row, Stack, Text},
 };
 use ribir_core::prelude::*;
-use std::collections::HashMap;
-use std::hash::Hash;
+use std::{collections::HashMap, hash::Hash, ops::Deref};
 
 #[derive(Declare, Default)]
 pub struct TextField {

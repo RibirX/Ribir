@@ -365,16 +365,12 @@ fn fix_subscribe_cancel_after_widget_drop() {
     states { cnt: notify_cnt.clone(), trigger: trigger.clone() }
     SizedBox {
       size: Size::zero(),
-      DynWidget  {
-        dyns: trigger.then(|| {
-          widget! {
-            SizedBox { size: Size::zero() }
-            finally {
-              let_watch!(*trigger.deref()).subscribe(move |_| *cnt +=1 );
-            }
-          }
-        })
-      }
+      widget::then(*trigger, || widget! {
+        SizedBox { size: Size::zero() }
+        finally {
+          let_watch!(*trigger).subscribe(move |_| *cnt +=1 );
+        }
+      })
     }
   };
 

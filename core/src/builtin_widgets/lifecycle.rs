@@ -196,16 +196,14 @@ mod tests {
         on_mounted: move |_| lifecycle.silent().push("static mounted"),
         on_performed_layout: move |_| lifecycle.silent().push("static performed layout"),
         on_disposed: move |_| lifecycle.silent().push("static disposed"),
-        DynWidget {
-          dyns: trigger.then(|| widget! {
-            MockBox {
-              size: Size::zero(),
-              on_mounted: move |_| lifecycle.silent().push("dyn mounted"),
-              on_performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
-              on_disposed: move |_| lifecycle.silent().push("dyn disposed")
-            }
-          })
-        }
+        widget::then(*trigger, || widget! {
+          MockBox {
+            size: Size::zero(),
+            on_mounted: move |_| lifecycle.silent().push("dyn mounted"),
+            on_performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
+            on_disposed: move |_| lifecycle.silent().push("dyn disposed")
+          }
+        })
       }
     };
 
