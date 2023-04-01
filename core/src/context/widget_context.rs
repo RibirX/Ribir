@@ -189,7 +189,7 @@ impl<'a> LifeCycleCtx<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::*, test::MockBox};
+  use crate::{prelude::*, test::MockBox, widget::WidgetTree};
 
   define_widget_context!(TestCtx);
 

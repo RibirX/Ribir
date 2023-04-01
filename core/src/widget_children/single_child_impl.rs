@@ -1,4 +1,5 @@
 use super::*;
+use crate::widget::ImplMarker;
 
 /// Trait specify what child a widget can have, and the target type is the
 /// result of widget compose its child.

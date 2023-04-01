@@ -1,4 +1,4 @@
-use crate::{prelude::*, widget_tree::TreeArena};
+use crate::{prelude::*, widget::WidgetTree, widget_tree::TreeArena};
 
 use indextree::{Arena, NodeId};
 use std::{

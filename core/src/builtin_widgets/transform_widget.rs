@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{impl_query_self_only, prelude::*, widget::hit_test_impl};
 
 #[derive(SingleChild, Declare, Clone)]
 pub struct TransformWidget {

@@ -2,7 +2,10 @@ use crate::{
   builtin_widgets::{delay_drop_widget::query_drop_until_widget, key::AnyKey},
   impl_proxy_query, impl_query_self_only,
   prelude::*,
-  widget::widget_id::{dispose_nodes, empty_node, split_arena},
+  widget::{
+    widget_id::{dispose_nodes, empty_node, split_arena},
+    *,
+  },
 };
 use std::{
   cell::RefCell,
@@ -410,7 +413,11 @@ impl<D: IntoWidget<M>, M: ImplMarker> IntoDyns<[M; 0]> for D {
   fn into_dyns(self) -> Vec<Widget> { vec![self.into_widget()] }
 }
 
-impl<D, M> IntoDyns<[M; 1]> for D
+impl<D: IntoWidget<M>, M: ImplMarker> IntoDyns<[M; 1]> for OptionWidget<D> {
+  fn into_dyns(self) -> Vec<Widget> { self.0.map_or_else(Vec::default, |w| vec![w.into_widget()]) }
+}
+
+impl<D, M> IntoDyns<[M; 2]> for D
 where
   D: IntoIterator,
   D::Item: IntoWidget<M>,
@@ -419,7 +426,7 @@ where
   fn into_dyns(self) -> Vec<Widget> { self.into_iter().map(IntoWidget::into_widget).collect() }
 }
 
-impl<D, M, Item> IntoDyns<[M; 2]> for D
+impl<D, M, Item> IntoDyns<[M; 3]> for D
 where
   D: IntoIterator<Item = Option<Item>>,
   Item: IntoWidget<M>,
@@ -486,7 +493,7 @@ fn down_to_leaf(id: WidgetId, arena: &TreeArena) -> (WidgetId, usize) {
 // impl IntoWidget
 
 // only `DynWidget` gen single widget can as a parent widget
-impl<M, D> IntoWidget<NotSelf<M>> for Stateful<DynWidget<D>>
+impl<M, D> IntoWidget<NotSelf<[M; 0]>> for Stateful<DynWidget<D>>
 where
   M: ImplMarker,
   D: IntoWidget<M> + 'static,
@@ -495,14 +502,7 @@ where
   fn into_widget(self) -> Widget { DynRender::new(self).into_widget() }
 }
 
-/// only use to avoid conflict implement for `IntoIterator`.
-/// `Stateful<DynWidget<Option<W: IntoWidget>>>` both satisfied `IntoWidget` as
-/// a single child and `Stateful<DynWidget<impl IntoIterator<Item= impl
-/// IntoWidget>>>` as multi child.
-pub struct OptionDyn<M>(PhantomData<fn(M)>);
-impl<M> ImplMarker for OptionDyn<M> {}
-
-impl<M, D> IntoWidget<OptionDyn<M>> for Stateful<DynWidget<Option<D>>>
+impl<M, D> IntoWidget<NotSelf<[M; 1]>> for Stateful<DynWidget<OptionWidget<D>>>
 where
   M: ImplMarker,
   D: IntoWidget<M> + 'static,

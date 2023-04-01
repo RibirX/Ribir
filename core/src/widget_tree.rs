@@ -1,5 +1,5 @@
 use indextree::*;
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, ops::Deref, rc::Rc};
 
 pub mod widget_id;
 pub(crate) use widget_id::TreeArena;
@@ -369,16 +369,12 @@ mod tests {
     let child = Stateful::new(true);
     let w = widget! {
       states { parent: parent.clone(), child: child.clone() }
-      DynWidget {
-        dyns: parent.then(|| {
-          widget!{
-            MockBox {
-              size: Size::zero(),
-              DynWidget { dyns: child.then(|| Void )}
-            }
-          }
-        })
-      }
+      widget::then(*parent, || widget!{
+        MockBox {
+          size: Size::zero(),
+          widget::then(*child, || Void)
+        }
+      })
     };
 
     let mut wnd = Window::default_mock(w, None);
@@ -398,11 +394,9 @@ mod tests {
     let trigger = Stateful::new(true);
     let w = widget! {
       states { trigger: trigger.clone() }
-      DynWidget {
-        dyns: trigger.then(|| {
-          widget!{ DynWidget { dyns: trigger.then(|| Void )}}
-        })
-      }
+      widget::then(*trigger, || widget!{
+        widget::then(*trigger, || Void)
+      })
     };
 
     let mut wnd = Window::default_mock(w, None);
