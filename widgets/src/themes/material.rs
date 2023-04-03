@@ -97,9 +97,11 @@ fn init_custom_theme(theme: &mut FullTheme) {
     thickness: 8.,
     track_brush: theme.palette.primary_container().into(),
   });
-  theme.custom_themes.set_custom_theme(CheckBoxTheme {
-    size: ICON_TINY,
+  theme.custom_themes.set_custom_theme(CheckBoxStyle {
+    icon_size: ICON_TINY,
     label_style: theme.typography_theme.body_large.text.clone(),
+    label_foreground: theme.palette.on_surface().into(),
+    position: Position::Right,
   });
   theme.custom_themes.set_custom_theme(InputTheme {
     min_length: 20.,
@@ -323,7 +325,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       ) { by: ease_in }
     }
   });
-  styles.override_compose_style::<CheckBoxStyle>(move |style, host| {
+  styles.override_compose_style::<CheckBoxDecorator>(move |style, host| {
     widget! {
       states { style }
       Ripple {
