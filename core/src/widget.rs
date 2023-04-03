@@ -416,9 +416,6 @@ impl Query for Vec<SubscriptionGuard<BoxSubscription<'static>>> {
   impl_query_self_only!();
 }
 
-/// Optional widget.
-pub struct OptionWidget<W>(pub(crate) Option<W>);
-
 /// Directly return `v`, this function does nothing, but it's useful to help you
 /// declare a widget expression in `widget!` macro.
 #[inline]
@@ -427,18 +424,8 @@ pub const fn from<W>(v: W) -> W { v }
 /// Return OptionWidget::Some widget if the `b` is true, the return value wrap
 /// from the return value of `f` method called.
 #[inline]
-pub fn then<W>(b: bool, f: impl FnOnce() -> W) -> OptionWidget<W> { OptionWidget(b.then(f)) }
-
-/// Returns [`OptionWidget::None`] if the w is [`None`], otherwise wrapped the
-/// widget with `OptionWidget` and returns:
-#[inline]
-pub fn filter<W>(w: Option<W>) -> OptionWidget<W> { OptionWidget(w) }
+pub fn then<W>(b: bool, f: impl FnOnce() -> W) -> Option<W> { b.then(f) }
 
 /// calls the closure on `value` and returns
 #[inline]
 pub fn map<T, W>(value: T, f: impl FnOnce(T) -> W) -> W { f(value) }
-
-/// Do both filter and map
-pub fn filter_map<T, W>(w: Option<T>, f: impl FnOnce(T) -> W) -> OptionWidget<W> {
-  OptionWidget(w.map(f))
-}

@@ -54,16 +54,12 @@ impl ComposeChild for ButtonImpl {
       states { this: this.into_readonly() }
       ConstrainedBox {
         clamp: BoxClamp::fixed_height(this.height),
-        DynWidget {
-          dyns: BoxDecoration {
-            border_radius: this.radius.map(Radius::all),
-            background: this.background_color.clone(),
-            border: this.border_style.clone(),
-          },
+        BoxDecoration {
+          border_radius: this.radius.map(Radius::all),
+          background: this.background_color.clone(),
+          border: this.border_style.clone(),
           DynWidget {
-            dyns: this.padding_style.map(|padding| Padding {
-              padding
-            }),
+            dyns: Option::map(this.padding_style, |padding| Padding { padding }),
             Row {
               v_align: VAlign::Center,
               Option::map(icon, |icon| widget! {

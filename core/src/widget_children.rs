@@ -36,7 +36,8 @@ mod single_child_impl;
 pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
-
+pub mod child_convert;
+pub use child_convert::IntoChild;
 /// Trait to tell Ribir a widget can have one child.
 pub trait SingleChild {}
 
@@ -122,9 +123,7 @@ mod tests {
   fn compose_option_dyn_parent() {
     widget! {
       DynWidget {
-        dyns: true.then(|| {
-          MockBox { size: Size::zero() }
-        }),
+        dyns: widget::then(true, || MockBox { size: Size::zero() }),
         Void {}
       }
     };
@@ -181,7 +180,7 @@ mod tests {
     let _e = widget! {
       states { size: size.clone() }
       DynWidget {
-        dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
+        dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
         MockBox { size: Size::zero() }
       }
     };
@@ -190,7 +189,7 @@ mod tests {
     let _e = widget! {
       states { size: size }
       DynWidget {
-        dyns: (size.area() > 0.).then(|| MockBox { size: Size::zero() }) ,
+        dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
         DynWidget { dyns: Void.into_widget() }
       }
     };
@@ -201,7 +200,7 @@ mod tests {
     let _ = widget! {
       MockBox {
         size: ZERO_SIZE,
-        Option::Some(MockBox { size: Size::zero() })
+        widget::then(true, || MockBox { size: Size::zero() })
       }
     };
   }

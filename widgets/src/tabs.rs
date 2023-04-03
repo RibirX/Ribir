@@ -193,9 +193,9 @@ impl Tabs {
                 Position::Top | Position::Bottom => Direction::Vertical,
               },
               reverse: matches!(icon_pos, Position::Right | Position::Bottom),
-              DynWidget::from(icon_widget)
+              widget::from(icon_widget)
               // todo: insert `Spacer`
-              DynWidget::from(label_widget)
+              widget::from(label_widget)
             }
           }
           finally {

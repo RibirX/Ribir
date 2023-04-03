@@ -371,7 +371,7 @@ fn build_input_area(
         Input {
           id: input,
           style: theme.text.clone(),
-          DynWidget::from(placeholder)
+          widget::from(placeholder)
         }
       }
       Option::map(suffix.clone(),  move |text| {

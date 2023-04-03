@@ -120,17 +120,12 @@ impl ComposeChild for Input {
                 ));
               }
             }
-
-            DynWidget {
-              dyns: placeholder.map(|holder| {
-                widget! {
-                  Text {
-                    visible: this.text.is_empty(),
-                    text: holder.0,
-                  }
-                }
-              })
-            }
+            Option::map(placeholder, |holder| widget! {
+              Text {
+                visible: this.text.is_empty(),
+                text: holder.0,
+              }
+            })
 
             Caret {
               id: caret,
