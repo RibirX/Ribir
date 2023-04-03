@@ -47,13 +47,35 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     }
   };
 
-  let fill_tml_impl = |field_name: TokenStream, f: &mut Field, tokens: &mut TokenStream| {
+  let fill_tml_impl = |mut f_idx: usize, f: &mut Field, tokens: &mut TokenStream| {
+    let field_name = if let Some(name) = f.ident.as_ref() {
+      quote! {#name}
+    } else {
+      let f_idx = Index::from(f_idx);
+      quote!(#f_idx)
+    };
     let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
     tokens.extend(quote! {
       impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
         fn fill_tml(&mut self, c: #ty) {
           assert!(self.#field_name.is_none(), "Try to fill same type twice.");
           self.#field_name = Some(c);
+        }
+      }
+    });
+
+    let mut fill_gen = generics.clone();
+    fill_gen.params.push(parse_quote!(_Marker));
+    fill_gen
+      .params
+      .push(parse_quote!(_Child: IntoChild<NotSelf<_Marker>, #ty>));
+
+    let (g_impl, _, g_where) = fill_gen.split_for_impl();
+    tokens.extend(quote! {
+      impl #g_impl FillTml<NotSelf<[_Marker; #f_idx]>, _Child> for #tml #g_ty #g_where  {
+        fn fill_tml(&mut self, c: _Child) {
+          assert!(self.#field_name.is_none(), "Try to fill same type twice.");
+          self.#field_name = Some(c.into_child());
         }
       }
     });
@@ -77,9 +99,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         <#ty as Template>::Builder: TemplateBuilder<Target = #ty> + FillTml<SelfImpl, Child>
       });
 
+      f_idx += 655536;
       let (g_impl, _, g_where) = flat_fill_gen.split_for_impl();
       tokens.extend(quote! {
-        impl #g_impl FillTml<NotSelf<#ty>, Child> for #tml #g_ty #g_where {
+        impl #g_impl FillTml<NotSelf<[(); #f_idx]>, Child> for #tml #g_ty #g_where {
           fn fill_tml(&mut self, c: Child) {
             let mut builder = #ty::builder();
             builder.fill_tml(c);
@@ -92,10 +115,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
   match data {
     syn::Data::Struct(stt) => match &mut stt.fields {
       Fields::Named(FieldsNamed { named: fields, .. }) => {
-        fields.iter_mut().for_each(|f| {
-          let f_name = f.ident.as_ref().unwrap();
-          fill_tml_impl(quote! {#f_name}, f, &mut tokens)
-        });
+        fields
+          .iter_mut()
+          .enumerate()
+          .for_each(|(f_idx, f)| fill_tml_impl(f_idx, f, &mut tokens));
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
           #[derive(Default)]
@@ -120,10 +143,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         });
       }
       Fields::Unnamed(FieldsUnnamed { unnamed: fields, .. }) => {
-        fields.iter_mut().enumerate().for_each(|(idx, f)| {
-          let idx = Index::from(idx);
-          fill_tml_impl(quote! {#idx}, f, &mut tokens)
-        });
+        fields
+          .iter_mut()
+          .enumerate()
+          .for_each(|(f_idx, f)| fill_tml_impl(f_idx, f, &mut tokens));
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
           #[derive(Default)]

@@ -71,7 +71,7 @@ impl ComposeChild for Ripple {
               delay_drop_until: !ripper_fade_out.is_running(),
               on_disposed: move |_| ripper_fade_out.run(),
               DynWidget {
-                dyns: (this.bounded != RippleBound::Unbounded).then(|| {
+                dyns: widget::then(this.bounded != RippleBound::Unbounded, || {
                   let rect = Rect::from_size(container.layout_size());
                   let path = match this.bounded {
                     RippleBound::Unbounded => unreachable!(),

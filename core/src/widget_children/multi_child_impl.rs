@@ -1,4 +1,4 @@
-use super::*;
+use super::{child_convert::IntoChild, *};
 use crate::widget::ImplMarker;
 
 /// Trait specify what child a multi child widget can have, and the target type
@@ -53,58 +53,31 @@ trait FillInChildren<M> {
   fn fill_in(self, children: &mut Vec<Widget>);
 }
 
-impl FillInChildren<[(); 0]> for Widget {
-  fn fill_in(self, children: &mut Vec<Widget>) { children.push(self) }
+impl<W, M> FillInChildren<[M; 0]> for W
+where
+  W: IntoChild<M, Widget>,
+  M: ImplMarker,
+{
+  fn fill_in(self, children: &mut Vec<Widget>) { children.push(self.into_child()) }
 }
 
 impl<D, M> FillInChildren<[M; 1]> for Stateful<DynWidget<D>>
 where
   D: IntoIterator + 'static,
-  D::Item: IntoWidget<M>,
+  D::Item: IntoChild<M, Option<Widget>>,
   M: ImplMarker,
 {
   fn fill_in(self, children: &mut Vec<Widget>) { children.push(DynRender::new(self).into_widget()) }
 }
 
-impl<D, M, Item> FillInChildren<[M; 2]> for Stateful<DynWidget<D>>
-where
-  D: IntoIterator<Item = Option<Item>> + 'static,
-  Item: IntoWidget<M>,
-  M: ImplMarker,
-{
-  fn fill_in(self, children: &mut Vec<Widget>) { children.push(DynRender::new(self).into_widget()) }
-}
-
-impl<C, M> FillInChildren<[M; 3]> for C
-where
-  C: IntoWidget<NotSelf<M>>,
-{
-  fn fill_in(self, children: &mut Vec<Widget>) { children.push(self.into_widget()) }
-}
-
-impl<C, M> FillInChildren<[M; 4]> for C
+impl<C, M> FillInChildren<[M; 2]> for C
 where
   C: IntoIterator,
-  C::Item: IntoWidget<M>,
+  C::Item: IntoChild<M, Option<Widget>>,
   M: ImplMarker,
 {
   fn fill_in(self, children: &mut Vec<Widget>) {
-    children.extend(self.into_iter().map(IntoWidget::into_widget))
-  }
-}
-
-impl<C, M, Item> FillInChildren<[M; 5]> for C
-where
-  C: IntoIterator<Item = Option<Item>>,
-  Item: IntoWidget<M>,
-  M: ImplMarker,
-{
-  fn fill_in(self, children: &mut Vec<Widget>) {
-    children.extend(
-      self
-        .into_iter()
-        .filter_map(|w| w.map(IntoWidget::into_widget)),
-    )
+    children.extend(self.into_iter().filter_map(|w| w.into_child()))
   }
 }
 
@@ -114,5 +87,9 @@ mod tests {
   use crate::test::MockMulti;
 
   #[test]
-  fn multi_option_child() { let _ = MockMulti {}.with_child([Some(Void)]).into_widget(); }
+  fn multi_option_child() {
+    let _ = MockMulti {}
+      .with_child([widget::then(true, || Void)])
+      .into_widget();
+  }
 }

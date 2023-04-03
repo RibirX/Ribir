@@ -1,7 +1,7 @@
 use crate::{
   builtin_widgets::{delay_drop_widget::query_drop_until_widget, key::AnyKey},
   impl_proxy_query, impl_query_self_only,
-  prelude::*,
+  prelude::{child_convert::IntoChild, *},
   widget::{
     widget_id::{dispose_nodes, empty_node, split_arena},
     *,
@@ -40,6 +40,7 @@ impl<D> DynWidgetDeclarer<D> {
 }
 
 impl<D> DynWidget<D> {
+  // todo: remove it.
   #[inline]
   pub const fn from(v: D) -> D { v }
 
@@ -60,12 +61,7 @@ pub(crate) struct DynRender<D> {
   self_render: RefCell<Box<dyn Render>>,
   gen_info: RefCell<Option<DynWidgetGenInfo>>,
   dyns_to_widgets: fn(D) -> Vec<Widget>,
-
   drop_until_widgets: WidgetsHost,
-}
-
-pub(crate) trait IntoDyns<M> {
-  fn into_dyns(self) -> Vec<Widget>;
 }
 
 // A dynamic widget must be stateful, depends others.
@@ -166,15 +162,15 @@ impl Query for WidgetsHost {
 }
 
 impl<D> DynRender<D> {
-  pub(crate) fn new<M>(dyns: Stateful<DynWidget<D>>) -> Self
+  pub(crate) fn new<M: ImplMarker>(dyns: Stateful<DynWidget<D>>) -> Self
   where
-    D: IntoDyns<M>,
+    D: IntoChild<M, Vec<Widget>>,
   {
     Self {
       dyn_widgets: dyns,
       self_render: RefCell::new(Box::new(Void)),
       gen_info: <_>::default(),
-      dyns_to_widgets: D::into_dyns,
+      dyns_to_widgets: D::into_child,
       drop_until_widgets: <_>::default(),
     }
   }
@@ -409,37 +405,6 @@ impl<D> DynRender<D> {
   }
 }
 
-impl<D: IntoWidget<M>, M: ImplMarker> IntoDyns<[M; 0]> for D {
-  fn into_dyns(self) -> Vec<Widget> { vec![self.into_widget()] }
-}
-
-impl<D: IntoWidget<M>, M: ImplMarker> IntoDyns<[M; 1]> for OptionWidget<D> {
-  fn into_dyns(self) -> Vec<Widget> { self.0.map_or_else(Vec::default, |w| vec![w.into_widget()]) }
-}
-
-impl<D, M> IntoDyns<[M; 2]> for D
-where
-  D: IntoIterator,
-  D::Item: IntoWidget<M>,
-  M: ImplMarker,
-{
-  fn into_dyns(self) -> Vec<Widget> { self.into_iter().map(IntoWidget::into_widget).collect() }
-}
-
-impl<D, M, Item> IntoDyns<[M; 3]> for D
-where
-  D: IntoIterator<Item = Option<Item>>,
-  Item: IntoWidget<M>,
-  M: ImplMarker,
-{
-  fn into_dyns(self) -> Vec<Widget> {
-    self
-      .into_iter()
-      .filter_map(|w| w.map(IntoWidget::into_widget))
-      .collect()
-  }
-}
-
 impl<D: 'static> Query for DynRender<D> {
   impl_proxy_query!(self.self_render, self.dyn_widgets, self.drop_until_widgets);
 }
@@ -493,22 +458,28 @@ fn down_to_leaf(id: WidgetId, arena: &TreeArena) -> (WidgetId, usize) {
 // impl IntoWidget
 
 // only `DynWidget` gen single widget can as a parent widget
-impl<M, D> IntoWidget<NotSelf<[M; 0]>> for Stateful<DynWidget<D>>
+impl<M, D> IntoWidget<NotSelf<M>> for Stateful<DynWidget<D>>
 where
   M: ImplMarker,
-  D: IntoWidget<M> + 'static,
+  D: IntoChild<M, Widget> + 'static,
 {
   #[inline]
   fn into_widget(self) -> Widget { DynRender::new(self).into_widget() }
 }
 
-impl<M, D> IntoWidget<NotSelf<[M; 1]>> for Stateful<DynWidget<OptionWidget<D>>>
-where
-  M: ImplMarker,
-  D: IntoWidget<M> + 'static,
-{
+/// Not implement as `IntoWidget` trait, because need to avoid conflict
+/// implement for `IntoIterator`. `Stateful<DynWidget<Option<W: IntoWidget>>>`
+/// both satisfied `IntoWidget` as a single child and `Stateful<DynWidget<impl
+/// IntoIterator<Item= impl IntoWidget>>>` as multi child.
+impl<D> Stateful<DynWidget<Option<D>>> {
   #[inline]
-  fn into_widget(self) -> Widget { DynRender::new(self).into_widget() }
+  pub fn into_widget<M>(self) -> Widget
+  where
+    M: ImplMarker,
+    D: IntoChild<M, Widget> + 'static,
+  {
+    DynRender::new(self).into_widget()
+  }
 }
 
 impl<W: SingleChild> SingleChild for DynWidget<W> {}
