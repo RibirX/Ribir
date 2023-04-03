@@ -1,6 +1,6 @@
 use crate::{
   layout::Position,
-  prelude::{svgs, Icon, Row, Text},
+  prelude::{svgs, Icon, Label, Row, Text},
 };
 use ribir_core::prelude::*;
 
@@ -11,18 +11,24 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
+  #[declare(default=Palette::of(ctx).primary(), convert=into)]
+  pub foreground: Brush,
 }
 
 #[derive(Clone)]
-pub struct CheckBoxTheme {
+pub struct CheckBoxStyle {
   /// The size of the checkbox icon.
-  pub size: Size,
+  pub icon_size: Size,
   /// The text style of the checkbox label.
   pub label_style: CowArc<TextStyle>,
+  /// The checkbox foreground
+  pub label_foreground: Brush,
+  /// The checkbox Label in the position of Icon
+  pub position: Position,
 }
 
 #[derive(Clone, Declare)]
-pub struct CheckBoxStyle {
+pub struct CheckBoxDecorator {
   #[declare(default=Palette::of(ctx).primary())]
   pub color: Color,
 }
@@ -38,75 +44,84 @@ impl Checkbox {
   }
 }
 
-#[derive(Declare)]
-pub struct CheckboxLabel {
-  pub desc: CowArc<str>,
-  pub position: Position,
+#[derive(Template)]
+pub struct CheckboxTemplate {
+  pub label: State<Label>,
 }
 
-impl ComposeStyle for CheckBoxStyle {
+impl ComposeStyle for CheckBoxDecorator {
   type Host = Widget;
   #[inline]
   fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
 }
 
 impl ComposeChild for Checkbox {
-  type Child = Option<CheckboxLabel>;
+  type Child = Option<CheckboxTemplate>;
 
-  fn compose_child(this: State<Self>, label: Self::Child) -> Widget {
-    let this = this.into_writable();
-    let mut checkbox = widget! {
-      states { this: this.clone() }
-      init ctx => { let theme = CheckBoxTheme::of(ctx); }
-      CheckBoxStyle { Icon {
-        size: theme.size,
-        DynWidget {
-          dyns: {
-            if this.indeterminate {
-              svgs::INDETERMINATE_CHECK_BOX
-            } else if this.checked {
-              svgs::CHECK_BOX
-            } else {
-              svgs::CHECK_BOX_OUTLINE_BLANK
-            }
-          }
-        }
-      }
-    }};
-
-    if let Some(CheckboxLabel { desc, position }) = label {
-      let label = widget! {
-        init ctx => { let theme = CheckBoxTheme::of(ctx); }
-        Text { text: desc, style: theme.label_style.clone() }
-      };
-      checkbox = match position {
-        Position::Left => {
-          widget! { Row { DynWidget { dyns: [label, checkbox] } } }
-        }
-        Position::Right => {
-          widget! { Row { DynWidget { dyns: [checkbox, label] } } }
-        }
-        _ => unreachable!("don't have vertical checkbox"),
-      };
-    }
-
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
-      states { this }
+      states { this: this.into_writable() }
+      init ctx => {
+        let CheckBoxStyle {
+          icon_size: size,
+          label_style,
+          position,
+          label_foreground,
+        } = CheckBoxStyle::of(ctx).clone();
+      }
       DynWidget {
         cursor: CursorIcon::Hand,
         on_tap: move |_| this.switch_check(),
-        on_key_up: move |k| {
-          if k.key == VirtualKeyCode::Space {
-            this.switch_check()
-          }
+        on_key_up: move |k| if k.key == VirtualKeyCode::Space {
+          this.switch_check()
         },
-        dyns: checkbox
+        dyns: {
+          let label = child.map(|child| widget! {
+            states { label: child.label.into_readonly() }
+            Text {
+              text: label.0.clone(),
+              foreground: label_foreground,
+              style: label_style.clone(),
+            }
+          });
+          let checkbox = widget! {
+            CheckBoxDecorator {
+              Icon {
+                size,
+                DynWidget {
+                  dyns: if this.indeterminate {
+                    svgs::INDETERMINATE_CHECK_BOX
+                  } else if this.checked {
+                    svgs::CHECK_BOX
+                  } else {
+                    svgs::CHECK_BOX_OUTLINE_BLANK
+                  }
+                }
+              }
+            }
+          };
+          match position {
+            Position::Left => widget! {
+              Row {
+                DynWidget::from(label)
+                DynWidget::from(checkbox)
+              }
+            },
+            Position::Right => widget! {
+              Row {
+                DynWidget::from(checkbox)
+                DynWidget::from(label)
+              }
+            },
+            _ => unreachable!("don't have vertical checkbox"),
+          }
+        }
       }
     }
   }
 }
 
-impl CustomTheme for CheckBoxTheme {}
+impl CustomTheme for CheckBoxStyle {}
 #[cfg(test)]
 mod tests {
   use crate::prelude::material;
