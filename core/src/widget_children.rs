@@ -37,7 +37,7 @@ pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
 pub mod child_convert;
-pub use child_convert::IntoChild;
+pub use child_convert::{IntoChild, IntoEnumVariable};
 /// Trait to tell Ribir a widget can have one child.
 pub trait SingleChild {}
 
