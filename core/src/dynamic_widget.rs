@@ -1,7 +1,10 @@
 use crate::{
   builtin_widgets::{delay_drop_widget::query_drop_until_widget, key::AnyKey},
   impl_proxy_query, impl_query_self_only,
-  prelude::{child_convert::IntoChild, *},
+  prelude::{
+    child_convert::{FillVec, IntoChild},
+    *,
+  },
   widget::{
     widget_id::{dispose_nodes, empty_node, split_arena},
     *,
@@ -164,13 +167,19 @@ impl Query for WidgetsHost {
 impl<D> DynRender<D> {
   pub(crate) fn new<M: ImplMarker>(dyns: Stateful<DynWidget<D>>) -> Self
   where
-    D: IntoChild<M, Vec<Widget>>,
+    D: FillVec<M, Widget>,
   {
+    fn into_vec<M, D: FillVec<M, Widget>>(this: D) -> Vec<Widget> {
+      let mut vec = vec![];
+      this.fill_vec(&mut vec);
+      vec
+    }
+
     Self {
       dyn_widgets: dyns,
       self_render: RefCell::new(Box::new(Void)),
       gen_info: <_>::default(),
-      dyns_to_widgets: D::into_child,
+      dyns_to_widgets: into_vec::<_, D>,
       drop_until_widgets: <_>::default(),
     }
   }

@@ -55,24 +55,16 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       quote!(#f_idx)
     };
     let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
-    tokens.extend(quote! {
-      impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
-        fn fill_tml(&mut self, c: #ty) {
-          assert!(self.#field_name.is_none(), "Try to fill same type twice.");
-          self.#field_name = Some(c);
-        }
-      }
-    });
 
     let mut fill_gen = generics.clone();
-    fill_gen.params.push(parse_quote!(_Marker));
+    fill_gen.params.push(parse_quote!(_Marker: ImplMarker));
     fill_gen
       .params
-      .push(parse_quote!(_Child: IntoChild<NotSelf<_Marker>, #ty>));
+      .push(parse_quote!(_Child: IntoChild<_Marker, #ty>));
 
     let (g_impl, _, g_where) = fill_gen.split_for_impl();
     tokens.extend(quote! {
-      impl #g_impl FillTml<NotSelf<[_Marker; #f_idx]>, _Child> for #tml #g_ty #g_where  {
+      impl #g_impl FillTml<[_Marker; #f_idx], _Child> for #tml #g_ty #g_where  {
         fn fill_tml(&mut self, c: _Child) {
           assert!(self.#field_name.is_none(), "Try to fill same type twice.");
           self.#field_name = Some(c.into_child());
@@ -89,21 +81,22 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         .parse_args()
         .expect("Only #[template(flat_fill) support");
       let mut flat_fill_gen = generics.clone();
-      flat_fill_gen.params.push(parse_quote!(Child));
+      flat_fill_gen.params.push(parse_quote!(_Child));
+      flat_fill_gen.params.push(parse_quote!(_Marker));
       let predicates = &mut flat_fill_gen
         .where_clause
         .get_or_insert_with(|| parse_quote! { where})
         .predicates;
       predicates.push(parse_quote! { #ty: Template});
       predicates.push(parse_quote! {
-        <#ty as Template>::Builder: TemplateBuilder<Target = #ty> + FillTml<SelfImpl, Child>
+        <#ty as Template>::Builder: TemplateBuilder<Target = #ty> + FillTml<_Marker, _Child>
       });
 
       f_idx += 655536;
       let (g_impl, _, g_where) = flat_fill_gen.split_for_impl();
       tokens.extend(quote! {
-        impl #g_impl FillTml<NotSelf<[(); #f_idx]>, Child> for #tml #g_ty #g_where {
-          fn fill_tml(&mut self, c: Child) {
+        impl #g_impl FillTml<[_Marker; #f_idx], _Child> for #tml #g_ty #g_where {
+          fn fill_tml(&mut self, c: _Child) {
             let mut builder = #ty::builder();
             builder.fill_tml(c);
             self.fill_tml(builder.build_tml());
@@ -186,18 +179,28 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         }
       });
 
-      variants.iter().for_each(|v| {
+      variants.iter().enumerate().for_each(|(idx, v)| {
         if let Fields::Unnamed(FieldsUnnamed { unnamed, .. }) = &v.fields {
           // only the enum variant has a single type need to implement fill convert.
           if unnamed.len() == 1 {
             let f = unnamed.first().unwrap();
             let ty = &f.ty;
             let v_name = &v.ident;
+            let mut fill_gen = generics.clone();
+            let idx = Index::from(idx);
+
+            fill_gen.params.push(parse_quote!(_Marker: ImplMarker));
+            fill_gen
+              .params
+              .push(parse_quote!(_Child: IntoEnumVariable<_Marker, #ty>));
+
+            let (g_impl, _, g_where) = fill_gen.split_for_impl();
+
             tokens.extend(quote! {
-              impl #g_impl FillTml<SelfImpl, #ty> for #tml #g_ty #g_where  {
-                fn fill_tml(&mut self, c: #ty) {
+              impl #g_impl FillTml<[_Marker;#idx], _Child> for #tml #g_ty #g_where  {
+                fn fill_tml(&mut self, c: _Child) {
                   assert!(self.0.is_none(), "Try to fill enum template with two variant.");
-                  self.0 = Some(#name::#v_name(c));
+                  self.0 = Some(#name::#v_name(c.into_variable()));
                 }
               }
             });
