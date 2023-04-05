@@ -80,6 +80,10 @@ impl WidgetId {
     self.node_feature(tree, |node| node.next_sibling())
   }
 
+  pub(crate) fn previous_sibling(self, tree: &TreeArena) -> Option<WidgetId> {
+    self.node_feature(tree, |node| node.previous_sibling())
+  }
+
   pub(crate) fn ancestors(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(tree).map(WidgetId)
   }
@@ -92,10 +96,6 @@ impl WidgetId {
   #[inline]
   pub(crate) fn children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.children(arena).map(WidgetId)
-  }
-
-  pub(crate) fn reverse_children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
-    self.0.reverse_children(arena).map(WidgetId)
   }
 
   pub(crate) fn descendants(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {

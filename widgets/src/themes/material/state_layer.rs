@@ -42,20 +42,22 @@ impl ComposeChild for InteractiveLayer {
       states { this: this.into_readonly() }
       Stack {
         DynWidget { id: host, dyns: child }
-        Container {
-          size: host.layout_size(),
-          StateLayer {
-            color: this.color,
-            path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
-            role: if host.pointer_pressed() {
-              StateRole::pressed()
-            } else if host.has_focus() {
-              StateRole::focus()
-            } else if host.mouse_hover() {
-              StateRole::hover()
-            } else {
-              // todo: not support drag & drop now
-              StateRole::custom(0.)
+        IgnorePointer {
+          Container {
+            size: host.layout_size(),
+            StateLayer {
+              color: this.color,
+              path: Path::rect_round(&host.layout_rect(), &this.border_radii, PathStyle::Fill),
+              role: if host.pointer_pressed() {
+                StateRole::pressed()
+              } else if host.has_focus() {
+                StateRole::focus()
+              } else if host.mouse_hover() {
+                StateRole::hover()
+              } else {
+                // todo: not support drag & drop now
+                StateRole::custom(0.)
+              }
             }
           }
         }
