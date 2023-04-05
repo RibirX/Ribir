@@ -87,6 +87,39 @@ pub fn layout_info_by_path<'a>(wnd: &'a Window, path: &[usize]) -> Option<&'a La
 }
 
 #[derive(Declare, MultiChild)]
+pub(crate) struct MockStack {
+  child_pos: Vec<Point>,
+}
+
+impl Render for MockStack {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let mut layouter = ctx.first_child_layouter();
+    let mut size = ZERO_SIZE;
+    let mut i = 0;
+    while let Some(mut l) = layouter {
+      let mut child_size = l.perform_widget_layout(clamp);
+      if let Some(offset) = self.child_pos.get(i) {
+        l.update_position(*offset);
+        child_size = Size::new(offset.x + child_size.width, offset.y + child_size.height);
+      } else {
+        l.update_position(Point::zero());
+      }
+      size = size.max(child_size);
+      layouter = l.into_next_sibling();
+
+      i += 1;
+    }
+
+    size
+  }
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+impl Query for MockStack {
+  impl_query_self_only!();
+}
+
+#[derive(Declare, MultiChild)]
 pub(crate) struct MockMulti;
 
 #[derive(Declare, Clone, SingleChild)]

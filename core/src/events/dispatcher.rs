@@ -278,33 +278,51 @@ impl Dispatcher {
   }
 
   fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
-    fn down_coordinate(id: WidgetId, pos: Point, tree: &WidgetTree) -> Option<(WidgetId, Point)> {
+    let mut w = Some(tree.root());
+    let mut hit_result = None;
+    let mut pos = self.info.cursor_pos;
+    while let Some(id) = w {
       let WidgetTree { arena, store, wnd_ctx, .. } = tree;
-
       let r = id.assert_get(arena);
       let ctx = HitTestCtx { id, arena, store, wnd_ctx };
-      let hit_test = r.hit_test(&ctx, pos);
+      let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
 
-      if hit_test.hit {
-        Some((id, store.map_from_parent(id, pos, arena)))
-      } else if hit_test.can_hit_child {
-        let pos = store.map_from_parent(id, pos, arena);
-        id.reverse_children(arena)
-          .find_map(|c| down_coordinate(c, pos, tree))
-      } else {
-        None
+      pos = store.map_from_parent(id, pos, arena);
+
+      if hit {
+        hit_result = w;
       }
-    }
 
-    let mut current = down_coordinate(tree.root(), self.info.cursor_pos, tree);
-    let mut hit = current;
-    while let Some((id, pos)) = current {
-      hit = current;
-      current = id
-        .reverse_children(&tree.arena)
-        .find_map(|c| down_coordinate(c, pos, tree));
+      w = id
+        .last_child(&tree.arena)
+        .filter(|_| can_hit_child)
+        .or_else(|| {
+          if hit {
+            return None;
+          }
+
+          pos = store.map_to_parent(id, pos, arena);
+
+          let mut node = w;
+          while let Some(p) = node {
+            node = p.previous_sibling(&tree.arena);
+            if let Some(_) = node {
+              break;
+            } else {
+              node = p.parent(&tree.arena);
+
+              if let Some(id) = node {
+                pos = store.map_to_parent(id, pos, arena);
+                if node == hit_result {
+                  node = None;
+                }
+              }
+            }
+          }
+          node
+        });
     }
-    hit.map(|(w, _)| w)
+    hit_result
   }
 
   fn pointer_event_for_hit_widget(&mut self, tree: &WidgetTree) -> Option<PointerEvent> {
@@ -823,5 +841,56 @@ mod tests {
     let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);
 
     assert_eq!(hit, None);
+  }
+
+  #[test]
+  fn hit_test_case() {
+    fn normal_mode_search() {
+      struct T {
+        pub wid1: Option<WidgetId>,
+        pub wid2: Option<WidgetId>,
+      }
+      let data = Rc::new(RefCell::new(T { wid1: None, wid2: None }));
+      let data1 = data.clone();
+      let data2 = data.clone();
+
+      let w = widget! {
+        MockBox {
+          size: Size::new(200., 200.),
+          MockStack {
+            child_pos: vec![
+              Point::new(50., 50.),
+              Point::new(100., 100.),
+            ],
+            MockBox {
+              on_mounted: move |ctx| {
+                let mut v = data1.borrow_mut();
+                (*v).wid1 = Some(ctx.id);
+              },
+              size: Size::new(100., 100.),
+            }
+            MockBox {
+              on_mounted: move |ctx| {
+                let mut v = data2.borrow_mut();
+                (*v).wid2 = Some(ctx.id);
+              },
+              size: Size::new(50., 150.),
+            }
+          }
+        }
+      };
+
+      let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(500., 500.)));
+      wnd.draw_frame();
+      wnd.dispatcher.info.cursor_pos = Point::new(125., 125.);
+      let hit_2 = wnd.dispatcher.hit_widget(&wnd.widget_tree);
+      assert_eq!(hit_2, data.borrow().wid2);
+
+      wnd.dispatcher.info.cursor_pos = Point::new(80., 80.);
+      let hit_1 = wnd.dispatcher.hit_widget(&wnd.widget_tree);
+      assert_eq!(hit_1, data.borrow().wid1);
+    }
+
+    normal_mode_search();
   }
 }
