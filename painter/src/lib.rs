@@ -10,7 +10,7 @@ pub use crate::painter::*;
 pub use path::*;
 pub mod image;
 mod style;
-pub use image::{PixelImage, ShallowImage};
+pub use crate::image::{PixelImage, ShallowImage};
 pub use style::*;
 mod svg_parser;
 pub use ribir_text;

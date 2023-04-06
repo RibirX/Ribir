@@ -26,8 +26,8 @@ impl SvgPaths {
     let view_rect = tree.view_box.rect;
     let size = tree.size;
     let fit_size = size.fit_view_box(&tree.view_box);
-    let scale_x = view_rect.width() / fit_size.width();
-    let scale_y = view_rect.height() / fit_size.height();
+    let scale_x = size.width() / fit_size.width();
+    let scale_y = size.height() / fit_size.height();
     let t = Transform::translation(-view_rect.x() as f32, -view_rect.y() as f32)
       .then_scale(scale_x as f32, scale_y as f32);
 
@@ -45,11 +45,18 @@ impl SvgPaths {
               let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
               let lyon_path = usvg_path_to_lyon_path(p);
               let transform = t_stack.current_transform();
+              let t: &lyon_tessellation::geom::Transform<f32> =
+                unsafe { std::mem::transmute(&transform) };
+              let lyon_path = lyon_path.transformed(t);
               let path = Path {
                 path: lyon_path,
                 style: PathStyle::Fill,
               };
-              paths.push(SvgRenderPath { path, transform, brush });
+              paths.push(SvgRenderPath {
+                path,
+                transform: Transform::default(),
+                brush,
+              });
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -184,4 +191,11 @@ impl TransformStack {
   fn pop(&mut self) -> Option<Transform> { self.stack.pop() }
 
   fn current_transform(&self) -> Transform { self.stack.last().cloned().unwrap() }
+}
+
+#[test]
+fn x() {
+  let data =
+    include_bytes!("../../widgets/src/themes/material/icons/sms_FILL0_wght400_GRAD0_opsz48.svg");
+  SvgPaths::parse_from_bytes(data);
 }

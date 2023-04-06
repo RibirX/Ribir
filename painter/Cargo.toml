@@ -27,6 +27,7 @@ serde = {workspace = true, features = ["rc"]}
 serde_json.workspace = true
 usvg.workspace = true
 png = {workspace = true, optional=true}
+image.workspace=true
 
 [features]
 png = ["dep:png"]

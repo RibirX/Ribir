@@ -51,10 +51,14 @@ impl EdgeInsets {
   pub fn all(value: f32) -> Self {
     Self {
       top: value,
-      left: value,
-      bottom: value,
       right: value,
+      bottom: value,
+      left: value,
     }
+  }
+
+  pub fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
+    Self { top, right, bottom, left }
   }
 
   #[inline]

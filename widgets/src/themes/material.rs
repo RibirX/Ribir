@@ -63,7 +63,10 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     svgs::SEARCH: "./material/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::SETTINGS: "./material/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::TEXT_CARET: "./material/icons/text_caret.svg"
+    svgs::TEXT_CARET: "./material/icons/text_caret.svg",
+    svgs::SMS: "./material/icons/sms_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ACCOUNT_CIRCLE: "./material/icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::MORE_HORIZ: "./material/icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg"
   };
 
   override_compose_style(&mut theme);
