@@ -97,7 +97,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       tokens.extend(quote! {
         impl #g_impl FillTml<[_Marker; #f_idx], _Child> for #tml #g_ty #g_where {
           fn fill_tml(&mut self, c: _Child) {
-            let mut builder = #ty::builder();
+            let mut builder = <#ty>::builder();
             builder.fill_tml(c);
             self.fill_tml(builder.build_tml());
           }
@@ -115,7 +115,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
           #[derive(Default)]
-          #vis struct #tml #g_ty #g_where {
+          #vis struct #tml #g_impl #g_where {
             #(#builder_fields)*
           }
         });
@@ -143,7 +143,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
         tokens.extend(quote! {
           #[derive(Default)]
-          #vis struct #tml #g_ty #g_where(#(#builder_fields)*);
+          #vis struct #tml #g_impl #g_where(#(#builder_fields)*);
         });
 
         let init_values = fields.iter().enumerate().map(|(idx, field)| {
@@ -168,7 +168,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       let err_str = format!("Child `{}` not specify.", quote! { #name });
       tokens.extend(quote! {
         #[derive(Default)]
-        #vis struct #tml #g_ty #g_where(Option<#name>);
+        #vis struct #tml #g_impl #g_where(Option<#name #g_ty>);
 
         impl #g_impl TemplateBuilder for #tml #g_ty #g_where {
           type Target = #name #g_ty;
