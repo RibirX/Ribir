@@ -59,14 +59,12 @@ use ribir_core::prelude::*;
 ///     // use leading custom widget
 ///     ListItem {
 ///       Leading {
-///         IntoWidget::into_widget(
-///           widget! {
-///             Container {
-///               size: Size::splat(40.),
-///               background: Color::YELLOW,
-///             }
+///         widget! {
+///           Container {
+///             size: Size::splat(40.),
+///             background: Color::YELLOW,
 ///           }
-///         )
+///         }
 ///       }
 ///     }
 ///   }
@@ -94,14 +92,12 @@ use ribir_core::prelude::*;
 ///     ListItem {
 ///       HeadlineText(Label::new("headline text"))
 ///       Trailing {
-///         IntoWidget::into_widget(
-///           widget! {
-///             Container {
-///               size: Size::splat(40.),
-///               background: Color::YELLOW,
-///             }
+///         widget! {
+///           Container {
+///             size: Size::splat(40.),
+///             background: Color::YELLOW,
 ///           }
-///         )
+///         }
 ///       }
 ///     }
 ///   }
@@ -182,35 +178,115 @@ pub struct ListItemConfig {
   pub icon: ItemInfo,
   pub text: TextItemInfo,
   pub avatar: ItemInfo,
-  // pub image: ItemInfo,
-  // pub poster: ItemInfo,
+  pub image: ItemInfo,
+  pub poster: ItemInfo,
   pub custom: ItemInfo,
 }
 
+pub struct Poster(pub ShallowImage);
+
 pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
-
-#[derive(Template)]
-pub enum LeadingWidget {
-  Text(DecorateTml<Leading, State<Label>>),
-  Icon(DecorateTml<Leading, NamedSvg>),
-  Avatar(DecorateTml<Leading, ComposePair<State<Avatar>, AvatarTemplate>>),
-  // Todo: Image,
-  // Todo: Poster,
-  Custom(DecorateTml<Leading, Widget>),
-}
 
 impl TmlFlag for Leading {}
 impl TmlFlag for Trailing {}
 
 #[derive(Template)]
-pub enum TrailingWidget {
-  Text(DecorateTml<Trailing, State<Label>>),
-  Icon(DecorateTml<Trailing, NamedSvg>),
-  Avatar(DecorateTml<Trailing, ComposePair<State<Avatar>, AvatarTemplate>>),
-  // Todo: Image,
-  // Todo: Poster,
-  Custom(DecorateTml<Trailing, Widget>),
+pub enum EdgeWidget<P: TmlFlag + Default + 'static> {
+  Text(DecorateTml<P, State<Label>>),
+  Icon(DecorateTml<P, NamedSvg>),
+  Avatar(DecorateTml<P, ComposePair<State<Avatar>, AvatarTemplate>>),
+  Image(DecorateTml<P, ShallowImage>),
+  Poster(DecorateTml<P, Poster>),
+  Custom(DecorateTml<P, Widget>),
+}
+
+impl<P> EdgeWidget<P>
+where
+  P: TmlFlag + Default,
+{
+  pub fn into_widget(self, config: ListItemConfig) -> Widget {
+    let ListItemConfig {
+      icon,
+      text,
+      avatar,
+      image,
+      poster,
+      custom,
+    } = config;
+    match self {
+      EdgeWidget::Icon(w) => widget! {
+        DynWidget {
+          dyns: icon.gap.map(|margin| Margin { margin }),
+          Icon {
+            size: icon.size,
+            widget::from(w.decorate(|_, c| c))
+          }
+        }
+      },
+      EdgeWidget::Text(w) => widget! {
+        DynWidget {
+          dyns: text.gap.map(|margin| Margin { margin }),
+          widget::from(w.decorate(|_, label| widget!{
+            states { label: label.into_readonly() }
+            Text {
+              text: label.0.clone(),
+              style: text.style.clone(),
+              foreground: text.foreground.clone(),
+            }
+          }))
+        }
+      },
+      EdgeWidget::Avatar(w) => widget! {
+        DynWidget {
+          dyns: avatar.gap.map(|margin| Margin { margin }),
+          SizedBox {
+            size: avatar.size,
+            DynWidget {
+              box_fit: BoxFit::Contain,
+              dyns: w.decorate(|_, c| c.into_widget())
+            }
+          }
+        }
+      },
+      EdgeWidget::Image(w) => widget! {
+        DynWidget {
+          dyns: image.gap.map(|margin| Margin { margin }),
+          SizedBox {
+            size: image.size,
+            DynWidget {
+              box_fit: BoxFit::None,
+              dyns: w.decorate(|_, c| c)
+            }
+          }
+        }
+      },
+      EdgeWidget::Poster(w) => widget! {
+        DynWidget {
+          dyns: poster.gap.map(|margin| Margin { margin }),
+          SizedBox {
+            size: poster.size,
+            DynWidget {
+              box_fit: BoxFit::None,
+              dyns: w.decorate(|_, c| c.0)
+            }
+          }
+        }
+      },
+      EdgeWidget::Custom(w) => widget! {
+        DynWidget {
+          dyns: custom.gap.map(|margin| Margin { margin }),
+          SizedBox {
+            size: custom.size,
+            DynWidget {
+              box_fit: BoxFit::Contain,
+              dyns: w.decorate(|_, c| c)
+            }
+          }
+        }
+      },
+    }
+  }
 }
 
 #[derive(Template)]
@@ -218,9 +294,9 @@ pub struct ListItemTemplate {
   headline: State<HeadlineText>,
   supporting: Option<State<SupportingText>>,
   #[template(flat_fill)]
-  leading: Option<LeadingWidget>,
+  leading: Option<EdgeWidget<Leading>>,
   #[template(flat_fill)]
-  trailing: Option<TrailingWidget>,
+  trailing: Option<EdgeWidget<Trailing>>,
 }
 
 impl ComposeChild for ListItem {
@@ -263,62 +339,7 @@ impl ComposeChild for ListItem {
           dyns: padding_style.map(|padding| Padding { padding }),
           Row {
             align_items: item_align(this.line_number),
-            Option::map(leading, |leading| {
-              let ListItemConfig {
-                icon,
-                text,
-                avatar,
-                custom,
-              } = leading_config.clone();
-              match leading {
-                LeadingWidget::Icon(w) => widget! {
-                  DynWidget {
-                    dyns: icon.gap.map(|margin| Margin { margin }),
-                    Icon {
-                      size: icon.size,
-                      widget::from(w.decorate(|_, c| c))
-                    }
-                  }
-                },
-                LeadingWidget::Text(w) => widget! {
-                  DynWidget {
-                    dyns: text.gap.map(|margin| Margin { margin }),
-                    widget::from(w.decorate(|_, label| widget!{
-                      states { label: label.into_readonly() }
-                      Text {
-                        text: label.0.clone(),
-                        style: text.style.clone(),
-                        foreground: text.foreground.clone(),
-                      }
-                    }))
-                  }
-                },
-                LeadingWidget::Avatar(w) => widget! {
-                  DynWidget {
-                    dyns: avatar.gap.map(|margin| Margin { margin }),
-                    SizedBox {
-                      size: avatar.size,
-                      DynWidget {
-                        box_fit: BoxFit::Contain,
-                        dyns: w.decorate(|_, c| c.into_widget())
-                      }
-                    }
-                  }
-                },
-                LeadingWidget::Custom(w) => widget! {
-                  DynWidget {
-                    dyns: custom.gap.map(|margin| Margin { margin }),
-                    SizedBox {
-                      size: custom.size,
-                      DynWidget {
-                        box_fit: BoxFit::Contain,
-                        dyns: w.decorate(|_, c| c)
-                      }
-                    }
-                  }
-                },
-              }
-            })
+            Option::map(leading, |w| w.into_widget(leading_config))
             Expanded {
               flex: 1.,
               DynWidget {
@@ -343,62 +364,7 @@ impl ComposeChild for ListItem {
                 }
               }
             }
-            Option::map(trailing, |trailing| {
-              let ListItemConfig {
-                icon,
-                text,
-                avatar,
-                custom,
-              } = trailing_config.clone();
-              match trailing {
-                TrailingWidget::Icon(w) => widget! {
-                  DynWidget {
-                    dyns: icon.gap.map(|margin| Margin { margin }),
-                    Icon {
-                      size: icon.size,
-                      widget::from(w.decorate(|_, c| c))
-                    }
-                  }
-                },
-                TrailingWidget::Text(w) => widget! {
-                  DynWidget {
-                    dyns: text.gap.map(|margin| Margin { margin }),
-                    widget::from(w.decorate(|_, label| widget!{
-                      states { label: label.into_readonly() }
-                      Text {
-                        text: label.0.clone(),
-                        style: text.style.clone(),
-                        foreground: text.foreground.clone(),
-                      }
-                    }))
-                  }
-                },
-                TrailingWidget::Avatar(w) => widget! {
-                  DynWidget {
-                    dyns: avatar.gap.map(|margin| Margin { margin }),
-                    SizedBox {
-                      size: avatar.size,
-                      DynWidget {
-                        box_fit: BoxFit::Contain,
-                        dyns: w.decorate(|_, c| c.into_widget())
-                      }
-                    }
-                  }
-                },
-                TrailingWidget::Custom(w) => widget! {
-                  DynWidget {
-                    dyns: custom.gap.map(|margin| Margin { margin }),
-                    SizedBox {
-                      size: custom.size,
-                      DynWidget {
-                        box_fit: BoxFit::Contain,
-                        dyns: w.decorate(|_,c| c)
-                      }
-                    }
-                  }
-                }
-              }
-            })
+            Option::map(trailing, |w| w.into_widget(trailing_config))
           }
         }
       }
