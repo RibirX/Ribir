@@ -181,56 +181,56 @@ fn init_custom_theme(theme: &mut FullTheme) {
     label_gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
     headline_style: theme.typography_theme.body_large.text.clone(),
     supporting_style: theme.typography_theme.body_medium.text.clone(),
-    leading_config: ListItemConfig {
-      icon: ItemInfo {
+    leading_config: EdgeWidgetStyle {
+      icon: EdgeItemStyle {
         size: ICON_SMALL,
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      text: TextItemInfo {
+      text: EdgeTextItemStyle {
         style: theme.typography_theme.label_small.text.clone(),
         foreground: theme.palette.on_surface_variant().into(),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      avatar: ItemInfo {
+      avatar: EdgeItemStyle {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      image: ItemInfo {
+      image: EdgeItemStyle {
         size: Size::splat(LIST_IMAGE_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      poster: ItemInfo {
+      poster: EdgeItemStyle {
         size: Size::new(120., 64.),
         gap: None,
       },
-      custom: ItemInfo {
+      custom: EdgeItemStyle {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
     },
-    trailing_config: ListItemConfig {
-      icon: ItemInfo {
+    trailing_config: EdgeWidgetStyle {
+      icon: EdgeItemStyle {
         size: ICON_SMALL,
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      text: TextItemInfo {
+      text: EdgeTextItemStyle {
         style: theme.typography_theme.label_small.text.clone(),
         foreground: theme.palette.on_surface_variant().into(),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      avatar: ItemInfo {
+      avatar: EdgeItemStyle {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      image: ItemInfo {
+      image: EdgeItemStyle {
         size: Size::splat(LIST_IMAGE_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
-      poster: ItemInfo {
+      poster: EdgeItemStyle {
         size: Size::new(120., 64.),
         gap: None,
       },
-      custom: ItemInfo {
+      custom: EdgeItemStyle {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },

@@ -6,7 +6,7 @@ use ribir_core::prelude::*;
 /// use `ListItem` must have `HeadlineText`, other like `SupportingText`,
 /// `Leading`, and `Trailing` are optional.
 ///
-/// # example
+/// # Example
 ///
 /// ## single headline text
 /// ```
@@ -161,26 +161,26 @@ impl ComposeChild for Lists {
 }
 
 #[derive(Clone, Default)]
-pub struct ItemInfo {
+pub struct EdgeItemStyle {
   pub size: Size,
   pub gap: Option<EdgeInsets>,
 }
 
 #[derive(Clone)]
-pub struct TextItemInfo {
+pub struct EdgeTextItemStyle {
   pub style: CowArc<TextStyle>,
   pub gap: Option<EdgeInsets>,
   pub foreground: Brush,
 }
 
 #[derive(Clone)]
-pub struct ListItemConfig {
-  pub icon: ItemInfo,
-  pub text: TextItemInfo,
-  pub avatar: ItemInfo,
-  pub image: ItemInfo,
-  pub poster: ItemInfo,
-  pub custom: ItemInfo,
+pub struct EdgeWidgetStyle {
+  pub icon: EdgeItemStyle,
+  pub text: EdgeTextItemStyle,
+  pub avatar: EdgeItemStyle,
+  pub image: EdgeItemStyle,
+  pub poster: EdgeItemStyle,
+  pub custom: EdgeItemStyle,
 }
 
 pub struct Poster(pub ShallowImage);
@@ -205,8 +205,8 @@ impl<P> EdgeWidget<P>
 where
   P: TmlFlag + Default,
 {
-  pub fn into_widget(self, config: ListItemConfig) -> Widget {
-    let ListItemConfig {
+  fn compose_with_style(self, config: EdgeWidgetStyle) -> Widget {
+    let EdgeWidgetStyle {
       icon,
       text,
       avatar,
@@ -339,7 +339,7 @@ impl ComposeChild for ListItem {
           dyns: padding_style.map(|padding| Padding { padding }),
           Row {
             align_items: item_align(this.line_number),
-            Option::map(leading, |w| w.into_widget(leading_config))
+            Option::map(leading, |w| w.compose_with_style(leading_config))
             Expanded {
               flex: 1.,
               DynWidget {
@@ -364,7 +364,7 @@ impl ComposeChild for ListItem {
                 }
               }
             }
-            Option::map(trailing, |w| w.into_widget(trailing_config))
+            Option::map(trailing, |w| w.compose_with_style(trailing_config))
           }
         }
       }
@@ -385,8 +385,8 @@ pub struct ListItemStyle {
   pub item_align: fn(usize) -> Align,
   pub headline_style: CowArc<TextStyle>,
   pub supporting_style: CowArc<TextStyle>,
-  pub leading_config: ListItemConfig,
-  pub trailing_config: ListItemConfig,
+  pub leading_config: EdgeWidgetStyle,
+  pub trailing_config: EdgeWidgetStyle,
 }
 
 impl CustomTheme for ListItemStyle {}

@@ -113,7 +113,7 @@ fn main() {
                   line_number: 2,
                   Leading {
                     Avatar {
-                      Label::new("A")
+                      ShallowImage::from_png(include_bytes!("../../gpu/examples/leaves.png"))
                     }
                   }
                   HeadlineText(Label::new("Two lines list item"))
