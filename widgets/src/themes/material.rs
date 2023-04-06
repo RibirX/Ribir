@@ -78,6 +78,8 @@ const BUTTON_PADDING: f32 = 16.;
 const INDICATOR_SIZE: f32 = 60.;
 const LIST_ITEM_GAP: f32 = 16.;
 const LIST_ITEM_SIZE: f32 = 40.;
+const AVATAR_SIZE: f32 = 40.;
+const AVATAR_RADIUS: f32 = 20.;
 
 const ICON_TINY: Size = Size::new(18., 18.);
 const ICON_SMALL: Size = Size::new(24., 24.);
@@ -154,6 +156,13 @@ fn init_custom_theme(theme: &mut FullTheme) {
     padding: EdgeInsets::vertical(8.),
     background: theme.palette.surface().into(),
   });
+  theme.custom_themes.set_custom_theme(AvatarStyle {
+    size: Size::splat(AVATAR_SIZE),
+    radius: Some(AVATAR_RADIUS),
+    background: Some(theme.palette.primary().into()),
+    text_color: theme.palette.on_primary().into(),
+    text_style: theme.typography_theme.body_large.text.clone(),
+  });
   theme.custom_themes.set_custom_theme(ListItemStyle {
     padding_style: Some(EdgeInsets {
       left: 0.,
@@ -181,6 +190,10 @@ fn init_custom_theme(theme: &mut FullTheme) {
         foreground: theme.palette.on_surface_variant().into(),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
+      avatar: ItemInfo {
+        size: Size::splat(LIST_ITEM_SIZE),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
       custom: ItemInfo {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
@@ -194,6 +207,10 @@ fn init_custom_theme(theme: &mut FullTheme) {
       text: TextItemInfo {
         style: theme.typography_theme.label_small.text.clone(),
         foreground: theme.palette.on_surface_variant().into(),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      avatar: ItemInfo {
+        size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
       custom: ItemInfo {
