@@ -114,21 +114,9 @@ fn main() {
                 ListItem {
                   line_number: 2,
                   Leading {
-                    IntoWidget::into_widget(
-                      widget! {
-                        Container {
-                          size: Size::splat(40.),
-                          background: primary.clone(),
-                          border_radius: Radius::all(20.),
-                          Text {
-                            h_align: HAlign::Center,
-                            v_align: VAlign::Center,
-                            foreground: on_primary.clone(),
-                            text: "A",
-                          }
-                        }
-                      }
-                    )
+                    Avatar {
+                      Label::new("A")
+                    }
                   }
                   HeadlineText(Label::new("Two lines list item"))
                   SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text"))

@@ -156,6 +156,18 @@ where
   }
 }
 
+// ComposePair<W, C> --- W: ComposeChild---> ComposePair<W, W::Child>
+impl<W, C> IntoChild<NotSelf<[(); 8]>, ComposePair<State<W>, W::Child>> for ComposePair<State<W>, C>
+where
+  W: ComposeChild,
+  C: TemplateBuilder<Target = W::Child>,
+{
+  fn into_child(self) -> ComposePair<State<W>, W::Child> {
+    let ComposePair { widget, child } = self;
+    ComposePair { widget, child: child.build_tml() }
+  }
+}
+
 // WidgetPair<W, C> --> DecorateTml<W, C2>
 impl<W, C, W2, C2, M1, M2> IntoChild<NotSelf<[(M1, M2); 9]>, DecorateTml<W2, C2>>
   for WidgetPair<W, C>
@@ -300,6 +312,18 @@ where
       tml_flag,
       child,
     }
+  }
+}
+
+impl<W, C> IntoEnumVariable<NotSelf<[(); 8]>, ComposePair<State<W>, W::Child>>
+  for ComposePair<State<W>, C>
+where
+  W: ComposeChild,
+  C: TemplateBuilder<Target = W::Child>,
+{
+  fn into_variable(self) -> ComposePair<State<W>, W::Child> {
+    let ComposePair { widget, child } = self;
+    ComposePair { widget, child: child.build_tml() }
   }
 }
 

@@ -181,7 +181,7 @@ pub struct TextItemInfo {
 pub struct ListItemConfig {
   pub icon: ItemInfo,
   pub text: TextItemInfo,
-  // pub avatar: ItemInfo,
+  pub avatar: ItemInfo,
   // pub image: ItemInfo,
   // pub poster: ItemInfo,
   pub custom: ItemInfo,
@@ -194,7 +194,7 @@ pub struct SupportingText(pub Label);
 pub enum LeadingWidget {
   Text(DecorateTml<Leading, State<Label>>),
   Icon(DecorateTml<Leading, NamedSvg>),
-  // Todo: Avatar,
+  Avatar(DecorateTml<Leading, ComposePair<State<Avatar>, AvatarTemplate>>),
   // Todo: Image,
   // Todo: Poster,
   Custom(DecorateTml<Leading, Widget>),
@@ -207,7 +207,7 @@ impl TmlFlag for Trailing {}
 pub enum TrailingWidget {
   Text(DecorateTml<Trailing, State<Label>>),
   Icon(DecorateTml<Trailing, NamedSvg>),
-  // Todo: Avatar,
+  Avatar(DecorateTml<Trailing, ComposePair<State<Avatar>, AvatarTemplate>>),
   // Todo: Image,
   // Todo: Poster,
   Custom(DecorateTml<Trailing, Widget>),
@@ -267,6 +267,7 @@ impl ComposeChild for ListItem {
               let ListItemConfig {
                 icon,
                 text,
+                avatar,
                 custom,
               } = leading_config.clone();
               match leading {
@@ -292,6 +293,18 @@ impl ComposeChild for ListItem {
                     }))
                   }
                 },
+                LeadingWidget::Avatar(w) => widget! {
+                  DynWidget {
+                    dyns: avatar.gap.map(|margin| Margin { margin }),
+                    SizedBox {
+                      size: avatar.size,
+                      DynWidget {
+                        box_fit: BoxFit::Contain,
+                        dyns: w.decorate(|_, c| c.into_widget())
+                      }
+                    }
+                  }
+                },
                 LeadingWidget::Custom(w) => widget! {
                   DynWidget {
                     dyns: custom.gap.map(|margin| Margin { margin }),
@@ -303,7 +316,7 @@ impl ComposeChild for ListItem {
                       }
                     }
                   }
-                }
+                },
               }
             })
             Expanded {
@@ -334,6 +347,7 @@ impl ComposeChild for ListItem {
               let ListItemConfig {
                 icon,
                 text,
+                avatar,
                 custom,
               } = trailing_config.clone();
               match trailing {
@@ -357,6 +371,18 @@ impl ComposeChild for ListItem {
                         foreground: text.foreground.clone(),
                       }
                     }))
+                  }
+                },
+                TrailingWidget::Avatar(w) => widget! {
+                  DynWidget {
+                    dyns: avatar.gap.map(|margin| Margin { margin }),
+                    SizedBox {
+                      size: avatar.size,
+                      DynWidget {
+                        box_fit: BoxFit::Contain,
+                        dyns: w.decorate(|_, c| c.into_widget())
+                      }
+                    }
                   }
                 },
                 TrailingWidget::Custom(w) => widget! {
