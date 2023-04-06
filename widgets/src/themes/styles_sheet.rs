@@ -38,6 +38,9 @@ pub mod svgs {
     SETTINGS,
     STAR,
     TEXT_CARET,
+    SMS,
+    ACCOUNT_CIRCLE,
+    MORE_HORIZ,
     THEME_EXTEND
   );
 }
