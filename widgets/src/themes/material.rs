@@ -80,6 +80,7 @@ const LIST_ITEM_GAP: f32 = 16.;
 const LIST_ITEM_SIZE: f32 = 40.;
 const AVATAR_SIZE: f32 = 40.;
 const AVATAR_RADIUS: f32 = 20.;
+const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
 
 const ICON_TINY: Size = Size::new(18., 18.);
 const ICON_SMALL: Size = Size::new(24., 24.);
@@ -194,6 +195,14 @@ fn init_custom_theme(theme: &mut FullTheme) {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
       },
+      image: ItemInfo {
+        size: Size::splat(LIST_IMAGE_ITEM_SIZE),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      poster: ItemInfo {
+        size: Size::new(120., 64.),
+        gap: None,
+      },
       custom: ItemInfo {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
@@ -212,6 +221,14 @@ fn init_custom_theme(theme: &mut FullTheme) {
       avatar: ItemInfo {
         size: Size::splat(LIST_ITEM_SIZE),
         gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      image: ItemInfo {
+        size: Size::splat(LIST_IMAGE_ITEM_SIZE),
+        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      },
+      poster: ItemInfo {
+        size: Size::new(120., 64.),
+        gap: None,
       },
       custom: ItemInfo {
         size: Size::splat(LIST_ITEM_SIZE),

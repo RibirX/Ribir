@@ -7,8 +7,6 @@ fn main() {
     init ctx => {
       let title_style = TypographyTheme::of(ctx).display_large.text.clone();
       let foreground = Palette::of(ctx).on_surface_variant().into();
-      let primary: Brush = Palette::of(ctx).primary().into();
-      let on_primary: Brush = Palette::of(ctx).on_primary().into();
       let secondary: Brush = Palette::of(ctx).secondary().into();
       let tertiary: Brush = Palette::of(ctx).tertiary().into();
     }
@@ -120,6 +118,38 @@ fn main() {
                   }
                   HeadlineText(Label::new("Two lines list item"))
                   SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text"))
+                  Trailing { Label::new("100+") }
+                }
+                Divider { indent: 16. }
+                ListItem {
+                  line_number: 1,
+                  Leading {
+                    ShallowImage::from_png(include_bytes!("../../gpu/examples/leaves.png"))
+                  }
+                  HeadlineText(Label::new("One lines list item"))
+                  SupportingText(Label::new("One lines supporting text"))
+                  Trailing { svgs::CHECK_BOX_OUTLINE_BLANK }
+                }
+                Divider { indent: 16. }
+                ListItem {
+                  line_number: 1,
+                  Leading {
+                    Avatar {
+                      Label::new("A")
+                    }
+                  }
+                  HeadlineText(Label::new("One lines list item"))
+                  SupportingText(Label::new("One lines supporting text"))
+                  Trailing { Label::new("100+") }
+                }
+                Divider { indent: 16. }
+                ListItem {
+                  line_number: 1,
+                  Leading {
+                    Poster(ShallowImage::from_png(include_bytes!("../../gpu/examples/leaves.png")))
+                  }
+                  HeadlineText(Label::new("One lines list item"))
+                  SupportingText(Label::new("One lines supporting text"))
                   Trailing { Label::new("100+") }
                 }
               }
