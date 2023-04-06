@@ -1,6 +1,27 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
 
+/// Avatar usage
+///
+/// # Example
+///
+/// ```
+/// # use ribir_core::prelude::*;
+/// # use ribir_widgets::prelude::*;
+///
+/// widget! {
+///   Avatar {
+///     Label::new("A")
+///   }
+/// };
+///
+/// # #[cfg(feature="png")]
+/// widget! {
+///   Avatar {
+///     ShallowImage::from_png(include_bytes!("../../gpu/examples/leaves.png"))
+///   }
+/// };
+/// ```
 #[derive(Declare, Default, Clone)]
 pub struct Avatar;
 
@@ -26,7 +47,7 @@ impl ComposeStyle for AvatarDecorator {
 #[derive(Template)]
 pub enum AvatarTemplate {
   Text(State<Label>),
-  // Image(Image),
+  Image(ShallowImage),
 }
 
 impl ComposeChild for Avatar {
@@ -41,27 +62,41 @@ impl ComposeChild for Avatar {
       }
       SizedBox {
         size,
-        DynWidget {
-          dyns: match child {
-            AvatarTemplate::Text(text) => widget! {
-              states { text: text.into_readonly() }
-              BoxDecoration {
-                background,
-                border_radius: radius.map(Radius::all),
-                Container {
-                  size,
-                  Text {
-                    h_align: HAlign::Center,
-                    v_align: VAlign::Center,
-                    text: text.0.clone(),
-                    style: text_style.clone(),
-                    foreground: text_color.clone(),
-                  }
+        widget::from(match child {
+          AvatarTemplate::Text(text) => widget! {
+            states { text: text.into_readonly() }
+            BoxDecoration {
+              background,
+              border_radius: radius.map(Radius::all),
+              Container {
+                size,
+                Text {
+                  h_align: HAlign::Center,
+                  v_align: VAlign::Center,
+                  text: text.0.clone(),
+                  style: text_style.clone(),
+                  foreground: text_color.clone(),
                 }
               }
             }
+          },
+          AvatarTemplate::Image(image) => widget! {
+            DynWidget {
+              dyns: radius.map(|radius| {
+                let path = Path::rect_round(
+                  &Rect::from_size(size),
+                  &Radius::all(radius),
+                  PathStyle::Fill,
+                );
+                Clip { clip: ClipType::Path(path) }
+              }),
+              Container {
+                size,
+                widget::from(image)
+              }
+            }
           }
-        }
+        })
       }
     }
   }
