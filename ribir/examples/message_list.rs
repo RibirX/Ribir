@@ -75,14 +75,8 @@ impl Compose for MessageList {
                             line_number: 1,
                             HeadlineText(Label::new(message.nick_name.clone()))
                             SupportingText(Label::new(message.content.clone()))
-                            Leading {
-                              widget! {
-                                DynWidget::from(img)
-                              }
-                            }
-                            Trailing {
-                              svgs::MORE_HORIZ
-                            }
+                            Leading { Avatar { widget::from(img) } }
+                            Trailing { svgs::MORE_HORIZ }
                           }
                           Divider {}
                         }

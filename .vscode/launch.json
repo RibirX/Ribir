@@ -268,24 +268,6 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug example 'message_list'",
-      "cargo": {
-        "args": [
-          "build",
-          "--example=message_list",
-          "--package=ribir"
-        ],
-        "filter": {
-          "name": "message_list",
-          "kind": "example"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
       "name": "Debug unit tests in example 'todo_mvp'",
       "cargo": {
         "args": [

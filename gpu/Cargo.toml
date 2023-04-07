@@ -28,7 +28,7 @@ zerocopy.workspace = true
 colored.workspace = true
 env_logger.workspace = true
 futures.workspace = true
-png.workspace = true
+image.workspace = true
 ribir = {path = "../ribir", version = "*"}
 winit.workspace = true
 
