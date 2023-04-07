@@ -65,7 +65,7 @@ impl ComposeChild for ButtonImpl {
               Option::map(icon, |icon| widget! {
                 Icon {
                   size: this.icon_size,
-                  DynWidget::from(icon)
+                  widget::from(icon)
                 }
               })
               Option::map(label, |label| widget! {

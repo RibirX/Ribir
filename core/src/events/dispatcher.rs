@@ -306,7 +306,7 @@ impl Dispatcher {
           let mut node = w;
           while let Some(p) = node {
             node = p.previous_sibling(&tree.arena);
-            if let Some(_) = node {
+            if node.is_some() {
               break;
             } else {
               node = p.parent(&tree.arena);

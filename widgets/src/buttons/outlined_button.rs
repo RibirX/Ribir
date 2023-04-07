@@ -113,7 +113,7 @@ impl ComposeChild for OutlinedButton {
           }),
           padding_style,
 
-          DynWidget::from(child)
+          widget::from(child)
         }
       }
     }

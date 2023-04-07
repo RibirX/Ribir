@@ -88,29 +88,29 @@ impl ComposeChild for Checkbox {
             CheckBoxDecorator {
               Icon {
                 size,
-                DynWidget {
-                  dyns: if this.indeterminate {
+                widget::from(
+                  if this.indeterminate {
                     svgs::INDETERMINATE_CHECK_BOX
                   } else if this.checked {
                     svgs::CHECK_BOX
                   } else {
                     svgs::CHECK_BOX_OUTLINE_BLANK
                   }
-                }
+                )
               }
             }
           };
           match position {
             Position::Left => widget! {
               Row {
-                DynWidget::from(label)
-                DynWidget::from(checkbox)
+                widget::from(label)
+                widget::from(checkbox)
               }
             },
             Position::Right => widget! {
               Row {
-                DynWidget::from(checkbox)
-                DynWidget::from(label)
+                widget::from(checkbox)
+                widget::from(label)
               }
             },
             _ => unreachable!("don't have vertical checkbox"),

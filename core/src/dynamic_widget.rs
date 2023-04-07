@@ -43,10 +43,6 @@ impl<D> DynWidgetDeclarer<D> {
 }
 
 impl<D> DynWidget<D> {
-  // todo: remove it.
-  #[inline]
-  pub const fn from(v: D) -> D { v }
-
   pub fn set_declare_dyns(&mut self, dyns: D) { self.dyns = Some(dyns); }
 
   pub fn into_inner(mut self) -> D {

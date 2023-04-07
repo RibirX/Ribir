@@ -109,7 +109,7 @@ impl ComposeChild for FabButton {
           border_style: None,
           padding_style,
 
-          DynWidget::from(child)
+          widget::from(child)
         }
       }
     }
