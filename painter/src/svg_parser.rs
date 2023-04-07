@@ -192,10 +192,3 @@ impl TransformStack {
 
   fn current_transform(&self) -> Transform { self.stack.last().cloned().unwrap() }
 }
-
-#[test]
-fn x() {
-  let data =
-    include_bytes!("../../widgets/src/themes/material/icons/sms_FILL0_wght400_GRAD0_opsz48.svg");
-  SvgPaths::parse_from_bytes(data);
-}

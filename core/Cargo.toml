@@ -22,7 +22,7 @@ lazy_static.workspace = true
 log.workspace = true
 lyon_algorithms.workspace = true
 lyon_geom.workspace = true
-png = {workspace = true, optional = true}
+image = {workspace = true, optional = true, default-features = false}
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_gpu = {path = "../gpu", version = "0.0.0", features = ["wgpu_gl"]}
 ribir_macros = {path = "../macros", version = "0.0.0"}
@@ -32,9 +32,8 @@ rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
 
-
 [features]
-png = ["dep:png", "ribir_painter/png"]
+png = ["dep:image", "ribir_painter/png"]
 thread-pool = [
   "futures/thread-pool",
 ]

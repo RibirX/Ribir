@@ -21,7 +21,7 @@ ribir_widgets = {path = "../widgets", version = "0.0.0"}
 
 [dev-dependencies]
 env_logger.workspace = true
-png.workspace = true
+image.workspace = true
 
 [features]
 default = ["wgpu_gl"]

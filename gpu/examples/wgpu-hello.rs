@@ -34,27 +34,16 @@ fn main() {
     shaper,
   ));
 
-  let abs_path =
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).with_file_name("./gpu/examples/leaves.png");
-  let decoder = png::Decoder::new(std::fs::File::open(abs_path).unwrap());
-  let mut reader = decoder.read_info().unwrap();
-
-  let mut buf = vec![0; reader.output_buffer_size()];
-  let info = reader.next_frame(&mut buf).unwrap();
-
-  let data = if info.buffer_size() != buf.len() {
-    buf[..info.buffer_size()].to_owned()
-  } else {
-    buf
-  };
-
-  assert_eq!(info.color_type, png::ColorType::Rgba);
-  assert_eq!(info.bit_depth, png::BitDepth::Eight);
-
+  let data = include_bytes!("./leaves.png");
+  let img = ::image::load(std::io::Cursor::new(data), ::image::ImageFormat::Png)
+    .unwrap()
+    .to_rgba8();
+  let width = img.width();
+  let height = img.height();
   let img = PixelImage::new(
-    std::borrow::Cow::Owned(data),
-    info.width as u16,
-    info.height as u16,
+    std::borrow::Cow::Owned(img.into_raw()),
+    width as u16,
+    height as u16,
     ColorFormat::Rgba8,
   );
   let img = ShallowImage::new(img);
