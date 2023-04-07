@@ -153,7 +153,10 @@ impl Tabs {
       .map(move |(idx, (icon, label))| {
         let icon_widget = icon.map(|icon| {
           widget! {
-            Icon { size, DynWidget::from(icon) }
+            Icon {
+              size,
+              widget::from(icon)
+            }
           }
         });
 
@@ -318,8 +321,8 @@ impl ComposeChild for Tabs {
             Position::Top | Position::Bottom => Direction::Vertical,
           },
           reverse: matches!(this.silent_ref().pos, Position::Right | Position::Bottom),
-          DynWidget::from(header)
-          DynWidget::from(panes)
+          widget::from(header)
+          widget::from(panes)
         }
       }
     }

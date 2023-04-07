@@ -468,7 +468,7 @@ fn no_watch() {
 fn embed_shadow_states() {
   let _ = widget! {
     // variable `_a` here
-    DynWidget::from(|_a: &BuildCtx| widget! {
+    widget::from(|_a: &BuildCtx| widget! {
       // states shadow `a`
       states { _a: Stateful::new(ZERO_SIZE) }
       // `_a` should be the state `_a`

@@ -96,7 +96,7 @@ impl ComposeChild for Button {
           border_style: None,
           padding_style,
 
-          DynWidget::from(child)
+          widget::from(child)
         }
       }
     }
