@@ -96,11 +96,14 @@ fn main() {
               Text::new("Lists", &foreground, title_style.clone())
               Lists {
                 margin: EdgeInsets::only_top(20.),
-                ListItem {
-                  line_number: 1,
-                  Leading { svgs::CHECK_BOX_OUTLINE_BLANK }
-                  HeadlineText(Label::new("One line list item"))
-                  SupportingText(Label::new("One line supporting text"))
+                Link {
+                  url: "https://ribir.org",
+                  ListItem {
+                    line_number: 1,
+                    Leading { svgs::CHECK_BOX_OUTLINE_BLANK }
+                    HeadlineText(Label::new("One line list item"))
+                    SupportingText(Label::new("One line supporting text"))
+                  }
                 }
                 Divider { indent: 16. }
                 ListItem {

@@ -32,7 +32,6 @@ rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
 
-
 [features]
 png = ["dep:png", "ribir_painter/png"]
 thread-pool = [
