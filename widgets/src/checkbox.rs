@@ -1,5 +1,5 @@
 use crate::{
-  layout::Position,
+  common_widget::{Leading, Trailing},
   prelude::{svgs, Icon, Label, Row, Text},
 };
 use ribir_core::prelude::*;
@@ -11,8 +11,8 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default=Palette::of(ctx).primary(), convert=into)]
-  pub foreground: Brush,
+  #[declare(default=Palette::of(ctx).primary())]
+  pub color: Color,
 }
 
 #[derive(Clone)]
@@ -22,9 +22,7 @@ pub struct CheckBoxStyle {
   /// The text style of the checkbox label.
   pub label_style: CowArc<TextStyle>,
   /// The checkbox foreground
-  pub label_foreground: Brush,
-  /// The checkbox Label in the position of Icon
-  pub position: Position,
+  pub label_color: Brush,
 }
 
 #[derive(Clone, Declare)]
@@ -45,14 +43,50 @@ impl Checkbox {
 }
 
 #[derive(Template)]
-pub struct CheckboxTemplate {
-  pub label: State<Label>,
+pub enum CheckboxTemplate {
+  Before(WidgetPair<Leading, State<Label>>),
+  After(WidgetPair<Trailing, State<Label>>),
 }
 
 impl ComposeStyle for CheckBoxDecorator {
   type Host = Widget;
   #[inline]
   fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
+}
+
+impl Checkbox {
+  fn icon(this: Stateful<Self>, size: Size) -> Widget {
+    widget! {
+      states { this }
+      CheckBoxDecorator {
+        color: this.color,
+        Icon {
+          size,
+          widget::from(
+            if this.indeterminate {
+              svgs::INDETERMINATE_CHECK_BOX
+            } else if this.checked {
+              svgs::CHECK_BOX
+            } else {
+              svgs::CHECK_BOX_OUTLINE_BLANK
+            }
+          )
+        }
+      }
+    }
+  }
+
+  fn label(label: &State<Label>, label_color: Brush, style: CowArc<TextStyle>) -> Widget {
+    let label = label.clone();
+    widget! {
+      states { label: label.into_readonly() }
+      Text {
+        text: label.0.clone(),
+        foreground: label_color,
+        style,
+      }
+    }
+  }
 }
 
 impl ComposeChild for Checkbox {
@@ -63,10 +97,9 @@ impl ComposeChild for Checkbox {
       states { this: this.into_writable() }
       init ctx => {
         let CheckBoxStyle {
-          icon_size: size,
+          icon_size,
           label_style,
-          position,
-          label_foreground,
+          label_color,
         } = CheckBoxStyle::of(ctx).clone();
       }
       DynWidget {
@@ -76,46 +109,25 @@ impl ComposeChild for Checkbox {
           this.switch_check()
         },
         dyns: {
-          let label = child.map(|child| widget! {
-            states { label: child.label.into_readonly() }
-            Text {
-              text: label.0.clone(),
-              foreground: label_foreground,
-              style: label_style.clone(),
-            }
-          });
-          let checkbox = widget! {
-            CheckBoxDecorator {
-              Icon {
-                size,
-                widget::from(
-                  if this.indeterminate {
-                    svgs::INDETERMINATE_CHECK_BOX
-                  } else if this.checked {
-                    svgs::CHECK_BOX
-                  } else {
-                    svgs::CHECK_BOX_OUTLINE_BLANK
-                  }
-                )
-              }
-            }
-          };
-          match position {
-            Position::Left => widget! {
+          let label_style = label_style.clone();
+          let label_color = label_color.clone();
+          child.map_or(
+            Checkbox::icon(no_watch!(this.clone_stateful()), icon_size),
+            |child| widget! {
               Row {
-                widget::from(label)
-                widget::from(checkbox)
+                widget::from(match &child {
+                  CheckboxTemplate::Before(w) => [
+                    Checkbox::label(&w.child, label_color.clone(), label_style.clone()),
+                    Checkbox::icon(this.clone_stateful(), icon_size),
+                  ],
+                  CheckboxTemplate::After(w) => [
+                    Checkbox::icon(this.clone_stateful(), icon_size),
+                    Checkbox::label(&w.child, label_color.clone(), label_style.clone()),
+                  ],
+                })
               }
-            },
-            Position::Right => widget! {
-              Row {
-                widget::from(checkbox)
-                widget::from(label)
-              }
-            },
-            _ => unreachable!("don't have vertical checkbox"),
-          }
-        }
+          })
+        },
       }
     }
   }
@@ -141,8 +153,8 @@ mod tests {
         expect: ExpectRect {
           x: Some(0.),
           y: Some(0.),
-          width: Some(42.),
-          height: Some(42.),
+          width: Some(48.),
+          height: Some(48.),
         },
       }],
     );

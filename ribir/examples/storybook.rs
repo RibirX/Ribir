@@ -159,6 +159,27 @@ fn main() {
             }
           }
         }
+        Tab {
+          TabItem {
+            svgs::HOME
+            Label::new("Checkbox")
+          }
+          TabPane {
+            Column {
+              margin: EdgeInsets::all(20.),
+              Checkbox {
+                Leading {
+                  Label::new("leading")
+                }
+              }
+              Checkbox {
+                Trailing {
+                  Label::new("trailing")
+                }
+              }
+            }
+          }
+        }
       }
     }
   };
