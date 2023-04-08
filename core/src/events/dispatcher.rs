@@ -864,15 +864,13 @@ mod tests {
             ],
             MockBox {
               on_mounted: move |ctx| {
-                let mut v = data1.borrow_mut();
-                (*v).wid1 = Some(ctx.id);
+                data1.borrow_mut().wid1 = Some(ctx.id);
               },
               size: Size::new(100., 100.),
             }
             MockBox {
               on_mounted: move |ctx| {
-                let mut v = data2.borrow_mut();
-                (*v).wid2 = Some(ctx.id);
+                data2.borrow_mut().wid2 = Some(ctx.id);
               },
               size: Size::new(50., 150.),
             }

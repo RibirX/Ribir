@@ -98,10 +98,9 @@ fn init_custom_theme(theme: &mut FullTheme) {
     track_brush: theme.palette.primary_container().into(),
   });
   theme.custom_themes.set_custom_theme(CheckBoxStyle {
-    icon_size: ICON_TINY,
+    icon_size: ICON_SMALL,
     label_style: theme.typography_theme.body_large.text.clone(),
-    label_foreground: theme.palette.on_surface().into(),
-    position: Position::Right,
+    label_color: theme.palette.on_surface().into(),
   });
   theme.custom_themes.set_custom_theme(InputTheme {
     min_length: 20.,
@@ -331,10 +330,10 @@ fn override_compose_style(theme: &mut FullTheme) {
       Ripple {
         center: true,
         color: style.color,
-        radius: 20.,
+        radius: 24.,
         bounded: RippleBound::Unbounded,
         InteractiveLayer {
-          color: style.color, border_radii: Radius::all(20.),
+          color: style.color, border_radii: Radius::all(24.),
           DynWidget { dyns: host, margin: EdgeInsets::all(12.) }
         }
       }
