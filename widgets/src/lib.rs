@@ -1,3 +1,5 @@
+use ribir_core::prelude::SystemTheme;
+
 pub mod avatar;
 pub mod buttons;
 pub mod checkbox;
@@ -37,4 +39,15 @@ pub mod prelude {
   pub use super::text_field::*;
   pub use super::themes::*;
   pub use super::transform_box::*;
+}
+
+pub fn widget_theme_init(theme: &mut SystemTheme) {
+  avatar::add_to_system_theme(theme);
+  buttons::add_to_system_theme(theme);
+  checkbox::add_to_system_theme(theme);
+  lists::add_to_system_theme(theme);
+  tabs::add_to_system_theme(theme);
+  scrollbar::add_to_system_theme(theme);
+  input::add_to_system_theme(theme);
+  themes::add_to_system_theme(theme);
 }

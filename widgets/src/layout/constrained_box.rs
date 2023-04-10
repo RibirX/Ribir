@@ -46,7 +46,7 @@ mod tests {
     expect_layout_result_with_theme(
       w,
       None,
-      material::purple::light(),
+      Theme::Full(FullTheme::default()),
       &[LayoutTestItem {
         path: &[0, 0],
         expect: ExpectRect {
@@ -75,7 +75,7 @@ mod tests {
     expect_layout_result_with_theme(
       w,
       None,
-      material::purple::light(),
+      Theme::Full(FullTheme::default()),
       &[LayoutTestItem {
         path: &[0, 0],
         expect: ExpectRect {

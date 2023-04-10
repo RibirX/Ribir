@@ -13,12 +13,12 @@ use ribir_core::{prelude::*, ticker::FrameMsg};
 pub struct Placeholder(CowArc<str>);
 
 #[derive(Clone, PartialEq)]
-pub struct InputTheme {
+pub struct InputStyle {
   pub min_length: f32,
   pub select_background: Brush,
   pub caret_color: Brush,
 }
-impl CustomStyle for InputTheme {}
+impl CustomStyle for InputStyle {}
 
 #[derive(Declare)]
 pub struct Input {
@@ -28,7 +28,7 @@ pub struct Input {
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
-  #[declare(default = InputTheme::of(ctx).min_length)]
+  #[declare(default = InputStyle::of(ctx).min_length)]
   min_length: f32,
 }
 
@@ -197,4 +197,12 @@ fn auto_x_scroll_pos(container: &ScrollableWidget, before: f32, after: f32) -> f
 
 fn to_content_pos(container: &ScrollableWidget, view_position: &Point) -> Point {
   *view_position - Size::from(container.scroll_pos.to_vector())
+}
+
+pub fn add_to_system_theme(theme: &mut SystemTheme) {
+  theme.set_custom_style(InputStyle {
+    min_length: 20.,
+    select_background: Color::from_rgb(181, 215, 254).into(),
+    caret_color: Brush::Color(theme.palette().on_surface()),
+  });
 }

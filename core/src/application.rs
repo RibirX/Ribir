@@ -19,10 +19,10 @@ pub struct Application {
 
 impl Application {
   #[inline]
-  pub fn new(theme: Theme) -> Self {
+  pub fn new(system_theme: SystemTheme) -> Self {
     // todo: theme can provide fonts to load.
     let ctx = AppContext {
-      app_theme: Rc::new(theme),
+      app_theme: Rc::new(system_theme.theme()),
       ..Default::default()
     };
 

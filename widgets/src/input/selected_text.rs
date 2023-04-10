@@ -2,7 +2,7 @@ use ribir_core::prelude::*;
 
 use crate::layout::{Container, Stack};
 
-use super::InputTheme;
+use super::InputStyle;
 
 #[derive(Declare)]
 pub(crate) struct SelectedText {
@@ -14,7 +14,7 @@ impl Compose for SelectedText {
     widget! {
       states { this: this.into_readonly() }
       init ctx => {
-        let color = InputTheme::of(ctx).select_background.clone();
+        let color = InputStyle::of(ctx).select_background.clone();
       }
       Stack {
         DynWidget {

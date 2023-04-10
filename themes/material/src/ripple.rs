@@ -1,6 +1,6 @@
 use super::state_layer::StateRole;
-use crate::prelude::*;
 use ribir_core::prelude::*;
+use ribir_widgets::prelude::*;
 
 /// Widget use to do ripple animate as a visual feedback to user interactive.
 /// Usually for touch and mouse.

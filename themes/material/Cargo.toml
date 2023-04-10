@@ -1,0 +1,17 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "ribir_theme_material"
+readme.workspace = true
+repository = "https://github.com/RibirX/Ribir/themes/material"
+version.workspace = true
+
+[dependencies]
+ribir_widgets = { path = "../../widgets", version = "0.0.0" }
+ribir_core = { path = "../../core", version = "0.0.0" }

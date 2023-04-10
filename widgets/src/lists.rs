@@ -132,6 +132,86 @@ pub struct ListsStyle {
 
 impl CustomStyle for ListsStyle {}
 
+pub fn add_to_system_theme(theme: &mut SystemTheme) {
+  theme.set_custom_style(ListItemStyle {
+    padding_style: Some(EdgeInsets {
+      left: 0.,
+      right: 24.,
+      bottom: 8.,
+      top: 8.,
+    }),
+    item_align: |num| {
+      if num >= 2 {
+        Align::Start
+      } else {
+        Align::Center
+      }
+    },
+    label_gap: Some(EdgeInsets::only_left(16.)),
+    headline_style: theme.typography_theme().body_large.text.clone(),
+    supporting_style: theme.typography_theme().body_medium.text.clone(),
+    leading_config: EdgeWidgetStyle {
+      icon: EdgeItemStyle {
+        size: Size::splat(24.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      text: EdgeTextItemStyle {
+        style: theme.typography_theme().label_small.text.clone(),
+        foreground: theme.palette().on_surface_variant().into(),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      avatar: EdgeItemStyle {
+        size: Size::splat(40.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      image: EdgeItemStyle {
+        size: Size::splat(56.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      poster: EdgeItemStyle {
+        size: Size::new(120., 64.),
+        gap: None,
+      },
+      custom: EdgeItemStyle {
+        size: Size::splat(40.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+    },
+    trailing_config: EdgeWidgetStyle {
+      icon: EdgeItemStyle {
+        size: Size::splat(24.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      text: EdgeTextItemStyle {
+        style: theme.typography_theme().label_small.text.clone(),
+        foreground: theme.palette().on_surface_variant().into(),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      avatar: EdgeItemStyle {
+        size: Size::splat(40.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      image: EdgeItemStyle {
+        size: Size::splat(56.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+      poster: EdgeItemStyle {
+        size: Size::new(120., 64.),
+        gap: None,
+      },
+      custom: EdgeItemStyle {
+        size: Size::splat(40.),
+        gap: Some(EdgeInsets::only_left(16.)),
+      },
+    },
+  });
+
+  theme.set_custom_style(ListsStyle {
+    padding: EdgeInsets::vertical(8.),
+    background: theme.palette().surface().into(),
+  });
+}
+
 #[derive(Declare)]
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
