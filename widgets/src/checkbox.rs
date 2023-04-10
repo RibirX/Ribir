@@ -133,10 +133,17 @@ impl ComposeChild for Checkbox {
   }
 }
 
+pub fn add_to_system_theme(theme: &mut SystemTheme) {
+  theme.set_custom_style(CheckBoxStyle {
+    icon_size: Size::splat(24.),
+    label_style: theme.typography_theme().body_large.text.clone(),
+    label_color: theme.palette().on_surface().into(),
+  });
+}
+
 impl CustomStyle for CheckBoxStyle {}
 #[cfg(test)]
 mod tests {
-  use crate::prelude::material;
 
   use super::*;
   use ribir_core::test::{expect_layout_result_with_theme, ExpectRect, LayoutTestItem};
@@ -144,17 +151,20 @@ mod tests {
   #[test]
   fn layout() {
     let w = widget! { Checkbox {} };
+    let mut system_theme = SystemTheme::new(FullTheme::default());
+    super::add_to_system_theme(&mut system_theme);
+
     expect_layout_result_with_theme(
       w,
       None,
-      material::purple::light(),
+      system_theme.theme(),
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect {
           x: Some(0.),
           y: Some(0.),
-          width: Some(48.),
-          height: Some(48.),
+          width: Some(24.),
+          height: Some(24.),
         },
       }],
     );

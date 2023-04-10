@@ -282,9 +282,17 @@ fn safe_recip(v: f32) -> f32 {
 
 impl CustomStyle for ScrollBarStyle {}
 
+pub fn add_to_system_theme(theme: &mut SystemTheme) {
+  theme.set_custom_style(ScrollBarStyle {
+    thumb_min_size: 12.,
+    thickness: 8.,
+    track_brush: theme.palette().primary_container().into(),
+  });
+}
+
 #[cfg(test)]
 mod test {
-  use crate::{layout::Column, prelude::material};
+  use crate::layout::Column;
 
   use super::*;
   use ribir_core::test::*;
@@ -305,10 +313,13 @@ mod test {
       }
     };
 
+    let mut system_theme = SystemTheme::new(FullTheme::default());
+    super::add_to_system_theme(&mut system_theme);
+
     expect_layout_result_with_theme(
       w,
       Some(Size::new(200., 200.)),
-      material::purple::light(),
+      system_theme.theme(),
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -380,8 +391,10 @@ mod test {
       }
     };
 
+    let mut system_theme = SystemTheme::new(FullTheme::default());
+    super::add_to_system_theme(&mut system_theme);
     let ctx = AppContext {
-      app_theme: std::rc::Rc::new(material::purple::light()),
+      app_theme: std::rc::Rc::new(system_theme.theme()),
       ..<_>::default()
     };
     let mut wnd = Window::mock_window(w, Size::new(1024., 1024.), ctx);

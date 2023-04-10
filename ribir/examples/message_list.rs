@@ -1,4 +1,5 @@
 use ribir::prelude::*;
+use ribir_theme_material::material_svgs;
 
 #[derive(Clone)]
 struct Message {
@@ -56,7 +57,7 @@ impl Compose for MessageList {
           pos: Position::Bottom,
           Tab {
             TabItem {
-              svgs::SMS
+              material_svgs::SMS
               Label::new("Messages")
             }
             TabPane {
@@ -89,7 +90,7 @@ impl Compose for MessageList {
           }
           Tab {
             TabItem {
-              svgs::ACCOUNT_CIRCLE
+              material_svgs::ACCOUNT_CIRCLE
               Label::new("Person")
             }
             TabPane {
@@ -130,7 +131,8 @@ fn main() {
     ],
   };
 
-  let app = Application::new(material::purple::light());
+  let system_theme = SystemTheme::new(ribir_theme_material::purple::light());
+  let app = Application::new(system_theme);
   let wnd = Window::builder(message_list.into_widget())
     .with_inner_size(Size::new(320., 568.))
     .with_title("Message")

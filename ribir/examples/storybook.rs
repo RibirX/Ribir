@@ -183,7 +183,9 @@ fn main() {
       }
     }
   };
-  let app = Application::new(material::purple::light());
+  let mut theme = SystemTheme::new(FullTheme::default());
+  ribir_widgets::widget_theme_init(&mut theme);
+  let app = Application::new(theme);
   let wnd = Window::builder(widgets)
     .with_inner_size(Size::new(WINDOW_SIZE, WINDOW_SIZE))
     .with_title("StoryBook")

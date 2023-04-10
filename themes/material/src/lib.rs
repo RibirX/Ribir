@@ -1,15 +1,16 @@
 use std::rc::Rc;
 
-pub use super::*;
-use crate::prelude::*;
 use ribir_core::{fill_svgs, prelude::*};
+use ribir_widgets::prelude::*;
 pub mod ripple;
 pub mod state_layer;
 pub use ripple::*;
 pub use state_layer::*;
+mod styles_sheet;
+pub use styles_sheet::*;
 
 /// Crate a material theme with palette.
-pub fn new(brightness: Brightness, palette: Palette) -> Theme {
+pub fn new(brightness: Brightness, palette: Palette) -> FullTheme {
   let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
     "Roboto Regular",
   ))]);
@@ -35,43 +36,47 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
   };
 
   fill_svgs! { theme.icon_theme,
-    svgs::ADD_CIRCLE: "./material/icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ADD: "./material/icons/add_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_BACK: "./material/icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_DROP_DOWN: "./material/icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_FORWARD: "./material/icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CANCEL: "./material/icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_BOX: "./material/icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_BOX_OUTLINE_BLANK: "./material/icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_CIRCLE: "./material/icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK: "./material/icons/check_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHEVRON_RIGHT: "./material/icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CLOSE: "./material/icons/close_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::DELETE: "./material/icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::DONE: "./material/icons/done_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::EXPAND_MORE: "./material/icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::FAVORITE: "./material/icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::FILE_DOWNLOAD: "./material/icons/file_download_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::GRADE: "./material/icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::HOME: "./material/icons/home_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::INDETERMINATE_CHECK_BOX: "./material/icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::LOGIN: "./material/icons/login_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::LOGOUT: "./material/icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MENU: "./material/icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MORE_VERT: "./material/icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::REFRESH: "./material/icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::SEARCH: "./material/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::SETTINGS: "./material/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::STAR: "./material/icons/star_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::TEXT_CARET: "./material/icons/text_caret.svg",
-    svgs::SMS: "./material/icons/sms_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ACCOUNT_CIRCLE: "./material/icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MORE_HORIZ: "./material/icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg"
+    svgs::ADD: "./icons/add_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ARROW_BACK: "./icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ARROW_DROP_DOWN: "./icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::ARROW_FORWARD: "./icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CANCEL: "./icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHECK_BOX: "./icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHECK_BOX_OUTLINE_BLANK: "./icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CHEVRON_RIGHT: "./icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::CLOSE: "./icons/close_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::DELETE: "./icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::DONE: "./icons/done_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::EXPAND_MORE: "./icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::FAVORITE: "./icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::HOME: "./icons/home_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::INDETERMINATE_CHECK_BOX: "./icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::LOGIN: "./icons/login_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::LOGOUT: "./icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::MENU: "./icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::MORE_VERT: "./icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::SEARCH: "./icons/search_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::SETTINGS: "./icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::STAR: "./icons/star_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::TEXT_CARET: "./icons/text_caret.svg",
+    svgs::MORE_HORIZ: "./icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg"
   };
+
+  fill_svgs! {
+    theme.icon_theme,
+    material_svgs::ADD_CIRCLE: "./icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::CHECK_CIRCLE: "./icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::CHECK: "./icons/check_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::FILE_DOWNLOAD: "./icons/file_download_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::GRADE: "./icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::REFRESH: "./icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::SMS: "./icons/sms_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::ACCOUNT_CIRCLE: "./icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg"
+  }
 
   override_compose_decorator(&mut theme);
   init_custom_style(&mut theme);
-  Theme::Full(theme)
+  theme
 }
 
 const FAB_RADIUS: f32 = 16.;
@@ -102,7 +107,7 @@ fn init_custom_style(theme: &mut FullTheme) {
     label_style: theme.typography_theme.body_large.text.clone(),
     label_color: theme.palette.on_surface().into(),
   });
-  theme.custom_styles.set_custom_style(InputTheme {
+  theme.custom_styles.set_custom_style(InputStyle {
     min_length: 20.,
     select_background: Color::from_rgb(181, 215, 254).into(),
     caret_color: Brush::Color(theme.palette.on_surface()),
@@ -126,7 +131,7 @@ fn init_custom_style(theme: &mut FullTheme) {
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
     border_width: 1.,
   });
-  theme.custom_styles.set_custom_style(RawButtonStyle {
+  theme.custom_styles.set_custom_style(ButtonStyle {
     height: 40.,
     icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
@@ -361,13 +366,13 @@ pub mod purple {
   }
 
   /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-  pub fn light() -> Theme {
+  pub fn light() -> FullTheme {
     let palette = palette(LightnessCfg::light_theme_default());
     new(Brightness::Light, palette)
   }
 
   /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-  pub fn dark() -> Theme {
+  pub fn dark() -> FullTheme {
     let palette = palette(LightnessCfg::dark_theme_default());
     new(Brightness::Dark, palette)
   }

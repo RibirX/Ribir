@@ -30,6 +30,29 @@ pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
 use super::SvgRender;
 
+pub struct SystemTheme(FullTheme);
+
+impl SystemTheme {
+  pub fn new(theme: FullTheme) -> Self { Self(theme) }
+
+  pub fn set_custom_style<T>(&mut self, v: T)
+  where
+    T: CustomStyle + 'static,
+  {
+    self.0.custom_styles.set_custom_style(v);
+  }
+
+  pub fn icon_theme(&mut self) -> &mut IconTheme { &mut self.0.icon_theme }
+
+  pub fn palette(&self) -> &Palette { &self.0.palette }
+
+  pub fn typography_theme(&self) -> &TypographyTheme { &self.0.typography_theme }
+
+  pub fn compose_decorators(&mut self) -> &mut ComposeDecorators { &mut self.0.compose_decorators }
+
+  pub fn theme(self) -> Theme { Theme::Full(self.0) }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
   Dark,
@@ -115,12 +138,8 @@ impl Default for FullTheme {
       huge: Size::new(64., 64.),
     };
 
-    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
-      "Roboto Regular",
-    ))]);
-    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
-      "Roboto Medium",
-    ))]);
+    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Inter Light"))]);
+    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Inter Black"))]);
 
     let typography_theme = typography_theme(
       regular_family,

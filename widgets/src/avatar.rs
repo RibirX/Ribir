@@ -101,3 +101,13 @@ impl ComposeChild for Avatar {
     }
   }
 }
+
+pub fn add_to_system_theme(theme: &mut SystemTheme) {
+  theme.set_custom_style(AvatarStyle {
+    size: Size::splat(40.),
+    radius: Some(20.),
+    background: Some(theme.palette().primary().into()),
+    text_color: theme.palette().on_primary().into(),
+    text_style: theme.typography_theme().body_large.text.clone(),
+  });
+}

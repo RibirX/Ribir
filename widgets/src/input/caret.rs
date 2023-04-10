@@ -1,10 +1,10 @@
-use super::InputTheme;
+use super::InputStyle;
 use crate::{layout::SizedBox, themes::svgs};
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]
 pub struct Caret {
-  #[declare(default = InputTheme::of(ctx).caret_color.clone())]
+  #[declare(default = InputStyle::of(ctx).caret_color.clone())]
   pub color: Brush,
   pub focused: bool,
   pub height: f32,

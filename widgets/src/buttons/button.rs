@@ -2,7 +2,7 @@ use super::{ButtonImpl, ButtonTemplate, ButtonType, IconPosition};
 use ribir_core::prelude::*;
 
 #[derive(Clone)]
-pub struct RawButtonStyle {
+pub struct ButtonStyle {
   pub height: f32,
   pub icon_size: Size,
   pub label_gap: f32,
@@ -11,15 +11,15 @@ pub struct RawButtonStyle {
   pub padding_style: EdgeInsets,
 }
 
-impl CustomStyle for RawButtonStyle {}
+impl CustomStyle for ButtonStyle {}
 
 #[derive(Clone, Declare)]
-pub struct RawButtonDecorator {
+pub struct ButtonDecorator {
   #[allow(unused)]
   button_type: ButtonType,
 }
 
-impl ComposeDecorator for RawButtonDecorator {
+impl ComposeDecorator for ButtonDecorator {
   type Host = Widget;
 
   fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
@@ -71,17 +71,17 @@ impl ComposeChild for Button {
     widget! {
       states { this: this.into_readonly() }
       init ctx => {
-        let RawButtonStyle {
+        let ButtonStyle {
           height,
           icon_size,
           label_gap,
           icon_pos,
           label_style,
           padding_style,
-        } = RawButtonStyle::of(ctx).clone();
+        } = ButtonStyle::of(ctx).clone();
         let palette = Palette::of(ctx).clone();
       }
-      RawButtonDecorator {
+      ButtonDecorator {
         button_type,
         ButtonImpl {
           height,
@@ -101,4 +101,15 @@ impl ComposeChild for Button {
       }
     }
   }
+}
+
+pub fn add_to_system_theme(theme: &mut SystemTheme) {
+  theme.set_custom_style(ButtonStyle {
+    height: 40.,
+    icon_size: Size::splat(18.),
+    label_gap: 8.,
+    icon_pos: IconPosition::Before,
+    label_style: theme.typography_theme().label_large.text.clone(),
+    padding_style: EdgeInsets::horizontal(16.),
+  });
 }
