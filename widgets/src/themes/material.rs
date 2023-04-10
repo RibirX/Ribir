@@ -30,8 +30,8 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     typography_theme,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
-    compose_styles: <_>::default(),
-    custom_themes: <_>::default(),
+    compose_decorators: <_>::default(),
+    custom_styles: <_>::default(),
   };
 
   fill_svgs! { theme.icon_theme,
@@ -69,8 +69,8 @@ pub fn new(brightness: Brightness, palette: Palette) -> Theme {
     svgs::MORE_HORIZ: "./material/icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg"
   };
 
-  override_compose_style(&mut theme);
-  init_custom_theme(&mut theme);
+  override_compose_decorator(&mut theme);
+  init_custom_style(&mut theme);
   Theme::Full(theme)
 }
 
@@ -91,23 +91,23 @@ const ICON_MEDIUM: Size = Size::new(36., 36.);
 const ICON_LARGE: Size = Size::new(48., 48.);
 const ICON_HUGE: Size = Size::new(64., 64.);
 
-fn init_custom_theme(theme: &mut FullTheme) {
-  theme.custom_themes.set_custom_theme(ScrollBarTheme {
+fn init_custom_style(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(ScrollBarStyle {
     thumb_min_size: 12.,
     thickness: 8.,
     track_brush: theme.palette.primary_container().into(),
   });
-  theme.custom_themes.set_custom_theme(CheckBoxStyle {
+  theme.custom_styles.set_custom_style(CheckBoxStyle {
     icon_size: ICON_SMALL,
     label_style: theme.typography_theme.body_large.text.clone(),
     label_color: theme.palette.on_surface().into(),
   });
-  theme.custom_themes.set_custom_theme(InputTheme {
+  theme.custom_styles.set_custom_style(InputTheme {
     min_length: 20.,
     select_background: Color::from_rgb(181, 215, 254).into(),
     caret_color: Brush::Color(theme.palette.on_surface()),
   });
-  theme.custom_themes.set_custom_theme(FilledButtonStyle {
+  theme.custom_styles.set_custom_style(FilledButtonStyle {
     height: 40.,
     icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
@@ -116,7 +116,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
     radius: BUTTON_RADIUS,
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
-  theme.custom_themes.set_custom_theme(OutlinedButtonStyle {
+  theme.custom_styles.set_custom_style(OutlinedButtonStyle {
     height: 40.,
     icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
@@ -126,7 +126,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
     border_width: 1.,
   });
-  theme.custom_themes.set_custom_theme(RawButtonStyle {
+  theme.custom_styles.set_custom_style(RawButtonStyle {
     height: 40.,
     icon_size: ICON_TINY,
     label_gap: LABEL_GAP,
@@ -134,7 +134,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
     label_style: theme.typography_theme.label_large.text.clone(),
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
-  theme.custom_themes.set_custom_theme(FabButtonStyle {
+  theme.custom_styles.set_custom_style(FabButtonStyle {
     height: 56.,
     icon_size: ICON_SMALL,
     label_gap: LABEL_GAP,
@@ -143,7 +143,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
     radius: FAB_RADIUS,
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
-  theme.custom_themes.set_custom_theme(TabsStyle {
+  theme.custom_styles.set_custom_style(TabsStyle {
     extent_with_both: 64.,
     extent_only_label: 48.,
     extent_only_icon: 48.,
@@ -157,18 +157,18 @@ fn init_custom_theme(theme: &mut FullTheme) {
       measure: Some(INDICATOR_SIZE),
     },
   });
-  theme.custom_themes.set_custom_theme(ListsStyle {
+  theme.custom_styles.set_custom_style(ListsStyle {
     padding: EdgeInsets::vertical(8.),
     background: theme.palette.surface().into(),
   });
-  theme.custom_themes.set_custom_theme(AvatarStyle {
+  theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(AVATAR_SIZE),
     radius: Some(AVATAR_RADIUS),
     background: Some(theme.palette.primary().into()),
     text_color: theme.palette.on_primary().into(),
     text_style: theme.typography_theme.body_large.text.clone(),
   });
-  theme.custom_themes.set_custom_theme(ListItemStyle {
+  theme.custom_styles.set_custom_style(ListItemStyle {
     padding_style: Some(EdgeInsets {
       left: 0.,
       right: 24.,
@@ -242,7 +242,7 @@ fn init_custom_theme(theme: &mut FullTheme) {
   });
 }
 
-fn override_compose_style(theme: &mut FullTheme) {
+fn override_compose_decorator(theme: &mut FullTheme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
       init ctx => {
@@ -257,8 +257,8 @@ fn override_compose_style(theme: &mut FullTheme) {
     }
   }
 
-  let styles = &mut theme.compose_styles;
-  styles.override_compose_style::<HScrollBarThumbStyle>(|this, host| {
+  let styles = &mut theme.compose_decorators;
+  styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
     widget! {
       states { this }
       init ctx => {
@@ -275,7 +275,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<VScrollBarThumbStyle>(|this, host| {
+  styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
     widget! {
       states { this }
       init ctx => {
@@ -292,7 +292,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_style::<IndicatorDecorator>(|style, host| {
+  styles.override_compose_decorator::<IndicatorDecorator>(|style, host| {
     widget! {
       states { style }
       init ctx => {
@@ -324,7 +324,7 @@ fn override_compose_style(theme: &mut FullTheme) {
       ) { by: ease_in }
     }
   });
-  styles.override_compose_style::<CheckBoxDecorator>(move |style, host| {
+  styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host| {
     widget! {
       states { style }
       Ripple {
@@ -340,7 +340,7 @@ fn override_compose_style(theme: &mut FullTheme) {
     }
   });
   let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
-  theme.custom_themes.set_custom_theme(textfield);
+  theme.custom_styles.set_custom_style(textfield);
 }
 
 pub mod purple {

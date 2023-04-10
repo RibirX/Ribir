@@ -34,14 +34,14 @@ pub struct AvatarStyle {
   pub text_style: CowArc<TextStyle>,
 }
 
-impl CustomTheme for AvatarStyle {}
+impl CustomStyle for AvatarStyle {}
 
 pub struct AvatarDecorator;
 
-impl ComposeStyle for AvatarDecorator {
+impl ComposeDecorator for AvatarDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]

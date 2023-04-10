@@ -12,7 +12,7 @@ pub struct FabButtonStyle {
   pub padding_style: EdgeInsets,
 }
 
-impl CustomTheme for FabButtonStyle {}
+impl CustomStyle for FabButtonStyle {}
 
 #[derive(Clone, Declare)]
 pub struct FabButtonDecorator {
@@ -20,10 +20,10 @@ pub struct FabButtonDecorator {
   button_type: ButtonType,
 }
 
-impl ComposeStyle for FabButtonDecorator {
+impl ComposeDecorator for FabButtonDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// FabButton usage

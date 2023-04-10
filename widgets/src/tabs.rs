@@ -83,15 +83,15 @@ pub struct TabsStyle {
   pub indicator: IndicatorStyle,
 }
 
-impl CustomTheme for TabsStyle {}
+impl CustomStyle for TabsStyle {}
 
 #[derive(Declare)]
 pub struct TabsDecorator {}
 
-impl ComposeStyle for TabsDecorator {
+impl ComposeDecorator for TabsDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -112,10 +112,10 @@ pub struct TabPane;
 #[derive(Declare)]
 pub struct TabDecorator {}
 
-impl ComposeStyle for TabDecorator {
+impl ComposeDecorator for TabDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Declare)]
@@ -125,11 +125,11 @@ pub struct IndicatorDecorator {
   pub extent: f32,
 }
 
-impl ComposeStyle for IndicatorDecorator {
+impl ComposeDecorator for IndicatorDecorator {
   type Host = Widget;
 
   #[inline]
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 impl Tabs {

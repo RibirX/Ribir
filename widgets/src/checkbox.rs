@@ -48,10 +48,10 @@ pub enum CheckboxTemplate {
   After(WidgetPair<Trailing, State<Label>>),
 }
 
-impl ComposeStyle for CheckBoxDecorator {
+impl ComposeDecorator for CheckBoxDecorator {
   type Host = Widget;
   #[inline]
-  fn compose_style(_: Stateful<Self>, style: Self::Host) -> Widget { style }
+  fn compose_decorator(_: Stateful<Self>, style: Self::Host) -> Widget { style }
 }
 
 impl Checkbox {
@@ -133,7 +133,7 @@ impl ComposeChild for Checkbox {
   }
 }
 
-impl CustomTheme for CheckBoxStyle {}
+impl CustomStyle for CheckBoxStyle {}
 #[cfg(test)]
 mod tests {
   use crate::prelude::material;
