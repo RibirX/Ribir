@@ -13,10 +13,10 @@ mod typography_theme;
 pub use typography_theme::*;
 mod transition_theme;
 pub use transition_theme::*;
-mod compose_styles;
-pub use compose_styles::*;
-mod custom_theme;
-pub use custom_theme::*;
+mod compose_decorators;
+pub use compose_decorators::*;
+mod custom_styles;
+pub use custom_styles::*;
 
 use crate::{
   declare::DeclareBuilder,
@@ -51,8 +51,8 @@ pub struct FullTheme {
   pub typography_theme: TypographyTheme,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
-  pub compose_styles: ComposeStyles,
-  pub custom_themes: CustomThemes,
+  pub compose_decorators: ComposeDecorators,
+  pub custom_styles: CustomStyles,
 }
 
 /// Inherit theme override part of parent theme, if anything not found in here,
@@ -67,8 +67,8 @@ pub struct InheritTheme {
   /// a collection of icons.
   pub icons: Option<HashMap<NamedSvg, ShareResource<SvgRender>, ahash::RandomState>>,
   pub transitions_theme: Option<TransitionTheme>,
-  pub compose_styles: Option<ComposeStyles>,
-  pub custom_themes: Option<CustomThemes>,
+  pub compose_decorators: Option<ComposeDecorators>,
+  pub custom_styles: Option<CustomStyles>,
 }
 
 pub enum Theme {
@@ -135,8 +135,8 @@ impl Default for FullTheme {
       typography_theme,
       icon_theme: IconTheme::new(icon_size),
       transitions_theme: Default::default(),
-      compose_styles: Default::default(),
-      custom_themes: Default::default(),
+      compose_decorators: Default::default(),
+      custom_styles: Default::default(),
     }
   }
 }

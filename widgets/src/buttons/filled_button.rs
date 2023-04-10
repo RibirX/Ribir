@@ -12,7 +12,7 @@ pub struct FilledButtonStyle {
   pub padding_style: EdgeInsets,
 }
 
-impl CustomTheme for FilledButtonStyle {}
+impl CustomStyle for FilledButtonStyle {}
 
 #[derive(Clone, Declare)]
 pub struct FilledButtonDecorator {
@@ -20,10 +20,10 @@ pub struct FilledButtonDecorator {
   button_type: ButtonType,
 }
 
-impl ComposeStyle for FilledButtonDecorator {
+impl ComposeDecorator for FilledButtonDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// FilledButton usage

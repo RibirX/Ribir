@@ -18,7 +18,7 @@ pub struct InputTheme {
   pub select_background: Brush,
   pub caret_color: Brush,
 }
-impl CustomTheme for InputTheme {}
+impl CustomStyle for InputTheme {}
 
 #[derive(Declare)]
 pub struct Input {

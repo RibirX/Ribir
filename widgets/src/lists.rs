@@ -130,15 +130,15 @@ pub struct ListsStyle {
   pub background: Brush,
 }
 
-impl CustomTheme for ListsStyle {}
+impl CustomStyle for ListsStyle {}
 
 #[derive(Declare)]
 pub struct ListsDecorator {}
-impl ComposeStyle for ListsDecorator {
+impl ComposeDecorator for ListsDecorator {
   type Host = Widget;
 
   #[inline]
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 impl ComposeChild for Lists {
@@ -389,13 +389,13 @@ pub struct ListItemStyle {
   pub trailing_config: EdgeWidgetStyle,
 }
 
-impl CustomTheme for ListItemStyle {}
+impl CustomStyle for ListItemStyle {}
 
 #[derive(Clone, Declare)]
 pub struct ListItemDecorator {}
 
-impl ComposeStyle for ListItemDecorator {
+impl ComposeDecorator for ListItemDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }

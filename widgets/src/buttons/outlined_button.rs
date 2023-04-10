@@ -13,7 +13,7 @@ pub struct OutlinedButtonStyle {
   pub border_width: f32,
 }
 
-impl CustomTheme for OutlinedButtonStyle {}
+impl CustomStyle for OutlinedButtonStyle {}
 
 #[derive(Clone, Declare)]
 pub struct OutlinedButtonDecorator {
@@ -21,10 +21,10 @@ pub struct OutlinedButtonDecorator {
   button_type: ButtonType,
 }
 
-impl ComposeStyle for OutlinedButtonDecorator {
+impl ComposeDecorator for OutlinedButtonDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// OutlinedButton usage

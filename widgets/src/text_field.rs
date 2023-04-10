@@ -180,7 +180,7 @@ pub enum TextFieldState {
   // Disabled,
 }
 
-impl CustomTheme for TextFieldThemeSuit {}
+impl CustomStyle for TextFieldThemeSuit {}
 
 impl TextFieldThemeSuit {
   pub fn from_theme(palette: &Palette, typo_theme: &TypographyTheme) -> Self {

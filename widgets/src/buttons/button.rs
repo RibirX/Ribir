@@ -11,7 +11,7 @@ pub struct RawButtonStyle {
   pub padding_style: EdgeInsets,
 }
 
-impl CustomTheme for RawButtonStyle {}
+impl CustomStyle for RawButtonStyle {}
 
 #[derive(Clone, Declare)]
 pub struct RawButtonDecorator {
@@ -19,10 +19,10 @@ pub struct RawButtonDecorator {
   button_type: ButtonType,
 }
 
-impl ComposeStyle for RawButtonDecorator {
+impl ComposeDecorator for RawButtonDecorator {
   type Host = Widget;
 
-  fn compose_style(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// Button usage

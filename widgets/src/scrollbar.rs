@@ -13,7 +13,7 @@ pub struct HScrollBar {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ScrollBarTheme {
+pub struct ScrollBarStyle {
   /// The min size of the thumb have.
   pub thumb_min_size: f32,
   /// The thickness of scrollbar element.
@@ -25,14 +25,14 @@ pub struct ScrollBarTheme {
 /// Compose style that use to decoration the thumb of horizontal scrollbar,
 /// overwrite it when init theme.
 #[derive(Debug, Declare)]
-pub struct HScrollBarThumbStyle {
+pub struct HScrollBarThumbDecorator {
   pub offset: f32,
 }
 
-impl ComposeStyle for HScrollBarThumbStyle {
+impl ComposeDecorator for HScrollBarThumbDecorator {
   type Host = Widget;
   #[inline]
-  fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
+  fn compose_decorator(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
       states { this }
       DynWidget { left_anchor: this.offset, dyns: host }
@@ -43,14 +43,14 @@ impl ComposeStyle for HScrollBarThumbStyle {
 /// Compose style that use to decoration the thumb of vertical scrollbar,
 /// overwrite it when init theme.
 #[derive(Debug, Declare)]
-pub struct VScrollBarThumbStyle {
+pub struct VScrollBarThumbDecorator {
   pub offset: f32,
 }
 
-impl ComposeStyle for VScrollBarThumbStyle {
+impl ComposeDecorator for VScrollBarThumbDecorator {
   type Host = Widget;
   #[inline]
-  fn compose_style(this: Stateful<Self>, host: Widget) -> Widget {
+  fn compose_decorator(this: Stateful<Self>, host: Widget) -> Widget {
     widget! {
       states { this }
       DynWidget {
@@ -188,11 +188,11 @@ impl Compose for HRawScrollbar {
     widget! {
       states { scrolling, this }
       init ctx => {
-        let ScrollBarTheme {
+        let ScrollBarStyle {
           thickness,
           thumb_min_size,
           ref track_brush,
-        } = *ScrollBarTheme::of(ctx);
+        } = *ScrollBarStyle::of(ctx);
       }
 
       Stack {
@@ -204,7 +204,7 @@ impl Compose for HRawScrollbar {
         }
         LayoutBox {
           id: thumb_outline,
-          HScrollBarThumbStyle{
+          HScrollBarThumbDecorator{
             offset: {
               let content_width = scrolling.scroll_content_size().width;
               -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
@@ -239,11 +239,11 @@ impl Compose for VRawScrollbar {
     widget! {
       states { scrolling, this }
       init ctx => {
-        let ScrollBarTheme {
+        let ScrollBarStyle {
           thickness,
           thumb_min_size,
           ref track_brush
-        } = *ScrollBarTheme::of(ctx);
+        } = *ScrollBarStyle::of(ctx);
       }
 
       Stack {
@@ -255,7 +255,7 @@ impl Compose for VRawScrollbar {
         }
         LayoutBox {
           id: thumb_outline,
-          VScrollBarThumbStyle {
+          VScrollBarThumbDecorator {
             offset: {
               let content_height = scrolling.scroll_content_size().height;
               -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
@@ -280,7 +280,7 @@ fn safe_recip(v: f32) -> f32 {
   if v.is_infinite() || v.is_nan() { 0. } else { v }
 }
 
-impl CustomTheme for ScrollBarTheme {}
+impl CustomStyle for ScrollBarStyle {}
 
 #[cfg(test)]
 mod test {
