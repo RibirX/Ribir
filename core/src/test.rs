@@ -87,7 +87,7 @@ pub fn layout_info_by_path<'a>(wnd: &'a Window, path: &[usize]) -> Option<&'a La
 }
 
 #[derive(Declare, MultiChild)]
-pub(crate) struct MockStack {
+pub struct MockStack {
   child_pos: Vec<Point>,
 }
 
@@ -120,10 +120,10 @@ impl Query for MockStack {
 }
 
 #[derive(Declare, MultiChild)]
-pub(crate) struct MockMulti;
+pub struct MockMulti;
 
 #[derive(Declare, Clone, SingleChild)]
-pub(crate) struct MockBox {
+pub struct MockBox {
   pub size: Size,
 }
 

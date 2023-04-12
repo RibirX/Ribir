@@ -1,9 +1,9 @@
 use std::error::Error;
 
 use crate::{
-  context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
+  context::AppContext, events::dispatcher::Dispatcher, prelude::*, timer::new_timer,
+  widget_tree::WidgetTree,
 };
-
 pub use winit::window::CursorIcon;
 use winit::{event::WindowEvent, window::WindowId};
 
@@ -225,7 +225,7 @@ impl Window {
         self.layout();
 
         // wait all frame task finished.
-        self.frame_pool.0.run();
+        self.run_futures();
 
         if !self.widget_tree.is_dirty() {
           break;
@@ -241,6 +241,8 @@ impl Window {
       self.context.end_frame();
     }
   }
+
+  pub fn run_futures(&mut self) { self.frame_pool.0.run_until_stalled(); }
 
   pub fn layout(&mut self) {
     self.widget_tree.layout(self.raw_window.inner_size());
@@ -373,6 +375,7 @@ impl Window {
   }
 
   pub fn mock_window(root: Widget, size: Size, ctx: AppContext) -> Self {
+    let _ = NEW_TIMER_FN.set(new_timer);
     Self::new(
       MockRawWindow { size, ..Default::default() },
       MockBackend,
@@ -381,7 +384,6 @@ impl Window {
     )
   }
 }
-
 #[cfg(test)]
 mod tests {
   use super::*;
