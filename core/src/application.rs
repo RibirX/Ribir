@@ -1,8 +1,12 @@
-use crate::prelude::*;
+use crate::{
+  prelude::*,
+  timer::{new_timer, recently_timeout, wake_timeout_futures},
+};
+use rxrust::scheduler::NEW_TIMER_FN;
 use std::{collections::HashMap, rc::Rc};
 pub use winit::window::WindowId;
 use winit::{
-  event::{Event, WindowEvent},
+  event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
   platform::run_return::EventLoopExtRunReturn,
 };
@@ -15,12 +19,14 @@ pub struct Application {
 
 impl Application {
   #[inline]
-  pub fn new(theme: Theme) -> Application {
+  pub fn new(theme: Theme) -> Self {
     // todo: theme can provide fonts to load.
     let ctx = AppContext {
       app_theme: Rc::new(theme),
       ..Default::default()
     };
+
+    let _ = NEW_TIMER_FN.set(new_timer);
     Self { ctx, ..Default::default() }
   }
 
@@ -43,10 +49,8 @@ impl Application {
     }
 
     let Self { mut windows, mut event_loop, .. } = self;
-    event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
-      *control = ControlFlow::Wait;
-
-      match event {
+    event_loop.run_return(
+      move |event, _event_loop, control: &mut ControlFlow| match event {
         Event::WindowEvent { event, window_id } => {
           if event == WindowEvent::CloseRequested {
             windows.remove(&window_id);
@@ -58,11 +62,14 @@ impl Application {
             wnd.processes_native_event(event);
           }
         }
-        Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
-          if wnd.need_draw() {
-            wnd.request_redraw();
-          }
-        }),
+        Event::MainEventsCleared => {
+          windows.iter_mut().for_each(|(_, wnd)| {
+            wnd.run_futures();
+            if wnd.need_draw() {
+              wnd.request_redraw();
+            }
+          });
+        }
         Event::RedrawRequested(id) => {
           if let Some(wnd) = windows.get_mut(&id) {
             wnd.draw_frame();
@@ -71,11 +78,21 @@ impl Application {
         Event::RedrawEventsCleared => {
           if windows.iter_mut().any(|(_, wnd)| wnd.need_draw()) {
             *control = ControlFlow::Poll;
-          }
+          } else if let Some(t) = recently_timeout() {
+            *control = ControlFlow::WaitUntil(t);
+          } else {
+            *control = ControlFlow::Wait;
+          };
         }
+        Event::NewEvents(cause) => match cause {
+          StartCause::Poll | StartCause::ResumeTimeReached { start: _, requested_resume: _ } => {
+            wake_timeout_futures();
+          }
+          _ => (),
+        },
         _ => (),
-      }
-    });
+      },
+    );
   }
 
   pub fn add_window(&mut self, wnd: Window) -> WindowId {

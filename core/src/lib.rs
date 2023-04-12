@@ -19,6 +19,7 @@ pub mod dynamic_widget;
 pub mod enum_widget;
 pub mod events;
 pub mod ticker;
+pub mod timer;
 pub mod widget;
 pub mod widget_children;
 pub mod window;

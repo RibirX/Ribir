@@ -23,6 +23,7 @@ log.workspace = true
 lyon_algorithms.workspace = true
 lyon_geom.workspace = true
 image = {workspace = true, optional = true, default-features = false}
+once_cell = "1.17.1"
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_gpu = {path = "../gpu", version = "0.0.0", features = ["wgpu_gl"]}
 ribir_macros = {path = "../macros", version = "0.0.0"}
@@ -40,3 +41,8 @@ thread-pool = [
 
 [dev-dependencies]
 colored.workspace = true
+
+[[test]]
+harness = false
+name = "single_thread"
+path = "tests/single_thread.rs"
