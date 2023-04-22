@@ -5,7 +5,7 @@ use std::{cell::Ref, collections::HashMap};
 
 /// The theme of icon, which specify the icon size standard and provide a store
 /// of svg icons to use.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IconTheme {
   /// icon size standard
   pub icon_size: IconSize,
@@ -43,13 +43,13 @@ macro_rules! define_named_svg {
 /// macro use to specify icon of [`SvgIdent`]! in [`IconTheme`]!.
 #[macro_export]
 macro_rules! fill_svgs {
-  ($theme: expr, $($name: path: $path: literal),+) => {
-    $(
-      let icon = ShareResource::new(SvgRender(include_svg!($path)));
-      $theme.set_svg($name,  icon);
-    )+
-  };
-}
+    ($theme: expr, $($name: path: $path: literal),+) => {
+      $(
+        let icon = ShareResource::new(include_svg!($path));
+        $theme.set_svg($name,  icon);
+      )+
+    };
+  }
 
 /// The user custom icon identify define start from.
 pub const CUSTOM_ICON_START: NamedSvg = NamedSvg::new(65536);

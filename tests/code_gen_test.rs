@@ -14,7 +14,7 @@ fn declare_smoke() {
 
 #[test]
 fn simple_ref_bind_work() {
-  let size = Size::new(500., 500.);
+  let size = Size::new(100., 100.);
   let w = widget! {
     Flex {
      SizedBox {
@@ -25,8 +25,8 @@ fn simple_ref_bind_work() {
    }
   };
 
-  let flex_size = Size::new(1000., 500.);
-  let mut wnd = Window::default_mock(w, Some(Size::new(2000., 2000.)));
+  let flex_size = Size::new(200., 100.);
+  let mut wnd = default_mock_window(w);
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size));
 
@@ -51,7 +51,7 @@ fn event_attr_sugar_work() {
     }
   };
 
-  let mut wnd = Window::default_mock(w.into_widget(), None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
 
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(BEFORE_SIZE));
@@ -81,7 +81,7 @@ fn widget_wrap_bind_work() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, Some(Size::new(2000., 2000.)));
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(104., 52.)));
 
@@ -107,7 +107,7 @@ fn expression_for_children() {
     }
   };
 
-  let mut wnd = Window::default_mock(embed_expr, None);
+  let mut wnd = default_mock_window(embed_expr);
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
   assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(size_one));
@@ -141,7 +141,7 @@ fn embed_widget_ref_outside() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.layout();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
 
@@ -166,7 +166,7 @@ fn data_flow_macro() {
         .subscribe(move |v| c.size = v);
     }
   };
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
   let size = layout_size_by_path(&wnd, &[0]);
   // data flow not affect on init.
@@ -233,7 +233,7 @@ fn builtin_ref() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
 
   tap_at(&mut wnd, (1, 1));
@@ -262,7 +262,7 @@ fn builtin_bind_to_self() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
   tap_at(&mut wnd, (1, 1));
   wnd.draw_frame();
@@ -307,7 +307,7 @@ fn builtin_method_support() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
 
   assert_eq!(&*layout_size.state_ref(), &Size::new(100., 100.));
@@ -322,7 +322,7 @@ fn fix_builtin_field_can_declare_as_widget() {
     }
   };
 
-  let wnd = Window::default_mock(w, None);
+  let wnd = default_mock_window(w);
   assert_eq!(wnd.widget_count(), 2);
 }
 
@@ -339,7 +339,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
     }
   };
 
-  let wnd = Window::default_mock(w, None);
+  let wnd = default_mock_window(w);
   assert_eq!(wnd.widget_count(), 2);
 }
 
@@ -374,7 +374,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
   {
     *trigger.state_ref() = true
@@ -434,7 +434,7 @@ fn fix_silent_not_relayout_dyn_widget() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
   {
@@ -453,7 +453,7 @@ fn no_watch() {
     SizedBox { size: no_watch!(*size) }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
   assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
 
@@ -512,7 +512,7 @@ fn untrack_prop_with_pure_lambda() {
     }
   };
 
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
   wnd.draw_frame();
 
   assert_eq!(*counter.state_ref(), 0);

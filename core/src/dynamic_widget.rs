@@ -800,7 +800,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     let mut removed = vec![];
 
     wnd.draw_frame();
@@ -907,7 +907,7 @@ mod tests {
       })
       }
     };
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
 
     let grandson_id = {

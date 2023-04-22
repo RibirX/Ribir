@@ -192,7 +192,7 @@ impl Tabs {
                 true => active_color.clone(),
                 false => foreground.clone(),
               },
-              style: label_style,
+              text_style: label_style,
             }
           }
         });

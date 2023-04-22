@@ -1,5 +1,5 @@
 use indextree::{Arena, Node, NodeId};
-use ribir_painter::{Painter, Rect};
+use ribir_painter::Painter;
 use rxrust::prelude::*;
 
 use super::{DirtySet, LayoutStore};
@@ -230,14 +230,6 @@ impl WidgetId {
     wnd_ctx: &WindowCtx,
     painter: &mut Painter,
   ) {
-    fn paint_rect_intersect(painter: &mut Painter, rc: &Rect) -> bool {
-      let paint_rect = painter.get_transform().outer_transformed_rect(rc);
-      painter
-        .paint_bounds()
-        .and_then(|rc| rc.intersection(&paint_rect))
-        .is_some()
-    }
-
     let mut paint_ctx = PaintingCtx {
       id: self,
       arena,
@@ -254,7 +246,7 @@ impl WidgetId {
       if paint_ctx.painter.alpha() != 0. {
         if let Some(layout_box) = paint_ctx.box_rect() {
           let render = id.assert_get(arena);
-          if paint_rect_intersect(paint_ctx.painter, &layout_box) || render.can_overflow() {
+          if paint_ctx.painter.rect_in_paint_bounds(&layout_box) || render.can_overflow() {
             paint_ctx
               .painter
               .translate(layout_box.min_x(), layout_box.min_y());

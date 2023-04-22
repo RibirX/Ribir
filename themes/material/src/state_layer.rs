@@ -7,7 +7,7 @@ use ribir_widgets::{layout::Stack, path::PathPaintKit};
 #[derive(Declare)]
 pub struct StateLayer {
   pub color: Color,
-  pub path: PaintPath,
+  pub path: Path,
   pub role: StateRole,
 }
 /// Widget that as visual indicator of material design used to communicate the

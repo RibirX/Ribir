@@ -112,7 +112,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(row_tree, None);
+    let mut wnd = default_mock_window(row_tree);
 
     wnd.draw_frame();
     let tree = &mut wnd.widget_tree;

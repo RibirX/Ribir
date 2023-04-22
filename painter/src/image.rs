@@ -65,3 +65,11 @@ impl PixelImage {
   #[inline]
   pub fn pixel_bytes(&self) -> &[u8] { &self.data }
 }
+
+impl std::fmt::Debug for PixelImage {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_tuple("PixelImage")
+      .field(&format!("{}x{}", self.width, self.height))
+      .finish()
+  }
+}

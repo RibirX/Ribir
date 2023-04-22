@@ -38,7 +38,7 @@ impl Compose for MessageList {
             Text {
               text: "Message",
               foreground,
-              style: title_style.clone(),
+              text_style: title_style.clone(),
             }
           }
           Row {
@@ -65,10 +65,10 @@ impl Compose for MessageList {
                 Lists {
                   DynWidget {
                     dyns: this.messages.clone().into_iter().map(move |message| {
-                      let mut avatar = "./themes/material/attachments/3DDD-".to_string();
-                      avatar.push_str(&message.avatar.to_string());
-                      avatar.push_str(".png");
-                      let img = ShallowImage::from_png(&std::fs::read(avatar).unwrap());
+                      let name = message.avatar.to_string();
+                      let mut avatar = format!("./ribir/examples/attachments/3DDD-{name}.png");
+                      let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
+                      let img = ShareResource::new(img);
 
                       widget! {
                         Column {
@@ -131,11 +131,10 @@ fn main() {
     ],
   };
 
-  let theme = ribir_material::purple::light();
-  let app = Application::new(theme);
-  let wnd = Window::builder(message_list.into_widget())
-    .with_inner_size(Size::new(320., 568.))
-    .with_title("Message")
-    .build(&app);
-  app::run_with_window(app, wnd);
+  let mut app = App::new(material::purple::light());
+  let id = app
+    .new_window(message_list.into_widget(), Some(Size::new(320., 568.)))
+    .set_title("Message")
+    .id();
+  app.exec(id);
 }

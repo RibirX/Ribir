@@ -108,13 +108,13 @@ impl ComposeChild for Input {
             Text {
               id: text,
               text: this.text.clone(),
-              style: this.style.clone(),
+              text_style: this.style.clone(),
 
               on_performed_layout: move |ctx| {
                 let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
                 helper.glyphs = Some(Text::text_layout(
                   &text.text,
-                  &text.style,
+                  &text.text_style,
                   ctx.wnd_ctx().typography_store(),
                   bound,
                 ));

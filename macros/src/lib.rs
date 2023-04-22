@@ -100,7 +100,7 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   let encoded_bytes = ribir_painter::Svg::open(file).and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
-      SvgPaths::deserialize(#data).unwrap()
+      Svg::deserialize(#data).unwrap()
     }
     .into(),
     Err(err) => {

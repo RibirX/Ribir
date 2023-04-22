@@ -1,14 +1,16 @@
+/*
 use ribir::prelude::*;
 use std::time::Duration;
 
 fn main() {
-  let style = PathStyle::Stroke(StrokeOptions::default());
+  let style = PathPaintStyle::Stroke(StrokeOptions::default());
   let lyon_path = include_svg!("./Logo.svg");
   let mut paths = vec![];
   lyon_path.paths.into_iter().for_each(|render_path| {
     paths.push(PathPaintKit {
       path: render_path.path,
       brush: render_path.brush.map_or(Brush::Color(Color::BLACK), |b| b),
+      style,
     });
   });
   let w = widget! {
@@ -18,9 +20,7 @@ fn main() {
       transform: Transform::scale(0.5, 0.5),
       id: path_widget,
       paths,
-      on_mounted: move |_| {
-        circle_animate.run();
-      },
+      on_mounted: move |_|  circle_animate.run(),
     }
     Animate {
       id: circle_animate,
@@ -33,11 +33,15 @@ fn main() {
       prop: prop!(path_widget.paths, PathPaintKit::paths_lerp_fn(prop!(path_widget.paths))),
       from: vec![
         PathPaintKit {
-          path: PaintPath::rect(&Rect::zero(), style),
+          path: Path::rect(&Rect::zero()),
           brush: Brush::Color(Color::WHITE),
+          style
         }
       ]
     }
   };
-  app::run(w);
+  App::run(w);
 }
+ */
+
+fn main() { panic!("Blocked by path sampler finished.") }

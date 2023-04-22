@@ -1,8 +1,13 @@
+use std::ops::Range;
+
 use crate::{
   path_builder::{stroke_path, PathBuilder},
   Point, Rect, Transform,
 };
-use lyon_algorithms::path::Path as LyonPath;
+use lyon_algorithms::{
+  measure::{PathMeasurements, SampleType},
+  path::Path as LyonPath,
+};
 use serde::{Deserialize, Serialize};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
@@ -100,9 +105,21 @@ pub struct Vertex<Attr> {
   pub attr: Attr,
 }
 
+/// Sampler that can queries point at the path or usb-path of the path.
+pub struct PathSampler {
+  path: LyonPath,
+  measurements: PathMeasurements,
+}
+
 impl Path {
   #[inline]
   pub fn builder() -> PathBuilder { PathBuilder::default() }
+
+  pub fn bounding_box(&self) -> Rect {
+    lyon_algorithms::aabb::bounding_box(&self.0)
+      .to_rect()
+      .cast_unit()
+  }
 
   /// create a rect path.
   pub fn rect(rect: &Rect) -> Self {
@@ -142,6 +159,13 @@ impl Path {
     Self(self.0.transformed(ts))
   }
 
+  /// Create an sampler that can queries point at this path or usb-path of this
+  /// path.
+  pub fn sampler(&self) -> PathSampler {
+    let measurements = PathMeasurements::from_path(&self.0, 1e-3);
+    PathSampler { path: self.0.clone(), measurements }
+  }
+
   #[cfg(feature = "tessellation")]
   pub fn tessellate<Attr>(
     &self,
@@ -161,6 +185,44 @@ impl Path {
         }),
       )
       .unwrap();
+  }
+}
+
+impl PathSampler {
+  /// Sample point at a given rate along the path.
+  #[inline]
+  pub fn normalized_sample(&self, rate: f32) -> Point { self.sample(rate, SampleType::Normalized) }
+
+  /// Sample point at a given distance along the path.
+  #[inline]
+  pub fn distance_sample(&self, dist: f32) -> Point { self.sample(dist, SampleType::Distance) }
+
+  /// Construct a path for a specific rate range of the measured path.
+  #[inline]
+  pub fn normalized_sub_path(&self, rate_range: Range<f32>) -> Path {
+    self.sub_path(rate_range, SampleType::Normalized)
+  }
+
+  /// Construct a path for a specific distance range of the measured path.
+  #[inline]
+  pub fn distance_sub_path(&self, range: Range<f32>) -> Path {
+    self.sub_path(range, SampleType::Distance)
+  }
+
+  /// Returns the approximate length of the path.
+  #[inline]
+  pub fn length(&self) -> f32 { self.measurements.length() }
+
+  fn sample(&self, dist: f32, t: SampleType) -> Point {
+    let mut sampler = self.measurements.create_sampler(&self.path, t);
+    sampler.sample(dist).position().cast_unit()
+  }
+
+  fn sub_path(&self, range: Range<f32>, t: SampleType) -> Path {
+    let mut sampler = self.measurements.create_sampler(&self.path, t);
+    let mut builder = LyonPath::builder();
+    sampler.split_range(range, &mut builder);
+    Path(builder.build())
   }
 }
 

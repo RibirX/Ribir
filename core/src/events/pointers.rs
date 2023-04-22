@@ -392,8 +392,7 @@ mod tests {
           .subscribe(move |v| *is_focused1.borrow_mut() = v);
       }
     };
-
-    let mut wnd = Window::mock_window(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
 
     tap_on(&mut wnd, 25., 25.);

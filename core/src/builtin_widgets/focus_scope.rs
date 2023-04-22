@@ -79,7 +79,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(widget.into_widget(), None);
+    let mut wnd = default_mock_window(widget);
     let Window { dispatcher, widget_tree, .. } = &mut wnd;
     dispatcher.refresh_focus(widget_tree);
 
@@ -140,7 +140,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(widget.into_widget(), None);
+    let mut wnd = default_mock_window(widget);
     let Window { dispatcher, widget_tree, .. } = &mut wnd;
     dispatcher.refresh_focus(widget_tree);
 

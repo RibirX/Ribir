@@ -78,7 +78,7 @@ impl ComposeChild for ButtonImpl {
                   Text {
                     text: text.0.clone(),
                     foreground: this.foreground_color.clone(),
-                    style: this.label_style.clone()
+                    text_style: this.label_style.clone()
                   }
                 }
               })

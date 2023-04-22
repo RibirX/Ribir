@@ -1,9 +1,11 @@
-use crate::{Brush, Color, LineCap, LineJoin, Path, Point, Size, StrokeOptions, Transform};
+use crate::{
+  Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, Point, Size, StrokeOptions, Transform,
+};
 use euclid::approxeq::ApproxEq;
 use palette::FromComponent;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
-use usvg::{Options, Tree};
+use usvg::{Options, Tree, TreeParsing};
 
 #[derive(Serialize, Deserialize)]
 pub struct Svg {
@@ -13,9 +15,10 @@ pub struct Svg {
 
 #[derive(Serialize, Deserialize)]
 pub struct SvgPath {
-  path: Path,
-  brush: Brush,
-  transform: Transform,
+  pub path: Path,
+  pub brush: Brush,
+  pub style: PathPaintStyle,
+  pub transform: Transform,
 }
 
 // todo: we need to support currentColor to change svg color.
@@ -49,6 +52,7 @@ impl Svg {
                 path: path.clone(),
                 brush,
                 transform: transform.clone(),
+                style: PathPaintStyle::Fill,
               });
             }
 
@@ -71,10 +75,12 @@ impl Svg {
               };
 
               let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity);
-              let ts = t_stack.current_transform();
-              if let Some(path) = path.stroke(&options, Some(ts)).map(|p| p.transform(ts)) {
-                paths.push(SvgPath { path, brush, transform });
-              }
+              paths.push(SvgPath {
+                path,
+                brush,
+                transform,
+                style: PathPaintStyle::Stroke(options),
+              });
             };
           }
           NodeKind::Image(_) => {

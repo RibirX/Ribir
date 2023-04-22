@@ -397,7 +397,7 @@ mod test {
       app_theme: std::rc::Rc::new(Theme::Full(theme)),
       ..<_>::default()
     };
-    let mut wnd = Window::mock_window(w, Size::new(1024., 1024.), ctx);
+    let mut wnd = mock_window(w, Size::new(1024., 1024.), ctx);
     {
       *offset.state_ref() = Point::new(10., 10.);
     }

@@ -117,7 +117,7 @@ mod tests {
     let w = Keys::default();
     let keys = w.0.clone();
 
-    let mut wnd = Window::default_mock(w.into_widget(), None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
 
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));

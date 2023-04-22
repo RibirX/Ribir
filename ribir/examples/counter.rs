@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 fn main() {
-  app::run(widget! {
+  App::run(widget! {
     states { cnt: Stateful::new(0) }
     Column {
       h_align: HAlign::Center,

@@ -3,21 +3,27 @@ use crate::{
   timer::{new_timer, recently_timeout, wake_timeout_futures},
 };
 use rxrust::scheduler::NEW_TIMER_FN;
+use ribir_core::{
+  prelude::*,
+  window::{ShellWindow, WindowId},
+};
+use ribir_widgets::prelude::*;
 use std::{collections::HashMap, rc::Rc};
-pub use winit::window::WindowId;
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
   platform::run_return::EventLoopExtRunReturn,
 };
+use crate::winit_shell_wnd::new_id;
 
-pub struct Application {
+pub struct App {
   windows: HashMap<WindowId, Window>,
   ctx: AppContext,
   event_loop: EventLoop<()>,
+  active_wnd: Option<WindowId>,
 }
 
-impl Application {
+impl App {
   #[inline]
   pub fn new(theme: FullTheme) -> Self {
     let app_theme = Rc::new(Theme::Full(theme));
@@ -39,42 +45,72 @@ impl Application {
     self
   }
 
+  pub fn run(root: Widget) { Self::run_by::<crate::winit_shell_wnd::WinitShellWnd>(root) }
+
+  pub fn new_window(&mut self, root: Widget, size: Option<Size>) -> &mut Window {
+    self.new_window_by::<crate::winit_shell_wnd::WinitShellWnd>(root, size)
+  }
+
+  fn run_by<S: ShellWindow + 'static>(root: Widget) {
+    let mut app = App::new(material::purple::light());
+    let id = app.new_window(root, None).set_title("ribir app").id();
+    app.exec(id);
+  }
+
+  pub fn new_window_by<S: ShellWindow + 'static>(
+    &mut self,
+    root: Widget,
+    size: Option<Size>,
+  ) -> &mut Window {
+    let wnd = Window::new::<S>(root, size, self.context().clone());
+    let id = wnd.id();
+    assert!(self.windows.get(&id).is_none());
+    self.windows.entry(id).or_insert(wnd)
+  }
+
   #[inline]
   pub fn context(&self) -> &AppContext { &self.ctx }
 
   pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
 
-  pub fn exec(mut self, wnd_id: WindowId) {
-    if let Some(wnd) = self.windows.get_mut(&wnd_id) {
-      wnd.draw_frame();
-    } else {
-      panic!("application at least have one window");
-    }
+  pub fn exec(&mut self, id: WindowId) {
+    self.active_wnd = Some(id);
+    self
+      .windows
+      .get_mut(&id)
+      .expect("application at least have one window")
+      .draw_frame();
 
-    let Self { mut windows, mut event_loop, .. } = self;
-    event_loop.run_return(
-      move |event, _event_loop, control: &mut ControlFlow| match event {
+    let Self { windows, event_loop, .. } = self;
+
+    event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
+      *control = ControlFlow::Wait;
+
+      match event {
         Event::WindowEvent { event, window_id } => {
           if event == WindowEvent::CloseRequested {
-            windows.remove(&window_id);
+            windows.remove(&new_id(window_id));
           } else if event == WindowEvent::Destroyed {
             if windows.is_empty() {
               *control = ControlFlow::Exit;
             }
-          } else if let Some(wnd) = windows.get_mut(&window_id) {
+          } else if let Some(wnd) = windows.get_mut(&new_id(window_id)) {
             wnd.processes_native_event(event);
           }
         }
-        Event::MainEventsCleared => {
-          windows.iter_mut().for_each(|(_, wnd)| {
-            wnd.run_futures();
-            if wnd.need_draw() {
-              wnd.request_redraw();
-            }
-          });
-        }
+        Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
+          wnd.run_futures();
+          if wnd.need_draw() {
+            let wnd = wnd
+              .shell_wnd()
+              .as_any()
+              .downcast_ref::<winit::window::Window>()
+              .unwrap();
+            wnd.request_redraw();
+          }
+        }),
         Event::RedrawRequested(id) => {
-          if let Some(wnd) = windows.get_mut(&id) {
+          if let Some(wnd) = windows.get_mut(&new_id(id)) {
             wnd.draw_frame();
           }
         }
@@ -97,21 +133,15 @@ impl Application {
       },
     );
   }
-
-  pub fn add_window(&mut self, wnd: Window) -> WindowId {
-    let id = wnd.raw_window.id();
-    self.windows.insert(id, wnd);
-
-    id
-  }
 }
 
-impl Default for Application {
+impl Default for App {
   fn default() -> Self {
     Self {
       windows: Default::default(),
       event_loop: EventLoop::new(),
       ctx: <_>::default(),
+      active_wnd: None,
     }
   }
 }

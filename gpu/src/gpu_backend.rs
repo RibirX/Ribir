@@ -339,7 +339,7 @@ mod tests {
   fn painter() -> Painter {
     let font_db = Arc::new(RwLock::new(FontDB::default()));
     let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
-    Painter::new(1., store)
+    Painter::new(1., Rect::from_size(Size::new(1024., 1024.)), store)
   }
 
   fn commands_to_image(commands: Vec<PaintCommand>) -> PixelImage {

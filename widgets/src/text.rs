@@ -14,9 +14,9 @@ pub struct Text {
   #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()))]
   pub foreground: Brush,
   #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
-  pub style: CowArc<TextStyle>,
+  pub text_style: CowArc<TextStyle>,
   #[declare(default)]
-  pub path_paint_style: PathPaintStyle,
+  pub path_style: PathPaintStyle,
 }
 
 impl Text {
@@ -56,10 +56,15 @@ impl Text {
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let wnd_ctx = ctx.wnd_ctx();
-    Text::text_layout(&self.text, &self.style, wnd_ctx.typography_store(), clamp)
-      .visual_rect()
-      .size
-      .cast_unit()
+    Text::text_layout(
+      &self.text,
+      &self.text_style,
+      wnd_ctx.typography_store(),
+      clamp,
+    )
+    .visual_rect()
+    .size
+    .cast_unit()
   }
 
   #[inline]
@@ -74,7 +79,7 @@ impl Render for Text {
       font_face,
       letter_space,
       line_height,
-    } = &*self.style;
+    } = &*self.text_style;
     painter
       .set_font(font_face.clone())
       .set_font_size(*font_size);
@@ -87,12 +92,14 @@ impl Render for Text {
 
     let text = self.text.substr(..);
     let bounds = Some(rect.size);
-    match self.path_paint_style {
+    match &self.path_style {
       PathPaintStyle::Fill => {
         painter.fill_text(text, bounds);
       }
       PathPaintStyle::Stroke(stroke) => {
-        painter.stroke_text(text, bounds);
+        painter
+          .set_strokes(stroke.clone())
+          .stroke_text(text, bounds);
       }
     }
   }
@@ -115,12 +122,14 @@ macro_rules! define_text_with_theme_style {
     impl Compose for $name {
       fn compose(this: State<Self>) -> Widget {
         widget! {
-          init ctx => { let style = TypographyTheme::of(ctx).$style.text.clone(); }
+          init ctx => {
+            let text_style = TypographyTheme::of(ctx).$style.text.clone();
+          }
           states { this: this.into_readonly() }
           Text {
             text: this.text.clone(),
             foreground: this.foreground.clone(),
-            style: style,
+            text_style,
           }
         }
       }

@@ -24,7 +24,7 @@ use std::{
 /// bottom edge of the canvas.
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
-  bounds: DeviceRect,
+  bounds: Rect,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: PathBuilder,
@@ -138,29 +138,36 @@ impl PainterState {
 }
 
 impl Painter {
-  pub fn new(device_scale: f32, typography_store: TypographyStore) -> Self {
-    let bounds = DeviceRect::from_size(DeviceSize::new(i32::MAX, i32::MAX));
-    let mut p = Self {
+  pub fn new(device_scale: f32, bounds: Rect, typography_store: TypographyStore) -> Self {
+    let device_bounds = bounds
+      .scale(device_scale, device_scale)
+      .round_out()
+      .to_i32()
+      .cast_unit();
+    Self {
       device_scale,
-      state_stack: vec![PainterState::new(device_scale, bounds)],
+      state_stack: vec![PainterState::new(device_scale, device_bounds)],
       commands: vec![],
       path_builder: Path::builder(),
       typography_store,
       bounds,
-    };
-    p.scale(device_scale, device_scale);
-    p
+    }
   }
 
   /// Change the bounds of the painter can draw.But it won't take effect until
   /// the next time you call [`Painter::reset`]!.
-  pub fn set_bounds(&mut self, bounds: DeviceRect) { self.bounds = bounds; }
+  pub fn set_bounds(&mut self, bounds: Rect) { self.bounds = bounds; }
+
+  pub fn rect_in_paint_bounds(&self, rect: &Rect) -> bool {
+    let rect = self.get_transform().outer_transformed_rect(rect);
+    rect.intersects(&self.paint_bounds().to_f32().cast_unit())
+  }
 
   pub fn paint_bounds(&self) -> &DeviceRect { &self.current_state().bounds }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
-    self.reset(None);
+    self.reset();
     self.commands.drain(..).collect()
   }
 
@@ -197,14 +204,23 @@ impl Painter {
     });
   }
 
-  pub fn reset(&mut self, device_scale: Option<f32>) {
-    if let Some(scale) = device_scale {
-      self.device_scale = scale;
-    }
+  pub fn set_device_scale(&mut self, device_scale: f32) {
+    self.device_scale = device_scale;
+    self.reset();
+    self.scale(device_scale, device_scale);
+  }
+
+  pub fn reset(&mut self) {
+    let device_bounds = self
+      .bounds
+      .scale(self.device_scale, self.device_scale)
+      .round_out()
+      .to_i32()
+      .cast_unit();
     self.state_stack.clear();
     self
       .state_stack
-      .push(PainterState::new(self.device_scale, self.bounds));
+      .push(PainterState::new(self.device_scale, device_bounds));
     self.scale(self.device_scale, self.device_scale);
   }
 
@@ -228,6 +244,12 @@ impl Painter {
   }
 
   pub fn alpha(&self) -> f32 { self.current_state().opacity }
+
+  #[inline]
+  pub fn set_strokes(&mut self, strokes: StrokeOptions) -> &mut Self {
+    self.current_state_mut().stroke_options = strokes;
+    self
+  }
 
   /// Return the line width of the stroke pen.
   #[inline]
@@ -644,11 +666,7 @@ impl PaintPath {
     if ts != &Transform::identity() {
       path = path.transform(ts);
     }
-    let bounds = lyon_algorithms::aabb::bounding_box(&path.0)
-      .round()
-      .to_rect()
-      .to_i32()
-      .cast_unit();
+    let bounds = path.bounding_box().to_i32().cast_unit();
 
     if bounds.min() != (0, 0).into() {
       path = path.transform(&Transform::translation(
@@ -687,6 +705,7 @@ mod test {
   fn save_guard() {
     let mut layer = Painter::new(
       1.,
+      Rect::from_size(Size::new(512., 512.)),
       TypographyStore::new(
         <_>::default(),
         <_>::default(),

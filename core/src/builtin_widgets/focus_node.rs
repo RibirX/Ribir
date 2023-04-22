@@ -153,7 +153,7 @@ mod tests {
       }
     };
 
-    let wnd = Window::default_mock(widget, None);
+    let wnd = default_mock_window(widget);
     let tree = &wnd.widget_tree;
     let id = tree.root();
     let node = id.get(&tree.arena).unwrap();

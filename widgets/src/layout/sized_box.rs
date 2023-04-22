@@ -21,7 +21,7 @@ impl Render for SizedBox {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let rect = Rect::from_size(ctx.box_rect().unwrap().size);
-    let path = PaintPath::rect(&rect);
+    let path = Path::rect(&rect);
     ctx.painter().clip(path);
   }
 }

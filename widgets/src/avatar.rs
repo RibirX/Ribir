@@ -48,7 +48,7 @@ impl ComposeDecorator for AvatarDecorator {
 #[derive(Template)]
 pub enum AvatarTemplate {
   Text(State<Label>),
-  Image(ShallowImage),
+  Image(ShareResource<PixelImage>),
 }
 
 impl ComposeChild for Avatar {
@@ -90,7 +90,6 @@ impl ComposeChild for Avatar {
                 let path = Path::rect_round(
                   &Rect::from_size(size),
                   &Radius::all(radius),
-                  PathStyle::Fill,
                 );
                 Clip { clip: ClipType::Path(path) }
               }),

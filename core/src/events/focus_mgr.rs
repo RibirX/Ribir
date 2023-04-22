@@ -543,7 +543,7 @@ mod tests {
       }
     };
 
-    let wnd = Window::default_mock(widget, None);
+    let wnd = default_mock_window(widget);
     let tree = &wnd.widget_tree;
 
     let id = tree.root().first_child(&tree.arena);
@@ -562,7 +562,7 @@ mod tests {
       }
     };
 
-    let wnd = Window::default_mock(widget, None);
+    let wnd = default_mock_window(widget);
     let tree = &wnd.widget_tree;
 
     let id = tree
@@ -587,7 +587,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(widget.into_widget(), None);
+    let mut wnd = default_mock_window(widget);
     let Window { dispatcher, widget_tree, .. } = &mut wnd;
     dispatcher.refresh_focus(widget_tree);
 
@@ -663,7 +663,7 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut wnd = Window::default_mock(widget.into_widget(), None);
+    let mut wnd = default_mock_window(widget);
     let Window { dispatcher, widget_tree: tree, .. } = &mut wnd;
 
     let parent = tree.root();
@@ -704,7 +704,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     let focus_id = wnd.dispatcher.focusing();
 
     wnd.draw_frame();

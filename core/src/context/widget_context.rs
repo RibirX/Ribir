@@ -191,7 +191,11 @@ impl<'a> LifeCycleCtx<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::*, test::MockBox, widget::WidgetTree};
+  use crate::{
+    prelude::*,
+    test::{default_mock_window, mock_window, MockBox},
+    widget::WidgetTree,
+  };
 
   define_widget_context!(TestCtx);
 
@@ -203,7 +207,7 @@ mod tests {
         margin: EdgeInsets::all(2.),
       }
     };
-    let mut wnd = Window::default_mock(w.into_widget(), None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;
@@ -230,7 +234,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(100., 100.)));
+    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;

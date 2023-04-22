@@ -70,7 +70,7 @@ mod tests {
         on_char: move |key| c_receive.borrow_mut().push(key.char)
       }
     };
-    let mut wnd = Window::default_mock(widget.into_widget(), None);
+    let mut wnd = default_mock_window(widget);
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();
