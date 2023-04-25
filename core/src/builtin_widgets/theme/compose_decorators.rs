@@ -12,9 +12,8 @@ pub struct ComposeDecorators {
 /// it has same signature of `ComposeChild`, but it can be overwrote in `Theme`
 /// by a function. The trait implementation only as a default logic if no
 /// overwrite function in `Theme`.
-pub trait ComposeDecorator: Sized {
+pub trait ComposeDecorator {
   type Host;
-  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget;
 }
 
 impl<W: ComposeDecorator + 'static> ComposeChild for W {
@@ -31,11 +30,8 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
           .and_then(|s| s.styles.get(&tid)),
       });
 
-      if let Some(style) = style {
-        style(Box::new(this.into_writable()), Box::new(child))
-      } else {
-        ComposeDecorator::compose_decorator(this.into_writable(), child)
-      }
+      let style = style.expect("Must be defined compose decorator");
+      style(Box::new(this.into_writable()), Box::new(child))
     })
     .into_widget()
   }
@@ -43,7 +39,7 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
 
 impl ComposeDecorators {
   #[inline]
-  pub fn override_compose_decorator<W: ComposeDecorator + 'static>(
+  pub fn set_compose_decorator<W: ComposeDecorator + 'static>(
     &mut self,
     compose_decorator: impl Fn(Stateful<W>, W::Host) -> Widget + Clone + 'static,
   ) {
@@ -86,7 +82,7 @@ mod tests {
     }
     theme
       .compose_decorators
-      .override_compose_decorator::<Size100Style>(|_, host| {
+      .set_compose_decorator::<Size100Style>(|_, host| {
         widget! {
           MockBox {
             size: Size::new(100., 100.),

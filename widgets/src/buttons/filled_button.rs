@@ -126,4 +126,5 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     radius: 20.,
     padding_style: EdgeInsets::horizontal(16.),
   });
+  theme.set_compose_decorator::<FilledButtonDecorator>(|_, host| host);
 }

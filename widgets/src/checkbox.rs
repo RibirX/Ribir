@@ -139,6 +139,7 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     label_style: theme.typography_theme().body_large.text.clone(),
     label_color: theme.palette().on_surface().into(),
   });
+  theme.set_compose_decorator::<CheckBoxDecorator>(|_, host| host);
 }
 
 impl CustomStyle for CheckBoxStyle {}

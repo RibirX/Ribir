@@ -131,4 +131,5 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     padding_style: EdgeInsets::horizontal(16.),
     border_width: 1.,
   });
+  theme.set_compose_decorator::<OutlinedButtonDecorator>(|_, host| host);
 }
