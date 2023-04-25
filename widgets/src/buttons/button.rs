@@ -112,4 +112,5 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     label_style: theme.typography_theme().label_large.text.clone(),
     padding_style: EdgeInsets::horizontal(16.),
   });
+  theme.set_compose_decorator::<ButtonDecorator>(|_, host| host);
 }

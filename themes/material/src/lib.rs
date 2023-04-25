@@ -263,7 +263,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
   }
 
   let styles = &mut theme.compose_decorators;
-  styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
+  styles.set_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
     widget! {
       states { this }
       init ctx => {
@@ -280,7 +280,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
+  styles.set_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
     widget! {
       states { this }
       init ctx => {
@@ -297,7 +297,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
       }
     }
   });
-  styles.override_compose_decorator::<IndicatorDecorator>(|style, host| {
+  styles.set_compose_decorator::<IndicatorDecorator>(|style, host| {
     widget! {
       states { style }
       init ctx => {
@@ -329,7 +329,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
       ) { by: ease_in }
     }
   });
-  styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host| {
+  styles.set_compose_decorator::<CheckBoxDecorator>(move |style, host| {
     widget! {
       states { style }
       Ripple {

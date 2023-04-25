@@ -110,4 +110,5 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     text_color: theme.palette().on_primary().into(),
     text_style: theme.typography_theme().body_large.text.clone(),
   });
+  theme.set_compose_decorator::<AvatarDecorator>(|_, host| host);
 }

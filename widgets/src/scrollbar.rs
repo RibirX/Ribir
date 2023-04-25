@@ -31,13 +31,6 @@ pub struct HScrollBarThumbDecorator {
 
 impl ComposeDecorator for HScrollBarThumbDecorator {
   type Host = Widget;
-  #[inline]
-  fn compose_decorator(this: Stateful<Self>, host: Widget) -> Widget {
-    widget! {
-      states { this }
-      DynWidget { left_anchor: this.offset, dyns: host }
-    }
-  }
 }
 
 /// Compose style that use to decoration the thumb of vertical scrollbar,
@@ -49,16 +42,6 @@ pub struct VScrollBarThumbDecorator {
 
 impl ComposeDecorator for VScrollBarThumbDecorator {
   type Host = Widget;
-  #[inline]
-  fn compose_decorator(this: Stateful<Self>, host: Widget) -> Widget {
-    widget! {
-      states { this }
-      DynWidget {
-        top_anchor: this.offset,
-        dyns: host
-      }
-    }
-  }
 }
 
 impl ComposeChild for HScrollBar {
@@ -287,6 +270,21 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     thumb_min_size: 12.,
     thickness: 8.,
     track_brush: theme.palette().primary_container().into(),
+  });
+  theme.set_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
+    widget! {
+      states { this }
+      DynWidget { left_anchor: this.offset, dyns: host }
+    }
+  });
+  theme.set_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
+    widget! {
+      states { this }
+      DynWidget {
+        top_anchor: this.offset,
+        dyns: host
+      }
+    }
   });
 }
 
