@@ -79,7 +79,7 @@ impl ComposeChild for Avatar {
                 }
               }
             }
-          },
+          }.into_widget(),
           AvatarTemplate::Image(image) => widget! {
             DynWidget {
               dyns: radius.map(|radius| {
@@ -95,10 +95,11 @@ impl ComposeChild for Avatar {
                 widget::from(image)
               }
             }
-          }
+          }.into_widget()
         })
       }
     }
+    .into_widget()
   }
 }
 

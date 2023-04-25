@@ -25,7 +25,7 @@ impl ComposeChild for Expanded {
         }
       }
     };
-    compose_child_as_data_widget(w, this)
+    compose_child_as_data_widget(w.into_widget(), this)
   }
 }
 

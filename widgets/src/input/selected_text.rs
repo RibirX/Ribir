@@ -29,11 +29,12 @@ impl Compose for SelectedText {
                     left_anchor: rc.origin.x,
                     size: rc.size,
                   }
-              }
+              }.into_widget()
             }).collect::<Vec<_>>()
           }
         }
       }
     }
+    .into_widget()
   }
 }

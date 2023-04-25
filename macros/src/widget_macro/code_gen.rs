@@ -208,7 +208,7 @@ impl Desugared {
         w.gen_compose_node(named_objs, tokens)
       }
     });
-    quote! { ; #name.into_widget() }.to_tokens(tokens);
+    quote! { ; ClosureWidget::new(#name) }.to_tokens(tokens);
   }
 
   pub fn collect_warnings(&mut self, ctx: &VisitCtx) { self.collect_unused_declare_obj(ctx); }

@@ -33,5 +33,6 @@ impl ComposeChild for Column {
         widget::from(children)
       }
     }
+    .into_widget()
   }
 }

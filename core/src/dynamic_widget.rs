@@ -509,7 +509,10 @@ mod tests {
       }
     };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(
+      w.into_widget(),
+      WindowCtx::new(AppContext::default(), scheduler),
+    );
     tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
@@ -538,7 +541,7 @@ mod tests {
     };
     let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx, scheduler));
+    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx, scheduler));
     tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
@@ -581,7 +584,10 @@ mod tests {
       }}
     };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(
+      w.into_widget(),
+      WindowCtx::new(AppContext::default(), scheduler),
+    );
     tree.layout(Size::zero());
     assert_eq!(*new_cnt.state_ref(), 3);
     assert_eq!(*drop_cnt.state_ref(), 0);
@@ -652,7 +658,7 @@ mod tests {
     // 1. 3 item enter
     let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx, scheduler));
+    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx, scheduler));
     tree.layout(Size::zero());
     let expect_vec = vec!['1', '2', '3'];
     assert_eq!((*enter_list.state_ref()).len(), 3);
@@ -759,6 +765,7 @@ mod tests {
           }
         }
       }
+      .into_widget()
     }
 
     #[derive(Declare)]

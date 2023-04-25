@@ -113,6 +113,7 @@ impl ComposeChild for FilledButton {
         }
       }
     }
+    .into_widget()
   }
 }
 

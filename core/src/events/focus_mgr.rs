@@ -658,6 +658,7 @@ mod tests {
             }
           }
         }
+        .into_widget()
       }
     }
 

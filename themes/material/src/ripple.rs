@@ -119,6 +119,7 @@ impl ComposeChild for Ripple {
         })
       }
     }
+    .into_widget()
   }
 }
 

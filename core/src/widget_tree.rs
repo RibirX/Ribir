@@ -276,6 +276,7 @@ mod tests {
           }
         }
       }
+      .into_widget()
     }
   }
 
@@ -308,6 +309,7 @@ mod tests {
           }
         }
       }
+      .into_widget()
     }
   }
 
@@ -506,7 +508,10 @@ mod tests {
     };
 
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(widget, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(
+      widget.into_widget(),
+      WindowCtx::new(AppContext::default(), scheduler),
+    );
     tree.layout(Size::new(100., 100.));
     {
       *trigger.silent_ref() = 2;
@@ -536,7 +541,7 @@ mod tests {
     }};
     let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree1 = WidgetTree::new(w1, WindowCtx::new(app_ctx, scheduler));
+    let mut tree1 = WidgetTree::new(w1.into_widget(), WindowCtx::new(app_ctx, scheduler));
     tree1.layout(win_size);
     tree1.draw(&mut painter);
 
@@ -553,7 +558,10 @@ mod tests {
         }
     }};
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree2 = WidgetTree::new(w2, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree2 = WidgetTree::new(
+      w2.into_widget(),
+      WindowCtx::new(AppContext::default(), scheduler),
+    );
     tree2.layout(win_size);
     tree2.draw(&mut painter);
     let len_1_widget = painter.finish().len();

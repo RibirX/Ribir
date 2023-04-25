@@ -4,10 +4,12 @@ pub mod prelude {
   pub use ribir_core::prelude::*;
   pub use ribir_widgets::prelude::*;
   pub mod app {
+    use ribir_core::widget::ImplMarker;
+    use ribir_core::widget::IntoWidget;
     use ribir_core::window::Window;
 
     #[cfg(feature = "wgpu_gl")]
-    pub fn run(root: super::Widget) {
+    pub fn run<M: ImplMarker, W: IntoWidget<M>>(root: W) {
       use ribir_core::prelude::FullTheme;
 
       let mut theme = FullTheme::default();

@@ -21,6 +21,7 @@ impl Compose for Svg {
         }
       }
     }
+    .into_widget()
   }
 }
 

@@ -74,6 +74,7 @@ impl Checkbox {
         }
       }
     }
+    .into_widget()
   }
 
   fn label(label: &State<Label>, label_color: Brush, style: CowArc<TextStyle>) -> Widget {
@@ -86,6 +87,7 @@ impl Checkbox {
         style,
       }
     }
+    .into_widget()
   }
 }
 
@@ -126,10 +128,11 @@ impl ComposeChild for Checkbox {
                   ],
                 })
               }
-          })
+          }.into_widget())
         },
       }
     }
+    .into_widget()
   }
 }
 

@@ -18,7 +18,7 @@ use crate::{
 ///       cursor: CursorIcon::Hand,
 ///       dyns: widget
 ///     }
-///   }
+///   }.into_widget()
 /// }
 ///
 /// // We can apply `decorate_widget` in `Void` in a declared way.

@@ -97,6 +97,7 @@ impl ComposeChild for ThemeWidget {
         }
       }
     }
+    .into_widget()
   }
 }
 

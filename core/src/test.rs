@@ -12,8 +12,8 @@ pub struct LayoutTestItem<'a> {
   pub expect: ExpectRect,
 }
 
-pub fn expect_layout_result_with_theme(
-  w: Widget,
+pub fn expect_layout_result_with_theme<M: ImplMarker, W: IntoWidget<M>>(
+  w: W,
   wnd_size: Option<Size>,
   theme: Theme,
   items: &[LayoutTestItem],
@@ -29,7 +29,11 @@ pub fn expect_layout_result_with_theme(
   });
 }
 
-pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTestItem]) {
+pub fn expect_layout_result<M: ImplMarker, W: IntoWidget<M>>(
+  w: W,
+  wnd_size: Option<Size>,
+  items: &[LayoutTestItem],
+) {
   let mut wnd = Window::default_mock(w, wnd_size);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {

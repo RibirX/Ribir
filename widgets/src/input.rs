@@ -160,7 +160,7 @@ impl ComposeChild for Input {
         // borrow mut from state_ref to manual triggered after init.
         let _:&mut Input = &mut this;
       }
-    }
+    }.into_widget()
   }
 }
 

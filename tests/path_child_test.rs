@@ -17,6 +17,7 @@ impl Compose for AB {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -74,6 +75,7 @@ fn tuple_widget() {
         states { this: this.into_readonly() }
         SizedBox { size: this.0 }
       }
+      .into_widget()
     }
   }
 

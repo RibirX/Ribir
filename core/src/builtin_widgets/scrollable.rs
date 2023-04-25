@@ -66,6 +66,7 @@ impl ComposeChild for ScrollableWidget {
       }
 
     }
+    .into_widget()
   }
 }
 

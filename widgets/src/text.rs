@@ -108,6 +108,7 @@ macro_rules! define_text_with_theme_style {
             style: style,
           }
         }
+        .into_widget()
       }
     }
   };

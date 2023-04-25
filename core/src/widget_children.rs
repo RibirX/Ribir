@@ -305,14 +305,15 @@ mod tests {
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
-        widget! { MockBox { size: EXPECT_SIZE } }
+        widget! { MockBox { size: EXPECT_SIZE } }.into_widget()
       }
     }
 
     expect_layout_result(
       widget! {
         Host { Field("test".into()) }
-      },
+      }
+      .into_widget(),
       None,
       &[LayoutTestItem {
         path: &[0],

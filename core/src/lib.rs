@@ -50,8 +50,8 @@ pub mod prelude {
   pub use crate::widget;
   #[doc(no_inline)]
   pub use crate::widget::{
-    Any, Compose, HitTest, ImplMarker, IntoWidget, NotSelf, Query, QueryFiler, QueryOrder, Render,
-    SelfImpl, TypeId, Widget,
+    Any, ClosureWidget, Compose, HitTest, ImplMarker, IntoWidget, NotSelf, Query, QueryFiler,
+    QueryOrder, Render, SelfImpl, TypeId, Widget,
   };
   #[doc(no_inline)]
   pub use crate::widget_children::*;
