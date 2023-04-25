@@ -137,6 +137,7 @@ impl ComposeChild for TextFieldThemeProxy {
         },
       }
     }
+    .into_widget()
   }
 }
 
@@ -343,6 +344,7 @@ impl ComposeChild for TextField {
           }
       }
     }
+    .into_widget()
   }
 }
 
@@ -402,6 +404,7 @@ fn build_input_area(
         });
     }
   }
+  .into_widget()
 }
 
 #[derive(Declare)]
@@ -439,6 +442,7 @@ impl Compose for TextFieldLabel {
         by: linear,
       }
     }
+    .into_widget()
   }
 }
 
@@ -483,6 +487,7 @@ fn build_content_area(
 
     transition prop!(content_area.padding) { by: linear }
   }
+  .into_widget()
 }
 
 fn build_icon(icon: Option<Widget>) -> Widget {
@@ -498,6 +503,7 @@ fn build_icon(icon: Option<Widget>) -> Widget {
         }
       }
     }
+    .into_widget()
   } else {
     Void.into_widget()
   }

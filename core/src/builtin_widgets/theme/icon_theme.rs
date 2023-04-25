@@ -66,6 +66,7 @@ impl Compose for NamedSvg {
         dyns: move |ctx: &BuildCtx| this.of_or_miss(ctx)
       }
     }
+    .into_widget()
   }
 }
 

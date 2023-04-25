@@ -265,6 +265,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         background
       }
     }
+    .into_widget()
   }
 
   let styles = &mut theme.compose_decorators;
@@ -284,6 +285,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         by: smooth_scroll,
       }
     }
+    .into_widget()
   });
   styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
     widget! {
@@ -301,6 +303,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         by: smooth_scroll
       }
     }
+    .into_widget()
   });
   styles.override_compose_decorator::<IndicatorDecorator>(|style, host| {
     widget! {
@@ -333,6 +336,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         PositionUnit::lerp_fn(style.rect.size.height)
       ) { by: ease_in }
     }
+    .into_widget()
   });
   styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host| {
     widget! {
@@ -348,6 +352,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
+    .into_widget()
   });
   let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
   theme.custom_styles.set_custom_style(textfield);

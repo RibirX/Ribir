@@ -73,6 +73,7 @@ impl Compose for TodoMVP {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -101,6 +102,7 @@ impl TodoMVP {
         }
       }
     }
+    .into_widget()
   }
 
   fn task(this: StateRef<Self>, task: Task, idx: usize, mount_task_cnt: StateRef<i32>) -> Widget {
@@ -124,7 +126,7 @@ impl TodoMVP {
           },
           HeadlineText(Label::new(task.label.clone()))
           Leading {
-            widget! {
+            Widget::new(widget! {
               Checkbox {
                 id: checkbox,
                 checked: task.finished,
@@ -134,7 +136,7 @@ impl TodoMVP {
                 let_watch!(checkbox.checked)
                   .subscribe(move |v| this.tasks[idx].finished = v);
               }
-            }
+            })
           }
           Trailing {
             // cursor: CursorIcon::Hand,
@@ -156,6 +158,7 @@ impl TodoMVP {
         from: Transform::translation(-400., 0. ),
       }
     }
+    .into_widget()
   }
 }
 

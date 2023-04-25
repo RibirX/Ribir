@@ -78,6 +78,40 @@ pub enum Widget {
   },
 }
 
+impl Widget {
+  pub fn new<M: ImplMarker, W: IntoWidget<M>>(w: W) -> Widget { w.into_widget() }
+}
+
+pub struct ClosureWidget<F, R>
+where
+  F: FnOnce(&BuildCtx) -> R + 'static,
+{
+  closure: F,
+}
+
+impl<F, R> ClosureWidget<F, R>
+where
+  F: FnOnce(&BuildCtx) -> R + 'static,
+{
+  pub fn new(closure: F) -> Self { Self { closure } }
+}
+
+impl<F, R> Clone for ClosureWidget<F, R>
+where
+  F: FnOnce(&BuildCtx) -> R + 'static + Clone,
+{
+  fn clone(&self) -> Self { Self { closure: self.closure.clone() } }
+}
+
+impl<F, R, M> IntoWidget<NotSelf<M>> for ClosureWidget<F, R>
+where
+  F: FnOnce(&BuildCtx) -> R + 'static,
+  R: IntoWidget<M>,
+  M: ImplMarker,
+{
+  fn into_widget(self) -> Widget { self.closure.into_widget() }
+}
+
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
 pub trait Query {

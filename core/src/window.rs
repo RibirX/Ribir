@@ -186,9 +186,9 @@ pub struct Window {
 
 impl Window {
   #[inline]
-  pub fn builder(root: Widget) -> WindowBuilder {
+  pub fn builder<M: ImplMarker, W: IntoWidget<M>>(root: W) -> WindowBuilder {
     WindowBuilder {
-      root,
+      root: root.into_widget(),
       inner_builder: winit::window::WindowBuilder::default(),
     }
   }
@@ -369,21 +369,26 @@ impl RawWindow for MockRawWindow {
 }
 
 impl Window {
-  pub fn default_mock(root: Widget, size: Option<Size>) -> Self {
+  pub fn default_mock<M: ImplMarker, W: IntoWidget<M>>(root: W, size: Option<Size>) -> Self {
     let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
     Self::mock_window(root, size, <_>::default())
   }
 
-  pub fn mock_window(root: Widget, size: Size, ctx: AppContext) -> Self {
+  pub fn mock_window<M: ImplMarker, W: IntoWidget<M>>(
+    root: W,
+    size: Size,
+    ctx: AppContext,
+  ) -> Self {
     let _ = NEW_TIMER_FN.set(new_timer);
     Self::new(
       MockRawWindow { size, ..Default::default() },
       MockBackend,
-      root,
+      root.into_widget(),
       ctx,
     )
   }
 }
+
 #[cfg(test)]
 mod tests {
   use super::*;

@@ -23,6 +23,7 @@ impl ComposeChild for LayoutBox {
         }
       }
     }
+    .into_widget()
   }
 }
 

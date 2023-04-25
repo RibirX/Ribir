@@ -26,5 +26,6 @@ impl ComposeChild for Icon {
         }
       }
     }
+    .into_widget()
   }
 }

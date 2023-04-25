@@ -51,7 +51,8 @@ impl ComposeChild for FocusNode {
           .remove_focus_node(ctx.id, FocusType::NODE),
         dyns: child
       }
-    };
+    }
+    .into_widget();
     compose_child_as_data_widget(w, State::Stateful(this))
   }
 }
@@ -79,6 +80,7 @@ pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
             dyns: widget,
           }
         }
+        .into_widget()
       }
     }
   }
@@ -101,7 +103,8 @@ impl ComposeChild for RequestFocus {
         },
         dyns: child
       }
-    };
+    }
+    .into_widget();
     let widget = compose_child_as_data_widget(w, State::Stateful(this));
     dynamic_compose_focus_node(widget)
   }

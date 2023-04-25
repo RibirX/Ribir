@@ -419,6 +419,7 @@ mod tests {
         on_pointer_cancel: handler_ctor(),
       }
     }
+    .into_widget()
   }
 
   #[test]
@@ -426,11 +427,11 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } },
+      widget! { MockBox { size: Size::new(100., 30.) } }.into_widget(),
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockMulti { DynWidget  { dyns: record } } },
+      widget! { MockMulti { DynWidget  { dyns: record } } }.into_widget(),
     );
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
@@ -467,7 +468,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } },
+      widget! { MockBox { size: Size::new(100., 30.) } }.into_widget(),
     );
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
@@ -603,6 +604,7 @@ mod tests {
             }
           }
         }
+        .into_widget()
       }
     }
 
@@ -646,6 +648,7 @@ mod tests {
             }
           }
         }
+        .into_widget()
       }
     }
 

@@ -31,6 +31,7 @@ impl Compose for StateLayer {
         brush: this.role.calc_color(this.color),
       }
     )
+    .into_widget()
   }
 }
 
@@ -63,6 +64,7 @@ impl ComposeChild for InteractiveLayer {
         }
       }
     }
+    .into_widget()
   }
 }
 

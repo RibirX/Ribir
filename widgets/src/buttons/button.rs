@@ -100,6 +100,7 @@ impl ComposeChild for Button {
         }
       }
     }
+    .into_widget()
   }
 }
 

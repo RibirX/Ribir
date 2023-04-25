@@ -117,6 +117,7 @@ impl ComposeChild for OutlinedButton {
         }
       }
     }
+    .into_widget()
   }
 }
 

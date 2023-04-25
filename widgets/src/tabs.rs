@@ -146,6 +146,7 @@ impl ComposeDecorator for IndicatorDecorator {
         dyns: host,
       }
     }
+    .into_widget()
   }
 }
 
@@ -224,6 +225,7 @@ impl Tabs {
               .subscribe(move |v| indicator.silent_ref().rect = v);
           }
         }
+        .into_widget()
       })
   }
 }
@@ -343,6 +345,7 @@ impl ComposeChild for Tabs {
         }
       }
     }
+    .into_widget()
   }
 }
 

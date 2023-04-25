@@ -37,6 +37,7 @@ impl ComposeDecorator for HScrollBarThumbDecorator {
       states { this }
       DynWidget { left_anchor: this.offset, dyns: host }
     }
+    .into_widget()
   }
 }
 
@@ -58,6 +59,7 @@ impl ComposeDecorator for VScrollBarThumbDecorator {
         dyns: host
       }
     }
+    .into_widget()
   }
 }
 
@@ -87,6 +89,7 @@ impl ComposeChild for HScrollBar {
           .subscribe(move |v| this.offset = v);
       }
     }
+    .into_widget()
   }
 }
 
@@ -125,6 +128,7 @@ impl ComposeChild for VScrollBar {
           .subscribe(move |v| this.offset = v);
       }
     }
+    .into_widget()
   }
 }
 /// A control widget that enables the user to access horizontal parts child that
@@ -170,6 +174,7 @@ impl ComposeChild for BothScrollbar {
           .subscribe(move |v| this.offset = v);
       }
     }
+    .into_widget()
   }
 }
 
@@ -221,6 +226,7 @@ impl Compose for HRawScrollbar {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -272,6 +278,7 @@ impl Compose for VRawScrollbar {
         }
       }
     }
+    .into_widget()
   }
 }
 

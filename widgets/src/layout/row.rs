@@ -33,5 +33,6 @@ impl ComposeChild for Row {
         DynWidget { dyns: children }
       }
     }
+    .into_widget()
   }
 }

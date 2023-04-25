@@ -35,6 +35,7 @@ impl ComposeChild for Cursor {
         }
       }
     }
+    .into_widget()
   }
 }
 

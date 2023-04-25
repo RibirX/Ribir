@@ -59,12 +59,12 @@ use ribir_core::prelude::*;
 ///     // use leading custom widget
 ///     ListItem {
 ///       Leading {
-///         widget! {
+///         Widget::new(widget! {
 ///           Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
 ///           }
-///         }
+///         })
 ///       }
 ///     }
 ///   }
@@ -92,12 +92,12 @@ use ribir_core::prelude::*;
 ///     ListItem {
 ///       HeadlineText(Label::new("headline text"))
 ///       Trailing {
-///         widget! {
+///         Widget::new(widget! {
 ///           Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
 ///           }
-///         }
+///         })
 ///       }
 ///     }
 ///   }
@@ -155,6 +155,7 @@ impl ComposeChild for Lists {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -221,7 +222,8 @@ where
             widget::from(w.decorate(|_, c| c))
           }
         }
-      },
+      }
+      .into_widget(),
       EdgeWidget::Text(w) => widget! {
         DynWidget {
           dyns: text.gap.map(|margin| Margin { margin }),
@@ -234,7 +236,8 @@ where
             }
           }))
         }
-      },
+      }
+      .into_widget(),
       EdgeWidget::Avatar(w) => widget! {
         DynWidget {
           dyns: avatar.gap.map(|margin| Margin { margin }),
@@ -246,7 +249,8 @@ where
             }
           }
         }
-      },
+      }
+      .into_widget(),
       EdgeWidget::Image(w) => widget! {
         DynWidget {
           dyns: image.gap.map(|margin| Margin { margin }),
@@ -258,7 +262,8 @@ where
             }
           }
         }
-      },
+      }
+      .into_widget(),
       EdgeWidget::Poster(w) => widget! {
         DynWidget {
           dyns: poster.gap.map(|margin| Margin { margin }),
@@ -270,7 +275,8 @@ where
             }
           }
         }
-      },
+      }
+      .into_widget(),
       EdgeWidget::Custom(w) => widget! {
         DynWidget {
           dyns: custom.gap.map(|margin| Margin { margin }),
@@ -282,7 +288,8 @@ where
             }
           }
         }
-      },
+      }
+      .into_widget(),
     }
   }
 }
@@ -367,6 +374,7 @@ impl ComposeChild for ListItem {
         }
       }
     }
+    .into_widget()
   }
 }
 

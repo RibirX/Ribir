@@ -80,6 +80,7 @@ impl ComposeChild for ButtonImpl {
         }
       }
     }
+    .into_widget()
   }
 }
 

@@ -102,6 +102,7 @@ impl Compose for MessageList {
         }
       }
     }
+    .into_widget()
   }
 }
 

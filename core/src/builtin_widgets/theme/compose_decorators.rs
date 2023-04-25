@@ -94,6 +94,7 @@ mod tests {
             DynWidget { dyns: host }
           }
         }
+        .into_widget()
       });
 
     let w = widget! {

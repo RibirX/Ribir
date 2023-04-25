@@ -113,6 +113,7 @@ impl ComposeChild for FabButton {
         }
       }
     }
+    .into_widget()
   }
 }
 
