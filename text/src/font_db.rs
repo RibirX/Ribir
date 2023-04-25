@@ -1,6 +1,6 @@
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
-use lyon_path::math::{Point, Transform};
+use lyon_path::math::Point;
 use ribir_algo::FrameCache;
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 use std::sync::Arc;
@@ -272,11 +272,7 @@ impl Face {
       .rb_face
       .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder)?;
 
-    // By default, outlie glyphs is an mirror.
-    let units_per_em = self.units_per_em() as f32;
-    let mirror =
-      Transform::scale(1. / units_per_em, -1. / units_per_em).then_translate((0., 1.).into());
-    Some(builder.into_path().transformed(&mirror))
+    Some(builder.into_path())
   }
 
   #[inline]

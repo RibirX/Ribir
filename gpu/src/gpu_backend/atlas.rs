@@ -1,6 +1,8 @@
 use crate::GPUBackendImpl;
 use guillotiere::{AllocId, Allocation, AtlasAllocator};
-use ribir_painter::{image::ColorFormat, DevicePoint, DeviceRect, DeviceSize, Texture};
+use ribir_painter::{image::ColorFormat, DevicePoint, DeviceRect, DeviceSize};
+
+use super::Texture;
 
 pub const ATLAS_MAX_ITEM: DeviceSize = DeviceSize::new(512, 512);
 pub const ATLAS_MIN_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
@@ -37,13 +39,14 @@ impl<T: Texture> Atlas<T> {
       let expand_size = (size * 2).min(ATLAS_MAX_SIZE);
       if expand_size != self.texture.size() {
         self.atlas_allocator.grow(expand_size.cast_unit());
-        let mut new_tex = gpu_impl.new_texture(expand_size, self.texture.format());
-        new_tex.copy_from_texture(
+        let mut new_tex = gpu_impl.new_texture(expand_size, self.texture.color_format());
+        gpu_impl.copy_texture_to_texture(
+          &mut new_tex,
           DevicePoint::zero(),
           &self.texture,
-          DeviceRect::from_size(self.size()),
-          gpu_impl,
+          &DeviceRect::from_size(self.size()),
         );
+
         self.texture = new_tex;
         alloc = self.atlas_allocator.allocate(alloc_size);
       }

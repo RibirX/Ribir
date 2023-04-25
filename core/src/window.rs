@@ -25,24 +25,18 @@ pub struct Window {
 pub struct WindowId(u64);
 
 pub trait ShellWindow {
-  fn new(size: Option<Size>) -> Self
-  where
-    Self: Sized;
-
   fn id(&self) -> WindowId;
-
-  fn size(&self) -> Size;
-
+  fn inner_size(&self) -> Size;
+  fn outer_size(&self) -> Size;
   fn device_scale(&self) -> f32;
-
   fn set_size(&mut self, size: Size);
-
   fn set_cursor(&mut self, cursor: CursorIcon);
+  fn set_title(&mut self, str: &str);
 
   fn as_any(&self) -> &dyn Any;
 
   fn begin_frame(&mut self);
-  fn draw_commands(&mut self, commands: Vec<PaintCommand>);
+  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>);
   fn end_frame(&mut self);
 }
 
@@ -96,7 +90,12 @@ impl Window {
     self.dispatcher.refresh_focus(&self.widget_tree);
 
     self.widget_tree.draw(&mut self.painter);
-    self.shell_wnd.draw_commands(self.painter.finish());
+    let scale = self.shell_wnd.device_scale();
+    let wnd_size = (self.shell_wnd.inner_size() * scale).to_i32().cast_unit();
+
+    self
+      .shell_wnd
+      .draw_commands(DeviceRect::from_size(wnd_size), self.painter.finish());
 
     self.shell_wnd.end_frame();
     self.context.end_frame();
@@ -105,7 +104,7 @@ impl Window {
   pub fn run_futures(&mut self) { self.frame_pool.0.run_until_stalled(); }
 
   pub fn layout(&mut self) {
-    self.widget_tree.layout(self.shell_wnd.size());
+    self.widget_tree.layout(self.shell_wnd.inner_size());
     self.context.layout_ready();
   }
 
@@ -113,18 +112,13 @@ impl Window {
     self.widget_tree.is_dirty() || self.context.has_actived_animate()
   }
 
-  pub fn new<S: ShellWindow + 'static>(
-    root: Widget,
-    size: Option<Size>,
-    context: AppContext,
-  ) -> Self {
+  pub fn new(root: Widget, shell_wnd: Box<dyn ShellWindow>, context: AppContext) -> Self {
     let typography = context.typography_store.clone();
     let frame_pool = FramePool(FuturesLocalSchedulerPool::new());
     let wnd_ctx = WindowCtx::new(context, frame_pool.0.spawner());
     let widget_tree = WidgetTree::new(root, wnd_ctx.clone());
     let dispatcher = Dispatcher::new(wnd_ctx.focus_mgr.clone());
-    let shell_wnd = S::new(size);
-    let size = shell_wnd.size();
+    let size = shell_wnd.inner_size();
     let mut painter = Painter::new(shell_wnd.device_scale(), Rect::from_size(size), typography);
     painter.set_bounds(Rect::from_size(size));
     Self {
@@ -133,14 +127,17 @@ impl Window {
       widget_tree,
       painter,
       frame_pool,
-      shell_wnd: Box::new(shell_wnd),
+      shell_wnd,
     }
   }
 
   #[inline]
   pub fn id(&self) -> WindowId { self.shell_wnd.id() }
 
-  pub fn set_title(&mut self, title: &str) -> &mut Self { todo!() }
+  pub fn set_title(&mut self, title: &str) -> &mut Self {
+    self.shell_wnd.set_title(title);
+    self
+  }
 
   pub fn set_device_factor(&mut self, device_scale: f32) -> &mut Self {
     self.painter.set_device_scale(device_scale);
@@ -148,7 +145,7 @@ impl Window {
   }
 
   fn resize(&mut self, size: Size) {
-    if self.shell_wnd.size() != size {
+    if self.shell_wnd.inner_size() != size {
       self.shell_wnd.set_size(size);
     }
     self.painter.finish();

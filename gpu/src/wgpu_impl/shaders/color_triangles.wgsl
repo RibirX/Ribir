@@ -45,7 +45,6 @@ fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
     let tex_size = vec2<f32>(textureDimensions(texture));
     let pos = input.mask_pos / tex_size;
     let mask = textureSample(texture, s_sampler, pos).r;
-    color.a = color.a * mask;
+    color = color * vec4<f32>(mask, mask, mask, mask);
     return color;
 }
-                    

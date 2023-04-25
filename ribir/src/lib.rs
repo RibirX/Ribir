@@ -1,4 +1,5 @@
 pub use ribir_core as core;
+#[cfg(feature = "widgets")]
 pub use ribir_widgets as widgets;
 
 pub mod app;

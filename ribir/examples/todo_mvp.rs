@@ -183,10 +183,8 @@ fn main() {
   };
 
   let mut app = App::new(material::purple::light());
-  let id = app
+  app
     .new_window(todo.into_widget(), Some(Size::new(400., 640.)))
-    .set_title("todo")
-    .id();
-
-  app.exec(id)
+    .set_title("todo");
+  app.exec()
 }

@@ -9,12 +9,14 @@ use ribir_core::{
 };
 use ribir_widgets::prelude::*;
 use std::{collections::HashMap, rc::Rc};
+use ribir_core::{prelude::*, window::WindowId};
+use std::{collections::HashMap, rc::Rc};
+use crate::winit_shell_wnd::{new_id, WinitShellWnd};
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
   platform::run_return::EventLoopExtRunReturn,
 };
-use crate::winit_shell_wnd::new_id;
 
 pub struct App {
   windows: HashMap<WindowId, Window>,
@@ -45,26 +47,20 @@ impl App {
     self
   }
 
-  pub fn run(root: Widget) { Self::run_by::<crate::winit_shell_wnd::WinitShellWnd>(root) }
+  pub fn run(root: Widget) {
+    let mut app = App::default();
+    app.new_window(root, None);
+    app.exec()
+  }
 
   pub fn new_window(&mut self, root: Widget, size: Option<Size>) -> &mut Window {
-    self.new_window_by::<crate::winit_shell_wnd::WinitShellWnd>(root, size)
-  }
-
-  fn run_by<S: ShellWindow + 'static>(root: Widget) {
-    let mut app = App::new(material::purple::light());
-    let id = app.new_window(root, None).set_title("ribir app").id();
-    app.exec(id);
-  }
-
-  pub fn new_window_by<S: ShellWindow + 'static>(
-    &mut self,
-    root: Widget,
-    size: Option<Size>,
-  ) -> &mut Window {
-    let wnd = Window::new::<S>(root, size, self.context().clone());
+    let shell_wnd = WinitShellWnd::new(size, &self.event_loop);
+    let wnd = Window::new(root, Box::new(shell_wnd), self.context().clone());
     let id = wnd.id();
     assert!(self.windows.get(&id).is_none());
+    if self.active_wnd.is_none() {
+      self.active_wnd = Some(id);
+    }
     self.windows.entry(id).or_insert(wnd)
   }
 
@@ -73,11 +69,12 @@ impl App {
 
   pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
 
-  pub fn exec(&mut self, id: WindowId) {
-    self.active_wnd = Some(id);
+  pub fn set_active_window(&mut self, id: WindowId) { self.active_wnd = Some(id); }
+
+  pub fn exec(&mut self) {
     self
-      .windows
-      .get_mut(&id)
+      .active_wnd
+      .and_then(|id| self.windows.get_mut(&id))
       .expect("application at least have one window")
       .draw_frame();
 
@@ -104,9 +101,9 @@ impl App {
             let wnd = wnd
               .shell_wnd()
               .as_any()
-              .downcast_ref::<winit::window::Window>()
+              .downcast_ref::<WinitShellWnd>()
               .unwrap();
-            wnd.request_redraw();
+            wnd.winit_wnd.request_redraw();
           }
         }),
         Event::RedrawRequested(id) => {

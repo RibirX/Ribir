@@ -1,15 +1,14 @@
 use self::textures_mgr::{valid_atlas_item, TextureID, TexturesMgr};
-use crate::{
-  gpu_backend::textures_mgr::TextureRect, ColorPrimitive, DrawIndices, GPUBackendImpl,
-  TexturePrimitive,
-};
+use crate::{ColorPrimitive, GPUBackendImpl, IndicesRange, TexturePrimitive};
 use ribir_painter::{
-  image::ColorFormat, AntiAliasing, Brush, DevicePoint, DeviceRect, ImageFuture, PaintCommand,
-  PaintPath, PainterBackend, Texture, Transform, Vertex, VertexBuffers,
+  image::ColorFormat, AntiAliasing, Brush, DevicePoint, DeviceRect, DeviceSize, PaintCommand,
+  PaintPath, PainterBackend, PixelImage, Transform, Vertex, VertexBuffers,
 };
+use std::{error::Error, future::Future, pin::Pin};
 
 mod atlas;
 mod textures_mgr;
+use textures_mgr::*;
 
 pub struct GPUBackend<Impl: GPUBackendImpl> {
   gpu_impl: Impl,
@@ -23,10 +22,36 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   skip_clip_cnt: usize,
 }
 
+enum LayerDrawCmd {
+  Draw(IndicesRange),
+  ComposeLayerFrom {
+    clip_mask: TextureSlice,
+    src_layer: usize,
+  },
+}
 struct Layer {
   viewport: DeviceRect,
-  texture: TextureRect,
-  commands: Vec<DrawIndices>,
+  commands: Vec<LayerDrawCmd>,
+}
+
+pub type ImageFuture =
+  Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>>;
+/// Texture use to display.
+pub trait Texture {
+  type Host;
+
+  /// write data to the texture.
+  fn write_data(&mut self, dist: &DeviceRect, data: &[u8], host: &mut Self::Host);
+
+  /// Return a image future of the texture area.
+  /// - you should poll the image future after the `end_frame` is called to
+  ///   ensure all content had been submitted, because the PainterBackend does
+  ///   not be required to draw synchronization
+  fn copy_as_image(&self, rect: &DeviceRect, host: &mut Self::Host) -> ImageFuture;
+
+  fn color_format(&self) -> ColorFormat;
+
+  fn size(&self) -> DeviceSize;
 }
 
 #[derive(Default)]
@@ -40,23 +65,29 @@ where
   Impl: GPUBackendImpl,
   Impl::Texture: Texture<Host = Impl>,
 {
+  type Texture = Impl::Texture;
   fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
     self.gpu_impl.set_anti_aliasing(anti_aliasing);
   }
 
-  fn begin_frame(&mut self) { self.gpu_impl.begin_frame() }
+  fn begin_frame(&mut self) {
+    self.tex_mgr.end_frame();
+    self.gpu_impl.begin_frame();
+  }
 
-  fn draw_commands(&mut self, view_port: DeviceRect, commands: Vec<PaintCommand>) -> ImageFuture {
-    self.gpu_impl.start_draw_phase();
+  fn draw_commands(
+    &mut self,
+    viewport: DeviceRect,
+    commands: Vec<PaintCommand>,
+    output: &mut Self::Texture,
+  ) {
     self.prim_ids_map.new_phase();
     self.buffers.vertices.clear();
     self.buffers.indices.clear();
+    self.color_primitives.clear();
+    self.texture_primitives.clear();
 
-    let output = self
-      .tex_mgr
-      .alloc(view_port.size, ColorFormat::Rgba8, &mut self.gpu_impl);
-
-    let layer = Layer::new(output, view_port);
+    let layer = Layer::new(viewport);
     self.layer_stack.push(layer);
 
     let mut commands = commands.into_iter();
@@ -81,19 +112,10 @@ where
     self.gpu_impl.load_triangles_vertices(&self.buffers);
 
     self.tex_mgr.submit(&mut self.gpu_impl);
-    self.layers_submit();
-
-    self.gpu_impl.end_draw_phase();
-    let texture = self.tex_mgr.texture(output.tex_id);
-    texture.copy_as_image(&view_port, &mut self.gpu_impl)
+    self.layers_submit(output);
   }
 
-  fn end_frame(&mut self) {
-    self.tex_mgr.end_frame();
-    self.gpu_impl.end_frame();
-    self.color_primitives.clear();
-    self.texture_primitives.clear();
-  }
+  fn end_frame(&mut self) { self.gpu_impl.end_frame(); }
 }
 
 impl<Impl: GPUBackendImpl> GPUBackend<Impl>
@@ -124,29 +146,21 @@ where
         if let Some(intersect_view) = paint_path.bounds.intersection(&self.viewport()) {
           let mask = self.fill_alpha_path(intersect_view, paint_path);
           let prim_id = self.add_primitive(intersect_view.origin, brush, mask);
-          self.add_rect_triangles(intersect_view, prim_id);
+          self.draw_rect_triangles(intersect_view, prim_id);
         }
       }
       PaintCommand::Clip(path) => {
         if self.skip_clip_cnt > 0 {
           self.skip_clip_cnt += 1;
-        } else if let Some(view_port) = path.bounds.intersection(&self.viewport()) {
-          let clip_mask = self.fill_alpha_path(view_port, path);
-          let texture = self
-            .tex_mgr
-            .alloc(view_port.size, ColorFormat::Rgba8, &mut self.gpu_impl);
-
-          let layer = Layer::new(texture, view_port);
-          let prim_id = self.add_texture_primitive(
-            view_port.origin,
-            texture,
-            1.,
+        } else if let Some(viewport) = path.bounds.intersection(&self.viewport()) {
+          let clip_mask = self.fill_alpha_path(viewport, path);
+          let compose_cmd = LayerDrawCmd::ComposeLayerFrom {
             clip_mask,
-            &Transform::default(),
-          );
-          self.add_rect_triangles(view_port, prim_id);
-          self.layer_stack.push(layer);
-          self.layer_stack_idx += 1;
+            src_layer: self.layer_stack.len(),
+          };
+          self.expand_indices_range();
+          self.current_layer().commands.push(compose_cmd);
+          self.new_layer(viewport);
         } else {
           self.skip_clip_cnt += 1;
         }
@@ -163,9 +177,14 @@ where
     }
   }
 
-  fn add_primitive(&mut self, content_origin: DevicePoint, brush: Brush, mask: TextureRect) -> u32 {
+  fn add_primitive(
+    &mut self,
+    content_origin: DevicePoint,
+    brush: Brush,
+    mask: TextureSlice,
+  ) -> u32 {
     self.update_indices_range(&brush);
-    let TextureRect { tex_id, rect } = mask;
+    let TextureSlice { tex_id, rect } = mask;
     let mask_id = self.prim_ids_map.prim_id(tex_id);
     match brush {
       Brush::Color(color) => {
@@ -198,20 +217,22 @@ where
     let rg = start..start;
 
     let rg = match brush {
-      Brush::Color(_) => DrawIndices::Color(rg),
-      Brush::Image { .. } => DrawIndices::Texture(rg),
+      Brush::Color(_) => IndicesRange::Color(rg),
+      Brush::Image { .. } => IndicesRange::Texture(rg),
       Brush::Gradient => todo!(),
     };
-    self.current_layer().commands.push(rg)
+    self.current_layer().commands.push(LayerDrawCmd::Draw(rg))
   }
 
-  fn expand_indices_range(&mut self) -> Option<&DrawIndices> {
+  fn expand_indices_range(&mut self) -> Option<&IndicesRange> {
     let end = self.buffers.indices.len() as u32;
     let cmd = self.current_layer().commands.last_mut()?;
+
+    let LayerDrawCmd::Draw(cmd) = cmd else { return None };
     let rg = match cmd {
-      DrawIndices::Color(rg) => rg,
-      DrawIndices::Texture(rg) => rg,
-      DrawIndices::Gradient(_) => todo!(),
+      IndicesRange::Color(rg) => rg,
+      IndicesRange::Texture(rg) => rg,
+      IndicesRange::Gradient(_) => todo!(),
     };
     rg.end = end;
 
@@ -221,12 +242,12 @@ where
   fn add_texture_primitive(
     &mut self,
     content_origin: DevicePoint,
-    texture: TextureRect,
+    texture: TextureSlice,
     opacity: f32,
-    mask: TextureRect,
+    mask: TextureSlice,
     transform: &Transform,
   ) -> u32 {
-    let TextureRect { tex_id: mask_id, rect: mask_rect } = mask;
+    let TextureSlice { tex_id: mask_id, rect: mask_rect } = mask;
     let brush_tex_idx = self.prim_ids_map.prim_id(texture.tex_id) as u16;
     let mask_idx = self.prim_ids_map.prim_id(mask_id) as u16;
     self.texture_primitives.push(TexturePrimitive {
@@ -241,7 +262,8 @@ where
     });
     (self.texture_primitives.len() - 1) as u32
   }
-  fn add_rect_triangles(&mut self, rect: DeviceRect, prim_id: u32) {
+
+  fn draw_rect_triangles(&mut self, rect: DeviceRect, prim_id: u32) {
     let lt = rect.min().to_f32();
     let rb = rect.max().to_f32();
     let rt = [rb.x, lt.y];
@@ -265,13 +287,13 @@ where
   fn viewport(&self) -> &DeviceRect { &self.layer_stack.last().unwrap().viewport }
 
   /// fill an alpha path in the viewport and return the texture of the viewport.
-  fn fill_alpha_path(&mut self, intersect_viewport: DeviceRect, path: PaintPath) -> TextureRect {
+  fn fill_alpha_path(&mut self, intersect_viewport: DeviceRect, path: PaintPath) -> TextureSlice {
     if valid_atlas_item(&path.bounds.size) || intersect_viewport.contains_rect(&path.bounds) {
       let offset = intersect_viewport.origin - path.bounds.origin;
-      let TextureRect { tex_id, rect } = self.tex_mgr.store_alpha_path(path, &mut self.gpu_impl);
+      let TextureSlice { tex_id, rect } = self.tex_mgr.store_alpha_path(path, &mut self.gpu_impl);
       let origin = rect.origin + offset;
       let rect = DeviceRect::new(origin, intersect_viewport.size);
-      TextureRect { tex_id, rect }
+      TextureSlice { tex_id, rect }
     } else {
       self
         .tex_mgr
@@ -279,31 +301,74 @@ where
     }
   }
 
-  fn layers_submit(&mut self) {
-    self.layer_stack.drain(..).rev().for_each(|layer| {
-      let Layer { texture, commands, .. } = layer;
-      let rect = texture.rect;
-      let texture = self.tex_mgr.texture_mut(texture.tex_id);
-      self.gpu_impl.draw_triangles(texture, rect, &commands);
-    });
+  fn new_layer(&mut self, viewport: DeviceRect) {
+    self.layer_stack.push(Layer::new(viewport));
+    self.layer_stack_idx += 1;
+  }
+
+  fn layers_submit(&mut self, output: &mut Impl::Texture) {
+    let invalid_texture = TextureSlice {
+      tex_id: TextureID::Extra(u32::MAX),
+      rect: DeviceRect::zero(),
+    };
+    let mut layers_texture = vec![invalid_texture; self.layer_stack.len()];
+    let mut idx = self.layer_stack.len() - 1;
+    loop {
+      let Layer { viewport, commands } = &self.layer_stack[idx];
+      commands.iter().for_each(|cmd| match cmd {
+        LayerDrawCmd::Draw(indices) => {
+          self
+            .gpu_impl
+            .draw_triangles(output, viewport, indices.clone())
+        }
+        LayerDrawCmd::ComposeLayerFrom { clip_mask, src_layer } => {
+          let texture_slice = &layers_texture[*src_layer];
+          let texture = self.tex_mgr.texture(texture_slice.tex_id);
+          let mask = self.tex_mgr.texture(clip_mask.tex_id);
+
+          self.gpu_impl.draw_texture_with_mask(
+            output,
+            self.layer_stack[*src_layer].viewport.origin,
+            texture,
+            texture_slice.rect.origin,
+            mask,
+            &clip_mask.rect,
+          );
+        }
+      });
+
+      if idx == 0 {
+        break;
+      } else {
+        let slice = self
+          .tex_mgr
+          .alloc(viewport.size, ColorFormat::Rgba8, &mut self.gpu_impl);
+        let texture = self.tex_mgr.texture_mut(slice.tex_id);
+        self
+          .gpu_impl
+          .copy_texture_to_texture(texture, slice.rect.origin, output, viewport);
+        layers_texture[idx] = slice;
+
+        idx -= 1;
+      }
+    }
+    self.layer_stack.clear();
   }
 }
 
-impl DrawIndices {
+impl IndicesRange {
   pub fn is_same_primitive(&self, brush: &Brush) -> bool {
     matches!(
       (self, brush),
-      (DrawIndices::Color(_), Brush::Color(_))
-        | (DrawIndices::Texture(_), Brush::Image { .. })
-        | (DrawIndices::Gradient(_), Brush::Gradient)
+      (IndicesRange::Color(_), Brush::Color(_))
+        | (IndicesRange::Texture(_), Brush::Image { .. })
+        | (IndicesRange::Gradient(_), Brush::Gradient)
     )
   }
 }
 
 impl Layer {
-  fn new(texture: TextureRect, viewport: DeviceRect) -> Self {
-    Layer { texture, viewport, commands: vec![] }
-  }
+  fn new(viewport: DeviceRect) -> Self { Layer { viewport, commands: vec![] } }
 }
 
 impl TexturePrimIdsMap {
@@ -343,12 +408,14 @@ mod tests {
   }
 
   fn commands_to_image(commands: Vec<PaintCommand>) -> PixelImage {
-    let gpu_impl = block_on(WgpuImpl::new(AntiAliasing::Msaa4X));
+    let rect = DeviceRect::from_size(DeviceSize::new(1024, 512));
+    let mut gpu_impl = block_on(WgpuImpl::headless(AntiAliasing::Msaa4X));
+    let mut texture = gpu_impl.new_texture(rect.size, ColorFormat::Rgba8);
     let mut gpu_backend = GPUBackend::new(gpu_impl);
     gpu_backend.begin_frame();
     gpu_backend.gpu_impl.start_capture();
-    let rect = DeviceRect::from_size(DeviceSize::new(1024, 512));
-    let img = gpu_backend.draw_commands(rect, commands);
+    gpu_backend.draw_commands(rect, commands, &mut texture);
+    let img = texture.copy_as_image(&rect, &mut gpu_backend.gpu_impl);
     gpu_backend.end_frame();
     let img = block_on(img).unwrap();
     gpu_backend.gpu_impl.stop_capture();

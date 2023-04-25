@@ -81,6 +81,7 @@ impl Render for Text {
       line_height,
     } = &*self.text_style;
     painter
+      .set_brush(self.foreground.clone())
       .set_font(font_face.clone())
       .set_font_size(*font_size);
     if let Some(letter_space) = letter_space {
@@ -115,7 +116,7 @@ macro_rules! define_text_with_theme_style {
     pub struct $name {
       #[declare(convert=into)]
       pub text: CowArc<str>,
-      #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()))]
+      #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()), convert = into)]
       pub foreground: Brush,
     }
 

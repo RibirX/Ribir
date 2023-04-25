@@ -25,10 +25,30 @@ pub struct MockShellWindow {
 }
 
 impl ShellWindow for MockShellWindow {
-  fn new(size: Option<Size>) -> Self
-  where
-    Self: Sized,
-  {
+  fn inner_size(&self) -> Size { self.size }
+
+  fn outer_size(&self) -> Size { self.size }
+
+  fn device_scale(&self) -> f32 { 1. }
+
+  fn set_size(&mut self, size: Size) { self.size = size; }
+
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
+
+  fn set_title(&mut self, _: &str) {}
+
+  fn as_any(&self) -> &dyn Any { self }
+
+  fn begin_frame(&mut self) {}
+
+  fn draw_commands(&mut self, _: DeviceRect, _: Vec<PaintCommand>) {}
+
+  fn end_frame(&mut self) {}
+
+  fn id(&self) -> WindowId { self.id }
+}
+impl MockShellWindow {
+  fn new(size: Option<Size>) -> Self {
     static ID: AtomicU64 = AtomicU64::new(0);
     let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
     MockShellWindow {
@@ -37,32 +57,22 @@ impl ShellWindow for MockShellWindow {
       id: ID.fetch_add(1, Ordering::Relaxed).into(),
     }
   }
-
-  fn size(&self) -> Size { self.size }
-
-  fn device_scale(&self) -> f32 { 1. }
-
-  fn set_size(&mut self, size: Size) { self.size = size; }
-
-  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
-
-  fn as_any(&self) -> &dyn Any { self }
-
-  fn begin_frame(&mut self) {}
-
-  fn draw_commands(&mut self, _: Vec<PaintCommand>) {}
-
-  fn end_frame(&mut self) {}
-
-  fn id(&self) -> WindowId { self.id }
 }
 
 pub fn default_mock_window<M: ImplMarker>(root: impl IntoWidget<M>) -> Window {
-  Window::new::<MockShellWindow>(root.into_widget(), None, <_>::default())
+  Window::new(
+    root.into_widget(),
+    Box::new(MockShellWindow::new(None)),
+    <_>::default(),
+  )
 }
 
 pub fn mock_window<M: ImplMarker>(root: impl IntoWidget<M>, size: Size, ctx: AppContext) -> Window {
-  Window::new::<MockShellWindow>(root.into_widget(), Some(size), ctx)
+  Window::new(
+    root.into_widget(),
+    Box::new(MockShellWindow::new(Some(size))),
+    ctx,
+  )
 }
 
 pub fn expect_layout_result_with_theme(
@@ -75,7 +85,7 @@ pub fn expect_layout_result_with_theme(
     app_theme: std::rc::Rc::new(theme),
     ..<_>::default()
   };
-  let mut wnd = Window::new::<MockShellWindow>(w, wnd_size, ctx);
+  let mut wnd = Window::new(w, Box::new(MockShellWindow::new(wnd_size)), ctx);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     assert_layout_result(&wnd, path, expect);
@@ -83,7 +93,7 @@ pub fn expect_layout_result_with_theme(
 }
 
 pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTestItem]) {
-  let mut wnd = Window::new::<MockShellWindow>(w, wnd_size, <_>::default());
+  let mut wnd = Window::new(w, Box::new(MockShellWindow::new(wnd_size)), <_>::default());
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     assert_layout_result(&wnd, path, expect);

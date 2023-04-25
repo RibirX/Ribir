@@ -1,63 +1,41 @@
+use crate::{gpu_backend::Texture, ColorPrimitive, GPUBackendImpl, IndicesRange, TexturePrimitive};
+use draw_alpha_triangles_pass::DrawAlphaTrianglesPass;
+use draw_text_pass::DrawTextPass;
+use draw_text_with_mask_pass::DrawTexWithMaskPass;
+use draw_triangles_pass::DrawTrianglesPass;
 use futures::{channel::oneshot, Future};
+use ribir_painter::{
+  image::ColorFormat, AntiAliasing, DevicePoint, DeviceRect, DeviceSize, PixelImage, VertexBuffers,
+};
 use std::{any::type_name, error::Error, mem::size_of, num::NonZeroU32, ops::Range, pin::Pin};
 
-use crate::{ColorPrimitive, DrawIndices, GPUBackendImpl, TexturePrimitive};
-use ribir_painter::{
-  image::ColorFormat, AntiAliasing, DevicePoint, DeviceRect, DeviceSize, PixelImage, Texture,
-  Vertex, VertexBuffers,
-};
-use zerocopy::AsBytes;
+use buffer_pool::BufferPool;
+mod buffer_pool;
 
-/// The max 3d coordinate can used in a frame
-/// - every draw triangles call need one.
-const MAX_3D_COORDINATE_PER_FRAME: usize = 256;
+mod draw_alpha_triangles_pass;
+mod draw_text_pass;
+mod draw_text_with_mask_pass;
+mod draw_triangles_pass;
+
+const COORDINATE_3D_POOL_SIZE: usize = 512;
 
 pub struct WgpuImpl {
   device: wgpu::Device,
   queue: wgpu::Queue,
-  anti_aliasing: AntiAliasing,
+
   command_encoder: Option<wgpu::CommandEncoder>,
   command_buffers: Vec<wgpu::CommandBuffer>,
 
-  /// The coordinate matrix used in current frame.
-  coordinate_data: Vec<[[f32; 4]; 4]>,
-  /// Buffer store the coordinate_data and use to update coordinate_uniform.
-  coordinate_pool: wgpu::Buffer,
+  coordinate_pool: BufferPool<[[f32; 4]; 4]>,
   coordinate_uniform: wgpu::Buffer,
   coordinate_layout: wgpu::BindGroupLayout,
   coordinate_bind: wgpu::BindGroup,
 
-  alpha_vertices_buffer: wgpu::Buffer,
-  alpha_indices_buffer: wgpu::Buffer,
-  alpha_triangles_pipeline: wgpu::RenderPipeline,
-  alpha_multisample: Option<AlphaMultiSample>,
-
-  primitives_layout: wgpu::BindGroupLayout,
-
-  color_primitives_buffer: wgpu::Buffer,
-  color_primitives_bind: wgpu::BindGroup,
-  color_triangles_pipeline: Option<wgpu::RenderPipeline>,
-
-  tex_primitives_buffer: wgpu::Buffer,
-  tex_primitives_bind: wgpu::BindGroup,
-  tex_triangles_pipeline: Option<wgpu::RenderPipeline>,
-
-  textures: Vec<wgpu::TextureView>,
-  textures_bind: Option<wgpu::BindGroup>,
-  textures_layout: Option<wgpu::BindGroupLayout>,
   sampler: wgpu::Sampler,
-
-  vertices_buffer: wgpu::Buffer,
-  indices_buffer: wgpu::Buffer,
-  tex_view_desc: wgpu::TextureViewDescriptor<'static>,
-}
-
-pub struct WgpuTexture(wgpu::Texture);
-
-struct AlphaMultiSample {
-  texture: wgpu::Texture,
-  view: wgpu::TextureView,
-  anti_aliasing: AntiAliasing,
+  draw_tex_pass: DrawTextPass,
+  draw_text_with_mask_pass: DrawTexWithMaskPass,
+  draw_alpha_triangles_pass: DrawAlphaTrianglesPass,
+  draw_triangles_pass: DrawTrianglesPass,
 }
 
 macro_rules! command_encoder {
@@ -69,15 +47,19 @@ macro_rules! command_encoder {
     })
   };
 }
+pub(crate) use command_encoder;
 
 impl GPUBackendImpl for WgpuImpl {
-  type Texture = WgpuTexture;
+  type Texture = wgpu::Texture;
+
+  fn map_x(x: f32, width: f32) -> f32 { 2. * x / width - 1. }
+
+  fn map_y(y: f32, height: f32) -> f32 { 2. * y / height + 1. }
+
   fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
-    if self.anti_aliasing != anti_aliasing {
-      self.anti_aliasing = anti_aliasing;
-      self.alpha_triangles_pipeline =
-        alpha_triangles_pipeline(&self.device, &self.coordinate_layout, anti_aliasing as u32)
-    }
+    self
+      .draw_alpha_triangles_pass
+      .set_anti_aliasing(anti_aliasing, &self.device);
   }
 
   fn begin_frame(&mut self) {
@@ -87,8 +69,6 @@ impl GPUBackendImpl for WgpuImpl {
       .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Frame Encoder") });
     self.command_encoder = Some(encoder);
   }
-
-  fn start_draw_phase(&mut self) {}
 
   fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture {
     let format = into_wgpu_format(format);
@@ -110,46 +90,19 @@ impl GPUBackendImpl for WgpuImpl {
       sample_count: 1,
       view_formats: &[],
     };
-    let texture = self.device.create_texture(texture_descriptor);
-    WgpuTexture(texture)
+    self.device.create_texture(texture_descriptor)
   }
 
   fn load_color_primitives(&mut self, primitives: &[ColorPrimitive]) {
-    let buffer_len = self.color_primitives_buffer.size() as usize / size_of::<ColorPrimitive>();
-    if buffer_len < primitives.len() {
-      self.color_primitives_buffer =
-        Self::new_storage::<ColorPrimitive>(&self.device, primitives.len());
-      self.color_primitives_bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &self.primitives_layout,
-        entries: &[wgpu::BindGroupEntry {
-          binding: 0,
-          resource: self.color_primitives_buffer.as_entire_binding(),
-        }],
-        label: Some("Color primitives storage bind group"),
-      });
-    }
     self
-      .queue
-      .write_buffer(&self.color_primitives_buffer, 0, primitives.as_bytes());
+      .draw_triangles_pass
+      .load_color_primitives(primitives, &self.device, &mut self.queue);
   }
 
   fn load_texture_primitives(&mut self, primitives: &[TexturePrimitive]) {
-    let buffer_len = self.tex_primitives_buffer.size() as usize / size_of::<TexturePrimitive>();
-    if buffer_len < primitives.len() {
-      self.tex_primitives_buffer =
-        Self::new_storage::<TexturePrimitive>(&self.device, primitives.len());
-      self.tex_primitives_bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &self.primitives_layout,
-        entries: &[wgpu::BindGroupEntry {
-          binding: 0,
-          resource: self.tex_primitives_buffer.as_entire_binding(),
-        }],
-        label: Some("Texture primitives storage bind group"),
-      });
-    }
     self
-      .queue
-      .write_buffer(&self.tex_primitives_buffer, 0, primitives.as_bytes());
+      .draw_triangles_pass
+      .load_texture_primitives(primitives, &self.device, &mut self.queue);
   }
 
   fn load_textures<'a, Iter>(&mut self, textures: Iter)
@@ -157,82 +110,31 @@ impl GPUBackendImpl for WgpuImpl {
     Iter: Iterator<Item = &'a Self::Texture> + 'a,
     Self::Texture: 'a,
   {
-    self.textures.clear();
-    for t in textures {
-      self.textures.push(t.0.create_view(&self.tex_view_desc))
-    }
-
-    let texture_size = NonZeroU32::new(self.textures.len() as u32);
-    let textures_layout = self
-      .device
-      .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        entries: &[
-          wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-              sample_type: wgpu::TextureSampleType::Float { filterable: true },
-              view_dimension: wgpu::TextureViewDimension::D2,
-              multisampled: false,
-            },
-            count: texture_size,
-          },
-          wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-            count: texture_size,
-          },
-        ],
-        label: Some("Textures layout"),
-      });
-
-    let mut views = Vec::with_capacity(self.textures.len());
-    self.textures.iter().for_each(|v| views.push(v));
-    let samplers = vec![&self.sampler; self.textures.len()];
-
-    let texture_bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-      layout: &textures_layout,
-      entries: &[
-        wgpu::BindGroupEntry {
-          binding: 0,
-          resource: wgpu::BindingResource::TextureViewArray(&views),
-        },
-        wgpu::BindGroupEntry {
-          binding: 1,
-          resource: wgpu::BindingResource::SamplerArray(&samplers),
-        },
-      ],
-      label: Some("color triangles bind group"),
-    });
-
-    self.textures_layout = Some(textures_layout);
-    self.textures_bind = Some(texture_bind);
-    self.update_color_triangles_pipeline();
-    self.update_texture_triangles_pipeline();
+    self.draw_triangles_pass.load_textures(
+      textures,
+      &self.device,
+      &self.coordinate_layout,
+      &self.sampler,
+    );
   }
 
   fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<()>) {
-    let VertexBuffers { vertices, indices } = buffers;
-    let v_buffer_len = self.alpha_vertices_buffer.size() as usize / size_of::<Vertex<()>>();
-    if v_buffer_len < vertices.len() {
-      self.alpha_vertices_buffer = Self::new_vertices::<Vertex<()>>(&self.device, vertices.len());
-    }
     self
-      .queue
-      .write_buffer(&self.alpha_vertices_buffer, 0, vertices.as_bytes());
-
-    let i_buffer_len = self.alpha_indices_buffer.size() as usize / size_of::<Vertex<()>>();
-    if i_buffer_len < indices.len() {
-      self.alpha_indices_buffer = Self::new_indices(&self.device, indices.len());
-    }
-    self
-      .queue
-      .write_buffer(&self.alpha_indices_buffer, 0, indices.as_bytes());
+      .draw_alpha_triangles_pass
+      .load_alpha_vertices(buffers, &self.device, &mut self.queue);
   }
 
   fn draw_alpha_triangles(&mut self, indices: &Range<u32>, texture: &mut Self::Texture) {
-    self.draw_alpha_triangles(indices, texture, None)
+    self.write_coordinate(&texture);
+    let encoder = command_encoder!(self);
+    self.draw_alpha_triangles_pass.draw_alpha_triangles(
+      indices,
+      texture,
+      None,
+      encoder,
+      &self.coordinate_bind,
+      &self.device,
+    );
   }
 
   fn draw_alpha_triangles_with_scissor(
@@ -241,91 +143,82 @@ impl GPUBackendImpl for WgpuImpl {
     texture: &mut Self::Texture,
     scissor: DeviceRect,
   ) {
-    self.draw_alpha_triangles(indices, texture, Some(scissor))
+    self.write_coordinate(&texture);
+    let encoder = command_encoder!(self);
+    self.draw_alpha_triangles_pass.draw_alpha_triangles(
+      indices,
+      texture,
+      Some(scissor),
+      encoder,
+      &self.coordinate_bind,
+      &self.device,
+    );
   }
 
   fn load_triangles_vertices(&mut self, buffers: &VertexBuffers<u32>) {
-    let VertexBuffers { vertices, indices } = buffers;
-    let v_buffer_len = self.vertices_buffer.size() as usize / size_of::<Vertex<u32>>();
-    if v_buffer_len < vertices.len() {
-      self.vertices_buffer = Self::new_vertices::<Vertex<u32>>(&self.device, vertices.len());
-    }
     self
-      .queue
-      .write_buffer(&self.vertices_buffer, 0, vertices.as_bytes());
-
-    let i_buffer_len = self.indices_buffer.size() as usize / size_of::<u32>();
-    if i_buffer_len < indices.len() {
-      self.indices_buffer = Self::new_indices(&self.device, indices.len());
-    }
-    self
-      .queue
-      .write_buffer(&self.indices_buffer, 0, indices.as_bytes());
+      .draw_triangles_pass
+      .load_triangles_vertices(buffers, &self.device, &mut self.queue);
   }
 
   fn draw_triangles(
     &mut self,
     texture: &mut Self::Texture,
-    scissor: DeviceRect,
-    commands: &[DrawIndices],
+    scissor: &DeviceRect,
+    range: IndicesRange,
   ) {
-    self.draw_pre_update(&texture.0);
-    let view = texture.0.create_view(&self.tex_view_desc);
+    self.write_coordinate(&texture);
     let encoder = command_encoder!(self);
-    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some("Triangles render pass"),
-      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view: &view,
-        resolve_target: None,
-        ops: wgpu::Operations {
-          load: wgpu::LoadOp::Load,
-          store: true,
-        },
-      })],
-      depth_stencil_attachment: None,
-    });
-    rpass.set_vertex_buffer(0, self.vertices_buffer.slice(..));
-    rpass.set_index_buffer(self.indices_buffer.slice(..), wgpu::IndexFormat::Uint32);
-    rpass.set_bind_group(0, &self.coordinate_bind, &[]);
-    let texture_group = self
-      .textures_bind
-      .as_ref()
-      .expect("Should load textures before draws!");
-    rpass.set_bind_group(1, texture_group, &[]);
-
-    rpass.set_scissor_rect(
-      scissor.min_x() as u32,
-      scissor.min_y() as u32,
-      scissor.width() as u32,
-      scissor.height() as u32,
+    self.draw_triangles_pass.draw_triangles(
+      texture,
+      scissor,
+      range,
+      &self.device,
+      encoder,
+      &self.coordinate_bind,
     );
-
-    commands.iter().for_each(|cmd| match cmd {
-      DrawIndices::Color(rg) => {
-        rpass.set_bind_group(2, &self.color_primitives_bind, &[]);
-        let pipeline = self.color_triangles_pipeline.as_ref().unwrap();
-        rpass.set_pipeline(pipeline);
-        rpass.draw_indexed(rg.clone(), 0, 0..1);
-      }
-      DrawIndices::Texture(rg) => {
-        rpass.set_bind_group(2, &self.tex_primitives_bind, &[]);
-        let pipeline = self.tex_triangles_pipeline.as_ref().unwrap();
-        rpass.set_pipeline(&pipeline);
-        rpass.draw_indexed(rg.clone(), 0, 0..1);
-      }
-      DrawIndices::Gradient(_) => todo!(),
-    })
   }
 
-  fn end_draw_phase(&mut self) {}
+  fn draw_texture_with_mask(
+    &mut self,
+    dist_tex: &mut Self::Texture,
+    dist_start_at: DevicePoint,
+    src_tex: &Self::Texture,
+    src_start_at: DevicePoint,
+    mask: &Self::Texture,
+    mask_rect: &DeviceRect,
+  ) {
+    self.draw_texture_with_mask(
+      dist_tex,
+      dist_start_at,
+      src_tex,
+      src_start_at,
+      mask,
+      mask_rect,
+    );
+  }
 
   fn end_frame(&mut self) {
     self.submit();
     self.device.poll(wgpu::Maintain::Wait);
   }
+
+  fn copy_texture_to_texture(
+    &mut self,
+    dist_tex: &mut Self::Texture,
+    copy_to: DevicePoint,
+    from_tex: &Self::Texture,
+    from_rect: &DeviceRect,
+  ) {
+    if dist_tex.format() == from_tex.format() {
+      self.copy_same_format_texture(dist_tex, copy_to, from_tex, from_rect);
+    } else {
+      self.draw_texture_to_texture(dist_tex, copy_to, from_tex, from_rect)
+    }
+  }
 }
 
-impl Texture for WgpuTexture {
+impl Texture for wgpu::Texture {
   type Host = WgpuImpl;
 
   fn write_data(&mut self, dist: &DeviceRect, data: &[u8], backend: &mut Self::Host) {
@@ -339,10 +232,10 @@ impl Texture for WgpuTexture {
       y: dist.min_y() as u32,
       z: 0,
     };
-    let bytes_per_pixel = self.format().pixel_per_bytes();
+    let bytes_per_pixel = self.color_format().pixel_per_bytes();
     backend.queue.write_texture(
       wgpu::ImageCopyTexture {
-        texture: &self.0,
+        texture: &self,
         mip_level: 0,
         origin,
         aspect: wgpu::TextureAspect::All,
@@ -358,46 +251,6 @@ impl Texture for WgpuTexture {
     );
   }
 
-  fn copy_from_texture(
-    &mut self,
-    copy_to: DevicePoint,
-    from_texture: &Self,
-    from_rect: DeviceRect,
-    backend: &mut Self::Host,
-  ) {
-    let encoder = command_encoder!(backend);
-    let src_origin = wgpu::Origin3d {
-      x: from_rect.min_x() as u32,
-      y: from_rect.min_y() as u32,
-      z: 0,
-    };
-    let dst_origin = wgpu::Origin3d {
-      x: copy_to.x as u32,
-      y: copy_to.y as u32,
-      z: 0,
-    };
-    let copy_size = wgpu::Extent3d {
-      width: from_rect.width() as u32,
-      height: from_rect.height() as u32,
-      depth_or_array_layers: 1,
-    };
-    encoder.copy_texture_to_texture(
-      wgpu::ImageCopyTexture {
-        texture: &from_texture.0,
-        mip_level: 0,
-        origin: src_origin,
-        aspect: wgpu::TextureAspect::All,
-      },
-      wgpu::ImageCopyTexture {
-        texture: &self.0,
-        mip_level: 0,
-        origin: dst_origin,
-        aspect: wgpu::TextureAspect::All,
-      },
-      copy_size,
-    );
-  }
-
   fn copy_as_image(
     &self,
     rect: &DeviceRect,
@@ -405,7 +258,7 @@ impl Texture for WgpuTexture {
   ) -> Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>> {
     let width = rect.width();
     let height = rect.height();
-    let format = self.format();
+    let format = self.color_format();
     let align_width = align(width as u32, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / 4);
     let pixel_bytes = format.pixel_per_bytes();
     let padded_row_bytes = pixel_bytes as u32 * align_width;
@@ -428,7 +281,7 @@ impl Texture for WgpuTexture {
 
     encoder.copy_texture_to_buffer(
       wgpu::ImageCopyTexture {
-        texture: &self.0,
+        texture: &self,
         mip_level: 0,
         origin,
         aspect: wgpu::TextureAspect::All,
@@ -457,15 +310,15 @@ impl Texture for WgpuTexture {
     let res = async move {
       let _ = receiver.await?;
 
-      let unpadded_row_bytes = width as usize * pixel_bytes as usize;
-      let mut data = vec![0; unpadded_row_bytes * height as usize];
+      let row_bytes = width as usize * pixel_bytes as usize;
+      let mut data = vec![0; row_bytes * height as usize];
 
       let slice = buffer.slice(..).get_mapped_range();
       (0..height as usize).for_each(|r| {
         let padded_start = r * padded_row_bytes as usize;
-        let unppaded_start = r * unpadded_row_bytes;
-        data[unppaded_start..unppaded_start + unpadded_row_bytes as usize]
-          .copy_from_slice(&slice[padded_start..padded_start + unpadded_row_bytes]);
+        let row_start = r * row_bytes;
+        data[row_start..row_start + row_bytes as usize]
+          .copy_from_slice(&slice[padded_start..padded_start + row_bytes]);
       });
 
       Ok(PixelImage::new(
@@ -479,28 +332,35 @@ impl Texture for WgpuTexture {
     Box::pin(res)
   }
 
-  fn format(&self) -> ColorFormat {
-    match self.0.format() {
-      wgpu::TextureFormat::R8Unorm => ColorFormat::Alpha8,
+  fn color_format(&self) -> ColorFormat {
+    match self.format() {
+      wgpu::TextureFormat::Stencil8 => ColorFormat::Alpha8,
       wgpu::TextureFormat::Rgba8Unorm => ColorFormat::Rgba8,
-      _ => unreachable!(),
+      _ => panic!("not a valid texture as image"),
     }
   }
 
   fn size(&self) -> DeviceSize {
-    let wgpu::Extent3d { width, height, .. } = self.0.size();
+    let wgpu::Extent3d { width, height, .. } = self.size();
     DeviceSize::new(width as i32, height as i32)
   }
 }
 
 impl WgpuImpl {
-  pub async fn new(anti_aliasing: AntiAliasing) -> WgpuImpl {
+  pub async fn headless(anti_aliasing: AntiAliasing) -> Self {
     let instance = wgpu::Instance::new(<_>::default());
+    Self::new(anti_aliasing, instance, None).await
+  }
 
+  pub async fn new(
+    anti_aliasing: AntiAliasing,
+    instance: wgpu::Instance,
+    surface: Option<&wgpu::Surface>,
+  ) -> WgpuImpl {
     let adapter = instance
       .request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::default(),
-        compatible_surface: None,
+        compatible_surface: surface,
         force_fallback_adapter: false,
       })
       .await
@@ -532,15 +392,12 @@ impl WgpuImpl {
       }],
       label: Some("Coordinate uniform layout"),
     });
-    let coordinate_data = Vec::with_capacity(MAX_3D_COORDINATE_PER_FRAME);
-    let coordinate_pool = device.create_buffer(&wgpu::BufferDescriptor {
-      label: Some("Coordinate pool"),
-      size: (size_of::<[[f32; 4]; 4]>() * MAX_3D_COORDINATE_PER_FRAME) as u64,
-      usage: wgpu::BufferUsages::UNIFORM
-        | wgpu::BufferUsages::COPY_SRC
-        | wgpu::BufferUsages::COPY_DST,
-      mapped_at_creation: false,
-    });
+
+    let coordinate_pool = BufferPool::new(
+      COORDINATE_3D_POOL_SIZE,
+      wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+      &device,
+    );
     let coordinate_uniform = device.create_buffer(&wgpu::BufferDescriptor {
       label: Some("Coordinate uniform"),
       size: (size_of::<[[f32; 4]; 4]>()) as u64,
@@ -556,47 +413,6 @@ impl WgpuImpl {
       label: Some("Coordinate uniform bind group"),
     });
 
-    let color_primitives_buffer = Self::new_storage::<ColorPrimitive>(&device, 256);
-    let primitives_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      entries: &[wgpu::BindGroupLayoutEntry {
-        binding: 0,
-        visibility: wgpu::ShaderStages::VERTEX,
-        ty: wgpu::BindingType::Buffer {
-          ty: wgpu::BufferBindingType::Storage { read_only: true },
-          has_dynamic_offset: false,
-          min_binding_size: None,
-        },
-        count: None,
-      }],
-      label: Some("Color primitives storage layout"),
-    });
-
-    let color_primitives_bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-      layout: &primitives_layout,
-      entries: &[wgpu::BindGroupEntry {
-        binding: 0,
-        resource: color_primitives_buffer.as_entire_binding(),
-      }],
-      label: Some("Color primitives storage bind group"),
-    });
-
-    let tex_primitives_buffer = Self::new_storage::<TexturePrimitive>(&device, 256);
-    let tex_primitives_bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-      layout: &primitives_layout,
-      entries: &[wgpu::BindGroupEntry {
-        binding: 0,
-        resource: tex_primitives_buffer.as_entire_binding(),
-      }],
-      label: Some("Texture primitives storage bind group"),
-    });
-
-    let alpha_vertices_buffer = Self::new_vertices::<Vertex<()>>(&device, 1024);
-    let alpha_indices_buffer = Self::new_indices(&device, 1024);
-    let alpha_triangles_pipeline =
-      alpha_triangles_pipeline(&device, &coordinate_layout, anti_aliasing as u32);
-
-    let vertices_buffer = Self::new_vertices::<Vertex<u32>>(&device, 512);
-    let indices_buffer = Self::new_indices(&device, 1024);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
       address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -609,41 +425,30 @@ impl WgpuImpl {
       label: Some("texture sampler"),
       ..Default::default()
     });
+
+    let draw_tex_pass = DrawTextPass::new(&device);
+    let draw_text_with_mask_pass = DrawTexWithMaskPass::new(&device);
+    let draw_alpha_triangles_pass =
+      DrawAlphaTrianglesPass::new(anti_aliasing, &device, &coordinate_layout);
+    let draw_triangles_pass = DrawTrianglesPass::new(&device);
+
     WgpuImpl {
       device,
       queue,
       command_encoder: None,
       command_buffers: vec![],
-      anti_aliasing,
 
-      coordinate_data,
       coordinate_pool,
       coordinate_uniform,
       coordinate_layout,
       coordinate_bind,
 
-      alpha_vertices_buffer,
-      alpha_indices_buffer,
-
-      color_primitives_buffer,
-      primitives_layout,
-      color_primitives_bind,
-      color_triangles_pipeline: None,
-
-      tex_primitives_buffer,
-      tex_primitives_bind,
-      tex_triangles_pipeline: None,
-
-      vertices_buffer,
-      indices_buffer,
-      textures: vec![],
-      tex_view_desc: <_>::default(),
-      alpha_triangles_pipeline,
-      alpha_multisample: None,
-
       sampler,
-      textures_bind: None,
-      textures_layout: None,
+
+      draw_tex_pass,
+      draw_text_with_mask_pass,
+      draw_alpha_triangles_pass,
+      draw_triangles_pass,
     }
   }
 
@@ -651,17 +456,22 @@ impl WgpuImpl {
 
   pub fn stop_capture(&self) { self.device.stop_capture(); }
 
-  fn submit(&mut self) {
+  pub fn device(&self) -> &wgpu::Device { &self.device }
+
+  pub(crate) fn submit(&mut self) {
     if let Some(encoder) = self.command_encoder.take() {
       self.command_buffers.push(encoder.finish());
     }
     if !self.command_buffers.is_empty() {
-      self
-        .queue
-        .write_buffer(&self.coordinate_pool, 0, &self.coordinate_data.as_bytes());
+      self.coordinate_pool.submit_buffer(&mut self.queue);
+      self.draw_tex_pass.submit(&mut self.queue);
+      self.draw_text_with_mask_pass.submit(&mut self.queue);
       self.queue.submit(self.command_buffers.drain(..));
+    } else {
+      self.coordinate_pool.clear();
+      self.draw_tex_pass.clear();
+      self.draw_text_with_mask_pass.clear();
     }
-    self.coordinate_data.clear();
   }
 
   fn new_storage<T>(device: &wgpu::Device, len: usize) -> wgpu::Buffer {
@@ -693,215 +503,73 @@ impl WgpuImpl {
     })
   }
 
-  fn draw_pre_update(&mut self, target: &wgpu::Texture) {
-    self.switch_main_texture(target);
-    self.update_alpha_multi_sample(target);
-  }
-
-  fn switch_main_texture(&mut self, main_texture: &wgpu::Texture) {
-    if self.coordinate_data.len() == self.coordinate_data.capacity() {
+  fn write_coordinate(&mut self, main_texture: &wgpu::Texture) {
+    if self.coordinate_pool.is_full() {
       self.submit();
     }
+    let address = self
+      .coordinate_pool
+      .push_value([
+        [2. / main_texture.width() as f32, 0., 0., 0.],
+        [0., -2. / main_texture.height() as f32, 0., 0.],
+        [0., 0., 1., 0.],
+        [-1., 1., 0., 1.],
+      ])
+      .unwrap();
 
     let coordinate_bytes = size_of::<[[f32; 4]; 4]>() as u64;
     let encoder = command_encoder!(self);
 
     // The `coordinate_data` will write to `coordinate_pool` before encoder submit.
     encoder.copy_buffer_to_buffer(
-      &self.coordinate_pool,
-      self.coordinate_data.len() as u64 * coordinate_bytes,
+      &self.coordinate_pool.buffer(),
+      address,
       &self.coordinate_uniform,
       0,
       coordinate_bytes,
     );
-    self.coordinate_data.push([
-      [2. / main_texture.width() as f32, 0., 0., 0.],
-      [0., -2. / main_texture.height() as f32, 0., 0.],
-      [0., 0., 1., 0.],
-      [-1., 1., 0., 1.],
-    ]);
   }
 
-  fn update_alpha_multi_sample(&mut self, target: &wgpu::Texture) {
-    if self.anti_aliasing == AntiAliasing::None {
-      self.alpha_multisample.take();
-      return;
-    }
-
-    if let Some(sample) = self.alpha_multisample.as_ref() {
-      if sample.anti_aliasing == self.anti_aliasing && sample.texture.size() == target.size() {
-        return;
-      }
-    }
-
-    self.alpha_multisample.take();
-
-    let sample_count = self.anti_aliasing as u32;
-    let multisampled_texture_extent = wgpu::Extent3d {
-      width: target.width(),
-      height: target.height(),
-      depth_or_array_layers: 1,
-    };
-    let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
-      size: multisampled_texture_extent,
-      mip_level_count: 1,
-      sample_count,
-      dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::R8Unorm,
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      label: None,
-      view_formats: &[],
-    };
-
-    let texture = self.device.create_texture(multisampled_frame_descriptor);
-    let view = texture.create_view(&self.tex_view_desc);
-    self.alpha_multisample = Some(AlphaMultiSample {
-      texture,
-      view,
-      anti_aliasing: self.anti_aliasing,
-    })
-  }
-
-  fn draw_alpha_triangles(
+  fn copy_same_format_texture(
     &mut self,
-    indices: &Range<u32>,
-    texture: &mut WgpuTexture,
-    scissor: Option<DeviceRect>,
+    dist_tex: &wgpu::Texture,
+    copy_to: DevicePoint,
+    from_tex: &wgpu::Texture,
+    from_rect: &DeviceRect,
   ) {
-    self.draw_pre_update(&texture.0);
-    let view = texture.0.create_view(&self.tex_view_desc);
-    let color_attachments = if let Some(multi_sample) = self.alpha_multisample.as_ref() {
-      wgpu::RenderPassColorAttachment {
-        view: &multi_sample.view,
-        resolve_target: Some(&view),
-        ops: wgpu::Operations {
-          load: wgpu::LoadOp::Load,
-          store: false,
-        },
-      }
-    } else {
-      wgpu::RenderPassColorAttachment {
-        view: &view,
-        resolve_target: None,
-        ops: wgpu::Operations {
-          load: wgpu::LoadOp::Load,
-          store: true,
-        },
-      }
-    };
+    assert_eq!(dist_tex.format(), from_tex.format());
 
     let encoder = command_encoder!(self);
-    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some("Alpha triangles render pass"),
-      color_attachments: &[Some(color_attachments)],
-      depth_stencil_attachment: None,
-    });
-    rpass.set_vertex_buffer(0, self.alpha_vertices_buffer.slice(..));
-    rpass.set_index_buffer(
-      self.alpha_indices_buffer.slice(..),
-      wgpu::IndexFormat::Uint32,
+    let src_origin = wgpu::Origin3d {
+      x: from_rect.min_x() as u32,
+      y: from_rect.min_y() as u32,
+      z: 0,
+    };
+    let dst_origin = wgpu::Origin3d {
+      x: copy_to.x as u32,
+      y: copy_to.y as u32,
+      z: 0,
+    };
+    let copy_size = wgpu::Extent3d {
+      width: from_rect.width() as u32,
+      height: from_rect.height() as u32,
+      depth_or_array_layers: 1,
+    };
+    encoder.copy_texture_to_texture(
+      wgpu::ImageCopyTexture {
+        texture: from_tex,
+        mip_level: 0,
+        origin: src_origin,
+        aspect: wgpu::TextureAspect::All,
+      },
+      wgpu::ImageCopyTexture {
+        texture: dist_tex,
+        mip_level: 0,
+        origin: dst_origin,
+        aspect: wgpu::TextureAspect::All,
+      },
+      copy_size,
     );
-
-    rpass.set_bind_group(0, &self.coordinate_bind, &[]);
-    if let Some(scissor) = scissor {
-      rpass.set_scissor_rect(
-        scissor.min_x() as u32,
-        scissor.min_y() as u32,
-        scissor.width() as u32,
-        scissor.height() as u32,
-      );
-    }
-    rpass.set_pipeline(&self.alpha_triangles_pipeline);
-    rpass.draw_indexed(indices.clone(), 0, 0..1)
-  }
-
-  fn update_color_triangles_pipeline(&mut self) {
-    let pipeline = self.triangles_pipeline(
-      include_str!("./wgpu_impl/shaders/color_triangles.wgsl"),
-      "Color triangles",
-    );
-    self.color_triangles_pipeline = Some(pipeline);
-  }
-
-  fn update_texture_triangles_pipeline(&mut self) {
-    let pipeline = self.triangles_pipeline(
-      include_str!("./wgpu_impl/shaders/tex_triangles.wgsl"),
-      "Texture triangles",
-    );
-    self.tex_triangles_pipeline = Some(pipeline);
-  }
-
-  fn triangles_pipeline(&mut self, shader: &str, label: &str) -> wgpu::RenderPipeline {
-    let label = Some(label);
-    let pipeline_layout = self
-      .device
-      .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label,
-        bind_group_layouts: &[
-          &self.coordinate_layout,
-          &self.textures_layout.as_ref().unwrap(),
-          &self.primitives_layout,
-        ],
-        push_constant_ranges: &[],
-      });
-
-    let module = self
-      .device
-      .create_shader_module(wgpu::ShaderModuleDescriptor {
-        label,
-        source: wgpu::ShaderSource::Wgsl(shader.into()),
-      });
-    self
-      .device
-      .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label,
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-          module: &module,
-          entry_point: "vs_main",
-          buffers: &[wgpu::VertexBufferLayout {
-            array_stride: size_of::<Vertex<u32>>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-              wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 0,
-                format: wgpu::VertexFormat::Float32x2,
-              },
-              wgpu::VertexAttribute {
-                offset: (size_of::<[f32; 2]>()) as wgpu::BufferAddress,
-                shader_location: 1,
-                format: wgpu::VertexFormat::Uint32,
-              },
-            ],
-          }],
-        },
-        fragment: Some(wgpu::FragmentState {
-          module: &module,
-          entry_point: "fs_main",
-          targets: &[Some(wgpu::ColorTargetState {
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-            write_mask: wgpu::ColorWrites::all(),
-          })],
-        }),
-        primitive: wgpu::PrimitiveState {
-          topology: wgpu::PrimitiveTopology::TriangleList,
-          strip_index_format: None,
-          front_face: wgpu::FrontFace::Ccw,
-          cull_mode: Some(wgpu::Face::Back),
-          unclipped_depth: false,
-          polygon_mode: wgpu::PolygonMode::Fill,
-          conservative: false,
-        },
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState {
-          count: 1,
-          mask: !0,
-          alpha_to_coverage_enabled: false,
-        },
-        multiview: None,
-      })
   }
 }
 
@@ -910,68 +578,6 @@ fn into_wgpu_format(format: ColorFormat) -> wgpu::TextureFormat {
     ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
     ColorFormat::Alpha8 => wgpu::TextureFormat::R8Unorm,
   }
-}
-
-fn alpha_triangles_pipeline(
-  device: &wgpu::Device,
-  coordinate_layout: &wgpu::BindGroupLayout,
-  msaa_count: u32,
-) -> wgpu::RenderPipeline {
-  let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-    label: Some("Alpha triangles pipeline layout"),
-    bind_group_layouts: &[coordinate_layout],
-    push_constant_ranges: &[],
-  });
-
-  let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-    label: Some("Alpha triangles"),
-    source: wgpu::ShaderSource::Wgsl(
-      include_str!("./wgpu_impl/shaders/alpha_triangles.wgsl").into(),
-    ),
-  });
-
-  device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-    label: Some("Alpha triangles pipeline"),
-    layout: Some(&pipeline_layout),
-    vertex: wgpu::VertexState {
-      module: &module,
-      entry_point: "vs_main",
-      buffers: &[wgpu::VertexBufferLayout {
-        array_stride: size_of::<Vertex<()>>() as wgpu::BufferAddress,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &[wgpu::VertexAttribute {
-          offset: 0,
-          shader_location: 0,
-          format: wgpu::VertexFormat::Float32x2,
-        }],
-      }],
-    },
-    fragment: Some(wgpu::FragmentState {
-      module: &module,
-      entry_point: "fs_main",
-      targets: &[Some(wgpu::ColorTargetState {
-        format: wgpu::TextureFormat::R8Unorm,
-        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-        write_mask: wgpu::ColorWrites::all(),
-      })],
-    }),
-    primitive: wgpu::PrimitiveState {
-      topology: wgpu::PrimitiveTopology::TriangleList,
-      strip_index_format: None,
-      front_face: wgpu::FrontFace::Ccw,
-      cull_mode: Some(wgpu::Face::Back),
-      unclipped_depth: false,
-      polygon_mode: wgpu::PolygonMode::Fill,
-      conservative: false,
-    },
-    depth_stencil: None,
-    multisample: wgpu::MultisampleState {
-      count: msaa_count,
-      mask: !0,
-      alpha_to_coverage_enabled: false,
-    },
-    multiview: None,
-  })
 }
 
 fn align(width: u32, align: u32) -> u32 {

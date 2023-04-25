@@ -1,6 +1,7 @@
 pub mod error;
+use gpu_backend::Texture;
 use ribir_painter::{
-  image::ColorFormat, AntiAliasing, DeviceRect, DeviceSize, Texture, VertexBuffers,
+  image::ColorFormat, AntiAliasing, DevicePoint, DeviceRect, DeviceSize, VertexBuffers,
 };
 use std::ops::Range;
 mod gpu_backend;
@@ -11,10 +12,10 @@ pub mod wgpu_impl;
 #[cfg(feature = "wgpu")]
 pub use wgpu_impl::*;
 
-pub use gpu_backend::GPUBackend;
+pub use gpu_backend::*;
 
 #[derive(Clone)]
-pub enum DrawIndices {
+pub enum IndicesRange {
   Color(Range<u32>),
   Texture(Range<u32>),
   Gradient(Range<u32>),
@@ -25,40 +26,41 @@ pub enum DrawIndices {
 /// The call graph:
 ///
 /// -- begin_frame()
-///  +-->--start_draw_phase() -->-----------------------+   
-///  | +->- new_texture()----+                          |
-///  | +-<-------<------<----+                          |    
-///  | |                                                |
-///  | v                                                |
-///  | +--> load_textures()                             v
-///  |   -> load_color_primitives()                     |
-///  |   -> load_texture_primitives()                   |
-///  |   -> load_triangles_buffer()                     |
-///  |                                                  |
-///  |   -> load_alpha_path_buffer()                    |
-///  |   -> + draw_alpha_triangles_with_scissor()--+    |
-///  |      +----<-----------<---------------------+    |
-///  |                                                  |
-///  |   -> + draw_alpha_triangles()---------------+    |
-///  |      +----<-----------<---------------------+    |
-///  |                                                  |
-///  |   -> +--- draw_triangles()----+                  |
-///  ^      +-------<----------------+                  |
-///  |                                                  |
-///  +----- end_draw_phase() ---<-----------------------+
-///  |
-///  V
+/// |  +->- new_texture()----+                          
+/// |  +-<-------<------<----+                              
+/// |  |                                                
+/// |  v                                                
+/// |  +--> load_textures()                             
+/// |    -> load_color_primitives()                     
+/// |    -> load_texture_primitives()                   
+/// |    -> load_triangles_buffer()                     
+/// |                                                  
+/// |    -> load_alpha_path_buffer()                    
+/// |    -> + draw_alpha_triangles_with_scissor()--+    
+/// |       +----<-----------<---------------------+    
+/// |                                                   
+/// |    -> + draw_alpha_triangles()---------------+    
+/// |       +----<-----------<---------------------+    
+/// |                                                   
+/// |    -> +--- draw_triangles()----+                  
+/// |       +-------<----------------+                  
+/// |                                                   
+/// |
+/// |
 /// -+ ->- end_frame()
 pub trait GPUBackendImpl {
   type Texture: Texture;
 
   fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing);
 
+  /// convert x axis from canvas to gpu coordinate
+  fn map_x(x: f32, width: f32) -> f32;
+
+  /// convert y axis from canvas to gpu coordinate
+  fn map_y(y: f32, height: f32) -> f32;
+
   /// A frame start, call once per frame
   fn begin_frame(&mut self);
-
-  /// A draw phase start. A frame may have many draw phase.
-  fn start_draw_phase(&mut self);
 
   /// Create a texture.
   fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture;
@@ -80,6 +82,14 @@ pub trait GPUBackendImpl {
   /// Load the vertices and indices buffer that `draw_alpha_triangles` &
   /// `draw_alpha_triangles_with_scissor` will use.
   fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<()>);
+
+  fn copy_texture_to_texture(
+    &mut self,
+    dist_tex: &mut Self::Texture,
+    copy_to: DevicePoint,
+    from_tex: &Self::Texture,
+    from_rect: &DeviceRect,
+  );
 
   /// Draw triangles only alpha channel with 1.0. Caller guarantee the texture
   /// format is `ColorFormat::Alpha8`, caller will try to batch as much as
@@ -103,13 +113,19 @@ pub trait GPUBackendImpl {
   fn draw_triangles(
     &mut self,
     texture: &mut Self::Texture,
-    scissor: DeviceRect,
-    commands: &[DrawIndices],
+    scissor: &DeviceRect,
+    indies_range: IndicesRange,
   );
 
-  /// A draw phase end
-  fn end_draw_phase(&mut self);
-
+  fn draw_texture_with_mask(
+    &mut self,
+    dist_texture: &mut Self::Texture,
+    dist_start_at: DevicePoint,
+    texture: &Self::Texture,
+    tex_start_at: DevicePoint,
+    mask: &Self::Texture,
+    mask_rect: &DeviceRect,
+  );
   /// A frame end, call once per frame
   fn end_frame(&mut self);
 }

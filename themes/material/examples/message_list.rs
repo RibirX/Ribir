@@ -132,9 +132,8 @@ fn main() {
   };
 
   let mut app = App::new(material::purple::light());
-  let id = app
+  app
     .new_window(message_list.into_widget(), Some(Size::new(320., 568.)))
-    .set_title("Message")
-    .id();
-  app.exec(id);
+    .set_title("Message");
+  app.exec();
 }

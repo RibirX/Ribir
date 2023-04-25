@@ -1,9 +1,7 @@
-use crate::image::ColorFormat;
 use crate::{
-  path::*, path_builder::PathBuilder, Angle, Brush, Color, DeviceRect, DeviceSize, Point, Rect,
-  Size, TextStyle, Transform, Vector,
+  path::*, path_builder::PathBuilder, Angle, Brush, Color, DeviceRect, Point, Rect, Size,
+  TextStyle, Transform, Vector,
 };
-use crate::{DevicePoint, PixelImage};
 use euclid::{num::Zero, Size2D};
 use ribir_algo::Substr;
 use ribir_text::{
@@ -11,12 +9,8 @@ use ribir_text::{
   Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
 };
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
-use std::{
-  error::Error,
-  future::Future,
-  ops::{Deref, DerefMut},
-};
+
+use std::ops::{Deref, DerefMut};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -36,48 +30,34 @@ pub struct Painter {
 /// will called between `begin_frame` and `end_frame`
 ///
 /// -- begin_frame()
+///
 ///  +--> draw_commands --+
 ///  ^                    V
 ///  +----------<---------+
-///  |
-///  V
+///                       
+///
+///
 /// -+ end_frame()
-pub type ImageFuture =
-  Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>>;
+///                       
 pub trait PainterBackend {
+  type Texture;
+
   fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing);
 
   /// A frame start.
   fn begin_frame(&mut self);
 
-  /// Paint `commands` and return a `SubTexture` store the image. This may be
-  /// called more than once to get multi sub-images.
-  fn draw_commands(&mut self, view_port: DeviceRect, commands: Vec<PaintCommand>) -> ImageFuture;
+  /// Paint `commands` to the `output` Texture.
+  /// This may be called more than once during a frame.
+  fn draw_commands(
+    &mut self,
+    viewport: DeviceRect,
+    commands: Vec<PaintCommand>,
+    output: &mut Self::Texture,
+  );
 
   /// A frame end.
   fn end_frame(&mut self);
-}
-
-/// Texture use to display.
-pub trait Texture {
-  type Host;
-
-  /// write data to the texture.
-  fn write_data(&mut self, dist: &DeviceRect, data: &[u8], host: &mut Self::Host);
-
-  fn copy_from_texture(
-    &mut self,
-    copy_to: DevicePoint,
-    from_texture: &Self,
-    from_rect: DeviceRect,
-    host: &mut Self::Host,
-  );
-
-  fn copy_as_image(&self, rect: &DeviceRect, host: &mut Self::Host) -> ImageFuture;
-
-  fn format(&self) -> ColorFormat;
-
-  fn size(&self) -> DeviceSize;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -215,7 +195,6 @@ impl Painter {
     self
       .state_stack
       .push(PainterState::new(self.device_scale, device_bounds));
-    self.scale(self.device_scale, self.device_scale);
   }
 
   pub fn device_scale(&self) -> f32 { self.device_scale }
@@ -572,13 +551,27 @@ impl Painter {
     );
 
     visual_glyphs.pixel_glyphs().for_each(|g| {
-      let face = self
-        .typography_store
-        .font_db_mut()
-        .face_data_or_insert(g.face_id)
-        .expect("Font face not exist!");
+      let path = {
+        // todo: font db should load face when setup theme.
+        let mut font_db = self.typography_store.font_db().write().unwrap();
+        let face = font_db.face_data_or_insert(g.face_id);
 
-      if let Some(path) = face.outline_glyph(g.glyph_id).map(Path) {
+        face.and_then(|face| {
+          face.outline_glyph(g.glyph_id).map(|p| {
+            let unit = face.units_per_em();
+            (unit as f32, Path(p))
+          })
+        })
+      };
+
+      if let Some((unit, path)) = path {
+        let font_size = font_size.into_pixel().value();
+        let scale = font_size / unit;
+        let ts = Transform::scale(1., -1.)
+          .then_translate((0., unit).into())
+          .then_scale(scale, scale);
+
+        let path = path.transform(&ts);
         // todo: mark glyph
         if stroke {
           self.stroke_path(path);
@@ -586,7 +579,7 @@ impl Painter {
           self.fill_path(path);
         }
       } else {
-        todo!("image or svg fallback");
+        // todo: image or svg fallback
       }
     });
   }

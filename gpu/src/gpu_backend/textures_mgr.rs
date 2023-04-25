@@ -1,11 +1,10 @@
 use super::atlas::Atlas;
+use super::Texture;
 use crate::{gpu_backend::atlas::ATLAS_MAX_ITEM, GPUBackendImpl};
 use guillotiere::AllocId;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::{FrameCache, ShareResource};
-use ribir_painter::{
-  image::ColorFormat, DeviceRect, DeviceSize, PaintPath, Path, PixelImage, Texture,
-};
+use ribir_painter::{image::ColorFormat, DeviceRect, DeviceSize, PaintPath, Path, PixelImage};
 use ribir_painter::{DeviceVector, Vertex, VertexBuffers};
 use slab::Slab;
 use std::ops::Range;
@@ -13,13 +12,13 @@ const TOLERANCE: f32 = 0.1;
 const PAR_CHUNKS_SIZE: usize = 128;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Copy)]
-pub enum TextureID {
+pub(super) enum TextureID {
   AlphaAtlas,
   RgbaAtlas,
   Extra(u32),
 }
 
-pub struct TexturesMgr<T: Texture> {
+pub(super) struct TexturesMgr<T: Texture> {
   alpha_atlas: Atlas<T>,
   rgba_atlas: Atlas<T>,
   extra_textures: Slab<T>,
@@ -30,7 +29,7 @@ pub struct TexturesMgr<T: Texture> {
   fill_task_buffers: VertexBuffers<()>,
 }
 
-pub struct FillTask {
+struct FillTask {
   id: TextureID,
   offset: DeviceVector,
   path: Path,
@@ -38,9 +37,9 @@ pub struct FillTask {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct TextureRect {
-  pub tex_id: TextureID,
-  pub rect: DeviceRect,
+pub(super) struct TextureSlice {
+  pub(super) tex_id: TextureID,
+  pub(super) rect: DeviceRect,
 }
 
 macro_rules! id_to_texture {
@@ -57,7 +56,7 @@ impl<T: Texture> TexturesMgr<T>
 where
   T::Host: GPUBackendImpl<Texture = T>,
 {
-  pub(crate) fn new(gpu_impl: &mut T::Host) -> Self {
+  pub(super) fn new(gpu_impl: &mut T::Host) -> Self {
     Self {
       alpha_atlas: Atlas::new(ColorFormat::Alpha8, gpu_impl),
       rgba_atlas: Atlas::new(ColorFormat::Rgba8, gpu_impl),
@@ -71,11 +70,11 @@ where
   }
 
   /// Store an alpha path in texture and return the texture.
-  pub(crate) fn store_alpha_path(
+  pub(super) fn store_alpha_path(
     &mut self,
     path: PaintPath,
     gpu_impl: &mut T::Host,
-  ) -> TextureRect {
+  ) -> TextureSlice {
     if let Some(dist) = self.path_cache.get((&path.path).into()) {
       return self.text_dist_to_rect(*dist);
     }
@@ -91,12 +90,12 @@ where
     texture
   }
 
-  pub(crate) fn alloc_path_without_cache(
+  pub(super) fn alloc_path_without_cache(
     &mut self,
     intersect_view: DeviceRect,
     path: PaintPath,
     gpu_impl: &mut T::Host,
-  ) -> TextureRect {
+  ) -> TextureSlice {
     let tex_dist = self.inner_alloc(ColorFormat::Alpha8, intersect_view.size, gpu_impl);
     self.uncached.push(tex_dist);
     let texture = self.text_dist_to_rect(tex_dist);
@@ -111,11 +110,11 @@ where
     texture
   }
 
-  pub(crate) fn store_image(
+  pub(super) fn store_image(
     &mut self,
     img: &ShareResource<PixelImage>,
     gpu_impl: &mut T::Host,
-  ) -> TextureRect {
+  ) -> TextureSlice {
     if let Some(dist) = self.resource_cache.get(&ShareResource::as_ptr(img)) {
       return self.text_dist_to_rect(*dist);
     }
@@ -134,12 +133,12 @@ where
     tex_rect
   }
 
-  pub(crate) fn alloc(
+  pub(super) fn alloc(
     &mut self,
     size: DeviceSize,
     format: ColorFormat,
     gpu_impl: &mut T::Host,
-  ) -> TextureRect {
+  ) -> TextureSlice {
     let tex_dist = self.inner_alloc(format, size, gpu_impl);
     self.uncached.push(tex_dist);
     self.text_dist_to_rect(tex_dist)
@@ -164,7 +163,7 @@ where
       };
       if let Some(alloc) = alloc {
         let rect = alloc.rectangle.to_rect().cast_unit();
-        let tex_rect = TextureRect { tex_id, rect };
+        let tex_rect = TextureSlice { tex_id, rect };
         return TextureDist::Atlas { alloc_id: alloc.id, tex_rect };
       }
     }
@@ -173,9 +172,9 @@ where
     TextureDist::Extra(id as u32)
   }
 
-  pub(crate) fn texture_mut(&mut self, tex_id: TextureID) -> &mut T { id_to_texture!(self, tex_id) }
+  pub(super) fn texture_mut(&mut self, tex_id: TextureID) -> &mut T { id_to_texture!(self, tex_id) }
 
-  pub(crate) fn texture(&self, tex_id: TextureID) -> &T {
+  pub(super) fn texture(&self, tex_id: TextureID) -> &T {
     match tex_id {
       TextureID::AlphaAtlas => &self.alpha_atlas.texture,
       TextureID::RgbaAtlas => &self.rgba_atlas.texture,
@@ -183,10 +182,10 @@ where
     }
   }
 
-  fn text_dist_to_rect(&self, dist: TextureDist) -> TextureRect {
+  fn text_dist_to_rect(&self, dist: TextureDist) -> TextureSlice {
     match dist {
       TextureDist::Atlas { tex_rect, .. } => tex_rect,
-      TextureDist::Extra(id) => TextureRect {
+      TextureDist::Extra(id) => TextureSlice {
         tex_id: TextureID::Extra(id),
         rect: DeviceRect::from_size(self.extra_textures[id as usize].size()),
       },
@@ -200,7 +199,7 @@ where
 
     self
       .fill_task
-      .sort_by(|a, b| a.clip_rect.is_some().cmp(&b.clip_rect.is_some()));
+      .sort_by(|a, b| b.clip_rect.is_some().cmp(&a.clip_rect.is_some()));
 
     fn tess_tasks(
       tasks: &[FillTask],
@@ -313,7 +312,7 @@ where
 enum TextureDist {
   Atlas {
     alloc_id: AllocId,
-    tex_rect: TextureRect,
+    tex_rect: TextureSlice,
   },
   Extra(u32),
 }
@@ -404,7 +403,7 @@ fn extend_buffer<V>(dist: &mut VertexBuffers<V>, from: VertexBuffers<V>) {
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 pub mod tests {
-  use crate::{wgpu_impl::WgpuTexture, WgpuImpl};
+  use crate::WgpuImpl;
 
   use super::*;
   use futures::executor::block_on;
@@ -427,7 +426,7 @@ pub mod tests {
     use crate::wgpu_impl::WgpuImpl;
     use ribir_painter::AntiAliasing;
 
-    let mut wgpu = block_on(WgpuImpl::new(AntiAliasing::None));
+    let mut wgpu = block_on(WgpuImpl::headless(AntiAliasing::None));
     let mut mgr = TexturesMgr::new(&mut wgpu);
 
     let red_img = color_image(Color::RED, 32, 32);
@@ -455,8 +454,8 @@ pub mod tests {
   }
 
   fn color_img_check(
-    mgr: &TexturesMgr<WgpuTexture>,
-    rect: &TextureRect,
+    mgr: &TexturesMgr<wgpu::Texture>,
+    rect: &TextureSlice,
     wgpu: &mut WgpuImpl,
     color: Color,
   ) {
