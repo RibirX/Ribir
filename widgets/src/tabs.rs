@@ -89,6 +89,8 @@ pub struct TabsDecorator {}
 
 impl ComposeDecorator for TabsDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -111,6 +113,8 @@ pub struct TabDecorator {}
 
 impl ComposeDecorator for TabDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Declare)]
@@ -122,6 +126,27 @@ pub struct IndicatorDecorator {
 
 impl ComposeDecorator for IndicatorDecorator {
   type Host = Widget;
+
+  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget {
+    widget! {
+      states { this }
+      DynWidget {
+        left_anchor: match this.pos {
+          Position::Top | Position::Bottom => this.rect.origin.x
+            + (this.rect.size.width - 60.) / 2.,
+          Position::Left => this.rect.size.width - this.extent,
+          Position::Right => 0.,
+        },
+        top_anchor: match this.pos {
+          Position::Left | Position::Right => this.rect.origin.y
+            + (this.rect.size.height - 60.) / 2.,
+          Position::Top => this.rect.size.height - this.extent,
+          Position::Bottom => 0.,
+        },
+        dyns: host,
+      }
+    }
+  }
 }
 
 impl Tabs {
@@ -321,41 +346,16 @@ impl ComposeChild for Tabs {
   }
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(TabsStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(TabsStyle {
     extent_with_both: 64.,
     extent_only_label: 48.,
     extent_only_icon: 48.,
     icon_size: Size::splat(24.),
     icon_pos: Position::Top,
-    active_color: theme.palette().primary().into(),
-    foreground: theme.palette().on_surface_variant().into(),
-    label_style: theme.typography_theme().title_small.text.clone(),
+    active_color: theme.palette.primary().into(),
+    foreground: theme.palette.on_surface_variant().into(),
+    label_style: theme.typography_theme.title_small.text.clone(),
     indicator: IndicatorStyle { extent: 3., measure: Some(60.) },
-  });
-
-  theme.set_compose_decorator::<TabDecorator>(|_, host| host);
-
-  theme.set_compose_decorator::<TabsDecorator>(|_, host| host);
-
-  theme.set_compose_decorator::<IndicatorDecorator>(|style, host| {
-    widget! {
-      states { style }
-      DynWidget {
-        left_anchor: match style.pos {
-          Position::Top | Position::Bottom => style.rect.origin.x
-            + (style.rect.size.width - 60.) / 2.,
-          Position::Left => style.rect.size.width - style.extent,
-          Position::Right => 0.,
-        },
-        top_anchor: match style.pos {
-          Position::Left | Position::Right => style.rect.origin.y
-            + (style.rect.size.height - 60.) / 2.,
-          Position::Top => style.rect.size.height - style.extent,
-          Position::Bottom => 0.,
-        },
-        dyns: host,
-      }
-    }
   });
 }

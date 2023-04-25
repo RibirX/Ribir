@@ -135,6 +135,8 @@ impl CustomStyle for ListsStyle {}
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 impl ComposeChild for Lists {
@@ -392,10 +394,11 @@ pub struct ListItemDecorator {}
 
 impl ComposeDecorator for ListItemDecorator {
   type Host = Widget;
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(ListItemStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(ListItemStyle {
     padding_style: Some(EdgeInsets {
       left: 0.,
       right: 24.,
@@ -410,16 +413,16 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
       }
     },
     label_gap: Some(EdgeInsets::only_left(16.)),
-    headline_style: theme.typography_theme().body_large.text.clone(),
-    supporting_style: theme.typography_theme().body_medium.text.clone(),
+    headline_style: theme.typography_theme.body_large.text.clone(),
+    supporting_style: theme.typography_theme.body_medium.text.clone(),
     leading_config: EdgeWidgetStyle {
       icon: EdgeItemStyle {
         size: Size::splat(24.),
         gap: Some(EdgeInsets::only_left(16.)),
       },
       text: EdgeTextItemStyle {
-        style: theme.typography_theme().label_small.text.clone(),
-        foreground: theme.palette().on_surface_variant().into(),
+        style: theme.typography_theme.label_small.text.clone(),
+        foreground: theme.palette.on_surface_variant().into(),
         gap: Some(EdgeInsets::only_left(16.)),
       },
       avatar: EdgeItemStyle {
@@ -445,8 +448,8 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
         gap: Some(EdgeInsets::only_left(16.)),
       },
       text: EdgeTextItemStyle {
-        style: theme.typography_theme().label_small.text.clone(),
-        foreground: theme.palette().on_surface_variant().into(),
+        style: theme.typography_theme.label_small.text.clone(),
+        foreground: theme.palette.on_surface_variant().into(),
         gap: Some(EdgeInsets::only_left(16.)),
       },
       avatar: EdgeItemStyle {
@@ -468,12 +471,8 @@ pub fn add_to_system_theme(theme: &mut SystemTheme) {
     },
   });
 
-  theme.set_custom_style(ListsStyle {
+  theme.custom_styles.set_custom_style(ListsStyle {
     padding: EdgeInsets::vertical(8.),
-    background: theme.palette().surface().into(),
+    background: theme.palette.surface().into(),
   });
-
-  theme.set_compose_decorator::<ListItemDecorator>(|_, host| host);
-
-  theme.set_compose_decorator::<ListsDecorator>(|_, host| host);
 }

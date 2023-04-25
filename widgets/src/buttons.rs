@@ -95,9 +95,9 @@ pub use button::*;
 mod fab_button;
 pub use fab_button::*;
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  filled_button::add_to_system_theme(theme);
-  outlined_button::add_to_system_theme(theme);
-  button::add_to_system_theme(theme);
-  fab_button::add_to_system_theme(theme);
+pub fn add_to_theme(theme: &mut FullTheme) {
+  filled_button::add_to_theme(theme);
+  outlined_button::add_to_theme(theme);
+  button::add_to_theme(theme);
+  fab_button::add_to_theme(theme);
 }

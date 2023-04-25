@@ -199,10 +199,10 @@ fn to_content_pos(container: &ScrollableWidget, view_position: &Point) -> Point 
   *view_position - Size::from(container.scroll_pos.to_vector())
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(InputStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(InputStyle {
     min_length: 20.,
     select_background: Color::from_rgb(181, 215, 254).into(),
-    caret_color: Brush::Color(theme.palette().on_surface()),
+    caret_color: Brush::Color(theme.palette.on_surface()),
   });
 }

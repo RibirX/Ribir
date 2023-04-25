@@ -22,6 +22,8 @@ pub struct FabButtonDecorator {
 
 impl ComposeDecorator for FabButtonDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// FabButton usage
@@ -114,15 +116,14 @@ impl ComposeChild for FabButton {
   }
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(FabButtonStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(FabButtonStyle {
     height: 56.,
     icon_size: Size::splat(24.),
     label_gap: 8.,
     icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme().label_large.text.clone(),
+    label_style: theme.typography_theme.label_large.text.clone(),
     radius: 16.,
     padding_style: EdgeInsets::horizontal(16.),
   });
-  theme.set_compose_decorator::<FabButtonDecorator>(|_, host| host);
 }

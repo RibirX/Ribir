@@ -40,6 +40,8 @@ pub struct AvatarDecorator;
 
 impl ComposeDecorator for AvatarDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -100,13 +102,12 @@ impl ComposeChild for Avatar {
   }
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(AvatarStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(40.),
     radius: Some(20.),
-    background: Some(theme.palette().primary().into()),
-    text_color: theme.palette().on_primary().into(),
-    text_style: theme.typography_theme().body_large.text.clone(),
+    background: Some(theme.palette.primary().into()),
+    text_color: theme.palette.on_primary().into(),
+    text_style: theme.typography_theme.body_large.text.clone(),
   });
-  theme.set_compose_decorator::<AvatarDecorator>(|_, host| host);
 }

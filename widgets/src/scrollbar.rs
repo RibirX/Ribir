@@ -31,6 +31,13 @@ pub struct HScrollBarThumbDecorator {
 
 impl ComposeDecorator for HScrollBarThumbDecorator {
   type Host = Widget;
+
+  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget {
+    widget! {
+      states { this }
+      DynWidget { left_anchor: this.offset, dyns: host }
+    }
+  }
 }
 
 /// Compose style that use to decoration the thumb of vertical scrollbar,
@@ -42,6 +49,16 @@ pub struct VScrollBarThumbDecorator {
 
 impl ComposeDecorator for VScrollBarThumbDecorator {
   type Host = Widget;
+
+  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget {
+    widget! {
+      states { this }
+      DynWidget {
+        top_anchor: this.offset,
+        dyns: host
+      }
+    }
+  }
 }
 
 impl ComposeChild for HScrollBar {
@@ -265,26 +282,11 @@ fn safe_recip(v: f32) -> f32 {
 
 impl CustomStyle for ScrollBarStyle {}
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(ScrollBarStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(ScrollBarStyle {
     thumb_min_size: 12.,
     thickness: 8.,
-    track_brush: theme.palette().primary_container().into(),
-  });
-  theme.set_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
-    widget! {
-      states { this }
-      DynWidget { left_anchor: this.offset, dyns: host }
-    }
-  });
-  theme.set_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
-    widget! {
-      states { this }
-      DynWidget {
-        top_anchor: this.offset,
-        dyns: host
-      }
-    }
+    track_brush: theme.palette.primary_container().into(),
   });
 }
 
@@ -311,13 +313,13 @@ mod test {
       }
     };
 
-    let mut system_theme = SystemTheme::new(FullTheme::default());
-    super::add_to_system_theme(&mut system_theme);
+    let mut theme = FullTheme::default();
+    super::add_to_theme(&mut theme);
 
     expect_layout_result_with_theme(
       w,
       Some(Size::new(200., 200.)),
-      system_theme.theme(),
+      Theme::Full(theme),
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -389,10 +391,10 @@ mod test {
       }
     };
 
-    let mut system_theme = SystemTheme::new(FullTheme::default());
-    super::add_to_system_theme(&mut system_theme);
+    let mut theme = FullTheme::default();
+    super::add_to_theme(&mut theme);
     let ctx = AppContext {
-      app_theme: std::rc::Rc::new(system_theme.theme()),
+      app_theme: std::rc::Rc::new(Theme::Full(theme)),
       ..<_>::default()
     };
     let mut wnd = Window::mock_window(w, Size::new(1024., 1024.), ctx);

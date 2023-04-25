@@ -8,12 +8,14 @@ pub struct ComposeDecorators {
   styles: HashMap<TypeId, Box<ComposeDecoratorFn>, ahash::RandomState>,
 }
 
-/// `ComposeStyle` is a trait let you can convert your host widget to another,
-/// it has same signature of `ComposeChild`, but it can be overwrote in `Theme`
-/// by a function. The trait implementation only as a default logic if no
-/// overwrite function in `Theme`.
-pub trait ComposeDecorator {
+/// `ComposeDecorator` is a trait let you can convert your host widget to
+/// another, it has same signature of `ComposeChild`, but it can be overwrote in
+/// `Theme` by a function. The trait implementation only as a default logic if
+/// no overwrite function in `Theme`.
+pub trait ComposeDecorator: Sized {
   type Host;
+
+  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget;
 }
 
 impl<W: ComposeDecorator + 'static> ComposeChild for W {
@@ -33,7 +35,7 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
       if let Some(style) = style {
         style(Box::new(this.into_writable()), Box::new(child))
       } else {
-        panic!("Must be defined compose decorator, {}", type_name::<W>())
+        ComposeDecorator::compose_decorator(this.into_writable(), child)
       }
     })
     .into_widget()
@@ -42,7 +44,7 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
 
 impl ComposeDecorators {
   #[inline]
-  pub fn set_compose_decorator<W: ComposeDecorator + 'static>(
+  pub fn override_compose_decorator<W: ComposeDecorator + 'static>(
     &mut self,
     compose_decorator: impl Fn(Stateful<W>, W::Host) -> Widget + Clone + 'static,
   ) {
@@ -81,10 +83,11 @@ mod tests {
 
     impl ComposeDecorator for Size100Style {
       type Host = Widget;
+      fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
     }
     theme
       .compose_decorators
-      .set_compose_decorator::<Size100Style>(|_, host| {
+      .override_compose_decorator::<Size100Style>(|_, host| {
         widget! {
           MockBox {
             size: Size::new(100., 100.),

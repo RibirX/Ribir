@@ -1,4 +1,4 @@
-use ribir_core::prelude::SystemTheme;
+use ribir_core::prelude::FullTheme;
 
 pub mod avatar;
 pub mod buttons;
@@ -41,13 +41,13 @@ pub mod prelude {
   pub use super::transform_box::*;
 }
 
-pub fn widget_theme_init(theme: &mut SystemTheme) {
-  avatar::add_to_system_theme(theme);
-  buttons::add_to_system_theme(theme);
-  checkbox::add_to_system_theme(theme);
-  lists::add_to_system_theme(theme);
-  tabs::add_to_system_theme(theme);
-  scrollbar::add_to_system_theme(theme);
-  input::add_to_system_theme(theme);
-  themes::add_to_system_theme(theme);
+pub fn widget_theme_init(theme: &mut FullTheme) {
+  avatar::add_to_theme(theme);
+  buttons::add_to_theme(theme);
+  checkbox::add_to_theme(theme);
+  lists::add_to_theme(theme);
+  tabs::add_to_theme(theme);
+  scrollbar::add_to_theme(theme);
+  input::add_to_theme(theme);
+  themes::add_to_theme(theme);
 }

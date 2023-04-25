@@ -74,7 +74,8 @@ fn new(brightness: Brightness, palette: Palette) -> FullTheme {
     material_svgs::ACCOUNT_CIRCLE: "./icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg"
   }
 
-  set_compose_decorator(&mut theme);
+  ribir_widgets::widget_theme_init(&mut theme);
+  override_compose_decorator(&mut theme);
   init_custom_style(&mut theme);
   theme
 }
@@ -247,7 +248,7 @@ fn init_custom_style(theme: &mut FullTheme) {
   });
 }
 
-fn set_compose_decorator(theme: &mut FullTheme) {
+fn override_compose_decorator(theme: &mut FullTheme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
       init ctx => {
@@ -263,7 +264,7 @@ fn set_compose_decorator(theme: &mut FullTheme) {
   }
 
   let styles = &mut theme.compose_decorators;
-  styles.set_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
+  styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
     widget! {
       states { this }
       init ctx => {
@@ -280,7 +281,7 @@ fn set_compose_decorator(theme: &mut FullTheme) {
       }
     }
   });
-  styles.set_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
+  styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
     widget! {
       states { this }
       init ctx => {
@@ -297,7 +298,7 @@ fn set_compose_decorator(theme: &mut FullTheme) {
       }
     }
   });
-  styles.set_compose_decorator::<IndicatorDecorator>(|style, host| {
+  styles.override_compose_decorator::<IndicatorDecorator>(|style, host| {
     widget! {
       states { style }
       init ctx => {
@@ -329,7 +330,7 @@ fn set_compose_decorator(theme: &mut FullTheme) {
       ) { by: ease_in }
     }
   });
-  styles.set_compose_decorator::<CheckBoxDecorator>(move |style, host| {
+  styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host| {
     widget! {
       states { style }
       Ripple {
