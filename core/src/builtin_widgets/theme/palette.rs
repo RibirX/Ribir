@@ -77,22 +77,22 @@ pub struct LightnessGroup {
 pub struct LightnessCfg {
   /// The light tone group of color.
   pub color_group: LightnessGroup,
-  /// The light tone of neutral
-  pub neutral: LightnessTone,
-  /// The light tone of on neutral
-  pub on_neutral: LightnessTone,
-  /// The light tone of inverse surface.
+  pub surface: LightnessTone,
+  pub surface_dim: LightnessTone,
+  pub surface_bright: LightnessTone,
+  pub surface_container_lowest: LightnessTone,
+  pub surface_container_low: LightnessTone,
+  pub surface_container: LightnessTone,
+  pub surface_container_high: LightnessTone,
+  pub surface_container_highest: LightnessTone,
+  pub surface_variant: LightnessTone,
+  pub on_surface: LightnessTone,
+  pub on_surface_variant: LightnessTone,
   pub inverse_surface: LightnessTone,
-  /// The light tone of on inverse surface.
-  pub on_inverse_surface: LightnessTone,
-  /// The light tone of variant neutral
-  pub variant_neutral: LightnessTone,
-  /// The light tone of on variant neutral
-  pub on_variant_neutral: LightnessTone,
-  /// The light tone of outline
+  pub inverse_on_surface: LightnessTone,
   pub outline: LightnessTone,
-  /// The light tone of outline variant
   pub outline_variant: LightnessTone,
+  pub shadow: LightnessTone,
 }
 
 impl Palette {
@@ -179,15 +179,60 @@ impl Palette {
   pub fn on_error_container(&self) -> Color { self.on_container_of(&self.error) }
 
   #[inline]
-  pub fn background(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.neutral) }
+  pub fn background(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.surface) }
 
   #[inline]
   pub fn on_background(&self) -> Color {
-    self.neutral.with_lightness(self.lightness_cfg.on_neutral)
+    self.neutral.with_lightness(self.lightness_cfg.on_surface)
   }
 
   #[inline]
   pub fn surface(&self) -> Color { self.background() }
+
+  #[inline]
+  pub fn surface_dim(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.surface_dim) }
+
+  #[inline]
+  pub fn surface_bright(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg.surface_bright)
+  }
+
+  #[inline]
+  pub fn surface_container_lowest(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg.surface_container_lowest)
+  }
+
+  #[inline]
+  pub fn surface_container_low(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg.surface_container_low)
+  }
+
+  #[inline]
+  pub fn surface_container(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg.surface_container)
+  }
+
+  #[inline]
+  pub fn surface_container_high(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg.surface_container_high)
+  }
+
+  #[inline]
+  pub fn surface_container_highest(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg.surface_container_highest)
+  }
 
   #[inline]
   pub fn on_surface(&self) -> Color { self.on_background() }
@@ -196,14 +241,14 @@ impl Palette {
   pub fn surface_variant(&self) -> Color {
     self
       .neutral_variant
-      .with_lightness(self.lightness_cfg.variant_neutral)
+      .with_lightness(self.lightness_cfg.surface_variant)
   }
 
   #[inline]
   pub fn on_surface_variant(&self) -> Color {
     self
       .neutral_variant
-      .with_lightness(self.lightness_cfg.on_variant_neutral)
+      .with_lightness(self.lightness_cfg.on_surface_variant)
   }
 
   #[inline]
@@ -227,11 +272,17 @@ impl Palette {
   }
 
   #[inline]
-  pub fn on_inverse_surface(&self) -> Color {
+  pub fn inverse_on_surface(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.on_inverse_surface)
+      .with_lightness(self.lightness_cfg.inverse_on_surface)
   }
+
+  #[inline]
+  pub fn shadow(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.shadow) }
+
+  #[inline]
+  pub fn scrim(&self) -> Color { self.shadow() }
 
   /// change color to the `base` light tone of the palette.
   #[inline]
@@ -285,14 +336,22 @@ impl LightnessCfg {
   pub fn light_theme_default() -> Self {
     Self {
       color_group: LightnessGroup::light_theme_default(),
-      neutral: LightnessTone::new(0.99),
-      on_neutral: LightnessTone::new(0.1),
-      variant_neutral: LightnessTone::new(0.9),
-      on_variant_neutral: LightnessTone::new(0.3),
       outline: LightnessTone::new(0.5),
       outline_variant: LightnessTone::new(0.8),
       inverse_surface: LightnessTone::new(0.2),
-      on_inverse_surface: LightnessTone::new(0.95),
+      surface: LightnessTone::new(0.98),
+      surface_dim: LightnessTone::new(0.87),
+      surface_bright: LightnessTone::new(0.98),
+      surface_container_lowest: LightnessTone::new(1.),
+      surface_container_low: LightnessTone::new(0.96),
+      surface_container: LightnessTone::new(0.94),
+      surface_container_high: LightnessTone::new(0.92),
+      surface_container_highest: LightnessTone::new(0.9),
+      surface_variant: LightnessTone::new(0.9),
+      on_surface: LightnessTone::new(0.1),
+      on_surface_variant: LightnessTone::new(0.3),
+      inverse_on_surface: LightnessTone::new(0.95),
+      shadow: LightnessTone::new(0.),
     }
   }
 
@@ -300,14 +359,22 @@ impl LightnessCfg {
   pub fn dark_theme_default() -> Self {
     Self {
       color_group: LightnessGroup::dark_theme_default(),
-      neutral: LightnessTone::new(0.1),
-      on_neutral: LightnessTone::new(0.9),
-      variant_neutral: LightnessTone::new(0.3),
-      on_variant_neutral: LightnessTone::new(0.8),
       outline: LightnessTone::new(0.6),
       outline_variant: LightnessTone::new(0.3),
       inverse_surface: LightnessTone::new(0.9),
-      on_inverse_surface: LightnessTone::new(0.2),
+      surface: LightnessTone::new(0.06),
+      surface_dim: LightnessTone::new(0.06),
+      surface_bright: LightnessTone::new(0.24),
+      surface_container_lowest: LightnessTone::new(0.04),
+      surface_container_low: LightnessTone::new(0.1),
+      surface_container: LightnessTone::new(0.12),
+      surface_container_high: LightnessTone::new(0.17),
+      surface_container_highest: LightnessTone::new(0.22),
+      surface_variant: LightnessTone::new(0.3),
+      on_surface: LightnessTone::new(0.9),
+      on_surface_variant: LightnessTone::new(0.8),
+      inverse_on_surface: LightnessTone::new(0.2),
+      shadow: LightnessTone::new(0.),
     }
   }
 }

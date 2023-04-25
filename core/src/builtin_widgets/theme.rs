@@ -30,6 +30,7 @@ pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
 use super::SvgRender;
 
+#[derive(Default)]
 pub struct SystemTheme(FullTheme);
 
 impl SystemTheme {

@@ -22,8 +22,6 @@ pub struct FabButtonDecorator {
 
 impl ComposeDecorator for FabButtonDecorator {
   type Host = Widget;
-
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// FabButton usage

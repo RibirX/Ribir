@@ -50,8 +50,6 @@ pub enum CheckboxTemplate {
 
 impl ComposeDecorator for CheckBoxDecorator {
   type Host = Widget;
-  #[inline]
-  fn compose_decorator(_: Stateful<Self>, style: Self::Host) -> Widget { style }
 }
 
 impl Checkbox {

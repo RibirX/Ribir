@@ -135,9 +135,6 @@ impl CustomStyle for ListsStyle {}
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
   type Host = Widget;
-
-  #[inline]
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 impl ComposeChild for Lists {
@@ -395,8 +392,6 @@ pub struct ListItemDecorator {}
 
 impl ComposeDecorator for ListItemDecorator {
   type Host = Widget;
-
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 pub fn add_to_system_theme(theme: &mut SystemTheme) {

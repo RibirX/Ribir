@@ -30,8 +30,11 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
           .and_then(|s| s.styles.get(&tid)),
       });
 
-      let style = style.expect("Must be defined compose decorator");
-      style(Box::new(this.into_writable()), Box::new(child))
+      if let Some(style) = style {
+        style(Box::new(this.into_writable()), Box::new(child))
+      } else {
+        panic!("Must be defined compose decorator, {}", type_name::<W>())
+      }
     })
     .into_widget()
   }
@@ -78,7 +81,6 @@ mod tests {
 
     impl ComposeDecorator for Size100Style {
       type Host = Widget;
-      fn compose_decorator(_: Stateful<Self>, style: Self::Host) -> Widget { style }
     }
     theme
       .compose_decorators
