@@ -4,13 +4,12 @@ pub mod prelude {
   pub use ribir_core::prelude::*;
   pub use ribir_widgets::prelude::*;
   pub mod app {
+    use ribir_core::prelude::SystemTheme;
     use ribir_core::window::Window;
 
     #[cfg(feature = "wgpu_gl")]
     pub fn run(root: super::Widget) {
-      use ribir_core::prelude::{FullTheme, SystemTheme};
-
-      let mut theme = SystemTheme::new(FullTheme::default());
+      let mut theme = SystemTheme::default();
       ribir_widgets::widget_theme_init(&mut theme);
       let app = super::Application::new(theme);
       let wnd = Window::builder(root).with_title("ribir app").build(&app);

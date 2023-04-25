@@ -10,7 +10,7 @@ mod styles_sheet;
 pub use styles_sheet::*;
 
 /// Crate a material theme with palette.
-pub fn new(brightness: Brightness, palette: Palette) -> FullTheme {
+fn new(brightness: Brightness, palette: Palette) -> FullTheme {
   let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
     "Roboto Regular",
   ))]);
@@ -74,7 +74,7 @@ pub fn new(brightness: Brightness, palette: Palette) -> FullTheme {
     material_svgs::ACCOUNT_CIRCLE: "./icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg"
   }
 
-  override_compose_decorator(&mut theme);
+  set_compose_decorator(&mut theme);
   init_custom_style(&mut theme);
   theme
 }
@@ -247,7 +247,7 @@ fn init_custom_style(theme: &mut FullTheme) {
   });
 }
 
-fn override_compose_decorator(theme: &mut FullTheme) {
+fn set_compose_decorator(theme: &mut FullTheme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     widget! {
       init ctx => {

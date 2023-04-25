@@ -89,8 +89,6 @@ pub struct TabsDecorator {}
 
 impl ComposeDecorator for TabsDecorator {
   type Host = Widget;
-
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -113,8 +111,6 @@ pub struct TabDecorator {}
 
 impl ComposeDecorator for TabDecorator {
   type Host = Widget;
-
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Declare)]
@@ -126,9 +122,6 @@ pub struct IndicatorDecorator {
 
 impl ComposeDecorator for IndicatorDecorator {
   type Host = Widget;
-
-  #[inline]
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 impl Tabs {

@@ -22,8 +22,6 @@ pub struct FilledButtonDecorator {
 
 impl ComposeDecorator for FilledButtonDecorator {
   type Host = Widget;
-
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// FilledButton usage
