@@ -24,10 +24,10 @@ impl Compose for MessageList {
         let foreground = Palette::of(ctx).on_surface().into();
       }
       Column {
+        background,
         Row {
           justify_content: JustifyContent::SpaceBetween,
           padding: EdgeInsets::new(8., 16., 8., 16.),
-          background,
           align_items: Align::Center,
           Row {
             item_gap: 10.,
@@ -94,7 +94,9 @@ impl Compose for MessageList {
               Label::new("Person")
             }
             TabPane {
-              Void {}
+              Text {
+                text: "Person"
+              }
             }
           }
         }
@@ -131,8 +133,8 @@ fn main() {
     ],
   };
 
-  let system_theme = SystemTheme::new(ribir_theme_material::purple::light());
-  let app = Application::new(system_theme);
+  let theme = ribir_theme_material::purple::dark();
+  let app = Application::new(theme);
   let wnd = Window::builder(message_list.into_widget())
     .with_inner_size(Size::new(320., 568.))
     .with_title("Message")

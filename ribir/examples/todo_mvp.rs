@@ -182,7 +182,7 @@ fn main() {
     ],
   };
 
-  let mut theme = SystemTheme::new(FullTheme::default());
+  let mut theme = FullTheme::default();
   ribir_widgets::widget_theme_init(&mut theme);
   let app = Application::new(theme);
   let wnd = Window::builder(todo.into_widget())

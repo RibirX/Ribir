@@ -23,6 +23,8 @@ pub struct OutlinedButtonDecorator {
 
 impl ComposeDecorator for OutlinedButtonDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 /// OutlinedButton usage
@@ -118,16 +120,15 @@ impl ComposeChild for OutlinedButton {
   }
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(OutlinedButtonStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(OutlinedButtonStyle {
     height: 40.,
     icon_size: Size::splat(18.),
     label_gap: 8.,
     icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme().label_large.text.clone(),
+    label_style: theme.typography_theme.label_large.text.clone(),
     radius: 20.,
     padding_style: EdgeInsets::horizontal(16.),
     border_width: 1.,
   });
-  theme.set_compose_decorator::<OutlinedButtonDecorator>(|_, host| host);
 }

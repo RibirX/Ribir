@@ -22,45 +22,13 @@ use crate::{
   declare::DeclareBuilder,
   impl_query_self_only,
   prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
-  state::{State, Stateful},
+  state::State,
 };
 
 pub use ribir_painter::*;
 pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
 use super::SvgRender;
-
-#[derive(Default)]
-pub struct SystemTheme(FullTheme);
-
-impl SystemTheme {
-  pub fn new(theme: FullTheme) -> Self { Self(theme) }
-
-  pub fn set_custom_style<T>(&mut self, v: T)
-  where
-    T: CustomStyle + 'static,
-  {
-    self.0.custom_styles.set_custom_style(v);
-  }
-
-  pub fn icon_theme(&mut self) -> &mut IconTheme { &mut self.0.icon_theme }
-
-  pub fn palette(&self) -> &Palette { &self.0.palette }
-
-  pub fn typography_theme(&self) -> &TypographyTheme { &self.0.typography_theme }
-
-  pub fn set_compose_decorator<W: ComposeDecorator + 'static>(
-    &mut self,
-    compose_decorator: impl Fn(Stateful<W>, W::Host) -> Widget + Clone + 'static,
-  ) {
-    self
-      .0
-      .compose_decorators
-      .set_compose_decorator(compose_decorator);
-  }
-
-  pub fn theme(self) -> Theme { Theme::Full(self.0) }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {

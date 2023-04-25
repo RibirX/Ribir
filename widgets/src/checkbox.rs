@@ -50,6 +50,8 @@ pub enum CheckboxTemplate {
 
 impl ComposeDecorator for CheckBoxDecorator {
   type Host = Widget;
+
+  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
 impl Checkbox {
@@ -131,13 +133,12 @@ impl ComposeChild for Checkbox {
   }
 }
 
-pub fn add_to_system_theme(theme: &mut SystemTheme) {
-  theme.set_custom_style(CheckBoxStyle {
+pub fn add_to_theme(theme: &mut FullTheme) {
+  theme.custom_styles.set_custom_style(CheckBoxStyle {
     icon_size: Size::splat(24.),
-    label_style: theme.typography_theme().body_large.text.clone(),
-    label_color: theme.palette().on_surface().into(),
+    label_style: theme.typography_theme.body_large.text.clone(),
+    label_color: theme.palette.on_surface().into(),
   });
-  theme.set_compose_decorator::<CheckBoxDecorator>(|_, host| host);
 }
 
 impl CustomStyle for CheckBoxStyle {}
@@ -150,13 +151,13 @@ mod tests {
   #[test]
   fn layout() {
     let w = widget! { Checkbox {} };
-    let mut system_theme = SystemTheme::new(FullTheme::default());
-    super::add_to_system_theme(&mut system_theme);
+    let mut theme = FullTheme::default();
+    super::add_to_theme(&mut theme);
 
     expect_layout_result_with_theme(
       w,
       None,
-      system_theme.theme(),
+      Theme::Full(theme),
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect {
