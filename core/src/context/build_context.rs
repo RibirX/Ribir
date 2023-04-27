@@ -68,11 +68,15 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     let themes: Stateful<Vec<Rc<Theme>>> = Stateful::new(vec![]);
+    let mut light_palette = Palette::default();
+    light_palette.brightness = Brightness::Light;
+    let mut dark_palette = Palette::default();
+    dark_palette.brightness = Brightness::Dark;
     let light_dark = widget! {
       states { themes: themes.clone() }
       ThemeWidget {
         theme: Rc::new(Theme::Inherit(InheritTheme {
-          brightness: Some(Brightness::Light),
+          palette: Some(Rc::new(light_palette)),
           ..<_>::default()
 
         })),
@@ -80,7 +84,7 @@ mod tests {
           size: INFINITY_SIZE,
           ThemeWidget {
             theme: Rc::new(Theme::Inherit(InheritTheme {
-              brightness: Some(Brightness::Dark),
+              palette: Some(Rc::new(dark_palette)),
               ..<_>::default()
             })),
             MockBox {
@@ -102,8 +106,8 @@ mod tests {
     let themes = themes.state_ref();
     assert_eq!(themes.borrow().len(), 3);
     let mut iter = themes.borrow().iter().filter_map(|t| match t.deref() {
-      Theme::Full(t) => Some(t.brightness),
-      Theme::Inherit(i) => i.brightness,
+      Theme::Full(t) => Some(t.palette.brightness),
+      Theme::Inherit(i) => i.palette.as_ref().map(|palette| palette.brightness),
     });
 
     assert_eq!(iter.next(), Some(Brightness::Light));
