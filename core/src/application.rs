@@ -20,11 +20,12 @@ pub struct Application {
 impl Application {
   #[inline]
   pub fn new(theme: FullTheme) -> Self {
-    // todo: theme can provide fonts to load.
+    let app_theme = Rc::new(Theme::Full(theme));
     let ctx = AppContext {
-      app_theme: Rc::new(Theme::Full(theme)),
+      app_theme: app_theme.clone(),
       ..Default::default()
     };
+    ctx.load_font_from_theme(app_theme);
 
     let _ = NEW_TIMER_FN.set(new_timer);
     Self { ctx, ..Default::default() }
@@ -32,7 +33,9 @@ impl Application {
 
   #[inline]
   pub fn with_theme(mut self, theme: FullTheme) -> Application {
-    self.ctx.app_theme = Rc::new(Theme::Full(theme));
+    let app_theme = Rc::new(Theme::Full(theme));
+    self.ctx.app_theme = app_theme.clone();
+    self.ctx.load_font_from_theme(app_theme);
     self
   }
 

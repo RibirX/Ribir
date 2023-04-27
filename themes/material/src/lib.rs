@@ -32,6 +32,11 @@ fn new(palette: Palette) -> FullTheme {
     transitions_theme: TransitionTheme::default(),
     compose_decorators: <_>::default(),
     custom_styles: <_>::default(),
+    font_bytes: Some(vec![
+      include_bytes!("./fonts/Roboto-Regular.ttf").to_vec(),
+      include_bytes!("./fonts/Roboto-Medium.ttf").to_vec(),
+    ]),
+    font_files: None,
   };
 
   fill_svgs! { theme.icon_theme,
