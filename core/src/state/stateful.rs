@@ -387,16 +387,14 @@ impl StateChangeNotifier {
 
 #[cfg(test)]
 mod tests {
-  use std::cell::RefCell;
-
   use super::*;
-  use crate::test::*;
+  use std::cell::RefCell;
 
   #[test]
   fn smoke() {
-    // Simulate `MockBox` widget need modify its size in event callback. Can use the
-    // `cell_ref` in closure.
-    let stateful = Stateful::new(MockBox { size: Size::zero() });
+    // Simulate `Container` widget need modify its size in event callback. Can use
+    // the `cell_ref` in closure.
+    let stateful = Stateful::new(Container { size: Size::zero() });
     {
       stateful.state_ref().size = Size::new(100., 100.)
     }
@@ -409,7 +407,7 @@ mod tests {
     let notified_count = Rc::new(RefCell::new(0));
     let cnc = notified_count.clone();
 
-    let sized_box = Stateful::new(MockBox { size: Size::new(100., 100.) });
+    let sized_box = Stateful::new(Container { size: Size::new(100., 100.) });
     sized_box
       .modifies()
       .subscribe(move |_| *cnc.borrow_mut() += 1);
@@ -439,7 +437,7 @@ mod tests {
 
   #[test]
   fn fix_pin_widget_node() {
-    let mut wnd = Window::default_mock(widget! { MockBox { size: Size::new(100., 100.) } }, None);
+    let mut wnd = Window::default_mock(widget! { Container { size: Size::new(100., 100.) } }, None);
     wnd.draw_frame();
     let tree = &wnd.widget_tree;
     assert_eq!(tree.content_widget_id().descendants(&tree.arena).count(), 1);
@@ -449,7 +447,7 @@ mod tests {
   fn change_notify() {
     let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
-    let w = Stateful::new(MockBox { size: Size::zero() });
+    let w = Stateful::new(Container { size: Size::zero() });
     w.raw_modifies()
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 

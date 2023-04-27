@@ -53,7 +53,6 @@ impl std::ops::DerefMut for CharEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
 
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
@@ -64,7 +63,7 @@ mod tests {
     let c_receive = receive.clone();
 
     let widget = widget! {
-      MockBox {
+      Container {
         size: ZERO_SIZE,
         auto_focus: true,
         on_char: move |key| c_receive.borrow_mut().push(key.char)

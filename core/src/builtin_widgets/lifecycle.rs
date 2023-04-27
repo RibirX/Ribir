@@ -175,11 +175,7 @@ impl Default for LifecycleSubject {
 mod tests {
   use std::collections::HashSet;
 
-  use crate::{
-    prelude::*,
-    test::{MockBox, MockMulti},
-    widget_tree::WidgetTree,
-  };
+  use crate::{prelude::*, test::MockMulti, widget_tree::WidgetTree};
 
   #[test]
   fn full_lifecycle() {
@@ -191,13 +187,13 @@ mod tests {
         trigger: trigger.clone(),
         lifecycle: lifecycle.clone()
       }
-      MockBox {
+      Container {
         size: Size::zero(),
         on_mounted: move |_| lifecycle.silent().push("static mounted"),
         on_performed_layout: move |_| lifecycle.silent().push("static performed layout"),
         on_disposed: move |_| lifecycle.silent().push("static disposed"),
         widget::then(*trigger, || widget! {
-          MockBox {
+          Container {
             size: Size::zero(),
             on_mounted: move |_| lifecycle.silent().push("dyn mounted"),
             on_performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
@@ -254,7 +250,7 @@ mod tests {
       MockMulti {
         DynWidget {
           dyns: (0..*cnt).map(move |_| widget! {
-            MockBox {
+            Container {
               size: Size::zero(),
               on_mounted: move |ctx| {
                 mounted.insert(ctx.id);

@@ -97,14 +97,14 @@ mod tests {
   #[test]
   fn tree_down_up() {
     let row_tree = widget! {
-      MockBox {
+      Container {
         size: Size::new(f32::INFINITY, f32::INFINITY),
         cursor: CursorIcon::AllScroll,
         MockMulti{
-          MockBox {
+          Container {
             size: Size::new(200., 200.),
             cursor: CursorIcon::Hand,
-            MockBox {
+            Container {
               size:  Size::new(100., 100.),
               cursor: CursorIcon::Help,
             }

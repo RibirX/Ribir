@@ -260,7 +260,7 @@ impl Widget {
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::test::{layout_size_by_path, MockBox, MockMulti};
+  use crate::test::{layout_size_by_path, MockMulti};
 
   use super::*;
   use ribir_painter::{font_db::FontDB, shaper::TextShaper};
@@ -293,7 +293,7 @@ mod tests {
                     depth: this.depth - 1,
                   }.into_widget()
                 } else {
-                  MockBox { size: Size::new(10., 10.)}.into_widget()
+                  Container { size: Size::new(10., 10.)}.into_widget()
                 }
               })
           }
@@ -317,7 +317,7 @@ mod tests {
           DynWidget {
             dyns: (0..this.width - 1)
               .map(move |_| {
-                MockBox { size: Size::new(10., 10.)}
+                Container { size: Size::new(10., 10.)}
               })
           }
           DynWidget {
@@ -327,7 +327,7 @@ mod tests {
                 depth: this.depth - 1,
               }.into_widget()
             } else {
-              MockBox { size: Size::new(10., 10.)}.into_widget()
+              Container { size: Size::new(10., 10.)}.into_widget()
             }
           }
         }
@@ -368,9 +368,9 @@ mod tests {
     let no_boundary_size = Stateful::new(INFINITY_SIZE);
     let w = widget! {
       states { size: no_boundary_size.clone() }
-      MockBox {
+      Container {
         size: expect_size,
-        MockBox { size: *size }
+        Container { size: *size }
       }
     }
     .into_widget();
@@ -379,7 +379,7 @@ mod tests {
     let size = layout_size_by_path(&wnd, &[0, 0]);
     assert_eq!(size, expect_size);
 
-    // when relayout the inner `MockBox`, its clamp should same with its previous
+    // when relayout the inner `Container`, its clamp should same with its previous
     // layout, and clamp its size.
     {
       *no_boundary_size.state_ref() = INFINITY_SIZE;
@@ -396,7 +396,7 @@ mod tests {
     let w = widget! {
       states { parent: parent.clone(), child: child.clone() }
       widget::then(*parent, || widget!{
-        MockBox {
+        Container {
           size: Size::zero(),
           widget::then(*child, || Void)
         }
@@ -524,9 +524,9 @@ mod tests {
       MockMulti {
         DynWidget {
           dyns: (0..3).map(move |_| if *trigger > 0 {
-            MockBox { size: Size::new(1., 1.)}
+            Container { size: Size::new(1., 1.)}
           } else {
-            MockBox { size: Size::zero()}
+            Container { size: Size::zero()}
           })
         }
       }
@@ -559,7 +559,7 @@ mod tests {
        MockMulti {
         DynWidget {
           dyns: (0..100).map(|_|
-            widget! { MockBox {
+            widget! { Container {
              size: Size::new(150., 50.),
              background: Color::BLUE,
           }})
@@ -578,7 +578,7 @@ mod tests {
        MockMulti {
         DynWidget {
           dyns: (0..1).map(|_|
-            widget! { MockBox {
+            widget! { Container {
              size: Size::new(150., 50.),
              background: Color::BLUE,
           }})

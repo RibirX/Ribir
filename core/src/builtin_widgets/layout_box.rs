@@ -69,9 +69,9 @@ mod tests {
          MockMulti {
           LayoutBox {
             id: layout_box,
-            MockBox { size: Size::new(100., 200.) }
+            Container { size: Size::new(100., 200.) }
           }
-          MockBox { size: layout_box.rect.size }
+          Container { size: layout_box.rect.size }
         }
       },
       None,

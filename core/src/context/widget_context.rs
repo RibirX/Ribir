@@ -199,14 +199,14 @@ impl<'a> LifeCycleCtx<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::*, test::MockBox, widget::WidgetTree};
+  use crate::{prelude::*, widget::WidgetTree};
 
   define_widget_context!(TestCtx);
 
   #[test]
   fn map_self_eq_self() {
     let w = widget! {
-      MockBox {
+      Container {
         size: Size::zero(),
         margin: EdgeInsets::all(2.),
       }
@@ -227,9 +227,9 @@ mod tests {
   #[test]
   fn map_transform_test() {
     let w = widget! {
-      MockBox {
+      Container {
         size: Size::new(100., 100.),
-        MockBox {
+        Container {
           transform: Transform::scale(0.5, 0.5),
           left_anchor: 30.,
           top_anchor: 30.,

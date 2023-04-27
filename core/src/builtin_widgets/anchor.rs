@@ -155,7 +155,7 @@ mod test {
   fn pixel_left_top() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           left_anchor: 1.,
           top_anchor: 1.,
@@ -179,7 +179,7 @@ mod test {
   fn pixel_left_bottom() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           left_anchor: 1.,
           bottom_anchor: 1.,
@@ -203,7 +203,7 @@ mod test {
   fn pixel_top_right() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           right_anchor: 1.,
           top_anchor: 1.,
@@ -227,7 +227,7 @@ mod test {
   fn pixel_bottom_right() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           right_anchor: 1.,
           bottom_anchor: 1.,
@@ -251,7 +251,7 @@ mod test {
   fn percent_left_top() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           left_anchor: Percent(10.),
           top_anchor: Percent(10.),
@@ -275,7 +275,7 @@ mod test {
   fn percent_left_bottom() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           left_anchor: Percent( 10.),
           bottom_anchor: Percent( 10.),
@@ -299,7 +299,7 @@ mod test {
   fn percent_top_right() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           right_anchor: Percent(10.),
           top_anchor: Percent(10.),
@@ -323,7 +323,7 @@ mod test {
   fn percent_bottom_right() {
     expect_layout_result(
       widget! {
-        MockBox {
+        Container {
           size: CHILD_SIZE,
           right_anchor: Percent(10.),
           bottom_anchor: Percent(10.),

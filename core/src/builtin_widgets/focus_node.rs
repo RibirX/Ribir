@@ -130,7 +130,6 @@ impl Query for RequestFocus {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
 
   #[test]
   fn dynamic_focus_node() {
@@ -148,7 +147,7 @@ mod tests {
       AutoFocusNode{
         AutoFocusNode{
           AutoFocusNode {
-            MockBox {
+            Container {
               size: Size::default(),
             }
           }

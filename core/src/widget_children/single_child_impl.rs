@@ -102,13 +102,11 @@ where
 
 #[cfg(test)]
 mod tests {
-  use crate::test::MockBox;
-
   use super::*;
 
   #[test]
   fn pair_with_child() {
-    let mock_box = MockBox { size: ZERO_SIZE };
+    let mock_box = Container { size: ZERO_SIZE };
     let _ = mock_box
       .clone()
       .with_child(mock_box.clone())

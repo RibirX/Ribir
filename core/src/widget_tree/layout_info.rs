@@ -435,7 +435,7 @@ mod tests {
     // Can't use layout info of dirty widget to detect if the ancestors path have
     // in relayout list. Because new widget insert by `DynWidget` not have layout
     // info, but its parent have.
-    let child_box = Stateful::new(MockBox { size: Size::zero() });
+    let child_box = Stateful::new(Container { size: Size::zero() });
     let root_layout_cnt = Stateful::new(0);
     let w = widget! {
       states {
@@ -446,7 +446,7 @@ mod tests {
         on_performed_layout: move |_| *root_layout_cnt += 1,
         DynWidget {
           dyns: if child_box.size.is_empty() {
-            MockBox { size: Size::new(1., 1.) }.into_widget()
+            Container { size: Size::new(1., 1.) }.into_widget()
           } else {
             child_box.clone_stateful().into_widget()
           }
@@ -475,13 +475,13 @@ mod tests {
         layout_order: layout_order.clone(),
         trigger: trigger.clone()
       }
-      MockBox {
+      Container {
         size: *trigger,
         on_performed_layout: move |_| layout_order.push(1),
-        MockBox {
+        Container {
           size: *trigger,
           on_performed_layout: move |_| layout_order.push(2),
-          MockBox {
+          Container {
             size: *trigger,
             on_performed_layout: move |_| layout_order.push(3),
           }
@@ -507,9 +507,9 @@ mod tests {
       OffsetBox {
         size: Size::new(100., 100.),
         offset: Point::new(50., 50.),
-        MockBox {
+        Container {
           size: Size::new(50., 50.),
-          MockBox {
+          Container {
             size: *trigger,
           }
         }
@@ -538,10 +538,10 @@ mod tests {
     let w = widget! {
       states {trigger: trigger.clone()}
       init { let cnt = cnt2; }
-      MockBox {
+      Container {
         size: Size::new(50., 50.),
         on_performed_layout: move |_| *cnt.borrow_mut() += 1,
-        MockBox {
+        Container {
           size: *trigger,
         }
       }
@@ -594,7 +594,7 @@ mod tests {
         let pos = pos2.clone();
       }
       MockMulti {
-        MockBox{
+        Container{
           size: Size::new(50., 50.),
         }
         MockWidget {

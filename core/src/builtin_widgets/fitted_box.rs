@@ -105,7 +105,7 @@ mod tests {
       let w = widget! {
         DynWidget {
           dyns: fit,
-          MockBox { size }
+          Container { size }
         }
       };
 
@@ -170,7 +170,7 @@ mod tests {
   #[test]
   fn as_builtin_field() {
     let w = widget! {
-      MockBox {
+      Container {
         size: Size::new(200., 200.),
         box_fit: BoxFit::Fill,
       }

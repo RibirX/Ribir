@@ -538,8 +538,8 @@ mod tests {
     let size = Size::zero();
     let widget = widget! {
       MockMulti  {
-        MockBox { size, auto_focus: true, }
-        MockBox { size, auto_focus: true, }
+        Container { size, auto_focus: true, }
+        Container { size, auto_focus: true, }
       }
     };
 
@@ -557,8 +557,8 @@ mod tests {
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
-        MockBox { size }
-        MockBox { size, auto_focus: true}
+        Container { size }
+        Container { size, auto_focus: true}
       }
     };
 
@@ -578,12 +578,12 @@ mod tests {
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
-        MockBox { size, tab_index: -1, }
-        MockBox { size, tab_index: 0, }
-        MockBox { size, tab_index: 1, auto_focus: true}
-        MockBox { size, tab_index: 2, }
-        MockMulti { tab_index: 4, MockBox { size, tab_index: 3, } }
-        MockBox { size, tab_index: 0 }
+        Container { size, tab_index: -1, }
+        Container { size, tab_index: 0, }
+        Container { size, tab_index: 1, auto_focus: true}
+        Container { size, tab_index: 2, }
+        MockMulti { tab_index: 4, Container { size, tab_index: 3, } }
+        Container { size, tab_index: 0 }
       }
     };
 
@@ -643,13 +643,13 @@ mod tests {
       fn compose(this: State<Self>) -> Widget {
         widget! {
           states { this: this.into_writable() }
-          MockBox {
+          Container {
             size: INFINITY_SIZE,
             on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },
             on_blur: move |_| { this.log.borrow_mut().push("blur parent"); },
             on_focus_in: move |_| { this.log.borrow_mut().push("focusin parent"); },
             on_focus_out: move |_| { this.log.borrow_mut().push("focusout parent"); },
-            MockBox {
+            Container {
               size: Size::zero(),
               on_focus: move |_| { this.log.borrow_mut().push("focus child"); },
               on_blur: move |_| { this.log.borrow_mut().push("blur child"); },
@@ -697,7 +697,7 @@ mod tests {
       states { visible: visible.clone_stateful() }
       MockMulti{
         Option::map(*visible, |_| widget!{
-          MockBox {
+          Container {
             size: Size::default(),
             on_tap: move |_| {},
           }

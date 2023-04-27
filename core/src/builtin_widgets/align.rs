@@ -171,7 +171,7 @@ mod tests {
       let w = widget! {
         HAlignWidget {
           h_align,
-          MockBox { size: CHILD_SIZE }
+          Container { size: CHILD_SIZE }
         }
       };
 
@@ -206,7 +206,7 @@ mod tests {
       let w = widget! {
         VAlignWidget {
           v_align,
-          MockBox { size: CHILD_SIZE }
+          Container { size: CHILD_SIZE }
         }
       };
 

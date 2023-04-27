@@ -137,11 +137,6 @@ impl Query for MockStack {
 #[derive(Declare, MultiChild)]
 pub struct MockMulti;
 
-#[derive(Declare, Clone, SingleChild)]
-pub struct MockBox {
-  pub size: Size,
-}
-
 impl Render for MockMulti {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let mut layouter = ctx.first_child_layouter();
@@ -159,29 +154,9 @@ impl Render for MockMulti {
 
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-impl Render for MockBox {
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    clamp.max = clamp.max.min(self.size);
-    ctx.perform_single_child_layout(clamp);
-
-    self.size
-  }
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-}
-
 impl Query for MockMulti {
   impl_query_self_only!();
 }
-
-impl Query for MockBox {
-  impl_query_self_only!();
-}
-
 impl Window {
   #[inline]
   pub fn widget_count(&self) -> usize {

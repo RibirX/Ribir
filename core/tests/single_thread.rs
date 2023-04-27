@@ -6,13 +6,13 @@ mod test_single_thread {
 
   use ribir_core::{
     prelude::*,
-    test::{assert_layout_result, ExpectRect, MockBox},
+    test::{assert_layout_result, ExpectRect},
     timer::wake_timeout_futures,
   };
 
   pub fn test_widget_with_timer() {
     let w = widget! {
-      MockBox {
+      Container {
         id: c,
         size: Size::new(20., 20.)
       }
@@ -47,7 +47,7 @@ mod test_single_thread {
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
     let w = widget! {
-      MockBox {
+      Container {
         size,
         on_x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
       }

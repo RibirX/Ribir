@@ -541,7 +541,7 @@ mod tests {
     let w = widget! {
       states { size: size.clone() }
       DynWidget {
-        dyns: MockBox { size: *size },
+        dyns: Container { size: *size },
         Void {}
       }
     };
@@ -569,10 +569,10 @@ mod tests {
     let size = Stateful::new(Size::zero());
     let w = widget! {
       states { size: size.clone() }
-      MockBox {
+      Container {
         size: Size::zero(),
         DynWidget {
-          dyns: MockBox { size: *size },
+          dyns: Container { size: *size },
           Void {}
         }
       }
@@ -612,7 +612,7 @@ mod tests {
         dyns: {
           v.clone().into_iter().map(move |_| {
             widget! {
-              MockBox{
+              Container{
                 size: Size::zero(),
                 on_mounted: move |_| *new_cnt += 1,
                 on_disposed: move |_| *drop_cnt += 1
@@ -668,7 +668,7 @@ mod tests {
                   key: Key::from(i),
                   value: Some(c),
 
-                  MockBox {
+                  Container {
                     size: Size::zero(),
                     on_mounted: move |_| {
                       if key.is_enter() {
@@ -939,7 +939,7 @@ mod tests {
         MockMulti {
           delay_drop_until: *child_destroy_until,
           Option::map(grandson.as_ref(), move|_| widget! {
-            MockBox {
+            Container {
               delay_drop_until: *grandson_destroy_until,
               size: Size::zero(),
             }

@@ -1,7 +1,7 @@
 use crate::{impl_query_self_only, prelude::*};
 
 /// Widget with fixed size as a container for its child.
-#[derive(Declare, SingleChild)]
+#[derive(Declare, SingleChild, Clone)]
 pub struct Container {
   pub size: Size,
 }

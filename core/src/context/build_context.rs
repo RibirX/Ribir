@@ -44,7 +44,6 @@ impl<'a> BuildCtx<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
   use std::borrow::Borrow;
   use std::{cell::RefCell, rc::Rc};
 
@@ -87,14 +86,14 @@ mod tests {
           ..<_>::default()
 
         })),
-        MockBox {
+        Container {
           size: INFINITY_SIZE,
           ThemeWidget {
             theme: Rc::new(Theme::Inherit(InheritTheme {
               palette: Some(Rc::new(dark_palette)),
               ..<_>::default()
             })),
-            MockBox {
+            Container {
               size: ZERO_SIZE,
               DynWidget {
                 dyns: move |ctx: &BuildCtx| {

@@ -71,7 +71,6 @@ impl std::ops::DerefMut for KeyboardEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, KeyboardInput, WindowEvent};
 
@@ -98,7 +97,7 @@ mod tests {
       fn compose(this: State<Self>) -> Widget {
         widget! {
           states { this: this.into_writable() }
-          MockBox {
+          Container {
             size: Size::zero(),
             auto_focus: true,
             on_key_down: move |key| {

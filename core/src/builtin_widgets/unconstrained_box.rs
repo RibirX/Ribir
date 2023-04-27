@@ -55,15 +55,15 @@ mod tests {
     let w = widget! {
       MockMulti {
         UnconstrainedBox {
-          MockBox { size}
+          Container { size}
         }
         UnconstrainedBox {
           dir: UnconstrainedDir::X,
-          MockBox { size }
+          Container { size }
         }
         UnconstrainedBox {
           dir: UnconstrainedDir::Y,
-          MockBox { size }
+          Container { size }
         }
       }
     };

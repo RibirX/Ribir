@@ -242,7 +242,7 @@ mod tests {
   use std::{cell::Cell, rc::Rc};
 
   use super::*;
-  use crate::{prelude::*, test::MockBox};
+  use crate::prelude::*;
   #[derive(Template)]
   struct PTml {
     #[template(flat_fill)]
@@ -275,7 +275,7 @@ mod tests {
 
   #[test]
   fn pair_compose_child() {
-    let _ = MockBox { size: ZERO_SIZE }
+    let _ = Container { size: ZERO_SIZE }
       .with_child(X)
       .with_child(Void {})
       .into_widget();
@@ -287,7 +287,7 @@ mod tests {
     let _ = widget! {
       DynWidget {
         dyns: match flag {
-          true => WidgetE2::A(MockBox{ size: ZERO_SIZE }.with_child(X)),
+          true => WidgetE2::A(Container{ size: ZERO_SIZE }.with_child(X)),
           false => WidgetE2::B(X),
         },
         X { Void {} }
@@ -311,7 +311,7 @@ mod tests {
         child.decorate(|_, _| Void.into_widget())
       }
     }
-    let mb = MockBox { size: Size::zero() };
+    let mb = Container { size: Size::zero() };
     let _: Widget = WithDecorate
       .with_child(mb.clone().with_child(mb.with_child(Tml.with_child(A))))
       .into_widget();
@@ -333,7 +333,7 @@ mod tests {
     }
 
     let _ = WithDecorate.with_child(Tml.with_child(A)).into_widget();
-    let mb = MockBox { size: Size::zero() };
+    let mb = Container { size: Size::zero() };
     let _ = WithDecorate.with_child(mb.clone().with_child(Tml.with_child(A)));
     let cursor = Cursor {
       cursor: Rc::new(Cell::new(CursorIcon::Hand)),

@@ -252,7 +252,7 @@ mod tests {
   fn layout() {
     const SIZE: Size = Size::new(100., 100.);
     let w = widget! {
-      MockBox {
+      Container {
         size: SIZE,
         border: Border {
           left: BorderSide::new(1., Color::BLACK.into()),

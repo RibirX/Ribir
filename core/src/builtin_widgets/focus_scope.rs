@@ -66,17 +66,17 @@ mod tests {
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
-        MockBox { size, tab_index: 0, auto_focus: true }
+        Container { size, tab_index: 0, auto_focus: true }
         FocusScope {
           skip_descendants: false,
           tab_index: 3,
           MockMulti {
-            MockBox { size, tab_index: 1, }
-            MockBox { size, tab_index: 2, }
-            MockBox { size, tab_index: 3, }
+            Container { size, tab_index: 1, }
+            Container { size, tab_index: 2, }
+            Container { size, tab_index: 3, }
           }
         }
-        MockBox { size, tab_index: 1 }
+        Container { size, tab_index: 1 }
       }
     };
 
@@ -126,18 +126,18 @@ mod tests {
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
-        MockBox { size, tab_index: 0, auto_focus: true }
+        Container { size, tab_index: 0, auto_focus: true }
         FocusScope {
           can_focus: true,
           skip_descendants: true,
           tab_index: 3,
           MockMulti {
-            MockBox { size, tab_index: 1, }
-            MockBox { size, tab_index: 2, }
-            MockBox { size, tab_index: 3, }
+            Container { size, tab_index: 1, }
+            Container { size, tab_index: 2, }
+            Container { size, tab_index: 3, }
           }
         }
-        MockBox { size, tab_index: 1 }
+        Container { size, tab_index: 1 }
       }
     };
 

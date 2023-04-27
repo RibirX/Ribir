@@ -89,7 +89,7 @@ mod tests {
       .compose_decorators
       .override_compose_decorator::<Size100Style>(|_, host| {
         widget! {
-          MockBox {
+          Container {
             size: Size::new(100., 100.),
             DynWidget { dyns: host }
           }
@@ -98,7 +98,7 @@ mod tests {
       });
 
     let w = widget! {
-      Size100Style { MockBox {
+      Size100Style { Container {
         size: Size::zero(),
       }}
     };

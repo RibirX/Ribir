@@ -397,7 +397,7 @@ mod tests {
   #[test]
   fn layout_after_wnd_resize() {
     let w = widget! {
-       MockBox { size: INFINITY_SIZE }
+       Container { size: INFINITY_SIZE }
     };
     let mut wnd = Window::mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();

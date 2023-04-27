@@ -134,7 +134,7 @@ mod tests {
   #[test]
   fn smoke() {
     let widget = widget! {
-      MockBox {
+      Container {
         margin: EdgeInsets::symmetrical(1., 1.),
         size: Size::new(100., 100.)
       }

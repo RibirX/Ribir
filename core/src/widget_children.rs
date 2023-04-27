@@ -123,7 +123,7 @@ mod tests {
   fn compose_option_dyn_parent() {
     widget! {
       DynWidget {
-        dyns: widget::then(true, || MockBox { size: Size::zero() }),
+        dyns: widget::then(true, || Container { size: Size::zero() }),
         Void {}
       }
     };
@@ -159,20 +159,20 @@ mod tests {
       states { size: size.clone() }
       DynWidget {
         dyns: if size.area() > 0. {
-           MockBox { size: *size }
+           Container { size: *size }
         } else {
-          MockBox { size: Size::new(1., 1.) }
+          Container { size: Size::new(1., 1.) }
         },
-        MockBox { size: *size }
+        Container { size: *size }
       }
     };
     // with multi child
     let _e = widget! {
       DynWidget {
         dyns: MockMulti {},
-        MockBox { size: Size::zero() }
-        MockBox { size: Size::zero() }
-        MockBox { size: Size::zero() }
+        Container { size: Size::zero() }
+        Container { size: Size::zero() }
+        Container { size: Size::zero() }
       }
     };
 
@@ -180,8 +180,8 @@ mod tests {
     let _e = widget! {
       states { size: size.clone() }
       DynWidget {
-        dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
-        MockBox { size: Size::zero() }
+        dyns: widget::then(size.area() > 0., || Container { size: Size::zero() }),
+        Container { size: Size::zero() }
       }
     };
 
@@ -189,7 +189,7 @@ mod tests {
     let _e = widget! {
       states { size: size }
       DynWidget {
-        dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
+        dyns: widget::then(size.area() > 0., || Container { size: Size::zero() }),
         DynWidget { dyns: Void.into_widget() }
       }
     };
@@ -198,9 +198,9 @@ mod tests {
   #[test]
   fn compose_const_dyn_option_widget() {
     let _ = widget! {
-      MockBox {
+      Container {
         size: ZERO_SIZE,
-        widget::then(true, || MockBox { size: Size::zero() })
+        widget::then(true, || Container { size: Size::zero() })
       }
     };
   }
@@ -211,12 +211,12 @@ mod tests {
     struct P;
 
     impl ComposeChild for P {
-      type Child = WidgetOf<MockBox>;
+      type Child = WidgetOf<Container>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { unreachable!() }
     }
 
     let _ = widget! {
-      P { MockBox { Void {} } }
+      P { Container { Void {} } }
     };
   }
 
@@ -224,11 +224,11 @@ mod tests {
   fn fix_multi_fill_for_pair() {
     struct X;
     impl ComposeChild for X {
-      type Child = WidgetOf<MockBox>;
+      type Child = WidgetOf<Container>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
     }
 
-    let child = MockBox { size: ZERO_SIZE }.with_child(Void.into_widget());
+    let child = Container { size: ZERO_SIZE }.with_child(Void.into_widget());
     X.with_child(child);
   }
 
@@ -238,14 +238,14 @@ mod tests {
     struct X;
 
     impl ComposeChild for X {
-      type Child = MockBox;
+      type Child = Container;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
     let dyns = Stateful::new(DynWidget { dyns: Some(X), stop_refresh: false });
     let size = Size::new(100., 200.);
 
-    let w = ComposeChild::compose_child(State::<X>::from(dyns), MockBox { size });
+    let w = ComposeChild::compose_child(State::<X>::from(dyns), Container { size });
     expect_layout_result(
       w,
       None,
@@ -262,7 +262,7 @@ mod tests {
     struct X;
 
     impl ComposeChild for X {
-      type Child = State<MockBox>;
+      type Child = State<Container>;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
@@ -273,9 +273,9 @@ mod tests {
       X {
         DynWidget {
           dyns: if *trigger {
-            MockBox { size }
+            Container { size }
           } else {
-            MockBox { size: ZERO_SIZE }
+            Container { size: ZERO_SIZE }
           }
         }
       }
@@ -305,7 +305,7 @@ mod tests {
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
-        widget! { MockBox { size: EXPECT_SIZE } }.into_widget()
+        widget! { Container { size: EXPECT_SIZE } }.into_widget()
       }
     }
 

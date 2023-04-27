@@ -69,7 +69,7 @@ mod tests {
     let widget = widget! {
       MockMulti {
         padding: EdgeInsets::only_left(1.),
-        MockBox {
+        Container {
            size: Size::new(100., 100.),
         }
       }
@@ -96,7 +96,7 @@ mod tests {
             ..Default::default()
           },
         },
-        // MockBox
+        // Container
         LayoutTestItem {
           path: &[0, 0, 0],
           expect: ExpectRect {

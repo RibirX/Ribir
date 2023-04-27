@@ -68,6 +68,7 @@ impl Render for Stack {
 impl Query for Stack {
   impl_query_self_only!();
 }
+
 #[cfg(test)]
 mod tests {
   use crate::test::*;
@@ -79,8 +80,8 @@ mod tests {
     let five = Size::new(5., 5.);
     let w = widget! {
       Stack {
-        MockBox { size: one}
-        MockBox { size: five}
+        Container { size: one}
+        Container { size: five}
       }
     };
 

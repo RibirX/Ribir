@@ -27,7 +27,6 @@ impl Query for ConstrainedBox {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::*;
   use ribir_core::test::*;
 
   #[test]

@@ -49,7 +49,7 @@ mod tests {
     let widget = widget! {
       TransformWidget {
         transform: Transform::new(2., 0., 0., 2., 0., 0.),
-        MockBox {
+        Container {
           size: Size::new(100., 100.)
         }
       }

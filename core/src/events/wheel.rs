@@ -53,7 +53,6 @@ impl std::ops::DerefMut for WheelEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::MockBox;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
@@ -63,7 +62,7 @@ mod tests {
     let c_receive = receive.clone();
 
     let widget = widget! {
-      MockBox {
+      Container {
         size: Size::new(100., 100.),
         auto_focus: true,
         on_wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)

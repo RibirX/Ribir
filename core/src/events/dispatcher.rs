@@ -427,7 +427,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } }.into_widget(),
+      widget! { Container { size: Size::new(100., 30.) } }.into_widget(),
     );
     let root = record_pointer(
       event_record.clone(),
@@ -468,7 +468,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } }.into_widget(),
+      widget! { Container { size: Size::new(100., 30.) } }.into_widget(),
     );
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
@@ -526,7 +526,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } }.into_widget(),
+      widget! { Container { size: Size::new(100., 30.) } }.into_widget(),
     );
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();
@@ -591,11 +591,11 @@ mod tests {
       fn compose(this: State<Self>) -> Widget {
         widget! {
           states { this: this.into_writable() }
-          MockBox {
+          Container {
             size: INFINITY_SIZE,
             on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
 
-            MockBox {
+            Container {
               size: Size::new(100., 30.),
               on_pointer_down: move |e| {
                 this.0.borrow_mut().push(e.clone());
@@ -636,11 +636,11 @@ mod tests {
       fn compose(this: State<Self>) -> Widget {
         widget! {
           states { this: this.into_writable() }
-          MockBox {
+          Container {
             size: INFINITY_SIZE,
             on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
             on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
-            MockBox {
+            Container {
               margin: EdgeInsets::all(4.),
               size: INFINITY_SIZE,
               on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
@@ -713,11 +713,11 @@ mod tests {
       states { click_path: click_path.clone() }
       MockMulti {
         on_tap: move |_| *click_path += 1,
-        MockBox {
+        Container {
           size: Size::new(100., 100.),
           on_tap: move |_| *click_path += 1,
         }
-        MockBox { size: Size::new(100., 400.) }
+        Container { size: Size::new(100., 400.) }
       }
     };
 
@@ -785,11 +785,11 @@ mod tests {
   fn focus_change_by_event() {
     let w = widget! {
       MockMulti {
-        MockBox {
+        Container {
           size: Size::new(50., 50.),
           tab_index: 0
         }
-        MockBox {
+        Container {
           size: Size::new(50., 50.)
         }
       }
@@ -837,7 +837,7 @@ mod tests {
 
   #[test]
   fn fix_hit_out_window() {
-    let w = MockBox { size: INFINITY_SIZE };
+    let w = Container { size: INFINITY_SIZE };
     let mut wnd = Window::default_mock(w.into_widget(), None);
     wnd.draw_frame();
     wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
@@ -858,20 +858,20 @@ mod tests {
       let data2 = data.clone();
 
       let w = widget! {
-        MockBox {
+        Container {
           size: Size::new(200., 200.),
           MockStack {
             child_pos: vec![
               Point::new(50., 50.),
               Point::new(100., 100.),
             ],
-            MockBox {
+            Container {
               on_mounted: move |ctx| {
                 data1.borrow_mut().wid1 = Some(ctx.id);
               },
               size: Size::new(100., 100.),
             }
-            MockBox {
+            Container {
               on_mounted: move |ctx| {
                 data2.borrow_mut().wid2 = Some(ctx.id);
               },
