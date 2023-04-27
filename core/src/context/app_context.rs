@@ -4,7 +4,7 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use crate::builtin_widgets::Theme;
+use crate::builtin_widgets::{FullTheme, InheritTheme, Theme};
 
 use ::ribir_text::shaper::TextShaper;
 pub use futures::task::SpawnError;
@@ -49,6 +49,25 @@ impl AppContext {
     self.shaper.end_frame();
     self.reorder.end_frame();
     self.typography_store.end_frame();
+  }
+
+  pub(crate) fn load_font_from_theme(&self, theme: Rc<Theme>) {
+    let mut font_db = self.font_db.write().unwrap();
+    match &*theme {
+      Theme::Full(FullTheme { font_bytes, font_files, .. })
+      | Theme::Inherit(InheritTheme { font_bytes, font_files, .. }) => {
+        if let Some(font_bytes) = font_bytes {
+          font_bytes
+            .iter()
+            .for_each(|data| font_db.load_from_bytes(data.clone()));
+        }
+        if let Some(font_files) = font_files {
+          font_files.iter().for_each(|path| {
+            let _ = font_db.load_font_file(path);
+          });
+        }
+      }
+    }
   }
 }
 

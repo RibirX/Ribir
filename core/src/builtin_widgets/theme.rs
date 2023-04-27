@@ -51,6 +51,8 @@ pub struct FullTheme {
   pub transitions_theme: TransitionTheme,
   pub compose_decorators: ComposeDecorators,
   pub custom_styles: CustomStyles,
+  pub font_bytes: Option<Vec<Vec<u8>>>,
+  pub font_files: Option<Vec<String>>,
 }
 
 /// Inherit theme override part of parent theme, if anything not found in here,
@@ -66,6 +68,8 @@ pub struct InheritTheme {
   pub transitions_theme: Option<TransitionTheme>,
   pub compose_decorators: Option<ComposeDecorators>,
   pub custom_styles: Option<CustomStyles>,
+  pub font_bytes: Option<Vec<Vec<u8>>>,
+  pub font_files: Option<Vec<String>>,
 }
 
 pub enum Theme {
@@ -84,6 +88,7 @@ impl ComposeChild for ThemeWidget {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     widget! {
+      init ctx => { ctx.app_ctx().load_font_from_theme(this.theme.clone()); }
       states { this: this.into_readonly() }
       DynWidget {
         dyns: move |ctx: &BuildCtx| {
@@ -112,8 +117,8 @@ impl Default for FullTheme {
       huge: Size::new(64., 64.),
     };
 
-    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Inter Light"))]);
-    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Inter Black"))]);
+    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato Regular"))]);
+    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato Regular"))]);
 
     let typography_theme = typography_theme(
       regular_family,
@@ -129,6 +134,8 @@ impl Default for FullTheme {
       transitions_theme: Default::default(),
       compose_decorators: Default::default(),
       custom_styles: Default::default(),
+      font_bytes: None,
+      font_files: None,
     }
   }
 }

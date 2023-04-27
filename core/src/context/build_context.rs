@@ -35,6 +35,9 @@ impl<'a> BuildCtx<'a> {
     .ok()
   }
 
+  #[inline]
+  pub fn app_ctx(&self) -> &AppContext { &self.wnd_ctx.app_ctx }
+
   pub(crate) fn push_theme(&self, theme: Rc<Theme>) { self.themes.borrow_mut().push(theme); }
 }
 
@@ -68,10 +71,14 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     let themes: Stateful<Vec<Rc<Theme>>> = Stateful::new(vec![]);
-    let mut light_palette = Palette::default();
-    light_palette.brightness = Brightness::Light;
-    let mut dark_palette = Palette::default();
-    dark_palette.brightness = Brightness::Dark;
+    let light_palette = Palette {
+      brightness: Brightness::Light,
+      ..Default::default()
+    };
+    let dark_palette = Palette {
+      brightness: Brightness::Dark,
+      ..Default::default()
+    };
     let light_dark = widget! {
       states { themes: themes.clone() }
       ThemeWidget {
