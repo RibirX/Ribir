@@ -4,7 +4,7 @@ use ribir_painter::{Color, LightnessTone};
 
 use crate::prelude::BuildCtx;
 
-use super::Theme;
+use super::{Brightness, Theme};
 
 /// The palette enables you to modify the color of your application to suit
 /// your brand. `Palette` provide colors base on the 8 key colors with different
@@ -55,8 +55,14 @@ pub struct Palette {
   /// completion of an action that user triggered.
   pub success: Color,
 
-  /// Config the key color lightness policy
-  pub lightness_cfg: LightnessCfg,
+  /// Dark or light theme.
+  pub brightness: Brightness,
+
+  /// Config the key color light theme lightness policy
+  pub light: LightnessCfg,
+
+  /// Config the key color dark theme lightness policy
+  pub dark: LightnessCfg,
 }
 
 /// The four light tone to generate compatible colors group for color.
@@ -179,59 +185,63 @@ impl Palette {
   pub fn on_error_container(&self) -> Color { self.on_container_of(&self.error) }
 
   #[inline]
-  pub fn background(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.surface) }
+  pub fn background(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg().surface) }
 
   #[inline]
   pub fn on_background(&self) -> Color {
-    self.neutral.with_lightness(self.lightness_cfg.on_surface)
+    self.neutral.with_lightness(self.lightness_cfg().on_surface)
   }
 
   #[inline]
   pub fn surface(&self) -> Color { self.background() }
 
   #[inline]
-  pub fn surface_dim(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.surface_dim) }
+  pub fn surface_dim(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg().surface_dim)
+  }
 
   #[inline]
   pub fn surface_bright(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.surface_bright)
+      .with_lightness(self.lightness_cfg().surface_bright)
   }
 
   #[inline]
   pub fn surface_container_lowest(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.surface_container_lowest)
+      .with_lightness(self.lightness_cfg().surface_container_lowest)
   }
 
   #[inline]
   pub fn surface_container_low(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.surface_container_low)
+      .with_lightness(self.lightness_cfg().surface_container_low)
   }
 
   #[inline]
   pub fn surface_container(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.surface_container)
+      .with_lightness(self.lightness_cfg().surface_container)
   }
 
   #[inline]
   pub fn surface_container_high(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.surface_container_high)
+      .with_lightness(self.lightness_cfg().surface_container_high)
   }
 
   #[inline]
   pub fn surface_container_highest(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.surface_container_highest)
+      .with_lightness(self.lightness_cfg().surface_container_highest)
   }
 
   #[inline]
@@ -241,45 +251,45 @@ impl Palette {
   pub fn surface_variant(&self) -> Color {
     self
       .neutral_variant
-      .with_lightness(self.lightness_cfg.surface_variant)
+      .with_lightness(self.lightness_cfg().surface_variant)
   }
 
   #[inline]
   pub fn on_surface_variant(&self) -> Color {
     self
       .neutral_variant
-      .with_lightness(self.lightness_cfg.on_surface_variant)
+      .with_lightness(self.lightness_cfg().on_surface_variant)
   }
 
   #[inline]
   pub fn outline(&self) -> Color {
     self
       .neutral_variant
-      .with_lightness(self.lightness_cfg.outline)
+      .with_lightness(self.lightness_cfg().outline)
   }
 
   pub fn outline_variant(&self) -> Color {
     self
       .neutral_variant
-      .with_lightness(self.lightness_cfg.outline_variant)
+      .with_lightness(self.lightness_cfg().outline_variant)
   }
 
   #[inline]
   pub fn inverse_surface(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.inverse_surface)
+      .with_lightness(self.lightness_cfg().inverse_surface)
   }
 
   #[inline]
   pub fn inverse_on_surface(&self) -> Color {
     self
       .neutral
-      .with_lightness(self.lightness_cfg.inverse_on_surface)
+      .with_lightness(self.lightness_cfg().inverse_on_surface)
   }
 
   #[inline]
-  pub fn shadow(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg.shadow) }
+  pub fn shadow(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg().shadow) }
 
   #[inline]
   pub fn scrim(&self) -> Color { self.shadow() }
@@ -287,25 +297,33 @@ impl Palette {
   /// change color to the `base` light tone of the palette.
   #[inline]
   pub fn base_of(&self, color: &Color) -> Color {
-    color.with_lightness(self.lightness_cfg.color_group.base)
+    color.with_lightness(self.lightness_cfg().color_group.base)
   }
 
   /// change color to the `container` light tone of the palette.
   #[inline]
   pub fn container_of(&self, color: &Color) -> Color {
-    color.with_lightness(self.lightness_cfg.color_group.container)
+    color.with_lightness(self.lightness_cfg().color_group.container)
   }
 
   /// change color to the `on`  light tone of the palette.
   #[inline]
   pub fn on_of(&self, color: &Color) -> Color {
-    color.with_lightness(self.lightness_cfg.color_group.on)
+    color.with_lightness(self.lightness_cfg().color_group.on)
   }
 
   /// change color to the `on`  light tone of the palette.
   #[inline]
   pub fn on_container_of(&self, color: &Color) -> Color {
-    color.with_lightness(self.lightness_cfg.color_group.on_container)
+    color.with_lightness(self.lightness_cfg().color_group.on_container)
+  }
+
+  #[inline]
+  fn lightness_cfg(&self) -> &LightnessCfg {
+    match self.brightness {
+      Brightness::Dark => &self.dark,
+      Brightness::Light => &self.light,
+    }
   }
 }
 
@@ -390,7 +408,9 @@ impl Default for Palette {
       error: Color::from_u32(0xB3261EFF),
       warning: Color::from_u32(0xFFB74DFF),
       success: Color::from_u32(0x81C784FF),
-      lightness_cfg: LightnessCfg::light_theme_default(),
+      brightness: Brightness::Light,
+      light: LightnessCfg::light_theme_default(),
+      dark: LightnessCfg::dark_theme_default(),
     }
   }
 }

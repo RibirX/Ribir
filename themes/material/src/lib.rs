@@ -10,7 +10,7 @@ mod styles_sheet;
 pub use styles_sheet::*;
 
 /// Crate a material theme with palette.
-fn new(brightness: Brightness, palette: Palette) -> FullTheme {
+fn new(palette: Palette) -> FullTheme {
   let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed(
     "Roboto Regular",
   ))]);
@@ -26,7 +26,6 @@ fn new(brightness: Brightness, palette: Palette) -> FullTheme {
   );
 
   let mut theme = FullTheme {
-    brightness,
     palette: Rc::new(palette),
     typography_theme,
     icon_theme: icon_theme(),
@@ -352,7 +351,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 pub mod purple {
   use super::*;
 
-  fn palette(lightness_cfg: LightnessCfg) -> Palette {
+  fn palette(brightness: Brightness) -> Palette {
     Palette {
       primary: Color::from_u32(0x6750A4FF),
       secondary: Color::from_u32(0x625B71FF),
@@ -362,21 +361,17 @@ pub mod purple {
       error: Color::from_u32(0xB3261EFF),
       warning: Color::from_u32(0xFFB74DFF),
       success: Color::from_u32(0x81C784FF),
-      lightness_cfg,
+      brightness,
+      light: LightnessCfg::light_theme_default(),
+      dark: LightnessCfg::dark_theme_default(),
     }
   }
 
   /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-  pub fn light() -> FullTheme {
-    let palette = palette(LightnessCfg::light_theme_default());
-    new(Brightness::Light, palette)
-  }
+  pub fn light() -> FullTheme { new(palette(Brightness::Light)) }
 
   /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-  pub fn dark() -> FullTheme {
-    let palette = palette(LightnessCfg::dark_theme_default());
-    new(Brightness::Dark, palette)
-  }
+  pub fn dark() -> FullTheme { new(palette(Brightness::Dark)) }
 }
 
 fn icon_theme() -> IconTheme {

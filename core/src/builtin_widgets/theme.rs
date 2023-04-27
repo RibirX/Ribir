@@ -45,8 +45,6 @@ pub struct TextSelectedBackground {
 /// theme are overriding here, if anything that you can't find means it be
 /// override as undefine, should not continue find in parent theme.
 pub struct FullTheme {
-  // Dark or light theme.
-  pub brightness: Brightness,
   pub palette: Rc<Palette>,
   pub typography_theme: TypographyTheme,
   pub icon_theme: IconTheme,
@@ -59,7 +57,6 @@ pub struct FullTheme {
 /// should query in parent theme until meet a `FullTheme`.
 #[derive(Default)]
 pub struct InheritTheme {
-  pub brightness: Option<Brightness>,
   pub palette: Option<Rc<Palette>>,
   pub typography_theme: Option<TypographyTheme>,
   /// icon size standard
@@ -126,7 +123,6 @@ impl Default for FullTheme {
     );
 
     FullTheme {
-      brightness: Brightness::Light,
       palette: Default::default(),
       typography_theme,
       icon_theme: IconTheme::new(icon_size),
