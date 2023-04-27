@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{prelude::*, widget_tree::WidgetTree};
-use ::ribir_text::PIXELS_PER_EM;
+use ribir_text::PIXELS_PER_EM;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 use super::focus_mgr::FocusManager;
@@ -526,7 +526,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } },
+      widget! { MockBox { size: Size::new(100., 30.) } }.into_widget(),
     );
     let mut wnd = Window::default_mock(root, None);
     wnd.draw_frame();

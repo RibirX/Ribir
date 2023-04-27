@@ -1,5 +1,6 @@
 use crate::{
-  context::EventCtx,
+  context::{EventCtx, WindowCtx},
+  overlay_mgr::OverlayMgr,
   widget_tree::{WidgetId, WidgetTree},
 };
 use std::ptr::NonNull;
@@ -94,6 +95,10 @@ impl EventCommon {
       info: self.dispatch_info_mut(),
     }
   }
+
+  pub fn overlays_mgr(&self) -> &OverlayMgr { unsafe { &self.tree.as_ref().overlays } }
+
+  pub fn wnd_ctx(&self) -> &WindowCtx { unsafe { &self.tree.as_ref().wnd_ctx } }
 
   pub fn next_focus(&self) {
     let tree = unsafe { self.tree.as_ref() };

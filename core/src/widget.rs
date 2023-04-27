@@ -422,6 +422,20 @@ macro_rules! impl_proxy_render {
   };
 }
 
+impl<W: 'static + Query> Query for Option<W> {
+  fn query_all(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    order: QueryOrder,
+  ) {
+    match self {
+      Some(v) => v.query_all(type_id, callback, order),
+      None => (),
+    };
+  }
+}
+
 impl<W: Render + 'static> Render for RefCell<W> {
   impl_proxy_render!(borrow());
 }

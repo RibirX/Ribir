@@ -57,6 +57,7 @@ impl WindowCtx {
   pub(crate) fn begin_frame(&mut self) {
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
   }
+
   pub(crate) fn layout_ready(&mut self) {
     self
       .frame_ticker

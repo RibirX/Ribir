@@ -33,6 +33,11 @@ pub(crate) enum DynWidgetGenInfo {
 pub struct DynWidget<D> {
   #[declare(convert=custom)]
   pub(crate) dyns: Option<D>,
+
+  #[declare(default)]
+  /// once the stop_refresh is true, the DynWidget will not refresh again.
+  /// Default value is false.
+  pub(crate) stop_refresh: bool,
 }
 
 impl<D> DynWidgetDeclarer<D> {
@@ -56,11 +61,12 @@ impl<D> DynWidget<D> {
 /// Widget help to limit which `DynWidget` can be a parent widget and which can
 /// be a child.
 pub(crate) struct DynRender<D> {
-  dyn_widgets: Stateful<DynWidget<D>>,
+  dyn_widgets: RefCell<Option<Stateful<DynWidget<D>>>>,
   self_render: RefCell<Box<dyn Render>>,
   gen_info: RefCell<Option<DynWidgetGenInfo>>,
   dyns_to_widgets: fn(D) -> Vec<Widget>,
-  drop_until_widgets: WidgetsHost,
+  drop_until_widgets: RefCell<WidgetsHost>,
+  is_empty: RefCell<bool>,
 }
 
 // A dynamic widget must be stateful, depends others.
@@ -69,16 +75,23 @@ impl<D: 'static> Render for DynRender<D> {
     if !self.regen_if_need(ctx) {
       self.destroy_unhosted(ctx.arena, ctx.store);
     }
+    self.stop_refresh_if_need(ctx);
     self.self_render.perform_layout(clamp, ctx)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    if !self.drop_until_widgets.is_empty() {
+    if !self.drop_until_widgets.borrow().is_empty() {
       ctx.painter.save();
       // set the position back to parent.
       let rc = ctx.box_rect().unwrap();
       ctx.painter.translate(-rc.min_x(), -rc.min_y());
-      self.drop_until_widgets.paint(ctx);
+      self
+        .drop_until_widgets
+        .borrow()
+        .host_subtree()
+        .for_each(|wid| {
+          wid.paint_subtree(ctx.arena, ctx.store, ctx.wnd_ctx, ctx.painter);
+        });
       ctx.painter.restore();
     }
 
@@ -97,7 +110,7 @@ impl<D: 'static> Render for DynRender<D> {
   }
 
   fn can_overflow(&self) -> bool {
-    !self.drop_until_widgets.is_empty() || self.self_render.can_overflow()
+    !self.drop_until_widgets.borrow().is_empty() || self.self_render.can_overflow()
   }
 
   fn get_transform(&self) -> Option<Transform> { self.self_render.get_transform() }
@@ -105,25 +118,18 @@ impl<D: 'static> Render for DynRender<D> {
 
 #[derive(Default)]
 struct WidgetsHost {
-  wids: RefCell<HashSet<WidgetId>>,
+  wids: HashSet<WidgetId>,
 }
 
 impl WidgetsHost {
-  fn add(&self, wid: WidgetId) { self.wids.borrow_mut().insert(wid); }
+  fn add(&mut self, wid: WidgetId) { self.wids.insert(wid); }
 
-  fn is_empty(&self) -> bool { self.wids.borrow().is_empty() }
+  fn is_empty(&self) -> bool { self.wids.is_empty() }
 
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    self.wids.borrow().iter().for_each(|wid| {
-      wid.paint_subtree(ctx.arena, ctx.store, ctx.wnd_ctx, ctx.painter);
-    });
-  }
-
-  fn remove_unhost(&self, arena: &mut TreeArena, store: &mut LayoutStore) {
+  fn remove_unhost(&mut self, arena: &mut TreeArena, store: &mut LayoutStore) {
     let mut set = HashSet::new();
     let arr = self
       .wids
-      .borrow()
       .iter()
       .filter(|id| {
         query_drop_until_widget(**id, arena).map_or(true, |w| w.state_ref().delay_drop_until)
@@ -131,7 +137,7 @@ impl WidgetsHost {
       .cloned()
       .collect::<Vec<_>>();
     arr.iter().for_each(|id| {
-      self.wids.borrow_mut().remove(id);
+      self.wids.remove(id);
     });
     self.collect_subtree(arr.into_iter(), arena, &mut set);
     set.iter().for_each(|id| id.remove_subtree(arena, store));
@@ -148,12 +154,14 @@ impl WidgetsHost {
         wid
           .assert_get(arena)
           .query_on_first_type(QueryOrder::OutsideFirst, |w: &WidgetsHost| {
-            w.collect_subtree(w.wids.borrow().iter().cloned(), arena, set)
+            w.collect_subtree(w.wids.iter().cloned(), arena, set)
           })
       });
       set.insert(id);
     });
   }
+
+  fn host_subtree(&self) -> impl Iterator<Item = &WidgetId> { self.wids.iter() }
 }
 
 impl Query for WidgetsHost {
@@ -172,16 +180,17 @@ impl<D> DynRender<D> {
     }
 
     Self {
-      dyn_widgets: dyns,
+      dyn_widgets: RefCell::new(Some(dyns)),
       self_render: RefCell::new(Box::new(Void)),
       gen_info: <_>::default(),
       dyns_to_widgets: into_vec::<_, D>,
       drop_until_widgets: <_>::default(),
+      is_empty: RefCell::new(true),
     }
   }
 
   fn regen_if_need(&self, ctx: &mut LayoutCtx) -> bool {
-    let Some(new_widgets) = self.dyn_widgets.silent_ref().dyns.take() else {
+    let Some(new_widgets) = self.gen_new_widget() else {
       return false;
     };
 
@@ -200,12 +209,14 @@ impl<D> DynRender<D> {
       store,
       wnd_ctx,
       dirty_set,
+      ..
     } = ctx;
 
-    let mut new_widgets = (self.dyns_to_widgets)(new_widgets)
+    let mut new_widgets = new_widgets
       .into_iter()
       .filter_map(|w| w.into_subtree(None, arena, wnd_ctx))
       .collect::<Vec<_>>();
+    *self.is_empty.borrow_mut() = new_widgets.is_empty();
     if new_widgets.is_empty() {
       new_widgets.push(empty_node(arena));
     }
@@ -298,6 +309,29 @@ impl<D> DynRender<D> {
     true
   }
 
+  fn stop_refresh_if_need(&self, ctx: &mut LayoutCtx) {
+    if self
+      .dyn_widgets
+      .borrow()
+      .as_ref()
+      .map_or(false, |w| w.silent_ref().stop_refresh)
+    {
+      self.dyn_widgets.borrow_mut().take();
+      if *self.is_empty.borrow() {
+        ctx.remove_set.borrow_mut().insert(ctx.id());
+      }
+    }
+  }
+
+  fn gen_new_widget(&self) -> Option<Vec<Widget>> {
+    self
+      .dyn_widgets
+      .borrow()
+      .as_ref()
+      .and_then(|w| w.silent_ref().dyns.take())
+      .map(|ws| (self.dyns_to_widgets)(ws))
+  }
+
   fn remove_old_subtree(
     &self,
     sign: WidgetId,
@@ -358,13 +392,16 @@ impl<D> DynRender<D> {
       wid.remove_subtree(arena, store);
     } else {
       detach(sign, wid, drop_until.unwrap(), arena, dirty_set);
-      self.drop_until_widgets.add(wid);
+      self.drop_until_widgets.borrow_mut().add(wid);
       dirty_set.borrow_mut().insert(wid);
     }
   }
 
   fn destroy_unhosted(&self, arena: &mut TreeArena, store: &mut LayoutStore) {
-    self.drop_until_widgets.remove_unhost(arena, store)
+    self
+      .drop_until_widgets
+      .borrow_mut()
+      .remove_unhost(arena, store)
   }
 
   fn update_key_state(
@@ -509,15 +546,19 @@ mod tests {
       }
     };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(
+      w.into_widget(),
+      WindowCtx::new(AppContext::default(), scheduler),
+    );
     tree.layout(Size::zero());
-    let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let wid = tree.content_widget_id();
+    let ids = wid.descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
     {
       *size.state_ref() = Size::new(1., 1.);
     }
     tree.layout(Size::zero());
-    let new_ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let new_ids = wid.descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 2);
 
     assert_eq!(ids[1], new_ids[1]);
@@ -540,13 +581,14 @@ mod tests {
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
     let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx, scheduler));
     tree.layout(Size::zero());
-    let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let wid = tree.content_widget_id();
+    let ids = wid.descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
     {
       *size.state_ref() = Size::new(1., 1.);
     }
     tree.layout(Size::zero());
-    let new_ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let new_ids = wid.descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 3);
 
     assert_eq!(ids[0], new_ids[0]);
@@ -581,7 +623,10 @@ mod tests {
       }}
     };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(
+      w.into_widget(),
+      WindowCtx::new(AppContext::default(), scheduler),
+    );
     tree.layout(Size::zero());
     assert_eq!(*new_cnt.state_ref(), 3);
     assert_eq!(*drop_cnt.state_ref(), 0);
@@ -782,12 +827,6 @@ mod tests {
       impl_query_self_only!();
     }
 
-    fn child_count(wnd: &Window) -> usize {
-      let tree = &wnd.widget_tree;
-      let root = tree.root();
-      root.children(&tree.arena).count()
-    }
-
     let tasks = (0..3)
       .map(|_| Stateful::new(Task::default()))
       .collect::<Vec<_>>();
@@ -804,14 +843,15 @@ mod tests {
     let mut wnd = Window::default_mock(w, None);
     let mut removed = vec![];
 
+    let wid = wnd.widget_tree.content_widget_id();
     wnd.draw_frame();
-    assert_eq!(child_count(&wnd), 3);
+    assert_eq!(wid.children(&wnd.widget_tree.arena).count(), 3);
 
     // the first pined widget will still paint it
     tasks.state_ref()[0].state_ref().pin = true;
     removed.push(tasks.state_ref().remove(0));
     wnd.draw_frame();
-    assert_eq!(child_count(&wnd), 2);
+    assert_eq!(wid.children(&wnd.widget_tree.arena).count(), 2);
     assert_eq!(*removed[0].state_ref().paint_cnt.borrow(), 2);
 
     // the remove pined widget will paint and no layout when no changed
@@ -819,7 +859,7 @@ mod tests {
     tasks.state_ref().get(0).unwrap().state_ref().pin = true;
     removed.push(tasks.state_ref().remove(0));
     wnd.draw_frame();
-    assert_eq!(child_count(&wnd), 1);
+    assert_eq!(wid.children(&wnd.widget_tree.arena).count(), 1);
     assert_eq!(*removed[0].state_ref().paint_cnt.borrow(), 3);
     assert_eq!(*removed[1].state_ref().paint_cnt.borrow(), 3);
     assert_eq!(
@@ -913,7 +953,7 @@ mod tests {
 
     let grandson_id = {
       let tree = &wnd.widget_tree;
-      let root = tree.root();
+      let root = tree.content_widget_id();
       root
         .first_child(&tree.arena)
         .unwrap()
@@ -931,5 +971,98 @@ mod tests {
     *child_destroy_until.state_ref() = true;
     wnd.draw_frame();
     assert!(grandson_id.is_dropped(&wnd.widget_tree.arena));
+  }
+
+  #[test]
+  fn remove_empty_dyn() {
+    let is_build = Stateful::new(true);
+    let stop_refresh = Stateful::new(false);
+
+    let w = widget! {
+      states { is_build: is_build.clone(), stop_refresh: stop_refresh.clone() }
+      MockMulti {
+        DynWidget {
+          dyns: widget::then(*is_build,
+            || Container {
+            size: Size::new(50., 50.),
+          }),
+          stop_refresh: *stop_refresh,
+        }
+      }
+    };
+
+    let mut wnd = Window::default_mock(w, None);
+    wnd.draw_frame();
+    let wid = wnd.widget_tree.content_widget_id();
+
+    assert_eq!(wnd.widget_tree.count(wid), 2);
+
+    // keep the empty node for dynwidget
+    {
+      *is_build.state_ref() = false;
+    }
+    wnd.draw_frame();
+    assert_eq!(wnd.widget_tree.count(wid), 2);
+
+    // remove the empty dynwidget
+    {
+      *stop_refresh.state_ref() = true;
+    }
+    wnd.draw_frame();
+    assert_eq!(wnd.widget_tree.count(wid), 1);
+  }
+
+  #[test]
+  fn stop_refresh() {
+    let cnt = Stateful::new(1);
+    let stop_refresh = Stateful::new(false);
+    let mounted = Rc::new(RefCell::new(0));
+    let mounted2 = mounted.clone();
+    let w = widget! {
+      states { cnt: cnt.clone(), stop_refresh: stop_refresh.clone() }
+      MockMulti {
+        DynWidget {
+          dyns: (0..*cnt).map(|_| {
+            let mounted =  mounted2.clone();
+            widget! {
+              Container {
+                size: Size::new(50., 50.),
+                on_mounted: move |_| *mounted.borrow_mut() += 1,
+              }
+            }
+          }).collect::<Vec<_>>(),
+          stop_refresh: *stop_refresh,
+        }
+      }
+    };
+
+    let mut wnd: Window = Window::default_mock(w, None);
+    wnd.draw_frame();
+
+    // init
+    let mut mounted_cnt = *cnt.silent_ref();
+    assert_eq!(*mounted.borrow(), *cnt.silent_ref());
+
+    // dynwidget rebuild
+    *cnt.state_ref() += 1;
+    mounted_cnt += *cnt.silent_ref();
+    wnd.draw_frame();
+    assert_eq!(*mounted.borrow(), mounted_cnt);
+
+    // stop_refresh
+    *stop_refresh.state_ref() = true;
+    wnd.draw_frame();
+    assert_eq!(*mounted.borrow(), mounted_cnt);
+
+    // not change any more
+    *cnt.state_ref() += 1;
+    wnd.draw_frame();
+    assert_eq!(*mounted.borrow(), mounted_cnt);
+
+    // stop_refresh once set true, not change any more
+    *stop_refresh.state_ref() = false;
+    *cnt.state_ref() += 1;
+    wnd.draw_frame();
+    assert_eq!(*mounted.borrow(), mounted_cnt);
   }
 }

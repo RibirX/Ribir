@@ -83,6 +83,7 @@ pub struct Layouter<'a> {
   pub(crate) store: &'a mut LayoutStore,
   pub(crate) wnd_ctx: &'a WindowCtx,
   pub(crate) dirty_set: &'a DirtySet,
+  pub(crate) remove_set: &'a DirtySet,
   pub(crate) is_layout_root: bool,
 }
 
@@ -192,6 +193,7 @@ impl<'a> Layouter<'a> {
       store,
       wnd_ctx,
       dirty_set,
+      remove_set,
       is_layout_root,
     } = self;
 
@@ -210,6 +212,7 @@ impl<'a> Layouter<'a> {
           store,
           wnd_ctx,
           dirty_set,
+          remove_set,
         };
         let size = layout.perform_layout(clamp, &mut ctx);
         let size = clamp.clamp(size);
@@ -245,6 +248,7 @@ impl<'a> Layouter<'a> {
       wnd_ctx,
       dirty_set,
       wid,
+      remove_set,
       ..
     } = self;
     wid.next_sibling(arena).map(move |sibling| Layouter {
@@ -253,6 +257,7 @@ impl<'a> Layouter<'a> {
       store,
       wnd_ctx,
       dirty_set,
+      remove_set,
       is_layout_root: false,
     })
   }
@@ -265,6 +270,7 @@ impl<'a> Layouter<'a> {
       wnd_ctx,
       dirty_set,
       wid,
+      remove_set,
       ..
     } = self;
     wid.first_child(arena).map(move |wid| Layouter {
@@ -273,6 +279,7 @@ impl<'a> Layouter<'a> {
       store,
       wnd_ctx,
       dirty_set,
+      remove_set,
       is_layout_root: false,
     })
   }

@@ -1,5 +1,5 @@
 use indextree::*;
-use std::{cell::RefCell, collections::HashSet, ops::Deref, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, mem::take, ops::Deref, rc::Rc};
 
 pub mod widget_id;
 pub(crate) use widget_id::TreeArena;
@@ -14,13 +14,17 @@ pub(crate) struct WidgetTree {
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
   pub(crate) wnd_ctx: WindowCtx,
+  pub(crate) overlays: OverlayMgr,
   dirty_set: DirtySet,
+  remove_set: DirtySet,
 }
 
 impl WidgetTree {
   pub(crate) fn new(root: Widget, wnd_ctx: WindowCtx) -> WidgetTree {
     let mut arena = Arena::default();
-    let root = root
+    let overlays = OverlayMgr::default();
+    let root = overlays
+      .bind_widget(root)
       .into_subtree(None, &mut arena, &wnd_ctx)
       .expect("must have a root");
     let store = LayoutStore::default();
@@ -31,7 +35,9 @@ impl WidgetTree {
       arena,
       wnd_ctx,
       store,
+      overlays,
       dirty_set,
+      remove_set: DirtySet::default(),
     };
     tree.mark_dirty(root);
     tree
@@ -50,6 +56,10 @@ impl WidgetTree {
   /// node has really computing the layout.
   pub(crate) fn layout(&mut self, win_size: Size) {
     loop {
+      let remove_set = take(&mut *self.remove_set.borrow_mut());
+      remove_set
+        .into_iter()
+        .for_each(|id| id.remove_subtree(&mut self.arena, &mut self.store));
       let Some(mut needs_layout) = self.layout_list() else {break;};
       while let Some(wid) = needs_layout.pop() {
         if wid.is_dropped(&self.arena) {
@@ -62,13 +72,21 @@ impl WidgetTree {
           .map(|info| info.clamp)
           .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-        let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
+        let Self {
+          arena,
+          store,
+          wnd_ctx,
+          dirty_set,
+          remove_set,
+          ..
+        } = self;
         let mut layouter = Layouter {
           wid,
           arena,
           store,
           wnd_ctx,
           dirty_set,
+          remove_set,
           is_layout_root: true,
         };
         layouter.perform_widget_layout(clamp);
@@ -88,9 +106,11 @@ impl WidgetTree {
 
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.dirty_set.borrow_mut().insert(id); }
 
-  pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
+  pub(crate) fn is_dirty(&self) -> bool {
+    !self.dirty_set.borrow().is_empty() || !self.remove_set.borrow().is_empty()
+  }
 
-  pub(crate) fn count(&self) -> usize { self.root.descendants(&self.arena).count() }
+  pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(&self.arena).count() }
 
   #[allow(unused)]
   pub fn display_tree(&self, sub_tree: WidgetId) -> String {
@@ -135,7 +155,7 @@ impl Widget {
     }
 
     let mut themes = vec![];
-    let full = parent.map_or(false, |p| {
+    let full: bool = parent.map_or(false, |p| {
       p.ancestors(arena).any(|p| {
         p.assert_get(arena).query_all_type(
           |t: &Rc<Theme>| {
@@ -240,15 +260,18 @@ impl Widget {
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::{
-    test::{layout_size_by_path, MockBox, MockMulti},
-    widget::widget_id::dispose_nodes,
-  };
+  use crate::test::{layout_size_by_path, MockBox, MockMulti};
 
   use super::*;
   use ribir_painter::{font_db::FontDB, shaper::TextShaper};
   use std::{sync::Arc, sync::RwLock};
   use test::Bencher;
+
+  impl WidgetTree {
+    // stripped the framework's auxiliary widget, return the WidgetId of the user's
+    // real content widget
+    pub fn content_widget_id(&self) -> WidgetId { self.root.first_child(&self.arena).unwrap() }
+  }
 
   #[derive(Clone, Debug)]
   pub struct Recursive {
@@ -349,7 +372,8 @@ mod tests {
         size: expect_size,
         MockBox { size: *size }
       }
-    };
+    }
+    .into_widget();
     let mut wnd = Window::default_mock(w, Some(Size::new(200., 200.)));
     wnd.draw_frame();
     let size = layout_size_by_path(&wnd, &[0, 0]);
@@ -377,7 +401,8 @@ mod tests {
           widget::then(*child, || Void)
         }
       })
-    };
+    }
+    .into_widget();
 
     let mut wnd = Window::default_mock(w, None);
     wnd.draw_frame();
@@ -399,7 +424,8 @@ mod tests {
       widget::then(*trigger, || widget!{
         widget::then(*trigger, || Void)
       })
-    };
+    }
+    .into_widget();
 
     let mut wnd = Window::default_mock(w, None);
     wnd.draw_frame();
@@ -425,12 +451,11 @@ mod tests {
       WindowCtx::new(AppContext::default(), scheduler),
     );
     tree.layout(Size::new(512., 512.));
-    assert_eq!(tree.count(), 16);
+    assert_eq!(tree.count(tree.content_widget_id()), 16);
 
     tree.mark_dirty(tree.root());
-    let WidgetTree { root, arena, store, wnd_ctx, .. } = &mut tree;
+    let WidgetTree { root, arena, store, .. } = &mut tree;
 
-    dispose_nodes(root.descendants(arena), arena, store, wnd_ctx);
     root.remove_subtree(arena, store);
 
     assert_eq!(tree.layout_list(), None);
@@ -505,7 +530,8 @@ mod tests {
           })
         }
       }
-    };
+    }
+    .into_widget();
 
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
     let mut tree = WidgetTree::new(
@@ -538,7 +564,8 @@ mod tests {
              background: Color::BLUE,
           }})
         }
-    }};
+    }}
+    .into_widget();
     let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
     let mut tree1 = WidgetTree::new(w1.into_widget(), WindowCtx::new(app_ctx, scheduler));
@@ -556,7 +583,8 @@ mod tests {
              background: Color::BLUE,
           }})
         }
-    }};
+    }}
+    .into_widget();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
     let mut tree2 = WidgetTree::new(
       w2.into_widget(),

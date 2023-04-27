@@ -1,6 +1,6 @@
 use crate::{
   prelude::QueryOrder,
-  widget::{LayoutInfo, LayoutStore, TreeArena},
+  widget::{BoxClamp, LayoutInfo, LayoutStore, TreeArena},
   widget_tree::WidgetId,
 };
 
@@ -31,6 +31,8 @@ pub trait WidgetContext {
   fn box_rect(&self) -> Option<Rect>;
   /// Return the widget box size of the widget of the context.
   fn box_size(&self) -> Option<Size>;
+  /// Return the layout clamp of the widget of the context.
+  fn layout_clamp(&self) -> Option<BoxClamp>;
   /// Return the box size of the widget `wid`.
   fn widget_box_size(&self, wid: WidgetId) -> Option<Size>;
   /// Return the box rect of the widget `wid` point to.
@@ -81,6 +83,14 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
 
   #[inline]
   fn box_size(&self) -> Option<Size> { self.widget_box_size(self.id()) }
+
+  #[inline]
+  fn layout_clamp(&self) -> Option<BoxClamp> {
+    self
+      .layout_store()
+      .layout_info(self.id())
+      .map(|info| info.clamp)
+  }
 
   #[inline]
   fn single_child_box(&self) -> Option<Rect> {
@@ -205,7 +215,7 @@ mod tests {
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;
-    let root = tree.root();
+    let root = tree.content_widget_id();
     let pos = Point::zero();
     let child = root.single_child(&tree.arena).unwrap();
     let WidgetTree { arena, store, wnd_ctx, .. } = tree;
@@ -232,7 +242,7 @@ mod tests {
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;
-    let root = tree.root();
+    let root = tree.content_widget_id();
     let child = get_single_child_by_depth(root, &tree.arena, 4);
     let WidgetTree { arena, store, wnd_ctx, .. } = tree;
     let w_ctx = TestCtx { id: root, arena, store, wnd_ctx };

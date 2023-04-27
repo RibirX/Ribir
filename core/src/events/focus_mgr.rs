@@ -546,7 +546,7 @@ mod tests {
     let wnd = Window::default_mock(widget, None);
     let tree = &wnd.widget_tree;
 
-    let id = tree.root().first_child(&tree.arena);
+    let id = tree.content_widget_id().first_child(&tree.arena);
     assert!(id.is_some());
     assert_eq!(wnd.dispatcher.focusing(), id);
   }
@@ -566,7 +566,7 @@ mod tests {
     let tree = &wnd.widget_tree;
 
     let id = tree
-      .root()
+      .content_widget_id()
       .first_child(&tree.arena)
       .and_then(|p| p.next_sibling(&tree.arena));
     assert!(id.is_some());
@@ -592,7 +592,7 @@ mod tests {
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;
-    let negative = widget_tree.root().first_child(arena).unwrap();
+    let negative = widget_tree.content_widget_id().first_child(arena).unwrap();
     let id0 = negative.next_sibling(arena).unwrap();
     let id1 = id0.next_sibling(arena).unwrap();
     let id2 = id1.next_sibling(arena).unwrap();
@@ -667,7 +667,7 @@ mod tests {
     let mut wnd = Window::default_mock(widget.into_widget(), None);
     let Window { dispatcher, widget_tree: tree, .. } = &mut wnd;
 
-    let parent = tree.root();
+    let parent = tree.content_widget_id();
     let child = parent.first_child(&tree.arena).unwrap();
 
     dispatcher.refresh_focus(tree);

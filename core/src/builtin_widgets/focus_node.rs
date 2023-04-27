@@ -99,7 +99,7 @@ impl ComposeChild for RequestFocus {
       states { this: this.clone() }
       DynWidget {
         on_mounted: move |ctx| {
-          this.silent().handle = Some(ctx.wnd_ctx().focus_handle(ctx.id));
+          this.silent().handle = Some(WidgetContext::wnd_ctx(&ctx).focus_handle(ctx.id));
         },
         dyns: child
       }
@@ -158,7 +158,7 @@ mod tests {
 
     let wnd = Window::default_mock(widget, None);
     let tree = &wnd.widget_tree;
-    let id = tree.root();
+    let id = tree.content_widget_id();
     let node = id.get(&tree.arena).unwrap();
     let mut cnt = 0;
     node.query_all_type(

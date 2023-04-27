@@ -6,13 +6,13 @@ use std::{
 
 use crate::builtin_widgets::{FullTheme, InheritTheme, Theme};
 
-use ::ribir_text::shaper::TextShaper;
 pub use futures::task::SpawnError;
 use futures::{
   executor::{block_on, LocalPool},
   task::LocalSpawnExt,
   Future,
 };
+use ribir_text::shaper::TextShaper;
 use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
 
 #[derive(Clone)]

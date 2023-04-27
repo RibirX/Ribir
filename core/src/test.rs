@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::{impl_query_self_only, prelude::*, widget::WidgetTree};
 
 #[derive(Default, Clone, Copy)]
 pub struct ExpectRect {
@@ -40,7 +40,6 @@ pub fn expect_layout_result<M: ImplMarker, W: IntoWidget<M>>(
     assert_layout_result(&wnd, path, expect);
   });
 }
-
 pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
   let rect = layout_rect_by_path(wnd, path);
   if let Some(x) = expect.x {
@@ -58,29 +57,41 @@ pub fn assert_layout_result(wnd: &Window, path: &[usize], expect: &ExpectRect) {
   }
 }
 
+// stripped the framework's auxiliary widget, return the WidgetId of the user's
+// real content widget
+fn content_widget_id(tree: &WidgetTree) -> WidgetId {
+  let root = tree.root();
+  root.first_child(&tree.arena).unwrap()
+}
+
 /// ues a index path to access widget tree and return the layout info,
 /// [0, 1] means use the second child of the root.
 /// [0, 1, 2] the first node at the root level (must be 0), then down to its
 /// second child, then down to third child.
 pub fn layout_rect_by_path(wnd: &Window, path: &[usize]) -> Rect {
-  let info = layout_info_by_path(wnd, path).unwrap();
+  let info = layout_info_by_path(wnd, content_widget_id(&wnd.widget_tree), path).unwrap();
   Rect::new(info.pos, info.size.unwrap())
 }
 
 pub fn layout_size_by_path(wnd: &Window, path: &[usize]) -> Size {
-  let info = layout_info_by_path(wnd, path).unwrap();
+  let info = layout_info_by_path(wnd, content_widget_id(&wnd.widget_tree), path).unwrap();
   info.size.unwrap()
 }
 
 pub fn layout_position_by_path(wnd: &Window, path: &[usize]) -> Point {
-  let info = layout_info_by_path(wnd, path).unwrap();
+  let info = layout_info_by_path(wnd, content_widget_id(&wnd.widget_tree), path).unwrap();
   info.pos
 }
 
-pub fn layout_info_by_path<'a>(wnd: &'a Window, path: &[usize]) -> Option<&'a LayoutInfo> {
+pub fn layout_info_by_path<'a>(
+  wnd: &'a Window,
+  root: WidgetId,
+  path: &[usize],
+) -> Option<&'a LayoutInfo> {
   assert_eq!(path[0], 0);
-  let tree = &wnd.widget_tree;
-  let mut node = tree.root();
+  let tree: &widget::WidgetTree = &wnd.widget_tree;
+  let mut node = root;
+
   for (level, idx) in path[1..].iter().enumerate() {
     node = node.children(&tree.arena).nth(*idx).unwrap_or_else(|| {
       panic!("node no exist: {:?}", &path[0..level]);
@@ -173,7 +184,10 @@ impl Query for MockBox {
 
 impl Window {
   #[inline]
-  pub fn widget_count(&self) -> usize { self.widget_tree.count() }
+  pub fn widget_count(&self) -> usize {
+    let wid = content_widget_id(&self.widget_tree);
+    self.widget_tree.count(wid)
+  }
 }
 
 #[allow(unused)]

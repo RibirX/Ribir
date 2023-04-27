@@ -18,6 +18,8 @@ mod decorator;
 pub mod dynamic_widget;
 pub mod enum_widget;
 pub mod events;
+pub mod overlay;
+pub mod overlay_mgr;
 pub mod ticker;
 pub mod timer;
 pub mod widget;
@@ -44,6 +46,8 @@ pub mod prelude {
   pub use crate::enum_widget::*;
   #[doc(no_inline)]
   pub use crate::events::*;
+  pub use crate::overlay::*;
+  pub use crate::overlay_mgr::*;
   #[doc(no_inline)]
   pub use crate::state::*;
   #[doc(no_inline)]
@@ -59,13 +63,13 @@ pub mod prelude {
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
   pub use crate::window::{Window, WindowBuilder};
-  #[doc(no_inline)]
-  pub use ::ribir_painter::*;
   pub use log;
   #[doc(no_inline)]
   pub use ribir_algo::CowArc;
   #[doc(no_inline)]
   pub use ribir_macros::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild, Template};
+  #[doc(no_inline)]
+  pub use ribir_painter::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
 }

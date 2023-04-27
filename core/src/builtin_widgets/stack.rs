@@ -1,10 +1,10 @@
-use ribir_core::{impl_query_self_only, prelude::*};
+use crate::{impl_query_self_only, prelude::*};
 
 /// A widget that overlap children align with left top.
-#[derive(MultiChild, Declare)]
+#[derive(MultiChild, Declare, Default)]
 pub struct Stack {
   #[declare(default)]
-  fit: StackFit,
+  pub fit: StackFit,
 }
 
 /// How to size the non-positioned children of a [Stack]. (same as flutter)
@@ -68,11 +68,9 @@ impl Render for Stack {
 impl Query for Stack {
   impl_query_self_only!();
 }
-
 #[cfg(test)]
 mod tests {
-  use crate::prelude::*;
-  use ribir_core::test::*;
+  use crate::test::*;
 
   use super::*;
   #[test]
@@ -81,8 +79,8 @@ mod tests {
     let five = Size::new(5., 5.);
     let w = widget! {
       Stack {
-        SizedBox { size: one}
-        SizedBox { size: five}
+        MockBox { size: one}
+        MockBox { size: five}
       }
     };
 

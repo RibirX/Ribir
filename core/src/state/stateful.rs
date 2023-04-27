@@ -442,7 +442,7 @@ mod tests {
     let mut wnd = Window::default_mock(widget! { MockBox { size: Size::new(100., 100.) } }, None);
     wnd.draw_frame();
     let tree = &wnd.widget_tree;
-    assert_eq!(tree.root().descendants(&tree.arena).count(), 1);
+    assert_eq!(tree.content_widget_id().descendants(&tree.arena).count(), 1);
   }
 
   #[test]

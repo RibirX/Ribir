@@ -92,6 +92,14 @@ impl BoxDecorationDeclarer {
 
 impl BoxDecoration {
   #[inline]
+  pub fn background(brush: impl Into<Brush>) -> Self {
+    Self {
+      background: Some(brush.into()),
+      ..<_>::default()
+    }
+  }
+
+  #[inline]
   pub fn set_declare_background<M>(&mut self, b: impl IntoBackground<M>) {
     self.background = b.into_background();
   }

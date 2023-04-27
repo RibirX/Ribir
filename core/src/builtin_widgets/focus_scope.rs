@@ -85,7 +85,7 @@ mod tests {
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;
-    let id0 = widget_tree.root().first_child(arena).unwrap();
+    let id0 = widget_tree.content_widget_id().first_child(arena).unwrap();
     let scope = id0.next_sibling(arena).unwrap();
     let scope_id1 = scope
       .first_child(arena)
@@ -146,7 +146,7 @@ mod tests {
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;
-    let id0 = widget_tree.root().first_child(arena).unwrap();
+    let id0 = widget_tree.content_widget_id().first_child(arena).unwrap();
     let scope = id0.next_sibling(arena).unwrap();
     let id1 = scope.next_sibling(arena).unwrap();
 

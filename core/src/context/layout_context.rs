@@ -15,6 +15,7 @@ pub struct LayoutCtx<'a> {
   pub(crate) store: &'a mut LayoutStore,
   pub(crate) wnd_ctx: &'a WindowCtx,
   pub(crate) dirty_set: &'a DirtySet,
+  pub(crate) remove_set: &'a DirtySet,
 }
 
 impl<'a> LayoutCtx<'a> {
@@ -72,13 +73,21 @@ impl<'a> LayoutCtx<'a> {
   }
 
   fn new_layouter(&mut self, wid: WidgetId, is_layout_root: bool) -> Layouter {
-    let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
+    let Self {
+      arena,
+      store,
+      wnd_ctx,
+      dirty_set,
+      remove_set,
+      ..
+    } = self;
     Layouter {
       wid,
       arena,
       store,
       wnd_ctx,
       dirty_set,
+      remove_set,
       is_layout_root,
     }
   }

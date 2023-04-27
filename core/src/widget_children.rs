@@ -242,7 +242,7 @@ mod tests {
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
-    let dyns = Stateful::new(DynWidget { dyns: Some(X) });
+    let dyns = Stateful::new(DynWidget { dyns: Some(X), stop_refresh: false });
     let size = Size::new(100., 200.);
 
     let w = ComposeChild::compose_child(State::<X>::from(dyns), MockBox { size });
@@ -334,7 +334,10 @@ mod tests {
       }
     }
 
-    let child = DynWidget { dyns: Some([Void]) };
+    let child = DynWidget {
+      dyns: Some([Void]),
+      stop_refresh: false,
+    };
     let child = Stateful::new(child);
     let cnt = Rc::new(RefCell::new(0));
     let c_cnt = cnt.clone();
@@ -354,7 +357,10 @@ mod tests {
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
     }
 
-    let c = Stateful::new(DynWidget { dyns: Some(Some(Void)) });
+    let c = Stateful::new(DynWidget {
+      dyns: Some(Some(Void)),
+      stop_refresh: false,
+    });
     let _ = M.with_child(c).into_widget();
   }
 }

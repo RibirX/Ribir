@@ -1,4 +1,4 @@
-use ribir_core::prelude::*;
+use crate::{impl_query_self_only, prelude::*};
 
 /// Widget with fixed size as a container for its child.
 #[derive(Declare, SingleChild)]
@@ -24,13 +24,13 @@ impl Render for Container {
 }
 
 impl Query for Container {
-  ribir_core::impl_query_self_only!();
+  impl_query_self_only!();
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use ribir_core::test::*;
+  use crate::test::*;
 
   #[test]
   fn smoke() {

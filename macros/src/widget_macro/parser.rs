@@ -25,6 +25,7 @@ pub mod kw {
   syn::custom_keyword!(Transition);
   syn::custom_keyword!(transition);
   syn::custom_punctuation!(AssignColon, :=);
+  syn::custom_keyword!(Overlay);
   syn::custom_keyword!(widget);
 }
 
@@ -116,6 +117,7 @@ pub enum Item {
   TransProps(TransProps),
   Transition(DeclareSingle),
   Animate(DeclareSingle),
+  Overlay(DeclareSingle),
 }
 
 pub struct TransProps {
@@ -178,6 +180,8 @@ impl Parse for MacroSyntax {
         items.push(Item::Transition(input.parse()?));
       } else if lk.peek(kw::transition) {
         items.push(Item::TransProps(input.parse()?));
+      } else if lk.peek(kw::Overlay) {
+        items.push(Item::Overlay(input.parse()?));
       } else if lk.peek(kw::states) {
         let mut t = input.parse::<States>()?;
         if let Some(ot) = states.take() {

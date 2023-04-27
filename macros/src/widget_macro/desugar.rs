@@ -320,7 +320,7 @@ impl Item {
           ));
         });
       }
-      Item::Transition(d) | Item::Animate(d) => {
+      Item::Transition(d) | Item::Animate(d) | Item::Overlay(d) => {
         if let DesugaredObj::Obj(obj) = d.desugar(desugared) {
           let warning = DeclareWarning::DefObjWithoutId(obj.span().unwrap());
           desugared.warnings.push(warning)

@@ -334,17 +334,14 @@ impl ComposeChild for TapListener {
 }
 
 #[cfg(test)]
-#[cfg(test)]
-mod tests {
+pub mod test_util {
   use super::*;
-  use crate::test::{MockBox, MockMulti};
-  use std::{cell::RefCell, rc::Rc};
   use winit::{
     dpi::LogicalPosition,
     event::{DeviceId, ElementState, MouseButton, WindowEvent},
   };
 
-  fn tap_on(wnd: &mut Window, x: f32, y: f32) {
+  pub fn tap_on(wnd: &mut Window, x: f32, y: f32) {
     let device_id = unsafe { DeviceId::dummy() };
     let logical = LogicalPosition::new(x, y);
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -365,6 +362,13 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
   }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{events::test_util::tap_on, test::MockMulti};
+  use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn tap_focus() {
@@ -377,11 +381,11 @@ mod tests {
     let w = widget! {
       MockMulti {
         id: host,
-        MockBox {
+        Container {
           size: Size::new(50., 50.,),
           on_tap: move |_| *tap_cnt1.borrow_mut() += 1,
         }
-        MockBox {
+        Container {
           size: Size::new(50., 50.,),
           on_tap: move |_| *tap_cnt2.borrow_mut() += 1,
           on_key_down: move |_| println!("dummy code"),
