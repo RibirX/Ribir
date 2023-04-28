@@ -329,7 +329,81 @@ impl ComposeChild for TapListener {
   type Child = Widget;
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let widget = dynamic_compose_focus_node(child);
-    compose_child_as_data_widget(widget, this)
+    compose_child_as_data_widget(child, this)
+  }
+}
+
+#[cfg(test)]
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test::{MockBox, MockMulti};
+  use std::{cell::RefCell, rc::Rc};
+  use winit::{
+    dpi::LogicalPosition,
+    event::{DeviceId, ElementState, MouseButton, WindowEvent},
+  };
+
+  fn tap_on(wnd: &mut Window, x: f32, y: f32) {
+    let device_id = unsafe { DeviceId::dummy() };
+    let logical = LogicalPosition::new(x, y);
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: logical.to_physical(wnd.raw_window.scale_factor()),
+      modifiers: ModifiersState::default(),
+    });
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Released,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+  }
+
+  #[test]
+  fn tap_focus() {
+    let tap_cnt = Rc::new(RefCell::new(0));
+    let is_focused = Rc::new(RefCell::new(false));
+
+    let tap_cnt1 = tap_cnt.clone();
+    let tap_cnt2 = tap_cnt.clone();
+    let is_focused1 = is_focused.clone();
+    let w = widget! {
+      MockMulti {
+        id: host,
+        MockBox {
+          size: Size::new(50., 50.,),
+          on_tap: move |_| *tap_cnt1.borrow_mut() += 1,
+        }
+        MockBox {
+          size: Size::new(50., 50.,),
+          on_tap: move |_| *tap_cnt2.borrow_mut() += 1,
+          on_key_down: move |_| println!("dummy code"),
+        }
+      }
+      finally {
+        let_watch!(host.has_focus())
+          .subscribe(move |v| *is_focused1.borrow_mut() = v);
+      }
+    };
+
+    let mut wnd = Window::mock_window(w, Size::new(100., 100.), <_>::default());
+    wnd.draw_frame();
+
+    tap_on(&mut wnd, 25., 25.);
+    wnd.draw_frame();
+    assert_eq!(*tap_cnt.borrow(), 1);
+    assert!(!*is_focused.borrow());
+
+    tap_on(&mut wnd, 75., 25.);
+    wnd.draw_frame();
+    assert_eq!(*tap_cnt.borrow(), 2);
+    assert!(*is_focused.borrow());
   }
 }

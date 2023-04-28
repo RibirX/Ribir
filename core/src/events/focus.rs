@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
 use crate::{
-  data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_query_self_only, prelude::*,
+  data_widget::compose_child_as_data_widget, impl_compose_child_for_listener,
+  impl_compose_child_with_focus_for_listener, impl_listener, impl_query_self_only, prelude::*,
 };
 
 pub type FocusEvent = EventCommon;
@@ -68,7 +68,7 @@ impl_listener!(
   FocusEvent,
   focus_in_stream
 );
-impl_compose_child_with_focus_for_listener!(FocusInListener);
+impl_compose_child_for_listener!(FocusInListener);
 
 impl_listener!(
   FocusOutListener,
@@ -77,4 +77,4 @@ impl_listener!(
   FocusEvent,
   focus_out_stream
 );
-impl_compose_child_with_focus_for_listener!(FocusOutListener);
+impl_compose_child_for_listener!(FocusOutListener);
