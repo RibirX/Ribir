@@ -21,7 +21,7 @@ impl Compose for MessageList {
         let title_style = TypographyTheme::of(ctx).title_large.text.clone();
         let title_icon_size = IconSize::of(ctx).tiny;
         let background = Palette::of(ctx).surface();
-        let foreground = Palette::of(ctx).on_surface().into();
+        let foreground = Palette::of(ctx).on_surface();
       }
       Column {
         background,

@@ -1,10 +1,10 @@
-use self::textures_mgr::{valid_atlas_item, TextureID, TexturesMgr};
-use crate::{ColorPrimitive, GPUBackendImpl, IndicesRange, TexturePrimitive};
+use self::textures_mgr::{TextureID, TexturesMgr};
+use crate::{ColorAttr, GPUBackendImpl, ImgPrimitive, MaskLayer};
 use ribir_painter::{
-  image::ColorFormat, AntiAliasing, Brush, DevicePoint, DeviceRect, DeviceSize, PaintCommand,
-  PaintPath, PainterBackend, PixelImage, Transform, Vertex, VertexBuffers,
+  geom::rect_corners, image::ColorFormat, AntiAliasing, Color, DeviceRect, DeviceSize,
+  PaintCommand, PaintPath, PainterBackend, PixelImage, Point, Vertex, VertexBuffers,
 };
-use std::{error::Error, future::Future, pin::Pin};
+use std::{error::Error, future::Future, ops::Range, pin::Pin};
 
 mod atlas;
 mod textures_mgr;
@@ -13,25 +13,27 @@ use textures_mgr::*;
 pub struct GPUBackend<Impl: GPUBackendImpl> {
   gpu_impl: Impl,
   tex_mgr: TexturesMgr<Impl::Texture>,
-  color_primitives: Vec<ColorPrimitive>,
-  texture_primitives: Vec<TexturePrimitive>,
-  prim_ids_map: TexturePrimIdsMap,
-  buffers: VertexBuffers<u32>,
-  layer_stack: Vec<Layer>,
-  layer_stack_idx: usize,
+  color_vertices_buffer: VertexBuffers<ColorAttr>,
+  img_vertices_buffer: VertexBuffers<u32>,
+  img_prims: Vec<ImgPrimitive>,
+  draw_indices: Vec<DrawIndices>,
+  tex_ids_map: TextureIdxMap,
+  viewport: DeviceRect,
+  mask_layers: Vec<MaskLayer>,
+  clip_layer_stack: Vec<ClipLayer>,
   skip_clip_cnt: usize,
 }
 
-enum LayerDrawCmd {
-  Draw(IndicesRange),
-  ComposeLayerFrom {
-    clip_mask: TextureSlice,
-    src_layer: usize,
-  },
+#[derive(Clone)]
+enum DrawIndices {
+  Color(Range<u32>),
+  Img(Range<u32>),
+  _Gradient(Range<u32>),
 }
-struct Layer {
+
+struct ClipLayer {
   viewport: DeviceRect,
-  commands: Vec<LayerDrawCmd>,
+  mask_idx: i32,
 }
 
 pub type ImageFuture =
@@ -39,6 +41,10 @@ pub type ImageFuture =
 /// Texture use to display.
 pub trait Texture {
   type Host;
+
+  fn anti_aliasing(&self) -> AntiAliasing;
+
+  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut Self::Host);
 
   /// write data to the texture.
   fn write_data(&mut self, dist: &DeviceRect, data: &[u8], host: &mut Self::Host);
@@ -55,7 +61,7 @@ pub trait Texture {
 }
 
 #[derive(Default)]
-struct TexturePrimIdsMap {
+struct TextureIdxMap {
   texture_map: ahash::HashMap<TextureID, u32>,
   textures: Vec<TextureID>,
 }
@@ -66,8 +72,11 @@ where
   Impl::Texture: Texture<Host = Impl>,
 {
   type Texture = Impl::Texture;
+
   fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
-    self.gpu_impl.set_anti_aliasing(anti_aliasing);
+    self
+      .tex_mgr
+      .set_anti_aliasing(anti_aliasing, &mut self.gpu_impl);
   }
 
   fn begin_frame(&mut self) {
@@ -79,40 +88,44 @@ where
     &mut self,
     viewport: DeviceRect,
     commands: Vec<PaintCommand>,
+    surface: Color,
     output: &mut Self::Texture,
   ) {
-    self.prim_ids_map.new_phase();
-    self.buffers.vertices.clear();
-    self.buffers.indices.clear();
-    self.color_primitives.clear();
-    self.texture_primitives.clear();
-
-    let layer = Layer::new(viewport);
-    self.layer_stack.push(layer);
+    // todo: batch multi `draw_commands`
+    self.begin_draw_phase(viewport);
 
     let mut commands = commands.into_iter();
+    let output_size = output.size();
     loop {
       let Some(cmd) = commands.next() else { break; };
-      self.draw_command(cmd);
+      self.draw_command(cmd, output_size);
     }
     self.expand_indices_range();
 
-    assert_eq!(self.layer_stack_idx, 0);
+    assert!(self.clip_layer_stack.is_empty());
 
-    let textures = self
-      .prim_ids_map
-      .all_textures()
-      .into_iter()
-      .map(|id| self.tex_mgr.texture(*id));
-    self.gpu_impl.load_textures(textures);
-    self.gpu_impl.load_color_primitives(&self.color_primitives);
-    self
-      .gpu_impl
-      .load_texture_primitives(&self.texture_primitives);
-    self.gpu_impl.load_triangles_vertices(&self.buffers);
+    self.gpu_impl.load_mask_layers(&self.mask_layers);
+    let all_tex_ids = self.tex_ids_map.all_textures();
+    let mut textures = Vec::with_capacity(all_tex_ids.len());
+    for id in all_tex_ids {
+      textures.push(self.tex_mgr.texture(*id));
+    }
+
+    self.gpu_impl.load_textures(&textures);
+    if !self.color_vertices_buffer.indices.is_empty() {
+      self
+        .gpu_impl
+        .load_color_vertices(&self.color_vertices_buffer);
+    }
+    if !self.img_vertices_buffer.indices.is_empty() {
+      self.gpu_impl.load_img_primitives(&self.img_prims);
+      self.gpu_impl.load_img_vertices(&self.img_vertices_buffer);
+    }
 
     self.tex_mgr.submit(&mut self.gpu_impl);
-    self.layers_submit(output);
+    self.layers_submit(output, surface);
+
+    self.end_draw_phase();
   }
 
   fn end_frame(&mut self) { self.gpu_impl.end_frame(); }
@@ -122,262 +135,202 @@ impl<Impl: GPUBackendImpl> GPUBackend<Impl>
 where
   Impl::Texture: Texture<Host = Impl>,
 {
-  pub fn new(mut gpu_impl: Impl) -> Self {
-    let tex_mgr = TexturesMgr::new(&mut gpu_impl);
+  pub fn new(mut gpu_impl: Impl, anti_aliasing: AntiAliasing) -> Self {
+    let tex_mgr = TexturesMgr::new(&mut gpu_impl, anti_aliasing);
     Self {
       gpu_impl,
       tex_mgr,
-      color_primitives: vec![],
-      texture_primitives: vec![],
-      prim_ids_map: <_>::default(),
-      buffers: <_>::default(),
-      layer_stack: vec![],
-      layer_stack_idx: 0,
+      tex_ids_map: <_>::default(),
+      mask_layers: vec![],
+      clip_layer_stack: vec![],
       skip_clip_cnt: 0,
+      color_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      img_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      img_prims: vec![],
+      draw_indices: vec![],
+      viewport: DeviceRect::zero(),
     }
   }
 
   #[inline]
   pub fn get_impl(&self) -> &Impl { &self.gpu_impl }
 
-  fn draw_command(&mut self, cmd: PaintCommand) {
+  fn draw_command(&mut self, cmd: PaintCommand, output_tex_size: DeviceSize) {
     match cmd {
-      PaintCommand::Fill { brush, paint_path } => {
-        if let Some(intersect_view) = paint_path.bounds.intersection(&self.viewport()) {
-          let mask = self.fill_alpha_path(intersect_view, paint_path);
-          let prim_id = self.add_primitive(intersect_view.origin, brush, mask);
-          self.draw_rect_triangles(intersect_view, prim_id);
+      PaintCommand::ColorPath { path, color } => {
+        if let Some((rect, mask_head)) = self.new_mask_layer(path) {
+          self.update_to_color_indices();
+          let color = color.into_components();
+          let color_attr = ColorAttr { color, mask_head };
+          let buffer = &mut self.color_vertices_buffer;
+          add_draw_rect_vertices(rect, output_tex_size, color_attr, buffer);
+        }
+      }
+      PaintCommand::ImgPath { path, img, opacity } => {
+        let ts = path.transform.clone();
+        if let Some((rect, mask_head)) = self.new_mask_layer(path) {
+          self.update_to_img_indices();
+
+          let img_slice = self.tex_mgr.store_image(&img, &mut self.gpu_impl);
+          let img_start = img_slice.rect.origin.to_f32().to_array();
+          let img_size = img_slice.rect.size.to_f32().to_array();
+          let img_tex_idx = self.tex_ids_map.tex_idx(img_slice.tex_id);
+          let prim_idx = self.img_prims.len() as u32;
+          let prim = ImgPrimitive {
+            transform: ts.inverse().unwrap().to_array(),
+            img_start,
+            img_size,
+            img_tex_idx,
+            mask_head,
+            opacity,
+            _dummy: 0,
+          };
+          self.img_prims.push(prim);
+          let buffer = &mut self.img_vertices_buffer;
+          add_draw_rect_vertices(rect, output_tex_size, prim_idx, buffer);
         }
       }
       PaintCommand::Clip(path) => {
-        if self.skip_clip_cnt > 0 {
-          self.skip_clip_cnt += 1;
-        } else if let Some(viewport) = path.bounds.intersection(&self.viewport()) {
-          let clip_mask = self.fill_alpha_path(viewport, path);
-          let compose_cmd = LayerDrawCmd::ComposeLayerFrom {
-            clip_mask,
-            src_layer: self.layer_stack.len(),
-          };
-          self.expand_indices_range();
-          self.current_layer().commands.push(compose_cmd);
-          self.new_layer(viewport);
-        } else {
-          self.skip_clip_cnt += 1;
+        if self.skip_clip_cnt == 0 {
+          if let Some(viewport) = path
+            .paint_bounds
+            .to_i32()
+            .cast_unit()
+            .intersection(self.viewport())
+          {
+            if let Some((_, mask_idx)) = self.new_mask_layer(path) {
+              self.clip_layer_stack.push(ClipLayer { viewport, mask_idx });
+              return;
+            }
+          }
         }
+        self.skip_clip_cnt += 1;
       }
-
       PaintCommand::PopClip => {
         if self.skip_clip_cnt > 0 {
           self.skip_clip_cnt -= 1;
         } else {
-          self.layer_stack_idx -= 1;
-          assert_eq!(self.skip_clip_cnt, 0)
+          self.clip_layer_stack.pop();
         }
       }
     }
   }
 
-  fn add_primitive(
-    &mut self,
-    content_origin: DevicePoint,
-    brush: Brush,
-    mask: TextureSlice,
-  ) -> u32 {
-    self.update_indices_range(&brush);
-    let TextureSlice { tex_id, rect } = mask;
-    let mask_id = self.prim_ids_map.prim_id(tex_id);
-    match brush {
-      Brush::Color(color) => {
-        self.color_primitives.push(ColorPrimitive {
-          mask_id,
-          mask_offset: (rect.origin - content_origin).to_f32().to_array(),
-          color: color.into_f32_components(),
-          _dummy: 0,
-        });
-        (self.color_primitives.len() - 1) as u32
-      }
-      Brush::Image { img, opacity, transform } => {
-        let texture = self.tex_mgr.store_image(&img, &mut self.gpu_impl);
-        self.add_texture_primitive(content_origin, texture, opacity, mask, &transform)
-      }
-      Brush::Gradient => todo!(),
+  fn begin_draw_phase(&mut self, viewport: DeviceRect) {
+    self.tex_ids_map.new_phase();
+    self.viewport = viewport;
+    self.tex_ids_map.tex_idx(TextureID::AlphaAtlas);
+  }
+
+  fn end_draw_phase(&mut self) {
+    self.color_vertices_buffer.vertices.clear();
+    self.color_vertices_buffer.indices.clear();
+    self.img_vertices_buffer.vertices.clear();
+    self.img_vertices_buffer.indices.clear();
+    self.img_prims.clear();
+    self.mask_layers.clear();
+  }
+
+  fn update_to_color_indices(&mut self) {
+    if !matches!(self.draw_indices.last(), Some(DrawIndices::Color(_))) {
+      self.expand_indices_range();
+      let start = self.color_vertices_buffer.indices.len() as u32;
+      self.draw_indices.push(DrawIndices::Color(start..start));
     }
   }
 
-  fn update_indices_range(&mut self, brush: &Brush) {
-    let last = self.expand_indices_range();
-
-    if last.map_or(true, |last| !last.is_same_primitive(brush)) {
-      self.start_new_primitive_range(brush);
+  fn update_to_img_indices(&mut self) {
+    if !matches!(self.draw_indices.last(), Some(DrawIndices::Img(_))) {
+      self.expand_indices_range();
+      let start = self.img_vertices_buffer.indices.len() as u32;
+      self.draw_indices.push(DrawIndices::Img(start..start));
     }
   }
 
-  fn start_new_primitive_range(&mut self, brush: &Brush) {
-    let start = self.buffers.indices.len() as u32;
-    let rg = start..start;
-
-    let rg = match brush {
-      Brush::Color(_) => IndicesRange::Color(rg),
-      Brush::Image { .. } => IndicesRange::Texture(rg),
-      Brush::Gradient => todo!(),
+  fn expand_indices_range(&mut self) -> Option<&DrawIndices> {
+    let cmd = self.draw_indices.last_mut()?;
+    match cmd {
+      DrawIndices::Color(rg) => rg.end = self.color_vertices_buffer.indices.len() as u32,
+      DrawIndices::Img(rg) => rg.end = self.img_vertices_buffer.indices.len() as u32,
+      DrawIndices::_Gradient(_) => todo!(),
     };
-    self.current_layer().commands.push(LayerDrawCmd::Draw(rg))
-  }
-
-  fn expand_indices_range(&mut self) -> Option<&IndicesRange> {
-    let end = self.buffers.indices.len() as u32;
-    let cmd = self.current_layer().commands.last_mut()?;
-
-    let LayerDrawCmd::Draw(cmd) = cmd else { return None };
-    let rg = match cmd {
-      IndicesRange::Color(rg) => rg,
-      IndicesRange::Texture(rg) => rg,
-      IndicesRange::Gradient(_) => todo!(),
-    };
-    rg.end = end;
 
     Some(&*cmd)
   }
 
-  fn add_texture_primitive(
-    &mut self,
-    content_origin: DevicePoint,
-    texture: TextureSlice,
-    opacity: f32,
-    mask: TextureSlice,
-    transform: &Transform,
-  ) -> u32 {
-    let TextureSlice { tex_id: mask_id, rect: mask_rect } = mask;
-    let brush_tex_idx = self.prim_ids_map.prim_id(texture.tex_id) as u16;
-    let mask_idx = self.prim_ids_map.prim_id(mask_id) as u16;
-    self.texture_primitives.push(TexturePrimitive {
-      brush_tex_idx,
-      mask_idx,
-      opacity,
-      content_origin: content_origin.to_f32().to_array(),
-      brush_origin: texture.rect.origin.to_f32().to_array(),
-      brush_size: texture.rect.size.to_f32().to_array(),
-      mask_offset: (mask_rect.origin - content_origin).to_f32().to_array(),
-      transform: transform.to_arrays(),
-    });
-    (self.texture_primitives.len() - 1) as u32
+  fn current_clip_mask_index(&self) -> i32 {
+    self.clip_layer_stack.last().map_or(-1, |l| l.mask_idx)
   }
 
-  fn draw_rect_triangles(&mut self, rect: DeviceRect, prim_id: u32) {
-    let lt = rect.min().to_f32();
-    let rb = rect.max().to_f32();
-    let rt = [rb.x, lt.y];
-    let lb = [lt.x, rb.y];
-    let VertexBuffers { vertices, indices } = &mut self.buffers;
-    let index_offset = vertices.len() as u32;
-    vertices.push(Vertex::new(lt.to_array(), prim_id));
-    vertices.push(Vertex::new(rt, prim_id));
-    vertices.push(Vertex::new(rb.to_array(), prim_id));
-    vertices.push(Vertex::new(lb, prim_id));
-    indices.push(index_offset);
-    indices.push(index_offset + 3);
-    indices.push(index_offset + 2);
-    indices.push(index_offset + 2);
-    indices.push(index_offset + 1);
-    indices.push(index_offset);
+  fn viewport(&self) -> &DeviceRect {
+    self
+      .clip_layer_stack
+      .last()
+      .map_or(&self.viewport, |l| &l.viewport)
   }
 
-  fn current_layer(&mut self) -> &mut Layer { self.layer_stack.last_mut().unwrap() }
+  fn new_mask_layer(&mut self, mut path: PaintPath) -> Option<([Point; 4], i32)> {
+    path.paint_bounds = path.paint_bounds.round_out();
+    let paint_bounds = path.paint_bounds.to_i32().cast_unit();
+    let view = paint_bounds.intersection(&self.viewport())?;
+    let prefer_cache_size = prefer_cache_size(&path.path, &path.transform);
 
-  fn viewport(&self) -> &DeviceRect { &self.layer_stack.last().unwrap().viewport }
-
-  /// fill an alpha path in the viewport and return the texture of the viewport.
-  fn fill_alpha_path(&mut self, intersect_viewport: DeviceRect, path: PaintPath) -> TextureSlice {
-    if valid_atlas_item(&path.bounds.size) || intersect_viewport.contains_rect(&path.bounds) {
-      let offset = intersect_viewport.origin - path.bounds.origin;
-      let TextureSlice { tex_id, rect } = self.tex_mgr.store_alpha_path(path, &mut self.gpu_impl);
-      let origin = rect.origin + offset;
-      let rect = DeviceRect::new(origin, intersect_viewport.size);
-      TextureSlice { tex_id, rect }
-    } else {
-      self
-        .tex_mgr
-        .alloc_path_without_cache(intersect_viewport, path, &mut self.gpu_impl)
-    }
-  }
-
-  fn new_layer(&mut self, viewport: DeviceRect) {
-    self.layer_stack.push(Layer::new(viewport));
-    self.layer_stack_idx += 1;
-  }
-
-  fn layers_submit(&mut self, output: &mut Impl::Texture) {
-    let invalid_texture = TextureSlice {
-      tex_id: TextureID::Extra(u32::MAX),
-      rect: DeviceRect::zero(),
-    };
-    let mut layers_texture = vec![invalid_texture; self.layer_stack.len()];
-    let mut idx = self.layer_stack.len() - 1;
-    loop {
-      let Layer { viewport, commands } = &self.layer_stack[idx];
-      commands.iter().for_each(|cmd| match cmd {
-        LayerDrawCmd::Draw(indices) => {
-          self
-            .gpu_impl
-            .draw_triangles(output, viewport, indices.clone())
-        }
-        LayerDrawCmd::ComposeLayerFrom { clip_mask, src_layer } => {
-          let texture_slice = &layers_texture[*src_layer];
-          let texture = self.tex_mgr.texture(texture_slice.tex_id);
-          let mask = self.tex_mgr.texture(clip_mask.tex_id);
-
-          self.gpu_impl.draw_texture_with_mask(
-            output,
-            self.layer_stack[*src_layer].viewport.origin,
-            texture,
-            texture_slice.rect.origin,
-            mask,
-            &clip_mask.rect,
-          );
-        }
-      });
-
-      if idx == 0 {
-        break;
-      } else {
-        let slice = self
-          .tex_mgr
-          .alloc(viewport.size, ColorFormat::Rgba8, &mut self.gpu_impl);
-        let texture = self.tex_mgr.texture_mut(slice.tex_id);
+    let (mask, mask_to_view) =
+      if valid_cache_item(&prefer_cache_size) || view.contains_rect(&paint_bounds) {
         self
-          .gpu_impl
-          .copy_texture_to_texture(texture, slice.rect.origin, output, viewport);
-        layers_texture[idx] = slice;
+          .tex_mgr
+          .store_alpha_path(path.path, &path.transform, &mut self.gpu_impl)
+      } else {
+        self
+          .tex_mgr
+          .store_clipped_path(view, path, &mut self.gpu_impl)
+      };
 
-        idx -= 1;
-      }
+    let mut points = rect_corners(&mask.rect.to_f32().cast_unit());
+    for p in points.iter_mut() {
+      *p = mask_to_view.transform_point(*p);
     }
-    self.layer_stack.clear();
+
+    // keep the rectangle corners in clock order.
+    if points[1].x < points[3].x {
+      let lr = points[3];
+      points[3] = points[1];
+      points[1] = lr;
+    }
+
+    let index = self.mask_layers.len();
+    let min_max = mask.rect.to_box2d().to_f32();
+    self.mask_layers.push(MaskLayer {
+      // view to mask transform.
+      transform: mask_to_view.inverse().unwrap().to_array(),
+      min: min_max.min.to_array(),
+      max: min_max.max.to_array(),
+      mask_tex_idx: self.tex_ids_map.tex_idx(mask.tex_id),
+      prev_mask_idx: self.current_clip_mask_index(),
+    });
+    Some((points, index as i32))
+  }
+
+  fn layers_submit(&mut self, output: &mut Impl::Texture, surface: Color) {
+    let mut color = Some(surface);
+    self
+      .draw_indices
+      .drain(..)
+      .for_each(|indices| match indices {
+        DrawIndices::Color(rg) => self.gpu_impl.draw_color_triangles(output, rg, color.take()),
+        DrawIndices::Img(rg) => self.gpu_impl.draw_img_triangles(output, rg, color.take()),
+        DrawIndices::_Gradient(_) => todo!(),
+      });
   }
 }
 
-impl IndicesRange {
-  pub fn is_same_primitive(&self, brush: &Brush) -> bool {
-    matches!(
-      (self, brush),
-      (IndicesRange::Color(_), Brush::Color(_))
-        | (IndicesRange::Texture(_), Brush::Image { .. })
-        | (IndicesRange::Gradient(_), Brush::Gradient)
-    )
-  }
-}
-
-impl Layer {
-  fn new(viewport: DeviceRect) -> Self { Layer { viewport, commands: vec![] } }
-}
-
-impl TexturePrimIdsMap {
+impl TextureIdxMap {
   fn new_phase(&mut self) {
     self.texture_map.clear();
     self.textures.clear();
   }
 
-  fn prim_id(&mut self, id: TextureID) -> u32 {
+  fn tex_idx(&mut self, id: TextureID) -> u32 {
     *self.texture_map.entry(id).or_insert_with(|| {
       let idx = self.textures.len();
       self.textures.push(id);
@@ -388,6 +341,35 @@ impl TexturePrimIdsMap {
   fn all_textures(&self) -> &[TextureID] { &self.textures }
 }
 
+pub fn vertices_coord(pos: Point, tex_size: DeviceSize) -> [f32; 2] {
+  [
+    pos.x / tex_size.width as f32,
+    pos.y / tex_size.height as f32,
+  ]
+}
+
+pub fn add_draw_rect_vertices<Attr: Copy>(
+  [lt, rt, rb, lb]: [Point; 4],
+  tex_size: DeviceSize,
+  attr: Attr,
+  buffer: &mut VertexBuffers<Attr>,
+) {
+  let VertexBuffers { vertices, indices } = buffer;
+
+  let vertex_start = vertices.len() as u32;
+  vertices.push(Vertex::new(vertices_coord(lt, tex_size), attr));
+  vertices.push(Vertex::new(vertices_coord(rt, tex_size), attr));
+  vertices.push(Vertex::new(vertices_coord(rb, tex_size), attr));
+  vertices.push(Vertex::new(vertices_coord(lb, tex_size), attr));
+
+  indices.push(vertex_start);
+  indices.push(vertex_start + 3);
+  indices.push(vertex_start + 2);
+  indices.push(vertex_start + 2);
+  indices.push(vertex_start + 1);
+  indices.push(vertex_start);
+}
+
 #[cfg(test)]
 mod tests {
   use crate::WgpuImpl;
@@ -396,25 +378,27 @@ mod tests {
   use futures::executor::block_on;
   use ribir_algo::ShareResource;
   use ribir_painter::{
-    font_db::FontDB, shaper::TextShaper, Brush, Color, DeviceSize, Painter, PixelImage, Point,
-    Rect, Size, TypographyStore,
+    font_db::FontDB, geom, shaper::TextShaper, Brush, Color, DeviceSize, Painter, Path, PixelImage,
+    Point, Rect, Size, Transform, TypographyStore,
   };
   use std::sync::{Arc, RwLock};
 
-  fn painter() -> Painter {
+  fn painter(bounds: Size) -> Painter {
     let font_db = Arc::new(RwLock::new(FontDB::default()));
     let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
-    Painter::new(1., Rect::from_size(Size::new(1024., 1024.)), store)
+    Painter::new(Rect::from_size(bounds), store)
   }
 
-  fn commands_to_image(commands: Vec<PaintCommand>) -> PixelImage {
-    let rect = DeviceRect::from_size(DeviceSize::new(1024, 512));
-    let mut gpu_impl = block_on(WgpuImpl::headless(AntiAliasing::Msaa4X));
-    let mut texture = gpu_impl.new_texture(rect.size, ColorFormat::Rgba8);
-    let mut gpu_backend = GPUBackend::new(gpu_impl);
+  fn commands_to_image(painter: &mut Painter) -> PixelImage {
+    let commands = painter.finish();
+    let bounds = painter.paint_bounds().to_i32();
+    let rect = DeviceRect::from_size(DeviceSize::new(bounds.max_x() + 2, bounds.max_y() + 2));
+    let mut gpu_impl = block_on(WgpuImpl::headless());
+    let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
+    let mut gpu_backend = GPUBackend::new(gpu_impl, AntiAliasing::Msaa4X);
     gpu_backend.begin_frame();
     gpu_backend.gpu_impl.start_capture();
-    gpu_backend.draw_commands(rect, commands, &mut texture);
+    gpu_backend.draw_commands(rect, commands, Color::TRANSPARENT, &mut texture);
     let img = texture.copy_as_image(&rect, &mut gpu_backend.gpu_impl);
     gpu_backend.end_frame();
     let img = block_on(img).unwrap();
@@ -437,16 +421,12 @@ mod tests {
         .end_path(true);
     }
 
-    let mut painter = painter();
+    let mut painter = painter(Size::new(1024., 512.));
 
     let img = PixelImage::from_png(include_bytes!("../test_imgs/leaves.png"));
     let share_img = ShareResource::new(img);
 
-    let img_brush = Brush::Image {
-      img: share_img,
-      opacity: 1.,
-      transform: <_>::default(),
-    };
+    let img_brush = Brush::Image(share_img);
 
     draw_arrow_path(&mut painter);
     painter.set_brush(Color::RED).fill();
@@ -463,14 +443,15 @@ mod tests {
     draw_arrow_path(&mut painter);
     painter.set_brush(img_brush).set_line_width(5.).stroke();
 
-    let img = commands_to_image(painter.finish());
+    let img = commands_to_image(&mut painter);
+
     let expect = PixelImage::from_png(include_bytes!("../test_imgs/smoke_arrow.png"));
     assert!(img == expect);
   }
 
   #[test]
   fn transform_img_brush() {
-    let mut painter = painter();
+    let mut painter = painter(Size::new(1024., 512.));
 
     let transform = Transform::new(1., 1., 2., 1., 0., 0.);
     let rect: Rect = Rect::new(Point::new(10., 10.), Size::new(100., 100.));
@@ -490,8 +471,73 @@ mod tests {
       .rect(&rect)
       .fill();
 
-    let img = commands_to_image(painter.finish());
+    let img = commands_to_image(&mut painter);
+
     let expect = PixelImage::from_png(include_bytes!("../test_imgs/transform_brush.png"));
+    assert!(img == expect);
+  }
+
+  #[test]
+  fn clip_layers() {
+    let mut painter = painter(Size::new(1024., 512.));
+    let rect_100x100 = Rect::from_size(Size::new(100., 100.));
+    painter
+      .set_brush(Color::RED)
+      .translate(10., 20.)
+      .rect(&rect_100x100)
+      .fill()
+      .translate(0., 200.)
+      .clip(Path::circle(Point::new(50., 50.), 50.))
+      .rect(&rect_100x100)
+      .fill();
+
+    let img = commands_to_image(&mut painter);
+
+    let expect = PixelImage::from_png(include_bytes!("../test_imgs/clip_layers.png"));
+    assert!(img == expect);
+  }
+
+  #[test]
+  fn stroke_include_border() {
+    let mut painter = painter(Size::new(100., 100.));
+    painter
+      .set_brush(Color::RED)
+      .begin_path(Point::new(50., 5.))
+      .line_to(Point::new(95., 50.))
+      .line_to(Point::new(50., 95.))
+      .line_to(Point::new(5., 50.))
+      .end_path(true)
+      .set_line_width(10.)
+      .stroke();
+
+    let img = commands_to_image(&mut painter);
+
+    let expect = PixelImage::from_png(include_bytes!("../test_imgs/border_include.png"));
+    assert!(img == expect);
+  }
+
+  #[test]
+  fn two_img_brush() {
+    let mut painter = painter(Size::new(200., 100.));
+
+    let brush1 = PixelImage::from_png(include_bytes!("../test_imgs/leaves.png"));
+    let brush2 = PixelImage::from_png(include_bytes!(
+      "../../ribir/examples/attachments/3DDD-1.png"
+    ));
+    let rect = geom::rect(0., 0., 100., 100.);
+    painter
+      .set_brush(brush1)
+      .rect(&rect)
+      .fill()
+      .set_brush(brush2)
+      .translate(100., 0.)
+      .clip(Path::circle(Point::new(50., 50.), 50.))
+      .rect(&rect)
+      .fill();
+
+    let img = commands_to_image(&mut painter);
+
+    let expect = PixelImage::from_png(include_bytes!("../test_imgs/two_img_brush.png"));
     assert!(img == expect);
   }
 }

@@ -2,6 +2,7 @@ use ribir_core::{
   prelude::*,
   window::{ShellWindow, WindowId},
 };
+use ribir_gpu::WgpuTexture;
 use winit::event_loop::EventLoopWindowTarget;
 
 pub struct WinitShellWnd {
@@ -14,7 +15,7 @@ pub struct WinitShellWnd {
 struct WinitWgpu {
   surface: wgpu::Surface,
   backend: ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>,
-  current_texture: Option<wgpu::SurfaceTexture>,
+  current_texture: Option<WgpuTexture>,
 }
 
 #[cfg(feature = "wgpu")]
@@ -22,11 +23,7 @@ impl WinitWgpu {
   fn new(window: &winit::window::Window) -> WinitWgpu {
     let instance = wgpu::Instance::new(<_>::default());
     let surface = unsafe { instance.create_surface(window).unwrap() };
-    let wgpu = AppContext::wait_future(ribir_gpu::WgpuImpl::new(
-      AntiAliasing::Msaa4X,
-      instance,
-      Some(&surface),
-    ));
+    let wgpu = AppContext::wait_future(ribir_gpu::WgpuImpl::new(instance, Some(&surface)));
     let size = window.inner_size();
     surface.configure(
       &wgpu.device(),
@@ -35,7 +32,7 @@ impl WinitWgpu {
 
     WinitWgpu {
       surface,
-      backend: ribir_gpu::GPUBackend::new(wgpu),
+      backend: ribir_gpu::GPUBackend::new(wgpu, AntiAliasing::Msaa4X),
       current_texture: None,
     }
   }
@@ -49,7 +46,7 @@ impl WinitWgpu {
 
   fn surface_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
     wgpu::SurfaceConfiguration {
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
       format: wgpu::TextureFormat::Bgra8Unorm,
       width,
       height,
@@ -62,19 +59,31 @@ impl WinitWgpu {
   fn begin_frame(&mut self) {
     self.backend.begin_frame();
     assert!(self.current_texture.is_none());
-    self.current_texture = Some(self.surface.get_current_texture().unwrap());
+    let surface_tex = self.surface.get_current_texture().unwrap();
+    self.current_texture = Some(WgpuTexture::from_surface_tex(surface_tex));
   }
 
-  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>) {
+  fn draw_commands(
+    &mut self,
+    viewport: DeviceRect,
+    commands: Vec<PaintCommand>,
+    surface_color: Color,
+  ) {
     let surface = self.current_texture.as_mut().unwrap();
+
     self
       .backend
-      .draw_commands(viewport, commands, &mut surface.texture);
+      .draw_commands(viewport, commands, surface_color, surface);
   }
 
   fn end_frame(&mut self) {
-    let surface = self.current_texture.take().unwrap();
     self.backend.end_frame();
+    let surface = self
+      .current_texture
+      .take()
+      .unwrap()
+      .into_surface_texture()
+      .unwrap();
     surface.present();
   }
 }
@@ -98,13 +107,12 @@ impl ShellWindow for WinitShellWnd {
     Size::new(size.width, size.height)
   }
 
-  #[inline]
-  fn device_scale(&self) -> f32 { self.winit_wnd.scale_factor() as f32 }
-
   fn set_size(&mut self, size: Size) {
-    self
-      .winit_wnd
-      .set_inner_size(winit::dpi::LogicalSize::new(size.width, size.height));
+    if self.inner_size() != size {
+      self
+        .winit_wnd
+        .set_inner_size(winit::dpi::LogicalSize::new(size.width, size.height));
+    }
     let size = self.winit_wnd.inner_size();
     self.backend.resize(size.width, size.height);
   }
@@ -122,8 +130,21 @@ impl ShellWindow for WinitShellWnd {
   fn begin_frame(&mut self) { self.backend.begin_frame() }
 
   #[inline]
-  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>) {
-    self.backend.draw_commands(viewport, commands);
+  fn draw_commands(&mut self, viewport: Rect, mut commands: Vec<PaintCommand>, surface: Color) {
+    commands.iter_mut().for_each(|c| match c {
+      PaintCommand::ColorPath { path, .. }
+      | PaintCommand::ImgPath { path, .. }
+      | PaintCommand::Clip(path) => path.scale(self.winit_wnd.scale_factor() as f32),
+      PaintCommand::PopClip => {}
+    });
+
+    let scale = self.winit_wnd.scale_factor() as f32;
+    let viewport = viewport
+      .scale(scale, scale)
+      .round_out()
+      .to_i32()
+      .cast_unit();
+    self.backend.draw_commands(viewport, commands, surface);
   }
 
   #[inline]

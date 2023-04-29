@@ -19,11 +19,9 @@ impl Compose for TodoMVP {
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
         let text_style = TypographyTheme::of(ctx).display_large.text.clone();
-        let surface: Brush = Palette::of(ctx).surface().clone().into();
       }
       Column {
         padding: EdgeInsets::all(10.),
-        background: surface.clone(),
         Text {
           margin: EdgeInsets::only_bottom(10.),
           text: "Todo",

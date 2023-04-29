@@ -80,19 +80,39 @@ impl App {
 
     let Self { windows, event_loop, .. } = self;
 
+    fn wnd_device_scale(wnd: &Window) -> f64 {
+      wnd
+        .shell_wnd()
+        .as_any()
+        .downcast_ref::<WinitShellWnd>()
+        .unwrap()
+        .winit_wnd
+        .scale_factor()
+    }
+
     event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
       *control = ControlFlow::Wait;
 
       match event {
         Event::WindowEvent { event, window_id } => {
-          if event == WindowEvent::CloseRequested {
-            windows.remove(&new_id(window_id));
-          } else if event == WindowEvent::Destroyed {
-            if windows.is_empty() {
-              *control = ControlFlow::Exit;
+          if let Some(wnd) = windows.get_mut(&new_id(window_id)) {
+            match event {
+              WindowEvent::CloseRequested => {
+                windows.remove(&new_id(window_id));
+                if windows.is_empty() {
+                  *control = ControlFlow::Exit;
+                }
+              }
+              WindowEvent::Resized(size) => {
+                let device_scale = wnd_device_scale(wnd);
+                let size = size.to_logical(device_scale);
+                wnd.set_size(Size::new(size.width, size.height));
+              }
+              event => {
+                let device_scale = wnd_device_scale(wnd);
+                wnd.processes_native_event_with_scale(event, device_scale);
+              }
             }
-          } else if let Some(wnd) = windows.get_mut(&new_id(window_id)) {
-            wnd.processes_native_event(event);
           }
         }
         Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {

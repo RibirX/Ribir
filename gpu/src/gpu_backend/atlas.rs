@@ -1,6 +1,6 @@
 use crate::GPUBackendImpl;
 use guillotiere::{AllocId, Allocation, AtlasAllocator};
-use ribir_painter::{image::ColorFormat, DevicePoint, DeviceRect, DeviceSize};
+use ribir_painter::{image::ColorFormat, AntiAliasing, DevicePoint, DeviceRect, DeviceSize};
 
 use super::Texture;
 
@@ -15,11 +15,11 @@ pub(crate) struct Atlas<T: Texture> {
 }
 
 impl<T: Texture> Atlas<T> {
-  pub fn new(format: ColorFormat, gpu_impl: &mut T::Host) -> Self
+  pub fn new(format: ColorFormat, anti_aliasing: AntiAliasing, gpu_impl: &mut T::Host) -> Self
   where
     T::Host: GPUBackendImpl<Texture = T>,
   {
-    let texture = gpu_impl.new_texture(ATLAS_MIN_SIZE, format);
+    let texture = gpu_impl.new_texture(ATLAS_MIN_SIZE, anti_aliasing, format);
     Self {
       texture,
       atlas_allocator: AtlasAllocator::new(ATLAS_MIN_SIZE.cast_unit()),
@@ -36,11 +36,15 @@ impl<T: Texture> Atlas<T> {
     let alloc_size = size.to_i32().cast_unit();
     let mut alloc = self.atlas_allocator.allocate(alloc_size);
     if alloc.is_none() {
-      let expand_size = (size * 2).min(ATLAS_MAX_SIZE);
+      let expand_size = (size * 2).max(self.size()).min(ATLAS_MAX_SIZE);
       if expand_size != self.texture.size() {
         self.atlas_allocator.grow(expand_size.cast_unit());
-        let mut new_tex = gpu_impl.new_texture(expand_size, self.texture.color_format());
-        gpu_impl.copy_texture_to_texture(
+        let mut new_tex = gpu_impl.new_texture(
+          expand_size,
+          self.texture.anti_aliasing(),
+          self.texture.color_format(),
+        );
+        gpu_impl.copy_texture_from_texture(
           &mut new_tex,
           DevicePoint::zero(),
           &self.texture,

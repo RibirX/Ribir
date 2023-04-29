@@ -522,7 +522,7 @@ mod tests {
     let shaper = TextShaper::new(font_db.clone());
     let store = TypographyStore::new(<_>::default(), font_db, shaper);
     let win_size = Size::new(150., 50.);
-    let mut painter = Painter::new(2., Rect::from_size(win_size), store);
+    let mut painter = Painter::new(Rect::from_size(win_size), store);
 
     let w1 = widget! {
        MockMulti {

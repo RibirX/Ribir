@@ -1,18 +1,21 @@
-use std::ops::Range;
-
 use crate::{
   path_builder::{stroke_path, PathBuilder},
   Point, Rect, Transform,
 };
 use lyon_algorithms::{
   measure::{PathMeasurements, SampleType},
-  path::Path as LyonPath,
+  path::{Event, Path as LyonPath},
 };
 use serde::{Deserialize, Serialize};
+use std::ops::Range;
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Path(pub(crate) LyonPath);
+pub struct Path {
+  pub(crate) lyon_path: LyonPath,
+  // the bounds of the path.
+  pub(crate) bounds: Rect,
+}
 
 /// Describe how to paint path, fill or stroke.
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
@@ -80,9 +83,16 @@ pub enum LineJoin {
 pub enum PathSegment {
   MoveTo(Point),
   LineTo(Point),
-  QuadTo(Point, Point),
-  CubicTo(Point, Point, Point),
-  Close,
+  QuadTo {
+    ctrl: Point,
+    to: Point,
+  },
+  CubicTo {
+    to: Point,
+    ctrl1: Point,
+    ctrl2: Point,
+  },
+  Close(bool),
 }
 
 /// The radius of each corner of a rounded rectangle.
@@ -115,11 +125,8 @@ impl Path {
   #[inline]
   pub fn builder() -> PathBuilder { PathBuilder::default() }
 
-  pub fn bounding_box(&self) -> Rect {
-    lyon_algorithms::aabb::bounding_box(&self.0)
-      .to_rect()
-      .cast_unit()
-  }
+  #[inline]
+  pub fn bounds(&self) -> &Rect { &self.bounds }
 
   /// create a rect path.
   pub fn rect(rect: &Rect) -> Self {
@@ -148,7 +155,7 @@ impl Path {
   /// `ts` is the current transform of the path pre applied. Provide it have a
   /// more precise convert.
   pub fn stroke(&self, options: &StrokeOptions, ts: Option<&Transform>) -> Option<Path> {
-    stroke_path(&self.0, options, ts).map(Path)
+    stroke_path(&self.lyon_path, options, ts).map(Into::into)
   }
 
   /// Returns a transformed path in place.
@@ -156,14 +163,34 @@ impl Path {
   /// Some points may become NaN/inf therefore this method can fail.
   pub fn transform(self, ts: &Transform) -> Self {
     let ts: &lyon_algorithms::geom::Transform<f32> = unsafe { std::mem::transmute(ts) };
-    Self(self.0.transformed(ts))
+    self.lyon_path.transformed(ts).into()
   }
 
   /// Create an sampler that can queries point at this path or usb-path of this
   /// path.
   pub fn sampler(&self) -> PathSampler {
-    let measurements = PathMeasurements::from_path(&self.0, 1e-3);
-    PathSampler { path: self.0.clone(), measurements }
+    let measurements = PathMeasurements::from_path(&self.lyon_path, 1e-3);
+    PathSampler {
+      path: self.lyon_path.clone(),
+      measurements,
+    }
+  }
+
+  pub fn segments(&self) -> impl Iterator<Item = PathSegment> + '_ {
+    self.lyon_path.iter().map(|e| match e {
+      Event::Begin { at } => PathSegment::MoveTo(at.cast_unit()),
+      Event::Line { to, .. } => PathSegment::LineTo(to.cast_unit()),
+      Event::Quadratic { ctrl, to, .. } => PathSegment::QuadTo {
+        ctrl: ctrl.cast_unit(),
+        to: to.cast_unit(),
+      },
+      Event::Cubic { ctrl1, ctrl2, to, .. } => PathSegment::CubicTo {
+        to: to.cast_unit(),
+        ctrl1: ctrl1.cast_unit(),
+        ctrl2: ctrl2.cast_unit(),
+      },
+      Event::End { close, .. } => PathSegment::Close(close),
+    })
   }
 
   #[cfg(feature = "tessellation")]
@@ -178,7 +205,7 @@ impl Path {
     let mut fill_tess = FillTessellator::default();
     fill_tess
       .tessellate_path(
-        &self.0,
+        &self.lyon_path,
         &FillOptions::non_zero().with_tolerance(tolerance),
         &mut BuffersBuilder::new(buffer, move |v: FillVertex| {
           vertex_ctor(v.position().cast_unit())
@@ -222,7 +249,7 @@ impl PathSampler {
     let mut sampler = self.measurements.create_sampler(&self.path, t);
     let mut builder = LyonPath::builder();
     sampler.split_range(range, &mut builder);
-    Path(builder.build())
+    builder.build().into()
   }
 }
 
@@ -274,6 +301,15 @@ impl Radius {
 
   #[inline]
   pub fn bottom_right(bottom_right: f32) -> Self { Radius { bottom_right, ..<_>::default() } }
+}
+
+impl From<LyonPath> for Path {
+  fn from(lyon_path: LyonPath) -> Self {
+    let bounds = lyon_algorithms::aabb::bounding_box(&lyon_path)
+      .to_rect()
+      .cast_unit();
+    Path { lyon_path, bounds }
+  }
 }
 
 impl Default for StrokeOptions {

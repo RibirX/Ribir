@@ -29,8 +29,6 @@ impl ShellWindow for MockShellWindow {
 
   fn outer_size(&self) -> Size { self.size }
 
-  fn device_scale(&self) -> f32 { 1. }
-
   fn set_size(&mut self, size: Size) { self.size = size; }
 
   fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
@@ -41,7 +39,7 @@ impl ShellWindow for MockShellWindow {
 
   fn begin_frame(&mut self) {}
 
-  fn draw_commands(&mut self, _: DeviceRect, _: Vec<PaintCommand>) {}
+  fn draw_commands(&mut self, _: Rect, _: Vec<PaintCommand>, _: Color) {}
 
   fn end_frame(&mut self) {}
 

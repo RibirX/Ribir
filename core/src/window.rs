@@ -19,6 +19,7 @@ pub struct Window {
   /// all task finished before current frame end.
   frame_pool: FramePool,
   shell_wnd: Box<dyn ShellWindow>,
+  pub(crate) size: Size,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -28,43 +29,34 @@ pub trait ShellWindow {
   fn id(&self) -> WindowId;
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
-  fn device_scale(&self) -> f32;
   fn set_size(&mut self, size: Size);
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
-
   fn as_any(&self) -> &dyn Any;
 
   fn begin_frame(&mut self);
-  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>);
+  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>, surface: Color);
   fn end_frame(&mut self);
 }
 
 impl Window {
-  /// processes native events from this native window
+  #[deprecated(note = "The core window should not depends on shell window event.")]
   #[inline]
-  pub fn processes_native_event(&mut self, event: WindowEvent) {
-    match event {
-      WindowEvent::Resized(size) => {
-        let size = size.to_logical(self.painter.device_scale() as f64);
-        self.resize(Size::new(size.width, size.height));
-      }
-      WindowEvent::ScaleFactorChanged { new_inner_size, scale_factor } => {
-        let size = new_inner_size.to_logical(scale_factor);
-        self
-          .set_device_factor(scale_factor as f32)
-          .resize(Size::new(size.width, size.height));
-        self.resize(Size::new(size.width, size.height));
-      }
-      event => self.dispatcher.dispatch(
-        event,
-        &mut self.widget_tree,
-        self.painter.device_scale() as f64,
-      ),
-    };
+  /// processes native events from this native window
+
+  pub fn processes_native_event_with_scale(&mut self, event: WindowEvent, device_scale: f64) {
+    self
+      .dispatcher
+      .dispatch(event, &mut self.widget_tree, device_scale);
     if let Some(icon) = self.dispatcher.take_cursor_icon() {
       self.shell_wnd.set_cursor(icon);
     }
+  }
+
+  #[deprecated(note = "The core window should not depends on shell window event.")]
+  #[inline]
+  pub fn processes_native_event(&mut self, event: WindowEvent) {
+    self.processes_native_event_with_scale(event, 1.);
   }
 
   /// Draw an image what current render tree represent.
@@ -90,12 +82,16 @@ impl Window {
     self.dispatcher.refresh_focus(&self.widget_tree);
 
     self.widget_tree.draw(&mut self.painter);
-    let scale = self.shell_wnd.device_scale();
-    let wnd_size = (self.shell_wnd.inner_size() * scale).to_i32().cast_unit();
 
-    self
-      .shell_wnd
-      .draw_commands(DeviceRect::from_size(wnd_size), self.painter.finish());
+    let surface = match self.context.app_theme().as_ref() {
+      Theme::Full(theme) => theme.palette.surface(),
+      Theme::Inherit(_) => unreachable!(),
+    };
+    self.shell_wnd.draw_commands(
+      Rect::from_size(self.shell_wnd.inner_size()),
+      self.painter.finish(),
+      surface,
+    );
 
     self.shell_wnd.end_frame();
     self.context.end_frame();
@@ -119,7 +115,7 @@ impl Window {
     let widget_tree = WidgetTree::new(root, wnd_ctx.clone());
     let dispatcher = Dispatcher::new(wnd_ctx.focus_mgr.clone());
     let size = shell_wnd.inner_size();
-    let mut painter = Painter::new(shell_wnd.device_scale(), Rect::from_size(size), typography);
+    let mut painter = Painter::new(Rect::from_size(size), typography);
     painter.set_bounds(Rect::from_size(size));
     Self {
       dispatcher,
@@ -128,6 +124,7 @@ impl Window {
       painter,
       frame_pool,
       shell_wnd,
+      size,
     }
   }
 
@@ -139,19 +136,15 @@ impl Window {
     self
   }
 
-  pub fn set_device_factor(&mut self, device_scale: f32) -> &mut Self {
-    self.painter.set_device_scale(device_scale);
-    self
-  }
-
-  fn resize(&mut self, size: Size) {
-    if self.shell_wnd.inner_size() != size {
+  pub fn set_size(&mut self, size: Size) {
+    if size != self.size {
+      self.size = size;
       self.shell_wnd.set_size(size);
+      self.widget_tree.mark_dirty(self.widget_tree.root());
+      self.widget_tree.store.remove(self.widget_tree.root());
+      self.painter.set_bounds(Rect::from_size(size));
+      self.painter.reset();
     }
-    self.painter.finish();
-    self.widget_tree.mark_dirty(self.widget_tree.root());
-    self.widget_tree.store.remove(self.widget_tree.root());
-    self.painter.set_bounds(Rect::from_size(size));
   }
 
   pub fn shell_wnd(&self) -> &dyn ShellWindow { &*self.shell_wnd }
@@ -181,7 +174,7 @@ mod tests {
     assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(100., 100.)));
 
     let new_size = Size::new(200., 200.);
-    wnd.resize(new_size);
+    wnd.set_size(new_size);
     wnd.draw_frame();
     assert_layout_result(&wnd, &[0], &ExpectRect::from_size(new_size));
   }

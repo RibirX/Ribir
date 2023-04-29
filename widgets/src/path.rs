@@ -60,7 +60,7 @@ pub struct PathWidget {
 impl Render for PathWidget {
   #[inline]
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
-    self.path.bounding_box().max().to_vector().to_size()
+    self.path.bounds().max().to_vector().to_size()
   }
 
   paint_method!();

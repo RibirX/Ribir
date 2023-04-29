@@ -1,4 +1,4 @@
-use crate::{Color, PixelImage, Transform};
+use crate::{Color, PixelImage};
 use ribir_algo::ShareResource;
 use ribir_text::{Em, FontFace, FontSize, Pixel};
 use serde::{Deserialize, Serialize};
@@ -22,12 +22,7 @@ pub struct TextStyle {
 pub enum Brush {
   Color(Color),
   /// Image brush always use a repeat mode to brush the path.
-  Image {
-    img: ShareResource<PixelImage>,
-    opacity: f32,
-    /// Transform applied to the image before brush the path.
-    transform: Transform,
-  },
+  Image(ShareResource<PixelImage>),
   Gradient, // todo,
 }
 
@@ -36,14 +31,6 @@ impl Brush {
     match self {
       Brush::Color(color) => f(color).into(),
       _ => panic!("Need Color!"),
-    }
-  }
-
-  pub fn apply_opacify(&mut self, alpha: f32) {
-    match self {
-      Brush::Color(c) => *c = c.apply_alpha(alpha),
-      Brush::Image { opacity, .. } => *opacity *= alpha,
-      Brush::Gradient => todo!(),
     }
   }
 }
@@ -66,13 +53,7 @@ impl From<Color> for Brush {
 
 impl From<ShareResource<PixelImage>> for Brush {
   #[inline]
-  fn from(img: ShareResource<PixelImage>) -> Self {
-    Brush::Image {
-      img,
-      opacity: 1.,
-      transform: Transform::identity(),
-    }
-  }
+  fn from(img: ShareResource<PixelImage>) -> Self { Brush::Image(img) }
 }
 
 impl From<PixelImage> for Brush {

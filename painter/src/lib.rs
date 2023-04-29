@@ -42,3 +42,24 @@ pub type DeviceVector = euclid::Vector2D<i32, PhysicUnit>;
 pub use euclid::Transform2D;
 pub const INFINITY_SIZE: Size = Size::new(f32::INFINITY, f32::INFINITY);
 pub const ZERO_SIZE: Size = Size::new(0., 0.);
+
+pub mod geom {
+  pub use euclid::rect;
+  use std::ops::Add;
+
+  /// Return the four corners of a rectangle: [left-top, right-top,
+  /// right-bottom, left-bottom]
+  pub fn rect_corners<T, U>(rect: &euclid::Rect<T, U>) -> [euclid::Point2D<T, U>; 4]
+  where
+    T: Copy + Add<Output = T>,
+  {
+    use euclid::Point2D;
+
+    [
+      rect.min(),
+      Point2D::new(rect.max_x(), rect.min_y()),
+      rect.max(),
+      Point2D::new(rect.min_x(), rect.max_y()),
+    ]
+  }
+}

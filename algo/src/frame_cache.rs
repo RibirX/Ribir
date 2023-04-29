@@ -73,7 +73,13 @@ where
     })
   }
 
-  pub fn remove(&mut self, key: K) -> Option<V> { self.cache.remove(&key).map(|c| c.value) }
+  pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+  where
+    K: Borrow<Q>,
+    Q: Hash + Eq,
+  {
+    self.cache.remove(&key).map(|c| c.value)
+  }
 
   pub fn insert(&mut self, key: K, value: V) -> Option<V> {
     self

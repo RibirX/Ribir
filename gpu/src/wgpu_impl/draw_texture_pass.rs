@@ -1,10 +1,10 @@
 use super::buffer_pool::BufferPool;
-use crate::{command_encoder, GPUBackendImpl, WgpuImpl};
-use ribir_painter::{DevicePoint, DeviceRect, Vertex};
+use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, WgpuTexture};
+use ribir_painter::{geom::rect_corners, DevicePoint, DeviceRect, DeviceSize, Vertex};
 use std::mem::size_of;
 const POOL_SIZE: usize = 256;
 
-pub struct DrawTextPass {
+pub struct DrawTexturePass {
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
   layout: wgpu::PipelineLayout,
@@ -13,7 +13,7 @@ pub struct DrawTextPass {
   vertices_pool: BufferPool<[Vertex<[f32; 2]>; 4]>,
 }
 
-impl DrawTextPass {
+impl DrawTexturePass {
   pub fn new(device: &wgpu::Device) -> Self {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
       label: Some("Draw texture to texture"),
@@ -97,7 +97,7 @@ impl DrawTextPass {
           entry_point: "fs_main",
           targets: &[Some(wgpu::ColorTargetState {
             format,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            blend: Some(wgpu::BlendState::REPLACE),
             write_mask: wgpu::ColorWrites::all(),
           })],
         }),
@@ -131,78 +131,51 @@ impl DrawTextPass {
 impl WgpuImpl {
   pub(crate) fn draw_texture_to_texture(
     &mut self,
-    dist_tex: &wgpu::Texture,
-    copy_to: DevicePoint,
-    from_tex: &wgpu::Texture,
-    from_rect: &DeviceRect,
+    dist_tex: &WgpuTexture,
+    dist_at: DevicePoint,
+    from_tex: &WgpuTexture,
+    src_rect: &DeviceRect,
   ) {
     if self.draw_tex_pass.vertices_pool.is_full() {
       self.submit();
     }
 
+    fn vertices_corners(rect: &DeviceRect, tex_size: DeviceSize) -> [[f32; 2]; 4] {
+      let [a, b, c, d] = rect_corners(&rect.to_f32().cast_unit());
+      [
+        vertices_coord(a, tex_size),
+        vertices_coord(b, tex_size),
+        vertices_coord(c, tex_size),
+        vertices_coord(d, tex_size),
+      ]
+    }
+
     let draw_tex_pass = &mut self.draw_tex_pass;
     draw_tex_pass.update(dist_tex.format(), &self.device);
 
-    let dist_tex_width = dist_tex.width() as f32;
-    let dist_tex_height = dist_tex.height() as f32;
-    let src_tex_width = from_tex.width() as f32;
-    let src_tex_height = from_tex.height() as f32;
-    let copy_to = copy_to.to_f32();
-    let from_rect = from_rect.to_f32();
+    let [d_lt, d_rt, d_rb, d_lb] = vertices_corners(
+      &DeviceRect::new(dist_at, src_rect.size),
+      Texture::size(dist_tex),
+    );
+
+    let [s_lt, s_rt, s_rb, s_lb] = vertices_corners(src_rect, Texture::size(from_tex));
 
     let address = draw_tex_pass
       .vertices_pool
       .push_value([
-        Vertex::new(
-          [
-            Self::map_x(copy_to.x, dist_tex_width),
-            Self::map_y(copy_to.y, dist_tex_height),
-          ],
-          [
-            Self::map_x(from_rect.origin.x, src_tex_width),
-            Self::map_y(from_rect.origin.y, src_tex_height),
-          ],
-        ),
-        Vertex::new(
-          [
-            Self::map_x(copy_to.x, dist_tex_width),
-            Self::map_y(copy_to.y + from_rect.height(), dist_tex_height),
-          ],
-          [
-            Self::map_x(from_rect.origin.x, src_tex_width),
-            Self::map_y(from_rect.max().y, src_tex_height),
-          ],
-        ),
-        Vertex::new(
-          [
-            Self::map_x(copy_to.x + from_rect.width(), dist_tex_width),
-            Self::map_y(copy_to.y, dist_tex_height),
-          ],
-          [
-            Self::map_x(from_rect.max().x, src_tex_width),
-            Self::map_y(from_rect.origin.y, src_tex_height),
-          ],
-        ),
-        Vertex::new(
-          [
-            Self::map_x(copy_to.x + from_rect.width(), dist_tex_width),
-            Self::map_y(copy_to.y + from_rect.height(), dist_tex_height),
-          ],
-          [
-            Self::map_x(from_rect.max().x, src_tex_width),
-            Self::map_y(from_rect.max().y, src_tex_height),
-          ],
-        ),
+        Vertex::new(d_lt, s_lt),
+        Vertex::new(d_lb, s_lb),
+        Vertex::new(d_rt, s_rt),
+        Vertex::new(d_rb, s_rb),
       ])
       .unwrap();
 
-    let tex_view_desc = <_>::default();
     let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
       layout: &draw_tex_pass.bind_layout,
       entries: &[
         wgpu::BindGroupEntry {
           binding: 0,
-          resource: wgpu::BindingResource::TextureView(&from_tex.create_view(&tex_view_desc)),
+          resource: wgpu::BindingResource::TextureView(from_tex.view()),
         },
         wgpu::BindGroupEntry {
           binding: 1,
@@ -212,9 +185,8 @@ impl WgpuImpl {
       label: Some("Color primitives storage bind group"),
     });
 
-    let view = dist_tex.create_view(&tex_view_desc);
     let color_attachments = wgpu::RenderPassColorAttachment {
-      view: &view,
+      view: dist_tex.view(),
       resolve_target: None,
       ops: wgpu::Operations {
         load: wgpu::LoadOp::Load,
@@ -233,10 +205,10 @@ impl WgpuImpl {
     rpass.set_bind_group(0, &bind_group, &[]);
 
     rpass.set_scissor_rect(
-      copy_to.x as u32,
-      copy_to.y as u32,
-      from_rect.width() as u32,
-      from_rect.height() as u32,
+      dist_at.x as u32,
+      dist_at.y as u32,
+      src_rect.width() as u32,
+      src_rect.height() as u32,
     );
     rpass.set_pipeline(&draw_tex_pass.pipeline.as_ref().unwrap());
 

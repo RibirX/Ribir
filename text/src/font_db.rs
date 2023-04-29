@@ -3,7 +3,7 @@ pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::Point;
 use ribir_algo::FrameCache;
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use crate::{FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
@@ -266,17 +266,17 @@ impl Face {
 
   pub fn as_rb_face(&self) -> &rustybuzz::Face { &self.rb_face }
 
+  // todo: should return its tight bounds
   pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<lyon_path::Path> {
     let mut builder = GlyphOutlineBuilder::default();
     self
       .rb_face
       .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder)?;
-
     Some(builder.into_path())
   }
 
   #[inline]
-  pub fn units_per_em(&self) -> i32 { self.rb_face.units_per_em() }
+  pub fn units_per_em(&self) -> u16 { self.rb_face.deref().units_per_em() }
 }
 
 fn to_db_family(f: &FontFamily) -> Family {

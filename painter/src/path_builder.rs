@@ -158,12 +158,15 @@ impl PathBuilder {
   #[inline]
   pub fn stroke(self, options: &StrokeOptions, ts: Option<&Transform>) -> Option<Path> {
     let path = self.lyon_builder.build();
-    stroke_path(&path, options, ts).map(Path)
+    stroke_path(&path, options, ts).map(Into::into)
   }
 
   /// Build a fill path, witch should fill with `style`
   #[inline]
-  pub fn build(self) -> Path { Path(self.lyon_builder.build()) }
+  pub fn build(self) -> Path {
+    // todo: we can store an anti-aliasing flag for the path.
+    self.lyon_builder.build().into()
+  }
 }
 
 pub(crate) fn stroke_path(

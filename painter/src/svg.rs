@@ -149,7 +149,7 @@ fn usvg_path_to_path(path: &usvg::Path) -> Path {
     usvg::PathSegment::ClosePath => builder.close(),
   });
 
-  Path(builder.build())
+  builder.build().into()
 }
 
 fn point(x: f64, y: f64) -> lyon_algorithms::math::Point {
