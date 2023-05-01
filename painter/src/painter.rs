@@ -90,7 +90,7 @@ pub enum AntiAliasing {
 }
 
 /// A path and its geometry information are friendly to paint and cache.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaintPath {
   /// The path to painting, and its axis is relative to the `bounds`.
   pub path: Path,
@@ -98,7 +98,7 @@ pub struct PaintPath {
   pub bounds: DeviceRect,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
   Fill { paint_path: PaintPath, brush: Brush },
   Clip(PaintPath),
@@ -116,7 +116,7 @@ struct PainterState {
   text_line_height: Option<Em>,
   transform: Transform,
   opacity: f32,
-  clip_cnt: u32,
+  clip_cnt: usize,
   bounds: DeviceRect,
 }
 
@@ -167,7 +167,7 @@ impl Painter {
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
-    self.reset();
+    self.fill_all_pop_clips();
     self.commands.drain(..).collect()
   }
 
@@ -194,14 +194,7 @@ impl Painter {
   pub fn restore(&mut self) {
     let clip_cnt = self.current_state().clip_cnt;
     self.state_stack.pop();
-
-    (self.current_state().clip_cnt..clip_cnt).for_each(|_| {
-      if matches!(self.commands.last(), Some(PaintCommand::Clip(_))) {
-        self.commands.pop();
-      } else {
-        self.commands.push(PaintCommand::PopClip)
-      }
-    });
+    self.push_n_pop_cmd(clip_cnt - self.current_state().clip_cnt);
   }
 
   pub fn set_device_scale(&mut self, device_scale: f32) {
@@ -211,6 +204,7 @@ impl Painter {
   }
 
   pub fn reset(&mut self) {
+    self.fill_all_pop_clips();
     let device_bounds = self
       .bounds
       .scale(self.device_scale, self.device_scale)
@@ -596,6 +590,22 @@ impl Painter {
       }
     });
   }
+
+  fn push_n_pop_cmd(&mut self, n: usize) {
+    for _ in 0..n {
+      if matches!(self.commands.last(), Some(PaintCommand::Clip(_))) {
+        self.commands.pop();
+      } else {
+        self.commands.push(PaintCommand::PopClip)
+      }
+    }
+  }
+
+  fn fill_all_pop_clips(&mut self) {
+    let clip_cnt = self.current_state().clip_cnt;
+    self.state_stack.iter_mut().for_each(|s| s.clip_cnt = 0);
+    self.push_n_pop_cmd(clip_cnt);
+  }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -697,13 +707,12 @@ impl PaintCommand {
 
 #[cfg(test)]
 mod test {
+  use super::*;
+  use crate::geom::rect;
   use ribir_text::shaper::TextShaper;
 
-  use super::*;
-
-  #[test]
-  fn save_guard() {
-    let mut layer = Painter::new(
+  fn painter() -> Painter {
+    Painter::new(
       1.,
       Rect::from_size(Size::new(512., 512.)),
       TypographyStore::new(
@@ -711,23 +720,54 @@ mod test {
         <_>::default(),
         TextShaper::new(<_>::default()),
       ),
-    );
+    )
+  }
+
+  #[test]
+  fn save_guard() {
+    let mut painter = painter();
     {
-      let mut paint = layer.save_guard();
+      let mut guard = painter.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
-      paint.set_transform(t);
-      assert_eq!(&t, paint.get_transform());
+      guard.set_transform(t);
+      assert_eq!(&t, guard.get_transform());
       {
-        let mut p2 = paint.save_guard();
+        let mut p2 = guard.save_guard();
         let t2 = Transform::new(2., 2., 2., 2., 2., 2.);
         p2.set_transform(t2);
         assert_eq!(&t2, p2.get_transform());
       }
-      assert_eq!(&t, paint.get_transform());
+      assert_eq!(&t, guard.get_transform());
     }
     assert_eq!(
       &Transform::new(1., 0., 0., 1., 0., 0.),
-      layer.get_transform()
+      painter.get_transform()
     );
+  }
+
+  #[test]
+  fn fix_clip_pop_without_restore() {
+    let mut painter = painter();
+    let commands = painter
+      .save()
+      .clip(Path::rect(&rect(0., 0., 100., 100.)))
+      .rect(&rect(0., 0., 10., 10.))
+      .fill()
+      .save()
+      .clip(Path::rect(&rect(0., 0., 50., 50.)))
+      .rect(&rect(0., 0., 10., 10.))
+      .fill()
+      .finish();
+
+    assert_eq!(painter.current_state().clip_cnt, 0);
+
+    assert!(matches!(
+      commands[commands.len() - 1],
+      PaintCommand::PopClip
+    ));
+    assert!(matches!(
+      commands[commands.len() - 2],
+      PaintCommand::PopClip
+    ));
   }
 }
