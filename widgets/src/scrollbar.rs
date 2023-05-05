@@ -65,7 +65,8 @@ impl ComposeDecorator for VScrollBarThumbDecorator {
 
 impl ComposeChild for HScrollBar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states { this: this.into_writable() }
       Stack {
@@ -104,7 +105,8 @@ pub struct VScrollBar {
 
 impl ComposeChild for VScrollBar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states { this: this.into_writable() }
       Stack {
@@ -142,7 +144,8 @@ pub struct BothScrollbar {
 
 impl ComposeChild for BothScrollbar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states { this: this.into_writable() }
       Stack {
@@ -186,7 +189,8 @@ pub struct HRawScrollbar {
 }
 
 impl Compose for HRawScrollbar {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     let this = this.into_writable();
     let scrolling = this.state_ref().scrolling.clone();
 
@@ -238,7 +242,8 @@ pub struct VRawScrollbar {
 }
 
 impl Compose for VRawScrollbar {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     let this = this.into_writable();
     let scrolling = this.state_ref().scrolling.clone();
 

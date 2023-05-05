@@ -141,7 +141,7 @@ impl ComposeDecorator for ListsDecorator {
 
 impl ComposeChild for Lists {
   type Child = Vec<Widget>;
-
+  type Target = Widget;
   fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
     widget! {
       init ctx => {
@@ -306,8 +306,8 @@ pub struct ListItemTemplate {
 
 impl ComposeChild for ListItem {
   type Child = ListItemTemplate;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let ListItemTemplate {
       headline,
       supporting,

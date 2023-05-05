@@ -12,7 +12,8 @@ pub struct Cursor {
 
 impl ComposeChild for Cursor {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states {
         save_cursor: Stateful::new(None),

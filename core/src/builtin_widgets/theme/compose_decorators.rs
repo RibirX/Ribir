@@ -20,8 +20,8 @@ pub trait ComposeDecorator: Sized {
 
 impl<W: ComposeDecorator + 'static> ComposeChild for W {
   type Child = W::Host;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     (move |ctx: &BuildCtx| {
       let tid = TypeId::of::<W>();
       let style = ctx.find_cfg(|t| match t {

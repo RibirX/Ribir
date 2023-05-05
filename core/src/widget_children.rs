@@ -48,7 +48,8 @@ pub trait MultiChild {}
 /// and its child.
 pub trait ComposeChild: Sized {
   type Child;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget;
+  type Target;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target;
 }
 
 /// A alias of `WidgetPair<W, Widget>`, means `Widget` is the child of the
@@ -82,7 +83,7 @@ mod tests {
 
     impl ComposeChild for Page {
       type Child = PageTml;
-
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
@@ -106,7 +107,7 @@ mod tests {
 
     impl ComposeChild for Parent {
       type Child = Option<WidgetPair<Child, Widget>>;
-
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
@@ -138,7 +139,7 @@ mod tests {
 
     impl ComposeChild for A {
       type Child = Vec<B>;
-
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
       }
@@ -212,6 +213,7 @@ mod tests {
 
     impl ComposeChild for P {
       type Child = WidgetOf<MockBox>;
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { unreachable!() }
     }
 
@@ -225,6 +227,7 @@ mod tests {
     struct X;
     impl ComposeChild for X {
       type Child = WidgetOf<MockBox>;
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
     }
 
@@ -239,6 +242,7 @@ mod tests {
 
     impl ComposeChild for X {
       type Child = MockBox;
+      type Target = Widget;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
@@ -263,6 +267,7 @@ mod tests {
 
     impl ComposeChild for X {
       type Child = State<MockBox>;
+      type Target = Widget;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
     }
 
@@ -304,6 +309,7 @@ mod tests {
     const EXPECT_SIZE: Size = Size::new(100., 200.);
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         widget! { MockBox { size: EXPECT_SIZE } }.into_widget()
       }
@@ -328,7 +334,7 @@ mod tests {
 
     impl ComposeChild for A {
       type Child = Vec<Widget>;
-
+      type Target = Widget;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
         MockMulti.with_child(child).into_widget()
       }
@@ -351,6 +357,7 @@ mod tests {
     struct M;
     impl ComposeChild for M {
       type Child = Vec<Widget>;
+      type Target = Widget;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
     }
 

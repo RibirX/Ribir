@@ -47,8 +47,8 @@ pub struct ButtonTemplate {
 
 impl ComposeChild for ButtonImpl {
   type Child = ButtonTemplate;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let ButtonTemplate { icon, label } = child;
     widget! {
       states { this: this.into_readonly() }

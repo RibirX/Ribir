@@ -588,7 +588,8 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
-      fn compose(this: State<Self>) -> Widget {
+      type Target = Widget;
+      fn compose(this: State<Self>) -> Self::Target {
         widget! {
           states { this: this.into_writable() }
           MockBox {
@@ -633,7 +634,8 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: State<Self>) -> Widget {
+      type Target = Widget;
+      fn compose(this: State<Self>) -> Self::Target {
         widget! {
           states { this: this.into_writable() }
           MockBox {

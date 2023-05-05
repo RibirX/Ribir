@@ -8,8 +8,9 @@ pub struct DelayDropWidget {
 
 impl ComposeChild for DelayDropWidget {
   type Child = Widget;
+  type Target = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let this = match this {
       State::Stateless(w) => Stateful::new(w),
       State::Stateful(w) => w,

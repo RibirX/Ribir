@@ -93,8 +93,8 @@ impl Checkbox {
 
 impl ComposeChild for Checkbox {
   type Child = Option<CheckboxTemplate>;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states { this: this.into_writable() }
       init ctx => {

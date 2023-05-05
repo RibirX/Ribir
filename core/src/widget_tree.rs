@@ -257,7 +257,8 @@ mod tests {
   }
 
   impl Compose for Recursive {
-    fn compose(this: State<Self>) -> Widget {
+    type Target = Widget;
+    fn compose(this: State<Self>) -> Self::Target {
       widget! {
         states { this: this.into_writable() }
         MockMulti {
@@ -287,7 +288,8 @@ mod tests {
   }
 
   impl Compose for Embed {
-    fn compose(this: State<Self>) -> Widget {
+    type Target = Widget;
+    fn compose(this: State<Self>) -> Self::Target {
       widget! {
         states { this: this.into_writable()}
         MockMulti {

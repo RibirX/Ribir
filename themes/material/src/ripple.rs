@@ -37,8 +37,8 @@ pub enum RippleBound {
 
 impl ComposeChild for Ripple {
   type Child = Widget;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states { this: this.into_writable() }
       init ctx => {

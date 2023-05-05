@@ -7,7 +7,8 @@ enum AB {
 
 const SIZE_ONE: Size = Size::new(1., 1.);
 impl Compose for AB {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_writable() }
       SizedBox {
@@ -70,7 +71,8 @@ fn path_widget() {
 fn tuple_widget() {
   struct TupleBox(Size);
   impl Compose for TupleBox {
-    fn compose(this: State<Self>) -> Widget {
+    type Target = Widget;
+    fn compose(this: State<Self>) -> Self::Target {
       widget! {
         states { this: this.into_readonly() }
         SizedBox { size: this.0 }

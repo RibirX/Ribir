@@ -95,7 +95,8 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: State<Self>) -> Widget {
+      type Target = Widget;
+      fn compose(this: State<Self>) -> Self::Target {
         widget! {
           states { this: this.into_writable() }
           MockBox {

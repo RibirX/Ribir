@@ -39,7 +39,8 @@ pub struct FocusNode {
 
 impl ComposeChild for FocusNode {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let this = this.into_writable();
 
     let w = widget! {
@@ -93,7 +94,8 @@ pub struct RequestFocus {
 
 impl ComposeChild for RequestFocus {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let this = this.into_writable();
     let w = widget! {
       states { this: this.clone() }
@@ -139,6 +141,7 @@ mod tests {
 
     impl ComposeChild for AutoFocusNode {
       type Child = Widget;
+      type Target = Widget;
       #[inline]
       fn compose_child(_this: State<Self>, child: Self::Child) -> Widget {
         dynamic_compose_focus_node(child)

@@ -23,7 +23,8 @@ pub struct InteractiveLayer {
 }
 
 impl Compose for StateLayer {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget!(
       states { this: this.into_readonly() }
       PathPaintKit {
@@ -37,8 +38,8 @@ impl Compose for StateLayer {
 
 impl ComposeChild for InteractiveLayer {
   type Child = Widget;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     widget! {
       states { this: this.into_readonly() }
       Stack {

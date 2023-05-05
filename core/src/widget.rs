@@ -16,9 +16,10 @@ pub use std::{
 };
 use std::{cell::RefCell, rc::Rc};
 pub trait Compose: Sized {
+  type Target;
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: State<Self>) -> Widget;
+  fn compose(this: State<Self>) -> Self::Target;
 }
 
 pub struct HitTest {
@@ -82,28 +83,19 @@ impl Widget {
   pub fn new<M: ImplMarker, W: IntoWidget<M>>(w: W) -> Widget { w.into_widget() }
 }
 
-pub struct ClosureWidget<F, R>
-where
-  F: FnOnce(&BuildCtx) -> R + 'static,
-{
+#[derive(Clone)]
+pub struct ClosureWidget<F> {
   closure: F,
 }
 
-impl<F, R> ClosureWidget<F, R>
+impl<F, R> ClosureWidget<F>
 where
   F: FnOnce(&BuildCtx) -> R + 'static,
 {
   pub fn new(closure: F) -> Self { Self { closure } }
 }
 
-impl<F, R> Clone for ClosureWidget<F, R>
-where
-  F: FnOnce(&BuildCtx) -> R + 'static + Clone,
-{
-  fn clone(&self) -> Self { Self { closure: self.closure.clone() } }
-}
-
-impl<F, R, M> IntoWidget<NotSelf<M>> for ClosureWidget<F, R>
+impl<F, R, M> IntoWidget<NotSelf<M>> for ClosureWidget<F>
 where
   F: FnOnce(&BuildCtx) -> R + 'static,
   R: IntoWidget<M>,
@@ -213,9 +205,12 @@ impl IntoWidget<SelfImpl> for Widget {
 
 macro_rules! impl_compose_into_widget {
   ($ty: ty) => {
-    impl<C: Compose> IntoWidget<NotSelf<[(); 0]>> for $ty {
+    impl<C: Compose, M: ImplMarker> IntoWidget<NotSelf<[M; 0]>> for $ty
+    where
+      C::Target: IntoWidget<M>,
+    {
       #[inline]
-      fn into_widget(self) -> Widget { Compose::compose(State::<C>::from(self)) }
+      fn into_widget(self) -> Widget { Compose::compose(State::<C>::from(self)).into_widget() }
     }
   };
 }
@@ -253,12 +248,16 @@ where
 
 macro_rules! impl_compose_option_child_into_widget {
   ($ty: ty) => {
-    impl<T, C> IntoWidget<NotSelf<[(); 2]>> for $ty
+    impl<T, C, M> IntoWidget<NotSelf<[M; 2]>> for $ty
     where
       T: ComposeChild<Child = Option<C>> + 'static,
+      T::Target: IntoWidget<M>,
+      M: ImplMarker,
     {
       #[inline]
-      fn into_widget(self) -> Widget { ComposeChild::compose_child(State::<T>::from(self), None) }
+      fn into_widget(self) -> Widget {
+        ComposeChild::compose_child(State::<T>::from(self), None).into_widget()
+      }
     }
   };
 }

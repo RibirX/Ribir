@@ -98,7 +98,8 @@ macro_rules! define_text_with_theme_style {
     }
 
     impl Compose for $name {
-      fn compose(this: State<Self>) -> Widget {
+      type Target = Widget;
+      fn compose(this: State<Self>) -> Self::Target {
         widget! {
           init ctx => { let style = TypographyTheme::of(ctx).$style.text.clone(); }
           states { this: this.into_readonly() }

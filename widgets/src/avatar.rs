@@ -52,7 +52,7 @@ pub enum AvatarTemplate {
 
 impl ComposeChild for Avatar {
   type Child = AvatarTemplate;
-
+  type Target = Widget;
   fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
     widget! {
       init ctx => {

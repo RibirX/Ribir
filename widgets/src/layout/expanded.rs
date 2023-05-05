@@ -12,8 +12,9 @@ pub struct Expanded {
 
 impl ComposeChild for Expanded {
   type Child = Widget;
+  type Target = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let w = widget! {
       ConstrainedBox {
         clamp: BoxClamp {

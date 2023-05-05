@@ -14,7 +14,8 @@ struct MessageList {
 }
 
 impl Compose for MessageList {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_readonly() }
       init ctx => {

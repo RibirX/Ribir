@@ -35,8 +35,9 @@ macro_rules! impl_compose_child_for_listener {
   ($listener: ident) => {
     impl ComposeChild for $listener {
       type Child = Widget;
+      type Target = Widget;
       #[inline]
-      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+      fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
         compose_child_as_data_widget(child, this)
       }
     }
@@ -48,7 +49,8 @@ macro_rules! impl_compose_child_with_focus_for_listener {
   ($listener: ident) => {
     impl ComposeChild for $listener {
       type Child = Widget;
-      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+      type Target = Widget;
+      fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
         let widget = dynamic_compose_focus_node(child);
         compose_child_as_data_widget(widget, this)
       }

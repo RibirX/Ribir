@@ -327,8 +327,9 @@ impl EventListener for TapListener {
 
 impl ComposeChild for TapListener {
   type Child = Widget;
+  type Target = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     compose_child_as_data_widget(child, this)
   }
 }

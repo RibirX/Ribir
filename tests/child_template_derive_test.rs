@@ -16,7 +16,7 @@ struct ChildTemplateOfP {
 
 impl ComposeChild for P {
   type Child = ChildTemplateOfP;
-
+  type Target = Widget;
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
 }
 
@@ -28,7 +28,7 @@ struct TupleStructTemplate(ChildA, Option<ChildB>, Option<ChildC>);
 
 impl ComposeChild for P2 {
   type Child = TupleStructTemplate;
-
+  type Target = Widget;
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
 }
 
@@ -44,7 +44,7 @@ enum EnumTml {
 
 impl ComposeChild for P3 {
   type Child = EnumTml;
-
+  type Target = Widget;
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
 }
 

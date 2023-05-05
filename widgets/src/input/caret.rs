@@ -13,7 +13,8 @@ pub struct Caret {
 }
 
 impl Compose for Caret {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_readonly() }
       SizedBox {

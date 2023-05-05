@@ -84,8 +84,9 @@ pub struct ThemeWidget {
 
 impl ComposeChild for ThemeWidget {
   type Child = Widget;
+  type Target = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     use crate::prelude::*;
     widget! {
       init ctx => { ctx.app_ctx().load_font_from_theme(this.theme.clone()); }

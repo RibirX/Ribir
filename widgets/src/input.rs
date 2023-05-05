@@ -50,6 +50,7 @@ impl Input {
 
 impl ComposeChild for Input {
   type Child = Option<Placeholder>;
+  type Target = Widget;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
       states {

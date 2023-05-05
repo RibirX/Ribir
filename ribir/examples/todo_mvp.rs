@@ -13,7 +13,8 @@ struct TodoMVP {
 }
 
 impl Compose for TodoMVP {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_writable(), id_gen: Stateful::new(this.state_ref().tasks.len()) }
       init ctx => {

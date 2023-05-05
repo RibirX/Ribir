@@ -10,7 +10,8 @@ pub(crate) struct SelectedText {
 }
 
 impl Compose for SelectedText {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_readonly() }
       init ctx => {

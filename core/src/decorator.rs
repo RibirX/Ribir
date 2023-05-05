@@ -38,8 +38,8 @@ pub struct Decorator<Host, F: Fn(Host) -> Widget> {
 
 impl<Host, F: Fn(Host) -> Widget> ComposeChild for Decorator<Host, F> {
   type Child = Host;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
     let this = match this {
       State::Stateless(this) => this,
       State::Stateful(_) => panic!("A hasn't any public fields, it should never be stateful."),

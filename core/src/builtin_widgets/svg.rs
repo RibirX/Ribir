@@ -8,7 +8,8 @@ pub struct Svg {
 }
 
 impl Compose for Svg {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_readonly() }
       DynWidget {

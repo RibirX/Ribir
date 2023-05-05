@@ -202,16 +202,18 @@ mod decorate_tml_impl {
   impl<T, C: TmlFlag> DecorateTmlMarker for ComposePair<T, C> {}
 }
 
-impl<W, M, C> IntoWidget<NotSelf<[M; 0]>> for ComposePair<State<W>, C>
+impl<W, M1, M2, C> IntoWidget<NotSelf<[(M1, M2); 2]>> for ComposePair<State<W>, C>
 where
   W: ComposeChild,
-  C: IntoChild<M, W::Child>,
-  M: ImplMarker,
+  W::Target: IntoWidget<M2>,
+  C: IntoChild<M1, W::Child>,
+  M1: ImplMarker,
+  M2: ImplMarker,
 {
   #[inline]
   fn into_widget(self) -> Widget {
     let Self { widget, child } = self;
-    ComposeChild::compose_child(widget, child.into_child())
+    ComposeChild::compose_child(widget, child.into_child()).into_widget()
   }
 }
 
@@ -258,6 +260,7 @@ mod tests {
 
   impl ComposeChild for P {
     type Child = PTml;
+    type Target = Widget;
     fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
   }
 
@@ -266,7 +269,7 @@ mod tests {
 
   impl ComposeChild for X {
     type Child = Widget;
-
+    type Target = Widget;
     fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
   }
 
@@ -306,7 +309,7 @@ mod tests {
 
     impl ComposeChild for WithDecorate {
       type Child = DecorateTml<Tml, A>;
-
+      type Target = Widget;
       fn compose_child(_this: State<Self>, child: Self::Child) -> Widget {
         child.decorate(|_, _| Void.into_widget())
       }
@@ -326,7 +329,7 @@ mod tests {
 
     impl ComposeChild for WithDecorate {
       type Child = EmbedDecorateTml;
-
+      type Target = Widget;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
         child.0.decorate(|_, _| Void.into_widget())
       }

@@ -107,7 +107,8 @@ type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
 impl ComposeChild for TextFieldThemeProxy {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget
+  type Target = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target
   where
     Self: Sized,
   {
@@ -287,6 +288,7 @@ macro_rules! take_option_field {
 
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
+  type Target = Widget;
   fn compose_child(this: State<Self>, config: Self::Child) -> Widget
   where
     Self: Sized,
@@ -414,7 +416,8 @@ struct TextFieldLabel {
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     widget! {
       states { this: this.into_readonly() }
       init ctx => {

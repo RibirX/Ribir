@@ -137,11 +137,14 @@ where
 }
 
 // ComposePair<W, C> --> DecorateTml<W, C2>
-impl<W, C, T, C2, M> IntoChild<NotSelf<[M; 8]>, DecorateTml<T, C2>> for ComposePair<State<W>, C>
+impl<W, C, T, C2, M1, M2> IntoChild<NotSelf<[(M1, M2); 8]>, DecorateTml<T, C2>>
+  for ComposePair<State<W>, C>
 where
   W: ComposeChild<Child = Widget> + 'static,
-  C: IntoChild<M, DecorateTml<T, C2>>,
-  M: ImplMarker,
+  W::Target: IntoWidget<M2>,
+  C: IntoChild<M1, DecorateTml<T, C2>>,
+  M1: ImplMarker,
+  M2: ImplMarker,
   T: TmlFlag,
 {
   #[inline]
@@ -149,7 +152,7 @@ where
     let ComposePair { widget, child } = self;
     let DecorateTml { decorator, tml_flag, child } = child.into_child();
     DecorateTml {
-      decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w))),
+      decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w)).into_widget()),
       tml_flag,
       child,
     }
@@ -295,12 +298,14 @@ where
   }
 }
 
-impl<W, C, T, C2, M> IntoEnumVariable<NotSelf<[M; 2]>, DecorateTml<T, C2>>
+impl<W, C, T, C2, M1, M2> IntoEnumVariable<NotSelf<[(M1, M2); 2]>, DecorateTml<T, C2>>
   for ComposePair<State<W>, C>
 where
   W: ComposeChild<Child = Widget> + 'static,
-  C: IntoEnumVariable<M, DecorateTml<T, C2>>,
-  M: ImplMarker,
+  W::Target: IntoWidget<M2>,
+  C: IntoEnumVariable<M1, DecorateTml<T, C2>>,
+  M1: ImplMarker,
+  M2: ImplMarker,
   T: TmlFlag,
 {
   #[inline]
@@ -308,7 +313,7 @@ where
     let ComposePair { widget, child } = self;
     let DecorateTml { decorator, tml_flag, child } = child.into_variable();
     DecorateTml {
-      decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w))),
+      decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w)).into_widget()),
       tml_flag,
       child,
     }

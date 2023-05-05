@@ -19,6 +19,7 @@ pub struct Row {
 
 impl ComposeChild for Row {
   type Child = Vec<Widget>;
+  type Target = Widget;
   fn compose_child(this: State<Self>, children: Self::Child) -> Widget {
     widget! {
       states { this: this.into_readonly() }

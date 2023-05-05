@@ -19,7 +19,8 @@ struct HeroCard {
 }
 
 impl Compose for HeroCard {
-  fn compose(this: State<Self>) -> Widget {
+  type Target = Widget;
+  fn compose(this: State<Self>) -> Self::Target {
     unreachable!("We don't care how implement `HeroCard` here, but focus on how to use it.")
   }
 }

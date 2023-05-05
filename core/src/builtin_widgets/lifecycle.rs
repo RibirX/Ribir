@@ -102,7 +102,8 @@ macro_rules! impl_lifecycle {
   ($listener: ident, $declarer:ident, $field: ident, $stream_name: ident) => {
     impl ComposeChild for $listener {
       type Child = Widget;
-      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+      type Target = Widget;
+      fn compose_child(this: State<Self>, child: Self::Child) -> Self::Target {
         compose_child_as_data_widget(child, this)
       }
     }
