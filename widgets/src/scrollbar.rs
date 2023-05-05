@@ -294,7 +294,7 @@ fn safe_recip(v: f32) -> f32 {
 
 impl CustomStyle for ScrollBarStyle {}
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(ScrollBarStyle {
     thumb_min_size: 12.,
     thickness: 8.,

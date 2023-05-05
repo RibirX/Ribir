@@ -136,7 +136,7 @@ impl ComposeChild for Checkbox {
   }
 }
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(CheckBoxStyle {
     icon_size: Size::splat(24.),
     label_style: theme.typography_theme.body_large.text.clone(),
