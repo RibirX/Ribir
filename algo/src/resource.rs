@@ -89,6 +89,7 @@ mod tests {
     let b = ShareResource::new(5);
     assert_ne!(a, b);
 
+    #[allow(clippy::redundant_clone)]
     let a2 = a.clone();
     assert_eq!(a, a2);
     assert!(5 == *a2);
