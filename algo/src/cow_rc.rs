@@ -8,8 +8,7 @@ use std::{
 };
 
 #[derive(Eq)]
-
-///! A copy on write smart pointer shared value without deep clone .
+/// A copy on write smart pointer shared value without deep clone .
 pub enum CowArc<B: ToOwned + ?Sized + 'static> {
   /// Borrowed  data
   Borrowed(&'static B),
