@@ -397,7 +397,7 @@ impl ComposeDecorator for ListItemDecorator {
   fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
 }
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(ListItemStyle {
     padding_style: Some(EdgeInsets {
       left: 0.,

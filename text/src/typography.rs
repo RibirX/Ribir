@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, ops::Range};
+use std::ops::Range;
 
 use lyon_path::geom::{euclid::num::Zero, euclid::UnknownUnit, Size};
 pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
@@ -206,11 +206,11 @@ where
     if self.cfg.line_dir.is_horizontal() {
       let mut cursor = VInlineCursor { pos: self.inline_cursor };
       p.runs
-        .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
+        .for_each(|r| self.consume_run_with_letter_space_cursor(&r, &mut cursor));
     } else {
       let mut cursor = HInlineCursor { pos: self.inline_cursor };
       p.runs
-        .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
+        .for_each(|r| self.consume_run_with_letter_space_cursor(&r, &mut cursor));
     }
     self.end_line();
 

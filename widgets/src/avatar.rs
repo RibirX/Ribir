@@ -102,7 +102,7 @@ impl ComposeChild for Avatar {
   }
 }
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(40.),
     radius: Some(20.),

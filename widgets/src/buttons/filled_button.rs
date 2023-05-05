@@ -116,7 +116,7 @@ impl ComposeChild for FilledButton {
   }
 }
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(FilledButtonStyle {
     height: 40.,
     icon_size: Size::splat(18.),

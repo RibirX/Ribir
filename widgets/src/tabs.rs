@@ -346,7 +346,7 @@ impl ComposeChild for Tabs {
   }
 }
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(TabsStyle {
     extent_with_both: 64.,
     extent_only_label: 48.,
