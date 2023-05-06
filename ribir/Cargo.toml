@@ -22,7 +22,7 @@ ribir_widgets = {path = "../widgets", version = "0.0.0"}
 [dev-dependencies]
 env_logger.workspace = true
 image.workspace = true
-ribir_theme_material = { path = "../themes/material", version = "0.0.0" }
+ribir_material = {path = "../themes/material", version = "0.0.0"}
 
 [features]
 default = ["wgpu_gl"]

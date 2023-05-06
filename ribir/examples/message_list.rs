@@ -1,5 +1,5 @@
 use ribir::prelude::*;
-use ribir_theme_material::material_svgs;
+use ribir_material::material_svgs;
 
 #[derive(Clone)]
 struct Message {
@@ -133,7 +133,7 @@ fn main() {
     ],
   };
 
-  let theme = ribir_theme_material::purple::dark();
+  let theme = ribir_material::purple::dark();
   let app = Application::new(theme);
   let wnd = Window::builder(message_list.into_widget())
     .with_inner_size(Size::new(320., 568.))
