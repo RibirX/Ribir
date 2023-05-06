@@ -1,0 +1,39 @@
+on:
+  workflow_dispatch: # allows manual triggering
+  schedule:
+    - cron: '0 2 * * 2' # runs every tuesday at 00:00
+name: "release weekly alpha version"
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Required to count the commits
+      - name: Get new commits
+        run: echo "NEW_COMMIT_COUNT=$(git log --oneline --since '1 week' | wc -l)" >> $GITHUB_ENV
+      - name: Install nightly toolchain
+        if: ${{ env.NEW_COMMIT_COUNT > 0 }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2023-02-01
+          override: true
+      - name: Install cargo-release
+        if: ${{ env.NEW_COMMIT_COUNT > 0 }}
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
+      - name: Cargo login
+        if: ${{ env.NEW_COMMIT_COUNT > 0 }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: login
+          args: ${{ secrets.CRATE_RELEASE_TOKEN }}
+      - name: Run cargo release
+        if: ${{ env.NEW_COMMIT_COUNT > 0 }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: release
+          args: alpha
+        
