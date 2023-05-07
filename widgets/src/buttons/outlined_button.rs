@@ -18,7 +18,8 @@ impl CustomStyle for OutlinedButtonStyle {}
 #[derive(Clone, Declare)]
 pub struct OutlinedButtonDecorator {
   #[allow(unused)]
-  button_type: ButtonType,
+  pub button_type: ButtonType,
+  pub color: Color,
 }
 
 impl ComposeDecorator for OutlinedButtonDecorator {
@@ -63,8 +64,8 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 /// ```
 #[derive(Declare, Default)]
 pub struct OutlinedButton {
-  #[declare(default=Palette::of(ctx).primary(), convert=into)]
-  color: Brush,
+  #[declare(default=Palette::of(ctx).primary())]
+  color: Color,
 }
 
 impl ComposeChild for OutlinedButton {
@@ -97,6 +98,7 @@ impl ComposeChild for OutlinedButton {
       }
       OutlinedButtonDecorator {
         button_type,
+        color: this.color,
         ButtonImpl {
           height,
           icon_size,
@@ -104,12 +106,11 @@ impl ComposeChild for OutlinedButton {
           icon_pos,
           label_style,
           background_color: None,
-          foreground_color: this.color
-            .only_convert_color(|color| palette1.base_of(color)),
+          foreground_color: Brush::from(palette1.base_of(&this.color)),
           radius,
           border_style: Border::all(BorderSide {
             width: border_width,
-            color: this.color.only_convert_color(|color| palette2.base_of(color)),
+            color: Brush::from(palette2.base_of(&this.color))
           }),
           padding_style,
 

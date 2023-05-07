@@ -16,7 +16,8 @@ impl CustomStyle for ButtonStyle {}
 #[derive(Clone, Declare)]
 pub struct ButtonDecorator {
   #[allow(unused)]
-  button_type: ButtonType,
+  pub button_type: ButtonType,
+  pub color: Color,
 }
 
 impl ComposeDecorator for ButtonDecorator {
@@ -52,8 +53,8 @@ impl ComposeDecorator for ButtonDecorator {
 /// ```
 #[derive(Declare, Default)]
 pub struct Button {
-  #[declare(default=Palette::of(ctx).primary(), convert=into)]
-  color: Brush,
+  #[declare(default=Palette::of(ctx).primary())]
+  color: Color,
 }
 
 impl ComposeChild for Button {
@@ -83,6 +84,7 @@ impl ComposeChild for Button {
       }
       ButtonDecorator {
         button_type,
+        color: this.color,
         ButtonImpl {
           height,
           icon_size,
@@ -90,8 +92,7 @@ impl ComposeChild for Button {
           icon_pos,
           label_style,
           background_color: None,
-          foreground_color: this.color
-            .only_convert_color(|color| palette.base_of(color)),
+          foreground_color: Brush::from(palette.base_of(&this.color)),
           radius: None,
           border_style: None,
           padding_style,

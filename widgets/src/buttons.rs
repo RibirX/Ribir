@@ -3,6 +3,8 @@ use ribir_core::prelude::*;
 
 #[derive(Declare)]
 pub struct ButtonImpl {
+  #[declare(default = 48.)]
+  pub min_width: f32,
   pub height: f32,
   pub icon_size: Size,
   pub label_gap: f32,
@@ -52,16 +54,17 @@ impl ComposeChild for ButtonImpl {
     let ButtonTemplate { icon, label } = child;
     widget! {
       states { this: this.into_readonly() }
-      ConstrainedBox {
-        clamp: BoxClamp::fixed_height(this.height),
-        BoxDecoration {
-          border_radius: this.radius.map(Radius::all),
-          background: this.background_color.clone(),
-          border: this.border_style.clone(),
+      BoxDecoration {
+        border_radius: this.radius.map(Radius::all),
+        background: this.background_color.clone(),
+        border: this.border_style.clone(),
+        ConstrainedBox {
+          clamp: BoxClamp::min_width(this.min_width).with_fixed_height(this.height),
           DynWidget {
             dyns: Option::map(this.padding_style, |padding| Padding { padding }),
             Row {
-              v_align: VAlign::Center,
+              justify_content: JustifyContent::Center,
+              align_items: Align::Center,
               Option::map(icon, |icon| widget! {
                 Icon {
                   size: this.icon_size,
