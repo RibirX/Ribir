@@ -80,7 +80,7 @@ impl Render for HAlignWidget {
     let child_size = layouter.perform_widget_layout(clamp);
     let x = align.align_value(child_size.width, box_width);
     layouter.update_position(Point::new(x, 0.));
-    Size::new((child_size.width + x).max(0.), child_size.height)
+    Size::new(box_width, child_size.height)
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -108,7 +108,7 @@ impl Render for VAlignWidget {
     let child_size = layouter.perform_widget_layout(clamp);
     let y = align.align_value(child_size.height, box_height);
     layouter.update_position(Point::new(0., y));
-    Size::new(child_size.width, (child_size.height + y).max(0.))
+    Size::new(child_size.width, box_height)
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
