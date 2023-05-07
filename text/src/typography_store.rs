@@ -347,7 +347,6 @@ impl VisualGlyphs {
 
   pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect<f32> {
     let visual_lines = &self.visual_info.visual_lines;
-    let line_dir = self.visual_info.line_dir;
     if visual_lines.is_empty() {
       return Rect::zero();
     }
@@ -357,45 +356,42 @@ impl VisualGlyphs {
     }
 
     let line = &visual_lines[para];
-    let mut is_end = false;
-    let glyph = if offset >= line.glyphs.len() {
-      is_end = true;
-      line.glyphs.last()
-    } else {
-      line.glyphs.get(offset)
-    };
+    let glyph = line.glyphs.get(offset);
+    let line_dir = self.visual_info.line_dir;
 
     glyph.map_or_else(
-      move || {
-        Rect::new(
-          Point::new(self.to_pixel_value(line.x), self.to_pixel_value(line.y)),
-          Size::zero(),
-        )
-      },
-      move |glyph| {
-        let mut rc = Rect::new(
+      || match line_dir.is_horizontal() {
+        true => Rect::new(
           Point::new(
-            self.to_pixel_value(glyph.x_offset),
-            self.to_pixel_value(glyph.y_offset),
+            self.to_pixel_value(line.x),
+            self.to_pixel_value(line.y + line.height),
           ),
-          Size::new(
-            self.to_pixel_value(glyph.x_advance),
+          Size::new(self.to_pixel_value(line.width), 0.),
+        ),
+        false => Rect::new(
+          Point::new(
+            self.to_pixel_value(line.width + line.x),
+            self.to_pixel_value(line.y),
+          ),
+          Size::new(0., self.to_pixel_value(line.height)),
+        ),
+      },
+      |glyph| {
+        let orign = Point::new(
+          self.to_pixel_value(glyph.x_offset + line.x),
+          self.to_pixel_value(glyph.y_offset + line.y),
+        );
+        let size = match line_dir.is_horizontal() {
+          true => Size::new(
+            self.to_pixel_value(line.width),
             self.to_pixel_value(glyph.y_advance),
           ),
-        );
-        if is_end {
-          match line_dir.is_horizontal() {
-            true => {
-              rc.origin.y += rc.height();
-              rc.size.height = 0.;
-            }
-            false => {
-              rc.origin.x += rc.width();
-              rc.size.width = 0.;
-            }
-          }
-        }
-        rc
+          false => Size::new(
+            self.to_pixel_value(glyph.x_advance),
+            self.to_pixel_value(line.height),
+          ),
+        };
+        Rect::new(orign, size)
       },
     )
   }
@@ -440,11 +436,13 @@ impl VisualGlyphs {
     let mut jointer = TypoRectJointer::new();
     for line in &self.visual_info.visual_lines {
       let height = (line.height * self.scale).into();
+      let offset_x = self.to_pixel_value(line.x).into();
+      let offset_y = self.to_pixel_value(line.y).into();
       for glyph in &line.glyphs {
         if rg.contains(&(glyph.cluster as usize)) {
           let glyph = self.scale_to_pixel_glyph(glyph);
           let rc = Rect::new(
-            Point::new(glyph.x_offset, glyph.y_offset),
+            Point::new(glyph.x_offset + offset_x, glyph.y_offset + offset_y),
             Size::new(glyph.x_advance, height),
           );
           jointer.join_x(rc);
