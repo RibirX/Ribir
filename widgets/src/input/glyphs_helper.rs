@@ -19,7 +19,7 @@ impl GlyphsHelper {
     let (para, offset) = glyphs.position_by_cluster(cursor as u32);
     let glphy = glyphs.glyph_rect(para, offset);
     let line_height = glyphs.line_height(para);
-    (Point::new(glphy.min_x(), glphy.max_y()), line_height)
+    (Point::new(glphy.min_x(), glphy.min_y()), line_height)
   }
 
   pub(crate) fn selection(&self, rg: &Range<usize>) -> Vec<Rect> {
