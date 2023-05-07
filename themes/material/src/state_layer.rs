@@ -1,5 +1,5 @@
 use ribir_core::prelude::*;
-use ribir_widgets::prelude::Container;
+use ribir_widgets::prelude::{Container, StackFit};
 use ribir_widgets::{layout::Stack, path::PathPaintKit};
 
 /// Widget that as an visual indicator of material design used to present the
@@ -41,6 +41,7 @@ impl ComposeChild for InteractiveLayer {
     widget! {
       states { this: this.into_readonly() }
       Stack {
+        fit: StackFit::Passthrough,
         DynWidget { id: host, dyns: child }
         IgnorePointer {
           Container {

@@ -106,8 +106,6 @@ impl Compose for MessageList {
 }
 
 fn main() {
-  env_logger::init();
-
   let message_list = MessageList {
     messages: vec![
       Message {

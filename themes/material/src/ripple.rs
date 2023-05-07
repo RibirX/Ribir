@@ -47,6 +47,7 @@ impl ComposeChild for Ripple {
       }
       Stack {
         id: container,
+        fit: StackFit::Passthrough,
         on_pointer_down: move |e| this.launch_pos = if this.center {
           let center = container.layout_size() / 2.;
           Some(Point::new(center.width, center.height))

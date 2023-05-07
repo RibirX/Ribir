@@ -128,10 +128,10 @@ impl BoxDecoration {
       "radius can't be setted with different border"
     );
     let width_half = border.left.width / 2.;
-    let min_x = content_rect.min_x() - width_half;
-    let max_x = content_rect.max_x() + width_half;
-    let min_y = content_rect.min_y() - width_half;
-    let max_y = content_rect.max_y() + width_half;
+    let min_x = content_rect.min_x() + width_half;
+    let max_x = content_rect.max_x() - width_half;
+    let min_y = content_rect.min_y() + width_half;
+    let max_y = content_rect.max_y() - width_half;
     let radius = Radius::new(
       radius.top_left + width_half,
       radius.top_right + width_half,

@@ -79,7 +79,7 @@ pub enum Theme {
 
 #[derive(Declare)]
 pub struct ThemeWidget {
-  pub(crate) theme: Rc<Theme>,
+  pub theme: Rc<Theme>,
 }
 
 impl ComposeChild for ThemeWidget {

@@ -96,7 +96,7 @@ impl ComposeDecorator for TabsDecorator {
 #[derive(Template)]
 pub struct Tab {
   header: TabItem,
-  pane: WidgetOf<TabPane>,
+  pane: Option<WidgetOf<TabPane>>,
 }
 
 #[derive(Template)]
@@ -199,23 +199,25 @@ impl Tabs {
         let indicator = indicator.clone();
         widget! {
           states { tabs: tabs.clone() }
-          Expanded {
-            id: tab_header,
-            flex: 1.,
-            on_tap: move |_| if tabs.cur_idx != idx {
-              tabs.cur_idx = idx;
-            },
-            Flex {
-              align_items: Align::Center,
-              justify_content: JustifyContent::Center,
-              direction: match icon_pos {
-                Position::Left | Position::Right => Direction::Horizontal,
-                Position::Top | Position::Bottom => Direction::Vertical,
+          TabDecorator {
+            Expanded {
+              id: tab_header,
+              flex: 1.,
+              on_tap: move |_| if tabs.cur_idx != idx {
+                tabs.cur_idx = idx;
               },
-              reverse: matches!(icon_pos, Position::Right | Position::Bottom),
-              widget::from(icon_widget)
-              // todo: insert `Spacer`
-              widget::from(label_widget)
+              Flex {
+                align_items: Align::Center,
+                justify_content: JustifyContent::Center,
+                direction: match icon_pos {
+                  Position::Left | Position::Right => Direction::Horizontal,
+                  Position::Top | Position::Bottom => Direction::Vertical,
+                },
+                reverse: matches!(icon_pos, Position::Right | Position::Bottom),
+                widget::from(icon_widget)
+                // todo: insert `Spacer`
+                widget::from(label_widget)
+              }
             }
           }
           finally {
@@ -238,7 +240,9 @@ impl ComposeChild for Tabs {
     for tab in child.into_iter() {
       let Tab { header, pane } = tab;
       headers.push((header.icon, header.label));
-      panes.push(pane.child);
+      if let Some(pane) = pane {
+        panes.push(pane.child)
+      }
     }
 
     widget! {
