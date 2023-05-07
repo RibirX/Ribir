@@ -78,6 +78,13 @@ impl Brush {
       _ => self.clone(),
     }
   }
+
+  pub fn only_convert_to_color(&self, f: impl FnOnce(&Color) -> Color) -> Color {
+    match self {
+      Brush::Color(color) => f(color),
+      _ => panic!("Need Color!"),
+    }
+  }
 }
 
 /// The style to paint path, maybe fill or stroke.

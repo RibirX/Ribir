@@ -75,7 +75,8 @@ fn new(palette: Palette) -> FullTheme {
     material_svgs::GRADE: "./icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
     material_svgs::REFRESH: "./icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
     material_svgs::SMS: "./icons/sms_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::ACCOUNT_CIRCLE: "./icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg"
+    material_svgs::ACCOUNT_CIRCLE: "./icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg",
+    material_svgs::INFO: "./icons/info_FILL0_wght400_GRAD0_opsz48.svg"
   }
 
   ribir_widgets::widget_theme_init(&mut theme);
@@ -345,6 +346,60 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         InteractiveLayer {
           color: style.color, border_radii: Radius::all(24.),
           DynWidget { dyns: host, margin: EdgeInsets::all(12.) }
+        }
+      }
+    }
+  });
+  styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host| {
+    widget! {
+      init ctx => {
+        let palette1 = Palette::of(ctx).clone();
+        let palette2 = Palette::of(ctx).clone();
+      }
+      states { style }
+      Ripple {
+        center: false,
+        color: palette1.on_of(&palette1.base_of(&style.color)),
+        bounded: RippleBound::Radius(Radius::all(20.)),
+        InteractiveLayer {
+          color: palette2.on_of(&palette2.base_of(&style.color)), border_radii: Radius::all(20.),
+          DynWidget { dyns: host, margin: EdgeInsets::all(0.) }
+        }
+      }
+    }
+  });
+  styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host| {
+    widget! {
+      init ctx => {
+        let palette1 = Palette::of(ctx).clone();
+        let palette2 = Palette::of(ctx).clone();
+      }
+      states { style }
+      Ripple {
+        center: false,
+        color: palette1.base_of(&style.color),
+        bounded: RippleBound::Radius(Radius::all(20.)),
+        InteractiveLayer {
+          color: palette2.base_of(&style.color), border_radii: Radius::all(20.),
+          DynWidget { dyns: host, margin: EdgeInsets::all(0.) }
+        }
+      }
+    }
+  });
+  styles.override_compose_decorator::<ButtonDecorator>(move |style, host| {
+    widget! {
+      init ctx => {
+        let palette1 = Palette::of(ctx).clone();
+        let palette2 = Palette::of(ctx).clone();
+      }
+      states { style }
+      Ripple {
+        center: false,
+        color: palette1.base_of(&style.color),
+        bounded: RippleBound::Radius(Radius::all(20.)),
+        InteractiveLayer {
+          color: palette2.base_of(&style.color), border_radii: Radius::all(20.),
+          DynWidget { dyns: host, margin: EdgeInsets::all(0.) }
         }
       }
     }

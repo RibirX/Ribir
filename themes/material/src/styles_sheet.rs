@@ -14,6 +14,7 @@ pub mod material_svgs {
     REFRESH,
     SMS,
     ACCOUNT_CIRCLE,
+    INFO,
     MATERIAL_THEME_END
   );
 }

@@ -7,8 +7,8 @@ fn main() {
     init ctx => {
       let title_style = TypographyTheme::of(ctx).display_large.text.clone();
       let foreground = Palette::of(ctx).on_surface_variant().into();
-      let secondary: Brush = Palette::of(ctx).secondary().into();
-      let tertiary: Brush = Palette::of(ctx).tertiary().into();
+      let secondary = Palette::of(ctx).secondary();
+      let tertiary = Palette::of(ctx).tertiary();
     }
     ConstrainedBox {
       clamp: BoxClamp::fixed_size(Size::splat(WINDOW_SIZE)),
