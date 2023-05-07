@@ -36,7 +36,7 @@ impl BoxClamp {
   };
 
   /// clamp use fixed width and unfixed height
-  pub fn fixed_width(width: f32) -> Self {
+  pub const fn fixed_width(width: f32) -> Self {
     BoxClamp {
       min: Size::new(width, 0.),
       max: Size::new(width, f32::INFINITY),
@@ -44,7 +44,7 @@ impl BoxClamp {
   }
 
   /// clamp use fixed height and unfixed width
-  pub fn fixed_height(height: f32) -> Self {
+  pub const fn fixed_height(height: f32) -> Self {
     BoxClamp {
       min: Size::new(0., height),
       max: Size::new(f32::INFINITY, height),
@@ -52,7 +52,31 @@ impl BoxClamp {
   }
 
   /// clamp use fixed size
-  pub fn fixed_size(size: Size) -> Self { BoxClamp { min: size, max: size } }
+  pub const fn fixed_size(size: Size) -> Self { BoxClamp { min: size, max: size } }
+
+  pub const fn min_width(width: f32) -> Self {
+    let mut clamp = BoxClamp::EXPAND_BOTH;
+    clamp.min.width = width;
+    clamp
+  }
+
+  pub const fn min_height(height: f32) -> Self {
+    let mut clamp = BoxClamp::EXPAND_BOTH;
+    clamp.min.height = height;
+    clamp
+  }
+
+  pub fn with_fixed_height(mut self, height: f32) -> Self {
+    self.min.height = height;
+    self.max.height = height;
+    self
+  }
+
+  pub fn with_fixed_width(mut self, width: f32) -> Self {
+    self.min.width = width;
+    self.max.width = width;
+    self
+  }
 }
 
 /// render object's layout box, the information about layout, including box

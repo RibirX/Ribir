@@ -8,8 +8,8 @@ pub struct ConstrainedBox {
 
 impl Render for ConstrainedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let max = clamp.max.min(self.clamp.max);
-    let min = clamp.min.max(self.clamp.min).min(max);
+    let max = clamp.clamp(self.clamp.max);
+    let min = clamp.clamp(self.clamp.min);
     ctx.assert_perform_single_child_layout(BoxClamp { min, max })
   }
 
@@ -29,6 +29,29 @@ mod tests {
   use super::*;
   use crate::prelude::*;
   use ribir_core::test::*;
+
+  #[test]
+  fn outside_fixed_clamp() {
+    let w = widget! {
+      SizedBox {
+        size: Size::new(50., 50.),
+        ConstrainedBox {
+          clamp: BoxClamp::fixed_size(Size::new(40., 40.)),
+          Void {}
+        }
+      }
+    };
+
+    expect_layout_result_with_theme(
+      w,
+      None,
+      Theme::Full(FullTheme::default()),
+      &[LayoutTestItem {
+        path: &[0, 0, 0],
+        expect: ExpectRect::from_size(Size::new(50., 50.)),
+      }],
+    );
+  }
 
   #[test]
   fn expand_one_axis() {
