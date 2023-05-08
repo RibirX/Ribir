@@ -1,6 +1,7 @@
+use material_color_utilities_rs::htc;
 use palette::{
   rgb::{channels::Rgba, Rgb},
-  Alpha, IntoColor, IntoComponent, Lab, Srgba,
+  Alpha, IntoComponent, Srgba,
 };
 use serde::{Deserialize, Serialize};
 
@@ -69,15 +70,17 @@ impl Color {
     self
   }
 
-  /// `l` is the lightness of the color. 0.0 gives absolute black and 1.0
-  /// give the brightest white.
   #[inline]
   pub fn with_lightness(self, l: LightnessTone) -> Self {
-    let color: Srgba = self.0.into_format();
-    let mut lab: Lab = color.into_color();
-    lab.l = (l.0 * 100.).clamp(0., 100.);
-    let rgba: Srgba = lab.into_color();
-    Color(rgba.into_format())
+    let mut hct = htc::Hct::from_int([
+      self.0.alpha,
+      self.0.color.red,
+      self.0.color.green,
+      self.0.color.blue,
+    ]);
+    hct.set_tone((l.0 * 100.).clamp(0., 100.) as f64);
+    let argb = hct.to_int();
+    Color(Srgba::new(argb[1], argb[2], argb[3], argb[0]))
   }
 
   #[inline]
