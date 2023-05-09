@@ -6,7 +6,7 @@ use crate::{
 
 use ribir_painter::{Point, Rect, Size};
 
-use super::WindowCtx;
+use super::{AppContext, WindowCtx};
 
 /// common action for all context of widget.
 pub trait WidgetContext {
@@ -54,6 +54,8 @@ pub trait WidgetContext {
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
 
   fn wnd_ctx(&self) -> &WindowCtx;
+
+  fn app_ctx(&self) -> &AppContext { &self.wnd_ctx().app_ctx }
 }
 
 pub(crate) trait WidgetCtxImpl {
