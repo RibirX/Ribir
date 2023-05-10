@@ -1,5 +1,5 @@
 use ribir::prelude::*;
-use ribir_theme_material::material_svgs;
+use ribir_material::material_svgs;
 use std::rc::Rc;
 
 const NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
@@ -17,7 +17,7 @@ impl Compose for App {
       }
       ThemeWidget {
         id: theme,
-        theme: Rc::new(Theme::Full(ribir_theme_material::purple::light())),
+        theme: Rc::new(Theme::Full(ribir_material::purple::light())),
         Column {
           background: surface_container_low.clone(),
           ConstrainedBox {
@@ -32,9 +32,9 @@ impl Compose for App {
                 id: brightness,
                 on_tap: move |_| {
                   if brightness.checked {
-                    theme.theme = Rc::new(Theme::Full(ribir_theme_material::purple::dark()));
+                    theme.theme = Rc::new(Theme::Full(ribir_material::purple::dark()));
                   } else {
-                    theme.theme = Rc::new(Theme::Full(ribir_theme_material::purple::light()));
+                    theme.theme = Rc::new(Theme::Full(ribir_material::purple::light()));
                   }
                 },
                 Trailing {
@@ -278,7 +278,7 @@ impl Compose for App {
 }
 
 fn main() {
-  let system_theme = ribir_theme_material::purple::light();
+  let system_theme = ribir_material::purple::light();
   let app: Application = Application::new(system_theme);
   let root = App {};
   let wnd = Window::builder(root.into_widget())
@@ -286,5 +286,5 @@ fn main() {
     .with_title("Material 3 Theme Show Case")
     .build(&app);
 
-  app::run_with_window(app, wnd);
+  ribir::prelude::app::run_with_window(app, wnd);
 }
