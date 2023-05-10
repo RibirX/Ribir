@@ -38,6 +38,8 @@ where
 {
   pub fn new(text: String, cursor: T) -> Self { Self { text, cursor } }
 
+  pub fn dispose(self) -> (String, T) { (self.text, self.cursor) }
+
   pub fn text(&self) -> &String { &self.text }
 
   pub fn byte_offset(&self) -> usize { self.cursor.byte_offset() }
