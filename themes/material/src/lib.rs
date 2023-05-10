@@ -113,10 +113,14 @@ fn init_custom_style(theme: &mut FullTheme) {
     label_style: theme.typography_theme.body_large.text.clone(),
     label_color: theme.palette.on_surface().into(),
   });
-  theme.custom_styles.set_custom_style(InputStyle {
-    min_length: 20.,
-    select_background: Color::from_rgb(181, 215, 254).into(),
-    caret_color: Brush::Color(theme.palette.on_surface()),
+  theme
+    .custom_styles
+    .set_custom_style(InputStyle { size: Some(20.) });
+  theme
+    .custom_styles
+    .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
+  theme.custom_styles.set_custom_style(SelectedTextStyle {
+    brush: Color::from_rgb(181, 215, 254).into(),
   });
   theme.custom_styles.set_custom_style(FilledButtonStyle {
     height: 40.,

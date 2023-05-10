@@ -1,11 +1,8 @@
-use super::InputStyle;
 use crate::{layout::SizedBox, themes::svgs};
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]
 pub struct Caret {
-  #[declare(default = InputStyle::of(ctx).caret_color.clone())]
-  pub color: Brush,
   pub focused: bool,
   pub height: f32,
   #[declare(default = svgs::TEXT_CARET)]
