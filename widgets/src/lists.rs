@@ -124,13 +124,6 @@ use ribir_core::prelude::*;
 #[derive(Declare)]
 pub struct Lists;
 
-#[derive(Clone)]
-pub struct ListsStyle {
-  pub padding: EdgeInsets,
-  pub background: Brush,
-}
-
-impl CustomStyle for ListsStyle {}
 #[derive(Declare)]
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
@@ -144,13 +137,8 @@ impl ComposeChild for Lists {
 
   fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
     widget! {
-      init ctx => {
-        let ListsStyle { padding, background, } = ListsStyle::of(ctx).clone();
-      }
       ListsDecorator {
-        background,
         Column {
-          padding,
           DynWidget { dyns: child.into_iter() }
         }
       }
@@ -469,10 +457,5 @@ pub fn add_to_theme(theme: &mut FullTheme) {
         gap: Some(EdgeInsets::only_left(16.)),
       },
     },
-  });
-
-  theme.custom_styles.set_custom_style(ListsStyle {
-    padding: EdgeInsets::vertical(8.),
-    background: theme.palette.surface().into(),
   });
 }
