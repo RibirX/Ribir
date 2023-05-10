@@ -168,10 +168,6 @@ fn init_custom_style(theme: &mut FullTheme) {
       measure: Some(INDICATOR_SIZE),
     },
   });
-  theme.custom_styles.set_custom_style(ListsStyle {
-    padding: EdgeInsets::vertical(8.),
-    background: theme.palette.surface().into(),
-  });
   theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(AVATAR_SIZE),
     radius: Some(AVATAR_RADIUS),
