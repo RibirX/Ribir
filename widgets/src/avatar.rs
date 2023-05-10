@@ -23,14 +23,15 @@ use ribir_core::prelude::*;
 /// };
 /// ```
 #[derive(Declare, Default, Clone)]
-pub struct Avatar;
+pub struct Avatar {
+  #[declare(default=Palette::of(ctx).primary())]
+  pub color: Color,
+}
 
 #[derive(Clone)]
 pub struct AvatarStyle {
   pub size: Size,
   pub radius: Option<f32>,
-  pub background: Option<Brush>,
-  pub text_color: Brush,
   pub text_style: CowArc<TextStyle>,
 }
 
@@ -53,12 +54,15 @@ pub enum AvatarTemplate {
 impl ComposeChild for Avatar {
   type Child = AvatarTemplate;
 
-  fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
+      states { this: this.into_readonly() }
       init ctx => {
         let AvatarStyle {
-          size, radius, background, text_style, text_color,
+          size, radius, text_style,
         } = AvatarStyle::of(ctx).clone();
+        let palette1 = Palette::of(ctx).clone();
+        let palette2 = Palette::of(ctx).clone();
       }
       SizedBox {
         size,
@@ -66,7 +70,7 @@ impl ComposeChild for Avatar {
           AvatarTemplate::Text(text) => widget! {
             states { text: text.into_readonly() }
             BoxDecoration {
-              background,
+              background: Brush::from(palette1.base_of(&this.color)),
               border_radius: radius.map(Radius::all),
               Container {
                 size,
@@ -75,7 +79,7 @@ impl ComposeChild for Avatar {
                   v_align: VAlign::Center,
                   text: text.0.clone(),
                   style: text_style.clone(),
-                  foreground: text_color.clone(),
+                  foreground: Brush::from(palette2.on_of(&palette2.base_of(&this.color))),
                 }
               }
             }
@@ -106,8 +110,6 @@ pub fn add_to_theme(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(40.),
     radius: Some(20.),
-    background: Some(theme.palette.primary().into()),
-    text_color: theme.palette.on_primary().into(),
     text_style: theme.typography_theme.body_large.text.clone(),
   });
 }
