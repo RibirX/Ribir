@@ -1,0 +1,16 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "ribir_geom"
+readme.workspace = true
+repository = "https://github.com/RibirX/Ribir/geom"
+version.workspace = true
+
+[dependencies]
+euclid.workspace = true

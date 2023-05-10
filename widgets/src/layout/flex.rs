@@ -208,7 +208,7 @@ impl FlexLayouter {
           line.main_width += gap;
         }
 
-        let mut line = &mut self.current_line;
+        let line = &mut self.current_line;
         line.main_width += size.main;
         line.cross_line_height = line.cross_line_height.max(size.cross);
       }

@@ -10,6 +10,7 @@ members = [
   "widgets",
   "ribir",
   "themes/material",
+  "geom",
   "tests",
 ]
 resolver = "2"
