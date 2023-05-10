@@ -50,10 +50,8 @@ pub struct TypographyStore {
   font_db: Arc<RwLock<FontDB>>,
   cache: Arc<RwLock<FrameCache<TypographyKey, TypographyResult>>>,
 }
-
 pub struct VisualGlyphs {
   scale: f32,
-  bounds: SizeEm,
   visual_info: Arc<VisualInfos>,
   order_info: Arc<ReorderResult>,
 }
@@ -91,7 +89,6 @@ impl TypographyStore {
       if !res.infos.over_bounds || res.bounds == bounds || res.bounds.greater_than(bounds).all() {
         return VisualGlyphs {
           scale: font_size.into_em().value(),
-          bounds,
           visual_info: res.infos,
           order_info: self.reorder.reorder_text(&text),
         };
@@ -146,7 +143,6 @@ impl TypographyStore {
     );
     VisualGlyphs {
       scale: font_size.into_em().value(),
-      bounds,
       visual_info,
       order_info: info,
     }
@@ -169,6 +165,7 @@ impl TypographyStore {
       line_dir,
       overflow,
       letter_space,
+      bounds,
       ..
     } = cfg;
     let line_height = line_height.map(|l| l / font_size.into_em());
@@ -178,13 +175,14 @@ impl TypographyStore {
       // line width is not so important in clip mode, the cache can be use even with difference line
       // width. The wider one can use for the narrower one. S
       Overflow::Clip => Em::absolute(f32::MAX),
-      // For word wrap
-      //
-      // if line_dir.is_horizontal() {
-      //   bounds.width()
-      // } else {
-      //   bounds.height()
-      // };
+
+      Overflow::AutoWrap => {
+        if line_dir.is_horizontal() {
+          bounds.height / font_size.into_em()
+        } else {
+          bounds.width / font_size.into_em()
+        }
+      }
     };
 
     TypographyKey {
@@ -273,28 +271,19 @@ impl VisualGlyphs {
     (0, 0)
   }
 
-  pub fn position_by_cluster(&self, cluster: u32) -> (usize, usize) {
-    struct RangeLocator<'a, Idx>
-    where
-      Idx: Ord + Copy,
-    {
-      ranges: Vec<(&'a Range<Idx>, usize)>,
+  pub fn position_by_cluster(&self, cluster: usize) -> (usize, usize) {
+    struct RangeLocator<'a> {
+      ranges: Vec<(&'a Range<usize>, usize)>,
     }
 
-    impl<'a, Idx> RangeLocator<'a, Idx>
-    where
-      Idx: Ord + Copy,
-    {
-      fn from_unorder_ranges(rgs: impl Iterator<Item = &'a Range<Idx>>) -> Self
-      where
-        Idx: 'static,
-      {
+    impl<'a> RangeLocator<'a> {
+      fn from_unorder_ranges(rgs: impl Iterator<Item = &'a Range<usize>>) -> Self {
         let mut ranges: Vec<_> = rgs.enumerate().map(|(idx, item)| (item, idx)).collect();
         ranges.sort_by(|lh, rh| lh.0.start.cmp(&rh.0.start));
         RangeLocator { ranges }
       }
 
-      fn range_index(&self, val: Idx) -> Option<usize> {
+      fn range_index(&self, val: usize) -> Option<usize> {
         let idx = self.ranges.partition_point(|item| item.0.end <= val);
         if idx < self.ranges.len() && self.ranges[idx].0.contains(&val) {
           Some(self.ranges[idx].1)
@@ -305,45 +294,77 @@ impl VisualGlyphs {
     }
 
     let visual_lines = &self.visual_info.visual_lines;
+    if visual_lines.is_empty() {
+      return (0, 0);
+    }
+
     let para = self
       .order_info
       .paras
-      .partition_point(|p| p.range.end <= cluster as usize)
+      .partition_point(|p| p.range.end <= cluster)
       .min(self.order_info.paras.len() - 1);
+
     let order_info = &self.order_info.paras[para];
-    let line = &visual_lines[para];
     let locator = RangeLocator::from_unorder_ranges(order_info.runs.iter());
-    if let Some(dst_run) = locator.range_index(cluster as usize) {
-      let is_ltr = order_info.levels[order_info.runs[dst_run].start].is_ltr();
-      let offset = line.glyphs.partition_point(|glyph| {
-        let glyph_run = locator.range_index(glyph.cluster as usize);
-        let glyph_run = glyph_run.unwrap();
-        if dst_run == glyph_run {
-          if is_ltr {
-            return glyph.cluster < cluster;
-          } else {
-            return glyph.cluster > cluster;
-          }
+    let dst_run = locator.range_index(cluster);
+    let is_ltr = dst_run.map_or(true, |run| {
+      order_info.levels[order_info.runs[run].start].is_ltr()
+    });
+    let is_layout_before = |glyph_cluster: usize| {
+      if dst_run.is_none() {
+        return true;
+      }
+      if glyph_cluster < order_info.range.start {
+        return true;
+      } else if order_info.range.end <= glyph_cluster {
+        return false;
+      }
+      let glyph_run = locator.range_index(glyph_cluster).unwrap();
+      let dst_run = dst_run.unwrap();
+      if dst_run == glyph_run {
+        if is_ltr {
+          return glyph_cluster < cluster;
+        } else {
+          return glyph_cluster > cluster;
         }
-        glyph_run < dst_run
-      });
-      (para, offset)
-    } else {
-      (para, order_info.range.end)
+      }
+      glyph_run < dst_run
+    };
+    let line_para = visual_lines.partition_point(|l| {
+      if l.glyphs.is_empty() {
+        return false;
+      }
+      is_layout_before(l.glyphs.first().map(|g| g.cluster).unwrap() as usize)
+        && is_layout_before(l.glyphs.last().map(|g| g.cluster).unwrap() as usize)
+    });
+    if line_para >= visual_lines.len() {
+      return (
+        visual_lines.len() - 1,
+        visual_lines.last().unwrap().glyphs.len(),
+      );
     }
+    let line = &visual_lines[line_para];
+    let offset = line
+      .glyphs
+      .partition_point(|glyph| is_layout_before(glyph.cluster as usize));
+    (line_para, offset)
   }
 
-  pub fn position_to_cluster(&self, para: usize, offset: usize) -> u32 {
+  pub fn position_to_cluster(&self, mut para: usize, mut offset: usize) -> u32 {
     let lines = &self.visual_info.visual_lines;
-    let paras = &self.order_info.paras;
-    if para >= lines.len() {
-      return paras.last().map_or(0, |p| p.range.end as u32);
-    } else {
-      return lines[para]
-        .glyphs
-        .get(offset)
-        .map_or(paras[para].range.end as u32, |g| g.cluster);
+    if para < lines.len() && offset == lines[para].glyphs.len() {
+      para += 1;
+      offset = 0;
     }
+    if para < lines.len() && offset < lines[para].glyphs.len() {
+      return lines[para].glyphs[offset].cluster;
+    }
+
+    self
+      .order_info
+      .paras
+      .last()
+      .map_or(0, |p| p.range.end as u32)
   }
 
   pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect {
@@ -406,14 +427,12 @@ impl VisualGlyphs {
   }
 
   pub fn select_range(&self, rg: &Range<usize>) -> Vec<Rect> {
-    struct TypoRectJointer
-    {
+    struct TypoRectJointer {
       acc: Vec<Rect>,
       cur: Option<Rect>,
     }
 
-    impl TypoRectJointer
-    {
+    impl TypoRectJointer {
       fn new() -> Self { Self { acc: vec![], cur: None } }
       fn join_x(&mut self, next: Rect) {
         if let Some(rc) = &mut self.cur {
@@ -432,15 +451,18 @@ impl VisualGlyphs {
     }
     let mut jointer = TypoRectJointer::new();
     for line in &self.visual_info.visual_lines {
-      let height = (line.height * self.scale).into();
+      let height: Pixel = (line.height * self.scale).into();
       let offset_x = self.to_pixel_value(line.x).into();
       let offset_y = self.to_pixel_value(line.y).into();
       for glyph in &line.glyphs {
         if rg.contains(&(glyph.cluster as usize)) {
           let glyph = self.scale_to_pixel_glyph(glyph);
           let rc = Rect::new(
-            Point::new(glyph.x_offset + offset_x, glyph.y_offset + offset_y),
-            Size::new(glyph.x_advance, height),
+            Point::new(
+              (glyph.x_offset + offset_x).value(),
+              (glyph.y_offset + offset_y).value(),
+            ),
+            Size::new((glyph.x_advance).value(), height.value()),
           );
           jointer.join_x(rc);
         } else {
@@ -470,12 +492,28 @@ impl VisualGlyphs {
           g
         })
       })
-      .filter(|g| {
-        Em::zero() <= g.x_offset + g.x_advance
-          && g.x_offset < self.bounds.width
-          && Em::zero() <= g.y_offset + g.y_advance
-          && g.y_offset < self.bounds.height
+      .map(move |g| self.scale_to_pixel_glyph(&g))
+  }
+
+  pub fn pixel_glyphs_in_rect(&self, rc: Rect) -> impl Iterator<Item = Glyph<Pixel>> + '_ {
+    let min_x: Em = Pixel((rc.min_x() / self.scale).into()).into();
+    let min_y: Em = Pixel((rc.min_y() / self.scale).into()).into();
+    let max_x: Em = Pixel((rc.max_x() / self.scale).into()).into();
+    let max_y: Em = Pixel((rc.max_y() / self.scale).into()).into();
+    self
+      .visual_info
+      .visual_lines
+      .iter()
+      .filter(move |l| !(l.y + l.height < min_y || max_y < l.y))
+      .flat_map(move |l| {
+        l.glyphs.iter().map(|g| {
+          let mut g = g.clone();
+          g.x_offset += l.x;
+          g.y_offset += l.y;
+          g
+        })
       })
+      .filter(move |g| !(g.x_offset + g.x_advance < min_x || max_x < g.x_offset))
       .map(move |g| self.scale_to_pixel_glyph(&g))
   }
 
@@ -500,13 +538,23 @@ impl VisualGlyphs {
       cluster,
     }
   }
+
+  pub fn glyph_count(&self, row: usize) -> usize {
+    self
+      .visual_info
+      .visual_lines
+      .get(row)
+      .map_or(0, |l| l.glyphs.len())
+  }
+
+  pub fn glyph_row_count(&self) -> usize { self.visual_info.visual_lines.len() }
 }
 
 #[cfg(test)]
 mod tests {
 
   use super::*;
-  use crate::{shaper::*, FontFace, FontFamily};
+  use crate::{shaper::*, typography::Size, FontFace, FontFamily};
 
   fn test_face() -> FontFace {
     FontFace {
@@ -597,9 +645,18 @@ mod tests {
   fn simple_typography_text() {
     fn glyphs(cfg: TypographyCfg) -> Vec<(f32, f32)> {
       let text = "Hello--------\nworld!".into();
+      fn em_to_pixel_val(v: &Em) -> f32 {
+        let p: Pixel = (*v).into();
+        p.value()
+      }
+      let bound_rc = Rect::from_size(Size::new(
+        em_to_pixel_val(&cfg.bounds.width),
+        em_to_pixel_val(&cfg.bounds.height),
+      ));
+
       let info = typography_text(text, FontSize::Pixel(10.0.into()), cfg);
       info
-        .pixel_glyphs()
+        .pixel_glyphs_in_rect(bound_rc)
         .map(|g| (g.x_offset.value(), g.y_offset.value()))
         .collect()
     }
@@ -773,7 +830,7 @@ mod tests {
   }
 
   #[test]
-  fn typo_cluster_test() {
+  fn cluster_position() {
     let cfg = TypographyCfg {
       line_height: None,
       letter_space: None,
@@ -789,5 +846,62 @@ mod tests {
     assert!((0, 35) == graphys.position_by_cluster(22));
     assert!((0, 27) == graphys.position_by_cluster(31));
     assert!((0, 8) == graphys.position_by_cluster(53));
+  }
+
+  #[test]
+  fn auto_wrap_position() {
+    let bounds = Size::new(Em::absolute(10.0), Em::absolute(2.0));
+    let cfg = TypographyCfg {
+      line_height: None,
+      letter_space: None,
+      text_align: None,
+      bounds,
+      line_dir: PlaceLineDirection::TopToBottom,
+      overflow: Overflow::AutoWrap,
+    };
+    let pixel_bounds = Size::new(
+      Into::<Pixel>::into(bounds.width).value(),
+      Into::<Pixel>::into(bounds.height).value(),
+    );
+    let text = "line within bound\r\
+      line exceed bound, will auto wrap to 3 lines.\r\
+      end"
+      .into();
+    let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg.clone());
+
+    // text will auto wrap layout to 5 line as follow:
+    let line1 = "line within bound\r";
+    let line2 = "line exceed bound, ";
+    let line3 = "will auto wrap to 3 l";
+    let line4 = "ines.\r";
+    let _line5 = "end";
+
+    // check auto wrap
+    assert!((1, line2.len() - 1) == graphys.position_by_cluster(line1.len() + line2.len() - 1));
+    assert!((2, 0) == graphys.position_by_cluster(line1.len() + line2.len()));
+    assert!((3, 1) == graphys.position_by_cluster(line1.len() + line2.len() + line3.len() + 1));
+    assert!(
+      (4, 2)
+        == graphys.position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len() + 2)
+    );
+
+    // line1 width should within bound.
+    let line1_glyphs = typography_text(line1.into(), FontSize::Em(Em::absolute(1.0)), cfg.clone());
+    assert!(line1_glyphs.visual_rect().size.width < pixel_bounds.width);
+
+    // line2 width should within bound.
+    let line2_glyphs = typography_text(line2.into(), FontSize::Em(Em::absolute(1.0)), cfg.clone());
+    assert!(line2_glyphs.visual_rect().size.width < pixel_bounds.width);
+
+    // line2 with line3's first char will excced bound width
+    {
+      let mut exceed_str = line2.to_string();
+      exceed_str.push(line3.chars().next().unwrap());
+      let mut cfg = cfg;
+      cfg.bounds = (Em::MAX, Em::MAX).into();
+      cfg.overflow = Overflow::Clip;
+      let exceed_glyphs = typography_text(exceed_str.into(), FontSize::Em(Em::absolute(1.0)), cfg);
+      assert!(exceed_glyphs.visual_rect().size.width > pixel_bounds.width);
+    }
   }
 }

@@ -23,7 +23,7 @@ fn main() {
             Column {
               margin: EdgeInsets::all(20.),
               item_gap: 20.,
-              Text::new("Button", &foreground, title_style.clone())
+              Text::new("Button", &foreground, title_style.clone(), Overflow::Clip)
               Row {
                 item_gap: 20.,
                 FilledButton { svgs::ADD }
@@ -93,7 +93,7 @@ fn main() {
           TabPane {
             Column {
               margin: EdgeInsets::all(20.),
-              Text::new("Lists", &foreground, title_style.clone())
+              Text::new("Lists", &foreground, title_style.clone(), Overflow::Clip)
               Lists {
                 margin: EdgeInsets::only_top(20.),
                 Link {

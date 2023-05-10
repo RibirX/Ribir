@@ -129,7 +129,7 @@ impl Painter {
     );
   }
 
-  pub fn visual_rect(&mut self) -> Option<Rect> { self.current_state().visiual_rect }
+  pub fn visual_rect(&self) -> Option<Rect> { self.current_state().visiual_rect }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
@@ -339,13 +339,22 @@ impl Painter {
     style: &TextStyle,
     foreground: Brush,
     bounds: Option<Size>,
+    overflow: Overflow,
   ) -> &mut Self {
     let transform = self.current_state().transform;
-    let visual_glyphs = typography_with_text_style(&self.typography_store, text, style, bounds);
+
+    let Some(view_rc) = self
+      .visual_rect()
+      .zip(transform.inverse())
+      .map(|(rc, trans)| trans.outer_transformed_rect(&rc))
+      else { return self; };
+
+    let visual_glyphs: VisualGlyphs =
+      typography_with_text_style(&self.typography_store, text, style, bounds, overflow);
     self.commands.push(PaintCommand::Paint(PaintInstruct {
       path: PaintPath::Text {
         font_size: style.font_size,
-        glyphs: visual_glyphs.pixel_glyphs().collect(),
+        glyphs: visual_glyphs.pixel_glyphs_in_rect(view_rc).collect(),
         style: style.path_style,
       },
       opacity: self.alpha(),
@@ -365,6 +374,7 @@ impl Painter {
     text: T,
     path_style: PathStyle,
     bounds: Option<Size>,
+    overflow: Overflow,
   ) -> &mut Self {
     let &PainterState {
       font_size,
@@ -375,6 +385,12 @@ impl Painter {
       transform,
       ..
     } = self.current_state();
+
+    let Some(view_rc) = self.visual_rect()
+      .zip(transform.inverse())
+      .map(|(rc, trans)| trans.outer_transformed_rect(&rc))
+      else { return self; };
+
     let visual_glyphs = typography_with_text_style(
       &self.typography_store,
       text,
@@ -386,13 +402,14 @@ impl Painter {
         line_height: text_line_height,
       },
       bounds,
+      overflow,
     );
 
     let cmd = PaintCommand::Paint(PaintInstruct {
       opacity: self.alpha(),
       path: PaintPath::Text {
         font_size,
-        glyphs: visual_glyphs.pixel_glyphs().collect(),
+        glyphs: visual_glyphs.pixel_glyphs_in_rect(view_rc).collect(),
         style: path_style,
       },
       transform,
@@ -408,8 +425,13 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T) -> &mut Self {
-    self.paint_text_without_style(text, PathStyle::Stroke(self.stroke_options()), None)
+  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T, overflow: Overflow) -> &mut Self {
+    self.paint_text_without_style(
+      text,
+      PathStyle::Stroke(self.stroke_options()),
+      None,
+      overflow,
+    )
   }
 
   /// Fill `text` from left to right, start at let top position, use
@@ -418,8 +440,13 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn fill_text<T: Into<Substr>>(&mut self, text: T, bounds: Option<Size>) -> &mut Self {
-    self.paint_text_without_style(text, PathStyle::Fill, bounds)
+  pub fn fill_text<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    bounds: Option<Size>,
+    overflow: Overflow,
+  ) -> &mut Self {
+    self.paint_text_without_style(text, PathStyle::Fill, bounds, overflow)
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -611,6 +638,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   text: T,
   style: &TextStyle,
   bounds: Option<Size>,
+  overflow: Overflow,
 ) -> VisualGlyphs {
   let &TextStyle {
     font_size,
@@ -622,7 +650,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
 
   let bounds = if let Some(b) = bounds {
     let width: Em = Pixel(b.width.into()).into();
-    let height: Em = Pixel(b.width.into()).into();
+    let height: Em = Pixel(b.height.into()).into();
     Size2D::new(width, height)
   } else {
     let max = Em::absolute(f32::MAX);
@@ -639,7 +667,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
       text_align: None,
       bounds,
       line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::Clip,
+      overflow,
     },
   )
 }
@@ -659,17 +687,21 @@ mod test {
 
   use super::*;
 
-  #[test]
-  fn save_guard() {
-    let mut layer = Painter::new(
+  fn new_painter(size: Size) -> Painter {
+    Painter::new(
       1.,
       TypographyStore::new(
         <_>::default(),
         <_>::default(),
         TextShaper::new(<_>::default()),
       ),
-      Size::new(512., 512.),
-    );
+      size,
+    )
+  }
+
+  #[test]
+  fn save_guard() {
+    let mut layer = new_painter(Size::new(512., 512.));
     {
       let mut paint = layer.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
@@ -687,5 +719,45 @@ mod test {
       &Transform::new(1., 0., 0., 1., 0., 0.),
       layer.get_transform()
     );
+  }
+
+  fn collect_paint_glyphs(cmds: Vec<PaintCommand>) -> Vec<Glyph<Pixel>> {
+    let mut all = vec![];
+    for cmd in cmds {
+      if let PaintCommand::Paint(p) = cmd {
+        if let PaintPath::Text { glyphs, .. } = p.path {
+          all.extend(glyphs.into_iter())
+        }
+      }
+    }
+    all
+  }
+  #[test]
+  fn paint_text_with_clip() {
+    let mut painter = new_painter(Size::new(100., 100.));
+    let bound_size = Size::new(20., 20.);
+
+    // paint long text
+    painter.fill_text(
+      "11111111111111111111111111111111111",
+      Some(bound_size),
+      Overflow::Clip,
+    );
+    let cmds1 = painter.finish();
+
+    // paint shot text
+    painter.fill_text("1111", Some(bound_size), Overflow::Clip);
+    let cmds2 = painter.finish();
+
+    // the two text all will be clip to same glyph
+    assert_eq!(cmds1.len(), cmds2.len());
+    let glyphs1 = collect_paint_glyphs(cmds1);
+    let glyphs2 = collect_paint_glyphs(cmds2);
+    assert_eq!(glyphs1, glyphs2);
+
+    // the last glyph is partially out of bounds
+    let glyph = glyphs1.last().unwrap();
+    assert!((glyph.x_offset).value() < bound_size.width);
+    assert!(bound_size.width < (glyph.x_offset + glyph.x_advance).value());
   }
 }
