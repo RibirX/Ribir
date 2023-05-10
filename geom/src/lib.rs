@@ -8,18 +8,19 @@ pub struct PhysicUnit;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LogicUnit;
 
-pub type Rect = euclid::Rect<f32, LogicUnit>;
-pub type Point = euclid::Point2D<f32, LogicUnit>;
-pub type Size = euclid::Size2D<f32, LogicUnit>;
-pub type Transform = euclid::Transform2D<f32, LogicUnit, LogicUnit>;
-pub type Vector = euclid::Vector2D<f32, LogicUnit>;
-pub type Angle = euclid::Angle<f32>;
-pub type Box2D = euclid::Box2D<f32, LogicUnit>;
+pub type Rect<T = f32> = euclid::Rect<T, LogicUnit>;
+pub type Point<T = f32> = euclid::Point2D<T, LogicUnit>;
+pub type Size<T = f32> = euclid::Size2D<T, LogicUnit>;
+pub type Transform<T = f32> = euclid::Transform2D<T, LogicUnit, LogicUnit>;
+pub type Vector<T = f32> = euclid::Vector2D<T, LogicUnit>;
+pub type Angle<T = f32> = euclid::Angle<T>;
+pub type Box2D<T = f32> = euclid::Box2D<T, LogicUnit>;
 
-pub type DeviceRect = euclid::Rect<u32, PhysicUnit>;
-pub type DevicePoint = euclid::Point2D<u32, PhysicUnit>;
-pub type DeviceSize = euclid::Size2D<u32, PhysicUnit>;
-pub type DeviceVector = euclid::Vector2D<u32, PhysicUnit>;
+pub type DeviceRect<T = u32> = euclid::Rect<T, PhysicUnit>;
+pub type DevicePoint<T = u32> = euclid::Point2D<T, PhysicUnit>;
+pub type DeviceSize<T = u32> = euclid::Size2D<T, PhysicUnit>;
+pub type DeviceVector<T = u32> = euclid::Vector2D<T, PhysicUnit>;
 
 pub const INFINITY_SIZE: Size = Size::new(f32::INFINITY, f32::INFINITY);
 pub const ZERO_SIZE: Size = Size::new(0., 0.);
+pub use euclid::num::Zero;

@@ -5,9 +5,9 @@ use std::{
 
 use lyon_path::geom::euclid::num::Zero;
 use ribir_algo::{FrameCache, Substr};
-use ribir_geom::{LogicUnit, Point, Rect, Size};
+use ribir_geom::{Point, Rect, Size};
 
-type SizeEm = lyon_path::geom::euclid::Size2D<Em, LogicUnit>;
+type SizeEm = Size<Em>;
 
 use crate::{
   font_db::FontDB,
@@ -552,9 +552,8 @@ impl VisualGlyphs {
 
 #[cfg(test)]
 mod tests {
-
   use super::*;
-  use crate::{shaper::*, typography::Size, FontFace, FontFamily};
+  use crate::{shaper::*, FontFace, FontFamily};
 
   fn test_face() -> FontFace {
     FontFace {
