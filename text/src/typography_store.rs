@@ -1,12 +1,13 @@
 use std::{
-  ops::{Add, Range, Sub},
+  ops::Range,
   sync::{Arc, RwLock},
 };
 
-use lyon_path::geom::euclid::UnknownUnit;
-use lyon_path::geom::{euclid::num::Zero, Point, Size};
+use lyon_path::geom::euclid::num::Zero;
 use ribir_algo::{FrameCache, Substr};
-pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
+use ribir_geom::{LogicUnit, Point, Rect, Size};
+
+type SizeEm = lyon_path::geom::euclid::Size2D<Em, LogicUnit>;
 
 use crate::{
   font_db::FontDB,
@@ -37,7 +38,7 @@ pub struct TypographyKey {
 struct TypographyResult {
   // The rect glyphs can place, and hint `TypographyMan` where to early return. The result of
   // typography may over bounds.
-  pub bounds: Size<Em>,
+  pub bounds: SizeEm,
   pub infos: Arc<VisualInfos>,
 }
 
@@ -52,7 +53,7 @@ pub struct TypographyStore {
 
 pub struct VisualGlyphs {
   scale: f32,
-  bounds: Size<Em>,
+  bounds: SizeEm,
   visual_info: Arc<VisualInfos>,
   order_info: Arc<ReorderResult>,
 }
@@ -217,7 +218,7 @@ impl InputRun for ShapeRun {
 
 impl VisualGlyphs {
   /// return a visual rect to place the text in pixel.
-  pub fn visual_rect(&self) -> Rect<f32> {
+  pub fn visual_rect(&self) -> Rect {
     let info = &self.visual_info;
 
     Rect::new(
@@ -345,7 +346,7 @@ impl VisualGlyphs {
     }
   }
 
-  pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect<f32> {
+  pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect {
     let visual_lines = &self.visual_info.visual_lines;
     if visual_lines.is_empty() {
       return Rect::zero();
@@ -404,21 +405,17 @@ impl VisualGlyphs {
       .map_or(0., |line| self.to_pixel_value(line.height))
   }
 
-  pub fn select_range(&self, rg: &Range<usize>) -> Vec<Rect<Pixel>> {
-    struct TypoRectJointer<T>
-    where
-      T: Add<T, Output = T> + Sub<T, Output = T> + Copy + PartialEq,
+  pub fn select_range(&self, rg: &Range<usize>) -> Vec<Rect> {
+    struct TypoRectJointer
     {
-      acc: Vec<Rect<T>>,
-      cur: Option<Rect<T>>,
+      acc: Vec<Rect>,
+      cur: Option<Rect>,
     }
 
-    impl<T> TypoRectJointer<T>
-    where
-      T: Add<T, Output = T> + Sub<T, Output = T> + Copy + PartialEq,
+    impl TypoRectJointer
     {
       fn new() -> Self { Self { acc: vec![], cur: None } }
-      fn join_x(&mut self, next: Rect<T>) {
+      fn join_x(&mut self, next: Rect) {
         if let Some(rc) = &mut self.cur {
           rc.size.width = next.max_x() - rc.min_x();
         } else {
@@ -431,7 +428,7 @@ impl VisualGlyphs {
           self.acc.push(rc);
         }
       }
-      fn rects(self) -> Vec<Rect<T>> { self.acc }
+      fn rects(self) -> Vec<Rect> { self.acc }
     }
     let mut jointer = TypoRectJointer::new();
     for line in &self.visual_info.visual_lines {
