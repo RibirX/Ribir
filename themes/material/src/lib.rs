@@ -175,8 +175,6 @@ fn init_custom_style(theme: &mut FullTheme) {
   theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(AVATAR_SIZE),
     radius: Some(AVATAR_RADIUS),
-    background: Some(theme.palette.primary().into()),
-    text_color: theme.palette.on_primary().into(),
     text_style: theme.typography_theme.body_large.text.clone(),
   });
   theme.custom_styles.set_custom_style(ListItemStyle {
