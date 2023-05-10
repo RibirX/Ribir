@@ -131,7 +131,7 @@ pub struct FontFace {
   pub weight: FontWeight,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Glyph<Unit> {
   /// The font face id of the glyph.
   pub face_id: ID,

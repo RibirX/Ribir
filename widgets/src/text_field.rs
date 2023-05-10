@@ -364,7 +364,12 @@ fn build_input_area(
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
       Option::map(prefix.clone(), move |text| {
-        Text { text, foreground: theme.foreground.clone(), style: theme.text.clone() }
+        Text {
+          text,
+          foreground: theme.foreground.clone(),
+          style: theme.text.clone(),
+          overflow: Overflow::Clip
+        }
       })
       Expanded {
         flex: 1.,
@@ -375,7 +380,12 @@ fn build_input_area(
         }
       }
       Option::map(suffix.clone(),  move |text| {
-        Text { text, foreground: theme.foreground.clone(), style: theme.text.clone()}
+        Text {
+          text,
+          foreground: theme.foreground.clone(),
+          style: theme.text.clone(),
+          overflow: Overflow::Clip
+        }
       })
 
     }

@@ -15,36 +15,39 @@ pub struct Text {
   pub foreground: Brush,
   #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
   pub style: CowArc<TextStyle>,
+  #[declare(default)]
+  pub overflow: Overflow,
 }
 
 impl Text {
-  pub fn new(str: impl Into<CowArc<str>>, foreground: &Brush, style: CowArc<TextStyle>) -> Self {
+  pub fn new(
+    str: impl Into<CowArc<str>>,
+    foreground: &Brush,
+    style: CowArc<TextStyle>,
+    overflow: Overflow,
+  ) -> Self {
     Text {
       text: str.into(),
       foreground: foreground.clone(),
       style,
+      overflow,
     }
   }
 
-  pub fn text_layout(
-    text: &CowArc<str>,
-    style: &CowArc<TextStyle>,
-    t_store: &TypographyStore,
-    bound: BoxClamp,
-  ) -> VisualGlyphs {
+  pub fn text_layout(&self, t_store: &TypographyStore, bound: BoxClamp) -> VisualGlyphs {
     let TextStyle {
       font_size,
       letter_space,
       line_height,
       ref font_face,
       ..
-    } = **style;
+    } = *self.style;
 
     let width: Em = Pixel(bound.max.width.into()).into();
     let height: Em = Pixel(bound.max.height.into()).into();
 
     t_store.typography(
-      text.substr(..),
+      self.text.substr(..),
       font_size,
       font_face,
       TypographyCfg {
@@ -53,7 +56,7 @@ impl Text {
         text_align: None,
         bounds: (width, height).into(),
         line_dir: PlaceLineDirection::TopToBottom,
-        overflow: Overflow::Clip,
+        overflow: self.overflow,
       },
     )
   }
@@ -62,7 +65,8 @@ impl Text {
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let wnd_ctx = ctx.wnd_ctx();
-    Text::text_layout(&self.text, &self.style, wnd_ctx.typography_store(), clamp)
+    self
+      .text_layout(wnd_ctx.typography_store(), clamp)
       .visual_rect()
       .size
       .cast_unit()
@@ -73,12 +77,13 @@ impl Render for Text {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let rect = ctx.box_rect().unwrap();
+    let clamp = ctx.layout_clamp().unwrap();
     ctx.painter().paint_text_with_style(
       self.text.substr(..),
       &self.style,
       self.foreground.clone(),
-      Some(rect.size),
+      Some(clamp.max),
+      self.overflow,
     );
   }
 }
@@ -95,6 +100,8 @@ macro_rules! define_text_with_theme_style {
       pub text: CowArc<str>,
       #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()))]
       pub foreground: Brush,
+      #[declare(default)]
+      pub overflow: Overflow,
     }
 
     impl Compose for $name {
@@ -106,6 +113,7 @@ macro_rules! define_text_with_theme_style {
             text: this.text.clone(),
             foreground: this.foreground.clone(),
             style: style,
+            overflow: this.overflow,
           }
         }
       }
