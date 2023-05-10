@@ -1,8 +1,11 @@
 use std::ops::Range;
 
-use lyon_path::geom::{euclid::num::Zero, euclid::UnknownUnit, Size};
-pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
-pub type Point<T> = lyon_path::geom::euclid::Point2D<T, UnknownUnit>;
+use lyon_path::geom::euclid::num::Zero;
+use ribir_geom::LogicUnit;
+pub type Rect<T> = lyon_path::geom::euclid::Rect<T, LogicUnit>;
+pub type Point<T> = lyon_path::geom::euclid::Point2D<T, LogicUnit>;
+pub type Size<T> = lyon_path::geom::euclid::Size2D<T, LogicUnit>;
+
 use unicode_script::{Script, UnicodeScript};
 
 use crate::{Em, FontSize, Glyph, Pixel, TextAlign};

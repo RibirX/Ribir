@@ -23,6 +23,7 @@ palette = {workspace = true, features = ["serializing"]}
 rctree.workspace = true
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
+ribir_geom = {path = "../geom", version = "0.0.0"}
 serde = {workspace = true, features = ["rc"]}
 serde_json.workspace = true
 usvg.workspace = true
