@@ -167,7 +167,7 @@ mod tests {
 
   #[test]
   fn h_align() {
-    fn test_case(h_align: HAlign, expect: Rect) {
+    fn test_case(h_align: HAlign, child_rect: Rect, align_size: Size) {
       let w = widget! {
         HAlignWidget {
           h_align,
@@ -181,28 +181,41 @@ mod tests {
         &[
           LayoutTestItem {
             path: &[0],
-            expect: ExpectRect::from_size(Size::new(expect.max_x(), expect.max_y())),
+            expect: ExpectRect::from_size(align_size),
           },
           LayoutTestItem {
             path: &[0, 0],
-            expect: ExpectRect::from_rect(expect),
+            expect: ExpectRect::from_rect(child_rect),
           },
         ],
       );
     }
 
-    test_case(HAlign::Left, Rect::new(Point::zero(), CHILD_SIZE));
-    test_case(HAlign::Center, Rect::new(Point::new(45., 0.), CHILD_SIZE));
-    test_case(HAlign::Right, Rect::new(Point::new(90., 0.), CHILD_SIZE));
+    test_case(
+      HAlign::Left,
+      Rect::new(Point::zero(), CHILD_SIZE),
+      Size::new(100., 10.),
+    );
+    test_case(
+      HAlign::Center,
+      Rect::new(Point::new(45., 0.), CHILD_SIZE),
+      Size::new(100., 10.),
+    );
+    test_case(
+      HAlign::Right,
+      Rect::new(Point::new(90., 0.), CHILD_SIZE),
+      Size::new(100., 10.),
+    );
     test_case(
       HAlign::Stretch,
       Rect::new(Point::zero(), Size::new(100., 10.)),
+      Size::new(100., 10.),
     );
   }
 
   #[test]
   fn v_align() {
-    fn test_case(v_align: VAlign, expect: Rect) {
+    fn test_case(v_align: VAlign, child_rect: Rect, align_size: Size) {
       let w = widget! {
         VAlignWidget {
           v_align,
@@ -216,22 +229,35 @@ mod tests {
         &[
           LayoutTestItem {
             path: &[0],
-            expect: ExpectRect::from_size(Size::new(expect.max_x(), expect.max_y())),
+            expect: ExpectRect::from_size(align_size),
           },
           LayoutTestItem {
             path: &[0, 0],
-            expect: ExpectRect::from_rect(expect),
+            expect: ExpectRect::from_rect(child_rect),
           },
         ],
       );
     }
 
-    test_case(VAlign::Top, Rect::new(Point::zero(), CHILD_SIZE));
-    test_case(VAlign::Center, Rect::new(Point::new(0., 45.), CHILD_SIZE));
-    test_case(VAlign::Bottom, Rect::new(Point::new(0., 90.), CHILD_SIZE));
+    test_case(
+      VAlign::Top,
+      Rect::new(Point::zero(), CHILD_SIZE),
+      Size::new(10., 100.),
+    );
+    test_case(
+      VAlign::Center,
+      Rect::new(Point::new(0., 45.), CHILD_SIZE),
+      Size::new(10., 100.),
+    );
+    test_case(
+      VAlign::Bottom,
+      Rect::new(Point::new(0., 90.), CHILD_SIZE),
+      Size::new(10., 100.),
+    );
     test_case(
       VAlign::Stretch,
       Rect::new(Point::zero(), Size::new(10., 100.)),
+      Size::new(10., 100.),
     );
   }
 }
