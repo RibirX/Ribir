@@ -41,7 +41,7 @@ pub struct Input {
 pub struct TextArea {
   #[declare(default = TypographyTheme::of(ctx).body_large.text.clone())]
   pub style: CowArc<TextStyle>,
-  #[declare(default)]
+  #[declare(default = true)]
   pub auto_wrap: bool,
   #[declare(skip)]
   text: CowArc<str>,
