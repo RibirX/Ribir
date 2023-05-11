@@ -56,7 +56,7 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 /// // use custom color
 /// let custom_color_button = widget! {
 ///   OutlinedButton {
-///     color: Brush::Color(Color::RED),
+///     color: Color::RED,
 ///     svgs::ADD
 ///     Label::new("outlined button")
 ///   }
