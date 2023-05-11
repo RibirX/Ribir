@@ -1,15 +1,24 @@
-use std::{borrow::Borrow, ops::Range};
+use std::{iter::Peekable, ops::Range};
 
-use lyon_path::geom::{euclid::num::Zero, euclid::UnknownUnit, Size};
-pub type Rect<T> = lyon_path::geom::euclid::Rect<T, UnknownUnit>;
-pub type Point<T> = lyon_path::geom::euclid::Point2D<T, UnknownUnit>;
+use lyon_path::geom::euclid::num::Zero;
+use ribir_geom::LogicUnit;
+pub type Rect<T> = lyon_path::geom::euclid::Rect<T, LogicUnit>;
+pub type Point<T> = lyon_path::geom::euclid::Point2D<T, LogicUnit>;
+pub type Size<T> = lyon_path::geom::euclid::Size2D<T, LogicUnit>;
+
 use unicode_script::{Script, UnicodeScript};
 
 use crate::{Em, FontSize, Glyph, Pixel, TextAlign};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
 pub enum Overflow {
+  #[default]
   Clip,
+  AutoWrap,
+}
+
+impl Overflow {
+  fn is_auto_wrap(&self) -> bool { matches!(self, Overflow::AutoWrap) }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -48,6 +57,8 @@ pub trait InlineCursor {
 
   /// cursor position relative of inline.
   fn position(&self) -> Em;
+
+  fn reset(&mut self);
 }
 
 #[derive(Default)]
@@ -102,10 +113,6 @@ where
   pub fn typography_all(mut self) -> VisualInfos {
     while let Some(p) = self.inputs.next() {
       self.consume_paragraph(p);
-      if self.is_next_line_over() {
-        self.over_bounds = true;
-        break;
-      }
     }
 
     if self.cfg.line_dir.is_reverse() {
@@ -201,16 +208,16 @@ where
 
   /// consume paragraph and return if early break because over boundary.
   fn consume_paragraph(&mut self, p: InputParagraph<Runs>) -> bool {
-    self.visual_lines.push(<_>::default());
+    self.begin_line();
 
     if self.cfg.line_dir.is_horizontal() {
       let mut cursor = VInlineCursor { pos: self.inline_cursor };
       p.runs
-        .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
+        .for_each(|r| self.consume_run_with_letter_space_cursor(&r, &mut cursor));
     } else {
       let mut cursor = HInlineCursor { pos: self.inline_cursor };
       p.runs
-        .for_each(|r| self.consume_run_with_letter_space_cursor(r.borrow(), &mut cursor));
+        .for_each(|r| self.consume_run_with_letter_space_cursor(&r, &mut cursor));
     }
     self.end_line();
 
@@ -260,33 +267,71 @@ where
     let text = run.text();
     let base = run.range().start as u32;
 
-    let line = self.visual_lines.last_mut().unwrap();
-    if self.cfg.line_dir.is_horizontal() {
-      line.width = line.width.max(font_size)
-    } else {
-      line.height = line.height.max(font_size)
-    }
-
-    // only align with the middle line in 1em, adjust after placed all runs.
+    let mut it = run
+      .glyphs()
+      .iter()
+      .cloned()
+      .map(|mut g| {
+        g.scale(font_size.value());
+        g
+      })
+      .peekable();
     let line_offset = (font_size - Em::absolute(1.)) / 2.;
-    for g in run.glyphs() {
-      let mut at = g.clone();
-      at.scale(font_size.value());
-      let over_boundary = cursor.advance_glyph(&mut at, line_offset, text);
-      at.cluster = g.cluster + base;
-      self.push_glyph(at);
-      if over_boundary {
-        self.over_bounds = true;
+
+    loop {
+      let line = self.visual_lines.last_mut().unwrap();
+      if self.cfg.line_dir.is_horizontal() {
+        line.width = line.width.max(font_size)
+      } else {
+        line.height = line.height.max(font_size)
+      }
+      let over_bound = self.consume_run_glyphs(cursor, &mut it, line_offset, text, base);
+      self.inline_cursor = cursor.position();
+      if over_bound && self.cfg.overflow.is_auto_wrap() {
+        // new line
+        self.end_line();
+        self.begin_line();
+        cursor.reset();
+      } else {
         break;
       }
     }
-    self.inline_cursor = cursor.position();
+  }
+
+  fn consume_run_glyphs<I>(
+    &mut self,
+    cursor: &mut impl InlineCursor,
+    it: &mut Peekable<I>,
+    line_offset: Em,
+    text: &str,
+    cluster_base: u32,
+  ) -> bool
+  where
+    I: Iterator<Item = Glyph<Em>>,
+  {
+    while let Some(g) = it.peek() {
+      let mut at = g.clone();
+      let over_boundary = cursor.advance_glyph(&mut at, line_offset, text);
+      at.cluster += cluster_base;
+      if over_boundary {
+        if self.cfg.overflow.is_auto_wrap() {
+          return true;
+        }
+        self.push_glyph(at);
+        return true;
+      }
+      self.push_glyph(at);
+      it.next();
+    }
+    false
   }
 
   fn push_glyph(&mut self, g: Glyph<Em>) {
     let line = self.visual_lines.last_mut();
     line.unwrap().glyphs.push(g)
   }
+
+  fn begin_line(&mut self) { self.visual_lines.push(<_>::default()); }
 
   fn end_line(&mut self) {
     let line = self.visual_lines.last_mut().unwrap();
@@ -303,14 +348,28 @@ where
       }
     }
 
+    self.over_bounds |= if self.cfg.line_dir.is_horizontal() {
+      self.cfg.bounds.height < self.inline_cursor
+    } else {
+      self.cfg.bounds.width < self.inline_cursor
+    };
+    self.over_bounds |= self.is_last_line_over();
     self.inline_cursor = Em::zero();
   }
 
-  fn is_next_line_over(&self) -> bool {
+  fn is_last_line_over(&self) -> bool {
     if self.cfg.line_dir.is_horizontal() {
-      self.cfg.bounds.width < self.inline_cursor
+      self.cfg.bounds.width
+        < self
+          .visual_lines
+          .iter()
+          .fold(Em::zero(), |acc, l| acc + l.width)
     } else {
-      self.cfg.bounds.height < self.inline_cursor
+      self.cfg.bounds.height
+        < self
+          .visual_lines
+          .iter()
+          .fold(Em::zero(), |acc, l| acc + l.height)
     }
   }
 }
@@ -367,6 +426,8 @@ impl InlineCursor for HInlineCursor {
   }
 
   fn position(&self) -> Em { self.pos }
+
+  fn reset(&mut self) { self.pos = Em::zero(); }
 }
 
 impl InlineCursor for VInlineCursor {
@@ -384,6 +445,8 @@ impl InlineCursor for VInlineCursor {
   }
 
   fn position(&self) -> Em { self.pos }
+
+  fn reset(&mut self) { self.pos = Em::zero(); }
 }
 
 impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
@@ -402,6 +465,8 @@ impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
   fn advance(&mut self, c: Em) -> bool { self.inner_cursor.advance(c) }
 
   fn position(&self) -> Em { self.inner_cursor.position() }
+
+  fn reset(&mut self) { self.inner_cursor.reset(); }
 }
 
 impl<'a, I: InlineCursor> InlineCursor for BoundsCursor<'a, I> {
@@ -418,6 +483,8 @@ impl<'a, I: InlineCursor> InlineCursor for BoundsCursor<'a, I> {
   }
 
   fn position(&self) -> Em { self.inner_cursor.position() }
+
+  fn reset(&mut self) { self.inner_cursor.reset(); }
 }
 
 impl PlaceLineDirection {

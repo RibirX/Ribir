@@ -1,20 +1,23 @@
-use ribir_core::prelude::*;
-
 use crate::layout::{Container, Stack};
-
-use super::InputStyle;
+use ribir_core::prelude::*;
 
 #[derive(Declare)]
 pub(crate) struct SelectedText {
   pub(crate) rects: Vec<Rect>,
 }
 
+#[derive(Clone, PartialEq)]
+pub struct SelectedTextStyle {
+  pub brush: Brush,
+}
+impl CustomStyle for SelectedTextStyle {}
+
 impl Compose for SelectedText {
   fn compose(this: State<Self>) -> Widget {
     widget! {
       states { this: this.into_readonly() }
       init ctx => {
-        let color = InputStyle::of(ctx).select_background.clone();
+        let color = SelectedTextStyle::of(ctx).brush.clone();
       }
       Stack {
         DynWidget {

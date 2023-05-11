@@ -11,12 +11,16 @@ impl From<usize> for CaretState {
   fn from(c: usize) -> Self { CaretState::Caret(c) }
 }
 
+impl From<u32> for CaretState {
+  fn from(c: u32) -> Self { CaretState::Caret(c as usize) }
+}
+
 impl From<(usize, usize)> for CaretState {
   fn from((begin, end): (usize, usize)) -> Self { CaretState::Select(begin, end) }
 }
 
 impl Default for CaretState {
-  fn default() -> Self { 0.into() }
+  fn default() -> Self { 0_u32.into() }
 }
 
 impl CaretState {

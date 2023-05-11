@@ -1,22 +1,27 @@
 mod caret;
 mod caret_state;
+mod editarea;
 mod glyphs_helper;
 mod handle;
 mod selected_text;
+use std::time::Duration;
+
 pub use caret_state::CaretState;
 
-use self::{caret::Caret, glyphs_helper::GlyphsHelper, selected_text::SelectedText};
-use crate::layout::{ConstrainedBox, Stack};
-use crate::prelude::Text;
-use ribir_core::{prelude::*, ticker::FrameMsg};
+use self::editarea::TextEditorArea;
+pub use self::selected_text::SelectedTextStyle;
+use crate::layout::Container;
+use ribir_core::prelude::*;
 
 pub struct Placeholder(CowArc<str>);
 
+impl Placeholder {
+  #[inline]
+  pub fn new(str: impl Into<CowArc<str>>) -> Self { Self(str.into()) }
+}
 #[derive(Clone, PartialEq)]
 pub struct InputStyle {
-  pub min_length: f32,
-  pub select_background: Brush,
-  pub caret_color: Brush,
+  pub size: f32,
 }
 impl CustomStyle for InputStyle {}
 
@@ -28,11 +33,43 @@ pub struct Input {
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
-  #[declare(default = InputStyle::of(ctx).min_length)]
-  min_length: f32,
+  #[declare(default = InputStyle::of(ctx).size)]
+  size: f32,
+}
+
+#[derive(Declare)]
+pub struct TextArea {
+  #[declare(default = TypographyTheme::of(ctx).body_large.text.clone())]
+  pub style: CowArc<TextStyle>,
+  #[declare(default)]
+  pub auto_wrap: bool,
+  #[declare(skip)]
+  text: CowArc<str>,
+  #[declare(skip)]
+  caret: CaretState,
+  #[declare(default = TextAreaStyle::of(ctx).rows)]
+  rows: f32,
+  #[declare(default = TextAreaStyle::of(ctx).cols)]
+  cols: f32,
 }
 
 impl Input {
+  pub fn text(&self) -> CowArc<str> { self.text.clone() }
+
+  pub fn caret(&self) -> &CaretState { &self.caret }
+
+  pub fn set_text(&mut self, text: impl Into<CowArc<str>>) {
+    self.text = text.into();
+    self.caret.valid(self.text.len());
+  }
+
+  pub fn set_caret(&mut self, caret: CaretState) {
+    self.caret = caret;
+    self.caret.valid(self.text.len());
+  }
+}
+
+impl TextArea {
   pub fn text(&self) -> CowArc<str> { self.text.clone() }
 
   pub fn caret(&self) -> &CaretState { &self.caret }
@@ -52,157 +89,111 @@ impl ComposeChild for Input {
   type Child = Option<Placeholder>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
+      init ctx => {
+        let frame_scheduler = ctx.wnd_ctx().frame_scheduler();
+      }
       states {
         this: this.into_writable(),
-        helper: Stateful::new(GlyphsHelper::default()),
       }
-      init ctx => {
-        let tick_of_layout_ready = ctx.wnd_ctx()
-          .frame_tick_stream()
-          .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
-      }
+      Container {
+        size: Size::new(
+          this.size * glyph_width(this.style.font_size),
+          line_height(this.style.line_height.unwrap_or(this.style.font_size.into_em()))
+        ),
+        TextEditorArea {
+          id: area,
+          text: this.text.clone(),
+          style: this.style.clone(),
+          caret: this.caret().clone(),
+          multi_line: false,
+          auto_wrap: false,
 
-      ConstrainedBox {
-        id: outbox,
-        clamp: BoxClamp {
-          min: Size::new(input_width(this.style.font_size, this.min_length), 0.),
-          max: Size::new(input_width(this.style.font_size, this.min_length), f32::INFINITY)
-        },
-        auto_focus: true,
-        on_char: move |char_event| this.edit_handle(char_event),
-        on_key_down: move |key| this.key_handle(key),
-        on_pointer_move: move |e| {
-          if let CaretState::Selecting(begin, _) = this.caret {
-            if e.point_type == PointerType::Mouse
-              && e.mouse_buttons() == MouseButtons::PRIMARY {
-              let position = to_content_pos(&container, &e.position());
-              let cluster = helper.cluster_from_pos(position.x, position.y);
-              this.caret = CaretState::Selecting(begin, cluster as usize);
-            }
-          }
-        },
-        on_pointer_down: move |e| {
-          let position = to_content_pos(&container, &e.position());
-          let cluster = helper.cluster_from_pos(position.x, position.y);
-          this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
-        },
-        on_pointer_up: move |_| {
-          if let CaretState::Selecting(begin, end) = this.caret {
-            this.caret = if begin == end {
-             CaretState::Caret(begin)
-            } else {
-              CaretState::Select(begin, end)
-            };
-          }
-        },
-
-        ScrollableWidget {
-          id: container,
-          scrollable: Scrollable::X,
-          padding: EdgeInsets::horizontal(1.),
-          Stack {
-            SelectedText {
-              id: selected,
-              rects: vec![],
-            }
-            Text {
-              id: text,
-              text: this.text.clone(),
-              style: this.style.clone(),
-
-              on_performed_layout: move |ctx| {
-                let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
-                helper.glyphs = Some(Text::text_layout(
-                  &text.text,
-                  &text.style,
-                  ctx.wnd_ctx().typography_store(),
-                  bound,
-                ));
-              }
-            }
-            Option::map(placeholder, |holder| widget! {
-              Text {
-                visible: this.text.is_empty(),
-                text: holder.0,
-              }
-            })
-
-            Caret {
-              id: caret,
-              top_anchor: 0.,
-              left_anchor: 0.,
-              focused: outbox.has_focus(),
-              height: 0.,
-            }
-          }
+          widget::from(placeholder)
         }
       }
       finally {
-        let_watch!(this.caret)
-          .distinct_until_changed()
-          .sample(tick_of_layout_ready)
-          .subscribe(move |cursor| {
-            selected.rects = helper.selection(&cursor.select_range());
-            let (offset, height) = helper.cursor(cursor.offset());
-            caret.top_anchor = PositionUnit::Pixel(offset.y);
-            caret.left_anchor = PositionUnit::Pixel(offset.x);
-            caret.height = height;
+        let_watch!(area.clone_stateful())
+          .delay(Duration::ZERO, frame_scheduler)
+          .subscribe(move |area| {
+            let area = area.state_ref();
+            if area.caret != this.caret {
+              this.silent().caret = area.caret.clone();
+            }
+            if area.text != this.text {
+              this.silent().text = area.text.clone();
+            }
           });
-        let_watch!(caret.left_anchor.abs_value(1.))
-          .scan_initial((0., 0.), |pair, v| (pair.1, v))
-          .distinct_until_changed()
-          .subscribe(move |(before, after)| {
-            let pos = auto_x_scroll_pos(&container, before, after);
-            container.silent().jump_to(Point::new(pos, 0.));
-          });
-
-        // let_watch!(this.caret).distinct_until_changed() will only be triggered after modify
-        // borrow mut from state_ref to manual triggered after init.
-        let _:&mut Input = &mut this;
       }
     }
+    .into_widget()
   }
 }
 
-impl Placeholder {
-  #[inline]
-  pub fn new(str: impl Into<CowArc<str>>) -> Self { Self(str.into()) }
+#[derive(Clone, PartialEq)]
+pub struct TextAreaStyle {
+  pub rows: f32,
+  pub cols: f32,
 }
+impl CustomStyle for TextAreaStyle {}
 
-fn input_width(font_size: FontSize, length: f32) -> f32 {
-  FontSize::Em(Em::relative_to(length, font_size))
-    .into_pixel()
-    .value()
-}
+impl ComposeChild for TextArea {
+  type Child = Option<Placeholder>;
+  fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
+    widget! {
+      init ctx => {
+        let frame_scheduler = ctx.wnd_ctx().frame_scheduler();
+      }
+      states {
+        this: this.into_writable(),
+      }
+      Container {
+        size: Size::new(
+          this.cols * glyph_width(this.style.font_size),
+          this.rows * line_height(this.style.line_height.unwrap_or(this.style.font_size.into_em()))
+        ),
+        TextEditorArea {
+          id: area,
+          text: this.text.clone(),
+          style: this.style.clone(),
+          caret: this.caret.clone(),
+          multi_line: true,
+          auto_wrap: no_watch!(this.auto_wrap),
 
-fn auto_x_scroll_pos(container: &ScrollableWidget, before: f32, after: f32) -> f32 {
-  let view_size = container.scroll_view_size();
-  let content_size = container.scroll_content_size();
-  let current = container.scroll_pos.x;
-  let view_after = current + after;
-  let view_before = current + before;
-  let inner_view = |pos| (0. <= pos && pos < view_size.width);
-  if content_size.width <= view_size.width || inner_view(view_after) {
-    return current;
+          widget::from(placeholder)
+        }
+      }
+      finally {
+        let_watch!(area.clone_stateful())
+          .delay(Duration::ZERO, frame_scheduler)
+          .subscribe(move |area| {
+            let area = area.state_ref();
+            if area.caret != this.caret {
+              this.silent().caret = area.caret.clone();
+            }
+            if area.text != this.text {
+              this.silent().text = area.text.clone();
+            }
+          });
+      }
+    }
+    .into_widget()
   }
-  let pos = if !inner_view(view_before) {
-    view_size.width / 2.
-  } else if view_after < 0. {
-    0.
-  } else {
-    view_size.width - 1.
-  };
-  pos - after
 }
 
-fn to_content_pos(container: &ScrollableWidget, view_position: &Point) -> Point {
-  *view_position - Size::from(container.scroll_pos.to_vector())
+fn glyph_width(font_size: FontSize) -> f32 {
+  FontSize::Em(font_size.relative_em(1.)).into_pixel().value()
 }
+
+fn line_height(line_height: Em) -> f32 { FontSize::Em(line_height).into_pixel().value() }
 
 pub fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(InputStyle {
-    min_length: 20.,
-    select_background: Color::from_rgb(181, 215, 254).into(),
-    caret_color: Brush::Color(theme.palette.on_surface()),
+  theme
+    .custom_styles
+    .set_custom_style(InputStyle { size: 20. });
+  theme
+    .custom_styles
+    .set_custom_style(TextAreaStyle { rows: 2., cols: 20. });
+  theme.custom_styles.set_custom_style(SelectedTextStyle {
+    brush: Color::from_rgb(181, 215, 254).into(),
   });
 }

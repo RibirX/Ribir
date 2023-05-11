@@ -1,11 +1,8 @@
-use super::InputStyle;
 use crate::{layout::SizedBox, themes::svgs};
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]
 pub struct Caret {
-  #[declare(default = InputStyle::of(ctx).caret_color.clone())]
-  pub color: Brush,
   pub focused: bool,
   pub height: f32,
   #[declare(default = svgs::TEXT_CARET)]
@@ -14,6 +11,7 @@ pub struct Caret {
 
 impl Compose for Caret {
   fn compose(this: State<Self>) -> Widget {
+    let blink_interval = Duration::from_millis(500);
     widget! {
       states { this: this.into_readonly() }
       SizedBox {
@@ -21,30 +19,25 @@ impl Compose for Caret {
         size: Size::new(this.height, this.height),
         DynWidget {
           id: caret,
-          visible: false,
+          opacity: 0.,
           dyns: this.icon,
           box_fit: BoxFit::Fill,
         }
       }
-      Animate {
-        id: animate1,
-        prop: prop!(caret.visible),
-        from: true,
-        transition: Transition {
-          easing: easing::steps(2, easing::StepsJump::JumpNone),
-          duration: Duration::from_secs(1),
-          repeat: Some(f32::INFINITY),
-          delay: None
-        }
-      }
-      finally {
+      finally ctx => {
+        let scheduler = ctx.wnd_ctx().frame_scheduler();
+        let mut _guard = None;
         let_watch!(this.focused)
           .distinct_until_changed()
           .subscribe(move |focused| {
             if focused {
-              animate1.run();
+              caret.opacity = 1.;
+              let unsub = interval(blink_interval, scheduler.clone())
+                            .subscribe(move |_| caret.opacity = 1. - caret.opacity);
+              _guard = Some(BoxSubscription::new(unsub).unsubscribe_when_dropped());
             } else {
-              animate1.stop();
+              caret.opacity = 0.;
+              _guard = None;
             }
           });
       }

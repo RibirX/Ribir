@@ -590,7 +590,7 @@ mod tests {
   use crate::TriangleLists;
   use ribir_painter::{Color, DeviceSize, Painter, Point, Radius, Rect, Size};
 
-  use ribir_text::{font_db::FontDB, shaper::TextShaper, TypographyStore};
+  use ribir_text::{font_db::FontDB, shaper::TextShaper, typography::Overflow, TypographyStore};
   extern crate test;
   use test::Bencher;
 
@@ -784,7 +784,7 @@ mod tests {
       #[bench]
       fn $name(b: &mut Bencher) {
         let mut painter = default_painter();
-        painter.fill_text($text, None);
+        painter.fill_text($text, None, Overflow::Clip);
         let commands = painter.finish();
         b.iter(|| {
           let mut tess = tessellator();
@@ -795,7 +795,7 @@ mod tests {
       #[bench]
       fn $with_cache_name(b: &mut Bencher) {
         let mut painter = default_painter();
-        painter.fill_text($text, None);
+        painter.fill_text($text, None, Overflow::Clip);
         let commands = painter.finish();
         let mut tess = tessellator();
         tess.tessellate(&commands, &mut |_: TriangleLists| {});
