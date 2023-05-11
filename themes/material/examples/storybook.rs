@@ -208,16 +208,19 @@ impl Compose for App {
                   Tabs {
                     Tab {
                       TabItem {
+                        svgs::HOME
                         Label::new("Video")
                       }
                     }
                     Tab {
                       TabItem {
+                        svgs::HOME
                         Label::new("Photos")
                       }
                     }
                     Tab {
                       TabItem {
+                        svgs::HOME
                         Label::new("Audio")
                       }
                     }
@@ -247,23 +250,98 @@ impl Compose for App {
               }
               Tab {
                 TabItem {
+                  Label::new("Lists")
+                }
+                TabPane {
+                  Column {
+                    margin: EdgeInsets::all(20.),
+                    Lists {
+                      margin: EdgeInsets::only_top(20.),
+                      Link {
+                        url: "https://ribir.org",
+                        ListItem {
+                          line_number: 1,
+                          Leading { svgs::CHECK_BOX_OUTLINE_BLANK }
+                          HeadlineText(Label::new("One line list item"))
+                          SupportingText(Label::new("One line supporting text"))
+                        }
+                      }
+                      Divider { indent: 16. }
+                      ListItem {
+                        Leading { svgs::MENU }
+                        HeadlineText(Label::new("One line list item"))
+                        Trailing { Label::new("100+") }
+                      }
+                      Divider { indent: 16. }
+                      ListItem {
+                        line_number: 2,
+                        Leading {
+                          Avatar {
+                            ShallowImage::from_png(include_bytes!("../attachments/3DDD-1.png"))
+                          }
+                        }
+                        HeadlineText(Label::new("Two lines list item"))
+                        SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text"))
+                        Trailing { Label::new("100+") }
+                      }
+                      Divider { indent: 16. }
+                      ListItem {
+                        line_number: 1,
+                        Leading {
+                          ShallowImage::from_png(include_bytes!("../attachments/3DDD-2.png"))
+                        }
+                        HeadlineText(Label::new("One lines list item"))
+                        SupportingText(Label::new("One lines supporting text"))
+                        Trailing { svgs::CHECK_BOX_OUTLINE_BLANK }
+                      }
+                      Divider { indent: 16. }
+                      ListItem {
+                        line_number: 1,
+                        Leading {
+                          Avatar {
+                            Label::new("A")
+                          }
+                        }
+                        HeadlineText(Label::new("One lines list item"))
+                        SupportingText(Label::new("One lines supporting text"))
+                        Trailing { Label::new("100+") }
+                      }
+                      Divider { indent: 16. }
+                      ListItem {
+                        line_number: 1,
+                        Leading {
+                          Poster(ShallowImage::from_png(include_bytes!("../attachments/3DDD-3.png")))
+                        }
+                        HeadlineText(Label::new("One lines list item"))
+                        SupportingText(Label::new("One lines supporting text"))
+                        Trailing { Label::new("100+") }
+                      }
+                    }
+                  }
+                }
+              }
+              Tab {
+                TabItem {
                   Label::new("Selections")
                 }
                 TabPane {
                   Column {
-                    Checkbox {
-                      Leading {
-                        Label::new("Option1")
+                    margin: EdgeInsets::all(20.),
+                    Lists {
+                      Checkbox {
+                        Leading {
+                          Label::new("Option1")
+                        }
                       }
-                    }
-                    Checkbox {
-                      Leading {
-                        Label::new("Option2")
+                      Checkbox {
+                        Leading {
+                          Label::new("Option2")
+                        }
                       }
-                    }
-                    Checkbox {
-                      Leading {
-                        Label::new("Option3")
+                      Checkbox {
+                        Leading {
+                          Label::new("Option3")
+                        }
                       }
                     }
                   }

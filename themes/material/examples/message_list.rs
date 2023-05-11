@@ -65,7 +65,7 @@ impl Compose for MessageList {
                 Lists {
                   DynWidget {
                     dyns: this.messages.clone().into_iter().map(move |message| {
-                      let mut avatar = "./ribir/examples/attachments/3DDD-".to_string();
+                      let mut avatar = "./themes/material/attachments/3DDD-".to_string();
                       avatar.push_str(&message.avatar.to_string());
                       avatar.push_str(".png");
                       let img = ShallowImage::from_png(&std::fs::read(avatar).unwrap());
@@ -131,7 +131,7 @@ fn main() {
     ],
   };
 
-  let theme = ribir_material::purple::dark();
+  let theme = ribir_material::purple::light();
   let app = Application::new(theme);
   let wnd = Window::builder(message_list.into_widget())
     .with_inner_size(Size::new(320., 568.))
