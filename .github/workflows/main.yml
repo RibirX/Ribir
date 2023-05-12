@@ -31,7 +31,7 @@ jobs:
     strategy:
       matrix:
         # ubuntu will test individual and be used for 'codecov'
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -47,8 +47,29 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-  ubuntu-test:
-    name: Test Suite(ubuntu-latest)
+  windows:
+    name: Test Suite(windows-latest)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: c:/ribir
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly-2023-02-01
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+  codcov:
+    name: Code coverage
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
@@ -70,7 +91,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           files: lcov.info
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   rustfmt:
     name: rust code format style check
