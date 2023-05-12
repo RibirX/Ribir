@@ -137,6 +137,9 @@ builtin! {
   HasFocus {
     #[doc="return if the widget has focus."]
     fn has_focus(&self) -> bool,
+
+    #[doc="set widget focus"]
+    fn set_focus(&mut self, focus: bool),
   }
 
   KeyDownListener {

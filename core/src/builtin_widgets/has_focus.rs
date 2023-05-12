@@ -7,6 +7,8 @@ pub struct HasFocus {
 
 impl HasFocus {
   pub fn has_focus(&self) -> bool { self.focused }
+
+  pub fn set_focus(&mut self, focus: bool) { self.focused = focus; }
 }
 
 impl ComposeChild for HasFocus {
