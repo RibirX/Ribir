@@ -155,6 +155,9 @@ PointerEvent, >`
  - `fn has_focus(& self) -> bool`
  	- return if the widget has focus.
 
+ - `fn set_focus(& mut self, focus : bool)`
+ 	- set widget focus
+
  - `fn key_down_stream(& self) -> MutRefItemSubject < 'static, KeyboardEvent, () >`
  	- return an observable stream of the key down event
 

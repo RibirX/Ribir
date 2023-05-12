@@ -15,6 +15,21 @@ pub(crate) struct TextEditorArea {
   pub(crate) auto_wrap: bool,
 }
 
+#[derive(Clone)]
+pub struct PlaceholderStyle {
+  pub text_style: CowArc<TextStyle>,
+  pub foreground: Brush,
+}
+
+impl CustomStyle for PlaceholderStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    Self {
+      foreground: Palette::of(ctx).on_surface_variant().into(),
+      text_style: TypographyTheme::of(ctx).body_medium.text.clone(),
+    }
+  }
+}
+
 impl ComposeChild for TextEditorArea {
   type Child = Option<Placeholder>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
