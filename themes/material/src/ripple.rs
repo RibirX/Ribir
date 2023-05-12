@@ -100,7 +100,7 @@ impl ComposeChild for Ripple {
               prop: prop!(ripple_path.path, move |_, _, rate| {
                 let radius = Lerp::lerp(&0., &radius, rate);
                 let center = this.launch_pos.clone().unwrap();
-                PaintPath::circle(center, radius)
+                Path::circle(center, radius)
               }),
               from: Path::circle(Point::zero(), 0.)
             }

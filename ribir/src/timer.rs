@@ -1,8 +1,8 @@
 use once_cell::sync::Lazy;
 use rxrust::scheduler::BoxFuture;
-
 use std::{
   collections::BTreeMap,
+  future::Future,
   mem::swap,
   sync::{
     atomic::{AtomicUsize, Ordering},
@@ -12,8 +12,6 @@ use std::{
   time::{Duration, Instant},
 };
 
-use futures::Future;
-
 #[derive(Default)]
 pub(crate) struct TimeReactor {
   timers: BTreeMap<(Instant, usize), Waker>,
@@ -22,9 +20,9 @@ pub(crate) struct TimeReactor {
 impl TimeReactor {
   pub(crate) fn timeout_wakers(&mut self, mut before: Instant) -> impl Iterator<Item = Waker> {
     before += Duration::from_nanos(1);
-    let mut notifys = self.timers.split_off(&(before, 0));
-    swap(&mut self.timers, &mut notifys);
-    notifys.into_values()
+    let mut notifies = self.timers.split_off(&(before, 0));
+    swap(&mut self.timers, &mut notifies);
+    notifies.into_values()
   }
 
   pub(crate) fn recently_timeout(&self) -> Option<Instant> {
@@ -32,7 +30,7 @@ impl TimeReactor {
   }
 
   fn insert_timer(&mut self, when: Instant, waker: Waker) -> usize {
-    // Generate a new timer ID, deal with timer's time conflit.
+    // Generate a new timer ID, deal with timer's time conflict.
     static ID_GENERATOR: AtomicUsize = AtomicUsize::new(1);
     let id = ID_GENERATOR.fetch_add(1, Ordering::Relaxed);
 
@@ -47,8 +45,8 @@ pub(crate) static TIME_REACTOR: Lazy<Mutex<TimeReactor>> =
   Lazy::new(|| Mutex::new(TimeReactor::default()));
 
 pub fn wake_timeout_futures() {
-  let notifys = TIME_REACTOR.lock().unwrap().timeout_wakers(Instant::now());
-  notifys.for_each(|waker| waker.wake());
+  let notifies = TIME_REACTOR.lock().unwrap().timeout_wakers(Instant::now());
+  notifies.for_each(|waker| waker.wake());
 }
 
 pub(crate) fn recently_timeout() -> Option<Instant> {

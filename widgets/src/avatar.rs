@@ -78,7 +78,7 @@ impl ComposeChild for Avatar {
                   h_align: HAlign::Center,
                   v_align: VAlign::Center,
                   text: text.0.clone(),
-                  style: text_style.clone(),
+                  text_style: text_style.clone(),
                   foreground: Brush::from(palette2.on_of(&palette2.base_of(&this.color))),
                 }
               }

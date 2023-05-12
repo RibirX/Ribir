@@ -37,6 +37,8 @@ impl ShellWindow for MockShellWindow {
 
   fn as_any(&self) -> &dyn Any { self }
 
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
   fn begin_frame(&mut self) {}
 
   fn draw_commands(&mut self, _: Rect, _: Vec<PaintCommand>, _: Color) {}
@@ -44,6 +46,8 @@ impl ShellWindow for MockShellWindow {
   fn end_frame(&mut self) {}
 
   fn id(&self) -> WindowId { self.id }
+
+  fn device_pixel_ratio(&self) -> f32 { 1. }
 }
 impl MockShellWindow {
   fn new(size: Option<Size>) -> Self {

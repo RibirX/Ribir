@@ -1,6 +1,5 @@
 use crate::{
-  context::AppContext, events::dispatcher::Dispatcher, prelude::*, timer::new_timer,
-  widget_tree::WidgetTree,
+  context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
 };
 
 use winit::event::WindowEvent;
@@ -19,7 +18,6 @@ pub struct Window {
   /// all task finished before current frame end.
   frame_pool: FramePool,
   shell_wnd: Box<dyn ShellWindow>,
-  pub(crate) size: Size,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -33,7 +31,11 @@ pub trait ShellWindow {
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
   fn as_any(&self) -> &dyn Any;
-
+  fn as_any_mut(&mut self) -> &mut dyn Any;
+  /// The device pixel ratio of Window interface returns the ratio of the
+  /// resolution in physical pixels to the logic pixels for the current display
+  /// device.
+  fn device_pixel_ratio(&self) -> f32;
   fn begin_frame(&mut self);
   fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>, surface: Color);
   fn end_frame(&mut self);
@@ -44,19 +46,14 @@ impl Window {
   #[inline]
   /// processes native events from this native window
 
-  pub fn processes_native_event_with_scale(&mut self, event: WindowEvent, device_scale: f64) {
+  pub fn processes_native_event(&mut self, event: WindowEvent) {
+    let ratio = self.device_pixel_ratio() as f64;
     self
       .dispatcher
-      .dispatch(event, &mut self.widget_tree, device_scale);
+      .dispatch(event, &mut self.widget_tree, ratio);
     if let Some(icon) = self.dispatcher.take_cursor_icon() {
       self.shell_wnd.set_cursor(icon);
     }
-  }
-
-  #[deprecated(note = "The core window should not depends on shell window event.")]
-  #[inline]
-  pub fn processes_native_event(&mut self, event: WindowEvent) {
-    self.processes_native_event_with_scale(event, 1.);
   }
 
   /// Draw an image what current render tree represent.
@@ -124,30 +121,34 @@ impl Window {
       painter,
       frame_pool,
       shell_wnd,
-      size,
     }
   }
 
   #[inline]
   pub fn id(&self) -> WindowId { self.shell_wnd.id() }
 
+  /// The device pixel ratio of Window interface returns the ratio of the
+  /// resolution in physical pixels to the logic pixels for the current display
+  /// device.
+  pub fn device_pixel_ratio(&self) -> f32 { self.shell_wnd.device_pixel_ratio() }
+
   pub fn set_title(&mut self, title: &str) -> &mut Self {
     self.shell_wnd.set_title(title);
     self
   }
 
-  pub fn set_size(&mut self, size: Size) {
-    if size != self.size {
-      self.size = size;
-      self.shell_wnd.set_size(size);
-      self.widget_tree.mark_dirty(self.widget_tree.root());
-      self.widget_tree.store.remove(self.widget_tree.root());
-      self.painter.set_bounds(Rect::from_size(size));
-      self.painter.reset();
-    }
+  pub fn set_size(&mut self, size: Size) { self.shell_wnd.set_size(size); }
+
+  pub fn on_wnd_resize_event(&mut self, size: Size) {
+    self.widget_tree.mark_dirty(self.widget_tree.root());
+    self.widget_tree.store.remove(self.widget_tree.root());
+    self.painter.set_bounds(Rect::from_size(size));
+    self.painter.reset();
   }
 
   pub fn shell_wnd(&self) -> &dyn ShellWindow { &*self.shell_wnd }
+
+  pub fn shell_wnd_mut(&mut self) -> &mut dyn ShellWindow { &mut *self.shell_wnd }
 }
 
 impl From<u64> for WindowId {
@@ -175,6 +176,8 @@ mod tests {
 
     let new_size = Size::new(200., 200.);
     wnd.set_size(new_size);
+    // not have a shell window, trigger the resize manually.
+    wnd.on_wnd_resize_event(new_size);
     wnd.draw_frame();
     assert_layout_result(&wnd, &[0], &ExpectRect::from_size(new_size));
   }

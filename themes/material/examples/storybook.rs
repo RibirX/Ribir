@@ -4,9 +4,9 @@ use std::rc::Rc;
 
 const NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
 
-struct App;
+struct Storybook;
 
-impl Compose for App {
+impl Compose for Storybook {
   fn compose(_: State<Self>) -> Widget {
     widget! {
       init ctx => {
@@ -277,7 +277,7 @@ impl Compose for App {
                         line_number: 2,
                         Leading {
                           Avatar {
-                            ShallowImage::from_png(include_bytes!("../attachments/3DDD-1.png"))
+                            ShareResource::new(PixelImage::from_png(include_bytes!("../attachments/3DDD-1.png")))
                           }
                         }
                         HeadlineText(Label::new("Two lines list item"))
@@ -288,7 +288,7 @@ impl Compose for App {
                       ListItem {
                         line_number: 1,
                         Leading {
-                          ShallowImage::from_png(include_bytes!("../attachments/3DDD-2.png"))
+                          ShareResource::new(PixelImage::from_png(include_bytes!("../attachments/3DDD-2.png")))
                         }
                         HeadlineText(Label::new("One lines list item"))
                         SupportingText(Label::new("One lines supporting text"))
@@ -310,7 +310,7 @@ impl Compose for App {
                       ListItem {
                         line_number: 1,
                         Leading {
-                          Poster(ShallowImage::from_png(include_bytes!("../attachments/3DDD-3.png")))
+                          Poster(ShareResource::new(PixelImage::from_png(include_bytes!("../attachments/3DDD-3.png"))))
                         }
                         HeadlineText(Label::new("One lines list item"))
                         SupportingText(Label::new("One lines supporting text"))
@@ -357,12 +357,9 @@ impl Compose for App {
 
 fn main() {
   let system_theme = ribir_material::purple::light();
-  let app: Application = Application::new(system_theme);
-  let root = App {};
-  let wnd = Window::builder(root.into_widget())
-    .with_inner_size(Size::new(1024., 768.))
-    .with_title("Material 3 Theme Show Case")
-    .build(&app);
-
-  ribir::prelude::app::run_with_window(app, wnd);
+  let mut app = App::new(system_theme);
+  app
+    .new_window(Storybook {}.into_widget(), Some(Size::new(1024., 768.)))
+    .set_title("Material 3 Theme Show Case");
+  app.exec();
 }

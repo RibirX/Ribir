@@ -110,9 +110,6 @@ where
     }
 
     let prefer_scale: f32 = transform.m11.max(transform.m22);
-    let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale).round_out();
-    let prefer_cache_size = path_add_edges(scale_bounds.size.to_i32().cast_unit());
-
     let key = PathKey::from(&path);
 
     let mut slice_ts = None;
@@ -130,6 +127,8 @@ where
     }
     let (slice, cache_ts) = slice_ts.unwrap_or_else(|| {
       let anti_aliasing = self.anti_aliasing();
+      let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale).round_out();
+      let prefer_cache_size = path_add_edges(scale_bounds.size.to_i32().cast_unit());
       let tex_dist = self.inner_alloc(
         ColorFormat::Alpha8,
         anti_aliasing,
@@ -403,7 +402,9 @@ where
               TextureDist::Atlas { alloc_id, .. } => {
                 self.rgba_atlas.deallocate(*alloc_id);
               }
-              TextureDist::Extra(_) => unreachable!(),
+              TextureDist::Extra(id) => {
+                self.extra_textures.remove(*id as usize);
+              }
             }
           }
         }),
@@ -421,7 +422,9 @@ where
               TextureDist::Atlas { alloc_id, .. } => {
                 self.alpha_atlas.deallocate(*alloc_id);
               }
-              TextureDist::Extra(_) => unreachable!(),
+              TextureDist::Extra(id) => {
+                self.extra_textures.remove(*id as usize);
+              }
             }
           }
         }),
@@ -448,7 +451,7 @@ fn extend_buffer<V>(dist: &mut VertexBuffers<V>, from: VertexBuffers<V>) {
     dist.vertices.extend(from.vertices.into_iter());
     dist.indices.extend(from.indices.into_iter());
   } else {
-    let offset = dist.indices.len() as u32;
+    let offset = dist.vertices.len() as u32;
     dist
       .indices
       .extend(from.indices.into_iter().map(|i| offset + i));

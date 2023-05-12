@@ -1,1 +1,0 @@
-Check if the backend resource cleanups and wake-up futures if them ready.

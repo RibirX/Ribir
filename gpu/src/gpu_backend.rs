@@ -522,7 +522,7 @@ mod tests {
 
     let brush1 = PixelImage::from_png(include_bytes!("../test_imgs/leaves.png"));
     let brush2 = PixelImage::from_png(include_bytes!(
-      "../../ribir/examples/attachments/3DDD-1.png"
+      "../../themes/material/attachments/3DDD-1.png"
     ));
     let rect = geom::rect(0., 0., 100., 100.);
     painter

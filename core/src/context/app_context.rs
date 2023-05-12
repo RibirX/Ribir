@@ -51,7 +51,7 @@ impl AppContext {
     self.typography_store.end_frame();
   }
 
-  pub(crate) fn load_font_from_theme(&self, theme: Rc<Theme>) {
+  pub fn load_font_from_theme(&self, theme: Rc<Theme>) {
     let mut font_db = self.font_db.write().unwrap();
     match &*theme {
       Theme::Full(FullTheme { font_bytes, font_files, .. })

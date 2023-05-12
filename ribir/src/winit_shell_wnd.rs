@@ -37,10 +37,10 @@ impl WinitWgpu {
     }
   }
 
-  fn resize(&mut self, width: u32, height: u32) {
+  pub fn on_resize(&mut self, size: DeviceSize) {
     self.surface.configure(
       &self.backend.get_impl().device(),
-      &Self::surface_config(width, height),
+      &Self::surface_config(size.width as u32, size.height as u32),
     );
   }
 
@@ -91,6 +91,8 @@ impl WinitWgpu {
 impl ShellWindow for WinitShellWnd {
   fn id(&self) -> WindowId { new_id(self.winit_wnd.id()) }
 
+  fn device_pixel_ratio(&self) -> f32 { self.winit_wnd.scale_factor() as f32 }
+
   fn inner_size(&self) -> Size {
     let size = self
       .winit_wnd
@@ -112,9 +114,8 @@ impl ShellWindow for WinitShellWnd {
       self
         .winit_wnd
         .set_inner_size(winit::dpi::LogicalSize::new(size.width, size.height));
+      self.on_resize(size)
     }
-    let size = self.winit_wnd.inner_size();
-    self.backend.resize(size.width, size.height);
   }
 
   #[inline]
@@ -125,6 +126,9 @@ impl ShellWindow for WinitShellWnd {
 
   #[inline]
   fn as_any(&self) -> &dyn std::any::Any { self }
+
+  #[inline]
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
 
   #[inline]
   fn begin_frame(&mut self) { self.backend.begin_frame() }
@@ -169,5 +173,10 @@ impl WinitShellWnd {
       backend: WinitWgpu::new(&winit_wnd),
       winit_wnd,
     }
+  }
+
+  pub fn on_resize(&mut self, size: Size) {
+    let size = (size * self.device_pixel_ratio()).to_i32().cast_unit();
+    self.backend.on_resize(size);
   }
 }

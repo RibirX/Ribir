@@ -309,11 +309,10 @@ impl Painter {
     self
   }
 
-  /// Multiplies the current transformation with the matrix. This lets you
-  /// scale, rotate, translate (move), and skew the context.
+  /// Apply this matrix to all subsequent paint commands。
   pub fn apply_transform(&mut self, transform: &Transform) -> &mut Self {
-    let t = &mut self.current_state_mut().transform;
-    *t = t.then(transform);
+    let t = transform.then(self.get_transform());
+    self.set_transform(t);
     self
   }
 

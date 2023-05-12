@@ -62,6 +62,8 @@ impl GPUBackendImpl for WgpuImpl {
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Frame Encoder") });
       self.command_encoder = Some(encoder);
+      #[cfg(debug_assertions)]
+      self.start_capture();
     }
   }
 
@@ -212,6 +214,8 @@ impl GPUBackendImpl for WgpuImpl {
   fn end_frame(&mut self) {
     self.submit();
     self.device.poll(wgpu::Maintain::Wait);
+    #[cfg(debug_assertions)]
+    self.stop_capture();
   }
 }
 

@@ -13,8 +13,8 @@ repository = "https://github.com/RibirX/Ribir/themes/material"
 version.workspace = true
 
 [dependencies]
-ribir_widgets = { path = "../../widgets", version = "0.0.0" }
-ribir_core = { path = "../../core", version = "0.0.0" }
+ribir_core = {path = "../../core", version = "0.0.0"}
+ribir_widgets = {path = "../../widgets", version = "0.0.0"}
 
 [dev-dependencies]
-ribir = { path = "../../ribir", version = "0.0.0" }
+ribir = {path = "../../ribir", version = "0.0.0", features = ["png"]}

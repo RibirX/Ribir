@@ -21,7 +21,6 @@ indextree.workspace = true
 lazy_static.workspace = true
 log.workspace = true
 lyon_geom.workspace = true
-once_cell = "1.17.1"
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_macros = {path = "../macros", version = "0.0.0"}
 ribir_painter = {path = "../painter", version = "0.0.0"}
@@ -30,16 +29,11 @@ rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
 
+[dev-dependencies]
+colored.workspace = true
+
 [features]
 png = ["ribir_painter/png"]
 thread-pool = [
   "futures/thread-pool",
 ]
-
-[dev-dependencies]
-colored.workspace = true
-
-[[test]]
-harness = false
-name = "single_thread"
-path = "tests/single_thread.rs"

@@ -47,7 +47,7 @@ impl ComposeChild for InteractiveLayer {
           size: host.layout_size(),
           StateLayer {
             color: this.color,
-            path: PaintPath::rect_round(&host.layout_rect(), &this.border_radii),
+            path: Path::rect_round(&host.layout_rect(), &this.border_radii),
             role: if host.pointer_pressed() {
               StateRole::pressed()
             } else if host.has_focus() {

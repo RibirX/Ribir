@@ -1,17 +1,8 @@
-use crate::{
-  prelude::*,
-  timer::{new_timer, recently_timeout, wake_timeout_futures},
-};
-use rxrust::scheduler::NEW_TIMER_FN;
-use ribir_core::{
-  prelude::*,
-  window::{ShellWindow, WindowId},
-};
-use ribir_widgets::prelude::*;
-use std::{collections::HashMap, rc::Rc};
-use ribir_core::{prelude::*, window::WindowId};
-use std::{collections::HashMap, rc::Rc};
+use crate::timer::{new_timer, recently_timeout, wake_timeout_futures};
 use crate::winit_shell_wnd::{new_id, WinitShellWnd};
+use ribir_core::{prelude::*, window::WindowId};
+use rxrust::scheduler::NEW_TIMER_FN;
+use std::{collections::HashMap, rc::Rc};
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
@@ -40,7 +31,7 @@ impl App {
   }
 
   #[inline]
-  pub fn with_theme(mut self, theme: FullTheme) -> Application {
+  pub fn with_theme(mut self, theme: FullTheme) -> App {
     let app_theme = Rc::new(Theme::Full(theme));
     self.ctx.app_theme = app_theme.clone();
     self.ctx.load_font_from_theme(app_theme);
@@ -80,16 +71,6 @@ impl App {
 
     let Self { windows, event_loop, .. } = self;
 
-    fn wnd_device_scale(wnd: &Window) -> f64 {
-      wnd
-        .shell_wnd()
-        .as_any()
-        .downcast_ref::<WinitShellWnd>()
-        .unwrap()
-        .winit_wnd
-        .scale_factor()
-    }
-
     event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
       *control = ControlFlow::Wait;
 
@@ -104,13 +85,19 @@ impl App {
                 }
               }
               WindowEvent::Resized(size) => {
-                let device_scale = wnd_device_scale(wnd);
-                let size = size.to_logical(device_scale);
-                wnd.set_size(Size::new(size.width, size.height));
+                let scale = wnd.device_pixel_ratio();
+                let size = size.to_logical(scale as f64);
+                let size = Size::new(size.width, size.height);
+                let shell_wnd = wnd
+                  .shell_wnd_mut()
+                  .as_any_mut()
+                  .downcast_mut::<WinitShellWnd>()
+                  .unwrap();
+                shell_wnd.on_resize(size);
+                wnd.on_wnd_resize_event(size);
               }
               event => {
-                let device_scale = wnd_device_scale(wnd);
-                wnd.processes_native_event_with_scale(event, device_scale);
+                wnd.processes_native_event(event);
               }
             }
           }
@@ -147,8 +134,8 @@ impl App {
           _ => (),
         },
         _ => (),
-      },
-    );
+      }
+    });
   }
 }
 

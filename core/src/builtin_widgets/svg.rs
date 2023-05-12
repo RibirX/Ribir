@@ -8,7 +8,10 @@ impl Render for Svg {
   fn paint(&self, ctx: &mut PaintingCtx) {
     let painter = ctx.painter();
     self.paths.iter().for_each(|c| {
-      painter.set_brush(c.brush.clone()).fill_path(c.path.clone());
+      painter
+        .apply_transform(&c.transform)
+        .set_brush(c.brush.clone())
+        .fill_path(c.path.clone());
     });
   }
 }

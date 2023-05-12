@@ -1,5 +1,10 @@
+use ribir::timer::new_timer;
+use rxrust::scheduler::NEW_TIMER_FN;
+
 mod test_single_thread {
   use futures::executor::LocalPool;
+  use ribir::timer::wake_timeout_futures;
+  use ribir_core::test::{default_mock_window, mock_window};
   use std::{cell::RefCell, rc::Rc};
   use std::{thread::sleep, time::Duration};
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
@@ -7,7 +12,6 @@ mod test_single_thread {
   use ribir_core::{
     prelude::*,
     test::{assert_layout_result, ExpectRect, MockBox},
-    timer::wake_timeout_futures,
   };
 
   pub fn test_widget_with_timer() {
@@ -23,7 +27,7 @@ mod test_single_thread {
       }
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     // init size
     wnd.draw_frame();
     assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(20., 20.)));
@@ -52,7 +56,7 @@ mod test_single_thread {
         on_x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
       }
     };
-    let mut wnd = Window::default_mock(w, Some(size));
+    let mut wnd = mock_window(w, size, <_>::default());
     wnd.draw_frame();
 
     (wnd, count)
@@ -155,6 +159,7 @@ mod test_single_thread {
 
 fn main() {
   use colored::Colorize;
+  let _ = NEW_TIMER_FN.set(new_timer);
   ribir_core::test::unit_test_describe! {
     run_unit_test(test_single_thread::test_widget_with_timer);
     run_unit_test(test_single_thread::test_double_tap);

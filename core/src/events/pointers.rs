@@ -337,7 +337,7 @@ impl ComposeChild for TapListener {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::{MockBox, MockMulti};
+  use crate::test::{mock_window, MockBox, MockMulti};
   use std::{cell::RefCell, rc::Rc};
   use winit::{
     dpi::LogicalPosition,
@@ -349,7 +349,7 @@ mod tests {
     let logical = LogicalPosition::new(x, y);
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: logical.to_physical(wnd.raw_window.scale_factor()),
+      position: logical.to_physical(1.),
       modifiers: ModifiersState::default(),
     });
     wnd.processes_native_event(WindowEvent::MouseInput {
