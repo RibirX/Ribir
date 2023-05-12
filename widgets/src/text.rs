@@ -11,7 +11,7 @@ use ribir_core::{
 pub struct Text {
   #[declare(convert=into)]
   pub text: CowArc<str>,
-  #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()))]
+  #[declare(default = Brush::Color(Palette::of(ctx).on_surface()))]
   pub foreground: Brush,
   #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
   pub style: CowArc<TextStyle>,

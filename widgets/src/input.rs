@@ -8,6 +8,7 @@ use std::time::Duration;
 
 pub use caret_state::CaretState;
 
+pub use self::editarea::PlaceholderStyle;
 use self::editarea::TextEditorArea;
 pub use self::selected_text::SelectedTextStyle;
 use crate::layout::Container;
@@ -195,5 +196,9 @@ pub fn add_to_theme(theme: &mut FullTheme) {
     .set_custom_style(TextAreaStyle { rows: 2., cols: 20. });
   theme.custom_styles.set_custom_style(SelectedTextStyle {
     brush: Color::from_rgb(181, 215, 254).into(),
+  });
+  theme.custom_styles.set_custom_style(PlaceholderStyle {
+    foreground: theme.palette.on_surface_variant().into(),
+    text_style: theme.typography_theme.body_medium.text.clone(),
   });
 }

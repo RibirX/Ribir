@@ -249,6 +249,10 @@ fn init_custom_style(theme: &mut FullTheme) {
       },
     },
   });
+  theme.custom_styles.set_custom_style(PlaceholderStyle {
+    foreground: theme.palette.on_surface_variant().into(),
+    text_style: theme.typography_theme.body_medium.text.clone(),
+  });
 }
 
 fn override_compose_decorator(theme: &mut FullTheme) {

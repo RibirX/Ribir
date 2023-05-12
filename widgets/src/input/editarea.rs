@@ -13,6 +13,14 @@ pub(crate) struct TextEditorArea {
   pub(crate) auto_wrap: bool,
 }
 
+#[derive(Clone)]
+pub struct PlaceholderStyle {
+  pub text_style: CowArc<TextStyle>,
+  pub foreground: Brush,
+}
+
+impl CustomStyle for PlaceholderStyle {}
+
 impl ComposeChild for TextEditorArea {
   type Child = Option<Placeholder>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
@@ -21,9 +29,13 @@ impl ComposeChild for TextEditorArea {
         this: this.into_writable(),
         helper: Stateful::new(GlyphsHelper::default()),
       }
-      init {
+      init ctx => {
         let layout_ready = Subject::default();
         let mut layout_ready_emit = layout_ready.clone();
+        let PlaceholderStyle {
+          text_style: placeholder_text_style,
+          foreground: placeholder_foreground,
+        } = PlaceholderStyle::of(ctx).clone();
       }
 
       ConstrainedBox {
@@ -83,6 +95,8 @@ impl ComposeChild for TextEditorArea {
               Text {
                 visible: this.text.is_empty(),
                 text: holder.0,
+                style: placeholder_text_style,
+                foreground: placeholder_foreground,
               }
             })
 
