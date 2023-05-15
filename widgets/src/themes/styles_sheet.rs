@@ -17,6 +17,7 @@ pub mod svgs {
     CLOSE,
     DELETE,
     DONE,
+    EDIT,
     EXPAND_MORE,
     FAVORITE,
     HOME,

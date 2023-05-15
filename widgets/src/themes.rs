@@ -15,6 +15,7 @@ pub(crate) fn add_to_theme(theme: &mut FullTheme) {
     svgs::CHEVRON_RIGHT: "./themes/icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::CLOSE: "./themes/icons/close_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::DELETE: "./themes/icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
+    svgs::EDIT: "./themes/icons/edit_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::DONE: "./themes/icons/done_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::EXPAND_MORE: "./themes/icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::FAVORITE: "./themes/icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
