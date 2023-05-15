@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use ribir_core::prelude::{CharEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
+use ribir_core::prelude::{CharsEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
 
 struct InputWriter<'a> {
   input: &'a mut TextEditorArea,
@@ -37,12 +37,17 @@ impl<'a> DerefMut for InputWriter<'a> {
 
 use super::{glyphs_helper::GlyphsHelper, TextEditorArea};
 impl TextEditorArea {
-  pub(crate) fn edit_handle(&mut self, event: &mut CharEvent) {
-    if !event.char.is_ascii_control() {
+  pub(crate) fn edit_handle(&mut self, event: &mut CharsEvent) {
+    let chars = event
+      .chars
+      .chars()
+      .filter(|c| !c.is_control())
+      .collect::<String>();
+    if !chars.is_empty() {
       let rg = self.caret.select_range();
       let mut writer = InputWriter::new(self);
       writer.delete_byte_range(&rg);
-      writer.insert_char(event.char);
+      writer.insert_str(&chars);
     }
   }
 

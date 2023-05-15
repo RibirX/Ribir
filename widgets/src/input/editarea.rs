@@ -30,7 +30,7 @@ impl ComposeChild for TextEditorArea {
         id: outbox,
         clamp: BoxClamp::EXPAND_BOTH,
         on_key_down: move|key| this.key_handle(key, &helper),
-        on_char: move|ch| this.edit_handle(ch),
+        on_chars: move|ch| this.edit_handle(ch),
         on_pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
             if e.point_type == PointerType::Mouse
@@ -92,6 +92,10 @@ impl ComposeChild for TextEditorArea {
               left_anchor: 0.,
               focused: outbox.has_focus(),
               height: 0.,
+              on_performed_layout: move |ctx| {
+                let size = ctx.layout_info().and_then(|info| info.size).unwrap();
+                ctx.set_ime_pos(Point::new(0., size.height));
+              },
             }
           }
         }

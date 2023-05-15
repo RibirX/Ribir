@@ -44,9 +44,9 @@ where
 
   pub fn byte_offset(&self) -> usize { self.cursor.byte_offset() }
 
-  pub fn insert_char(&mut self, c: char) {
-    self.text.insert(self.cursor.byte_offset(), c);
-    self.cursor.next(&self.text);
+  pub fn insert_chars(&mut self, s: &str) {
+    self.text.insert_str(self.cursor.byte_offset(), s);
+    self.cursor.reset(self.cursor.byte_offset() + s.len());
   }
 
   pub fn del_char(&mut self) {

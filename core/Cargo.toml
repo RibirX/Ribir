@@ -29,6 +29,7 @@ ribir_gpu = {path = "../gpu", version = "0.0.0", features = ["wgpu_gl"]}
 ribir_macros = {path = "../macros", version = "0.0.0"}
 ribir_painter = {path = "../painter", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
+ribir_geom = {path = "../geom", version = "0.0.0"}
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
