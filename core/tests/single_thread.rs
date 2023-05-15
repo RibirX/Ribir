@@ -65,7 +65,7 @@ mod test_single_thread {
       if (cond)() {
         break;
       }
-      sleep(Duration::from_millis(8));
+      sleep(Duration::from_millis(1));
     }
   }
 
@@ -148,7 +148,6 @@ mod test_single_thread {
       });
 
     run_until(&mut local_pool, || *is_complete2.borrow());
-
     assert_eq!(*count.borrow(), 2);
   }
 }
