@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{prelude::*, widget_tree::WidgetTree};
-use ::ribir_text::PIXELS_PER_EM;
-use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+use ribir_text::PIXELS_PER_EM;
+use winit::event::{DeviceId, ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent};
 
 use super::focus_mgr::FocusManager;
 
@@ -54,8 +54,14 @@ impl Dispatcher {
         self.dispatch_keyboard_input(input, tree);
       }
       WindowEvent::ReceivedCharacter(c) => {
-        self.dispatch_received_char(c, tree);
+        self.dispatch_received_chars(c.to_string(), tree);
       }
+      WindowEvent::Ime(ime) => {
+        if let Ime::Commit(s) = ime {
+          self.dispatch_received_chars(s, tree);
+        }
+      }
+
       WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, tree, wnd_factor),
       _ => log::info!("not processed event {:?}", event),
     }
@@ -88,13 +94,13 @@ impl Dispatcher {
     }
   }
 
-  pub fn dispatch_received_char(&mut self, c: char, tree: &mut WidgetTree) {
+  pub fn dispatch_received_chars(&mut self, c: String, tree: &mut WidgetTree) {
     if let Some(focus) = self.focusing() {
-      let mut char_event = CharEvent {
-        char: c,
+      let mut char_event = CharsEvent {
+        chars: c,
         common: EventCommon::new(focus, tree, &self.info),
       };
-      tree.bubble_event::<CharListener>(&mut char_event);
+      tree.bubble_event::<CharsListener>(&mut char_event);
     }
   }
 

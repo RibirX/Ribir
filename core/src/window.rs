@@ -5,7 +5,7 @@ use crate::{
   widget_tree::WidgetTree,
 };
 pub use winit::window::CursorIcon;
-use winit::{event::WindowEvent, window::WindowId};
+use winit::{dpi::LogicalPosition, event::WindowEvent, window::WindowId};
 
 pub trait RawWindow {
   fn inner_size(&self) -> Size;
@@ -19,6 +19,7 @@ pub trait RawWindow {
   /// Modify the native window if cursor modified.
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn scale_factor(&self) -> f64;
+  fn set_ime_pos(&mut self, pos: Point);
 }
 
 impl RawWindow for winit::window::Window {
@@ -62,6 +63,12 @@ impl RawWindow for winit::window::Window {
   fn set_cursor(&mut self, cursor: CursorIcon) { self.set_cursor_icon(cursor) }
 
   #[inline]
+  fn set_ime_pos(&mut self, pos: Point) {
+    let position: LogicalPosition<f32> = LogicalPosition::new(pos.x, pos.y);
+    self.set_ime_position(position);
+  }
+
+  #[inline]
   fn scale_factor(&self) -> f64 { winit::window::Window::scale_factor(self) }
 }
 
@@ -83,6 +90,7 @@ impl WindowBuilder {
       None,
       ctx.shaper.clone(),
     ));
+    native_wnd.set_ime_allowed(true);
     Window::new(native_wnd, p_backend, self.root, ctx)
   }
 
@@ -233,6 +241,7 @@ impl Window {
       }
 
       self.dispatcher.refresh_focus(&self.widget_tree);
+      self.raw_window.set_ime_pos(*self.context.ime_pos.borrow());
 
       self.widget_tree.draw(&mut self.painter);
       let commands = self.painter.finish();
@@ -366,6 +375,7 @@ impl RawWindow for MockRawWindow {
   fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
   fn request_redraw(&self) {}
   fn scale_factor(&self) -> f64 { 1. }
+  fn set_ime_pos(&mut self, _: Point) {}
 }
 
 impl Window {
