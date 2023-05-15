@@ -97,6 +97,7 @@ impl App {
                 wnd.on_wnd_resize_event(size);
               }
               event => {
+                #[allow(deprecated)]
                 wnd.processes_native_event(event);
               }
             }

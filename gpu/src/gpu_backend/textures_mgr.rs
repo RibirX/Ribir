@@ -12,7 +12,7 @@ use ribir_painter::{
 };
 use slab::Slab;
 use std::{cmp::Ordering, ops::Range};
-const TOLERANCE: f32 = 0.100000001f32;
+const TOLERANCE: f32 = 0.1_f32;
 const PAR_CHUNKS_SIZE: usize = 64;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Copy)]
@@ -146,7 +146,7 @@ where
       (cut_blank_slice, ts)
     });
 
-    return (slice, cache_to_view(&cache_ts, &transform));
+    (slice, cache_to_view(&cache_ts, transform))
   }
 
   pub(super) fn store_clipped_path(
@@ -314,7 +314,7 @@ where
         .map(|tasks| {
           let mut buffer = VertexBuffers::default();
           let mut indices = Vec::with_capacity(tasks.len());
-          for (slice, ts, tex_size, slice_bounds, path, clip_rect) in tasks.into_iter() {
+          for (slice, ts, tex_size, slice_bounds, path, clip_rect) in tasks.iter() {
             let rg = Self::fill_tess(path, ts, *tex_size, slice_bounds, &mut buffer);
             indices.push((slice.tex_id, rg, *clip_rect));
           }
@@ -343,7 +343,7 @@ where
 
       let (tex_id,  rg,Some(clip_rect)) = &draw_indices[idx] else { break; };
       let texture = id_to_texture_mut!(self, *tex_id);
-      gpu_impl.draw_alpha_triangles_with_scissor(&rg, texture, *clip_rect);
+      gpu_impl.draw_alpha_triangles_with_scissor(rg, texture, *clip_rect);
       idx += 1;
     }
 
@@ -604,7 +604,7 @@ pub mod tests {
       img
         .pixel_bytes()
         .chunks(4)
-        .all(|c| c == &color.into_components())
+        .all(|c| c == color.into_components())
     );
   }
 

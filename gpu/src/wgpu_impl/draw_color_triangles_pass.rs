@@ -18,7 +18,7 @@ impl DrawColorTrianglesPass {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
     let label = "Color triangles pass";
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some(&label),
+      label: Some(label),
       source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/color_triangles.wgsl").into()),
     });
 
@@ -42,6 +42,7 @@ impl DrawColorTrianglesPass {
     self.vertices_buffer.write_buffer(buffers, device, queue);
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self,
     texture: &mut WgpuTexture,
@@ -63,7 +64,7 @@ impl DrawColorTrianglesPass {
 
     let color_attachments = texture.color_attachments(clear);
     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some(&self.label),
+      label: Some(self.label),
       color_attachments: &[Some(color_attachments)],
       depth_stencil_attachment: None,
     });
@@ -105,7 +106,7 @@ impl DrawColorTrianglesPass {
         push_constant_ranges: &[],
       });
       let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(&self.label),
+        label: Some(self.label),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
           module: &self.shader,

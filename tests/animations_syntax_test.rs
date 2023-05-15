@@ -7,6 +7,7 @@ fn wheel_widget(w: Widget) -> Window {
 
   wnd.draw_frame();
   let device_id = unsafe { DeviceId::dummy() };
+  #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::MouseWheel {
     device_id,
     delta: MouseScrollDelta::LineDelta(1.0, 1.0),

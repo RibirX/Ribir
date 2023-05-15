@@ -317,7 +317,7 @@ impl Painter {
   }
 
   pub fn clip(&mut self, path: Path) -> &mut Self {
-    let paint_path = PaintPath::new(path, self.get_transform().clone());
+    let paint_path = PaintPath::new(path, *self.get_transform());
 
     self.current_state_mut().bounds = self
       .current_state()
@@ -332,7 +332,7 @@ impl Painter {
 
   /// Fill a path with its style.
   pub fn fill_path(&mut self, p: Path) -> &mut Self {
-    let ts = self.get_transform().clone();
+    let ts = *self.get_transform();
     let path = PaintPath::new(p, ts);
     if !path.paint_bounds.is_empty() && path.paint_bounds.intersects(self.paint_bounds()) {
       let opacity = self.alpha();
@@ -669,7 +669,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
 
 impl PaintPath {
   pub fn new(path: Path, transform: Transform) -> Self {
-    let paint_bounds = transform.outer_transformed_rect(&path.bounds());
+    let paint_bounds = transform.outer_transformed_rect(path.bounds());
     PaintPath { path, transform, paint_bounds }
   }
 

@@ -12,7 +12,7 @@ pub struct DrawAlphaTrianglesPass {
 
 impl DrawAlphaTrianglesPass {
   pub fn new(device: &wgpu::Device) -> Self {
-    let vertices_buffer = VerticesBuffer::new(2048, 4096, &device);
+    let vertices_buffer = VerticesBuffer::new(2048, 4096, device);
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
       label: Some("Alpha triangles"),
       source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/alpha_triangles.wgsl").into()),

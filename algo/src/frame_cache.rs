@@ -78,7 +78,7 @@ where
     K: Borrow<Q>,
     Q: Hash + Eq,
   {
-    self.cache.remove(&key).map(|c| c.value)
+    self.cache.remove(key).map(|c| c.value)
   }
 
   pub fn insert(&mut self, key: K, value: V) -> Option<V> {
@@ -210,7 +210,7 @@ where
     } else {
       let v = self
         .cache
-        .get_or_insert_with(key.borrow().to_owned().into(), V::default);
+        .get_or_insert_with(key.borrow().to_owned(), V::default);
 
       let v_ptr = v.heap_mut_ptr();
       let v_mut_ptr = SendMutPtr(v_ptr);

@@ -347,17 +347,20 @@ mod tests {
   fn tap_on(wnd: &mut Window, x: f32, y: f32) {
     let device_id = unsafe { DeviceId::dummy() };
     let logical = LogicalPosition::new(x, y);
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: logical.to_physical(1.),
       modifiers: ModifiersState::default(),
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,

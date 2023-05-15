@@ -36,6 +36,7 @@ pub struct WgpuImpl {
   mask_layers_storage: Storage<MaskLayer>,
 }
 
+#[derive(Default)]
 pub struct TexturesBind {
   texture_cnt: usize,
   textures_bind: Option<wgpu::BindGroup>,
@@ -281,15 +282,11 @@ impl WgpuTexture {
     if let Some(multi_sample) = &self.multisampler {
       wgpu::RenderPassColorAttachment {
         view: multi_sample,
-        resolve_target: Some(&view),
+        resolve_target: Some(view),
         ops,
       }
     } else {
-      wgpu::RenderPassColorAttachment {
-        view: &view,
-        resolve_target: None,
-        ops,
-      }
+      wgpu::RenderPassColorAttachment { view, resolve_target: None, ops }
     }
   }
 
@@ -454,7 +451,7 @@ impl Texture for WgpuTexture {
       (0..height as usize).for_each(|r| {
         let padded_start = r * padded_row_bytes as usize;
         let row_start = r * row_bytes;
-        data[row_start..row_start + row_bytes as usize]
+        data[row_start..row_start + row_bytes]
           .copy_from_slice(&slice[padded_start..padded_start + row_bytes]);
       });
 
@@ -539,7 +536,7 @@ impl WgpuImpl {
       draw_alpha_triangles_pass,
       draw_color_triangles_pass,
       draw_img_triangles_pass,
-      textures_bind: TexturesBind::new(),
+      textures_bind: TexturesBind::default(),
       mask_layers_storage,
     }
   }
@@ -606,19 +603,11 @@ impl WgpuImpl {
 }
 
 impl TexturesBind {
-  pub fn new() -> Self {
-    Self {
-      texture_cnt: 0,
-      textures_bind: None,
-      textures_layout: None,
-    }
-  }
-
   pub fn textures_count(&self) -> usize { self.texture_cnt }
 
-  pub fn assert_layout(&self) -> &wgpu::BindGroupLayout { &self.textures_layout.as_ref().unwrap() }
+  pub fn assert_layout(&self) -> &wgpu::BindGroupLayout { self.textures_layout.as_ref().unwrap() }
 
-  pub fn assert_bind(&self) -> &wgpu::BindGroup { &self.textures_bind.as_ref().unwrap() }
+  pub fn assert_bind(&self) -> &wgpu::BindGroup { self.textures_bind.as_ref().unwrap() }
 
   fn load_textures(
     &mut self,

@@ -318,7 +318,7 @@ pub macro unit_test_describe($(run_unit_test($name: path);)* ) {{
 
   let count = count!($($name)*);
 
-  println!("running {} tests", count);
+  println!("running {} test", count);
   let mut res  = Result::Ok(());
   // catch panic and continue execute unit tests.
   $(
@@ -350,7 +350,6 @@ pub macro unit_test_describe($(run_unit_test($name: path);)* ) {{
     infos.iter().for_each(|info| println!("{}", info))
   }
 
-  println!("");
 
   if let Result::Err(err) = res {
     std::panic::resume_unwind(err);

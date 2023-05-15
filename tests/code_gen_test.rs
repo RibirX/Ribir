@@ -273,17 +273,20 @@ fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
   let device_id = unsafe { DeviceId::dummy() };
   let modifiers = ModifiersState::default();
 
+  #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::CursorMoved {
     device_id,
     position: pos.into(),
     modifiers,
   });
+  #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::MouseInput {
     device_id,
     state: ElementState::Pressed,
     button: MouseButton::Left,
     modifiers,
   });
+  #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::MouseInput {
     device_id,
     state: ElementState::Released,

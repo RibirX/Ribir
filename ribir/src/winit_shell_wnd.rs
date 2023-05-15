@@ -26,7 +26,7 @@ impl WinitWgpu {
     let wgpu = AppContext::wait_future(ribir_gpu::WgpuImpl::new(instance, Some(&surface)));
     let size = window.inner_size();
     surface.configure(
-      &wgpu.device(),
+      wgpu.device(),
       &Self::surface_config(size.width, size.height),
     );
 
@@ -39,7 +39,7 @@ impl WinitWgpu {
 
   pub fn on_resize(&mut self, size: DeviceSize) {
     self.surface.configure(
-      &self.backend.get_impl().device(),
+      self.backend.get_impl().device(),
       &Self::surface_config(size.width as u32, size.height as u32),
     );
   }

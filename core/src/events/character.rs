@@ -74,6 +74,7 @@ mod tests {
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();
+    #[allow(deprecated)]
     test_text_case
       .chars()
       .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));

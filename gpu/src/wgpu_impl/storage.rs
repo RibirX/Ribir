@@ -25,7 +25,7 @@ impl<T: AsBytes> Storage<T> {
       label: Some(&format!("{} storage layout", type_name::<T>())),
     });
     let (buffer, bind) = Self::new_bind(
-      &device,
+      device,
       &layout,
       (size_of::<T>() * init_count) as wgpu::BufferAddress,
     );

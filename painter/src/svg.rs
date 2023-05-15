@@ -45,13 +45,13 @@ impl Svg {
           NodeKind::Path(p) => {
             t_stack.push(matrix_convert(p.transform));
             let path = usvg_path_to_path(p);
-            let transform = t_stack.current_transform().clone();
+            let transform = *t_stack.current_transform();
             if let Some(ref fill) = p.fill {
               let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
               paths.push(SvgPath {
                 path: path.clone(),
                 brush,
-                transform: transform.clone(),
+                transform,
                 style: PathPaintStyle::Fill,
               });
             }

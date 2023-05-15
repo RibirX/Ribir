@@ -50,7 +50,7 @@ impl DrawTexturePass {
     let vertices_pool = BufferPool::new(
       POOL_SIZE,
       wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-      &device,
+      device,
     );
     Self {
       pipeline: None,
@@ -210,7 +210,7 @@ impl WgpuImpl {
       src_rect.width() as u32,
       src_rect.height() as u32,
     );
-    rpass.set_pipeline(&draw_tex_pass.pipeline.as_ref().unwrap());
+    rpass.set_pipeline(draw_tex_pass.pipeline.as_ref().unwrap());
 
     rpass.draw(0..4, 0..1)
   }

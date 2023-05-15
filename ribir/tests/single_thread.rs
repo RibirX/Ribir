@@ -86,6 +86,7 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
+        #[allow(deprecated)]
         wnd.processes_native_event(WindowEvent::MouseInput {
           device_id,
           state: if i % 2 == 0 {
@@ -110,6 +111,7 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
+        #[allow(deprecated)]
         wnd.processes_native_event(WindowEvent::MouseInput {
           device_id,
           state: if i % 2 == 0 {
@@ -139,6 +141,7 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
+        #[allow(deprecated)]
         wnd.processes_native_event(WindowEvent::MouseInput {
           device_id,
           state: if i % 2 == 0 {

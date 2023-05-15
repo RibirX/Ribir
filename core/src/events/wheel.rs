@@ -74,6 +74,7 @@ mod tests {
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
       delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),

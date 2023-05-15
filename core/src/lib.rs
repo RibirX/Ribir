@@ -21,6 +21,7 @@ pub mod ticker;
 pub mod widget;
 pub mod widget_children;
 pub mod window;
+
 pub mod prelude {
   pub use crate::animation::*;
   #[doc(no_inline)]
