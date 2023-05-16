@@ -19,29 +19,20 @@ pub struct App {
 }
 
 impl App {
-  #[inline]
+  /// Create an application with a theme, caller should init your widgets
+  /// library with the theme before create the application.
   pub fn new(theme: FullTheme) -> Self {
-    let app_theme = Rc::new(Theme::Full(theme));
+    let mut ctx = AppContext::new(theme);
     let clipboard = Clipboard::new().unwrap();
-    let ctx = AppContext {
-      app_theme: app_theme.clone(),
-      clipboard: Rc::new(RefCell::new(clipboard)),
-      ..Default::default()
-    };
-    ctx.load_font_from_theme(app_theme);
+    ctx.clipboard = Rc::new(RefCell::new(clipboard));
 
     let _ = NEW_TIMER_FN.set(new_timer);
     Self { ctx, ..Default::default() }
   }
 
-  #[inline]
-  pub fn with_theme(mut self, theme: FullTheme) -> App {
-    let app_theme = Rc::new(Theme::Full(theme));
-    self.ctx.app_theme = app_theme.clone();
-    self.ctx.load_font_from_theme(app_theme);
-    self
-  }
-
+  /// Start an application with the `root` widget, this will use the default
+  /// theme to create an application and use the `root` widget to create a
+  /// window, then run the application.
   pub fn run(root: Widget) {
     let mut app = App::default();
     app.new_window(root, None);
@@ -146,10 +137,14 @@ impl App {
 
 impl Default for App {
   fn default() -> Self {
+    let mut theme = FullTheme::default();
+    ribir_widgets::widget_theme_init(&mut theme);
+    let ctx = AppContext::new(theme);
+
     Self {
       windows: Default::default(),
       event_loop: EventLoop::new(),
-      ctx: <_>::default(),
+      ctx,
       active_wnd: None,
     }
   }
