@@ -277,7 +277,7 @@ impl Compose for Storybook {
                         line_number: 2,
                         Leading {
                           Avatar {
-                            ShareResource::new(PixelImage::from_png(include_bytes!("../attachments/3DDD-1.png")))
+                            ShareResource::new(PixelImage::from_png(include_bytes!("./attachments/3DDD-1.png")))
                           }
                         }
                         HeadlineText(Label::new("Two lines list item"))
@@ -288,7 +288,7 @@ impl Compose for Storybook {
                       ListItem {
                         line_number: 1,
                         Leading {
-                          ShareResource::new(PixelImage::from_png(include_bytes!("../attachments/3DDD-2.png")))
+                          ShareResource::new(PixelImage::from_png(include_bytes!("./attachments/3DDD-2.png")))
                         }
                         HeadlineText(Label::new("One lines list item"))
                         SupportingText(Label::new("One lines supporting text"))
@@ -310,7 +310,7 @@ impl Compose for Storybook {
                       ListItem {
                         line_number: 1,
                         Leading {
-                          Poster(ShareResource::new(PixelImage::from_png(include_bytes!("../attachments/3DDD-3.png"))))
+                          Poster(ShareResource::new(PixelImage::from_png(include_bytes!("./attachments/3DDD-3.png"))))
                         }
                         HeadlineText(Label::new("One lines list item"))
                         SupportingText(Label::new("One lines supporting text"))
