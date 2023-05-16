@@ -11,7 +11,7 @@ pub use caret_state::CaretState;
 pub use self::editarea::PlaceholderStyle;
 use self::editarea::TextEditorArea;
 pub use self::selected_text::SelectedTextStyle;
-use crate::layout::Container;
+use crate::layout::ConstrainedBox;
 use ribir_core::prelude::*;
 
 pub struct Placeholder(CowArc<str>);
@@ -22,7 +22,7 @@ impl Placeholder {
 }
 #[derive(Clone, PartialEq)]
 pub struct InputStyle {
-  pub size: f32,
+  pub size: Option<f32>,
 }
 impl CustomStyle for InputStyle {}
 
@@ -35,7 +35,7 @@ pub struct Input {
   #[declare(skip)]
   caret: CaretState,
   #[declare(default = InputStyle::of(ctx).size)]
-  size: f32,
+  size: Option<f32>,
 }
 
 #[derive(Declare)]
@@ -49,9 +49,9 @@ pub struct TextArea {
   #[declare(skip)]
   caret: CaretState,
   #[declare(default = TextAreaStyle::of(ctx).rows)]
-  rows: f32,
+  rows: Option<f32>,
   #[declare(default = TextAreaStyle::of(ctx).cols)]
-  cols: f32,
+  cols: Option<f32>,
 }
 
 impl Input {
@@ -96,11 +96,8 @@ impl ComposeChild for Input {
       states {
         this: this.into_writable(),
       }
-      Container {
-        size: Size::new(
-          this.size * glyph_width(this.style.font_size),
-          line_height(this.style.line_height.unwrap_or(this.style.font_size.into_em()))
-        ),
+      ConstrainedBox {
+        clamp: size_clamp(&this.style, Some(1.), this.size),
         TextEditorArea {
           id: area,
           text: this.text.clone(),
@@ -132,8 +129,8 @@ impl ComposeChild for Input {
 
 #[derive(Clone, PartialEq)]
 pub struct TextAreaStyle {
-  pub rows: f32,
-  pub cols: f32,
+  pub rows: Option<f32>,
+  pub cols: Option<f32>,
 }
 impl CustomStyle for TextAreaStyle {}
 
@@ -147,11 +144,8 @@ impl ComposeChild for TextArea {
       states {
         this: this.into_writable(),
       }
-      Container {
-        size: Size::new(
-          this.cols * glyph_width(this.style.font_size),
-          this.rows * line_height(this.style.line_height.unwrap_or(this.style.font_size.into_em()))
-        ),
+      ConstrainedBox {
+        clamp: size_clamp(&this.style, this.rows, this.cols),
         TextEditorArea {
           id: area,
           text: this.text.clone(),
@@ -181,6 +175,19 @@ impl ComposeChild for TextArea {
   }
 }
 
+fn size_clamp(style: &TextStyle, rows: Option<f32>, cols: Option<f32>) -> BoxClamp {
+  let mut clamp: BoxClamp = BoxClamp::EXPAND_BOTH;
+  if let Some(cols) = cols {
+    let width = cols * glyph_width(style.font_size);
+    clamp = clamp.with_fixed_width(width);
+  }
+  if let Some(rows) = rows {
+    let height = rows * line_height(style.line_height.unwrap_or(style.font_size.into_em()));
+    clamp = clamp.with_fixed_height(height);
+  }
+  clamp
+}
+
 fn glyph_width(font_size: FontSize) -> f32 {
   FontSize::Em(font_size.relative_em(1.)).into_pixel().value()
 }
@@ -190,10 +197,10 @@ fn line_height(line_height: Em) -> f32 { FontSize::Em(line_height).into_pixel().
 pub fn add_to_theme(theme: &mut FullTheme) {
   theme
     .custom_styles
-    .set_custom_style(InputStyle { size: 20. });
+    .set_custom_style(InputStyle { size: Some(20.) });
   theme
     .custom_styles
-    .set_custom_style(TextAreaStyle { rows: 2., cols: 20. });
+    .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
   theme.custom_styles.set_custom_style(SelectedTextStyle {
     brush: Color::from_rgb(181, 215, 254).into(),
   });

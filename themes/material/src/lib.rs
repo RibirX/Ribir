@@ -115,10 +115,10 @@ fn init_custom_style(theme: &mut FullTheme) {
   });
   theme
     .custom_styles
-    .set_custom_style(InputStyle { size: 20. });
+    .set_custom_style(InputStyle { size: Some(20.) });
   theme
     .custom_styles
-    .set_custom_style(TextAreaStyle { rows: 2., cols: 20. });
+    .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
   theme.custom_styles.set_custom_style(SelectedTextStyle {
     brush: Color::from_rgb(181, 215, 254).into(),
   });

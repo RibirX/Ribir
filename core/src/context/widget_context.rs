@@ -196,6 +196,12 @@ impl<'a> LifeCycleCtx<'a> {
   pub fn layout_info(&self) -> Option<&LayoutInfo> { self.layout_store().layout_info(self.id()) }
 
   pub fn wnd_ctx(&self) -> &WindowCtx { WidgetCtxImpl::wnd_ctx(self) }
+
+  pub fn set_ime_pos(&self, pos: Point) {
+    let wnd_ctx = self.wnd_ctx();
+    let pos = self.map_to_global(pos);
+    wnd_ctx.set_ime_pos(pos);
+  }
 }
 
 #[cfg(test)]

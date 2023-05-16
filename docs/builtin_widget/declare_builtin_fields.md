@@ -40,8 +40,8 @@
  	 - specify the event handler when keyboard press down.
 - on_key_up : [`impl FnMut(& mut KeyboardEvent)`] 
  	 - specify the event handler when a key is released.
-- on_char : [`impl FnMut(& mut CharEvent)`] 
- 	 - specify the event handler when received a unicode character.
+- on_chars : [`impl FnMut(& mut CharsEvent)`] 
+ 	 - specify the event handler when received unicode characters.
 - on_wheel : [`impl FnMut(& mut WheelEvent)`] 
  	 - specify the event handler when user moving a mouse wheel or similar input device.
 - box_fit : [`BoxFit`] 
@@ -164,7 +164,7 @@ PointerEvent, >`
  - `fn key_up_stream(& self) -> MutRefItemSubject < 'static, KeyboardEvent, () >`
  	- return an observable stream of the key up event
 
- - `fn char_stream(& self) -> MutRefItemSubject < 'static, CharEvent, () >`
+ - `fn chars_stream(& self) -> MutRefItemSubject < 'static, CharsEvent, () >`
  	- return an observable stream of the char event
 
  - `fn key_down_stream(& self) -> MutRefItemSubject < 'static, WheelEvent, () >`

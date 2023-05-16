@@ -2,6 +2,7 @@ use futures::{
   task::{LocalSpawnExt, SpawnError},
   Future,
 };
+use ribir_geom::Point;
 use ribir_painter::TypographyStore;
 use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
 use std::{cell::RefCell, convert::Infallible, rc::Rc, time::Instant};
@@ -22,6 +23,7 @@ pub struct WindowCtx {
   pub(crate) app_ctx: AppContext,
   pub(crate) actived_animates: Rc<RefCell<u32>>,
   pub(crate) frame_scheduler: FuturesLocalScheduler,
+  pub(crate) ime_pos: Rc<RefCell<Point>>,
 }
 
 impl WindowCtx {
@@ -33,6 +35,7 @@ impl WindowCtx {
       focus_mgr: Rc::new(RefCell::new(FocusManager::default())),
       frame_ticker: FrameTicker::default(),
       actived_animates: Rc::new(RefCell::new(0)),
+      ime_pos: Rc::new(RefCell::new(Point::zero())),
       frame_scheduler,
     }
   }
@@ -57,6 +60,7 @@ impl WindowCtx {
   pub(crate) fn begin_frame(&mut self) {
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
   }
+
   pub(crate) fn layout_ready(&mut self) {
     self
       .frame_ticker
@@ -108,4 +112,6 @@ impl WindowCtx {
       actived_cnt: self.actived_animates.clone(),
     }
   }
+
+  pub(crate) fn set_ime_pos(&self, global_pos: Point) { *self.ime_pos.borrow_mut() = global_pos; }
 }
