@@ -47,6 +47,15 @@ impl Default for Executor {
 }
 
 impl AppContext {
+  pub fn new(theme: FullTheme) -> Self {
+    let ctx = AppContext {
+      app_theme: Rc::new(Theme::Full(theme)),
+      ..Default::default()
+    };
+    ctx.load_font_from_theme(&ctx.app_theme);
+    ctx
+  }
+
   pub(crate) fn end_frame(&mut self) {
     // todo: frame cache is not a good choice? because not every text will relayout
     // in every frame.
@@ -55,9 +64,9 @@ impl AppContext {
     self.typography_store.end_frame();
   }
 
-  pub fn load_font_from_theme(&self, theme: Rc<Theme>) {
+  pub fn load_font_from_theme(&self, theme: &Theme) {
     let mut font_db = self.font_db.write().unwrap();
-    match &*theme {
+    match theme {
       Theme::Full(FullTheme { font_bytes, font_files, .. })
       | Theme::Inherit(InheritTheme { font_bytes, font_files, .. }) => {
         if let Some(font_bytes) = font_bytes {
