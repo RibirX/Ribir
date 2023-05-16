@@ -1,9 +1,7 @@
-use crate::{
-  path::*, path_builder::PathBuilder, Angle, Brush, Color, DeviceRect, PixelImage, Point, Rect,
-  Size, TextStyle, Transform, Vector,
-};
+use crate::{path::*, path_builder::PathBuilder, Brush, Color, PixelImage, TextStyle};
 use euclid::{num::Zero, Size2D, Vector2D};
 use ribir_algo::{ShareResource, Substr};
+use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use ribir_text::{
   typography::{Overflow, PlaceLineDirection, TypographyCfg},
   Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
@@ -376,8 +374,13 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T, bounds: Option<Size>) -> &mut Self {
-    self.paint_text_command(text, true, bounds);
+  pub fn stroke_text<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    bounds: Option<Size>,
+    overflow: Overflow,
+  ) -> &mut Self {
+    self.paint_text_command(text, true, bounds, overflow);
     self
   }
 
@@ -387,8 +390,13 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn fill_text<T: Into<Substr>>(&mut self, text: T, bounds: Option<Size>) -> &mut Self {
-    self.paint_text_command(text, false, bounds);
+  pub fn fill_text<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    bounds: Option<Size>,
+    overflow: Overflow,
+  ) -> &mut Self {
+    self.paint_text_command(text, false, bounds, overflow);
     self
   }
 
@@ -530,7 +538,13 @@ impl Painter {
 
   fn stroke_options(&self) -> &StrokeOptions { &self.current_state().stroke_options }
 
-  fn paint_text_command<T: Into<Substr>>(&mut self, text: T, stroke: bool, bounds: Option<Size>) {
+  fn paint_text_command<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    stroke: bool,
+    bounds: Option<Size>,
+    overflow: Overflow,
+  ) {
     let &PainterState {
       font_size,
       letter_space,
@@ -548,6 +562,7 @@ impl Painter {
         line_height: text_line_height,
       },
       bounds,
+      overflow,
     );
 
     visual_glyphs.pixel_glyphs().for_each(|g| {
@@ -634,6 +649,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   text: T,
   style: &TextStyle,
   bounds: Option<Size>,
+  overflow: Overflow,
 ) -> VisualGlyphs {
   let &TextStyle {
     font_size,
@@ -645,7 +661,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
 
   let bounds = if let Some(b) = bounds {
     let width: Em = Pixel(b.width.into()).into();
-    let height: Em = Pixel(b.width.into()).into();
+    let height: Em = Pixel(b.height.into()).into();
     Size2D::new(width, height)
   } else {
     let max = Em::absolute(f32::MAX);
@@ -662,7 +678,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
       text_align: None,
       bounds,
       line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::Clip,
+      overflow,
     },
   )
 }
@@ -682,7 +698,7 @@ impl PaintPath {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::geom::rect;
+  use ribir_geom::rect;
   use ribir_text::shaper::TextShaper;
 
   fn painter() -> Painter {

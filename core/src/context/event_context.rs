@@ -1,9 +1,11 @@
 use super::{define_widget_context, WidgetCtxImpl, WindowCtx};
+use crate::context::widget_context::WidgetContext;
 use crate::{
   events::dispatcher::DispatchInfo,
   widget::{LayoutStore, TreeArena},
   widget_tree::WidgetId,
 };
+use ribir_geom::Point;
 use winit::{event::ModifiersState, window::CursorIcon};
 
 define_widget_context!(EventCtx, info: &'a mut DispatchInfo);
@@ -18,4 +20,10 @@ impl<'a> EventCtx<'a> {
 
   #[inline]
   pub fn modifiers(&self) -> ModifiersState { self.info.modifiers() }
+
+  pub fn set_ime_pos(&self, pos: Point) {
+    let wnd_ctx = WidgetContext::wnd_ctx(self);
+    let pos = self.map_to_global(pos);
+    wnd_ctx.set_ime_pos(pos);
+  }
 }

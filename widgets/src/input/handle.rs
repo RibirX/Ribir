@@ -1,16 +1,16 @@
 use std::ops::{Deref, DerefMut};
 
-use ribir_core::prelude::{CharEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
+use ribir_core::prelude::{CharsEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
 
 struct InputWriter<'a> {
-  input: &'a mut Input,
+  input: &'a mut TextEditorArea,
   writer: TextWriter<GraphemeCursor>,
 }
 
 impl<'a> InputWriter<'a> {
-  fn new(input: &'a mut Input) -> Self {
+  fn new(input: &'a mut TextEditorArea) -> Self {
     let cursor = GraphemeCursor(input.caret.offset());
-    let string = input.text().to_string();
+    let string = input.text.to_string();
     Self {
       input,
       writer: TextWriter::new(string, cursor),
@@ -35,24 +35,40 @@ impl<'a> DerefMut for InputWriter<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.writer }
 }
 
-use super::Input;
-impl Input {
-  pub(crate) fn edit_handle(&mut self, event: &mut CharEvent) {
-    if !event.char.is_ascii_control() {
+use super::{glyphs_helper::GlyphsHelper, TextEditorArea};
+impl TextEditorArea {
+  pub(crate) fn edit_handle(&mut self, event: &mut CharsEvent) {
+    let chars = event
+      .chars
+      .chars()
+      .filter(|c| !c.is_control())
+      .collect::<String>();
+    if !chars.is_empty() {
       let rg = self.caret.select_range();
       let mut writer = InputWriter::new(self);
       writer.delete_byte_range(&rg);
-      writer.insert_char(event.char);
+      writer.insert_str(&chars);
     }
   }
 
-  pub(crate) fn key_handle(&mut self, key: &mut KeyboardEvent) {
+  pub(crate) fn key_handle(&mut self, key: &mut KeyboardEvent, helper: &GlyphsHelper) {
     match key.key {
       VirtualKeyCode::Left => {
-        InputWriter::new(self).move_to_prev();
+        self.caret = helper.prev_cluster(self.caret.offset()).into();
       }
       VirtualKeyCode::Right => {
-        InputWriter::new(self).move_to_next();
+        self.caret = helper.next_cluster(self.caret.offset()).into();
+      }
+      VirtualKeyCode::Up => {
+        self.caret = helper.up_cluster(self.caret.offset()).into();
+      }
+      VirtualKeyCode::Down => {
+        self.caret = helper.down_cluster(self.caret.offset()).into();
+      }
+      VirtualKeyCode::NumpadEnter | VirtualKeyCode::Return => {
+        if self.multi_line {
+          InputWriter::new(self).insert_str("\r");
+        }
       }
       VirtualKeyCode::Back => {
         let rg = self.caret.select_range();

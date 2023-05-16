@@ -1,8 +1,9 @@
 use self::textures_mgr::{TextureID, TexturesMgr};
 use crate::{ColorAttr, GPUBackendImpl, ImgPrimitive, MaskLayer};
+use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
-  geom::rect_corners, image::ColorFormat, AntiAliasing, Color, DeviceRect, DeviceSize,
-  PaintCommand, PaintPath, PainterBackend, PixelImage, Point, Vertex, VertexBuffers,
+  image::ColorFormat, AntiAliasing, Color, PaintCommand, PaintPath, PainterBackend, PixelImage,
+  Vertex, VertexBuffers,
 };
 use std::{error::Error, future::Future, ops::Range, pin::Pin};
 
@@ -376,9 +377,9 @@ mod tests {
   use super::*;
   use futures::executor::block_on;
   use ribir_algo::ShareResource;
+  use ribir_geom::*;
   use ribir_painter::{
-    font_db::FontDB, geom, shaper::TextShaper, Brush, Color, DeviceSize, Painter, Path, PixelImage,
-    Point, Rect, Size, Transform, TypographyStore,
+    font_db::FontDB, shaper::TextShaper, Brush, Color, Painter, Path, PixelImage, TypographyStore,
   };
   use std::sync::{Arc, RwLock};
 
@@ -523,7 +524,7 @@ mod tests {
     let brush2 = PixelImage::from_png(include_bytes!(
       "../../ribir/examples/attachments/3DDD-1.png"
     ));
-    let rect = geom::rect(0., 0., 100., 100.);
+    let rect = rect(0., 0., 100., 100.);
     painter
       .set_brush(brush1)
       .rect(&rect)

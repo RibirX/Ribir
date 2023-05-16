@@ -32,7 +32,8 @@ module.exports = {
     "algo",
     "widgets",
     "ribir",
-    "theme"
+    "theme",
+    "geom"
   ],
   "types": {
     "chore": {

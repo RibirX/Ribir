@@ -1,8 +1,7 @@
-use crate::{
-  Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, Point, Size, StrokeOptions, Transform,
-};
+use crate::{Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions};
 use euclid::approxeq::ApproxEq;
 use palette::FromComponent;
+use ribir_geom::{Point, Size, Transform};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree, TreeParsing};

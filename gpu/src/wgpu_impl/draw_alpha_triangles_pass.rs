@@ -1,6 +1,7 @@
 use super::vertex_buffer::VerticesBuffer;
 use crate::WgpuTexture;
-use ribir_painter::{AntiAliasing, DeviceRect, Vertex, VertexBuffers};
+use ribir_geom::DeviceRect;
+use ribir_painter::{AntiAliasing, Vertex, VertexBuffers};
 use std::{mem::size_of, ops::Range};
 
 pub struct DrawAlphaTrianglesPass {

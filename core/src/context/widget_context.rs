@@ -1,10 +1,9 @@
 use crate::{
   prelude::QueryOrder,
-  widget::{LayoutInfo, LayoutStore, TreeArena},
+  widget::{BoxClamp, LayoutInfo, LayoutStore, TreeArena},
   widget_tree::WidgetId,
 };
-
-use ribir_painter::{Point, Rect, Size};
+use ribir_geom::{Point, Rect, Size};
 
 use super::{AppContext, WindowCtx};
 
@@ -31,6 +30,8 @@ pub trait WidgetContext {
   fn box_rect(&self) -> Option<Rect>;
   /// Return the widget box size of the widget of the context.
   fn box_size(&self) -> Option<Size>;
+  /// layout clamp
+  fn layout_clamp(&self) -> Option<BoxClamp>;
   /// Return the box size of the widget `wid`.
   fn widget_box_size(&self, wid: WidgetId) -> Option<Size>;
   /// Return the box rect of the widget `wid` point to.
@@ -83,6 +84,14 @@ impl<T: WidgetCtxImpl> WidgetContext for T {
 
   #[inline]
   fn box_size(&self) -> Option<Size> { self.widget_box_size(self.id()) }
+
+  #[inline]
+  fn layout_clamp(&self) -> Option<BoxClamp> {
+    self
+      .layout_store()
+      .layout_info(self.id())
+      .map(|info| info.clamp)
+  }
 
   #[inline]
   fn single_child_box(&self) -> Option<Rect> {
@@ -186,6 +195,12 @@ impl<'a> LifeCycleCtx<'a> {
   pub fn layout_info(&self) -> Option<&LayoutInfo> { self.layout_store().layout_info(self.id()) }
 
   pub fn wnd_ctx(&self) -> &WindowCtx { WidgetCtxImpl::wnd_ctx(self) }
+
+  pub fn set_ime_pos(&self, pos: Point) {
+    let wnd_ctx = self.wnd_ctx();
+    let pos = self.map_to_global(pos);
+    wnd_ctx.set_ime_pos(pos);
+  }
 }
 
 #[cfg(test)]

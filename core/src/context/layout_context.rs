@@ -3,7 +3,7 @@ use crate::{
   widget::{BoxClamp, DirtySet, LayoutStore, Layouter, TreeArena},
   widget_tree::WidgetId,
 };
-use ribir_painter::Size;
+use ribir_geom::Size;
 
 /// A place to compute the render object's layout. Rather than holding children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx`

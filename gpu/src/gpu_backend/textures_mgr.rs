@@ -5,10 +5,9 @@ use crate::{gpu_backend::atlas::ATLAS_MAX_ITEM, GPUBackendImpl};
 use guillotiere::{euclid::SideOffsets2D, AllocId};
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::{FrameCache, ShareResource};
-use ribir_painter::geom::rect_corners;
-use ribir_painter::{image::ColorFormat, DeviceRect, DeviceSize, PaintPath, PixelImage};
+use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize, Point, Transform};
 use ribir_painter::{
-  AntiAliasing, DevicePoint, Path, PathSegment, Point, Transform, Vertex, VertexBuffers,
+  image::ColorFormat, AntiAliasing, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
 };
 use slab::Slab;
 use std::{cmp::Ordering, ops::Range};
@@ -546,7 +545,8 @@ pub mod tests {
   use crate::{WgpuImpl, WgpuTexture};
   use futures::executor::block_on;
   use ribir_algo::ShareResource;
-  use ribir_painter::{geom, image::ColorFormat, AntiAliasing, Color, Path, Transform};
+  use ribir_geom::*;
+  use ribir_painter::{image::ColorFormat, AntiAliasing, Color, Path};
   use std::borrow::Cow;
 
   pub fn color_image(color: Color, width: u32, height: u32) -> ShareResource<PixelImage> {
@@ -613,8 +613,8 @@ pub mod tests {
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
 
-    let path1 = Path::rect(&geom::rect(0., 0., 300., 300.));
-    let path2 = Path::rect(&geom::rect(100., 100., 300., 300.));
+    let path1 = Path::rect(&rect(0., 0., 300., 300.));
+    let path2 = Path::rect(&rect(100., 100., 300., 300.));
     let ts = Transform::scale(2., 2.);
 
     let (slice1, ts1) = mgr.store_alpha_path(path1, &ts, &mut wgpu);

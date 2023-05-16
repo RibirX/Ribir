@@ -45,7 +45,6 @@ impl<'a> BuildCtx<'a> {
 mod tests {
   use super::*;
   use crate::test::*;
-  use std::borrow::Borrow;
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
@@ -111,8 +110,8 @@ mod tests {
     let mut wnd = default_mock_window(light_dark);
     wnd.layout();
     let themes = themes.state_ref();
-    assert_eq!(themes.borrow().len(), 3);
-    let mut iter = themes.borrow().iter().filter_map(|t| match t.deref() {
+    assert_eq!(themes.len(), 3);
+    let mut iter = themes.iter().filter_map(|t| match t.deref() {
       Theme::Full(t) => Some(t.palette.brightness),
       Theme::Inherit(i) => i.palette.as_ref().map(|palette| palette.brightness),
     });

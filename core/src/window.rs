@@ -27,6 +27,7 @@ pub trait ShellWindow {
   fn id(&self) -> WindowId;
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
+  fn set_ime_pos(&mut self, pos: Point);
   fn set_size(&mut self, size: Size);
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
@@ -77,6 +78,7 @@ impl Window {
     }
 
     self.dispatcher.refresh_focus(&self.widget_tree);
+    self.shell_wnd.set_ime_pos(*self.context.ime_pos.borrow());
 
     self.widget_tree.draw(&mut self.painter);
 

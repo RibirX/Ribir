@@ -62,6 +62,7 @@ pub mod prelude {
   pub use log;
   #[doc(no_inline)]
   pub use ribir_algo::CowArc;
+  pub use ribir_geom::*;
   #[doc(no_inline)]
   pub use ribir_macros::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild, Template};
   #[doc(hidden)]

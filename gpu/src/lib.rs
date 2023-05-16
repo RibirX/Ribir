@@ -1,8 +1,7 @@
 pub mod error;
 use gpu_backend::Texture;
-use ribir_painter::{
-  image::ColorFormat, AntiAliasing, Color, DevicePoint, DeviceRect, DeviceSize, VertexBuffers,
-};
+use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
+use ribir_painter::{image::ColorFormat, AntiAliasing, Color, VertexBuffers};
 use std::ops::Range;
 mod gpu_backend;
 use zerocopy::AsBytes;

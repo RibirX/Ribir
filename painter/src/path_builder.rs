@@ -1,11 +1,10 @@
-use crate::{
-  Angle, LineCap, LineJoin, Path, Point, Radius, Rect, StrokeOptions, Transform, Vector,
-};
+use crate::{LineCap, LineJoin, Path, Radius, StrokeOptions};
 use lyon_algorithms::path::{
   geom::{Arc, LineSegment},
   path::Builder as LyonBuilder,
   Event, Path as LyonPath, Winding,
 };
+use ribir_geom::{Angle, Point, Rect, Transform, Vector};
 
 #[derive(Default)]
 pub struct PathBuilder {

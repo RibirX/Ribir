@@ -38,13 +38,15 @@ where
 {
   pub fn new(text: String, cursor: T) -> Self { Self { text, cursor } }
 
+  pub fn dispose(self) -> (String, T) { (self.text, self.cursor) }
+
   pub fn text(&self) -> &String { &self.text }
 
   pub fn byte_offset(&self) -> usize { self.cursor.byte_offset() }
 
-  pub fn insert_char(&mut self, c: char) {
-    self.text.insert(self.cursor.byte_offset(), c);
-    self.cursor.next(&self.text);
+  pub fn insert_chars(&mut self, s: &str) {
+    self.text.insert_str(self.cursor.byte_offset(), s);
+    self.cursor.reset(self.cursor.byte_offset() + s.len());
   }
 
   pub fn del_char(&mut self) {

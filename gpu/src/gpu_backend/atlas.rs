@@ -1,6 +1,7 @@
 use crate::GPUBackendImpl;
 use guillotiere::{AllocId, Allocation, AtlasAllocator};
-use ribir_painter::{image::ColorFormat, AntiAliasing, DevicePoint, DeviceRect, DeviceSize};
+use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
+use ribir_painter::{image::ColorFormat, AntiAliasing};
 
 use super::Texture;
 

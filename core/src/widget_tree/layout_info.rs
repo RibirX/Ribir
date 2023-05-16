@@ -1,4 +1,4 @@
-use ribir_painter::ZERO_SIZE;
+use ribir_geom::ZERO_SIZE;
 
 use super::{widget_id::split_arena, DirtySet, WidgetId, WidgetTree};
 use crate::{

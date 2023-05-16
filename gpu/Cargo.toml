@@ -19,6 +19,7 @@ guillotiere.workspace = true
 log.workspace = true
 rayon.workspace = true
 ribir_algo = {path = "../algo", version = "0.0.0"}
+ribir_geom = {path = "../geom", version = "0.0.0"}
 ribir_painter = {path = "../painter", features = ["tessellation"], version = "0.0.0"}
 slab = "0.4.8"
 wgpu = {workspace = true, optional = true}

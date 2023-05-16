@@ -1,10 +1,17 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use std::{collections::HashMap, rc::Rc};
-
+use crate::{
+  declare::DeclareBuilder,
+  impl_query_self_only,
+  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
+  state::State,
+};
 use ribir_algo::CowArc;
 pub use ribir_algo::ShareResource;
+use ribir_geom::Size;
+use std::{collections::HashMap, rc::Rc};
+
 mod palette;
 pub use palette::*;
 mod icon_theme;
@@ -17,13 +24,6 @@ mod compose_decorators;
 pub use compose_decorators::*;
 mod custom_styles;
 pub use custom_styles::*;
-
-use crate::{
-  declare::DeclareBuilder,
-  impl_query_self_only,
-  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
-  state::State,
-};
 
 pub use ribir_painter::*;
 pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};

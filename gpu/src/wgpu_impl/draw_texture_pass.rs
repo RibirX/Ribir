@@ -1,6 +1,7 @@
 use super::buffer_pool::BufferPool;
 use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, WgpuTexture};
-use ribir_painter::{geom::rect_corners, DevicePoint, DeviceRect, DeviceSize, Vertex};
+use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize};
+use ribir_painter::Vertex;
 use std::mem::size_of;
 const POOL_SIZE: usize = 256;
 

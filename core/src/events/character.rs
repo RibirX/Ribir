@@ -8,44 +8,44 @@ use crate::{
 /// An attribute that sends a single Unicode codepoint. The character can be
 /// pushed to the end of a string.
 #[derive(Declare)]
-pub struct CharListener {
+pub struct CharsListener {
   #[declare(builtin, convert=custom)]
-  on_char: MutRefItemSubject<'static, CharEvent, Infallible>,
+  on_chars: MutRefItemSubject<'static, CharsEvent, Infallible>,
 }
 
 #[derive(Debug)]
-pub struct CharEvent {
-  pub char: char,
+pub struct CharsEvent {
+  pub chars: String,
   pub common: EventCommon,
 }
 
 impl_listener!(
-  CharListener,
-  CharListenerDeclarer,
-  on_char,
-  CharEvent,
+  CharsListener,
+  CharsListenerDeclarer,
+  on_chars,
+  CharsEvent,
   char_stream
 );
-impl_compose_child_with_focus_for_listener!(CharListener);
+impl_compose_child_with_focus_for_listener!(CharsListener);
 
-impl std::borrow::Borrow<EventCommon> for CharEvent {
+impl std::borrow::Borrow<EventCommon> for CharsEvent {
   #[inline]
   fn borrow(&self) -> &EventCommon { &self.common }
 }
 
-impl std::borrow::BorrowMut<EventCommon> for CharEvent {
+impl std::borrow::BorrowMut<EventCommon> for CharsEvent {
   #[inline]
   fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
 }
 
-impl std::ops::Deref for CharEvent {
+impl std::ops::Deref for CharsEvent {
   type Target = EventCommon;
 
   #[inline]
   fn deref(&self) -> &Self::Target { &self.common }
 }
 
-impl std::ops::DerefMut for CharEvent {
+impl std::ops::DerefMut for CharsEvent {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
 }
@@ -67,7 +67,7 @@ mod tests {
       MockBox {
         size: ZERO_SIZE,
         auto_focus: true,
-        on_char: move |key| c_receive.borrow_mut().push(key.char)
+        on_chars: move |event| c_receive.borrow_mut().push_str(&event.chars)
       }
     };
     let mut wnd = default_mock_window(widget);

@@ -359,6 +359,7 @@ fn build_input_area(
       foreground: theme.foreground.clone(),
       text_style: theme.text.clone(),
       path_style: PathPaintStyle::Fill,
+      overflow: Overflow::Clip,
     }
   }
 

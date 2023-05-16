@@ -5,10 +5,8 @@ use self::{
 };
 use crate::{gpu_backend::Texture, ColorAttr, GPUBackendImpl, ImgPrimitive, MaskLayer};
 use futures::{channel::oneshot, Future};
-use ribir_painter::{
-  image::ColorFormat, AntiAliasing, Color, DevicePoint, DeviceRect, DeviceSize, PixelImage,
-  VertexBuffers,
-};
+use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
+use ribir_painter::{image::ColorFormat, AntiAliasing, Color, PixelImage, VertexBuffers};
 use std::{error::Error, num::NonZeroU32, ops::Range, pin::Pin};
 mod buffer_pool;
 mod storage;

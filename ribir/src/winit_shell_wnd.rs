@@ -4,7 +4,7 @@ use ribir_core::{
   prelude::*,
   window::{ShellWindow, WindowId},
 };
-use winit::event_loop::EventLoopWindowTarget;
+use winit::{dpi::LogicalPosition, event_loop::EventLoopWindowTarget};
 pub trait WinitBackend {
   fn new(window: &winit::window::Window) -> Self;
 
@@ -62,6 +62,12 @@ impl ShellWindow for WinitShellWnd {
 
   #[inline]
   fn set_title(&mut self, title: &str) { self.winit_wnd.set_title(title) }
+
+  #[inline]
+  fn set_ime_pos(&mut self, pos: Point) {
+    let position: LogicalPosition<f32> = LogicalPosition::new(pos.x, pos.y);
+    self.winit_wnd.set_ime_position(position);
+  }
 
   #[inline]
   fn as_any(&self) -> &dyn std::any::Any { self }

@@ -1,11 +1,9 @@
-use crate::{
-  path_builder::{stroke_path, PathBuilder},
-  Point, Rect, Transform,
-};
+use crate::path_builder::{stroke_path, PathBuilder};
 use lyon_algorithms::{
   measure::{PathMeasurements, SampleType},
   path::{Event, Path as LyonPath},
 };
+use ribir_geom::{Point, Rect, Transform};
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 

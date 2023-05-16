@@ -35,6 +35,8 @@ impl ShellWindow for MockShellWindow {
 
   fn set_title(&mut self, _: &str) {}
 
+  fn set_ime_pos(&mut self, _: Point) {}
+
   fn as_any(&self) -> &dyn Any { self }
 
   fn as_any_mut(&mut self) -> &mut dyn Any { self }

@@ -153,11 +153,11 @@ builtin! {
     fn key_up_stream(&self) -> MutRefItemSubject<'static, KeyboardEvent, ()>,
   }
 
-  CharListener {
-    #[doc="specify the event handler when received a unicode character."]
-    on_char: impl FnMut(&mut CharEvent),
+  CharsListener {
+    #[doc="specify the event handler when received unicode characters."]
+    on_chars: impl FnMut(&mut CharsEvent),
     #[doc= "return an observable stream of the char event"]
-    fn char_stream(&self) -> MutRefItemSubject<'static, CharEvent, ()>,
+    fn chars_stream(&self) -> MutRefItemSubject<'static, CharsEvent, ()>,
   }
 
   WheelListener {

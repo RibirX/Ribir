@@ -2,7 +2,7 @@ mod styles_sheet;
 use ribir_core::{fill_svgs, prelude::*};
 pub use styles_sheet::*;
 
-pub fn add_to_theme(theme: &mut FullTheme) {
+pub(crate) fn add_to_theme(theme: &mut FullTheme) {
   fill_svgs! {
     theme.icon_theme,
     svgs::ADD: "./themes/icons/add_FILL0_wght400_GRAD0_opsz48.svg",
