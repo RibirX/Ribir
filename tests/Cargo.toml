@@ -8,10 +8,10 @@ homepage.workspace = true
 keywords.workspace = true
 license.workspace = true
 name = "tests"
+publish = false
 readme.workspace = true
 repository = "https://github.com/RibirX/Ribir/tests"
 version.workspace = true
-publish = false
 
 [dev-dependencies]
 ribir = {path = "../ribir"}

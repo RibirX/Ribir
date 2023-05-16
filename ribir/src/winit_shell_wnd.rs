@@ -1,91 +1,30 @@
+use crate::backends::*;
+
 use ribir_core::{
   prelude::*,
   window::{ShellWindow, WindowId},
 };
-use ribir_gpu::WgpuTexture;
 use winit::event_loop::EventLoopWindowTarget;
+pub trait WinitBackend {
+  fn new(window: &winit::window::Window) -> Self;
 
-pub struct WinitShellWnd {
-  pub(crate) winit_wnd: winit::window::Window,
-  #[cfg(feature = "wgpu")]
-  backend: WinitWgpu,
-}
+  fn on_resize(&mut self, size: DeviceSize);
 
-#[cfg(feature = "wgpu")]
-struct WinitWgpu {
-  surface: wgpu::Surface,
-  backend: ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>,
-  current_texture: Option<WgpuTexture>,
-}
-
-#[cfg(feature = "wgpu")]
-impl WinitWgpu {
-  fn new(window: &winit::window::Window) -> WinitWgpu {
-    let instance = wgpu::Instance::new(<_>::default());
-    let surface = unsafe { instance.create_surface(window).unwrap() };
-    let wgpu = AppContext::wait_future(ribir_gpu::WgpuImpl::new(instance, Some(&surface)));
-    let size = window.inner_size();
-    surface.configure(
-      wgpu.device(),
-      &Self::surface_config(size.width, size.height),
-    );
-
-    WinitWgpu {
-      surface,
-      backend: ribir_gpu::GPUBackend::new(wgpu, AntiAliasing::Msaa4X),
-      current_texture: None,
-    }
-  }
-
-  pub fn on_resize(&mut self, size: DeviceSize) {
-    self.surface.configure(
-      self.backend.get_impl().device(),
-      &Self::surface_config(size.width as u32, size.height as u32),
-    );
-  }
-
-  fn surface_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
-    wgpu::SurfaceConfiguration {
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-      format: wgpu::TextureFormat::Bgra8Unorm,
-      width,
-      height,
-      present_mode: wgpu::PresentMode::Fifo,
-      alpha_mode: wgpu::CompositeAlphaMode::Auto,
-      view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
-    }
-  }
-
-  fn begin_frame(&mut self) {
-    self.backend.begin_frame();
-    assert!(self.current_texture.is_none());
-    let surface_tex = self.surface.get_current_texture().unwrap();
-    self.current_texture = Some(WgpuTexture::from_surface_tex(surface_tex));
-  }
+  fn begin_frame(&mut self);
 
   fn draw_commands(
     &mut self,
     viewport: DeviceRect,
     commands: Vec<PaintCommand>,
     surface_color: Color,
-  ) {
-    let surface = self.current_texture.as_mut().unwrap();
+  );
 
-    self
-      .backend
-      .draw_commands(viewport, commands, surface_color, surface);
-  }
+  fn end_frame(&mut self);
+}
 
-  fn end_frame(&mut self) {
-    self.backend.end_frame();
-    let surface = self
-      .current_texture
-      .take()
-      .unwrap()
-      .into_surface_texture()
-      .unwrap();
-    surface.present();
-  }
+pub struct WinitShellWnd {
+  pub(crate) winit_wnd: winit::window::Window,
+  backend: Backend,
 }
 
 impl ShellWindow for WinitShellWnd {
@@ -143,11 +82,12 @@ impl ShellWindow for WinitShellWnd {
     });
 
     let scale = self.winit_wnd.scale_factor() as f32;
-    let viewport = viewport
+    let viewport: DeviceRect = viewport
       .scale(scale, scale)
       .round_out()
       .to_i32()
       .cast_unit();
+
     self.backend.draw_commands(viewport, commands, surface);
   }
 
@@ -169,14 +109,14 @@ impl WinitShellWnd {
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
     WinitShellWnd {
-      #[cfg(feature = "wgpu")]
-      backend: WinitWgpu::new(&winit_wnd),
+      backend: Backend::new(&winit_wnd),
       winit_wnd,
     }
   }
 
   pub fn on_resize(&mut self, size: Size) {
-    let size = (size * self.device_pixel_ratio()).to_i32().cast_unit();
+    let size: DeviceSize = (size * self.device_pixel_ratio()).to_i32().cast_unit();
+
     self.backend.on_resize(size);
   }
 }

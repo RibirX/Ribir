@@ -368,6 +368,7 @@ pub fn add_draw_rect_vertices<Attr: Copy>(
   indices.push(vertex_start);
 }
 
+#[cfg(feature = "wgpu")]
 #[cfg(test)]
 mod tests {
   use crate::WgpuImpl;
