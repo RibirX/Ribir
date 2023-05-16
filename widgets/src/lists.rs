@@ -262,13 +262,7 @@ where
       EdgeWidget::Custom(w) => widget! {
         DynWidget {
           dyns: custom.gap.map(|margin| Margin { margin }),
-          SizedBox {
-            size: custom.size,
-            DynWidget {
-              box_fit: BoxFit::Contain,
-              dyns: w.decorate(|_, c| c)
-            }
-          }
+          widget::from(w.decorate(|_, c| c))
         }
       },
     }
@@ -321,6 +315,8 @@ impl ComposeChild for ListItem {
         let text_height = line_height * this.line_number as f32;
       }
       ListItemDecorator {
+        color: this.active_background,
+        is_active: false,
         DynWidget {
           dyns: padding_style.map(|padding| Padding { padding }),
           Row {
@@ -330,23 +326,25 @@ impl ComposeChild for ListItem {
               flex: 1.,
               DynWidget {
                 dyns: label_gap.map(|padding| Padding { padding }),
-                Column {
-                  Text {
-                    text: headline.0.0.clone(),
-                    foreground: on_surface,
-                    style: headline_style.clone(),
-                  }
-                  Option::map(supporting, |supporting| widget! {
-                    states { supporting: supporting.into_readonly() }
-                    ConstrainedBox {
-                      clamp: BoxClamp::fixed_height(*text_height.0),
-                      Text {
-                        text: supporting.0.0.clone(),
-                        foreground: on_surface_variant.clone(),
-                        style: supporting_style.clone(),
-                      }
+                Clip {
+                  Column {
+                    Text {
+                      text: headline.0.0.clone(),
+                      foreground: on_surface,
+                      style: headline_style.clone(),
                     }
-                  })
+                    Option::map(supporting, |supporting| widget! {
+                      states { supporting: supporting.into_readonly() }
+                      ConstrainedBox {
+                        clamp: BoxClamp::fixed_height(*text_height.0),
+                        Text {
+                          text: supporting.0.0.clone(),
+                          foreground: on_surface_variant.clone(),
+                          style: supporting_style.clone(),
+                        }
+                      }
+                    })
+                  }
                 }
               }
             }
@@ -360,8 +358,10 @@ impl ComposeChild for ListItem {
 
 #[derive(Declare)]
 pub struct ListItem {
-  #[declare(default = 0)]
+  #[declare(default = 1)]
   pub line_number: usize,
+  #[declare(default = Palette::of(ctx).primary())]
+  pub active_background: Color,
 }
 
 #[derive(Clone)]
@@ -378,7 +378,10 @@ pub struct ListItemStyle {
 impl CustomStyle for ListItemStyle {}
 
 #[derive(Clone, Declare)]
-pub struct ListItemDecorator {}
+pub struct ListItemDecorator {
+  pub color: Color,
+  pub is_active: bool,
+}
 
 impl ComposeDecorator for ListItemDecorator {
   type Host = Widget;
