@@ -65,7 +65,7 @@ mod test_single_thread {
       if (cond)() {
         break;
       }
-      sleep(Duration::from_millis(8));
+      sleep(Duration::from_millis(1));
     }
   }
 
