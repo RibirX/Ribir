@@ -15,6 +15,7 @@ struct FragInput {
 @vertex
 fn vs_main(v: Vertex) -> FragInput {
     var input: FragInput;
+    // convert from gpu-backend coords(0..1) to wgpu corrds(-1..1)
     let pos = v.pos * vec2(2., -2.) + vec2(-1., 1.);
     input.pos = vec4<f32>(pos, 0.0, 1.0);
     input.mask_head = v.mask_head;

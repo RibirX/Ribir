@@ -12,6 +12,7 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
+    // convert from gpu-backend coords(0..1) to wgpu corrds(-1..1)
     let pos = input.pos * vec2(2., -2.) + vec2(-1., 1.);
     var output: VertexOutput;
     output.pos = vec4<f32>(pos, 0.0, 1.0);

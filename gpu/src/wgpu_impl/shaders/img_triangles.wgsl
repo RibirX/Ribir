@@ -32,6 +32,7 @@ var<storage> mask_layers: array<MaskLayer>;
 @vertex
 fn vs_main(v: VertexInput) -> VertexOutput {
     var o: VertexOutput;
+    // convert from gpu-backend coords(0..1) to wgpu corrds(-1..1)
     let pos = v.pos * vec2(2., -2.) + vec2(-1., 1.);
     o.pos = vec4<f32>(pos, 1., 1.);
     o.prim_idx = v.prim_idx;
