@@ -13,24 +13,22 @@ repository = "https://github.com/RibirX/Ribir/painter"
 version.workspace = true
 
 [dependencies]
-bitflags = "2.0.1"
-bitflags-serde-legacy = "0.1.0"
-euclid = {version = "0.22.6", features = ["serde"]}
+bitflags = "2.3.0"
 image = {workspace = true, optional = true, default-features = false}
 log.workspace = true
 lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-color-utilities-rs = {workspace = true}
-palette = {version = "0.6.1", features = ["serializing"]}
-rctree = "0.5.0"
+palette = {workspace = true, features = ["serializing"]}
+rctree.workspace = true
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_geom = {path = "../geom", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
 serde = {version = "1.0", features = ["rc", "derive"]}
 serde_json.workspace = true
-tiny-skia-path = "0.9.0"
+tiny-skia-path = {workspace = true}
 usvg.workspace = true
-zerocopy = {version = "0.7.0-alpha.3", optional = true}
+zerocopy = {workspace = true, optional = true}
 
 [features]
 png = ["image/png"]

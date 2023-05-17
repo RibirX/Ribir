@@ -1,7 +1,6 @@
 use crate::{path::*, path_builder::PathBuilder, Brush, Color, PixelImage, TextStyle};
-use euclid::{num::Zero, Size2D, Vector2D};
 use ribir_algo::{ShareResource, Substr};
-use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
+use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector, Zero};
 use ribir_text::{
   typography::{Overflow, PlaceLineDirection, TypographyCfg},
   Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
@@ -587,7 +586,7 @@ impl Painter {
         let ts = Transform::scale(1., -1.)
           .then_translate((0., unit).into())
           .then_scale(scale, scale)
-          .then_translate(Vector2D::new(g.x_offset.value(), g.y_offset.value()));
+          .then_translate(Vector::new(g.x_offset.value(), g.y_offset.value()));
         let path = path.transform(&ts);
 
         // todo: glyph path as resource.
@@ -662,10 +661,10 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   let bounds = if let Some(b) = bounds {
     let width: Em = Pixel(b.width.into()).into();
     let height: Em = Pixel(b.height.into()).into();
-    Size2D::new(width, height)
+    Size::new(width, height)
   } else {
     let max = Em::absolute(f32::MAX);
-    Size2D::new(max, max)
+    Size::new(max, max)
   };
 
   store.typography(

@@ -1,5 +1,5 @@
 pub mod error;
-use gpu_backend::Texture;
+pub use gpu_backend::Texture;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{image::ColorFormat, AntiAliasing, Color, VertexBuffers};
 use std::ops::Range;

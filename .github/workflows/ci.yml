@@ -13,40 +13,31 @@ env:
 
 name: CI
 jobs:
-  check:
-    name: Check
+  lint:
+    name: rust code lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: nightly-2023-02-01
-          override: true
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-
-  test:
-    name: Test Suite
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux x86_64
-            os: ubuntu-22.04
-          - name: Macos x86
-            os: macos-latest
+      - name: format style check 
+        run: cargo fmt --all -- --check
+      - name: cargo clippy check
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: cargo check
+        run: cargo check
+  linux:
+    name: Test Suite (ubuntu-22.04)
+    needs: lint
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
       - name: install swiftshader
-        if: matrix.os == 'ubuntu-22.04'
         shell: bash
         run: |
           set -e
@@ -54,7 +45,6 @@ jobs:
           curl -LsSf https://github.com/gfx-rs/ci-build/releases/latest/download/swiftshader-linux-x86_64.tar.xz | tar -xf - -C swiftshader
           echo "LD_LIBRARY_PATH=$PWD/swiftshader" >> $GITHUB_ENV
       - name: install llvmpipe, vulkan sdk
-        if: matrix.os == 'ubuntu-22.04'
         shell: bash
         run: |
           set -e
@@ -64,99 +54,32 @@ jobs:
           sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
           sudo apt-get update
           sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev vulkan-sdk
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: nightly-2023-02-01
-          override: true
-      - uses: Swatinem/rust-cache@v2
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features
-
-  windows:
-    name: Test Suite(windows-latest)
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: c:/ribir
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2023-02-01
-          override: true
-      - uses: Swatinem/rust-cache@v2
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features
-  codcov:
-    name: Code coverage
-    runs-on: ubuntu-latest
-    env:
-      CARGO_TERM_COLOR: always
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2023-02-01
-          override: true
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
-      - name: run llvm-cov test
-        # should test with --all-features if gpu support.
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --no-default-features
+      - name: llvm-cov test
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: lcov.info
           fail_ci_if_error: false
-  rustfmt:
-    name: rust code format style check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install nightly toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2023-02-01
-          override: true
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-  clippy_check:
-    runs-on: ubuntu-latest
+  win_mac: 
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    needs: lint
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly-2023-02-01
-          components: clippy
-          override: true
       - uses: Swatinem/rust-cache@v2
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets --all-features -- -D warnings
+      - run: cargo test --no-default-features

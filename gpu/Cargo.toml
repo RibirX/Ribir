@@ -26,7 +26,8 @@ wgpu = {workspace = true, optional = true}
 zerocopy.workspace = true
 
 [dev-dependencies]
-ribir_painter = {path = "../painter", features = ["tessellation", "png"], version = "0.0.0"}
+paste.workspace = true
+ribir_dev_helper = {path = "../dev-helper", version = "0.0.0"}
 
 [features]
-wgpu = ["dep:wgpu", "futures"]
+wgpu = ["dep:wgpu", "futures", "ribir_dev_helper/wgpu"]

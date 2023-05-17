@@ -1,0 +1,24 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "ribir_dev_helper"
+repository = "https://github.com/RibirX/Ribir/test-helper"
+version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dssim-core.workspace = true
+futures.workspace = true
+ribir_geom = {path = "../geom", version = "0.0.0"}
+ribir_gpu = {path = "../gpu", version = "0.0.0"}
+ribir_painter = {path = "../painter", features = ["png"], version = "0.0.0"}
+
+[features]
+wgpu = ["ribir_gpu/wgpu"]

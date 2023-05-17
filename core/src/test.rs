@@ -51,6 +51,7 @@ impl ShellWindow for MockShellWindow {
 
   fn device_pixel_ratio(&self) -> f32 { 1. }
 }
+
 impl MockShellWindow {
   fn new(size: Option<Size>) -> Self {
     static ID: AtomicU64 = AtomicU64::new(0);
