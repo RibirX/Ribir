@@ -45,7 +45,7 @@ var samplers: binding_array<sampler>;
 fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
     var color = input.color;
     var mask_idx = input.mask_head;
-    for (;;) {
+    loop {
         if mask_idx < 0 {
             break;
         }

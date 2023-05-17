@@ -1,5 +1,4 @@
 use crate::{Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions};
-use euclid::approxeq::ApproxEq;
 use palette::FromComponent;
 use ribir_geom::{Point, Size, Transform};
 use serde::{Deserialize, Serialize};
@@ -89,7 +88,7 @@ impl Svg {
           NodeKind::Group(ref g) => {
             t_stack.push(matrix_convert(g.transform));
             // todo;
-            if !g.opacity.get().approx_eq(&1.) {
+            if g.opacity.get() != 1. {
               log::warn!("[painter]: not support `opacity` in svg, ignored!");
             }
             if g.clip_path.is_some() {

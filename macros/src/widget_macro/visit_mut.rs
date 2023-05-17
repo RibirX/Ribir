@@ -36,6 +36,7 @@ use syn::{
 };
 
 bitflags::bitflags! {
+
   pub struct IdType: u16 {
     /// Declared by `id: name`,
     const DECLARE = 0x001;

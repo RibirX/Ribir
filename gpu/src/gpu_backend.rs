@@ -156,6 +156,9 @@ where
   #[inline]
   pub fn get_impl(&self) -> &Impl { &self.gpu_impl }
 
+  #[inline]
+  pub fn get_impl_mut(&mut self) -> &mut Impl { &mut self.gpu_impl }
+
   fn draw_command(&mut self, cmd: PaintCommand, output_tex_size: DeviceSize) {
     match cmd {
       PaintCommand::ColorPath { path, color } => {
@@ -372,11 +375,9 @@ pub fn add_draw_rect_vertices<Attr: Copy>(
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 mod tests {
-  use crate::WgpuImpl;
-
   use super::*;
-  use futures::executor::block_on;
   use ribir_algo::ShareResource;
+  use ribir_dev_helper::*;
   use ribir_geom::*;
   use ribir_painter::{
     font_db::FontDB, shaper::TextShaper, Brush, Color, Painter, Path, PixelImage, TypographyStore,
@@ -389,26 +390,8 @@ mod tests {
     Painter::new(Rect::from_size(bounds), store)
   }
 
-  fn commands_to_image(painter: &mut Painter) -> PixelImage {
-    let commands = painter.finish();
-    let bounds = painter.paint_bounds().to_i32();
-    let rect = DeviceRect::from_size(DeviceSize::new(bounds.max_x() + 2, bounds.max_y() + 2));
-    let mut gpu_impl = block_on(WgpuImpl::headless());
-    let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
-    let mut gpu_backend = GPUBackend::new(gpu_impl, AntiAliasing::Msaa4X);
-    gpu_backend.begin_frame();
-    gpu_backend.gpu_impl.start_capture();
-    gpu_backend.draw_commands(rect, commands, Color::TRANSPARENT, &mut texture);
-    let img = texture.copy_as_image(&rect, &mut gpu_backend.gpu_impl);
-    gpu_backend.end_frame();
-    let img = block_on(img).unwrap();
-    gpu_backend.gpu_impl.stop_capture();
-
-    img
-  }
-
-  #[test]
-  fn smoke() {
+  painter_backend_eq_image_test!(smoke);
+  fn smoke() -> Painter {
     fn draw_arrow_path(painter: &mut Painter) {
       painter
         .begin_path((0., 70.).into())
@@ -421,9 +404,9 @@ mod tests {
         .end_path(true);
     }
 
-    let mut painter = painter(Size::new(1024., 512.));
+    let mut painter = painter(Size::new(512., 512.));
 
-    let img = PixelImage::from_png(include_bytes!("../test_imgs/leaves.png"));
+    let img = PixelImage::from_png(include_bytes!("../imgs/leaves.png"));
     let share_img = ShareResource::new(img);
 
     let img_brush = Brush::Image(share_img);
@@ -431,27 +414,24 @@ mod tests {
     draw_arrow_path(&mut painter);
     painter.set_brush(Color::RED).fill();
 
-    painter.translate(300., 0.);
+    painter.translate(260., 0.);
     draw_arrow_path(&mut painter);
     painter.set_brush(Color::RED).set_line_width(5.).stroke();
 
-    painter.translate(-300., 250.);
+    painter.translate(-260., 250.);
     draw_arrow_path(&mut painter);
     painter.set_brush(img_brush.clone()).fill();
 
-    painter.translate(300., 0.);
+    painter.translate(260., 0.);
     draw_arrow_path(&mut painter);
     painter.set_brush(img_brush).set_line_width(5.).stroke();
 
-    let img = commands_to_image(&mut painter);
-
-    let expect = PixelImage::from_png(include_bytes!("../test_imgs/smoke_arrow.png"));
-    assert!(img == expect);
+    painter
   }
 
-  #[test]
-  fn transform_img_brush() {
-    let mut painter = painter(Size::new(1024., 512.));
+  painter_backend_eq_image_test!(transform_img_brush);
+  fn transform_img_brush() -> Painter {
+    let mut painter = painter(Size::new(800., 250.));
 
     let transform = Transform::new(1., 1., 2., 1., 0., 0.);
     let rect: Rect = Rect::new(Point::new(10., 10.), Size::new(100., 100.));
@@ -461,9 +441,8 @@ mod tests {
       .rect(&rect)
       .fill();
 
-    let leaves_brush = ShareResource::new(PixelImage::from_png(include_bytes!(
-      "../test_imgs/leaves.png"
-    )));
+    let leaves_brush =
+      ShareResource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
 
     painter
       .set_brush(leaves_brush)
@@ -471,14 +450,11 @@ mod tests {
       .rect(&rect)
       .fill();
 
-    let img = commands_to_image(&mut painter);
-
-    let expect = PixelImage::from_png(include_bytes!("../test_imgs/transform_brush.png"));
-    assert!(img == expect);
+    painter
   }
 
-  #[test]
-  fn clip_layers() {
+  painter_backend_eq_image_test!(clip_layers);
+  fn clip_layers() -> Painter {
     let mut painter = painter(Size::new(1024., 512.));
     let rect_100x100 = Rect::from_size(Size::new(100., 100.));
     painter
@@ -491,14 +467,11 @@ mod tests {
       .rect(&rect_100x100)
       .fill();
 
-    let img = commands_to_image(&mut painter);
-
-    let expect = PixelImage::from_png(include_bytes!("../test_imgs/clip_layers.png"));
-    assert!(img == expect);
+    painter
   }
 
-  #[test]
-  fn stroke_include_border() {
+  painter_backend_eq_image_test!(stroke_include_border);
+  fn stroke_include_border() -> Painter {
     let mut painter = painter(Size::new(100., 100.));
     painter
       .set_brush(Color::RED)
@@ -509,18 +482,14 @@ mod tests {
       .end_path(true)
       .set_line_width(10.)
       .stroke();
-
-    let img = commands_to_image(&mut painter);
-
-    let expect = PixelImage::from_png(include_bytes!("../test_imgs/border_include.png"));
-    assert!(img == expect);
+    painter
   }
 
-  #[test]
-  fn two_img_brush() {
+  painter_backend_eq_image_test!(two_img_brush);
+  fn two_img_brush() -> Painter {
     let mut painter = painter(Size::new(200., 100.));
 
-    let brush1 = PixelImage::from_png(include_bytes!("../test_imgs/leaves.png"));
+    let brush1 = PixelImage::from_png(include_bytes!("../imgs/leaves.png"));
     let brush2 = PixelImage::from_png(include_bytes!(
       "../../ribir/examples/attachments/3DDD-1.png"
     ));
@@ -535,9 +504,6 @@ mod tests {
       .rect(&rect)
       .fill();
 
-    let img = commands_to_image(&mut painter);
-
-    let expect = PixelImage::from_png(include_bytes!("../test_imgs/two_img_brush.png"));
-    assert!(img == expect);
+    painter
   }
 }
