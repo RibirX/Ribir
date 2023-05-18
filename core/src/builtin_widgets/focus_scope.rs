@@ -58,7 +58,7 @@ impl Query for FocusScopeRender {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
 
   #[test]
   fn tab_scope() {
@@ -79,8 +79,8 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(widget);
-    let Window { dispatcher, widget_tree, .. } = &mut wnd;
+    let mut wnd = TestWindow::new(widget);
+    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;
@@ -140,8 +140,8 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(widget);
-    let Window { dispatcher, widget_tree, .. } = &mut wnd;
+    let mut wnd = TestWindow::new(widget);
+    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;

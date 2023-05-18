@@ -337,7 +337,7 @@ impl ComposeChild for TapListener {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::{mock_window, MockBox, MockMulti};
+  use crate::test_helper::{MockBox, MockMulti, TestWindow};
   use std::{cell::RefCell, rc::Rc};
   use winit::{
     dpi::LogicalPosition,
@@ -395,7 +395,7 @@ mod tests {
           .subscribe(move |v| *is_focused1.borrow_mut() = v);
       }
     };
-    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     tap_on(&mut wnd, 25., 25.);

@@ -51,7 +51,7 @@ impl<R: Render + MultiChild + 'static> IntoWidget<NotSelf<()>> for MultiChildWid
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::MockMulti;
+  use crate::test_helper::MockMulti;
 
   #[test]
   fn multi_option_child() {

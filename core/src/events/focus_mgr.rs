@@ -529,7 +529,7 @@ fn common_ancestors(path: &[WidgetId], path2: &[WidgetId]) -> HashSet<WidgetId> 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
@@ -543,7 +543,7 @@ mod tests {
       }
     };
 
-    let wnd = default_mock_window(widget);
+    let wnd = TestWindow::new(widget);
     let tree = &wnd.widget_tree;
 
     let id = tree.root().first_child(&tree.arena);
@@ -562,7 +562,7 @@ mod tests {
       }
     };
 
-    let wnd = default_mock_window(widget);
+    let wnd = TestWindow::new(widget);
     let tree = &wnd.widget_tree;
 
     let id = tree
@@ -587,8 +587,8 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(widget);
-    let Window { dispatcher, widget_tree, .. } = &mut wnd;
+    let mut wnd = TestWindow::new(widget);
+    let Window { dispatcher, widget_tree, .. } = &mut wnd.0;
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;
@@ -663,8 +663,8 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut wnd = default_mock_window(widget);
-    let Window { dispatcher, widget_tree: tree, .. } = &mut wnd;
+    let mut wnd = TestWindow::new(widget);
+    let Window { dispatcher, widget_tree: tree, .. } = &mut wnd.0;
 
     let parent = tree.root();
     let child = parent.first_child(&tree.arena).unwrap();
@@ -704,7 +704,7 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     let focus_id = wnd.dispatcher.focusing();
 
     wnd.draw_frame();

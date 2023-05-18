@@ -146,200 +146,137 @@ impl PositionUnit {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
   use PositionUnit::*;
   const CHILD_SIZE: Size = Size::new(50., 50.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
-  #[test]
-  fn pixel_left_top() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          left_anchor: 1.,
-          top_anchor: 1.,
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(1.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(1.), ..<_>::default() },
-        },
-      ],
-    );
+  fn pixel_left_top() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        left_anchor: 1.,
+        top_anchor: 1.,
+      }
+    }
+  }
+  widget_layout_test!(
+    pixel_left_top,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 1., }
+    { path = [0, 0, 0], x == 1., }
+  );
+
+  fn pixel_left_bottom() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        left_anchor: 1.,
+        bottom_anchor: 1.,
+      }
+    }
+  }
+  widget_layout_test!(
+    pixel_left_bottom,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 49.,}
+    { path = [0, 0, 0], x == 1., }
+  );
+
+  fn pixel_top_right() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        right_anchor: 1.,
+        top_anchor: 1.,
+      }
+    }
+  }
+  widget_layout_test!(
+    pixel_top_right,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 1.,}
+    { path = [0, 0, 0], x == 49.,}
+  );
+
+  fn pixel_bottom_right() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        right_anchor: 1.,
+        bottom_anchor: 1.,
+      }
+    }
+  }
+  widget_layout_test!(
+    pixel_bottom_right,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 49.,}
+    { path = [0, 0, 0], x== 49.,}
+  );
+
+  fn percent_left_top() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        left_anchor: Percent(10.),
+        top_anchor: Percent(10.),
+      }
+    }
+  }
+  widget_layout_test!(
+    percent_left_top,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 5., }
+    { path = [0, 0, 0], x == 5.,}
+  );
+
+  fn percent_left_bottom() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        left_anchor: Percent( 10.),
+        bottom_anchor: Percent( 10.),
+      }
+    }
+  }
+  widget_layout_test! {
+    percent_left_bottom,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 45., }
+    { path = [0, 0, 0], x == 5., }
   }
 
-  #[test]
-  fn pixel_left_bottom() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          left_anchor: 1.,
-          bottom_anchor: 1.,
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(49.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(1.), ..<_>::default() },
-        },
-      ],
-    );
+  fn percent_top_right() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        right_anchor: Percent(10.),
+        top_anchor: Percent(10.),
+      }
+    }
   }
+  widget_layout_test!(
+    percent_top_right,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 5., }
+    { path = [0, 0, 0],  x == 45.,}
+  );
 
-  #[test]
-  fn pixel_top_right() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          right_anchor: 1.,
-          top_anchor: 1.,
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(1.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(49.), ..<_>::default() },
-        },
-      ],
-    );
+  fn percent_bottom_right() -> Widget {
+    widget! {
+      MockBox {
+        size: CHILD_SIZE,
+        right_anchor: Percent(10.),
+        bottom_anchor: Percent(10.),
+      }
+    }
   }
-
-  #[test]
-  fn pixel_bottom_right() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          right_anchor: 1.,
-          bottom_anchor: 1.,
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(49.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(49.), ..<_>::default() },
-        },
-      ],
-    );
-  }
-
-  #[test]
-  fn percent_left_top() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          left_anchor: Percent(10.),
-          top_anchor: Percent(10.),
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(5.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(5.), ..<_>::default() },
-        },
-      ],
-    );
-  }
-
-  #[test]
-  fn percent_left_bottom() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          left_anchor: Percent( 10.),
-          bottom_anchor: Percent( 10.),
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(45.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(5.), ..<_>::default() },
-        },
-      ],
-    );
-  }
-
-  #[test]
-  fn percent_top_right() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          right_anchor: Percent(10.),
-          top_anchor: Percent(10.),
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(5.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(45.), ..<_>::default() },
-        },
-      ],
-    );
-  }
-
-  #[test]
-  fn percent_bottom_right() {
-    expect_layout_result(
-      widget! {
-        MockBox {
-          size: CHILD_SIZE,
-          right_anchor: Percent(10.),
-          bottom_anchor: Percent(10.),
-        }
-      },
-      Some(WND_SIZE),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect { y: Some(45.), ..<_>::default() },
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect { x: Some(45.), ..<_>::default() },
-        },
-      ],
-    );
-  }
+  widget_layout_test!(
+    percent_bottom_right,
+    wnd_size = WND_SIZE,
+    { path = [0, 0], y == 45.,}
+    { path = [0, 0, 0], x == 45.,}
+  );
 }

@@ -42,26 +42,18 @@ impl TransformWidget {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn smoke() {
-    let widget = widget! {
+  fn smoke() -> Widget {
+    widget! {
       TransformWidget {
         transform: Transform::new(2., 0., 0., 2., 0., 0.),
         MockBox {
           size: Size::new(100., 100.)
         }
       }
-    };
-
-    expect_layout_result(
-      widget,
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(Size::new(100., 100.)),
-      }],
-    );
+    }
   }
+  widget_layout_test!(smoke, width == 100., height == 100.,);
 }

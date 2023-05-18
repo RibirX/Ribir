@@ -30,19 +30,13 @@ impl Query for Container {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
+  use ribir_geom::Size;
 
-  #[test]
-  fn smoke() {
-    let size = Size::new(100., 100.);
-
-    expect_layout_result(
-      widget! { Container { size }},
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(size),
-      }],
-    );
+  const SIZE: Size = Size::new(100., 100.);
+  fn smoke() -> Widget {
+    widget! { Container { size: SIZE }}
   }
+  widget_layout_test!(smoke, size == SIZE,);
 }

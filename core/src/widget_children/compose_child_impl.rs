@@ -242,7 +242,7 @@ mod tests {
   use std::{cell::Cell, rc::Rc};
 
   use super::*;
-  use crate::{prelude::*, test::MockBox};
+  use crate::{prelude::*, test_helper::MockBox};
   #[derive(Template)]
   struct PTml {
     #[template(flat_fill)]

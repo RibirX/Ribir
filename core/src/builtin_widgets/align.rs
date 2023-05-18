@@ -159,105 +159,90 @@ impl From<VAlign> for Align {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::*;
-
   use super::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
   const CHILD_SIZE: Size = Size::new(10., 10.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
-  #[test]
-  fn h_align() {
-    fn test_case(h_align: HAlign, child_rect: Rect, align_size: Size) {
-      let w = widget! {
-        HAlignWidget {
-          h_align,
-          MockBox { size: CHILD_SIZE }
-        }
-      };
-
-      expect_layout_result(
-        w,
-        Some(WND_SIZE),
-        &[
-          LayoutTestItem {
-            path: &[0],
-            expect: ExpectRect::from_size(align_size),
-          },
-          LayoutTestItem {
-            path: &[0, 0],
-            expect: ExpectRect::from_rect(child_rect),
-          },
-        ],
-      );
+  fn h_align(h_align: HAlign) -> Widget {
+    widget! {
+      HAlignWidget {
+        h_align,
+        MockBox { size: CHILD_SIZE }
+      }
     }
+  }
+  fn left_align() -> Widget { h_align(HAlign::Left) }
+  widget_layout_test!(
+    left_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 100., height == 10.,}
+    { path = [0, 0], size == CHILD_SIZE, }
+  );
 
-    test_case(
-      HAlign::Left,
-      Rect::new(Point::zero(), CHILD_SIZE),
-      Size::new(100., 10.),
-    );
-    test_case(
-      HAlign::Center,
-      Rect::new(Point::new(45., 0.), CHILD_SIZE),
-      Size::new(100., 10.),
-    );
-    test_case(
-      HAlign::Right,
-      Rect::new(Point::new(90., 0.), CHILD_SIZE),
-      Size::new(100., 10.),
-    );
-    test_case(
-      HAlign::Stretch,
-      Rect::new(Point::zero(), Size::new(100., 10.)),
-      Size::new(100., 10.),
-    );
+  fn h_center_align() -> Widget { h_align(HAlign::Center) }
+  widget_layout_test!(
+    h_center_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 100., height == 10.,}
+    { path = [0, 0], x == 45., size == CHILD_SIZE,}
+  );
+
+  fn right_align() -> Widget { h_align(HAlign::Right) }
+  widget_layout_test!(
+    right_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 100., height == 10.,}
+    { path = [0, 0], x == 90., size == CHILD_SIZE,}
+  );
+
+  fn h_stretch_algin() -> Widget { h_align(HAlign::Stretch) }
+  widget_layout_test!(
+    h_stretch_algin,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 100., height == 10.,}
+    { path = [0, 0], x == 0., width == 100., height == 10.,}
+  );
+
+  fn v_align(v_align: VAlign) -> Widget {
+    widget! {
+      VAlignWidget {
+        v_align,
+        MockBox { size: CHILD_SIZE }
+      }
+    }
   }
 
-  #[test]
-  fn v_align() {
-    fn test_case(v_align: VAlign, child_rect: Rect, align_size: Size) {
-      let w = widget! {
-        VAlignWidget {
-          v_align,
-          MockBox { size: CHILD_SIZE }
-        }
-      };
+  fn top_align() -> Widget { v_align(VAlign::Top) }
+  widget_layout_test!(
+    top_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 10., height == 100.,}
+    { path = [0, 0], size == CHILD_SIZE,}
+  );
 
-      expect_layout_result(
-        w,
-        Some(WND_SIZE),
-        &[
-          LayoutTestItem {
-            path: &[0],
-            expect: ExpectRect::from_size(align_size),
-          },
-          LayoutTestItem {
-            path: &[0, 0],
-            expect: ExpectRect::from_rect(child_rect),
-          },
-        ],
-      );
-    }
+  fn v_center_align() -> Widget { v_align(VAlign::Center) }
+  widget_layout_test!(
+    v_center_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 10., height == 100.,}
+    { path = [0, 0], y == 45., size == CHILD_SIZE,}
+  );
 
-    test_case(
-      VAlign::Top,
-      Rect::new(Point::zero(), CHILD_SIZE),
-      Size::new(10., 100.),
-    );
-    test_case(
-      VAlign::Center,
-      Rect::new(Point::new(0., 45.), CHILD_SIZE),
-      Size::new(10., 100.),
-    );
-    test_case(
-      VAlign::Bottom,
-      Rect::new(Point::new(0., 90.), CHILD_SIZE),
-      Size::new(10., 100.),
-    );
-    test_case(
-      VAlign::Stretch,
-      Rect::new(Point::zero(), Size::new(10., 100.)),
-      Size::new(10., 100.),
-    );
-  }
+  fn bottom_align() -> Widget { v_align(VAlign::Bottom) }
+  widget_layout_test!(
+    bottom_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 10., height == 100.,}
+    { path = [0, 0], y == 90., size == CHILD_SIZE,}
+  );
+
+  fn v_stretch_align() -> Widget { v_align(VAlign::Stretch) }
+  widget_layout_test!(
+    v_stretch_align,
+    wnd_size = WND_SIZE,
+    { path = [0], width == 10., height == 100.,}
+    { path = [0, 0], width == 10., height == 100.,}
+  );
 }

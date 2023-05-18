@@ -395,7 +395,7 @@ impl WidgetTree {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
@@ -438,7 +438,7 @@ mod tests {
       event_record.clone(),
       widget! { MockMulti { DynWidget  { dyns: record } } },
     );
-    let mut wnd = default_mock_window(root);
+    let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -477,7 +477,7 @@ mod tests {
       event_record.clone(),
       widget! { MockBox { size: Size::new(100., 30.) } },
     );
-    let mut wnd = default_mock_window(root);
+    let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -540,7 +540,7 @@ mod tests {
       event_record.clone(),
       widget! { MockBox { size: Size::new(100., 30.) } },
     );
-    let mut wnd = default_mock_window(root);
+    let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -627,7 +627,7 @@ mod tests {
     let root = EventRecord::default();
     let event_record = root.0.clone();
 
-    let mut wnd = mock_window(root, Size::new(100., 100.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(root, Size::new(100., 100.));
     wnd.draw_frame();
 
     #[allow(deprecated)]
@@ -672,7 +672,7 @@ mod tests {
     let enter_event = w.enter.clone();
     let leave_event = w.leave.clone();
 
-    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -744,7 +744,7 @@ mod tests {
     };
 
     // Stretch row
-    let mut wnd = mock_window(w, Size::new(400., 400.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -823,7 +823,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -872,7 +872,7 @@ mod tests {
   #[test]
   fn fix_hit_out_window() {
     let w = MockBox { size: INFINITY_SIZE };
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
     wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
     let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);
@@ -915,7 +915,7 @@ mod tests {
         }
       };
 
-      let mut wnd = mock_window(w, Size::new(500., 500.), <_>::default());
+      let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
       wnd.draw_frame();
       wnd.dispatcher.info.cursor_pos = Point::new(125., 125.);
       let hit_2 = wnd.dispatcher.hit_widget(&wnd.widget_tree);

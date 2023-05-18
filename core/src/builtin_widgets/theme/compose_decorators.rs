@@ -71,7 +71,8 @@ impl ComposeDecorators {
 
 #[cfg(test)]
 mod tests {
-  use crate::{prelude::*, test::*};
+  use crate::{prelude::*, test_helper::*};
+  use ribir_dev_helper::*;
 
   #[test]
   fn compose_decorator_smoke() {
@@ -102,10 +103,11 @@ mod tests {
     };
 
     let ctx = AppContext::new(theme);
-    let mut wnd = mock_window(w, Size::new(500., 500.), ctx);
+    let mut wnd = TestWindow::new_with_ctx(w, Size::new(500., 500.), ctx);
     wnd.draw_frame();
-
-    let size = layout_size_by_path(&wnd, &[0]);
-    assert_eq!(size, Size::new(100., 100.));
+    assert_layout_result_by_path!(
+      wnd,
+      { path = [0], width == 100., height == 100., }
+    );
   }
 }

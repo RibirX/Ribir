@@ -1,4 +1,4 @@
-use ribir::{core::test::expect_layout_result, prelude::*};
+use ribir::{core::test_helper::TestWindow, prelude::*};
 
 #[derive(Declare)]
 struct P;
@@ -94,11 +94,12 @@ fn enum_template() {
 #[test]
 #[should_panic = "Try to fill enum template with two variant."]
 fn panic_multi_enum_variant() {
-  let a = widget! {
+  let w = widget! {
     P3 {
       self::ChildA
       self::ChildB
     }
   };
-  expect_layout_result(a, None, &[]);
+
+  let _ = TestWindow::new(w);
 }

@@ -368,256 +368,141 @@ impl MainLineInfo {
 mod tests {
   use super::*;
   use crate::prelude::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn horizontal_line() {
-    let row = widget! {
+  fn horizontal_line() -> Widget {
+    widget! {
       Flex {
         DynWidget {
           dyns: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
       }
-    };
-    expect_layout_result_with_theme(
-      row,
-      Some(Size::new(500., 500.)),
-      FullTheme::default(),
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(0.),
-          width: Some(100.),
-          height: Some(20.),
-        },
-      }],
-    );
+    }
   }
+  widget_layout_test!(horizontal_line, width == 100., height == 20.,);
 
-  #[test]
-  fn vertical_line() {
-    let col = widget! {
+  fn vertical_line() -> Widget {
+    widget! {
       Flex {
         direction: Direction::Vertical,
         DynWidget  {
          dyns: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
       }
-    };
-    expect_layout_result_with_theme(
-      col,
-      Some(Size::new(500., 500.)),
-      FullTheme::default(),
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::new(0., 0., 10., 200.),
-      }],
-    );
+    }
   }
+  widget_layout_test!(vertical_line, width == 10., height == 200.,);
 
-  #[test]
-  fn row_wrap() {
+  fn row_wrap() -> Widget {
     let size = Size::new(200., 20.);
-    let row = widget! {
+    widget! {
       Flex {
         wrap: true,
         DynWidget {
           dyns: (0..3).map(|_| SizedBox { size })
         }
       }
-    };
-
-    let layouts = [
-      LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(0.),
-          width: Some(400.),
-          height: Some(40.),
-        },
-      },
-      LayoutTestItem {
-        path: &[0, 0],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(0.),
-          width: Some(200.),
-          height: Some(20.),
-        },
-      },
-      LayoutTestItem {
-        path: &[0, 1],
-        expect: ExpectRect {
-          x: Some(200.),
-          y: Some(0.),
-          width: Some(200.),
-          height: Some(20.),
-        },
-      },
-      LayoutTestItem {
-        path: &[0, 2],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(20.),
-          width: Some(200.),
-          height: Some(20.),
-        },
-      },
-    ];
-    expect_layout_result_with_theme(
-      row,
-      Some(Size::new(500., 500.)),
-      FullTheme::default(),
-      &layouts,
-    );
+    }
   }
+  widget_layout_test!(
+    row_wrap,
+    wnd_size = Size::new(500., 500.),
+    {path = [0], width == 400., height == 40.,}
+    {path = [0, 0], width == 200., height == 20.,}
+    {path = [0, 1], x == 200., width == 200., height == 20.,}
+    {path = [0, 2], rect == ribir_geom::rect(0., 20., 200., 20.),}
+  );
 
-  #[test]
-  fn reverse_row_wrap() {
+  fn reverse_row_wrap() -> Widget {
     let size = Size::new(200., 20.);
-
-    expect_layout_result_with_theme(
-      widget! {
-        Flex {
-          wrap: true,
-          reverse: true,
-          DynWidget {
-            dyns: (0..3).map(|_| SizedBox { size })
-          }
+    widget! {
+      Flex {
+        wrap: true,
+        reverse: true,
+        DynWidget {
+          dyns: (0..3).map(|_| SizedBox { size })
         }
-      },
-      Some(Size::new(500., 500.)),
-      FullTheme::default(),
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(Size::new(400., 40.)),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(200., 20., 200., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(0., 20., 200., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(0., 0., 200., 20.),
-        },
-      ],
-    );
+      }
+    }
   }
+  widget_layout_test!(
+    reverse_row_wrap,
+    wnd_size = Size::new(500., 500.),
+    { path = [0], size == Size::new(400., 40.),}
+    { path = [0,0], rect == ribir_geom::rect(200., 20., 200., 20.),}
+    { path = [0, 1], rect == ribir_geom::rect(0., 20., 200., 20.),}
+    { path = [0, 2], rect == ribir_geom::rect(0., 0., 200., 20.),}
+  );
 
-  #[test]
-  fn main_axis_gap() {
-    expect_layout_result_with_theme(
-      widget! {
-        Row {
-          item_gap: 15.,
-          SizedBox { size: Size::new(120., 20.) }
-          SizedBox { size: Size::new(80., 20.) }
-          SizedBox { size: Size::new(30., 20.) }
-        }
-      },
-      Some(Size::new(500., 40.)),
-      FullTheme::default(),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(0., 0., 120., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(135., 0., 80., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(230., 0., 30., 20.),
-        },
-      ],
-    );
-
-    // reverse
-    expect_layout_result_with_theme(
-      widget! {
-        Row {
-          item_gap: 15.,
-          reverse: true,
-          SizedBox { size: Size::new(120., 20.) }
-          SizedBox { size: Size::new(80., 20.) }
-          SizedBox { size: Size::new(30., 20.) }
-        }
-      },
-      Some(Size::new(500., 40.)),
-      FullTheme::default(),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(140., 0., 120., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(45., 0., 80., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(0., 0., 30., 20.),
-        },
-      ],
-    );
-
-    // with expand
-    expect_layout_result_with_theme(
-      widget! {
-        Row {
-          item_gap: 15.,
-          SizedBox { size: Size::new(120., 20.) }
-          Expanded {
-            flex: 1.,
-            SizedBox { size: Size::new(10., 20.) }
-          }
-          SizedBox { size: Size::new(80., 20.) }
-          Expanded {
-            flex: 2.,
-            SizedBox { size: Size::new(10., 20.) }
-          }
-          SizedBox { size: Size::new(30., 20.) }
-        }
-      },
-      Some(Size::new(500., 40.)),
-      FullTheme::default(),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(0., 0., 120., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(135., 0., 70., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(220., 0., 80., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 3],
-          expect: ExpectRect::new(315., 0., 140., 20.),
-        },
-        LayoutTestItem {
-          path: &[0, 4],
-          expect: ExpectRect::new(470., 0., 30., 20.),
-        },
-      ],
-    );
+  fn main_axis_gap() -> Widget {
+    widget! {
+      Row {
+        item_gap: 15.,
+        SizedBox { size: Size::new(120., 20.) }
+        SizedBox { size: Size::new(80., 20.) }
+        SizedBox { size: Size::new(30., 20.) }
+      }
+    }
   }
+  widget_layout_test!(
+    main_axis_gap,
+    wnd_size = Size::new(500., 40.),
+    { path = [0, 0], rect == ribir_geom::rect(0., 0., 120., 20.),}
+    { path = [0, 1], rect == ribir_geom::rect(135., 0., 80., 20.),}
+    { path = [0, 2], rect == ribir_geom::rect(230., 0., 30., 20.),}
+  );
 
-  #[test]
-  fn cross_axis_gap() {
+  fn main_axis_reverse_gap() -> Widget {
+    widget! {
+      Row {
+        item_gap: 15.,
+        reverse: true,
+        SizedBox { size: Size::new(120., 20.) }
+        SizedBox { size: Size::new(80., 20.) }
+        SizedBox { size: Size::new(30., 20.) }
+      }
+    }
+  }
+  widget_layout_test!(
+    main_axis_reverse_gap,
+    wnd_size = Size::new(500., 40.),
+    { path = [0, 0], rect == ribir_geom::rect(140., 0., 120., 20.),}
+    { path = [0, 1], rect == ribir_geom::rect(45., 0., 80., 20.),}
+    { path = [0, 2], rect == ribir_geom::rect(0., 0., 30., 20.),}
+  );
+
+  fn main_axis_expand() -> Widget {
+    widget! {
+      Row {
+        item_gap: 15.,
+        SizedBox { size: Size::new(120., 20.) }
+        Expanded {
+          flex: 1.,
+          SizedBox { size: Size::new(10., 20.) }
+        }
+        SizedBox { size: Size::new(80., 20.) }
+        Expanded {
+          flex: 2.,
+          SizedBox { size: Size::new(10., 20.) }
+        }
+        SizedBox { size: Size::new(30., 20.) }
+      }
+    }
+  }
+  widget_layout_test!(
+    main_axis_expand,
+    wnd_size = Size::new(500., 40.),
+    { path = [0, 0], rect == ribir_geom::rect(0., 0., 120., 20.),}
+    { path = [0, 1], rect == ribir_geom::rect(135., 0., 70., 20.),}
+    { path = [0, 2], rect == ribir_geom::rect(220., 0., 80., 20.),}
+    { path = [0, 3], rect == ribir_geom::rect(315., 0., 140., 20.),}
+    { path = [0, 4], rect == ribir_geom::rect(470., 0., 30., 20.),}
+  );
+
+  fn cross_axis_gap() -> Widget {
     let size = Size::new(200., 20.);
-    let row = widget! {
+    widget! {
       Flex {
         wrap: true,
         cross_axis_gap: 10.,
@@ -625,172 +510,144 @@ mod tests {
           dyns: (0..3).map(|_| SizedBox { size })
         }
       }
-    };
-
-    let layouts = [
-      LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::new(0., 0., 400., 50.),
-      },
-      LayoutTestItem {
-        path: &[0, 0],
-        expect: ExpectRect::new(0., 0., 200., 20.),
-      },
-      LayoutTestItem {
-        path: &[0, 1],
-        expect: ExpectRect::new(200., 0., 200., 20.),
-      },
-      LayoutTestItem {
-        path: &[0, 2],
-        expect: ExpectRect::new(0., 30., 200., 20.),
-      },
-    ];
-    expect_layout_result_with_theme(
-      row,
-      Some(Size::new(500., 500.)),
-      FullTheme::default(),
-      &layouts,
-    );
-  }
-
-  #[test]
-  fn cross_align() {
-    fn cross_align_check(align: Align, y_pos: [f32; 3]) {
-      expect_layout_result_with_theme(
-        widget! {
-          Row {
-            align_items: align,
-            SizedBox { size: Size::new(100., 20.) }
-            SizedBox { size: Size::new(100., 30.) }
-            SizedBox { size: Size::new(100., 40.) }
-          }
-        },
-        Some(Size::new(500., 40.)),
-        FullTheme::default(),
-        &[
-          LayoutTestItem {
-            path: &[0],
-            expect: ExpectRect::from_size(Size::new(300., 40.)),
-          },
-          LayoutTestItem {
-            path: &[0, 0],
-            expect: ExpectRect::new(0., y_pos[0], 100., 20.),
-          },
-          LayoutTestItem {
-            path: &[0, 1],
-            expect: ExpectRect::new(100., y_pos[1], 100., 30.),
-          },
-          LayoutTestItem {
-            path: &[0, 2],
-            expect: ExpectRect::new(200., y_pos[2], 100., 40.),
-          },
-        ],
-      );
     }
-    cross_align_check(Align::Start, [0., 0., 0.]);
-    cross_align_check(Align::Center, [10., 5., 0.]);
-    cross_align_check(Align::End, [20., 10., 0.]);
+  }
+  widget_layout_test!(
+    cross_axis_gap,
+    wnd_size = Size::new(500., 500.),
+    { path = [0], rect == ribir_geom::rect(0., 0., 400., 50.),}
+    { path = [0, 0], rect == ribir_geom::rect(0., 0., 200., 20.),}
+    { path = [0, 1], rect == ribir_geom::rect(200., 0., 200., 20.),}
+    { path = [0, 2], rect == ribir_geom::rect(0., 30., 200., 20.),}
+  );
 
-    let row = widget! {
+  fn cross_align(align: Align) -> Widget {
+    widget! {
       Row {
-        align_items: Align::Stretch,
+        align_items: align,
         SizedBox { size: Size::new(100., 20.) }
         SizedBox { size: Size::new(100., 30.) }
         SizedBox { size: Size::new(100., 40.) }
       }
-    };
-
-    expect_layout_result_with_theme(
-      row,
-      Some(Size::new(500., 40.)),
-      FullTheme::default(),
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(Size::new(300., 40.)),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(0., 0., 100., 40.),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(100., 0., 100., 40.),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(200., 0., 100., 40.),
-        },
-      ],
-    );
-  }
-
-  #[test]
-  fn main_align() {
-    fn main_align_check(justify_content: JustifyContent, pos: [(f32, f32); 3]) {
-      let item_size = Size::new(100., 20.);
-      let root = widget! {
-        SizedBox {
-          size: Size::new(500., 500.),
-          Row {
-            justify_content,
-            align_items: Align::Start,
-            SizedBox { size: item_size }
-            SizedBox { size: item_size }
-            SizedBox { size: item_size }
-          }
-        }
-      };
-
-      expect_layout_result(
-        root,
-        Some(Size::new(500., 500.)),
-        &[
-          LayoutTestItem {
-            path: &[0, 0],
-            expect: ExpectRect::from_size(Size::new(500., 500.)),
-          },
-          LayoutTestItem {
-            path: &[0, 0, 0],
-            expect: ExpectRect::from_point(pos[0].into()),
-          },
-          LayoutTestItem {
-            path: &[0, 0, 1],
-            expect: ExpectRect::from_point(pos[1].into()),
-          },
-          LayoutTestItem {
-            path: &[0, 0, 2],
-            expect: ExpectRect::from_point(pos[2].into()),
-          },
-        ],
-      );
     }
-
-    main_align_check(JustifyContent::Start, [(0., 0.), (100., 0.), (200., 0.)]);
-    main_align_check(JustifyContent::Center, [(100., 0.), (200., 0.), (300., 0.)]);
-    main_align_check(JustifyContent::End, [(200., 0.), (300., 0.), (400., 0.)]);
-    main_align_check(
-      JustifyContent::SpaceBetween,
-      [(0., 0.), (200., 0.), (400., 0.)],
-    );
-    let space = 200.0 / 3.0;
-    main_align_check(
-      JustifyContent::SpaceAround,
-      [
-        (0.5 * space, 0.),
-        (100. + space * 1.5, 0.),
-        (2.5 * space + 200., 0.),
-      ],
-    );
-    main_align_check(
-      JustifyContent::SpaceEvenly,
-      [(50., 0.), (200., 0.), (350., 0.)],
-    );
   }
 
-  #[test]
-  fn flex_expand() {
-    let row = widget! {
+  fn start_cross_align() -> Widget { cross_align(Align::Start) }
+  widget_layout_test!(
+    start_cross_align,
+    { path =[0],  width == 300., height == 40., }
+    { path =[0, 0],  rect == ribir_geom::rect(0., 0., 100., 20.),}
+    { path =[0, 1],  rect == ribir_geom::rect(100., 0., 100., 30.),}
+    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+  );
+
+  fn center_cross_align() -> Widget { cross_align(Align::Center) }
+  widget_layout_test!(
+    center_cross_align,
+    { path =[0],  width == 300., height == 40., }
+    { path =[0, 0],  rect == ribir_geom::rect(0., 10., 100., 20.),}
+    { path =[0, 1],  rect == ribir_geom::rect(100., 5., 100., 30.),}
+    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+  );
+
+  fn end_cross_align() -> Widget { cross_align(Align::End) }
+  widget_layout_test!(
+    end_cross_align,
+    { path =[0],  width == 300., height == 40., }
+    { path =[0, 0],  rect == ribir_geom::rect(0., 20., 100., 20.),}
+    { path =[0, 1],  rect == ribir_geom::rect(100., 10., 100., 30.),}
+    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+  );
+
+  fn stretch_cross_align() -> Widget { cross_align(Align::Stretch) }
+  widget_layout_test!(
+    stretch_cross_align,
+    wnd_size = Size::new(500., 40.),
+    { path =[0],  width == 300., height == 40., }
+    { path =[0, 0],  rect == ribir_geom::rect(0., 0., 100., 40.),}
+    { path =[0, 1],  rect == ribir_geom::rect(100., 0., 100., 40.),}
+    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+  );
+
+  fn main_align(justify_content: JustifyContent) -> Widget {
+    let item_size = Size::new(100., 20.);
+    widget! {
+      SizedBox {
+        size: Size::new(500., 500.),
+        Row {
+          justify_content,
+          align_items: Align::Start,
+          SizedBox { size: item_size }
+          SizedBox { size: item_size }
+          SizedBox { size: item_size }
+        }
+      }
+    }
+  }
+
+  fn start_main_align() -> Widget { main_align(JustifyContent::Start) }
+  widget_layout_test!(
+    start_main_align,
+    wnd_size = Size::new(500., 500.),
+    { path =[0, 0], width == 500., height == 500.,}
+    { path =[0, 0, 0], x == 0.,}
+    { path =[0, 0, 1], x == 100.,}
+    { path =[0, 0, 2], x == 200.,}
+  );
+
+  fn center_main_align() -> Widget { main_align(JustifyContent::Center) }
+  widget_layout_test!(
+    center_main_align,
+    wnd_size = Size::new(500., 500.),
+    { path =[0, 0], width == 500., height == 500.,}
+    { path =[0, 0, 0], x == 100.,}
+    { path =[0, 0, 1], x == 200.,}
+    { path =[0, 0, 2], x == 300.,}
+  );
+
+  fn end_main_align() -> Widget { main_align(JustifyContent::End) }
+  widget_layout_test!(
+    end_main_align,
+    wnd_size = Size::new(500., 500.),
+    { path =[0, 0], width == 500., height == 500.,}
+    { path =[0, 0, 0], x == 200.,}
+    { path =[0, 0, 1], x == 300.,}
+    { path =[0, 0, 2], x == 400.,}
+  );
+
+  fn space_between_align() -> Widget { main_align(JustifyContent::SpaceBetween) }
+  widget_layout_test!(
+    space_between_align,
+    wnd_size = Size::new(500., 500.),
+    { path =[0, 0], width == 500., height == 500.,}
+    { path =[0, 0, 0], x == 0.,}
+    { path =[0, 0, 1], x == 200.,}
+    { path =[0, 0, 2], x == 400.,}
+  );
+
+  fn space_around_align() -> Widget { main_align(JustifyContent::SpaceAround) }
+  const AROUND_SPACE: f32 = 200.0 / 3.0;
+  widget_layout_test!(
+    space_around_align,
+    wnd_size = Size::new(500., 500.),
+    { path =[0, 0], width == 500., height == 500.,}
+    { path =[0, 0, 0], x == 0.5 * AROUND_SPACE,}
+    { path =[0, 0, 1], x == 100. + AROUND_SPACE * 1.5,}
+    { path =[0, 0, 2], x == 2.5 * AROUND_SPACE+ 200.,}
+  );
+
+  fn space_evenly_align() -> Widget { main_align(JustifyContent::SpaceEvenly) }
+  widget_layout_test!(
+    space_evenly_align,
+    wnd_size = Size::new(500., 500.),
+    { path =[0, 0], width == 500., height == 500.,}
+    { path =[0, 0, 0], x == 50.,}
+    { path =[0, 0, 1], x == 200.,}
+    { path =[0, 0, 2], x == 350.,}
+  );
+
+  fn flex_expand() -> Widget {
+    widget! {
       SizedBox {
         size: Size::new(500., 25.),
         Flex {
@@ -806,26 +663,13 @@ mod tests {
           }
         }
       }
-
-    };
-    expect_layout_result_with_theme(
-      row,
-      Some(Size::new(500., 500.)),
-      FullTheme::default(),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(0., 0., 500., 25.),
-        },
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect::new(0., 0., 100., 25.),
-        },
-        LayoutTestItem {
-          path: &[0, 0, 2],
-          expect: ExpectRect::new(200., 0., 300., 25.),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    flex_expand,
+    wnd_size = Size::new(500., 500.),
+    { path = [0, 0], rect == ribir_geom::rect(0., 0., 500., 25.),}
+    { path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 100., 25.),}
+    { path = [0, 0, 2], rect == ribir_geom::rect(200., 0., 300., 25.),}
+  );
 }

@@ -57,10 +57,10 @@ pub type WidgetOf<W> = WidgetPair<W, Widget>;
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
-
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
+  use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn compose_template_child() {
@@ -232,8 +232,7 @@ mod tests {
     X.with_child(child);
   }
 
-  #[test]
-  fn dyns_compose_child() {
+  fn dyns_compose_child() -> Widget {
     #[derive(Declare)]
     struct X;
 
@@ -245,19 +244,12 @@ mod tests {
     let dyns = Stateful::new(DynWidget { dyns: Some(X) });
     let size = Size::new(100., 200.);
 
-    let w = ComposeChild::compose_child(State::<X>::from(dyns), MockBox { size });
-    expect_layout_result(
-      w,
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(size),
-      }],
-    );
+    ComposeChild::compose_child(State::<X>::from(dyns), MockBox { size })
   }
+  widget_layout_test!(dyns_compose_child, width == 100., height == 200.,);
 
-  #[test]
-  fn compose_dyns_child() {
+  const COMPOSE_DYNS_CHILD_SIZE: Size = Size::new(100., 200.);
+  fn compose_dyns_child() -> Widget {
     #[derive(Declare)]
     struct X;
 
@@ -267,31 +259,24 @@ mod tests {
     }
 
     let trigger = Stateful::new(true);
-    let size = Size::new(100., 200.);
-    let w = widget! {
+
+    widget! {
       states { trigger: trigger }
       X {
         DynWidget {
           dyns: if *trigger {
-            MockBox { size }
+            MockBox { size: COMPOSE_DYNS_CHILD_SIZE }
           } else {
             MockBox { size: ZERO_SIZE }
           }
         }
       }
-    };
-    expect_layout_result(
-      w,
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(size),
-      }],
-    );
+    }
   }
+  widget_layout_test!(compose_dyns_child, size == COMPOSE_DYNS_CHILD_SIZE,);
 
-  #[test]
-  fn fix_option_template() {
+  const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
+  fn fix_option_template() -> Widget {
     struct Field(String);
 
     #[derive(Template, Default)]
@@ -301,25 +286,21 @@ mod tests {
     #[derive(Declare)]
     struct Host {}
 
-    const EXPECT_SIZE: Size = Size::new(100., 200.);
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
-        widget! { MockBox { size: EXPECT_SIZE } }
+        widget! { MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }
       }
     }
 
-    expect_layout_result(
-      widget! {
-        Host { Field("test".into()) }
-      },
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(EXPECT_SIZE),
-      }],
-    );
+    widget! {
+      Host { Field("test".into()) }
+    }
   }
+  widget_layout_test!(
+    fix_option_template,
+    { path = [0], size == FIX_OPTION_TEMPLATE_EXPECT_SIZE, }
+  );
 
   #[test]
   fn compose_dyn_multi_child() {
@@ -341,7 +322,7 @@ mod tests {
       .modifies()
       .subscribe(move |_| *c_cnt.borrow_mut() += 1);
 
-    let _ = default_mock_window(A.with_child(child));
+    let _ = TestWindow::new(A.with_child(child));
     assert_eq!(*cnt.borrow(), 0);
   }
 

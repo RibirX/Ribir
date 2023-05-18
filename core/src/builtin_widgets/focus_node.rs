@@ -127,7 +127,7 @@ impl Query for RequestFocus {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
 
   #[test]
   fn dynamic_focus_node() {
@@ -153,7 +153,7 @@ mod tests {
       }
     };
 
-    let wnd = default_mock_window(widget);
+    let wnd = TestWindow::new(widget);
     let tree = &wnd.widget_tree;
     let id = tree.root();
     let node = id.get(&tree.arena).unwrap();

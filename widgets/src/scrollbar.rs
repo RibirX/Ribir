@@ -295,11 +295,11 @@ mod test {
   use crate::layout::Column;
 
   use super::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn content_expand_so_all_view_can_scroll() {
-    let w = widget! {
+  fn content_expand_so_all_view_can_scroll() -> Widget {
+    widget! {
       Stack {
         HScrollBar {
           Container { size: Size::new(100., 100.) }
@@ -311,42 +311,15 @@ mod test {
           Container { size: Size::new(100., 100.) }
         }
       }
-    };
-
-    let theme = FullTheme::default();
-
-    expect_layout_result_with_theme(
-      w,
-      Some(Size::new(200., 200.)),
-      theme,
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    content_expand_so_all_view_can_scroll,
+    wnd_size = Size::new(200., 200.),
+    { path = [0, 0], width == 200., height == 200., }
+    { path = [0, 1], width == 200., height == 200., }
+    { path = [0, 2], width == 200., height == 200., }
+  );
 
   #[test]
   fn scrollable() {
@@ -390,9 +363,7 @@ mod test {
       }
     };
 
-    let theme = FullTheme::default();
-    let ctx = AppContext::new(theme);
-    let mut wnd = mock_window(w, Size::new(1024., 1024.), ctx);
+    let mut wnd = TestWindow::new_with_size(w, Size::new(1024., 1024.));
     {
       *offset.state_ref() = Point::new(10., 10.);
     }

@@ -77,13 +77,14 @@ impl Query for UnconstrainedBox {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::test::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn smoke() {
+  use super::*;
+  use crate::test_helper::*;
+
+  fn smoke() -> Widget {
     let size = Size::new(200., 200.);
-    let w = widget! {
+    widget! {
       MockMulti {
         UnconstrainedBox {
           MockBox { size}
@@ -97,37 +98,13 @@ mod tests {
           MockBox { size }
         }
       }
-    };
-
-    expect_layout_result(
-      w,
-      Some(Size::new(100., 100.)),
-      &[
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-        LayoutTestItem {
-          path: &[0, 1, 0],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(100.),
-            ..<_>::default()
-          },
-        },
-        LayoutTestItem {
-          path: &[0, 2, 0],
-          expect: ExpectRect {
-            width: Some(100.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    smoke,
+    wnd_size = Size::new(100., 100.),
+    { path = [0, 0, 0],width == 200., height == 200.,}
+    { path = [0, 1, 0],width == 200., height == 100.,}
+    { path = [0, 2, 0],width == 100., height == 200.,}
+  );
 }

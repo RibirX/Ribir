@@ -177,7 +177,7 @@ mod tests {
 
   use crate::{
     prelude::*,
-    test::{MockBox, MockMulti},
+    test_helper::{MockBox, MockMulti},
     widget_tree::WidgetTree,
   };
 

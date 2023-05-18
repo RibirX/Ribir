@@ -46,7 +46,6 @@ impl Window {
   #[deprecated(note = "The core window should not depends on shell window event.")]
   #[inline]
   /// processes native events from this native window
-
   pub fn processes_native_event(&mut self, event: WindowEvent) {
     let ratio = self.device_pixel_ratio() as f64;
     self
@@ -165,22 +164,24 @@ impl From<WindowId> for u64 {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::assert_layout_result_by_path;
 
   #[test]
   fn layout_after_wnd_resize() {
     let w = widget! {
        MockBox { size: INFINITY_SIZE }
     };
-    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
+    let size = Size::new(100., 100.);
+    let mut wnd = TestWindow::new_with_size(w, size);
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(100., 100.)));
+    assert_layout_result_by_path!(wnd, { path = [0], size == size, });
 
     let new_size = Size::new(200., 200.);
     wnd.set_size(new_size);
     // not have a shell window, trigger the resize manually.
     wnd.on_wnd_resize_event(new_size);
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0], &ExpectRect::from_size(new_size));
+    assert_layout_result_by_path!(wnd, { path = [0], size == new_size, });
   }
 }

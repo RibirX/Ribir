@@ -4,15 +4,13 @@ use rxrust::scheduler::NEW_TIMER_FN;
 mod test_single_thread {
   use futures::executor::LocalPool;
   use ribir::timer::wake_timeout_futures;
-  use ribir_core::test::{default_mock_window, mock_window};
+  use ribir_core::test_helper::TestWindow;
+  use ribir_dev_helper::*;
   use std::{cell::RefCell, rc::Rc};
   use std::{thread::sleep, time::Duration};
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
 
-  use ribir_core::{
-    prelude::*,
-    test::{assert_layout_result, ExpectRect, MockBox},
-  };
+  use ribir_core::{prelude::*, test_helper::MockBox};
 
   pub fn test_widget_with_timer() {
     let w = widget! {
@@ -27,26 +25,26 @@ mod test_single_thread {
       }
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     // init size
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(20., 20.)));
+    assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
 
     sleep(Duration::from_millis(10));
 
     // keep same
     wnd.run_futures();
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(20., 20.)));
+    assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
 
     // trigger timeout
     wake_timeout_futures();
     wnd.run_futures();
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(10., 10.)));
+    assert_layout_result_by_path!(wnd, {path = [0], width == 10., height == 10.,});
   }
 
-  fn env(times: usize) -> (Window, Rc<RefCell<usize>>) {
+  fn env(times: usize) -> (TestWindow, Rc<RefCell<usize>>) {
     let size = Size::new(400., 400.);
     let count = Rc::new(RefCell::new(0));
     let c_count = count.clone();
@@ -56,7 +54,7 @@ mod test_single_thread {
         on_x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
       }
     };
-    let mut wnd = mock_window(w, size, <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, size);
     wnd.draw_frame();
 
     (wnd, count)
